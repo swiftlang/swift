@@ -149,7 +149,7 @@ internal struct InsertContentsOfTest {
   }
 }
 
-internal struct RemoveAtIndexTest {
+internal struct RemoveAtTest {
   let collection: [OpaqueValue<Int>]
   let indexSelection: IndexSelection
   let expectedRemovedElement: Int
@@ -165,7 +165,7 @@ internal struct RemoveAtIndexTest {
     self.indexSelection = indexSelection
     self.expectedRemovedElement = expectedRemovedElement
     self.expectedCollection = expectedCollection
-    self.loc = SourceLoc(file, line, comment: "removeAtIndex() test data")
+    self.loc = SourceLoc(file, line, comment: "removeAt() test data")
   }
 }
 
@@ -656,30 +656,30 @@ self.test("\(testNamePrefix).insertContentsOf()/semantics") {
 }
 
 //===----------------------------------------------------------------------===//
-// removeAtIndex()
+// removeAt()
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).removeAtIndex()/semantics") {
-  let tests: [RemoveAtIndexTest] = [
-    RemoveAtIndexTest(
+self.test("\(testNamePrefix).removeAt()/semantics") {
+  let tests: [RemoveAtTest] = [
+    RemoveAtTest(
       collection: [1010],
       indexSelection: .Start,
       expectedRemovedElement: 1010,
       expectedCollection: []),
 
-    RemoveAtIndexTest(
+    RemoveAtTest(
       collection: [1010, 2020, 3030],
       indexSelection: .Start,
       expectedRemovedElement: 1010,
       expectedCollection: [2020, 3030]),
 
-    RemoveAtIndexTest(
+    RemoveAtTest(
       collection: [1010, 2020, 3030],
       indexSelection: .Middle,
       expectedRemovedElement: 2020,
       expectedCollection: [1010, 3030]),
 
-    RemoveAtIndexTest(
+    RemoveAtTest(
       collection: [1010, 2020, 3030],
       indexSelection: .Last,
       expectedRemovedElement: 3030,
@@ -688,7 +688,7 @@ self.test("\(testNamePrefix).removeAtIndex()/semantics") {
 
   for test in tests {
     var c = makeWrappedCollection(test.collection)
-    let removedElement = c.removeAtIndex(test.indexSelection.indexIn(c))
+    let removedElement = c.removeAt(test.indexSelection.indexIn(c))
     expectEqualSequence(
       test.expectedCollection,
       c.map { extractValue($0).value },

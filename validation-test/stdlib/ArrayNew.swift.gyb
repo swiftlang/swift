@@ -183,7 +183,7 @@ ArrayTestSuite.test("${array_type}/appendNonUnique") {
     x.append(1)
     expectTrue(x.capacity == capacity)
     let z = x
-    x.removeAtIndex(0)
+    x.removeAt(0)
   }
 }
 

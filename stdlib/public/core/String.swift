@@ -711,9 +711,9 @@ extension String {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  public mutating func removeAtIndex(i: Index) -> Character {
+  public mutating func removeAt(i: Index) -> Character {
     return withMutableCharacters {
-      (inout v: CharacterView) in v.removeAtIndex(i)
+      (inout v: CharacterView) in v.removeAt(i)
     }
   }
 

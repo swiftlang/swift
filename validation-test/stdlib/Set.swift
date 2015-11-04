@@ -616,7 +616,7 @@ SetTestSuite.test("COW.Slow.IndexForMemberDoesNotReallocate") {
   }
 }
 
-SetTestSuite.test("COW.Fast.RemoveAtIndexDoesNotReallocate") {
+SetTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate") {
   if true {
     var s = getCOWFastSet()
     var identity1 = unsafeBitCast(s, Int.self)
@@ -626,7 +626,7 @@ SetTestSuite.test("COW.Fast.RemoveAtIndexDoesNotReallocate") {
 
     expectEqual(1010, s[foundIndex1])
 
-    let removed = s.removeAtIndex(foundIndex1)
+    let removed = s.removeAt(foundIndex1)
     expectEqual(1010, removed)
 
     expectEqual(identity1, unsafeBitCast(s, Int.self))
@@ -646,7 +646,7 @@ SetTestSuite.test("COW.Fast.RemoveAtIndexDoesNotReallocate") {
     expectEqual(identity1, unsafeBitCast(s1, Int.self))
     expectEqual(identity1, unsafeBitCast(s2, Int.self))
 
-    let removed = s2.removeAtIndex(foundIndex1)
+    let removed = s2.removeAt(foundIndex1)
     expectEqual(1010, removed)
 
     expectEqual(identity1, unsafeBitCast(s1, Int.self))
@@ -655,7 +655,7 @@ SetTestSuite.test("COW.Fast.RemoveAtIndexDoesNotReallocate") {
   }
 }
 
-SetTestSuite.test("COW.Slow.RemoveAtIndexDoesNotReallocate") {
+SetTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate") {
   if true {
     var s = getCOWSlowSet()
     var identity1 = unsafeBitCast(s, Int.self)
@@ -665,7 +665,7 @@ SetTestSuite.test("COW.Slow.RemoveAtIndexDoesNotReallocate") {
 
     expectEqual(TestKeyTy(1010), s[foundIndex1])
 
-    let removed = s.removeAtIndex(foundIndex1)
+    let removed = s.removeAt(foundIndex1)
     expectEqual(TestKeyTy(1010), removed)
 
     expectEqual(identity1, unsafeBitCast(s, Int.self))
@@ -685,7 +685,7 @@ SetTestSuite.test("COW.Slow.RemoveAtIndexDoesNotReallocate") {
     expectEqual(identity1, unsafeBitCast(s1, Int.self))
     expectEqual(identity1, unsafeBitCast(s2, Int.self))
 
-    let removed = s2.removeAtIndex(foundIndex1)
+    let removed = s2.removeAt(foundIndex1)
     expectEqual(TestKeyTy(1010), removed)
 
     expectEqual(identity1, unsafeBitCast(s1, Int.self))
@@ -1586,7 +1586,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithMember") {
   expectTrue(s.contains(TestBridgedKeyTy(4040)))
 }
 
-SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAtIndex") {
+SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAt") {
   var s = getBridgedVerbatimSet()
   let identity1 = unsafeBitCast(s, Int.self)
   expectTrue(isCocoaSet(s))
@@ -1595,7 +1595,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAtIndex") {
   expectEqual(TestObjCKeyTy(1010), s[foundIndex1])
   expectEqual(identity1, unsafeBitCast(s, Int.self))
 
-  let removedElement = s.removeAtIndex(foundIndex1)
+  let removedElement = s.removeAt(foundIndex1)
   expectNotEqual(identity1, unsafeBitCast(s, Int.self))
   expectTrue(isNativeSet(s))
   expectEqual(2, s.count)
@@ -1603,7 +1603,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAtIndex") {
   expectEmpty(s.indexOf(TestObjCKeyTy(1010)))
 }
 
-SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAtIndex") {
+SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt") {
   var s = getBridgedNonverbatimSet()
   let identity1 = unsafeBitCast(s, Int.self)
   expectTrue(isNativeSet(s))
@@ -1612,7 +1612,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAtIndex") {
   expectEqual(1010, s[foundIndex1].value)
   expectEqual(identity1, unsafeBitCast(s, Int.self))
 
-  let removedElement = s.removeAtIndex(foundIndex1)
+  let removedElement = s.removeAt(foundIndex1)
   expectEqual(identity1, unsafeBitCast(s, Int.self))
   expectTrue(isNativeSet(s))
   expectEqual(1010, removedElement.value)
@@ -3528,11 +3528,11 @@ SetTestSuite.test("popFirst") {
   }
 }
 
-SetTestSuite.test("removeAtIndex") {
+SetTestSuite.test("removeAt") {
   // Test removing from the startIndex, the middle, and the end of a set.
   for i in 1...3 {
     var s = Set<Int>([1010, 2020, 3030])
-    let removed = s.removeAtIndex(s.indexOf(i*1010)!)
+    let removed = s.removeAt(s.indexOf(i*1010)!)
     expectEqual(i*1010, removed)
     expectEqual(2, s.count)
     expectEmpty(s.indexOf(i*1010))

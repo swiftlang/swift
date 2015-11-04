@@ -734,7 +734,7 @@ func checkPartition_${'Predicate' if predicate else 'WhereElementIsComparable'}(
     expectEqual(0xfffe, extract(c.first!).identity)
     expectEqual(0xffff, extract(c.last!).identity)
     identities.removeLast()
-    identities.removeAtIndex(0)
+    identities.removeAt(0)
 %     end
     expectEqualsUnordered(0..<sequence.count, identities)
 

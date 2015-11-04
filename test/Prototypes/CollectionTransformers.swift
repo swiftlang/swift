@@ -373,7 +373,7 @@ final class _ForkJoinWorkDeque<T> {
     return _dequeMutex.withLock {
       let result = _deque.first
       if _deque.count > 0 {
-        _deque.removeAtIndex(0)
+        _deque.removeAt(0)
       }
       return result
     }
@@ -679,9 +679,9 @@ final public class ForkJoinPool {
           _workDequesMutex.withLock {
             let i = _runningThreads.indexOf { $0 === thread }!
             ForkJoinPool._threadRegistry[thread._tid!] = nil
-            _runningThreads.removeAtIndex(i)
-            _submissionQueues.removeAtIndex(i)
-            _workDeques.removeAtIndex(i)
+            _runningThreads.removeAt(i)
+            _submissionQueues.removeAt(i)
+            _workDeques.removeAt(i)
           }
         }
       }

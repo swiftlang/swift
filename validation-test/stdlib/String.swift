@@ -184,12 +184,12 @@ StringTests.test("ForeignIndexes/replaceRange/OutOfBoundsTrap/2") {
     donor.startIndex.advancedBy(4)..<donor.startIndex.advancedBy(5), with: "")
 }
 
-StringTests.test("ForeignIndexes/removeAtIndex/OutOfBoundsTrap") {
+StringTests.test("ForeignIndexes/removeAt/OutOfBoundsTrap") {
   if true {
     let donor = "abcdef"
     var acceptor = "uvw"
 
-    let removed = acceptor.removeAtIndex(donor.startIndex)
+    let removed = acceptor.removeAt(donor.startIndex)
     expectEqual("u", removed)
     expectEqual("vw", acceptor)
   }
@@ -198,7 +198,7 @@ StringTests.test("ForeignIndexes/removeAtIndex/OutOfBoundsTrap") {
   var acceptor = "uvw"
 
   expectCrashLater()
-  acceptor.removeAtIndex(donor.startIndex.advancedBy(4))
+  acceptor.removeAt(donor.startIndex.advancedBy(4))
 }
 
 StringTests.test("ForeignIndexes/removeRange/OutOfBoundsTrap/1") {

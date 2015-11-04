@@ -526,7 +526,7 @@ DictionaryTestSuite.test("COW.Slow.IndexForKeyDoesNotReallocate") {
 }
 
 
-DictionaryTestSuite.test("COW.Fast.RemoveAtIndexDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate") {
   if true {
     var d = getCOWFastDictionary()
     var identity1 = unsafeBitCast(d, Int.self)
@@ -537,7 +537,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAtIndexDoesNotReallocate") {
     assert(d[foundIndex1].0 == 10)
     assert(d[foundIndex1].1 == 1010)
 
-    let removed = d.removeAtIndex(foundIndex1)
+    let removed = d.removeAt(foundIndex1)
     assert(removed.0 == 10)
     assert(removed.1 == 1010)
 
@@ -559,7 +559,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAtIndexDoesNotReallocate") {
     assert(identity1 == unsafeBitCast(d1, Int.self))
     assert(identity1 == unsafeBitCast(d2, Int.self))
 
-    let removed = d2.removeAtIndex(foundIndex1)
+    let removed = d2.removeAt(foundIndex1)
     assert(removed.0 == 10)
     assert(removed.1 == 1010)
 
@@ -569,7 +569,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAtIndexDoesNotReallocate") {
   }
 }
 
-DictionaryTestSuite.test("COW.Slow.RemoveAtIndexDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate") {
   if true {
     var d = getCOWSlowDictionary()
     var identity1 = unsafeBitCast(d, Int.self)
@@ -580,7 +580,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveAtIndexDoesNotReallocate") {
     assert(d[foundIndex1].0 == TestKeyTy(10))
     assert(d[foundIndex1].1.value == 1010)
 
-    let removed = d.removeAtIndex(foundIndex1)
+    let removed = d.removeAt(foundIndex1)
     assert(removed.0 == TestKeyTy(10))
     assert(removed.1.value == 1010)
 
@@ -600,7 +600,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveAtIndexDoesNotReallocate") {
     assert(d2[foundIndex1].0 == TestKeyTy(10))
     assert(d2[foundIndex1].1.value == 1010)
 
-    let removed = d2.removeAtIndex(foundIndex1)
+    let removed = d2.removeAt(foundIndex1)
     assert(removed.0 == TestKeyTy(10))
     assert(removed.1.value == 1010)
 
@@ -1809,7 +1809,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.UpdateValueForKey") {
 }
 
 
-DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAtIndex") {
+DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAt") {
   var d = getBridgedVerbatimDictionary()
   var identity1 = unsafeBitCast(d, Int.self)
   assert(isCocoaDictionary(d))
@@ -1819,7 +1819,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAtIndex") {
   assert(d[foundIndex1].1.value == 1010)
   assert(identity1 == unsafeBitCast(d, Int.self))
 
-  let removedElement = d.removeAtIndex(foundIndex1)
+  let removedElement = d.removeAt(foundIndex1)
   assert(identity1 != unsafeBitCast(d, Int.self))
   assert(isNativeDictionary(d))
   assert(removedElement.0 == TestObjCKeyTy(10))
@@ -1828,7 +1828,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAtIndex") {
   assert(d.indexForKey(TestObjCKeyTy(10)) == nil)
 }
 
-DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAtIndex") {
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt") {
   var d = getBridgedNonverbatimDictionary()
   var identity1 = unsafeBitCast(d, Int.self)
   assert(isNativeDictionary(d))
@@ -1838,7 +1838,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAtIndex") {
   assert(d[foundIndex1].1.value == 1010)
   assert(identity1 == unsafeBitCast(d, Int.self))
 
-  let removedElement = d.removeAtIndex(foundIndex1)
+  let removedElement = d.removeAt(foundIndex1)
   assert(identity1 == unsafeBitCast(d, Int.self))
   assert(isNativeDictionary(d))
   assert(removedElement.0 == TestObjCKeyTy(10))
@@ -3868,7 +3868,7 @@ DictionaryTestSuite.test("popFirst") {
   }
 }
 
-DictionaryTestSuite.test("removeAtIndex") {
+DictionaryTestSuite.test("removeAt") {
   // Test removing from the startIndex, the middle, and the end of a dictionary.
   for i in 1...3 {
     var d: [Int: Int] = [
@@ -3876,7 +3876,7 @@ DictionaryTestSuite.test("removeAtIndex") {
       20: 2020,
       30: 3030,
     ]
-    let removed = d.removeAtIndex(d.indexForKey(i*10)!)
+    let removed = d.removeAt(d.indexForKey(i*10)!)
     expectEqual(i*10, removed.0)
     expectEqual(i*1010, removed.1)
     expectEqual(2, d.count)

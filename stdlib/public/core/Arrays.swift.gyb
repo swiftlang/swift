@@ -732,7 +732,7 @@ extension ${Self} : _ArrayType {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  public mutating func removeAtIndex(index: Int) -> Element {
+  public mutating func removeAt(index: Int) -> Element {
     let result = self[index]
     self.replaceRange(index..<(index + 1), with: EmptyCollection())
     return result

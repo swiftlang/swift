@@ -67,7 +67,7 @@ public class RangeReplaceableCollectionLog {
   public static var appendContentsOf = TypeIndexed(0)
   public static var insert = TypeIndexed(0)
   public static var removeAll = TypeIndexed(0)
-  public static var removeAtIndex = TypeIndexed(0)
+  public static var removeAt = TypeIndexed(0)
   public static var _customRemoveLast = TypeIndexed(0)
   public static var _customRemoveLastN = TypeIndexed(0)
   public static var removeRange = TypeIndexed(0)
@@ -165,9 +165,9 @@ public struct LoggingRangeReplaceableCollection<
     base.insert(newElement, atIndex: i)
   }
 
-  public mutating func removeAtIndex(index: Base.Index) -> Base.Iterator.Element {
-    ++Log.removeAtIndex[selfType]
-    return base.removeAtIndex(index)
+  public mutating func removeAt(index: Base.Index) -> Base.Iterator.Element {
+    ++Log.removeAt[selfType]
+    return base.removeAt(index)
   }
 
   public mutating func _customRemoveLast() -> Base.Iterator.Element? {

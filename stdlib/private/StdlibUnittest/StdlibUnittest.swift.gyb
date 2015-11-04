@@ -2641,7 +2641,7 @@ internal enum _CollectionOperation : Equatable {
   case ReplaceRange(subRange: Range<Int>, replacementCount: Int)
   case Insert(atIndex: Int)
   case InsertContentsOf(atIndex: Int, count: Int)
-  case RemoveAtIndex(index: Int)
+  case RemoveAt(index: Int)
   case RemoveLast
   case RemoveRange(subRange: Range<Int>)
   case RemoveAll(keepCapacity: Bool)
@@ -2691,8 +2691,8 @@ internal enum _CollectionOperation : Equatable {
         invalidIndices,
         with: Repeat(repeating: nextStateId, count: invalidIndices.count))
 
-    case RemoveAtIndex(let index):
-      result.removeAtIndex(index)
+    case RemoveAt(let index):
+      result.removeAt(index)
 
       let invalidIndices = index..<result.endIndex
       result.replaceRange(
@@ -2747,7 +2747,7 @@ internal func == (
 
     return lhsAtIndex == rhsAtIndex && lhsCount == rhsCount
 
-  case (.RemoveAtIndex(let lhsIndex), .RemoveAtIndex(let rhsIndex)):
+  case (.RemoveAt(let lhsIndex), .RemoveAt(let rhsIndex)):
     return lhsIndex == rhsIndex
 
   case (.RemoveLast, .RemoveLast):
@@ -3620,9 +3620,9 @@ public struct ${Self}<T> : RangeReplaceableCollection {
     }
   }
 
-  public mutating func removeAtIndex(i: ${Index}) -> T {
-    _willMutate(.RemoveAtIndex(index: i._offset))
-    return elements.removeAtIndex(i.position)
+  public mutating func removeAt(i: ${Index}) -> T {
+    _willMutate(.RemoveAt(index: i._offset))
+    return elements.removeAt(i.position)
   }
 
   public mutating func removeLast() -> T {

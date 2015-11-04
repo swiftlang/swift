@@ -128,7 +128,7 @@ public protocol RangeReplaceableCollection : Collection {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  mutating func removeAtIndex(i: Index) -> Iterator.Element
+  mutating func removeAt(i: Index) -> Iterator.Element
 
   /// Customization point for `removeLast()`.  Implement this function if you
   /// want to replace the default implementation.
@@ -212,7 +212,7 @@ extension RangeReplaceableCollection {
     replaceRange(i..<i, with: newElements)
   }
 
-  public mutating func removeAtIndex(index: Index) -> Iterator.Element {
+  public mutating func removeAt(index: Index) -> Iterator.Element {
     _precondition(!isEmpty, "can't remove from an empty collection")
     let result: Iterator.Element = self[index]
     replaceRange(index...index, with: EmptyCollection())
@@ -318,7 +318,7 @@ extension RangeReplaceableCollection where Index : BidirectionalIndexType {
     if let result = _customRemoveLast() {
       return result
     }
-    return removeAtIndex(endIndex.predecessor())
+    return removeAt(endIndex.predecessor())
   }
 
   /// Remove the last `n` elements.

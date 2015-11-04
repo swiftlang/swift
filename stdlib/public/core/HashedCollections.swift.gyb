@@ -221,7 +221,7 @@ internal protocol _HashStorageType {
   func maybeGet(key: Key) -> Value?
 
   mutating func updateValue(value: Value, forKey: Key) -> Value?
-  mutating func removeAtIndex(index: Index) -> SequenceElement
+  mutating func removeAt(index: Index) -> SequenceElement
   mutating func removeValueForKey(key: Key) -> Value?
   mutating func removeAll(keepCapacity keepCapacity: Bool)
   var count: Int { get }
@@ -373,8 +373,8 @@ public struct Set<Element : Hashable> :
   }
 
   /// Remove the member referenced by the given index.
-  public mutating func removeAtIndex(index: Index) -> Element {
-    return _variantStorage.removeAtIndex(index)
+  public mutating func removeAt(index: Index) -> Element {
+    return _variantStorage.removeAt(index)
   }
 
   /// Erase all the elements.  If `keepCapacity` is `true`, `capacity`
@@ -1078,8 +1078,8 @@ public struct Dictionary<Key : Hashable, Value> :
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  public mutating func removeAtIndex(index: Index) -> Element {
-    return _variantStorage.removeAtIndex(index)
+  public mutating func removeAt(index: Index) -> Element {
+    return _variantStorage.removeAt(index)
   }
 
   /// Remove a given key and the associated value from the dictionary.
@@ -2191,7 +2191,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
       "don't call mutating methods on _Native${Self}Storage")
   }
 
-  internal mutating func removeAtIndex(index: Index) -> SequenceElement {
+  internal mutating func removeAt(index: Index) -> SequenceElement {
     _sanityCheckFailure(
       "don't call mutating methods on _Native${Self}Storage")
   }
@@ -2857,7 +2857,7 @@ internal struct _Cocoa${Self}Storage : _HashStorageType {
     _sanityCheckFailure("can not mutate NS${Self}")
   }
 
-  internal mutating func removeAtIndex(index: Index) -> SequenceElement {
+  internal mutating func removeAt(index: Index) -> SequenceElement {
     _sanityCheckFailure("can not mutate NS${Self}")
   }
 
@@ -3308,7 +3308,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
     return oldValue
   }
 
-  internal mutating func nativeRemoveAtIndex(
+  internal mutating func nativeRemoveAt(
     nativeIndex: NativeIndex
   ) -> SequenceElement {
     var nativeStorage = native
@@ -3332,14 +3332,14 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
     return result
   }
 
-  internal mutating func removeAtIndex(index: Index) -> SequenceElement {
+  internal mutating func removeAt(index: Index) -> SequenceElement {
     if _fastPath(guaranteedNative) {
-      return nativeRemoveAtIndex(index._nativeIndex)
+      return nativeRemoveAt(index._nativeIndex)
     }
 
     switch self {
     case .Native:
-      return nativeRemoveAtIndex(index._nativeIndex)
+      return nativeRemoveAt(index._nativeIndex)
     case .Cocoa(let cocoaStorage):
 #if _runtime(_ObjC)
       // We have to migrate the data first.  But after we do so, the Cocoa
@@ -4106,7 +4106,7 @@ extension ${Self} {
   /// - Complexity: Amortized O(1)
   public mutating func popFirst() -> Element? {
     guard !isEmpty else { return nil }
-    return removeAtIndex(startIndex)
+    return removeAt(startIndex)
   }
 }
 
