@@ -246,13 +246,21 @@ void CompilerInstance::performSema() {
   case SourceFile::ImplicitModuleImportKind::None:
   case SourceFile::ImplicitModuleImportKind::Builtin:
     break;
-  case SourceFile::ImplicitModuleImportKind::Stdlib:
-    if (!Context->getStdlibModule(true)) {
+  case SourceFile::ImplicitModuleImportKind::Stdlib: {
+    ModuleDecl *M = Context->getStdlibModule(true);
+
+    if (!M) {
       Diagnostics.diagnose(SourceLoc(), diag::error_stdlib_not_found,
                            Invocation.getTargetTriple());
       return;
     }
+
+    // If we failed to load, we should have already diagnosed
+    if (M->failedToLoad())
+      return;
+
     break;
+  }
   }
 
   auto clangImporter =
