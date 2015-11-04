@@ -10,5 +10,6 @@ set(UTILITYPASSES_SOURCES
   UtilityPasses/LoopRegionPrinter.cpp
   UtilityPasses/MemLocationPrinter.cpp
   UtilityPasses/StripDebugInfo.cpp
+  UtilityPasses/UpdateEscapeAnalysis.cpp
   UtilityPasses/UpdateSideEffects.cpp
   PARENT_SCOPE)

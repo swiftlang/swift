@@ -253,7 +253,8 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.addDeadFunctionElimination();
   PM.addDeadObjectElimination();
   PM.addGlobalPropertyOpt();
-  
+  PM.addUpdateEscapeAnalysis();
+
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 
@@ -285,6 +286,8 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   // Specialize closure.
   PM.addClosureSpecializer();
+
+  PM.addUpdateEscapeAnalysis();
 
   // Speculate virtual call targets.
   PM.addSpeculativeDevirtualization();
