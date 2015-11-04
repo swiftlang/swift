@@ -19,15 +19,15 @@ GElement = "Iterator.Element"
 }%
 
 //===----------------------------------------------------------------------===//
-// enumerate()
+// enumerated
 //===----------------------------------------------------------------------===//
 
 extension SequenceType {
   /// Return a lazy `SequenceType` containing pairs (*n*, *x*), where
   /// *n*s are consecutive `Int`s starting at zero, and *x*s are
-  /// the elements of `base`:
+  /// the elements of `self`:
   ///
-  ///     > for (n, c) in "Swift".characters.enumerate() {
+  ///     > for (n, c) in "Swift".characters.enumerated {
   ///         print("\(n): '\(c)'")
   ///       }
   ///     0: 'S'
@@ -35,8 +35,7 @@ extension SequenceType {
   ///     2: 'i'
   ///     3: 'f'
   ///     4: 't'
-  @warn_unused_result
-  public func enumerate() -> EnumeratedSequence<Self> {
+  public var enumerated: EnumeratedSequence<Self> {
     return EnumeratedSequence(_base: self)
   }
 }

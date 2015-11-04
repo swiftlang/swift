@@ -66,31 +66,30 @@ public func max<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
   return r
 }
 
-/// The `IteratorProtocol` for `EnumeratedSequence`.  `EnumeratedIterator`
-/// wraps a `Base` `IteratorProtocol` and yields successive `Int` values,
+/// The iterator for `EnumeratedSequence`.  `EnumeratedIterator`
+/// wraps a `Base` iterator and yields successive `Int` values,
 /// starting at zero, along with the elements of the underlying
 /// `Base`:
 ///
-///     var iterator = ["foo", "bar"].enumerate()
+///     var iterator = ["foo", "bar"].enumerated.iterator()
 ///     iterator.next() // (0, "foo")
 ///     iterator.next() // (1, "bar")
 ///     iterator.next() // nil
-///
-/// - Note: Idiomatic usage is to call `enumerate` instead of
-///   constructing an `EnumeratedIterator` directly.
 public struct EnumeratedIterator<
   Base : IteratorProtocol
 > : IteratorProtocol, SequenceType {
-  /// The type of element returned by `next()`.
-  public typealias Element = (offset: Int, element: Base.Element)
-  var _base: Base
-  var _count: Int
+
+  internal var _base: Base
+  internal var _count: Int
 
   /// Construct from a `Base` iterator.
   internal init(_base: Base) {
     self._base = _base
     self._count = 0
   }
+
+  /// The type of element returned by `next()`.
+  public typealias Element = (offset: Int, element: Base.Element)
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
@@ -102,16 +101,14 @@ public struct EnumeratedIterator<
   }
 }
 
-/// The `SequenceType` returned by `enumerate()`.  `EnumeratedSequence`
-/// is a sequence of pairs (*n*, *x*), where *n*s are consecutive
-/// `Int`s starting at zero, and *x*s are the elements of a `Base`
-/// `SequenceType`:
+/// The type of the `enumerated` property.
 ///
-///     var s = EnumeratedSequence(["foo", "bar"])
+/// `EnumeratedSequence` is a sequence of pairs (*n*, *x*), where *n*s
+/// are consecutive `Int`s starting at zero, and *x*s are the elements
+/// of a `Base` `SequenceType`:
+///
+///     var s = ["foo", "bar"].enumerated
 ///     Array(s) // [(0, "foo"), (1, "bar")]
-///
-/// - Note: Idiomatic usage is to call `enumerate` instead of
-///   constructing an `EnumeratedSequence` directly.
 public struct EnumeratedSequence<Base : SequenceType> : SequenceType {
   internal var _base: Base
 

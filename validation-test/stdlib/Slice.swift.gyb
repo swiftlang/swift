@@ -78,7 +78,7 @@ SliceTests.test("Slice.subscript(_: Index)") {
       expectEqual(base[i].value, element.value)
     }
 
-    for (i, index) in base.indices.enumerate() {
+    for (i, index) in base.indices.enumerated {
       if test.bounds.contains(i) {
         expectEqual(base[index].value, slice[index].value)
       } else {
@@ -227,7 +227,7 @@ SliceTests.test("MutableSlice.subscript(_: Index)/{get,set}") {
     }
 
     var sliceForSetter = slice
-    for (i, index) in base.indices.enumerate() {
+    for (i, index) in base.indices.enumerated {
       if test.bounds.contains(i) {
         // Test getter.
         expectEqual(base[index].value, slice[index].value)

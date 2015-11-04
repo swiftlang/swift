@@ -58,7 +58,7 @@ print(["a", "b", "c", "d", "e"].myIndexOf("d")!)
 
 extension SequenceType {
   final public func myEnumerate() -> EnumeratedSequence<Self> {
-    return self.enumerate()
+    return self.enumerated
   }
 }
 

@@ -62,7 +62,7 @@ var SequenceTypeTests = TestSuite("SequenceType")
 SequenceTypeTests.test("${algorithmKind}Element/WhereElementIsComparable") {
   for test in minMaxElementTests {
     let s = MinimalSequence<MinimalComparableValue>(
-      elements: test.sequence.enumerate().map {
+      elements: test.sequence.enumerated.map {
         MinimalComparableValue($1, identity: $0)
       })
     var maybeResult = s.${algorithmKind}Element()
@@ -89,7 +89,7 @@ SequenceTypeTests.test("${algorithmKind}Element/WhereElementIsComparable") {
 SequenceTypeTests.test("${algorithmKind}Element/Predicate") {
   for test in minMaxElementTests {
     let s = MinimalSequence<OpaqueValue<Int>>(
-      elements: test.sequence.enumerate().map {
+      elements: test.sequence.enumerated.map {
         OpaqueValue($1, identity: $0)
       })
     var timesClosureWasCalled = 0
@@ -234,7 +234,7 @@ SequenceTypeTests.test("IteratorSequence/SequenceType") {
 }
 
 //===----------------------------------------------------------------------===//
-// enumerate()
+// enumerated
 //===----------------------------------------------------------------------===//
 
 // Check that the generic parameter is called 'Base'.
@@ -250,7 +250,7 @@ extension EnumeratedSequence where Base : TestProtocol1 {
   }
 }
 
-SequenceTypeTests.test("enumerate") {
+SequenceTypeTests.test("enumerated") {
   typealias Element = (index: Int, element: OpaqueValue<Int>)
   func compareElements(lhs: Element, rhs: Element) -> Bool {
     return lhs.0 == rhs.0 && lhs.1.value == rhs.1.value
@@ -259,7 +259,7 @@ SequenceTypeTests.test("enumerate") {
   for test in enumerateTests {
     let s = MinimalSequence<OpaqueValue<Int>>(
       elements: test.sequence.map(OpaqueValue.init))
-    var result = s.enumerate()
+    var result = s.enumerated
     expectType(
       EnumeratedSequence<MinimalSequence<OpaqueValue<Int>>>.self,
       &result)
