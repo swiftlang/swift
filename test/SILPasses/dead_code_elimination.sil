@@ -124,7 +124,7 @@ bb5:
   %47 = struct $Int32 (%46 : $Builtin.Int32)
   br bb6(%47 : $Int32)
 
-// CHECK: bb6
+// CHECK: bb6{{.*}}):
 bb6(%49 : $Int32):
   %50 = integer_literal $Builtin.Int32, 10
   %52 = struct_extract %29 : $Int32, #Int32._value
@@ -142,11 +142,13 @@ bb7:
 // CHECK: br bb8
   br bb8(%58 : $Int32)
 
-// CHECK: bb8
+// CHECK: bb8(%{{[0-9]+}} : $Int32):
 bb8(%60 : $Int32):
   %61 = struct_extract %31 : $Int32, #Int32._value
   %62 = integer_literal $Builtin.Int32, 1
   %64 = integer_literal $Builtin.Int1, -1
+// CHECK-NOT: builtin "sadd_with_overflow_Int32"
+// CHECK-NOT: cond_fail
   %65 = builtin "sadd_with_overflow_Int32"(%61 : $Builtin.Int32, %62 : $Builtin.Int32, %64 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
   %66 = tuple_extract %65 : $(Builtin.Int32, Builtin.Int1), 0
   %67 = tuple_extract %65 : $(Builtin.Int32, Builtin.Int1), 1
@@ -155,11 +157,15 @@ bb8(%60 : $Int32):
   %70 = struct_extract %30 : $Int32, #Int32._value
   %71 = integer_literal $Builtin.Int32, 1
   %73 = integer_literal $Builtin.Int1, -1
-  %74 = builtin "sadd_with_overflow_Int32"(%70 : $Builtin.Int32, %71 : $Builtin.Int32, %73 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+// CHECK: builtin "ssub_with_overflow_Int32"
+  %74 = builtin "ssub_with_overflow_Int32"(%70 : $Builtin.Int32, %71 : $Builtin.Int32, %73 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
   %75 = tuple_extract %74 : $(Builtin.Int32, Builtin.Int1), 0
   %76 = tuple_extract %74 : $(Builtin.Int32, Builtin.Int1), 1
+// CHECK: cond_fail
   cond_fail %76 : $Builtin.Int1
   %78 = struct $Int32 (%75 : $Builtin.Int32)
+  %tif = function_ref @take_int32 : $@convention(thin) (Int32) -> ()
+  %atif = apply %tif(%78) : $@convention(thin) (Int32) -> ()
 // CHECK: br bb3(undef : $Int32, undef : $Int32,
   br bb3(%49 : $Int32, %60 : $Int32, %78 : $Int32, %69 : $Int32)
 
@@ -182,3 +188,5 @@ bb10:
 // CHECK: return 
   return %90 : $()
 }
+
+sil @take_int32 : $@convention(thin) (Int32) -> ()

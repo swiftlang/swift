@@ -74,6 +74,10 @@ class DCE : public SILFunctionTransform {
   PostDominanceInfo *PDT;
   llvm::DenseMap<SILBasicBlock *, ControllingInfo> ControllingInfoMap;
 
+  // Maps instructions which produce a failing condition (like overflow
+  // builtins) to the actual cond_fail instructions which handle the failure.
+  llvm::DenseMap<SILInstruction *, CondFailInst *> CondFailProducers;
+
   /// Tracks if the pass changed branches.
   bool BranchesChanged;
   /// Trackes if the pass changed ApplyInsts.
@@ -173,15 +177,51 @@ void DCE::markValueLive(ValueBase *V) {
   propagateLiveBlockArgument(Arg);
 }
 
+/// Gets the producing instruction of a cond_fail condition. Currently these
+/// are overflow builtints but may be extended to other instructions in the
+/// future.
+static SILInstruction *getProducer(CondFailInst *CFI) {
+  // Check for the pattern:
+  //   %1 = builtin "some_operation_with_overflow"
+  //   %2 = tuple_extract %1
+  //   %3 = cond_fail %2
+  SILValue FailCond = CFI->getOperand();
+  if (auto *TEI = dyn_cast<TupleExtractInst>(FailCond)) {
+    if (auto *BI = dyn_cast<BuiltinInst>(TEI->getOperand())) {
+      return BI;
+    }
+  }
+  return nullptr;
+}
+
 // Determine which instructions from this function we need to keep.
 void DCE::markLive(SILFunction &F) {
+
+  llvm::SmallVector<CondFailInst *, 16> CondFailInsts;
+
   // Find the initial set of instructions in this function that appear
   // to be live in the sense that they are not trivially something we
   // can delete by examining only that instruction.
-  for (auto &BB : F)
-    for (auto &I : BB)
+  for (auto &BB : F) {
+    for (auto &I : BB) {
+      if (auto *CFI = dyn_cast<CondFailInst>(&I)) {
+        // Special case cond_fail instructions. A cond_fail is only alive
+        // if its (identifyable) producer is alive. We handle this in
+        // propagateLiveness.
+        if (SILInstruction *Prod = getProducer(CFI)) {
+          CondFailInst *&MappedCFI = CondFailProducers[Prod];
+          if (!MappedCFI) {
+            // For simplicity we only handle a single cond_fail for each
+            // producer (which is the usual case).
+            MappedCFI = CFI;
+            continue;
+          }
+        }
+      }
       if (seemsUseful(&I))
         markValueLive(&I);
+    }
+  }
 
   // Now propagate liveness backwards from each instruction in our
   // worklist, adding new instructions to the worklist as we discover
@@ -281,6 +321,11 @@ void DCE::propagateLiveness(SILInstruction *I) {
     for (Operand *DU : getDebugUses(*I))
       markValueLive(DU->getUser());
 
+    // The same situation for cond_fail instructions. Only if the producer of
+    // the cond_fail is alive, the cond_fail itself is alive.
+    if (CondFailInst *CFI = CondFailProducers.lookup(I)) {
+      markValueLive(CFI);
+    }
     return;
   }
 
