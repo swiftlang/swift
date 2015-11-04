@@ -108,7 +108,7 @@
 ///       }
 ///     }
 ///
-/// - See also: `LazySequence`, `LazyCollectionType`, `LazyCollection`
+/// - See also: `LazySequence`, `LazyCollectionProtocol`, `LazyCollection`
 ///
 /// - Note: The explicit permission to implement further operations
 ///   lazily applies only in contexts where the sequence is statically

@@ -154,7 +154,7 @@ public func == <Base : Collection>(
 ///   documented complexity.
 public struct LazyFilterCollection<
   Base : Collection
-> : LazyCollectionType {
+> : LazyCollectionProtocol {
 
   /// A type that represents a valid position in the collection.
   ///
@@ -238,7 +238,7 @@ extension LazySequenceType {
   }
 }
 
-extension LazyCollectionType {
+extension LazyCollectionProtocol {
   /// Return the elements of `self` that satisfy `predicate`.
   ///
   /// - Note: The elements of the result are computed on-demand, as

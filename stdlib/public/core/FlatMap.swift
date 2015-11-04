@@ -26,7 +26,7 @@ extension LazySequenceType {
   }
 }
 
-extension LazyCollectionType {
+extension LazyCollectionProtocol {
   /// Returns the concatenated results of mapping `transform` over
   /// `self`.  Equivalent to 
   ///
@@ -44,7 +44,7 @@ extension LazyCollectionType {
   }
 }
 
-extension LazyCollectionType where Elements.Index : BidirectionalIndexType
+extension LazyCollectionProtocol where Elements.Index : BidirectionalIndexType
 {
   /// Returns the concatenated results of mapping `transform` over
   /// `self`.  Equivalent to 

@@ -212,7 +212,7 @@ extension Collection where Index : RandomAccessIndexType {
   }
 }
 
-extension LazyCollectionType
+extension LazyCollectionProtocol
 where Index : BidirectionalIndexType, Elements.Index : BidirectionalIndexType {
   /// Return the elements of `self` in reverse order.
   ///
@@ -225,7 +225,7 @@ where Index : BidirectionalIndexType, Elements.Index : BidirectionalIndexType {
   }
 }
 
-extension LazyCollectionType
+extension LazyCollectionProtocol
 where Index : RandomAccessIndexType, Elements.Index : RandomAccessIndexType {
   /// Return the elements of `self` in reverse order.
   ///

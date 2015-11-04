@@ -74,7 +74,7 @@ public struct LazyMapSequence<Base : SequenceType, Element>
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
 public struct LazyMapCollection<Base : Collection, Element>
-  : LazyCollectionType {
+  : LazyCollectionProtocol {
 
   // FIXME: Should be inferrable.
   public typealias Index = Base.Index
@@ -140,7 +140,7 @@ extension LazySequenceType {
   }
 }
 
-extension LazyCollectionType {
+extension LazyCollectionProtocol {
   /// Return a `LazyMapCollection` over this `Collection`.  The elements of
   /// the result are computed lazily, each time they are read, by
   /// calling `transform` function on a base element.

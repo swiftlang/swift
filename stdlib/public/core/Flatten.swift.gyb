@@ -298,7 +298,7 @@ extension Collection where ${constraints % {'Base': ''}} {
   }
 }
 
-extension LazyCollectionType
+extension LazyCollectionProtocol
   where ${constraints % {'Base': ''}}, 
   ${constraints % {'Base': 'Elements.'}},
   Iterator.Element == Elements.Iterator.Element {
