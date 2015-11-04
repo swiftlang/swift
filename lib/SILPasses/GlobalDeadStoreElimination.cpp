@@ -140,6 +140,9 @@ public:
   /// The basic block this BBState represents.
   SILBasicBlock *BB;
 
+  /// Keep the number of MemLocations in the LocationVault.
+  unsigned MemLocationCount;
+
   /// A bit vector for which the ith bit represents the ith MemLocation in
   /// MemLocationVault. If the bit is set, then the location currently has an
   /// upward visible store.
@@ -148,6 +151,16 @@ public:
   /// If WriteSetIn changes while processing a basicblock, then all its
   /// predecessors needs to be rerun.
   llvm::BitVector WriteSetIn;
+
+  /// A bit vector for which the ith bit represents the ith MemLocation in
+  /// MemLocationVault. If the bit is set, then the current basic block
+  /// generates an upward visible store.
+  llvm::BitVector BBGenSet;
+
+  /// A bit vector for which the ith bit represents the ith MemLocation in
+  /// MemLocationVault. If the bit is set, then the current basic block
+  /// kills an upward visible store.
+  llvm::BitVector BBKillSet;
 
   /// The dead stores in the current basic block.
   llvm::DenseSet<SILInstruction *> DeadStores;
@@ -158,7 +171,7 @@ public:
 
   /// Constructors.
   BBState() : BB(nullptr) {}
-  BBState(SILBasicBlock *B, unsigned lcnt) : BB(B) {
+  BBState(SILBasicBlock *B, unsigned lcnt) : BB(B), MemLocationCount(lcnt) {
     // The initial state of WriteSetIn should be all 1's. Otherwise the
     // dataflow solution could be too conservative.
     //
@@ -172,8 +185,12 @@ public:
     // However, by doing so, we can only eliminate the dead stores after the
     // data flow stablizes.
     //
-    WriteSetIn.resize(lcnt, true);
-    WriteSetOut.resize(lcnt, false);
+    WriteSetIn.resize(MemLocationCount, true);
+    WriteSetOut.resize(MemLocationCount, false);
+   
+    // GenSet and KillSet initially empty.
+    BBGenSet.resize(MemLocationCount, false);
+    BBKillSet.resize(MemLocationCount, false);
   }
 
   /// Check whether the WriteSetIn has changed. If it does, we need to
@@ -212,7 +229,7 @@ bool BBState::isTrackingMemLocation(unsigned bit) {
 void BBState::initialize(const BBState &Succ) { WriteSetOut = Succ.WriteSetIn; }
 
 void BBState::intersect(const BBState &Succ) {
-  for (unsigned i = 0; i < WriteSetOut.size(); ++i) {
+  for (unsigned i = 0; i < MemLocationCount; ++i) {
     if (Succ.WriteSetIn.test(i))
       continue;
     // WriteSetIn is not set.
@@ -265,6 +282,16 @@ class DSEContext {
   }
 
   /// MemLocation read has been extracted, expanded and mapped to the bit
+  /// position in the bitvector. update the gen kill set using the bit
+  /// position.
+  void updateGenKillSetForRead(SILInstruction *I, BBState *S, unsigned bit);
+
+  /// MemLocation written has been extracted, expanded and mapped to the bit
+  /// position in the bitvector. update the gen kill set using the bit
+  /// position.
+  void updateGenKillSetForWrite(SILInstruction *I, BBState *S, unsigned bit);
+
+  /// MemLocation read has been extracted, expanded and mapped to the bit
   /// position in the bitvector. process it using the bit position.
   void updateWriteSetForRead(SILInstruction *Inst, BBState *State,
                              unsigned Bit);
@@ -276,21 +303,22 @@ class DSEContext {
 
   /// There is a read to a location, expand the location into individual fields
   /// before processing them.
-  void processRead(SILInstruction *Inst, BBState *State, SILValue Mem);
+  void processRead(SILInstruction *Inst, BBState *State, SILValue Mem,
+                   bool BuildGenKillSet);
 
   /// There is a write to a location, expand the location into individual fields
   /// before processing them.
   void processWrite(SILInstruction *Inst, BBState *State, SILValue Val,
-                    SILValue Mem, bool PDSE);
+                    SILValue Mem, bool BuildGenKillSet);
 
   /// Process Instructions. Extract MemLocations from SIL LoadInst.
-  void processLoadInst(SILInstruction *Inst);
+  void processLoadInst(SILInstruction *Inst, bool BuildGenKillSet);
 
   /// Process Instructions. Extract MemLocations from SIL StoreInst.
-  void processStoreInst(SILInstruction *Inst, bool PDSE);
+  void processStoreInst(SILInstruction *Inst, bool BuildGenKillSet);
 
   /// Process Instructions. Extract MemLocations from SIL Unknown Memory Inst.
-  void processUnknownReadMemInst(SILInstruction *Inst);
+  void processUnknownReadMemInst(SILInstruction *Inst, bool BuildGenKillSet);
 
   /// Check whether the instruction invalidate any MemLocations due to change in
   /// its MemLocation Base.
@@ -315,7 +343,7 @@ class DSEContext {
   /// the loop basic block will have store to x.a and therefore x.a = 13 can now
   /// be considered dead.
   ///
-  void invalidateMemLocationBase(SILInstruction *Inst);
+  void invalidateMemLocationBase(SILInstruction *Inst, bool BuildGenKillSet);
 
   /// Get the bit representing the location in the MemLocationVault.
   ///
@@ -330,13 +358,20 @@ public:
 
   /// Compute the kill set for the basic block. return true if the store set
   /// changes.
-  bool processBasicBlock(SILBasicBlock *BB, bool PDSE = false);
+  bool processBasicBlock(SILBasicBlock *BB);
+
+  /// Compute the genset and killset for the current basic block.
+  void processBasicBlockForGenKillSet(SILBasicBlock *BB);
+
+  /// Compute the WriteSetOut and WriteSetIn for the current basic
+  /// block with the generated gen and kill set.
+  bool processBasicBlockWithGenKillSet(SILBasicBlock *BB);
 
   /// Intersect the successor live-ins.
   void mergeSuccessorStates(SILBasicBlock *BB);
 
   /// Update the BBState based on the given instruction.
-  void processInstruction(SILInstruction *I, bool PDSE);
+  void processInstruction(SILInstruction *I, bool BuildGenKillSet);
 
   /// Entry point for global dead store elimination.
   void run();
@@ -365,14 +400,35 @@ unsigned DSEContext::getMemLocationBit(const MemLocation &Loc) {
   return Iter->second;
 }
 
-bool DSEContext::processBasicBlock(SILBasicBlock *BB, bool PDSE) {
+void DSEContext::processBasicBlockForGenKillSet(SILBasicBlock *BB) {
+  for (auto I = BB->rbegin(), E = BB->rend(); I != E; ++I) {
+    processInstruction(&(*I), true);
+  }
+}
+
+bool DSEContext::processBasicBlockWithGenKillSet(SILBasicBlock *BB) {
+  // Compute the WriteSetOut at the end of the basic block.
+  mergeSuccessorStates(BB);
+
+  // Compute the WriteSetOut at the beginning of the basic block.
+  BBState *S = getBBLocState(BB);
+  llvm::BitVector T = S->BBKillSet;
+  S->WriteSetOut &= T.flip();
+  S->WriteSetOut |= S->BBGenSet;
+
+  // If WriteSetIn changes, then keep iterating until reached a fixed
+  // point.
+  return S->updateWriteSetIn();
+}
+
+bool DSEContext::processBasicBlock(SILBasicBlock *BB) {
   // Intersect in the successor live-ins. A store is dead if it is not read from
   // any path to the end of the program. Thus an intersection.
   mergeSuccessorStates(BB);
 
   // Process instructions in post-order fashion.
   for (auto I = BB->rbegin(), E = BB->rend(); I != E; ++I) {
-    processInstruction(&(*I), PDSE);
+    processInstruction(&(*I), false);
   }
 
   // If WriteSetIn changes, then keep iterating until reached a fixed
@@ -399,11 +455,22 @@ void DSEContext::mergeSuccessorStates(SILBasicBlock *BB) {
   }
 }
 
-void DSEContext::invalidateMemLocationBase(SILInstruction *I) {
+void DSEContext::invalidateMemLocationBase(SILInstruction *I,
+                                           bool GenKillSet) {
   BBState *S = getBBLocState(I);
+  if (GenKillSet) {
+    for (unsigned i = 0; i < S->MemLocationCount; ++i) {
+      if (MemLocationVault[i].getBase().getDef() != I)
+        continue;
+      S->BBGenSet.reset(i);
+      S->BBKillSet.set(i);
+    }
+    return;
+  }
+  
   // If this instruction defines the base of a location, then we need to
   // invalidate any locations with the same base.
-  for (unsigned i = 0; i < S->WriteSetOut.size(); ++i) {
+  for (unsigned i = 0; i < S->MemLocationCount; ++i) {
     if (!S->WriteSetOut.test(i))
       continue;
     if (MemLocationVault[i].getBase().getDef() != I)
@@ -418,7 +485,7 @@ void DSEContext::updateWriteSetForRead(SILInstruction *I, BBState *S,
   // used
   // to kill any upward visible stores due to the intefering load.
   MemLocation &R = MemLocationVault[bit];
-  for (unsigned i = 0; i < S->WriteSetOut.size(); ++i) {
+  for (unsigned i = 0; i < S->MemLocationCount; ++i) {
     if (!S->isTrackingMemLocation(i))
       continue;
     MemLocation &L = MemLocationVault[i];
@@ -430,12 +497,29 @@ void DSEContext::updateWriteSetForRead(SILInstruction *I, BBState *S,
   }
 }
 
+void DSEContext::updateGenKillSetForRead(SILInstruction *I, BBState *S,
+                                         unsigned bit) {
+  // Start tracking the read to this MemLocation in the killset and update
+  // the genset accordingly.
+  MemLocation &R = MemLocationVault[bit];
+  for (unsigned i = 0; i < S->MemLocationCount; ++i) {
+    if (!S->BBGenSet.test(i))
+      continue;
+    MemLocation &L = MemLocationVault[i];
+    if (!L.isMayAliasMemLocation(R, AA))
+      continue;
+    S->BBGenSet.reset(i);
+  }
+  // Update the kill set.
+  S->BBKillSet.set(bit);
+}
+
 bool DSEContext::updateWriteSetForWrite(SILInstruction *I, BBState *S,
                                         unsigned bit) {
   // If a tracked store must aliases with this store, then this store is dead.
   bool IsDead = false;
   MemLocation &R = MemLocationVault[bit];
-  for (unsigned i = 0; i < S->WriteSetOut.size(); ++i) {
+  for (unsigned i = 0; i < S->MemLocationCount; ++i) {
     if (!S->isTrackingMemLocation(i))
       continue;
     // If 2 locations may alias, we can still keep both stores.
@@ -455,7 +539,14 @@ bool DSEContext::updateWriteSetForWrite(SILInstruction *I, BBState *S,
   return IsDead;
 }
 
-void DSEContext::processRead(SILInstruction *I, BBState *S, SILValue Mem) {
+void DSEContext::updateGenKillSetForWrite(SILInstruction *I, BBState *S,
+                                          unsigned bit) {
+  // Start tracking the store to this MemLoation.
+  S->BBGenSet.set(bit);
+}
+
+void DSEContext::processRead(SILInstruction *I, BBState *S, SILValue Mem,
+                             bool BuildGenKillSet) {
   // Construct a MemLocation to represent the memory read by this instruction.
   // NOTE: The base will point to the actual object this inst is accessing,
   // not this particular field.
@@ -474,7 +565,7 @@ void DSEContext::processRead(SILInstruction *I, BBState *S, SILValue Mem) {
   // If we cant figure out the Base or Projection Path for the read instruction,
   // process it as an unknown memory instruction for now.
   if (!L.isValid()) {
-    processUnknownReadMemInst(I);
+    processUnknownReadMemInst(I, BuildGenKillSet);
     return;
   }
 
@@ -490,12 +581,19 @@ void DSEContext::processRead(SILInstruction *I, BBState *S, SILValue Mem) {
   MemLocationList Locs;
   MemLocation::expand(L, &I->getModule(), Locs, TypeExpansionVault);
   for (auto &E : Locs) {
+    if (BuildGenKillSet) {
+      // Only building the gen and kill sets for now.
+      updateGenKillSetForRead(I, S, getMemLocationBit(E));
+      continue;
+    }
+    // This is the last iteration, compute WriteSetOut and perform the dead
+    // store elimination. 
     updateWriteSetForRead(I, S, getMemLocationBit(E));
   }
 }
 
 void DSEContext::processWrite(SILInstruction *I, BBState *S, SILValue Val,
-                              SILValue Mem, bool PDSE) {
+                              SILValue Mem, bool BuildGenKillSet) {
   // Construct a MemLocation to represent the memory read by this instruction.
   // NOTE: The base will point to the actual object this inst is accessing,
   // not this particular field.
@@ -532,6 +630,13 @@ void DSEContext::processWrite(SILInstruction *I, BBState *S, SILValue Val,
   llvm::BitVector V(Locs.size());
   unsigned idx = 0;
   for (auto &E : Locs) {
+    if (BuildGenKillSet) {
+      // Only building the gen and kill sets here.
+      updateGenKillSetForWrite(I, S, getMemLocationBit(E));
+      continue;
+    }
+    // This is the last iteration, compute WriteSetOut and perform the dead
+    // store elimination. 
     if (updateWriteSetForWrite(I, S, getMemLocationBit(E)))
       V.set(idx);
     Dead &= V.test(idx);
@@ -539,7 +644,7 @@ void DSEContext::processWrite(SILInstruction *I, BBState *S, SILValue Val,
   }
 
   // Data flow has not stablized, do not perform the DSE just yet.
-  if (!PDSE)
+  if (BuildGenKillSet)
     return;
 
   // Fully dead store - stores to all the components are dead, therefore this
@@ -599,23 +704,35 @@ void DSEContext::processWrite(SILInstruction *I, BBState *S, SILValue Val,
   }
 }
 
-void DSEContext::processLoadInst(SILInstruction *I) {
+void DSEContext::processLoadInst(SILInstruction *I, bool BuildGenKillSet) {
   SILValue Mem = cast<LoadInst>(I)->getOperand();
-  processRead(I, getBBLocState(I), Mem);
+  processRead(I, getBBLocState(I), Mem, BuildGenKillSet);
 }
 
-void DSEContext::processStoreInst(SILInstruction *I, bool PDSE) {
+void DSEContext::processStoreInst(SILInstruction *I, bool BuildGenKillSet) {
   SILValue Val = cast<StoreInst>(I)->getSrc();
   SILValue Mem = cast<StoreInst>(I)->getDest();
-  processWrite(I, getBBLocState(I), Val, Mem, PDSE);
+  processWrite(I, getBBLocState(I), Val, Mem, BuildGenKillSet);
 }
 
-void DSEContext::processUnknownReadMemInst(SILInstruction *I) {
+void DSEContext::processUnknownReadMemInst(SILInstruction *I,
+                                           bool BuildGenKillSet) {
+  BBState *S = getBBLocState(I);
+  // Update the gen kill set.
+  if (BuildGenKillSet) {
+    for (unsigned i = 0; i < S->MemLocationCount; ++i) {
+      if (!AA->mayReadFromMemory(I, MemLocationVault[i].getBase()))
+        continue;
+      S->BBKillSet.set(i);
+      S->BBGenSet.reset(i);
+    }
+    return;
+  }
+
   // We do not know what this instruction does or the memory that it *may*
   // touch. Hand it to alias analysis to see whether we need to invalidate
   // any MemLocation.
-  BBState *S = getBBLocState(I);
-  for (unsigned i = 0; i < S->WriteSetOut.size(); ++i) {
+  for (unsigned i = 0; i < S->MemLocationCount; ++i) {
     if (!S->isTrackingMemLocation(i))
       continue;
     if (!AA->mayReadFromMemory(I, MemLocationVault[i].getBase()))
@@ -624,7 +741,7 @@ void DSEContext::processUnknownReadMemInst(SILInstruction *I) {
   }
 }
 
-void DSEContext::processInstruction(SILInstruction *I, bool PDSE) {
+void DSEContext::processInstruction(SILInstruction *I, bool BuildGenKillSet) {
   // If this instruction has side effects, but is inert from a store
   // perspective, skip it.
   if (isDeadStoreInertInstruction(I))
@@ -635,15 +752,15 @@ void DSEContext::processInstruction(SILInstruction *I, bool PDSE) {
   // TODO: process more instructions.
   //
   if (isa<LoadInst>(I)) {
-    processLoadInst(I);
+    processLoadInst(I, BuildGenKillSet);
   } else if (isa<StoreInst>(I)) {
-    processStoreInst(I, PDSE);
+    processStoreInst(I, BuildGenKillSet);
   } else if (I->mayReadFromMemory()) {
-    processUnknownReadMemInst(I);
+    processUnknownReadMemInst(I, BuildGenKillSet);
   }
 
   // Check whether this instruction will invalidate any other MemLocations.
-  invalidateMemLocationBase(I);
+  invalidateMemLocationBase(I, BuildGenKillSet);
 }
 
 SILValue DSEContext::createExtract(SILValue Base,
@@ -687,38 +804,44 @@ void DSEContext::run() {
     BBToLocState[&B] = BBState(&B, MemLocationVault.size());
   }
 
+  // Generate the genset and killset for each basic block.
+  for (auto &B : *F) {
+    processBasicBlockForGenKillSet(&B);
+  }
+
+  // Process each basic block with the gen and kill set. Every time the
+  // WriteSetIn of a basic block changes, the optimization is rerun on its
+  // predecessors.
   auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
-  // Keep iterating over all basicblocks in a post-order fashion until
-  // convergence. Everytime the WriteSetIn of a basic block changes, the
-  // optimization is rerun.
-  //
-  // TODO: We only need to rerun basic blocks with successors changed.
-  // use a worklist in the future.
-  //
-  bool Changed = false;
-  do {
-    Changed = false;
-    for (SILBasicBlock *BB : PO->getPostOrder()) {
-      Changed |= processBasicBlock(BB);
+  llvm::SmallVector<SILBasicBlock *, 16> WorkList;
+  for (SILBasicBlock *B : PO->getPostOrder()) {
+    WorkList.push_back(B);
+  }
+
+  while(!WorkList.empty()) {
+    SILBasicBlock *BB = WorkList.pop_back_val();
+    if (processBasicBlockWithGenKillSet(BB)) {
+      for (auto X : BB->getPreds())
+        WorkList.push_back(X);
     }
-  } while (Changed);
+  }
 
   // The data flow has stablized, run one last iteration over all the basic
   // blocks and try to remove dead stores.
-  for (SILBasicBlock *BB : PO->getPostOrder()) {
-    processBasicBlock(BB, true);
+  for (SILBasicBlock &BB : *F) {
+    processBasicBlock(&BB);
   }
 
   // Finally, delete the dead stores and create the live stores.
-  for (SILBasicBlock *BB : PO->getPostOrder()) {
+  for (SILBasicBlock &BB : *F) {
     // Create the stores that are alive.
-    for (auto &I : getBBLocState(BB)->LiveStores) {
+    for (auto &I : getBBLocState(&BB)->LiveStores) {
       SILInstruction *IT = cast<SILInstruction>(I.first)->getNextNode();
       SILBuilderWithScope<16> Builder(IT);
       Builder.createStore(I.first.getLoc().getValue(), I.second, I.first);
     }
     // Delete the dead stores.
-    for (auto &I : getBBLocState(BB)->DeadStores) {
+    for (auto &I : getBBLocState(&BB)->DeadStores) {
       DEBUG(llvm::dbgs() << "*** Removing: " << *I << " ***\n");
       I->eraseFromParent();
     }
