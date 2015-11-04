@@ -3360,7 +3360,7 @@ extension ${Protocol} where Index : _MinimalIndexType {
   }
 }
 
-/// A minimal implementation of `CollectionType` with extra checks.
+/// A minimal implementation of `Collection` with extra checks.
 public struct ${Self}<T> : ${'MutableCollection' if mutable else 'Collection'} {
   public init<S : SequenceType where S.Iterator.Element == T>(
     elements: S,

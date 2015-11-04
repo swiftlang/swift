@@ -97,20 +97,20 @@ public struct ReverseRandomAccessIndex<Base: RandomAccessIndexType>
   }
 }
 
-public protocol _ReverseCollectionType : Collection {
+public protocol _ReverseCollection : Collection {
   typealias Index : ReverseIndexType
   typealias Base : Collection
   var _base: Base {get}
 }
 
 extension Collection
-  where Self : _ReverseCollectionType, Self.Base.Index : RandomAccessIndexType {
+  where Self : _ReverseCollection, Self.Base.Index : RandomAccessIndexType {
   public var startIndex : ReverseRandomAccessIndex<Self.Base.Index> {
     return ReverseRandomAccessIndex(_base.endIndex)
   }
 }
 
-extension _ReverseCollectionType
+extension _ReverseCollection
   where Self : Collection, Self.Index.Base == Self.Base.Index
 {
   public var startIndex : Index { return Self.Index(_base.endIndex) }
@@ -138,7 +138,7 @@ extension _ReverseCollectionType
 /// - See also: `ReverseRandomAccessCollection`
 public struct ReverseCollection<
   Base : Collection where Base.Index : BidirectionalIndexType
-> : Collection, _ReverseCollectionType {
+> : Collection, _ReverseCollection {
   /// Creates an instance that presents the elements of `base` in
   /// reverse order.
   ///
@@ -168,7 +168,7 @@ public struct ReverseCollection<
 /// - See also: `ReverseCollection`
 public struct ReverseRandomAccessCollection<
   Base : Collection where Base.Index : RandomAccessIndexType
-> : _ReverseCollectionType {
+> : _ReverseCollection {
   /// Creates an instance that presents the elements of `base` in
   /// reverse order.
   ///
