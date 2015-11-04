@@ -696,6 +696,10 @@ if [[ "${INSTALL_PREFIX}" == "" ]] ; then
     fi
 fi
 
+if [[ "$(uname -s)" == "Darwin" ]] ; then
+    TOOLCHAIN_PREFIX=$(echo ${INSTALL_PREFIX} | sed -E 's/\/usr$//')
+fi
+
 # A list of deployment targets to compile the Swift host tools for, in case when
 # we can run the resulting binaries natively on the build machine.
 NATIVE_TOOLS_DEPLOYMENT_TARGETS=()
@@ -1837,6 +1841,17 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 if [[ -z "${INSTALL_LLDB}" ]] ; then
                     continue
                 fi
+                case "$(uname -s)" in
+                    Linux)
+                        ;;
+                    Darwin)
+                        set_lldb_build_mode
+                        pushd ${LLDB_SOURCE_DIR}
+                        xcodebuild -target toolchain -configuration ${LLDB_BUILD_MODE} install ${lldb_xcodebuild_options[@]} DSTROOT="${INSTALL_DESTDIR}"
+                        popd
+                        continue
+                        ;;
+                esac
                 ;;
             llbuild)
                 if [[ -z "${INSTALL_LLBUILD}" ]] ; then
@@ -1943,7 +1958,7 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
     if [[ "$(uname -s)" == "Darwin" ]] ; then
       # FIXME: Don't use gnutar on Darwin
       (cd "${INSTALL_DESTDIR}" &&
-        gnutar -c -z -f "${INSTALLABLE_PACKAGE}" --owner=0 --group=0 "${INSTALL_PREFIX/#\/}")
+        gnutar -c -z -f "${INSTALLABLE_PACKAGE}" --owner=0 --group=0 "${TOOLCHAIN_PREFIX/#\/}")
     else
       (cd "${INSTALL_DESTDIR}" &&
         tar -c -z -f "${INSTALLABLE_PACKAGE}" --owner=0 --group=0 "${INSTALL_PREFIX/#\/}")
@@ -1956,7 +1971,7 @@ if [[ "${SYMBOLS_PACKAGE}" ]] ; then
     if [[ "$(uname -s)" == "Darwin" ]] ; then
       # FIXME: Don't use gnutar on Darwin
       (cd "${INSTALL_SYMROOT}" &&
-        gnutar -c -z -f "${SYMBOLS_PACKAGE}" --owner=0 --group=0 "${INSTALL_PREFIX/#\/}")
+        gnutar -c -z -f "${SYMBOLS_PACKAGE}" --owner=0 --group=0 "${TOOLCHAIN_PREFIX/#\/}")
     else
       (cd "${INSTALL_SYMROOT}" &&
         tar -c -z -f "${SYMBOLS_PACKAGE}" --owner=0 --group=0 "${INSTALL_PREFIX/#\/}")
