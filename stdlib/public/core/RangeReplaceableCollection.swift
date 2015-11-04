@@ -156,12 +156,12 @@ public protocol RangeReplaceableCollection : Collection {
   /// - Requires: `n >= 0 && self.count >= n`.
   mutating func removeFirst(n: Int)
 
-  /// Remove the elements in `bounds`.
+  /// Remove all elements within `bounds`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  mutating func removeRange(bounds: Range<Index>)
+  mutating func removeSubrange(bounds: Range<Index>)
 
   /// Remove all elements.
   ///
@@ -219,7 +219,7 @@ extension RangeReplaceableCollection {
     return result
   }
 
-  public mutating func removeRange(bounds: Range<Index>) {
+  public mutating func removeSubrange(bounds: Range<Index>) {
     replaceSubrange(bounds, with: EmptyCollection())
   }
 
@@ -229,7 +229,7 @@ extension RangeReplaceableCollection {
     _precondition(count >= numericCast(n),
       "can't remove more items from a collection than it has")
     let end = startIndex.advancedBy(numericCast(n))
-    removeRange(startIndex..<end)
+    removeSubrange(startIndex..<end)
   }
 
   public mutating func removeFirst() -> Iterator.Element {
@@ -334,7 +334,7 @@ extension RangeReplaceableCollection where Index : BidirectionalIndex {
       return
     }
     let end = endIndex
-    removeRange(end.advancedBy(numericCast(-n))..<end)
+    removeSubrange(end.advancedBy(numericCast(-n))..<end)
   }
 }
 

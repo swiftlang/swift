@@ -258,10 +258,10 @@ ${Self}TestSuite.test("removeLast()/IndexInvalidation") {
   _blackHole(c2)
 }
 
-${Self}TestSuite.test("removeRange()/IndexInvalidation") {
+${Self}TestSuite.test("removeSubrange()/IndexInvalidation") {
   var (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
   let i1 = c1.startIndex.advancedBy(1)
-  c1.removeRange(i1..<i1.advancedBy(1))
+  c1.removeSubrange(i1..<i1.advancedBy(1))
   let i2 = c1.startIndex.advancedBy(1)
 
   expectCrashLater()

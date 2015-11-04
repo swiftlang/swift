@@ -70,7 +70,7 @@ public class RangeReplaceableCollectionLog {
   public static var removeAt = TypeIndexed(0)
   public static var _customRemoveLast = TypeIndexed(0)
   public static var _customRemoveLastN = TypeIndexed(0)
-  public static var removeRange = TypeIndexed(0)
+  public static var removeSubrange = TypeIndexed(0)
   public static var removeFirst = TypeIndexed(0)
   public static var removeFirstN = TypeIndexed(0)
   public static var replaceSubrange = TypeIndexed(0)
@@ -190,9 +190,9 @@ public struct LoggingRangeReplaceableCollection<
     base.removeFirst(n)
   }
 
-  public mutating func removeRange(bounds: Range<Base.Index>) {
-    ++Log.removeRange[selfType]
-    base.removeRange(bounds)
+  public mutating func removeSubrange(bounds: Range<Base.Index>) {
+    ++Log.removeSubrange[selfType]
+    base.removeSubrange(bounds)
   }
 
   public mutating func removeAll(keepCapacity keepCapacity: Bool) {

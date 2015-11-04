@@ -2643,7 +2643,7 @@ internal enum _CollectionOperation : Equatable {
   case InsertContentsOf(at: Int, count: Int)
   case RemoveAt(index: Int)
   case RemoveLast
-  case RemoveRange(bounds: Range<Int>)
+  case RemoveSubrange(bounds: Range<Int>)
   case RemoveAll(keepCapacity: Bool)
 
   internal func _applyTo(
@@ -2702,8 +2702,8 @@ internal enum _CollectionOperation : Equatable {
     case RemoveLast:
       result.removeLast()
 
-    case RemoveRange(let bounds):
-      result.removeRange(bounds)
+    case RemoveSubrange(let bounds):
+      result.removeSubrange(bounds)
 
       let invalidIndices = bounds.startIndex..<result.endIndex
       result.replaceSubrange(
@@ -2732,10 +2732,10 @@ internal func == (
     return lhsCount == rhsCount
 
   case (
-    .ReplaceSubrange(let lhsSubRange, let lhsReplacementCount),
-    .ReplaceSubrange(let rhsSubRange, let rhsReplacementCount)):
+    .ReplaceSubrange(let lhsBounds, let lhsReplacementCount),
+    .ReplaceSubrange(let rhsBounds, let rhsReplacementCount)):
 
-    return lhsSubRange == rhsSubRange &&
+    return lhsBounds == rhsBounds &&
       lhsReplacementCount == rhsReplacementCount
 
   case (.Insert(let lhsAtIndex), .Insert(let rhsAtIndex)):
@@ -2753,8 +2753,8 @@ internal func == (
   case (.RemoveLast, .RemoveLast):
     return true
 
-  case (.RemoveRange(let lhsSubRange), .RemoveRange(let rhsSubRange)):
-    return lhsSubRange == rhsSubRange
+  case (.RemoveSubrange(let lhsBounds), .RemoveSubrange(let rhsBounds)):
+    return lhsBounds == rhsBounds
 
   case (.RemoveAll(let lhsKeepCapacity), .RemoveAll(let rhsKeepCapacity)):
     return lhsKeepCapacity == rhsKeepCapacity
@@ -3630,12 +3630,12 @@ public struct ${Self}<T> : RangeReplaceableCollection {
     return elements.removeLast()
   }
 
-  public mutating func removeRange(bounds: Range<${Index}>) {
+  public mutating func removeSubrange(bounds: Range<${Index}>) {
     if !bounds.isEmpty {
-      _willMutate(.RemoveRange(
+      _willMutate(.RemoveSubrange(
         bounds: bounds.startIndex._offset..<bounds.endIndex._offset))
     }
-    elements.removeRange(
+    elements.removeSubrange(
       bounds.startIndex.position..<bounds.endIndex.position
     )
   }

@@ -186,7 +186,7 @@ internal struct RemoveLastNTest {
   }
 }
 
-internal struct RemoveRangeTest {
+internal struct RemoveSubrangeTest {
   let collection: [OpaqueValue<Int>]
   let rangeSelection: RangeSelection
   let expected: [Int]
@@ -199,7 +199,7 @@ internal struct RemoveRangeTest {
     self.collection = collection.map(OpaqueValue.init)
     self.rangeSelection = rangeSelection
     self.expected = expected
-    self.loc = SourceLoc(file, line, comment: "removeRange() test data")
+    self.loc = SourceLoc(file, line, comment: "removeSubrange() test data")
   }
 }
 
@@ -759,47 +759,47 @@ self.test("\(testNamePrefix).removeFirst(n: Int)/removeTooMany/semantics") {
 }
 
 //===----------------------------------------------------------------------===//
-// removeRange()
+// removeSubrange()
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).removeRange()/semantics") {
-  let tests: [RemoveRangeTest] = [
-    RemoveRangeTest(
+self.test("\(testNamePrefix).removeSubrange()/semantics") {
+  let tests: [RemoveSubrangeTest] = [
+    RemoveSubrangeTest(
       collection: [],
       rangeSelection: .EmptyRange,
       expected: []),
 
-    RemoveRangeTest(
+    RemoveSubrangeTest(
       collection: [1010],
       rangeSelection: .Middle,
       expected: []),
 
-    RemoveRangeTest(
+    RemoveSubrangeTest(
       collection: [1010, 2020, 3030, 4040],
       rangeSelection: .LeftHalf,
       expected: [3030, 4040]),
 
-    RemoveRangeTest(
+    RemoveSubrangeTest(
       collection: [1010, 2020, 3030, 4040],
       rangeSelection: .RightHalf,
       expected: [1010, 2020]),
 
-    RemoveRangeTest(
+    RemoveSubrangeTest(
       collection: [1010, 2020, 3030, 4040, 5050],
       rangeSelection: .Middle,
       expected: [1010, 5050]),
 
-    RemoveRangeTest(
+    RemoveSubrangeTest(
       collection: [1010, 2020, 3030, 4040, 5050, 6060],
       rangeSelection: .LeftHalf,
       expected: [4040, 5050, 6060]),
 
-    RemoveRangeTest(
+    RemoveSubrangeTest(
       collection: [1010, 2020, 3030, 4040, 5050, 6060],
       rangeSelection: .RightHalf,
       expected: [1010, 2020, 3030]),
 
-    RemoveRangeTest(
+    RemoveSubrangeTest(
       collection: [1010, 2020, 3030, 4040, 5050, 6060],
       rangeSelection: .Middle,
       expected: [1010, 6060]),
@@ -808,7 +808,7 @@ self.test("\(testNamePrefix).removeRange()/semantics") {
   for test in tests {
     var c = makeWrappedCollection(test.collection)
     let rangeToRemove = test.rangeSelection.rangeOf(c)
-    c.removeRange(rangeToRemove)
+    c.removeSubrange(rangeToRemove)
     expectEqualSequence(
       test.expected,
       c.map { extractValue($0).value },

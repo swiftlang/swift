@@ -722,9 +722,9 @@ extension String {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  public mutating func removeRange(bounds: Range<Index>) {
+  public mutating func removeSubrange(bounds: Range<Index>) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.removeRange(bounds)
+      (inout v: CharacterView) in v.removeSubrange(bounds)
     }
   }
 
