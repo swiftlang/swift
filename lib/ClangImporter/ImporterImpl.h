@@ -198,13 +198,6 @@ enum class MappedTypeNameKind {
   DefineAndUse
 };
 
-/// \brief Bitmask constants for language dialects where a certain C to Swift
-/// type mapping applies.
-enum class MappedLanguages {
-  ObjC1 = 0x1,
-  All = ObjC1
-};
-
 /// \brief Describes certain kinds of methods that need to be specially
 /// handled by the importer.
 enum class SpecialMethodKind {

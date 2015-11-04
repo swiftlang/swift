@@ -150,13 +150,12 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
   StringRef SwiftModuleName;
   bool IsSwiftModule; // True if SwiftModuleName == STDLIB_NAME.
   StringRef SwiftTypeName;
-  MappedLanguages Languages;
   bool CanBeMissing;
 
   do {
-#define MAP_TYPE(C_TYPE_NAME, C_TYPE_KIND, C_TYPE_BITWIDTH,     \
-                 SWIFT_MODULE_NAME, SWIFT_TYPE_NAME, LANGUAGES, \
-                 CAN_BE_MISSING, C_NAME_MAPPING)                \
+#define MAP_TYPE(C_TYPE_NAME, C_TYPE_KIND, C_TYPE_BITWIDTH,        \
+                 SWIFT_MODULE_NAME, SWIFT_TYPE_NAME,               \
+                 CAN_BE_MISSING, C_NAME_MAPPING)                   \
     if (Name.str() == C_TYPE_NAME) {                               \
       CTypeKind = MappedCTypeKind::C_TYPE_KIND;                    \
       Bitwidth = C_TYPE_BITWIDTH;                                  \
@@ -167,7 +166,6 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
         SwiftModuleName = SWIFT_MODULE_NAME;                       \
       }                                                            \
       SwiftTypeName = SWIFT_TYPE_NAME;                             \
-      Languages = MappedLanguages::LANGUAGES;                      \
       CanBeMissing = CAN_BE_MISSING;                               \
       NameMapping = MappedTypeNameKind::C_NAME_MAPPING;            \
       assert(verifyNameMapping(MappedTypeNameKind::C_NAME_MAPPING, \
@@ -182,12 +180,6 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
   } while(0);
 
   clang::ASTContext &ClangCtx = Impl.getClangASTContext();
-
-  if (Languages != MappedLanguages::All) {
-    if ((unsigned(Languages) & unsigned(MappedLanguages::ObjC1)) != 0 &&
-        !ClangCtx.getLangOpts().ObjC1)
-      return std::make_pair(Type(), "");
-  }
 
   auto ClangType = D->getUnderlyingType();
 
