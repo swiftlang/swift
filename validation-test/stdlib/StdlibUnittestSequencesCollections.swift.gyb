@@ -201,10 +201,10 @@ ${Self}TestSuite.test("appendContentsOf()/IndexInvalidation") {
   _blackHole(c2)
 }
 
-${Self}TestSuite.test("replaceRange()/IndexInvalidation") {
+${Self}TestSuite.test("replaceSubrange()/IndexInvalidation") {
   var (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
   let i1 = c1.startIndex.advancedBy(1)
-  c1.replaceRange(
+  c1.replaceSubrange(
     i1..<i1.advancedBy(2),
     with: [ 4040, 5050 ].map(OpaqueValue.init))
   let i2 = c1.startIndex.advancedBy(1)

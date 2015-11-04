@@ -660,13 +660,13 @@ extension String {
   ///
   /// - Complexity: O(`bounds.count`) if `bounds.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
-  public mutating func replaceRange<
+  public mutating func replaceSubrange<
     C: Collection where C.Iterator.Element == Character
   >(
     bounds: Range<Index>, with newElements: C
   ) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.replaceRange(bounds, with: newElements)
+      (inout v: CharacterView) in v.replaceSubrange(bounds, with: newElements)
     }
   }
 
@@ -676,10 +676,10 @@ extension String {
   ///
   /// - Complexity: O(`bounds.count`) if `bounds.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
-  public mutating func replaceRange(
+  public mutating func replaceSubrange(
     bounds: Range<Index>, with newElements: String
   ) {
-    replaceRange(bounds, with: newElements.characters)
+    replaceSubrange(bounds, with: newElements.characters)
   }
 
   /// Insert `newElement` at index `i`.

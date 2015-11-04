@@ -57,7 +57,7 @@ internal enum IndexSelection {
   }
 }
 
-internal struct ReplaceRangeTest {
+internal struct ReplaceSubrangeTest {
   let collection: [OpaqueValue<Int>]
   let newElements: [OpaqueValue<Int>]
   let rangeSelection: RangeSelection
@@ -73,7 +73,7 @@ internal struct ReplaceRangeTest {
     self.newElements = newElements.map(OpaqueValue.init)
     self.rangeSelection = rangeSelection
     self.expected = expected
-    self.loc = SourceLoc(file, line, comment: "replaceRange() test data")
+    self.loc = SourceLoc(file, line, comment: "replaceSubrange() test data")
   }
 }
 
@@ -411,42 +411,42 @@ self.test("\(testNamePrefix).init(Sequence)/semantics") {
 }
 
 //===----------------------------------------------------------------------===//
-// replaceRange()
+// replaceSubrange()
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).replaceRange()/semantics") {
-  let tests: [ReplaceRangeTest] = [
-    ReplaceRangeTest(
+self.test("\(testNamePrefix).replaceSubrange()/semantics") {
+  let tests: [ReplaceSubrangeTest] = [
+    ReplaceSubrangeTest(
       collection: [],
       newElements: [],
       rangeSelection: .EmptyRange,
       expected: []),
 
-    ReplaceRangeTest(
+    ReplaceSubrangeTest(
       collection: [],
       newElements: [1010, 2020, 3030],
       rangeSelection: .EmptyRange,
       expected: [1010, 2020, 3030]),
 
-    ReplaceRangeTest(
+    ReplaceSubrangeTest(
       collection: [4040],
       newElements: [1010, 2020, 3030],
       rangeSelection: .LeftEdge,
       expected: [1010, 2020, 3030, 4040]),
 
-    ReplaceRangeTest(
+    ReplaceSubrangeTest(
       collection: [1010],
       newElements: [2020, 3030, 4040],
       rangeSelection: .RightEdge,
       expected: [1010, 2020, 3030, 4040]),
 
-    ReplaceRangeTest(
+    ReplaceSubrangeTest(
       collection: [1010, 2020, 3030],
       newElements: [4040],
       rangeSelection: .RightEdge,
       expected: [1010, 2020, 3030, 4040]),
 
-    ReplaceRangeTest(
+    ReplaceSubrangeTest(
       collection: [1010, 2020, 3030, 4040, 5050],
       newElements: [9090],
       rangeSelection: .Middle,
@@ -458,7 +458,7 @@ self.test("\(testNamePrefix).replaceRange()/semantics") {
     let rangeToReplace = test.rangeSelection.rangeOf(c)
     let newElements =
       MinimalForwardCollection(elements: test.newElements.map(wrapValue))
-    c.replaceRange(rangeToReplace, with: newElements)
+    c.replaceSubrange(rangeToReplace, with: newElements)
     expectEqualSequence(
       test.expected,
       c.map { extractValue($0).value },

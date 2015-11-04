@@ -88,7 +88,7 @@ Subsequent Parameters
 
   .. parsed-literal::
 
-    x.replaceRange(r, **with:** someElements)
+    x.replaceSubrange(r, **with:** someElements)
 
     p.initializeFrom(q, **count:** n)
   

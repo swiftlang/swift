@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  A Collection protocol with replaceRange
+// A Collection protocol with replaceSubrange.
 //
 //===----------------------------------------------------------------------===//
 
@@ -29,7 +29,7 @@ public protocol RangeReplaceableCollection : Collection {
   /// - Complexity: O(`bounds.count`) if
   ///   `bounds.endIndex == self.endIndex` and `newElements.isEmpty`,
   ///   O(`self.count` + `newElements.count`) otherwise.
-  mutating func replaceRange<
+  mutating func replaceSubrange<
     C : Collection where C.Iterator.Element == Iterator.Element
   >(
     bounds: Range<Index>, with newElements: C
@@ -203,24 +203,24 @@ extension RangeReplaceableCollection {
   public mutating func insert(
     newElement: Iterator.Element, atIndex i: Index
   ) {
-    replaceRange(i..<i, with: CollectionOfOne(newElement))
+    replaceSubrange(i..<i, with: CollectionOfOne(newElement))
   }
 
   public mutating func insertContentsOf<
     C : Collection where C.Iterator.Element == Iterator.Element
   >(newElements: C, at i: Index) {
-    replaceRange(i..<i, with: newElements)
+    replaceSubrange(i..<i, with: newElements)
   }
 
   public mutating func removeAt(index: Index) -> Iterator.Element {
     _precondition(!isEmpty, "can't remove from an empty collection")
     let result: Iterator.Element = self[index]
-    replaceRange(index...index, with: EmptyCollection())
+    replaceSubrange(index...index, with: EmptyCollection())
     return result
   }
 
   public mutating func removeRange(bounds: Range<Index>) {
-    replaceRange(bounds, with: EmptyCollection())
+    replaceSubrange(bounds, with: EmptyCollection())
   }
 
   public mutating func removeFirst(n: Int) {
@@ -245,7 +245,7 @@ extension RangeReplaceableCollection {
       self = Self()
     }
     else {
-      replaceRange(indices, with: EmptyCollection())
+      replaceSubrange(indices, with: EmptyCollection())
     }
   }
 

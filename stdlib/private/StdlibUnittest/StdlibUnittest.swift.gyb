@@ -2240,7 +2240,7 @@ public func checkRangeReplaceable<
 
         var a = makeCollection()
      
-        a.replaceRange(nthIndex(a, ix)..<nthIndex(a, jx), with: newValues)
+        a.replaceSubrange(nthIndex(a, ix)..<nthIndex(a, jx), with: newValues)
         let growth = newCount - oldCount
         
         let expectedCount = source.count + growth
@@ -2638,7 +2638,7 @@ internal enum _CollectionOperation : Equatable {
   case ReserveCapacity(capacity: Int)
   case Append
   case AppendContentsOf(count: Int)
-  case ReplaceRange(bounds: Range<Int>, replacementCount: Int)
+  case ReplaceSubrange(bounds: Range<Int>, replacementCount: Int)
   case Insert(atIndex: Int)
   case InsertContentsOf(atIndex: Int, count: Int)
   case RemoveAt(index: Int)
@@ -2652,7 +2652,7 @@ internal enum _CollectionOperation : Equatable {
     switch self {
     case ReserveCapacity:
       let invalidIndices = result.indices
-      result.replaceRange(
+      result.replaceSubrange(
         invalidIndices,
         with: Repeat(repeating: nextStateId, count: invalidIndices.count))
 
@@ -2663,13 +2663,13 @@ internal enum _CollectionOperation : Equatable {
       result.appendContentsOf(
         Repeat(repeating: nextStateId, count: count))
 
-    case ReplaceRange(let bounds, let replacementCount):
-      result.replaceRange(
+    case ReplaceSubrange(let bounds, let replacementCount):
+      result.replaceSubrange(
         bounds,
         with: Repeat(repeating: nextStateId, count: replacementCount))
 
       let invalidIndices = bounds.startIndex..<result.endIndex
-      result.replaceRange(
+      result.replaceSubrange(
         invalidIndices,
         with: Repeat(repeating: nextStateId, count: invalidIndices.count))
 
@@ -2677,7 +2677,7 @@ internal enum _CollectionOperation : Equatable {
       result.insert(nextStateId, atIndex: atIndex)
 
       let invalidIndices = atIndex..<result.endIndex
-      result.replaceRange(
+      result.replaceSubrange(
         invalidIndices,
         with: Repeat(repeating: nextStateId, count: invalidIndices.count))
 
@@ -2687,7 +2687,7 @@ internal enum _CollectionOperation : Equatable {
         at: atIndex)
 
       let invalidIndices = atIndex..<result.endIndex
-      result.replaceRange(
+      result.replaceSubrange(
         invalidIndices,
         with: Repeat(repeating: nextStateId, count: invalidIndices.count))
 
@@ -2695,7 +2695,7 @@ internal enum _CollectionOperation : Equatable {
       result.removeAt(index)
 
       let invalidIndices = index..<result.endIndex
-      result.replaceRange(
+      result.replaceSubrange(
         invalidIndices,
         with: Repeat(repeating: nextStateId, count: invalidIndices.count))
 
@@ -2706,7 +2706,7 @@ internal enum _CollectionOperation : Equatable {
       result.removeRange(bounds)
 
       let invalidIndices = bounds.startIndex..<result.endIndex
-      result.replaceRange(
+      result.replaceSubrange(
         invalidIndices,
         with: Repeat(repeating: nextStateId, count: invalidIndices.count))
 
@@ -2732,8 +2732,8 @@ internal func == (
     return lhsCount == rhsCount
 
   case (
-    .ReplaceRange(let lhsSubRange, let lhsReplacementCount),
-    .ReplaceRange(let rhsSubRange, let rhsReplacementCount)):
+    .ReplaceSubrange(let lhsSubRange, let lhsReplacementCount),
+    .ReplaceSubrange(let rhsSubRange, let rhsReplacementCount)):
 
     return lhsSubRange == rhsSubRange &&
       lhsReplacementCount == rhsReplacementCount
@@ -3448,11 +3448,11 @@ public protocol ${Protocol} : RangeReplaceableCollection {
 }
 
 extension ${Protocol} {
-  public mutating func replaceRange<
+  public mutating func replaceSubrange<
     C : Collection where C.Iterator.Element == Element
   >(bounds: Range<${Self}<Element>.Index>,
     with newElements: C) {
-    base.replaceRange(bounds, with: newElements)
+    base.replaceSubrange(bounds, with: newElements)
   }
 
   public mutating func removeLast() -> Element {
@@ -3586,17 +3586,17 @@ public struct ${Self}<T> : RangeReplaceableCollection {
     _willMutate(.AppendContentsOf(count: newCount - oldCount))
   }
 
-  public mutating func replaceRange<
+  public mutating func replaceSubrange<
     C : Collection where C.Iterator.Element == T
   >(
     bounds: Range<${Index}>, with newElements: C
   ) {
     let oldCount = count
-    elements.replaceRange(
+    elements.replaceSubrange(
       bounds.startIndex.position..<bounds.endIndex.position,
       with: newElements)
     let newCount = count
-    _willMutate(.ReplaceRange(
+    _willMutate(.ReplaceSubrange(
       bounds: bounds.startIndex._offset..<bounds.endIndex._offset,
       replacementCount: bounds.count + newCount - oldCount))
   }
@@ -3934,7 +3934,7 @@ public struct Defaulted${traversal}RangeReplaceableSlice<Element>
       base: base, bounds: bounds)
   }
 
-  public mutating func replaceRange<
+  public mutating func replaceSubrange<
     C : Collection where C.Iterator.Element == Element
   >(
     bounds: Range<Index>,
@@ -3948,7 +3948,7 @@ public struct Defaulted${traversal}RangeReplaceableSlice<Element>
     Index._failEarlyRangeCheck2(
       bounds.startIndex, rangeEnd: bounds.endIndex,
       boundsStart: startIndex, boundsEnd: endIndex)
-    base.replaceRange(bounds, with: newElements)
+    base.replaceSubrange(bounds, with: newElements)
     startIndex = base.startIndex.advancedBy(startOffset)
     endIndex = base.startIndex.advancedBy(endOffset)
   }

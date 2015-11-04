@@ -158,29 +158,29 @@ StringTests.test("ForeignIndexes/subscript(Range)/OutOfBoundsTrap/2") {
   acceptor[donor.startIndex.advancedBy(4)..<donor.startIndex.advancedBy(5)]
 }
 
-StringTests.test("ForeignIndexes/replaceRange/OutOfBoundsTrap/1") {
+StringTests.test("ForeignIndexes/replaceSubrange/OutOfBoundsTrap/1") {
   let donor = "abcdef"
   var acceptor = "uvw"
 
-  acceptor.replaceRange(
+  acceptor.replaceSubrange(
     donor.startIndex..<donor.startIndex.successor(), with: "u")
   expectEqual("uvw", acceptor)
 
   expectCrashLater()
-  acceptor.replaceRange(
+  acceptor.replaceSubrange(
     donor.startIndex..<donor.startIndex.advancedBy(4), with: "")
 }
 
-StringTests.test("ForeignIndexes/replaceRange/OutOfBoundsTrap/2") {
+StringTests.test("ForeignIndexes/replaceSubrange/OutOfBoundsTrap/2") {
   let donor = "abcdef"
   var acceptor = "uvw"
 
-  acceptor.replaceRange(
+  acceptor.replaceSubrange(
     donor.startIndex..<donor.startIndex.successor(), with: "u")
   expectEqual("uvw", acceptor)
 
   expectCrashLater()
-  acceptor.replaceRange(
+  acceptor.replaceSubrange(
     donor.startIndex.advancedBy(4)..<donor.startIndex.advancedBy(5), with: "")
 }
 
@@ -527,7 +527,7 @@ StringTests.test("COW/removeRange/end") {
   }
 }
 
-StringTests.test("COW/replaceRange/end") {
+StringTests.test("COW/replaceSubrange/end") {
   // Check literal-to-heap reallocation.
   if true {
     var str = "12345678"
@@ -540,7 +540,7 @@ StringTests.test("COW/replaceRange/end") {
     expectEqual("1234567", slice)
 
     // This mutation should reallocate the string.
-    slice.replaceRange(slice.endIndex..<slice.endIndex, with: "a")
+    slice.replaceSubrange(slice.endIndex..<slice.endIndex, with: "a")
     expectNotEqual(literalIdentity, slice.bufferID)
     expectEqual(literalIdentity, str.bufferID)
     let heapStrIdentity = str.bufferID
@@ -548,7 +548,7 @@ StringTests.test("COW/replaceRange/end") {
     expectEqual("12345678", str)
 
     // No more reallocations are expected.
-    slice.replaceRange(slice.endIndex.advancedBy(-1)..<slice.endIndex, with: "b")
+    slice.replaceSubrange(slice.endIndex.advancedBy(-1)..<slice.endIndex, with: "b")
     // FIXME: extra reallocation, should be expectEqual()
     expectNotEqual(heapStrIdentity, slice.bufferID)
     // end FIXME
@@ -573,7 +573,7 @@ StringTests.test("COW/replaceRange/end") {
     expectEqual(heapStrIdentity1, slice.bufferID)
 
     // This mutation should reallocate the string.
-    slice.replaceRange(slice.endIndex..<slice.endIndex, with: "a")
+    slice.replaceSubrange(slice.endIndex..<slice.endIndex, with: "a")
     expectNotEqual(heapStrIdentity1, slice.bufferID)
     expectEqual(heapStrIdentity1, str.bufferID)
     let heapStrIdentity2 = slice.bufferID
@@ -581,7 +581,7 @@ StringTests.test("COW/replaceRange/end") {
     expectEqual("12345678", str)
 
     // No more reallocations are expected.
-    slice.replaceRange(slice.endIndex.advancedBy(-1)..<slice.endIndex, with: "b")
+    slice.replaceSubrange(slice.endIndex.advancedBy(-1)..<slice.endIndex, with: "b")
     // FIXME: extra reallocation, should be expectEqual()
     expectNotEqual(heapStrIdentity2, slice.bufferID)
     // end FIXME

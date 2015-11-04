@@ -73,7 +73,7 @@ public class RangeReplaceableCollectionLog {
   public static var removeRange = TypeIndexed(0)
   public static var removeFirst = TypeIndexed(0)
   public static var removeFirstN = TypeIndexed(0)
-  public static var replaceRange = TypeIndexed(0)
+  public static var replaceSubrange = TypeIndexed(0)
   public static var reserveCapacity = TypeIndexed(0)
   public static var insertContentsOf = TypeIndexed(0)
 
@@ -137,13 +137,13 @@ public struct LoggingRangeReplaceableCollection<
     return base[position]
   }
 
-  public mutating func replaceRange<
+  public mutating func replaceSubrange<
     C : Collection where C.Iterator.Element == Base.Iterator.Element
   >(
     bounds: Range<Base.Index>, with newElements: C
   ) {
-    ++Log.replaceRange[selfType]
-    base.replaceRange(bounds, with: newElements)
+    ++Log.replaceSubrange[selfType]
+    base.replaceSubrange(bounds, with: newElements)
   }
 
   public mutating func append(newElement: Base.Iterator.Element) {

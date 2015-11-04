@@ -574,18 +574,18 @@ extension _StringCore : RangeReplaceableCollection {
   ///
   /// - Complexity: O(`bounds.count`) if `bounds.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
-  public mutating func replaceRange<
+  public mutating func replaceSubrange<
     C: Collection where C.Iterator.Element == UTF16.CodeUnit
   >(
     bounds: Range<Int>, with newElements: C
   ) {
     _precondition(
       bounds.startIndex >= 0,
-      "replaceRange: subrange start precedes String start")
+      "replaceSubrange: subrange start precedes String start")
 
     _precondition(
       bounds.endIndex <= count,
-      "replaceRange: subrange extends past String end")
+      "replaceSubrange: subrange extends past String end")
 
     let width = elementWidth == 2 || newElements.contains { $0 > 0x7f } ? 2 : 1
     let replacementCount = numericCast(newElements.count) as Int

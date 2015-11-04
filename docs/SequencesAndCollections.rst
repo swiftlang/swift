@@ -306,7 +306,7 @@ range of elements, denoted by two indices, by elements from a collection with a
 ::
 
   public protocol RangeReplaceableCollectionType : MutableCollectionType {
-    mutating func replaceRange<
+    mutating func replaceSubrange<
       C: CollectionType where C.Iterator.Element == Self.Iterator.Element
     >(
       subRange: Range<Index>, with newElements: C

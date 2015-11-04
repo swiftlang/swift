@@ -281,7 +281,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   ///
   /// - Complexity: O(`bounds.count`) if `bounds.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
-  public mutating func replaceRange<
+  public mutating func replaceSubrange<
     C: Collection where C.Iterator.Element == UnicodeScalar
   >(
     bounds: Range<Index>, with newElements: C
@@ -289,7 +289,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
     let rawSubRange = bounds.startIndex._position
       ..< bounds.endIndex._position
     let lazyUTF16 = newElements.lazy.flatMap { $0.utf16 }
-    _core.replaceRange(rawSubRange, with: lazyUTF16)
+    _core.replaceSubrange(rawSubRange, with: lazyUTF16)
   }
 }
 

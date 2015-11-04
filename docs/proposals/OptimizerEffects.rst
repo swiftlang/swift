@@ -185,7 +185,7 @@ state.
       var storage: ArrayStorage
 
       @preserve_unique
-      mutating func replaceRange<
+      mutating func replaceSubrange<
         C : CollectionType where C.Iterator.Element == T
       >(
         subRange: Range<Int>, with newElements: C
@@ -203,7 +203,7 @@ state.
   Note: In terms of low-level SIL attributes such a method will be marked:::
 
     @self_effects(preserve_unique, nocapture, norelease)
-    func replaceRange<> {}
+    func replaceSubrange<> {}
 
 ``@get_subobject``
 

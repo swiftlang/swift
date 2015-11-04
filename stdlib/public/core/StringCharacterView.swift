@@ -272,7 +272,7 @@ extension String.CharacterView : RangeReplaceableCollection {
   ///
   /// - Complexity: O(`bounds.count`) if `bounds.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
-  public mutating func replaceRange<
+  public mutating func replaceSubrange<
     C: Collection where C.Iterator.Element == Character
   >(
     bounds: Range<Index>, with newElements: C
@@ -280,7 +280,7 @@ extension String.CharacterView : RangeReplaceableCollection {
     let rawSubRange = bounds.startIndex._base._position
       ..< bounds.endIndex._base._position
     let lazyUTF16 = newElements.lazy.flatMap { $0.utf16 }
-    _core.replaceRange(rawSubRange, with: lazyUTF16)
+    _core.replaceSubrange(rawSubRange, with: lazyUTF16)
   }
 
   /// Reserve enough space to store `n` ASCII characters.
