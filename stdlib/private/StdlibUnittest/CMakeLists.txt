@@ -23,10 +23,10 @@ add_swift_library(swiftStdlibUnittest SHARED IS_STDLIB
   # filename.
   StdlibUnittest.swift.gyb
 
-  CheckCollectionType.swift
-  CheckMutableCollectionType.swift.gyb
-  CheckRangeReplaceableCollectionType.swift
-  CheckRangeReplaceableSliceType.swift
+  CheckCollection.swift
+  CheckMutableCollection.swift.gyb
+  CheckRangeReplaceableCollection.swift
+  CheckRangeReplaceableSlice.swift
   CheckSequenceType.swift
   InterceptTraps.cpp
   LoggingWrappers.swift.gyb
