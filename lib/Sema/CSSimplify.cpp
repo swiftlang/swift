@@ -566,6 +566,9 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
   // In the empty existential parameter case, we don't need to decompose the
   // arguments.
   if (paramType->isEmptyExistentialComposition()) {
+    if (argType->is<InOutType>()) {
+      return ConstraintSystem::SolutionKind::Error;
+    }
     return ConstraintSystem::SolutionKind::Solved;
   }
 
@@ -1057,6 +1060,10 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
                                         ConstraintKind kind, unsigned flags,
                                         ConstraintLocatorBuilder locator) {
+  if (type1->is<InOutType>()) {
+    return SolutionKind::Error;
+  }
+
   SmallVector<ProtocolDecl *, 4> protocols;
   type2->getAnyExistentialTypeProtocols(protocols);
 

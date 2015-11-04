@@ -757,6 +757,15 @@ func inoutTests(inout arr: Int) {
   
   // <rdar://problem/17489894> inout not rejected as operand to assignment operator
   &x += y  // expected-error {{'&' can only appear immediately in a call argument list}}
+
+  // <rdar://problem/23249098>
+  func takeAny(x: Any) {}
+  takeAny(&x) // expected-error{{'&' used with non-inout argument of type 'Any'}}
+  func takeManyAny(x: Any...) {}
+  takeManyAny(&x) // expected-error{{'&' used with non-inout argument of type '[Any]'}}
+  takeManyAny(1, &x) // expected-error{{'&' used with non-inout argument of type 'Any'}}
+  func takeIntAndAny(x: Int, _ y: Any) {}
+  takeIntAndAny(1, &x) // expected-error{{'&' used with non-inout argument of type 'Any'}}
 }
 
 
