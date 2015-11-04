@@ -375,6 +375,38 @@ static bool typedAccessTBAABuiltinTypesMayAlias(SILType LTy, SILType RTy,
   return false;
 }
 
+/// Return true if LTyRef and RTyRef have a parent-child relationship, i.e.
+/// the objects with the given types mayalias.
+static bool referenceTypeTBAAMayAlias(ClassDecl *LTyRef, ClassDecl *RTyRef) {
+  ClassDecl *C = nullptr;
+  // Walk from LTy to RTy.
+  C = LTyRef;
+  while(C->hasSuperclass()) {
+    Type T = C->getSuperclass();
+    C = T.getCanonicalTypeOrNull().getClassOrBoundGenericClass();
+    // We are unable to get a valid superclass type, bail out.
+    if (!C)
+      return true;
+    // There is a parent-child relationship.
+    if (C == RTyRef)
+      return true;
+  }
+
+  // Walk from RTy to LTy.
+  C = RTyRef;
+  while(C->hasSuperclass()) {
+    Type T = C->getSuperclass();
+    C = T.getCanonicalTypeOrNull().getClassOrBoundGenericClass();
+    // We are unable to get a valid superclass type, bail out.
+    if (!C)
+      return true;
+    // There is a parent-child relationship.
+    if (C == LTyRef)
+      return true;
+  }
+  return false;
+}
+
 /// \brief return True if the types \p LTy and \p RTy may alias.
 ///
 /// Currently this only implements typed access based TBAA. See the TBAA section
@@ -389,6 +421,15 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy, SILModule &Mod) {
   if (LTy == RTy)
     return true;
 
+  // If 2 reference types have no parent-child relationship, then they can
+  // not alias.
+  if (LTy.isHeapObjectReferenceType() && RTy.isHeapObjectReferenceType()) {
+    ClassDecl *L = LTy.getClassOrBoundGenericClass();
+    ClassDecl *R = RTy.getClassOrBoundGenericClass();
+    if (L && R)
+      return referenceTypeTBAAMayAlias(L, R);
+  }
+ 
   // Typed access based TBAA only occurs on pointers. If we reach this point and
   // do not have a pointer, be conservative and return that the two types may
   // alias. *NOTE* This ensures we return may alias for local_storage.
