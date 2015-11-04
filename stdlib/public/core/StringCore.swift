@@ -678,7 +678,7 @@ extension _StringCore : RangeReplaceableCollection {
     }
 
     let growth = s.underestimateCount()
-    var g = s.iterator()
+    var iter = s.iterator()
 
     if _fastPath(growth > 0) {
       let newSize = count + growth
@@ -686,18 +686,18 @@ extension _StringCore : RangeReplaceableCollection {
       if elementWidth == 1 {
         let destination8 = UnsafeMutablePointer<UTF8.CodeUnit>(destination)
         for i in 0..<growth {
-          destination8[i] = UTF8.CodeUnit(g.next()!)
+          destination8[i] = UTF8.CodeUnit(iter.next()!)
         }
       }
       else {
         let destination16 = UnsafeMutablePointer<UTF16.CodeUnit>(destination)
         for i in 0..<growth {
-          destination16[i] = g.next()!
+          destination16[i] = iter.next()!
         }
       }
     }
     // Append any remaining elements
-    for u in IteratorSequence(g) {
+    for u in IteratorSequence(iter) {
       self.append(u)
     }
   }

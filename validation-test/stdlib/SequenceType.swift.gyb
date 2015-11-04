@@ -153,20 +153,20 @@ SequenceTypeTests.test("IteratorSequence/IteratorProtocol/empty") {
   if true {
     let data: [OpaqueValue<Int>] = []
     let base = MinimalIterator(data)
-    var g = IteratorSequence(base)
+    var iter = IteratorSequence(base)
     expectType(
       IteratorSequence<MinimalIterator<OpaqueValue<Int>>>.self,
-      &g)
-    checkIterator(data, g, resiliencyChecks: .none) { $0.value == $1.value }
+      &iter)
+    checkIterator(data, iter, resiliencyChecks: .none) { $0.value == $1.value }
   }
   if true {
     let data: [OpaqueValue<Int>] = []
     let base = data.iterator()
-    var g = IteratorSequence(base)
+    var iter = IteratorSequence(base)
     expectType(
       IteratorSequence<CollectionDefaultIterator<Array<OpaqueValue<Int>>>>.self,
-      &g)
-    checkIterator(data, g) { $0.value == $1.value }
+      &iter)
+    checkIterator(data, iter) { $0.value == $1.value }
   }
 }
 
@@ -174,20 +174,20 @@ SequenceTypeTests.test("IteratorSequence/IteratorProtocol") {
   if true {
     let data: [OpaqueValue<Int>] = []
     let base = MinimalIterator(data)
-    var g = IteratorSequence(base)
+    var iter = IteratorSequence(base)
     expectType(
       IteratorSequence<MinimalIterator<OpaqueValue<Int>>>.self,
-      &g)
-    checkIterator(data, g, resiliencyChecks: .none) { $0.value == $1.value }
+      &iter)
+    checkIterator(data, iter, resiliencyChecks: .none) { $0.value == $1.value }
   }
   if true {
     let data: [OpaqueValue<Int>] = []
     let base = data.iterator()
-    var g = IteratorSequence(base)
+    var iter = IteratorSequence(base)
     expectType(
       IteratorSequence<CollectionDefaultIterator<Array<OpaqueValue<Int>>>>.self,
-      &g)
-    checkIterator(data, g) { $0.value == $1.value }
+      &iter)
+    checkIterator(data, iter) { $0.value == $1.value }
   }
 }
 
@@ -195,20 +195,20 @@ SequenceTypeTests.test("IteratorSequence/SequenceType/empty") {
   if true {
     let data = [ 10, 20, 30 ].map(OpaqueValue.init)
     let base = MinimalIterator(data)
-    var g = IteratorSequence(base)
+    var iter = IteratorSequence(base)
     expectType(
       IteratorSequence<MinimalIterator<OpaqueValue<Int>>>.self,
-      &g)
-    checkSequence(data, g, resiliencyChecks: .none) { $0.value == $1.value }
+      &iter)
+    checkSequence(data, iter, resiliencyChecks: .none) { $0.value == $1.value }
   }
   if true {
     let data = [ 10, 20, 30 ].map(OpaqueValue.init)
     let base = data.iterator()
-    var g = IteratorSequence(base)
+    var iter = IteratorSequence(base)
     expectType(
       IteratorSequence<CollectionDefaultIterator<Array<OpaqueValue<Int>>>>.self,
-      &g)
-    checkSequence(data, g) { $0.value == $1.value }
+      &iter)
+    checkSequence(data, iter) { $0.value == $1.value }
   }
 }
 
@@ -216,20 +216,20 @@ SequenceTypeTests.test("IteratorSequence/SequenceType") {
   if true {
     let data = [ 10, 20, 30 ].map(OpaqueValue.init)
     let base = MinimalIterator(data)
-    var g = IteratorSequence(base)
+    var iter = IteratorSequence(base)
     expectType(
       IteratorSequence<MinimalIterator<OpaqueValue<Int>>>.self,
-      &g)
-    checkSequence(data, g, resiliencyChecks: .none) { $0.value == $1.value }
+      &iter)
+    checkSequence(data, iter, resiliencyChecks: .none) { $0.value == $1.value }
   }
   if true {
     let data = [ 10, 20, 30 ].map(OpaqueValue.init)
     let base = data.iterator()
-    var g = IteratorSequence(base)
+    var iter = IteratorSequence(base)
     expectType(
       IteratorSequence<CollectionDefaultIterator<Array<OpaqueValue<Int>>>>.self,
-      &g)
-    checkSequence(data, g) { $0.value == $1.value }
+      &iter)
+    checkSequence(data, iter) { $0.value == $1.value }
   }
 }
 

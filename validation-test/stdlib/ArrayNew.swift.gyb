@@ -456,25 +456,25 @@ ArrayTestSuite.test("${array_type}/_withUnsafeMutableBufferPointerIfSupported/Re
 ArrayTestSuite.test(
   "${array_type}/mutationDoesNotAffectIterator/subscript/store") {
   var arr: ${array_type}<Int> = [ 1010, 1020, 1030 ]
-  var g = arr.iterator()
+  var iter = arr.iterator()
   arr[0] = 1011
-  expectEqual([ 1010, 1020, 1030 ], Array(IteratorSequence(g)))
+  expectEqual([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
 }
 
 ArrayTestSuite.test(
   "${array_type}/mutationDoesNotAffectIterator/subscript/append") {
   var arr: ${array_type}<Int> = [ 1010, 1020, 1030 ]
-  var g = arr.iterator()
+  var iter = arr.iterator()
   arr.append(1040)
-  expectEqual([ 1010, 1020, 1030 ], Array(IteratorSequence(g)))
+  expectEqual([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
 }
 
 ArrayTestSuite.test(
   "${array_type}/mutationDoesNotAffectIterator/subscript/replaceRange") {
   var arr: ${array_type}<Int> = [ 1010, 1020, 1030 ]
-  var g = arr.iterator()
+  var iter = arr.iterator()
   arr.replaceRange(1..<3, with: [ 1040, 1050, 1060 ])
-  expectEqual([ 1010, 1020, 1030 ], Array(IteratorSequence(g)))
+  expectEqual([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
 }
 
 % end

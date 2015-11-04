@@ -21,8 +21,8 @@ extension Q_SequenceDefaultsType {
     var result = _ContiguousArrayBuffer<Iterator.Element>(
       count: initialCapacity, minimumCapacity: 0)
 
-    var g = self.iterator()
-    while let x? = g.next() {
+    var iter = self.iterator()
+    while let x? = iter.next() {
       result += CollectionOfOne(x)
     }
     return ContiguousArray(result)
@@ -34,8 +34,8 @@ extension Q_SequenceDefaultsType {
     baseAddress: UnsafeMutablePointer<Iterator.Element>
   ) {
     var p = baseAddress
-    var g = self.iterator()
-    while let element? = g.next() {
+    var iter = self.iterator()
+    while let element? = iter.next() {
       p.initialize(element)
       ++p
     }

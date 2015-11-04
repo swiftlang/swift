@@ -93,7 +93,7 @@ public class SequenceLog {
   ) -> LoggingSequence<LoggingSequence<S>> {
     return LoggingSequence(LoggingSequence(s))
   }
-  public static var generate = TypeIndexed(0)
+  public static var iterator = TypeIndexed(0)
   public static var underestimateCount = TypeIndexed(0)
   public static var map = TypeIndexed(0)
   public static var filter = TypeIndexed(0)
@@ -112,7 +112,7 @@ public protocol LoggingSequenceType  : SequenceType, LoggingType {
 extension LoggingSequenceType
   where Log == SequenceLog, Iterator == LoggingIterator<Base.Iterator> {
   public func iterator() -> LoggingIterator<Base.Iterator> {
-    ++Log.generate[selfType]
+    ++Log.iterator[selfType]
     return LoggingIterator(base.iterator())
   }
 

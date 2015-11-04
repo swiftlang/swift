@@ -141,10 +141,10 @@ public struct JoinSequence<
     }
 
     if separatorSize != 0 {
-      var gen = _base.iterator()
-      if let first = gen.next() {
+      var iter = _base.iterator()
+      if let first = iter.next() {
         result.appendContentsOf(first)
-        while let next = gen.next() {
+        while let next = iter.next() {
           result.appendContentsOf(_separator)
           result.appendContentsOf(next)
         }

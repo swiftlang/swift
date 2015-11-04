@@ -41,9 +41,9 @@ public struct AnyIterator<Element> : IteratorProtocol {
   ///
   ///       // This is a really complicated type of no interest to our
   ///       // clients.
-  ///       let g: MapSequenceIterator<RangeIterator<Int>, String>
+  ///       let iterator: MapSequenceIterator<RangeIterator<Int>, String>
   ///         = lazyStrings.iterator()
-  ///       return AnyIterator(g)
+  ///       return AnyIterator(iterator)
   ///     }
   public init<I : IteratorProtocol where I.Element == Element>(_ base: I) {
     self._box = _IteratorBox(base)
@@ -55,8 +55,8 @@ public struct AnyIterator<Element> : IteratorProtocol {
   /// Example:
   ///
   ///     var x = 7
-  ///     let g = AnyIterator { x < 15 ? x++ : nil }
-  ///     let a = Array(g) // [ 7, 8, 9, 10, 11, 12, 13, 14 ]
+  ///     let iterator = AnyIterator { x < 15 ? x++ : nil }
+  ///     let a = Array(iterator) // [ 7, 8, 9, 10, 11, 12, 13, 14 ]
   public init(body: () -> Element?) {
     self._box = _IteratorBox(_ClosureBasedIterator(body))
   }

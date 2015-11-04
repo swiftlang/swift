@@ -634,10 +634,10 @@ extension SequenceType where Iterator.Element == String {
     }
 
     if separatorSize != 0 {
-      var gen = iterator()
-      if let first = gen.next() {
+      var iter = iterator()
+      if let first = iter.next() {
         result.appendContentsOf(first)
-        while let next = gen.next() {
+        while let next = iter.next() {
           result.appendContentsOf(separator)
           result.appendContentsOf(next)
         }

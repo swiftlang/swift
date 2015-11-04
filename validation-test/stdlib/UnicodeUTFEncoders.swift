@@ -112,10 +112,10 @@ class CodecTest<Codec : TestableUnicodeCodec> {
       self.encodeBuffer[encodeIndex++] = $0
     }
 
-    var g = nsEncoded.iterator()
+    var iter = nsEncoded.iterator()
     var decoded: UnicodeScalar
     var decoder = Codec()
-    switch decoder.decode(&g) {
+    switch decoder.decode(&iter) {
     case .Result(let us):
       decoded = us
     default:

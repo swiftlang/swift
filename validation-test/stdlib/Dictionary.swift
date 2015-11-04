@@ -882,9 +882,9 @@ DictionaryTestSuite.test("COW.Fast.GenerateDoesNotReallocate") {
   var d = getCOWFastDictionary()
   var identity1 = unsafeBitCast(d, Int.self)
 
-  var gen = d.iterator()
+  var iter = d.iterator()
   var pairs = Array<(Int, Int)>()
-  while let (key, value) = gen.next() {
+  while let (key, value) = iter.next() {
     pairs += [(key, value)]
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
@@ -895,9 +895,9 @@ DictionaryTestSuite.test("COW.Slow.GenerateDoesNotReallocate") {
   var d = getCOWSlowDictionary()
   var identity1 = unsafeBitCast(d, Int.self)
 
-  var gen = d.iterator()
+  var iter = d.iterator()
   var pairs = Array<(Int, Int)>()
-  while let (key, value) = gen.next() {
+  while let (key, value) = iter.next() {
     // FIXME: This doesn't work (<rdar://problem/17751308> Can't +=
     // with array literal of pairs)
     // pairs += [(key.value, value.value)]
@@ -2158,18 +2158,18 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
   var identity1 = unsafeBitCast(d, Int.self)
   assert(isCocoaDictionary(d))
 
-  var gen = d.iterator()
+  var iter = d.iterator()
   var pairs = Array<(Int, Int)>()
-  while let (key, value) = gen.next() {
+  while let (key, value) = iter.next() {
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
   // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
-  assert(gen.next() == nil)
-  assert(gen.next() == nil)
-  assert(gen.next() == nil)
+  assert(iter.next() == nil)
+  assert(iter.next() == nil)
+  assert(iter.next() == nil)
   assert(identity1 == unsafeBitCast(d, Int.self))
 }
 
@@ -2178,18 +2178,18 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
   var identity1 = unsafeBitCast(d, Int.self)
   assert(isNativeDictionary(d))
 
-  var gen = d.iterator()
+  var iter = d.iterator()
   var pairs = Array<(Int, Int)>()
-  while let (key, value) = gen.next() {
+  while let (key, value) = iter.next() {
     let kv = (key.value, value.value)
     pairs.append(kv)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
   // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
-  assert(gen.next() == nil)
-  assert(gen.next() == nil)
-  assert(gen.next() == nil)
+  assert(iter.next() == nil)
+  assert(iter.next() == nil)
+  assert(iter.next() == nil)
   assert(identity1 == unsafeBitCast(d, Int.self))
 }
 
@@ -2198,16 +2198,16 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
   var identity1 = unsafeBitCast(d, Int.self)
   assert(isCocoaDictionary(d))
 
-  var gen = d.iterator()
+  var iter = d.iterator()
   // Can not write code below because of
   // <rdar://problem/16811736> Optional tuples are broken as optionals regarding == comparison
-  // assert(gen.next() == .None)
-  assert(gen.next() == nil)
+  // assert(iter.next() == .None)
+  assert(iter.next() == nil)
   // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
-  assert(gen.next() == nil)
-  assert(gen.next() == nil)
-  assert(gen.next() == nil)
+  assert(iter.next() == nil)
+  assert(iter.next() == nil)
+  assert(iter.next() == nil)
   assert(identity1 == unsafeBitCast(d, Int.self))
 }
 
@@ -2216,16 +2216,16 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
   var identity1 = unsafeBitCast(d, Int.self)
   assert(isNativeDictionary(d))
 
-  var gen = d.iterator()
+  var iter = d.iterator()
   // Can not write code below because of
   // <rdar://problem/16811736> Optional tuples are broken as optionals regarding == comparison
-  // assert(gen.next() == .None)
-  assert(gen.next() == nil)
+  // assert(iter.next() == .None)
+  assert(iter.next() == nil)
   // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
-  assert(gen.next() == nil)
-  assert(gen.next() == nil)
-  assert(gen.next() == nil)
+  assert(iter.next() == nil)
+  assert(iter.next() == nil)
+  assert(iter.next() == nil)
   assert(identity1 == unsafeBitCast(d, Int.self))
 }
 
@@ -2235,9 +2235,9 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
   var identity1 = unsafeBitCast(d, Int.self)
   assert(isCocoaDictionary(d))
 
-  var gen = d.iterator()
+  var iter = d.iterator()
   var pairs = Array<(Int, Int)>()
-  while let (key, value) = gen.next() {
+  while let (key, value) = iter.next() {
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
@@ -2248,9 +2248,9 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
   assert(equalsUnordered(pairs, expectedPairs))
   // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
-  assert(gen.next() == nil)
-  assert(gen.next() == nil)
-  assert(gen.next() == nil)
+  assert(iter.next() == nil)
+  assert(iter.next() == nil)
+  assert(iter.next() == nil)
   assert(identity1 == unsafeBitCast(d, Int.self))
 }
 
@@ -2259,9 +2259,9 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
   var identity1 = unsafeBitCast(d, Int.self)
   assert(isNativeDictionary(d))
 
-  var gen = d.iterator()
+  var iter = d.iterator()
   var pairs = Array<(Int, Int)>()
-  while let (key, value) = gen.next() {
+  while let (key, value) = iter.next() {
     let kv = (key.value, value.value)
     pairs.append(kv)
   }
@@ -2272,9 +2272,9 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
   assert(equalsUnordered(pairs, expectedPairs))
   // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
-  assert(gen.next() == nil)
-  assert(gen.next() == nil)
-  assert(gen.next() == nil)
+  assert(iter.next() == nil)
+  assert(iter.next() == nil)
+  assert(iter.next() == nil)
   assert(identity1 == unsafeBitCast(d, Int.self))
 }
 
@@ -2288,9 +2288,9 @@ autoreleasepoolIfUnoptimizedReturnAutoreleased {
   var identity1 = unsafeBitCast(d, Int.self)
   assert(isCocoaDictionary(d))
 
-  var gen = d.iterator()
+  var iter = d.iterator()
   var pairs = Array<(Int, Int)>()
-  while let (key, value) = gen.next() {
+  while let (key, value) = iter.next() {
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
@@ -2298,9 +2298,9 @@ autoreleasepoolIfUnoptimizedReturnAutoreleased {
   assert(equalsUnordered(pairs, expectedPairs))
   // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
-  assert(gen.next() == nil)
-  assert(gen.next() == nil)
-  assert(gen.next() == nil)
+  assert(iter.next() == nil)
+  assert(iter.next() == nil)
+  assert(iter.next() == nil)
   assert(identity1 == unsafeBitCast(d, Int.self))
 }
 }
@@ -2314,9 +2314,9 @@ autoreleasepoolIfUnoptimizedReturnAutoreleased {
   var identity1 = unsafeBitCast(d, Int.self)
   assert(isNativeDictionary(d))
 
-  var gen = d.iterator()
+  var iter = d.iterator()
   var pairs = Array<(Int, Int)>()
-  while let (key, value) = gen.next() {
+  while let (key, value) = iter.next() {
     let kv = (key.value, value.value)
     pairs.append(kv)
   }
@@ -2324,9 +2324,9 @@ autoreleasepoolIfUnoptimizedReturnAutoreleased {
   assert(equalsUnordered(pairs, expectedPairs))
   // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
-  assert(gen.next() == nil)
-  assert(gen.next() == nil)
-  assert(gen.next() == nil)
+  assert(iter.next() == nil)
+  assert(iter.next() == nil)
+  assert(iter.next() == nil)
   assert(identity1 == unsafeBitCast(d, Int.self))
 }
 }
@@ -2481,9 +2481,9 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.ArrayOfDictionaries") {
   var a = nsa as [AnyObject] as! [Dictionary<NSObject, AnyObject>]
   for i in 0..<3 {
     var d = a[i]
-    var gen = d.iterator()
+    var iter = d.iterator()
     var pairs = Array<(Int, Int)>()
-    while let (key, value) = gen.next() {
+    while let (key, value) = iter.next() {
       let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
       pairs.append(kv)
     }
@@ -2502,9 +2502,9 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfDictionaries") {
   var a = nsa as [AnyObject] as! [Dictionary<TestBridgedKeyTy, TestBridgedValueTy>]
   for i in 0..<3 {
     var d = a[i]
-    var gen = d.iterator()
+    var iter = d.iterator()
     var pairs = Array<(Int, Int)>()
-    while let (key, value) = gen.next() {
+    while let (key, value) = iter.next() {
       let kv = (key.value, value.value)
       pairs.append(kv)
     }
@@ -3675,61 +3675,61 @@ ObjCThunks.test("Dictionary/Return") {
 }
 
 //===---
-// Check that generators traverse a snapshot of the collection.
+// Check that iterators traverse a snapshot of the collection.
 //===---
 
 DictionaryTestSuite.test("mutationDoesNotAffectIterator/subscript/store") {
   var dict = getDerivedAPIsDictionary()
-  var g = dict.iterator()
+  var iter = dict.iterator()
   dict[10] = 1011
 
   expectEqualsUnordered(
     [ (10, 1010), (20, 1020), (30, 1030) ],
-    Array(IteratorSequence(g)))
+    Array(IteratorSequence(iter)))
 }
 
 DictionaryTestSuite.test("mutationDoesNotAffectIterator/removeValueForKey,1") {
   var dict = getDerivedAPIsDictionary()
-  var g = dict.iterator()
+  var iter = dict.iterator()
   expectOptionalEqual(1010, dict.removeValueForKey(10))
 
   expectEqualsUnordered(
     [ (10, 1010), (20, 1020), (30, 1030) ],
-    Array(IteratorSequence(g)))
+    Array(IteratorSequence(iter)))
 }
 
 DictionaryTestSuite.test("mutationDoesNotAffectIterator/removeValueForKey,all") {
   var dict = getDerivedAPIsDictionary()
-  var g = dict.iterator()
+  var iter = dict.iterator()
   expectOptionalEqual(1010, dict.removeValueForKey(10))
   expectOptionalEqual(1020, dict.removeValueForKey(20))
   expectOptionalEqual(1030, dict.removeValueForKey(30))
 
   expectEqualsUnordered(
     [ (10, 1010), (20, 1020), (30, 1030) ],
-    Array(IteratorSequence(g)))
+    Array(IteratorSequence(iter)))
 }
 
 DictionaryTestSuite.test(
   "mutationDoesNotAffectIterator/removeAll,keepCapacity=false") {
   var dict = getDerivedAPIsDictionary()
-  var g = dict.iterator()
+  var iter = dict.iterator()
   dict.removeAll(keepCapacity: false)
 
   expectEqualsUnordered(
     [ (10, 1010), (20, 1020), (30, 1030) ],
-    Array(IteratorSequence(g)))
+    Array(IteratorSequence(iter)))
 }
 
 DictionaryTestSuite.test(
   "mutationDoesNotAffectIterator/removeAll,keepCapacity=true") {
   var dict = getDerivedAPIsDictionary()
-  var g = dict.iterator()
+  var iter = dict.iterator()
   dict.removeAll(keepCapacity: true)
 
   expectEqualsUnordered(
     [ (10, 1010), (20, 1020), (30, 1030) ],
-    Array(IteratorSequence(g)))
+    Array(IteratorSequence(iter)))
 }
 
 //===---

@@ -79,7 +79,7 @@ public class SequenceLog {
   ) -> LoggingSequence<LoggingSequence<S>> {
     return LoggingSequence(LoggingSequence(s))
   }
-  public static var generate = TypeIndexed(0)
+  public static var iterator = TypeIndexed(0)
   public static var underestimateCount = TypeIndexed(0)
   public static var map = TypeIndexed(0)
   public static var filter = TypeIndexed(0)
@@ -99,7 +99,7 @@ extension LoggingSequenceType {
   }
   
   public func iterator() -> LoggingIterator<Base.Iterator> {
-    ++SequenceLog.generate[selfType]
+    ++SequenceLog.iterator[selfType]
     return LoggingIterator(base.iterator())
   }
 

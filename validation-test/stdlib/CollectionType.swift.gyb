@@ -403,7 +403,7 @@ struct MinimalForwardCollectionWithDefaultIterator : Collection {
   var _count: Int
 }
 
-func callGenericGenerate<S : SequenceType>(sequence: S) -> S.Iterator {
+func callGenericIterator<S : SequenceType>(sequence: S) -> S.Iterator {
   return sequence.iterator()
 }
 
@@ -413,18 +413,18 @@ CollectionTypeTests.test("Collection.iterator()/DefaultImplementation") {
 
     if true {
       // Check the return type of the function when called statically.
-      var generator = collection.iterator()
+      var iter = collection.iterator()
       expectType(
         CollectionDefaultIterator<MinimalForwardCollectionWithDefaultIterator>.self,
-        &generator)
+        &iter)
     }
 
     if true {
       // Check the return type of the function when called generically.
-      var generator = callGenericGenerate(collection)
+      var iter = callGenericIterator(collection)
       expectType(
         CollectionDefaultIterator<MinimalForwardCollectionWithDefaultIterator>.self,
-        &generator)
+        &iter)
     }
 
     checkForwardCollection(
@@ -471,20 +471,20 @@ CollectionTypeTests.test("Collection.iterator()/CustomImplementation") {
     if true {
       // Check the return type of the function when called statically.
       MinimalForwardCollectionWithCustomIterator.timesGenerateWasCalled = 0
-      var generator = collection.iterator()
+      var iter = collection.iterator()
       expectType(
         MinimalIterator<OpaqueValue<Int>>.self,
-        &generator)
+        &iter)
       expectEqual(1, MinimalForwardCollectionWithCustomIterator.timesGenerateWasCalled)
     }
 
     if true {
       MinimalForwardCollectionWithCustomIterator.timesGenerateWasCalled = 0
       // Check the return type of the function when called generically.
-      var generator = callGenericGenerate(collection)
+      var iter = callGenericIterator(collection)
       expectType(
         MinimalIterator<OpaqueValue<Int>>.self,
-        &generator)
+        &iter)
       expectEqual(1, MinimalForwardCollectionWithCustomIterator.timesGenerateWasCalled)
     }
 

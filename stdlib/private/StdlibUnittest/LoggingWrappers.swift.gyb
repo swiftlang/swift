@@ -269,7 +269,7 @@ public class SequenceLog {
     return LoggingSequence(LoggingSequence(s))
   }
   public static var forEach = TypeIndexed(0)
-  public static var generate = TypeIndexed(0)
+  public static var iterator = TypeIndexed(0)
   public static var underestimateCount = TypeIndexed(0)
   public static var map = TypeIndexed(0)
   public static var filter = TypeIndexed(0)
@@ -448,7 +448,7 @@ public struct Logging${Kind}<Base: ${Kind}${Suffix}> : ${Kind}${Suffix}, Logging
 %   end
 
   public func iterator() -> LoggingIterator<Base.Iterator> {
-    ++Log.generate[selfType]
+    ++Log.iterator[selfType]
     return LoggingIterator(base.iterator())
   }
 

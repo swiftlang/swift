@@ -995,9 +995,9 @@ SetTestSuite.test("COW.Fast.GenerateDoesNotReallocate") {
   var s = getCOWFastSet()
   var identity1 = unsafeBitCast(s, Int.self)
 
-  var gen = s.iterator()
+  var iter = s.iterator()
   var items: [Int] = []
-  while let value = gen.next() {
+  while let value = iter.next() {
     items += [value]
   }
   expectTrue(equalsUnordered(items, [ 1010, 2020, 3030 ]))
@@ -1008,9 +1008,9 @@ SetTestSuite.test("COW.Slow.GenerateDoesNotReallocate") {
   var s = getCOWSlowSet()
   var identity1 = unsafeBitCast(s, Int.self)
 
-  var gen = s.iterator()
+  var iter = s.iterator()
   var items: [Int] = []
-  while let value = gen.next() {
+  while let value = iter.next() {
     items.append(value.value)
   }
   expectTrue(equalsUnordered(items, [ 1010, 2020, 3030 ]))
@@ -1893,17 +1893,17 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
   var identity1 = unsafeBitCast(s, Int.self)
   expectTrue(isCocoaSet(s))
 
-  var gen = s.iterator()
+  var iter = s.iterator()
   var members: [Int] = []
-  while let member = gen.next() {
+  while let member = iter.next() {
     members.append((member as! TestObjCKeyTy).value)
   }
   expectTrue(equalsUnordered(members, [1010, 2020, 3030]))
   // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
-  expectEmpty(gen.next())
-  expectEmpty(gen.next())
-  expectEmpty(gen.next())
+  expectEmpty(iter.next())
+  expectEmpty(iter.next())
+  expectEmpty(iter.next())
   expectEqual(identity1, unsafeBitCast(s, Int.self))
 }
 
@@ -1912,17 +1912,17 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
   var identity1 = unsafeBitCast(s, Int.self)
   expectTrue(isNativeSet(s))
 
-  var gen = s.iterator()
+  var iter = s.iterator()
   var members: [Int] = []
-  while let member = gen.next() {
+  while let member = iter.next() {
     members.append(member.value)
   }
   expectTrue(equalsUnordered(members, [1010, 2020, 3030]))
   // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
-  expectEmpty(gen.next())
-  expectEmpty(gen.next())
-  expectEmpty(gen.next())
+  expectEmpty(iter.next())
+  expectEmpty(iter.next())
+  expectEmpty(iter.next())
   expectEqual(identity1, unsafeBitCast(s, Int.self))
 }
 
@@ -1931,13 +1931,13 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
   var identity1 = unsafeBitCast(s, Int.self)
   expectTrue(isCocoaSet(s))
 
-  var gen = s.iterator()
-  expectEmpty(gen.next())
+  var iter = s.iterator()
+  expectEmpty(iter.next())
   // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
-  expectEmpty(gen.next())
-  expectEmpty(gen.next())
-  expectEmpty(gen.next())
+  expectEmpty(iter.next())
+  expectEmpty(iter.next())
+  expectEmpty(iter.next())
   expectEqual(identity1, unsafeBitCast(s, Int.self))
 }
 
@@ -1946,13 +1946,13 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
   var identity1 = unsafeBitCast(s, Int.self)
   expectTrue(isNativeSet(s))
 
-  var gen = s.iterator()
-  expectEmpty(gen.next())
+  var iter = s.iterator()
+  expectEmpty(iter.next())
   // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
-  expectEmpty(gen.next())
-  expectEmpty(gen.next())
-  expectEmpty(gen.next())
+  expectEmpty(iter.next())
+  expectEmpty(iter.next())
+  expectEmpty(iter.next())
   expectEqual(identity1, unsafeBitCast(s, Int.self))
 }
 
@@ -1961,17 +1961,17 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
   var identity1 = unsafeBitCast(s, Int.self)
   expectTrue(isCocoaSet(s))
 
-  var gen = s.iterator()
+  var iter = s.iterator()
   var members = [Int]()
-  while let member = gen.next() {
+  while let member = iter.next() {
     members.append((member as! TestObjCKeyTy).value)
   }
   expectTrue(equalsUnordered(members, hugeNumberArray))
   // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
-  expectEmpty(gen.next())
-  expectEmpty(gen.next())
-  expectEmpty(gen.next())
+  expectEmpty(iter.next())
+  expectEmpty(iter.next())
+  expectEmpty(iter.next())
   expectEqual(identity1, unsafeBitCast(s, Int.self))
 }
 
@@ -1980,17 +1980,17 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
   var identity1 = unsafeBitCast(s, Int.self)
   expectTrue(isNativeSet(s))
 
-  var gen = s.iterator()
+  var iter = s.iterator()
   var members = [Int]()
-  while let member = gen.next() as AnyObject? {
+  while let member = iter.next() as AnyObject? {
     members.append((member as! TestBridgedKeyTy).value)
   }
   expectTrue(equalsUnordered(members, hugeNumberArray))
   // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
-  expectEmpty(gen.next())
-  expectEmpty(gen.next())
-  expectEmpty(gen.next())
+  expectEmpty(iter.next())
+  expectEmpty(iter.next())
+  expectEmpty(iter.next())
   expectEqual(identity1, unsafeBitCast(s, Int.self))
 }
 
@@ -2081,9 +2081,9 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.ArrayOfSets") {
   var a = nsa as [AnyObject] as! [Set<NSObject>]
   for i in 0..<3 {
     var s = a[i]
-    var gen = s.iterator()
+    var iter = s.iterator()
     var items: [Int] = []
-    while let value = gen.next() {
+    while let value = iter.next() {
       let v = (value as! TestObjCKeyTy).value
       items.append(v)
     }
@@ -2102,9 +2102,9 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfSets") {
   var a = nsa as [AnyObject] as! [Set<TestBridgedKeyTy>]
   for i in 0..<3 {
     var d = a[i]
-    var gen = d.iterator()
+    var iter = d.iterator()
     var items: [Int] = []
-    while let value = gen.next() {
+    while let value = iter.next() {
       items.append(value.value)
     }
     var expectedItems = [ 1 + i, 2 + i, 3 + i ]
@@ -3664,41 +3664,41 @@ SetTestSuite.test("Operator.Precedence") {
 }
 
 //===---
-// Check that generators traverse a snapshot of the collection.
+// Check that iterators traverse a snapshot of the collection.
 //===---
 
 SetTestSuite.test("mutationDoesNotAffectIterator/remove,1") {
   var set = Set([ 1010, 1020, 1030 ])
-  var g = set.iterator()
+  var iter = set.iterator()
   expectOptionalEqual(1010, set.remove(1010))
 
-  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(IteratorSequence(g)))
+  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
 }
 
 SetTestSuite.test("mutationDoesNotAffectIterator/remove,all") {
   var set = Set([ 1010, 1020, 1030 ])
-  var g = set.iterator()
+  var iter = set.iterator()
   expectOptionalEqual(1010, set.remove(1010))
   expectOptionalEqual(1020, set.remove(1020))
   expectOptionalEqual(1030, set.remove(1030))
 
-  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(IteratorSequence(g)))
+  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
 }
 
 SetTestSuite.test("mutationDoesNotAffectIterator/removeAll,keepCapacity=false") {
   var set = Set([ 1010, 1020, 1030 ])
-  var g = set.iterator()
+  var iter = set.iterator()
   set.removeAll(keepCapacity: false)
 
-  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(IteratorSequence(g)))
+  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
 }
 
 SetTestSuite.test("mutationDoesNotAffectIterator/removeAll,keepCapacity=true") {
   var set = Set([ 1010, 1020, 1030 ])
-  var g = set.iterator()
+  var iter = set.iterator()
   set.removeAll(keepCapacity: true)
 
-  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(IteratorSequence(g)))
+  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
 }
 
 runAllTests()
