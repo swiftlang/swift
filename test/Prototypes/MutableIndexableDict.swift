@@ -416,8 +416,8 @@ struct Dictionary<Key: Hashable, Value> : CollectionType, SequenceType {
   }
 
   // Satisfying SequenceType
-  func iterator() -> IndexingGenerator<_Self> {
-    return IndexingGenerator(self)
+  func iterator() -> CollectionDefaultIterator<_Self> {
+    return CollectionDefaultIterator(self)
   }
 }
 

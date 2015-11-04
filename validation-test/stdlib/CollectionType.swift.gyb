@@ -415,7 +415,7 @@ CollectionTypeTests.test("CollectionType.iterator()/DefaultImplementation") {
       // Check the return type of the function when called statically.
       var generator = collection.iterator()
       expectType(
-        IndexingGenerator<MinimalForwardCollectionWithDefaultIterator>.self,
+        CollectionDefaultIterator<MinimalForwardCollectionWithDefaultIterator>.self,
         &generator)
     }
 
@@ -423,7 +423,7 @@ CollectionTypeTests.test("CollectionType.iterator()/DefaultImplementation") {
       // Check the return type of the function when called generically.
       var generator = callGenericGenerate(collection)
       expectType(
-        IndexingGenerator<MinimalForwardCollectionWithDefaultIterator>.self,
+        CollectionDefaultIterator<MinimalForwardCollectionWithDefaultIterator>.self,
         &generator)
     }
 

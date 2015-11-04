@@ -19,7 +19,7 @@
 // This protocol is almost an implementation detail of the standard
 // library; it is used to deduce things like the `SubSequence` and
 // `Iterator` type from a minimal collection, but it is also used in
-// exposed places like as a constraint on IndexingGenerator.
+// exposed places like as a constraint on CollectionDefaultIterator.
 public protocol Indexable {
   /// A type that represents a valid position in the collection.
   ///
@@ -46,11 +46,11 @@ public protocol Indexable {
   // The declaration of _Element and subscript here is a trick used to
   // break a cyclic conformance/deduction that Swift can't handle.  We
   // need something other than a CollectionType.Iterator.Element that can
-  // be used as IndexingGenerator<T>'s Element.  Here we arrange for the
-  // CollectionType itself to have an Element type that's deducible from
-  // its subscript.  Ideally we'd like to constrain this
-  // Element to be the same as CollectionType.Iterator.Element (see
-  // below), but we have no way of expressing it today.
+  // be used as CollectionDefaultIterator<T>'s Element.  Here we arrange for
+  // the CollectionType itself to have an Element type that's deducible from
+  // its subscript.  Ideally we'd like to constrain this Element to be the same
+  // as CollectionType.Iterator.Element (see below), but we have no way of
+  // expressing it today.
   typealias _Element
 
   /// Returns the element at the given `position`.
@@ -70,19 +70,8 @@ public protocol MutableIndexable {
   subscript(position: Index) -> _Element {get set}
 }
 
-/// An *iterator* for an arbitrary *collection*.  Provided `C`
-/// conforms to the other requirements of `Indexable`,
-/// `IndexingGenerator<C>` can be used as the result of `C`'s
-/// `iterator()` method.  For example:
-///
-///      struct MyCollection : CollectionType {
-///        struct Index : ForwardIndexType { /* implementation hidden */ }
-///        subscript(i: Index) -> MyElement { /* implementation hidden */ }
-///        func iterator() -> IndexingGenerator<MyCollection> { // <===
-///          return IndexingGenerator(self)
-///        }
-///      }
-public struct IndexingGenerator<Elements : Indexable>
+/// The iterator used for collections that don't specify one.
+public struct CollectionDefaultIterator<Elements : Indexable>
  : IteratorProtocol, SequenceType {
 
   /// Create a *iterator* over the given collection.
@@ -123,13 +112,13 @@ public protocol CollectionType : Indexable, SequenceType {
   /// encapsulates its iteration state.
   ///
   /// By default, a `CollectionType` satisfies `SequenceType` by
-  /// supplying an `IndexingGenerator` as its associated `Iterator`
+  /// supplying a `CollectionDefaultIterator` as its associated `Iterator`
   /// type.
-  typealias Iterator : IteratorProtocol = IndexingGenerator<Self>
+  typealias Iterator : IteratorProtocol = CollectionDefaultIterator<Self>
 
   // FIXME: Needed here so that the Iterator is properly deduced from
   // a custom iterator() function.  Otherwise we get an
-  // IndexingGenerator. <rdar://problem/21539115>
+  // CollectionDefaultIterator. <rdar://problem/21539115>
   func iterator() -> Iterator
   
   // FIXME: should be constrained to CollectionType
@@ -197,10 +186,10 @@ public protocol CollectionType : Indexable, SequenceType {
 
 /// Supply the default `iterator()` method for `CollectionType` models
 /// that accept the default associated `Iterator`,
-/// `IndexingGenerator<Self>`.
-extension CollectionType where Iterator == IndexingGenerator<Self> {
-  public func iterator() -> IndexingGenerator<Self> {
-    return IndexingGenerator(self)
+/// `CollectionDefaultIterator<Self>`.
+extension CollectionType where Iterator == CollectionDefaultIterator<Self> {
+  public func iterator() -> CollectionDefaultIterator<Self> {
+    return CollectionDefaultIterator(self)
   }
 }
 

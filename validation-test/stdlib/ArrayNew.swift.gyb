@@ -1593,8 +1593,8 @@ final class EvilCollection : CollectionType {
     return TestValueTy(i)
   }
 
-  func iterator() -> IndexingGenerator<EvilCollection> {
-    return IndexingGenerator(self)
+  func iterator() -> CollectionDefaultIterator<EvilCollection> {
+    return CollectionDefaultIterator(self)
   }
 }
 
