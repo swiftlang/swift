@@ -111,13 +111,13 @@ func testUnreachableCase5(a : Tree) {
 }
 
 
-func testUnreachableAfterThrow(e : ErrorType) throws {
+func testUnreachableAfterThrow(e: ErrorProtocol) throws {
   throw e
   return   // expected-warning {{code after 'throw' will never be executed}}
 }
 
 class TestThrowInInit {
-  required init(e : ErrorType) throws {
+  required init(e: ErrorProtocol) throws {
     throw e  // no unreachable code diagnostic for the implicit return.
   }
 }

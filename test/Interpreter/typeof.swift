@@ -31,15 +31,15 @@ func archeMetatype2<T : Fooable>(t: T) {
   t.dynamicType.foo()
 }
 
-func boxedExistentialMetatype(e: ErrorType) -> ErrorType.Type {
+func boxedExistentialMetatype(e: ErrorProtocol) -> ErrorProtocol.Type {
   return e.dynamicType
 }
 
-enum Hangry : ErrorType {
+enum Hangry : ErrorProtocol {
   case Hungry, Angry
 }
 
-class Meltdown : ErrorType {
+class Meltdown : ErrorProtocol {
   var _domain : String {
     return "_domain"
   }

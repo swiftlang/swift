@@ -351,7 +351,7 @@ public func expectUnreachable(${TRACE1}) {
   expectationFailure("this code should not be executed", trace: ${trace})
 }
 
-public func expectUnreachableCatch(error: ErrorType, ${TRACE}) {
+public func expectUnreachableCatch(error: ErrorProtocol, ${TRACE}) {
   expectationFailure(
     "error should not be thrown: \"\(error)\"", trace: ${trace})
 }

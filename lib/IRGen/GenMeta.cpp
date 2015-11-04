@@ -4869,8 +4869,8 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   switch (*known) {
   case KnownProtocolKind::AnyObject:
     return SpecialProtocol::AnyObject;
-  case KnownProtocolKind::ErrorType:
-    return SpecialProtocol::ErrorType;
+  case KnownProtocolKind::ErrorProtocol:
+    return SpecialProtocol::ErrorProtocol;
     
   // The other known protocols aren't special at runtime.
   case KnownProtocolKind::SequenceType:

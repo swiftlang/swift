@@ -551,7 +551,7 @@ NominalTypeDecl *ASTContext::getStringDecl() const {
 }
 
 CanType ASTContext::getExceptionType() const {
-  if (auto exn = getExceptionTypeDecl()) {
+  if (auto exn = getErrorProtocolDecl()) {
     return exn->getDeclaredType()->getCanonicalType();
   } else {
     // Use Builtin.NativeObject just as a stand-in.
@@ -559,8 +559,8 @@ CanType ASTContext::getExceptionType() const {
   }
 }
 
-NominalTypeDecl *ASTContext::getExceptionTypeDecl() const {
-  return getProtocol(KnownProtocolKind::ErrorType);
+NominalTypeDecl *ASTContext::getErrorProtocolDecl() const {
+  return getProtocol(KnownProtocolKind::ErrorProtocol);
 }
 
 NominalTypeDecl *ASTContext::getArrayDecl() const {

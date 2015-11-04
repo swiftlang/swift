@@ -31,11 +31,11 @@ func _convertNSSetToSet<T: NSObject>(s: NSSet?) -> Set<T> {
   return Set<T>()
 }
 
-extension NSError: ErrorType {
+extension NSError: ErrorProtocol {
   public var _domain: String { return domain }
   public var _code: Int { return code }
 }
 
-public func _convertErrorTypeToNSError(x: ErrorType) -> NSError {
+public func _convertErrorProtocolToNSError(x: ErrorProtocol) -> NSError {
   return x as NSError
 }

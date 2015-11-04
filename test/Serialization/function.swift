@@ -112,8 +112,8 @@ do {
   try throws1()
   try throws2(1)
 } catch _ {}
-// SIL: sil @_TF8def_func7throws1FzT_T_ : $@convention(thin) () -> @error ErrorType
-// SIL: sil @_TF8def_func7throws2{{.*}} : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> @error ErrorType
+// SIL: sil @_TF8def_func7throws1FzT_T_ : $@convention(thin) () -> @error ErrorProtocol
+// SIL: sil @_TF8def_func7throws2{{.*}} : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> @error ErrorProtocol
 
 // LLVM: }
 

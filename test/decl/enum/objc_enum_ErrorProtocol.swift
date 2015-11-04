@@ -4,15 +4,15 @@
 
 import Foundation
 
-func acceptBridgeableNSError<E : _ObjectiveCBridgeableErrorType>(e: E) { }
+func acceptBridgeableNSError<E : _ObjectiveCBridgeableErrorProtocol>(e: E) { }
 
-@objc enum E1 : Int, ErrorType, _BridgedNSError {
+@objc enum E1 : Int, ErrorProtocol, _BridgedNSError {
   case A = 1
 }
 
 acceptBridgeableNSError(E1.A)
 
-@objc enum E2 : Int, ErrorType {
+@objc enum E2 : Int, ErrorProtocol {
   case A = 1
 }
 

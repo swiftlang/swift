@@ -1,4 +1,4 @@
-//===--- DerivedConformanceErrorType.cpp - Derived ErrorType --------------===//
+//===--- DerivedConformanceErrorProtocol.cpp - Derived ErrorProtocol ------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file implements implicit derivation of the ErrorType
+//  This file implements implicit derivation of the ErrorProtocol
 //  protocol.
 //
 //===----------------------------------------------------------------------===//
@@ -26,7 +26,7 @@
 using namespace swift;
 using namespace DerivedConformance;
 
-static void deriveBodyErrorType_enum_code(AbstractFunctionDecl *codeDecl) {
+static void deriveBodyErrorProtocol_enum_code(AbstractFunctionDecl *codeDecl) {
   // enum SomeEnum {
   //   case A,B,C,D
   //
@@ -106,7 +106,7 @@ static void deriveBodyErrorType_enum_code(AbstractFunctionDecl *codeDecl) {
   codeDecl->setBody(body);
 }
 
-static void deriveBodyErrorType_zero_code(AbstractFunctionDecl *codeDecl) {
+static void deriveBodyErrorProtocol_zero_code(AbstractFunctionDecl *codeDecl) {
   // struct SomeStruct {
   //   @derived
   //   var code: Int { return 0 }
@@ -128,8 +128,8 @@ static void deriveBodyErrorType_zero_code(AbstractFunctionDecl *codeDecl) {
   codeDecl->setBody(body);
 }
 
-static ValueDecl *deriveErrorType_code(TypeChecker &tc, Decl *parentDecl,
-                                       NominalTypeDecl *nominal) {
+static ValueDecl *deriveErrorProtocol_code(TypeChecker &tc, Decl *parentDecl,
+                                           NominalTypeDecl *nominal) {
   // enum SomeEnum {
   //   case A,B,C,D
   //
@@ -153,9 +153,9 @@ static ValueDecl *deriveErrorType_code(TypeChecker &tc, Decl *parentDecl,
   auto getterDecl = declareDerivedPropertyGetter(tc, parentDecl, nominal,
                                                  nominalType, intTy, intTy);
   if (isa<EnumDecl>(nominal))
-    getterDecl->setBodySynthesizer(&deriveBodyErrorType_enum_code);
+    getterDecl->setBodySynthesizer(&deriveBodyErrorProtocol_enum_code);
   else
-    getterDecl->setBodySynthesizer(&deriveBodyErrorType_zero_code);
+    getterDecl->setBodySynthesizer(&deriveBodyErrorProtocol_zero_code);
 
   // Define the property.
   VarDecl *propDecl;
@@ -173,12 +173,12 @@ static ValueDecl *deriveErrorType_code(TypeChecker &tc, Decl *parentDecl,
 
 }
 
-ValueDecl *DerivedConformance::deriveErrorType(TypeChecker &tc,
-                                               Decl *parentDecl,
-                                               NominalTypeDecl *type,
-                                               ValueDecl *requirement) {
+ValueDecl *DerivedConformance::deriveErrorProtocol(TypeChecker &tc,
+                                                   Decl *parentDecl,
+                                                   NominalTypeDecl *type,
+                                                   ValueDecl *requirement) {
   if (requirement->getName() == tc.Context.Id_code_)
-    return deriveErrorType_code(tc, parentDecl, type);
+    return deriveErrorProtocol_code(tc, parentDecl, type);
   
   tc.diagnose(requirement->getLoc(),
               diag::broken_errortype_requirement);

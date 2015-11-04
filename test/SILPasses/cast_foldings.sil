@@ -58,7 +58,7 @@ entry:
 // CHECK-LABEL: sil @function_cast_throw_to_nothrow
 // CHECK:         builtin "int_trap"
 sil @function_cast_throw_to_nothrow : $@convention(thin) <T> () -> () {
-  %b = unconditional_checked_cast_addr take_on_success () throws -> () in undef : $*(@out (), @in ()) -> (@error ErrorType) to () -> ()        in undef : $*(@out (), @in ()) -> ()
+  %b = unconditional_checked_cast_addr take_on_success () throws -> () in undef : $*(@out (), @in ()) -> (@error ErrorProtocol) to () -> ()        in undef : $*(@out (), @in ()) -> ()
   return undef : $()
 }
 
@@ -66,7 +66,7 @@ sil @function_cast_throw_to_nothrow : $@convention(thin) <T> () -> () {
 // CHECK-LABEL: sil @function_cast_nothrow_to_throw
 // CHECK:         unconditional_checked_cast_addr
 sil @function_cast_nothrow_to_throw : $@convention(thin) <T> () -> () {
-  %c = unconditional_checked_cast_addr take_on_success () -> ()        in undef : $*(@out (), @in ()) -> ()                 to () throws -> () in undef : $*(@out (), @in ()) -> (@error ErrorType)
+  %c = unconditional_checked_cast_addr take_on_success () -> ()        in undef : $*(@out (), @in ()) -> ()                 to () throws -> () in undef : $*(@out (), @in ()) -> (@error ErrorProtocol)
   return undef : $()
 }
 
@@ -74,7 +74,7 @@ sil @function_cast_nothrow_to_throw : $@convention(thin) <T> () -> () {
 // CHECK:         load
 // CHECK:         store
 sil @function_cast_throw_to_throw : $@convention(thin) <T> () -> () {
-  %d = unconditional_checked_cast_addr take_on_success () throws -> () in undef : $*(@out (), @in ()) -> (@error ErrorType) to () throws -> () in undef : $*(@out (), @in ()) -> (@error ErrorType)
+  %d = unconditional_checked_cast_addr take_on_success () throws -> () in undef : $*(@out (), @in ()) -> (@error ErrorProtocol) to () throws -> () in undef : $*(@out (), @in ()) -> (@error ErrorProtocol)
   return undef : $()
 }
 

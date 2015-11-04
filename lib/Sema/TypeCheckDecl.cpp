@@ -2313,8 +2313,8 @@ static void checkBridgedFunctions(TypeChecker &TC) {
                                "_convertNSSetToSet",
                                "_convertSetToNSSet");
     checkObjCBridgingFunctions(TC, module, "NSError",
-                               "_convertNSErrorToErrorType",
-                               "_convertErrorTypeToNSError");
+                               "_convertNSErrorToErrorProtocol",
+                               "_convertErrorProtocolToNSError");
   }
 }
 

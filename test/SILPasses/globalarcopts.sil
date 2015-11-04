@@ -56,7 +56,7 @@ sil [fragile] @guaranteed_use : $@convention(thin) (@guaranteed Builtin.NativeOb
 
 sil [fragile] @owned_return : $@convention(thin) () -> (@owned @box Builtin.Int32)
 
-sil [fragile] @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorType
+sil [fragile] @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorProtocol
 
 /////////////////
 // Basic Tests //
@@ -1910,24 +1910,24 @@ bb0:
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [fragile] @try_apply_test : $@convention(thin) (Builtin.NativeObject) -> @error ErrorType {
+// CHECK-LABEL: sil [fragile] @try_apply_test : $@convention(thin) (Builtin.NativeObject) -> @error ErrorProtocol {
 // CHECK: bb0
 // CHECK: strong_retain
 // CHECK: bb1
 // CHECK: strong_release
 // CHECK: bb2
 // CHECK: strong_release
-sil [fragile] @try_apply_test : $@convention(thin) (Builtin.NativeObject) -> @error ErrorType {
+sil [fragile] @try_apply_test : $@convention(thin) (Builtin.NativeObject) -> @error ErrorProtocol {
 bb0(%0 : $Builtin.NativeObject):
   strong_retain %0 : $Builtin.NativeObject
-  %1 = function_ref @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorType
-  try_apply %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorType, normal bb1, error bb2
+  %1 = function_ref @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorProtocol
+  try_apply %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorProtocol, normal bb1, error bb2
 
 bb1(%2 : $()):
   strong_release %0 : $Builtin.NativeObject
   return undef : $()
 
-bb2(%3 : $ErrorType):
+bb2(%3 : $ErrorProtocol):
   strong_release %0 : $Builtin.NativeObject
-  throw %3 : $ErrorType
+  throw %3 : $ErrorProtocol
 }

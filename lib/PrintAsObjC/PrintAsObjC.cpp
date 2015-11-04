@@ -1530,7 +1530,7 @@ public:
     ASTContext &ctx = M.getASTContext();
 
     auto protos = ED->getAllProtocols();
-    auto errorTypeProto = ctx.getProtocol(KnownProtocolKind::ErrorType);
+    auto errorTypeProto = ctx.getProtocol(KnownProtocolKind::ErrorProtocol);
     if (std::find(protos.begin(), protos.end(), errorTypeProto) !=
         protos.end()) {
       bool hasDomainCase = std::any_of(ED->getAllElements().begin(),

@@ -1012,26 +1012,26 @@ sil [fragile] @block_invoke : $@convention(c) (@inout @block_storage Int) -> ()
 
 // Test try_apply and throws
 // rdar://20925014
-// CHECK-LABEL: sil public_external [fragile] @test_try_apply : $@convention(thin) (@convention(thin) () -> @error ErrorType) -> @error ErrorType {
-sil [fragile]  @test_try_apply : $@convention(thin) (@convention(thin) () -> @error ErrorType) -> @error ErrorType {
-bb0(%0 : $@convention(thin) () -> @error ErrorType):
-  // CHECK: try_apply %0() : $@convention(thin) () -> @error ErrorType, normal bb1, error bb2
-  try_apply %0() : $@convention(thin) () -> @error ErrorType, normal bb1, error bb2
+// CHECK-LABEL: sil public_external [fragile] @test_try_apply : $@convention(thin) (@convention(thin) () -> @error ErrorProtocol) -> @error ErrorProtocol {
+sil [fragile]  @test_try_apply : $@convention(thin) (@convention(thin) () -> @error ErrorProtocol) -> @error ErrorProtocol {
+bb0(%0 : $@convention(thin) () -> @error ErrorProtocol):
+  // CHECK: try_apply %0() : $@convention(thin) () -> @error ErrorProtocol, normal bb1, error bb2
+  try_apply %0() : $@convention(thin) () -> @error ErrorProtocol, normal bb1, error bb2
 
 bb1(%1 : $()):
   %2 = tuple ()
   return %2 : $()
 
-bb2(%3 : $ErrorType):
-  throw %3 : $ErrorType
+bb2(%3 : $ErrorProtocol):
+  throw %3 : $ErrorProtocol
 }
 
 // Test apply with the nothrow attribute
-// CHECK-LABEL: sil public_external [fragile] @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error ErrorType) -> () {
-sil [fragile]  @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error ErrorType) -> () {
-bb0(%0 : $@convention(thin) () -> @error ErrorType):
-  // CHECK: apply [nothrow] %0() : $@convention(thin) () -> @error ErrorType
-  apply [nothrow] %0() : $@convention(thin) () -> @error ErrorType
+// CHECK-LABEL: sil public_external [fragile] @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error ErrorProtocol) -> () {
+sil [fragile]  @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error ErrorProtocol) -> () {
+bb0(%0 : $@convention(thin) () -> @error ErrorProtocol):
+  // CHECK: apply [nothrow] %0() : $@convention(thin) () -> @error ErrorProtocol
+  apply [nothrow] %0() : $@convention(thin) () -> @error ErrorProtocol
   %2 = tuple ()
   return %2 : $()
 }
@@ -1124,7 +1124,7 @@ bb0(%0 : $*Beth):
   return undef : $()
 }
 
-struct SomeError: ErrorType {
+struct SomeError: ErrorProtocol {
   var _domain: String { get }
   var _code: Int { get }
 }
@@ -1132,16 +1132,16 @@ struct SomeError: ErrorType {
 // CHECK-LABEL: sil public_external [fragile] @existential_box : $@convention(thin) (SomeError) -> () {
 sil [fragile] @existential_box : $@convention(thin) (SomeError) -> () {
 bb0(%0 : $SomeError):
-  // CHECK: %1 = alloc_existential_box $ErrorType, $SomeError
-  %1 = alloc_existential_box $ErrorType, $SomeError
+  // CHECK: %1 = alloc_existential_box $ErrorProtocol, $SomeError
+  %1 = alloc_existential_box $ErrorProtocol, $SomeError
   // CHECK: store %0 to %1#1 : $*SomeError
   store %0 to %1#1 : $*SomeError
-  // CHECK: %3 = open_existential_box %1#0 : $ErrorType to $*[[OPENED:@opened\(".*"\)]] ErrorType
-  %3 = open_existential_box %1#0 : $ErrorType to $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorType
-  // CHECK: destroy_addr %3 : $*[[OPENED]] ErrorType
-  destroy_addr %3 : $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorType
-  // CHECK: dealloc_existential_box %1#0 : $ErrorType, $SomeError
-  dealloc_existential_box %1#0 : $ErrorType, $SomeError
+  // CHECK: %3 = open_existential_box %1#0 : $ErrorProtocol to $*[[OPENED:@opened\(".*"\)]] ErrorProtocol
+  %3 = open_existential_box %1#0 : $ErrorProtocol to $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorProtocol
+  // CHECK: destroy_addr %3 : $*[[OPENED]] ErrorProtocol
+  destroy_addr %3 : $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorProtocol
+  // CHECK: dealloc_existential_box %1#0 : $ErrorProtocol, $SomeError
+  dealloc_existential_box %1#0 : $ErrorProtocol, $SomeError
   return undef : $()
 }
 
@@ -1367,8 +1367,8 @@ bb0:
   %125 = function_ref @metatype_to_object : $@convention(thin) (@objc_metatype SomeClass.Type, @objc_metatype SomeClassProtocol.Type) -> @owned (AnyObject, AnyObject)
   %127 = function_ref @bitcasts : $@convention(thin) (@owned Class1) -> @owned (Class2, Int)
   %126 = function_ref @protocol_conversion : $@convention(thin) () -> @owned Protocol
-  %133 = function_ref @test_try_apply : $@convention(thin) (@convention(thin) () -> @error ErrorType) -> @error ErrorType
-  %135 = function_ref @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error ErrorType) -> ()
+  %133 = function_ref @test_try_apply : $@convention(thin) (@convention(thin) () -> @error ErrorProtocol) -> @error ErrorProtocol
+  %135 = function_ref @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error ErrorProtocol) -> ()
   %134 = function_ref @box_type : $@convention(thin) (@box Int, Int) -> ()
   %120 = function_ref @test_forward_ref : $@convention(thin) (UInt8, UInt8) -> UInt8
   %121 = function_ref @partial_apply : $@convention(thin) (@convention(thin) (@out Int, Int) -> (), Int) -> Int

@@ -1036,8 +1036,7 @@ public:
       Refcounting(refcounting) {}
 
   ReferenceCounting getReferenceCounting() const {
-    // ErrorType uses its own rc entry points when the Objective-C runtime
-    // is in use.
+    // ErrorProtocol uses its own rc entry points.
     return Refcounting;
   }
   
@@ -1050,11 +1049,11 @@ public:
 
 static const TypeInfo *createErrorExistentialTypeInfo(IRGenModule &IGM,
                                             ArrayRef<ProtocolDecl*> protocols) {
-  // The ErrorType existential has a special boxed representation. It has space
-  // only for witnesses to the ErrorType protocol.
+  // The ErrorProtocol existential has a special boxed representation. It has
+  // space only for witnesses to the ErrorProtocol protocol.
   assert(protocols.size() == 1
-     && *protocols[0]->getKnownProtocolKind() == KnownProtocolKind::ErrorType);
-
+     && *protocols[0]->getKnownProtocolKind() == KnownProtocolKind::ErrorProtocol);
+  
   const ProtocolInfo &impl = IGM.getProtocolInfo(protocols[0]);
   auto refcounting = (!IGM.ObjCInterop
                       ? ReferenceCounting::Native
@@ -1077,8 +1076,8 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
   // Check for special existentials.
   if (protocols.size() == 1) {
     switch (getSpecialProtocolID(protocols[0])) {
-    case SpecialProtocol::ErrorType:
-      // ErrorType has a special runtime representation.
+    case SpecialProtocol::ErrorProtocol:
+      // ErrorProtocol has a special runtime representation.
       return createErrorExistentialTypeInfo(IGM, protocols);
     // Other existentials have standard representations.
     case SpecialProtocol::AnyObject:
@@ -1379,12 +1378,12 @@ static void forEachProtocolWitnessTable(IRGenFunction &IGF,
 }
 
 #ifndef NDEBUG
-static bool _isErrorType(SILType baseTy) {
+static bool _isErrorProtocol(SILType baseTy) {
   llvm::SmallVector<ProtocolDecl*, 1> protos;
   return baseTy.getSwiftRValueType()->isExistentialType(protos)
     && protos.size() == 1
     && protos[0]->getKnownProtocolKind()
-    && *protos[0]->getKnownProtocolKind() == KnownProtocolKind::ErrorType;
+    && *protos[0]->getKnownProtocolKind() == KnownProtocolKind::ErrorProtocol;
 }
 #endif
 
@@ -1394,8 +1393,8 @@ Address irgen::emitBoxedExistentialProjection(IRGenFunction &IGF,
                                               Explosion &base,
                                               SILType baseTy,
                                               CanArchetypeType openedArchetype){
-  // TODO: Non-ErrorType boxed existentials.
-  assert(_isErrorType(baseTy));
+  // TODO: Non-ErrorProtocol boxed existentials.
+  assert(_isErrorProtocol(baseTy));
   
   // Get the reference to the existential box.
   llvm::Value *box = base.claimNext();
@@ -1436,14 +1435,14 @@ Address irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
                                   CanType formalSrcType,
                                   SILType loweredSrcType,
                                   ArrayRef<ProtocolConformance *> conformances){
-  // TODO: Non-ErrorType boxed existentials.
-  assert(_isErrorType(destType));
+  // TODO: Non-ErrorProtocol boxed existentials.
+  assert(_isErrorProtocol(destType));
 
   auto &destTI = IGF.getTypeInfo(destType).as<ErrorExistentialTypeInfo>();
   auto &srcTI = IGF.getTypeInfo(loweredSrcType);
   
   auto srcMetadata = IGF.emitTypeMetadataRef(formalSrcType);
-  // Should only be one conformance, for the ErrorType protocol.
+  // Should only be one conformance, for the ErrorProtocol protocol.
   assert(conformances.size() == 1 && destTI.getStoredProtocols().size() == 1);
   const ProtocolEntry &entry = destTI.getStoredProtocols()[0];
   auto witness = getProtocolWitnessTable(IGF, formalSrcType, srcTI,
@@ -1473,8 +1472,8 @@ void irgen::emitBoxedExistentialContainerDeallocation(IRGenFunction &IGF,
                                                       Explosion &container,
                                                       SILType containerType,
                                                       CanType valueType) {
-  // TODO: Non-ErrorType boxed existentials.
-  assert(_isErrorType(containerType));
+  // TODO: Non-ErrorProtocol boxed existentials.
+  assert(_isErrorProtocol(containerType));
 
   auto box = container.claimNext();
   auto srcMetadata = IGF.emitTypeMetadataRef(valueType);
@@ -1506,15 +1505,15 @@ void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
                                CanType instanceFormalType,
                                SILType instanceLoweredType,
                                ArrayRef<ProtocolConformance*> conformances) {
-  // As a special case, an ErrorType existential can represented as a reference
-  // to an already existing NSError or CFError instance.
+  // As a special case, an ErrorProtocol existential can represented as a
+  // reference to an already existing NSError or CFError instance.
   SmallVector<ProtocolDecl*, 4> protocols;
   
   if (outType.getSwiftRValueType()->isExistentialType(protocols)
       && protocols.size() == 1) {
     switch (getSpecialProtocolID(protocols[0])) {
-    case SpecialProtocol::ErrorType: {
-      // Bitcast the incoming class reference to ErrorType.
+    case SpecialProtocol::ErrorProtocol: {
+      // Bitcast the incoming class reference to ErrorProtocol.
       out.add(IGF.Builder.CreateBitCast(instance, IGF.IGM.ErrorPtrTy));
       return;
     }
@@ -1634,8 +1633,8 @@ void irgen::emitMetatypeOfOpaqueExistential(IRGenFunction &IGF, Address addr,
 
 void irgen::emitMetatypeOfBoxedExistential(IRGenFunction &IGF, Explosion &value,
                                            SILType type, Explosion &out) {
-  // TODO: Non-ErrorType boxed existentials.
-  assert(_isErrorType(type));
+  // TODO: Non-ErrorProtocol boxed existentials.
+  assert(_isErrorProtocol(type));
 
   // Get the reference to the existential box.
   llvm::Value *box = value.claimNext();

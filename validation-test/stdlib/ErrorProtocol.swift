@@ -7,15 +7,15 @@ import SwiftPrivate
 import StdlibUnittest
 import Foundation
 
-enum SomeError : ErrorType {
+enum SomeError : ErrorProtocol {
   case GoneToFail
 }
 
-struct ErrorTypeAsNSErrorRaceTest : RaceTestWithPerTrialDataType {
+struct ErrorProtocolAsNSErrorRaceTest : RaceTestWithPerTrialDataType {
   class RaceData {
-    let error: ErrorType
+    let error: ErrorProtocol
 
-    init(error: ErrorType) {
+    init(error: ErrorProtocol) {
       self.error = error
     }
   }
@@ -44,8 +44,8 @@ struct ErrorTypeAsNSErrorRaceTest : RaceTestWithPerTrialDataType {
   }
 }
 
-var ErrorTypeRaceTestSuite = TestSuite("ErrorType races")
-ErrorTypeRaceTestSuite.test("NSError bridging") {
-  runRaceTest(ErrorTypeAsNSErrorRaceTest.self, operations: 1000)
+var ErrorProtocolRaceTestSuite = TestSuite("ErrorProtocol races")
+ErrorProtocolRaceTestSuite.test("NSError bridging") {
+  runRaceTest(ErrorProtocolAsNSErrorRaceTest.self, operations: 1000)
 }
 runAllTests()

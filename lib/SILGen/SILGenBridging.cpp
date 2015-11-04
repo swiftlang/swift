@@ -643,7 +643,7 @@ ManagedValue SILGenFunction::emitBridgedToNativeValue(SILLocation loc,
   llvm_unreachable("bad CC");
 }
 
-/// Bridge an optional foreign error type to ErrorType.
+/// Bridge an optional foreign error type to ErrorProtocol.
 ManagedValue SILGenFunction::emitBridgedToNativeError(SILLocation loc,
                                                   ManagedValue bridgedError) {
 #ifndef NDEBUG
@@ -657,27 +657,27 @@ ManagedValue SILGenFunction::emitBridgedToNativeError(SILLocation loc,
   }
 #endif
 
-  auto bridgeFn = emitGlobalFunctionRef(loc, SGM.getNSErrorToErrorTypeFn());
+  auto bridgeFn = emitGlobalFunctionRef(loc, SGM.getNSErrorToErrorProtocolFn());
   auto bridgeFnType = bridgeFn.getType().castTo<SILFunctionType>();
-  auto nativeErrorType = bridgeFnType->getResult().getSILType();
+  auto nativeErrorProtocol = bridgeFnType->getResult().getSILType();
   assert(bridgeFnType->getResult().getConvention() == ResultConvention::Owned);
   assert(bridgeFnType->getParameters()[0].getConvention()
            == ParameterConvention::Direct_Owned);
 
   SILValue nativeError = B.createApply(loc, bridgeFn, bridgeFn.getType(),
-                                       nativeErrorType, {},
+                                       nativeErrorProtocol, {},
                                        bridgedError.forward(*this));
   return emitManagedRValueWithCleanup(nativeError);
 }
 
-/// Bridge ErrorType to a foreign error type.
+/// Bridge ErrorProtocol to a foreign error type.
 ManagedValue SILGenFunction::emitNativeToBridgedError(SILLocation loc,
                                                   ManagedValue nativeError,
-                                                      CanType bridgedErrorType) {
-  assert(bridgedErrorType == SGM.Types.getNSErrorType() &&
+                                                      CanType bridgedErrorProtocol) {
+  assert(bridgedErrorProtocol == SGM.Types.getNSErrorType() &&
          "only handling NSError for now");
 
-  auto bridgeFn = emitGlobalFunctionRef(loc, SGM.getErrorTypeToNSErrorFn());
+  auto bridgeFn = emitGlobalFunctionRef(loc, SGM.getErrorProtocolToNSErrorFn());
   auto bridgeFnType = bridgeFn.getType().castTo<SILFunctionType>();
   assert(bridgeFnType->getResult().getConvention() == ResultConvention::Owned);
   assert(bridgeFnType->getParameters()[0].getConvention()

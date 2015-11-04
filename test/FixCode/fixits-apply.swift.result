@@ -38,7 +38,7 @@ func foo() -> Int {
   }
 }
 
-func goo(e : ErrorType) {}
+func goo(e : ErrorProtocol) {}
 
 func ftest1() {
   // Don't replace the variable name with '_'

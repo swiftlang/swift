@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This implements the object representation of the standard ErrorType protocol
-// type, which represents recoverable errors in the language. This
+// This implements the object representation of the standard ErrorProtocol
+// protocol type, which represents recoverable errors in the language. This
 // implementation is used when ObjC interop is disabled; the ObjC-interoperable
 // version is implemented in ErrorObject.mm.
 //
@@ -26,7 +26,7 @@
 
 using namespace swift;
 
-/// Determine the size and alignment of an ErrorType box containing the given
+/// Determine the size and alignment of an ErrorProtocol box containing the given
 /// type.
 static std::pair<size_t, size_t>
 _getErrorAllocatedSizeAndAlignmentMask(const Metadata *type) {
@@ -43,7 +43,7 @@ _getErrorAllocatedSizeAndAlignmentMask(const Metadata *type) {
   return {size, alignMask};
 }
 
-/// Destructor for an ErrorType box.
+/// Destructor for an ErrorProtocol box.
 static void _destroyErrorObject(HeapObject *obj) {
   auto error = static_cast<SwiftError *>(obj);
   
@@ -56,8 +56,8 @@ static void _destroyErrorObject(HeapObject *obj) {
   swift_deallocObject(obj, sizeAndAlign.first, sizeAndAlign.second);
 }
 
-/// Heap metadata for ErrorType boxes.
-static const FullMetadata<HeapMetadata> ErrorTypeMetadata{
+/// Heap metadata for ErrorProtocol boxes.
+static const FullMetadata<HeapMetadata> ErrorProtocolMetadata{
   HeapMetadataHeader{{_destroyErrorObject}, {&_TWVBo}},
   Metadata{MetadataKind::ErrorObject},
 };
@@ -69,7 +69,7 @@ swift::swift_allocError(const swift::Metadata *type,
                         bool isTake) {
   auto sizeAndAlign = _getErrorAllocatedSizeAndAlignmentMask(type);
   
-  auto allocated = swift_allocObject(&ErrorTypeMetadata,
+  auto allocated = swift_allocObject(&ErrorProtocolMetadata,
                                      sizeAndAlign.first, sizeAndAlign.second);
   
   auto error = reinterpret_cast<SwiftError*>(allocated);

@@ -56,7 +56,7 @@ PROTOCOL(RawRepresentable)
 PROTOCOL(Equatable)
 PROTOCOL(Hashable)
 PROTOCOL(Comparable)
-PROTOCOL(ErrorType)
+PROTOCOL(ErrorProtocol)
 PROTOCOL(OptionSetType)
 PROTOCOL_(BridgedNSError)
 

@@ -5,7 +5,7 @@ import StdlibUnittest
 
 var ThrowingInitTestSuite = TestSuite("ThrowingInit")
 
-enum E : ErrorType {
+enum E : ErrorProtocol {
   case X
 }
 

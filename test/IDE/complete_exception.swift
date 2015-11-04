@@ -53,12 +53,12 @@
 
 import Foundation // importer SDK
 
-protocol ErrorPro1 : ErrorType {}
-class Error1 : ErrorType {}
-class Error2 : ErrorType {}
+protocol ErrorPro1 : ErrorProtocol {}
+class Error1 : ErrorProtocol {}
+class Error2 : ErrorProtocol {}
 class Error3 {}
-extension Error3 : ErrorType{}
-enum Error4 : ErrorType {
+extension Error3 : ErrorProtocol{}
+enum Error4 : ErrorProtocol {
   case E1
   case E2(Int32)
 }
@@ -95,7 +95,7 @@ func test002() {
 // THROW1-DAG:  Decl[FreeFunction]/CurrModule:      getError1()[#Error1#]{{; name=.+$}}
 // THROW1-DAG:  Decl[FreeFunction]/CurrModule:      getNSError()[#NSError#]{{; name=.+$}}
 
-// If we could prove that there is no way to get to an ErrorType value by
+// If we could prove that there is no way to get to an ErrorProtocol value by
 // starting from these, we could remove them.  But that may be infeasible in
 // the presence of overloaded operators.
 // THROW1-DAG: Decl[Class]/CurrModule:             NoneError1[#NoneError1#]; name=NoneError1{{$}}
@@ -149,14 +149,14 @@ func test006() {
   } catch {
     #^INSIDE_CATCH1^#
   }
-// IMPLICIT_ERROR: Decl[LocalVar]/Local:  error[#ErrorType#]; name=error
+// IMPLICIT_ERROR: Decl[LocalVar]/Local:  error[#ErrorProtocol#]; name=error
 }
 func test007() {
   do {
   } catch let e {
     #^INSIDE_CATCH2^#
   }
-// EXPLICIT_ERROR_E: Decl[LocalVar]/Local: e[#ErrorType#]; name=e
+// EXPLICIT_ERROR_E: Decl[LocalVar]/Local: e[#ErrorProtocol#]; name=e
 }
 func test008() {
   do {

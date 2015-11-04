@@ -14,7 +14,7 @@ add_swift_library(swiftSema
   SourceLoader.cpp
   DerivedConformances.cpp
   DerivedConformanceEquatableHashable.cpp
-  DerivedConformanceErrorType.cpp
+  DerivedConformanceErrorProtocol.cpp
   DerivedConformanceRawRepresentable.cpp
   IterativeTypeChecker.cpp
   ITCDecl.cpp

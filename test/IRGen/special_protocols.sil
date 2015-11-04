@@ -5,8 +5,8 @@ protocol AnyObject: class {}
 // --                 0x0000_0049: special protocol 01, class, empty, swift
 // CHECK:         i32 73 }
 
-protocol ErrorType {}
-// CHECK-LABEL: @_TMps9ErrorType = constant %swift.protocol {
+protocol ErrorProtocol {}
+// CHECK-LABEL: @_TMps13ErrorProtocol = constant %swift.protocol {
 // --                 0x0000_0087: special protocol 02, non-class, witness, swift
 // CHECK:         i32 135 }
 

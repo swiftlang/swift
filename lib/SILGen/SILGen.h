@@ -119,8 +119,8 @@ public:
   Optional<SILDeclRef> ObjCBoolToBoolFn;
   Optional<SILDeclRef> BoolToDarwinBooleanFn;
   Optional<SILDeclRef> DarwinBooleanToBoolFn;
-  Optional<SILDeclRef> NSErrorToErrorTypeFn;
-  Optional<SILDeclRef> ErrorTypeToNSErrorFn;
+  Optional<SILDeclRef> NSErrorToErrorProtocolFn;
+  Optional<SILDeclRef> ErrorProtocolToNSErrorFn;
 
   Optional<ProtocolDecl*> PointerProtocol;
   
@@ -347,8 +347,8 @@ public:
   SILDeclRef getObjCBoolToBoolFn();
   SILDeclRef getBoolToDarwinBooleanFn();
   SILDeclRef getDarwinBooleanToBoolFn();
-  SILDeclRef getNSErrorToErrorTypeFn();
-  SILDeclRef getErrorTypeToNSErrorFn();
+  SILDeclRef getNSErrorToErrorProtocolFn();
+  SILDeclRef getErrorProtocolToNSErrorFn();
   
   /// Report a diagnostic.
   template<typename...T, typename...U>

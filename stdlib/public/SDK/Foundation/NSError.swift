@@ -1,16 +1,16 @@
 import CoreFoundation
 import Darwin
 
-// NSError and CFError conform to the standard ErrorType protocol. Compiler
+// NSError and CFError conform to the standard ErrorProtocol protocol. Compiler
 // magic allows this to be done as a "toll-free" conversion when an NSError
-// or CFError is used as an ErrorType existential.
+// or CFError is used as an ErrorProtocol existential.
 
-extension NSError : ErrorType {
+extension NSError : ErrorProtocol {
   public var _domain: String { return domain }
   public var _code: Int { return code }
 }
 
-extension CFError : ErrorType {
+extension CFError : ErrorProtocol {
   public var _domain: String {
     return CFErrorGetDomain(self) as String
   }
@@ -22,7 +22,7 @@ extension CFError : ErrorType {
 
 // An error value to use when an Objective-C API indicates error
 // but produces a nil error object.
-public enum _GenericObjCError : ErrorType {
+public enum _GenericObjCError : ErrorProtocol {
   case NilError
 }
 
@@ -30,28 +30,28 @@ public enum _GenericObjCError : ErrorType {
 /// Objective-C API indicates failure but produces a nil error.
 @warn_unused_result
 @_silgen_name("swift_allocNilObjCError")
-public func _allocNilObjCError() -> ErrorType {
+public func _allocNilObjCError() -> ErrorProtocol {
   return _GenericObjCError.NilError
 }
 
 /// An internal protocol to represent Swift error enums that map to standard
 /// Cocoa NSError domains.
-public protocol _ObjectiveCBridgeableErrorType : ErrorType {
+public protocol _ObjectiveCBridgeableErrorProtocol : ErrorProtocol {
   /// Produce a value of the error type corresponding to the given NSError,
   /// or return nil if it cannot be bridged.
   init?(_bridgedNSError: NSError)
 }
 
-/// A hook for the runtime to use _ObjectiveCBridgeableErrorType in order to
+/// A hook for the runtime to use _ObjectiveCBridgeableErrorProtocol in order to
 /// attempt an "errorTypeValue as? SomeError" cast.
 ///
 /// If the bridge succeeds, the bridged value is written to the uninitialized
 /// memory pointed to by 'out', and true is returned. Otherwise, 'out' is
 /// left uninitialized, and false is returned.
 @warn_unused_result
-@_silgen_name("swift_stdlib_bridgeNSErrorToErrorType")
-public func _stdlib_bridgeNSErrorToErrorType<
-  T : _ObjectiveCBridgeableErrorType
+@_silgen_name("swift_stdlib_bridgeNSErrorToErrorProtocol")
+public func _stdlib_bridgeNSErrorToErrorProtocol<
+  T : _ObjectiveCBridgeableErrorProtocol
 >(error: NSError, out: UnsafeMutablePointer<T>) -> Bool {
   if let bridged = T(_bridgedNSError: error) {
     out.initialize(bridged)
@@ -63,7 +63,7 @@ public func _stdlib_bridgeNSErrorToErrorType<
 
 /// Helper protocol for _BridgedNSError, which used used to provide
 /// default implementations.
-public protocol __BridgedNSError : RawRepresentable, ErrorType {
+public protocol __BridgedNSError : RawRepresentable, ErrorProtocol {
   static var _NSErrorDomain: String { get }
 }
 
@@ -130,9 +130,9 @@ public extension __BridgedNSError where RawValue: UnsignedIntegerType {
 /// NSError domain.
 ///
 /// This protocol is used primarily to generate the conformance to
-/// _ObjectiveCBridgeableErrorType for such an enum.
+/// _ObjectiveCBridgeableErrorProtocol for such an enum.
 public protocol _BridgedNSError : __BridgedNSError,
-                                  _ObjectiveCBridgeableErrorType,
+                                  _ObjectiveCBridgeableErrorProtocol,
                                   Hashable {
   /// The NSError domain to which this type is bridged.
   static var _NSErrorDomain: String { get }
@@ -151,7 +151,7 @@ public struct NSCocoaError : RawRepresentable, _BridgedNSError {
 }
 
 @warn_unused_result
-public func ~=(match: NSCocoaError, error: ErrorType) -> Bool {
+public func ~=(match: NSCocoaError, error: ErrorProtocol) -> Bool {
   guard let cocoaError = error as? NSCocoaError else { return false }
   return match.rawValue == cocoaError.rawValue
 }

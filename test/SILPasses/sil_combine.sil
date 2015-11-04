@@ -1728,11 +1728,11 @@ bb0(%0 : $*SSS):
 
 sil [readonly] @read_only_in : $@convention(thin) (@in SSS) -> ()
 
-struct MyError : ErrorType {
+struct MyError : ErrorProtocol {
 }
 
 sil @unknown : $@convention(thin) () -> ()
-sil [readonly] @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType)
+sil [readonly] @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol)
 
 //CHECK-LABEL: sil @test_delete_readonly_try_apply
 //CHECK:      bb0(%0 : $ZZZ): 
@@ -1747,15 +1747,15 @@ sil [readonly] @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @er
 //CHECK:        return
 sil @test_delete_readonly_try_apply : $@convention(thin) (@owned ZZZ) -> () {
 bb0(%0 : $ZZZ):
-  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType)
-  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType), normal bb1, error bb2
+  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol)
+  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol), normal bb1, error bb2
 
 bb1(%4 : $ZZZ):
   strong_release %4 : $ZZZ
   br bb3
 
-bb2(%8 : $ErrorType):
-  strong_release %8 : $ErrorType
+bb2(%8 : $ErrorProtocol):
+  strong_release %8 : $ErrorProtocol
   br bb3
 
 bb3:
@@ -1767,18 +1767,18 @@ bb3:
 //CHECK: try_apply %{{[0-9]+}}(%0)
 sil @test_dont_delete_readonly_try_apply1 : $@convention(thin) (@owned ZZZ) -> () {
 bb0(%0 : $ZZZ):
-  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType)
-  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType), normal bb1, error bb2
+  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol)
+  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol), normal bb1, error bb2
 
 bb1(%4 : $ZZZ):
   strong_release %4 : $ZZZ
   br bb3
 
-bb2(%8 : $ErrorType):
+bb2(%8 : $ErrorProtocol):
   // Additional instructions in error block.
   %u = function_ref @unknown : $@convention(thin) () -> ()
   %r = apply %u() : $@convention(thin) () -> ()
-  strong_release %8 : $ErrorType
+  strong_release %8 : $ErrorProtocol
   br bb3
 
 bb3:
@@ -1790,8 +1790,8 @@ bb3:
 //CHECK: try_apply %{{[0-9]+}}(%0)
 sil @test_dont_delete_readonly_try_apply2 : $@convention(thin) (@owned ZZZ) -> () {
 bb0(%0 : $ZZZ):
-  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType)
-  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType), normal bb1, error bb2
+  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol)
+  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol), normal bb1, error bb2
 
 bb1(%4 : $ZZZ):
   // Additional instructions in normal return block.
@@ -1800,8 +1800,8 @@ bb1(%4 : $ZZZ):
   strong_release %4 : $ZZZ
   br bb3
 
-bb2(%8 : $ErrorType):
-  strong_release %8 : $ErrorType
+bb2(%8 : $ErrorProtocol):
+  strong_release %8 : $ErrorProtocol
   br bb3
 
 bb3:
@@ -1813,15 +1813,15 @@ bb3:
 //CHECK: try_apply %{{[0-9]+}}(%0)
 sil @test_dont_delete_readonly_try_apply3 : $@convention(thin) (@owned ZZZ) -> () {
 bb0(%0 : $ZZZ):
-  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType)
-  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType), normal bb1, error bb2
+  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol)
+  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol), normal bb1, error bb2
 
 bb1(%4 : $ZZZ):
   strong_release %4 : $ZZZ
   br bb3
 
-bb2(%8 : $ErrorType):
-  strong_release %8 : $ErrorType
+bb2(%8 : $ErrorProtocol):
+  strong_release %8 : $ErrorProtocol
   // Normal and error block don't have a common successor block.
   br bb4
 
@@ -1839,15 +1839,15 @@ bb4:
 //CHECK: try_apply %{{[0-9]+}}(%0)
 sil @test_dont_delete_readonly_try_apply4 : $@convention(thin) (@owned ZZZ, @owned ZZZ) -> @owned ZZZ {
 bb0(%0 : $ZZZ, %1 : $ZZZ):
-  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType)
-  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType), normal bb1, error bb2
+  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol)
+  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol), normal bb1, error bb2
 
 bb1(%4 : $ZZZ):
   strong_release %4 : $ZZZ
   br bb3(%0 : $ZZZ)
 
-bb2(%8 : $ErrorType):
-  strong_release %8 : $ErrorType
+bb2(%8 : $ErrorProtocol):
+  strong_release %8 : $ErrorProtocol
   // Normal and error block don't use the same block arguments for the common successor.
   br bb3(%1 : $ZZZ)
 
@@ -2692,7 +2692,7 @@ bb0(%0 : $@sil_unowned NClass, %1 : $@sil_unowned NClass):
 }
 
 
-enum VendingMachineError: ErrorType {
+enum VendingMachineError: ErrorProtocol {
     case InvalidSelection
     case InsufficientFunds(required: Double)
     case OutOfStock
@@ -2704,7 +2704,7 @@ enum VendingMachineError: ErrorType {
 // CHECK-NOT: alloc_existential_box
 // CHECK-NOT: enum $VendingMachineError
 // CHECK: return
-sil hidden @RemoveUnusedException : $@convention(thin) (Int32) -> (Double, @error ErrorType) {
+sil hidden @RemoveUnusedException : $@convention(thin) (Int32) -> (Double, @error ErrorProtocol) {
 bb0(%0 : $Int32):
   debug_value %0 : $Int32  // let x               // id: %1
   %2 = integer_literal $Builtin.Int32, 10         // user: %4
@@ -2713,14 +2713,14 @@ bb0(%0 : $Int32):
   cond_br %4, bb1, bb2                            // id: %5
 
 bb1:                                              // Preds: bb0
-  %6 = alloc_existential_box $ErrorType, $VendingMachineError // users: %8, %9, %13
+  %6 = alloc_existential_box $ErrorProtocol, $VendingMachineError // users: %8, %9, %13
   %7 = enum $VendingMachineError, #VendingMachineError.OutOfStock!enumelt // user: %8
   store %7 to %6#1 : $*VendingMachineError        // id: %8
-  debug_value %6#0 : $ErrorType  // let error     // id: %9
+  debug_value %6#0 : $ErrorProtocol  // let error     // id: %9
   %10 = float_literal $Builtin.FPIEEE80, 0x3FFF8000000000000000 // 1 // user: %11
   %11 = builtin "fptrunc_FPIEEE80_FPIEEE64"(%10 : $Builtin.FPIEEE80) : $Builtin.FPIEEE64 // user: %12
   %12 = struct $Double (%11 : $Builtin.FPIEEE64)  // user: %14
-  strong_release %6#0 : $ErrorType                // id: %13
+  strong_release %6#0 : $ErrorProtocol                // id: %13
   br bb3(%12 : $Double)                           // id: %14
 
 bb2:                                              // Preds: bb0
@@ -2907,7 +2907,7 @@ bb0(%0 : $*Optional<CC2>, %1 : $CC1, %2 : $CC3, %3 : $CC4, %4 : $CC2):
   %12 = partial_apply %5(%1, %8, %9#1) : $@convention(method) (@in CC2, @guaranteed CC1, @owned CC3, @in CC4) -> Optional<Int>
   dealloc_stack %9#0 : $*@local_storage CC4
   dealloc_stack %6#0 : $*@local_storage CC3
-  %15 = convert_function %12 : $@callee_owned (@in CC2) -> Optional<Int> to $@callee_owned (@in CC2) -> (Optional<Int>, @error ErrorType)
+  %15 = convert_function %12 : $@callee_owned (@in CC2) -> Optional<Int> to $@callee_owned (@in CC2) -> (Optional<Int>, @error ErrorProtocol)
   %16 = alloc_stack $Optional<Int>
   %17 = alloc_stack $Optional<CC2>
   copy_addr %0 to [initialization] %17#1 : $*Optional<CC2>
@@ -2921,7 +2921,7 @@ bb1:
   %24 = alloc_stack $CC2
   copy_addr %22#1 to [initialization] %24#1 : $*CC2
   destroy_addr %22#1 : $*CC2
-  strong_retain %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error ErrorType)
+  strong_retain %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error ErrorProtocol)
   %28 = apply %12(%24#1) : $@callee_owned (@in CC2) -> Optional<Int>
   store %28 to %16#1 : $*Optional<Int>
   dealloc_stack %24#0 : $*@local_storage CC2
@@ -2932,7 +2932,7 @@ bb1:
   %104 = alloc_stack $CC2
   copy_addr %102#1 to [initialization] %104#1 : $*CC2
   destroy_addr %102#1 : $*CC2
-  strong_retain %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error ErrorType)
+  strong_retain %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error ErrorProtocol)
   %108 = apply %12(%104#1) : $@callee_owned (@in CC2) -> Optional<Int>
   store %108 to %16#1 : $*Optional<Int>
   dealloc_stack %104#0 : $*@local_storage CC2
@@ -2945,7 +2945,7 @@ bb1:
 bb2:
   %39 = alloc_stack $CC2
   store %4 to %39#1 : $*CC2
-  strong_retain %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error ErrorType)
+  strong_retain %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error ErrorProtocol)
   %42 = apply %12(%39#1) : $@callee_owned (@in CC2) -> Optional<Int>
   store %42 to %16#1 : $*Optional<Int>
   dealloc_stack %39#0 : $*@local_storage CC2
@@ -2954,7 +2954,7 @@ bb2:
 
 bb3:
   destroy_addr %0 : $*Optional<CC2>
-  strong_release %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error ErrorType)
+  strong_release %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error ErrorProtocol)
   %36 = load %16#1 : $*Optional<Int>
   dealloc_stack %16#0 : $*@local_storage Optional<Int>
   return %36 : $Optional<Int>

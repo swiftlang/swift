@@ -13,7 +13,7 @@ class Noisy {
   init() { NoisyCount++ }
   deinit { NoisyCount-- }
 }
-enum SillyError: ErrorType { case JazzHands }
+enum SillyError : ErrorProtocol { case JazzHands }
 
 var ErrorHandlingTests = TestSuite("ErrorHandling")
 

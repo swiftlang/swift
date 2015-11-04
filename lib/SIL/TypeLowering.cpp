@@ -945,9 +945,9 @@ namespace {
   };
   
   /// A class that acts as a stand-in for improperly recursive types.
-  class RecursiveErrorTypeLowering : public AddressOnlyTypeLowering {
+  class RecursiveErrorProtocolLowering : public AddressOnlyTypeLowering {
   public:
-    RecursiveErrorTypeLowering(SILType type)
+    RecursiveErrorProtocolLowering(SILType type)
       : AddressOnlyTypeLowering(type) {}
     
     bool isValid() const override {
@@ -1254,7 +1254,7 @@ const TypeLowering *TypeConverter::find(TypeKey k) {
                      nomTy->getDeclaredTypeInContext());
     }
   }
-  auto result = new (*this, k.isDependent()) RecursiveErrorTypeLowering(
+  auto result = new (*this, k.isDependent()) RecursiveErrorProtocolLowering(
                             SILType::getPrimitiveAddressType(k.SubstType));
   found->second = result;
   return result;

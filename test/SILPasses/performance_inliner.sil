@@ -967,26 +967,26 @@ class C {
 }
 
 // CHECK-LABEL: sil [noinline] @callThrowing
-sil [noinline] @callThrowing : $@convention(method) <T> (@out T, @in T, @owned @callee_owned (@out T) -> @error ErrorType, @guaranteed C) -> () {
-bb0(%0 : $*T, %1 : $*T, %2 : $@callee_owned (@out T) -> @error ErrorType, %3 : $C):
-  strong_retain %2 : $@callee_owned (@out T) -> @error ErrorType
-  try_apply %2(%0) : $@callee_owned (@out T) -> @error ErrorType, normal bb1, error bb4
+sil [noinline] @callThrowing : $@convention(method) <T> (@out T, @in T, @owned @callee_owned (@out T) -> @error ErrorProtocol, @guaranteed C) -> () {
+bb0(%0 : $*T, %1 : $*T, %2 : $@callee_owned (@out T) -> @error ErrorProtocol, %3 : $C):
+  strong_retain %2 : $@callee_owned (@out T) -> @error ErrorProtocol
+  try_apply %2(%0) : $@callee_owned (@out T) -> @error ErrorProtocol, normal bb1, error bb4
 
 bb1(%6 : $()):
   br bb2
 
 bb2:
-  strong_release %2 : $@callee_owned (@out T) -> @error ErrorType
+  strong_release %2 : $@callee_owned (@out T) -> @error ErrorProtocol
   destroy_addr %1 : $*T
   %10 = tuple ()
   return %10 : $()
 
 bb3:
   copy_addr %1 to [initialization] %0 : $*T
-  strong_release %15 : $ErrorType
+  strong_release %15 : $ErrorProtocol
   br bb2
 
-bb4(%15 : $ErrorType):
+bb4(%15 : $ErrorProtocol):
   br bb3
 }
 
@@ -998,13 +998,13 @@ bb0(%0 : $C):
   %2 = struct $Int32 (%1 : $Builtin.Int32)
   %3 = alloc_stack $Int32
   store %2 to %3#1 : $*Int32
-  %5 = function_ref @theClosure : $@convention(thin) () -> (Int32, @error ErrorType)
-  %6 = thin_to_thick_function %5 : $@convention(thin) () -> (Int32, @error ErrorType) to $@callee_owned () -> (Int32, @error ErrorType)
-  %7 = function_ref @reabstractionThunk : $@convention(thin) (@out Int32, @owned @callee_owned () -> (Int32, @error ErrorType)) -> @error ErrorType
-  %8 = partial_apply %7(%6) : $@convention(thin) (@out Int32, @owned @callee_owned () -> (Int32, @error ErrorType)) -> @error ErrorType
+  %5 = function_ref @theClosure : $@convention(thin) () -> (Int32, @error ErrorProtocol)
+  %6 = thin_to_thick_function %5 : $@convention(thin) () -> (Int32, @error ErrorProtocol) to $@callee_owned () -> (Int32, @error ErrorProtocol)
+  %7 = function_ref @reabstractionThunk : $@convention(thin) (@out Int32, @owned @callee_owned () -> (Int32, @error ErrorProtocol)) -> @error ErrorProtocol
+  %8 = partial_apply %7(%6) : $@convention(thin) (@out Int32, @owned @callee_owned () -> (Int32, @error ErrorProtocol)) -> @error ErrorProtocol
   %9 = alloc_stack $Int32
-  %10 = function_ref @callThrowing : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @owned @callee_owned (@out τ_0_0) -> @error ErrorType, @guaranteed C) -> ()
-  %11 = apply %10<Int32>(%9#1, %3#1, %8, %0) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @owned @callee_owned (@out τ_0_0) -> @error ErrorType, @guaranteed C) -> ()
+  %10 = function_ref @callThrowing : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @owned @callee_owned (@out τ_0_0) -> @error ErrorProtocol, @guaranteed C) -> ()
+  %11 = apply %10<Int32>(%9#1, %3#1, %8, %0) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @owned @callee_owned (@out τ_0_0) -> @error ErrorProtocol, @guaranteed C) -> ()
   %12 = load %9#1 : $*Int32
   dealloc_stack %9#0 : $*@local_storage Int32
   dealloc_stack %3#0 : $*@local_storage Int32
@@ -1015,7 +1015,7 @@ bb0(%0 : $C):
 
 
 // CHECK-LABEL: sil @theClosure
-sil @theClosure : $@convention(thin) () -> (Int32, @error ErrorType) {
+sil @theClosure : $@convention(thin) () -> (Int32, @error ErrorProtocol) {
 bb0:
   %0 = integer_literal $Builtin.Int32, 0
   %1 = struct $Int32 (%0 : $Builtin.Int32)
@@ -1023,18 +1023,18 @@ bb0:
 }
 
 // CHECK-LABEL: sil [transparent] [reabstraction_thunk] @reabstractionThunk
-sil [transparent] [reabstraction_thunk] @reabstractionThunk : $@convention(thin) (@out Int32, @owned @callee_owned () -> (Int32, @error ErrorType)) -> @error ErrorType {
-bb0(%0 : $*Int32, %1 : $@callee_owned () -> (Int32, @error ErrorType)):
-  try_apply %1() : $@callee_owned () -> (Int32, @error ErrorType), normal bb1, error bb2
+sil [transparent] [reabstraction_thunk] @reabstractionThunk : $@convention(thin) (@out Int32, @owned @callee_owned () -> (Int32, @error ErrorProtocol)) -> @error ErrorProtocol {
+bb0(%0 : $*Int32, %1 : $@callee_owned () -> (Int32, @error ErrorProtocol)):
+  try_apply %1() : $@callee_owned () -> (Int32, @error ErrorProtocol), normal bb1, error bb2
 
 bb1(%3 : $Int32):
   store %3 to %0 : $*Int32
   %5 = tuple ()
   return %5 : $()
 
-bb2(%7 : $ErrorType):
-  %8 = builtin "willThrow"(%7 : $ErrorType) : $()
-  throw %7 : $ErrorType
+bb2(%7 : $ErrorProtocol):
+  %8 = builtin "willThrow"(%7 : $ErrorProtocol) : $()
+  throw %7 : $ErrorProtocol
 }
 
 sil_vtable C {
