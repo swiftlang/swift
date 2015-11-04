@@ -3454,9 +3454,18 @@ void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
   // deallocated in the final release.
   auto *ARI = cast<AllocRefInst>(i->getOperand());
   assert(ARI->canAllocOnStack());
-  if (IGM.Opts.EmitStackPromotionChecks && StackAllocs.count(ARI)) {
-    selfValue = Builder.CreateBitCast(selfValue, IGM.RefCountedPtrTy);
-    emitVerifyEndOfLifetimeCall(selfValue);
+  if (StackAllocs.count(ARI)) {
+    if (IGM.Opts.EmitStackPromotionChecks) {
+      selfValue = Builder.CreateBitCast(selfValue, IGM.RefCountedPtrTy);
+      emitVerifyEndOfLifetimeCall(selfValue);
+    } else {
+      // This has two purposes:
+      // 1. Tell LLVM the lifetime of the allocated stack memory.
+      // 2. Avoid tail-call optimization which may convert the call to the final
+      //    release to a jump, which is done after the stack frame is
+      //    destructed.
+      Builder.CreateLifetimeEnd(selfValue);
+    }
   }
 }
 
