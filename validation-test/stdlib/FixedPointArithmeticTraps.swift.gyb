@@ -66,6 +66,7 @@ FixedPointArithmeticTraps.test("PreDecrement/${IntTy}") {
   expectCrashLater()
   // --IntTy.min
   --x
+  _blackHole(x)
 }
 
 FixedPointArithmeticTraps.test("PreIncrement/${IntTy}") {
@@ -76,6 +77,7 @@ FixedPointArithmeticTraps.test("PreIncrement/${IntTy}") {
   expectCrashLater()
   // ++IntTy.max
   ++x
+  _blackHole(x)
 }
 
 FixedPointArithmeticTraps.test("PostDecrement/${IntTy}") {
@@ -86,6 +88,7 @@ FixedPointArithmeticTraps.test("PostDecrement/${IntTy}") {
   expectCrashLater()
   // IntTy.min--
   x--
+  _blackHole(x)
 }
 
 FixedPointArithmeticTraps.test("PostIncrement/${IntTy}") {
@@ -96,6 +99,7 @@ FixedPointArithmeticTraps.test("PostIncrement/${IntTy}") {
   expectCrashLater()
   // IntTy.max++
   x++
+  _blackHole(x)
 }
 
 //
@@ -115,6 +119,7 @@ FixedPointArithmeticTraps.test("Addition/${IntTy}") {
   expectOverflow(${IntTy}.addWithOverflow(a, get${IntTy}(${IntTy}.max / 3)))
   expectCrashLater()
   a = a + get${IntTy}(${IntTy}.max / 3)
+  _blackHole(a)
 }
 
 //
@@ -131,6 +136,7 @@ FixedPointArithmeticTraps.test("Subtraction/${IntTy}") {
   expectOverflow(${IntTy}.subtractWithOverflow(a, get${IntTy}(${IntTy}.max / 3)))
   expectCrashLater()
   a = a - get${IntTy}(${IntTy}.max / 3)
+  _blackHole(a)
 }
 
 //
@@ -147,6 +153,7 @@ FixedPointArithmeticTraps.test("Multplication/${IntTy}") {
   expectOverflow(${IntTy}.multiplyWithOverflow(a, get${IntTy}(2)))
   expectCrashLater()
   a = a * get${IntTy}(2)
+  _blackHole(a)
 }
 
 //
@@ -179,6 +186,7 @@ FixedPointArithmeticTraps.test("Division/${IntTy}.min-over-minus-one") {
   expectCrashLater()
   a = a / get${IntTy}(-1)
   // IntTy.min / -1
+  _blackHole(a)
 }
 
 %   end
@@ -198,6 +206,7 @@ FixedPointArithmeticTraps.test("Remainder/${IntTy}") {
   expectOverflow(${IntTy}.remainderWithOverflow(a, get${IntTy}(0)))
   expectCrashLater()
   a = a % get${IntTy}(0)
+  _blackHole(a)
 }
 
 %   if self_ty.is_signed:
@@ -214,6 +223,7 @@ FixedPointArithmeticTraps.test("Remainder/${IntTy}.min-mod-minus-one") {
   expectOverflow(${IntTy}.remainderWithOverflow(a, get${IntTy}(-1)))
   expectCrashLater()
   a = a % get${IntTy}(-1)
+  _blackHole(a)
 }
 
 %   end
@@ -236,6 +246,7 @@ FixedPointArithmeticTraps.test("${description}/${IntTy}/Negative") {
   // Overflow in ${description}.
   expectCrashLater()
   a = a ${operation} get${IntTy}(shiftAmount)
+  _blackHole(a)
 }
 
 %     end
@@ -251,6 +262,7 @@ FixedPointArithmeticTraps.test("${description}/${IntTy}/TypeSize") {
   // Overflow in ${description}.
   expectCrashLater()
   a = a ${operation} get${IntTy}(shiftAmount)
+  _blackHole(a)
 }
 
 FixedPointArithmeticTraps.test("${description}/${IntTy}/TypeSizePlusOne") {
@@ -263,6 +275,7 @@ FixedPointArithmeticTraps.test("${description}/${IntTy}/TypeSizePlusOne") {
   // Overflow in ${description}.
   expectCrashLater()
   a = a ${operation} get${IntTy}(shiftAmount)
+  _blackHole(a)
 }
 
 FixedPointArithmeticTraps.test("${description}/${IntTy}/Max") {
@@ -275,6 +288,7 @@ FixedPointArithmeticTraps.test("${description}/${IntTy}/Max") {
   // Overflow in ${description}.
   expectCrashLater()
   a = a ${operation} get${IntTy}(shiftAmount)
+  _blackHole(a)
 }
 
 %   end
@@ -292,52 +306,60 @@ FixedPointTruncationTraps.test("SignedToSignedTruncation/dest=sign-overflow") {
   // Test that we check if we overflow on the sign bit.
   var x = getInt16(128)
   expectCrashLater()
-  _ = Int8(x)
+  var result = Int8(x)
+  _blackHole(result)
 }
 
 FixedPointTruncationTraps.test("SignedToUnsignedTruncation/src=-1") {
   var x = getInt32(-1)
   expectCrashLater()
-  _ = UInt8(x)
+  var result = UInt8(x)
+  _blackHole(result)
 }
 
 FixedPointTruncationTraps.test("SignedToUnignedSameSize/src=min") {
   var x = getInt8(-128)
   expectCrashLater()
-  _ = UInt16(x)
+  var result = UInt16(x)
+  _blackHole(result)
 }
 
 
 FixedPointTruncationTraps.test("SignedToUnsignedTruncation/src=max") {
   var x = getInt32(0xFFFFFFF)
   expectCrashLater()
-  _ = UInt16(x)
+  var result = UInt16(x)
+  _blackHole(result)
 }
 
 FixedPointTruncationTraps.test("UnsignedToSignedTruncation/dest=sign-overflow") {
   // Test that we check if we overflow on the sign bit.
   var x = getUInt16(128)
   expectCrashLater()
-  _ = Int8(x)
+  var result = Int8(x)
+  _blackHole(result)
 }
 
 FixedPointTruncationTraps.test("UnsignedToUnsignedTruncation/src=max") {
   var x = getUInt32(0xFFFFFFFF)
   expectCrashLater()
-  _ = UInt16(x)
+  var result = UInt16(x)
+  _blackHole(result)
 }
 
 // Same size conversions.
 FixedPointTruncationTraps.test("SignedToUnsignedSameSize") {
   var x = getInt8(-2)
   expectCrashLater()
-  _ = UInt8(x)
+  var result = UInt8(x)
+  _blackHole(result)
 }
 
 FixedPointTruncationTraps.test("UnsignedToSignedSameSize") {
   var x = getUInt8(128)
   expectCrashLater()
-  _ = Int8(x)
+  var result = Int8(x)
+  _blackHole(result)
 }
 
 runAllTests()
