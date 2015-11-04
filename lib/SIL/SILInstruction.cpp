@@ -626,7 +626,7 @@ namespace {
     ArrayRef<Operand> visit##CLASS(const CLASS *I) {                    \
       llvm_unreachable("accessing non-instruction " #CLASS);            \
     }
-#define INST(CLASS, PARENT, MEMBEHAVIOR) \
+#define INST(CLASS, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR) \
     ArrayRef<Operand> visit##CLASS(const CLASS *I) {                    \
       ASSERT_IMPLEMENTS(CLASS, SILInstruction, getAllOperands,          \
                         ArrayRef<Operand>() const);                     \
@@ -643,7 +643,7 @@ namespace {
     MutableArrayRef<Operand> visit##CLASS(const CLASS *I) {             \
       llvm_unreachable("accessing non-instruction " #CLASS);            \
     }
-#define INST(CLASS, PARENT, MEMBEHAVIOR) \
+#define INST(CLASS, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR) \
     MutableArrayRef<Operand> visit##CLASS(CLASS *I) {                   \
       ASSERT_IMPLEMENTS(CLASS, SILInstruction, getAllOperands,          \
                         MutableArrayRef<Operand>());                    \
@@ -700,12 +700,24 @@ SILInstruction::MemoryBehavior SILInstruction::getMemoryBehavior() const {
                    : MemoryBehavior::MayHaveSideEffects;
 
   switch (getKind()) {
-#define INST(CLASS, PARENT, MEMBEHAVIOR) \
+#define INST(CLASS, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR) \
   case ValueKind::CLASS: return MemoryBehavior::MEMBEHAVIOR;
 #include "swift/SIL/SILNodes.def"
   case ValueKind::SILArgument:
   case ValueKind::SILUndef:
     llvm_unreachable("Non-instructions are unreachable.");
+  }
+  llvm_unreachable("We've just exhausted the switch.");
+}
+
+SILInstruction::ReleasingBehavior SILInstruction::getReleasingBehavior() const {
+  switch (getKind()) {
+#define INST(CLASS, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR) \
+  case ValueKind::CLASS: return ReleasingBehavior::RELEASINGBEHAVIOR;
+#include "swift/SIL/SILNodes.def"
+ case ValueKind::SILArgument:
+ case ValueKind::SILUndef:
+   llvm_unreachable("Non-instructions are unreachable.");
   }
   llvm_unreachable("We've just exhausted the switch.");
 }

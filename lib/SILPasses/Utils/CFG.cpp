@@ -174,7 +174,7 @@ void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
   SILBuilderWithScope<8> B(T);
 
   switch (T->getKind()) {
-#define TERMINATOR(ID, PARENT, MEM)
+#define TERMINATOR(ID, PARENT, MEM, RELEASE)
 #define VALUE(ID, PARENT) case ValueKind::ID:
 #include "swift/SIL/SILNodes.def"
     llvm_unreachable("Unexpected terminator instruction!");
@@ -333,7 +333,7 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
   SILBuilderWithScope<8> B(T);
 
   switch (T->getKind()) {
-#define TERMINATOR(ID, PARENT, MEM)
+#define TERMINATOR(ID, PARENT, MEM, RELEASE)
 #define VALUE(ID, PARENT) case ValueKind::ID:
 #include "swift/SIL/SILNodes.def"
     llvm_unreachable("Unexpected terminator instruction!");

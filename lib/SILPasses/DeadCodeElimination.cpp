@@ -330,7 +330,7 @@ void DCE::propagateLiveness(SILInstruction *I) {
   }
 
   switch (I->getKind()) {
-#define TERMINATOR(ID, PARENT, MEM)
+#define TERMINATOR(ID, PARENT, MEM, RELEASE)
 #define VALUE(ID, PARENT) case ValueKind::ID:
 #include "swift/SIL/SILNodes.def"
     llvm_unreachable("Unexpected terminator instruction!");

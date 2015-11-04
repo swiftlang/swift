@@ -97,6 +97,13 @@ public:
     MayHaveSideEffects,
   };
 
+  /// Enumeration representing whether the execution of an instruction can
+  /// result in memory being released.
+  enum class ReleasingBehavior {
+    DoesNotRelease,
+    MayRelease,
+  };
+
   const SILBasicBlock *getParent() const { return ParentBB; }
   SILBasicBlock *getParent() { return ParentBB; }
 
@@ -151,6 +158,7 @@ public:
   }
 
   MemoryBehavior getMemoryBehavior() const;
+  ReleasingBehavior getReleasingBehavior() const;
 
   /// Can this instruction abort the program in some manner?
   bool mayTrap() const;

@@ -694,7 +694,7 @@ bool StructExtractInst::isFieldOnlyNonTrivialField() const {
 
 
 TermInst::SuccessorListTy TermInst::getSuccessors() {
-  #define TERMINATOR(TYPE, PARENT, EFFECT) \
+  #define TERMINATOR(TYPE, PARENT, EFFECT, RELEASING) \
     if (auto I = dyn_cast<TYPE>(this)) \
       return I->getSuccessors();
   #include "swift/SIL/SILNodes.def"

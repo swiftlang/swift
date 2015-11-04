@@ -59,7 +59,7 @@ protected:
   void visit##CLASS(CLASS *I) {                                       \
     llvm_unreachable("SILCloner visiting non-instruction?");          \
   }
-#define INST(CLASS, PARENT, MEMBEHAVIOR) \
+#define INST(CLASS, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR) \
   void visit##CLASS(CLASS *I);
 #include "swift/SIL/SILNodes.def"
 
