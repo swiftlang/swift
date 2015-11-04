@@ -97,13 +97,13 @@ public struct ReverseRandomAccessIndex<Base: RandomAccessIndexType>
   }
 }
 
-public protocol _ReverseCollectionType : CollectionType {
+public protocol _ReverseCollectionType : Collection {
   typealias Index : ReverseIndexType
-  typealias Base : CollectionType
+  typealias Base : Collection
   var _base: Base {get}
 }
 
-extension CollectionType
+extension Collection
   where Self : _ReverseCollectionType, Self.Base.Index : RandomAccessIndexType {
   public var startIndex : ReverseRandomAccessIndex<Self.Base.Index> {
     return ReverseRandomAccessIndex(_base.endIndex)
@@ -111,7 +111,7 @@ extension CollectionType
 }
 
 extension _ReverseCollectionType
-  where Self : CollectionType, Self.Index.Base == Self.Base.Index
+  where Self : Collection, Self.Index.Base == Self.Base.Index
 {
   public var startIndex : Index { return Self.Index(_base.endIndex) }
   public var endIndex : Index { return Self.Index(_base.startIndex) }
@@ -137,8 +137,8 @@ extension _ReverseCollectionType
 ///
 /// - See also: `ReverseRandomAccessCollection`
 public struct ReverseCollection<
-  Base : CollectionType where Base.Index : BidirectionalIndexType
-> : CollectionType, _ReverseCollectionType {
+  Base : Collection where Base.Index : BidirectionalIndexType
+> : Collection, _ReverseCollectionType {
   /// Creates an instance that presents the elements of `base` in
   /// reverse order.
   ///
@@ -167,7 +167,7 @@ public struct ReverseCollection<
 ///   collection having random access indices.
 /// - See also: `ReverseCollection`
 public struct ReverseRandomAccessCollection<
-  Base : CollectionType where Base.Index : RandomAccessIndexType
+  Base : Collection where Base.Index : RandomAccessIndexType
 > : _ReverseCollectionType {
   /// Creates an instance that presents the elements of `base` in
   /// reverse order.
@@ -192,7 +192,7 @@ public struct ReverseRandomAccessCollection<
   public let _base: Base
 }
 
-extension CollectionType where Index : BidirectionalIndexType {
+extension Collection where Index : BidirectionalIndexType {
   /// Return the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)
@@ -202,7 +202,7 @@ extension CollectionType where Index : BidirectionalIndexType {
   }
 }
 
-extension CollectionType where Index : RandomAccessIndexType {
+extension Collection where Index : RandomAccessIndexType {
   /// Return the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)

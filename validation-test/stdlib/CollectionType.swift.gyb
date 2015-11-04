@@ -8,11 +8,11 @@
 import StdlibUnittest
 import SwiftPrivate
 
-var CollectionTypeTests = TestSuite("CollectionType")
+var CollectionTypeTests = TestSuite("Collection")
 
 % import gyb
 
-struct CollectionWithDefaultUnderestimateCount : CollectionType {
+struct CollectionWithDefaultUnderestimateCount : Collection {
   init(count: Int) {
     self._count = count
   }
@@ -49,7 +49,7 @@ var MinimalForwardCollectionWithCustomFilter_timesFilterWasCalled: Int = 0
 % for Implementation in [ 'Default', 'Custom' ]:
 
 struct MinimalForwardCollectionWith${Implementation}Filter<Element>
-  : CollectionType {
+  : Collection {
 
   init(_ data: [Element], underestimatedCount: UnderestimateCountBehavior) {
     self._data = MinimalForwardCollection(
@@ -117,7 +117,7 @@ func callStaticCollectionFilter(
   return result
 }
 
-func callGenericCollectionFilter<S : CollectionType>(
+func callGenericCollectionFilter<S : Collection>(
   sequence: S,
   @noescape includeElement: (S.Iterator.Element) -> Bool
 ) -> [S.Iterator.Element] {
@@ -130,7 +130,7 @@ func callGenericCollectionFilter<S : CollectionType>(
 
 %   for dispatch in [ 'Static', 'Generic' ]:
 
-CollectionTypeTests.test("filter/CollectionType/${Implementation}Implementation/${dispatch}") {
+CollectionTypeTests.test("filter/Collection/${Implementation}Implementation/${dispatch}") {
   for test in filterTests {
     for underestimateCountBehavior in [
       UnderestimateCountBehavior.Precise,
@@ -181,7 +181,7 @@ var MinimalForwardCollectionWithCustomMap_timesMapWasCalled: Int = 0
 % for Implementation in [ 'Default', 'Custom' ]:
 
 struct MinimalForwardCollectionWith${Implementation}Map<Element>
-  : CollectionType {
+  : Collection {
 
   init(_ data: [Element], underestimatedCount: UnderestimateCountBehavior) {
     self._data = MinimalForwardCollection(
@@ -249,7 +249,7 @@ func callStaticCollectionMap<T>(
   return result
 }
 
-func callGenericCollectionMap<C : CollectionType, T>(
+func callGenericCollectionMap<C : Collection, T>(
   collection: C,
   @noescape transform: (C.Iterator.Element) -> T
 ) -> [T] {
@@ -263,7 +263,7 @@ func callGenericCollectionMap<C : CollectionType, T>(
 %   for dispatch in [ 'Static', 'Generic' ]:
 
 CollectionTypeTests.test(
-  "map/CollectionType/${Implementation}Implementation/${dispatch}"
+  "map/Collection/${Implementation}Implementation/${dispatch}"
 ) {
   for test in mapTests {
     for underestimateCountBehavior in [
@@ -323,7 +323,7 @@ ${LazyFlatMapTest}
 // underestimateCount()
 //===----------------------------------------------------------------------===//
 
-CollectionTypeTests.test("underestimateCount/CollectionType/DefaultImplementation") {
+CollectionTypeTests.test("underestimateCount/Collection/DefaultImplementation") {
   if true {
     let s = CollectionWithDefaultUnderestimateCount(count: 0)
     expectEqual(0, callGenericUnderestimatedCount(s))
@@ -334,7 +334,7 @@ CollectionTypeTests.test("underestimateCount/CollectionType/DefaultImplementatio
   }
 }
 
-struct CollectionWithCustomUnderestimateCount : CollectionType {
+struct CollectionWithCustomUnderestimateCount : Collection {
   init(underestimatedCount: Int) {
     self._underestimatedCount = underestimatedCount
   }
@@ -367,7 +367,7 @@ struct CollectionWithCustomUnderestimateCount : CollectionType {
   let _underestimatedCount: Int
 }
 
-CollectionTypeTests.test("underestimateCount/CollectionType/CustomImplementation") {
+CollectionTypeTests.test("underestimateCount/Collection/CustomImplementation") {
   if true {
     let s = CollectionWithCustomUnderestimateCount(underestimatedCount: 0)
     expectEqual(0, callGenericUnderestimatedCount(s))
@@ -379,10 +379,10 @@ CollectionTypeTests.test("underestimateCount/CollectionType/CustomImplementation
 }
 
 //===----------------------------------------------------------------------===//
-// CollectionType.iterator(), CollectionType.Iterator
+// Collection.iterator(), Collection.Iterator
 //===----------------------------------------------------------------------===//
 
-struct MinimalForwardCollectionWithDefaultIterator : CollectionType {
+struct MinimalForwardCollectionWithDefaultIterator : Collection {
   init(count: Int) {
     self._count = count
   }
@@ -407,7 +407,7 @@ func callGenericGenerate<S : SequenceType>(sequence: S) -> S.Iterator {
   return sequence.iterator()
 }
 
-CollectionTypeTests.test("CollectionType.iterator()/DefaultImplementation") {
+CollectionTypeTests.test("Collection.iterator()/DefaultImplementation") {
   for count in [ 0, 5 ] {
     let collection = MinimalForwardCollectionWithDefaultIterator(count: count)
 
@@ -434,7 +434,7 @@ CollectionTypeTests.test("CollectionType.iterator()/DefaultImplementation") {
   }
 }
 
-struct MinimalForwardCollectionWithCustomIterator : CollectionType {
+struct MinimalForwardCollectionWithCustomIterator : Collection {
   init(count: Int) {
     self._count = count
   }
@@ -464,7 +464,7 @@ struct MinimalForwardCollectionWithCustomIterator : CollectionType {
   var _count: Int
 }
 
-CollectionTypeTests.test("CollectionType.iterator()/CustomImplementation") {
+CollectionTypeTests.test("Collection.iterator()/CustomImplementation") {
   for count in [ 0, 5 ] {
     let collection = MinimalForwardCollectionWithCustomIterator(count: count)
 
@@ -496,7 +496,7 @@ CollectionTypeTests.test("CollectionType.iterator()/CustomImplementation") {
 }
 
 //===----------------------------------------------------------------------===//
-// subscript(_: Range<Index>), CollectionType.SubSequence
+// subscript(_: Range<Index>), Collection.SubSequence
 //===----------------------------------------------------------------------===//
 
 CollectionTypeTests.test("subscript(_: Range<Index>)/Dispatch") {
@@ -563,7 +563,7 @@ CollectionTypeTests.test("indexOf/WhereElementIsEquatable/dispatch") {
 // <rdar://problem/20582358> Commenting out one line determines whether a
 // completely different line type-checks
 func callGenericFind_<
-  C : CollectionType where C.Iterator.Element : Equatable
+  C : Collection where C.Iterator.Element : Equatable
 >(collection: C, _ element: C.Iterator.Element) -> C.Index? {
   return collection.indexOf(element)
 }
@@ -613,13 +613,13 @@ CollectionTypeTests.test("Set<T>.find/CustomImplementation/${dispatch}") {
 
 % end
 
-extension CollectionType where
+extension Collection where
   Iterator.Element : Equatable,
 
   // FIXME: the following constraints should go away after
   // <rdar://problem/20715697> CollectionType.SubSlice should constrain its
   // Element type
-  SubSequence : CollectionType,
+  SubSequence : Collection,
   SubSequence.SubSequence == SubSequence,
   SubSequence.Iterator.Element == Iterator.Element,
   SubSequence.Index == Index {
@@ -654,10 +654,10 @@ CollectionTypeTests.test("indexOf/ContinueSearch") {
 }
 
 //===----------------------------------------------------------------------===//
-// CollectionType.split()
+// Collection.split()
 //===----------------------------------------------------------------------===//
 
-CollectionTypeTests.test("CollectionType/split/dispatch") {
+CollectionTypeTests.test("Collection/split/dispatch") {
   var tester = CollectionLog.dispatchTester([OpaqueValue(1)])
   tester.split { $0.value == 1 }
   expectCustomizable(tester, tester.log.split)
@@ -667,7 +667,7 @@ CollectionTypeTests.test("CollectionType/split/dispatch") {
 // prefixThrough()
 //===----------------------------------------------------------------------===//
 
-CollectionTypeTests.test("CollectionType/prefixThrough/dispatch") {
+CollectionTypeTests.test("Collection/prefixThrough/dispatch") {
   var tester = CollectionLog.dispatchTester([1, 2, 3].map(OpaqueValue.init))
   tester.prefixThrough(1)
   expectCustomizable(tester, tester.log.prefixThrough)
@@ -677,7 +677,7 @@ CollectionTypeTests.test("CollectionType/prefixThrough/dispatch") {
 // prefixUpTo()
 //===----------------------------------------------------------------------===//
 
-CollectionTypeTests.test("CollectionType/prefixUpTo/dispatch") {
+CollectionTypeTests.test("Collection/prefixUpTo/dispatch") {
   var tester = CollectionLog.dispatchTester([OpaqueValue(1)])
   tester.prefixUpTo(1)
   expectCustomizable(tester, tester.log.prefixUpTo)
@@ -687,7 +687,7 @@ CollectionTypeTests.test("CollectionType/prefixUpTo/dispatch") {
 // suffixFrom()
 //===----------------------------------------------------------------------===//
 
-CollectionTypeTests.test("CollectionType/suffixFrom/dispatch") {
+CollectionTypeTests.test("Collection/suffixFrom/dispatch") {
   var tester = CollectionLog.dispatchTester([1, 2, 3].map(OpaqueValue.init))
   tester.suffixFrom(1)
   expectCustomizable(tester, tester.log.suffixFrom)
@@ -695,7 +695,7 @@ CollectionTypeTests.test("CollectionType/suffixFrom/dispatch") {
 
 
 //===----------------------------------------------------------------------===//
-// MutableCollectionType
+// MutableCollection
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//

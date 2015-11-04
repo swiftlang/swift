@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-struct Q<T: CollectionType> : SequenceType {
+struct Q<T: Collection> : SequenceType {
   func iterator() -> T.Iterator {
     return base.iterator()
   }

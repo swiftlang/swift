@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 class A {
-func compose<h : P> (bytes: b where h: CollectionType where k) -> Any)()
+func compose<h : P> (bytes: b where h: Collection where k) -> Any)()
 class a {
 let g = {
 }

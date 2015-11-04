@@ -122,7 +122,7 @@ rdar14005696 ~~~ 5
 
 // <rdar://problem/15168483>
 func f1<
-  S: CollectionType 
+  S: Collection 
   where S.Index: BidirectionalIndexType
 >(seq: S) {
   let x = (seq.indices).lazy.reverse()
@@ -131,7 +131,7 @@ func f1<
 }
 
 // <rdar://problem/16078944>
-func count16078944<C: CollectionType>(x: C) -> Int { return 0 }
+func count16078944<C: Collection>(x: C) -> Int { return 0 }
 
 func test16078944 <T: ForwardIndexType>(lhs: T, args: T) -> Int {
     return count16078944(lhs..<args) // don't crash

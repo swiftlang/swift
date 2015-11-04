@@ -52,7 +52,7 @@ func b> {
 return $0
 }
 let h, g : NSObject {
-(a: CollectionType where l.c<T : C<T> T : d where B = c<h == {
+(a: Collection where l.c<T : C<T> T : d where B = c<h == {
 protocol A = b> d<c) {
 typealias A {
 case A<h : a {

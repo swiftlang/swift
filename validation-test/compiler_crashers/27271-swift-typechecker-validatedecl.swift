@@ -110,12 +110,12 @@ class d=c
 }
 let
 {
-struct d:CollectionType
+struct d:Collection
 }
 protocol c : Poid{
 let f
 let:T{
-class b<T where g:CollectionType
+class b<T where g:Collection
 func a<T : a{
 let f
 class B{
@@ -124,7 +124,7 @@ class b{
 var a
 struct d=c{struct B{
 class C{
-f:CollectionType
+f:Collection
 class A{struct B<T where H:SequenceType
 var a:a{
 class a{
@@ -136,7 +136,7 @@ protocol c<T where I : a{
 enum S
 protocol c<T where H:{
 }
-let f:CollectionType
+let f:Collection
 enum S< > S >
 class d}{struct B
 protocol c {
@@ -182,6 +182,6 @@ f=[Void{
 let a{
 <T where h:T
 let
-struct S< {let f:CollectionType
+struct S< {let f:Collection
 {
 let

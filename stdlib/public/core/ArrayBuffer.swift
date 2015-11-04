@@ -453,7 +453,7 @@ extension _ArrayBuffer {
     }
   }
   
-  //===--- CollectionType conformance -------------------------------------===//
+  //===--- Collection conformance -------------------------------------===//
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.

@@ -500,7 +500,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
 
 /// Append the elements of `rhs` to `lhs`.
 public func += <
-  Element, C : CollectionType where C.Iterator.Element == Element
+  Element, C : Collection where C.Iterator.Element == Element
 > (inout lhs: _ContiguousArrayBuffer<Element>, rhs: C) {
   let oldCount = lhs.count
   let newCount = oldCount + numericCast(rhs.count)
@@ -522,7 +522,7 @@ public func += <
   }
 }
 
-extension _ContiguousArrayBuffer : CollectionType {
+extension _ContiguousArrayBuffer : Collection {
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
@@ -572,7 +572,7 @@ internal func _copySequenceToNativeArrayBuffer<
   return builder.finish()
 }
 
-extension CollectionType {
+extension Collection {
   public func _copyToNativeArrayBuffer(
   ) -> _ContiguousArrayBuffer<Iterator.Element> {
     return _copyCollectionToNativeArrayBuffer(self)
@@ -595,7 +595,7 @@ extension _ContiguousArrayBuffer {
 /// should be changed to use _UnsafePartiallyInitializedContiguousArrayBuffer.
 @warn_unused_result
 internal func _copyCollectionToNativeArrayBuffer<
-  C : CollectionType
+  C : Collection
 >(source: C) -> _ContiguousArrayBuffer<C.Iterator.Element>
 {
   let count: Int = numericCast(source.count)

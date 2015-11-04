@@ -54,7 +54,7 @@ public func randomShuffle<T>(a: [T]) -> [T] {
 }
 
 public func gather<
-  C : CollectionType,
+  C : Collection,
   IndicesSequence : SequenceType
   where
   IndicesSequence.Iterator.Element == C.Index

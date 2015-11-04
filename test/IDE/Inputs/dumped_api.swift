@@ -335,7 +335,7 @@ public func == (lhs: AnyRandomAccessIndex, rhs: AnyRandomAccessIndex) -> Bool
 ///
 /// This protocol can be considered an implementation detail of the
 /// `===` and `!==` implementations for these types.
-public protocol AnyCollectionType : CollectionType {
+public protocol AnyCollectionType : Collection {
   /// Identifies the underlying collection stored by `self`. Instances
   /// copied from one another have the same `underlyingCollectionID`.
   var underlyingCollectionID: ObjectIdentifier {get}
@@ -356,7 +356,7 @@ public func !== <
 ///
 /// Forwards operations to an arbitrary underlying collection having the
 /// same `Element` type, hiding the specifics of the underlying
-/// `CollectionType`.
+/// `Collection`.
 ///
 /// See also: `AnyBidirectionalType`, `AnyRandomAccessType`
 public struct AnyForwardCollection<Element> : AnyCollectionType {
@@ -366,7 +366,7 @@ public struct AnyForwardCollection<Element> : AnyCollectionType {
   ///
   /// Complexity: O(1)
   public init<
-    C: CollectionType
+    C: Collection
       where C.Index: ForwardIndexType, C.Generator.Element == Element
   >(_ base: C) 
 
@@ -382,7 +382,7 @@ public struct AnyForwardCollection<Element> : AnyCollectionType {
   ///
   /// Complexity: O(1)
   public init<
-    C: CollectionType
+    C: Collection
       where C.Index: BidirectionalIndexType, C.Generator.Element == Element
   >(_ base: C) 
 
@@ -398,7 +398,7 @@ public struct AnyForwardCollection<Element> : AnyCollectionType {
   ///
   /// Complexity: O(1)
   public init<
-    C: CollectionType
+    C: Collection
       where C.Index: RandomAccessIndexType, C.Generator.Element == Element
   >(_ base: C) 
 
@@ -443,7 +443,7 @@ public struct AnyForwardCollection<Element> : AnyCollectionType {
 ///
 /// Forwards operations to an arbitrary underlying collection having the
 /// same `Element` type, hiding the specifics of the underlying
-/// `CollectionType`.
+/// `Collection`.
 ///
 /// See also: `AnyRandomAccessType`, `AnyForwardType`
 public struct AnyBidirectionalCollection<Element> : AnyCollectionType {
@@ -453,7 +453,7 @@ public struct AnyBidirectionalCollection<Element> : AnyCollectionType {
   ///
   /// Complexity: O(1)
   public init<
-    C: CollectionType
+    C: Collection
       where C.Index: BidirectionalIndexType, C.Generator.Element == Element
   >(_ base: C) 
 
@@ -469,7 +469,7 @@ public struct AnyBidirectionalCollection<Element> : AnyCollectionType {
   ///
   /// Complexity: O(1)
   public init<
-    C: CollectionType
+    C: Collection
       where C.Index: RandomAccessIndexType, C.Generator.Element == Element
   >(_ base: C) 
 
@@ -521,7 +521,7 @@ public struct AnyBidirectionalCollection<Element> : AnyCollectionType {
 ///
 /// Forwards operations to an arbitrary underlying collection having the
 /// same `Element` type, hiding the specifics of the underlying
-/// `CollectionType`.
+/// `Collection`.
 ///
 /// See also: `AnyForwardType`, `AnyBidirectionalType`
 public struct AnyRandomAccessCollection<Element> : AnyCollectionType {
@@ -531,7 +531,7 @@ public struct AnyRandomAccessCollection<Element> : AnyCollectionType {
   ///
   /// Complexity: O(1)
   public init<
-    C: CollectionType
+    C: Collection
       where C.Index: RandomAccessIndexType, C.Generator.Element == Element
   >(_ base: C) 
 

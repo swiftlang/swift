@@ -13,7 +13,7 @@
 extension String {
   /// A collection of UTF-16 code units that encodes a `String` value.
   public struct UTF16View
-    : CollectionType, _Reflectable, CustomStringConvertible,
+    : Collection, _Reflectable, CustomStringConvertible,
     CustomDebugStringConvertible {
 
     public struct Index {

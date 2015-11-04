@@ -212,7 +212,7 @@ public struct Mirror {
   /// initializers of `AnyBidirectionalCollection` and
   /// `AnyRandomAccessCollection` for details.
   public init<
-    T, C: CollectionType where C.Iterator.Element == Child
+    T, C: Collection where C.Iterator.Element == Child
   >(
     _ subject: T,
     children: C,
@@ -260,7 +260,7 @@ public struct Mirror {
   /// initializers of `AnyBidirectionalCollection` and
   /// `AnyRandomAccessCollection` for details.
   public init<
-    T, C: CollectionType
+    T, C: Collection
   >(
     _ subject: T,
     unlabeledChildren: C,
@@ -494,7 +494,7 @@ internal extension Mirror {
   /// appropriate for random access!  To avoid this pitfall, convert
   /// mirrors to use the new style, which only present forward
   /// traversal in general.
-  internal struct LegacyChildren : CollectionType {
+  internal struct LegacyChildren : Collection {
     init(_ oldMirror: _MirrorType) {
       self._oldMirror = oldMirror
     }
@@ -737,9 +737,9 @@ public struct DictionaryLiteral<Key, Value> : DictionaryLiteralConvertible {
   internal let elements: [(Key, Value)]
 }
 
-/// `CollectionType` conformance that allows `DictionaryLiteral` to
+/// `Collection` conformance that allows `DictionaryLiteral` to
 /// interoperate with the rest of the standard library.
-extension DictionaryLiteral : CollectionType {
+extension DictionaryLiteral : Collection {
   /// The position of the first element in a non-empty `DictionaryLiteral`.
   ///
   /// Identical to `endIndex` in an empty `DictionaryLiteral`.

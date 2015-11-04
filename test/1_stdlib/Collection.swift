@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 // REQUIRES: executable_test
 
-struct X : CollectionType {
+struct X : Collection {
   typealias Element = String.CharacterView.Iterator.Element
   typealias Index = String.Index
   var msg: String
@@ -40,7 +40,7 @@ for a in PermutationGenerator(elements: foobar, indices: r) {
 print("")
 
 func isPalindrome0<
-  S : CollectionType
+  S : Collection
   where
   S.Index : BidirectionalIndexType,
   S.Iterator.Element : Equatable
@@ -65,7 +65,7 @@ print(isPalindrome0(X("GoHangaSalamiImaLasagneHoG")))
 print(isPalindrome0(X("GoHangaSalamiimalaSagnaHoG")))
 
 func isPalindrome1<
-  S : CollectionType
+  S : Collection
   where
   S.Index : BidirectionalIndexType,
   S.Iterator.Element : Equatable
@@ -82,7 +82,7 @@ func isPalindrome1<
 }
 
 func isPalindrome1_5<
-  S: CollectionType
+  S: Collection
   where
   S.Index: BidirectionalIndexType,
   S.Iterator.Element == S.Iterator.Element,
@@ -111,7 +111,7 @@ print(isPalindrome1_5(X("FleetoMeReMoteelF")))
 // Finally, one that actually uses indexing to do half as much work.
 // BidirectionalIndexType traversal finally pays off!
 func isPalindrome2<
-  S: CollectionType
+  S: Collection
   where
   S.Index : BidirectionalIndexType,
   S.Iterator.Element: Equatable
@@ -143,7 +143,7 @@ print(isPalindrome2(X("ZerimarORamireZ")))
 print(isPalindrome2(X("Zerimar-O-ramireZ")))
 
 func isPalindrome4<
-  S: CollectionType
+  S: Collection
   where
   S.Index : BidirectionalIndexType,
   S.Iterator.Element : Equatable

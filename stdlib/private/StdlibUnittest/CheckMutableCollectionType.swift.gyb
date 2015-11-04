@@ -58,7 +58,7 @@ public func withInvalidOrderings(body: ((Int,Int) -> Bool) -> Void) {
   body { (_,_) in i++ % 5 == 0 }
 }
 
-internal func _mapInPlace<C : MutableCollectionType>(
+internal func _mapInPlace<C : MutableCollection>(
   inout elements: C,
   @noescape transform: (C.Iterator.Element) -> C.Iterator.Element
 ) {
@@ -69,20 +69,20 @@ internal func _mapInPlace<C : MutableCollectionType>(
 
 extension TestSuite {
   public func addForwardMutableCollectionTests<
-    Collection : MutableCollectionType,
-    CollectionWithEquatableElement : MutableCollectionType,
-    CollectionWithComparableElement : MutableCollectionType
+    C : MutableCollection,
+    CollectionWithEquatableElement : MutableCollection,
+    CollectionWithComparableElement : MutableCollection
     where
-    Collection.SubSequence : MutableCollectionType,
-    Collection.SubSequence.Iterator.Element == Collection.Iterator.Element,
-    Collection.SubSequence.SubSequence == Collection.SubSequence,
+    C.SubSequence : MutableCollection,
+    C.SubSequence.Iterator.Element == C.Iterator.Element,
+    C.SubSequence.SubSequence == C.SubSequence,
     CollectionWithEquatableElement.Iterator.Element : Equatable,
     CollectionWithComparableElement.Iterator.Element : Comparable
   >(
     testNamePrefix: String = "",
-    makeCollection: ([Collection.Iterator.Element]) -> Collection,
-    wrapValue: (OpaqueValue<Int>) -> Collection.Iterator.Element,
-    extractValue: (Collection.Iterator.Element) -> OpaqueValue<Int>,
+    makeCollection: ([C.Iterator.Element]) -> C,
+    wrapValue: (OpaqueValue<Int>) -> C.Iterator.Element,
+    extractValue: (C.Iterator.Element) -> OpaqueValue<Int>,
 
     makeCollectionOfEquatable: ([CollectionWithEquatableElement.Iterator.Element]) -> CollectionWithEquatableElement,
     wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
@@ -119,7 +119,7 @@ extension TestSuite {
       outOfBoundsIndexOffset: outOfBoundsIndexOffset,
       outOfBoundsSubscriptOffset: outOfBoundsSubscriptOffset)
 
-    func makeWrappedCollection(elements: [OpaqueValue<Int>]) -> Collection {
+    func makeWrappedCollection(elements: [OpaqueValue<Int>]) -> C {
       return makeCollection(elements.map(wrapValue))
     }
 
@@ -129,7 +129,7 @@ extension TestSuite {
       return makeCollectionOfComparable(elements.map(wrapValueIntoComparable))
     }
 
-    testNamePrefix += String(Collection.Type)
+    testNamePrefix += String(C.Type)
 
 //===----------------------------------------------------------------------===//
 // subscript(_: Index)
@@ -371,24 +371,24 @@ self.test("\(testNamePrefix).sort/${'Predicate' if predicate else 'WhereElementI
   } // addForwardMutableCollectionTests
 
   public func addBidirectionalMutableCollectionTests<
-    Collection : MutableCollectionType,
-    CollectionWithEquatableElement : MutableCollectionType,
-    CollectionWithComparableElement : MutableCollectionType
+    C : MutableCollection,
+    CollectionWithEquatableElement : MutableCollection,
+    CollectionWithComparableElement : MutableCollection
     where
-    Collection.Index : BidirectionalIndexType,
-    Collection.SubSequence : MutableCollectionType,
-    Collection.SubSequence.Iterator.Element == Collection.Iterator.Element,
-    Collection.SubSequence.Index : BidirectionalIndexType,
-    Collection.SubSequence.SubSequence == Collection.SubSequence,
+    C.Index : BidirectionalIndexType,
+    C.SubSequence : MutableCollection,
+    C.SubSequence.Iterator.Element == C.Iterator.Element,
+    C.SubSequence.Index : BidirectionalIndexType,
+    C.SubSequence.SubSequence == C.SubSequence,
     CollectionWithEquatableElement.Index : BidirectionalIndexType,
     CollectionWithEquatableElement.Iterator.Element : Equatable,
     CollectionWithComparableElement.Index : BidirectionalIndexType,
     CollectionWithComparableElement.Iterator.Element : Comparable
   >(
     testNamePrefix: String = "",
-    makeCollection: ([Collection.Iterator.Element]) -> Collection,
-    wrapValue: (OpaqueValue<Int>) -> Collection.Iterator.Element,
-    extractValue: (Collection.Iterator.Element) -> OpaqueValue<Int>,
+    makeCollection: ([C.Iterator.Element]) -> C,
+    wrapValue: (OpaqueValue<Int>) -> C.Iterator.Element,
+    extractValue: (C.Iterator.Element) -> OpaqueValue<Int>,
 
     makeCollectionOfEquatable: ([CollectionWithEquatableElement.Iterator.Element]) -> CollectionWithEquatableElement,
     wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
@@ -443,11 +443,11 @@ self.test("\(testNamePrefix).sort/${'Predicate' if predicate else 'WhereElementI
       outOfBoundsIndexOffset: outOfBoundsIndexOffset,
       outOfBoundsSubscriptOffset: outOfBoundsSubscriptOffset)
 
-    func makeWrappedCollection(elements: [OpaqueValue<Int>]) -> Collection {
+    func makeWrappedCollection(elements: [OpaqueValue<Int>]) -> C {
       return makeCollection(elements.map(wrapValue))
     }
 
-    testNamePrefix += String(Collection.Type)
+    testNamePrefix += String(C.Type)
 
 //===----------------------------------------------------------------------===//
 // subscript(_: Index)
@@ -490,24 +490,24 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
   } // addBidirectionalMutableCollectionTests
 
   public func addRandomAccessMutableCollectionTests<
-    Collection : MutableCollectionType,
-    CollectionWithEquatableElement : MutableCollectionType,
-    CollectionWithComparableElement : MutableCollectionType
+    C : MutableCollection,
+    CollectionWithEquatableElement : MutableCollection,
+    CollectionWithComparableElement : MutableCollection
     where
-    Collection.Index : RandomAccessIndexType,
-    Collection.SubSequence : MutableCollectionType,
-    Collection.SubSequence.Iterator.Element == Collection.Iterator.Element,
-    Collection.SubSequence.Index : RandomAccessIndexType,
-    Collection.SubSequence.SubSequence == Collection.SubSequence,
+    C.Index : RandomAccessIndexType,
+    C.SubSequence : MutableCollection,
+    C.SubSequence.Iterator.Element == C.Iterator.Element,
+    C.SubSequence.Index : RandomAccessIndexType,
+    C.SubSequence.SubSequence == C.SubSequence,
     CollectionWithEquatableElement.Index : RandomAccessIndexType,
     CollectionWithEquatableElement.Iterator.Element : Equatable,
     CollectionWithComparableElement.Index : RandomAccessIndexType,
     CollectionWithComparableElement.Iterator.Element : Comparable
   >(
     testNamePrefix: String = "",
-    makeCollection: ([Collection.Iterator.Element]) -> Collection,
-    wrapValue: (OpaqueValue<Int>) -> Collection.Iterator.Element,
-    extractValue: (Collection.Iterator.Element) -> OpaqueValue<Int>,
+    makeCollection: ([C.Iterator.Element]) -> C,
+    wrapValue: (OpaqueValue<Int>) -> C.Iterator.Element,
+    extractValue: (C.Iterator.Element) -> OpaqueValue<Int>,
 
     makeCollectionOfEquatable: ([CollectionWithEquatableElement.Iterator.Element]) -> CollectionWithEquatableElement,
     wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
@@ -562,7 +562,7 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
       outOfBoundsIndexOffset: outOfBoundsIndexOffset,
       outOfBoundsSubscriptOffset: outOfBoundsSubscriptOffset)
 
-    func makeWrappedCollection(elements: [OpaqueValue<Int>]) -> Collection {
+    func makeWrappedCollection(elements: [OpaqueValue<Int>]) -> C {
       return makeCollection(elements.map(wrapValue))
     }
 
@@ -572,7 +572,7 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
       return makeCollectionOfComparable(elements.map(wrapValueIntoComparable))
     }
 
-    testNamePrefix += String(Collection.Type)
+    testNamePrefix += String(C.Type)
 
 //===----------------------------------------------------------------------===//
 // sortInPlace()

@@ -7,7 +7,7 @@
 func d<e? {
 struct c {
 class A {
-struct c : CollectionType where I) {
+struct c : Collection where I) {
 }
 }
 }

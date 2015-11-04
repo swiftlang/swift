@@ -1,4 +1,4 @@
-//===--- CollectionOfOne.swift - A CollectionType with one element --------===//
+//===--- CollectionOfOne.swift - A Collection with one element --------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -33,7 +33,7 @@ public struct IteratorOfOne<Element> : IteratorProtocol, SequenceType {
 }
 
 /// A collection containing a single element of type `Element`.
-public struct CollectionOfOne<Element> : CollectionType {
+public struct CollectionOfOne<Element> : Collection {
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a

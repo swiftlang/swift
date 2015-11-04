@@ -6,7 +6,7 @@
 
 struct Q<T,j{
 class a
-struct D:CollectionType
+struct D:Collection
 enum S{
 struct Q{
 struct b{{

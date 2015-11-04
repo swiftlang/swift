@@ -139,9 +139,9 @@ internal class _AnyCollectionBoxBase<Element> : _AnySequenceBox<Element> {
   internal let endIndex: _ForwardIndexBoxType
 }
 
-% for Kind in ['Sequence', 'Collection']:
+% for (Kind, Suffix) in [('Sequence', 'Type'), ('Collection', '')]:
 // FIXME: can't make this a protocol due to <rdar://20209031>
-internal class _${Kind}Box<S : ${Kind}Type>
+internal class _${Kind}Box<S : ${Kind}${Suffix}>
   : _Any${Kind}Box<S.Iterator.Element> {
   typealias Element = S.Iterator.Element
 
@@ -501,7 +501,7 @@ internal class _AnyCollectionBox<Element> : _AnyCollectionBoxBase<Element> {
 ///
 /// This protocol can be considered an implementation detail of the
 /// `===` and `!==` implementations for these types.
-public protocol AnyCollectionType : CollectionType {
+public protocol AnyCollectionType : Collection {
   /// Identifies the underlying collection stored by `self`. Instances
   /// copied from one another have the same `_underlyingCollectionID`.
   var _underlyingCollectionID: ObjectIdentifier {get}
@@ -529,7 +529,7 @@ public func !== <
 ///
 /// Forwards operations to an arbitrary underlying collection having the
 /// same `Element` type, hiding the specifics of the underlying
-/// `CollectionType`.
+/// `Collection`.
 ///
 /// - SeeAlso: ${', '.join('`Any%sType`' % t for t in (2 * traversals)[ti + 1 : ti + 3]) }
 public struct Any${Traversal}Collection<Element> : AnyCollectionType {
@@ -541,7 +541,7 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
   ///
   /// - Complexity: O(1).
   public init<
-    C : CollectionType
+    C : Collection
     where
     C.Index: ${SubTraversal}IndexType, C.Iterator.Element == Element
   >(_ base: C) {

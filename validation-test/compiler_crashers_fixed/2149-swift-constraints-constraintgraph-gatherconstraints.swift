@@ -17,7 +17,7 @@ struct c == { c
 class a<j : A {
 }
 }
-class A : CollectionType where Optional<S {
+class A : Collection where Optional<S {
 return self.Type) -> [")
 enum S) -> : A, U) {
 }

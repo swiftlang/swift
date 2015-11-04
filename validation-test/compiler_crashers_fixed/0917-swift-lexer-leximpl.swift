@@ -11,7 +11,7 @@ self.c> Self {
 func g<d where T! {
 let t: [c) {
 }
-func b(array: CollectionType where T> U -> {
+func b(array: Collection where T> U -> {
 func d<T where B {
 b) {
 var d where B : C<Int) { x = a<d where A> ((false)) {

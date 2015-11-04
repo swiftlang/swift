@@ -172,7 +172,7 @@ internal class _SequenceBox<S: SequenceType>
   internal var _base: S
 }
 // FIXME: can't make this a protocol due to <rdar://20209031>
-internal class _CollectionBox<S: CollectionType>
+internal class _CollectionBox<S: Collection>
   : _AnyCollectionBox<S.Generator.Element> {
   typealias Element = S.Generator.Element
 
@@ -652,7 +652,7 @@ internal class _AnyCollectionBox<Element> : _AnyCollectionBoxBase {
 ///
 /// This protocol can be considered an implementation detail of the
 /// `===` and `!==` implementations for these types.
-public protocol AnyCollectionType : CollectionType {
+public protocol AnyCollectionType : Collection {
   /// Identifies the underlying collection stored by `self`. Instances
   /// copied from one another have the same `underlyingCollectionID`.
   var underlyingCollectionID: ObjectIdentifier {get}
@@ -677,7 +677,7 @@ public func !== <
 ///
 /// Forwards operations to an arbitrary underlying collection having the
 /// same `Element` type, hiding the specifics of the underlying
-/// `CollectionType`.
+/// `Collection`.
 ///
 /// See also: `AnyBidirectionalType`, `AnyRandomAccessType`
 public struct AnyForwardCollection<Element> : AnyCollectionType {
@@ -688,7 +688,7 @@ public struct AnyForwardCollection<Element> : AnyCollectionType {
   ///
   /// Complexity: O(1)
   public init<
-    C: CollectionType
+    C: Collection
       where C.Index: ForwardIndexType, C.Generator.Element == Element
   >(_ base: C) {
     self._box = _CollectionBox<C>(
@@ -711,7 +711,7 @@ public struct AnyForwardCollection<Element> : AnyCollectionType {
   ///
   /// Complexity: O(1)
   public init<
-    C: CollectionType
+    C: Collection
       where C.Index: BidirectionalIndexType, C.Generator.Element == Element
   >(_ base: C) {
     self._box = _CollectionBox<C>(
@@ -734,7 +734,7 @@ public struct AnyForwardCollection<Element> : AnyCollectionType {
   ///
   /// Complexity: O(1)
   public init<
-    C: CollectionType
+    C: Collection
       where C.Index: RandomAccessIndexType, C.Generator.Element == Element
   >(_ base: C) {
     self._box = _CollectionBox<C>(
@@ -797,7 +797,7 @@ public struct AnyForwardCollection<Element> : AnyCollectionType {
 ///
 /// Forwards operations to an arbitrary underlying collection having the
 /// same `Element` type, hiding the specifics of the underlying
-/// `CollectionType`.
+/// `Collection`.
 ///
 /// See also: `AnyRandomAccessType`, `AnyForwardType`
 public struct AnyBidirectionalCollection<Element> : AnyCollectionType {
@@ -808,7 +808,7 @@ public struct AnyBidirectionalCollection<Element> : AnyCollectionType {
   ///
   /// Complexity: O(1)
   public init<
-    C: CollectionType
+    C: Collection
       where C.Index: BidirectionalIndexType, C.Generator.Element == Element
   >(_ base: C) {
     self._box = _CollectionBox<C>(
@@ -831,7 +831,7 @@ public struct AnyBidirectionalCollection<Element> : AnyCollectionType {
   ///
   /// Complexity: O(1)
   public init<
-    C: CollectionType
+    C: Collection
       where C.Index: RandomAccessIndexType, C.Generator.Element == Element
   >(_ base: C) {
     self._box = _CollectionBox<C>(
@@ -907,7 +907,7 @@ public struct AnyBidirectionalCollection<Element> : AnyCollectionType {
 ///
 /// Forwards operations to an arbitrary underlying collection having the
 /// same `Element` type, hiding the specifics of the underlying
-/// `CollectionType`.
+/// `Collection`.
 ///
 /// See also: `AnyForwardType`, `AnyBidirectionalType`
 public struct AnyRandomAccessCollection<Element> : AnyCollectionType {
@@ -918,7 +918,7 @@ public struct AnyRandomAccessCollection<Element> : AnyCollectionType {
   ///
   /// Complexity: O(1)
   public init<
-    C: CollectionType
+    C: Collection
       where C.Index: RandomAccessIndexType, C.Generator.Element == Element
   >(_ base: C) {
     self._box = _CollectionBox<C>(

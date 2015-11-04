@@ -2,7 +2,7 @@
 // RUN: %target-run %t.out | FileCheck %s
 // REQUIRES: executable_test
 
-// General Mutable, CollectionType, Value-Type Collections
+// General Mutable, Collection, Value-Type Collections
 // =================================================
 //
 // Basic copy-on-write (COW) requires a container's data to be copied
@@ -16,7 +16,7 @@
 // an open-addressing hash table) are not traversable with a fixed
 // size offset, so incrementing/decrementing indices requires looking
 // at the contents of the container.  The current interface for
-// incrementing/decrementing indices of an CollectionType is the usual ++i,
+// incrementing/decrementing indices of an Collection is the usual ++i,
 // --i. Therefore, for memory safety, the indices need to keep a
 // reference to the container's underlying data so that it can be
 // inspected.  But having multiple outstanding references to the
@@ -209,7 +209,7 @@ struct DictionaryIndex<Element> : BidirectionalIndexType {
   var offset: Int
 }
 
-struct Dictionary<Key: Hashable, Value> : CollectionType, SequenceType {
+struct Dictionary<Key: Hashable, Value> : Collection, SequenceType {
   typealias _Self = Dictionary<Key, Value>
   typealias BufferOwner = DictionaryBufferOwner<Key, Value>
   typealias Buffer = BufferOwner.Buffer

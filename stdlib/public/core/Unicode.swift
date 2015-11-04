@@ -731,7 +731,7 @@ public func transcode<
 /// that was encoded.
 @warn_unused_result
 internal func _transcodeSomeUTF16AsUTF8<
-  Input : CollectionType
+  Input : Collection
   where
   Input.Iterator.Element == UInt16>(
   input: Input, _ startIndex: Input.Index

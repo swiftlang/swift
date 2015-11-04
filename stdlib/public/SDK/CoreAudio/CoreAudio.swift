@@ -120,7 +120,7 @@ public struct UnsafeMutableAudioBufferListPointer {
   public var unsafeMutablePointer: UnsafeMutablePointer<AudioBufferList>
 }
 
-extension UnsafeMutableAudioBufferListPointer : MutableCollectionType {
+extension UnsafeMutableAudioBufferListPointer : MutableCollection {
   /// Always zero, which is the index of the first `AudioBuffer`.
   public var startIndex: Int {
     return 0

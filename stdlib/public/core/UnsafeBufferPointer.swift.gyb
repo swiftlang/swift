@@ -31,7 +31,7 @@ public struct UnsafeBufferPointerIterator<Element>
 ///
 /// The pointer should be aligned to `alignof(Element.self)`.
 public struct Unsafe${Mutable}BufferPointer<Element>
-  : ${Mutable}CollectionType {
+  : ${Mutable}Collection {
 
   /// Always zero, which is the index of the first element in a
   /// non-empty buffer.

@@ -11,7 +11,7 @@ class b: B<T) {
 }
 struct A : a {
 extension Array {
-func b: CollectionType where f: c<T) -> T] = i()) {
+func b: Collection where f: c<T) -> T] = i()) {
 var e?) {
 }
 }

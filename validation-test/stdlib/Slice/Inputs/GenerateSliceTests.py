@@ -35,7 +35,7 @@ for traversal, base_kind, mutable in itertools.product(
 
 import StdlibUnittest
 
-var SliceTests = TestSuite("CollectionType")
+var SliceTests = TestSuite("Collection")
 
 % import gyb
 % TSliceTest = gyb.parseTemplate("{{}}/Inputs/slice.gyb".format(test_path))

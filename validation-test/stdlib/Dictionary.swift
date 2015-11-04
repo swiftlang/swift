@@ -3467,7 +3467,7 @@ DictionaryDerivedAPIs.test("isEmpty") {
   }
 }
 
-func callGenericIsEmpty<C : CollectionType>(collection: C) -> Bool {
+func callGenericIsEmpty<C : Collection>(collection: C) -> Bool {
   return collection.isEmpty
 }
 

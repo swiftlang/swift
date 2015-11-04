@@ -16,7 +16,7 @@
 
 /// A *collection* that supports replacement of an arbitrary subRange
 /// of elements with the elements of another collection.
-public protocol RangeReplaceableCollectionType : CollectionType {
+public protocol RangeReplaceableCollectionType : Collection {
   //===--- Fundamental Requirements ---------------------------------------===//
 
   /// Create an empty instance.
@@ -30,7 +30,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   ///   `subRange.endIndex == self.endIndex` and `newElements.isEmpty`,
   ///   O(`self.count` + `newElements.count`) otherwise.
   mutating func replaceRange<
-    C : CollectionType where C.Iterator.Element == Iterator.Element
+    C : Collection where C.Iterator.Element == Iterator.Element
   >(
     subRange: Range<Index>, with newElements: C
   )
@@ -53,7 +53,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   >(_: S, _: Self) -> Self
 
   func +<
-    S : CollectionType
+    S : Collection
     where S.Iterator.Element == Iterator.Element
   >(_: Self, _: S) -> Self
 
@@ -120,7 +120,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   ///
   /// - Complexity: O(`self.count + newElements.count`).
   mutating func insertContentsOf<
-    S : CollectionType where S.Iterator.Element == Iterator.Element
+    S : Collection where S.Iterator.Element == Iterator.Element
   >(newElements: S, at i: Index)
 
   /// Remove the element at index `i`.
@@ -207,7 +207,7 @@ extension RangeReplaceableCollectionType {
   }
 
   public mutating func insertContentsOf<
-    C : CollectionType where C.Iterator.Element == Iterator.Element
+    C : Collection where C.Iterator.Element == Iterator.Element
   >(newElements: C, at i: Index) {
     replaceRange(i..<i, with: newElements)
   }
@@ -366,7 +366,7 @@ public func +<
 @warn_unused_result
 public func +<
   C : RangeReplaceableCollectionType,
-  S : CollectionType
+  S : Collection
   where S.Iterator.Element == C.Iterator.Element
 >(lhs: C, rhs: S) -> C {
   var lhs = lhs

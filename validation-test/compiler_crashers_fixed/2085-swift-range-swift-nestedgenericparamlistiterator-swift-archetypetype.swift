@@ -7,6 +7,6 @@
 func a
 extension NSSet {
 }
-func a: CollectionType where T -> ()
+func a: Collection where T -> ()
 protocol P {
 func b<T : b) -> {

@@ -69,11 +69,11 @@ public struct LazyMapSequence<Base : SequenceType, Element>
 
 //===--- Collections ------------------------------------------------------===//
 
-/// A `CollectionType` whose elements consist of those in a `Base`
-/// `CollectionType` passed through a transform function returning `Element`.
+/// A `Collection` whose elements consist of those in a `Base`
+/// `Collection` passed through a transform function returning `Element`.
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
-public struct LazyMapCollection<Base : CollectionType, Element>
+public struct LazyMapCollection<Base : Collection, Element>
   : LazyCollectionType {
 
   // FIXME: Should be inferrable.

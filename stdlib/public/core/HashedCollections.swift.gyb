@@ -26,7 +26,7 @@ import SwiftShims
 // an open-addressing hash table) are not traversable with a fixed
 // size offset, so incrementing/decrementing indices requires looking
 // at the contents of the container.  The current interface for
-// incrementing/decrementing indices of an CollectionType is the usual ++i,
+// incrementing/decrementing indices of an Collection is the usual ++i,
 // --i. Therefore, for memory safety, the indices need to keep a
 // reference to the container's underlying data so that it can be
 // inspected.  But having multiple outstanding references to the
@@ -277,7 +277,7 @@ internal struct _UnmanagedAnyObjectArray {
 
 /// A collection of unique `Element` instances with no defined ordering.
 public struct Set<Element : Hashable> :
-  Hashable, CollectionType, ArrayLiteralConvertible {
+  Hashable, Collection, ArrayLiteralConvertible {
 
   internal typealias _Self = Set<Element>
   internal typealias _VariantStorage = _VariantSetStorage<Element>
@@ -641,7 +641,7 @@ public struct Set<Element : Hashable> :
   }
 
   //
-  // CollectionType conformance
+  // Collection conformance
   //
 
   /// `true` if the set is empty.
@@ -945,7 +945,7 @@ public func _setBridgeFromObjectiveCConditional<
 /// A hash-based mapping from `Key` to `Value` instances.  Also a
 /// collection of key-value pairs with no defined ordering.
 public struct Dictionary<Key : Hashable, Value> :
-  CollectionType, DictionaryLiteralConvertible {
+  Collection, DictionaryLiteralConvertible {
 
   internal typealias _Self = Dictionary<Key, Value>
   internal typealias _VariantStorage = _VariantDictionaryStorage<Key, Value>
@@ -1164,7 +1164,7 @@ public struct Dictionary<Key : Hashable, Value> :
   }
 
   //
-  // CollectionType conformance
+  // Collection conformance
   //
 
   /// `true` iff `count == 0`.

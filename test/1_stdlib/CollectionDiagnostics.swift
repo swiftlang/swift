@@ -3,12 +3,12 @@
 import StdlibUnittest
 
 //
-// Check that CollectionType.SubSequence is constrained to CollectionType.
+// Check that Collection.SubSequence is constrained to Collection.
 //
 
 // expected-error@+2 {{type 'CollectionWithBadSubSequence' does not conform to protocol 'SequenceType'}}
-// expected-error@+1 {{type 'CollectionWithBadSubSequence' does not conform to protocol 'CollectionType'}}
-struct CollectionWithBadSubSequence : CollectionType {
+// expected-error@+1 {{type 'CollectionWithBadSubSequence' does not conform to protocol 'Collection'}}
+struct CollectionWithBadSubSequence : Collection {
   var startIndex: MinimalForwardIndex {
     fatalError("unreachable")
   }
@@ -27,19 +27,19 @@ struct CollectionWithBadSubSequence : CollectionType {
 }
 
 func useCollectionTypeSubSequenceIndex<
-  C : CollectionType
+  C : Collection
   where
   C.SubSequence.Index : BidirectionalIndexType
 >(c: C) {}
 
 func useCollectionTypeSubSequenceGeneratorElement<
-  C : CollectionType
+  C : Collection
   where
   C.SubSequence.Iterator.Element == C.Iterator.Element
 >(c: C) {}
 
 func sortResultIgnored<
-  S : SequenceType, MC : MutableCollectionType
+  S : SequenceType, MC : MutableCollection
   where
   S.Iterator.Element : Comparable,
   MC.Iterator.Element : Comparable

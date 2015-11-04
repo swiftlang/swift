@@ -22,10 +22,10 @@
 import SwiftShims
 
 /// A wrapper around any `_NSArrayCoreType` that gives it
-/// `CollectionType` conformance.  Why not make
+/// `Collection` conformance.  Why not make
 /// `_NSArrayCoreType` conform directly?  It's a class, and I
 /// don't want to pay for the dynamic dispatch overhead.
-internal struct _CocoaArrayWrapper : CollectionType {
+internal struct _CocoaArrayWrapper : Collection {
   var startIndex: Int {
     return 0
   }

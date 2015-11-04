@@ -167,7 +167,7 @@ if True:
 
 ${SelfDocComment}
 public struct ${Self}<Element>
-  : CollectionType, MutableCollectionType, _DestructorSafeContainer {
+  : Collection, MutableCollection, _DestructorSafeContainer {
 
 %if Self == 'ArraySlice':
   /// The position of the first element in a non-empty collection.
@@ -698,7 +698,7 @@ extension ${Self} : _ArrayType {
   ///
   /// - Complexity: O(*length of result*).
   public mutating func appendContentsOf<
-    C : CollectionType
+    C : Collection
     where
     C.Iterator.Element == Element
   >(newElements: C) {
@@ -890,7 +890,7 @@ extension ${Self} {
 %end
 
 internal struct _InitializeMemoryFromCollection<
-  C: CollectionType
+  C: Collection
 > : _PointerFunctionType {
   func call(rawMemory: UnsafeMutablePointer<C.Iterator.Element>, count: Int) {
     var p = rawMemory
@@ -910,7 +910,7 @@ internal struct _InitializeMemoryFromCollection<
 
 @inline(never)
 internal func _arrayOutOfPlaceReplace<
-  B : _ArrayBufferType, C : CollectionType
+  B : _ArrayBufferType, C : Collection
   where
   C.Iterator.Element == B.Element,
   B.Index == Int
@@ -933,10 +933,10 @@ internal func _arrayOutOfPlaceReplace<
 /// A _debugPrecondition check that `i` has exactly reached the end of
 /// `s`.  This test is never used to ensure memory safety; that is
 /// always guaranteed by measuring `s` once and re-using that value.
-internal func _expectEnd<C : CollectionType>(i: C.Index, _ s: C) {
+internal func _expectEnd<C : Collection>(i: C.Index, _ s: C) {
   _debugPrecondition(
     i == s.endIndex,
-      "invalid CollectionType: count differed in successive traversals"
+      "invalid Collection: count differed in successive traversals"
     )
 }
 
@@ -953,7 +953,7 @@ extension ${Self} {
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   @_semantics("array.mutate_unknown")
   public mutating func replaceRange<
-    C: CollectionType where C.Iterator.Element == _Buffer.Element
+    C: Collection where C.Iterator.Element == _Buffer.Element
   >(
     subRange: Range<Int>, with newElements: C
   ) {
@@ -995,7 +995,7 @@ public func += <
 
 /// Extend `lhs` with the elements of `rhs`.
 public func += <
-  Element, C : CollectionType
+  Element, C : Collection
   where
   C.Iterator.Element == Element
 >(inout lhs: ${Self}<Element>, rhs: C) {

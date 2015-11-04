@@ -8,7 +8,7 @@ struct c {
 func c() -> (v: A>(self] = A<T: H) {
 return ["]
 class A {
-class c: CollectionType where T where l.h == {
+class c: Collection where T where l.h == {
 }
 }
 override init() {

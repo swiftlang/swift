@@ -40,7 +40,7 @@ def get_slice_doc_comment(Self):
 }%
 
 ${get_slice_doc_comment('Slice')}
-public struct Slice<Base : Indexable> : CollectionType {
+public struct Slice<Base : Indexable> : Collection {
 
   public typealias Index = Base.Index
 
@@ -77,7 +77,7 @@ ${get_slice_doc_comment('MutableSlice')}
 ///   to not invalidate indices.  If you are writing a collection and mutations
 ///   need to invalidate indices, don't use `MutableSlice`, use `Slice` or
 ///   define your own `Base.SubSequence` type that takes that into account.
-public struct MutableSlice<Base : MutableIndexable> : MutableCollectionType {
+public struct MutableSlice<Base : MutableIndexable> : MutableCollection {
 
   public typealias Index = Base.Index
 

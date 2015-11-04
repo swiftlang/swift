@@ -115,14 +115,14 @@ extension LazySequenceType
 % for traversal in ('Forward', 'Bidirectional'):
 %   t = '' if traversal == 'Forward' else traversal
 %   Collection = 'Flatten%sCollection' % t
-%   constraints = '%(Base)sIterator.Element : CollectionType'
+%   constraints = '%(Base)sIterator.Element : Collection'
 %   if traversal == 'Bidirectional':
 %     constraints += ''',
 %   %(Base)sIndex : BidirectionalIndexType, 
 %   %(Base)sIterator.Element.Index : BidirectionalIndexType'''
 %   Index = Collection + 'Index'
 public struct ${Index}<
-  BaseElements: CollectionType where ${constraints % {'Base': 'BaseElements.'}}
+  BaseElements: Collection where ${constraints % {'Base': 'BaseElements.'}}
 > : ${traversal}IndexType {
   /// Returns the next consecutive value after `self`.
   ///
@@ -224,8 +224,8 @@ public func == <BaseElements> (
 ///
 /// - See also: `FlattenSequence`
 public struct ${Collection}<
-  Base: CollectionType where ${constraints % {'Base': 'Base.'}}
-> : CollectionType {
+  Base: Collection where ${constraints % {'Base': 'Base.'}}
+> : Collection {
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
@@ -290,7 +290,7 @@ public struct ${Collection}<
   internal var _base: Base
 }
 
-extension CollectionType where ${constraints % {'Base': ''}} {
+extension Collection where ${constraints % {'Base': ''}} {
   /// A concatenation of the elements of `self`.
   @warn_unused_result
   public func flatten() -> ${Collection}<Self> {

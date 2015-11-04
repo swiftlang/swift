@@ -6,7 +6,7 @@
 
 func b
 {
-{class A{class A:CollectionType
+{class A{class A:Collection
 struct B{struct B<T where g:a{
 class B<b{
-class A{class A{class A:CollectionType
+class A{class A{class A:Collection

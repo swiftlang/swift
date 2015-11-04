@@ -3,4 +3,4 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-func a{func f:c:protocol c{typealias h:typealias h:CollectionType
+func a{func f:c:protocol c{typealias h:typealias h:Collection

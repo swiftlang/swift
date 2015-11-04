@@ -293,7 +293,7 @@ extension UnicodeScalar {
   }
 }
 
-extension UnicodeScalar.UTF16View : CollectionType {
+extension UnicodeScalar.UTF16View : Collection {
   /// The position of the first code unit.
   var startIndex: Int {
     return 0

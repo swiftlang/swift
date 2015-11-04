@@ -24,8 +24,8 @@ public protocol ApproximateCountableSequenceType : SequenceType {
   var approximateCount: ApproximateCount { get }
 }
 
-/// A collection that provides an efficient way to split its index ranges.
-public protocol SplittableCollectionType : CollectionType {
+/// A collection that provides an efficient way to spilt its index ranges.
+public protocol SplittableCollection : Collection {
   // We need this protocol so that collections with only forward or bidirectional
   // traversals could customize their splitting behavior.
   //
@@ -70,8 +70,8 @@ internal func _splitRandomAccessIndexRange<Index : RandomAccessIndexType>(
 /// Using a builder can be more efficient than creating an empty collection
 /// instance and adding elements one by one.
 public protocol CollectionBuilderType {
-  typealias Collection : CollectionType
-  typealias Element = Collection.Iterator.Element
+  typealias Destination : Collection
+  typealias Element = Destination.Iterator.Element
 
   init()
 
@@ -85,7 +85,7 @@ public protocol CollectionBuilderType {
   /// added at the end.
   ///
   /// Complexity: amortized O(1).
-  mutating func append(element: Collection.Iterator.Element)
+  mutating func append(element: Destination.Iterator.Element)
 
   /// Append `elements` to `self`.
   ///
@@ -94,7 +94,7 @@ public protocol CollectionBuilderType {
   ///
   /// Complexity: amortized O(n), where `n` is equal to `count(elements)`.
   mutating func appendContentsOf<
-    C : CollectionType
+    C : Collection
     where
     C.Iterator.Element == Element
   >(elements: C)
@@ -117,14 +117,14 @@ public protocol CollectionBuilderType {
   ///
   /// Complexity: O(n) or better (where `n` is the number of elements that were
   /// added to this builder); typically O(1).
-  mutating func takeResult() -> Collection
+  mutating func takeResult() -> Destination
 }
 
-public protocol BuildableCollectionType : CollectionType {
+public protocol BuildableCollectionType : Collection {
   typealias Builder : CollectionBuilderType
 }
 
-extension Array : SplittableCollectionType {
+extension Array : SplittableCollection {
   public func split(range: Range<Int>) -> [Range<Int>] {
     return _splitRandomAccessIndexRange(range)
   }
@@ -133,7 +133,7 @@ extension Array : SplittableCollectionType {
 public struct ArrayBuilder<T> : CollectionBuilderType {
   // FIXME: the compiler didn't complain when I remove public on 'Collection'.
   // File a bug.
-  public typealias Collection = Array<T>
+  public typealias Destination = Array<T>
   public typealias Element = T
 
   internal var _resultParts = [[T]]()
@@ -150,7 +150,7 @@ public struct ArrayBuilder<T> : CollectionBuilderType {
   }
 
   public mutating func appendContentsOf<
-    C : CollectionType
+    C : Collection
     where
     C.Iterator.Element == T
   >(elements: C) {
@@ -168,7 +168,7 @@ public struct ArrayBuilder<T> : CollectionBuilderType {
     swap(&_resultTail, &otherBuilder._resultTail)
   }
 
-  public mutating func takeResult() -> Collection {
+  public mutating func takeResult() -> Destination {
     _resultParts.append(_resultTail)
     _resultTail = []
     // FIXME: optimize.  parallelize.
@@ -755,7 +755,7 @@ final public class ForkJoinPool {
   }
 
   internal func _submitTasksToRandomWorkers<
-    C : CollectionType
+    C : Collection
     where
     C.Iterator.Element == ForkJoinTaskBase
   >(tasks: C) {
@@ -834,7 +834,7 @@ internal protocol _CollectionTransformerStepType /*: class*/ {
   typealias OutputElement
 
   func transform<
-    InputCollection : CollectionType,
+    InputCollection : Collection,
     Collector : _ElementCollectorType
     where
     InputCollection.Iterator.Element == PipelineInputElement,
@@ -873,7 +873,7 @@ internal class _CollectionTransformerStep<PipelineInputElement_, OutputElement_>
   func collectTo<
     C : BuildableCollectionType
     where
-    C.Builder.Collection == C,
+    C.Builder.Destination == C,
     C.Builder.Element == C.Iterator.Element,
     C.Iterator.Element == OutputElement
   >(_: C.Type) -> _CollectionTransformerFinalizer<PipelineInputElement, C> {
@@ -882,7 +882,7 @@ internal class _CollectionTransformerStep<PipelineInputElement_, OutputElement_>
   }
 
   func transform<
-    InputCollection : CollectionType,
+    InputCollection : Collection,
     Collector : _ElementCollectorType
     where
     InputCollection.Iterator.Element == PipelineInputElement,
@@ -927,7 +927,7 @@ final internal class _CollectionTransformerStepCollectionSource<
   override func collectTo<
     C : BuildableCollectionType
     where
-    C.Builder.Collection == C,
+    C.Builder.Destination == C,
     C.Builder.Element == C.Iterator.Element,
     C.Iterator.Element == OutputElement
   >(c: C.Type) -> _CollectionTransformerFinalizer<PipelineInputElement, C> {
@@ -936,7 +936,7 @@ final internal class _CollectionTransformerStepCollectionSource<
   }
 
   override func transform<
-    InputCollection : CollectionType,
+    InputCollection : Collection,
     Collector : _ElementCollectorType
     where
     InputCollection.Iterator.Element == PipelineInputElement,
@@ -1010,7 +1010,7 @@ final internal class _CollectionTransformerStepOneToMaybeOne<
   override func collectTo<
     C : BuildableCollectionType
     where
-    C.Builder.Collection == C,
+    C.Builder.Destination == C,
     C.Builder.Element == C.Iterator.Element,
     C.Iterator.Element == OutputElement
   >(c: C.Type) -> _CollectionTransformerFinalizer<PipelineInputElement, C> {
@@ -1019,7 +1019,7 @@ final internal class _CollectionTransformerStepOneToMaybeOne<
   }
 
   override func transform<
-    InputCollection : CollectionType,
+    InputCollection : Collection,
     Collector : _ElementCollectorType
     where
     InputCollection.Iterator.Element == PipelineInputElement,
@@ -1062,7 +1062,7 @@ struct _ElementCollectorOneToMaybeOne<
   }
 
   mutating func appendContentsOf<
-    C : CollectionType
+    C : Collection
     where
     C.Iterator.Element == Element
   >(elements: C) {
@@ -1080,7 +1080,7 @@ protocol _ElementCollectorType {
   mutating func append(element: Element)
 
   mutating func appendContentsOf<
-    C : CollectionType
+    C : Collection
     where
     C.Iterator.Element == Element
   >(elements: C)
@@ -1088,7 +1088,7 @@ protocol _ElementCollectorType {
 
 class _CollectionTransformerFinalizer<PipelineInputElement, Result> {
   func transform<
-    InputCollection : CollectionType
+    InputCollection : Collection
     where
     InputCollection.Iterator.Element == PipelineInputElement
   >(c: InputCollection) -> Result {
@@ -1117,7 +1117,7 @@ final class _CollectionTransformerFinalizerReduce<
   }
 
   override func transform<
-    InputCollection : CollectionType
+    InputCollection : Collection
     where
     InputCollection.Iterator.Element == PipelineInputElement
   >(c: InputCollection) -> U {
@@ -1145,7 +1145,7 @@ struct _ElementCollectorReduce<Element_, Result> : _ElementCollectorType {
   }
 
   mutating func appendContentsOf<
-    C : CollectionType
+    C : Collection
     where
     C.Iterator.Element == Element
   >(elements: C) {
@@ -1167,7 +1167,7 @@ final class _CollectionTransformerFinalizerCollectTo<
   where
   InputStep.OutputElement == InputElementTy,
   InputStep.PipelineInputElement == PipelineInputElement,
-  U.Builder.Collection == U,
+  U.Builder.Destination == U,
   U.Builder.Element == U.Iterator.Element,
   U.Iterator.Element == InputStep.OutputElement
 > : _CollectionTransformerFinalizer<PipelineInputElement, U> {
@@ -1179,7 +1179,7 @@ final class _CollectionTransformerFinalizerCollectTo<
   }
 
   override func transform<
-    InputCollection : CollectionType
+    InputCollection : Collection
     where
     InputCollection.Iterator.Element == PipelineInputElement
   >(c: InputCollection) -> U {
@@ -1190,18 +1190,18 @@ final class _CollectionTransformerFinalizerCollectTo<
 }
 
 struct _ElementCollectorCollectTo<
-  Collection : BuildableCollectionType
+  BuildableCollection : BuildableCollectionType
   where
-  Collection.Builder.Collection == Collection,
-  Collection.Builder.Element == Collection.Iterator.Element
+  BuildableCollection.Builder.Destination == BuildableCollection,
+  BuildableCollection.Builder.Element == BuildableCollection.Iterator.Element
 > : _ElementCollectorType {
 
-  typealias Element = Collection.Iterator.Element
+  typealias Element = BuildableCollection.Iterator.Element
 
-  var _builder: Collection.Builder
+  var _builder: BuildableCollection.Builder
 
   init() {
-    self._builder = Collection.Builder()
+    self._builder = BuildableCollection.Builder()
   }
 
   mutating func sizeHint(approximateSize: Int) {
@@ -1213,14 +1213,14 @@ struct _ElementCollectorCollectTo<
   }
 
   mutating func appendContentsOf<
-    C : CollectionType
+    C : Collection
     where
     C.Iterator.Element == Element
   >(elements: C) {
     _builder.appendContentsOf(elements)
   }
 
-  mutating func takeResult() -> Collection {
+  mutating func takeResult() -> BuildableCollection {
     return _builder.takeResult()
   }
 }
@@ -1232,7 +1232,7 @@ internal func _optimizeCollectionTransformer<PipelineInputElement, Result>(
 }
 
 internal func _runCollectionTransformer<
-  InputCollection : CollectionType, Result
+  InputCollection : Collection, Result
 >(
   c: InputCollection,
   _ transformer: _CollectionTransformerFinalizer<InputCollection.Iterator.Element, Result>
@@ -1248,7 +1248,7 @@ internal func _runCollectionTransformer<
 //===----------------------------------------------------------------------===//
 
 public struct CollectionTransformerPipeline<
-  InputCollection : CollectionType, T
+  InputCollection : Collection, T
 > {
   internal var _input: InputCollection
   internal var _step: _CollectionTransformerStep<InputCollection.Iterator.Element, T>
@@ -1278,7 +1278,7 @@ public struct CollectionTransformerPipeline<
   public func collectTo<
     C : BuildableCollectionType
     where
-    C.Builder.Collection == C,
+    C.Builder.Destination == C,
     C.Iterator.Element == T,
     C.Builder.Element == T
   >(c: C.Type) -> C {
@@ -1290,7 +1290,7 @@ public struct CollectionTransformerPipeline<
   }
 }
 
-public func transform<C : CollectionType>(c: C)
+public func transform<C : Collection>(c: C)
   -> CollectionTransformerPipeline<C, C.Iterator.Element> {
 
   return CollectionTransformerPipeline<C, C.Iterator.Element>(

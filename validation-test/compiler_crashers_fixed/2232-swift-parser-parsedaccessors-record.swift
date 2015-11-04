@@ -18,6 +18,6 @@ let a {s : a {
 }
 }
 protocol A {
-typealias d : a : CollectionType where g<1 {
+typealias d : a : Collection where g<1 {
 d("):b : T.<T where T where A: a {
 func a(An

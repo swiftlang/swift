@@ -8,5 +8,5 @@ struct d<f{
 let
 a{let a{
 {
-struct S<T where f:CollectionType{
+struct S<T where f:Collection{
 func a<f

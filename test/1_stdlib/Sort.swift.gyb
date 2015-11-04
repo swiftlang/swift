@@ -58,7 +58,7 @@ func expectSortedCollection(sortedAry: ArraySlice<Int>, _ originalAry: ArraySlic
   expectSortedCollection([Int](sortedAry), [Int](originalAry))
 }
 
-class OffsetCollection : MutableCollectionType {
+class OffsetCollection : MutableCollection {
   let offset: Int
   var data: [Int] = []
   let forward: Bool

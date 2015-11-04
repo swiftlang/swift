@@ -6,7 +6,7 @@
 
 class A<T where T: a {
 let d>(a() -> {
-class a: CollectionType where A"
+class a: Collection where A"
 }
 let end = true {
 assert(i: A, y)

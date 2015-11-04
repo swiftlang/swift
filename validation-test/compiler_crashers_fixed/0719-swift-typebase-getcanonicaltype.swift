@@ -8,7 +8,7 @@ func b(t: l) -> (Any) {
 return { self.Element>() -> {
 return ""a<T : a {
 }
-func f.e : CollectionType where B {
+func f.e : Collection where B {
 }
 }
 }

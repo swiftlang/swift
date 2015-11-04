@@ -731,7 +731,7 @@ extension NSArray : SequenceType {
 }
 
 /* TODO: API review
-extension NSArray : Swift.CollectionType {
+extension NSArray : Swift.Collection {
   final public var startIndex: Int {
     return 0
   }

@@ -424,7 +424,7 @@ tests.test("LazySequence/Passthrough") {
 }
 
 % for traversal in 'Forward', 'Bidirectional', 'RandomAccess':
-tests.test("LazyCollection/CollectionType/${traversal}") {
+tests.test("LazyCollection/Collection/${traversal}") {
   let expected = (0..<100).map(OpaqueValue.init)
   let base = Minimal${traversal}Collection(elements: expected)
   var actual = base.lazy

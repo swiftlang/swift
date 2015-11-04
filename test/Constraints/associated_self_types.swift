@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-protocol P : CollectionType {
+protocol P : Collection {
   init()
 }
 postfix operator ~>> {}

@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 protocol b {
-typealias d : CollectionType where g.startIndex, T where k.Element>>?) -> a {
+typealias d : Collection where g.startIndex, T where k.Element>>?) -> a {
 }
 func b: Any) {
 }

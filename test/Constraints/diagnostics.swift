@@ -111,7 +111,7 @@ func ***~(_: Int, _: String) { }
 i ***~ i // expected-error{{cannot convert value of type 'Int' to expected argument type 'String'}}
 
 @available(*, unavailable, message="call the 'map()' method on the sequence")
-public func myMap<C : CollectionType, T>(
+public func myMap<C : Collection, T>(
   source: C, _ transform: (C.Iterator.Element) -> T
 ) -> [T] {
   fatalError("unavailable function can't be called")

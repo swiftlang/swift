@@ -77,7 +77,7 @@ struct _SliceBuffer<Element> : _ArrayBufferType {
   ///   `_ContiguousArrayBuffer` and
   ///   `insertCount <= numericCast(newValues.count)`.
   public mutating func replace<
-    C : CollectionType where C.Iterator.Element == Element
+    C : Collection where C.Iterator.Element == Element
   >(
     subRange subRange: Range<Int>,
     with insertCount: Int,
@@ -286,7 +286,7 @@ struct _SliceBuffer<Element> : _ArrayBufferType {
     }
   }
 
-  //===--- CollectionType conformance -------------------------------------===//
+  //===--- Collection conformance -------------------------------------===//
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.

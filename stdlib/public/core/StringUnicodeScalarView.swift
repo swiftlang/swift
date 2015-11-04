@@ -29,7 +29,7 @@ public func <(
 extension String {
   /// A collection of [Unicode scalar values](http://www.unicode.org/glossary/#unicode_scalar_value) that
   /// encode a `String` .
-  public struct UnicodeScalarView : CollectionType, _Reflectable,
+  public struct UnicodeScalarView : Collection, _Reflectable,
     CustomStringConvertible, CustomDebugStringConvertible {
     init(_ _core: _StringCore) {
       self._core = _core
@@ -282,7 +282,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
   /// - Complexity: O(`subRange.count`) if `subRange.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceRange<
-    C: CollectionType where C.Iterator.Element == UnicodeScalar
+    C: Collection where C.Iterator.Element == UnicodeScalar
   >(
     subRange: Range<Index>, with newElements: C
   ) {

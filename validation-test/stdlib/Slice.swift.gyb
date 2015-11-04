@@ -8,7 +8,7 @@
 import StdlibUnittest
 import SwiftPrivate
 
-var SliceTests = TestSuite("CollectionType")
+var SliceTests = TestSuite("Collection")
 
 //===----------------------------------------------------------------------===//
 // Slice<Base>
@@ -28,7 +28,7 @@ SliceTests.test("Slice/AssociatedTypes") {
   }
 %end
 
-  func checkStaticTypealiases<Base : CollectionType>(_: Base) {
+  func checkStaticTypealiases<Base : Collection>(_: Base) {
     expectEqualType(Base.Index.self, Slice<Base>.Index.self)
   }
 }
@@ -143,7 +143,7 @@ SliceTests.test("MutableSlice/AssociatedTypes") {
 %end
 
   func checkStaticTypealiases<
-    Base : MutableCollectionType
+    Base : MutableCollection
   >(_: Base) {
     expectEqualType(Base.Index.self, MutableSlice<Base>.Index.self)
   }

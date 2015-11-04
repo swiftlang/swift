@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  String is-not-a SequenceType or CollectionType, but it exposes a
+//  String is-not-a SequenceType or Collection, but it exposes a
 //  collection of characters.
 //
 //===----------------------------------------------------------------------===//
@@ -65,7 +65,7 @@ extension String {
 }
 
 /// `String.CharacterView` is a collection of `Character`.
-extension String.CharacterView : CollectionType {
+extension String.CharacterView : Collection {
   internal typealias UnicodeScalarView = String.UnicodeScalarView
   internal var unicodeScalars: UnicodeScalarView {
     return UnicodeScalarView(_core)
@@ -273,7 +273,7 @@ extension String.CharacterView : RangeReplaceableCollectionType {
   /// - Complexity: O(`subRange.count`) if `subRange.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceRange<
-    C: CollectionType where C.Iterator.Element == Character
+    C: Collection where C.Iterator.Element == Character
   >(
     subRange: Range<Index>, with newElements: C
   ) {

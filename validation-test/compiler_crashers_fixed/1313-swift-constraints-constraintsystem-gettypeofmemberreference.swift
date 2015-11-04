@@ -10,7 +10,7 @@ protocol a {
 A>? = .c {
 }
 }
-func c: b: CollectionType where k) -> T
+func c: b: Collection where k) -> T
 func e? = 1)))(range.a: A {
 convenience init("
 return z() -> {

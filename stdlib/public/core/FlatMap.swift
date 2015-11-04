@@ -34,7 +34,7 @@ extension LazyCollectionType {
   ///
   /// - Complexity: O(1)
   @warn_unused_result
-  public func flatMap<Intermediate: CollectionType>(
+  public func flatMap<Intermediate: Collection>(
     transform: (Elements.Iterator.Element)->Intermediate
   ) -> LazyCollection<
     FlattenCollection<
@@ -54,7 +54,7 @@ extension LazyCollectionType where Elements.Index : BidirectionalIndexType
   /// - Complexity: O(1)
   @warn_unused_result
   public func flatMap<
-    Intermediate: CollectionType
+    Intermediate: Collection
     where Intermediate.Index : BidirectionalIndexType
   >(
     transform: (Elements.Iterator.Element)->Intermediate

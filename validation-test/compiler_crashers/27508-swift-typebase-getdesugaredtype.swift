@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 func p{{
-var:CollectionType
+var:Collection
 class S<T where I:A{class A{func a{class A{
 enum S{
 struct Ba{

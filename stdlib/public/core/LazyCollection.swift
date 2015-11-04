@@ -22,12 +22,12 @@
 ///
 /// - See Also: `LazySequenceType`, `LazyCollection`
 public protocol LazyCollectionType
-  : CollectionType, LazySequenceType {
-  /// A `CollectionType` that can contain the same elements as this one,
+  : Collection, LazySequenceType {
+  /// A `Collection` that can contain the same elements as this one,
   /// possibly with a simpler type.
   ///
   /// - See also: `elements`
-  typealias Elements: CollectionType = Self
+  typealias Elements: Collection = Self
 
 }
 
@@ -43,7 +43,7 @@ extension LazyCollectionType where Elements == Self {
 /// implemented lazily.
 ///
 /// - See also: `LazySequenceType`, `LazyCollection`
-public struct LazyCollection<Base : CollectionType>
+public struct LazyCollection<Base : Collection>
   : LazyCollectionType {
 
   /// The type of the underlying collection
@@ -100,7 +100,7 @@ extension LazyCollection : SequenceType {
   }
 }
 
-extension LazyCollection : CollectionType {
+extension LazyCollection : Collection {
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
@@ -166,7 +166,7 @@ extension LazyCollection : CollectionType {
 }
 
 /// Augment `self` with lazy methods such as `map`, `filter`, etc.
-extension CollectionType {
+extension Collection {
   /// A collection with contents identical to `self`, but on which
   /// normally-eager operations such as `map` and `filter` are
   /// implemented lazily.

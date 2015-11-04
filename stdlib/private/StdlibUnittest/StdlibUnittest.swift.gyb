@@ -278,32 +278,32 @@ public func expectSequenceType<
 
 public func expectIndexable<X : Indexable>(x: X) -> X { return x }
 public func expectCollectionType<
-  X : CollectionType
+  X : Collection
   where
-  X.SubSequence : CollectionType,
+  X.SubSequence : Collection,
   X.SubSequence.Iterator.Element == X.Iterator.Element,
   X.SubSequence.SubSequence == X.SubSequence
 >(x: X) -> X { return x }
 
-/// A slice is a `CollectionType` that when sliced returns an instance of
+/// A slice is a `Collection` that when sliced returns an instance of
 /// itself.
 public func expectSliceType<
-  X : CollectionType
+  X : Collection
   where
   X.SubSequence == X
 >(sliceType: X.Type) {}
 
-/// A mutable slice is a `MutableCollectionType` that when sliced returns an
+/// A mutable slice is a `MutableCollection` that when sliced returns an
 /// instance of itself.
 public func expectMutableSliceType<
-  X : MutableCollectionType
+  X : MutableCollection
   where
   X.SubSequence == X
 >(mutableSliceType: X.Type) {}
 
-/// Check all associated types of a `CollectionType`.
+/// Check all associated types of a `Collection`.
 public func expectCollectionAssociatedTypes<
-  X : CollectionType,
+  X : Collection,
   Iterator : IteratorProtocol,
   SubSequence : SequenceType,
   Index : ForwardIndexType
@@ -1420,7 +1420,7 @@ public enum TestRunPredicate : CustomStringConvertible {
 /// - Note: `oracle` is also checked for conformance to the
 ///   laws.
 public func checkEquatable<
-  Instances: CollectionType where Instances.Iterator.Element : Equatable
+  Instances: Collection where Instances.Iterator.Element : Equatable
 >(
   instances: Instances,
   oracle: (Instances.Index, Instances.Index) -> Bool,
@@ -1474,7 +1474,7 @@ public func checkEquatable<T : Equatable>(
 /// requirements of `Hashable`, using `equalityOracle` to generate
 /// equality expectations from pairs of positions in `instances`.
 public func checkHashable<
-  Instances: CollectionType where Instances.Iterator.Element : Hashable
+  Instances: Collection where Instances.Iterator.Element : Hashable
 >(
   instances: Instances,
   equalityOracle: (Instances.Index, Instances.Index)->Bool,
@@ -1512,7 +1512,7 @@ public func checkHashable<T : Hashable>(
 ///   elements of `instances`.''' if inc == 'inc' else '''all
 ///   elements of `instances` are reachable from `startIndex`.'''}
 public func check${inc.capitalize()}rementable<
-  Instances: CollectionType
+  Instances: Collection
   where Instances.Iterator.Element : ${protocol}
 >(
   instances: Instances,
@@ -1604,7 +1604,7 @@ extension ExpectedComparisonResult : CustomStringConvertible {
 /// - Note: `oracle` is also checked for conformance to the
 ///   laws.
 public func checkComparable<
-  Instances: CollectionType where Instances.Iterator.Element : Comparable
+  Instances: Collection where Instances.Iterator.Element : Comparable
 >(
   instances: Instances,
   oracle: (Instances.Index, Instances.Index) -> ExpectedComparisonResult,
@@ -1671,7 +1671,7 @@ public func checkComparable<T : Comparable>(
 /// - Note: `oracle` is also checked for conformance to the
 ///   laws.
 public func checkStrideable<
-  Instances: CollectionType, Strides: CollectionType
+  Instances: Collection, Strides: Collection
   where
   Instances.Iterator.Element : Strideable,
   Strides.Iterator.Element == Instances.Iterator.Element.Stride
@@ -1733,7 +1733,7 @@ public struct CollectionMisuseResiliencyChecks {
 }
 
 internal func _checkIncrementalAdvance<
-  Instances : CollectionType
+  Instances : Collection
   where
   Instances.Iterator.Element : ForwardIndexType
 >(
@@ -1769,7 +1769,7 @@ internal func _checkIncrementalAdvance<
 /// - Precondition: `endIndex` is reachable from all elements of
 ///   `instances`
 public func checkForwardIndex<
-  Instances : CollectionType
+  Instances : Collection
   where
   Instances.Iterator.Element : ForwardIndexType
 >(
@@ -1796,7 +1796,7 @@ public func checkForwardIndex<
 ///   - all elements of `instances` are reachable from `startIndex`.
 ///   - `endIndex` is reachable from all elements of `instances`.
 public func checkBidirectionalIndex<
-  Instances: CollectionType
+  Instances: Collection
   where
   Instances.Iterator.Element : BidirectionalIndexType
 >(
@@ -1829,7 +1829,7 @@ public func checkBidirectionalIndex<
 ///   - all elements of `instances` are reachable from `startIndex`.
 ///   - `endIndex` is reachable from all elements of `instances`.
 public func checkRandomAccessIndex<
-  Instances : CollectionType, Distances : CollectionType
+  Instances : Collection, Distances : Collection
   where
   Instances.Iterator.Element : RandomAccessIndexType,
   Distances.Iterator.Element == Instances.Iterator.Element.Distance,
@@ -1858,7 +1858,7 @@ public func checkRandomAccessIndex<
 // picked up when the caller passes a literal), and another that
 // accepts any appropriate Collection type.
 % for genericParam, Element, Expected in zip(
-%   ('Expected: CollectionType', 'Element'),
+%   ('Expected: Collection', 'Element'),
 %   ('Expected.Iterator.Element', 'Element'),
 %   ('Expected', 'Array<Element>')):
 
@@ -1962,7 +1962,7 @@ public func checkSequence<
 %for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
 
 public func check${traversal}Collection<
-  ${genericParam}, C : CollectionType
+  ${genericParam}, C : Collection
   where
   C.Iterator.Element == ${Element},
   C.Index : ${traversal}IndexType
@@ -1975,7 +1975,7 @@ public func check${traversal}Collection<
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (${Element}, ${Element}) -> Bool
 ) {
-  // A `CollectionType` is a multi-pass `SequenceType`.
+  // A `Collection` is a multi-pass `SequenceType`.
   for _ in 0..<3 {
     checkSequence(
       expected, collection, ${trace},
@@ -2129,7 +2129,7 @@ public func check${traversal}Collection<
 }
 
 public func check${traversal}Collection<
-  ${genericParam}, C : CollectionType
+  ${genericParam}, C : Collection
   where
   C.Iterator.Element == ${Element},
   C.Index : ${traversal}IndexType,
@@ -2150,18 +2150,18 @@ public func check${traversal}Collection<
 
 // FIXME: merge into checkCollection()
 public func checkSliceableWithBidirectionalIndex<
-  ${genericParam}, S : CollectionType
+  ${genericParam}, S : Collection
   where
   S.Iterator.Element == ${Element},
   S.SubSequence.Iterator.Element == ${Element},
   S.Index : BidirectionalIndexType,
-  S.SubSequence : CollectionType,
+  S.SubSequence : Collection,
   S.SubSequence.Index : BidirectionalIndexType,
   ${Element} : Equatable
 >(
   expected: ${Expected}, _ sliceable: S, ${TRACE}
 ) {
-  // A `Sliceable` is a `CollectionType`.
+  // A `Sliceable` is a `Collection`.
   checkBidirectionalCollection(expected, sliceable, ${trace})
 
   let expectedArray = Array(expected)
@@ -2198,17 +2198,17 @@ public func checkSliceableWithBidirectionalIndex<
 
 % end
 
-public func nthIndex<C: CollectionType>(x: C, _ n: Int) -> C.Index {
+public func nthIndex<C: Collection>(x: C, _ n: Int) -> C.Index {
   return x.startIndex.advancedBy(numericCast(n))
 }
 
-public func nth<C: CollectionType>(x: C, _ n: Int) -> C.Iterator.Element {
+public func nth<C: Collection>(x: C, _ n: Int) -> C.Iterator.Element {
   return x[nthIndex(x, n)]
 }
 
 public func checkRangeReplaceable<
   C: RangeReplaceableCollectionType,
-  N: CollectionType
+  N: Collection
   where
   C.Iterator.Element : Equatable,
   C.Iterator.Element == N.Iterator.Element
@@ -3303,11 +3303,11 @@ extension MinimalRandomAccessIndex : _MinimalIndexType {
 % for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
 %   for mutable in [ False, True ]:
 // This comment is a workaround for <rdar://problem/18900352> gyb miscompiles nested loops
-%     Protocol = 'Strict%s%sCollectionType' % (traversal, 'Mutable' if mutable else '')
+%     Protocol = 'Strict%s%sCollection' % (traversal, 'Mutable' if mutable else '')
 %     Self = 'Minimal%s%sCollection' % (traversal, 'Mutable' if mutable else '')
 %     Index = 'Minimal%sIndex' % traversal
 
-public protocol ${Protocol} : ${'MutableCollectionType' if mutable else 'CollectionType'} {
+public protocol ${Protocol} : ${'MutableCollection' if mutable else 'Collection'} {
   typealias Element
   init(base: ${Self}<Element>)
 %     if mutable:
@@ -3361,7 +3361,7 @@ extension ${Protocol} where Index : _MinimalIndexType {
 }
 
 /// A minimal implementation of `CollectionType` with extra checks.
-public struct ${Self}<T> : ${'MutableCollectionType' if mutable else 'CollectionType'} {
+public struct ${Self}<T> : ${'MutableCollection' if mutable else 'Collection'} {
   public init<S : SequenceType where S.Iterator.Element == T>(
     elements: S,
     underestimatedCount: UnderestimateCountBehavior = .Value(0)
@@ -3449,7 +3449,7 @@ public protocol ${Protocol} : RangeReplaceableCollectionType {
 
 extension ${Protocol} {
   public mutating func replaceRange<
-    C : CollectionType where C.Iterator.Element == Element
+    C : Collection where C.Iterator.Element == Element
   >(subRange: Range<${Self}<Element>.Index>,
     with newElements: C) {
     base.replaceRange(subRange, with: newElements)
@@ -3587,7 +3587,7 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
   }
 
   public mutating func replaceRange<
-    C : CollectionType where C.Iterator.Element == T
+    C : Collection where C.Iterator.Element == T
   >(
     subRange: Range<${Index}>, with newElements: C
   ) {
@@ -3607,7 +3607,7 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
   }
 
   public mutating func insertContentsOf<
-    S : CollectionType where S.Iterator.Element == T
+    S : Collection where S.Iterator.Element == T
   >(newElements: S, at i: ${Index}) {
     let oldCount = count
     elements.insertContentsOf(newElements, at: i.position)
@@ -3804,9 +3804,9 @@ public struct DefaultedSequence<Element> : StrictSequenceType {
 % for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
 
 /// A Collection that uses as many default implementations as
-/// `CollectionType` can provide.
+/// `Collection` can provide.
 public struct Defaulted${traversal}Collection<Element>
-  : Strict${traversal}CollectionType {
+  : Strict${traversal}Collection {
 
   public typealias Base = Minimal${traversal}Collection<Element>
   public typealias Iterator = MinimalIterator<Element>
@@ -3828,7 +3828,7 @@ public struct Defaulted${traversal}Collection<Element>
 }
 
 public struct Defaulted${traversal}MutableCollection<Element>
-  : Strict${traversal}MutableCollectionType {
+  : Strict${traversal}MutableCollection {
 
   public typealias Base = Minimal${traversal}MutableCollection<Element>
   public typealias Iterator = MinimalIterator<Element>
@@ -3935,7 +3935,7 @@ public struct Defaulted${traversal}RangeReplaceableSlice<Element>
   }
 
   public mutating func replaceRange<
-    C : CollectionType where C.Iterator.Element == Element
+    C : Collection where C.Iterator.Element == Element
   >(
     subRange: Range<Index>,
     with newElements: C

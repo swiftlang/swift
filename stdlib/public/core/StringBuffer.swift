@@ -84,7 +84,7 @@ public struct _StringBuffer {
 
   @warn_unused_result
   static func fromCodeUnits<
-    Encoding : UnicodeCodecType, Input : CollectionType // SequenceType?
+    Encoding : UnicodeCodecType, Input : Collection // SequenceType?
     where Input.Iterator.Element == Encoding.CodeUnit
   >(
     encoding: Encoding.Type, input: Input, repairIllFormedSequences: Bool,

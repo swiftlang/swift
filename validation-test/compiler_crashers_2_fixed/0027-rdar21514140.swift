@@ -25,7 +25,7 @@ extension SequenceType
     return _base._customContainsEquatableElement(element)
   }
   
-  /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
+  /// If `self` is multi-pass (i.e., a `Collection`), invoke
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
   public func _preprocessingPass<R>(preprocess: (Self)->R) -> R? {
@@ -46,12 +46,12 @@ extension SequenceType
 }
 
 internal protocol _CollectionWrapperType : _SequenceWrapperType {
-  typealias Base : CollectionType
+  typealias Base : Collection
   typealias Index : ForwardIndexType = Base.Index
   var _base: Base {get}
 }
 
-extension CollectionType
+extension Collection
   where Self : _CollectionWrapperType, Self.Index == Self.Base.Index {
   /// The position of the first element in a non-empty collection.
   ///
@@ -153,13 +153,13 @@ public extension SequenceType
 //
 //===----------------------------------------------------------------------===//
 
-public protocol _prext_LazyCollectionType : CollectionType, _prext_LazySequenceType {
-  /// A CollectionType that can contain the same elements as this one,
+public protocol _prext_LazyCollectionType : Collection, _prext_LazySequenceType {
+  /// A Collection that can contain the same elements as this one,
   /// possibly with a simpler type.
   ///
   /// This associated type is used to keep the result type of
   /// `lazy(x).operation` from growing a `_prext_LazyCollection` layer.
-  typealias Elements: CollectionType = Self
+  typealias Elements: Collection = Self
 
 }
 
@@ -173,7 +173,7 @@ extension _prext_LazyCollectionType where Self : _CollectionWrapperType {
 
 /// A collection that forwards its implementation to an underlying
 /// collection instance while exposing lazy computations as methods.
-public struct _prext_LazyCollection<Base_ : CollectionType>
+public struct _prext_LazyCollection<Base_ : Collection>
   : /*_prext_LazyCollectionType,*/ _CollectionWrapperType {
 
   typealias Base = Base_
@@ -192,7 +192,7 @@ public struct _prext_LazyCollection<Base_ : CollectionType>
 }
 
 /// Augment `s` with lazy methods such as `map`, `filter`, etc.
-public func _prext_lazy<Base: CollectionType>(s: Base) -> _prext_LazyCollection<Base> {
+public func _prext_lazy<Base: Collection>(s: Base) -> _prext_LazyCollection<Base> {
   return _prext_LazyCollection(s)
 }
 
@@ -244,11 +244,11 @@ public struct _prext_MapSequence<Base : SequenceType, T>
 
 //===--- Collections ------------------------------------------------------===//
 
-/// A `CollectionType` whose elements consist of those in a `Base`
-/// `CollectionType` passed through a transform function returning `T`.
+/// A `Collection` whose elements consist of those in a `Base`
+/// `Collection` passed through a transform function returning `T`.
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
-public struct _prext_MapCollection<Base : CollectionType, T>
+public struct _prext_MapCollection<Base : Collection, T>
   : _prext_LazyCollectionType, _CollectionWrapperType {
 
   public var startIndex: Base.Index { return _base.startIndex }
@@ -374,12 +374,12 @@ public struct _prext_ReverseRandomAccessIndex<Base: RandomAccessIndexType>
 internal protocol __prext_ReverseCollectionType
   : _prext_LazyCollectionType, _CollectionWrapperType {
 
-  typealias Base : CollectionType
+  typealias Base : Collection
   
   var _base : Base {get}
 }
 
-extension CollectionType
+extension Collection
   where Self : __prext_ReverseCollectionType,
   Self.Index : _prext_ReverseIndexType,
   Self.Index.Base == Self.Base.Index,

@@ -129,7 +129,7 @@ extension LoggingSequenceType {
     return base._customContainsEquatableElement(element)
   }
   
-  /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
+  /// If `self` is multi-pass (i.e., a `Collection`), invoke
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
   public func _preprocessingPass<R>(
@@ -166,7 +166,7 @@ public struct LoggingSequence<Base_: SequenceType> : LoggingSequenceType {
 }
 
 public class CollectionLog : SequenceLog {
-  public class func dispatchTester<C: CollectionType>(
+  public class func dispatchTester<C: Collection>(
     c: C
   ) -> LoggingCollection<LoggingCollection<C>> {
     return LoggingCollection(LoggingCollection(c))
@@ -179,8 +179,8 @@ public class CollectionLog : SequenceLog {
   static var first = TypeIndexed(0)
 }
 
-public protocol LoggingCollectionType : CollectionType, LoggingSequenceType {
-  typealias Base : CollectionType
+public protocol LoggingCollectionType : Collection, LoggingSequenceType {
+  typealias Base : Collection
 }
 
 extension LoggingCollectionType {
@@ -215,4 +215,4 @@ extension LoggingCollectionType {
   }
 }
 
-struct LoggingCollection<Base_: CollectionType> : LoggingCollectionType {}
+struct LoggingCollection<Base_: Collection> : LoggingCollectionType {}

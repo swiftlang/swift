@@ -81,11 +81,11 @@ func privateNominalMembers(a: String) {
 // PRIVATE_NOMINAL_MEMBERS_1-DAG: Decl[InstanceVar]/CurrNominal: startIndex[#Index#]{{; name=.+$}}
 // PRIVATE_NOMINAL_MEMBERS_1: End completions
 
-func protocolExtCollection1a<C : CollectionType>(a: C) {
+func protocolExtCollection1a<C : Collection>(a: C) {
   a.#^PRIVATE_NOMINAL_MEMBERS_2A^#
 }
 
-func protocolExtCollection1b(a: CollectionType) {
+func protocolExtCollection1b(a: Collection) {
   a.#^PRIVATE_NOMINAL_MEMBERS_2B^#
 }
 
@@ -94,7 +94,7 @@ func protocolExtCollection1b(a: CollectionType) {
 // PRIVATE_NOMINAL_MEMBERS_2-DAG-NOT: Decl{{.*}}: last
 // PRIVATE_NOMINAL_MEMBERS_2: End completions
 
-func protocolExtCollection2<C : CollectionType where C.Index : BidirectionalIndexType>(a: C) {
+func protocolExtCollection2<C : Collection where C.Index : BidirectionalIndexType>(a: C) {
   a.#^PRIVATE_NOMINAL_MEMBERS_3^#
 }
 

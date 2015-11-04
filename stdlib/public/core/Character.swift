@@ -134,7 +134,7 @@ public struct Character :
     return UInt64(Builtin.zext_Int63_Int64(value)) | (1<<63)
   }
 
-  internal struct _SmallUTF8 : CollectionType {
+  internal struct _SmallUTF8 : Collection {
     init(_ u8: UInt64) {
       let count = Character._smallSize(u8)
       _sanityCheck(count <= 8, "Character with more than 8 UTF-8 code units")
@@ -196,7 +196,7 @@ public struct Character :
     var data: UInt64
   }
 
-  struct _SmallUTF16 : CollectionType {
+  struct _SmallUTF16 : Collection {
     init(_ u8: UInt64) {
       let count = UTF16.measure(
         UTF8.self, input: _SmallUTF8(u8).iterator(),

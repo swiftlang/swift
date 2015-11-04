@@ -49,7 +49,7 @@ extension Q_SequenceDefaultsType {
 /// `SequenceType` makes no requirement on conforming types regarding
 /// whether they will be destructively "consumed" by iteration.  To
 /// ensure non-destructive iteration, constrain your *sequence* to
-/// `CollectionType`.
+/// `Collection`.
 public protocol Q_SequenceType : Q_SequenceDefaultsType {
   /// A type that provides the *sequence*\ 's iteration interface and
   /// encapsulates its iteration state.
@@ -63,7 +63,7 @@ public protocol Q_SequenceType : Q_SequenceDefaultsType {
   /// Complexity: O(N)
   func underestimateCount() -> Int
 
-  /// If `self` is multi-pass (i.e., a `CollectionType`), invoke the function
+  /// If `self` is multi-pass (i.e., a `Collection`), invoke the function
   /// on `self` and return its result.  Otherwise, return `nil`.
   func preprocessingPass<R>(body: (Self)->R) -> R?
 

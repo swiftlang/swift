@@ -69,7 +69,7 @@ public struct RangeIterator<
 ///     print(brackets(Range<Int>(start:-99, end:100), 0)) // prints 0
 public struct Range<
   Element : ForwardIndexType
-> : Equatable, CollectionType,
+> : Equatable, Collection,
     CustomStringConvertible, CustomDebugStringConvertible {
 
   /// Construct a copy of `x`.

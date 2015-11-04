@@ -6,7 +6,7 @@
 
 class B{
 struct A{
-var:CollectionType
+var:Collection
 let a{
 class a{class p{
 class c<T:T.E

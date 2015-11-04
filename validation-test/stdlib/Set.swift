@@ -3438,7 +3438,7 @@ func getMockSetWithCustomCount(count count: Int)
   return MockSetWithCustomCount(count: count) as Set
 }
 
-func callGenericIsEmpty<C : CollectionType>(collection: C) -> Bool {
+func callGenericIsEmpty<C : Collection>(collection: C) -> Bool {
   return collection.isEmpty
 }
 

@@ -40,7 +40,7 @@ else:
 }%
 
 func _insertionSort<
-  C: MutableCollectionType where C.Index: BidirectionalIndexType
+  C: MutableCollection where C.Index: BidirectionalIndexType
   ${"" if p else ", C.Iterator.Element : Comparable"}
 >(
   inout elements: C,
@@ -85,7 +85,7 @@ func _insertionSort<
 }
 
 func _partition<
-  C: MutableCollectionType where C.Index: RandomAccessIndexType
+  C: MutableCollection where C.Index: RandomAccessIndexType
   ${"" if p else ", C.Iterator.Element : Comparable"}
 >(
   inout elements: C,
@@ -136,7 +136,7 @@ Loop: while true {
 
 public // @testable
 func _introSort<
-  C : MutableCollectionType where C.Index : RandomAccessIndexType
+  C : MutableCollection where C.Index : RandomAccessIndexType
   ${"" if p else ", C.Iterator.Element : Comparable"}
 >(
   inout elements: C,
@@ -157,7 +157,7 @@ func _introSort<
 }
 
 func _introSortImpl<
-  C : MutableCollectionType where C.Index : RandomAccessIndexType
+  C : MutableCollection where C.Index : RandomAccessIndexType
   ${"" if p else ", C.Iterator.Element : Comparable"}
 >(
   inout elements: C,
@@ -188,7 +188,7 @@ func _introSortImpl<
 }
 
 func _siftDown<
-  C : MutableCollectionType where C.Index : RandomAccessIndexType
+  C : MutableCollection where C.Index : RandomAccessIndexType
   ${"" if p else ", C.Iterator.Element : Comparable"}
 >(
   inout elements: C,
@@ -223,7 +223,7 @@ func _siftDown<
   }
 }
 func _heapify<
-  C : MutableCollectionType where C.Index : RandomAccessIndexType
+  C : MutableCollection where C.Index : RandomAccessIndexType
   ${"" if p else ", C.Iterator.Element : Comparable"}
 >(
   inout elements: C,
@@ -243,7 +243,7 @@ func _heapify<
   }
 }
 func _heapSort<
-  C : MutableCollectionType where C.Index : RandomAccessIndexType
+  C : MutableCollection where C.Index : RandomAccessIndexType
   ${"" if p else ", C.Iterator.Element : Comparable"}
 >(
   inout elements: C,

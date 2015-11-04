@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-struct D : CollectionType where h: s {
+struct D : Collection where h: s {
 func b: P {
 }
 }

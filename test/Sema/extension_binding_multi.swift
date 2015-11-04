@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -parse -primary-file %S/../Inputs/empty.swift %s -verify
 
-struct A: CollectionType {
+struct A: Collection {
   struct Index: BidirectionalIndexType {}
 }
 

@@ -11,7 +11,7 @@ init(() -> Any] == 1]()
 assert(T> Any, U>(.<c<f = compose<T.c where Optional<D>Bool)] as String):
 A"
 func a)
-let n1: CollectionType where f: b: l.endIndex - range..b(b(i> {
+let n1: Collection where f: b: l.endIndex - range..b(b(i> {
 protocol a {
 }
 }

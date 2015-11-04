@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-struct S<A: CollectionType where A.Index == Int> : CollectionType {
+struct S<A: Collection where A.Index == Int> : Collection {
   typealias Element = A.Iterator.Element
   typealias Index = A.Index
   

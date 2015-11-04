@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  To create a SequenceType or CollectionType that forwards
-//  requirements to an underlying SequenceType or CollectionType,
+//  To create a SequenceType or Collection that forwards
+//  requirements to an underlying SequenceType or Collection,
 //  have it conform to one of these protocols.
 //
 //===----------------------------------------------------------------------===//
@@ -61,7 +61,7 @@ extension SequenceType
     return _base._customContainsEquatableElement(element)
   }
   
-  /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
+  /// If `self` is multi-pass (i.e., a `Collection`), invoke
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
   public func _preprocessingPass<R>(preprocess: (Self)->R) -> R? {
@@ -85,12 +85,12 @@ extension SequenceType
 
 public // @testable
 protocol _CollectionWrapperType : _SequenceWrapperType {
-  typealias Base : CollectionType
+  typealias Base : Collection
   typealias Index : ForwardIndexType = Base.Index
   var _base: Base {get}
 }
 
-extension CollectionType
+extension Collection
   where Self : _CollectionWrapperType, Self.Index == Self.Base.Index {
   /// The position of the first element in a non-empty collection.
   ///
@@ -137,7 +137,7 @@ extension CollectionType
     return _base._customContainsEquatableElement(element)
   }
   
-  /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
+  /// If `self` is multi-pass (i.e., a `Collection`), invoke
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
   public func _preprocessingPass<R>(preprocess: (Self)->R) -> R? {

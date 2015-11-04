@@ -12,23 +12,23 @@ func f<C : P2> (elements: C) {
   var _: Int = elements.foo() // should not error
 }
 
-protocol _CollectionType  {
+protocol _Collection  {
   typealias Index
 
   typealias _Element
   subscript(i: Index) -> _Element {get}
 }
 
-protocol CollectionType : _CollectionType, SequenceType {
+protocol Collection : _Collection, SequenceType {
   subscript(i: Index) -> Iterator.Element {get}
 }
 
-protocol MutableCollectionType : CollectionType {
+protocol MutableCollection : Collection {
   subscript(i: Index) -> Iterator.Element {get set}
 }
 
 func insertionSort<
-C: MutableCollectionType 
+C: MutableCollection 
 >(
   inout elements: C,
   i: C.Index
@@ -41,7 +41,7 @@ protocol FactoryType {
   typealias Item
 }
 
-protocol MyCollectionType : Swift.CollectionType {}
+protocol MyCollectionType : Swift.Collection {}
 
 struct TestClass<
   Factory: FactoryType,

@@ -11,10 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 /// A protocol representing the minimal requirements of
-/// `CollectionType`.
+/// `Collection`.
 ///
 /// - Note: In most cases, it's best to ignore this protocol and use
-///   `CollectionType` instead, as it has a more complete interface.
+///   `Collection` instead, as it has a more complete interface.
 //
 // This protocol is almost an implementation detail of the standard
 // library; it is used to deduce things like the `SubSequence` and
@@ -45,11 +45,11 @@ public protocol Indexable {
 
   // The declaration of _Element and subscript here is a trick used to
   // break a cyclic conformance/deduction that Swift can't handle.  We
-  // need something other than a CollectionType.Iterator.Element that can
+  // need something other than a Collection.Iterator.Element that can
   // be used as CollectionDefaultIterator<T>'s Element.  Here we arrange for
-  // the CollectionType itself to have an Element type that's deducible from
+  // the Collection itself to have an Element type that's deducible from
   // its subscript.  Ideally we'd like to constrain this Element to be the same
-  // as CollectionType.Iterator.Element (see below), but we have no way of
+  // as Collection.Iterator.Element (see below), but we have no way of
   // expressing it today.
   typealias _Element
 
@@ -107,11 +107,11 @@ public struct CollectionDefaultIterator<Elements : Indexable>
 ///     for i in startIndex..<endIndex {
 ///       let x = self[i]
 ///     }
-public protocol CollectionType : Indexable, SequenceType {
+public protocol Collection : Indexable, SequenceType {
   /// A type that provides the *sequence*'s iteration interface and
   /// encapsulates its iteration state.
   ///
-  /// By default, a `CollectionType` satisfies `SequenceType` by
+  /// By default, a `Collection` satisfies `SequenceType` by
   /// supplying a `CollectionDefaultIterator` as its associated `Iterator`
   /// type.
   typealias Iterator : IteratorProtocol = CollectionDefaultIterator<Self>
@@ -121,7 +121,7 @@ public protocol CollectionType : Indexable, SequenceType {
   // CollectionDefaultIterator. <rdar://problem/21539115>
   func iterator() -> Iterator
   
-  // FIXME: should be constrained to CollectionType
+  // FIXME: should be constrained to Collection
   // (<rdar://problem/20715009> Implement recursive protocol
   // constraints)
   
@@ -130,8 +130,8 @@ public protocol CollectionType : Indexable, SequenceType {
   ///
   /// - Note: This associated type appears as a requirement in
   ///   `SequenceType`, but is restated here with stricter
-  ///   constraints: in a `CollectionType`, the `SubSequence` should
-  ///   also be a `CollectionType`.
+  ///   constraints: in a `Collection`, the `SubSequence` should
+  ///   also be a `Collection`.
   typealias SubSequence: Indexable, SequenceType = Slice<Self>
 
   /// Returns the element at the given `position`.
@@ -187,15 +187,15 @@ public protocol CollectionType : Indexable, SequenceType {
 /// Supply the default `iterator()` method for `CollectionType` models
 /// that accept the default associated `Iterator`,
 /// `CollectionDefaultIterator<Self>`.
-extension CollectionType where Iterator == CollectionDefaultIterator<Self> {
+extension Collection where Iterator == CollectionDefaultIterator<Self> {
   public func iterator() -> CollectionDefaultIterator<Self> {
     return CollectionDefaultIterator(self)
   }
 }
 
-/// Supply the default "slicing" `subscript`  for `CollectionType` models
+/// Supply the default "slicing" `subscript`  for `Collection` models
 /// that accept the default associated `SubSequence`, `Slice<Self>`.
-extension CollectionType where SubSequence == Slice<Self> {
+extension Collection where SubSequence == Slice<Self> {
   public subscript(bounds: Range<Index>) -> Slice<Self> {
     Index._failEarlyRangeCheck2(
       bounds.startIndex, rangeEnd: bounds.endIndex,
@@ -204,7 +204,7 @@ extension CollectionType where SubSequence == Slice<Self> {
   }
 }
 
-extension CollectionType where SubSequence == Self {
+extension Collection where SubSequence == Self {
   /// If `!self.isEmpty`, remove the first element and return it, otherwise
   /// return `nil`.
   ///
@@ -232,7 +232,7 @@ extension CollectionType where SubSequence == Self {
 }
 
 /// Default implementations of core requirements
-extension CollectionType {
+extension Collection {
   /// Returns `true` iff `self` is empty.
   ///
   /// - Complexity: O(1)
@@ -281,10 +281,10 @@ extension CollectionType {
 }
 
 //===----------------------------------------------------------------------===//
-// Default implementations for CollectionType
+// Default implementations for Collection
 //===----------------------------------------------------------------------===//
 
-extension CollectionType {
+extension Collection {
   /// Return an `Array` containing the results of mapping `transform`
   /// over `self`.
   ///
@@ -451,7 +451,7 @@ extension CollectionType {
   }
 }
 
-extension CollectionType where Iterator.Element : Equatable {
+extension Collection where Iterator.Element : Equatable {
   /// Returns the maximal `SubSequence`s of `self`, in order, around a
   /// `separator` element.
   ///
@@ -478,7 +478,7 @@ extension CollectionType where Iterator.Element : Equatable {
   }
 }
 
-extension CollectionType where Index : BidirectionalIndexType {
+extension Collection where Index : BidirectionalIndexType {
   /// Returns a subsequence containing all but the last `n` elements.
   ///
   /// - Requires: `n >= 0`
@@ -506,7 +506,7 @@ extension CollectionType where Index : BidirectionalIndexType {
   }
 }
 
-extension CollectionType where SubSequence == Self {
+extension Collection where SubSequence == Self {
   /// Remove the element at `startIndex` and return it.
   ///
   /// - Complexity: O(1)
@@ -533,7 +533,7 @@ extension CollectionType where SubSequence == Self {
   }
 }
 
-extension CollectionType
+extension Collection
   where
   SubSequence == Self,
   Index : BidirectionalIndexType {
@@ -584,7 +584,7 @@ extension SequenceType
   }
 }
 
-extension CollectionType {
+extension Collection {
   public func _preprocessingPass<R>(preprocess: (Self)->R) -> R? {
     return preprocess(self)
   }
@@ -593,7 +593,7 @@ extension CollectionType {
 /// A *collection* that supports subscript assignment.
 ///
 /// For any instance `a` of a type conforming to
-/// `MutableCollectionType`, :
+/// `MutableCollection`, :
 ///
 ///     a[i] = x
 ///     let y = a[i]
@@ -603,11 +603,11 @@ extension CollectionType {
 ///     a[i] = x
 ///     let y = x
 ///
-public protocol MutableCollectionType : MutableIndexable, CollectionType {
+public protocol MutableCollection : MutableIndexable, Collection {
   // FIXME: should be constrained to MutableCollectionType
   // (<rdar://problem/20715009> Implement recursive protocol
   // constraints)
-  typealias SubSequence : CollectionType /*: MutableCollectionType*/
+  typealias SubSequence : Collection /*: MutableCollection*/
     = MutableSlice<Self>
 
   /// Access the element at `position`.
@@ -645,7 +645,7 @@ public protocol MutableCollectionType : MutableIndexable, CollectionType {
   // UnsafeMutableBufferPointer
 }
 
-extension MutableCollectionType {
+extension MutableCollection {
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     @noescape body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
   ) rethrows -> R? {
@@ -666,13 +666,13 @@ extension MutableCollectionType {
 }
 
 internal func _writeBackMutableSlice<
-  Collection : MutableCollectionType,
-  Slice_ : CollectionType
+  C : MutableCollection,
+  Slice_ : Collection
   where
-  Collection._Element == Slice_.Iterator.Element,
-  Collection.Index == Slice_.Index
->(inout self_: Collection, bounds: Range<Collection.Index>, slice: Slice_) {
-  Collection.Index._failEarlyRangeCheck2(
+  C._Element == Slice_.Iterator.Element,
+  C.Index == Slice_.Index
+>(inout self_: C, bounds: Range<C.Index>, slice: Slice_) {
+  C.Index._failEarlyRangeCheck2(
     bounds.startIndex, rangeEnd: bounds.endIndex,
     boundsStart: self_.startIndex, boundsEnd: self_.endIndex)
   // FIXME(performance): can we use
@@ -694,17 +694,17 @@ internal func _writeBackMutableSlice<
 
   _precondition(
     selfElementIndex == selfElementsEndIndex,
-    "Can not replace a slice of a MutableCollectionType with a slice of a larger size")
+    "Can not replace a slice of a MutableCollection with a slice of a larger size")
   _precondition(
     newElementIndex == newElementsEndIndex,
-    "Can not replace a slice of a MutableCollectionType with a slice of a smaller size")
+    "Can not replace a slice of a MutableCollection with a slice of a smaller size")
 }
 
 /// An *iterator* that adapts a *collection* `C` and any *sequence* of
 /// its `Index` type to present the collection's elements in a
 /// permuted order.
 public struct PermutationGenerator<
-  C: CollectionType, Indices: SequenceType
+  C: Collection, Indices: SequenceType
   where
   C.Index == Indices.Iterator.Element
 > : IteratorProtocol, SequenceType {
@@ -738,7 +738,7 @@ public struct PermutationGenerator<
 ///
 ///      x[i..<j] = someExpression
 ///      x[i..<j].mutatingMethod()
-public protocol MutableSliceable : CollectionType, MutableCollectionType {
+public protocol MutableSliceable : Collection, MutableCollection {
   subscript(_: Range<Index>) -> SubSequence { get set }
 }
 

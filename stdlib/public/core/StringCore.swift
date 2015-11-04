@@ -556,7 +556,7 @@ public struct _StringCore {
   }
 }
 
-extension _StringCore : CollectionType {
+extension _StringCore : Collection {
   public // @testable
   var startIndex: Int {
     return 0
@@ -575,7 +575,7 @@ extension _StringCore : RangeReplaceableCollectionType {
   /// - Complexity: O(`subRange.count`) if `subRange.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceRange<
-    C: CollectionType where C.Iterator.Element == UTF16.CodeUnit
+    C: Collection where C.Iterator.Element == UTF16.CodeUnit
   >(
     subRange: Range<Int>, with newElements: C
   ) {

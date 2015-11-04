@@ -8,7 +8,7 @@
 return $0.Element == b(Any) -> String {
 protocol b {
 }
-return b: CollectionType where k.init() + seq: b: A {
+return b: Collection where k.init() + seq: b: A {
 override func a<T)
 }
 }

@@ -22,7 +22,7 @@ GElement = "Iterator.Element"
 // last
 //===----------------------------------------------------------------------===//
 
-extension CollectionType where Index : BidirectionalIndexType {
+extension Collection where Index : BidirectionalIndexType {
   public var last: Iterator.Element? {
     return isEmpty ? nil : self[endIndex.predecessor()]
   }
@@ -32,7 +32,7 @@ extension CollectionType where Index : BidirectionalIndexType {
 // indexOf()
 //===----------------------------------------------------------------------===//
 
-extension CollectionType where ${GElement} : Equatable {
+extension Collection where ${GElement} : Equatable {
   /// Returns the first index where `value` appears in `self` or `nil` if
   /// `value` is not found.
   ///
@@ -52,7 +52,7 @@ extension CollectionType where ${GElement} : Equatable {
   }
 }
 
-extension CollectionType {
+extension Collection {
   /// Returns the first index where `predicate` returns `true` for the
   /// corresponding value, or `nil` if such value is not found.
   ///
@@ -74,7 +74,7 @@ extension CollectionType {
 // indices
 //===----------------------------------------------------------------------===//
 
-extension CollectionType {
+extension Collection {
   /// Return the range of valid index values.
   ///
   /// The result's `endIndex` is the same as that of `self`.  Because
@@ -86,7 +86,7 @@ extension CollectionType {
 }
 
 //===----------------------------------------------------------------------===//
-// MutableCollectionType
+// MutableCollection
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
@@ -122,7 +122,7 @@ orderingRequirementForComparable = """\
 % for preds in [ True, False ]:
 
 %   if preds:
-extension MutableCollectionType where Index : RandomAccessIndexType {
+extension MutableCollection where Index : RandomAccessIndexType {
 
 ${partitionDocComment}
   ///
@@ -135,7 +135,7 @@ ${orderingRequirementForPredicate}
 
 %   else:
 
-extension MutableCollectionType
+extension MutableCollection
   where Index : RandomAccessIndexType, ${GElement} : Comparable {
 
 ${partitionDocComment}
@@ -209,7 +209,7 @@ sortIsUnstableForComparable = """\
 
 }%
 
-% for Self in [ 'SequenceType', 'MutableCollectionType' ]:
+% for Self in [ 'SequenceType', 'MutableCollection' ]:
 
 extension ${Self} where Self.Iterator.Element : Comparable {
 ${sortDocCommentForComparable}
@@ -217,7 +217,7 @@ ${sortDocCommentForComparable}
 ${sortIsUnstableForComparable}
   ///
 ${orderingRequirementForComparable}
-  @warn_unused_result(${'mutable_variant="sortInPlace"' if Self == 'MutableCollectionType' else ''})
+  @warn_unused_result(${'mutable_variant="sortInPlace"' if Self == 'MutableCollection' else ''})
   public func sort() -> [Iterator.Element] {
     var result = ContiguousArray(self)
     result.sortInPlace()
@@ -231,7 +231,7 @@ ${sortDocCommentForPredicate}
 ${sortIsUnstableForPredicate}
   ///
 ${orderingRequirementForPredicate}
-  @warn_unused_result(${'mutable_variant="sortInPlace"' if Self == 'MutableCollectionType' else ''})
+  @warn_unused_result(${'mutable_variant="sortInPlace"' if Self == 'MutableCollection' else ''})
   public func sort(
     @noescape isOrderedBefore: (Iterator.Element, Iterator.Element) -> Bool
   ) -> [Iterator.Element] {
@@ -248,7 +248,7 @@ ${orderingRequirementForPredicate}
 
 % end
 
-extension MutableCollectionType
+extension MutableCollection
   where
   Self.Index : RandomAccessIndexType,
   Self.Iterator.Element : Comparable {
@@ -273,7 +273,7 @@ ${orderingRequirementForComparable}
   }
 }
 
-extension MutableCollectionType where Self.Index : RandomAccessIndexType {
+extension MutableCollection where Self.Index : RandomAccessIndexType {
 ${sortInPlaceDocCommentForPredicate}
   ///
 ${sortIsUnstableForPredicate}

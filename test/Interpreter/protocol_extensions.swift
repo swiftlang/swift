@@ -16,7 +16,7 @@ extension SequenceType {
 print(["a", "b", "c", "d"].myCount)
 
 // Extend a protocol with a function.
-extension CollectionType {
+extension Collection {
   final var myIndices: Range<Index> {
     return Range(start: startIndex, end: endIndex)
   }
@@ -29,7 +29,7 @@ extension CollectionType {
 // CHECK: 4
 print(["a", "b", "c", "d"].clone().myCount)
 
-extension CollectionType {
+extension Collection {
   final func indexMatching(fn: Iterator.Element -> Bool) -> Index? {
     for i in myIndices {
       if fn(self[i]) { return i }
@@ -43,7 +43,7 @@ print(["a", "b", "c", "d"].indexMatching({$0 == "c"})!)
 
 // Extend certain instances of a collection (those that have equatable
 // element types) with another algorithm.
-extension CollectionType where Self.Iterator.Element : Equatable {
+extension Collection where Self.Iterator.Element : Equatable {
   final func myIndexOf(element: Iterator.Element) -> Index? {
     for i in self.indices {
       if self[i] == element { return i }
@@ -99,7 +99,7 @@ for (a, b) in [1, 2, 3].myZip(["a", "b", "c"]) {
 }
 
 // Mutating algorithms.
-extension MutableCollectionType
+extension MutableCollection
   where Self.Index: RandomAccessIndexType, Self.Iterator.Element : Comparable {
 
   public final mutating func myPartition(range: Range<Index>) -> Index {
@@ -142,7 +142,7 @@ print(
 )
 
 // Constrained extensions for specific types.
-extension CollectionType where Self.Iterator.Element == String {
+extension Collection where Self.Iterator.Element == String {
   final var myCommaSeparatedList: String {
     if startIndex == endIndex { return "" }
 

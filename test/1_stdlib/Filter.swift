@@ -52,7 +52,7 @@ func printlnByGenerating<S: SequenceType>(s: S) {
   print(">")
 }
 
-func printlnByIndexing<C: CollectionType>(c: C) {
+func printlnByIndexing<C: Collection>(c: C) {
   printlnByGenerating(
     PermutationGenerator(elements: c, indices: c.indices)
   )

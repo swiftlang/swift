@@ -138,7 +138,7 @@ public struct LoggingRangeReplaceableCollection<
   }
 
   public mutating func replaceRange<
-    C : CollectionType where C.Iterator.Element == Base.Iterator.Element
+    C : Collection where C.Iterator.Element == Base.Iterator.Element
   >(
     subRange: Range<Base.Index>, with newElements: C
   ) {
@@ -206,7 +206,7 @@ public struct LoggingRangeReplaceableCollection<
   }
 
   public mutating func insertContentsOf<
-    C : CollectionType where C.Iterator.Element == Base.Iterator.Element
+    C : Collection where C.Iterator.Element == Base.Iterator.Element
   >(newElements: C, at i: Base.Index) {
     ++Log.insertContentsOf[selfType]
     base.insertContentsOf(newElements, at: i)
@@ -285,7 +285,7 @@ public class SequenceLog {
 }
 
 public class CollectionLog : SequenceLog {
-  public class func dispatchTester<C : CollectionType>(
+  public class func dispatchTester<C : Collection>(
     c: C
   ) -> LoggingCollection<LoggingCollection<C>> {
     return LoggingCollection(LoggingCollection(c))
@@ -304,7 +304,7 @@ public class CollectionLog : SequenceLog {
 }
 
 public class MutableCollectionLog : CollectionLog {
-  public class func dispatchTester<C : MutableCollectionType>(
+  public class func dispatchTester<C : MutableCollection>(
     c: C
   ) -> LoggingMutableCollection<LoggingMutableCollection<C>> {
     return LoggingMutableCollection(LoggingMutableCollection(c))
@@ -365,8 +365,8 @@ public func ==<Base>(lhs: Logging${Kind}<Base>, rhs: Logging${Kind}<Base>)
 }
 % end
 
-% for Kind in 'Sequence', 'Collection', 'MutableCollection':
-public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
+% for (Kind, Suffix) in [('Sequence', 'Type'), ('Collection', ''), ('MutableCollection', '')]:
+public struct Logging${Kind}<Base: ${Kind}${Suffix}> : ${Kind}${Suffix}, LoggingType {
 
   public typealias Log = ${Kind}Log
 
@@ -536,7 +536,7 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
     return base._customContainsEquatableElement(element)
   }
 
-  /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
+  /// If `self` is multi-pass (i.e., a `Collection`), invoke
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
   public func _preprocessingPass<R>(

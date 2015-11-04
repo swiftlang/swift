@@ -667,7 +667,7 @@ SequenceTypeTests.test("reverse/WhereIndexIsBidirectional,BidirectionalReverseVi
       test.expected, result.map { $0.value },
       stackTrace: SourceLocStack().with(test.loc))
 
-    // Check ReverseCollection's CollectionType conformance.
+    // Check ReverseCollection's Collection conformance.
     checkBidirectionalCollection(
       test.expected.map(OpaqueValue.init) as [OpaqueValue<Int>],
       result) { $0.value == $1.value }
@@ -686,7 +686,7 @@ SequenceTypeTests.test("reverse/WhereIndexIsRandomAccess,RandomAccessReverseView
       test.expected, result.map { $0.value },
       stackTrace: SourceLocStack().with(test.loc))
 
-    // Check ReverseRandomAccessCollection CollectionType conformance.
+    // Check ReverseRandomAccessCollection Collection conformance.
     checkRandomAccessCollection(
       test.expected.map(OpaqueValue.init) as [OpaqueValue<Int>],
       result) { $0.value == $1.value }

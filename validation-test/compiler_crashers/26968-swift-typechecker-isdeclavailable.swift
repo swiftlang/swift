@@ -6,7 +6,7 @@
 
 class C<t
 {
-class A{class c{let h:CollectionType
+class A{class c{let h:Collection
 func b{struct B<T where h=a{
 func b{
 struct Q<T where h=a{

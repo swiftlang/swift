@@ -24,7 +24,7 @@ protocol _CollectionType {
   subscript(i: Index) -> _Element {get}
 }
 
-protocol CollectionType : _CollectionType, SequenceType {
+protocol Collection : _CollectionType, SequenceType {
   subscript(i: Index) -> Iterator.Element {get set }
 }
 func insertionSort<C: Mutable> (inout elements: C, i: C.Index) { // expected-error {{use of undeclared type 'Mutable'}} expected-error {{'Index' is not a member type of 'C'}}

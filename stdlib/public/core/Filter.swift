@@ -100,7 +100,7 @@ public struct LazyFilterSequence<Base : SequenceType>
 ///   and may not offer the usual performance given by models of
 ///   `ForwardIndexType`.
 public struct LazyFilterIndex<
-  BaseElements: CollectionType
+  BaseElements: Collection
 > : ForwardIndexType {
   /// Returns the next consecutive value after `self`.
   ///
@@ -136,14 +136,14 @@ public struct LazyFilterIndex<
 
 /// Returns `true` iff `lhs` is identical to `rhs`.
 @warn_unused_result
-public func == <Base : CollectionType>(
+public func == <Base : Collection>(
   lhs: LazyFilterIndex<Base>,
   rhs: LazyFilterIndex<Base>
 ) -> Bool {
   return lhs.base == rhs.base
 }
 
-/// A lazy `CollectionType` wrapper that includes the elements of an
+/// A lazy `Collection` wrapper that includes the elements of an
 /// underlying collection that satisfy a predicate.
 ///
 /// - Note: The performance of advancing a `LazyFilterIndex`
@@ -153,7 +153,7 @@ public func == <Base : CollectionType>(
 ///   on `LazyFilterCollection` instances may not have the
 ///   documented complexity.
 public struct LazyFilterCollection<
-  Base : CollectionType
+  Base : Collection
 > : LazyCollectionType {
 
   /// A type that represents a valid position in the collection.

@@ -123,7 +123,7 @@ extension String {
   @warn_unused_result
   public // @testable
   static func _fromWellFormedCodeUnitSequence<
-    Encoding: UnicodeCodecType, Input: CollectionType
+    Encoding: UnicodeCodecType, Input: Collection
     where Input.Iterator.Element == Encoding.CodeUnit
   >(
     encoding: Encoding.Type, input: Input
@@ -134,7 +134,7 @@ extension String {
   @warn_unused_result
   public // @testable
   static func _fromCodeUnitSequence<
-    Encoding: UnicodeCodecType, Input: CollectionType
+    Encoding: UnicodeCodecType, Input: Collection
     where Input.Iterator.Element == Encoding.CodeUnit
   >(
     encoding: Encoding.Type, input: Input
@@ -152,7 +152,7 @@ extension String {
   @warn_unused_result
   public // @testable
   static func _fromCodeUnitSequenceWithRepair<
-    Encoding: UnicodeCodecType, Input: CollectionType
+    Encoding: UnicodeCodecType, Input: Collection
     where Input.Iterator.Element == Encoding.CodeUnit
   >(
     encoding: Encoding.Type, input: Input
@@ -661,7 +661,7 @@ extension String {
   /// - Complexity: O(`subRange.count`) if `subRange.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceRange<
-    C: CollectionType where C.Iterator.Element == Character
+    C: Collection where C.Iterator.Element == Character
   >(
     subRange: Range<Index>, with newElements: C
   ) {
@@ -699,7 +699,7 @@ extension String {
   ///
   /// - Complexity: O(`self.count + newElements.count`).
   public mutating func insertContentsOf<
-    S : CollectionType where S.Iterator.Element == Character
+    S : Collection where S.Iterator.Element == Character
   >(newElements: S, at i: Index) {
     withMutableCharacters {
       (inout v: CharacterView) in v.insertContentsOf(newElements, at: i)

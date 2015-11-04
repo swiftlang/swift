@@ -55,7 +55,7 @@ extension NSSet {
 let x in a = c
 }
 private let x }
-class func a(s: CollectionType where f<f = F>) -> : d : A".startIndex)
+class func a(s: Collection where f<f = F>) -> : d : A".startIndex)
 }
 let c: e: c(x):
 func c(()

@@ -20,7 +20,7 @@
 
 internal struct _CollectionOf<
   IndexType_ : ForwardIndexType, T
-> : CollectionType {
+> : Collection {
   init(startIndex: IndexType_, endIndex: IndexType_,
       _ subscriptImpl: (IndexType_)->T) {
     self.startIndex = startIndex

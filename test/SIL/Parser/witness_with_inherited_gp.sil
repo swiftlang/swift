@@ -38,7 +38,7 @@ sil_witness_table <Base : SequenceType> mmEnumerateSequence<Base>: _Sequence_Typ
   associated_type_protocol (Generator: GeneratorType): mmEnumerateGenerator<Base.Generator>: specialize <Base = Base.Generator, Base.Element = Base.Generator.Element> (<Base : GeneratorType> mmEnumerateGenerator<Base>: GeneratorType module WitnessTableWithGP)
 }
 
-public struct _mmArrayBuffer<T> : CollectionType {
+public struct _mmArrayBuffer<T> : Collection {
   public typealias Element = T
   public var startIndex: Int { get }
   public var endIndex: Int { get }

@@ -6,7 +6,7 @@
 
 class a {
 }
-class a<T, T : CollectionType where B : A> {
+class a<T, T : Collection where B : A> {
 var b {
 struct c {
 }

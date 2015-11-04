@@ -12,7 +12,7 @@
 
 /// The underlying buffer for an ArrayType conforms to
 /// `_ArrayBufferType`.  This buffer does not provide value semantics.
-public protocol _ArrayBufferType : MutableCollectionType {
+public protocol _ArrayBufferType : MutableCollection {
   /// The type of elements stored in the buffer.
   typealias Element
 
@@ -67,7 +67,7 @@ public protocol _ArrayBufferType : MutableCollectionType {
   ///
   /// - Requires: This buffer is backed by a uniquely-referenced
   /// `_ContiguousArrayBuffer`.
-  mutating func replace<C: CollectionType where C.Iterator.Element == Element>(
+  mutating func replace<C: Collection where C.Iterator.Element == Element>(
     subRange subRange: Range<Int>, with newCount: Int, elementsOf newValues: C
   )
 
@@ -132,7 +132,7 @@ extension _ArrayBufferType {
   }
 
   public mutating func replace<
-    C: CollectionType where C.Iterator.Element == Element
+    C: Collection where C.Iterator.Element == Element
   >(subRange subRange: Range<Int>, with newCount: Int,
     elementsOf newValues: C) {
     _sanityCheck(startIndex == 0, "_SliceBuffer should override this function.")

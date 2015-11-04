@@ -79,7 +79,7 @@ f() -> Any, (B)
 t: T>) {
 }
 }
-init(range: CollectionType where A: B<T>(self)
+init(range: Collection where A: B<T>(self)
 return {
 }
 return "foobar"]([c()

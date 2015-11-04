@@ -9,7 +9,7 @@ print(a: A<l : A>]])
 let a
 return ")
 }
-class d<S : CollectionType where h: A? {
+class d<S : Collection where h: A? {
 map(f(n: 1](Any, end)
 }
 typealias h: S<H : ()""")

@@ -19,7 +19,7 @@
 /// Any code that uses multiple iterators (or `for`...`in` loops)
 /// over a single *sequence* should have static knowledge that the
 /// specific *sequence* is multi-pass, either because its concrete
-/// type is known or because it is constrained to `CollectionType`.
+/// type is known or because it is constrained to `Collection`.
 /// Also, the iterators must be obtained by distinct calls to the
 /// *sequence's* `iterator()` method, rather than by copying.
 public protocol IteratorProtocol {
@@ -43,7 +43,7 @@ public protocol IteratorProtocol {
 /// `SequenceType` makes no requirement on conforming types regarding
 /// whether they will be destructively "consumed" by iteration.  To
 /// ensure non-destructive iteration, constrain your *sequence* to
-/// `CollectionType`.
+/// `Collection`.
 ///
 /// As a consequence, it is not possible to run multiple `for` loops
 /// on a sequence to "resume" iteration:
@@ -186,7 +186,7 @@ public protocol SequenceType {
     element: Iterator.Element
   ) -> Bool?
 
-  /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
+  /// If `self` is multi-pass (i.e., a `Collection`), invoke
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
   func _preprocessingPass<R>(preprocess: (Self)->R) -> R?

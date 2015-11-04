@@ -58,7 +58,7 @@ print(">")
 // SequenceType having a reference-semantics IteratorProtocol produces a
 // self-destructive mapped view.  This is technically correct because
 // Sequences are allowed to be self-destructive, and theoretically
-// every multi-pass SequenceType would be a CollectionType, but Sequences are
+// every multi-pass SequenceType would be a Collection, but Sequences are
 // much easier to build than Collections and it would be extremely
 // surprising for users if their mappings were not stable.
 
