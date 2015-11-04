@@ -184,7 +184,7 @@ public protocol Collection : Indexable, SequenceType {
   var first: Iterator.Element? { get }
 }
 
-/// Supply the default `iterator()` method for `CollectionType` models
+/// Supply the default `iterator()` method for `Collection` models
 /// that accept the default associated `Iterator`,
 /// `CollectionDefaultIterator<Self>`.
 extension Collection where Iterator == CollectionDefaultIterator<Self> {
@@ -604,7 +604,7 @@ extension Collection {
 ///     let y = x
 ///
 public protocol MutableCollection : MutableIndexable, Collection {
-  // FIXME: should be constrained to MutableCollectionType
+  // FIXME: should be constrained to MutableCollection
   // (<rdar://problem/20715009> Implement recursive protocol
   // constraints)
   typealias SubSequence : Collection /*: MutableCollection*/
