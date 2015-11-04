@@ -1,4 +1,4 @@
-//===--- Map.swift - Lazily map over a SequenceType -----------*- swift -*-===//
+//===--- Map.swift - Lazily map over a Sequence -----------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -15,7 +15,7 @@
 /// `IteratorProtocol` through a transform function returning `Element`.
 public struct LazyMapIterator<
   Base : IteratorProtocol, Element
-> : IteratorProtocol, SequenceType {
+> : IteratorProtocol, Sequence {
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
@@ -32,11 +32,11 @@ public struct LazyMapIterator<
   internal var _transform: (Base.Element)->Element
 }
 
-/// A `SequenceType` whose elements consist of those in a `Base`
-/// `SequenceType` passed through a transform function returning `Element`.
+/// A `Sequence` whose elements consist of those in a `Base`
+/// `Sequence` passed through a transform function returning `Element`.
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
-public struct LazyMapSequence<Base : SequenceType, Element>
+public struct LazyMapSequence<Base : Sequence, Element>
   : LazySequenceType {
   
   public typealias Elements = LazyMapSequence

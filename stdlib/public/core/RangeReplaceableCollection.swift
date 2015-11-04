@@ -43,12 +43,12 @@ public protocol RangeReplaceableCollection : Collection {
   or SILGen
 
   func +<
-    S : SequenceType
+    S : Sequence
     where S.Iterator.Element == Iterator.Element
   >(_: Self, _: S) -> Self
 
   func +<
-    S : SequenceType
+    S : Sequence
     where S.Iterator.Element == Iterator.Element
   >(_: S, _: Self) -> Self
 
@@ -75,7 +75,7 @@ public protocol RangeReplaceableCollection : Collection {
 
   /// Creates a collection instance that contains `elements`.
   init<
-    S : SequenceType where S.Iterator.Element == Iterator.Element
+    S : Sequence where S.Iterator.Element == Iterator.Element
   >(_ elements: S)
 
   /// Append `x` to `self`.
@@ -93,7 +93,7 @@ public protocol RangeReplaceableCollection : Collection {
   or SILGen
 
   func +=<
-    S : SequenceType
+    S : Sequence
     where S.Iterator.Element == Iterator.Element
   >(inout _: Self, _: S)
   */
@@ -102,7 +102,7 @@ public protocol RangeReplaceableCollection : Collection {
   ///
   /// - Complexity: O(*length of result*).
   mutating func appendContentsOf<
-    S : SequenceType
+    S : Sequence
     where
     S.Iterator.Element == Iterator.Element
   >(newElements: S)
@@ -182,7 +182,7 @@ public protocol RangeReplaceableCollection : Collection {
 
 extension RangeReplaceableCollection {
   public init<
-    S : SequenceType where S.Iterator.Element == Iterator.Element
+    S : Sequence where S.Iterator.Element == Iterator.Element
   >(_ elements: S) {
     self.init()
     appendContentsOf(elements)
@@ -193,7 +193,7 @@ extension RangeReplaceableCollection {
   }
 
   public mutating func appendContentsOf<
-    S : SequenceType where S.Iterator.Element == Iterator.Element
+    S : Sequence where S.Iterator.Element == Iterator.Element
   >(newElements: S) {
     for element in newElements {
       append(element)
@@ -341,7 +341,7 @@ extension RangeReplaceableCollection where Index : BidirectionalIndex {
 @warn_unused_result
 public func +<
     C : RangeReplaceableCollection,
-    S : SequenceType
+    S : Sequence
     where S.Iterator.Element == C.Iterator.Element
 >(lhs: C, rhs: S) -> C {
   var lhs = lhs
@@ -353,7 +353,7 @@ public func +<
 @warn_unused_result
 public func +<
   C : RangeReplaceableCollection,
-  S : SequenceType
+  S : Sequence
   where S.Iterator.Element == C.Iterator.Element
 >(lhs: S, rhs: C) -> C {
   var result = C()

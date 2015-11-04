@@ -27,7 +27,7 @@ func f<g : d {
 func f<T : BooleanType>(b: T) {
 }
 f(true as BooleanType)
-struct c<d: SequenceType, b where Optional<b> == d.Iterator.Element>
+struct c<d: Sequence, b where Optional<b> == d.Iterator.Element>
 var f = 1
 var e: Int -> Int = {
     return $0

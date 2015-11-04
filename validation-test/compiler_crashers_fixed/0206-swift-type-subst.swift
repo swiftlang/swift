@@ -27,7 +27,7 @@ func c<d {
         var _ = e
     }
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
     var b: d
 }
 func a<d>() -> [c<d>] -> Bool {
@@ -41,7 +41,7 @@ class b: a {
 (b() as a).dynamicType.c()
 b
 protocol c : b { func b
-func some<S: SequenceType, T where Optional<T> == S.Iterator.Element>(xs : S) -> T? {
+func some<S: Sequence, T where Optional<T> == S.Iterator.Element>(xs : S) -> T? {
     for (mx :       if let x = mx {
      d: f{  ceanTy b {
     clasi() {

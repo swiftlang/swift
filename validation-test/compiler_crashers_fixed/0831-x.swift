@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-func g<Q<j : SequenceType> : a {
+func g<Q<j : Sequence> : a {
 func c(a((T> T) -> (() {
 switch x }
 typealias F>() {

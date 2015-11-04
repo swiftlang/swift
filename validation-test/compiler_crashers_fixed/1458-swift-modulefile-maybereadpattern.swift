@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-print(array: SequenceType, Any)
+print(array: Sequence, Any)
 protocol P {
 }
 struct Q<T, Any) {

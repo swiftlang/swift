@@ -199,7 +199,7 @@ LazyTestSuite.test("MapSequence<Sequence>/underestimateCount") {
   expectEqual(42, lazyMap.underestimateCount())
 }
 
-struct SequenceWithCustomUnderestimateCount : SequenceType {
+struct SequenceWithCustomUnderestimateCount : Sequence {
   init(_ data: [Int]) {
     self._data = MinimalSequence(elements: data.map(OpaqueValue.init))
   }
@@ -360,7 +360,7 @@ extension ReverseRandomAccessIndex where Base : TestProtocol1 {
 
 var tests = TestSuite("NewLazy")
 
-tests.test("LazySequence/SequenceType") {
+tests.test("LazySequence/Sequence") {
   let expected = (0..<100).map(OpaqueValue.init)
   var actual = MinimalSequence(elements: expected).lazy
   
@@ -383,8 +383,8 @@ tests.test("LazySequence/SequenceType") {
 }
 
 func expectSequencePassthrough<
-  S : SequenceType,
-  Base : SequenceType
+  S : Sequence,
+  Base : Sequence
   where
   S : LazySequenceType, Base : LoggingType,
   Base.Iterator.Element == S.Iterator.Element
@@ -670,7 +670,7 @@ tests.test("ReverseCollection/Lazy") {
 // the first selects even numbers and the second selects odd numbers,
 // both from an underlying sequence of whole numbers.
 func checkFilterIteratorBase<
-  S : SequenceType, I : IteratorProtocol
+  S : Sequence, I : IteratorProtocol
   where
   S.Iterator == LazyFilterIterator<I>,
   I.Element == OpaqueValue<Int>

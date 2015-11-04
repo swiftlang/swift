@@ -12,7 +12,7 @@
 
 %{
 
-# We know we will eventually get a SequenceType.Element type.  Define
+# We know we will eventually get a Sequence.Element type.  Define
 # a shorthand that we can use today.
 GElement = "Iterator.Element"
 
@@ -209,7 +209,7 @@ sortIsUnstableForComparable = """\
 
 }%
 
-% for Self in [ 'SequenceType', 'MutableCollection' ]:
+% for Self in [ 'Sequence', 'MutableCollection' ]:
 
 extension ${Self} where Self.Iterator.Element : Comparable {
 ${sortDocCommentForComparable}

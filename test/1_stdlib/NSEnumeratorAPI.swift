@@ -8,7 +8,7 @@ import Foundation
 
 var NSEnumeratorAPI = TestSuite("NSEnumeratorAPI")
 
-NSEnumeratorAPI.test("SequenceType") {
+NSEnumeratorAPI.test("Sequence") {
   let result = NSDictionary().keyEnumerator()
   expectSequenceType(result)
 }

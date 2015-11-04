@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 struct g{
-let:SequenceType
+let:Sequence
 struct c<T where I:P{
 class A
 {

@@ -20,7 +20,7 @@ internal enum _JoinIteratorState {
 /// An iterator that presents the elements of the sequences traversed
 /// by `Base`, concatenated using a given separator.
 public struct JoinIterator<
-  Base : IteratorProtocol where Base.Element : SequenceType
+  Base : IteratorProtocol where Base.Element : Sequence
 > : IteratorProtocol {
 
   /// Creates an iterator that presents the elements of the sequences
@@ -28,7 +28,7 @@ public struct JoinIterator<
   ///
   /// - Complexity: O(`separator.count`).
   public init<
-    Separator : SequenceType
+    Separator : Sequence
     where
     Separator.Iterator.Element == Base.Element.Iterator.Element
   >(base: Base, separator: Separator) {
@@ -97,15 +97,15 @@ public struct JoinIterator<
 /// A sequence that presents the elements of the `Base` sequences
 /// concatenated using a given separator.
 public struct JoinSequence<
-  Base : SequenceType where Base.Iterator.Element : SequenceType
-> : SequenceType {
+  Base : Sequence where Base.Iterator.Element : Sequence
+> : Sequence {
 
   /// Creates a sequence that presents the elements of `base` sequences
   /// concatenated using `separator`.
   ///
   /// - Complexity: O(`separator.count`).
   public init<
-    Separator : SequenceType
+    Separator : Sequence
     where
     Separator.Iterator.Element == Base.Iterator.Element.Iterator.Element
   >(base: Base, separator: Separator) {
@@ -163,7 +163,7 @@ public struct JoinSequence<
     ContiguousArray<Base.Iterator.Element.Iterator.Element>
 }
 
-extension SequenceType where Iterator.Element : SequenceType {
+extension Sequence where Iterator.Element : Sequence {
   /// Returns a view, whose elements are the result of interposing a given
   /// `separator` between the elements of the sequence `self`.
   ///
@@ -172,7 +172,7 @@ extension SequenceType where Iterator.Element : SequenceType {
   /// yields `[1, 2, 3, -1, -2, 4, 5, 6, -1, -2, 7, 8, 9]`.
   @warn_unused_result
   public func joinWithSeparator<
-    Separator : SequenceType
+    Separator : Sequence
     where
     Separator.Iterator.Element == Iterator.Element.Iterator.Element
   >(separator: Separator) -> JoinSequence<Self> {

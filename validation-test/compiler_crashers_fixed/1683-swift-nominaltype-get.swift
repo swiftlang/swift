@@ -6,7 +6,7 @@
 
 class A<A<T : b() -> Any) {
 struct c : B
-struct B<d where f: SequenceType, Any) -> U {
+struct B<d where f: Sequence, Any) -> U {
 print((()
 let n1: ()!))->, end)
 enum a(t

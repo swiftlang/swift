@@ -23,7 +23,7 @@ GInt.static_foo(GChar())
 GInt.static_bar(0)
 
 // <rdar://problem/12895793>
-struct AnyStream<T : SequenceType> {
+struct AnyStream<T : Sequence> {
   struct StreamRange<S : IteratorProtocol> { // expected-error{{generic type 'StreamRange' nested in type 'AnyStream' is not allowed}}
     var index : Int
     var elements : S
@@ -48,6 +48,6 @@ struct AnyStream<T : SequenceType> {
   }
 }
 
-func enumerate<T : SequenceType>(arg: T) -> AnyStream<T> {
+func enumerate<T : Sequence>(arg: T) -> AnyStream<T> {
   return AnyStream<T>(input: arg)
 }

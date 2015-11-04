@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-class A : SequenceType> (Any) -> Any in
+class A : Sequence> (Any) -> Any in
 var d {
 protocol a {
 protocol a {

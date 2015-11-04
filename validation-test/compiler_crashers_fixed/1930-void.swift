@@ -7,7 +7,7 @@
 import Foundation
 enum A {
 }
-func b: SequenceType> (a!() { self.init()
+func b: Sequence> (a!() { self.init()
 return NSData(AnyObject, x }
 class A {
 return """cd""")) {

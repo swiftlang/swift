@@ -11,7 +11,7 @@ class A.advance() {
 }
 }
 func f{ func c: (i<h where k: B
-func a<T : SequenceType> Any) {a():c: d<T)
+func a<T : Sequence> Any) {a():c: d<T)
 class f.j : C> {
 return { c: Int {
 typealias h }

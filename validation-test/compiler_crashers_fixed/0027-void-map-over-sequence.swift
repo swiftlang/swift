@@ -5,7 +5,7 @@
 
 class a<T : Hashable> {
   var b = [T : Bool]()
-  init<S : SequenceType where S.Iterator.Element == T>(_ c: S) {
+  init<S : Sequence where S.Iterator.Element == T>(_ c: S) {
     c.map { self.b[$0] = true }
   }
 }

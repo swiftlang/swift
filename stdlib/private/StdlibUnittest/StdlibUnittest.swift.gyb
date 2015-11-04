@@ -269,9 +269,9 @@ public func expectType<T>(_: T.Type, inout _ x: T) {}
 public func expectEqualType<T>(_: T.Type, _: T.Type) {}
 
 public func expectSequenceType<
-  X : SequenceType
+  X : Sequence
   where
-  X.SubSequence : SequenceType,
+  X.SubSequence : Sequence,
   X.SubSequence.Iterator.Element == X.Iterator.Element,
   X.SubSequence.SubSequence == X.SubSequence
 >(x: X) -> X { return x }
@@ -305,7 +305,7 @@ public func expectMutableSliceType<
 public func expectCollectionAssociatedTypes<
   X : Collection,
   Iterator : IteratorProtocol,
-  SubSequence : SequenceType,
+  SubSequence : Sequence,
   Index : ForwardIndex
   where
   X.Index == Index
@@ -1906,7 +1906,7 @@ public func checkIterator<
 }
 
 public func checkSequence<
-  ${genericParam}, S : SequenceType
+  ${genericParam}, S : Sequence
   where
   S.Iterator.Element == ${Element}
 >(
@@ -1943,7 +1943,7 @@ public func checkSequence<
 }
 
 public func checkSequence<
-  ${genericParam}, S : SequenceType
+  ${genericParam}, S : Sequence
   where
   S.Iterator.Element == ${Element},
   S.Iterator.Element : Equatable
@@ -1975,7 +1975,7 @@ public func check${traversal}Collection<
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (${Element}, ${Element}) -> Bool
 ) {
-  // A `Collection` is a multi-pass `SequenceType`.
+  // A `Collection` is a multi-pass `Sequence`.
   for _ in 0..<3 {
     checkSequence(
       expected, collection, ${trace},
@@ -2269,8 +2269,8 @@ public func checkRangeReplaceable<
 }
 
 public func expectEqualSequence<
-  Expected: SequenceType,
-  Actual: SequenceType
+  Expected: Sequence,
+  Actual: Sequence
   where
   Expected.Iterator.Element == Actual.Iterator.Element,
   Expected.Iterator.Element : Equatable
@@ -2279,8 +2279,8 @@ public func expectEqualSequence<
 }
 
 public func expectEqualSequence<
-  Expected : SequenceType,
-  Actual : SequenceType,
+  Expected : Sequence,
+  Actual : Sequence,
   T : Equatable,
   U : Equatable
   where
@@ -2295,8 +2295,8 @@ public func expectEqualSequence<
 }
 
 public func expectEqualSequence<
-  Expected: SequenceType,
-  Actual: SequenceType
+  Expected: Sequence,
+  Actual: Sequence
   where
   Expected.Iterator.Element == Actual.Iterator.Element
 >(expected: Expected, _ actual: Actual, ${TRACE},
@@ -2310,8 +2310,8 @@ public func expectEqualSequence<
 }
 
 public func expectEqualsUnordered<
-  Expected : SequenceType,
-  Actual : SequenceType
+  Expected : Sequence,
+  Actual : Sequence
   where
   Expected.Iterator.Element == Actual.Iterator.Element
 >(
@@ -2328,8 +2328,8 @@ public func expectEqualsUnordered<
 }
 
 public func expectEqualsUnordered<
-  Expected : SequenceType,
-  Actual : SequenceType
+  Expected : Sequence,
+  Actual : Sequence
   where
   Expected.Iterator.Element == Actual.Iterator.Element,
   Expected.Iterator.Element : Comparable
@@ -2373,8 +2373,8 @@ func < <T>(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
 }
 
 public func expectEqualsUnordered<
-    Expected : SequenceType,
-    Actual : SequenceType,
+    Expected : Sequence,
+    Actual : Sequence,
     T : Comparable
     where
     Expected.Iterator.Element == Actual.Iterator.Element,
@@ -2503,7 +2503,7 @@ internal class _MinimalIteratorSharedState<T> {
 ///
 /// This iterator will return `nil` only once.
 public struct MinimalIterator<T> : IteratorProtocol {
-  public init<S : SequenceType where S.Iterator.Element == T>(_ s: S) {
+  public init<S : Sequence where S.Iterator.Element == T>(_ s: S) {
     self._sharedState = _MinimalIteratorSharedState(Array(s))
   }
 
@@ -2562,14 +2562,14 @@ public enum UnderestimateCountBehavior {
   case Value(Int)
 }
 
-public protocol StrictSequenceType : SequenceType {
+public protocol StrictSequenceType : Sequence {
   typealias Element
   init(base: MinimalSequence<Element>)
   var base: MinimalSequence<Element> { get }
 }
 
 extension StrictSequenceType {
-  public init<S : SequenceType where S.Iterator.Element == Element>(
+  public init<S : Sequence where S.Iterator.Element == Element>(
     elements: S,
     underestimatedCount: UnderestimateCountBehavior = .Value(0)
   ) {
@@ -2588,12 +2588,12 @@ extension StrictSequenceType where Iterator : _MinimalIteratorProtocol {
   }
 }
 
-/// A SequenceType that implements the protocol contract in the most
+/// A Sequence that implements the protocol contract in the most
 /// narrow way possible.
 ///
 /// This sequence is consumed when its iterator is advanced.
-public struct MinimalSequence<T> : SequenceType, CustomDebugStringConvertible {
-  public init<S : SequenceType where S.Iterator.Element == T>(
+public struct MinimalSequence<T> : Sequence, CustomDebugStringConvertible {
+  public init<S : Sequence where S.Iterator.Element == T>(
     elements: S,
     underestimatedCount: UnderestimateCountBehavior = .Value(0)
   ) {
@@ -3318,7 +3318,7 @@ public protocol ${Protocol} : ${'MutableCollection' if mutable else 'Collection'
 }
 
 extension ${Protocol} {
-  public init<S : SequenceType where S.Iterator.Element == Element>(
+  public init<S : Sequence where S.Iterator.Element == Element>(
     elements: S,
     underestimatedCount: UnderestimateCountBehavior = .Value(0)
   ) {
@@ -3362,7 +3362,7 @@ extension ${Protocol} where Index : _MinimalIndexType {
 
 /// A minimal implementation of `Collection` with extra checks.
 public struct ${Self}<T> : ${'MutableCollection' if mutable else 'Collection'} {
-  public init<S : SequenceType where S.Iterator.Element == T>(
+  public init<S : Sequence where S.Iterator.Element == T>(
     elements: S,
     underestimatedCount: UnderestimateCountBehavior = .Value(0)
   ) {
@@ -3492,7 +3492,7 @@ extension ${Protocol} where Index : _MinimalIndexType {
 public struct ${Self}<T> : RangeReplaceableCollection {
   /// Creates a collection with given contents, but a unique modification
   /// history.  No other instance has the same modification history.
-  public init<S : SequenceType where S.Iterator.Element == T>(
+  public init<S : Sequence where S.Iterator.Element == T>(
     elements: S,
     underestimatedCount: UnderestimateCountBehavior = .Value(0)
   ) {
@@ -3523,7 +3523,7 @@ public struct ${Self}<T> : RangeReplaceableCollection {
   }
 
   public init<
-    S : SequenceType where S.Iterator.Element == T
+    S : Sequence where S.Iterator.Element == T
   >(_ elements: S) {
     self.underestimatedCount = 0
     self.elements = Array(elements)
@@ -3578,7 +3578,7 @@ public struct ${Self}<T> : RangeReplaceableCollection {
   }
 
   public mutating func appendContentsOf<
-    S : SequenceType where S.Iterator.Element == T
+    S : Sequence where S.Iterator.Element == T
   >(newElements: S) {
     let oldCount = count
     elements.appendContentsOf(newElements)
@@ -3792,7 +3792,7 @@ public func < (
 }
 
 /// A Sequence that uses as many default implementations as
-/// `SequenceType` can provide.
+/// `Sequence` can provide.
 public struct DefaultedSequence<Element> : StrictSequenceType {
   public let base: MinimalSequence<Element>
 

@@ -11,7 +11,7 @@ i j i() {
 protocol f {
 }
 protocol d : f {
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
 }
 func a<d>() -> [c<d>] {
 }

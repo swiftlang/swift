@@ -1,8 +1,8 @@
 // -*- swift -*-
 // RUN: rm -rf %t ; mkdir -p %t
-// RUN: %S/../../utils/gyb %s -o %t/SequenceType.swift -D test_path="%S"
-// RUN: %S/../../utils/line-directive %t/SequenceType.swift -- %target-build-swift %t/SequenceType.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/SequenceType.swift -- %target-run %t/a.out
+// RUN: %S/../../utils/gyb %s -o %t/Sequence.swift -D test_path="%S"
+// RUN: %S/../../utils/line-directive %t/Sequence.swift -- %target-build-swift %t/Sequence.swift -o %t/a.out
+// RUN: %S/../../utils/line-directive %t/Sequence.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
 % import gyb
@@ -15,7 +15,7 @@ import SwiftPrivate
 // implementation in 'InstrumentedP' that does some bookeeping for
 // testing (like counting calls to the operation) and then dispatches
 // to the same operation on its 'base' member.  InstrumentedSequence
-// already contains implementations of all the SequenceType
+// already contains implementations of all the Sequence
 // requirements.
 
 var _nonCustomizableOperation = TypeIndexed(0)
@@ -34,11 +34,11 @@ extension LoggingSequence {
 }
 
 // Add a non-customizable operation to sequence
-extension SequenceType {
+extension Sequence {
   func nonCustomizableOperation() {}
 }
 
-var SequenceTypeTests = TestSuite("SequenceType")
+var SequenceTypeTests = TestSuite("Sequence")
 
 //===----------------------------------------------------------------------===//
 
@@ -191,7 +191,7 @@ SequenceTypeTests.test("IteratorSequence/IteratorProtocol") {
   }
 }
 
-SequenceTypeTests.test("IteratorSequence/SequenceType/empty") {
+SequenceTypeTests.test("IteratorSequence/Sequence/empty") {
   if true {
     let data = [ 10, 20, 30 ].map(OpaqueValue.init)
     let base = MinimalIterator(data)
@@ -212,7 +212,7 @@ SequenceTypeTests.test("IteratorSequence/SequenceType/empty") {
   }
 }
 
-SequenceTypeTests.test("IteratorSequence/SequenceType") {
+SequenceTypeTests.test("IteratorSequence/Sequence") {
   if true {
     let data = [ 10, 20, 30 ].map(OpaqueValue.init)
     let base = MinimalIterator(data)
@@ -559,7 +559,7 @@ func callStaticContains(
 }
 
 func callGenericContains<
-  S : SequenceType where S.Iterator.Element : Equatable
+  S : Sequence where S.Iterator.Element : Equatable
 >(sequence: S, _ element: S.Iterator.Element) -> Bool {
   return sequence.contains(element)
 }
@@ -642,7 +642,7 @@ SequenceTypeTests.test("reduce") {
 // reverse()
 //===----------------------------------------------------------------------===//
 
-SequenceTypeTests.test("reverse/SequenceType") {
+SequenceTypeTests.test("reverse/Sequence") {
   for test in reverseTests {
     let s = MinimalSequence<OpaqueValue<Int>>(
       elements: test.sequence.map(OpaqueValue.init))
@@ -698,13 +698,13 @@ SequenceTypeTests.test("reverse/WhereIndexIsRandomAccess,RandomAccessReverseView
 // filter()
 //===----------------------------------------------------------------------===//
 
-SequenceTypeTests.test("filter/SequenceType/Dispatch") {
+SequenceTypeTests.test("filter/Sequence/Dispatch") {
   let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
   _ = tester.filter { _ in false }
   expectCustomizable(tester, tester.log.filter)
 }
 
-SequenceTypeTests.test("filter/SequenceType/Semantics") {
+SequenceTypeTests.test("filter/Sequence/Semantics") {
   for test in filterTests {
     for underestimateCountBehavior in [
       UnderestimateCountBehavior.Precise,
@@ -748,7 +748,7 @@ var MinimalSequenceWithCustomMap_timesMapWasCalled: Int = 0
 
 % for Implementation in [ 'Default', 'Custom' ]:
 
-struct MinimalSequenceWith${Implementation}Map<Element> : SequenceType {
+struct MinimalSequenceWith${Implementation}Map<Element> : Sequence {
   init(_ data: [Element], underestimatedCount: UnderestimateCountBehavior) {
     self._data = MinimalSequence(
       elements: data, underestimatedCount: underestimatedCount)
@@ -802,7 +802,7 @@ func callStaticSequenceMap<T>(
   return result
 }
 
-func callGenericSequenceMap<S : SequenceType, T>(
+func callGenericSequenceMap<S : Sequence, T>(
   sequence: S,
   @noescape transform: (S.Iterator.Element) -> T
 ) -> [T] {
@@ -816,7 +816,7 @@ func callGenericSequenceMap<S : SequenceType, T>(
 %   for dispatch in [ 'Static', 'Generic' ]:
 
 SequenceTypeTests.test(
-  "map/SequenceType/${Implementation}Implementation/${dispatch}"
+  "map/Sequence/${Implementation}Implementation/${dispatch}"
 ) {
   for test in mapTests {
     for underestimateCountBehavior in [
@@ -862,7 +862,7 @@ SequenceTypeTests.test(
 // flatMap()
 //===----------------------------------------------------------------------===//
 
-SequenceTypeTests.test("flatMap/SequenceType") {
+SequenceTypeTests.test("flatMap/Sequence") {
   for test in flatMapTests {
     for underestimateCountBehavior in [
       UnderestimateCountBehavior.Precise,
@@ -900,7 +900,7 @@ SequenceTypeTests.test("flatMap/SequenceType") {
 % LazyFlatMapTest = gyb.executeTemplate(TLazyFlatMapTest, Test='SequenceTypeTests', Kinds=['Sequence'])
 ${LazyFlatMapTest}
 
-SequenceTypeTests.test("flatMap/SequenceType/TransformProducesOptional") {
+SequenceTypeTests.test("flatMap/Sequence/TransformProducesOptional") {
   for test in flatMapToOptionalTests {
     for underestimateCountBehavior in [
       UnderestimateCountBehavior.Precise,
@@ -988,7 +988,7 @@ SequenceTypeTests.test("suffix/dispatch") {
 // split()
 //===----------------------------------------------------------------------===//
 
-SequenceTypeTests.test("SequenceType/split/dispatch") {
+SequenceTypeTests.test("Sequence/split/dispatch") {
   var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
   tester.split { $0.value == 1 }
   expectCustomizable(tester, tester.log.split)
@@ -1032,7 +1032,7 @@ SequenceTypeTests.test("zip") {
       Zip2Sequence<MinimalSequence<OpaqueValue<Int>>, MinimalSequence<OpaqueValue<Int32>>>.self,
       &result)
 
-    // Check for expected result and check the Zip2Sequence's SequenceType
+    // Check for expected result and check the Zip2Sequence's Sequence
     // conformance.
     checkSequence(
       test.expected.map { (OpaqueValue($0), OpaqueValue($1)) }, result,
@@ -1054,7 +1054,7 @@ SequenceTypeTests.test("zip") {
 // underestimateCount()
 //===----------------------------------------------------------------------===//
 
-struct SequenceWithDefaultUnderestimateCount : SequenceType {
+struct SequenceWithDefaultUnderestimateCount : Sequence {
   init() {}
 
   func iterator() -> MinimalSequence<OpaqueValue<Int>>.Iterator {
@@ -1065,12 +1065,12 @@ struct SequenceWithDefaultUnderestimateCount : SequenceType {
   }
 }
 
-SequenceTypeTests.test("underestimateCount/SequenceType/DefaultImplementation") {
+SequenceTypeTests.test("underestimateCount/Sequence/DefaultImplementation") {
   let s = SequenceWithDefaultUnderestimateCount()
   expectEqual(0, callGenericUnderestimatedCount(s))
 }
 
-struct SequenceWithCustomUnderestimateCount : SequenceType {
+struct SequenceWithCustomUnderestimateCount : Sequence {
   init(underestimatedCount: Int) {
     self._underestimatedCount = underestimatedCount
   }
@@ -1089,7 +1089,7 @@ struct SequenceWithCustomUnderestimateCount : SequenceType {
   let _underestimatedCount: Int
 }
 
-SequenceTypeTests.test("underestimateCount/SequenceType/CustomImplementation") {
+SequenceTypeTests.test("underestimateCount/Sequence/CustomImplementation") {
   if true {
     let s = SequenceWithCustomUnderestimateCount(underestimatedCount: 5)
     expectEqual(5, callGenericUnderestimatedCount(s))

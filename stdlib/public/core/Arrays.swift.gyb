@@ -497,7 +497,7 @@ extension ${Self} : _ArrayType {
 
   /// Construct from an arbitrary sequence with elements of type `Element`.
   public init<
-    S: SequenceType where S.Iterator.Element == _Buffer.Element
+    S: Sequence where S.Iterator.Element == _Buffer.Element
   >(_ s: S) {
     self = ${Self}(_Buffer(s._copyToNativeArrayBuffer(),
       shiftedToStartIndex: 0))
@@ -685,7 +685,7 @@ extension ${Self} : _ArrayType {
   ///
   /// - Complexity: O(*length of result*).
   public mutating func appendContentsOf<
-    S : SequenceType
+    S : Sequence
     where
     S.Iterator.Element == Element
   >(newElements: S) {
@@ -978,7 +978,7 @@ extension ${Self} {
 
 /// Extend `lhs` with the elements of `rhs`.
 public func += <
-  Element, S : SequenceType
+  Element, S : Sequence
   where
   S.Iterator.Element == Element
 >(inout lhs: ${Self}<Element>, rhs: S) {
@@ -1209,7 +1209,7 @@ func _extractOrCopyToNativeArrayBuffer<
 /// Append items from `newItems` to `buffer`.
 internal func _arrayAppendSequence<
   Buffer : _ArrayBufferType,
-  S : SequenceType
+  S : Sequence
   where
   S.Iterator.Element == Buffer.Element,
   Buffer.Index == Int

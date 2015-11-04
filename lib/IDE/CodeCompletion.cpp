@@ -4244,7 +4244,7 @@ public:
          if (auto SEQ = FES->getSequence()) {
            if (SM.rangeContains(SEQ->getSourceRange(),
                                 ParsedExpr->getSourceRange())) {
-             Callback(Context.getSequenceTypeDecl()->getDeclaredInterfaceType());
+             Callback(Context.getSequenceDecl()->getDeclaredInterfaceType());
            }
          }
          break;

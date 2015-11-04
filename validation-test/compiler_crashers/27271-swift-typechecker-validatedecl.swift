@@ -56,7 +56,7 @@ var _=B{func a:{
 class A
 struct c
 class A{
-"" \(a{enum S<c<T where H:SequenceType
+"" \(a{enum S<c<T where H:Sequence
 class B<T=k
 a {
 class d=k
@@ -104,7 +104,7 @@ class A : A {
 }
 }}
 class b{
-class d:SequenceType
+class d:Sequence
 }func b{}protocol P{
 class d=c
 }
@@ -125,7 +125,7 @@ var a
 struct d=c{struct B{
 class C{
 f:Collection
-class A{struct B<T where H:SequenceType
+class A{struct B<T where H:Sequence
 var a:a{
 class a{
 func x(a<T : b:a= []

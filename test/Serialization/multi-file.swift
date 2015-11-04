@@ -31,7 +31,7 @@ func bar() {
 
 
 // <rdar://problem/17251682>
-struct StructWithInheritedConformances: SequenceType {
+struct StructWithInheritedConformances: Sequence {
   struct EmptyIterator : IteratorProtocol {
     mutating func next() -> Int? {
       return nil

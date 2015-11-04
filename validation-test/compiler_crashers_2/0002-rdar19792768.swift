@@ -3,8 +3,8 @@
 // rdar://problem/19792768
 
 public func foo<
-  Expected : SequenceType,
-  Actual : SequenceType,
+  Expected : Sequence,
+  Actual : Sequence,
   T : Comparable
   where
   Expected.Iterator.Element == Actual.Iterator.Element,

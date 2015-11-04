@@ -7,7 +7,7 @@
 }(n: a {
 class C) {
 let v: T>Bool) {
-return self.g : SequenceType, AnyObject) {
+return self.g : Sequence, AnyObject) {
 }
 }
 return z(n: Int>

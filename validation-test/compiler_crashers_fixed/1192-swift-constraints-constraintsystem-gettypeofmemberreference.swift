@@ -8,7 +8,7 @@ class Foo<T>: NSObject {
 init(foo: T) {
 (b: Int = 0) {
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
 struct e : d {
 }
 }

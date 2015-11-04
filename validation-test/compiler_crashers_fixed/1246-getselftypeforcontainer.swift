@@ -14,7 +14,7 @@ var e: Int -> Int = {
 }
 let d: Int =  { c, b in
 }(f, e)
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
 var b:  [c<d>] {
 return []
 }

@@ -12,7 +12,7 @@ self..h: m {
 }
 class func f(t) -> () {
 class A {
-func b: d h = c: SequenceType where f)] {
+func b: d h = c: Sequence where f)] {
 }
 func f> {
 return ").a: BooleanType)

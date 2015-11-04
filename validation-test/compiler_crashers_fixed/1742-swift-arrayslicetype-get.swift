@@ -6,7 +6,7 @@
 
 protocol a {
 protocol b : b {
-func b(.Element>: SequenceType where h>(i> S {
+func b(.Element>: Sequence where h>(i> S {
 return ")
 }
 }(n: Range([0] == b: Int -> {

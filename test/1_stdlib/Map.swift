@@ -55,10 +55,10 @@ print(">")
 //===--- Avoid creating gratuitously self-destructive sequences ----------===//
 
 // In a naive implementation, mapping over a non-self-destructive
-// SequenceType having a reference-semantics IteratorProtocol produces a
+// Sequence having a reference-semantics IteratorProtocol produces a
 // self-destructive mapped view.  This is technically correct because
 // Sequences are allowed to be self-destructive, and theoretically
-// every multi-pass SequenceType would be a Collection, but Sequences are
+// every multi-pass Sequence would be a Collection, but Sequences are
 // much easier to build than Collections and it would be extremely
 // surprising for users if their mappings were not stable.
 
@@ -77,8 +77,8 @@ class Counter : IteratorProtocol {
   var end: Int
 }
 
-// A SequenceType with value semantics
-struct IntRange : SequenceType {
+// A Sequence with value semantics
+struct IntRange : Sequence {
   func iterator() -> Counter {
     return Counter(start, end)
   }

@@ -7,7 +7,7 @@
 func b<T -> {
 struct c {
 func f(h, b {
-var f : C(2, Any, "\(n: SequenceType, object2: A: T, U) -> d.substringWithRange(b() -> e(T>)
+var f : C(2, Any, "\(n: Sequence, object2: A: T, U) -> d.substringWithRange(b() -> e(T>)
 return b, f, c<Q<B == a(() {
 }
 typealias e = "")

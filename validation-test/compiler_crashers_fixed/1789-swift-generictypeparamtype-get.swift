@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-enum S<h: SequenceType where A>?
+enum S<h: Sequence where A>?
 func compose<T: d {
 case .<T -> String {
 }

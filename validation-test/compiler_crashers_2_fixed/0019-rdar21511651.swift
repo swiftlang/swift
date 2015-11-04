@@ -1,13 +1,13 @@
 // RUN: not %target-swift-frontend %s -parse
 
 internal protocol _SequenceWrapperType {
-  typealias Base : SequenceType
+  typealias Base : Sequence
   typealias Iterator : IteratorProtocol = Base.Iterator
   
   var _base: Base {get}
 }
 
-extension SequenceType
+extension Sequence
   where Self : _SequenceWrapperType, Self.Iterator == Self.Base.Iterator {
   public func iterator() -> Base.Iterator {
     return self._base.iterator()
@@ -77,13 +77,13 @@ extension Collection
 }
 
 //===--- New stuff --------------------------------------------------------===//
-public protocol _prext_LazySequenceType : SequenceType {
-  /// A SequenceType that can contain the same elements as this one,
+public protocol _prext_LazySequenceType : Sequence {
+  /// A Sequence that can contain the same elements as this one,
   /// possibly with a simpler type.
   ///
   /// This associated type is used to keep the result type of
   /// `lazy(x).operation` from growing a `_prext_LazySequence` layer.
-  typealias Elements: SequenceType = Self
+  typealias Elements: Sequence = Self
 
   /// A sequence containing the same elements as this one, possibly with
   /// a simpler type.
@@ -98,7 +98,7 @@ public protocol _prext_LazySequenceType : SequenceType {
   var elements: Elements {get} 
   
   /// An Array, created on-demand, containing the elements of this
-  /// lazy SequenceType.
+  /// lazy Sequence.
   ///
   /// Note: this property need not be implemented by conforming types, it has a
   /// default implementation in a protocol extension.
@@ -107,7 +107,7 @@ public protocol _prext_LazySequenceType : SequenceType {
 
 extension _prext_LazySequenceType {
   /// an Array, created on-demand, containing the elements of this
-  /// lazy SequenceType.
+  /// lazy Sequence.
   public var array: [Iterator.Element] {
     return Array(self)
   }
@@ -123,16 +123,16 @@ extension _prext_LazySequenceType where Self : _SequenceWrapperType {
 
 /// A sequence that forwards its implementation to an underlying
 /// sequence instance while exposing lazy computations as methods.
-public struct _prext_LazySequence<Base_ : SequenceType> : _SequenceWrapperType {
+public struct _prext_LazySequence<Base_ : Sequence> : _SequenceWrapperType {
   var _base: Base_
 }
 
 /// Augment `s` with lazy methods such as `map`, `filter`, etc.
-public func _prext_lazy<S : SequenceType>(s: S) -> _prext_LazySequence<S> {
+public func _prext_lazy<S : Sequence>(s: S) -> _prext_LazySequence<S> {
   return _prext_LazySequence(_base: s)
 }
 
-public extension SequenceType
+public extension Sequence
   where Self.Iterator == Self, Self : IteratorProtocol {
   public func iterator() -> Self {
     return self
@@ -200,7 +200,7 @@ public func _prext_lazy<Base: Collection>(s: Base) -> _prext_LazyCollection<Base
 /// `IteratorProtocol` through a transform function returning `T`.
 public struct _prext_MapIterator<
   Base: IteratorProtocol, T
-> : IteratorProtocol, SequenceType {
+> : IteratorProtocol, Sequence {
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
@@ -221,11 +221,11 @@ public struct _prext_MapIterator<
 
 //===--- Sequences --------------------------------------------------------===//
 
-/// A `SequenceType` whose elements consist of those in a `Base`
-/// `SequenceType` passed through a transform function returning `T`.
+/// A `Sequence` whose elements consist of those in a `Base`
+/// `Sequence` passed through a transform function returning `T`.
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
-public struct _prext_MapSequence<Base : SequenceType, T>
+public struct _prext_MapSequence<Base : Sequence, T>
   : _prext_LazySequenceType, _SequenceWrapperType {
 
   typealias Elements = _prext_MapSequence

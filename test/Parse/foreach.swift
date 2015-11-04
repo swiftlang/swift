@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-struct IntRange<Int> : SequenceType, IteratorProtocol {
+struct IntRange<Int> : Sequence, IteratorProtocol {
   typealias Element = (Int, Int)
   func next() -> (Int, Int)? {}
 

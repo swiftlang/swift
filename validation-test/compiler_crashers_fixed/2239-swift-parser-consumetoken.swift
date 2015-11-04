@@ -21,7 +21,7 @@ clas
 }
 }
 }
-func k) -> T>(m>: SequenceType, q
+func k) -> T>(m>: Sequence, q
 class C((i: g = T, b : e(("
 }
 }

@@ -103,7 +103,7 @@ public struct LoggingRangeReplaceableCollection<
   }
 
   public init<
-    S : SequenceType where S.Iterator.Element == Iterator.Element
+    S : Sequence where S.Iterator.Element == Iterator.Element
   >(_ elements: S) {
     self.base = Base(elements)
     ++Log.initWithSequence[selfType]
@@ -152,7 +152,7 @@ public struct LoggingRangeReplaceableCollection<
   }
 
   public mutating func appendContentsOf<
-    S : SequenceType where S.Iterator.Element == Base.Iterator.Element
+    S : Sequence where S.Iterator.Element == Base.Iterator.Element
   >(newElements: S) {
     ++Log.appendContentsOf[selfType]
     base.appendContentsOf(newElements)
@@ -263,7 +263,7 @@ public class RandomAccessIndexLog : BidirectionalIndexLog {
 }
 
 public class SequenceLog {
-  public static func dispatchTester<S: SequenceType>(
+  public static func dispatchTester<S: Sequence>(
     s: S
   ) -> LoggingSequence<LoggingSequence<S>> {
     return LoggingSequence(LoggingSequence(s))
@@ -365,8 +365,8 @@ public func ==<Base>(lhs: Logging${Kind}<Base>, rhs: Logging${Kind}<Base>)
 }
 % end
 
-% for (Kind, Suffix) in [('Sequence', 'Type'), ('Collection', ''), ('MutableCollection', '')]:
-public struct Logging${Kind}<Base: ${Kind}${Suffix}> : ${Kind}${Suffix}, LoggingType {
+% for Kind in ['Sequence', 'Collection', 'MutableCollection']:
+public struct Logging${Kind}<Base: ${Kind}> : ${Kind}, LoggingType {
 
   public typealias Log = ${Kind}Log
 

@@ -102,7 +102,7 @@ class A<T where T : String {
 func f: a {
 typealias b = b: d {
 }
-class B : SequenceType> ()
+class B : Sequence> ()
 }
 }
 }

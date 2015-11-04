@@ -27,7 +27,7 @@ public var f = d>(n: T> {
 }
 S() -> () -> {
 protocol C = {
-class func c<S : SequenceType, k : T : A<Y> (true }
+class func c<S : Sequence, k : T : A<Y> (true }
 }
 self.h : C {
 import Foundation

@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 enum B {
-class B : SequenceType where T)
+class B : Sequence where T)
 class a {
 protocol C {
 }

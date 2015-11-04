@@ -19,7 +19,7 @@ class b<i : b> i: g{ func c {}
 e g {
  : g {
 h func i() ->  }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
     var b: d
 }
 func a<d>() -> [c<d>] {
@@ -152,9 +152,9 @@ class q<k>: c a(b: Int = 0) {
 }
 let c = a
 c()
-func d<b: SequenceType, e where Optional<e> == b.Iterator.Element>(c : b) -> e? {
+func d<b: Sequence, e where Optional<e> == b.Iterator.Element>(c : b) -> e? {
     for (mx : e?) in c {
-struct c<d: SequenceType, b where Optional<b> == d.Iterator.Element>
+struct c<d: Sequence, b where Optional<b> == d.Iterator.Element>
 enum S<T> {
     case C(T, () -> ())
 }
@@ -197,7 +197,7 @@ class g {
 func g(f: Int = k) {
 }
 let i = g
-struct l<e : SequenceType> {
+struct l<e : Sequence> {
     l g: e
 }
 func h<e>() -> [l<e>] {

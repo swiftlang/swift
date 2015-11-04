@@ -6,7 +6,7 @@
 
 protocol b : a {
 return self.B {
-var b> Any) -> T, y: SequenceType where T> Bool {
+var b> Any) -> T, y: Sequence where T> Bool {
 }
 }
 var a: a {

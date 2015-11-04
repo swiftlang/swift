@@ -7,7 +7,7 @@
 
 i<c])
 }
-func g<T : Range<h: SequenceType, AnyObject) {
+func g<T : Range<h: Sequence, AnyObject) {
 typealias B {
 }
 ("](self.d : A, i<T) {

@@ -4,5 +4,5 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-class a<H : a = a: SequenceType where A: AnyObject> : b {
+class a<H : a = a: Sequence where A: AnyObject> : b {
 func b([B, e =

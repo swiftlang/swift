@@ -402,7 +402,7 @@ func AO_curryThunk<T>(ao: AO<T>) -> (AO<T> -> Int -> ()/*, Int -> ()*/) {
 // correctly if we are asked to.
 // ----------------------------------------------------------------------------
 
-// CHECK-LABEL: sil [transparent] [thunk] @_TTWV15guaranteed_self9FakeArrayS_12SequenceTypeS_FS1_17_constrainElement{{.*}} : $@convention(witness_method) (@in FakeElement, @in_guaranteed FakeArray) -> () {
+// CHECK-LABEL: sil [transparent] [thunk] @_TTWV15guaranteed_self9FakeArrayS_8SequenceS_FS1_17_constrainElement{{.*}} : $@convention(witness_method) (@in FakeElement, @in_guaranteed FakeArray) -> () {
 // CHECK: bb0([[ARG0_PTR:%.*]] : $*FakeElement, [[ARG1_PTR:%.*]] : $*FakeArray):
 // CHECK: [[GUARANTEED_COPY_STACK_SLOT:%.*]] = alloc_stack $FakeArray
 // CHECK: copy_addr [[ARG1_PTR]] to [initialization] [[GUARANTEED_COPY_STACK_SLOT]]#1
@@ -440,12 +440,12 @@ extension SequenceDefaultsType {
   public final func _constrainElement(_: FakeGenerator.Element) {}
 }
 
-public protocol SequenceType : SequenceDefaultsType {
+public protocol Sequence : SequenceDefaultsType {
   func _constrainElement(_: Element)
 }
 
 
-extension FakeArray : SequenceType {
+extension FakeArray : Sequence {
   public typealias Element = FakeElement
   public typealias Generator = FakeGenerator
 

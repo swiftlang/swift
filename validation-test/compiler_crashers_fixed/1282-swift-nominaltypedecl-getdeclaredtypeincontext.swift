@@ -80,7 +80,7 @@ struct B : A {
 }
 struct C<D, E: A where D.C == E> {
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
 var b: d
 }
 func a<d>() -> [c<d>] {

@@ -20,7 +20,7 @@
 /// A iterator that never produces an element.
 ///
 /// - SeeAlso: `EmptyCollection<Element>`.
-public struct EmptyIterator<Element> : IteratorProtocol, SequenceType {
+public struct EmptyIterator<Element> : IteratorProtocol, Sequence {
   /// Construct an instance.
   public init() {}
 

@@ -179,7 +179,7 @@ func testCount() {
 }
 testCount()
 
-struct SequenceOnly<T : SequenceType> : SequenceType {
+struct SequenceOnly<T : Sequence> : Sequence {
   var base: T
   func iterator() -> T.Iterator { return base.iterator() }
 }
@@ -191,9 +191,9 @@ func testUnderestimateCount() {
   print("random access: \(array.underestimateCount())")
   // CHECK-NEXT: bidirectional: 5
   print("bidirectional: \(dict.underestimateCount())")
-  // CHECK-NEXT: SequenceType only: 0
+  // CHECK-NEXT: Sequence only: 0
   let s = SequenceOnly(base: array)
-  print("SequenceType only: \(s.underestimateCount())")
+  print("Sequence only: \(s.underestimateCount())")
 }
 testUnderestimateCount()
 

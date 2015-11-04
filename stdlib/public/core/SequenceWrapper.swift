@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  To create a SequenceType or Collection that forwards
-//  requirements to an underlying SequenceType or Collection,
+//  To create a Sequence or Collection that forwards
+//  requirements to an underlying Sequence or Collection,
 //  have it conform to one of these protocols.
 //
 //===----------------------------------------------------------------------===//
@@ -19,13 +19,13 @@
 /// A type that is just a wrapper over some base Sequence
 public // @testable
 protocol _SequenceWrapperType {
-  typealias Base : SequenceType
+  typealias Base : Sequence
   typealias Iterator : IteratorProtocol = Base.Iterator
   
   var _base: Base {get}
 }
 
-extension SequenceType
+extension Sequence
   where
   Self : _SequenceWrapperType,
   Self.Iterator == Self.Base.Iterator {

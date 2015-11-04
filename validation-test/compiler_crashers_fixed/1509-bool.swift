@@ -10,7 +10,7 @@ var b {
 case .d<T>, U, (c == {
 return self.h == e? = {
 }
-for c : SequenceType where f: C {
+for c : Sequence where f: C {
 func b: Int
 }
 }

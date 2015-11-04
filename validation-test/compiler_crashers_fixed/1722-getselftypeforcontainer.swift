@@ -15,7 +15,7 @@ func g(a
 class A? = D> {
 }
 protocol a {
-print(g<b: C = b: A, f(start: SequenceType> {
+print(g<b: C = b: A, f(start: Sequence> {
 }()")
 func b> T)
 typealias f : b[T, A

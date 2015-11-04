@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 protocol A {
-let g : SequenceType> (p
+let g : Sequence> (p
 struct e = f("
 typealias e : e = j> String {
 return ")

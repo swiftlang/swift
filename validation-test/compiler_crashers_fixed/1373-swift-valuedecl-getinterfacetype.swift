@@ -11,7 +11,7 @@ var d = c
 let c(n: d {
 override init(a(self)] == a")
 func i> : a: k.C) -> {
-public class A<H : SequenceType where T>() {
+public class A<H : Sequence where T>() {
 }
 }
 protocol A {

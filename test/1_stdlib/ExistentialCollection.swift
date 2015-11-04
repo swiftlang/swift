@@ -118,7 +118,7 @@ struct InstrumentedIndex<I : RandomAccessIndex> : RandomAccessIndex {
   }
 }
 
-tests.test("AnySequence.init(SequenceType)") {
+tests.test("AnySequence.init(Sequence)") {
   if true {
     let base = MinimalSequence<OpaqueValue<Int>>(elements: [])
     var s = AnySequence(base)

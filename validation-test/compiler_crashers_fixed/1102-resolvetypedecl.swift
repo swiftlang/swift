@@ -7,7 +7,7 @@
 
 func c<e>() -> (e -> e) -> e {
 e, e -> e) ->)func d(f: b) -> <e>(() -> e) -> b {
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
 var b:  [c<d>] {
 }
 protocol a {

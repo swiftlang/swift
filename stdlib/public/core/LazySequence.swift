@@ -34,7 +34,7 @@
 /// `LazySequenceType`s.  For example, given an eager `scan`
 /// method defined as follows
 ///
-///     extension SequenceType {
+///     extension Sequence {
 ///       /// Returns an array containing the results of
 ///       ///
 ///       ///   p.reduce(initial, combine: combine)
@@ -73,7 +73,7 @@
 ///       private let combine: (ResultElement, Base.Element)->ResultElement
 ///     }
 ///     
-///     struct LazyScanSequence<Base: SequenceType, ResultElement>
+///     struct LazyScanSequence<Base: Sequence, ResultElement>
 ///       : LazySequenceType // Chained operations on self are lazy, too
 ///     {
 ///       func iterator() -> LazyScanIterator<Base.Iterator, ResultElement> {
@@ -116,7 +116,7 @@
 ///   as the accumulation of `result` below are never unexpectedly
 ///   dropped or deferred:
 ///
-///       extension SequenceType where Iterator.Element == Int {
+///       extension Sequence where Iterator.Element == Int {
 ///         func sum() -> Int {
 ///           var result = 0
 ///           _ = self.map { result += $0 }
@@ -127,12 +127,12 @@
 ///   [We don't recommend that you use `map` this way, because it
 ///   creates and discards an array. `sum` would be better implemented
 ///   using `reduce`].
-public protocol LazySequenceType : SequenceType {
-  /// A `SequenceType` that can contain the same elements as this one,
+public protocol LazySequenceType : Sequence {
+  /// A `Sequence` that can contain the same elements as this one,
   /// possibly with a simpler type.
   ///
   /// - See also: `elements`
-  typealias Elements: SequenceType = Self
+  typealias Elements: Sequence = Self
 
   /// A sequence containing the same elements as this one, possibly with
   /// a simpler type.
@@ -161,7 +161,7 @@ extension LazySequenceType where Elements == Self {
 /// implemented lazily.
 ///
 /// - See also: `LazySequenceType`
-public struct LazySequence<Base : SequenceType>
+public struct LazySequence<Base : Sequence>
   : LazySequenceType, _SequenceWrapperType {
 
   /// Creates a sequence that has the same elements as `base`, but on
@@ -177,7 +177,7 @@ public struct LazySequence<Base : SequenceType>
   public var elements: Base { return _base }
 }
 
-extension SequenceType {
+extension Sequence {
   /// A sequence containing the same elements as a `Base` sequence,
   /// but on which some operations such as `map` and `filter` are
   /// implemented lazily.

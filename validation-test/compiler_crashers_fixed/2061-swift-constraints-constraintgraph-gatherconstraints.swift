@@ -12,7 +12,7 @@ func c() {
 }
 }
 }
-enum B : SequenceType, b where B {
+enum B : Sequence, b where B {
 }
 func b(seq: T, Bool) {
 protocol a {

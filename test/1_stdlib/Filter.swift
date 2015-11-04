@@ -42,7 +42,7 @@ extension LazyFilterCollection where Base : TestProtocol1 {
 // CHECK: testing...
 print("testing...")
 
-func printlnByGenerating<S: SequenceType>(s: S) {
+func printlnByGenerating<S: Sequence>(s: S) {
   print("<", terminator: "")
   var prefix = ""
   for x in s {

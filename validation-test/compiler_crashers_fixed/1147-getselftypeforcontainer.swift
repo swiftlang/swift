@@ -31,6 +31,6 @@ protocol c : b { func b
 protocol a {
 ss b<h : c, i : c where }
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
 }
 func a<d>() -> [c<d>] {

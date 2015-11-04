@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-class B : SequenceType, y: e = h>(f() {
+class B : Sequence, y: e = h>(f() {
 typealias e = d.h>: A")
 private class a(()?
 class c)

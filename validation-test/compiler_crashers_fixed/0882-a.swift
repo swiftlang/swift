@@ -8,7 +8,7 @@ class B : BooleanType, i : T
 protocol P {
 func c: (B) -> d() {
 protocol P {
-typealias h: SequenceType where I) {
+typealias h: Sequence where I) {
 }
 }
 }

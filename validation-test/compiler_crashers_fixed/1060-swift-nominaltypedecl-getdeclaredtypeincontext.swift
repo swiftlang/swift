@@ -34,7 +34,7 @@ struct B : A {
 }
 struct C<D, E: A where D.C == E> {
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
 var b: d
 }
 func a<d>() -> [c<d>] {
@@ -73,7 +73,7 @@ typealias F = Int
 func g<T where T.E == F>(f: B<T>) {
 }
 }
-func some<S: SequenceType, T where Optional<T> == S.Iterator.Element>(xs : S) -> T? {
+func some<S: Sequence, T where Optional<T> == S.Iterator.Element>(xs : S) -> T? {
 for (mx : T?) in xs {
 if let x = mx {
 return x

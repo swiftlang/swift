@@ -8,7 +8,7 @@ class n<t>: j {
     init(h: t) {
         u. j {
 }
-struct c<j : SequenceType> {
+struct c<j : Sequence> {
     var b:  [c<j>] {
     k []
 }

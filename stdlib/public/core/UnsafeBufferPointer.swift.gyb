@@ -13,7 +13,7 @@
 /// A iterator for the elements in the buffer referenced by
 /// `UnsafeBufferPointer` or `UnsafeMutableBufferPointer`.
 public struct UnsafeBufferPointerIterator<Element>
-  : IteratorProtocol, SequenceType {
+  : IteratorProtocol, Sequence {
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.

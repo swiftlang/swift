@@ -9,7 +9,7 @@ import Swift
 
 public struct mmEnumerateGenerator<
   Base: GeneratorType
-> : GeneratorType, SequenceType {
+> : GeneratorType, Sequence {
   public typealias Element = (index: Int, element: Base.Element)
   var base: Base
   var count: Int
@@ -21,19 +21,19 @@ public struct mmEnumerateGenerator<
 }
 
 public struct mmEnumerateSequence<
-  Base: SequenceType
-> : SequenceType {
+  Base: Sequence
+> : Sequence {
   var base: Base
   public init(_ base: Base)
   public func iterator() -> mmEnumerateGenerator<Base.Generator>
 }
 
-// CHECK: sil_witness_table <Base where Base : SequenceType, Base.Generator : GeneratorType> mmEnumerateSequence<Base>: _Sequence_Type module WitnessTableWithGP {
-// CHECK:  base_protocol _SequenceType: <Base where Base : SequenceType, Base.Generator : GeneratorType> mmEnumerateSequence<Base>: _SequenceType module WitnessTableWithGP
+// CHECK: sil_witness_table <Base where Base : Sequence, Base.Generator : GeneratorType> mmEnumerateSequence<Base>: _Sequence_Type module WitnessTableWithGP {
+// CHECK:  base_protocol _SequenceType: <Base where Base : Sequence, Base.Generator : GeneratorType> mmEnumerateSequence<Base>: _SequenceType module WitnessTableWithGP
 // CHECK:  associated_type Generator: mmEnumerateGenerator<Base.Generator>
 // CHECK:  associated_type_protocol (Generator: GeneratorType): mmEnumerateGenerator<Base.Generator>: specialize <Base = Base.Generator, Base.Element = Base.Generator.Element> (<Base where Base : GeneratorType> mmEnumerateGenerator<Base>: GeneratorType module WitnessTableWithGP)
-sil_witness_table <Base : SequenceType> mmEnumerateSequence<Base>: _Sequence_Type module WitnessTableWithGP {
-  base_protocol _SequenceType: <Base : SequenceType> mmEnumerateSequence<Base>: _SequenceType module WitnessTableWithGP
+sil_witness_table <Base : Sequence> mmEnumerateSequence<Base>: _Sequence_Type module WitnessTableWithGP {
+  base_protocol _SequenceType: <Base : Sequence> mmEnumerateSequence<Base>: _SequenceType module WitnessTableWithGP
   associated_type Generator: mmEnumerateGenerator<Base.Generator>
   associated_type_protocol (Generator: GeneratorType): mmEnumerateGenerator<Base.Generator>: specialize <Base = Base.Generator, Base.Element = Base.Generator.Element> (<Base : GeneratorType> mmEnumerateGenerator<Base>: GeneratorType module WitnessTableWithGP)
 }

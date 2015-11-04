@@ -138,8 +138,8 @@ public struct StrideToIterator<Element : Strideable> : IteratorProtocol {
   }
 }
 
-/// A `SequenceType` of values formed by striding over a half-open interval.
-public struct StrideTo<Element : Strideable> : SequenceType {
+/// A `Sequence` of values formed by striding over a half-open interval.
+public struct StrideTo<Element : Strideable> : Sequence {
   // FIXME: should really be a Collection, as it is multipass
 
   /// Return an *iterator* over the elements of this *sequence*.
@@ -152,7 +152,7 @@ public struct StrideTo<Element : Strideable> : SequenceType {
   init(start: Element, end: Element, stride: Element.Stride) {
     _precondition(stride != 0, "stride size must not be zero")
     // Unreachable endpoints are allowed; they just make for an
-    // already-empty SequenceType.
+    // already-empty Sequence.
     self.start = start
     self.end = end
     self.stride = stride
@@ -199,8 +199,8 @@ public struct StrideThroughIterator<Element : Strideable> : IteratorProtocol {
   }
 }
 
-/// A `SequenceType` of values formed by striding over a closed interval.
-public struct StrideThrough<Element : Strideable> : SequenceType {
+/// A `Sequence` of values formed by striding over a closed interval.
+public struct StrideThrough<Element : Strideable> : Sequence {
   // FIXME: should really be a Collection, as it is multipass
 
   /// Return an *iterator* over the elements of this *sequence*.

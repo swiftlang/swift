@@ -11,7 +11,7 @@ struct d<f : e, g: e where g.h == f.h> {
 protocol e {
     typealias h
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
     var b: d
 }
 func a<d>() -> [c<d>] {
@@ -60,7 +60,7 @@ var e: Int -> Int = {
 }
 let d: Int =  { c, b in
 }(f, e)
-func d<b: SequenceType, e where Optional<e> == b.Iterator.Element>(c : b) -> e? {
+func d<b: Sequence, e where Optional<e> == b.Iterator.Element>(c : b) -> e? {
     for (mx : e?) in c {
     }
 }

@@ -26,7 +26,7 @@ protocol c where T> : String {
 print())
 typealias e where T> {
 }
-t: (start: (p: SequenceType> a {
+t: (start: (p: Sequence> a {
 }
 public class a = 0
 }

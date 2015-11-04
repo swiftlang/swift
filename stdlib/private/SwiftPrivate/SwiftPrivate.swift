@@ -20,7 +20,7 @@ public func asHex<T : IntegerType>(x: T) -> String {
 /// Convert the given sequence of numeric values to a string representing
 /// their hexadecimal values.
 public func asHex<
-  S: SequenceType
+  S: Sequence
 where
   S.Iterator.Element : IntegerType
 >(x: S) -> String {
@@ -29,7 +29,7 @@ where
 
 /// Compute the prefix sum of `seq`.
 public func scan<
-  S : SequenceType, U
+  S : Sequence, U
 >(seq: S, _ initial: U, _ combine: (U, S.Iterator.Element) -> U) -> [U] {
   var result: [U] = []
   result.reserveCapacity(seq.underestimateCount())
@@ -55,7 +55,7 @@ public func randomShuffle<T>(a: [T]) -> [T] {
 
 public func gather<
   C : Collection,
-  IndicesSequence : SequenceType
+  IndicesSequence : Sequence
   where
   IndicesSequence.Iterator.Element == C.Index
 >(

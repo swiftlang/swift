@@ -45,7 +45,7 @@ extension Q_SequenceDefaultsType {
 
 /// A type that can be iterated with a `for`\ ...\ `in` loop.
 ///
-/// `SequenceType` makes no requirement on conforming types regarding
+/// `Sequence` makes no requirement on conforming types regarding
 /// whether they will be destructively "consumed" by iteration.  To
 /// ensure non-destructive iteration, constrain your *sequence* to
 /// `Collection`.

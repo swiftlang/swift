@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 class B<g{
-func a{let C{{enum B<T where g:SequenceType
+func a{let C{{enum B<T where g:Sequence
 {struct S
 func c
 func c<a

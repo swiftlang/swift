@@ -11,6 +11,6 @@ var b : U) -> {
 typealias f = [self.endIndex - range.d(f<(B, range.init()] = b> ()""")
 var f: P {
 }
-let n1: SequenceType> {
+let n1: Sequence> {
 func a<d("A, Any, Any, range: Array<T>(start, end: String
 typealias A

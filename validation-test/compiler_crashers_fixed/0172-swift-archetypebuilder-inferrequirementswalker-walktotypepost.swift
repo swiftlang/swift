@@ -127,7 +127,7 @@ class C: B, A {
 func e<T where T: A, T: B>(t: T) {
     t.c()
 }
-struct c<d: SequenceType, b where Optional<b> == d.Iterator.Element>
+struct c<d: Sequence, b where Optional<b> == d.Iterator.Element>
 func f<e>() -> (e, e -> e) -> e {
     e b e.c = {}
     {
@@ -143,7 +143,7 @@ func f<e>() -> (e, e -> e) -> e {
         class func c
     }
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
     var b: d
 }
 func a<d>() -> [c<d>] {
@@ -295,7 +295,7 @@ class k<f>: NSObject {
 d
 protocol i : d { func d
 i
-struct l<e : SequenceType> {
+struct l<e : Sequence> {
     l g: e
 }
 func h<e>() -> [l<e>] {

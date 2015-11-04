@@ -6,7 +6,7 @@
 
 let t: C {
 class A {
-class d: SequenceType> {
+class d: Sequence> {
 return NSData("a()
 protocol A : d {
 typealias d<T>>

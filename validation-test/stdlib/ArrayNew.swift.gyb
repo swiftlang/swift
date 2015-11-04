@@ -91,7 +91,7 @@ extension ${array_type} where Element : TestProtocol1 {
 }
 
 /// Returns an ${array_type} that does not share its buffer with other arrays.
-func getFresh${array_type}<S : SequenceType>(sequence: S)
+func getFresh${array_type}<S : Sequence>(sequence: S)
   -> ${array_type}<S.Iterator.Element> {
   var result: ${array_type}<S.Iterator.Element> = []
   result.reserveCapacity(sequence.underestimateCount())
@@ -117,7 +117,7 @@ func == (lhs: EnumWithoutPayloads, rhs: EnumWithoutPayloads) -> Bool {
   }
 }
 
-struct SequenceWithCustomUnderestimateCount : SequenceType {
+struct SequenceWithCustomUnderestimateCount : Sequence {
   init(_ data: [Int]) {
     self._data = MinimalSequence(elements: data.map(OpaqueValue.init))
   }
@@ -138,7 +138,7 @@ struct SequenceWithCustomUnderestimateCount : SequenceType {
 
 % for array_type in all_array_types:
 
-ArrayTestSuite.test("${array_type}/init(SequenceType)") {
+ArrayTestSuite.test("${array_type}/init(Sequence)") {
   let base = SequenceWithCustomUnderestimateCount(
     [ 0, 30, 10, 90 ])
 

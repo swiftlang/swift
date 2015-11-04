@@ -2,7 +2,7 @@
 // REQUIRES: executable_test
 
 // Extend a protocol with a property.
-extension SequenceType {
+extension Sequence {
   final var myCount: Int {
     var result = 0
     for _ in self {
@@ -56,7 +56,7 @@ extension Collection where Self.Iterator.Element : Equatable {
 // CHECK: 3
 print(["a", "b", "c", "d", "e"].myIndexOf("d")!)
 
-extension SequenceType {
+extension Sequence {
   final public func myEnumerate() -> EnumeratedSequence<Self> {
     return self.enumerated
   }
@@ -69,7 +69,7 @@ for (index, element) in ["a", "b", "c"].myEnumerate() {
   print("(\(index), \(element))")
 }
 
-extension SequenceType {
+extension Sequence {
   final public func myReduce<T>(
     initial: T, @noescape combine: (T, Self.Iterator.Element) -> T
   ) -> T { 
@@ -85,8 +85,8 @@ extension SequenceType {
 print([1, 2, 3, 4, 5].myReduce(0, combine: +))
 
 
-extension SequenceType {
-  final public func myZip<S : SequenceType>(s: S) -> Zip2Sequence<Self, S> {
+extension Sequence {
+  final public func myZip<S : Sequence>(s: S) -> Zip2Sequence<Self, S> {
     return Zip2Sequence(self, s)
   }
 }
@@ -118,7 +118,7 @@ for i in evenOdd.myIndices {
 print("")
 
 extension RangeReplaceableCollection {
-  public final func myJoin<S : SequenceType where S.Iterator.Element == Self>(
+  public final func myJoin<S : Sequence where S.Iterator.Element == Self>(
     elements: S
   ) -> Self {
     var result = Self()

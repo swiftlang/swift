@@ -6,7 +6,7 @@
 // Test case found by fuzzing
 
 let a {
-protocol e : SequenceType where T, x = a<T: e<C(bytes: A> T.advance(A.Iterator.a: NSObject {
+protocol e : Sequence where T, x = a<T: e<C(bytes: A> T.advance(A.Iterator.a: NSObject {
 func a: (A) -> S(b(x: a"\(m: (() -> ((f.Iterator.substringWithRange(seq
 protocol a {
 enum A {

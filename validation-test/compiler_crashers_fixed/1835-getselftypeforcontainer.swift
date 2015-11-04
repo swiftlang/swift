@@ -26,7 +26,7 @@ protocol b {
 extension NSSet {
 }
 typealias f : b<Y> {
-func f: SequenceType where h>, self.c: A, AnyObject, "))
+func f: Sequence where h>, self.c: A, AnyObject, "))
 func b: a {
 }
 }

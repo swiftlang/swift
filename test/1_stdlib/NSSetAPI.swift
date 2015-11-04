@@ -8,7 +8,7 @@ import Foundation
 
 var NSSetAPI = TestSuite("NSSetAPI")
 
-NSSetAPI.test("SequenceType") {
+NSSetAPI.test("Sequence") {
   let result = NSSet()
   expectSequenceType(result)
 }
@@ -41,7 +41,7 @@ NSSetAPI.test("CustomStringConvertible") {
 
 var NSOrderedSetAPI = TestSuite("NSOrderedSetAPI")
 
-NSOrderedSetAPI.test("SequenceType") {
+NSOrderedSetAPI.test("Sequence") {
   let result = NSOrderedSet()
   expectSequenceType(result)
 }
@@ -72,7 +72,7 @@ NSSetAPI.test("copy construction") {
 
 var NSIndexSetAPI = TestSuite("NSIndexSetAPI")
 
-NSIndexSetAPI.test("SequenceType") {
+NSIndexSetAPI.test("Sequence") {
   let result = NSIndexSet()
   expectSequenceType(result)
   let s = NSIndexSet(indexesInRange: NSMakeRange(1, 1))

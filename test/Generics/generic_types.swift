@@ -138,7 +138,7 @@ d1["hello"] = d2["world"]
 i = d2["blarg"]
 
 struct RangeOfPrintables<
-  R : SequenceType
+  R : Sequence
   where
   R.Iterator.Element : MyFormattedPrintable
 > {
@@ -154,7 +154,7 @@ struct RangeOfPrintables<
 }
 
 struct Y {}
-struct SequenceY : SequenceType, IteratorProtocol {
+struct SequenceY : Sequence, IteratorProtocol {
   typealias Iterator = SequenceY
   typealias Element = Y
 
@@ -163,7 +163,7 @@ struct SequenceY : SequenceType, IteratorProtocol {
 }
 
 func useRangeOfPrintables(roi : RangeOfPrintables<[Int]>) {
-  var rop : RangeOfPrintables<X> // expected-error{{type 'X' does not conform to protocol 'SequenceType'}}
+  var rop : RangeOfPrintables<X> // expected-error{{type 'X' does not conform to protocol 'Sequence'}}
   var rox : RangeOfPrintables<SequenceY> // expected-error{{type 'Element' (aka 'Y') does not conform to protocol 'MyFormattedPrintable'}}
 }
 

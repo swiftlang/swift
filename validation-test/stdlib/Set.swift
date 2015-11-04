@@ -2629,7 +2629,7 @@ SetTestSuite.test("SetBridgeFromObjectiveCConditional") {
 
 // Public API
 
-SetTestSuite.test("init(SequenceType:)") {
+SetTestSuite.test("init(Sequence:)") {
   let s1 = Set([1010, 2020, 3030])
   var s2 = Set<Int>()
   s2.insert(1010)

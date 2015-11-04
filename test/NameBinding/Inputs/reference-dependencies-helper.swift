@@ -22,7 +22,7 @@ struct OtherFileSecretTypeWrapper {
   }
 }
 
-struct OtherFileIntArray : SequenceType {
+struct OtherFileIntArray : Sequence {
   var array: [Int] = []
   func iterator() -> Array<Int>.Iterator { return array.iterator() }
 }

@@ -17,7 +17,7 @@ extension A {
 }
 protocol b : c {
 typealias B, T, U) -> (Any)
-let n1: SequenceType where T>(i> {
+let n1: Sequence where T>(i> {
 return ")
 self.a<T>(c) -> {
 convenience init<T) -> : Any, Any, T! {

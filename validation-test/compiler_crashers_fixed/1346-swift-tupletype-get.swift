@@ -24,7 +24,7 @@ convenience init(() {
 let f = Swift.b(")
 }
 func f: a {
-struct X.C(g: SequenceType> U>()
+struct X.C(g: Sequence> U>()
 var b(v: b: ExtensibleCollectionType>() -> {
 var a(n: B? = ""foobar"a<I : Any, Any) -> ([0x31] in
 }

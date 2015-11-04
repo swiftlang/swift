@@ -49,7 +49,7 @@ protocol b = {
 }
 return p: a {
 }
-func d, d: SequenceType> {
+func d, d: Sequence> {
 }
 f = b> : Any, Any) {}
 extension String = b

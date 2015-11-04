@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A iterator that produces one or fewer instances of `Element`.
-public struct IteratorOfOne<Element> : IteratorProtocol, SequenceType {
+public struct IteratorOfOne<Element> : IteratorProtocol, Sequence {
   /// Construct an instance that generates `element!`, or an empty
   /// sequence if `element == nil`.
   public init(_ element: Element?) {

@@ -47,7 +47,7 @@ public class _AnyIteratorBase {}
 ///
 /// See also:
 ///
-///     struct AnySequence<S: SequenceType>
+///     struct AnySequence<S: Sequence>
 ///     func anyIterator<G: GeneratorType>(base: G) -> AnyIterator<G.Element>
 ///     func anyIterator<T>(nextImplementation: ()->T?) -> AnyIterator<T>
 public class AnyIterator<T> : _AnyIteratorBase, GeneratorType {
@@ -68,9 +68,9 @@ public class AnyIterator<T> : _AnyIteratorBase, GeneratorType {
   public func next() -> T? {_abstract()}
 }
 
-/// Every `GeneratorType` can also be a `SequenceType`.  Note that
+/// Every `GeneratorType` can also be a `Sequence`.  Note that
 /// traversing the sequence consumes the generator.
-extension AnyIterator : SequenceType {
+extension AnyIterator : Sequence {
   /// Returns `self`.
   public func iterator() -> AnyIterator { return self }
 }
@@ -150,7 +150,7 @@ internal class _AnyCollectionBoxBase : _AnySequenceBox {
 }
 
 // FIXME: can't make this a protocol due to <rdar://20209031>
-internal class _SequenceBox<S: SequenceType>
+internal class _SequenceBox<S: Sequence>
   : _AnySequenceBox {
   typealias Element = S.Generator.Element
 
@@ -212,14 +212,14 @@ internal class _CollectionBox<S: Collection>
 ///
 /// Forwards operations to an arbitrary underlying sequence having the
 /// same `Element` type, hiding the specifics of the underlying
-/// `SequenceType`.
+/// `Sequence`.
 ///
 /// See also: `AnyIterator<T>`.
-public struct AnySequence<T> : SequenceType {
+public struct AnySequence<T> : Sequence {
   typealias Element = T
 
   /// Wrap and forward operations to to `base`
-  public init<S: SequenceType where S.Generator.Element == T>(_ base: S) {
+  public init<S: Sequence where S.Generator.Element == T>(_ base: S) {
     _box = _SequenceBox(base)
   }
 

@@ -7,7 +7,7 @@
 extension NSSet {
 class B : P {
 protocol P {
-func> : SequenceType, y: p : a {
+func> : Sequence, y: p : a {
 }
 }
 }

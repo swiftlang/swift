@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 func compose() {
-let v: SequenceType, (#object1, k : a {
+let v: Sequence, (#object1, k : a {
 class C<T>() {
 }
 }

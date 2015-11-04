@@ -841,7 +841,7 @@ ERROR(expected_var_decl_for_stmt,stmt_parsing,PointsToFirstBadToken,
 ERROR(expected_foreach_in,stmt_parsing,none,
       "expected 'in' after for-each pattern", ())
 ERROR(expected_foreach_container,stmt_parsing,none,
-      "expected SequenceType expression for for-each loop", ())
+      "expected Sequence expression for for-each loop", ())
 ERROR(expected_foreach_lbrace,stmt_parsing,none,
       "expected '{' to start the body of for-each loop", ())
 ERROR(expected_foreach_where_expr,stmt_parsing,PointsToFirstBadToken,

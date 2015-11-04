@@ -61,7 +61,7 @@ var i : Int, f : Float
 var p = pair(i, f)
 
 // Conformance constraints on static variables.
-func f1<S1 : SequenceType>(s1: S1) {}
+func f1<S1 : Sequence>(s1: S1) {}
 var x : Array<Int> = [1]
 f1(x)
 
@@ -155,7 +155,7 @@ class MyArrayBuffer<Element>: r22409190ManagedBuffer<UInt, Element> {
 
 // <rdar://problem/22459135> error: 'print' is unavailable: Please wrap your tuple argument in parentheses: 'print((...))'
 func r22459135() {
-  func h<S : SequenceType where S.Iterator.Element : IntegerType>
+  func h<S : Sequence where S.Iterator.Element : IntegerType>
     (sequence: S) -> S.Iterator.Element {
     return 0
   }

@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-S(h: SequenceType, x in c == b() {
+S(h: Sequence, x in c == b() {
 typealias B.A<D> [")
 func g<B == c<T : Any) {
 protocol d {

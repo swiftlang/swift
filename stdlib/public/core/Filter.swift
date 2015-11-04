@@ -17,7 +17,7 @@
 /// and `LazyFilterCollection`.
 public struct LazyFilterIterator<
   Base : IteratorProtocol
-> : IteratorProtocol, SequenceType {
+> : IteratorProtocol, Sequence {
   /// Advances to the next element and returns it, or `nil` if no next
   /// element exists.
   ///
@@ -59,7 +59,7 @@ public struct LazyFilterIterator<
 ///
 /// - Note: `s.lazy.filter { ... }`, for an arbitrary sequence `s`,
 ///   is a `LazyFilterSequence`.
-public struct LazyFilterSequence<Base : SequenceType>
+public struct LazyFilterSequence<Base : Sequence>
   : LazySequenceType {
   
   /// Return an *iterator* over the elements of this *sequence*.

@@ -8,10 +8,10 @@ public protocol Indexable {
   subscript(_i: Index) -> _Element {get}
 }
 
-protocol Collection : Indexable, SequenceType {}
+protocol Collection : Indexable, Sequence {}
 
 public struct CollectionDefaultIterator<Elements : Indexable>
-  : IteratorProtocol, SequenceType {
+  : IteratorProtocol, Sequence {
   
   public func iterator() -> CollectionDefaultIterator {
     return self
@@ -22,7 +22,7 @@ public struct CollectionDefaultIterator<Elements : Indexable>
   }
 }
 
-extension SequenceType where Self : Collection {
+extension Sequence where Self : Collection {
   func iterator() -> CollectionDefaultIterator<Self> {
     return CollectionDefaultIterator(self)
   }

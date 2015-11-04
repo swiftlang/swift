@@ -72,7 +72,7 @@ public protocol MutableIndexable {
 
 /// The iterator used for collections that don't specify one.
 public struct CollectionDefaultIterator<Elements : Indexable>
- : IteratorProtocol, SequenceType {
+ : IteratorProtocol, Sequence {
 
   /// Create a *iterator* over the given collection.
   public init(_ elements: Elements) {
@@ -107,11 +107,11 @@ public struct CollectionDefaultIterator<Elements : Indexable>
 ///     for i in startIndex..<endIndex {
 ///       let x = self[i]
 ///     }
-public protocol Collection : Indexable, SequenceType {
+public protocol Collection : Indexable, Sequence {
   /// A type that provides the *sequence*'s iteration interface and
   /// encapsulates its iteration state.
   ///
-  /// By default, a `Collection` satisfies `SequenceType` by
+  /// By default, a `Collection` satisfies `Sequence` by
   /// supplying a `CollectionDefaultIterator` as its associated `Iterator`
   /// type.
   typealias Iterator : IteratorProtocol = CollectionDefaultIterator<Self>
@@ -125,14 +125,14 @@ public protocol Collection : Indexable, SequenceType {
   // (<rdar://problem/20715009> Implement recursive protocol
   // constraints)
   
-  /// A `SequenceType` that can represent a contiguous subrange of `self`'s
+  /// A `Sequence` that can represent a contiguous subrange of `self`'s
   /// elements.
   ///
   /// - Note: This associated type appears as a requirement in
-  ///   `SequenceType`, but is restated here with stricter
+  ///   `Sequence`, but is restated here with stricter
   ///   constraints: in a `Collection`, the `SubSequence` should
   ///   also be a `Collection`.
-  typealias SubSequence: Indexable, SequenceType = Slice<Self>
+  typealias SubSequence: Indexable, Sequence = Slice<Self>
 
   /// Returns the element at the given `position`.
   subscript(position: Index) -> Iterator.Element {get}
@@ -263,7 +263,7 @@ extension Collection {
     return startIndex.distanceTo(endIndex)
   }
 
-  /// Customization point for `SequenceType.indexOf()`.
+  /// Customization point for `Sequence.indexOf()`.
   ///
   /// Define this method if the collection can find an element in less than
   /// O(N) by exploiting collection-specific knowledge.
@@ -563,7 +563,7 @@ extension Collection
   }
 }
 
-extension SequenceType
+extension Sequence
   where Self : _ArrayType, Self.Element == Self.Iterator.Element {
   // A fast implementation for when you are backed by a contiguous array.
   public func _initializeTo(ptr: UnsafeMutablePointer<Iterator.Element>)
@@ -704,10 +704,10 @@ internal func _writeBackMutableSlice<
 /// its `Index` type to present the collection's elements in a
 /// permuted order.
 public struct PermutationGenerator<
-  C: Collection, Indices: SequenceType
+  C: Collection, Indices: Sequence
   where
   C.Index == Indices.Iterator.Element
-> : IteratorProtocol, SequenceType {
+> : IteratorProtocol, Sequence {
   var seq : C
   var indices : Indices.Iterator
 

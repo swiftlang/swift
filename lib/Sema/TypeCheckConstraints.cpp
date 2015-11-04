@@ -1576,7 +1576,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       // The expression type must conform to the Sequence.
       auto &tc = cs.getTypeChecker();
       ProtocolDecl *sequenceProto
-        = tc.getProtocol(Stmt->getForLoc(), KnownProtocolKind::SequenceType);
+        = tc.getProtocol(Stmt->getForLoc(), KnownProtocolKind::Sequence);
       if (!sequenceProto) {
         return true;
       }

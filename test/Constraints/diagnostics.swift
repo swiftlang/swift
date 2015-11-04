@@ -593,7 +593,7 @@ func r22470302(c: r22470302Class) {
 // <rdar://problem/21928143> QoI: Pointfree reference to generic initializer in generic context does not compile
 extension String {
   @available(*, unavailable, message="calling this is unwise")
-  func unavail<T : SequenceType where T.Iterator.Element == String> // expected-note {{'unavail' has been explicitly marked unavailable here}}
+  func unavail<T : Sequence where T.Iterator.Element == String> // expected-note {{'unavail' has been explicitly marked unavailable here}}
     (a : T) -> String {}
 }
 extension Array {

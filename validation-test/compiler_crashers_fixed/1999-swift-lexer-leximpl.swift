@@ -15,5 +15,5 @@ case .B == g: X.f = ["])
 }
 class b: b() {
 if true }
-protocol B : SequenceType, b {
+protocol B : Sequence, b {
 func b<T>

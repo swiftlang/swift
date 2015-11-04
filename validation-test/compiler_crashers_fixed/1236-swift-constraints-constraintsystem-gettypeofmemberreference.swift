@@ -17,7 +17,7 @@ class d: f{  class func i {}
 func a(b: Int = 0) {
 }
 let c = a
-func some<S: SequenceType, T where Optional<T> == S.Iterator.Element>(xs : S) -> T? {
+func some<S: Sequence, T where Optional<T> == S.Iterator.Element>(xs : S) -> T? {
 for (mx : T?) in xs {
 if let x = mx {
 }
@@ -113,7 +113,7 @@ protocol b {
 struct c {
 func e() {
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
 }
 func a<d>() -> [c<d>] {
 }
@@ -149,6 +149,6 @@ func e() {
 }
 enum S<T> {
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
 }
 func a<d>() -> [c<d>] {

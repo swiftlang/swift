@@ -97,7 +97,7 @@ protocol HasherType {
   // This handles arrays, UnsafeBufferPointer, user-defined
   // collections.
   mutating func combineSequence<
-    S : SequenceType
+    S : Sequence
     where
     S.Iterator.Element : NewHashable
   >(s: S)
@@ -126,7 +126,7 @@ struct InProcessHashtableHasher : HasherType {
   }
 
   mutating func combineSequence<
-    S : SequenceType
+    S : Sequence
     where
     S.Iterator.Element : NewHashable
   >(s: S) {

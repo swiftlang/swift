@@ -45,7 +45,7 @@ struct SatisfySameTypeAssocTypeRequirementDependent<T>
 
 // Pulled in from old standard library to keep the following test
 // (LazySequenceOf) valid.
-public struct GeneratorOf<T> : IteratorProtocol, SequenceType {
+public struct GeneratorOf<T> : IteratorProtocol, Sequence {
 
   /// Construct an instance whose `next()` method calls `nextElement`.
   public init(_ nextElement: ()->T?) {
@@ -69,7 +69,7 @@ public struct GeneratorOf<T> : IteratorProtocol, SequenceType {
     return _next()
   }
 
-  /// `GeneratorOf<T>` is also a `SequenceType`, so it `generate`\ s
+  /// `GeneratorOf<T>` is also a `Sequence`, so it `generate`\ s
   /// a copy of itself
   public func iterator() -> GeneratorOf {
     return self
@@ -78,7 +78,7 @@ public struct GeneratorOf<T> : IteratorProtocol, SequenceType {
 }
 
 // rdar://problem/19009056
-public struct LazySequenceOf<S : SequenceType, A where S.Iterator.Element == A> : SequenceType {
+public struct LazySequenceOf<S : Sequence, A where S.Iterator.Element == A> : Sequence {
   public func iterator() -> GeneratorOf<A> { 
     return GeneratorOf<A>({ return nil })
   }
@@ -89,7 +89,7 @@ public func iterate<A>(f : A -> A)(x : A) -> LazySequenceOf<Iterate<A>, A>? { //
   return nil
 }
 
-public final class Iterate<A> : SequenceType {
+public final class Iterate<A> : Sequence {
   typealias IteratorProtocol = IterateGenerator<A>
   public func iterator() -> IterateGenerator<A> {
     return IterateGenerator<A>()
@@ -142,7 +142,7 @@ protocol Seq {
 
 // rdar://problem/18435371
 extension Dictionary {
-    func multiSubscript<S : SequenceType where S.Iterator.Element == Key>(seq: S) -> [Value?] {
+    func multiSubscript<S : Sequence where S.Iterator.Element == Key>(seq: S) -> [Value?] {
         var result = [Value?]()
         for seqElt in seq {
             result.append(self[seqElt])
@@ -190,7 +190,7 @@ struct Something<T> {
 }
 
 extension Something {
-    init<S : SequenceType where S.Iterator.Element == T>(_ s: S) {
+    init<S : Sequence where S.Iterator.Element == T>(_ s: S) {
         for item in s {
             items.append(item)
         }

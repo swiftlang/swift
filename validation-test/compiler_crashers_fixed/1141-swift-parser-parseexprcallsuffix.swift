@@ -23,7 +23,7 @@ func f<T>() -> T -> T {
 protocol P {
 }
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
 var b:  [c<d>] {
 }
 protocol a {

@@ -589,7 +589,7 @@ extension String {
   }
   
   public mutating func appendContentsOf<
-    S : SequenceType where S.Iterator.Element == Character
+    S : Sequence where S.Iterator.Element == Character
   >(newElements: S) {
     withMutableCharacters {
       (inout v: CharacterView) in v.appendContentsOf(newElements)
@@ -598,13 +598,13 @@ extension String {
   
   /// Create an instance containing `characters`.
   public init<
-    S : SequenceType where S.Iterator.Element == Character
+    S : Sequence where S.Iterator.Element == Character
   >(_ characters: S) {
     self._core = CharacterView(characters)._core
   }
 }
 
-extension SequenceType where Iterator.Element == String {
+extension Sequence where Iterator.Element == String {
 
   /// Interpose the `separator` between elements of `self`, then concatenate
   /// the result.  For example:

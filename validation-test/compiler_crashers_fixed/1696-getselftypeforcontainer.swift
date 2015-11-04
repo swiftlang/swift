@@ -16,7 +16,7 @@ print() -> {
 }
 protocol a {
 protocol A {
-typealias A : a: SequenceType where T>("
+typealias A : a: Sequence where T>("
 func a
 return x in x }
 func a: A, g

@@ -6,7 +6,7 @@
 
 protocol A {
 protocol A : a {
-self.<Q<T: SequenceType, A = c> Int {
+self.<Q<T: Sequence, A = c> Int {
 }
 func a
 }

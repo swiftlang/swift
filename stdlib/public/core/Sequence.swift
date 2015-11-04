@@ -40,7 +40,7 @@ public protocol IteratorProtocol {
 
 /// A type that can be iterated with a `for`...`in` loop.
 ///
-/// `SequenceType` makes no requirement on conforming types regarding
+/// `Sequence` makes no requirement on conforming types regarding
 /// whether they will be destructively "consumed" by iteration.  To
 /// ensure non-destructive iteration, constrain your *sequence* to
 /// `Collection`.
@@ -56,18 +56,18 @@ public protocol IteratorProtocol {
 ///       // Not guaranteed to continue from the next element.
 ///     }
 ///
-/// `SequenceType` makes no requirement about the behavior in that
+/// `Sequence` makes no requirement about the behavior in that
 /// case.  It is not correct to assume that a sequence will either be
 /// "consumable" and will resume iteration, or that a sequence is a
 /// collection and will restart iteration from the first element.
 /// A conforming sequence that is not a collection is allowed to
 /// produce an arbitrary sequence of elements from the second iterator.
-public protocol SequenceType {
+public protocol Sequence {
   /// A type that provides the *sequence*'s iteration interface and
   /// encapsulates its iteration state.
   typealias Iterator : IteratorProtocol
 
-  // FIXME: should be constrained to SequenceType
+  // FIXME: should be constrained to Sequence
   // (<rdar://problem/20715009> Implement recursive protocol
   // constraints)
 
@@ -202,8 +202,8 @@ public protocol SequenceType {
 }
 
 /// A default iterator() function for `IteratorProtocol` instances that
-/// are declared to conform to `SequenceType`
-extension SequenceType
+/// are declared to conform to `Sequence`
+extension Sequence
   where Self.Iterator == Self, Self : IteratorProtocol {
   public func iterator() -> Self {
     return self
@@ -218,7 +218,7 @@ extension SequenceType
 /// This is a class - we require reference semantics to keep track
 /// of how many elements we've already dropped from the underlying sequence.
 internal class _DropFirstSequence<Base : IteratorProtocol>
-    : SequenceType, IteratorProtocol {
+    : Sequence, IteratorProtocol {
 
   internal var _iterator: Base
   internal let _limit: Int
@@ -254,7 +254,7 @@ internal class _DropFirstSequence<Base : IteratorProtocol>
 /// This is a class - we require reference semantics to keep track
 /// of how many elements we've already taken from the underlying sequence.
 internal class _PrefixSequence<Base : IteratorProtocol>
-  : SequenceType, IteratorProtocol {
+  : Sequence, IteratorProtocol {
 
   internal let _maxLength: Int
   internal var _iterator: Base
@@ -284,10 +284,10 @@ internal class _PrefixSequence<Base : IteratorProtocol>
 }
 
 //===----------------------------------------------------------------------===//
-// Default implementations for SequenceType
+// Default implementations for Sequence
 //===----------------------------------------------------------------------===//
 
-extension SequenceType {
+extension Sequence {
   /// Return an `Array` containing the results of mapping `transform`
   /// over `self`.
   ///
@@ -530,7 +530,7 @@ extension SequenceType {
   }
 }
 
-extension SequenceType {
+extension Sequence {
   /// Call `body` on each element in `self` in the same order as a
   /// *for-in loop.*
   ///
@@ -560,7 +560,7 @@ extension SequenceType {
   }
 }
 
-extension SequenceType where Iterator.Element : Equatable {
+extension Sequence where Iterator.Element : Equatable {
   /// Returns the maximal `SubSequence`s of `self`, in order, around elements
   /// equatable to `separator`.
   ///
@@ -587,7 +587,7 @@ extension SequenceType where Iterator.Element : Equatable {
   }
 }
 
-extension SequenceType {
+extension Sequence {
   /// Returns a subsequence containing all but the first element.
   ///
   /// - Complexity: O(1)
@@ -602,7 +602,7 @@ extension SequenceType {
   public func dropLast() -> SubSequence  { return dropLast(1) }
 }
 
-extension SequenceType {
+extension Sequence {
   public func _initializeTo(ptr: UnsafeMutablePointer<Iterator.Element>)
     -> UnsafeMutablePointer<Iterator.Element> {
     var p = UnsafeMutablePointer<Iterator.Element>(ptr)
@@ -614,7 +614,7 @@ extension SequenceType {
 }
 
 // Pending <rdar://problem/14011860> and <rdar://problem/14396120>,
-// pass a IteratorProtocol through IteratorSequence to give it "SequenceType-ness"
+// pass a IteratorProtocol through IteratorSequence to give it "Sequence-ness"
 /// A sequence built around a iterator of type `Base`.
 ///
 /// Useful mostly to recover the ability to use `for`...`in`,
@@ -623,7 +623,7 @@ extension SequenceType {
 ///     for x in IteratorSequence(i) { ... }
 public struct IteratorSequence<
   Base : IteratorProtocol
-> : IteratorProtocol, SequenceType {
+> : IteratorProtocol, Sequence {
   /// Construct an instance whose iterator is a copy of `base`.
   public init(_ base: Base) {
     _base = base

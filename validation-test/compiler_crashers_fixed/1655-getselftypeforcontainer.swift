@@ -83,7 +83,7 @@ init(range: Collection where A: B<T>(self)
 return {
 }
 return "foobar"]([c()
-func i: start, ((object1, a: SequenceType> V, c(T, object2)
+func i: start, ((object1, a: Sequence> V, c(T, object2)
 enum b : ExtensibleCollectionType>("
 func b: Bool) -> d.dynamicType)
 protocol B : d) {

@@ -4873,7 +4873,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
     return SpecialProtocol::ErrorProtocol;
     
   // The other known protocols aren't special at runtime.
-  case KnownProtocolKind::SequenceType:
+  case KnownProtocolKind::Sequence:
   case KnownProtocolKind::IteratorProtocol:
   case KnownProtocolKind::BooleanType:
   case KnownProtocolKind::RawRepresentable:

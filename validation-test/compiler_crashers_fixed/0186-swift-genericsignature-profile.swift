@@ -312,7 +312,7 @@ k()
 h
 protocol k : h { func h
 k
-func d<b: SequenceType, e where Optional<e> == b.Iterator.Element>(c : b) -> e? {
+func d<b: Sequence, e where Optional<e> == b.Iterator.Element>(c : b) -> e? {
     for (mx : e?) in c {
     }
 }
@@ -509,7 +509,7 @@ struct l<l : d> : d {
 protocol f {
 }
 protocol d : f {
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
     var b: dlass func s {}
 s p {
     func m() -> String

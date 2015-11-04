@@ -77,7 +77,7 @@ public func max<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
 ///     iterator.next() // nil
 public struct EnumeratedIterator<
   Base : IteratorProtocol
-> : IteratorProtocol, SequenceType {
+> : IteratorProtocol, Sequence {
 
   internal var _base: Base
   internal var _count: Int
@@ -105,11 +105,11 @@ public struct EnumeratedIterator<
 ///
 /// `EnumeratedSequence` is a sequence of pairs (*n*, *x*), where *n*s
 /// are consecutive `Int`s starting at zero, and *x*s are the elements
-/// of a `Base` `SequenceType`:
+/// of a `Base` `Sequence`:
 ///
 ///     var s = ["foo", "bar"].enumerated
 ///     Array(s) // [(0, "foo"), (1, "bar")]
-public struct EnumeratedSequence<Base : SequenceType> : SequenceType {
+public struct EnumeratedSequence<Base : Sequence> : Sequence {
   internal var _base: Base
 
   /// Construct from a `Base` sequence.

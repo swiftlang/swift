@@ -19,7 +19,7 @@ protocol _Collection  {
   subscript(i: Index) -> _Element {get}
 }
 
-protocol Collection : _Collection, SequenceType {
+protocol Collection : _Collection, Sequence {
   subscript(i: Index) -> Iterator.Element {get}
 }
 

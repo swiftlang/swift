@@ -107,8 +107,8 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.Set<T>.
   NominalTypeDecl *SetDecl = nullptr;
 
-  /// The declaration of Swift.SequenceType<T>.
-  NominalTypeDecl *SequenceTypeDecl = nullptr;
+  /// The declaration of Swift.Sequence<T>.
+  NominalTypeDecl *SequenceDecl = nullptr;
 
   /// The declaration of Swift.Dictionary<T>.
   NominalTypeDecl *DictionaryDecl = nullptr;
@@ -575,10 +575,10 @@ NominalTypeDecl *ASTContext::getSetDecl() const {
   return Impl.SetDecl;
 }
 
-NominalTypeDecl *ASTContext::getSequenceTypeDecl() const {
-  if (!Impl.SequenceTypeDecl)
-    Impl.SequenceTypeDecl = findStdlibType(*this, "SequenceType", 1);
-  return Impl.SequenceTypeDecl;
+NominalTypeDecl *ASTContext::getSequenceDecl() const {
+  if (!Impl.SequenceDecl)
+    Impl.SequenceDecl = findStdlibType(*this, "Sequence", 1);
+  return Impl.SequenceDecl;
 }
 
 NominalTypeDecl *ASTContext::getDictionaryDecl() const {

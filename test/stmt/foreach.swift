@@ -5,10 +5,10 @@ struct BadContainer1 {
 }
 
 func bad_containers_1(bc: BadContainer1) {
-  for e in bc { } // expected-error{{type 'BadContainer1' does not conform to protocol 'SequenceType'}}
+  for e in bc { } // expected-error{{type 'BadContainer1' does not conform to protocol 'Sequence'}}
 }
 
-struct BadContainer2 : SequenceType { // expected-error{{type 'BadContainer2' does not conform to protocol 'SequenceType'}}
+struct BadContainer2 : Sequence { // expected-error{{type 'BadContainer2' does not conform to protocol 'Sequence'}}
   var generate : Int
 }
 
@@ -16,7 +16,7 @@ func bad_containers_2(bc: BadContainer2) {
   for e in bc { }
 }
 
-struct BadContainer3 : SequenceType { // expected-error{{type 'BadContainer3' does not conform to protocol 'SequenceType'}}
+struct BadContainer3 : Sequence { // expected-error{{type 'BadContainer3' does not conform to protocol 'Sequence'}}
   func iterator() { } // expected-note{{inferred type '()' (by matching requirement 'iterator()') is invalid: does not conform to 'IteratorProtocol'}}
 }
 
@@ -26,7 +26,7 @@ func bad_containers_3(bc: BadContainer3) {
 
 struct BadIterator1 {}
 
-struct BadContainer4 : SequenceType { // expected-error{{type 'BadContainer4' does not conform to protocol 'SequenceType'}}
+struct BadContainer4 : Sequence { // expected-error{{type 'BadContainer4' does not conform to protocol 'Sequence'}}
   typealias Iterator = BadIterator1 // expected-note{{possibly intended match 'Iterator' (aka 'BadIterator1') does not conform to 'IteratorProtocol'}}
   func iterator() -> BadIterator1 { }
 }
@@ -37,7 +37,7 @@ func bad_containers_4(bc: BadContainer4) {
 
 // Pattern type-checking
 
-struct GoodRange<Int> : SequenceType, IteratorProtocol {
+struct GoodRange<Int> : Sequence, IteratorProtocol {
   typealias Element = Int
   func next() -> Int? {}
 
@@ -45,7 +45,7 @@ struct GoodRange<Int> : SequenceType, IteratorProtocol {
   func iterator() -> GoodRange<Int> { return self }
 }
 
-struct GoodTupleIterator: SequenceType, IteratorProtocol {
+struct GoodTupleIterator: Sequence, IteratorProtocol {
   typealias Element = (Int, Float)
   func next() -> (Int, Float)? {}
 
@@ -98,7 +98,7 @@ struct Gen<T> : IteratorProtocol {
   func next() -> T? { return nil }
 }
 
-struct Seq<T> : SequenceType {
+struct Seq<T> : Sequence {
   func iterator() -> Gen<T> { return Gen() }
 }
 

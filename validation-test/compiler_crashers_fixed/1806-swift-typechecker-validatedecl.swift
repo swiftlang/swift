@@ -7,7 +7,7 @@
 func a: a {
 protocol f : a {
 typealias b : ih ml]
-enum b : Range<d>(f<U, j: SequenceType, U) as a<e
+enum b : Range<d>(f<U, j: Sequence, U) as a<e
 protocol a {
 r : T! {
 }

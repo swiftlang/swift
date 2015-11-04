@@ -19,8 +19,8 @@
 /// - Note: This is the `IteratorProtocol` used by `FlattenSequence`,
 ///   `FlattenCollection`, and `BidirectionalFlattenCollection`.
 public struct FlattenIterator<
-  Base : IteratorProtocol where Base.Element : SequenceType
-> : IteratorProtocol, SequenceType {
+  Base : IteratorProtocol where Base.Element : Sequence
+> : IteratorProtocol, Sequence {
 
   /// Construct around a `base` iterator.
   public init(_ base: Base) {
@@ -70,8 +70,8 @@ public struct FlattenIterator<
 ///
 /// - See also: `FlattenCollection`
 public struct FlattenSequence<
-  Base : SequenceType where Base.Iterator.Element : SequenceType
-> : SequenceType {
+  Base : Sequence where Base.Iterator.Element : Sequence
+> : Sequence {
 
   /// Creates a concatenation of the elements of the elements of `base`.
   ///
@@ -90,7 +90,7 @@ public struct FlattenSequence<
   internal var _base: Base
 }
 
-extension SequenceType where Iterator.Element : SequenceType {
+extension Sequence where Iterator.Element : Sequence {
   /// A concatenation of the elements of `self`.
   @warn_unused_result
   public func flatten() -> FlattenSequence<Self> {
@@ -101,7 +101,7 @@ extension SequenceType where Iterator.Element : SequenceType {
 extension LazySequenceType
   where
   Elements.Iterator.Element == Iterator.Element,
-  Iterator.Element : SequenceType {
+  Iterator.Element : Sequence {
 
   /// A concatenation of the elements of `self`.
   @warn_unused_result

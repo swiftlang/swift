@@ -4,4 +4,4 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-struct A{let:SequenceType{}class B{enum a{protocol c{protocol c:U
+struct A{let:Sequence{}class B{enum a{protocol c{protocol c:U

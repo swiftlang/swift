@@ -297,7 +297,7 @@ func s<S: y, t i o<t> == S.k.b>(r : S) -> t? {
 }
 let r : [n?] = [w o = h
     typealias h = x<g<h
-struct l<e : SequenceType> {
+struct l<e : Sequence> {
     l g: e
 }
 func h<e>() -> [l<e>] {
@@ -498,7 +498,7 @@ class e: n, p {
 func s<o : m, o : p o o.m == o> (m: o) {
 }
 func s<v : p o v.m == m> (u: String) -> <t>(() -> t) -
-struct c<d: SequenceType, b where Optional<b> == d.Iterator.Element>
+struct c<d: Sequence, b where Optional<b> == d.Iterator.Element>
 func f<m>() -> (m, m -> m) -> m {
    e c e.i = {
 }
@@ -543,7 +543,7 @@ protocol f {
   i []
 }
 func f<g>() -> (g, g -> g) -> g
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
     var b:  [c<d>] {
     return []
 }
@@ -936,7 +936,7 @@ class c {
         b(a)
     }
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
     var b: d
 }
 func a<d>() -> [c<d>] {

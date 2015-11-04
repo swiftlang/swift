@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-ere T: a : T>(range: SequenceType, range.E
+ere T: a : T>(range: Sequence, range.E
 ")
 class A {
 protocol e : start, a(A.b

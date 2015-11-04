@@ -209,7 +209,7 @@ struct DictionaryIndex<Element> : BidirectionalIndex {
   var offset: Int
 }
 
-struct Dictionary<Key: Hashable, Value> : Collection, SequenceType {
+struct Dictionary<Key: Hashable, Value> : Collection, Sequence {
   typealias _Self = Dictionary<Key, Value>
   typealias BufferOwner = DictionaryBufferOwner<Key, Value>
   typealias Buffer = BufferOwner.Buffer
@@ -415,7 +415,7 @@ struct Dictionary<Key: Hashable, Value> : Collection, SequenceType {
     return _owner.buffer
   }
 
-  // Satisfying SequenceType
+  // Satisfying Sequence
   func iterator() -> CollectionDefaultIterator<_Self> {
     return CollectionDefaultIterator(self)
   }

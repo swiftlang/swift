@@ -29,7 +29,7 @@ internal func _abstract(file: StaticString = __FILE__, line: UInt = __LINE__) {
 /// underlying `IteratorProtocol`.
 ///
 /// - seealso:
-///   - `struct AnySequence<S : SequenceType>`
+///   - `struct AnySequence<S : Sequence>`
 public struct AnyIterator<Element> : IteratorProtocol {
   /// Create a `IteratorProtocol` instance that wraps `base` but whose type
   /// depends only on the type of `I.Element`.
@@ -74,9 +74,9 @@ public struct AnyIterator<Element> : IteratorProtocol {
   internal let _box: _AnyIteratorBoxBase<Element>
 }
 
-/// Every `IteratorProtocol` can also be a `SequenceType`.  Note that
+/// Every `IteratorProtocol` can also be a `Sequence`.  Note that
 /// traversing the sequence consumes the iterator.
-extension AnyIterator : SequenceType {}
+extension AnyIterator : Sequence {}
 
 internal struct _ClosureBasedIterator<Element> : IteratorProtocol {
   internal init(_ body: () -> Element?) {
@@ -139,9 +139,9 @@ internal class _AnyCollectionBoxBase<Element> : _AnySequenceBox<Element> {
   internal let endIndex: _ForwardIndexBoxType
 }
 
-% for (Kind, Suffix) in [('Sequence', 'Type'), ('Collection', '')]:
+% for Kind in ['Sequence', 'Collection']:
 // FIXME: can't make this a protocol due to <rdar://20209031>
-internal class _${Kind}Box<S : ${Kind}${Suffix}>
+internal class _${Kind}Box<S : ${Kind}>
   : _Any${Kind}Box<S.Iterator.Element> {
   typealias Element = S.Iterator.Element
 
@@ -186,7 +186,7 @@ internal class _${Kind}Box<S : ${Kind}${Suffix}>
 % end
 
 internal struct _ClosureBasedSequence<Iterator : IteratorProtocol>
-  : SequenceType {
+  : Sequence {
 
   internal init(_ makeUnderlyingIterator: () -> Iterator) {
     self._makeUnderlyingIterator = makeUnderlyingIterator
@@ -203,12 +203,12 @@ internal struct _ClosureBasedSequence<Iterator : IteratorProtocol>
 ///
 /// Forwards operations to an arbitrary underlying sequence having the
 /// same `Element` type, hiding the specifics of the underlying
-/// `SequenceType`.
+/// `Sequence`.
 ///
 /// - SeeAlso: `AnyIterator<Element>`.
-public struct AnySequence<Element> : SequenceType {
+public struct AnySequence<Element> : Sequence {
   /// Wrap and forward operations to to `base`.
-  public init<S: SequenceType where S.Iterator.Element == Element>(_ base: S) {
+  public init<S: Sequence where S.Iterator.Element == Element>(_ base: S) {
     _box = _SequenceBox(base)
   }
 

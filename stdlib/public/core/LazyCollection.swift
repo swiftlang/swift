@@ -69,7 +69,7 @@ public struct LazyCollection<Base : Collection>
 
 /// Forward implementations to the base collection, to pick up any
 /// optimizations it might implement.
-extension LazyCollection : SequenceType {
+extension LazyCollection : Sequence {
   
   /// Return an *iterator* over the elements of this *sequence*.
   ///

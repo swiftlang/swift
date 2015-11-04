@@ -38,7 +38,7 @@ public class _AnyIteratorBase {}
 ///
 /// See also:
 ///
-///     struct AnySequence<S: SequenceType>
+///     struct AnySequence<S: Sequence>
 ///     func anyIterator<G: GeneratorType>(base: G) -> AnyIterator<G.Element>
 ///     func anyIterator<T>(nextImplementation: ()->T?) -> AnyIterator<T>
 public class AnyIterator<T> : _AnyIteratorBase, GeneratorType {
@@ -53,9 +53,9 @@ public class AnyIterator<T> : _AnyIteratorBase, GeneratorType {
   public func next() -> T? 
 }
 
-/// Every `GeneratorType` can also be a `SequenceType`.  Note that
+/// Every `GeneratorType` can also be a `Sequence`.  Note that
 /// traversing the sequence consumes the generator.
-extension AnyIterator : SequenceType {
+extension AnyIterator : Sequence {
   /// Returns `self`.
   public func iterator() -> AnyIterator 
 }
@@ -101,13 +101,13 @@ public func anyIterator<T>(nextImplementation: ()->T?) -> AnyIterator<T>
 ///
 /// Forwards operations to an arbitrary underlying sequence having the
 /// same `Element` type, hiding the specifics of the underlying
-/// `SequenceType`.
+/// `Sequence`.
 ///
 /// See also: `AnyIterator<T>`.
-public struct AnySequence<T> : SequenceType {
+public struct AnySequence<T> : Sequence {
 
   /// Wrap and forward operations to to `base`
-  public init<S: SequenceType where S.Generator.Element == T>(_ base: S) 
+  public init<S: Sequence where S.Generator.Element == T>(_ base: S) 
 
   /// Return a *generator* over the elements of this *sequence*.
   ///

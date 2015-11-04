@@ -68,7 +68,7 @@ func < (x: X, y: X) -> Bool {
 
 //===----------------------------------------------------------------------===//
 
-func printSequence<T : SequenceType>(x: T) {
+func printSequence<T : Sequence>(x: T) {
   print("[", terminator: "")
   var prefix = ""
   for a in x {
@@ -97,7 +97,7 @@ func checkReallocation<T : _ArrayType>(
 }
 
 func checkEqual<
-  S1 : SequenceType, S2 : SequenceType
+  S1 : Sequence, S2 : Sequence
   where
   S1.Iterator.Element == S2.Iterator.Element,
   S1.Iterator.Element : Equatable

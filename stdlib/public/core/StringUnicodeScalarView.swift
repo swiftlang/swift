@@ -271,7 +271,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   ///
   /// - Complexity: O(*length of result*).
   public mutating func appendContentsOf<
-    S : SequenceType where S.Iterator.Element == UnicodeScalar
+    S : Sequence where S.Iterator.Element == UnicodeScalar
   >(newElements: S) {
     _core.appendContentsOf(newElements.lazy.flatMap { $0.utf16 })
   }

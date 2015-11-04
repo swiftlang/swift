@@ -12,6 +12,6 @@ struct D : A : P> d(true }
 protocol A : c {
 var a(f: X<Y> T : A) {
 return "
-protocol e : SequenceType> T) {
+protocol e : Sequence> T) {
 }
 func c: Any) -

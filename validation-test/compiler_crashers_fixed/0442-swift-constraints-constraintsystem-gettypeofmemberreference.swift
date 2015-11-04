@@ -25,6 +25,6 @@ func i<l : d where l.f == c> (n: l) {
 func a(b: Int = 0) {
 }
 let c = a
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
 }
 func a<d>() -> [c<d>] {

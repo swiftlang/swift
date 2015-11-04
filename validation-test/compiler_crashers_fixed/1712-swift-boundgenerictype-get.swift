@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 protocol d : C {
-typealias e : SequenceType, T> U.E == true {
+typealias e : Sequence, T> U.E == true {
 }
 class func b()) + seq: a {
 return """"]]("ab"")

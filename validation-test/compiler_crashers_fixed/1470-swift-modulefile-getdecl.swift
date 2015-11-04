@@ -73,7 +73,7 @@ var a)
 func b(Any)(A: Bool) + seq: T>("foobar")
 func f<U, c(#object1, y)
 }
-return b> ((t: SequenceType> T where S<d
+return b> ((t: Sequence> T where S<d
 protocol a {
 }
 }

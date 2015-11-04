@@ -48,7 +48,7 @@
 #define BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL_(name) \
     BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL_WITH_NAME(name, "_" #name)
 
-PROTOCOL(SequenceType)
+PROTOCOL(Sequence)
 PROTOCOL(IteratorProtocol)
 PROTOCOL(BooleanType)
 PROTOCOL(AnyObject)

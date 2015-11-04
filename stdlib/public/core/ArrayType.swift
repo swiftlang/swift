@@ -51,7 +51,7 @@ protocol _ArrayType
 
   /// Operator form of `appendContentsOf`.
   func += <
-    S: SequenceType where S.Iterator.Element == Iterator.Element
+    S: Sequence where S.Iterator.Element == Iterator.Element
   >(inout lhs: Self, rhs: S)
 
   /// Insert `newElement` at index `i`.

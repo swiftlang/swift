@@ -27,7 +27,7 @@ protocol A : B, A {
 protocol d {
 }
 extension NSData {
-func g<d: SequenceType> {
+func g<d: Sequence> {
 let start = f<T>(n: T> Self {
 let h : NSObject {
 }

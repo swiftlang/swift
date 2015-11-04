@@ -666,7 +666,7 @@ extension _StringCore : RangeReplaceableCollection {
   }
 
   public mutating func appendContentsOf<
-    S : SequenceType where S.Iterator.Element == UTF16.CodeUnit
+    S : Sequence where S.Iterator.Element == UTF16.CodeUnit
   >(s: S) {
     var width = elementWidth
     if width == 1 {

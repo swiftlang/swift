@@ -191,7 +191,7 @@ protocol k {
    class func j()
 }
 class e: k{  class func j
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
     var b:  [c<d>] {
     return []
 }
@@ -217,7 +217,7 @@ otocol A {
 }
 struct  }
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
     var b: d
 }
 func a<d>() -> [c<d>] {
@@ -282,7 +282,7 @@ func p<p>() -> (p, p -> p) -> p {
 }
 j(k(m, k(2, 3)))
 func l(p: j) -> <n>(() -> n
-struct c<d: SequenceType, b where Optional<b> == d.Iterator.Element>
+struct c<d: Sequence, b where Optional<b> == d.Iterator.Element>
 d = i
 }
 class d<j : i, f : i where j.i == f> : e {
@@ -537,7 +537,7 @@ i c {
 }
 class d: c{  class func f {}
 struct d<c : f,f where g.i == c.i>
-struct l<e : SequenceType> {
+struct l<e : Sequence> {
     l g: e
 }
 func h<e>() -> [l<e>] {

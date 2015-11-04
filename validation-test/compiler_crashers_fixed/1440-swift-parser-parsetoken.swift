@@ -13,4 +13,4 @@ public var f = D>(c(A? {
 }
 func c) {
 }
-typealias e : SequenceType, e
+typealias e : Sequence, e

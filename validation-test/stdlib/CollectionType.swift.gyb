@@ -403,7 +403,7 @@ struct MinimalForwardCollectionWithDefaultIterator : Collection {
   var _count: Int
 }
 
-func callGenericIterator<S : SequenceType>(sequence: S) -> S.Iterator {
+func callGenericIterator<S : Sequence>(sequence: S) -> S.Iterator {
   return sequence.iterator()
 }
 

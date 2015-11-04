@@ -154,7 +154,7 @@ protocol SequenceViaStream {
   func iterator() -> SequenceStreamTypeType
 }
 
-struct IntIterator : IteratorProtocol /*, SequenceType, ReplPrintable*/ {
+struct IntIterator : IteratorProtocol /*, Sequence, ReplPrintable*/ {
   typealias Element = Int
   var min : Int
   var max : Int
@@ -242,14 +242,14 @@ struct WrongIsEqual : IsEqualComparable { // expected-error{{type 'WrongIsEqual'
 // Using values of existential type.
 //===----------------------------------------------------------------------===//
 
-func existentialSequence(e: SequenceType) { // expected-error{{has Self or associated type requirements}}
-  var x = e.iterator() // expected-error{{type 'SequenceType' does not conform to protocol 'IteratorProtocol'}}
+func existentialSequence(e: Sequence) { // expected-error{{has Self or associated type requirements}}
+  var x = e.iterator() // expected-error{{type 'Sequence' does not conform to protocol 'IteratorProtocol'}}
   x.next()
   x.nonexistent()
 }
 
 protocol HasSequenceAndStream {
-  typealias R : IteratorProtocol, SequenceType
+  typealias R : IteratorProtocol, Sequence
   func getR() -> R
 }
 

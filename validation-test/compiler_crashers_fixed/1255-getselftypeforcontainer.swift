@@ -64,7 +64,7 @@ class m<j>k i<g : g, e : f k(f: l) {
 i(())
 class h {
 typealias g = g
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
 var b:  [c<d>] {
 return []
 }
@@ -90,7 +90,7 @@ E == F>(f: B<T>)
 }
 struct  }
 }
-struct l<e : SequenceType> {
+struct l<e : Sequence> {
 l g: e
 }
 func h<e>() -> [l<e>] {
@@ -136,7 +136,7 @@ j q
 j o
 }
 struct n<r : l>
-struct c<d: SequenceType, b where Optional<b> == d.Iterator.Element>
+struct c<d: Sequence, b where Optional<b> == d.Iterator.Element>
 }
 class p {
 u _ = q() {

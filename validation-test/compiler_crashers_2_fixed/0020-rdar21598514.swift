@@ -74,7 +74,7 @@ public struct LoggingIterator<Base : IteratorProtocol>
 }
 
 public class SequenceLog {
-  public class func dispatchTester<S: SequenceType>(
+  public class func dispatchTester<S: Sequence>(
     s: S
   ) -> LoggingSequence<LoggingSequence<S>> {
     return LoggingSequence(LoggingSequence(s))
@@ -89,8 +89,8 @@ public class SequenceLog {
   public static var _initializeTo = TypeIndexed(0)
 }
 
-public protocol LoggingSequenceType  : SequenceType, LoggingType {
-  typealias Base : SequenceType
+public protocol LoggingSequenceType  : Sequence, LoggingType {
+  typealias Base : Sequence
 }
 
 extension LoggingSequenceType {
@@ -154,7 +154,7 @@ extension LoggingSequenceType {
   }
 }
 
-public struct LoggingSequence<Base_: SequenceType> : LoggingSequenceType {
+public struct LoggingSequence<Base_: Sequence> : LoggingSequenceType {
   typealias Log = SequenceLog
   typealias Base = Base_
   

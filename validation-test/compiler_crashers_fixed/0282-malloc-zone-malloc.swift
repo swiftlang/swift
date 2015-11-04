@@ -20,7 +20,7 @@ func n<q>() {
 }
     k {
 }
-struct c<d : SequenceType> {
+struct c<d : Sequence> {
     var b:  [c<d>] {
     return []
 }

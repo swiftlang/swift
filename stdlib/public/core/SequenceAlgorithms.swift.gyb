@@ -12,7 +12,7 @@
 
 %{
 
-# We know we will eventually get a SequenceType.Element type.  Define
+# We know we will eventually get a Sequence.Element type.  Define
 # a shorthand that we can use today.
 GElement = "Iterator.Element"
 
@@ -22,8 +22,8 @@ GElement = "Iterator.Element"
 // enumerated
 //===----------------------------------------------------------------------===//
 
-extension SequenceType {
-  /// Return a lazy `SequenceType` containing pairs (*n*, *x*), where
+extension Sequence {
+  /// Return a lazy `Sequence` containing pairs (*n*, *x*), where
   /// *n*s are consecutive `Int`s starting at zero, and *x*s are
   /// the elements of `self`:
   ///
@@ -60,7 +60,7 @@ else:
   rethrows_ = ""
 }%
 
-extension SequenceType ${"" if preds else "where Iterator.Element : Comparable"} {
+extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
 
   /// Returns the minimum element in `self` or `nil` if the sequence is empty.
   ///
@@ -124,7 +124,7 @@ extension SequenceType ${"" if preds else "where Iterator.Element : Comparable"}
 % # an Equatable requirement.
 % for preds in [ True, False ]:
 
-extension SequenceType ${"" if preds else "where Iterator.Element : Equatable"} {
+extension Sequence ${"" if preds else "where Iterator.Element : Equatable"} {
 
 %{
 if preds:
@@ -146,7 +146,7 @@ else:
   ${comment}
   @warn_unused_result
   public func startsWith<
-    OtherSequence : SequenceType where OtherSequence.${GElement} == ${GElement}
+    OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
   >(
     other: OtherSequence${"," if preds else ""}
 %   if preds:
@@ -178,7 +178,7 @@ else:
 % # an Equatable requirement.
 % for preds in [ True, False ]:
 
-extension SequenceType ${"" if preds else "where Iterator.Element : Equatable"} {
+extension Sequence ${"" if preds else "where Iterator.Element : Equatable"} {
 
 %{
 if preds:
@@ -199,7 +199,7 @@ else:
   ${comment}
   @warn_unused_result
   public func elementsEqual<
-    OtherSequence : SequenceType where OtherSequence.${GElement} == ${GElement}
+    OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
   >(
     other: OtherSequence${"," if preds else ""}
 %   if preds:
@@ -234,7 +234,7 @@ else:
 % # Comparable requirement.
 % for preds in [ True, False ]:
 
-extension SequenceType ${"" if preds else "where Iterator.Element : Comparable"} {
+extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
 
 %{
 if preds:
@@ -266,7 +266,7 @@ else:
   ${comment}
   @warn_unused_result
   public func lexicographicalCompare<
-    OtherSequence : SequenceType where OtherSequence.${GElement} == ${GElement}
+    OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
   >(
     other: OtherSequence${"," if preds else ""}
 %   if preds:
@@ -300,7 +300,7 @@ else:
 // contains()
 //===----------------------------------------------------------------------===//
 
-extension SequenceType where Iterator.Element : Equatable {
+extension Sequence where Iterator.Element : Equatable {
   /// Return `true` iff `element` is in `self`.
   @warn_unused_result
   public func contains(element: ${GElement}) -> Bool {
@@ -317,7 +317,7 @@ extension SequenceType where Iterator.Element : Equatable {
   }
 }
 
-extension SequenceType {
+extension Sequence {
   /// Return `true` iff an element in `self` satisfies `predicate`.
   @warn_unused_result
   public func contains(
@@ -336,7 +336,7 @@ extension SequenceType {
 // reduce()
 //===----------------------------------------------------------------------===//
 
-extension SequenceType {
+extension Sequence {
   /// Return the result of repeatedly calling `combine` with an
   /// accumulated value initialized to `initial` and each element of
   /// `self`, in turn, i.e. return
@@ -358,7 +358,7 @@ extension SequenceType {
 // reverse()
 //===----------------------------------------------------------------------===//
 
-extension SequenceType {
+extension Sequence {
   /// Return an `Array` containing the elements of `self` in reverse
   /// order.
   ///
@@ -381,7 +381,7 @@ extension SequenceType {
 // flatMap()
 //===----------------------------------------------------------------------===//
 
-extension SequenceType {
+extension Sequence {
   /// Return an `Array` containing the concatenated results of mapping
   /// `transform` over `self`.
   ///
@@ -394,7 +394,7 @@ extension SequenceType {
   /// - Complexity: O(*M* + *N*), where *M* is the length of `self`
   ///   and *N* is the length of the result.
   @warn_unused_result
-  public func flatMap<S : SequenceType>(
+  public func flatMap<S : Sequence>(
     transform: (${GElement}) throws -> S
   ) rethrows -> [S.${GElement}] {
     var result: [S.${GElement}] = []
@@ -405,7 +405,7 @@ extension SequenceType {
   }
 }
 
-extension SequenceType {
+extension Sequence {
   /// Return an `Array` containing the non-nil results of mapping
   /// `transform` over `self`.
   ///

@@ -6,7 +6,7 @@
 
 {
 }
-protocol b : SequenceType where g<T where B : d.e = [T>(.g : Any, g : d where k.<h
+protocol b : Sequence where g<T where B : d.e = [T>(.g : Any, g : d where k.<h
 return "
 A<Y> {
 }

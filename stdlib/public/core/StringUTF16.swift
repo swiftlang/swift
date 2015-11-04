@@ -63,7 +63,7 @@ extension String {
       }
 
       if (u >> 10) == 0b1101_10 {
-        // `u` is a high-surrogate.  SequenceType is well-formed if it
+        // `u` is a high-surrogate.  Sequence is well-formed if it
         // is followed by a low-surrogate.
         if _fastPath(
                index + 1 < _core.count &&
@@ -73,7 +73,7 @@ extension String {
         return 0xfffd
       }
 
-      // `u` is a low-surrogate.  SequenceType is well-formed if
+      // `u` is a low-surrogate.  Sequence is well-formed if
       // previous code unit is a high-surrogate.
       if _fastPath(index != 0 && (_core[index - 1] >> 10) == 0b1101_10) {
         return u

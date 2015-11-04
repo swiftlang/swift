@@ -397,10 +397,10 @@ self.test("\(testNamePrefix).init()/semantics") {
 }
 
 //===----------------------------------------------------------------------===//
-// init(SequenceType)
+// init(Sequence)
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).init(SequenceType)/semantics") {
+self.test("\(testNamePrefix).init(Sequence)/semantics") {
   for test in appendContentsOfTests {
     let c = C(test.newElements.map(wrapValue))
     expectEqualSequence(
@@ -973,7 +973,7 @@ self.test("\(testNamePrefix).OperatorPlus") {
       expected: [ 1010, 2020, 3030, 4040, 5050, 6060, 7070 ]),
   ]
 
-  // RangeReplaceableCollection + SequenceType
+  // RangeReplaceableCollection + Sequence
   for test in tests {
     let lhs = makeWrappedCollection(test.lhs)
     let rhs = MinimalSequence(elements: test.rhs.map(wrapValue))
@@ -990,7 +990,7 @@ self.test("\(testNamePrefix).OperatorPlus") {
       stackTrace: SourceLocStack().with(test.loc))
   }
 
-  // SequenceType + RangeReplaceableCollection
+  // Sequence + RangeReplaceableCollection
   for test in tests {
     let lhs = MinimalSequence(elements: test.lhs.map(wrapValue))
     let rhs = makeWrappedCollection(test.rhs)

@@ -1425,24 +1425,24 @@ public let zipTests = [
     leftovers: [], []),
 ]
 
-public func callGenericUnderestimatedCount<S : SequenceType>(s: S) -> Int {
+public func callGenericUnderestimatedCount<S : Sequence>(s: S) -> Int {
   return s.underestimateCount()
 }
 
 extension TestSuite {
   public func addSequenceTests<
-    Sequence : SequenceType,
-    SequenceWithEquatableElement : SequenceType
+    S : Sequence,
+    SequenceWithEquatableElement : Sequence
     where
     SequenceWithEquatableElement.Iterator.Element : Equatable,
-    Sequence.SubSequence : SequenceType,
-    Sequence.SubSequence.Iterator.Element == Sequence.Iterator.Element,
-    Sequence.SubSequence.SubSequence == Sequence.SubSequence
+    S.SubSequence : Sequence,
+    S.SubSequence.Iterator.Element == S.Iterator.Element,
+    S.SubSequence.SubSequence == S.SubSequence
   >(
     testNamePrefix: String = "",
-    makeSequence: ([Sequence.Iterator.Element]) -> Sequence,
-    wrapValue: (OpaqueValue<Int>) -> Sequence.Iterator.Element,
-    extractValue: (Sequence.Iterator.Element) -> OpaqueValue<Int>,
+    makeSequence: ([S.Iterator.Element]) -> S,
+    wrapValue: (OpaqueValue<Int>) -> S.Iterator.Element,
+    extractValue: (S.Iterator.Element) -> OpaqueValue<Int>,
 
     makeSequenceOfEquatable: ([SequenceWithEquatableElement.Iterator.Element]) -> SequenceWithEquatableElement,
     wrapValueIntoEquatable: (MinimalEquatableValue) -> SequenceWithEquatableElement.Iterator.Element,
@@ -1459,7 +1459,7 @@ extension TestSuite {
     }
     checksAdded.value.insert(__FUNCTION__)
 
-    func makeWrappedSequence(elements: [OpaqueValue<Int>]) -> Sequence {
+    func makeWrappedSequence(elements: [OpaqueValue<Int>]) -> S {
       return makeSequence(elements.map(wrapValue))
     }
 
@@ -1469,7 +1469,7 @@ extension TestSuite {
       return makeSequenceOfEquatable(elements.map(wrapValueIntoEquatable))
     }
 
-    testNamePrefix += String(Sequence.Type)
+    testNamePrefix += String(S.Type)
 
     let isMultiPass = makeSequence([])
       ._preprocessingPass { _ in true } ?? false
@@ -1670,7 +1670,7 @@ self.test("\(testNamePrefix).split/closure/semantics") {
   for test in splitTests {
     let closureLifetimeTracker = LifetimeTracked(0)
     expectEqual(1, LifetimeTracked.instances)
-    let s: Sequence = makeWrappedSequence(test.sequence.map(OpaqueValue.init))
+    let s: S = makeWrappedSequence(test.sequence.map(OpaqueValue.init))
     let result = s.split(test.maxSplit,
       allowEmptySlices: test.allowEmptySlices) {
       _blackHole(closureLifetimeTracker)

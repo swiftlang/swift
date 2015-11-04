@@ -6,7 +6,7 @@
 
 var e: P {
 struct X<T where l.c = d() -> V {
-let v: SequenceType> Any) -> {
+let v: Sequence> Any) -> {
 protocol b = 0] = "))
 typealias e {
 }

@@ -106,7 +106,7 @@ struct S7b : P7 {
 
 // <rdar://problem/14685674>
 struct zip<A : IteratorProtocol, B : IteratorProtocol>
-  : IteratorProtocol, SequenceType {
+  : IteratorProtocol, Sequence {
 
   func next() -> (A.Element, B.Element)? { }
 

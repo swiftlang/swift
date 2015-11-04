@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 func compose() -> {
-let end = B<T : SequenceType> {
+let end = B<T : Sequence> {
 }
 map(a: 1
 }

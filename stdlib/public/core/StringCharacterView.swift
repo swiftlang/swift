@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  String is-not-a SequenceType or Collection, but it exposes a
+//  String is-not-a Sequence or Collection, but it exposes a
 //  collection of characters.
 //
 //===----------------------------------------------------------------------===//
@@ -305,7 +305,7 @@ extension String.CharacterView : RangeReplaceableCollection {
 
   /// Append the elements of `newElements` to `self`.
   public mutating func appendContentsOf<
-    S : SequenceType where S.Iterator.Element == Character
+    S : Sequence where S.Iterator.Element == Character
   >(newElements: S) {
     reserveCapacity(_core.count + newElements.underestimateCount())
     for c in newElements {
@@ -315,7 +315,7 @@ extension String.CharacterView : RangeReplaceableCollection {
 
   /// Create an instance containing `characters`.
   public init<
-    S : SequenceType where S.Iterator.Element == Character
+    S : Sequence where S.Iterator.Element == Character
   >(_ characters: S) {
     self = String.CharacterView()
     self.appendContentsOf(characters)

@@ -13,7 +13,7 @@
 /// An iterator over the elements of `Range<Element>`.
 public struct RangeIterator<
   Element : ForwardIndex
-> : IteratorProtocol, SequenceType {
+> : IteratorProtocol, Sequence {
 
   /// Construct an instance that traverses the elements of `bounds`.
   @_transparent

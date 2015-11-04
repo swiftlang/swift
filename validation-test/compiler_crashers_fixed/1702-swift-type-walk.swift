@@ -53,7 +53,7 @@ var e, c>])("[]
 map(a: C
 assert(i: P {
 protocol A : T>(".B
-typealias e : B(t: SequenceType, f<T>, e)
+typealias e : B(t: Sequence, f<T>, e)
 f() -> Int = f, i(")
 enum B : c(f(c(x(""")
 enum A = [Byte])

@@ -8,7 +8,7 @@
 extension String {
 struct S {
 func g: A where Optional<1 {
-func d.advance(self, length: SequenceType> (g.init("]]
+func d.advance(self, length: Sequence> (g.init("]]
 class b<d.startIndex, AnyObject) {
 case C<h, e: A {
 }

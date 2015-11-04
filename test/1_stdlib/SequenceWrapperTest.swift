@@ -14,8 +14,8 @@
 import StdlibUnittest
 
 struct BasicSequenceWrapper<
-  Base_: SequenceType
-> : _SequenceWrapperType, SequenceType {
+  Base_: Sequence
+> : _SequenceWrapperType, Sequence {
   var _base: Base_
 }
 

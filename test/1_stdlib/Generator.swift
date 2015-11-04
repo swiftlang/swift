@@ -38,8 +38,8 @@ struct MyIterator : IteratorProtocol {
   }
 }
 
-extension MyIterator : SequenceType {}
-tests.test("IteratorsModelSequenceTypeByDeclaration") {
+extension MyIterator : Sequence {}
+tests.test("IteratorsModelSequenceByDeclaration") {
   var n = 0
   for i in MyIterator() {
     expectEqual(n++, i)

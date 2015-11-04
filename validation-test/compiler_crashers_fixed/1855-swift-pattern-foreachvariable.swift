@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-protocol A : SequenceType, g<T -> {
+protocol A : Sequence, g<T -> {
 typealias A : A? {
 class a).substringWithRange("foobar"foo"\()
 let d: A

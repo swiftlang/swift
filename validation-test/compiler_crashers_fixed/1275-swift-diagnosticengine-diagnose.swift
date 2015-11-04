@@ -61,6 +61,6 @@ class func l() : f {
 }
 func h<d {
 enum h {
-struct l<e : SequenceType> {
+struct l<e : Sequence> {
 }
 func h<e>() -> [l<

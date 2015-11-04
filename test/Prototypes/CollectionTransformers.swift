@@ -19,7 +19,7 @@ public enum ApproximateCount {
   case Overestimate(IntMax)
 }
 
-public protocol ApproximateCountableSequenceType : SequenceType {
+public protocol ApproximateCountableSequenceType : Sequence {
   /// Complexity: amortized O(1).
   var approximateCount: ApproximateCount { get }
 }

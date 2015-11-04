@@ -13,7 +13,7 @@
 /// A sequence of pairs built out of two underlying sequences, where
 /// the elements of the `i`th pair are the `i`th elements of each
 /// underlying sequence.
-public func zip<Sequence1 : SequenceType, Sequence2 : SequenceType>(
+public func zip<Sequence1 : Sequence, Sequence2 : Sequence>(
   sequence1: Sequence1, _ sequence2: Sequence2
 ) -> Zip2Sequence<Sequence1, Sequence2> {
   return Zip2Sequence(sequence1, sequence2)
@@ -68,8 +68,8 @@ public struct Zip2Iterator<
 /// A sequence of pairs built out of two underlying sequences, where
 /// the elements of the `i`th pair are the `i`th elements of each
 /// underlying sequence.
-public struct Zip2Sequence<Sequence1 : SequenceType, Sequence2 : SequenceType>
-  : SequenceType {
+public struct Zip2Sequence<Sequence1 : Sequence, Sequence2 : Sequence>
+  : Sequence {
 
   public typealias Stream1 = Sequence1.Iterator
   public typealias Stream2 = Sequence2.Iterator

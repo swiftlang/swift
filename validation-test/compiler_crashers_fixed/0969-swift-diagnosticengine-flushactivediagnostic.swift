@@ -44,7 +44,7 @@ return self.h : A, range.B
 }
 return true
 func e: d where H) {
-private class func a: SequenceType> {
+private class func a: Sequence> {
 }
 }
 }

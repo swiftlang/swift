@@ -19,6 +19,6 @@ let g = [1, f: C {
 }
 public class c(self.c {
 }
-typealias f : A<T : SequenceType> T> : [Byte])?
+typealias f : A<T : Sequence> T> : [Byte])?
 class B {
 var b = {

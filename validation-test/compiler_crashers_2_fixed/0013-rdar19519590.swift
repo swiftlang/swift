@@ -41,13 +41,13 @@ struct PiecewiseTransformedIteratorOf<
 }
 
 struct PiecewiseTransformedSequenceOf<
-        SourceSequence: SequenceType,
-        TransformerSequence: SequenceType,
+        SourceSequence: Sequence,
+        TransformerSequence: Sequence,
         Transformable: SourceTargetTransformable
     where
         SourceSequence.Iterator.Element == Transformable.Source,
         TransformerSequence.Iterator.Element == Transformable.Transformer
-        >: SequenceType {
+        >: Sequence {
     
     typealias Source = SourceSequence.Iterator.Element
     typealias Target = Transformable.Target

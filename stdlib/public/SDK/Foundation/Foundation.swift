@@ -721,7 +721,7 @@ final public class NSFastEnumerationIterator : IteratorProtocol {
   }
 }
 
-extension NSArray : SequenceType {
+extension NSArray : Sequence {
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
@@ -765,7 +765,7 @@ extension Set {
   }
 }
 
-extension NSSet : SequenceType {
+extension NSSet : Sequence {
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
@@ -774,7 +774,7 @@ extension NSSet : SequenceType {
   }
 }
 
-extension NSOrderedSet : SequenceType {
+extension NSOrderedSet : Sequence {
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
@@ -812,7 +812,7 @@ public struct NSIndexSetIterator : IteratorProtocol {
   }
 }
 
-extension NSIndexSet : SequenceType {
+extension NSIndexSet : Sequence {
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
@@ -913,7 +913,7 @@ extension Set : _ObjectiveCBridgeable {
   }
 }
 
-extension NSDictionary : SequenceType {
+extension NSDictionary : Sequence {
   // FIXME: A class because we can't pass a struct with class fields through an
   // [objc] interface without prematurely destroying the references.
   final public class Iterator : IteratorProtocol {
@@ -947,7 +947,7 @@ extension NSDictionary : SequenceType {
   }
 }
 
-extension NSEnumerator : SequenceType {
+extension NSEnumerator : Sequence {
   /// Return an *iterator* over the *enumerator*.
   ///
   /// - Complexity: O(1).

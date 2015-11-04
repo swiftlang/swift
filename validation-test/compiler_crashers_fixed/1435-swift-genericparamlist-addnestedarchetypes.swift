@@ -10,7 +10,7 @@ let h : d where B {
 }
 protocol a {
 self.C) -> T).C> {
-protocol A = b: SequenceType> Any) -> {
+protocol A = b: Sequence> Any) -> {
 "[1
 func e?
 typealias e : A() {

@@ -22,7 +22,7 @@ func h<d {
     enum h {
         func e
         var _ = d:b class b
-struct l<e : SequenceType> {
+struct l<e : Sequence> {
     l g: e
 }
 func h<e>() -> [l<, l: i) -> (((i, i) -> i) -> i) {

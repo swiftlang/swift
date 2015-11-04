@@ -13,5 +13,5 @@ func e(.f = 1, ")
 typealias e : A()
 }
 }
-func call(range: SequenceType, A {
+func call(range: Sequence, A {
 clas

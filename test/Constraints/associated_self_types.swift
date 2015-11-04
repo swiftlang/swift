@@ -5,19 +5,19 @@ protocol P : Collection {
 }
 postfix operator ~>> {}
 
-postfix func ~>> <_Self : SequenceType, A : P where _Self.Iterator.Element == A.Iterator.Element>(_:_Self) -> A {
+postfix func ~>> <_Self : Sequence, A : P where _Self.Iterator.Element == A.Iterator.Element>(_:_Self) -> A {
   return A()
 }
 
-protocol _ExtendedSequence : SequenceType {
+protocol _ExtendedSequence : Sequence {
   postfix func ~>> <A : P where Self.Iterator.Element == A.Iterator.Element>(s: Self) -> A
 }
 
 extension Range : _ExtendedSequence {
 }
 
-protocol Q : SequenceType {
-  func f<QS : SequenceType where QS.Iterator.Element == Self.Iterator.Element>(x: QS)
+protocol Q : Sequence {
+  func f<QS : Sequence where QS.Iterator.Element == Self.Iterator.Element>(x: QS)
 }
 
 struct No<NT> : IteratorProtocol {
@@ -29,7 +29,7 @@ struct No<NT> : IteratorProtocol {
 class X<XT> : Q {
   typealias Iterator = No<XT>
   
-  func f<SX : SequenceType where SX.Iterator.Element == X.Iterator.Element>(x: SX) {
+  func f<SX : Sequence where SX.Iterator.Element == X.Iterator.Element>(x: SX) {
   }
   
   func iterator() -> No<XT> {

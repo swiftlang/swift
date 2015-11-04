@@ -18,7 +18,7 @@ extension LazySequenceType {
   ///
   /// - Complexity: O(1)
   @warn_unused_result
-  public func flatMap<Intermediate: SequenceType>(
+  public func flatMap<Intermediate: Sequence>(
     transform: (Elements.Iterator.Element)->Intermediate
   ) -> LazySequence<
     FlattenSequence<LazyMapSequence<Elements, Intermediate>>> {

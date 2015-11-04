@@ -593,7 +593,7 @@ StringTests.test("COW/replaceRange/end") {
 }
 
 func asciiString<
-  S: SequenceType where S.Iterator.Element == Character
+  S: Sequence where S.Iterator.Element == Character
 >(content: S) -> String {
   var s = String()
   s.appendContentsOf(content)

@@ -53,7 +53,7 @@ func == (x: Tracked, y: Tracked) -> Bool {
 
 //===--- struct MrMcRange -------------------------------------------------===//
 // A wrapper around Range<Tracked> that allows us to detect when it is
-// being treated as a Collection rather than merely a SequenceType, which
+// being treated as a Collection rather than merely a Sequence, which
 // helps us to prove that an optimization is being used.  In
 // particular, when constructing a _ContiguousArrayBuffer from a
 // Collection, the necessary storage should be pre-allocated.
@@ -84,7 +84,7 @@ struct MrMcRange : Collection {
   var base: Base
 }
 
-func printSequence<T : SequenceType>(x: T) {
+func printSequence<T : Sequence>(x: T) {
   print("<", terminator: "")
   var prefix = ""
   for a in x {

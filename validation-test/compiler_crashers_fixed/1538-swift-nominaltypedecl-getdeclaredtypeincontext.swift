@@ -23,7 +23,7 @@ func b.init() -> () -> {
 }
 }
 }
-class B : SequenceType, q:Any, i : NSObject {
+class B : Sequence, q:Any, i : NSObject {
 i(s: d = ")(n: ExtensibleCollectionType>(s: d = nil
 }
 class b<T) {

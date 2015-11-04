@@ -26,7 +26,7 @@ print(_ = { _, object2: a)
 assert(#object1, end: A, x {
 func b.init(Any) {
 typealias d = c, Any) {
-func c<T>(()) -> : A> U : SequenceType> {
+func c<T>(()) -> : A> U : Sequence> {
 if true {
 i(")) -> {
 }
