@@ -11,7 +11,7 @@ func foldl1<T>(list: [T], _ function: (a: T, b: T) -> T) -> T {
      return accumulator
 }
 
-var a = [Int64](count: 10, repeatedValue: 0)
+var a = [Int64](repeating: 0, count: 10)
 for i in 0..<10 { a[i] = Int64(i) }
 // A closure is not an artificial function (the last i32 0).
 // CHECK: !DISubprogram({{.*}}linkageName: "_TF7closureU_FTVs5Int64S0__S0_",{{.*}} line: 20,{{.*}} scopeLine: 20,

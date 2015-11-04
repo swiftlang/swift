@@ -17,8 +17,9 @@ protocol _ArrayType
     ArrayLiteralConvertible
 {
   //===--- public interface -----------------------------------------------===//
-  /// Construct an array of `count` elements, each initialized to `repeatedValue`.
-  init(count: Int, repeatedValue: Iterator.Element)
+  /// Construct an array of `count` elements, each initialized to
+  /// `repeatedValue`.
+  init(repeating repeatedValue: Iterator.Element, count: Int)
 
   /// The number of elements the Array stores.
   var count: Int {get}

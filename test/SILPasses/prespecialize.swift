@@ -23,13 +23,13 @@ public func test(inout a: [Int], size: Int) {
 }
 
 // CHECK-LABEL: sil [noinline] @_TF13prespecialize3runFT_T_
-// Look for generic specialization <Swift.Int> of Swift.Array.init <A> (Swift.Array<A>.Type)(count : Swift.Int, repeatedValue : A) -> Swift.Array<A>
-// CHECK: function_ref @_TTSg5Si___TFSaCfT5countSi13repeatedValuex_GSax_
+// Look for generic specialization <Swift.Int> of Swift.Array.init (repeating : A, count : Swift.Int) -> Swift.Array<A>
+// CHECK: function_ref @_TTSg5Si___TFSaCfT9repeatingx5countSi_GSax_
 // CHECK: return
 @inline(never)
 public func run() {
   let size = 10000
-  var p = [Int](count: size, repeatedValue: 0)
+  var p = [Int](repeating: 0, count: size)
   for i in 0..<size {
     p[i] = i
   }

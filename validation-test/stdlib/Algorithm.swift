@@ -136,8 +136,8 @@ func makeQSortKiller(len: Int) -> [Int] {
     return keys[x]! > keys[y]!
   }
 
-  var ary = [Int](count: len, repeatedValue:0)
-  var ret = [Int](count: len, repeatedValue:0)
+  var ary = [Int](repeating: 0, count: len)
+  var ret = [Int](repeating: 0, count: len)
   for i in 0..<len { ary[i] = i }
   ary = ary.sort(Compare)
   for i in 0..<len {
@@ -151,10 +151,10 @@ Algorithm.test("sorted/complexity") {
 
   // Check performance of sort on array of repeating values
   var comparisons_100 = 0
-  ary = [Int](count: 100, repeatedValue: 0)
+  ary = [Int](repeating: 0, count: 100)
   ary.sortInPlace { comparisons_100++; return $0 < $1 }
   var comparisons_1000 = 0
-  ary = [Int](count: 1000, repeatedValue: 0)
+  ary = [Int](repeating: 0, count: 1000)
   ary.sortInPlace { comparisons_1000++; return $0 < $1 }
   expectTrue(comparisons_1000/comparisons_100 < 20)
 

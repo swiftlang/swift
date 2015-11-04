@@ -506,7 +506,7 @@ extension ${Self} : _ArrayType {
   /// Construct a ${Self} of `count` elements, each initialized to
   /// `repeatedValue`.
   @_semantics("array.init")
-  public init(count: Int, repeatedValue: Element) {
+  public init(repeating repeatedValue: Element, count: Int) {
     var p: UnsafeMutablePointer<Element>
     (self, p) = ${Self}._allocateUninitialized(count)
     for _ in 0..<count {

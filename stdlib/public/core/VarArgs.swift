@@ -104,9 +104,10 @@ public func getVaList(args: [CVarArgType]) -> CVaListPointer {
 @warn_unused_result
 public func _encodeBitsAsWords<T : CVarArgType>(x: T) -> [Int] {
   let result = [Int](
-    count: (sizeof(T.self) + sizeof(Int.self) - 1) / sizeof(Int.self),
-    repeatedValue: 0)
+    repeating: 0,
+    count: (sizeof(T.self) + sizeof(Int.self) - 1) / sizeof(Int.self))
   var tmp = x
+  // FIXME: use UnsafeMutablePointer.assignFrom() instead of memcpy.
   _memcpy(dest: UnsafeMutablePointer(result._baseAddressIfContiguous),
           src: UnsafeMutablePointer(Builtin.addressof(&tmp)),
           size: UInt(sizeof(T.self)))
@@ -293,7 +294,7 @@ final public class VaListBuilder {
       let misalignmentInWords = count % alignmentInWords
       if misalignmentInWords != 0 {
         let paddingInWords = alignmentInWords - misalignmentInWords
-        appendWords([Int](count: paddingInWords, repeatedValue: -1))
+        appendWords([Int](repeating: -1, count: paddingInWords))
       }
     }
 #endif
@@ -383,7 +384,7 @@ final public class VaListBuilder {
 
   init() {
     // prepare the register save area
-    storage = Array(count: _x86_64RegisterSaveWords, repeatedValue: 0)
+    storage = Array(repeating: 0, count: _x86_64RegisterSaveWords)
   }
 
   func append(arg: CVarArgType) {

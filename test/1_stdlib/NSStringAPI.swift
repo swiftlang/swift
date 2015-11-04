@@ -600,7 +600,7 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     while (expectedStr.count != bufferLength) {
       expectedStr.append(0xff)
     }
-    var buffer = [UInt8](count: bufferLength, repeatedValue: 0xff)
+    var buffer = [UInt8](repeating: 0xff, count: bufferLength)
     var usedLength = 0
     var remainingRange = startIndex..<endIndex
     var result = s.getBytes(&buffer, maxLength: 11, usedLength: &usedLength,
@@ -621,7 +621,7 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     while (expectedStr.count != bufferLength) {
       expectedStr.append(0xff)
     }
-    var buffer = [UInt8](count: bufferLength, repeatedValue: 0xff)
+    var buffer = [UInt8](repeating: 0xff, count: bufferLength)
     var usedLength = 0
     var remainingRange = startIndex..<endIndex
     var result = s.getBytes(&buffer, maxLength: 11, usedLength: &usedLength,
@@ -641,7 +641,7 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     while (expectedStr.count != bufferLength) {
       expectedStr.append(0xff)
     }
-    var buffer = [UInt8](count: bufferLength, repeatedValue: 0xff)
+    var buffer = [UInt8](repeating: 0xff, count: bufferLength)
     var usedLength = 0
     var remainingRange = startIndex..<endIndex
     var result = s.getBytes(&buffer, maxLength: bufferLength,
@@ -661,7 +661,7 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     while (expectedStr.count != bufferLength) {
       expectedStr.append(0xff)
     }
-    var buffer = [UInt8](count: bufferLength, repeatedValue: 0xff)
+    var buffer = [UInt8](repeating: 0xff, count: bufferLength)
     var usedLength = 0
     var remainingRange = startIndex..<endIndex
     var result = s.getBytes(&buffer, maxLength: bufferLength,
@@ -682,7 +682,7 @@ NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
     // The largest buffer that can not accommodate the string plus null terminator.
     let bufferLength = 16
     var buffer = Array(
-      count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
+      repeating: CChar(bitPattern: 0xff), count: bufferLength)
     let result = s.getCString(&buffer, maxLength: 100,
       encoding: NSUTF8StringEncoding)
     expectFalse(result)
@@ -695,7 +695,7 @@ NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
       expectedStr.append(CChar(bitPattern: 0xff))
     }
     var buffer = Array(
-      count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
+      repeating: CChar(bitPattern: 0xff), count: bufferLength)
     let result = s.getCString(&buffer, maxLength: 100,
       encoding: NSUTF8StringEncoding)
     expectTrue(result)
@@ -705,7 +705,7 @@ NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
     // Limit buffer size with 'maxLength'.
     let bufferLength = 100
     var buffer = Array(
-      count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
+      repeating: CChar(bitPattern: 0xff), count: bufferLength)
     let result = s.getCString(&buffer, maxLength: 8,
       encoding: NSUTF8StringEncoding)
     expectFalse(result)
@@ -715,7 +715,7 @@ NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
     let illFormedUTF16 = NonContiguousNSString([ 0xd800 ]) as String
     let bufferLength = 100
     var buffer = Array(
-      count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
+      repeating: CChar(bitPattern: 0xff), count: bufferLength)
     let result = illFormedUTF16.getCString(&buffer, maxLength: 100,
       encoding: NSUTF8StringEncoding)
     expectFalse(result)

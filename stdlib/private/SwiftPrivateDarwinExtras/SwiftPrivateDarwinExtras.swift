@@ -41,8 +41,8 @@ public struct _stdlib_fd_set {
 
   public init() {
     _data = [UInt32](
-      count: Int(_stdlib_FD_SETSIZE) / _stdlib_fd_set._wordBits,
-      repeatedValue: 0)
+      repeating: 0,
+      count: Int(_stdlib_FD_SETSIZE) / _stdlib_fd_set._wordBits)
   }
 
   public func isset(fd: CInt) -> Bool {

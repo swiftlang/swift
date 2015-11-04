@@ -48,8 +48,9 @@ UnicodeTrie.test("_UnicodeGraphemeClusterBreakPropertyTrie") {
 
   var trie = _UnicodeGraphemeClusterBreakPropertyTrie()
 
-  var expected = [_GraphemeClusterBreakPropertyValue](count: 0x110000,
-      repeatedValue: _GraphemeClusterBreakPropertyValue.Other)
+  var expected = [_GraphemeClusterBreakPropertyValue](
+    repeating: _GraphemeClusterBreakPropertyValue.Other,
+    count: 0x110000)
   for (startCodePoint, endCodePoint, value) in graphemeBreakPropertyTable {
     for cp in startCodePoint...endCodePoint {
       expected[cp] = value

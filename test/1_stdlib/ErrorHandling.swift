@@ -163,7 +163,7 @@ ErrorHandlingTests.test("ErrorHandling/Array flatMap") {
       if x == 2 {
         throw SillyError.JazzHands
       }
-      return Array(count: x, repeatedValue: x)
+      return Array(repeating: x, count: x)
     }
     expectUnreachable()
   } catch {}

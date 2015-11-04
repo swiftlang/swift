@@ -14,8 +14,8 @@
 extension String {
   /// Construct an instance that is the concatenation of `count` copies
   /// of `repeatedValue`.
-  public init(count: Int, repeatedValue c: Character) {
-    let s = String(c)
+  public init(repeating repeatedValue: Character, count: Int) {
+    let s = String(repeatedValue)
     self = String(_storage: _StringBuffer(
         capacity: s._core.count * count,
         initialSize: 0,
@@ -27,9 +27,10 @@ extension String {
 
   /// Construct an instance that is the concatenation of `count` copies
   /// of `Character(repeatedValue)`.
-  public init(count: Int, repeatedValue c: UnicodeScalar) {
-    self = String._fromWellFormedCodeUnitSequence(UTF32.self,
-        input: Repeat(count: count, repeatedValue: c.value))
+  public init(repeating repeatedValue: UnicodeScalar, count: Int) {
+    self = String._fromWellFormedCodeUnitSequence(
+      UTF32.self,
+      input: Repeat(repeating: repeatedValue.value, count: count))
   }
   
   public var _lines : [String] {
@@ -50,7 +51,7 @@ extension String {
 
 extension String {
   public init(_ _c: UnicodeScalar) {
-    self = String(count: 1, repeatedValue: _c)
+    self = String(repeating: _c, count: 1)
   }
 
   @warn_unused_result

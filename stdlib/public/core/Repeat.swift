@@ -20,7 +20,7 @@ public struct Repeat<Element> : Collection {
 
   /// Construct an instance that contains `count` elements having the
   /// value `repeatedValue`.
-  public init(count: Int, repeatedValue: Element) {
+  public init(repeating repeatedValue: Element, count: Int) {
     self.count = count
     self.repeatedValue = repeatedValue
   }

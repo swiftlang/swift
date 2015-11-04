@@ -612,9 +612,12 @@ let a = safeAssign // expected-error {{generic parameter 'T' could not be inferr
 
 
 // <rdar://problem/21692808> QoI: Incorrect 'add ()' fixit with trailing closure
-func foo() -> [Int] {
-  return Array <Int> (count: 1) { // expected-error {{cannot invoke initializer for type 'Array<Int>' with an argument list of type '(count: Int, () -> Int)'}}
-    // expected-note @-1 {{expected an argument list of type '(count: Int, repeatedValue: Element)'}}
+struct Radar21692808<Element> {
+  init(count: Int, value: Element) {}
+}
+func radar21692808() -> Radar21692808<Int> {
+  return Radar21692808<Int>(count: 1) { // expected-error {{cannot invoke initializer for type 'Radar21692808<Int>' with an argument list of type '(count: Int, () -> Int)'}}
+    // expected-note @-1 {{expected an argument list of type '(count: Int, value: Element)'}}
     return 1
   }
 }

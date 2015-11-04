@@ -40,7 +40,7 @@ public func randInt() -> Int {
 }
 
 public func randArray64(count: Int) -> [UInt64] {
-  var result = [UInt64](count: count, repeatedValue: 0)
+  var result = [UInt64](repeating: 0, count: count)
   for i in result.indices {
     result[i] = rand64()
   }
@@ -48,7 +48,7 @@ public func randArray64(count: Int) -> [UInt64] {
 }
 
 public func randArray(count: Int) -> [Int] {
-  var result = [Int](count: count, repeatedValue: 0)
+  var result = [Int](repeating: 0, count: count)
   for i in result.indices {
     result[i] = randInt()
   }

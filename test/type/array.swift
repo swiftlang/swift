@@ -29,7 +29,7 @@ func testGenericSpec() {
 
 // Array types for construction.
 func constructArray(n: Int) {
-  var ones = [Int](count: n, repeatedValue: 1)
+  var ones = [Int](repeating: 1, count: n)
   ones[5] = 0
 
   var matrix = [[Float]]()

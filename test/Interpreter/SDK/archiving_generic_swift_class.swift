@@ -165,7 +165,7 @@ func unarchive() {
   // written it.
   var rawData: [UInt8] = []
 
-  var buffer = [UInt8](count: 4096, repeatedValue: 0)
+  var buffer = [UInt8](repeating: 0, count: 4096)
 
   while true {
     let count = read(STDIN_FILENO, &buffer, 4096)

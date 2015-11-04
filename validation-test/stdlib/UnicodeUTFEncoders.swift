@@ -94,8 +94,8 @@ func nsEncode<CodeUnit>(
 class CodecTest<Codec : TestableUnicodeCodec> {
   var used = 0
   typealias CodeUnit = Codec.CodeUnit
-  var nsEncodeBuffer: [CodeUnit] = Array(count: 4, repeatedValue: 0)
-  var encodeBuffer: [CodeUnit] = Array(count: 4, repeatedValue: 0)
+  var nsEncodeBuffer: [CodeUnit] = Array(repeating: 0, count: 4)
+  var encodeBuffer: [CodeUnit] = Array(repeating: 0, count: 4)
 
   func testOne(scalar: UnicodeScalar) {
     /* Progress reporter

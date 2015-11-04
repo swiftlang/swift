@@ -161,8 +161,8 @@ public func forAllPermutations(size: Int, body: ([Int]) -> Void) {
     return
   }
 
-  var permutation = [Int](count: size, repeatedValue: 0)
-  var visited = [Bool](count: size, repeatedValue: false)
+  var permutation = [Int](repeating: 0, count: size)
+  var visited = [Bool](repeating: false, count: size)
   _forAllPermutationsImpl(0, size, &permutation, &visited, body)
 }
 

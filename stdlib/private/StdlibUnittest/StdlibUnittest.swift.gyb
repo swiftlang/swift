@@ -2654,24 +2654,24 @@ internal enum _CollectionOperation : Equatable {
       let invalidIndices = result.indices
       result.replaceRange(
         invalidIndices,
-        with: Repeat(count: invalidIndices.count, repeatedValue: nextStateId))
+        with: Repeat(repeating: nextStateId, count: invalidIndices.count))
 
     case Append:
       result.append(nextStateId)
 
     case AppendContentsOf(let count):
       result.appendContentsOf(
-        Repeat(count: count, repeatedValue: nextStateId))
+        Repeat(repeating: nextStateId, count: count))
 
     case ReplaceRange(let subRange, let replacementCount):
       result.replaceRange(
         subRange,
-        with: Repeat(count: replacementCount, repeatedValue: nextStateId))
+        with: Repeat(repeating: nextStateId, count: replacementCount))
 
       let invalidIndices = subRange.startIndex..<result.endIndex
       result.replaceRange(
         invalidIndices,
-        with: Repeat(count: invalidIndices.count, repeatedValue: nextStateId))
+        with: Repeat(repeating: nextStateId, count: invalidIndices.count))
 
     case Insert(let atIndex):
       result.insert(nextStateId, atIndex: atIndex)
@@ -2679,17 +2679,17 @@ internal enum _CollectionOperation : Equatable {
       let invalidIndices = atIndex..<result.endIndex
       result.replaceRange(
         invalidIndices,
-        with: Repeat(count: invalidIndices.count, repeatedValue: nextStateId))
+        with: Repeat(repeating: nextStateId, count: invalidIndices.count))
 
     case InsertContentsOf(let atIndex, let count):
       result.insertContentsOf(
-        Repeat(count: count, repeatedValue: nextStateId),
+        Repeat(repeating: nextStateId, count: count),
         at: atIndex)
 
       let invalidIndices = atIndex..<result.endIndex
       result.replaceRange(
         invalidIndices,
-        with: Repeat(count: invalidIndices.count, repeatedValue: nextStateId))
+        with: Repeat(repeating: nextStateId, count: invalidIndices.count))
 
     case RemoveAtIndex(let index):
       result.removeAtIndex(index)
@@ -2697,7 +2697,7 @@ internal enum _CollectionOperation : Equatable {
       let invalidIndices = index..<result.endIndex
       result.replaceRange(
         invalidIndices,
-        with: Repeat(count: invalidIndices.count, repeatedValue: nextStateId))
+        with: Repeat(repeating: nextStateId, count: invalidIndices.count))
 
     case RemoveLast:
       result.removeLast()
@@ -2708,7 +2708,7 @@ internal enum _CollectionOperation : Equatable {
       let invalidIndices = subRange.startIndex..<result.endIndex
       result.replaceRange(
         invalidIndices,
-        with: Repeat(count: invalidIndices.count, repeatedValue: nextStateId))
+        with: Repeat(repeating: nextStateId, count: invalidIndices.count))
 
     case RemoveAll(let keepCapacity):
       result.removeAll(keepCapacity: keepCapacity)
@@ -2779,7 +2779,7 @@ public struct _CollectionState : Equatable, Hashable {
   internal init(newRootStateForElementCount count: Int) {
     self._id = _CollectionState._nextUnusedState++
     self._elementsLastMutatedStateIds =
-      Array(Repeat(count: count, repeatedValue: self._id))
+      Array(Repeat(repeating: self._id, count: count))
   }
 
   internal init(name: String, elementCount: Int) {

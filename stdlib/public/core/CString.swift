@@ -59,7 +59,7 @@ public func _persistCString(s: UnsafePointer<CChar>) -> [CChar]? {
     return .None
   }
   let length = Int(_swift_stdlib_strlen(s))
-  var result = [CChar](count: length + 1, repeatedValue: 0)
+  var result = [CChar](repeating: 0, count: length + 1)
   for i in 0..<length {
     // FIXME: this will not compile on platforms where 'CChar' is unsigned.
     result[i] = s[i]

@@ -316,7 +316,7 @@ StringTests.test("appendToSubstring") {
           sliceEnd < sliceStart {
           continue
         }
-        var s0 = String(count: initialSize, repeatedValue: UnicodeScalar("x"))
+        var s0 = String(repeating: UnicodeScalar("x"), count: initialSize)
         let originalIdentity = s0.bufferID
         s0 = s0[
           s0.startIndex.advancedBy(sliceStart)..<s0.startIndex.advancedBy(sliceEnd)]
@@ -330,8 +330,8 @@ StringTests.test("appendToSubstring") {
         }
         expectEqual(
           String(
-            count: sliceEnd - sliceStart + 1,
-            repeatedValue: UnicodeScalar("x")),
+            repeating: UnicodeScalar("x"),
+            count: sliceEnd - sliceStart + 1),
           s0)
       }
     }
@@ -359,8 +359,8 @@ StringTests.test("appendToSubstringBug") {
   let prefixSize = size - suffixSize
   for i in 1..<10 {
     // We will be overflowing s0 with s1.
-    var s0 = String(count: size, repeatedValue: UnicodeScalar("x"))
-    let s1 = String(count: prefixSize, repeatedValue: UnicodeScalar("x"))
+    var s0 = String(repeating: UnicodeScalar("x"), count: size)
+    let s1 = String(repeating: UnicodeScalar("x"), count: prefixSize)
     let originalIdentity = s0.bufferID
 
     // Turn s0 into a slice that points to the end.
@@ -378,8 +378,9 @@ StringTests.test("appendToSubstringBug") {
 
     expectEqual(
       String(
-        count: suffixSize + prefixSize,
-        repeatedValue: UnicodeScalar("x")), s0)
+        repeating: UnicodeScalar("x"),
+        count: suffixSize + prefixSize),
+      s0)
   }
 }
 
@@ -618,16 +619,16 @@ StringTests.test("stringCoreExtensibility") {
         
         for i in 0..<length {
           x.appendContentsOf(
-            Repeat(count: 3, repeatedValue: i < boundary ? ascii : nonAscii))
+            Repeat(repeating: i < boundary ? ascii : nonAscii, count: 3))
         }
         // Make sure we can append pure ASCII to wide storage
-        x.appendContentsOf(Repeat(count: 2, repeatedValue: ascii))
+        x.appendContentsOf(Repeat(repeating: ascii, count: 2))
         
         expectEqualSequence(
           [UTF16.CodeUnit(UnicodeScalar("b").value)]
-          + Array(Repeat(count: 3*boundary, repeatedValue: ascii))
-          + Repeat(count: 3*(length - boundary), repeatedValue: nonAscii)
-          + Repeat(count: 2, repeatedValue: ascii),
+          + Array(Repeat(repeating: ascii, count: 3*boundary))
+          + Repeat(repeating: nonAscii, count: 3*(length - boundary))
+          + Repeat(repeating: ascii, count: 2),
           x
         )
       }
@@ -759,17 +760,17 @@ StringTests.test("reserveCapacity") {
   let id0 = s.bufferID
   let oldCap = s.capacity
   let x: Character = "x" // Help the typechecker - <rdar://problem/17128913>
-  s.insertContentsOf(Repeat(count: s.capacity + 1, repeatedValue: x), at: s.endIndex)
+  s.insertContentsOf(Repeat(repeating: x, count: s.capacity + 1), at: s.endIndex)
   expectNotEqual(id0, s.bufferID)
   s = ""
   print("empty capacity \(s.capacity)")
   s.reserveCapacity(oldCap + 2)
   print("reserving \(oldCap + 2) -> \(s.capacity), width = \(s._core.elementWidth)")
   let id1 = s.bufferID
-  s.insertContentsOf(Repeat(count: oldCap + 2, repeatedValue: x), at: s.endIndex)
+  s.insertContentsOf(Repeat(repeating: x, count: oldCap + 2), at: s.endIndex)
   print("extending by \(oldCap + 2) -> \(s.capacity), width = \(s._core.elementWidth)")
   expectEqual(id1, s.bufferID)
-  s.insertContentsOf(Repeat(count: s.capacity + 100, repeatedValue: x), at: s.endIndex)
+  s.insertContentsOf(Repeat(repeating: x, count: s.capacity + 100), at: s.endIndex)
   expectNotEqual(id1, s.bufferID)
 }
 

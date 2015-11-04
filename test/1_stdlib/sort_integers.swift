@@ -25,8 +25,8 @@ func _permuteInternal(
 
 // Convenience wrapper for the permute method.
 func permute(size: Int, _ verify: ([Int]) -> Void) {
-  var perm = [Int](count: size, repeatedValue: 0)
-  var visited = [Bool](count: size, repeatedValue: false)
+  var perm = [Int](repeating: 0, count: size)
+  var visited = [Bool](repeating: false, count: size)
   _permuteInternal(0, size, &perm, &visited, verify)
 }
 

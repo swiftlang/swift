@@ -16,7 +16,7 @@ public struct _FDInputStream {
   public let fd: CInt
   public var isClosed: Bool = false
   public var isEOF: Bool = false
-  internal var _buffer = [UInt8](count: 256, repeatedValue: 0)
+  internal var _buffer = [UInt8](repeating: 0, count: 256)
   internal var _bufferUsed: Int = 0
 
   public init(fd: CInt) {

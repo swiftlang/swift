@@ -141,7 +141,7 @@ public func spawnChild(args: [String])
 }
 
 internal func _readAll(fd: CInt) -> String {
-  var buffer = [UInt8](count: 1024, repeatedValue: 0)
+  var buffer = [UInt8](repeating: 0, count: 1024)
   var usedBytes = 0
   while true {
     let readResult: ssize_t = buffer.withUnsafeMutableBufferPointer {
