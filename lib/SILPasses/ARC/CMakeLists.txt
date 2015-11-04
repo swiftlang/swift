@@ -4,7 +4,6 @@ set(ARC_SOURCES
   ARC/GlobalARCPairingAnalysis.cpp
   ARC/GlobalARCSequenceDataflow.cpp
   ARC/GlobalLoopARCSequenceDataflow.cpp
-  ARC/RCIdentityAnalysis.cpp  
   ARC/RCStateTransition.cpp
   ARC/RCStateTransitionVisitors.cpp  
   ARC/RefCountState.cpp
