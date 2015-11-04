@@ -4822,14 +4822,16 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // *remove* any bits that are already on the closure though.
       // Note that in this case, we do not want to propagate the 'throws' bit
       // to the closure type, as the closure has already been analyzed for
-      // throwing subexpressions.
+      // throwing subexpressions. We also don't want to change the convention
+      // of the original closure.
       auto fromEI = fromFunc->getExtInfo(), toEI = toFunc->getExtInfo();
       if ((toEI.isNoEscape() && !fromEI.isNoEscape()) ||
           (toEI.isNoReturn() && !fromEI.isNoReturn())) {
         auto newToEI =
           toEI.withIsNoReturn(toEI.isNoReturn()|fromEI.isNoReturn())
-                .withNoEscape(toEI.isNoEscape()|fromEI.isNoEscape())
-                .withThrows(toEI.throws()&fromEI.throws());
+              .withNoEscape(toEI.isNoEscape()|fromEI.isNoEscape())
+              .withThrows(toEI.throws()&fromEI.throws())
+              .withRepresentation(fromEI.getRepresentation());
         auto newToType = FunctionType::get(fromFunc->getInput(),
                                            fromFunc->getResult(), newToEI);
         if (applyTypeToClosureExpr(expr, newToType)) {

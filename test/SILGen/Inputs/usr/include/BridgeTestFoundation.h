@@ -1,4 +1,5 @@
 #import "ObjectiveC.h"
+#import "dispatch.h"
 
 #pragma clang assume_nonnull begin
 
@@ -74,3 +75,17 @@ void useBool(_Bool x);
 
 #pragma clang assume_nonnull end
 
+void nonnullStringBlockResult(NSString *_Nonnull (^block)(void));
+void nonnullArrayBlockResult(NSArray *_Nonnull (^block)(void));
+void nonnullDictionaryBlockResult(NSDictionary *_Nonnull (^block)(void));
+void nonnullSetBlockResult(NSSet *_Nonnull (^block)(void));
+
+void noescapeBlock(__attribute__((noescape)) void (^block)(void));
+void escapeBlock(void (^block)(void));
+
+void noescapeNonnullBlock(__attribute__((noescape)) void (^_Nonnull block)(void));
+void escapeNonnullBlock(void (^_Nonnull block)(void));
+
+void noescapeBlockAlias(__attribute__((noescape)) dispatch_block_t block);
+void noescapeNonnullBlockAlias(__attribute__((noescape)) _Nonnull dispatch_block_t  block);
+void escapeBlockAlias(dispatch_block_t  block);

@@ -308,8 +308,6 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 ManagedValue
 SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                                  AnyFunctionRef TheClosure) {
-  // FIXME: Stash the capture args somewhere and curry them on demand rather
-  // than here.
   assert(((constant.uncurryLevel == 1 &&
            TheClosure.getCaptureInfo().hasLocalCaptures()) ||
           (constant.uncurryLevel == 0 &&

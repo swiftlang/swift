@@ -346,19 +346,14 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   return emitManagedRValueWithCleanup(heapBlock);
 }
 
-static ManagedValue emitNativeToCBridgedValue(SILGenFunction &gen,
-                                              SILLocation loc,
-                                              ManagedValue v,
-                                              SILType bridgedTy) {
+static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &gen,
+                                                         SILLocation loc,
+                                                         ManagedValue v,
+                                                         SILType bridgedTy) {
   CanType loweredBridgedTy = bridgedTy.getSwiftRValueType();
   CanType loweredNativeTy = v.getType().getSwiftRValueType();
   if (loweredNativeTy == loweredBridgedTy)
     return v;
-
-  if (loweredNativeTy.getAnyOptionalObjectType()) {
-    return gen.emitOptionalToOptional(loc, v, bridgedTy,
-                                      emitNativeToCBridgedValue);
-  }
 
   // If the input is a native type with a bridged mapping, convert it.
 #define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType,Opt) \
@@ -412,6 +407,34 @@ static ManagedValue emitNativeToCBridgedValue(SILGenFunction &gen,
   }
 
   return v;
+}
+
+static ManagedValue emitNativeToCBridgedValue(SILGenFunction &gen,
+                                              SILLocation loc,
+                                              ManagedValue v,
+                                              SILType bridgedTy) {
+  CanType loweredBridgedTy = bridgedTy.getSwiftRValueType();
+  CanType loweredNativeTy = v.getType().getSwiftRValueType();
+  if (loweredNativeTy == loweredBridgedTy)
+    return v;
+
+  if (loweredNativeTy.getAnyOptionalObjectType()) {
+    return gen.emitOptionalToOptional(loc, v, bridgedTy,
+                                      emitNativeToCBridgedValue);
+  }
+  
+  // Check if we need to wrap the bridged result in an optional.
+  OptionalTypeKind OTK;
+  if (SILType bridgedObjectType =
+        bridgedTy.getAnyOptionalObjectType(gen.SGM.M, OTK)) {
+    auto bridgedPayload
+      = emitNativeToCBridgedNonoptionalValue(gen, loc, v, bridgedObjectType);
+    
+    return gen.getOptionalSomeValue(loc, bridgedPayload,
+                                    gen.getTypeLowering(bridgedTy));
+  }
+  
+  return emitNativeToCBridgedNonoptionalValue(gen, loc, v, bridgedTy);
 }
 
 ManagedValue SILGenFunction::emitNativeToBridgedValue(SILLocation loc,
