@@ -2937,7 +2937,8 @@ public:
           handleDeclRange(Ex->getMembers(), Reason);
         }
       } else if (isNameHit(VD->getNameStr())) {
-        unboxType(VD->getType());
+        if (VD->hasType())
+          unboxType(VD->getType());
       }
     }
   };
