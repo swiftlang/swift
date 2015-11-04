@@ -2440,7 +2440,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     }
     auto fn = FuncDecl::createDeserialized(
         ctx, SourceLoc(), staticSpelling.getValue(), SourceLoc(), name,
-        SourceLoc(), SourceLoc(), genericParams, /*type=*/nullptr,
+        SourceLoc(), SourceLoc(), SourceLoc(), genericParams, /*type=*/nullptr,
         numParamPatterns, DC);
     fn->setEarlyAttrValidation();
     declOrOffset = fn;

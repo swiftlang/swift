@@ -4617,6 +4617,7 @@ class FuncDecl : public AbstractFunctionDecl {
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
   SourceLoc ThrowsLoc;  // Location of the 'throws' token.
+  SourceLoc AccessorKeywordLoc; // Location of the accessor keyword token, e,g. 'set'.
 
   TypeLoc FnRetType;
 
@@ -4639,11 +4640,14 @@ class FuncDecl : public AbstractFunctionDecl {
 
   FuncDecl(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
            SourceLoc FuncLoc, DeclName Name,
-           SourceLoc NameLoc, SourceLoc ThrowsLoc, unsigned NumParamPatterns,
+           SourceLoc NameLoc, SourceLoc ThrowsLoc,
+           SourceLoc AccessorKeywordLoc,
+           unsigned NumParamPatterns,
            GenericParamList *GenericParams, Type Ty, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Func, Parent, Name, NameLoc,
                            NumParamPatterns, GenericParams),
       StaticLoc(StaticLoc), FuncLoc(FuncLoc), ThrowsLoc(ThrowsLoc),
+      AccessorKeywordLoc(AccessorKeywordLoc),
       OverriddenOrDerivedForDecl(),
       OperatorAndAddressorKind(nullptr, AddressorKind::NotAddressor) {
     FuncDeclBits.IsStatic = StaticLoc.isValid() || getName().isOperator();
@@ -4662,6 +4666,7 @@ class FuncDecl : public AbstractFunctionDecl {
                               StaticSpellingKind StaticSpelling,
                               SourceLoc FuncLoc, DeclName Name,
                               SourceLoc NameLoc, SourceLoc ThrowsLoc,
+                              SourceLoc AccessorKeywordLoc,
                               GenericParamList *GenericParams, Type Ty,
                               unsigned NumParamPatterns,
                               DeclContext *Parent,
@@ -4673,6 +4678,7 @@ public:
                                       StaticSpellingKind StaticSpelling,
                                       SourceLoc FuncLoc, DeclName Name,
                                       SourceLoc NameLoc, SourceLoc ThrowsLoc,
+                                      SourceLoc AccessorKeywordLoc,
                                       GenericParamList *GenericParams, Type Ty,
                                       unsigned NumParamPatterns,
                                       DeclContext *Parent);
@@ -4680,7 +4686,8 @@ public:
   static FuncDecl *create(ASTContext &Context, SourceLoc StaticLoc,
                           StaticSpellingKind StaticSpelling,
                           SourceLoc FuncLoc, DeclName Name, SourceLoc NameLoc,
-                          SourceLoc ThrowsLoc, GenericParamList *GenericParams,
+                          SourceLoc ThrowsLoc, SourceLoc AccessorKeywordLoc,
+                          GenericParamList *GenericParams,
                           Type Ty, ArrayRef<Pattern *> BodyParams,
                           TypeLoc FnRetType, DeclContext *Parent,
                           ClangNode ClangN = ClangNode());
@@ -4727,6 +4734,7 @@ public:
   SourceLoc getStaticLoc() const { return StaticLoc; }
   SourceLoc getFuncLoc() const { return FuncLoc; }
   SourceLoc getThrowsLoc() const { return ThrowsLoc; }
+  SourceLoc getAccessorKeywordLoc() const {return AccessorKeywordLoc; }
 
   SourceLoc getStartLoc() const {
     return StaticLoc.isValid() ? StaticLoc : FuncLoc;

@@ -158,9 +158,9 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
 
   FuncDecl *getterDecl =
     FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-                     DeclName(), SourceLoc(), SourceLoc(), nullptr, Type(),
-                     params, TypeLoc::withoutLoc(propertyContextType),
-                     parentDC);
+                     DeclName(), SourceLoc(), SourceLoc(), SourceLoc(),
+                     nullptr, Type(), params,
+                     TypeLoc::withoutLoc(propertyContextType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setStatic(isStatic);
 

@@ -167,9 +167,8 @@ getBuiltinFunction(Identifier Id,
   DeclName Name(Context, Id, ArgNames);
   auto FD = FuncDecl::create(Context, SourceLoc(), StaticSpellingKind::None,
                           SourceLoc(), Name, SourceLoc(), SourceLoc(),
-                          /*GenericParams=*/nullptr, FnType, ParamPattern,
-                          TypeLoc::withoutLoc(ResType),
-                          DC);
+                          SourceLoc(), /*GenericParams=*/nullptr, FnType,
+                          ParamPattern, TypeLoc::withoutLoc(ResType), DC);
   FD->setImplicit();
   FD->setAccessibility(Accessibility::Public);
   return FD;
@@ -239,9 +238,9 @@ getBuiltinGenericFunction(Identifier Id,
   DeclName Name(Context, Id, ArgNames);
   auto func = FuncDecl::create(Context, SourceLoc(), StaticSpellingKind::None,
                                SourceLoc(), Name,
-                               SourceLoc(), SourceLoc(), GenericParams, FnType,
-                               ParamPattern, TypeLoc::withoutLoc(ResBodyType),
-                               DC);
+                               SourceLoc(), SourceLoc(), SourceLoc(),
+                               GenericParams, FnType, ParamPattern,
+                               TypeLoc::withoutLoc(ResBodyType), DC);
     
   func->setInterfaceType(InterfaceType);
   func->setImplicit();

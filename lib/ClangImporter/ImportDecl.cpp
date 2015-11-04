@@ -450,7 +450,7 @@ static FuncDecl *makeRawValueTrivialGetter(ClangImporter::Implementation &Impl,
 
   FuncDecl *getterDecl = FuncDecl::create(
       C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-      DeclName(), SourceLoc(), SourceLoc(),  nullptr, Type(), params,
+      DeclName(), SourceLoc(), SourceLoc(), SourceLoc(), nullptr, Type(), params,
       TypeLoc::withoutLoc(rawType), optionSetDecl);
   getterDecl->setImplicit();
   
@@ -517,7 +517,7 @@ static FuncDecl *makeRawValueTrivialSetter(ClangImporter::Implementation &Impl,
 
   FuncDecl *setterDecl = FuncDecl::create(
       C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-      DeclName(), SourceLoc(), SourceLoc(), nullptr, Type(), params,
+      DeclName(), SourceLoc(), SourceLoc(), SourceLoc(), nullptr, Type(), params,
       TypeLoc::withoutLoc(voidTy), importedDecl);
   setterDecl->setImplicit();
   setterDecl->setMutating();
@@ -659,7 +659,7 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
 
   auto getterDecl =
     FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-                     DeclName(), SourceLoc(), SourceLoc(), nullptr,
+                     DeclName(), SourceLoc(), SourceLoc(), SourceLoc(), nullptr,
                      Type(), params,
                      TypeLoc::withoutLoc(enumDecl->getRawType()), enumDecl);
   getterDecl->setImplicit();
@@ -705,9 +705,9 @@ static FuncDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
   auto getterDecl = FuncDecl::create(C, importedFieldDecl->getLoc(),
                                      StaticSpellingKind::None,
                                      SourceLoc(), DeclName(), SourceLoc(),
-                                     SourceLoc(), nullptr, Type(), getterParams,
-                                     getterFnRetTypeLoc, importedDecl,
-                                     clangNode);
+                                     SourceLoc(), SourceLoc(), nullptr, Type(),
+                                     getterParams, getterFnRetTypeLoc,
+                                     importedDecl, clangNode);
   getterDecl->setAccessibility(Accessibility::Public);
   
   auto voidTy = TupleType::getEmpty(C);
@@ -754,9 +754,9 @@ static FuncDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
 
   auto setterDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
                                      SourceLoc(), DeclName(), SourceLoc(),
-                                     SourceLoc(), nullptr, Type(), setterParams,
-                                     setterFnRetTypeLoc, importedDecl,
-                                     clangNode);
+                                     SourceLoc(), SourceLoc(), nullptr, Type(),
+                                     setterParams, setterFnRetTypeLoc,
+                                     importedDecl, clangNode);
   
   // Create the field setter
   auto setterFnTy = FunctionType::get(importedFieldDecl->getType(), voidTy);
@@ -2768,7 +2768,7 @@ namespace {
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
       auto result = FuncDecl::create(
           Impl.SwiftContext, SourceLoc(), StaticSpellingKind::None, loc,
-          name, nameLoc, SourceLoc(),
+          name, nameLoc, SourceLoc(), SourceLoc(),
           /*GenericParams=*/nullptr, type, bodyPatterns,
           TypeLoc::withoutLoc(resultTy), dc, decl);
 
@@ -3243,7 +3243,7 @@ namespace {
 
       auto result = FuncDecl::create(
           Impl.SwiftContext, SourceLoc(), StaticSpellingKind::None,
-          SourceLoc(), name, SourceLoc(), SourceLoc(),
+          SourceLoc(), name, SourceLoc(), SourceLoc(), SourceLoc(),
           /*GenericParams=*/nullptr, Type(),
           bodyPatterns, TypeLoc(), dc, decl);
 
@@ -3981,7 +3981,7 @@ namespace {
       // Create the getter thunk.
       FuncDecl *thunk = FuncDecl::create(
           context, SourceLoc(), StaticSpellingKind::None, loc,
-          Identifier(), SourceLoc(), SourceLoc(), nullptr, getterType,
+          Identifier(), SourceLoc(), SourceLoc(), SourceLoc(), nullptr, getterType,
           getterArgs, TypeLoc::withoutLoc(elementTy), dc,
           getter->getClangNode());
       thunk->setBodyResultType(elementTy);
@@ -4059,7 +4059,7 @@ namespace {
       // Create the setter thunk.
       FuncDecl *thunk = FuncDecl::create(
           context, SourceLoc(), StaticSpellingKind::None, setter->getLoc(),
-          Identifier(), SourceLoc(), SourceLoc(), nullptr, setterType,
+          Identifier(), SourceLoc(), SourceLoc(), SourceLoc(), nullptr, setterType,
           setterArgs, TypeLoc::withoutLoc(TupleType::getEmpty(context)), dc,
           setter->getClangNode());
       thunk->setBodyResultType(TupleType::getEmpty(context));
@@ -6327,7 +6327,8 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   // Create the getter function declaration.
   auto func = FuncDecl::create(context, SourceLoc(), StaticSpellingKind::None,
                                SourceLoc(), Identifier(),
-                               SourceLoc(), SourceLoc(), nullptr, getterType,
+                               SourceLoc(), SourceLoc(), SourceLoc(),
+                               nullptr, getterType,
                                getterArgs, TypeLoc::withoutLoc(type), dc);
   func->setStatic(isStatic);
   func->setBodyResultType(type);

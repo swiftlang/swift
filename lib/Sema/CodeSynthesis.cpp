@@ -201,7 +201,7 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
 
   auto getter = FuncDecl::create(
       TC.Context, staticLoc, StaticSpellingKind::None, loc, Identifier(), loc,
-      SourceLoc(), /*GenericParams=*/nullptr, Type(), getterParams,
+      SourceLoc(), SourceLoc(), /*GenericParams=*/nullptr, Type(), getterParams,
       TypeLoc::withoutLoc(storageType), storage->getDeclContext());
   getter->setImplicit();
 
@@ -240,8 +240,8 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
   Type setterRetTy = TupleType::getEmpty(TC.Context);
   FuncDecl *setter = FuncDecl::create(
       TC.Context, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, loc,
-      Identifier(), loc, SourceLoc(), /*generic=*/nullptr, Type(), params,
-      TypeLoc::withoutLoc(setterRetTy), storage->getDeclContext());
+      Identifier(), loc, SourceLoc(), SourceLoc(), /*generic=*/nullptr, Type(),
+      params, TypeLoc::withoutLoc(setterRetTy), storage->getDeclContext());
   setter->setImplicit();
 
   if (!storage->isSetterNonMutating())
@@ -378,8 +378,8 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
 
   auto *materializeForSet = FuncDecl::create(
       ctx, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, loc,
-      Identifier(), loc, SourceLoc(), /*generic=*/nullptr, Type(), params,
-      TypeLoc::withoutLoc(retTy), DC);
+      Identifier(), loc, SourceLoc(), SourceLoc(), /*generic=*/nullptr, Type(),
+      params, TypeLoc::withoutLoc(retTy), DC);
   materializeForSet->setImplicit();
   
   // materializeForSet is mutating and static if the setter is.

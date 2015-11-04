@@ -2629,7 +2629,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
                                     Parser::ParseDeclOptions Flags,
                                     AccessorKind Kind,
                                     AddressorKind addressorKind,
-                                    Parser *P) {
+                                    Parser *P, SourceLoc AccessorKeywordLoc) {
   // First task, set up the value argument pattern.  This is the NamePattern
   // (for setters) followed by the index list (for subscripts).  For
   // non-subscript getters, this degenerates down to "()".
@@ -2766,7 +2766,8 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
   // Start the function.
   auto *D = FuncDecl::create(P->Context, StaticLoc, StaticSpellingKind::None,
                              /* FIXME*/DeclLoc, Identifier(),
-                             DeclLoc, SourceLoc(), /*GenericParams=*/nullptr,
+                             DeclLoc, SourceLoc(), AccessorKeywordLoc,
+                             /*GenericParams=*/nullptr,
                              Type(), Params, ReturnType, P->CurDeclContext);
 
   // Non-static set/willSet/didSet/materializeForSet/mutableAddress
@@ -3037,6 +3038,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
       AccessorKind Kind;
       AddressorKind addressorKind = AddressorKind::NotAddressor;
       FuncDecl **TheDeclPtr;
+      SourceLoc AccessorKeywordLoc = Tok.getLoc();
       if (Tok.isContextualKeyword("get")) {
         Kind = AccessorKind::IsGetter;
         TheDeclPtr = &accessors.Get;
@@ -3054,6 +3056,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
         Kind = AccessorKind::IsMutableAddressor;
         TheDeclPtr = &accessors.MutableAddressor;
       } else {
+        AccessorKeywordLoc = SourceLoc();
         diagnose(Tok, diag::expected_getset_in_protocol);
         return true;
       }
@@ -3081,7 +3084,8 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
 
       // Set up a function declaration.
       TheDecl = createAccessorFunc(Loc, ValueNamePattern, ElementTy, Indices,
-                                   StaticLoc, Flags, Kind, addressorKind, this);
+                                   StaticLoc, Flags, Kind, addressorKind, this,
+                                   AccessorKeywordLoc);
       TheDecl->getAttrs() = Attributes;
       
       Decls.push_back(TheDecl);
@@ -3131,6 +3135,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
     AccessorKind Kind;
     AddressorKind addressorKind = AddressorKind::NotAddressor;
     FuncDecl **TheDeclPtr;
+    SourceLoc AccessorKeywordLoc =  Tok.getLoc();
     if (Tok.isContextualKeyword("get")) {
       Kind = AccessorKind::IsGetter;
       TheDeclPtr = &accessors.Get;
@@ -3152,6 +3157,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
       Kind = AccessorKind::IsMutableAddressor;
       TheDeclPtr = &accessors.MutableAddressor;
     } else {
+      AccessorKeywordLoc = SourceLoc();
       // This is an implicit getter.  Might be not valid in this position,
       // though.  Anyway, go back to the beginning of the getter code to ensure
       // that the diagnostics point to correct tokens.
@@ -3209,7 +3215,8 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
 
     // Set up a function declaration.
     TheDecl = createAccessorFunc(Loc, ValueNamePattern, ElementTy, Indices,
-                                 StaticLoc, Flags, Kind, addressorKind, this);
+                                 StaticLoc, Flags, Kind, addressorKind, this,
+                                 AccessorKeywordLoc);
     TheDecl->getAttrs() = Attributes;
 
     // Parse the body, if any.
@@ -3420,7 +3427,7 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
       TypedPattern *argPattern) -> FuncDecl* {
     auto accessor = createAccessorFunc(SourceLoc(), argPattern,
                                        elementTy, indices, staticLoc, flags,
-                                       kind, addressorKind, &P);
+                                       kind, addressorKind, &P, SourceLoc());
     accessor->setImplicit();
     decls.push_back(accessor);
     return accessor;
@@ -4018,7 +4025,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
 
     // Create the decl for the func and add it to the parent scope.
     FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,
-                          FuncLoc, FullName, NameLoc, throwsLoc,
+                          FuncLoc, FullName, NameLoc, throwsLoc, SourceLoc(),
                           GenericParams, Type(), BodyParams, FuncRetTy,
                           CurDeclContext);
     
