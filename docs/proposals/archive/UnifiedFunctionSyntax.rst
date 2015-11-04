@@ -3,6 +3,11 @@
 Unified Function Syntax via Selector Splitting
 ==============================================
 
+.. warning:: This document was used in planning Swift 1.0; it has not been kept
+  up to date and does not describe the current or planned behavior of Swift. In
+  particular, we experimented with preposition-based splitting and decided
+  against it.
+
 .. contents::
 
 Cocoa Selectors
