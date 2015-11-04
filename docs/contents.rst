@@ -7,7 +7,6 @@ Contents
 .. toctree::
    :maxdepth: 1
 
-   DesignDecisions
    IndexInvalidation
    AccessControl
    DriverInternals
