@@ -3,6 +3,9 @@
 Constructors and Initialization in Swift
 ========================================
 
+.. warning:: This proposal was rejected, though it helped in the design of the
+  final Swift 1 initialization model.
+
 .. contents::
 
 Initialization in Objective-C

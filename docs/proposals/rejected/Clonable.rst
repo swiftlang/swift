@@ -11,6 +11,9 @@
 :Date: 2013-03-21
 :Edition: 2
 
+.. warning:: This proposal was rejected. We decided not to introduce a
+  language-level copying mechanism for classes.
+
 **Abstract:** to better support the creation of value types, we
 propose a “magic” ``Clonable`` protocol and an annotation for describing
 which instance variables should be cloned when a type is copied.  This

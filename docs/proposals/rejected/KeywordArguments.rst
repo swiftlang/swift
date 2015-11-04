@@ -1,5 +1,9 @@
 :orphan:
 
+.. warning:: This proposal was rejected. We explored a number of alternate
+  syntaxes for method names that both allowed describing arguments and were
+  compatible with Objective-C selectors.
+
 Summary
 -------
 

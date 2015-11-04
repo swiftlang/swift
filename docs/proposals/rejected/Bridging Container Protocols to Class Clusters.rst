@@ -1,5 +1,8 @@
 :orphan:
 
+.. warning:: This proposal was rejected. We ultimately decided to keep Array as
+  a dual-representation struct.
+
 Bridging Container Protocols to Class Clusters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
