@@ -121,7 +121,7 @@ func testArchetypeReplacement1<FOO : Equatable>(a: [FOO]) {
 
 // PRIVATE_NOMINAL_MEMBERS_5: Begin completions
 // PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceMethod]/CurrNominal:   append({#(newElement): Equatable#})[#Void#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceMethod]/CurrNominal:   insert({#(newElement): Equatable#}, {#atIndex: Int#})[#Void#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceMethod]/CurrNominal:   insert({#(newElement): Equatable#}, {#at: Int#})[#Void#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceMethod]/CurrNominal:   popLast()[#Equatable?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceMethod]/Super:         iterator()[#CollectionDefaultIterator<[Equatable]>#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceVar]/Super:            isEmpty[#Bool#]{{; name=.+}}
@@ -138,7 +138,7 @@ func testArchetypeReplacement2<BAR : Equatable>(a: [BAR]) {
 
 // PRIVATE_NOMINAL_MEMBERS_6: Begin completions
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/CurrNominal:   append({#(newElement): Equatable#})[#Void#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/CurrNominal:   insert({#(newElement): Equatable#}, {#atIndex: Int#})[#Void#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/CurrNominal:   insert({#(newElement): Equatable#}, {#at: Int#})[#Void#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/CurrNominal:   popLast()[#Equatable?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         dropFirst()[#ArraySlice<Equatable>#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         dropLast()[#ArraySlice<Equatable>#]{{; name=.+}}

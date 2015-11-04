@@ -112,7 +112,7 @@ public protocol RangeReplaceableCollection : Collection {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  mutating func insert(newElement: Iterator.Element, atIndex i: Index)
+  mutating func insert(newElement: Iterator.Element, at i: Index)
 
   /// Insert `newElements` at index `i`.
   ///
@@ -189,7 +189,7 @@ extension RangeReplaceableCollection {
   }
 
   public mutating func append(newElement: Iterator.Element) {
-    insert(newElement, atIndex: endIndex)
+    insert(newElement, at: endIndex)
   }
 
   public mutating func appendContentsOf<
@@ -201,7 +201,7 @@ extension RangeReplaceableCollection {
   }
 
   public mutating func insert(
-    newElement: Iterator.Element, atIndex i: Index
+    newElement: Iterator.Element, at i: Index
   ) {
     replaceSubrange(i..<i, with: CollectionOfOne(newElement))
   }

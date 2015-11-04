@@ -342,8 +342,8 @@ state.
       var storage: ArrayStorage
 
       @set_subobject
-      func setElement(elt: T, atIndex: Int) {
-        storage.set(elt, atIndex)
+      func setElement(elt: T, at index: Int) {
+        storage.set(elt, index)
       }
     }
 

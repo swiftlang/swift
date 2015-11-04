@@ -159,10 +159,10 @@ public struct LoggingRangeReplaceableCollection<
   }
 
   public mutating func insert(
-    newElement: Base.Iterator.Element, atIndex i: Base.Index
+    newElement: Base.Iterator.Element, at i: Base.Index
   ) {
     ++Log.insert[selfType]
-    base.insert(newElement, atIndex: i)
+    base.insert(newElement, at: i)
   }
 
   public mutating func removeAt(index: Base.Index) -> Base.Iterator.Element {

@@ -562,7 +562,7 @@ self.test("\(testNamePrefix).insert()/semantics") {
   for test in tests {
     var c = makeWrappedCollection(test.collection)
     let newElement = wrapValue(test.newElement)
-    c.insert(newElement, atIndex: test.indexSelection.indexIn(c))
+    c.insert(newElement, at: test.indexSelection.indexIn(c))
     expectEqualSequence(
       test.expected,
       c.map { extractValue($0).value },

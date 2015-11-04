@@ -2639,8 +2639,8 @@ internal enum _CollectionOperation : Equatable {
   case Append
   case AppendContentsOf(count: Int)
   case ReplaceSubrange(bounds: Range<Int>, replacementCount: Int)
-  case Insert(atIndex: Int)
-  case InsertContentsOf(atIndex: Int, count: Int)
+  case Insert(at: Int)
+  case InsertContentsOf(at: Int, count: Int)
   case RemoveAt(index: Int)
   case RemoveLast
   case RemoveRange(bounds: Range<Int>)
@@ -2673,20 +2673,20 @@ internal enum _CollectionOperation : Equatable {
         invalidIndices,
         with: Repeat(repeating: nextStateId, count: invalidIndices.count))
 
-    case Insert(let atIndex):
-      result.insert(nextStateId, atIndex: atIndex)
+    case Insert(let index):
+      result.insert(nextStateId, at: index)
 
-      let invalidIndices = atIndex..<result.endIndex
+      let invalidIndices = index..<result.endIndex
       result.replaceSubrange(
         invalidIndices,
         with: Repeat(repeating: nextStateId, count: invalidIndices.count))
 
-    case InsertContentsOf(let atIndex, let count):
+    case InsertContentsOf(let index, let count):
       result.insertContentsOf(
         Repeat(repeating: nextStateId, count: count),
-        at: atIndex)
+        at: index)
 
-      let invalidIndices = atIndex..<result.endIndex
+      let invalidIndices = index..<result.endIndex
       result.replaceSubrange(
         invalidIndices,
         with: Repeat(repeating: nextStateId, count: invalidIndices.count))
@@ -3601,9 +3601,9 @@ public struct ${Self}<T> : RangeReplaceableCollection {
       replacementCount: bounds.count + newCount - oldCount))
   }
 
-  public mutating func insert(newElement: T, atIndex i: ${Index}) {
-    _willMutate(.Insert(atIndex: i._offset))
-    elements.insert(newElement, atIndex: i.position)
+  public mutating func insert(newElement: T, at i: ${Index}) {
+    _willMutate(.Insert(at: i._offset))
+    elements.insert(newElement, at: i.position)
   }
 
   public mutating func insertContentsOf<
@@ -3615,7 +3615,7 @@ public struct ${Self}<T> : RangeReplaceableCollection {
 
     if newCount - oldCount != 0 {
       _willMutate(.InsertContentsOf(
-        atIndex: i._offset,
+        at: i._offset,
         count: newCount - oldCount))
     }
   }

@@ -256,7 +256,7 @@ func testCocoa() {
   // CHECK-NEXT: [foo, bar, baz]
   
   a = nsArrayOfStrings()
-  a.insert("bag", atIndex:2)
+  a.insert("bag", at: 2)
   printSequence(a)
   // CHECK-NEXT: [foo, bar, bag, baz]
 
@@ -440,7 +440,7 @@ func testSingleElementModifiers${A}() {
   print(a.removeLast().value)     // CHECK-NEXT: 9
   printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 4, 5, 6, 7, 8]
   
-  a.insert(42, atIndex: 4)
+  a.insert(42, at: 4)
   printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 42, 4, 5, 6, 7, 8]
   
   print(a.removeAt(2).value) // CHECK-NEXT: 2
@@ -470,7 +470,7 @@ func testIsEmptyFirstLast${A}() {
   print(a.removeLast().value)     // CHECK-NEXT: 9
   printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 4, 5, 6, 7, 8]
   
-  a.insert(42, atIndex: 4)
+  a.insert(42, at: 4)
   printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 42, 4, 5, 6, 7, 8]
   
   print(a.removeAt(2).value) // CHECK-NEXT: 2

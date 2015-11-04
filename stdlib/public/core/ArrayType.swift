@@ -61,7 +61,7 @@ protocol _ArrayType
   /// - Complexity: O(`self.count`).
   ///
   /// - Requires: `i <= count`.
-  mutating func insert(newElement: Iterator.Element, atIndex i: Int)
+  mutating func insert(newElement: Iterator.Element, at i: Int)
 
   /// Remove and return the element at the given index.
   ///

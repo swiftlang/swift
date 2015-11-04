@@ -687,9 +687,9 @@ extension String {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  public mutating func insert(newElement: Character, atIndex i: Index) {
+  public mutating func insert(newElement: Character, at i: Index) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.insert(newElement, atIndex: i)
+      (inout v: CharacterView) in v.insert(newElement, at: i)
     }
   }
 

@@ -365,7 +365,7 @@ final class _ForkJoinWorkDeque<T> {
 
   func append(element: T) {
     _dequeMutex.withLock {
-      _deque.insert(element, atIndex: 0)
+      _deque.insert(element, at: 0)
     }
   }
 

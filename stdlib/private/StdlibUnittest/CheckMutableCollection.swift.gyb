@@ -687,7 +687,7 @@ func checkPartition_${'Predicate' if predicate else 'WhereElementIsComparable'}(
 
 %       if slice:
     elements.insert(
-      OpaqueValue(0xfffe, identity: 0xfffe), atIndex: 0)
+      OpaqueValue(0xfffe, identity: 0xfffe), at: 0)
     elements.append(OpaqueValue(0xffff, identity: 0xffff))
 %       end
 
@@ -704,7 +704,7 @@ func checkPartition_${'Predicate' if predicate else 'WhereElementIsComparable'}(
 
 %       if slice:
     elements.insert(
-      MinimalComparableValue(0xfffe, identity: 0xfffe), atIndex: 0)
+      MinimalComparableValue(0xfffe, identity: 0xfffe), at: 0)
     elements.append(MinimalComparableValue(0xffff, identity: 0xffff))
 %       end
 

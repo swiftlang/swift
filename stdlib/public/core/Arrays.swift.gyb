@@ -722,7 +722,7 @@ extension ${Self} : _ArrayType {
   /// - Requires: `i <= count`.
   ///
   /// - Complexity: O(`self.count`).
-  public mutating func insert(newElement: Element, atIndex i: Int) {
+  public mutating func insert(newElement: Element, at i: Int) {
     _checkIndex(i)
     self.replaceSubrange(i..<i, with: CollectionOfOne(newElement))
   }

@@ -112,14 +112,14 @@ ${ArrayTy}Traps.test("PopFromEmpty") {
 }
 
 %   for index in -1, 2:
-${ArrayTy}Traps.test("${'insert(_:atIndex:)/%s' % index}")
+${ArrayTy}Traps.test("${'insert(_:at:)/%s' % index}")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var a: ${ArrayTy}<Int> = [42]
   expectCrashLater()
-  a.insert(3, atIndex: ${index})
+  a.insert(3, at: ${index})
 }
 %   end
 
