@@ -652,7 +652,7 @@ internal class _AnyCollectionBox<Element> : _AnyCollectionBoxBase {
 ///
 /// This protocol can be considered an implementation detail of the
 /// `===` and `!==` implementations for these types.
-public protocol AnyCollection : Collection {
+public protocol AnyCollectionProtocol : Collection {
   /// Identifies the underlying collection stored by `self`. Instances
   /// copied from one another have the same `underlyingCollectionID`.
   var underlyingCollectionID: ObjectIdentifier {get}
@@ -660,14 +660,14 @@ public protocol AnyCollection : Collection {
 
 /// Return true iff `lhs` and `rhs` store the same underlying collection.
 public func === <
-  L: AnyCollection, R: AnyCollection
+  L: AnyCollectionProtocol, R: AnyCollectionProtocol
 >(lhs: L, rhs: R) -> Bool {
   return lhs.underlyingCollectionID == rhs.underlyingCollectionID
 }
 
 /// Return false iff `lhs` and `rhs` store the same underlying collection.
 public func !== <
-  L: AnyCollection, R: AnyCollection
+  L: AnyCollectionProtocol, R: AnyCollectionProtocol
 >(lhs: L, rhs: R) -> Bool {
   return lhs.underlyingCollectionID != rhs.underlyingCollectionID
 }
@@ -680,7 +680,7 @@ public func !== <
 /// `Collection`.
 ///
 /// See also: `AnyBidirectionalType`, `AnyRandomAccessType`
-public struct AnyForwardCollection<Element> : AnyCollection {
+public struct AnyForwardCollection<Element> : AnyCollectionProtocol {
   typealias Box = _AnyCollectionBox<Element>
 
   /// Create an `AnyForwardCollection` that stores `base` as its
@@ -800,7 +800,7 @@ public struct AnyForwardCollection<Element> : AnyCollection {
 /// `Collection`.
 ///
 /// See also: `AnyRandomAccessType`, `AnyForwardType`
-public struct AnyBidirectionalCollection<Element> : AnyCollection {
+public struct AnyBidirectionalCollection<Element> : AnyCollectionProtocol {
   typealias Box = _AnyCollectionBox<Element>
 
   /// Create an `AnyBidirectionalCollection` that stores `base` as its
@@ -910,7 +910,7 @@ public struct AnyBidirectionalCollection<Element> : AnyCollection {
 /// `Collection`.
 ///
 /// See also: `AnyForwardType`, `AnyBidirectionalType`
-public struct AnyRandomAccessCollection<Element> : AnyCollection {
+public struct AnyRandomAccessCollection<Element> : AnyCollectionProtocol {
   typealias Box = _AnyCollectionBox<Element>
 
   /// Create an `AnyRandomAccessCollection` that stores `base` as its

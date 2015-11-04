@@ -501,7 +501,7 @@ internal class _AnyCollectionBox<Element> : _AnyCollectionBoxBase<Element> {
 ///
 /// This protocol can be considered an implementation detail of the
 /// `===` and `!==` implementations for these types.
-public protocol AnyCollection : Collection {
+public protocol AnyCollectionProtocol : Collection {
   /// Identifies the underlying collection stored by `self`. Instances
   /// copied from one another have the same `_underlyingCollectionID`.
   var _underlyingCollectionID: ObjectIdentifier {get}
@@ -510,7 +510,7 @@ public protocol AnyCollection : Collection {
 /// Return true iff `lhs` and `rhs` store the same underlying collection.
 @warn_unused_result
 public func === <
-  L: AnyCollection, R: AnyCollection
+  L: AnyCollectionProtocol, R: AnyCollectionProtocol
 >(lhs: L, rhs: R) -> Bool {
   return lhs._underlyingCollectionID == rhs._underlyingCollectionID
 }
@@ -518,7 +518,7 @@ public func === <
 /// Returns false iff `lhs` and `rhs` store the same underlying collection.
 @warn_unused_result
 public func !== <
-  L: AnyCollection, R: AnyCollection
+  L: AnyCollectionProtocol, R: AnyCollectionProtocol
 >(lhs: L, rhs: R) -> Bool {
   return lhs._underlyingCollectionID != rhs._underlyingCollectionID
 }
@@ -532,7 +532,7 @@ public func !== <
 /// `Collection`.
 ///
 /// - SeeAlso: ${', '.join('`Any%sType`' % t for t in (2 * traversals)[ti + 1 : ti + 3]) }
-public struct Any${Traversal}Collection<Element> : AnyCollection {
+public struct Any${Traversal}Collection<Element> : AnyCollectionProtocol {
   typealias Box = _AnyCollectionBox<Element>
 
 %   for SubTraversal in traversals[ti:]:
