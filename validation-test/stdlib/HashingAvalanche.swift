@@ -44,7 +44,7 @@ func avalancheTest(bits: Int, _ hashUnderTest: (UInt64) -> UInt64, _ pValue: Dou
         chiSquaredUniform2(testsInBatch, bitFlips[outputBit], pValue),
         "inputBit: \(inputBit), outputBit: \(outputBit)")
     }
-    bitFlips.dealloc(bits)
+    bitFlips.deallocateCapacity(bits)
   }
 }
 

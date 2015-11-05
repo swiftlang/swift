@@ -114,7 +114,7 @@ public struct ${Self}<Pointee>
   /// - Requires: The memory is not initialized.
   ///
   /// - Postcondition: The memory has been deallocated.
-  public func dealloc(num: Int) {
+  public func deallocateCapacity(num: Int) {
     let size = strideof(Pointee.self) * num
     Builtin.deallocRaw(
       _rawValue, size._builtinWordValue, Builtin.alignof(Pointee.self))

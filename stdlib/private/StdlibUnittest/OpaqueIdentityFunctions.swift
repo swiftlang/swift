@@ -19,7 +19,7 @@ public func _opaqueIdentity<T>(x: T) -> T {
   let result =
     UnsafeMutablePointer<T>(_stdlib_getPointer(OpaquePointer(ptr))).memory
   ptr.destroy()
-  ptr.dealloc(1)
+  ptr.deallocateCapacity(1)
   return result
 }
 

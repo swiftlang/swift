@@ -93,9 +93,9 @@ public func _stdlib_pthread_barrier_destroy(
     return -1
   }
   barrier.memory.cond.destroy()
-  barrier.memory.cond.dealloc(1)
+  barrier.memory.cond.deallocateCapacity(1)
   barrier.memory.mutex.destroy()
-  barrier.memory.mutex.dealloc(1)
+  barrier.memory.mutex.deallocateCapacity(1)
   return 0
 }
 

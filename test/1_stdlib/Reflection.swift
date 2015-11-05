@@ -208,7 +208,7 @@ var sanePointerString = UnsafeMutablePointer<String>(allocatingCapacity: 1)
 sanePointerString.initialize("Hello panda")
 print(_reflect(sanePointerString.memory).summary)
 sanePointerString.destroy()
-sanePointerString.dealloc(1)
+sanePointerString.deallocateCapacity(1)
 
 // Don't crash on types with opaque metadata. rdar://problem/19791252
 var rawPointer = unsafeBitCast(0 as Int, Builtin.RawPointer.self)

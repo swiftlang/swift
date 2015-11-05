@@ -92,7 +92,7 @@ public func _stdlib_pthread_join<Result>(
   if result == 0 {
     let threadResult = UnsafeMutablePointer<Result>(threadResultPtr).memory
     threadResultPtr.destroy()
-    threadResultPtr.dealloc(1)
+    threadResultPtr.deallocateCapacity(1)
     return (result, threadResult)
   } else {
     return (result, nil)

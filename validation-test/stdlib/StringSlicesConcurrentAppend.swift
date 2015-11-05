@@ -117,7 +117,7 @@ StringTestSuite.test("SliceConcurrentAppend") {
   expectEqual(0, ret)
 
   barrierVar.destroy()
-  barrierVar.dealloc(1)
+  barrierVar.deallocateCapacity(1)
 }
 
 runAllTests()

@@ -1051,7 +1051,7 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/getObjects") {
     expectEqual(idValue2, unsafeBitCast(a.objectAtIndex(2), UInt.self))
   }
 
-  buffer.dealloc(3)
+  buffer.deallocateCapacity(3)
   _fixLifetime(a)
 
   expectAutoreleasedKeysAndValues(unopt: (0, 3))
@@ -1323,7 +1323,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/getObjects") {
     expectEqual(idValue2, unsafeBitCast(a.objectAtIndex(2), UInt.self))
   }
 
-  buffer.dealloc(3)
+  buffer.deallocateCapacity(3)
   _fixLifetime(a)
 
   expectEqual(3, TestBridgedValueTy.bridgeOperations)

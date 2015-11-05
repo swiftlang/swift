@@ -205,7 +205,7 @@ CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.count") {
   ablPtrWrapper.count = 0x7765_4321
   expectEqual(0x7765_4321, UnsafeMutablePointer<UInt32>(ablPtr).memory)
 
-  ablPtr.dealloc(sizeInBytes)
+  ablPtr.deallocateCapacity(sizeInBytes)
 }
 
 CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.subscript(_: Int)") {
@@ -248,7 +248,7 @@ CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.subscript(_: Int)")
     expectEqual(audioBuffer.mData, audioBufferPtr.memory.mData)
   }
 
-  ablPtr.dealloc(sizeInBytes)
+  ablPtr.deallocateCapacity(sizeInBytes)
 }
 
 CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.subscript(_: Int)/trap") {

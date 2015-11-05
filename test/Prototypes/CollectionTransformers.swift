@@ -229,7 +229,7 @@ struct _ForkJoinMutex {
       fatalError("pthread_mutex_init")
     }
     _mutex.destroy()
-    _mutex.dealloc(1)
+    _mutex.deallocateCapacity(1)
   }
 
   func withLock<Result>(@noescape body: () -> Result) -> Result {
@@ -259,7 +259,7 @@ struct _ForkJoinCond {
       fatalError("pthread_cond_destroy")
     }
     _cond.destroy()
-    _cond.dealloc(1)
+    _cond.deallocateCapacity(1)
   }
 
   func signal() {

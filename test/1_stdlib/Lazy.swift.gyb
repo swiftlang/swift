@@ -408,7 +408,7 @@ func expectSequencePassthrough<
     let end = s._initializeTo(buf)
     expectTrue(end <= buf + count)
     buf.destroy(end - buf)
-    buf.dealloc(count)
+    buf.deallocateCapacity(count)
   }
 }
 

@@ -1938,7 +1938,7 @@ public func checkSequence<
       expectTrue(sameValue(expected[j++], buf[i]))
     }
     buf.destroy(end - buf)
-    buf.dealloc(count)
+    buf.deallocateCapacity(count)
   }
 }
 

@@ -147,7 +147,7 @@ func exerciseArrayValueWitnesses<T>(value: T) {
   Builtin.takeArrayFrontToBack(T.self, buf._rawValue, (buf + 1)._rawValue, 4._builtinWordValue)
   Builtin.destroyArray(T.self, buf._rawValue, 4._builtinWordValue)
 
-  buf.dealloc(5)
+  buf.deallocateCapacity(5)
 }
 
 tests.test("array value witnesses") {
