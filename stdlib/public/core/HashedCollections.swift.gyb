@@ -952,8 +952,10 @@ public func _setBridgeFromObjectiveCConditional<
 
 //===--- APIs unique to Dictionary<Key, Value> ----------------------------===//
 
-/// A hash-based mapping from `Key` to `Value` instances.  Also a
-/// collection of key-value pairs with no defined ordering.
+/// A mapping from `Key` to `Value`.
+///
+/// The order of elements in a dictionary is stable between mutations
+/// but otherwise unpredictable.
 public struct Dictionary<Key : Hashable, Value> :
   Collection, DictionaryLiteralConvertible {
 
@@ -972,21 +974,20 @@ public struct Dictionary<Key : Hashable, Value> :
 
   /// Create a dictionary with at least the given number of
   /// elements worth of storage.  The actual capacity will be the
-  /// smallest power of 2 that's >= `minimumCapacity`.
+  /// smallest power of 2 that is >= `minimumCapacity`.
   public init(minimumCapacity: Int) {
     _variantStorage =
       .Native(_NativeStorage.Owner(minimumCapacity: minimumCapacity))
   }
 
-  /// Private initializer.
   internal init(_nativeStorage: _NativeDictionaryStorage<Key, Value>) {
     _variantStorage =
       .Native(_NativeStorage.Owner(nativeStorage: _nativeStorage))
   }
 
-  /// Private initializer.
-  internal init(_nativeStorageOwner:
-    _NativeDictionaryStorageOwner<Key, Value>) {
+  internal init(
+    _nativeStorageOwner: _NativeDictionaryStorageOwner<Key, Value>
+  ) {
     _variantStorage = .Native(_nativeStorageOwner)
   }
 
@@ -1044,7 +1045,7 @@ public struct Dictionary<Key : Hashable, Value> :
     return _variantStorage.indexForKey(key)
   }
 
-  /// Access the key-value pair at `position`.
+  /// Returns the key-value pair at `position`.
   ///
   /// - Complexity: O(1).
   public subscript(position: Index) -> Element {
@@ -1083,7 +1084,7 @@ public struct Dictionary<Key : Hashable, Value> :
     return _variantStorage.updateValue(value, forKey: key)
   }
 
-  /// Remove the key-value pair at `index`.
+  /// Remove and return the key-value pair at `index`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -1099,10 +1100,11 @@ public struct Dictionary<Key : Hashable, Value> :
     return _variantStorage.removeValueForKey(key)
   }
 
-  /// Remove all elements.
+  /// Remove all the elements.  If `keepingCapacity` is `true`, existing
+  /// element capacity is kept for future insertions.
   ///
-  /// - Postcondition: `capacity == 0` if `keepCapacity` is `false`, otherwise
-  ///   the capacity will not be decreased.
+  /// - Postcondition: `capacity == 0` if `keepingCapacity` is
+  /// `false`, otherwise the capacity will not be decreased.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -1158,7 +1160,7 @@ public struct Dictionary<Key : Hashable, Value> :
 
   /// A collection containing just the keys of `self`.
   ///
-  /// Keys appear in the same order as they occur as the `.0` member
+  /// Keys appear in the same order as they occur as the `.key` member
   /// of key-value pairs in `self`.  Each key in the result has a
   /// unique value.
   public var keys: LazyMapCollection<Dictionary, Key> {
@@ -1167,7 +1169,7 @@ public struct Dictionary<Key : Hashable, Value> :
 
   /// A collection containing just the values of `self`.
   ///
-  /// Values appear in the same order as they occur as the `.1` member
+  /// Values appear in the same order as they occur as the `.value` member
   /// of key-value pairs in `self`.
   public var values: LazyMapCollection<Dictionary, Value> {
     return self.lazy.map { $0.1 }
