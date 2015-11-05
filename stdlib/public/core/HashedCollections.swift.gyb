@@ -1513,7 +1513,7 @@ public func _dictionaryBridgeFromObjectiveCConditional<
     _isBridgedVerbatimToObjectiveC(SwiftValue.self) ==
       _isBridgedVerbatimToObjectiveC(ObjCValue.self)
 
-  var result = Dictionary<SwiftKey, SwiftValue>()
+  var result = Dictionary<SwiftKey, SwiftValue>(minimumCapacity: source.count)
   for (key, value) in source {
     // Downcast the key.
     var resultKey: SwiftKey
