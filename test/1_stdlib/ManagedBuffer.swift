@@ -154,11 +154,11 @@ tests.test("basic") {
       expectEqual(i * 2, s.count)
       expectEqual(
         s.count,
-        s.withUnsafeMutablePointerToValue { $0.memory.count.value }
+        s.withUnsafeMutablePointerToValue { $0.pointee.count.value }
       )
       expectEqual(
         s.capacity,
-        s.withUnsafeMutablePointerToValue { $0.memory.capacity }
+        s.withUnsafeMutablePointerToValue { $0.pointee.capacity }
       )
       expectEqual(
         LifetimeTracked(i),
@@ -238,7 +238,7 @@ tests.test("ManagedBufferPointer") {
     let s2 = mgr.buffer as! MyBuffer<LifetimeTracked>
     expectFalse(mgr.holdsUniqueReference())
     
-    let val = mgr.withUnsafeMutablePointerToValue { $0 }.memory
+    let val = mgr.withUnsafeMutablePointerToValue { $0 }.pointee
     expectEqual(val.count.value, 0)
     expectEqual(val.capacity, 99)
   }

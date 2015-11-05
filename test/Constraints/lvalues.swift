@@ -199,7 +199,7 @@ public struct Kale : Radish {
 }
 
 func testImmutableUnsafePointer(p: UnsafePointer<Int>) {
-  p.memory = 1 // expected-error {{cannot assign to property: 'memory' is a get-only property}}
+  p.pointee = 1 // expected-error {{cannot assign to property: 'pointee' is a get-only property}}
   p[0] = 1 // expected-error {{cannot assign through subscript: subscript is get-only}}
 }
 

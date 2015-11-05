@@ -1254,12 +1254,12 @@ class ParallelArrayDictionary : NSDictionary {
   override func countByEnumeratingWithState(
       state: UnsafeMutablePointer<NSFastEnumerationState>,
       objects: AutoreleasingUnsafeMutablePointer<AnyObject?>, count: Int) -> Int {
-    var theState = state.memory
+    var theState = state.pointee
     if theState.state == 0 {
       theState.state = 1
       theState.itemsPtr = AutoreleasingUnsafeMutablePointer(keys._baseAddressIfContiguous)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-      state.memory = theState
+      state.pointee = theState
       return 4
     }
     return 0

@@ -128,7 +128,7 @@ puts(s)
 
 var unsorted = [3, 14, 15, 9, 2, 6, 5]
 qsort(&unsorted, unsorted.count, sizeofValue(unsorted[0])) { a, b in
-  return Int32(UnsafePointer<Int>(a).memory - UnsafePointer<Int>(b).memory)
+  return Int32(UnsafePointer<Int>(a).pointee - UnsafePointer<Int>(b).pointee)
 }
 // CHECK-NEXT: [2, 3, 5, 6, 9, 14, 15]
 print(unsorted)

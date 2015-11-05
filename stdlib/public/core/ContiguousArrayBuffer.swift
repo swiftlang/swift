@@ -101,7 +101,7 @@ class _ContiguousArrayStorage1 : _ContiguousArrayStorageBase {
 final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
 
   deinit {
-    __manager._elementPointer.destroy(__manager._valuePointer.memory.count)
+    __manager._elementPointer.destroy(__manager._valuePointer.pointee.count)
     __manager._valuePointer.destroy()
     _fixLifetime(__manager)
   }
@@ -351,7 +351,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
         newValue <= capacity,
         "Can't grow an array buffer past its capacity")
 
-      __bufferPointer._valuePointer.memory.count = newValue
+      __bufferPointer._valuePointer.pointee.count = newValue
     }
   }
 

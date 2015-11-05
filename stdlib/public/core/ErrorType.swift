@@ -30,13 +30,13 @@ extension ErrorProtocol {
 @_silgen_name("swift_stdlib_getErrorDomainNSString")
 public func _stdlib_getErrorDomainNSString<T : ErrorProtocol>(x: UnsafePointer<T>)
 -> AnyObject {
-  return x.memory._domain._bridgeToObjectiveCImpl()
+  return x.pointee._domain._bridgeToObjectiveCImpl()
 }
 
 @warn_unused_result
 @_silgen_name("swift_stdlib_getErrorCode")
 public func _stdlib_getErrorCode<T : ErrorProtocol>(x: UnsafePointer<T>) -> Int {
-  return x.memory._code
+  return x.pointee._code
 }
 
 // Known function for the compiler to use to coerce `ErrorProtocol` instances

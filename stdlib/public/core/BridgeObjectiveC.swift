@@ -354,14 +354,16 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
     return UnsafeMutablePointer<Pointee>(self)._isNull
   }
 
-  /// Access the underlying raw memory, getting and
-  /// setting values.
-  public var memory: Pointee {
+  /// Access the `Pointee` instance referenced by `self`.
+  ///
+  /// - Requires: the pointee has been initialized with an instance of
+  ///   type `Pointee`.
+  public var pointee: Pointee {
     /// Retrieve the value the pointer points to.
     @_transparent get {
       _debugPrecondition(!_isNull)
       // We can do a strong load normally.
-      return UnsafeMutablePointer<Pointee>(self).memory
+      return UnsafeMutablePointer<Pointee>(self).pointee
     }
     /// Set the value the pointer points to, copying over the previous value.
     ///
@@ -380,7 +382,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
       // unneeded.
       let p = UnsafeMutablePointer<OpaquePointer>(
         UnsafeMutablePointer<Pointee>(self))
-        p.memory = unsafeBitCast(newValue, OpaquePointer.self)
+        p.pointee = unsafeBitCast(newValue, OpaquePointer.self)
     }
   }
 
@@ -393,7 +395,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
     get {
       _debugPrecondition(!_isNull)
       // We can do a strong load normally.
-      return (UnsafePointer<Pointee>(self) + i).memory
+      return (UnsafePointer<Pointee>(self) + i).pointee
     }
   }
 

@@ -125,7 +125,7 @@ public struct ${Self}<Pointee>
   ///
   /// - Requires: the pointee has been initialized with an instance of
   ///   type `Pointee`.
-  public var memory: Pointee {
+  public var pointee: Pointee {
 %  if mutable:
     @_transparent unsafeAddress {
       return UnsafePointer(self)
@@ -406,7 +406,7 @@ public struct ${Self}<Pointee>
   public // SPI(Foundation)
   func _setIfNonNil(@noescape body: () -> Pointee) {
     if self != nil {
-      memory = body()
+      pointee = body()
     }
   }
 

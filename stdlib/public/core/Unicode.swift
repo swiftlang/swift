@@ -911,8 +911,8 @@ extension UTF16 {
     }
     else {
       for i in 0..<count {
-        let u16 = T._toUTF16CodeUnit((source + i).memory)
-        (destination + i).memory = U._fromUTF16CodeUnit(u16)
+        let u16 = T._toUTF16CodeUnit((source + i).pointee)
+        (destination + i).pointee = U._fromUTF16CodeUnit(u16)
       }
     }
   }

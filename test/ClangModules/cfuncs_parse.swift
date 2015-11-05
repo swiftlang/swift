@@ -56,7 +56,7 @@ func test_puts(s: String) {
 
 func test_fopen(filename: String) -> CInt {
   let file = filename.withCString { fopen($0, "r") }
-  return file.memory.inode
+  return file.pointee.inode
 }
 
 func test_cfunc_in_swift() -> Int {

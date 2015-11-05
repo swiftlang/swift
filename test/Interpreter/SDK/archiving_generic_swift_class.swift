@@ -39,7 +39,7 @@ func WEXITSTATUS(status: Int32) -> Int32 {
 func _NSGetEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>>>
 
 var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>> {
-  return _NSGetEnviron().memory
+  return _NSGetEnviron().pointee
 }
 
 func driver() {

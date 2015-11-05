@@ -121,7 +121,7 @@ public struct _StringCore {
       var src = UnsafeMutablePointer<UTF8.CodeUnit>(srcStart)
       let srcEnd = src + count
       while (src != srcEnd) {
-        dest++.memory = UTF16.CodeUnit(src++.memory)
+        dest++.pointee = UTF16.CodeUnit(src++.pointee)
       }
     }
     else {
@@ -130,7 +130,7 @@ public struct _StringCore {
       var src = UnsafeMutablePointer<UTF16.CodeUnit>(srcStart)
       let srcEnd = src + count
       while (src != srcEnd) {
-        dest++.memory = UTF8.CodeUnit(src++.memory)
+        dest++.pointee = UTF8.CodeUnit(src++.pointee)
       }
     }
   }
@@ -295,8 +295,8 @@ public struct _StringCore {
     // Always dereference two bytes, but when elements are 8 bits we
     // multiply the high byte by 0.
     // FIXME(performance): use masking instead of multiplication.
-    return UTF16.CodeUnit(p.memory)
-      + UTF16.CodeUnit((p + 1).memory) * _highByteMultiplier
+    return UTF16.CodeUnit(p.pointee)
+      + UTF16.CodeUnit((p + 1).pointee) * _highByteMultiplier
   }
 
   /// Get the Nth UTF-16 Code Unit stored.
@@ -618,13 +618,13 @@ extension _StringCore : RangeReplaceableCollection {
       if _fastPath(elementWidth == 1) {
         var dst = rangeStart
         for u in newElements {
-          dst++.memory = UInt8(u & 0xFF)
+          dst++.pointee = UInt8(u & 0xFF)
         }
       }
       else {
         var dst = UnsafeMutablePointer<UTF16.CodeUnit>(rangeStart)
         for u in newElements {
-          dst++.memory = u
+          dst++.pointee = u
         }
       }
 

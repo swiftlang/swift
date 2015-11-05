@@ -91,7 +91,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
     state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>, count: Int
   ) -> Int {
-    var enumerationState = state.memory
+    var enumerationState = state.pointee
 
     if enumerationState.state != 0 {
       return 0
@@ -104,7 +104,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
         objects.baseAddress,
         AutoreleasingUnsafeMutablePointer<AnyObject?>.self)
       enumerationState.state = 1
-      state.memory = enumerationState
+      state.pointee = enumerationState
       return objects.count
     }
   }

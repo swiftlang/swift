@@ -413,7 +413,7 @@ It will see the following calls because methods with attributes are not inlined.
     for i in 0 .. A.size {
       makeUnique(&A)
       addr = getElementAddr(i, &A)
-      addr.memory = value
+      addr.pointee = value
       f()
     }
   }

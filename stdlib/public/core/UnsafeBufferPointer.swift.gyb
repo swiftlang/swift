@@ -18,7 +18,7 @@ public struct UnsafeBufferPointerIterator<Element>
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   public mutating func next() -> Element? {
-    return _position == _end ? nil : (_position++).memory
+    return _position == _end ? nil : (_position++).pointee
   }
 
   internal var _position, _end: UnsafePointer<Element>

@@ -1954,7 +1954,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     _precondition(i >= 0 && i < capacity)
     _sanityCheck(isInitializedEntry(i))
 
-    let res = (keys + i).memory
+    let res = (keys + i).pointee
     _fixLifetime(self)
     return res
   }
@@ -1998,7 +1998,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     _precondition(i >= 0 && i < capacity)
     _sanityCheck(isInitializedEntry(i))
 
-    (keys + i).memory = key
+    (keys + i).pointee = key
     _fixLifetime(self)
   }
 
@@ -2027,7 +2027,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   internal func valueAt(i: Int) -> Value {
     _sanityCheck(isInitializedEntry(i))
 
-    let res = (values + i).memory
+    let res = (values + i).pointee
     _fixLifetime(self)
     return res
   }
@@ -2035,8 +2035,8 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   @_transparent
   internal func setKey(key: Key, value: Value, at i: Int) {
     _sanityCheck(isInitializedEntry(i))
-    (keys + i).memory = key
-    (values + i).memory = value
+    (keys + i).pointee = key
+    (values + i).pointee = value
     _fixLifetime(self)
   }
 
@@ -2312,7 +2312,7 @@ internal struct _BridgedNative${Self}Storage {
     _precondition(i >= 0 && i < capacity)
     _sanityCheck(isInitializedEntry(i))
 
-    let res = (keys + i).memory
+    let res = (keys + i).pointee
     _fixLifetime(self)
     return res
   }
@@ -2321,7 +2321,7 @@ internal struct _BridgedNative${Self}Storage {
     _precondition(i >= 0 && i < capacity)
     _sanityCheck(isInitializedEntry(i))
 
-    (keys + i).memory = key
+    (keys + i).pointee = key
     _fixLifetime(self)
   }
 
@@ -2350,7 +2350,7 @@ internal struct _BridgedNative${Self}Storage {
   @warn_unused_result
   internal func valueAt(i: Int) -> AnyObject {
     _sanityCheck(isInitializedEntry(i))
-    let res = (values + i).memory
+    let res = (values + i).pointee
     _fixLifetime(self)
     return res
   }
@@ -2416,7 +2416,7 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
     objects: UnsafeMutablePointer<AnyObject>,
     count: Int
   ) -> Int {
-    var theState = state.memory
+    var theState = state.pointee
     if theState.state == 0 {
       theState.state = 1 // Arbitrary non-zero value.
       theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
@@ -2424,7 +2424,7 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
     }
 
     if nextIndex == endIndex {
-      state.memory = theState
+      state.pointee = theState
       return 0
     }
 
@@ -2435,7 +2435,7 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
 
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects)
     unmanagedObjects[0] = bridgedKey
-    state.memory = theState
+    state.pointee = theState
     return 1
   }
 }
@@ -2593,7 +2593,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   internal func deinitializeHeapBufferBridged() {
     // Perform a non-atomic store because storage should be
     // uniquely-referenced.
-    _heapBufferBridgedPtr.memory = nil
+    _heapBufferBridgedPtr.pointee = nil
   }
 
   /// Returns the bridged ${Self} values.
@@ -2763,7 +2763,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
     objects: UnsafeMutablePointer<AnyObject>,
     count: Int
   ) -> Int {
-    var theState = state.memory
+    var theState = state.pointee
     if theState.state == 0 {
       theState.state = 1 // Arbitrary non-zero value.
       theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
@@ -2786,7 +2786,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
       currIndex = currIndex.successor()
     }
     theState.extra.0 = CUnsignedLong(currIndex.offset)
-    state.memory = theState
+    state.pointee = theState
     return stored
   }
 #endif

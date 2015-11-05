@@ -206,7 +206,7 @@ print(_reflect(randomUnsafeMutablePointerString).summary)
 // CHECK-NEXT: Hello panda
 var sanePointerString = UnsafeMutablePointer<String>(allocatingCapacity: 1)
 sanePointerString.initialize("Hello panda")
-print(_reflect(sanePointerString.memory).summary)
+print(_reflect(sanePointerString.pointee).summary)
 sanePointerString.destroy()
 sanePointerString.deallocateCapacity(1)
 

@@ -64,13 +64,13 @@ class Vector<T> {
       if i >= length {
         Builtin.int_trap()
       }
-      return (base + i).memory
+      return (base + i).pointee
     }
     set {
       if i >= length {
         Builtin.int_trap()
       }
-      (base + i).memory = newValue
+      (base + i).pointee = newValue
     }
   }
 

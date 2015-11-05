@@ -101,10 +101,10 @@ public func || <T : Boolean>(
 
 public var errno : Int32 {
   get {
-    return __error().memory
+    return __error().pointee
   }
   set {
-    __error().memory = newValue
+    __error().pointee = newValue
   }
 }
 

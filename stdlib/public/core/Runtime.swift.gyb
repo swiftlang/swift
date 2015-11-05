@@ -29,8 +29,8 @@ func _stdlib_atomicCompareExchangeStrongPtrImpl(
   desired: OpaquePointer) -> Bool {
 
   let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_RawPointer(
-    target._rawValue, expected.memory._rawValue, desired._rawValue)
-  expected.memory._rawValue = oldValue
+    target._rawValue, expected.pointee._rawValue, desired._rawValue)
+  expected.pointee._rawValue = oldValue
   return Bool(won)
 }
 
@@ -104,8 +104,8 @@ func _stdlib_atomicCompareExchangeStrongUInt${bits}(
   desired: UInt${bits}) -> Bool {
 
   let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Int${bits}(
-    target._rawValue, expected.memory._value, desired._value)
-  expected.memory._value = oldValue
+    target._rawValue, expected.pointee._value, desired._value)
+  expected.pointee._value = oldValue
   return Bool(won)
 }
 

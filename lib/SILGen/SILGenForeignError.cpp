@@ -90,11 +90,11 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &gen,
   // Convert the error to a bridged form.
   SILValue bridgedError = errorSrc.emitBridged(gen, loc, bridgedErrorProtocol);
 
-  // Store to the "memory" property.
+  // Store to the "pointee" property.
   // If we can't find it, diagnose and then just don't store anything.
-  VarDecl *memoryProperty = ctx.getPointerMemoryPropertyDecl(ptrKind);
-  if (!memoryProperty) {
-    gen.SGM.diagnose(loc, diag::could_not_find_pointer_memory_property,
+  VarDecl *pointeeProperty = ctx.getPointerPointeePropertyDecl(ptrKind);
+  if (!pointeeProperty) {
+    gen.SGM.diagnose(loc, diag::could_not_find_pointer_pointee_property,
                      bridgedErrorPtrType);
     return;
   }
@@ -102,7 +102,7 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &gen,
   // Otherwise, do a normal assignment.
   LValue lvalue =
     gen.emitPropertyLValue(loc, ManagedValue::forUnmanaged(foreignErrorSlot),
-                           bridgedErrorPtrType, memoryProperty,
+                           bridgedErrorPtrType, pointeeProperty,
                            AccessKind::Write,
                            AccessSemantics::Ordinary);
   RValue rvalue(gen, loc, bridgedErrorProtocol,

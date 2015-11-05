@@ -425,8 +425,8 @@ public:
   /// Retrieve the declaration of Swift.Unmanaged<T>.
   NominalTypeDecl *getUnmanagedDecl() const;
 
-  /// Retrieve the declaration of the "memory" property of a pointer type.
-  VarDecl *getPointerMemoryPropertyDecl(PointerTypeKind ptrKind) const;
+  /// Retrieve the declaration of the "pointee" property of a pointer type.
+  VarDecl *getPointerPointeePropertyDecl(PointerTypeKind ptrKind) const;
 
   /// Retrieve the declaration of Swift.Void.
   TypeAliasDecl *getVoidDecl() const;

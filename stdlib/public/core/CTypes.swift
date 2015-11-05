@@ -91,16 +91,12 @@ public struct OpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   }
 
   /// Construct an `OpaquePointer` from a given address in memory.
-  ///
-  /// This is a fundamentally unsafe conversion.
   @_transparent
   public init(bitPattern: Int) {
     self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
   /// Construct an `OpaquePointer` from a given address in memory.
-  ///
-  /// This is a fundamentally unsafe conversion.
   @_transparent
   public init(bitPattern: UInt) {
     self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
