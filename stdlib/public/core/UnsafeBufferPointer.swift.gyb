@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A iterator for the elements in the buffer referenced by
+/// An iterator for the elements in the buffer referenced by
 /// `UnsafeBufferPointer` or `UnsafeMutableBufferPointer`.
 public struct UnsafeBufferPointerIterator<Element>
   : IteratorProtocol, Sequence {
@@ -18,10 +18,10 @@ public struct UnsafeBufferPointerIterator<Element>
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   public mutating func next() -> Element? {
-    return position == end ? nil : (position++).memory
+    return _position == _end ? nil : (_position++).memory
   }
 
-  var position, end: UnsafePointer<Element>
+  internal var _position, _end: UnsafePointer<Element>
 }
 
 %for Mutable in ('Mutable', ''):
@@ -77,7 +77,7 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   ///
   /// - Complexity: O(1).
   public func iterator() -> UnsafeBufferPointerIterator<Element> {
-    return UnsafeBufferPointerIterator(position: _position, end: _end)
+    return UnsafeBufferPointerIterator(_position: _position, _end: _end)
   }
 
   /// A pointer to the first element of the buffer.
