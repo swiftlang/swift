@@ -700,38 +700,6 @@ internal func _writeBackMutableSlice<
     "Can not replace a slice of a MutableCollection with a slice of a smaller size")
 }
 
-/// An *iterator* that adapts a *collection* `C` and any *sequence* of
-/// its `Index` type to present the collection's elements in a
-/// permuted order.
-public struct PermutationGenerator<
-  C: Collection, Indices: Sequence
-  where
-  C.Index == Indices.Iterator.Element
-> : IteratorProtocol, Sequence {
-  var seq : C
-  var indices : Indices.Iterator
-
-  /// The type of element returned by `next()`.
-  public typealias Element = C.Iterator.Element
-
-  /// Advance to the next element and return it, or `nil` if no next
-  /// element exists.
-  ///
-  /// - Requires: No preceding call to `self.next()` has returned `nil`.
-  public mutating func next() -> Element? {
-    return indices.next().map { seq[$0] }
-  }
-
-  /// Construct an *iterator* over a permutation of `elements` given
-  /// by `indices`.
-  ///
-  /// - Requires: `elements[i]` is valid for every `i` in `indices`.
-  public init(elements: C, indices: Indices) {
-    self.seq = elements
-    self.indices = indices.iterator()
-  }
-}
-
 /// A *collection* with mutable slices.
 ///
 /// For example,

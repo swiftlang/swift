@@ -1,6 +1,39 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 // REQUIRES: executable_test
 
+/// An *iterator* that adapts a *collection* `C` and any *sequence* of
+/// its `Index` type to present the collection's elements in a
+/// permuted order.
+public struct PermutationGenerator<
+  C: Collection, Indices: Sequence
+  where
+  C.Index == Indices.Iterator.Element
+> : IteratorProtocol, Sequence {
+  var seq : C
+  var indices : Indices.Iterator
+
+  /// The type of element returned by `next()`.
+  public typealias Element = C.Iterator.Element
+
+  /// Advance to the next element and return it, or `nil` if no next
+  /// element exists.
+  ///
+  /// - Requires: No preceding call to `self.next()` has returned `nil`.
+  public mutating func next() -> Element? {
+    let result = indices.next()
+    return result != nil ? seq[result!] : .None
+  }
+
+  /// Construct an *iterator* over a permutation of `elements` given
+  /// by `indices`.
+  ///
+  /// - Requires: `elements[i]` is valid for every `i` in `indices`.
+  public init(elements: C, indices: Indices) {
+    self.seq = elements
+    self.indices = indices.iterator()
+  }
+}
+
 struct X : Collection {
   typealias Element = String.CharacterView.Iterator.Element
   typealias Index = String.Index

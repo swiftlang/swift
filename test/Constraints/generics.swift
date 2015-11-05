@@ -121,13 +121,31 @@ var rdar14005696 : UInt8
 rdar14005696 ~~~ 5
 
 // <rdar://problem/15168483>
+public struct SomeIterator<
+  C: Collection, Indices: Sequence
+  where
+  C.Index == Indices.Iterator.Element
+> : IteratorProtocol, Sequence {
+  var seq : C
+  var indices : Indices.Iterator
+
+  public typealias Element = C.Iterator.Element
+
+  public mutating func next() -> Element? {
+    fatalError()
+  }
+
+  public init(elements: C, indices: Indices) {
+    fatalError()
+  }
+}
 func f1<
   S: Collection 
   where S.Index: BidirectionalIndex
 >(seq: S) {
   let x = (seq.indices).lazy.reverse()
-  PermutationGenerator(elements: seq, indices: x) // expected-warning{{unused}}
-  PermutationGenerator(elements: seq, indices: seq.indices.reverse()) // expected-warning{{unused}}
+  SomeIterator(elements: seq, indices: x) // expected-warning{{unused}}
+  SomeIterator(elements: seq, indices: seq.indices.reverse()) // expected-warning{{unused}}
 }
 
 // <rdar://problem/16078944>

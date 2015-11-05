@@ -53,9 +53,7 @@ func printlnByGenerating<S: Sequence>(s: S) {
 }
 
 func printlnByIndexing<C: Collection>(c: C) {
-  printlnByGenerating(
-    PermutationGenerator(elements: c, indices: c.indices)
-  )
+  printlnByGenerating(c)
 }
 
 // Test filtering Collections
