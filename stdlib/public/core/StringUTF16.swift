@@ -145,7 +145,12 @@ extension String {
 
   /// A UTF-16 encoding of `self`.
   public var utf16: UTF16View {
-    return UTF16View(_core)
+    get {
+      return UTF16View(_core)
+    }
+    set {
+      self = String(newValue)
+    }
   }
 
   /// Construct the `String` corresponding to the given sequence of

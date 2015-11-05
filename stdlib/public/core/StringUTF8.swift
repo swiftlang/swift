@@ -246,7 +246,12 @@ extension String {
 
   /// A UTF-8 encoding of `self`.
   public var utf8: UTF8View {
-    return UTF8View(self._core)
+    get {
+      return UTF8View(self._core)
+    }
+    set {
+      self = String(newValue)
+    }
   }
 
   public var _contiguousUTF8: UnsafeMutablePointer<UTF8.CodeUnit> {
