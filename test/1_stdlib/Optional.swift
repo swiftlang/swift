@@ -16,7 +16,7 @@ let OptionalTests = TestSuite("Optional")
 
 protocol TestProtocol1 {}
 
-// Check that the generic parameter is called 'Memory'.
+// Check the generic parameter name.
 extension Optional where Wrapped : TestProtocol1 {
   var _wrappedIsTestProtocol1: Bool {
     fatalError("not implemented")

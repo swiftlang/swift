@@ -18,15 +18,15 @@
 % for mutable in (True, False):
 %  Self = 'UnsafeMutablePointer' if mutable else 'UnsafePointer'
 %  a_Self = 'an `UnsafeMutablePointer`' if mutable else 'an `UnsafePointer`'
-%  MirrorConformance = gyb.executeTemplate(TMirrorConformance,introspecteeType=Self,genericArgs=['Memory'],disposition='Struct')
-%  MirrorDecl = gyb.executeTemplate(TMirrorDecl,introspecteeType=Self,genericArgs=['Memory'],disposition='Struct')
-%  MirrorBoilerplate = gyb.executeTemplate(TMirrorBoilerplate,introspecteeType=Self,genericArgs=['Memory'],disposition='Struct')
+%  MirrorConformance = gyb.executeTemplate(TMirrorConformance,introspecteeType=Self,genericArgs=['Pointee'],disposition='Struct')
+%  MirrorDecl = gyb.executeTemplate(TMirrorDecl,introspecteeType=Self,genericArgs=['Pointee'],disposition='Struct')
+%  MirrorBoilerplate = gyb.executeTemplate(TMirrorBoilerplate,introspecteeType=Self,genericArgs=['Pointee'],disposition='Struct')
 
-/// A pointer to an object of type `Memory`.  This type provides no automated
+/// A pointer to an object of type `Pointee`.  This type provides no automated
 /// memory management, and therefore the user must take care to allocate
 /// and free memory appropriately.
 ///
-/// The pointer should be aligned to `alignof(Memory.self)`.
+/// The pointer should be aligned to `alignof(Pointee.self)`.
 ///
 /// The pointer can be in one of the following states:
 ///
@@ -36,7 +36,7 @@
 /// - memory is allocated, but value has not been initialized;
 ///
 /// - memory is allocated and value is initialized.
-public struct ${Self}<Memory>
+public struct ${Self}<Pointee>
   : RandomAccessIndex, Hashable,
     NilLiteralConvertible, _Pointer {
 
@@ -104,14 +104,14 @@ public struct ${Self}<Memory>
   }
 
 %  if mutable:
-  /// Allocate memory for `num` objects of type `Memory`.
+  /// Allocate memory for `num` objects of type `Pointee`.
   ///
   /// - Postcondition: The memory is allocated, but not initialized.
   @warn_unused_result
   public static func alloc(num: Int) -> ${Self} {
-    let size = strideof(Memory.self) * num
+    let size = strideof(Pointee.self) * num
     return ${Self}(
-      Builtin.allocRaw(size._builtinWordValue, Builtin.alignof(Memory.self)))
+      Builtin.allocRaw(size._builtinWordValue, Builtin.alignof(Pointee.self)))
   }
 
   /// Deallocate `num` objects.
@@ -124,9 +124,9 @@ public struct ${Self}<Memory>
   ///
   /// - Postcondition: The memory has been deallocated.
   public func dealloc(num: Int) {
-    let size = strideof(Memory.self) * num
+    let size = strideof(Pointee.self) * num
     Builtin.deallocRaw(
-      _rawValue, size._builtinWordValue, Builtin.alignof(Memory.self))
+      _rawValue, size._builtinWordValue, Builtin.alignof(Pointee.self))
   }
 %  end
 
@@ -140,7 +140,7 @@ else:
 }%
 
 ${comment}
-  public var memory: Memory {
+  public var memory: Pointee {
 %  if mutable:
     @_transparent unsafeAddress {
       return UnsafePointer(self)
@@ -163,7 +163,7 @@ ${comment}
   ///
   /// - Postcondition: The memory is initalized; the value should eventually
   ///   be destroyed or moved from to avoid leaks.
-  public func initialize(newvalue: Memory) {
+  public func initialize(newvalue: Pointee) {
     Builtin.initialize(newvalue, _rawValue)
   }
 
@@ -178,7 +178,7 @@ ${comment}
   /// - Postcondition: The value has been destroyed and the memory must
   ///   be initialized before being used again.
   @warn_unused_result
-  public func move() -> Memory {
+  public func move() -> Pointee {
     return Builtin.take(_rawValue)
   }
 
@@ -221,7 +221,7 @@ ${comment}
       self < source || self >= source + count,
       "${Self}.moveInitializeFrom non-following overlapping range; use moveInitializeBackwardFrom")
     Builtin.takeArrayFrontToBack(
-      Memory.self, self._rawValue, source._rawValue, count._builtinWordValue)
+      Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // This builtin is equivalent to:
     // for i in 0..<count {
     //   (self + i).initialize((source + i).move())
@@ -241,7 +241,7 @@ ${comment}
       source < self || source >= self + count,
       "${Self}.moveInitializeBackwardFrom non-preceding overlapping range; use moveInitializeFrom instead")
     Builtin.takeArrayBackToFront(
-      Memory.self, self._rawValue, source._rawValue, count._builtinWordValue)
+      Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // This builtin is equivalent to:
     // var src = source + count
     // var dst = self + count
@@ -262,7 +262,7 @@ ${comment}
       self + count <= source || source + count <= self,
       "${Self}.initializeFrom non-following overlapping range")
     Builtin.copyArray(
-      Memory.self, self._rawValue, source._rawValue, count._builtinWordValue)
+      Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // This builtin is equivalent to:
     // for i in 0..<count {
     //   (self + i).initialize(source[i])
@@ -273,7 +273,7 @@ ${comment}
   ///
   /// - Precondition: The memory is not initialized.
   public func initializeFrom<
-    C : Collection where C.Iterator.Element == Memory
+    C : Collection where C.Iterator.Element == Pointee
   >(source: C) {
     source._initializeTo(self)
   }
@@ -288,9 +288,9 @@ ${comment}
     _debugPrecondition(
       self + count <= source || source + count <= self,
       "moveAssignFrom overlapping range")
-    Builtin.destroyArray(Memory.self, self._rawValue, count._builtinWordValue)
+    Builtin.destroyArray(Pointee.self, self._rawValue, count._builtinWordValue)
     Builtin.takeArrayFrontToBack(
-      Memory.self, self._rawValue, source._rawValue, count._builtinWordValue)
+      Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // These builtins are equivalent to:
     // for i in 0..<count {
     //   self[i] = (source + i).move()
@@ -304,7 +304,7 @@ ${comment}
   /// - Postcondition: The value has been destroyed and the memory must
   ///   be initialized before being used again.
   public func destroy() {
-    Builtin.destroy(Memory.self, _rawValue)
+    Builtin.destroy(Pointee.self, _rawValue)
   }
 
   /// Destroy the `count` objects the pointer points to.
@@ -314,7 +314,7 @@ ${comment}
   ///   be initialized before being used again.
   public func destroy(count: Int) {
     _debugPrecondition(count >= 0, "${Self}.destroy with negative count")
-    Builtin.destroyArray(Memory.self, _rawValue, count._builtinWordValue)
+    Builtin.destroyArray(Pointee.self, _rawValue, count._builtinWordValue)
   }
 %  end
 
@@ -324,7 +324,7 @@ ${comment}
   }
 
   /// Access the `i`th element of the raw array starting at `self`.
-  public subscript(i: Int) -> Memory {
+  public subscript(i: Int) -> Pointee {
 %  if mutable:
     @_transparent
     unsafeAddress {
@@ -346,7 +346,7 @@ ${comment}
   /// If self was converted from `nil`, writes the result of invoking body into
   /// the pointee.
   public // SPI(Foundation)
-  func _setIfNonNil(@noescape body: () -> Memory) {
+  func _setIfNonNil(@noescape body: () -> Pointee) {
     if self != nil {
       memory = body()
     }
@@ -355,7 +355,7 @@ ${comment}
 #if _runtime(_ObjC)
   /// Return the result of invoking body.  If self was converted from
   /// `nil`, passes `nil` as the argument.  Otherwise, passes the address
-  /// of a `Memory` which is written into buffer before this method returns.
+  /// of a `Pointee` which is written into buffer before this method returns.
   @_transparent public
   func _withBridgeObject<U : AnyObject, R>(
     inout buffer: U?, @noescape body: AutoreleasingUnsafeMutablePointer<U?> -> R
@@ -448,61 +448,61 @@ ${MirrorConformance}
 
 @_transparent
 @warn_unused_result
-public func == <Memory>(
-  lhs: ${Self}<Memory>, rhs: ${Self}<Memory>
+public func == <Pointee>(
+  lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>
 ) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
 @_transparent
 @warn_unused_result
-public func < <Memory>(lhs: ${Self}<Memory>, rhs: ${Self}<Memory>) -> Bool {
+public func < <Pointee>(lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
   return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
 @_transparent
 @warn_unused_result
-public func + <Memory>(lhs: ${Self}<Memory>, rhs: Int) -> ${Self}<Memory> {
+public func + <Pointee>(lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
   return ${Self}(Builtin.gep_Word(
-    lhs._rawValue, (rhs &* strideof(Memory.self))._builtinWordValue))
+    lhs._rawValue, (rhs &* strideof(Pointee.self))._builtinWordValue))
 }
 
 @_transparent
 @warn_unused_result
-public func + <Memory>(lhs: Int,
-           rhs: ${Self}<Memory>) -> ${Self}<Memory> {
+public func + <Pointee>(lhs: Int,
+           rhs: ${Self}<Pointee>) -> ${Self}<Pointee> {
   return rhs + lhs
 }
 
 @_transparent
 @warn_unused_result
-public func - <Memory>(lhs: ${Self}<Memory>, rhs: Int) -> ${Self}<Memory> {
+public func - <Pointee>(lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
   return lhs + -rhs
 }
 
 @_transparent
 @warn_unused_result
-public func - <Memory>(lhs: ${Self}<Memory>, rhs: ${Self}<Memory>) -> Int {
+public func - <Pointee>(lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Int {
   return
     Int(Builtin.sub_Word(Builtin.ptrtoint_Word(lhs._rawValue),
                          Builtin.ptrtoint_Word(rhs._rawValue)))
-    / strideof(Memory.self)
+    / strideof(Pointee.self)
 }
 
 @_transparent
-public func += <Memory>(inout lhs: ${Self}<Memory>, rhs: Int) {
+public func += <Pointee>(inout lhs: ${Self}<Pointee>, rhs: Int) {
   lhs = lhs + rhs
 }
 
 @_transparent
-public func -= <Memory>(inout lhs: ${Self}<Memory>, rhs: Int) {
+public func -= <Pointee>(inout lhs: ${Self}<Pointee>, rhs: Int) {
   lhs = lhs - rhs
 }
 % end # for mutable
 
 /// A byte-sized thing that isn't designed to interoperate with
 /// any other types; it makes a decent parameter to
-/// `UnsafeMutablePointer<Memory>` when you just want to do bytewise
+/// `UnsafeMutablePointer<Pointee>` when you just want to do bytewise
 /// pointer arithmetic.
 public // @testable
 struct _RawByte {

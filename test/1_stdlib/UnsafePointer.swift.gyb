@@ -15,22 +15,22 @@ import ObjectiveC
 
 protocol TestProtocol1 {}
 
-// Check that the generic parameter is called 'Memory'.
+// Check that the generic parameter is called 'Pointee'.
 #if _runtime(_ObjC)
-extension AutoreleasingUnsafeMutablePointer where Memory : TestProtocol1 {
+extension AutoreleasingUnsafeMutablePointer where Pointee : TestProtocol1 {
   var _memoryIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
 }
 #endif
 
-extension UnsafePointer where Memory : TestProtocol1 {
+extension UnsafePointer where Pointee : TestProtocol1 {
   var _memoryIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
 }
 
-extension UnsafeMutablePointer where Memory : TestProtocol1 {
+extension UnsafeMutablePointer where Pointee : TestProtocol1 {
   var _memoryIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
