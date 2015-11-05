@@ -188,9 +188,6 @@ dump(CollectionOfOne("Howdy Swift!"))
 var emptyCollectionOfInt: EmptyCollection<Int> = EmptyCollection()
 print(_reflect(emptyCollectionOfInt).summary)
 
-// CHECK-NEXT: .One
-print(_reflect(Bit.One).summary)
-
 // CHECK-NEXT: ▿
 // CHECK-NEXT: from: 1.0
 // CHECK-NEXT: through: 12.15

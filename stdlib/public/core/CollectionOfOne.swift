@@ -34,11 +34,6 @@ public struct IteratorOfOne<Element> : IteratorProtocol, Sequence {
 
 /// A collection containing a single element of type `Element`.
 public struct CollectionOfOne<Element> : Collection {
-  /// A type that represents a valid position in the collection.
-  ///
-  /// Valid indices consist of the position of every element and a
-  /// "past the end" position that's not valid for use as a subscript.
-  public typealias Index = Bit
 
   /// Construct an instance containing just `element`.
   public init(_ element: Element) {
@@ -46,16 +41,16 @@ public struct CollectionOfOne<Element> : Collection {
   }
 
   /// The position of the first element.
-  public var startIndex: Index {
-    return .Zero
+  public var startIndex: Int {
+    return 0
   }
 
   /// The "past the end" position; always identical to
   /// `startIndex.successor()`.
   ///
   /// - Note: `endIndex` is not a valid argument to `subscript`.
-  public var endIndex: Index {
-    return .One
+  public var endIndex: Int {
+    return 1
   }
 
   /// Return a *iterator* over the elements of this *sequence*.
@@ -67,9 +62,9 @@ public struct CollectionOfOne<Element> : Collection {
 
   /// Access the element at `position`.
   ///
-  /// - Requires: `position == .Zero`.
-  public subscript(position: Index) -> Element {
-    _precondition(position == .Zero, "Index out of range")
+  /// - Requires: `position == 0`.
+  public subscript(position: Int) -> Element {
+    _precondition(position == 0, "Index out of range")
     return element
   }
 
