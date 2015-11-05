@@ -1847,7 +1847,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                     Darwin)
                         set_lldb_build_mode
                         pushd ${LLDB_SOURCE_DIR}
-                        xcodebuild -target toolchain -configuration ${LLDB_BUILD_MODE} install ${lldb_xcodebuild_options[@]} DSTROOT="${INSTALL_DESTDIR}"
+                        xcodebuild -target toolchain -configuration ${LLDB_BUILD_MODE} install ${lldb_xcodebuild_options[@]} DSTROOT="${INSTALL_DESTDIR}" LLDB_TOOLCHAIN_PREFIX="${TOOLCHAIN_PREFIX}"
                         popd
                         continue
                         ;;
