@@ -1242,11 +1242,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case ValueKind::UncheckedRefCastInst:
       // A cast is almost like a projection.
       if (CGNode *OpNode = ConGraph->getNode(I->getOperand(0))) {
-        if (CGNode *ResultNode = ConGraph->getNodeOrNull(I)) {
-          ConGraph->defer(ResultNode, OpNode);
-        } else {
-          ConGraph->setNode(I, OpNode);
-        }
+        ConGraph->setNode(I, OpNode);
       }
       break;
     case ValueKind::ReturnInst:
