@@ -93,9 +93,47 @@ CallGraph::~CallGraph() {
   }
 }
 
+/// Update the callee set for the destructor of a given class, along
+/// with all the destructors from its superclass.
+void CallGraph::computeDestructorCalleesForClass(ClassDecl *CD) {
+  auto *Dtor = CD->getDestructor();
+  if (!Dtor)
+    return;
+
+  auto Method = SILDeclRef(Dtor);
+  auto *CalledFn = M.lookUpFunctionInVTable(CD, Method);
+  if (!CalledFn)
+    return;
+
+  auto *Node = getOrAddCallGraphNode(CalledFn);
+
+  while (CD) {
+    auto &TheCalleeSet = getOrCreateCalleeSetForMethod(Method);
+    assert(TheCalleeSet.getPointer() && "Unexpected null callee set!");
+
+    TheCalleeSet.getPointer()->insert(Node);
+
+    bool canCallUnknown = !calleesAreStaticallyKnowable(M, Method);
+    if (canCallUnknown)
+      TheCalleeSet.setInt(true);
+
+    if (!CD->hasSuperclass())
+      return;
+
+    CD = CD->getSuperclass()->getClassOrBoundGenericClass();
+
+    Dtor = CD->getDestructor();
+    assert(Dtor && "Expected destructor in superclass!");
+
+    Method = SILDeclRef(Dtor);
+  }
+}
+
 /// Update the callee set for each method of a given class, along with
 /// all the overridden methods from superclasses.
 void CallGraph::computeClassMethodCalleesForClass(ClassDecl *CD) {
+  computeDestructorCalleesForClass(CD);
+
   for (auto *Member : CD->getMembers()) {
     auto *AFD = dyn_cast<AbstractFunctionDecl>(Member);
     if (!AFD)
@@ -352,14 +390,8 @@ static void orderEdges(const llvm::SmallPtrSetImpl<CallGraphEdge *> &Edges,
             });
 }
 
-void CallGraph::addEdgesForInstruction(SILInstruction *I,
-                                       CallGraphNode *CallerNode) {
-  auto Apply = FullApplySite::isa(I);
-
-  // TODO: Support non-apply instructions.
-  if (!Apply)
-    return;
-
+void CallGraph::addEdgesForApply(FullApplySite Apply,
+                                 CallGraphNode *CallerNode) {
   CallerNode->MayBindDynamicSelf |=
     hasDynamicSelfTypes(Apply.getSubstitutions());
 
@@ -376,6 +408,88 @@ void CallGraph::addEdgesForInstruction(SILInstruction *I,
   // TODO: Compute this from the call graph itself after stripping
   //       unreachable nodes from graph.
   ++NumAppliesWithEdges;
+}
+
+static SILType getReleasedType(SILInstruction *I) {
+  switch (I->getKind()) {
+  default:
+    llvm_unreachable("Unhandled releasing instruction!");
+
+  case ValueKind::DestroyAddrInst:
+    return cast<DestroyAddrInst>(I)->getOperand().getType();
+
+  case ValueKind::StrongReleaseInst:
+    return cast<StrongReleaseInst>(I)->getOperand().getType();
+
+  case ValueKind::UnownedReleaseInst:
+    return cast<UnownedReleaseInst>(I)->getOperand().getType();
+
+  case ValueKind::ReleaseValueInst:
+    // TODO
+    return SILType();
+
+  case ValueKind::UnconditionalCheckedCastAddrInst:
+    return cast<UnconditionalCheckedCastAddrInst>(I)->getSrc().getType();
+
+  case ValueKind::CheckedCastAddrBranchInst:
+    return cast<CheckedCastAddrBranchInst>(I)->getSrc().getType();
+
+  case ValueKind::CopyAddrInst:
+    return cast<CopyAddrInst>(I)->getDest().getType();
+  }
+}
+
+CallGraphEdge *CallGraph::getEdgeForReleasingInstruction(SILInstruction *I) {
+  auto Ty = getReleasedType(I);
+
+  // FIXME: Handle release_value, which could involve multiple types.
+  if (!Ty)
+    return new (Allocator) CallGraphEdge(I, EdgeOrdinal++);
+
+  auto CanTy = getReleasedType(I).getSwiftRValueType();
+  // FIXME: Handle archetypes.
+  if (CanTy->is<ArchetypeType>())
+    return new (Allocator) CallGraphEdge(I, EdgeOrdinal++);
+
+  auto *CD = CanTy.getClassOrBoundGenericClass();
+  // We release non-class types, e.g. BridgeObject
+  if (!CD)
+    return new (Allocator) CallGraphEdge(I, EdgeOrdinal++);
+
+  if (CD->isObjC())
+    return new (Allocator) CallGraphEdge(I, EdgeOrdinal++);
+
+  auto *Dtor = CD->getDestructor();
+  assert(Dtor && "Expected destructor for class!");
+
+  auto Found = CalleeSetCache.find(Dtor);
+  if (Found == CalleeSetCache.end())
+    return new (Allocator) CallGraphEdge(I, EdgeOrdinal++);
+
+  return new (Allocator) CallGraphEdge(I, Found->second, EdgeOrdinal++);
+}
+
+void CallGraph::addEdgesForInstruction(SILInstruction *I,
+                                       CallGraphNode *CallerNode) {
+  if (auto Apply = FullApplySite::isa(I)) {
+    addEdgesForApply(Apply, CallerNode);
+    return;
+  }
+
+  if (!I->mayRelease())
+    return;
+
+  auto *Edge = getEdgeForReleasingInstruction(I);
+
+  assert(Edge && "Expected to be able to make call graph edge for callee!");
+  assert(!InstToEdgeMap.count(I) &&
+         "Added instruction that already has an edge node!\n");
+  InstToEdgeMap[I] = Edge;
+
+  CallerNode->addCalleeEdge(Edge);
+
+  for (auto *CalleeNode : Edge->getCalleeSet())
+    CalleeNode->addCallerEdge(Edge);
 }
 
 void CallGraph::removeEdgeFromFunction(CallGraphEdge *Edge, SILFunction *F) {
@@ -429,8 +543,7 @@ void CallGraph::addEdges(SILFunction *F) {
 
   for (auto &BB : *F) {
     for (auto &I : BB) {
-      if (FullApplySite::isa(&I))
-        addEdgesForInstruction(&I, CallerNode);
+      addEdgesForInstruction(&I, CallerNode);
 
       auto *FRI = dyn_cast<FunctionRefInst>(&I);
       if (!FRI)
@@ -587,13 +700,12 @@ void CallGraphNode::dump() const {
 void CallGraph::print(llvm::raw_ostream &OS) {
   OS << CallGraphFileCheckPrefix << "*** Call Graph ***\n";
 
-  auto const &Funcs = getBottomUpFunctionOrder();
-  for (auto *F : Funcs) {
-    auto *Node = getCallGraphNode(F);
+  for (auto &F : M) {
+    auto *Node = getCallGraphNode(&F);
     if (Node)
       Node->print(OS);
     else
-      OS << "!!! Missing node for " << F->getName() << "!!!";
+      OS << "!!! Missing node for " << F.getName() << "!!!";
     OS << "\n";
   }
 }
@@ -924,21 +1036,24 @@ void CallGraph::verify(SILFunction *F) const {
 
   for (auto &BB : *F) {
     for (auto &I : BB) {
-      auto FAS = FullApplySite::isa(&I);
-      if (!FAS)
+      if (!I.mayRelease())
         continue;
 
-      auto *Edge = getCallGraphEdge(FAS.getInstruction());
+      auto *Edge = getCallGraphEdge(&I);
 
       numEdges++;
 
       assert(Edge->getInstruction() == &I &&
              "Edge is not linked to the correct apply site");
 
-      assert(InstToEdgeMap.lookup(FAS.getInstruction()) == Edge &&
+      assert(InstToEdgeMap.lookup(&I) == Edge &&
              "Edge is not in InstToEdgeMap");
 
       if (!Edge->canCallUnknownFunction()) {
+        auto FAS = FullApplySite::isa(&I);
+        if (!FAS)
+          continue;
+
         // In the trivial case that we call a known function, check if we have
         // exactly one callee in the edge.
         SILValue Callee = FAS.getCallee();
