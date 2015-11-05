@@ -44,15 +44,6 @@ option(SWIFT_BUILD_STATIC_STDLIB
     "Build static variants of the Swift standard library and SDK overlay"
     FALSE)
 
-if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-  set(SWIFT_BUILD_SOURCEKIT_default TRUE)
-else()
-  set(SWIFT_BUILD_SOURCEKIT_default FALSE)
-endif()
-option(SWIFT_BUILD_SOURCEKIT
-    "Build SourceKit"
-    ${SWIFT_BUILD_SOURCEKIT_default})
-
 option(SWIFT_INCLUDE_BENCHMARKS
     "Create targets for running swift benchmarks"
     TRUE)
@@ -231,6 +222,21 @@ endif()
 if(SWIFT_BUILT_STANDALONE)
   project(Swift)
 endif()
+
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "")
+  message(FATAL_ERROR "CMAKE_SYSTEM_NAME is empty!")
+endif()
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+  set(SWIFT_BUILD_SOURCEKIT_default TRUE)
+else()
+  set(SWIFT_BUILD_SOURCEKIT_default FALSE)
+endif()
+option(SWIFT_BUILD_SOURCEKIT
+    "Build SourceKit"
+    ${SWIFT_BUILD_SOURCEKIT_default})
+# Force updating the cache, remove the following after a couple of weeks or so.
+set(SWIFT_BUILD_SOURCEKIT ${SWIFT_BUILD_SOURCEKIT_default}
+    CACHE BOOL "Build SourceKit" FORCE)
 
 #
 # Include CMake modules
