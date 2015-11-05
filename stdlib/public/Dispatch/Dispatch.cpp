@@ -12,6 +12,22 @@
 
 #include <dispatch/dispatch.h>
 
+#define SOURCE(t)                               \
+  __attribute__((visibility("hidden")))         \
+  extern "C" dispatch_source_type_t             \
+  _swift_dispatch_source_type_##t(void) {       \
+    return DISPATCH_SOURCE_TYPE_##t;            \
+  }
+
+SOURCE(DATA_ADD)
+SOURCE(DATA_OR)
+SOURCE(READ)
+SOURCE(SIGNAL)
+SOURCE(TIMER)
+SOURCE(WRITE)
+
+
+#if defined(__APPLE__)
 __attribute__((visibility("hidden")))
 extern "C" dispatch_queue_attr_t 
 _swift_dispatch_queue_concurrent(void) {
@@ -24,21 +40,9 @@ _swift_dispatch_data_empty(void) {
   return dispatch_data_empty;
 }
 
-#define SOURCE(t)                               \
-  __attribute__((visibility("hidden")))         \
-  extern "C" dispatch_source_type_t             \
-  _swift_dispatch_source_type_##t(void) {       \
-    return DISPATCH_SOURCE_TYPE_##t;            \
-  }
-
-SOURCE(DATA_ADD)
-SOURCE(DATA_OR)
 SOURCE(MACH_SEND)
 SOURCE(MACH_RECV)
 SOURCE(MEMORYPRESSURE)
 SOURCE(PROC)
-SOURCE(READ)
-SOURCE(SIGNAL)
-SOURCE(TIMER)
 SOURCE(VNODE)
-SOURCE(WRITE)
+#endif  // defined(__APPLE__)
