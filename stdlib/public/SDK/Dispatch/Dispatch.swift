@@ -26,7 +26,6 @@ public typealias dispatch_block_t = @convention(block) () -> Void
 // FIXME: rdar://16851050 update API so these import better
 //===----------------------------------------------------------------------===//
 
-#if _runtime(_ObjC)
 // dispatch/io.h
 public var DISPATCH_IO_STREAM: dispatch_io_type_t {
   return 0
@@ -41,9 +40,6 @@ public var DISPATCH_IO_STOP: dispatch_io_close_flags_t {
 public var DISPATCH_IO_STRICT_INTERVAL: dispatch_io_interval_flags_t {
   return 1
 }
-#endif // _runtime(_ObjC)
-
-public typealias dispatch_queue_priority_t = Int
 
 // dispatch/queue.h
 public var DISPATCH_QUEUE_SERIAL: dispatch_queue_attr_t! {
@@ -68,7 +64,6 @@ public var DISPATCH_QUEUE_PRIORITY_BACKGROUND: dispatch_queue_priority_t {
   return -32768
 }
 
-#if _runtime(_ObjC)
 @warn_unused_result
 public func dispatch_get_global_queue(identifier: qos_class_t,
                                       _ flags: UInt) -> dispatch_queue_t {
@@ -112,8 +107,6 @@ public var DISPATCH_PROC_EXIT: dispatch_source_proc_flags_t {
 public var DISPATCH_PROC_FORK: dispatch_source_proc_flags_t { return 0x40000000 }
 public var DISPATCH_PROC_EXEC: dispatch_source_proc_flags_t { return 0x20000000 }
 public var DISPATCH_PROC_SIGNAL: dispatch_source_proc_flags_t { return 0x08000000 }
-
-
 public var DISPATCH_VNODE_DELETE: dispatch_source_vnode_flags_t { return 0x1 }
 public var DISPATCH_VNODE_WRITE:  dispatch_source_vnode_flags_t { return 0x2 }
 public var DISPATCH_VNODE_EXTEND: dispatch_source_vnode_flags_t { return 0x4 }
@@ -122,7 +115,6 @@ public var DISPATCH_VNODE_LINK:   dispatch_source_vnode_flags_t { return 0x10 }
 public var DISPATCH_VNODE_RENAME: dispatch_source_vnode_flags_t { return 0x20 }
 public var DISPATCH_VNODE_REVOKE: dispatch_source_vnode_flags_t { return 0x40 }
 public var DISPATCH_TIMER_STRICT: dispatch_source_timer_flags_t { return 1 }
-#endif // _runtime(_ObjC)
 
 public var DISPATCH_SOURCE_TYPE_DATA_ADD: dispatch_source_type_t {
   return _swift_dispatch_source_type_data_add()
@@ -130,14 +122,29 @@ public var DISPATCH_SOURCE_TYPE_DATA_ADD: dispatch_source_type_t {
 public var DISPATCH_SOURCE_TYPE_DATA_OR: dispatch_source_type_t {
   return _swift_dispatch_source_type_data_or()
 }
+public var DISPATCH_SOURCE_TYPE_MACH_SEND: dispatch_source_type_t {
+  return _swift_dispatch_source_type_mach_send()
+}
+public var DISPATCH_SOURCE_TYPE_MACH_RECV: dispatch_source_type_t {
+  return _swift_dispatch_source_type_mach_recv()
+}
+public var DISPATCH_SOURCE_TYPE_MEMORYPRESSURE: dispatch_source_type_t {
+  return _swift_dispatch_source_type_memorypressure()
+}
 public var DISPATCH_SOURCE_TYPE_READ: dispatch_source_type_t {
   return _swift_dispatch_source_type_read()
+}
+public var DISPATCH_SOURCE_TYPE_PROC: dispatch_source_type_t {
+  return _swift_dispatch_source_type_proc()
 }
 public var DISPATCH_SOURCE_TYPE_SIGNAL: dispatch_source_type_t {
   return _swift_dispatch_source_type_signal()
 }
 public var DISPATCH_SOURCE_TYPE_TIMER: dispatch_source_type_t {
   return _swift_dispatch_source_type_timer()
+}
+public var DISPATCH_SOURCE_TYPE_VNODE: dispatch_source_type_t {
+  return _swift_dispatch_source_type_vnode()
 }
 public var DISPATCH_SOURCE_TYPE_WRITE: dispatch_source_type_t {
   return _swift_dispatch_source_type_write()
@@ -150,39 +157,6 @@ internal func _swift_dispatch_source_type_data_add() -> dispatch_source_type_t
 @warn_unused_result
 @asmname("_swift_dispatch_source_type_DATA_OR")
 internal func _swift_dispatch_source_type_data_or() -> dispatch_source_type_t
-
-@warn_unused_result
-@asmname("_swift_dispatch_source_type_READ")
-internal func _swift_dispatch_source_type_read() -> dispatch_source_type_t
-
-@warn_unused_result
-@asmname("_swift_dispatch_source_type_SIGNAL")
-internal func _swift_dispatch_source_type_signal() -> dispatch_source_type_t
-
-@warn_unused_result
-@asmname("_swift_dispatch_source_type_TIMER")
-internal func _swift_dispatch_source_type_timer() -> dispatch_source_type_t
-
-@warn_unused_result
-@asmname("_swift_dispatch_source_type_WRITE")
-internal func _swift_dispatch_source_type_write() -> dispatch_source_type_t
-
-#if _runtime(_ObjC)
-public var DISPATCH_SOURCE_TYPE_MACH_SEND: dispatch_source_type_t {
-  return _swift_dispatch_source_type_mach_send()
-}
-public var DISPATCH_SOURCE_TYPE_MACH_RECV: dispatch_source_type_t {
-  return _swift_dispatch_source_type_mach_recv()
-}
-public var DISPATCH_SOURCE_TYPE_MEMORYPRESSURE: dispatch_source_type_t {
-  return _swift_dispatch_source_type_memorypressure()
-}
-public var DISPATCH_SOURCE_TYPE_PROC: dispatch_source_type_t {
-  return _swift_dispatch_source_type_proc()
-}
-public var DISPATCH_SOURCE_TYPE_VNODE: dispatch_source_type_t {
-  return _swift_dispatch_source_type_vnode()
-}
 
 @warn_unused_result
 @asmname("_swift_dispatch_source_type_MACH_SEND")
@@ -202,9 +176,24 @@ internal func _swift_dispatch_source_type_memorypressure()
 internal func _swift_dispatch_source_type_proc() -> dispatch_source_type_t
 
 @warn_unused_result
+@asmname("_swift_dispatch_source_type_READ")
+internal func _swift_dispatch_source_type_read() -> dispatch_source_type_t
+
+@warn_unused_result
+@asmname("_swift_dispatch_source_type_SIGNAL")
+internal func _swift_dispatch_source_type_signal() -> dispatch_source_type_t
+
+@warn_unused_result
+@asmname("_swift_dispatch_source_type_TIMER")
+internal func _swift_dispatch_source_type_timer() -> dispatch_source_type_t
+
+@warn_unused_result
 @asmname("_swift_dispatch_source_type_VNODE")
 internal func _swift_dispatch_source_type_vnode() -> dispatch_source_type_t
-#endif // _runtime(_ObjC)
+
+@warn_unused_result
+@asmname("_swift_dispatch_source_type_WRITE")
+internal func _swift_dispatch_source_type_write() -> dispatch_source_type_t
 
 // dispatch/time.h
 // DISPATCH_TIME_NOW: ok

@@ -37,12 +37,8 @@ option(SWIFT_BUILD_STDLIB
     TRUE)
 
 option(SWIFT_BUILD_SDK_OVERLAY
-    "Build Swift SDK overlay (Darwin only)"
+    "Build Swift SDK overlay"
     TRUE)
-
-option(SWIFT_BUILD_DISPATCH_OVERLAY
-    "Build Swift Grand Central Dispatch overlay (on Linux; on Darwin, controlled by SWIFT_BUILD_SDK_OVERLAY)"
-    FALSE)
 
 option(SWIFT_BUILD_STATIC_STDLIB
     "Build static variants of the Swift standard library and SDK overlay"
@@ -577,17 +573,9 @@ message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  Assertions: ${LLVM_ENABLE_ASSERTIONS}")
 message(STATUS "")
 
-message(STATUS "Building Swift standard library for SDKs: ${SWIFT_SDKS}")
+message(STATUS "Building Swift standard library and SDK overlays for SDKs: ${SWIFT_SDKS}")
 message(STATUS "  Build type: ${SWIFT_STDLIB_BUILD_TYPE}")
 message(STATUS "  Assertions: ${SWIFT_STDLIB_ASSERTIONS}")
-message(STATUS "")
-
-message(STATUS "Building Swift overlays for SDKs: ${SWIFT_SDKS}")
-if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
-  message(STATUS "  libdispatch overlay: ${SWIFT_BUILD_DISPATCH_OVERLAY}")
-else()
-  message(STATUS "  SDK overlays: ${SWIFT_BUILD_SDK_OVERLAY}")
-endif()
 message(STATUS "")
 
 message(STATUS "Building Swift runtime with:")
@@ -610,18 +598,16 @@ endif()
 # Set up global CMake variables for API notes.
 #
 
-if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-  set(SWIFT_API_NOTES_PATH "${SWIFT_SOURCE_DIR}/apinotes")
-  if(NOT EXISTS "${SWIFT_API_NOTES_PATH}/Foundation.apinotes")
-    message(FATAL_ERROR "API notes are not available in ${SWIFT_API_NOTES_PATH}")
-  endif()
-
-  file(GLOB SWIFT_API_NOTES_INPUT_FILES "${SWIFT_API_NOTES_PATH}/*.apinotes")
-  foreach(file ${SWIFT_API_NOTES_INPUT_FILES})
-    get_filename_component(name "${file}" NAME_WE)
-    list(APPEND SWIFT_API_NOTES_INPUTS ${name})
-  endforeach()
+set(SWIFT_API_NOTES_PATH "${SWIFT_SOURCE_DIR}/apinotes")
+if(NOT EXISTS "${SWIFT_API_NOTES_PATH}/Foundation.apinotes")
+  message(FATAL_ERROR "API notes are not available in ${SWIFT_API_NOTES_PATH}")
 endif()
+
+file(GLOB SWIFT_API_NOTES_INPUT_FILES "${SWIFT_API_NOTES_PATH}/*.apinotes")
+foreach(file ${SWIFT_API_NOTES_INPUT_FILES})
+  get_filename_component(name "${file}" NAME_WE)
+  list(APPEND SWIFT_API_NOTES_INPUTS ${name})
+endforeach()
 
 # Add all of the subdirectories, where we actually do work.
 if(SWIFT_BUILD_TOOLS)
