@@ -230,19 +230,21 @@ namespace swift {
   /// produced by the pass.
   class PreserveKindBuilder {
     using PreserveKind = SILAnalysis::PreserveKind;
-    llvm::Optional<PreserveKind> Kind;
+    PreserveKind ToPreserve = PreserveKind::All;
 
-    /// Initialize Kind if it is None with PreserveKind::All and unset the bits
-    /// corresponding to K.
+    // Invalidate analysis specified by \p K. The argument \p K contains a list
+    // analysis kind that needs to be invalidated.
     void invalidate(PreserveKind K) {
-      unsigned NewValue = !Kind ? PreserveKind::All : Kind.getValue();
-      Kind = PreserveKind(NewValue & ~K);
+      // Compute the set of analysis that are *not* invalidated.
+      unsigned NotInvalidated = ~K;
+      // A trait is on the preserve list if it is currently on the list and
+      // we did not invalidate it in the current round of invalidation.
+      ToPreserve = PreserveKind(ToPreserve & NotInvalidated);
     }
 
   public:
-    /// Returns None if no changes were made. Returns the kind that is preserved
-    /// otherwise.
-    llvm::Optional<PreserveKind> getKind() const { return Kind; }
+    /// Returns the kind of analysis that's preserved.
+    PreserveKind getPreserved() const { return ToPreserve; }
 
     void invalidateProgramFlow() { invalidate(PreserveKind::ProgramFlow); }
     void invalidateCalls() { invalidate(PreserveKind::Calls); }

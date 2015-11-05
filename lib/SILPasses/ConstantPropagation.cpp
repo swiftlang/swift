@@ -831,7 +831,7 @@ static void initializeWorklist(SILFunction &F,
   }
 }
 
-static llvm::Optional<SILAnalysis::PreserveKind>
+SILAnalysis::PreserveKind
 processFunction(SILFunction &F, bool EnableDiagnostics,
                 unsigned AssertConfiguration) {
   DEBUG(llvm::dbgs() << "*** ConstPropagation processing: " << F.getName()
@@ -1053,7 +1053,7 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
                                                });
   }
 
-  return PKBuilder.getKind();
+  return PKBuilder.getPreserved();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1072,9 +1072,10 @@ public:
 private:
   /// The entry point to the transformation.
   void run() override {
-    if (auto Preserves = processFunction(*getFunction(), EnableDiagnostics,
-                                         getOptions().AssertConfig))
-      invalidateAnalysis(Preserves.getValue());
+    auto Preserves = processFunction(*getFunction(), EnableDiagnostics,
+                                     getOptions().AssertConfig);
+    if (Preserves != SILAnalysis::PreserveKind::All)
+      invalidateAnalysis(Preserves);
   }
 
   StringRef getName() override { return "Constant Propagation"; }
