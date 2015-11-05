@@ -44,7 +44,7 @@ public struct ${Self}<Pointee>
   public typealias Distance = Int
 
   /// The underlying raw (untyped) pointer.
-  public var _rawValue : Builtin.RawPointer
+  public let _rawValue: Builtin.RawPointer
 
   /// Construct a null pointer.
   @_transparent
