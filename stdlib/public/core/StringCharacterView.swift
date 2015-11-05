@@ -37,7 +37,12 @@ extension String {
   /// [extended grapheme
   /// clusters](http://www.unicode.org/glossary/#extended_grapheme_cluster).
   public var characters: CharacterView {
-    return CharacterView(self)
+    get {
+      return CharacterView(self)
+    }
+    set {
+      self = String(newValue)
+    }
   }
 
   /// Efficiently mutate `self` by applying `body` to its `characters`.
