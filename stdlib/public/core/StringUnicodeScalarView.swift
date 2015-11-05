@@ -93,8 +93,8 @@ extension String {
         return Index(_core.endIndex, _core)
       }
 
-      var _position: Int
-      var _core: _StringCore
+      internal var _position: Int
+      internal var _core: _StringCore
     }
 
     /// The position of the first `UnicodeScalar` if the `String` is
@@ -192,12 +192,12 @@ extension String {
           return UnicodeScalar(0xfffd)
         }
       }
-      var _decoder: UTF16 = UTF16()
-      let _baseSet: Bool
-      let _ascii: Bool
-      var _asciiBase: UnsafeBufferPointerIterator<UInt8>!
-      var _base: UnsafeBufferPointerIterator<UInt16>!
-      var _iterator: CollectionDefaultIterator<_StringCore>!
+      internal var _decoder: UTF16 = UTF16()
+      internal let _baseSet: Bool
+      internal let _ascii: Bool
+      internal var _asciiBase: UnsafeBufferPointerIterator<UInt8>!
+      internal var _base: UnsafeBufferPointerIterator<UInt16>!
+      internal var _iterator: CollectionDefaultIterator<_StringCore>!
     }
 
     /// Return an *iterator* over the `UnicodeScalar`s that comprise
@@ -223,7 +223,7 @@ extension String {
       return "StringUnicodeScalarView(\(self.description.debugDescription))"
     }
 
-    var _core: _StringCore
+    internal var _core: _StringCore
   }
 
   /// Construct the `String` corresponding to the given sequence of
