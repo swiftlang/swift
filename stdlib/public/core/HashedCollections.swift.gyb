@@ -3878,7 +3878,7 @@ internal enum ${Self}IteratorRepresentation<${TypeParametersDecl}> {
   case _Cocoa(_Cocoa${Self}Iterator)
 }
 
-/// A iterator over the members of a `${Self}<${TypeParameters}>`.
+/// An iterator over the members of a `${Self}<${TypeParameters}>`.
 public struct ${Self}Iterator<${TypeParametersDecl}> : IteratorProtocol {
   // ${Self} has a separate IteratorProtocol and Index because of efficiency
   // and implementability reasons.

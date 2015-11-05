@@ -17,7 +17,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A iterator that never produces an element.
+/// An iterator that never produces an element.
 ///
 /// - SeeAlso: `EmptyCollection<Element>`.
 public struct EmptyIterator<Element> : IteratorProtocol, Sequence {

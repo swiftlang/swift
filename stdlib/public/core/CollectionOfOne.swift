@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A iterator that produces one or fewer instances of `Element`.
+/// An iterator that produces one or fewer instances of `Element`.
 public struct IteratorOverOne<Element> : IteratorProtocol, Sequence {
   /// Construct an instance that generates `element!`, or an empty
   /// sequence if `element == nil`.
