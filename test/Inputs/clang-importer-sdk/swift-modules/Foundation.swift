@@ -1,6 +1,6 @@
-@exported import ObjectiveC
-@exported import CoreGraphics
-@exported import Foundation
+@_exported import ObjectiveC
+@_exported import CoreGraphics
+@_exported import Foundation
 
 @asmname("swift_StringToNSString") internal
 func _convertStringToNSString(string: String) -> NSString

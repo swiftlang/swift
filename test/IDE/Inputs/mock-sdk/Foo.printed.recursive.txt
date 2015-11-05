@@ -1,5 +1,5 @@
-@exported import Foo.FooSub
-@exported import FooHelper
+@_exported import Foo.FooSub
+@_exported import FooHelper
 
 
 /// Aaa.  FooEnum1.  Bbb.

@@ -1,3 +1,3 @@
-@exported import cfuncs
+@_exported import cfuncs
 
 public func cfunc_in_swift(x: Int) -> Int {}

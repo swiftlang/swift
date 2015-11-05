@@ -1,4 +1,4 @@
-@exported import ObjectiveC // Clang module
+@_exported import ObjectiveC // Clang module
 
 // The iOS/arm64 target uses _Bool for Objective C's BOOL.  We include
 // x86_64 here as well because the iOS simulator also uses _Bool.

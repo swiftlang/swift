@@ -37,10 +37,10 @@ import not_existent_module_a // expected-error{{no such module 'not_existent_mod
 import not_existent_module_a.submodule // expected-error{{no such module}}
 // CHECK-NEXT: {{^}}import not_existent_module_a.submodule{{$}}
 
-@exported import not_existent_module_b // expected-error{{no such module 'not_existent_module_b'}}
-// CHECK-NEXT: {{^}}@exported import not_existent_module_b{{$}}
-@exported import not_existent_module_b.submodule // expected-error{{no such module}}
-// CHECK-NEXT: {{^}}@exported import not_existent_module_b.submodule{{$}}
+@_exported import not_existent_module_b // expected-error{{no such module 'not_existent_module_b'}}
+// CHECK-NEXT: {{^}}@_exported import not_existent_module_b{{$}}
+@_exported import not_existent_module_b.submodule // expected-error{{no such module}}
+// CHECK-NEXT: {{^}}@_exported import not_existent_module_b.submodule{{$}}
 
 import struct   not_existent_module_c.foo // expected-error{{no such module 'not_existent_module_c'}}
 // CHECK-NEXT: {{^}}import struct not_existent_module_c.foo{{$}}

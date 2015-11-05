@@ -1,4 +1,4 @@
-@exported import EventKit
+@_exported import EventKit
 import Foundation
 
 extension EKErrorCode : _BridgedNSError {

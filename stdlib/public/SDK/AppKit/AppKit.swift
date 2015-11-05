@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import Foundation
-@exported import AppKit
+@_exported import AppKit
 
 struct _NSCursorMirror : _MirrorType {
   var _value: NSCursor

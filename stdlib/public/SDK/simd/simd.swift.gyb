@@ -14,7 +14,7 @@
 
 import Swift
 import Darwin
-@exported import simd
+@_exported import simd
 
 % component = ['x','y','z','w']
 % scalar_types = ['Float','Double','Int32']

@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@exported import Contacts
+@_exported import Contacts
 import Foundation
 
 @available(OSX, introduced=10.11)

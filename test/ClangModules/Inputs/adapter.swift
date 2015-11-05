@@ -1,3 +1,3 @@
-@exported import ClangModuleWithAdapter
+@_exported import ClangModuleWithAdapter
 
 public func fromSwiftAdapter() {}

@@ -1,5 +1,5 @@
-@exported import Foo.FooSub
-@exported import FooHelper
+@_exported import Foo.FooSub
+@_exported import FooHelper
 
 /*  Foo.h
   Copyright (c) 1815, Napoleon Bonaparte. All rights reserved.

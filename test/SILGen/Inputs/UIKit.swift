@@ -1,3 +1,3 @@
 import Foundation
-@exported import UIKit
+@_exported import UIKit
 

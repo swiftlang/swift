@@ -1,7 +1,7 @@
-@exported import abcde
-@exported import aeiou
-@exported import struct aeiou.E
-@exported import struct asdf.D
+@_exported import abcde
+@_exported import aeiou
+@_exported import struct aeiou.E
+@_exported import struct asdf.D
 import struct asdf.S
 
 public struct C {

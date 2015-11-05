@@ -103,7 +103,7 @@ SIMPLE_DECL_ATTR(optional, Optional,
 
 SIMPLE_DECL_ATTR(noreturn, NoReturn, OnFunc, 7)
 
-SIMPLE_DECL_ATTR(exported, Exported, OnImport | UserInaccessible, 8)
+SIMPLE_DECL_ATTR(_exported, Exported, OnImport | UserInaccessible, 8)
 
 /// NOTE: 9 is unused.
 

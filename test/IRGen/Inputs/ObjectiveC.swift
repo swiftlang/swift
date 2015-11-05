@@ -1,5 +1,5 @@
 // This is an overlay Swift module.
-@exported import ObjectiveC
+@_exported import ObjectiveC
 
 public struct ObjCBool : CustomStringConvertible {
 #if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))

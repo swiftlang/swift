@@ -1,4 +1,4 @@
-@exported import def_class
+@_exported import def_class
 
 public class OverrideComputedProperty : ComputedProperty {
   public override var value : Int {

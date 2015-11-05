@@ -1,2 +1,2 @@
-@exported import ImportedByAuxFile
+@_exported import ImportedByAuxFile
 public func fromAuxFile() {}

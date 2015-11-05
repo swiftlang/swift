@@ -1,4 +1,4 @@
-@exported import GameKit
+@_exported import GameKit
 import Foundation
 
 extension GKErrorCode : _BridgedNSError {

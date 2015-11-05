@@ -1,4 +1,4 @@
-@exported import MixedWithHeader
+@_exported import MixedWithHeader
 
 public func testLineImpl(line: Line) {
   doSomethingElse(line)

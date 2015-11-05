@@ -1,4 +1,4 @@
-@exported import Darwin // Clang module
+@_exported import Darwin // Clang module
 
 
 //===----------------------------------------------------------------------===//

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import Foundation
-@exported import CoreImage  // Clang module
+@_exported import CoreImage  // Clang module
 
 #if os(OSX)
 import QuartzCore

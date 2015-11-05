@@ -1,4 +1,4 @@
-@exported import PassKit
+@_exported import PassKit
 import Foundation
 
 @available(iOS, introduced=6.0)

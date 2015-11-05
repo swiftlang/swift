@@ -15,7 +15,7 @@
 // RUN: FileCheck %s -check-prefix=PASS_ANNOTATED -strict-whitespace < %t.annotated.txt
 // REQUIRES: executable_test
 
-@exported import Foo
+@_exported import Foo
 
 public func overlay_func() {}
 internal func overlay_func_internal() {}
@@ -42,6 +42,6 @@ public class FooOverlayClassDerived : FooOverlayClassBase {
 
 // PASS_NO_INTERNAL-NOT: overlay_func_internal
 
-// PASS_ANNOTATED: <decl:Import>@exported import <ref:module>Foo</ref>.<ref:module>FooSub</ref></decl>
-// PASS_ANNOTATED: <decl:Import>@exported import <ref:module>Foo</ref></decl>
-// PASS_ANNOTATED: <decl:Import>@exported import <ref:module>FooHelper</ref></decl>
+// PASS_ANNOTATED: <decl:Import>@_exported import <ref:module>Foo</ref>.<ref:module>FooSub</ref></decl>
+// PASS_ANNOTATED: <decl:Import>@_exported import <ref:module>Foo</ref></decl>
+// PASS_ANNOTATED: <decl:Import>@_exported import <ref:module>FooHelper</ref></decl>
