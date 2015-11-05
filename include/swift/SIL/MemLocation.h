@@ -32,6 +32,159 @@
 namespace swift {
 
 //===----------------------------------------------------------------------===//
+//                            Load Store Value
+//===----------------------------------------------------------------------===//
+
+class MemLocation;
+class LoadStoreValue;
+using LoadStoreValueList = llvm::SmallVector<LoadStoreValue, 8>;
+using MemLocationValueMap = llvm::DenseMap<MemLocation, LoadStoreValue>; 
+
+/// This class represents either a single SILValue or a covering of values that
+/// we can forward from via the introdution of a SILArgument. This enables us
+/// to treat the case of having one value or multiple values and load and store
+/// cases all at once abstractly and cleanly.
+///
+/// A LoadStoreValue is an abstraction of an object field value in program. It
+/// consists of a base that is the tracked SILValue, and a projection path to
+/// the represented field.
+///
+/// In this example below, 2 LoadStoreValues will be created for the 2 stores,
+/// they will have %6 and %7 as their Bases and empty projection paths.
+///
+///  struct A {
+///    var a: Int
+///    var b: Int
+///  }
+///
+/// sil hidden @test_1 : $@convention(thin) () -> () {
+///   %0 = alloc_stack $A  // var x                   // users: %4, %7
+///   %5 = integer_literal $Builtin.Int64, 19         // user: %6
+///   %6 = struct $Int (%5 : $Builtin.Int64)          // user: %8
+///   %7 = struct_element_addr %0#1 : $*A, #A.a       // user: %8
+///   store %6 to %7 : $*Int                          // id: %8
+///   %9 = integer_literal $Builtin.Int64, 20         // user: %10
+///   %10 = struct $Int (%9 : $Builtin.Int64)         // user: %12
+///   %11 = struct_element_addr %0#1 : $*A, #A.b      // user: %12
+///   store %10 to %11 : $*Int                        // id: %12
+/// }
+///
+/// In this example below, 2 LoadStoreValues will be created with %3 as their
+/// bases and #a and #b as their projection paths respectively.
+///
+/// sil hidden @test_1 : $@convention(thin) () -> () {
+///   %0 = alloc_stack $A  // var x                   // users: %4, %6
+///   // function_ref a.A.init (a.A.Type)() -> a.A
+///   %1 = function_ref @a.A.init : $@convention(thin) (@thin A.Type) -> A
+///   %2 = metatype $@thin A.Type                     // user: %3
+///   %3 = apply %1(%2) : $@convention(thin) (@thin A.Type) -> A // user: %4
+///   store %3 to %0#1 : $*A                          // id: %4
+/// }
+///
+///
+/// NOTE: LoadStoreValue can take 2 forms.
+///
+/// 1. It can take a concrete value, i.e. with a valid Base and ProjectionPath.
+/// using the extract function, it can be materialized in IR.
+///
+/// 2. It can represent a covering set of LoadStoreValues from all predecessor
+/// blocks. and to get the forwardable SILValue, we need to go to its
+/// predecessors to materialize each one of them and create the forwarding
+/// SILValue through a SILArgument.
+///
+/// Given a set of MemLocations and their available LoadStoreValues,
+/// reduceWithValues will create the forwarding SILValue by merging them while
+/// creating as few value extraction and aggregation as possible.
+///
+/// NOTE: ProjectionPath in LoadStoreValue could be replaced by the
+/// ProjectionPath in the MemLocation, but that would require we break the
+/// ProjectionPath into 2 parts, 1 for the Base to the accessed (aggregate) node
+/// and another 1 for the accessed (aggregate) node to the leaf node the
+/// MemLocation represents.
+///
+/// This makes implementing the MemLocationVault more difficult, as there are
+/// multiple ways to represent the same MemLocations (even they have the same
+/// base).
+///
+class LoadStoreValue {
+  /// The base of the memory value.
+  SILValue Base;
+  /// The path to reach the accessed field of the object.
+  Optional<ProjectionPath> Path;
+  /// If this is a covering value, we need to go to each predecessor to
+  /// materialize the value.
+  bool IsCoveringValue;
+
+  /// Create a path of ValueProjection with the given VA and Path.
+  SILValue createExtract(SILValue VA, Optional<ProjectionPath> &Path,
+                         SILInstruction *Inst);
+public:
+  /// Constructors.
+  LoadStoreValue() : Base(), IsCoveringValue(false) {}
+  LoadStoreValue(SILValue B) : Base(B), IsCoveringValue(false) {}
+  LoadStoreValue(SILValue B, ProjectionPath &P)
+      : Base(B), Path(std::move(P)), IsCoveringValue(false) {}
+
+  SILValue getBase() const { return Base; }
+  Optional<ProjectionPath> &getPath() { return Path; }
+
+  /// Copy constructor.
+  LoadStoreValue(const LoadStoreValue &RHS) {
+    Base = RHS.Base;
+    IsCoveringValue = RHS.IsCoveringValue;
+    Path.reset();
+    if (!RHS.Path.hasValue())
+      return;
+    ProjectionPath X;
+    X.append(RHS.Path.getValue());
+    Path = std::move(X);
+  }
+
+  LoadStoreValue &operator=(const LoadStoreValue &RHS) {
+    Base = RHS.Base;
+    IsCoveringValue = RHS.IsCoveringValue;
+    Path.reset();
+    if (!RHS.Path.hasValue())
+      return *this;
+    ProjectionPath X;
+    X.append(RHS.Path.getValue());
+    Path = std::move(X);
+    return *this;
+  }
+
+  /// Returns true if the LoadStoreValue has a non-empty projection path.
+  bool hasEmptyProjectionPath() const { return !Path.getValue().size(); }
+
+  /// Take the last level projection off. Return the modified LoadStoreValue.
+  LoadStoreValue &stripLastLevelProjection();
+ 
+  bool isCoveringValue() const { return IsCoveringValue; }
+  /// Mark this LoadStoreValue as a covering value.
+  void setCoveringValue(); 
+ 
+  /// Print the base and the path of the LoadStoreValue.
+  void print();
+
+  /// Materialize the SILValue that this LoadStoreValue represents.
+  ///
+  /// In the case where we have a single value this can be materialized by
+  /// applying Path to the Base.
+  ///
+  /// In the case where we are handling a covering set, this is initially null
+  /// and when we insert the PHI node, this is set to the SILArgument which
+  /// represents the PHI node.
+  SILValue materialize(SILInstruction *Inst) {
+    //
+    // TODO: handle covering value.
+    //
+    if (IsCoveringValue)
+      return SILValue();
+    return createExtract(Base, Path, Inst);
+  }
+};
+
+
+//===----------------------------------------------------------------------===//
 //                              Memory Location
 //===----------------------------------------------------------------------===//
 /// Forward declaration.
@@ -197,6 +350,21 @@ public:
   /// them into smallest number of MemLocations possible.
   static void reduce(MemLocation &Base, SILModule *Mod, MemLocationSet &Locs);
 
+  /// Given a memory location and a SILValue, expand the location into its
+  /// individual fields and the values that is in each individual field.
+  static void expandWithValues(MemLocation &Base, SILValue &Val, SILModule *Mod,
+                               MemLocationList &Locs, LoadStoreValueList &Vals);
+
+  /// Given a memory location and a map between the expansions of the location
+  /// and their corresponding values, try to come up with a single SILValue this
+  /// location holds. This may involve extracting and aggregating available values.
+  ///
+  /// NOTE: reduceValues assumes that every component of the location has an
+  /// concrete (i.e. not coverings set) available value in LocAndVal.
+  static SILValue reduceWithValues(MemLocation &Base, SILModule *Mod,
+                                   MemLocationValueMap &LocAndVal,
+                                   SILInstruction *InsertPt);
+
   /// Enumerate the given Mem MemLocation.
   static void enumerateMemLocation(SILModule *M, SILValue Mem,
                                    std::vector<MemLocation> &MemLocationVault,
@@ -256,4 +424,4 @@ template <> struct DenseMapInfo<MemLocation> {
 
 } // namespace llvm
 
-#endif  // SWIFT_MEM_LOCATION_H
+#endif  // SWIFT_SIL_MEMLOCATION_H

@@ -57,7 +57,7 @@ namespace {
 class MemLocationPrinter : public SILFunctionTransform {
 
   /// Dumps the expansions of SILType accessed in the function.
-  /// This tests the BreadthFirstEnumTypeProjection function, which is
+  /// This tests the expandTypeIntoLeafProjectionPaths function, which is
   /// a function used extensively in expand and reduce functions.
   ///
   /// We test it to catch any suspicious things in the earliest point.
@@ -72,12 +72,14 @@ class MemLocationPrinter : public SILFunctionTransform {
           SILValue V = LI->getOperand();
           // This is an address type, take it object type.
           SILType Ty = V.getType().getObjectType();
-          ProjectionPath::BreadthFirstEnumTypeProjection(Ty, M, PPList, true);
+          ProjectionPath::expandTypeIntoLeafProjectionPaths(Ty, M, PPList,
+                                                            true);
         } else if (auto *SI = dyn_cast<StoreInst>(&II)) {
           SILValue V = SI->getDest();
           // This is an address type, take it object type.
           SILType Ty = V.getType().getObjectType();
-          ProjectionPath::BreadthFirstEnumTypeProjection(Ty, M, PPList, true);
+          ProjectionPath::expandTypeIntoLeafProjectionPaths(Ty, M, PPList,
+                                                            true);
         } else {
           // Not interested in these instructions yet.
           continue;
