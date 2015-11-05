@@ -30,7 +30,7 @@ import gizmo
 // CHECK-tvos: private unnamed_addr constant [11 x i8] c"v24@0:8q16\00"
 
   @objc func testPrimitives(b: CBool, i: Int, f: Float, d: Double)
-    -> OpaquePointer { return OpaquePointer() }
+    -> OpaquePointer { return nil }
 // CHECK-macosx: private unnamed_addr constant [21 x i8] c"^v40@0:8c16q20f28d32\00"
 // CHECK-ios: private unnamed_addr constant [21 x i8] c"^v40@0:8B16q20f28d32\00"
 // CHECK-tvos: private unnamed_addr constant [21 x i8] c"^v40@0:8B16q20f28d32\00"

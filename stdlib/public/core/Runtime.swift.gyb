@@ -79,7 +79,7 @@ public // @testable
 func _stdlib_atomicInitializeARCRef(
   object target: UnsafeMutablePointer<AnyObject?>,
   desired: AnyObject) -> Bool {
-  var expected = OpaquePointer()
+  var expected: OpaquePointer = nil
   let desiredPtr = Unmanaged.passRetained(desired).toOpaque()
   let wonRace = _stdlib_atomicCompareExchangeStrongPtrImpl(
     object: UnsafeMutablePointer(target),

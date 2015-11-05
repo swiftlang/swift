@@ -90,7 +90,7 @@ public struct Unsafe${Mutable}BufferPointer<Element>
     return _end - _position
   }
 
-  var _position, _end: Unsafe${Mutable}Pointer<Element>
+  let _position, _end: Unsafe${Mutable}Pointer<Element>
 }
 
 extension Unsafe${Mutable}BufferPointer : CustomDebugStringConvertible {

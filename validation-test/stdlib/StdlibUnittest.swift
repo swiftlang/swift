@@ -456,7 +456,7 @@ AssertionsTestSuite.test("UnexpectedCrash/RuntimeTrap") {
 // CHECK: [     FAIL ] Assertions.UnexpectedCrash/RuntimeTrap
 
 AssertionsTestSuite.test("UnexpectedCrash/NullPointerDereference") {
-  let ptr = _opaqueIdentity(UnsafePointer<Int>())
+  let ptr: UnsafePointer<Int> = _opaqueIdentity(nil)
   _blackHole(ptr.memory)
 }
 // CHECK: [ RUN      ] Assertions.UnexpectedCrash/NullPointerDereference

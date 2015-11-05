@@ -46,12 +46,6 @@ public struct ${Self}<Pointee>
   /// The underlying raw (untyped) pointer.
   public let _rawValue: Builtin.RawPointer
 
-  /// Construct a null pointer.
-  @_transparent
-  public init() {
-    self._rawValue = _nilRawPointer
-  }
-
   /// Construct ${a_Self} from a builtin raw pointer.
   @_transparent
   public init(_ _rawValue : Builtin.RawPointer) {
@@ -99,9 +93,9 @@ public struct ${Self}<Pointee>
   }
 
   /// Create an instance initialized with `nil`.
-  @_transparent public
-  init(nilLiteral: ()) {
-    self = ${Self}()
+  @_transparent
+  public init(nilLiteral: ()) {
+    self._rawValue = _nilRawPointer
   }
 
 %  if mutable:

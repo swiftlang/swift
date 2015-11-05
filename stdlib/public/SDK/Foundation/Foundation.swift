@@ -681,10 +681,11 @@ final public class NSFastEnumerationIterator : IteratorProtocol {
   /// Size of ObjectsBuffer, in ids.
   var STACK_BUF_SIZE: Int { return 4 }
 
+  // FIXME: Replace with _CocoaFastEnumerationStackBuf.
   /// Must have enough space for STACK_BUF_SIZE object references.
   struct ObjectsBuffer {
-    var buf = (OpaquePointer(), OpaquePointer(),
-               OpaquePointer(), OpaquePointer())
+    var buf: (OpaquePointer, OpaquePointer, OpaquePointer, OpaquePointer) =
+      (nil, nil, nil, nil)
   }
   var objects: [ObjectsBuffer]
 

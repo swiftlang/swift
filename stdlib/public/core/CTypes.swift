@@ -77,17 +77,17 @@ public typealias CBool = Bool
 /// Opaque pointers are used to represent C pointers to types that
 /// cannot be represented in Swift, such as incomplete struct types.
 public struct OpaquePointer : Equatable, Hashable, NilLiteralConvertible {
-  var _rawValue: Builtin.RawPointer
+  internal var _rawValue: Builtin.RawPointer
 
-  /// Construct a `nil` instance.
+  /// Create an instance initialized with `nil`.
   @_transparent
-  public init() {
-    _rawValue = _nilRawPointer
+  public init(nilLiteral: ()) {
+    self._rawValue = _nilRawPointer
   }
 
   @_transparent
-  init(_ v: Builtin.RawPointer) {
-    _rawValue = v
+  internal init(_ v: Builtin.RawPointer) {
+    self._rawValue = v
   }
 
   /// Construct an `OpaquePointer` from a given address in memory.
@@ -95,7 +95,7 @@ public struct OpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   /// This is a fundamentally unsafe conversion.
   @_transparent
   public init(bitPattern: Int) {
-    _rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
+    self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
   /// Construct an `OpaquePointer` from a given address in memory.
@@ -103,7 +103,7 @@ public struct OpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   /// This is a fundamentally unsafe conversion.
   @_transparent
   public init(bitPattern: UInt) {
-    _rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
+    self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
   /// Convert a typed `UnsafePointer` to an opaque C pointer.
@@ -134,12 +134,15 @@ public struct OpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   public var hashValue: Int {
     return Int(Builtin.ptrtoint_Word(_rawValue))
   }
+<<<<<<< HEAD
 
   /// Create an instance initialized with `nil`.
   @_transparent public
   init(nilLiteral: ()) {
     _rawValue = _nilRawPointer
   }
+=======
+>>>>>>> a0a9a9b... Remove no-argument initializers from unsafe pointer types
 }
 
 extension OpaquePointer : CustomDebugStringConvertible {

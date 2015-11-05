@@ -72,7 +72,7 @@ public func _stdlib_pthread_create_block<Argument, Result>(
     .toOpaque()
   let contextAsVoidPointer = UnsafeMutablePointer<Void>(contextAsOpaque)
 
-  var threadID = pthread_t()
+  var threadID: pthread_t = nil
   let result = pthread_create(&threadID, attr,
     invokeBlockContext, contextAsVoidPointer)
   if result == 0 {
@@ -87,7 +87,7 @@ public func _stdlib_pthread_join<Result>(
   thread: pthread_t,
   _ resultType: Result.Type
 ) -> (CInt, Result?) {
-  var threadResultPtr = UnsafeMutablePointer<Void>()
+  var threadResultPtr: UnsafeMutablePointer<Void> = nil
   let result = pthread_join(thread, &threadResultPtr)
   if result == 0 {
     let threadResult = UnsafeMutablePointer<Result>(threadResultPtr).memory

@@ -106,9 +106,9 @@ func pointerProperties(obj: PointerWrapper) {
   // CHECK: load i8*, i8** @"\01L_selector(setVoidPtr:)"
   // CHECK: load i8*, i8** @"\01L_selector(setIntPtr:)"
   // CHECK: load i8*, i8** @"\01L_selector(setIdPtr:)"
-  obj.voidPtr = UnsafeMutablePointer()
-  obj.intPtr = UnsafeMutablePointer()
-  obj.idPtr = AutoreleasingUnsafeMutablePointer()
+  obj.voidPtr = nil as UnsafeMutablePointer
+  obj.intPtr = nil as UnsafeMutablePointer
+  obj.idPtr = nil as AutoreleasingUnsafeMutablePointer
 }
 
 // CHECK-LABEL: define hidden void @_TF7objc_ir20customFactoryMethodsFT_T_() {{.*}} {

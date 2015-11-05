@@ -70,7 +70,7 @@ ${SelfName}TestSuite.test("convertFromNil") {
 }
 
 ${SelfName}TestSuite.test("initNoArgs") {
-  let ptr = ${SelfType}()
+  let ptr: ${SelfType} = nil
   expectEqual(0, unsafeBitCast(ptr, Int.self))
 }
 

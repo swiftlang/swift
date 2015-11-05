@@ -398,14 +398,8 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   }
 
   /// Create an instance initialized with `nil`.
-  @_transparent public
-  init(nilLiteral: ()) {
-    _rawValue = _nilRawPointer
-  }
-
-  /// Initialize to a null pointer.
-  @_transparent public
-  init() {
+  @_transparent
+  public init(nilLiteral: ()) {
     self._rawValue = _nilRawPointer
   }
 
