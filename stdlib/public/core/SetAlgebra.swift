@@ -29,7 +29,7 @@
 ///
 /// Two elements are **disjoint** when neither one *subsumes* the other.
 ///
-/// - SeeAlso: `OptionSetType`.
+/// - SeeAlso: `OptionSet`.
 ///
 /// - Axioms, where `S` conforms to `SetAlgebraType`, `x` and `y` are
 ///   of type `S`, and `e` is of type `S.Element`:

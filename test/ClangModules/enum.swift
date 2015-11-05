@@ -142,7 +142,7 @@ var withQuince: NSRuncingOptions = .EnableQuince
 // derive the namespaced name.
 var singleValue: NSSingleOptions = .Value
 
-// Check OptionSetType conformance.
+// Check OptionSet conformance.
 var minceAndQuince: NSRuncingOptions = NSRuncingOptions.EnableMince.intersect(NSRuncingOptions.EnableQuince)
 var minceOrQuince: NSRuncingOptions = [.EnableMince, .EnableQuince]
 minceOrQuince.intersectInPlace(minceAndQuince)

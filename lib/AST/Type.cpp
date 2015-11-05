@@ -962,7 +962,7 @@ StringRef TypeBase::getInferredDefaultArgString() {
       for (auto attr : structDecl->getAttrs()) {
         if (auto synthesizedProto = dyn_cast<SynthesizedProtocolAttr>(attr)) {
           if (synthesizedProto->getProtocolKind()
-              == KnownProtocolKind::OptionSetType)
+              == KnownProtocolKind::OptionSet)
             return "[]";
         }
       }

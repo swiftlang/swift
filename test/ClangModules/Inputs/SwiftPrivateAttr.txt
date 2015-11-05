@@ -83,12 +83,12 @@ enum NSEnum : Int {
   case __PrivA
   case B
 }
-struct __PrivNSOptions : OptionSetType {
+struct __PrivNSOptions : OptionSet {
   init(rawValue: Int)
   let rawValue: Int
   static var A: __PrivNSOptions { get }
 }
-struct NSOptions : OptionSetType {
+struct NSOptions : OptionSet {
   init(rawValue: Int)
   let rawValue: Int
   static var __PrivA: NSOptions { get }

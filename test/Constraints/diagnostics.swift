@@ -531,7 +531,7 @@ func f(arguments: [String]) -> [ArraySlice<String>] {
 
 
 
-struct AOpts : OptionSetType {
+struct AOpts : OptionSet {
   let rawValue : Int
 }
 

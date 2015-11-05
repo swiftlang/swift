@@ -57,7 +57,7 @@ PROTOCOL(Equatable)
 PROTOCOL(Hashable)
 PROTOCOL(Comparable)
 PROTOCOL(ErrorProtocol)
-PROTOCOL(OptionSetType)
+PROTOCOL(OptionSet)
 PROTOCOL_(BridgedNSError)
 
 PROTOCOL_(ObjectiveCBridgeable)

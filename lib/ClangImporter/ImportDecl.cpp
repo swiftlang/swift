@@ -325,7 +325,7 @@ static bool isNSDictionaryMethod(const clang::ObjCMethodDecl *MD,
 /// unknown enum.
 ///
 /// \code
-/// struct NSSomeOptionSet : OptionSetType {
+/// struct NSSomeOptionSet : OptionSet {
 ///   let rawValue: Raw
 /// }
 /// \endcode
@@ -1903,7 +1903,7 @@ namespace {
       // Note that this is a raw option set type.
       structDecl->getAttrs().add(
         new (Impl.SwiftContext) SynthesizedProtocolAttr(
-                                  KnownProtocolKind::OptionSetType));
+                                  KnownProtocolKind::OptionSet));
 
       
       // Create a field to store the underlying value.
@@ -1931,9 +1931,9 @@ namespace {
                                 /*wantCtorParamNames=*/true,
                                 /*wantBody=*/!Impl.hasFinishedTypeChecking());
 
-      // Build an OptionSetType conformance for the type.
+      // Build an OptionSet conformance for the type.
       ProtocolDecl *protocols[]
-        = {cxt.getProtocol(KnownProtocolKind::OptionSetType)};
+        = {cxt.getProtocol(KnownProtocolKind::OptionSet)};
       populateInheritedTypes(structDecl, protocols);
 
       structDecl->addMember(labeledValueConstructor);

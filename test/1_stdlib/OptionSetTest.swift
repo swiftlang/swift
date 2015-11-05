@@ -12,7 +12,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-struct PackagingOptions : OptionSetType {
+struct PackagingOptions : OptionSet {
   let rawValue: Int
   init(rawValue: Int) { self.rawValue = rawValue }
 

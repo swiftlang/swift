@@ -4904,7 +4904,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::BuiltinStringLiteralConvertible:
   case KnownProtocolKind::BuiltinUTF16StringLiteralConvertible:
   case KnownProtocolKind::BuiltinUnicodeScalarLiteralConvertible:
-  case KnownProtocolKind::OptionSetType:
+  case KnownProtocolKind::OptionSet:
   case KnownProtocolKind::BridgedNSError:
     return SpecialProtocol::None;
   }

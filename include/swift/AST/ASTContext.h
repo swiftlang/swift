@@ -410,8 +410,8 @@ public:
   EnumElementDecl *getOptionalSomeDecl(OptionalTypeKind kind) const;
   EnumElementDecl *getOptionalNoneDecl(OptionalTypeKind kind) const;
 
-  /// Retrieve the declaration of Swift.OptionSetType.
-  NominalTypeDecl *getOptionSetTypeDecl() const;
+  /// Retrieve the declaration of Swift.OptionSet.
+  NominalTypeDecl *getOptionSetDecl() const;
   
   /// Retrieve the declaration of Swift.UnsafeMutablePointer<T>.
   NominalTypeDecl *getUnsafeMutablePointerDecl() const;
