@@ -218,7 +218,7 @@ struct _ForkJoinMutex {
   var _mutex: UnsafeMutablePointer<pthread_mutex_t>
 
   init() {
-    _mutex = UnsafeMutablePointer.alloc(1)
+    _mutex = UnsafeMutablePointer(allocatingCapacity: 1)
     if pthread_mutex_init(_mutex, nil) != 0 {
       fatalError("pthread_mutex_init")
     }
@@ -248,7 +248,7 @@ struct _ForkJoinCond {
   var _cond: UnsafeMutablePointer<pthread_cond_t> = nil
 
   init() {
-    _cond = UnsafeMutablePointer.alloc(1)
+    _cond = UnsafeMutablePointer(allocatingCapacity: 1)
     if pthread_cond_init(_cond, nil) != 0 {
       fatalError("pthread_cond_init")
     }

@@ -102,10 +102,10 @@ public struct ${Self}<Pointee>
   ///
   /// - Postcondition: The pointee is allocated, but not initialized.
   @warn_unused_result
-  public static func alloc(num: Int) -> ${Self} {
-    let size = strideof(Pointee.self) * num
-    return ${Self}(
-      Builtin.allocRaw(size._builtinWordValue, Builtin.alignof(Pointee.self)))
+  public init(allocatingCapacity count: Int) {
+    let size = strideof(Pointee.self) * count
+    self._rawValue =
+      Builtin.allocRaw(size._builtinWordValue, Builtin.alignof(Pointee.self))
   }
 
   /// Deallocate uninitialized memory allocated for `count` instances

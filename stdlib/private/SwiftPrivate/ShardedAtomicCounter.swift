@@ -33,7 +33,7 @@ public struct _stdlib_ShardedAtomicCounter {
   public init() {
     let hardwareConcurrency = _stdlib_getHardwareConcurrency()
     let count = max(8, hardwareConcurrency * hardwareConcurrency)
-    let shards = UnsafeMutablePointer<Int>.alloc(count)
+    let shards = UnsafeMutablePointer<Int>(allocatingCapacity: count)
     for var i = 0; i != count; i++ {
       (shards + i).initialize(0)
     }

@@ -94,7 +94,7 @@ func sliceConcurrentAppendThread(tid: ThreadID) {
 }
 
 StringTestSuite.test("SliceConcurrentAppend") {
-  barrierVar = UnsafeMutablePointer.alloc(1)
+  barrierVar = UnsafeMutablePointer(allocatingCapacity: 1)
   barrierVar.initialize(_stdlib_pthread_barrier_t())
   var ret = _stdlib_pthread_barrier_init(barrierVar, nil, 2)
   expectEqual(0, ret)

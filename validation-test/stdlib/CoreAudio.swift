@@ -191,7 +191,7 @@ CoreAudioTestSuite.test(
 CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.count") {
   let sizeInBytes = AudioBufferList.sizeInBytes(maximumBuffers: 16)
   let ablPtr = UnsafeMutablePointer<AudioBufferList>(
-    UnsafeMutablePointer<UInt8>.alloc(sizeInBytes))
+    UnsafeMutablePointer<UInt8>(allocatingCapacity: sizeInBytes))
 
   // It is important that 'ablPtrWrapper' is a 'let'.  We are verifying that
   // the 'count' property has a nonmutating setter.
@@ -211,7 +211,7 @@ CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.count") {
 CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.subscript(_: Int)") {
   let sizeInBytes = AudioBufferList.sizeInBytes(maximumBuffers: 16)
   let ablPtr = UnsafeMutablePointer<AudioBufferList>(
-    UnsafeMutablePointer<UInt8>.alloc(sizeInBytes))
+    UnsafeMutablePointer<UInt8>(allocatingCapacity: sizeInBytes))
 
   // It is important that 'ablPtrWrapper' is a 'let'.  We are verifying that
   // the subscript has a nonmutating setter.

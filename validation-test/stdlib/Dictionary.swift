@@ -3821,9 +3821,9 @@ DictionaryTestSuite.test("dropsBridgedCache") {
 DictionaryTestSuite.test("getObjects:andKeys:") {
   let d = ([1: "one", 2: "two"] as Dictionary<Int, String>) as NSDictionary
   var keys = UnsafeMutableBufferPointer(
-    start: UnsafeMutablePointer<NSNumber>.alloc(2), count: 2)
+    start: UnsafeMutablePointer<NSNumber>(allocatingCapacity: 2), count: 2)
   var values = UnsafeMutableBufferPointer(
-    start: UnsafeMutablePointer<NSString>.alloc(2), count: 2)
+    start: UnsafeMutablePointer<NSString>(allocatingCapacity: 2), count: 2)
   var kp = AutoreleasingUnsafeMutablePointer<AnyObject?>(keys.baseAddress)
   var vp = AutoreleasingUnsafeMutablePointer<AnyObject?>(values.baseAddress)
   var null: AutoreleasingUnsafeMutablePointer<AnyObject?> = nil

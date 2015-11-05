@@ -67,12 +67,12 @@ public func _stdlib_pthread_barrier_init(
     errno = EINVAL
     return -1
   }
-  barrier.memory.mutex = UnsafeMutablePointer.alloc(1)
+  barrier.memory.mutex = UnsafeMutablePointer(allocatingCapacity: 1)
   if pthread_mutex_init(barrier.memory.mutex, nil) != 0 {
     // FIXME: leaking memory.
     return -1
   }
-  barrier.memory.cond = UnsafeMutablePointer.alloc(1)
+  barrier.memory.cond = UnsafeMutablePointer(allocatingCapacity: 1)
   if pthread_cond_init(barrier.memory.cond, nil) != 0 {
     // FIXME: leaking memory, leaking a mutex.
     return -1

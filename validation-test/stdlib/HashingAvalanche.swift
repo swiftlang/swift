@@ -22,7 +22,7 @@ func avalancheTest(bits: Int, _ hashUnderTest: (UInt64) -> UInt64, _ pValue: Dou
 
   for inputBit in 0..<bits {
     // Using an array here makes the test too slow.
-    var bitFlips = UnsafeMutablePointer<Int>.alloc(bits)
+    var bitFlips = UnsafeMutablePointer<Int>(allocatingCapacity: bits)
     for i in 0..<bits {
       bitFlips[i] = 0
     }

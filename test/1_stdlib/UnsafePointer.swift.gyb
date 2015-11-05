@@ -139,7 +139,7 @@ func checkPointerCorrectness(check: Check,
   _ f: (UnsafeMutablePointer<Missile>) ->
     (UnsafeMutablePointer<Missile>, count: Int) -> Void,
   _ withMissiles: Bool = false) {
-  let ptr = UnsafeMutablePointer<Missile>.alloc(4)
+  let ptr = UnsafeMutablePointer<Missile>(allocatingCapacity: 4)
   switch check {
   case .RightOverlap:
     ptr.initialize(Missile(1))
@@ -170,7 +170,7 @@ func checkPointerCorrectness(check: Check,
     expectEqual(2, ptr[0].number)
     expectEqual(3, ptr[1].number)
     // backwards
-    let ptr2 = UnsafeMutablePointer<Missile>.alloc(4)
+    let ptr2 = UnsafeMutablePointer<Missile>(allocatingCapacity: 4)
     ptr2.initialize(Missile(0))
     (ptr2 + 1).initialize(Missile(1))
     if withMissiles {

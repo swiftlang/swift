@@ -1930,7 +1930,7 @@ public func checkSequence<
   sequence._preprocessingPass { (sequence)->Void in 
     var count = 0
     for _ in sequence { ++count }
-    let buf = UnsafeMutablePointer<S.Iterator.Element>.alloc(count)
+    let buf = UnsafeMutablePointer<S.Iterator.Element>(allocatingCapacity: count)
     let end = sequence._initializeTo(buf)
     expectTrue(end == buf + count, "_initializeTo returned the wrong value")
     var j = expected.startIndex
