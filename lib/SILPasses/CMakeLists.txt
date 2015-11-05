@@ -15,7 +15,7 @@ add_swift_library(swiftSILPasses
   ClosureSpecializer.cpp
   ConstantPropagation.cpp
   CopyForwarding.cpp
-  CropOverflowChecks.cpp
+  RedundantOverflowCheckRemoval.cpp
   DIMemoryUseCollector.cpp
   DataflowDiagnostics.cpp
   DeadCodeElimination.cpp
