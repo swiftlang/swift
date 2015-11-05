@@ -185,7 +185,7 @@ void MemLocation::expand(MemLocation &Base, SILModule *Mod,
     // There is no cached expansion for this type, build and cache it now.
     ProjectionPathList Paths;
     ProjectionPath::expandTypeIntoLeafProjectionPaths(BaseType, Mod, Paths,
-                                                   true);
+                                                      true);
     for (auto &X : Paths) {
       TypeExpansionVault[Base.getType()].push_back(std::move(X.getValue()));
     }
@@ -206,7 +206,7 @@ void MemLocation::reduce(MemLocation &Base, SILModule *Mod,
   MemLocationList ALocs;
   ProjectionPathList Paths;
   ProjectionPath::expandTypeIntoLeafProjectionPaths(Base.getType(), Mod, Paths,
-                                                 false);
+                                                    false);
   for (auto &X : Paths) {
     ALocs.push_back(MemLocation::createMemLocation(Base.getBase(), X.getValue(),
                                                    Base.getPath().getValue()));
