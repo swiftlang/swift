@@ -129,8 +129,7 @@ extension String {
       }
     }
 
-    /// Access the elements delimited by the given half-open range of
-    /// indices.
+    /// Access the contiguous subrange of elements enclosed by `bounds`.
     ///
     /// - Complexity: O(1) unless bridging from Objective-C requires an
     ///   O(N) conversion.

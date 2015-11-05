@@ -266,7 +266,7 @@ extension String.CharacterView : RangeReplaceableCollection {
     self.init("")
   }
 
-  /// Replace the elements in `bounds` with `newElements`.
+  /// Replace the characters within `bounds` with `newElements`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///

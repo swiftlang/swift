@@ -12,6 +12,9 @@
 
 import SwiftShims
 
+// FIXME: complexity documentation for most of methods on String is ought to be
+// qualified with "amortized" at least, as Characters are variable-length.
+
 /// An arbitrary Unicode string value.
 ///
 /// Unicode-Correct
@@ -567,7 +570,7 @@ public func < (lhs: String.Index, rhs: String.Index) -> Bool {
 }
 
 extension String {
-  /// Access the characters in `bounds`.
+  /// Return the characters within the given `bounds`.
   ///
   /// - Complexity: O(1) unless bridging from Objective-C requires an
   ///   O(N) conversion.
@@ -654,7 +657,8 @@ extension Sequence where Iterator.Element == String {
 }
 
 extension String {
-  /// Replace the elements in `bounds` with `newElements`.
+  /// Replace the characters within `bounds` with the elements of
+  /// `replacement`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -670,7 +674,7 @@ extension String {
     }
   }
 
-  /// Replace the elements in `bounds` with `newElements`.
+  /// Replace the text in `bounds` with `replacement`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -682,7 +686,7 @@ extension String {
     replaceSubrange(bounds, with: newElements.characters)
   }
 
-  /// Insert `newElement` at index `i`.
+  /// Insert `newElement` at position `i`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -693,7 +697,7 @@ extension String {
     }
   }
 
-  /// Insert `newElements` at index `i`.
+  /// Insert `newElements` at position `i`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -706,7 +710,7 @@ extension String {
     }
   }
 
-  /// Remove and return the element at index `i`.
+  /// Remove and return the `Character` at position `i`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -728,7 +732,7 @@ extension String {
     }
   }
 
-  /// Remove all characters.
+  /// Replace `self` with the empty string.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -823,6 +827,9 @@ extension String {
     }
   }
 
+  /// Return `self` converted to lower case.
+  ///
+  /// - Complexity: O(n)
   public var lowercaseString: String {
     if self._core.isASCII {
       let length = self._core.count
@@ -861,6 +868,9 @@ extension String {
 #endif
   }
 
+  /// Return `self` converted to upper case.
+  ///
+  /// - Complexity: O(n)
   public var uppercaseString: String {
     if self._core.isASCII {
       let length = self._core.count

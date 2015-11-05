@@ -99,8 +99,7 @@ extension String {
     }
 #endif
 
-    /// Access the elements delimited by the given half-open range of
-    /// indices.
+    /// Get the contiguous subrange of elements enclosed by `bounds`.
     ///
     /// - Complexity: O(1) unless bridging from Objective-C requires an
     ///   O(N) conversion.
@@ -139,9 +138,9 @@ extension String {
       return "StringUTF16(\(self.description.debugDescription))"
     }
 
-    var _offset: Int
-    var _length: Int
-    let _core: _StringCore
+    internal var _offset: Int
+    internal var _length: Int
+    internal let _core: _StringCore
   }
 
   /// A UTF-16 encoding of `self`.
@@ -207,7 +206,6 @@ public func < (
 // We can do some things more efficiently, even if we don't promise to
 // by conforming to RandomAccessIndex.
 
-/// Do not use this operator directly; call distance(start, end) instead.
 extension String.UTF16View.Index {
   @warn_unused_result
   public func distanceTo(end: String.UTF16View.Index)
