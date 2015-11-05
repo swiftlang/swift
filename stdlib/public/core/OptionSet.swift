@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Supplies convenient conformance to `SetAlgebraType` for any type
+/// Supplies convenient conformance to `SetAlgebra` for any type
 /// whose `RawValue` is a `BitwiseOperationsType`.  For example:
 ///
 ///     struct PackagingOptions : OptionSet {
@@ -28,7 +28,7 @@
 /// In the example above, `PackagingOptions.Element` is the same type
 /// as `PackagingOptions`, and instance `a` subsumes instance `b` if
 /// and only if `a.rawValue & b.rawValue == b.rawValue`.
-public protocol OptionSet : SetAlgebraType, RawRepresentable {
+public protocol OptionSet : SetAlgebra, RawRepresentable {
   // We can't constrain the associated Element type to be the same as
   // Self, but we can do almost as well with a default and a
   // constrained extension
@@ -41,7 +41,7 @@ public protocol OptionSet : SetAlgebraType, RawRepresentable {
   // that prevent non-failable initializers from forwarding to
   // failable ones would prevent us from generating the non-failing
   // default (zero-argument) initializer.  Since OptionSet's main
-  // purpose is to create convenient conformances to SetAlgebraType,
+  // purpose is to create convenient conformances to SetAlgebra,
   // we opt for a non-failable initializer.
   
   /// Convert from a value of `RawValue`, succeeding unconditionally.
