@@ -4096,12 +4096,14 @@ public struct _${Self}Builder<${TypeParametersDecl}> {
 %if Self == 'Set':
   public mutating func add(member newKey: Key) {
     _nativeStorage.unsafeAddNew(key: newKey)
+    _actualCount++
+  }
 %elif Self == 'Dictionary':
   public mutating func add(key newKey: Key, value: Value) {
     _nativeStorage.unsafeAddNew(key: newKey, value: value)
-%end
     _actualCount++
   }
+%end
 
   @warn_unused_result
   public mutating func take() -> ${Self}<${TypeParameters}> {
