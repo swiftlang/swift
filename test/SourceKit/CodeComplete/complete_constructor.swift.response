@@ -1,0 +1,15 @@
+{
+  key.results: [
+    {
+      key.kind: source.lang.swift.decl.function.constructor,
+      key.name: "arg1:arg2:)",
+      key.sourcetext: "arg1: <#T##Int#>, arg2: <#T##Int#>)",
+      key.description: "(arg1: Int, arg2: Int)",
+      key.typename: "Foo",
+      key.context: source.codecompletion.context.thisclass,
+      key.num_bytes_to_erase: 0,
+      key.associated_usrs: "s:FC20complete_constructor3FoocFT4arg1Si4arg2Si_S0_",
+      key.modulename: "complete_constructor"
+    }
+  ]
+}

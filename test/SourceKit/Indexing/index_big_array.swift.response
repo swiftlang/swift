@@ -1,0 +1,42 @@
+{
+  key.hash: <hash>,
+  key.dependencies: [
+    {
+      key.kind: source.lang.swift.import.module.swift,
+      key.name: "Swift",
+      key.filepath: Swift.swiftmodule,
+      key.hash: <hash>,
+      key.is_system: 1
+    }
+  ],
+  key.entities: [
+    {
+      key.kind: source.lang.swift.decl.var.global,
+      key.name: "gCubeVertexData",
+      key.usr: "s:v9big_array15gCubeVertexDataGSaSf_",
+      key.line: 1,
+      key.column: 5,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.function.accessor.getter,
+          key.usr: "s:F9big_arrayg15gCubeVertexDataGSaSf_",
+          key.line: 1,
+          key.column: 5
+        },
+        {
+          key.kind: source.lang.swift.decl.function.accessor.setter,
+          key.usr: "s:F9big_arrays15gCubeVertexDataGSaSf_",
+          key.line: 1,
+          key.column: 5
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.ref.struct,
+      key.name: "Float",
+      key.usr: "s:Sf",
+      key.line: 1,
+      key.column: 23
+    }
+  ]
+}

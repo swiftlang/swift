@@ -1,0 +1,37 @@
+{
+  key.hash: <hash>,
+  key.dependencies: [
+    {
+      key.kind: source.lang.swift.import.module.swift,
+      key.name: "Swift",
+      key.filepath: Swift.swiftmodule,
+      key.hash: <hash>,
+      key.is_system: 1
+    }
+  ],
+  key.entities: [
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.name: "A",
+      key.usr: "s:C12implicit_vis1A",
+      key.line: 1,
+      key.column: 7,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "b",
+          key.usr: "s:vC12implicit_vis1A1bCS_1B",
+          key.line: 2,
+          key.column: 6
+        },
+        {
+          key.kind: source.lang.swift.ref.class,
+          key.name: "B",
+          key.usr: "s:C12implicit_vis1B",
+          key.line: 2,
+          key.column: 9
+        }
+      ]
+    }
+  ]
+}

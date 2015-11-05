@@ -1,0 +1,38 @@
+{
+  key.results: [
+    {
+      key.kind: source.lang.swift.decl.function.method.instance,
+      key.name: "fooInstanceFunc0()",
+      key.sourcetext: "fooInstanceFunc0()",
+      key.description: "fooInstanceFunc0()",
+      key.typename: "Double",
+      key.context: source.codecompletion.context.thisclass,
+      key.num_bytes_to_erase: 0,
+      key.associated_usrs: "s:FP15complete_member11FooProtocol16fooInstanceFunc0FT_Sd",
+      key.modulename: "complete_member"
+    },
+    {
+      key.kind: source.lang.swift.decl.function.method.instance,
+      key.name: "fooInstanceFunc1(a:)",
+      key.sourcetext: "fooInstanceFunc1(<#T##a: Int##Int#>)",
+      key.description: "fooInstanceFunc1(a: Int)",
+      key.typename: "Double",
+      key.context: source.codecompletion.context.thisclass,
+      key.num_bytes_to_erase: 0,
+      key.associated_usrs: "s:FP15complete_member11FooProtocol16fooInstanceFunc1FSiSd",
+      key.modulename: "complete_member"
+    },
+    {
+      key.kind: source.lang.swift.decl.var.instance,
+      key.name: "fooInstanceVar",
+      key.sourcetext: "fooInstanceVar",
+      key.description: "fooInstanceVar",
+      key.typename: "Int",
+      key.doc.brief: "fooInstanceVar Aaa. Bbb.",
+      key.context: source.codecompletion.context.thisclass,
+      key.num_bytes_to_erase: 0,
+      key.associated_usrs: "s:vP15complete_member11FooProtocol14fooInstanceVarSi",
+      key.modulename: "complete_member"
+    }
+  ]
+}

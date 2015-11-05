@@ -1,0 +1,53 @@
+include "llvm/Option/OptParser.td"
+
+def req : Separate<["-"], "req">,
+  HelpText<"Request kind">;
+def req_EQ : Joined<["-"], "req=">, Alias<req>;
+
+def offset : Separate<["-"], "offset">,
+  HelpText<"byte offset">;
+def offset_EQ : Joined<["-"], "offset=">, Alias<offset>;
+
+def length : Separate<["-"], "length">,
+  HelpText<"length of text referred to by pos / offset">;
+def length_EQ : Joined<["-"], "length=">, Alias<length>;
+
+def pos : Separate<["-"], "pos">,
+  HelpText<"line:col">;
+def pos_EQ : Joined<["-"], "pos=">, Alias<pos>;
+
+def line : Separate<["-"], "line">,
+  HelpText<"line">;
+def line_EQ : Joined<["-"], "line=">, Alias<line>;
+
+def replace : Separate<["-"], "replace">,
+  HelpText<"replace text ('text')">;
+def replace_EQ : Joined<["-"], "replace=">, Alias<replace>;
+
+def module : Separate<["-"], "module">,
+  HelpText<"Module name">;
+
+def header : Separate<["-"], "header">,
+  HelpText<"Header path">;
+
+def usr : Separate<["-"], "usr">,
+  HelpText<"USR">;
+
+def text_input : Separate<["-"], "text-input">,
+  HelpText<"File to get source text from">;
+
+def pass_as_sourcetext : Flag<["-"], "pass-as-sourcetext">,
+  HelpText<"Read source file and pass the contents with key.sourcetext">;
+
+def cache_path: Separate<["-"], "cache-path">, HelpText<"cache path">;
+def cache_path_EQ : Joined<["-"], "cache-path=">, Alias<cache_path>;
+
+def req_opts : CommaJoined<["-"], "req-opts=">,
+  HelpText<"Pass the comma separated options in <arg> as request specific options">,
+  MetaVarName<"<arg>">;
+
+def check_interface_is_ascii : Flag<["-"], "check-interface-ascii">,
+  HelpText<"Check that the module interface text is ASCII">;
+
+def json_request_path: Separate<["-"], "json-request-path">,
+  HelpText<"path to read a request in JSON format">;

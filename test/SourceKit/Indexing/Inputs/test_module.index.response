@@ -1,0 +1,112 @@
+{
+  key.hash: <hash>,
+  key.dependencies: [
+    {
+      key.kind: source.lang.swift.import.module.swift,
+      key.name: "Swift",
+      key.filepath: Swift.swiftmodule,
+      key.hash: <hash>,
+      key.is_system: 1
+    }
+  ],
+  key.entities: [
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.name: "C2",
+      key.usr: "s:C11test_module2C2"
+    },
+    {
+      key.kind: source.lang.swift.decl.protocol,
+      key.name: "Prot1",
+      key.usr: "s:P11test_module5Prot1"
+    },
+    {
+      key.kind: source.lang.swift.decl.protocol,
+      key.name: "Prot2",
+      key.usr: "s:P11test_module5Prot2",
+      key.related: [
+        {
+          key.kind: source.lang.swift.ref.protocol,
+          key.name: "Prot1",
+          key.usr: "s:P11test_module5Prot1"
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.protocol,
+      key.name: "Prot3",
+      key.usr: "s:P11test_module5Prot3"
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.name: "TwoInts",
+      key.usr: "s:C11test_module7TwoInts",
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "x",
+          key.usr: "s:vC11test_module7TwoInts1xSi"
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "y",
+          key.usr: "s:vC11test_module7TwoInts1ySi"
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.name: "init(a:b:)",
+          key.usr: "s:FC11test_module7TwoIntscFT1aSi1bSi_S0_"
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.name: "ComputedProperty",
+      key.usr: "s:C11test_module16ComputedProperty",
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "value",
+          key.usr: "s:vC11test_module16ComputedProperty5valueSi",
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:FC11test_module16ComputedPropertyg5valueSi"
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:FC11test_module16ComputedPropertys5valueSi"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.name: "Empty",
+      key.usr: "s:C11test_module5Empty"
+    },
+    {
+      key.kind: source.lang.swift.decl.extension.class,
+      key.name: "C2",
+      key.usr: "s:C11test_module2C2",
+      key.related: [
+        {
+          key.kind: source.lang.swift.ref.protocol,
+          key.name: "Prot3",
+          key.usr: "s:P11test_module5Prot3"
+        },
+        {
+          key.kind: source.lang.swift.ref.protocol,
+          key.name: "Prot1",
+          key.usr: "s:P11test_module5Prot1"
+        },
+        {
+          key.kind: source.lang.swift.ref.protocol,
+          key.name: "Prot2",
+          key.usr: "s:P11test_module5Prot2"
+        }
+      ]
+    }
+  ]
+}

@@ -44,6 +44,15 @@ option(SWIFT_BUILD_STATIC_STDLIB
     "Build static variants of the Swift standard library and SDK overlay"
     FALSE)
 
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+  set(SWIFT_BUILD_SOURCEKIT_default TRUE)
+else()
+  set(SWIFT_BUILD_SOURCEKIT_default FALSE)
+endif()
+option(SWIFT_BUILD_SOURCEKIT
+    "Build SourceKit"
+    ${SWIFT_BUILD_SOURCEKIT_default})
+
 option(SWIFT_INCLUDE_BENCHMARKS
     "Create targets for running swift benchmarks"
     TRUE)
@@ -77,7 +86,7 @@ set(SWIFT_ENABLE_GOLD_LINKER FALSE CACHE BOOL
     "Enable using the gold linker when available")
 
 set(_SWIFT_KNOWN_INSTALL_COMPONENTS
-    "compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;clang-libclang;arclite-symlink;stdlib;stdlib-experimental;sdk-overlay;editor-integration;lang-docs;tools;testsuite-tools;dev")
+    "compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;clang-libclang;arclite-symlink;stdlib;stdlib-experimental;sdk-overlay;editor-integration;lang-docs;tools;testsuite-tools;dev;sourcekit-xpc-service;sourcekit-inproc")
 
 # Set the SWIFT_INSTALL_COMPONENTS variable to the default value if it is not passed in via -D
 set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_KNOWN_INSTALL_COMPONENTS}" CACHE STRING

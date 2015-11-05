@@ -1,0 +1,8 @@
+[
+  {
+    key.kind: source.lang.swift.ref.function.free,
+    key.offset: 5,
+    key.length: 5,
+    key.is_system: 1
+  }
+]

@@ -1,0 +1,5 @@
+framework module sourcekitdInProc {
+  umbrella header "sourcekitd.h"
+  export *
+  module * { export * }
+}

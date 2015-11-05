@@ -1,0 +1,106 @@
+{
+  key.offset: 0,
+  key.length: 271,
+  key.diagnostic_stage: source.diagnostic.stage.swift.parse,
+  key.substructure: [
+    {
+      key.kind: source.lang.swift.decl.var.global,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "color",
+      key.offset: 144,
+      key.length: 73,
+      key.typename: "S",
+      key.nameoffset: 148,
+      key.namelength: 5,
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.__raw_doc_comment
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.expr.object_literal,
+      key.name: "Color",
+      key.offset: 159,
+      key.length: 58,
+      key.nameoffset: 161,
+      key.namelength: 5,
+      key.bodyoffset: 161,
+      key.bodylength: 54,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.var.parameter,
+          key.name: "colorLiteralRed",
+          key.offset: 167,
+          key.length: 18,
+          key.nameoffset: 167,
+          key.namelength: 15,
+          key.bodyoffset: 184,
+          key.bodylength: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.var.parameter,
+          key.name: "green",
+          key.offset: 187,
+          key.length: 8,
+          key.nameoffset: 187,
+          key.namelength: 5,
+          key.bodyoffset: 194,
+          key.bodylength: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.var.parameter,
+          key.name: "blue",
+          key.offset: 197,
+          key.length: 7,
+          key.nameoffset: 197,
+          key.namelength: 4,
+          key.bodyoffset: 203,
+          key.bodylength: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.var.parameter,
+          key.name: "alpha",
+          key.offset: 206,
+          key.length: 8,
+          key.nameoffset: 206,
+          key.namelength: 5,
+          key.bodyoffset: 213,
+          key.bodylength: 1
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.var.global,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "image",
+      key.offset: 218,
+      key.length: 52,
+      key.typename: "I?",
+      key.nameoffset: 222,
+      key.namelength: 5
+    },
+    {
+      key.kind: source.lang.swift.expr.object_literal,
+      key.name: "Image",
+      key.offset: 234,
+      key.length: 36,
+      key.nameoffset: 236,
+      key.namelength: 5,
+      key.bodyoffset: 236,
+      key.bodylength: 32,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.var.parameter,
+          key.name: "imageLiteral",
+          key.offset: 242,
+          key.length: 25,
+          key.nameoffset: 242,
+          key.namelength: 12,
+          key.bodyoffset: 256,
+          key.bodylength: 11
+        }
+      ]
+    }
+  ]
+}

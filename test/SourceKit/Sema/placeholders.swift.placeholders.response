@@ -1,0 +1,17 @@
+<<NULL>>
+[
+  {
+    key.line: 1,
+    key.column: 19,
+    key.filepath: placeholders.swift,
+    key.severity: source.diagnostic.severity.error,
+    key.description: "use of undeclared type '<#OtherClass#>'",
+    key.diagnostic_stage: source.diagnostic.stage.swift.sema,
+    key.ranges: [
+      {
+        key.offset: 18,
+        key.length: 14
+      }
+    ]
+  }
+]

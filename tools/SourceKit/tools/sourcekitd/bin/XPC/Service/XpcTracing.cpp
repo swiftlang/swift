@@ -1,0 +1,128 @@
+#include "sourcekitd/XpcTracing.h"
+
+#include "swift/Frontend/Frontend.h"
+
+#include "llvm/Support/TimeValue.h"
+#include "llvm/Support/YAMLTraits.h"
+
+#include <xpc/xpc.h>
+
+using namespace sourcekitd;
+using namespace sourcekitd::trace;
+using namespace llvm;
+
+
+
+//----------------------------------------------------------------------------//
+// General
+//----------------------------------------------------------------------------//
+
+static std::atomic<uint64_t> operation_id(0);
+static uint64_t tracing_session = llvm::sys::TimeValue::now().msec();
+
+uint64_t trace::getTracingSession() {
+  return tracing_session;
+}
+
+static void append(xpc_object_t Contents, uint64_t Value) {
+  xpc_array_set_uint64(Contents, XPC_ARRAY_APPEND, Value);
+}
+
+static void append(xpc_object_t Contents, ActionKind Value) {
+  append(Contents, static_cast<uint64_t>(Value));
+}
+
+static void append(xpc_object_t Contents, OperationKind Value) {
+  append(Contents, static_cast<uint64_t>(Value));
+}
+
+static void append(xpc_object_t Contents, llvm::StringRef Value) {
+  xpc_array_set_string(Contents, XPC_ARRAY_APPEND, Value.data());
+}
+
+static void append(xpc_object_t Contents, const StringPairs &Files) {
+  append(Contents, Files.size());
+  std::for_each(Files.begin(), Files.end(),
+                [&] (const std::pair<std::string, std::string> &File) {
+                  append(Contents, File.first);
+                  append(Contents, File.second);
+                });
+}
+
+template <typename U>
+struct llvm::yaml::SequenceTraits<std::vector<U>> {
+  static size_t size(IO &Io, std::vector<U> &Vector) {
+    return Vector.size();
+  }
+  static U &element(IO &Io, std::vector<U> &Vector, size_t Index) {
+    return Vector[Index];
+  }
+};
+
+template <>
+struct llvm::yaml::MappingTraits<SwiftArguments> {
+  static void mapping(IO &Io, SwiftArguments &Args) {
+
+    Io.mapOptional("PrimaryFile", Args.PrimaryFile, std::string());
+    Io.mapRequired("CompilerArgs", Args.Args);
+  }
+};
+
+static std::string serializeCompilerArguments(const SwiftArguments &Args) {
+  // Serialize comiler instance
+  std::string OptionsAsYaml;
+  llvm::raw_string_ostream OptionsStream(OptionsAsYaml);
+  llvm::yaml::Output YamlOutput(OptionsStream);
+  YamlOutput << const_cast<SwiftArguments &>(Args);
+  OptionsStream.flush();
+  return OptionsAsYaml;
+}
+
+
+
+//----------------------------------------------------------------------------//
+// Trace consumer
+//----------------------------------------------------------------------------//
+
+class XpcTraceConsumer : public SourceKit::trace::TraceConsumer {
+public:
+  virtual ~XpcTraceConsumer() = default;
+
+  // Operation previously started with startXXX has finished
+  virtual void operationFinished(uint64_t OpId) override;
+
+  // Trace start of SourceKit operation
+  virtual void opertationStarted(uint64_t OpId, OperationKind OpKind,
+                                 const SwiftInvocation &Inv,
+                                 const StringPairs &OpArgs) override;
+};
+
+// Trace start of SourceKit operation
+void XpcTraceConsumer::opertationStarted(uint64_t OpId,
+                                         OperationKind OpKind,
+                                         const SwiftInvocation &Inv,
+                                         const StringPairs &OpArgs) {
+  xpc_object_t Contents = xpc_array_create(nullptr, 0);
+  append(Contents, ActionKind::OperationStarted);
+  append(Contents, OpId);
+  append(Contents, OpKind);
+  append(Contents, serializeCompilerArguments(Inv.Args));
+  append(Contents, Inv.Files);
+  append(Contents, OpArgs);
+  trace::sendTraceMessage(Contents);
+}
+
+// Operation previously started with startXXX has finished
+void XpcTraceConsumer::operationFinished(uint64_t OpId) {
+  xpc_object_t Contents = xpc_array_create(nullptr, 0);
+  append(Contents, trace::ActionKind::OperationFinished);
+  append(Contents, OpId);
+  trace::sendTraceMessage(Contents);
+}
+
+static XpcTraceConsumer Instance;
+
+void trace::initialize() {
+  SourceKit::trace::registerConsumer(&Instance);
+}
+

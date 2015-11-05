@@ -1,0 +1,110 @@
+{
+  key.offset: 0,
+  key.length: 262,
+  key.diagnostic_stage: source.diagnostic.stage.swift.parse,
+  key.substructure: [
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "<#MyCls#>",
+      key.offset: 0,
+      key.length: 35,
+      key.runtime_name: "_TtC8__main__9<#MyCls#>",
+      key.nameoffset: 6,
+      key.namelength: 9,
+      key.bodyoffset: 34,
+      key.bodylength: 0,
+      key.inheritedtypes: [
+        {
+          key.name: "<#OtherClass#>"
+        }
+      ],
+      key.elements: [
+        {
+          key.kind: source.lang.swift.structure.elem.typeref,
+          key.offset: 18,
+          key.length: 14
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.function.free,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "<#test1#>()",
+      key.offset: 37,
+      key.length: 52,
+      key.nameoffset: 42,
+      key.namelength: 12,
+      key.bodyoffset: 56,
+      key.bodylength: 32,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.stmt.foreach,
+          key.offset: 59,
+          key.length: 28,
+          key.nameoffset: 0,
+          key.namelength: 0,
+          key.elements: [
+            {
+              key.kind: source.lang.swift.structure.elem.id,
+              key.offset: 63,
+              key.length: 8
+            },
+            {
+              key.kind: source.lang.swift.structure.elem.expr,
+              key.offset: 75,
+              key.length: 9
+            }
+          ],
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.stmt.brace,
+              key.offset: 85,
+              key.length: 2,
+              key.nameoffset: 0,
+              key.namelength: 0,
+              key.bodyoffset: 86,
+              key.bodylength: 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.var.global,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "myArray",
+      key.offset: 225,
+      key.length: 36,
+      key.typename: "myArray",
+      key.nameoffset: 229,
+      key.namelength: 7,
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.__raw_doc_comment
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.expr.array,
+      key.offset: 239,
+      key.length: 22,
+      key.nameoffset: 0,
+      key.namelength: 0,
+      key.bodyoffset: 240,
+      key.bodylength: 20,
+      key.elements: [
+        {
+          key.kind: source.lang.swift.structure.elem.expr,
+          key.offset: 240,
+          key.length: 9
+        },
+        {
+          key.kind: source.lang.swift.structure.elem.expr,
+          key.offset: 251,
+          key.length: 9
+        }
+      ]
+    }
+  ]
+}

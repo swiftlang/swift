@@ -1,0 +1,22 @@
+[
+  {
+    key.kind: source.lang.swift.ref.var.global,
+    key.offset: 17,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.ref.function.free,
+    key.offset: 46,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.ref.class,
+    key.offset: 64,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.ref.var.instance,
+    key.offset: 73,
+    key.length: 6
+  }
+]

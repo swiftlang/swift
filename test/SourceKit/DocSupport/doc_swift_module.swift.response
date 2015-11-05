@@ -1,0 +1,632 @@
+
+class C1 : Prot {
+    typealias Element = Int
+    var p: Int
+    func foo()
+    subscript (_ index: Int) -> Int { get }
+    subscript (index i: Float) -> Int { get }
+}
+
+enum MyEnum : Int {
+    case Blah
+}
+
+protocol Prot {
+    typealias Element
+    var p: Int { get }
+    func foo()
+}
+
+extension Prot where Self.Element == Int {
+    func extfoo()
+}
+
+func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.Element>(x ix: T1, y iy: T2)
+
+
+[
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 1,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 7,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.ref.protocol,
+    key.name: "Prot",
+    key.usr: "s:P4cake4Prot",
+    key.offset: 12,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 23,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 33,
+    key.length: 7
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Int",
+    key.usr: "s:Si",
+    key.offset: 43,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 51,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 55,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Int",
+    key.usr: "s:Si",
+    key.offset: 58,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 66,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 71,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 81,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 92,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 94,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 94,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Int",
+    key.usr: "s:Si",
+    key.offset: 101,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Int",
+    key.usr: "s:Si",
+    key.offset: 109,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 115,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 125,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 136,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 142,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 136,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 142,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Float",
+    key.usr: "s:Sf",
+    key.offset: 145,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Int",
+    key.usr: "s:Si",
+    key.offset: 155,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 161,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 170,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 175,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Int",
+    key.usr: "s:Si",
+    key.offset: 184,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 194,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 199,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 207,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 216,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 227,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 237,
+    key.length: 7
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 249,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 253,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Int",
+    key.usr: "s:Si",
+    key.offset: 256,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 262,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 272,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 277,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 286,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.ref.protocol,
+    key.name: "Prot",
+    key.usr: "s:P4cake4Prot",
+    key.offset: 296,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 301,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 307,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 312,
+    key.length: 7
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 323,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 333,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 338,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 350,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 355,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 362,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.ref.protocol,
+    key.name: "Prot",
+    key.usr: "s:P4cake4Prot",
+    key.offset: 367,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 373,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 378,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.ref.class,
+    key.name: "C1",
+    key.usr: "s:C4cake2C1",
+    key.offset: 383,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 386,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 392,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 395,
+    key.length: 7
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 406,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 411,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 414,
+    key.length: 7
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 425,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 428,
+    key.length: 7
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 437,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 439,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 437,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 439,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 443,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 447,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 449,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 447,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 449,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 453,
+    key.length: 2
+  }
+]
+[
+  {
+    key.kind: source.lang.swift.decl.class,
+    key.name: "C1",
+    key.usr: "s:C4cake2C1",
+    key.offset: 1,
+    key.length: 167,
+    key.conforms: [
+      {
+        key.kind: source.lang.swift.ref.protocol,
+        key.name: "Prot",
+        key.usr: "s:P4cake4Prot"
+      }
+    ],
+    key.entities: [
+      {
+        key.kind: source.lang.swift.decl.typealias,
+        key.name: "Element",
+        key.usr: "s:C4cake2C17Element",
+        key.offset: 23,
+        key.length: 23,
+        key.conforms: [
+          {
+            key.kind: source.lang.swift.ref.typealias,
+            key.name: "Element",
+            key.usr: "s:P4cake4Prot7Element"
+          }
+        ]
+      },
+      {
+        key.kind: source.lang.swift.decl.var.instance,
+        key.name: "p",
+        key.usr: "s:vC4cake2C11pSi",
+        key.offset: 51,
+        key.length: 10,
+        key.conforms: [
+          {
+            key.kind: source.lang.swift.ref.var.instance,
+            key.name: "p",
+            key.usr: "s:vP4cake4Prot1pSi"
+          }
+        ]
+      },
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.name: "foo()",
+        key.usr: "s:FC4cake2C13fooFT_T_",
+        key.offset: 66,
+        key.length: 10,
+        key.conforms: [
+          {
+            key.kind: source.lang.swift.ref.function.method.instance,
+            key.name: "foo()",
+            key.usr: "s:FP4cake4Prot3fooFT_T_"
+          }
+        ]
+      },
+      {
+        key.kind: source.lang.swift.decl.function.subscript,
+        key.name: "subscript(_:)",
+        key.usr: "s:iC4cake2C19subscriptFSiSi",
+        key.offset: 81,
+        key.length: 39,
+        key.entities: [
+          {
+            key.kind: source.lang.swift.decl.var.local,
+            key.keyword: "_",
+            key.name: "index",
+            key.offset: 101,
+            key.length: 3
+          }
+        ]
+      },
+      {
+        key.kind: source.lang.swift.decl.function.subscript,
+        key.name: "subscript(index:)",
+        key.usr: "s:iC4cake2C19subscriptFT5indexSf_Si",
+        key.offset: 125,
+        key.length: 41,
+        key.entities: [
+          {
+            key.kind: source.lang.swift.decl.var.local,
+            key.keyword: "index",
+            key.name: "i",
+            key.offset: 145,
+            key.length: 5
+          }
+        ]
+      }
+    ]
+  },
+  {
+    key.kind: source.lang.swift.decl.enum,
+    key.name: "MyEnum",
+    key.usr: "s:O4cake6MyEnum",
+    key.offset: 170,
+    key.length: 35,
+    key.inherits: [
+      {
+        key.kind: source.lang.swift.ref.struct,
+        key.name: "Int",
+        key.usr: "s:Si"
+      }
+    ],
+    key.entities: [
+      {
+        key.kind: source.lang.swift.decl.enumelement,
+        key.name: "Blah",
+        key.usr: "s:FO4cake6MyEnum4BlahFMS0_S0_",
+        key.offset: 194,
+        key.length: 9
+      }
+    ]
+  },
+  {
+    key.kind: source.lang.swift.decl.protocol,
+    key.name: "Prot",
+    key.usr: "s:P4cake4Prot",
+    key.offset: 207,
+    key.length: 77,
+    key.entities: [
+      {
+        key.kind: source.lang.swift.decl.typealias,
+        key.name: "Element",
+        key.usr: "s:P4cake4Prot7Element",
+        key.offset: 227,
+        key.length: 17
+      },
+      {
+        key.kind: source.lang.swift.decl.var.instance,
+        key.name: "p",
+        key.usr: "s:vP4cake4Prot1pSi",
+        key.offset: 249,
+        key.length: 18
+      },
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.name: "foo()",
+        key.usr: "s:FP4cake4Prot3fooFT_T_",
+        key.offset: 272,
+        key.length: 10
+      }
+    ]
+  },
+  {
+    key.kind: source.lang.swift.decl.extension.protocol,
+    key.generic_requirements: [
+      {
+        key.description: "Self.Element == Int"
+      }
+    ],
+    key.offset: 286,
+    key.length: 62,
+    key.extends: {
+      key.kind: source.lang.swift.ref.protocol,
+      key.name: "Prot",
+      key.usr: "s:P4cake4Prot"
+    },
+    key.entities: [
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.name: "extfoo()",
+        key.usr: "s:Fe4cakeRxS_4Protwx7ElementzSirS0_6extfooFT_T_",
+        key.offset: 333,
+        key.length: 13
+      }
+    ]
+  },
+  {
+    key.kind: source.lang.swift.decl.function.free,
+    key.name: "genfoo(x:y:)",
+    key.usr: "s:F4cake6genfoou0_RxS_4Prot_CS_2C1wx7ElementzSirFT1xx1yq__T_",
+    key.generic_params: [
+      {
+        key.name: "T1",
+        key.inherits: "Prot"
+      },
+      {
+        key.name: "T2",
+        key.inherits: "C1"
+      }
+    ],
+    key.generic_requirements: [
+      {
+        key.description: "T1.Element == Int"
+      },
+      {
+        key.description: "T2.Element == T1.Element"
+      }
+    ],
+    key.offset: 350,
+    key.length: 106,
+    key.entities: [
+      {
+        key.kind: source.lang.swift.decl.var.local,
+        key.keyword: "x",
+        key.name: "ix",
+        key.offset: 443,
+        key.length: 2
+      },
+      {
+        key.kind: source.lang.swift.decl.var.local,
+        key.keyword: "y",
+        key.name: "iy",
+        key.offset: 453,
+        key.length: 2
+      }
+    ]
+  }
+]

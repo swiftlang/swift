@@ -1,0 +1,598 @@
+{
+  key.offset: 0,
+  key.length: 1555,
+  key.diagnostic_stage: source.diagnostic.stage.swift.parse,
+  key.substructure: [
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "DefAccess",
+      key.offset: 0,
+      key.length: 136,
+      key.runtime_name: "_TtC6Access9DefAccess",
+      key.nameoffset: 6,
+      key.namelength: 9,
+      key.bodyoffset: 17,
+      key.bodylength: 118,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.setter_accessibility: source.lang.swift.accessibility.internal,
+          key.name: "defProp",
+          key.offset: 20,
+          key.length: 21,
+          key.typename: "Int",
+          key.nameoffset: 24,
+          key.namelength: 7
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.accessibility: source.lang.swift.accessibility.public,
+          key.setter_accessibility: source.lang.swift.accessibility.public,
+          key.name: "pubProp",
+          key.offset: 51,
+          key.length: 21,
+          key.typename: "Int",
+          key.nameoffset: 55,
+          key.namelength: 7
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.accessibility: source.lang.swift.accessibility.private,
+          key.setter_accessibility: source.lang.swift.accessibility.private,
+          key.name: "privProp",
+          key.offset: 83,
+          key.length: 22,
+          key.typename: "Int",
+          key.nameoffset: 87,
+          key.namelength: 8
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "intFunc()",
+          key.offset: 117,
+          key.length: 17,
+          key.nameoffset: 122,
+          key.namelength: 9,
+          key.bodyoffset: 133,
+          key.bodylength: 0
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.accessibility: source.lang.swift.accessibility.public,
+      key.name: "PubAccess",
+      key.offset: 145,
+      key.length: 180,
+      key.runtime_name: "_TtC6Access9PubAccess",
+      key.nameoffset: 151,
+      key.namelength: 9,
+      key.bodyoffset: 162,
+      key.bodylength: 162,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.setter_accessibility: source.lang.swift.accessibility.internal,
+          key.name: "defProp",
+          key.offset: 165,
+          key.length: 21,
+          key.typename: "Int",
+          key.nameoffset: 169,
+          key.namelength: 7
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.accessibility: source.lang.swift.accessibility.public,
+          key.setter_accessibility: source.lang.swift.accessibility.public,
+          key.name: "pubProp",
+          key.offset: 196,
+          key.length: 21,
+          key.typename: "Int",
+          key.nameoffset: 200,
+          key.namelength: 7
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.accessibility: source.lang.swift.accessibility.private,
+          key.setter_accessibility: source.lang.swift.accessibility.private,
+          key.name: "privProp",
+          key.offset: 228,
+          key.length: 22,
+          key.typename: "Int",
+          key.nameoffset: 232,
+          key.namelength: 8
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "intFunc()",
+          key.offset: 262,
+          key.length: 17,
+          key.nameoffset: 267,
+          key.namelength: 9,
+          key.bodyoffset: 278,
+          key.bodylength: 0
+        },
+        {
+          key.kind: source.lang.swift.decl.class,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "Nested",
+          key.offset: 283,
+          key.length: 40,
+          key.nameoffset: 289,
+          key.namelength: 6,
+          key.bodyoffset: 297,
+          key.bodylength: 25,
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.decl.function.method.instance,
+              key.accessibility: source.lang.swift.accessibility.internal,
+              key.name: "defFunc()",
+              key.offset: 302,
+              key.length: 17,
+              key.nameoffset: 307,
+              key.namelength: 9,
+              key.bodyoffset: 318,
+              key.bodylength: 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "IntAccess",
+      key.offset: 336,
+      key.length: 136,
+      key.runtime_name: "_TtC6Access9IntAccess",
+      key.nameoffset: 342,
+      key.namelength: 9,
+      key.bodyoffset: 353,
+      key.bodylength: 118,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.setter_accessibility: source.lang.swift.accessibility.internal,
+          key.name: "defProp",
+          key.offset: 356,
+          key.length: 21,
+          key.typename: "Int",
+          key.nameoffset: 360,
+          key.namelength: 7
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.accessibility: source.lang.swift.accessibility.public,
+          key.setter_accessibility: source.lang.swift.accessibility.public,
+          key.name: "pubProp",
+          key.offset: 387,
+          key.length: 21,
+          key.typename: "Int",
+          key.nameoffset: 391,
+          key.namelength: 7
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.accessibility: source.lang.swift.accessibility.private,
+          key.setter_accessibility: source.lang.swift.accessibility.private,
+          key.name: "privProp",
+          key.offset: 419,
+          key.length: 22,
+          key.typename: "Int",
+          key.nameoffset: 423,
+          key.namelength: 8
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "intFunc()",
+          key.offset: 453,
+          key.length: 17,
+          key.nameoffset: 458,
+          key.namelength: 9,
+          key.bodyoffset: 469,
+          key.bodylength: 0
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.accessibility: source.lang.swift.accessibility.private,
+      key.name: "PrivAccess",
+      key.offset: 482,
+      key.length: 183,
+      key.runtime_name: "_TtC6Access10PrivAccess",
+      key.nameoffset: 488,
+      key.namelength: 10,
+      key.bodyoffset: 500,
+      key.bodylength: 164,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.accessibility: source.lang.swift.accessibility.private,
+          key.setter_accessibility: source.lang.swift.accessibility.private,
+          key.name: "defProp",
+          key.offset: 503,
+          key.length: 21,
+          key.typename: "Int",
+          key.nameoffset: 507,
+          key.namelength: 7
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.accessibility: source.lang.swift.accessibility.public,
+          key.setter_accessibility: source.lang.swift.accessibility.public,
+          key.name: "pubProp",
+          key.offset: 534,
+          key.length: 21,
+          key.typename: "Int",
+          key.nameoffset: 538,
+          key.namelength: 7
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.accessibility: source.lang.swift.accessibility.private,
+          key.setter_accessibility: source.lang.swift.accessibility.private,
+          key.name: "privProp",
+          key.offset: 566,
+          key.length: 22,
+          key.typename: "Int",
+          key.nameoffset: 570,
+          key.namelength: 8
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "intFunc()",
+          key.offset: 600,
+          key.length: 17,
+          key.nameoffset: 605,
+          key.namelength: 9,
+          key.bodyoffset: 616,
+          key.bodylength: 0
+        },
+        {
+          key.kind: source.lang.swift.decl.class,
+          key.accessibility: source.lang.swift.accessibility.private,
+          key.name: "Nested",
+          key.offset: 623,
+          key.length: 40,
+          key.nameoffset: 629,
+          key.namelength: 6,
+          key.bodyoffset: 637,
+          key.bodylength: 25,
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.decl.function.method.instance,
+              key.accessibility: source.lang.swift.accessibility.private,
+              key.name: "defFunc()",
+              key.offset: 642,
+              key.length: 17,
+              key.nameoffset: 647,
+              key.namelength: 9,
+              key.bodyoffset: 658,
+              key.bodylength: 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.function.free,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "defFunc()",
+      key.offset: 667,
+      key.length: 17,
+      key.nameoffset: 672,
+      key.namelength: 9,
+      key.bodyoffset: 683,
+      key.bodylength: 0
+    },
+    {
+      key.kind: source.lang.swift.decl.function.free,
+      key.accessibility: source.lang.swift.accessibility.public,
+      key.name: "pubFunc()",
+      key.offset: 692,
+      key.length: 17,
+      key.nameoffset: 697,
+      key.namelength: 9,
+      key.bodyoffset: 708,
+      key.bodylength: 0
+    },
+    {
+      key.kind: source.lang.swift.decl.function.free,
+      key.accessibility: source.lang.swift.accessibility.private,
+      key.name: "privFunc()",
+      key.offset: 718,
+      key.length: 18,
+      key.nameoffset: 723,
+      key.namelength: 10,
+      key.bodyoffset: 735,
+      key.bodylength: 0
+    },
+    {
+      key.kind: source.lang.swift.decl.function.free,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "intFunc()",
+      key.offset: 746,
+      key.length: 17,
+      key.nameoffset: 751,
+      key.namelength: 9,
+      key.bodyoffset: 762,
+      key.bodylength: 0
+    },
+    {
+      key.kind: source.lang.swift.decl.enum,
+      key.accessibility: source.lang.swift.accessibility.public,
+      key.name: "PubEnum",
+      key.offset: 772,
+      key.length: 40,
+      key.nameoffset: 777,
+      key.namelength: 7,
+      key.bodyoffset: 786,
+      key.bodylength: 25,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.enumcase,
+          key.offset: 789,
+          key.length: 9,
+          key.nameoffset: 0,
+          key.namelength: 0,
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.decl.enumelement,
+              key.accessibility: source.lang.swift.accessibility.internal,
+              key.name: "Some",
+              key.offset: 794,
+              key.length: 4,
+              key.nameoffset: 794,
+              key.namelength: 4
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.decl.enumcase,
+          key.offset: 801,
+          key.length: 9,
+          key.nameoffset: 0,
+          key.namelength: 0,
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.decl.enumelement,
+              key.accessibility: source.lang.swift.accessibility.internal,
+              key.name: "Else",
+              key.offset: 806,
+              key.length: 4,
+              key.nameoffset: 806,
+              key.namelength: 4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.var.global,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.setter_accessibility: source.lang.swift.accessibility.private,
+      key.name: "defPrivSetProp",
+      key.offset: 827,
+      key.length: 28,
+      key.typename: "Int",
+      key.nameoffset: 831,
+      key.namelength: 14
+    },
+    {
+      key.kind: source.lang.swift.decl.var.global,
+      key.accessibility: source.lang.swift.accessibility.public,
+      key.setter_accessibility: source.lang.swift.accessibility.private,
+      key.name: "pubPrivSetProp",
+      key.offset: 878,
+      key.length: 24,
+      key.typename: "Int",
+      key.nameoffset: 882,
+      key.namelength: 14,
+      key.bodyoffset: 904,
+      key.bodylength: 31
+    },
+    {
+      key.kind: source.lang.swift.decl.var.global,
+      key.accessibility: source.lang.swift.accessibility.public,
+      key.setter_accessibility: source.lang.swift.accessibility.internal,
+      key.name: "pubIntSetProp",
+      key.offset: 958,
+      key.length: 23,
+      key.typename: "Int",
+      key.nameoffset: 962,
+      key.namelength: 13,
+      key.bodyoffset: 983,
+      key.bodylength: 31
+    },
+    {
+      key.kind: source.lang.swift.decl.var.global,
+      key.accessibility: source.lang.swift.accessibility.public,
+      key.name: "pubGetOnly",
+      key.offset: 1024,
+      key.length: 20,
+      key.typename: "Int",
+      key.nameoffset: 1028,
+      key.namelength: 10,
+      key.bodyoffset: 1046,
+      key.bodylength: 21
+    },
+    {
+      key.kind: source.lang.swift.decl.var.global,
+      key.accessibility: source.lang.swift.accessibility.public,
+      key.name: "pubLetVar",
+      key.offset: 1077,
+      key.length: 19,
+      key.typename: "Int",
+      key.nameoffset: 1081,
+      key.namelength: 9
+    },
+    {
+      key.kind: source.lang.swift.decl.function.free,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "defProt()",
+      key.offset: 1098,
+      key.length: 17,
+      key.nameoffset: 1103,
+      key.namelength: 9,
+      key.bodyoffset: 1114,
+      key.bodylength: 0
+    },
+    {
+      key.kind: source.lang.swift.decl.function.free,
+      key.accessibility: source.lang.swift.accessibility.public,
+      key.name: "pubProt()",
+      key.offset: 1123,
+      key.length: 17,
+      key.nameoffset: 1128,
+      key.namelength: 9,
+      key.bodyoffset: 1139,
+      key.bodylength: 0
+    },
+    {
+      key.kind: source.lang.swift.decl.function.free,
+      key.accessibility: source.lang.swift.accessibility.private,
+      key.name: "privProt()",
+      key.offset: 1149,
+      key.length: 18,
+      key.nameoffset: 1154,
+      key.namelength: 10,
+      key.bodyoffset: 1166,
+      key.bodylength: 0
+    },
+    {
+      key.kind: source.lang.swift.decl.function.free,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "intProt()",
+      key.offset: 1177,
+      key.length: 17,
+      key.nameoffset: 1182,
+      key.namelength: 9,
+      key.bodyoffset: 1193,
+      key.bodylength: 0
+    },
+    {
+      key.kind: source.lang.swift.decl.extension,
+      key.name: "DefAccess",
+      key.offset: 1196,
+      key.length: 43,
+      key.nameoffset: 1206,
+      key.namelength: 9,
+      key.bodyoffset: 1217,
+      key.bodylength: 21,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "defFunc()",
+          key.offset: 1220,
+          key.length: 17,
+          key.nameoffset: 1225,
+          key.namelength: 9,
+          key.bodyoffset: 1236,
+          key.bodylength: 0
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.extension,
+      key.name: "PubAccess",
+      key.offset: 1240,
+      key.length: 43,
+      key.nameoffset: 1250,
+      key.namelength: 9,
+      key.bodyoffset: 1261,
+      key.bodylength: 21,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "defFunc()",
+          key.offset: 1264,
+          key.length: 17,
+          key.nameoffset: 1269,
+          key.namelength: 9,
+          key.bodyoffset: 1280,
+          key.bodylength: 0
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.extension,
+      key.name: "IntAccess",
+      key.offset: 1284,
+      key.length: 43,
+      key.nameoffset: 1294,
+      key.namelength: 9,
+      key.bodyoffset: 1305,
+      key.bodylength: 21,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "defFunc()",
+          key.offset: 1308,
+          key.length: 17,
+          key.nameoffset: 1313,
+          key.namelength: 9,
+          key.bodyoffset: 1324,
+          key.bodylength: 0
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.extension,
+      key.name: "PrivAccess",
+      key.offset: 1328,
+      key.length: 44,
+      key.nameoffset: 1338,
+      key.namelength: 10,
+      key.bodyoffset: 1350,
+      key.bodylength: 21,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "defFunc()",
+          key.offset: 1353,
+          key.length: 17,
+          key.nameoffset: 1358,
+          key.namelength: 9,
+          key.bodyoffset: 1369,
+          key.bodylength: 0
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.extension,
+      key.name: "PubAccess",
+      key.offset: 1381,
+      key.length: 47,
+      key.nameoffset: 1391,
+      key.namelength: 9,
+      key.bodyoffset: 1402,
+      key.bodylength: 25,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.accessibility: source.lang.swift.accessibility.private,
+          key.name: "privExtFunc()",
+          key.offset: 1405,
+          key.length: 21,
+          key.nameoffset: 1410,
+          key.namelength: 13,
+          key.bodyoffset: 1425,
+          key.bodylength: 0
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+set(LLVM_TARGET_DEFINITIONS Options.td)
+tablegen(LLVM Options.inc -gen-opt-parser-defs)
+add_public_tablegen_target(sourcekitdTestOptionsTableGen)
+
+if( SWIFT_SOURCEKIT_USE_INPROC_LIBRARY )
+  set(SOURCEKITD_TEST_DEPEND sourcekitdInProc)
+else()
+  set(SOURCEKITD_TEST_DEPEND sourcekitd)
+endif()
+
+add_sourcekit_executable(sourcekitd-test
+  sourcekitd-test.cpp
+  TestOptions.cpp
+  DEPENDS ${SOURCEKITD_TEST_DEPEND}
+    clangRewrite clangLex clangBasic
+  COMPONENT_DEPENDS support option
+)
+
+add_dependencies(sourcekitd-test sourcekitdTestOptionsTableGen)
+
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  set_target_properties(sourcekitd-test
+    PROPERTIES
+    LINK_FLAGS "-Wl,-rpath -Wl,@executable_path/../lib")
+endif()
+
+install(TARGETS sourcekitd-test
+  RUNTIME DESTINATION bin)

@@ -45,5 +45,9 @@ if(SWIFT_BUILD_TOOLS)
     # FIXME: cross-compile runtime unittests.
     add_subdirectory(runtime)
   endif()
+
+  if(SWIFT_BUILD_SOURCEKIT)
+    add_subdirectory(SourceKit)
+  endif()
 endif()
 

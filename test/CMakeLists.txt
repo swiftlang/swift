@@ -8,6 +8,12 @@ function(swift_configure_lit_site_cfg source_path destination_path installed_nam
   string(REPLACE ${CMAKE_CFG_INTDIR} ${SWIFT_BUILD_MODE} LLVM_TOOLS_DIR ${LLVM_TOOLS_BINARY_DIR})
   string(REPLACE ${CMAKE_CFG_INTDIR} ${SWIFT_BUILD_MODE} LLVM_LIBS_DIR  ${LLVM_LIBRARY_DIR})
 
+  if (XCODE)
+    string(REPLACE ${CMAKE_CFG_INTDIR} Debug LIT_SWIFTLIB_DIR ${SWIFTLIB_DIR})
+  else ()
+    set(LIT_SWIFTLIB_DIR ${SWIFTLIB_DIR})
+  endif ()
+
   configure_lit_site_cfg("${source_path}" "${destination_path}")
 
   if(NOT "${installed_name}" STREQUAL "")
@@ -38,6 +44,9 @@ function(get_test_dependencies SDK result_var_name)
       sil-extract lldb-moduleimport-test)
   if(NOT SWIFT_BUILT_STANDALONE)
     list(APPEND deps_binaries llc)
+  endif()
+  if(SWIFT_BUILD_SOURCEKIT)
+    list(APPEND deps_binaries sourcekitd-test complete-test)
   endif()
 
   if(("${SDK}" STREQUAL "IOS") OR

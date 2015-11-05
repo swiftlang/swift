@@ -1,0 +1,12 @@
+{
+  key.request: source.request.codecomplete.setcustom,
+  key.results: [
+    {
+      key.name: "name",
+      key.kind: myuid1,
+      key.context: [
+        invalidcontext
+      ]
+    }
+  ]
+}
