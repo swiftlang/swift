@@ -121,10 +121,6 @@ public struct Selector : StringLiteralConvertible, NilLiteralConvertible {
     self = sel_registerName(value)
   }
 
-  public init() {
-    ptr = nil
-  }
-
   /// Create an instance initialized with `nil`.
   @_transparent
   public init(nilLiteral: ()) {
