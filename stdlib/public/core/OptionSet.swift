@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// Supplies convenient conformance to `SetAlgebra` for any type
-/// whose `RawValue` is a `BitwiseOperationsType`.  For example:
+/// whose `RawValue` is a `BitwiseOperations`.  For example:
 ///
 ///     struct PackagingOptions : OptionSet {
 ///       let rawValue: Int
@@ -117,7 +117,7 @@ extension OptionSet where Element == Self {
 }
 
 /// `OptionSet` requirements for which default implementations are
-/// supplied when `RawValue` conforms to `BitwiseOperationsType`,
+/// supplied when `RawValue` conforms to `BitwiseOperations`,
 /// which is the usual case.  Each distinct bit of an option set's
 /// `.rawValue` corresponds to a disjoint element of the option set.
 ///
@@ -128,7 +128,7 @@ extension OptionSet where Element == Self {
 /// - Note: A type conforming to `OptionSet` can implement any of
 ///   these initializers or methods, and those implementations will be
 ///   used in lieu of these defaults.
-extension OptionSet where RawValue : BitwiseOperationsType {
+extension OptionSet where RawValue : BitwiseOperations {
   /// Create an empty instance.
   ///
   /// - Equivalent to `[] as Self`

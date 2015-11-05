@@ -265,7 +265,7 @@ public protocol Comparable : Equatable {
 /// -  `x & Self.allZeros == .allZeros`
 /// -  `x & ~Self.allZeros == x`
 /// -  `~x == x ^ ~Self.allZeros`
-public protocol BitwiseOperationsType {
+public protocol BitwiseOperations {
   /// Returns the intersection of bits set in `lhs` and `rhs`.
   ///
   /// - Complexity: O(1).
@@ -299,17 +299,17 @@ public protocol BitwiseOperationsType {
 }
 
 @warn_unused_result
-public func |= <T : BitwiseOperationsType>(inout lhs: T, rhs: T) {
+public func |= <T : BitwiseOperations>(inout lhs: T, rhs: T) {
   lhs = lhs | rhs
 }
 
 @warn_unused_result
-public func &= <T : BitwiseOperationsType>(inout lhs: T, rhs: T) {
+public func &= <T : BitwiseOperations>(inout lhs: T, rhs: T) {
   lhs = lhs & rhs
 }
 
 @warn_unused_result
-public func ^= <T : BitwiseOperationsType>(inout lhs: T, rhs: T) {
+public func ^= <T : BitwiseOperations>(inout lhs: T, rhs: T) {
   lhs = lhs ^ rhs
 }
 

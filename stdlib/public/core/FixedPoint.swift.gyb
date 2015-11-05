@@ -54,7 +54,7 @@ public protocol _IntegerType
     CustomStringConvertible,
     Hashable,
     IntegerArithmeticType,
-    BitwiseOperationsType,
+    BitwiseOperations,
     _Incrementable
 {
 }
@@ -588,7 +588,7 @@ public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 
 // bitwise operations
 @_transparent
-extension ${Self} : BitwiseOperationsType {
+extension ${Self} : BitwiseOperations {
   /// The empty bitset of type ${Self}.
   public static var allZeros: ${Self} { return 0 }
 }
