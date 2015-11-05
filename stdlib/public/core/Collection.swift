@@ -700,13 +700,3 @@ internal func _writeBackMutableSlice<
     "Can not replace a slice of a MutableCollection with a slice of a smaller size")
 }
 
-/// A *collection* with mutable slices.
-///
-/// For example,
-///
-///      x[i..<j] = someExpression
-///      x[i..<j].mutatingMethod()
-public protocol MutableSliceable : Collection, MutableCollection {
-  subscript(_: Range<Index>) -> SubSequence { get set }
-}
-

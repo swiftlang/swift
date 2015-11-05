@@ -43,7 +43,7 @@ Algorithm.test("sorted/strings")
 
 // A wrapper around Array<T> that disables any type-specific algorithm
 // optimizations and forces bounds checking on.
-struct A<T> : MutableSliceable {
+struct A<T> : MutableCollection {
   init(_ a: Array<T>) {
     impl = a
   }
