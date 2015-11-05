@@ -504,7 +504,8 @@ public func -= <Memory>(inout lhs: ${Self}<Memory>, rhs: Int) {
 /// any other types; it makes a decent parameter to
 /// `UnsafeMutablePointer<Memory>` when you just want to do bytewise
 /// pointer arithmetic.
-public struct RawByte {
+public // @testable
+struct _RawByte {
   let _inaccessible: UInt8
 }
 

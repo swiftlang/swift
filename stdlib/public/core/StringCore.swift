@@ -99,7 +99,7 @@ public struct _StringCore {
   func _pointerToNth(n: Int) -> OpaquePointer {
     _sanityCheck(hasContiguousStorage && n >= 0 && n <= count)
     return OpaquePointer(
-      UnsafeMutablePointer<RawByte>(_baseAddress) + (n << elementShift))
+      UnsafeMutablePointer<_RawByte>(_baseAddress) + (n << elementShift))
   }
 
   static func _copyElements(
@@ -194,7 +194,7 @@ public struct _StringCore {
   }
 
   /// Left shift amount to apply to an offset N so that when
-  /// added to a UnsafeMutablePointer<RawByte>, it traverses N elements.
+  /// added to a UnsafeMutablePointer<_RawByte>, it traverses N elements.
   var elementShift: Int {
     return Int(_countAndFlags >> (UInt._sizeInBits - 1))
   }
@@ -494,7 +494,7 @@ public struct _StringCore {
     if _fastPath(elementWidth == 1) {
       _sanityCheck(
         _pointerToNth(count)
-        == OpaquePointer(UnsafeMutablePointer<RawByte>(destination) + 1))
+        == OpaquePointer(UnsafeMutablePointer<_RawByte>(destination) + 1))
 
       UnsafeMutablePointer<UTF8.CodeUnit>(destination)[0] = UTF8.CodeUnit(u0)
     }
@@ -654,7 +654,7 @@ extension _StringCore : RangeReplaceableCollection {
     if _fastPath(!hasCocoaBuffer) {
       if _fastPath(isUniquelyReferencedNonObjC(&_owner)) {
 
-        let bounds: Range<UnsafePointer<RawByte>>
+        let bounds: Range<UnsafePointer<_RawByte>>
           = UnsafePointer(_pointerToNth(0))..<UnsafePointer(_pointerToNth(count))
 
         if _fastPath(nativeBuffer!.hasCapacity(n, forSubRange: bounds)) {

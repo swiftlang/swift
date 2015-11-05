@@ -18,7 +18,7 @@ struct _StringBufferIVars {
   }
 
   init(
-    usedEnd: UnsafeMutablePointer<RawByte>,
+    usedEnd: UnsafeMutablePointer<_RawByte>,
     byteCapacity: Int,
     elementWidth: Int
   ) {
@@ -30,7 +30,7 @@ struct _StringBufferIVars {
 
   // This stored property should be stored at offset zero.  We perform atomic
   // operations on it using _HeapBuffer's pointer.
-  var usedEnd: UnsafeMutablePointer<RawByte>
+  var usedEnd: UnsafeMutablePointer<_RawByte>
 
   var capacityAndElementShift: Int
   var byteCapacity: Int {
@@ -127,12 +127,13 @@ public struct _StringBuffer {
   }
 
   /// A pointer to the start of this buffer's data area.
-  public var start: UnsafeMutablePointer<RawByte> {
+  public // @testable
+  var start: UnsafeMutablePointer<_RawByte> {
     return UnsafeMutablePointer(_storage.baseAddress)
   }
 
   /// A past-the-end pointer for this buffer's stored data.
-  var usedEnd: UnsafeMutablePointer<RawByte> {
+  var usedEnd: UnsafeMutablePointer<_RawByte> {
     get {
       return _storage.value.usedEnd
     }
@@ -146,7 +147,7 @@ public struct _StringBuffer {
   }
 
   /// A past-the-end pointer for this buffer's available storage.
-  var capacityEnd: UnsafeMutablePointer<RawByte> {
+  var capacityEnd: UnsafeMutablePointer<_RawByte> {
     return start + _storage.value.byteCapacity
   }
 
@@ -172,7 +173,7 @@ public struct _StringBuffer {
   // "grow()," below.
   @warn_unused_result
   func hasCapacity(
-    cap: Int, forSubRange r: Range<UnsafePointer<RawByte>>
+    cap: Int, forSubRange r: Range<UnsafePointer<_RawByte>>
   ) -> Bool {
     // The substring to be grown could be pointing in the middle of this
     // _StringBuffer.
@@ -191,7 +192,7 @@ public struct _StringBuffer {
   ///   to extend.
   /// - parameter newUsedCount: The desired size of the substring.
   mutating func grow(
-    bounds: Range<UnsafePointer<RawByte>>, newUsedCount: Int
+    bounds: Range<UnsafePointer<_RawByte>>, newUsedCount: Int
   ) -> Bool {
     var newUsedCount = newUsedCount
     // The substring to be grown could be pointing in the middle of this
@@ -220,8 +221,8 @@ public struct _StringBuffer {
     //  return true
     // }
     let usedEndPhysicalPtr =
-      UnsafeMutablePointer<UnsafeMutablePointer<RawByte>>(_storage._value)
-    var expected = UnsafeMutablePointer<RawByte>(bounds.endIndex)
+      UnsafeMutablePointer<UnsafeMutablePointer<_RawByte>>(_storage._value)
+    var expected = UnsafeMutablePointer<_RawByte>(bounds.endIndex)
     if _stdlib_atomicCompareExchangeStrongPtr(
       object: usedEndPhysicalPtr, expected: &expected, desired: newUsedEnd) {
       return true
