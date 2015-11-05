@@ -84,6 +84,9 @@ class MemoryBehaviorVisitor
   /// The value we are attempting to discover memory behavior relative to.
   SILValue V;
 
+  /// The SILType of the value.
+  Optional<SILType> TypedAccessTy;
+
   /// Should we treat instructions that increment ref counts as None instead of
   /// MayHaveSideEffects.
   bool IgnoreRefCountIncrements;
@@ -91,6 +94,12 @@ class MemoryBehaviorVisitor
 public:
   MemoryBehaviorVisitor(AliasAnalysis &AA, SILValue V, bool IgnoreRefCountIncs)
       : AA(AA), V(V), IgnoreRefCountIncrements(IgnoreRefCountIncs) {}
+
+  SILType getTypedAccessType() {
+    if (!TypedAccessTy)
+      TypedAccessTy = findTypedAccessType(V);
+    return *TypedAccessTy;
+  }
 
   MemBehavior visitValueBase(ValueBase *V) {
     llvm_unreachable("unimplemented");
@@ -181,7 +190,7 @@ public:
 
 MemBehavior MemoryBehaviorVisitor::visitLoadInst(LoadInst *LI) {
   if (AA.isNoAlias(LI->getOperand(), V, LI->getOperand().getType(),
-                   findTypedAccessType(V))) {
+                   getTypedAccessType())) {
     DEBUG(llvm::dbgs() << "  Load Operand does not alias inst. Returning "
                           "None.\n");
     return MemBehavior::None;
@@ -201,7 +210,7 @@ MemBehavior MemoryBehaviorVisitor::visitStoreInst(StoreInst *SI) {
   // If the store dest cannot alias the pointer in question, then the
   // specified value can not be modified by the store.
   if (AA.isNoAlias(SI->getDest(), V, SI->getDest().getType(),
-                   findTypedAccessType(V))) {
+                   getTypedAccessType())) {
     DEBUG(llvm::dbgs() << "  Store Dst does not alias inst. Returning "
                           "None.\n");
     return MemBehavior::None;
@@ -281,7 +290,7 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
         SILValue Arg = AI->getArgument(Idx);
         // We only consider the argument effects if the argument aliases V.
         if (!Arg.getType().isAddress() ||
-            !AA.isNoAlias(Arg, V, Arg.getType(), findTypedAccessType(V))) {
+            !AA.isNoAlias(Arg, V, Arg.getType(), getTypedAccessType())) {
           Behavior = ArgBehavior;
         }
       }
