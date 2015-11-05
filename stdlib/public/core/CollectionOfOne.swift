@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A iterator that produces one or fewer instances of `Element`.
-public struct IteratorOfOne<Element> : IteratorProtocol, Sequence {
+public struct IteratorOverOne<Element> : IteratorProtocol, Sequence {
   /// Construct an instance that generates `element!`, or an empty
   /// sequence if `element == nil`.
   public init(_ element: Element?) {
@@ -56,8 +56,8 @@ public struct CollectionOfOne<Element> : Collection {
   /// Return a *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func iterator() -> IteratorOfOne<Element> {
-    return IteratorOfOne(element)
+  public func iterator() -> IteratorOverOne<Element> {
+    return IteratorOverOne(element)
   }
 
   /// Access the element at `position`.
