@@ -815,13 +815,13 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     expectEqual(3, s.count)
     expectTrue(s.contains(1010))
 
-    s.removeAll(keepCapacity: true)
+    s.removeAll(keepingCapacity: true)
     expectEqual(identity1, unsafeBitCast(s, Int.self))
     expectEqual(originalCapacity, s._variantStorage.native.capacity)
     expectEqual(0, s.count)
     expectFalse(s.contains(1010))
 
-    s.removeAll(keepCapacity: true)
+    s.removeAll(keepingCapacity: true)
     expectEqual(identity1, unsafeBitCast(s, Int.self))
     expectEqual(originalCapacity, s._variantStorage.native.capacity)
     expectEqual(0, s.count)
@@ -857,7 +857,7 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     expectTrue(s1.contains(1010))
 
     var s2 = s1
-    s2.removeAll(keepCapacity: true)
+    s2.removeAll(keepingCapacity: true)
     var identity2 = unsafeBitCast(s2, Int.self)
     expectEqual(identity1, unsafeBitCast(s1, Int.self))
     expectNotEqual(identity1, identity2)
@@ -901,13 +901,13 @@ SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     expectEqual(3, s.count)
     expectTrue(s.contains(TestKeyTy(1010)))
 
-    s.removeAll(keepCapacity: true)
+    s.removeAll(keepingCapacity: true)
     expectEqual(identity1, unsafeBitCast(s, Int.self))
     expectEqual(originalCapacity, s._variantStorage.native.capacity)
     expectEqual(0, s.count)
     expectFalse(s.contains(TestKeyTy(1010)))
 
-    s.removeAll(keepCapacity: true)
+    s.removeAll(keepingCapacity: true)
     expectEqual(identity1, unsafeBitCast(s, Int.self))
     expectEqual(originalCapacity, s._variantStorage.native.capacity)
     expectEqual(0, s.count)
@@ -943,7 +943,7 @@ SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     expectTrue(s1.contains(TestKeyTy(1010)))
 
     var s2 = s1
-    s2.removeAll(keepCapacity: true)
+    s2.removeAll(keepingCapacity: true)
     var identity2 = unsafeBitCast(s2, Int.self)
     expectEqual(identity1, unsafeBitCast(s1, Int.self))
     expectNotEqual(identity1, identity2)
@@ -1798,7 +1798,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     expectTrue(s1.contains(TestBridgedKeyTy(1010)))
 
     var s2 = s1
-    s2.removeAll(keepCapacity: true)
+    s2.removeAll(keepingCapacity: true)
     var identity2 = unsafeBitCast(s2, Int.self)
     expectEqual(identity1, unsafeBitCast(s1, Int.self))
     expectNotEqual(identity2, identity1)
@@ -1859,7 +1859,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     expectTrue(s1.contains(TestBridgedKeyTy(1010)))
 
     var s2 = s1
-    s2.removeAll(keepCapacity: true)
+    s2.removeAll(keepingCapacity: true)
     var identity2 = unsafeBitCast(s2, Int.self)
     expectEqual(identity1, unsafeBitCast(s1, Int.self))
     expectNotEqual(identity2, identity1)
@@ -3685,18 +3685,18 @@ SetTestSuite.test("mutationDoesNotAffectIterator/remove,all") {
   expectEqualsUnordered([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
 }
 
-SetTestSuite.test("mutationDoesNotAffectIterator/removeAll,keepCapacity=false") {
+SetTestSuite.test("mutationDoesNotAffectIterator/removeAll,keepingCapacity=false") {
   var set = Set([ 1010, 1020, 1030 ])
   var iter = set.iterator()
-  set.removeAll(keepCapacity: false)
+  set.removeAll(keepingCapacity: false)
 
   expectEqualsUnordered([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
 }
 
-SetTestSuite.test("mutationDoesNotAffectIterator/removeAll,keepCapacity=true") {
+SetTestSuite.test("mutationDoesNotAffectIterator/removeAll,keepingCapacity=true") {
   var set = Set([ 1010, 1020, 1030 ])
   var iter = set.iterator()
-  set.removeAll(keepCapacity: true)
+  set.removeAll(keepingCapacity: true)
 
   expectEqualsUnordered([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
 }

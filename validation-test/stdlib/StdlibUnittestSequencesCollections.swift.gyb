@@ -272,7 +272,7 @@ ${Self}TestSuite.test("removeSubrange()/IndexInvalidation") {
 ${Self}TestSuite.test("removeAll()/IndexInvalidation") {
   var (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
   let i = c1.startIndex
-  c1.removeAll(keepCapacity: true)
+  c1.removeAll(keepingCapacity: true)
 
   expectCrashLater()
   _ = i == c1.startIndex

@@ -418,12 +418,12 @@ func _masterThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
   let raceDataCount = racingThreadCount * racingThreadCount
   let rt = RT()
 
-  sharedState.raceData.removeAll(keepCapacity: true)
+  sharedState.raceData.removeAll(keepingCapacity: true)
   sharedState.raceData.appendContentsOf(
     (0..<raceDataCount).lazy.map { i in rt.makeRaceData() })
 
   let identityShuffle = Array(0..<sharedState.raceData.count)
-  sharedState.workerStates.removeAll(keepCapacity: true)
+  sharedState.workerStates.removeAll(keepingCapacity: true)
   sharedState.workerStates.appendContentsOf(
     (0..<racingThreadCount).lazy.map {
       i in
@@ -466,7 +466,7 @@ func _masterThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
 
       let sink = { sharedState.aggregatedEvaluations.addEvaluation($0) }
       rt.evaluateObservations(observations, sink)
-      observations.removeAll(keepCapacity: true)
+      observations.removeAll(keepingCapacity: true)
     }
   }
 }

@@ -2644,7 +2644,7 @@ internal enum _CollectionOperation : Equatable {
   case RemoveAt(index: Int)
   case RemoveLast
   case RemoveSubrange(bounds: Range<Int>)
-  case RemoveAll(keepCapacity: Bool)
+  case RemoveAll(keepingCapacity: Bool)
 
   internal func _applyTo(
     elementsLastMutatedStateIds: [Int], nextStateId: Int) -> [Int] {
@@ -2711,7 +2711,7 @@ internal enum _CollectionOperation : Equatable {
         with: Repeat(repeating: nextStateId, count: invalidIndices.count))
 
     case RemoveAll(let keepCapacity):
-      result.removeAll(keepCapacity: keepCapacity)
+      result.removeAll(keepingCapacity: keepCapacity)
     }
     return result
   }
@@ -3640,10 +3640,10 @@ public struct ${Self}<T> : RangeReplaceableCollection {
     )
   }
 
-  public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
-    _willMutate(.RemoveAll(keepCapacity: keepCapacity))
+  public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
+    _willMutate(.RemoveAll(keepingCapacity: keepCapacity))
     // Ignore the value of `keepCapacity`.
-    elements.removeAll(keepCapacity: false)
+    elements.removeAll(keepingCapacity: false)
   }
 
   internal mutating func _willMutate(operation: _CollectionOperation) {

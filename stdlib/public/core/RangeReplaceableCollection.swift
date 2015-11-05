@@ -172,7 +172,7 @@ public protocol RangeReplaceableCollection : Collection {
   ///    when `self` is going to be grown again.
   ///
   /// - Complexity: O(`self.count`).
-  mutating func removeAll(keepCapacity keepCapacity: Bool /*= false*/)
+  mutating func removeAll(keepingCapacity keepCapacity: Bool /*= false*/)
 
 }
 
@@ -240,7 +240,7 @@ extension RangeReplaceableCollection {
     return firstElement
   }
 
-  public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
+  public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
     if !keepCapacity {
       self = Self()
     }

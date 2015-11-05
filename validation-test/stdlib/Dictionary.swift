@@ -716,13 +716,13 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     assert(d.count == 3)
     assert(d[10]! == 1010)
 
-    d.removeAll(keepCapacity: true)
+    d.removeAll(keepingCapacity: true)
     assert(identity1 == unsafeBitCast(d, Int.self))
     assert(d._variantStorage.native.capacity == originalCapacity)
     assert(d.count == 0)
     assert(d[10] == nil)
 
-    d.removeAll(keepCapacity: true)
+    d.removeAll(keepingCapacity: true)
     assert(identity1 == unsafeBitCast(d, Int.self))
     assert(d._variantStorage.native.capacity == originalCapacity)
     assert(d.count == 0)
@@ -758,7 +758,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     assert(d1[10] == 1010)
 
     var d2 = d1
-    d2.removeAll(keepCapacity: true)
+    d2.removeAll(keepingCapacity: true)
     var identity2 = unsafeBitCast(d2, Int.self)
     assert(identity1 == unsafeBitCast(d1, Int.self))
     assert(identity2 != identity1)
@@ -802,13 +802,13 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     assert(d.count == 3)
     assert(d[TestKeyTy(10)]!.value == 1010)
 
-    d.removeAll(keepCapacity: true)
+    d.removeAll(keepingCapacity: true)
     assert(identity1 == unsafeBitCast(d, Int.self))
     assert(d._variantStorage.native.capacity == originalCapacity)
     assert(d.count == 0)
     assert(d[TestKeyTy(10)] == nil)
 
-    d.removeAll(keepCapacity: true)
+    d.removeAll(keepingCapacity: true)
     assert(identity1 == unsafeBitCast(d, Int.self))
     assert(d._variantStorage.native.capacity == originalCapacity)
     assert(d.count == 0)
@@ -844,7 +844,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     assert(d1[TestKeyTy(10)]!.value == 1010)
 
     var d2 = d1
-    d2.removeAll(keepCapacity: true)
+    d2.removeAll(keepingCapacity: true)
     var identity2 = unsafeBitCast(d2, Int.self)
     assert(identity1 == unsafeBitCast(d1, Int.self))
     assert(identity2 != identity1)
@@ -2002,7 +2002,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     assert(d.count == 3)
     assert(d[TestObjCKeyTy(10)]!.value == 1010)
 
-    d.removeAll(keepCapacity: true)
+    d.removeAll(keepingCapacity: true)
     assert(identity1 != unsafeBitCast(d, Int.self))
     assert(d._variantStorage.native.capacity >= originalCapacity)
     assert(d.count == 0)
@@ -2038,7 +2038,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     assert(d1[TestObjCKeyTy(10)]!.value == 1010)
 
     var d2 = d1
-    d2.removeAll(keepCapacity: true)
+    d2.removeAll(keepingCapacity: true)
     var identity2 = unsafeBitCast(d2, Int.self)
     assert(identity1 == unsafeBitCast(d1, Int.self))
     assert(identity2 != identity1)
@@ -2085,7 +2085,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     assert(d.count == 3)
     assert(d[TestBridgedKeyTy(10)]!.value == 1010)
 
-    d.removeAll(keepCapacity: true)
+    d.removeAll(keepingCapacity: true)
     assert(identity1 == unsafeBitCast(d, Int.self))
     assert(d._variantStorage.native.capacity >= originalCapacity)
     assert(d.count == 0)
@@ -2121,7 +2121,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     assert(d1[TestBridgedKeyTy(10)]!.value == 1010)
 
     var d2 = d1
-    d2.removeAll(keepCapacity: true)
+    d2.removeAll(keepingCapacity: true)
     var identity2 = unsafeBitCast(d2, Int.self)
     assert(identity1 == unsafeBitCast(d1, Int.self))
     assert(identity2 != identity1)
@@ -3711,10 +3711,10 @@ DictionaryTestSuite.test("mutationDoesNotAffectIterator/removeValueForKey,all") 
 }
 
 DictionaryTestSuite.test(
-  "mutationDoesNotAffectIterator/removeAll,keepCapacity=false") {
+  "mutationDoesNotAffectIterator/removeAll,keepingCapacity=false") {
   var dict = getDerivedAPIsDictionary()
   var iter = dict.iterator()
-  dict.removeAll(keepCapacity: false)
+  dict.removeAll(keepingCapacity: false)
 
   expectEqualsUnordered(
     [ (10, 1010), (20, 1020), (30, 1030) ],
@@ -3722,10 +3722,10 @@ DictionaryTestSuite.test(
 }
 
 DictionaryTestSuite.test(
-  "mutationDoesNotAffectIterator/removeAll,keepCapacity=true") {
+  "mutationDoesNotAffectIterator/removeAll,keepingCapacity=true") {
   var dict = getDerivedAPIsDictionary()
   var iter = dict.iterator()
-  dict.removeAll(keepCapacity: true)
+  dict.removeAll(keepingCapacity: true)
 
   expectEqualsUnordered(
     [ (10, 1010), (20, 1020), (30, 1030) ],

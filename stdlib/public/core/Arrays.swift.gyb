@@ -743,7 +743,7 @@ extension ${Self} : _ArrayType {
   /// - Postcondition: `capacity == 0` iff `keepCapacity` is `false`.
   ///
   /// - Complexity: O(`self.count`).
-  public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
+  public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
     if !keepCapacity {
       _buffer = _Buffer()
     }

@@ -195,9 +195,9 @@ public struct LoggingRangeReplaceableCollection<
     base.removeSubrange(bounds)
   }
 
-  public mutating func removeAll(keepCapacity keepCapacity: Bool) {
+  public mutating func removeAll(keepingCapacity keepCapacity: Bool) {
     ++Log.removeAll[selfType]
-    base.removeAll(keepCapacity: keepCapacity)
+    base.removeAll(keepingCapacity: keepCapacity)
   }
 
   public mutating func reserveCapacity(n: Base.Index.Distance) {

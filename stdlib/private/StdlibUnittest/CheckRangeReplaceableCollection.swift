@@ -846,7 +846,7 @@ self.test("\(testNamePrefix).removeAll()/semantics") {
 
   for test in tests {
     var c = makeWrappedCollection(test.collection)
-    c.removeAll(keepCapacity: false)
+    c.removeAll(keepingCapacity: false)
     expectEqualSequence(
       test.expected,
       c.map { extractValue($0).value },
@@ -855,7 +855,7 @@ self.test("\(testNamePrefix).removeAll()/semantics") {
 
   for test in tests {
     var c = makeWrappedCollection(test.collection)
-    c.removeAll(keepCapacity: true)
+    c.removeAll(keepingCapacity: true)
     expectEqualSequence(
       test.expected,
       c.map { extractValue($0).value },

@@ -74,7 +74,7 @@ RangeReplaceableTestSuite.test("removeFirst(n)/dispatch") {
 
 RangeReplaceableTestSuite.test("removeAll/dispatch") {
   var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
-  tester.removeAll(keepCapacity: false)
+  tester.removeAll(keepingCapacity: false)
   expectCustomizable(tester, tester.log.removeAll)
 }
 

@@ -223,7 +223,7 @@ internal protocol _HashStorageType {
   mutating func updateValue(value: Value, forKey: Key) -> Value?
   mutating func removeAt(index: Index) -> SequenceElement
   mutating func removeValueForKey(key: Key) -> Value?
-  mutating func removeAll(keepCapacity keepCapacity: Bool)
+  mutating func removeAll(keepingCapacity keepCapacity: Bool)
   var count: Int { get }
 
   @warn_unused_result
@@ -379,8 +379,8 @@ public struct Set<Element : Hashable> :
 
   /// Erase all the elements.  If `keepCapacity` is `true`, `capacity`
   /// will not decrease.
-  public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
-    _variantStorage.removeAll(keepCapacity: keepCapacity)
+  public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
+    _variantStorage.removeAll(keepingCapacity: keepCapacity)
   }
 
   /// Remove a member from the set and return it.
@@ -1101,11 +1101,11 @@ public struct Dictionary<Key : Hashable, Value> :
   ///   storage is released.  The default is `false`.
   ///
   /// Complexity: O(`self.count`).
-  public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
+  public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
     // The 'will not decrease' part in the documentation comment is worded very
     // carefully.  The capacity can increase if we replace Cocoa storage with
     // native storage.
-    _variantStorage.removeAll(keepCapacity: keepCapacity)
+    _variantStorage.removeAll(keepingCapacity: keepCapacity)
   }
 
   /// The number of entries in the dictionary.
@@ -2201,7 +2201,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
       "don't call mutating methods on _Native${Self}Storage")
   }
 
-  internal mutating func removeAll(keepCapacity keepCapacity: Bool) {
+  internal mutating func removeAll(keepingCapacity keepCapacity: Bool) {
     _sanityCheckFailure(
       "don't call mutating methods on _Native${Self}Storage")
   }
@@ -2865,7 +2865,7 @@ internal struct _Cocoa${Self}Storage : _HashStorageType {
     _sanityCheckFailure("can not mutate NS${Self}")
   }
 
-  internal mutating func removeAll(keepCapacity keepCapacity: Bool) {
+  internal mutating func removeAll(keepingCapacity keepCapacity: Bool) {
     _sanityCheckFailure("can not mutate NS${Self}")
   }
 
@@ -3411,7 +3411,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
     nativeStorage.count = 0
   }
 
-  internal mutating func removeAll(keepCapacity keepCapacity: Bool) {
+  internal mutating func removeAll(keepingCapacity keepCapacity: Bool) {
     if count == 0 {
       return
     }

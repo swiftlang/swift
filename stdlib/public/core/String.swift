@@ -735,9 +735,9 @@ extension String {
   /// - parameter keepCapacity: If `true`, prevents the release of
   ///   allocated storage, which can be a useful optimization
   ///   when `self` is going to be grown again.
-  public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
+  public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.removeAll(keepCapacity: keepCapacity)
+      (inout v: CharacterView) in v.removeAll(keepingCapacity: keepCapacity)
     }
   }
 }
