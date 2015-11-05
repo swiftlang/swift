@@ -22,20 +22,21 @@
 %  MirrorDecl = gyb.executeTemplate(TMirrorDecl,introspecteeType=Self,genericArgs=['Pointee'],disposition='Struct')
 %  MirrorBoilerplate = gyb.executeTemplate(TMirrorBoilerplate,introspecteeType=Self,genericArgs=['Pointee'],disposition='Struct')
 
-/// A pointer to an object of type `Pointee`.  This type provides no automated
-/// memory management, and therefore the user must take care to allocate
-/// and free memory appropriately.
+/// A raw pointer for accessing data of type `Pointee`.  This type
+/// provides no automated memory management, and therefore must
+/// be handled with great care to ensure safety.
 ///
-/// The pointer should be aligned to `alignof(Pointee.self)`.
+/// Instances must be aligned to `alignof(Pointee.self)`, i.e.
+/// `(UnsafePointer<Int8>(self) - nil) % alignof(Pointee.self) == 0`
 ///
-/// The pointer can be in one of the following states:
+/// The memory referenced by an instance can be in one of the following states:
 ///
-/// - memory is not allocated (for example, pointer is null, or memory has
-///   been deallocated previously);
+/// - not allocated (for example, `self == nil`, or the memory was
+///   deallocated and `self` is dangling);
 ///
-/// - memory is allocated, but value has not been initialized;
+/// - allocated, but `pointee` has not been initialized;
 ///
-/// - memory is allocated and value is initialized.
+/// - memory is allocated and `pointee` is initialized.
 public struct ${Self}<Pointee>
   : RandomAccessIndex, Hashable,
     NilLiteralConvertible, _Pointer {
