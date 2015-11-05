@@ -275,7 +275,10 @@ internal struct _UnmanagedAnyObjectArray {
 
 //===--- APIs unique to Set<Element> --------------------------------------===//
 
-/// A collection of unique `Element` instances with no defined ordering.
+/// A collection of unique `Element` instances.
+///
+/// The order of elements in a set is stable between mutations but
+/// otherwise unpredictable.
 public struct Set<Element : Hashable> :
   Hashable, Collection, ArrayLiteralConvertible {
 
@@ -288,7 +291,7 @@ public struct Set<Element : Hashable> :
 
   /// Create an empty set with at least the given number of
   /// elements worth of storage.  The actual capacity will be the
-  /// smallest power of 2 that's >= `minimumCapacity`.
+  /// smallest power of 2 that is >= `minimumCapacity`.
   public init(minimumCapacity: Int) {
     _variantStorage =
       _VariantStorage.Native(
@@ -349,6 +352,8 @@ public struct Set<Element : Hashable> :
     return _variantStorage.endIndex
   }
 
+  // APINAMING: complexity docs are broadly missing in this file.
+
   /// Returns `true` if the set contains a member.
   @warn_unused_result
   public func contains(member: Element) -> Bool {
@@ -362,9 +367,10 @@ public struct Set<Element : Hashable> :
     return _variantStorage.indexForKey(member)
   }
 
-  /// Insert a member into the set.
-  public mutating func insert(member: Element) {
-    _variantStorage.updateValue(member, forKey: member)
+  // APINAMING: say what happens when the element is already there.
+  /// Insert a new member into the set.
+  public mutating func insert(newMember: Element) {
+    _variantStorage.updateValue(newMember, forKey: newMember)
   }
 
   /// Remove the member from the set and return it if it was present.
@@ -372,25 +378,23 @@ public struct Set<Element : Hashable> :
     return _variantStorage.removeValueForKey(member)
   }
 
-  /// Remove the member referenced by the given index.
-  public mutating func removeAt(index: Index) -> Element {
-    return _variantStorage.removeAt(index)
+  /// Remove the element at the given `position`.
+  public mutating func removeAt(position: Index) -> Element {
+    return _variantStorage.removeAt(position)
   }
 
-  /// Erase all the elements.  If `keepCapacity` is `true`, `capacity`
-  /// will not decrease.
+  /// Erase all the elements.  If `keepCapacity` is `true`, existing
+  /// element capacity is kept for future insertions.
   public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
     _variantStorage.removeAll(keepingCapacity: keepCapacity)
   }
 
-  /// Remove a member from the set and return it.
+  /// Removes and returns the first element.
   ///
-  /// - Requires: `count > 0`.
+  /// - Requires: `!isEmpty`.
   public mutating func removeFirst() -> Element {
-    _precondition(count > 0, "can't removeFirst from an empty Set")
-    let member = first!
-    remove(member)
-    return member
+    _precondition(!isEmpty, "can't removeFirst from an empty Set")
+    return removeAt(startIndex)
   }
 
   /// The number of members in the set.
@@ -442,14 +446,14 @@ public struct Set<Element : Hashable> :
 
   /// Create a `Set` from a finite sequence of items.
   public init<
-    S : Sequence where S.Iterator.Element == Element
-  >(_ sequence: S) {
+    Source : Sequence where Source.Iterator.Element == Element
+  >(_ sequence: Source) {
     self.init()
     if let s = sequence as? Set<Element> {
       // If this sequence is actually a native `Set`, then we can quickly
       // adopt its native storage and let COW handle uniquing only
       // if necessary.
-      switch (s._variantStorage) {
+      switch s._variantStorage {
         case .Native(let owner):
           _variantStorage = .Native(owner)
         case .Cocoa(let owner):
@@ -462,52 +466,58 @@ public struct Set<Element : Hashable> :
     }
   }
 
-  /// Returns true if the set is a subset of a finite sequence as a `Set`.
+  /// Returns `true` iff `maybeSuperset` contains every member of `self`.
   @warn_unused_result
   public func isSubsetOf<
     S : Sequence where S.Iterator.Element == Element
-  >(sequence: S) -> Bool {
-    let other = sequence as? Set<Element> ?? Set(sequence)
+  >(maybeSuperset: S) -> Bool {
+    // FIXME(performance): isEmpty fast path, here and elsewhere.
+    let other = maybeSuperset as? Set<Element> ?? Set(maybeSuperset)
     let (isSubset, isEqual) = _compareSets(self, other)
     return isSubset || isEqual
   }
 
-  /// Returns true if the set is a subset of a finite sequence as a `Set`
-  /// but not equal.
+  /// Returns `true` iff `maybeStrictSuperset` contains every member
+  /// of `self`, and at least one other element.
   @warn_unused_result
   public func isStrictSubsetOf<
     S : Sequence where S.Iterator.Element == Element
-  >(sequence: S) -> Bool {
-    let other = sequence as? Set<Element> ?? Set(sequence)
+  >(maybeStrictSuperset: S) -> Bool {
+    // FIXME: code duplication.
+    let other =
+      maybeStrictSuperset as? Set<Element> ?? Set(maybeStrictSuperset)
     let (isSubset, isEqual) = _compareSets(self, other)
     return isSubset && !isEqual
   }
 
-  /// Returns true if the set is a superset of a finite sequence as a `Set`.
+  /// Returns `true` iff `self` contains every element of `maybeSubset`.
   @warn_unused_result
   public func isSupersetOf<
     S : Sequence where S.Iterator.Element == Element
-  >(sequence: S) -> Bool {
-    let other = sequence as? Set<Element> ?? Set(sequence)
+  >(maybeSubset: S) -> Bool {
+    // FIXME(performance): Don't build a set; just ask if every element is in
+    // `self`.
+    let other = maybeSubset as? Set<Element> ?? Set(maybeSubset)
     return other.isSubsetOf(self)
   }
 
-  /// Returns true if the set is a superset of a finite sequence as a `Set`
-  /// but not equal.
+  /// Returns `true` iff `self` contains every element of
+  /// `maybeStrictSubset`, and at least one other element.
   @warn_unused_result
   public func isStrictSupersetOf<
     S : Sequence where S.Iterator.Element == Element
-  >(sequence: S) -> Bool {
-    let other = sequence as? Set<Element> ?? Set(sequence)
+  >(maybeStrictSubset: S) -> Bool {
+    let other = maybeStrictSubset as? Set<Element> ?? Set(maybeStrictSubset)
     return other.isStrictSubsetOf(self)
   }
 
-  /// Returns true if no members in the set are in a finite sequence as a `Set`.
+  /// Returns `true` iff no element of `other` is a member of `self`.
   @warn_unused_result
   public func isDisjointWith<
     S : Sequence where S.Iterator.Element == Element
-  >(sequence: S) -> Bool {
-    let other = sequence as? Set<Element> ?? Set(sequence)
+  >(other: S) -> Bool {
+    // FIXME(performance): Don't need to build a set.
+    let other = other as? Set<Element> ?? Set(other)
     for member in self {
       if other.contains(member) {
         return false
@@ -516,51 +526,52 @@ public struct Set<Element : Hashable> :
     return true
   }
 
-  /// Return a new `Set` with items in both this set and a finite sequence.
+  // APINAMING: should we say which one wins if an element appears twice?
+  /// Return a new `Set` containing the members of `self` and the
+  /// elements of `other`.
   @warn_unused_result
   public func union<
     S : Sequence where S.Iterator.Element == Element
-  >(sequence: S) -> Set<Element> {
+  >(other: S) -> Set<Element> {
     var newSet = self
-    newSet.unionInPlace(sequence)
+    newSet.unionInPlace(other)
     return newSet
   }
 
-  /// Insert elements of a finite sequence into this `Set`.
+  /// Insert the elements of `other`.
   public mutating func unionInPlace<
     S : Sequence where S.Iterator.Element == Element
-  >(sequence: S) {
-    for item in sequence {
+  >(other: S) {
+    for item in other {
       insert(item)
     }
   }
 
-  /// Return a new set with elements in this set that do not occur
-  /// in a finite sequence.
+  /// Return the members of `self` not contained in `other`.
   @warn_unused_result
   public func subtract<
     S : Sequence where S.Iterator.Element == Element
-  >(sequence: S) -> Set<Element> {
+  >(other: S) -> Set<Element> {
     var newSet = self
-    newSet.subtractInPlace(sequence)
+    newSet.subtractInPlace(other)
     return newSet
   }
 
-  /// Remove all members in the set that occur in a finite sequence.
+  /// Remove the elements of `other` from `self`.
   public mutating func subtractInPlace<
     S : Sequence where S.Iterator.Element == Element
-  >(sequence: S) {
-    for item in sequence {
+  >(other: S) {
+    for item in other {
       remove(item)
     }
   }
 
-  /// Return a new set with elements common to this set and a finite sequence.
+  /// Return the members of `self` contained in `other`.
   @warn_unused_result
   public func intersect<
     S : Sequence where S.Iterator.Element == Element
-  >(sequence: S) -> Set<Element> {
-    let other = sequence as? Set<Element> ?? Set(sequence)
+  >(other: S) -> Set<Element> {
+    let other = other as? Set<Element> ?? Set(other)
     var newSet = Set<Element>()
     for member in self {
       if other.contains(member) {
@@ -570,17 +581,17 @@ public struct Set<Element : Hashable> :
     return newSet
   }
 
-  /// Remove any members of this set that aren't also in a finite sequence.
+  /// Remove any members not contained in `other`.
   public mutating func intersectInPlace<
     S : Sequence where S.Iterator.Element == Element
-  >(sequence: S) {
+  >(other: S) {
     // Because `intersect` needs to both modify and iterate over
     // the left-hand side, the index may become invalidated during
     // traversal so an intermediate set must be created.
     //
     // FIXME(performance): perform this operation at a lower level
     // to avoid invalidating the index and avoiding a copy.
-    let result = self.intersect(sequence)
+    let result = self.intersect(other)
 
     // The result can only have fewer or the same number of elements.
     // If no elements were removed, don't perform a reassignment
@@ -590,24 +601,22 @@ public struct Set<Element : Hashable> :
     }
   }
 
-  /// Return a new set with elements that are either in the set or a finite
-  /// sequence but do not occur in both.
+  /// Returns the elements contained in `self` or `other`, but not both.
   @warn_unused_result
   public func exclusiveOr<
     S : Sequence where S.Iterator.Element == Element
-  >(sequence: S) -> Set<Element> {
+  >(other: S) -> Set<Element> {
     var newSet = self
-    newSet.exclusiveOrInPlace(sequence)
+    newSet.exclusiveOrInPlace(other)
     return newSet
   }
 
-  /// For each element of a finite sequence, remove it from the set if it is a
-  /// common element, otherwise add it to the set. Repeated elements of the
-  /// sequence will be ignored.
+  /// Replace `self` with the elements contained in `self` or `other`,
+  /// but not both.
   public mutating func exclusiveOrInPlace<
     S : Sequence where S.Iterator.Element == Element
-  >(sequence: S) {
-    let other = sequence as? Set<Element> ?? Set(sequence)
+  >(other: S) {
+    let other = other as? Set<Element> ?? Set(other)
     for member in other {
       if contains(member) {
         remove(member)
@@ -644,13 +653,12 @@ public struct Set<Element : Hashable> :
   // Collection conformance
   //
 
-  /// `true` if the set is empty.
+  /// `true` iff `self` is empty.
   public var isEmpty: Bool {
     return count == 0
   }
 
-  /// The first element obtained when iterating, or `nil` if `self` is
-  /// empty.  Equivalent to `self.iterator().next()`.
+  /// The first element of `self`, or `nil` if `self` is empty.
   public var first: Element? {
     return count > 0 ? self[startIndex] : .None
   }
@@ -663,6 +671,8 @@ public struct Set<Element : Hashable> :
 @warn_unused_result
 internal func _compareSets<Element>(lhs: Set<Element>, _ rhs: Set<Element>)
   -> (isSubset: Bool, isEqual: Bool) {
+  // FIXME(performance): performance could be better if we start by comparing
+  // counts.
   for member in lhs {
     if !rhs.contains(member) {
       return (false, false)
