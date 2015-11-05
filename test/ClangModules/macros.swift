@@ -2,7 +2,7 @@
 
 // XFAIL: linux
 
-@exported import macros
+@_exported import macros
 
 func circle_area(radius: CDouble) -> CDouble {
   return M_PI * radius * radius

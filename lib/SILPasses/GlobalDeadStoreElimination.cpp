@@ -456,9 +456,9 @@ void DSEContext::mergeSuccessorStates(SILBasicBlock *BB) {
 }
 
 void DSEContext::invalidateMemLocationBase(SILInstruction *I,
-                                           bool GenKillSet) {
+                                           bool BuildGenKillSet) {
   BBState *S = getBBLocState(I);
-  if (GenKillSet) {
+  if (BuildGenKillSet) {
     for (unsigned i = 0; i < S->MemLocationCount; ++i) {
       if (MemLocationVault[i].getBase().getDef() != I)
         continue;
@@ -580,15 +580,17 @@ void DSEContext::processRead(SILInstruction *I, BBState *S, SILValue Mem,
   // separate reads.
   MemLocationList Locs;
   MemLocation::expand(L, &I->getModule(), Locs, TypeExpansionVault);
-  for (auto &E : Locs) {
-    if (BuildGenKillSet) {
+  if (BuildGenKillSet) {
+    for (auto &E : Locs) {
       // Only building the gen and kill sets for now.
       updateGenKillSetForRead(I, S, getMemLocationBit(E));
-      continue;
     }
-    // This is the last iteration, compute WriteSetOut and perform the dead
-    // store elimination. 
-    updateWriteSetForRead(I, S, getMemLocationBit(E));
+  } else {
+    for (auto &E : Locs) {
+      // This is the last iteration, compute WriteSetOut and perform the dead
+      // store elimination. 
+      updateWriteSetForRead(I, S, getMemLocationBit(E));
+    }
   }
 }
 
@@ -628,19 +630,21 @@ void DSEContext::processWrite(SILInstruction *I, BBState *S, SILValue Val,
   MemLocationList Locs;
   MemLocation::expand(L, Mod, Locs, TypeExpansionVault);
   llvm::BitVector V(Locs.size());
-  unsigned idx = 0;
-  for (auto &E : Locs) {
-    if (BuildGenKillSet) {
-      // Only building the gen and kill sets here.
-      updateGenKillSetForWrite(I, S, getMemLocationBit(E));
-      continue;
+  if (BuildGenKillSet) {
+    for (auto &E : Locs) {
+        // Only building the gen and kill sets here.
+        updateGenKillSetForWrite(I, S, getMemLocationBit(E));
     }
-    // This is the last iteration, compute WriteSetOut and perform the dead
-    // store elimination. 
-    if (updateWriteSetForWrite(I, S, getMemLocationBit(E)))
-      V.set(idx);
-    Dead &= V.test(idx);
-    ++idx;
+  } else {
+    unsigned idx = 0;
+    for (auto &E : Locs) {
+      // This is the last iteration, compute WriteSetOut and perform the dead
+      // store elimination. 
+      if (updateWriteSetForWrite(I, S, getMemLocationBit(E)))
+        V.set(idx);
+      Dead &= V.test(idx);
+      ++idx;
+    }
   }
 
   // Data flow has not stablized, do not perform the DSE just yet.
@@ -843,7 +847,8 @@ void DSEContext::run() {
     // Delete the dead stores.
     for (auto &I : getBBLocState(&BB)->DeadStores) {
       DEBUG(llvm::dbgs() << "*** Removing: " << *I << " ***\n");
-      I->eraseFromParent();
+      // This way, we get rid of pass dependence on DCE.
+      recursivelyDeleteTriviallyDeadInstructions(I, true);
     }
   }
 }

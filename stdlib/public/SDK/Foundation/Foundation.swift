@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@exported import Foundation // Clang module
+@_exported import Foundation // Clang module
 import CoreFoundation
 import CoreGraphics
 

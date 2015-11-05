@@ -1,5 +1,5 @@
 import Foundation
-@exported import AppKit
+@_exported import AppKit
 
 // Fix the ARGV type of NSApplicationMain, which nonsensically takes
 // argv as a const char**.

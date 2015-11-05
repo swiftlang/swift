@@ -65,7 +65,7 @@ import ObjectiveC
 import class Foo.FooClassBase
 import struct Foo.FooStruct1
 import func Foo.fooFunc1
-@exported import FooHelper
+@_exported import FooHelper
 import foo_swift_module
 
 // FIXME: enum tests
@@ -75,7 +75,7 @@ import foo_swift_module
 // PASS_COMMON: {{^}}import class Foo.FooClassBase{{$}}
 // PASS_COMMON: {{^}}import struct Foo.FooStruct1{{$}}
 // PASS_COMMON: {{^}}import func Foo.fooFunc1{{$}}
-// PASS_COMMON: {{^}}@exported import FooHelper{{$}}
+// PASS_COMMON: {{^}}@_exported import FooHelper{{$}}
 // PASS_COMMON: {{^}}import foo_swift_module{{$}}
 
 //===---

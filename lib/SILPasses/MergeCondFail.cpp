@@ -23,7 +23,6 @@
 
 using namespace swift;
 
-
 /// \brief Return true if the operand of the cond_fail instruction looks like
 /// the overflow bit of an arithmetic instruction.
 static bool hasOverflowConditionOperand(CondFailInst *CFI) {
@@ -104,17 +103,19 @@ public:
     // Merge conditions and remove the merged cond_fail instructions.
     for (unsigned I = 0, E = CondFailToMerge.size(); I != E; ++I) {
       auto CurCond = CondFailToMerge[I]->getOperand();
-      if (MergedCond)
-        CurCond = Builder.createBuiltinBinaryFunction(
-            Loc, "or", CurCond.getType(), CurCond.getType(),
-            {MergedCond, CurCond});
+      if (MergedCond) {
+        CurCond = Builder.createBuiltinBinaryFunction(Loc, "or",
+                                                      CurCond.getType(),
+                                                      CurCond.getType(),
+                                                      {MergedCond, CurCond});
+      }
 
       CondFailToMerge[I]->eraseFromParent();
       MergedCond = CurCond;
     }
 
-    Builder.createCondFail(Loc, MergedCond);
     // Create a new cond_fail using the merged condition.
+    Builder.createCondFail(Loc, MergedCond);
     return true;
   }
 };

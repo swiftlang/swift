@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@exported import SceneKit // Clang module
+@_exported import SceneKit // Clang module
 
 // MARK: Exposing SCNFloat
 

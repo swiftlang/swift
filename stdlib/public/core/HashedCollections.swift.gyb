@@ -1513,8 +1513,7 @@ public func _dictionaryBridgeFromObjectiveCConditional<
     _isBridgedVerbatimToObjectiveC(SwiftValue.self) ==
       _isBridgedVerbatimToObjectiveC(ObjCValue.self)
 
-  var result = [(SwiftKey, SwiftValue)]()
-  result.reserveCapacity(source.count)
+  var result = Dictionary<SwiftKey, SwiftValue>(minimumCapacity: source.count)
   for (key, value) in source {
     // Downcast the key.
     var resultKey: SwiftKey
@@ -1550,9 +1549,9 @@ public func _dictionaryBridgeFromObjectiveCConditional<
       }
     }
 
-    result.append((resultKey, resultValue))
+    result[resultKey] = resultValue
   }
-  return Dictionary(_nativeStorage: _NativeDictionaryStorage.fromArray(result))
+  return result
 }
 #endif
 

@@ -1,4 +1,4 @@
-@exported import WatchConnectivity
+@_exported import WatchConnectivity
 import Foundation
 
 @available(iOS, introduced=9.0)

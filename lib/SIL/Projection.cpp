@@ -613,9 +613,9 @@ ProjectionPath::subtractPaths(const ProjectionPath &LHS, const ProjectionPath &R
 }
 
 void
-ProjectionPath::BreadthFirstEnumTypeProjection(SILType B, SILModule *Mod,
-                                               ProjectionPathList &Paths,
-                                               bool OnlyLeafNode) {
+ProjectionPath::expandTypeIntoLeafProjectionPaths(SILType B, SILModule *Mod,
+                                                  ProjectionPathList &Paths,
+                                                  bool OnlyLeafNode) {
   // Perform a BFS to expand the given type into projectionpath each of 
   // which contains 1 field from the type.
   ProjectionPathList Worklist;

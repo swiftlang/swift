@@ -416,6 +416,9 @@ public:
     return *this;
   }
 
+  /// Removes the first element of the path.
+  void remove_front() { Path.erase(Path.begin()); }
+
   /// Create a new address projection path from the pointer Start through
   /// various address projections to End. Returns Nothing::None if there is no
   /// such path.
@@ -427,9 +430,10 @@ public:
 
   /// Given the SILType Base, expand every leaf nodes in the type tree.
   /// Include the intermediate nodes if OnlyLeafNode is false.
-  static void BreadthFirstEnumTypeProjection(SILType BaseType, SILModule *Mod,
-                                             ProjectionPathList &P,
-                                             bool OnlyLeafNode);
+  static void expandTypeIntoLeafProjectionPaths(SILType BaseType,
+                                                SILModule *Mod,
+                                                ProjectionPathList &P,
+                                                bool OnlyLeafNode);
 
   /// Returns true if the two paths have a non-empty symmetric difference.
   ///
@@ -648,6 +652,7 @@ public:
       return nullptr;
     return getParent(Tree);
   }
+
 
   llvm::Optional<Projection> getProjection() const { return Proj; }
 

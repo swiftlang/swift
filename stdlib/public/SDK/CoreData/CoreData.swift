@@ -1,4 +1,4 @@
-@exported import CoreData
+@_exported import CoreData
 import Foundation
 
 public extension NSCocoaError {

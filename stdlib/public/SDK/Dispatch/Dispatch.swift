@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@exported import Dispatch
+@_exported import Dispatch
 
 /// The type of blocks submitted to dispatch queues, which take no arguments
 /// and have no return value.

@@ -1,3 +1,5 @@
+include(CheckSymbolExists)
+
 set(SOURCEKIT_VERSION_STRING "${SWIFT_COMPILER_VERSION}")
 
 set(SOURCEKIT_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
@@ -108,9 +110,6 @@ macro(add_sourcekit_library name)
   foreach(dep ${SOURCEKITLIB_DEPENDS})
     if("${dep}" MATCHES "^clang")
       set(dep "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${dep}.a")
-    endif()
-    if("${dep}" MATCHES "^swift")
-      set(dep "${SWIFT_LIBRARY_OUTPUT_INTDIR}/lib${dep}.a")
     endif()
     if("${dep}" STREQUAL "cmark")
       set(dep "${CMARK_LIBRARY_DIR}/lib${dep}.a")

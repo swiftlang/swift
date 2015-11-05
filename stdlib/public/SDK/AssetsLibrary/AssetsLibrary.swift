@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@exported import AssetsLibrary // Clang module
+@_exported import AssetsLibrary // Clang module
 
 //===----------------------------------------------------------------------===//
 // ALAssetsLibrary.h

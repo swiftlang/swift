@@ -136,7 +136,7 @@ static const char *getImportKindString(ImportKind kind) {
 
 static bool shouldImportSelfImportClang(const ImportDecl *ID,
                                         const SourceFile &SF) {
-  // FIXME: We use '@exported' for fake overlays in testing.
+  // FIXME: We use '@_exported' for fake overlays in testing.
   if (ID->isExported())
     return true;
   if (SF.Kind == SourceFileKind::SIL)

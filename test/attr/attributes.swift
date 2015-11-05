@@ -178,9 +178,9 @@ weak var weak16 : Class!
 @weak var weak17 : Class? // expected-error {{'weak' is a declaration modifier, not an attribute}} {{1-2=}}
 
 
-@exported var exportVar: Int // expected-error {{@exported may only be used on 'import' declarations}}{{1-11=}}
-@exported func exportFunc() {} // expected-error {{@exported may only be used on 'import' declarations}}{{1-11=}}
-@exported struct ExportStruct {} // expected-error {{@exported may only be used on 'import' declarations}}{{1-11=}}
+@_exported var exportVar: Int // expected-error {{@_exported may only be used on 'import' declarations}}{{1-12=}}
+@_exported func exportFunc() {} // expected-error {{@_exported may only be used on 'import' declarations}}{{1-12=}}
+@_exported struct ExportStruct {} // expected-error {{@_exported may only be used on 'import' declarations}}{{1-12=}}
 
 
 // Function result type attributes.

@@ -1,7 +1,7 @@
 // This is an overlay Swift module.
-@exported import Foundation
+@_exported import Foundation
 
-@exported import ObjectiveC
+@_exported import ObjectiveC
 
 // String/NSString bridging functions.
 @asmname("swift_StringToNSString") internal

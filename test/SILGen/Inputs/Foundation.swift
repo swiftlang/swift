@@ -1,7 +1,7 @@
 // Fake Foundation module for testing bridging.
 
-@exported import ObjectiveC
-@exported import Foundation // clang module
+@_exported import ObjectiveC
+@_exported import Foundation // clang module
 
 @asmname("swift_StringToNSString")
 func _convertStringToNSString(string: String) -> NSString

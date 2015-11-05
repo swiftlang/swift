@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@exported import GameplayKit
+@_exported import GameplayKit
 
 @warn_unused_result
 @asmname("GK_Swift_GKEntity_componentForClass")

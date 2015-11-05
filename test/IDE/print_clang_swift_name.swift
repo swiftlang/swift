@@ -6,7 +6,7 @@
 // REQUIRES: objc_interop
 
 // EXPECTED OUTPUT STARTS BELOW THIS LINE.
-@exported import Foundation
+@_exported import Foundation
 
 
 class Test : NSObject {

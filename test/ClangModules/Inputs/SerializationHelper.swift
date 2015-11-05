@@ -1,7 +1,7 @@
 import Foundation
 
-@exported import ProtoWithInitializer
-@exported import TypeAndValue
+@_exported import ProtoWithInitializer
+@_exported import TypeAndValue
 
 public class Impl : InitProto {
   @objc public required init(int i: CInt) {}

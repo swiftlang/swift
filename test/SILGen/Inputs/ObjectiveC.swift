@@ -1,6 +1,6 @@
 // Fake ObjectiveC module for testing String/NSString bridging.
 
-@exported import ObjectiveC
+@_exported import ObjectiveC
 
 public struct ObjCBool : BooleanType {
   var value : UInt8

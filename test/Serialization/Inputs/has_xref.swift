@@ -1,5 +1,5 @@
 import has_alias
-@exported import struct_with_operators
+@_exported import struct_with_operators
 
 public func numeric(x: MyInt64) {}
 public func conditional(x: AliasWrapper.Boolean) {}

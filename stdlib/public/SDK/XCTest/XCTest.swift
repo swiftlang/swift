@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@exported import XCTest // Clang module
+@_exported import XCTest // Clang module
 
 import CoreGraphics
 

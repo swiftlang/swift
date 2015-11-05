@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@exported import CoreMedia // Clang module
+@_exported import CoreMedia // Clang module
 
 extension CMTime {
   public init(seconds: Double, preferredTimescale: CMTimeScale) {

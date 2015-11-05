@@ -332,8 +332,11 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   // Perform the final lowering transformations.
   PM.addExternalFunctionDefinitionsElimination();
   PM.addDeadFunctionElimination();
-  PM.addMergeCondFails();
+
+  // Optimize overflow checks:
   PM.addRedundantOverflowCheckRemoval();
+  PM.addMergeCondFails();
+
   // Remove dead code.
   PM.addDCE();
   // Clean-up after DCE.

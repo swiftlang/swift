@@ -1,4 +1,4 @@
-@exported import FooSwiftModule
+@_exported import FooSwiftModule
 
 public func overlayedFoo() {}
 public func onlyInFooOverlay() {}

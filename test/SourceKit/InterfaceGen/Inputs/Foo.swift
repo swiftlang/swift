@@ -1,4 +1,4 @@
-@exported import Foo
+@_exported import Foo
 
 public class FooOverlayClassBase {
   public func f() {}
