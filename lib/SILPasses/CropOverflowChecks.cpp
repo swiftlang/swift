@@ -1,4 +1,4 @@
-//===-- CropOverflowChecks.cpp - Delete masked overflow checkes -*- C++ -*-===//
+//===-- RedundantOverflowCheckRemoval.cpp ----------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -13,7 +13,7 @@
 // overflow checks.
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "crop-overflow-checks"
+#define DEBUG_TYPE "remove-redundant-overflow-checks"
 
 #include "swift/SIL/Dominance.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
@@ -32,9 +32,9 @@ STATISTIC(NumCondFailRemoved,   "Number of cond_fail instructions removed");
 
 namespace {
 
-class CropOverflowChecksPass : public SILFunctionTransform {
+class RedundantOverflowCheckRemovalPass : public SILFunctionTransform {
 public:
-  CropOverflowChecksPass() {}
+  RedundantOverflowCheckRemovalPass() {}
 
   /// This enum represents a relationship between two operands.
   /// The relationship represented by arithmetic operators represent the
@@ -636,6 +636,6 @@ public:
 };
 }
 
-SILTransform *swift::createCropOverflowChecks() {
-  return new CropOverflowChecksPass();
+SILTransform *swift::createRedundantOverflowCheckRemoval() {
+  return new RedundantOverflowCheckRemovalPass();
 }

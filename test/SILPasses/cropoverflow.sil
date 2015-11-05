@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -crop-overflow-checks | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -remove-redundant-overflow-checks | FileCheck %s
 
 sil_stage canonical
 
@@ -24,7 +24,6 @@ bb1:                                              // Preds: bb0
   %8 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 1 // user: %9
 // CHECK-NOT: cond_fail
   cond_fail %8 : $Builtin.Int1                    // id: %9
-  // function_ref function signature specialization <Arg[0] = Dead> of cropoverflow.sink (Swift.Int64) -> ()
   %10 = function_ref @sink_unsigned_int : $@convention(thin) () -> () // users: %11, %15, %20
   %11 = apply %10() : $@convention(thin) () -> ()
   %12 = builtin "ssub_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %13
@@ -65,7 +64,6 @@ bb1:                                              // Preds: bb0
   %7 = builtin "ssub_with_overflow_Int64"(%2 : $Builtin.Int64, %5 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %8
   %8 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 1 // user: %9
   cond_fail %8 : $Builtin.Int1                    // id: %9
-  // function_ref function signature specialization <Arg[0] = Dead> of cropoverflow.sink (Swift.Int64) -> ()
   %10 = function_ref @sink_unsigned_int : $@convention(thin) () -> () // users: %11, %15, %20
   %11 = apply %10() : $@convention(thin) () -> ()
   %12 = builtin "ssub_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %13
@@ -100,7 +98,6 @@ bb1:                                              // Preds: bb0
   %7 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %5 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %8
   %8 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 1 // user: %9
   cond_fail %8 : $Builtin.Int1                    // id: %9
-  // function_ref function signature specialization <Arg[0] = Dead> of cropoverflow.sink (Swift.UInt64) -> ()
   %10 = function_ref @sink_signed_int : $@convention(thin) () -> () // users: %11, %15, %20
   %11 = apply %10() : $@convention(thin) () -> ()
   %12 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %13
@@ -135,7 +132,6 @@ bb1:                                              // Preds: bb0
   %7 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %5 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %8
   %8 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 1 // user: %9
   cond_fail %8 : $Builtin.Int1                    // id: %9
-  // function_ref function signature specialization <Arg[0] = Dead> of cropoverflow.sink (Swift.UInt64) -> ()
   %10 = function_ref @sink_signed_int : $@convention(thin) () -> () // users: %11, %15, %20
   %11 = apply %10() : $@convention(thin) () -> ()
   %12 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %13
@@ -169,7 +165,6 @@ bb0(%0 : $UInt64):
   %4 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %5
   %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 1 // user: %6
   cond_fail %5 : $Builtin.Int1                    // id: %6
-  // function_ref function signature specialization <Arg[0] = Dead> of cropoverflow.sink (Swift.UInt64) -> ()
   %7 = function_ref @sink_signed_int : $@convention(thin) () -> () // users: %8, %13, %18, %23, %28, %29
   %8 = apply %7() : $@convention(thin) () -> ()
   %9 = integer_literal $Builtin.Int64, 2          // user: %10
@@ -208,7 +203,6 @@ bb0(%0 : $Int64):
 // Keep this condfail because it is the first one.
 // CHECK: cond_fail
   cond_fail %5 : $Builtin.Int1                    // id: %6
-  // function_ref function signature specialization <Arg[0] = Dead> of cropoverflow.sink (Swift.Int64) -> ()
   %7 = function_ref @sink_unsigned_int : $@convention(thin) () -> () // users: %8, %13, %18, %23, %28, %29
   %8 = apply %7() : $@convention(thin) () -> ()
   %9 = integer_literal $Builtin.Int64, 2          // user: %10
@@ -251,7 +245,6 @@ bb0(%0 : $UInt64):
 // Keep the first condfail.
 //CHECK: cond_fail
   cond_fail %5 : $Builtin.Int1                    // id: %6
-  // function_ref function signature specialization <Arg[0] = Dead> of cropoverflow.sink (Swift.UInt64) -> ()
   %7 = function_ref @sink_signed_int : $@convention(thin) () -> () // users: %8, %13, %18, %23, %28, %29
   %8 = apply %7() : $@convention(thin) () -> ()
   %9 = integer_literal $Builtin.Int64, 2          // user: %10
@@ -298,7 +291,6 @@ bb0(%0 : $Int64):
   %4 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %5
   %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 1 // user: %6
   cond_fail %5 : $Builtin.Int1                    // id: %6
-  // function_ref function signature specialization <Arg[0] = Dead> of cropoverflow.sink (Swift.Int64) -> ()
   %7 = function_ref @sink_unsigned_int : $@convention(thin) () -> () // users: %8, %13, %18, %23, %28, %29
   %8 = apply %7() : $@convention(thin) () -> ()
   %9 = integer_literal $Builtin.Int64, 2          // user: %10
@@ -342,7 +334,6 @@ bb1:                                              // Preds: bb0
   %8 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %6 : $Builtin.Int64, %7 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %9
   %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 1 // user: %10
   cond_fail %9 : $Builtin.Int1                    // id: %10
-  // function_ref function signature specialization <Arg[0] = Dead> of cropoverflow.sink (Swift.Int64) -> ()
   %11 = function_ref @sink_unsigned_int : $@convention(thin) () -> () // users: %12, %17
   %12 = apply %11() : $@convention(thin) () -> ()
   %13 = integer_literal $Builtin.Int64, 2         // user: %14
@@ -373,7 +364,6 @@ bb1:                                              // Preds: bb0
   %8 = builtin "uadd_with_overflow_Int64"(%2 : $Builtin.Int64, %6 : $Builtin.Int64, %7 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %9
   %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 1 // user: %10
   cond_fail %9 : $Builtin.Int1                    // id: %10
-  // function_ref function signature specialization <Arg[0] = Dead> of cropoverflow.sink (Swift.UInt64) -> ()
   %11 = function_ref @sink_signed_int : $@convention(thin) () -> () // users: %12, %17
   %12 = apply %11() : $@convention(thin) () -> ()
   %13 = integer_literal $Builtin.Int64, 2         // user: %14

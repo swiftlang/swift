@@ -333,7 +333,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.addExternalFunctionDefinitionsElimination();
   PM.addDeadFunctionElimination();
   PM.addMergeCondFails();
-  PM.addCropOverflowChecks();
+  PM.addRedundantOverflowCheckRemoval();
   // Remove dead code.
   PM.addDCE();
   // Clean-up after DCE.

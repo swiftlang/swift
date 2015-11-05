@@ -54,7 +54,7 @@ PASS(CodeSinking, "code-sinking",
      "Sinks code closer to users")
 PASS(CopyForwarding, "copy-forwarding",
      "Eliminate redundant copies")
-PASS(CropOverflowChecks, "crop-overflow-checks",
+PASS(RedundantOverflowCheckRemoval, "remove-redundant-overflow-checks",
      "Removes redundant overflow checks")
 PASS(DCE, "dce",
      "Eliminate dead code")
