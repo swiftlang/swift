@@ -10,7 +10,7 @@ i j i.f = {
 protocol d {
 }
 class i: d{  class func f {}
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
 protocol f : f {
 }

@@ -877,13 +877,13 @@ bb0(%0 : $*Builtin.Int32, %1 : $Builtin.Int32, %2 : $@callee_owned (Builtin.Int3
 //CHECK: return
 sil @remove_init_ex : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
-  %1 = alloc_stack $BooleanType
-  %2 = init_existential_addr %1#1 : $*BooleanType, $Bool
+  %1 = alloc_stack $Boolean
+  %2 = init_existential_addr %1#1 : $*Boolean, $Bool
   %3 = integer_literal $Builtin.Int1, 1
   %4 = struct $Bool (%3 : $Builtin.Int1)
   store %4 to %2 : $*Bool
-  destroy_addr %1#1 : $*BooleanType
-  dealloc_stack %1#0 : $*@local_storage BooleanType
+  destroy_addr %1#1 : $*Boolean
+  dealloc_stack %1#0 : $*@local_storage Boolean
   %8 = tuple ()
   return %8 : $()
 }

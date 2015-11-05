@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 s))
-func ^(a: BooleanType, Bool) -> Bool {
+func ^(a: Boolean, Bool) -> Bool {
 return !(a)
 }
 f

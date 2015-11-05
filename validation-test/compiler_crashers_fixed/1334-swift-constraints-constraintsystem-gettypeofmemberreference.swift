@@ -8,7 +8,7 @@ func a<T>() {
 class A {
 typealias e(v: P {
 }
-class a: BooleanType)
+class a: Boolean)
 convenience init(a!)
 let a {
 super.init()

@@ -6,7 +6,7 @@
 
 struct S : a {
 print() -> String {
-var b = true as BooleanType)) {
+var b = true as Boolean)) {
 }
 }
 private class A {

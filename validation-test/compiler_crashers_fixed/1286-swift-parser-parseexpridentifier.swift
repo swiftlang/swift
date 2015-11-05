@@ -26,7 +26,7 @@ enum e {
 func p() { p
 f> {
 }
-func f BooleanType>(b: T) {
+func f Boolean>(b: T) {
 }
 f(   func b(b: X.Type) {
 enum S<T> : P {

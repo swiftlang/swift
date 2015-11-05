@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-class B<T where B = b: BooleanType).substringWithRange(i<Int
+class B<T where B = b: Boolean).substringWithRange(i<Int
 return "cd""",")
 var _ c())) {
 typealias f = T)) in c == a: Hashable> String {

@@ -7,4 +7,4 @@
 func b{struct S<T where g:a{class A{class
 a{
 class B{
-class c:A{{}class c:BooleanType
+class c:A{{}class c:Boolean

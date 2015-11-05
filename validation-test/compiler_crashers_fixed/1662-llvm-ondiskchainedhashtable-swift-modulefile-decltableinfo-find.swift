@@ -55,7 +55,7 @@ protocol d = c> {
 }
 }
 () -> {
-enum S<T] as BooleanType, Any) {
+enum S<T] as Boolean, Any) {
 class A<T where l..init(_ = b()
 struct e where T> : end)
 }
@@ -71,7 +71,7 @@ protocol c == "ab"
 }
 func a<T>()
 init(T, x }
-init <S : BooleanType)
+init <S : Boolean)
 func g<U : Bool) {
 enum a: NSObject {
 func d: A where f, Any, y: [B, (A.Iterator.C(seq: AnyObject)

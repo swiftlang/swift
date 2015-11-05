@@ -4,5 +4,5 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-class A{enum T:BooleanType
+class A{enum T:Boolean
 let a{class a<T:T.e

@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-func compose<H : A, T : T, T : BooleanType, U) {
+func compose<H : A, T : T, T : Boolean, U) {
 }
 protocol a {
 let n1: (a(start, T -> Any) -> : Int = { }

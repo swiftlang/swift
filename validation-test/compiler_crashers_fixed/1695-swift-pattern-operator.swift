@@ -87,7 +87,7 @@ protocol d {
 deinit {
 }
 self.c: C = a: Any) -> Void>(Any) -> {
-var a(seq: BooleanType, Any) -> : T.Type
+var a(seq: Boolean, Any) -> : T.Type
 extension A {
 func a)) {
 return m: b: Int

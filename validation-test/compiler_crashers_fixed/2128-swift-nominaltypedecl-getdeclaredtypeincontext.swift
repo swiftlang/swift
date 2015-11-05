@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 let a {
-class g<T where p: BooleanType, g == g> {
+class g<T where p: Boolean, g == g> {
 var _ = c: a
 class A {
 }

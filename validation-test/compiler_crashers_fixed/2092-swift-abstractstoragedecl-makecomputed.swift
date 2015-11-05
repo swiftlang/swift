@@ -11,6 +11,6 @@ func g> Int = {
 }
 extension A {
 }
-func a: BooleanType>)
+func a: Boolean>)
 return S(b(((B()
 func f

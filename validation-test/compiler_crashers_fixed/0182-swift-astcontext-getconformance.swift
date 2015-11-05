@@ -10,7 +10,7 @@ protocol a {
 class b: a {
     c T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 func f() {
     ({})
 }

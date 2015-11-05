@@ -92,9 +92,9 @@ struct n : C {
     typealias n = ss l: j{  k() -> ())
 }
 ({})
-func j<o : BooleanType>(l: o) {
+func j<o : Boolean>(l: o) {
 }
-j(j q BooleanType)
+j(j q Boolean)
    h  }
 }
 protoco  c() -> i) -> b {

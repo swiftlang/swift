@@ -6,6 +6,6 @@
 // Test case found by fuzzing
 
 let c {
-class a<T : BooleanType, T! {
+class a<T : Boolean, T! {
 protocol c : a {
 func a

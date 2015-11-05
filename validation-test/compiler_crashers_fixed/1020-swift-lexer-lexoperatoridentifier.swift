@@ -11,7 +11,7 @@ q {
 }
 class gf: q{  w() -> ())
 }
-func q<y : BooleanType>(gf: y) {
+func q<y : Boolean>(gf: y) {
 }
 func ed(gf: Any, hg: Any) -> (((Any, Any) -> Any) -> Any) {
 return {

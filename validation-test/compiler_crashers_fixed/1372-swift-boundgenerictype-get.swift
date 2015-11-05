@@ -6,6 +6,6 @@
 // Test case found by fuzzing
 
 (A(_ = [1
-struct Q<d where T where k.c<T> : BooleanType, A {
+struct Q<d where T where k.c<T> : Boolean, A {
 protocol a {
 class func a<T: a

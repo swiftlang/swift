@@ -48,12 +48,12 @@ class B {
    B) {
     }
 }
-func ^(a: BooleanType, Bool) -> Bool {
+func ^(a: Boolean, Bool) -> Bool {
     return !(a)
 }
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 var f = 1
 var e: Int -> Int = {
     return $0

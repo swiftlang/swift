@@ -4,4 +4,4 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-let c{struct c<T where h:A{class b{let f=(struct B:BooleanType
+let c{struct c<T where h:A{class b{let f=(struct B:Boolean

@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 func b> T
-class A<T: d where B : BooleanType)).C("cd""")
+class A<T: d where B : Boolean)).C("cd""")
 static let b {
 func b> : C(2, range.<T
 })

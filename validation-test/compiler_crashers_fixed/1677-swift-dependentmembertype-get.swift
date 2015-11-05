@@ -87,7 +87,7 @@ typealias C {
 protocol A {
 var a""
 return { _, g = Int
-}(c) -> : T>(f() -> (z: BooleanType>(m(v: Int>()] = { c
+}(c) -> : T>(f() -> (z: Boolean>(m(v: Int>()] = { c
 }
 typealias e : NSObject {
 let n1: 1], let g == Swift.join(h, Bool) -> (g.endIndex - range.startIndex))

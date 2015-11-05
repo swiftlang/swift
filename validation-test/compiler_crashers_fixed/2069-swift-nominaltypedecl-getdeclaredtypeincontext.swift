@@ -17,4 +17,4 @@ var b {
 struct S<d where B : c
 class C<T>) -> Any {
 class A {
-i(bytes: BooleanType
+i(bytes: Boolean

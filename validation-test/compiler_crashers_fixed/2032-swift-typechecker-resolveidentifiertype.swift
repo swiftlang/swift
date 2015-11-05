@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-func e: BooleanType>] {
+func e: Boolean>] {
 }
 func e<T).A.join(".init() {
 struct B) {

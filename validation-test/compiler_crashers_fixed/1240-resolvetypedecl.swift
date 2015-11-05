@@ -12,6 +12,6 @@ class b<h, i> {
 }
 protocol c {
 }
-func ^(a: BooleanType, Bool) -> Bool {
+func ^(a: Boolean, Bool) -> Bool {
 }
 class a<f : b, g

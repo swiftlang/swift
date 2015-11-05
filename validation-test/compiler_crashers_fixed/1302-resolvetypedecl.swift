@@ -15,7 +15,7 @@ protocol b {
 }
 struct c<h : b> : b {
 }
-func ^(a: BooleanType, Bool) -> Bool {
+func ^(a: Boolean, Bool) -> Bool {
 }
 class a {
 }

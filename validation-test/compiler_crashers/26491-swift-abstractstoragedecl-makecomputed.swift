@@ -7,6 +7,6 @@ struct S{
 struct S<d where g:b{
 struct D{
 class d<h{
-func g:BooleanType
+func g:Boolean
 class b
 let v{var _=b{

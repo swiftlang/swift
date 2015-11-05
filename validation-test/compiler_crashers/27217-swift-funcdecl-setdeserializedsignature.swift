@@ -4,4 +4,4 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-{var b{protocol P{let:BooleanType}}class B<T where B:a{class B<c{let a=c
+{var b{protocol P{let:Boolean}}class B<T where B:a{class B<c{let a=c

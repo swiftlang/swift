@@ -16,7 +16,7 @@ protocol m {
 }
 class b: m {
 }
-func h<o : BooleanType>(b: o) {
+func h<o : Boolean>(b: o) {
 }
 func m(b: q, e: r) -> (((r -> r) -> c  var j: b.Type
 protocol c : b { func b

@@ -16,9 +16,9 @@ func a<T>() -> (T, T -> T) -> T {
     var b: ((T, T -> T) -> T)!
     return b
 }
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 protocol a {
     class func c()
 }

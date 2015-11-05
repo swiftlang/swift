@@ -49,9 +49,9 @@ class c {
 }
 struct c<d, e: b where d.c == e> {
 }
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 enum S<T> {
     case C(T, () -> ())
 }

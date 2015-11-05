@@ -10,6 +10,6 @@ case s: b: Array<T {
 }
 func a: Int>([0
 case .b) -> (T>(start: [[self, range.f == ")
-let t: BooleanType>(true }
+let t: Boolean>(true }
 typealias A = e(i> (""")
 func a<T : a

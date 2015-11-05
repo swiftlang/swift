@@ -18,14 +18,14 @@ typealias e = a<c<h>, d>
 func prefix(with: String) -> <T>(() -> T) -> String {
 return { g in "\(with): \(g())" }
 }
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 func a<T>() -> (T, T -> T) -> T {
 var b: ((T, T -> T) -> T)!
 return b
 }
-func ^(a: BooleanType, Bool) -> Bool {
+func ^(a: Boolean, Bool) -> Bool {
 return !(a)
 }
 protocol A {

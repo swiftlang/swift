@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 import Foundation
-func f<3] as BooleanType>() -> String {
+func f<3] as Boolean>() -> String {
 protocol C {
 }
 struct c == { x }
@@ -13,7 +13,7 @@ convenience init(B? = true {
 class a {
 }
 protocol a {
-func b.advance() as BooleanType, range.init() {
+func b.advance() as Boolean, range.init() {
 }
 }
 }

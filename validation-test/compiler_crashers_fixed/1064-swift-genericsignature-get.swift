@@ -7,5 +7,5 @@
 func compose<T : d = T) -> {
 func e> {
 }
-struct c : b: BooleanType>: Array<U, a<3)
+struct c : b: Boolean>: Array<U, a<3)
 public var b = [c()

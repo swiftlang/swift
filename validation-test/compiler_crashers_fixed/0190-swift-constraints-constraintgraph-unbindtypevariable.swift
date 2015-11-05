@@ -28,7 +28,7 @@ struct D : C {
     func g<T where T.E == F>(f: B<T>) {
     }
 }
-func ^(a: BooleanType, Bool) -> Bool {
+func ^(a: Boolean, Bool) -> Bool {
     return !(a)
 }
 a)

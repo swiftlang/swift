@@ -6,5 +6,5 @@
 
 class B<d where B : a {
 }
-let g : (Any) -> (e: BooleanType>: A<T> Void>()
+let g : (Any) -> (e: Boolean>: A<T> Void>()
 let h = B

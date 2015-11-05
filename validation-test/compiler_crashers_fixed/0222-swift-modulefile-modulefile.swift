@@ -23,7 +23,7 @@ prtocolAny) -> Any in
     })
 }
 b(a(1, a(2, 3)))
-func f BooleanType>(b: T) {
+func f Boolean>(b: T) {
 }
 f(   func b( d
 {

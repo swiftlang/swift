@@ -6,7 +6,7 @@
 
 enum B : String {
 class func b(f: NSObject {
-return [0x31] as BooleanType, ")
+return [0x31] as Boolean, ")
 case .init() {
 class c {
 var d.Iterator..dynamicType.C() -> T : () {

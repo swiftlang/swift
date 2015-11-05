@@ -7,4 +7,4 @@
 let a{struct S<T where g:T{
 class b{
 let a=Int
-protocol A:BooleanType
+protocol A:Boolean

@@ -262,7 +262,7 @@ func n<i>() {
 func n(k: Int = l) {
 }
 let j = n
-func ^(a: BooleanType, Bool) -> Bool {
+func ^(a: Boolean, Bool) -> Bool {
     return !(a)
 }
 protocol a {
@@ -367,9 +367,9 @@ func b<d {
 func f() {
     ({})
 }
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 func a<T>() -> (T, T -> T) -> T {
     var4, nil]
 print(some(xs))
@@ -422,7 +422,7 @@ protocol a {
 class b: a {
     c T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 func f() {
     ({})
 }
@@ -478,9 +478,9 @@ var e: Int -> Int = {
 }
 let d: Int =  { c, b in
     }(f, e)
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 i)
 import Foundation
 class q<k>: NSObject {

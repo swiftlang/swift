@@ -21,7 +21,7 @@ typealias d, e? = A? = a<S {
 extension NSSet {
 enum A : a {
 convenience init()
-protocol d : BooleanType, let foo as a<T: C(x()
+protocol d : Boolean, let foo as a<T: C(x()
 extension NSSet {
 }
 }

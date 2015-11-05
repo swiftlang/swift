@@ -36,7 +36,7 @@ case .h : T> {
 func g> ()).init(g<U) -> {
 }
 let d<U -> S : T> Int -> {
-return { _, let h : BooleanType>() {
+return { _, let h : Boolean>() {
 }
 }
 }

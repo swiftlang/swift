@@ -39,6 +39,6 @@ import Foundation
 protocol A {
 let c: d {
 }
-func f(f, let foo as BooleanType))-> U -> {
+func f(f, let foo as Boolean))-> U -> {
 print("[1
 typealias A : A {

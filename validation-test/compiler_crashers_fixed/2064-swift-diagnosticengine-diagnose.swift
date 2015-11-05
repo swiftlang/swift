@@ -6,7 +6,7 @@
 
 func g<T {
 case c() {
-var b = d: AnyObject, object2: BooleanType)) -> Int {
+var b = d: AnyObject, object2: Boolean)) -> Int {
 return { self[])
 }
 }

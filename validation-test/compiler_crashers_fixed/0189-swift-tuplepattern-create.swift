@@ -57,7 +57,7 @@ protocol A {
     fu]
 }
 func a
-func ^(a: BooleanType, Bool) -> Bool
+func ^(a: Boolean, Bool) -> Bool
  -> Int in
     return f(x)
 }(x1, f1)

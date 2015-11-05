@@ -84,7 +84,7 @@ let h == [$0
 }
 func f: (bytes: T, let d.C() -> String) {
 struct c(g> Void>(()
-typealias B<l : BooleanType>(_ = Swift.<b
+typealias B<l : Boolean>(_ = Swift.<b
 var b) {
 }
 for (2, length: b {

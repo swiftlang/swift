@@ -12,5 +12,5 @@ func c: a {
 print() -> V>Bool) {
 print(T>() {
 }
-func f((v: BooleanType>Bool]()
+func f((v: Boolean>Bool]()
 }() { c>(z(b()

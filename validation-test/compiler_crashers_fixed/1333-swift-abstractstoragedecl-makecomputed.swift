@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 func c: a {
-func x: BooleanType, g == F
+func x: Boolean, g == F
 func i<T, f()(Any, Bool]
 (i: b<b("
 }

@@ -19,7 +19,7 @@ typealias C {
 func g() -> Self {
 }
 b: d == {
-let foo as BooleanType).c: B) -> {
+let foo as Boolean).c: B) -> {
 }
 let a<T) {
 print(g(#object1: d : a {

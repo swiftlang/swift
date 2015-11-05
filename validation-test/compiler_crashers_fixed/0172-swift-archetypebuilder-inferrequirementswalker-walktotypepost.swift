@@ -261,7 +261,7 @@ struct c<e> {
     let d: [(  h
 }
 func b(g: f) -> <e>(()-> e) -> i
-func ^(a: BooleanType, Bool) -> Bool {
+func ^(a: Boolean, Bool) -> Bool {
     return !(a)
 }
 func d() -> String {
@@ -422,9 +422,9 @@ protocol d : b { func b
 func d(e:  = { (g: h, f: h -> h) -> h in
     return f(g)
 }
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 class k {
     func l((Any, k))(m }
 }

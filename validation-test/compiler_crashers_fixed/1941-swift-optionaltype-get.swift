@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 let b = 0)
-}(x: BooleanType)?) -> String = {
+}(x: Boolean)?) -> String = {
 print("a()
 return [() {
 return "A) -> {

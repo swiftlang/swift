@@ -1737,7 +1737,7 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
   // If this expression is already typechecked and has an i1 type, then it has
-  // already got its conversion from BooleanType back to i1.  Just re-typecheck
+  // already got its conversion from Boolean back to i1.  Just re-typecheck
   // it.
   if (expr->getType() && expr->getType()->isBuiltinIntegerType(1))
     return typeCheckExpression(expr, dc);
@@ -1747,22 +1747,22 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
     Expr *OrigExpr = nullptr;
 
   public:
-    // Add the appropriate BooleanType constraint.
+    // Add the appropriate Boolean constraint.
     virtual bool builtConstraints(ConstraintSystem &cs, Expr *expr) {
       // Save the original expression.
       OrigExpr = expr;
       
-      // Otherwise, the result must be a BooleanType.
+      // Otherwise, the result must be a Boolean.
       auto &tc = cs.getTypeChecker();
       auto logicValueProto = tc.getProtocol(expr->getLoc(),
-                                            KnownProtocolKind::BooleanType);
+                                            KnownProtocolKind::Boolean);
       if (!logicValueProto)
         return true;
 
       auto logicValueType = logicValueProto->getDeclaredType();
 
-      // We use SelfObjectOfProtocol because an existential BooleanType is
-      // allowed as a condition, but BooleanType is not self-conforming.
+      // We use SelfObjectOfProtocol because an existential Boolean is
+      // allowed as a condition, but Boolean is not self-conforming.
       cs.addConstraint(ConstraintKind::SelfObjectOfProtocol,
                        expr->getType(), logicValueType,
                        cs.getConstraintLocator(OrigExpr), /*isFavored*/true);

@@ -23,7 +23,7 @@ public var noErr: OSStatus { return 0 }
 /// Foundation.
 ///
 /// The C type is a typedef for `unsigned char`.
-public struct DarwinBoolean : BooleanType, BooleanLiteralConvertible {
+public struct DarwinBoolean : Boolean, BooleanLiteralConvertible {
   var _value: UInt8
 
   public init(_ value: Bool) {
@@ -78,7 +78,7 @@ func _convertDarwinBooleanToBool(x: DarwinBoolean) -> Bool {
 // for DarwinBoolean.
 @_transparent
 @warn_unused_result
-public func && <T : BooleanType>(
+public func && <T : Boolean>(
   lhs: T, @autoclosure rhs: () -> DarwinBoolean
 ) -> Bool {
   return lhs.boolValue ? rhs().boolValue : false
@@ -86,7 +86,7 @@ public func && <T : BooleanType>(
 
 @_transparent
 @warn_unused_result
-public func || <T : BooleanType>(
+public func || <T : Boolean>(
   lhs: T, @autoclosure rhs: () -> DarwinBoolean
 ) -> Bool {
   return lhs.boolValue ? true : rhs().boolValue

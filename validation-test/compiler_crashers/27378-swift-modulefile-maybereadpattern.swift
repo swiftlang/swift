@@ -4,4 +4,4 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-func a<H:BooleanType{struct Q{func a<H:H.a
+func a<H:Boolean{struct Q{func a<H:H.a

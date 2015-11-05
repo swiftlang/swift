@@ -175,4 +175,4 @@ import Foundation
 public var b, V, Bool) {
 struct X.E
 }
-let foo as BooleanType, AnyObject, T : B<Q<h
+let foo as Boolean, AnyObject, T : B<Q<h

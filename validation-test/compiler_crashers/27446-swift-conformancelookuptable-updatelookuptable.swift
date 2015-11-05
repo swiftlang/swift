@@ -7,6 +7,6 @@
 {{
 typealias classl A {
 {"
-func c{let t:BooleanType
+func c{let t:Boolean
 enum A { typealias B = }}<T}}}class S<T{func a<h{func b<T where h.g=a
 {

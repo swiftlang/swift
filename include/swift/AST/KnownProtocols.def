@@ -50,7 +50,7 @@
 
 PROTOCOL(Sequence)
 PROTOCOL(IteratorProtocol)
-PROTOCOL(BooleanType)
+PROTOCOL(Boolean)
 PROTOCOL(AnyObject)
 PROTOCOL(RawRepresentable)
 PROTOCOL(Equatable)

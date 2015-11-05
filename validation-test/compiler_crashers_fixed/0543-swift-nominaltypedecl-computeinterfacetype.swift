@@ -13,6 +13,6 @@ protocol a {
 }
 class b: a {
 }
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
 func e() {

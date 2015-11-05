@@ -1702,7 +1702,7 @@ ERROR(reference_non_inout,sema_tce,none,
 NOTE(subscript_decl_here,sema_tca,none,
      "subscript operator declared here", ())
 ERROR(condition_broken_proto,sema_tce,none,
-      "protocol 'BooleanType' is broken", ())
+      "protocol 'Boolean' is broken", ())
 ERROR(option_type_broken,sema_tce,none,
       "type 'Optional' is broken", ())
 

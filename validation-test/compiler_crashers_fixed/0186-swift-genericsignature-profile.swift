@@ -734,9 +734,9 @@ func e<l {
 class l: j{  k() -> ())
 }
 ({})
-func j<o : BooleanType>(l: o) {
+func j<o : Boolean>(l: o) {
 }
-j(j q BooleanType)
+j(j q Boolean)
 func p(l: Any, g: Any) -> (((Any, Any) -> Any) -> Any) {
     return {
         (p: (Any, Any) -> Any) -> Any in

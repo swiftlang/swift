@@ -12,7 +12,7 @@ j {
 }
 class l: j{  k() -> ())
 }
-func j<o : BooleanType>(l: o) {
+func j<o : Boolean>(l: o) {
 }
 func p(l: Any, g: Any) -> (((Any, Any) -> Any) -> Any) {
 return {

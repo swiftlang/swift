@@ -43,7 +43,7 @@ struct D : C {
 func g<T where T.E == F>(f: B<T>) {
 }
 }
-func ^(a: BooleanType, Bool) -> Bool {
+func ^(a: Boolean, Bool) -> Bool {
 }
 protocol A {
 }
@@ -123,7 +123,7 @@ func c<d {
 enum c {
 }
 }
-func ^(a: BooleanType, Bool) -> Bool {
+func ^(a: Boolean, Bool) -> Bool {
 }
 protocol a {
 for (mx : T?) in xs {

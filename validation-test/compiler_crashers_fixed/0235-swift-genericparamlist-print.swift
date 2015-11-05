@@ -40,7 +40,7 @@ struct d<x> : e {
 }
 class e<v : e> {
 }
-func ^(a: BooleanType, Bool) -> Bool {
+func ^(a: Boolean, Bool) -> Bool {
     return !(a)
 }
 func i(f: g) -> <j>(() -> j) -> g { func g

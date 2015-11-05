@@ -344,11 +344,11 @@ BoolTestSuite.test("init()") {
   expectFalse(v)
 }
 
-struct Booleanish : BooleanType {
+struct Booleanish : Boolean {
   let boolValue: Bool
 }
 
-BoolTestSuite.test("init<T : BooleanType>(_:)") {
+BoolTestSuite.test("init<T : Boolean>(_:)") {
   if true {
     let v = Bool(Booleanish(boolValue: false))
     expectFalse(v)
@@ -359,7 +359,7 @@ BoolTestSuite.test("init<T : BooleanType>(_:)") {
   }
 }
 
-BoolTestSuite.test("BooleanType") {
+BoolTestSuite.test("Boolean") {
   if true {
     var v: Bool = false
     expectIsBooleanType(&v)

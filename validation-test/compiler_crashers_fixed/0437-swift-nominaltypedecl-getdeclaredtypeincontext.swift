@@ -8,7 +8,7 @@
 protocol a {
 class b: a {
 }
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
 func a(x: Any, y: Any) -> (((Any, Any) -> Any) -g {
 }

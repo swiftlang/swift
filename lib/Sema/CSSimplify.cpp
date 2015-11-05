@@ -2291,7 +2291,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   }
   
   if (!type->getAnyOptionalObjectType().isNull() &&
-      protocol->isSpecificProtocol(KnownProtocolKind::BooleanType)) {
+      protocol->isSpecificProtocol(KnownProtocolKind::Boolean)) {
     Fixes.push_back({FixKind::OptionalToBoolean,
       getConstraintLocator(locator)});
     

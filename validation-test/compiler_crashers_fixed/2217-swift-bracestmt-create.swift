@@ -15,7 +15,7 @@ class A {
 func b: d h = c: Sequence where f)] {
 }
 func f> {
-return ").a: BooleanType)
+return ").a: Boolean)
 let c = f.v : Any, y):}
 }
 () -> Any, e<T: d {

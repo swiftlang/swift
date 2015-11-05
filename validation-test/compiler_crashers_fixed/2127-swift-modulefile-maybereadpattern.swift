@@ -36,4 +36,4 @@ protocol d {
 self.b.Iterator.dynamicType.Iterator.Element == {
 }
 func g: b = a
-typealias B : BooleanType, f
+typealias B : Boolean, f

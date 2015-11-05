@@ -9,7 +9,7 @@
 s d
 extension NSSet {
 case A, y: b<T
-let foo as BooleanType)
+let foo as Boolean)
 func a: ExtensibleCollectionType>, i> String)
 protocol B : d {
 typealias d: () -> Bool {

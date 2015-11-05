@@ -11,7 +11,7 @@ protocol c {
 }
 class b> T> T> String {
 return self.count]["
-class A : b: (h: BooleanType)
+class A : b: (h: Boolean)
 var b {
 struct e {
 func a<I : a :

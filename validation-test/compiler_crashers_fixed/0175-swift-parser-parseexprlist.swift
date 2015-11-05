@@ -53,7 +53,7 @@ func p<p>() -> (p, p -> p) -> p {
 }
 j(k(m, k(2, 3)))
 func l(p: j) -> <n>(() -> n 
-func ^(a: BooleanType, Bool) -> Bool {
+func ^(a: Boolean, Bool) -> Bool {
     return !(a)
 }
 func b((Any, e))(e: (Any) -> <d>(()-> d) -> f

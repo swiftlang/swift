@@ -7,7 +7,7 @@
 protocol c {
 typealias B = [c, U)] as [self] = F
 }
-self, length: BooleanType>(c
+self, length: Boolean>(c
 func g<H : A, i> V, object2: $0) -> (bytes: $0
 func a<T where g() { }
 class func i<T>])

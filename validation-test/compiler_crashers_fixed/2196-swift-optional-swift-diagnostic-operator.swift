@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 protocol A {
-let foo as BooleanType>] as a<(.c> {
+let foo as Boolean>] as a<(.c> {
 }
 func k<T, AnyObject))
 typealias e : e: e

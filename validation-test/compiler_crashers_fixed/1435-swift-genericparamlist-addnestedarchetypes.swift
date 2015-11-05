@@ -14,7 +14,7 @@ protocol A = b: Sequence> Any) -> {
 "[1
 func e?
 typealias e : A() {
-protocol c where l.e: b: BooleanType>(a: d == [].B<h> U) -> U : Int {
+protocol c where l.e: b: Boolean>(a: d == [].B<h> U) -> U : Int {
 }
 }
 typealias A where f

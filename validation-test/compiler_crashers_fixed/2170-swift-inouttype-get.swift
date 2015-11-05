@@ -29,4 +29,4 @@ class A : A<h.advance() -> {
 extension NSSet {
 }
 }
-protocol A : BooleanType, U.h
+protocol A : Boolean, U.h

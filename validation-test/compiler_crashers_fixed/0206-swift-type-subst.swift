@@ -15,7 +15,7 @@ protocol a {
 class b: a {
     c T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 func f() {
     ({})
 }
@@ -101,9 +101,9 @@ struct c<h : b> : b {
     typealias d = h
     typealias e = a<c<h>, d>
 }
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 func i(c: () -> ()) {
 }
 c1, f1)
@@ -121,7 +121,7 @@ protocol a {
   typealias e = d
   typealeanType>(b: T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 func a<T>() {
     enum b {
         case c

@@ -201,7 +201,7 @@ d ""
 e}
 class d {
     func b((Any, d)typealias b = b
-func ^(a: BooleanType, Bool) -> Bool {
+func ^(a: Boolean, Bool) -> Bool {
     return !(a)
 }
 func r<t>() {
@@ -554,9 +554,9 @@ class b: a {
     class func c() { }
 }
 (b() as a).dynamicType.c()
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 func a(x: Any, y: Any) -> (((Any, Any) -> Any) -> A  var d: b.Type
     func e() {
         d.e()
@@ -844,9 +844,9 @@ class g {
 func g(f: Int = k) {
 }
 let i = g
-func f<T : BooleanType>(b: T) {
+func f<T : Boolean>(b: T) {
 }
-f(true as BooleanType)
+f(true as Boolean)
 o
 class w<r>: c {
     init(g: r) {
