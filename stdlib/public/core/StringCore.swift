@@ -340,7 +340,7 @@ public struct _StringCore {
             count: count
           ).iterator(),
           output,
-          stopOnError: true
+          stoppingOnError: true
         )
         _sanityCheck(!hadError, "Swift.String with native storage should not have unpaired surrogates")
       }

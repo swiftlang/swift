@@ -110,7 +110,7 @@ public struct _StringBuffer {
       }
       let hadError = transcode(
         encoding, UTF32.self, input.iterator(), sink,
-        stopOnError: true)
+        stoppingOnError: true)
       _sanityCheck(!hadError, "string can not be ASCII if there were decoding errors")
       return (result, hadError)
     }
@@ -121,7 +121,7 @@ public struct _StringBuffer {
       }
       let hadError = transcode(
         encoding, UTF16.self, input.iterator(), sink,
-        stopOnError: !repairIllFormedSequences)
+        stoppingOnError: !repairIllFormedSequences)
       return (result, hadError)
     }
   }

@@ -210,7 +210,7 @@ public struct Character :
       }
       transcode(
         UTF8.self, UTF16.self, _SmallUTF8(u8).iterator(), output,
-        stopOnError: false)
+        stoppingOnError: false)
       self.data = u16
     }
 
