@@ -37,7 +37,7 @@ public struct LazyMapIterator<
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
 public struct LazyMapSequence<Base : Sequence, Element>
-  : LazySequenceType {
+  : LazySequenceProtocol {
   
   public typealias Elements = LazyMapSequence
   
@@ -128,7 +128,7 @@ public struct LazyMapCollection<Base : Collection, Element>
 
 //===--- Support for s.lazy ----------------------------------------------===//
 
-extension LazySequenceType {
+extension LazySequenceProtocol {
   /// Return a `LazyMapSequence` over this `Sequence`.  The elements of
   /// the result are computed lazily, each time they are read, by
   /// calling `transform` function on a base element.

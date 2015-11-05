@@ -13,16 +13,16 @@
 /// A collection on which normally-eager operations such as `map` and
 /// `filter` are implemented lazily.
 ///
-/// Please see `LazySequenceType` for background; `LazyCollectionProtocol`
+/// Please see `LazySequenceProtocol` for background; `LazyCollectionProtocol`
 /// is an analogous component, but for collections.
 ///
 /// To add new lazy collection operations, extend this protocol with
 /// methods that return lazy wrappers that are themselves
 /// `LazyCollectionProtocol`s.
 ///
-/// - See Also: `LazySequenceType`, `LazyCollection`
+/// - See Also: `LazySequenceProtocol`, `LazyCollection`
 public protocol LazyCollectionProtocol
-  : Collection, LazySequenceType {
+  : Collection, LazySequenceProtocol {
   /// A `Collection` that can contain the same elements as this one,
   /// possibly with a simpler type.
   ///
@@ -42,7 +42,7 @@ extension LazyCollectionProtocol where Elements == Self {
 /// but on which some operations such as `map` and `filter` are
 /// implemented lazily.
 ///
-/// - See also: `LazySequenceType`, `LazyCollection`
+/// - See also: `LazySequenceProtocol`, `LazyCollection`
 public struct LazyCollection<Base : Collection>
   : LazyCollectionProtocol {
 
@@ -171,7 +171,7 @@ extension Collection {
   /// normally-eager operations such as `map` and `filter` are
   /// implemented lazily.
   ///
-  /// - See Also: `LazySequenceType`, `LazyCollectionProtocol`.
+  /// - See Also: `LazySequenceProtocol`, `LazyCollectionProtocol`.
   public var lazy: LazyCollection<Self> {
     return LazyCollection(self)
   }

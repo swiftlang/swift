@@ -386,7 +386,7 @@ func expectSequencePassthrough<
   S : Sequence,
   Base : Sequence
   where
-  S : LazySequenceType, Base : LoggingType,
+  S : LazySequenceProtocol, Base : LoggingType,
   Base.Iterator.Element == S.Iterator.Element
 >(s: S, base: Base, arbitraryElement: S.Iterator.Element, count: Int) {
   let baseType = base.dynamicType
