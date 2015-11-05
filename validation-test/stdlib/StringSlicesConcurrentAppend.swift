@@ -44,7 +44,7 @@ func sliceConcurrentAppendThread(tid: ThreadID) {
     if tid == .Primary {
       // Get a fresh buffer.
       sharedString = ""
-      sharedString.appendContentsOf("abc")
+      sharedString.append("abc")
       sharedString.reserveCapacity(16)
       expectLE(16, sharedString.capacityInBytes)
     }
@@ -58,9 +58,9 @@ func sliceConcurrentAppendThread(tid: ThreadID) {
 
     // Append to the private string.
     if tid == .Primary {
-      privateString.appendContentsOf("def")
+      privateString.append("def")
     } else {
-      privateString.appendContentsOf("ghi")
+      privateString.append("ghi")
     }
 
     barrier()

@@ -110,7 +110,7 @@ public struct Character :
         return
       }
       var nativeString = ""
-      nativeString.appendContentsOf(s)
+      nativeString.append(s)
       _representation = .Large(nativeString._core.nativeBuffer!._storage)
     }
   }

@@ -50,7 +50,7 @@ import SwiftShims
 ///
 ///     var a = "foo"
 ///     var b = a
-///     b.appendContentsOf("bar")
+///     b.append("bar")
 ///     print("a=\(a), b=\(b)")     // a=foo, b=foobar
 ///
 /// Strings use Copy-on-Write so that their data is only copied
@@ -423,7 +423,7 @@ public func <(lhs: String, rhs: String) -> Bool {
 extension String {
 
   /// Append the elements of `other` to `self`.
-  public mutating func appendContentsOf(other: String) {
+  public mutating func append(other: String) {
     _core.append(other._core)
   }
 
@@ -636,16 +636,16 @@ extension Sequence where Iterator.Element == String {
     if separatorSize != 0 {
       var iter = iterator()
       if let first = iter.next() {
-        result.appendContentsOf(first)
+        result.append(first)
         while let next = iter.next() {
-          result.appendContentsOf(separator)
-          result.appendContentsOf(next)
+          result.append(separator)
+          result.append(next)
         }
       }
     }
     else {
       for x in self {
-        result.appendContentsOf(x)
+        result.append(x)
       }
     }
 
