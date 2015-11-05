@@ -298,6 +298,9 @@ std::string getSwiftFullVersion() {
 #endif
 
   OS << "Swift version " SWIFT_VERSION_STRING;
+#ifndef SWIFT_COMPILER_VERSION
+  OS << "-dev";
+#endif
 
 #if defined(SWIFT_COMPILER_VERSION)
   OS << " (swiftlang-" SWIFT_COMPILER_VERSION;
