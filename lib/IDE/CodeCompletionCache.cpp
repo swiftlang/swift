@@ -192,11 +192,15 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto context = static_cast<SemanticContextKind>(*cursor++);
     auto notRecommended = static_cast<bool>(*cursor++);
     auto numBytesToErase = static_cast<unsigned>(*cursor++);
+    auto oldCursor = cursor;
     auto chunkIndex = read32le(cursor);
+    auto IntLength = cursor - oldCursor;
     auto moduleIndex = read32le(cursor);
     auto briefDocIndex = read32le(cursor);
     auto assocUSRCount = read32le(cursor);
     auto assocUSRsIndex = read32le(cursor);
+    auto declKeywordCount = read32le(cursor);
+    auto declKeywordIndex = read32le(cursor);
 
     CodeCompletionString *string = getCompletionString(chunkIndex);
     auto moduleName = getString(moduleIndex);
@@ -205,7 +209,14 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     for (unsigned i = 0; i < assocUSRCount; ++i) {
       auto usr = getString(assocUSRsIndex);
       assocUSRs.push_back(usr);
-      assocUSRsIndex += usr.size();
+      assocUSRsIndex += usr.size() + IntLength;
+    }
+
+    SmallVector<StringRef, 4> declKeywords;
+    for (unsigned i = 0; i < declKeywordCount; ++i) {
+      auto kw = getString(declKeywordIndex);
+      declKeywords.push_back(kw);
+      declKeywordIndex += kw.size() + IntLength;
     }
 
     CodeCompletionResult *result = nullptr;
@@ -213,7 +224,8 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
       result = new (*V.Sink.Allocator)
           CodeCompletionResult(context, numBytesToErase, string, declKind,
                                moduleName, notRecommended, briefDocComment,
-                               copyStringArray(*V.Sink.Allocator, assocUSRs));
+                               copyStringArray(*V.Sink.Allocator, assocUSRs),
+                               copyStringArray(*V.Sink.Allocator, declKeywords));
     } else {
       result = new (*V.Sink.Allocator)
           CodeCompletionResult(kind, context, numBytesToErase, string);
@@ -337,6 +349,16 @@ static void writeCachedModule(llvm::raw_ostream &out,
           addString(R->getAssociatedUSRs()[i]); // ignore result
         }
       }
+      auto AllKeywords = R->getDeclKeywords();
+      LE.write(static_cast<uint32_t>(AllKeywords.size()));
+      if (AllKeywords.empty()) {
+        LE.write(static_cast<uint32_t>(~0u));
+      } else {
+        LE.write(addString(AllKeywords[0]));
+        for (unsigned i = 1; i < AllKeywords.size(); ++i) {
+          addString(AllKeywords[i]);
+      }
+    }
     }
   }
   LE.write(static_cast<uint32_t>(results.tell()));

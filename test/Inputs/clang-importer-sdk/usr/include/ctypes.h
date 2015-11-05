@@ -56,12 +56,17 @@ typedef struct {
 //===---
 // Tag decls and typedefs.
 //===---
-
+/*!
+  @keyword Foo1, Struct1
+*/
 struct FooStruct1 {
   int x;
   double y;
 };
 
+/*!
+  @keyword Foo2
+*/
 typedef struct FooStruct2 {
   int x;
   double y;

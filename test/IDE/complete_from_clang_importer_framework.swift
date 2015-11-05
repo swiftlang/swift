@@ -9,8 +9,8 @@ import ctypes
 import Darwin
 
 // CLANG_CTYPES: Begin completions
-// CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]:    FooStruct1[#FooStruct1#]{{; name=.+$}}
-// CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]:    FooStruct2[#FooStruct2#]{{; name=.+$}}
+// CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/Keywords[Foo1, Struct1]:    FooStruct1[#FooStruct1#]{{; name=.+$}}
+// CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/Keywords[Foo2]:    FooStruct2[#FooStruct2#]{{; name=.+$}}
 // CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]:    FooStruct3[#FooStruct3#]{{; name=.+$}}
 // CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]:    FooStruct4[#FooStruct4#]{{; name=.+$}}
 // CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]:    FooStruct5[#FooStruct5#]{{; name=.+$}}

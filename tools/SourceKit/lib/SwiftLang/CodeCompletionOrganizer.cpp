@@ -967,7 +967,8 @@ Completion *CompletionBuilder::finish() {
                          completionString, current.getAssociatedDeclKind(),
                          current.getModuleName(), current.isNotRecommended(),
                          current.getBriefDocComment(),
-                         current.getAssociatedUSRs());
+                         current.getAssociatedUSRs(),
+                         current.getDeclKeywords());
     } else {
       base = SwiftResult(current.getKind(), semanticContext,
                          current.getNumBytesToErase(), completionString);
