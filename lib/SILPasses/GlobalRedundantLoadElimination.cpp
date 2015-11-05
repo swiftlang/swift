@@ -1,20 +1,16 @@
-///===---- LoadStoreOpts.cpp - SIL Load/Store Optimizations Forwarding -----===//
+//===------ GlobalRedundantLoadElimination.cpp -SIL  Load Forwarding ------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
 ///
-/// This source file is part of the Swift.org open source project
-///
-/// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
-/// Licensed under Apache License v2.0 with Runtime Library Exception
-///
-/// See http://swift.org/LICENSE.txt for license information
-/// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-///
-///===----------------------------------------------------------------------===//
-///
-/// This pass eliminates redundant loads, dead stores, and performs load
-/// forwarding.
-///
-/// TODO: Plan to implement new redundant load elimination, a.k.a. load
-/// forwarding.
+/// This pass eliminates redundant loads.
 ///
 /// A load can be eliminated if its value has already been held somewhere,
 /// i.e. loaded by a previous load, memory location stored by a known
@@ -23,7 +19,7 @@
 /// In this case, one can replace the load instruction with the previous
 /// results.
 ///
-/// RedudantLoadElimination (RLE) eliminates such loads by:
+/// Redudant Load Elimination (RLE) eliminates such loads by:
 ///
 /// 1. Introducing a notion of a MemLocation that is used to model objects
 /// fields. (See below for more details).
