@@ -17,6 +17,58 @@
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
+//                              Utility Functions 
+//===----------------------------------------------------------------------===//
+
+static inline void removeMemLocations(MemLocationValueMap &Values,
+                                      MemLocationList &FirstLevel) {
+  for (auto &X : FirstLevel)
+    Values.erase(X);
+}
+
+//===----------------------------------------------------------------------===//
+//                              Load Store Value 
+//===----------------------------------------------------------------------===//
+
+LoadStoreValue &LoadStoreValue::stripLastLevelProjection() {
+  Path.getValue().remove_front(); 
+  return *this;
+}
+
+void LoadStoreValue::setCoveringValue() {
+  Base = SILValue();
+  Path.reset();
+  IsCoveringValue = true;
+}
+
+void LoadStoreValue::print() {
+  Base.dump();
+  llvm::outs() << Path.getValue();
+}
+
+SILValue LoadStoreValue::createExtract(SILValue Base, Optional<ProjectionPath> &Path,
+                                SILInstruction *Inst) {
+  // If we found a projection path, but there are no projections, then the two
+  // loads must be the same, return PrevLI.
+  if (!Path || Path->empty())
+    return Base;
+
+  // Ok, at this point we know that we can construct our aggregate projections
+  // from our list of address projections.
+  SILValue LastExtract = Base;
+  SILBuilder Builder(Inst);
+
+  // Construct the path!
+  for (auto PI = Path->rbegin(), PE = Path->rend(); PI != PE; ++PI) {
+    LastExtract =
+        PI->createValueProjection(Builder, Inst->getLoc(), LastExtract).get();
+    continue;
+  }
+  // Return the last extract we created.
+  return LastExtract;
+}
+
+//===----------------------------------------------------------------------===//
 //                                  Memory Location
 //===----------------------------------------------------------------------===//
 
@@ -135,26 +187,23 @@ void MemLocation::expand(MemLocation &Base, SILModule *Mod,
 
 void MemLocation::reduce(MemLocation &Base, SILModule *Mod,
                          MemLocationSet &Locs) {
-  // Get all the nodes in the projection tree, then go from leaf nodes to their
-  // parents. This guarantees that at the point the parent is processed, its 
-  // children have been processed already.
+  // First, construct the MemLocation by appending the projection path from the
+  // accessed node to the leaf nodes.
   MemLocationList ALocs;
   ProjectionPathList Paths;
   ProjectionPath::BreadthFirstEnumTypeProjection(Base.getType(), Mod, Paths,
                                                  false);
-
-  // Construct the MemLocation by appending the projection path from the
-  // accessed node to the leaf nodes.
   for (auto &X : Paths) {
     ALocs.push_back(MemLocation::createMemLocation(Base.getBase(), X.getValue(),
                                                    Base.getPath().getValue()));
   }
 
+  // Second, go from leaf nodes to their parents. This guarantees that at the
+  // point the parent is processed, its children have been processed already.
   for (auto I = ALocs.rbegin(), E = ALocs.rend(); I != E; ++I) {
     MemLocationList FirstLevel;
     I->getFirstLevelMemLocations(FirstLevel, Mod);
-    // Reached the end of the projection tree, this field can not be expanded
-    // anymore.
+    // Reached the end of the projection tree, this is a leaf node.
     if (FirstLevel.empty())
       continue;
 
@@ -178,6 +227,118 @@ void MemLocation::reduce(MemLocation &Base, SILModule *Mod,
       Locs.insert(*I);
     }
   }
+}
+
+void MemLocation::expandWithValues(MemLocation &Base, SILValue &Val,
+                                   SILModule *Mod, MemLocationList &Locs,
+                                   LoadStoreValueList &Vals) {
+  // To expand a memory location to its indivisible parts, we first get the
+  // projection paths from the accessed type to each indivisible field, i.e.
+  // leaf nodes, then we append these projection paths to the Base.
+  ProjectionPathList Paths;
+  ProjectionPath::BreadthFirstEnumTypeProjection(Base.getType(), Mod, Paths,
+                                                 true);
+
+  // Construct the MemLocation and LoadStoreValues by appending the projection path
+  // from the accessed node to the leaf nodes.
+  for (auto &X : Paths) {
+    Locs.push_back(MemLocation::createMemLocation(Base.getBase(), X.getValue(),
+                                                  Base.getPath().getValue()));
+    Vals.push_back(LoadStoreValue::createLoadStoreValue(Val, X.getValue()));
+  }
+}
+
+SILValue MemLocation::reduceWithValues(MemLocation &Base, SILModule *Mod,
+                                       MemLocationValueMap &Values,
+                                       SILInstruction *InsertPt) {
+  // Walk bottom up the projection tree, try to reason about how to construct
+  // a single SILValue out of all the available values for all the memory
+  // locations.
+  // 
+  // First, get a list of all the leaf nodes and intermediate nodes for the
+  // Base memory location.
+  MemLocationList ALocs;
+  ProjectionPathList Paths;
+  ProjectionPath::BreadthFirstEnumTypeProjection(Base.getType(), Mod, Paths,
+                                                 false);
+  for (auto &X : Paths) {
+    ALocs.push_back(MemLocation::createMemLocation(Base.getBase(), X.getValue(),
+                                                   Base.getPath().getValue()));
+  }
+
+  // Second, go from leaf nodes to their parents. This guarantees that at the
+  // point the parent is processed, its children have been processed already.
+  for (auto I = ALocs.rbegin(), E = ALocs.rend(); I != E; ++I) {
+    //
+    // This is a leaf node, we have a value for it.
+    //
+    // Reached the end of the projection tree, this is a leaf node.
+    MemLocationList FirstLevel;
+    I->getFirstLevelMemLocations(FirstLevel, Mod);
+    if (FirstLevel.empty())
+      continue;
+
+    // If this is a class reference type, we have reached end of the type tree.
+    if (I->getType().getClassOrBoundGenericClass())
+      continue;
+
+    //
+    // This is NOT a leaf node, we need to construct a value for it.
+    //
+    // If there are more than 1 children and all the children nodes have
+    // LoadStoreValues with the same base. we can get away by not extracting value
+    // for every single field.
+    //
+    // Simply create a new node with all the aggregated base value, i.e.
+    // stripping off the last level projection.
+    //
+    bool HasIdenticalValueBase = true;
+    auto Iter = FirstLevel.begin();
+    LoadStoreValue &FirstVal = Values[*Iter];
+    SILValue FirstBase = FirstVal.getBase();
+    Iter = std::next(Iter);
+    for (auto EndIter = FirstLevel.end(); Iter != EndIter; ++Iter) {
+      LoadStoreValue &V = Values[*Iter];
+      HasIdenticalValueBase &= (FirstBase == V.getBase());
+    }
+
+    if (HasIdenticalValueBase && (FirstLevel.size() > 1 ||
+        !FirstVal.hasEmptyProjectionPath())) {
+      Values[*I] = FirstVal.stripLastLevelProjection();
+      // We have a value for the parent, remove all the values for children.
+      removeMemLocations(Values, FirstLevel);
+      continue;
+    }
+
+    // In 2 cases do we need aggregation. 
+    // 
+    // 1. If there is only 1 child and we can not strip off any projections,
+    // that means we need to create an aggregation.
+    //
+    // 2. Children have values from different bases, We need to create
+    // extractions and aggregation in this case.
+    //
+    llvm::SmallVector<SILValue, 8> Vals;
+    for (auto &X : FirstLevel) {
+      Vals.push_back(Values[X].materialize(InsertPt));
+    }
+    SILBuilder Builder(InsertPt);
+    NullablePtr<swift::SILInstruction> AI = 
+          Projection::createAggFromFirstLevelProjections(Builder,
+                                                         InsertPt->getLoc(),
+                                                         I->getType(), Vals);
+    // This is the Value for the current node.
+    Values[*I] = LoadStoreValue::createLoadStoreValue(SILValue(AI.get()));
+    removeMemLocations(Values, FirstLevel);
+
+    // Keep iterating until we have reach the top-most level of the projection tree.
+    // i.e. the memory location represented by the Base.
+  }
+
+  assert(Values.size() == 1 && "Should have a single location this point");
+
+  // Finally materialize and return the forwarding SILValue.
+  return Values.begin()->second.materialize(InsertPt);
 }
 
 void

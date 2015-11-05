@@ -416,6 +416,9 @@ public:
     return *this;
   }
 
+  /// Removes the first element of the path.
+  void remove_front() { Path.erase(Path.begin()); }
+
   /// Create a new address projection path from the pointer Start through
   /// various address projections to End. Returns Nothing::None if there is no
   /// such path.
@@ -648,6 +651,7 @@ public:
       return nullptr;
     return getParent(Tree);
   }
+
 
   llvm::Optional<Projection> getProjection() const { return Proj; }
 
