@@ -1304,7 +1304,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
     if [[ "${CLANG_COMPILER_VERSION}" ]] ; then
         llvm_cmake_options=(
             "${llvm_cmake_options[@]}"
-            -DCLANG_COMPILER_VERSION="${CLANG_COMPILER_VERSION}"
+            -DCLANG_REPOSITORY_STRING="clang-${CLANG_COMPILER_VERSION}"
         )
         swift_cmake_options=(
             "${swift_cmake_options[@]}"
