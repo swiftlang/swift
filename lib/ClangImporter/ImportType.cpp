@@ -2558,9 +2558,24 @@ Type ClangImporter::Implementation::getNamedSwiftType(Module *module,
     return Type();
 
   // Look for the type.
+  Identifier identifier = SwiftContext.getIdentifier(name);
   SmallVector<ValueDecl *, 2> results;
-  module->lookupValue({ }, SwiftContext.getIdentifier(name),
-                      NLKind::UnqualifiedLookup, results);
+
+  // Check if the lookup we're about to perform a lookup within is
+  // a Clang module.
+  for (auto *file : module->getFiles()) {
+    if (auto clangUnit = dyn_cast<ClangModuleUnit>(file)) {
+      // If we have an overlay, look in the overlay. Otherwise, skip
+      // the lookup to avoid infinite recursion.
+      if (auto module = clangUnit->getAdapterModule())
+        module->lookupValue({ }, identifier,
+                          NLKind::UnqualifiedLookup, results);
+    } else {
+      file->lookupValue({ }, identifier,
+                        NLKind::UnqualifiedLookup, results);
+    }
+  }
+
   if (results.size() != 1)
     return Type();
 
