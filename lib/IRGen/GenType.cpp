@@ -70,12 +70,9 @@ Address TypeInfo::initializeBufferWithCopy(IRGenFunction &IGF,
 }
 
 
-bool TypeInfo::isSingleSwiftRetainablePointer(ResilienceScope scope) const {
+bool TypeInfo::isSingleRetainablePointer(ResilienceScope scope,
+                                         ReferenceCounting *refcounting) const {
   return false;
-}
-
-bool TypeInfo::isSingleUnknownRetainablePointer(ResilienceScope scope) const {
-  return isSingleSwiftRetainablePointer(scope);
 }
 
 FixedPacking TypeInfo::getFixedPacking(IRGenModule &IGM) const {

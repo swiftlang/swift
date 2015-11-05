@@ -62,6 +62,64 @@ enum NullableRefcounted {
 // CHECK:   ret %swift.opaque* %6
 // CHECK: }
 
+// Enums consisting of a retainable block pointer and a single empty case use
+// nullable block pointer value semantics.
+enum NullableBlockRefcounted {
+  case Ref(@convention(block) () -> ())
+  case None
+}
+
+// CHECK-LABEL: define linkonce_odr hidden void @_TwxxO34enum_value_semantics_special_cases23NullableBlockRefcounted(%swift.opaque* %object, %swift.type* %Self) {{.*}} {
+// CHECK: entry:
+// CHECK:   %0 = bitcast %swift.opaque* %object to %O34enum_value_semantics_special_cases23NullableBlockRefcounted*
+// CHECK:   %1 = bitcast %O34enum_value_semantics_special_cases23NullableBlockRefcounted* %0 to %objc_block**
+// CHECK:   %2 = load %objc_block*, %objc_block** %1, align 8
+// CHECK:   call void @_Block_release(%objc_block* %2) {{#[0-9]+}}
+// CHECK:   ret void
+// CHECK: }
+
+// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_TwcpO34enum_value_semantics_special_cases23NullableBlockRefcounted(%swift.opaque* %dest, %swift.opaque* %src, %swift.type* %Self) {{.*}} {
+// CHECK: entry:
+// CHECK:   %0 = bitcast %swift.opaque* %dest to %O34enum_value_semantics_special_cases23NullableBlockRefcounted*
+// CHECK:   %1 = bitcast %swift.opaque* %src to %O34enum_value_semantics_special_cases23NullableBlockRefcounted*
+// CHECK:   %2 = bitcast %O34enum_value_semantics_special_cases23NullableBlockRefcounted* %0 to %objc_block**
+// CHECK:   %3 = bitcast %O34enum_value_semantics_special_cases23NullableBlockRefcounted* %1 to %objc_block**
+// CHECK:   %4 = load %objc_block*, %objc_block** %3, align 8
+// CHECK:   %5 = call %objc_block* @_Block_copy(%objc_block* %4)
+// CHECK:   store %objc_block* %4, %objc_block** %2, align 8
+// CHECK:   %6 = bitcast %O34enum_value_semantics_special_cases23NullableBlockRefcounted* %0 to %swift.opaque*
+// CHECK:   ret %swift.opaque* %6
+// CHECK: }
+
+// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_TwcaO34enum_value_semantics_special_cases23NullableBlockRefcounted(%swift.opaque* %dest, %swift.opaque* %src, %swift.type* %Self) {{.*}} {
+// CHECK: entry:
+// CHECK:   %0 = bitcast %swift.opaque* %dest to %O34enum_value_semantics_special_cases23NullableBlockRefcounted*
+// CHECK:   %1 = bitcast %swift.opaque* %src to %O34enum_value_semantics_special_cases23NullableBlockRefcounted*
+// CHECK:   %2 = bitcast %O34enum_value_semantics_special_cases23NullableBlockRefcounted* %0 to %objc_block**
+// CHECK:   %3 = bitcast %O34enum_value_semantics_special_cases23NullableBlockRefcounted* %1 to %objc_block**
+// CHECK:   %4 = load %objc_block*, %objc_block** %2, align 8
+// CHECK:   %5 = load %objc_block*, %objc_block** %3, align 8
+// CHECK:   %6 = call %objc_block* @_Block_copy(%objc_block* %5)
+// CHECK:   store %objc_block* %5, %objc_block** %2, align 8
+// CHECK:   call void @_Block_release(%objc_block* %4) {{#[0-9]+}}
+// CHECK:   %7 = bitcast %O34enum_value_semantics_special_cases23NullableBlockRefcounted* %0 to %swift.opaque*
+// CHECK:   ret %swift.opaque* %7
+// CHECK: }
+
+// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_TwtaO34enum_value_semantics_special_cases23NullableBlockRefcounted(%swift.opaque* %dest, %swift.opaque* %src, %swift.type* %Self) {{.*}} {
+// CHECK: entry:
+// CHECK:   %0 = bitcast %swift.opaque* %dest to %O34enum_value_semantics_special_cases23NullableBlockRefcounted*
+// CHECK:   %1 = bitcast %swift.opaque* %src to %O34enum_value_semantics_special_cases23NullableBlockRefcounted*
+// CHECK:   %2 = bitcast %O34enum_value_semantics_special_cases23NullableBlockRefcounted* %0 to %objc_block**
+// CHECK:   %3 = bitcast %O34enum_value_semantics_special_cases23NullableBlockRefcounted* %1 to %objc_block**
+// CHECK:   %4 = load %objc_block*, %objc_block** %2, align 8
+// CHECK:   %5 = load %objc_block*, %objc_block** %3, align 8
+// CHECK:   store %objc_block* %5, %objc_block** %2, align 8
+// CHECK:   call void @_Block_release(%objc_block* %4) {{#[0-9]+}}
+// CHECK:   %6 = bitcast %O34enum_value_semantics_special_cases23NullableBlockRefcounted* %0 to %swift.opaque*
+// CHECK:   ret %swift.opaque* %6
+// CHECK: }
+
 // With multiple empty cases, the nullable pointer semantics aren't used.
 enum MultipleEmptyRefcounted {
   case Ref(Builtin.NativeObject)

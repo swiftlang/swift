@@ -1181,18 +1181,15 @@ namespace {
       Normal,
       /// The payload is POD, so copying is bitwise, and destruction is a noop.
       POD,
-      /// The payload is a single Swift reference-counted value, and we have
+      /// The payload is a single reference-counted value, and we have
       /// a single no-payload case which uses the null extra inhabitant, so
-      /// copy and destroy can pass through to swift_retain/swift_release.
-      NullableSwiftRefcounted,
-      /// The payload is a single unknown-reference-counted value, and we have
-      /// a single no-payload case which uses the null extra inhabitant, so
-      /// copy and destroy can pass through to
-      /// swift_unknownRetain/swift_unknownRelease.
-      NullableUnknownRefcounted,
+      /// copy and destroy can pass through to retain and release entry
+      /// points.
+      NullableRefcounted,
     };
 
     CopyDestroyStrategy CopyDestroyKind;
+    ReferenceCounting Refcounting;
 
     unsigned NumExtraInhabitantTagValues = ~0U;
 
@@ -1213,7 +1210,8 @@ namespace {
                                 std::move(WithPayload),
                                 std::move(WithNoPayload),
                                 getPreferredPayloadSchema(WithPayload.front())),
-        CopyDestroyKind(Normal)
+        CopyDestroyKind(Normal),
+        Refcounting(ReferenceCounting::Native)
     {
       assert(ElementsWithPayload.size() == 1);
 
@@ -1225,17 +1223,14 @@ namespace {
       // empty case, then the layout will be a nullable pointer, and we can
       // pass enum values directly into swift_retain/swift_release as-is.
       } else if (tik >= TypeInfoKind::Loadable
-          && payloadTI.isSingleUnknownRetainablePointer(
-                                                     ResilienceScope::Component)
+          && payloadTI.isSingleRetainablePointer(ResilienceScope::Component,
+                                                 &Refcounting)
           && ElementsWithNoPayload.size() == 1
           // FIXME: All single-retainable-pointer types should eventually have
           // extra inhabitants.
           && cast<FixedTypeInfo>(payloadTI)
             .getFixedExtraInhabitantCount(IGM) > 0) {
-        CopyDestroyKind = payloadTI.isSingleSwiftRetainablePointer(
-                                                     ResilienceScope::Component)
-          ? NullableSwiftRefcounted
-          : NullableUnknownRefcounted;
+        CopyDestroyKind = NullableRefcounted;
       }
     }
 
@@ -1876,10 +1871,8 @@ namespace {
 
     llvm::Type *getRefcountedPtrType(IRGenModule &IGM) const {
       switch (CopyDestroyKind) {
-      case NullableSwiftRefcounted:
-        return IGM.RefCountedPtrTy;
-      case NullableUnknownRefcounted:
-        return IGM.UnknownRefCountedPtrTy;
+      case NullableRefcounted:
+        return IGM.getReferenceType(Refcounting);
       case POD:
       case Normal:
         llvm_unreachable("not a refcounted payload");
@@ -1889,14 +1882,9 @@ namespace {
     void retainRefcountedPayload(IRGenFunction &IGF,
                                  llvm::Value *ptr) const {
       switch (CopyDestroyKind) {
-      case NullableSwiftRefcounted: {
-        IGF.emitRetainCall(ptr);
+      case NullableRefcounted:
+        IGF.emitScalarRetainCall(ptr, Refcounting);
         return;
-      }
-      case NullableUnknownRefcounted: {
-        IGF.emitUnknownRetainCall(ptr);
-        return;
-      }
       case POD:
       case Normal:
         llvm_unreachable("not a refcounted payload");
@@ -1906,11 +1894,9 @@ namespace {
     void fixLifetimeOfRefcountedPayload(IRGenFunction &IGF,
                                         llvm::Value *ptr) const {
       switch (CopyDestroyKind) {
-      case NullableSwiftRefcounted:
-      case NullableUnknownRefcounted: {
+      case NullableRefcounted:
         IGF.emitFixLifetime(ptr);
         return;
-      }
       case POD:
       case Normal:
         llvm_unreachable("not a refcounted payload");
@@ -1920,14 +1906,9 @@ namespace {
     void releaseRefcountedPayload(IRGenFunction &IGF,
                                   llvm::Value *ptr) const {
       switch (CopyDestroyKind) {
-      case NullableSwiftRefcounted: {
-        IGF.emitRelease(ptr);
+      case NullableRefcounted:
+        IGF.emitScalarRelease(ptr, Refcounting);
         return;
-      }
-      case NullableUnknownRefcounted: {
-        IGF.emitUnknownRelease(ptr);
-        return;
-      }
       case POD:
       case Normal:
         llvm_unreachable("not a refcounted payload");
@@ -1970,8 +1951,7 @@ namespace {
         return;
       }
 
-      case NullableSwiftRefcounted:
-      case NullableUnknownRefcounted: {
+      case NullableRefcounted: {
         // Bitcast to swift.refcounted*, and retain the pointer.
         llvm::Value *val = src.claimNext();
         llvm::Value *ptr = IGF.Builder.CreateBitOrPointerCast(val,
@@ -2013,8 +1993,7 @@ namespace {
         return;
       }
 
-      case NullableSwiftRefcounted:
-      case NullableUnknownRefcounted: {
+      case NullableRefcounted: {
         // Bitcast to swift.refcounted*, and hand to swift_release.
         llvm::Value *val = src.claimNext();
         llvm::Value *ptr = IGF.Builder.CreateBitOrPointerCast(val,
@@ -2056,8 +2035,7 @@ namespace {
         return;
       }
 
-      case NullableSwiftRefcounted:
-      case NullableUnknownRefcounted: {
+      case NullableRefcounted: {
         // Bitcast to swift.refcounted*, and hand to swift_release.
         llvm::Value *val = src.claimNext();
         llvm::Value *ptr = IGF.Builder.CreateIntToPtr(val,
@@ -2088,8 +2066,7 @@ namespace {
         return;
       }
 
-      case NullableSwiftRefcounted:
-      case NullableUnknownRefcounted: {
+      case NullableRefcounted: {
         // Load the value as swift.refcounted, then hand to swift_release.
         addr = IGF.Builder.CreateBitCast(addr,
                                  getRefcountedPtrType(IGF.IGM)->getPointerTo());
@@ -2207,8 +2184,7 @@ namespace {
         return;
       }
 
-      case NullableSwiftRefcounted:
-      case NullableUnknownRefcounted: {
+      case NullableRefcounted: {
         // Do the assignment as for a refcounted pointer.
         auto refCountedTy = getRefcountedPtrType(IGF.IGM);
         Address destAddr = IGF.Builder.CreateBitCast(dest,
@@ -2273,8 +2249,7 @@ namespace {
         return;
       }
 
-      case NullableSwiftRefcounted:
-      case NullableUnknownRefcounted: {
+      case NullableRefcounted: {
         auto refCountedTy = getRefcountedPtrType(IGF.IGM);
 
         // Do the initialization as for a refcounted pointer.
@@ -2552,21 +2527,16 @@ namespace {
       /// The payloads are all bitwise-takable, but have no other special
       /// shared layout.
       BitwiseTakable,
-      /// The payloads are all Swift-reference-counted values, and there is at
-      /// most one no-payload case with the tagged-zero representation. Copy
-      /// and destroy can just mask out the tag bits and pass the result to
-      /// swift_retain/swift_release.
-      /// This implies BitwiseTakable.
-      TaggedSwiftRefcounted,
       /// The payloads are all reference-counted values, and there is at
       /// most one no-payload case with the tagged-zero representation. Copy
       /// and destroy can just mask out the tag bits and pass the result to
-      /// swift_unknownRetain/swift_unknownRelease.
+      /// retain and release entry points.
       /// This implies BitwiseTakable.
-      TaggedUnknownRefcounted,
+      TaggedRefcounted,
     };
 
     CopyDestroyStrategy CopyDestroyKind;
+    ReferenceCounting Refcounting;
 
     bool ConstrainedByRuntimeLayout : 1;
 
@@ -2603,32 +2573,43 @@ namespace {
       // optimize our value semantics.
       bool allPOD = true;
       bool allBitwiseTakable = true;
-      bool allSingleSwiftRefcount = true;
-      bool allSingleUnknownRefcount = true;
+      bool allSingleRefcount = true;
+      bool haveRefcounting = false;
       for (auto &elt : ElementsWithPayload) {
         if (!elt.ti->isPOD(ResilienceScope::Component))
           allPOD = false;
         if (!elt.ti->isBitwiseTakable(ResilienceScope::Component))
           allBitwiseTakable = false;
-        if (!elt.ti->isSingleSwiftRetainablePointer(ResilienceScope::Component))
-          allSingleSwiftRefcount = false;
-        if (!elt.ti->isSingleUnknownRetainablePointer(ResilienceScope::Component))
-          allSingleUnknownRefcount = false;
+
+        // refcounting is only set in the else branches
+        ReferenceCounting refcounting;
+        if (!elt.ti->isSingleRetainablePointer(ResilienceScope::Component,
+                                               &refcounting)) {
+          allSingleRefcount = false;
+        } else if (haveRefcounting) {
+          // Different payloads have different reference counting styles.
+          if (refcounting != Refcounting) {
+            // Fall back to unknown entry points if the Objective-C runtime is
+            // available.
+            Refcounting = ReferenceCounting::Unknown;
+            // Otherwise, use value witnesses.
+            if (!IGM.ObjCInterop)
+              allSingleRefcount = false;
+          }
+        } else {
+          Refcounting = refcounting;
+          haveRefcounting = true;
+        }
       }
 
       if (allPOD) {
-        assert(!allSingleSwiftRefcount && !allSingleUnknownRefcount
-               && "pod *and* refcounted?!");
+        assert(!allSingleRefcount && "pod *and* refcounted?!");
         CopyDestroyKind = POD;
-      } else if (allSingleSwiftRefcount
-                 && ElementsWithNoPayload.size() <= 1) {
-        CopyDestroyKind = TaggedSwiftRefcounted;
-      }
       // FIXME: Memory corruption issues arise when enabling this for mixed
       // Swift/ObjC enums.
-      else if (allSingleUnknownRefcount
+      } else if (allSingleRefcount
                  && ElementsWithNoPayload.size() <= 1) {
-        CopyDestroyKind = TaggedUnknownRefcounted;
+        CopyDestroyKind = TaggedRefcounted;
       } else if (allBitwiseTakable) {
         CopyDestroyKind = BitwiseTakable;
       }
@@ -2701,10 +2682,8 @@ namespace {
 
     llvm::Type *getRefcountedPtrType(IRGenModule &IGM) const {
       switch (CopyDestroyKind) {
-      case TaggedSwiftRefcounted:
-        return IGM.RefCountedPtrTy;
-      case TaggedUnknownRefcounted:
-        return IGM.UnknownRefCountedPtrTy;
+      case TaggedRefcounted:
+        return IGM.getReferenceType(Refcounting);
       case POD:
       case BitwiseTakable:
       case Normal:
@@ -2715,14 +2694,9 @@ namespace {
     void retainRefcountedPayload(IRGenFunction &IGF,
                                  llvm::Value *ptr) const {
       switch (CopyDestroyKind) {
-      case TaggedSwiftRefcounted: {
-        IGF.emitRetainCall(ptr);
+      case TaggedRefcounted:
+        IGF.emitScalarRetainCall(ptr, Refcounting);
         return;
-      }
-      case TaggedUnknownRefcounted: {
-        IGF.emitUnknownRetainCall(ptr);
-        return;
-      }
       case POD:
       case BitwiseTakable:
       case Normal:
@@ -2733,11 +2707,9 @@ namespace {
     void fixLifetimeOfRefcountedPayload(IRGenFunction &IGF,
                                         llvm::Value *ptr) const {
       switch (CopyDestroyKind) {
-      case TaggedSwiftRefcounted:
-      case TaggedUnknownRefcounted: {
+      case TaggedRefcounted:
         IGF.emitFixLifetime(ptr);
         return;
-      }
       case POD:
       case BitwiseTakable:
       case Normal:
@@ -2748,14 +2720,9 @@ namespace {
     void releaseRefcountedPayload(IRGenFunction &IGF,
                                   llvm::Value *ptr) const {
       switch (CopyDestroyKind) {
-      case TaggedSwiftRefcounted: {
-        IGF.emitRelease(ptr);
+      case TaggedRefcounted:
+        IGF.emitScalarRelease(ptr, Refcounting);
         return;
-      }
-      case TaggedUnknownRefcounted: {
-        IGF.emitUnknownRelease(ptr);
-        return;
-      }
       case POD:
       case BitwiseTakable:
       case Normal:
@@ -3427,8 +3394,7 @@ namespace {
         return;
       }
 
-      case TaggedSwiftRefcounted:
-      case TaggedUnknownRefcounted: {
+      case TaggedRefcounted: {
         auto parts = destructureLoadableEnum(IGF, src);
 
         // Hold onto the original payload, so we can pass it on as the copy.
@@ -3474,8 +3440,7 @@ namespace {
         return;
       }
 
-      case TaggedSwiftRefcounted:
-      case TaggedUnknownRefcounted: {
+      case TaggedRefcounted: {
         auto parts = destructureLoadableEnum(IGF, src);
         // Mask the tag bits out of the payload, if any.
         maskTagBitsFromPayload(IGF, parts.payload);
@@ -3512,8 +3477,7 @@ namespace {
         return;
       }
 
-      case TaggedSwiftRefcounted:
-      case TaggedUnknownRefcounted: {
+      case TaggedRefcounted: {
         auto parts = destructureLoadableEnum(IGF, src);
         // Mask the tag bits out of the payload, if any.
         maskTagBitsFromPayload(IGF, parts.payload);
@@ -3539,8 +3503,7 @@ namespace {
         return emitPrimitiveCopy(IGF, dest, src, T);
 
       case BitwiseTakable:
-      case TaggedSwiftRefcounted:
-      case TaggedUnknownRefcounted:
+      case TaggedRefcounted:
       case Normal: {
         // If the enum is loadable, it's better to do this directly using
         // values, so we don't need to RMW tag bits in place.
@@ -3590,8 +3553,7 @@ namespace {
         return emitPrimitiveCopy(IGF, dest, src, T);
 
       case BitwiseTakable:
-      case TaggedSwiftRefcounted:
-      case TaggedUnknownRefcounted:
+      case TaggedRefcounted:
         // Takes can be done by primitive copy in these case.
         if (isTake)
           return emitPrimitiveCopy(IGF, dest, src, T);
@@ -3711,8 +3673,7 @@ namespace {
 
       case BitwiseTakable:
       case Normal:
-      case TaggedSwiftRefcounted:
-      case TaggedUnknownRefcounted: {
+      case TaggedRefcounted: {
         // If loadable, it's better to do this directly to the value than
         // in place, so we don't need to RMW out the tag bits in memory.
         if (TI->isLoadable()) {

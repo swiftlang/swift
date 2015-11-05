@@ -915,10 +915,9 @@ class ClassExistentialTypeInfo
 
 public:
 
-  bool isSingleSwiftRetainablePointer(ResilienceScope scope) const override {
-    return (Refcounting == ReferenceCounting::Native);
-  }
-  bool isSingleUnknownRetainablePointer(ResilienceScope scope) const override{
+  bool isSingleRetainablePointer(ResilienceScope scope,
+                                 ReferenceCounting *refcounting) const override{
+    if (refcounting) *refcounting = Refcounting;
     return getNumStoredProtocols() == 0;
   }
 
