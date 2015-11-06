@@ -1,4 +1,4 @@
-//===--- SILGenPoly.cpp - Polymorphic Abstraction Difference --------------===//
+//===--- SILGenPoly.cpp - Function Type Thunks ----------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,120 +10,72 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Routines for manipulating and translating between polymorphic
-// abstraction patterns.
+// In Swift's AST-level type system, function types are allowed to be equivalent
+// or have a subtyping relationship even if the SIL-level lowering of the
+// calling convention is different. The routines in this file implement thunking
+// between lowered function types.
 //
-// The representation of values in Swift can vary according to how
-// their type is abstracted: which is to say, according to the pattern
-// of opaque type variables within their type.  The main motivation
-// here is performance: it would be far easier for types to adopt a
-// single representation regardless of their abstraction, but this
-// would force Swift to adopt a very inefficient representation for
-// abstractable values.
 //
-// For example, consider the comparison function on Int:
-//   func <(lhs : Int, rhs : Int) -> Bool
+// Re-abstraction thunks
+// =====================
+// After SIL type lowering, generic substitutions become explicit, for example
+// the AST type Int -> Int passes the Ints directly, whereas T -> T with Int
+// substituted for T will pass the Ints like a T, as an address-only value with
+// opaque type metadata. Such a thunk is called a "re-abstraction thunk" -- the
+// AST-level type of the function value does not change, only the manner in
+// which parameters and results are passed.
 //
-// This function can be used as an opaque value of type
-// (Int,Int)->Bool.  An optimal representation of values of that type
-// (ignoring context parameters for the moment) would be a pointer to
-// a function that takes these two arguments directly in registers and
-// returns the result directly in a register.
+// Function conversion thunks
+// ==========================
+// In Swift's AST-level type system, certain types have a subtype relation
+// involving a representation change. For example, a concrete type is always
+// a subtype of any protocol it conforms to. The upcast from the concrete
+// type to an existential type for the protocol requires packaging the
+// payload together with type metadata and witness tables.
 //
-// (It's important to remember throughout this discussion that we're
-// talking about abstract values.  There's absolutely nothing that
-// requires direct uses of the function to follow the same conventions
-// as abstract uses!  A direct use of a declaration --- even one that
-// implies an indirect call, like a class's instance method ---
-// provides a concrete specification for exactly how to interact with
-// value.)
+// Between function types, the type A -> B is defined to be a subtype of
+// A' -> B' iff A' is a subtype of A, and B is a subtype of B' -- parameters
+// are contravariant, and results are covariant.
 //
-// However, that representation is problematic in the presence of
-// generics.  This function could be passed off to any of the following
-// generic functions:
-//   func foo<T>(f : (T, Int) -> Bool)
-//   func bar<U,V>(f : (U, V) -> Bool)
-//   func baz<W>(f : (Int, Int) -> W)
+// A subtype conversion of a function value A -> B is performed by wrapping
+// the function value in a thunk of type A' -> B'. The thunk takes an A' and
+// converts it into an A, calls the inner function value, and converts the
+// result from B to B'.
 //
-// These generic functions all need to be able to call 'f'.  But in
-// Swift's implementation model, these functions don't have to be
-// instantiated for different parameter types, which means that (e.g.)
-// the same 'baz' implementation needs to also be able to work when
-// W=String.  But the optimal way to pass an Int to a function might
-// well be different from the optimal way to pass a String.
+// VTable thunks
+// =============
 //
-// And this runs in both directions: a generic function might return
-// a function that the caller would like to use as an (Int,Int)->Bool:
-//   func getFalseFunction<T>() -> (T,T)->Bool
+// If a base class is generic and a derived class substitutes some generic
+// parameter of the base with a concrete type, the derived class can override
+// methods in the base that involved generic types. In the derived class, a
+// method override that involves substituted types will have a different
+// SIL lowering than the base method. In this case, the overriden vtable entry
+// will point to a thunk which transforms parameters and results and invokes
+// the derived method.
 //
-// There are three ways we can deal with this:
+// Some limited forms of subtyping are also supported for method overrides;
+// namely, a derived method's parameter can be a superclass of, or more
+// optional than, a parameter of the base, and result can be a subclass of,
+// or less optional than, the result of the base.
 //
-// 1. Give all types in Swift a common representation.  The generic
-// implementation can work with both W=String and W=Int because
-// both of those types have the same (direct) storage representation.
-// That's pretty clearly not an acceptable sacrifice.
+// Witness thunks
+// ==============
 //
-// 2. Adopt a most-general representation of function types that is
-// used for opaque values; for example, all parameters and results
-// could be passed indirectly.  Concrete values must be coerced to
-// this representation when made abstract.  Unfortunately, there
-// are a lot of obvious situations where this is sub-optimal:
-// for example, in totally non-generic code that just passes around
-// a value of type (Int,Int)->Bool.  It's particularly bad because
-// Swift functions take multiple arguments as just a tuple, and that
-// tuple is usually abstractable: e.g., '<' above could also be
-// passed to this:
-//   func fred<T>(f : T -> Bool)
+// Currently protocol witness methods are called with an additional generic
+// parameter bound to the Self type, and thus always require a thunk.
 //
-// 3. Permit the representation of values to vary by abstraction.
-// Values require coercion when changing abstraction patterns.
-// For example, the argument to 'fred' would be expected to return
-// its Bool result directly but take a single T parameter indirectly.
-// When '<' is passed to this, what must actually be passed is a
-// thunk that expects a tuple of type (Int,Int) to be stored at
-// the input address.
+// Thunks for class method witnesses dispatch through the vtable allowing
+// inherited witnesses to be overridden in subclasses. Hence a witness thunk
+// might require two levels of abstraction difference -- the method might
+// override a base class method with more generic types, and the protocol
+// requirement may involve associated types which are always concrete in the
+// conforming class.
 //
-// There is one major risk with (3): naively implemented, a single
-// function value which undergoes many coercions could build up a
-// linear number of re-abstraction thunks.  However, this can be
-// solved dynamically by applying thunks with a runtime function that
-// can recognize and bypass its own previous handiwork.
+// Other thunks
+// ============
 //
-// There is one major exception to what sub-expressions in a type
-// expression can be abstracted with type variables: a type substitution
-// must always be materializable.  For example:
-//   func f(inout Int, Int) -> Bool
-// 'f' cannot be passed to 'foo' above: T=inout Int is not a legal
-// substitution.  Nor can it be passed to 'fred'.
-//
-// In general, abstraction patterns are derived from some explicit
-// type expression, such as the written type of a variable or
-// parameter.  This works whenever the expression directly provides
-// structure for the type in question; for example, when the original
-// type is (T,Int)->Bool and we are working with an (Int,Int)->Bool
-// substitution.  However, it is inadequate when the expression does
-// not provide structure at the appropriate level, i.e. when that
-// level is substituted in: when the original type is merely T.  In
-// these cases, we must devolve to a representation which all legal
-// substitutors will agree upon.  In general, this is the
-// representation of the type which replaces all materializable
-// sub-expressions with a fresh type variable.
-//
-// For example, when applying the substitution
-//   T=(Int,Int)->Bool
-// values of T are abstracted as if they were of type U->V, i.e.
-// taking one indirect parameter and returning one indirect result.
-//
-// But under the substitution
-//   T=(inout Int,Int)->Bool
-// values of T are abstracted as if they were of type (inout U,V)->W,
-// i.e. taking one parameter inout, another indirectly, and returning
-// one indirect result.
-//
-// We generally pass around an original, unsubstituted type as the
-// abstraction pattern.  The exact archetypes in this type are
-// irrelevant; only whether or not a position is filled by an
-// archetype matters.
+// Foreign-to-native, native-to-foreign thunks for declarations and function
+// values are implemented in SILGenBridging.cpp.
 //
 //===----------------------------------------------------------------------===//
 

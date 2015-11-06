@@ -36,6 +36,113 @@ namespace Lowering {
 /// A pattern for the abstraction of a value.  See the large comment
 /// in SILGenPoly.cpp.
 ///
+/// The representation of values in Swift can vary according to how
+/// their type is abstracted: which is to say, according to the pattern
+/// of opaque type variables within their type.  The main motivation
+/// here is performance: it would be far easier for types to adopt a
+/// single representation regardless of their abstraction, but this
+/// would force Swift to adopt a very inefficient representation for
+/// abstractable values.
+///
+/// For example, consider the comparison function on Int:
+///   func <(lhs : Int, rhs : Int) -> Bool
+///
+/// This function can be used as an opaque value of type
+/// (Int,Int)->Bool.  An optimal representation of values of that type
+/// (ignoring context parameters for the moment) would be a pointer to
+/// a function that takes these two arguments directly in registers and
+/// returns the result directly in a register.
+///
+/// (It's important to remember throughout this discussion that we're
+/// talking about abstract values.  There's absolutely nothing that
+/// requires direct uses of the function to follow the same conventions
+/// as abstract uses!  A direct use of a declaration --- even one that
+/// implies an indirect call, like a class's instance method ---
+/// provides a concrete specification for exactly how to interact with
+/// value.)
+///
+/// However, that representation is problematic in the presence of
+/// generics.  This function could be passed off to any of the following
+/// generic functions:
+///   func foo<T>(f : (T, Int) -> Bool)
+///   func bar<U,V>(f : (U, V) -> Bool)
+///   func baz<W>(f : (Int, Int) -> W)
+///
+/// These generic functions all need to be able to call 'f'.  But in
+/// Swift's implementation model, these functions don't have to be
+/// instantiated for different parameter types, which means that (e.g.)
+/// the same 'baz' implementation needs to also be able to work when
+/// W=String.  But the optimal way to pass an Int to a function might
+/// well be different from the optimal way to pass a String.
+///
+/// And this runs in both directions: a generic function might return
+/// a function that the caller would like to use as an (Int,Int)->Bool:
+///   func getFalseFunction<T>() -> (T,T)->Bool
+///
+/// There are three ways we can deal with this:
+///
+/// 1. Give all types in Swift a common representation.  The generic
+/// implementation can work with both W=String and W=Int because
+/// both of those types have the same (direct) storage representation.
+/// That's pretty clearly not an acceptable sacrifice.
+///
+/// 2. Adopt a most-general representation of function types that is
+/// used for opaque values; for example, all parameters and results
+/// could be passed indirectly.  Concrete values must be coerced to
+/// this representation when made abstract.  Unfortunately, there
+/// are a lot of obvious situations where this is sub-optimal:
+/// for example, in totally non-generic code that just passes around
+/// a value of type (Int,Int)->Bool.  It's particularly bad because
+/// Swift functions take multiple arguments as just a tuple, and that
+/// tuple is usually abstractable: e.g., '<' above could also be
+/// passed to this:
+///   func fred<T>(f : T -> Bool)
+///
+/// 3. Permit the representation of values to vary by abstraction.
+/// Values require coercion when changing abstraction patterns.
+/// For example, the argument to 'fred' would be expected to return
+/// its Bool result directly but take a single T parameter indirectly.
+/// When '<' is passed to this, what must actually be passed is a
+/// thunk that expects a tuple of type (Int,Int) to be stored at
+/// the input address.
+///
+/// There is one major risk with (3): naively implemented, a single
+/// function value which undergoes many coercions could build up a
+/// linear number of re-abstraction thunks.  However, this can be
+/// solved dynamically by applying thunks with a runtime function that
+/// can recognize and bypass its own previous handiwork.
+///
+/// There is one major exception to what sub-expressions in a type
+/// expression can be abstracted with type variables: a type substitution
+/// must always be materializable.  For example:
+///   func f(inout Int, Int) -> Bool
+/// 'f' cannot be passed to 'foo' above: T=inout Int is not a legal
+/// substitution.  Nor can it be passed to 'fred'.
+///
+/// In general, abstraction patterns are derived from some explicit
+/// type expression, such as the written type of a variable or
+/// parameter.  This works whenever the expression directly provides
+/// structure for the type in question; for example, when the original
+/// type is (T,Int)->Bool and we are working with an (Int,Int)->Bool
+/// substitution.  However, it is inadequate when the expression does
+/// not provide structure at the appropriate level, i.e. when that
+/// level is substituted in: when the original type is merely T.  In
+/// these cases, we must devolve to a representation which all legal
+/// substitutors will agree upon.  In general, this is the
+/// representation of the type which replaces all materializable
+/// sub-expressions with a fresh type variable.
+///
+/// For example, when applying the substitution
+///   T=(Int,Int)->Bool
+/// values of T are abstracted as if they were of type U->V, i.e.
+/// taking one indirect parameter and returning one indirect result.
+///
+/// But under the substitution
+///   T=(inout Int,Int)->Bool
+/// values of T are abstracted as if they were of type (inout U,V)->W,
+/// i.e. taking one parameter inout, another indirectly, and returning
+/// one indirect result.
+///
 /// An abstraction pattern is represented with an original,
 /// unsubstituted type.  The archetypes or generic parameters
 /// naturally fall at exactly the specified abstraction points.

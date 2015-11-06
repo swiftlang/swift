@@ -613,15 +613,16 @@ public:
                                ManagedValue block,
                                CanSILFunctionType funcTy);
   
-  /// Thunk between a derived and base class.
+  /// Thunk with the signature of a base class method calling a derived class
+  /// method.
   ///
-  /// \param origPattern Abstraction pattern of base class method
-  /// \param inputTy Formal AST type of base class method
-  /// \param substTy Formal AST type of derived class method
+  /// \param inputOrigType Abstraction pattern of base class method
+  /// \param inputSubstType Formal AST type of base class method
+  /// \param outputSubstType Formal AST type of derived class method
   void emitVTableThunk(SILDeclRef derived,
-                       AbstractionPattern origPattern,
-                       CanAnyFunctionType inputTy,
-                       CanAnyFunctionType substTy);
+                       AbstractionPattern inputOrigType,
+                       CanAnyFunctionType inputSubstType,
+                       CanAnyFunctionType outputSubstType);
   
   //===--------------------------------------------------------------------===//
   // Control flow
