@@ -13,7 +13,7 @@
 import SwiftShims
 
 /// Convert the given numeric value to a hexadecimal string.
-public func asHex<T : IntegerType>(x: T) -> String {
+public func asHex<T : Integer>(x: T) -> String {
   return "0x" + String(x.toIntMax(), radix: 16)
 }
 
@@ -22,7 +22,7 @@ public func asHex<T : IntegerType>(x: T) -> String {
 public func asHex<
   S: Sequence
 where
-  S.Iterator.Element : IntegerType
+  S.Iterator.Element : Integer
 >(x: S) -> String {
   return "[ " + x.lazy.map { asHex($0) }.joinWithSeparator(", ") + " ]"
 }

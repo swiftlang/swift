@@ -99,7 +99,7 @@ public struct Range<
 
   //===--------------------------------------------------------------------===//
   // Overloads for subscript that allow us to make subscripting fail
-  // at compile time, outside a generic context, when Element is an IntegerType
+  // at compile time, outside a generic context, when Element is an Integer
   // type. The current language design gives us no way to force r[0]
   // to work "as expected" (return the first element of the range) for
   // an arbitrary Range<Int>, so instead we make it ambiguous.  Same

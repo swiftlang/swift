@@ -69,14 +69,14 @@ public protocol __BridgedNSError : RawRepresentable, ErrorProtocol {
 
 // Allow two bridged NSError types to be compared.
 @warn_unused_result
-public func ==<T: __BridgedNSError where T.RawValue: SignedIntegerType>(
+public func ==<T: __BridgedNSError where T.RawValue: SignedInteger>(
   lhs: T,
   rhs: T
 ) -> Bool {
   return lhs.rawValue.toIntMax() == rhs.rawValue.toIntMax()
 }
 
-public extension __BridgedNSError where RawValue: SignedIntegerType {
+public extension __BridgedNSError where RawValue: SignedInteger {
   public final var _domain: String { return Self._NSErrorDomain }
   public final var _code: Int { return Int(rawValue.toIntMax()) }
 
@@ -97,7 +97,7 @@ public extension __BridgedNSError where RawValue: SignedIntegerType {
 
 // Allow two bridged NSError types to be compared.
 @warn_unused_result
-public func ==<T: __BridgedNSError where T.RawValue: UnsignedIntegerType>(
+public func ==<T: __BridgedNSError where T.RawValue: UnsignedInteger>(
   lhs: T,
   rhs: T
 ) -> Bool {
@@ -105,7 +105,7 @@ public func ==<T: __BridgedNSError where T.RawValue: UnsignedIntegerType>(
 }
 
 
-public extension __BridgedNSError where RawValue: UnsignedIntegerType {
+public extension __BridgedNSError where RawValue: UnsignedInteger {
   public final var _domain: String { return Self._NSErrorDomain }
   public final var _code: Int {
     return Int(bitPattern: UInt(rawValue.toUIntMax()))

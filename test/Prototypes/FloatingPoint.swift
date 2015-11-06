@@ -4,9 +4,9 @@
 // REQUIRES: executable_test
 import Swift
 
-//  TODO: These should probably subsumed into UnsignedIntegerType or
+//  TODO: These should probably subsumed into UnsignedInteger or
 //  another integer protocol.  Dave has already done some work here.
-public protocol FloatingPointRepresentationType : UnsignedIntegerType {
+public protocol FloatingPointRepresentationType : UnsignedInteger {
   var leadingZeros: UInt { get }
   func <<(left: Self, right: Self) -> Self
   func >>(left: Self, right: Self) -> Self

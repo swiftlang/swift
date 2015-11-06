@@ -146,7 +146,7 @@ extension double4x4 {
 @available(iOS, introduced=8.0)
 @available(OSX, introduced=10.8)
 extension SCNGeometryElement {
-  public convenience init<IndexType : IntegerType>(
+  public convenience init<IndexType : Integer>(
     indices: [IndexType], primitiveType: SCNGeometryPrimitiveType
   ) {
     let indexCount = indices.count

@@ -82,13 +82,13 @@ public func -= <T : Strideable> (inout lhs: T, rhs: T.Stride) {
 // overloads, expressions such as UInt(2) + Int(3) would compile.             //
 //===----------------------------------------------------------------------===//
 
-public func + <T : UnsignedIntegerType> (
+public func + <T : UnsignedInteger> (
   lhs: T, rhs: T._DisallowMixedSignArithmetic
 ) -> T {
   _sanityCheckFailure("Should not be callable.")
 }
 
-public func + <T : UnsignedIntegerType> (
+public func + <T : UnsignedInteger> (
   lhs: T._DisallowMixedSignArithmetic, rhs: T
 ) -> T {
   _sanityCheckFailure("Should not be callable.")
@@ -106,13 +106,13 @@ public func - <T : _DisallowMixedSignArithmetic> (
   _sanityCheckFailure("Should not be callable.")
 }
 
-public func += <T : UnsignedIntegerType> (
+public func += <T : UnsignedInteger> (
   inout lhs: T, rhs: T._DisallowMixedSignArithmetic
 ) {
   _sanityCheckFailure("Should not be callable.")
 }
 
-public func -= <T : UnsignedIntegerType> (
+public func -= <T : UnsignedInteger> (
   inout lhs: T, rhs: T._DisallowMixedSignArithmetic
 ) {
   _sanityCheckFailure("Should not be callable.")

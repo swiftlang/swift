@@ -84,9 +84,9 @@ protocol HasherType {
   mutating func combine(value: Float)
   // ... overloads for other primitive types...
 
-  mutating func squeezeHashValue<I : SignedIntegerType>(
+  mutating func squeezeHashValue<I : SignedInteger>(
     resultRange: Range<I>) -> I
-  mutating func squeezeHashValue<I : UnsignedIntegerType>(
+  mutating func squeezeHashValue<I : UnsignedInteger>(
     resultRange: Range<I>) -> I
 
   //
@@ -139,12 +139,12 @@ struct InProcessHashtableHasher : HasherType {
     value.combineIntoHash(&self)
   }
 
-  mutating func squeezeHashValue<I : SignedIntegerType>(
+  mutating func squeezeHashValue<I : SignedInteger>(
     resultRange: Range<I>) -> I {
     // ... finalize hash value computation first...
     return I(IntMax(_state)) // Should actually clamp the value
   }
-  mutating func squeezeHashValue<I : UnsignedIntegerType>(
+  mutating func squeezeHashValue<I : UnsignedInteger>(
     resultRange: Range<I>) -> I {
     // ... finalize hash value computation first...
     return I(UIntMax(_state)) // Should actually clamp the value

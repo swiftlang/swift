@@ -12,7 +12,7 @@ import Foundation
 @_silgen_name("srandomdev") func srandomdev()
 
 protocol TestableUnicodeCodec : UnicodeCodecType {
-  typealias CodeUnit : IntegerType
+  typealias CodeUnit : Integer
   static func encodingId() -> NSStringEncoding
   static func name() -> NSString
 }

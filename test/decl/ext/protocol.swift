@@ -848,7 +848,7 @@ extension PConstrained6 where Assoc == Double {
 public protocol ReallyRaw : RawRepresentable {
 }
 
-public extension ReallyRaw where RawValue: SignedIntegerType {
+public extension ReallyRaw where RawValue: SignedInteger {
   public init?(rawValue: RawValue) {
     self = unsafeBitCast(rawValue, Self.self)
   }
