@@ -256,8 +256,11 @@ void CompilerInstance::performSema() {
     }
 
     // If we failed to load, we should have already diagnosed
-    if (M->failedToLoad())
+    if (M->failedToLoad()) {
+      assert(Diagnostics.hadAnyError() &&
+             "Module failed to load but nothing was diagnosed?");
       return;
+    }
 
     break;
   }
