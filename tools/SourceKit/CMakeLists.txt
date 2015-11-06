@@ -100,7 +100,9 @@ macro(add_sourcekit_library name)
   add_library( ${name} ${libkind} ${srcs} )
   llvm_update_compile_flags(${name})
 
-  set_output_directory(${name} ${SOURCEKIT_RUNTIME_OUTPUT_INTDIR} ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
+  set_output_directory(${name}
+      BINARY_DIR ${SOURCEKIT_RUNTIME_OUTPUT_INTDIR}
+      LIBRARY_DIR ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
 
   if( LLVM_COMMON_DEPENDS )
     add_dependencies( ${name} ${LLVM_COMMON_DEPENDS} )
@@ -175,7 +177,9 @@ macro(add_sourcekit_executable name)
     add_executable(${name} ${SOURCEKITEXE_UNPARSED_ARGUMENTS})
   endif()
   llvm_update_compile_flags(${name})
-  set_output_directory(${name} ${SOURCEKIT_RUNTIME_OUTPUT_INTDIR} ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
+  set_output_directory(${name}
+      BINARY_DIR ${SOURCEKIT_RUNTIME_OUTPUT_INTDIR}
+      LIBRARY_DIR ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
 
   # Add appropriate dependencies
   if(LLVM_COMMON_DEPENDS)
@@ -278,7 +282,9 @@ macro(add_sourcekit_framework name)
         ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}
         RUNTIME DESTINATION bin)
     set_target_properties(${name} PROPERTIES FOLDER "SourceKit frameworks")
-    set_output_directory(${name} ${SOURCEKIT_RUNTIME_OUTPUT_INTDIR} ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
+    set_output_directory(${name}
+        BINARY_DIR ${SOURCEKIT_RUNTIME_OUTPUT_INTDIR}
+        LIBRARY_DIR ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
     set_target_properties(${name} PROPERTIES FRAMEWORK TRUE)
     set_target_properties(${name} PROPERTIES PUBLIC_HEADER "${headers}")
     set_target_properties(${name} PROPERTIES MACOSX_FRAMEWORK_INFO_PLIST "${SOURCEKIT_SOURCE_DIR}/cmake/MacOSXFrameworkInfo.plist.in")
@@ -293,7 +299,9 @@ macro(add_sourcekit_framework name)
         DESTINATION lib${LLVM_LIBDIR_SUFFIX}
         USE_SOURCE_PERMISSIONS)
     set_target_properties(${name} PROPERTIES FOLDER "SourceKit frameworks")
-    set_output_directory(${name} ${framework_location} ${framework_location})
+    set_output_directory(${name}
+        BINARY_DIR ${framework_location}
+        LIBRARY_DIR ${framework_location})
     set_target_properties(${name} PROPERTIES PREFIX "")
     set_target_properties(${name} PROPERTIES SUFFIX "")
     set_target_properties(${name} PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
@@ -347,7 +355,9 @@ macro(add_sourcekit_xpc_service name framework_target)
   set_target_properties(${name} PROPERTIES FOLDER "XPC Services")
   set_target_properties(${name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${xpc_bin_dir}")
 
-  set_output_directory(${name} "${xpc_bin_dir}" "${xpc_bin_dir}")
+  set_output_directory(${name}
+    BINARY_DIR "${xpc_bin_dir}"
+    LIBRARY_DIR "${xpc_bin_dir}")
 
   # Add appropriate dependencies
   if( LLVM_COMMON_DEPENDS )
