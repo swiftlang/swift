@@ -71,6 +71,8 @@ destroyARCMatchingSetComputationContext(ARCMatchingSetComputationContext *Ctx);
 /// TODO: We could potentially pass in all of the matching sets as a list and
 /// use less virtual calls at the cost of potentially greater numbers of moves.
 struct ARCMatchingSetCallback {
+  virtual ~ARCMatchingSetCallback() = default;
+
   /// This call should process \p Set and modify any internal state of
   /// ARCMatchingSetCallback given \p Set. This call should not remove any
   /// instructions since any removed instruction might be used as an insertion
