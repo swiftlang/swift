@@ -19,6 +19,9 @@
 /// It's not named just Glibc so that it doesn't conflict in the event of a
 /// future official glibc modulemap.
 module SwiftGlibc [system] {
+  link "pthread"
+  link "dl"
+
   // C standard library
   module C {
     module complex {
