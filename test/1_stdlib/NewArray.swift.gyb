@@ -81,11 +81,11 @@ func printSequence<T : Sequence>(x: T) {
 
 typealias BufferID = UnsafePointer<Void>
 
-func bufferID<T : _ArrayType>(x: T) -> BufferID {
+func bufferID<T : _ArrayProtocol>(x: T) -> BufferID {
   return x._buffer.identity
 }
 
-func checkReallocation<T : _ArrayType>(
+func checkReallocation<T : _ArrayProtocol>(
   x: T, _ lastBuffer: BufferID, _ reallocationExpected: Bool
 ) -> BufferID {
   let currentBuffer = bufferID(x)
@@ -109,7 +109,7 @@ func checkEqual<
 }
 
 func test<
-  T : _ArrayType
+  T : _ArrayProtocol
   where
   T.Iterator.Element == T._Buffer.Element,
   T._Buffer.Element == T.Element,

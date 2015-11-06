@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 public // @testable
-protocol _ArrayType
+protocol _ArrayProtocol
   : RangeReplaceableCollection,
     ArrayLiteralConvertible
 {
@@ -80,8 +80,8 @@ protocol _ArrayType
   var _buffer: _Buffer {get}
 }
 
-internal struct _ArrayTypeMirror<
-  T : _ArrayType where T.Index == Int
+internal struct _ArrayProtocolMirror<
+  T : _ArrayProtocol where T.Index == Int
 > : _MirrorType {
   let _value : T
 

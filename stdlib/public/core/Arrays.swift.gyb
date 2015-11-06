@@ -488,7 +488,7 @@ public func _deallocateUninitialized${Self}<Element>(
 }
 %end
 
-extension ${Self} : _ArrayType {
+extension ${Self} : _ArrayProtocol {
   /// Construct an empty ${Self}.
   @_semantics("array.init")
   public init() {
@@ -774,7 +774,7 @@ extension ${Self} : _Reflectable {
   /// Returns a mirror that reflects `self`.
   @warn_unused_result
   public func _getMirror() -> _MirrorType {
-    return _ArrayTypeMirror(self)
+    return _ArrayProtocolMirror(self)
   }
 }
 

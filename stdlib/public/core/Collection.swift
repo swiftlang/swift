@@ -566,7 +566,7 @@ extension Collection
 }
 
 extension Sequence
-  where Self : _ArrayType, Self.Element == Self.Iterator.Element {
+  where Self : _ArrayProtocol, Self.Element == Self.Iterator.Element {
   // A fast implementation for when you are backed by a contiguous array.
   public func _initializeTo(ptr: UnsafeMutablePointer<Iterator.Element>)
     -> UnsafeMutablePointer<Iterator.Element> {
