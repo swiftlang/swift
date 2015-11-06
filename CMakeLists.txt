@@ -639,8 +639,7 @@ if(XCODE)
   add_custom_target(Documentation
       SOURCES
         README.md
-        docs/archive/LangRef.html
-        docs/toc.js)
+        docs)
 
   file(GLOB SWIFT_TOPLEVEL_HEADERS
       ${CMAKE_CURRENT_SOURCE_DIR}/include/swift${dir}/*.h
