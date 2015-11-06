@@ -134,9 +134,6 @@ class BBState;
 /// the computation. We put its interface at the top for use in other parts of
 /// the pass which may want to use this global information.
 class RLEContext {
-  /// Function this context is currently processing.
-  SILFunction *F;
-
   /// The alias analysis that we will use during all computations.
   AliasAnalysis *AA;
 
@@ -689,7 +686,7 @@ roundPostOrderSize(PostOrderFunctionInfo::reverse_range R) {
 
 RLEContext::RLEContext(SILFunction *F, AliasAnalysis *AA,
                        PostOrderFunctionInfo::reverse_range RPOT)
-    : F(F), AA(AA), ReversePostOrder(RPOT),
+    : AA(AA), ReversePostOrder(RPOT),
       BBIDToBBStateMap(roundPostOrderSize(RPOT)),
       BBToBBIDMap(roundPostOrderSize(RPOT)) {
   // Walk over the function and find all the locations accessed by
