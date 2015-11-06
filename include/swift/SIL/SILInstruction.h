@@ -159,6 +159,7 @@ public:
 
   MemoryBehavior getMemoryBehavior() const;
   ReleasingBehavior getReleasingBehavior() const;
+  bool mayRelease() const;
 
   /// Can this instruction abort the program in some manner?
   bool mayTrap() const;

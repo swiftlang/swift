@@ -733,6 +733,43 @@ bool SILInstruction::mayHaveSideEffects() const {
     B == MemoryBehavior::MayHaveSideEffects;
 }
 
+bool SILInstruction::mayRelease() const {
+  if (getReleasingBehavior() ==
+      SILInstruction::ReleasingBehavior::DoesNotRelease)
+    return false;
+
+  switch (getKind()) {
+  default:
+    llvm_unreachable("Unhandled releasing instruction!");
+
+  case ValueKind::ApplyInst:
+  case ValueKind::DestroyAddrInst:
+  case ValueKind::StrongReleaseInst:
+  case ValueKind::UnownedReleaseInst:
+  case ValueKind::ReleaseValueInst:
+    return true;
+
+  case ValueKind::UnconditionalCheckedCastAddrInst: {
+    // Failing casts with take_always can release.
+    auto *Cast = cast<UnconditionalCheckedCastAddrInst>(this);
+    return Cast->getConsumptionKind() == CastConsumptionKind::TakeAlways;
+  }
+  case ValueKind::CheckedCastAddrBranchInst: {
+    // Failing casts with take_always can release.
+    auto *Cast = cast<CheckedCastAddrBranchInst>(this);
+    return Cast->getConsumptionKind() == CastConsumptionKind::TakeAlways;
+  }
+
+  case ValueKind::CopyAddrInst: {
+    auto *CopyAddr = cast<CopyAddrInst>(this);
+    // copy_addr without initialization can cause a release.
+    return CopyAddr->isInitializationOfDest() ==
+           IsInitialization_t::IsNotInitialization;
+    break;
+  }
+  }
+}
+
 namespace {
   class TrivialCloner : public SILClonerWithScopes<TrivialCloner> {
     friend class SILCloner<TrivialCloner>;
