@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// An interval over a `Comparable` type.
-public protocol IntervalType {
+public protocol Interval {
   /// The type of the `Interval`'s endpoints.
   typealias Bound : Comparable
 
@@ -46,9 +46,9 @@ public protocol IntervalType {
 
 %{
 selfDocComment = """
-/// A half-open `IntervalType`, which contains its `start` but not its
+/// A half-open `Interval`, which contains its `start` but not its
 /// `end`.  Can represent an empty interval.""" if Kind == 'HalfOpen' else """
-/// A closed `IntervalType`, which contains both its `start` and its
+/// A closed `Interval`, which contains both its `start` and its
 /// `end`.  Cannot represent an empty interval."""
 
 selfDocComment += """
@@ -58,7 +58,7 @@ selfDocComment += """
 
 ${selfDocComment}
 public struct ${Self}<Bound : Comparable>
-  : IntervalType, Equatable, CustomStringConvertible, CustomDebugStringConvertible, _Reflectable {
+  : Interval, Equatable, CustomStringConvertible, CustomDebugStringConvertible, _Reflectable {
 
   /// Construct a copy of `x`.
   public init(_ x: ${Self}) {
@@ -158,11 +158,11 @@ extension ClosedInterval {
   }
 }
 
-extension IntervalType {
+extension Interval {
   /// Returns `true` if `lhs` and `rhs` have a non-empty intersection.
   @warn_unused_result
   public func overlaps<
-    I: IntervalType where I.Bound == Bound
+    I: Interval where I.Bound == Bound
   >(other: I) -> Bool {
     return contains(other.start) || other.contains(start)
   }
@@ -186,7 +186,7 @@ public func ... <Bound : Comparable>(
 
 /// Returns `true` iff `pattern` contains `value`.
 @warn_unused_result
-public func ~= <I: IntervalType>(pattern: I, value: I.Bound) -> Bool {
+public func ~= <I: Interval>(pattern: I, value: I.Bound) -> Bool {
   return pattern.contains(value)
 }
 
@@ -199,7 +199,7 @@ public func ~= <I: IntervalType>(pattern: I, value: I.Bound) -> Bool {
 %                                  disposition='Struct')
 
 internal struct _IntervalMirror<
-  T : protocol<IntervalType, CustomStringConvertible>
+  T : protocol<Interval, CustomStringConvertible>
 > : _MirrorType {
   ${Boilerplate}
 
