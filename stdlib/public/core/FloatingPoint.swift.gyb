@@ -205,7 +205,7 @@ extension ${Self} : CustomStringConvertible {
 % if bits in allIntBits:
 // Not transparent because the compiler crashes in that case.
 //@_transparent
-extension ${Self} : FloatingPointType {
+extension ${Self} : FloatingPoint {
   public typealias _BitsType = UInt${bits}
 
   public static func _fromBitPattern(bits: _BitsType) -> ${Self} {
@@ -329,7 +329,7 @@ extension ${Self} : FloatingPointType {
 }
 
 // Not @_transparent because the function is too complex.
-extension ${Self} /* : FloatingPointType */ {
+extension ${Self} /* : FloatingPoint */ {
   /// The IEEE 754 "class" of this type.
   public var floatingPointClass: FloatingPointClassification {
     get {
