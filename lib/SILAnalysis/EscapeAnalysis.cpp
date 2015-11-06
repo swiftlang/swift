@@ -556,21 +556,6 @@ struct CGForDotView {
 
   CGForDotView(const EscapeAnalysis::ConnectionGraph *CG);
   
-  static bool includeInDotView(EscapeAnalysis::CGNode *Node) {
-    if (Node->isMerged)
-      return false;
-
-    if (Node->Type != EscapeAnalysis::NodeType::Value)
-      return true;
-
-    // Don't include unconnected single nodes to reduce the dot graph size. Such
-    // nodes are not interresting anyway.
-    if (!Node->getPointsToEdge() && Node->defersTo.empty() && Node->Preds.empty())
-      return false;
-
-    return true;
-  }
-  
   std::string getNodeLabel(const Node *Node) const;
   
   std::string getNodeAttributes(const Node *Node) const;
@@ -592,7 +577,7 @@ CGForDotView::CGForDotView(const EscapeAnalysis::ConnectionGraph *CG) :
   llvm::DenseMap<EscapeAnalysis::CGNode *, Node *> Orig2Node;
   int idx = 0;
   for (auto *OrigNode : CG->Nodes) {
-    if (!includeInDotView(OrigNode))
+    if (OrigNode->isMerged)
       continue;
 
     Orig2Node[OrigNode] = &Nodes[idx++];
@@ -602,7 +587,7 @@ CGForDotView::CGForDotView(const EscapeAnalysis::ConnectionGraph *CG) :
 
   idx = 0;
   for (auto *OrigNode : CG->Nodes) {
-    if (!includeInDotView(OrigNode))
+    if (OrigNode->isMerged)
       continue;
 
     auto &Nd = Nodes[idx++];
