@@ -225,32 +225,6 @@ namespace swift {
   SILAnalysis *create##NAME##Analysis(SILModule *);
 #include "Analysis.def"
 
-  /// A builder struct that can be used by passes to manage the building of a
-  /// SILAnalysis::PreserveKind when multiple SILAnalysis::PreserveKind can be
-  /// produced by the pass.
-  class PreserveKindBuilder {
-    using PreserveKind = SILAnalysis::PreserveKind;
-    PreserveKind ToPreserve = PreserveKind::All;
-
-    // Invalidate analysis specified by \p K. The argument \p K contains a list
-    // analysis kind that needs to be invalidated.
-    void invalidate(PreserveKind K) {
-      // Compute the set of analysis that are *not* invalidated.
-      unsigned NotInvalidated = ~K;
-      // A trait is on the preserve list if it is currently on the list and
-      // we did not invalidate it in the current round of invalidation.
-      ToPreserve = PreserveKind(ToPreserve & NotInvalidated);
-    }
-
-  public:
-    /// Returns the kind of analysis that's preserved.
-    PreserveKind getPreserved() const { return ToPreserve; }
-
-    void invalidateProgramFlow() { invalidate(PreserveKind::ProgramFlow); }
-    void invalidateCalls() { invalidate(PreserveKind::Calls); }
-    void invalidateBranches() { invalidate(PreserveKind::Branches); }
-    void invalidateInstructions() { invalidate(PreserveKind::Nothing); }
-  };
 } // end namespace swift
 
 #endif

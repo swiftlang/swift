@@ -831,13 +831,16 @@ static void initializeWorklist(SILFunction &F,
   }
 }
 
-SILAnalysis::PreserveKind
+static llvm::Optional<SILAnalysis::PreserveKind>
 processFunction(SILFunction &F, bool EnableDiagnostics,
                 unsigned AssertConfiguration) {
   DEBUG(llvm::dbgs() << "*** ConstPropagation processing: " << F.getName()
         << "\n");
 
-  PreserveKindBuilder PKBuilder;
+  // This is the list of traits that this transformation preserves.
+  bool PreserveBranches = true;
+  bool PreserveCalls = true;
+  bool Changed = false;
 
   // Should we replace calls to assert_configuration by the assert
   // configuration.
@@ -856,16 +859,20 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
   llvm::SetVector<SILInstruction *> FoldedUsers;
   CastOptimizer CastOpt(nullptr, /* We invalidate the CG anyway */
       [&](SILInstruction *I, ValueBase *V) { /* ReplaceInstUsesAction */
-        PKBuilder.invalidateInstructions();
+
+        Changed = true;
         SILValue(I).replaceAllUsesWith(V);
       },
       [&](SILInstruction *I) { /* EraseAction */
         auto *TI = dyn_cast<TermInst>(I);
+
         if (TI && TI->isBranch()) {
-          PKBuilder.invalidateBranches();
-        } else {
-          PKBuilder.invalidateInstructions();
+          // Invalidate all analysis that's related to the call graph.
+          PreserveBranches = false;
         }
+
+        Changed = true;
+
         WorkList.remove(I);
         I->eraseFromParent();
       });
@@ -890,7 +897,8 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
           WorkList.insert(AssertConfInt);
           // Delete the call.
           recursivelyDeleteTriviallyDeadInstructions(BI);
-          PKBuilder.invalidateInstructions();
+
+          Changed = true;
           continue;
         }
 
@@ -899,7 +907,7 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
         if (isApplyOfBuiltin(*BI, BuiltinValueKind::CondUnreachable)) {
           assert(BI->use_empty() && "use of conditionallyUnreachable?!");
           recursivelyDeleteTriviallyDeadInstructions(BI, /*force*/ true);
-          PKBuilder.invalidateInstructions();
+          Changed = true;
           continue;
         }
       }
@@ -907,8 +915,8 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
     if (auto *AI = dyn_cast<ApplyInst>(I)) {
       // Apply may only come from a string.concat invocation.
       if (constantFoldStringConcatenation(AI, WorkList)) {
-        // This invalidates calls.
-        PKBuilder.invalidateCalls();
+        // Invalidate all analysis that's related to the call graph.
+        PreserveCalls = false;
       }
 
       continue;
@@ -1002,7 +1010,7 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
       FoldedUsers.insert(User);
       ++NumInstFolded;
 
-      PKBuilder.invalidateInstructions();
+      Changed = true;
 
       // If the constant produced a tuple, be smarter than RAUW: explicitly nuke
       // any tuple_extract instructions using the apply.  This is a common case
@@ -1044,7 +1052,7 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
     auto UserArray = ArrayRef<SILInstruction *>(&*FoldedUsers.begin(),
                                                 FoldedUsers.size());
     if (!UserArray.empty()) {
-      PKBuilder.invalidateInstructions();
+      Changed = true;
     }
 
     recursivelyDeleteTriviallyDeadInstructions(UserArray, false,
@@ -1053,7 +1061,15 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
                                                });
   }
 
-  return PKBuilder.getPreserved();
+  llvm::Optional<SILAnalysis::PreserveKind> Pres;
+  if (!Changed) return Pres;
+
+  unsigned P = SILAnalysis::PreserveKind::Nothing;
+  if (PreserveCalls)    P |= (unsigned) SILAnalysis::PreserveKind::Calls;
+  if (PreserveBranches) P |= (unsigned) SILAnalysis::PreserveKind::Branches;
+  Pres = SILAnalysis::PreserveKind(P);
+
+  return Pres;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1072,10 +1088,10 @@ public:
 private:
   /// The entry point to the transformation.
   void run() override {
-    auto Preserves = processFunction(*getFunction(), EnableDiagnostics,
-                                     getOptions().AssertConfig);
-    if (Preserves != SILAnalysis::PreserveKind::All)
-      invalidateAnalysis(Preserves);
+
+    if (auto Preserves = processFunction(*getFunction(), EnableDiagnostics,
+                                         getOptions().AssertConfig))
+      invalidateAnalysis(Preserves.getValue());
   }
 
   StringRef getName() override { return "Constant Propagation"; }
