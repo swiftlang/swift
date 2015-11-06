@@ -22,13 +22,11 @@ namespace llvm {
   void initializeSwiftRCIdentityPass(PassRegistry &);
   void initializeSwiftARCOptPass(PassRegistry &);
   void initializeSwiftARCContractPass(PassRegistry &);
-  void initializeSwiftStackPromotionPass(PassRegistry &);
 }
 
 namespace swift {
   llvm::FunctionPass *createSwiftARCOptPass();
   llvm::FunctionPass *createSwiftARCContractPass();
-  llvm::FunctionPass *createSwiftStackPromotionPass();
   llvm::ImmutablePass *createSwiftAAWrapperPass();
   llvm::ImmutablePass *createSwiftRCIdentityPass();
 } // end namespace swift
