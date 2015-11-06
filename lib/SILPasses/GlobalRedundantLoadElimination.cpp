@@ -690,8 +690,8 @@ roundPostOrderSize(PostOrderFunctionInfo::reverse_range R) {
 RLEContext::RLEContext(SILFunction *F, AliasAnalysis *AA,
                        PostOrderFunctionInfo::reverse_range RPOT)
     : F(F), AA(AA), ReversePostOrder(RPOT),
-      BBToBBIDMap(roundPostOrderSize(RPOT)),
-      BBIDToBBStateMap(roundPostOrderSize(RPOT)) {
+      BBIDToBBStateMap(roundPostOrderSize(RPOT)),
+      BBToBBIDMap(roundPostOrderSize(RPOT)) {
   // Walk over the function and find all the locations accessed by
   // this function.
   MemLocation::enumerateMemLocations(*F, MemLocationVault, LocToBitIndex,
