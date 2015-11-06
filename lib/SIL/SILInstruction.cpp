@@ -743,6 +743,7 @@ bool SILInstruction::mayRelease() const {
     llvm_unreachable("Unhandled releasing instruction!");
 
   case ValueKind::ApplyInst:
+  case ValueKind::TryApplyInst:
   case ValueKind::DestroyAddrInst:
   case ValueKind::StrongReleaseInst:
   case ValueKind::UnownedReleaseInst:
