@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -primary-file %s -O -emit-sil | FileCheck %s
 
+// REQUIRES: swift_stdlib_no_asserts
+
 //CHECK-LABEL: @_TF17unused_containers16empty_array_testFT_T_
 //CHECK: bb0:
 //CHECK-NEXT: tuple

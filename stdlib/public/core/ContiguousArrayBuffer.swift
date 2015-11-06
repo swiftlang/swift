@@ -199,25 +199,49 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
         _uncheckedBufferClass: _ContiguousArrayStorage<Element>.self,
         minimumCapacity: realMinimumCapacity)
 
-#if _runtime(_ObjC)
-      let verbatim = _isBridgedVerbatimToObjectiveC(Element.self)
-#else
-      let verbatim = false
-#endif
+      _initStorageHeader(count, capacity: __bufferPointer.allocatedElementCount)
 
-      __bufferPointer._valuePointer.initialize(
-        _ArrayBody(
-          count: count,
-          capacity: __bufferPointer.allocatedElementCount,
-          elementTypeIsBridgedVerbatim: verbatim))
-      
       _fixLifetime(__bufferPointer)
     }
   }
 
-  init(_ storage: _ContiguousArrayStorageBase) {
+  /// Initialize using the given uninitialized `storage`.
+  /// The storage is assumed to be uninitialized. The returned buffer has the
+  /// body part of the storage initialized, but not the elements.
+  ///
+  /// - Warning: The result has uninitialized elements.
+  /// 
+  /// - Warning: storage may have been stack-allocated, so it's
+  ///   crucial not to call, e.g., `malloc_size` on it.
+  internal init(count: Int, storage: _ContiguousArrayStorage<Element>) {
     __bufferPointer = ManagedBufferPointer(
       _uncheckedUnsafeBufferObject: storage)
+
+    _initStorageHeader(count, capacity: count)
+
+    _fixLifetime(__bufferPointer)
+  }
+
+  internal init(_ storage: _ContiguousArrayStorageBase) {
+    __bufferPointer = ManagedBufferPointer(
+      _uncheckedUnsafeBufferObject: storage)
+  }
+
+  /// Initialize the body part of our storage.
+  ///
+  /// - Warning: does not initialize elements
+  func _initStorageHeader(count: Int, capacity: Int) {
+#if _runtime(_ObjC)
+    let verbatim = _isBridgedVerbatimToObjectiveC(Element.self)
+#else
+    let verbatim = false
+#endif
+
+    __bufferPointer._valuePointer.initialize(
+      _ArrayBody(
+        count: count,
+        capacity: capacity,
+        elementTypeIsBridgedVerbatim: verbatim))
   }
 
   var arrayPropertyIsNative : Bool {

@@ -33,6 +33,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SILAnalysis/ArraySemantic.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Utils/SILSSAUpdater.h"
@@ -773,6 +774,30 @@ bool DeadObjectElimination::processAllocApply(ApplyInst *AI) {
   if (ArraySemanticsCall(AI).getKind() != ArrayCallKind::kArrayUninitialized)
     return false;
 
+  ApplyInst *AllocBufferAI = nullptr;
+  SILValue Arg0 = AI->getArgument(0);
+  if (Arg0.getType().isExistentialType()) {
+    // This is a version of the initializer which receives a pre-allocated
+    // buffer as first argument. If we want to delete the initializer we also
+    // have to delete the allocation.
+    // But we have to check tbhe argument is really a buffer allocation call.
+    AllocBufferAI = dyn_cast<ApplyInst>(Arg0);
+    if (!AllocBufferAI)
+      return false;
+
+    auto *FRI = dyn_cast<FunctionRefInst>(AllocBufferAI->getCallee());
+    if (!FRI)
+      return false;
+
+    StringRef AllocFuncName = FRI->getReferencedFunction()->getName();
+    if (AllocFuncName != "swift_bufferAllocate" &&
+        AllocFuncName != "swift_bufferAllocateOnStack")
+      return false;
+
+    if (!hasOneNonDebugUse(*AllocBufferAI))
+      return false;
+  }
+
   if (!removeAndReleaseArray(AI))
     return false;
 
@@ -781,6 +806,8 @@ bool DeadObjectElimination::processAllocApply(ApplyInst *AI) {
   eraseUsesOfInstruction(AI);
   assert(AI->use_empty() && "All users should have been removed.");
   recursivelyDeleteTriviallyDeadInstructions(AI, true);
+  if (AllocBufferAI)
+    recursivelyDeleteTriviallyDeadInstructions(AllocBufferAI, true);
   ++DeadAllocApplyEliminated;
   return true;
 }

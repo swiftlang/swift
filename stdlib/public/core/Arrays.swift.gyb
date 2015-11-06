@@ -450,16 +450,35 @@ extension ${Self} : ArrayLiteralConvertible {
 %end
 }
 
+%if Self == 'Array':
+
 // Referenced by the compiler to allocate array literals.
+//
+/// Returns an Array of `count` uninitialized elements using the
+/// given `storage`, and a pointer to uninitialized memory for the
+/// first element.
+///
+/// - Requires: `storage` is _ContiguousArrayStorage.
 @warn_unused_result
-@_semantics("array.uninitialized")
-public func _allocateUninitialized${Self}<Element>(count: Builtin.Word)
-    -> (${Self}<Element>, Builtin.RawPointer) {
-  let (array, ptr) = ${Self}<Element>._allocateUninitialized(Int(count))
+@inline(__always)
+public func _allocateUninitializedArray<Element>(_count: Builtin.Word)
+    -> (Array<Element>, Builtin.RawPointer) {
+  let count = Int(_count)
+  if count > 0 {
+    // Doing the actual buffer alloction outside of the array.uninitialized
+    // semantics function enables stack propagation of the buffer.
+    let bufferObject = ManagedBufferPointer<_ArrayBody, Element>(
+      _uncheckedBufferClass: _ContiguousArrayStorage<Element>.self,
+      minimumCapacity: count)
+
+    let (array, ptr) = Array<Element>._adoptStorage(bufferObject.buffer, count: count)
+    return (array, ptr._rawValue)
+  }
+  // For an empty array no buffer allocation is needed.
+  let (array, ptr) = Array<Element>._allocateUninitialized(count)
   return (array, ptr._rawValue)
 }
 
-%if Self == 'Array':
 // Referenced by the compiler to deallocate array literals on the
 // error path.
 @warn_unused_result
@@ -522,6 +541,7 @@ extension ${Self} : _ArrayType {
   /// Entry point for `Array` literal construction; builds and returns
   /// a ${Self} of `count` uninitialized elements.
   @warn_unused_result
+  @_semantics("array.uninitialized")
   internal static func _allocateUninitialized(
     count: Int
   ) -> (${Self}, UnsafeMutablePointer<Element>) {
@@ -530,6 +550,29 @@ extension ${Self} : _ArrayType {
   }
 
 %if Self == 'Array':
+
+  /// Returns an Array of `count` uninitialized elements using the
+  /// given `storage`, and a pointer to uninitialized memory for the
+  /// first element.
+  ///
+  /// - Requires: `storage is _ContiguousArrayStorage`.
+  @warn_unused_result
+  @_semantics("array.uninitialized")
+  internal static func _adoptStorage(
+    storage: AnyObject, count: Int
+  ) -> (Array, UnsafeMutablePointer<Element>) {
+    
+    _sanityCheck(
+      storage is _ContiguousArrayStorage<Element>, "Invalid array storage type")
+    
+    let innerBuffer = _ContiguousArrayBuffer<Element>(
+      count: count, storage: unsafeDowncast(storage))
+    
+    return (
+      Array(_Buffer(innerBuffer, shiftedToStartIndex: 0)),
+      innerBuffer.firstElementAddress)
+  }
+
   /// Entry point for aborting literal construction: deallocates
   /// a ${Self} containing only uninitialized elements.
   internal mutating func _deallocateUninitialized() {
