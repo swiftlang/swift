@@ -45,7 +45,7 @@ bb0(%0 : $TrivialDestructor):
   store %0 to %10 : $*TrivialDestructor
   %13 = struct_extract %5 : $Array<TrivialDestructor>, #Array._buffer
   %14 = struct_extract %13 : $_ArrayBuffer<TrivialDestructor>, #_ArrayBuffer._storage
-  %15 = struct_extract %14 : $_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCoreType>, #_BridgeStorage.rawValue
+  %15 = struct_extract %14 : $_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue
   strong_retain %0 : $TrivialDestructor
   strong_release %15 : $Builtin.BridgeObject
   %18 = tuple ()

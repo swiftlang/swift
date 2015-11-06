@@ -28,7 +28,7 @@ public protocol _ShadowProtocol {}
 
 /// A shadow for the `NSFastEnumeration` protocol.
 @objc
-public protocol _NSFastEnumerationType : _ShadowProtocol {
+public protocol _NSFastEnumeration : _ShadowProtocol {
   func countByEnumeratingWithState(
     state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>, count: Int
@@ -37,7 +37,7 @@ public protocol _NSFastEnumerationType : _ShadowProtocol {
 
 /// A shadow for the `NSEnumerator` class.
 @objc
-public protocol _NSEnumeratorType : _ShadowProtocol {
+public protocol _NSEnumerator : _ShadowProtocol {
   init()
   func nextObject() -> AnyObject?
 }
@@ -47,7 +47,7 @@ public typealias _SwiftNSZone = OpaquePointer
 
 /// A shadow for the `NSCopying` protocol.
 @objc
-public protocol _NSCopyingType : _ShadowProtocol {
+public protocol _NSCopying : _ShadowProtocol {
   func copyWithZone(zone: _SwiftNSZone) -> AnyObject
 }
 
@@ -56,8 +56,8 @@ public protocol _NSCopyingType : _ShadowProtocol {
 /// Covers a set of operations everyone needs to implement in order to
 /// be a useful `NSArray` subclass.
 @unsafe_no_objc_tagged_pointer @objc
-public protocol _NSArrayCoreType :
-    _NSCopyingType, _NSFastEnumerationType {
+public protocol _NSArrayCore :
+    _NSCopying, _NSFastEnumeration {
 
   func objectAtIndex(index: Int) -> AnyObject
 
@@ -76,8 +76,8 @@ public protocol _NSArrayCoreType :
 /// Covers a set of operations everyone needs to implement in order to
 /// be a useful `NSDictionary` subclass.
 @objc
-public protocol _NSDictionaryCoreType :
-    _NSCopyingType, _NSFastEnumerationType {
+public protocol _NSDictionaryCore :
+    _NSCopying, _NSFastEnumeration {
 
   // The following methods should be overridden when implementing an
   // NSDictionary subclass.
@@ -89,7 +89,7 @@ public protocol _NSDictionaryCoreType :
 
   var count: Int { get }
   func objectForKey(aKey: AnyObject) -> AnyObject?
-  func keyEnumerator() -> _NSEnumeratorType
+  func keyEnumerator() -> _NSEnumerator
 
   // We also override the following methods for efficiency.
 
@@ -108,12 +108,12 @@ public protocol _NSDictionaryCoreType :
 /// stdlib.
 ///
 /// `NSDictionary` operations, in addition to those on
-/// `_NSDictionaryCoreType`, that we need to use from the core stdlib.
-/// Distinct from `_NSDictionaryCoreType` because we don't want to be
+/// `_NSDictionaryCore`, that we need to use from the core stdlib.
+/// Distinct from `_NSDictionaryCore` because we don't want to be
 /// forced to implement operations that `NSDictionary` already
 /// supplies.
 @unsafe_no_objc_tagged_pointer @objc
-public protocol _NSDictionaryType : _NSDictionaryCoreType {
+public protocol _NSDictionary : _NSDictionaryCore {
   // Note! This API's type is different from what is imported by the clang
   // importer.
   func getObjects(objects: UnsafeMutablePointer<AnyObject>,
@@ -125,8 +125,8 @@ public protocol _NSDictionaryType : _NSDictionaryCoreType {
 /// Covers a set of operations everyone needs to implement in order to
 /// be a useful `NSSet` subclass.
 @objc
-public protocol _NSSetCoreType :
-    _NSCopyingType, _NSFastEnumerationType {
+public protocol _NSSetCore :
+    _NSCopying, _NSFastEnumeration {
 
   // The following methods should be overridden when implementing an
   // NSSet subclass.
@@ -136,7 +136,7 @@ public protocol _NSSetCoreType :
 
   var count: Int { get }
   func member(object: AnyObject) -> AnyObject?
-  func objectEnumerator() -> _NSEnumeratorType
+  func objectEnumerator() -> _NSEnumerator
 
   // We also override the following methods for efficiency.
 
@@ -152,18 +152,18 @@ public protocol _NSSetCoreType :
 /// stdlib.
 ///
 /// `NSSet` operations, in addition to those on
-/// `_NSSetCoreType`, that we need to use from the core stdlib.
-/// Distinct from `_NSSetCoreType` because we don't want to be
+/// `_NSSetCore`, that we need to use from the core stdlib.
+/// Distinct from `_NSSetCore` because we don't want to be
 /// forced to implement operations that `NSSet` already
 /// supplies.
 @unsafe_no_objc_tagged_pointer @objc
-public protocol _NSSetType : _NSSetCoreType {
+public protocol _NSSet : _NSSetCore {
 }
 
 #else
 
-public protocol _NSArrayCoreType {}
-public protocol _NSDictionaryCoreType {}
-public protocol _NSSetCoreType {}
+public protocol _NSArrayCore {}
+public protocol _NSDictionaryCore {}
+public protocol _NSSetCore {}
 
 #endif

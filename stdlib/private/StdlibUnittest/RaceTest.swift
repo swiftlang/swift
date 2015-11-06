@@ -62,7 +62,7 @@ func autoreleasepool(@noescape code: () -> Void) {
 /// Types conforming to this protocol should be structs.  (The type
 /// should be a struct to reduce unnecessary reference counting during
 /// the test.)  The types should be stateless.
-public protocol RaceTestWithPerTrialDataType {
+public protocol RaceTestWithPerTrialData {
 
   /// Input for threads.
   ///
@@ -319,7 +319,7 @@ public func == (lhs: Observation9Int, rhs: Observation9Int) -> Bool {
 }
 
 /// A helper that is useful to implement
-/// `RaceTestWithPerTrialDataType.evaluateObservations()` in race tests.
+/// `RaceTestWithPerTrialData.evaluateObservations()` in race tests.
 public func evaluateObservationsAllEqual<T : Equatable>(observations: [T])
   -> RaceTestObservationEvaluation {
   let first = observations.first!
@@ -382,14 +382,14 @@ struct _RaceTestAggregatedEvaluations : CustomStringConvertible {
 }
 
 // FIXME: protect this class against false sharing.
-class _RaceTestWorkerState<RT : RaceTestWithPerTrialDataType> {
+class _RaceTestWorkerState<RT : RaceTestWithPerTrialData> {
   // FIXME: protect every element of 'raceData' against false sharing.
   var raceData: [RT.RaceData] = []
   var raceDataShuffle: [Int] = []
   var observations: [RT.Observation] = []
 }
 
-class _RaceTestSharedState<RT : RaceTestWithPerTrialDataType> {
+class _RaceTestSharedState<RT : RaceTestWithPerTrialData> {
   var racingThreadCount: Int
 
   var trialBarrier: _stdlib_Barrier
@@ -411,7 +411,7 @@ class _RaceTestSharedState<RT : RaceTestWithPerTrialDataType> {
   }
 }
 
-func _masterThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
+func _masterThreadOneTrial<RT : RaceTestWithPerTrialData>(
   sharedState: _RaceTestSharedState<RT>
 ) {
   let racingThreadCount = sharedState.racingThreadCount
@@ -471,7 +471,7 @@ func _masterThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
   }
 }
 
-func _workerThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
+func _workerThreadOneTrial<RT : RaceTestWithPerTrialData>(
   tid: Int, _ sharedState: _RaceTestSharedState<RT>
 ) {
   sharedState.trialBarrier.wait()
@@ -493,7 +493,7 @@ func _workerThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
   sharedState.trialBarrier.wait()
 }
 
-public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
+public func runRaceTest<RT : RaceTestWithPerTrialData>(
   _: RT.Type,
   trials: Int,
   threads: Int? = nil
@@ -550,7 +550,7 @@ internal func _divideRoundUp(lhs: Int, _ rhs: Int) -> Int {
   return (lhs + rhs) / rhs
 }
 
-public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
+public func runRaceTest<RT : RaceTestWithPerTrialData>(
   test: RT.Type,
   operations: Int,
   threads: Int? = nil

@@ -126,7 +126,7 @@ extension String {
   @warn_unused_result
   public // @testable
   static func _fromWellFormedCodeUnitSequence<
-    Encoding: UnicodeCodecType, Input: Collection
+    Encoding: UnicodeCodec, Input: Collection
     where Input.Iterator.Element == Encoding.CodeUnit
   >(
     encoding: Encoding.Type, input: Input
@@ -137,7 +137,7 @@ extension String {
   @warn_unused_result
   public // @testable
   static func _fromCodeUnitSequence<
-    Encoding: UnicodeCodecType, Input: Collection
+    Encoding: UnicodeCodec, Input: Collection
     where Input.Iterator.Element == Encoding.CodeUnit
   >(
     encoding: Encoding.Type, input: Input
@@ -155,7 +155,7 @@ extension String {
   @warn_unused_result
   public // @testable
   static func _fromCodeUnitSequenceWithRepair<
-    Encoding: UnicodeCodecType, Input: Collection
+    Encoding: UnicodeCodec, Input: Collection
     where Input.Iterator.Element == Encoding.CodeUnit
   >(
     encoding: Encoding.Type, input: Input
@@ -272,7 +272,7 @@ extension String {
   /// in the given encoding.
   @warn_unused_result
   func _encodedLength<
-    Encoding: UnicodeCodecType
+    Encoding: UnicodeCodec
   >(encoding: Encoding.Type) -> Int {
     var codeUnitCount = 0
     let output: (Encoding.CodeUnit) -> Void = { _ in ++codeUnitCount }
@@ -288,7 +288,7 @@ extension String {
   // Related: <rdar://problem/17340917> Please document how NSString interacts
   // with unpaired surrogates
   func _encode<
-    Encoding: UnicodeCodecType
+    Encoding: UnicodeCodec
   >(encoding: Encoding.Type, output: (Encoding.CodeUnit) -> Void)
   {
     return _core.encode(encoding, output: output)
@@ -477,7 +477,7 @@ extension String : Hashable {
     // FIXME(performance): constructing a temporary NSString is extremely
     // wasteful and inefficient.
     let cocoaString = unsafeBitCast(
-      self._bridgeToObjectiveCImpl(), _NSStringCoreType.self)
+      self._bridgeToObjectiveCImpl(), _NSStringCore.self)
 
     // If we have an ASCII string, we do not need to normalize.
     if self._core.isASCII {
@@ -748,11 +748,11 @@ extension String {
 #if _runtime(_ObjC)
 @warn_unused_result
 @_silgen_name("swift_stdlib_NSStringLowercaseString")
-func _stdlib_NSStringLowercaseString(str: AnyObject) -> _CocoaStringType
+func _stdlib_NSStringLowercaseString(str: AnyObject) -> _CocoaString
 
 @warn_unused_result
 @_silgen_name("swift_stdlib_NSStringUppercaseString")
-func _stdlib_NSStringUppercaseString(str: AnyObject) -> _CocoaStringType
+func _stdlib_NSStringUppercaseString(str: AnyObject) -> _CocoaString
 #else
 @warn_unused_result
 internal func _nativeUnicodeLowercaseString(str: String) -> String {

@@ -773,7 +773,7 @@ extension ${Self} : _ArrayProtocol {
 extension ${Self} : _Reflectable {
   /// Returns a mirror that reflects `self`.
   @warn_unused_result
-  public func _getMirror() -> _MirrorType {
+  public func _getMirror() -> _Mirror {
     return _ArrayProtocolMirror(self)
   }
 }
@@ -891,7 +891,7 @@ extension ${Self} {
 
 internal struct _InitializeMemoryFromCollection<
   C: Collection
-> : _PointerFunctionType {
+> : _PointerFunction {
   func call(rawMemory: UnsafeMutablePointer<C.Iterator.Element>, count: Int) {
     var p = rawMemory
     var q = newValues.startIndex
@@ -1073,7 +1073,7 @@ internal func _forceCreateUniqueMutableBufferImpl<_Buffer : _ArrayBufferProtocol
     count: countForBuffer, minimumCapacity: minimumCapacity)
 }
 
-internal protocol _PointerFunctionType {
+internal protocol _PointerFunction {
   typealias Element
   func call(_: UnsafeMutablePointer<Element>, count: Int)
 }
@@ -1087,7 +1087,7 @@ internal protocol _PointerFunctionType {
 /// copying when it isUniquelyReferenced.
 @inline(never)
 internal func _arrayOutOfPlaceUpdate<
-  _Buffer : _ArrayBufferProtocol, Initializer : _PointerFunctionType
+  _Buffer : _ArrayBufferProtocol, Initializer : _PointerFunction
   where Initializer.Element == _Buffer.Element,
   _Buffer.Index == Int
 >(
@@ -1152,7 +1152,7 @@ internal func _arrayOutOfPlaceUpdate<
   source = _Buffer(dest!, shiftedToStartIndex: source.startIndex)
 }
 
-internal struct _InitializePointer<T> : _PointerFunctionType {
+internal struct _InitializePointer<T> : _PointerFunction {
   internal func call(rawMemory: UnsafeMutablePointer<T>, count: Int) {
     _sanityCheck(count == 1)
     // FIXME: it would be better if we could find a way to move, here
@@ -1167,7 +1167,7 @@ internal struct _InitializePointer<T> : _PointerFunctionType {
   internal var newValue: T
 }
 
-internal struct _IgnorePointer<T> : _PointerFunctionType {
+internal struct _IgnorePointer<T> : _PointerFunction {
   internal func call(_: UnsafeMutablePointer<T>, count: Int) {
     _sanityCheck(count == 0)
   }
@@ -1329,7 +1329,7 @@ extension Array {
   /// * it is statically known that the given `NSArray` is immutable;
   /// * `Element` is bridged verbatim to Objective-C (i.e.,
   ///   is a reference type).
-  public init(_immutableCocoaArray: _NSArrayCoreType) {
+  public init(_immutableCocoaArray: _NSArrayCore) {
     self = Array(_ArrayBuffer(nsArray: _immutableCocoaArray))
   }
 }

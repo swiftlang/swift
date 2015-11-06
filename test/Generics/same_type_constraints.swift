@@ -225,18 +225,18 @@ func testSameTypeTuple(a: Array<(Int,Int)>, s: ArraySlice<(Int,Int)>) {
 }
 
 // rdar://problem/20256475
-protocol FooType {
+protocol FooProtocol {
   typealias Element
 
   func getElement() -> Element
 }
-protocol BarType {
-  typealias Foo : FooType
+protocol Bar {
+  typealias Foo : FooProtocol
 
   func getFoo() -> Foo
 
   mutating func extend<
-    C : FooType
+    C : FooProtocol
     where
     C.Element == Foo.Element
   >(elements: C)

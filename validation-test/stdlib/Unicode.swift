@@ -108,7 +108,7 @@ class EOFCountingIterator<T> : IteratorProtocol {
   }
 }
 
-func checkDecodeUTF<Codec : UnicodeCodecType>(
+func checkDecodeUTF<Codec : UnicodeCodec>(
     codec: Codec.Type, _ expectedHead: [UInt32],
     _ expectedRepairedTail: [UInt32], _ utfStr: [Codec.CodeUnit]
 ) -> AssertionResult {

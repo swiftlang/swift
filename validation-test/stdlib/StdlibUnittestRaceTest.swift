@@ -14,7 +14,7 @@ import ObjectiveC
 
 _setTestSuiteFailedCallback() { print("abort()") }
 
-struct RaceTest1 : RaceTestWithPerTrialDataType {
+struct RaceTest1 : RaceTestWithPerTrialData {
   static var shouldPass: Bool = true
   static var iterationCountdown: _stdlib_AtomicInt = _stdlib_AtomicInt(8)
 

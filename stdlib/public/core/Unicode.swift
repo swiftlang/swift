@@ -40,7 +40,7 @@ public enum UnicodeDecodingResult {
 ///
 /// Consists of an underlying [code unit](http://www.unicode.org/glossary/#code_unit) and functions to
 /// translate between sequences of these code units and [unicode scalar values](http://www.unicode.org/glossary/#unicode_scalar_value).
-public protocol UnicodeCodecType {
+public protocol UnicodeCodec {
 
   /// A type that can hold [code unit](http://www.unicode.org/glossary/#code_unit) values for this
   /// encoding.
@@ -70,7 +70,7 @@ public protocol UnicodeCodecType {
 }
 
 /// A codec for [UTF-8](http://www.unicode.org/glossary/#UTF_8).
-public struct UTF8 : UnicodeCodecType {
+public struct UTF8 : UnicodeCodec {
 
   /// A type that can hold [code unit](http://www.unicode.org/glossary/#code_unit) values for this
   /// encoding.
@@ -490,7 +490,7 @@ public struct UTF8 : UnicodeCodecType {
 }
 
 /// A codec for [UTF-16](http://www.unicode.org/glossary/#UTF_16).
-public struct UTF16 : UnicodeCodecType {
+public struct UTF16 : UnicodeCodec {
   /// A type that can hold [code unit](http://www.unicode.org/glossary/#code_unit) values for this
   /// encoding.
   public typealias CodeUnit = UInt16
@@ -635,7 +635,7 @@ public struct UTF16 : UnicodeCodecType {
 }
 
 /// A codec for [UTF-32](http://www.unicode.org/glossary/#UTF_32).
-public struct UTF32 : UnicodeCodecType {
+public struct UTF32 : UnicodeCodec {
   /// A type that can hold [code unit](http://www.unicode.org/glossary/#code_unit) values for this
   /// encoding.
   public typealias CodeUnit = UInt32
@@ -689,8 +689,8 @@ public struct UTF32 : UnicodeCodecType {
 ///   replacement characters are inserted for each detected error.
 public func transcode<
   Input : IteratorProtocol,
-  InputEncoding : UnicodeCodecType,
-  OutputEncoding : UnicodeCodecType
+  InputEncoding : UnicodeCodec,
+  OutputEncoding : UnicodeCodec
   where InputEncoding.CodeUnit == Input.Element>(
   inputEncoding: InputEncoding.Type, _ outputEncoding: OutputEncoding.Type,
   _ input: Input, _ output: (OutputEncoding.CodeUnit) -> Void,
@@ -823,7 +823,7 @@ internal func _transcodeSomeUTF16AsUTF8<
 /// Instances of conforming types are used in internal `String`
 /// representation.
 public // @testable
-protocol _StringElementType {
+protocol _StringElement {
   @warn_unused_result
   static func _toUTF16CodeUnit(_: Self) -> UTF16.CodeUnit
 
@@ -831,7 +831,7 @@ protocol _StringElementType {
   static func _fromUTF16CodeUnit(utf16: UTF16.CodeUnit) -> Self
 }
 
-extension UTF16.CodeUnit : _StringElementType {
+extension UTF16.CodeUnit : _StringElement {
   public // @testable
   static func _toUTF16CodeUnit(x: UTF16.CodeUnit) -> UTF16.CodeUnit {
     return x
@@ -844,7 +844,7 @@ extension UTF16.CodeUnit : _StringElementType {
   }
 }
 
-extension UTF8.CodeUnit : _StringElementType {
+extension UTF8.CodeUnit : _StringElement {
   public // @testable
   static func _toUTF16CodeUnit(x: UTF8.CodeUnit) -> UTF16.CodeUnit {
     _sanityCheck(x <= 0x7f, "should only be doing this with ASCII")
@@ -899,7 +899,7 @@ extension UTF16 {
   }
 
   public // @testable
-  static func _copy<T : _StringElementType, U : _StringElementType>(
+  static func _copy<T : _StringElement, U : _StringElement>(
     source: UnsafeMutablePointer<T>,
     destination: UnsafeMutablePointer<U>, count: Int
   ) {
@@ -926,7 +926,7 @@ extension UTF16 {
   /// found in `input`.
   @warn_unused_result
   public static func measure<
-      Encoding : UnicodeCodecType, Input : IteratorProtocol
+      Encoding : UnicodeCodec, Input : IteratorProtocol
       where Encoding.CodeUnit == Input.Element
   >(
     _: Encoding.Type, input: Input, repairIllFormedSequences: Bool

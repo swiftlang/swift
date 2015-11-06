@@ -37,7 +37,7 @@ internal func _abstract(file: StaticString = __FILE__, line: UWord = __LINE__) {
 
 public class _AnyIteratorBase {}
 
-/// An abstract `GeneratorType` base class over `T` elements.
+/// An abstract `Generator` base class over `T` elements.
 ///
 /// Use this as a `Sequence`'s associated `Generator` type when you
 /// don't want to expose details of the concrete generator, a subclass.
@@ -48,9 +48,9 @@ public class _AnyIteratorBase {}
 /// See also:
 ///
 ///     struct AnySequence<S: Sequence>
-///     func anyIterator<G: GeneratorType>(base: G) -> AnyIterator<G.Element>
+///     func anyIterator<G: Generator>(base: G) -> AnyIterator<G.Element>
 ///     func anyIterator<T>(nextImplementation: ()->T?) -> AnyIterator<T>
-public class AnyIterator<T> : _AnyIteratorBase, GeneratorType {
+public class AnyIterator<T> : _AnyIteratorBase, Generator {
   /// Initialize the instance.  May only be called from a subclass
   /// initializer.
   override public init() {
@@ -68,14 +68,14 @@ public class AnyIterator<T> : _AnyIteratorBase, GeneratorType {
   public func next() -> T? {_abstract()}
 }
 
-/// Every `GeneratorType` can also be a `Sequence`.  Note that
+/// Every `Generator` can also be a `Sequence`.  Note that
 /// traversing the sequence consumes the generator.
 extension AnyIterator : Sequence {
   /// Returns `self`.
   public func iterator() -> AnyIterator { return self }
 }
 
-/// Return a `GeneratorType` instance that wraps `base` but whose type
+/// Return a `Generator` instance that wraps `base` but whose type
 /// depends only on the type of `G.Element`.
 ///
 /// Example:
@@ -89,7 +89,7 @@ extension AnyIterator : Sequence {
 ///         = lazyStrings.iterator()
 ///       return anyIterator(g)
 ///     }
-public func anyIterator<G: GeneratorType>(base: G) -> AnyIterator<G.Element> {
+public func anyIterator<G: Generator>(base: G) -> AnyIterator<G.Element> {
   return _GeneratorBox(base)
 }
 
@@ -101,7 +101,7 @@ internal class _FunctionGenerator<T> : AnyIterator<T> {
   let nextImplementation: ()->T?
 }
 
-/// Return a `GeneratorType` instance whose `next` method invokes
+/// Return a `Generator` instance whose `next` method invokes
 /// `nextImplementation` and returns the result.
 ///
 /// Example:
@@ -114,7 +114,7 @@ public func anyIterator<T>(nextImplementation: ()->T?) -> AnyIterator<T> {
 }
 
 internal final class _GeneratorBox<
-  Base: GeneratorType
+  Base: Generator
 > : AnyIterator<Base.Element> {
   init(_ base: Base) { self.base = base }
   override func next() -> Base.Element? { return base.next() }

@@ -11,7 +11,7 @@ import Foundation
 @_silgen_name("random") func random() -> UInt32
 @_silgen_name("srandomdev") func srandomdev()
 
-protocol TestableUnicodeCodec : UnicodeCodecType {
+protocol TestableUnicodeCodec : UnicodeCodec {
   typealias CodeUnit : Integer
   static func encodingId() -> NSStringEncoding
   static func name() -> NSString

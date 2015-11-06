@@ -176,13 +176,13 @@ func minMaxElement<R : IteratorProtocol where R.Element : Comparable>(range: R)
   return (min, max)
 }
 
-protocol RandomAccessStreamType : IteratorProtocol {
+protocol RandomAccessStream : IteratorProtocol {
   func size() -> Int
   func getNth(n: Int) -> Element
   subscript (r : Range<Int>) -> Self { get }
 }
 
-func lowerBound<R : RandomAccessStreamType where R.Element : Comparable>
+func lowerBound<R : RandomAccessStream where R.Element : Comparable>
        (inputrange : R, value : R.Element) -> R {
   var range = inputrange
   while range.size() > 1 {
@@ -196,7 +196,7 @@ func lowerBound<R : RandomAccessStreamType where R.Element : Comparable>
   return range
 }
 
-func upperBound<R : RandomAccessStreamType where R.Element : Comparable>
+func upperBound<R : RandomAccessStream where R.Element : Comparable>
        (inputrange : R, value : R.Element) -> R {
   var range = inputrange
   while range.size() > 1 {

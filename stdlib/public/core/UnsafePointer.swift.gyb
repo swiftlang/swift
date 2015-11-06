@@ -485,7 +485,7 @@ ${MirrorDecl} {
     return UInt64(Int(Builtin.ptrtoint_Word(_value._rawValue)))
   }
 
-  subscript(i: Int) -> (String, _MirrorType) {
+  subscript(i: Int) -> (String, _Mirror) {
     switch i {
     case 0: return ("pointerValue",_reflect(_getPointerValue()))
     default: _preconditionFailure("cannot extract this child index")

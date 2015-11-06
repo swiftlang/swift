@@ -226,7 +226,7 @@ public struct StaticString
     return self.stringValue.debugDescription
   }
 
-  public func _getMirror() -> _MirrorType {
+  public func _getMirror() -> _Mirror {
     return _reflect(self.stringValue)
   }
 }

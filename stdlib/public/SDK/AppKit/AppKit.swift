@@ -13,7 +13,7 @@
 import Foundation
 @_exported import AppKit
 
-struct _NSCursorMirror : _MirrorType {
+struct _NSCursorMirror : _Mirror {
   var _value: NSCursor
 
   init(_ v: NSCursor) { _value = v }
@@ -26,8 +26,8 @@ struct _NSCursorMirror : _MirrorType {
 
   var count: Int { return 0 }
 
-  subscript(_: Int) -> (String, _MirrorType) {
-    _preconditionFailure("_MirrorType access out of bounds")
+  subscript(_: Int) -> (String, _Mirror) {
+    _preconditionFailure("_Mirror access out of bounds")
   }
 
   var summary: String { return "" }
@@ -40,12 +40,12 @@ struct _NSCursorMirror : _MirrorType {
 }
 
 extension NSCursor : _Reflectable {
-  public func _getMirror() -> _MirrorType {
+  public func _getMirror() -> _Mirror {
     return _NSCursorMirror(self)
   }
 }
 
-struct _NSViewMirror : _MirrorType {
+struct _NSViewMirror : _Mirror {
   static var _views = NSMutableSet()
 
   var _v : NSView
@@ -60,8 +60,8 @@ struct _NSViewMirror : _MirrorType {
   
   var count: Int { get { return 0 } }
   
-  subscript(_: Int) -> (String, _MirrorType) {
-    _preconditionFailure("_MirrorType access out of bounds")
+  subscript(_: Int) -> (String, _Mirror) {
+    _preconditionFailure("_Mirror access out of bounds")
   }
   
   var summary: String { get { return "" } }
@@ -101,7 +101,7 @@ struct _NSViewMirror : _MirrorType {
 
 extension NSView : _Reflectable {
   /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> _MirrorType {
+  public func _getMirror() -> _Mirror {
     return _NSViewMirror(self)
   }
 }

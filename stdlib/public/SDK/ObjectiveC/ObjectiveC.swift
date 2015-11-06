@@ -17,7 +17,7 @@ import ObjectiveC
 // Objective-C Primitive Types
 //===----------------------------------------------------------------------===//
 
-public typealias BooleanType = Swift.Boolean
+public typealias Boolean = Swift.Boolean
 /// The Objective-C BOOL type.
 ///
 /// On 64-bit iOS, the Objective-C BOOL type is a typedef of C/C++
@@ -63,7 +63,7 @@ public struct ObjCBool : Boolean, BooleanLiteralConvertible {
 
 extension ObjCBool : _Reflectable {
   /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> _MirrorType {
+  public func _getMirror() -> _Mirror {
     return _reflect(boolValue)
   }
 }
@@ -166,7 +166,7 @@ extension String {
 
 extension Selector : _Reflectable {
   /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> _MirrorType {
+  public func _getMirror() -> _Mirror {
     return _reflect(String(_sel: self))
   }
 }

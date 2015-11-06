@@ -1,11 +1,11 @@
 // RUN: not %target-swift-frontend %s -parse
 
-public protocol Q_SequenceDefaultsType {
+public protocol Q_SequenceDefaults {
   typealias Iterator : IteratorProtocol
   func iterator() -> Iterator
 }
 
-extension Q_SequenceDefaultsType {
+extension Q_SequenceDefaults {
   typealias Element = Iterator.Element
   
   public final func underestimateCount() -> Int { return 0 }
@@ -50,7 +50,7 @@ extension Q_SequenceDefaultsType {
 /// whether they will be destructively "consumed" by iteration.  To
 /// ensure non-destructive iteration, constrain your *sequence* to
 /// `Collection`.
-public protocol Q_SequenceType : Q_SequenceDefaultsType {
+public protocol Q_Sequence : Q_SequenceDefaults {
   /// A type that provides the *sequence*\ 's iteration interface and
   /// encapsulates its iteration state.
   typealias Iterator : IteratorProtocol
@@ -86,9 +86,9 @@ public extension IteratorProtocol {
   }
 }
 
-public typealias Q_ConcreteIteratorProtocol = protocol<IteratorProtocol, Q_SequenceType>
+public typealias Q_ConcreteIteratorProtocol = protocol<IteratorProtocol, Q_Sequence>
 
-public protocol Q_IndexableType {
+public protocol Q_Indexable {
   typealias Index : ForwardIndex
   typealias Element
   subscript(position: Index) -> Element {get}
@@ -96,17 +96,17 @@ public protocol Q_IndexableType {
   var endIndex: Index {get}
 }
 
-extension Q_IndexableType {
+extension Q_Indexable {
   public final func iterator() -> Q_IndexingIterator<Self> {
     return Q_IndexingIterator(pos: self.startIndex, elements: self)
   }
 }
 
-public protocol Q_CollectionDefaultsType : Q_IndexableType, Q_SequenceType {
+public protocol Q_CollectionDefaults : Q_Indexable, Q_Sequence {
   typealias Element = Iterator.Element
 }
 
-extension Q_CollectionDefaultsType {
+extension Q_CollectionDefaults {
   public final func count() -> Index.Distance {
     return distance(startIndex, endIndex)
   }
@@ -121,7 +121,7 @@ extension Q_CollectionDefaultsType {
   }
 }
 
-public struct Q_IndexingIterator<C: Q_IndexableType> : Q_ConcreteIteratorProtocol {
+public struct Q_IndexingIterator<C: Q_Indexable> : Q_ConcreteIteratorProtocol {
   public typealias Element = C.Element
   var pos: C.Index
   let elements: C
@@ -136,18 +136,18 @@ public struct Q_IndexingIterator<C: Q_IndexableType> : Q_ConcreteIteratorProtoco
   }
 }
 
-public protocol Q_CollectionType : Q_CollectionDefaultsType {
+public protocol Q_Collection : Q_CollectionDefaults {
   func count() -> Index.Distance
   subscript(position: Index) -> Element {get}
 }
 
-extension Array : Q_CollectionType {
+extension Array : Q_Collection {
   public func copyToContiguousArray() -> ContiguousArray<Element> {
     return ContiguousArray(self~>_copyToNativeArrayBuffer())
   }
 }
 
-struct Boo : Q_CollectionType {
+struct Boo : Q_Collection {
   let startIndex: Int = 0
   let endIndex: Int = 10
   

@@ -126,7 +126,7 @@ public struct ${Self}<Bound : Comparable>
 
 
   /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> _MirrorType {
+  public func _getMirror() -> _Mirror {
     return _IntervalMirror(self)
   }
 
@@ -200,16 +200,16 @@ public func ~= <I: Interval>(pattern: I, value: I.Bound) -> Bool {
 
 internal struct _IntervalMirror<
   T : protocol<Interval, CustomStringConvertible>
-> : _MirrorType {
+> : _Mirror {
   ${Boilerplate}
 
   internal var count: Int { return 2 }
 
-  internal subscript(i: Int) -> (String, _MirrorType) {
+  internal subscript(i: Int) -> (String, _Mirror) {
     switch i {
     case 0: return ("start", _reflect(_value.start))
     case 1: return ("end", _reflect(_value.end))
-    default: _preconditionFailure("_MirrorType access out of bounds")
+    default: _preconditionFailure("_Mirror access out of bounds")
     }
   }
 

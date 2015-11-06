@@ -41,13 +41,13 @@ public class TypeIndexed<Value> : Resettable {
 //
 //===----------------------------------------------------------------------===//
 
-public protocol WrapperType {
+public protocol Wrapper {
   typealias Base
   init(_: Base)
   var base: Base {get set}
 }
 
-public protocol LoggingType : WrapperType {
+public protocol LoggingType : Wrapper {
   typealias Log : AnyObject
 }
 
@@ -261,9 +261,9 @@ public struct LoggingCollection<Base_: Collection> : LoggingCollectionType {
 }
 
 public func expectCustomizable<
-  T : WrapperType where
+  T : Wrapper where
   T : LoggingType,
-  T.Base : WrapperType, T.Base : LoggingType,
+  T.Base : Wrapper, T.Base : LoggingType,
   T.Log == T.Base.Log
 >(_: T, _ counters: TypeIndexed<Int>,
   stackTrace: SourceLocStack? = nil,
@@ -280,9 +280,9 @@ public func expectCustomizable<
 }
 
 public func expectNotCustomizable<
-  T : WrapperType where
+  T : Wrapper where
   T : LoggingType,
-  T.Base : WrapperType, T.Base : LoggingType,
+  T.Base : Wrapper, T.Base : LoggingType,
   T.Log == T.Base.Log
 >(_: T, _ counters: TypeIndexed<Int>,
   stackTrace: SourceLocStack? = nil,

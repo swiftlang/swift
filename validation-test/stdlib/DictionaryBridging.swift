@@ -22,7 +22,7 @@ import SwiftPrivatePthreadExtras
 import ObjectiveC
 #endif
 
-struct DictionaryBridge_objectForKey_RaceTest : RaceTestWithPerTrialDataType {
+struct DictionaryBridge_objectForKey_RaceTest : RaceTestWithPerTrialData {
   class RaceData {
     var nsd: NSDictionary
     init(nsd: NSDictionary) {
@@ -62,7 +62,7 @@ struct DictionaryBridge_objectForKey_RaceTest : RaceTestWithPerTrialDataType {
 }
 
 struct DictionaryBridge_KeyEnumerator_FastEnumeration_ObjC_RaceTest :
-  RaceTestWithPerTrialDataType {
+  RaceTestWithPerTrialData {
   class RaceData {
     var nsd: NSDictionary
     init(nsd: NSDictionary) {

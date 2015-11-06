@@ -147,7 +147,7 @@ public var CGFLOAT_MAX: CGFloat {
 
 extension CGFloat : _Reflectable {
   /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> _MirrorType {
+  public func _getMirror() -> _Mirror {
     return _reflect(native)
   }
 }
@@ -731,7 +731,7 @@ public func yn(n: Int, _ x: CGFloat) -> CGFloat {
 }
 
 @_transparent
-extension CGFloat : _CVarArgPassedAsDouble, _CVarArgAlignedType {
+extension CGFloat : _CVarArgPassedAsDouble, _CVarArgAligned {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
   public var _cVarArgEncoding: [Int] {

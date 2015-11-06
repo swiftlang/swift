@@ -18,7 +18,7 @@
 
 /// A type that is just a wrapper over some base Sequence
 public // @testable
-protocol _SequenceWrapperType {
+protocol _SequenceWrapper {
   typealias Base : Sequence
   typealias Iterator : IteratorProtocol = Base.Iterator
   
@@ -27,7 +27,7 @@ protocol _SequenceWrapperType {
 
 extension Sequence
   where
-  Self : _SequenceWrapperType,
+  Self : _SequenceWrapper,
   Self.Iterator == Self.Base.Iterator {
 
   /// Return an *iterator* over the elements of this *sequence*.
@@ -84,14 +84,14 @@ extension Sequence
 }
 
 public // @testable
-protocol _CollectionWrapperType : _SequenceWrapperType {
+protocol _CollectionWrapper : _SequenceWrapper {
   typealias Base : Collection
   typealias Index : ForwardIndex = Base.Index
   var _base: Base {get}
 }
 
 extension Collection
-  where Self : _CollectionWrapperType, Self.Index == Self.Base.Index {
+  where Self : _CollectionWrapper, Self.Index == Self.Base.Index {
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.

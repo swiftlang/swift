@@ -1,6 +1,6 @@
 // RUN: not %target-swift-frontend %s -parse
 
-internal protocol _SequenceWrapperType {
+internal protocol _SequenceWrapper {
   typealias Base : Sequence
   typealias Iterator : IteratorProtocol = Base.Iterator
   
@@ -8,7 +8,7 @@ internal protocol _SequenceWrapperType {
 }
 
 extension Sequence
-  where Self : _SequenceWrapperType, Self.Iterator == Self.Base.Iterator {
+  where Self : _SequenceWrapper, Self.Iterator == Self.Base.Iterator {
   public func iterator() -> Base.Iterator {
     return self._base.iterator()
   }
@@ -43,14 +43,14 @@ extension Sequence
   }
 }
 
-internal protocol _CollectionWrapperType : _SequenceWrapperType {
+internal protocol _CollectionWrapper : _SequenceWrapper {
   typealias Base : Collection
   typealias Index : ForwardIndex = Base.Index
   var _base: Base {get}
 }
 
 extension Collection
-  where Self : _CollectionWrapperType, Self.Index == Self.Base.Index {
+  where Self : _CollectionWrapper, Self.Index == Self.Base.Index {
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
@@ -77,7 +77,7 @@ extension Collection
 }
 
 //===--- New stuff --------------------------------------------------------===//
-public protocol _prext_LazySequenceType : Sequence {
+public protocol _prext_LazySequence : Sequence {
   /// A Sequence that can contain the same elements as this one,
   /// possibly with a simpler type.
   ///
@@ -105,7 +105,7 @@ public protocol _prext_LazySequenceType : Sequence {
   var array: [Iterator.Element] {get}
 }
 
-extension _prext_LazySequenceType {
+extension _prext_LazySequence {
   /// an Array, created on-demand, containing the elements of this
   /// lazy Sequence.
   public var array: [Iterator.Element] {
@@ -113,17 +113,17 @@ extension _prext_LazySequenceType {
   }
 }
 
-extension _prext_LazySequenceType where Elements == Self {
+extension _prext_LazySequence where Elements == Self {
   public var elements: Self { return self }
 }
 
-extension _prext_LazySequenceType where Self : _SequenceWrapperType {
+extension _prext_LazySequence where Self : _SequenceWrapper {
   public var elements: Base { return _base }
 }
 
 /// A sequence that forwards its implementation to an underlying
 /// sequence instance while exposing lazy computations as methods.
-public struct _prext_LazySequence<Base_ : Sequence> : _SequenceWrapperType {
+public struct _prext_LazySequence<Base_ : Sequence> : _SequenceWrapper {
   var _base: Base_
 }
 
@@ -151,7 +151,7 @@ public extension Sequence
 //
 //===----------------------------------------------------------------------===//
 
-public protocol _prext_LazyCollectionType : Collection, _prext_LazySequenceType {
+public protocol _prext_LazyCollection : Collection, _prext_LazySequence {
   /// A Collection that can contain the same elements as this one,
   /// possibly with a simpler type.
   ///
@@ -161,18 +161,18 @@ public protocol _prext_LazyCollectionType : Collection, _prext_LazySequenceType 
 
 }
 
-extension _prext_LazyCollectionType where Elements == Self {
+extension _prext_LazyCollection where Elements == Self {
   public var elements: Self { return self }
 }
 
-extension _prext_LazyCollectionType where Self : _CollectionWrapperType {
+extension _prext_LazyCollection where Self : _CollectionWrapper {
   public var elements: Base { return _base }
 }
 
 /// A collection that forwards its implementation to an underlying
 /// collection instance while exposing lazy computations as methods.
 public struct _prext_LazyCollection<Base_ : Collection>
-  : /*_prext_LazyCollectionType,*/ _CollectionWrapperType {
+  : /*_prext_LazyCollection,*/ _CollectionWrapper {
 
   typealias Base = Base_
   typealias Index = Base.Index
@@ -226,7 +226,7 @@ public struct _prext_MapIterator<
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
 public struct _prext_MapSequence<Base : Sequence, T>
-  : _prext_LazySequenceType, _SequenceWrapperType {
+  : _prext_LazySequence, _SequenceWrapper {
 
   typealias Elements = _prext_MapSequence
 
@@ -246,7 +246,7 @@ public struct _prext_MapSequence<Base : Sequence, T>
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
 public struct _prext_MapCollection<Base : Collection, T>
-  : _prext_LazyCollectionType, _CollectionWrapperType {
+  : _prext_LazyCollection, _CollectionWrapper {
 
   public var startIndex: Base.Index { return _base.startIndex }
   public var endIndex: Base.Index { return _base.endIndex }
@@ -273,7 +273,7 @@ public struct _prext_MapCollection<Base : Collection, T>
 
 //===--- Support for lazy(s) ----------------------------------------------===//
 
-extension _prext_LazySequenceType {
+extension _prext_LazySequence {
   /// Return a `_prext_MapSequence` over this `Sequence`.  The elements of
   /// the result are computed lazily, each time they are read, by
   /// calling `transform` function on a base element.
@@ -284,7 +284,7 @@ extension _prext_LazySequenceType {
   }
 }
 
-extension _prext_LazyCollectionType {
+extension _prext_LazyCollection {
   /// Return a `_prext_MapCollection` over this `Collection`.  The elements of
   /// the result are computed lazily, each time they are read, by
   /// calling `transform` function on a base element.
@@ -300,7 +300,7 @@ extension _prext_LazyCollectionType {
  // End:
  
 //===--- New stuff --------------------------------------------------------===//
-internal protocol __prext_ReverseCollectionType : _prext_LazyCollectionType {
+internal protocol __prext_ReverseCollection : _prext_LazyCollection {
   typealias Base : Collection
   var _base : Base {get}
 }
@@ -386,7 +386,7 @@ public func == <I> (lhs: _prext_ReverseRandomAccessIndex<I>, rhs: _prext_Reverse
 }
 
 extension Collection
-  where Self : __prext_ReverseCollectionType, Self.Base.Index : BidirectionalIndex {
+  where Self : __prext_ReverseCollection, Self.Base.Index : BidirectionalIndex {
   public var startIndex : _prext_ReverseIndex<Base.Index> {
     return _prext_ReverseIndex<Base.Index>(_base.endIndex)
   }
@@ -400,7 +400,7 @@ extension Collection
 
 
 extension Collection
-  where Self : __prext_ReverseCollectionType, Self.Base.Index : RandomAccessIndex {
+  where Self : __prext_ReverseCollection, Self.Base.Index : RandomAccessIndex {
   public var startIndex : _prext_ReverseRandomAccessIndex<Base.Index> {
     return _prext_ReverseRandomAccessIndex<Base.Index>(_base.endIndex)
   }
@@ -419,7 +419,7 @@ extension Collection
 /// The lazy `Collection` returned by `reverse(c)` where `c` is a
 /// `Collection` with an `Index` conforming to `${IndexProtocol}`.
 public struct _prext_ReverseCollection<Base : Collection>
-  : Collection, __prext_ReverseCollectionType {
+  : Collection, __prext_ReverseCollection {
 
   public init(_ _base: Base) {
     self._base = _base

@@ -14,16 +14,16 @@
 //  a little bit with Cocoa.  Because we want to keep the core
 //  decoupled from the Foundation module, we can't use NSArray
 //  directly.  We _can_, however, use an @objc protocol with a
-//  compatible API.  That's _NSArrayCoreType.
+//  compatible API.  That's _NSArrayCore.
 //
 //===----------------------------------------------------------------------===//
 
 #if _runtime(_ObjC)
 import SwiftShims
 
-/// A wrapper around any `_NSArrayCoreType` that gives it
+/// A wrapper around any `_NSArrayCore` that gives it
 /// `Collection` conformance.  Why not make
-/// `_NSArrayCoreType` conform directly?  It's a class, and I
+/// `_NSArrayCore` conform directly?  It's a class, and I
 /// don't want to pay for the dynamic dispatch overhead.
 internal struct _CocoaArrayWrapper : Collection {
   var startIndex: Int {
@@ -67,10 +67,10 @@ internal struct _CocoaArrayWrapper : Collection {
   }
 
   @_transparent
-  init(_ buffer: _NSArrayCoreType) {
+  init(_ buffer: _NSArrayCore) {
     self.buffer = buffer
   }
 
-  var buffer: _NSArrayCoreType
+  var buffer: _NSArrayCore
 }
 #endif

@@ -25,8 +25,8 @@ ${MirrorDecl} {
 
     var count: Int { return 3 }
 
-    subscript(i: Int) -> (String, _MirrorType) {
-      _precondition(i >= 0 && i < count, "_MirrorType access out of bounds")
+    subscript(i: Int) -> (String, _Mirror) {
+      _precondition(i >= 0 && i < count, "_Mirror access out of bounds")
       switch i {
       case 0: return ("${Self[1]}",_reflect(_value.start))
       case 1: return ("${Self[2]}",_reflect(_value.end))

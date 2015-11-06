@@ -1080,7 +1080,7 @@ Reflection.test("Struct/NonGeneric/DefaultMirror") {
 
   do {
     // Build a String around an interpolation as a way of smoke-testing that
-    // the internal _MirrorType implementation gets memory management right.
+    // the internal _Mirror implementation gets memory management right.
     var output = ""
     dump(StructWithDefaultMirror("\(456)"), &output)
     expectEqual("▿ a.StructWithDefaultMirror\n  - s: 456\n", output)
@@ -1428,7 +1428,7 @@ Reflection.test("Enum/IndirectGeneric/DefaultMirror") {
 }
 
 /// A type that provides its own mirror.
-struct BrilliantMirror : _MirrorType {
+struct BrilliantMirror : _Mirror {
   let _value: Brilliant
 
   init (_ _value: Brilliant) {
@@ -1451,7 +1451,7 @@ struct BrilliantMirror : _MirrorType {
     return 3
   }
 
-  subscript(i: Int) -> (String, _MirrorType) {
+  subscript(i: Int) -> (String, _Mirror) {
     switch i {
     case 0:
       return ("first", _reflect(_value.first))
@@ -1486,7 +1486,7 @@ class Brilliant : _Reflectable {
     self.second = snd
   }
 
-  func _getMirror() -> _MirrorType {
+  func _getMirror() -> _Mirror {
     return BrilliantMirror(self)
   }
 }
@@ -1749,7 +1749,7 @@ Reflection.test("TupleMirror") {
 
 class DullClass {}
 Reflection.test("ObjectIdentity") {
-  // Check that the primitive _MirrorType implementation produces appropriately
+  // Check that the primitive _Mirror implementation produces appropriately
   // unique identifiers for class instances.
 
   let x = DullClass()

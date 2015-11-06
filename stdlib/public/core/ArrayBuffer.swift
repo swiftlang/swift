@@ -19,7 +19,7 @@
 import SwiftShims
 
 internal typealias _ArrayBridgeStorage
-  = _BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCoreType>
+  = _BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>
 
 public struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
 
@@ -28,7 +28,7 @@ public struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
     _storage = _ArrayBridgeStorage(native: _emptyArrayStorage)
   }
 
-  public init(nsArray: _NSArrayCoreType) {
+  public init(nsArray: _NSArrayCore) {
     _sanityCheck(_isClassOrObjCExistential(Element.self))
     _storage = _ArrayBridgeStorage(objC: nsArray)
   }
@@ -117,7 +117,7 @@ extension _ArrayBuffer {
   /// - Precondition: `_isBridgedToObjectiveC(Element.self)`.
   ///   O(1) if the element type is bridged verbatim, O(N) otherwise.
   @warn_unused_result
-  public func _asCocoaArray() -> _NSArrayCoreType {
+  public func _asCocoaArray() -> _NSArrayCore {
     _sanityCheck(
       _isBridgedToObjectiveC(Element.self),
       "Array element type is not bridged to Objective-C")
@@ -504,7 +504,7 @@ extension _ArrayBuffer {
     return NativeBuffer(_storage.nativeInstance_noSpareBits)
   }
 
-  var _nonNative: _NSArrayCoreType {
+  var _nonNative: _NSArrayCore {
     @inline(__always)
     get {
       _sanityCheck(_isClassOrObjCExistential(Element.self))

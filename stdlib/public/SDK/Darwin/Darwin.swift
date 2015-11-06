@@ -44,7 +44,7 @@ public struct DarwinBoolean : Boolean, BooleanLiteralConvertible {
 
 extension DarwinBoolean : _Reflectable {
   /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> _MirrorType {
+  public func _getMirror() -> _Mirror {
     return _reflect(boolValue)
   }
 }

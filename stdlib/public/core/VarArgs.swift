@@ -46,7 +46,7 @@ protocol _CVarArgPassedAsDouble : CVarArg {}
 
 /// Some types require alignment greater than Int on some architectures.
 public // SPI(CoreGraphics)
-protocol _CVarArgAlignedType : CVarArg {
+protocol _CVarArgAligned : CVarArg {
   /// Return the required alignment in bytes of 
   /// the value returned by `_cVarArgEncoding`.
   var _cVarArgAlignment: Int { get }
@@ -128,7 +128,7 @@ extension Int : CVarArg {
   }
 }
 
-extension Int64 : CVarArg, _CVarArgAlignedType {
+extension Int64 : CVarArg, _CVarArgAligned {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Int] {
@@ -176,7 +176,7 @@ extension UInt : CVarArg {
   }
 }
 
-extension UInt64 : CVarArg, _CVarArgAlignedType {
+extension UInt64 : CVarArg, _CVarArgAligned {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Int] {
@@ -249,7 +249,7 @@ extension AutoreleasingUnsafeMutablePointer : CVarArg {
 }
 #endif
 
-extension Float : _CVarArgPassedAsDouble, _CVarArgAlignedType {
+extension Float : _CVarArgPassedAsDouble, _CVarArgAligned {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Int] {
@@ -264,7 +264,7 @@ extension Float : _CVarArgPassedAsDouble, _CVarArgAlignedType {
   }
 }
 
-extension Double : _CVarArgPassedAsDouble, _CVarArgAlignedType {
+extension Double : _CVarArgPassedAsDouble, _CVarArgAligned {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Int] {
@@ -292,7 +292,7 @@ final public class VaListBuilder {
     // FIXME: this implementation is not portable because
     // alignof differs from the ABI alignment on some architectures
 #if os(watchOS) && arch(arm)   // FIXME: rdar://21203036 should be arch(armv7k)
-    if let arg = arg as? _CVarArgAlignedType {
+    if let arg = arg as? _CVarArgAligned {
       let alignmentInWords = arg._cVarArgAlignment / sizeof(Int)
       let misalignmentInWords = count % alignmentInWords
       if misalignmentInWords != 0 {

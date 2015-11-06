@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 //  _ContiguousArrayStorageBase supplies the implementation of the
-//  _NSArrayCoreType API (and thus, NSArray the API) for our
+//  _NSArrayCore API (and thus, NSArray the API) for our
 //  _ContiguousArrayStorage<T>.  We can't put this implementation
 //  directly on _ContiguousArrayStorage because generic classes can't
 //  override Objective-C selectors.
@@ -50,7 +50,7 @@ class _SwiftNativeNSArrayWithContiguousStorage
 }
 
 // Implement the APIs required by NSArray 
-extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
+extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
   @objc internal var count: Int {
     return withUnsafeBufferOfObjects { $0.count }
   }

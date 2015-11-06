@@ -426,7 +426,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   ///
   /// - Complexity: O(1).
   @warn_unused_result
-  public func _asCocoaArray() -> _NSArrayCoreType {
+  public func _asCocoaArray() -> _NSArrayCore {
     _sanityCheck(
         _isBridgedToObjectiveC(Element.self),
         "Array element type is not bridged to Objective-C")

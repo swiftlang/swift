@@ -17,10 +17,10 @@ class Story {
   }
 }
 
-protocol StoriedType {
+protocol Storied {
   var protocolRequirement: [Block] { get set }
 }
 
-func testProtocol<T: StoriedType>(inout x: T) {
+func testProtocol<T: Storied>(inout x: T) {
   swap(&x.protocolRequirement[0], &x.protocolRequirement[1])
 }

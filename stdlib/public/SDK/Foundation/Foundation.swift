@@ -463,7 +463,7 @@ extension Array : _ObjectiveCBridgeable {
     // and watchOS.
     self = Array(
       _immutableCocoaArray:
-        unsafeBitCast(_cocoaArray.copyWithZone(nil), _NSArrayCoreType.self))
+        unsafeBitCast(_cocoaArray.copyWithZone(nil), _NSArrayCore.self))
   }
 
   public static func _isBridgedToObjectiveC() -> Bool {
@@ -534,7 +534,7 @@ extension Dictionary {
   ///
   /// The provided `NSDictionary` will be copied to ensure that the copy can
   /// not be mutated by other code.
-  public init(_cocoaDictionary: _NSDictionaryType) {
+  public init(_cocoaDictionary: _NSDictionary) {
     _sanityCheck(
       _isBridgedVerbatimToObjectiveC(Key.self) &&
       _isBridgedVerbatimToObjectiveC(Value.self),
@@ -550,7 +550,7 @@ extension Dictionary {
     // and watchOS.
     self = Dictionary(
       _immutableCocoaDictionary:
-        unsafeBitCast(_cocoaDictionary.copyWithZone(nil), _NSDictionaryType.self))
+        unsafeBitCast(_cocoaDictionary.copyWithZone(nil), _NSDictionary.self))
   }
 }
 
@@ -626,7 +626,7 @@ extension Dictionary : _ObjectiveCBridgeable {
     if _isBridgedVerbatimToObjectiveC(Key.self) &&
        _isBridgedVerbatimToObjectiveC(Value.self) {
       result = [Key : Value](
-        _cocoaDictionary: unsafeBitCast(d, _NSDictionaryType.self))
+        _cocoaDictionary: unsafeBitCast(d, _NSDictionary.self))
       return
     }
 
@@ -748,7 +748,7 @@ extension Set {
   ///
   /// The provided `NSSet` will be copied to ensure that the copy can
   /// not be mutated by other code.
-  public init(_cocoaSet: _NSSetType) {
+  public init(_cocoaSet: _NSSet) {
     _sanityCheck(_isBridgedVerbatimToObjectiveC(Element.self),
       "Set can be backed by NSSet _variantStorage only when the member type can be bridged verbatim to Objective-C")
     // FIXME: We would like to call CFSetCreateCopy() to avoid doing an
@@ -762,7 +762,7 @@ extension Set {
     // and watchOS.
     self = Set(
       _immutableCocoaSet:
-        unsafeBitCast(_cocoaSet.copyWithZone(nil), _NSSetType.self))
+        unsafeBitCast(_cocoaSet.copyWithZone(nil), _NSSet.self))
   }
 }
 
@@ -881,7 +881,7 @@ extension Set : _ObjectiveCBridgeable {
     }
 
     if _isBridgedVerbatimToObjectiveC(Element.self) {
-      result = Set<Element>(_cocoaSet: unsafeBitCast(s, _NSSetType.self))
+      result = Set<Element>(_cocoaSet: unsafeBitCast(s, _NSSet.self))
       return
     }
 

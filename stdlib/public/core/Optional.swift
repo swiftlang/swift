@@ -48,7 +48,7 @@ public enum Optional<Wrapped> : _Reflectable, NilLiteralConvertible {
 
   /// Returns a mirror that reflects `self`.
   @warn_unused_result
-  public func _getMirror() -> _MirrorType {
+  public func _getMirror() -> _Mirror {
     return _OptionalMirror(self)
   }
 
@@ -191,7 +191,7 @@ public func != <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   }
 }
 
-internal struct _OptionalMirror<Wrapped> : _MirrorType {
+internal struct _OptionalMirror<Wrapped> : _Mirror {
   let _value : Optional<Wrapped>
 
   init(_ x : Optional<Wrapped>) {
@@ -206,7 +206,7 @@ internal struct _OptionalMirror<Wrapped> : _MirrorType {
 
   var count: Int { return (_value != nil) ? 1 : 0 }
 
-  subscript(i: Int) -> (String, _MirrorType) {
+  subscript(i: Int) -> (String, _Mirror) {
     switch (_value, i) {
     case (.Some(let contents), 0) : return ("Some", _reflect(contents))
     default: _preconditionFailure("cannot extract this child index")

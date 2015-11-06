@@ -82,7 +82,7 @@ protocol _ArrayProtocol
 
 internal struct _ArrayProtocolMirror<
   T : _ArrayProtocol where T.Index == Int
-> : _MirrorType {
+> : _Mirror {
   let _value : T
 
   init(_ v : T) { _value = v }
@@ -95,8 +95,8 @@ internal struct _ArrayProtocolMirror<
 
   var count: Int { return _value.count }
 
-  subscript(i: Int) -> (String, _MirrorType) {
-    _precondition(i >= 0 && i < count, "_MirrorType access out of bounds")
+  subscript(i: Int) -> (String, _Mirror) {
+    _precondition(i >= 0 && i < count, "_Mirror access out of bounds")
     return ("[\(i)]", _reflect(_value[_value.startIndex + i]))
   }
 

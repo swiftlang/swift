@@ -249,10 +249,10 @@ public struct _StringCore {
 
 #if _runtime(_ObjC)
   /// the Cocoa String buffer, if any, or `nil`.
-  public var cocoaBuffer: _CocoaStringType? {
+  public var cocoaBuffer: _CocoaString? {
     if hasCocoaBuffer {
       return _owner.map {
-        unsafeBitCast($0, _CocoaStringType.self)
+        unsafeBitCast($0, _CocoaString.self)
       }
     }
     return nil
@@ -321,7 +321,7 @@ public struct _StringCore {
 
   /// Write the string, in the given encoding, to output.
   func encode<
-    Encoding: UnicodeCodecType
+    Encoding: UnicodeCodec
   >(encoding: Encoding.Type, output: (Encoding.CodeUnit) -> Void)
   {
     if _fastPath(_baseAddress != nil) {

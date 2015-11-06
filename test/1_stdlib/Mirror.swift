@@ -695,7 +695,7 @@ mirrors.test("Invalid Path Type")
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
-  struct X : MirrorPathType {}
+  struct X : MirrorPath {}
   let m = Mirror(reflecting: [1, 2, 3])
   expectEqual(1, m.descendant(0) as? Int)
   expectCrashLater()

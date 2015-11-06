@@ -15,7 +15,7 @@
 // CHECK-NEXT: "someGlobal"
 // CHECK-NEXT: "ExtraFloatLiteralConvertible"
 // CHECK-NEXT: "~~~"
-// CHECK-NEXT: "ThreeTildeType"
+// CHECK-NEXT: "ThreeTilde"
 // CHECK-NEXT: "overloadedOnProto"
 // CHECK-NEXT: "overloadedOnProto"
 // CHECK-NEXT: "topLevelComputedProperty"
@@ -109,15 +109,15 @@ private protocol ExtraCharLiteralConvertible : UnicodeScalarLiteralConvertible {
 }
 
 prefix operator ~~~ {}
-protocol ThreeTildeType {
+protocol ThreeTilde {
   prefix func ~~~(lhs: Self)
 }
 
-private struct ThreeTildeTypeImpl : ThreeTildeType {
+private struct ThreeTildeTypeImpl : ThreeTilde {
 }
 
 func overloadedOnProto<T>(_: T) {}
-func overloadedOnProto<T: ThreeTildeType>(_: T) {}
+func overloadedOnProto<T: ThreeTilde>(_: T) {}
 
 // CHECK-DAG: !private "~~~"
 private prefix func ~~~(_: ThreeTildeTypeImpl) {}

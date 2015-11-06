@@ -162,7 +162,7 @@ extension LazySequenceProtocol where Elements == Self {
 ///
 /// - See also: `LazySequenceProtocol`
 public struct LazySequence<Base : Sequence>
-  : LazySequenceProtocol, _SequenceWrapperType {
+  : LazySequenceProtocol, _SequenceWrapper {
 
   /// Creates a sequence that has the same elements as `base`, but on
   /// which some operations such as `map` and `filter` are implemented

@@ -211,7 +211,7 @@ extension String {
 
     /// Returns a mirror that reflects `self`.
     @warn_unused_result
-    public func _getMirror() -> _MirrorType {
+    public func _getMirror() -> _Mirror {
       return _UnicodeScalarViewMirror(self)
     }
 

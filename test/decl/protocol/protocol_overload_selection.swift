@@ -37,15 +37,15 @@ C: MutableCollection
 }
 
 // rdar://problem/21322215
-protocol FactoryType {
+protocol FactoryProtocol {
   typealias Item
 }
 
-protocol MyCollectionType : Swift.Collection {}
+protocol MyCollection : Swift.Collection {}
 
 struct TestClass<
-  Factory: FactoryType,
-  NodeCollection: MyCollectionType
+  Factory : FactoryProtocol,
+  NodeCollection : MyCollection
   where
   NodeCollection.Iterator.Element == Factory.Item
 > {

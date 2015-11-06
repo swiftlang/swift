@@ -40,8 +40,8 @@ ${MirrorDecl} {
 
   var count: Int { return ${Count} }
 
-  subscript(i: Int) -> (String, _MirrorType) {
-    _precondition(i >= 0 && i < count, "_MirrorType access out of bounds")
+  subscript(i: Int) -> (String, _Mirror) {
+    _precondition(i >= 0 && i < count, "_Mirror access out of bounds")
     return ("${ElementName}", _reflect(_value[_value.startIndex.advancedBy(i)]))
   }
 
