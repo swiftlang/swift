@@ -1206,6 +1206,16 @@ bb0(%0 : $E):
   return %2 : $E
 }
 
+// CHECK-LABEL: sil @unchecked_ref_cast_open_existential_ref : $@convention(thin) (AnyObject) -> AnyObject {
+// CHECK: bb0(%0 : $AnyObject):
+// CHECK-NEXT: return %0 : $AnyObject
+sil @unchecked_ref_cast_open_existential_ref : $@convention(thin) (AnyObject) -> AnyObject {
+bb0(%0 : $AnyObject):
+  %1 = open_existential_ref %0 : $AnyObject to $@opened("F06A1466-8414-11E5-81D5-685B35C48C83") AnyObject
+  %2 = unchecked_ref_cast %1 : $@opened("F06A1466-8414-11E5-81D5-685B35C48C83") AnyObject to $AnyObject
+  return %2 : $AnyObject
+}
+
 // CHECK-LABEL: sil @unchecked_ref_cast_upcast_combine : $@convention(thin) (E) -> Builtin.NativeObject {
 // CHECK: bb0
 // CHECK-NEXT: unchecked_ref_cast

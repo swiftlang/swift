@@ -326,6 +326,11 @@ visitUncheckedRefCastInst(UncheckedRefCastInst *OPRI) {
     if (UI->getOperand().getType() == OPRI->getType())
       return UI->getOperand();
 
+  // (unchecked-ref-cast Y->X (open_existential_ref x X->Y)) -> x
+  if (auto *OER = dyn_cast<OpenExistentialRefInst>(OPRI->getOperand()))
+    if (OER->getOperand().getType() == OPRI->getType())
+      return OER->getOperand();
+
   // (unchecked-ref-cast X->X x) -> x
   if (OPRI->getOperand().getType() == OPRI->getType())
     return OPRI->getOperand();
