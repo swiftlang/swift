@@ -10,5 +10,6 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     LINK_FLAGS "-Wl,-rpath -Wl,@executable_path/../lib")
 endif()
 
-install(TARGETS sourcekitd-repl
-  RUNTIME DESTINATION bin)
+swift_install_in_component(tools
+    TARGETS sourcekitd-repl
+    RUNTIME DESTINATION bin)
