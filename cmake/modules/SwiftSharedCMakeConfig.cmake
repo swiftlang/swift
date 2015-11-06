@@ -109,6 +109,8 @@ endfunction()
 #   is_cross_compiling
 #     Whether this is cross-compiling host tools.
 macro(swift_common_standalone_build_config product is_cross_compiling)
+  option(LLVM_ENABLE_WARNINGS "Enable compiler warnings." ON)
+
   if(${is_cross_compiling})
     # Can't run llvm-config from the cross-compiled LLVM.
     set(LLVM_TOOLS_BINARY_DIR "" CACHE PATH "Path to llvm/bin")
