@@ -20,7 +20,7 @@ set(SWIFTLIB_ESSENTIAL
   Algorithm.swift
   ArrayBody.swift
   ArrayBuffer.swift
-  ArrayBufferType.swift
+  ArrayBufferProtocol.swift
   ArrayCast.swift
   ArrayType.swift
   Arrays.swift.gyb

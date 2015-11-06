@@ -184,7 +184,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
   }
 }
 
-public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
+public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
 
   /// Make a buffer with uninitialized elements.  After using this
   /// method, you must either initialize the count elements at the
@@ -275,7 +275,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
       UnsafeMutableBufferPointer(start: firstElementAddress, count: count))
   }
 
-  //===--- _ArrayBufferType conformance -----------------------------------===//
+  //===--- _ArrayBufferProtocol conformance -----------------------------------===//
   /// Create an empty buffer.
   public init() {
     __bufferPointer = ManagedBufferPointer(

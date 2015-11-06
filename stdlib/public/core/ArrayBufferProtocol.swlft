@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 /// The underlying buffer for an ArrayType conforms to
-/// `_ArrayBufferType`.  This buffer does not provide value semantics.
-public protocol _ArrayBufferType : MutableCollection {
+/// `_ArrayBufferProtocol`.  This buffer does not provide value semantics.
+public protocol _ArrayBufferProtocol : MutableCollection {
   /// The type of elements stored in the buffer.
   typealias Element
 
@@ -120,7 +120,7 @@ public protocol _ArrayBufferType : MutableCollection {
   var startIndex: Int {get}
 }
 
-extension _ArrayBufferType {
+extension _ArrayBufferProtocol {
   public var subscriptBaseAddress: UnsafeMutablePointer<Element> {
     return firstElementAddress
   }

@@ -910,7 +910,7 @@ internal struct _InitializeMemoryFromCollection<
 
 @inline(never)
 internal func _arrayOutOfPlaceReplace<
-  B : _ArrayBufferType, C : Collection
+  B : _ArrayBufferProtocol, C : Collection
   where
   C.Iterator.Element == B.Element,
   B.Index == Int
@@ -1026,7 +1026,7 @@ public func += <
 ///   max(requiredCapacity, source.capacity)  if newCount <= source.capacity
 ///   max(requiredCapacity, _growArrayCapacity(source.capacity)) otherwise
 @inline(never)
-internal func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferType>(
+internal func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferProtocol>(
   inout source: _Buffer, newCount: Int, requiredCapacity: Int
 ) -> _ContiguousArrayBuffer<_Buffer.Element> {
   return _forceCreateUniqueMutableBufferImpl(
@@ -1042,7 +1042,7 @@ internal func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferType>(
 ///   max(minNewCapacity, _growArrayCapacity(source.capacity)) otherwise
 @inline(never)
 internal
-func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferType>(
+func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferProtocol>(
   inout source: _Buffer,  countForNewBuffer: Int,  minNewCapacity: Int
 ) -> _ContiguousArrayBuffer<_Buffer.Element> {
   return _forceCreateUniqueMutableBufferImpl(
@@ -1057,7 +1057,7 @@ func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferType>(
 /// The formula used to compute the new capacity is:
 ///  max(requiredCapacity, source.capacity) if minNewCapacity <= source.capacity
 ///  max(requiredCapacity, _growArrayCapacity(source.capacity))  otherwise
-internal func _forceCreateUniqueMutableBufferImpl<_Buffer : _ArrayBufferType>(
+internal func _forceCreateUniqueMutableBufferImpl<_Buffer : _ArrayBufferProtocol>(
   inout source: _Buffer,  countForBuffer: Int, minNewCapacity: Int,
   requiredCapacity: Int
 ) -> _ContiguousArrayBuffer<_Buffer.Element> {
@@ -1087,7 +1087,7 @@ internal protocol _PointerFunctionType {
 /// copying when it isUniquelyReferenced.
 @inline(never)
 internal func _arrayOutOfPlaceUpdate<
-  _Buffer : _ArrayBufferType, Initializer : _PointerFunctionType
+  _Buffer : _ArrayBufferProtocol, Initializer : _PointerFunctionType
   where Initializer.Element == _Buffer.Element,
   _Buffer.Index == Int
 >(
@@ -1174,7 +1174,7 @@ internal struct _IgnorePointer<T> : _PointerFunctionType {
 }
 
 internal func _arrayReserve<
-  _Buffer : _ArrayBufferType where _Buffer.Index == Int
+  _Buffer : _ArrayBufferProtocol where _Buffer.Index == Int
 >(
   inout buffer: _Buffer, _ minimumCapacity: Int
 ) {
@@ -1194,7 +1194,7 @@ internal func _arrayReserve<
 
 public // SPI(Foundation)
 func _extractOrCopyToNativeArrayBuffer<
-  Buffer : _ArrayBufferType
+  Buffer : _ArrayBufferProtocol
   where
   Buffer.Iterator.Element == Buffer.Element
 >(source: Buffer)
@@ -1208,7 +1208,7 @@ func _extractOrCopyToNativeArrayBuffer<
 
 /// Append items from `newItems` to `buffer`.
 internal func _arrayAppendSequence<
-  Buffer : _ArrayBufferType,
+  Buffer : _ArrayBufferProtocol,
   S : Sequence
   where
   S.Iterator.Element == Buffer.Element,

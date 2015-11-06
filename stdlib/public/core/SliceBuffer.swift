@@ -12,7 +12,7 @@
 
 /// Buffer type for `ArraySlice<Element>`.
 public // @testable
-struct _SliceBuffer<Element> : _ArrayBufferType {
+struct _SliceBuffer<Element> : _ArrayBufferProtocol {
   internal typealias NativeStorage = _ContiguousArrayStorage<Element>
   public typealias NativeBuffer = _ContiguousArrayBuffer<Element>
 

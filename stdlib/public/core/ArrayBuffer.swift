@@ -21,7 +21,7 @@ import SwiftShims
 internal typealias _ArrayBridgeStorage
   = _BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCoreType>
 
-public struct _ArrayBuffer<Element> : _ArrayBufferType {
+public struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
 
   /// Create an empty buffer.
   public init() {
