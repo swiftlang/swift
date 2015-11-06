@@ -20,17 +20,6 @@ if(SPHINX_EXECUTABLE)
       . ${CMAKE_BINARY_DIR}/docs/html
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Building HTML documentation")
-
-  # Selectively install docs intended for general consumption.
-  swift_install_in_component(lang-docs
-      FILES "${CMAKE_BINARY_DIR}/docs/archive/LangRef.html"
-      DESTINATION "share/swift/docs/html")
-
-  swift_install_in_component(lang-docs
-      DIRECTORY
-        "${CMAKE_BINARY_DIR}/docs/html/_static"
-        "${CMAKE_BINARY_DIR}/docs/html/whitepaper"
-      DESTINATION "share/swift/docs/html")
 else()
   message(WARNING "Unable to find sphinx-build program. Not building docs")
 endif()
