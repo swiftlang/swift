@@ -49,5 +49,6 @@ add_swift_library(swiftSILPasses
   SimplifyCFG.cpp
   Sink.cpp
   SpeculativeDevirtualizer.cpp
+  StackPromotion.cpp
   UsePrespecialized.cpp
   LINK_LIBRARIES swiftSILPassesUtils swiftSILAnalysis)
