@@ -58,11 +58,11 @@ RCStateTransitionKind getRCStateTransitionKind(ValueBase *V);
 //                             RCStateTransition
 //===----------------------------------------------------------------------===//
 
-struct RefCountState;
+class RefCountState;
 
 /// Represents a transition in the RC history of a ref count.
 class RCStateTransition {
-  friend struct RefCountState;
+  friend class RefCountState;
 
   /// An RCStateTransition can represent either an RC end point (i.e. an initial
   /// or terminal RC transition) or a ptr set of Mutators.
