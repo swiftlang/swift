@@ -27,7 +27,7 @@ func _XCTRegisterFailure(expected: Bool, _ condition: String, _ message: String,
 }
 
 /// Produce a failure description for the given assertion type.
-func _XCTFailureDescription(assertionType: _XCTAssertionType, _ formatIndex: UInt, _ expressionStrings: CVarArgType...) -> String {
+func _XCTFailureDescription(assertionType: _XCTAssertionType, _ formatIndex: UInt, _ expressionStrings: CVarArg...) -> String {
   // In order to avoid revlock/submission issues between XCTest and the Swift XCTest overlay,
   // we are using the convention with _XCTFailureFormat that (formatIndex >= 100) should be
   // treated just like (formatIndex - 100), but WITHOUT the expression strings. (Swift can't

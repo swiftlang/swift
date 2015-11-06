@@ -993,7 +993,7 @@ func NSLocalizedString(key: String,
 // NSLog
 //===----------------------------------------------------------------------===//
 
-public func NSLog(format: String, _ args: CVarArgType...) {
+public func NSLog(format: String, _ args: CVarArg...) {
   withVaList(args) { NSLogv(format, $0) }
 }
 
@@ -1062,7 +1062,7 @@ func _convertErrorProtocolToNSError(error: ErrorProtocol) -> NSError
 extension NSPredicate {
   // + (NSPredicate *)predicateWithFormat:(NSString *)predicateFormat, ...;
   public
-  convenience init(format predicateFormat: String, _ args: CVarArgType...) {
+  convenience init(format predicateFormat: String, _ args: CVarArg...) {
     let va_args = getVaList(args)
     self.init(format: predicateFormat, arguments: va_args)
   }
@@ -1071,14 +1071,14 @@ extension NSPredicate {
 extension NSExpression {
   // + (NSExpression *) expressionWithFormat:(NSString *)expressionFormat, ...;
   public
-  convenience init(format expressionFormat: String, _ args: CVarArgType...) {
+  convenience init(format expressionFormat: String, _ args: CVarArg...) {
     let va_args = getVaList(args)
     self.init(format: expressionFormat, arguments: va_args)
   }
 }
 
 extension NSString {
-  public convenience init(format: NSString, _ args: CVarArgType...) {
+  public convenience init(format: NSString, _ args: CVarArg...) {
     // We can't use withVaList because 'self' cannot be captured by a closure
     // before it has been initialized.
     let va_args = getVaList(args)
@@ -1086,7 +1086,7 @@ extension NSString {
   }
 
   public convenience init(
-    format: NSString, locale: NSLocale?, _ args: CVarArgType...
+    format: NSString, locale: NSLocale?, _ args: CVarArg...
   ) {
     // We can't use withVaList because 'self' cannot be captured by a closure
     // before it has been initialized.
@@ -1096,7 +1096,7 @@ extension NSString {
 
   @warn_unused_result
   public class func localizedStringWithFormat(
-    format: NSString, _ args: CVarArgType...
+    format: NSString, _ args: CVarArg...
   ) -> Self {
     return withVaList(args) {
       self.init(format: format as String, locale: NSLocale.currentLocale(), arguments: $0)
@@ -1104,7 +1104,7 @@ extension NSString {
   }
 
   @warn_unused_result
-  public func stringByAppendingFormat(format: NSString, _ args: CVarArgType...)
+  public func stringByAppendingFormat(format: NSString, _ args: CVarArg...)
   -> NSString {
     return withVaList(args) {
       self.stringByAppendingString(NSString(format: format as String, arguments: $0) as String) as NSString
@@ -1113,7 +1113,7 @@ extension NSString {
 }
 
 extension NSMutableString {
-  public func appendFormat(format: NSString, _ args: CVarArgType...) {
+  public func appendFormat(format: NSString, _ args: CVarArg...) {
     return withVaList(args) {
       self.appendString(NSString(format: format as String, arguments: $0) as String)
     }

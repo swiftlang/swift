@@ -262,7 +262,7 @@ public func == (lhs: NSObject, rhs: NSObject) -> Bool {
   return lhs.isEqual(rhs)
 }
 
-extension NSObject : CVarArgType {
+extension NSObject : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
   public var _cVarArgEncoding: [Int] {

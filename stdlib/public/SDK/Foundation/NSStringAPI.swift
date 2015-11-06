@@ -172,7 +172,7 @@ extension String {
   /// according to the user's default locale.
   @warn_unused_result
   public static func localizedStringWithFormat(
-    format: String, _ arguments: CVarArgType...
+    format: String, _ arguments: CVarArg...
   ) -> String {
     return String(format: format, locale: NSLocale.currentLocale(),
       arguments: arguments)
@@ -913,7 +913,7 @@ extension String {
   /// Returns a `String` object initialized by using a given
   /// format string as a template into which the remaining argument
   /// values are substituted.
-  public init(format: String, _ arguments: CVarArgType...) {
+  public init(format: String, _ arguments: CVarArg...) {
     self = String(format: format, arguments: arguments)
   }
 
@@ -924,7 +924,7 @@ extension String {
   /// Returns a `String` object initialized by using a given
   /// format string as a template into which the remaining argument
   /// values are substituted according to the user’s default locale.
-  public init(format: String, arguments: [CVarArgType]) {
+  public init(format: String, arguments: [CVarArg]) {
     self = String(format: format, locale: nil, arguments: arguments)
   }
 
@@ -933,7 +933,7 @@ extension String {
   /// Returns a `String` object initialized by using a given
   /// format string as a template into which the remaining argument
   /// values are substituted according to given locale information.
-  public init(format: String, locale: NSLocale?, _ args: CVarArgType...) {
+  public init(format: String, locale: NSLocale?, _ args: CVarArg...) {
     self = String(format: format, locale: locale, arguments: args)
   }
 
@@ -945,7 +945,7 @@ extension String {
   /// Returns a `String` object initialized by using a given
   /// format string as a template into which the remaining argument
   /// values are substituted according to given locale information.
-  public init(format: String, locale: NSLocale?, arguments: [CVarArgType]) {
+  public init(format: String, locale: NSLocale?, arguments: [CVarArg]) {
     _precondition(
       _countFormatSpecifiers(format) <= arguments.count,
       "Too many format specifiers (%<letter>) provided for the argument list"
@@ -1348,7 +1348,7 @@ extension String {
   /// arguments.
   @warn_unused_result
   public func stringByAppendingFormat(
-    format: String, _ arguments: CVarArgType...
+    format: String, _ arguments: CVarArg...
   ) -> String {
     return _ns.stringByAppendingString(
       String(format: format, arguments: arguments))

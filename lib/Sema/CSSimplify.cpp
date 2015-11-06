@@ -1738,11 +1738,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       
       auto isBridgeableTargetType = type2->isBridgeableObjectType();
       
-      // Allow bridged conversions to CVarArgType through NSObject.
+      // Allow bridged conversions to CVarArg through NSObject.
       if (!isBridgeableTargetType && type2->isExistentialType()) {
         if (auto nominalType = type2->getAs<NominalType>())
           isBridgeableTargetType = nominalType->getDecl()->getName() ==
-                                      TC.Context.Id_CVarArgType;
+                                      TC.Context.Id_CVarArg;
       }
       
       if (isBridgeableTargetType && TC.getBridgedToObjC(DC, type1)) {
