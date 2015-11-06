@@ -39,6 +39,7 @@ class MemLocation;
 class LoadStoreValue;
 using LoadStoreValueList = llvm::SmallVector<LoadStoreValue, 8>;
 using MemLocationValueMap = llvm::DenseMap<MemLocation, LoadStoreValue>; 
+using ValueTableMap = llvm::SmallMapVector<unsigned, LoadStoreValue, 8>;
 
 /// This class represents either a single SILValue or a covering of values that
 /// we can forward from via the introdution of a SILArgument. This enables us

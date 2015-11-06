@@ -89,10 +89,8 @@
 #include "llvm/ADT/BitVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/None.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/ADT/TinyPtrVector.h"
 
 using namespace swift;
 
@@ -147,6 +145,7 @@ class RLEContext {
   std::vector<MemLocation> MemLocationVault;
 
   /// Contains a map between MemLocation to their index in the MemLocationVault.
+  /// Use for fast lookup.
   llvm::DenseMap<MemLocation, unsigned> LocToBitIndex;
 
   /// Caches a list of projection paths to leaf nodes in the given type.
@@ -192,8 +191,8 @@ public:
   MemLocation &getMemLocation(const unsigned index);
 
   /// Given a MemLocation, gather all the LoadStoreValues for this MemLocation.
-  /// Return true if all there are concrete values for every part of the
-  /// MemLocation.
+  /// Return true if all there are concrete values (i.e. no covering value)
+  /// for every part of the MemLocation.
   bool gatherValues(SILInstruction *I, MemLocation &L, MemLocationValueMap &Vs);
 
   /// Dump all the MemLocations in the MemLocationVault.
@@ -234,7 +233,7 @@ class BBState {
   /// i.e. MemLocation and LoadStoreValue both represented as bit vector
   /// indices.
   ///
-  llvm::SmallMapVector<unsigned, LoadStoreValue, 8> ForwardSetVal;
+  ValueTableMap ForwardSetVal;
 
   /// Keep a list of *materialized* LoadStoreValues in the current basic block.
   llvm::SmallMapVector<MemLocation, SILValue, 8> MaterializedValues;
@@ -250,6 +249,29 @@ class BBState {
     ForwardSetOut = ForwardSetIn;
     return Changed;
   }
+
+  /// Merge in the state of an individual predecessor.
+  void mergePredecessorState(BBState &OtherState);
+
+  /// MemLocation read has been extracted, expanded and mapped to the bit
+  /// position in the bitvector. process it using the bit position.
+  void updateForwardSetForRead(RLEContext &Ctx, unsigned Bit,
+                               LoadStoreValue Val);
+
+  /// MemLocation written has been extracted, expanded and mapped to the bit
+  /// position in the bitvector. process it using the bit position.
+  void updateForwardSetForWrite(RLEContext &Ctx, unsigned Bit,
+                                LoadStoreValue Val);
+
+  /// There is a read to a MemLocation, expand the MemLocation into individual
+  /// fields before processing them.
+  void processRead(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
+                   SILValue Val, bool PF);
+
+  /// There is a write to a MemLocation, expand the MemLocation into individual
+  /// fields before processing them.
+  void processWrite(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
+                    SILValue Val);
 
   /// BitVector manipulation fucntions.
   void clearMemLocations();
@@ -280,12 +302,13 @@ public:
     ForwardSetOut.resize(bitcnt, true);
   }
 
-  llvm::SmallMapVector<unsigned, LoadStoreValue, 8> &getForwardSetVal() {
-    return ForwardSetVal;
-  }
+  /// Returns the map between MemLocations and their LoadStoreValues.
+  ValueTableMap &getForwardSetVal() { return ForwardSetVal; }
 
+  /// Returns the basic block this BBState represents.
   SILBasicBlock *getBB() const { return BB; }
 
+  /// Returns all the redundant load in the current basic block.
   llvm::DenseMap<SILInstruction *, SILValue> &getRL() { return RedundantLoads; }
 
   bool optimize(RLEContext &Ctx, bool PF);
@@ -298,38 +321,14 @@ public:
   mergePredecessorStates(llvm::DenseMap<SILBasicBlock *, unsigned> &BBToBBIDMap,
                          std::vector<BBState> &BBIDToBBStateMap);
 
-  /// Process Instruction which writes to memory in an unknown way.
-  void processUnknownWriteInst(RLEContext &Ctx, SILInstruction *I);
-
   /// Process LoadInst. Extract MemLocations from LoadInst.
   void processLoadInst(RLEContext &Ctx, LoadInst *LI, bool PF);
 
   /// Process LoadInst. Extract MemLocations from StoreInst.
   void processStoreInst(RLEContext &Ctx, StoreInst *SI);
 
-private:
-  /// Merge in the state of an individual predecessor.
-  void mergePredecessorState(BBState &OtherState);
-
-  /// MemLocation read has been extracted, expanded and mapped to the bit
-  /// position in the bitvector. process it using the bit position.
-  void updateForwardSetForRead(RLEContext &Ctx, unsigned Bit,
-                               LoadStoreValue Val);
-
-  /// MemLocation written has been extracted, expanded and mapped to the bit
-  /// position in the bitvector. process it using the bit position.
-  void updateForwardSetForWrite(RLEContext &Ctx, unsigned Bit,
-                                LoadStoreValue Val);
-
-  /// There is a read to a MemLocation, expand the MemLocation into individual
-  /// fields before processing them.
-  void processRead(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
-                   SILValue Val, bool PF);
-
-  /// There is a write to a MemLocation, expand the MemLocation into individual
-  /// fields before processing them.
-  void processWrite(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
-                    SILValue Val);
+  /// Process Instruction which writes to memory in an unknown way.
+  void processUnknownWriteInst(RLEContext &Ctx, SILInstruction *I);
 };
 
 } // end anonymous namespace
@@ -349,13 +348,11 @@ void BBState::clearMemLocations() {
 }
 
 void BBState::startTrackingMemLocation(unsigned bit, LoadStoreValue Val) {
-  assert(Val.isValid() && "Invalid load store value");
   ForwardSetIn.set(bit);
   ForwardSetVal[bit] = Val;
 }
 
 void BBState::updateTrackedMemLocation(unsigned bit, LoadStoreValue Val) {
-  assert(Val.isValid() && "Invalid load store value");
   ForwardSetVal[bit] = Val;
 }
 
