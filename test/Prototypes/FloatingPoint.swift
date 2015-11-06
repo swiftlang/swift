@@ -31,7 +31,7 @@ extension UInt32 : FloatingPointRepresentation {
   import Glibc
 #endif
 
-public protocol FloatingPoint : Comparable, SignedNumberType,
+public protocol FloatingPoint : Comparable, SignedNumber,
   IntegerLiteralConvertible,
 FloatLiteralConvertible {
   
@@ -359,11 +359,11 @@ FloatLiteralConvertible {
   /// Implements the IEEE-754 copy operation.
   prefix func +(value: Self) -> Self
   
-  //  IEEE-754 negate operation is prefix `-`, provided by SignedNumberType.
+  //  IEEE-754 negate operation is prefix `-`, provided by SignedNumber.
   //  TODO: ensure that the optimizer is able to produce a simple xor for -.
   
   //  IEEE-754 abs operation is the free function abs( ), provided by
-  //  SignedNumberType.  TODO: ensure that the optimizer is able to produce
+  //  SignedNumber.  TODO: ensure that the optimizer is able to produce
   //  a simple and or bic for abs( ).
   
   //  TODO: should this be the free function copysign(x, y) instead, a la C?

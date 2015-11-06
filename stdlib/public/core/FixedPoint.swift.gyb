@@ -65,7 +65,7 @@ public protocol Integer : _IntegerType, RandomAccessIndex {
 
 /// This protocol is an implementation detail of `SignedInteger`;
 /// do not use it directly.
-public protocol _SignedIntegerType : _IntegerType, SignedNumberType {
+public protocol _SignedIntegerType : _IntegerType, SignedNumber {
   /// Represent this number using Swift's widest native signed integer
   /// type.
   @warn_unused_result
@@ -443,7 +443,7 @@ extension ${Self} {
 
 % if signed:
 @_transparent
-extension ${Self} : SignedNumberType {}
+extension ${Self} : SignedNumber {}
 % end
 
 // construction from other integer types
