@@ -1500,6 +1500,10 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   Pattern *pattern = PBD->getPattern(patternNumber);
   Expr *init = PBD->getInit(patternNumber);
 
+  if (!init) {
+    PBD->setInvalid();
+    return true;
+  }
 
   // Enter an initializer context if necessary.
   PatternBindingInitializer *initContext = nullptr;
