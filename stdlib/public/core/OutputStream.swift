@@ -17,7 +17,7 @@ import SwiftShims
 //===----------------------------------------------------------------------===//
 
 /// A target of text streaming operations.
-public protocol OutputStreamType {
+public protocol OutputStream {
   mutating func _lock()
   mutating func _unlock()
 
@@ -25,7 +25,7 @@ public protocol OutputStreamType {
   mutating func write(string: String)
 }
 
-extension OutputStreamType {
+extension OutputStream {
   public mutating func _lock() {}
   public mutating func _unlock() {}
 }
@@ -36,7 +36,7 @@ extension OutputStreamType {
 /// For example: `String`, `Character`, `UnicodeScalar`.
 public protocol Streamable {
   /// Write a textual representation of `self` into `target`.
-  func writeTo<Target : OutputStreamType>(inout target: Target)
+  func writeTo<Target : OutputStream>(inout target: Target)
 }
 
 /// A type with a customized textual representation.
@@ -83,7 +83,7 @@ public protocol CustomDebugStringConvertible {
 //===----------------------------------------------------------------------===//
 
 /// Do our best to print a value that cannot be printed directly.
-internal func _adHocPrint<T, TargetStream : OutputStreamType>(
+internal func _adHocPrint<T, TargetStream : OutputStream>(
     value: T, inout _ target: TargetStream, isDebugPrint: Bool
 ) {
   func printTypeName(type: Any.Type) {
@@ -162,7 +162,7 @@ internal func _adHocPrint<T, TargetStream : OutputStreamType>(
 
 @inline(never)
 @_semantics("stdlib_binary_only")
-internal func _print_unlocked<T, TargetStream : OutputStreamType>(
+internal func _print_unlocked<T, TargetStream : OutputStream>(
   value: T, inout _ target: TargetStream
 ) {
   // Optional has no representation suitable for display; therefore,
@@ -217,7 +217,7 @@ func _toStringReadOnlyPrintable<T : CustomStringConvertible>(x: T) -> String {
 //===----------------------------------------------------------------------===//
 
 @inline(never)
-public func _debugPrint_unlocked<T, TargetStream : OutputStreamType>(
+public func _debugPrint_unlocked<T, TargetStream : OutputStream>(
     value: T, inout _ target: TargetStream
 ) {
   if let debugPrintableObject = value as? CustomDebugStringConvertible {
@@ -242,7 +242,7 @@ public func _debugPrint_unlocked<T, TargetStream : OutputStreamType>(
 // OutputStreams
 //===----------------------------------------------------------------------===//
 
-internal struct _Stdout : OutputStreamType {
+internal struct _Stdout : OutputStream {
   mutating func _lock() {
     _swift_stdlib_flockfile_stdout()
   }
@@ -261,7 +261,7 @@ internal struct _Stdout : OutputStreamType {
   }
 }
 
-extension String : OutputStreamType {
+extension String : OutputStream {
   /// Append `other` to this stream.
   public mutating func write(other: String) {
     self += other
@@ -274,21 +274,21 @@ extension String : OutputStreamType {
 
 extension String : Streamable {
   /// Write a textual representation of `self` into `target`.
-  public func writeTo<Target : OutputStreamType>(inout target: Target) {
+  public func writeTo<Target : OutputStream>(inout target: Target) {
     target.write(self)
   }
 }
 
 extension Character : Streamable {
   /// Write a textual representation of `self` into `target`.
-  public func writeTo<Target : OutputStreamType>(inout target: Target) {
+  public func writeTo<Target : OutputStream>(inout target: Target) {
     target.write(String(self))
   }
 }
 
 extension UnicodeScalar : Streamable {
   /// Write a textual representation of `self` into `target`.
-  public func writeTo<Target : OutputStreamType>(inout target: Target) {
+  public func writeTo<Target : OutputStream>(inout target: Target) {
     target.write(String(Character(self)))
   }
 }
@@ -297,9 +297,9 @@ extension UnicodeScalar : Streamable {
 public var _playgroundPrintHook : ((String)->Void)? = {_ in () }
 
 internal struct _TeeStream<
-  L : OutputStreamType, 
-  R : OutputStreamType
-> : OutputStreamType {
+  L : OutputStream, 
+  R : OutputStream
+> : OutputStream {
   var left: L
   var right: R
   
