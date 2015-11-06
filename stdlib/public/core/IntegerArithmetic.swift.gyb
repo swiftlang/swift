@@ -21,12 +21,12 @@ integerBinaryOps = [
 ] + [ ('remainder', '%', 'Divide', 'the remainder') ]
 }%
 
-/// This protocol is an implementation detail of `IntegerArithmeticType`; do
+/// This protocol is an implementation detail of `IntegerArithmetic`; do
 /// not use it directly.
 ///
-/// Its requirements are inherited by `IntegerArithmeticType` and thus must
+/// Its requirements are inherited by `IntegerArithmetic` and thus must
 /// be satisfied by types conforming to that protocol.
-public protocol _IntegerArithmeticType {
+public protocol _IntegerArithmetic {
 % for name,_,Action,result in integerBinaryOps:
   /// ${Action} `lhs` and `rhs`, returning ${result} and a `Bool` that is
   /// true iff the operation caused an arithmetic overflow.
@@ -35,7 +35,7 @@ public protocol _IntegerArithmeticType {
 }
 
 /// The common requirements for types that support integer arithmetic.
-public protocol IntegerArithmeticType : _IntegerArithmeticType, Comparable {
+public protocol IntegerArithmetic : _IntegerArithmetic, Comparable {
   // Checked arithmetic functions.  Specific implementations in
   // FixedPoint.swift.gyb support static checking for integer types.
 % for name,op,Action,result in integerBinaryOps:
@@ -56,7 +56,7 @@ public protocol IntegerArithmeticType : _IntegerArithmeticType, Comparable {
 /// arithmetic overflow (except in -Ounchecked builds).
 @_transparent
 @warn_unused_result
-public func ${op} <T : _IntegerArithmeticType>(lhs: T, rhs: T) -> T {
+public func ${op} <T : _IntegerArithmetic>(lhs: T, rhs: T) -> T {
   return _overflowChecked(T.${name}WithOverflow(lhs, rhs))
 }
 
@@ -64,7 +64,7 @@ public func ${op} <T : _IntegerArithmeticType>(lhs: T, rhs: T) -> T {
 /// ${name} `lhs` and `rhs`, silently discarding any overflow.
 @_transparent
 @warn_unused_result
-public func &${op} <T : _IntegerArithmeticType>(lhs: T, rhs: T) -> T {
+public func &${op} <T : _IntegerArithmetic>(lhs: T, rhs: T) -> T {
   return T.${name}WithOverflow(lhs, rhs).0
 }
 % end
@@ -72,7 +72,7 @@ public func &${op} <T : _IntegerArithmeticType>(lhs: T, rhs: T) -> T {
 /// ${name} `lhs` and `rhs` and store the result in `lhs`, trapping in
 /// case of arithmetic overflow (except in -Ounchecked builds).
 @_transparent
-public func ${op}= <T : _IntegerArithmeticType>(inout lhs: T, rhs: T) {
+public func ${op}= <T : _IntegerArithmetic>(inout lhs: T, rhs: T) {
   lhs = lhs ${op} rhs
 }
 % end

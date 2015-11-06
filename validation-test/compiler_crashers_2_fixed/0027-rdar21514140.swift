@@ -309,7 +309,7 @@ internal protocol _prext_ReverseIndexType : BidirectionalIndex {
   
   /// A type that can represent the number of steps between pairs of
   /// `_prext_ReverseIndex` values where one value is reachable from the other.
-  typealias Distance: _SignedIntegerType = Base.Distance
+  typealias Distance: _SignedInteger = Base.Distance
   
   var _base: Base { get }
   init(_ base: Base)

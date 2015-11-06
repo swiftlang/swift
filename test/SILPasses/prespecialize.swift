@@ -6,9 +6,9 @@
 // This test requires the standard library to be compiled with pre-specializations!
 
 // CHECK-LABEL: sil [noinline] @_TF13prespecialize4testFTRGSaSi_4sizeSi_T_ 
-// Look for generic specialization <Swift.Int with Swift.Int : Swift.ForwardIndex in Swift, Swift.Int with Swift.Int : Swift._SignedIntegerType in Swift, Swift.Int with Swift.Int : Swift._BuiltinIntegerLiteralConvertible in Swift, Swift.Int> of Swift.Range.iterator <A where A: Swift.ForwardIndex> (Swift.Range<A>)() -> Swift.RangeIterator<A>
+// Look for generic specialization <Swift.Int with Swift.Int : Swift.ForwardIndex in Swift, Swift.Int with Swift.Int : Swift._SignedInteger in Swift, Swift.Int with Swift.Int : Swift._BuiltinIntegerLiteralConvertible in Swift, Swift.Int> of Swift.Range.iterator <A where A: Swift.ForwardIndex> (Swift.Range<A>)() -> Swift.RangeIterator<A>
 // CHECK: function_ref @_TTSg5SiSis12ForwardIndexs_SiSis18_SignedIntegerTypes_SiSis33_BuiltinIntegerLiteralConvertibles_Si___TFVs5Range8iterator
-// Look for generic specialization <Swift.Int with Swift.Int : Swift.ForwardIndex in Swift, Swift.Int with Swift.Int : Swift._SignedIntegerType in Swift, Swift.Int with Swift.Int : Swift._BuiltinIntegerLiteralConvertible in Swift, Swift.Int> of Swift.RangeIterator.next <A where A: Swift.ForwardIndex> (inout Swift.RangeIterator<A>)() -> Swift.Optional<A>
+// Look for generic specialization <Swift.Int with Swift.Int : Swift.ForwardIndex in Swift, Swift.Int with Swift.Int : Swift._SignedInteger in Swift, Swift.Int with Swift.Int : Swift._BuiltinIntegerLiteralConvertible in Swift, Swift.Int> of Swift.RangeIterator.next <A where A: Swift.ForwardIndex> (inout Swift.RangeIterator<A>)() -> Swift.Optional<A>
 // CHECK: function_ref @_TTSg5SiSis12ForwardIndexs_SiSis18_SignedIntegerTypes_SiSis33_BuiltinIntegerLiteralConvertibles_Si___TFVs13RangeIterator4next
 // Look for generic specialization <Swift.Int> of Swift.Array.subscript.getter : (Swift.Int) -> A
 // CHECK: function_ref {{@_TTSg5Si___TFSag9subscriptFSix|@_TTSg5Si___TFSaap9subscriptFSix}}

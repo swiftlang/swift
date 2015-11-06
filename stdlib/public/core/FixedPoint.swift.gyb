@@ -48,24 +48,24 @@ public typealias UIntMax = ${UIntMax}
 
 /// This protocol is an implementation detail of `Integer`; do
 /// not use it directly.
-public protocol _IntegerType
+public protocol _Integer
   : _BuiltinIntegerLiteralConvertible,
     IntegerLiteralConvertible,
     CustomStringConvertible,
     Hashable,
-    IntegerArithmeticType,
+    IntegerArithmetic,
     BitwiseOperations,
     _Incrementable
 {
 }
 
 /// A set of common requirements for Swift's integer types.
-public protocol Integer : _IntegerType, RandomAccessIndex {
+public protocol Integer : _Integer, RandomAccessIndex {
 }
 
 /// This protocol is an implementation detail of `SignedInteger`;
 /// do not use it directly.
-public protocol _SignedIntegerType : _IntegerType, SignedNumber {
+public protocol _SignedInteger : _Integer, SignedNumber {
   /// Represent this number using Swift's widest native signed integer
   /// type.
   @warn_unused_result
@@ -77,7 +77,7 @@ public protocol _SignedIntegerType : _IntegerType, SignedNumber {
 }
 
 /// A set of common requirements for Swift's signed integer types.
-public protocol SignedInteger : _SignedIntegerType, Integer {
+public protocol SignedInteger : _SignedInteger, Integer {
   /// Represent this number using Swift's widest native signed integer
   /// type.
   func toIntMax() -> IntMax
@@ -89,7 +89,7 @@ public protocol SignedInteger : _SignedIntegerType, Integer {
 
 /// This protocol is an implementation detail of `UnsignedInteger`;
 /// do not use it directly.
-public protocol _DisallowMixedSignArithmetic : _IntegerType {
+public protocol _DisallowMixedSignArithmetic : _Integer {
   // Used to create a deliberate ambiguity in cases like UInt(1) +
   // Int(1), which would otherwise compile due to the arithmetic
   // operators defined for Strideable types (unsigned types are
@@ -120,7 +120,7 @@ public protocol UnsignedInteger : _DisallowMixedSignArithmetic, Integer {
 ///     func g(x: Int64) { f(numericCast(x)) }
 @warn_unused_result
 public func numericCast<
-  T : _SignedIntegerType, U : _SignedIntegerType
+  T : _SignedInteger, U : _SignedInteger
 >(x: T) -> U {
   return U(x.toIntMax())
 }
@@ -150,7 +150,7 @@ public func numericCast<
 ///     func g(x: Int64) { f(numericCast(x)) }
 @warn_unused_result
 public func numericCast<
-  T : _SignedIntegerType, U : UnsignedInteger
+  T : _SignedInteger, U : UnsignedInteger
 >(x: T) -> U {
   return U(UIntMax(x.toIntMax()))
 }
@@ -165,7 +165,7 @@ public func numericCast<
 ///     func g(x: UInt64) { f(numericCast(x)) }
 @warn_unused_result
 public func numericCast<
-T : UnsignedInteger, U : _SignedIntegerType
+T : UnsignedInteger, U : _SignedInteger
 >(x: T) -> U {
   return U(IntMax(x.toUIntMax()))
 }
