@@ -255,9 +255,6 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.addGlobalPropertyOpt();
   PM.addUpdateEscapeAnalysis();
 
-  // Do the first stack promotion on high-level SIL.
-  PM.addStackPromotion();
-
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 
@@ -291,9 +288,6 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.addClosureSpecializer();
 
   PM.addUpdateEscapeAnalysis();
-
-  // Do the second stack promotion on low-level SIL.
-  PM.addStackPromotion();
 
   // Speculate virtual call targets.
   PM.addSpeculativeDevirtualization();
