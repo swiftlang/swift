@@ -157,8 +157,7 @@ void ArgumentSource::forwardInto(SILGenFunction &SGF,
   // Reabstract.
   ManagedValue outputValue =
     SGF.emitSubstToOrigValue(loc, inputValue, origFormalType,
-                             substFormalType, substFormalType,
-                             SGFContext(dest));
+                             substFormalType, SGFContext(dest));
   if (outputValue.isInContext()) return;
 
   // Use RValue's forward-into-initialization code.  We have to lie to

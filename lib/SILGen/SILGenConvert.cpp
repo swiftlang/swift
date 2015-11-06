@@ -49,8 +49,9 @@ SILGenFunction::emitInjectOptional(SILLocation loc,
 
   auto loweredTy = getLoweredType(opaque, substObjectType);
   if (v.getType() != loweredTy)
-    v = emitSubstToOrigValue(loc, v, opaque,
-                             inputFormalType, substObjectType);
+    v = emitTransformedValue(loc, v,
+                             AbstractionPattern(inputFormalType), inputFormalType,
+                             opaque, substObjectType);
 
   auto someDecl = getASTContext().getOptionalSomeDecl(substOTK);
   SILType optTy = getLoweredType(substFormalType);
@@ -286,7 +287,7 @@ ManagedValue SILGenFunction::emitUncheckedGetOptionalValueFrom(SILLocation loc,
   
   // Reabstract it to the substituted form, if necessary.
   return emitOrigToSubstValue(loc, payload, AbstractionPattern::getOpaque(),
-                              formalPayloadTy, formalPayloadTy, C);
+                              formalPayloadTy, C);
 }
 
 /// Emit an optional-to-optional transformation.

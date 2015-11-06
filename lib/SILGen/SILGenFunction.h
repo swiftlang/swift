@@ -1393,16 +1393,29 @@ public:
   /// to a value with the abstraction patterns of the substituted type.
   ManagedValue emitOrigToSubstValue(SILLocation loc, ManagedValue input,
                                     AbstractionPattern origType,
-                                    CanType inputType,
-                                    CanType substType = CanType(),
+                                    CanType substType,
                                     SGFContext ctx = SGFContext());
 
   /// Convert a value with the abstraction patterns of the substituted
   /// type to a value with the abstraction patterns of the original type.
   ManagedValue emitSubstToOrigValue(SILLocation loc, ManagedValue input,
                                     AbstractionPattern origType,
+                                    CanType substType,
+                                    SGFContext ctx = SGFContext());
+
+  /// Transform the AST-level types in the function signature without an
+  /// abstraction or representation change.
+  ManagedValue emitTransformedValue(SILLocation loc, ManagedValue input,
                                     CanType inputType,
-                                    CanType substType = CanType(),
+                                    CanType outputType,
+                                    SGFContext ctx = SGFContext());
+
+  /// Most general form of the above.
+  ManagedValue emitTransformedValue(SILLocation loc, ManagedValue input,
+                                    AbstractionPattern inputOrigType,
+                                    CanType inputSubstType,
+                                    AbstractionPattern outputOrigType,
+                                    CanType outputSubstType,
                                     SGFContext ctx = SGFContext());
 
   /// Build the type of a function transformation thunk.

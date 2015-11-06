@@ -1244,14 +1244,12 @@ namespace {
     ManagedValue untranslate(SILGenFunction &gen, SILLocation loc,
                              ManagedValue mv, SGFContext c) && override {
       return gen.emitSubstToOrigValue(loc, mv, OrigType,
-                                      getSubstFormalType(),
                                       getSubstFormalType(), c);
     }
 
     ManagedValue translate(SILGenFunction &gen, SILLocation loc,
                            ManagedValue mv, SGFContext c) && override {
       return gen.emitOrigToSubstValue(loc, mv, OrigType,
-                                      getSubstFormalType(),
                                       getSubstFormalType(), c);
     }
 
@@ -1285,14 +1283,12 @@ namespace {
     ManagedValue untranslate(SILGenFunction &gen, SILLocation loc,
                              ManagedValue mv, SGFContext c) && override {
       return gen.emitOrigToSubstValue(loc, mv, getOrigFormalType(),
-                                      getSubstFormalType(),
                                       getSubstFormalType(), c);
     }
 
     ManagedValue translate(SILGenFunction &gen, SILLocation loc,
                            ManagedValue mv, SGFContext c) && override {
       return gen.emitSubstToOrigValue(loc, mv, getOrigFormalType(),
-                                      getSubstFormalType(),
                                       getSubstFormalType(), c);
     }
     

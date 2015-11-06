@@ -399,3 +399,22 @@ func convClassBoundMetatypeArchetypeUpcast<T : Parent>(f1: Parent.Type -> (T.Typ
 // CHECK-NEXT:    enum $Optional<Trivial>
 // CHECK-NEXT:    tuple
 // CHECK-NEXT:    return
+
+// ==== Make sure we destructure one-element tuples
+
+// CHECK-LABEL: sil hidden @_TF19function_conversion15convTupleScalarFTFPS_1Q_T_2f2FT6parentPS0___T_2f3FT5tupleGSqTSiSi___T__T_
+// CHECK:         function_ref @_TTRXFo_iP19function_conversion1Q__dT__XFo_iPS_1P__dT__
+// CHECK:         function_ref @_TTRXFo_iP19function_conversion1Q__dT__XFo_iPS_1P__dT__
+// CHECK:         function_ref @_TTRXFo_dGSqTSiSi___dT__XFo_dSidSi_dT__
+
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iP19function_conversion1Q__dT__XFo_iPS_1P__dT__ : $@convention(thin) (@in P, @owned @callee_owned (@in Q) -> ()) -> ()
+
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dGSqTSiSi___dT__XFo_dSidSi_dT__ : $@convention(thin) (Int, Int, @owned @callee_owned (Optional<(Int, Int)>) -> ()) -> ()
+
+func convTupleScalar(f1: Q -> (),
+                     f2: (parent: Q) -> (),
+                     f3: (tuple: (Int, Int)?) -> ()) {
+  let _: (parent: P) -> () = f1
+  let _: P -> () = f2
+  let _: (Int, Int) -> () = f3
+}

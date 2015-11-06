@@ -553,7 +553,7 @@ emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
                  (hasAbstraction ? SGFContext() : C), IsNotTake);
   if (hasAbstraction) {
     result = SGF.emitOrigToSubstValue(loc, result, origFormalType,
-                                      substFormalType, substFormalType, C);
+                                      substFormalType, C);
   }
 
   switch (cast<FuncDecl>(accessor.getDecl())->getAddressorKind()) {
@@ -652,7 +652,7 @@ ManagedValue SILGenFunction::emitRValueForPropertyLoad(
     if (hasAbstractionChange)
       Result =
           emitOrigToSubstValue(loc, Result, origFormalType,
-                               substFormalType, substFormalType, C);
+                               substFormalType, C);
     return Result;
   }
 
@@ -692,7 +692,7 @@ ManagedValue SILGenFunction::emitRValueForPropertyLoad(
   // now.
   if (hasAbstractionChange)
     Result = emitOrigToSubstValue(loc, Result, origFormalType,
-                                  substFormalType, substFormalType, C);
+                                  substFormalType, C);
   return Result;
 }
 
@@ -1179,24 +1179,6 @@ static RValue emitCFunctionPointer(SILGenFunction &gen,
   return RValue(gen, conversionExpr, result);
 }
 
-// Transform the AST-level types in the function signature without an
-// abstraction or representation change.
-static ManagedValue convertFunctionSignature(SILGenFunction &SGF,
-                                             SILLocation loc,
-                                             ManagedValue original,
-                                             CanAnyFunctionType srcTy,
-                                             CanAnyFunctionType destTy) {
-  AbstractionPattern abstractionPattern(destTy);
-  ManagedValue result = SGF.emitOrigToSubstValue(loc, original,
-                                                 abstractionPattern,
-                                                 srcTy, destTy);
-
-  SILType resultType = result.getType();
-  assert(resultType == SGF.getLoweredType(destTy));
-
-  return result;
-}
-
 // Change the representation without changing the signature or
 // abstraction level.
 static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
@@ -1321,7 +1303,7 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
     result = convertFunctionRepresentation(SGF, e, result, srcRepTy, srcTy);
 
   if (srcTy != destTy)
-    result = convertFunctionSignature(SGF, e, result, srcTy, destTy);
+    result = SGF.emitTransformedValue(e, result, srcTy, destTy);
 
   if (destTy != destRepTy)
     result = convertFunctionRepresentation(SGF, e, result, destTy, destRepTy);

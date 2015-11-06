@@ -221,7 +221,7 @@ namespace {
 
       if (hasAbstraction) {
         result = SGF.emitOrigToSubstValue(Loc, result, abstraction,
-                                          TargetType, TargetType, ctx);
+                                          TargetType, ctx);
       }
       return result;
     }
@@ -243,7 +243,7 @@ namespace {
       // Re-abstract if necessary.
       if (hasAbstraction) {
         result = SGF.emitOrigToSubstValue(Loc, result, abstraction,
-                                          TargetType, TargetType, ctx);
+                                          TargetType, ctx);
       }
       return result;
     }
@@ -511,7 +511,6 @@ RValue Lowering::emitConditionalCheckedCast(SILGenFunction &SGF,
       // Otherwise, make sure the value is in the context.
       if (!objectValue.isInContext() && hasAbstraction) {
         objectValue = SGF.emitSubstToOrigValue(loc, objectValue, abstraction,
-                                               resultObjectType,
                                                resultObjectType,
                                    SGFContext(&resultObjectTemp.getValue()));
       }

@@ -2030,8 +2030,7 @@ ManagedValue SILGenFunction::emitApply(
 
     if (!hasAbsDiffs) return managedActualResult;
     return emitOrigToSubstValue(loc, managedActualResult, origResultType,
-                                substResultType, substResultType,
-                                evalContext);
+                                substResultType, evalContext);
   }
 
   // Okay, we want a scalar result.
@@ -2589,7 +2588,7 @@ namespace {
       switch (getSILFunctionLanguage(Rep)) {
       case SILFunctionLanguage::Swift:
         value = SGF.emitSubstToOrigValue(loc, value, origParamType,
-                                         arg.getType(), arg.getType(), ctxt);
+                                         arg.getType(), ctxt);
         break;
       case SILFunctionLanguage::C:
         value = SGF.emitNativeToBridgedValue(loc, value, Rep, origParamType,
