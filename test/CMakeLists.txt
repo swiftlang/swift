@@ -64,9 +64,8 @@ function(get_test_dependencies SDK result_var_name)
 
   if(XCODE)
     # Xcode's build paths have a configuration variable in them,
-    # so CMake can't match them at compile time.
-    list(APPEND deps
-         ${test_host_tools_dependencies_binaries})
+    # so CMake can't match them at compile time. Just use target names.
+    list(APPEND deps ${deps_binaries})
   else()
     foreach(binary ${deps_binaries})
       list(APPEND deps "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/${binary}")
