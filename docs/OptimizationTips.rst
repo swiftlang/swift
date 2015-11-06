@@ -379,6 +379,71 @@ faster.
   play_a_game(Game(10))
 
 
+The cost of large swift values
+==============================
+
+In Swift, values keep a unique copy of their data. There are several advantages
+to using value-types, like ensuring that values have independent state. When we
+copy values (the effect of assignment, initialization, and argument passing) the
+program will create a new copy of the value. For some large values these copies
+could be time consuming and hurt the performance of the program.
+
+.. More on value types:
+.. https://developer.apple.com/swift/blog/?id=10
+
+Consider the example below that defines a tree using "value" nodes. The tree
+nodes contain other nodes using a protocol. In computer graphics scenes are
+often composed from different entities and transformations that can be
+represented as values, so this example is somewhat realistic.
+
+.. See Protocol-Oriented-Programming:
+.. https://developer.apple.com/videos/play/wwdc2015-408/
+
+::
+
+  protocol P {}
+  struct Node : P {
+    var left, right : P?
+  }
+
+  struct Tree {
+    var node : P?
+    init() { ... }
+  }
+
+
+When a tree is copied (passed as an argument, initialized or assigned) the whole
+tree needs to be copied. In the case of our tree this is an expensive operation
+that requires many calls to malloc/free and a significant reference counting
+overhead.
+
+However, we don't really care if the value is copied in memory as long as the
+semantics of the value remains.
+
+Advice: Use copy-on-write semantics for large values
+----------------------------------------------------
+
+To eliminate the cost of copying large values adopt copy-on-write behavior.  The
+easiest way to implement copy-on-write is to compose existing copy-on-write data
+structures, such as Array. Swift arrays are values, but the content of the array
+is not copied around every time the array is passed as an argument because it
+features copy-on-write traits.
+
+In our Tree example we eliminate the cost of copying the content of the tree by
+wrapping it in an array. This simple change has a major impact on the
+performance of our tree data structure, and the cost of passing the array as an
+argument drops from being O(n), depending on the size of the tree to O(1). 
+
+::
+
+  struct tree : P { 
+    var node : [P?]
+    init() {
+      node = [ thing ]
+    }
+  }
+
+
 Unsafe code
 ===========
 
