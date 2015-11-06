@@ -1627,6 +1627,20 @@ public:
           }
         }
 
+        // No extra indentation level for getters without explicit names.
+        // e.g.
+        // public var someValue: Int {
+        //   return 0; <- No indentation added because of the getter.
+        // }
+        if (auto VD = dyn_cast_or_null<VarDecl>(Cursor->getAsDecl())) {
+          if (auto Getter = VD->getGetter()) {
+            if (Getter->getAccessorKeywordLoc().isInvalid()) {
+              LineAndColumn = ParentLineAndColumn;
+              continue;
+            }
+          }
+        }
+
         // Align with Func start instead of with param decls.
         if (auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(Cursor->getAsDecl())) {
           if (LineAndColumn.first <= SM.getLineNumber(FD->getSignatureSourceRange().End)) {
@@ -1681,6 +1695,19 @@ public:
     // If we're within an implicit brace context, don't add indent.
     if (isImplicitBraceContext())
       return false;
+
+    // If we're at the open brace of a no-name getter, don't add an indent.
+    // For example:
+    //  public var someValue: Int
+    //  { <- We add no indentation here.
+    //    return 0
+    //  }
+    if (auto FD = dyn_cast_or_null<FuncDecl>(Start.getAsDecl())) {
+      if(FD->isGetter() && FD->getAccessorKeywordLoc().isInvalid()) {
+        if(SM.getLineNumber(FD->getBody()->getLBraceLoc()) == Line)
+          return false;
+      }
+    }
 
     // If we're at the beginning of a brace on a separate line in the context
     // of anything other than BraceStmt, don't add an indent.
