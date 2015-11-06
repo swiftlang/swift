@@ -39,6 +39,21 @@ static bool isProjection(ValueBase *V) {
   }
 }
 
+static bool isNonWritableMemoryAddress(ValueBase *V) {
+  switch (V->getKind()) {
+    case ValueKind::FunctionRefInst:
+    case ValueKind::WitnessMethodInst:
+    case ValueKind::ClassMethodInst:
+    case ValueKind::SuperMethodInst:
+    case ValueKind::StringLiteralInst:
+      // These instructions return pointers to memory which can't be a
+      // destination of a store.
+      return true;
+    default:
+      return false;
+  }
+}
+
 static ValueBase *skipProjections(ValueBase *V) {
   for (;;) {
     if (!isProjection(V))
@@ -1032,7 +1047,7 @@ void EscapeAnalysis::buildConnectionGraph(SILFunction *F,
       if (!BBArg->getIncomingValues(Incoming)) {
         // We don't know where the block argument comes from -> treat it
         // conservatively.
-        ArgNode->setEscapesGlobal();
+        ConGraph->setEscapesGlobal(ArgNode);
         continue;
       }
 
@@ -1041,7 +1056,7 @@ void EscapeAnalysis::buildConnectionGraph(SILFunction *F,
         if (SrcArg) {
           ConGraph->defer(ArgNode, SrcArg);
         } else {
-          ArgNode->setEscapesGlobal();
+          ConGraph->setEscapesGlobal(ArgNode);
           break;
         }
       }
@@ -1057,9 +1072,14 @@ static bool allCalleeFunctionsVisible(FullApplySite FAS, CallGraph &CG) {
   if (CG.canCallUnknownFunction(FAS.getInstruction()))
     return false;
 
+  SILFunction *Caller = FAS.getInstruction()->getFunction();
   auto Callees = CG.getCallees(FAS.getInstruction());
   for (SILFunction *Callee : Callees) {
     if (Callee->isExternalDeclaration())
+      return false;
+    // TODO: Currently we can't self-cycles in the call graph, because we can't
+    // merge a graph to itself.
+    if (Callee == Caller)
       return false;
   }
   return true;
@@ -1133,6 +1153,11 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
   if (isProjection(I))
     return;
 
+  // Instructions which return the address of non-writable memory cannot have
+  // an effect on escaping.
+  if (isNonWritableMemoryAddress(I))
+    return;
+
   switch (I->getKind()) {
     case ValueKind::AllocStackInst:
     case ValueKind::AllocRefInst:
@@ -1147,7 +1172,6 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case ValueKind::SwitchEnumInst:
     case ValueKind::DebugValueInst:
     case ValueKind::DebugValueAddrInst:
-    case ValueKind::FunctionRefInst:
     case ValueKind::RefElementAddrInst:
       // These instructions don't have any effect on escaping.
       return;
@@ -1171,7 +1195,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
             isArrayOrArrayStorage(OpV)) {
           CapturedByDeinit = ConGraph->getContentNode(CapturedByDeinit);
         }
-        CapturedByDeinit->setEscapesGlobal();
+        ConGraph->setEscapesGlobal(CapturedByDeinit);
       }
       return;
     }
@@ -1182,7 +1206,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         if (!AddrNode) {
           // A load from an address we don't handle -> be conservative.
           CGNode *ValueNode = ConGraph->getNode(I);
-          ValueNode->setEscapesGlobal();
+          ConGraph->setEscapesGlobal(ValueNode);
           return;
         }
         CGNode *PointsTo = ConGraph->getContentNode(AddrNode);
@@ -1201,7 +1225,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
           ConGraph->defer(PointsTo, ValueNode);
         } else {
           // A store to an address we don't handle -> be conservative.
-          ValueNode->setEscapesGlobal();
+          ConGraph->setEscapesGlobal(ValueNode);
         }
       }
       return;
@@ -1270,24 +1294,24 @@ bool EscapeAnalysis::isArrayOrArrayStorage(SILValue V) {
   }
 }
 
-bool EscapeAnalysis::setAllEscaping(SILInstruction *I,
+void EscapeAnalysis::setAllEscaping(SILInstruction *I,
                                     ConnectionGraph *ConGraph) {
-  bool Changed = false;
   if (auto *TAI = dyn_cast<TryApplyInst>(I)) {
-    Changed |= ConGraph->setEscapesGlobal(TAI->getNormalBB()->getBBArg(0));
-    Changed |= ConGraph->setEscapesGlobal(TAI->getErrorBB()->getBBArg(0));
+    ConGraph->setEscapesGlobal(TAI->getNormalBB()->getBBArg(0));
+    ConGraph->setEscapesGlobal(TAI->getErrorBB()->getBBArg(0));
   }
   // Even if the instruction does not write memory we conservatively set all
   // operands to escaping, because they may "escape" to the result value in
   // an unspecified way. For example consider bit-casting a pointer to an int.
   // In this case we don't even create a node for the resulting int value.
   for (const Operand &Op : I->getAllOperands()) {
-    Changed |= ConGraph->setEscapesGlobal(Op.get());
+    SILValue OpVal = Op.get();
+    if (!isNonWritableMemoryAddress(OpVal.getDef()))
+      ConGraph->setEscapesGlobal(OpVal);
   }
   // Even if the instruction does not write memory it could e.g. return the
   // address of global memory. Therefore we have to define it as escaping.
-  Changed |= ConGraph->setEscapesGlobal(I);
-  return Changed;
+  ConGraph->setEscapesGlobal(I);
 }
 
 void EscapeAnalysis::recompute() {
@@ -1381,14 +1405,8 @@ bool EscapeAnalysis::mergeAllCallees(ConnectionGraph *ConGraph, CallGraph &CG) {
       DEBUG(llvm::dbgs() << "    callee " << Callee->getName() << '\n');
       ConnectionGraph *CalleeCG = getConnectionGraph(Callee);
       assert(CalleeCG);
-      // TODO: Handle self-cycles in the call graph. We can't merge a graph to
-      // itself. All we have to do is to copy the graph before we merge it.
-      if (CalleeCG != ConGraph) {
-        Changed |= ConGraph->mergeCalleeGraph(FAS, CalleeCG);
-      } else {
-        Changed |= setAllEscaping(FAS.getInstruction(), ConGraph);
-        break;
-      }
+      assert (CalleeCG != ConGraph && "no support for CG self cycles yet");
+      Changed |= ConGraph->mergeCalleeGraph(FAS, CalleeCG);
     }
   }
 

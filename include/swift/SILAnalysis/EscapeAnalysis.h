@@ -290,12 +290,6 @@ private:
 
   public:
     
-    /// Specifies that the node's value escapes to global or unidentified
-    /// memory. Returns true if this changed the state.
-    bool setEscapesGlobal() {
-      return mergeEscapeState(EscapeState::Global);
-    }
-
     /// Returns the escape state.
     EscapeState getEscapeState() const { return State; }
 
@@ -496,11 +490,23 @@ public:
       return Idx;
     }
 
+    /// Specifies that the node's value escapes to global or unidentified
+    /// memory.
+    void setEscapesGlobal(CGNode *Node) {
+      Node->mergeEscapeState(EscapeState::Global);
+
+      // Make sure to have a content node. Otherwise we may end up not merging
+      // the global-escape state into a caller graph (only content nodes are
+      // merged). Either the node itself is a content node or we let the node
+      // point to one.
+      if (Node->Type != NodeType::Content)
+        getContentNode(Node);
+    }
+
     /// If V is a pointer, set it to global escaping.
-    bool setEscapesGlobal(SILValue V) {
+    void setEscapesGlobal(SILValue V) {
       if (CGNode *Node = getNode(V))
-        return Node->setEscapesGlobal();
-      return false;
+        setEscapesGlobal(Node);
     }
 
     /// Creates a defer-edge between \p From and \p To.
@@ -595,7 +601,7 @@ private:
   bool isArrayOrArrayStorage(SILValue V);
 
   /// Sets all operands and results of \p I as global escaping.
-  bool setAllEscaping(SILInstruction *I, ConnectionGraph *ConGraph);
+  void setAllEscaping(SILInstruction *I, ConnectionGraph *ConGraph);
 
   /// Merge the graphs of all known callees into this graph.
   bool mergeAllCallees(ConnectionGraph *ConGraph, CallGraph &CG);
