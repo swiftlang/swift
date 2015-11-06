@@ -292,7 +292,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   PM.addUpdateEscapeAnalysis();
 
-  // Do the first stack promotion on low-level SIL.
+  // Do the second stack promotion on low-level SIL.
   PM.addStackPromotion();
 
   // Speculate virtual call targets.
