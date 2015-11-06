@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-public protocol ReverseIndexType : BidirectionalIndex {
+public protocol ReverseIndexProtocol : BidirectionalIndex {
   typealias Base : BidirectionalIndex
   
   /// A type that can represent the number of steps between pairs of
@@ -29,7 +29,7 @@ public protocol ReverseIndexType : BidirectionalIndex {
   init(_ base: Base)
 }
 
-extension BidirectionalIndex where Self : ReverseIndexType {
+extension BidirectionalIndex where Self : ReverseIndexProtocol {
   /// Returns the next consecutive value after `self`.
   ///
   /// - Requires: The next value is representable.
@@ -48,7 +48,7 @@ extension BidirectionalIndex where Self : ReverseIndexType {
 /// A wrapper for a `BidirectionalIndex` that reverses its
 /// direction of traversal.
 public struct ReverseIndex<Base: BidirectionalIndex>
-: BidirectionalIndex, ReverseIndexType {
+: BidirectionalIndex, ReverseIndexProtocol {
   public typealias Distance = Base.Distance
   
   public init(_ base: Base) { self.base = base }
@@ -73,7 +73,7 @@ public func == <Base> (
 /// A wrapper for a `RandomAccessIndex` that reverses its
 /// direction of traversal.
 public struct ReverseRandomAccessIndex<Base: RandomAccessIndex>
-  : RandomAccessIndex, ReverseIndexType {
+  : RandomAccessIndex, ReverseIndexProtocol {
 
   public typealias Distance = Base.Distance
   
@@ -98,7 +98,7 @@ public struct ReverseRandomAccessIndex<Base: RandomAccessIndex>
 }
 
 public protocol _ReverseCollection : Collection {
-  typealias Index : ReverseIndexType
+  typealias Index : ReverseIndexProtocol
   typealias Base : Collection
   var _base: Base {get}
 }
