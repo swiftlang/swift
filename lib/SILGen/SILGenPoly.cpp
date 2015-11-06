@@ -692,23 +692,32 @@ namespace {
                    CanType inputSubstType,
                    AbstractionPattern outputOrigType,
                    CanType outputSubstType) {
-      // Look inside one-element exploded tuples.
-      while (inputOrigType.isTuple() &&
-             inputOrigType.getNumTupleElements() == 1) {
-        inputOrigType = inputOrigType.getTupleElementType(0);
-        inputSubstType = cast<TupleType>(inputSubstType).getElementType(0);
-      }
-
-      while (outputOrigType.isTuple() &&
-             outputOrigType.getNumTupleElements() == 1) {
-        outputOrigType = outputOrigType.getTupleElementType(0);
-        outputSubstType = cast<TupleType>(outputSubstType).getElementType(0);
-      }
-
       // Most of this function is about tuples: tuples can be represented
       // as one or many values, with varying levels of indirection.
       auto inputTupleType = dyn_cast<TupleType>(inputSubstType);
       auto outputTupleType = dyn_cast<TupleType>(outputSubstType);
+
+      // Look inside one-element exploded tuples, but not if both input
+      // and output types are *both* one-element tuples.
+      if (!(inputTupleType && outputTupleType &&
+            inputTupleType.getElementTypes().size() == 1 &&
+            outputTupleType.getElementTypes().size() == 1)) {
+        if (inputOrigType.isTuple() &&
+            inputOrigType.getNumTupleElements() == 1) {
+          inputOrigType = inputOrigType.getTupleElementType(0);
+          inputSubstType = cast<TupleType>(inputSubstType).getElementType(0);
+          return translate(inputOrigType, inputSubstType,
+                           outputOrigType, outputSubstType);
+        }
+
+        if (outputOrigType.isTuple() &&
+            outputOrigType.getNumTupleElements() == 1) {
+          outputOrigType = outputOrigType.getTupleElementType(0);
+          outputSubstType = cast<TupleType>(outputSubstType).getElementType(0);
+          return translate(inputOrigType, inputSubstType,
+                           outputOrigType, outputSubstType);
+        }
+      }
 
       // Special-case: tuples containing inouts.
       if (inputTupleType && inputTupleType->hasInOut()) {

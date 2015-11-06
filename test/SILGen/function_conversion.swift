@@ -418,3 +418,12 @@ func convTupleScalar(f1: Q -> (),
   let _: P -> () = f2
   let _: (Int, Int) -> () = f3
 }
+
+// CHECK-LABEL: sil hidden @_TF19function_conversion21convTupleScalarOpaqueurFFt4argsGSax__T_GSqFt4argsGSax__T__
+// CHECK:         function_ref @_TTRGrXFo_oGSax__dT__XFo_it4argsGSax___iT__
+
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRGrXFo_oGSax__dT__XFo_it4argsGSax___iT__ : $@convention(thin) <T> (@out (), @in (args: T...), @owned @callee_owned (@owned Array<T>) -> ()) -> ()
+
+func convTupleScalarOpaque<T>(f: (args: T...) -> ()) -> ((args: T...) -> ())? {
+  return f
+}
