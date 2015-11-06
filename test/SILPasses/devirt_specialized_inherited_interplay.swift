@@ -5,18 +5,20 @@
 // check works by making sure we can blow through a long class hierarchy and
 // expose the various "unknown" functions.
 //
+// As a side-test it also checks if all allocs can be promoted to the stack.
+//
 // *NOTE* If something like templated protocols is ever implemented this file
 // needs to be updated.
 
 // CHECK-LABEL: sil @_TF38devirt_specialized_inherited_interplay6driverFT_T_ : $@convention(thin) () -> () {
 // CHECK: bb0:
-// CHECK: [[A3:%[0-9]+]] = alloc_ref $A3<S>
-// CHECK: [[A4:%[0-9]+]] = alloc_ref $A4<S>
-// CHECK: [[A5:%[0-9]+]] = alloc_ref $A5<S>
-// CHECK: [[B1:%[0-9]+]] = alloc_ref $B1<S>
-// CHECK: [[B2:%[0-9]+]] = alloc_ref $B2<S>
-// CHECK: [[B3:%[0-9]+]] = alloc_ref $B3<S>
-// CHECK: [[B4:%[0-9]+]] = alloc_ref $B4<S>
+// CHECK: [[A3:%[0-9]+]] = alloc_ref [stack] $A3<S>
+// CHECK: [[A4:%[0-9]+]] = alloc_ref [stack] $A4<S>
+// CHECK: [[A5:%[0-9]+]] = alloc_ref [stack] $A5<S>
+// CHECK: [[B1:%[0-9]+]] = alloc_ref [stack] $B1<S>
+// CHECK: [[B2:%[0-9]+]] = alloc_ref [stack] $B2<S>
+// CHECK: [[B3:%[0-9]+]] = alloc_ref [stack] $B3<S>
+// CHECK: [[B4:%[0-9]+]] = alloc_ref [stack] $B4<S>
 // CHECK: [[F0:%[0-9]+]] = function_ref @unknown0 : $@convention(thin) () -> ()
 // CHECK: apply [[F0]]
 // CHECK: apply [[F0]]

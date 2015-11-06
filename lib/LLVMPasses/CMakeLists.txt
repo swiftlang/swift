@@ -3,6 +3,7 @@ add_swift_library(swiftLLVMPasses
   LLVMSwiftRCIdentity.cpp
   LLVMARCOpts.cpp
   LLVMARCContract.cpp
+  LLVMStackPromotion.cpp
   )
 
 add_dependencies(swiftLLVMPasses LLVMAnalysis)
