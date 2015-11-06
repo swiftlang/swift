@@ -156,6 +156,19 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
     }
   }
 
+  // Because the swift compiler relies on Clang to setup the Module,
+  // the clang CU is always created first.  Several dwarf-reading
+  // tools (older versions of ld64, and lldb) can get confused if the
+  // first CU in an object is empty, so ensure that the Swift CU comes
+  // first by rearranging the list of CUs in the LLVM module.
+  llvm::NamedMDNode *CU_Nodes = M.getNamedMetadata("llvm.dbg.cu");
+  SmallVector<llvm::DICompileUnit *, 2> CUs;
+  for (auto *N : CU_Nodes->operands())
+    CUs.push_back(cast<llvm::DICompileUnit>(N));
+  CU_Nodes->dropAllReferences();
+  for (auto CU = CUs.rbegin(), CE = CUs.rend(); CU != CE; ++CU)
+    CU_Nodes->addOperand(*CU);
+
   // Create a module for the current compile unit.
   llvm::sys::path::remove_filename(AbsMainFile);
   MainModule =
