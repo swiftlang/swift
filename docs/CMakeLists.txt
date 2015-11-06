@@ -23,7 +23,7 @@ if(SPHINX_EXECUTABLE)
 
   # Selectively install docs intended for general consumption.
   swift_install_in_component(lang-docs
-      FILES "${CMAKE_BINARY_DIR}/docs/html/LangRef.html"
+      FILES "${CMAKE_BINARY_DIR}/docs/archive/LangRef.html"
       DESTINATION "share/swift/docs/html")
 
   swift_install_in_component(lang-docs

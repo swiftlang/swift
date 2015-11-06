@@ -639,7 +639,7 @@ if(XCODE)
   add_custom_target(Documentation
       SOURCES
         README.md
-        docs/LangRef.html
+        docs/archive/LangRef.html
         docs/toc.js)
 
   file(GLOB SWIFT_TOPLEVEL_HEADERS
