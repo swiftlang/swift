@@ -536,8 +536,8 @@ public:
   CallGraphEditor(CallGraph *CG) : CG(CG) {}
 
   void replaceApplyWithNew(FullApplySite Old, FullApplySite New);
-  void replaceApplyWithNew(FullApplySite Old,
-                           llvm::SmallVectorImpl<FullApplySite> &NewApplies);
+  void replaceApplyWithCallSites(FullApplySite Old,
+                         llvm::SmallVectorImpl<SILInstruction *> &NewCallSites);
 
   /// Detaches the call graph node from function \p Old and attaches it to
   /// function \a New.

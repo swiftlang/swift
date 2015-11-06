@@ -47,7 +47,7 @@ public:
 
   SILInliner(SILFunction &To, SILFunction &From, InlineKind IKind,
              TypeSubstitutionMap &ContextSubs, ArrayRef<Substitution> ApplySubs,
-             ApplyCollector::CallbackType Callback =nullptr)
+             CloneCollector::CallbackType Callback =nullptr)
     : TypeSubstCloner<SILInliner>(To, From, ContextSubs, ApplySubs, true),
     IKind(IKind), CalleeEntryBB(nullptr), CallSiteScope(nullptr),
     Callback(Callback) {
@@ -114,7 +114,7 @@ private:
   SILDebugScope *CallSiteScope;
   SILFunction *CalleeFunction;
   llvm::SmallDenseMap<SILDebugScope *, SILDebugScope *> InlinedScopeCache;
-  ApplyCollector::CallbackType Callback;
+  CloneCollector::CallbackType Callback;
 };
 
 } // end namespace swift

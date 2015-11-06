@@ -13,6 +13,7 @@
 #ifndef SWIFT_SILPASSES_UTILS_LOCAL_H
 #define SWIFT_SILPASSES_UTILS_LOCAL_H
 
+#include "swift/Basic/ArrayRefView.h"
 #include "swift/SILAnalysis/SimplifyInstruction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILBuilder.h"
@@ -496,30 +497,34 @@ public:
 };
 
 // Helper class that provides a callback that can be used in
-// inliners/cloners for collecting ApplySites.
-class ApplyCollector {
+// inliners/cloners for collecting new call sites.
+class CloneCollector {
 public:
-  typedef std::pair<ApplySite, ApplySite> value_type;
+  typedef std::pair<SILInstruction *, SILInstruction *> value_type;
   typedef std::function<void(SILInstruction *, SILInstruction *)> CallbackType;
-
+  typedef std::function<bool (SILInstruction *)> FilterType;
 
 private:
-  llvm::SmallVector<value_type, 4> ApplyPairs;
+  FilterType Filter;
 
-  void collect(SILInstruction *OldApply, SILInstruction *NewApply) {
-    if (auto NewApplySite = ApplySite::isa(NewApply))
-      ApplyPairs.push_back(std::make_pair(NewApplySite,
-                                          ApplySite(OldApply)));
+  // Pairs of collected instructions; (new, old)
+  llvm::SmallVector<value_type, 4> InstructionPairs;
+
+  void collect(SILInstruction *Old, SILInstruction *New) {
+    if (Filter(New))
+      InstructionPairs.push_back(std::make_pair(New, Old));
   }
 
 public:
+  CloneCollector(FilterType Filter) : Filter(Filter) {}
+
   CallbackType getCallback() {
-    return std::bind(&ApplyCollector::collect, this, std::placeholders::_1,
+    return std::bind(&CloneCollector::collect, this, std::placeholders::_1,
                      std::placeholders::_2);
   }
 
-  llvm::SmallVectorImpl<value_type> &getApplyPairs() {
-    return ApplyPairs;
+  llvm::SmallVectorImpl<value_type> &getInstructionPairs() {
+    return InstructionPairs;
   }
 };
 

@@ -233,10 +233,9 @@ SILFunction *swift::getExistingSpecialization(SILModule &M,
 
 ApplySite swift::trySpecializeApplyOfGeneric(ApplySite Apply,
                                              SILFunction *&NewFunction,
-             llvm::SmallVectorImpl<ApplyCollector::value_type> &NewApplyPairs) {
+                                             CloneCollector &Collector) {
   NewFunction = nullptr;
 
-  assert(NewApplyPairs.empty() && "Expected no new applies in vector yet!");
   assert(Apply.hasSubstitutions() && "Expected an apply with substitutions!");
 
   auto *F = cast<FunctionRefInst>(Apply.getCallee())->getReferencedFunction();
@@ -308,14 +307,10 @@ ApplySite swift::trySpecializeApplyOfGeneric(ApplySite Apply,
       if (M.getOptions().Optimization <= SILOptions::SILOptMode::Debug) {
         llvm::dbgs() << "Creating a specialization: " << ClonedName << "\n"; });
 
-    ApplyCollector Collector;
-
     // Create a new function.
     NewF = GenericCloner::cloneFunction(F, InterfaceSubs, ContextSubs,
                                         ClonedName, Apply,
                                         Collector.getCallback());
-    for (auto &P : Collector.getApplyPairs())
-      NewApplyPairs.push_back(P);
 
     NewFunction = NewF;
 

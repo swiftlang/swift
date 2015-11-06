@@ -891,11 +891,16 @@ ApplySite SILPerformanceInliner::specializeGenericUpdatingCallGraph(
   if (!Callee || Callee->isExternalDeclaration())
     return ApplySite();
 
+  auto Filter = [](SILInstruction *I) -> bool {
+    return ApplySite::isa(I) != ApplySite();
+  };
+
+  CloneCollector Collector(Filter);
+
   SILFunction *SpecializedFunction;
-  llvm::SmallVector<ApplyCollector::value_type, 4> NewApplyPairs;
   auto Specialized = trySpecializeApplyOfGeneric(Apply,
                                                  SpecializedFunction,
-                                                 NewApplyPairs);
+                                                 Collector);
 
   if (!Specialized)
     return ApplySite();
@@ -906,8 +911,9 @@ ApplySite SILPerformanceInliner::specializeGenericUpdatingCallGraph(
     Editor.addNewFunction(SpecializedFunction);
 
   // Track the new applies from the specialization.
-  for (auto NewApply : NewApplyPairs)
-    NewApplies.push_back(NewApply.first);
+  for (auto NewCallSite : Collector.getInstructionPairs())
+    if (auto NewApply = ApplySite::isa(NewCallSite.first))
+      NewApplies.push_back(NewApply);
 
   auto FullApply = FullApplySite::isa(Apply.getInstruction());
 
@@ -926,10 +932,10 @@ ApplySite SILPerformanceInliner::specializeGenericUpdatingCallGraph(
   auto SpecializedFullApply = FullApplySite(Specialized.getInstruction());
   Editor.replaceApplyWithNew(FullApply, SpecializedFullApply);
 
-  for (auto NewApply : NewApplyPairs) {
-    if (auto Apply = FullApplySite::isa(NewApply.first.getInstruction())) {
+  for (auto NewApply : Collector.getInstructionPairs()) {
+    if (auto Apply = FullApplySite::isa(NewApply.first)) {
       assert(!OriginMap.count(Apply) && "Unexpected apply in map!");
-      OriginMap[Apply] = FullApplySite(NewApply.second.getInstruction());
+      OriginMap[Apply] = FullApplySite(NewApply.second);
     }
   }
 
@@ -1134,7 +1140,13 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
     for (const auto &Arg : AI.getArguments())
       Args.push_back(Arg);
     
-    ApplyCollector Collector;
+    // As we inline and clone we need to collect instructions that
+    // require updates to the call graph.
+    auto Filter = [](SILInstruction *I) -> bool {
+      return I->mayRelease();
+    };
+
+    CloneCollector Collector(Filter);
 
     // Notice that we will skip all of the newly inlined ApplyInsts. That's
     // okay because we will visit them in our next invocation of the inliner.
@@ -1149,8 +1161,11 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
     // we expect it to have happened.
     assert(Success && "Expected inliner to inline this function!");
     llvm::SmallVector<FullApplySite, 4> AppliesFromInlinee;
-    for (auto &P : Collector.getApplyPairs()) {
-      if (auto FullApply = FullApplySite::isa(P.first.getInstruction())) {
+    llvm::SmallVector<SILInstruction *, 4> NewCallSites;
+    for (auto &P : Collector.getInstructionPairs()) {
+      NewCallSites.push_back(P.first);
+
+      if (auto FullApply = FullApplySite::isa(P.first)) {
         AppliesFromInlinee.push_back(FullApply);
 
         // Maintain a mapping for all new applies back to the apply they
@@ -1158,12 +1173,12 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
         assert(!OriginMap.count(FullApply) &&
                "Did not expect apply to be in map!");
         assert(P.second && "Expected non-null apply site!");
-        OriginMap[FullApply] = FullApplySite(P.second.getInstruction());
+        OriginMap[FullApply] = FullApplySite(P.second);
       }
     }
 
     CallGraphEditor Editor(&CG);
-    Editor.replaceApplyWithNew(AI, AppliesFromInlinee);
+    Editor.replaceApplyWithCallSites(AI, NewCallSites);
 
     RemovedApplies.insert(AI);
     recursivelyDeleteTriviallyDeadInstructions(AI.getInstruction(), true);

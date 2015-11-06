@@ -355,8 +355,10 @@ static void orderEdges(const llvm::SmallPtrSetImpl<CallGraphEdge *> &Edges,
 void CallGraph::addEdgesForInstruction(SILInstruction *I,
                                        CallGraphNode *CallerNode) {
   auto Apply = FullApplySite::isa(I);
-  // TODO: Build this out for non-apply instructions.
-  assert(Apply && "Expected apply for instruction!");
+
+  // TODO: Support non-apply instructions.
+  if (!Apply)
+    return;
 
   CallerNode->MayBindDynamicSelf |=
     hasDynamicSelfTypes(Apply.getSubstitutions());
@@ -803,16 +805,16 @@ void CallGraphEditor::replaceApplyWithNew(FullApplySite Old,
   CG->addEdgesForInstruction(New.getInstruction());
 }
 
-void CallGraphEditor::replaceApplyWithNew(FullApplySite Old,
-                             llvm::SmallVectorImpl<FullApplySite> &NewApplies) {
+void CallGraphEditor::replaceApplyWithCallSites(FullApplySite Old,
+                        llvm::SmallVectorImpl<SILInstruction *> &NewCallSites) {
   if (!CG)
     return;
 
   if (auto *Edge = CG->tryGetCallGraphEdge(Old.getInstruction()))
     CG->removeEdgeFromFunction(Edge, Old.getInstruction()->getFunction());
 
-  for (auto NewApply : NewApplies)
-    CG->addEdgesForInstruction(NewApply.getInstruction());
+  for (auto NewApply : NewCallSites)
+    CG->addEdgesForInstruction(NewApply);
 }
 
 void CallGraphEditor::moveNodeToNewFunction(SILFunction *Old,
