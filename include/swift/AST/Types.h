@@ -76,7 +76,7 @@ namespace swift {
 /// on structural types.
 class RecursiveTypeProperties {
 public:
-  enum { BitWidth = 8 };
+  enum { BitWidth = 10 };
 
   /// A single property.
   ///
@@ -84,34 +84,39 @@ public:
   /// the correct default value and bitwise-or correctly merges things.
   enum Property : unsigned {
     /// This type expression contains a TypeVariableType.
-    HasTypeVariable     = 0x01,
+    HasTypeVariable      = 0x01,
 
     /// This type expression contains an ArchetypeType.
-    HasArchetype        = 0x02,
+    HasArchetype         = 0x02,
 
     /// This type expression contains a GenericTypeParamType.
-    HasTypeParameter    = 0x04,
+    HasTypeParameter     = 0x04,
 
-    /// This  type expression contains an UnresolvedType.
-    HasUnresolvedType   = 0x08,
-    
-    
-    /// This type expression contains an LValueType or InOutType,
+    /// This type expression contains an UnresolvedType.
+    HasUnresolvedType    = 0x08,
+   
+    /// This type expression contains an InOutType other than as a
+    /// function input.
+    HasInOut             = 0x10,
+
+    /// This type expression contains a tuple with default arguments
     /// other than as a function input.
-    IsNotMaterializable = 0x10,
+    HasDefaultParameter  = 0x20,
     
-    /// This type expression contains an LValueType and can be loaded to convert
-    /// to an rvalue.
-    IsLValue = 0x20,
+    /// This type expression contains an LValueType other than as a
+    /// function input, and can be loaded to convert to an rvalue.
+    IsLValue             = 0x40,
 
     /// This type expression contains an opened existential ArchetypeType.
-    HasOpenedExistential = 0x40,
+    HasOpenedExistential = 0x80,
 
     /// This type expression contains a DynamicSelf type.
-    HasDynamicSelf = 0x80,
+    HasDynamicSelf       = 0x100,
 
     /// Whether this type expression contains an unbound generic type.
-    HasUnboundGeneric = 0x100,
+    HasUnboundGeneric    = 0x200,
+
+    IsNotMaterializable  = (HasInOut | HasDefaultParameter | IsLValue)
   };
 
 private:
@@ -139,13 +144,22 @@ public:
   /// Does a type with these properties have an unresolved type somewhere in it?
   bool hasUnresolvedType() const { return Bits & HasUnresolvedType; }
 
+  /// Does a type with these properties structurally contain an
+  /// inout, except as the parameter of a function?
+  bool hasInOut() const { return Bits & HasInOut; }
+  
+  /// Does a type with these properties structurally contain a
+  /// tuple with default argument values, except as the parameter
+  /// of a function?
+  bool hasDefaultArg() const { return Bits & HasDefaultParameter; }
+  
+  /// Is a type with these properties an lvalue?
+  bool isLValue() const { return Bits & IsLValue; }
+
   /// Is a type with these properties materializable: that is, is it a
   /// first-class value type?
   bool isMaterializable() const { return !(Bits & IsNotMaterializable); }
 
-  /// Is a type with these properties an lvalue?
-  bool isLValue() const { return Bits & IsLValue; }
-  
   /// Does a type with these properties structurally contain an
   /// archetype?
   bool hasOpenedExistential() const { return Bits & HasOpenedExistential; }
@@ -388,7 +402,19 @@ public:
     return getRecursiveProperties().hasUnresolvedType();
   }
 
-  /// Determine whether the type involves an archetype.
+  /// \brief Determine whether the type involves an inout type, except
+  /// as a function input.
+  bool hasInOut() const {
+    return getRecursiveProperties().hasInOut();
+  }
+
+  /// \brief Determine whether the type involves a tuple type with a
+  /// default argument, except as a function input.
+  bool hasDefaultArg() const {
+    return getRecursiveProperties().hasDefaultArg();
+  }
+
+  /// \brief Determine whether the type involves an archetype.
   bool hasArchetype() const {
     return getRecursiveProperties().hasArchetype();
   }

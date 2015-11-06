@@ -2328,7 +2328,7 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
     if (Elt.getType())
       properties |= Elt.getType()->getRecursiveProperties();
     if (Elt.getDefaultArgKind() != DefaultArgumentKind::None)
-      properties |= RecursiveTypeProperties::IsNotMaterializable;
+      properties |= RecursiveTypeProperties::HasDefaultParameter;
   }
 
   auto arena = getArena(properties);
@@ -2696,7 +2696,7 @@ ModuleType *ModuleType::get(Module *M) {
 
 DynamicSelfType *DynamicSelfType::get(Type selfType, const ASTContext &ctx) {
   auto properties = selfType->getRecursiveProperties();
-  properties &= ~RecursiveTypeProperties::IsNotMaterializable;
+  assert(properties.isMaterializable() && "non-materializable dynamic self?");
   auto arena = getArena(properties);
 
   auto &dynamicSelfTypes = ctx.Impl.getArena(arena).DynamicSelfTypes;
@@ -2726,7 +2726,6 @@ static RecursiveTypeProperties getFunctionRecursiveProperties(Type Input,
   auto properties = Input->getRecursiveProperties()
                   | Result->getRecursiveProperties();
   properties &= ~RecursiveTypeProperties::IsNotMaterializable;
-  properties &= ~RecursiveTypeProperties::IsLValue;
   return properties;
 }
 
@@ -2737,7 +2736,7 @@ static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(Type Input, Type Result) {
   checkFunctionRecursiveProperties(Input, Result);
 
-  static_assert(RecursiveTypeProperties::BitWidth == 8,
+  static_assert(RecursiveTypeProperties::BitWidth == 10,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
   if (Result->getRecursiveProperties().hasDynamicSelf())
@@ -3027,7 +3026,7 @@ CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
   // FIXME: If we ever have first-class polymorphic values, we'll need to
   // revisit this.
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 8,
+  static_assert(RecursiveTypeProperties::BitWidth == 10,
                 "revisit this if you add new recursive type properties");
   if (genericSig) {
     // See getGenericFunctionRecursiveProperties.
@@ -3139,7 +3138,6 @@ LValueType *LValueType::get(Type objectTy) {
          "can not have 'inout' or @lvalue wrapped inside an @lvalue");
 
   auto properties = objectTy->getRecursiveProperties()
-                    | RecursiveTypeProperties::IsNotMaterializable
                     | RecursiveTypeProperties::IsLValue;
   auto arena = getArena(properties);
 
@@ -3160,7 +3158,7 @@ InOutType *InOutType::get(Type objectTy) {
          "can not have 'inout' or @lvalue wrapped inside an 'inout'");
 
   auto properties = objectTy->getRecursiveProperties() |
-                     RecursiveTypeProperties::IsNotMaterializable;
+                     RecursiveTypeProperties::HasInOut;
 
   properties &= ~RecursiveTypeProperties::IsLValue;
   auto arena = getArena(properties);

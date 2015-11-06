@@ -223,22 +223,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       unsigned kind =
         fn->isInstanceMember() ? PartialApplication::MutatingMethod
                                : PartialApplication::Function;
-      bool requiresFullApply = false;
 
       // Functions with inout parameters cannot be partially applied.
-      auto argTy = expr->getArg()->getType();
-      if (auto tupleTy = argTy->getAs<TupleType>()) {
-        for (auto eltTy : tupleTy->getElementTypes()) {
-          if (eltTy->getAs<InOutType>()) {
-            requiresFullApply = true;
-            break;
-          }
-        }
-      } else if (argTy->getAs<InOutType>()) {
-        requiresFullApply = true;
-      }
-
-      if (requiresFullApply) {
+      if (expr->getArg()->getType()->hasInOut()) {
         // We need to apply all argument clauses.
         InvalidPartialApplications.insert({
           fnExpr, {fn->getNaturalArgumentCount(), kind}
