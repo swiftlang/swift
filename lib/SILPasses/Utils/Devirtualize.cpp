@@ -340,24 +340,6 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
   return true;
 }
 
-/// Insert a cast for an address argument if its type is not the same
-/// as the expected parameter type, which can happen with covariant
-/// indirect return types and contravariant argument types.
-static SILValue conditionallyCastAddr(SILBuilderWithScope<16> &B,
-                                      SILLocation Loc, SILValue Arg,
-                                      SILType ParamTy) {
-  if (Arg.getType() == ParamTy)
-    return Arg;
-
-  if (Arg.getType().isAddress())
-    return B.createUncheckedAddrCast(Loc, Arg, ParamTy);
-
-  assert(Arg.getType().isHeapObjectReferenceType() &&
-         "Expected address type or heap object reference for argument!");
-
-  return B.createUncheckedRefCast(Loc, Arg, ParamTy);
-}
-
 /// \brief Devirtualize an apply of a class method.
 ///
 /// \p AI is the apply to devirtualize.

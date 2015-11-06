@@ -403,25 +403,6 @@ static UIdent KeywordForUID("source.lang.swift.keyword.for");
 static UIdent KeywordWhileUID("source.lang.swift.keyword.while");
 static UIdent KeywordFuncUID("source.lang.swift.keyword.func");
 
-static UIdent getUIDForKeywordKind(CodeCompletionKeywordKind kind) {
-  switch (kind) {
-  case CodeCompletionKeywordKind::kw_let:
-    return KeywordLetUID;
-  case CodeCompletionKeywordKind::kw_var:
-    return KeywordVarUID;
-  case CodeCompletionKeywordKind::kw_if:
-    return KeywordIfUID;
-  case CodeCompletionKeywordKind::kw_for:
-    return KeywordForUID;
-  case CodeCompletionKeywordKind::kw_while:
-    return KeywordWhileUID;
-  case CodeCompletionKeywordKind::kw_func:
-    return KeywordFuncUID;
-  default:
-    return KeywordUID;
-  }
-}
-
 bool SwiftToSourceKitCompletionAdapter::handleResult(
     SourceKit::CodeCompletionConsumer &Consumer, Completion *Result,
     bool leadingPunctuation, bool includeLiterals) {

@@ -82,16 +82,6 @@ static FullApplySite CloneApply(FullApplySite AI, SILBuilder &Builder) {
   return NAI;
 }
 
-/// Check if a given value is used as an operand of a given instruction.
-static bool isOperandOf(SILValue V, SILInstruction *I) {
-  for (auto &Op : I->getAllOperands()) {
-    if (Op.get() == V) {
-      return true;
-    }
-  }
-  return false;
-}
-
 /// Insert monomorphic inline caches for a specific class or metatype
 /// type \p SubClassTy.
 static FullApplySite speculateMonomorphicTarget(FullApplySite AI,

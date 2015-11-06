@@ -3713,21 +3713,6 @@ static void emitUncheckedValueBitCast(IRGenSILFunction &IGF,
   return;
 }
 
-static void emitValueBitCast(IRGenSILFunction &IGF,
-                             SourceLoc loc,
-                             Explosion &in,
-                             const LoadableTypeInfo &inTI,
-                             Explosion &out,
-                             const LoadableTypeInfo &outTI) {
-  // Unfortunately, we can't check this invariant until we get to IRGen, since
-  // the AST and SIL don't know anything about type layout.
-  if (inTI.getFixedSize() != outTI.getFixedSize()) {
-    emitTrapAndUndefValue(IGF, in, out, outTI);
-    return;
-  }
-  emitUncheckedValueBitCast(IGF, loc, in, inTI, out, outTI);
-}
-
 static void emitValueBitwiseCast(IRGenSILFunction &IGF,
                                  SourceLoc loc,
                                  Explosion &in,
