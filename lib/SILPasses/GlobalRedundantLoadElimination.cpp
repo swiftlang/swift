@@ -95,7 +95,7 @@
 using namespace swift;
 
 static llvm::cl::opt<bool> EnableGlobalRLE("enable-global-redundant-load-elim",
-                                           llvm::cl::init(false));
+                                           llvm::cl::init(true));
 
 STATISTIC(NumForwardedLoads, "Number of loads forwarded");
 
@@ -151,14 +151,8 @@ class RLEContext {
   /// Caches a list of projection paths to leaf nodes in the given type.
   TypeExpansionMap TypeExpansionCache;
 
-  /// A "map" from a BBID (which is just an index) to an BBState.
-  std::vector<BBState> BBIDToBBStateMap;
-
-  /// A map from each BasicBlock to its index in the BBIDToBBStateMap.
-  ///
-  /// TODO: Each block does not need its own BBState instance. Only
-  /// the set of reaching loads and stores is specific to the block.
-  llvm::DenseMap<SILBasicBlock *, unsigned> BBToBBIDMap;
+  /// A map from each BasicBlock to its BBState.
+  llvm::DenseMap<SILBasicBlock *, BBState> BBToLocState;
 
 public:
   RLEContext(SILFunction *F, AliasAnalysis *AA,
@@ -176,13 +170,8 @@ public:
   /// Returns the TypeExpansionCache we will use during expanding MemLocations.
   TypeExpansionMap &getTypeExpansionCache() { return TypeExpansionCache; }
 
-  BBState &getBBState(SILBasicBlock *BB) {
-    auto IDIter = BBToBBIDMap.find(BB);
-    assert(IDIter != BBToBBIDMap.end() && "We just constructed this!?");
-    unsigned ID = IDIter->second;
-    BBState &Forwarder = BBIDToBBStateMap[ID];
-    return Forwarder;
-  }
+  /// Return the BBState for the basic block this basic block belongs to.
+  BBState &getBBLocState(SILBasicBlock *B) { return BBToLocState[B]; }
 
   /// Get the bit representing the MemLocation in the MemLocationVault.
   unsigned getMemLocationBit(const MemLocation &L);
@@ -317,9 +306,7 @@ public:
   bool setupRLE(RLEContext &Ctx, SILInstruction *I, SILValue Mem);
 
   /// Merge in the states of all predecessors.
-  void
-  mergePredecessorStates(llvm::DenseMap<SILBasicBlock *, unsigned> &BBToBBIDMap,
-                         std::vector<BBState> &BBIDToBBStateMap);
+  void mergePredecessorStates(RLEContext &Ctx);
 
   /// Process LoadInst. Extract MemLocations from LoadInst.
   void processLoadInst(RLEContext &Ctx, LoadInst *LI, bool PF);
@@ -607,46 +594,27 @@ void BBState::mergePredecessorState(BBState &OtherState) {
   }
 }
 
-void BBState::mergePredecessorStates(
-    llvm::DenseMap<SILBasicBlock *, unsigned> &BBToBBIDMap,
-    std::vector<BBState> &BBIDToBBStateMap) {
+void BBState::mergePredecessorStates(RLEContext &Ctx) {
   // Clear the state if the basic block has no predecessor.
   if (BB->getPreds().begin() == BB->getPreds().end()) {
     clearMemLocations();
     return;
   }
 
-  // We initialize the state with the first
-  // predecessor's state and merge in states of other predecessors.
-  //
+  // We initialize the state with the first predecessor's state and merge
+  // in states of other predecessors.
   bool HasAtLeastOnePred = false;
   // For each predecessor of BB...
   for (auto Pred : BB->getPreds()) {
-
-    // Lookup the BBState associated with the predecessor and merge the
-    // predecessor in.
-    auto I = BBToBBIDMap.find(Pred);
-
-    // If we can not lookup the BBID then the BB was not in the RPO,
-    // implying that it is unreachable. LLVM will ensure that the BB is removed
-    // if we do not reach it at the SIL level. Since it is unreachable, ignore
-    // it.
-    if (I == BBToBBIDMap.end())
-      continue;
-
-    BBState &Other = BBIDToBBStateMap[I->second];
+    BBState &Other = Ctx.getBBLocState(Pred);
 
     // If we have not had at least one predecessor, initialize BBState
     // with the state of the initial predecessor.
     // If BB is also a predecessor of itself, we should not initialize.
     if (!HasAtLeastOnePred) {
-      DEBUG(llvm::dbgs() << "    Initializing with pred: " << I->second
-                         << "\n");
       ForwardSetIn = Other.ForwardSetOut;
       ForwardSetVal = Other.ForwardSetVal;
     } else {
-      DEBUG(llvm::dbgs() << "    Merging with pred  bb" << Pred->getDebugID()
-                         << "\n");
       mergePredecessorState(Other);
     }
     HasAtLeastOnePred = true;
@@ -661,34 +629,17 @@ void BBState::mergePredecessorStates(
 //                          RLEContext Implementation
 //===----------------------------------------------------------------------===//
 
-static inline unsigned
-roundPostOrderSize(PostOrderFunctionInfo::reverse_range R) {
-  unsigned PostOrderSize = std::distance(R.begin(), R.end());
-
-  // NextPowerOf2 operates on uint64_t, so we can not overflow since our input
-  // is a 32 bit value. But we need to make sure if the next power of 2 is
-  // greater than the representable UINT_MAX, we just pass in (1 << 31) if the
-  // next power of 2 is (1 << 32).
-  uint64_t SizeRoundedToPow2 = llvm::NextPowerOf2(PostOrderSize);
-  if (SizeRoundedToPow2 > uint64_t(UINT_MAX))
-    return 1 << 31;
-  return unsigned(SizeRoundedToPow2);
-}
-
 RLEContext::RLEContext(SILFunction *F, AliasAnalysis *AA,
                        PostOrderFunctionInfo::reverse_range RPOT)
-    : AA(AA), ReversePostOrder(RPOT),
-      BBIDToBBStateMap(roundPostOrderSize(RPOT)),
-      BBToBBIDMap(roundPostOrderSize(RPOT)) {
+    : AA(AA), ReversePostOrder(RPOT ) {
   // Walk over the function and find all the locations accessed by
   // this function.
   MemLocation::enumerateMemLocations(*F, MemLocationVault, LocToBitIndex,
                                      TypeExpansionCache);
 
   for (SILBasicBlock *BB : ReversePostOrder) {
-    unsigned count = BBToBBIDMap.size();
-    BBToBBIDMap[BB] = count;
-    BBIDToBBStateMap[count].init(BB, MemLocationVault.size());
+    BBToLocState[BB] = BBState();
+    BBToLocState[BB].init(BB, MemLocationVault.size());
   }
 }
 
@@ -714,7 +665,7 @@ bool RLEContext::gatherValues(SILInstruction *I, MemLocation &L,
   MemLocationList Locs;
   MemLocation::expand(L, &I->getModule(), Locs, getTypeExpansionCache());
   SILBasicBlock *BB = I->getParent();
-  BBState &Forwarder = getBBState(BB);
+  BBState &Forwarder = getBBLocState(BB);
   for (auto &X : Locs) {
     Values[X] = Forwarder.getForwardSetVal()[getMemLocationBit(X)];
     // Currently do not handle covering value, return false for now.
@@ -740,16 +691,12 @@ bool RLEContext::run() {
   do {
     ForwardSetChanged = false;
     for (SILBasicBlock *BB : ReversePostOrder) {
-      auto IDIter = BBToBBIDMap.find(BB);
-      assert(IDIter != BBToBBIDMap.end() && "We just constructed this!?");
-      unsigned ID = IDIter->second;
-      BBState &Forwarder = BBIDToBBStateMap[ID];
-      assert(Forwarder.getBB() == BB && "We just constructed this!?");
+      BBState &Forwarder = getBBLocState(BB);
 
       // Merge the predecessors. After merging, BBState now contains
       // lists of available MemLocations and their values that reach the
       // beginning of the basic block along all paths.
-      Forwarder.mergePredecessorStates(BBToBBIDMap, BBIDToBBStateMap);
+      Forwarder.mergePredecessorStates(*this);
 
       // Merge duplicate loads, and forward stores to
       // loads. We also update lists of stores|loads to reflect the end
@@ -778,8 +725,8 @@ bool RLEContext::run() {
 
   // Finally, perform the redundant load replacements.
   bool SILChanged = false;
-  for (auto &X : BBIDToBBStateMap) {
-    for (auto &F : X.getRL()) {
+  for (auto &X : BBToLocState) {
+    for (auto &F : X.second.getRL()) {
       SILChanged = true;
       SILValue(F.first).replaceAllUsesWith(F.second);
       ++NumForwardedLoads;
