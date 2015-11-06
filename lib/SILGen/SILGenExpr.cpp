@@ -3064,10 +3064,10 @@ ProtocolDecl *SILGenFunction::getPointerProtocol() {
     return *SGM.PointerProtocol;
   
   SmallVector<ValueDecl*, 1> lookup;
-  getASTContext().lookupInSwiftModule("_PointerType", lookup);
+  getASTContext().lookupInSwiftModule("_Pointer", lookup);
   // FIXME: Should check for protocol in Sema
-  assert(lookup.size() == 1 && "no _PointerType protocol");
-  assert(isa<ProtocolDecl>(lookup[0]) && "_PointerType is not a protocol");
+  assert(lookup.size() == 1 && "no _Pointer protocol");
+  assert(isa<ProtocolDecl>(lookup[0]) && "_Pointer is not a protocol");
   SGM.PointerProtocol = cast<ProtocolDecl>(lookup[0]);
   return cast<ProtocolDecl>(lookup[0]);
 }

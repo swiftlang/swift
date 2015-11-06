@@ -339,7 +339,7 @@ internal var _nilNativeObject: AnyObject? {
 /// because it only needs to reference the results of inout conversions, which
 /// already have writeback-scoped lifetime.
 public struct AutoreleasingUnsafeMutablePointer<Memory /* TODO : class */>
-  : Equatable, NilLiteralConvertible, _PointerType {
+  : Equatable, NilLiteralConvertible, _Pointer {
 
   public let _rawValue: Builtin.RawPointer
 
