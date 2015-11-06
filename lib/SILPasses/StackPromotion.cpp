@@ -208,7 +208,6 @@ void StackPromoter::tryPromoteAlloc(SILInstruction *I) {
     SILFunction *OldF = OldFRI->getReferencedFunction();
     SILLocation loc = (OldF->hasLocation() ? OldF->getLocation() : AI->getLoc());
     SILFunction *DeallocFun = getBufferDeallocFunc(OldF, loc);
-    CanSILFunctionType FunTy = DeallocFun->getLoweredFunctionType();
 
     // We insert a swift_bufferDeallocateFromStack at the end of the buffer's
     // lifetime.

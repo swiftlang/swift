@@ -503,8 +503,6 @@ bool LoopARCMatchingSetComputationContext::run(
     Worklist.push_back({L, L->empty()});
   }
 
-  bool NestingDetected;
-  bool MatchedPair;
   while (Worklist.size()) {
     SILLoop *L;
     bool Visited;

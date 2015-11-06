@@ -557,7 +557,6 @@ void BBState::processUnknownWriteInst(RLEContext &Ctx, SILInstruction *I) {
 /// Promote stored values to loads and merge duplicated loads.
 bool BBState::optimize(RLEContext &Ctx, bool PF) {
   auto II = BB->begin(), E = BB->end();
-  bool Changed = false;
   while (II != E) {
     SILInstruction *Inst = II++;
     DEBUG(llvm::dbgs() << "    Visiting: " << *Inst);
@@ -633,7 +632,6 @@ void BBState::mergePredecessorStates(
   // predecessor's state and merge in states of other predecessors.
   //
   bool HasAtLeastOnePred = false;
-  SILBasicBlock *TheBB = getBB();
   // For each predecessor of BB...
   for (auto Pred : BB->getPreds()) {
 

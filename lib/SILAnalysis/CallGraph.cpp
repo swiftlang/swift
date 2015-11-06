@@ -130,8 +130,6 @@ void CallGraph::computeClassMethodCalleesForClass(ClassDecl *CD) {
 
 void
 CallGraph::computeWitnessMethodCalleesForWitnessTable(SILWitnessTable &WTable) {
-  auto *Conformance = WTable.getConformance();
-
   for (const SILWitnessTable::Entry &Entry : WTable.getEntries()) {
     if (Entry.getKind() != SILWitnessTable::Method)
       continue;
@@ -429,7 +427,7 @@ void CallGraph::addEdges(SILFunction *F) {
 
   for (auto &BB : *F) {
     for (auto &I : BB) {
-      if (auto FAS = FullApplySite::isa(&I))
+      if (FullApplySite::isa(&I))
         addEdgesForInstruction(&I, CallerNode);
 
       auto *FRI = dyn_cast<FunctionRefInst>(&I);
