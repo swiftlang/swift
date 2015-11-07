@@ -71,39 +71,6 @@ static void diagSelfAssignment(TypeChecker &TC, const Expr *E) {
 }
 
 
-/// Issue a warning on code where a returned expression is on a different line
-/// than the return keyword, but both have the same indentation.
-///
-/// \code
-///   ...
-///   return
-///   foo()
-/// \endcode
-static void diagUnreachableCode(TypeChecker &TC, const Stmt *S) {
-  auto *RS = dyn_cast<ReturnStmt>(S);
-  if (!RS)
-    return;
-  if (!RS->hasResult())
-    return;
-
-  auto RetExpr = RS->getResult();
-  auto RSLoc = RS->getStartLoc();
-  auto RetExprLoc = RetExpr->getStartLoc();
-  // FIXME: Expose getColumnNumber() in LLVM SourceMgr to make this check
-  // cheaper.
-  if (RSLoc.isInvalid() || RetExprLoc.isInvalid() || (RSLoc == RetExprLoc))
-    return;
-  SourceManager &SM = TC.Context.SourceMgr;
-  if (SM.getLineAndColumn(RSLoc).second ==
-      SM.getLineAndColumn(RetExprLoc).second) {
-    TC.diagnose(RetExpr->getStartLoc(), diag::unindented_code_after_return);
-    TC.diagnose(RetExpr->getStartLoc(), diag::indent_expression_to_silence);
-    return;
-  }
-  return;
-}
-
-
 /// Diagnose syntactic restrictions of expressions.
 ///
 ///   - Module values may only occur as part of qualification.
@@ -1223,7 +1190,6 @@ void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
 
 void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
   TC.checkUnsupportedProtocolType(const_cast<Stmt *>(S));
-  return diagUnreachableCode(TC, S);
 }
 
 //===--------------------------------------------------------------------===//

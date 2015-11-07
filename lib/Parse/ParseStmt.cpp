@@ -689,6 +689,14 @@ ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
       !isStartOfStmt() && !isStartOfDecl()) {
     SourceLoc ExprLoc = Tok.getLoc();
 
+    // Issue a warning when the returned expression is on a different line than
+    // the return keyword, but both have the same indentation.
+    if (SourceMgr.getLineAndColumn(ReturnLoc).second ==
+        SourceMgr.getLineAndColumn(ExprLoc).second) {
+      diagnose(ExprLoc, diag::unindented_code_after_return);
+      diagnose(ExprLoc, diag::indent_expression_to_silence);
+    }
+
     ParserResult<Expr> Result = parseExpr(diag::expected_expr_return);
     if (Result.isNull()) {
       // Create an ErrorExpr to tell the type checker that this return

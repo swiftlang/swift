@@ -13,6 +13,13 @@ func unreachable_returns_Int() {
   f_returns_Int() // expected-warning {{expression following 'return' is treated as an argument of the 'return'}} // expected-note{{indent the expression to silence this warning}}
 }
 
+func f_closure_returns_void() {
+  _ = {
+    return
+    f_closure_returns_void() // expected-warning {{expression following 'return' is treated as an argument of the 'return'}} // expected-note{{indent the expression to silence this warning}}
+  }
+}
+
 // Do not warn when the indentation is differnt.
 func reachable_returns_void() {
   return 
