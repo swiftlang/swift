@@ -162,7 +162,7 @@ extension _ArrayBufferProtocol {
       }
       // Initialize the hole left by sliding the tail forward
       for j in oldTailIndex..<newTailIndex {
-        (elements + j).initialize(newValues[i++])
+        (elements + j).initializeMemory(newValues[i++])
       }
       _expectEnd(i, newValues)
     }
@@ -197,7 +197,7 @@ extension _ArrayBufferProtocol {
         newTailStart.moveAssignFrom(oldTailStart, count: tailCount)
 
         // Destroy elements remaining after the tail in subRange
-        (newTailStart + tailCount).destroy(shrinkage - tailCount)
+        (newTailStart + tailCount).deinitializePointee(shrinkage - tailCount)
       }
     }
   }

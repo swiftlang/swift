@@ -97,7 +97,7 @@ final class TestManagedBuffer<T> : ManagedBuffer<CountAndCapacity,T> {
     withUnsafeMutablePointerToElements {
       (x: UnsafeMutablePointer<T>)->() in
       for i in 0.stride(to: count, by: 2) {
-        (x + i).destroy()
+        (x + i).deinitializePointee()
       }
     }
   }
@@ -108,7 +108,7 @@ final class TestManagedBuffer<T> : ManagedBuffer<CountAndCapacity,T> {
     
     withUnsafeMutablePointerToElements {
       (p: UnsafeMutablePointer<T>)->() in
-      (p + count).initialize(x)
+      (p + count).initializeMemory(x)
     }
     self.count = count + 2
   }
@@ -119,8 +119,8 @@ class MyBuffer<T> {
   deinit {
     Manager(unsafeBufferObject: self).withUnsafeMutablePointers {
       (pointerToValue, pointerToElements)->Void in
-      pointerToElements.destroy(self.count)
-      pointerToValue.destroy()
+      pointerToElements.deinitializePointee(self.count)
+      pointerToValue.deinitializePointee()
     }
   }
 

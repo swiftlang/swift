@@ -45,7 +45,7 @@ class _HeapBufferStorage<Value,Element> : NonObjectiveCBase {
   /// `_HeapBufferStorage<Value,Element>`.
   typealias Buffer = _HeapBuffer<Value, Element>
   deinit {
-    Buffer(self)._value.destroy()
+    Buffer(self)._value.deinitializePointee()
   }
 
   @warn_unused_result
@@ -173,7 +173,7 @@ struct _HeapBuffer<Value, Element> : Equatable {
     let object: AnyObject = _swift_bufferAllocate(
       storageClass, totalSize, alignMask)
     self._storage = Builtin.castToNativeObject(object)
-    self._value.initialize(initializer)
+    self._value.initializeMemory(initializer)
   }
 
   public // @testable

@@ -205,9 +205,9 @@ print(_reflect(randomUnsafeMutablePointerString).summary)
 
 // CHECK-NEXT: Hello panda
 var sanePointerString = UnsafeMutablePointer<String>(allocatingCapacity: 1)
-sanePointerString.initialize("Hello panda")
+sanePointerString.initializeMemory("Hello panda")
 print(_reflect(sanePointerString.pointee).summary)
-sanePointerString.destroy()
+sanePointerString.deinitializePointee()
 sanePointerString.deallocateCapacity(1)
 
 // Don't crash on types with opaque metadata. rdar://problem/19791252

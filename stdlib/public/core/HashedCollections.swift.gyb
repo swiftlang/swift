@@ -1642,7 +1642,7 @@ internal struct _BitMap {
 
   internal func initializeToZero() {
     for i in 0 ..< numberOfWords {
-      (values + i).initialize(0)
+      (values + i).initializeMemory(0)
     }
   }
 
@@ -1845,7 +1845,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
     if !_isPOD(Key.self) {
       for i in 0 ..< capacity {
         if initializedEntries[i] {
-          (keys+i).destroy()
+          (keys+i).deinitializePointee()
         }
       }
     }
@@ -1854,12 +1854,12 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
     if !_isPOD(Value.self) {
       for i in 0 ..< capacity {
         if initializedEntries[i] {
-          (values+i).destroy()
+          (values+i).deinitializePointee()
         }
       }
     }
 %end
-    buffer._valuePointer.destroy()
+    buffer._valuePointer.deinitializePointee()
     _fixLifetime(self)
   }
 }
@@ -1968,9 +1968,9 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   @_transparent
   internal func destroyEntryAt(i: Int) {
     _sanityCheck(isInitializedEntry(i))
-    (keys + i).destroy()
+    (keys + i).deinitializePointee()
 %if Self == 'Dictionary':
-    (values + i).destroy()
+    (values + i).deinitializePointee()
 %end
     initializedEntries[i] = false
     _fixLifetime(self)
@@ -1981,7 +1981,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   internal func initializeKey(k: Key, at i: Int) {
     _sanityCheck(!isInitializedEntry(i))
 
-    (keys + i).initialize(k)
+    (keys + i).initializeMemory(k)
     initializedEntries[i] = true
     _fixLifetime(self)
   }
@@ -1989,7 +1989,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   @_transparent
   internal func moveInitializeFrom(from: Storage, at: Int, toEntryAt: Int) {
     _sanityCheck(!isInitializedEntry(toEntryAt))
-    (keys + toEntryAt).initialize((from.keys + at).move())
+    (keys + toEntryAt).initializeMemory((from.keys + at).move())
     from.initializedEntries[at] = false
     initializedEntries[toEntryAt] = true
   }
@@ -2007,8 +2007,8 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   internal func initializeKey(k: Key, value v: Value, at i: Int) {
     _sanityCheck(!isInitializedEntry(i))
 
-    (keys + i).initialize(k)
-    (values + i).initialize(v)
+    (keys + i).initializeMemory(k)
+    (values + i).initializeMemory(v)
     initializedEntries[i] = true
     _fixLifetime(self)
   }
@@ -2016,8 +2016,8 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   @_transparent
   internal func moveInitializeFrom(from: Storage, at: Int, toEntryAt: Int) {
     _sanityCheck(!isInitializedEntry(toEntryAt))
-    (keys + toEntryAt).initialize((from.keys + at).move())
-    (values + toEntryAt).initialize((from.values + at).move())
+    (keys + toEntryAt).initializeMemory((from.keys + at).move())
+    (values + toEntryAt).initializeMemory((from.values + at).move())
     from.initializedEntries[at] = false
     initializedEntries[toEntryAt] = true
   }
@@ -2330,7 +2330,7 @@ internal struct _BridgedNative${Self}Storage {
   internal func initializeKey(k: AnyObject, at i: Int) {
     _sanityCheck(!isInitializedEntry(i))
 
-    (keys + i).initialize(k)
+    (keys + i).initializeMemory(k)
     initializedEntries[i] = true
     _fixLifetime(self)
   }
@@ -2340,8 +2340,8 @@ internal struct _BridgedNative${Self}Storage {
   ) {
     _sanityCheck(!isInitializedEntry(i))
 
-    (keys + i).initialize(k)
-    (values + i).initialize(v)
+    (keys + i).initializeMemory(k)
+    (values + i).initializeMemory(v)
     initializedEntries[i] = true
     _fixLifetime(self)
   }

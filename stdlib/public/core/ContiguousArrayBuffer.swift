@@ -101,8 +101,8 @@ class _ContiguousArrayStorage1 : _ContiguousArrayStorageBase {
 final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
 
   deinit {
-    __manager._elementPointer.destroy(__manager._valuePointer.pointee.count)
-    __manager._valuePointer.destroy()
+    __manager._elementPointer.deinitializePointee(__manager._valuePointer.pointee.count)
+    __manager._valuePointer.deinitializePointee()
     _fixLifetime(__manager)
   }
 
@@ -146,7 +146,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
     let resultPtr = result.baseAddress
     let p = __manager._elementPointer
     for i in 0..<count {
-      (resultPtr + i).initialize(_bridgeToObjectiveCUnconditional(p[i]))
+      (resultPtr + i).initializeMemory(_bridgeToObjectiveCUnconditional(p[i]))
     }
     _fixLifetime(__manager)
     return result
@@ -608,7 +608,7 @@ internal func _copyCollectionToNativeArrayBuffer<
   var i = source.startIndex
   for _ in 0..<count {
     // FIXME(performance): use _initializeTo().
-    (p++).initialize(source[i++])
+    (p++).initializeMemory(source[i++])
   }
   _expectEnd(i, source)
   return result
@@ -665,7 +665,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
       "_UnsafePartiallyInitializedContiguousArrayBuffer has no more capacity")
     remainingCapacity--
 
-    (p++).initialize(element)
+    (p++).initializeMemory(element)
   }
 
   /// Finish initializing the buffer, adjusting its count to the final

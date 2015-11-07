@@ -147,7 +147,7 @@ public struct ${Self}<Pointee>
   ///
   /// - Postcondition: The pointee is initalized; the value should eventually
   ///   be destroyed or moved from to avoid leaks.
-  public func initialize(newvalue: Pointee) {
+  public func initializeMemory(newvalue: Pointee) {
     Builtin.initialize(newvalue, _rawValue)
   }
 
@@ -159,7 +159,7 @@ public struct ${Self}<Pointee>
   /// Retrieve the `pointee`, returning the referenced memory to an
   /// uninitialized state.
   ///
-  /// Equivalent to `{ defer { destroy() }; return pointee }()`, but
+  /// Equivalent to `{ defer { deinitializePointee() }; return pointee }()`, but
   /// more efficient.
   ///
   /// - Requires: The pointee is initialized.
@@ -244,7 +244,7 @@ public struct ${Self}<Pointee>
       Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // This builtin is equivalent to:
     // for i in 0..<count {
-    //   (self + i).initialize((source + i).move())
+    //   (self + i).initializeMemory((source + i).move())
     // }
   }
 
@@ -277,7 +277,7 @@ public struct ${Self}<Pointee>
     // var src = source + count
     // var dst = self + count
     // while dst != self {
-    //   (--dst).initialize((--src).move())
+    //   (--dst).initializeMemory((--src).move())
     // }
   }
 
@@ -306,7 +306,7 @@ public struct ${Self}<Pointee>
       Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // This builtin is equivalent to:
     // for i in 0..<count {
-    //   (self + i).initialize(source[i])
+    //   (self + i).initializeMemory(source[i])
     // }
   }
 
@@ -352,23 +352,23 @@ public struct ${Self}<Pointee>
     // }
   }
 
-  /// Destroy the pointee, returning its memory to an uninitialized state.
+  /// De-initialize the pointee, returning its memory to an uninitialized state.
   ///
   /// - Precondition: The pointee is initialized.
   ///
   /// - Postcondition: The memory is uninitialized.
-  public func destroy() {
+  public func deinitializePointee() {
     Builtin.destroy(Pointee.self, _rawValue)
   }
 
-  /// Destroy the `count` `Pointee`s starting at `self`, returning
+  /// De-initialize the `count` `Pointee`s starting at `self`, returning
   /// their memory to an uninitialized state.
   ///
   /// - Precondition: The `Pointee`s at `self..<self + count` are
   ///   initialized.
   ///
   /// - Postcondition: The memory is uninitialized.
-  public func destroy(count: Int) {
+  public func deinitializePointee(count: Int) {
     _debugPrecondition(count >= 0, "${Self}.destroy with negative count")
     Builtin.destroyArray(Pointee.self, _rawValue, count._builtinWordValue)
   }

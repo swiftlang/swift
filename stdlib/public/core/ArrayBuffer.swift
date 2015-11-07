@@ -224,7 +224,7 @@ extension _ArrayBuffer {
     // Make another pass to retain the copied objects
     var result = target
     for _ in bounds {
-      result.initialize(result.pointee)
+      result.initializeMemory(result.pointee)
       ++result
     }
     return result

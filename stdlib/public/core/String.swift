@@ -532,7 +532,7 @@ extension String {
     resultStorage: UnsafeMutablePointer<String>,
     start: UnsafeMutablePointer<UTF8.CodeUnit>, utf8Count: Int
   ) {
-    resultStorage.initialize(
+    resultStorage.initializeMemory(
         String._fromWellFormedCodeUnitSequence(UTF8.self,
             input: UnsafeBufferPointer(start: start, count: utf8Count)))
   }

@@ -112,7 +112,7 @@ public class ManagedBuffer<Value, Element>
 
   /// Destroy the stored Value.
   deinit {
-    ManagedBufferPointer(self).withUnsafeMutablePointerToValue { $0.destroy() }
+    ManagedBufferPointer(self).withUnsafeMutablePointerToValue { $0.deinitializePointee() }
   }
 
   /// The stored `Value` instance.
@@ -147,8 +147,8 @@ public class ManagedBuffer<Value, Element>
 ///        deinit {
 ///          Manager(unsafeBufferObject: self).withUnsafeMutablePointers {
 ///            (pointerToValue, pointerToElements)->Void in
-///            pointerToElements.destroy(self.count)
-///            pointerToValue.destroy()
+///            pointerToElements.deinitializePointee(self.count)
+///            pointerToValue.deinitializePointee()
 ///          }
 ///        }
 ///
@@ -187,7 +187,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
 
     // initialize the value field
     withUnsafeMutablePointerToValue {
-      $0.initialize(
+      $0.initializeMemory(
         initialValue(
           buffer: self.buffer,
           allocatedCount: {

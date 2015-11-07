@@ -510,7 +510,7 @@ extension ${Self} : _ArrayProtocol {
     var p: UnsafeMutablePointer<Element>
     (self, p) = ${Self}._allocateUninitialized(count)
     for _ in 0..<count {
-      p++.initialize(repeatedValue)
+      p++.initializeMemory(repeatedValue)
     }
   }
 
@@ -668,7 +668,7 @@ extension ${Self} : _ArrayProtocol {
     _sanityCheck(_buffer.capacity >= _buffer.count + 1)
 
     _buffer.count = oldCount + 1
-    (_buffer.firstElementAddress + oldCount).initialize(newElement)
+    (_buffer.firstElementAddress + oldCount).initializeMemory(newElement)
   }
 
   /// Append `newElement` to the ${Self}.
@@ -896,7 +896,7 @@ internal struct _InitializeMemoryFromCollection<
     var p = rawMemory
     var q = newValues.startIndex
     for _ in 0..<count {
-      p++.initialize(newValues[q++])
+      p++.initializeMemory(newValues[q++])
     }
     _expectEnd(q, newValues)
   }
@@ -1119,13 +1119,13 @@ internal func _arrayOutOfPlaceUpdate<
     // its real first element
     let backingStart = backing.firstElementAddress
     let sourceOffset = sourceStart - backingStart
-    backingStart.destroy(sourceOffset)
+    backingStart.deinitializePointee(sourceOffset)
 
     // Move the head items
     destStart.moveInitializeFrom(sourceStart, count: headCount)
 
     // Destroy unused source items
-    oldStart.destroy(oldCount)
+    oldStart.deinitializePointee(oldCount)
 
     initializeNewElements.call(newStart, count: newCount)
 
@@ -1136,7 +1136,7 @@ internal func _arrayOutOfPlaceUpdate<
     // its real last element
     let backingEnd = backingStart + backing.count
     let sourceEnd = sourceStart + sourceCount
-    sourceEnd.destroy(backingEnd - sourceEnd)
+    sourceEnd.deinitializePointee(backingEnd - sourceEnd)
     backing.count = 0
   }
   else {
@@ -1156,7 +1156,7 @@ internal struct _InitializePointer<T> : _PointerFunction {
   internal func call(rawMemory: UnsafeMutablePointer<T>, count: Int) {
     _sanityCheck(count == 1)
     // FIXME: it would be better if we could find a way to move, here
-    rawMemory.initialize(newValue)
+    rawMemory.initializeMemory(newValue)
   }
 
   @_transparent
@@ -1231,7 +1231,7 @@ internal func _arrayAppendSequence<
     let base = buffer.firstElementAddress
 
     while (nextItem != nil) && count < capacity {
-      (base + count++).initialize(nextItem!)
+      (base + count++).initializeMemory(nextItem!)
       nextItem = stream.next()
     }
     buffer.count = count

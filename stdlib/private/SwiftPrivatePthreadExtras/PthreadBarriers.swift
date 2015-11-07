@@ -92,9 +92,9 @@ public func _stdlib_pthread_barrier_destroy(
     // FIXME: leaking memory.
     return -1
   }
-  barrier.pointee.cond.destroy()
+  barrier.pointee.cond.deinitializePointee()
   barrier.pointee.cond.deallocateCapacity(1)
-  barrier.pointee.mutex.destroy()
+  barrier.pointee.mutex.deinitializePointee()
   barrier.pointee.mutex.deallocateCapacity(1)
   return 0
 }

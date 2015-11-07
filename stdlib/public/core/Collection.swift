@@ -579,7 +579,7 @@ extension Sequence
     } else {
       var p = ptr
       for x in self {
-        p++.initialize(x)
+        p++.initializeMemory(x)
       }
       return p
     }

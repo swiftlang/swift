@@ -228,7 +228,7 @@ struct _ForkJoinMutex {
     if pthread_mutex_destroy(_mutex) != 0 {
       fatalError("pthread_mutex_init")
     }
-    _mutex.destroy()
+    _mutex.deinitializePointee()
     _mutex.deallocateCapacity(1)
   }
 
@@ -258,7 +258,7 @@ struct _ForkJoinCond {
     if pthread_cond_destroy(_cond) != 0 {
       fatalError("pthread_cond_destroy")
     }
-    _cond.destroy()
+    _cond.deinitializePointee()
     _cond.deallocateCapacity(1)
   }
 
