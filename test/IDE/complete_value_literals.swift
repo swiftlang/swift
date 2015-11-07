@@ -120,63 +120,63 @@ func testDouble2() {
 func testString0() {
   let x: Int = #^STRING_0^#
 }
-// STRING_0: Literal[String]/None: "{#text#}"[#String#];
+// STRING_0: Literal[String]/None: "{#(text)#}"[#String#];
 
 func testString1() {
   let x: MyString1 = #^STRING_1^#
 }
-// STRING_1: Literal[String]/None/TypeRelation[Identical]: "{#text#}"[#MyString1#];
+// STRING_1: Literal[String]/None/TypeRelation[Identical]: "{#(text)#}"[#MyString1#];
 
 func testString2() {
   let x: String = #^STRING_2^#
 }
-// STRING_2: Literal[String]/None/TypeRelation[Identical]: "{#text#}"[#String#];
+// STRING_2: Literal[String]/None/TypeRelation[Identical]: "{#(text)#}"[#String#];
 
 func testArray0() {
   let x: Int = #^ARRAY_0^#
 }
-// ARRAY_0: Literal[Array]/None: [{#item#}][#Array#];
+// ARRAY_0: Literal[Array]/None: [{#(item)#}][#Array#];
 
 func testArray1() {
   let x: MyArray1<MyInt1> = #^ARRAY_1^#
 }
-// ARRAY_1: Literal[Array]/None/TypeRelation[Identical]: [{#item#}][#MyArray1<MyInt1>#];
+// ARRAY_1: Literal[Array]/None/TypeRelation[Identical]: [{#(item)#}][#MyArray1<MyInt1>#];
 
 func testArray2() {
   let x: [MyInt1] = #^ARRAY_2^#
 }
-// ARRAY_2: Literal[Array]/None/TypeRelation[Identical]: [{#item#}][#[MyInt1]#];
+// ARRAY_2: Literal[Array]/None/TypeRelation[Identical]: [{#(item)#}][#[MyInt1]#];
 
 func testDict0() {
   let x: Int = #^DICT_0^#
 }
-// DICT_0: Literal[Dictionary]/None: [{#key#}: {#value#}][#Dictionary#];
+// DICT_0: Literal[Dictionary]/None: [{#(key)#}: {#(value)#}][#Dictionary#];
 
 func testDict1() {
   let x: MyDict1<MyInt1, MyString1> = #^DICT_1^#
 }
-// DICT_1: Literal[Dictionary]/None/TypeRelation[Identical]: [{#key#}: {#value#}][#MyDict1<MyInt1, MyString1>#];
+// DICT_1: Literal[Dictionary]/None/TypeRelation[Identical]: [{#(key)#}: {#(value)#}][#MyDict1<MyInt1, MyString1>#];
 
 func testDict2() {
   let x: [MyInt1: MyString1] = #^DICT_2^#
 }
-// DICT_2: Literal[Dictionary]/None/TypeRelation[Identical]: [{#key#}: {#value#}][#[MyInt1 : MyString1]#];
+// DICT_2: Literal[Dictionary]/None/TypeRelation[Identical]: [{#(key)#}: {#(value)#}][#[MyInt1 : MyString1]#];
 
 func testTuple0() {
   let x: Int = #^TUPLE_0^#
 }
-// TUPLE_0: Literal[Tuple]/None: ({#item#}, {#item#});
+// TUPLE_0: Literal[Tuple]/None: ({#(item)#}, {#(item)#});
 
 func testTuple1() {
   let x: (MyInt1, MyString1) = #^TUPLE_1^#
 }
-// TUPLE_1: Literal[Tuple]/None/TypeRelation[Identical]: ({#item#}, {#item#})[#(MyInt1, MyString1)#];
+// TUPLE_1: Literal[Tuple]/None/TypeRelation[Identical]: ({#(item)#}, {#(item)#})[#(MyInt1, MyString1)#];
 
 func testTuple2() {
   let x: (MyInt1, MyString1, MyDouble1) = #^TUPLE_2^#
 }
 // FIXME: should we extend the tuple to have the right number of elements?
-// TUPLE_2: Literal[Tuple]/None/TypeRelation[Identical]: ({#item#}, {#item#})[#(MyInt1, MyString1, MyDouble1)#];
+// TUPLE_2: Literal[Tuple]/None/TypeRelation[Identical]: ({#(item)#}, {#(item)#})[#(MyInt1, MyString1, MyDouble1)#];
 
 struct MyColor1: _ColorLiteralConvertible {
   init(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float) {}

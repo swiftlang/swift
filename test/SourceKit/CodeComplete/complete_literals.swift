@@ -6,7 +6,14 @@
 // KEYWORDS: key.name: "nil"
 // KEYWORDS-NOT: source.lang.swift.literal
 // LITERALS: key.kind: source.lang.swift.literal.boolean
+// LITERALS: key.kind: source.lang.swift.literal.string
+// LITERALS: key.sourcetext: ""<#{{.*}}#>""
 // LITERALS: key.kind: source.lang.swift.literal.array
+// LITERALS: key.sourcetext: "[<#{{.*}}#>]"
+// LITERALS: key.kind: source.lang.swift.literal.dictionary
+// LITERALS: key.sourcetext: "[<#{{.*}}#>: <#{{.*}}#>]"
+// LITERALS: key.kind: source.lang.swift.literal.tuple
+// LITERALS: key.sourcetext: "(<#{{.*}}#>, <#{{.*}}#>)"
 // LITERALS: key.kind: source.lang.swift.literal.nil
 
 // RUN: %complete-test -tok=STMT1 %s -raw | FileCheck %s -check-prefix=STMT
