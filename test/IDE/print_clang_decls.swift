@@ -49,28 +49,28 @@
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}struct FooStruct3 {{{$}}
+// TAG_DECLS_AND_TYPEDEFS: {{^}}struct FooStruct3 {{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(){{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}struct FooStruct4 {{{$}}
+// TAG_DECLS_AND_TYPEDEFS: {{^}}struct FooStruct4 {{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(){{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}struct FooStruct5 {{{$}}
+// TAG_DECLS_AND_TYPEDEFS: {{^}}struct FooStruct5 {{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(){{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}struct FooStruct6 {{{$}}
+// TAG_DECLS_AND_TYPEDEFS: {{^}}struct FooStruct6 {{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(){{$}}

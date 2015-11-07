@@ -77,11 +77,17 @@ typedef struct {
   double y;
 } FooStructTypedef2;
 
+/*!
+  @recommended Foo2, Foo1
+*/
 typedef struct FooStruct3 {
   int x;
   double y;
 } FooStruct3;
 
+/*!
+  @recommendedover Foo3, Foo2
+*/
 struct FooStruct4 {
   int x;
   double y;
@@ -96,6 +102,11 @@ struct FooStruct5 {
 };
 
 typedef struct FooStruct6 FooStruct6;
+/*!
+  @recommendedover ro1, ro2, ro3, ro4
+  @recommended r1, r2, r3
+  @keyword k1, k2, k3, k4
+*/
 struct FooStruct6 {
   int x;
   double y;
