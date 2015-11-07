@@ -99,6 +99,14 @@ infix operator &<<= { associativity right precedence 90 assignment }
 infix operator &>> { associativity none precedence 160 }
 infix operator &>>= { associativity right precedence 90 assignment }
 
+// Heterogeneous arithmetic operators.  Because of the need to do
+// promotion, the ambiguities are otherwise too horrible to witness.
+infix operator |* { associativity left precedence 150 }
+infix operator |/ { associativity left precedence 150 }
+infix operator |% { associativity left precedence 150 }
+infix operator |+ { associativity left precedence 140 }
+infix operator |- { associativity left precedence 140 }
+
 @transparent
 public func _assertCond(
   @autoclosure condition: () -> Bool,
@@ -162,15 +170,22 @@ public prefix func -<T: ArithmeticType>(x: T) -> T {
 public typealias Word = Int${word_bits}
 public typealias UWord = UInt${word_bits}
 
+// Will be obsoleted by recursive protocol requirements
+public protocol IntegerConvertible {
+  init<T : IntegerType>(_ source: T)
+}
+
 public protocol IntegerType
-  : Comparable, ArithmeticType, 
+  : IntegerConvertible, Comparable, ArithmeticType, 
     IntegerLiteralConvertible, CustomStringConvertible  {
 
 % for otherBits in fixedBitWidths:
   typealias PromoteInt${otherBits}
-    : Comparable, ArithmeticType, IntegerLiteralConvertible, CustomStringConvertible
+    : Comparable, ArithmeticType, IntegerLiteralConvertible, 
+      CustomStringConvertible, IntegerConvertible
   typealias PromoteUInt${otherBits}
-    : Comparable, ArithmeticType, IntegerLiteralConvertible, CustomStringConvertible
+    : Comparable, ArithmeticType, IntegerLiteralConvertible, 
+      CustomStringConvertible, IntegerConvertible
 % end
 
   // Dispatching through these puts less stress on the user reading
@@ -629,6 +644,27 @@ extension SignedIntegerType where Self : FixedWidthIntegerType {
     return Self.bitWidth - 1 - x.countLeadingZeros()
   }
 }
+
+//===--- Heterogeneous Arithmetic -----------------------------------------===//
+
+% for x in binaryArithmetic:
+%   for rhsBits in fixedBitWidths:
+public func |${x.operator} <T : IntegerType> (
+  lhs: T, rhs: Int${rhsBits}
+) -> T.PromoteInt${rhsBits} {
+  return T.PromoteInt${rhsBits}(lhs)
+    ${x.operator} T.PromoteInt${rhsBits}(rhs)
+}
+
+public func |${x.operator} <T : IntegerType> (
+  lhs: T, rhs: UInt${rhsBits}
+) -> T.PromoteUInt${rhsBits} {
+  return T.PromoteUInt${rhsBits}(lhs)
+    ${x.operator} T.PromoteUInt${rhsBits}(rhs)
+}
+%   end
+% end
+
 
 //===--- Concrete FixedWidthIntegers --------------------------------------===//
 
@@ -1122,6 +1158,11 @@ tests.test("SmartBitShift/Unconstrained/Left/UInt16") {
   expectEqual(UInt16.max / 2, all1s << -1)
   expectEqual(1, all1s << -15)
   expectEqual(0, all1s << -16)
+}
+
+tests.test("HeterogeneousArithmetic/Addition") {
+  expectEqual(256, (255 as UInt8) |+ (1 as Int16))
+  expectEqual(256, (128 as Int16) |+ (128 as Int128))
 }
 
 tests.test("Basics") {
