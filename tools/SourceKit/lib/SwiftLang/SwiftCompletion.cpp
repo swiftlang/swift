@@ -875,7 +875,8 @@ static void transformAndForwardResults(
 
   organizer.groupAndSort(options);
 
-  if ((options.addInnerResults || options.addInnerOperators) && exactMatch) {
+  if ((options.addInnerResults || options.addInnerOperators) &&
+      exactMatch && exactMatch->getKind() == Completion::Declaration) {
     std::vector<Completion *> innerResults;
     bool hasDot = false;
     bool hasQDot = false;

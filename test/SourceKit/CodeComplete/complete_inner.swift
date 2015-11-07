@@ -121,3 +121,11 @@ func test005(x: Base?) {
 // RUN: %complete-test %s -group=none -no-inner-results -inner-operators -tok=OPTIONAL_POSTFIX | FileCheck %s -check-prefix=OPTIONAL_POSTFIX_OP
 // OPTIONAL_POSTFIX_OP: .
 // OPTIONAL_POSTFIX_OP: ?.
+
+// RUN: %complete-test %s -group=none -no-inner-results -inner-operators -tok=KEYWORD_0 | FileCheck %s -check-prefix=KEYWORD_0
+func test006() {
+  #^KEYWORD_0,for^#
+}
+// KEYWORD_0-NOT: for_
+// KEYWORD_0-NOT: fortest
+// KEYWORD_0-NOT: for.
