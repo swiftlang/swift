@@ -7,7 +7,7 @@
  Value Semantics in Swift
 ==========================
 
-**Abstract**: Swift is the first language to take Generic Programming
+:Abstract: Swift is the first language to take Generic Programming
  seriously that also has both value and reference types.  The
  (sometimes subtle) differences between the behaviors of value and
  reference types create unique challenges for generic programs that we
