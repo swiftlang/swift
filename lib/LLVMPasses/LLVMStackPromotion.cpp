@@ -102,7 +102,7 @@ bool SwiftStackPromotion::runOnFunction(Function &F) {
   // Search for allocation- and deallocation-calls in the function.
   for (BasicBlock &BB : F) {
     for (auto Iter = BB.begin(); Iter != BB.end(); ) {
-      Instruction *I = Iter;
+      Instruction *I = &*Iter;
       Iter++;
 
       if (auto *AI = dyn_cast<AllocaInst>(I)) {
@@ -150,9 +150,8 @@ bool SwiftStackPromotion::runOnFunction(Function &F) {
         initFunc = M->getOrInsertFunction("swift_initStackObject", NewFTy);
       }
       // Replace the allocation call with an alloca.
-      Value *AllocA = new AllocaInst(AllocType,
-                                     ConstantInt::get(IntType, size),
-                                     align, "buffer", F.front().begin());
+      Value *AllocA = new AllocaInst(AllocType, ConstantInt::get(IntType, size),
+                                     align, "buffer", &*F.front().begin());
       // And initialize it with a call to swift_initStackObject.
       IRBuilder<> B(CI);
       Value *casted = B.CreateBitCast(AllocA, CI->getType());

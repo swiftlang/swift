@@ -59,7 +59,7 @@ void GenericCloner::populateCloned() {
   SILModule &M = Cloned->getModule();
 
   // Create arguments for the entry block.
-  SILBasicBlock *OrigEntryBB = Original.begin();
+  SILBasicBlock *OrigEntryBB = &*Original.begin();
   SILBasicBlock *ClonedEntryBB = new (M) SILBasicBlock(Cloned);
 
   // Create the entry basic block with the function arguments.

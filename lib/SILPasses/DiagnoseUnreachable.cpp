@@ -470,7 +470,7 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
 
   // Does this block contain a call to a noreturn function?
   while (I != E) {
-    auto CurrentInst = I;
+    auto *CurrentInst = &*I;
     // Move the iterator before we remove instructions to avoid iterator
     // invalidation issues.
     ++I;
@@ -579,8 +579,7 @@ static bool diagnoseUnreachableBlock(const SILBasicBlock &B,
 
     // Check if the instruction corresponds to user-written code, also make
     // sure we don't report an error twice for the same instruction.
-    if (isUserCode(I) &&
-        !State->BlocksWithErrors.count(&B)) {
+    if (isUserCode(&*I) && !State->BlocksWithErrors.count(&B)) {
 
       // Emit the diagnostic.
       auto BrInfoIter = State->MetaMap.find(TopLevelB);
@@ -694,7 +693,7 @@ static bool removeUnreachableBlocks(SILFunction &F, SILModule &M,
 
   // Remove references from the dead blocks.
   for (auto I = F.begin(), E = F.end(); I != E; ++I) {
-    SILBasicBlock *BB = I;
+    SILBasicBlock *BB = &*I;
     if (Reachable.count(BB))
       continue;
 
@@ -707,7 +706,7 @@ static bool removeUnreachableBlocks(SILFunction &F, SILModule &M,
   // their deletion.
   llvm::SmallVector<SILInstruction*, 32> ToBeDeleted;
   for (auto BI = F.begin(), BE = F.end(); BI != BE; ++BI)
-    if (!Reachable.count(BI))
+    if (!Reachable.count(&*BI))
       for (auto I = BI->begin(), E = BI->end(); I != E; ++I)
         ToBeDeleted.push_back(&*I);
   recursivelyDeleteTriviallyDeadInstructions(ToBeDeleted, true);
@@ -715,7 +714,7 @@ static bool removeUnreachableBlocks(SILFunction &F, SILModule &M,
 
   // Delete the dead blocks.
   for (auto I = F.begin(), E = F.end(); I != E;)
-    if (!Reachable.count(I)) {
+    if (!Reachable.count(&*I)) {
       I = F.getBlocks().erase(I);
       NumBlocksRemoved++;
     } else

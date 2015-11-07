@@ -518,7 +518,8 @@ void BBState::processUnknownWriteInst(RLEContext &Ctx, SILInstruction *I) {
 bool BBState::optimize(RLEContext &Ctx, bool PF) {
   auto II = BB->begin(), E = BB->end();
   while (II != E) {
-    SILInstruction *Inst = II++;
+    SILInstruction *Inst = &*II;
+    ++II;
     DEBUG(llvm::dbgs() << "    Visiting: " << *Inst);
 
     // This is a StoreInst, try to see whether it clobbers any forwarding

@@ -626,7 +626,7 @@ public:
     // block are inside the lifetime of the allocated memory.
     SILBasicBlock *SBB = AI->getParent();
     bool Allocated = true;
-    for (SILBasicBlock::iterator Inst = AI, E = SBB->end(); Inst != E; ++Inst) {
+    for (auto Inst = AI->getIterator(), E = SBB->end(); Inst != E; ++Inst) {
       if (LoadInst *LI = dyn_cast<LoadInst>(Inst))
         if (LI->getOperand().getDef() == AI)
           require(Allocated, "AllocStack used by Load outside its lifetime");
@@ -2821,8 +2821,8 @@ public:
   void verifyStackHeight(SILFunction *F) {
     llvm::DenseMap<SILBasicBlock*, std::vector<SILInstruction*>> visitedBBs;
     SmallVector<SILBasicBlock*, 16> Worklist;
-    visitedBBs[F->begin()] = {};
-    Worklist.push_back(F->begin());
+    visitedBBs[&*F->begin()] = {};
+    Worklist.push_back(&*F->begin());
     while (!Worklist.empty()) {
       SILBasicBlock *BB = Worklist.pop_back_val();
       std::vector<SILInstruction*> stack = visitedBBs[BB];
@@ -2982,7 +2982,7 @@ public:
     }
 
     // Otherwise, verify the body of the function.
-    verifyEntryPointArguments(F->getBlocks().begin());
+    verifyEntryPointArguments(&*F->getBlocks().begin());
     verifyEpilogBlocks(F);
     verifyStackHeight(F);
     verifyBranches(F);

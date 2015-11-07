@@ -1304,7 +1304,7 @@ void IRGenSILFunction::emitSILFunction() {
   }
 
   // Map the entry bb.
-  LoweredBBs[CurSILFn->begin()] = LoweredBB(CurFn->begin(), {});
+  LoweredBBs[&*CurSILFn->begin()] = LoweredBB(&*CurFn->begin(), {});
   // Create LLVM basic blocks for the other bbs.
   for (SILBasicBlock *bb = CurSILFn->begin()->getNextNode();
        bb != CurSILFn->end(); bb = bb->getNextNode()) {
@@ -1352,8 +1352,8 @@ void IRGenSILFunction::emitSILFunction() {
   SmallVector<SILBasicBlock*, 8> workQueue; // really a stack
 
   // Queue up the entry block, for which the invariant trivially holds.
-  visitedBlocks.insert(CurSILFn->begin());
-  workQueue.push_back(CurSILFn->begin());
+  visitedBlocks.insert(&*CurSILFn->begin());
+  workQueue.push_back(&*CurSILFn->begin());
 
   while (!workQueue.empty()) {
     auto bb = workQueue.pop_back_val();

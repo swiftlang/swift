@@ -164,7 +164,7 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
       // computed by this initializer.
       InstructionsCloner Cloner(*Load->getFunction(), Init, Load);
       Cloner.clone();
-      SILInstruction *I = prev(SILBasicBlock::iterator(Load));
+      SILInstruction *I = &*std::prev(Load->getIterator());
       SILBuilderWithScope<1> B(Load);
       for (auto Use : Load->getUses()) {
         if (isa<StoreInst>(Use->getUser()))
@@ -182,7 +182,7 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
       // computed by this initializer.
       InstructionsCloner Cloner(*Load->getFunction(), Init, Load);
       Cloner.clone();
-      SILInstruction *I = prev(SILBasicBlock::iterator(Load));
+      SILInstruction *I = &*std::prev(Load->getIterator());
       Load->replaceAllUsesWith(I);
       Load->eraseFromParent();
       ++NumReplaced;
@@ -193,7 +193,7 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
       // computed by this initializer.
       InstructionsCloner Cloner(*Load->getFunction(), Init, Load);
       Cloner.clone();
-      SILInstruction *I = prev(SILBasicBlock::iterator(Load));
+      SILInstruction *I = &*std::prev(Load->getIterator());
       SILBuilderWithScope<1> B(Load);
       for (auto Use : Load->getUses()) {
         if (isa<StoreInst>(Use->getUser()))

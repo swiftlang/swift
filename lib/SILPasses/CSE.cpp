@@ -523,7 +523,8 @@ bool CSE::processNode(DominanceInfoNode *Node) {
   // See if any instructions in the block can be eliminated.  If so, do it.  If
   // not, add them to AvailableValues.
   for (SILBasicBlock::iterator I = BB->begin(), E = BB->end(); I != E;) {
-    SILInstruction *Inst = I++;
+    SILInstruction *Inst = &*I;
+    ++I;
 
     DEBUG(llvm::dbgs() << "SILCSE VISITING: " << *Inst << "\n");
 

@@ -470,8 +470,7 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
 
   // If we are not the first instruction in this basic block...
   if (RVI != &*RVI->getParent()->begin()) {
-    SILBasicBlock::iterator Pred = RVI;
-    --Pred;
+    SILBasicBlock::iterator Pred = std::prev(RVI->getIterator());
 
     // ...and the predecessor instruction is a release_value on the same value
     // as our retain_value...
@@ -549,8 +548,7 @@ SILInstruction *SILCombiner::visitStrongRetainInst(StrongRetainInst *SRI) {
 
   // If we are not the first instruction in this basic block...
   if (SRI != &*SRI->getParent()->begin()) {
-    SILBasicBlock::iterator Pred = SRI;
-    --Pred;
+    auto Pred = std::prev(SRI->getIterator());
 
     // ...and the predecessor instruction is a strong_release on the same value
     // as our strong_retain...
@@ -612,10 +610,10 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
       if (SEAI->getOperand() != IEAI->getOperand())
         return nullptr;
 
-      SILBasicBlock::iterator II = IEAI;
+      SILBasicBlock::iterator II = IEAI->getIterator();
       StoreInst *SI = nullptr;
       for (;;) {
-        SILInstruction *CI = II;
+        SILInstruction *CI = &*II;
         if (CI == SEAI)
           break;
         ++II;
@@ -626,7 +624,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
         }
         // Allow all instructions inbetween, which don't have any dependency to
         // the store.
-        if (AA->mayWriteToMemory(II, IEAI->getOperand()))
+        if (AA->mayWriteToMemory(&*II, IEAI->getOperand()))
           return nullptr;
       }
 
@@ -651,10 +649,10 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
       if (SEI->getOperand() != IEAI->getOperand())
         return nullptr;
 
-      SILBasicBlock::iterator II = IEAI;
+      SILBasicBlock::iterator II = IEAI->getIterator();
       StoreInst *SI = nullptr;
       for (;;) {
-        SILInstruction *CI = II;
+        SILInstruction *CI = &*II;
         if (CI == SEI)
           break;
         ++II;
@@ -665,7 +663,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
         }
         // Allow all instructions inbetween, which don't have any dependency to
         // the store.
-        if (AA->mayWriteToMemory(II, IEAI->getOperand()))
+        if (AA->mayWriteToMemory(&*II, IEAI->getOperand()))
           return nullptr;
       }
 
@@ -717,7 +715,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
 
   // Ok, we have a payload enum, make sure that we have a store previous to
   // us...
-  SILBasicBlock::iterator II = IEAI;
+  SILBasicBlock::iterator II = IEAI->getIterator();
   StoreInst *SI = nullptr;
   InitEnumDataAddrInst *DataAddrInst = nullptr;
   for (;;) {
@@ -734,7 +732,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     }
     // Allow all instructions inbetween, which don't have any dependency to
     // the store.
-    if (AA->mayWriteToMemory(II, IEAI->getOperand()))
+    if (AA->mayWriteToMemory(&*II, IEAI->getOperand()))
       return nullptr;
   }
   // Found the store to this enum payload. Check if the store is the only use.

@@ -286,7 +286,7 @@ void PartialApplyCombiner::processSingleApply(FullApplySite AI) {
   for (auto Op : AI.getArguments())
     Args.push_back(Op);
 
-  SILInstruction *InsertionPoint = Builder.getInsertionPoint();
+  SILInstruction *InsertionPoint = &*Builder.getInsertionPoint();
   // Next, the partial apply args.
 
   // Pre-process partial_apply arguments only once, lazily.

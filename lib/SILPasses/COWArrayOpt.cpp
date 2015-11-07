@@ -513,7 +513,7 @@ bool COWArrayOpt::isRetainReleasedBeforeMutate(SILInstruction *RetainInst,
   // (element uses may only be retained/released).
   for (auto II = std::next(SILBasicBlock::iterator(RetainInst)),
          IE = RetainInst->getParent()->end(); II != IE; ++II) {
-    if (isRelease(II, RetainInst->getOperand(0), CurrentArrayAddr, RCIA,
+    if (isRelease(&*II, RetainInst->getOperand(0), CurrentArrayAddr, RCIA,
                   MatchedReleases))
       return true;
 
@@ -525,7 +525,7 @@ bool COWArrayOpt::isRetainReleasedBeforeMutate(SILInstruction *RetainInst,
       continue;
 
     // Non mutating array calls are safe.
-    if (isNonMutatingArraySemanticCall(II))
+    if (isNonMutatingArraySemanticCall(&*II))
       continue;
 
     if (IsUniquelyIdentifiedArray) {
@@ -544,7 +544,7 @@ bool COWArrayOpt::isRetainReleasedBeforeMutate(SILInstruction *RetainInst,
       if (isa<ReleaseValueInst>(II) || isa<StrongReleaseInst>(II))
         continue;
 
-      if (ArrayUserSet.count(II)) // May be an array mutation.
+      if (ArrayUserSet.count(&*II)) // May be an array mutation.
         break;
     } else {
       // Not safe.
@@ -861,8 +861,8 @@ bool COWArrayOpt::isArrayValueReleasedBeforeMutate(
       if (MatchedReleases.count(&RVI->getOperandRef()))
         continue;
 
-    if (isReleaseOfArrayValueAt(ASI, II, RCIA)) {
-      Releases.erase(II);
+    if (isReleaseOfArrayValueAt(ASI, &*II, RCIA)) {
+      Releases.erase(&*II);
       return true;
     }
 
@@ -874,7 +874,7 @@ bool COWArrayOpt::isArrayValueReleasedBeforeMutate(
       continue;
 
     // Non mutating array calls are safe.
-    if (isNonMutatingArraySemanticCall(II))
+    if (isNonMutatingArraySemanticCall(&*II))
       continue;
 
     return false;
@@ -883,7 +883,7 @@ bool COWArrayOpt::isArrayValueReleasedBeforeMutate(
 }
 
 static SILInstruction *getInstBefore(SILInstruction *I) {
-  auto It = SILBasicBlock::reverse_iterator(I);
+  auto It = SILBasicBlock::reverse_iterator(I->getIterator());
   if (I->getParent()->rend() == It)
     return nullptr;
   return &*It;
@@ -915,7 +915,8 @@ stripValueProjections(SILValue V,
 /// by the array bounds check elimination pass.
 static SILInstruction *
 findPreceedingCheckSubscriptOrMakeMutable(ApplyInst *GetElementAddr) {
-  for (auto ReverseIt = SILBasicBlock::reverse_iterator(GetElementAddr),
+  for (auto ReverseIt =
+           SILBasicBlock::reverse_iterator(GetElementAddr->getIterator()),
             End = GetElementAddr->getParent()->rend();
        ReverseIt != End; ++ReverseIt) {
     auto Apply = dyn_cast<ApplyInst>(&*ReverseIt);
@@ -1484,7 +1485,8 @@ bool COWArrayOpt::run() {
       continue;
     for (auto II = BB->begin(), IE = BB->end(); II != IE;) {
       // Inst may be moved by hoistMakeMutable.
-      SILInstruction *Inst = II++;
+      SILInstruction *Inst = &*II;
+      ++II;
       ArraySemanticsCall MakeMutableCall(Inst, "array.make_mutable");
       if (!MakeMutableCall)
         continue;

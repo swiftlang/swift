@@ -343,7 +343,7 @@ void CheckedCastBrJumpThreading::modifyCFGForUnknownPreds() {
   // Check the FailureBB if it is a BB that contains a class_method
   // referring to the same value as a condition. This pattern is typical
   // for method chaining code like obj.method1().method2().etc()
-  SILInstruction *Inst = FailureBB->begin();
+  SILInstruction *Inst = &*FailureBB->begin();
   if (ClassMethodInst *CMI = dyn_cast<ClassMethodInst>(Inst)) {
     if (CMI->getOperand() == Condition) {
       // Replace checked_cast_br by branch to FailureBB.

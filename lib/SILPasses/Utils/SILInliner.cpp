@@ -48,7 +48,7 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
          "Cannot inline Objective-C methods or C functions in mandatory "
          "inlining");
 
-  CalleeEntryBB = CalleeFunction->begin();
+  CalleeEntryBB = &*CalleeFunction->begin();
 
   // Compute the SILLocation which should be used by all the inlined
   // instructions.
@@ -85,7 +85,7 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
   // track of the next BB so we always insert new BBs before it; otherwise,
   // we just leave the new BBs at the end as they are by default.
   auto IBI = std::next(SILFunction::iterator(AI.getParent()));
-  InsertBeforeBB = IBI != F.end() ? IBI : nullptr;
+  InsertBeforeBB = IBI != F.end() ? &*IBI : nullptr;
 
   // Clear argument map and map ApplyInst arguments to the arguments of the
   // callee's entry block.

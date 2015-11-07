@@ -194,7 +194,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(IGF, fn);
 
-  Address structAddr = layout.emitCastTo(IGF, fn->arg_begin());
+  Address structAddr = layout.emitCastTo(IGF, &*fn->arg_begin());
 
   // Bind necessary bindings, if we have them.
   if (layout.hasBindings()) {
@@ -218,7 +218,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
                             fieldTy);
   }
 
-  emitDeallocateHeapObject(IGF, fn->arg_begin(), offsets.getSize(),
+  emitDeallocateHeapObject(IGF, &*fn->arg_begin(), offsets.getSize(),
                            offsets.getAlignMask());
   IGF.Builder.CreateRetVoid();
 

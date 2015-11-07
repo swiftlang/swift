@@ -812,7 +812,7 @@ static Address emitInitializeBufferWithTake(IRGenFunction &IGF,
 
 static llvm::Value *getArg(llvm::Function::arg_iterator &it,
                            StringRef name) {
-  llvm::Value *arg = it++;
+  llvm::Value *arg = &*(it++);
   arg->setName(name);
   return arg;
 }
@@ -1166,11 +1166,11 @@ static llvm::Constant *getNoOpVoidFunction(IRGenModule &IGM) {
 /// the first one immediately.
 static llvm::Constant *getReturnSelfFunction(IRGenModule &IGM) {
   llvm::Type *argTys[] = { IGM.Int8PtrTy, IGM.TypeMetadataPtrTy };
-  return IGM.getOrCreateHelperFunction("__swift_noop_self_return",
-                                       IGM.Int8PtrTy, argTys,
-                                       [&](IRGenFunction &IGF) {
-    IGF.Builder.CreateRet(IGF.CurFn->arg_begin());
-  });
+  return IGM.getOrCreateHelperFunction(
+      "__swift_noop_self_return", IGM.Int8PtrTy, argTys,
+      [&](IRGenFunction &IGF) {
+        IGF.Builder.CreateRet(&*IGF.CurFn->arg_begin());
+      });
 }
 
 /// Return a function which takes three pointer arguments and does a
@@ -1184,8 +1184,8 @@ static llvm::Constant *getAssignWithCopyStrongFunction(IRGenModule &IGM) {
                                        ptrPtrTy, argTys,
                                        [&](IRGenFunction &IGF) {
     auto it = IGF.CurFn->arg_begin();
-    Address dest(it++, IGM.getPointerAlignment());
-    Address src(it++, IGM.getPointerAlignment());
+    Address dest(&*(it++), IGM.getPointerAlignment());
+    Address src(&*(it++), IGM.getPointerAlignment());
 
     llvm::Value *newValue = IGF.Builder.CreateLoad(src, "new");
     IGF.emitRetainCall(newValue);
@@ -1208,8 +1208,8 @@ static llvm::Constant *getAssignWithTakeStrongFunction(IRGenModule &IGM) {
                                        ptrPtrTy, argTys,
                                        [&](IRGenFunction &IGF) {
     auto it = IGF.CurFn->arg_begin();
-    Address dest(it++, IGM.getPointerAlignment());
-    Address src(it++, IGM.getPointerAlignment());
+    Address dest(&*(it++), IGM.getPointerAlignment());
+    Address src(&*(it++), IGM.getPointerAlignment());
 
     llvm::Value *newValue = IGF.Builder.CreateLoad(src, "new");
     llvm::Value *oldValue = IGF.Builder.CreateLoad(dest, "old");
@@ -1230,8 +1230,8 @@ static llvm::Constant *getInitWithCopyStrongFunction(IRGenModule &IGM) {
                                        ptrPtrTy, argTys,
                                        [&](IRGenFunction &IGF) {
     auto it = IGF.CurFn->arg_begin();
-    Address dest(it++, IGM.getPointerAlignment());
-    Address src(it++, IGM.getPointerAlignment());
+    Address dest(&*(it++), IGM.getPointerAlignment());
+    Address src(&*(it++), IGM.getPointerAlignment());
 
     llvm::Value *newValue = IGF.Builder.CreateLoad(src, "new");
     IGF.emitRetainCall(newValue);
@@ -1349,7 +1349,7 @@ static llvm::Constant *getMemOpArrayFunction(IRGenModule &IGM,
     auto it = IGF.CurFn->arg_begin();
     Address dest(it++, fixedTI.getFixedAlignment());
     Address src(it++, fixedTI.getFixedAlignment());
-    llvm::Value *count = it++;
+    llvm::Value *count = &*(it++);
     llvm::Value *stride
       = llvm::ConstantInt::get(IGM.SizeTy, fixedTI.getFixedStride().getValue());
     llvm::Value *totalCount = IGF.Builder.CreateNUWMul(count, stride);

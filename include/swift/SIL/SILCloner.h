@@ -357,7 +357,7 @@ SILCloner<ImplClass>::visitSILBasicBlock(SILBasicBlock* BB) {
   SILFunction &F = getBuilder().getFunction();
   // Iterate over and visit all instructions other than the terminator to clone.
   for (auto I = BB->begin(), E = --BB->end(); I != E; ++I)
-    asImpl().visit(I);
+    asImpl().visit(&*I);
   // Iterate over successors to do the depth-first search.
   for (auto &Succ : BB->getSuccessors()) {
     auto BBI = BBMap.find(Succ);

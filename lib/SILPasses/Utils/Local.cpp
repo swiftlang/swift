@@ -271,7 +271,7 @@ void swift::placeFuncRef(ApplyInst *AI, DominanceInfo *DT) {
     FuncRef->moveBefore(AI);
   else
     // Otherwise, conservatively stick it at the beginning of the block.
-    FuncRef->moveBefore(DomBB->begin());
+    FuncRef->moveBefore(&*DomBB->begin());
 }
 
 /// \brief Add an argument, \p val, to the branch-edge that is pointing into

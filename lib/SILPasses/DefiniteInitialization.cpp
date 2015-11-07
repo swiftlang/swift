@@ -1674,7 +1674,7 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
   if (SelfConsumed == DIKind::Yes) {
     // We're in an error path after performing a self.init or super.init
     // delegation. The value was already consumed so there's nothing to release.
-    processUninitializedRelease(Release, true, Release);
+    processUninitializedRelease(Release, true, Release->getIterator());
     deleteDeadRelease(ReleaseID);
     return;
   }
@@ -1686,7 +1686,7 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
 
   // If it is all 'no' then we can handle it specially without conditional code.
   if (Availability.isAllNo() && SelfConsumed == DIKind::No) {
-    processUninitializedRelease(Release, false, Release);
+    processUninitializedRelease(Release, false, Release->getIterator());
     deleteDeadRelease(ReleaseID);
     return;
   }
@@ -2242,10 +2242,10 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
     // store is before or after the load.  If it is before, it produces the value
     // we are looking for.
     if (getBlockInfo(InstBB).HasNonLoadUse) {
-      for (SILBasicBlock::iterator BBI = Inst, E = InstBB->begin();
-           BBI != E;) {
-        SILInstruction *TheInst = --BBI;
-        
+      for (auto BBI = Inst->getIterator(), E = InstBB->begin(); BBI != E;) {
+        --BBI;
+        SILInstruction *TheInst = &*BBI;
+
         // If this instruction is unrelated to the memory, ignore it.
         if (!NonLoadUses.count(TheInst))
           continue;
@@ -2280,8 +2280,9 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
   // store is before or after the load.  If it is before, it may produce some of
   // the elements we are looking for.
   if (getBlockInfo(InstBB).HasNonLoadUse) {
-    for (SILBasicBlock::iterator BBI = Inst, E = InstBB->begin(); BBI != E;) {
-      SILInstruction *TheInst = --BBI;
+    for (auto BBI = Inst->getIterator(), E = InstBB->begin(); BBI != E;) {
+      --BBI;
+      SILInstruction *TheInst = &*BBI;
 
       // If this instruction is unrelated to the memory, ignore it.
       auto It = NonLoadUses.find(TheInst);
@@ -2424,7 +2425,7 @@ static bool checkDefiniteInitialization(SILFunction &Fn) {
   bool Changed = false;
   for (auto &BB : Fn) {
     for (auto I = BB.begin(), E = BB.end(); I != E; ++I) {
-      SILInstruction *Inst = I;
+      SILInstruction *Inst = &*I;
       if (isa<MarkUninitializedInst>(Inst))
         Changed |= processMemoryObject(Inst);
     }
@@ -2440,8 +2441,9 @@ static bool lowerRawSILOperations(SILFunction &Fn) {
   for (auto &BB : Fn) {
     auto I = BB.begin(), E = BB.end();
     while (I != E) {
-      SILInstruction *Inst = I++;
-      
+      SILInstruction *Inst = &*I;
+      ++I;
+
       // Unprocessed assigns just lower into assignments, not initializations.
       if (auto *AI = dyn_cast<AssignInst>(Inst)) {
         SILBuilderWithScope<4> B(AI);

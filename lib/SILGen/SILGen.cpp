@@ -296,7 +296,7 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
     if (!insertAfter) {
       M.functions.push_front(F);
     } else {
-      M.functions.insertAfter(insertAfter, F);
+      M.functions.insertAfter(insertAfter->getIterator(), F);
     }
 
     forcedFunctions.push_back(*foundDelayed);

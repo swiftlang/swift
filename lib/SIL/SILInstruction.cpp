@@ -140,7 +140,7 @@ void SILInstruction::moveAfter(SILInstruction *Earlier) {
   // Since MovePos is an instruction, we know that there is always a valid
   // iterator after it.
   auto Later = std::next(SILBasicBlock::iterator(Earlier));
-  moveBefore(Later);
+  moveBefore(&*Later);
 }
 
 void SILInstruction::dropAllReferences() {

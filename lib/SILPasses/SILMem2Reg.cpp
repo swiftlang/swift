@@ -371,7 +371,8 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
 
   // For all instructions in the block.
   for (auto BBI = BB->begin(), E = BB->end(); BBI != E;) {
-    SILInstruction *Inst = BBI++;
+    SILInstruction *Inst = &*BBI;
+    ++BBI;
 
     if (isLoadFromStack(Inst, ASI)) {
       if (RunningVal.isValid()) {
@@ -453,7 +454,8 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
 
   // For all instructions in the block.
   for (auto BBI = BB->begin(), E = BB->end(); BBI != E;) {
-    SILInstruction *Inst = BBI++;
+    SILInstruction *Inst = &*BBI;
+    ++BBI;
 
     // Remove instructions that we are loading from. Replace the loaded value
     // with our running value.
@@ -828,7 +830,7 @@ bool MemoryToRegisters::run() {
   for (auto &BB : F) {
     auto I = BB.begin(), E = BB.end();
     while (I != E) {
-      SILInstruction *Inst = I;
+      SILInstruction *Inst = &*I;
       AllocStackInst *ASI = dyn_cast<AllocStackInst>(Inst);
       if (!ASI) {
         ++I;

@@ -981,7 +981,7 @@ static bool onlyHasTerminatorAndDebugInsts(SILBasicBlock *BB) {
   TermInst *Terminator = BB->getTerminator();
   SILBasicBlock::iterator Iter = BB->begin();
   while (&*Iter != Terminator) {
-    if (!isDebugInst(Iter))
+    if (!isDebugInst(&*Iter))
       return false;
     Iter++;
   }
@@ -1049,7 +1049,7 @@ static BranchInst *getTrampolineWithoutBBArgsTerminator(SILBasicBlock *SBB) {
 static bool isReachable(SILBasicBlock *Block) {
   SmallPtrSet<SILBasicBlock *, 16> Visited;
   llvm::SmallVector<SILBasicBlock *, 16> Worklist;
-  SILBasicBlock *EntryBB = Block->getParent()->begin();
+  SILBasicBlock *EntryBB = &*Block->getParent()->begin();
   Worklist.push_back(EntryBB);
   Visited.insert(EntryBB);
 
@@ -1977,7 +1977,7 @@ bool RemoveUnreachable::run() {
   Visited.clear();
 
   // Visit all blocks reachable from the entry block of the function.
-  visit(Fn.begin());
+  visit(&*Fn.begin());
 
   // Remove the blocks we never reached.
   for (auto It = Fn.begin(), End = Fn.end(); It != End; ) {
@@ -2711,7 +2711,7 @@ static bool isSingleBranchBlock(SILBasicBlock *BB) {
   TermInst *TI = BB->getTerminator();
   if (!isa<BranchInst>(TI))
     return false;
-  return TI == BB->begin();
+  return TI == &*BB->begin();
 }
 
 /// Find a parent SwitchEnumInst of a basic block. If SEI is set, then
@@ -2747,9 +2747,9 @@ getSwitchEnumPred(SILBasicBlock *BB, SwitchEnumInst *SEI, SILBasicBlock *PostBB,
   auto *BI = dyn_cast<BranchInst>(BB->getTerminator());
   if (!BI)
     return nullptr;
-  if (BI != First) {
+  if (BI != &*First) {
     // There may be only one instruction before the branch.
-    if (BI != next(First))
+    if (BI != &*std::next(First))
       return nullptr;
 
     // There are some instructions besides the branch.

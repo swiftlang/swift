@@ -22,7 +22,7 @@ using namespace swift;
 static void stripFunction(SILFunction *F) {
   for (auto &BB : *F)
     for (auto II = BB.begin(), IE = BB.end(); II != IE;) {
-      SILInstruction *Inst = II;
+      SILInstruction *Inst = &*II;
       ++II;
 
       if (!isa<DebugValueInst>(Inst) &&

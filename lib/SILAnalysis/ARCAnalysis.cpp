@@ -694,7 +694,7 @@ ConsumedArgToEpilogueReleaseMatcher(RCIdentityFunctionInfo *RCIA,
   // Find the return BB of F. If we fail, then bail.
   auto ReturnBB = F->findReturnBB();
   if (ReturnBB != F->end())
-    findMatchingReleases(RCIA, ReturnBB);
+    findMatchingReleases(RCIA, &*ReturnBB);
 }
 
 void ConsumedArgToEpilogueReleaseMatcher::

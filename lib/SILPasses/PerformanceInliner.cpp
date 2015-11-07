@@ -1060,10 +1060,10 @@ void SILPerformanceInliner::collectAppliesToInline(SILFunction *Caller,
     for (auto I = block->begin(), E = block->end(); I != E; ++I) {
       constTracker.trackInst(&*I);
 
-      if (!FullApplySite::isa(I))
+      if (!FullApplySite::isa(&*I))
         continue;
 
-      FullApplySite AI = FullApplySite(I);
+      FullApplySite AI = FullApplySite(&*I);
 
       DEBUG(llvm::dbgs() << "    Check:" << *I);
 

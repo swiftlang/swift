@@ -30,7 +30,8 @@ static void cleanFunction(SILFunction &Fn) {
     while (I != E) {
       // Make sure there is no iterator invalidation if the inspected
       // instruction gets removed from the block.
-      SILInstruction *Inst = I++;
+      SILInstruction *Inst = &*I;
+      ++I;
 
       // Remove calls to Builtin.staticReport().
       if (BuiltinInst *BI = dyn_cast<BuiltinInst>(Inst)) {

@@ -97,7 +97,7 @@ DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) {
 }
 
 SILInstruction *DIMemoryObjectInfo::getFunctionEntryPoint() const {
-  return getFunction().begin()->begin();
+  return &*getFunction().begin()->begin();
 }
 
 /// Given a symbolic element number, return the type of the element.

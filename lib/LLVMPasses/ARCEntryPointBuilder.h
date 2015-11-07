@@ -55,7 +55,7 @@ class ARCEntryPointBuilder {
   NullablePtr<Type> BridgeObjectPtrTy;
 
 public:
-  ARCEntryPointBuilder(Function &F) : B(F.begin()), Retain(), ObjectPtrTy() {}
+  ARCEntryPointBuilder(Function &F) : B(&*F.begin()), Retain(), ObjectPtrTy() {}
   ~ARCEntryPointBuilder() = default;
   ARCEntryPointBuilder(ARCEntryPointBuilder &&) = delete;
   ARCEntryPointBuilder(const ARCEntryPointBuilder &) = delete;

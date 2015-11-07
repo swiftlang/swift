@@ -3010,7 +3010,7 @@ void CallEmission::addAttribute(unsigned Index, llvm::Attribute::AttrKind Attr) 
 Explosion IRGenFunction::collectParameters() {
   Explosion params;
   for (auto i = CurFn->arg_begin(), e = CurFn->arg_end(); i != e; ++i)
-    params.add(i);
+    params.add(&*i);
   return params;
 }
 
@@ -3020,7 +3020,7 @@ Address IRGenFunction::getErrorResultSlot(SILType errorType) {
     auto &errorTI = cast<FixedTypeInfo>(getTypeInfo(errorType));
 
     IRBuilder builder(IGM.getLLVMContext());
-    builder.SetInsertPoint(AllocaIP->getParent(), AllocaIP);
+    builder.SetInsertPoint(AllocaIP->getParent(), AllocaIP->getIterator());
 
     // Create the alloca.  We don't use allocateStack because we're
     // not allocating this in stack order.

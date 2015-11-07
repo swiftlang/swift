@@ -119,7 +119,8 @@ public:
         block->getInstList().push_front(I);
       } else {
         llvm::Instruction *afterInsn = After.get<llvm::Instruction*>();
-        afterInsn->getParent()->getInstList().insertAfter(afterInsn, I);
+        afterInsn->getParent()->getInstList().insertAfter(
+            afterInsn->getIterator(), I);
       }
     }
 

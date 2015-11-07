@@ -199,7 +199,7 @@ SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden,
                                    OperandRelation &opRelation) {
   int SkipBudget = SinkSearchWindow;
 
-  SILBasicBlock::iterator InstToSink = BB->getTerminator();
+  SILBasicBlock::iterator InstToSink = BB->getTerminator()->getIterator();
   SILBasicBlock *IdenBlock = Iden->getParent();
   
   // The compare function for instruction operands.
@@ -230,14 +230,14 @@ SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden,
   while (SkipBudget) {
     // If we found a sinkable instruction that is identical to our goal
     // then return it.
-    if (canSinkInstruction(InstToSink) &&
-        Iden->isIdenticalTo(InstToSink, operandCompare)) {
+    if (canSinkInstruction(&*InstToSink) &&
+        Iden->isIdenticalTo(&*InstToSink, operandCompare)) {
       DEBUG(llvm::dbgs() << "Found an identical instruction.");
-      return InstToSink;
+      return &*InstToSink;
     }
 
     // If this instruction is a skip-barrier end the scan.
-    if (isSinkBarrier(InstToSink))
+    if (isSinkBarrier(&*InstToSink))
       return nullptr;
 
     // If this is the first instruction in the block then we are done.
@@ -348,7 +348,7 @@ static bool sinkLiteralArguments(SILBasicBlock *BB, unsigned ArgNum) {
   }
 
   // Replace the use of the argument with the cloned literal.
-  auto Cloned = FirstLiteral->clone(BB->begin());
+  auto Cloned = FirstLiteral->clone(&*BB->begin());
   BB->getBBArg(ArgNum)->replaceAllUsesWith(Cloned);
 
   return true;
@@ -430,7 +430,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
 
   if (DifferentOperandIndex) {
     // Sink one of the instructions to BB
-    FSI->moveBefore(BB->begin());
+    FSI->moveBefore(&*BB->begin());
 
     // The instruction we are lowering has an argument which is different
     // for each predecessor.  We need to sink the instruction, then add
@@ -466,7 +466,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
 
   // Sink one of the copies of the instruction.
   FirstPredArg.replaceAllUsesWith(Undef);
-  FSI->moveBefore(BB->begin());
+  FSI->moveBefore(&*BB->begin());
   SILValue(BB->getBBArg(ArgNum)).replaceAllUsesWith(FirstPredArg);
 
   // The argument is no longer in use. Replace all incoming inputs with undef
@@ -553,7 +553,7 @@ static bool sinkCodeFromPredecessors(SILBasicBlock *BB) {
 
   SILBasicBlock *FirstPred = *BB->pred_begin();
   // The first Pred must have at least one non-terminator.
-  if (FirstPred->getTerminator() == FirstPred->begin())
+  if (FirstPred->getTerminator() == &*FirstPred->begin())
     return Changed;
 
   DEBUG(llvm::dbgs() << " Sinking values from predecessors.\n");
@@ -580,7 +580,7 @@ static bool sinkCodeFromPredecessors(SILBasicBlock *BB) {
   unsigned SkipBudget = SinkSearchWindow;
 
   // Start scanning backwards from the terminator.
-  SILBasicBlock::iterator InstToSink = FirstPred->getTerminator();
+  auto InstToSink = FirstPred->getTerminator()->getIterator();
 
   while (SkipBudget) {
     DEBUG(llvm::dbgs() << "Processing: " << *InstToSink);
@@ -588,8 +588,8 @@ static bool sinkCodeFromPredecessors(SILBasicBlock *BB) {
     // Save the duplicated instructions in case we need to remove them.
     SmallVector<SILInstruction *, 4> Dups;
 
-    if (canSinkInstruction(InstToSink)) {
-      
+    if (canSinkInstruction(&*InstToSink)) {
+
       OperandRelation opRelation = NotDeterminedYet;
 
       // For all preds:
@@ -598,9 +598,8 @@ static bool sinkCodeFromPredecessors(SILBasicBlock *BB) {
           continue;
 
         // Search the duplicated instruction in the predecessor.
-        if (SILInstruction *DupInst = findIdenticalInBlock(P, InstToSink,
-                                                           valueToArgIdxMap,
-                                                           opRelation)) {
+        if (SILInstruction *DupInst = findIdenticalInBlock(
+                P, &*InstToSink, valueToArgIdxMap, opRelation)) {
           Dups.push_back(DupInst);
         } else {
           DEBUG(llvm::dbgs() << "Instruction mismatch.\n");
@@ -613,7 +612,7 @@ static bool sinkCodeFromPredecessors(SILBasicBlock *BB) {
       // the rest.
       if (Dups.size()) {
         DEBUG(llvm::dbgs() << "Moving: " << *InstToSink);
-        InstToSink->moveBefore(BB->begin());
+        InstToSink->moveBefore(&*BB->begin());
 
         if (opRelation == EqualAfterMove) {
           // Replace operand values (which are passed to the successor block)
@@ -628,20 +627,20 @@ static bool sinkCodeFromPredecessors(SILBasicBlock *BB) {
         }
         Changed = true;
         for (auto I : Dups) {
-          I->replaceAllUsesWith(InstToSink);
+          I->replaceAllUsesWith(&*InstToSink);
           I->eraseFromParent();
           NumSunk++;
         }
 
         // Restart the scan.
-        InstToSink = FirstPred->getTerminator();
+        InstToSink = FirstPred->getTerminator()->getIterator();
         DEBUG(llvm::dbgs() << "Restarting scan. Next inst: " << *InstToSink);
         continue;
       }
     }
 
     // If this instruction was a barrier then we can't sink anything else.
-    if (isSinkBarrier(InstToSink)) {
+    if (isSinkBarrier(&*InstToSink)) {
       DEBUG(llvm::dbgs() << "Aborting on barrier: " << *InstToSink);
       return Changed;
     }
@@ -679,11 +678,11 @@ static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *Switch,
   // can decrement our ptr value, we can move the retain over the ref count
   // inst. If any of them do potentially decrement the ref count of Ptr, we can
   // not move it.
-  SILBasicBlock::iterator SwitchIter = Switch;
+  auto SwitchIter = Switch->getIterator();
   if (auto B = valueHasARCDecrementOrCheckInInstructionRange(Ptr, RV,
                                                              SwitchIter,
                                                              AA)) {
-    RV->moveBefore(*B);
+    RV->moveBefore(&**B);
     return true;
   }
 
@@ -711,7 +710,7 @@ static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *Switch,
     SILBasicBlock *Succ = Case.second;
     Builder.setInsertionPoint(&*Succ->begin());
     if (Enum->hasArgumentType())
-      createRefCountOpForPayload(Builder, RV, Enum, Switch->getOperand());
+      createRefCountOpForPayload(Builder, &*RV, Enum, Switch->getOperand());
   }
 
   RV->eraseFromParent();
@@ -750,10 +749,10 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
   // not move it.
 
   SILValue Ptr = I->getOperand(0);
-  SILBasicBlock::iterator CondBrIter = CondBr;
+  auto CondBrIter = CondBr->getIterator();
   if (auto B = valueHasARCDecrementOrCheckInInstructionRange(Ptr, std::next(I),
                                                              CondBrIter, AA)) {
-    I->moveBefore(*B);
+    I->moveBefore(&**B);
     return false;
   }
 
@@ -797,7 +796,7 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
     SILBasicBlock *Succ = i == 0 ? CondBr->getTrueBB() : CondBr->getFalseBB();
     Builder.setInsertionPoint(&*Succ->begin());
     if (Enum->hasArgumentType())
-      createRefCountOpForPayload(Builder, I, Enum, SEI->getEnumOperand());
+      createRefCountOpForPayload(Builder, &*I, Enum, SEI->getEnumOperand());
   }
 
   I->eraseFromParent();
@@ -835,7 +834,7 @@ static bool tryToSinkRefCountInst(SILBasicBlock::iterator T,
   if (auto B = valueHasARCDecrementOrCheckInInstructionRange(Ptr, std::next(I),
                                                              T, AA)) {
     DEBUG(llvm::dbgs() << "    Moving " << *I);
-    I->moveBefore(*B);
+    I->moveBefore(&**B);
     return true;
   }
 
@@ -845,7 +844,7 @@ static bool tryToSinkRefCountInst(SILBasicBlock::iterator T,
   if (!CanSinkToSuccessors ||
       (!isa<CheckedCastBranchInst>(T) && !isa<CondBranchInst>(T))) {
     DEBUG(llvm::dbgs() << "    Moving " << *I);
-    I->moveBefore(T);
+    I->moveBefore(&*T);
     return true;
   }
 
@@ -904,7 +903,7 @@ static bool isRetainAvailableInSomeButNotAllPredecessors(
     auto End = CheckUpToInstruction[Pred];
     auto EndIt = SILBasicBlock::iterator(End ? *End : Pred->getTerminator());
     if (Retain == Pred->rend() || valueHasARCDecrementOrCheckInInstructionRange(
-                                      Ptr, &*Retain, EndIt, AA)) {
+                                      Ptr, Retain->getIterator(), EndIt, AA)) {
       NotAvailInSome = true;
       continue;
     }
@@ -951,7 +950,8 @@ static bool hoistDecrementsToPredecessors(SILBasicBlock *BB, AliasAnalysis *AA,
       continue;
 
     // No arc use to the beginning of this block.
-    if (valueHasARCUsesInInstructionRange(Ptr, BB->begin(), Inst, AA))
+    if (valueHasARCUsesInInstructionRange(Ptr, BB->begin(), Inst->getIterator(),
+                                          AA))
       continue;
 
     if (!isRetainAvailableInSomeButNotAllPredecessors(Ptr, BB, AA, RCIA,
@@ -998,7 +998,7 @@ static bool sinkRefCountIncrement(SILBasicBlock *BB, AliasAnalysis *AA,
   });
 
   SILInstruction *S = BB->getTerminator();
-  SILBasicBlock::iterator SI = S, SE = BB->begin();
+  auto SI = S->getIterator(), SE = BB->begin();
   if (SI == SE)
     return false;
 
@@ -1018,11 +1018,13 @@ static bool sinkRefCountIncrement(SILBasicBlock *BB, AliasAnalysis *AA,
     //      terminator, sink the ref count inst into either our successors.
     //   2. If there are such decrements, move the retain right before that
     //      decrement.
-    Changed |= tryToSinkRefCountInst(S, Inst, CanSinkToSuccessor, AA, RCIA);
+    Changed |= tryToSinkRefCountInst(S->getIterator(), Inst->getIterator(),
+                                     CanSinkToSuccessor, AA, RCIA);
   }
 
   // Handle the first instruction in the BB.
-  Changed |= tryToSinkRefCountInst(S, &*SI, CanSinkToSuccessor, AA, RCIA);
+  Changed |=
+      tryToSinkRefCountInst(S->getIterator(), SI, CanSinkToSuccessor, AA, RCIA);
   return Changed;
 }
 
@@ -1564,9 +1566,9 @@ findLastSinkableMatchingEnumValueRCIncrementInPred(AliasAnalysis *AA,
     // Otherwise, see if there are any instructions in between FirstPredInc and
     // the end of the given basic block that could decrement first pred. If such
     // an instruction exists, we can not perform this optimization so continue.
-    if (valueHasARCDecrementOrCheckInInstructionRange(EnumValue, &*FirstInc,
-                                                      BB->getTerminator(),
-                                                      AA))
+    if (valueHasARCDecrementOrCheckInInstructionRange(
+            EnumValue, (*FirstInc).getIterator(),
+            BB->getTerminator()->getIterator(), AA))
       return nullptr;
 
     return &*FirstInc;

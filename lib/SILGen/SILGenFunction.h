@@ -195,6 +195,18 @@ public:
   SILGenBuilder(SILGenFunction &gen, SILBasicBlock *insertBB,
                 SILInstruction *insertInst);
 
+  SILGenBuilder(SILGenFunction &gen, SILFunction::iterator insertBB)
+      : SILGenBuilder(gen, &*insertBB) {}
+  SILGenBuilder(SILGenFunction &gen, SILFunction::iterator insertBB,
+                SmallVectorImpl<SILInstruction *> *insertedInsts)
+      : SILGenBuilder(gen, &*insertBB, insertedInsts) {}
+  SILGenBuilder(SILGenFunction &gen, SILFunction::iterator insertBB,
+                SILInstruction *insertInst)
+      : SILGenBuilder(gen, &*insertBB, insertInst) {}
+  SILGenBuilder(SILGenFunction &gen, SILFunction::iterator insertBB,
+                SILBasicBlock::iterator insertInst)
+      : SILGenBuilder(gen, &*insertBB, &*insertInst) {}
+
   // Metatype instructions use the conformances necessary to instantiate the
   // type.
   

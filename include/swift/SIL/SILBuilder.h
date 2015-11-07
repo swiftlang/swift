@@ -46,6 +46,10 @@ public:
     setInsertionPoint(I);
   }
 
+  explicit SILBuilder(SILBasicBlock::iterator I,
+                      SmallVectorImpl<SILInstruction *> *InsertedInstrs = 0)
+      : SILBuilder(&*I, InsertedInstrs) {}
+
   explicit SILBuilder(SILBasicBlock *BB,
                       SmallVectorImpl<SILInstruction*> *InsertedInstrs = 0)
     : F(*BB->getParent()), InsertedInstrs(InsertedInstrs) {
@@ -97,7 +101,13 @@ public:
   /// setInsertionPoint - Set the insertion point to insert before the specified
   /// instruction.
   void setInsertionPoint(SILInstruction *I) {
-    setInsertionPoint(I->getParent(), I);
+    setInsertionPoint(I->getParent(), I->getIterator());
+  }
+
+  /// setInsertionPoint - Set the insertion point to insert before the specified
+  /// instruction.
+  void setInsertionPoint(SILBasicBlock::iterator IIIter) {
+    setInsertionPoint(IIIter->getParent(), IIIter);
   }
 
   /// setInsertionPoint - Set the insertion point to insert at the end of the
@@ -105,7 +115,13 @@ public:
   void setInsertionPoint(SILBasicBlock *BB) {
     setInsertionPoint(BB, BB->end());
   }
-  
+
+  /// setInsertionPoint - Set the insertion point to insert at the end of the
+  /// specified block.
+  void setInsertionPoint(SILFunction::iterator BBIter) {
+    setInsertionPoint(&*BBIter);
+  }
+
   SILBasicBlock *getInsertionPoint() const {
     return BB;
   }
@@ -143,6 +159,11 @@ public:
     auto &Blocks = F->getBlocks();
     Blocks.remove(BB);
     Blocks.insert(IP, BB);
+  }
+
+  /// moveBlockTo - Move \p BB to immediately before \p Before.
+  void moveBlockTo(SILBasicBlock *BB, SILBasicBlock *Before) {
+    moveBlockTo(BB, Before->getIterator());
   }
 
   /// moveBlockToEnd - Reorder a block to the end of its containing function.
@@ -1388,9 +1409,15 @@ public:
     assert((DebugScope || maybeScopeless(*I)) && "no debug scope");
   }
 
+  explicit SILBuilderWithScope(SILBasicBlock::iterator I)
+      : SILBuilderWithScope(&*I) {}
+
   explicit SILBuilderWithScope(SILInstruction *I, SILDebugScope *DS)
     : SILBuilder(I, &InsertedInstrs), DebugScope(DS) {
   }
+
+  explicit SILBuilderWithScope(SILBasicBlock::iterator I, SILDebugScope *DS)
+      : SILBuilderWithScope(&*I, DS) {}
 
   explicit SILBuilderWithScope(SILBasicBlock *BB, SILDebugScope *DS)
     : SILBuilder(BB, &InsertedInstrs), DebugScope(DS) {

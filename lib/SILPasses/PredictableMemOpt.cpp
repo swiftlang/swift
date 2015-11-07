@@ -389,11 +389,11 @@ computeAvailableValues(SILInstruction *StartingFrom,
                        SmallVectorImpl<std::pair<SILValue, unsigned>> &Result) {
   llvm::SmallDenseMap<SILBasicBlock*, llvm::SmallBitVector, 32> VisitedBlocks;
   llvm::SmallBitVector ConflictingValues(Result.size());
-  
-  computeAvailableValuesFrom(StartingFrom, StartingFrom->getParent(),
-                             RequiredElts, Result, VisitedBlocks,
-                             ConflictingValues);
-  
+
+  computeAvailableValuesFrom(StartingFrom->getIterator(),
+                             StartingFrom->getParent(), RequiredElts, Result,
+                             VisitedBlocks, ConflictingValues);
+
   // If we have any conflicting values, explicitly mask them out of the result,
   // so we don't pick one arbitrary available value.
   if (!ConflictingValues.none())
@@ -418,8 +418,8 @@ computeAvailableValuesFrom(SILBasicBlock::iterator StartingFrom,
   // before, check to see if it produces the value we are looking for.
   if (HasLocalDefinition.count(BB)) {
     for (SILBasicBlock::iterator BBI = StartingFrom; BBI != BB->begin();) {
-      SILInstruction *TheInst = std::prev(BBI);
-      
+      SILInstruction *TheInst = &*std::prev(BBI);
+
       // If this instruction is unrelated to the element, ignore it.
       if (!NonLoadUses.count(TheInst)) {
         --BBI;
@@ -964,7 +964,7 @@ static bool optimizeMemoryAllocations(SILFunction &Fn) {
   for (auto &BB : Fn) {
     auto I = BB.begin(), E = BB.end();
     while (I != E) {
-      SILInstruction *Inst = I;
+      SILInstruction *Inst = &*I;
       if (!isa<AllocBoxInst>(Inst) && !isa<AllocStackInst>(Inst)) {
         ++I;
         continue;

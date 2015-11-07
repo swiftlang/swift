@@ -393,8 +393,9 @@ addStore(StoreInst *Store, IndexTrieNode *AddressNode) {
       return;
 
     if (OtherSt->getParent() == Store->getParent()) {
-      for (SILBasicBlock::iterator II = std::next(Store),
-             IE = Store->getParent()->end(); II != IE; ++II) {
+      for (auto II = std::next(Store->getIterator()),
+                IE = Store->getParent()->end();
+           II != IE; ++II) {
         if (&*II == OtherSt)
           return; // Keep the other store.
       }

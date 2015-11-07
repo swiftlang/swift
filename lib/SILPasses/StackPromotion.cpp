@@ -348,7 +348,7 @@ bool StackPromoter::canPromoteAlloc(SILInstruction *AI,
     if (BB == StartBlock) {
       // In the first block we start at the allocation instruction and not at
       // the begin of the block.
-      Iter = AI;
+      Iter = AI->getIterator();
     } else {
       // Track all uses in the block arguments.
       for (SILArgument *BBArg : BB->getBBArgs()) {

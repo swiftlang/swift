@@ -362,12 +362,12 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
                "Must have a constant parameter or an array.props.isNative call "
                "as argument");
         SI->moveBefore(
-            DT->findNearestCommonDominator(InsertBefore->getParent(),
-                                           SI->getParent())->begin());
+            &*DT->findNearestCommonDominator(InsertBefore->getParent(),
+                                             SI->getParent())->begin());
         auto *IL = cast<IntegerLiteralInst>(SI->getOperand(0));
         IL->moveBefore(
-            DT->findNearestCommonDominator(InsertBefore->getParent(),
-                                           IL->getParent())->begin());
+            &*DT->findNearestCommonDominator(InsertBefore->getParent(),
+                                             IL->getParent())->begin());
       } else {
         NewArrayProps = IsNative.copyTo(InsertBefore, DT);
       }

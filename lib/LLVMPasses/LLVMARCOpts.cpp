@@ -257,7 +257,7 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB,
   // doesn't have nice Swift-style enums.
   Value *ReleasedObject = RC->getSwiftRCIdentityRoot(Release.getArgOperand(0));
 
-  BasicBlock::iterator BBI = &Release;
+  BasicBlock::iterator BBI = Release.getIterator();
 
   // Scan until we get to the top of the block.
   while (BBI != BB.begin()) {
@@ -385,7 +385,7 @@ OutOfLoop:
   // there) move the release to the top of the block.
   // TODO: This is where we'd plug in some global algorithms someday.
   if (&*BBI != &Release) {
-    Release.moveBefore(BBI);
+    Release.moveBefore(&*BBI);
     return true;
   }
 
@@ -409,7 +409,8 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB,
   // doesn't have nice Swift-style enums.
   Value *RetainedObject = RC->getSwiftRCIdentityRoot(Retain.getArgOperand(0));
 
-  BasicBlock::iterator BBI = &Retain, BBE = BB.getTerminator();
+  BasicBlock::iterator BBI = Retain.getIterator(),
+                       BBE = BB.getTerminator()->getIterator();
 
   bool isObjCRetain = Retain.getCalledFunction()->getName() == "objc_retain";
 
@@ -506,7 +507,7 @@ OutOfLoop:
   // If we were able to move the retain down, move it now.
   // TODO: This is where we'd plug in some global algorithms someday.
   if (MadeProgress) {
-    Retain.moveBefore(BBI);
+    Retain.moveBefore(&*BBI);
     return true;
   }
 
@@ -566,7 +567,7 @@ static DtorKind analyzeDestructor(Value *P) {
   // The first argument is the object being destroyed.
   assert(DtorFn->arg_size() == 1 && !DtorFn->isVarArg() &&
          "expected a single object argument to destructors");
-  Value *ThisObject = DtorFn->arg_begin();
+  Value *ThisObject = &*DtorFn->arg_begin();
 
   // Scan the body of the function, looking for anything scary.
   for (BasicBlock &BB : *DtorFn) {
@@ -774,7 +775,7 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
   // pass is using, and indicates the next instruction to process).  This would
   // happen if we delete the instruction it is pointing to.  Advance the
   // iterator if that would happen.
-  while (InvolvedInstructions.count(BBI))
+  while (InvolvedInstructions.count(&*BBI))
     ++BBI;
 
   // Zap all of the instructions.
@@ -818,9 +819,9 @@ static bool performLocalRetainUnownedOpt(CallInst *Retain, BasicBlock &BB,
                                          ARCEntryPointBuilder &B) {
   Value *RetainedObject = Retain->getArgOperand(0);
   Value *LoadBaseAddr = getBaseAddress(RetainedObject);
-  
-  BasicBlock::iterator BBI = Retain, BBE = BB.getTerminator();
-  
+
+  auto BBI = Retain->getIterator(), BBE = BB.getTerminator()->getIterator();
+
   // Scan until we get to the end of the block.
   for (++BBI; BBI != BBE; ++BBI) {
     Instruction &I = *BBI;
@@ -931,7 +932,7 @@ static bool performGeneralOptimizations(Function &F, ARCEntryPointBuilder &B,
       case RT_ObjCRetain: {
         // Retain motion is a forward pass over the block.  Make sure we don't
         // invalidate our iterators by parking it on the instruction before I.
-        BasicBlock::iterator Safe = &I;
+        BasicBlock::iterator Safe = I.getIterator();
         Safe = Safe != BB.begin() ? std::prev(Safe) : BB.end();
         if (performLocalRetainMotion(cast<CallInst>(I), BB, RC)) {
           // If we zapped or moved the retain, reset the iterator on the

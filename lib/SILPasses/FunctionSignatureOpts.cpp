@@ -503,7 +503,7 @@ FunctionAnalyzer::analyze() {
   ConsumedArgToEpilogueReleaseMatcher ArgToThrowReleaseMap;
   auto ThrowBBIter = F->findThrowBB();
   if (ThrowBBIter != F->end())
-    ArgToThrowReleaseMap.findMatchingReleases(RCIA, ThrowBBIter);
+    ArgToThrowReleaseMap.findMatchingReleases(RCIA, &*ThrowBBIter);
 
   for (unsigned i = 0, e = Args.size(); i != e; ++i) {
     ArgumentDescriptor A(Allocator, Args[i]);

@@ -306,8 +306,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
   SmallVector<SILValue, 32> FullArgs;
   for (auto FI = F->begin(), FE = F->end(); FI != FE; ++FI) {
     for (auto I = FI->begin(), E = FI->end(); I != E; ++I) {
-      FullApplySite InnerAI = FullApplySite::isa(I);
-
+      FullApplySite InnerAI = FullApplySite::isa(&*I);
 
       if (!InnerAI)
         continue;
@@ -317,8 +316,8 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       auto NewInstPair = tryDevirtualizeApply(InnerAI);
       if (auto *NewInst = NewInstPair.first) {
         replaceDeadApply(InnerAI, NewInst);
-        if (auto II = dyn_cast<SILInstruction>(NewInst))
-          I = II;
+        if (auto *II = dyn_cast<SILInstruction>(NewInst))
+          I = II->getIterator();
         else
           I = NewInst->getParentBB()->begin();
         auto NewAI = NewInstPair.second;
@@ -390,7 +389,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
                          SILInliner::InlineKind::MandatoryInline,
                          ContextSubs, ApplySubs);
       if (!Inliner.inlineFunction(InnerAI, FullArgs)) {
-        I = InnerAI.getInstruction();
+        I = InnerAI.getInstruction()->getIterator();
         continue;
       }
 

@@ -276,7 +276,7 @@ public:
 
     // For now just look at the previous instruction if it exists.
     SILBasicBlock::iterator Start = BB->begin();
-    SILBasicBlock::iterator Iter = I;
+    SILBasicBlock::iterator Iter = I->getIterator();
     if (Iter == Start)
       return false;
     --Iter;

@@ -423,7 +423,7 @@ void IRGenModule::emitLazyObjCProtocolDefinition(ProtocolDecl *proto) {
 
   // Move the new record to the placeholder's position.
   Module.getGlobalList().remove(record);
-  Module.getGlobalList().insertAfter(placeholder, record);
+  Module.getGlobalList().insertAfter(placeholder->getIterator(), record);
 
   // Replace and destroy the placeholder.
   placeholder->replaceAllUsesWith(

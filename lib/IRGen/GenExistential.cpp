@@ -1324,8 +1324,8 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
   return IGM.getOrCreateHelperFunction(fnName, IGM.VoidTy, argTys,
                                        [&](IRGenFunction &IGF) {
     auto it = IGF.CurFn->arg_begin();
-    Address dest(it++, getFixedBufferAlignment(IGM));
-    Address src(it++, getFixedBufferAlignment(IGM));
+    Address dest(&*(it++), getFixedBufferAlignment(IGM));
+    Address src(&*(it++), getFixedBufferAlignment(IGM));
 
     // If doing a self-assignment, we're done.
     llvm::BasicBlock *doneBB = IGF.createBasicBlock("done");

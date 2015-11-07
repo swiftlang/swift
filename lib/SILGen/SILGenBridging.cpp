@@ -173,7 +173,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
                                        CanSILBlockStorageType blockStorageTy,
                                        CanSILFunctionType funcTy) {
   Scope scope(gen.Cleanups, CleanupLocation::get(loc));
-  SILBasicBlock *entry = gen.F.begin();
+  SILBasicBlock *entry = &*gen.F.begin();
 
   // Get the captured native function value out of the block.
   auto storageAddrTy = SILType::getPrimitiveAddressType(blockStorageTy);
@@ -466,7 +466,7 @@ static void buildBlockToFuncThunkBody(SILGenFunction &gen,
          && "block and function types don't match");
 
   SmallVector<ManagedValue, 4> args;
-  SILBasicBlock *entry = gen.F.begin();
+  SILBasicBlock *entry = &*gen.F.begin();
   for (unsigned i : indices(funcTy->getParameters())) {
     auto &param = funcTy->getParameters()[i];
     auto &blockParam = blockTy->getParameters()[i];

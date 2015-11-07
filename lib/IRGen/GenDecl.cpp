@@ -1201,7 +1201,7 @@ llvm::Function *LinkInfo::createFunction(IRGenModule &IGM,
   llvm::Function *fn
     = llvm::Function::Create(fnType, getLinkage(), getName());
   if (insertBefore) {
-    IGM.Module.getFunctionList().insert(insertBefore, fn);
+    IGM.Module.getFunctionList().insert(insertBefore->getIterator(), fn);
   } else {
     IGM.Module.getFunctionList().push_back(fn);
   }

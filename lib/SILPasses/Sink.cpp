@@ -106,7 +106,7 @@ public:
         return false;
     }
 
-    II->moveBefore(Dest->begin());
+    II->moveBefore(&*Dest->begin());
     NumInstrSunk++;
     return true;
   }
@@ -136,12 +136,13 @@ public:
         if (Inst == Begin) {
           // This is the first instruction in the block. Try to sink it and
           // move on to the next block.
-          Changed |= sinkInstruction(Inst);
+          Changed |= sinkInstruction(&*Inst);
           break;
         } else {
           // Move the iterator to the next instruction because we may sink the
           // current instruction.
-          SILInstruction *II = Inst--;
+          SILInstruction *II = &*Inst;
+          --Inst;
           Changed |= sinkInstruction(II);
         }
       }

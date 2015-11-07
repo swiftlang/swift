@@ -557,7 +557,7 @@ SILBasicBlock *swift::splitBasicBlockAndBranch(SILBuilder &B,
                                                DominanceInfo *DT,
                                                SILLoopInfo *LI) {
   auto *OrigBB = SplitBeforeInst->getParent();
-  auto *NewBB = OrigBB->splitBasicBlock(SplitBeforeInst);
+  auto *NewBB = OrigBB->splitBasicBlock(SplitBeforeInst->getIterator());
   B.setInsertionPoint(OrigBB);
   B.createBranch(SplitBeforeInst->getLoc(), NewBB);
 

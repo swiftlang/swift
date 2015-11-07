@@ -576,7 +576,7 @@ bool CopyForwarding::areCopyDestUsersDominatedBy(
     bool CheckDominanceInBlock = Copy->getParent() == UserInst->getParent();
     // Check whether Copy is before UserInst.
     if (CheckDominanceInBlock) {
-      SILBasicBlock::iterator SI = Copy, SE = Copy->getParent()->end();
+      auto SI = Copy->getIterator(), SE = Copy->getParent()->end();
       for (++SI; SI != SE; ++SI)
         if (&*SI == UserInst)
           break;
@@ -662,7 +662,7 @@ bool CopyForwarding::forwardPropagateCopy(
   // Scan forward recording all operands that use CopyDest until we see the
   // next deinit of CopyDest.
   SmallVector<Operand*, 16> ValueUses;
-  SILBasicBlock::iterator SI = CopyInst, SE = CopyInst->getParent()->end();
+  auto SI = CopyInst->getIterator(), SE = CopyInst->getParent()->end();
   for (++SI; SI != SE; ++SI) {
     SILInstruction *UserInst = &*SI;
     // If we see another use of Src, then the source location is reinitialized
@@ -736,7 +736,7 @@ bool CopyForwarding::backwardPropagateCopy(
   bool seenInit = false;
   SmallVector<Operand*, 16> ValueUses;
   SmallVector<DebugValueAddrInst*, 4> DebugValueInstsToDelete;
-  SILBasicBlock::iterator SI = CopyInst, SE = CopyInst->getParent()->begin();
+  auto SI = CopyInst->getIterator(), SE = CopyInst->getParent()->begin();
   while (SI != SE) {
     --SI;
     SILInstruction *UserInst = &*SI;
@@ -822,7 +822,7 @@ bool CopyForwarding::hoistDestroy(SILInstruction *DestroyPoint,
   bool MustHoist = (DestroyPoint == BB->getTerminator());
 
   bool IsWorthHoisting = MustHoist;
-  SILBasicBlock::iterator SI = DestroyPoint, SE = BB->begin();
+  auto SI = DestroyPoint->getIterator(), SE = BB->begin();
   while (SI != SE) {
     --SI;
     SILInstruction *Inst = &*SI;
@@ -1001,7 +1001,7 @@ static bool canNRVO(CopyAddrInst *CopyInst) {
   if (!hasOneNonDebugUse(CopyDest))
     return false;
 
-  SILBasicBlock::iterator SI = CopyInst, SE = BB->end();
+  auto SI = CopyInst->getIterator(), SE = BB->end();
   for (++SI; SI != SE; ++SI) {
     if (SI->mayWriteToMemory() && !isa<DeallocationInst>(SI))
       return false;

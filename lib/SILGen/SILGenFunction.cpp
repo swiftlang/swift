@@ -743,7 +743,7 @@ SILGenBuilder::SILGenBuilder(SILGenFunction &gen, SILBasicBlock *insertBB,
   : SILBuilder(insertBB, insertedInsts), SGM(gen.SGM) {}
 SILGenBuilder::SILGenBuilder(SILGenFunction &gen, SILBasicBlock *insertBB,
                              SILInstruction *insertInst)
-  : SILBuilder(insertBB, insertInst), SGM(gen.SGM) {}
+    : SILBuilder(insertBB, insertInst->getIterator()), SGM(gen.SGM) {}
 
 MetatypeInst *SILGenBuilder::createMetatype(SILLocation loc, SILType metatype) {
   auto theMetatype = metatype.castTo<MetatypeType>();

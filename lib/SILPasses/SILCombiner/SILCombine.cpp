@@ -63,7 +63,8 @@ void SILCombiner::addReachableCodeToWorklist(SILBasicBlock *BB) {
     if (!Visited.insert(BB).second) continue;
 
     for (SILBasicBlock::iterator BBI = BB->begin(), E = BB->end(); BBI != E; ) {
-      SILInstruction *Inst = BBI++;
+      SILInstruction *Inst = &*BBI;
+      ++BBI;
 
       // DCE instruction if trivially dead.
       if (isInstructionTriviallyDead(Inst)) {
@@ -118,7 +119,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
                      << F.getName() << "\n");
 
   // Add reachable instructions to our worklist.
-  addReachableCodeToWorklist(F.begin());
+  addReachableCodeToWorklist(&*F.begin());
 
   // Process until we run out of items in our worklist.
   while (!Worklist.isEmpty()) {
@@ -161,7 +162,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 
     // If we have reached this point, all attempts to do simple simplifications
     // have failed. Prepare to SILCombine.
-    Builder.setInsertionPoint(I->getParent(), I);
+    Builder.setInsertionPoint(I);
 
 #ifndef NDEBUG
     std::string OrigI;

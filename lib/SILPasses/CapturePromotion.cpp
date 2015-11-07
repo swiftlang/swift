@@ -471,7 +471,7 @@ ClosureCloner::populateCloned() {
   SILModule &M = Cloned->getModule();
 
   // Create arguments for the entry block
-  SILBasicBlock *OrigEntryBB = Orig->begin();
+  SILBasicBlock *OrigEntryBB = &*Orig->begin();
   SILBasicBlock *ClonedEntryBB = new (M) SILBasicBlock(Cloned);
   unsigned ArgNo = 0;
   auto I = OrigEntryBB->bbarg_begin(), E = OrigEntryBB->bbarg_end();
@@ -790,7 +790,7 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
   // Helper lambda function to determine if instruction b is strictly after
   // instruction a, assuming both are in the same basic block.
   auto isAfter = [](SILInstruction *a, SILInstruction *b) {
-    SILInstruction *f = b->getParent()->begin();
+    SILInstruction *f = &*b->getParent()->begin();
     while (b != f) {
       b = b->getPrevNode();
       if (a == b)

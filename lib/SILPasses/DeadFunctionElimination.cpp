@@ -359,7 +359,8 @@ class DeadFunctionElimination : FunctionLivenessComputation {
 
     auto &WitnessTables = Module->getWitnessTableList();
     for (auto WI = WitnessTables.begin(), EI = WitnessTables.end(); WI != EI;) {
-      SILWitnessTable *WT = WI++;
+      SILWitnessTable *WT = &*WI;
+      WI++;
       WT->clearMethods_if([this](const SILWitnessTable::MethodWitness &MW) -> bool {
         if (!isAlive(MW.Witness)) {
           DEBUG(llvm::dbgs() << "  erase dead witness method " <<
@@ -394,7 +395,8 @@ public:
     // Next step: delete all dead functions.
     bool NeedUpdate = false;
     for (auto FI = Module->begin(), EI = Module->end(); FI != EI;) {
-      SILFunction *F = FI++;
+      SILFunction *F = &*FI;
+      ++FI;
       if (!isAlive(F)) {
         DEBUG(llvm::dbgs() << "  erase dead function " << F->getName() << "\n");
         NumDeadFunc++;
@@ -501,7 +503,8 @@ public:
     // alive.
     bool NeedUpdate = false;
     for (auto FI = Module->begin(), EI = Module->end(); FI != EI;) {
-      SILFunction *F = FI++;
+      SILFunction *F = &*FI;
+      ++FI;
       // Do not remove bodies of any functions that are alive.
       if (!isAlive(F)) {
         if (tryToConvertExternalDefinitionIntoDeclaration(F)) {

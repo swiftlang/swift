@@ -575,7 +575,7 @@ void ClosureSpecCloner::populateCloned() {
   SILFunction *ClosureUser = CallSiteDesc.getApplyCallee();
 
   // Create arguments for the entry block.
-  SILBasicBlock *ClosureUserEntryBB = ClosureUser->begin();
+  SILBasicBlock *ClosureUserEntryBB = &*ClosureUser->begin();
   SILBasicBlock *ClonedEntryBB = new (M) SILBasicBlock(Cloned);
 
   // Remove the closure argument.
@@ -657,7 +657,7 @@ void ClosureSpecCloner::populateCloned() {
       // cast failure in debug builds.
       auto *Unreachable = cast<UnreachableInst>(TI);
       auto PrevIter = std::prev(SILBasicBlock::iterator(Unreachable));
-      auto NoReturnApply = FullApplySite::isa(PrevIter);
+      auto NoReturnApply = FullApplySite::isa(&*PrevIter);
 
       // We insert the release value right before the no return apply so that if
       // the partial apply is passed into the @noreturn function as an @owned

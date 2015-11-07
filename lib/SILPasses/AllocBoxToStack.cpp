@@ -568,7 +568,7 @@ DeadParamCloner::populateCloned() {
   SILModule &M = Cloned->getModule();
 
   // Create arguments for the entry block
-  SILBasicBlock *OrigEntryBB = Orig->begin();
+  SILBasicBlock *OrigEntryBB = &*Orig->begin();
   SILBasicBlock *ClonedEntryBB = new (M) SILBasicBlock(Cloned);
   unsigned ArgNo = 0;
   auto I = OrigEntryBB->bbarg_begin(), E = OrigEntryBB->bbarg_end();

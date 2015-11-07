@@ -319,10 +319,10 @@ struct ArgumentInitVisitor :
     if (!PD->hasName()) {
       // A value bound to _ is unused and can be immediately released.
       Scope discardScope(gen.Cleanups, CleanupLocation(P));
-      makeArgument(P->getType(), f.begin(), PD);
+      makeArgument(P->getType(), &*f.begin(), PD);
       // Popping the scope destroys the value.
     } else {
-      makeArgumentIntoBinding(P->getType(), f.begin(), PD);
+      makeArgumentIntoBinding(P->getType(), &*f.begin(), PD);
     }
   }
 

@@ -430,7 +430,8 @@ bool DCE::removeDead(SILFunction &F) {
     }
 
     for (auto I = BB.begin(), E = BB.end(); I != E; ) {
-      auto Inst = I++;
+      auto *Inst = &*I;
+      I++;
       if (LiveValues.count(Inst) || isa<BranchInst>(Inst))
         continue;
 

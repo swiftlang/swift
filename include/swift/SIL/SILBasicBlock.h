@@ -88,6 +88,10 @@ public:
   using const_reverse_iterator = InstListType::const_reverse_iterator;
 
   void insert(iterator InsertPt, SILInstruction *I);
+  void insert(SILInstruction *InsertPt, SILInstruction *I) {
+    insert(InsertPt->getIterator(), I);
+  }
+
   void push_back(SILInstruction *I);
   void push_front(SILInstruction *I);
   void remove(SILInstruction *I);

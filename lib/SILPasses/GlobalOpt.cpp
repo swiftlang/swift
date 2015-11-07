@@ -411,7 +411,7 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
       // We must not move initializers around availability-checks.
       if (!isAvailabilityCheckOnDomPath(DomBB, CommonAI->getParent(), DT)) {
         if (DomBB != CommonAI->getParent()) {
-          CommonAI->moveBefore(DomBB->begin());
+          CommonAI->moveBefore(&*DomBB->begin());
           placeFuncRef(CommonAI, DT);
           
           // Try to hoist the existing AI again if we move it to another block,
@@ -454,7 +454,7 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
       else {
         DEBUG(llvm::dbgs() << "  hoisting: " << *HoistAI
               << "  in " << HoistAI->getFunction()->getName() << "\n");
-        HoistAI->moveBefore(BB->begin());
+        HoistAI->moveBefore(&*BB->begin());
         placeFuncRef(HoistAI, DT);
         HasChanged = true;
       }
@@ -489,7 +489,7 @@ static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
 
   auto *EntryBB = GetterF->createBasicBlock();
   // Copy InitF into GetterF
-  BasicBlockCloner Cloner(InitF->begin(), EntryBB);
+  BasicBlockCloner Cloner(&*InitF->begin(), EntryBB);
   Cloner.clone();
   GetterF->setInlined();
 

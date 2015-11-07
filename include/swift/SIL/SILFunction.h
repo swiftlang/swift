@@ -613,7 +613,6 @@ public:
   /// block inside.  This depends on there being a 'dot' and 'gv' program in
   /// your path.
   void viewCFG() const;
-
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,

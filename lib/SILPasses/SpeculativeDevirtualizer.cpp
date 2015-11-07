@@ -96,7 +96,7 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   // instruction that checks the exact type of the object.
   // This cast selects between two paths: one that calls the slow dynamic
   // dispatch and one that calls the specific method.
-  SILBasicBlock::iterator It = AI.getInstruction();
+  auto It = AI.getInstruction()->getIterator();
   SILFunction *F = AI.getFunction();
   SILBasicBlock *Entry = AI.getParent();
 
@@ -117,7 +117,7 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   CCBI = Builder.createCheckedCastBranch(AI.getLoc(), /*exact*/ true,
                                        CMI->getOperand(), SubType, Iden,
                                        Virt);
-  It = CCBI;
+  It = CCBI->getIterator();
 
   SILBuilder VirtBuilder(Virt);
   SILBuilder IdenBuilder(Iden);

@@ -1559,7 +1559,7 @@ SILGenModule::getWitnessTable(ProtocolConformance *conformance) {
     if (!insertAfter) {
       M.witnessTables.push_front(table);
     } else {
-      M.witnessTables.insertAfter(insertAfter, table);
+      M.witnessTables.insertAfter(insertAfter->getIterator(), table);
     }
   } else {
     // We would have marked a delayed conformance as "last emitted" when it

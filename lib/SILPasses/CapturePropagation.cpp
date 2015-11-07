@@ -161,7 +161,7 @@ void CapturePropagationCloner::cloneBlocks(
   SILModule &M = CloneF.getModule();
 
   // Create the entry basic block with the function arguments.
-  SILBasicBlock *OrigEntryBB = OrigF->begin();
+  SILBasicBlock *OrigEntryBB = &*OrigF->begin();
   SILBasicBlock *ClonedEntryBB = new (M) SILBasicBlock(&CloneF);
   CanSILFunctionType CloneFTy = CloneF.getLoweredFunctionType();
 
@@ -267,7 +267,7 @@ void CapturePropagation::rewritePartialApply(PartialApplyInst *OrigPAI,
 ///
 /// TODO: Check for other profitable constant propagation, like builtin compare.
 static bool isProfitable(SILFunction *Callee) {
-  SILBasicBlock *EntryBB = Callee->begin();
+  SILBasicBlock *EntryBB = &*Callee->begin();
   for (auto *Arg : EntryBB->getBBArgs()) {
     for (auto *Operand : Arg->getUses()) {
       if (auto *AI = dyn_cast<ApplyInst>(Operand->getUser())) {

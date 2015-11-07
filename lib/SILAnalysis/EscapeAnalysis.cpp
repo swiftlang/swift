@@ -1000,8 +1000,8 @@ void EscapeAnalysis::buildConnectionGraph(SILFunction *F,
   // We use a worklist for iteration to visit the blocks in dominance order.
   llvm::SmallPtrSet<SILBasicBlock*, 32> VisitedBlocks;
   llvm::SmallVector<SILBasicBlock *, 16> WorkList;
-  VisitedBlocks.insert(F->begin());
-  WorkList.push_back(F->begin());
+  VisitedBlocks.insert(&*F->begin());
+  WorkList.push_back(&*F->begin());
 
   while (!WorkList.empty()) {
     SILBasicBlock *BB = WorkList.pop_back_val();

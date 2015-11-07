@@ -31,6 +31,13 @@ public:
   SILArgument(SILBasicBlock *ParentBB, SILBasicBlock::bbarg_iterator Pos,
               SILType Ty, const ValueDecl *D=nullptr);
 
+  SILArgument(SILFunction::iterator ParentBB, SILType Ty,
+              const ValueDecl *D = nullptr)
+      : SILArgument(&*ParentBB, Ty, D) {}
+  SILArgument(SILFunction::iterator ParentBB, SILBasicBlock::bbarg_iterator Pos,
+              SILType Ty, const ValueDecl *D = nullptr)
+      : SILArgument(&*ParentBB, Pos, Ty, D) {}
+
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
