@@ -488,7 +488,7 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
   pattern.normalize = true;
   for (Completion *completion : completions) {
     bool match = false;
-    if (options.fuzzyMatching) {
+    if (options.fuzzyMatching && filterText.size() >= options.minFuzzyLength) {
       match = pattern.matchesCandidate(completion->getName());
     } else {
       match = completion->getName().startswith_lower(filterText);

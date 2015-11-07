@@ -133,3 +133,17 @@ func test5(x: Test5) {
 // DONT_FILTER_TYPES_1-NEXT: ]
 // DONT_FILTER_TYPES_1-LABEL: Results for filterText: flo [
 // DONT_FILTER_TYPES_1-NEXT: ]
+
+// RUN: %complete-test %s -fuzz -tok=MIN_LENGTH_1 | FileCheck %s -check-prefix=MIN_LENGTH_1
+func test6(x: S1) {
+  x.#^MIN_LENGTH_1,f,o,b^#
+}
+// MIN_LENGTH_1-LABEL: Results for filterText: f [
+// MIN_LENGTH_1-NEXT:   fooBarBaz()
+// MIN_LENGTH_1-NEXT:   footastic()
+// MIN_LENGTH_1-NEXT:   fooBarTastic()
+// MIN_LENGTH_1-NEXT: ]
+// MIN_LENGTH_1-LABEL: Results for filterText: o [
+// MIN_LENGTH_1-NEXT: ]
+// MIN_LENGTH_1-LABEL: Results for filterText: b [
+// MIN_LENGTH_1-NEXT: ]
