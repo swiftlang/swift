@@ -152,6 +152,28 @@
 // RELATIVE-LINKER: /DISTINCTIVE-PATH/usr/bin/ld
 // RELATIVE-LINKER: -o {{[^ ]+}}
 
+// Also test arclite detection. This uses xcrun to find arclite when it's not
+// next to Swift.
+
+// RUN: mkdir -p %t/ANOTHER-DISTINCTIVE-PATH/usr/bin
+// RUN: mkdir -p %t/ANOTHER-DISTINCTIVE-PATH/usr/lib/arc
+// RUN: cp %S/Inputs/xcrun-return-self.sh %t/ANOTHER-DISTINCTIVE-PATH/usr/bin/xcrun
+
+// RUN: env PATH=%t/ANOTHER-DISTINCTIVE-PATH/usr/bin %t/DISTINCTIVE-PATH/usr/bin/swiftc -target x86_64-apple-macosx10.9 %s -### | FileCheck -check-prefix=XCRUN_ARCLITE %s
+
+// XCRUN_ARCLITE: bin/ld{{"? }}
+// XCRUN_ARCLITE: /ANOTHER-DISTINCTIVE-PATH/usr/lib/arc/libarclite_macosx.a
+// XCRUN_ARCLITE: -o {{[^ ]+}}
+
+// RUN: mkdir -p %t/DISTINCTIVE-PATH/usr/lib/arc
+
+// RUN: env PATH=%t/ANOTHER-DISTINCTIVE-PATH/usr/bin %t/DISTINCTIVE-PATH/usr/bin/swiftc -target x86_64-apple-macosx10.9 %s -### | FileCheck -check-prefix=RELATIVE_ARCLITE %s
+
+// RELATIVE_ARCLITE: bin/ld{{"? }}
+// RELATIVE_ARCLITE: /DISTINCTIVE-PATH/usr/lib/arc/libarclite_macosx.a
+// RELATIVE_ARCLITE: -o {{[^ ]+}}
+
+
 // Clean up the test executable because hard links are expensive.
 // RUN: rm -rf %t/DISTINCTIVE-PATH/usr/bin/swiftc
 

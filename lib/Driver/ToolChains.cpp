@@ -17,6 +17,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/TaskQueue.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "swift/Frontend/Frontend.h"
@@ -696,6 +697,35 @@ static void addVersionString(const ArgList &inputArgs, ArgStringList &arguments,
   arguments.push_back(inputArgs.MakeArgString(os.str()));
 }
 
+/// Runs <code>xcrun -f clang</code> in order to find the location of Clang for
+/// the currently active Xcode.
+///
+/// We get the "currently active" part by passing through the DEVELOPER_DIR
+/// environment variable (along with the rest of the environment).
+static bool findXcodeClangPath(llvm::SmallVectorImpl<char> &path) {
+  assert(path.empty());
+
+  auto xcrunPath = llvm::sys::findProgramByName("xcrun");
+  if (!xcrunPath.getError()) {
+    const char *args[] = { "-f", "clang", nullptr };
+    sys::TaskQueue queue;
+    queue.addTask(xcrunPath->c_str(), args);
+    queue.execute(nullptr,
+                  [&path](sys::ProcessId PID,
+                          int returnCode,
+                          StringRef output,
+                          void *unused) -> sys::TaskFinishedResponse {
+      if (returnCode == 0) {
+        output = output.rtrim();
+        path.append(output.begin(), output.end());
+      }
+      return sys::TaskFinishedResponse::ContinueExecution;
+    });
+  }
+
+  return !path.empty();
+}
+
 std::pair<const char *, llvm::opt::ArgStringList>
 toolchains::Darwin::constructInvocation(const LinkJobAction &job,
                                         const JobContext &context) const {
@@ -736,6 +766,9 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   }
 
   assert(Triple.isOSDarwin());
+
+  // FIXME: If we used Clang as a linker instead of going straight to ld,
+  // we wouldn't have to replicate Clang's logic here.
   bool wantsObjCRuntime = false;
   if (Triple.isiOS())
     wantsObjCRuntime = Triple.isOSVersionLT(8);
@@ -750,16 +783,34 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
     llvm::SmallString<128> ARCLiteLib(D.getSwiftProgramPath());
     llvm::sys::path::remove_filename(ARCLiteLib); // 'swift'
     llvm::sys::path::remove_filename(ARCLiteLib); // 'bin'
-    llvm::sys::path::append(ARCLiteLib, "lib", "arc", "libarclite_");
-    ARCLiteLib += getPlatformNameForTriple(Triple);
-    ARCLiteLib += ".a";
+    llvm::sys::path::append(ARCLiteLib, "lib", "arc");
 
-    Arguments.push_back("-force_load");
-    Arguments.push_back(context.Args.MakeArgString(ARCLiteLib));
+    if (!llvm::sys::fs::is_directory(ARCLiteLib)) {
+      // If we don't have a 'lib/arc/' directory, find the "arclite" library
+      // relative to the Clang in the active Xcode.
+      ARCLiteLib.clear();
+      if (findXcodeClangPath(ARCLiteLib)) {
+        llvm::sys::path::remove_filename(ARCLiteLib); // 'clang'
+        llvm::sys::path::remove_filename(ARCLiteLib); // 'bin'
+        llvm::sys::path::append(ARCLiteLib, "lib", "arc");
+      }
+    }
 
-    // Arclite depends on CoreFoundation.
-    Arguments.push_back("-framework");
-    Arguments.push_back("CoreFoundation");
+    if (!ARCLiteLib.empty()) {
+      llvm::sys::path::append(ARCLiteLib, "libarclite_");
+      ARCLiteLib += getPlatformNameForTriple(Triple);
+      ARCLiteLib += ".a";
+
+      Arguments.push_back("-force_load");
+      Arguments.push_back(context.Args.MakeArgString(ARCLiteLib));
+
+      // Arclite depends on CoreFoundation.
+      Arguments.push_back("-framework");
+      Arguments.push_back("CoreFoundation");
+    } else {
+      // FIXME: We should probably diagnose this, but this is not a place where
+      // we can emit diagnostics. Silently ignore it for now.
+    }
   }
 
   context.Args.AddAllArgValues(Arguments, options::OPT_Xlinker);
