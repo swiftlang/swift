@@ -46,56 +46,10 @@ using namespace ide;
 
 namespace clang {
   namespace comments {
-
-enum CodeCompletionCommandKind {
-  none,
-  keyword,
-  recommended,
-  recommendedover,
-};
-
-typedef std::vector<std::pair<StringRef, StringRef>> CommandWordsPairs;
-
-class WordPairsArrangedViewer {
-  ArrayRef<std::pair<StringRef, StringRef>> Content;
-  std::vector<StringRef> ViewedText;
-  std::vector<StringRef> Words;
-  StringRef Key;
-
-  bool isKeyViewed(StringRef K) {
-    return std::find(ViewedText.begin(), ViewedText.end(), K) != ViewedText.end();
-  }
-
-public:
-  WordPairsArrangedViewer(ArrayRef<std::pair<StringRef, StringRef>> Content):
-    Content(Content) {}
-
-  bool hasNext() {
-    Words.clear();
-    bool Found = false;
-    for (auto P : Content) {
-      if (!Found && !isKeyViewed(P.first)) {
-        Key = P.first;
-        Words.push_back(P.second);
-        Found = true;
-        continue;
-      }
-      if (Found && P.first == Key)
-        Words.push_back(P.second);
-    }
-    return Found;
-  }
-
-  std::pair<StringRef, ArrayRef<StringRef>> next() {
-    assert(hasNext() && "Have no more data.");
-    ViewedText.push_back(Key);
-    return std::make_pair(Key, Words);
-  }
-};
-
 class ClangCommentExtractor : public ConstCommentVisitor<ClangCommentExtractor> {
-  CommandWordsPairs &Words;
+  std::vector<StringRef> &Keywords;
   const CommandTraits &Traits;
+  std::string Keyword = "keyword";
   std::vector<const Comment *> Parents;
 
   void visitChildren(const Comment* C) {
@@ -105,33 +59,9 @@ class ClangCommentExtractor : public ConstCommentVisitor<ClangCommentExtractor> 
     Parents.pop_back();
   }
 
-  StringRef getCommnadName(CodeCompletionCommandKind Kind) {
-#define CHECK_CASE(KIND)                                                      \
-    if (CodeCompletionCommandKind::KIND == Kind) {                            \
-      static std::string Name(#KIND);                                         \
-      return Name;                                                            \
-    }
-    CHECK_CASE(keyword)
-    CHECK_CASE(recommended)
-    CHECK_CASE(recommendedover)
-#undef CHECK_CASE
-    llvm_unreachable("Can not handle this Kind.");
-  }
-
-  CodeCompletionCommandKind getCommandKind(StringRef Command) {
-#define CHECK_CASE(KIND)                                                      \
-    if (Command == #KIND)                                                     \
-      return CodeCompletionCommandKind::KIND;
-    CHECK_CASE(keyword);
-    CHECK_CASE(recommended);
-    CHECK_CASE(recommendedover);
-#undef CHECK_CASE
-    return CodeCompletionCommandKind::none;
-  }
-
 public:
-  ClangCommentExtractor(CommandWordsPairs &Words,
-                        const CommandTraits &Traits) : Words(Words),
+  ClangCommentExtractor(std::vector<StringRef> &Keywords,
+                        const CommandTraits &Traits) : Keywords(Keywords),
                                                        Traits(Traits) {}
 #define CHILD_VISIT(NAME) \
   void visit##NAME(const NAME *C) {\
@@ -143,8 +73,7 @@ public:
 
   void visitInlineCommandComment(const InlineCommandComment *C) {
     auto Command = C->getCommandName(Traits);
-    auto CommandKind = getCommandKind(Command);
-    if (CommandKind == CodeCompletionCommandKind::none)
+    if (Command != Keyword)
       return;
     auto &Parent = Parents.back();
     for (auto CIT = std::find(Parent->child_begin(), Parent->child_end(), C) + 1;
@@ -155,7 +84,7 @@ public:
           auto Pair = Text.split(',');
           auto Key = Pair.first.trim();
           if (!Key.empty())
-            Words.push_back(std::make_pair(getCommnadName(CommandKind), Key));
+            Keywords.push_back(Key);
           Text = Pair.second;
         } while (!Text.empty());
       } else
@@ -164,27 +93,13 @@ public:
   }
 };
 
-bool containsInterestedWords(StringRef Content) {
-  do {
-    Content = Content.split('@').second;
-#define CHECK_CASE(KIND)                                                       \
-    if (Content.startswith(#KIND))                                             \
-      return true;
-    CHECK_CASE(keyword)
-    CHECK_CASE(recommended)
-    CHECK_CASE(recommendedover)
-#undef CHECK_CASE
-  } while(!Content.empty());
-  return false;
-}
-
 void getClangDocKeyword(ClangImporter &Importer, const Decl *D,
-                        CommandWordsPairs &Words) {
-  ClangCommentExtractor Extractor(Words, Importer.getClangASTContext().
+                 std::vector<StringRef> &Keywords) {
+  ClangCommentExtractor Extractor(Keywords, Importer.getClangASTContext().
     getCommentCommandTraits());
   if (auto RC = Importer.getClangASTContext().getRawCommentForAnyRedecl(D)) {
     auto RT = RC->getRawText(Importer.getClangASTContext().getSourceManager());
-    if (containsInterestedWords(RT)) {
+    if (RT.find("@keyword") != StringRef::npos) {
       FullComment* Comment = Importer.getClangASTContext().
         getLocalCommentForDeclUncached(D);
       Extractor.visit(Comment);
@@ -618,14 +533,10 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
       break;
   }
 
-  for (clang::comments::WordPairsArrangedViewer Viewer(DocWords);
-       Viewer.hasNext();) {
-    auto Pair = Viewer.next();
-    Prefix.append("/");
-    Prefix.append(Pair.first);
-    Prefix.append("[");
+  if (!Keywords.empty()) {
+    Prefix.append("/Keywords[");
     StringRef Sep = ", ";
-    for (auto KW : Pair.second) {
+    for (auto KW : Keywords) {
       Prefix.append(KW);
       Prefix.append(Sep);
     }
@@ -656,14 +567,6 @@ static StringRef copyString(llvm::BumpPtrAllocator &Allocator,
 static ArrayRef<StringRef> copyStringArray(llvm::BumpPtrAllocator &Allocator,
                                            ArrayRef<StringRef> Arr) {
   StringRef *Buff = Allocator.Allocate<StringRef>(Arr.size());
-  std::copy(Arr.begin(), Arr.end(), Buff);
-  return llvm::makeArrayRef(Buff, Arr.size());
-}
-
-static ArrayRef<std::pair<StringRef, StringRef>> copyStringPairArray(
-    llvm::BumpPtrAllocator &Allocator,
-    ArrayRef<std::pair<StringRef, StringRef>> Arr) {
-  auto *Buff = Allocator.Allocate<std::pair<StringRef, StringRef>>(Arr.size());
   std::copy(Arr.begin(), Arr.end(), Buff);
   return llvm::makeArrayRef(Buff, Arr.size());
 }
@@ -831,7 +734,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
         SemanticContext, NumBytesToErase, CCS, AssociatedDecl, ModuleName,
         /*NotRecommended=*/false, copyString(*Sink.Allocator, BriefComment),
         copyAssociatedUSRs(*Sink.Allocator, AssociatedDecl),
-        copyStringPairArray(*Sink.Allocator, CommentWords), typeRelation);
+        copyStringArray(*Sink.Allocator, DeclKeywords), typeRelation);
   }
 
   case CodeCompletionResult::ResultKind::Keyword:
@@ -1407,11 +1310,11 @@ private:
   }
 
   void setClangDeclKeywords(const ValueDecl *VD,
-                            clang::comments::CommandWordsPairs &Pairs,
                             CodeCompletionResultBuilder &Builder) {
     if (auto *CD = VD->getClangDecl()) {
-      clang::comments::getClangDocKeyword(*Importer, CD, Pairs);
-      Builder.addDeclDocCommentWords(Pairs);
+      std::vector<StringRef> Keywords;
+      clang::comments::getClangDocKeyword(*Importer, CD, Keywords);
+      Builder.addDeclKeywords(Keywords);
     }
   }
 
@@ -1706,7 +1609,6 @@ public:
            "name lookup bug -- can not see an instance variable "
            "in a static function");
 
-    clang::comments::CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Declaration,
@@ -1714,7 +1616,7 @@ public:
     Builder.setAssociatedDecl(VD);
     addLeadingDot(Builder);
     Builder.addTextChunk(Name);
-    setClangDeclKeywords(VD, Pairs, Builder);
+    setClangDeclKeywords(VD, Builder);
     // Add a type annotation.
     Type VarType = getTypeOfMember(VD);
     if (VD->getName() == Ctx.Id_self) {
@@ -2011,11 +1913,10 @@ public:
 
     // Add the method, possibly including any default arguments.
     auto addMethodImpl = [&](bool includeDefaultArgs = true) {
-      clang::comments::CommandWordsPairs Pairs;
       CodeCompletionResultBuilder Builder(
           Sink, CodeCompletionResult::ResultKind::Declaration,
           getSemanticContext(FD, Reason), ExpectedTypes);
-      setClangDeclKeywords(FD, Pairs, Builder);
+      setClangDeclKeywords(FD, Builder);
       Builder.setAssociatedDecl(FD);
       addLeadingDot(Builder);
       Builder.addTextChunk(Name);
@@ -2107,11 +2008,10 @@ public:
 
     // Add the constructor, possibly including any default arguments.
     auto addConstructorImpl = [&](bool includeDefaultArgs = true) {
-      clang::comments::CommandWordsPairs Pairs;
       CodeCompletionResultBuilder Builder(
           Sink, CodeCompletionResult::ResultKind::Declaration,
           getSemanticContext(CD, Reason), ExpectedTypes);
-      setClangDeclKeywords(CD, Pairs, Builder);
+      setClangDeclKeywords(CD, Builder);
       Builder.setAssociatedDecl(CD);
       if (needInit) {
         assert(addName.empty());
@@ -2180,13 +2080,12 @@ public:
 
   void addSubscriptCall(const SubscriptDecl *SD, DeclVisibilityKind Reason) {
     assert(!HaveDot && "can not add a subscript after a dot");
-    clang::comments::CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(SD, Reason), ExpectedTypes);
     Builder.setAssociatedDecl(SD);
-    setClangDeclKeywords(SD, Pairs, Builder);
+    setClangDeclKeywords(SD, Builder);
     Builder.addLeftBracket();
     addPatternParameters(Builder, SD->getIndices());
     Builder.addRightBracket();
@@ -2203,26 +2102,24 @@ public:
 
   void addNominalTypeRef(const NominalTypeDecl *NTD,
                          DeclVisibilityKind Reason) {
-    clang::comments::CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(NTD, Reason), ExpectedTypes);
     Builder.setAssociatedDecl(NTD);
-    setClangDeclKeywords(NTD, Pairs, Builder);
+    setClangDeclKeywords(NTD, Builder);
     addLeadingDot(Builder);
     Builder.addTextChunk(NTD->getName().str());
     addTypeAnnotation(Builder, NTD->getDeclaredType());
   }
 
   void addTypeAliasRef(const TypeAliasDecl *TAD, DeclVisibilityKind Reason) {
-    clang::comments::CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(TAD, Reason), ExpectedTypes);
     Builder.setAssociatedDecl(TAD);
-    setClangDeclKeywords(TAD, Pairs, Builder);
+    setClangDeclKeywords(TAD, Builder);
     addLeadingDot(Builder);
     Builder.addTextChunk(TAD->getName().str());
     if (TAD->hasUnderlyingType() && !TAD->getUnderlyingType()->is<ErrorType>())
@@ -2234,12 +2131,11 @@ public:
 
   void addGenericTypeParamRef(const GenericTypeParamDecl *GP,
                               DeclVisibilityKind Reason) {
-    clang::comments::CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(GP, Reason), ExpectedTypes);
-    setClangDeclKeywords(GP, Pairs, Builder);
+    setClangDeclKeywords(GP, Builder);
     Builder.setAssociatedDecl(GP);
     addLeadingDot(Builder);
     Builder.addTextChunk(GP->getName().str());
@@ -2248,12 +2144,11 @@ public:
 
   void addAssociatedTypeRef(const AssociatedTypeDecl *AT,
                             DeclVisibilityKind Reason) {
-    clang::comments::CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(AT, Reason), ExpectedTypes);
-    setClangDeclKeywords(AT, Pairs, Builder);
+    setClangDeclKeywords(AT, Builder);
     Builder.setAssociatedDecl(AT);
     addLeadingDot(Builder);
     Builder.addTextChunk(AT->getName().str());
@@ -2266,14 +2161,14 @@ public:
                          bool HasTypeContext) {
     if (!EED->hasName())
       return;
-    clang::comments::CommandWordsPairs Pairs;
+
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Declaration,
         HasTypeContext ? SemanticContextKind::ExpressionSpecific
                        : getSemanticContext(EED, Reason), ExpectedTypes);
     Builder.setAssociatedDecl(EED);
-    setClangDeclKeywords(EED, Pairs, Builder);
+    setClangDeclKeywords(EED, Builder);
     addLeadingDot(Builder);
     Builder.addTextChunk(EED->getName().str());
     if (EED->hasArgumentType())

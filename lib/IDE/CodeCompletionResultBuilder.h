@@ -44,7 +44,7 @@ class CodeCompletionResultBuilder {
   CodeCompletionResult::ExpectedTypeRelation ExpectedTypeRelation =
       CodeCompletionResult::Unrelated;
   bool Cancelled = false;
-  ArrayRef<std::pair<StringRef, StringRef>> CommentWords;
+  std::vector<StringRef> DeclKeywords;
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
                         StringRef Text);
@@ -141,9 +141,10 @@ public:
        " throws");
   }
 
-  void addDeclDocCommentWords(ArrayRef<std::pair<StringRef, StringRef>> Pairs) {
+  void addDeclKeywords(ArrayRef<StringRef> Keywords) {
     assert(Kind == CodeCompletionResult::ResultKind::Declaration);
-    CommentWords = Pairs;
+    for (auto KW : Keywords)
+      DeclKeywords.push_back(KW);
   }
 
   void addAnnotatedRethrows() {

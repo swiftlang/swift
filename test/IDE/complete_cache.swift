@@ -48,12 +48,12 @@ import ctypes
 @testable import Darwin
 
 // CLANG_CTYPES: Begin completions
-// CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/keyword[Foo1, Struct1]:    FooStruct1[#FooStruct1#]{{; name=.+$}}
-// CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/keyword[Foo2]:    FooStruct2[#FooStruct2#]{{; name=.+$}}
-// CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/recommended[Foo2, Foo1]: FooStruct3[#FooStruct3#]{{; name=.+$}}
-// CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/recommendedover[Foo3, Foo2]: FooStruct4[#FooStruct4#]{{; name=.+$}}
+// CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/Keywords[Foo1, Struct1]:    FooStruct1[#FooStruct1#]{{; name=.+$}}
+// CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/Keywords[Foo2]:    FooStruct2[#FooStruct2#]{{; name=.+$}}
+// CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]:    FooStruct3[#FooStruct3#]{{; name=.+$}}
+// CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]:    FooStruct4[#FooStruct4#]{{; name=.+$}}
 // CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]:    FooStruct5[#FooStruct5#]{{; name=.+$}}
-// CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/recommendedover[ro1, ro2, ro3, ro4]/recommended[r1, r2, r3]/keyword[k1, k2, k3, k4]:    FooStruct6[#FooStruct6#]{{; name=.+$}}
+// CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]:    FooStruct6[#FooStruct6#]{{; name=.+$}}
 // CLANG_CTYPES-DAG: Decl[TypeAlias]/OtherModule[ctypes]: FooStructTypedef1[#FooStruct2#]{{; name=.+$}}
 // CLANG_CTYPES: End completions
 
