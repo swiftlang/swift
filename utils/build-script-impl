@@ -1941,6 +1941,7 @@ if [[ "${DARWIN_INSTALL_EXTRACT_SYMBOLS}" ]] ; then
     # Exclude shell scripts.
     (cd "${INSTALL_SYMROOT}" &&
      find ./"${INSTALL_PREFIX}" -perm -0111 -type f -print | \
+       grep -v swift-stdlib-tool | \
        xargs -n 1 -P $(get_dsymutil_parallelism) $(xcrun_find_tool dsymutil))
 
     # Strip executables, shared libraries and static libraries in
@@ -1956,6 +1957,10 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
     echo "--- Creating installable package ---"
     echo "-- Package file: ${INSTALLABLE_PACKAGE} --"
     if [[ "$(uname -s)" == "Darwin" ]] ; then
+      if [ ! -f "${INSTALL_DESTDIR}/${INSTALL_PREFIX}/bin/swift-stdlib-tool" ] ; then
+        echo "--- Copy swift-stdlib-tool ---"
+        cp "${SWIFT_SOURCE_DIR}/utils/swift-stdlib-tool-substitute" "${INSTALL_DESTDIR}/${INSTALL_PREFIX}/bin/swift-stdlib-tool"
+      fi
       # FIXME: Don't use gnutar on Darwin
       (cd "${INSTALL_DESTDIR}" &&
         gnutar -c -z -f "${INSTALLABLE_PACKAGE}" --owner=0 --group=0 "${TOOLCHAIN_PREFIX/#\/}")
