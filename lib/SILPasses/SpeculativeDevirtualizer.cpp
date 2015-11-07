@@ -170,10 +170,6 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   assert(NewInstPair.first && "Expected to be able to devirtualize apply!");
   replaceDeadApply(IdenAI, NewInstPair.first);
 
-  // Sink class_method instructions down to their single user.
-  if (CMI->hasOneUse())
-    CMI->moveBefore(CMI->use_begin()->getUser());
-
   // Split critical edges resulting from VirtAI.
   if (auto *TAI = dyn_cast<TryApplyInst>(VirtAI)) {
     auto *ErrorBB = TAI->getFunction()->createBasicBlock();
