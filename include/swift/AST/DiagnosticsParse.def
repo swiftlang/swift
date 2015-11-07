@@ -732,10 +732,10 @@ ERROR(expected_close_after_else,stmt_parsing,none,
 // Return Statement
 ERROR(expected_expr_return,stmt_parsing,PointsToFirstBadToken,
       "expected expression in 'return' statement", ())
-WARNING(unindented_code_after_return,tce_sema,none,
+WARNING(unindented_code_after_return,stmt_parsing,none,
         "expression following 'return' is treated as an argument of "
         "the 'return'", ())
-NOTE(indent_expression_to_silence,tce_sema,none,
+NOTE(indent_expression_to_silence,stmt_parsing,none,
      "indent the expression to silence this warning", ())
 
 // Throw Statement
