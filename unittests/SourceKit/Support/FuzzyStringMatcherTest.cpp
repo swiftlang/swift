@@ -294,3 +294,25 @@ TEST(FuzzyStringMatcher, NormalizeScore) {
   EXPECT_EQ(1.0, n.scoreCandidate("abc"));
   EXPECT_EQ(1.0, n.scoreCandidate("ABC"));
 }
+
+TEST(FuzzyStringMatcher, TokenizingCharacters) {
+  FuzzyStringMatcher m("ab");
+  EXPECT_GT(m.scoreCandidate("a/b"), m.scoreCandidate("acb"));
+  EXPECT_GT(m.scoreCandidate("a.b"), m.scoreCandidate("acb"));
+  EXPECT_GT(m.scoreCandidate("a_b"), m.scoreCandidate("acb"));
+  EXPECT_GT(m.scoreCandidate("a+b"), m.scoreCandidate("acb"));
+  EXPECT_GT(m.scoreCandidate("a-b"), m.scoreCandidate("acb"));
+  EXPECT_GT(m.scoreCandidate("a:b"), m.scoreCandidate("acb"));
+  EXPECT_GT(m.scoreCandidate("a,b"), m.scoreCandidate("acb"));
+  EXPECT_GT(m.scoreCandidate("a b"), m.scoreCandidate("acb"));
+  EXPECT_GT(m.scoreCandidate("a(b"), m.scoreCandidate("acb"));
+  EXPECT_GT(m.scoreCandidate("a)b"), m.scoreCandidate("acb"));
+  EXPECT_GT(m.scoreCandidate("a!b"), m.scoreCandidate("acb"));
+  EXPECT_GT(m.scoreCandidate("a?b"), m.scoreCandidate("acb"));
+}
+
+TEST(FuzzyStringMatcher, ShortUnconnectedMatches) {
+  FuzzyStringMatcher m("abcd");
+  EXPECT_GT(m.scoreCandidate("xaxbxcdxxxxxx"), m.scoreCandidate("xaxbxcxd"));
+  EXPECT_GT(m.scoreCandidate("xaxbxc_d"), m.scoreCandidate("xaxbxcxd"));
+}

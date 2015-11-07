@@ -76,6 +76,13 @@ static bool isTokenizingChar(char c) {
   case '_':
   case '+':
   case '-':
+  case ':':
+  case ',':
+  case ' ':
+  case '(':
+  case ')':
+  case '!':
+  case '?':
     return true;
   default:
     return false;
@@ -501,13 +508,16 @@ CandidateSpecificMatcher::scoreCandidateTrial(unsigned firstPatternPos) {
   case 0:
     break;
   case 1:
-    trialScore *= 0.8;
+    trialScore *= 0.8125;
     break;
   case 2:
     trialScore *= 0.5;
     break;
+  case 3:
+    trialScore *= 0.25;
+    break;
   default:
-    trialScore *= 0.33;
+    trialScore *= 0.0625;
     break;
   }
 
