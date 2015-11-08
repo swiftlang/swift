@@ -152,13 +152,6 @@ public:
     return *this;
   }
 
-  /// Returns whether the LoadStoreValue has been initialized properly.
-  bool isValid() const {
-    if (IsCoveringValue)
-      return true;
-    return Base && Path.hasValue();
-  }
-
   /// Returns true if the LoadStoreValue has a non-empty projection path.
   bool hasEmptyProjectionPath() const { return !Path.getValue().size(); }
 

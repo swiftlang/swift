@@ -656,12 +656,10 @@ bb4(%19 : $ErrorType):
   br bb3
 }
 
-// DISABLE THIS TEST CASE FOR NOW. AS RLE GETS BETTER. WILL RE-ENABLE.
-//
-// DISABLECHECK-INLINE-LABEL: sil @_TF16devirt_try_apply5test5FT_Vs5Int32
-// DISABLECHECK-INLINE-NOT: = witness_method
-// DISABLECHECK-INLINE-NOT: = class_method
-// DISABLECHECK-INLINE: }
+// CHECK-INLINE-LABEL: sil @_TF16devirt_try_apply5test5FT_Vs5Int32
+// CHECK-INLINE-NOT: = witness_method
+// CHECK-INLINE-NOT: = class_method
+// CHECK-INLINE: }
 sil @_TF16devirt_try_apply5test5FT_Vs5Int32 : $@convention(thin) () -> Int32 {
 bb0:
   %0 = alloc_stack $Int32
