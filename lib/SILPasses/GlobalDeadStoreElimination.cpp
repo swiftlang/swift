@@ -456,9 +456,9 @@ void DSEContext::mergeSuccessorStates(SILBasicBlock *BB) {
 }
 
 void DSEContext::invalidateMemLocationBase(SILInstruction *I,
-                                           bool BuildGenKillSet) {
+                                           bool GenKillSet) {
   BBState *S = getBBLocState(I);
-  if (BuildGenKillSet) {
+  if (GenKillSet) {
     for (unsigned i = 0; i < S->MemLocationCount; ++i) {
       if (MemLocationVault[i].getBase().getDef() != I)
         continue;
@@ -580,17 +580,15 @@ void DSEContext::processRead(SILInstruction *I, BBState *S, SILValue Mem,
   // separate reads.
   MemLocationList Locs;
   MemLocation::expand(L, &I->getModule(), Locs, TypeExpansionVault);
-  if (BuildGenKillSet) {
-    for (auto &E : Locs) {
+  for (auto &E : Locs) {
+    if (BuildGenKillSet) {
       // Only building the gen and kill sets for now.
       updateGenKillSetForRead(I, S, getMemLocationBit(E));
+      continue;
     }
-  } else {
-    for (auto &E : Locs) {
-      // This is the last iteration, compute WriteSetOut and perform the dead
-      // store elimination. 
-      updateWriteSetForRead(I, S, getMemLocationBit(E));
-    }
+    // This is the last iteration, compute WriteSetOut and perform the dead
+    // store elimination. 
+    updateWriteSetForRead(I, S, getMemLocationBit(E));
   }
 }
 
@@ -631,20 +629,18 @@ void DSEContext::processWrite(SILInstruction *I, BBState *S, SILValue Val,
   MemLocation::expand(L, Mod, Locs, TypeExpansionVault);
   llvm::BitVector V(Locs.size());
   unsigned idx = 0;
-  if (BuildGenKillSet) {
-    for (auto &E : Locs) {
-        // Only building the gen and kill sets here.
-        updateGenKillSetForWrite(I, S, getMemLocationBit(E));
+  for (auto &E : Locs) {
+    if (BuildGenKillSet) {
+      // Only building the gen and kill sets here.
+      updateGenKillSetForWrite(I, S, getMemLocationBit(E));
+      continue;
     }
-  } else {
-    for (auto &E : Locs) {
-      // This is the last iteration, compute WriteSetOut and perform the dead
-      // store elimination. 
-      if (updateWriteSetForWrite(I, S, getMemLocationBit(E)))
-        V.set(idx);
-      Dead &= V.test(idx);
-      ++idx;
-    }
+    // This is the last iteration, compute WriteSetOut and perform the dead
+    // store elimination. 
+    if (updateWriteSetForWrite(I, S, getMemLocationBit(E)))
+      V.set(idx);
+    Dead &= V.test(idx);
+    ++idx;
   }
 
   // Data flow has not stablized, do not perform the DSE just yet.
