@@ -17,7 +17,7 @@
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
-//                              Utility Functions
+//                              Utility Functions 
 //===----------------------------------------------------------------------===//
 
 static inline void removeMemLocations(MemLocationValueMap &Values,
@@ -27,33 +27,11 @@ static inline void removeMemLocations(MemLocationValueMap &Values,
 }
 
 //===----------------------------------------------------------------------===//
-//                              SILValue Projection
-//===----------------------------------------------------------------------===//
-
-bool SILValueProjection::hasIdenticalProjectionPath(
-    const SILValueProjection &RHS) const {
-  // If both Paths have no value, then the 2 locations are different.
-  if (!Path.hasValue() && !RHS.Path.hasValue())
-    return false;
-  // If 1 Path has value while the other does not, then the 2 locations
-  // are different.
-  if (Path.hasValue() != RHS.Path.hasValue())
-    return false;
-  // If both Paths are empty, then the 2 locations are the same.
-  if (Path.getValue().empty() && RHS.Path.getValue().empty())
-    return true;
-  // If both Paths have different values, then the 2 locations are different.
-  if (Path.getValue() != RHS.Path.getValue())
-    return false;
-  return true;
-}
-
-//===----------------------------------------------------------------------===//
-//                              Load Store Value
+//                              Load Store Value 
 //===----------------------------------------------------------------------===//
 
 LoadStoreValue &LoadStoreValue::stripLastLevelProjection() {
-  Path.getValue().remove_front();
+  Path.getValue().remove_front(); 
   return *this;
 }
 
@@ -129,6 +107,23 @@ void MemLocation::initialize(SILValue Dest) {
 
 void MemLocation::print() const { llvm::outs() << *this; }
 
+bool MemLocation::hasIdenticalProjectionPath(const MemLocation &RHS) const {
+  // If both Paths have no value, then the 2 locations are different.
+  if (!Path.hasValue() && !RHS.Path.hasValue())
+    return false;
+  // If 1 Path has value while the other does not, then the 2 locations
+  // are different.
+  if (Path.hasValue() != RHS.Path.hasValue())
+    return false;
+  // If both Paths are empty, then the 2 locations are the same.
+  if (Path.getValue().empty() && RHS.Path.getValue().empty())
+    return true;
+  // If both Paths have different values, then the 2 locations are different.
+  if (Path.getValue() != RHS.Path.getValue())
+    return false;
+  return true;
+}
+
 bool MemLocation::isMustAliasMemLocation(const MemLocation &RHS,
                                          AliasAnalysis *AA) {
   // If the bases are not must-alias, the locations may not alias.
@@ -152,7 +147,8 @@ bool MemLocation::isMayAliasMemLocation(const MemLocation &RHS,
   return true;
 }
 
-MemLocation MemLocation::createMemLocation(SILValue Base, ProjectionPath &P1,
+MemLocation MemLocation::createMemLocation(SILValue Base,
+                                           ProjectionPath &P1,
                                            ProjectionPath &P2) {
   ProjectionPath T;
   T.append(P1);
@@ -257,8 +253,7 @@ void MemLocation::expandWithValues(MemLocation &Base, SILValue &Val,
   ProjectionPath::expandTypeIntoLeafProjectionPaths(Base.getType(), Mod, Paths,
                                                     true);
 
-  // Construct the MemLocation and LoadStoreValues by appending the projection
-  // path
+  // Construct the MemLocation and LoadStoreValues by appending the projection path
   // from the accessed node to the leaf nodes.
   for (auto &X : Paths) {
     Locs.push_back(MemLocation::createMemLocation(Base.getBase(), X.getValue(),
@@ -273,7 +268,7 @@ SILValue MemLocation::reduceWithValues(MemLocation &Base, SILModule *Mod,
   // Walk bottom up the projection tree, try to reason about how to construct
   // a single SILValue out of all the available values for all the memory
   // locations.
-  //
+  // 
   // First, get a list of all the leaf nodes and intermediate nodes for the
   // Base memory location.
   MemLocationList ALocs;
@@ -303,8 +298,7 @@ SILValue MemLocation::reduceWithValues(MemLocation &Base, SILModule *Mod,
     // This is NOT a leaf node, we need to construct a value for it.
     //
     // If there are more than 1 children and all the children nodes have
-    // LoadStoreValues with the same base. we can get away by not extracting
-    // value
+    // LoadStoreValues with the same base. we can get away by not extracting value
     // for every single field.
     //
     // Simply create a new node with all the aggregated base value, i.e.
@@ -320,16 +314,16 @@ SILValue MemLocation::reduceWithValues(MemLocation &Base, SILModule *Mod,
       HasIdenticalValueBase &= (FirstBase == V.getBase());
     }
 
-    if (HasIdenticalValueBase &&
-        (FirstLevel.size() > 1 || !FirstVal.hasEmptyProjectionPath())) {
+    if (HasIdenticalValueBase && (FirstLevel.size() > 1 ||
+        !FirstVal.hasEmptyProjectionPath())) {
       Values[*I] = FirstVal.stripLastLevelProjection();
       // We have a value for the parent, remove all the values for children.
       removeMemLocations(Values, FirstLevel);
       continue;
     }
 
-    // In 2 cases do we need aggregation.
-    //
+    // In 2 cases do we need aggregation. 
+    // 
     // 1. If there is only 1 child and we can not strip off any projections,
     // that means we need to create an aggregation.
     //
@@ -341,16 +335,16 @@ SILValue MemLocation::reduceWithValues(MemLocation &Base, SILModule *Mod,
       Vals.push_back(Values[X].materialize(InsertPt));
     }
     SILBuilder Builder(InsertPt);
-    NullablePtr<swift::SILInstruction> AI =
-        Projection::createAggFromFirstLevelProjections(
-            Builder, InsertPt->getLoc(), I->getType(), Vals);
+    NullablePtr<swift::SILInstruction> AI = 
+          Projection::createAggFromFirstLevelProjections(Builder,
+                                                         InsertPt->getLoc(),
+                                                         I->getType(), Vals);
     // This is the Value for the current node.
     ProjectionPath P;
     Values[*I] = LoadStoreValue(SILValue(AI.get()), P);
     removeMemLocations(Values, FirstLevel);
 
-    // Keep iterating until we have reach the top-most level of the projection
-    // tree.
+    // Keep iterating until we have reach the top-most level of the projection tree.
     // i.e. the memory location represented by the Base.
   }
 
@@ -360,10 +354,11 @@ SILValue MemLocation::reduceWithValues(MemLocation &Base, SILModule *Mod,
   return Values.begin()->second.materialize(InsertPt);
 }
 
-void MemLocation::enumerateMemLocation(SILModule *M, SILValue Mem,
-                                       std::vector<MemLocation> &LV,
-                                       MemLocationIndexMap &BM,
-                                       TypeExpansionMap &TV) {
+void
+MemLocation::enumerateMemLocation(SILModule *M, SILValue Mem,
+                                  std::vector<MemLocation> &LV,
+                                  MemLocationIndexMap &BM,
+                                  TypeExpansionMap &TV) {
   // Construct a Location to represent the memory written by this instruction.
   MemLocation L(Mem);
 
@@ -382,10 +377,11 @@ void MemLocation::enumerateMemLocation(SILModule *M, SILValue Mem,
   }
 }
 
-void MemLocation::enumerateMemLocations(SILFunction &F,
-                                        std::vector<MemLocation> &LV,
-                                        MemLocationIndexMap &BM,
-                                        TypeExpansionMap &TV) {
+void
+MemLocation::enumerateMemLocations(SILFunction &F,
+                                   std::vector<MemLocation> &LV,
+                                   MemLocationIndexMap &BM,
+                                   TypeExpansionMap &TV) {
   // Enumerate all locations accessed by the loads or stores.
   //
   // TODO: process more instructions as we process more instructions in
