@@ -432,17 +432,64 @@ features copy-on-write traits.
 In our Tree example we eliminate the cost of copying the content of the tree by
 wrapping it in an array. This simple change has a major impact on the
 performance of our tree data structure, and the cost of passing the array as an
-argument drops from being O(n), depending on the size of the tree to O(1). 
+argument drops from being O(n), depending on the size of the tree to O(1).
 
 ::
 
-  struct tree : P { 
+  struct tree : P {
     var node : [P?]
     init() {
       node = [ thing ]
     }
   }
 
+
+There are two obvious disadvantages of using Array for COW semantics. The first
+problem is that Array exposes methods like `append` and `count` that don't make
+any sense in the context of a value wrapper. These methods can make the use of
+the reference wrapper awkward. It is possible to work around this problem by
+creating a wrapper struct that will hide the unused APIs and the optimizer will
+remove this overhead, but this wrapper will not solve the second problem.  The
+Second problem is that Array has code for ensuring program safety and
+interaction with Objective-C. Swift checks if indexed accesses fall within the
+array bounds and when storing a value if the array storage needs to be extended.
+These runtime checks can slow things down.
+
+An alternative to using Array is to implement a dedicated copy-on-write data
+structure to replace Array as the value wrapper. The example below shows how to
+construct such a data structure:
+
+.. Note: This solution is suboptimal for nested structs, and an addressor based
+..       COW data structure would be more efficient. However at this point it's not
+..       possible to implement addressors out of the standard library.
+
+.. More details in this blog post by Mike Ash:
+.. https://www.mikeash.com/pyblog/friday-qa-2015-04-17-lets-build-swiftarray.html
+
+::
+
+  final class Ref<T> {
+    var val : T
+    init(_ v : T) {val = v}
+  }
+
+  struct Box<T> {
+      var ref : Ref<T>
+      init(_ x : T) { ref = Ref(x) }
+
+      var value: T {
+          get { return ref.val }
+          set {
+            if (!isUniquelyReferencedNonObjC(&ref)) {
+              ref = Ref(newValue)
+              return
+            }
+            ref.val = newValue
+          }
+      }
+  }
+
+The type `Box` can replace the array in the code sample above.
 
 Unsafe code
 ===========
