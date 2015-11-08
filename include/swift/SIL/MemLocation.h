@@ -328,18 +328,6 @@ public:
   /// projection.
   void getFirstLevelMemLocations(MemLocationList &Locs, SILModule *Mod);
 
-  /// Returns true if the MemLocation is local to this function, i.e.
-  /// does not escape.
-  ///
-  /// TODO: we should look at the projection path as well. i.e. one field
-  /// might escape but the object itself does not.
-  ///
-  bool isNonEscapingLocalMemLocation() {
-    assert(isValid() && "Invalid memory location");
-    // TODO: this does not have to be limited to allocstack. 
-    return isa<AllocStackInst>(Base) && isNonEscapingLocalObject(Base);
-  }
-
   /// Check whether the 2 MemLocations may alias each other or not.
   bool isMayAliasMemLocation(const MemLocation &RHS, AliasAnalysis *AA);
 
