@@ -1964,5 +1964,5 @@ MsgPackTestSuite.test("Deserialize/Extension/ext32") {
   }
 }
 
-//runAllTests()
+runAllTests()
 
