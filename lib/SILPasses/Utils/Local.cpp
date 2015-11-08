@@ -2335,21 +2335,18 @@ bool swift::calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl) {
   if (!AssocDC)
     return false;
 
-  FuncDecl *FD = Decl.getFuncDecl();
-
-  // FIXME: Handle other things like init().
-  if (!FD)
-    return false;
+  auto *AFD = Decl.getAbstractFunctionDecl();
+  assert(AFD && "Expected abstract function decl!");
 
   // Only handle members defined within the SILModule's associated context.
-  if (!FD->isChildContextOf(AssocDC))
+  if (!AFD->isChildContextOf(AssocDC))
     return false;
 
-  if (FD->isDynamic())
+  if (AFD->isDynamic())
     return false;
 
   // Only consider 'private' members, unless we are in whole-module compilation.
-  switch (FD->getEffectiveAccess()) {
+  switch (AFD->getEffectiveAccess()) {
   case Accessibility::Public:
     return false;
   case Accessibility::Internal:
