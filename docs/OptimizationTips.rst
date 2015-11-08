@@ -330,7 +330,7 @@ standard library is a special case. Definitions in the standard library are
 visible in all modules and available for specialization.
 
 Advice: Allow the compiler to perform generic specialization
-----------------------------------------------------------------------
+------------------------------------------------------------
 
 The compiler can only specialize generic code if the call site and the callee
 function are located in the same compilation unit. One trick that we can use to
