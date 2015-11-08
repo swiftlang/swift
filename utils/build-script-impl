@@ -1290,7 +1290,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
     if [[ "${BUILD_SWIFT_PERF_TESTSUITE}" ]]; then
         swift_cmake_options=(
             "${swift_cmake_options[@]}"
-            -DSWIFT_INCLUDE_PERF_TESTSUITE=YES
+            -DSWIFT_INCLUDE_PERF_TESTSUITE=$(true_false "${BUILD_SWIFT_PERF_TESTSUITE}")
         )
     fi
 
