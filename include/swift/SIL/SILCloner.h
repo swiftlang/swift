@@ -441,7 +441,7 @@ SILCloner<ImplClass>::visitAllocRefInst(AllocRefInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createAllocRef(getOpLocation(Inst->getLoc()),
                                 getOpType(Inst->getType()),
-                                Inst->isObjC()));
+                                Inst->isObjC(), Inst->canAllocOnStack()));
 }
 
 template<typename ImplClass>
@@ -1425,7 +1425,8 @@ void
 SILCloner<ImplClass>::visitDeallocRefInst(DeallocRefInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createDeallocRef(getOpLocation(Inst->getLoc()),
-                                  getOpValue(Inst->getOperand())));
+                                  getOpValue(Inst->getOperand()),
+                                  Inst->canAllocOnStack()));
 }
 
 template<typename ImplClass>

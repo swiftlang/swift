@@ -1000,7 +1000,7 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
     auto &Mod = ARDI->getModule();
     auto SILInstanceTy = MI->getType().getMetatypeInstanceType(Mod);
     auto *ARI = Builder.createAllocRef(ARDI->getLoc(), SILInstanceTy,
-                                       ARDI->isObjC());
+                                       ARDI->isObjC(), false);
     ARI->setDebugScope(ARDI->getDebugScope());
     return ARI;
   }
@@ -1020,7 +1020,7 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
       auto &Mod = ARDI->getModule();
       auto SILInstanceTy = CCBI->getCastType().getMetatypeInstanceType(Mod);
       auto *ARI = Builder.createAllocRef(ARDI->getLoc(), SILInstanceTy,
-                                         ARDI->isObjC());
+                                         ARDI->isObjC(), false);
       ARI->setDebugScope(ARDI->getDebugScope());
       return ARI;
     }

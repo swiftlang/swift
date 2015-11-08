@@ -182,7 +182,7 @@ public:
   }
 
   AllocRefInst *createAllocRef(SILLocation Loc, SILType elementType, bool objc,
-                               bool canAllocOnStack = false){
+                               bool canAllocOnStack){
     // AllocRefInsts expand to function calls and can therefore not be
     // counted towards the function prologue.
     assert(!Loc.isInPrologue());
@@ -984,7 +984,7 @@ public:
     return insert(new (F.getModule()) DeallocStackInst(loc, operand));
   }
   DeallocRefInst *createDeallocRef(SILLocation loc, SILValue operand,
-                                   bool canBeOnStack = false) {
+                                   bool canBeOnStack) {
     return insert(new (F.getModule()) DeallocRefInst(loc, operand, canBeOnStack));
   }
   DeallocPartialRefInst *createDeallocPartialRef(SILLocation loc,
