@@ -482,6 +482,30 @@ automatic reference counting for a specific reference.
     }
 
 
+Protocols
+=========
+
+Advice: Mark protocols that are only satisfied by classes as class-protocols
+----------------------------------------------------------------------------
+
+Swift can limit protocols adoption to classes only. One advantage of marking
+protocols as class-only is that the compiler can optimize the program based on
+the knowledge that only classes satisfy a protocol. For example, the ARC memory
+management system can easily retain (increase the reference count of an object)
+if it knows that it is dealing with a class. Without this knowledge the compiler
+has to assume that a struct may satisfy the protocol and it needs to be prepared
+to retain or release non-trivial structures, which can be expensive.
+
+If it makes sense to limit the adoption of protocols to classes then mark
+protocols as class-only protocols to get better runtime performance.
+
+::
+  protocol Pingable : class { func ping() -> Int }
+
+.. https://developer.apple.com/library/ios/documentation/Swift/Conceptual/Swift_Programming_Language/Protocols.html
+
+
+
 Footnotes
 =========
 
