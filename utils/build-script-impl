@@ -135,6 +135,7 @@ KNOWN_SETTINGS=(
     build-swift-sdk-overlay     "1"              "set to 1 to build the Swift SDK overlay"
     build-swift-static-stdlib   "0"              "set to 1 to build static versions of the Swift standard library and SDK overlay"
     build-swift-examples        "1"              "set to 1 to build examples"
+    build-swift-perf-testsuite  "0"              "set to 1 to build perf test suite"
     source-tree-includes-tests  "1"              "set to 0 to allow the build to proceed when 'test' directory is missing (required for B&I builds)"
     native-llvm-tools-path      ""               "directory that contains LLVM tools that are executable on the build machine"
     native-clang-tools-path     ""               "directory that contains Clang tools that are executable on the build machine"
@@ -1283,6 +1284,13 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
         swift_cmake_options=(
             "${swift_cmake_options[@]}"
             -DSWIFT_EXPERIMENTAL_EXTRA_REGEXP_FLAGS="${EXTRA_SWIFT_ARGS}"
+        )
+    fi
+
+    if [[ "${BUILD_SWIFT_PERF_TESTSUITE}" ]]; then
+        swift_cmake_options=(
+            "${swift_cmake_options[@]}"
+            -DSWIFT_INCLUDE_PERF_TESTSUITE=YES
         )
     fi
 
