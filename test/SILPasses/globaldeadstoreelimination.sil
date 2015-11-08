@@ -148,6 +148,8 @@ bb0(%0 : $B):
 // CHECK-NEXT: integer_literal
 // CHECK-NEXT: builtin
 // CHECK-NEXT: tuple_extract
+// CHECK-NEXT: builtin
+// CHECK-NEXT: tuple_extract
 // CHECK-NEXT: store
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
@@ -775,6 +777,12 @@ bb3:                                              // Preds: bb1 bb2
 // CHECK-LABEL: DeadStoreInSimpleTuple
 // CHECK: bb0:
 // CHECK-NEXT: alloc_stack
+// CHECK-NEXT: tuple_element_addr
+// CHECK-NEXT: tuple_element_addr
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: struct
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: struct
 // CHECK-NEXT: integer_literal
 // CHECK-NEXT: struct
 // CHECK-NEXT: tuple_element_addr

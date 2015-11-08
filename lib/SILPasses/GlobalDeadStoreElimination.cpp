@@ -843,8 +843,7 @@ void DSEContext::run() {
     // Delete the dead stores.
     for (auto &I : getBBLocState(&BB)->DeadStores) {
       DEBUG(llvm::dbgs() << "*** Removing: " << *I << " ***\n");
-      // This way, we get rid of pass dependence on DCE.
-      recursivelyDeleteTriviallyDeadInstructions(I, true);
+      I->eraseFromParent();
     }
   }
 }
