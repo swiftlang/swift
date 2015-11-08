@@ -630,13 +630,13 @@ void DSEContext::processWrite(SILInstruction *I, BBState *S, SILValue Val,
   MemLocationList Locs;
   MemLocation::expand(L, Mod, Locs, TypeExpansionVault);
   llvm::BitVector V(Locs.size());
+  unsigned idx = 0;
   if (BuildGenKillSet) {
     for (auto &E : Locs) {
         // Only building the gen and kill sets here.
         updateGenKillSetForWrite(I, S, getMemLocationBit(E));
     }
   } else {
-    unsigned idx = 0;
     for (auto &E : Locs) {
       // This is the last iteration, compute WriteSetOut and perform the dead
       // store elimination. 
