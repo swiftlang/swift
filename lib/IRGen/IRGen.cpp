@@ -74,12 +74,6 @@ static void addSwiftContractPass(const PassManagerBuilder &Builder,
     PM.add(createSwiftARCContractPass());
 }
 
-static void addSwiftStackPromotionPass(const PassManagerBuilder &Builder,
-                                       PassManagerBase &PM) {
-  if (Builder.OptLevel > 0)
-    PM.add(createSwiftStackPromotionPass());
-}
-
 // FIXME: Copied from clang/lib/CodeGen/CGObjCMac.cpp. 
 // These should be moved to a single definition shared by clang and swift.
 enum ImageInfoFlags {
@@ -130,9 +124,6 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
       PMBuilder.Inliner =
         llvm::createAlwaysInlinerPass(/*insertlifetime*/false);
   }
-
-  PMBuilder.addExtension(PassManagerBuilder::EP_ModuleOptimizerEarly,
-                         addSwiftStackPromotionPass);
 
   // If the optimizer is enabled, we run the ARCOpt pass in the scalar optimizer
   // and the Contract pass as late as possible.

@@ -234,7 +234,6 @@ int main(int argc, char **argv) {
   initializeSwiftRCIdentityPass(Registry);
   initializeSwiftARCOptPass(Registry);
   initializeSwiftARCContractPass(Registry);
-  initializeSwiftStackPromotionPass(Registry);
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift LLVM optimizer\n");
 

@@ -166,8 +166,6 @@ PASS(SplitAllCriticalEdges, "split-critical-edges",
      "Split all critical edges")
 PASS(SplitNonCondBrCriticalEdges, "split-non-cond_br-critical-edges",
      "Split all critical edges that do not involve cond_br")
-PASS(StackPromotion, "stack-promotion",
-     "Promote allocated objects on the stack")
 PASS(StripDebugInfo, "strip-debug-info",
      "Strip debug info")
 PASS(SwiftArrayOpts, "array-specialize",
