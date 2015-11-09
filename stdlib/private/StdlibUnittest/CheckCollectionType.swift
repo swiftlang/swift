@@ -287,7 +287,7 @@ extension TestSuite {
     Collection.SubSequence.SubSequence == Collection.SubSequence,
     CollectionWithEquatableElement.Generator.Element : Equatable
   >(
-    var testNamePrefix: String = "",
+    testNamePrefix: String = "",
     makeCollection: ([Collection.Generator.Element]) -> Collection,
     wrapValue: (OpaqueValue<Int>) -> Collection.Generator.Element,
     extractValue: (Collection.Generator.Element) -> OpaqueValue<Int>,
@@ -301,6 +301,8 @@ extension TestSuite {
     outOfBoundsIndexOffset: Int = 1,
     outOfBoundsSubscriptOffset: Int = 1
   ) {
+
+    var testNamePrefix = testNamePrefix
 
     if checksAdded.value.contains(__FUNCTION__) {
       return
@@ -786,7 +788,7 @@ self.test("\(testNamePrefix).removeFirst(n: Int)/slice/removeTooMany/semantics")
     CollectionWithEquatableElement.Index : BidirectionalIndexType,
     CollectionWithEquatableElement.Generator.Element : Equatable
   >(
-    var testNamePrefix: String = "",
+    testNamePrefix: String = "",
     makeCollection: ([Collection.Generator.Element]) -> Collection,
     wrapValue: (OpaqueValue<Int>) -> Collection.Generator.Element,
     extractValue: (Collection.Generator.Element) -> OpaqueValue<Int>,
@@ -800,6 +802,9 @@ self.test("\(testNamePrefix).removeFirst(n: Int)/slice/removeTooMany/semantics")
     outOfBoundsIndexOffset: Int = 1,
     outOfBoundsSubscriptOffset: Int = 1
   ) {
+
+    var testNamePrefix = testNamePrefix
+
     if checksAdded.value.contains(__FUNCTION__) {
       return
     }
@@ -1088,7 +1093,7 @@ self.test("\(testNamePrefix).suffix/semantics") {
     CollectionWithEquatableElement.Index : RandomAccessIndexType,
     CollectionWithEquatableElement.Generator.Element : Equatable
   >(
-    var testNamePrefix: String = "",
+    testNamePrefix: String = "",
     makeCollection: ([Collection.Generator.Element]) -> Collection,
     wrapValue: (OpaqueValue<Int>) -> Collection.Generator.Element,
     extractValue: (Collection.Generator.Element) -> OpaqueValue<Int>,
@@ -1102,6 +1107,8 @@ self.test("\(testNamePrefix).suffix/semantics") {
     outOfBoundsIndexOffset: Int = 1,
     outOfBoundsSubscriptOffset: Int = 1
   ) {
+
+    var testNamePrefix = testNamePrefix
 
     if checksAdded.value.contains(__FUNCTION__) {
       return

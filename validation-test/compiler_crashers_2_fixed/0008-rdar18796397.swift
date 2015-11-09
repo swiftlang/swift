@@ -12,8 +12,10 @@ class Parent {
 
 class MyClass<T> : OurProtocol {
   var myVar: T?
-  var validator: (Int) -> (T) = { (var t) -> (T) in return t as! T }
-  
+  var validator: (Int) -> (T) = { (t) -> (T) in
+    var t = t
+    return t as! T
+  }
 }
 
 

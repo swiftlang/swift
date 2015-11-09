@@ -431,7 +431,7 @@ class D2 : D1 {}
 class E : C {}
 
 // CHECK-LABEL: sil hidden @_TF6switch16test_isa_class_1FT1xCS_1B_T_
-func test_isa_class_1(let x x: B) {
+func test_isa_class_1(x x: B) {
   // CHECK: strong_retain %0
   switch x {
   // CHECK:   checked_cast_br [[X:%.*]] : $B to $D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]

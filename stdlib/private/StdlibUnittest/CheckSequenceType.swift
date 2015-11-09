@@ -1439,7 +1439,7 @@ extension TestSuite {
     Sequence.SubSequence.Generator.Element == Sequence.Generator.Element,
     Sequence.SubSequence.SubSequence == Sequence.SubSequence
   >(
-    var testNamePrefix: String = "",
+    testNamePrefix: String = "",
     makeSequence: ([Sequence.Generator.Element]) -> Sequence,
     wrapValue: (OpaqueValue<Int>) -> Sequence.Generator.Element,
     extractValue: (Sequence.Generator.Element) -> OpaqueValue<Int>,
@@ -1451,6 +1451,8 @@ extension TestSuite {
     checksAdded: Box<Set<String>> = Box([]),
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all
   ) {
+
+    var testNamePrefix = testNamePrefix
 
     if checksAdded.value.contains(__FUNCTION__) {
       return

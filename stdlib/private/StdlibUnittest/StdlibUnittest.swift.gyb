@@ -2008,7 +2008,8 @@ public func check${traversal}Collection<
     x + offset0 >= 0 && x + offset1 <= count
   }
 
-  func nextN(n: C.Index.Distance, var _ i: C.Index) -> C.Index {
+  func nextN(n: C.Index.Distance, _ i: C.Index) -> C.Index {
+    var i = i
     if n < 0 {
       for _ in 0 ..< -(n.toIntMax()) {
         --i

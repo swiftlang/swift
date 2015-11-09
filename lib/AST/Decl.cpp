@@ -3268,26 +3268,6 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
      .fixItReplace(PBD->getLoc(), "var");
     return;
   }
-
-  // If this is an argument pattern, suggest adding 'var' to the pattern.
-  if (auto *PD = dyn_cast<ParamDecl>(this)) {
-    if (auto *P = PD->getParamParentPattern()) {
-      if (P->getStartLoc().isValid() && !PD->isImplicit()) {
-        // The pattern is: (pattern_let (pattern_typed (pattern_named)))
-        // where the outside let pattern may be missing.  If present, this is a
-        // change, otherwise this is an addition of "var"
-        auto &d = getASTContext().Diags;
-        if (auto *VP = dyn_cast<VarPattern>(P)) {
-          d.diagnose(VP->getLoc(), diag::change_let_to_var_param)
-           .fixItReplace(VP->getLoc(), "var");
-        } else {
-          d.diagnose(P->getStartLoc(), diag::mark_param_var)
-           .fixItInsert(P->getStartLoc(), "var ");
-        }
-        return;
-      }
-    }
-  }
 }
 
 

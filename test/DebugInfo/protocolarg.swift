@@ -14,9 +14,10 @@ class SomeImplementor : IGiveOutInts {
   func callMe() -> Int64 { return 1 }
 }
 
-func printSomeNumbers(var gen: IGiveOutInts) {
-  // CHECK: !DILocalVariable(name: "gen", arg: 1
-  // CHECK-SAME:             line: [[@LINE-2]]
+func printSomeNumbers(gen: IGiveOutInts) {
+  var gen = gen
+  // CHECK: !DILocalVariable(name: "gen", scope{{.*}} line: [[@LINE-1]]
+  // CHECK: !DILocalVariable(name: "gen", arg: 1{{.*}} line: [[@LINE-3]]
   // CHECK-SAME:             type: ![[PT]]
   markUsed(gen.callMe())
 }

@@ -1,16 +1,28 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
 // CHECK: @_TFC12generic_arg25Class3foo{{.*}}, %swift.type* %U
-// CHECK: %[[Y:.*]] = call %swift.opaque* %initializeBufferWithTake{{.*}}([{{(24|12)}} x i8]* %{{.*}}, %swift.opaque* %{{.*}}, %swift.type* %U)
-// store %swift.opaque* %[[Y]], %swift.opaque** %[[Y_SHADOW:.*]], align
-// CHECK: call void @llvm.dbg.value(metadata %swift.opaque* %[[Y]], {{.*}}metadata ![[U:.*]], metadata !{{[0-9]+}}), !dbg
+// CHECK: %[[X:[0-9]+]] = call %swift.opaque* %initializeBufferWithCopy{{.*}}([{{(24|12)}} x i8]* %{{.*}}, %swift.opaque* %{{.*}}, %swift.type* %T)
+// CHECK-NEXT: call void @llvm.dbg.value(metadata %swift.opaque* %[[X]], {{.*}}metadata ![[T:[0-9]+]], metadata !{{[0-9]+}}), !dbg !{{[0-9]+}}
+// CHECK: %[[Y:[0-9]+]] = call %swift.opaque* %initializeBufferWithCopy{{.*}}([{{(24|12)}} x i8]* %{{.*}}, %swift.opaque* %{{.*}}, %swift.type* %U)
+// CHECK-NEXT: call void @llvm.dbg.value(metadata %swift.opaque* %[[Y]], {{.*}}metadata ![[U:[0-9]+]], metadata !{{[0-9]+}}), !dbg !{{[0-9]+}}
 // Make sure there is no conflicting dbg.value for this variable.x
 // CHECK-NOT: dbg.value{{.*}}metadata ![[U]]
 class Class <T> {
-// CHECK: ![[U]] = !DILocalVariable(name: "y", arg: 2{{.*}} line: [[@LINE+1]],
-  func foo<U>(var x: T, var y: U) {}
+  func foo<U>(x: T, y: U) {
+    // CHECK: ![[T]] = !DILocalVariable(name: "x", scope: !{{[0-9]+}}, {{.*}}line: [[@LINE+1]],
+    var x = x
+    // CHECK: ![[U]] = !DILocalVariable(name: "y", scope: !{{[0-9]+}}, {{.*}}line: [[@LINE+1]],
+    var y = y
+    _ = x
+    _ = y
+  }
 
-  func bar(var x: String, var y: Int64) {}
+  func bar(x: String, y: Int64) {
+    var x = x
+    var y = y
+    _ = x
+    _ = y
+  }
 
   init() {}
 }

@@ -348,7 +348,7 @@ extension TestSuite {
     Collection.SubSequence.SubSequence == Collection.SubSequence,
     CollectionWithEquatableElement.Generator.Element : Equatable
   >(
-    var testNamePrefix: String = "",
+    testNamePrefix: String = "",
     makeCollection: ([Collection.Generator.Element]) -> Collection,
     wrapValue: (OpaqueValue<Int>) -> Collection.Generator.Element,
     extractValue: (Collection.Generator.Element) -> OpaqueValue<Int>,
@@ -361,6 +361,8 @@ extension TestSuite {
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1
   ) {
+
+    var testNamePrefix = testNamePrefix
 
     if checksAdded.value.contains(__FUNCTION__) {
       return
@@ -1108,7 +1110,7 @@ self.test("\(testNamePrefix).OperatorPlus") {
     CollectionWithEquatableElement.Index : BidirectionalIndexType,
     CollectionWithEquatableElement.Generator.Element : Equatable
   >(
-    var testNamePrefix: String = "",
+    testNamePrefix: String = "",
     makeCollection: ([Collection.Generator.Element]) -> Collection,
     wrapValue: (OpaqueValue<Int>) -> Collection.Generator.Element,
     extractValue: (Collection.Generator.Element) -> OpaqueValue<Int>,
@@ -1121,6 +1123,8 @@ self.test("\(testNamePrefix).OperatorPlus") {
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1
   ) {
+
+    var testNamePrefix = testNamePrefix
 
     if checksAdded.value.contains(__FUNCTION__) {
       return
@@ -1233,7 +1237,7 @@ self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/remove
     CollectionWithEquatableElement.Index : RandomAccessIndexType,
     CollectionWithEquatableElement.Generator.Element : Equatable
   >(
-    var testNamePrefix: String = "",
+    testNamePrefix: String = "",
     makeCollection: ([Collection.Generator.Element]) -> Collection,
     wrapValue: (OpaqueValue<Int>) -> Collection.Generator.Element,
     extractValue: (Collection.Generator.Element) -> OpaqueValue<Int>,
@@ -1246,6 +1250,8 @@ self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/remove
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1
   ) {
+
+    var testNamePrefix = testNamePrefix
 
     if checksAdded.value.contains(__FUNCTION__) {
       return

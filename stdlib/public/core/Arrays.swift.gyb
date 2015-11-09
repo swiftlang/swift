@@ -484,8 +484,9 @@ public func _allocateUninitializedArray<Element>(_count: Builtin.Word)
 @warn_unused_result
 @_semantics("array.dealloc_uninitialized")
 public func _deallocateUninitialized${Self}<Element>(
-  var array: ${Self}<Element>
+  array: ${Self}<Element>
 ) {
+  var array = array
   array._deallocateUninitialized()
 }
 %end

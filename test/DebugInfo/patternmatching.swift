@@ -6,8 +6,9 @@
 func markUsed<T>(t: T) {}
 
 func classifyPoint2(p: (Double, Double)) {
-    func return_same (var input : Double) -> Double
+    func return_same (input : Double) -> Double
     {
+        var input = input
         return input; // return_same gets called in both where statements
     }
 

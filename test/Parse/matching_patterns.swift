@@ -32,11 +32,9 @@ case let (let b): // expected-error {{'let' cannot appear nested inside another 
   print(b)
 
 // 'var' patterns (not allowed)
-// FIXME: rdar://problem/23378003
-// This will eventually be an error.
-case var a: // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{6-9=let}}
+case var a: // expected-error {{Use of 'var' binding here is not allowed}} {{6-9=let}}
   a += 1
-case var let a: // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{6-9=let}}
+case var let a: // expected-error {{Use of 'var' binding here is not allowed}} {{6-9=let}}
   // expected-error@-1 {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
   print(a, terminator: "")
 

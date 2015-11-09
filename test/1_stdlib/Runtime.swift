@@ -2249,7 +2249,8 @@ Reflection.test("NSObject is properly CustomDebugStringConvertible") {
 
 var BitTwiddlingTestSuite = TestSuite("BitTwiddling")
 
-func computeCountLeadingZeroes(var x: Int64) -> Int64 {
+func computeCountLeadingZeroes(x: Int64) -> Int64 {
+  var x = x
   var r: Int64 = 64
   while x != 0 {
     x >>= 1

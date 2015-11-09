@@ -24,10 +24,11 @@ typealias MyFloat = Float
 // PROMO-CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "_TtRVs5Int64"
 func modifyFooHeap(inout a: Int64,
 // CHECK-DAG: ![[A]] = !DILocalVariable(name: "a", arg: 1{{.*}} line: [[@LINE-1]],{{.*}} type: !"_TtRVs5Int64"
-// CHECK-DAG: ![[B]] = !DILocalVariable(name: "b", arg: 2{{.*}} line: [[@LINE+2]],{{.*}} type: ![[MYFLOAT:[0-9]+]]
+// CHECK-DAG: ![[B]] = !DILocalVariable(name: "b", scope:{{.*}} line: [[@LINE+4]],{{.*}} type: ![[MYFLOAT:[0-9]+]]
 // CHECK-DAG: ![[MYFLOAT]] = !DIDerivedType(tag: DW_TAG_typedef, name: "_Tta5inout7MyFloat",{{.*}} baseType: !"_TtSf"
-                   var _ b: MyFloat)
+                   _ b: MyFloat)
 {
+    var b = b
     if (b > 2.71) {
       a = a + 12// Set breakpoint here
     }
@@ -41,11 +42,12 @@ func modifyFooHeap(inout a: Int64,
 // FOO-CHECK: call void @llvm.dbg.declare(metadata %Vs5Int64** %{{.*}}, metadata ![[U:[0-9]+]], metadata ![[EMPTY_EXPR:.*]])
 // FOO-CHECK-DAG: ![[EMPTY_EXPR]] = !DIExpression()
 func modifyFoo(inout u: Int64,
-// FOO-CHECK-DAG: !DILocalVariable(name: "v", arg: 2{{.*}} line: [[@LINE+2]],{{.*}} type: ![[MYFLOAT:[0-9]+]]
+// FOO-CHECK-DAG: !DILocalVariable(name: "v", scope:{{.*}} line: [[@LINE+5]],{{.*}} type: ![[MYFLOAT:[0-9]+]]
 // FOO-CHECK-DAG: [[U]] = !DILocalVariable(name: "u", arg: 1{{.*}} line: [[@LINE-2]],{{.*}} type: !"_TtRVs5Int64"
-               var _ v: MyFloat)
+               _ v: MyFloat)
 // FOO-CHECK-DAG: ![[MYFLOAT]] = !DIDerivedType(tag: DW_TAG_typedef, name: "_Tta5inout7MyFloat",{{.*}} baseType: !"_TtSf"
 {
+    var v = v
     if (v > 2.71) {
       u = u - 41
     }

@@ -833,7 +833,8 @@ func testInsideFunctionCall8(var x: FooStruct) {
 // Since we already have '()', there is no pattern to complete.
 // INSIDE_FUNCTION_CALL_8-NOT: Pattern/{{.*}}:
 }
-func testInsideFunctionCall9(var x: FooStruct) {
+func testInsideFunctionCall9(x: FooStruct) {
+  var x = x
   x.instanceFunc1(#^INSIDE_FUNCTION_CALL_9^#)
 // Annotated ')'
 // INSIDE_FUNCTION_CALL_9: Begin completions
@@ -841,7 +842,8 @@ func testInsideFunctionCall9(var x: FooStruct) {
 // INSIDE_FUNCTION_CALL_9-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{; name=.+$}}
 // INSIDE_FUNCTION_CALL_9: End completions
 }
-func testInsideFunctionCall10(var x: FooStruct) {
+func testInsideFunctionCall10(x: FooStruct) {
+  var x = x
   x.instanceFunc2(#^INSIDE_FUNCTION_CALL_10^#)
 // Annotated ')'
 // INSIDE_FUNCTION_CALL_10: Begin completions
@@ -849,11 +851,13 @@ func testInsideFunctionCall10(var x: FooStruct) {
 // INSIDE_FUNCTION_CALL_10-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{; name=.+$}}
 // INSIDE_FUNCTION_CALL_10: End completions
 }
-func testInsideFunctionCall11(var x: FooStruct) {
+func testInsideFunctionCall11(x: FooStruct) {
+  var x = x
   x.instanceFunc2(#^INSIDE_FUNCTION_CALL_11^#,
 // INSIDE_FUNCTION_CALL_11-NOT: Pattern/{{.*}}:{{.*}}({{.*}}{#Int#}
 }
-func testInsideFunctionCall12(var x: FooStruct) {
+func testInsideFunctionCall12(x: FooStruct) {
+  var x = x
   x.instanceFunc2(#^INSIDE_FUNCTION_CALL_12^#<#placeholder#>
 // INSIDE_FUNCTION_CALL_12-NOT: Pattern/{{.*}}:{{.*}}({{.*}}{#Int#}
 }
@@ -1180,7 +1184,8 @@ func testFuncParenPattern2(fpp: FuncParenPattern) {
 // FUNC_PAREN_PATTERN_2-NEXT: End completions
 }
 
-func testFuncParenPattern3(var fpp: FuncParenPattern) {
+func testFuncParenPattern3(fpp: FuncParenPattern) {
+  var fpp = fpp
   fpp.instanceFunc#^FUNC_PAREN_PATTERN_3^#
 // FUNC_PAREN_PATTERN_3: Begin completions
 // FUNC_PAREN_PATTERN_3-NEXT: Pattern/ExprSpecific: ({#Int#})[#Void#]{{; name=.+$}}

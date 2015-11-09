@@ -45,14 +45,16 @@ func inOutFunc(inout f: (Int -> Int)) { }
 // CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTR
 // CHECK:         [[F_ORIG:%.*]] = partial_apply [[REABSTRACT_FN]]([[F_SUBST_OUT]])
 // CHECK:         assign [[F_ORIG]] to [[F_ADDR]]
-func inOutF(var x: Foo<Int, Int>) {
+func inOutF(x: Foo<Int, Int>) {
+  var x = x
   inOutFunc(&x.f)
 }
 
 // Don't produce a writeback for generic lvalues when there's no real
 // abstraction difference. <rdar://problem/16530674>
 // CHECK-LABEL: sil hidden @_TF20property_abstraction23noAbstractionDifference
-func noAbstractionDifference(var x: Foo<Int, Int>) {
+func noAbstractionDifference(x: Foo<Int, Int>) {
+  var x = x
   // CHECK: [[ADDR:%.*]] = struct_element_addr {{%.*}}, #Foo.g
   // CHECK: apply {{%.*}}([[ADDR]])
   x.g.foo()

@@ -6,13 +6,16 @@ struct A {
   var fn : () -> ()
 }
 
-func test(var x : A) {}
+func test(x : A) {
+  var vx = x
+}
 // CHECK:    define hidden void @_TF7structs4test
-// CHECK:      [[X:%.*]] = alloca [[A:%.*]], align {{(4|8)}}
-// CHECK-NEXT: call void @llvm.dbg.declare(metadata [[A]]* [[X]],
-// CHECK-SAME:                             metadata [[X_DBG:!.*]], metadata
+// CHECK: [[VX:%.*]] = alloca
+// CHECK: [[X_DBG:%.*]] = alloca
+// CHECK: call void @llvm.dbg.declare(metadata {{.*}}* [[X_DBG]], metadata [[X_MD:!.*]], metadata
 // CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "A"
 // CHECK-SAME:             identifier: [[A_DI:"[^"]+"]]
+
 
 class C {
   var lots_of_extra_storage: (Int, Int, Int) = (1, 2, 3)
@@ -26,5 +29,5 @@ struct B {
   var c : C
 }
 
-// CHECK: [[X_DBG]] = !DILocalVariable(name: "x", arg: 1
+// CHECK: [[X_MD]] = !DILocalVariable(name: "x", arg: 1
 // CHECK-SAME:                         type: ![[A_DI]]

@@ -226,7 +226,9 @@ public struct UTF8 : UnicodeCodecType {
   @inline(never)
   @warn_unused_result
   static func _findMaximalSubpartOfIllFormedUTF8Sequence(
-      var buffer: UInt32, var validBytes: UInt8) -> UInt8 {
+      buffer: UInt32, validBytes: UInt8) -> UInt8 {
+    var buffer = buffer
+    var validBytes = validBytes
     // This function is '@inline(never)' because it is used only in the error
     // handling path.
 
@@ -691,9 +693,11 @@ public func transcode<
   OutputEncoding : UnicodeCodecType
   where InputEncoding.CodeUnit == Input.Element>(
   inputEncoding: InputEncoding.Type, _ outputEncoding: OutputEncoding.Type,
-  var _ input: Input, _ output: (OutputEncoding.CodeUnit) -> Void,
+  _ input: Input, _ output: (OutputEncoding.CodeUnit) -> Void,
   stopOnError: Bool
 ) -> Bool {
+
+  var input = input
 
   // NB.  It is not possible to optimize this routine to a memcpy if
   // InputEncoding == OutputEncoding.  The reason is that memcpy will not
@@ -924,8 +928,9 @@ extension UTF16 {
       Encoding : UnicodeCodecType, Input : GeneratorType
       where Encoding.CodeUnit == Input.Element
   >(
-    _: Encoding.Type, var input: Input, repairIllFormedSequences: Bool
+    _: Encoding.Type, input: Input, repairIllFormedSequences: Bool
   ) -> (Int, Bool)? {
+    var input = input
     var count = 0
     var isAscii = true
 

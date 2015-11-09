@@ -445,7 +445,8 @@ public func +<
     C : RangeReplaceableCollectionType,
     S : SequenceType
     where S.Generator.Element == C.Generator.Element
->(var lhs: C, rhs: S) -> C {
+>(lhs: C, rhs: S) -> C {
+  var lhs = lhs
   // FIXME: what if lhs is a reference type?  This will mutate it.
   lhs.appendContentsOf(rhs)
   return lhs
@@ -469,7 +470,8 @@ public func +<
     C : RangeReplaceableCollectionType,
     S : CollectionType
     where S.Generator.Element == C.Generator.Element
->(var lhs: C, rhs: S) -> C {
+>(lhs: C, rhs: S) -> C {
+  var lhs = lhs
   // FIXME: what if lhs is a reference type?  This will mutate it.
   lhs.reserveCapacity(lhs.count + numericCast(rhs.count))
   lhs.appendContentsOf(rhs)
@@ -481,7 +483,8 @@ public func +<
     RRC1 : RangeReplaceableCollectionType,
     RRC2 : RangeReplaceableCollectionType 
     where RRC1.Generator.Element == RRC2.Generator.Element
->(var lhs: RRC1, rhs: RRC2) -> RRC1 {
+>(lhs: RRC1, rhs: RRC2) -> RRC1 {
+  var lhs = lhs
   // FIXME: what if lhs is a reference type?  This will mutate it.
   lhs.reserveCapacity(lhs.count + numericCast(rhs.count))
   lhs.appendContentsOf(rhs)

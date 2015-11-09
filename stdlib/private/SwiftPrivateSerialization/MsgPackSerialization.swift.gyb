@@ -17,7 +17,8 @@
 public struct MsgPackSerializer {
   public static func serialize<
     T : SerializableFixedDictionaryType
-  >(var value: T) -> [UInt8] {
+  >(value: T) -> [UInt8] {
+    var value = value
     // FIXME(performance): we could serialize directly into a byte stream
     // without creating an intermediate data structure if our MsgPack
     // serializer could accept arrays and dictionaries of unknown length and
@@ -76,7 +77,8 @@ internal func _toMsgPackVariant<
   }
 %   end
   return .Array(MsgPackVariantArray(value.map {
-    (var element) -> MsgPackVariant in
+    element -> MsgPackVariant in
+    var element = element
     var serializerImpl = _MsgPackSerializerImpl()
     element.serializeDeserialize(&serializerImpl)
     return serializerImpl._value!

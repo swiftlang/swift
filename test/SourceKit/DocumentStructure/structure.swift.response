@@ -989,66 +989,6 @@
       key.severity: source.diagnostic.severity.error,
       key.description: "getter/setter can only be defined for a single variable",
       key.diagnostic_stage: source.diagnostic.stage.swift.parse
-    },
-    {
-      key.line: 77,
-      key.column: 7,
-      key.filepath: main.swift,
-      key.severity: source.diagnostic.severity.warning,
-      key.description: "Use of 'var' binding here is deprecated and will be removed in a future version of Swift",
-      key.diagnostic_stage: source.diagnostic.stage.swift.parse,
-      key.fixits: [
-        {
-          key.offset: 1127,
-          key.length: 3,
-          key.sourcetext: "let"
-        }
-      ]
-    },
-    {
-      key.line: 77,
-      key.column: 7,
-      key.filepath: main.swift,
-      key.severity: source.diagnostic.severity.warning,
-      key.description: "Use of 'var' binding here is deprecated and will be removed in a future version of Swift",
-      key.diagnostic_stage: source.diagnostic.stage.swift.parse,
-      key.fixits: [
-        {
-          key.offset: 1127,
-          key.length: 3,
-          key.sourcetext: "let"
-        }
-      ]
-    },
-    {
-      key.line: 79,
-      key.column: 4,
-      key.filepath: main.swift,
-      key.severity: source.diagnostic.severity.warning,
-      key.description: "Use of 'var' binding here is deprecated and will be removed in a future version of Swift",
-      key.diagnostic_stage: source.diagnostic.stage.swift.parse,
-      key.fixits: [
-        {
-          key.offset: 1185,
-          key.length: 3,
-          key.sourcetext: "let"
-        }
-      ]
-    },
-    {
-      key.line: 79,
-      key.column: 4,
-      key.filepath: main.swift,
-      key.severity: source.diagnostic.severity.warning,
-      key.description: "Use of 'var' binding here is deprecated and will be removed in a future version of Swift",
-      key.diagnostic_stage: source.diagnostic.stage.swift.parse,
-      key.fixits: [
-        {
-          key.offset: 1185,
-          key.length: 3,
-          key.sourcetext: "let"
-        }
-      ]
     }
   ]
 }

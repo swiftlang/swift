@@ -191,8 +191,9 @@ public struct _StringBuffer {
   ///   to extend.
   /// - parameter newUsedCount: The desired size of the substring.
   mutating func grow(
-    subRange: Range<UnsafePointer<RawByte>>, var newUsedCount: Int
+    subRange: Range<UnsafePointer<RawByte>>, newUsedCount: Int
   ) -> Bool {
+    var newUsedCount = newUsedCount
     // The substring to be grown could be pointing in the middle of this
     // _StringBuffer.  Adjust the size so that it covers the imaginary
     // substring from the start of the buffer to `oldUsedEnd`.

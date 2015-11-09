@@ -147,7 +147,8 @@ public protocol ArithmeticType {
 % for x in binaryArithmetic:
 @transparent
 @warn_unused_result
-public func ${x.operator} <T: ArithmeticType>(var lhs: T, rhs: T) -> T {
+public func ${x.operator} <T: ArithmeticType>(lhs: T, rhs: T) -> T {
+  var lhs = lhs
   lhs.${x.name}InPlace(rhs)
   return lhs
 }
@@ -515,7 +516,8 @@ extension FixedWidthIntegerType {
   }
 
   @transparent
-  public func word(var n: Word) -> Word {
+  public func word(n: Word) -> Word {
+    var n = n
     _precondition(n >= 0, "Negative word index")
     var x = self
     while n > 0 {

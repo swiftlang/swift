@@ -63,13 +63,13 @@ func ifexpr_rval() -> Int {
 }
 
 // TODO: missing info on the first branch.
-func forstmt_empty_cond(var i: Int) -> Int {
-  for i=0;;++i {}
+func forstmt_empty_cond(i: Int) -> Int {
+  for var i=0;;++i {}
     // CHECK-LABEL: sil hidden  @{{.*}}forstmt_empty_cond{{.*}}
-    // CHECK: apply {{.*}} line:[[@LINE-2]]:9
+    // CHECK: apply {{.*}} line:[[@LINE-2]]:13
     // CHECK: br [[TRUE_BB:bb[0-9]+]]
     // CHECK: [[TRUE_BB:bb[0-9]+]]:
-    // CHECK: br [[TRUE_BB:bb[0-9]+]] // {{.*}} line:[[@LINE-5]]:17
+    // CHECK: br [[TRUE_BB:bb[0-9]+]] // {{.*}} line:[[@LINE-5]]:21
 }
 
 // --- Test function calls.

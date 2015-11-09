@@ -27,7 +27,8 @@ func _blackHolePtr<T>(x: UnsafePointer<T>) {
   _stdlib_getPointer(COpaquePointer(x))
 }
 
-public func _blackHole<T>(var x: T) {
+public func _blackHole<T>(x: T) {
+  var x = x
   _blackHolePtr(&x)
 }
 

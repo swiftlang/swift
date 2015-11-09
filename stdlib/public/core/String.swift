@@ -499,7 +499,8 @@ extension String : Hashable {
 @warn_unused_result
 @effects(readonly)
 @_semantics("string.concat")
-public func + (var lhs: String, rhs: String) -> String {
+public func + (lhs: String, rhs: String) -> String {
+  var lhs = lhs
   if (lhs.isEmpty) {
     return rhs
   }

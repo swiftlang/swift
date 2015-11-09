@@ -152,7 +152,7 @@ final class C2:C {
 // CHECK-NOT: class_method
 // CHECK-NOT: function_ref
 // CHECK: return
-func driver1(let c: C1) -> Int32 {
+func driver1(c: C1) -> Int32 {
   return c.doSomething().getValue()
 }
 
@@ -166,7 +166,7 @@ func driver1(let c: C1) -> Int32 {
 // CHECK: enum $Optional
 // CHECK-NEXT: upcast
 // CHECK: return
-func driver3(let c: C) -> Int32 {
+func driver3(c: C) -> Int32 {
   return c.doSomething()!.getValue()
 }
 

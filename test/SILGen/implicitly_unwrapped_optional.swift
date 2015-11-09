@@ -1,11 +1,13 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
-func foo(var f f: (()->())!) {
+func foo(f f: (()->())!) {
+  var f = f
   f?()
 }
 // CHECK:    sil hidden @{{.*}}foo{{.*}} : $@convention(thin) (@owned ImplicitlyUnwrappedOptional<() -> ()>) -> () {
 // CHECK:    bb0([[T0:%.*]] : $ImplicitlyUnwrappedOptional<() -> ()>):
-// CHECK-NEXT: [[F:%.*]] = alloc_box $ImplicitlyUnwrappedOptional<() -> ()>
+// CHECK: [[F:%.*]] = alloc_box $ImplicitlyUnwrappedOptional<() -> ()>
+// CHECK-NEXT: retain_value %0
 // CHECK-NEXT: store [[T0]] to [[F]]#1
 // CHECK:      [[T1:%.*]] = select_enum_addr [[F]]#1
 // CHECK-NEXT: cond_br [[T1]], bb1, bb3

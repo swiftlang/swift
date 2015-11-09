@@ -83,8 +83,9 @@ public func date() {
 }
 
 // Make sure we build some witness tables for enums.
-func useOptions(var opt: NSURLBookmarkCreationOptions)
+func useOptions(opt: NSURLBookmarkCreationOptions)
        -> NSURLBookmarkCreationOptions {
+  var opt = opt
   return [opt, opt]
 }
 

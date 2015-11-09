@@ -25,10 +25,12 @@ func higher_order_function2(f: (Int, Int) -> Int, _ x: Int, _ y: Int) -> Int {
 
 // -- Entry point BBs correspond to curried arguments in left-to-right order.
 // CHECK-LABEL: sil hidden @_TF9functions16curried_function{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
-func curried_function(var x: Int)(var y: Int) -> Int {
+func curried_function(x: Int)(y: Int) -> Int {
+  var x = x
+  var y = y
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
-  // CHECK: [[YADDR:%[0-9]+]] = alloc_box $Builtin.Int64
   // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Builtin.Int64
+  // CHECK: [[YADDR:%[0-9]+]] = alloc_box $Builtin.Int64
 
   return standalone_function(x, y)
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF9functions19standalone_function{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
@@ -44,7 +46,9 @@ func generic_curried_function<T, U>(x: T)(y: U) { }
 
 // -- Curried function that returns a function uncurries to the right "natural" level
 // CHECK-LABEL: sil hidden @_TF9functions33curried_function_returns_function{{.*}} :  $@convention(thin) (Builtin.Int64, Builtin.Int64) -> @owned @callee_owned (Builtin.Int64) -> Builtin.Int64
-func curried_function_returns_function(var x:Int)(var y:Int) -> (z:Int) -> Int {
+func curried_function_returns_function(x: Int)(y: Int) -> (z:Int) -> Int {
+  var x = x
+  var y = y
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
   return { z in standalone_function(standalone_function(x, y), z) }
 }
@@ -139,7 +143,10 @@ class SomeGeneric<T> {
 }
 
 // CHECK-LABEL: sil hidden @_TF9functions5calls{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, Builtin.Int64) -> ()
-func calls(var i:Int, var j:Int, var k:Int) {
+func calls(i: Int, j: Int, k: Int) {
+  var i = i
+  var j = j
+  var k = k
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
   // CHECK: [[IADDR:%[0-9]+]] = alloc_box $Builtin.Int64
   // CHECK: [[JADDR:%[0-9]+]] = alloc_box $Builtin.Int64

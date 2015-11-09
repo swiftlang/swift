@@ -127,8 +127,9 @@ extension String.CharacterView : CollectionType {
     /// code units.
     @warn_unused_result
     internal static func _measureExtendedGraphemeClusterForward(
-        var start: UnicodeScalarView.Index
+        start: UnicodeScalarView.Index
     ) -> Int {
+      var start = start
       let end = start._viewEndIndex
       if start == end {
         return 0

@@ -79,7 +79,7 @@ extension TestSuite {
     CollectionWithEquatableElement.Generator.Element : Equatable,
     CollectionWithComparableElement.Generator.Element : Comparable
   >(
-    var testNamePrefix: String = "",
+    testNamePrefix: String = "",
     makeCollection: ([Collection.Generator.Element]) -> Collection,
     wrapValue: (OpaqueValue<Int>) -> Collection.Generator.Element,
     extractValue: (Collection.Generator.Element) -> OpaqueValue<Int>,
@@ -98,6 +98,8 @@ extension TestSuite {
     outOfBoundsSubscriptOffset: Int = 1,
     withUnsafeMutableBufferPointerIsSupported: Bool
   ) {
+
+    var testNamePrefix = testNamePrefix
 
     if checksAdded.value.contains(__FUNCTION__) {
       return
@@ -383,7 +385,7 @@ self.test("\(testNamePrefix).sort/${'Predicate' if predicate else 'WhereElementI
     CollectionWithComparableElement.Index : BidirectionalIndexType,
     CollectionWithComparableElement.Generator.Element : Comparable
   >(
-    var testNamePrefix: String = "",
+    testNamePrefix: String = "",
     makeCollection: ([Collection.Generator.Element]) -> Collection,
     wrapValue: (OpaqueValue<Int>) -> Collection.Generator.Element,
     extractValue: (Collection.Generator.Element) -> OpaqueValue<Int>,
@@ -402,6 +404,8 @@ self.test("\(testNamePrefix).sort/${'Predicate' if predicate else 'WhereElementI
     outOfBoundsSubscriptOffset: Int = 1,
     withUnsafeMutableBufferPointerIsSupported: Bool
   ) {
+
+    var testNamePrefix = testNamePrefix
 
     if checksAdded.value.contains(__FUNCTION__) {
       return
@@ -500,7 +504,7 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
     CollectionWithComparableElement.Index : RandomAccessIndexType,
     CollectionWithComparableElement.Generator.Element : Comparable
   >(
-    var testNamePrefix: String = "",
+    testNamePrefix: String = "",
     makeCollection: ([Collection.Generator.Element]) -> Collection,
     wrapValue: (OpaqueValue<Int>) -> Collection.Generator.Element,
     extractValue: (Collection.Generator.Element) -> OpaqueValue<Int>,
@@ -519,6 +523,8 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
     outOfBoundsSubscriptOffset: Int = 1,
     withUnsafeMutableBufferPointerIsSupported: Bool
   ) {
+
+    var testNamePrefix = testNamePrefix
 
     if checksAdded.value.contains(__FUNCTION__) {
       return

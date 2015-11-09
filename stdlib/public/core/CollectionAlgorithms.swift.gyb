@@ -129,8 +129,9 @@ ${partitionDocComment}
 ${orderingRequirementForPredicate}
   public mutating func partition(
     range: Range<Index>,
-    var isOrderedBefore: (${GElement}, ${GElement}) -> Bool
+    isOrderedBefore: (${GElement}, ${GElement}) -> Bool
   ) -> Index {
+    var isOrderedBefore = isOrderedBefore
 
 %   else:
 
