@@ -226,7 +226,7 @@ public final class _NSContiguousString : _SwiftNativeNSString {
     buffer: UnsafeMutablePointer<UInt16>,
     range aRange: _SwiftNSRange) {
 
-    _precondition(aRange.location + aRange.length <= Int(_core.count))
+    _require(aRange.location + aRange.length <= Int(_core.count))
 
     if _core.elementWidth == 2 {
       UTF16._copy(

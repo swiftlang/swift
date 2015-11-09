@@ -184,7 +184,7 @@ struct _UIViewMirror : _Mirror {
   var count: Int { get { return 0 } }
   
   subscript(_: Int) -> (String, _Mirror) {
-    _preconditionFailure("_Mirror access out of bounds")
+    _requirementFailure("_Mirror access out of bounds")
   }
   
   var summary: String { get { return "" } }

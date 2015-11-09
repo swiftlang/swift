@@ -93,7 +93,7 @@ extension String.CharacterView : Collection {
     ///
     /// - Requires: The next value is representable.
     public func successor() -> Index {
-      _precondition(_base != _base._viewEndIndex, "can not increment endIndex")
+      _require(_base != _base._viewEndIndex, "can not increment endIndex")
       return Index(_base: _endBase)
     }
 
@@ -101,7 +101,7 @@ extension String.CharacterView : Collection {
     ///
     /// - Requires: The previous value is representable.
     public func predecessor() -> Index {
-      _precondition(_base != _base._viewStartIndex,
+      _require(_base != _base._viewStartIndex,
           "can not decrement startIndex")
       let predecessorLengthUTF16 =
           Index._measureExtendedGraphemeClusterBackward(_base)
@@ -254,7 +254,7 @@ extension String.CharacterView : Collection {
     var count: Int { return 0 }
 
     subscript(i: Int) -> (String, _Mirror) {
-      _preconditionFailure("_Mirror access out of bounds")
+      _requirementFailure("_Mirror access out of bounds")
     }
 
     var summary: String { return "\(_value._utf16Index)" }

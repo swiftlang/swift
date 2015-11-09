@@ -484,7 +484,7 @@ ${MirrorDecl} {
   subscript(i: Int) -> (String, _Mirror) {
     switch i {
     case 0: return ("pointerValue",_reflect(_getPointerValue()))
-    default: _preconditionFailure("cannot extract this child index")
+    default: _requirementFailure("cannot extract this child index")
     }
   }
 

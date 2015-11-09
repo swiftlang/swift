@@ -191,7 +191,7 @@ extension ForwardIndex {
   @_transparent
   @warn_unused_result
   internal func _advanceForward(n: Distance) -> Self {
-    _precondition(n >= 0,
+    _require(n >= 0,
         "Only BidirectionalIndex can be advanced by a negative amount")
     var p = self
     for var i: Distance = 0; i != n; ++i {
@@ -204,7 +204,7 @@ extension ForwardIndex {
   @_transparent
   @warn_unused_result
   internal func _advanceForward(n: Distance, _ limit: Self) -> Self {
-    _precondition(n >= 0,
+    _require(n >= 0,
         "Only BidirectionalIndex can be advanced by a negative amount")
     var p = self
     for var i: Distance = 0; i != n && p != limit; ++i {
@@ -338,10 +338,10 @@ public protocol RandomAccessIndex : BidirectionalIndex, Strideable,
 
 extension RandomAccessIndex {
   public static func _failEarlyRangeCheck(index: Self, bounds: Range<Self>) {
-    _precondition(
+    _require(
       bounds.startIndex <= index,
       "index is out of bounds: index designates a position before bounds.startIndex")
-    _precondition(
+    _require(
       index < bounds.endIndex,
       "index is out of bounds: index designates the bounds.endIndex position or a position after it")
   }
@@ -351,17 +351,17 @@ extension RandomAccessIndex {
   ) {
     let range = rangeStart..<rangeEnd
     let bounds = boundsStart..<boundsEnd
-    _precondition(
+    _require(
       bounds.startIndex <= range.startIndex,
       "range.startIndex is out of bounds: index designates a position before bounds.startIndex")
-    _precondition(
+    _require(
       bounds.startIndex <= range.endIndex,
       "range.endIndex is out of bounds: index designates a position before bounds.startIndex")
 
-    _precondition(
+    _require(
       range.startIndex <= bounds.endIndex,
       "range.startIndex is out of bounds: index designates a position after bounds.endIndex")
-    _precondition(
+    _require(
       range.endIndex <= bounds.endIndex,
       "range.startIndex is out of bounds: index designates a position after bounds.endIndex")
   }

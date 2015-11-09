@@ -89,9 +89,9 @@ public struct Character :
     // one-byte code points there, we simplify decoding by banning
     // starting a code point in the last byte, and assuming that its
     // high bit is 1.
-    _precondition(
+    _require(
       s._core.count != 0, "Can't form a Character from an empty String")
-    _precondition(
+    _require(
       s.startIndex.successor() == s.endIndex,
       "Can't form a Character from a String containing more than one extended grapheme cluster")
 

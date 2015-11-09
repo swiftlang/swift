@@ -111,7 +111,7 @@ func _getImplicitlyUnwrappedOptionalValue<Wrapped>(v: Wrapped!) -> Wrapped {
   case .Some(let x):
     return x
   case .None:
-    _preconditionFailure(
+    _requirementFailure(
       "unexpectedly found nil while unwrapping an Optional value")
   }
 }
@@ -141,7 +141,7 @@ extension ImplicitlyUnwrappedOptional : _ObjectiveCBridgeable {
   public func _bridgeToObjectiveC() -> AnyObject {
     switch self {
     case .None:
-      _preconditionFailure("attempt to bridge an implicitly unwrapped optional containing nil")
+      _requirementFailure("attempt to bridge an implicitly unwrapped optional containing nil")
 
     case .Some(let x):
       return Swift._bridgeToObjectiveC(x)!

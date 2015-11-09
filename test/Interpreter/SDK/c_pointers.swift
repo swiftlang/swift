@@ -86,7 +86,7 @@ autoreleasepool {
   do {
     let s = try NSString(contentsOfFile: "/hopefully/does/not/exist\u{1B}",
                          encoding: NSUTF8StringEncoding)
-    _preconditionFailure("file should not actually exist")
+    _requirementFailure("file should not actually exist")
   } catch {
     print(error._code) // CHECK-NEXT: 260
     hangCanary(error as NSError)
@@ -95,7 +95,7 @@ autoreleasepool {
 // The result error should have died with the autorelease pool
 // CHECK-NEXT: died
 class DumbString: NSString {
-  override func characterAtIndex(x: Int) -> unichar { _preconditionFailure("nope") }
+  override func characterAtIndex(x: Int) -> unichar { _requirementFailure("nope") }
   override var length: Int { return 0 }
 
   convenience init(contentsOfFile s: String, encoding: NSStringEncoding) throws {

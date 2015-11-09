@@ -38,7 +38,7 @@ ${getMirrorDecl("NSURL")} {
   var count: Int { get { return 0 } }
   
   subscript(_: Int) -> (String, _Mirror) {
-    _preconditionFailure("_Mirror access out of bounds")
+    _requirementFailure("_Mirror access out of bounds")
   }
   
   var summary: String { get { return _value.absoluteString } }
@@ -55,7 +55,7 @@ ${getMirrorDecl("NSRange")} {
     switch i {
     case 0: return ("location", _reflect(_value.location))
     case 1: return ("length", _reflect(_value.length))
-    default: _preconditionFailure("_Mirror access out of bounds")
+    default: _requirementFailure("_Mirror access out of bounds")
     }
   }
   
@@ -72,7 +72,7 @@ ${getMirrorDecl("NSDate")} {
   var count: Int { get { return 0 } }
   
   subscript(i: Int) -> (String, _Mirror) {
-    _preconditionFailure("_Mirror access out of bounds")
+    _requirementFailure("_Mirror access out of bounds")
   }
   
   var summary: String {
@@ -111,7 +111,7 @@ ${getMirrorDecl("NSSet","MembershipContainer")} {
   }
   
   subscript(i: Int) -> (String, _Mirror) {
-    _precondition(i >= 0 && i < count, "_Mirror access out of bounds")
+    _require(i >= 0 && i < count, "_Mirror access out of bounds")
     return ("[\(i)]", _reflect(_a[i]))
   }
   
@@ -126,7 +126,7 @@ ${getMirrorDecl("NSString")} {
   var count: Int { get { return 0 } }
   
   subscript(_: Int) -> (String, _Mirror) {
-    _preconditionFailure("_Mirror access out of bounds")
+    _requirementFailure("_Mirror access out of bounds")
   }
   
   var summary: String { get { return _value as String } }

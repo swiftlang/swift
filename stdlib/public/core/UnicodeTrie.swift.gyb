@@ -223,7 +223,7 @@ struct _UnicodeGraphemeClusterBreakPropertyTrie {
               (dataBlockIndex << ${BMPDataOffsetBits}) &+
               _getBMPDataOffset(codePoint)])
     } else {
-      _precondition(codePoint <= 0x10ffff)
+      _require(codePoint <= 0x10ffff)
       let secondLookupIndex = Int(_SuppLookup1[_getSuppFirstLevelIndex(codePoint)])
       let dataBlockIndex = Int(_SuppLookup2[
           (secondLookupIndex << ${SuppSecondLevelIndexBits}) &+

@@ -150,7 +150,7 @@ public func fatalError(
 /// an error message but just trap. In debug mode they print an error message
 /// and abort.
 @_transparent
-public func _precondition(
+public func _require(
   @autoclosure condition: () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UInt = __LINE__
 ) {
@@ -166,11 +166,11 @@ public func _precondition(
 }
 
 @_transparent @noreturn
-public func _preconditionFailure(
+public func _requirementFailure(
   message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UInt = __LINE__) {
 
-  _precondition(false, message, file:file, line: line)
+  _require(false, message, file:file, line: line)
 
   _conditionallyUnreachable()
 }
@@ -220,7 +220,7 @@ public func _debugPreconditionFailure(
   message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UInt = __LINE__) {
   if _isDebugAssertConfiguration() {
-    _precondition(false, message, file: file, line: line)
+    _require(false, message, file: file, line: line)
   }
   _conditionallyUnreachable()
 }

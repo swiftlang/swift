@@ -58,7 +58,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
   @objc internal func objectAtIndex(index: Int) -> AnyObject {
     return withUnsafeBufferOfObjects {
       objects in
-      _precondition(
+      _require(
         _isValidArraySubscript(index, objects.count),
         "Array index out of range")
       return objects[index]
@@ -70,11 +70,11 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
   ) {
     return withUnsafeBufferOfObjects {
       objects in
-      _precondition(
+      _require(
         _isValidArrayIndex(range.location, objects.count),
         "Array index out of range")
 
-      _precondition(
+      _require(
         _isValidArrayIndex(
           range.location + range.length, objects.count),
         "Array index out of range")

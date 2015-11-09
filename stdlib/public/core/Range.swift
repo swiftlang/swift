@@ -175,7 +175,7 @@ public func ... <Pos : ForwardIndex> (
 public func ..< <Pos : ForwardIndex where Pos : Comparable> (
   start: Pos, end: Pos
 ) -> Range<Pos> {
-  _precondition(start <= end, "Can't form Range with end < start")
+  _require(start <= end, "Can't form Range with end < start")
   return Range(start: start, end: end)
 }
 
@@ -186,8 +186,8 @@ public func ..< <Pos : ForwardIndex where Pos : Comparable> (
 public func ... <Pos : ForwardIndex where Pos : Comparable> (
   start: Pos, end: Pos
 ) -> Range<Pos> {
-  _precondition(start <= end, "Can't form Range with end < start")
-  _precondition(end.successor() > end, "Range end index has no valid successor")
+  _require(start <= end, "Can't form Range with end < start")
+  _require(end.successor() > end, "Range end index has no valid successor")
   return Range(start: start, end: end.successor())
 }
 

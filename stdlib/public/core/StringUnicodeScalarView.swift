@@ -307,7 +307,7 @@ extension String.UnicodeScalarIndex {
 
     if utf16Index != utf16.startIndex
     && utf16Index != utf16.endIndex {
-      _precondition(
+      _require(
         utf16Index >= utf16.startIndex
         && utf16Index <= utf16.endIndex,
         "Invalid String.UTF16Index for this UnicodeScalar view")
@@ -335,7 +335,7 @@ extension String.UnicodeScalarIndex {
   ) {
     let core = unicodeScalars._core
 
-    _precondition(
+    _require(
       utf8Index._coreIndex >= 0 && utf8Index._coreIndex <= core.endIndex,
       "Invalid String.UTF8Index for this UnicodeScalar view")
 

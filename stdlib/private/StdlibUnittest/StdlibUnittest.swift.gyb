@@ -820,7 +820,7 @@ public func runAllTests() {
 public class TestSuite {
   public init(_ name: String) {
     self.name = name
-    _precondition(
+    _require(
       _testNameToIndex[name] == nil,
       "test suite with the same name already exists")
     _allTestSuites.append(self)
@@ -843,12 +843,12 @@ public class TestSuite {
   }
 
   public func setUp(code: () -> Void) {
-    _precondition(_testSetUpCode == nil, "set-up code already set")
+    _require(_testSetUpCode == nil, "set-up code already set")
     _testSetUpCode = code
   }
 
   public func tearDown(code: () -> Void) {
-    _precondition(_testTearDownCode == nil, "tear-down code already set")
+    _require(_testTearDownCode == nil, "tear-down code already set")
     _testTearDownCode = code
   }
 

@@ -104,7 +104,7 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
 @_transparent
 @warn_unused_result
 public func unsafeBitCast<T, U>(x: T, _: U.Type) -> U {
-  _precondition(sizeof(T.self) == sizeof(U.self),
+  _require(sizeof(T.self) == sizeof(U.self),
     "can't unsafeBitCast between types of different sizes")
   return Builtin.reinterpretCast(x)
 }

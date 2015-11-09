@@ -100,7 +100,7 @@ public struct ${vectype} :
   ///
   /// - Precondition: `array` must have exactly ${cardinal[size]} elements.
   public init(_ array: [${type}]) {
-  _precondition(array.count == ${size},
+  _require(array.count == ${size},
                 "${vectype} requires a ${cardinal[size]}-element array")
     self.init(${', '.join(map(lambda i:
               'array[' + str(i) + ']',
@@ -116,16 +116,16 @@ public struct ${vectype} :
   public subscript(index: Int) -> ${type} {
     @_transparent
     get {
-      _precondition(index >= 0, "vector index out of range")
-      _precondition(index < ${size}, "vector index out of range")
+      _require(index >= 0, "vector index out of range")
+      _require(index < ${size}, "vector index out of range")
       let elt = Builtin.${extractelement}(_vector,
         Int32(index)._value)
       return ${type}(_bits: elt)
     }
     @_transparent
     set(value) {
-      _precondition(index >= 0, "vector index out of range")
-      _precondition(index < ${size}, "vector index out of range")
+      _require(index >= 0, "vector index out of range")
+      _require(index < ${size}, "vector index out of range")
       _vector = Builtin.${insertelement}(_vector,
         value._value,
         Int32(index)._value)
@@ -720,7 +720,7 @@ public struct ${mattype} : CustomDebugStringConvertible {
 
   /// Initialize matrix to have specified `columns`.
   public init(_ columns: [${coltype}]) {
-    _precondition(columns.count == ${cols}, "Requires array of ${cols} vectors")
+    _require(columns.count == ${cols}, "Requires array of ${cols} vectors")
 %   for i in range(cols):
     self._columns.${i} = columns[${i}]
 %   end
@@ -728,7 +728,7 @@ public struct ${mattype} : CustomDebugStringConvertible {
 
   /// Initialize matrix to have specified `rows`.
   public init(rows: [${rowtype}]) {
-    _precondition(rows.count == ${rows}, "Requires array of ${rows} vectors")
+    _require(rows.count == ${rows}, "Requires array of ${rows} vectors")
 %   for i in range(cols):
       self._columns.${i} = [${', '.join(map(lambda j:
                             'rows[' + str(j) + '].' + component[i],
@@ -762,7 +762,7 @@ public struct ${mattype} : CustomDebugStringConvertible {
 % for i in range(cols):
       case ${i}: return _columns.${i}
 % end
-      default: _preconditionFailure("Column index out of range")
+      default: _requirementFailure("Column index out of range")
       }
     }
     set (value) {
@@ -770,7 +770,7 @@ public struct ${mattype} : CustomDebugStringConvertible {
 % for i in range(cols):
       case ${i}: _columns.${i} = value
 % end
-      default: _preconditionFailure("Column index out of range")
+      default: _requirementFailure("Column index out of range")
       }
     }
   }

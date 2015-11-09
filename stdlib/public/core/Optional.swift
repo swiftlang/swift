@@ -84,7 +84,7 @@ func _doesOptionalHaveValueAsBool<Wrapped>(v: Wrapped?) -> Bool {
 @_transparent
 public // COMPILER_INTRINSIC
 func _diagnoseUnexpectedNilOptional() {
-  _preconditionFailure(
+  _requirementFailure(
                 "unexpectedly found nil while unwrapping an Optional value")
 }
 
@@ -95,7 +95,7 @@ func _getOptionalValue<Wrapped>(v: Wrapped?) -> Wrapped {
   case let x?:
     return x
   case .None:
-    _preconditionFailure(
+    _requirementFailure(
       "unexpectedly found nil while unwrapping an Optional value")
   }
 }
@@ -209,7 +209,7 @@ internal struct _OptionalMirror<Wrapped> : _Mirror {
   subscript(i: Int) -> (String, _Mirror) {
     switch (_value, i) {
     case (.Some(let contents), 0) : return ("Some", _reflect(contents))
-    default: _preconditionFailure("cannot extract this child index")
+    default: _requirementFailure("cannot extract this child index")
     }
   }
 

@@ -32,7 +32,7 @@ func testTrapsAreNoreturn(i: Int) -> Int {
   case 2:
     requirementFailure("can not happen")
   case 3:
-    _preconditionFailure("can not happen")
+    _requirementFailure("can not happen")
   case 4:
     _debugPreconditionFailure("can not happen")
   case 5:
@@ -154,26 +154,26 @@ Assert.test("fatalError/StringInterpolation")
   fatalError("this \(should) fail")
 }
 
-Assert.test("_precondition")
+Assert.test("_require")
   .xfail(.Custom(
     { _isFastAssertConfiguration() },
     reason: "preconditions are disabled in Unchecked mode"))
   .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
   .code {
   var x = 2
-  _precondition(x * 21 == 42, "should not fail")
+  _require(x * 21 == 42, "should not fail")
   expectCrashLater()
-  _precondition(x == 42, "this should fail")
+  _require(x == 42, "this should fail")
 }
 
-Assert.test("_preconditionFailure")
+Assert.test("_requirementFailure")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
     reason: "optimizer assumes that the code path is unreachable"))
   .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
   .code {
   expectCrashLater()
-  _preconditionFailure("this should fail")
+  _requirementFailure("this should fail")
 }
 
 Assert.test("_debugPrecondition")

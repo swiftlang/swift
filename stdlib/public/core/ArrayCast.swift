@@ -69,7 +69,7 @@ public func _arrayForceCast<SourceElement, TargetElement>(
     
   case (.Reference, .Explicit):
     let result: [TargetElement]? = _arrayConditionalBridgeElements(source)
-    _precondition(result != nil, "array cannot be bridged from Objective-C")
+    _require(result != nil, "array cannot be bridged from Objective-C")
     return result!
     
   case (.Value, .Verbatim):
@@ -80,7 +80,7 @@ public func _arrayForceCast<SourceElement, TargetElement>(
       var p = $0.baseAddress
       for value in source {
         let bridged: AnyObject? = _bridgeToObjectiveC(value)
-        _precondition(
+        _require(
           bridged != nil, "array element cannot be bridged to Objective-C")
         // FIXME: should be an unsafeDowncast, but for <rdar://problem/18638230>
         p++.initializeMemory(unsafeBitCast(bridged!, TargetElement.self))

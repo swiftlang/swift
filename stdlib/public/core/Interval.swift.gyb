@@ -71,7 +71,7 @@ public struct ${Self}<Bound : Comparable>
   ///
   /// - Requires: `start <= end`.
   public init(_ start: Bound, _ end: Bound) {
-    _precondition(end >= start, "Invalid ${Self} bounds (end < start)")
+    _require(end >= start, "Invalid ${Self} bounds (end < start)")
     _start = start
     _end = end
   }
@@ -209,7 +209,7 @@ internal struct _IntervalMirror<
     switch i {
     case 0: return ("start", _reflect(_value.start))
     case 1: return ("end", _reflect(_value.end))
-    default: _preconditionFailure("_Mirror access out of bounds")
+    default: _requirementFailure("_Mirror access out of bounds")
     }
   }
 

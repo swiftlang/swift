@@ -660,23 +660,23 @@ extension ${Self} {
     // FIXME: Float80 does not have 'isFinite' property.
     // <rdar://problem/17958458> Int(Float80.quietNaN) is garbage
     // <rdar://problem/17959546> Float80.isFinite is missing
-    _precondition(
+    _require(
       other.isFinite,
       "floating point value can not be converted to ${Self} because it is either infinite or NaN")
 %      if signed:
     // FIXME: Float80 doesn't have a _fromBitPattern
     // ${That}(roundTowardsZero: ${Self}.min)
     // > ${getMinFloat(srcBits, incIfSigned(intFormatFix(bits), signed))}
-    _precondition(other >= ${That}._fromBitPattern(${getMinFloat(srcBits,
+    _require(other >= ${That}._fromBitPattern(${getMinFloat(srcBits,
       incIfSigned(intFormatFix(bits), signed))}),
       "floating point value can not be converted to ${Self} because it is less than ${Self}.min")
 %      else:
-    _precondition(other >= (0.0 as ${That}),
+    _require(other >= (0.0 as ${That}),
       "floating point value can not be converted to ${Self} because it is less than ${Self}.min")
 %      end
     // ${That}(roundTowardsZero: ${Self}.max)
     // > ${getMaxFloat(srcBits, incIfSigned(intFormatFix(bits), signed))}
-    _precondition(other <= ${That}._fromBitPattern(${getMaxFloat(srcBits,
+    _require(other <= ${That}._fromBitPattern(${getMaxFloat(srcBits,
       incIfSigned(intFormatFix(bits), signed))}),
       "floating point value can not be converted to ${Self} because it is greater than ${Self}.max")
 

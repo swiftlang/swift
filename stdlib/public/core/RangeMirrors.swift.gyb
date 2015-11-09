@@ -31,7 +31,7 @@ ${MirrorDecl} {
     switch i {
     case 0: return ("startIndex",_reflect(_value.startIndex))
     case 1: return ("endIndex",_reflect(_value.endIndex))
-    default: _preconditionFailure("cannot extract this child index")
+    default: _requirementFailure("cannot extract this child index")
     }
   }
   

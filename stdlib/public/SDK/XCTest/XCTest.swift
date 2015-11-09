@@ -614,7 +614,7 @@ public func XCTAssertEqualWithAccuracy<T : FloatingPoint>(@autoclosure expressio
       
     default:
       // unknown type, fail with prejudice
-      _preconditionFailure("unsupported floating-point type passed to XCTAssertEqualWithAccuracy")
+      _requirementFailure("unsupported floating-point type passed to XCTAssertEqualWithAccuracy")
     }
     
     if !equalWithAccuracy {
@@ -682,7 +682,7 @@ public func XCTAssertNotEqualWithAccuracy<T : FloatingPoint>(@autoclosure expres
       
     default:
       // unknown type, fail with prejudice
-      _preconditionFailure("unsupported floating-point type passed to XCTAssertNotEqualWithAccuracy")
+      _requirementFailure("unsupported floating-point type passed to XCTAssertNotEqualWithAccuracy")
     }
     
     if !notEqualWithAccuracy {

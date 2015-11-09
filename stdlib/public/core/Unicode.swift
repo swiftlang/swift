@@ -872,7 +872,7 @@ extension UTF16 {
   /// - Requires: `width(x) == 2`.
   @warn_unused_result
   public static func leadSurrogate(x: UnicodeScalar) -> UTF16.CodeUnit {
-    _precondition(width(x) == 2)
+    _require(width(x) == 2)
     return UTF16.CodeUnit((x.value - 0x1_0000) >> (10 as UInt32)) + 0xD800
   }
 
@@ -882,7 +882,7 @@ extension UTF16 {
   /// - Requires: `width(x) == 2`.
   @warn_unused_result
   public static func trailSurrogate(x: UnicodeScalar) -> UTF16.CodeUnit {
-    _precondition(width(x) == 2)
+    _require(width(x) == 2)
     return UTF16.CodeUnit(
       (x.value - 0x1_0000) & (((1 as UInt32) << 10) - 1)
     ) + 0xDC00

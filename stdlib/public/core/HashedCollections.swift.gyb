@@ -394,7 +394,7 @@ public struct Set<Element : Hashable> :
   ///
   /// - Requires: `!isEmpty`.
   public mutating func removeFirst() -> Element {
-    _precondition(!isEmpty, "can't removeFirst from an empty Set")
+    _require(!isEmpty, "can't removeFirst from an empty Set")
     return removeAt(startIndex)
   }
 
@@ -835,7 +835,7 @@ public func _setBridgeToObjectiveC<SwiftValue, ObjCValue>(
       bridgedMember = unsafeBitCast(member, ObjCValue.self)
     } else {
       let bridged: AnyObject? = _bridgeToObjectiveC(member)
-      _precondition(bridged != nil,
+      _require(bridged != nil,
       "set member cannot be bridged to Objective-C")
       bridgedMember = unsafeBitCast(bridged!, ObjCValue.self)
     }
@@ -905,7 +905,7 @@ public func _setBridgeFromObjectiveC<ObjCValue, SwiftValue>(
   source: Set<ObjCValue>
 ) -> Set<SwiftValue> {
   let result: Set<SwiftValue>? = _setBridgeFromObjectiveCConditional(source)
-  _precondition(result != nil, "This set cannot be bridged from Objective-C")
+  _require(result != nil, "This set cannot be bridged from Objective-C")
   return result!
 }
 
@@ -1391,7 +1391,7 @@ public func _dictionaryBridgeToObjectiveC<
       bridgedKey = unsafeBitCast(key, ObjCKey.self)
     } else {
       let bridged: AnyObject? = _bridgeToObjectiveC(key)
-      _precondition(bridged != nil, "dictionary key cannot be bridged to Objective-C")
+      _require(bridged != nil, "dictionary key cannot be bridged to Objective-C")
       bridgedKey = unsafeBitCast(bridged!, ObjCKey.self)
     }
 
@@ -1401,7 +1401,7 @@ public func _dictionaryBridgeToObjectiveC<
       bridgedValue = unsafeBitCast(value, ObjCValue.self)
     } else {
       let bridged: AnyObject? = _bridgeToObjectiveC(value)
-      _precondition(bridged != nil,
+      _require(bridged != nil,
           "dictionary value cannot be bridged to Objective-C")
       bridgedValue = unsafeBitCast(bridged!, ObjCValue.self)
     }
@@ -1498,7 +1498,7 @@ public func _dictionaryBridgeFromObjectiveC<
 ) -> Dictionary<SwiftKey, SwiftValue> {
   let result: Dictionary<SwiftKey, SwiftValue>? =
     _dictionaryBridgeFromObjectiveCConditional(source)
-  _precondition(result != nil, "dictionary cannot be bridged from Objective-C")
+  _require(result != nil, "dictionary cannot be bridged from Objective-C")
   return result!
 }
 
@@ -1951,7 +1951,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
   @warn_unused_result
   internal func keyAt(i: Int) -> Key {
-    _precondition(i >= 0 && i < capacity)
+    _require(i >= 0 && i < capacity)
     _sanityCheck(isInitializedEntry(i))
 
     let res = (keys + i).pointee
@@ -1961,7 +1961,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
   @warn_unused_result
   internal func isInitializedEntry(i: Int) -> Bool {
-    _precondition(i >= 0 && i < capacity)
+    _require(i >= 0 && i < capacity)
     return initializedEntries[i]
   }
 
@@ -1995,7 +1995,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   internal func setKey(key: Key, at i: Int) {
-    _precondition(i >= 0 && i < capacity)
+    _require(i >= 0 && i < capacity)
     _sanityCheck(isInitializedEntry(i))
 
     (keys + i).pointee = key
@@ -2167,7 +2167,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
   @warn_unused_result
   internal func assertingGet(i: Index) -> SequenceElement {
-    _precondition(
+    _require(
       isInitializedEntry(i.offset),
       "attempting to access ${Self} elements using an invalid Index")
     let key = keyAt(i.offset)
@@ -2182,7 +2182,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   @warn_unused_result
   internal func assertingGet(key: Key) -> Value {
     let (i, found) = _find(key, _bucket(key))
-    _precondition(found, "key not found")
+    _require(found, "key not found")
 %if Self == 'Set':
     return keyAt(i.offset)
 %elif Self == 'Dictionary':
@@ -2255,7 +2255,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
     for (key, value) in elements {
       let (i, found) = nativeStorage._find(key, nativeStorage._bucket(key))
-      _precondition(!found, "${Self} literal contains duplicate keys")
+      _require(!found, "${Self} literal contains duplicate keys")
       nativeStorage.initializeKey(key, value: value, at: i.offset)
     }
     nativeStorage.count = elements.count
@@ -2309,7 +2309,7 @@ internal struct _BridgedNative${Self}Storage {
   }
 
   internal func keyAt(i: Int) -> AnyObject {
-    _precondition(i >= 0 && i < capacity)
+    _require(i >= 0 && i < capacity)
     _sanityCheck(isInitializedEntry(i))
 
     let res = (keys + i).pointee
@@ -2318,7 +2318,7 @@ internal struct _BridgedNative${Self}Storage {
   }
 
   internal func setKey(key: AnyObject, at i: Int) {
-    _precondition(i >= 0 && i < capacity)
+    _require(i >= 0 && i < capacity)
     _sanityCheck(isInitializedEntry(i))
 
     (keys + i).pointee = key
@@ -2358,7 +2358,7 @@ internal struct _BridgedNative${Self}Storage {
 
   @warn_unused_result
   internal func assertingGet(i: Int) -> SequenceElement {
-    _precondition(
+    _require(
       isInitializedEntry(i),
       "attempting to access ${Self} elements using an invalid Index")
     let key = keyAt(i)
@@ -2856,11 +2856,11 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
   internal func assertingGet(key: Key) -> Value {
 %if Self == 'Set':
     let value: Value? = cocoa${Self}.member(key)
-    _precondition(value != nil, "member not found in underlying NS${Self}")
+    _require(value != nil, "member not found in underlying NS${Self}")
     return value!
 %elif Self == 'Dictionary':
     let value: Value? = cocoa${Self}.objectForKey(key)
-    _precondition(value != nil, "key not found in underlying NS${Self}")
+    _require(value != nil, "key not found in underlying NS${Self}")
     return value!
 %end
   }
@@ -3601,7 +3601,7 @@ internal struct _Cocoa${Self}Index : ForwardIndex, Comparable {
   /// - Requires: The next value is representable.
   @warn_unused_result
   internal func successor() -> _Cocoa${Self}Index {
-    _precondition(
+    _require(
       currentKeyIndex < allKeys.value, "can not increment endIndex")
     return _Cocoa${Self}Index(cocoa${Self}, allKeys, currentKeyIndex + 1)
   }
@@ -3609,9 +3609,9 @@ internal struct _Cocoa${Self}Index : ForwardIndex, Comparable {
 
 @warn_unused_result
 internal func ==(lhs: _Cocoa${Self}Index, rhs: _Cocoa${Self}Index) -> Bool {
-  _precondition(lhs.cocoa${Self} === rhs.cocoa${Self},
+  _require(lhs.cocoa${Self} === rhs.cocoa${Self},
     "can not compare indexes pointing to different ${Self}s")
-  _precondition(lhs.allKeys.value == rhs.allKeys.value,
+  _require(lhs.allKeys.value == rhs.allKeys.value,
     "one or both of the indexes have been invalidated")
 
   return lhs.currentKeyIndex == rhs.currentKeyIndex
@@ -3619,9 +3619,9 @@ internal func ==(lhs: _Cocoa${Self}Index, rhs: _Cocoa${Self}Index) -> Bool {
 
 @warn_unused_result
 internal func <(lhs: _Cocoa${Self}Index, rhs: _Cocoa${Self}Index) -> Bool {
-  _precondition(lhs.cocoa${Self} === rhs.cocoa${Self},
+  _require(lhs.cocoa${Self} === rhs.cocoa${Self},
     "can not compare indexes pointing to different ${Self}s")
-  _precondition(lhs.allKeys.value == rhs.allKeys.value,
+  _require(lhs.allKeys.value == rhs.allKeys.value,
     "one or both of the indexes have been invalidated")
 
   return lhs.currentKeyIndex < rhs.currentKeyIndex
@@ -3755,7 +3755,7 @@ public func == <${TypeParametersDecl}> (
     _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
   default:
-    _preconditionFailure("comparing indexes from different sets")
+    _requirementFailure("comparing indexes from different sets")
   }
 }
 
@@ -3778,7 +3778,7 @@ public func < <${TypeParametersDecl}> (
     _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
   default:
-    _preconditionFailure("comparing indexes from different sets")
+    _requirementFailure("comparing indexes from different sets")
   }
 }
 
@@ -4025,7 +4025,7 @@ internal class ${Self}Mirror<${TypeParametersDecl}> : _Mirror {
   internal var count: Int { return _mirror.count }
 
   internal subscript(i: Int) -> (String, _Mirror) {
-    _precondition(i >= 0 && i < count, "_Mirror access out of bounds")
+    _require(i >= 0 && i < count, "_Mirror access out of bounds")
 
     if _pos > i {
       _pos._intPos = 0
@@ -4111,9 +4111,9 @@ public struct _${Self}Builder<${TypeParametersDecl}> {
 
   @warn_unused_result
   public mutating func take() -> ${Self}<${TypeParameters}> {
-    _precondition(_actualCount >= 0,
+    _require(_actualCount >= 0,
       "can not take the result twice")
-    _precondition(_actualCount == _requestedCount,
+    _require(_actualCount == _requestedCount,
       "the number of members added does not match the promised count")
 
     // Finish building the `${Self}`.
@@ -4145,10 +4145,10 @@ extension ${Self} {
     switch _variantStorage {
     case _Variant${Self}Storage.Native(let nativeOwner):
 %if Self == 'Set':
-      _precondition(_isBridgedToObjectiveC(Element.self),
+      _require(_isBridgedToObjectiveC(Element.self),
         "Key is not bridged to Objective-C")
 %elif Self == 'Dictionary':
-      _precondition(_isBridgedToObjectiveC(Value.self),
+      _require(_isBridgedToObjectiveC(Value.self),
         "Value is not bridged to Objective-C")
 %end
       return nativeOwner as _Native${Self}StorageOwner<${TypeParameters}>

@@ -1460,7 +1460,7 @@ struct BrilliantMirror : _Mirror {
     case 2:
       return ("self", self)
     case _:
-      _preconditionFailure("child index out of bounds")
+      _requirementFailure("child index out of bounds")
     }
   }
 

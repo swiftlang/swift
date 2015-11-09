@@ -429,7 +429,7 @@ extension Mirror {
           offset, limit: children.endIndex)
       }
       else {
-        _preconditionFailure(
+        _requirementFailure(
           "Someone added a conformance to MirrorPath; that privilege is reserved to the standard library")
       }
       if position == children.endIndex { return nil }

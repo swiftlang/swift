@@ -946,7 +946,7 @@ extension String {
   /// format string as a template into which the remaining argument
   /// values are substituted according to given locale information.
   public init(format: String, locale: NSLocale?, arguments: [CVarArg]) {
-    _precondition(
+    _require(
       _countFormatSpecifiers(format) <= arguments.count,
       "Too many format specifiers (%<letter>) provided for the argument list"
     )

@@ -96,7 +96,7 @@ internal struct _ArrayProtocolMirror<
   var count: Int { return _value.count }
 
   subscript(i: Int) -> (String, _Mirror) {
-    _precondition(i >= 0 && i < count, "_Mirror access out of bounds")
+    _require(i >= 0 && i < count, "_Mirror access out of bounds")
     return ("[\(i)]", _reflect(_value[_value.startIndex + i]))
   }
 

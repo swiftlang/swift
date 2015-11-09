@@ -339,7 +339,7 @@ extension Sequence {
   /// - Complexity: O(`n`)
   @warn_unused_result
   public func dropFirst(n: Int) -> AnySequence<Iterator.Element> {
-    _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
+    _require(n >= 0, "Can't drop a negative number of elements from a sequence")
     if n == 0 { return AnySequence(self) }
     // If this is already a _DropFirstSequence, we need to fold in
     // the current drop count and drop limit so no data is lost.
@@ -366,7 +366,7 @@ extension Sequence {
   /// - Complexity: O(`self.count`)
   @warn_unused_result
   public func dropLast(n: Int) -> AnySequence<Iterator.Element> {
-    _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
+    _require(n >= 0, "Can't drop a negative number of elements from a sequence")
     if n == 0 { return AnySequence(self) }
     // FIXME: <rdar://problem/21885650> Create reusable RingBuffer<T>
     // Put incoming elements from this sequence in a holding tank, a ring buffer
@@ -392,7 +392,7 @@ extension Sequence {
 
   @warn_unused_result
   public func prefix(maxLength: Int) -> AnySequence<Iterator.Element> {
-    _precondition(maxLength >= 0, "Can't take a prefix of negative length from a sequence")
+    _require(maxLength >= 0, "Can't take a prefix of negative length from a sequence")
     if maxLength == 0 {
       return AnySequence(EmptyCollection<Iterator.Element>())
     }
@@ -412,7 +412,7 @@ extension Sequence {
 
   @warn_unused_result
   public func suffix(maxLength: Int) -> AnySequence<Iterator.Element> {
-    _precondition(maxLength >= 0, "Can't take a suffix of negative length from a sequence")
+    _require(maxLength >= 0, "Can't take a suffix of negative length from a sequence")
     if maxLength == 0 { return AnySequence([]) }
     // FIXME: <rdar://problem/21885650> Create reusable RingBuffer<T>
     // Put incoming elements into a ring buffer to save space. Once all
@@ -461,7 +461,7 @@ extension Sequence {
     allowEmptySlices: Bool = false,
     @noescape isSeparator: (Iterator.Element) throws -> Bool
   ) rethrows -> [AnySequence<Iterator.Element>] {
-    _precondition(maxSplit >= 0, "Must take zero or more splits")
+    _require(maxSplit >= 0, "Must take zero or more splits")
     var result: [AnySequence<Iterator.Element>] = []
     var subSequence: [Iterator.Element] = []
 
