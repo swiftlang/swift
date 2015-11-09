@@ -497,7 +497,7 @@ private:
   StringRef ModuleName;
   StringRef BriefDocComment;
   ArrayRef<StringRef> AssociatedUSRs;
-  ArrayRef<StringRef> Keywords;
+  ArrayRef<std::pair<StringRef, StringRef>> DocWords;
   unsigned TypeDistance : 3;
 
 public:
@@ -558,14 +558,14 @@ public:
                        const Decl *AssociatedDecl, StringRef ModuleName,
                        bool NotRecommended, StringRef BriefDocComment,
                        ArrayRef<StringRef> AssociatedUSRs,
-                       ArrayRef<StringRef> Keywords,
+                       ArrayRef<std::pair<StringRef, StringRef>> DocWords,
                        enum ExpectedTypeRelation TypeDistance)
       : Kind(ResultKind::Declaration),
         SemanticContext(unsigned(SemanticContext)),
         NotRecommended(NotRecommended), NumBytesToErase(NumBytesToErase),
         CompletionString(CompletionString), ModuleName(ModuleName),
         BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
-        Keywords(Keywords), TypeDistance(TypeDistance) {
+        DocWords(DocWords), TypeDistance(TypeDistance) {
     assert(AssociatedDecl && "should have a decl");
     AssociatedKind = unsigned(getCodeCompletionDeclKind(AssociatedDecl));
     assert(CompletionString);
@@ -578,13 +578,13 @@ public:
                        CodeCompletionDeclKind DeclKind, StringRef ModuleName,
                        bool NotRecommended, StringRef BriefDocComment,
                        ArrayRef<StringRef> AssociatedUSRs,
-                       ArrayRef<StringRef> Keywords)
+                       ArrayRef<std::pair<StringRef, StringRef>> DocWords)
       : Kind(ResultKind::Declaration),
         SemanticContext(unsigned(SemanticContext)),
         NotRecommended(NotRecommended), NumBytesToErase(NumBytesToErase),
         CompletionString(CompletionString), ModuleName(ModuleName),
         BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
-        Keywords(Keywords) {
+        DocWords(DocWords) {
     AssociatedKind = static_cast<unsigned>(DeclKind);
     assert(CompletionString);
     TypeDistance = ExpectedTypeRelation::Unrelated;
@@ -650,8 +650,8 @@ public:
     return AssociatedUSRs;
   }
 
-  ArrayRef<StringRef> getDeclKeywords() const {
-    return Keywords;
+  ArrayRef<std::pair<StringRef, StringRef>> getDeclKeywords() const {
+    return DocWords;
   }
 
   /// Print a debug representation of the code completion result to \p OS.

@@ -103,6 +103,18 @@ static ArrayRef<StringRef> copyStringArray(llvm::BumpPtrAllocator &Allocator,
   return llvm::makeArrayRef(Buff, Arr.size());
 }
 
+static ArrayRef<std::pair<StringRef, StringRef>> copyStringPairArray(
+    llvm::BumpPtrAllocator &Allocator,
+    ArrayRef<std::pair<StringRef, StringRef>> Arr) {
+  std::pair<StringRef, StringRef> *Buff = Allocator.Allocate<std::pair<StringRef,
+    StringRef>>(Arr.size());
+  for (unsigned I = 0; I < Arr.size(); ++I) {
+    Buff[I].first = Arr[I].first;
+    Buff[I].second = Arr[I].second;
+  }
+  return llvm::makeArrayRef(Buff, Arr.size());
+}
+
 /// Deserializes CodeCompletionResults from \p in and stores them in \p V.
 /// \see writeCacheModule.
 static bool readCachedModule(llvm::MemoryBuffer *in,
@@ -212,11 +224,13 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
       assocUSRsIndex += usr.size() + IntLength;
     }
 
-    SmallVector<StringRef, 4> declKeywords;
+    SmallVector<std::pair<StringRef, StringRef>, 4> declKeywords;
     for (unsigned i = 0; i < declKeywordCount; ++i) {
-      auto kw = getString(declKeywordIndex);
-      declKeywords.push_back(kw);
-      declKeywordIndex += kw.size() + IntLength;
+      auto first = getString(declKeywordIndex);
+      declKeywordIndex += first.size() + IntLength;
+      auto second = getString(declKeywordIndex);
+      declKeywordIndex += second.size() + IntLength;
+      declKeywords.push_back(std::make_pair(first, second));
     }
 
     CodeCompletionResult *result = nullptr;
@@ -225,7 +239,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
           CodeCompletionResult(context, numBytesToErase, string, declKind,
                                moduleName, notRecommended, briefDocComment,
                                copyStringArray(*V.Sink.Allocator, assocUSRs),
-                               copyStringArray(*V.Sink.Allocator, declKeywords));
+                               copyStringPairArray(*V.Sink.Allocator, declKeywords));
     } else {
       result = new (*V.Sink.Allocator)
           CodeCompletionResult(kind, context, numBytesToErase, string);
@@ -354,11 +368,13 @@ static void writeCachedModule(llvm::raw_ostream &out,
       if (AllKeywords.empty()) {
         LE.write(static_cast<uint32_t>(~0u));
       } else {
-        LE.write(addString(AllKeywords[0]));
+        LE.write(addString(AllKeywords[0].first));
+        addString(AllKeywords[0].second);
         for (unsigned i = 1; i < AllKeywords.size(); ++i) {
-          addString(AllKeywords[i]);
+          addString(AllKeywords[i].first);
+          addString(AllKeywords[i].second);
+        }
       }
-    }
     }
   }
   LE.write(static_cast<uint32_t>(results.tell()));
