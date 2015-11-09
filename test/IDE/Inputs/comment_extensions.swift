@@ -86,3 +86,12 @@ func imageAlt() {}
 /// ![Image _Alt_](/swift.png "Image Title")
 func imageTitle() {}
 
+/// Brief.
+///
+/// Test [a link](http://apple.com?a=1&b=1&c=abc)
+func urlWithQueryString() {}
+
+/// Brief.
+///
+/// ![&&&](http://apple.com "&&&")
+func imageWithAmpersandsInTitleAndAlt() {}

@@ -168,7 +168,10 @@ struct CommentToXMLConverter {
   void printLink(const Link *L) {
     SmallString<32> Tag;
     llvm::raw_svector_ostream S(Tag);
-    S << "<Link href=\"" << L->getDestination() << "\">";
+    S << "<Link href=\"";
+    appendWithXMLEscaping(S, L->getDestination());
+    S << "\">";
+
     OS << S.str();
 
     for (const auto N : L->getChildren())
