@@ -141,14 +141,22 @@ public struct ${Self}<Pointee>
   }
 
 %  if mutable:
-  /// Initialize `self.pointee` to `newValue`
+  /// Initialize `self.pointee` with `count` consecutive copies of `newValue`
   ///
   /// - Requires: The pointee is not initialized.
+  ///             `count` is non-negative.
   ///
   /// - Postcondition: The pointee is initalized; the value should eventually
   ///   be destroyed or moved from to avoid leaks.
-  public func initializeMemory(newvalue: Pointee) {
-    Builtin.initialize(newvalue, _rawValue)
+  // FIXME: add tests (since the `count` has been added)
+  public func initializeMemory(newValue: Pointee, count: Int = 1) {
+    _debugPrecondition(count >= 0,
+      "${Self}.initializeMemory with negative count")
+    // Must not use `initializeFrom` with a `Collection` as that will introduce
+    // a cycle.
+    for offset in 0..<count {
+      Builtin.initialize(newValue, (self + offset)._rawValue)
+    }
   }
 
   // APINAMING: Dave doesn't like the name 'move()'.  It should say something
@@ -369,7 +377,7 @@ public struct ${Self}<Pointee>
   ///
   /// - Postcondition: The memory is uninitialized.
   public func deinitializePointee(count: Int) {
-    _debugPrecondition(count >= 0, "${Self}.destroy with negative count")
+    _debugPrecondition(count >= 0, "${Self}.deinitializeMemory with negative count")
     Builtin.destroyArray(Pointee.self, _rawValue, count._builtinWordValue)
   }
 %  end
