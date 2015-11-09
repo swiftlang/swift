@@ -42,7 +42,7 @@ public struct _stdlib_ShardedAtomicCounter {
   }
 
   public func `deinit`() {
-    self._shardsPtr.deinitializePointee(self._shardsCount)
+    self._shardsPtr.deinitializePointee(count: self._shardsCount)
     self._shardsPtr.deallocateCapacity(self._shardsCount)
   }
 

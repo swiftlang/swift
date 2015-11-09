@@ -147,7 +147,7 @@ public class ManagedBuffer<Value, Element>
 ///        deinit {
 ///          Manager(unsafeBufferObject: self).withUnsafeMutablePointers {
 ///            (pointerToValue, pointerToElements)->Void in
-///            pointerToElements.deinitializePointee(self.count)
+///            pointerToElements.deinitializePointee(count: self.count)
 ///            pointerToValue.deinitializePointee()
 ///          }
 ///        }

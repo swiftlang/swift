@@ -355,15 +355,6 @@ public struct ${Self}<Pointee>
     // }
   }
 
-  /// De-initialize the pointee, returning its memory to an uninitialized state.
-  ///
-  /// - Precondition: The pointee is initialized.
-  ///
-  /// - Postcondition: The memory is uninitialized.
-  public func deinitializePointee() {
-    Builtin.destroy(Pointee.self, _rawValue)
-  }
-
   /// De-initialize the `count` `Pointee`s starting at `self`, returning
   /// their memory to an uninitialized state.
   ///
@@ -371,8 +362,10 @@ public struct ${Self}<Pointee>
   ///   initialized.
   ///
   /// - Postcondition: The memory is uninitialized.
-  public func deinitializePointee(count: Int) {
+  public func deinitializePointee(count count: Int = 1) {
     _debugPrecondition(count >= 0, "${Self}.deinitializeMemory with negative count")
+    // FIXME: optimization should be implemented, where if the `count` value
+    // is 1, the `Builtin.destroy(Pointee.self, _rawValue)` gets called.
     Builtin.destroyArray(Pointee.self, _rawValue, count._builtinWordValue)
   }
 %  end

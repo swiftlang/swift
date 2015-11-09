@@ -1937,7 +1937,7 @@ public func checkSequence<
     for i in 0..<(end - buf) {
       expectTrue(sameValue(expected[j++], buf[i]))
     }
-    buf.deinitializePointee(end - buf)
+    buf.deinitializePointee(count: end - buf)
     buf.deallocateCapacity(count)
   }
 }

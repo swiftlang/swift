@@ -101,7 +101,8 @@ class _ContiguousArrayStorage1 : _ContiguousArrayStorageBase {
 final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
 
   deinit {
-    __manager._elementPointer.deinitializePointee(__manager._valuePointer.pointee.count)
+    __manager._elementPointer.deinitializePointee(
+      count: __manager._valuePointer.pointee.count)
     __manager._valuePointer.deinitializePointee()
     _fixLifetime(__manager)
   }
