@@ -65,12 +65,13 @@ with version 2 shipped with Ubuntu.
 
       git clone git@github.com:/apple/swift.git swift
       git clone git@github.com:/apple/swift-llvm.git llvm
+      (cd llvm && git checkout -t origin/stable)
       git clone git@github.com:/apple/swift-clang.git clang
+      (cd clang && git checkout -t origin/stable)
       git clone git@github.com:/apple/swift-lldb.git lldb
       git clone git@github.com:/apple/swift-cmark.git cmark
       git clone git@github.com:/apple/swift-llbuild.git llbuild
       git clone git@github.com:/apple/swift-package-manager.git swiftpm
-
 
 ### Building Swift
 
