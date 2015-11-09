@@ -1989,7 +1989,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   @_transparent
   internal func moveInitializeFrom(from: Storage, at: Int, toEntryAt: Int) {
     _sanityCheck(!isInitializedEntry(toEntryAt))
-    (keys + toEntryAt).initializeMemory((from.keys + at).move())
+    (keys + toEntryAt).initializeMemory((from.keys + at).take())
     from.initializedEntries[at] = false
     initializedEntries[toEntryAt] = true
   }
@@ -2016,8 +2016,8 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   @_transparent
   internal func moveInitializeFrom(from: Storage, at: Int, toEntryAt: Int) {
     _sanityCheck(!isInitializedEntry(toEntryAt))
-    (keys + toEntryAt).initializeMemory((from.keys + at).move())
-    (values + toEntryAt).initializeMemory((from.values + at).move())
+    (keys + toEntryAt).initializeMemory((from.keys + at).take())
+    (values + toEntryAt).initializeMemory((from.values + at).take())
     from.initializedEntries[at] = false
     initializedEntries[toEntryAt] = true
   }

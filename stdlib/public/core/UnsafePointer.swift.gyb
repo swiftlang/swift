@@ -159,11 +159,6 @@ public struct ${Self}<Pointee>
     }
   }
 
-  // APINAMING: Dave doesn't like the name 'move()'.  It should say something
-  // like getAndDeinitializePointee, but that's too horrible.  He'd
-  // like to at least say "destructiveMove," but even that doesn't
-  // extend well to the other move operations.
-
   /// Retrieve the `pointee`, returning the referenced memory to an
   /// uninitialized state.
   ///
@@ -174,7 +169,7 @@ public struct ${Self}<Pointee>
   ///
   /// - Postcondition: The memory is uninitialized.
   @warn_unused_result
-  public func move() -> Pointee {
+  public func take() -> Pointee {
     return Builtin.take(_rawValue)
   }
 

@@ -44,7 +44,7 @@ class Vector<T> {
       let size = Int(Builtin.sizeof(T.self))
       let newbase = UnsafeMutablePointer<T>(c_malloc(newcapacity * size))
       for i in 0..<length {
-        (newbase + i).initializeMemory((base+i).move())
+        (newbase + i).initializeMemory((base+i).take())
       }
       c_free(base)
       base = newbase
@@ -56,7 +56,7 @@ class Vector<T> {
 
   func pop_back() -> T {
     length -= 1
-    return (base + length).move()
+    return (base + length).take()
   }
 
   subscript (i : Int) -> T {
