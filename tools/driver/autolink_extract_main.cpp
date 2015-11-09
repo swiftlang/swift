@@ -29,6 +29,7 @@
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
+#include "llvm/Object/Archive.h"
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Object/ELFObjectFile.h"
 
@@ -104,6 +105,61 @@ public:
     return 0;
   }
 };
+
+// Look inside the binary 'Bin' and append any linker flags found in its
+// ".swift1_autolink_entries" section to 'LinkerFlags'. If 'Bin' is an archive,
+// recursively look inside all children within the archive. Return 'true' if
+// there was an error, and 'false' otherwise.
+static bool extractLinkerFlags(const llvm::object::Binary *Bin,
+                               CompilerInstance &Instance,
+                               StringRef BinaryFileName,
+                               std::set<std::string> &LinkerFlags) {
+  if (auto *ObjectFile = llvm::dyn_cast<llvm::object::ELFObjectFileBase>(Bin)) {
+    // Search for the section we hold autolink entries in
+    for (auto &Section : ObjectFile->sections()) {
+      llvm::StringRef SectionName;
+      Section.getName(SectionName);
+      if (SectionName == ".swift1_autolink_entries") {
+        llvm::StringRef SectionData;
+        Section.getContents(SectionData);
+
+        // entries are null-terminated, so extract them and push them into
+        // the set.
+        llvm::SmallVector<llvm::StringRef, 4> SplitFlags;
+        SectionData.split(SplitFlags, llvm::StringRef("\0", 1),
+          -1, /*KeepEmpty=*/false);
+        for (const auto &Flag : SplitFlags) {
+          LinkerFlags.insert(Flag);
+        }
+      }
+    }
+    return false;
+  } else if (auto *Archive = llvm::dyn_cast<llvm::object::Archive>(Bin)) {
+    for (const auto &Child : Archive->children()) {
+      auto ChildBinary = Child.getAsBinary();
+      // FIXME: BinaryFileName below should instead be ld-style names for
+      // object files in archives, e.g. "foo.a(bar.o)".
+      if (!ChildBinary) {
+        Instance.getDiags().diagnose(SourceLoc(), diag::error_open_input_file,
+                                     BinaryFileName,
+                                     ChildBinary.getError().message());
+        return true;
+      }
+      if (extractLinkerFlags(ChildBinary->get(), Instance, BinaryFileName,
+                             LinkerFlags)) {
+        return true;
+      }
+    }
+    return false;
+  } else {
+    Instance.getDiags().diagnose(SourceLoc(), diag::error_open_input_file,
+                                 BinaryFileName,
+                                 "Don't know how to extract from object file"
+                                 "format");
+    return true;
+  }
+}
+
 int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
                           void *MainAddr) {
   CompilerInstance Instance;
@@ -123,41 +179,18 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
   // Store each linker flag only once
   std::set<std::string> LinkerFlags;
 
-  for (const auto &ObjectFileName : Invocation.getInputFilenames()) {
-    auto ObjectFileOwner =
-      llvm::object::ObjectFile::createObjectFile(ObjectFileName);
-    if (!ObjectFileOwner) {
+  // Extract the linker flags from the objects.
+  for (const auto &BinaryFileName : Invocation.getInputFilenames()) {
+    auto BinaryOwner = llvm::object::createBinary(BinaryFileName);
+    if (!BinaryOwner) {
       Instance.getDiags().diagnose(SourceLoc(), diag::error_open_input_file,
-                                   ObjectFileName,
-                                   ObjectFileOwner.getError().message());
+                                   BinaryFileName,
+                                   BinaryOwner.getError().message());
       return 1;
     }
 
-    auto ObjectFile = ObjectFileOwner->getBinary();
-    if (llvm::isa<llvm::object::ELFObjectFileBase>(ObjectFile)) {
-      // Search for the section we hold autolink entries in
-      for (auto &Section : ObjectFileOwner->getBinary()->sections()) {
-        llvm::StringRef SectionName;
-        Section.getName(SectionName);
-        if (SectionName == ".swift1_autolink_entries") {
-          llvm::StringRef SectionData;
-          Section.getContents(SectionData);
-
-          // entries are null-terminated, so extract them and push them into
-          // the set.
-          llvm::SmallVector<llvm::StringRef, 4> SplitFlags;
-          SectionData.split(SplitFlags, llvm::StringRef("\0", 1),
-            -1, /*KeepEmpty=*/false);
-          for (const auto &Flag : SplitFlags) {
-            LinkerFlags.insert(Flag);
-          }
-        }
-      }
-    } else {
-      Instance.getDiags().diagnose(SourceLoc(), diag::error_open_input_file,
-                                   ObjectFileName,
-                                   "Don't know how to extract from object file"
-                                   "format");
+    if (extractLinkerFlags(BinaryOwner->getBinary(), Instance, BinaryFileName,
+                           LinkerFlags)) {
       return 1;
     }
   }
