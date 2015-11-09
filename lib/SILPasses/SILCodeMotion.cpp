@@ -373,7 +373,12 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
     return false;
 
   // Don't move instructions that are sensitive to their location.
-  if (FSI->mayHaveSideEffects() && !isa<AllocationInst>(FSI))
+  //
+  // If this instruction can read memory, we try to be conservatively not to
+  // move it, as there may be instructions that can clobber the read memory
+  // from current place to the place where it is moved to.
+  if (FSI->mayReadFromMemory() || (FSI->mayHaveSideEffects() &&
+      !isa<AllocationInst>(FSI)))
     return false;
 
   // If the instructions are different, but only in terms of a cheap operand

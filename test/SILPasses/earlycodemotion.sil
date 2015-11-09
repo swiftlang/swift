@@ -3,6 +3,18 @@
 import Builtin
 import Swift
 
+struct Int {
+  var value : Builtin.Int64
+}
+
+struct Int64 {
+  var value : Builtin.Int64
+}
+
+struct Bool {
+  var value : Builtin.Int1
+}
+
 class fuzz { }
 
 enum Boo {
@@ -36,10 +48,18 @@ enum ThreeCaseAbstractionDifference {
   case C(S)
 }
 
+struct foo {
+  var a: Int
+  init(a: Int)
+  init()
+}
+
 sil @user : $@convention(thin) (Builtin.NativeObject) -> ()
+sil @user_int : $@convention(thin) (Int) -> ()
 sil @optional_user : $@convention(thin) (Optional<Builtin.Int32>) -> ()
 sil @blocker : $@convention(thin) () -> ()
 sil @get_object : $@convention(thin) () -> Builtin.NativeObject
+sil @foo_init : $@convention(thin) (@thin foo.Type) -> foo
 
 // CHECK-LABEL: sil @sink_from_preds
 // CHECK: bb1:
@@ -1613,3 +1633,48 @@ bb0(%0 : $*T, %1 : $*T, %2 : $B):
   %4 = tuple ()                                   // user: %5
   return %4 : $()                                 // id: %5
 }
+
+// Make sure we do not sink the SILArgument for bb3.
+//
+// CHECK-LABEL: no_sinkargument_on_clobbered_load
+// CHECK: bb3(%20 : $Int):
+// CHECK-NOT: load
+// CHECK: return
+sil hidden @no_sinkargument_on_clobbered_load : $@convention(thin) (Bool) -> () {
+// %0                                             // users: %2, %7
+bb0(%0 : $Bool):
+  %1 = alloc_stack $foo                           // users: %6, %11, %17, %24
+  debug_value %0 : $Bool                          // id: %2
+  // function_ref foo_init
+  %3 = function_ref @foo_init : $@convention(thin) (@thin foo.Type) -> foo // user: %5
+  %4 = metatype $@thin foo.Type                   // user: %5
+  %5 = apply %3(%4) : $@convention(thin) (@thin foo.Type) -> foo // user: %6
+  store %5 to %1#1 : $*foo                        // id: %6
+  %7 = struct_extract %0 : $Bool, #Bool.value     // user: %8
+  cond_br %7, bb1, bb2                            // id: %8
+
+bb1:                                              // Preds: bb0
+  %9 = integer_literal $Builtin.Int64, 11         // user: %10
+  %10 = struct $Int (%9 : $Builtin.Int64)         // user: %13
+  %11 = struct_element_addr %1#1 : $*foo, #foo.a  // users: %12, %13
+  %12 = load %11 : $*Int                          // user: %14
+  store %10 to %11 : $*Int                        // id: %13
+  br bb3(%12 : $Int)                              // id: %14
+
+bb2:                                              // Preds: bb0
+  %15 = integer_literal $Builtin.Int64, 12        // user: %16
+  %16 = struct $Int (%15 : $Builtin.Int64)
+  %17 = struct_element_addr %1#1 : $*foo, #foo.a  // user: %18
+  %18 = load %17 : $*Int                          // user: %19
+  br bb3(%18 : $Int)                              // id: %19
+
+// %20                                            // user: %22
+bb3(%20 : $Int):                                  // Preds: bb1 bb2
+  // function_ref user_int
+  %21 = function_ref @user_int : $@convention(thin) (Int) -> () // user: %22
+  %22 = apply %21(%20) : $@convention(thin) (Int) -> ()
+  %23 = tuple ()                                  // user: %25
+  dealloc_stack %1#0 : $*@local_storage foo       // id: %24
+  return %23 : $()                                // id: %25
+}
+
