@@ -914,11 +914,7 @@ class SILGlobalOptPass : public SILModuleTransform
     auto *CGA = PM->getAnalysis<CallGraphAnalysis>();
     if (SILGlobalOpt(getModule(), DA, CGA->getCallGraphOrNull()).run()) {
       // Preserve the CallGraph analysis.
-      if (CGA)
-        CGA->lockInvalidation();
       invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
-      if (CGA)
-        CGA->unlockInvalidation();
     }
   }
 

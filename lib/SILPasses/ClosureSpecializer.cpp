@@ -877,9 +877,7 @@ public:
     // We maintain the call graph, but delete calls, and introduce new
     // calls and branches in the cloned functions.
     if (Changed) {
-      CGA->lockInvalidation();
       invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
-      CGA->unlockInvalidation();
     }
 
     // If for testing purposes we were asked to not eliminate dead closures,

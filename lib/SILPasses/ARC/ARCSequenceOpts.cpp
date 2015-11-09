@@ -259,7 +259,7 @@ class ARCSequenceOpts : public SILFunctionTransform {
 
     if (processFunction(*getFunction(), false, AA, POTA, LRFI, LI, RCFI)) {
       processFunction(*getFunction(), true, AA, POTA, LRFI, LI, RCFI);
-      invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
+      invalidateAnalysis(SILAnalysis::PreserveKind::Branches);
     }
   }
 

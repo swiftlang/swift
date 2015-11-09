@@ -703,7 +703,7 @@ class DeadObjectElimination : public SILFunctionTransform {
     CG = CGA->getCallGraphOrNull();
 
     if (processFunction(*getFunction()))
-      invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
+      invalidateAnalysis(SILAnalysis::PreserveKind::Branches);
   }
 
   StringRef getName() override { return "Dead Object Elimination"; }

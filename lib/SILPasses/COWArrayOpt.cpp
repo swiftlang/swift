@@ -2352,9 +2352,7 @@ class SwiftArrayOptPass : public SILFunctionTransform {
       // We preserve the dominator tree and call graph. Let's
       // invalidate everything else.
       DA->lockInvalidation();
-      CGA->lockInvalidation();
       invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
-      CGA->unlockInvalidation();
       DA->unlockInvalidation();
     }
   }

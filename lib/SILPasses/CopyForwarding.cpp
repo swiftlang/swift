@@ -1064,7 +1064,7 @@ class CopyForwardingPass : public SILFunctionTransform
     // Perform NRVO
     for (auto Copy : NRVOCopies) {
       performNRVO(Copy);
-      invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
+      invalidateAnalysis(SILAnalysis::PreserveKind::Branches);
     }
 
     // Perform Copy Forwarding.
@@ -1088,11 +1088,10 @@ class CopyForwardingPass : public SILFunctionTransform
       } while (Forwarding.hasForwardedToCopy());
     }
     if (Forwarding.hasChangedCFG())
-      // We've split critical edges so we can't preserve CFG, but we did not
-      // change calls so we can preserve them.
-      invalidateAnalysis(SILAnalysis::PreserveKind::Calls);
+      // We've split critical edges so we can't preserve CFG.
+      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
     else
-      invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
+      invalidateAnalysis(SILAnalysis::PreserveKind::Branches);
   }
 
   StringRef getName() override { return "Copy Forwarding"; }

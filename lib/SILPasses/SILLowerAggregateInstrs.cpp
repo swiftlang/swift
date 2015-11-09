@@ -261,7 +261,7 @@ class SILLowerAggregate : public SILFunctionTransform {
           F->getName() << " *****\n");
     bool Changed = processFunction(*F);
     if (Changed)
-      invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
+      invalidateAnalysis(SILAnalysis::PreserveKind::Branches);
   }
 
   StringRef getName() override { return "Lower Aggregate Instructions"; }
