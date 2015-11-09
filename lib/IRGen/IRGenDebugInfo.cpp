@@ -694,7 +694,7 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(
     ? nullptr
     : createParameterTypes(SILTy, DeclCtx);
   llvm::DISubroutineType *DIFnTy = DBuilder.createSubroutineType(Params);
-  llvm::MDNode *TemplateParameters = nullptr;
+  llvm::DITemplateParameterArray TemplateParameters = nullptr;
   llvm::DISubprogram *Decl = nullptr;
 
   // Various flags
@@ -724,7 +724,10 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(
 
   llvm::DISubprogram *SP = DBuilder.createFunction(
       Scope, Name, LinkageName, File, Line, DIFnTy, IsLocalToUnit, IsDefinition,
-      ScopeLine, Flags, IsOptimized, Fn, TemplateParameters, Decl);
+      ScopeLine, Flags, IsOptimized, TemplateParameters, Decl);
+
+  if (Fn && !Fn->isDeclaration())
+    Fn->setSubprogram(SP);
 
   // RAUW the entry point function forward declaration with the real thing.
   if (LinkageName == SWIFT_ENTRY_POINT_FUNCTION) {
