@@ -445,7 +445,7 @@ argument drops from being O(n), depending on the size of the tree to O(1).
 
 
 There are two obvious disadvantages of using Array for COW semantics. The first
-problem is that Array exposes methods like `append` and `count` that don't make
+problem is that Array exposes methods like "append" and "count" that don't make
 any sense in the context of a value wrapper. These methods can make the use of
 the reference wrapper awkward. It is possible to work around this problem by
 creating a wrapper struct that will hide the unused APIs and the optimizer will
