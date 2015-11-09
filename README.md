@@ -55,7 +55,7 @@ For OS X, you need [the latest Xcode](https://developer.apple.com/xcode/download
 
 For Ubuntu, you'll need the following development dependencies:
 
-    sudo apt-get install git cmake ninja clang uuid-dev libicu-dev libbsd-dev libedit-dev swig libpython-dev libncurses5-dev
+    sudo apt-get install git cmake ninja clang uuid-dev libicu-dev libbsd-dev libedit-dev libxml2-dev swig libpython-dev libncurses5-dev
 
 Note: LLDB currently requires at least swig-1.3.40 but will successfully build
 with version 2 shipped with Ubuntu.
