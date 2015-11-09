@@ -39,6 +39,7 @@ class MemLocation;
 class LoadStoreValue;
 using LoadStoreValueList = llvm::SmallVector<LoadStoreValue, 8>;
 using MemLocationValueMap = llvm::DenseMap<MemLocation, LoadStoreValue>; 
+using ValueTableMap = llvm::SmallMapVector<unsigned, LoadStoreValue, 8>;
 
 /// This class represents either a single SILValue or a covering of values that
 /// we can forward from via the introdution of a SILArgument. This enables us
@@ -150,6 +151,13 @@ public:
     X.append(RHS.Path.getValue());
     Path = std::move(X);
     return *this;
+  }
+
+  /// Returns whether the LoadStoreValue has been initialized properly.
+  bool isValid() const {
+    if (IsCoveringValue)
+      return true;
+    return Base && Path.hasValue();
   }
 
   /// Returns true if the LoadStoreValue has a non-empty projection path.
