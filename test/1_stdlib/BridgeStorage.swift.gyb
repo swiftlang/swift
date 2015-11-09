@@ -87,24 +87,24 @@ struct BridgeObject<NativeType : AnyObject, ObjCType : AnyObject>
   }
   
   var nativeInstance: Native {
-    precondition(isNative)
+    require(isNative)
     return Builtin.bridgeFromRawPointer(rawObject)
   }
     
   var nativeInstance_noSpareBits: Native {
-    precondition(isNative)
-    precondition(spareBits == 0)
+    require(isNative)
+    require(spareBits == 0)
     return Builtin.bridgeFromRawPointer(rawObject)
   }
     
   mutating func isUniquelyReferenced_native_noSpareBits() -> Bool {
-    precondition(isNative)
-    precondition(spareBits == 0)
+    require(isNative)
+    require(spareBits == 0)
     return _isUnique_native(&object)
   }
 
   var objCInstance: ObjC {
-    precondition(isObjC)
+    require(isObjC)
     return Builtin.bridgeFromRawPointer(rawObject)
   }
     

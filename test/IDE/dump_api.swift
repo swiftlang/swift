@@ -430,7 +430,7 @@ public struct AnyForwardIndex : ForwardIndex {
 public func ~> (
   start: AnyForwardIndex, other : (_Distance, AnyForwardIndex)
 ) -> AnyForwardIndex.Distance {
-  precondition(
+  require(
     start._typeID == other.1._typeID,
     "distance: base index types differ.")
   return start._box._distanceTo(other.1._box)
@@ -446,7 +446,7 @@ public func ~> (
   start: AnyForwardIndex,
   args: (_Advance, (AnyForwardIndex.Distance, AnyForwardIndex))
 ) -> AnyForwardIndex {
-  precondition(
+  require(
     start._typeID == args.1.1._typeID, "advance: base index types differ.")
   return AnyForwardIndex(start._box._advancedBy(args.1.0, args.1.1._box))
 }
@@ -457,7 +457,7 @@ public func ~> (
 /// Requires: the types of indices wrapped by `lhs` and `rhs` are
 /// identical.
 public func == (lhs: AnyForwardIndex, rhs: AnyForwardIndex) -> Bool {
-  precondition(lhs._typeID == rhs._typeID, "base index types differ.")
+  require(lhs._typeID == rhs._typeID, "base index types differ.")
   return lhs._box.equals(rhs._box)
 }
 
@@ -506,7 +506,7 @@ public struct AnyBidirectionalIndex : BidirectionalIndex {
 public func ~> (
   start: AnyBidirectionalIndex, other : (_Distance, AnyBidirectionalIndex)
 ) -> AnyBidirectionalIndex.Distance {
-  precondition(
+  require(
     start._typeID == other.1._typeID,
     "distance: base index types differ.")
   return start._box._distanceTo(other.1._box)
@@ -522,7 +522,7 @@ public func ~> (
   start: AnyBidirectionalIndex,
   args: (_Advance, (AnyBidirectionalIndex.Distance, AnyBidirectionalIndex))
 ) -> AnyBidirectionalIndex {
-  precondition(
+  require(
     start._typeID == args.1.1._typeID, "advance: base index types differ.")
   return AnyBidirectionalIndex(start._box._advancedBy(args.1.0, args.1.1._box))
 }
@@ -533,7 +533,7 @@ public func ~> (
 /// Requires: the types of indices wrapped by `lhs` and `rhs` are
 /// identical.
 public func == (lhs: AnyBidirectionalIndex, rhs: AnyBidirectionalIndex) -> Bool {
-  precondition(lhs._typeID == rhs._typeID, "base index types differ.")
+  require(lhs._typeID == rhs._typeID, "base index types differ.")
   return lhs._box.equals(rhs._box)
 }
 
@@ -598,7 +598,7 @@ public struct AnyRandomAccessIndex : RandomAccessIndex {
 public func ~> (
   start: AnyRandomAccessIndex, other : (_Distance, AnyRandomAccessIndex)
 ) -> AnyRandomAccessIndex.Distance {
-  precondition(
+  require(
     start._typeID == other.1._typeID,
     "distance: base index types differ.")
   return start._box._distanceTo(other.1._box)
@@ -614,7 +614,7 @@ public func ~> (
   start: AnyRandomAccessIndex,
   args: (_Advance, (AnyRandomAccessIndex.Distance, AnyRandomAccessIndex))
 ) -> AnyRandomAccessIndex {
-  precondition(
+  require(
     start._typeID == args.1.1._typeID, "advance: base index types differ.")
   return AnyRandomAccessIndex(start._box._advancedBy(args.1.0, args.1.1._box))
 }
@@ -625,7 +625,7 @@ public func ~> (
 /// Requires: the types of indices wrapped by `lhs` and `rhs` are
 /// identical.
 public func == (lhs: AnyRandomAccessIndex, rhs: AnyRandomAccessIndex) -> Bool {
-  precondition(lhs._typeID == rhs._typeID, "base index types differ.")
+  require(lhs._typeID == rhs._typeID, "base index types differ.")
   return lhs._box.equals(rhs._box)
 }
 

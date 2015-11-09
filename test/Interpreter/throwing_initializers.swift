@@ -280,7 +280,7 @@ struct Chimera {
 func mustThrow<T>(f: () throws -> T) {
   do {
     try f()
-    preconditionFailure("Didn't throw")
+    requirementFailure("Didn't throw")
   } catch {}
 }
 

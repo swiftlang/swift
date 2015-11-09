@@ -14,7 +14,7 @@
 ///
 /// Use this function for internal sanity checks that are active
 /// during testing but do not impact performance of shipping code.
-/// To check for invalid usage in Release builds; see `precondition`.
+/// To check for invalid usage in Release builds; see `require`.
 ///
 /// * In playgrounds and -Onone builds (the default for Xcode's Debug
 ///   configuration): if `condition` evaluates to false, stop program
@@ -58,7 +58,7 @@ public func assert(
 ///   to satisfy that assumption in -Ounchecked builds is a serious
 ///   programming error.
 @_transparent
-public func precondition(
+public func require(
   @autoclosure condition: () -> Bool,
   @autoclosure _ message: () -> String = String(),
   file: StaticString = __FILE__, line: UInt = __LINE__
@@ -81,7 +81,7 @@ public func precondition(
 /// reach the call (e.g. in the `default` case of a `switch` where you
 /// have knowledge that one of the other cases must be satisfied). To
 /// protect code from invalid usage in Release builds; see
-/// `preconditionFailure`.
+/// `requirementFailure`.
 ///
 /// * In playgrounds and -Onone builds (the default for Xcode's Debug
 ///   configuration) stop program execution in a debuggable state
@@ -121,7 +121,7 @@ public func assertionFailure(
 ///   function will never be called. Failure to satisfy that assumption
 ///   is a serious programming error.
 @_transparent @noreturn
-public func preconditionFailure(
+public func requirementFailure(
   @autoclosure message: () -> String = String(),
   file: StaticString = __FILE__, line: UInt = __LINE__
 ) {

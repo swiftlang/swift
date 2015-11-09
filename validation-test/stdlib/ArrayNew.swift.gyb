@@ -1597,7 +1597,7 @@ final class EvilCollection : Collection {
 
   subscript(i: Int) -> TestValueTy {
     if boundsChecked {
-      precondition(i >= 0 && i < _count, evilBoundsError)
+      require(i >= 0 && i < _count, evilBoundsError)
     }
     return TestValueTy(i)
   }

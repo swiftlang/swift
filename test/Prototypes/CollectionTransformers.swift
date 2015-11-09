@@ -322,7 +322,7 @@ final class _ForkJoinWorkDeque<T> {
   init() {}
 
   deinit {
-    precondition(_deque.isEmpty)
+    require(_deque.isEmpty)
 
     _dequeMutex.`deinit`()
   }
@@ -557,12 +557,12 @@ public class ForkJoinTaskBase {
   }
 
   final public func fork() {
-    precondition(_pool == nil)
+    require(_pool == nil)
     if let thread = ForkJoinPool._getCurrentThread() {
       thread._forkTask(self)
     } else {
       // FIXME: decide if we want to allow this.
-      precondition(false)
+      require(false)
       ForkJoinPool.commonPool.forkTask(self)
     }
   }
@@ -591,7 +591,7 @@ final public class ForkJoinTask<Result> : ForkJoinTaskBase, _Future {
   /// It is not allowed to call _complete() in a racy way.  Only one thread
   /// should ever call _complete().
   internal func _complete(result: Result) {
-    precondition(!_completedEvent.isSet())
+    require(!_completedEvent.isSet())
     _result = result
     _completedEvent.set()
   }
@@ -763,7 +763,7 @@ final public class ForkJoinPool {
       return
     }
     _submissionQueuesMutex.withLock {
-      precondition(!_submissionQueues.isEmpty)
+      require(!_submissionQueues.isEmpty)
       for task in tasks {
         pickRandom(_submissionQueues).append(task)
       }
@@ -820,7 +820,7 @@ final public class ForkJoinPool {
       first!._run()
     } else {
       // FIXME: decide if we want to allow this.
-      precondition(false)
+      require(false)
     }
   }
 }

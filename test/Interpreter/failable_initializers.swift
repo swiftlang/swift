@@ -278,7 +278,7 @@ struct Chimera {
 
 func mustFail<T>(f: () -> T?) {
   if f() != nil {
-    preconditionFailure("Didn't fail")
+    requirementFailure("Didn't fail")
   }
 }
 

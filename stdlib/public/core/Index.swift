@@ -87,7 +87,7 @@ public protocol ForwardIndex : _Incrementable {
   ///
   /// The range check, if performed, is equivalent to:
   ///
-  ///     precondition(bounds.contains(index))
+  ///     require(bounds.contains(index))
   ///
   /// Use this function to perform a cheap range check for QoI purposes when
   /// memory safety is not a concern.  Do not rely on this range check for
@@ -105,10 +105,10 @@ public protocol ForwardIndex : _Incrementable {
   ///
   /// The range check, if performed, is equivalent to:
   ///
-  ///     precondition(
+  ///     require(
   ///       bounds.contains(range.startIndex) ||
   ///       range.startIndex == bounds.endIndex)
-  ///     precondition(
+  ///     require(
   ///       bounds.contains(range.endIndex) ||
   ///       range.endIndex == bounds.endIndex)
   ///

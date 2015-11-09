@@ -54,7 +54,7 @@ func posixPipe() -> (readFD: CInt, writeFD: CInt) {
     (fds) in
     let ptr = fds.baseAddress
     if pipe(ptr) != 0 {
-      preconditionFailure("pipe() failed")
+      requirementFailure("pipe() failed")
     }
   }
   return (fds[0], fds[1])
@@ -66,46 +66,46 @@ public func spawnChild(args: [String])
   -> (pid: pid_t, stdinFD: CInt, stdoutFD: CInt, stderrFD: CInt) {
   var fileActions: posix_spawn_file_actions_t = nil
   if swift_posix_spawn_file_actions_init(&fileActions) != 0 {
-    preconditionFailure("swift_posix_spawn_file_actions_init() failed")
+    requirementFailure("swift_posix_spawn_file_actions_init() failed")
   }
 
   let childStdin = posixPipe()
   // Close the write end of the pipe on the child side.
   if swift_posix_spawn_file_actions_addclose(
     &fileActions, childStdin.writeFD) != 0 {
-    preconditionFailure("swift_posix_spawn_file_actions_addclose() failed")
+    requirementFailure("swift_posix_spawn_file_actions_addclose() failed")
   }
 
   // Remap child's stdin.
   if swift_posix_spawn_file_actions_adddup2(
     &fileActions, childStdin.readFD, STDIN_FILENO) != 0 {
-    preconditionFailure("swift_posix_spawn_file_actions_adddup2() failed")
+    requirementFailure("swift_posix_spawn_file_actions_adddup2() failed")
   }
 
   let childStdout = posixPipe()
   // Close the read end of the pipe on the child side.
   if swift_posix_spawn_file_actions_addclose(
     &fileActions, childStdout.readFD) != 0 {
-    preconditionFailure("swift_posix_spawn_file_actions_addclose() failed")
+    requirementFailure("swift_posix_spawn_file_actions_addclose() failed")
   }
 
   // Remap child's stdout.
   if swift_posix_spawn_file_actions_adddup2(
     &fileActions, childStdout.writeFD, STDOUT_FILENO) != 0 {
-    preconditionFailure("swift_posix_spawn_file_actions_adddup2() failed")
+    requirementFailure("swift_posix_spawn_file_actions_adddup2() failed")
   }
 
   let childStderr = posixPipe()
   // Close the read end of the pipe on the child side.
   if swift_posix_spawn_file_actions_addclose(
     &fileActions, childStderr.readFD) != 0 {
-    preconditionFailure("swift_posix_spawn_file_actions_addclose() failed")
+    requirementFailure("swift_posix_spawn_file_actions_addclose() failed")
   }
 
   // Remap child's stderr.
   if swift_posix_spawn_file_actions_adddup2(
     &fileActions, childStderr.writeFD, STDERR_FILENO) != 0 {
-    preconditionFailure("swift_posix_spawn_file_actions_adddup2() failed")
+    requirementFailure("swift_posix_spawn_file_actions_adddup2() failed")
   }
 
   var pid: pid_t = -1
@@ -115,26 +115,26 @@ public func spawnChild(args: [String])
   }
   if spawnResult != 0 {
     print(String.fromCString(strerror(spawnResult)))
-    preconditionFailure("swift_posix_spawn() failed")
+    requirementFailure("swift_posix_spawn() failed")
   }
 
   if swift_posix_spawn_file_actions_destroy(&fileActions) != 0 {
-    preconditionFailure("swift_posix_spawn_file_actions_destroy() failed")
+    requirementFailure("swift_posix_spawn_file_actions_destroy() failed")
   }
 
   // Close the read end of the pipe on the parent side.
   if close(childStdin.readFD) != 0 {
-    preconditionFailure("close() failed")
+    requirementFailure("close() failed")
   }
 
   // Close the write end of the pipe on the parent side.
   if close(childStdout.writeFD) != 0 {
-    preconditionFailure("close() failed")
+    requirementFailure("close() failed")
   }
 
   // Close the write end of the pipe on the parent side.
   if close(childStderr.writeFD) != 0 {
-    preconditionFailure("close() failed")
+    requirementFailure("close() failed")
   }
 
   return (pid, childStdin.writeFD, childStdout.readFD, childStderr.readFD)
@@ -156,7 +156,7 @@ internal func _readAll(fd: CInt) -> String {
     if readResult == 0 {
       break
     }
-    preconditionFailure("read() failed")
+    requirementFailure("read() failed")
   }
   return String._fromCodeUnitSequenceWithRepair(
     UTF8.self, input: buffer[0..<usedBytes]).0
@@ -193,7 +193,7 @@ public enum ProcessTerminationStatus : CustomStringConvertible {
 public func posixWaitpid(pid: pid_t) -> ProcessTerminationStatus {
   var status: CInt = 0
   if waitpid(pid, &status, 0) < 0 {
-    preconditionFailure("waitpid() failed")
+    requirementFailure("waitpid() failed")
   }
   if (WIFEXITED(status)) {
     return .Exit(Int(WEXITSTATUS(status)))
@@ -201,7 +201,7 @@ public func posixWaitpid(pid: pid_t) -> ProcessTerminationStatus {
   if (WIFSIGNALED(status)) {
     return .Signal(Int(WTERMSIG(status)))
   }
-  preconditionFailure("did not understand what happened to child process")
+  requirementFailure("did not understand what happened to child process")
 }
 
 public func runChild(args: [String])
@@ -215,10 +215,10 @@ public func runChild(args: [String])
   let stderr = _readAll(stderrFD)
 
   if close(stdoutFD) != 0 {
-    preconditionFailure("close() failed")
+    requirementFailure("close() failed")
   }
   if close(stderrFD) != 0 {
-    preconditionFailure("close() failed")
+    requirementFailure("close() failed")
   }
   let status = posixWaitpid(pid)
   return (stdout, stderr, status)

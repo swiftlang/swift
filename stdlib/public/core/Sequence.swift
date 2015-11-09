@@ -33,7 +33,7 @@ public protocol IteratorProtocol {
   ///   since the copy was made, and no preceding call to `self.next()`
   ///   has returned `nil`.  Specific implementations of this protocol
   ///   are encouraged to respond to violations of this requirement by
-  ///   calling `preconditionFailure("...")`.
+  ///   calling `requirementFailure("...")`.
   @warn_unused_result
   mutating func next() -> Element?
 }
