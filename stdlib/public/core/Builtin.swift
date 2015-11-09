@@ -231,7 +231,7 @@ public func _unsafeReferenceCast<T, U>(x: T, _: U.Type) -> U {
 @_transparent
 @warn_unused_result
 public func unsafeDowncast<T : AnyObject>(x: AnyObject) -> T {
-  _debugPrecondition(x is T, "invalid unsafeDowncast")
+  _debugRequire(x is T, "invalid unsafeDowncast")
   return Builtin.castReference(x)
 }
 
@@ -251,7 +251,7 @@ public func unsafeUnwrap<T>(nonEmpty: T?) -> T {
   if let x = nonEmpty {
     return x
   }
-  _debugPreconditionFailure("unsafeUnwrap of nil optional")
+  _debugRequirementFailure("unsafeUnwrap of nil optional")
 }
 
 /// - Returns: `unsafeUnwrap(nonEmpty)`.

@@ -27,7 +27,7 @@ var UnmanagedTests = TestSuite("Unmanaged")
 UnmanagedTests.test("fromOpaque()/trap")
   .skip(.Custom(
     { !_isDebugAssertConfiguration() },
-    reason: "fromOpaque() does a _debugPrecondition() for null pointers"))
+    reason: "fromOpaque() does a _debugRequire() for null pointers"))
   .code {
   let null: OpaquePointer = getPointer(nil)
   expectCrashLater()

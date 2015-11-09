@@ -51,14 +51,14 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   /// Access the `i`th element in the buffer.
   public subscript(i: Int) -> Element {
     get {
-      _debugPrecondition(i >= 0)
-      _debugPrecondition(i < endIndex)
+      _debugRequire(i >= 0)
+      _debugRequire(i < endIndex)
       return _position[i]
     }
 %if Mutable:
     nonmutating set {
-      _debugPrecondition(i >= 0)
-      _debugPrecondition(i < endIndex)
+      _debugRequire(i >= 0)
+      _debugRequire(i < endIndex)
       _position[i] = newValue
     }
 %end

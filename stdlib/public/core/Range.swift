@@ -93,7 +93,7 @@ public struct Range<
   /// - Requires: `position` is a valid position in `self` and
   ///   `position != endIndex`.
   public subscript(position: Element) -> Element {
-    _debugPrecondition(position != endIndex, "Index out of range")
+    _debugRequire(position != endIndex, "Index out of range")
     return position
   }
 

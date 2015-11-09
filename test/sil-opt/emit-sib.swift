@@ -1,4 +1,4 @@
-// Started to fail after adding a `_debugPrecondition` in `UnsafeMutablePointer.initializeMemory`.
+// Started to fail after adding a `_debugRequire` in `UnsafeMutablePointer.initializeMemory`.
 // XFAIL: *
 // RUN: rm -rf %t && mkdir -p %t
 

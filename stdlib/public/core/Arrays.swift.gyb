@@ -930,11 +930,11 @@ internal func _arrayOutOfPlaceReplace<
   )
 }
 
-/// A _debugPrecondition check that `i` has exactly reached the end of
+/// A _debugRequire check that `i` has exactly reached the end of
 /// `s`.  This test is never used to ensure memory safety; that is
 /// always guaranteed by measuring `s` once and re-using that value.
 internal func _expectEnd<C : Collection>(i: C.Index, _ s: C) {
-  _debugPrecondition(
+  _debugRequire(
     i == s.endIndex,
       "invalid Collection: count differed in successive traversals"
     )

@@ -192,7 +192,7 @@ UnsafeMutablePointerTestSuite.test("moveInitializeBackwardFrom") {
   check(Check.RightOverlap)
   check(Check.Disjoint)
 
-  // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
+  // This check relies on _debugRequire() so will only trigger in -Onone mode.
   if _isDebugAssertConfiguration() {
     expectCrashLater()
     check(Check.LeftOverlap)
@@ -202,7 +202,7 @@ UnsafeMutablePointerTestSuite.test("moveInitializeBackwardFrom") {
 UnsafeMutablePointerTestSuite.test("moveAssignFrom") {
   let check = checkPtr(UnsafeMutablePointer.moveAssignFrom, true)
   check(Check.Disjoint)
-  // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
+  // This check relies on _debugRequire() so will only trigger in -Onone mode.
   if _isDebugAssertConfiguration() {
     expectCrashLater()
     check(Check.LeftOverlap)
@@ -211,7 +211,7 @@ UnsafeMutablePointerTestSuite.test("moveAssignFrom") {
 
 UnsafeMutablePointerTestSuite.test("moveAssignFrom.Right") {
   let check = checkPtr(UnsafeMutablePointer.moveAssignFrom, true)
-  // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
+  // This check relies on _debugRequire() so will only trigger in -Onone mode.
   if _isDebugAssertConfiguration() {
     expectCrashLater()
     check(Check.RightOverlap)
@@ -222,7 +222,7 @@ UnsafeMutablePointerTestSuite.test("assignFrom") {
   let check = checkPtr(UnsafeMutablePointer.assignFrom, true)
   check(Check.LeftOverlap)
   check(Check.Disjoint)
-  // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
+  // This check relies on _debugRequire() so will only trigger in -Onone mode.
   if _isDebugAssertConfiguration() {
     expectCrashLater()
     check(Check.RightOverlap)
@@ -233,7 +233,7 @@ UnsafeMutablePointerTestSuite.test("assignBackwardFrom") {
   let check = checkPtr(UnsafeMutablePointer.assignBackwardFrom, true)
   check(Check.RightOverlap)
   check(Check.Disjoint)
-  // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
+  // This check relies on _debugRequire() so will only trigger in -Onone mode.
   if _isDebugAssertConfiguration() {
     expectCrashLater()
     check(Check.LeftOverlap)
@@ -244,7 +244,7 @@ UnsafeMutablePointerTestSuite.test("moveInitializeFrom") {
   let check = checkPtr(UnsafeMutablePointer.moveInitializeFrom, false)
   check(Check.LeftOverlap)
   check(Check.Disjoint)
-  // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
+  // This check relies on _debugRequire() so will only trigger in -Onone mode.
   if _isDebugAssertConfiguration() {
     expectCrashLater()
     check(Check.RightOverlap)
@@ -254,7 +254,7 @@ UnsafeMutablePointerTestSuite.test("moveInitializeFrom") {
 UnsafeMutablePointerTestSuite.test("initializeFrom") {
   let check = checkPtr(UnsafeMutablePointer.initializeFrom, false)
   check(Check.Disjoint)
-  // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
+  // This check relies on _debugRequire() so will only trigger in -Onone mode.
   if _isDebugAssertConfiguration() {
     expectCrashLater()
     check(Check.LeftOverlap)
@@ -263,7 +263,7 @@ UnsafeMutablePointerTestSuite.test("initializeFrom") {
 
 UnsafeMutablePointerTestSuite.test("initializeFrom.Right") {
   let check = checkPtr(UnsafeMutablePointer.initializeFrom, false)
-  // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
+  // This check relies on _debugRequire() so will only trigger in -Onone mode.
   if _isDebugAssertConfiguration() {
     expectCrashLater()
     check(Check.RightOverlap)

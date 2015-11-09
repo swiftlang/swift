@@ -55,7 +55,7 @@ public class AnyIterator<T> : _AnyIteratorBase, Generator {
   /// initializer.
   override public init() {
     super.init()
-    _debugPrecondition(
+    _debugRequire(
       _typeID(self) != unsafeBitCast(AnyIterator.self, ObjectIdentifier.self),
       "AnyIterator<T> instances can not be created; create a subclass instance instead."
     )

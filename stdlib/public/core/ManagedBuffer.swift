@@ -356,7 +356,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   internal static func _checkValidBufferClass(
     bufferClass: AnyClass, creating: Bool = false
   ) {
-    _debugPrecondition(
+    _debugRequire(
       _class_getInstancePositiveExtentSize(bufferClass) == sizeof(_HeapObject.self)
       || (
         !creating
@@ -364,7 +364,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
           == _valueOffset + sizeof(Value.self)),
       "ManagedBufferPointer buffer class has illegal stored properties"
     )
-    _debugPrecondition(
+    _debugRequire(
       _usesNativeSwiftReferenceCounting(bufferClass),
       "ManagedBufferPointer buffer class must be non-@objc"
     )
