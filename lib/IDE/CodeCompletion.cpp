@@ -664,11 +664,8 @@ static ArrayRef<std::pair<StringRef, StringRef>> copyStringPairArray(
     llvm::BumpPtrAllocator &Allocator,
     ArrayRef<std::pair<StringRef, StringRef>> Arr) {
   std::pair<StringRef, StringRef> *Buff = Allocator.Allocate<std::pair<StringRef,
-  StringRef>>(Arr.size());
-  for (unsigned I = 0; I < Arr.size(); ++I) {
-    Buff[I].first = Arr[I].first;
-    Buff[I].second = Arr[I].second;
-  }
+    StringRef>>(Arr.size());
+  std::copy(Arr.begin(), Arr.end(), Buff);
   return llvm::makeArrayRef(Buff, Arr.size());
 }
 
