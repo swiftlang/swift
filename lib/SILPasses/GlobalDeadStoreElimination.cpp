@@ -79,6 +79,9 @@
 using namespace swift;
 using swift::MemLocation;
 
+static llvm::cl::opt<bool> EnableLocalStoreDSE("enable-local-store-dse",
+                                               llvm::cl::init(false));
+
 STATISTIC(NumDeadStores, "Number of dead stores removed");
 STATISTIC(NumPartialDeadStores, "Number of partial dead stores removed");
 
@@ -317,6 +320,11 @@ class DSEContext {
   /// Process Instructions. Extract MemLocations from SIL StoreInst.
   void processStoreInst(SILInstruction *Inst, bool BuildGenKillSet);
 
+  /// Process Instructions. Extract MemLocations from SIL DebugValueAddrInst.
+  /// DebugValueAddrInst operand maybe promoted to DebugValue, when this is
+  /// done, DebugValueAddrInst is effectively a read on the MemLocation.
+  void processDebugValueAddrInst(SILInstruction *I);
+
   /// Process Instructions. Extract MemLocations from SIL Unknown Memory Inst.
   void processUnknownReadMemInst(SILInstruction *Inst, bool BuildGenKillSet);
 
@@ -441,10 +449,20 @@ void DSEContext::mergeSuccessorStates(SILBasicBlock *BB) {
   BBState *C = getBBLocState(BB);
   C->clearMemLocations();
 
-  // If the basic block has no successor, then we do not need to do anything
-  // for its WriteSetOut.
-  if (BB->succ_empty())
-    return;
+  // If basic block has no successor, then all local writes can be considered
+  // dead at this point.
+  if (BB->succ_empty()) {
+    // There is currently a outstand radar in the swift type/aa system, will
+    // take this flag off once thats fixed.
+    if (!EnableLocalStoreDSE)
+      return;
+    for (unsigned i = 0; i < MemLocationVault.size(); ++i) {
+      if (!MemLocationVault[i].isNonEscapingLocalMemLocation())
+        continue;
+      C->startTrackingMemLocation(i);
+    }
+     return;
+  }
 
   // Use the first successor as the base condition.
   auto Iter = BB->succ_begin();
@@ -719,6 +737,18 @@ void DSEContext::processStoreInst(SILInstruction *I, bool BuildGenKillSet) {
   processWrite(I, getBBLocState(I), Val, Mem, BuildGenKillSet);
 }
 
+void DSEContext::processDebugValueAddrInst(SILInstruction *I) {
+  BBState *S = getBBLocState(I);
+  SILValue Mem = cast<DebugValueAddrInst>(I)->getOperand();
+  for (unsigned i = 0; i < S->WriteSetOut.size(); ++i) {
+    if (!S->isTrackingMemLocation(i))
+      continue;
+    if (AA->isNoAlias(Mem, MemLocationVault[i].getBase()))
+      continue;
+    getBBLocState(I)->stopTrackingMemLocation(i);
+  }
+}
+
 void DSEContext::processUnknownReadMemInst(SILInstruction *I,
                                            bool BuildGenKillSet) {
   BBState *S = getBBLocState(I);
@@ -759,6 +789,8 @@ void DSEContext::processInstruction(SILInstruction *I, bool BuildGenKillSet) {
     processLoadInst(I, BuildGenKillSet);
   } else if (isa<StoreInst>(I)) {
     processStoreInst(I, BuildGenKillSet);
+  } else if (isa<DebugValueAddrInst>(I)) {
+    processDebugValueAddrInst(I);
   } else if (I->mayReadFromMemory()) {
     processUnknownReadMemInst(I, BuildGenKillSet);
   }
