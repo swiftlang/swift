@@ -628,16 +628,16 @@ StringTests.test("stringCoreExtensibility") {
         
         for i in 0..<length {
           x.appendContentsOf(
-            Repeat(repeating: i < boundary ? ascii : nonAscii, length: 3))
+            Repeated(repeating: i < boundary ? ascii : nonAscii, length: 3))
         }
         // Make sure we can append pure ASCII to wide storage
-        x.appendContentsOf(Repeat(repeating: ascii, length: 2))
+        x.appendContentsOf(Repeated(repeating: ascii, length: 2))
         
         expectEqualSequence(
           [UTF16.CodeUnit(UnicodeScalar("b").value)]
-          + Array(Repeat(repeating: ascii, length: 3*boundary))
-          + Repeat(repeating: nonAscii, length: 3*(length - boundary))
-          + Repeat(repeating: ascii, length: 2),
+          + Array(Repeated(repeating: ascii, length: 3*boundary))
+          + Repeated(repeating: nonAscii, length: 3*(length - boundary))
+          + Repeated(repeating: ascii, length: 2),
           x
         )
       }
@@ -769,17 +769,17 @@ StringTests.test("reserveCapacity") {
   let id0 = s.bufferID
   let oldCap = s.capacity
   let x: Character = "x" // Help the typechecker - <rdar://problem/17128913>
-  s.insertContentsOf(Repeat(repeating: x, length: s.capacity + 1), at: s.endIndex)
+  s.insertContentsOf(Repeated(repeating: x, length: s.capacity + 1), at: s.endIndex)
   expectNotEqual(id0, s.bufferID)
   s = ""
   print("empty capacity \(s.capacity)")
   s.reserveCapacity(oldCap + 2)
   print("reserving \(oldCap + 2) -> \(s.capacity), width = \(s._core.elementWidth)")
   let id1 = s.bufferID
-  s.insertContentsOf(Repeat(repeating: x, length: oldCap + 2), at: s.endIndex)
+  s.insertContentsOf(Repeated(repeating: x, length: oldCap + 2), at: s.endIndex)
   print("extending by \(oldCap + 2) -> \(s.capacity), width = \(s._core.elementWidth)")
   expectEqual(id1, s.bufferID)
-  s.insertContentsOf(Repeat(repeating: x, length: s.capacity + 100), at: s.endIndex)
+  s.insertContentsOf(Repeated(repeating: x, length: s.capacity + 100), at: s.endIndex)
   expectNotEqual(id1, s.bufferID)
 }
 

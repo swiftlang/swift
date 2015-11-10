@@ -1,4 +1,4 @@
-//===--- Repeat.swift - A Collection that repeats a value N times -----===//
+//===--- Repeated.swift - A Collection that repeats a value N times -------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A collection whose elements are all identical `Element`s.
-public struct Repeat<Element> : Collection {
+public struct Repeated<Element> : Collection {
   /// A type that represents a valid position in the collection.
   /// 
   /// Valid indices consist of the position of every element and a

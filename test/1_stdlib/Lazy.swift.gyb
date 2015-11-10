@@ -23,30 +23,30 @@ var LazyTestSuite = TestSuite("Lazy")
 protocol TestProtocol1 {}
 
 //===----------------------------------------------------------------------===//
-// Repeat
+// Repeated
 //===----------------------------------------------------------------------===//
 
 // Check that the generic parameter is called 'Element'.
-extension Repeat where Element : TestProtocol1 {
+extension Repeated where Element : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
 }
 
-LazyTestSuite.test("Repeat") {
+LazyTestSuite.test("Repeated") {
   checkRandomAccessCollection(
     [] as Array<OpaqueValue<Int>>,
-    Repeat(repeating: OpaqueValue(42), length: 0))
+    Repeated(repeating: OpaqueValue(42), length: 0))
     { $0.value == $1.value }
 
   checkRandomAccessCollection(
     [ OpaqueValue(42) ] as Array<OpaqueValue<Int>>,
-    Repeat(repeating: OpaqueValue(42), length: 1))
+    Repeated(repeating: OpaqueValue(42), length: 1))
     { $0.value == $1.value }
 
   checkRandomAccessCollection(
     [ OpaqueValue(42), OpaqueValue(42), OpaqueValue(42) ] as Array<OpaqueValue<Int>>,
-    Repeat(repeating: OpaqueValue(42), length: 3))
+    Repeated(repeating: OpaqueValue(42), length: 3))
     { $0.value == $1.value }
 }
 
