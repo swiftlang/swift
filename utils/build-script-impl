@@ -2003,6 +2003,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 DSTROOT="${INSTALL_DESTDIR}" BUILD_DIR="${build_dir}" ./install
                 popd
                 { set +x; } 2>/dev/null
+                ;;
             *)
                 echo "error: unknown product: ${product}"
                 exit 1
