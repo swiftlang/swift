@@ -85,6 +85,7 @@ KNOWN_SETTINGS=(
     install-symroot             ""               "the path to install debug symbols into"
     swift-install-components    ""               "a semicolon-separated list of Swift components to install"
     installable-package         ""               "the path to the archive of the installation directory"
+    test-installable-package    ""               "whether to run post-packaging tests on the produced package"
     symbols-package             ""               "the path to the archive of the symbols directory"
     show-sdks                   ""               "print installed Xcode and SDK versions"
     reconfigure                 ""               "force a CMake configuration run even if CMakeCache.txt already exists"
@@ -2087,6 +2088,20 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
     else
       (cd "${INSTALL_DESTDIR}" &&
         tar -c -z -f "${INSTALLABLE_PACKAGE}" --owner=0 --group=0 "${INSTALL_PREFIX/#\/}")
+    fi
+    if [[ "${TEST_INSTALLABLE_PACKAGE}" ]] ; then
+        PKG_TESTS_SOURCE_DIR="${WORKSPACE}/swift-package-tests"
+        PKG_TESTS_SANDBOX="/tmp/swift_package_sandbox"
+        LIT_EXECUTABLE_PATH="${LLVM_SOURCE_DIR}/utils/lit/lit.py"
+        FILECHECK_EXECUTABLE_PATH="$(build_directory_bin $deployment_target llvm)/FileCheck"
+
+        rm -rf "${PKG_TESTS_SANDBOX}"
+        mkdir "${PKG_TESTS_SANDBOX}"
+        pushd "${PKG_TESTS_SANDBOX}"
+        tar xzf "${INSTALLABLE_PACKAGE}"
+        popd
+        (cd "${PKG_TESTS_SOURCE_DIR}" &&
+                python "${LIT_EXECUTABLE_PATH}" . --param package-path="${PKG_TESTS_SANDBOX}" --param filecheck="${FILECHECK_EXECUTABLE_PATH}")
     fi
 fi
 
