@@ -47,7 +47,7 @@ public struct Repeated<Element> : Collection {
   }
 
   /// The number of elements in this collection.
-  public var length: Int
+  public let length: Int
 
   /// The value of every element in this collection.
   public let repeatedValue: Element
