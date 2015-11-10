@@ -76,7 +76,7 @@ func _reportFatalError(
 func _reportUnimplementedInitializerInFile(
   className: UnsafePointer<UInt8>, _ classNameLength: UInt,
   _ initName: UnsafePointer<UInt8>, _ initNameLength: UInt,
-  _ file: UnsafePointer<UInt8>, _ fileLength: UInt,
+  _ fileName: UnsafePointer<UInt8>, _ fileNameLength: UInt,
   _ line: UInt, _ column: UInt)
 
 @_silgen_name("swift_reportUnimplementedInitializer")
@@ -102,9 +102,9 @@ func _assertionFailed(
       file.withUTF8Buffer {
         (file) -> Void in
         _reportFatalErrorInFile(
-          prefix.baseAddress, UInt(prefix.count),
-          message.baseAddress, UInt(message.count),
-          file.baseAddress, UInt(file.count), line)
+          prefix.baseAddress, UInt(prefix.length),
+          message.baseAddress, UInt(message.length),
+          file.baseAddress, UInt(file.length), line)
         Builtin.int_trap()
       }
     }
@@ -131,9 +131,9 @@ func _assertionFailed(
       file.withUTF8Buffer {
         (file) -> Void in
         _reportFatalErrorInFile(
-          prefix.baseAddress, UInt(prefix.count),
-          messageUTF8.baseAddress, UInt(messageUTF8.count),
-          file.baseAddress, UInt(file.count), line)
+          prefix.baseAddress, UInt(prefix.length),
+          messageUTF8.baseAddress, UInt(messageUTF8.length),
+          file.baseAddress, UInt(file.length), line)
       }
     }
   }
@@ -158,9 +158,9 @@ func _fatalErrorMessage(prefix: StaticString, _ message: StaticString,
       file.withUTF8Buffer {
         (file) in
         _reportFatalErrorInFile(
-          prefix.baseAddress, UInt(prefix.count),
-          message.baseAddress, UInt(message.count),
-          file.baseAddress, UInt(file.count), line)
+          prefix.baseAddress, UInt(prefix.length),
+          message.baseAddress, UInt(message.length),
+          file.baseAddress, UInt(file.length), line)
       }
     }
   }
@@ -170,8 +170,8 @@ func _fatalErrorMessage(prefix: StaticString, _ message: StaticString,
     message.withUTF8Buffer {
       (message) in
       _reportFatalError(
-        prefix.baseAddress, UInt(prefix.count),
-        message.baseAddress, UInt(message.count))
+        prefix.baseAddress, UInt(prefix.length),
+        message.baseAddress, UInt(message.length))
     }
   }
 #endif
@@ -201,9 +201,9 @@ func _unimplemented_initializer(className: StaticString,
         file.withUTF8Buffer {
           (file) in
           _reportUnimplementedInitializerInFile(
-            className.baseAddress, UInt(className.count),
-            initName.baseAddress, UInt(initName.count),
-            file.baseAddress, UInt(file.count), line, column)
+            className.baseAddress, UInt(className.length),
+            initName.baseAddress, UInt(initName.length),
+            file.baseAddress, UInt(file.length), line, column)
         }
       }
     }
@@ -213,8 +213,8 @@ func _unimplemented_initializer(className: StaticString,
       initName.withUTF8Buffer {
         (initName) in
         _reportUnimplementedInitializer(
-          className.baseAddress, UInt(className.count),
-          initName.baseAddress, UInt(initName.count))
+          className.baseAddress, UInt(className.length),
+          initName.baseAddress, UInt(initName.length))
       }
     }
   }

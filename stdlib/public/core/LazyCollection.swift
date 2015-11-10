@@ -80,7 +80,7 @@ extension LazyCollection : Sequence {
   /// `self`, **nondestructively**.
   ///
   /// - Complexity: O(N).
-  public func underestimateCount() -> Int { return _base.underestimateCount() }
+  public func underestimateLength() -> Int { return _base.underestimateLength() }
 
   public func _copyToNativeArrayBuffer() 
      -> _ContiguousArrayBuffer<Base.Iterator.Element> {
@@ -142,8 +142,8 @@ extension LazyCollection : Collection {
   ///
   /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndex`;
   ///   O(N) otherwise.
-  public var count: Index.Distance {
-    return _base.count
+  public var length: Index.Distance {
+    return _base.length
   }
   
   // The following requirement enables dispatching for indexOf when

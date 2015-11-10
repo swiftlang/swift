@@ -66,7 +66,7 @@ extension String {
         // `u` is a high-surrogate.  Sequence is well-formed if it
         // is followed by a low-surrogate.
         if _fastPath(
-               index + 1 < _core.count &&
+               index + 1 < _core.length &&
                (_core[index + 1] >> 10) == 0b1101_11) {
           return u
         }
@@ -112,7 +112,7 @@ extension String {
 
     internal init(_ _core: _StringCore) {
       self._offset = 0
-      self._length = _core.count
+      self._length = _core.length
       self._core = _core
     }
 

@@ -13,9 +13,9 @@ do {
     baseElements.appendContentsOf(elements)
     baseElements.appendContentsOf(suffix.map(OpaqueValue.init))
     let base = ${Base}(elements: baseElements)
-    let startIndex = base.startIndex.advancedBy(numericCast(prefix.count))
+    let startIndex = base.startIndex.advancedBy(numericCast(prefix.length))
     let endIndex = base.startIndex.advancedBy(
-      numericCast(prefix.count + elements.count))
+      numericCast(prefix.length + elements.length))
     return ${Wrapper}(
       base: base,
       bounds: startIndex..<endIndex)
@@ -27,9 +27,9 @@ do {
     baseElements.appendContentsOf(elements)
     baseElements.appendContentsOf(suffix.map(MinimalEquatableValue.init))
     let base = ${Base}(elements: baseElements)
-    let startIndex = base.startIndex.advancedBy(numericCast(prefix.count))
+    let startIndex = base.startIndex.advancedBy(numericCast(prefix.length))
     let endIndex = base.startIndex.advancedBy(
-      numericCast(prefix.count + elements.count))
+      numericCast(prefix.length + elements.length))
     return ${Wrapper}(
       base: base,
       bounds: startIndex..<endIndex)
@@ -41,9 +41,9 @@ do {
     baseElements.appendContentsOf(elements)
     baseElements.appendContentsOf(suffix.map(MinimalComparableValue.init))
     let base = ${Base}(elements: baseElements)
-    let startIndex = base.startIndex.advancedBy(numericCast(prefix.count))
+    let startIndex = base.startIndex.advancedBy(numericCast(prefix.length))
     let endIndex = base.startIndex.advancedBy(
-      numericCast(prefix.count + elements.count))
+      numericCast(prefix.length + elements.length))
     return ${Wrapper}(
       base: base,
       bounds: startIndex..<endIndex)

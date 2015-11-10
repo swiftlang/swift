@@ -12,25 +12,25 @@
 
 
 extension String {
-  /// Construct an instance that is the concatenation of `count` copies
+  /// Construct an instance that is the concatenation of `length` copies
   /// of `repeatedValue`.
-  public init(repeating repeatedValue: Character, count: Int) {
+  public init(repeating repeatedValue: Character, length: Int) {
     let s = String(repeatedValue)
     self = String(_storage: _StringBuffer(
-        capacity: s._core.count * count,
+        capacity: s._core.length * length,
         initialSize: 0,
         elementWidth: s._core.elementWidth))
-    for _ in 0..<count {
+    for _ in 0..<length {
       self += s
     }
   }
 
-  /// Construct an instance that is the concatenation of `count` copies
+  /// Construct an instance that is the concatenation of `length` copies
   /// of `Character(repeatedValue)`.
-  public init(repeating repeatedValue: UnicodeScalar, count: Int) {
+  public init(repeating repeatedValue: UnicodeScalar, length: Int) {
     self = String._fromWellFormedCodeUnitSequence(
       UTF32.self,
-      input: Repeat(repeating: repeatedValue.value, count: count))
+      input: Repeat(repeating: repeatedValue.value, length: length))
   }
   
   public var _lines : [String] {
@@ -45,13 +45,13 @@ extension String {
 
   /// `true` iff `self` contains no characters.
   public var isEmpty : Bool {
-    return _core.count == 0
+    return _core.length == 0
   }
 }
 
 extension String {
   public init(_ _c: UnicodeScalar) {
-    self = String(repeating: _c, count: 1)
+    self = String(repeating: _c, length: 1)
   }
 
   @warn_unused_result

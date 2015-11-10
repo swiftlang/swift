@@ -36,7 +36,7 @@ extension Collection where ${GElement} : Equatable {
   /// Returns the first index where `value` appears in `self` or `nil` if
   /// `value` is not found.
   ///
-  /// - Complexity: O(`self.count`).
+  /// - Complexity: O(`self.length`).
   @warn_unused_result
   public func indexOf(element: ${GElement}) -> Index? {
     if let result = _customIndexOfEquatableElement(element) {
@@ -56,7 +56,7 @@ extension Collection {
   /// Returns the first index where `predicate` returns `true` for the
   /// corresponding value, or `nil` if such value is not found.
   ///
-  /// - Complexity: O(`self.count`).
+  /// - Complexity: O(`self.length`).
   @warn_unused_result
   public func indexOf(
     @noescape predicate: (${GElement}) throws -> Bool
@@ -146,9 +146,9 @@ ${orderingRequirementForComparable}
 %   end
 
     let maybeResult = _withUnsafeMutableBufferPointerIfSupported {
-      (baseAddress, count) -> Index in
+      (baseAddress, length) -> Index in
       var bufferPointer =
-        UnsafeMutableBufferPointer(start: baseAddress, count: count)
+        UnsafeMutableBufferPointer(start: baseAddress, length: length)
       let startOffset = startIndex.distanceTo(range.startIndex)
       let unsafeBufferStartIndex =
         bufferPointer.startIndex + numericCast(startOffset)
@@ -261,9 +261,9 @@ ${orderingRequirementForComparable}
   public mutating func sortInPlace() {
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
-      (baseAddress, count) -> Void in
+      (baseAddress, length) -> Void in
       var bufferPointer =
-        UnsafeMutableBufferPointer(start: baseAddress, count: count)
+        UnsafeMutableBufferPointer(start: baseAddress, length: length)
       bufferPointer.sortInPlace()
       return ()
     }
@@ -289,9 +289,9 @@ ${orderingRequirementForPredicate}
 
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
-      (baseAddress, count) -> Void in
+      (baseAddress, length) -> Void in
       var bufferPointer =
-        UnsafeMutableBufferPointer(start: baseAddress, count: count)
+        UnsafeMutableBufferPointer(start: baseAddress, length: length)
       bufferPointer.sortInPlace(escapableIsOrderedBefore)
       return ()
     }

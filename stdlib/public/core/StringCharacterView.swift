@@ -251,7 +251,7 @@ extension String.CharacterView : Collection {
 
     var disposition: _MirrorDisposition { return .Aggregate }
 
-    var count: Int { return 0 }
+    var length: Int { return 0 }
 
     subscript(i: Int) -> (String, _Mirror) {
       _requirementFailure("_Mirror access out of bounds")
@@ -275,7 +275,7 @@ extension String.CharacterView : RangeReplaceableCollection {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`bounds.count`) if `bounds.endIndex
+  /// - Complexity: O(`bounds.length`) if `bounds.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceSubrange<
     C: Collection where C.Iterator.Element == Character
@@ -312,7 +312,7 @@ extension String.CharacterView : RangeReplaceableCollection {
   public mutating func appendContentsOf<
     S : Sequence where S.Iterator.Element == Character
   >(newElements: S) {
-    reserveCapacity(_core.count + newElements.underestimateCount())
+    reserveCapacity(_core.length + newElements.underestimateLength())
     for c in newElements {
       self.append(c)
     }

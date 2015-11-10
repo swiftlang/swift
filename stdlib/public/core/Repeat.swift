@@ -18,10 +18,10 @@ public struct Repeat<Element> : Collection {
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = Int
 
-  /// Construct an instance that contains `count` elements having the
+  /// Construct an instance that contains `length` elements having the
   /// value `repeatedValue`.
-  public init(repeating repeatedValue: Element, count: Int) {
-    self.count = count
+  public init(repeating repeatedValue: Element, length: Int) {
+    self.length = length
     self.repeatedValue = repeatedValue
   }
   
@@ -31,10 +31,10 @@ public struct Repeat<Element> : Collection {
     return 0
   }
 
-  /// Always equal to `count`, which is one greater than the index of
+  /// Always equal to `length`, which is one greater than the index of
   /// the last element in a non-empty instance.
   public var endIndex: Index {
-    return count
+    return length
   }
 
   /// Access the element at `position`.
@@ -42,12 +42,12 @@ public struct Repeat<Element> : Collection {
   /// - Requires: `position` is a valid position in `self` and
   ///   `position != endIndex`.
   public subscript(position: Int) -> Element {
-    _require(position >= 0 && position < count, "Index out of range")
+    _require(position >= 0 && position < length, "Index out of range")
     return repeatedValue
   }
 
   /// The number of elements in this collection.
-  public var count: Int
+  public var length: Int
 
   /// The value of every element in this collection.
   public let repeatedValue: Element

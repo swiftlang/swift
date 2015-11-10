@@ -145,7 +145,7 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() const {
           .Case("array.uninitialized", ArrayCallKind::kArrayUninitialized)
           .Case("array.check_subscript", ArrayCallKind::kCheckSubscript)
           .Case("array.check_index", ArrayCallKind::kCheckIndex)
-          .Case("array.get_count", ArrayCallKind::kGetCount)
+          .Case("array.get_length", ArrayCallKind::kGetCount)
           .Case("array.get_capacity", ArrayCallKind::kGetCapacity)
           .Case("array.get_element", ArrayCallKind::kGetElement)
           .Case("array.owner", ArrayCallKind::kGetArrayOwner)

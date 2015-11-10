@@ -27,7 +27,7 @@ extension String {
     }
     let len = Int(_swift_stdlib_strlen(cs))
     return String._fromCodeUnitSequence(UTF8.self,
-        input: UnsafeBufferPointer(start: UnsafeMutablePointer(cs), count: len))
+      input: UnsafeBufferPointer(start: UnsafeMutablePointer(cs), length: len))
   }
 
   /// Creates a new `String` by copying the nul-terminated UTF-8 data
@@ -45,7 +45,7 @@ extension String {
     }
     let len = Int(_swift_stdlib_strlen(cs))
     let (result, hadError) = String._fromCodeUnitSequenceWithRepair(UTF8.self,
-        input: UnsafeBufferPointer(start: UnsafeMutablePointer(cs), count: len))
+      input: UnsafeBufferPointer(start: UnsafeMutablePointer(cs), length: len))
     return (result, hadError: hadError)
   }
 }
@@ -59,7 +59,7 @@ public func _persistCString(s: UnsafePointer<CChar>) -> [CChar]? {
     return nil
   }
   let length = Int(_swift_stdlib_strlen(s))
-  var result = [CChar](repeating: 0, count: length + 1)
+  var result = [CChar](repeating: 0, length: length + 1)
   for var i = 0; i < length; ++i {
     // FIXME: this will not compile on platforms where 'CChar' is unsigned.
     result[i] = s[i]

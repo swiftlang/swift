@@ -209,7 +209,7 @@ ArrayTraps.test("unsafeLength")
   expectCrashLater()
 
   a.withUnsafeBufferPointer {
-    UnsafeBufferPointer(start: $0.baseAddress, count: -1)
+    UnsafeBufferPointer(start: $0.baseAddress, length: -1)
   }
 }
 
@@ -254,7 +254,7 @@ class ViolateInoutSafeySwitchToObjcBuffer {
     // Simulate what happens if we hoist array properties out of a loop and the
     // loop calls a function that violates inout safety and overrides the array.
     let isNativeTypeChecked = A._hoistableIsNativeTypeChecked()
-    for i in 0..<A.count {
+    for i in 0..<A.length {
       let t = A._checkSubscript(
         i, wasNativeTypeChecked: isNativeTypeChecked)
       _ = A._getElement(
@@ -297,7 +297,7 @@ class ViolateInoutSafeyNeedElementTypeCheck {
     // Simulate what happens if we hoist array properties out of a loop and the
     // loop calls a function that violates inout safety and overrides the array.
     let isNativeTypeChecked = A._hoistableIsNativeTypeChecked()
-    for i in 0..<A.count {
+    for i in 0..<A.length {
       let t = A._checkSubscript(
         i, wasNativeTypeChecked: isNativeTypeChecked)
       _ = A._getElement(

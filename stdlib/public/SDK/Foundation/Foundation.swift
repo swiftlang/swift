@@ -103,7 +103,7 @@ extension NSString : StringLiteralConvertible {
     if value.hasPointerRepresentation {
       immutableResult = NSString(
         bytesNoCopy: UnsafeMutablePointer<Void>(value.utf8Start),
-        length: Int(value.byteSize),
+        length: Int(value.lengthInBytes),
         encoding: value.isASCII ? NSASCIIStringEncoding : NSUTF8StringEncoding,
         freeWhenDone: false)!
     } else {
@@ -410,7 +410,7 @@ extension NSArray : ArrayLiteralConvertible {
     // + (instancetype)arrayWithObjects:(const id [])objects count:(NSUInteger)cnt;
     let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
     self.init(
-      objects: UnsafeMutablePointer(x.firstElementAddress), count: x.count)
+      objects: UnsafeMutablePointer(x.firstElementAddress), count: x.length)
     _fixLifetime(x)
   }
 }
@@ -525,7 +525,7 @@ extension NSDictionary : DictionaryLiteralConvertible {
     self.init(
       objects: elements.map { (AnyObject?)($0.1) },
       forKeys: elements.map { (NSCopying?)($0.0) },
-      count: elements.count)
+      count: elements.length)
   }
 }
 
@@ -632,7 +632,7 @@ extension Dictionary : _ObjectiveCBridgeable {
 
     // `Dictionary<Key, Value>` where either `Key` or `Value` is a value type
     // may not be backed by an NSDictionary.
-    var builder = _DictionaryBuilder<Key, Value>(count: d.count)
+    var builder = _DictionaryBuilder<Key, Value>(length: d.count)
     d.enumerateKeysAndObjectsUsingBlock {
       (anyObjectKey: AnyObject, anyObjectValue: AnyObject,
        stop: UnsafeMutablePointer<ObjCBool>) in
@@ -887,7 +887,7 @@ extension Set : _ObjectiveCBridgeable {
 
     // `Set<Element>` where `Element` is a value type may not be backed by
     // an NSSet.
-    var builder = _SetBuilder<Element>(count: s.count)
+    var builder = _SetBuilder<Element>(length: s.count)
     s.enumerateObjectsUsingBlock {
       (anyObjectMember: AnyObject, stop: UnsafeMutablePointer<ObjCBool>) in
       builder.add(member: Swift._forceBridgeFromObjectiveC(
@@ -964,7 +964,7 @@ extension NSEnumerator : Sequence {
 extension NSRange {
   public init(_ x: Range<Int>) {
     location = x.startIndex
-    length = x.count
+    length = x.length
   }
 
   @warn_unused_result
@@ -1129,7 +1129,7 @@ extension NSArray {
     // @objc(initWithObjects:count:)
     //    init(withObjects objects: UnsafePointer<AnyObject?>,
     //    count cnt: Int)
-    self.init(objects: UnsafeMutablePointer(x.firstElementAddress), count: x.count)
+    self.init(objects: UnsafeMutablePointer(x.firstElementAddress), count: x.length)
     _fixLifetime(x)
   }
 }

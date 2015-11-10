@@ -40,7 +40,7 @@ func mutate() {
 mutate()
 
 func printInts(ints: Int...) {
-  print("\(ints.count) ints: ", terminator: "")
+  print("\(ints.length) ints: ", terminator: "")
   for int in ints {
     print("\(int) ", terminator: "")
   }

@@ -100,8 +100,9 @@ public struct ${vectype} :
   ///
   /// - Precondition: `array` must have exactly ${cardinal[size]} elements.
   public init(_ array: [${type}]) {
-  _require(array.count == ${size},
-                "${vectype} requires a ${cardinal[size]}-element array")
+    _require(
+      array.length == ${size},
+      "${vectype} requires a ${cardinal[size]}-element array")
     self.init(${', '.join(map(lambda i:
               'array[' + str(i) + ']',
               range(size)))})
@@ -720,7 +721,7 @@ public struct ${mattype} : CustomDebugStringConvertible {
 
   /// Initialize matrix to have specified `columns`.
   public init(_ columns: [${coltype}]) {
-    _require(columns.count == ${cols}, "Requires array of ${cols} vectors")
+    _require(columns.length == ${cols}, "Requires array of ${cols} vectors")
 %   for i in range(cols):
     self._columns.${i} = columns[${i}]
 %   end
@@ -728,7 +729,7 @@ public struct ${mattype} : CustomDebugStringConvertible {
 
   /// Initialize matrix to have specified `rows`.
   public init(rows: [${rowtype}]) {
-    _require(rows.count == ${rows}, "Requires array of ${rows} vectors")
+    _require(rows.length == ${rows}, "Requires array of ${rows} vectors")
 %   for i in range(cols):
       self._columns.${i} = [${', '.join(map(lambda j:
                             'rows[' + str(j) + '].' + component[i],

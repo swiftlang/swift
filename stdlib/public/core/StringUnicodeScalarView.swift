@@ -148,12 +148,12 @@ extension String {
             self._ascii = true
             self._asciiBase = UnsafeBufferPointer<UInt8>(
               start: UnsafePointer(_base._baseAddress),
-              count: _base.count).iterator()
+              length: _base.length).iterator()
           } else {
             self._ascii = false
             self._base = UnsafeBufferPointer<UInt16>(
               start: UnsafePointer(_base._baseAddress),
-              count: _base.count).iterator()
+              length: _base.length).iterator()
           }
         } else {
           self._ascii = false
@@ -278,7 +278,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`bounds.count`) if `bounds.endIndex
+  /// - Complexity: O(`bounds.length`) if `bounds.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceSubrange<
     C: Collection where C.Iterator.Element == UnicodeScalar

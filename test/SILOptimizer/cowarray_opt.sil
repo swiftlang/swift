@@ -36,7 +36,7 @@ struct ContainerContainer {
 }
 
 sil [_semantics "array.make_mutable"] @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-sil [_semantics "array.get_count"] @guaranteed_array_get_count : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
+sil [_semantics "array.get_length"] @guaranteed_array_get_count : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
 sil [_semantics "array.get_capacity"] @guaranteed_array_get_capacity : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
 sil [_semantics "array.mutate_unknown"] @array_unknown_mutate : $@convention(method) (@inout MyArray<MyStruct>) -> ()
 

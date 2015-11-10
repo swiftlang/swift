@@ -16,12 +16,12 @@ protocol _ArrayProtocol
     ArrayLiteralConvertible
 {
   //===--- public interface -----------------------------------------------===//
-  /// Construct an array of `count` elements, each initialized to
+  /// Construct an array of `length` elements, each initialized to
   /// `repeatedValue`.
-  init(repeating repeatedValue: Iterator.Element, count: Int)
+  init(repeating repeatedValue: Iterator.Element, length: Int)
 
   /// The number of elements the Array stores.
-  var count: Int {get}
+  var length: Int {get}
 
   /// The number of elements the Array can store without reallocation.
   var capacity: Int {get}
@@ -45,7 +45,7 @@ protocol _ArrayProtocol
   /// - Postcondition: `capacity >= minimumCapacity` and the array has
   ///   mutable contiguous storage.
   ///
-  /// - Complexity: O(`self.count`).
+  /// - Complexity: O(`self.length`).
   mutating func reserveCapacity(minimumCapacity: Int)
 
   /// Operator form of `appendContentsOf`.
@@ -57,9 +57,9 @@ protocol _ArrayProtocol
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`self.count`).
+  /// - Complexity: O(`self.length`).
   ///
-  /// - Requires: `i <= count`.
+  /// - Requires: `i <= length`.
   mutating func insert(newElement: Iterator.Element, at i: Int)
 
   /// Remove and return the element at the given index.
@@ -68,7 +68,7 @@ protocol _ArrayProtocol
   ///
   /// - Complexity: Worst case O(N).
   ///
-  /// - Requires: `count > index`.
+  /// - Requires: `length > index`.
   mutating func removeAt(index: Int) -> Iterator.Element
 
   //===--- implementation detail  -----------------------------------------===//
@@ -93,16 +93,16 @@ internal struct _ArrayProtocolMirror<
 
   var objectIdentifier: ObjectIdentifier? { return nil }
 
-  var count: Int { return _value.count }
+  var length: Int { return _value.length }
 
   subscript(i: Int) -> (String, _Mirror) {
-    _require(i >= 0 && i < count, "_Mirror access out of bounds")
+    _require(i >= 0 && i < length, "_Mirror access out of bounds")
     return ("[\(i)]", _reflect(_value[_value.startIndex + i]))
   }
 
   var summary: String {
-    if count == 1 { return "1 element" }
-    return "\(count) elements"
+    if length == 1 { return "1 element" }
+    return "\(length) elements"
   }
 
   var quickLookObject: PlaygroundQuickLook? { return nil }

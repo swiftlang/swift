@@ -138,7 +138,7 @@ let tupleTypeWithNames = (age:Int, count:Int)(4, 5)
 let dictWithTuple = [String: (age:Int, count:Int)]()
 
 // <rdar://problem/21684837> typeexpr not being formed for postfix !
-let bb2 = [Int!](repeating: nil, count: 2)
+let bb2 = [Int!](repeating: nil, length: 2)
 
 // <rdar://problem/21560309> inout allowed on function return type
 func r21560309<U>(body: (inout _: Int) -> inout U) {}  // expected-error {{'inout' is only valid in parameter lists}}

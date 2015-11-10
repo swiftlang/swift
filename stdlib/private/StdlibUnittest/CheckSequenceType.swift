@@ -1425,8 +1425,8 @@ public let zipTests = [
     leftovers: [], []),
 ]
 
-public func callGenericUnderestimatedCount<S : Sequence>(s: S) -> Int {
-  return s.underestimateCount()
+public func callGenericUnderestimatedLength<S : Sequence>(s: S) -> Int {
+  return s.underestimateLength()
 }
 
 extension TestSuite {

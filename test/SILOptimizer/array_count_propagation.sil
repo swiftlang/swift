@@ -26,7 +26,7 @@ struct MyArray<T> {
 
 sil @swift_bufferAllocate : $@convention(thin)() -> @owned AnyObject
 sil [_semantics "array.uninitialized"] @adoptStorage : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
-sil [_semantics "array.get_count"] @getCount : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyInt
+sil [_semantics "array.get_length"] @getCount : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyInt
 sil [_semantics "array.get_element"] @getElement : $@convention(method) (@out MyInt, MyInt, MyBool, @guaranteed MyArray<MyInt>) -> ()
 sil [_semantics "array.uninitialized"] @allocateUninitialized : $@convention(thin) (MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
 sil [_semantics "array.init"] @initCountRepeatedValue : $@convention(thin) (MyInt, @in MyInt, @thin MyArray<MyInt>.Type) -> @owned MyArray<MyInt>

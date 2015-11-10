@@ -752,7 +752,7 @@ internal func _transcodeSomeUTF16AsUTF8<
       result |= _UTF8Chunk(u) << shift
       utf8Count += 1
     } else {
-      var scalarUtf8Length: Int
+      var scalarUTF8Length: Int
       var r: UInt
       if _fastPath((u >> 11) != 0b1101_1) {
         // Neither high-surrogate, nor low-surrogate -- well-formed sequence
@@ -761,14 +761,14 @@ internal func _transcodeSomeUTF16AsUTF8<
           r = 0b10__00_0000__110__0_0000
           r |= u >> 6
           r |= (u & 0b11_1111) << 8
-          scalarUtf8Length = 2
+          scalarUTF8Length = 2
         }
         else {
           r = 0b10__00_0000__10__00_0000__1110__0000
           r |= u >> 12
           r |= ((u >> 6) & 0b11_1111) << 8
           r |= (u        & 0b11_1111) << 16
-          scalarUtf8Length = 3
+          scalarUTF8Length = 3
         }
       } else {
         let unit0 = u
@@ -776,12 +776,12 @@ internal func _transcodeSomeUTF16AsUTF8<
           // `unit0` is a low-surrogate.  We have an ill-formed sequence.
           // Replace it with U+FFFD.
           r = 0xbdbfef
-          scalarUtf8Length = 3
+          scalarUTF8Length = 3
         } else if _slowPath(nextIndex.advancedBy(1) == endIndex) {
           // We have seen a high-surrogate and EOF, so we have an ill-formed
           // sequence.  Replace it with U+FFFD.
           r = 0xbdbfef
-          scalarUtf8Length = 3
+          scalarUTF8Length = 3
         } else {
           let unit1 = UInt(input[nextIndex.advancedBy(1)])
           if _fastPath((unit1 >> 10) == 0b1101_11) {
@@ -794,22 +794,22 @@ internal func _transcodeSomeUTF16AsUTF8<
             r |= ((v >> 12) & 0b11_1111) << 8
             r |= ((v >> 6) & 0b11_1111) << 16
             r |= (v        & 0b11_1111) << 24
-            scalarUtf8Length = 4
+            scalarUTF8Length = 4
             utf16Length = 2
           } else {
             // Otherwise, we have an ill-formed sequence.  Replace it with
             // U+FFFD.
             r = 0xbdbfef
-            scalarUtf8Length = 3
+            scalarUTF8Length = 3
           }
         }
       }
       // Don't overrun the buffer
-      if utf8Count + scalarUtf8Length > utf8Max {
+      if utf8Count + scalarUTF8Length > utf8Max {
         break
       }
       result |= numericCast(r) << shift
-      utf8Count += scalarUtf8Length
+      utf8Count += scalarUTF8Length
     }
     nextIndex = nextIndex.advancedBy(utf16Length)
   }
@@ -901,16 +901,16 @@ extension UTF16 {
   public // @testable
   static func _copy<T : _StringElement, U : _StringElement>(
     source: UnsafeMutablePointer<T>,
-    destination: UnsafeMutablePointer<U>, count: Int
+    destination: UnsafeMutablePointer<U>, length: Int
   ) {
     if strideof(T.self) == strideof(U.self) {
       _memcpy(
         dest: UnsafeMutablePointer(destination),
         src: UnsafeMutablePointer(source),
-        size: UInt(count) * UInt(strideof(U.self)))
+        size: UInt(length) * UInt(strideof(U.self)))
     }
     else {
-      for i in 0..<count {
+      for i in 0..<length {
         let u16 = T._toUTF16CodeUnit((source + i).pointee)
         (destination + i).pointee = U._fromUTF16CodeUnit(u16)
       }

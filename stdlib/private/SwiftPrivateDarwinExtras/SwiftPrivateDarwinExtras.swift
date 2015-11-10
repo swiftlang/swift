@@ -42,7 +42,7 @@ public struct _stdlib_fd_set {
   public init() {
     _data = [UInt32](
       repeating: 0,
-      count: Int(_stdlib_FD_SETSIZE) / _stdlib_fd_set._wordBits)
+      length: Int(_stdlib_FD_SETSIZE) / _stdlib_fd_set._wordBits)
   }
 
   public func isset(fd: CInt) -> Bool {
@@ -66,10 +66,10 @@ public struct _stdlib_fd_set {
   }
 
   public mutating func zero() {
-    let count = _data.count
+    let length = _data.length
     return _data.withUnsafeMutableBufferPointer {
       (_data) in
-      for i in 0..<count {
+      for i in 0..<length {
         _data[i] = 0
       }
       return

@@ -19,7 +19,7 @@
 %               'CollectionOfOne(\( _reflect(_value.element).summary ))'],\
 %             ['EmptyCollection',0,"DONTSHOWME",'EmptyCollection']]:
 %   Self = Type[0]
-%   Count = Type[1]
+%   Length = Type[1]
 %   ElementName = Type[2]
 %   SummaryString = Type[3]
 %   MirrorDecl = gyb.executeTemplate(TMirrorDecl,\
@@ -38,10 +38,10 @@
 ${MirrorDecl} {
   ${MirrorBoilerplate}
 
-  var count: Int { return ${Count} }
+  var length: Int { return ${Length} }
 
   subscript(i: Int) -> (String, _Mirror) {
-    _require(i >= 0 && i < count, "_Mirror access out of bounds")
+    _require(i >= 0 && i < length, "_Mirror access out of bounds")
     return ("${ElementName}", _reflect(_value[_value.startIndex.advancedBy(i)]))
   }
 

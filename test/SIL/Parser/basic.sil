@@ -509,7 +509,7 @@ isa(%6 : $Builtin.Int1):
 }
 
 sil @_TSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $@convention(thin) (Builtin.FPIEEE64, @thin Float64.Type) -> Float64
-sil @_TSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
+sil @_TSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp13lengthInBytesBi64_7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
 
 
 sil @_T5index5gep64FT1pBp1iBi64__Bp : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {

@@ -37,8 +37,8 @@ extension Sequence
     return self._base.iterator()
   }
 
-  public func underestimateCount() -> Int {
-    return _base.underestimateCount()
+  public func underestimateLength() -> Int {
+    return _base.underestimateLength()
   }
 
   @warn_unused_result

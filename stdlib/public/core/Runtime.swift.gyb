@@ -372,7 +372,7 @@ func _float${bits}ToString(value: Float${bits}, debug: Bool) -> String {
     return String._fromWellFormedCodeUnitSequence(
       UTF8.self,
       input: UnsafeBufferPointer(
-        start: bufferUTF8Ptr, count: Int(actualLength)))
+        start: bufferUTF8Ptr, length: Int(actualLength)))
   }
 }
 
@@ -404,7 +404,7 @@ func _int64ToString(
       return String._fromWellFormedCodeUnitSequence(
         UTF8.self,
         input: UnsafeBufferPointer(
-          start: bufferUTF8Ptr, count: Int(actualLength)))
+          start: bufferUTF8Ptr, length: Int(actualLength)))
     }
   } else {
     var buffer = _Buffer72()
@@ -416,7 +416,7 @@ func _int64ToString(
       return String._fromWellFormedCodeUnitSequence(
         UTF8.self,
         input: UnsafeBufferPointer(
-          start: bufferUTF8Ptr, count: Int(actualLength)))
+          start: bufferUTF8Ptr, length: Int(actualLength)))
     }
   }
 }
@@ -443,7 +443,7 @@ func _uint64ToString(
       return String._fromWellFormedCodeUnitSequence(
         UTF8.self,
         input: UnsafeBufferPointer(
-          start: bufferUTF8Ptr, count: Int(actualLength)))
+          start: bufferUTF8Ptr, length: Int(actualLength)))
     }
   } else {
     var buffer = _Buffer72()
@@ -455,7 +455,7 @@ func _uint64ToString(
       return String._fromWellFormedCodeUnitSequence(
         UTF8.self,
         input: UnsafeBufferPointer(
-          start: bufferUTF8Ptr, count: Int(actualLength)))
+          start: bufferUTF8Ptr, length: Int(actualLength)))
     }
   }
 }
@@ -464,7 +464,7 @@ func _uint64ToString(
 func _rawPointerToString(value: Builtin.RawPointer) -> String {
   var result = _uint64ToString(
     UInt64(unsafeBitCast(value, UInt.self)), radix: 16, uppercase: false)
-  for _ in 0..<(2 * sizeof(Builtin.RawPointer) - result.utf16.count) {
+  for _ in 0..<(2 * sizeof(Builtin.RawPointer) - result.utf16.length) {
     result = "0" + result
   }
   return "0x" + result

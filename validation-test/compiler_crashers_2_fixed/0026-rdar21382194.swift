@@ -22,7 +22,7 @@ protocol Vector {
 
 
   // Extras
-  var count: Int {get}
+  var length: Int {get}
   subscript(Int) -> Element {get set}
   typealias Tail
 }
@@ -33,7 +33,7 @@ struct EmptyVector<T: ApproximateReal> : Vector {
   func dotProduct(other: EmptyVector) -> Element {
     return Element() // zero
   }
-  var count: Int { return 0 }
+  var length: Int { return 0 }
   
   subscript(i: Int) -> Element {
     get { fatalError("subscript out-of-range") }
@@ -65,7 +65,7 @@ struct Vector<Tail: Vector> : Vector {
     return head * other.head + tail.dotProduct(other.tail)
   }
 
-  var count: Int { return tail.count + 1 }
+  var length: Int { return tail.length + 1 }
   var head: Element
   var tail: Tail
 
@@ -98,10 +98,10 @@ func ⋮ <T: ApproximateReal, U where U.Element == T> (lhs: T, rhs: Vector<U>) -
 
 extension Vector : CustomDebugStringConvertible {
   var debugDescription: String {
-    if count == 1 {
+    if length == 1 {
       return "Vector(\(String(reflecting: head)))"
     }
-    return "\(String(reflecting: head)) ⋮ " + (count == 2 ? String(reflecting: self[1]) : String(reflecting: tail))
+    return "\(String(reflecting: head)) ⋮ " + (length == 2 ? String(reflecting: self[1]) : String(reflecting: tail))
   }
 }
 

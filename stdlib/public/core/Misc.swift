@@ -78,9 +78,9 @@ public func _getTypeName(type: Any.Type, qualified: Bool)
 @warn_unused_result
 public // @testable
 func _typeName(type: Any.Type, qualified: Bool = true) -> String {
-  let (stringPtr, count) = _getTypeName(type, qualified: qualified)
+  let (stringPtr, length) = _getTypeName(type, qualified: qualified)
   return ._fromWellFormedCodeUnitSequence(UTF8.self,
-    input: UnsafeBufferPointer(start: stringPtr, count: count))
+    input: UnsafeBufferPointer(start: stringPtr, length: length))
 }
 
 @warn_unused_result

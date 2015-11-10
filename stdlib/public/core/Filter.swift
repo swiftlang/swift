@@ -176,7 +176,7 @@ public struct LazyFilterCollection<
   /// In an empty collection, `startIndex == endIndex`.
   ///
   /// - Complexity: O(N), where N is the ratio between unfiltered and
-  ///   filtered collection counts.
+  ///   filtered collection lengths.
   public var startIndex: Index {
     var first = _base.startIndex
     while first != _base.endIndex {

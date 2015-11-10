@@ -342,7 +342,7 @@ final class _ForkJoinWorkDeque<T> {
   func tryTakeFirst() -> T? {
     return _dequeMutex.withLock {
       let result = _deque.last
-      if _deque.count > 0 {
+      if _deque.length > 0 {
         _deque.removeLast()
       }
       return result
@@ -352,11 +352,11 @@ final class _ForkJoinWorkDeque<T> {
   func tryTakeFirstTwo() -> (T?, T?) {
     return _dequeMutex.withLock {
       let result1 = _deque.last
-      if _deque.count > 0 {
+      if _deque.length > 0 {
         _deque.removeLast()
       }
       let result2 = _deque.last
-      if _deque.count > 0 {
+      if _deque.length > 0 {
         _deque.removeLast()
       }
       return (result1, result2)
@@ -372,7 +372,7 @@ final class _ForkJoinWorkDeque<T> {
   func tryTakeLast() -> T? {
     return _dequeMutex.withLock {
       let result = _deque.first
-      if _deque.count > 0 {
+      if _deque.length > 0 {
         _deque.removeAt(0)
       }
       return result
@@ -727,9 +727,9 @@ final public class ForkJoinPool {
   internal func _stealTask() -> ForkJoinTaskBase? {
     return _workDequesMutex.withLock {
       let randomOffset = pickRandom(_workDeques.indices)
-      let count = _workDeques.count
+      let length = _workDeques.length
       for i in _workDeques.indices {
-        let index = (i + randomOffset) % count
+        let index = (i + randomOffset) % length
         if let task = _workDeques[index].tryTakeLast() {
           return task
         }
@@ -1388,7 +1388,7 @@ func _parallelMap(input: [Int], transform: (Int) -> Int, range: Range<Int>)
   -> Array<Int>.Builder {
 
   var builder = Array<Int>.Builder()
-  if range.count < 1_000 {
+  if range.length < 1_000 {
     builder.appendContentsOf(input[range].map(transform))
   } else {
     let tasks = input.split(range).map {

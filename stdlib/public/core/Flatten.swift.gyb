@@ -270,7 +270,7 @@ public struct ${Collection}<
     return position._innerCollection![position._inner!]
   }
 
-  public func underestimateCount() -> Int {
+  public func underestimateLength() -> Int {
     // To return any estimate of the number of elements, we have to start
     // evaluating the collections.  That is a bad default for `flatMap()`, so
     // just return zero.
@@ -281,9 +281,9 @@ public struct ${Collection}<
     -> _ContiguousArrayBuffer<Base.Iterator.Element.Iterator.Element> {
 
     // The default implementation of `_copyToNativeArrayBuffer` queries the
-    // `count` property, which materializes every inner collection.  This is a
+    // `length` property, which materializes every inner collection.  This is a
     // bad default for `flatMap()`.  So we treat `self` as a sequence and only
-    // rely on underestimated count.
+    // rely on underestimated length.
     return _copySequenceToNativeArrayBuffer(self)
   }
 

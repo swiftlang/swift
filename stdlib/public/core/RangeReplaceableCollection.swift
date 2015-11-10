@@ -26,9 +26,9 @@ public protocol RangeReplaceableCollection : Collection {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`bounds.count`) if
+  /// - Complexity: O(`bounds.length`) if
   ///   `bounds.endIndex == self.endIndex` and `newElements.isEmpty`,
-  ///   O(`self.count` + `newElements.count`) otherwise.
+  ///   O(`self.length` + `newElements.length`) otherwise.
   mutating func replaceSubrange<
     C : Collection where C.Iterator.Element == Iterator.Element
   >(
@@ -111,14 +111,14 @@ public protocol RangeReplaceableCollection : Collection {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`self.count`).
+  /// - Complexity: O(`self.length`).
   mutating func insert(newElement: Iterator.Element, at i: Index)
 
   /// Insert `newElements` at index `i`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`self.count + newElements.count`).
+  /// - Complexity: O(`self.length + newElements.length`).
   mutating func insertContentsOf<
     S : Collection where S.Iterator.Element == Iterator.Element
   >(newElements: S, at i: Index)
@@ -127,7 +127,7 @@ public protocol RangeReplaceableCollection : Collection {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`self.count`).
+  /// - Complexity: O(`self.length`).
   mutating func removeAt(i: Index) -> Iterator.Element
 
   /// Customization point for `removeLast()`.  Implement this function if you
@@ -146,21 +146,21 @@ public protocol RangeReplaceableCollection : Collection {
 
   /// Remove the element at `startIndex` and return it.
   ///
-  /// - Complexity: O(`self.count`)
+  /// - Complexity: O(`self.length`)
   /// - Requires: `!self.isEmpty`.
   mutating func removeFirst() -> Iterator.Element
 
   /// Remove the first `n` elements.
   ///
-  /// - Complexity: O(`self.count`)
-  /// - Requires: `n >= 0 && self.count >= n`.
+  /// - Complexity: O(`self.length`)
+  /// - Requires: `n >= 0 && self.length >= n`.
   mutating func removeFirst(n: Int)
 
   /// Remove all elements within `bounds`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`self.count`).
+  /// - Complexity: O(`self.length`).
   mutating func removeSubrange(bounds: Range<Index>)
 
   /// Remove all elements.
@@ -171,7 +171,7 @@ public protocol RangeReplaceableCollection : Collection {
   ///    avoid releasing storage, which can be a useful optimization
   ///    when `self` is going to be grown again.
   ///
-  /// - Complexity: O(`self.count`).
+  /// - Complexity: O(`self.length`).
   mutating func removeAll(keepingCapacity keepCapacity: Bool /*= false*/)
 
 }
@@ -226,7 +226,7 @@ extension RangeReplaceableCollection {
   public mutating func removeFirst(n: Int) {
     if n == 0 { return }
     _require(n >= 0, "number of elements to remove should be non-negative")
-    _require(count >= numericCast(n),
+    _require(length >= numericCast(n),
       "can't remove more items from a collection than it has")
     let end = startIndex.advancedBy(numericCast(n))
     removeSubrange(startIndex..<end)
@@ -267,11 +267,11 @@ extension RangeReplaceableCollection where SubSequence == Self {
   /// Remove the first `n` elements.
   ///
   /// - Complexity: O(1)
-  /// - Requires: `self.count >= n`.
+  /// - Requires: `self.length >= n`.
   public mutating func removeFirst(n: Int) {
     if n == 0 { return }
     _require(n >= 0, "number of elements to remove should be non-negative")
-    _require(count >= numericCast(n),
+    _require(length >= numericCast(n),
       "can't remove more items from a collection than it contains")
     self = self[startIndex.advancedBy(numericCast(n))..<endIndex]
   }
@@ -323,12 +323,12 @@ extension RangeReplaceableCollection where Index : BidirectionalIndex {
 
   /// Remove the last `n` elements.
   ///
-  /// - Complexity: O(`self.count`)
-  /// - Requires: `n >= 0 && self.count >= n`.
+  /// - Complexity: O(`self.length`)
+  /// - Requires: `n >= 0 && self.length >= n`.
   public mutating func removeLast(n: Int) {
     if n == 0 { return }
     _require(n >= 0, "number of elements to remove should be non-negative")
-    _require(count >= numericCast(n),
+    _require(length >= numericCast(n),
       "can't remove more items from a collection than it contains")
     if _customRemoveLast(n) {
       return
@@ -357,7 +357,7 @@ public func +<
   where S.Iterator.Element == C.Iterator.Element
 >(lhs: S, rhs: C) -> C {
   var result = C()
-  result.reserveCapacity(rhs.count + numericCast(rhs.underestimateCount()))
+  result.reserveCapacity(rhs.length + numericCast(rhs.underestimateLength()))
   result.appendContentsOf(lhs)
   result.appendContentsOf(rhs)
   return result
@@ -371,7 +371,7 @@ public func +<
 >(lhs: C, rhs: S) -> C {
   var lhs = lhs
   // FIXME: what if lhs is a reference type?  This will mutate it.
-  lhs.reserveCapacity(lhs.count + numericCast(rhs.count))
+  lhs.reserveCapacity(lhs.length + numericCast(rhs.length))
   lhs.appendContentsOf(rhs)
   return lhs
 }
@@ -384,7 +384,7 @@ public func +<
 >(lhs: RRC1, rhs: RRC2) -> RRC1 {
   var lhs = lhs
   // FIXME: what if lhs is a reference type?  This will mutate it.
-  lhs.reserveCapacity(lhs.count + numericCast(rhs.count))
+  lhs.reserveCapacity(lhs.length + numericCast(rhs.length))
   lhs.appendContentsOf(rhs)
   return lhs
 }

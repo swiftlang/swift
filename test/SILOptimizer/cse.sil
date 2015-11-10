@@ -1026,7 +1026,7 @@ bb0(%0 : $Builtin.RawPointer):
   return %3 : $(@convention(thin) () -> (), @convention(thin) () -> ())
 }
 
-sil [_semantics "array.get_count"] @getCount : $@convention(method) (@guaranteed Array<Int>) -> Int
+sil [_semantics "array.get_length"] @getCount : $@convention(method) (@guaranteed Array<Int>) -> Int
 
 // CHECK-LABEL:   sil @dont_cse_get_count_on_low_level_sil
 // CHECK:           [[R1:%[0-9]+]] = apply

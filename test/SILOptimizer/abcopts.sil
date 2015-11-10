@@ -603,16 +603,16 @@ bb3:
   return %23 : $Int32
 }
 
-// HOIST-LABEL: sil @eliminate_zero_to_count
+// HOIST-LABEL: sil @eliminate_zero_to_length
 // HOIST-NOT: function_ref @checkbounds2
 // HOIST:  return
 
-sil @eliminate_zero_to_count : $@convention(thin) (@owned Array<Int>) -> () {
+sil @eliminate_zero_to_length : $@convention(thin) (@owned Array<Int>) -> () {
 bb0(%0 : $Array<Int>):
   %100 = integer_literal $Builtin.Int1, -1
   %101 = struct $Bool(%100 : $Builtin.Int1)
   %z0 = integer_literal $Builtin.Int32, 0
-  %f1 = function_ref @getCount2 : $@convention(method) (@owned Array<Int>) -> Int32
+  %f1 = function_ref @getLength2 : $@convention(method) (@owned Array<Int>) -> Int32
   retain_value %0 : $Array<Int>
   %t1 = apply %f1(%0) : $@convention(method) (@owned Array<Int>) -> Int32
   %c1 = struct_extract %t1 : $Int32, #Int32._value
@@ -631,7 +631,7 @@ bb3:
   %t3 = struct $Int32(%i0 : $Builtin.Int32)
 
   // This subscript check can be completely eliminated because the loop goes
-  // from 0 to array.count.
+  // from 0 to array.length.
   // It's even not required that this loop block dominates the exit block.
   %t4 = apply %f2(%t3, %101, %0) : $@convention(method) (Int32, Bool, @owned Array<Int>) -> _DependenceToken
   br bb4
@@ -649,18 +649,18 @@ bb5:
   return %r1 : $()
 }
 
-// HOIST-LABEL: sil @dont_eliminate_zero_to_count_for_slices
+// HOIST-LABEL: sil @dont_eliminate_zero_to_length_for_slices
 // HOIST: {{^}}bb1:
 // HOIST:   [[F:%[0-9]+]] = function_ref @checkbounds3
 // HOIST:   apply [[F]]
 // HOIST:  return
 
-sil @dont_eliminate_zero_to_count_for_slices : $@convention(thin) (@owned ArraySlice<Int>) -> () {
+sil @dont_eliminate_zero_to_length_for_slices : $@convention(thin) (@owned ArraySlice<Int>) -> () {
 bb0(%0 : $ArraySlice<Int>):
   %100 = integer_literal $Builtin.Int1, -1
   %101 = struct $Bool(%100 : $Builtin.Int1)
   %z0 = integer_literal $Builtin.Int32, 0
-  %f1 = function_ref @getCount3 : $@convention(method) (@owned ArraySlice<Int>) -> Int32
+  %f1 = function_ref @getLength3 : $@convention(method) (@owned ArraySlice<Int>) -> Int32
   retain_value %0 : $ArraySlice<Int>
   %t1 = apply %f1(%0) : $@convention(method) (@owned ArraySlice<Int>) -> Int32
   %c1 = struct_extract %t1 : $Int32, #Int32._value
@@ -673,7 +673,7 @@ bb1(%i0 : $Builtin.Int32):
   %t3 = struct $Int32(%i0 : $Builtin.Int32)
 
   // Slices don't necessarily have a zero lower bound. So we can't eliminate the
-  // subscript check for 0..<count loops.
+  // subscript check for 0..<length loops.
   %t4 = apply %f2(%t3, %101, %0) : $@convention(method) (Int32, Bool, @owned ArraySlice<Int>) -> _DependenceToken
 
   %t5 = integer_literal $Builtin.Int1, 0
@@ -995,7 +995,7 @@ sil public_external [_semantics "array.init"] @arrayinit : $@convention(thin) ()
   unreachable
 }
 
-sil public_external [_semantics "array.get_count"] @getCount : $@convention(method) (@owned ArrayInt) -> Int32 {
+sil public_external [_semantics "array.get_length"] @getLength : $@convention(method) (@owned ArrayInt) -> Int32 {
   bb0(%0: $ArrayInt):
     unreachable
 }
@@ -1012,9 +1012,9 @@ bb0(%0 : $*ArrayInt):
 
 sil @getArray : $@convention(thin) () -> ArrayInt
 
-sil [_semantics "array.get_count"] @getCount2 : $@convention(method) (@owned Array<Int>) -> Int32
+sil [_semantics "array.get_length"] @getLength2 : $@convention(method) (@owned Array<Int>) -> Int32
 sil [_semantics "array.check_subscript"] @checkbounds2 : $@convention(method) (Int32, Bool, @owned Array<Int>) -> _DependenceToken
 
-sil [_semantics "array.get_count"] @getCount3 : $@convention(method) (@owned ArraySlice<Int>) -> Int32
+sil [_semantics "array.get_length"] @getLength3 : $@convention(method) (@owned ArraySlice<Int>) -> Int32
 sil [_semantics "array.check_subscript"] @checkbounds3 : $@convention(method) (Int32, Bool, @owned ArraySlice<Int>) -> _DependenceToken
 

@@ -25,7 +25,7 @@
 
 ${MirrorDecl} {
   ${MirrorBoilerplate}
-  var count: Int { return 2 }
+  var length: Int { return 2 }
 
   subscript(i: Int) -> (String, _Mirror) {
     switch i {

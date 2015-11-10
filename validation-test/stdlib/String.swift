@@ -325,7 +325,7 @@ StringTests.test("appendToSubstring") {
           sliceEnd < sliceStart {
           continue
         }
-        var s0 = String(repeating: UnicodeScalar("x"), count: initialSize)
+        var s0 = String(repeating: UnicodeScalar("x"), length: initialSize)
         let originalIdentity = s0.bufferID
         s0 = s0[
           s0.startIndex.advancedBy(sliceStart)..<s0.startIndex.advancedBy(sliceEnd)]
@@ -340,7 +340,7 @@ StringTests.test("appendToSubstring") {
         expectEqual(
           String(
             repeating: UnicodeScalar("x"),
-            count: sliceEnd - sliceStart + 1),
+            length: sliceEnd - sliceStart + 1),
           s0)
       }
     }
@@ -368,8 +368,8 @@ StringTests.test("appendToSubstringBug") {
   let prefixSize = size - suffixSize
   for i in 1..<10 {
     // We will be overflowing s0 with s1.
-    var s0 = String(repeating: UnicodeScalar("x"), count: size)
-    let s1 = String(repeating: UnicodeScalar("x"), count: prefixSize)
+    var s0 = String(repeating: UnicodeScalar("x"), length: size)
+    let s1 = String(repeating: UnicodeScalar("x"), length: prefixSize)
     let originalIdentity = s0.bufferID
 
     // Turn s0 into a slice that points to the end.
@@ -388,7 +388,7 @@ StringTests.test("appendToSubstringBug") {
     expectEqual(
       String(
         repeating: UnicodeScalar("x"),
-        count: suffixSize + prefixSize),
+        length: suffixSize + prefixSize),
       s0)
   }
 }
@@ -628,16 +628,16 @@ StringTests.test("stringCoreExtensibility") {
         
         for i in 0..<length {
           x.appendContentsOf(
-            Repeat(repeating: i < boundary ? ascii : nonAscii, count: 3))
+            Repeat(repeating: i < boundary ? ascii : nonAscii, length: 3))
         }
         // Make sure we can append pure ASCII to wide storage
-        x.appendContentsOf(Repeat(repeating: ascii, count: 2))
+        x.appendContentsOf(Repeat(repeating: ascii, length: 2))
         
         expectEqualSequence(
           [UTF16.CodeUnit(UnicodeScalar("b").value)]
-          + Array(Repeat(repeating: ascii, count: 3*boundary))
-          + Repeat(repeating: nonAscii, count: 3*(length - boundary))
-          + Repeat(repeating: ascii, count: 2),
+          + Array(Repeat(repeating: ascii, length: 3*boundary))
+          + Repeat(repeating: nonAscii, length: 3*(length - boundary))
+          + Repeat(repeating: ascii, length: 2),
           x
         )
       }
@@ -705,10 +705,10 @@ StringTests.test("stringCoreReserve") {
 func makeStringCore(base: String) -> _StringCore {
   var x = _StringCore()
   // make sure some - but not all - replacements will have to grow the buffer
-  x.reserveCapacity(base._core.count * 3 / 2)
+  x.reserveCapacity(base._core.length * 3 / 2)
   x.appendContentsOf(base._core)
   // In case the core was widened and lost its capacity
-  x.reserveCapacity(base._core.count * 3 / 2)
+  x.reserveCapacity(base._core.length * 3 / 2)
   return x
 }
 
@@ -769,17 +769,17 @@ StringTests.test("reserveCapacity") {
   let id0 = s.bufferID
   let oldCap = s.capacity
   let x: Character = "x" // Help the typechecker - <rdar://problem/17128913>
-  s.insertContentsOf(Repeat(repeating: x, count: s.capacity + 1), at: s.endIndex)
+  s.insertContentsOf(Repeat(repeating: x, length: s.capacity + 1), at: s.endIndex)
   expectNotEqual(id0, s.bufferID)
   s = ""
   print("empty capacity \(s.capacity)")
   s.reserveCapacity(oldCap + 2)
   print("reserving \(oldCap + 2) -> \(s.capacity), width = \(s._core.elementWidth)")
   let id1 = s.bufferID
-  s.insertContentsOf(Repeat(repeating: x, count: oldCap + 2), at: s.endIndex)
+  s.insertContentsOf(Repeat(repeating: x, length: oldCap + 2), at: s.endIndex)
   print("extending by \(oldCap + 2) -> \(s.capacity), width = \(s._core.elementWidth)")
   expectEqual(id1, s.bufferID)
-  s.insertContentsOf(Repeat(repeating: x, count: s.capacity + 100), at: s.endIndex)
+  s.insertContentsOf(Repeat(repeating: x, length: s.capacity + 100), at: s.endIndex)
   expectNotEqual(id1, s.bufferID)
 }
 
@@ -1051,7 +1051,7 @@ StringTests.test("indexConversion") {
   var matches: [String] = []
   
   re.enumerateMatchesInString(
-    s, options: NSMatchingOptions(), range: NSRange(0..<s.utf16.count)
+    s, options: NSMatchingOptions(), range: NSRange(0..<s.utf16.length)
   ) {
     result, flags, stop
   in

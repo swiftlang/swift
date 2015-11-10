@@ -62,12 +62,12 @@ public struct Character :
   @effects(readonly)
   public init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
-    byteSize: Builtin.Word,
+    lengthInBytes: Builtin.Word,
     isASCII: Builtin.Int1) {
     self = Character(
       String(
-        _builtinExtendedGraphemeClusterLiteral: start,
-        byteSize: byteSize,
+        _builtinExtendedGraphemeClusterLiteral: start, 
+        lengthInBytes: lengthInBytes, 
         isASCII: isASCII))
   }
 
@@ -90,17 +90,17 @@ public struct Character :
     // starting a code point in the last byte, and assuming that its
     // high bit is 1.
     _require(
-      s._core.count != 0, "Can't form a Character from an empty String")
+      s._core.length != 0, "Can't form a Character from an empty String")
     _require(
       s.startIndex.successor() == s.endIndex,
       "Can't form a Character from a String containing more than one extended grapheme cluster")
 
-    let (count, initialUTF8) = s._core._encodeSomeUTF8(0)
+    let (length, initialUTF8) = s._core._encodeSomeUTF8(0)
     // Notice that the result of sizeof() is a small non-zero number and can't
     // overflow when multiplied by 8.
     let bits = sizeofValue(initialUTF8) &* 8 &- 1
     if _fastPath(
-      count == s._core.count && (initialUTF8 & (1 << numericCast(bits))) != 0) {
+      length == s._core.length && (initialUTF8 & (1 << numericCast(bits))) != 0) {
       _representation = .Small(Builtin.trunc_Int64_Int63(initialUTF8._value))
     }
     else {
@@ -136,9 +136,9 @@ public struct Character :
 
   internal struct _SmallUTF8 : Collection {
     init(_ u8: UInt64) {
-      let count = Character._smallSize(u8)
-      _sanityCheck(count <= 8, "Character with more than 8 UTF-8 code units")
-      self.count = UInt16(count)
+      let utf8Length = Character._smallSize(u8)
+      _sanityCheck(utf8Length <= 8, "Character with more than 8 UTF-8 code units")
+      self.length = UInt16(utf8Length)
       self.data = u8
     }
 
@@ -155,7 +155,7 @@ public struct Character :
     /// reachable from `startIndex` by zero or more applications of
     /// `successor()`.
     var endIndex: Int {
-      return Int(count)
+      return Int(length)
     }
 
     /// Access the code unit at `position`.
@@ -164,7 +164,7 @@ public struct Character :
     ///   `position != endIndex`.
     subscript(position: Int) -> UTF8.CodeUnit {
       _sanityCheck(position >= 0)
-      _sanityCheck(position < Int(count))
+      _sanityCheck(position < Int(length))
       // Note: using unchecked arithmetic because overflow can not happen if the
       // above sanity checks hold.
       return UTF8.CodeUnit(
@@ -192,17 +192,17 @@ public struct Character :
       return Iterator(data)
     }
 
-    var count: UInt16
+    var length: UInt16
     var data: UInt64
   }
 
   struct _SmallUTF16 : Collection {
     init(_ u8: UInt64) {
-      let count = UTF16.measure(
+      let length = UTF16.measure(
         UTF8.self, input: _SmallUTF8(u8).iterator(),
         repairIllFormedSequences: true)!.0
-      _sanityCheck(count <= 4, "Character with more than 4 UTF-16 code units")
-      self.count = UInt16(count)
+      _sanityCheck(length <= 4, "Character with more than 4 UTF-16 code units")
+      self.length = UInt16(length)
       var u16: UInt64 = 0
       let output: (UTF16.CodeUnit) -> Void = {
         u16 = u16 << 16
@@ -227,7 +227,7 @@ public struct Character :
     /// reachable from `startIndex` by zero or more applications of
     /// `successor()`.
     var endIndex : Int {
-      return Int(count)
+      return Int(length)
     }
 
     /// Access the code unit at `position`.
@@ -236,14 +236,14 @@ public struct Character :
     ///   `position != endIndex`.
     subscript(position: Int) -> UTF16.CodeUnit {
       _sanityCheck(position >= 0)
-      _sanityCheck(position < Int(count))
+      _sanityCheck(position < Int(length))
       // Note: using unchecked arithmetic because overflow can not happen if the
       // above sanity checks hold.
       return UTF16.CodeUnit(truncatingBitPattern:
-        data >> ((UInt64(count) &- UInt64(position) &- 1) &* 16))
+        data >> ((UInt64(length) &- UInt64(position) &- 1) &* 16))
     }
 
-    var count: UInt16
+    var length: UInt16
     var data: UInt64
   }
 

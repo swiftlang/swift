@@ -471,7 +471,7 @@ isa(%6 : $Builtin.Int1):
 sil [fragile] @_TF7literal8literalsFT_T_ : $@convention(thin) () -> ()
 
 sil [fragile] @_TFSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $@convention(thin) (Builtin.FPIEEE64, @thin Float64.Type) -> Float64
-sil [fragile] @_TFSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
+sil [fragile] @_TFSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp13lengthInBytesBi64_7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
 
 // CHECK-LABEL: @_TF5index5gep64FT1pBp1iBi64__Bp : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
 sil [fragile] @_TF5index5gep64FT1pBp1iBi64__Bp : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
@@ -1325,7 +1325,7 @@ bb0:
   %49 = function_ref @_TFC3ref1C3foofS0_FT1xSi_T_ : $@convention(method) (Int, @guaranteed M) -> ()
   %51 = function_ref @_TF4null3isaFT1bCS_1B_Sb : $@convention(thin) (B) -> Builtin.Int1
   %53 = function_ref @_TFSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $@convention(thin) (Builtin.FPIEEE64, @thin Float64.Type) -> Float64
-  %55 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
+  %55 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp13lengthInBytesBi64_7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
   %57 = function_ref @_TF7literal8literalsFT_T_ : $@convention(thin) () -> ()
   %59 = function_ref @_TF5index5gep64FT1pBp1iBi64__Bp : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer
   %60 = function_ref @global_code : $@convention(thin) () -> ()
