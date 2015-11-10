@@ -198,14 +198,6 @@ public:
     return *CS.getPointer()->begin();
   }
 
-  /// Does this edge represent an instruction that may or may not end
-  /// up calling any callees depending on other state (like reference
-  /// counts)?
-  bool isMayCall() const {
-    auto Kind = getInstruction()->getKind();
-    return Kind != ValueKind::ApplyInst && Kind != ValueKind::TryApplyInst;
-  }
-
   unsigned getOrdinal() const {
     return Ordinal;
   }
@@ -525,7 +517,6 @@ private:
 
   void removeFunctionFromCalleeSets(SILFunction *F);
   void computeMethodCallees();
-  void computeDestructorCalleesForClass(ClassDecl *CD);
   void computeClassMethodCalleesForClass(ClassDecl *CD);
   void computeWitnessMethodCalleesForWitnessTable(SILWitnessTable &WTable);
 
@@ -533,8 +524,6 @@ private:
   void addEdges(SILFunction *F);
   CallGraphEdge *makeCallGraphEdgeForCallee(FullApplySite FAS,
                                             SILValue Callee);
-  void addEdgesForApply(FullApplySite FAS, CallGraphNode *CallerNode);
-  CallGraphEdge *getEdgeForReleasingInstruction(SILInstruction *I);
   void addEdgesForInstruction(SILInstruction *I, CallGraphNode *CallerNode);
   void clearBottomUpSCCOrder();
   void computeBottomUpSCCOrder();
