@@ -160,6 +160,9 @@ public:
     // If type is not the same, then SILValueProjections different.
     if (Kind != RHS.Kind)
       return false;
+    // Return true if this is a TombstoneKey or EmptyKey. 
+    if (Kind == EmptyKey || Kind == TombstoneKey)
+      return true; 
     // If Base is different, then SILValueProjections different.
     if (Base != RHS.Base)
       return false;
@@ -486,7 +489,6 @@ static inline llvm::hash_code hash_value(const MemLocation &L) {
 namespace llvm {
 
 using swift::MemLocation;
-
 template <> struct DenseMapInfo<MemLocation> {
   static inline MemLocation getEmptyKey() {
     return MemLocation(MemLocation::EmptyKey);
@@ -498,12 +500,6 @@ template <> struct DenseMapInfo<MemLocation> {
     return hash_value(Loc);
   }
   static bool isEqual(const MemLocation &LHS, const MemLocation &RHS) {
-    if (LHS.getKind() == MemLocation::EmptyKey &&
-        RHS.getKind() == MemLocation::EmptyKey)
-      return true;
-    if (LHS.getKind() == MemLocation::TombstoneKey &&
-        RHS.getKind() == MemLocation::TombstoneKey)
-      return true;
     return LHS == RHS;
   }
 };
