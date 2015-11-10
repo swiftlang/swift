@@ -16,8 +16,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_MEM_LOCATION_H
-#define SWIFT_MEM_LOCATION_H
+#ifndef SWIFT_SIL_MEMLOCATION_H
+#define SWIFT_SIL_MEMLOCATION_H
 
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SIL/Projection.h"
@@ -31,14 +31,164 @@
 
 namespace swift {
 
+/// forward declarations.
+class SILValueProjection;
+class MemLocation;
+class LoadStoreValue;
+
+//===----------------------------------------------------------------------===//
+//                           SILValue Projection 
+//===----------------------------------------------------------------------===//
+
+/// This class contains a SILValue base and a ProjectionPath. It is used as
+/// the base class for MemLocation and LoadStoreValue.
+///
+/// In the case of MemLocation, the base represents the base of the allocated
+/// objects and the ProjectionPath tells which field in the object the
+/// MemLocation represents.
+///
+/// In the case of LoadStoreValue, the base represents the root of loaded or
+/// stored value it represents. And the ProjectionPath represents the field in
+/// the loaded/store value the LoadStoreValue represents.
+///
+class SILValueProjection {
+public:
+  enum KeyKind : uint8_t { EmptyKey = 0, TombstoneKey, NormalKey };
+
+protected:
+  /// The base of the object.
+  SILValue Base;
+  /// Empty key, tombstone key or normal key.
+  KeyKind Kind;
+  /// The path to reach the accessed field of the object.
+  Optional<ProjectionPath> Path;
+
+public:
+  /// Constructors.
+  SILValueProjection() : Base(), Kind(NormalKey) {}
+  SILValueProjection(SILValue B) : Base(B), Kind(NormalKey) {}
+  SILValueProjection(SILValue B, ProjectionPath &P, KeyKind Kind = NormalKey)
+      : Base(B), Kind(Kind), Path(std::move(P)) {}
+
+  /// Destructors.
+  virtual ~SILValueProjection() {}
+
+  /// Copy constructor.
+  SILValueProjection(const SILValueProjection &RHS) {
+    Base = RHS.Base;
+    Path.reset();
+    Kind = RHS.Kind;
+    if (!RHS.Path.hasValue())
+      return;
+    ProjectionPath X;
+    X.append(RHS.Path.getValue());
+    Path = std::move(X);
+  }
+
+  SILValueProjection &operator=(const SILValueProjection &RHS) {
+    Base = RHS.Base;
+    Path.reset();
+    Kind = RHS.Kind;
+    if (!RHS.Path.hasValue())
+      return *this;
+    ProjectionPath X;
+    X.append(RHS.Path.getValue());
+    Path = std::move(X);
+    return *this;
+  }
+
+  /// Getters and setters for SILValueProjection.
+  KeyKind getKind() const { return Kind; }
+  void setKind(KeyKind K) { Kind = K; }
+  SILValue getBase() const { return Base; }
+  Optional<ProjectionPath> &getPath() { return Path; }
+
+  /// Reset the SILValueProjection, i.e. clear base and path.
+  void reset() {
+    Base = SILValue();
+    Path.reset();
+    Kind = NormalKey;
+  }
+
+  /// Returns whether the SILValueProjection has been initialized properly.
+  virtual bool isValid() const { return Base && Path.hasValue(); }
+
+  /// Returns true if the LoadStoreValue has a non-empty projection path.
+  bool hasEmptyProjectionPath() const { return !Path.getValue().size(); }
+
+  /// Return false if one projection path is a prefix of another. false
+  /// otherwise.
+  bool hasNonEmptySymmetricPathDifference(const SILValueProjection &RHS) const {
+    const ProjectionPath &P = RHS.Path.getValue();
+    return Path.getValue().hasNonEmptySymmetricDifference(P);
+  }
+
+  /// Substract the given path from the ProjectionPath.
+  void subtractPaths(Optional<ProjectionPath> &P) {
+    if (!P.hasValue())
+      return;
+    ProjectionPath::subtractPaths(Path.getValue(), P.getValue());
+  }
+
+  /// Return true if the RHS have identical projection paths.
+  /// If both SILValueProjection have empty paths, they are treated as having
+  /// identical projection path.
+  bool hasIdenticalProjectionPath(const SILValueProjection &RHS) const {
+    // If both Paths have no value, then the 2 SILValueProjections are different.
+    if (!Path.hasValue() && !RHS.Path.hasValue())
+      return false;
+    // If 1 Path has value while the other does not, then the 2
+    // SILValueProjections are different.
+    if (Path.hasValue() != RHS.Path.hasValue())
+      return false;
+    // If both Paths are empty, then the 2 SILValueProjections are the same.
+    if (Path.getValue().empty() && RHS.Path.getValue().empty())
+      return true;
+    // If both Paths have different values, then the 2 SILValueProjections are
+    // different.
+    if (Path.getValue() != RHS.Path.getValue())
+      return false;
+    return true;
+  }
+
+  /// Comparisons.
+  bool operator!=(const SILValueProjection &RHS) const {
+    return !(*this == RHS);
+  }
+  bool operator==(const SILValueProjection &RHS) const {
+    // If type is not the same, then SILValueProjections different.
+    if (Kind != RHS.Kind)
+      return false;
+    // If Base is different, then SILValueProjections different.
+    if (Base != RHS.Base)
+      return false;
+    // If the projection paths are different, then SILValueProjections are
+    // different.
+    if (!hasIdenticalProjectionPath(RHS))
+      return false;
+    // These SILValueProjections represent the same memory location.
+    return true;
+  }
+
+  /// Returns the hashcode for the location.
+  llvm::hash_code getHashCode() const {
+    llvm::hash_code HC = llvm::hash_combine(
+        Base.getDef(), Base.getResultNumber(), Base.getType());
+    if (!Path.hasValue())
+      return HC;
+    HC = llvm::hash_combine(HC, hash_value(Path.getValue()));
+    return HC;
+  }
+
+  virtual void print() const;
+};
+
 //===----------------------------------------------------------------------===//
 //                            Load Store Value
 //===----------------------------------------------------------------------===//
 
-class MemLocation;
-class LoadStoreValue;
 using LoadStoreValueList = llvm::SmallVector<LoadStoreValue, 8>;
-using MemLocationValueMap = llvm::DenseMap<MemLocation, LoadStoreValue>; 
+using MemLocationValueMap = llvm::DenseMap<MemLocation, LoadStoreValue>;
 using ValueTableMap = llvm::SmallMapVector<unsigned, LoadStoreValue, 8>;
 
 /// This class represents either a single SILValue or a covering of values that
@@ -82,7 +232,6 @@ using ValueTableMap = llvm::SmallMapVector<unsigned, LoadStoreValue, 8>;
 ///   store %3 to %0#1 : $*A                          // id: %4
 /// }
 ///
-///
 /// NOTE: LoadStoreValue can take 2 forms.
 ///
 /// 1. It can take a concrete value, i.e. with a valid Base and ProjectionPath.
@@ -107,11 +256,7 @@ using ValueTableMap = llvm::SmallMapVector<unsigned, LoadStoreValue, 8>;
 /// multiple ways to represent the same MemLocations (even they have the same
 /// base).
 ///
-class LoadStoreValue {
-  /// The base of the memory value.
-  SILValue Base;
-  /// The path to reach the accessed field of the object.
-  Optional<ProjectionPath> Path;
+class LoadStoreValue : public SILValueProjection {
   /// If this is a covering value, we need to go to each predecessor to
   /// materialize the value.
   bool IsCoveringValue;
@@ -119,37 +264,23 @@ class LoadStoreValue {
   /// Create a path of ValueProjection with the given VA and Path.
   SILValue createExtract(SILValue VA, Optional<ProjectionPath> &Path,
                          SILInstruction *Inst);
+
 public:
   /// Constructors.
-  LoadStoreValue() : Base(), IsCoveringValue(false) {}
-  LoadStoreValue(SILValue B) : Base(B), IsCoveringValue(false) {}
+  LoadStoreValue() : SILValueProjection(), IsCoveringValue(false) {}
+  LoadStoreValue(SILValue B) : SILValueProjection(B), IsCoveringValue(false) {}
   LoadStoreValue(SILValue B, ProjectionPath &P)
-      : Base(B), Path(std::move(P)), IsCoveringValue(false) {}
-
-  SILValue getBase() const { return Base; }
-  Optional<ProjectionPath> &getPath() { return Path; }
+      : SILValueProjection(B, P), IsCoveringValue(false) {}
 
   /// Copy constructor.
-  LoadStoreValue(const LoadStoreValue &RHS) {
-    Base = RHS.Base;
+  LoadStoreValue(const LoadStoreValue &RHS) : SILValueProjection(RHS) {
     IsCoveringValue = RHS.IsCoveringValue;
-    Path.reset();
-    if (!RHS.Path.hasValue())
-      return;
-    ProjectionPath X;
-    X.append(RHS.Path.getValue());
-    Path = std::move(X);
   }
 
+  /// Assignment operator.
   LoadStoreValue &operator=(const LoadStoreValue &RHS) {
-    Base = RHS.Base;
+    SILValueProjection::operator=(RHS);
     IsCoveringValue = RHS.IsCoveringValue;
-    Path.reset();
-    if (!RHS.Path.hasValue())
-      return *this;
-    ProjectionPath X;
-    X.append(RHS.Path.getValue());
-    Path = std::move(X);
     return *this;
   }
 
@@ -160,18 +291,20 @@ public:
     return Base && Path.hasValue();
   }
 
-  /// Returns true if the LoadStoreValue has a non-empty projection path.
-  bool hasEmptyProjectionPath() const { return !Path.getValue().size(); }
-
   /// Take the last level projection off. Return the modified LoadStoreValue.
-  LoadStoreValue &stripLastLevelProjection();
- 
+  LoadStoreValue &stripLastLevelProjection(){
+    Path.getValue().remove_front();
+    return *this;
+  }
+
+  /// Returns true if this LoadStoreValue is a covering value.
   bool isCoveringValue() const { return IsCoveringValue; }
   /// Mark this LoadStoreValue as a covering value.
-  void setCoveringValue(); 
- 
-  /// Print the base and the path of the LoadStoreValue.
-  void print();
+  void setCoveringValue() {
+    Base = SILValue();
+    Path.reset();
+    IsCoveringValue = true;
+  }
 
   /// Materialize the SILValue that this LoadStoreValue represents.
   ///
@@ -191,77 +324,61 @@ public:
   }
 };
 
-
 //===----------------------------------------------------------------------===//
 //                              Memory Location
 //===----------------------------------------------------------------------===//
-/// Forward declaration.
-class MemLocation;
-
 /// Type declarations.
 using MemLocationSet = llvm::DenseSet<MemLocation>;
 using MemLocationList = llvm::SmallVector<MemLocation, 8>;
 using MemLocationIndexMap = llvm::DenseMap<MemLocation, unsigned>;
 using TypeExpansionMap = llvm::DenseMap<SILType, ProjectionPathList>;
 
-class MemLocation {
-public:
-  enum KeyKind : uint8_t { EmptyKey = 0, TombstoneKey, NormalKey };
-
-private:
-  /// The base of the object.
-  SILValue Base;
-  /// Empty key, tombstone key or normal key.
-  KeyKind Kind;
-  /// The path to reach the accessed field of the object.
-  Optional<ProjectionPath> Path;
-
+/// This class represents a field in an allocated object. It consists of a
+/// base that is the tracked SILValue, and a projection path to the
+/// represented field.
+/// 
+/// The base here will point to the actual object this inst is accessing,
+/// not this particular field. We call this MemLocation canonicalization.
+///
+/// e.g. %1 = alloc_stack $S
+///      %2 = struct_element_addr %1, #a
+///      store %3 to %2 : $*Int
+///
+/// Base will point to %1, but not %2. Projection path will indicate which
+/// field is accessed.
+///
+/// Canonicalizing MemLocation reduces the # of the MemLocations we keep in
+/// the MemLocationVault, and this in turn reduces the # of bits each basic
+/// block keeps.
+///
+/// Moreover, without canonicalization, its more difficult to implement the
+/// intersection operator in DSE/RLE?
+///
+/// We basically need to compare every pair of MemLocation and find the ones
+/// that must alias O(n^2). Or we need to go through every MemLocation in the
+/// vault and turn on/off the bits for the MustAlias ones whenever we want to
+/// turn a MemLocation bit on/off. Both are expensive.
+///
+/// Canonicalizing suffers from the same problem, but to a lesser extend. i.e.
+/// 2 MemLocations with different bases but happen to be the same object and
+/// field. By doing canonicalization, the intersection is simply a bitwise AND
+/// (No AA involved).
+///
+class MemLocation : public SILValueProjection {
 public:
   /// Constructors.
-  MemLocation() : Base(), Kind(NormalKey) {}
-  MemLocation(SILValue B) : Base(B), Kind(NormalKey) { initialize(B); }
+  MemLocation() {}
+  MemLocation(SILValue B) : SILValueProjection(B) { initialize(B); }
   MemLocation(SILValue B, ProjectionPath &P, KeyKind Kind = NormalKey)
-      : Base(B), Kind(Kind), Path(std::move(P)) {}
+      : SILValueProjection(B, P, Kind) {}
 
   /// Copy constructor.
-  MemLocation(const MemLocation &RHS) {
-    Base = RHS.Base;
-    Path.reset();
-    Kind = RHS.Kind;
-    if (!RHS.Path.hasValue())
-      return;
-    ProjectionPath X;
-    X.append(RHS.Path.getValue());
-    Path = std::move(X);
-  }
+  MemLocation(const MemLocation &RHS) : SILValueProjection(RHS) {}
 
+  /// Assignment operator.
   MemLocation &operator=(const MemLocation &RHS) {
-    Base = RHS.Base;
-    Path.reset();
-    Kind = RHS.Kind;
-    if (!RHS.Path.hasValue())
-      return *this;
-    ProjectionPath X;
-    X.append(RHS.Path.getValue());
-    Path = std::move(X);
+    SILValueProjection::operator=(RHS);
     return *this;
-  }
-
-  /// Getters and setters for MemLocation.
-  KeyKind getKind() const { return Kind; }
-  void setKind(KeyKind K) { Kind = K; }
-  SILValue getBase() const { return Base; }
-  Optional<ProjectionPath> &getPath() { return Path; }
-
-  /// Returns the hashcode for the location.
-  llvm::hash_code getHashCode() const {
-    llvm::hash_code HC = llvm::hash_combine(Base.getDef(),
-                                            Base.getResultNumber(),
-                                            Base.getType());
-    if (!Path.hasValue())
-      return HC;
-    HC = llvm::hash_combine(HC, hash_value(Path.getValue()));
-    return HC;
   }
 
   /// Returns the type of the object the MemLocation represents.
@@ -273,57 +390,9 @@ public:
     return Path.getValue().front().getType().getObjectType();
   }
 
-  /// Returns whether the memory location has been initialized properly.
-  bool isValid() const {
-    return Base && Path.hasValue();
-  }
-
-  void subtractPaths(Optional<ProjectionPath> &P) {
-    if (!P.hasValue())
-      return;
-    ProjectionPath::subtractPaths(Path.getValue(), P.getValue());
-  }
-
-  /// Return false if one projection path is a prefix of another. false
-  /// otherwise.
-  bool hasNonEmptySymmetricPathDifference(const MemLocation &RHS) const {
-    const ProjectionPath &P = RHS.Path.getValue();
-    return Path.getValue().hasNonEmptySymmetricDifference(P);
-  }
-
-  /// Return true if the 2 locations have identical projection paths.
-  /// If both locations have empty paths, they are treated as having
-  /// identical projection path.
-  bool hasIdenticalProjectionPath(const MemLocation &RHS) const;
-
-  /// Comparisons.
-  bool operator!=(const MemLocation &RHS) const { return !(*this == RHS); }
-  bool operator==(const MemLocation &RHS) const {
-    // If type is not the same, then locations different.
-    if (Kind != RHS.Kind)
-      return false;
-    // If Base is different, then locations different.
-    if (Base != RHS.Base)
-      return false;
-
-    // If the projection paths are different, then locations are different.
-    if (!hasIdenticalProjectionPath(RHS))
-      return false;
-
-    // These locations represent the same memory location.
-    return true;
-  }
-
   /// Trace the given SILValue till the base of the accessed object. Also
   /// construct the projection path to the field accessed.
   void initialize(SILValue val);
-
-  /// Reset the memory location, i.e. clear base and path. 
-  void reset() {
-    Base = SILValue();
-    Path.reset();
-    Kind = NormalKey;
-  }
 
   /// Get the first level locations based on this location's first level
   /// projection.
@@ -337,7 +406,7 @@ public:
   ///
   bool isNonEscapingLocalMemLocation() {
     assert(isValid() && "Invalid memory location");
-    // TODO: this does not have to be limited to allocstack. 
+    // TODO: this does not have to be limited to allocstack.
     return isa<AllocStackInst>(Base) && isNonEscapingLocalObject(Base);
   }
 
@@ -347,12 +416,9 @@ public:
   /// Check whether the 2 MemLocations must alias each other or not.
   bool isMustAliasMemLocation(const MemLocation &RHS, AliasAnalysis *AA);
 
-  /// Print MemLocation.
-  void print() const;
-
-  ///============================/// 
-  ///       static functions.    ///
-  ///============================/// 
+  //============================//
+  //       static functions.    //
+  //============================//
 
   /// Given Base and 2 ProjectionPaths, create a MemLocation out of them.
   static MemLocation createMemLocation(SILValue Base, ProjectionPath &P1,
@@ -377,7 +443,8 @@ public:
 
   /// Given a memory location and a map between the expansions of the location
   /// and their corresponding values, try to come up with a single SILValue this
-  /// location holds. This may involve extracting and aggregating available values.
+  /// location holds. This may involve extracting and aggregating available
+  /// values.
   ///
   /// NOTE: reduceValues assumes that every component of the location has an
   /// concrete (i.e. not coverings set) available value in LocAndVal.
@@ -403,14 +470,7 @@ static inline llvm::hash_code hash_value(const MemLocation &L) {
                             L.getBase().getType());
 }
 
-inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, MemLocation V) {
-  V.getBase().print(OS);
-  OS << V.getPath().getValue();
-  return OS;
-}
-
 } // end swift namespace
-
 
 /// MemLocation is used in DenseMap, define functions required by DenseMap.
 namespace llvm {
@@ -444,4 +504,4 @@ template <> struct DenseMapInfo<MemLocation> {
 
 } // namespace llvm
 
-#endif  // SWIFT_SIL_MEMLOCATION_H
+#endif // SWIFT_SIL_MEMLOCATION_H

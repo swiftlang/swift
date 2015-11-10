@@ -509,7 +509,8 @@ static inline llvm::hash_code hash_value(const Projection &P) {
   }
 }
 
-inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, Projection &P) {
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                                     const Projection &P) {
   // Print the projection type first.
   OS << "Address Projection Type: ";
   OS << P.getType() << "\n";
@@ -523,7 +524,8 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, Projection &P) {
   return OS;
 }
 
-inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, ProjectionPath &P) {
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                                     const ProjectionPath &P) {
   for (auto &X : P)
     OS << X << "\n";
   if (P.empty())

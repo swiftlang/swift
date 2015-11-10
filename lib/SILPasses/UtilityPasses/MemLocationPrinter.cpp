@@ -125,7 +125,7 @@ class MemLocationPrinter : public SILFunctionTransform {
 
         llvm::outs() << "#" << Counter++ << II;
         for (auto &Loc : Locs) {
-          llvm::outs() << Loc;
+          Loc.print();
         }
         L.reset();
         Locs.clear();
@@ -176,7 +176,7 @@ class MemLocationPrinter : public SILFunctionTransform {
         MemLocation::reduce(L, &Fn.getModule(), SLocs);
         llvm::outs() << "#" << Counter++ << II;
         for (auto &Loc : SLocs) {
-          llvm::outs() << Loc;
+          Loc.print();
         }
         L.reset();
         Locs.clear();
