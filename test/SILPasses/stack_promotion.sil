@@ -247,6 +247,33 @@ bb5:
   return %a1 : $Int32
 }
 
+// CHECK-LABEL: sil @promote_and_move_alloc_before_alloc_stack
+// CHECK: [[O:%[0-9]+]] = alloc_ref [stack] $XX
+// CHECK: alloc_stack
+// CHECK: {{^}}bb2:
+// CHECK: dealloc_stack
+// CHECK: strong_release
+// CHECK: dealloc_ref [stack] [[O]] : $XX
+// CHECK: return
+sil @promote_and_move_alloc_before_alloc_stack : $@convention(thin) () -> Int32 {
+bb0:
+  %s1 = alloc_stack $Int32
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb2
+ 
+bb2:
+  %o1 = alloc_ref $XX
+  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> XX
+  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> XX
+  dealloc_stack %s1#0 : $*@local_storage Int32
+  %l1 = ref_element_addr %n1 : $XX, #XX.x
+  %l2 = load %l1 : $*Int32
+  strong_release %n1 : $XX
+  return %l2 : $Int32
+}
+
 // CHECK-LABEL: sil @promote_array
 // CHECK: [[AF:%[0-9]+]] = function_ref @swift_bufferAllocateOnStack : $@convention(thin) (@thick AnyObject.Type, Int, Int) -> @owned AnyObject
 // CHECK: [[B:%[0-9]+]] = apply [[AF]](

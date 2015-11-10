@@ -109,9 +109,14 @@ class StackPromoter {
   SILFunction *getBufferDeallocFunc(SILFunction *OrigFunc,
                                     SILLocation Loc);
 
-  /// Checks if the allocation \p AI can be promoted and returns the insertion
-  /// point for the deallocation instruction(s) if it is possible.
-  SILInstruction *canPromoteAlloc(SILInstruction *AI);
+  /// Returns true if the allocation \p AI can be promoted.
+  /// In this case it sets the \a DeallocInsertionPoint to the instruction
+  /// where the deallocation must be inserted.
+  /// It optionally also sets \a AllocInsertionPoint in case the allocation
+  /// instruction must be moved to another place.
+  bool canPromoteAlloc(SILInstruction *AI,
+                       SILInstruction *&AllocInsertionPoint,
+                       SILInstruction *&DeallocInsertionPoint);
 
   bool strictlyDominates(SILBasicBlock *A, SILBasicBlock *B) {
     return A != B && DT->dominates(A, B);
@@ -172,9 +177,12 @@ static bool isPromotableAllocInst(SILInstruction *I) {
 StackPromoter::ChangeState StackPromoter::promote() {
   // Search the whole function for stack promotable allocations.
   for (SILBasicBlock &BB : *ConGraph->getFunction()) {
-    for (SILInstruction &I : BB) {
-      if (isPromotableAllocInst(&I)) {
-        tryPromoteAlloc(&I);
+    for (auto Iter = BB.begin(); Iter != BB.end();) {
+      // The allocaiton instruction may be moved, so increment Iter prior to
+      // doing the optimization.
+      SILInstruction *I = &*Iter++;
+      if (isPromotableAllocInst(I)) {
+        tryPromoteAlloc(I);
       }
     }
   }
@@ -186,18 +194,21 @@ StackPromoter::ChangeState StackPromoter::promote() {
 }
 
 void StackPromoter::tryPromoteAlloc(SILInstruction *I) {
-  SILInstruction *InsertionPoint = canPromoteAlloc(I);
-  if (!InsertionPoint)
+  SILInstruction *AllocInsertionPoint = nullptr;
+  SILInstruction *DeallocInsertionPoint = nullptr;
+  if (!canPromoteAlloc(I, AllocInsertionPoint, DeallocInsertionPoint))
     return;
 
   DEBUG(llvm::dbgs() << "Promoted " << *I);
   DEBUG(llvm::dbgs() << "    in " << I->getFunction()->getName() << '\n');
   NumStackPromoted++;
 
-  SILBuilder B(InsertionPoint);
+  SILBuilder B(DeallocInsertionPoint);
   if (auto *ARI = dyn_cast<AllocRefInst>(I)) {
     // It's an object allocation. We set the [stack] attribute in the alloc_ref.
     ARI->setStackAllocatable();
+    if (AllocInsertionPoint)
+      ARI->moveBefore(AllocInsertionPoint);
 
     /// And create a dealloc_ref [stack] at the end of the object's lifetime.
     B.createDeallocRef(I->getLoc(), I, true);
@@ -205,6 +216,7 @@ void StackPromoter::tryPromoteAlloc(SILInstruction *I) {
     return;
   }
   if (auto *AI = dyn_cast<ApplyInst>(I)) {
+    assert(!AllocInsertionPoint && "can't move call to swift_bufferAlloc");
     // It's an array buffer allocation.
     auto *OldFRI = cast<FunctionRefInst>(AI->getCallee());
     SILFunction *OldF = OldFRI->getReferencedFunction();
@@ -281,14 +293,18 @@ static void dumpUsePoints(const llvm::SmallPtrSetImpl<ValueBase *> &UsePoints) {
 }
 #endif
 
-SILInstruction *StackPromoter::canPromoteAlloc(SILInstruction *AI) {
+bool StackPromoter::canPromoteAlloc(SILInstruction *AI,
+                                    SILInstruction *&AllocInsertionPoint,
+                                    SILInstruction *&DeallocInsertionPoint) {
+  AllocInsertionPoint = nullptr;
+  DeallocInsertionPoint = nullptr;
   auto *Node = ConGraph->getNodeOrNull(AI);
   if (!Node)
-    return nullptr;
+    return false;
 
   // The most important check: does the object escape the current function?
   if (Node->escapes())
-    return nullptr;
+    return false;
 
   // Now we have to determine the lifetime of the allocated object in its
   // function.
@@ -303,7 +319,7 @@ SILInstruction *StackPromoter::canPromoteAlloc(SILInstruction *AI) {
     // But in case all pathes from this block end in unreachable then the
     // final release of the object may be optimized away. We bail out in this
     // case.
-    return nullptr;
+    return false;
   }
   DEBUG(dumpUsePoints(UsePoints));
 
@@ -355,7 +371,7 @@ SILInstruction *StackPromoter::canPromoteAlloc(SILInstruction *AI) {
         while (!strictlyPostDominates(EndBlock, Pred)) {
           EndBlock = getImmediatePostDom(EndBlock);
           if (!EndBlock)
-            return nullptr;
+            return false;
         }
       }
       Iter = BB->begin();
@@ -366,7 +382,8 @@ SILInstruction *StackPromoter::canPromoteAlloc(SILInstruction *AI) {
       SILInstruction &I = *Iter++;
       if (BB == EndBlock && StackDepth == 0 && NumUsePointsToFind == 0) {
         // We found a place to insert the stack deallocation.
-        return &I;
+        DeallocInsertionPoint = &I;
+        return true;
       }
       if (I.isAllocatingStack()) {
         StackDepth++;
@@ -380,7 +397,19 @@ SILInstruction *StackPromoter::canPromoteAlloc(SILInstruction *AI) {
           //     %obj = alloc_ref // the allocation
           //     dealloc_stack %1
           //     use_of_obj(%obj)
-          return nullptr;
+          //
+          // In this case we can move the alloc_ref before the alloc_stack
+          // to fix the nesting.
+          if (!isa<AllocRefInst>(AI))
+            return false;
+          auto *Alloc = dyn_cast<SILInstruction>(I.getOperand(0).getDef());
+          if (!Alloc)
+            return false;
+          // This should always be the case, but let's be on the safe side.
+          if (!PDT->dominates(StartBlock, Alloc->getParent()))
+            return false;
+          AllocInsertionPoint = Alloc;
+          StackDepth++;
         }
         StackDepth--;
       }
@@ -405,7 +434,7 @@ SILInstruction *StackPromoter::canPromoteAlloc(SILInstruction *AI) {
         //     dealloc_stack %1 // this is the new EndBlock
         EndBlock = getImmediatePostDom(EndBlock);
         if (!EndBlock)
-          return nullptr;
+          return false;
       }
       // Again, it's important that the EndBlock is the first in the WorkList.
       WorkList.insert(EndBlock, -1);
@@ -424,7 +453,7 @@ SILInstruction *StackPromoter::canPromoteAlloc(SILInstruction *AI) {
         //     cond_br ..., loop, exit
         //   exit:
         //     use(%container)
-        return nullptr;
+        return false;
       }
       WorkList.insert(Succ, StackDepth);
     }
