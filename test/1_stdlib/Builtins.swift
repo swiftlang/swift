@@ -105,14 +105,6 @@ tests.test("_assumeNonNegative") {
   expectEqual(r, 27)
 }
 
-tests.test("unsafeUnwrap") {
-  let empty: Int? = nil
-  let nonEmpty: Int? = 3
-  expectEqual(3, unsafeUnwrap(nonEmpty))
-  expectCrashLater()
-  unsafeUnwrap(empty)
-}
-
 var NoisyLifeCount = 0
 var NoisyDeathCount = 0
 

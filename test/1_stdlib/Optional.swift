@@ -305,4 +305,12 @@ OptionalTests.test("Optional OutputStream") {
   expectEqual(debugPrintStr(optStream), "Optional(AStream)")
 }
 
+OptionalTests.test("unsafeUnwrap") {
+  let empty: Int? = nil
+  let nonEmpty: Int? = 3
+  expectEqual(3, nonEmpty.unsafeUnwrap())
+  expectCrashLater()
+  empty.unsafeUnwrap()
+}
+
 runAllTests()
