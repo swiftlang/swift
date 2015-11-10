@@ -30,7 +30,7 @@ extension String {
       input: UnsafeBufferPointer(start: UnsafeMutablePointer(cs), length: len))
   }
 
-  /// Creates a new `String` by copying the nul-terminated UTF-8 data
+  /// Create a new `String` by copying the nul-terminated UTF-8 data
   /// referenced by a `CString`.
   ///
   /// Returns `nil` if the `CString` is `NULL`.  If `CString` contains
@@ -38,10 +38,9 @@ extension String {
   /// characters (U+FFFD).
   @warn_unused_result
   public static func fromCStringRepairingIllFormedUTF8(
-    cs: UnsafePointer<CChar>)
-      -> (String?, hadError: Bool) {
+    cs: UnsafePointer<CChar>) -> (String, hadError: Bool)? {
     if cs._isNull {
-      return (nil, hadError: false)
+      return nil
     }
     let len = Int(_swift_stdlib_strlen(cs))
     let (result, hadError) = String._fromCodeUnitSequenceWithRepair(UTF8.self,

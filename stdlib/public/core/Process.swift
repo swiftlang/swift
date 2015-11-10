@@ -17,7 +17,8 @@ public enum Process {
     // Use lazy initialization of static properties to safely initialize the
     // public 'arguments' property on first use.
     (0..<Int(argc)).map { i in
-      String.fromCStringRepairingIllFormedUTF8(unsafeArgv[i]).0 ?? ""
+      String.fromCStringRepairingIllFormedUTF8(unsafeArgv[i])
+        .map { $0.0 } ?? ""
     }
   }()
 

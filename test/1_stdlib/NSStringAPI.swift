@@ -2215,29 +2215,37 @@ CStringTests.test("String.fromCString") {
 CStringTests.test("String.fromCStringRepairingIllFormedUTF8") {
   do {
     let s = getNullCString()
-    let (result, hadError) = String.fromCStringRepairingIllFormedUTF8(s)
+    let result = String.fromCStringRepairingIllFormedUTF8(s)
     expectEmpty(result)
-    expectFalse(hadError)
   }
   do {
     let (s, dealloc) = getASCIICString()
-    let (result, hadError) = String.fromCStringRepairingIllFormedUTF8(s)
-    expectOptionalEqual("ab", result)
-    expectFalse(hadError)
+    if let (result, hadError) = String.fromCStringRepairingIllFormedUTF8(s) {
+      expectOptionalEqual("ab", result)
+      expectFalse(hadError)
+    } else {
+      expectTrue(false, "Expected .Some()")
+    }
     dealloc()
   }
   do {
     let (s, dealloc) = getNonASCIICString()
-    let (result, hadError) = String.fromCStringRepairingIllFormedUTF8(s)
-    expectOptionalEqual("аб", result)
-    expectFalse(hadError)
+    if let (result, hadError) = String.fromCStringRepairingIllFormedUTF8(s) {
+      expectOptionalEqual("аб", result)
+      expectFalse(hadError)
+    } else {
+      expectTrue(false, "Expected .Some()")
+    }
     dealloc()
   }
   do {
     let (s, dealloc) = getIllFormedUTF8String1()
-    let (result, hadError) = String.fromCStringRepairingIllFormedUTF8(s)
-    expectOptionalEqual("\u{41}\u{fffd}\u{fffd}\u{fffd}\u{41}", result)
-    expectTrue(hadError)
+    if let (result, hadError) = String.fromCStringRepairingIllFormedUTF8(s) {
+      expectOptionalEqual("\u{41}\u{fffd}\u{fffd}\u{fffd}\u{41}", result)
+      expectTrue(hadError)
+    } else {
+      expectTrue(false, "Expected .Some()")
+    }
     dealloc()
   }
 }
