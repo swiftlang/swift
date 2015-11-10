@@ -86,6 +86,7 @@ public:
 
   std::pair<StringRef, ArrayRef<StringRef>> next() {
     bool HasNext = hasNext();
+    (void) HasNext;
     assert(HasNext && "Have no more data.");
     ViewedText.push_back(Key);
     return std::make_pair(Key, llvm::makeArrayRef(Words));

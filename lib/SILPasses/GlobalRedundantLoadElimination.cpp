@@ -629,6 +629,7 @@ void BBState::mergePredecessorStates(RLEContext &Ctx) {
   }
 
   for (auto &X : ForwardSetVal) {
+    (void) X;
     assert(X.second.isValid() && "Invalid load store value");
   }
 }
@@ -685,6 +686,7 @@ bool RLEContext::collectRLEValues(SILInstruction *I, MemLocation &L,
   // Sanity check to make sure we have valid load store values for each
   // memory location.
   for (auto &X : Locs) {
+    (void) X;
     assert(Values[X].isValid() && "Invalid load store value");
   }
   return true;
