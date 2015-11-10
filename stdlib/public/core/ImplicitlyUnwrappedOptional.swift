@@ -44,31 +44,6 @@ public enum ImplicitlyUnwrappedOptional<Wrapped>
     self = .None
   }
 
-  /// If `self == nil`, returns `nil`.  Otherwise, returns `f(self!)`.
-  @warn_unused_result
-  public func map<U>(@noescape f: (Wrapped) throws -> U)
-      rethrows -> ImplicitlyUnwrappedOptional<U> {
-    switch self {
-    case .Some(let y):
-      return .Some(try f(y))
-    case .None:
-      return .None
-    }
-  }
-
-  /// Returns `nil` if `self` is `nil`, `f(self!)` otherwise.
-  @warn_unused_result
-  public func flatMap<U>(
-    @noescape f: (Wrapped) throws -> ImplicitlyUnwrappedOptional<U>
-  ) rethrows -> ImplicitlyUnwrappedOptional<U> {
-    switch self {
-    case .Some(let y):
-      return try f(y)
-    case .None:
-      return .None
-    }
-  }
-
   /// Returns a mirror that reflects `self`.
   public func _getMirror() -> _Mirror {
     // FIXME: This should probably use _OptionalMirror in both cases.
