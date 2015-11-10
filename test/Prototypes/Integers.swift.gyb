@@ -1164,7 +1164,7 @@ tests.test("SmartBitShift/Unconstrained/Left/UInt16") {
 
 tests.test("HeterogeneousArithmetic/Addition") {
   expectEqual(256, (255 as UInt8) |+ (1 as Int16))
-  expectEqual(256, (128 as Int16) |+ (128 as Int128))
+  expectEqual(256, (128 as Int16) |+ (128 as DWord))
 }
 
 tests.test("Basics") {
