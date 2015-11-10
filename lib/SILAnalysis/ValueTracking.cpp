@@ -25,6 +25,7 @@ using namespace swift::PatternMatch;
 /// Strip off casts/indexing insts/address projections from V until there is
 /// nothing left to strip.
 /// FIXME: Maybe put this on SILValue?
+/// FIXME: Why don't we strip projections after stripping indexes?
 SILValue swift::getUnderlyingObject(SILValue V) {
   while (true) {
     SILValue V2 = V.stripCasts().stripAddressProjections().stripIndexingInsts();
