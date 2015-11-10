@@ -31,8 +31,8 @@
 /// each block. The kill set tracks what MemLocations are stored into by this
 /// basic block and its successors.
 ///
-/// 3. An optimistic iterative dataflow is performed on the kill sets until
-/// convergence.
+/// 3. An optimistic iterative dataflow is performed on the gen sets and kill
+/// sets until convergence.
 ///
 /// At the core of DSE, there is the MemLocation class. a MemLocation is an
 /// abstraction of an object field in program. It consists of a base and a
@@ -196,8 +196,8 @@ public:
     BBKillSet.resize(MemLocationCount, false);
   }
 
-  /// Check whether the WriteSetIn has changed. If it does, we need to
-  /// re-iterate to reach fixed point.
+  /// Check whether the WriteSetIn has changed. If it does, we need to reiterate
+  /// to reach fixed point.
   bool updateWriteSetIn();
 
   /// Functions to manipulate the write set.
@@ -212,11 +212,9 @@ public:
 } // end anonymous namespace
 
 bool BBState::updateWriteSetIn() {
-  if (WriteSetIn != WriteSetOut) {
-    WriteSetIn = WriteSetOut;
-    return true;
-  }
-  return false;
+  bool Changed = (WriteSetIn != WriteSetOut);
+  WriteSetIn = WriteSetOut;
+  return Changed;
 }
 
 void BBState::clearMemLocations() { WriteSetOut.reset(); }
