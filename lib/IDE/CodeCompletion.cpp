@@ -830,7 +830,8 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
 
     return new (*Sink.Allocator) CodeCompletionResult(
         SemanticContext, NumBytesToErase, CCS, AssociatedDecl, ModuleName,
-        /*NotRecommended=*/false, copyString(*Sink.Allocator, BriefComment),
+        /*NotRecommended=*/IsNotRecommended,
+        copyString(*Sink.Allocator, BriefComment),
         copyAssociatedUSRs(*Sink.Allocator, AssociatedDecl),
         copyStringPairArray(*Sink.Allocator, CommentWords), typeRelation);
   }
@@ -1021,7 +1022,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
 
   SmallVector<StringRef, 3> ParsedKeywords;
 
-  std::vector<std::string> SubModuleNames;
+  std::vector<std::pair<StringRef, bool>> SubModuleNameVisibilityPairs;
   StmtKind ParentStmtKind;
 
   void addSuperKeyword(CodeCompletionResultSink &Sink) {
@@ -1505,17 +1506,19 @@ public:
     ExpressionSpecificDecls.insert(D);
   }
 
-  void addSubModuleNames(std::vector<std::string> &SubModuleNames) {
-    for (auto Name : SubModuleNames) {
+  void addSubModuleNames(std::vector<std::pair<StringRef, bool>>
+      &SubModuleNameVisibilityPairs) {
+    for (auto &Pair : SubModuleNameVisibilityPairs) {
       CodeCompletionResultBuilder Builder(Sink,
                                           CodeCompletionResult::ResultKind::
                                           Declaration,
                                           SemanticContextKind::OtherModule,
                                           ExpectedTypes);
-      auto MD = ModuleDecl::create(Ctx.getIdentifier(Name), Ctx);
+      auto MD = ModuleDecl::create(Ctx.getIdentifier(Pair.first), Ctx);
       Builder.setAssociatedDecl(MD);
       Builder.addTextChunk(MD->getNameStr());
       Builder.addTypeAnnotation("Module");
+      Builder.setNotRecommended(Pair.second);
     }
   }
 
@@ -1543,6 +1546,9 @@ public:
         Builder.setAssociatedDecl(MD);
         Builder.addTextChunk(MD->getNameStr());
         Builder.addTypeAnnotation("Module");
+
+        // Imported modules are not recommended.
+        Builder.setNotRecommended(ClangImporter::isModuleImported(M));
       }
     }
   }
@@ -3833,7 +3839,7 @@ void CodeCompletionCallbacksImpl::completeImportDecl(
     return;
   auto Importer = static_cast<ClangImporter *>(CurDeclContext->getASTContext().
                                                getClangModuleLoader());
-  Importer->collectSubModuleNames(Path, SubModuleNames);
+  Importer->collectSubModuleNamesAndVisibility(Path, SubModuleNameVisibilityPairs);
 }
 
 void CodeCompletionCallbacksImpl::completeUnresolvedMember(UnresolvedMemberExpr *E,
@@ -4448,7 +4454,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
   case CompletionKind::Import: {
     if (DotLoc.isValid())
-      Lookup.addSubModuleNames(SubModuleNames);
+      Lookup.addSubModuleNames(SubModuleNameVisibilityPairs);
     else
       Lookup.addImportModuleNames();
     break;

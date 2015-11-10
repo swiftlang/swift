@@ -45,6 +45,7 @@ class CodeCompletionResultBuilder {
       CodeCompletionResult::Unrelated;
   bool Cancelled = false;
   ArrayRef<std::pair<StringRef, StringRef>> CommentWords;
+  bool IsNotRecommended = false;
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
                         StringRef Text);
@@ -92,6 +93,9 @@ public:
 
   void setLiteralKind(CodeCompletionLiteralKind kind) { LiteralKind = kind; }
   void setKeywordKind(CodeCompletionKeywordKind kind) { KeywordKind = kind; }
+  void setNotRecommended(bool NotRecommended = true) {
+    IsNotRecommended = NotRecommended;
+  }
 
   void
   setExpectedTypeRelation(CodeCompletionResult::ExpectedTypeRelation relation) {
