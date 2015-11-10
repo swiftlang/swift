@@ -141,6 +141,7 @@ SWIFT_SOURCE_ROOT: a directory containing the source for LLVM, Clang, Swift.
                      /lldb       (optional)
                      /llbuild    (optional)
                      /swiftpm    (optional, requires llbuild)
+                     /XCTest     (optional)
 
 SWIFT_BUILD_ROOT: a directory in which to create out-of-tree builds.
                   Defaults to "$SWIFT_SOURCE_ROOT/build/".
@@ -283,6 +284,10 @@ details of the setups of other systems or automated environments.""")
         help="build swiftpm",
         action="store_true",
         dest="build_swiftpm")
+    projects_group.add_argument("--xctest",
+        help="build xctest",
+        action="store_true",
+        dest="build_xctest")
 
     extra_actions_group = parser.add_argument_group(
         title="Extra actions to perform before building")
@@ -547,6 +552,7 @@ placed""",
             "--skip-test-swift",
             "--skip-test-llbuild",
             "--skip-test-swiftpm",
+            "--skip-test-xctest",
             "--skip-test-ios",
             "--skip-test-tvos",
             "--skip-test-watchos",
@@ -593,6 +599,11 @@ placed""",
     if not args.build_swiftpm:
         build_script_impl_inferred_args += [
             "--skip-build-swiftpm"
+        ]
+
+    if not args.build_xctest:
+        build_script_impl_inferred_args += [
+            "--skip-build-xctest"
         ]
 
     if args.skip_build:

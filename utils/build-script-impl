@@ -111,11 +111,13 @@ KNOWN_SETTINGS=(
     skip-build-lldb             ""               "set to skip building LLDB"
     skip-build-llbuild          ""               "set to skip buildling llbuild"
     skip-build-swiftpm          ""               "set to skip buildling swiftpm"
+    skip-build-xctest           ""               "set to skip buildling xctest"
     skip-test-cmark             ""               "set to skip testing CommonMark"
     skip-test-lldb              ""               "set to skip testing lldb"
     skip-test-swift             ""               "set to skip testing Swift"
     skip-test-llbuild           ""               "set to skip testing llbuild"
     skip-test-swiftpm           ""               "set to skip testing swiftpm"
+    skip-test-xctest            ""               "set to skip testing xctest"
     skip-test-osx               ""               "set to skip testing Swift stdlibs for OSX"
     skip-test-ios               ""               "set to skip testing Swift stdlibs for iOS"
     skip-test-ios-simulator     ""               "set to skip testing Swift stdlibs for iOS simulators (i.e. test devices only)"
@@ -151,6 +153,7 @@ KNOWN_SETTINGS=(
     install-lldb                ""               "whether to install LLDB"
     install-llbuild             ""               "whether to install llbuild"
     install-swiftpm             ""               "whether to install swiftpm"
+    install-xctest              ""               "whether to install xctest"
     darwin-install-extract-symbols ""            "whether to extract symbols with dsymutil during installations"
     cross-compile-tools-deployment-targets ""    "space-separated list of targets to cross-compile host Swift tools for"
     skip-merge-lipo-cross-compile-tools ""       "set to skip running merge-lipo after installing cross-compiled host Swift tools"
@@ -516,6 +519,7 @@ if [[ "$SKIP_BUILD" ]]; then
     SKIP_BUILD_LLDB=1
     SKIP_BUILD_LLBUILD=1
     SKIP_BUILD_SWIFTPM=1
+    SKIP_BUILD_XCTEST=1
 fi
 
 if [[ "$SKIP_IOS" ]] ; then
@@ -812,6 +816,7 @@ CMARK_SOURCE_DIR="$WORKSPACE/cmark"
 LLDB_SOURCE_DIR="$WORKSPACE/lldb"
 LLBUILD_SOURCE_DIR="$WORKSPACE/llbuild"
 SWIFTPM_SOURCE_DIR="$WORKSPACE/swiftpm"
+XCTEST_SOURCE_DIR="$WORKSPACE/XCTest"
 
 if [[ "$SKIP_BUILD_LLDB" ]]; then
   SKIP_BUILD_SWIG=1
@@ -841,6 +846,11 @@ if [[ ! "$SKIP_BUILD_SWIFTPM" && ! -d $SWIFTPM_SOURCE_DIR ]]; then
     exit 1
 fi
 
+if [[ ! "$SKIP_BUILD_XCTEST" && ! -d $XCTEST_SOURCE_DIR ]]; then
+    echo "Couldn't find XCTest source directory."
+    exit 1
+fi
+
 # Symlink clang into the llvm tree.
 CLANG_SOURCE_DIR="${LLVM_SOURCE_DIR}/tools/clang"
 if [ ! -e "${WORKSPACE}/clang" ] ; then
@@ -866,6 +876,9 @@ if [[ ! "${SKIP_BUILD_LLBUILD}" ]] ; then
 fi
 if [[ ! "${SKIP_BUILD_SWIFTPM}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" swiftpm)
+fi
+if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
+     PRODUCTS=("${PRODUCTS[@]}" xctest)
 fi
 
 SWIFT_STDLIB_TARGETS=()
@@ -1078,6 +1091,9 @@ function build_directory_bin() {
             swiftpm)
                 echo "${root}/${SWIFTPM_BUILD_TYPE}/bin"
                 ;;
+            xctest)
+                echo "${root}/${XCTEST_BUILD_TYPE}/bin"
+                ;;
             *)
                 echo "error: unknown product: ${product}"
                 exit 1
@@ -1173,6 +1189,9 @@ function cmake_config_opt() {
                 ;;
             swiftpm)
                 echo "--config ${SWIFTPM_BUILD_TYPE}"
+                ;;
+            xctest)
+                echo "--config ${XCTEST_BUILD_TYPE}"
                 ;;
             *)
                 echo "error: unknown product: ${product}"
@@ -1620,6 +1639,16 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 # swiftpm installs itself with a bootstrap method. No further cmake building is performed.
                 continue
                 ;;
+            xctest)
+                SWIFTC_BIN="$(build_directory_bin $deployment_target swift)/swiftc"
+                SWIFT_BUILD_PATH="$(build_directory $deployment_target swift)"
+                set -x
+                "$XCTEST_SOURCE_DIR"/build_script.py --swiftc="${SWIFTC_BIN}" --build-dir="${build_dir}" --swift-build-dir="${SWIFT_BUILD_PATH}"
+                { set +x; } 2>/dev/null
+
+                # XCTest builds itself and doesn't rely on cmake
+                continue
+                ;;
             *)
                 echo "error: unknown product: ${product}"
                 exit 1
@@ -1781,6 +1810,13 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                 # FIXME: We don't test swiftpm, yet...
                 continue
                 ;;
+            xctest)
+                if [[ "$SKIP_TEST_XCTEST" ]]; then
+                    continue
+                fi
+                # FIXME: We don't test xctest, yet...
+                continue
+                ;;
             *)
                 echo "error: unknown product: ${product}"
                 exit 1
@@ -1890,6 +1926,27 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                                      --build="${build_dir}" --prefix="${INSTALL_DESTDIR}"/"${INSTALL_PREFIX}" install
                 { set +x; } 2>/dev/null
                 # As swiftpm bootstraps the installation itself, we break early here.
+                continue
+                ;;
+            xctest)
+                if [[ -z "${INSTALL_XCTEST}" ]] ; then
+                    continue
+                fi
+                LIB_TARGET="linux"
+                if [[ `uname -s` == "Darwin" ]]; then
+                    LIB_TARGET="macosx"
+                fi
+                XCTEST_INSTALL_PREFIX="${INSTALL_DESTDIR}"/"${INSTALL_PREFIX}"/lib/swift/"${LIB_TARGET}"
+                set -x
+                "$XCTEST_SOURCE_DIR"/build_script.py --swiftc="${SWIFTC_BIN}" \
+                                    --build-dir="${build_dir}" \
+                                    --library-install-path="${XCTEST_INSTALL_PREFIX}" \
+                                    --module-install-path="${XCTEST_INSTALL_PREFIX}"/"${deployment_target}" \
+                                    --swift-build-dir="${SWIFT_BUILD_PATH}"
+                # cp "${build_dir}"/libXCTest.so "${INSTALL_DESTDIR}"/"${INSTALL_PREFIX}"/lib/swift/"${LIB_TARGET}"/libXCTest.so
+                # cp "${build_dir}" "${INSTALL_DESTDIR}"/"${INSTALL_PREFIX}"/lib/swift/"${LIB_TARGET}"/"${deployment_target}"
+                { set +x; } 2>/dev/null
+                # As XCTest installation is self-contained, we break early here.
                 continue
                 ;;
             *)
