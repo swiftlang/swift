@@ -264,7 +264,7 @@ public:
   /// module.
   void collectSubModuleNamesAndVisibility(
       ArrayRef<std::pair<Identifier, SourceLoc>> path,
-      std::vector<std::pair<StringRef, bool>> &namesVisiblePairs);
+      std::vector<std::pair<std::string, bool>> &namesVisiblePairs);
 
   /// Given a Clang module, decide whether this module is imported already.
   static bool isModuleImported(const clang::Module *M);

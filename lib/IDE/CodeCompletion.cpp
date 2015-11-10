@@ -1022,7 +1022,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
 
   SmallVector<StringRef, 3> ParsedKeywords;
 
-  std::vector<std::pair<StringRef, bool>> SubModuleNameVisibilityPairs;
+  std::vector<std::pair<std::string, bool>> SubModuleNameVisibilityPairs;
   StmtKind ParentStmtKind;
 
   void addSuperKeyword(CodeCompletionResultSink &Sink) {
@@ -1506,7 +1506,7 @@ public:
     ExpressionSpecificDecls.insert(D);
   }
 
-  void addSubModuleNames(std::vector<std::pair<StringRef, bool>>
+  void addSubModuleNames(std::vector<std::pair<std::string, bool>>
       &SubModuleNameVisibilityPairs) {
     for (auto &Pair : SubModuleNameVisibilityPairs) {
       CodeCompletionResultBuilder Builder(Sink,
