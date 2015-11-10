@@ -17,7 +17,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/DebugUtils.h"
-#include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/Local.h"
