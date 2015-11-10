@@ -499,7 +499,7 @@ construct such a data structure:
       }
   }
 
-The type `Box` can replace the array in the code sample above.
+The type ``Box`` can replace the array in the code sample above.
 
 Unsafe code
 ===========
