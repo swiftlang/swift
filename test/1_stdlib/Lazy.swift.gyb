@@ -36,17 +36,17 @@ extension Repeated where Element : TestProtocol1 {
 LazyTestSuite.test("Repeated") {
   checkRandomAccessCollection(
     [] as Array<OpaqueValue<Int>>,
-    Repeated(repeating: OpaqueValue(42), length: 0))
+    repeatElement(OpaqueValue(42), count: 0))
     { $0.value == $1.value }
 
   checkRandomAccessCollection(
     [ OpaqueValue(42) ] as Array<OpaqueValue<Int>>,
-    Repeated(repeating: OpaqueValue(42), length: 1))
+    repeatElement(OpaqueValue(42), count: 1))
     { $0.value == $1.value }
 
   checkRandomAccessCollection(
     [ OpaqueValue(42), OpaqueValue(42), OpaqueValue(42) ] as Array<OpaqueValue<Int>>,
-    Repeated(repeating: OpaqueValue(42), length: 3))
+    repeatElement(OpaqueValue(42), count: 3))
     { $0.value == $1.value }
 }
 

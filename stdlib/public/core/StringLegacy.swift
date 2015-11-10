@@ -30,7 +30,7 @@ extension String {
   public init(repeating repeatedValue: UnicodeScalar, length: Int) {
     self = String._fromWellFormedCodeUnitSequence(
       UTF32.self,
-      input: Repeated(repeating: repeatedValue.value, length: length))
+      input: repeatElement(repeatedValue.value, count: length))
   }
   
   public var _lines : [String] {

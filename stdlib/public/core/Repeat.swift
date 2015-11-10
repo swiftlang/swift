@@ -20,7 +20,7 @@ public struct Repeated<Element> : Collection {
 
   /// Construct an instance that contains `length` elements having the
   /// value `repeatedValue`.
-  public init(repeating repeatedValue: Element, length: Int) {
+  internal init(_repeating repeatedValue: Element, length: Int) {
     self.length = length
     self.repeatedValue = repeatedValue
   }
@@ -51,5 +51,10 @@ public struct Repeated<Element> : Collection {
 
   /// The value of every element in this collection.
   public let repeatedValue: Element
+}
+
+/// Return a collection containing `n` repetitions of `elementInstance`.
+public func repeatElement<T>(element: T, count n: Int) -> Repeated<T> {
+  return Repeated(_repeating: element, length: n)
 }
 
