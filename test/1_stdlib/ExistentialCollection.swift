@@ -58,7 +58,7 @@ extension AnyRandomAccessCollection where Element : TestProtocol1 {
 var tests = TestSuite("ExistentialCollection")
 
 tests.test("AnyIterator") {
-  func countStrings() -> AnyIterator<String> {
+  func digits() -> AnyIterator<String> {
     let lazyStrings = (0..<5).lazy.map { String($0) }
     
     // This is a really complicated type of no interest to our
@@ -67,7 +67,7 @@ tests.test("AnyIterator") {
       lazyStrings.iterator()
     return AnyIterator(iterator)
   }
-  expectEqual(["0", "1", "2", "3", "4"], Array(countStrings()))
+  expectEqual(["0", "1", "2", "3", "4"], Array(digits()))
 
   var x = 7
   let iterator = AnyIterator { x < 15 ? x++ : nil }
