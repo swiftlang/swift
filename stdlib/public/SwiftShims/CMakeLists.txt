@@ -84,28 +84,6 @@ add_custom_command_target(unused_var
     COMMENT "Symlinking Clang resource headers into ${SWIFTLIB_DIR}/clang")
 add_dependencies(copy_shim_headers symlink_clang_headers)
 
-include(SwiftDarwin)
-if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-  # Symlink in arclite from the XcodeDefault toolchain.
-  get_default_toolchain_dir(toolchain_dir)
-  add_custom_command_target(unused_var
-      COMMAND
-        "${CMAKE_COMMAND}" "-E" "make_directory"
-        "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib"
-      COMMAND
-        "${CMAKE_COMMAND}" "-E" "create_symlink"
-        "${toolchain_dir}/usr/lib/arc"
-        "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/arc"
-      CUSTOM_TARGET_NAME "symlink_arclite"
-      OUTPUT "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/arc"
-      COMMENT "Symlinking toolchain's arclite into ${SWIFTLIB_DIR}/arc")
-  add_dependencies(copy_shim_headers symlink_arclite)
-
-  swift_install_in_component(arclite-symlink
-      DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/arc"
-      DESTINATION "lib")
-endif()
-
 swift_install_in_component(compiler
     FILES ${sources}
     DESTINATION "lib/swift/shims")
