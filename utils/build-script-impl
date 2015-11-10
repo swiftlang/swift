@@ -112,12 +112,14 @@ KNOWN_SETTINGS=(
     skip-build-llbuild          ""               "set to skip buildling llbuild"
     skip-build-swiftpm          ""               "set to skip buildling swiftpm"
     skip-build-xctest           ""               "set to skip buildling xctest"
+    skip-build-foundation       ""               "set to skip buildling foundation"
     skip-test-cmark             ""               "set to skip testing CommonMark"
     skip-test-lldb              ""               "set to skip testing lldb"
     skip-test-swift             ""               "set to skip testing Swift"
     skip-test-llbuild           ""               "set to skip testing llbuild"
     skip-test-swiftpm           ""               "set to skip testing swiftpm"
     skip-test-xctest            ""               "set to skip testing xctest"
+    skip-test-foundation        ""               "set to skip testing foundation"
     skip-test-osx               ""               "set to skip testing Swift stdlibs for OSX"
     skip-test-ios               ""               "set to skip testing Swift stdlibs for iOS"
     skip-test-ios-simulator     ""               "set to skip testing Swift stdlibs for iOS simulators (i.e. test devices only)"
@@ -154,6 +156,7 @@ KNOWN_SETTINGS=(
     install-llbuild             ""               "whether to install llbuild"
     install-swiftpm             ""               "whether to install swiftpm"
     install-xctest              ""               "whether to install xctest"
+    install-foundation          ""               "whether to install foundation"
     darwin-install-extract-symbols ""            "whether to extract symbols with dsymutil during installations"
     cross-compile-tools-deployment-targets ""    "space-separated list of targets to cross-compile host Swift tools for"
     skip-merge-lipo-cross-compile-tools ""       "set to skip running merge-lipo after installing cross-compiled host Swift tools"
@@ -520,6 +523,7 @@ if [[ "$SKIP_BUILD" ]]; then
     SKIP_BUILD_LLBUILD=1
     SKIP_BUILD_SWIFTPM=1
     SKIP_BUILD_XCTEST=1
+    SKIP_BUILD_FOUNDATION=1
 fi
 
 if [[ "$SKIP_IOS" ]] ; then
@@ -817,6 +821,7 @@ LLDB_SOURCE_DIR="$WORKSPACE/lldb"
 LLBUILD_SOURCE_DIR="$WORKSPACE/llbuild"
 SWIFTPM_SOURCE_DIR="$WORKSPACE/swiftpm"
 XCTEST_SOURCE_DIR="$WORKSPACE/XCTest"
+FOUNDATION_SOURCE_DIR="$WORKSPACE/Foundation"
 
 if [[ "$SKIP_BUILD_LLDB" ]]; then
   SKIP_BUILD_SWIG=1
@@ -851,6 +856,11 @@ if [[ ! "$SKIP_BUILD_XCTEST" && ! -d $XCTEST_SOURCE_DIR ]]; then
     exit 1
 fi
 
+if [[ ! "$SKIP_BUILD_FOUNDATION" && ! -d $FOUNDATION_SOURCE_DIR ]]; then
+    echo "Couldn't find Foundation source directory."
+    exit 1
+fi
+
 # Symlink clang into the llvm tree.
 CLANG_SOURCE_DIR="${LLVM_SOURCE_DIR}/tools/clang"
 if [ ! -e "${WORKSPACE}/clang" ] ; then
@@ -879,6 +889,9 @@ if [[ ! "${SKIP_BUILD_SWIFTPM}" ]] ; then
 fi
 if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" xctest)
+fi
+if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
+     PRODUCTS=("${PRODUCTS[@]}" foundation)
 fi
 
 SWIFT_STDLIB_TARGETS=()
@@ -1094,6 +1107,9 @@ function build_directory_bin() {
             xctest)
                 echo "${root}/${XCTEST_BUILD_TYPE}/bin"
                 ;;
+            foundation)
+                echo "${root}/${FOUNDATION_BUILD_TYPE}/bin"
+                ;;
             *)
                 echo "error: unknown product: ${product}"
                 exit 1
@@ -1193,6 +1209,9 @@ function cmake_config_opt() {
             xctest)
                 echo "--config ${XCTEST_BUILD_TYPE}"
                 ;;
+            foundation)
+                echo "--config ${FOUNDATION_BUILD_TYPE}"
+                ;;            
             *)
                 echo "error: unknown product: ${product}"
                 exit 1
@@ -1636,6 +1655,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                                      --swiftc="${SWIFTC_BIN}" --sbt="${LLBUILD_BIN}" \
                                      --build="${build_dir}"
                 { set +x; } 2>/dev/null
+                
                 # swiftpm installs itself with a bootstrap method. No further cmake building is performed.
                 continue
                 ;;
@@ -1647,6 +1667,22 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 { set +x; } 2>/dev/null
 
                 # XCTest builds itself and doesn't rely on cmake
+                continue
+                ;;
+            foundation)
+                SWIFTC_BIN="$(build_directory_bin $deployment_target swift)/swiftc"
+                SWIFT_BUILD_PATH="$(build_directory $deployment_target swift)"
+                LLVM_BIN="$(build_directory_bin $deployment_target llvm)"
+                NINJA_BIN="$(build_directory $deployment_target ninja)/ninja"
+                set -x
+                pushd "${FOUNDATION_SOURCE_DIR}"
+                SWIFTC="${SWIFTC_BIN}" CLANG="${LLVM_BIN}"/clang \
+                      SDKROOT="${SWIFT_BUILD_PATH}" BUILD_DIR="${build_dir}" ./configure
+                $NINJA_BIN
+                popd
+                { set +x; } 2>/dev/null
+
+                # Foundation builds itself and doesn't use cmake
                 continue
                 ;;
             *)
@@ -1817,6 +1853,13 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                 # FIXME: We don't test xctest, yet...
                 continue
                 ;;
+            foundation)
+                if [[ "$SKIP_TEST_FOUNDATION" ]]; then
+                    continue
+                fi
+                # FIXME: We don't test foundation, yet...
+                continue
+                ;;
             *)
                 echo "error: unknown product: ${product}"
                 exit 1
@@ -1937,6 +1980,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                     LIB_TARGET="macosx"
                 fi
                 XCTEST_INSTALL_PREFIX="${INSTALL_DESTDIR}"/"${INSTALL_PREFIX}"/lib/swift/"${LIB_TARGET}"
+                echo "--- Installing ${product} ---"
                 set -x
                 "$XCTEST_SOURCE_DIR"/build_script.py --swiftc="${SWIFTC_BIN}" \
                                     --build-dir="${build_dir}" \
@@ -1946,9 +1990,20 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 # cp "${build_dir}"/libXCTest.so "${INSTALL_DESTDIR}"/"${INSTALL_PREFIX}"/lib/swift/"${LIB_TARGET}"/libXCTest.so
                 # cp "${build_dir}" "${INSTALL_DESTDIR}"/"${INSTALL_PREFIX}"/lib/swift/"${LIB_TARGET}"/"${deployment_target}"
                 { set +x; } 2>/dev/null
+                
                 # As XCTest installation is self-contained, we break early here.
                 continue
                 ;;
+            foundation)
+                if [[ -z "${INSTALL_FOUNDATION}" ]] ; then
+                    continue
+                fi
+                echo "--- Installing ${product} ---"
+                set -x
+                pushd "${FOUNDATION_SOURCE_DIR}"
+                DSTROOT="${INSTALL_DESTDIR}" BUILD_DIR="${build_dir}" ./install
+                popd
+                { set +x; } 2>/dev/null
             *)
                 echo "error: unknown product: ${product}"
                 exit 1
