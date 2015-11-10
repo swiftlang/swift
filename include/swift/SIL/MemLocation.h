@@ -66,6 +66,7 @@ protected:
 public:
   /// Constructors.
   SILValueProjection() : Base(), Kind(NormalKey) {}
+  SILValueProjection(KeyKind Kind) : Base(), Kind(Kind) {}
   SILValueProjection(SILValue B) : Base(B), Kind(NormalKey) {}
   SILValueProjection(SILValue B, ProjectionPath &P, KeyKind Kind = NormalKey)
       : Base(B), Kind(Kind), Path(std::move(P)) {}
@@ -322,6 +323,14 @@ public:
       return SILValue();
     return createExtract(Base, Path, Inst);
   }
+
+  void print() const {
+    if (IsCoveringValue) {
+      llvm::outs() << "Covering Value";
+      return;
+    }
+    SILValueProjection::print();
+  }
 };
 
 //===----------------------------------------------------------------------===//
@@ -371,6 +380,7 @@ public:
   MemLocation(SILValue B) : SILValueProjection(B) { initialize(B); }
   MemLocation(SILValue B, ProjectionPath &P, KeyKind Kind = NormalKey)
       : SILValueProjection(B, P, Kind) {}
+  MemLocation(KeyKind Kind) : SILValueProjection(Kind) {} 
 
   /// Copy constructor.
   MemLocation(const MemLocation &RHS) : SILValueProjection(RHS) {}
@@ -479,14 +489,10 @@ using swift::MemLocation;
 
 template <> struct DenseMapInfo<MemLocation> {
   static inline MemLocation getEmptyKey() {
-    MemLocation L;
-    L.setKind(MemLocation::EmptyKey);
-    return L;
+    return MemLocation(MemLocation::EmptyKey);
   }
   static inline MemLocation getTombstoneKey() {
-    MemLocation L;
-    L.setKind(MemLocation::TombstoneKey);
-    return L;
+    return MemLocation(MemLocation::TombstoneKey);
   }
   static unsigned getHashValue(const MemLocation &Loc) {
     return hash_value(Loc);
