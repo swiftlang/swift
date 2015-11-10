@@ -1195,17 +1195,13 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK:         store %1 to [[SELF_BOX]]#1
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_TFC35definite_init_failable_initializers17ThrowDerivedClasscfzT_S0_
 // CHECK-NEXT:    try_apply [[INIT_FN]](%1)
-// CHECK:       bb1:
-// CHECK-NEXT:    store [[NEW_SELF:%.*]] to [[SELF_BOX]]#1
+// CHECK:       bb1([[NEW_SELF:%.*]] : $ThrowDerivedClass):
+// CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]#1
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]#0
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb2
+// CHECK:       bb2([[ERROR:%.*]] : $ErrorType):
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]#0
-// CHECK-NEXT:    throw [[ERROR:%.*]] : $ErrorType
-// CHECK:       bb3([[NEW_SELF]] : $ThrowDerivedClass):
-// CHECK:         br bb1
-// CHECK:       bb4([[ERROR]] : $ErrorType):
-// CHECK:         br bb2
+// CHECK-NEXT:    throw [[ERROR]] : $ErrorType
   convenience init(failDuringDelegation: Int) throws {
     try self.init()
   }
@@ -1224,17 +1220,17 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]#1
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_TFC35definite_init_failable_initializers17ThrowDerivedClasscfzT_S0_
 // CHECK-NEXT:    try_apply [[INIT_FN]](%1)
-// CHECK:       bb2:
-// CHECK-NEXT:    store [[NEW_SELF:%.*]] to [[SELF_BOX]]#1
+// CHECK:       bb2([[NEW_SELF:%.*]] : $ThrowDerivedClass):
+// CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]#1
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]#0
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]#0
 // CHECK-NEXT:    return [[NEW_SELF]]
 // CHECK:       bb3([[ERROR1:%.*]] : $ErrorType):
 // CHECK-NEXT:    br bb5([[ERROR1]] : $ErrorType)
-// CHECK:       bb4
+// CHECK:       bb4([[ERROR2:%.*]] : $ErrorType):
 // CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, -1
 // CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]#1
-// CHECK-NEXT:    br bb5([[ERROR2:%.*]] : $ErrorType)
+// CHECK-NEXT:    br bb5([[ERROR2]] : $ErrorType)
 // CHECK:       bb5([[ERROR3:%.*]] : $ErrorType):
 // CHECK-NEXT:    [[BITMAP_VALUE:%.*]] = load [[BITMAP_BOX]]#1
 // CHECK-NEXT:    [[BIT_NUM:%.*]] = integer_literal $Builtin.Int2, 1
@@ -1251,10 +1247,6 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]#0
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]#0
 // CHECK-NEXT:    throw [[ERROR3]]
-// CHECK:       bb9([[NEW_SELF]] : $ThrowDerivedClass):
-// CHECK:         br bb2
-// CHECK:       bb10([[ERROR2]] : $ErrorType):
-// CHECK:         br bb4
   convenience init(failBeforeOrDuringDelegation: Int) throws {
     try unwrap(failBeforeOrDuringDelegation)
     try self.init()
@@ -1274,17 +1266,17 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]#1
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_TFC35definite_init_failable_initializers17ThrowDerivedClasscfzT20failBeforeDelegationSi_S0_
 // CHECK-NEXT:    try_apply [[INIT_FN]]([[ARG]], %1)
-// CHECK:       bb2
-// CHECK-NEXT:    store [[NEW_SELF:%.*]] to [[SELF_BOX]]#1
+// CHECK:       bb2([[NEW_SELF:%.*]] : $ThrowDerivedClass):
+// CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]#1
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]#0
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]#0
 // CHECK-NEXT:    return [[NEW_SELF]]
 // CHECK:       bb3([[ERROR:%.*]] : $ErrorType):
 // CHECK-NEXT:    br bb5([[ERROR]] : $ErrorType)
-// CHECK:       bb4:
+// CHECK:       bb4([[ERROR1:%.*]] : $ErrorType):
 // CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, -1
 // CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]#1
-// CHECK-NEXT:    br bb5([[ERROR1:%.*]] : $ErrorType)
+// CHECK-NEXT:    br bb5([[ERROR1]] : $ErrorType)
 // CHECK:       bb5([[ERROR2:%.*]] : $ErrorType):
 // CHECK-NEXT:    [[BITMAP_VALUE:%.*]] = load [[BITMAP_BOX]]#1
 // CHECK-NEXT:    [[BIT_NUM:%.*]] = integer_literal $Builtin.Int2, 1
@@ -1301,10 +1293,6 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]#0
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]#0
 // CHECK-NEXT:    throw [[ERROR2]]
-// CHECK:       bb9([[NEW_SELF]] : $ThrowDerivedClass):
-// CHECK:         br bb2
-// CHECK:       bb10([[ERROR1]] : $ErrorType):
-// CHECK:         br bb4
   convenience init(failBeforeOrDuringDelegation2: Int) throws {
     try self.init(failBeforeDelegation: unwrap(failBeforeOrDuringDelegation2))
   }
@@ -1341,18 +1329,18 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]#1
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_TFC35definite_init_failable_initializers17ThrowDerivedClasscfzT_S0_
 // CHECK-NEXT:    try_apply [[INIT_FN]](%1)
-// CHECK:       bb1:
-// CHECK-NEXT:    store [[NEW_SELF:%.*]] to [[SELF_BOX]]#1
+// CHECK:       bb1([[NEW_SELF:%.*]] : $ThrowDerivedClass):
+// CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]#1
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @_TF35definite_init_failable_initializers6unwrapFzSiSi
 // CHECK-NEXT:    try_apply [[UNWRAP_FN]](%0)
 // CHECK:       bb2([[RESULT:%.*]] : $Int):
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]#0
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]#0
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb3:
+// CHECK:       bb3([[ERROR1:%.*]] : $ErrorType):
 // CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, -1
 // CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]#1
-// CHECK-NEXT:    br bb5([[ERROR1:%.*]] : $ErrorType)
+// CHECK-NEXT:    br bb5([[ERROR1]] : $ErrorType)
 // CHECK:       bb4([[ERROR2:%.*]] : $ErrorType):
 // CHECK-NEXT:    br bb5([[ERROR2]] : $ErrorType)
 // CHECK:       bb5([[ERROR3:%.*]] : $ErrorType):
@@ -1370,10 +1358,6 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]#0
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]#0
 // CHECK-NEXT:    throw [[ERROR3]]
-// CHECK:       bb9([[NEW_SELF]] : $ThrowDerivedClass):
-// CHECK:         br bb1
-// CHECK:       bb10([[ERROR1:%.*]] : $ErrorType):
-// CHECK:         br bb3
   convenience init(failDuringOrAfterDelegation: Int) throws {
     try self.init()
     try unwrap(failDuringOrAfterDelegation)

@@ -401,6 +401,8 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
   SILBasicBlock *ResultBB = nullptr;
   SILBasicBlock *NormalBB = nullptr;
   SILValue ResultValue;
+  bool ResultCastRequired = false;
+  SmallVector<Operand *, 4> OriginalResultUses;
 
   if (!isa<TryApplyInst>(AI)) {
     NewAI = B.createApply(AI.getLoc(), FRI, SubstCalleeSILType, ResultTy,
@@ -408,24 +410,53 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
     ResultValue = SILValue(NewAI.getInstruction(), 0);
   } else {
     auto *TAI = cast<TryApplyInst>(AI);
-    // Always create a new BB for normal and error BBs.
-    // This avoids creation of critical edges.
-    ResultBB = B.getFunction().createBasicBlock();
-    ResultBB->createBBArg(ResultTy);
+    // Create new normal and error BBs only if:
+    // - re-using a BB would create a critical edge
+    // - or, the result of the new apply would be of different
+    //   type than the argument of the original normal BB.
+    if (TAI->getNormalBB()->getSinglePredecessor())
+      ResultBB = TAI->getNormalBB();
+    else {
+      ResultBB = B.getFunction().createBasicBlock();
+      ResultBB->createBBArg(ResultTy);
+    }
+
     NormalBB = TAI->getNormalBB();
 
-    auto *ErrorBB = B.getFunction().createBasicBlock();
-    ErrorBB->createBBArg(TAI->getErrorBB()->getBBArg(0)->getType());
+    SILBasicBlock *ErrorBB = nullptr;
+    if (TAI->getErrorBB()->getSinglePredecessor())
+      ErrorBB = TAI->getErrorBB();
+    else {
+      ErrorBB = B.getFunction().createBasicBlock();
+      ErrorBB->createBBArg(TAI->getErrorBB()->getBBArg(0)->getType());
+    }
 
     NewAI = B.createTryApply(AI.getLoc(), FRI, SubstCalleeSILType,
                              Subs, NewArgs,
                              ResultBB, ErrorBB);
+    if (ErrorBB != TAI->getErrorBB()) {
+      B.setInsertionPoint(ErrorBB);
+      B.createBranch(TAI->getLoc(), TAI->getErrorBB(),
+                     {ErrorBB->getBBArg(0)});
+    }
+
+    // Does the result value need to be casted?
+    ResultCastRequired = ResultTy != NormalBB->getBBArg(0)->getType();
+
+    if (ResultBB != NormalBB)
+      B.setInsertionPoint(ResultBB);
+    else if (ResultCastRequired) {
+      B.setInsertionPoint(NormalBB->begin());
+      // Collect all uses, before casting.
+      for (auto *Use : NormalBB->getBBArg(0)->getUses()) {
+        OriginalResultUses.push_back(Use);
+      }
+      NormalBB->getBBArg(0)->replaceAllUsesWith(SILUndef::get(AI.getType(), Mod));
+      NormalBB->replaceBBArg(0, ResultTy, nullptr);
+    }
+
     // The result value is passed as a parameter to the normal block.
     ResultValue = ResultBB->getBBArg(0);
-    B.setInsertionPoint(ErrorBB);
-    B.createBranch(TAI->getLoc(), TAI->getErrorBB(),
-                   {ErrorBB->getBBArg(0)});
-    B.setInsertionPoint(ResultBB);
   }
 
   // Check if any casting is required for the return value.
@@ -436,7 +467,16 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
   NumClassDevirt++;
 
   if (NormalBB) {
-    B.createBranch(NewAI.getLoc(), NormalBB, { ResultValue });
+    if (NormalBB != ResultBB) {
+      // If artificial normal BB was introduced, branch
+      // to the original normal BB.
+      B.createBranch(NewAI.getLoc(), NormalBB, { ResultValue });
+    } else if (ResultCastRequired) {
+      // Update all original uses by the new value.
+      for(auto *Use: OriginalResultUses) {
+        Use->set(ResultValue);
+      }
+    }
     return std::make_pair(NewAI.getInstruction(), NewAI);
   }
 
