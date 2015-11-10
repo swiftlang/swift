@@ -1651,7 +1651,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                     exit 1
                 fi
                 set -x
-                "$SWIFTPM_SOURCE_DIR"/utils/bootstrap -v "${swiftpm_bootstrap_options[@]}" \
+                "$SWIFTPM_SOURCE_DIR"/Utilities/bootstrap -v "${swiftpm_bootstrap_options[@]}" \
                                      --swiftc="${SWIFTC_BIN}" --sbt="${LLBUILD_BIN}" \
                                      --build="${build_dir}"
                 { set +x; } 2>/dev/null
@@ -1963,7 +1963,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 echo "--- Installing ${product} ---"
                 build_dir=$(build_directory $deployment_target $product)
                 set -x
-                "$SWIFTPM_SOURCE_DIR"/utils/bootstrap -v "${swiftpm_bootstrap_options[@]}" \
+                "$SWIFTPM_SOURCE_DIR"/Utilities/bootstrap -v "${swiftpm_bootstrap_options[@]}" \
                                      --swiftc="${SWIFTC_BIN}" --sbt="${LLBUILD_BIN}" \
                                      --build="${build_dir}" --prefix="${INSTALL_DESTDIR}"/"${INSTALL_PREFIX}" install
                 { set +x; } 2>/dev/null
