@@ -1,10 +1,20 @@
 :orphan:
 
-Writing Performant Swift Code
-=============================
+Writing High-Performance Swift Code
+===================================
 
-The following is a gathering of various tips and tricks for writing performance
-sensitive Swift code.
+The following document is a gathering of various tips and tricks for writing
+high-performance Swift code. The intended audience of this document is compiler
+and standard library developers.
+
+Some of the tips in this document can help improve the quality of your Swift
+program and make your code less error prone and more readable. Explicitly
+marking final-classes and class-protocols are two obvious examples. However some
+of the tips described in this document are unprincipled, twisted and come to
+solve a specific temporary limitation of the compiler or the language. Many of
+the recommendations in this document come with trade offs for things like
+program runtime, binary size, code readability, etc.
+
 
 Enabling Optimizations
 ======================
