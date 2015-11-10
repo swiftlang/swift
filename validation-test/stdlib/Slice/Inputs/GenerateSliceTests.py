@@ -52,7 +52,7 @@ var SliceTests = TestSuite("Collection")
 %   traversal='{traversal}',
 %   base_kind='{base_kind}',
 %   mutable={mutable},
-%   WrapperType='{WrapperType}',
+%   Wrapper='{Wrapper}',
 %   name='{name}',
 %   prefix={prefix},
 %   suffix={suffix})
@@ -64,7 +64,7 @@ runAllTests()
     traversal=traversal,
     base_kind=base_kind,
     mutable=mutable,
-    WrapperType=WrapperType,
+    Wrapper=WrapperType,
     name=name,
     prefix=prefix,
     suffix=suffix

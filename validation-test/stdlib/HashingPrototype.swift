@@ -58,7 +58,7 @@ class UserClassA : NSObject {
   var a1: Int = 0
 
   // error: declarations from extensions cannot be overridden yet
-  //func combineIntoHash<Hasher : Hasher>(inout hasher: Hasher) {
+  //func combineIntoHash<H : Hasher>(inout hasher: H) {
   //  hasher.combine(a1)
   //}
 
