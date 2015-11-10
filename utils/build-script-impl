@@ -1673,12 +1673,11 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 SWIFTC_BIN="$(build_directory_bin $deployment_target swift)/swiftc"
                 SWIFT_BUILD_PATH="$(build_directory $deployment_target swift)"
                 LLVM_BIN="$(build_directory_bin $deployment_target llvm)"
-                NINJA_BIN="$(build_directory $deployment_target ninja)/ninja"
                 set -x
                 pushd "${FOUNDATION_SOURCE_DIR}"
                 SWIFTC="${SWIFTC_BIN}" CLANG="${LLVM_BIN}"/clang \
                       SDKROOT="${SWIFT_BUILD_PATH}" BUILD_DIR="${build_dir}" ./configure
-                $NINJA_BIN
+                ninja
                 popd
                 { set +x; } 2>/dev/null
 
