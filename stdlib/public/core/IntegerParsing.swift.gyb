@@ -76,7 +76,7 @@ internal func _parseAsciiAsUIntMax(
   let c = u16.first
   if _fastPath(c != _ascii16("-")) {
     let unsignedText
-      = c == _ascii16("+") ? unsafeUnwrap(u16.dropFirst()) : u16
+      = c == _ascii16("+") ? u16.dropFirst() : u16
     return _parseUnsignedAsciiAsUIntMax(unsignedText, radix, maximum)
   }
   else {
@@ -99,7 +99,7 @@ internal func _parseAsciiAsIntMax(
 
   // Drop any leading "-"
   let negative = u16.first == _ascii16("-")
-  let absResultText = negative ? _unsafeUnwrap(u16.dropFirst()) : u16
+  let absResultText = negative ? u16.dropFirst() : u16
 
   let absResultMax = UIntMax(bitPattern: maximum) + (negative ? 1 : 0)
 
