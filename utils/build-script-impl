@@ -207,8 +207,8 @@ function set_deployment_target_based_options() {
     swiftpm_bootstrap_options=()
 
     case $deployment_target in
-        linux-*)
-            # No special CMake options required.
+        linux-x86_64)
+            SWIFT_HOST_VARIANT_ARCH="x86_64"
             ;;
         macosx-* | iphoneos-* | iphonesimulator-* | \
           appletvos-* | appletvsimulator-* | \
@@ -1985,10 +1985,8 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 "$XCTEST_SOURCE_DIR"/build_script.py --swiftc="${SWIFTC_BIN}" \
                                     --build-dir="${build_dir}" \
                                     --library-install-path="${XCTEST_INSTALL_PREFIX}" \
-                                    --module-install-path="${XCTEST_INSTALL_PREFIX}"/"${deployment_target}" \
+                                    --module-install-path="${XCTEST_INSTALL_PREFIX}"/"${SWIFT_HOST_VARIANT_ARCH}" \
                                     --swift-build-dir="${SWIFT_BUILD_PATH}"
-                # cp "${build_dir}"/libXCTest.so "${INSTALL_DESTDIR}"/"${INSTALL_PREFIX}"/lib/swift/"${LIB_TARGET}"/libXCTest.so
-                # cp "${build_dir}" "${INSTALL_DESTDIR}"/"${INSTALL_PREFIX}"/lib/swift/"${LIB_TARGET}"/"${deployment_target}"
                 { set +x; } 2>/dev/null
                 
                 # As XCTest installation is self-contained, we break early here.
