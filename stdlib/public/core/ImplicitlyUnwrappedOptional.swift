@@ -24,17 +24,6 @@ public enum ImplicitlyUnwrappedOptional<Wrapped>
   /// Construct a non-`nil` instance that stores `some`.
   public init(_ some: Wrapped) { self = .Some(some) }
 
-  /// Construct an instance from an explicitly unwrapped optional
-  /// (`Wrapped?`).
-  public init(_ v: Wrapped?) {
-    switch v {
-    case .Some(let some):
-      self = .Some(some)
-    case .None:
-      self = .None
-    }
-  }
-
   /// Create an instance initialized with `nil`.
   @_transparent public
   init(nilLiteral: ()) {
