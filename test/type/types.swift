@@ -57,6 +57,12 @@ func test_array_construct<T>(_: T) {
   _ = [(String, Float)]()
 }
 
+extension Optional {
+  init() {
+    self = .None
+  }
+}
+
 // <rdar://problem/15295763> default constructing an optional fails to typecheck
 func test_optional_construct<T>(_: T) {
   _ = T?()    // Local name.

@@ -162,7 +162,7 @@ switch _reflect(true).quickLookObject {
 // CHECK-NEXT: Hello world
 print( _reflect(Optional<String>("Hello world")).summary )
 // CHECK-NEXT: nil
-print( _reflect(Optional<String>()).summary  )
+print(_reflect(nil as String?).summary)
 
 let intArray = [1,2,3,4,5]
 let intArrayMirror = _reflect(intArray)

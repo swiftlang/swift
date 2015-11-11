@@ -21,9 +21,6 @@ public enum ImplicitlyUnwrappedOptional<Wrapped>
   case None
   case Some(Wrapped)
 
-  /// Construct a `nil` instance.
-  public init() { self = .None }
-
   /// Construct a non-`nil` instance that stores `some`.
   public init(_ some: Wrapped) { self = .Some(some) }
 
