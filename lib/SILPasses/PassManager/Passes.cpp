@@ -151,6 +151,7 @@ void AddHighLevelLoopOptPasses(SILPassManager &PM) {
   PM.addHighLevelCSE();
   PM.addSILCombine();
   PM.addSimplifyCFG();
+  PM.addArrayCountPropagation();
   PM.addHighLevelLICM();
   PM.addRemovePins();
   PM.addABCOpt();

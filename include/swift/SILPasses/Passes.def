@@ -36,6 +36,8 @@ PASS(ABCOpt, "abcopts",
      "Optimization of array bounds checks")
 PASS(AllocBoxToStack, "allocbox-to-stack",
      "Promote heap allocations to stack allocations")
+PASS(ArrayCountPropagation, "array-count-propagation",
+     "Propagate the count of arrays")
 PASS(CFGPrinter, "view-cfg",
      "View the CFG of all passed in functions")
 PASS(COWArrayOpts, "cowarray-opt",
