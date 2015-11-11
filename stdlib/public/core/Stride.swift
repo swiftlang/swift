@@ -149,7 +149,7 @@ public struct StrideTo<Element : Strideable> : Sequence {
     return StrideToIterator(current: start, end: end, stride: stride)
   }
 
-  init(start: Element, end: Element, stride: Element.Stride) {
+  internal init(start: Element, end: Element, stride: Element.Stride) {
     _require(stride != 0, "stride size must not be zero")
     // Unreachable endpoints are allowed; they just make for an
     // already-empty Sequence.
@@ -158,9 +158,9 @@ public struct StrideTo<Element : Strideable> : Sequence {
     self.stride = stride
   }
 
-  let start: Element
-  let end: Element
-  let stride: Element.Stride
+  internal let start: Element
+  internal let end: Element
+  internal let stride: Element.Stride
 }
 
 extension Strideable {
@@ -175,10 +175,10 @@ extension Strideable {
 
 /// An `IteratorProtocol` for `StrideThrough<Element>`.
 public struct StrideThroughIterator<Element : Strideable> : IteratorProtocol {
-  var current: Element
-  let end: Element
-  let stride: Element.Stride
-  var done: Bool = false
+  internal var current: Element
+  internal let end: Element
+  internal let stride: Element.Stride
+  internal var done: Bool = false
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
@@ -211,16 +211,16 @@ public struct StrideThrough<Element : Strideable> : Sequence {
       current: start, end: end, stride: stride, done: false)
   }
 
-  init(start: Element, end: Element, stride: Element.Stride) {
+  internal init(start: Element, end: Element, stride: Element.Stride) {
     _require(stride != 0, "stride size must not be zero")
     self.start = start
     self.end = end
     self.stride = stride
   }
 
-  let start: Element
-  let end: Element
-  let stride: Element.Stride
+  internal let start: Element
+  internal let end: Element
+  internal let stride: Element.Stride
 }
 
 extension Strideable {

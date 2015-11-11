@@ -16,7 +16,7 @@
 public func zip<Sequence1 : Sequence, Sequence2 : Sequence>(
   sequence1: Sequence1, _ sequence2: Sequence2
 ) -> Zip2Sequence<Sequence1, Sequence2> {
-  return Zip2Sequence(sequence1, sequence2)
+  return Zip2Sequence(_sequence1: sequence1, _sequence2: sequence2)
 }
 
 /// An iterator for `Zip2Sequence`.
@@ -27,7 +27,7 @@ public struct Zip2Iterator<
   public typealias Element = (Iterator1.Element, Iterator2.Element)
 
   /// Construct around a pair of underlying iterators.
-  public init(_ iterator1: Iterator1, _ iterator2: Iterator2) {
+  internal init(_ iterator1: Iterator1, _ iterator2: Iterator2) {
     (_baseStream1, _baseStream2) = (iterator1, iterator2)
   }
 
@@ -76,7 +76,8 @@ public struct Zip2Sequence<Sequence1 : Sequence, Sequence2 : Sequence>
 
   /// Construct an instance that makes pairs of elements from `sequence1` and
   /// `sequence2`.
-  public init(_ sequence1: Sequence1, _ sequence2: Sequence2) {
+  public // @testable
+  init(_sequence1 sequence1: Sequence1, _sequence2 sequence2: Sequence2) {
     (_sequence1, _sequence2) = (sequence1, sequence2)
   }
 

@@ -45,7 +45,8 @@ public struct AnyIterator<Element> : IteratorProtocol {
   ///         = lazyStrings.iterator()
   ///       return AnyIterator(iterator)
   ///     }
-  public init<I : IteratorProtocol where I.Element == Element>(_ base: I) {
+  public // @testable
+  init<I : IteratorProtocol where I.Element == Element>(_ base: I) {
     self._box = _IteratorBox(base)
   }
 

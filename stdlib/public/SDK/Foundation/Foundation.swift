@@ -970,7 +970,7 @@ extension NSRange {
   @warn_unused_result
   public func toRange() -> Range<Int>? {
     if location == NSNotFound { return nil }
-    return Range(start: location, end: location + length)
+    return location..<(location+length)
   }
 }
 

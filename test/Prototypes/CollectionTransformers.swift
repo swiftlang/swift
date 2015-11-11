@@ -59,10 +59,7 @@ internal func _splitRandomAccessIndexRange<Index : RandomAccessIndex>(
     return [ range ]
   }
   let middle = startIndex.advancedBy(Index.Distance(length / 2))
-  return [
-    Range(start: startIndex, end: middle),
-    Range(start: middle, end: endIndex)
-  ]
+  return [startIndex ..< middle, middle ..< endIndex]
 }
 
 /// A helper object to build a collection incrementally in an efficient way.

@@ -6,7 +6,7 @@ import Swift
 
 let RepeatTests = TestSuite("Repeat")
 RepeatTests.test("Attributes") {
-  let r = Repeat(repeating: "repeat", length: 42)
+  let r = repeatElement("repeat", count: 42)
   expectEqual(r.length, 42)
   expectEqual(r.startIndex, 0)
   expectEqual(r.endIndex, 42)

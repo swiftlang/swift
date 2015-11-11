@@ -58,12 +58,12 @@ public struct LazyMapSequence<Base : Sequence, Element>
 
   /// Create an instance with elements `transform(x)` for each element
   /// `x` of base.
-  public init(_ base: Base, transform: (Base.Iterator.Element)->Element) {
+  internal init(_ base: Base, transform: (Base.Iterator.Element)->Element) {
     self._base = base
     self._transform = transform
   }
   
-  public var _base: Base
+  internal var _base: Base
   internal var _transform: (Base.Iterator.Element)->Element
 }
 
@@ -117,13 +117,13 @@ public struct LazyMapCollection<Base : Collection, Element>
 
   /// Create an instance with elements `transform(x)` for each element
   /// `x` of base.
-  public init(_ base: Base, transform: (Base.Iterator.Element)->Element) {
+  internal init(_ base: Base, transform: (Base.Iterator.Element)->Element) {
     self._base = base
     self._transform = transform
   }
   
-  public var _base: Base
-  var _transform: (Base.Iterator.Element)->Element
+  internal var _base: Base
+  internal var _transform: (Base.Iterator.Element)->Element
 }
 
 //===--- Support for s.lazy ----------------------------------------------===//

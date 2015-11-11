@@ -31,11 +31,11 @@ extension String {
   /// encode a `String` .
   public struct UnicodeScalarView : Collection, _Reflectable,
     CustomStringConvertible, CustomDebugStringConvertible {
-    init(_ _core: _StringCore) {
+    internal init(_ _core: _StringCore) {
       self._core = _core
     }
 
-    struct _ScratchIterator : IteratorProtocol {
+    internal struct _ScratchIterator : IteratorProtocol {
       var core: _StringCore
       var idx: Int
       init(_ core: _StringCore, _ pos: Int) {

@@ -143,7 +143,7 @@ public struct ReverseCollection<
   /// reverse order.
   ///
   /// - Complexity: O(1)
-  public init(_ base: Base) {
+  internal init(_ base: Base) {
     self._base = base
   }
 
@@ -173,7 +173,7 @@ public struct ReverseRandomAccessCollection<
   /// reverse order.
   ///
   /// - Complexity: O(1)
-  public init(_ base: Base) {
+  internal init(_ base: Base) {
     self._base = base
   }
 

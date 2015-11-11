@@ -17,7 +17,7 @@ public struct RangeIterator<
 
   /// Construct an instance that traverses the elements of `bounds`.
   @_transparent
-  public init(_ bounds: Range<Element>) {
+  internal init(_ bounds: Range<Element>) {
     self.startIndex = bounds.startIndex
     self.endIndex = bounds.endIndex
   }
@@ -32,11 +32,11 @@ public struct RangeIterator<
   }
 
   /// The lower bound of the remaining range.
-  public var startIndex: Element
+  internal var startIndex: Element
 
   /// The upper bound of the remaining range; not included in the
   /// generated sequence.
-  public var endIndex: Element
+  internal let endIndex: Element
 }
 
 /// A collection of consecutive discrete index values.
@@ -83,7 +83,7 @@ public struct Range<
   /// Construct a range with `startIndex == start` and `endIndex ==
   /// end`.
   @_transparent
-  public init(start: Element, end: Element) {
+  internal init(start: Element, end: Element) {
     self.startIndex = start
     self.endIndex = end
   }

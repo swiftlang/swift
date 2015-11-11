@@ -222,7 +222,7 @@ LazyTestSuite.test("LazySequence.array") {
   SequenceWithCustomUnderestimateLength.timesUnderestimateLengthWasCalled = 0
 
   let base = SequenceWithCustomUnderestimateLength([ 0, 30, 10, 90 ])
-  let lazySequence = LazySequence(base)
+  let lazySequence = base.lazy
   let arrayFromLazy = Array(lazySequence)
 
   expectEqual([ 0, 30, 10, 90 ], arrayFromLazy.map { $0.value })
@@ -275,7 +275,7 @@ extension LazyCollection where Base : TestProtocol1 {
 LazyTestSuite.test("LazyCollection.array") {
   let base = Minimal${traversal}Collection(
     elements: [ 0, 30, 10, 90 ], underestimatedLength: .Value(42))
-  let lazyCollection = LazyCollection(base)
+  let lazyCollection = base.lazy
   let arrayFromLazy = Array(lazyCollection)
 
   expectEqual([ 0, 30, 10, 90 ], arrayFromLazy)
@@ -291,7 +291,7 @@ LazyTestSuite.test("LazyCollection.reverse") {
   let base = Minimal${traversal}Collection(
     elements: [ 0, 30, 10, 90 ].map(OpaqueValue.init),
     underestimatedLength: .Value(42))
-  let lazyCollection = LazyCollection(base)
+  let lazyCollection = base.lazy
   var reversed = lazyCollection.reverse()
   expectType(
     LazyCollection<${ReversedType}<Minimal${traversal}Collection<OpaqueValue<Int>>>>.self,
@@ -724,7 +724,7 @@ tests.test("LazyFilterSequence") {
   
   // Try again using explicit construction
   filtered = LazyFilterSequence(
-    MinimalSequence(elements: base),
+    _base: MinimalSequence(elements: base),
     whereElementsSatisfy: { x in ++calls; return x.value % 2 == 0})
   
   expectEqual(100, calls)

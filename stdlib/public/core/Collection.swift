@@ -75,7 +75,8 @@ public struct CollectionDefaultIterator<Elements : Indexable>
  : IteratorProtocol, Sequence {
 
   /// Create a *iterator* over the given collection.
-  public init(_ elements: Elements) {
+  public /// @testable
+  init(_ elements: Elements) {
     self._elements = elements
     self._position = elements.startIndex
   }
@@ -202,7 +203,7 @@ extension Collection where SubSequence == Slice<Self> {
     Index._failEarlyRangeCheck2(
       bounds.startIndex, rangeEnd: bounds.endIndex,
       boundsStart: startIndex, boundsEnd: endIndex)
-    return Slice(base: self, bounds: bounds)
+    return Slice(_base: self, bounds: bounds)
   }
 }
 
@@ -669,7 +670,7 @@ extension MutableCollection {
       Index._failEarlyRangeCheck2(
         bounds.startIndex, rangeEnd: bounds.endIndex,
         boundsStart: startIndex, boundsEnd: endIndex)
-      return MutableSlice(base: self, bounds: bounds)
+      return MutableSlice(_base: self, bounds: bounds)
     }
     set {
       _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)

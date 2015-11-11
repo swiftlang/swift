@@ -23,7 +23,7 @@ public struct FlattenIterator<
 > : IteratorProtocol, Sequence {
 
   /// Construct around a `base` iterator.
-  public init(_ base: Base) {
+  internal init(_ base: Base) {
     self._base = base
   }
 
@@ -76,7 +76,7 @@ public struct FlattenSequence<
   /// Creates a concatenation of the elements of the elements of `base`.
   ///
   /// - Complexity: O(1)
-  public init(_ base: Base) {
+  internal init(_ base: Base) {
     self._base = base
   }
 

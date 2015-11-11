@@ -39,8 +39,8 @@ RangeTestSuite.test("ReverseRange") {
 func isEquatable<E : Equatable>(e: E) {}
 
 RangeTestSuite.test("Range/Equatable") {
-  let r1 = Range(start: 0, end: 0)
-  let r2 = Range(start: 0, end: 1)
+  let r1: Range<Int> = 0..<0
+  let r2: Range<Int> = 0..<1
   isEquatable(r1)
   expectTrue(r1 == r1)
   expectFalse(r1 != r1)

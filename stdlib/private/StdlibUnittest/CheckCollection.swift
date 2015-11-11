@@ -21,9 +21,9 @@ public struct SubscriptRangeTest {
 
   public func boundsIn<C : Collection>(c: C) -> Range<C.Index> {
     let i = c.startIndex
-    return Range(
-      start: i.advancedBy(numericCast(bounds.startIndex)),
-      end: i.advancedBy(numericCast(bounds.endIndex)))
+    let from = i.advancedBy(numericCast(bounds.startIndex))
+    let to = i.advancedBy(numericCast(bounds.endIndex))
+    return from..<to
   }
 
   public init(

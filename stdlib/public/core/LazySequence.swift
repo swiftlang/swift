@@ -167,7 +167,7 @@ public struct LazySequence<Base : Sequence>
   /// Creates a sequence that has the same elements as `base`, but on
   /// which some operations such as `map` and `filter` are implemented
   /// lazily.
-  public init(_ base: Base) {
+  internal init(_ base: Base) {
     self._base = base
   }
   

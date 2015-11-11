@@ -60,7 +60,7 @@ public struct LazyCollection<Base : Collection>
   
   /// Construct an instance with `base` as its underlying Collection
   /// instance.
-  public init(_ base: Base) {
+  internal init(_ base: Base) {
     self._base = base
   }
 
@@ -130,7 +130,7 @@ extension LazyCollection : Collection {
   ///
   /// - Complexity: O(1)
   public subscript(bounds: Range<Index>) -> LazyCollection<Slice<Base>> {
-    return Slice(base: _base, bounds: bounds).lazy
+    return Slice(_base: _base, bounds: bounds).lazy
   }
   
   /// Returns `true` iff `self` is empty.
