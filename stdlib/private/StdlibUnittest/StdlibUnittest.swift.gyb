@@ -1045,7 +1045,7 @@ func _getOSVersion() -> OSVersion {
     return .OSX(major: major, minor: minor, bugFix: bugFix)
   case "iPhone OS":
     return .iOS(major: major, minor: minor, bugFix: bugFix)
-  case "tvOS":
+  case "Apple TVOS":
     return .TVOS(major: major, minor: minor, bugFix: bugFix)
   case "Watch OS":
     return .watchOS(major: major, minor: minor, bugFix: bugFix)
