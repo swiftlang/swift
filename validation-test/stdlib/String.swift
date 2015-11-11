@@ -903,7 +903,7 @@ StringTests.test(
     String._compareDeterministicUnicodeCollation, String._compareASCII)
 }
 
-StringTests.test("lowercaseString") {
+StringTests.test("lowercased") {
   // Use setlocale so tolower() is correct on ASCII.
   setlocale(LC_ALL, "C")
 
@@ -912,12 +912,12 @@ StringTests.test("lowercaseString") {
   expectEqualFunctionsForDomain(
     asciiDomain,
     { String(UnicodeScalar(Int(tolower($0)))) },
-    { String(UnicodeScalar(Int($0))).lowercaseString })
+    { String(UnicodeScalar(Int($0))).lowercased })
 
-  expectEqual("", "".lowercaseString)
-  expectEqual("abcd", "abCD".lowercaseString)
-  expectEqual("абвг", "абВГ".lowercaseString)
-  expectEqual("たちつてと", "たちつてと".lowercaseString)
+  expectEqual("", "".lowercased)
+  expectEqual("abcd", "abCD".lowercased)
+  expectEqual("абвг", "абВГ".lowercased)
+  expectEqual("たちつてと", "たちつてと".lowercased)
 
   //
   // Special casing.
@@ -927,17 +927,17 @@ StringTests.test("lowercaseString") {
   // to lower case:
   // U+0069 LATIN SMALL LETTER I
   // U+0307 COMBINING DOT ABOVE
-  expectEqual("\u{0069}\u{0307}", "\u{0130}".lowercaseString)
+  expectEqual("\u{0069}\u{0307}", "\u{0130}".lowercased)
 
   // U+0049 LATIN CAPITAL LETTER I
   // U+0307 COMBINING DOT ABOVE
   // to lower case:
   // U+0069 LATIN SMALL LETTER I
   // U+0307 COMBINING DOT ABOVE
-  expectEqual("\u{0069}\u{0307}", "\u{0049}\u{0307}".lowercaseString)
+  expectEqual("\u{0069}\u{0307}", "\u{0049}\u{0307}".lowercased)
 }
 
-StringTests.test("uppercaseString") {
+StringTests.test("uppercased") {
   // Use setlocale so toupper() is correct on ASCII.
   setlocale(LC_ALL, "C")
 
@@ -946,12 +946,12 @@ StringTests.test("uppercaseString") {
   expectEqualFunctionsForDomain(
     asciiDomain,
     { String(UnicodeScalar(Int(toupper($0)))) },
-    { String(UnicodeScalar(Int($0))).uppercaseString })
+    { String(UnicodeScalar(Int($0))).uppercased })
 
-  expectEqual("", "".uppercaseString)
-  expectEqual("ABCD", "abCD".uppercaseString)
-  expectEqual("АБВГ", "абВГ".uppercaseString)
-  expectEqual("たちつてと", "たちつてと".uppercaseString)
+  expectEqual("", "".uppercased)
+  expectEqual("ABCD", "abCD".uppercased)
+  expectEqual("АБВГ", "абВГ".uppercased)
+  expectEqual("たちつてと", "たちつてと".uppercased)
 
   //
   // Special casing.
@@ -960,7 +960,7 @@ StringTests.test("uppercaseString") {
   // U+0069 LATIN SMALL LETTER I
   // to upper case:
   // U+0049 LATIN CAPITAL LETTER I
-  expectEqual("\u{0049}", "\u{0069}".uppercaseString)
+  expectEqual("\u{0049}", "\u{0069}".uppercased)
 
   // U+00DF LATIN SMALL LETTER SHARP S
   // to upper case:
@@ -968,7 +968,7 @@ StringTests.test("uppercaseString") {
   // U+0073 LATIN SMALL LETTER S
   // But because the whole string is converted to uppercase, we just get two
   // U+0053.
-  expectEqual("\u{0053}\u{0053}", "\u{00df}".uppercaseString)
+  expectEqual("\u{0053}\u{0053}", "\u{00df}".uppercased)
 
   // U+FB01 LATIN SMALL LIGATURE FI
   // to upper case:
@@ -976,7 +976,7 @@ StringTests.test("uppercaseString") {
   // U+0069 LATIN SMALL LETTER I
   // But because the whole string is converted to uppercase, we get U+0049
   // LATIN CAPITAL LETTER I.
-  expectEqual("\u{0046}\u{0049}", "\u{fb01}".uppercaseString)
+  expectEqual("\u{0046}\u{0049}", "\u{fb01}".uppercased)
 }
 
 StringTests.test("unicodeViews") {
