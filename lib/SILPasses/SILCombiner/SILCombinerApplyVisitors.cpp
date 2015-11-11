@@ -164,8 +164,6 @@ class PartialApplyCombiner {
 
   SILBuilder &Builder;
 
-  CallGraph *CG;
-
   // Function referenced by partial_apply.
   FunctionRefInst *FRI;
 
@@ -178,8 +176,8 @@ class PartialApplyCombiner {
 
 public:
   PartialApplyCombiner(PartialApplyInst *PAI, SILBuilder &Builder,
-                       CallGraph *CG, SILCombiner *SilCombiner)
-      : isFirstTime(true), PAI(PAI), Builder(Builder), CG(CG),
+                       SILCombiner *SilCombiner)
+      : isFirstTime(true), PAI(PAI), Builder(Builder),
         FRI(nullptr), SilCombiner(SilCombiner) {}
   SILInstruction *combine();
 };
@@ -356,8 +354,6 @@ void PartialApplyCombiner::processSingleApply(FullApplySite AI) {
 
   NAI.getInstruction()->setDebugScope(AI.getDebugScope());
 
-  CallGraphEditor(CG).addEdgesForInstruction(NAI.getInstruction());
-
   // We also need to release the partial_apply instruction itself because it
   // is consumed by the apply_instruction.
   if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
@@ -438,7 +434,7 @@ SILInstruction *PartialApplyCombiner::combine() {
 SILInstruction *
 SILCombiner::tryOptimizeApplyOfPartialApply(PartialApplyInst *PAI) {
 
-  PartialApplyCombiner PACombiner(PAI, Builder, CG, this);
+  PartialApplyCombiner PACombiner(PAI, Builder, this);
   return PACombiner.combine();
 }
 
@@ -762,8 +758,6 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
   if (isa<ApplyInst>(NewAI))
     replaceInstUsesWith(*AI.getInstruction(), NewAI.getInstruction(), 0);
   eraseInstFromFunction(*AI.getInstruction());
-
-  CallGraphEditor(CG).addEdgesForInstruction(NewAI.getInstruction());
 
   return NewAI.getInstruction();
 }
@@ -1260,7 +1254,6 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
                 Builder, AI, OrigThinFun, CastedThinFun)) {
           replaceInstUsesWith(*AI, NewAI, 0);
           eraseInstFromFunction(*AI);
-          CallGraphEditor(CG).addEdgesForInstruction(NewAI);
           return nullptr;
         }
 

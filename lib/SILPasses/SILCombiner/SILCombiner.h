@@ -26,7 +26,6 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILPasses/Utils/Local.h"
-#include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/DenseMap.h"
 
@@ -138,22 +137,16 @@ class SILCombiner :
   /// Cast optimizer
   CastOptimizer CastOpt;
 
-  /// The call graph, if we have one, or nullptr otherwise.
-  CallGraph *CG;
-
 public:
-  SILCombiner(SILBuilder &B, AliasAnalysis *AA, CallGraph *CG,
-              bool removeCondFails)
+  SILCombiner(SILBuilder &B, AliasAnalysis *AA, bool removeCondFails)
       : AA(AA), Worklist(), MadeChange(false), RemoveCondFails(removeCondFails),
         Iteration(0), Builder(B), DeletedInstSet(128),
-        CastOpt(CG,
-                /* ReplaceInstUsesAction */
+        CastOpt(/* ReplaceInstUsesAction */
                 [&](SILInstruction *I, ValueBase * V) {
                   replaceInstUsesWith(*I, V);
                 },
                 /* EraseAction */
-                [&](SILInstruction *I) { eraseInstFromFunction(*I); }),
-        CG(CG) {}
+                [&](SILInstruction *I) { eraseInstFromFunction(*I); }) {}
 
   bool runOnFunction(SILFunction &F);
 

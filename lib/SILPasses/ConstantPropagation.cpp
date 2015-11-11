@@ -837,7 +837,7 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
   DEBUG(llvm::dbgs() << "*** ConstPropagation processing: " << F.getName()
         << "\n");
 
-  // This is the list of traits that this transformation preserves.
+  // This is the list of traits that this transformation might preserve.
   bool PreserveBranches = true;
   bool PreserveCalls = true;
   bool Changed = false;
@@ -857,7 +857,7 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
   initializeWorklist(F, InstantiateAssertConfiguration, WorkList);
 
   llvm::SetVector<SILInstruction *> FoldedUsers;
-  CastOptimizer CastOpt(nullptr, /* We invalidate the CG anyway */
+  CastOptimizer CastOpt(
       [&](SILInstruction *I, ValueBase *V) { /* ReplaceInstUsesAction */
 
         Changed = true;
@@ -867,7 +867,7 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
         auto *TI = dyn_cast<TermInst>(I);
 
         if (TI && TI->isBranch()) {
-          // Invalidate all analysis that's related to the call graph.
+          // Invalidate analysis information related to branches.
           PreserveBranches = false;
         }
 

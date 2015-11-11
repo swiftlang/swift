@@ -176,10 +176,6 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
         assert(&*std::prev(SILBasicBlock::iterator(I)) == Result &&
               "Expected new instruction inserted before existing instruction!");
 
-        if (auto FAS = FullApplySite::isa(Result)) {
-          CallGraphEditor(CG).addEdgesForInstruction(FAS.getInstruction());
-        }
-
         DEBUG(llvm::dbgs() << "SC: Old = " << *I << '\n'
                            << "    New = " << *Result << '\n');
 
@@ -322,10 +318,6 @@ SILInstruction *SILCombiner::eraseInstFromFunction(SILInstruction &I,
       if (SILInstruction *Op = llvm::dyn_cast<SILInstruction>(&*OpI.get()))
         Worklist.add(Op);
 
-  // If we have a call graph and we've removing an apply, remove the
-  // associated edges from the call graph.
-  CallGraphEditor(CG).removeEdgeIfPresent(&I);
-
   for (Operand *DU : getDebugUses(I))
     Worklist.remove(DU->getUser());
 
@@ -348,16 +340,12 @@ class SILCombine : public SILFunctionTransform {
   void run() override {
     auto *AA = PM->getAnalysis<AliasAnalysis>();
 
-    // Call Graph Analysis in case we need to perform Call Graph updates.
-    auto *CGA = PM->getAnalysis<CallGraphAnalysis>();
-
     // Create a SILBuilder with a tracking list for newly added
     // instructions, which we will periodically move to our worklist.
     llvm::SmallVector<SILInstruction *, 64> TrackingList;
 
     SILBuilder B(*getFunction(), &TrackingList);
-    SILCombiner Combiner(B, AA, CGA->getCallGraphOrNull(),
-                         getOptions().RemoveRuntimeAsserts);
+    SILCombiner Combiner(B, AA, getOptions().RemoveRuntimeAsserts);
     bool Changed = Combiner.runOnFunction(*getFunction());
 
     if (Changed) {

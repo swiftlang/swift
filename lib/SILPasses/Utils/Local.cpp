@@ -1181,7 +1181,6 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   // Lookup a function from the stdlib.
   SILFunction *BridgedFunc = M.getOrCreateFunction(
       Loc, FuncDeclRef, ForDefinition_t::NotForDefinition);
-  CallGraphEditor(CG).addNewFunction(BridgedFunc);
 
   if (!BridgedFunc)
     return nullptr;
@@ -1310,7 +1309,6 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
 
   auto *AI = Builder.createApply(Loc, FuncRef, SubstFnTy, ResultTy, Subs, Args,
                                  false);
-  CallGraphEditor(CG).addEdgesForInstruction(AI);
 
   // If the source of a cast should be destroyed, emit a release.
   if (auto *UCCAI = dyn_cast<UnconditionalCheckedCastAddrInst>(Inst)) {
@@ -1449,7 +1447,6 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   auto *BridgedFunc = M.getOrCreateFunction(Loc, MemberDeclRef, Linkage);
   assert(BridgedFunc &&
          "Implementation of _bridgeToObjectiveC could not be found");
-  CallGraphEditor(CG).addNewFunction(BridgedFunc);
 
   if (Inst->getFunction()->isFragile() &&
       !(BridgedFunc->isFragile() ||
@@ -1484,7 +1481,6 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   // Generate a code to invoke the bridging function.
   auto *NewAI = Builder.createApply(Loc, FnRef, SubstFnTy, ResultTy, Subs, Src,
                                     false);
-  CallGraphEditor(CG).addEdgesForInstruction(NewAI);
 
   if(ParamTypes[0].getConvention() == ParameterConvention::Direct_Guaranteed)
     Builder.createReleaseValue(Loc, Src);
