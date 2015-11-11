@@ -35,7 +35,6 @@
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SILAnalysis/ArraySemantic.h"
-#include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Utils/SILSSAUpdater.h"
 #include "swift/SILPasses/Transforms.h"
@@ -663,7 +662,6 @@ namespace {
 class DeadObjectElimination : public SILFunctionTransform {
   llvm::DenseMap<SILType, bool> DestructorAnalysisCache;
   llvm::SmallVector<SILInstruction*, 16> Allocations;
-  CallGraph *CG;
 
   void collectAllocations(SILFunction &Fn) {
     for (auto &BB : Fn)
@@ -699,9 +697,6 @@ class DeadObjectElimination : public SILFunctionTransform {
   }
 
   void run() override {
-    auto *CGA = PM->getAnalysis<CallGraphAnalysis>();
-    CG = CGA->getCallGraphOrNull();
-
     if (processFunction(*getFunction()))
       invalidateAnalysis(SILAnalysis::PreserveKind::Branches);
   }
@@ -810,10 +805,8 @@ bool DeadObjectElimination::processAllocApply(ApplyInst *AI) {
 
   eraseUsesOfInstruction(AI);
   assert(AI->use_empty() && "All users should have been removed.");
-  CallGraphEditor(CG).removeEdgesForInstruction(AI);
   recursivelyDeleteTriviallyDeadInstructions(AI, true);
   if (AllocBufferAI) {
-    CallGraphEditor(CG).removeEdgesForInstruction(AllocBufferAI);
     recursivelyDeleteTriviallyDeadInstructions(AllocBufferAI, true);
   }
   ++DeadAllocApplyEliminated;

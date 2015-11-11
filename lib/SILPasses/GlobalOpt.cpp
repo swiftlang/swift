@@ -15,7 +15,6 @@
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILAnalysis/ColdBlockInfo.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILPasses/Passes.h"
@@ -72,16 +71,14 @@ class SILGlobalOpt {
   llvm::DenseSet<SILFunction*> LoopCheckedFunctions;
   // Keep track of cold blocks.
   ColdBlockInfo ColdBlocks;
-  // Call graph.
-  CallGraph *CG;
 
   // Whether we see a "once" call to callees that we currently don't handle.
   bool UnhandledOnceCallee = false;
   // Recored number of times a globalinit_func is called by "once".
   llvm::DenseMap<SILFunction*, unsigned> InitializerCount;
 public:
-  SILGlobalOpt(SILModule *M, DominanceAnalysis *DA, CallGraph *CG): Module(M), DA(DA),
-                                                     ColdBlocks(DA), CG(CG) {}
+  SILGlobalOpt(SILModule *M, DominanceAnalysis *DA): Module(M), DA(DA),
+                                                     ColdBlocks(DA) {}
 
   bool run();
 
@@ -200,8 +197,7 @@ static void removeToken(SILValue Op) {
 /// Generate getter from the initialization code whose
 /// result is stored by a given store instruction.
 static SILFunction *genGetterFromInit(StoreInst *Store,
-                                      SILGlobalVariable *SILG,
-                                      CallGraph *CG) {
+                                      SILGlobalVariable *SILG) {
   auto *varDecl = SILG->getDecl();
   llvm::SmallString<20> getterBuffer;
   llvm::raw_svector_ostream getterStream(getterBuffer);
@@ -248,7 +244,6 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
   InstructionsCloner Cloner(*GetterF, Insns, EntryBB);
   Cloner.clone();
   GetterF->setInlined();
-  CallGraphEditor(CG).addNewFunction(GetterF);
 
   // Find the store instruction
   auto BB = EntryBB;
@@ -424,7 +419,6 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
           HoistAI = CommonAI;
         }
         AI->replaceAllUsesWith(CommonAI);
-        CallGraphEditor(CG).removeEdgesForInstruction(AI);
         AI->eraseFromParent();
         HasChanged = true;
       }
@@ -469,8 +463,7 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
 }
 
 /// Create a getter function from the intializer function.
-static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl,
-                                      CallGraph *CG) {
+static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
   // Generate a getter from the global init function without side-effects.
   llvm::SmallString<20> getterBuffer;
   llvm::raw_svector_ostream getterStream(getterBuffer);
@@ -499,7 +492,6 @@ static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl,
   BasicBlockCloner Cloner(InitF->begin(), EntryBB);
   Cloner.clone();
   GetterF->setInlined();
-  CallGraphEditor(CG).addNewFunction(GetterF);
 
   // Find the store instruction
   auto BB = EntryBB;
@@ -621,14 +613,13 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
     SmallVector<SILValue, 1> Args;
     auto *NewAI = B.createApply(Call->getLoc(), Call->getCallee(), Args, false);
     Call->replaceAllUsesWith(NewAI);
-    CallGraphEditor(CG).replaceApplyWithNew(Call, NewAI);
     eraseUsesOfInstruction(Call);
     recursivelyDeleteTriviallyDeadInstructions(Call, true);
     Calls[i] = NewAI;
   }
 
   // Generate a getter from InitF which returns the value of the global.
-  auto *GetterF = genGetterFromInit(InitF, SILG->getDecl(), CG);
+  auto *GetterF = genGetterFromInit(InitF, SILG->getDecl());
 
   // Replace all calls of an addressor by calls of a getter .
   for (int i = 0, e = Calls.size(); i < e; ++i) {
@@ -651,7 +642,6 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
     SmallVector<SILValue, 1> Args;
     auto *GetterRef = B.createFunctionRef(Call->getLoc(), GetterF);
     auto *NewAI = B.createApply(Call->getLoc(), GetterRef, Args, false);
-    CallGraphEditor(CG).replaceApplyWithNew(Call, NewAI);
 
     for (auto Use : Call->getUses()) {
       auto *PTAI = dyn_cast<PointerToAddressInst>(Use->getUser());
@@ -848,7 +838,7 @@ void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
     return;
 
   // Generate a getter only if there are any loads from this variable.
-  SILFunction *GetterF = genGetterFromInit(SI, SILG, CG);
+  SILFunction *GetterF = genGetterFromInit(SI, SILG);
   if (!GetterF)
     return;
 
@@ -861,7 +851,6 @@ void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
     SILBuilderWithScope<1> B(Load);
     auto *GetterRef = B.createFunctionRef(Load->getLoc(), GetterF);
     auto *Value = B.createApply(Load->getLoc(), GetterRef, {}, false);
-    CallGraphEditor(CG).addEdgesForInstruction(Value);
 
     convertLoadSequence(Load, Value, B);
     HasChanged = true;
@@ -911,9 +900,7 @@ class SILGlobalOptPass : public SILModuleTransform
 {
   void run() override {
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
-    auto *CGA = PM->getAnalysis<CallGraphAnalysis>();
-    if (SILGlobalOpt(getModule(), DA, CGA->getCallGraphOrNull()).run()) {
-      // Preserve the CallGraph analysis.
+    if (SILGlobalOpt(getModule(), DA).run()) {
       invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
     }
   }
