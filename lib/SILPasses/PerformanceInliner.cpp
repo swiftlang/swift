@@ -545,7 +545,8 @@ static SILFunction *getReferencedFunction(ApplySite Apply) {
 bool SILPerformanceInliner::applyTargetsOriginFunction(FullApplySite Apply,
                                                        SILFunction *Callee) {
   assert(Apply && "Expected non-null apply!");
-  assert(!RemovedApplies.count(Apply) && "Apply cannot have been removed!");
+  if (RemovedApplies.count(Apply))
+    return true;
 
   while (Apply.getFunction() != Callee) {
     auto Found = OriginMap.find(Apply);
@@ -868,7 +869,8 @@ FullApplySite SILPerformanceInliner::devirtualizeUpdatingCallGraph(
   // from devirtualizing.
   assert(NewAI && "Expected to find an apply!");
 
-  assert(!OriginMap.count(NewAI) && "Unexpected apply in map!");
+  assert((!OriginMap.count(NewAI) || RemovedApplies.count(NewAI)) &&
+         "Unexpected apply in map!");
   if (OriginMap.count(Apply))
     OriginMap[NewAI] = OriginMap[Apply];
   RemovedApplies.insert(Apply);
@@ -934,12 +936,14 @@ ApplySite SILPerformanceInliner::specializeGenericUpdatingCallGraph(
 
   for (auto NewApply : Collector.getInstructionPairs()) {
     if (auto Apply = FullApplySite::isa(NewApply.first)) {
-      assert(!OriginMap.count(Apply) && "Unexpected apply in map!");
+      assert((!OriginMap.count(Apply) || RemovedApplies.count(Apply)) &&
+             "Unexpected apply in map!");
       OriginMap[Apply] = FullApplySite(NewApply.second);
     }
   }
 
-  assert(!OriginMap.count(SpecializedFullApply) &&
+  assert((!OriginMap.count(SpecializedFullApply) ||
+          RemovedApplies.count(SpecializedFullApply)) &&
          "Unexpected apply in map!");
   if (OriginMap.count(FullApply))
     OriginMap[SpecializedFullApply] = OriginMap[FullApply];
@@ -1170,7 +1174,8 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
 
         // Maintain a mapping for all new applies back to the apply they
         // originated from.
-        assert(!OriginMap.count(FullApply) &&
+        assert((!OriginMap.count(FullApply) ||
+                 RemovedApplies.count(FullApply)) &&
                "Did not expect apply to be in map!");
         assert(P.second && "Expected non-null apply site!");
         OriginMap[FullApply] = FullApplySite(P.second);
