@@ -1,4 +1,4 @@
-//===------ GlobalRedundantLoadElimination.cpp -SIL  Load Forwarding ------===//
+//===------ GlobalRedundantLoadElimination.cpp - SIL Load Forwarding ------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,6 +9,8 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+///
+/// \file
 ///
 /// This pass eliminates redundant loads.
 ///
@@ -21,7 +23,7 @@
 ///
 /// Redudant Load Elimination (RLE) eliminates such loads by:
 ///
-/// 1. Introducing a notion of a MemLocation that is used to model objects
+/// 1. Introducing a notion of a MemLocation that is used to model object
 /// fields. (See below for more details).
 ///
 /// 2. Introducing a notion of a LoadStoreValue that is used to model the value
@@ -53,8 +55,7 @@
 ///
 /// Every basic block keeps a map between MemLocation <-> LoadStoreValue. By
 /// keeping the MemLocation and LoadStoreValue in their indivisible form, one
-/// can
-/// easily find which part of the load is redundant and how to compute its
+/// can easily find which part of the load is redundant and how to compute its
 /// forwarding value.
 ///
 /// Given the case which the 2 fields of the struct both have available values,
@@ -67,7 +68,7 @@
 /// can be replaced by forwarded value, it will try to find minimum # of
 /// extraction necessary to form the forwarded value. It will group the
 /// available value's by the LoadStoreValue base, i.e. the LoadStoreValues come
-/// from the same instruction,  and then use extraction to obtain the needed
+/// from the same instruction, and then use extraction to obtain the needed
 /// components of the base.
 ///
 //===----------------------------------------------------------------------===//
@@ -122,6 +123,7 @@ static bool isRLEInertInstruction(SILInstruction *Inst) {
     return false;
   }
 }
+
 
 //===----------------------------------------------------------------------===//
 //                            RLEContext Interface
@@ -182,8 +184,8 @@ public:
   MemLocation &getMemLocation(const unsigned index);
 
   /// Given a MemLocation, gather all the LoadStoreValues for this MemLocation.
-  /// Return true if all there are concrete values for every part of the
-  /// MemLocation.
+  /// Return true if all there are concrete (non-covering) values for every part
+  /// of the MemLocation.
   bool gatherValues(SILInstruction *I, MemLocation &L, MemLocationValueMap &Vs);
 
   /// Dump all the MemLocations in the MemLocationVault.
@@ -197,9 +199,8 @@ public:
 } // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
-//                               BBState
+//                       Basic Block Location State
 //===----------------------------------------------------------------------===//
-
 namespace {
 
 /// State of the load store in one basic block which allows for forwarding from
@@ -208,16 +209,16 @@ class BBState {
   /// The basic block that we are optimizing.
   SILBasicBlock *BB;
 
-  /// If ForwardSetIn changes while processing a basicblock, then all its
-  /// predecessors needs to be rerun.
-  llvm::BitVector ForwardSetIn;
-
   /// A bit vector for which the ith bit represents the ith MemLocation in
   /// MemLocationVault. If the bit is set, then the location currently has an
   /// downward visible value.
   llvm::BitVector ForwardSetOut;
 
-  /// This is a list of MemLocations that have available values.
+  /// If ForwardSetIn changes while processing a basicblock, then all its
+  /// predecessors needs to be rerun.
+  llvm::BitVector ForwardSetIn;
+
+  /// This is a list of MemLocations and their LoadStoreValues.
   ///
   /// TODO: can we create a LoadStoreValue vault so that we do not need to keep
   /// them per basic block. This would also give ForwardSetVal more symmetry.
@@ -292,10 +293,10 @@ public:
     ForwardSetOut.resize(bitcnt, true);
   }
 
-  llvm::SmallMapVector<unsigned, LoadStoreValue, 8> &getForwardSetVal() {
-    return ForwardSetVal;
-  }
+  /// Returns the ForwardSetVal for the current basic block. 
+  ValueTableMap &getForwardSetVal() { return ForwardSetVal; }
 
+  /// Returns the current basic block we are processing.
   SILBasicBlock *getBB() const { return BB; }
 
   llvm::DenseMap<SILInstruction *, SILValue> &getRL() { return RedundantLoads; }
@@ -408,24 +409,13 @@ void BBState::updateForwardSetForRead(RLEContext &Ctx, unsigned bit,
 
 void BBState::updateForwardSetForWrite(RLEContext &Ctx, unsigned bit,
                                        LoadStoreValue Val) {
-  // This is a store.
-  //
-  // 1. Update any MemLocation that this MemLocation Must alias. As we have
-  // a new value.
-  //
-  // 2. Invalidate any Memlocation that this location may alias, as their value
-  // can no longer be forwarded.
-  //
+  // This is a store. Invalidate any Memlocation that this location may
+  // alias, as their value can no longer be forwarded.
   MemLocation &R = Ctx.getMemLocation(bit);
   for (unsigned i = 0; i < ForwardSetIn.size(); ++i) {
     if (!isTrackingMemLocation(i))
       continue;
     MemLocation &L = Ctx.getMemLocation(i);
-    // MustAlias, update the tracked value.
-    if (L.isMustAliasMemLocation(R, Ctx.getAA())) {
-      updateTrackedMemLocation(i, Val);
-      continue;
-    }
     if (!L.isMayAliasMemLocation(R, Ctx.getAA()))
       continue;
     // MayAlias, invaliate the MemLocation.
@@ -508,7 +498,7 @@ void BBState::processLoadInst(RLEContext &Ctx, LoadInst *LI, bool PF) {
 }
 
 void BBState::processUnknownWriteInst(RLEContext &Ctx, SILInstruction *I) {
-  llvm::SmallVector<unsigned, 8> LocDeleteList;
+  auto *AA = Ctx.getAA();
   for (unsigned i = 0; i < ForwardSetIn.size(); ++i) {
     if (!isTrackingMemLocation(i))
       continue;
@@ -516,15 +506,10 @@ void BBState::processUnknownWriteInst(RLEContext &Ctx, SILInstruction *I) {
     //
     // TODO: checking may alias with Base is overly conservative,
     // we should check may alias with base plus projection path.
-    auto *AA = Ctx.getAA();
     MemLocation &R = Ctx.getMemLocation(i);
     if (!AA->mayWriteToMemory(I, R.getBase()))
       continue;
     // MayAlias.
-    LocDeleteList.push_back(i);
-  }
-
-  for (auto i : LocDeleteList) {
     stopTrackingMemLocation(i);
   }
 }
@@ -621,7 +606,6 @@ void BBState::mergePredecessorStates(RLEContext &Ctx) {
   }
 
   for (auto &X : ForwardSetVal) {
-    (void) X;
     assert(X.second.isValid() && "Invalid load store value");
   }
 }
