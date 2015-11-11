@@ -1,3 +1,4 @@
+// REQUIRES: rdar23506925
 // RUN: not %swift -Xcc -fake-argument -parse %s 2>&1 | FileCheck %s -check-prefix=CHECK-UNKNOWN-ARG
 // CHECK-UNKNOWN-ARG: unknown argument: '-fake-argument'
 
