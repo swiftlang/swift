@@ -136,7 +136,7 @@ static bool extractLinkerFlags(const llvm::object::Binary *Bin,
     return false;
   } else if (auto *Archive = llvm::dyn_cast<llvm::object::Archive>(Bin)) {
     for (const auto &Child : Archive->children()) {
-      auto ChildBinary = Child.getAsBinary();
+      auto ChildBinary = Child->getAsBinary();
       // FIXME: BinaryFileName below should instead be ld-style names for
       // object files in archives, e.g. "foo.a(bar.o)".
       if (!ChildBinary) {
