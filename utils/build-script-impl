@@ -1677,9 +1677,9 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 LLVM_BIN="$(build_directory_bin $deployment_target llvm)"
                 NINJA_BIN="ninja"
 
-                if [[ $BUILD_NINJA == 1 ]]; then
+                if [[ "${BUILD_NINJA}" ]]; then
                    NINJA_BIN="$(build_directory $deployment_target ninja)/ninja"
-                fi    
+                fi
                 
                 set -x
                 pushd "${FOUNDATION_SOURCE_DIR}"
