@@ -1258,7 +1258,8 @@ void SILPerformanceInliner::inlineDevirtualizeAndSpecialize(
       // Inlining in turn might result in new applies that we should
       // consider for devirtualization and specialization.
       llvm::SmallVector<FullApplySite, 4> NewApplies;
-      if (inlineCallsIntoFunction(WorkItem, DA, LA, CG, NewApplies)) {
+      bool Inlined = inlineCallsIntoFunction(WorkItem, DA, LA, CG, NewApplies);
+      if (Inlined) {
         // Invalidate analyses, but lock the call graph since we
         // maintain it.
         CGA->lockInvalidation();
@@ -1271,18 +1272,23 @@ void SILPerformanceInliner::inlineDevirtualizeAndSpecialize(
         llvm::SmallVector<ApplySite, 4> WorkItemApplies;
         collectAllAppliesInFunction(WorkItem, WorkItemApplies);
 
-        if (devirtualizeAndSpecializeApplies(WorkItemApplies, CGA, MT,
-                                             NewFuncs)) {
+        bool Modified = devirtualizeAndSpecializeApplies(WorkItemApplies, CGA,
+                                                         MT, NewFuncs);
+        if (Modified) {
           WorkList.insert(WorkList.end(), NewFuncs.begin(), NewFuncs.end());
           NewFuncs.clear();
           assert(WorkItemApplies.empty() &&
                  "Expected all applies to be processed!");
         } else if (WorkItem == Initial) {
-          break;
+          // We did not specialize generics or devirtualize calls and we
+          // did not create new opportunities so we can bail out now.
+         break;
         } else {
           WorkList.pop_back();
         }
       } else if (WorkItem == Initial) {
+        // We did not inline any calls and did not create new opportunities
+        // so we can bail out now.
         break;
       } else {
         WorkList.pop_back();
