@@ -62,16 +62,18 @@ let _x86_64RegisterSaveWords = _x86_64CountGPRegisters + _x86_64CountSSERegister
 /// Invoke `f` with a C `va_list` argument derived from `args`.
 public func withVaList<R>(args: [CVarArg],
   @noescape _ f: CVaListPointer -> R) -> R {
-  let builder = VaListBuilder()
+  let builder = _VaListBuilder()
   for a in args {
     builder.append(a)
   }
-  return withVaList(builder, f)
+  return _withVaList(builder, f)
 }
 
 /// Invoke `f` with a C `va_list` argument derived from `builder`.
-public func withVaList<R>(builder: VaListBuilder,
-  @noescape _ f: CVaListPointer -> R) -> R {
+internal func _withVaList<R>(
+  builder: _VaListBuilder,
+  @noescape _ f: CVaListPointer -> R
+) -> R {
   let result = f(builder.va_list())
   _fixLifetime(builder)
   return result
@@ -91,7 +93,7 @@ public func withVaList<R>(builder: VaListBuilder,
 /// `withVaList` as intended.
 @warn_unused_result
 public func getVaList(args: [CVarArg]) -> CVaListPointer {
-  let builder = VaListBuilder()
+  let builder = _VaListBuilder()
   for a in args {
     builder.append(a)
   }
@@ -283,7 +285,7 @@ extension Double : _CVarArgPassedAsDouble, _CVarArgAligned {
 
 /// An object that can manage the lifetime of storage backing a
 /// `CVaListPointer`.
-final public class VaListBuilder {
+final internal class _VaListBuilder {
 
   func append(arg: CVarArg) {
     // Write alignment padding if necessary.
@@ -376,7 +378,7 @@ final public class VaListBuilder {
 
 /// An object that can manage the lifetime of storage backing a
 /// `CVaListPointer`.
-final public class VaListBuilder {
+final internal class _VaListBuilder {
 
   struct Header {
     var gp_offset = CUnsignedInt(0)
