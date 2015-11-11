@@ -124,7 +124,7 @@ constexpr unsigned MaxPartialDeadStoreCountLimit = 1;
 /// initialized to the intersection of WriteSetIns of all successors of the
 /// basic block.
 ///
-/// Initially WriteSetIn is empty. After the basic block is processed, if its
+/// Initially WriteSetIn is set to true. After the basic block is processed, if its
 /// WriteSetOut is different from WriteSetIn, WriteSetIn is initialized to the
 /// value of WriteSetOut and the data flow is rerun.
 ///
@@ -135,8 +135,8 @@ constexpr unsigned MaxPartialDeadStoreCountLimit = 1;
 /// 2. When a load instruction is encountered, remove the loaded location and
 ///    any location it may alias with from the WriteSetOut.
 ///
-/// 3. When an instruction reads or writes to memory in an unknown way, the
-///    WriteSetOut is cleared.
+/// 3. When an instruction reads from  memory in an unknown way, the WriteSetOut
+///    bit is cleared if the instruction can read the MemLocation.
 ///
 class BBState {
 public:
@@ -380,7 +380,7 @@ public:
   /// 
   /// TODO: Use the createExtract in LoadStoreValue in MemLocation.
   ///
-  SILValue createExtract(SILValue VA, Optional<ProjectionPath> &Path,
+  SILValue createExtract(SILValue Base, Optional<ProjectionPath> &Path,
                          SILInstruction *Inst, bool IsValExtract);
 };
 
