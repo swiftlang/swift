@@ -1678,7 +1678,8 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 NINJA_BIN="ninja"
 
                 if [[ "${BUILD_NINJA}" ]]; then
-                   NINJA_BIN="$(build_directory $deployment_target ninja)/ninja"
+                    NINJA_BUILD_DIR=$(build_directory build ninja)
+                    NINJA_BIN="${NINJA_BUILD_DIR}/ninja"
                 fi
                 
                 set -x
