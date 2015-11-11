@@ -22,7 +22,7 @@ StaticStringTestSuite.test("PointerRepresentation/ASCII/Empty") {
     utf8 in
     expectEqual(0, utf8.length)
   }
-  expectEqual("", str.stringValue)
+  expectEqual("", String(str))
 
   expectPrinted("", str)
   expectDebugPrinted("\"\"", str)
@@ -43,7 +43,7 @@ StaticStringTestSuite.test("PointerRepresentation/ASCII") {
     expectEqual(0x62, utf8[1])
     expectEqual(0x63, utf8[2])
   }
-  expectEqual("abc", str.stringValue)
+  expectEqual("abc", String(str))
 
   expectPrinted("abc", str)
   expectDebugPrinted("\"abc\"", str)
@@ -70,7 +70,7 @@ StaticStringTestSuite.test("PointerRepresentation/NonASCII") {
     expectEqual(0xd0, utf8[4])
     expectEqual(0xb2, utf8[5])
   }
-  expectEqual("абв", str.stringValue)
+  expectEqual("абв", String(str))
 
   expectPrinted("абв", str)
   expectDebugPrinted("\"абв\"", str)
@@ -103,7 +103,7 @@ StaticStringTestSuite.test("UnicodeScalarRepresentation/ASCII") {
     expectEqual(1, utf8.length)
     expectEqual(0x5a, utf8[0])
   }
-  expectEqual("Z", str.stringValue)
+  expectEqual("Z", String(str))
 
   expectPrinted("Z", str)
   expectDebugPrinted("\"Z\"", str)
@@ -120,7 +120,7 @@ StaticStringTestSuite.test("UnicodeScalarRepresentation/NonASCII") {
     expectEqual(0xd0, utf8[0])
     expectEqual(0xab, utf8[1])
   }
-  expectEqual("Ы", str.stringValue)
+  expectEqual("Ы", String(str))
 
   expectPrinted("Ы", str)
   expectDebugPrinted("\"Ы\"", str)

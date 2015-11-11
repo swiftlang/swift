@@ -128,16 +128,6 @@ public struct StaticString
     }
   }
 
-  /// Return a `String` representing the same sequence of Unicode
-  /// scalar values as `self` does.
-  @_transparent
-  public var stringValue: String {
-    return withUTF8Buffer {
-      (buffer) in
-      return String._fromWellFormedCodeUnitSequence(UTF8.self, input: buffer)
-    }
-  }
-
   /// Create an empty instance.
   @_transparent
   public init() {
@@ -221,15 +211,18 @@ public struct StaticString
 
   /// A textual representation of `self`.
   public var description: String {
-    return self.stringValue
+    return withUTF8Buffer {
+      (buffer) in
+      return String._fromWellFormedCodeUnitSequence(UTF8.self, input: buffer)
+    }
   }
 
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
-    return self.stringValue.debugDescription
+    return self.description.debugDescription
   }
 
   public func _getMirror() -> _Mirror {
-    return _reflect(self.stringValue)
+    return _reflect(self.description)
   }
 }
