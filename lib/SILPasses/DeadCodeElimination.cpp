@@ -103,11 +103,9 @@ class DCE : public SILFunctionTransform {
     DEBUG(F->dump());
     DEBUG(PDT->print(llvm::dbgs()));
 
-    assert(Worklist.empty() && "Expected to start with an empty worklist!");
-
-    LiveValues.clear();
-    LiveBlocks.clear();
-    ControllingInfoMap.clear();
+    assert(Worklist.empty() && LiveValues.empty() && LiveBlocks.empty() &&
+           ControllingInfoMap.empty() && CondFailProducers.empty() &&
+           "Expected to start with empty data structures!");
 
     if (!precomputeControlInfo(*F))
       return;
@@ -123,6 +121,11 @@ class DCE : public SILFunctionTransform {
 
       invalidateAnalysis((SILAnalysis::PreserveKind)P);
     }
+
+    LiveValues.clear();
+    LiveBlocks.clear();
+    ControllingInfoMap.clear();
+    CondFailProducers.clear();
   }
 
   bool precomputeControlInfo(SILFunction &F);
@@ -196,8 +199,6 @@ static SILInstruction *getProducer(CondFailInst *CFI) {
 
 // Determine which instructions from this function we need to keep.
 void DCE::markLive(SILFunction &F) {
-
-  llvm::SmallVector<CondFailInst *, 16> CondFailInsts;
 
   // Find the initial set of instructions in this function that appear
   // to be live in the sense that they are not trivially something we
