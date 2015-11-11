@@ -55,10 +55,14 @@ public:
 
     // Some instructions don't have direct memory side effects but can't be sunk
     // because of other reasons.
-    if (isa<AllocStackInst>(II)         ||
-        isa<MarkUninitializedInst>(II)  ||
+    if (isa<MarkUninitializedInst>(II)  ||
         isa<MarkFunctionEscapeInst>(II) ||
         isa<MarkDependenceInst>(II)) return false;
+
+    // We don't sink stack allocations to not destroy the proper nesting of
+    // stack allocations.
+    if (II->isAllocatingStack() || II->isDeallocatingStack())
+      return false;
 
     SILBasicBlock *CurrentBlock = II->getParent();
     SILBasicBlock *Dest = nullptr;
