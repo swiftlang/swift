@@ -349,6 +349,10 @@ class DSEContext {
   /// NOTE: Adds the location to the location vault if necessary.
   unsigned getMemLocationBit(const MemLocation &L);
 
+  /// Create the value or address extraction based on the give Base and
+  /// projection path.
+  SILValue createExtract(SILValue Base, Optional<ProjectionPath> &Path,
+                         SILInstruction *Inst, bool IsValExtract);
 public:
   /// Constructor.
   DSEContext(SILFunction *F, SILModule *M, SILPassManager *PM,
@@ -374,14 +378,6 @@ public:
 
   /// Entry point for global dead store elimination.
   void run();
-
-  /// Create the value or address extraction based on the give Base and
-  /// projection path.
-  /// 
-  /// TODO: Use the createExtract in LoadStoreValue in MemLocation.
-  ///
-  SILValue createExtract(SILValue Base, Optional<ProjectionPath> &Path,
-                         SILInstruction *Inst, bool IsValExtract);
 };
 
 } // end anonymous namespace
@@ -466,6 +462,8 @@ void DSEContext::mergeSuccessorStates(SILBasicBlock *BB) {
 
 void DSEContext::invalidateMemLocationBase(SILInstruction *I,
                                            bool BuildGenKillSet) {
+  // If this instruction defines the base of a location, then we need to
+  // invalidate any locations with the same base.
   BBState *S = getBBLocState(I);
   if (BuildGenKillSet) {
     for (unsigned i = 0; i < S->MemLocationCount; ++i) {
@@ -477,8 +475,6 @@ void DSEContext::invalidateMemLocationBase(SILInstruction *I,
     return;
   }
   
-  // If this instruction defines the base of a location, then we need to
-  // invalidate any locations with the same base.
   for (unsigned i = 0; i < S->MemLocationCount; ++i) {
     if (!S->WriteSetOut.test(i))
       continue;
@@ -691,7 +687,6 @@ void DSEContext::processWrite(SILInstruction *I, BBState *S, SILValue Val,
     if (Alives.size() > MaxPartialDeadStoreCountLimit)
       return;
 
-    //
     // At this point, we are performing a partial dead store elimination.
     //
     // Locations here have a projection path from their Base, but this
