@@ -18,7 +18,6 @@
 namespace swift {
 
 class DominanceInfo;
-class CallGraph;
 
 /// The kind of array operation identified by looking at the semantics attribute
 /// of the called function.
@@ -91,9 +90,7 @@ public:
 
   /// Remove the semantics call replacing it by a release of any @owned
   /// parameter.
-  ///
-  /// Updates the passed in callgraph if non-null.
-  void removeCall(CallGraph *CG);
+  void removeCall();
 
   /// Hoist the call to the insert point.
   void hoist(SILInstruction *InsertBefore, DominanceInfo *DT) {

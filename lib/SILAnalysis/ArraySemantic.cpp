@@ -13,7 +13,6 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "swift/SILAnalysis/ArraySemantic.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
-#include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -399,14 +398,11 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
   } // End switch.
 }
 
-void swift::ArraySemanticsCall::removeCall(CallGraph *CG) {
+void swift::ArraySemanticsCall::removeCall() {
   if (getSelfParameterConvention(SemanticsCall) ==
       ParameterConvention::Direct_Owned)
     SILBuilderWithScope<1>(SemanticsCall)
         .createReleaseValue(SemanticsCall->getLoc(), getSelf());
-
-  // Invalidate any information in the callgraph.
-  CallGraphEditor(CG).removeEdgeIfPresent(SemanticsCall);
 
   SemanticsCall->eraseFromParent();
   SemanticsCall = nullptr;

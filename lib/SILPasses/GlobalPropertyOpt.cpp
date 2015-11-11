@@ -20,7 +20,6 @@
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILAnalysis/ArraySemantic.h"
-#include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/Statistic.h"
@@ -87,9 +86,6 @@ class GlobalPropertyOpt {
   
   /// The module that we are optimizing.
   SILModule &M;
-  
-  /// The call graph - only used for updating.
-  CallGraph *CG;
   
   NominalTypeDecl *ArrayType;
   
@@ -228,8 +224,8 @@ class GlobalPropertyOpt {
   bool replacePropertyCalls();
   
 public:
-  GlobalPropertyOpt(SILModule &Module, CallGraph *CG) :
-      M(Module), CG(CG), ArrayType(nullptr) {}
+  GlobalPropertyOpt(SILModule &Module) :
+      M(Module), ArrayType(nullptr) {}
   
   bool run();
 };
@@ -485,7 +481,7 @@ bool GlobalPropertyOpt::replacePropertyCalls() {
       auto TrueStruct = B.createStruct(AI->getLoc(), AI->getType(), {C1});
       AI->replaceAllUsesWith(TrueStruct);
       
-      semCall.removeCall(CG);
+      semCall.removeCall();
       NumPropertiesReplaced++;
       Changed = true;
     }
@@ -519,14 +515,10 @@ class GlobalPropertyOptPass : public SILModuleTransform {
     
     DEBUG(llvm::dbgs() << "** GlobalPropertyOpt **\n");
     
-    auto *CGA = PM->getAnalysis<CallGraphAnalysis>(); // Just for updating.
-    assert(CGA);
-    CallGraph *CG = CGA->getCallGraphOrNull();
-
-    bool Changed = GlobalPropertyOpt(*M, CG).run();
+    bool Changed = GlobalPropertyOpt(*M).run();
     
     if (Changed)
-      invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
+      invalidateAnalysis(SILAnalysis::PreserveKind::Branches);
   }
   
   StringRef getName() override { return "GlobalPropertyOpt"; }

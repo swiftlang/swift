@@ -17,7 +17,6 @@
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/Analysis.h"
 #include "swift/SILAnalysis/ArraySemantic.h"
-#include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILAnalysis/DestructorAnalysis.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/IVAnalysis.h"
@@ -344,8 +343,7 @@ getArrayIndexPair(SILValue Array, SILValue ArrayIndex, ArrayCallKind K) {
 /// after an instruction that may modify any array allowing removal of redundant
 /// checks up to that point and after that point.
 static bool removeRedundantChecksInBlock(SILBasicBlock &BB, ArraySet &Arrays,
-                                         RCIdentityFunctionInfo *RCIA,
-                                         CallGraph *CG) {
+                                         RCIdentityFunctionInfo *RCIA) {
   ABCAnalysis ABC(false, Arrays, RCIA);
   IndexedArraySet RedundantChecks;
   bool Changed = false;
@@ -405,7 +403,7 @@ static bool removeRedundantChecksInBlock(SILBasicBlock &BB, ArraySet &Arrays,
     }
 
     // Remove the bounds check.
-    ArrayCall.removeCall(CG);
+    ArrayCall.removeCall();
     Changed = true;
   }
   return Changed;
@@ -415,8 +413,7 @@ static bool removeRedundantChecksInBlock(SILBasicBlock &BB, ArraySet &Arrays,
 static bool removeRedundantChecks(DominanceInfoNode *CurBB,
                                   ABCAnalysis &ABC,
                                   IndexedArraySet &DominatingSafeChecks,
-                                  SILLoop *Loop,
-                                  CallGraph *CG) {
+                                  SILLoop *Loop) {
   auto *BB = CurBB->getBlock();
   if (!Loop->contains(BB))
     return false;
@@ -467,14 +464,14 @@ static bool removeRedundantChecks(DominanceInfoNode *CurBB,
     }
 
     // Remove the bounds check.
-    ArrayCall.removeCall(CG);
+    ArrayCall.removeCall();
     Changed = true;
   }
 
   // Traverse the children in the dominator tree inside the loop.
   for (auto Child: *CurBB)
     Changed |=
-        removeRedundantChecks(Child, ABC, DominatingSafeChecks, Loop, CG);
+        removeRedundantChecks(Child, ABC, DominatingSafeChecks, Loop);
 
   // Remove checks we have seen for the first time.
   std::for_each(SafeChecksToPop.begin(), SafeChecksToPop.end(),
@@ -965,7 +962,7 @@ static bool hasArrayType(SILValue Value, SILModule &M) {
 static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
                               ABCAnalysis &ABC, InductionAnalysis &IndVars,
                               SILBasicBlock *Preheader, SILBasicBlock *Header,
-                              SILBasicBlock *ExitingBlk, CallGraph *CG) {
+                              SILBasicBlock *ExitingBlk) {
 
   bool Changed = false;
   auto *CurBB = DTNode->getBlock();
@@ -1031,7 +1028,7 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
       // We can remove the check. This is even possible if the block does not
       // dominate the loop exit block.
       Changed = true;
-      ArrayCall.removeCall(CG);
+      ArrayCall.removeCall();
       DEBUG(llvm::dbgs() << "  Bounds check removed\n");
       continue;
     }
@@ -1048,7 +1045,7 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
     F.hoistCheckToPreheader(ArrayCall, Preheader, DT);
 
     // Remove the old check in the loop and the match the retain with a release.
-    ArrayCall.removeCall(CG);
+    ArrayCall.removeCall();
   
     DEBUG(llvm::dbgs() << "  Bounds check hoisted\n");
     Changed = true;
@@ -1058,7 +1055,7 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
   // Traverse the children in the dominator tree.
   for (auto Child: *DTNode)
     Changed |= hoistChecksInLoop(DT, Child, ABC, IndVars, Preheader,
-                                 Header, ExitingBlk, CG);
+                                 Header, ExitingBlk);
 
   return Changed;
 }
@@ -1067,8 +1064,7 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
 /// based redundant bounds check removal.
 static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
                               IVInfo &IVs, ArraySet &Arrays,
-                              RCIdentityFunctionInfo *RCIA, bool ShouldVerify,
-                              CallGraph *CG) {
+                              RCIdentityFunctionInfo *RCIA, bool ShouldVerify) {
   auto *Header = Loop->getHeader();
   if (!Header) return false;
 
@@ -1098,7 +1094,7 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
   // check for safety outside the loop (with ABCAnalysis).
   IndexedArraySet DominatingSafeChecks;
   bool Changed = removeRedundantChecks(DT->getNode(Header), ABC,
-                                       DominatingSafeChecks, Loop, CG);
+                                       DominatingSafeChecks, Loop);
 
   if (!EnableABCHoisting)
     return Changed;
@@ -1138,7 +1134,7 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
 
   // Hoist bounds checks.
   Changed |= hoistChecksInLoop(DT, DT->getNode(Header), ABC, IndVars,
-                               Preheader, Header, ExitingBlk, CG);
+                               Preheader, Header, ExitingBlk);
   if (Changed) {
     Preheader->getParent()->verify();
   }
@@ -1191,9 +1187,6 @@ public:
     assert(DA);
     auto *IVA = PM->getAnalysis<IVAnalysis>();
     assert(IVA);
-    auto *CGA = PM->getAnalysis<CallGraphAnalysis>(); // Just for updating.
-    assert(CGA);
-    CallGraph *CG = CGA->getCallGraphOrNull();
 
     SILFunction *F = getFunction();
     assert(F);
@@ -1231,7 +1224,7 @@ public:
     // Remove redundant checks on a per basic block basis.
     bool Changed = false;
     for (auto &BB : *F)
-      Changed |= removeRedundantChecksInBlock(BB, ReleaseSafeArrays, RCIA, CG);
+      Changed |= removeRedundantChecksInBlock(BB, ReleaseSafeArrays, RCIA);
 
     if (ShouldReportBoundsChecks) { reportBoundsChecks(F); };
 
@@ -1255,8 +1248,7 @@ public:
 
         while (!Worklist.empty()) {
           Changed |= hoistBoundsChecks(Worklist.pop_back_val(), DT, LI, IVs,
-                                       ReleaseSafeArrays, RCIA, ShouldVerify,
-                                       CG);
+                                       ReleaseSafeArrays, RCIA, ShouldVerify);
         }
       }
 
@@ -1264,7 +1256,7 @@ public:
     }
 
     if (Changed)
-      PM->invalidateAnalysis(F, SILAnalysis::PreserveKind::ProgramFlow);
+      PM->invalidateAnalysis(F, SILAnalysis::PreserveKind::Branches);
   }
 };
 }

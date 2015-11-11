@@ -25,7 +25,6 @@
 #include "swift/SILAnalysis/ARCAnalysis.h"
 #include "swift/SILAnalysis/ColdBlockInfo.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
-#include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILAnalysis/LoopAnalysis.h"
 #include "swift/SILAnalysis/RCIdentityAnalysis.h"
 #include "swift/SILAnalysis/ValueTracking.h"
@@ -345,7 +344,6 @@ class COWArrayOpt {
   SILLoop *Loop;
   SILBasicBlock *Preheader;
   DominanceInfo *DomTree;
-  CallGraph *CG;
   bool HasChanged = false;
 
   // Keep track of cold blocks.
@@ -390,10 +388,10 @@ class COWArrayOpt {
   SILValue CurrentArrayAddr;
 public:
   COWArrayOpt(RCIdentityFunctionInfo *RCIA, SILLoop *L,
-              DominanceAnalysis *DA, CallGraph *CG)
+              DominanceAnalysis *DA)
       : RCIA(RCIA), Function(L->getHeader()->getParent()), Loop(L),
         Preheader(L->getLoopPreheader()), DomTree(DA->get(Function)),
-        CG(CG), ColdBlocks(DA), CachedSafeLoop(false, false) {}
+        ColdBlocks(DA), CachedSafeLoop(false, false) {}
 
   bool run();
 
@@ -1508,7 +1506,7 @@ bool COWArrayOpt::run() {
         continue;
 
       DEBUG(llvm::dbgs() << "    Removing make_mutable call: " << *MakeMutableCall);
-      MakeMutableCall.removeCall(CG);
+      MakeMutableCall.removeCall();
       HasChanged = true;
     }
   }
@@ -1527,7 +1525,6 @@ class COWArrayOptPass : public SILFunctionTransform {
     auto *RCIA =
       PM->getAnalysis<RCIdentityAnalysis>()->get(getFunction());
     SILLoopInfo *LI = LA->get(getFunction());
-    CallGraph *CG = PM->getAnalysis<CallGraphAnalysis>()->getCallGraphOrNull();
     if (LI->empty()) {
       DEBUG(llvm::dbgs() << "  Skipping Function: No loops.\n");
       return;
@@ -1552,10 +1549,10 @@ class COWArrayOptPass : public SILFunctionTransform {
 
     bool HasChanged = false;
     for (auto *L : Loops)
-      HasChanged |= COWArrayOpt(RCIA, L, DA, CG).run();
+      HasChanged |= COWArrayOpt(RCIA, L, DA).run();
 
     if (HasChanged)
-      invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
+      invalidateAnalysis(SILAnalysis::PreserveKind::Branches);
   }
 
   StringRef getName() override { return "SIL COW Array Optimization"; }
@@ -2103,13 +2100,10 @@ class ArrayPropertiesSpecializer {
   SILLoopAnalysis *LoopAnalysis;
   SILBasicBlock *HoistableLoopPreheader;
 
-  /// Just for updating.
-  CallGraph *CG;
 public:
   ArrayPropertiesSpecializer(DominanceInfo *DT, SILLoopAnalysis *LA,
-                             SILBasicBlock *Hoistable, CallGraph *CG)
-      : DomTree(DT), LoopAnalysis(LA), HoistableLoopPreheader(Hoistable),
-        CG(CG) {}
+                             SILBasicBlock *Hoistable)
+      : DomTree(DT), LoopAnalysis(LA), HoistableLoopPreheader(Hoistable) {}
 
   void run() {
     specializeLoopNest();
@@ -2204,8 +2198,7 @@ static void collectArrayPropsCalls(
 ///
 /// This is true for array.props.isNative and false for
 /// array.props.needsElementTypeCheck.
-static void replaceArrayPropsCall(SILBuilder &B, ArraySemanticsCall C,
-                                  CallGraph *CG) {
+static void replaceArrayPropsCall(SILBuilder &B, ArraySemanticsCall C) {
   assert(C.getKind() == ArrayCallKind::kArrayPropsIsNative ||
          C.getKind() == ArrayCallKind::kArrayPropsIsNativeTypeChecked);
   ApplyInst *AI = C;
@@ -2218,7 +2211,7 @@ static void replaceArrayPropsCall(SILBuilder &B, ArraySemanticsCall C,
 
   (*C).replaceAllUsesWith(BoolVal);
     // Remove call to array.props.read/write.
-  C.removeCall(CG);
+  C.removeCall();
 }
 
 void ArrayPropertiesSpecializer::specializeLoopNest() {
@@ -2286,7 +2279,7 @@ void ArrayPropertiesSpecializer::specializeLoopNest() {
   // value.
   SILBuilder B2(ClonedPreheader->getTerminator());
   for (auto C : ArrayPropCalls)
-    replaceArrayPropsCall(B2, C, CG);
+    replaceArrayPropsCall(B2, C);
 
   // We have potentially cloned a loop - invalidate loop info.
   LoopAnalysis->invalidate(Header->getParent(),
@@ -2303,8 +2296,6 @@ class SwiftArrayOptPass : public SILFunctionTransform {
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
     SILLoopInfo *LI = LA->get(getFunction());
-    CallGraphAnalysis *CGA = PM->getAnalysis<CallGraphAnalysis>();
-    CallGraph *CG = CGA->getCallGraphOrNull();
 
     bool HasChanged = false;
 
@@ -2339,7 +2330,7 @@ class SwiftArrayOptPass : public SILFunctionTransform {
 
       // Hoist the loop nests.
       for (auto &HoistableLoopNest : HoistableLoopNests)
-        ArrayPropertiesSpecializer(DT, LA, HoistableLoopNest, CG).run();
+        ArrayPropertiesSpecializer(DT, LA, HoistableLoopNest).run();
 
       // We might have cloned there might be critical edges that need splitting.
       splitAllCriticalEdges(*getFunction(), true /* only cond_br terminators*/,
@@ -2349,8 +2340,8 @@ class SwiftArrayOptPass : public SILFunctionTransform {
     }
 
     if (HasChanged) {
-      // We preserve the dominator tree and call graph. Let's
-      // invalidate everything else.
+      // We preserve the dominator tree. Let's invalidate everything
+      // else.
       DA->lockInvalidation();
       invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
       DA->unlockInvalidation();
