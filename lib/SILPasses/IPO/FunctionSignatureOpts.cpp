@@ -427,8 +427,9 @@ class FunctionAnalyzer {
   /// The function that we are analyzing.
   SILFunction *F;
 
-  /// The call graph for the module.
-  CallGraph &CG;
+  /// Does any call inside the given function may bind dynamic 'Self' to a
+  /// generic argument of the callee.
+  bool MayBindDynamicSelf;
 
   /// Did we ascertain that we can optimize this function?
   bool ShouldOptimize;
@@ -449,8 +450,9 @@ public:
 
   FunctionAnalyzer(llvm::BumpPtrAllocator &Allocator,
                    RCIdentityFunctionInfo *RCIA,
-                   SILFunction *F, CallGraph &CG)
-    : Allocator(Allocator), RCIA(RCIA), F(F), CG(CG),
+                   SILFunction *F)
+    : Allocator(Allocator), RCIA(RCIA), F(F),
+      MayBindDynamicSelf(computeMayBindDynamicSelf(F)),
       ShouldOptimize(false), HaveModifiedSelfArgument(false), ArgDescList() {}
 
   /// Analyze the given function.
@@ -476,7 +478,7 @@ public:
   bool isArgumentABIRequired(SILArgument *Arg) {
     // This implicitly asserts that a function binding dynamic self has a self
     // metadata argument or object from which self metadata can be obtained.
-    return CG.mayBindDynamicSelf(F) && (F->getSelfMetadataArgument() == Arg);
+    return MayBindDynamicSelf && (F->getSelfMetadataArgument() == Arg);
   }
 
 private:
@@ -896,7 +898,7 @@ optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
   llvm::SmallVector<ArgumentDescriptor, 8> Arguments;
 
   // Analyze function arguments. If there is no work to be done, exit early.
-  FunctionAnalyzer Analyzer(BPA, RCIA, F, CG);
+  FunctionAnalyzer Analyzer(BPA, RCIA, F);
   if (!Analyzer.analyze()) {
     DEBUG(llvm::dbgs() << "    Has no optimizable arguments... "
                           "bailing...\n");

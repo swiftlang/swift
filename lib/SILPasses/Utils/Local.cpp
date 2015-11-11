@@ -261,6 +261,15 @@ bool swift::hasDynamicSelfTypes(ArrayRef<Substitution> Subs) {
   return false;
 }
 
+bool swift::computeMayBindDynamicSelf(SILFunction *F) {
+  for (auto &BB : *F)
+    for (auto &I : BB)
+      if (auto Apply = FullApplySite::isa(&I))
+        if (hasDynamicSelfTypes(Apply.getSubstitutions()))
+          return true;
+  return false;
+}
+
 /// Find a new position for an ApplyInst's FuncRef so that it dominates its
 /// use. Not that FuncionRefInsts may be shared by multiple ApplyInsts.
 void swift::placeFuncRef(ApplyInst *AI, DominanceInfo *DT) {

@@ -360,9 +360,6 @@ void CallGraph::addEdgesForInstruction(SILInstruction *I,
   if (!Apply)
     return;
 
-  CallerNode->MayBindDynamicSelf |=
-    hasDynamicSelfTypes(Apply.getSubstitutions());
-
   auto *Edge = makeCallGraphEdgeForCallee(Apply, Apply.getCallee());
   assert(Edge && "Expected to be able to make call graph edge for callee!");
   assert(!InstToEdgeMap.count(Apply.getInstruction()) &&
@@ -533,7 +530,6 @@ void CallGraphNode::print(llvm::raw_ostream &OS) const {
     demangle_wrappers::demangleSymbolAsString(getFunction()->getName()) << "\n";
   printFlag(OS, "Trivially dead", isTriviallyDead());
   printFlag(OS, "All callers known", isCallerEdgesComplete());
-  printFlag(OS, "Binds self", mayBindDynamicSelf());
 
   auto &CalleeEdges = getCalleeEdges();
   if (!CalleeEdges.empty()) {

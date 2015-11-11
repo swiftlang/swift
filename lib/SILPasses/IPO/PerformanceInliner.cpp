@@ -617,7 +617,7 @@ getEligibleFunction(FullApplySite AI, CallGraph &CG) {
 
   // We don't support inlining a function that binds dynamic self because we
   // have no mechanism to preserve the original function's local self metadata.
-  if (CG.mayBindDynamicSelf(Callee)) {
+  if (computeMayBindDynamicSelf(Callee)) {
     DEBUG(llvm::dbgs() << "        FAIL: Binding dynamic Self in " <<
           Callee->getName() << ".\n");
     return nullptr;

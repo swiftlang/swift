@@ -8,7 +8,6 @@ sil_stage canonical
 // CHECK: Demangled: private_bottom
 // CHECK: Trivially dead: no
 // CHECK: All callers known: yes
-// CHECK: Binds self: no
 // CHECK: Callers:
 
 // CHECK: Name: private_middle
@@ -24,7 +23,6 @@ bb0:
 // CHECK: Demangled: private_middle
 // CHECK: Trivially dead: no
 // CHECK: All callers known: yes
-// CHECK: Binds self: no
 // CHECK: Call sites:
 
 // CHECK: Call site #0:   %1 = apply %0() : $@convention(thin) () -> ()
@@ -50,7 +48,6 @@ bb0:
 // CHECK: Demangled: private_top
 // CHECK: Trivially dead: yes
 // CHECK: All callers known: yes
-// CHECK: Binds self: no
 // CHECK: Call sites:
 
 // CHECK: Call site #1:   %1 = apply %0() : $@convention(thin) () -> ()
@@ -72,7 +69,6 @@ bb0:
 // CHECK: Trivially dead: no
 // CHECK-NOWMO: All callers known: no
 // CHECK-WMO: All callers known: yes
-// CHECK: Binds self: no
 // CHECK-NOWMO: Known Callers:
 // CHECK-WMO: Callers:
 
@@ -90,7 +86,6 @@ bb0:
 // CHECK: Trivially dead: no
 // CHECK-NOWMO: All callers known: no
 // CHECK-WMO: All callers known: yes
-// CHECK: Binds self: no
 // CHECK: Call sites:
 
 // CHECK: Call site #2:   %1 = apply %0() : $@convention(thin) () -> ()
@@ -119,7 +114,6 @@ bb0:
 // CHECK-NOWMO: All callers known: no
 // CHECK-WMO: Trivially dead: yes
 // CHECK-WMO: All callers known: yes
-// CHECK: Binds self: no
 // CHECK: Call sites:
 
 // CHECK: Call site #3:   %1 = apply %0() : $@convention(thin) () -> ()
@@ -140,7 +134,6 @@ bb0:
 // CHECK: Demangled: public_bottom
 // CHECK: Trivially dead: no
 // CHECK: All callers known: no
-// CHECK: Binds self: no
 // CHECK: Known Callers:
 
 // CHECK: Name: public_middle
@@ -156,7 +149,6 @@ bb0:
 // CHECK: Demangled: public_middle
 // CHECK: Trivially dead: no
 // CHECK: All callers known: no
-// CHECK: Binds self: no
 // CHECK: Call sites:
 
 // CHECK: Call site #4:   %1 = apply %0() : $@convention(thin) () -> ()
@@ -182,7 +174,6 @@ bb0:
 // CHECK: Demangled: public_top
 // CHECK: Trivially dead: no
 // CHECK: All callers known: no
-// CHECK: Binds self: no
 // CHECK: Call sites:
 
 // CHECK: Call site #5:   %1 = apply %0() : $@convention(thin) () -> ()
@@ -238,7 +229,6 @@ public class public_derived : public_base {
 // CHECK: Demangled: private_base_foo
 // CHECK: Trivially dead: no
 // CHECK: All callers known: no
-// CHECK: Binds self: no
 // CHECK: Known Callers:
 
 // CHECK: Name: call_private
@@ -256,7 +246,6 @@ bb0(%0 : $private_base):
 // CHECK: Demangled: private_derived_foo
 // CHECK: Trivially dead: no
 // CHECK: All callers known: no
-// CHECK: Binds self: no
 // CHECK: Known Callers:
 
 // CHECK: Name: call_private
@@ -275,7 +264,6 @@ bb0(%0 : $private_derived):
 // CHECK: Demangled: call_private
 // CHECK: Trivially dead: yes
 // CHECK: All callers known: yes
-// CHECK: Binds self: no
 // CHECK: Call sites:
 
 // CHECK: Call site #6:   %3 = apply %2(%0) : $@convention(method) (@guaranteed private_base) -> ()
@@ -303,7 +291,6 @@ bb0(%0 : $private_base):
 // CHECK: Demangled: internal_base_foo
 // CHECK: Trivially dead: no
 // CHECK: All callers known: no
-// CHECK: Binds self: no
 // CHECK: Known Callers:
 
 // CHECK: Name: call_internal
@@ -322,7 +309,6 @@ bb0(%0 : $internal_base):
 // CHECK: Demangled: internal_base_bar
 // CHECK: Trivially dead: no
 // CHECK: All callers known: no
-// CHECK: Binds self: no
 // CHECK: Known Callers:
 
 // CHECK: Name: call_internal
@@ -341,7 +327,6 @@ bb0(%0 : $internal_base):
 // CHECK: Demangled: internal_derived_foo
 // CHECK: Trivially dead: no
 // CHECK: All callers known: no
-// CHECK: Binds self: no
 // CHECK: Known Callers:
 
 // CHECK: Name: call_internal
@@ -360,7 +345,6 @@ bb0(%0 : $internal_derived):
 // CHECK: Demangled: internal_derived_bar
 // CHECK: Trivially dead: no
 // CHECK: All callers known: no
-// CHECK: Binds self: no
 // CHECK: Known Callers:
 
 // CHECK: Name: call_internal
@@ -381,7 +365,6 @@ bb0(%0 : $internal_derived):
 // CHECK-NOWMO: All callers known: no
 // CHECK-WMO: Trivially dead: yes
 // CHECK-WMO: All callers known: yes
-// CHECK: Binds self: no
 // CHECK: Call sites:
 
 // CHECK: Call site #7:   %3 = apply %2(%0) : $@convention(method) (@guaranteed internal_base) -> ()
@@ -422,7 +405,6 @@ bb0(%0 : $internal_base):
 // CHECK: Demangled: public_base_foo
 // CHECK: Trivially dead: no
 // CHECK: All callers known: no
-// CHECK: Binds self: no
 // CHECK: Known Callers:
 
 // CHECK: Name: call_public
@@ -441,7 +423,6 @@ bb0(%0 : $public_base):
 // CHECK: Demangled: public_base_bar
 // CHECK: Trivially dead: no
 // CHECK: All callers known: no
-// CHECK: Binds self: no
 // CHECK: Known Callers:
 
 // CHECK: Name: call_public
@@ -460,7 +441,6 @@ bb0(%0 : $public_base):
 // CHECK: Demangled: public_base_baz
 // CHECK: Trivially dead: no
 // CHECK: All callers known: no
-// CHECK: Binds self: no
 // CHECK: Known Callers:
 
 // CHECK: Name: call_public
@@ -479,7 +459,6 @@ bb0(%0 : $public_base):
 // CHECK: Demangled: public_derived_foo
 // CHECK: Trivially dead: no
 // CHECK: All callers known: no
-// CHECK: Binds self: no
 // CHECK: Known Callers:
 
 // CHECK: Name: call_public
@@ -498,7 +477,6 @@ bb0(%0 : $public_derived):
 // CHECK: Demangled: public_derived_bar
 // CHECK: Trivially dead: no
 // CHECK: All callers known: no
-// CHECK: Binds self: no
 // CHECK: Known Callers:
 
 // CHECK: Name: call_public
@@ -517,7 +495,6 @@ bb0(%0 : $public_derived):
 // CHECK: Demangled: public_derived_baz
 // CHECK: Trivially dead: no
 // CHECK: All callers known: no
-// CHECK: Binds self: no
 // CHECK: Known Callers:
 
 // CHECK: Name: call_public
@@ -538,7 +515,6 @@ bb0(%0 : $public_derived):
 // CHECK-NOWMO: All callers known: no
 // CHECK-WMO: Trivially dead: yes
 // CHECK-WMO: All callers known: yes
-// CHECK: Binds self: no
 // CHECK: Call sites:
 
 // CHECK: Call site #9:   %3 = apply %2(%0) : $@convention(method) (@guaranteed public_base) -> ()
@@ -658,7 +634,6 @@ private func call_through_private_proto_4<T : private_proto_4>(x: T)
 // CHECK: Demangled: private_proto_private_class_theMethod
 // CHECK: Trivially dead: no
 // CHECK: All callers known: no
-// CHECK: Binds self: no
 // CHECK: Known Callers:
 
 // CHECK: Name: private_proto_1_private_class_witness
@@ -677,7 +652,6 @@ bb0(%0 : $private_proto_private_class):
 // CHECK: Demangled: private_proto_1_private_class_witness
 // CHECK: Trivially dead: no
 // CHECK: All callers known: no
-// CHECK: Binds self: no
 // CHECK: Call sites:
 
 // CHECK: Call site #12:   %4 = apply %3(%1) : $@convention(method) (@guaranteed private_proto_private_class) -> ()
@@ -707,7 +681,6 @@ bb0(%0 : $*private_proto_private_class):
 // CHECK: Demangled: call_through_private_proto_1
 // CHECK: Trivially dead: yes
 // CHECK: All callers known: yes
-// CHECK: Binds self: no
 // CHECK: Call sites:
 
 // CHECK: Call site #13:   %3 = apply %2<T>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : private_proto_1> (@in_guaranteed τ_0_0) -> ()
@@ -732,7 +705,6 @@ bb0(%0 : $*T):
 // CHECK: Demangled: private_proto_internal_class_theMethod
 // CHECK: Trivially dead: no
 // CHECK: All callers known: no
-// CHECK: Binds self: no
 // CHECK: Known Callers:
 
 // CHECK: Name: private_proto_2_internal_class_witness
@@ -751,7 +723,6 @@ bb0(%0 : $private_proto_internal_class):
 // CHECK: Demangled: private_proto_2_internal_class_witness
 // CHECK: Trivially dead: no
 // CHECK: All callers known: no
-// CHECK: Binds self: no
 // CHECK: Call sites:
 
 // CHECK: Call site #14:   %4 = apply %3(%1) : $@convention(method) (@guaranteed private_proto_internal_class) -> ()
@@ -782,7 +753,6 @@ bb0(%0 : $*private_proto_internal_class):
 // CHECK: Demangled: call_through_private_proto_2
 // CHECK: Trivially dead: yes
 // CHECK: All callers known: yes
-// CHECK: Binds self: no
 // CHECK: Call sites:
 
 // CHECK: Call site #15:   %3 = apply %2<T>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : private_proto_2> (@in_guaranteed τ_0_0) -> ()
@@ -807,7 +777,6 @@ bb0(%0 : $*T):
 // CHECK: Demangled: private_proto_public_class_theMethod
 // CHECK: Trivially dead: no
 // CHECK: All callers known: no
-// CHECK: Binds self: no
 // CHECK: Known Callers:
 
 // CHECK: Name: private_proto_3_public_class_witness
@@ -826,7 +795,6 @@ bb0(%0 : $private_proto_public_class):
 // CHECK: Demangled: private_proto_3_public_class_witness
 // CHECK: Trivially dead: no
 // CHECK: All callers known: no
-// CHECK: Binds self: no
 // CHECK: Call sites:
 
 // CHECK: Call site #16:   %4 = apply %3(%1) : $@convention(method) (@guaranteed private_proto_public_class) -> ()
@@ -856,7 +824,6 @@ bb0(%0 : $*private_proto_public_class):
 // CHECK: Demangled: call_through_private_proto_3
 // CHECK: Trivially dead: yes
 // CHECK: All callers known: yes
-// CHECK: Binds self: no
 // CHECK: Call sites:
 
 // CHECK: Call site #17:   %3 = apply %2<T>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : private_proto_3> (@in_guaranteed τ_0_0) -> ()
@@ -881,7 +848,6 @@ bb0(%0 : $*T):
 // CHECK: Demangled: private_proto_public_class_private_method_theMethod
 // CHECK: Trivially dead: no
 // CHECK: All callers known: no
-// CHECK: Binds self: no
 // CHECK: Known Callers:
 
 // CHECK: Name: private_proto_4_public_class_private_method_witness
@@ -900,7 +866,6 @@ bb0(%0 : $private_proto_public_class_private_method):
 // CHECK: Demangled: private_proto_4_public_class_private_method_witness
 // CHECK: Trivially dead: no
 // CHECK: All callers known: no
-// CHECK: Binds self: no
 // CHECK: Call sites:
 
 // CHECK: Call site #18:   %4 = apply %3(%1) : $@convention(method) (@guaranteed private_proto_public_class_private_method) -> ()
@@ -930,7 +895,6 @@ bb0(%0 : $*private_proto_public_class_private_method):
 // CHECK: Demangled: call_through_private_proto_4
 // CHECK: Trivially dead: yes
 // CHECK: All callers known: yes
-// CHECK: Binds self: no
 // CHECK: Call sites:
 
 // CHECK: Call site #19:   %3 = apply %2<T>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : private_proto_4> (@in_guaranteed τ_0_0) -> ()

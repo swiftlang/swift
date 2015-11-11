@@ -132,6 +132,10 @@ bool hasDynamicSelfTypes(TypeSubstitutionMap &SubsMap);
 /// substitution that refers to the dynamic Self type.
 bool hasDynamicSelfTypes(ArrayRef<Substitution> Subs);
 
+/// \brief Return true if any call inside the given function may bind dynamic
+/// 'Self' to a generic argument of the callee.
+bool computeMayBindDynamicSelf(SILFunction *F);
+
 /// \brief Move an ApplyInst's FuncRef so that it dominates the call site.
 void placeFuncRef(ApplyInst *AI, DominanceInfo *DT);
 
