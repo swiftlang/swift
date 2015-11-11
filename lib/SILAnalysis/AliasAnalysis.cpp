@@ -377,33 +377,28 @@ static bool typedAccessTBAABuiltinTypesMayAlias(SILType LTy, SILType RTy,
 
 /// Return true if LTyRef and RTyRef have a parent-child relationship, i.e.
 /// the objects with the given types mayalias.
-static bool referenceTypeTBAAMayAlias(ClassDecl *LTyRef, ClassDecl *RTyRef) {
-  ClassDecl *C = nullptr;
+static bool referenceTypeTBAAMayAlias(SILType LTy, SILType RTy) {
+  // Walk the type hiearchy to see whether LTy and RTy have a parent-child
+  // relationship.
+  SILType C = SILType();
   // Walk from LTy to RTy.
-  C = LTyRef;
-  while(C->hasSuperclass()) {
-    Type T = C->getSuperclass();
-    C = T.getCanonicalTypeOrNull().getClassOrBoundGenericClass();
-    // We are unable to get a valid superclass type, bail out.
-    if (!C)
-      return true;
+  C = LTy;
+  do {
     // There is a parent-child relationship.
-    if (C == RTyRef)
+    if (C == RTy)
       return true;
-  }
+    C = C.getSuperclass(nullptr);
+  } while(C);
 
   // Walk from RTy to LTy.
-  C = RTyRef;
-  while(C->hasSuperclass()) {
-    Type T = C->getSuperclass();
-    C = T.getCanonicalTypeOrNull().getClassOrBoundGenericClass();
-    // We are unable to get a valid superclass type, bail out.
-    if (!C)
-      return true;
+  C = RTy;
+  do {
     // There is a parent-child relationship.
-    if (C == LTyRef)
+    if (C == LTy)
       return true;
-  }
+    C = C.getSuperclass(nullptr);
+  } while(C);
+
   return false;
 }
 
@@ -423,11 +418,9 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy, SILModule &Mod) {
 
   // If 2 reference types have no parent-child relationship, then they can
   // not alias.
-  if (LTy.isHeapObjectReferenceType() && RTy.isHeapObjectReferenceType()) {
-    ClassDecl *L = LTy.getClassOrBoundGenericClass();
-    ClassDecl *R = RTy.getClassOrBoundGenericClass();
-    if (L && R)
-      return referenceTypeTBAAMayAlias(L, R);
+  if (!LTy.isAddress() && !RTy.isAddress()) {
+    if (LTy.isHeapObjectReferenceType() && RTy.isHeapObjectReferenceType())
+      return referenceTypeTBAAMayAlias(LTy, RTy);
   }
  
   // Typed access based TBAA only occurs on pointers. If we reach this point and
