@@ -781,21 +781,8 @@ bool DeadObjectElimination::processAllocApply(ApplyInst *AI) {
     // This is a version of the initializer which receives a pre-allocated
     // buffer as first argument. If we want to delete the initializer we also
     // have to delete the allocation.
-    // But we have to check tbhe argument is really a buffer allocation call.
     AllocBufferAI = dyn_cast<ApplyInst>(Arg0);
     if (!AllocBufferAI)
-      return false;
-
-    auto *FRI = dyn_cast<FunctionRefInst>(AllocBufferAI->getCallee());
-    if (!FRI)
-      return false;
-
-    StringRef AllocFuncName = FRI->getReferencedFunction()->getName();
-    if (AllocFuncName != "swift_bufferAllocate" &&
-        AllocFuncName != "swift_bufferAllocateOnStack")
-      return false;
-
-    if (!hasOneNonDebugUse(*AllocBufferAI))
       return false;
   }
 
