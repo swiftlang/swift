@@ -120,7 +120,7 @@ extension String {
       var scratch = _ScratchIterator(_core, position._position)
       var decoder = UTF16()
       switch decoder.decode(&scratch) {
-      case .Result(let us):
+      case .ScalarValue(let us):
         return us
       case .EmptyInput:
         _sanityCheckFailure("can not subscript using an endIndex")
@@ -173,7 +173,7 @@ extension String {
           if _ascii {
             switch self._asciiBase.next() {
             case let x?:
-              result = .Result(UnicodeScalar(x))
+              result = .ScalarValue(UnicodeScalar(x))
             case nil:
               result = .EmptyInput
             }
@@ -184,7 +184,7 @@ extension String {
           result = _decoder.decode(&(self._iterator!))
         }
         switch result {
-        case .Result(let us):
+        case .ScalarValue(let us):
           return us
         case .EmptyInput:
           return nil

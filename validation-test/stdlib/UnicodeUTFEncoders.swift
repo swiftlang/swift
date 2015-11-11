@@ -116,7 +116,7 @@ class CodecTest<Codec : TestableUnicodeCodec> {
     var decoded: UnicodeScalar
     var decoder = Codec()
     switch decoder.decode(&iter) {
-    case .Result(let us):
+    case .ScalarValue(let us):
       decoded = us
     default:
       fatalError("decoding failed")
