@@ -1486,6 +1486,7 @@ class FormatContext
   swift::ASTWalker::ParentTy Start;
   swift::ASTWalker::ParentTy End;
   bool InDocCommentBlock;
+  bool InCommentLine;
   SourceLoc SiblingLoc;
 
 public:
@@ -1494,9 +1495,11 @@ public:
                 swift::ASTWalker::ParentTy Start = swift::ASTWalker::ParentTy(),
                 swift::ASTWalker::ParentTy End = swift::ASTWalker::ParentTy(),
                 bool InDocCommentBlock = false,
+                bool InCommentLine = false,
                 SourceLoc SiblingLoc = SourceLoc())
     :SM(SM), Stack(Stack), Cursor(Stack.rbegin()), Start(Start), End(End),
-     InDocCommentBlock(InDocCommentBlock), SiblingLoc(SiblingLoc) { }
+     InDocCommentBlock(InDocCommentBlock), InCommentLine(InCommentLine),
+     SiblingLoc(SiblingLoc) { }
 
   FormatContext parent() {
     assert(Cursor != Stack.rend());
@@ -1507,6 +1510,10 @@ public:
 
   bool IsInDocCommentBlock() {
     return InDocCommentBlock;
+  }
+
+  bool IsInCommentLine() {
+    return InCommentLine;
   }
 
   void padToSiblingColumn(StringBuilder &Builder) {
@@ -1690,6 +1697,16 @@ public:
       auto *S = cast<SwitchStmt>(Cursor->getAsStmt());
       if (SM.getLineAndColumn(S->getLBraceLoc()).first == Line)
         return false;
+      if(IsInCommentLine()) {
+        for (auto Case : S->getCases()) {
+          // switch ...
+          // {
+          // // case comment <-- No indent here.
+          // case 0:
+          if (SM.getLineAndColumn(Case->swift::Stmt::getStartLoc()).first == Line + 1)
+            return false;
+        }
+      }
     }
 
     // If we're within an implicit brace context, don't add indent.
@@ -1924,6 +1941,7 @@ class FormatWalker: public ide::SourceEntityWalker {
   swift::ASTWalker::ParentTy AtStart;
   swift::ASTWalker::ParentTy AtEnd;
   bool InDocCommentBlock = false;
+  bool InCommentLine = false;
   std::vector<Token> Tokens;
   LangOptions Options;
   TokenIt CurrentTokIt;
@@ -1976,16 +1994,18 @@ class FormatWalker: public ide::SourceEntityWalker {
   }
 
   void scanForComments(SourceLoc Loc) {
-    if (InDocCommentBlock)
+    if (InDocCommentBlock || InCommentLine)
       return;
     for (auto InValid = Loc.isInvalid(); CurrentTokIt != Tokens.end() &&
          (InValid || SM.isBeforeInBuffer(CurrentTokIt->getLoc(), Loc));
          CurrentTokIt ++) {
-      if (CurrentTokIt->getKind() == tok::comment &&
-          CurrentTokIt->getRange().str().startswith("/*")) {
+      if (CurrentTokIt->getKind() == tok::comment) {
         auto StartLine = SM.getLineNumber(CurrentTokIt->getRange().getStart());
         auto EndLine = SM.getLineNumber(CurrentTokIt->getRange().getEnd());
-        InDocCommentBlock |= TargetLine > StartLine && TargetLine <= EndLine;
+        auto TokenStr = CurrentTokIt->getRange().str();
+        InDocCommentBlock |= TargetLine > StartLine && TargetLine <= EndLine &&
+                             TokenStr.startswith("/*");
+        InCommentLine |= StartLine == TargetLine && TokenStr.startswith("//");
       }
     }
   }
@@ -2013,7 +2033,7 @@ public:
     walk(SF);
     scanForComments(SourceLoc());
     return FormatContext(SM, Stack, AtStart, AtEnd, InDocCommentBlock,
-                         SCollector.findSibling());
+                         InCommentLine, SCollector.findSibling());
   }
 
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
