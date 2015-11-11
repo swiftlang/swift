@@ -14,6 +14,7 @@
 #include "swift/SILAnalysis/ArraySemantic.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -75,6 +76,29 @@ bool swift::ArraySemanticsCall::isValidSignature() {
   case ArrayCallKind::kMakeMutable: {
     auto SelfConvention = FnTy->getSelfParameter().getConvention();
     return SelfConvention == ParameterConvention::Indirect_Inout;
+  }
+  case ArrayCallKind::kArrayUninitialized: {
+    // Make sure that if we are a _adoptStorage call that our storage is
+    // uniquely referenced by us.
+    SILValue Arg0 = SemanticsCall->getArgument(0);
+    if (Arg0.getType().isExistentialType()) {
+      auto *AllocBufferAI = dyn_cast<ApplyInst>(Arg0);
+      if (!AllocBufferAI)
+        return false;
+
+      auto *FRI = dyn_cast<FunctionRefInst>(AllocBufferAI->getCallee());
+      if (!FRI)
+        return false;
+
+      StringRef AllocFuncName = FRI->getReferencedFunction()->getName();
+      if (AllocFuncName != "swift_bufferAllocate" &&
+          AllocFuncName != "swift_bufferAllocateOnStack")
+        return false;
+
+      if (!hasOneNonDebugUse(*AllocBufferAI))
+        return false;
+    }
+    return true;
   }
   }
 
@@ -478,4 +502,52 @@ bool swift::ArraySemanticsCall::mayHaveBridgedObjectElementType() const {
     return isClass;
   }
   return true;
+}
+
+SILValue swift::ArraySemanticsCall::getInitializationCount() const {
+  if (getKind() == ArrayCallKind::kArrayUninitialized) {
+    // Can be either a call to _adoptStorage or _allocateUninitialized.
+    // A call to _adoptStorage has the buffer as AnyObject as the first
+    // argument. The count is the second argument.
+    // A call to _allocateUninitialized has the count as first argument.
+    SILValue Arg0 = SemanticsCall->getArgument(0);
+    if (Arg0.getType().isExistentialType())
+      return SemanticsCall->getArgument(1);
+    else return SemanticsCall->getArgument(0);
+  }
+
+  if (getKind() == ArrayCallKind::kArrayInit &&
+      SemanticsCall->getNumArguments() == 3)
+    return SemanticsCall->getArgument(0);
+
+  return SILValue();
+}
+
+SILValue swift::ArraySemanticsCall::getArrayValue() const {
+  if (getKind() == ArrayCallKind::kArrayUninitialized) {
+    TupleExtractInst *ArrayDef = nullptr;
+    for (auto *Op : SemanticsCall->getUses()) {
+      auto *TupleElt = dyn_cast<TupleExtractInst>(Op->getUser());
+      if (!TupleElt)
+        return SILValue();
+      switch (TupleElt->getFieldNo()) {
+      default:
+        return SILValue();
+      case 0: {
+          // Should only have one tuple extract after CSE.
+        if (ArrayDef)
+          return SILValue();
+        ArrayDef = TupleElt;
+        break;
+      }
+      case 1: /*Ignore the storage address */ break;
+      }
+    }
+    return SILValue(ArrayDef);
+  }
+
+  if(getKind() == ArrayCallKind::kArrayInit)
+    return SILValue(SemanticsCall);
+
+  return SILValue();
 }

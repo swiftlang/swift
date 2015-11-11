@@ -88,6 +88,17 @@ public:
   /// Get the array.props.needsElementTypeCheck argument.
   SILValue getArrayPropertyNeedsTypeCheck() const;
 
+  /// Get the count used for this array initialization.
+  ///
+  /// Returns SILValue() if this is not an array initialization call or the call
+  /// can't be parsed.
+  SILValue getInitializationCount() const;
+
+  /// Get the array value returned by an array initialization call.
+  ///
+  /// Returns SILValue() if this is not an array initialization call.
+  SILValue getArrayValue() const;
+
   /// Remove the semantics call replacing it by a release of any @owned
   /// parameter.
   void removeCall();
