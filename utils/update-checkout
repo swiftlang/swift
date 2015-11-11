@@ -77,6 +77,8 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "cmark"))
     update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "lldb"))
     update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "swiftpm"))
+    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "Foundation"))
+    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "XCTest"))
 
     return 0
 
