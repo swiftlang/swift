@@ -229,14 +229,7 @@ bool BBState::isTrackingMemLocation(unsigned bit) {
 
 void BBState::initialize(const BBState &Succ) { WriteSetOut = Succ.WriteSetIn; }
 
-void BBState::intersect(const BBState &Succ) {
-  for (unsigned i = 0; i < MemLocationCount; ++i) {
-    if (Succ.WriteSetIn.test(i))
-      continue;
-    // WriteSetIn is not set.
-    stopTrackingMemLocation(i);
-  }
-}
+void BBState::intersect(const BBState &Succ) { WriteSetOut &= Succ.WriteSetIn; }
 
 //===----------------------------------------------------------------------===//
 //                          Top Level Implementation
