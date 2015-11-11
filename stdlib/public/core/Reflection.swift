@@ -22,20 +22,12 @@ public protocol _Reflectable {
   func _getMirror() -> _Mirror
 }
 
-/// A unique identifier for a class instance or metatype. This can be used by
-/// reflection clients to recognize cycles in the object graph.
+/// A unique identifier for a class instance or metatype.
 ///
 /// In Swift, only class instances and metatypes have unique identities. There
 /// is no notion of identity for structs, enums, functions, or tuples.
 public struct ObjectIdentifier : Hashable, Comparable {
-  let value: Builtin.RawPointer
-
-  /// Convert to a `UInt` that captures the full value of `self`.
-  ///
-  /// Axiom: `a.uintValue == b.uintValue` iff `a == b`.
-  public var uintValue: UInt {
-    return UInt(Builtin.ptrtoint_Word(value))
-  }
+  internal let _value: Builtin.RawPointer
 
   // FIXME: Better hashing algorithm
   /// The hash value.
@@ -46,30 +38,43 @@ public struct ObjectIdentifier : Hashable, Comparable {
   ///   different invocations of the same program.  Do not persist the
   ///   hash value across program runs.
   public var hashValue: Int {
-    return Int(Builtin.ptrtoint_Word(value))
+    return Int(Builtin.ptrtoint_Word(_value))
   }
 
   /// Construct an instance that uniquely identifies the class instance `x`.
   public init(_ x: AnyObject) {
-    self.value = Builtin.bridgeToRawPointer(x)
+    self._value = Builtin.bridgeToRawPointer(x)
   }
 
   /// Construct an instance that uniquely identifies the metatype `x`.
   public init(_ x: Any.Type) {
-    self.value = unsafeBitCast(x, Builtin.RawPointer.self)
+    self._value = unsafeBitCast(x, Builtin.RawPointer.self)
   }
 }
 
 @warn_unused_result
 public func <(lhs: ObjectIdentifier, rhs: ObjectIdentifier) -> Bool {
-  return lhs.uintValue < rhs.uintValue
+  return UInt(lhs) < UInt(rhs)
 }
 
 @warn_unused_result
 public func ==(x: ObjectIdentifier, y: ObjectIdentifier) -> Bool {
-  return Bool(Builtin.cmp_eq_RawPointer(x.value, y.value))
+  return Bool(Builtin.cmp_eq_RawPointer(x._value, y._value))
 }
 
+extension UInt {
+  /// Create a `UInt` that captures the full value of `objectID`.
+  public init(_ objectID: ObjectIdentifier) {
+    self.init(Builtin.ptrtoint_Word(objectID._value))
+  }
+}
+
+extension Int {
+  /// Create an `Int` that captures the full value of `objectID`.
+  public init(_ objectID: ObjectIdentifier) {
+    self.init(bitPattern: UInt(objectID))
+  }
+}
 
 /// How children of this value should be presented in the IDE.
 public enum _MirrorDisposition {
