@@ -312,3 +312,13 @@ class Top {}
 class Bottom<T : Bottom<Top>> {} // expected-error 2{{type may not reference itself as a requirement}}
 // expected-error@-1{{Bottom' requires that 'Top' inherit from 'Bottom<Top>'}}
 // expected-note@-2{{requirement specified as 'T' : 'Bottom<Top>' [with T = Top]}}
+
+class X6<T> {
+  let d: D<T>
+  init(_ value: T) {
+    d = D(value) // expected-error{{cannot invoke initializer for type 'X6<T>.D<_, _>' with an argument list of type '(T)'}} expected-note{{expected an argument list of type '(T2)'}}
+  }
+  class D<T2> { // expected-error{{generic type 'D' nested in type 'X6' is not allowed}}
+    init(_ value: T2) {}
+  }
+}

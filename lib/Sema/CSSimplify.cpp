@@ -1038,7 +1038,9 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
   // Match up the generic arguments, exactly.
   auto args1 = bound1->getGenericArgs();
   auto args2 = bound2->getGenericArgs();
-  assert(args1.size() == args2.size() && "Mismatched generic args");
+  if (args1.size() != args2.size()) {
+    return SolutionKind::Error;
+  }
   for (unsigned i = 0, n = args1.size(); i != n; ++i) {
     switch (matchTypes(args1[i], args2[i], TypeMatchKind::SameType,
                        TMF_GenerateConstraints,
