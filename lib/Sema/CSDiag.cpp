@@ -2509,7 +2509,8 @@ static void eraseTypeData(Expr *expr) {
       // and we don't want it to make
       //   Init.init(Init.init(<builtinliteral>))
       // preserve the type info to prevent this from happening.
-      if (isa<LiteralExpr>(expr))
+      if (isa<LiteralExpr>(expr) &&
+          !(expr->getType() && expr->getType()->is<ErrorType>()))
         return { false, expr };
       
       expr->setType(nullptr);
