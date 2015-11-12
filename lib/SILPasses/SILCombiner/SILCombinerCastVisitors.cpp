@@ -251,9 +251,11 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
 
   // Ok, we have all loads. Lets simplify this. Go back through the loads a
   // second time, rewriting them into a load + bitcast from our source.
-  for (auto U : getNonDebugUses(*UADCI)) {
+  auto UsesRange = getNonDebugUses(*UADCI);
+  for (auto UI = UsesRange.begin(), E = UsesRange.end(); UI != E;) {
     // Grab the original load.
-    LoadInst *L = cast<LoadInst>(U->getUser());
+    LoadInst *L = cast<LoadInst>(UI->getUser());
+    UI++;
 
     // Insert a new load from our source and bitcast that as appropriate.
     LoadInst *NewLoad = Builder.createLoad(Loc, Op);
