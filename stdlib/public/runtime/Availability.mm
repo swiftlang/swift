@@ -22,7 +22,7 @@ using namespace swift;
 
 /// Load the contents of the SystemVersion plist, looking in the appropriate
 /// place if running on the iOS simulator.
-NSDictionary *systemVersionDictionaryFromPlist() {
+static NSDictionary *systemVersionDictionaryFromPlist() {
   NSString *plistPath = @"/System/Library/CoreServices/SystemVersion.plist";
 
 #if TARGET_IPHONE_SIMULATOR
@@ -42,7 +42,7 @@ NSDictionary *systemVersionDictionaryFromPlist() {
 
 /// Load and parse the SystemVersion dictionary to determine the current
 /// operating system version.
-NSOperatingSystemVersion operatingSystemVersionFromPlist() {
+static NSOperatingSystemVersion operatingSystemVersionFromPlist() {
   NSDictionary *plistDictionary = systemVersionDictionaryFromPlist();
   if (!plistDictionary) {
     fatalError("Unable to check API availability: "
