@@ -877,13 +877,19 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
   if (IsLoadedFrom)
     return;
 
-  SILInstruction *HoistedDestroy = nullptr;
+  bool HoistedDestroyFound = false;
+  SILLocation HoistedDestroyLoc = F->getLocation();
+  SILDebugScope *HoistedDebugScope = nullptr;
+
   for (auto *Destroy : DestroyPoints) {
     // If hoistDestroy returns false, it was not worth hoisting.
     if (hoistDestroy(Destroy, Destroy->getLoc())) {
       // Propagate DestroyLoc for any destroy hoisted above a block.
-      if (DeadInBlocks.count(Destroy->getParent()))
-        HoistedDestroy = Destroy;
+      if (DeadInBlocks.count(Destroy->getParent())) {
+        HoistedDestroyLoc = Destroy->getLoc();
+        HoistedDebugScope = Destroy->getDebugScope();
+        HoistedDestroyFound = true;
+      }
       // We either just created a new destroy, forwarded a copy, or will
       // continue propagating from this dead-in block. In any case, erase the
       // original Destroy.
@@ -896,7 +902,8 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
   if (DeadInBlocks.empty())
     return;
 
-  SILLocation DestroyLoc = HoistedDestroy->getLoc();
+  assert(HoistedDestroyFound && "Hoisted destroy should have been found");
+
   DestroyPoints.clear();
 
   // Propagate dead-in blocks upward via PostOrder traversal.
@@ -915,7 +922,7 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
     if (DeadInSuccs.size() == Succs.size() &&
         !SrcUserInsts.count(BB->getTerminator())) {
       // All successors are dead, so continue hoisting.
-      bool WasHoisted = hoistDestroy(BB->getTerminator(), DestroyLoc);
+      bool WasHoisted = hoistDestroy(BB->getTerminator(), HoistedDestroyLoc);
       (void)WasHoisted;
       assert(WasHoisted && "should always hoist above a terminator");
       continue;
@@ -932,8 +939,8 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
 
       // We make no attempt to use the best DebugLoc, because in all known
       // cases, we only have one.
-      SILBuilder(SuccBB->begin()).createDestroyAddr(DestroyLoc, CurrentDef)
-        ->setDebugScope(HoistedDestroy->getDebugScope());
+      SILBuilder(SuccBB->begin()).createDestroyAddr(HoistedDestroyLoc, CurrentDef)
+        ->setDebugScope(HoistedDebugScope);
       HasChanged = true;
     }
   }
