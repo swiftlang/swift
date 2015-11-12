@@ -1,11 +1,11 @@
 // RUN: %target-swift-frontend -primary-file %s -O -emit-sil
 // Derived from rdar://22936260
 
-import Foundation
+class TTTT {}
 
 class XXXXXX {
-    var data: NSString
-    init (data: NSString) { self.data = data }
+    var data: TTTT
+    init (data: TTTT) { self.data = data }
     func LLLL () -> KKKK? {
         if let EEEE = PPPPP () { return KKKK (LLLL: [EEEE]) }
         return nil
@@ -19,7 +19,7 @@ class XXXXXX {
 
 class JJJJJ {
     var SSS: JJJJJ { return self }
-    func PPPPP (data: String) -> JJJJJ? {
+    func PPPPP (data: TTTT) -> JJJJJ? {
         return XXXXXX (data: data).PPPPP ()
     }
 }
