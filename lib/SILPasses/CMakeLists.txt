@@ -2,43 +2,35 @@ add_subdirectory(Utils)
 add_subdirectory(SILCombiner)
 add_subdirectory(UtilityPasses)
 add_subdirectory(ARC)
+add_subdirectory(PassManager)
+add_subdirectory(Loop)
+add_subdirectory(Diagnostics)
 add_swift_library(swiftSILPasses
   ${SILCOMBINER_SOURCES}
   ${UTILITYPASSES_SOURCES}
   ${ARC_SOURCES}
+  ${PM_SOURCES}
+  ${LOOP_SOURCES}
+  ${DIAG_SOURCES}
   AllocBoxToStack.cpp
-  ArrayBoundsCheckOpts.cpp
-  COWArrayOpt.cpp
   CSE.cpp
   CapturePromotion.cpp
   CapturePropagation.cpp
   ClosureSpecializer.cpp
-  ConstantPropagation.cpp
   CopyForwarding.cpp
   RedundantOverflowCheckRemoval.cpp
-  DIMemoryUseCollector.cpp
-  DataflowDiagnostics.cpp
   DeadCodeElimination.cpp
   DeadFunctionElimination.cpp
   DeadObjectElimination.cpp
-  DefiniteInitialization.cpp
-  DiagnoseUnreachable.cpp
   ExternalDefsToDecls.cpp
   FunctionSignatureOpts.cpp
   GlobalDeadStoreElimination.cpp
   GlobalRedundantLoadElimination.cpp
   GlobalOpt.cpp
   GlobalPropertyOpt.cpp
-  InOutDeshadowing.cpp
-  LICM.cpp
   LetPropertiesOpts.cpp
-  LoopRotate.cpp
-  MandatoryInlining.cpp
   MergeCondFail.cpp
-  PassManager.cpp
-  Passes.cpp
   PerformanceInliner.cpp
-  PredictableMemOpt.cpp
   PrettyStackTrace.cpp
   RemovePin.cpp
   SILCleanup.cpp
