@@ -1326,6 +1326,13 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
         )
     fi
 
+    if [[ "${BUILD_SWIFT_PERF_TESTSUITE}" ]]; then
+        swift_cmake_options=(
+            "${swift_cmake_options[@]}"
+            -DSWIFT_INCLUDE_PERF_TESTSUITE=YES
+        )
+    fi
+
     swift_cmake_options=(
         "${swift_cmake_options[@]}"
         -DSWIFT_AST_VERIFIER:BOOL=$(true_false "${SWIFT_ENABLE_AST_VERIFIER}")
@@ -1333,7 +1340,6 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
         -DSWIFT_RUNTIME_ENABLE_DTRACE:BOOL=$(true_false "${SWIFT_RUNTIME_ENABLE_DTRACE}")
         -DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER:BOOL=$(true_false "${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
         -DSWIFT_ENABLE_TARGET_LINUX:BOOL=$(true_false "${SWIFT_ENABLE_TARGET_LINUX}")
-        -DSWIFT_INCLUDE_PERF_TESTSUITE:BOOL=$(true_false "${BUILD_SWIFT_PERF_TESTSUITE}")
     )
 
     for product in "${PRODUCTS[@]}"; do
