@@ -634,28 +634,6 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
     SILBasicBlock *BB = Inst->getParent();
     if (BB->pred_empty() || !DT->getNode(BB)) {
       Inst->eraseFromParent();
-
-      if (LastStoreInBlock.lookup(BB) == Inst) {
-        LastStoreInBlock.erase(BB);
-        // Update the LastStoreInBlock map.
-        // Scan the BB backwards for a store instruction.
-        SILBasicBlock::iterator I = BB->getTerminator()->getIterator();
-        StoreInst *LastStore = nullptr;
-        while(true) {
-          if (auto *SI = dyn_cast<StoreInst>(I)) {
-            if (SI->getDest().getDef() == ASI) {
-              LastStore = SI;
-              break;
-            }
-          }
-          if (I == BB->begin())
-            break;
-          --I;
-        }
-        if (LastStore)
-          LastStoreInBlock[BB] = LastStore;
-      }
-
       NumInstRemoved++;
       continue;
     }
