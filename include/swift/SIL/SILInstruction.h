@@ -46,6 +46,7 @@ class StringLiteralExpr;
 class Substitution;
 class ValueDecl;
 class VarDecl;
+class FunctionRefInst;
 
 /// This is the root class for all instructions that can be used as the contents
 /// of a Swift SILBasicBlock.
@@ -599,6 +600,13 @@ public:
   static unsigned getArgumentOperandNumber() { return 1; }
 
   SILValue getCallee() const { return Operands[Callee].get(); }
+
+  // Gets the called function if the callee is a function_ref instruction.
+  SILFunction *getCalledFunction() const {
+    if (auto *FRI = dyn_cast<FunctionRefInst>(getCallee()))
+      return FRI->getReferencedFunction();
+    return nullptr;
+  }
 
   // Get the type of the callee without the applied substitutions.
   CanSILFunctionType getOrigCalleeType() const {
