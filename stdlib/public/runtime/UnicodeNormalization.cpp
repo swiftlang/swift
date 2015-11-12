@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/Config.h"
-#include "Debug.h"
+#include "swift/Runtime/Debug.h"
 
 #include <algorithm>
 #include <mutex>
