@@ -221,14 +221,12 @@ namespace {
     /// global_init attributes.
     InlineSelection WhatToInline;
 
-    /// A map for each newly cloned apply back to the apply that it
-    /// was cloned from. This is used in order to stop unbounded
-    /// recursion in the case where we are cloning functions that are
-    /// themselves recursive, especially when they are indirectly
-    /// recursive in a way that is only exposed through inlining
-    /// followed by devirtualization.
-    llvm::DenseMap<FullApplySite, FullApplySite> OriginMap;
-    llvm::DenseSet<FullApplySite> RemovedApplies;
+
+    /// A set of pairs of function names. This set records a successful
+    /// inlining operations and is used to prevent infinite inlining of
+    /// recursive functions. The pair (A, B) records inlining of function
+    /// B into A.
+    llvm::DenseSet<std::pair<StringRef, StringRef>> InlinedFunctions;
 
     SILFunction *getEligibleFunction(FullApplySite AI, CallGraph &CG);
     
@@ -247,7 +245,11 @@ namespace {
                                 SILLoopAnalysis *LA,
                                 CallGraph &CG);
 
-    bool applyTargetsOriginFunction(FullApplySite Apply, SILFunction *Callee);
+    /// \return true if the function \p Callee was previously inlined into
+    /// the caller and the inliner needs to reject this inlining request.
+    /// function. This method is responsible for breaking recursive cycles
+    /// in the inliner (some of which are only exposed via devirtualization).
+    bool detectInliningCycle(FullApplySite Apply, SILFunction *Callee);
 
     void removeApply(FullApplySite Apply, CallGraph &CG,
                      llvm::SmallVectorImpl<FullApplySite> &NewApplies);
@@ -538,31 +540,19 @@ static SILFunction *getReferencedFunction(ApplySite Apply) {
   return FRI->getReferencedFunction();
 }
 
-// Given an apply, determine if it or any the apply it was cloned from
-// were in Callee. If so, we can end up in an infinite loop on trying
-// to inline recursive cycles in the code (some of which are only
-// exposed via devirtualization).
-bool SILPerformanceInliner::applyTargetsOriginFunction(FullApplySite Apply,
-                                                       SILFunction *Callee) {
-  assert(Apply && "Expected non-null apply!");
-  if (RemovedApplies.count(Apply))
-    return true;
+bool SILPerformanceInliner::detectInliningCycle(FullApplySite Apply,
+                                                SILFunction *Callee) {
+  // Reject simple recursions.
+  if (Apply.getFunction() == Callee) return false;
 
-  while (Apply.getFunction() != Callee) {
-    auto Found = OriginMap.find(Apply);
-    if (Found == OriginMap.end())
-      return false;
+  StringRef CallerName = Apply.getFunction()->getName();
+  StringRef CalleeName = Callee->getName();
 
-    assert(Found->second && "Expected non-null apply!");
-    Apply = Found->second;
+  bool InlinedBefore = InlinedFunctions.count(std::make_pair(CallerName, CalleeName));
 
-    // Bail if we hit an apply that has been removed since we cannot
-    // determine if we'll end up in a recursive inlining situation.
-    if (RemovedApplies.count(Apply))
-      return true;
-  }
-
-  return true;
+  // If the Callee was inlined into the Caller in previous inlining iterations then
+  // we need to reject this inlining request to prevent a cycle.
+  return InlinedBefore;
 }
 
 // Returns the callee of an apply_inst if it is basically inlinable.
@@ -643,7 +633,7 @@ getEligibleFunction(FullApplySite AI, CallGraph &CG) {
   }
   
   // Check for non-trivial recursion.
-  if (applyTargetsOriginFunction(AI, Callee)) {
+  if (detectInliningCycle(AI, Callee)) {
     DEBUG(llvm::dbgs() << "        FAIL: Non-trivial recursion calling " <<
           Callee->getName() << ".\n");
     return nullptr;
@@ -860,20 +850,6 @@ FullApplySite SILPerformanceInliner::devirtualizeUpdatingCallGraph(
   auto NewAI = NewInstPair.second;
   CallGraphEditor(&CG).replaceApplyWithNew(Apply, NewAI);
 
-  // In cases where devirtualization results in having to
-  // insert code to match the result type of the original
-  // function, we need to find the original apply. It's
-  // currently simple enough to always do this, and we'll end
-  // up with a better call graph if we try to maintain the
-  // property that we can always find the apply that resulted
-  // from devirtualizing.
-  assert(NewAI && "Expected to find an apply!");
-
-  assert((!OriginMap.count(NewAI) || RemovedApplies.count(NewAI)) &&
-         "Unexpected apply in map!");
-  if (OriginMap.count(Apply))
-    OriginMap[NewAI] = OriginMap[Apply];
-  RemovedApplies.insert(Apply);
   replaceDeadApply(Apply, NewInstPair.first);
 
   return NewAI;
@@ -933,22 +909,6 @@ ApplySite SILPerformanceInliner::specializeGenericUpdatingCallGraph(
   // Update call graph edges
   auto SpecializedFullApply = FullApplySite(Specialized.getInstruction());
   Editor.replaceApplyWithNew(FullApply, SpecializedFullApply);
-
-  for (auto NewApply : Collector.getInstructionPairs()) {
-    if (auto Apply = FullApplySite::isa(NewApply.first)) {
-      assert((!OriginMap.count(Apply) || RemovedApplies.count(Apply)) &&
-             "Unexpected apply in map!");
-      OriginMap[Apply] = FullApplySite(NewApply.second);
-    }
-  }
-
-  assert((!OriginMap.count(SpecializedFullApply) ||
-          RemovedApplies.count(SpecializedFullApply)) &&
-         "Unexpected apply in map!");
-  if (OriginMap.count(FullApply))
-    OriginMap[SpecializedFullApply] = OriginMap[FullApply];
-
-  RemovedApplies.insert(FullApply);
 
   // Replace the old apply with the new and delete the old.
   replaceDeadApply(Apply, Specialized.getInstruction());
@@ -1096,7 +1056,7 @@ void SILPerformanceInliner::collectAppliesToInline(SILFunction *Caller,
   for (auto AI : InitialCandidates) {
     SILFunction *Callee = getReferencedFunction(AI);
     assert(Callee && "apply_inst does not have a direct callee anymore");
-    
+
     const unsigned CallsToCalleeThreshold = 1024;
     if (CalleeCount[Callee] <= CallsToCalleeThreshold)
       Applies.push_back(AI);
@@ -1114,7 +1074,12 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
   if (!Caller->shouldOptimize())
     return false;
 
-  DEBUG(llvm::dbgs() << "Visiting Function: " << Caller->getName() << "\n");
+  // Construct a log of all of the names of the functions that we've inlined
+  // in the current iteration.
+  SmallVector<StringRef, 16> InlinedFunctionNames;
+  StringRef CallerName = Caller->getName();
+
+  DEBUG(llvm::dbgs() << "Visiting Function: " << CallerName << "\n");
 
   assert(NewApplies.empty() && "Expected empty vector to store results in!");
 
@@ -1159,6 +1124,10 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
                        SILInliner::InlineKind::PerformanceInline,
                        ContextSubs, AI.getSubstitutions(),
                        Collector.getCallback());
+
+    // Record the name of the inlined function (for cycle detection).
+    InlinedFunctionNames.push_back(Callee->getName());
+
     auto Success = Inliner.inlineFunction(AI, Args);
     (void) Success;
     // We've already determined we should be able to inline this, so
@@ -1171,21 +1140,12 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
 
       if (auto FullApply = FullApplySite::isa(P.first)) {
         AppliesFromInlinee.push_back(FullApply);
-
-        // Maintain a mapping for all new applies back to the apply they
-        // originated from.
-        assert((!OriginMap.count(FullApply) ||
-                 RemovedApplies.count(FullApply)) &&
-               "Did not expect apply to be in map!");
-        assert(P.second && "Expected non-null apply site!");
-        OriginMap[FullApply] = FullApplySite(P.second);
       }
     }
 
     CallGraphEditor Editor(&CG);
     Editor.replaceApplyWithCallSites(AI, NewCallSites);
 
-    RemovedApplies.insert(AI);
     recursivelyDeleteTriviallyDeadInstructions(AI.getInstruction(), true);
 
     NewApplies.insert(NewApplies.end(), AppliesFromInlinee.begin(),
@@ -1194,10 +1154,16 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
     NumFunctionsInlined++;
   }
 
+  // Record the names of the functions that we inlined.
+  // We'll use this list to detect cycles in future iterations of
+  // the inliner.
+  for (auto CalleeName : InlinedFunctionNames) {
+    InlinedFunctions.insert(std::make_pair(CallerName, CalleeName));
+  }
+
   DEBUG(llvm::dbgs() << "\n");
   return true;
 }
-
 
 void SILPerformanceInliner::inlineDevirtualizeAndSpecialize(
                                                           SILFunction *Caller,
@@ -1212,8 +1178,6 @@ void SILPerformanceInliner::inlineDevirtualizeAndSpecialize(
   WorkList.push_back(Caller);
 
   auto &CG = CGA->getOrBuildCallGraph();
-  OriginMap.clear();
-  RemovedApplies.clear();
 
   while (!WorkList.empty()) {
     llvm::SmallVector<ApplySite, 4> WorkItemApplies;
