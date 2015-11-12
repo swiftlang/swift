@@ -146,8 +146,9 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
 
 void swift::eraseUsesOfInstruction(SILInstruction *Inst,
                                    CallbackTy Callback) {
-  for (auto UI : Inst->getUses()) {
+  for (auto UI = Inst->use_begin(), E = Inst->use_end(); UI != E;) {
     auto *User = UI->getUser();
+    UI++;
 
     // If the instruction itself has any uses, recursively zap them so that
     // nothing uses this instruction.
@@ -171,8 +172,9 @@ void swift::eraseUsesOfInstruction(SILInstruction *Inst,
 }
 
 void swift::eraseUsesOfValue(SILValue V) {
-  for (auto UI : V.getUses()) {
+  for (auto UI = V.use_begin(), E = V.use_end(); UI != E;) {
     auto *User = UI->getUser();
+    UI++;
 
     // If the instruction itself has any uses, recursively zap them so that
     // nothing uses this instruction.
