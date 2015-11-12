@@ -660,7 +660,10 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
   // For each Block with a new Phi argument:
   for (auto Block : PhiBlocks) {
     // Fix all predecessors.
-    for (auto PBB : Block->getPreds()) {
+    for (auto PBBI = Block->getPreds().begin(), E = Block->getPreds().end();
+        PBBI != E;) {
+      auto *PBB = *PBBI;
+      ++PBBI;
       assert(PBB && "Invalid block!");
       fixPhiPredBlock(PhiBlocks, Block, PBB);
     }
