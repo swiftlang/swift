@@ -120,20 +120,20 @@ public func -= <T : UnsignedInteger>(
 
 //===----------------------------------------------------------------------===//
 
-/// An `IteratorProtocol` for `StrideTo<Element>`.
+/// An iterator for the result of `strideTo(...)`.
 public struct StrideToIterator<Element : Strideable> : IteratorProtocol {
-  var current: Element
-  let end: Element
-  let stride: Element.Stride
+  internal var _current: Element
+  internal let _end: Element
+  internal let _stride: Element.Stride
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   public mutating func next() -> Element? {
-    if stride > 0 ? current >= end : current <= end {
+    if _stride > 0 ? _current >= _end : _current <= _end {
       return nil
     }
-    let ret = current
-    current += stride
+    let ret = _current
+    _current += _stride
     return ret
   }
 }
@@ -146,21 +146,21 @@ public struct StrideTo<Element : Strideable> : Sequence {
   ///
   /// - Complexity: O(1).
   public func iterator() -> StrideToIterator<Element> {
-    return StrideToIterator(current: start, end: end, stride: stride)
+    return StrideToIterator(_current: _start, _end: _end, _stride: _stride)
   }
 
-  internal init(start: Element, end: Element, stride: Element.Stride) {
+  internal init(_start: Element, end: Element, stride: Element.Stride) {
     _require(stride != 0, "stride size must not be zero")
     // Unreachable endpoints are allowed; they just make for an
     // already-empty Sequence.
-    self.start = start
-    self.end = end
-    self.stride = stride
+    self._start = _start
+    self._end = end
+    self._stride = stride
   }
 
-  internal let start: Element
-  internal let end: Element
-  internal let stride: Element.Stride
+  internal let _start: Element
+  internal let _end: Element
+  internal let _stride: Element.Stride
 }
 
 extension Strideable {
@@ -169,32 +169,32 @@ extension Strideable {
   /// the progression that is less than `end`.
   @warn_unused_result
   public func stride(to end: Self, by stride: Stride) -> StrideTo<Self> {
-    return StrideTo(start: self, end: end, stride: stride)
+    return StrideTo(_start: self, end: end, stride: stride)
   }
 }
 
 /// An `IteratorProtocol` for `StrideThrough<Element>`.
 public struct StrideThroughIterator<Element : Strideable> : IteratorProtocol {
-  internal var current: Element
-  internal let end: Element
-  internal let stride: Element.Stride
-  internal var done: Bool = false
+  internal var _current: Element
+  internal let _end: Element
+  internal let _stride: Element.Stride
+  internal var _done: Bool = false
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   public mutating func next() -> Element? {
-    if done {
+    if _done {
       return nil
     }
-    if stride > 0 ? current >= end : current <= end {
-      if current == end {
-        done = true
-        return current
+    if _stride > 0 ? _current >= _end : _current <= _end {
+      if _current == _end {
+        _done = true
+        return _current
       }
       return nil
     }
-    let ret = current
-    current += stride
+    let ret = _current
+    _current += _stride
     return ret
   }
 }
@@ -208,19 +208,19 @@ public struct StrideThrough<Element : Strideable> : Sequence {
   /// - Complexity: O(1).
   public func iterator() -> StrideThroughIterator<Element> {
     return StrideThroughIterator(
-      current: start, end: end, stride: stride, done: false)
+      _current: _start, _end: _end, _stride: _stride, _done: false)
   }
 
-  internal init(start: Element, end: Element, stride: Element.Stride) {
+  internal init(_start: Element, end: Element, stride: Element.Stride) {
     _require(stride != 0, "stride size must not be zero")
-    self.start = start
-    self.end = end
-    self.stride = stride
+    self._start = _start
+    self._end = end
+    self._stride = stride
   }
 
-  internal let start: Element
-  internal let end: Element
-  internal let stride: Element.Stride
+  internal let _start: Element
+  internal let _end: Element
+  internal let _stride: Element.Stride
 }
 
 extension Strideable {
@@ -233,7 +233,7 @@ extension Strideable {
   public func stride(
     through end: Self, by stride: Stride
   ) -> StrideThrough<Self> {
-    return StrideThrough(start: self, end: end, stride: stride)
+    return StrideThrough(_start: self, end: end, stride: stride)
   }
 }
 
