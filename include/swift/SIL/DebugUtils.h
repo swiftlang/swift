@@ -50,10 +50,11 @@ inline bool isDebugInst(SILInstruction *Inst) {
 
 /// Deletes all of the debug instructions that use \p Inst.
 inline void deleteAllDebugUses(ValueBase *Inst) {
-  for (auto U : Inst->getUses()) {
-    auto II = U->getUser();
-    if (isDebugInst(II))
-      II->eraseFromParent();
+  for (auto UI = Inst->use_begin(), E = Inst->use_end(); UI != E;) {
+    auto *Inst = UI->getUser();
+    UI++;
+    if (isDebugInst(Inst))
+      Inst->eraseFromParent();
   }
 }
 
