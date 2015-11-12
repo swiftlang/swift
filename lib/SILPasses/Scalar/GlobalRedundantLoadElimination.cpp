@@ -607,6 +607,7 @@ void BBState::mergePredecessorStates(RLEContext &Ctx) {
   }
 
   for (auto &X : ForwardSetVal) {
+    (void) X;
     assert(X.second.isValid() && "Invalid load store value");
   }
 }
