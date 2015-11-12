@@ -802,20 +802,24 @@ visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
 
   // Go back through a second time now that we know all of our users are
   // loads. Perform the transformation on each load.
+  SmallVector<LoadInst*, 4> ToRemove;
   for (auto U : getNonDebugUses(*TEDAI)) {
     // Grab the load.
     LoadInst *L = cast<LoadInst>(U->getUser());
 
     // Insert a new Load of the enum and extract the data from that.
-    auto *Load = Builder.createLoad(Loc, EnumAddr);
-    Load->setDebugScope(Scope);
-    auto *D = Builder.createUncheckedEnumData(
-        Loc, Load, EnumElt, PayloadType);
+    auto *Ld = Builder.createLoad(Loc, EnumAddr);
+    Ld->setDebugScope(Scope);
+    auto *D = Builder.createUncheckedEnumData(Loc, Ld, EnumElt, PayloadType);
     D->setDebugScope(Scope);
 
     // Replace all uses of the old load with the data and erase the old load.
     replaceInstUsesWith(*L, D, 0);
-    eraseInstFromFunction(*L);
+    ToRemove.push_back(L);
+  }
+
+  for (auto *LD : ToRemove) {
+    eraseInstFromFunction(*LD);
   }
 
   return eraseInstFromFunction(*TEDAI);
