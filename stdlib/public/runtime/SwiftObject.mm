@@ -303,7 +303,7 @@ static NSString *_getClassDescription(Class cls) {
 }
 
 - (void)dealloc {
-  _swift_deallocClassInstance(reinterpret_cast<HeapObject *>(self));
+  swift_rootObjCDealloc(reinterpret_cast<HeapObject *>(self));
 }
 
 - (BOOL)isKindOfClass:(Class)someClass {

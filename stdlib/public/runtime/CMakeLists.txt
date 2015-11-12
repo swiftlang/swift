@@ -35,7 +35,6 @@ if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
   set(swift_runtime_objc_sources
       ErrorObject.mm
       SwiftObject.mm
-      SwiftNativeNSXXXBase.mm.gyb
       Remangle.cpp
       Reflection.mm)
   set(LLVM_OPTIONAL_SOURCES

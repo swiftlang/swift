@@ -39,10 +39,8 @@
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/ObjCBridge.h"
 #include "llvm/ADT/DenseMap.h"
-#include "Private.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <mutex>
 
 using namespace swift;
 
@@ -55,6 +53,7 @@ using namespace swift;
   uint32_t __magic_weakRefCount;
 }
 @end
+
 
 @implementation _SwiftNativeNS${Class}Base
 
@@ -79,7 +78,7 @@ using namespace swift;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wobjc-missing-super-calls"
 - (void)dealloc {
-  _swift_deallocClassInstance(reinterpret_cast<HeapObject *>(self));
+  swift_rootObjCDealloc(reinterpret_cast<HeapObject *>(self));
 }
 #pragma clang diagnostic pop
 

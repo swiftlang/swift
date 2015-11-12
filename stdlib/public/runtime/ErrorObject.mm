@@ -22,6 +22,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/ObjCBridge.h"
 #include "ErrorObject.h"
 #include "Private.h"
 #include <dlfcn.h>

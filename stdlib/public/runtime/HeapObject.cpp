@@ -36,6 +36,7 @@
 # include <objc/runtime.h>
 # include <objc/message.h>
 # include <objc/objc.h>
+#include "swift/Runtime/ObjCBridge.h"
 #endif
 #if SWIFT_RUNTIME_ENABLE_DTRACE
 # include "SwiftRuntimeDTraceProbes.h"
@@ -449,8 +450,9 @@ void _swift_release_dealloc(HeapObject *object) {
   asFullMetadata(object->metadata)->destroy(object);
 }
 
+#if SWIFT_OBJC_INTEROP
 /// Perform the root -dealloc operation for a class instance.
-void swift::_swift_deallocClassInstance(HeapObject *self) {
+void swift::swift_rootObjCDealloc(HeapObject *self) {
   auto metadata = self->metadata;
   assert(metadata->isClassObject());
   auto classMetadata = static_cast<const ClassMetadata*>(metadata);
@@ -458,6 +460,7 @@ void swift::_swift_deallocClassInstance(HeapObject *self) {
   swift_deallocClassInstance(self, classMetadata->getInstanceSize(),
                              classMetadata->getInstanceAlignMask());
 }
+#endif
 
 void swift::swift_deallocClassInstance(HeapObject *object,
                                        size_t allocatedSize,
