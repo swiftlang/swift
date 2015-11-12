@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -O -emit-sil | FileCheck %s
-
+// RUN: %target-swift-frontend -primary-file %s -O -emit-sil
 // Derived from rdar://22936260
 
 import Foundation
