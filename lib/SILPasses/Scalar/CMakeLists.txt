@@ -1,0 +1,21 @@
+set(SCALAR_SOURCES
+    Scalar/AllocBoxToStack.cpp
+    Scalar/MergeCondFail.cpp
+    Scalar/SILSROA.cpp
+    Scalar/CSE.cpp
+    Scalar/RedundantOverflowCheckRemoval.cpp
+    Scalar/SimplifyCFG.cpp
+    Scalar/CopyForwarding.cpp
+    Scalar/RemovePin.cpp
+    Scalar/Sink.cpp
+    Scalar/DeadCodeElimination.cpp
+    Scalar/SILCleanup.cpp
+    Scalar/SpeculativeDevirtualizer.cpp
+    Scalar/DeadObjectElimination.cpp
+    Scalar/SILCodeMotion.cpp
+    Scalar/StackPromotion.cpp
+    Scalar/GlobalDeadStoreElimination.cpp
+    Scalar/SILLowerAggregateInstrs.cpp
+    Scalar/GlobalRedundantLoadElimination.cpp
+    Scalar/SILMem2Reg.cpp
+    PARENT_SCOPE)

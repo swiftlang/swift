@@ -5,6 +5,8 @@ add_subdirectory(ARC)
 add_subdirectory(PassManager)
 add_subdirectory(Loop)
 add_subdirectory(Diagnostics)
+add_subdirectory(Scalar)
+add_subdirectory(IPO)
 add_swift_library(swiftSILPasses
   ${SILCOMBINER_SOURCES}
   ${UTILITYPASSES_SOURCES}
@@ -12,35 +14,6 @@ add_swift_library(swiftSILPasses
   ${PM_SOURCES}
   ${LOOP_SOURCES}
   ${DIAG_SOURCES}
-  AllocBoxToStack.cpp
-  CSE.cpp
-  CapturePromotion.cpp
-  CapturePropagation.cpp
-  ClosureSpecializer.cpp
-  CopyForwarding.cpp
-  RedundantOverflowCheckRemoval.cpp
-  DeadCodeElimination.cpp
-  DeadFunctionElimination.cpp
-  DeadObjectElimination.cpp
-  ExternalDefsToDecls.cpp
-  FunctionSignatureOpts.cpp
-  GlobalDeadStoreElimination.cpp
-  GlobalRedundantLoadElimination.cpp
-  GlobalOpt.cpp
-  GlobalPropertyOpt.cpp
-  LetPropertiesOpts.cpp
-  MergeCondFail.cpp
-  PerformanceInliner.cpp
-  PrettyStackTrace.cpp
-  RemovePin.cpp
-  SILCleanup.cpp
-  SILCodeMotion.cpp
-  SILLowerAggregateInstrs.cpp
-  SILMem2Reg.cpp
-  SILSROA.cpp
-  SimplifyCFG.cpp
-  Sink.cpp
-  SpeculativeDevirtualizer.cpp
-  StackPromotion.cpp
-  UsePrespecialized.cpp
+  ${SCALAR_SOURCES}
+  ${IPO_SOURCES}
   LINK_LIBRARIES swiftSILPassesUtils swiftSILAnalysis)
