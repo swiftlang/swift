@@ -4,6 +4,9 @@
 // RUN: FileCheck %s -check-prefix=CLANG_DARWIN < %t.compl.txt
 // RUN: FileCheck %s -check-prefix=CLANG_DARWIN_NEG < %t.compl.txt
 
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=CLANG_MEMBER1 > %t.compl.txt
+// RUN: FileCheck %s -check-prefix=CLANG_MEMBERS1 < %t.compl.txt
+
 import macros
 import ctypes
 import Darwin
@@ -51,4 +54,12 @@ func testCompleteModuleQualifiedMacros1() {
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]: UTF8_STRING[#CString#]{{; name=.+$}}
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]: VERSION_STRING[#CString#]{{; name=.+$}}
 // CLANG_QUAL_MACROS_1: End completions
+}
+
+func testClangMember1() {
+	var FS = FooStruct1()
+	FS.#^CLANG_MEMBER1^#
+// CLANG_MEMBERS1: Begin completions, 2 items
+// CLANG_MEMBERS1-DAG: Decl[InstanceVar]/CurrNominal/keyword[x, Struct1]/recommended[y]: x[#Int32#]{{; name=.+$}}
+// CLANG_MEMBERS1-DAG: Decl[InstanceVar]/CurrNominal/keyword[y, Struct1]/recommendedover[x]: y[#Double#]{{; name=.+$}}
 }

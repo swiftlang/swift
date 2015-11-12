@@ -23,12 +23,12 @@
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=nullability -function-definitions=false -prefer-type-repr=true > %t.printed.txt
 // RUN: FileCheck %s -check-prefix=CHECK-NULLABILITY -strict-whitespace < %t.printed.txt
 
-// TAG_DECLS_AND_TYPEDEFS:      {{^}}struct FooStruct1 {{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(){{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
+// TAG_DECLS_AND_TYPEDEFS: {{^}}struct FooStruct1 {{{$}}
+// TAG_DECLS_AND_TYPEDEFS: {{^}}  var x: Int32{{$}}
+// TAG_DECLS_AND_TYPEDEFS: {{^}}  var y: Double{{$}}
+// TAG_DECLS_AND_TYPEDEFS: {{^}}  init(){{$}}
+// TAG_DECLS_AND_TYPEDEFS: {{^}}  init(x: Int32, y: Double){{$}}
+// TAG_DECLS_AND_TYPEDEFS: {{^}}}{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS:      /*!
 // TAG_DECLS_AND_TYPEDEFS-NEXT:   @keyword Foo2

@@ -60,7 +60,15 @@ typedef struct {
   @keyword Foo1, Struct1
 */
 struct FooStruct1 {
+  /*!
+  @keyword x, Struct1
+  @recommended y
+  */
   int x;
+  /*!
+  @keyword y, Struct1
+  @recommendedover x
+  */
   double y;
 };
 
