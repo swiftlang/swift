@@ -66,11 +66,9 @@ add_swift_library(swiftRuntime IS_STDLIB IS_STDLIB_CORE
   Heap.cpp
   HeapObject.cpp
   KnownMetadata.cpp
-  LibcShims.cpp
   Metadata.cpp
   Once.cpp
   Reflection.cpp
-  Stubs.cpp
   SwiftObject.cpp
   UnicodeExtendedGraphemeClusters.cpp.gyb
   ${swift_runtime_objc_sources}

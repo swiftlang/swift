@@ -16,7 +16,7 @@
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Enum.h"
 #include "swift/Basic/Demangle.h"
-#include "Debug.h"
+#include "swift/Runtime/Debug.h"
 #include "Private.h"
 #include <cassert>
 #include <cstring>

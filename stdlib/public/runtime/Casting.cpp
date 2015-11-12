@@ -24,7 +24,7 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "llvm/ADT/DenseMap.h"
-#include "Debug.h"
+#include "swift/Runtime/Debug.h"
 #include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
 #include "Private.h"

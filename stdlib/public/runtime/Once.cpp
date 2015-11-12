@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/Once.h"
-#include "Debug.h"
+#include "swift/Runtime/Debug.h"
 #include <type_traits>
 
 using namespace swift;

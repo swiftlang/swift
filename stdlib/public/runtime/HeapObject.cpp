@@ -23,7 +23,7 @@
 #include "llvm/Support/MathExtras.h"
 #include "MetadataCache.h"
 #include "Private.h"
-#include "Debug.h"
+#include "swift/Runtime/Debug.h"
 #include <algorithm>
 #include <cassert>
 #include <cstring>

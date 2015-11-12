@@ -32,7 +32,7 @@
 #include "swift/Strings.h"
 #include "../SwiftShims/RuntimeShims.h"
 #include "Private.h"
-#include "Debug.h"
+#include "swift/Runtime/Debug.h"
 #include <dlfcn.h>
 #include <stdio.h>
 #include <stdlib.h>

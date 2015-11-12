@@ -137,7 +137,7 @@ set(swift_core_framework_depends)
 set(swift_core_private_link_libraries)
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   list(APPEND swift_core_link_flags "-all_load")
-  list(APPEND swift_core_private_link_libraries swiftRuntime)
+  list(APPEND swift_core_private_link_libraries swiftRuntime swiftStdlibStubs)
   list(APPEND swift_core_framework_depends Foundation)
   list(APPEND swift_core_framework_depends CoreFoundation)
 else()
@@ -152,7 +152,7 @@ else()
   # effort has been completed.
   #set(LINK_FLAGS
   #  -Wl,--whole-archive swiftRuntime -Wl,--no-whole-archive)
-  list(APPEND swift_core_private_link_libraries swiftRuntime)
+  list(APPEND swift_core_private_link_libraries swiftRuntime swiftStdlibStubs)
   find_package(ICU REQUIRED COMPONENTS uc i18n)
   find_package(BSD REQUIRED)
   list(APPEND swift_core_private_link_libraries

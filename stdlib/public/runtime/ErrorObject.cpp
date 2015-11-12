@@ -18,7 +18,7 @@
 //===----------------------------------------------------------------------===//
 
 #include <stdio.h>
-#include "Debug.h"
+#include "swift/Runtime/Debug.h"
 #include "ErrorObject.h"
 #include "Private.h"
 

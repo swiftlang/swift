@@ -33,7 +33,7 @@
 #include "llvm/ADT/Hashing.h"
 #include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
-#include "Debug.h"
+#include "swift/Runtime/Debug.h"
 #include "Private.h"
 
 #if defined(__APPLE__)

@@ -19,7 +19,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Enum.h"
-#include "Debug.h"
+#include "swift/Runtime/Debug.h"
 #include "Private.h"
 #include <cstring>
 #include <algorithm>

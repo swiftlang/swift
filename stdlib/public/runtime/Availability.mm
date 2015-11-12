@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Debug.h"
+#include "swift/Runtime/Debug.h"
 #import <Foundation/Foundation.h>
 #include <TargetConditionals.h>
 

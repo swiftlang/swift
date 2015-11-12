@@ -21,7 +21,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <stdarg.h>
-#include "Debug.h"
+#include "swift/Runtime/Debug.h"
 
 #ifdef __APPLE__
 #include <asl.h>

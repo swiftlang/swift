@@ -17,7 +17,7 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Heap.h"
 #include "Private.h"
-#include "Debug.h"
+#include "swift/Runtime/Debug.h"
 #include <stdlib.h>
 
 using namespace swift;
