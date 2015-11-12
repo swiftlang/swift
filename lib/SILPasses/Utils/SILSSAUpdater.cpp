@@ -308,7 +308,8 @@ public:
     SILValue PHI(new (BB->getModule()) SILArgument(BB, Updater->ValType), 0);
 
     // Mark all predecessor blocks with the sentinel undef value.
-    for (auto *PredBB: BB->getPreds()) {
+    SmallVector<SILBasicBlock*, 4> Preds(BB->pred_begin(), BB->pred_end());
+    for (auto *PredBB: Preds) {
       TermInst *TI = PredBB->getTerminator();
       addNewEdgeValueToBranch(TI, BB, SILValue(Updater->PHISentinel.get(), 0));
     }
