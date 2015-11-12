@@ -4,7 +4,7 @@ add_subdirectory(UtilityPasses)
 add_subdirectory(ARC)
 add_subdirectory(PassManager)
 add_subdirectory(Loop)
-add_subdirectory(Diagnostics)
+add_subdirectory(EarlySIL)
 add_subdirectory(Scalar)
 add_subdirectory(IPO)
 add_swift_library(swiftSILPasses
@@ -13,7 +13,7 @@ add_swift_library(swiftSILPasses
   ${ARC_SOURCES}
   ${PM_SOURCES}
   ${LOOP_SOURCES}
-  ${DIAG_SOURCES}
+  ${EARLY_SOURCES}
   ${SCALAR_SOURCES}
   ${IPO_SOURCES}
   LINK_LIBRARIES swiftSILPassesUtils swiftSILAnalysis)
