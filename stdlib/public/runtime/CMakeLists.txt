@@ -34,7 +34,6 @@ set(swift_runtime_link_libraries)
 if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
   set(swift_runtime_objc_sources
       ErrorObject.mm
-      FoundationHelpers.mm
       SwiftObject.mm
       SwiftNativeNSXXXBase.mm.gyb
       Remangle.cpp

@@ -2,7 +2,8 @@ set(swift_stubs_objc_sources)
 
 if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
   set(swift_stubs_objc_sources
-      Availability.mm)
+      Availability.mm
+      FoundationHelpers.mm)
 endif()
 
 add_swift_library(swiftStdlibStubs IS_STDLIB IS_STDLIB_CORE
