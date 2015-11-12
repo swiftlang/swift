@@ -153,6 +153,7 @@ KNOWN_SETTINGS=(
     darwin-stdlib-install-name-dir ""            "the directory of the install_name for standard library dylibs"
     install-cmark               ""               "whether to install cmark"
     install-swift               ""               "whether to install Swift"
+    install-llvm                ""               "whether to install components from llvm, like libclang"
     install-lldb                ""               "whether to install LLDB"
     install-llbuild             ""               "whether to install llbuild"
     install-swiftpm             ""               "whether to install swiftpm"
@@ -1056,11 +1057,13 @@ esac
 
 if [[ "${CLANG_COMPILER_VERSION}" ]] ; then
     major_version=$(echo "${CLANG_COMPILER_VERSION}" | sed -e 's/\([0-9]*\).*/\1/')
-    minor_version=$(echo "${CLANG_COMPILER_VERSION}" | sed -e 's/[^.]*\.\([0-9]*\)/\1/')
+    minor_version=$(echo "${CLANG_COMPILER_VERSION}" | sed -e 's/[^.]*\.\([0-9]*\).*/\1/')
+    patch_version=$(echo "${CLANG_COMPILER_VERSION}" | sed -e 's/[^.]*\.[^.]*\.\([0-9]*\)/\1/')
     COMMON_CMAKE_OPTIONS=(
         "${COMMON_CMAKE_OPTIONS[@]}"
-        -DLLVM_SUBMIT_VERSION:STRING="${major_version}"
-        -DLLVM_SUBMIT_SUBVERSION:STRING="${minor_version}"
+        -DLLVM_VERSION_MAJOR:STRING="${major_version}"
+        -DLLVM_VERSION_MINOR:STRING="${minor_version}"
+        -DLLVM_VERSION_PATCH:STRING="${patch_version}"
     )
 fi
 
@@ -1288,6 +1291,11 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
             exit 1
             ;;
     esac
+
+    llvm_cmake_options=(
+        "${llvm_cmake_options[@]}"
+        -DCMAKE_INSTALL_PREFIX:PATH="${INSTALL_PREFIX}"
+    )
 
     if [[ "${CLANG_COMPILER_VERSION}" ]] ; then
         llvm_cmake_options=(
@@ -1924,6 +1932,8 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
 
     for product in "${PRODUCTS[@]}"; do
 
+        INSTALL_TARGETS="install"
+
         case $product in
             cmark)
                 if [[ -z "${INSTALL_CMARK}" ]] ; then
@@ -1931,7 +1941,10 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 fi
                 ;;
             llvm)
-                continue # We don't install LLVM
+                if [[ -z "${INSTALL_LLVM}" ]] ; then
+                    continue
+                fi
+                INSTALL_TARGETS="install-libclang install-c-index-test"
                 ;;
             swift)
                 if [[ -z "${INSTALL_SWIFT}" ]] ; then
@@ -2051,7 +2064,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
 
         set -x
 
-        DESTDIR="${target_install_destdir}" "$CMAKE" --build "${build_dir}" -- install
+        DESTDIR="${target_install_destdir}" "$CMAKE" --build "${build_dir}" -- ${INSTALL_TARGETS}
         { set +x; } 2>/dev/null
     done
 

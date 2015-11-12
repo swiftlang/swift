@@ -30,9 +30,9 @@ if (SOURCEKIT_BUILT_STANDALONE)
 endif()
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-  if(LLVM_SUBMIT_VERSION)
+  if(SWIFT_COMPILER_VERSION)
     set_property(TARGET sourcekitdInProc APPEND_STRING PROPERTY
-                 LINK_FLAGS " -Wl,-current_version -Wl,${LLVM_SUBMIT_VERSION}.${LLVM_SUBMIT_SUBVERSION}")
+                 LINK_FLAGS " -Wl,-current_version -Wl,${SWIFT_COMPILER_VERSION}")
   endif()
 endif()
 
