@@ -256,6 +256,7 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
 
   // Find all dealloc instruction that touch the local storage handle for AI
   // and then chop them up.
+  llvm::SmallVector<DeallocStackInst *, 4> ToRemove;
   for (auto *Operand : getNonDebugUses(SILValue(AI, 0))) {
     SILInstruction *User = Operand->getUser();
     SILBuilder B(User);
@@ -265,11 +266,17 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
     if (auto *DSI = dyn_cast<DeallocStackInst>(User)) {
       DEBUG(llvm::dbgs() << "        Found DeallocStackInst!\n");
       // Create the allocations in reverse order.
-      for (auto *NewAI : swift::reversed(NewAllocations))
-        B.createDeallocStack(DSI->getLoc(), SILValue(NewAI))
-          ->setDebugScope(DSI->getDebugScope());
-      DSI->eraseFromParent();
+      for (auto *NewAI : swift::reversed(NewAllocations)) {
+        auto NewDSI = B.createDeallocStack(DSI->getLoc(), SILValue(NewAI));
+        NewDSI->setDebugScope(DSI->getDebugScope());
+      }
+      ToRemove.push_back(DSI);
     }
+  }
+
+  // Remove the old DeallocStackInst instructions.
+  for (auto *DSI : ToRemove) {
+      DSI->eraseFromParent();
   }
 
   eraseFromParentWithDebugInsts(AI);
