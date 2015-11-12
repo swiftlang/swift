@@ -245,11 +245,11 @@ namespace {
                                 SILLoopAnalysis *LA,
                                 CallGraph &CG);
 
-    /// \return true if the function \p Callee was previously inlined into
-    /// the caller and the inliner needs to reject this inlining request.
-    /// function. This method is responsible for breaking recursive cycles
+    /// This method is responsible for breaking recursive cycles
     /// in the inliner (some of which are only exposed via devirtualization).
-    bool detectInliningCycle(FullApplySite Apply, SILFunction *Callee);
+    /// \return true if the function \p Callee was previously inlined into
+    /// \p Caller and the inliner needs to reject this inlining request.
+    bool hasInliningCycle(SILFunction *Caller, SILFunction *Callee);
 
     void removeApply(FullApplySite Apply, CallGraph &CG,
                      llvm::SmallVectorImpl<FullApplySite> &NewApplies);
@@ -540,12 +540,12 @@ static SILFunction *getReferencedFunction(ApplySite Apply) {
   return FRI->getReferencedFunction();
 }
 
-bool SILPerformanceInliner::detectInliningCycle(FullApplySite Apply,
+bool SILPerformanceInliner::hasInliningCycle(SILFunction *Caller,
                                                 SILFunction *Callee) {
   // Reject simple recursions.
-  if (Apply.getFunction() == Callee) return false;
+  if (Caller == Callee) return true;
 
-  StringRef CallerName = Apply.getFunction()->getName();
+  StringRef CallerName = Caller->getName();
   StringRef CalleeName = Callee->getName();
 
   bool InlinedBefore = InlinedFunctions.count(std::make_pair(CallerName, CalleeName));
@@ -624,17 +624,10 @@ getEligibleFunction(FullApplySite AI, CallGraph &CG) {
   }
 
   SILFunction *Caller = AI.getFunction();
-  
-  // Check for trivial recursions.
-  if (Callee == Caller) {
-    DEBUG(llvm::dbgs() << "        FAIL: Skipping recursive calls on " <<
-          Callee->getName() << ".\n");
-    return nullptr;
-  }
-  
-  // Check for non-trivial recursion.
-  if (detectInliningCycle(AI, Callee)) {
-    DEBUG(llvm::dbgs() << "        FAIL: Non-trivial recursion calling " <<
+
+  // Detect inlining cycles.
+  if (hasInliningCycle(Caller, Callee)) {
+    DEBUG(llvm::dbgs() << "        FAIL: Detected a recursion inlining " <<
           Callee->getName() << ".\n");
     return nullptr;
   }
