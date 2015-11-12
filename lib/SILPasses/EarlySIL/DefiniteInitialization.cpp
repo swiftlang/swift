@@ -1559,12 +1559,14 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &InstInfo) {
     SmallVector<SILInstruction*, 4> InsertedInsts;
     SILBuilder B(Inst, &InsertedInsts);
 
+    auto DebugScope = AI->getDebugScope();
+
     LowerAssignInstruction(B, AI, InitKind);
 
     // If lowering of the assign introduced any new loads or stores, keep track
     // of them.
     for (auto I : InsertedInsts) {
-      I->setDebugScope(AI->getDebugScope());
+      I->setDebugScope(DebugScope);
       if (isa<StoreInst>(I)) {
         NonLoadUses[I] = Uses.size();
         Uses.push_back(DIMemoryUse(I, Kind, FirstElement, NumElements));
