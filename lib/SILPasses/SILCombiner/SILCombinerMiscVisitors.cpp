@@ -245,9 +245,6 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
     break;
   }
 
-  // Save the original insertion point.
-  auto OrigInsertionPoint = Builder.getInsertionPoint();
-
   // If the only users of the alloc_stack are alloc, destroy and
   // init_existential_addr then we can promote the allocation of the init
   // existential.
@@ -265,7 +262,6 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
         Builder.createDestroyAddr(DA->getLoc(), SILValue(ConcAlloc, 1))
           ->setDebugScope(DA->getDebugScope());
         eraseInstFromFunction(*DA);
-
       }
       if (auto *DS = dyn_cast<DeallocStackInst>(Op->getUser())) {
         Builder.setInsertionPoint(DS);
@@ -276,8 +272,6 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
     }
 
     eraseInstFromFunction(*AS);
-    // Restore the insertion point.
-    Builder.setInsertionPoint(OrigInsertionPoint);
   }
 
   // Remove a dead live range that is only copied into.
@@ -317,9 +311,6 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
       eraseInstFromFunction(*Inst);
     }
     eraseInstFromFunction(*AS);
-
-    // Restore the insertion point.
-    Builder.setInsertionPoint(OrigInsertionPoint);
   }
 
   return nullptr;
