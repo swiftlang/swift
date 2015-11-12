@@ -2774,16 +2774,6 @@ public:
   
   void setBraces(SourceRange braces) { Braces = braces; }
 
-  /// \brief Does this declaration expose a fixed layout to all resilience
-  /// domains?
-  bool hasFixedLayout() const;
-
-  /// \brief Does this declaration expose a fixed layout to the given
-  /// module?
-  bool hasFixedLayout(ModuleDecl *M) const {
-    return (hasFixedLayout() || M == getModuleContext());
-  }
-
   void setMemberLoader(LazyMemberLoader *resolver, uint64_t contextData);
   bool hasLazyMembers() const {
     return IterableDeclContext::isLazy();

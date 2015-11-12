@@ -658,13 +658,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableSelfTypeMangling |=
     Args.hasArg(OPT_disable_self_type_mangling);
 
-  Opts.EnableResilience = false;
-  if (auto A = Args.getLastArg(OPT_enable_resilience,
-                               OPT_disable_resilience)) {
-    Opts.EnableResilience
-      = A->getOption().matches(OPT_enable_resilience);
-  }
-
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
   

@@ -1184,35 +1184,18 @@ ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC) const {
     // TODO: What about static properties?
     switch (var->getStorageKind()) {
     case AbstractStorageDecl::Stored:
-    case AbstractStorageDecl::Addressed:
-      // The storage is completely trivial. Always do direct access.
-      return AccessSemantics::DirectToStorage;
-
     case AbstractStorageDecl::StoredWithTrivialAccessors:
-    case AbstractStorageDecl::AddressedWithTrivialAccessors: {
-      // If the property is defined in a non-final class or a protocol, the
-      // accessors are dynamically dispatched, and we cannot do direct access.
-      if (isPolymorphic(var))
-        return AccessSemantics::Ordinary;
-
-      // If the property is defined in a nominal type which must be accessed
-      // resiliently from the current module, we cannot do direct access.
-      auto VarDC = var->getDeclContext();
-      if (auto *nominal = VarDC->isNominalTypeOrNominalTypeExtensionContext())
-        if (!nominal->hasFixedLayout(UseDC->getParentModule()))
-          return AccessSemantics::Ordinary;
-
-      // We know enough about the property to perform direct access.
-      return AccessSemantics::DirectToStorage;
-    }
+    case AbstractStorageDecl::Addressed:
+    case AbstractStorageDecl::AddressedWithTrivialAccessors:
+      if (!isPolymorphic(var))
+        return AccessSemantics::DirectToStorage;
+      break;
 
     case AbstractStorageDecl::StoredWithObservers:
     case AbstractStorageDecl::InheritedWithObservers:
     case AbstractStorageDecl::Computed:
     case AbstractStorageDecl::ComputedWithMutableAddress:
     case AbstractStorageDecl::AddressedWithObservers:
-      // Property is not trivially backed by storage, do not perform
-      // direct access.
       break;
     }
   }
@@ -1273,27 +1256,13 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
       SWIFT_FALLTHROUGH;
 
     case StoredWithTrivialAccessors:
-    case AddressedWithTrivialAccessors: {
-        // If the property is defined in a non-final class or a protocol, the
-        // accessors are dynamically dispatched, and we cannot do direct access.
+    case AddressedWithTrivialAccessors:
+      // If the storage is polymorphic, either the getter or the
+      // setter could be overridden by something more interesting.
       if (isPolymorphic(this))
         return AccessStrategy::DispatchToAccessor;
 
-      // If we end up here with a stored property of a type that's resilient
-      // from some resilience domain, we cannot do direct access.
-      //
-      // As an optimization, we do want to perform direct accesses of stored
-      // properties of resilient types in the same resilience domain as the
-      // access.
-      //
-      // This is done by using DirectToStorage semantics above, with the
-      // understanding that the access semantics are with respect to the
-      // resilience domain of the accessor's caller.
-      auto DC = getDeclContext();
-      if (auto *nominal = DC->isNominalTypeOrNominalTypeExtensionContext())
-        if (!nominal->hasFixedLayout())
-          return AccessStrategy::DirectToAccessor;
-
+      // Otherwise, just access the storage directly.
       if (storageKind == StoredWithObservers ||
           storageKind == StoredWithTrivialAccessors) {
         return AccessStrategy::Storage;
@@ -1302,7 +1271,6 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
                storageKind == AddressedWithTrivialAccessors);
         return AccessStrategy::Addressor;
       }
-    }
 
     case ComputedWithMutableAddress:
       if (isPolymorphic(this))
@@ -1830,24 +1798,6 @@ Type TypeDecl::getDeclaredInterfaceType() const {
     return interfaceType;
 
   return interfaceType->castTo<MetatypeType>()->getInstanceType();
-}
-
-
-bool NominalTypeDecl::hasFixedLayout() const {
-  // Private and internal types always have a fixed layout.
-  if (getFormalAccess() != Accessibility::Public)
-    return true;
-
-  // Check for an explicit @fixed_layout attribute.
-  if (getAttrs().hasAttribute<FixedLayoutAttr>())
-    return true;
-
-  // Types imported from C always have a fixed layout.
-  if (hasClangNode())
-    return true;
-
-  // Otherwise, access via indirect "resilient" interfaces.
-  return false;
 }
 
 /// Provide the set of parameters to a generic type, or null if

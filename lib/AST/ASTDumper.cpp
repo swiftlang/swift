@@ -537,17 +537,6 @@ namespace {
         OS << " @objc";
     }
 
-    void printCommon(NominalTypeDecl *NTD, const char *Name,
-                     llvm::Optional<llvm::raw_ostream::Colors> Color =
-                      llvm::Optional<llvm::raw_ostream::Colors>()) {
-      printCommon((ValueDecl *)NTD, Name, Color);
-
-      if (NTD->hasFixedLayout())
-        OS << " @fixed_layout";
-      else
-        OS << " @resilient_layout";
-    }
-
     void visitSourceFile(const SourceFile &SF) {
       OS.indent(Indent) << "(source_file";
       for (Decl *D : SF.Decls) {
@@ -631,18 +620,18 @@ namespace {
       OS << ')';
     }
 
-    void visitEnumDecl(EnumDecl *ED) {
-      printCommon(ED, "enum_decl");
-      printInherited(ED->getInherited());
-      for (Decl *D : ED->getMembers()) {
+    void visitEnumDecl(EnumDecl *UD) {
+      printCommon(UD, "enum_decl");
+      printInherited(UD->getInherited());
+      for (Decl *D : UD->getMembers()) {
         OS << '\n';
         printRec(D);
       }
       OS << ')';
     }
 
-    void visitEnumElementDecl(EnumElementDecl *EED) {
-      printCommon(EED, "enum_element_decl");
+    void visitEnumElementDecl(EnumElementDecl *UED) {
+      printCommon(UED, "enum_element_decl");
       OS << ')';
     }
 

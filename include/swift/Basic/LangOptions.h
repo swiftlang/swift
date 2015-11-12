@@ -31,84 +31,6 @@ namespace swift {
   /// provide compiler debugging facilities.
   class LangOptions {
   public:
-
-    /// \brief The target we are building for.
-    ///
-    /// This represents the minimum deployment target.
-    llvm::Triple Target;
-
-    ///
-    /// Language features
-    ///
-
-    /// \brief If true, all types are treated as resilient unless declared
-    /// @fixed_layout.
-    bool EnableResilience = false;
-
-    /// \brief Disable API availability checking.
-    bool DisableAvailabilityChecking = false;
-    
-    /// Whether to warn about "needless" words in declarations.
-    bool WarnOmitNeedlessWords = false;
-
-    /// Should access control be respected?
-    bool EnableAccessControl = true;
-
-    /// Enable 'availability' restrictions for App Extensions.
-    bool EnableAppExtensionRestrictions = false;
-
-    ///
-    /// Support for alternate usage modes
-    ///
-
-    /// \brief Enable features useful for running in the debugger.
-    bool DebuggerSupport = false;
-
-    /// Allows using identifiers with a leading dollar.
-    bool EnableDollarIdentifiers = false;
-
-    /// \brief Allow throwing call expressions without annotation with 'try'.
-    bool EnableThrowWithoutTry = false;
-
-    /// \brief Enable features useful for running playgrounds.
-    // FIXME: This should probably be limited to the particular SourceFile.
-    bool Playground = false;
-
-    /// Whether to delay adding enum protocol conformances during code
-    /// completion. This isn't completely correct with multiple files but is
-    /// currently necessary to get reasonable performance.
-    // FIXME: remove this when rdar://20047340 is fixed.
-    bool EnableCodeCompletionDelayedEnumConformanceHack = false;
-
-    /// \brief Keep comments during lexing and attach them to declarations.
-    bool AttachCommentsToDecls = false;
-
-    /// Whether to include initializers when code-completing a postfix
-    /// expression.
-    bool CodeCompleteInitsInPostfixExpr = false;
-
-    ///
-    /// Flags for use by tests
-    ///
-
-    /// Enable Objective-C Runtime interop code generation and build
-    /// configuration options.
-    bool EnableObjCInterop = true;
-
-    /// Enables checking that uses of @objc require importing
-    /// the Foundation module.
-    /// This is enabled by default because SILGen can crash in such a case, but
-    /// it gets disabled when compiling the Swift core stdlib.
-    bool EnableObjCAttrRequiresFoundation = true;
-
-    /// If true, <code>@testable import Foo</code> produces an error if \c Foo
-    /// was not compiled with -enable-testing.
-    bool EnableTestableAttrRequiresTestableModule = true;
-
-    ///
-    /// Flags for developers
-    ///
-
     /// \brief Whether we are debugging the constraint solver.
     ///
     /// This option enables verbose debugging output from the constraint
@@ -147,6 +69,58 @@ namespace swift {
     /// \brief Enable experimental "switch" pattern-matching features.
     bool EnableExperimentalPatterns = false;
 
+    /// \brief Disable API availability checking.
+    bool DisableAvailabilityChecking = false;
+    
+    /// \brief Enable features useful for running in the debugger.
+    bool DebuggerSupport = false;
+
+    /// Allows using identifiers with a leading dollar.
+    bool EnableDollarIdentifiers = false;
+
+    /// \brief Allow throwing call expressions without annotation with 'try'.
+    bool EnableThrowWithoutTry = false;
+
+    /// \brief Enable features useful for running playgrounds.
+    // FIXME: This should probably be limited to the particular SourceFile.
+    bool Playground = false;
+
+    /// Whether to warn about "needless" words in declarations.
+    bool WarnOmitNeedlessWords = false;
+
+    /// Whether to delay adding enum protocol conformances during code
+    /// completion. This isn't completely correct with multiple files but is
+    /// currently necessary to get reasonable performance.
+    // FIXME: remove this when rdar://20047340 is fixed.
+    bool EnableCodeCompletionDelayedEnumConformanceHack = false;
+
+    /// \brief Keep comments during lexing and attach them to declarations.
+    bool AttachCommentsToDecls = false;
+
+    /// Enable 'availability' restrictions for App Extensions.
+    bool EnableAppExtensionRestrictions = false;
+
+    /// Enable Objective-C Runtime interop code generation and build
+    /// configuration options.
+    bool EnableObjCInterop = true;
+
+    /// Enables checking that uses of @objc require importing
+    /// the Foundation module.
+    /// This is enabled by default because SILGen can crash in such a case, but
+    /// it gets disabled when compiling the Swift core stdlib.
+    bool EnableObjCAttrRequiresFoundation = true;
+
+    /// If true, <code>@testable import Foo</code> produces an error if \c Foo
+    /// was not compiled with -enable-testing.
+    bool EnableTestableAttrRequiresTestableModule = true;
+
+    /// Should access control be respected?
+    bool EnableAccessControl = true;
+
+    /// Whether to include initializers when code-completing a postfix
+    /// expression.
+    bool CodeCompleteInitsInPostfixExpr = false;
+
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;
@@ -154,6 +128,11 @@ namespace swift {
     /// Don't mangle the Self type as part of declaration manglings.
     bool DisableSelfTypeMangling = true;
     
+    /// The target we are building for.
+    ///
+    /// This represents the minimum deployment target.
+    llvm::Triple Target;
+
     /// Sets the target we are building for and updates configuration options
     /// to match.
     ///

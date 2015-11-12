@@ -1066,9 +1066,9 @@ namespace {
       // SIL lowering to catch unsupported recursive value types.
       bool isAddressOnly = false;
       
-      // For now, if the type does not have a fixed layout in all resilience
-      // domains, we will treat it as address-only in SIL.
-      if (!D->hasFixedLayout())
+      // For consistency, if it's anywhere resilient, we need to treat the type
+      // as resilient in SIL.
+      if (TC.isAnywhereResilient(D))
         isAddressOnly = true;
 
       // Classify the type according to its stored properties.
@@ -1102,9 +1102,9 @@ namespace {
       // SIL lowering to catch unsupported recursive value types.
       bool isAddressOnly = false;
 
-      // For now, if the type does not have a fixed layout in all resilience
-      // domains, we will treat it as address-only in SIL.
-      if (!D->hasFixedLayout())
+      // For consistency, if it's anywhere resilient, we need to treat the type
+      // as resilient in SIL.
+      if (TC.isAnywhereResilient(D))
         isAddressOnly = true;
       
       // Lower Self? as if it were Whatever? and Self! as if it were Whatever!.

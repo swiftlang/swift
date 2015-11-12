@@ -614,6 +614,21 @@ public:
     return isIndirectPlusZeroSelfParameter(T.getSwiftRValueType());
   }
   
+  /// Is the given declaration resilient from the current context?
+  bool isResilient(Decl *D) {
+    // FIXME
+    return false;
+  }
+
+  /// Is the given declaration resilient in any theoretical component,
+  /// possibly one compiled in the past?  This can lead to some
+  /// sub-optimal decisions sometimes, but it has the merit of being
+  /// guaranteed stable.
+  bool isAnywhereResilient(Decl *D) {
+    // FIXME
+    return false;
+  }
+
   /// Lowers a Swift type to a SILType, and returns the SIL TypeLowering
   /// for that type.
   const TypeLowering &getTypeLowering(Type t, unsigned uncurryLevel = 0) {
