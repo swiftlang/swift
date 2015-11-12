@@ -665,10 +665,12 @@ bool RLEContext::gatherValues(SILInstruction *I, MemLocation &L,
 
   // Sanity check to make sure we have valid load store values for each
   // MemLocation.
+#ifndef NDEBUG
   for (auto &X : Locs) {
     (void) X;
     assert(Values[X].isValid() && "Invalid load store value");
   }
+#endif
   return true;
 }
 
