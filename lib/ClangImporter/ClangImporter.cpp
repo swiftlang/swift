@@ -486,7 +486,7 @@ addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
     // assuming that the Clang resource directory is located next to it is that
     // Swift, when installed separately, should not need to install files in
     // directories that are not "owned" by it.
-    llvm::sys::path::append(resourceDir, "clang", CLANG_VERSION_STRING);
+    llvm::sys::path::append(resourceDir, "clang");
 
     // Set the Clang resource directory to the path we computed.
     invocationArgStrs.push_back("-resource-dir");
