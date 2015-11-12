@@ -606,10 +606,12 @@ void BBState::mergePredecessorStates(RLEContext &Ctx) {
     HasAtLeastOnePred = true;
   }
 
+#ifndef NDEBUG
   for (auto &X : ForwardSetVal) {
-    (void) X;
+    (void)X;
     assert(X.second.isValid() && "Invalid load store value");
   }
+#endif
 }
 
 //===----------------------------------------------------------------------===//
