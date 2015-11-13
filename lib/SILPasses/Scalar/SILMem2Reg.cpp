@@ -632,11 +632,6 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
     // the instruction is unreachable. Delete the instruction and move
     // on.
     SILBasicBlock *BB = Inst->getParent();
-    if (BB->pred_empty() || !DT->getNode(BB)) {
-      Inst->eraseFromParent();
-      NumInstRemoved++;
-      continue;
-    }
 
     if (auto *DVAI = dyn_cast<DebugValueAddrInst>(Inst)) {
       // Replace DebugValueAddr with DebugValue.
