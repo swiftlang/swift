@@ -3,6 +3,7 @@
 
 // REQUIRES: objc_interop
 // UNSUPPORTED: OS=watchos
+// REQUIRES: rdar23527707
 
 import StdlibUnittest
 import GameplayKit
