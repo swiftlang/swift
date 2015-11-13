@@ -973,6 +973,7 @@ public:
   FunctionSignatureOpts() {}
 
   void run() override {
+    SILModule *M = getModule();
     auto *CGA = getAnalysis<CallGraphAnalysis>();
     auto *RCIA = getAnalysis<RCIdentityAnalysis>();
     llvm::BumpPtrAllocator Allocator;
@@ -995,12 +996,12 @@ public:
     // function..
     llvm::DenseMap<SILFunction *, ApplyList> CallerMap;
 
-    for (auto *F : CG.getBottomUpFunctionOrder()) {
+    for (auto &F : *M) {
       // Don't optimize callers that are marked as 'no.optimize'.
-      if (!F->shouldOptimize()) continue;
+      if (!F.shouldOptimize()) continue;
 
       // Scan the whole module and search Apply sites.
-      for (auto &BB : *F) {
+      for (auto &BB : F) {
         for (auto &II : BB) {
           if (auto Apply = FullApplySite::isa(&II)) {
             SILValue Callee = Apply.getCallee();
