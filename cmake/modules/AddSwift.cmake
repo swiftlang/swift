@@ -453,7 +453,7 @@ function(_compile_swift_files dependency_target_out_var_name)
         ${SWIFTFILE_OUTPUT} "${module_file}" "${module_doc_file}"
         ${apinote_files}
       DEPENDS
-        "${swift_compiler_tool}" ${swift_compiler_tool_dep}
+        ${swift_compiler_tool_dep}
         ${source_files} ${SWIFTFILE_DEPENDS}
         ${swift_ide_test_dependency} ${depends_create_apinotes}
       COMMENT "Compiling ${first_output}")
