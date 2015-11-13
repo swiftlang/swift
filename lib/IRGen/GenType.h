@@ -90,6 +90,8 @@ private:
   const LoadableTypeInfo *TypeMetadataPtrTI = nullptr;
   const LoadableTypeInfo *ObjCClassPtrTI = nullptr;
   const LoadableTypeInfo *EmptyTI = nullptr;
+
+  const TypeInfo *ResilientStructTI = nullptr;
   
   llvm::DenseMap<std::pair<unsigned, unsigned>, const LoadableTypeInfo *>
     OpaqueStorageTypes;
@@ -130,6 +132,7 @@ private:
   const LoadableTypeInfo *convertBuiltinNativeObject();
   const LoadableTypeInfo *convertBuiltinUnknownObject();
   const LoadableTypeInfo *convertBuiltinBridgeObject();
+  const TypeInfo *convertResilientStruct();
   const TypeInfo *convertUnmanagedStorageType(UnmanagedStorageType *T);
   const TypeInfo *convertUnownedStorageType(UnownedStorageType *T);
   const TypeInfo *convertWeakStorageType(WeakStorageType *T);
@@ -149,6 +152,7 @@ public:
   const LoadableTypeInfo &getObjCClassPtrTypeInfo();
   const LoadableTypeInfo &getWitnessTablePtrTypeInfo();
   const LoadableTypeInfo &getEmptyTypeInfo();
+  const TypeInfo &getResilientStructTypeInfo();
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *P);
   const LoadableTypeInfo &getOpaqueStorageTypeInfo(Size storageSize,
                                                    Alignment storageAlign);

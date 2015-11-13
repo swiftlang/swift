@@ -971,6 +971,14 @@ const LoadableTypeInfo &TypeConverter::getEmptyTypeInfo() {
   return *EmptyTI;
 }
 
+const TypeInfo &TypeConverter::getResilientStructTypeInfo() {
+  if (ResilientStructTI) return *ResilientStructTI;
+  ResilientStructTI = convertResilientStruct();
+  ResilientStructTI->NextConverted = FirstType;
+  FirstType = ResilientStructTI;
+  return *ResilientStructTI;
+}
+
 /// Get the fragile type information for the given type, which may not
 /// have yet undergone SIL type lowering.  The type can serve as its own
 /// abstraction pattern.

@@ -1835,6 +1835,8 @@ Type TypeDecl::getDeclaredInterfaceType() const {
 
 bool NominalTypeDecl::hasFixedLayout() const {
   // Private and internal types always have a fixed layout.
+  // TODO: internal types with availability information need to be
+  // resilient, since they can be used from @_transparent functions.
   if (getFormalAccess() != Accessibility::Public)
     return true;
 
@@ -1842,9 +1844,18 @@ bool NominalTypeDecl::hasFixedLayout() const {
   if (getAttrs().hasAttribute<FixedLayoutAttr>())
     return true;
 
-  // Types imported from C always have a fixed layout.
-  if (hasClangNode())
+  if (hasClangNode()) {
+    // Classes imported from Objective-C *never* have a fixed layout.
+    // IRGen needs to use dynamic ivar layout to ensure that subclasses
+    // of Objective-C classes are resilient against base class size
+    // changes.
+    if (isa<ClassDecl>(this))
+      return false;
+
+    // Structs and enums imported from C *always* have a fixed layout.
+    // We know their size, and pass them as values in SIL and IRGen.
     return true;
+  }
 
   // Otherwise, access via indirect "resilient" interfaces.
   return false;

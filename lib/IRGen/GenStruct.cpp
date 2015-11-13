@@ -35,6 +35,7 @@
 #include "Linking.h"
 #include "IndirectTypeInfo.h"
 #include "NonFixedTypeInfo.h"
+#include "ResilientTypeInfo.h"
 #include "StructMetadataLayout.h"
 
 #pragma clang diagnostic ignored "-Winconsistent-missing-override"
@@ -743,9 +744,31 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
   emitNestedTypeDecls(st->getMembers());
 }
 
+namespace {
+  /// A type implementation for resilient struct types. This is not a
+  /// StructTypeInfoBase at all, since we don't know anything about
+  /// the struct's fields.
+  class ResilientStructTypeInfo
+      : public ResilientTypeInfo<ResilientStructTypeInfo>
+  {
+  public:
+    ResilientStructTypeInfo(llvm::Type *T)
+      : ResilientTypeInfo(T) { }
+  };
+}
+
+const TypeInfo *TypeConverter::convertResilientStruct() {
+  llvm::Type *storageType = IGM.OpaquePtrTy->getElementType();
+  return new ResilientStructTypeInfo(storageType);
+}
 
 const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
                                                  StructDecl *D) {
+  // All resilient structs have the same opaque lowering, since they are
+  // indistinguishable as values.
+  if (IGM.isResilient(D, ResilienceScope::Local))
+    return &getResilientStructTypeInfo();
+
   // Create the struct type.
   auto ty = IGM.createNominalType(D);
 

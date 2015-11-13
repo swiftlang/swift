@@ -2589,13 +2589,21 @@ StringRef IRGenModule::mangleType(CanType type, SmallVectorImpl<char> &buffer) {
 }
 
 /// Is the given declaration resilient?
-bool IRGenModule::isResilient(Decl *theDecl, ResilienceScope scope) {
-  // Classes defined by Clang are resilient.
-  if (auto theClass = dyn_cast<ClassDecl>(theDecl)) {
-    return theClass->hasClangNode();
+bool IRGenModule::isResilient(Decl *D, ResilienceScope scope) {
+  auto NTD = dyn_cast<NominalTypeDecl>(D);
+  if (!NTD)
+    return false;
+
+  switch (scope) {
+  case ResilienceScope::Local:
+  case ResilienceScope::Component:
+    return !NTD->hasFixedLayout(SILMod->getSwiftModule());
+  case ResilienceScope::Program:
+  case ResilienceScope::Universal:
+    return !NTD->hasFixedLayout();
   }
 
-  return false;
+  llvm_unreachable("Bad resilience scope");
 }
 
 /// Fetch the witness table access function for a protocol conformance.
