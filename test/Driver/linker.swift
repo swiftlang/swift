@@ -173,6 +173,21 @@
 // RELATIVE_ARCLITE: /DISTINCTIVE-PATH/usr/lib/arc/libarclite_macosx.a
 // RELATIVE_ARCLITE: -o {{[^ ]+}}
 
+// RUN: %t/DISTINCTIVE-PATH/usr/bin/swiftc -target x86_64-apple-macosx10.9 %s -### | FileCheck -check-prefix=APPLE-LINKER %s
+// APPLE-LINKER: /usr/bin/ld
+// APPLE-LINKER-NOT: /path/to/my/linker
+
+// RUN: %t/DISTINCTIVE-PATH/usr/bin/swiftc -linker-path /path/to/my/linker -target x86_64-apple-macosx10.9 %s -### | FileCheck -check-prefix=APPLE-LINKER-OVERRIDE %s
+// APPLE-LINKER-OVERRIDE: /path/to/my/linker
+// APPLE-LINKER-OVERRIDE-NOT: /usr/bin/ld
+
+// RUN: %t/DISTINCTIVE-PATH/usr/bin/swiftc -target x86_64-unknown-linux-gnu %s -### | FileCheck -check-prefix=LINUX-LINKER %s
+// LINUX-LINKER: clang++
+// LINUX-LINKER-NOT: /path/to/my/linker
+
+// RUN: %t/DISTINCTIVE-PATH/usr/bin/swiftc -linker-path /path/to/my/linker -target x86_64-unknown-linux-gnu %s -### | FileCheck -check-prefix=LINUX-LINKER-OVERRIDE %s
+// LINUX-LINKER-OVERRIDE: /path/to/my/linker
+// LINUX-LINKER-OVERRIDE-NOT: clang++
 
 // Clean up the test executable because hard links are expensive.
 // RUN: rm -rf %t/DISTINCTIVE-PATH/usr/bin/swiftc
