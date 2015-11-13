@@ -54,6 +54,9 @@ STATISTIC(DeadAllocApplyEliminated,
 
 using UserList = llvm::SmallSetVector<SILInstruction *, 16>;
 
+// Analyzing the body of this classes destructor is valid because the object is
+// dead. This means that the object is never passed to objc_setAssociatedObject,
+// so its destructor cannot be extended at runtime.
 static SILFunction *getDestructor(AllocRefInst *ARI) {
   // We only support classes.
   ClassDecl *ClsDecl = ARI->getType().getClassOrBoundGenericClass();
