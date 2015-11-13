@@ -395,7 +395,7 @@ public struct _StringCore {
       }
       else if newSize > buffer.capacity {
         // Growth failed because of insufficient storage; double the size
-        return (max(_growArrayCapacity(buffer.capacity), newSize), nil)
+        return (Swift.max(_growArrayCapacity(buffer.capacity), newSize), nil)
       }
     }
     return (newSize, nil)
@@ -668,7 +668,10 @@ extension _StringCore : RangeReplaceableCollection {
         }
       }
     }
-    _copyInPlace(newSize: length, newCapacity: max(length, n), minElementWidth: 1)
+    _copyInPlace(
+      newSize: length,
+      newCapacity: Swift.max(length, n),
+      minElementWidth: 1)
   }
 
   public mutating func appendContentsOf<

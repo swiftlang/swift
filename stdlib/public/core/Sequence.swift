@@ -403,7 +403,7 @@ extension Sequence {
       let base = box._base
       let folded = _PrefixSequence(
         base._iterator,
-        maxLength: min(base._maxLength, maxLength),
+        maxLength: Swift.min(base._maxLength, maxLength),
         taken: base._taken)
       return AnySequence(folded)
     }
@@ -420,7 +420,7 @@ extension Sequence {
     // and return it. This saves memory for sequences particularly longer
     // than `maxLength`.
     var ringBuffer: [Iterator.Element] = []
-    ringBuffer.reserveCapacity(min(maxLength, underestimateLength()))
+    ringBuffer.reserveCapacity(Swift.min(maxLength, underestimateLength()))
 
     var i = ringBuffer.startIndex
 

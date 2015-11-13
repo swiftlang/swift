@@ -34,7 +34,7 @@ extension _StringCore {
     if _fastPath(elementWidth == 1) {
       // How many UTF-16 code units might we use before we've filled up
       // our _UTF8Chunk with UTF-8 code units?
-      let utf16Length = min(sizeof(_UTF8Chunk.self), length - i)
+      let utf16Length = Swift.min(sizeof(_UTF8Chunk.self), length - i)
 
       var result: _UTF8Chunk = ~0 // Start with all bits set
 

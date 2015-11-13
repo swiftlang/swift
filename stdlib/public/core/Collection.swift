@@ -334,7 +334,7 @@ extension Collection {
   public func dropLast(n: Int) -> SubSequence {
     _require(
       n >= 0, "Can't drop a negative number of elements from a collection")
-    let amount = max(0, numericCast(length) - n)
+    let amount = Swift.max(0, numericCast(length) - n)
     let end = startIndex.advancedBy(numericCast(amount), limit: endIndex)
     return self[startIndex..<end]
   }
@@ -369,7 +369,7 @@ extension Collection {
     _require(
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")
-    let amount = max(0, numericCast(length) - maxLength)
+    let amount = Swift.max(0, numericCast(length) - maxLength)
     let start = startIndex.advancedBy(numericCast(amount), limit: endIndex)
     return self[start..<endIndex]
   }

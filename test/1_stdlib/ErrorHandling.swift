@@ -179,9 +179,9 @@ ErrorHandlingTests.test("ErrorHandling/Array flatMap") {
   expectEqual(loopCount, 2)
 }
 
-ErrorHandlingTests.test("ErrorHandling/minElement") {
+ErrorHandlingTests.test("ErrorHandling/min") {
   do {
-    let _: Int? = try [1, 2, 3].minElement { _, _ in
+    let _: Int? = try [1, 2, 3].min { _, _ in
       throw SillyError.JazzHands
       return false
     }
@@ -189,7 +189,7 @@ ErrorHandlingTests.test("ErrorHandling/minElement") {
   } catch {}
 
   do {
-    let _: Int? = try [1, 2, 3].maxElement { _, _ in
+    let _: Int? = try [1, 2, 3].max { _, _ in
       throw SillyError.JazzHands
       return false
     }

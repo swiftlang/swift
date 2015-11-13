@@ -231,7 +231,7 @@ public struct MapTest {
   }
 }
 
-public struct MinMaxElementTest {
+public struct MinMaxTest {
   public let expectedMinValue: Int?
   public let expectedMinIndex: Int?
   public let expectedMaxValue: Int?
@@ -709,20 +709,20 @@ public let mapTests = [
   MapTest(Array(101..<200), Array(1..<100), { (x: Int) -> Int32 in x + 100 }),
 ]
 
-public let minMaxElementTests = [
-  MinMaxElementTest(
+public let minMaxTests = [
+  MinMaxTest(
     minValue: nil, index: nil,
     maxValue: nil, index: nil,
     []),
-  MinMaxElementTest(
+  MinMaxTest(
     minValue: 42, index: 0,
     maxValue: 42, index: 0,
     [ 42 ]),
-  MinMaxElementTest(
+  MinMaxTest(
     minValue: -1, index: 1,
     maxValue: 30, index: 2,
     [ 10, -1, 30, -1, 30 ]),
-  MinMaxElementTest(
+  MinMaxTest(
     minValue: -2, index: 5,
     maxValue: 31, index: 6,
     [ 10, -1, 30, -1, 30, -2, 31 ]),

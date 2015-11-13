@@ -41,7 +41,7 @@ extension Sequence {
 }
 
 //===----------------------------------------------------------------------===//
-// minElement(), maxElement()
+// min(), max()
 //===----------------------------------------------------------------------===//
 
 % # Generate two versions: with explicit predicates and with
@@ -68,7 +68,7 @@ extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
   ///
   /// ${orderingRequirement}
   @warn_unused_result
-  public func minElement(
+  public func min(
 %   if preds:
     @noescape isOrderedBefore: (${GElement}, ${GElement}) throws -> Bool
 %   end
@@ -93,7 +93,7 @@ extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
   /// - Complexity: O(`self.length`).
   ///   ${orderingRequirement}
   @warn_unused_result
-  public func maxElement(
+  public func max(
 %   if preds:
     @noescape isOrderedBefore: (${GElement}, ${GElement}) throws -> Bool
 %   end

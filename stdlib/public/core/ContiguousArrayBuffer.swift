@@ -192,7 +192,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// result's `.firstElementAddress` or set the result's `.length`
   /// to zero.
   public init(length: Int, minimumCapacity: Int) {
-    let realMinimumCapacity = max(length, minimumCapacity)
+    let realMinimumCapacity = Swift.max(length, minimumCapacity)
     if realMinimumCapacity == 0 {
       self = _ContiguousArrayBuffer<Element>()
     }

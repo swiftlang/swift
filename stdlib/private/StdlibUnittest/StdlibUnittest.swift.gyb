@@ -2620,7 +2620,8 @@ public struct MinimalSequence<T> : Sequence, CustomDebugStringConvertible {
   }
 
   public func underestimateLength() -> Int {
-    return max(0, self._sharedState.underestimatedLength - self._sharedState.i)
+    return Swift.max(
+      0, self._sharedState.underestimatedLength - self._sharedState.i)
   }
 
   public var debugDescription: String {
@@ -3570,7 +3571,7 @@ public struct ${Self}<T> : RangeReplaceableCollection {
   public mutating func reserveCapacity(n: Int) {
     _willMutate(.ReserveCapacity(capacity: n))
     elements.reserveCapacity(n)
-    reservedCapacity = max(reservedCapacity, n)
+    reservedCapacity = Swift.max(reservedCapacity, n)
   }
 
   public mutating func append(x: T) {
