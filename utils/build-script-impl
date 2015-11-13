@@ -84,6 +84,7 @@ KNOWN_SETTINGS=(
     install-destdir             ""               "the path to use as the filesystem root for the installation"
     install-symroot             ""               "the path to install debug symbols into"
     swift-install-components    ""               "a semicolon-separated list of Swift components to install"
+    llvm-install-components    ""                "a semicolon-separated list of LLVM components to install"
     installable-package         ""               "the path to the archive of the installation directory"
     test-installable-package    ""               "whether to run post-packaging tests on the produced package"
     symbols-package             ""               "the path to the archive of the symbols directory"
@@ -153,7 +154,6 @@ KNOWN_SETTINGS=(
     darwin-stdlib-install-name-dir ""            "the directory of the install_name for standard library dylibs"
     install-cmark               ""               "whether to install cmark"
     install-swift               ""               "whether to install Swift"
-    install-llvm                ""               "whether to install components from llvm, like libclang"
     install-lldb                ""               "whether to install LLDB"
     install-llbuild             ""               "whether to install llbuild"
     install-swiftpm             ""               "whether to install swiftpm"
@@ -1295,6 +1295,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
     llvm_cmake_options=(
         "${llvm_cmake_options[@]}"
         -DCMAKE_INSTALL_PREFIX:PATH="${INSTALL_PREFIX}"
+        -DINTERNAL_INSTALL_PREFIX="local"
     )
 
     if [[ "${CLANG_COMPILER_VERSION}" ]] ; then
@@ -1941,10 +1942,10 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 fi
                 ;;
             llvm)
-                if [[ -z "${INSTALL_LLVM}" ]] ; then
+                if [[ -z "${LLVM_INSTALL_COMPONENTS}" ]] ; then
                     continue
                 fi
-                INSTALL_TARGETS="install-libclang install-c-index-test"
+                INSTALL_TARGETS=install-$(echo ${LLVM_INSTALL_COMPONENTS} | sed -E 's/;/ install-/g')
                 ;;
             swift)
                 if [[ -z "${INSTALL_SWIFT}" ]] ; then
