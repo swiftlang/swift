@@ -621,6 +621,50 @@ enum SomeEnum {
   init() { self = .A }
 }
 
+Runtime.test("typeName") {
+  expectEqual("a.SomeClass", _typeName(SomeClass.self))
+  expectEqual("a.SomeObjCClass", _typeName(SomeObjCClass.self))
+  expectEqual("a.SomeNSObjectSubclass", _typeName(SomeNSObjectSubclass.self))
+  expectEqual("NSObject", _typeName(NSObject.self))
+  expectEqual("a.SomeStruct", _typeName(SomeStruct.self))
+  expectEqual("a.SomeEnum", _typeName(SomeEnum.self))
+  expectEqual("protocol<>.Protocol", _typeName(Any.Protocol.self))
+  expectEqual("Swift.AnyObject.Protocol", _typeName(AnyObject.Protocol.self))
+  expectEqual("Swift.AnyObject.Type.Protocol", _typeName(AnyClass.Protocol.self))
+  expectEqual("Swift.Optional<Swift.AnyObject>.Type", _typeName((AnyObject?).Type.self))
+
+  var a: Any = SomeClass()
+  expectEqual("a.SomeClass", _typeName(a.dynamicType))
+
+  a = SomeObjCClass()
+  expectEqual("a.SomeObjCClass", _typeName(a.dynamicType))
+
+  a = SomeNSObjectSubclass()
+  expectEqual("a.SomeNSObjectSubclass", _typeName(a.dynamicType))
+
+  a = NSObject()
+  expectEqual("NSObject", _typeName(a.dynamicType))
+
+  a = SomeStruct()
+  expectEqual("a.SomeStruct", _typeName(a.dynamicType))
+
+  a = SomeEnum()
+  expectEqual("a.SomeEnum", _typeName(a.dynamicType))
+
+  a = AnyObject.self
+  expectEqual("Swift.AnyObject.Protocol", _typeName(a.dynamicType))
+
+  a = AnyClass.self
+  expectEqual("Swift.AnyObject.Type.Protocol", _typeName(a.dynamicType))
+
+  a = (AnyObject?).self
+  expectEqual("Swift.Optional<Swift.AnyObject>.Type",
+    _typeName(a.dynamicType))
+
+  a = Any.self
+  expectEqual("protocol<>.Protocol", _typeName(a.dynamicType))
+}
+
 Runtime.test("demangleName") {
   expectEqual("", _stdlib_demangleName(""))
   expectEqual("abc", _stdlib_demangleName("abc"))
