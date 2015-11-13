@@ -128,7 +128,8 @@ internal func _adHocPrint<T, TargetStream : OutputStream>(
     target.write(")")
 
   case let enumMirror as _EnumMirror:
-    if let caseName = String.fromCString(enumMirror.caseName) {
+    if enumMirror.caseName != nil {
+      let caseName = String(cString: enumMirror.caseName)
       // Write the qualified type name in debugPrint.
       if isDebugPrint {
         target.write(_typeName(mirror.valueType))

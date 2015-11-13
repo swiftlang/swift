@@ -156,7 +156,7 @@ tests.test("clSetKernelArgsListAPPLE") {
     print("Error: Failed to build program executable!")
     clGetProgramBuildInfo(
       program, device_id, cl_program_build_info(CL_PROGRAM_BUILD_LOG), 2048, &buffer, &len)
-    print("\(String.fromCString(buffer)!)")
+    print("\(String(cString: buffer))")
     exit(1)
   }
 

@@ -364,7 +364,7 @@ struct _EnumMirror : _Mirror {
     @_silgen_name("swift_EnumMirror_subscript")get
   }
   var summary: String {
-    let maybeCaseName = String.fromCString(self.caseName)
+    let maybeCaseName = String(validatingUTF8: self.caseName)
     let typeName = _typeName(valueType)
     if let caseName = maybeCaseName {
       return typeName + "." + caseName

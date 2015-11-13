@@ -1340,7 +1340,7 @@ NSStringAPIs.test("smallestEncoding") {
 
 func getHomeDir() -> String {
 #if os(OSX)
-  return String.fromCString(getpwuid(getuid()).pointee.pw_dir)!
+  return String(cString: getpwuid(getuid()).pointee.pw_dir)
 #elseif os(iOS) || os(tvOS) || os(watchOS)
   // getpwuid() returns null in sandboxed apps under iOS simulator.
   return NSHomeDirectory()
@@ -2190,62 +2190,67 @@ func asCCharArray(a: [UInt8]) -> [CChar] {
   return a.map { CChar(bitPattern: $0) }
 }
 
-CStringTests.test("String.fromCString") {
-  do {
-    let s = getNullCString()
-    expectEmpty(String.fromCString(s))
-  }
+CStringTests.test("String.init(validatingUTF8:)") {
   do {
     let (s, dealloc) = getASCIICString()
-    expectOptionalEqual("ab", String.fromCString(s))
+    expectOptionalEqual("ab", String(validatingUTF8: s))
     dealloc()
   }
   do {
     let (s, dealloc) = getNonASCIICString()
-    expectOptionalEqual("аб", String.fromCString(s))
+    expectOptionalEqual("аб", String(validatingUTF8: s))
     dealloc()
   }
   do {
     let (s, dealloc) = getIllFormedUTF8String1()
-    expectEmpty(String.fromCString(s))
+    expectEmpty(String(validatingUTF8: s))
     dealloc()
   }
 }
 
-CStringTests.test("String.fromCStringRepairingIllFormedUTF8") {
-  do {
-    let s = getNullCString()
-    let result = String.fromCStringRepairingIllFormedUTF8(s)
-    expectEmpty(result)
-  }
+CStringTests.test("String(cString:)") {
   do {
     let (s, dealloc) = getASCIICString()
-    if let (result, hadError) = String.fromCStringRepairingIllFormedUTF8(s) {
-      expectOptionalEqual("ab", result)
-      expectFalse(hadError)
-    } else {
-      expectTrue(false, "Expected .Some()")
-    }
+    let result = String(cString: s)
+    expectEqual("ab", result)
     dealloc()
   }
   do {
     let (s, dealloc) = getNonASCIICString()
-    if let (result, hadError) = String.fromCStringRepairingIllFormedUTF8(s) {
-      expectOptionalEqual("аб", result)
-      expectFalse(hadError)
+    let result = String(cString: s)
+    expectEqual("аб", result)
+    dealloc()
+  }
+  do {
+    let (s, dealloc) = getIllFormedUTF8String1()
+    let result = String(cString: s)
+    expectEqual("\u{41}\u{fffd}\u{fffd}\u{fffd}\u{41}", result)
+    dealloc()
+  }
+}
+
+CStringTests.test("String.decodeCString") {
+  do {
+    let s = getNullCString()
+    let result = String.decodeCString(UnsafePointer(s), `as`: UTF8.self)
+    expectEmpty(result)
+  }
+  do { // repairing
+    let (s, dealloc) = getIllFormedUTF8String1()
+    if let (result, repairsMade) = String.decodeCString(
+      UnsafePointer(s), `as`: UTF8.self, repairingInvalidCodeUnits: true) {
+      expectOptionalEqual("\u{41}\u{fffd}\u{fffd}\u{fffd}\u{41}", result)
+      expectTrue(repairsMade)
     } else {
       expectTrue(false, "Expected .Some()")
     }
     dealloc()
   }
-  do {
+  do { // non repairing
     let (s, dealloc) = getIllFormedUTF8String1()
-    if let (result, hadError) = String.fromCStringRepairingIllFormedUTF8(s) {
-      expectOptionalEqual("\u{41}\u{fffd}\u{fffd}\u{fffd}\u{41}", result)
-      expectTrue(hadError)
-    } else {
-      expectTrue(false, "Expected .Some()")
-    }
+    let result = String.decodeCString(
+      UnsafePointer(s), `as`: UTF8.self, repairingInvalidCodeUnits: false)
+    expectEmpty(result)
     dealloc()
   }
 }

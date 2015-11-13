@@ -114,7 +114,7 @@ public func spawnChild(args: [String])
       &pid, Process.arguments[0], &fileActions, nil, $0, _getEnviron())
   }
   if spawnResult != 0 {
-    print(String.fromCString(strerror(spawnResult)))
+    print(String(cString: strerror(spawnResult)))
     requirementFailure("swift_posix_spawn() failed")
   }
 

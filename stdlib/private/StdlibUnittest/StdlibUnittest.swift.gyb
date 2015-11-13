@@ -971,8 +971,8 @@ func _stdlib_getSystemVersionPlistPropertyImpl(
   propertyName: UnsafePointer<CChar>) -> UnsafePointer<CChar>
 
 func _stdlib_getSystemVersionPlistProperty(propertyName: String) -> String? {
-  return String.fromCString(
-    _stdlib_getSystemVersionPlistPropertyImpl(propertyName))
+  let cs = _stdlib_getSystemVersionPlistPropertyImpl(propertyName)
+  return (cs != nil) ? String(cString: cs) : Optional.None
 }
 #endif
 
