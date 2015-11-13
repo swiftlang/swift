@@ -543,9 +543,9 @@ namespace {
       printCommon((ValueDecl *)NTD, Name, Color);
 
       if (NTD->hasFixedLayout())
-        OS << " @fixed_layout";
+        OS << " @_fixed_layout";
       else
-        OS << " @resilient_layout";
+        OS << " @_resilient_layout";
     }
 
     void visitSourceFile(const SourceFile &SF) {

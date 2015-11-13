@@ -1,5 +1,5 @@
 // Fixed-layout struct
-@fixed_layout public struct Point {
+@_fixed_layout public struct Point {
   public var x: Int // read-write stored property
   public let y: Int // read-only stored property
 
@@ -27,7 +27,7 @@ public struct Size {
 }
 
 // Fixed-layout struct with resilient-layout members
-@fixed_layout public struct Rectangle {
+@_fixed_layout public struct Rectangle {
   public let p: Point
   public let s: Size
 

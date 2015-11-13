@@ -42,7 +42,7 @@ namespace swift {
     ///
 
     /// \brief If true, all types are treated as resilient unless declared
-    /// @fixed_layout.
+    /// @_fixed_layout.
     bool EnableResilience = false;
 
     /// \brief Disable API availability checking.

@@ -6961,12 +6961,12 @@ static void validateFixedLayoutAttribute(TypeChecker &TC,
     return;
 
   // Since -enable-resilience should not change how we call into
-  // existing compiled modules, make all value types @fixed_layout
+  // existing compiled modules, make all value types @_fixed_layout
   // when the frontend is not run with the -enable-resilience flag.
   if (!TC.Context.LangOpts.EnableResilience &&
       D->getFormalAccess() == Accessibility::Public)
     Attrs.add(new (TC.Context) FixedLayoutAttr(/*IsImplicit*/ true));
-  // @objc enums are always @fixed_layout.
+  // @objc enums are always @_fixed_layout.
   else if (isa<EnumDecl>(D) && D->isObjC())
     Attrs.add(new (TC.Context) FixedLayoutAttr(/*IsImplicit*/ true));
 }

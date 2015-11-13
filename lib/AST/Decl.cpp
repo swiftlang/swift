@@ -1838,7 +1838,7 @@ bool NominalTypeDecl::hasFixedLayout() const {
   if (getFormalAccess() != Accessibility::Public)
     return true;
 
-  // Check for an explicit @fixed_layout attribute.
+  // Check for an explicit @_fixed_layout attribute.
   if (getAttrs().hasAttribute<FixedLayoutAttr>())
     return true;
 
