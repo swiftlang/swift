@@ -2242,7 +2242,7 @@ CStringTests.test("String.decodeCString") {
       expectOptionalEqual("\u{41}\u{fffd}\u{fffd}\u{fffd}\u{41}", result)
       expectTrue(repairsMade)
     } else {
-      expectTrue(false, "Expected .Some()")
+      expectUnreachable("Expected .Some()")
     }
     dealloc()
   }
