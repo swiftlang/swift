@@ -2,19 +2,19 @@ add_swift_library(swiftSILAnalysis
   ARCAnalysis.cpp
   AliasAnalysis.cpp
   Analysis.cpp
-  ColdBlockInfo.cpp
-  ValueTracking.cpp
-  LoopAnalysis.cpp
-  ClassHierarchyAnalysis.cpp
-  IVAnalysis.cpp
-  CallGraph.cpp
-  SimplifyInstruction.cpp
-  DestructorAnalysis.cpp
-  CFG.cpp
   ArraySemantic.cpp
-  SideEffectAnalysis.cpp
+  CFG.cpp
+  CallGraph.cpp
+  ClassHierarchyAnalysis.cpp
+  ColdBlockInfo.cpp
+  DestructorAnalysis.cpp
   EscapeAnalysis.cpp
+  IVAnalysis.cpp
+  LoopAnalysis.cpp
   LoopRegionAnalysis.cpp
   MemoryBehavior.cpp
   RCIdentityAnalysis.cpp
+  SideEffectAnalysis.cpp
+  SimplifyInstruction.cpp
+  ValueTracking.cpp
   LINK_LIBRARIES swiftSILPassesUtils)
