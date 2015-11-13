@@ -886,8 +886,7 @@ optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
                           RCIdentityFunctionInfo *RCIA,
                           SILFunction *F,
                           CallGraph &CG,
-                        const llvm::SmallPtrSetImpl<CallGraphEdge *> &CallSites,
-                          std::vector<SILFunction *> &DeadFunctions) {
+                        const llvm::SmallPtrSetImpl<CallGraphEdge *> &CallSites) {
   DEBUG(llvm::dbgs() << "Optimizing Function Signature of " << F->getName()
                      << "\n");
 
@@ -929,14 +928,9 @@ optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
   if (F->getModule().lookUpFunction(NewFName))
     return false;
 
-  // Check whether we know all the callers to the function. We must do
-  // this before moving the function body, because in that process we
-  // also remove any knowledge of the function from the call graph.
-  bool allCallersKnown = CG.allCallersKnown(F);
-
   // Otherwise, move F over to NewF.
-  SILFunction *NewF =
-    moveFunctionBodyToNewFunctionWithName(F, CG, NewFName, Analyzer);
+  SILFunction *NewF = moveFunctionBodyToNewFunctionWithName(F, CG, NewFName,
+                                                            Analyzer);
 
   // And remove all Callee releases that we found and made redundant via owned
   // to guaranteed conversion.
@@ -954,12 +948,6 @@ optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
   // Rewrite all apply insts calling F to call NewF. Update each call site as
   // appropriate given the form of function signature optimization performed.
   rewriteApplyInstToCallNewFunction(Analyzer, NewF, CG, CallSites);
-
-  // If we know all call sites to this function we can remove it since
-  // we've rewritten all of them to call the new function.
-  if (allCallersKnown) {
-    DeadFunctions.push_back(F);
-  }
 
   return true;
 }
@@ -1021,7 +1009,6 @@ public:
   FunctionSignatureOpts() {}
 
   void run() override {
-    SILModule *M = getModule();
     auto *CGA = getAnalysis<CallGraphAnalysis>();
     auto *RCIA = getAnalysis<RCIdentityAnalysis>();
     llvm::BumpPtrAllocator Allocator;
@@ -1039,9 +1026,6 @@ public:
     // line more calls may be exposed and the inliner might be able to handle
     // those calls.
     bool Changed = false;
-
-    std::vector<SILFunction *> DeadFunctions;
-    DeadFunctions.reserve(128);
 
     for (auto *F : CG.getBottomUpFunctionOrder()) {
       // Don't optimize functions that are marked with the opt.never
@@ -1068,15 +1052,7 @@ public:
 
       // Otherwise, try to optimize the function signature of F.
       Changed |= optimizeFunctionSignature(Allocator, RCIA->get(F), F, CG,
-                                           CallSites,
-                                           DeadFunctions);
-    }
-
-    while (!DeadFunctions.empty()) {
-      SILFunction *F = DeadFunctions.back();
-      if (F->canBeDeleted())
-        M->eraseFunction(F);
-      DeadFunctions.pop_back();
+                                           CallSites);
     }
 
     // If we changed anything, invalidate the call graph.
