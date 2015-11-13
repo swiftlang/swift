@@ -315,9 +315,17 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   PM.setStageName("LowLevel");
 
+  // Should be after FunctionSignatureOpts and before the last inliner.
+  PM.addReleaseDevirtualizer();
+
   PM.addLateInliner();
   AddSimplifyCFGSILCombine(PM);
   PM.addAllocBoxToStack();
+
+  // The ReleaseDevirtualizer + specialization (in the inliner) can produce
+  // aggregates in specialized deinit functions, which can be lowered.
+  PM.addLowerAggregateInstrs();
+
   PM.addSROA();
   PM.addMem2Reg();
   PM.addCSE();

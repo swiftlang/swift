@@ -45,13 +45,13 @@
 // CHECK: [[F8:%[0-9]+]] = function_ref @unknown8 :
 // CHECK: apply [[F8]]
 // CHECK: apply [[F8]]
-// CHECK: strong_release [[B4]]
-// CHECK: strong_release [[B3]]
-// CHECK: strong_release [[B2]]
-// CHECK: strong_release [[B1]]
-// CHECK: strong_release [[A5]]
-// CHECK: strong_release [[A4]]
-// CHECK: strong_release [[A3]]
+// CHECK: dealloc_ref [stack] [[B4]]
+// CHECK: dealloc_ref [stack] [[B3]]
+// CHECK: dealloc_ref [stack] [[B2]]
+// CHECK: dealloc_ref [stack] [[B1]]
+// CHECK: dealloc_ref [stack] [[A5]]
+// CHECK: dealloc_ref [stack] [[A4]]
+// CHECK: dealloc_ref [stack] [[A3]]
 // CHECK: return
 
 @asmname("unknown0")

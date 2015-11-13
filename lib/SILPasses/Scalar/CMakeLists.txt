@@ -12,6 +12,7 @@ set(SCALAR_SOURCES
     Scalar/DeadCodeElimination.cpp
     Scalar/SILCleanup.cpp
     Scalar/SpeculativeDevirtualizer.cpp
+	Scalar/ReleaseDevirtualizer.cpp
     Scalar/DeadObjectElimination.cpp
     Scalar/SILCodeMotion.cpp
     Scalar/StackPromotion.cpp

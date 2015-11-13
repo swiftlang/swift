@@ -145,6 +145,8 @@ PASS(PerformanceConstantPropagation, "performance-constant-propagation",
      "Propagate constants and do not emit diagnostics")
 PASS(PredictableMemoryOptimizations, "predictable-memopt",
      "Predictable early memory optimizations")
+PASS(ReleaseDevirtualizer, "release-devirtualizer",
+     "Devirtualize release-instructions")
 PASS(RemovePins, "remove-pins",
      "Remove pin/unpin pairs")
 PASS(SILCleanup, "cleanup",

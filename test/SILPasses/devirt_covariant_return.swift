@@ -3,12 +3,14 @@
 // Make sure that we can dig all the way through the class hierarchy and
 // protocol conformances with covariant return types correctly. The verifier
 // should trip if we do not handle things correctly.
+//
+// As a side-test it also checks if all allocs can be promoted to the stack.
 
 // CHECK-LABEL: sil hidden @_TF23devirt_covariant_return6driverFT_T_ : $@convention(thin) () -> () {
 // CHECK: bb0
-// CHECK: alloc_ref
-// CHECK: alloc_ref
-// CHECK: alloc_ref
+// CHECK: alloc_ref [stack]
+// CHECK: alloc_ref [stack]
+// CHECK: alloc_ref [stack]
 // CHECK: function_ref @unknown1a : $@convention(thin) () -> ()
 // CHECK: apply
 // CHECK: function_ref @defrenestrate : $@convention(thin) () -> ()
@@ -19,9 +21,9 @@
 // CHECK: function_ref @unknown3a : $@convention(thin) () -> ()
 // CHECK: apply
 // CHECK: apply
-// CHECK: strong_release
-// CHECK: strong_release
-// CHECK: strong_release
+// CHECK: dealloc_ref [stack]
+// CHECK: dealloc_ref [stack]
+// CHECK: dealloc_ref [stack]
 // CHECK: tuple
 // CHECK: return
 
