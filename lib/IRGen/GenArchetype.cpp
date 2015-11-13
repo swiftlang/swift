@@ -39,13 +39,12 @@
 #include "GenProto.h"
 #include "GenType.h"
 #include "HeapTypeInfo.h"
-#include "IndirectTypeInfo.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Linking.h"
-#include "NonFixedTypeInfo.h"
 #include "ProtocolInfo.h"
+#include "ResilientTypeInfo.h"
 #include "TypeInfo.h"
 #include "UnownedTypeInfo.h"
 #include "WeakTypeInfo.h"
@@ -91,18 +90,17 @@ public:
 };
 
 /// A type implementation for an ArchetypeType, otherwise known as a
-/// type variable: for example, This in a protocol declaration, or T
+/// type variable: for example, Self in a protocol declaration, or T
 /// in a generic declaration like foo<T>(x : T) -> T.  The critical
 /// thing here is that performing an operation involving archetypes
 /// is dependent on the witness binding we can see.
 class OpaqueArchetypeTypeInfo
-  : public IndirectTypeInfo<OpaqueArchetypeTypeInfo,
-                            WitnessSizedTypeInfo<OpaqueArchetypeTypeInfo>>,
+  : public ResilientTypeInfo<OpaqueArchetypeTypeInfo>,
     public ArchetypeTypeInfoBase
 {
   OpaqueArchetypeTypeInfo(llvm::Type *type,
                           ArrayRef<ProtocolEntry> protocols)
-    : IndirectTypeInfo(type, Alignment(1), IsNotPOD, IsNotBitwiseTakable),
+    : ResilientTypeInfo(type),
       ArchetypeTypeInfoBase(this + 1, protocols)
   {}
 
@@ -112,125 +110,6 @@ public:
     void *buffer = operator new(sizeof(OpaqueArchetypeTypeInfo)
                                 + protocols.size() * sizeof(ProtocolEntry));
     return ::new (buffer) OpaqueArchetypeTypeInfo(type, protocols);
-  }
-
-  void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                      SILType T) const override {
-    emitAssignWithCopyCall(IGF, T,
-                           dest.getAddress(), src.getAddress());
-  }
-
-  void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
-                      SILType T) const override {
-    emitAssignWithTakeCall(IGF, T,
-                           dest.getAddress(), src.getAddress());
-  }
-
-  Address initializeBufferWithCopy(IRGenFunction &IGF,
-                                   Address dest, Address src,
-                                   SILType T) const override {
-    auto addr = emitInitializeBufferWithCopyCall(IGF, T,
-                                         dest.getAddress(), src.getAddress());
-    return getAddressForPointer(addr);
-  }
-
-  Address initializeBufferWithTake(IRGenFunction &IGF,
-                                   Address dest, Address src,
-                                   SILType T) const override {
-    auto addr = emitInitializeBufferWithTakeCall(IGF, T,
-                                         dest.getAddress(), src.getAddress());
-    return getAddressForPointer(addr);
-  }
-
-  void initializeWithCopy(IRGenFunction &IGF,
-                        Address dest, Address src, SILType T) const override {
-    emitInitializeWithCopyCall(IGF, T,
-                               dest.getAddress(), src.getAddress());
-  }
-
-  void initializeArrayWithCopy(IRGenFunction &IGF,
-                               Address dest, Address src, llvm::Value *count,
-                               SILType T) const override {
-    emitInitializeArrayWithCopyCall(IGF, T,
-                               dest.getAddress(), src.getAddress(), count);
-  }
-
-  void initializeWithTake(IRGenFunction &IGF,
-                        Address dest, Address src, SILType T) const override {
-    emitInitializeWithTakeCall(IGF, T,
-                               dest.getAddress(), src.getAddress());
-  }
-
-  void initializeArrayWithTakeFrontToBack(IRGenFunction &IGF,
-                                          Address dest, Address src,
-                                          llvm::Value *count,
-                                          SILType T) const override {
-    emitInitializeArrayWithTakeFrontToBackCall(IGF, T,
-                                  dest.getAddress(), src.getAddress(), count);
-  }
-
-  void initializeArrayWithTakeBackToFront(IRGenFunction &IGF,
-                                          Address dest, Address src,
-                                          llvm::Value *count,
-                                          SILType T) const override {
-    emitInitializeArrayWithTakeBackToFrontCall(IGF, T,
-                                  dest.getAddress(), src.getAddress(), count);
-  }
-
-  void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
-    emitDestroyCall(IGF, T, addr.getAddress());
-  }
-
-  void destroyArray(IRGenFunction &IGF, Address addr, llvm::Value *count,
-                    SILType T) const override {
-    emitDestroyArrayCall(IGF, T, addr.getAddress(), count);
-  }
-
-  std::pair<llvm::Value*,llvm::Value*>
-  getSizeAndAlignment(IRGenFunction &IGF, SILType T) const {
-    auto size = emitLoadOfSize(IGF, T);
-    auto align = emitLoadOfAlignmentMask(IGF, T);
-    return std::make_pair(size, align);
-  }
-
-  llvm::Value *getSize(IRGenFunction &IGF, SILType T) const override {
-    return emitLoadOfSize(IGF, T);
-  }
-
-  llvm::Value *getAlignment(IRGenFunction &IGF, SILType T) const {
-    return emitLoadOfAlignmentMask(IGF, T);
-  }
-
-  llvm::Value *getStride(IRGenFunction &IGF, SILType T) const override {
-    return emitLoadOfStride(IGF, T);
-  }
-
-  llvm::Constant *getStaticSize(IRGenModule &IGM) const override { return nullptr; }
-  llvm::Constant *getStaticAlignment(IRGenModule &IGM) const { return nullptr; }
-  llvm::Constant *getStaticStride(IRGenModule &IGM) const override { return nullptr; }
-
-  void initializeMetadata(IRGenFunction &IGF,
-                          llvm::Value *metadata,
-                          llvm::Value *vwtable,
-                          SILType T) const override {
-    // Archetypes always refer to an existing type. A witness table should
-    // never be independently initialized for one.
-    llvm_unreachable("initializing value witness table for archetype?!");
-  }
-
-  bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
-    return true;
-  }
-  llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                       Address src,
-                                       SILType T) const override {
-    return emitGetExtraInhabitantIndexCall(IGF, T, src.getAddress());
-  }
-  void storeExtraInhabitant(IRGenFunction &IGF,
-                            llvm::Value *index,
-                            Address dest,
-                            SILType T) const override {
-    emitStoreExtraInhabitantCall(IGF, T, index, dest.getAddress());
   }
 };
 
