@@ -73,9 +73,6 @@ func _withUninitializedString<R>(
 @asmname("swift_stdlib_getDemangledMetatypeName")
 public func _stdlib_getDemangledMetatypeNameImpl(type: Any.Type, qualified: Bool, _ result: UnsafeMutablePointer<String>)
 
-@asmname("swift_stdlib_getDemangledUnqualifiedMetatypeName")
-public func _stdlib_getDemangledUnqualifiedMetatypeNameImpl(type: Any.Type, _ result: UnsafeMutablePointer<String>)
-
 /// Returns the demangled qualified name of a metatype.
 @warn_unused_result
 public // @testable
