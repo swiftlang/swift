@@ -888,10 +888,14 @@ function(_add_swift_library_single target name)
 
     set_target_properties("${target}"
       PROPERTIES
-      INSTALL_NAME_DIR "${install_name_dir}"
-      BUILD_WITH_INSTALL_RPATH YES)
+      INSTALL_NAME_DIR "${install_name_dir}")
+  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+    set_target_properties("${target}"
+      PROPERTIES
+      INSTALL_RPATH "$ORIGIN:/usr/lib/swift/linux")
   endif()
 
+  set_target_properties("${target}" PROPERTIES BUILD_WITH_INSTALL_RPATH YES)
   set_target_properties("${target}" PROPERTIES FOLDER "Swift libraries")
 
   # Configure the static library target.
