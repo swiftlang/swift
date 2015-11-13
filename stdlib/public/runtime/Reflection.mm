@@ -1271,65 +1271,6 @@ swift_stdlib_getDemangledMetatypeName(const Metadata *type,
   swift_stringFromUTF8InRawMemory(outString, name.data(), name.length());
 }
 
-static void swift_stdlib_getDemangledTypeNameImpl(OpaqueValue *value,
-                                         const Metadata *T,
-                                         const Metadata *dynamicType,
-                                         String *result) {
-  switch (dynamicType->getKind()) {
-  // Drill through existentials to properly get the dynamic type of their
-  // contained value.
-  case MetadataKind::Existential: {
-    auto existentialMetadata =
-      static_cast<const ExistentialTypeMetadata *>(dynamicType);
-    return swift_stdlib_getDemangledTypeNameImpl(
-                  value, T, existentialMetadata->getDynamicType(value), result);
-  }
-
-  // TODO: Do we need something similar for ExistentialMetatype?
-  
-  case MetadataKind::Class: {
-    // If the class is an artificial subclass, jump up to the "real" base
-    // class.
-    for (;;) {
-      auto dynamicClass = static_cast<const ClassMetadata *>(dynamicType);
-      if (dynamicClass->isTypeMetadata()
-          && dynamicClass->isArtificialSubclass())
-        dynamicType = dynamicClass->SuperClass;
-      else
-        break;
-    }
-    SWIFT_FALLTHROUGH;
-  }
-  case MetadataKind::Tuple:
-  case MetadataKind::Struct:
-  case MetadataKind::Enum:
-  case MetadataKind::Opaque:
-  case MetadataKind::Function:
-  case MetadataKind::ExistentialMetatype:
-  case MetadataKind::Metatype:
-  case MetadataKind::ObjCClassWrapper:
-  case MetadataKind::ForeignClass:
-    return swift_stdlib_getDemangledMetatypeName(dynamicType,
-                                                 /*qualified*/ true,
-                                                 result);
-
-  // Values should never use these metadata kinds.
-  case MetadataKind::HeapLocalVariable:
-  case MetadataKind::HeapGenericLocalVariable:
-  case MetadataKind::ErrorObject:
-    assert(false);
-    new (result) String("");
-    return;
-  }
-}
-
-extern "C" void swift_stdlib_getDemangledTypeName(OpaqueValue *value,
-                                                  String *result,
-                                                  const Metadata *T) {
-  swift_stdlib_getDemangledTypeNameImpl(value, T, T, result);
-  T->vw_destroy(value);
-}
-
 extern "C" void swift_stdlib_demangleName(const char *mangledName,
                                           size_t mangledNameLength,
                                           String *demangledName) {

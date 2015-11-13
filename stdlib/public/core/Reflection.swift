@@ -349,7 +349,7 @@ struct _StructMirror : _MirrorType {
   }
 
   var summary: String {
-    return _stdlib_getDemangledTypeName(value)
+    return _typeName(valueType)
   }
   var quickLookObject: PlaygroundQuickLook? { return nil }
   var disposition: _MirrorDisposition { return .Struct }
@@ -372,7 +372,7 @@ struct _EnumMirror : _MirrorType {
   }
   var summary: String {
     let maybeCaseName = String.fromCString(self.caseName)
-    let typeName = _stdlib_getDemangledTypeName(value)
+    let typeName = _typeName(valueType)
     if let caseName = maybeCaseName {
       return typeName + "." + caseName
     }
@@ -413,7 +413,7 @@ struct _ClassMirror : _MirrorType {
     return _getClassChild(i, data)
   }
   var summary: String {
-    return _stdlib_getDemangledTypeName(value)
+    return _typeName(valueType)
   }
   var quickLookObject: PlaygroundQuickLook? {
 #if _runtime(_ObjC)
@@ -442,7 +442,7 @@ struct _ClassSuperMirror : _MirrorType {
     return _getClassChild(i, data)
   }
   var summary: String {
-    return _stdlib_getDemangledTypeName(value)
+    return _typeName(data.metadata)
   }
   var quickLookObject: PlaygroundQuickLook? { return nil }
   var disposition: _MirrorDisposition { return .Class }
