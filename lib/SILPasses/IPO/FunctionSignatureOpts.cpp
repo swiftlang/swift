@@ -47,6 +47,8 @@ STATISTIC(NumSROAArguments, "Total SROA argumments optimized");
 //                                  Utility
 //===----------------------------------------------------------------------===//
 
+typedef SmallVector<FullApplySite, 8> ApplyList;
+
 /// Returns true if I is a release instruction.
 static bool isRelease(SILInstruction *I) {
   switch (I->getKind()) {
@@ -667,40 +669,12 @@ llvm::SmallString<64> FunctionAnalyzer::getOptimizedName() {
 //                                Main Routine
 //===----------------------------------------------------------------------===//
 
-static bool isSupportedCallee(SILValue Callee) {
-  switch (Callee->getKind()) {
-  case ValueKind::FunctionRefInst:
-  case ValueKind::ThinToThickFunctionInst:
-    return true;
-  default:
-    return false;
-  }
-}
-
 /// This function takes in OldF and all callsites of OldF and rewrites the
 /// callsites to call the new function.
 static void
-rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
-                                  CallGraph &CG,
-                      const llvm::SmallPtrSetImpl<CallGraphEdge *> &CallEdges) {
-  // The second loop can modify the call graph edges. Therefore we store the
-  // edges in a temporary vector in the first loop.
-  llvm::SmallVector<FullApplySite, 8> CallSites;
-  for (const CallGraphEdge *Edge : CallEdges) {
-    const FullApplySite FAS = FullApplySite::isa(Edge->getInstruction());
-
-    if (!FAS)
-      continue;
-
-    if (!CG.hasSingleCallee(FAS.getInstruction()))
-      continue;
-
-    // Don't optimize functions that are marked with the opt.never attribute.
-    if (FAS.getFunction()->shouldOptimize() &&
-        isSupportedCallee(FAS.getCallee())) {
-      CallSites.push_back(FAS);
-    }
-  }
+rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer,
+                                  SILFunction *NewF,
+                                  const ApplyList &CallSites) {
   for (auto FAS : CallSites) {
     auto *AI = FAS.getInstruction();
 
@@ -746,7 +720,6 @@ rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
       // Also insert release_value in the normal block (done below).
       Builder.setInsertionPoint(TAI->getNormalBB(), TAI->getNormalBB()->begin());
     }
-    CallGraphEditor(&CG).replaceApplyWithNew(FAS, FullApplySite(NewAI));
 
     // If we have any arguments that were consumed but are now guaranteed,
     // insert a release_value.
@@ -829,7 +802,7 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
 }
 
 static SILFunction *
-moveFunctionBodyToNewFunctionWithName(SILFunction *F, CallGraph &CG,
+moveFunctionBodyToNewFunctionWithName(SILFunction *F,
                                       llvm::SmallString<64> &NewFName,
                                       FunctionAnalyzer &Analyzer) {
   // First we create an empty function (i.e. no BB) whose function signature has
@@ -844,7 +817,6 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F, CallGraph &CG,
   // first BB will not match.
   NewF->spliceBody(F);
   // Do the same with the call graph.
-  CallGraphEditor(&CG).moveNodeToNewFunction(F, NewF);
 
   // Then perform any updates to the arguments of NewF.
   SILBasicBlock *NewFEntryBB = &*NewF->begin();
@@ -885,8 +857,7 @@ static bool
 optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
                           RCIdentityFunctionInfo *RCIA,
                           SILFunction *F,
-                          CallGraph &CG,
-                        const llvm::SmallPtrSetImpl<CallGraphEdge *> &CallSites) {
+                          const ApplyList &CallSites) {
   DEBUG(llvm::dbgs() << "Optimizing Function Signature of " << F->getName()
                      << "\n");
 
@@ -909,13 +880,6 @@ optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
 
   ++NumFunctionSignaturesOptimized;
 
-  DEBUG(for (auto *Edge : CallSites) {
-      auto *AI = Edge->getInstruction();
-      llvm::dbgs() << "        CALLSITE: " << *AI;
-      llvm::dbgs() << "            CALLER: "
-                   << AI->getFunction()->getName() << "\n";
-  });
-
   llvm::SmallString<64> NewFName = Analyzer.getOptimizedName();
 
   // If we already have a specialized version of this function, do not
@@ -929,7 +893,7 @@ optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
     return false;
 
   // Otherwise, move F over to NewF.
-  SILFunction *NewF = moveFunctionBodyToNewFunctionWithName(F, CG, NewFName,
+  SILFunction *NewF = moveFunctionBodyToNewFunctionWithName(F, NewFName,
                                                             Analyzer);
 
   // And remove all Callee releases that we found and made redundant via owned
@@ -947,7 +911,7 @@ optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
 
   // Rewrite all apply insts calling F to call NewF. Update each call site as
   // appropriate given the form of function signature optimization performed.
-  rewriteApplyInstToCallNewFunction(Analyzer, NewF, CG, CallSites);
+  rewriteApplyInstToCallNewFunction(Analyzer, NewF, CallSites);
 
   return true;
 }
@@ -1027,20 +991,48 @@ public:
     // those calls.
     bool Changed = false;
 
+    // The CallerMap maps functions to the list of call sites that call that
+    // function..
+    llvm::DenseMap<SILFunction *, ApplyList> CallerMap;
+
     for (auto *F : CG.getBottomUpFunctionOrder()) {
-      // Don't optimize functions that are marked with the opt.never
-      // attribute.
+      // Don't optimize callers that are marked as 'no.optimize'.
+      if (!F->shouldOptimize()) continue;
+
+      // Scan the whole module and search Apply sites.
+      for (auto &BB : *F) {
+        for (auto &II : BB) {
+          if (auto Apply = FullApplySite::isa(&II)) {
+            SILValue Callee = Apply.getCallee();
+
+            //  Strip ThinToThickFunctionInst.
+            if (auto TTTF = dyn_cast<ThinToThickFunctionInst>(Callee)) {
+              Callee = TTTF->getOperand();
+            }
+
+            // Find the target function.
+            auto *FRI = dyn_cast<FunctionRefInst>(Callee);
+            if (!FRI) continue;
+
+            SILFunction *F = FRI->getReferencedFunction();
+            CallerMap[F].push_back(Apply);
+          }
+        }
+      }
+    }
+
+    for (auto *F : CG.getBottomUpFunctionOrder()) {
+      // Don't optimize callees that should not be optimized.
       if (!F->shouldOptimize())
         continue;
 
       // Check the signature of F to make sure that it is a function that we
-      // can
-      // specialize. These are conditions independent of the call graph.
+      // can specialize. These are conditions independent of the call graph.
       if (!canSpecializeFunction(F))
         continue;
 
       // Now that we have our call graph, grab the CallSites of F.
-      auto &CallSites = CG.getCallerEdges(F);
+      ApplyList &CallSites = CallerMap[F];
 
       // If this function is not called anywhere, for now don't do anything.
       //
@@ -1051,7 +1043,7 @@ public:
         continue;
 
       // Otherwise, try to optimize the function signature of F.
-      Changed |= optimizeFunctionSignature(Allocator, RCIA->get(F), F, CG,
+      Changed |= optimizeFunctionSignature(Allocator, RCIA->get(F), F,
                                            CallSites);
     }
 
