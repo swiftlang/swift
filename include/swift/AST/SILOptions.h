@@ -89,9 +89,6 @@ public:
   /// Should we print out instruction counts if -print-stats is passed in?
   bool PrintInstCounts = false;
 
-  /// Should we optimize function signatures?
-  bool EnableFuncSigOpts = true;
-
   /// Instrument code to generate profiling information.
   bool GenerateProfile = false;
 
