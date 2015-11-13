@@ -525,7 +525,7 @@ func r22020088bar(p: r22020088P?) {
 
 // <rdar://problem/22288575> QoI: poor diagnostic involving closure, bad parameter label, and mismatch return type
 func f(arguments: [String]) -> [ArraySlice<String>] {
-  return arguments.split(1, allowEmptySlices: true, isSeparator: { $0 == "--" })
+  return arguments.split(1, omitEmptySubsequences: false, isSeparator: { $0 == "--" })
 }
 
 

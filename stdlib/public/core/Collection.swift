@@ -401,38 +401,39 @@ extension Collection {
   /// Returns the maximal `SubSequence`s of `self`, in order, that
   /// don't contain elements satisfying the predicate `isSeparator`.
   ///
-  /// - Parameter maxSplit: The maximum number of `SubSequence`s to
+  /// - Parameter maxSplits: The maximum number of `SubSequence`s to
   ///   return, minus 1.
-  ///   If `maxSplit + 1` `SubSequence`s are returned, the last one is
-  ///   a suffix of `self` containing the remaining elements.
+  ///   If `maxSplits + 1` `SubSequence`s are returned, the last one is
+  ///   a suffix of `self` containing *all* the elements of `self` following the
+  ///   last split point.
   ///   The default value is `Int.max`.
   ///
-  /// - Parameter allowEmptySubsequences: If `true`, an empty `SubSequence`
+  /// - Parameter omitEmptySubsequences: If `false`, an empty `SubSequence`
   ///   is produced in the result for each pair of consecutive elements
   ///   satisfying `isSeparator`.
-  ///   The default value is `false`.
+  ///   The default value is `true`.
   ///
   /// - Requires: `maxSplit >= 0`
   @warn_unused_result
   public func split(
-    maxSplit: Int = Int.max,
-    allowEmptySlices: Bool = false,
+    maxSplits: Int = Int.max,
+    omitEmptySubsequences: Bool = true,
     @noescape isSeparator: (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
-    _require(maxSplit >= 0, "Must take zero or more splits")
+    _require(maxSplits >= 0, "Must take zero or more splits")
 
     var result: [SubSequence] = []
     var subSequenceStart: Index = startIndex
 
     func appendSubsequence(end end: Index) -> Bool {
-      if subSequenceStart == end && !allowEmptySlices {
+      if subSequenceStart == end && omitEmptySubsequences {
         return false
       }
       result.append(self[subSequenceStart..<end])
       return true
     }
 
-    if maxSplit == 0 || isEmpty {
+    if maxSplits == 0 || isEmpty {
       appendSubsequence(end: endIndex)
       return result
     }
@@ -444,7 +445,7 @@ extension Collection {
         let didAppend = appendSubsequence(end: subSequenceEnd)
         subSequenceEnd._successorInPlace()
         subSequenceStart = subSequenceEnd
-        if didAppend && result.length == maxSplit {
+        if didAppend && result.length == maxSplits {
           break
         }
         continue
@@ -452,7 +453,7 @@ extension Collection {
       subSequenceEnd._successorInPlace()
     }
 
-    if subSequenceStart != cachedEndIndex || allowEmptySlices {
+    if subSequenceStart != cachedEndIndex || !omitEmptySubsequences {
       result.append(self[subSequenceStart..<cachedEndIndex])
     }
 
@@ -464,25 +465,26 @@ extension Collection where Iterator.Element : Equatable {
   /// Returns the maximal `SubSequence`s of `self`, in order, around a
   /// `separator` element.
   ///
-  /// - Parameter maxSplit: The maximum number of `SubSequence`s to
+  /// - Parameter maxSplits: The maximum number of `SubSequence`s to
   ///   return, minus 1.
   ///   If `maxSplit + 1` `SubSequence`s are returned, the last one is
-  ///   a suffix of `self` containing the remaining elements.
+  ///   a suffix of `self` containing *all* the elements of `self` following the
+  ///   last split point.
   ///   The default value is `Int.max`.
   ///
-  /// - Parameter allowEmptySubsequences: If `true`, an empty `SubSequence`
+  /// - Parameter omitEmptySubsequences: If `false`, an empty `SubSequence`
   ///   is produced in the result for each pair of consecutive elements
-  ///   satisfying `isSeparator`.
-  ///   The default value is `false`.
+  ///   equal to `separator`.
+  ///   The default value is `true`.
   ///
   /// - Requires: `maxSplit >= 0`
   @warn_unused_result
   public func split(
     separator: Iterator.Element,
-    maxSplit: Int = Int.max,
-    allowEmptySlices: Bool = false
+    maxSplits: Int = Int.max,
+    omitEmptySubsequences: Bool = true
   ) -> [SubSequence] {
-  return split(maxSplit, allowEmptySlices: allowEmptySlices,
+  return split(maxSplits, omitEmptySubsequences: omitEmptySubsequences,
       isSeparator: { $0 == separator })
   }
 }

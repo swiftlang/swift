@@ -164,20 +164,21 @@ public protocol Sequence {
   /// Returns the maximal `SubSequence`s of `self`, in order, that
   /// don't contain elements satisfying the predicate `isSeparator`.
   ///
-  /// - Parameter maxSplit: The maximum number of `SubSequence`s to
+  /// - Parameter maxSplits: The maximum number of `SubSequence`s to
   ///   return, minus 1.
-  ///   If `maxSplit + 1` `SubSequence`s are returned, the last one is
-  ///   a suffix of `self` containing the remaining elements.
+  ///   If `maxSplits + 1` `SubSequence`s are returned, the last one is
+  ///   a suffix of `self` containing *all* the elements of `self` following the
+  ///   last split point.
   ///   The default value is `Int.max`.
   ///
-  /// - Parameter allowEmptySubsequences: If `true`, an empty `SubSequence`
+  /// - Parameter omitEmptySubsequences: If `false`, an empty `SubSequence`
   ///   is produced in the result for each pair of consecutive elements
   ///   satisfying `isSeparator`.
-  ///   The default value is `false`.
+  ///   The default value is `true`.
   ///
   /// - Requires: `maxSplit >= 0`
   @warn_unused_result
-  func split(maxSplit: Int, allowEmptySlices: Bool,
+  func split(maxSplits: Int, omitEmptySubsequences: Bool,
     @noescape isSeparator: (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence]
 
@@ -443,30 +444,31 @@ extension Sequence {
   /// Returns the maximal `SubSequence`s of `self`, in order, that
   /// don't contain elements satisfying the predicate `isSeparator`.
   ///
-  /// - Parameter maxSplit: The maximum number of `SubSequence`s to
+  /// - Parameter maxSplits: The maximum number of `SubSequence`s to
   ///   return, minus 1.
-  ///   If `maxSplit + 1` `SubSequence`s are returned, the last one is
-  ///   a suffix of `self` containing the remaining elements.
+  ///   If `maxSplits + 1` `SubSequence`s are returned, the last one is
+  ///   a suffix of `self` containing *all* the elements of `self` following the
+  ///   last split point.
   ///   The default value is `Int.max`.
   ///
-  /// - Parameter allowEmptySubsequences: If `true`, an empty `SubSequence`
+  /// - Parameter omitEmptySubsequences: If `false`, an empty `SubSequence`
   ///   is produced in the result for each pair of consecutive elements
   ///   satisfying `isSeparator`.
-  ///   The default value is `false`.
+  ///   The default value is `true`.
   ///
   /// - Requires: `maxSplit >= 0`
   @warn_unused_result
   public func split(
-    maxSplit: Int = Int.max,
-    allowEmptySlices: Bool = false,
+    maxSplits: Int = Int.max,
+    omitEmptySubsequences: Bool = true,
     @noescape isSeparator: (Iterator.Element) throws -> Bool
   ) rethrows -> [AnySequence<Iterator.Element>] {
-    _require(maxSplit >= 0, "Must take zero or more splits")
+    _require(maxSplits >= 0, "Must take zero or more splits")
     var result: [AnySequence<Iterator.Element>] = []
     var subSequence: [Iterator.Element] = []
 
     func appendSubsequence() -> Bool {
-      if subSequence.isEmpty && !allowEmptySlices {
+      if subSequence.isEmpty && omitEmptySubsequences {
         return false
       }
       result.append(AnySequence(subSequence))
@@ -474,7 +476,7 @@ extension Sequence {
       return true
     }
 
-    if maxSplit == 0 {
+    if maxSplits == 0 {
       // We aren't really splitting the sequence.  Convert `self` into an
       // `Array` using a fast entry point.
       subSequence = Array(self)
@@ -493,7 +495,7 @@ extension Sequence {
         if !appendSubsequence() {
           continue
         }
-        if result.length == maxSplit {
+        if result.length == maxSplits {
           break
         }
       } else {
@@ -561,28 +563,29 @@ extension Sequence {
 }
 
 extension Sequence where Iterator.Element : Equatable {
-  /// Returns the maximal `SubSequence`s of `self`, in order, around elements
-  /// equatable to `separator`.
+  /// Returns the maximal `SubSequence`s of `self`, in order, around a
+  /// `separator` element.
   ///
-  /// - Parameter maxSplit: The maximum number of `SubSequence`s to
+  /// - Parameter maxSplits: The maximum number of `SubSequence`s to
   ///   return, minus 1.
   ///   If `maxSplit + 1` `SubSequence`s are returned, the last one is
-  ///   a suffix of `self` containing the remaining elements.
+  ///   a suffix of `self` containing *all* the elements of `self` following the
+  ///   last split point.
   ///   The default value is `Int.max`.
   ///
-  /// - Parameter allowEmptySubsequences: If `true`, an empty `SubSequence`
+  /// - Parameter omitEmptySubsequences: If `false`, an empty `SubSequence`
   ///   is produced in the result for each pair of consecutive elements
-  ///   satisfying `isSeparator`.
-  ///   The default value is `false`.
+  ///   equal to `separator`.
+  ///   The default value is `true`.
   ///
   /// - Requires: `maxSplit >= 0`
   @warn_unused_result
   public func split(
     separator: Iterator.Element,
-    maxSplit: Int = Int.max,
-    allowEmptySlices: Bool = false
+    maxSplits: Int = Int.max,
+    omitEmptySubsequences: Bool = true
   ) -> [AnySequence<Iterator.Element>] {
-    return split(maxSplit, allowEmptySlices: allowEmptySlices,
+    return split(maxSplits, omitEmptySubsequences: omitEmptySubsequences,
       isSeparator: { $0 == separator })
   }
 }

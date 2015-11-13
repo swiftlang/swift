@@ -625,8 +625,8 @@ self.test("\(testNamePrefix).suffix/semantics") {
 self.test("\(testNamePrefix).split/semantics") {
   for test in splitTests {
     let s = makeWrappedCollection(test.sequence.map(OpaqueValue.init))
-    let result = s.split(test.maxSplit,
-        allowEmptySlices: test.allowEmptySlices) {
+    let result = s.split(test.maxSplits,
+        omitEmptySubsequences: test.omitEmptySubsequences) {
       extractValue($0).value == test.separator
     }
     expectEqualSequence(test.expected, result.map {

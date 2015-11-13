@@ -501,13 +501,14 @@ public struct Logging${Kind}<Base: ${Kind}> : ${Kind}, LoggingType {
   }
 
   public func split(
-    maxSplit: Int = Int.max,
-    allowEmptySlices: Bool = false,
+    maxSplits: Int = Int.max,
+    omitEmptySubsequences: Bool = true,
     @noescape isSeparator: (Base.Iterator.Element) throws -> Bool
   ) rethrows -> [Base.SubSequence] {
     ++Log.split[selfType]
-    return try base.split(maxSplit, allowEmptySlices: allowEmptySlices,
-        isSeparator: isSeparator)
+    return try base.split(maxSplits,
+      omitEmptySubsequences: omitEmptySubsequences,
+      isSeparator: isSeparator)
   }
 
 %   if Kind == 'Collection' or Kind == 'MutableCollection':

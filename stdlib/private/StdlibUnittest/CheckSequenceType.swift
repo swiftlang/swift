@@ -317,18 +317,18 @@ public struct SuffixTest {
 
 public struct SplitTest {
   public var sequence: [Int]
-  public let maxSplit: Int
+  public let maxSplits: Int
   public let separator: Int
-  public let allowEmptySlices: Bool
+  public let omitEmptySubsequences: Bool
   public let expected: [[Int]]
   public let loc: SourceLoc
 
-  public init(sequence: [Int], maxSplit: Int, separator: Int, expected: [[Int]],
-       allowEmptySlices: Bool, file: String = __FILE__, line: UInt = __LINE__) {
+  public init(sequence: [Int], maxSplits: Int, separator: Int, expected: [[Int]],
+       omitEmptySubsequences: Bool, file: String = __FILE__, line: UInt = __LINE__) {
     self.sequence = sequence
-    self.maxSplit = maxSplit
+    self.maxSplits = maxSplits
     self.separator = separator
-    self.allowEmptySlices = allowEmptySlices
+    self.omitEmptySubsequences = omitEmptySubsequences
     self.expected = expected
     self.loc = SourceLoc(file, line, comment: "suffix() test data")
   }
@@ -752,376 +752,376 @@ public let splitTests: [SplitTest] = [
   // Empty sequence.
   //
 
-  // Empty sequence, maxSplit == 0.
+  // Empty sequence, maxSplits == 0.
   SplitTest(
     sequence: [],
-    maxSplit: 0,
+    maxSplits: 0,
     separator: 99,
     expected: [[]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [],
-    maxSplit: 0,
+    maxSplits: 0,
     separator: 99,
     expected: [],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
 
-  // Empty sequence, maxSplit == 1.
+  // Empty sequence, maxSplits == 1.
   SplitTest(
     sequence: [],
-    maxSplit: 1,
+    maxSplits: 1,
     separator: 99,
     expected: [[]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [],
-    maxSplit: 1,
+    maxSplits: 1,
     separator: 99,
     expected: [],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
 
-  // Empty sequence, maxSplit == Int.max.
+  // Empty sequence, maxSplits == Int.max.
   SplitTest(
     sequence: [],
-    maxSplit: Int.max,
+    maxSplits: Int.max,
     separator: 99,
     expected: [[]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [],
-    maxSplit: Int.max,
+    maxSplits: Int.max,
     separator: 99,
     expected: [],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
 
   //
   // 1-element sequence.
   //
 
-  // 1-element sequence, maxSplit == 0.
+  // 1-element sequence, maxSplits == 0.
   SplitTest(
     sequence: [1],
-    maxSplit: 0,
+    maxSplits: 0,
     separator: 1,
     expected: [[1]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1],
-    maxSplit: 0,
+    maxSplits: 0,
     separator: 99,
     expected: [[1]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1],
-    maxSplit: 0,
+    maxSplits: 0,
     separator: 1,
     expected: [[1]],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
   SplitTest(
     sequence: [1],
-    maxSplit: 0,
+    maxSplits: 0,
     separator: 99,
     expected: [[1]],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
 
-  // 1-element sequence, maxSplit == 1.
+  // 1-element sequence, maxSplits == 1.
   SplitTest(
     sequence: [1],
-    maxSplit: 1,
+    maxSplits: 1,
     separator: 1,
     expected: [[], []],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1],
-    maxSplit: 1,
+    maxSplits: 1,
     separator: 99,
     expected: [[1]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1],
-    maxSplit: 1,
+    maxSplits: 1,
     separator: 1,
     expected: [],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
   SplitTest(
     sequence: [1],
-    maxSplit: 1,
+    maxSplits: 1,
     separator: 99,
     expected: [[1]],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
 
-  // 1-element sequence, maxSplit == Int.max.
+  // 1-element sequence, maxSplits == Int.max.
   SplitTest(
     sequence: [1],
-    maxSplit: Int.max,
+    maxSplits: Int.max,
     separator: 1,
     expected: [[], []],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1],
-    maxSplit: Int.max,
+    maxSplits: Int.max,
     separator: 99,
     expected: [[1]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1],
-    maxSplit: Int.max,
+    maxSplits: Int.max,
     separator: 1,
     expected: [],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
   SplitTest(
     sequence: [1],
-    maxSplit: Int.max,
+    maxSplits: Int.max,
     separator: 99,
     expected: [[1]],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
 
   //
   // 2-element sequence [1, 2].
   //
 
-  // 2-element sequence [1, 2], maxSplit == 0.
+  // 2-element sequence [1, 2], maxSplits == 0.
   SplitTest(
     sequence: [1, 2],
-    maxSplit: 0,
+    maxSplits: 0,
     separator: 1,
     expected: [[1, 2]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1, 2],
-    maxSplit: 0,
+    maxSplits: 0,
     separator: 2,
     expected: [[1, 2]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1, 2],
-    maxSplit: 0,
+    maxSplits: 0,
     separator: 99,
     expected: [[1, 2]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1, 2],
-    maxSplit: 0,
+    maxSplits: 0,
     separator: 1,
     expected: [[1, 2]],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
   SplitTest(
     sequence: [1, 2],
-    maxSplit: 0,
+    maxSplits: 0,
     separator: 2,
     expected: [[1, 2]],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
   SplitTest(
     sequence: [1, 2],
-    maxSplit: 0,
+    maxSplits: 0,
     separator: 99,
     expected: [[1, 2]],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
 
-  // 2-element sequence [1, 2], maxSplit == 1.
+  // 2-element sequence [1, 2], maxSplits == 1.
   SplitTest(
     sequence: [1, 2],
-    maxSplit: 1,
+    maxSplits: 1,
     separator: 1,
     expected: [[], [2]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1, 2],
-    maxSplit: 1,
+    maxSplits: 1,
     separator: 2,
     expected: [[1], []],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1, 2],
-    maxSplit: 1,
+    maxSplits: 1,
     separator: 99,
     expected: [[1, 2]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1, 2],
-    maxSplit: 1,
+    maxSplits: 1,
     separator: 1,
     expected: [[2]],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
   SplitTest(
     sequence: [1, 2],
-    maxSplit: 1,
+    maxSplits: 1,
     separator: 2,
     expected: [[1]],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
   SplitTest(
     sequence: [1, 2],
-    maxSplit: 1,
+    maxSplits: 1,
     separator: 99,
     expected: [[1, 2]],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
 
-  // 2-element sequence [1, 2], maxSplit == Int.max.
+  // 2-element sequence [1, 2], maxSplits == Int.max.
   SplitTest(
     sequence: [1, 2],
-    maxSplit: Int.max,
+    maxSplits: Int.max,
     separator: 1,
     expected: [[], [2]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1, 2],
-    maxSplit: Int.max,
+    maxSplits: Int.max,
     separator: 2,
     expected: [[1], []],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1, 2],
-    maxSplit: Int.max,
+    maxSplits: Int.max,
     separator: 99,
     expected: [[1, 2]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1, 2],
-    maxSplit: Int.max,
+    maxSplits: Int.max,
     separator: 1,
     expected: [[2]],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
   SplitTest(
     sequence: [1, 2],
-    maxSplit: Int.max,
+    maxSplits: Int.max,
     separator: 2,
     expected: [[1]],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
   SplitTest(
     sequence: [1, 2],
-    maxSplit: Int.max,
+    maxSplits: Int.max,
     separator: 99,
     expected: [[1, 2]],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
 
   //
   // 2-element sequence [1, 1].
   //
 
-  // 2-element sequence [1, 1], maxSplit == 0.
+  // 2-element sequence [1, 1], maxSplits == 0.
   SplitTest(
     sequence: [1, 1],
-    maxSplit: 0,
+    maxSplits: 0,
     separator: 1,
     expected: [[1, 1]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1, 1],
-    maxSplit: 0,
+    maxSplits: 0,
     separator: 99,
     expected: [[1, 1]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1, 1],
-    maxSplit: 0,
+    maxSplits: 0,
     separator: 1,
     expected: [[1, 1]],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
   SplitTest(
     sequence: [1, 1],
-    maxSplit: 0,
+    maxSplits: 0,
     separator: 99,
     expected: [[1, 1]],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
 
-  // 2-element sequence [1, 1], maxSplit == 1.
+  // 2-element sequence [1, 1], maxSplits == 1.
   SplitTest(
     sequence: [1, 1],
-    maxSplit: 1,
+    maxSplits: 1,
     separator: 1,
     expected: [[], [1]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1, 1],
-    maxSplit: 1,
+    maxSplits: 1,
     separator: 99,
     expected: [[1, 1]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1, 1],
-    maxSplit: 1,
+    maxSplits: 1,
     separator: 1,
     expected: [],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
   SplitTest(
     sequence: [1, 1],
-    maxSplit: 1,
+    maxSplits: 1,
     separator: 99,
     expected: [[1, 1]],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
 
-  // 2-element sequence [1, 1], maxSplit == 2.
+  // 2-element sequence [1, 1], maxSplits == 2.
   SplitTest(
     sequence: [1, 1],
-    maxSplit: 2,
+    maxSplits: 2,
     separator: 1,
     expected: [[], [], []],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1, 1],
-    maxSplit: 2,
+    maxSplits: 2,
     separator: 99,
     expected: [[1, 1]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1, 1],
-    maxSplit: 2,
+    maxSplits: 2,
     separator: 1,
     expected: [],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
   SplitTest(
     sequence: [1, 1],
-    maxSplit: 2,
+    maxSplits: 2,
     separator: 99,
     expected: [[1, 1]],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
 
   //
@@ -1130,59 +1130,59 @@ public let splitTests: [SplitTest] = [
 
   SplitTest(
     sequence: [1, 1, 1],
-    maxSplit: 1,
+    maxSplits: 1,
     separator: 1,
     expected: [[], [1, 1]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1, 1, 1],
-    maxSplit: 2,
+    maxSplits: 2,
     separator: 1,
     expected: [[], [], [1]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1, 1, 1],
-    maxSplit: 3,
+    maxSplits: 3,
     separator: 1,
     expected: [[], [], [], []],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1, 1, 1],
-    maxSplit: Int.max,
+    maxSplits: Int.max,
     separator: 1,
     expected: [[], [], [], []],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1, 1, 1],
-    maxSplit: 1,
+    maxSplits: 1,
     separator: 1,
     expected: [],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
   SplitTest(
     sequence: [1, 1, 1],
-    maxSplit: 2,
+    maxSplits: 2,
     separator: 1,
     expected: [],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
   SplitTest(
     sequence: [1, 1, 1],
-    maxSplit: 3,
+    maxSplits: 3,
     separator: 1,
     expected: [],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
   SplitTest(
     sequence: [1, 1, 1],
-    maxSplit: Int.max,
+    maxSplits: Int.max,
     separator: 1,
     expected: [],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
 
   //
@@ -1191,88 +1191,88 @@ public let splitTests: [SplitTest] = [
 
   SplitTest(
     sequence: [1, 2, 2, 2, 1],
-    maxSplit: 1,
+    maxSplits: 1,
     separator: 2,
     expected: [[1], [2, 2, 1]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1, 2, 2, 2, 1],
-    maxSplit: Int.max,
+    maxSplits: Int.max,
     separator: 2,
     expected: [[1], [], [], [1]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1, 2, 2, 2, 1],
-    maxSplit: Int.max,
+    maxSplits: Int.max,
     separator: 2,
     expected: [[1], [1]],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
   SplitTest(
     sequence: [1, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 1],
-    maxSplit: Int.max,
+    maxSplits: Int.max,
     separator: 2,
     expected: [[1], [], [], [1], [], [], [1], [], [], [1]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 1],
-    maxSplit: Int.max,
+    maxSplits: Int.max,
     separator: 2,
     expected: [[1], [1], [1], [1]],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
   SplitTest(
     sequence: [2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2],
-    maxSplit: Int.max,
+    maxSplits: Int.max,
     separator: 2,
     expected:
       [[], [], [], [1], [], [], [1], [], [], [1], [], [], [1], [], [], []],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2],
-    maxSplit: Int.max,
+    maxSplits: Int.max,
     separator: 2,
     expected: [[1], [1], [1], [1]],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
   SplitTest(
     sequence: [1, 2, 3, 4, 5, 6, 7],
-    maxSplit: 4,
+    maxSplits: 4,
     separator: 4,
     expected: [[1, 2, 3], [5, 6, 7]],
-    allowEmptySlices: false
+    omitEmptySubsequences: true
   ),
   SplitTest(
     sequence: [1, 2, 3, 3, 4, 5, 6, 7],
-    maxSplit: 3,
+    maxSplits: 3,
     separator: 3,
     expected: [[1, 2], [], [4, 5, 6, 7]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1, 2, 2, 2, 2, 2, 2, 2, 2],
-    maxSplit: 3,
+    maxSplits: 3,
     separator: 2,
     expected: [[1], [], [], [2, 2, 2, 2, 2]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1, 2, 2, 2],
-    maxSplit: Int.max,
+    maxSplits: Int.max,
     separator: 2,
     expected: [[1], [], [], []],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
   SplitTest(
     sequence: [1, 2, 2, 2],
-    maxSplit: Int.max,
+    maxSplits: Int.max,
     separator: 3,
     expected: [[1, 2, 2, 2]],
-    allowEmptySlices: true
+    omitEmptySubsequences: false
   ),
 ]
 
@@ -1671,8 +1671,8 @@ self.test("\(testNamePrefix).split/closure/semantics") {
     let closureLifetimeTracker = LifetimeTracked(0)
     expectEqual(1, LifetimeTracked.instances)
     let s: S = makeWrappedSequence(test.sequence.map(OpaqueValue.init))
-    let result = s.split(test.maxSplit,
-      allowEmptySlices: test.allowEmptySlices) {
+    let result = s.split(test.maxSplits,
+      omitEmptySubsequences: test.omitEmptySubsequences) {
       _blackHole(closureLifetimeTracker)
       return extractValue($0).value == test.separator
     }
@@ -1693,8 +1693,8 @@ self.test("\(testNamePrefix).split/separator/semantics") {
     let separator = wrapValueIntoEquatable(MinimalEquatableValue(test.separator))
     let result = s.split(
       separator,
-      maxSplit: test.maxSplit,
-      allowEmptySlices: test.allowEmptySlices)
+      maxSplits: test.maxSplits,
+      omitEmptySubsequences: test.omitEmptySubsequences)
     expectEqualSequence(
       test.expected,
       result.map {
@@ -1712,14 +1712,14 @@ self.test("\(testNamePrefix).split/semantics/closure/negativeMaxSplit") {
   expectCrashLater()
   _ = s.split(
     -1,
-    allowEmptySlices: true) { extractValueFromEquatable($0) == separator }
+    omitEmptySubsequences: false) { extractValueFromEquatable($0) == separator }
 }
 
 self.test("\(testNamePrefix).split/semantics/separator/negativeMaxSplit") {
   let s = makeWrappedSequenceWithEquatableElement([MinimalEquatableValue(1)])
   let separator = wrapValueIntoEquatable(MinimalEquatableValue(1))
   expectCrashLater()
-  _ = s.split(separator, maxSplit: -1, allowEmptySlices: true)
+  _ = s.split(separator, maxSplits: -1, omitEmptySubsequences: false)
 }
 
 //===----------------------------------------------------------------------===//
