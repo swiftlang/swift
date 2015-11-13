@@ -247,10 +247,9 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 
-
   PM.setStageName("EarlyLoopOpt");
   AddHighLevelLoopOptPasses(PM);
-  
+
   PM.addDeadFunctionElimination();
   PM.addDeadObjectElimination();
   PM.addGlobalPropertyOpt();
@@ -372,8 +371,6 @@ void swift::runSILPassesForOnone(SILModule &Module) {
 
   SILPassManager PM(&Module, "Onone");
 
-  // Enable the pre-specialized mode by default
-  Module.getOptions().UsePrespecialized = true;
   // First specialize user-code.
   PM.addUsePrespecialized();
   PM.run();

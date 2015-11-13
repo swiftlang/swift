@@ -186,8 +186,7 @@ static SILFunction *lookupExistingSpecialization(SILModule &M,
   // TODO: Cache optimized specializations and perform lookup here?
   // TODO: Only check that this function exists, but don't read
   // its body. It can save some compile-time.
-  if (M.getOptions().UsePrespecialized &&
-      isWhitelistedSpecialization(FunctionName) &&
+  if (isWhitelistedSpecialization(FunctionName) &&
       M.linkFunction(FunctionName, SILOptions::LinkingMode::LinkNormal))
     return M.lookUpFunction(FunctionName);
 

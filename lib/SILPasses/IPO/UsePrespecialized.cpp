@@ -42,13 +42,9 @@ static void collectApplyInst(SILFunction &F,
 /// of the corresponding pre-specialized function, if such a pre-specialization
 /// exists.
 class UsePrespecialized: public SILModuleTransform {
-  virtual ~UsePrespecialized() {
-  }
+  virtual ~UsePrespecialized() { }
 
   void run() override {
-    if (!getOptions().UsePrespecialized)
-      return;
-
     auto &M = *getModule();
     for (auto &F : M) {
       if (replaceByPrespecialized(F))
@@ -116,8 +112,7 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     // If we already have this specialization, reuse it.
     auto PrevF = M.lookUpFunction(ClonedName);
     if (PrevF) {
-      if (PrevF->getLinkage() != SILLinkage::SharedExternal
-          || !M.getOptions().UsePrespecialized)
+      if (PrevF->getLinkage() != SILLinkage::SharedExternal)
         NewF = PrevF;
     } else {
       PrevF = getExistingSpecialization(M, ClonedName);
