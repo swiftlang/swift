@@ -1271,15 +1271,3 @@ swift_stdlib_getDemangledMetatypeName(const Metadata *type,
   swift_stringFromUTF8InRawMemory(outString, name.data(), name.length());
 }
 
-extern "C" void swift_stdlib_demangleName(const char *mangledName,
-                                          size_t mangledNameLength,
-                                          String *demangledName) {
-  auto options = Demangle::DemangleOptions();
-  options.DisplayDebuggerGeneratedModule = false;
-  auto result =
-      Demangle::demangleSymbolAsString(mangledName,
-                                       mangledNameLength,
-                                       options);
-  new (demangledName) String(result.data(), result.size());
-}
-
