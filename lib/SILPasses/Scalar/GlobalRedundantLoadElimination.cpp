@@ -124,7 +124,6 @@ static bool isRLEInertInstruction(SILInstruction *Inst) {
   }
 }
 
-
 //===----------------------------------------------------------------------===//
 //                            RLEContext Interface
 //===----------------------------------------------------------------------===//
@@ -478,8 +477,7 @@ void BBState::processRead(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
     return;
   }
 
-  // At this point, we have all the MemLocations and their values
-  // available.
+  // At this point, we have all the MemLocations and their values available.
   //
   // If we are not doing forwarding just yet, simply return.
   if (!PF)
@@ -626,8 +624,9 @@ RLEContext::RLEContext(SILFunction *F, AliasAnalysis *AA,
   MemLocation::enumerateMemLocations(*F, MemLocationVault, LocToBitIndex,
                                      TypeExpansionCache);
 
-  for (SILBasicBlock *BB : ReversePostOrder) {
-    getBBLocState(BB).init(BB, MemLocationVault.size());
+  // Initialize the BBState for every basic block.
+  for (SILBasicBlock &BB : *F) {
+    getBBLocState(&BB).init(&BB, MemLocationVault.size());
   }
 }
 
