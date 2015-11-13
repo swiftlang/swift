@@ -2133,7 +2133,7 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
         tar xzf "${INSTALLABLE_PACKAGE}"
         popd
         (cd "${PKG_TESTS_SOURCE_DIR}" &&
-                python "${LIT_EXECUTABLE_PATH}" . --param package-path="${PKG_TESTS_SANDBOX}" --param filecheck="${FILECHECK_EXECUTABLE_PATH}")
+                python "${LIT_EXECUTABLE_PATH}" . -sv --param package-path="${PKG_TESTS_SANDBOX}" --param filecheck="${FILECHECK_EXECUTABLE_PATH}")
     fi
 fi
 
