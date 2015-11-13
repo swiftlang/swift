@@ -162,7 +162,8 @@ public:
                           Address dest, Address src,
                           SILType T) const override {
     // If we're POD, use the generic routine.
-    if (this->isPOD(ResilienceScope::Local) && isa<LoadableTypeInfo>(this)) {
+    if (this->isPOD(ResilienceScope::Component) &&
+        isa<LoadableTypeInfo>(this)) {
       return cast<LoadableTypeInfo>(this)->
                LoadableTypeInfo::initializeWithCopy(IGF, dest, src, T);
     }
@@ -182,7 +183,7 @@ public:
                           Address dest, Address src,
                           SILType T) const override {
     // If we're bitwise-takable, use memcpy.
-    if (this->isBitwiseTakable(ResilienceScope::Local)) {
+    if (this->isBitwiseTakable(ResilienceScope::Component)) {
       IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(),
                  asImpl().Impl::getSize(IGF, T),
                  std::min(dest.getAlignment(), src.getAlignment()).getValue());

@@ -131,10 +131,10 @@ irgen::emitTypeLayoutVerifier(IRGenFunction &IGF,
                              == FixedPacking::OffsetZero),
            "is-inline bit");
     verify(emitLoadOfIsPOD(IGF, layoutType),
-           getBoolConstant(fixedTI->isPOD(ResilienceScope::Local)),
+           getBoolConstant(fixedTI->isPOD(ResilienceScope::Component)),
            "is-POD bit");
     verify(emitLoadOfIsBitwiseTakable(IGF, layoutType),
-           getBoolConstant(fixedTI->isBitwiseTakable(ResilienceScope::Local)),
+           getBoolConstant(fixedTI->isBitwiseTakable(ResilienceScope::Component)),
            "is-bitwise-takable bit");
     unsigned xiCount = fixedTI->getFixedExtraInhabitantCount(IGF.IGM);
     verify(emitLoadOfHasExtraInhabitants(IGF, layoutType),

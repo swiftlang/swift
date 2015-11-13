@@ -107,18 +107,9 @@ enum class ExtraData : unsigned char {
 /// structure is resilient, is there any reason not to answer as if
 /// the subject structure were universally fragile?
 enum class ResilienceScope {
-  /// Local scope means the decision doesn't have to be consistent
-  /// with anything.
-  Local,
-
   /// Component scope means the decision has to be consistent within
-  /// the current component.  In the current theory, this is equivalent
-  /// to Local because the entire component is recompiled as one.
+  /// the current component only.
   Component,
-
-  /// Program scope means the decision has to be consistent across all
-  /// components.
-  Program,
 
   /// Universal scope means that the decision has to be consistent
   /// across all possible clients who could see this declaration.

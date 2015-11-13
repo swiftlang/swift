@@ -138,7 +138,7 @@ Address TypeInfo::indexArray(IRGenFunction &IGF, Address base,
 
 void TypeInfo::destroyArray(IRGenFunction &IGF, Address array,
                             llvm::Value *count, SILType T) const {
-  if (isPOD(ResilienceScope::Local))
+  if (isPOD(ResilienceScope::Component))
     return;
   
   auto entry = IGF.Builder.GetInsertBlock();
@@ -281,7 +281,7 @@ void irgen::emitInitializeArrayBackToFront(IRGenFunction &IGF,
 void TypeInfo::initializeArrayWithCopy(IRGenFunction &IGF,
                                        Address dest, Address src,
                                        llvm::Value *count, SILType T) const {
-  if (isPOD(ResilienceScope::Local)) {
+  if (isPOD(ResilienceScope::Component)) {
     llvm::Value *stride = getStride(IGF, T);
     llvm::Value *byteCount = IGF.Builder.CreateNUWMul(stride, count);
     IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(),
@@ -296,7 +296,7 @@ void TypeInfo::initializeArrayWithTakeFrontToBack(IRGenFunction &IGF,
                                                   Address dest, Address src,
                                                   llvm::Value *count, SILType T)
 const {
-  if (isBitwiseTakable(ResilienceScope::Local)) {
+  if (isBitwiseTakable(ResilienceScope::Component)) {
     llvm::Value *stride = getStride(IGF, T);
     llvm::Value *byteCount = IGF.Builder.CreateNUWMul(stride, count);
     IGF.Builder.CreateMemMove(dest.getAddress(), src.getAddress(),
@@ -311,7 +311,7 @@ void TypeInfo::initializeArrayWithTakeBackToFront(IRGenFunction &IGF,
                                                   Address dest, Address src,
                                                   llvm::Value *count, SILType T)
 const {
-  if (isBitwiseTakable(ResilienceScope::Local)) {
+  if (isBitwiseTakable(ResilienceScope::Component)) {
     llvm::Value *stride = getStride(IGF, T);
     llvm::Value *byteCount = IGF.Builder.CreateNUWMul(stride, count);
     IGF.Builder.CreateMemMove(dest.getAddress(), src.getAddress(),
@@ -352,7 +352,7 @@ void FixedTypeInfo::initializeWithTake(IRGenFunction &IGF,
                                        Address destAddr,
                                        Address srcAddr,
                                        SILType T) const {
-  assert(isBitwiseTakable(ResilienceScope::Local)
+  assert(isBitwiseTakable(ResilienceScope::Component)
         && "non-bitwise-takable type must override default initializeWithTake");
   
   // Prefer loads and stores if we won't make a million of them.
@@ -377,7 +377,7 @@ void LoadableTypeInfo::initializeWithCopy(IRGenFunction &IGF,
                                           Address srcAddr,
                                           SILType T) const {
   // Use memcpy if that's legal.
-  if (isPOD(ResilienceScope::Local)) {
+  if (isPOD(ResilienceScope::Component)) {
     return initializeWithTake(IGF, destAddr, srcAddr, T);
   }
 
@@ -434,7 +434,7 @@ llvm::Value *FixedTypeInfo::getStride(IRGenFunction &IGF, SILType T) const {
 }
 llvm::Value *FixedTypeInfo::getIsPOD(IRGenFunction &IGF, SILType T) const {
   return llvm::ConstantInt::get(IGF.IGM.Int1Ty,
-                                isPOD(ResilienceScope::Local) == IsPOD);
+                                isPOD(ResilienceScope::Component) == IsPOD);
 }
 llvm::Constant *FixedTypeInfo::getStaticStride(IRGenModule &IGM) const {
   return asSizeConstant(IGM, getFixedStride());
@@ -1638,7 +1638,7 @@ namespace {
       return visitStructDecl(type->getDecl());
     }
     bool visitStructDecl(StructDecl *decl) {
-      if (IGM.isResilient(decl, ResilienceScope::Local))
+      if (IGM.isResilient(decl, ResilienceScope::Component))
         return true;
 
       for (auto field : decl->getStoredProperties()) {
@@ -1657,7 +1657,7 @@ namespace {
       return visitEnumDecl(type->getDecl());
     }
     bool visitEnumDecl(EnumDecl *decl) {
-      if (IGM.isResilient(decl, ResilienceScope::Local))
+      if (IGM.isResilient(decl, ResilienceScope::Component))
         return true;
       if (decl->isIndirect())
         return false;
@@ -1713,7 +1713,7 @@ static bool isIRTypeDependent(IRGenModule &IGM, NominalTypeDecl *decl) {
     // in size.
     if (IGM.classifyTypeSize(SILType::getPrimitiveObjectType(
                        ed->getDeclaredTypeInContext()->getCanonicalType()),
-                             ResilienceScope::Local)
+                             ResilienceScope::Component)
           == ObjectSize::Fixed)
       return false;
 

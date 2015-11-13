@@ -199,8 +199,8 @@ bool StructLayoutBuilder::addFields(llvm::MutableArrayRef<ElementLayout> elts,
   // is Type; StructIndex and ByteOffset need to be laid out.
   for (auto &elt : elts) {
     auto &eltTI = elt.getType();
-    IsKnownPOD &= eltTI.isPOD(ResilienceScope::Local);
-    IsKnownBitwiseTakable &= eltTI.isBitwiseTakable(ResilienceScope::Local);
+    IsKnownPOD &= eltTI.isPOD(ResilienceScope::Component);
+    IsKnownBitwiseTakable &= eltTI.isBitwiseTakable(ResilienceScope::Component);
     
     // If the element type is empty, it adds nothing.
     if (eltTI.isKnownEmpty()) {
@@ -295,7 +295,7 @@ void StructLayoutBuilder::addNonFixedSizeElement(ElementLayout &elt) {
 
 /// Add an empty element to the aggregate.
 void StructLayoutBuilder::addEmptyElement(ElementLayout &elt) {
-  elt.completeEmpty(elt.getType().isPOD(ResilienceScope::Local));
+  elt.completeEmpty(elt.getType().isPOD(ResilienceScope::Component));
 }
 
 /// Add an element at the fixed offset of the current end of the
@@ -304,7 +304,7 @@ void StructLayoutBuilder::addElementAtFixedOffset(ElementLayout &elt) {
   assert(isFixedLayout());
   auto &eltTI = cast<FixedTypeInfo>(elt.getType());
 
-  elt.completeFixed(elt.getType().isPOD(ResilienceScope::Local),
+  elt.completeFixed(elt.getType().isPOD(ResilienceScope::Component),
                     CurSize, StructFields.size());
   StructFields.push_back(elt.getType().getStorageType());
   
@@ -315,7 +315,7 @@ void StructLayoutBuilder::addElementAtFixedOffset(ElementLayout &elt) {
 /// Add an element at a non-fixed offset to the aggregate.
 void StructLayoutBuilder::addElementAtNonFixedOffset(ElementLayout &elt) {
   assert(!isFixedLayout());
-  elt.completeNonFixed(elt.getType().isPOD(ResilienceScope::Local),
+  elt.completeNonFixed(elt.getType().isPOD(ResilienceScope::Component),
                        NextNonFixedOffsetIndex);
   CurSpareBits.clear();
 }
@@ -325,7 +325,7 @@ void StructLayoutBuilder::addNonFixedSizeElementAtOffsetZero(ElementLayout &elt)
   assert(isFixedLayout());
   assert(!isa<FixedTypeInfo>(elt.getType()));
   assert(CurSize.isZero());
-  elt.completeInitialNonFixedSize(elt.getType().isPOD(ResilienceScope::Local));
+  elt.completeInitialNonFixedSize(elt.getType().isPOD(ResilienceScope::Component));
   CurSpareBits.clear();
 }
 

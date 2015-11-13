@@ -280,7 +280,7 @@ namespace {
       if (!var->hasStorage()) return;
 
       SILType fieldType = classType.getFieldType(var, *IGM.SILMod);
-      switch (IGM.classifyTypeSize(fieldType, ResilienceScope::Local)) {
+      switch (IGM.classifyTypeSize(fieldType, ResilienceScope::Component)) {
       case ObjectSize::Fixed:
         return;
       case ObjectSize::Resilient:
@@ -497,7 +497,7 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
   // TODO: Lay out the class based on the substituted baseType rather than
   // the generic type. Doing this requires that we also handle
   // specialized layout in ClassTypeInfo.
-  LayoutClass layout(IGF.IGM, ResilienceScope::Local, baseClass,
+  LayoutClass layout(IGF.IGM, ResilienceScope::Component, baseClass,
                      getSelfType(baseClass) /* TODO: should be baseType */);
   
   auto &entry = layout.getFieldEntry(field);
@@ -1890,7 +1890,7 @@ IRGenModule::getObjCRuntimeBaseForSwiftRootClass(ClassDecl *theClass) {
 }
 
 ClassDecl *irgen::getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C) {
-  LayoutClass layout(IGM, ResilienceScope::Local, C, getSelfType(C));
+  LayoutClass layout(IGM, ResilienceScope::Component, C, getSelfType(C));
 
   return layout.getRootClassForMetaclass();
 }

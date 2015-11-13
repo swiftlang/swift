@@ -3512,7 +3512,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       case ParameterConvention::Direct_Unowned:
         // If the type is nontrivial, keep the context alive since the field
         // depends on the context to not be deallocated.
-        if (!fieldTI.isPOD(ResilienceScope::Local))
+        if (!fieldTI.isPOD(ResilienceScope::Component))
           dependsOnContextLifetime = true;
         SWIFT_FALLTHROUGH;
       case ParameterConvention::Direct_Deallocating:
@@ -3753,7 +3753,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
       continue;
     }
       
-    if (ti.isSingleSwiftRetainablePointer(ResilienceScope::Local)) {
+    if (ti.isSingleSwiftRetainablePointer(ResilienceScope::Component)) {
       hasSingleSwiftRefcountedContext = Yes;
       singleRefcountedConvention = param.getConvention();
     } else {

@@ -2595,10 +2595,8 @@ bool IRGenModule::isResilient(Decl *D, ResilienceScope scope) {
     return false;
 
   switch (scope) {
-  case ResilienceScope::Local:
   case ResilienceScope::Component:
     return !NTD->hasFixedLayout(SILMod->getSwiftModule());
-  case ResilienceScope::Program:
   case ResilienceScope::Universal:
     return !NTD->hasFixedLayout();
   }

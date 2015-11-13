@@ -1392,25 +1392,25 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
     goto standard;
 
   case ValueWitness::DestroyBuffer:
-    if (concreteTI.isPOD(ResilienceScope::Local)) {
+    if (concreteTI.isPOD(ResilienceScope::Component)) {
       if (isNeverAllocated(packing))
         return asOpaquePtr(IGM, getNoOpVoidFunction(IGM));
-    } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceScope::Local)) {
+    } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceScope::Component)) {
       assert(isNeverAllocated(packing));
       return asOpaquePtr(IGM, getDestroyStrongFunction(IGM));
     }
     goto standard;
 
   case ValueWitness::Destroy:
-    if (concreteTI.isPOD(ResilienceScope::Local)) {
+    if (concreteTI.isPOD(ResilienceScope::Component)) {
       return asOpaquePtr(IGM, getNoOpVoidFunction(IGM));
-    } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceScope::Local)) {
+    } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceScope::Component)) {
       return asOpaquePtr(IGM, getDestroyStrongFunction(IGM));
     }
     goto standard;
 
   case ValueWitness::DestroyArray:
-    if (concreteTI.isPOD(ResilienceScope::Local)) {
+    if (concreteTI.isPOD(ResilienceScope::Component)) {
       return asOpaquePtr(IGM, getNoOpVoidFunction(IGM));
     }
     // TODO: A standard "destroy strong array" entrypoint for arrays of single
@@ -1420,9 +1420,9 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
   case ValueWitness::InitializeBufferWithCopyOfBuffer:
   case ValueWitness::InitializeBufferWithCopy:
     if (packing == FixedPacking::OffsetZero) {
-      if (concreteTI.isPOD(ResilienceScope::Local)) {
+      if (concreteTI.isPOD(ResilienceScope::Component)) {
         return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
-      } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceScope::Local)) {
+      } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceScope::Component)) {
         return asOpaquePtr(IGM, getInitWithCopyStrongFunction(IGM));
       }
     }
@@ -1432,61 +1432,61 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
     if (packing == FixedPacking::Allocate) {
       return asOpaquePtr(IGM, getCopyOutOfLinePointerFunction(IGM));
     } else if (packing == FixedPacking::OffsetZero &&
-               concreteTI.isBitwiseTakable(ResilienceScope::Local)) {
+               concreteTI.isBitwiseTakable(ResilienceScope::Component)) {
       return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
     }
     goto standard;
 
   case ValueWitness::InitializeBufferWithTake:
-    if (concreteTI.isBitwiseTakable(ResilienceScope::Local)
+    if (concreteTI.isBitwiseTakable(ResilienceScope::Component)
         && packing == FixedPacking::OffsetZero)
       return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
     goto standard;
 
   case ValueWitness::InitializeWithTake:
-    if (concreteTI.isBitwiseTakable(ResilienceScope::Local)) {
+    if (concreteTI.isBitwiseTakable(ResilienceScope::Component)) {
       return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
     }
     goto standard;
 
   case ValueWitness::InitializeArrayWithTakeFrontToBack:
-    if (concreteTI.isBitwiseTakable(ResilienceScope::Local)) {
+    if (concreteTI.isBitwiseTakable(ResilienceScope::Component)) {
       return asOpaquePtr(IGM, getMemMoveArrayFunction(IGM, concreteTI));
     }
     goto standard;
 
   case ValueWitness::InitializeArrayWithTakeBackToFront:
-    if (concreteTI.isBitwiseTakable(ResilienceScope::Local)) {
+    if (concreteTI.isBitwiseTakable(ResilienceScope::Component)) {
       return asOpaquePtr(IGM, getMemMoveArrayFunction(IGM, concreteTI));
     }
     goto standard;
 
   case ValueWitness::AssignWithCopy:
-    if (concreteTI.isPOD(ResilienceScope::Local)) {
+    if (concreteTI.isPOD(ResilienceScope::Component)) {
       return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
-    } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceScope::Local)) {
+    } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceScope::Component)) {
       return asOpaquePtr(IGM, getAssignWithCopyStrongFunction(IGM));
     }
     goto standard;
 
   case ValueWitness::AssignWithTake:
-    if (concreteTI.isPOD(ResilienceScope::Local)) {
+    if (concreteTI.isPOD(ResilienceScope::Component)) {
       return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
-    } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceScope::Local)) {
+    } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceScope::Component)) {
       return asOpaquePtr(IGM, getAssignWithTakeStrongFunction(IGM));
     }
     goto standard;
 
   case ValueWitness::InitializeWithCopy:
-    if (concreteTI.isPOD(ResilienceScope::Local)) {
+    if (concreteTI.isPOD(ResilienceScope::Component)) {
       return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
-    } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceScope::Local)) {
+    } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceScope::Component)) {
       return asOpaquePtr(IGM, getInitWithCopyStrongFunction(IGM));
     }
     goto standard;
 
   case ValueWitness::InitializeArrayWithCopy:
-    if (concreteTI.isPOD(ResilienceScope::Local)) {
+    if (concreteTI.isPOD(ResilienceScope::Component)) {
       return asOpaquePtr(IGM, getMemCpyArrayFunction(IGM, concreteTI));
     }
     // TODO: A standard "copy strong array" entrypoint for arrays of single
@@ -1514,7 +1514,7 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
     // meaningful flags for it.
     if (auto *fixedTI = dyn_cast<FixedTypeInfo>(&concreteTI)) {
       flags |= fixedTI->getFixedAlignment().getValue() - 1;
-      if (!fixedTI->isPOD(ResilienceScope::Local))
+      if (!fixedTI->isPOD(ResilienceScope::Component))
         flags |= ValueWitnessFlags::IsNonPOD;
       assert(packing == FixedPacking::OffsetZero ||
              packing == FixedPacking::Allocate);
@@ -1524,7 +1524,7 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
       if (fixedTI->getFixedExtraInhabitantCount(IGM) > 0)
         flags |= ValueWitnessFlags::Enum_HasExtraInhabitants;
 
-      if (!fixedTI->isBitwiseTakable(ResilienceScope::Local))
+      if (!fixedTI->isBitwiseTakable(ResilienceScope::Component))
         flags |= ValueWitnessFlags::IsNonBitwiseTakable;
     }
 
@@ -2006,7 +2006,8 @@ ProtocolInfo::getConformance(IRGenModule &IGM, ProtocolDecl *protocol,
   // TODO: maybe this should apply whenever it's out of the module?
   // TODO: actually enable this
   if ((false) &&
-      isDependentConformance(IGM, normalConformance, ResilienceScope::Local)) {
+      isDependentConformance(IGM, normalConformance,
+                             ResilienceScope::Component)) {
     info = new AccessorConformanceInfo(normalConformance);
 
   // Otherwise, we can use a direct-referencing conformance.

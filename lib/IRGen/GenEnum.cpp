@@ -333,7 +333,7 @@ namespace {
     }
 
     void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
-      if (getSingleton() && !getSingleton()->isPOD(ResilienceScope::Local))
+      if (getSingleton() && !getSingleton()->isPOD(ResilienceScope::Component))
         getSingleton()->destroy(IGF, getSingletonAddress(IGF, addr),
                                 getSingletonType(IGF.IGM, T));
     }
@@ -1037,10 +1037,10 @@ namespace {
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const override {
       assert(TIK >= Loadable);
       Explosion old;
-      if (!isPOD(ResilienceScope::Local))
+      if (!isPOD(ResilienceScope::Component))
         loadAsTake(IGF, addr, old);
       initialize(IGF, e, addr);
-      if (!isPOD(ResilienceScope::Local))
+      if (!isPOD(ResilienceScope::Component))
         consume(IGF, old);
     }
 
@@ -3315,7 +3315,7 @@ namespace {
         auto &payloadTI = *payloadCasePair.ti;
 
         // Trivial payloads don't need any work.
-        if (payloadTI.isPOD(ResilienceScope::Local)) {
+        if (payloadTI.isPOD(ResilienceScope::Component)) {
           ++tagIndex;
           continue;
         }
@@ -3588,8 +3588,8 @@ namespace {
           auto &payloadTI = *payloadCasePair.ti;
           // Trivial and, in the case of a take, bitwise-takable payloads,
           // can all share the default path.
-          if (payloadTI.isPOD(ResilienceScope::Local)
-              || (isTake && payloadTI.isBitwiseTakable(ResilienceScope::Local))) {
+          if (payloadTI.isPOD(ResilienceScope::Component)
+              || (isTake && payloadTI.isBitwiseTakable(ResilienceScope::Component))) {
             ++tagIndex;
             continue;
           }
@@ -4358,8 +4358,8 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                             alignment);
       return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
                              alignment,
-                             eltTI.isPOD(ResilienceScope::Local),
-                             eltTI.isBitwiseTakable(ResilienceScope::Local)));
+                             eltTI.isPOD(ResilienceScope::Component),
+                             eltTI.isBitwiseTakable(ResilienceScope::Component)));
     } else {
       auto &fixedEltTI = cast<FixedTypeInfo>(eltTI);
       auto alignment = fixedEltTI.getFixedAlignment();
@@ -4369,8 +4369,8 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                         fixedEltTI.getFixedSize(),
                         fixedEltTI.getSpareBits(),
                         alignment,
-                        fixedEltTI.isPOD(ResilienceScope::Local),
-                        fixedEltTI.isBitwiseTakable(ResilienceScope::Local));
+                        fixedEltTI.isPOD(ResilienceScope::Component),
+                        fixedEltTI.isBitwiseTakable(ResilienceScope::Component));
     }
   }
 }
