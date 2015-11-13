@@ -81,7 +81,7 @@ print("Test1 - Done")
 let partition_verifier: ([Int]) -> Void = {
     var y = $0
     // Partition() returns the index to the pivot value.
-    let idx = y.partition(0..<y.length)
+    let idx = y.partition()
     // Check that all of the elements in the first partition are smaller or
     // equal to the pivot value.
     for i in 0..<idx {

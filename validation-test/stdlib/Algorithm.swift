@@ -151,7 +151,7 @@ Algorithm.test("invalidOrderings") {
   withInvalidOrderings {
     var a: A<Int>
     a = randomArray()
-    a.partition(a.indices, isOrderedBefore: $0)
+    a.partition($0)
   }
   /*
   // FIXME: Disabled due to <rdar://problem/17734737> Unimplemented:

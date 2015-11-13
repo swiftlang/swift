@@ -676,82 +676,54 @@ func checkPartition_${'Predicate' if predicate else 'WhereElementIsComparable'}(
   lessImpl: ((Int, Int) -> Bool),
   verifyOrder: Bool
 ) {
-%   for slice in [ False, True ]:
-  if true {
-%     if predicate:
-    let extract = extractValue
-    ${'var' if slice else 'let'} elements: [OpaqueValue<Int>] =
-      zip(sequence, 0..<sequence.length).map {
-        OpaqueValue($0, identity: $1)
-      }
-
-%       if slice:
-    elements.insert(
-      OpaqueValue(0xfffe, identity: 0xfffe), at: 0)
-    elements.append(OpaqueValue(0xffff, identity: 0xffff))
-%       end
-
-    var c = makeWrappedCollection(elements)
-%     else:
-    MinimalComparableValue.equalImpl.value = equalImpl
-    MinimalComparableValue.lessImpl.value = lessImpl
-
-    let extract = extractValueFromComparable
-    ${'var' if slice else 'let'} elements: [MinimalComparableValue] =
-      zip(sequence, 0..<sequence.length).map {
-        MinimalComparableValue($0, identity: $1)
-      }
-
-%       if slice:
-    elements.insert(
-      MinimalComparableValue(0xfffe, identity: 0xfffe), at: 0)
-    elements.append(MinimalComparableValue(0xffff, identity: 0xffff))
-%       end
-
-    var c = makeWrappedCollectionWithComparableElement(elements)
-%     end
-
-%     if slice:
-    let indices = c.startIndex.successor()..<c.endIndex.predecessor()
-%     else:
-    let indices = c.indices
-%     end
-
-%     if predicate:
-    let closureLifetimeTracker = LifetimeTracked(0)
-    let pivot = c.partition(indices) {
-      (lhs, rhs) in
-      _blackHole(closureLifetimeTracker)
-      return extract(lhs).value < extract(rhs).value
+%   if predicate:
+  let extract = extractValue
+  let elements: [OpaqueValue<Int>] =
+    zip(sequence, 0..<sequence.length).map {
+      OpaqueValue($0, identity: $1)
     }
-%     else:
-    let pivot = c.partition(indices)
-%     end
 
-    // Check that we didn't lose any elements.
-    ${'var' if slice else 'let'} identities = c.map { extract($0).identity }
-%     if slice:
-    expectEqual(0xfffe, extract(c.first!).identity)
-    expectEqual(0xffff, extract(c.last!).identity)
-    identities.removeLast()
-    identities.removeAt(0)
-%     end
-    expectEqualsUnordered(0..<sequence.length, identities)
+  var c = makeWrappedCollection(elements)
+%   else:
+  MinimalComparableValue.equalImpl.value = equalImpl
+  MinimalComparableValue.lessImpl.value = lessImpl
 
-    if verifyOrder {
-      // All the elements in the first partition are less than the pivot
-      // value.
-      for i in indices.startIndex..<pivot {
-        expectLT(extract(c[i]).value, extract(c[pivot]).value)
-      }
-      // All the elements in the second partition are greater or equal to
-      // the pivot value.
-      for i in pivot..<indices.endIndex {
-        expectLE(extract(c[pivot]).value, extract(c[i]).value)
-      }
+  let extract = extractValueFromComparable
+  let elements: [MinimalComparableValue] =
+    zip(sequence, 0..<sequence.length).map {
+      MinimalComparableValue($0, identity: $1)
+    }
+
+  var c = makeWrappedCollectionWithComparableElement(elements)
+%   end
+
+%   if predicate:
+  let closureLifetimeTracker = LifetimeTracked(0)
+  let pivot = c.partition() {
+    (lhs, rhs) in
+    _blackHole(closureLifetimeTracker)
+    return extract(lhs).value < extract(rhs).value
+  }
+%   else:
+  let pivot = c.partition()
+%   end
+
+  // Check that we didn't lose any elements.
+  let identities = c.map { extract($0).identity }
+  expectEqualsUnordered(0..<sequence.length, identities)
+
+  if verifyOrder {
+    // All the elements in the first partition are less than the pivot
+    // value.
+    for i in c.startIndex..<pivot {
+      expectLT(extract(c[i]).value, extract(c[pivot]).value)
+    }
+    // All the elements in the second partition are greater or equal to
+    // the pivot value.
+    for i in pivot..<c.endIndex {
+      expectLE(extract(c[pivot]).value, extract(c[i]).value)
     }
   }
-%   end
 }
 
 self.test("\(testNamePrefix).partition/${'Predicate' if predicate else 'WhereElementIsComparable'}") {
@@ -805,13 +777,13 @@ self.test("\(testNamePrefix).partition/DispatchesThrough_withUnsafeMutableBuffer
 
 %   if predicate:
   let closureLifetimeTracker = LifetimeTracked(0)
-  let pivot = lc.partition(lc.indices) {
+  let pivot = lc.partition() {
     (lhs, rhs) in
     _blackHole(closureLifetimeTracker)
     return extract(lhs).value < extract(rhs).value
   }
 %   else:
-  let pivot = lc.partition(lc.indices)
+  let pivot = lc.partition()
 %   end
 
   expectEqual(

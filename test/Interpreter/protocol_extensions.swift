@@ -102,14 +102,14 @@ for (a, b) in [1, 2, 3].myZip(["a", "b", "c"]) {
 extension MutableCollection
   where Self.Index: RandomAccessIndex, Self.Iterator.Element : Comparable {
 
-  public final mutating func myPartition(range: Range<Index>) -> Index {
-    return self.partition(range)
+  public final mutating func myPartition() -> Index {
+    return self.partition()
   }
 }
 
 // CHECK: 4 3 1 2 | 5 9 8 6 7 6
 var evenOdd = [5, 3, 6, 2, 4, 9, 8, 1, 7, 6]
-var evenOddSplit = evenOdd.myPartition(evenOdd.myIndices)
+var evenOddSplit = evenOdd.myPartition()
 for i in evenOdd.myIndices {
   if i == evenOddSplit { print(" |", terminator: "") }
   if i > 0 { print(" ", terminator: "") }

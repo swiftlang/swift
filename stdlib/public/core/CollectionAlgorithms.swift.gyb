@@ -127,8 +127,8 @@ extension MutableCollection where Index : RandomAccessIndex {
 ${partitionDocComment}
   ///
 ${orderingRequirementForPredicate}
+  @warn_unused_result
   public mutating func partition(
-    range: Range<Index>,
     isOrderedBefore: (${GElement}, ${GElement}) -> Bool
   ) -> Index {
     var isOrderedBefore = isOrderedBefore
@@ -141,7 +141,8 @@ extension MutableCollection
 ${partitionDocComment}
   ///
 ${orderingRequirementForComparable}
-  public mutating func partition(range: Range<Index>) -> Index {
+  @warn_unused_result
+  public mutating func partition() -> Index {
 
 %   end
 
@@ -149,18 +150,9 @@ ${orderingRequirementForComparable}
       (baseAddress, length) -> Index in
       var bufferPointer =
         UnsafeMutableBufferPointer(start: baseAddress, length: length)
-      let startOffset = startIndex.distanceTo(range.startIndex)
-      let unsafeBufferStartIndex =
-        bufferPointer.startIndex + numericCast(startOffset)
-
-      let endOffset = startIndex.distanceTo(range.endIndex)
-      let unsafeBufferEndIndex =
-        bufferPointer.startIndex + numericCast(endOffset)
-
       let unsafeBufferPivot = bufferPointer.partition(
-        unsafeBufferStartIndex..<unsafeBufferEndIndex
 %   if preds:
-        , isOrderedBefore: isOrderedBefore
+        isOrderedBefore
 %   end
         )
       return startIndex.advancedBy(
@@ -171,9 +163,9 @@ ${orderingRequirementForComparable}
     }
 
 %   if preds:
-    return _partition(&self, range, &isOrderedBefore)
+    return _partition(&self, indices, &isOrderedBefore)
 %   else:
-    return _partition(&self, range)
+    return _partition(&self, indices)
 %   end
   }
 }

@@ -143,7 +143,7 @@ Algorithm.test("sort/CollectionsWithUnusualIndices") {
 
 Algorithm.test("partition/CrashOnSingleElement") {
   var a = DefaultedRandomAccessMutableCollection([10])
-  expectEqual(a.startIndex, a.partition(a.indices))
+  expectEqual(a.startIndex, a.partition())
 }
 
 runAllTests()
