@@ -2959,3 +2959,36 @@ bb3:
   return %36 : $Optional<Int>
 }
 
+// CHECK-LABEL: sil @remove_destroy_array
+// CHECK-NOT: destroyArray
+// CHECK: return
+sil @remove_destroy_array : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %4 = metatype $@thick Int32.Type
+  %8 = builtin "destroyArray"<Int32>(%4 : $@thick Int32.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  %90 = tuple ()
+  return %90 : $()
+}
+
+// CHECK-LABEL: sil @dont_remove_destroy_array_of_nontrivial_type
+// CHECK: builtin "destroyArray"
+// CHECK: return
+sil @dont_remove_destroy_array_of_nontrivial_type : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %4 = metatype $@thick B.Type
+  %8 = builtin "destroyArray"<B>(%4 : $@thick B.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  %90 = tuple ()
+  return %90 : $()
+}
+
+// CHECK-LABEL: sil @dont_remove_destroy_array_of_generic_type
+// CHECK: builtin "destroyArray"
+// CHECK: return
+sil @dont_remove_destroy_array_of_generic_type : $@convention(thin) <Memory> (Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %4 = metatype $@thick Memory.Type
+  %8 = builtin "destroyArray"<Memory>(%4 : $@thick Memory.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  %90 = tuple ()
+  return %90 : $()
+}
+

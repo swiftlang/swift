@@ -418,6 +418,21 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
       [](const APInt &i) -> bool { return i.isMinValue(); }  /* isNeutral */,
       [](const APInt &i) -> bool { return false; }           /* isZero */,
       Builder, this);
+  case BuiltinValueKind::DestroyArray: {
+    ArrayRef<Substitution> Substs = I->getSubstitutions();
+    // Check if the element type is a trivial type.
+    if (Substs.size() == 1) {
+      Substitution Subst = Substs[0];
+      Type ElemType = Subst.getReplacement();
+      if (ElemType->isCanonical() && ElemType->isLegalSILType()) {
+        SILType SILElemTy = SILType::getPrimitiveObjectType(CanType(ElemType));
+        // Destroying an array of trivial types is a no-op.
+        if (SILElemTy.isTrivial(I->getModule()))
+          return eraseInstFromFunction(*I);
+      }
+    }
+    break;
+  }
   default:
     break;
   }
