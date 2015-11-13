@@ -2827,7 +2827,7 @@ public:
     // BaseType::AnyFunctionTypeBits.
 
     //   |representation|noReturn|
-    //   |    0 .. 3    |   7    |
+    //   |    0 .. 3    |   4    |
     //
     enum : uint16_t { RepresentationMask = 0x00F };
     enum : uint16_t { NoReturnMask       = 0x010 };
