@@ -313,7 +313,7 @@ func _getBridgedNonVerbatimObjectiveCType<T>(_: T.Type) -> Any.Type?
 
 // -- Pointer argument bridging
 
-@_transparent
+@transparent
 internal var _nilNativeObject: AnyObject? {
   return nil
 }
@@ -346,13 +346,13 @@ public struct AutoreleasingUnsafeMutablePointer<Memory /* TODO : class */>
 
   public let _rawValue: Builtin.RawPointer
 
-  @_transparent
+  @transparent
   public // COMPILER_INTRINSIC
   init(_ _rawValue: Builtin.RawPointer) {
     self._rawValue = _rawValue
   }
 
-  @_transparent
+  @transparent
   var _isNull : Bool {
     return UnsafeMutablePointer<Memory>(self)._isNull
   }
@@ -361,7 +361,7 @@ public struct AutoreleasingUnsafeMutablePointer<Memory /* TODO : class */>
   /// setting values.
   public var memory: Memory {
     /// Retrieve the value the pointer points to.
-    @_transparent get {
+    @transparent get {
       _debugPrecondition(!_isNull)
       // We can do a strong load normally.
       return UnsafeMutablePointer<Memory>(self).memory
@@ -372,7 +372,7 @@ public struct AutoreleasingUnsafeMutablePointer<Memory /* TODO : class */>
     /// value with __autoreleasing ownership semantics, like 'NSFoo**'
     /// in ARC. This autoreleases the argument before trivially
     /// storing it to the referenced memory.
-    @_transparent nonmutating set {
+    @transparent nonmutating set {
       _debugPrecondition(!_isNull)
       // Autorelease the object reference.
       typealias OptionalAnyObject = AnyObject?
@@ -392,7 +392,7 @@ public struct AutoreleasingUnsafeMutablePointer<Memory /* TODO : class */>
   ///
   /// - Requires: `self != nil`.
   public subscript(i: Int) -> Memory {
-    @_transparent
+    @transparent
     get {
       _debugPrecondition(!_isNull)
       // We can do a strong load normally.
@@ -401,13 +401,13 @@ public struct AutoreleasingUnsafeMutablePointer<Memory /* TODO : class */>
   }
 
   /// Create an instance initialized with `nil`.
-  @_transparent public
+  @transparent public
   init(nilLiteral: ()) {
     _rawValue = _nilRawPointer
   }
 
   /// Initialize to a null pointer.
-  @_transparent public
+  @transparent public
   init() {
     self._rawValue = _nilRawPointer
   }
@@ -417,7 +417,7 @@ public struct AutoreleasingUnsafeMutablePointer<Memory /* TODO : class */>
   /// This is inherently unsafe; UnsafeMutablePointer assumes the
   /// referenced memory has +1 strong ownership semantics, whereas
   /// AutoreleasingUnsafeMutablePointer implies +0 semantics.
-  @_transparent public
+  @transparent public
   init<U>(_ ptr: UnsafeMutablePointer<U>) {
     self._rawValue = ptr._rawValue
   }
@@ -426,7 +426,7 @@ public struct AutoreleasingUnsafeMutablePointer<Memory /* TODO : class */>
   ///
   /// This is inherently unsafe because UnsafePointers do not imply
   /// mutability.
-  @_transparent
+  @transparent
   init<U>(_ ptr: UnsafePointer<U>) {
     self._rawValue = ptr._rawValue
   }
@@ -439,7 +439,7 @@ extension AutoreleasingUnsafeMutablePointer : CustomDebugStringConvertible {
   }
 }
 
-@_transparent
+@transparent
 @warn_unused_result
 public func == <Memory> (
   lhs: AutoreleasingUnsafeMutablePointer<Memory>,
@@ -467,7 +467,7 @@ internal struct _CocoaFastEnumerationStackBuf {
   var item14: Builtin.RawPointer
   var item15: Builtin.RawPointer
 
-  @_transparent
+  @transparent
   var length: Int {
     return 16
   }

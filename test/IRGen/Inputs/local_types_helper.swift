@@ -1,4 +1,4 @@
-@_transparent public func test() {
+@transparent public func test() {
   struct S { var x: Int }
   print(S.self)
 }

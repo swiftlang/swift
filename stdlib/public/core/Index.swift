@@ -72,7 +72,7 @@ public struct _DisabledRangeIndex_ {
 
 /// Replace `i` with its `successor()` and return the updated value of
 /// `i`.
-@_transparent
+@transparent
 public prefix func ++ <T : _Incrementable> (inout i: T) -> T {
   i._successorInPlace()
   return i
@@ -80,7 +80,7 @@ public prefix func ++ <T : _Incrementable> (inout i: T) -> T {
 
 /// Replace `i` with its `successor()` and return the original
 /// value of `i`.
-@_transparent
+@transparent
 public postfix func ++ <T : _Incrementable> (inout i: T) -> T {
   let ret = i
   i._successorInPlace()
@@ -208,7 +208,7 @@ extension ForwardIndexType {
   }
 
   /// Do not use this method directly; call advancedBy(n) instead.
-  @_transparent
+  @transparent
   @warn_unused_result
   internal func _advanceForward(n: Distance) -> Self {
     _precondition(n >= 0,
@@ -221,7 +221,7 @@ extension ForwardIndexType {
   }
 
   /// Do not use this method directly; call advancedBy(n, limit) instead.
-  @_transparent
+  @transparent
   @warn_unused_result
   internal func _advanceForward(n: Distance, _ limit: Self) -> Self {
     _precondition(n >= 0,
@@ -309,7 +309,7 @@ extension BidirectionalIndexType {
 
 /// Replace `i` with its `predecessor()` and return the updated value
 /// of `i`.
-@_transparent
+@transparent
 public prefix func -- <T : BidirectionalIndexType> (inout i: T) -> T {
   i._predecessorInPlace()
   return i
@@ -318,7 +318,7 @@ public prefix func -- <T : BidirectionalIndexType> (inout i: T) -> T {
 
 /// Replace `i` with its `predecessor()` and return the original
 /// value of `i`.
-@_transparent
+@transparent
 public postfix func -- <T : BidirectionalIndexType> (inout i: T) -> T {
   let ret = i
   i._predecessorInPlace()
@@ -386,7 +386,7 @@ extension RandomAccessIndexType {
       "range.startIndex is out of bounds: index designates a position after bounds.endIndex")
   }
 
-  @_transparent
+  @transparent
   @warn_unused_result
   public func advancedBy(n: Distance, limit: Self) -> Self {
     let d = self.distanceTo(limit)

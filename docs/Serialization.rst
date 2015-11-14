@@ -132,7 +132,7 @@ organizational purposes.
 - The **SIL block** contains SIL-level implementations that can be imported
   into a client's SILModule context. In most cases this is just a performance
   concern, but sometimes it affects language semantics as well, as in the case
-  of ``@_transparent``. The SIL block precedes the AST block because it affects
+  of ``@transparent``. The SIL block precedes the AST block because it affects
   which AST nodes get serialized.
 
 - The **SIL index black** contains tables for accessing various SIL entities by

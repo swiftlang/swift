@@ -26,13 +26,13 @@ public struct UnicodeScalar :
     }
   }
 
-  @_transparent
+  @transparent
   public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
     self._value = UInt32(value)
   }
 
   /// Create an instance initialized to `value`.
-  @_transparent
+  @transparent
   public init(unicodeScalarLiteral value: UnicodeScalar) {
     self = value
   }

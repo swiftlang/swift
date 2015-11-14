@@ -8,7 +8,7 @@ class CA: PA { }
 class CB: PB { typealias B = CA }
 
 struct S<A: PB> {
-  @_transparent
+  @transparent
   func crash() -> Bool {
     let a: A.B? = nil
     return a === a

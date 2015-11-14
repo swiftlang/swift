@@ -37,11 +37,11 @@ func testArithmeticOverflow() {
 //  var csh2: Int8 = (-1 & ~(1<<7))+1 // expected - error {{arithmetic operation '127 + 1' (on type 'Int8') results in an overflow}}
 }
 
-@_transparent 
+@transparent 
 func myaddSigned(x: Int8, _ y: Int8, _ z: Int8) -> Int8 {
   return x + y
 }
-@_transparent 
+@transparent 
 func myaddUnsigned(x: UInt8, _ y: UInt8, _ z: UInt8) -> UInt8 {
   return x + y
 }
@@ -207,11 +207,11 @@ func testConvertOverflow() {
   var _/*float64_min_definitely_overflow*/ : Float64 = (-179769313486231590772930519078902473361797697894230657273430081157732675805500963132708477322407536021120113879871393357658789768814416622492847430639474124377767893424865485276302219601246094119453082952085005768838150682342462881473913110540827237163350510684586298239947245938479716304835356329624224137216) // expected-error {{integer literal '-179769313486231590772930519078902473361797697894230657273430081157732675805500963132708477322407536021120113879871393357658789768814416622492847430639474124377767893424865485276302219601246094119453082952085005768838150682342462881473913110540827237163350510684586298239947245938479716304835356329624224137216' overflows when stored into 'Double'}}
 }
 
-@_transparent 
+@transparent 
 func intConversionWrapperForUSCheckedConversion(x: UInt8, _ unused: UInt8) -> Int8 {
   return Int8(x)
 }
-@_transparent 
+@transparent 
 func intConversionWrapperForLiteral() -> Int8 {
   return 255 // expected-error {{integer literal '255' overflows when stored into 'Int8'}}
 }
@@ -376,23 +376,23 @@ func testAssumeNonNegative() {
 protocol Num { func Double() -> Self }
 
 extension Int8 : Num {
-  @_transparent
+  @transparent
   func Double() -> Int8 { return self * 2 }
 }
 
-@_transparent
+@transparent
 func Double<T : Num>(x: T) -> T { return x.Double() }
 
 func tryDouble() -> Int8 {
   return Double(Int8.max) // expected-error {{arithmetic operation '127 * 2' (on signed 8-bit integer type) results in an overflow}}
 }
 
-@_transparent
+@transparent
 func add<T : SignedIntegerType>(left: T, _ right: T) -> T {
   return left + right
 }
 
-@_transparent
+@transparent
 func applyBinary<T : SignedIntegerType>(fn: (T, T)->(T), _ left: T, _ right: T) -> T {
   return fn(left, right)
 }

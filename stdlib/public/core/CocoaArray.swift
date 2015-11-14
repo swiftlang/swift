@@ -66,7 +66,7 @@ internal struct _CocoaArrayWrapper : CollectionType {
     : nil
   }
 
-  @_transparent
+  @transparent
   init(_ buffer: _NSArrayCoreType) {
     self.buffer = buffer
   }

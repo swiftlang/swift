@@ -15,7 +15,7 @@ public struct MyStruct : Proto {
 private func callit(p: Proto) {
 }
 
-@_transparent
+@transparent
 public func testit(n: MyStruct) {
   callit(n)
 }

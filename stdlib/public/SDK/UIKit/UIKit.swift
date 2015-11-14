@@ -18,7 +18,7 @@ import Foundation
 // Equatable types.
 //===----------------------------------------------------------------------===//
 
-@_transparent // @fragile
+@transparent // @fragile
 @warn_unused_result
 public func == (lhs: UIEdgeInsets, rhs: UIEdgeInsets) -> Bool {
   return lhs.top == rhs.top  && 
@@ -29,7 +29,7 @@ public func == (lhs: UIEdgeInsets, rhs: UIEdgeInsets) -> Bool {
 
 extension UIEdgeInsets : Equatable {}
 
-@_transparent // @fragile
+@transparent // @fragile
 @warn_unused_result
 public func == (lhs: UIOffset, rhs: UIOffset) -> Bool {
   return lhs.horizontal == rhs.horizontal  &&

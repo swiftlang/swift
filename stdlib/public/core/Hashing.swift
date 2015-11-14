@@ -39,7 +39,7 @@ struct _HashingDetail {
     }
   }
 
-  @_transparent
+  @transparent
   @warn_unused_result
   static func getExecutionSeed() -> UInt64 {
     // FIXME: This needs to be a per-execution seed. This is just a placeholder
@@ -48,7 +48,7 @@ struct _HashingDetail {
     return _HashingDetail.fixedSeedOverride == 0 ? seed : fixedSeedOverride
   }
 
-  @_transparent
+  @transparent
   @warn_unused_result
   static func hash16Bytes(low: UInt64, _ high: UInt64) -> UInt64 {
     // Murmur-inspired hashing.
@@ -71,7 +71,7 @@ struct _HashingDetail {
 // their inputs and just exhibit avalance effect.
 //
 
-@_transparent
+@transparent
 @warn_unused_result
 public // @testable
 func _mixUInt32(value: UInt32) -> UInt32 {
@@ -85,14 +85,14 @@ func _mixUInt32(value: UInt32) -> UInt32 {
   return UInt32((extendedResult >> 3) & 0xffff_ffff)
 }
 
-@_transparent
+@transparent
 @warn_unused_result
 public // @testable
 func _mixInt32(value: Int32) -> Int32 {
   return Int32(bitPattern: _mixUInt32(UInt32(bitPattern: value)))
 }
 
-@_transparent
+@transparent
 @warn_unused_result
 public // @testable
 func _mixUInt64(value: UInt64) -> UInt64 {
@@ -103,14 +103,14 @@ func _mixUInt64(value: UInt64) -> UInt64 {
   return _HashingDetail.hash16Bytes(seed &+ (low << 3), high)
 }
 
-@_transparent
+@transparent
 @warn_unused_result
 public // @testable
 func _mixInt64(value: Int64) -> Int64 {
   return Int64(bitPattern: _mixUInt64(UInt64(bitPattern: value)))
 }
 
-@_transparent
+@transparent
 @warn_unused_result
 public // @testable
 func _mixUInt(value: UInt) -> UInt {
@@ -121,7 +121,7 @@ func _mixUInt(value: UInt) -> UInt {
 #endif
 }
 
-@_transparent
+@transparent
 @warn_unused_result
 public // @testable
 func _mixInt(value: Int) -> Int {

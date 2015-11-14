@@ -36,7 +36,7 @@ public struct DarwinBoolean : BooleanType, BooleanLiteralConvertible {
   }
 
   /// Create an instance initialized to `value`.
-  @_transparent
+  @transparent
   public init(booleanLiteral value: Bool) {
     self.init(value)
   }
@@ -73,10 +73,10 @@ func _convertDarwinBooleanToBool(x: DarwinBoolean) -> Bool {
   return Bool(x)
 }
 
-// FIXME: We can't make the fully-generic versions @_transparent due to
-// rdar://problem/19418937, so here are some @_transparent overloads
+// FIXME: We can't make the fully-generic versions @transparent due to
+// rdar://problem/19418937, so here are some @transparent overloads
 // for DarwinBoolean.
-@_transparent
+@transparent
 @warn_unused_result
 public func && <T : BooleanType>(
   lhs: T, @autoclosure rhs: () -> DarwinBoolean
@@ -84,7 +84,7 @@ public func && <T : BooleanType>(
   return lhs.boolValue ? rhs().boolValue : false
 }
 
-@_transparent
+@transparent
 @warn_unused_result
 public func || <T : BooleanType>(
   lhs: T, @autoclosure rhs: () -> DarwinBoolean

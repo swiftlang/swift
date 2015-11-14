@@ -3,7 +3,7 @@
 // Test if 'transparent' atribute gets propagated correctly to apply instructions.
 
 // Test that the attribute gets set on default argument generators.
-@_transparent func transparentFuncWithDefaultArgument (x: Int = 1) -> Int {
+@transparent func transparentFuncWithDefaultArgument (x: Int = 1) -> Int {
   return x
 }
 func useTransparentFuncWithDefaultArgument() ->Int {
@@ -32,7 +32,7 @@ func useTransparentFuncWithoutDefaultArgument() -> Int {
 
 // Make sure the transparent attribute is set on constructors (allocating and initializing).
 struct StructWithTranspConstructor {
-  @_transparent init () {}
+  @transparent init () {}
 }
 func testStructWithTranspConstructor() -> StructWithTranspConstructor {
   return StructWithTranspConstructor()
@@ -49,21 +49,21 @@ func testStructWithTranspConstructor() -> StructWithTranspConstructor {
 struct MySt {}
 var _x = MySt()
 var x1 : MySt {
-  @_transparent
+  @transparent
   get {
     return _x
   }
-  @_transparent
+  @transparent
   set {
     _x = newValue
   }
 }
 var x2 : MySt {
-  @_transparent
+  @transparent
   set(v) {
     _x = v
   }
-  @_transparent
+  @transparent
   get {
     return _x
   }
@@ -87,7 +87,7 @@ func testProperty(z: MySt) {
 var _tr2 = MySt()
 var _tr3 = MySt()
 struct MyTranspStruct {}
-@_transparent extension MyTranspStruct {
+@transparent extension MyTranspStruct {
   init(input : MySt) {}
   mutating
   func tr1() {}
@@ -102,7 +102,7 @@ struct MyTranspStruct {}
 }
 
 extension MyTranspStruct {
-    @_transparent
+    @transparent
     var tr3: MySt {
     get {
       return _tr3
@@ -134,7 +134,7 @@ enum MyEnum {
   case twotransp
 }
 
-@_transparent extension MyEnum {
+@transparent extension MyEnum {
   func tr3() {}
 }
 
@@ -148,7 +148,7 @@ func testEnumExtension() {
 }
 
 struct testVarDecl {
-  @_transparent var max: Int {
+  @transparent var max: Int {
     get {
       return 0xFF
     }
@@ -166,7 +166,7 @@ struct testVarDecl {
 }
 
 struct testVarDeclShortenedSyntax {
-  @_transparent static var max: Int { return 0xFF };
+  @transparent static var max: Int { return 0xFF };
   func testVarDeclShortenedSyntaxfoo () {
     var z: Int = testVarDeclShortenedSyntax.max
     // CHECK-APPLY: sil hidden @_TFV21transparent_attribute26testVarDeclShortenedSyntax29testVarDeclShortenedSyntaxfoo
@@ -175,7 +175,7 @@ struct testVarDeclShortenedSyntax {
   }
 };
 
-@_transparent var transparentOnGlobalVar: Int {
+@transparent var transparentOnGlobalVar: Int {
   get {
     return 0xFF
   }
@@ -183,7 +183,7 @@ struct testVarDeclShortenedSyntax {
 // CHECK: sil hidden [transparent] @_TF21transparent_attributeg22transparentOnGlobalVarSi
 
 // Local functions in transparent context have public linkage.
-@_transparent func foo() {
+@transparent func foo() {
   // CHECK-LABEL: sil @_TFF21transparent_attribute3fooFT_T_L_3barFT_T_ : $@convention(thin) () -> ()
   func bar() {}
   bar()

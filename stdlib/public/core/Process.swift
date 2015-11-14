@@ -40,7 +40,7 @@ public enum Process {
 }
 
 /// Intrinsic entry point invoked on entry to a standalone program's "main".
-@_transparent
+@transparent
 public // COMPILER_INTRINSIC
 func _didEnterMain(
   argc: Int32, argv: UnsafeMutablePointer<UnsafeMutablePointer<Int8>>

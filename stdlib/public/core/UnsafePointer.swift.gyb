@@ -49,13 +49,13 @@ public struct ${Self}<Memory>
   public var _rawValue : Builtin.RawPointer
 
   /// Construct a null pointer.
-  @_transparent
+  @transparent
   public init() {
     self._rawValue = _nilRawPointer
   }
 
   /// Construct ${a_Self} from a builtin raw pointer.
-  @_transparent
+  @transparent
   public init(_ _rawValue : Builtin.RawPointer) {
     self._rawValue = _rawValue
   }
@@ -63,7 +63,7 @@ public struct ${Self}<Memory>
   /// Convert from an opaque C pointer to a typed pointer.
   ///
   /// This is a fundamentally unsafe conversion.
-  @_transparent
+  @transparent
   public init(_ other : COpaquePointer) {
     _rawValue = other._rawValue
   }
@@ -71,7 +71,7 @@ public struct ${Self}<Memory>
   /// Construct ${a_Self} from a given address in memory.
   ///
   /// This is a fundamentally unsafe conversion.
-  @_transparent
+  @transparent
   public init(bitPattern: Int) {
     self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
@@ -79,7 +79,7 @@ public struct ${Self}<Memory>
   /// Construct ${a_Self} from a given address in memory.
   ///
   /// This is a fundamentally unsafe conversion.
-  @_transparent
+  @transparent
   public init(bitPattern: UInt) {
     self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
@@ -87,7 +87,7 @@ public struct ${Self}<Memory>
   /// Convert from an `UnsafeMutablePointer` of a different type.
   ///
   /// This is a fundamentally unsafe conversion.
-  @_transparent
+  @transparent
   public init<U>(_ from : UnsafeMutablePointer<U>) {
     _rawValue = from._rawValue
   }
@@ -95,13 +95,13 @@ public struct ${Self}<Memory>
   /// Convert from a `UnsafePointer` of a different type.
   ///
   /// This is a fundamentally unsafe conversion.
-  @_transparent
+  @transparent
   public init<U>(_ from : UnsafePointer<U>) {
     _rawValue = from._rawValue
   }
 
   /// Create an instance initialized with `nil`.
-  @_transparent public
+  @transparent public
   init(nilLiteral: ()) {
     self = ${Self}()
   }
@@ -145,14 +145,14 @@ else:
 ${comment}
   public var memory: Memory {
 %  if mutable:
-    @_transparent unsafeAddress {
+    @transparent unsafeAddress {
       return UnsafePointer(self)
     }
-    @_transparent nonmutating unsafeMutableAddress {
+    @transparent nonmutating unsafeMutableAddress {
       return self
     }
 %  else:
-    @_transparent unsafeAddress {
+    @transparent unsafeAddress {
       return self
     }
 %  end
@@ -321,7 +321,7 @@ ${comment}
   }
 %  end
 
-  @_transparent public
+  @transparent public
   var _isNull : Bool {
     return self == nil
   }
@@ -329,16 +329,16 @@ ${comment}
   /// Access the `i`th element of the raw array starting at `self`.
   public subscript(i: Int) -> Memory {
 %  if mutable:
-    @_transparent
+    @transparent
     unsafeAddress {
       return UnsafePointer(self + i)
     }
-    @_transparent
+    @transparent
     nonmutating unsafeMutableAddress {
       return self + i
     }
 %  else:
-    @_transparent
+    @transparent
     unsafeAddress {
       return self + i
     }
@@ -359,7 +359,7 @@ ${comment}
   /// Return the result of invoking body.  If self was converted from
   /// nil, passes nil as the argument.  Otherwise, passes the address
   /// of a `Memory` which is written into buffer before this method returns.
-  @_transparent public
+  @transparent public
   func _withBridgeObject<U : AnyObject, R>(
     inout buffer: U?, @noescape body: AutoreleasingUnsafeMutablePointer<U?> -> R
   ) -> R {
@@ -370,7 +370,7 @@ ${comment}
   /// Return the result of invoking body.  If self was converted from
   /// `nil`, passes `nil` as the argument.  Otherwise, passes the address
   /// of buffer.
-  @_transparent public
+  @transparent public
   func _withBridgeValue<U, R>(
     inout buffer: U, @noescape body: UnsafeMutablePointer<U> -> R
   ) -> R {
@@ -449,7 +449,7 @@ ${MirrorDecl} {
 
 ${MirrorConformance}
 
-@_transparent
+@transparent
 @warn_unused_result
 public func == <Memory>(
   lhs: ${Self}<Memory>, rhs: ${Self}<Memory>
@@ -457,33 +457,33 @@ public func == <Memory>(
   return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
-@_transparent
+@transparent
 @warn_unused_result
 public func < <Memory>(lhs: ${Self}<Memory>, rhs: ${Self}<Memory>) -> Bool {
   return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
-@_transparent
+@transparent
 @warn_unused_result
 public func + <Memory>(lhs: ${Self}<Memory>, rhs: Int) -> ${Self}<Memory> {
   return ${Self}(Builtin.gep_Word(
     lhs._rawValue, (rhs &* strideof(Memory.self))._builtinWordValue))
 }
 
-@_transparent
+@transparent
 @warn_unused_result
 public func + <Memory>(lhs: Int,
            rhs: ${Self}<Memory>) -> ${Self}<Memory> {
   return rhs + lhs
 }
 
-@_transparent
+@transparent
 @warn_unused_result
 public func - <Memory>(lhs: ${Self}<Memory>, rhs: Int) -> ${Self}<Memory> {
   return lhs + -rhs
 }
 
-@_transparent
+@transparent
 @warn_unused_result
 public func - <Memory>(lhs: ${Self}<Memory>, rhs: ${Self}<Memory>) -> Int {
   return
@@ -492,12 +492,12 @@ public func - <Memory>(lhs: ${Self}<Memory>, rhs: ${Self}<Memory>) -> Int {
     / strideof(Memory.self)
 }
 
-@_transparent
+@transparent
 public func += <Memory>(inout lhs: ${Self}<Memory>, rhs: Int) {
   lhs = lhs + rhs
 }
 
-@_transparent
+@transparent
 public func -= <Memory>(inout lhs: ${Self}<Memory>, rhs: Int) {
   lhs = lhs - rhs
 }

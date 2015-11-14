@@ -20,11 +20,11 @@ public enum Optional<Wrapped> : _Reflectable, NilLiteralConvertible {
   public typealias T = Wrapped
 
   /// Construct a `nil` instance.
-  @_transparent
+  @transparent
   public init() { self = .None }
 
   /// Construct a non-`nil` instance that stores `some`.
-  @_transparent
+  @transparent
   public init(_ some: Wrapped) { self = .Some(some) }
 
   /// If `self == nil`, returns `nil`.  Otherwise, returns `f(self!)`.
@@ -56,7 +56,7 @@ public enum Optional<Wrapped> : _Reflectable, NilLiteralConvertible {
   }
 
   /// Create an instance initialized with `nil`.
-  @_transparent
+  @transparent
   public init(nilLiteral: ()) {
     self = .None
   }
@@ -98,20 +98,20 @@ public func flatMap<T, U>(x: T?, @noescape _ f: (T)->U?) -> U? {
 }
 
 // Intrinsics for use by language features.
-@_transparent
+@transparent
 public // COMPILER_INTRINSIC
 func _doesOptionalHaveValueAsBool<Wrapped>(v: Wrapped?) -> Bool {
   return v != nil
 }
 
-@_transparent
+@transparent
 public // COMPILER_INTRINSIC
 func _diagnoseUnexpectedNilOptional() {
   _preconditionFailure(
                 "unexpectedly found nil while unwrapping an Optional value")
 }
 
-@_transparent
+@transparent
 public // COMPILER_INTRINSIC
 func _getOptionalValue<Wrapped>(v: Wrapped?) -> Wrapped {
   switch v {
@@ -123,13 +123,13 @@ func _getOptionalValue<Wrapped>(v: Wrapped?) -> Wrapped {
   }
 }
 
-@_transparent
+@transparent
 public // COMPILER_INTRINSIC
 func _injectValueIntoOptional<Wrapped>(v: Wrapped) -> Wrapped? {
   return .Some(v)
 }
 
-@_transparent
+@transparent
 public // COMPILER_INTRINSIC
 func _injectNothingIntoOptional<Wrapped>() -> Wrapped? {
   return .None
@@ -157,11 +157,11 @@ public func != <T : Equatable> (lhs: T?, rhs: T?) -> Bool {
 // isn't equatable.
 public struct _OptionalNilComparisonType : NilLiteralConvertible {
   /// Create an instance initialized with `nil`.
-  @_transparent
+  @transparent
   public init(nilLiteral: ()) {
   }
 }
-@_transparent
+@transparent
 @warn_unused_result
 public func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   switch rhs {
@@ -291,7 +291,7 @@ public func >= <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
   }
 }
 
-@_transparent
+@transparent
 @warn_unused_result
 public func ?? <T> (optional: T?, @autoclosure defaultValue: () throws -> T)
     rethrows -> T {
@@ -303,7 +303,7 @@ public func ?? <T> (optional: T?, @autoclosure defaultValue: () throws -> T)
   }
 }
 
-@_transparent
+@transparent
 @warn_unused_result
 public func ?? <T> (optional: T?, @autoclosure defaultValue: () throws -> T?)
     rethrows -> T? {

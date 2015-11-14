@@ -13,7 +13,7 @@ func foo(x: Float) -> Float {
 // CHECK-NEXT: debug_value %0 : $Float  // let x
 // CHECK-NEXT: return %0
 
-@_transparent func bar(x: Float) -> Float {
+@transparent func bar(x: Float) -> Float {
   return baz(x)
 }
 
@@ -22,7 +22,7 @@ func foo(x: Float) -> Float {
   // CHECK-NOT: apply
   // CHECK: return
 
-@_transparent func baz(x: Float) -> Float {
+@transparent func baz(x: Float) -> Float {
   return x;
 }
 
@@ -35,7 +35,7 @@ func spam(x: Int) -> Int {
 
 // CHECK-LABEL: sil hidden @_TF18mandatory_inlining4spam
 
-@_transparent func ham(x: Int) -> Int {
+@transparent func ham(x: Int) -> Int {
   return spam(x)
 }
 
@@ -53,7 +53,7 @@ func eggs(x: Int) -> Int {
   // CHECK: apply
   // CHECK: return
 
-@_transparent func call_auto_closure(@autoclosure x: () -> Bool) -> Bool {
+@transparent func call_auto_closure(@autoclosure x: () -> Bool) -> Bool {
   return x()
 }
 
@@ -80,7 +80,7 @@ func test_auto_closure_without_capture() -> Bool {
   // CHECK: [[FALSE:%.*]] = struct $Bool ([[FV:%.*]] : $Builtin.Int1)
   // CHECK: return [[FALSE]]
 
-@_transparent func test_curried(x: Int)(y: Int) -> Int { // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
+@transparent func test_curried(x: Int)(y: Int) -> Int { // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
   return y
 }
 
@@ -112,7 +112,7 @@ infix operator ||| {
   precedence 110
 }
 
-@_transparent func &&& (lhs: Bool, @autoclosure rhs: ()->Bool) -> Bool {
+@transparent func &&& (lhs: Bool, @autoclosure rhs: ()->Bool) -> Bool {
   if lhs {
     return rhs()
   }
@@ -120,7 +120,7 @@ infix operator ||| {
   return false
 }
 
-@_transparent func ||| (lhs: Bool, @autoclosure rhs: ()->Bool) -> Bool {
+@transparent func ||| (lhs: Bool, @autoclosure rhs: ()->Bool) -> Bool {
   if lhs {
     return true
   }
@@ -157,7 +157,7 @@ func testInlineUnionElement() -> X {
 
 
 
-@_transparent
+@transparent
 func call_let_auto_closure(@autoclosure x: () -> Bool) -> Bool {
   return x()
 }
@@ -175,7 +175,7 @@ func test_let_auto_closure_with_value_capture(x: Bool) -> Bool {
 class C {}
 
 // CHECK-LABEL: sil hidden [transparent] @_TF18mandatory_inlining25class_constrained_generic
-@_transparent
+@transparent
 func class_constrained_generic<T : C>(o: T) -> AnyClass? {
   // CHECK: return
   return T.self

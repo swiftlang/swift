@@ -233,7 +233,7 @@ internal protocol _HashStorageType {
 /// The inverse of the default hash table load factor.  Factored out so that it
 /// can be used in multiple places in the implementation and stay consistent.
 /// Should not be used outside `Dictionary` implementation.
-@_transparent
+@transparent
 internal var _hashContainerDefaultMaxLoadFactorInverse: Double {
   return 1.0 / 0.75
 }
@@ -1893,7 +1893,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     self = _Native${Self}Storage(capacity: capacity)
   }
 
-  @_transparent
+  @transparent
   public // @testable
   var capacity: Int {
     @warn_unused_result
@@ -1904,7 +1904,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     }
   }
 
-  @_transparent
+  @transparent
   internal var count: Int {
     @warn_unused_result
     get {
@@ -1918,7 +1918,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     }
   }
 
-  @_transparent
+  @transparent
   internal var maxLoadFactorInverse: Double {
     @warn_unused_result
     get {
@@ -1944,7 +1944,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     return initializedEntries[i]
   }
 
-  @_transparent
+  @transparent
   internal func destroyEntryAt(i: Int) {
     _sanityCheck(isInitializedEntry(i))
     (keys + i).destroy()
@@ -1956,7 +1956,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
 %if Self == 'Set':
-  @_transparent
+  @transparent
   internal func initializeKey(k: Key, at i: Int) {
     _sanityCheck(!isInitializedEntry(i))
 
@@ -1965,7 +1965,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     _fixLifetime(self)
   }
 
-  @_transparent
+  @transparent
   internal func moveInitializeFrom(from: Storage, at: Int, toEntryAt: Int) {
     _sanityCheck(!isInitializedEntry(toEntryAt))
     (keys + toEntryAt).initialize((from.keys + at).move())
@@ -1982,7 +1982,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
 %elif Self == 'Dictionary':
-  @_transparent
+  @transparent
   internal func initializeKey(k: Key, value v: Value, at i: Int) {
     _sanityCheck(!isInitializedEntry(i))
 
@@ -1992,7 +1992,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     _fixLifetime(self)
   }
 
-  @_transparent
+  @transparent
   internal func moveInitializeFrom(from: Storage, at: Int, toEntryAt: Int) {
     _sanityCheck(!isInitializedEntry(toEntryAt))
     (keys + toEntryAt).initialize((from.keys + at).move())
@@ -2001,7 +2001,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     initializedEntries[toEntryAt] = true
   }
 
-  @_transparent
+  @transparent
   @warn_unused_result
   internal func valueAt(i: Int) -> Value {
     _sanityCheck(isInitializedEntry(i))
@@ -2011,7 +2011,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     return res
   }
 
-  @_transparent
+  @transparent
   internal func setKey(key: Key, value: Value, at i: Int) {
     _sanityCheck(isInitializedEntry(i))
     (keys + i).memory = key
@@ -2070,7 +2070,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     }
   }
 
-  @_transparent
+  @transparent
   @warn_unused_result
   internal static func getMinCapacity(
       requestedCount: Int, _ maxLoadFactorInverse: Double) -> Int {
@@ -2274,7 +2274,7 @@ internal struct _BridgedNative${Self}Storage {
     _fixLifetime(buffer)
   }
 
-  @_transparent
+  @transparent
   internal var capacity: Int {
     get {
       let c = buffer._capacity
@@ -2305,7 +2305,7 @@ internal struct _BridgedNative${Self}Storage {
   }
 
 %if Self == 'Set':
-  @_transparent
+  @transparent
   internal func initializeKey(k: AnyObject, at i: Int) {
     _sanityCheck(!isInitializedEntry(i))
 
@@ -2314,7 +2314,7 @@ internal struct _BridgedNative${Self}Storage {
     _fixLifetime(self)
   }
 %elif Self == 'Dictionary':
-  @_transparent
+  @transparent
   internal func initializeKey(k: AnyObject, value v: AnyObject, at i: Int
   ) {
     _sanityCheck(!isInitializedEntry(i))
@@ -2325,7 +2325,7 @@ internal struct _BridgedNative${Self}Storage {
     _fixLifetime(self)
   }
 
-  @_transparent
+  @transparent
   @warn_unused_result
   internal func valueAt(i: Int) -> AnyObject {
     _sanityCheck(isInitializedEntry(i))
@@ -2903,7 +2903,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
   case Native(NativeStorageOwner)
   case Cocoa(CocoaStorage)
 
-  @_transparent
+  @transparent
   internal var guaranteedNative: Bool {
     return _canBeClass(Key.self) == 0 && _canBeClass(Value.self) == 0
   }
@@ -3668,12 +3668,12 @@ public struct ${Self}Index<${TypeParametersDecl}> :
   }
 #endif
 
-  @_transparent
+  @transparent
   internal var _guaranteedNative: Bool {
     return _canBeClass(Key.self) == 0 && _canBeClass(Value.self) == 0
   }
 
-  @_transparent
+  @transparent
   internal var _nativeIndex: _NativeIndex {
     switch _value {
     case ._Native(let nativeIndex):
@@ -3684,7 +3684,7 @@ public struct ${Self}Index<${TypeParametersDecl}> :
   }
 
 #if _runtime(_ObjC)
-  @_transparent
+  @transparent
   internal var _cocoaIndex: _CocoaIndex {
     switch _value {
     case ._Native:
@@ -3895,7 +3895,7 @@ public struct ${Self}Generator<${TypeParametersDecl}> : GeneratorType {
   }
 #endif
 
-  @_transparent
+  @transparent
   internal var _guaranteedNative: Bool {
 %if Self == 'Set':
     return _canBeClass(Element.self) == 0

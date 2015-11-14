@@ -4,11 +4,11 @@ func searchForMe(x: Float) -> Float {
   return x
 }
 
-@_transparent func baz(x: Float) -> Float {
+@transparent func baz(x: Float) -> Float {
   return searchForMe(x);
 }
 
-@_transparent func bar(x: Float, _ b: Bool) -> Float {
+@transparent func bar(x: Float, _ b: Bool) -> Float {
   if b {
     return baz(x)
   }

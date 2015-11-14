@@ -98,7 +98,7 @@ Modules can also contain `autolinking` information, which the compiler passes
 on to the linker. This can be used to specify which library implements the
 declarations in the module.
 
-.. [#] Specifically, code marked with the ``@_transparent`` attribute is
+.. [#] Specifically, code marked with the ``[transparent]`` attribute is
    required to be "transparent" to the compiler: it *must* be inlined and
    will affect diagnostics.
 

@@ -2,7 +2,7 @@
 
 // Make sure that we are able to inline try-apply instructions.
 
-@_transparent
+@transparent
 public func foo() throws -> Int32 {
   return 999
 }

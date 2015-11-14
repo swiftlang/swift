@@ -148,7 +148,7 @@ SIMPLE_DECL_ATTR(infix  , Infix  , OnFunc | OnOperator | DeclModifier, 23)
 SIMPLE_DECL_ATTR(prefix , Prefix , OnFunc | OnOperator | DeclModifier, 24)
 SIMPLE_DECL_ATTR(postfix, Postfix, OnFunc | OnOperator | DeclModifier, 25)
 
-SIMPLE_DECL_ATTR(_transparent, Transparent,
+SIMPLE_DECL_ATTR(transparent, Transparent,
                  OnFunc|OnConstructor|OnVar|OnExtension|UserInaccessible, 26)
 SIMPLE_DECL_ATTR(requires_stored_property_inits, RequiresStoredPropertyInits,
                  OnClass, 27)
