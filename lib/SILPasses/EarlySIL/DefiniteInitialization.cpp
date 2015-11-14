@@ -1637,13 +1637,13 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
 
 void LifetimeChecker::deleteDeadRelease(unsigned ReleaseID) {
   SILInstruction *Release = Releases[ReleaseID];
-  Release->eraseFromParent();
-  Releases[ReleaseID] = nullptr;
   if (isa<DestroyAddrInst>(Release)) {
     SILValue Addr = Release->getOperand(0);
     if (auto *AddrI = dyn_cast<SILInstruction>(Addr))
       recursivelyDeleteTriviallyDeadInstructions(AddrI);
   }
+  Release->eraseFromParent();
+  Releases[ReleaseID] = nullptr;
 }
 
 /// processNonTrivialRelease - We handle two kinds of release instructions here:
