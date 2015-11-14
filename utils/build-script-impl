@@ -2118,9 +2118,8 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
         echo "--- Copy swift-stdlib-tool ---"
         cp "${SWIFT_SOURCE_DIR}/utils/swift-stdlib-tool-substitute" "${INSTALL_DESTDIR}/${INSTALL_PREFIX}/bin/swift-stdlib-tool"
       fi
-      # FIXME: Don't use gnutar on Darwin
       (cd "${INSTALL_DESTDIR}" &&
-        gnutar -c -z -f "${INSTALLABLE_PACKAGE}" --owner=0 --group=0 "${TOOLCHAIN_PREFIX/#\/}")
+        tar -c -z -f "${INSTALLABLE_PACKAGE}" "${TOOLCHAIN_PREFIX/#\/}")
     else
       (cd "${INSTALL_DESTDIR}" &&
         tar -c -z -f "${INSTALLABLE_PACKAGE}" --owner=0 --group=0 "${INSTALL_PREFIX/#\/}")
@@ -2145,9 +2144,8 @@ if [[ "${SYMBOLS_PACKAGE}" ]] ; then
     echo "--- Creating symbols package ---"
     echo "-- Package file: ${SYMBOLS_PACKAGE} --"
     if [[ "$(uname -s)" == "Darwin" ]] ; then
-      # FIXME: Don't use gnutar on Darwin
       (cd "${INSTALL_SYMROOT}" &&
-        gnutar -c -z -f "${SYMBOLS_PACKAGE}" --owner=0 --group=0 "${TOOLCHAIN_PREFIX/#\/}")
+        tar -c -z -f "${SYMBOLS_PACKAGE}" "${TOOLCHAIN_PREFIX/#\/}")
     else
       (cd "${INSTALL_SYMROOT}" &&
         tar -c -z -f "${SYMBOLS_PACKAGE}" --owner=0 --group=0 "${INSTALL_PREFIX/#\/}")
