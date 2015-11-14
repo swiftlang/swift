@@ -5,7 +5,6 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: swift_repl
-// REQUIRES: rdar23526659
 
 "start"
 // CHECK-LABEL: String = "start"{{$}}
