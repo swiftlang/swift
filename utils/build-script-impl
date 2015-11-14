@@ -1560,9 +1560,6 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 fi
 
                 build_targets=(all "${SWIFT_STDLIB_TARGETS[@]}")
-                if [[ $(true_false "${BUILD_SWIFT_PERF_TESTSUITE}") == "TRUE" ]]; then
-                    build_targets=("${build_targets[@]}" benchmark-swift)
-                fi
                 skip_build=$SKIP_BUILD_SWIFT
                 ;;
 
