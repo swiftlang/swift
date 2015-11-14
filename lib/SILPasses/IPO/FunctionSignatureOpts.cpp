@@ -798,6 +798,13 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
     Builder.createReleaseValue(Loc, BB->getBBArg(ArgDesc.Index));
   }
 
+  // Function that are marked as @NoReturn must be followed by an 'unreachable'
+  // instruction.
+  if (NewF->getLoweredFunctionType()->isNoReturn()) {
+    Builder.createUnreachable(Loc);
+    return;
+  }
+
   Builder.createReturn(Loc, ReturnValue);
 }
 
