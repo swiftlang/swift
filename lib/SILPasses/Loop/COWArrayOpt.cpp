@@ -1954,11 +1954,13 @@ public:
     // exit block. After cloning this edge will become critical if it came from
     // inside the cloned region. The SSAUpdater can't handle critical non
     // cond_br edges.
-    for (auto *BB : OutsideBBs)
-      for (auto *Pred : BB->getPreds())
+    for (auto *BB : OutsideBBs) {
+      SmallVector<SILBasicBlock*, 8> Preds(BB->getPreds());
+      for (auto *Pred : Preds)
         if (!isa<CondBranchInst>(Pred->getTerminator()) &&
             !isa<BranchInst>(Pred->getTerminator()))
           splitEdgesFromTo(Pred, BB, &DomTree, nullptr);
+    }
 
     // Create the cloned start basic block.
     auto *ClonedStartBB = new (Mod) SILBasicBlock(CurFun);
