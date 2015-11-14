@@ -1857,7 +1857,7 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                     fi
                 fi
 
-                SWIFTCC="$swift_build_dir/bin/swiftc" SWIFTLIBS="$swift_build_dir/lib/swift" "$LLDB_SOURCE_DIR"/test/dotest.py --executable "$lldb_executable" $LLDB_FORMATTER_OPTS
+                SWIFTCC="$swift_build_dir/bin/swiftc" SWIFTLIBS="$swift_build_dir/lib/swift" "$LLDB_SOURCE_DIR"/test/dotest.py --executable "$lldb_executable" -C $HOST_CC $LLDB_FORMATTER_OPTS
                 popd
                 continue
                 ;;
