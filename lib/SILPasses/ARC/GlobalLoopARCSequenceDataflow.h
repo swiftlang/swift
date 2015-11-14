@@ -87,6 +87,10 @@ public:
   /// \p R.
   bool runOnLoop(const LoopRegion *R, bool FreezeOwnedArgEpilogueReleases);
 
+  /// Summarize the contents of the loop so that loops further up the loop tree
+  /// can reason about the loop.
+  void summarizeLoop(const LoopRegion *R);
+
 private:
   /// Merge in the BottomUp state of any successors of DataHandle.getBB() into
   /// DataHandle.getState().

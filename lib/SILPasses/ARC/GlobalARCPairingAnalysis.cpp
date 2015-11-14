@@ -492,6 +492,8 @@ void LoopARCMatchingSetComputationContext::processLoop(
     DecToIncStateMap.clear();
     IncToDecStateMap.clear();
   }
+
+  Evaluator.summarizeLoop(Region);
 }
 
 bool LoopARCMatchingSetComputationContext::run(
