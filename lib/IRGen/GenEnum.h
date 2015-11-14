@@ -118,6 +118,7 @@ public:
   struct Element {
     EnumElementDecl *decl;
     const TypeInfo *ti;
+    const TypeInfo *origTI;
   };
   
   enum TypeInfoKind {

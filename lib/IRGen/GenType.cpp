@@ -1702,22 +1702,7 @@ static bool isIRTypeDependent(IRGenModule &IGM, NominalTypeDecl *decl) {
     return IsIRTypeDependent(IGM).visitStructDecl(sd);
   } else {
     auto ed = cast<EnumDecl>(decl);
-
-    // HACK: there's some sort of logic in multi-payload enums that
-    // tries to assume that there are no spare bits in class-bounded
-    // archetypes.  This logic is quite broken; if you instantiate a
-    // non-shared implementation for the enum, you get different
-    // results.  This check prevents this from being a problem in
-    // common practice by pretending that a shared implementation is
-    // acceptable as long as the generic instance is known to be fixed
-    // in size.
-    if (IGM.classifyTypeSize(SILType::getPrimitiveObjectType(
-                       ed->getDeclaredTypeInContext()->getCanonicalType()),
-                             ResilienceScope::Component)
-          == ObjectSize::Fixed)
-      return false;
-
-    return IsIRTypeDependent(IGM).visitEnumDecl(cast<EnumDecl>(decl));
+    return IsIRTypeDependent(IGM).visitEnumDecl(ed);
   }
 }
 
