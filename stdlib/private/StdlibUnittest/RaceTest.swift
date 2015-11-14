@@ -368,12 +368,12 @@ struct _RaceTestAggregatedEvaluations : CustomStringConvertible {
   var description: String {
     var result = ""
     result += "Pass: \(passCount) times\n"
-    for desc in passInterestingCount.keys.sort() {
+    for desc in passInterestingCount.keys.sorted() {
       let count = passInterestingCount[desc]!
       result += "Pass \(desc): \(count) times\n"
     }
     result += "Failure: \(failureCount) times\n"
-    for desc in failureInterestingCount.keys.sort() {
+    for desc in failureInterestingCount.keys.sorted() {
       let count = failureInterestingCount[desc]!
       result += "Failure \(desc): \(count) times\n"
     }

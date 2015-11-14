@@ -52,14 +52,14 @@ func sortResultIgnored<
   var mutableCollection = mutableCollection // expected-warning {{was never mutated; consider changing to 'let' constant}}
   var array = array // expected-warning {{was never mutated; consider changing to 'let' constant}}
 
-  sequence.sort() // expected-warning {{result of call to 'sort()' is unused}}
-  sequence.sort { $0 < $1 } // expected-warning {{result of call to 'sort' is unused}}
+  sequence.sorted() // expected-warning {{result of call to 'sorted()' is unused}}
+  sequence.sorted { $0 < $1 } // expected-warning {{result of call to 'sorted' is unused}}
 
-  mutableCollection.sort() // expected-warning {{result of call to non-mutating function 'sort()' is unused; use 'sortInPlace()' to mutate in-place}} {{21-25=sortInPlace}}
-  mutableCollection.sort { $0 < $1 } // expected-warning {{result of call to non-mutating function 'sort' is unused; use 'sortInPlace' to mutate in-place}} {{21-25=sortInPlace}}
+  mutableCollection.sorted() // expected-warning {{result of call to non-mutating function 'sorted()' is unused; use 'sortInPlace()' to mutate in-place}} {{21-27=sortInPlace}}
+  mutableCollection.sorted { $0 < $1 } // expected-warning {{result of call to non-mutating function 'sorted' is unused; use 'sortInPlace' to mutate in-place}} {{21-27=sortInPlace}}
 
-  array.sort() // expected-warning {{result of call to non-mutating function 'sort()' is unused; use 'sortInPlace()' to mutate in-place}} {{9-13=sortInPlace}}
-  array.sort { $0 < $1 } // expected-warning {{result of call to non-mutating function 'sort' is unused; use 'sortInPlace' to mutate in-place}} {{9-13=sortInPlace}}
+  array.sorted() // expected-warning {{result of call to non-mutating function 'sorted()' is unused; use 'sortInPlace()' to mutate in-place}} {{9-15=sortInPlace}}
+  array.sorted { $0 < $1 } // expected-warning {{result of call to non-mutating function 'sorted' is unused; use 'sortInPlace' to mutate in-place}} {{9-15=sortInPlace}}
 }
 
 struct GoodForwardIndex1 : ForwardIndex {

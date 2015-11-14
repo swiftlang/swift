@@ -412,16 +412,16 @@ func testInoutViolation() {
 %for A in arrayTypes:
   if true {
     var b = ${A}(a)
-    b.sort { x, y in
+    b.sorted { x, y in
       b.removeAll()
       return x < y
     }
   }
 %end
   
-  // An overload of sort for Arrays uses withUnsafeMutableBufferPointer,
+  // An overload of sorted for Arrays uses withUnsafeMutableBufferPointer,
   // which disables bounds checks.
-  a.sort { x, y in
+  a.sorted { x, y in
     a = []         // Invalidate the whole array during sorting
     return x < y
   }

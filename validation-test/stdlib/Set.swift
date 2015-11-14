@@ -136,7 +136,7 @@ func isCocoaSet<T : Hashable>(s: Set<T>) -> Bool {
 }
 
 func equalsUnordered(lhs: Set<Int>, _ rhs: Set<Int>) -> Bool {
-  return lhs.sort().elementsEqual(rhs.sort()) {
+  return lhs.sorted().elementsEqual(rhs.sorted()) {
     $0 == $1
   }
 }
@@ -3537,7 +3537,7 @@ SetTestSuite.test("removeAt") {
     expectEqual(2, s.length)
     expectEmpty(s.indexOf(i*1010))
     let origKeys: [Int] = [1010, 2020, 3030]
-    expectEqual(origKeys.filter { $0 != (i*1010) }, [Int](s).sort())
+    expectEqual(origKeys.filter { $0 != (i*1010) }, [Int](s).sorted())
   }
 }
 

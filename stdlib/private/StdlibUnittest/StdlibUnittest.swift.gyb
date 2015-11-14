@@ -2320,9 +2320,9 @@ public func expectEqualsUnordered<
     -> ExpectedComparisonResult
 ) {
   let x: [Expected.Iterator.Element] =
-    expected.sort(compose(compare, { $0.isLT() }))
+    expected.sorted(compose(compare, { $0.isLT() }))
   let y: [Actual.Iterator.Element] =
-    actual.sort(compose(compare, { $0.isLT() }))
+    actual.sorted(compose(compare, { $0.isLT() }))
   expectEqualSequence(
     x, y, ${trace}, sameValue: compose(compare, { $0.isEQ() }))
 }
@@ -2344,8 +2344,8 @@ public func expectEqualsUnordered<
 public func expectEqualsUnordered<T : Comparable>(
   expected: [T], _ actual: [T], ${TRACE}
 ) {
-  let x = expected.sort()
-  let y = actual.sort()
+  let x = expected.sorted()
+  let y = actual.sorted()
   expectEqualSequence(x, y, ${trace})
 }
 
@@ -2386,8 +2386,8 @@ public func expectEqualsUnordered<
     return [ lhs.0, lhs.1 ].lexicographicalCompare([ rhs.0, rhs.1 ])
   }
 
-  let x: [(T, T)] = Array(expected).sort(comparePairLess)
-  let y: [(T, T)] = Array(actual).sort(comparePairLess)
+  let x: [(T, T)] = Array(expected).sorted(comparePairLess)
+  let y: [(T, T)] = Array(actual).sorted(comparePairLess)
 
   func comparePairEquals(lhs: (T, T), rhs: (T, T)) -> Bool {
     return lhs.0 == rhs.0 && lhs.1 == rhs.1

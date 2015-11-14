@@ -173,16 +173,16 @@ ${orderingRequirementForComparable}
 % end
 
 //===----------------------------------------------------------------------===//
-// sort()
+// sorted()
 //===----------------------------------------------------------------------===//
 
 %{
 
-sortDocCommentForPredicate = """\
+sortedDocCommentForPredicate = """\
   /// Return an `Array` containing the sorted elements of `source`
   /// according to `isOrderedBefore`."""
 
-sortDocCommentForComparable = """\
+sortedDocCommentForComparable = """\
   /// Return an `Array` containing the sorted elements of `source`."""
 
 sortInPlaceDocCommentForPredicate = """\
@@ -204,13 +204,13 @@ sortIsUnstableForComparable = """\
 % for Self in [ 'Sequence', 'MutableCollection' ]:
 
 extension ${Self} where Self.Iterator.Element : Comparable {
-${sortDocCommentForComparable}
+${sortedDocCommentForComparable}
   ///
 ${sortIsUnstableForComparable}
   ///
 ${orderingRequirementForComparable}
   @warn_unused_result(${'mutable_variant="sortInPlace"' if Self == 'MutableCollection' else ''})
-  public func sort() -> [Iterator.Element] {
+  public func sorted() -> [Iterator.Element] {
     var result = ContiguousArray(self)
     result.sortInPlace()
     return Array(result)
@@ -218,13 +218,13 @@ ${orderingRequirementForComparable}
 }
 
 extension ${Self} {
-${sortDocCommentForPredicate}
+${sortedDocCommentForPredicate}
   ///
 ${sortIsUnstableForPredicate}
   ///
 ${orderingRequirementForPredicate}
   @warn_unused_result(${'mutable_variant="sortInPlace"' if Self == 'MutableCollection' else ''})
-  public func sort(
+  public func sorted(
     @noescape isOrderedBefore: (Iterator.Element, Iterator.Element) -> Bool
   ) -> [Iterator.Element] {
     typealias EscapingBinaryPredicate =

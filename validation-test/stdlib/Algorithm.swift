@@ -84,9 +84,9 @@ Algorithm.test("sorted/strings")
   .code {
   expectEqual(
     [ "Banana", "apple", "cherry" ],
-    [ "apple", "Banana", "cherry" ].sort())
+    [ "apple", "Banana", "cherry" ].sorted())
 
-  let s = ["apple", "Banana", "cherry"].sort() {
+  let s = ["apple", "Banana", "cherry"].sorted() {
     $0.characters.length > $1.characters.length
   }
   expectEqual([ "Banana", "cherry", "apple" ], s)
@@ -146,7 +146,7 @@ func randomArray() -> A<Int> {
 Algorithm.test("invalidOrderings") {
   withInvalidOrderings {
     var a = randomArray()
-    _blackHole(a.sort($0))
+    _blackHole(a.sorted($0))
   }
   withInvalidOrderings {
     var a: A<Int>
@@ -190,7 +190,7 @@ func makeQSortKiller(len: Int) -> [Int] {
   var ary = [Int](repeating: 0, length: len)
   var ret = [Int](repeating: 0, length: len)
   for i in 0..<len { ary[i] = i }
-  ary = ary.sort(Compare)
+  ary = ary.sorted(Compare)
   for i in 0..<len {
     ret[ary[i]] = i
   }
@@ -200,7 +200,7 @@ func makeQSortKiller(len: Int) -> [Int] {
 Algorithm.test("sorted/complexity") {
   var ary: [Int] = []
 
-  // Check performance of sort on array of repeating values
+  // Check performance of sorting an array of repeating values.
   var comparisons_100 = 0
   ary = [Int](repeating: 0, length: 100)
   ary.sortInPlace { comparisons_100++; return $0 < $1 }
@@ -221,7 +221,7 @@ Algorithm.test("sorted/complexity") {
 }
 
 Algorithm.test("sorted/return type") {
-  let x: Array = ([5, 4, 3, 2, 1] as ArraySlice).sort()
+  let x: Array = ([5, 4, 3, 2, 1] as ArraySlice).sorted()
 }
 
 runAllTests()

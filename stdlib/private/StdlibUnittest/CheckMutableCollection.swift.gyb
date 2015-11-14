@@ -237,12 +237,12 @@ self.test("\(testNamePrefix)._withUnsafeMutableBufferPointerIfSupported()/semant
 }
 
 //===----------------------------------------------------------------------===//
-// sort()
+// sorted()
 //===----------------------------------------------------------------------===//
 
 % for predicate in [ False, True ]:
 
-self.test("\(testNamePrefix).sort/DispatchesThrough_withUnsafeMutableBufferPointerIfSupported/${'Predicate' if predicate else 'WhereElementIsComparable'}") {
+self.test("\(testNamePrefix).sorted/DispatchesThrough_withUnsafeMutableBufferPointerIfSupported/${'Predicate' if predicate else 'WhereElementIsComparable'}") {
   let sequence = [ 5, 4, 3, 2, 1 ]
 %   if predicate:
   let elements: [OpaqueValue<Int>] =
@@ -261,14 +261,14 @@ self.test("\(testNamePrefix).sort/DispatchesThrough_withUnsafeMutableBufferPoint
   var lc = LoggingMutableCollection(c)
 
 %   if predicate:
-  let result = lc.sort { extractValue($0).value < extractValue($1).value }
+  let result = lc.sorted { extractValue($0).value < extractValue($1).value }
   let extractedResult = result.map(extractValue)
 %   else:
-  let result = lc.sort()
+  let result = lc.sorted()
   let extractedResult = result.map(extractValueFromComparable)
 %   end
 
-  // This sort operation is not in-place.
+  // sorted() method is not in-place.
   // The collection is copied into an array before sorting.
   expectEqual(
     0, lc.log._withUnsafeMutableBufferPointerIfSupported[lc.dynamicType])
@@ -293,7 +293,7 @@ func checkSort_${'Predicate' if predicate else 'WhereElementIsComparable'}(
     }
   let c = makeWrappedCollection(elements)
   let closureLifetimeTracker = LifetimeTracked(0)
-  let result = c.sort {
+  let result = c.sorted {
     (lhs, rhs) in
     _blackHole(closureLifetimeTracker)
     return lessImpl(extractValue(lhs).value, extractValue(rhs).value)
@@ -308,7 +308,7 @@ func checkSort_${'Predicate' if predicate else 'WhereElementIsComparable'}(
       MinimalComparableValue($0, identity: $1)
     }
   let c = makeWrappedCollectionWithComparableElement(elements)
-  let result = c.sort()
+  let result = c.sorted()
 %   end
 
   // Check that the original collection is unchanged.
@@ -335,7 +335,7 @@ func checkSort_${'Predicate' if predicate else 'WhereElementIsComparable'}(
   }
 }
 
-self.test("\(testNamePrefix).sort/${'Predicate' if predicate else 'WhereElementIsComparable'}") {
+self.test("\(testNamePrefix).sorted/${'Predicate' if predicate else 'WhereElementIsComparable'}") {
   for test in partitionExhaustiveTests {
     forAllPermutations(test.sequence) { (sequence) in
       checkSort_${'Predicate' if predicate else 'WhereElementIsComparable'}(
@@ -347,7 +347,7 @@ self.test("\(testNamePrefix).sort/${'Predicate' if predicate else 'WhereElementI
   }
 }
 
-self.test("\(testNamePrefix).sort/${'Predicate' if predicate else 'WhereElementIsComparable'}/InvalidOrderings") {
+self.test("\(testNamePrefix).sorted/${'Predicate' if predicate else 'WhereElementIsComparable'}/InvalidOrderings") {
   withInvalidOrderings { (comparisonPredicate) in
     for i in 0..<7 {
       forAllPermutations(i) { (sequence) in

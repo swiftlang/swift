@@ -1577,10 +1577,10 @@ Reflection.test("CustomMirror") {
       ObjectIdentifier(a) >= ObjectIdentifier(b)
       && ObjectIdentifier(a) <= ObjectIdentifier(b))
 
-    // Check ordering is transitive
+    // Check that ordering is transitive.
     expectEqual(
-      [ ObjectIdentifier(a), ObjectIdentifier(b), ObjectIdentifier(c) ].sort(),
-      [ ObjectIdentifier(c), ObjectIdentifier(b), ObjectIdentifier(a) ].sort())
+      [ ObjectIdentifier(a), ObjectIdentifier(b), ObjectIdentifier(c) ].sorted(),
+      [ ObjectIdentifier(c), ObjectIdentifier(b), ObjectIdentifier(a) ].sorted())
   }
 }
 

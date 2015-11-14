@@ -102,7 +102,7 @@ Algorithm.test("${t}/sorted/${name}") {
   var sortedAry2 = ${t}<Int>()
 
   // Similar test for sorting with predicate
-  sortedAry1 = ary.sort(${comparePredicate})
+  sortedAry1 = ary.sorted(${comparePredicate})
   expectSortedCollection(sortedAry1, ary)
 
   // Check that sorting works well on intervals
@@ -118,7 +118,7 @@ Algorithm.test("${t}/sorted/${name}") {
 %   end
 % end
 
-Algorithm.test("sort/CollectionsWithUnusualIndices") {
+Algorithm.test("sortInPlace/CollectionsWithUnusualIndices") {
   let length = 1000
   var ary = randArray(length)
 

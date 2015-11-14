@@ -53,8 +53,8 @@ struct _Prespecialize {
       a.reserveCapacity(100)
 
       // Sort array
-      let _ = a.sort { (a:Element, b:Element) in a < b }
-      a.sortInPlace { (a:Element, b:Element) in a < b }
+      let _ = a.sorted { (a: Element, b: Element) in a < b }
+      a.sortInPlace { (a: Element, b: Element) in a < b }
 
 
       // force specialization of print<Element>

@@ -3882,7 +3882,7 @@ DictionaryTestSuite.test("removeAt") {
     expectEqual(2, d.length)
     expectEmpty(d.indexForKey(i))
     let origKeys: [Int] = [10, 20, 30]
-    expectEqual(origKeys.filter { $0 != (i*10) }, d.keys.sort())
+    expectEqual(origKeys.filter { $0 != (i*10) }, d.keys.sorted())
   }
 }
 
