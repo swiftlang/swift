@@ -401,7 +401,9 @@ SILInstruction *PartialApplyCombiner::combine() {
 
   // Iterate over all uses of the partial_apply
   // and look for applies that use it as a callee.
-  for (auto Use : PAI->getUses()) {
+  for (auto UI = PAI->use_begin(), UE = PAI->use_end(); UI != UE; ) {
+    auto Use = *UI;
+    ++UI;
     auto User = Use->getUser();
     // If this use of a partial_apply is not
     // an apply which uses it as a callee, bail.
