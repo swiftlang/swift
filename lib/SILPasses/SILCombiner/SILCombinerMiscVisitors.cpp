@@ -255,20 +255,25 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
     SILValue(IEI, 0).replaceAllUsesWith(ConcAlloc->getAddressResult());
     eraseInstFromFunction(*IEI);
 
-
-    for (Operand *Op: AS->getUses()) {
+    for (auto UI = AS->use_begin(), UE = AS->use_end(); UI != UE;) {
+      auto *Op = *UI;
+      ++UI;
       if (auto *DA = dyn_cast<DestroyAddrInst>(Op->getUser())) {
         Builder.setInsertionPoint(DA);
         Builder.createDestroyAddr(DA->getLoc(), SILValue(ConcAlloc, 1))
           ->setDebugScope(DA->getDebugScope());
         eraseInstFromFunction(*DA);
+        continue;
       }
-      if (auto *DS = dyn_cast<DeallocStackInst>(Op->getUser())) {
-        Builder.setInsertionPoint(DS);
-        Builder.createDeallocStack(DS->getLoc(), SILValue(ConcAlloc, 0))
+
+      if (!isa<DeallocStackInst>(Op->getUser()))
+        continue;
+
+      auto *DS = cast<DeallocStackInst>(Op->getUser());
+      Builder.setInsertionPoint(DS);
+      Builder.createDeallocStack(DS->getLoc(), SILValue(ConcAlloc, 0))
           ->setDebugScope(DS->getDebugScope());
-        eraseInstFromFunction(*DS);
-      }
+      eraseInstFromFunction(*DS);
     }
 
     eraseInstFromFunction(*AS);
