@@ -67,7 +67,7 @@ func unreachableBranch() -> Int {
 }
 
 // We should not report unreachable user code inside inlined transparent function.
-@transparent
+@_transparent
 func ifTrueTransparent(b: Bool) -> Int {
   _ = 0
   if b {

@@ -14,7 +14,7 @@
 
 // FIXME: Once we have an FFI interface, make these have proper function bodies
 
-@transparent
+@_transparent
 @warn_unused_result
 public // @testable
 func _countLeadingZeros(value: Int64) -> Int64 {
@@ -22,7 +22,7 @@ func _countLeadingZeros(value: Int64) -> Int64 {
 }
 
 /// Returns if `x` is a power of 2.
-@transparent
+@_transparent
 @warn_unused_result
 public // @testable
 func _isPowerOf2(x: UInt) -> Bool {
@@ -35,7 +35,7 @@ func _isPowerOf2(x: UInt) -> Bool {
 }
 
 /// Returns if `x` is a power of 2.
-@transparent
+@_transparent
 @warn_unused_result
 public // @testable
 func _isPowerOf2(x: Int) -> Bool {
@@ -48,7 +48,7 @@ func _isPowerOf2(x: Int) -> Bool {
 }
 
 #if _runtime(_ObjC)
-@transparent
+@_transparent
 public func _autorelease(x: AnyObject) {
   Builtin.retain(x)
   Builtin.autorelease(x)
@@ -97,7 +97,7 @@ func _typeName(type: Any.Type, qualified: Bool = true) -> String {
 ///
 /// TODO: Implement version working on Int instead of Int64.
 @warn_unused_result
-@transparent
+@_transparent
 public // @testable
 func _floorLog2(x: Int64) -> Int {
   _sanityCheck(x > 0, "_floorLog2 operates only on non-negative integers")

@@ -731,7 +731,7 @@ extension r17233681Lazy {
 }
 
 
-// <rdar://problem/17556858> delegating init that delegates to @transparent init fails
+// <rdar://problem/17556858> delegating init that delegates to @_transparent init fails
 struct FortyTwo { }
 
 extension Double {
@@ -1041,7 +1041,7 @@ struct StructMutatingMethodTest {
   }
 }
 
-@transparent
+@_transparent
 func myTransparentFunction(inout x : Int) {}
 
 

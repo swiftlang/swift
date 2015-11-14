@@ -80,12 +80,12 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   var _rawValue: Builtin.RawPointer
 
   /// Construct a `nil` instance.
-  @transparent
+  @_transparent
   public init() {
     _rawValue = _nilRawPointer
   }
 
-  @transparent
+  @_transparent
   init(_ v: Builtin.RawPointer) {
     _rawValue = v
   }
@@ -93,7 +93,7 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   /// Construct a `COpaquePointer` from a given address in memory.
   ///
   /// This is a fundamentally unsafe conversion.
-  @transparent
+  @_transparent
   public init(bitPattern: Int) {
     _rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
@@ -101,25 +101,25 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   /// Construct a `COpaquePointer` from a given address in memory.
   ///
   /// This is a fundamentally unsafe conversion.
-  @transparent
+  @_transparent
   public init(bitPattern: UInt) {
     _rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
   /// Convert a typed `UnsafePointer` to an opaque C pointer.
-  @transparent
+  @_transparent
   public init<T>(_ source: UnsafePointer<T>) {
     self._rawValue = source._rawValue
   }
 
   /// Convert a typed `UnsafeMutablePointer` to an opaque C pointer.
-  @transparent
+  @_transparent
   public init<T>(_ source: UnsafeMutablePointer<T>) {
     self._rawValue = source._rawValue
   }
 
   /// Determine whether the given pointer is null.
-  @transparent
+  @_transparent
   var _isNull : Bool {
     return self == nil
   }
@@ -136,7 +136,7 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   }
 
   /// Create an instance initialized with `nil`.
-  @transparent public
+  @_transparent public
   init(nilLiteral: ()) {
     _rawValue = _nilRawPointer
   }

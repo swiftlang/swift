@@ -22,7 +22,7 @@ public protocol _PointerType {
 }
 
 /// Derive a pointer argument from a convertible pointer type.
-@transparent
+@_transparent
 @warn_unused_result
 public // COMPILER_INTRINSIC
 func _convertPointerToPointerArgument<
@@ -33,7 +33,7 @@ func _convertPointerToPointerArgument<
 }
 
 /// Derive a pointer argument from the address of an inout parameter.
-@transparent
+@_transparent
 @warn_unused_result
 public // COMPILER_INTRINSIC
 func _convertInOutToPointerArgument<
@@ -43,7 +43,7 @@ func _convertInOutToPointerArgument<
 }
 
 /// Derive a pointer argument from an inout array parameter.
-@transparent
+@_transparent
 @warn_unused_result
 public // COMPILER_INTRINSIC
 func _convertMutableArrayToPointerArgument<
@@ -61,7 +61,7 @@ func _convertMutableArrayToPointerArgument<
 }
 
 /// Derive a pointer argument from a value array parameter.
-@transparent
+@_transparent
 @warn_unused_result
 public // COMPILER_INTRINSIC
 func _convertConstArrayToPointerArgument<
@@ -73,7 +73,7 @@ func _convertConstArrayToPointerArgument<
 }
 
 /// Derive a UTF-8 pointer argument from a value string parameter.
-@transparent
+@_transparent
 @warn_unused_result
 public // COMPILER_INTRINSIC
 func _convertConstStringToUTF8PointerArgument<

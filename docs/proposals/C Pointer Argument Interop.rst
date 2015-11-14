@@ -259,7 +259,7 @@ An example of a conformance for ``CMutablePointer``::
 
     typealias InOutType = T
 
-    @transparent
+    @_transparent
     static func _convertFromInOutAddress(p: Builtin.RawPointer)
     -> CMutablePointer {
       return CMutablePointer(p)
@@ -315,7 +315,7 @@ An example of a conformance for ``ObjCInOut``::
     typealias InOutType = T!
     typealias WritebackType = Builtin.RawPointer
 
-    @transparent
+    @_transparent
     static func _createWriteback(inout ref: T!)
     -> Builtin.RawPointer {
       // The initial object reference is passed into the callee effectively
@@ -323,7 +323,7 @@ An example of a conformance for ``ObjCInOut``::
       return unsafeBitCast(ref, Builtin.RawPointer.self)
     }
 
-    @transparent
+    @_transparent
     static func _commitWriteback(inout ref: T!,
                                  value: Builtin.RawPointer) {
       // The reference is autoreleased on return from the caller, so retain it
@@ -331,7 +331,7 @@ An example of a conformance for ``ObjCInOut``::
       ref = unsafeBitCast(value, T!.self)
     }
 
-    @transparent
+    @_transparent
     static func _convertFromWritebackAddress(value: Builtin.RawPointer) {
       return ObjCInOut(value)
     }

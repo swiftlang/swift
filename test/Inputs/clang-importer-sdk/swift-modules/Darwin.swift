@@ -23,7 +23,7 @@ public struct DarwinBoolean : BooleanType, BooleanLiteralConvertible {
   }
 
   /// Create an instance initialized to `value`.
-  @transparent
+  @_transparent
   public init(booleanLiteral value: Bool) {
     self.init(value)
   }

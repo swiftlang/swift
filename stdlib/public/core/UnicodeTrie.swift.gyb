@@ -140,31 +140,31 @@ struct _UnicodeGraphemeClusterBreakPropertyTrie {
   let _trieData: UnsafePointer<UInt8>
 
 % if BMPLookupBytesPerEntry == 1:
-  @transparent var _BMPLookup: UnsafePointer<UInt8> {
+  @_transparent var _BMPLookup: UnsafePointer<UInt8> {
     return _trieData + ${BMPLookupBytesOffset}
   }
 % end
 
 % if BMPDataBytesPerEntry == 1:
-  @transparent var _BMPData: UnsafePointer<UInt8> {
+  @_transparent var _BMPData: UnsafePointer<UInt8> {
     return _trieData + ${BMPDataBytesOffset}
   }
 % end
 
 % if SuppLookup1BytesPerEntry == 1:
-  @transparent var _SuppLookup1: UnsafePointer<UInt8> {
+  @_transparent var _SuppLookup1: UnsafePointer<UInt8> {
     return _trieData + ${SuppLookup1BytesOffset}
   }
 % end
 
 % if SuppLookup2BytesPerEntry == 1:
-  @transparent var _SuppLookup2: UnsafePointer<UInt8> {
+  @_transparent var _SuppLookup2: UnsafePointer<UInt8> {
     return _trieData + ${SuppLookup2BytesOffset}
   }
 % end
 
 % if SuppDataBytesPerEntry == 1:
-  @transparent var _SuppData: UnsafePointer<UInt8> {
+  @_transparent var _SuppData: UnsafePointer<UInt8> {
     return _trieData + ${SuppDataBytesOffset}
   }
 % end
@@ -175,32 +175,32 @@ struct _UnicodeGraphemeClusterBreakPropertyTrie {
     _trieData = _swift_stdlib_GraphemeClusterBreakPropertyTrie
   }
 
-  @transparent
+  @_transparent
   @warn_unused_result
   func _getBMPFirstLevelIndex(cp: UInt32) -> Int {
     return Int(cp >> ${BMPFirstLevelIndexBits})
   }
 
-  @transparent
+  @_transparent
   @warn_unused_result
   func _getBMPDataOffset(cp: UInt32) -> Int {
     return Int(cp & ((1 << ${BMPDataOffsetBits}) - 1))
   }
 
-  @transparent
+  @_transparent
   @warn_unused_result
   func _getSuppFirstLevelIndex(cp: UInt32) -> Int {
     return Int(cp >> (${SuppSecondLevelIndexBits} + ${SuppDataOffsetBits}))
   }
 
-  @transparent
+  @_transparent
   @warn_unused_result
   func _getSuppSecondLevelIndex(cp: UInt32) -> Int {
     return Int((cp >> ${SuppDataOffsetBits}) &
         ((1 << ${SuppSecondLevelIndexBits}) - 1))
   }
 
-  @transparent
+  @_transparent
   @warn_unused_result
   func _getSuppDataOffset(cp: UInt32) -> Int {
     return Int(cp & ((1 << ${SuppDataOffsetBits}) - 1))
