@@ -65,7 +65,7 @@ private:
   bool createDeinitCall(SILType AllocType, SILInstruction *ReleaseInst,
                         SILValue object);
 
-  StringRef getName() override { return "ReleaseDevirtualizer"; }
+  StringRef getName() override { return "Release Devirtualizer"; }
 
   RCIdentityFunctionInfo *RCIA = nullptr;
 };
@@ -94,14 +94,12 @@ void ReleaseDevirtualizer::run() {
           continue;
         }
       }
-      if (I.mayRelease()) {
+
+      if (isa<ReleaseValueInst>(&I) ||
+          isa<StrongReleaseInst>(&I)) {
         LastRelease = &I;
-        if (isa<ReleaseValueInst>(&I) || isa<StrongReleaseInst>(&I)) {
-          LastRelease = &I;
-        } else {
-          // An unsupported release instruction, e.g. a function call.
-          LastRelease = nullptr;
-        }
+      } else if (I.mayRelease()) {
+        LastRelease = nullptr;
       }
     }
   }
@@ -178,10 +176,10 @@ devirtualizeReleaseOfBuffer(SILInstruction *ReleaseInst,
   SILType SILClType = SILType::getPrimitiveObjectType(CanType(ClType));
   return createDeinitCall(SILClType, ReleaseInst, AllocAI);
 }
-  
-bool ReleaseDevirtualizer::
-createDeinitCall(SILType AllocType, SILInstruction *ReleaseInst,
-                 SILValue object) {
+
+bool ReleaseDevirtualizer::createDeinitCall(SILType AllocType,
+                                            SILInstruction *ReleaseInst,
+                                            SILValue object) {
   ClassDecl *Cl = AllocType.getClassOrBoundGenericClass();
   assert(Cl && "no class type allocated with alloc_ref");
 
@@ -208,7 +206,7 @@ createDeinitCall(SILType AllocType, SILInstruction *ReleaseInst,
 
   SILBuilder B(ReleaseInst);
   if (object.getType() != AllocType)
-    object =  B.createUncheckedRefCast(ReleaseInst->getLoc(), object, AllocType);
+    object = B.createUncheckedRefCast(ReleaseInst->getLoc(), object, AllocType);
 
   // Create the call to the destructor with the allocated object as self
   // argument.
