@@ -76,19 +76,7 @@ class DCE : public SILFunctionTransform {
 
   // Maps instructions which produce a failing condition (like overflow
   // builtins) to the actual cond_fail instructions which handle the failure.
-
-  // Dependencies which go in the reverse direction. Usually for a pair
-  //   %1 = inst_a
-  //   inst_b(%1)
-  // the dependency goes from inst_b to inst_a: if inst_b is alive then also
-  // inst_a is alive.
-  // For some instructions the dependency is exactly the other way round, e.g.
-  //   %1 = inst_which_can_fail
-  //   cond_fail(%1)
-  // In this case cond_fail is alive only if inst_which_can_fail is alive.
-  // The key of this map is the source of the dependency (inst_a), the
-  // value is the destination (inst_b).
-  llvm::DenseMap<SILInstruction *, SILInstruction *> ReverseDependencies;
+  llvm::DenseMap<SILInstruction *, CondFailInst *> CondFailProducers;
 
   /// Tracks if the pass changed branches.
   bool BranchesChanged;
@@ -116,7 +104,7 @@ class DCE : public SILFunctionTransform {
     DEBUG(PDT->print(llvm::dbgs()));
 
     assert(Worklist.empty() && LiveValues.empty() && LiveBlocks.empty() &&
-           ControllingInfoMap.empty() && ReverseDependencies.empty() &&
+           ControllingInfoMap.empty() && CondFailProducers.empty() &&
            "Expected to start with empty data structures!");
 
     if (!precomputeControlInfo(*F))
@@ -137,12 +125,11 @@ class DCE : public SILFunctionTransform {
     LiveValues.clear();
     LiveBlocks.clear();
     ControllingInfoMap.clear();
-    ReverseDependencies.clear();
+    CondFailProducers.clear();
   }
 
   bool precomputeControlInfo(SILFunction &F);
   void markLive(SILFunction &F);
-  void addReverseDependency(SILInstruction *From, SILInstruction *To);
   bool removeDead(SILFunction &F);
 
   void computeLevelNumbers(PostDomTreeNode *Node, unsigned Level);
@@ -219,25 +206,18 @@ void DCE::markLive(SILFunction &F) {
   for (auto &BB : F) {
     for (auto &I : BB) {
       if (auto *CFI = dyn_cast<CondFailInst>(&I)) {
-        // A cond_fail is only alive if its (identifyable) producer is alive.
+        // Special case cond_fail instructions. A cond_fail is only alive
+        // if its (identifyable) producer is alive. We handle this in
+        // propagateLiveness.
         if (SILInstruction *Prod = getProducer(CFI)) {
-          addReverseDependency(Prod, CFI);
-        } else {
-          markValueLive(CFI);
+          CondFailInst *&MappedCFI = CondFailProducers[Prod];
+          if (!MappedCFI) {
+            // For simplicity we only handle a single cond_fail for each
+            // producer (which is the usual case).
+            MappedCFI = CFI;
+            continue;
+          }
         }
-        continue;
-      }
-      if (auto *FLI = dyn_cast<FixLifetimeInst>(&I)) {
-        // A fix_lifetime (with a non-address type) is only alive if it's
-        // definition is alive.
-        SILValue Op = FLI->getOperand();
-        auto *OpInst = dyn_cast<SILInstruction>(Op);
-        if (OpInst && !Op.getType().isAddress()) {
-          addReverseDependency(OpInst, FLI);
-        } else {
-          markValueLive(FLI);
-        }
-        continue;
       }
       if (seemsUseful(&I))
         markValueLive(&I);
@@ -251,18 +231,6 @@ void DCE::markLive(SILFunction &F) {
     auto *I = Worklist.pop_back_val();
     propagateLiveness(I);
   }
-}
-
-// Records a reverse dependency. See DCE::ReverseDependencies.
-void DCE::addReverseDependency(SILInstruction *From, SILInstruction *To) {
-  assert(!ReverseDependencies.lookup(To) &&
-         "Target of reverse dependency already in map");
-  SILInstruction *&ExistingTo = ReverseDependencies[From];
-  if (ExistingTo) {
-    // Create a single linked chain if From has multiple targets.
-    ReverseDependencies[To] = ExistingTo;
-  }
-  ExistingTo = To;
 }
 
 // Mark as live the terminator argument at index ArgIndex in Pred that
@@ -354,10 +322,10 @@ void DCE::propagateLiveness(SILInstruction *I) {
     for (Operand *DU : getDebugUses(*I))
       markValueLive(DU->getUser());
 
-    // Handle all other reverse-dependency instructions, like cond_fail and
-    // fix_lifetime. Only if the definition is alive, the user itself is alive.
-    if (SILInstruction *DepInst = ReverseDependencies.lookup(I)) {
-      markValueLive(DepInst);
+    // The same situation for cond_fail instructions. Only if the producer of
+    // the cond_fail is alive, the cond_fail itself is alive.
+    if (CondFailInst *CFI = CondFailProducers.lookup(I)) {
+      markValueLive(CFI);
     }
     return;
   }
