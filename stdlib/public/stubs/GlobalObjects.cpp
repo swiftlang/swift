@@ -26,7 +26,7 @@ extern "C" ClassMetadata _TMCs18_EmptyArrayStorage;
 extern "C" _SwiftEmptyArrayStorage _swiftEmptyArrayStorage = {
   // HeapObject header;
   {
-    &_TMCs18_EmptyArrayStorage, // is-a pointer
+    &_TMCs18_EmptyArrayStorage, // isa pointer
   },
   
   // _SwiftArrayBodyStorage body;

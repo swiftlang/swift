@@ -59,7 +59,6 @@ add_swift_library(swiftRuntime IS_STDLIB IS_STDLIB_CORE
   Enum.cpp
   ErrorObject.cpp
   Errors.cpp
-  GlobalObjects.cpp
   Heap.cpp
   HeapObject.cpp
   KnownMetadata.cpp
