@@ -177,7 +177,7 @@ public protocol IntegerType
   func isLessThan(rhs: Self) -> Bool
 
   /// The number of bits required to represent our value.  If `self`
-  /// is negative, returns the index of the most significant bit of
+  /// is negative, returns the index of the least significant bit of
   /// our representation such that all more-significant bits are 1.
   /// Has the value -1 if `self` is 0.
   var mostSignificantBit: Word { get }
