@@ -158,97 +158,147 @@ SILInstruction *SILCombiner::visitSelectValueInst(SelectValueInst *SVI) {
 SILInstruction *SILCombiner::visitSwitchValueInst(SwitchValueInst *SVI) {
   return nullptr;
 }
-SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
-  // init_existential_addr instructions behave like memory allocation within
-  // the allocated object. We can promote the init_existential_addr allocation
-  // into a dedicated allocation.
 
-  // Detect this pattern
-  // %0 = alloc_stack $LogicValue
-  // %1 = init_existential_addr %0#1 : $*LogicValue, $*Bool
-  // ...
-  // use of %1
-  // ...
-  // destroy_addr %0#1 : $*LogicValue
-  // dealloc_stack %0#0 : $*@local_storage LogicValue
-  //
+namespace {
 
-  // At the same time also look for dead alloc_stack live ranges that are only
-  // copied into.
-  // %0 = alloc_stack
-  // copy_addr %src, %0
-  // destroy_addr %0#1 : $*LogicValue
-  // dealloc_stack %0#0 : $*@local_storage LogicValue
+/// A SILInstruction visitor that analyzes alloc stack values for dead live
+/// range and promotion opportunities.
+///
+/// init_existential_addr instructions behave like memory allocation within the
+/// allocated object. We can promote the init_existential_addr allocation into a
+/// dedicated allocation.
+///
+/// We detect this pattern
+/// %0 = alloc_stack $LogicValue
+/// %1 = init_existential_addr %0#1 : $*LogicValue, $*Bool
+/// ...
+/// use of %1
+/// ...
+/// destroy_addr %0#1 : $*LogicValue
+/// dealloc_stack %0#0 : $*@local_storage LogicValue
+///
+/// At the same we time also look for dead alloc_stack live ranges that are only
+/// copied into.
+///
+/// %0 = alloc_stack
+/// copy_addr %src, %0
+/// destroy_addr %0#1 : $*LogicValue
+/// dealloc_stack %0#0 : $*@local_storage LogicValue
+struct AllocStackAnalyzer : SILInstructionVisitor<AllocStackAnalyzer> {
+  /// The alloc_stack that we are analyzing.
+  AllocStackInst *ASI;
 
+  /// Do all of the users of the alloc stack allow us to perform optimizations.
   bool LegalUsers = true;
+
+  /// If we saw an init_existential_addr in the use list of the alloc_stack,
+  /// this is the init_existential_addr. We are conservative in the face of
+  /// having multiple init_existential_addr. In such a case, we say that the use
+  /// list of the alloc_stack does not allow for optimizations to occur.
   InitExistentialAddrInst *IEI = nullptr;
+
+  /// If we saw an open_existential_addr in the use list of the alloc_stack,
+  /// this is the open_existential_addr. We are conservative in the case of
+  /// multiple open_existential_addr. In such a case, we say that the use list
+  /// of the alloc_stack does not allow for optimizations to occur.
   OpenExistentialAddrInst *OEI = nullptr;
+
+  /// Did we see any copies into the alloc stack.
   bool HaveSeenCopyInto = false;
-  // Scan all of the uses of the AllocStack and check if it is not used for
-  // anything other than the init_existential_addr/open_existential_addr container.
-  for (Operand *Op: getNonDebugUses(*AS)) {
-    // Destroy and dealloc are both fine.
-    if (isa<DestroyAddrInst>(Op->getUser()) ||
-        isa<DeinitExistentialAddrInst>(Op->getUser()) ||
-        isa<DeallocStackInst>(Op->getUser()))
-      continue;
 
-    // Make sure there is exactly one init_existential_addr.
-    if (auto *I = dyn_cast<InitExistentialAddrInst>(Op->getUser())) {
-      if (IEI || HaveSeenCopyInto) {
-        LegalUsers = false;
-        break;
-      }
-      IEI = I;
-      continue;
-    }
+public:
+  AllocStackAnalyzer(AllocStackInst *ASI) : ASI(ASI) {}
 
-    // Make sure there is exactly one open_existential_addr.
-    if (auto *I = dyn_cast<OpenExistentialAddrInst>(Op->getUser())) {
-      if (OEI) {
-        LegalUsers = false;
-        break;
-      }
+  /// Analyze the alloc_stack instruction's uses.
+  void analyze() {
+    // Scan all of the uses of the AllocStack and check if it is not used for
+    // anything other than the init_existential_addr/open_existential_addr
+    // container.
 
-      // This open_existential should not have any uses except destroy_addr.
-      for (auto Use: getNonDebugUses(*I)) {
-        if (!isa<DestroyAddrInst>(Use->getUser())) {
-          LegalUsers = false;
-          break;
-        }
-      }
+    for (auto *Op : getNonDebugUses(*ASI)) {
+      visit(Op->getUser());
 
+      // If we found a non-legal user, bail early.
       if (!LegalUsers)
         break;
-
-      OEI = I;
-      continue;
     }
-
-    if (auto *CopyAddr = dyn_cast<CopyAddrInst>(Op->getUser())) {
-      if (IEI) {
-        LegalUsers = false;
-        break;
-      }
-      // Copies into the alloc_stack live range are safe.
-      if (CopyAddr->getDest().getDef() == AS) {
-        HaveSeenCopyInto = true;
-        continue;
-      }
-
-      LegalUsers = false;
-      break;
-    }
-
-    // All other instructions are illegal.
-    LegalUsers = false;
-    break;
   }
+
+  /// Given an unhandled case, we have an illegal use for our optimization
+  /// purposes. Set LegalUsers to false and return.
+  void visitSILInstruction(SILInstruction *I) { LegalUsers = false; }
+
+  // Destroy and dealloc are both fine.
+  void visitDestroyAddrInst(DestroyAddrInst *I) {}
+  void visitDeinitExistentialAddrInst(DeinitExistentialAddrInst *I) {}
+  void visitDeallocStackInst(DeallocStackInst *I) {}
+
+  void visitInitExistentialAddrInst(InitExistentialAddrInst *I) {
+    // If we have already seen an init_existential_addr, we can not
+    // optimize. This is because we only handle the single init_existential_addr
+    // case.
+    if (IEI || HaveSeenCopyInto) {
+      LegalUsers = false;
+      return;
+    }
+    IEI = I;
+  }
+
+  void visitOpenExistentialAddrInst(OpenExistentialAddrInst *I) {
+    // If we have already seen an open_existential_addr, we can not
+    // optimize. This is because we only handle the single open_existential_addr
+    // case.
+    if (OEI) {
+      LegalUsers = false;
+      return;
+    }
+
+    // Make sure tht the open_existential does not have any uses except
+    // destroy_addr.
+    for (auto *Use : getNonDebugUses(*I)) {
+      if (!isa<DestroyAddrInst>(Use->getUser())) {
+        LegalUsers = false;
+        return;
+      }
+    }
+
+    OEI = I;
+  }
+
+  void visitCopyAddrInst(CopyAddrInst *I) {
+    if (IEI) {
+      LegalUsers = false;
+      return;
+    }
+
+    // Copies into the alloc_stack live range are safe.
+    if (I->getDest().getDef() == ASI) {
+      HaveSeenCopyInto = true;
+      return;
+    }
+
+    LegalUsers = false;
+  }
+};
+
+} // end anonymous namespace
+
+SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
+  AllocStackAnalyzer Analyzer(AS);
+  Analyzer.analyze();
+
+  // If when analyzing, we found a user that makes our optimization, illegal,
+  // bail early.
+  if (!Analyzer.LegalUsers)
+    return nullptr;
+
+  InitExistentialAddrInst *IEI = Analyzer.IEI;
+  OpenExistentialAddrInst *OEI = Analyzer.OEI;
 
   // If the only users of the alloc_stack are alloc, destroy and
   // init_existential_addr then we can promote the allocation of the init
   // existential.
-  if (LegalUsers && IEI && !OEI) {
+  if (IEI && !OEI) {
     auto *ConcAlloc = Builder.createAllocStack(AS->getLoc(),
                                                 IEI->getLoweredConcreteType());
     ConcAlloc->setDebugScope(AS->getDebugScope());
@@ -276,49 +326,54 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
       eraseInstFromFunction(*DS);
     }
 
-    eraseInstFromFunction(*AS);
+    return eraseInstFromFunction(*AS);
   }
 
-  // Remove a dead live range that is only copied into.
-  if (LegalUsers && HaveSeenCopyInto && !IEI) {
-    SmallPtrSet<SILInstruction *, 16> ToDelete;
+  // If we have a live 'live range' or a live range that we have not sen a copy
+  // into, bail.
+  if (!Analyzer.HaveSeenCopyInto || IEI)
+    return nullptr;
 
-    for (auto *Op : AS->getUses()) {
-      // Replace a copy_addr [take] %src ... by a destroy_addr %src if %src is
-      // no the alloc_stack.
-      // Otherwise, just delete the copy_addr.
-      if (auto *CopyAddr = dyn_cast<CopyAddrInst>(Op->getUser())) {
-        if (CopyAddr->isTakeOfSrc() && CopyAddr->getSrc().getDef() != AS) {
-          Builder.setInsertionPoint(CopyAddr);
-          Builder.createDestroyAddr(CopyAddr->getLoc(), CopyAddr->getSrc())
-              ->setDebugScope(CopyAddr->getDebugScope());
-        }
+  // Otherwise remove the dead live range that is only copied into.
+  //
+  // TODO: Do we not remove purely dead live ranges here? Seems like we should.
+  SmallPtrSet<SILInstruction *, 16> ToDelete;
+
+  for (auto *Op : AS->getUses()) {
+    // Replace a copy_addr [take] %src ... by a destroy_addr %src if %src is
+    // no the alloc_stack.
+    // Otherwise, just delete the copy_addr.
+    if (auto *CopyAddr = dyn_cast<CopyAddrInst>(Op->getUser())) {
+      if (CopyAddr->isTakeOfSrc() && CopyAddr->getSrc().getDef() != AS) {
+        Builder.setInsertionPoint(CopyAddr);
+        Builder.createDestroyAddr(CopyAddr->getLoc(), CopyAddr->getSrc())
+            ->setDebugScope(CopyAddr->getDebugScope());
       }
-      if (auto *OEAI = dyn_cast<OpenExistentialAddrInst>(Op->getUser())) {
-        for (auto *Op : OEAI->getUses()) {
-          assert(isa<DestroyAddrInst>(Op->getUser()) ||
-                 isDebugInst(Op->getUser()) && "Unexpected instruction");
-          ToDelete.insert(Op->getUser());
-        }
-      }
-      assert(isa<CopyAddrInst>(Op->getUser()) ||
-             isa<OpenExistentialAddrInst>(Op->getUser()) ||
-             isa<DestroyAddrInst>(Op->getUser()) ||
-             isa<DeallocStackInst>(Op->getUser()) ||
-             isa<DeinitExistentialAddrInst>(Op->getUser()) ||
-             isDebugInst(Op->getUser()) && "Unexpected instruction");
-      ToDelete.insert(Op->getUser());
     }
 
-    // Erase the 'live-range'
-    for (auto *Inst : ToDelete) {
-      Inst->replaceAllUsesWithUndef();
-      eraseInstFromFunction(*Inst);
+    if (auto *OEAI = dyn_cast<OpenExistentialAddrInst>(Op->getUser())) {
+      for (auto *Op : OEAI->getUses()) {
+        assert(isa<DestroyAddrInst>(Op->getUser()) ||
+               isDebugInst(Op->getUser()) && "Unexpected instruction");
+        ToDelete.insert(Op->getUser());
+      }
     }
-    eraseInstFromFunction(*AS);
+
+    assert(isa<CopyAddrInst>(Op->getUser()) ||
+           isa<OpenExistentialAddrInst>(Op->getUser()) ||
+           isa<DestroyAddrInst>(Op->getUser()) ||
+           isa<DeallocStackInst>(Op->getUser()) ||
+           isa<DeinitExistentialAddrInst>(Op->getUser()) ||
+           isDebugInst(Op->getUser()) && "Unexpected instruction");
+    ToDelete.insert(Op->getUser());
   }
 
-  return nullptr;
+  // Erase the 'live-range'
+  for (auto *Inst : ToDelete) {
+    Inst->replaceAllUsesWithUndef();
+    eraseInstFromFunction(*Inst);
+  }
+  return eraseInstFromFunction(*AS);
 }
 
 SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
