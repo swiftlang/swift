@@ -7,6 +7,12 @@
 
 // XFAIL: linux
 
+// rdar://problem/23545577 - optimizer incorrectly folds
+// 'var x: Any; x.dynamicType' when 'x' is reassigned to a value of different
+// type
+// XFAIL: swift_test_mode_optimize
+// XFAIL: swift_test_mode_optimize_unchecked
+
 import Swift
 import StdlibUnittest
 import Foundation
