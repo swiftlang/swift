@@ -1,4 +1,4 @@
-set(swift_runtime_compile_flags)
+set(swift_runtime_compile_flags ${SWIFT_CORE_CXX_FLAGS})
 
 if(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS)
   list(APPEND swift_runtime_compile_flags
@@ -48,10 +48,6 @@ else()
   include_directories(
       ${ICU_UC_INCLUDE_DIR} ${ICU_I18N_INCLUDE_DIR})
 endif()
-
-# Complain about static global constructors in the runtime.
-check_cxx_compiler_flag("-Werror -Wglobal-constructors" CXX_SUPPORTS_GLOBAL_CONSTRUCTORS_WARNING)
-append_if(CXX_SUPPORTS_GLOBAL_CONSTRUCTORS_WARNING "-Wglobal-constructors" swift_runtime_compile_flags)
 
 add_swift_library(swiftRuntime IS_STDLIB IS_STDLIB_CORE
   Casting.cpp

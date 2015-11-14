@@ -12,6 +12,6 @@ add_swift_library(swiftStdlibStubs IS_STDLIB IS_STDLIB_CORE
   LibcShims.cpp
   Stubs.cpp
   ${swift_stubs_objc_sources}
+  C_COMPILE_FLAGS ${SWIFT_CORE_CXX_FLAGS}
   INSTALL_IN_COMPONENT stdlib)
-
 
