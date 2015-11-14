@@ -43,7 +43,6 @@
 #include <cstring>
 #include <mutex>
 #include <atomic>
-#include <sstream>
 #include <type_traits>
 
 // FIXME: Clang defines max_align_t in stddef.h since 3.6.
