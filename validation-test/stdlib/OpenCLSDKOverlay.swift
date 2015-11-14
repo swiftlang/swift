@@ -1,7 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
-// REQUIRES: rdar23505191
 
 // Translated from standard OpenCL hello.c program
 

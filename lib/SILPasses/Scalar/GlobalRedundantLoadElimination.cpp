@@ -717,10 +717,6 @@ bool RLEContext::run() {
   bool SILChanged = false;
   for (auto &X : BBToLocState) {
     for (auto &F : X.second.getRL()) {
-      static int count = 0;
-      ++ count;
-      if (count > 10)
-        continue;
       SILChanged = true;
       SILValue(F.first).replaceAllUsesWith(F.second);
       ++NumForwardedLoads;
