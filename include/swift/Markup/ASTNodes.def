@@ -74,6 +74,9 @@ MARKUP_AST_NODE(PrivateExtension, MarkupASTNode)
   MARKUP_AST_NODE(ThrowsField, PrivateExtension)
   MARKUP_AST_NODE(VersionField, PrivateExtension)
   MARKUP_AST_NODE(WarningField, PrivateExtension)
+  MARKUP_AST_NODE(KeywordField, PrivateExtension)
+  MARKUP_AST_NODE(RecommendedField, PrivateExtension)
+  MARKUP_AST_NODE(RecommendedoverField, PrivateExtension)
 
 MARKUP_AST_NODE_RANGE(Private, ParamField, WarningField)
 #undef MARKUP_AST_NODE

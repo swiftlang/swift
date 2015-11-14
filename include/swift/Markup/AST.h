@@ -688,6 +688,16 @@ public:
   void walk(const MarkupASTNode *Node) {
     enter(Node);
 
+    switch(Node->getKind()) {
+#define MARKUP_AST_NODE(Id, Parent)                                         \
+    case ASTNodeKind::Id:                                                   \
+      visit##Id(static_cast<const Id*>(Node));                              \
+      break;
+#define ABSTRACT_MARKUP_AST_NODE(Id, Parent)
+#define MARKUP_AST_NODE_RANGE(Id, FirstId, LastId)
+#include "swift/Markup/ASTNodes.def"
+    }
+
     if (shouldVisitChildrenOf(Node))
       for (auto Child : Node->getChildren())
         walk(Child);
@@ -708,7 +718,7 @@ public:
 #define MARKUP_AST_NODE_RANGE(Id, FirstId, LastId)
 #include "swift/Markup/ASTNodes.def"
 
-  virtual ~MarkupASTWalker();
+  virtual ~MarkupASTWalker() = default;
 };
 
 MarkupASTNode *createSimpleField(MarkupContext &MC, StringRef Tag,

@@ -19,6 +19,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Comment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/USRGeneration.h"
@@ -44,8 +45,7 @@
 using namespace swift;
 using namespace ide;
 
-namespace clang {
-  namespace comments {
+typedef std::vector<std::pair<StringRef, StringRef>> CommandWordsPairs;
 
 enum CodeCompletionCommandKind {
   none,
@@ -54,8 +54,58 @@ enum CodeCompletionCommandKind {
   recommendedover,
 };
 
-typedef std::vector<std::pair<StringRef, StringRef>> CommandWordsPairs;
+CodeCompletionCommandKind getCommandKind(StringRef Command) {
+#define CHECK_CASE(KIND)                                                      \
+  if (Command == #KIND)                                                       \
+    return CodeCompletionCommandKind::KIND;
+  CHECK_CASE(keyword);
+  CHECK_CASE(recommended);
+  CHECK_CASE(recommendedover);
+#undef CHECK_CASE
+  return CodeCompletionCommandKind::none;
+}
 
+StringRef getCommnadName(CodeCompletionCommandKind Kind) {
+#define CHECK_CASE(KIND)                                                    \
+  if (CodeCompletionCommandKind::KIND == Kind) {                            \
+    static std::string Name(#KIND);                                         \
+    return Name;                                                            \
+  }
+  CHECK_CASE(keyword)
+  CHECK_CASE(recommended)
+  CHECK_CASE(recommendedover)
+#undef CHECK_CASE
+  llvm_unreachable("Can not handle this Kind.");
+}
+
+bool containsInterestedWords(StringRef Content, StringRef Splitter,
+                             bool AllowWhitespace) {
+  do {
+    Content = Content.split(Splitter).second;
+    Content = AllowWhitespace ? Content.trim() : Content;
+#define CHECK_CASE(KIND)                                                       \
+if (Content.startswith(#KIND))                                                 \
+return true;
+    CHECK_CASE(keyword)
+    CHECK_CASE(recommended)
+    CHECK_CASE(recommendedover)
+#undef CHECK_CASE
+  } while(!Content.empty());
+  return false;
+}
+
+void splitTextByComma(StringRef Text, std::vector<StringRef>& Subs) {
+  do {
+    auto Pair = Text.split(',');
+    auto Key = Pair.first.trim();
+    if (!Key.empty())
+      Subs.push_back(Key);
+    Text = Pair.second;
+  } while (!Text.empty());
+}
+
+namespace clang {
+  namespace comments {
 class WordPairsArrangedViewer {
   ArrayRef<std::pair<StringRef, StringRef>> Content;
   std::vector<StringRef> ViewedText;
@@ -105,30 +155,6 @@ class ClangCommentExtractor : public ConstCommentVisitor<ClangCommentExtractor> 
     Parents.pop_back();
   }
 
-  StringRef getCommnadName(CodeCompletionCommandKind Kind) {
-#define CHECK_CASE(KIND)                                                      \
-    if (CodeCompletionCommandKind::KIND == Kind) {                            \
-      static std::string Name(#KIND);                                         \
-      return Name;                                                            \
-    }
-    CHECK_CASE(keyword)
-    CHECK_CASE(recommended)
-    CHECK_CASE(recommendedover)
-#undef CHECK_CASE
-    llvm_unreachable("Can not handle this Kind.");
-  }
-
-  CodeCompletionCommandKind getCommandKind(StringRef Command) {
-#define CHECK_CASE(KIND)                                                      \
-    if (Command == #KIND)                                                     \
-      return CodeCompletionCommandKind::KIND;
-    CHECK_CASE(keyword);
-    CHECK_CASE(recommended);
-    CHECK_CASE(recommendedover);
-#undef CHECK_CASE
-    return CodeCompletionCommandKind::none;
-  }
-
 public:
   ClangCommentExtractor(CommandWordsPairs &Words,
                         const CommandTraits &Traits) : Words(Words),
@@ -151,32 +177,16 @@ public:
          CIT != Parent->child_end(); CIT ++) {
       if (auto TC = dyn_cast<TextComment>(*CIT)) {
         auto Text = TC->getText();
-        do {
-          auto Pair = Text.split(',');
-          auto Key = Pair.first.trim();
-          if (!Key.empty())
-            Words.push_back(std::make_pair(getCommnadName(CommandKind), Key));
-          Text = Pair.second;
-        } while (!Text.empty());
+        std::vector<StringRef> Subs;
+        splitTextByComma(Text, Subs);
+        auto Kind = getCommnadName(CommandKind);
+        for (auto S : Subs)
+          Words.push_back(std::make_pair(Kind, S));
       } else
         break;
     }
   }
 };
-
-bool containsInterestedWords(StringRef Content) {
-  do {
-    Content = Content.split('@').second;
-#define CHECK_CASE(KIND)                                                       \
-    if (Content.startswith(#KIND))                                             \
-      return true;
-    CHECK_CASE(keyword)
-    CHECK_CASE(recommended)
-    CHECK_CASE(recommendedover)
-#undef CHECK_CASE
-  } while(!Content.empty());
-  return false;
-}
 
 void getClangDocKeyword(ClangImporter &Importer, const Decl *D,
                         CommandWordsPairs &Words) {
@@ -184,7 +194,7 @@ void getClangDocKeyword(ClangImporter &Importer, const Decl *D,
     getCommentCommandTraits());
   if (auto RC = Importer.getClangASTContext().getRawCommentForAnyRedecl(D)) {
     auto RT = RC->getRawText(Importer.getClangASTContext().getSourceManager());
-    if (containsInterestedWords(RT)) {
+    if (containsInterestedWords(RT, "@", /*AllowWhitespace*/false)) {
       FullComment* Comment = Importer.getClangASTContext().
         getLocalCommentForDeclUncached(D);
       Extractor.visit(Comment);
@@ -193,6 +203,61 @@ void getClangDocKeyword(ClangImporter &Importer, const Decl *D,
 }
 }}
 
+namespace llvm {
+  namespace markup {
+class SwiftDocWordExtractor : public MarkupASTWalker {
+  CommandWordsPairs &Pairs;
+  CodeCompletionCommandKind Kind;
+public:
+  SwiftDocWordExtractor(CommandWordsPairs &Pairs) :
+    Pairs(Pairs), Kind(CodeCompletionCommandKind::none) {}
+  void visitKeywordField(const KeywordField *Field) override {
+    Kind = CodeCompletionCommandKind::keyword;
+  }
+  void visitRecommendedField(const RecommendedField *Field) override {
+    Kind = CodeCompletionCommandKind::recommended;
+  }
+  void visitRecommendedoverField(const RecommendedoverField *Field) override {
+    Kind = CodeCompletionCommandKind::recommendedover;
+  }
+  void visitText(const Text *Text) override {
+    if (Kind == CodeCompletionCommandKind::none)
+      return;
+    StringRef CommandName = getCommnadName(Kind);
+    std::vector<StringRef> Subs;
+    splitTextByComma(Text->str(), Subs);
+    for (auto S : Subs)
+      Pairs.push_back(std::make_pair(CommandName, S));
+  }
+};
+
+void getSwiftDocKeyword(const Decl* D, CommandWordsPairs &Words) {
+  auto Interested = false;
+  for (auto C : D->getRawComment().Comments) {
+    if (containsInterestedWords(C.RawText, "-", /*AllowWhitespace*/true)) {
+      Interested = true;
+      break;
+    }
+  }
+  if (!Interested)
+    return;
+  static llvm::markup::MarkupContext MC;
+  auto DC = getDocComment(MC, D);
+  if (!DC.hasValue())
+    return;
+  SwiftDocWordExtractor Extractor(Words);
+  for (auto Part : DC.getValue()->getBodyNodes()) {
+    switch (Part->getKind()) {
+      case ASTNodeKind::KeywordField:
+      case ASTNodeKind::RecommendedField:
+      case ASTNodeKind::RecommendedoverField:
+        Extractor.walk(Part);
+        break;
+      default:
+        break;
+    }
+  }
+}}}
 typedef llvm::function_ref<bool(ValueDecl*, DeclVisibilityKind)> DeclFilter;
 DeclFilter DefaultFilter = [] (ValueDecl* VD, DeclVisibilityKind Kind) {return true;};
 
@@ -728,7 +793,7 @@ ArrayRef<StringRef> copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator,
     } else if (auto *OND = OD.dyn_cast<const clang::NamedDecl*>()) {
       Ignored = clang::index::generateUSRForDecl(OND, SS);
     }
-    
+
     if (!Ignored)
       USRs.push_back(copyString(Allocator, SS));
   });
@@ -1408,13 +1473,14 @@ private:
       FoundFunctionsWithoutFirstKeyword = true;
   }
 
-  void setClangDeclKeywords(const ValueDecl *VD,
-                            clang::comments::CommandWordsPairs &Pairs,
+  void setClangDeclKeywords(const ValueDecl *VD, CommandWordsPairs &Pairs,
                             CodeCompletionResultBuilder &Builder) {
     if (auto *CD = VD->getClangDecl()) {
       clang::comments::getClangDocKeyword(*Importer, CD, Pairs);
-      Builder.addDeclDocCommentWords(Pairs);
+    } else {
+      llvm::markup::getSwiftDocKeyword(VD, Pairs);
     }
+    Builder.addDeclDocCommentWords(llvm::makeArrayRef(Pairs));
   }
 
 public:
@@ -1713,7 +1779,7 @@ public:
            "name lookup bug -- can not see an instance variable "
            "in a static function");
 
-    clang::comments::CommandWordsPairs Pairs;
+    CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Declaration,
@@ -2018,7 +2084,7 @@ public:
 
     // Add the method, possibly including any default arguments.
     auto addMethodImpl = [&](bool includeDefaultArgs = true) {
-      clang::comments::CommandWordsPairs Pairs;
+      CommandWordsPairs Pairs;
       CodeCompletionResultBuilder Builder(
           Sink, CodeCompletionResult::ResultKind::Declaration,
           getSemanticContext(FD, Reason), ExpectedTypes);
@@ -2114,7 +2180,7 @@ public:
 
     // Add the constructor, possibly including any default arguments.
     auto addConstructorImpl = [&](bool includeDefaultArgs = true) {
-      clang::comments::CommandWordsPairs Pairs;
+      CommandWordsPairs Pairs;
       CodeCompletionResultBuilder Builder(
           Sink, CodeCompletionResult::ResultKind::Declaration,
           getSemanticContext(CD, Reason), ExpectedTypes);
@@ -2187,7 +2253,7 @@ public:
 
   void addSubscriptCall(const SubscriptDecl *SD, DeclVisibilityKind Reason) {
     assert(!HaveDot && "can not add a subscript after a dot");
-    clang::comments::CommandWordsPairs Pairs;
+    CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Declaration,
@@ -2210,7 +2276,7 @@ public:
 
   void addNominalTypeRef(const NominalTypeDecl *NTD,
                          DeclVisibilityKind Reason) {
-    clang::comments::CommandWordsPairs Pairs;
+    CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Declaration,
@@ -2223,7 +2289,7 @@ public:
   }
 
   void addTypeAliasRef(const TypeAliasDecl *TAD, DeclVisibilityKind Reason) {
-    clang::comments::CommandWordsPairs Pairs;
+    CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Declaration,
@@ -2241,7 +2307,7 @@ public:
 
   void addGenericTypeParamRef(const GenericTypeParamDecl *GP,
                               DeclVisibilityKind Reason) {
-    clang::comments::CommandWordsPairs Pairs;
+    CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Declaration,
@@ -2255,7 +2321,7 @@ public:
 
   void addAssociatedTypeRef(const AssociatedTypeDecl *AT,
                             DeclVisibilityKind Reason) {
-    clang::comments::CommandWordsPairs Pairs;
+    CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Declaration,
@@ -2273,7 +2339,7 @@ public:
                          bool HasTypeContext) {
     if (!EED->hasName())
       return;
-    clang::comments::CommandWordsPairs Pairs;
+    CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Declaration,
