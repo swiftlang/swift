@@ -280,17 +280,17 @@ namespace {
       if (!var->hasStorage()) return;
 
       SILType fieldType = classType.getFieldType(var, *IGM.SILMod);
-      switch (IGM.classifyTypeSize(fieldType, ResilienceScope::Component)) {
-      case ObjectSize::Fixed:
+      auto &fieldTI = IGM.getTypeInfo(fieldType);
+      if (fieldTI.isFixedSize())
         return;
-      case ObjectSize::Resilient:
-        IsObjectResilient = true;
-        return;
-      case ObjectSize::Dependent:
-        IsObjectResilient = IsObjectGenericallyArranged = true;
-        return;
-      }
-      llvm_unreachable("bad ObjectSize value");
+
+      // If the field type is not fixed-size, the size either depends
+      // on generic parameters, or resilient types. In the former case,
+      // we store field offsets in type metadata.
+      if (fieldType.hasArchetype())
+        IsObjectGenericallyArranged = true;
+
+      IsObjectResilient = true;
     }
   };
 }  // end anonymous namespace.
