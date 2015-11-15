@@ -2530,18 +2530,24 @@ static void eraseOpenedExistentials(Expr *&expr) {
 
   public:
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      if (auto openExistentialExpr = dyn_cast<OpenExistentialExpr>(expr)) {
-        auto archetypeVal = openExistentialExpr->getOpaqueValue();
-        auto base = openExistentialExpr->getExistentialValue();
+      if (auto OOE = dyn_cast<OpenExistentialExpr>(expr)) {
+        auto archetypeVal = OOE->getOpaqueValue();
+        auto base = OOE->getExistentialValue();
+        
+        // Walk the base expression to ensure we erase any existentials within
+        // it.
+        base = base->walk(*this);
+        
         bool inserted = OpenExistentials.insert({archetypeVal, base}).second;
-        assert(inserted);
-        (void) inserted;
-        return { true, openExistentialExpr->getSubExpr() };
+        assert(inserted && "OpaqueValue appears multiple times?");
+        (void)inserted;
+        return { true, OOE->getSubExpr() };
       }
       
-      if (auto opaqueValueExpr = dyn_cast<OpaqueValueExpr>(expr)) {
-        auto value = OpenExistentials.find(opaqueValueExpr);
-        assert(value != OpenExistentials.end());
+      if (auto OVE = dyn_cast<OpaqueValueExpr>(expr)) {
+        auto value = OpenExistentials.find(OVE);
+        assert(value != OpenExistentials.end() &&
+               "didn't see this OVE in a containing OpenExistentialExpr?");
         return { true, value->second };
       }
       
@@ -2572,7 +2578,7 @@ static void eraseOpenedExistentials(Expr *&expr) {
     }
   };
 
-  expr->walk(ExistentialEraser());
+  expr = expr->walk(ExistentialEraser());
 }
 
 /// Rewrite any type variables & archetypes in the specified type with

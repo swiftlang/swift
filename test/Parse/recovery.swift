@@ -683,3 +683,18 @@ func r22387625() {
   let _= 5 // expected-error{{postfix '=' is reserved}} {{8-8= }}
   let _ =5 // expected-error{{prefix '=' is reserved}} {{10-10= }}
 }
+
+
+// <rdar://problem/23086402> Swift compiler crash in CSDiag
+protocol A23086402 {
+  var b: B23086402 { get }
+}
+
+protocol B23086402 {
+  var c: [String] { get }
+}
+
+func test23086402(a: A23086402) {
+  print(a.b.c + "")  // expected-error {{cannot convert value of type '[String]' to expected argument type '[Any]'}}
+}
+
