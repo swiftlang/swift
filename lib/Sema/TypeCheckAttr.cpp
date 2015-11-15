@@ -1509,7 +1509,7 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
     // If we have an opaque type, suggest the possibility of adding
     // a class bound.
     if (type->isExistentialType() || type->is<ArchetypeType>()) {
-      diagnose(var->getStartLoc(), diag::invalid_ownership_opaque_type,
+      diagnose(var->getStartLoc(), diag::invalid_ownership_protocol_type,
                (unsigned) ownershipKind, underlyingType);
     } else {
       diagnose(var->getStartLoc(), diag::invalid_ownership_type,

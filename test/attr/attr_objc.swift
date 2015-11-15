@@ -1204,12 +1204,12 @@ class infer_instanceVar1 {
 
   weak var var_Weak_fail1: PlainClass?
   weak var var_Weak_bad2: PlainStruct?
-  // expected-error@-1 {{'weak' cannot be applied to non-class type 'PlainStruct'}}
+  // expected-error@-1 {{'weak' may only be applied to class and class-bound protocol types, not 'PlainStruct'}}
 
   weak var var_Weak_bad3: PlainEnum?
-  // expected-error@-1 {{'weak' cannot be applied to non-class type 'PlainEnum'}}
+  // expected-error@-1 {{'weak' may only be applied to class and class-bound protocol types, not 'PlainEnum'}}
   weak var var_Weak_bad4: String?
-  // expected-error@-1 {{'weak' cannot be applied to non-class type 'String'}}
+  // expected-error@-1 {{'weak' may only be applied to class and class-bound protocol types, not 'String'}}
 // CHECK-NOT: @objc{{.*}}Weak_fail
 
 
@@ -1232,11 +1232,11 @@ class infer_instanceVar1 {
 
   unowned var var_Unowned_fail1: PlainClass
   unowned var var_Unowned_bad2: PlainStruct
-  // expected-error@-1 {{'unowned' cannot be applied to non-class type 'PlainStruct'}}
+  // expected-error@-1 {{'unowned' may only be applied to class and class-bound protocol types, not 'PlainStruct'}}
   unowned var var_Unowned_bad3: PlainEnum
-  // expected-error@-1 {{'unowned' cannot be applied to non-class type 'PlainEnum'}}
+  // expected-error@-1 {{'unowned' may only be applied to class and class-bound protocol types, not 'PlainEnum'}}
   unowned var var_Unowned_bad4: String
-  // expected-error@-1 {{'unowned' cannot be applied to non-class type 'String'}}
+  // expected-error@-1 {{'unowned' may only be applied to class and class-bound protocol types, not 'String'}}
 // CHECK-NOT: @objc{{.*}}Unowned_fail
 
 

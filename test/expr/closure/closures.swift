@@ -194,7 +194,7 @@ func testCaptureBehavior(ptr : SomeClass) {
 
   let i = 42
   // expected-warning @+1 {{variable 'i' was never mutated}} {{19-20=let}}
-  doStuff { [weak i] in i! }   // expected-error {{'weak' cannot be applied to non-class type 'Int'}}
+  doStuff { [weak i] in i! }   // expected-error {{'weak' may only be applied to class and class-bound protocol types, not 'Int'}}
 }
 
 extension SomeClass {

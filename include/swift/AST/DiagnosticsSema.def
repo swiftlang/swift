@@ -2202,11 +2202,12 @@ ERROR(tuple_ellipsis,sema_tcd,none,
 
 // Ownership
 ERROR(invalid_ownership_type,attribute_parsing,none,
-      "'%select{strong|weak|unowned|unowned}0' cannot be applied to "
-      "non-class type %1", (/*Ownership*/unsigned, Type))
-ERROR(invalid_ownership_opaque_type,attribute_parsing,none,
-      "'%select{strong|weak|unowned|unowned}0' cannot be applied to "
-      "non-class type %1; consider adding a class bound",
+      "'%select{strong|weak|unowned|unowned}0' may only be applied to "
+      "class and class-bound protocol types, not %1",
+      (/*Ownership*/unsigned, Type))
+ERROR(invalid_ownership_protocol_type,attribute_parsing,none,
+      "'%select{strong|weak|unowned|unowned}0' may not be applied to "
+      "non-class-bound protocol %1; consider adding a class bound",
       (/*Ownership*/unsigned, Type))
 ERROR(invalid_weak_ownership_not_optional,attribute_parsing,none,
       "'weak' variable should have optional type %0", (Type))

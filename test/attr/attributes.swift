@@ -152,21 +152,21 @@ unowned unowned var weak4 : Ty0  // expected-error {{duplicate modifier}}  expec
 unowned weak var weak5 : Ty0 // expected-error {{duplicate modifier}}  expected-note {{modifier already specified here}}
 
 weak
-var weak6 : Int // expected-error {{'weak' cannot be applied to non-class type 'Int'}}
+var weak6 : Int // expected-error {{'weak' may only be applied to class and class-bound protocol types, not 'Int'}}
 unowned
-var weak7 : Int // expected-error {{'unowned' cannot be applied to non-class type 'Int'}}
+var weak7 : Int // expected-error {{'unowned' may only be applied to class and class-bound protocol types, not 'Int'}}
 weak
 var weak8 : Class? = Ty0()
 unowned var weak9 : Class = Ty0()
 weak
-var weak10 : NonClass = Ty0() // expected-error {{'weak' cannot be applied to non-class type 'NonClass'; consider adding a class bound}}
+var weak10 : NonClass = Ty0() // expected-error {{'weak' may not be applied to non-class-bound protocol 'NonClass'; consider adding a class bound}}
 unowned
-var weak11 : NonClass = Ty0() // expected-error {{'unowned' cannot be applied to non-class type 'NonClass'; consider adding a class bound}}
+var weak11 : NonClass = Ty0() // expected-error {{'unowned' may not be applied to non-class-bound protocol 'NonClass'; consider adding a class bound}}
 
 unowned
-var weak12 : NonClass = Ty0() // expected-error {{'unowned' cannot be applied to non-class type 'NonClass'; consider adding a class bound}}
+var weak12 : NonClass = Ty0() // expected-error {{'unowned' may not be applied to non-class-bound protocol 'NonClass'; consider adding a class bound}}
 unowned
-var weak13 : NonClass = Ty0() // expected-error {{'unowned' cannot be applied to non-class type 'NonClass'; consider adding a class bound}}
+var weak13 : NonClass = Ty0() // expected-error {{'unowned' may not be applied to non-class-bound protocol 'NonClass'; consider adding a class bound}}
 
 weak
 var weak14 : Ty0 // expected-error {{'weak' variable should have optional type 'Ty0?'}}
