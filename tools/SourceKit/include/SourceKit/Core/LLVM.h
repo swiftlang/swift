@@ -11,8 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 /// \file
-/// \brief Forward declares and imports various common LLVM datatypes that
-/// clangd wants to use unqualified.
+/// \brief Forward declares and imports various common LLVM datatypes.
 ///
 //===----------------------------------------------------------------------===//
 
