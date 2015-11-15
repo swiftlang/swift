@@ -1164,6 +1164,11 @@ namespace {
         return funcTy->getResult();
       return Type();
     }
+    
+    void dump() const {
+      decl->dumpRef(llvm::errs());
+      llvm::errs() << " - uncurry level " << level << "\n";
+    }
   };
 
 
@@ -1217,9 +1222,21 @@ namespace {
     void suggestPotentialOverloads(SourceLoc loc, bool isCallExpr = false,
                                    bool isResult = false);
 
+    void dump() const LLVM_ATTRIBUTE_USED;
+    
   private:
     void collectCalleeCandidates(Expr *fnExpr);
   };
+}
+
+void CalleeCandidateInfo::dump() const {
+  llvm::errs() << "CalleeCandidateInfo for '" << declName << "': closeness="
+               << unsigned(closeness) << "\n";
+  llvm::errs() << candidates.size() << " candidates:\n";
+  for (auto c : candidates) {
+    llvm::errs() << "  ";
+    c.dump();
+  }
 }
 
 
