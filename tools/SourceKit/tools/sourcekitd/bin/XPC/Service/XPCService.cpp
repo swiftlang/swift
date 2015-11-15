@@ -121,11 +121,11 @@ UIdent sourcekitd::UIdentFromSKDUID(sourcekitd_uid_t SKDUID) {
     return UIdent();
 
   xpc_object_t contents = xpc_array_create(nullptr, 0);
+  xpc_array_set_uint64(contents, XPC_ARRAY_APPEND,
+                       (uint64_t)xpc::Message::UIDSynchronization);
   xpc_array_set_uint64(contents, XPC_ARRAY_APPEND, uintptr_t(SKDUID));
 
   xpc_object_t msg = xpc_dictionary_create(nullptr, nullptr,  0);
-  xpc_array_set_uint64(contents, XPC_ARRAY_APPEND,
-                       (uint64_t)xpc::Message::UIDSynchronization);
   xpc_dictionary_set_value(msg, xpc::KeyInternalMsg, contents);
   xpc_release(contents);
 
