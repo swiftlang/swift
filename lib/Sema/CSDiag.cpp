@@ -3074,10 +3074,27 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     if (argType)
       if (auto argTT = argType->getAs<TupleType>()) {
         int scalarElt = argTT->getElementForScalarInit();
-        if (scalarElt != -1)
-          argType = argTT->getElementType(scalarElt);
-        else if (argTT->hasAnyDefaultValues())
-          argType = Type();
+        // If the argument cannot be initialized with a scalar, then it is an
+        // error, so we might as well pass down the expected type, to get a
+        // specific error involving it.
+        if (scalarElt == -1) {
+          // However, if there are default values, we don't actually want to do
+          // this.  We don't know if the user just forgot a label on a defaulted
+          // value.
+          if (argTT->hasAnyDefaultValues())
+            argType = Type();
+        } else {
+          // If we found the single argument being initialized, use it.
+          auto &arg = argTT->getElement(scalarElt);
+          
+          // If the argument being specified is actually varargs, then we're
+          // just specifying one element of a variadic list.  Use the type of
+          // the individual varargs argument, not the overall array type.
+          if (arg.isVararg())
+            argType = arg.getVarargBaseTy();
+          else
+            argType = arg.getType();
+        }
       }
     
     auto CTPurpose = argType ? CTP_CallArgument : CTP_Unused;

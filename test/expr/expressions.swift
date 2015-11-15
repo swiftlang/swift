@@ -762,7 +762,7 @@ func inoutTests(inout arr: Int) {
   func takeAny(x: Any) {}
   takeAny(&x) // expected-error{{'&' used with non-inout argument of type 'Any'}}
   func takeManyAny(x: Any...) {}
-  takeManyAny(&x) // expected-error{{'&' used with non-inout argument of type '[Any]'}}
+  takeManyAny(&x) // expected-error{{'&' used with non-inout argument of type 'Any' (aka 'protocol<>')}}
   takeManyAny(1, &x) // expected-error{{'&' used with non-inout argument of type 'Any'}}
   func takeIntAndAny(x: Int, _ y: Any) {}
   takeIntAndAny(1, &x) // expected-error{{'&' used with non-inout argument of type 'Any'}}
