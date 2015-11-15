@@ -1233,6 +1233,15 @@ function cmake_config_opt() {
     fi
 }
 
+function should_build_perftestsuite() {
+    if [ "$(uname -s)" != Darwin ]; then
+        echo "FALSE"
+        return
+    fi
+
+    return $(true_false "${BUILD_SWIFT_PERF_TESTSUITE}")
+}
+
 mkdir -p "${BUILD_DIR}"
 
 #
@@ -1344,10 +1353,10 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
         )
     fi
 
-    if [[ "${BUILD_SWIFT_PERF_TESTSUITE}" ]]; then
+    if [[ $(should_build_perftestsuite) ]]; then
         swift_cmake_options=(
             "${swift_cmake_options[@]}"
-            -DSWIFT_INCLUDE_PERF_TESTSUITE=$(true_false "${BUILD_SWIFT_PERF_TESTSUITE}")
+            -DSWIFT_INCLUDE_PERF_TESTSUITE=YES)
         )
     fi
 
@@ -1560,7 +1569,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 fi
 
                 build_targets=(all "${SWIFT_STDLIB_TARGETS[@]}")
-                if [[ $(true_false "${BUILD_SWIFT_PERF_TESTSUITE}") == "TRUE" ]]; then
+                if [[ $(should_build_perftestsuite) == "TRUE" ]]; then
                     build_targets=("${build_targets[@]}" benchmark-swift)
                 fi
                 skip_build=$SKIP_BUILD_SWIFT
