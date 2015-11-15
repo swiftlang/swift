@@ -229,11 +229,8 @@ ${orderingRequirementForPredicate}
   ) -> [Iterator.Element] {
     typealias EscapingBinaryPredicate =
        (Iterator.Element, Iterator.Element) -> Bool
-    let escapableIsOrderedBefore =
-      unsafeBitCast(isOrderedBefore, EscapingBinaryPredicate.self)
-
     var result = ContiguousArray(self)
-    result.sortInPlace(escapableIsOrderedBefore)
+    result.sortInPlace(isOrderedBefore)
     return Array(result)
   }
 }
