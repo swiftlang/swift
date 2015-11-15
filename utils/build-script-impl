@@ -1239,7 +1239,7 @@ function should_build_perftestsuite() {
         return
     fi
 
-    return $(true_false "${BUILD_SWIFT_PERF_TESTSUITE}")
+    echo $(true_false "${BUILD_SWIFT_PERF_TESTSUITE}")
 }
 
 mkdir -p "${BUILD_DIR}"
