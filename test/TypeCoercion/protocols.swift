@@ -119,7 +119,7 @@ var fp : FormattedPrintable = IsPrintable1()
 var ip1 : IsPrintable1
 
 refCoercion(&p)
-refCoercion(&fp) // expected-error{{cannot pass immutable value of type 'MyPrintable' as inout argument}}
+refCoercion(&fp) // expected-error{{cannot pass immutable value as inout argument: implicit conversion from 'FormattedPrintable' to 'MyPrintable' requires a temporary}}
 refCoercion(&ip1) // expected-error{{cannot pass immutable value as inout argument: implicit conversion from 'IsPrintable1' to 'MyPrintable' requires a temporary}}
 
 protocol IntSubscriptable {
