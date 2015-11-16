@@ -118,25 +118,25 @@ Algorithm.test("${t}/sorted/${name}") {
 %   end
 % end
 
-Algorithm.test("sortInPlace/CollectionsWithUnusualIndices") {
+Algorithm.test("sort/CollectionsWithUnusualIndices") {
   let length = 1000
   var ary = randArray(length)
 
   // Check if sorting routines work well on collections with startIndex != 0.
   var offsetAry = OffsetCollection(ary, offset: 500, forward: false)
-  offsetAry.sortInPlace(${comparePredicate})
+  offsetAry.sort(${comparePredicate})
   expectSortedCollection(offsetAry.toArray(), ary)
 
   // Check if sorting routines work well on collections with endIndex = Int.max.
   // That could expose overflow errors in index computations.
   offsetAry = OffsetCollection(ary, offset: Int.max, forward: false)
-  offsetAry.sortInPlace(${comparePredicate})
+  offsetAry.sort(${comparePredicate})
   expectSortedCollection(offsetAry.toArray(), ary)
 
   // Check if sorting routines work well on collections with
   // startIndex = Int.min.
   offsetAry = OffsetCollection(ary, offset: Int.min, forward: true)
-  offsetAry.sortInPlace(${comparePredicate})
+  offsetAry.sort(${comparePredicate})
   expectSortedCollection(offsetAry.toArray(), ary)
   
 }

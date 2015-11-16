@@ -185,10 +185,10 @@ sortedDocCommentForPredicate = """\
 sortedDocCommentForComparable = """\
   /// Return an `Array` containing the sorted elements of `source`."""
 
-sortInPlaceDocCommentForPredicate = """\
+sortDocCommentForPredicate = """\
   /// Sort `self` in-place according to `isOrderedBefore`."""
 
-sortInPlaceDocCommentForComparable = """\
+sortDocCommentForComparable = """\
   /// Sort `self` in-place."""
 
 sortIsUnstableForPredicate = """\
@@ -209,10 +209,10 @@ ${sortedDocCommentForComparable}
 ${sortIsUnstableForComparable}
   ///
 ${orderingRequirementForComparable}
-  @warn_unused_result(${'mutable_variant="sortInPlace"' if Self == 'MutableCollection' else ''})
+  @warn_unused_result(${'mutable_variant="sort"' if Self == 'MutableCollection' else ''})
   public func sorted() -> [Iterator.Element] {
     var result = ContiguousArray(self)
-    result.sortInPlace()
+    result.sort()
     return Array(result)
   }
 }
@@ -223,14 +223,14 @@ ${sortedDocCommentForPredicate}
 ${sortIsUnstableForPredicate}
   ///
 ${orderingRequirementForPredicate}
-  @warn_unused_result(${'mutable_variant="sortInPlace"' if Self == 'MutableCollection' else ''})
+  @warn_unused_result(${'mutable_variant="sort"' if Self == 'MutableCollection' else ''})
   public func sorted(
     @noescape isOrderedBefore: (Iterator.Element, Iterator.Element) -> Bool
   ) -> [Iterator.Element] {
     typealias EscapingBinaryPredicate =
        (Iterator.Element, Iterator.Element) -> Bool
     var result = ContiguousArray(self)
-    result.sortInPlace(isOrderedBefore)
+    result.sort(isOrderedBefore)
     return Array(result)
   }
 }
@@ -242,18 +242,18 @@ extension MutableCollection
   Self.Index : RandomAccessIndex,
   Self.Iterator.Element : Comparable {
 
-${sortInPlaceDocCommentForComparable}
+${sortDocCommentForComparable}
   ///
 ${sortIsUnstableForComparable}
   ///
 ${orderingRequirementForComparable}
-  public mutating func sortInPlace() {
+  public mutating func sort() {
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
       (baseAddress, length) -> Void in
       var bufferPointer =
         UnsafeMutableBufferPointer(start: baseAddress, length: length)
-      bufferPointer.sortInPlace()
+      bufferPointer.sort()
       return ()
     }
     if didSortUnsafeBuffer == nil {
@@ -263,12 +263,12 @@ ${orderingRequirementForComparable}
 }
 
 extension MutableCollection where Self.Index : RandomAccessIndex {
-${sortInPlaceDocCommentForPredicate}
+${sortDocCommentForPredicate}
   ///
 ${sortIsUnstableForPredicate}
   ///
 ${orderingRequirementForPredicate}
-  public mutating func sortInPlace(
+  public mutating func sort(
     @noescape isOrderedBefore: (Iterator.Element, Iterator.Element) -> Bool
   ) {
     typealias EscapingBinaryPredicate =
@@ -281,7 +281,7 @@ ${orderingRequirementForPredicate}
       (baseAddress, length) -> Void in
       var bufferPointer =
         UnsafeMutableBufferPointer(start: baseAddress, length: length)
-      bufferPointer.sortInPlace(escapableIsOrderedBefore)
+      bufferPointer.sort(escapableIsOrderedBefore)
       return ()
     }
     if didSortUnsafeBuffer == nil {

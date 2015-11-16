@@ -575,7 +575,7 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
     testNamePrefix += String(C.Type)
 
 //===----------------------------------------------------------------------===//
-// sortInPlace()
+// sort()
 //===----------------------------------------------------------------------===//
 
 % for predicate in [ False, True ]:
@@ -595,7 +595,7 @@ func checkSortInPlace_${'Predicate' if predicate else 'WhereElementIsComparable'
 
   var c = makeWrappedCollection(elements)
   let closureLifetimeTracker = LifetimeTracked(0)
-  c.sortInPlace {
+  c.sort {
     (lhs, rhs) in
     _blackHole(closureLifetimeTracker)
     return lessImpl(extractValue(lhs).value, extractValue(rhs).value)
@@ -611,7 +611,7 @@ func checkSortInPlace_${'Predicate' if predicate else 'WhereElementIsComparable'
     }
 
   var c = makeWrappedCollectionWithComparableElement(elements)
-  c.sortInPlace()
+  c.sort()
 %   end
 
   let extractedResult = c.map(extract)
@@ -633,7 +633,7 @@ func checkSortInPlace_${'Predicate' if predicate else 'WhereElementIsComparable'
   }
 }
 
-self.test("\(testNamePrefix).sortInPlace/${'Predicate' if predicate else 'WhereElementIsEquatable'}") {
+self.test("\(testNamePrefix).sort/${'Predicate' if predicate else 'WhereElementIsEquatable'}") {
   for test in partitionExhaustiveTests {
     forAllPermutations(test.sequence) { (sequence) in
       checkSortInPlace_${'Predicate' if predicate else 'WhereElementIsComparable'}(
@@ -645,7 +645,7 @@ self.test("\(testNamePrefix).sortInPlace/${'Predicate' if predicate else 'WhereE
   }
 }
 
-self.test("\(testNamePrefix).sortInPlace/${'Predicate' if predicate else 'WhereElementIsEquatable'}/InvalidOrderings") {
+self.test("\(testNamePrefix).sort/${'Predicate' if predicate else 'WhereElementIsEquatable'}/InvalidOrderings") {
   withInvalidOrderings { (comparisonPredicate) in
     for i in 0..<7 {
       forAllPermutations(i) { (sequence) in

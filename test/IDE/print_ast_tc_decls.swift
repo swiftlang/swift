@@ -1288,12 +1288,12 @@ struct d2900_TypeSugar1 {
 
 // @warn_unused_result attribute
 public struct ArrayThingy {
-    // PASS_PRINT_AST: @warn_unused_result(mutable_variant="sortInPlace")
+    // PASS_PRINT_AST: @warn_unused_result(mutable_variant="sort")
     // PASS_PRINT_AST-NEXT: public func sort() -> ArrayThingy
-    @warn_unused_result(mutable_variant="sortInPlace")
+    @warn_unused_result(mutable_variant="sort")
     public func sort() -> ArrayThingy { return self }
 
-    public mutating func sortInPlace() { }
+    public mutating func sort() { }
 
     // PASS_PRINT_AST: @warn_unused_result(message="dummy", mutable_variant="reverseInPlace")
     // PASS_PRINT_AST-NEXT: public func reverse() -> ArrayThingy

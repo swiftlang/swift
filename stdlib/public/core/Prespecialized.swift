@@ -54,7 +54,7 @@ struct _Prespecialize {
 
       // Sort array
       let _ = a.sorted { (a: Element, b: Element) in a < b }
-      a.sortInPlace { (a: Element, b: Element) in a < b }
+      a.sort { (a: Element, b: Element) in a < b }
 
 
       // force specialization of print<Element>
