@@ -461,6 +461,34 @@ extension Collection {
   }
 }
 
+extension Collection where Iterator.Element : Equatable {
+  /// Returns the maximal `SubSequence`s of `self`, in order, around a
+  /// `separator` element.
+  ///
+  /// - Parameter maxSplits: The maximum number of `SubSequence`s to
+  ///   return, minus 1.
+  ///   If `maxSplit + 1` `SubSequence`s are returned, the last one is
+  ///   a suffix of `self` containing *all* the elements of `self` following the
+  ///   last split point.
+  ///   The default value is `Int.max`.
+  ///
+  /// - Parameter omitEmptySubsequences: If `false`, an empty `SubSequence`
+  ///   is produced in the result for each pair of consecutive elements
+  ///   equal to `separator`.
+  ///   The default value is `true`.
+  ///
+  /// - Requires: `maxSplit >= 0`
+  @warn_unused_result
+  public func split(
+    separator: Iterator.Element,
+    maxSplits: Int = Int.max,
+    omitEmptySubsequences: Bool = true
+  ) -> [SubSequence] {
+  return split(maxSplits, omitEmptySubsequences: omitEmptySubsequences,
+      isSeparator: { $0 == separator })
+  }
+}
+
 extension Collection where Index : BidirectionalIndex {
   /// Returns a subsequence containing all but the last `n` elements.
   ///
