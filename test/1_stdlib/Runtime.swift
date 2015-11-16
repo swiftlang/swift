@@ -2247,11 +2247,11 @@ Reflection.test("NSRange QuickLook") {
   let rng = NSRange(location:-9223372036854775808, length:5)
   let ql = PlaygroundQuickLook(reflecting: rng)
   switch ql {
-    case .Range(let loc, let len):
+  case .Range(let loc, let len):
     expectEqual(loc, -9223372036854775808)
     expectEqual(len, 5)
-    default:
-    expectFalse(true, "PlaygroundQuickLook for NSRange did not match Range")
+  default:
+    expectUnreachable("PlaygroundQuickLook for NSRange did not match Range")
   }
 }
 
