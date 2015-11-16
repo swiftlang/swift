@@ -141,7 +141,7 @@ devirtualizeReleaseOfBuffer(SILInstruction *ReleaseInst,
                             ApplyInst *DeallocCall) {
 
   // Is this a deallocation of a buffer?
-  SILFunction *DeallocFn = DeallocCall->getCalledFunction();
+  SILFunction *DeallocFn = DeallocCall->getCalleeFunction();
   if (!DeallocFn || DeallocFn->getName() != "swift_bufferDeallocateFromStack")
     return false;
 
@@ -150,7 +150,7 @@ devirtualizeReleaseOfBuffer(SILInstruction *ReleaseInst,
   if (!AllocAI || AllocAI->getNumArguments() < 1)
     return false;
 
-  SILFunction *AllocFunc = AllocAI->getCalledFunction();
+  SILFunction *AllocFunc = AllocAI->getCalleeFunction();
   if (!AllocFunc || AllocFunc->getName() != "swift_bufferAllocateOnStack")
     return false;
 
