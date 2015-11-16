@@ -54,7 +54,7 @@ public struct ObjCBool : BooleanType, BooleanLiteralConvertible {
   }
 
   /// Create an instance initialized to `value`.
-  @transparent
+  @_transparent
   public init(booleanLiteral value: Bool) {
     self.init(value)
   }
@@ -125,7 +125,7 @@ public struct Selector : StringLiteralConvertible, NilLiteralConvertible {
   }
   
   /// Create an instance initialized with `nil`.
-  @transparent public
+  @_transparent public
   init(nilLiteral: ()) {
     ptr = nil
   }
@@ -184,7 +184,7 @@ public struct NSZone : NilLiteralConvertible {
   public init() { pointer = nil }
 
   /// Create an instance initialized with `nil`.
-  @transparent public
+  @_transparent public
   init(nilLiteral: ()) {
     pointer = nil
   }
@@ -220,10 +220,10 @@ public var NO: ObjCBool {
   fatalError("can't retrieve unavailable property")
 }
 
-// FIXME: We can't make the fully-generic versions @transparent due to
-// rdar://problem/19418937, so here are some @transparent overloads
+// FIXME: We can't make the fully-generic versions @_transparent due to
+// rdar://problem/19418937, so here are some @_transparent overloads
 // for ObjCBool
-@transparent
+@_transparent
 @warn_unused_result
 public func && <T : BooleanType>(
   lhs: T, @autoclosure rhs: () -> ObjCBool
@@ -231,7 +231,7 @@ public func && <T : BooleanType>(
   return lhs.boolValue ? rhs().boolValue : false
 }
 
-@transparent
+@_transparent
 @warn_unused_result
 public func || <T : BooleanType>(
   lhs: T, @autoclosure rhs: () -> ObjCBool

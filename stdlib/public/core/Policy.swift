@@ -335,7 +335,7 @@ public typealias SinkType = _SinkType
 //===----------------------------------------------------------------------===//
 
 // Equatable types can be matched in patterns by value equality.
-@transparent
+@_transparent
 @warn_unused_result
 public func ~= <T : Equatable> (a: T, b: T) -> Bool {
   return a == b

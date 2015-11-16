@@ -16,7 +16,7 @@ import SwiftShims
 // without gobs of boilerplate.
 
 /// An initialized raw pointer to use as a NULL value.
-@transparent
+@_transparent
 internal var _nilRawPointer: Builtin.RawPointer {
   let zero: Int8 = 0
   return Builtin.inttoptr_Int8(zero._value)
@@ -27,7 +27,7 @@ internal var _nilRawPointer: Builtin.RawPointer {
 /// Does not include any dynamically-allocated or "remote" storage.
 /// In particular, `sizeof(X.self)`, when `X` is a class type, is the
 /// same regardless of how many stored properties `X` has.
-@transparent
+@_transparent
 @warn_unused_result
 public func sizeof<T>(_:T.Type) -> Int {
   return Int(Builtin.sizeof(T.self))
@@ -38,21 +38,21 @@ public func sizeof<T>(_:T.Type) -> Int {
 /// Does not include any dynamically-allocated or "remote" storage.
 /// In particular, `sizeof(a)`, when `a` is a class instance, is the
 /// same regardless of how many stored properties `a` has.
-@transparent
+@_transparent
 @warn_unused_result
 public func sizeofValue<T>(_:T) -> Int {
   return sizeof(T.self)
 }
 
 /// Returns the minimum memory alignment of `T`.
-@transparent
+@_transparent
 @warn_unused_result
 public func alignof<T>(_:T.Type) -> Int {
   return Int(Builtin.alignof(T.self))
 }
 
 /// Returns the minimum memory alignment of `T`.
-@transparent
+@_transparent
 @warn_unused_result
 public func alignofValue<T>(_:T) -> Int {
   return alignof(T.self)
@@ -60,7 +60,7 @@ public func alignofValue<T>(_:T) -> Int {
 
 /// Returns the least possible interval between distinct instances of
 /// `T` in memory.  The result is always positive.
-@transparent
+@_transparent
 @warn_unused_result
 public func strideof<T>(_:T.Type) -> Int {
   return Int(Builtin.strideof_nonzero(T.self))
@@ -68,7 +68,7 @@ public func strideof<T>(_:T.Type) -> Int {
 
 /// Returns the least possible interval between distinct instances of
 /// `T` in memory.  The result is always positive.
-@transparent
+@_transparent
 @warn_unused_result
 public func strideofValue<T>(_:T) -> Int {
   return strideof(T.self)
@@ -88,7 +88,7 @@ func _roundUpToAlignment(offset: Int, _ alignment: Int) -> Int {
 }
 
 /// Returns a tri-state of 0 = no, 1 = yes, 2 = maybe.
-@transparent
+@_transparent
 @warn_unused_result
 public // @testable
 func _canBeClass<T>(_: T.Type) -> Int8 {
@@ -101,7 +101,7 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
 ///   with extreme care.  There's almost always a better way to do
 ///   anything.
 ///
-@transparent
+@_transparent
 @warn_unused_result
 public func unsafeBitCast<T, U>(x: T, _: U.Type) -> U {
   _precondition(sizeof(T.self) == sizeof(U.self),
@@ -110,31 +110,31 @@ public func unsafeBitCast<T, U>(x: T, _: U.Type) -> U {
 }
 
 /// `unsafeBitCast` something to `AnyObject`.
-@transparent
+@_transparent
 @warn_unused_result
 public func _reinterpretCastToAnyObject<T>(x: T) -> AnyObject {
   return unsafeBitCast(x, AnyObject.self)
 }
 
-@transparent
+@_transparent
 @warn_unused_result
 func ==(lhs: Builtin.NativeObject, rhs: Builtin.NativeObject) -> Bool {
   return unsafeBitCast(lhs, Int.self) == unsafeBitCast(rhs, Int.self)
 }
 
-@transparent
+@_transparent
 @warn_unused_result
 func !=(lhs: Builtin.NativeObject, rhs: Builtin.NativeObject) -> Bool {
   return !(lhs == rhs)
 }
 
-@transparent
+@_transparent
 @warn_unused_result
 func ==(lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
   return unsafeBitCast(lhs, Int.self) == unsafeBitCast(rhs, Int.self)
 }
 
-@transparent
+@_transparent
 @warn_unused_result
 func !=(lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
   return !(lhs == rhs)
@@ -158,7 +158,7 @@ public func != (t0: Any.Type?, t1: Any.Type?) -> Bool {
 /// Tell the optimizer that this code is unreachable if condition is
 /// known at compile-time to be true.  If condition is false, or true
 /// but not a compile-time constant, this call has no effect.
-@transparent
+@_transparent
 internal func _unreachable(condition: Bool = true) {
   if condition {
     // FIXME: use a parameterized version of Builtin.unreachable when
@@ -169,7 +169,7 @@ internal func _unreachable(condition: Bool = true) {
 
 /// Tell the optimizer that this code is unreachable if this builtin is
 /// reachable after constant folding build configuration builtins.
-@transparent @noreturn internal
+@_transparent @noreturn internal
 func _conditionallyUnreachable() {
   Builtin.conditionallyUnreachable()
 }
@@ -200,7 +200,7 @@ internal func _isClassOrObjCExistential<T>(x: T.Type) -> Bool {
 /// Returns an `UnsafePointer` to the storage used for `object`.  There's
 /// not much you can do with this other than use it to identify the
 /// object.
-@transparent
+@_transparent
 @warn_unused_result
 public func unsafeAddressOf(object: AnyObject) -> UnsafePointer<Void> {
   return UnsafePointer(Builtin.bridgeToRawPointer(object))
@@ -212,7 +212,7 @@ public func unsafeAddressOf(object: AnyObject) -> UnsafePointer<Void> {
 /// Unwrapped `T` and `U` must be convertible to AnyObject. They may
 /// be either a class or a class protocol. Either T, U, or both may be
 /// optional references.
-@transparent
+@_transparent
 @warn_unused_result
 public func _unsafeReferenceCast<T, U>(x: T, _: U.Type) -> U {
   return Builtin.castReference(x)
@@ -228,7 +228,7 @@ public func _unsafeReferenceCast<T, U>(x: T, _: U.Type) -> U {
 ///   are confident that, always, `x is T`.  It is better than an
 ///   `unsafeBitCast` because it's more restrictive, and because
 ///   checking is still performed in debug builds.
-@transparent
+@_transparent
 @warn_unused_result
 public func unsafeDowncast<T : AnyObject>(x: AnyObject) -> T {
   _debugPrecondition(x is T, "invalid unsafeDowncast")
@@ -286,7 +286,7 @@ public func _getUnsafePointerToStoredProperties(x: AnyObject)
 // semantics of these function calls. This won't be necessary with
 // mandatory generic inlining.
 
-@transparent
+@_transparent
 @_semantics("branchhint")
 @warn_unused_result
 internal func _branchHint<C : BooleanType>(actual: C, _ expected: Bool)
@@ -295,7 +295,7 @@ internal func _branchHint<C : BooleanType>(actual: C, _ expected: Bool)
 }
 
 /// Optimizer hint that `x` is expected to be `true`.
-@transparent
+@_transparent
 @_semantics("fastpath")
 @warn_unused_result
 public func _fastPath<C: BooleanType>(x: C) -> Bool {
@@ -303,7 +303,7 @@ public func _fastPath<C: BooleanType>(x: C) -> Bool {
 }
 
 /// Optimizer hint that `x` is expected to be `false`.
-@transparent
+@_transparent
 @_semantics("slowpath")
 @warn_unused_result
 public func _slowPath<C : BooleanType>(x: C) -> Bool {
@@ -514,14 +514,14 @@ func _getSuperclass(t: Any.Type) -> AnyClass? {
 // and type checking will fail.
 
 /// Return true if `object` is uniquely referenced.
-@transparent
+@_transparent
 @warn_unused_result
 internal func _isUnique<T>(inout object: T) -> Bool {
   return Bool(Builtin.isUnique(&object))
 }
 
 /// Return true if `object` is uniquely referenced or pinned.
-@transparent
+@_transparent
 @warn_unused_result
 internal func _isUniqueOrPinned<T>(inout object: T) -> Bool {
   return Bool(Builtin.isUniqueOrPinned(&object))
@@ -529,7 +529,7 @@ internal func _isUniqueOrPinned<T>(inout object: T) -> Bool {
 
 /// Return true if `object` is uniquely referenced.
 /// This provides sanity checks on top of the Builtin.
-@transparent
+@_transparent
 @warn_unused_result
 public // @testable
 func _isUnique_native<T>(inout object: T) -> Bool {
@@ -546,7 +546,7 @@ func _isUnique_native<T>(inout object: T) -> Bool {
 
 /// Return true if `object` is uniquely referenced or pinned.
 /// This provides sanity checks on top of the Builtin.
-@transparent
+@_transparent
 @warn_unused_result
 public // @testable
 func _isUniqueOrPinned_native<T>(inout object: T) -> Bool {
@@ -562,7 +562,7 @@ func _isUniqueOrPinned_native<T>(inout object: T) -> Bool {
 
 /// Return true if type is a POD type. A POD type is a type that does not
 /// require any special handling on copying or destruction.
-@transparent
+@_transparent
 @warn_unused_result
 public // @testable
 func _isPOD<T>(type: T.Type) -> Bool {

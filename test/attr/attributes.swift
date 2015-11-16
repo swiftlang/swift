@@ -46,58 +46,58 @@ func foo() {}
 func foo(x: @convention(block) Int) {} // expected-error {{attribute only applies to syntactic function types}}
 func foo(x: @convention(block) (Int) -> Int) {}
 
-@transparent
+@_transparent
 func zim() {}
-@transparent
+@_transparent
 func zang()() {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-@transparent
+@_transparent
 func zung<T>(_: T) {}
-@transparent // expected-error{{@transparent cannot be applied to stored properties}} {{1-14=}}
+@_transparent // expected-error{{@_transparent cannot be applied to stored properties}} {{1-15=}}
 var zippity : Int
-func zoom(x: @transparent () -> ()) { } // expected-error{{attribute can only be applied to declarations, not types}} {{1-1=@transparent }} {{14-27=}}
+func zoom(x: @_transparent () -> ()) { } // expected-error{{attribute can only be applied to declarations, not types}} {{1-1=@_transparent }} {{14-28=}}
 protocol ProtoWithTransparent {
-  @transparent// expected-error{{@transparent is not supported on declarations within protocols}} {{3-15=}}
+  @_transparent// expected-error{{@_transparent is not supported on declarations within protocols}} {{3-16=}}
   func transInProto()
 }
 class TestTranspClass : ProtoWithTransparent {
-  @transparent  // expected-error{{@transparent is not supported on declarations within classes}} {{3-16=}}
+  @_transparent  // expected-error{{@_transparent is not supported on declarations within classes}} {{3-17=}}
   init () {}
-  @transparent // expected-error{{@transparent cannot be applied to this declaration}} {{3-16=}}
+  @_transparent // expected-error{{@_transparent cannot be applied to this declaration}} {{3-17=}}
   deinit {}
-  @transparent // expected-error{{@transparent is not supported on declarations within classes}} {{3-16=}}
+  @_transparent // expected-error{{@_transparent is not supported on declarations within classes}} {{3-17=}}
   class func transStatic() {}
-  @transparent// expected-error{{@transparent is not supported on declarations within classes}} {{3-15=}}
+  @_transparent// expected-error{{@_transparent is not supported on declarations within classes}} {{3-16=}}
   func transInProto() {}
 }
 struct TestTranspStruct : ProtoWithTransparent{
-  @transparent
+  @_transparent
   init () {}
-  @transparent
+  @_transparent
   init <T> (x : T) { }
-  @transparent
+  @_transparent
   static func transStatic() {}
-  @transparent
+  @_transparent
   func transInProto() {}
 }
-@transparent // expected-error{{@transparent cannot be applied to this declaration}} {{1-14=}}
+@_transparent // expected-error{{@_transparent cannot be applied to this declaration}} {{1-15=}}
 struct CannotHaveTransparentStruct {
   func m1() {}
 }
-@transparent // expected-error{{@transparent is only supported on struct and enum extensions}} {{1-14=}}
+@_transparent // expected-error{{@_transparent is only supported on struct and enum extensions}} {{1-15=}}
 extension TestTranspClass {
   func tr1() {}
 }
-@transparent
+@_transparent
 extension TestTranspStruct {
   func tr1() {}
 }
-@transparent
+@_transparent
 extension binary {
   func tr1() {}
 }
 
 class transparentOnCalssVar {
-  @transparent var max: Int { return 0xFF }; // expected-error {{@transparent is not supported on declarations within classes}} {{3-16=}}
+  @_transparent var max: Int { return 0xFF }; // expected-error {{@_transparent is not supported on declarations within classes}} {{3-17=}}
   func blah () {
     var _: Int = max
   }
@@ -105,7 +105,7 @@ class transparentOnCalssVar {
 
 class transparentOnCalssVar2 {
   var max: Int {
-    @transparent // expected-error {{@transparent is not supported on declarations within classes}} {{5-18=}}
+    @_transparent // expected-error {{@_transparent is not supported on declarations within classes}} {{5-19=}}
     get {
       return 0xFF
     }

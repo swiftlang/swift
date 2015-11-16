@@ -17,7 +17,7 @@
 // FIXME: We could go farther with this simplification, e.g. avoiding
 // UnsafeMutablePointer
 
-@transparent
+@_transparent
 @warn_unused_result
 public // @testable
 func _isDebugAssertConfiguration() -> Bool {
@@ -28,7 +28,7 @@ func _isDebugAssertConfiguration() -> Bool {
   return Int32(Builtin.assert_configuration()) == 0
 }
 
-@transparent
+@_transparent
 @warn_unused_result
 internal func _isReleaseAssertConfiguration() -> Bool {
   // The values for the assert_configuration call are:
@@ -38,7 +38,7 @@ internal func _isReleaseAssertConfiguration() -> Bool {
   return Int32(Builtin.assert_configuration()) == 1
 }
 
-@transparent
+@_transparent
 @warn_unused_result
 public // @testable
 func _isFastAssertConfiguration() -> Bool {
@@ -49,7 +49,7 @@ func _isFastAssertConfiguration() -> Bool {
   return Int32(Builtin.assert_configuration()) == 2
 }
 
-@transparent
+@_transparent
 @warn_unused_result
 public // @testable
 func _isStdlibInternalChecksEnabled() -> Bool {
@@ -181,14 +181,14 @@ func _fatalErrorMessage(prefix: StaticString, _ message: StaticString,
 
 /// Prints a fatal error message when a unimplemented initializer gets
 /// called by the Objective-C runtime.
-@transparent @noreturn
+@_transparent @noreturn
 public // COMPILER_INTRINSIC
 func _unimplemented_initializer(className: StaticString,
                                 initName: StaticString = __FUNCTION__,
                                 file: StaticString = __FILE__,
                                 line: UInt = __LINE__,
                                 column: UInt = __COLUMN__) {
-  // This function is marked @transparent so that it is inlined into the caller
+  // This function is marked @_transparent so that it is inlined into the caller
   // (the initializer stub), and, depending on the build configuration,
   // redundant parameter values (__FILE__ etc.) are eliminated, and don't leak
   // information about the user's source.

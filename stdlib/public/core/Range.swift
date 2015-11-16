@@ -19,7 +19,7 @@ public struct RangeGenerator<
   public typealias T = Element
 
   /// Construct an instance that traverses the elements of `bounds`.
-  @transparent
+  @_transparent
   public init(_ bounds: Range<Element>) {
     self.startIndex = bounds.startIndex
     self.endIndex = bounds.endIndex
@@ -88,7 +88,7 @@ public struct Range<
 
   /// Construct a range with `startIndex == start` and `endIndex ==
   /// end`.
-  @transparent
+  @_transparent
   public init(start: Element, end: Element) {
     self.startIndex = start
     self.endIndex = end
@@ -155,7 +155,7 @@ public func == <Element>(lhs: Range<Element>, rhs: Range<Element>) -> Bool {
 
 /// Forms a half-open range that contains `minimum`, but not
 /// `maximum`.
-@transparent
+@_transparent
 @warn_unused_result
 public func ..< <Pos : ForwardIndexType> (minimum: Pos, maximum: Pos)
   -> Range<Pos> {
@@ -163,7 +163,7 @@ public func ..< <Pos : ForwardIndexType> (minimum: Pos, maximum: Pos)
 }
 
 /// Forms a closed range that contains both `minimum` and `maximum`.
-@transparent
+@_transparent
 @warn_unused_result
 public func ... <Pos : ForwardIndexType> (
   minimum: Pos, maximum: Pos
@@ -176,7 +176,7 @@ public func ... <Pos : ForwardIndexType> (
 /// Forms a half-open range that contains `start`, but not `end`.
 ///
 /// - Requires: `start <= end`.
-@transparent
+@_transparent
 @warn_unused_result
 public func ..< <Pos : ForwardIndexType where Pos : Comparable> (
   start: Pos, end: Pos
@@ -187,7 +187,7 @@ public func ..< <Pos : ForwardIndexType where Pos : Comparable> (
 
 /// Forms a closed range that contains both `start` and `end`.
 /// - Requires: `start <= end`.
-@transparent
+@_transparent
 @warn_unused_result
 public func ... <Pos : ForwardIndexType where Pos : Comparable> (
   start: Pos, end: Pos

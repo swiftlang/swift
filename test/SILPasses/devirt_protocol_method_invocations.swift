@@ -21,17 +21,17 @@ public class C : Foo {
   }
 }
 
-@transparent
+@_transparent
 func callfoo(f: Foo)->Int {
   return f.foo(2) + f.foo(2)
 }
 
-@transparent
+@_transparent
 func callboo(f: Foo)->Int32 {
   return f.boo(2) + f.boo(2)
 }
 
-@transparent
+@_transparent
 func callGetSelf(f: Foo)->Foo {
   return f.getSelf()
 }

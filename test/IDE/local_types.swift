@@ -160,7 +160,7 @@ public let doubleClosure: () -> () = {
   singleClosure()
 }
 
-@transparent
+@_transparent
 public func transparentFunc() {
   // CHECK-DAG: VF10LocalTypes15transparentFuncFT_T_L_21TransparentFuncStruct
   struct TransparentFuncStruct {

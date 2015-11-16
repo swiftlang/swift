@@ -27,7 +27,7 @@
 ///   optimizer may assume that it *would* evaluate to `true`. Failure
 ///   to satisfy that assumption in -Ounchecked builds is a serious
 ///   programming error.
-@transparent
+@_transparent
 public func assert(
   @autoclosure condition: () -> Bool,
   @autoclosure _ message: () -> String = String(),
@@ -57,7 +57,7 @@ public func assert(
 ///   optimizer may assume that it *would* evaluate to `true`. Failure
 ///   to satisfy that assumption in -Ounchecked builds is a serious
 ///   programming error.
-@transparent
+@_transparent
 public func precondition(
   @autoclosure condition: () -> Bool,
   @autoclosure _ message: () -> String = String(),
@@ -120,7 +120,7 @@ public func assertionFailure(
 /// * In -Ounchecked builds, the optimizer may assume that this
 ///   function will never be called. Failure to satisfy that assumption
 ///   is a serious programming error.
-@transparent @noreturn
+@_transparent @noreturn
 public func preconditionFailure(
   @autoclosure message: () -> String = String(),
   file: StaticString = __FILE__, line: UInt = __LINE__
@@ -135,7 +135,7 @@ public func preconditionFailure(
 }
 
 /// Unconditionally print a `message` and stop execution.
-@transparent @noreturn
+@_transparent @noreturn
 public func fatalError(
   @autoclosure message: () -> String = String(),
   file: StaticString = __FILE__, line: UInt = __LINE__
@@ -149,7 +149,7 @@ public func fatalError(
 /// building in fast mode they are disabled.  In release mode they don't print
 /// an error message but just trap. In debug mode they print an error message
 /// and abort.
-@transparent
+@_transparent
 public func _precondition(
   @autoclosure condition: () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UInt = __LINE__
@@ -165,7 +165,7 @@ public func _precondition(
   }
 }
 
-@transparent @noreturn
+@_transparent @noreturn
 public func _preconditionFailure(
   message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UInt = __LINE__) {
@@ -178,7 +178,7 @@ public func _preconditionFailure(
 /// If `error` is true, prints an error message in debug mode, traps in release
 /// mode, and returns an undefined error otherwise.
 /// Otherwise returns `result`.
-@transparent
+@_transparent
 public func _overflowChecked<T>(
   args: (T, Bool),
   file: StaticString = __FILE__, line: UInt = __LINE__
@@ -202,7 +202,7 @@ public func _overflowChecked<T>(
 /// and abort.
 /// They are meant to be used when the check is not comprehensively checking for
 /// all possible errors.
-@transparent
+@_transparent
 public func _debugPrecondition(
   @autoclosure condition: () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UInt = __LINE__
@@ -215,7 +215,7 @@ public func _debugPrecondition(
   }
 }
 
-@transparent @noreturn
+@_transparent @noreturn
 public func _debugPreconditionFailure(
   message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UInt = __LINE__) {
@@ -231,7 +231,7 @@ public func _debugPreconditionFailure(
 /// standard library. They are only enable when the standard library is built
 /// with the build configuration INTERNAL_CHECKS_ENABLED enabled. Otherwise, the
 /// call to this function is a noop.
-@transparent
+@_transparent
 public func _sanityCheck(
   @autoclosure condition: () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UInt = __LINE__
@@ -243,7 +243,7 @@ public func _sanityCheck(
 #endif
 }
 
-@transparent @noreturn
+@_transparent @noreturn
 public func _sanityCheckFailure(
   message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UInt = __LINE__

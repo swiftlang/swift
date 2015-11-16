@@ -1,5 +1,5 @@
 
-@transparent public func negate_bad(x: Int) -> Int {
+@_transparent public func negate_bad(x: Int) -> Int {
   return !x
 }
 

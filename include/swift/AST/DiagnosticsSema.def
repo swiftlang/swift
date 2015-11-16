@@ -691,13 +691,13 @@ ERROR(static_functions_not_mutating,sema_tcd,none,
       "static functions may not be declared mutating", ())
 
 ERROR(transparent_stored_property,sema_tcd,none,
-      "@transparent cannot be applied to stored properties", ())
+      "@_transparent cannot be applied to stored properties", ())
 ERROR(transparent_on_invalid_extension,sema_tcd,none,
-      "@transparent is only supported on struct and enum extensions", ())
+      "@_transparent is only supported on struct and enum extensions", ())
 ERROR(transparent_in_protocols_not_supported,sema_tcd,none,
-      "@transparent is not supported on declarations within protocols", ())
+      "@_transparent is not supported on declarations within protocols", ())
 ERROR(transparent_in_classes_not_supported,sema_tcd,none,
-      "@transparent is not supported on declarations within classes", ())
+      "@_transparent is not supported on declarations within classes", ())
 
 ERROR(invalid_iboutlet,sema_tcd,none,
       "only instance properties can be declared @IBOutlet", ())

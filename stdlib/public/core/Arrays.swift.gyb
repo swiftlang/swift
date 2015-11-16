@@ -829,7 +829,7 @@ extension ${Self} : CustomStringConvertible, CustomDebugStringConvertible {
 }
 
 extension ${Self} {
-  @transparent
+  @_transparent
   @warn_unused_result
   internal func _cPointerArgs() -> (AnyObject?, Builtin.RawPointer) {
     let p = _baseAddressIfContiguous
@@ -1168,7 +1168,7 @@ internal struct _InitializePointer<T> : _PointerFunctionType {
     rawMemory.initialize(newValue)
   }
 
-  @transparent
+  @_transparent
   internal init(_ newValue: T) {
     self.newValue = newValue
   }

@@ -1,35 +1,35 @@
 :orphan:
 
-``@transparent``
-================
+``@_transparent``
+=================
 
-Semantically, ``@transparent`` means something like "treat this operation as if
-it were a primitive operation". The name is meant to imply that both the
+Semantically, ``@_transparent`` means something like "treat this operation as
+if it were a primitive operation". The name is meant to imply that both the
 compiler and the compiled program will "see through" the operation to its
 implementation.
 
 This has several consequences:
 
-- Any calls to a function marked ``@transparent`` MUST be inlined prior to
+- Any calls to a function marked ``@_transparent`` MUST be inlined prior to
   doing dataflow-related diagnostics, even under ``-Onone``. This may be
   necessary to *catch* dataflow errors.
 
-- Because of this, a ``@transparent`` function is inherently "fragile", in that
-  changing its implementation most likely will not affect callers in existing
-  compiled binaries.
+- Because of this, a ``@_transparent`` function is inherently "fragile", in
+  that changing its implementation most likely will not affect callers in
+  existing compiled binaries.
 
-- Because of this, a ``@transparent`` function MUST only reference public
+- Because of this, a ``@_transparent`` function MUST only reference public
   symbols, and MUST not be optimized based on knowledge of the module it's in.
   [This is not currently implemented or enforced.]
 
 - Debug info SHOULD skip over the inlined operations when single-stepping
   through the calling function.
 
-This is all that ``@transparent`` means.
+This is all that ``@_transparent`` means.
 
 
-When should you use ``@transparent``?
--------------------------------------
+When should you use ``@_transparent``?
+--------------------------------------
 
 - Does the implementation of this function ever have to change? Then you can't
   allow it to be inlined.
@@ -42,19 +42,19 @@ When should you use ``@transparent``?
 
 - Is it okay if the function is *not* inlined? You'd just prefer that it were?
   Then you should use [the attribute we haven't designed yet], rather than
-  ``@transparent``. (If you really need this right now, try
+  ``@_transparent``. (If you really need this right now, try
   ``@inline(__always)``.)
 
 - Is it a problem if the function is inlined even under ``-Onone``? Then you're
   really in the previous case. Trust the compiler.
 
 - Is it a problem if you can't step through the function that's been inlined?
-  Then you don't want ``@transparent``; you just want ``@inline(__always)``.
+  Then you don't want ``@_transparent``; you just want ``@inline(__always)``.
 
 - Is it okay if the inlining happens after all the dataflow diagnostics? Then
-  you don't want ``@transparent``; you just want ``@inline(__always)``.
+  you don't want ``@_transparent``; you just want ``@inline(__always)``.
 
-If you made it this far, it sounds like ``@transparent`` is the right choice.
+If you made it this far, it sounds like ``@_transparent`` is the right choice.
 
 
 Current implementation limitations
@@ -79,5 +79,5 @@ Current implementation limitations
 
 - Similarly, when compiling in non-single-frontend mode, no SIL is generated for
   any functions but those in the primary file (for each frontend invocation),
-  including ``@inline(__always)`` and ``@transparent`` functions. This is
+  including ``@inline(__always)`` and ``@_transparent`` functions. This is
   semantically a bug. rdar://problem/15366167

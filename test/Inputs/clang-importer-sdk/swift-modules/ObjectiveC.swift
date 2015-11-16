@@ -62,7 +62,7 @@ public struct Selector : StringLiteralConvertible {
 public struct NSZone: NilLiteralConvertible {
   public var pointer : COpaquePointer
 
-  @transparent public
+  @_transparent public
   init(nilLiteral: ()) {
     pointer = COpaquePointer()
   }

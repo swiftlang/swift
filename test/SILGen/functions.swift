@@ -509,7 +509,7 @@ func return_generic_tuple()
 func testNoReturnAttrParam(fptr: @noreturn ()->()) -> () {}
 
 // CHECK-LABEL: sil hidden [transparent] @_TF9functions15testTransparent{{.*}} : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
-@transparent func testTransparent(x: Bool) -> Bool {
+@_transparent func testTransparent(x: Bool) -> Bool {
   return x
 }
 

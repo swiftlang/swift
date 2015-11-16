@@ -59,7 +59,7 @@ public struct StaticString
   ///
   /// - Requires: `self` stores a pointer to either ASCII or UTF-8 code
   ///   units.
-  @transparent
+  @_transparent
   public var utf8Start: UnsafePointer<UInt8> {
     _precondition(
       hasPointerRepresentation,
@@ -70,7 +70,7 @@ public struct StaticString
   /// The stored Unicode scalar value.
   ///
   /// - Requires: `self` stores a single Unicode scalar value.
-  @transparent
+  @_transparent
   public var unicodeScalar: UnicodeScalar {
     _precondition(
       !hasPointerRepresentation,
@@ -83,7 +83,7 @@ public struct StaticString
   ///
   /// If `self` stores a single Unicode scalar value, the value of
   /// `byteSize` is unspecified.
-  @transparent
+  @_transparent
   public var byteSize: Int {
     _precondition(
       hasPointerRepresentation,
@@ -92,7 +92,7 @@ public struct StaticString
   }
 
   /// `true` iff `self` stores a pointer to ASCII or UTF-8 code units.
-  @transparent
+  @_transparent
   public var hasPointerRepresentation: Bool {
     return (UInt8(_flags) & 0x1) == 0
   }
@@ -101,7 +101,7 @@ public struct StaticString
   ///
   /// If `self` stores a single Unicode scalar value, the value of
   /// `isASCII` is unspecified.
-  @transparent
+  @_transparent
   public var isASCII: Bool {
     return (UInt8(_flags) & 0x2) != 0
   }
@@ -130,7 +130,7 @@ public struct StaticString
 
   /// Return a `String` representing the same sequence of Unicode
   /// scalar values as `self` does.
-  @transparent
+  @_transparent
   public var stringValue: String {
     return withUTF8Buffer {
       (buffer) in
@@ -139,12 +139,12 @@ public struct StaticString
   }
 
   /// Create an empty instance.
-  @transparent
+  @_transparent
   public init() {
     self = ""
   }
 
-  @transparent
+  @_transparent
   internal init(
     start: Builtin.RawPointer, byteSize: Builtin.Word, isASCII: Builtin.Int1
   ) {
@@ -153,7 +153,7 @@ public struct StaticString
     self._flags = Bool(isASCII) ? (0x2 as UInt8)._value : (0x0 as UInt8)._value
   }
 
-  @transparent
+  @_transparent
   internal init(
     unicodeScalar: Builtin.Int32
   ) {
@@ -166,20 +166,20 @@ public struct StaticString
   }
 
   @effects(readonly)
-  @transparent
+  @_transparent
   public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
     self = StaticString(unicodeScalar: value)
   }
 
   /// Create an instance initialized to `value`.
   @effects(readonly)
-  @transparent
+  @_transparent
   public init(unicodeScalarLiteral value: StaticString) {
     self = value
   }
 
   @effects(readonly)
-  @transparent
+  @_transparent
   public init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
     byteSize: Builtin.Word,
@@ -194,13 +194,13 @@ public struct StaticString
 
   /// Create an instance initialized to `value`.
   @effects(readonly)
-  @transparent
+  @_transparent
   public init(extendedGraphemeClusterLiteral value: StaticString) {
     self = value
   }
 
   @effects(readonly)
-  @transparent
+  @_transparent
   public init(
     _builtinStringLiteral start: Builtin.RawPointer,
     byteSize: Builtin.Word,
@@ -211,7 +211,7 @@ public struct StaticString
 
   /// Create an instance initialized to `value`.
   @effects(readonly)
-  @transparent
+  @_transparent
   public init(stringLiteral value: StaticString) {
     self = value
   }
