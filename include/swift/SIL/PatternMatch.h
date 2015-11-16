@@ -465,11 +465,7 @@ struct Callee_match<SILFunction &> {
     if (!AI)
       return false;
 
-    auto *FunctionRef = dyn_cast<FunctionRefInst>(AI->getCallee());
-    if (!FunctionRef)
-      return false;
-
-    return FunctionRef->getReferencedFunction() == &Fun;
+    return AI->getCalleeFunction() == &Fun;
   }
 };
 

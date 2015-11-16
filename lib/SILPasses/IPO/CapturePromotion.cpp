@@ -596,18 +596,6 @@ static std::pair<SILArgument *, SILArgument *> getBoxAndAddrFromIndex(
   return std::make_pair(Box, Addr);
 }
 
-static SILFunction *getFunctionDefinition(SILValue FunctionValue) {
-  auto *FRI = dyn_cast<FunctionRefInst>(FunctionValue);
-  if (!FRI)
-    return nullptr;
-
-  auto *Fn = FRI->getReferencedFunction();
-  if (!Fn->isDefinition())
-    return nullptr;
-
-  return Fn;
-}
-
 /// \brief Given a partial_apply instruction and the argument index into its
 /// callee's argument list of a box argument (which is followed by an argument
 /// for the address of the box's contents), return true if the closure is known
@@ -755,8 +743,8 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       // index so is not stored separately);
       unsigned Index = OpNo - 2 + closureType->getParameters().size();
 
-      auto *Fn = getFunctionDefinition(Callee);
-      if (!Fn)
+      auto *Fn = PAI->getCalleeFunction();
+      if (!Fn || !Fn->isDefinition())
         return false;
 
       SILArgument *BoxArg;

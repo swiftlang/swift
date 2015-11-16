@@ -70,11 +70,9 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
   collectApplyInst(F, NewApplies);
 
   for (auto &AI : NewApplies) {
-    auto *FunRef = dyn_cast<FunctionRefInst>(AI.getCallee());
-    if (!FunRef)
+    auto *ReferencedF = AI.getCalleeFunction();
+    if (!ReferencedF)
       continue;
-
-    auto *ReferencedF = FunRef->getReferencedFunction();
 
     // Check if it is a call of a generic function.
     // If this is the case, check if there is a specialization

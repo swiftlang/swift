@@ -151,12 +151,8 @@ class InstructionsCloner : public SILClonerWithScopes<InstructionsCloner> {
 
 /// If this is a call to a global initializer, map it.
 void SILGlobalOpt::collectGlobalInitCall(ApplyInst *AI) {
-  FunctionRefInst *FR = dyn_cast<FunctionRefInst>(AI->getCallee());
-  if (!FR)
-    return;
-
-  SILFunction *F = FR->getReferencedFunction();
-  if (!F->isGlobalInit())
+  SILFunction *F = AI->getCalleeFunction();
+  if (!F || !F->isGlobalInit())
     return;
 
   GlobalInitCallMap[F].push_back(AI);
@@ -346,12 +342,8 @@ static bool isAvailabilityCheck(SILBasicBlock *BB) {
   if (!AI)
     return false;
   
-  FunctionRefInst *FR = dyn_cast<FunctionRefInst>(AI->getCallee());
-  if (!FR)
-    return false;
-  
-  SILFunction *F = FR->getReferencedFunction();
-  if (!F->hasDefinedSemantics())
+  SILFunction *F = AI->getCalleeFunction();
+  if (!F || !F->hasDefinedSemantics())
     return false;
   
   return F->getSemanticsString().startswith("availability");

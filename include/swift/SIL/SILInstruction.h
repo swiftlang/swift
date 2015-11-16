@@ -601,8 +601,8 @@ public:
 
   SILValue getCallee() const { return Operands[Callee].get(); }
 
-  // Gets the called function if the callee is a function_ref instruction.
-  SILFunction *getCalledFunction() const {
+  // Gets the referenced function if the callee is a function_ref instruction.
+  SILFunction *getCalleeFunction() const {
     if (auto *FRI = dyn_cast<FunctionRefInst>(getCallee()))
       return FRI->getReferencedFunction();
     return nullptr;
@@ -4236,6 +4236,11 @@ public:
   /// Return the callee operand.
   SILValue getCallee() const {
     FOREACH_IMPL_RETURN(getCallee());
+  }
+
+  // Return the referenced function if the callee is a function_ref instruction.
+  SILFunction *getCalleeFunction() const {
+    FOREACH_IMPL_RETURN(getCalleeFunction());
   }
 
   /// Return the type.

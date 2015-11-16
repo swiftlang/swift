@@ -4043,14 +4043,15 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
     // optimizations we perform to things that are reproducible by the runtime.
     Type origArgType = elt->getArgumentType();
     if (origArgType.isNull()) {
-      elementsWithNoPayload.push_back({elt, nullptr});
+      elementsWithNoPayload.push_back({elt, nullptr, nullptr});
       continue;
     }
 
     // If the payload is indirect, we can use the NativeObject type metadata
     // without recurring. The box won't affect loadability or fixed-ness.
     if (elt->isIndirect() || theEnum->isIndirect()) {
-      elementsWithPayload.push_back({elt, &TC.getNativeObjectTypeInfo()});
+      auto *nativeTI = &TC.getNativeObjectTypeInfo();
+      elementsWithPayload.push_back({elt, nativeTI, nativeTI});
       continue;
     }
 
@@ -4066,7 +4067,7 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
 
     auto loadableOrigArgTI = dyn_cast<LoadableTypeInfo>(origArgTI);
     if (loadableOrigArgTI && loadableOrigArgTI->isKnownEmpty()) {
-      elementsWithNoPayload.push_back({elt, nullptr});
+      elementsWithNoPayload.push_back({elt, nullptr, nullptr});
     } else {
       // *Now* apply the substitutions and get the type info for the instance's
       // payload type, since we know this case carries an apparent payload in
@@ -4074,7 +4075,7 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
       SILType fieldTy = type.getEnumElementType(elt, *TC.IGM.SILMod);
       auto *substArgTI = &TC.IGM.getTypeInfo(fieldTy);
 
-      elementsWithPayload.push_back({elt, substArgTI});
+      elementsWithPayload.push_back({elt, substArgTI, origArgTI});
       if (!substArgTI->isFixedSize())
         tik = Opaque;
       else if (!substArgTI->isLoadable() && tik > Fixed)
@@ -4571,7 +4572,7 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
   IsPOD_t isPOD = IsPOD;
   IsBitwiseTakable_t isBT = IsBitwiseTakable;
   for (auto &elt : ElementsWithPayload) {
-    auto &fixedPayloadTI = cast<FixedTypeInfo>(*elt.ti); // FIXME
+    auto &fixedPayloadTI = cast<FixedTypeInfo>(*elt.ti);
     if (fixedPayloadTI.getFixedAlignment() > worstAlignment)
       worstAlignment = fixedPayloadTI.getFixedAlignment();
     if (!fixedPayloadTI.isPOD(ResilienceScope::Component))
@@ -4592,20 +4593,15 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
       continue;
     }
 
-    // As a hack, if the payload type is generic, don't use any spare bits
-    // from it, even if our concrete instance has them. We don't want varying
-    // spare bits between ObjC and Swift class references to introduce dynamic
-    // layout; that's a lot of overhead in generic code for little gain.
-    // There's a corresponding hack in TypeConverter::convertArchetypeType to
-    // give class archetypes no spare bits.
-    if (elt.decl->getInterfaceType()->hasTypeParameter()) {
-      FixedTypeInfo::applyFixedSpareBitsMask(CommonSpareBits,
-                               SpareBitVector::getConstant(payloadBits, false));
-      continue;
-    }
+    // Otherwise, all unsubstituted payload types are fixed-size and
+    // we have no constraints on what spare bits we can use.
 
-    // Otherwise, we have no constraints on what spare bits we can use.
-    fixedPayloadTI.applyFixedSpareBitsMask(CommonSpareBits);
+    // We might still have a dependently typed payload though, namely a
+    // class-bound archetype. These do not have any spare bits because
+    // they can contain Obj-C tagged pointers. To handle this case
+    // correctly, we get spare bits from the unsubstituted type.
+    auto &fixedOrigTI = cast<FixedTypeInfo>(*elt.origTI);
+    fixedOrigTI.applyFixedSpareBitsMask(CommonSpareBits);
   }
 
   unsigned commonSpareBitCount = CommonSpareBits.count();

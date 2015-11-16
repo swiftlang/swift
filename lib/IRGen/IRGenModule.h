@@ -470,7 +470,6 @@ public:
   llvm::PointerType *isSingleIndirectValue(SILType T);
   llvm::PointerType *requiresIndirectResult(SILType T);
   bool isPOD(SILType type, ResilienceScope scope);
-  ObjectSize classifyTypeSize(SILType type, ResilienceScope scope);
   clang::CanQual<clang::Type> getClangType(CanType type);
   clang::CanQual<clang::Type> getClangType(SILType type);
   clang::CanQual<clang::Type> getClangType(SILParameterInfo param);

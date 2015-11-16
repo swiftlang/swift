@@ -29,11 +29,11 @@ static bool isAutoreleasePoolCall(SILInstruction *I) {
   if (!AI)
     return false;
 
-  auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee());
-  if (!FRI)
+  auto *Fn = AI->getCalleeFunction();
+  if (!Fn)
     return false;
 
-  return llvm::StringSwitch<bool>(FRI->getReferencedFunction()->getName())
+  return llvm::StringSwitch<bool>(Fn->getName())
       .Case("objc_autoreleasePoolPush", true)
       .Case("objc_autoreleasePoolPop", true)
       .Default(false);

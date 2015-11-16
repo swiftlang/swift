@@ -531,15 +531,6 @@ IntConst ConstantTracker::getIntConst(SILValue val, int depth) {
 //                           Performance Inliner
 //===----------------------------------------------------------------------===//
 
-// Returns the referenced function an ApplySite.
-static SILFunction *getReferencedFunction(ApplySite Apply) {
-  auto *FRI = dyn_cast<FunctionRefInst>(Apply.getCallee());
-  if (!FRI)
-    return nullptr;
-
-  return FRI->getReferencedFunction();
-}
-
 bool SILPerformanceInliner::hasInliningCycle(SILFunction *Caller,
                                                 SILFunction *Callee) {
   // Reject simple recursions.
@@ -559,7 +550,7 @@ bool SILPerformanceInliner::hasInliningCycle(SILFunction *Caller,
 SILFunction *SILPerformanceInliner::
 getEligibleFunction(FullApplySite AI, CallGraph &CG) {
  
-  SILFunction *Callee = getReferencedFunction(AI);
+  SILFunction *Callee = AI.getCalleeFunction();
   
   if (!Callee) {
     DEBUG(llvm::dbgs() << "        FAIL: Cannot find inlineable callee.\n");
@@ -719,7 +710,7 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
                                               DominanceAnalysis *DA,
                                               SILLoopAnalysis *LA,
                                               ConstantTracker &callerTracker) {
-  SILFunction *Callee = getReferencedFunction(AI);
+  SILFunction *Callee = AI.getCalleeFunction();
   
   if (Callee->getInlineStrategy() == AlwaysInline)
     return true;
@@ -857,7 +848,7 @@ ApplySite SILPerformanceInliner::specializeGenericUpdatingCallGraph(
   if (!Apply.hasSubstitutions())
     return ApplySite();
 
-  auto *Callee = getReferencedFunction(Apply);
+  auto *Callee = Apply.getCalleeFunction();
 
   if (!Callee || Callee->isExternalDeclaration())
     return ApplySite();
@@ -969,7 +960,7 @@ bool SILPerformanceInliner::devirtualizeAndSpecializeApplies(
     if (ChangedApply) {
       ChangedAny = true;
 
-      auto *NewCallee = getReferencedFunction(Apply);
+      auto *NewCallee = Apply.getCalleeFunction();
       assert(NewCallee && "Expected directly referenced function!");
 
       // Track all new references to function definitions.
@@ -1039,7 +1030,7 @@ void SILPerformanceInliner::collectAppliesToInline(SILFunction *Caller,
   // Calculate how many times a callee is called from this caller.
   llvm::DenseMap<SILFunction *, unsigned> CalleeCount;
   for (auto AI : InitialCandidates) {
-    SILFunction *Callee = getReferencedFunction(AI);
+    SILFunction *Callee = AI.getCalleeFunction();
     assert(Callee && "apply_inst does not have a direct callee anymore");
     CalleeCount[Callee]++;
   }
@@ -1047,7 +1038,7 @@ void SILPerformanceInliner::collectAppliesToInline(SILFunction *Caller,
   // Now copy each candidate callee that has a small enough number of
   // call sites into the final set of call sites.
   for (auto AI : InitialCandidates) {
-    SILFunction *Callee = getReferencedFunction(AI);
+    SILFunction *Callee = AI.getCalleeFunction();
     assert(Callee && "apply_inst does not have a direct callee anymore");
 
     const unsigned CallsToCalleeThreshold = 1024;
@@ -1087,7 +1078,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
 
   // Second step: do the actual inlining.
   for (auto AI : AppliesToInline) {
-    SILFunction *Callee = getReferencedFunction(AI);
+    SILFunction *Callee = AI.getCalleeFunction();
     assert(Callee && "apply_inst does not have a direct callee anymore");
 
     DEBUG(llvm::dbgs() << "    Inline:" <<  *AI.getInstruction());

@@ -116,20 +116,6 @@ enum class ResilienceScope {
   Universal
 };
 
-/// Whether an object is fixed in size or not.  This answer is always
-/// relative to some resilience scope.
-enum class ObjectSize : uint8_t {
-  /// The object's size is fixed in the resilience scope.
-  Fixed,
-
-  /// The object's size is unknown in the resilience domain, but it is
-  /// not dependent.
-  Resilient,
-
-  /// The object's size is dependent on a generic parameter.
-  Dependent
-};
-
 /// Destructor variants.
 enum class DestructorKind : uint8_t {
   /// A deallocating destructor destroys the object and deallocates

@@ -1702,22 +1702,7 @@ static bool isIRTypeDependent(IRGenModule &IGM, NominalTypeDecl *decl) {
     return IsIRTypeDependent(IGM).visitStructDecl(sd);
   } else {
     auto ed = cast<EnumDecl>(decl);
-
-    // HACK: there's some sort of logic in multi-payload enums that
-    // tries to assume that there are no spare bits in class-bounded
-    // archetypes.  This logic is quite broken; if you instantiate a
-    // non-shared implementation for the enum, you get different
-    // results.  This check prevents this from being a problem in
-    // common practice by pretending that a shared implementation is
-    // acceptable as long as the generic instance is known to be fixed
-    // in size.
-    if (IGM.classifyTypeSize(SILType::getPrimitiveObjectType(
-                       ed->getDeclaredTypeInContext()->getCanonicalType()),
-                             ResilienceScope::Component)
-          == ObjectSize::Fixed)
-      return false;
-
-    return IsIRTypeDependent(IGM).visitEnumDecl(cast<EnumDecl>(decl));
+    return IsIRTypeDependent(IGM).visitEnumDecl(ed);
   }
 }
 
@@ -1938,114 +1923,6 @@ bool IRGenModule::isPOD(SILType type, ResilienceScope scope) {
   return getTypeInfo(type).isPOD(scope);
 }
 
-
-namespace {
-  struct ClassifyTypeSize : CanTypeVisitor<ClassifyTypeSize, ObjectSize> {
-    IRGenModule &IGM;
-    ResilienceScope Scope;
-    ClassifyTypeSize(IRGenModule &IGM, ResilienceScope scope)
-      : IGM(IGM), Scope(scope) {}
-
-#define ALWAYS(KIND, RESULT) \
-    ObjectSize visit##KIND##Type(KIND##Type *t) { return ObjectSize::RESULT; }
-
-    ALWAYS(Builtin, Fixed)
-    ALWAYS(SILFunction, Fixed)
-    ALWAYS(Class, Fixed)
-    ALWAYS(BoundGenericClass, Fixed)
-    ALWAYS(Protocol, Fixed)
-    ALWAYS(ProtocolComposition, Fixed)
-    ALWAYS(LValue, Dependent)
-#undef ALWAYS
-    
-    ObjectSize visitArchetypeType(CanArchetypeType archetype) {
-      if (archetype->requiresClass())
-        return ObjectSize::Fixed;
-      return ObjectSize::Dependent;
-    }
-    
-    ObjectSize visitTupleType(CanTupleType tuple) {
-      ObjectSize result = ObjectSize::Fixed;
-      for (auto eltType : tuple.getElementTypes()) {
-        result = std::max(result, visit(eltType));
-      }
-      return result;
-    }
-
-    ObjectSize visitStructType(CanStructType type) {
-      if (type->getDecl()->getGenericParamsOfContext())
-        return visitGenericStructType(type, type->getDecl());
-      if (IGM.isResilient(type->getDecl(), Scope))
-        return ObjectSize::Resilient;
-      return ObjectSize::Fixed;
-    }
-
-    ObjectSize visitBoundGenericStructType(CanBoundGenericStructType type) {
-      return visitGenericStructType(type, type->getDecl());
-    }
-
-    ObjectSize visitGenericStructType(CanType type, StructDecl *D) {
-      assert(D->getGenericParamsOfContext());
-
-      // If a generic struct is resilient, we have to assume that any
-      // unknown fields might be dependently-sized.
-      if (IGM.isResilient(D, Scope))
-        return ObjectSize::Dependent;
-
-      auto structType = SILType::getPrimitiveAddressType(type);
-
-      ObjectSize result = ObjectSize::Fixed;
-      for (auto field : D->getStoredProperties()) {
-        auto fieldType = structType.getFieldType(field, *IGM.SILMod);
-        result = std::max(result, visitSILType(fieldType));
-      }
-      return result;
-    }
-
-    ObjectSize visitEnumType(CanEnumType type) {
-      if (type->getDecl()->getGenericParamsOfContext())
-        return visitGenericEnumType(type, type->getDecl());
-      if (IGM.isResilient(type->getDecl(), Scope))
-        return ObjectSize::Resilient;
-      return ObjectSize::Fixed;
-    }
-
-    ObjectSize visitBoundGenericEnumType(CanBoundGenericEnumType type) {
-      return visitGenericEnumType(type, type->getDecl());
-    }
-
-    ObjectSize visitGenericEnumType(CanType type, EnumDecl *D) {
-      assert(D->getGenericParamsOfContext());
-
-      // If a generic enum is resilient, we have to assume that any
-      // unknown elements might be dependently-sized.
-      if (IGM.isResilient(D, Scope))
-        return ObjectSize::Dependent;
-
-      auto enumType = SILType::getPrimitiveAddressType(type);
-
-      ObjectSize result = ObjectSize::Fixed;
-      for (auto elt : D->getAllElements()) {
-        if (!elt->hasArgumentType()) continue;
-        auto eltType = enumType.getEnumElementType(elt, *IGM.SILMod);
-        result = std::max(result, visitSILType(eltType));
-      }
-      return result;
-    }
-
-    ObjectSize visitType(CanType type) {
-      return ObjectSize::Fixed;
-    }
-
-    ObjectSize visitSILType(SILType type) {
-      return visit(type.getSwiftRValueType());
-    }
-  };
-}
-
-ObjectSize IRGenModule::classifyTypeSize(SILType type, ResilienceScope scope) {
-  return ClassifyTypeSize(*this, scope).visitSILType(type);
-}
 
 SpareBitVector IRGenModule::getSpareBitsForType(llvm::Type *scalarTy, Size size) {
   auto it = SpareBitsForTypes.find(scalarTy);

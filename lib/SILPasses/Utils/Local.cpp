@@ -681,14 +681,12 @@ public:
 /// Returns false if optimization is not possible.
 /// Returns true and initializes internal fields if optimization is possible.
 bool StringConcatenationOptimizer::extractStringConcatOperands() {
-  auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee());
-  if (!FRI)
+  auto *Fn = AI->getCalleeFunction();
+  if (!Fn)
     return false;
 
-  auto *FRIFun = FRI->getReferencedFunction();
-
   if (AI->getNumOperands() != 3 ||
-      !FRIFun->hasSemanticsString("string.concat"))
+      !Fn->hasSemanticsString("string.concat"))
     return false;
 
   // Left and right operands of a string concatenation operation.

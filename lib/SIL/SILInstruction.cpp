@@ -693,11 +693,10 @@ SILInstruction::MemoryBehavior SILInstruction::getMemoryBehavior() const {
 
   // Handle functions that have an effects attribute.
   if (auto *AI = dyn_cast<ApplyInst>(this))
-    if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
-      if (auto *F = FRI->getReferencedFunction())
-        return F->getEffectsKind() == EffectsKind::ReadNone
-                   ? MemoryBehavior::None
-                   : MemoryBehavior::MayHaveSideEffects;
+    if (auto *F = AI->getCalleeFunction())
+      return F->getEffectsKind() == EffectsKind::ReadNone
+                 ? MemoryBehavior::None
+                 : MemoryBehavior::MayHaveSideEffects;
 
   switch (getKind()) {
 #define INST(CLASS, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR) \
