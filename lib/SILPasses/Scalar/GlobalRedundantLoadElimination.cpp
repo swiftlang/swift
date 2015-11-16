@@ -225,9 +225,6 @@ class BBState {
   ///
   ValueTableMap ForwardSetVal;
 
-  /// Keep a list of *materialized* LoadStoreValues in the current basic block.
-  llvm::SmallMapVector<MemLocation, SILValue, 8> MaterializedValues;
-  
   /// Keeps a list of replaceable instructions in the current basic block as
   /// well as their SILValue replacement.
   llvm::DenseMap<SILInstruction *, SILValue> RedundantLoads;
@@ -344,17 +341,10 @@ void BBState::updateTrackedMemLocation(unsigned bit, LoadStoreValue Val) {
 }
 
 bool BBState::setupRLE(RLEContext &Ctx, SILInstruction *I, SILValue Mem) {
-  // We have already materialized a SILValue for this MemLocation. Use it.
-  MemLocation L(Mem);
-  if (MaterializedValues.find(L) != MaterializedValues.end()) {
-    RedundantLoads[I] = MaterializedValues[L];
-    return true;
-  }
-
-  // We do not have a SILValue for the current MemLocation, try to construct
-  // one.
+  // Try to construct a SILValue for the current MemLocation.
   //
   // Collect the locations and their corresponding values into a map.
+  MemLocation L(Mem);
   MemLocationValueMap Values;
   if (!Ctx.gatherValues(I, L, Values))
     return false;
@@ -717,6 +707,8 @@ bool RLEContext::run() {
   bool SILChanged = false;
   for (auto &X : BBToLocState) {
     for (auto &F : X.second.getRL()) {
+      DEBUG(llvm::dbgs() << "Replacing  " << SILValue(F.first) << "With "
+                         << F.second);
       SILChanged = true;
       SILValue(F.first).replaceAllUsesWith(F.second);
       ++NumForwardedLoads;
