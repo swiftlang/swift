@@ -2257,6 +2257,11 @@ public:
 #endif
 };
 
+/// \brief Fetch a uniqued metadata object for a nominal type with
+/// resilient layout.
+extern "C" const Metadata *
+swift_getResilientMetadata(GenericMetadata *pattern);
+
 /// \brief Fetch a uniqued metadata object for a generic nominal type.
 ///
 /// The basic algorithm for fetching a metadata object is:

@@ -230,6 +230,23 @@ swift::swift_allocateGenericValueMetadata(GenericMetadata *pattern,
   return metadata;
 }
 
+/// Entrypoint for non-generic types with resilient layout.
+const Metadata *
+swift::swift_getResilientMetadata(GenericMetadata *pattern) {
+  assert(pattern->NumKeyArguments == 0);
+
+  auto entry = getCache(pattern).findOrAdd(nullptr, 0,
+    [&]() -> GenericCacheEntry* {
+      // Create new metadata to cache.
+      auto metadata = pattern->CreateFunction(pattern, nullptr);
+      auto entry = GenericCacheEntry::getFromMetadata(pattern, metadata);
+      entry->Value = metadata;
+      return entry;
+    });
+
+  return entry->Value;
+}
+
 /// The primary entrypoint.
 const Metadata *
 swift::swift_getGenericMetadata(GenericMetadata *pattern,
@@ -252,6 +269,7 @@ swift::swift_getGenericMetadata(GenericMetadata *pattern,
 /// Fast entry points.
 const Metadata *
 swift::swift_getGenericMetadata1(GenericMetadata *pattern, const void*argument){
+  assert(pattern->NumKeyArguments == 1);
   return swift_getGenericMetadata(pattern, &argument);
 }
 
@@ -259,6 +277,7 @@ const Metadata *
 swift::swift_getGenericMetadata2(GenericMetadata *pattern,
                                  const void *arg0, const void *arg1) {
   const void *args[] = {arg0, arg1};
+  assert(pattern->NumKeyArguments == 2);
   return swift_getGenericMetadata(pattern, args);
 }
 
@@ -268,6 +287,7 @@ swift::swift_getGenericMetadata3(GenericMetadata *pattern,
                                  const void *arg1,
                                  const void *arg2) {
   const void *args[] = {arg0, arg1, arg2};
+  assert(pattern->NumKeyArguments == 3);
   return swift_getGenericMetadata(pattern, args);
 }
 
@@ -278,6 +298,7 @@ swift::swift_getGenericMetadata4(GenericMetadata *pattern,
                                  const void *arg2,
                                  const void *arg3) {
   const void *args[] = {arg0, arg1, arg2, arg3};
+  assert(pattern->NumKeyArguments == 4);
   return swift_getGenericMetadata(pattern, args);
 }
 
