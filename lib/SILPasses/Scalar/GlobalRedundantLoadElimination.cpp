@@ -121,6 +121,30 @@ static bool isRLEInertInstruction(SILInstruction *Inst) {
   }
 }
 
+/// Returns true if the given basic block is reachable from the entry block.
+///
+/// TODO: this is very inefficient, can we make use of the domtree. 
+static bool isReachable(SILBasicBlock *Block) {
+  SmallPtrSet<SILBasicBlock *, 16> Visited;
+  llvm::SmallVector<SILBasicBlock *, 16> Worklist;
+  SILBasicBlock *EntryBB = &*Block->getParent()->begin();
+  Worklist.push_back(EntryBB);
+  Visited.insert(EntryBB);
+
+  while (!Worklist.empty()) {
+    auto *CurBB = Worklist.back();
+    Worklist.pop_back();
+
+    if (CurBB == Block)
+      return true;
+
+    for (auto &Succ : CurBB->getSuccessors())
+      if (!Visited.insert(Succ).second)
+        Worklist.push_back(Succ);
+  }
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 //                            RLEContext Interface
 //===----------------------------------------------------------------------===//
@@ -179,10 +203,22 @@ public:
   /// Given the bit, get the MemLocation from the MemLocationVault.
   MemLocation &getMemLocation(const unsigned index);
 
-  /// Given a MemLocation, gather all the LoadStoreValues for this MemLocation.
-  /// Return true if all there are concrete (non-covering) values for every part
-  /// of the MemLocation.
-  bool gatherValues(SILInstruction *I, MemLocation &L, MemLocationValueMap &Vs);
+  /// Go to the predecessors of the given basic block, compute the value
+  /// for the given MemLocation.
+  SILValue computePredecessorCoveringValue(SILBasicBlock *B, MemLocation &L); 
+
+  /// Given a MemLocation, try to collect all the LoadStoreValues for this
+  /// MemLocation in the given basic block. If a LoadStoreValue is a covering
+  /// value, collectForwardingValues also create a SILArgument for it. As a
+  /// a result, collectForwardingValues may invalidate TerminatorInsts for 
+  /// basic blocks.
+  /// 
+  /// UseForwardValOut tells whether to use the ForwardValOut or not. i.e.
+  /// when materialize a covering value, we go to each predecessors and
+  /// collect forwarding values from their ForwardValOuts.
+  bool gatherValues(SILBasicBlock *B, MemLocation &L,
+                    MemLocationValueMap &Vs,
+                    bool UseForwardValOut);
 
   /// Dump all the MemLocations in the MemLocationVault.
   void printMemLocationVault() const {
@@ -217,10 +253,14 @@ class BBState {
   /// This is a list of MemLocations and their LoadStoreValues.
   ///
   /// TODO: can we create a LoadStoreValue vault so that we do not need to keep
-  /// them per basic block. This would also give ForwardSetVal more symmetry.
+  /// them per basic block. This would also give ForwardValIn more symmetry.
   /// i.e. MemLocation and LoadStoreValue both represented as bit vector indices.
   ///
-  ValueTableMap ForwardSetVal;
+  ValueTableMap ForwardValIn;
+
+  /// This is map between MemLocations and their available values at the end of
+  /// this basic block.
+  ValueTableMap ForwardValOut;
 
   /// Keeps a list of replaceable instructions in the current basic block as
   /// well as their SILValue replacement.
@@ -230,7 +270,10 @@ class BBState {
   /// rerun the data flow to reach fixed point.
   bool updateForwardSetOut() {
     bool Changed = (ForwardSetIn != ForwardSetOut);
+    // Reached the end of this basic block, update the end-of-block
+    // ForwardSetOut and ForwardValOut;
     ForwardSetOut = ForwardSetIn;
+    ForwardValOut = ForwardValIn;
     return Changed;
   }
 
@@ -267,7 +310,7 @@ class BBState {
 public:
   BBState() = default;
 
-  void init(SILBasicBlock *NewBB, unsigned bitcnt) {
+  void init(SILBasicBlock *NewBB, unsigned bitcnt, bool reachable) {
     BB = NewBB;
     // The initial state of ForwardSetOut should be all 1's. Otherwise the
     // dataflow solution could be too conservative.
@@ -283,11 +326,14 @@ public:
     // data flow stablizes.
     //
     ForwardSetIn.resize(bitcnt, false);
-    ForwardSetOut.resize(bitcnt, true);
+    ForwardSetOut.resize(bitcnt, reachable);
   }
 
-  /// Returns the ForwardSetVal for the current basic block. 
-  ValueTableMap &getForwardSetVal() { return ForwardSetVal; }
+  /// Returns the ForwardValIn for the current basic block. 
+  ValueTableMap &getForwardValIn() { return ForwardValIn; }
+
+  /// Returns the ForwardValOut for the current basic block.
+  ValueTableMap  &getForwardValOut() { return ForwardValOut; }
 
   /// Returns the current basic block we are processing.
   SILBasicBlock *getBB() const { return BB; }
@@ -310,6 +356,12 @@ public:
 
   /// Process LoadInst. Extract MemLocations from StoreInst.
   void processStoreInst(RLEContext &Ctx, StoreInst *SI);
+
+  /// Returns a *single* forwardable SILValue for the given MemLocation right
+  /// before the InsertPt instruction.
+  SILValue computeForwardingValues(RLEContext &Ctx, MemLocation &L,
+                                   SILInstruction *InsertPt,
+                                   bool UseForwardValOut);
 };
 
 } // end anonymous namespace
@@ -320,21 +372,51 @@ bool BBState::isTrackingMemLocation(unsigned bit) {
 
 void BBState::stopTrackingMemLocation(unsigned bit) {
   ForwardSetIn.reset(bit);
-  ForwardSetVal.erase(bit);
+  ForwardValIn.erase(bit);
 }
 
 void BBState::clearMemLocations() {
   ForwardSetIn.reset();
-  ForwardSetVal.clear();
+  ForwardValIn.clear();
 }
 
 void BBState::startTrackingMemLocation(unsigned bit, LoadStoreValue Val) {
   ForwardSetIn.set(bit);
-  ForwardSetVal[bit] = Val;
+  ForwardValIn[bit] = Val;
 }
 
 void BBState::updateTrackedMemLocation(unsigned bit, LoadStoreValue Val) {
-  ForwardSetVal[bit] = Val;
+  ForwardValIn[bit] = Val;
+}
+
+SILValue BBState::computeForwardingValues(RLEContext &Ctx, MemLocation &L,
+                                          SILInstruction *InsertPt,
+                                          bool UseForwardValOut) {
+  SILBasicBlock *ParentBB = InsertPt->getParent();
+  bool IsTerminator = (InsertPt == ParentBB->getTerminator());
+  // We do not have a SILValue for the current MemLocation, try to construct
+  // one.
+  //
+  // Collect the locations and their corresponding values into a map.
+  // First, collect current available locations and their corresponding values
+  // into a map.
+  MemLocationValueMap Values;
+  if (!Ctx.gatherValues(ParentBB, L, Values, UseForwardValOut))
+    return SILValue();
+
+  // If the InsertPt is the terminator instruction of the basic block, we 
+  // *refresh* it as terminator instruction could be deleted as a result
+  // of adding new edge values to the terminator instruction.
+  if (IsTerminator)
+    InsertPt = ParentBB->getTerminator();
+
+  // Second, reduce the available values into a single SILValue we can use to
+  // forward.
+  SILValue TheForwardingValue;
+  TheForwardingValue = MemLocation::reduceWithValues(L, &ParentBB->getModule(),
+                                                     Values, InsertPt);
+  /// Return the forwarding value.
+  return TheForwardingValue;
 }
 
 bool BBState::setupRLE(RLEContext &Ctx, SILInstruction *I, SILValue Mem) {
@@ -343,7 +425,7 @@ bool BBState::setupRLE(RLEContext &Ctx, SILInstruction *I, SILValue Mem) {
   // Collect the locations and their corresponding values into a map.
   MemLocation L(Mem);
   MemLocationValueMap Values;
-  if (!Ctx.gatherValues(I, L, Values))
+  if (!Ctx.gatherValues(I->getParent(), L, Values, false))
     return false;
 
   // Reduce the available values into a single SILValue we can use to forward.
@@ -498,10 +580,8 @@ void BBState::processUnknownWriteInst(RLEContext &Ctx, SILInstruction *I) {
 
 /// Promote stored values to loads and merge duplicated loads.
 bool BBState::optimize(RLEContext &Ctx, bool PF) {
-  auto II = BB->begin(), E = BB->end();
-  while (II != E) {
-    SILInstruction *Inst = &*II;
-    ++II;
+  for (auto &II : *BB) {
+    SILInstruction *Inst = &II;
     DEBUG(llvm::dbgs() << "    Visiting: " << *Inst);
 
     // This is a StoreInst, try to see whether it clobbers any forwarding
@@ -554,7 +634,7 @@ void BBState::mergePredecessorState(BBState &OtherState) {
       // There are multiple values from multiple predecessors, set this as
       // a covering value. We do not need to track the value itself, as we
       // can always go to the predecessors BBState to find it.
-      ForwardSetVal[i].setCoveringValue();
+      ForwardValIn[i].setCoveringValue();
       continue;
     }
     // If this location does have an available value, then clear it.
@@ -581,7 +661,7 @@ void BBState::mergePredecessorStates(RLEContext &Ctx) {
     // If BB is also a predecessor of itself, we should not initialize.
     if (!HasAtLeastOnePred) {
       ForwardSetIn = Other.ForwardSetOut;
-      ForwardSetVal = Other.ForwardSetVal;
+      ForwardValIn = Other.ForwardValOut;
     } else {
       mergePredecessorState(Other);
     }
@@ -589,7 +669,7 @@ void BBState::mergePredecessorStates(RLEContext &Ctx) {
   }
 
 #ifndef NDEBUG
-  for (auto &X : ForwardSetVal) {
+  for (auto &X : ForwardValIn) {
     (void)X;
     assert(X.second.isValid() && "Invalid load store value");
   }
@@ -608,11 +688,112 @@ RLEContext::RLEContext(SILFunction *F, AliasAnalysis *AA,
   MemLocation::enumerateMemLocations(*F, MemLocationVault, LocToBitIndex,
                                      TypeExpansionCache);
 
-  // Initialize the BBState for every basic block.
-  for (SILBasicBlock &BB : *F) {
-    getBBLocState(&BB).init(&BB, MemLocationVault.size());
+  // For all basic blocks in the function, initialize a BB state. Since we
+  // know all the locations accessed in this function, we can resize the bit
+  // vector to the approproate size.
+  for (auto &B : *F) {
+    BBToLocState[&B] = BBState();
+    // We set the initial state of unreachable block to 0, as we do not have
+    // a value for the location.
+    //
+    // This is a bit conservative as we could be missing forwarding
+    // opportunities. i.e. a joint block with 1 predecessor being an
+    // unreachable block.
+    //
+    // we rely on other passes to clean up unreachable block.
+    BBToLocState[&B].init(&B, MemLocationVault.size(), isReachable(&B));
   }
 }
+
+SILValue RLEContext::computePredecessorCoveringValue(SILBasicBlock *BB,
+                                                     MemLocation &L) {
+  // This is a covering value, need to go to each of the predecessors to
+  // materialize them and create a SILArgument to merge them.
+  //
+  // If any of the predecessors can not forward an edge value, bail out
+  // for now.
+  //
+  // *NOTE* This is a strong argument in favor of representing PHI nodes
+  // separately from SILArguments.
+  //
+  // TODO: this is overly conservative, we should only check basic blocks
+  // which are relevant. Or better, we can create a trampoline basic block
+  // if the predecessor has a non-edgevalue terminator inst.
+  //
+  for (auto &BB : *BB->getParent()) {
+    if (auto *TI = BB.getTerminator())
+      if (!isa<CondBranchInst>(TI) && !isa<BranchInst>(TI) &&
+          !isa<ReturnInst>(TI) && !isa<UnreachableInst>(TI))
+        return SILValue();
+  }
+
+  // At this point, we know this MemLocation has available value and we also
+  // know we can forward a SILValue from every predecesor. It is safe to
+  // insert the basic block argument.
+  BBState &Forwarder = getBBLocState(BB);
+  SILValue TheForwardingValue = BB->createBBArg(L.getType());
+
+  // For the given MemLocation, we just created a concrete value at the
+  // beginning of this basic block. Update the ForwardValOut for the
+  // current basic block.
+  //
+  // ForwardValOut keeps all the MemLocations and their forwarding values
+  // at the end of the basic block. If a MemLocation has a covering value
+  // at the end of the basic block, we can now replace the covering value with
+  // this concrete SILArgument.
+  //
+  // However, if the MemLocation has a concrete value, we know there must
+  // be an instruction that generated the concrete value between the current
+  // instruction and the end of the basic block, we do not update the 
+  // ForwardValOut in this case.
+  //
+  // NOTE: This is necessary to prevent an infinite loop while materializing
+  // the covering value.
+  //
+  // Imagine an empty selfloop block with 1 predecessor having a load [A], to
+  // materialize [A]'s covering value, we go to its predecessors. However,
+  // the backedge will carry a covering value as well in this case.
+  //
+  MemLocationList Locs;
+  MemLocation::expand(L, &BB->getModule(), Locs, getTypeExpansionCache());
+  LoadStoreValueList Vals;
+  MemLocation::expandWithValues(L, TheForwardingValue, &BB->getModule(), Locs,
+                                Vals);
+  ValueTableMap &VTM = Forwarder.getForwardValOut();
+  for (unsigned i = 0; i < Locs.size(); ++i) {
+    unsigned bit = getMemLocationBit(Locs[i]);
+    if (!VTM[bit].isCoveringValue())
+      continue;
+    VTM[bit] = Vals[i];
+  }
+
+  // Compute the SILArgument for the covering value.
+  llvm::SmallVector<SILBasicBlock *, 4> Preds;
+  for (auto Pred : BB->getPreds()) {
+    Preds.push_back(Pred);
+  }
+
+  llvm::DenseMap<SILBasicBlock *, SILValue> Args;
+  for (auto Pred : Preds) {
+    BBState &Forwarder = getBBLocState(Pred);
+    // Call computeForwardingValues with using ForwardValOut as we are
+    // computing the MemLocation value at the end of each predecessor. 
+    Args[Pred] = Forwarder.computeForwardingValues(*this, L,
+                                                   Pred->getTerminator(),
+                                                   true);
+    assert(Args[Pred] && "Fail to create a forwarding value");
+  }
+
+  // Create the new SILArgument and set ForwardingValue to it.
+  for (auto Pred : Preds) {
+    // Update all edges. We do not create new edges in between BBs so this
+    // information should always be correct.
+    addNewEdgeValueToBranch(Pred->getTerminator(), BB, Args[Pred]);
+  }
+
+  return TheForwardingValue;
+}
+
 
 MemLocation &RLEContext::getMemLocation(const unsigned index) {
   return MemLocationVault[index];
@@ -631,19 +812,45 @@ unsigned RLEContext::getMemLocationBit(const MemLocation &Loc) {
   return Iter->second;
 }
 
-bool RLEContext::gatherValues(SILInstruction *I, MemLocation &L,
-                              MemLocationValueMap &Values) {
+bool RLEContext::gatherValues(SILBasicBlock *BB, MemLocation &L,
+                              MemLocationValueMap &Values,
+                              bool UseForwardValOut) {
+  MemLocationSet CSLocs;
   MemLocationList Locs;
-  MemLocation::expand(L, &I->getModule(), Locs, getTypeExpansionCache());
-  SILBasicBlock *BB = I->getParent();
+  MemLocation::expand(L, &BB->getModule(), Locs, getTypeExpansionCache());
+  // Are we using the ForwardVal at the end of the basic block or not.
+  // If we are collecting values at the end of the basic block, we can
+  // use its ForwardValOut.
+  //
   BBState &Forwarder = getBBLocState(BB);
+  ValueTableMap &OTM = UseForwardValOut ? Forwarder.getForwardValOut() :
+                                          Forwarder.getForwardValIn();
   for (auto &X : Locs) {
-    Values[X] = Forwarder.getForwardSetVal()[getMemLocationBit(X)];
-    // Currently do not handle covering value, return false for now.
-    // NOTE: to handle covering value, we need to go to the predecessor and
-    // materialize them there.
-    if (Values[X].isCoveringValue())
-      return false;
+    Values[X] = OTM[getMemLocationBit(X)];
+    if (!Values[X].isCoveringValue())
+      continue;
+    CSLocs.insert(X);
+  }
+
+  // Try to reduce it to the minimum # of locations possible, this will help
+  // us to generate as few extractions as possible.
+  MemLocation::reduce(L, &BB->getModule(), CSLocs);
+
+  // To handle covering value, we need to go to the predecessors and
+  // materialize them there.
+  for (auto &X : CSLocs) {
+    SILValue V = computePredecessorCoveringValue(BB, X);
+    if (!V)
+       return false;
+    // We've constructed a concrete value for the covering value. Expand and
+    // collect the newly created forwardable values.
+    MemLocationList Locs;
+    LoadStoreValueList Vals;
+    MemLocation::expandWithValues(X, V, &BB->getModule(), Locs, Vals);
+    for (unsigned i = 0; i < Locs.size() ; ++i) {
+      Values[Locs[i]] = Vals[i]; 
+      assert(Values[Locs[i]].isValid() && "Invalid load store value");
+    }
   }
 
   // Sanity check to make sure we have valid load store values for each

@@ -12,6 +12,10 @@ struct Int {
   var value : Builtin.Int64
 }
 
+struct Int32 {
+  var value : Builtin.Int32
+}
+
 struct Int64 {
   var value : Builtin.Int64
 }
@@ -20,6 +24,10 @@ struct Bool {
   var value : Builtin.Int1
 }
 
+class AX {
+  final var current: Int32
+  init()
+}
 
 struct A {
   var i : Builtin.Int32
@@ -73,13 +81,14 @@ class AB {
    deinit 
 }
 
-
 sil @use : $@convention(thin) (Builtin.Int32) -> ()
 sil @use_64 : $@convention(thin) (Builtin.Int64) -> ()
 sil @use_2_64 : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> ()
 sil @use_a : $@convention(thin) (@in A) -> ()
 sil @escaped_a_ptr : $@convention(thin) (@out A) -> ()
 sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
+
+sil_global @total : $Int32
 
 // CHECK-LABEL: sil @store_promotion
 // CHECK: store
@@ -323,4 +332,37 @@ bb0(%0 : $AB):
   return %13 : $Int                               // id: %15
 }
 
+// Make sure we RLE the load in BB2.
+//
+// CHECK-LABEL: test_silargument_rle 
+// CHECK: bb2
+// CHECK-NOT: load
+// CHECK: cond_br
+sil @test_silargument_rle : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @total : $*Int32
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = struct $Int32 (%1 : $Builtin.Int32)
+  store %2 to %0 : $*Int32
+  %6 = alloc_ref $AX
+  %8 = ref_element_addr %6 : $AX, #AX.current
+  store %2 to %8 : $*Int32
+  // %10 = load %8 : $*Int32
+  cond_br undef, bb3, bb2
+
+bb2:
+  %24 = integer_literal $Builtin.Int1, -1
+  %31 = struct_element_addr %0 : $*Int32, #Int32.value
+  %32 = load %31 : $*Builtin.Int32
+  %33 = builtin "sadd_with_overflow_Int32"(%32 : $Builtin.Int32, %1 : $Builtin.Int32, %24 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %34 = tuple_extract %33 : $(Builtin.Int32, Builtin.Int1), 0
+  %37 = struct $Int32 (%34 : $Builtin.Int32)
+  store %37 to %0 : $*Int32
+  cond_br undef, bb3, bb2
+
+bb3:
+  strong_release %6 : $AX
+  %44 = tuple ()
+  return %44 : $()
+}
 
