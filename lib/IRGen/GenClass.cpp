@@ -231,10 +231,9 @@ namespace {
         Root = theClass;
       }
 
-      // If the class is resilient, then it may have fields we can't
-      // see, and all subsequent fields are *at least* resilient ---
-      // and if the class is generic, then it may have
-      // dependently-sized fields, and we'll be in the worst case.
+      // If the class is resilient (which includes classes imported
+      // from Objective-C), then it may have fields we can't see,
+      // and all subsequent fields are *at least* resilient.
       bool isClassResilient = IGM.isResilient(theClass, Resilience);
       if (isClassResilient) {
         IsMetadataResilient = true;
@@ -247,7 +246,6 @@ namespace {
         if (!var) continue;
 
         // Skip properties that we have to access logically.
-        assert(isClassResilient || !IGM.isResilient(var, Resilience));
         if (!var->hasStorage())
           continue;
 

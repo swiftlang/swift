@@ -181,22 +181,35 @@ static void emitPolymorphicParametersFromArray(IRGenFunction &IGF,
   }
 }
 
+/// If true, we lazily initialize metadata at runtime because the layout
+/// is only partially known. Otherwise, we can emit a direct reference a
+/// constant metadata symbol.
+static bool hasMetadataPattern(IRGenModule &IGM, NominalTypeDecl *theDecl) {
+  // Protocols must be special-cased in a few places.
+  assert(!isa<ProtocolDecl>(theDecl));
+
+  // Classes imported from Objective-C never have a metadata pattern.
+  if (theDecl->hasClangNode())
+    return false;
+
+  // A generic class, struct, or enum is always initialized at runtime.
+  if (theDecl->isGenericContext())
+    return true;
+
+  return false;
+}
+
 /// Attempts to return a constant heap metadata reference for a
 /// nominal type.
 llvm::Constant *irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
                                                       CanType type) {
-  assert(isa<NominalType>(type) || isa<BoundGenericType>(type));
+  auto theDecl = type->getAnyNominal();
+  assert(theDecl && "emitting constant metadata ref for non-nominal type?");
 
-  // We can't do this for any types with generic parameters, either
-  // directly or inherited from the context.
-  // FIXME: Should be an isSpecialized check here.
-  if (isa<BoundGenericType>(type))
-    return nullptr;
-  auto theDecl = cast<NominalType>(type)->getDecl();
-  if (theDecl->getGenericParamsOfContext())
+  if (hasMetadataPattern(IGM, theDecl))
     return nullptr;
 
-  if (auto theClass = dyn_cast<ClassDecl>(theDecl))
+  if (auto theClass = type->getClassOrBoundGenericClass())
     if (!hasKnownSwiftMetadata(IGM, theClass))
       return IGM.getAddrOfObjCClass(theClass, NotForDefinition);
 
@@ -234,10 +247,12 @@ static llvm::Value *emitForeignTypeMetadataRef(IRGenFunction &IGF,
   return call;
 }
 
-/// Returns a metadata reference for a class type.
+/// Returns a metadata reference for a nominal type.
 static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
                                            NominalTypeDecl *theDecl,
                                            CanType theType) {
+  assert(!isa<ProtocolDecl>(theDecl));
+
   // Non-native Swift classes need to be handled differently.
   if (auto theClass = dyn_cast<ClassDecl>(theDecl)) {
     // We emit a completely different pattern for foreign classes.
@@ -257,13 +272,7 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
     return emitForeignTypeMetadataRef(IGF, theType);
   }
 
-  auto generics = isa<ProtocolDecl>(theDecl)
-                    ? nullptr
-                    : theDecl->getGenericParamsOfContext();
-
-  bool isPattern = (generics != nullptr);
-  assert(!isPattern || isa<BoundGenericType>(theType));
-  assert(isPattern || isa<NominalType>(theType));
+  bool isPattern = hasMetadataPattern(IGF.IGM, theDecl);
 
   // If this is generic, check to see if we've maybe got a local
   // reference already.
@@ -277,8 +286,8 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
   CanType declaredType = theDecl->getDeclaredType()->getCanonicalType();
   llvm::Value *metadata = IGF.IGM.getAddrOfTypeMetadata(declaredType,isPattern);
 
-  // If we don't have generic parameters, that's all we need.
-  if (!generics) {
+  // If we don't have a metadata pattern, that's all we need.
+  if (!isPattern) {
     assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy);
 
     // If this is a class, we need to force ObjC initialization,
@@ -417,6 +426,10 @@ irgen::getTypeMetadataAccessStrategy(IRGenModule &IGM, CanType type,
   assert(!type->hasArchetype());
 
   // Non-generic structs, enums, and classes are special cases.
+  //
+  // Note that while protocol types don't have a metadata pattern,
+  // we still require an accessor since we actually want to get
+  // the metadata for the existential type.
   auto nominal = dyn_cast<NominalType>(type);
   if (nominal && !isa<ProtocolType>(nominal)) {
     assert(!nominal->getDecl()->isGenericContext());
@@ -2607,9 +2620,6 @@ namespace {
   class GenericMetadataBuilderBase : public Base {
     typedef Base super;
 
-    /// The generics clause for the type we're emitting.
-    const GenericParamList &ClassGenerics;
-    
     /// The number of generic witnesses in the type we're emitting.
     /// This is not really something we need to track.
     unsigned NumGenericWitnesses = 0;
@@ -2647,10 +2657,8 @@ namespace {
     Size DependentVWTPoint = Size::invalid();
 
     template <class... T>
-    GenericMetadataBuilderBase(IRGenModule &IGM, 
-                               const GenericParamList &generics,
-                               T &&...args)
-      : super(IGM, std::forward<T>(args)...), ClassGenerics(generics) {}
+    GenericMetadataBuilderBase(IRGenModule &IGM, T &&...args)
+      : super(IGM, std::forward<T>(args)...) {}
 
     /// Emit the create function for the template.
     llvm::Function *emitCreateFunction() {
@@ -3196,9 +3204,8 @@ namespace {
     Size DependentMetaclassRODataPoint = Size::invalid();
   public:
     GenericClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
-                                const StructLayout &layout,
-                                const GenericParamList &classGenerics)
-      : super(IGM, classGenerics, theClass, layout)
+                                const StructLayout &layout)
+      : super(IGM, theClass, layout)
     {
       // We need special initialization of metadata objects to trick the ObjC
       // runtime into initializing them.
@@ -3602,8 +3609,8 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
   llvm::Constant *init;
   bool isPattern;
   bool hasRuntimeBase;
-  if (auto *generics = classDecl->getGenericParamsOfContext()) {
-    GenericClassMetadataBuilder builder(IGM, classDecl, layout, *generics);
+  if (classDecl->isGenericContext()) {
+    GenericClassMetadataBuilder builder(IGM, classDecl, layout);
     builder.layout();
     init = builder.getInit();
     isPattern = true;
@@ -4382,7 +4389,7 @@ namespace {
   
   /// Emit a value witness table for a fixed-layout generic type, or a null
   /// placeholder if the value witness table is dependent on generic parameters.
-  /// Returns true if the value witness table is dependent.
+  /// Returns nullptr if the value witness table is dependent.
   static llvm::Constant *
   getValueWitnessTableForGenericValueType(IRGenModule &IGM,
                                           NominalTypeDecl *decl,
@@ -4405,9 +4412,8 @@ namespace {
     typedef GenericMetadataBuilderBase super;
                         
   public:
-    GenericStructMetadataBuilder(IRGenModule &IGM, StructDecl *theStruct,
-                                const GenericParamList &structGenerics)
-      : super(IGM, structGenerics, theStruct) {}
+    GenericStructMetadataBuilder(IRGenModule &IGM, StructDecl *theStruct)
+      : super(IGM, theStruct) {}
 
     llvm::Value *emitAllocateMetadata(IRGenFunction &IGF,
                                       llvm::Value *metadataPattern,
@@ -4447,8 +4453,8 @@ void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
   // TODO: structs nested within generic types
   llvm::Constant *init;
   bool isPattern;
-  if (auto *generics = structDecl->getGenericParamsOfContext()) {
-    GenericStructMetadataBuilder builder(IGM, structDecl, *generics);
+  if (hasMetadataPattern(IGM, structDecl)) {
+    GenericStructMetadataBuilder builder(IGM, structDecl);
     builder.layout();
     init = builder.getInit();
     isPattern = true;
@@ -4533,9 +4539,8 @@ class GenericEnumMetadataBuilder
                         EnumMetadataBuilderBase<GenericEnumMetadataBuilder>>
 {
 public:
-  GenericEnumMetadataBuilder(IRGenModule &IGM, EnumDecl *theEnum,
-                              const GenericParamList &enumGenerics)
-    : GenericMetadataBuilderBase(IGM, enumGenerics, theEnum) {}
+  GenericEnumMetadataBuilder(IRGenModule &IGM, EnumDecl *theEnum)
+    : GenericMetadataBuilderBase(IGM, theEnum) {}
 
   llvm::Value *emitAllocateMetadata(IRGenFunction &IGF,
                                     llvm::Value *metadataPattern,
@@ -4582,8 +4587,8 @@ void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
   llvm::Constant *init;
   
   bool isPattern;
-  if (auto *generics = theEnum->getGenericParamsOfContext()) {
-    GenericEnumMetadataBuilder builder(IGM, theEnum, *generics);
+  if (hasMetadataPattern(IGM, theEnum)) {
+    GenericEnumMetadataBuilder builder(IGM, theEnum);
     builder.layout();
     init = builder.getInit();
     isPattern = true;
