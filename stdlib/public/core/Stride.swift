@@ -168,7 +168,7 @@ extension Strideable {
   /// stride + stride`, ... *last*) where *last* is the last value in
   /// the progression that is less than `end`.
   @warn_unused_result
-  public func stride(to end: Self, by stride: Stride) -> StrideTo<Self> {
+  public func strideTo(end: Self, by stride: Stride) -> StrideTo<Self> {
     return StrideTo(_start: self, end: end, stride: stride)
   }
 }
@@ -230,8 +230,8 @@ extension Strideable {
   ///
   /// - Note: There is no guarantee that `end` is an element of the sequence.
   @warn_unused_result
-  public func stride(
-    through end: Self, by stride: Stride
+  public func strideThrough(
+    end: Self, by stride: Stride
   ) -> StrideThrough<Self> {
     return StrideThrough(_start: self, end: end, stride: stride)
   }

@@ -192,7 +192,7 @@ print(_reflect(emptyCollectionOfInt).summary)
 // CHECK-NEXT: from: 1.0
 // CHECK-NEXT: through: 12.15
 // CHECK-NEXT: by: 3.14
-dump(1.0.stride(through: 12.15, by: 3.14))
+dump(1.0.strideThrough(12.15, by: 3.14))
 
 // CHECK-NEXT: UnsafeMutablePointer(nil)
 var nilUnsafeMutablePointerString: UnsafeMutablePointer<String> = nil
