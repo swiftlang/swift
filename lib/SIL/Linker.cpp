@@ -193,14 +193,10 @@ bool SILLinkerVisitor::linkInVTable(ClassDecl *D) {
 //===----------------------------------------------------------------------===//
 
 bool SILLinkerVisitor::visitApplyInst(ApplyInst *AI) {
-  // If we don't have a function ref inst, just return false. We do not have
-  // interesting callees.
-  auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee());
-  if (!FRI)
-    return false;
-
   // Ok we have a function ref inst, grab the callee.
-  SILFunction *Callee = FRI->getReferencedFunction();
+  SILFunction *Callee = AI->getCalleeFunction();
+  if (!Callee)
+    return false;
 
   // If the linking mode is not link all, AI is not transparent, and the
   // callee is not shared, we don't want to perform any linking.
@@ -215,11 +211,9 @@ bool SILLinkerVisitor::visitApplyInst(ApplyInst *AI) {
 }
 
 bool SILLinkerVisitor::visitPartialApplyInst(PartialApplyInst *PAI) {
-  auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
-  if (!FRI)
+  SILFunction *Callee = PAI->getCalleeFunction();
+  if (!Callee)
     return false;
-
-  SILFunction *Callee = FRI->getReferencedFunction();
   if (!isLinkAll() && !Callee->isTransparent() &&
       !hasSharedVisibility(Callee->getLinkage()))
     return false;

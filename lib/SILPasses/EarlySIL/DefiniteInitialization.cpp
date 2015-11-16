@@ -973,9 +973,9 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
         FD = dyn_cast<FuncDecl>(WMI->getMember().getDecl());
       
       // If this is a direct/devirt method application, check the location info.
-      if (auto *FRI = dyn_cast<FunctionRefInst>(Apply->getOperand(0))) {
-        if (FRI->getReferencedFunction()->hasLocation()) {
-          auto SILLoc = FRI->getReferencedFunction()->getLocation();
+      if (auto *Fn = Apply->getCalleeFunction()) {
+        if (Fn->hasLocation()) {
+          auto SILLoc = Fn->getLocation();
           FD = SILLoc.getAsASTNode<FuncDecl>();
         }
       }
@@ -1227,9 +1227,9 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
       Method = dyn_cast<FuncDecl>(CMI->getMember().getDecl());
 
     // If this is a direct/devirt method application, check the location info.
-    if (auto *FRI = dyn_cast<FunctionRefInst>(Inst->getOperand(0))) {
-      if (FRI->getReferencedFunction()->hasLocation()) {
-        auto SILLoc = FRI->getReferencedFunction()->getLocation();
+    if (auto *Fn = cast<ApplyInst>(Inst)->getCalleeFunction()) {
+      if (Fn->hasLocation()) {
+        auto SILLoc = Fn->getLocation();
         Method = SILLoc.getAsASTNode<FuncDecl>();
       }
     }

@@ -614,11 +614,11 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
 static bool ignoreableApplyInstInUnreachableBlock(ApplyInst *AI) {
   const char *fatalName =
     "_TFs18_fatalErrorMessageFTVs12StaticStringS_S_Su_T_";
-  auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee());
+  auto *Fn = AI->getCalleeFunction();
 
   // We use endswith here since if we specialize fatal error we will always
   // prepend the specialization records to fatalName.
-  if (!FRI || !FRI->getReferencedFunction()->getName().endswith(fatalName))
+  if (!Fn || !Fn->getName().endswith(fatalName))
     return false;
 
   return true;

@@ -741,11 +741,8 @@ void ClosureSpecializer::gatherCallSites(
 
         // If AI does not have a function_ref definition as its callee, we can
         // not do anything here... so continue...
-        auto *ApplyCalleeFRI = dyn_cast<FunctionRefInst>(AI.getCallee());
-        if (!ApplyCalleeFRI)
-          continue;
-        SILFunction *ApplyCallee = ApplyCalleeFRI->getReferencedFunction();
-        if (ApplyCallee->isExternalDeclaration())
+        SILFunction *ApplyCallee = AI.getCalleeFunction();
+        if (!ApplyCallee || ApplyCallee->isExternalDeclaration())
           continue;
 
         // Ok, we know that we can perform the optimization but not whether or

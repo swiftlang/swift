@@ -86,11 +86,11 @@ bool swift::ArraySemanticsCall::isValidSignature() {
       if (!AllocBufferAI)
         return false;
 
-      auto *FRI = dyn_cast<FunctionRefInst>(AllocBufferAI->getCallee());
-      if (!FRI)
+      auto *AllocFn = AllocBufferAI->getCalleeFunction();
+      if (!AllocFn)
         return false;
 
-      StringRef AllocFuncName = FRI->getReferencedFunction()->getName();
+      StringRef AllocFuncName = AllocFn->getName();
       if (AllocFuncName != "swift_bufferAllocate" &&
           AllocFuncName != "swift_bufferAllocateOnStack")
         return false;
@@ -109,24 +109,22 @@ bool swift::ArraySemanticsCall::isValidSignature() {
 swift::ArraySemanticsCall::ArraySemanticsCall(ValueBase *V,
                                               StringRef SemanticStr,
                                               bool MatchPartialName) {
-  if (auto AI = dyn_cast<ApplyInst>(V))
-    if (auto FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
-      if (auto FunRef = FRI->getReferencedFunction()) {
-        if ((MatchPartialName &&
-             (FunRef->hasDefinedSemantics() &&
-              FunRef->getSemanticsString().startswith(SemanticStr))) ||
-            (!MatchPartialName && FunRef->hasSemanticsString(SemanticStr))) {
-          SemanticsCall = AI;
-          // Need a 'self' argument otherwise this is not a semantic call that
-          // we recognize.
-          if (getKind() < ArrayCallKind::kArrayInit && !hasSelf())
-            SemanticsCall = nullptr;
+  if (auto *AI = dyn_cast<ApplyInst>(V))
+    if (auto *Fn = AI->getCalleeFunction())
+      if ((MatchPartialName &&
+           (Fn->hasDefinedSemantics() &&
+            Fn->getSemanticsString().startswith(SemanticStr))) ||
+          (!MatchPartialName && Fn->hasSemanticsString(SemanticStr))) {
+        SemanticsCall = AI;
+        // Need a 'self' argument otherwise this is not a semantic call that
+        // we recognize.
+        if (getKind() < ArrayCallKind::kArrayInit && !hasSelf())
+          SemanticsCall = nullptr;
 
-          // A arguments must be passed reference count neutral except for self.
-          if (SemanticsCall && !isValidSignature())
-            SemanticsCall = nullptr;
-          return;
-        }
+        // A arguments must be passed reference count neutral except for self.
+        if (SemanticsCall && !isValidSignature())
+          SemanticsCall = nullptr;
+        return;
       }
   // Otherwise, this is not the semantic call we are looking for.
   SemanticsCall = nullptr;

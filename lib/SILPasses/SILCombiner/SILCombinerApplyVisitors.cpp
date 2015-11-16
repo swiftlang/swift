@@ -43,10 +43,7 @@ isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI, bool requireSingleUse)
   if (PAI->getNumArguments() != 1)
     return SILValue();
 
-  auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
-  if (!FRI)
-    return SILValue();
-  auto *Fun = FRI->getReferencedFunction();
+  auto *Fun = PAI->getCalleeFunction();
   if (!Fun)
     return SILValue();
 
@@ -920,11 +917,8 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI) {
   // Check if it is legal to perform the propagation.
   if (!AI.hasSubstitutions())
     return nullptr;
-  auto *FRI = dyn_cast<FunctionRefInst>(AI.getCallee());
-  if (!FRI)
-    return nullptr;
-  auto *Callee = FRI->getReferencedFunction();
-  if (!Callee->getDeclContext())
+  auto *Callee = AI.getCalleeFunction();
+  if (!Callee || !Callee->getDeclContext())
     return nullptr;
 
   // Bail, if there is no self argument.
@@ -1260,9 +1254,8 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
         }
 
   // Optimize readonly functions with no meaningful users.
-  FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(AI->getCallee());
-  if (FRI &&
-      FRI->getReferencedFunction()->getEffectsKind() < EffectsKind::ReadWrite) {
+  SILFunction *SF = AI->getCalleeFunction();
+  if (SF && SF->getEffectsKind() < EffectsKind::ReadWrite) {
     UserListTy Users;
     if (recursivelyCollectARCUsers(Users, AI)) {
       eraseApply(AI, Users);
@@ -1271,8 +1264,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
     // We found a user that we can't handle.
   }
 
-  if (FRI) {
-    auto *SF = FRI->getReferencedFunction();
+  if (SF) {
     if (SF->getEffectsKind() < EffectsKind::ReadWrite) {
       // Try to optimize string concatenation.
       if (auto I = optimizeConcatenationOfStringLiterals(AI)) {
@@ -1397,9 +1389,8 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
   }
 
   // Optimize readonly functions with no meaningful users.
-  FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(AI->getCallee());
-  if (FRI &&
-      FRI->getReferencedFunction()->getEffectsKind() < EffectsKind::ReadWrite) {
+  SILFunction *Fn = AI->getCalleeFunction();
+  if (Fn && Fn->getEffectsKind() < EffectsKind::ReadWrite) {
     UserListTy Users;
     if (isTryApplyResultNotUsed(Users, AI)) {
       SILBasicBlock *BB = AI->getParent();

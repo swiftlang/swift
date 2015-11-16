@@ -1009,8 +1009,8 @@ static SILInstruction *isSuperInitUse(UpcastInst *Inst) {
       // super.init call as a hack to allow us to write testcases.
       auto *AI = dyn_cast<ApplyInst>(inst);
       if (AI && inst->getLoc().is<SILFileLocation>())
-        if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
-          if (FRI->getReferencedFunction()->getName() == "superinit")
+        if (auto *Fn = AI->getCalleeFunction())
+          if (Fn->getName() == "superinit")
             return inst;
       continue;
     }
@@ -1049,8 +1049,8 @@ static bool isSelfInitUse(SILInstruction *I) {
   // self.init call as a hack to allow us to write testcases.
   if (I->getLoc().is<SILFileLocation>()) {
     if (auto *AI = dyn_cast<ApplyInst>(I))
-      if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
-        if (FRI->getReferencedFunction()->getName().startswith("selfinit"))
+      if (auto *Fn = AI->getCalleeFunction())
+        if (Fn->getName().startswith("selfinit"))
           return true;
     
     // If this is a copy_addr to a delegating self MUI, then we treat it as a
