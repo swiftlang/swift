@@ -1221,8 +1221,7 @@ namespace {
     /// Given a set of parameter lists from an overload group, and a list of
     /// arguments, emit a diagnostic indicating any partially matching
     /// overloads.
-    void suggestPotentialOverloads(SourceLoc loc, bool isCallExpr = false,
-                                   bool isResult = false);
+    void suggestPotentialOverloads(SourceLoc loc, bool isResult = false);
 
     void dump() const LLVM_ATTRIBUTE_USED;
     
@@ -1398,18 +1397,12 @@ evaluateCloseness(Type candArgListType, ArrayRef<CallArgParam> actualArgs,
   
   // If we have exactly one argument mismatching, classify it specially, so that
   // close matches are prioritized against obviously wrong ones.
-  if (mismatchingArgs == 1) {
-    if (mismatchesAreNearMisses)
-      return actualArgs.size() != 1 ? CC_OneArgumentNearMismatch :CC_ArgumentNearMismatch;
-    
-    return actualArgs.size() != 1 ? CC_OneArgumentMismatch :CC_ArgumentMismatch;
-  }
+  if (mismatchingArgs == 1 && actualArgs.size() != 1)
+    return mismatchesAreNearMisses ? CC_OneArgumentNearMismatch
+                                   : CC_OneArgumentMismatch;
   
-  // FIXME: Why isn't this an ArgumentMismatch error?
-  // Related to the isCallExpr hack at the top of suggestPotentialOverloads.
-  //return CC_ArgumentMismatch;
-  
-  return CC_GeneralMismatch;
+  return mismatchesAreNearMisses ? CC_ArgumentNearMismatch
+                                 : CC_ArgumentMismatch;
 }
 
 void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
@@ -1639,17 +1632,7 @@ CalleeCandidateInfo::CalleeCandidateInfo(ArrayRef<OverloadChoice> overloads,
 /// Given a set of parameter lists from an overload group, and a list of
 /// arguments, emit a diagnostic indicating any partially matching overloads.
 void CalleeCandidateInfo::
-suggestPotentialOverloads(SourceLoc loc, bool isCallExpr, bool isResult) {
-  
-  // If the candidate list is has no near matches to the actual types, don't
-  // print out a candidate list, it will just be noise.
-  if (closeness == CC_GeneralMismatch) {
-    
-    // FIXME: This is arbitrary, we should use the same policy for operators.
-    if (!isCallExpr)
-      return;
-  }
-  
+suggestPotentialOverloads(SourceLoc loc, bool isResult) {
   std::string suggestionText = "";
   std::set<std::string> dupes;
   
@@ -2857,7 +2840,7 @@ bool FailureDiagnosis::diagnoseCalleeResultContextualConversionError() {
   default:
     diagnose(expr->getLoc(), diag::no_candidates_match_result_type,
              calleeInfo.declName, contextualResultType);
-    calleeInfo.suggestPotentialOverloads(expr->getLoc(), true, true);
+    calleeInfo.suggestPotentialOverloads(expr->getLoc(), /*isResult*/true);
     return true;
   }
 }
@@ -3641,8 +3624,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         .highlight(argExpr->getSourceRange());
 
       // Did the user intend on invoking a different overload?
-      calleeInfo.suggestPotentialOverloads(fnExpr->getLoc(),
-                                           /*isCallExpr*/true);
+      calleeInfo.suggestPotentialOverloads(fnExpr->getLoc());
       return true;
     }
 
@@ -3733,7 +3715,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   }
   
   // Did the user intend on invoking a different overload?
-  calleeInfo.suggestPotentialOverloads(fnExpr->getLoc(), /*isCallExpr*/true);
+  calleeInfo.suggestPotentialOverloads(fnExpr->getLoc());
   return true;
 }
 
@@ -4289,7 +4271,9 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   switch (candidateInfo.closeness) {
   case CC_NonLValueInOut:      // First argument is inout but no lvalue present.
   case CC_OneArgumentMismatch: // All arguments except one match.
+  case CC_OneArgumentNearMismatch:
   case CC_SelfMismatch:        // Self argument mismatches.
+  case CC_ArgumentNearMismatch:// Argument list mismatch.
   case CC_ArgumentMismatch:    // Argument list mismatch.
     assert(0 && "These aren't produced by filterContextualMemberList");
     return false;

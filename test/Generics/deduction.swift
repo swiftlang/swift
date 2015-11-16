@@ -227,6 +227,7 @@ protocol Addable {
 }
 func addAddables<T : Addable, U>(x: T, y: T, u: U) -> T {
   u + u // expected-error{{binary operator '+' cannot be applied to two 'U' operands}}
+  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: }}
   return x+y
 }
 

@@ -15,6 +15,7 @@ func weirdConcat<T : ConcatToAnything, U>(t: T, u: U) {
   t +++ u
   t +++ 1
   u +++ t // expected-error{{binary operator '+++' cannot be applied to operands of type 'U' and 'T'}}
+  // expected-note @-1 {{expected an argument list of type '(Self, T)'}}
 }
 
 // Make sure that the protocol operators don't get in the way.

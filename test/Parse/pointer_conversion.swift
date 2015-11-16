@@ -206,6 +206,7 @@ func arrayComparison(x: [NotEquatable], y: [NotEquatable], p: UnsafeMutablePoint
   var x = x
   // Don't allow implicit array-to-pointer conversions in operators.
   let a: Bool = x == y // expected-error{{binary operator '==' cannot be applied to two '[NotEquatable]' operands}}
+  // expected-note @-1 {{overloads for '==' exist with these partially matching parameter lists:}}
 
   let _: Bool = p == &x  // Allowed!
 }

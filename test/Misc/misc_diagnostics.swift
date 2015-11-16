@@ -103,9 +103,13 @@ func test17875634() {
   var coord = (row, col)
 
   match += (1, 2) // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
+  // expected-note @-1 {{overloads for '+=' exist with these partially matching parameter lists:}}
+  
   match += (row, col) // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
+  // expected-note @-1 {{overloads for '+=' exist with these partially matching parameter lists:}}
 
   match += coord // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
+  // expected-note @-1 {{overloads for '+=' exist with these partially matching parameter lists:}}
 
   match.append(row, col) // expected-error{{cannot invoke 'append' with an argument list of type '(Int, Int)'}}
   // expected-note @-1 {{expected an argument list of type '(Element)'}}
