@@ -4238,6 +4238,11 @@ public:
     FOREACH_IMPL_RETURN(getCallee());
   }
 
+  // Return the referenced function if the callee is a function_ref instruction.
+  SILFunction *getCalleeFunction() const {
+    FOREACH_IMPL_RETURN(getCalleeFunction());
+  }
+
   /// Return the type.
   SILType getType() const {
     FOREACH_IMPL_RETURN(getSubstCalleeType()->getResult().getSILType());
