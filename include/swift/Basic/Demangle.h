@@ -17,7 +17,7 @@
 #include <string>
 #include <vector>
 #include <cassert>
-#include <iosfwd>
+#include <cstdint>
 #include "llvm/ADT/StringRef.h"
 
 namespace llvm {
@@ -322,18 +322,13 @@ enum class OperatorKind {
 
 /// \brief Mangle an identifier using Swift's mangling rules.
 void mangleIdentifier(const char *data, size_t length,
-                      OperatorKind operatorKind, std::ostream &out,
+                      OperatorKind operatorKind, std::string &out,
                       bool usePunycode = true);
 
 /// \brief Remangle a demangled parse tree.
 ///
 /// This should always round-trip perfectly with demangleSymbolAsNode.
 std::string mangleNode(const NodePointer &root);
-
-/// \brief Write a mangling of the given parse tree into the given stream.
-///
-/// This should always round-trip perfectly with demangleSymbolAsNode.
-void mangleNode(NodePointer root, std::ostream &out);
 
 /// \brief Transform the node structure in a string.
 ///
@@ -368,6 +363,47 @@ struct NodeFactory {
   static NodePointer create(Node::Kind K, const char (&Text)[N]) {
     return NodePointer(new Node(K, llvm::StringRef(Text)));
   }
+};
+
+  /// A class for printing to a std::string.
+class DemanglerPrinter {
+public:
+  DemanglerPrinter(std::string &out) : Stream(out) {}
+  DemanglerPrinter(std::string &&out) : Stream(out) {}
+
+  DemanglerPrinter &operator<<(llvm::StringRef Value) & {
+    Stream.append(Value.data(), Value.size());
+    return *this;
+  }
+  
+  DemanglerPrinter &operator<<(char c) & {
+    Stream.push_back(c);
+    return *this;
+  }
+  DemanglerPrinter &operator<<(unsigned long long n) &;
+  DemanglerPrinter &operator<<(long long n) &;
+  DemanglerPrinter &operator<<(unsigned long n) & {
+    return *this << (unsigned long long)n;
+  }
+  DemanglerPrinter &operator<<(long n) & {
+    return *this << (long long)n;
+  }
+  DemanglerPrinter &operator<<(unsigned n) & {
+    return *this << (unsigned long long)n;
+  }
+  DemanglerPrinter &operator<<(int n) & {
+    return *this << (long long)n;
+  }
+  
+  template<typename T>
+  DemanglerPrinter &&operator<<(T &&x) && {
+    return std::move(*this << std::forward<T>(x));
+  }
+  
+  std::string &&str() && { return std::move(Stream); }
+  
+private:
+  std::string &Stream;
 };
 
 } // end namespace Demangle

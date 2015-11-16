@@ -22,8 +22,6 @@
 #include "swift/Basic/UUID.h"
 #include "llvm/ADT/StringRef.h"
 #include <functional>
-#include <ostream>
-#include <sstream>
 #include <vector>
 #include <cstdlib>
 
@@ -36,43 +34,60 @@ static void unreachable(const char *Message) {
   std::abort();
 }
 
+DemanglerPrinter &DemanglerPrinter::operator<<(unsigned long long n) & {
+  char buffer[32];
+  snprintf(buffer, 32, "%llu", n);
+  Stream.append(buffer);
+  return *this;
+}
+DemanglerPrinter &DemanglerPrinter::operator<<(long long n) & {
+  char buffer[32];
+  snprintf(buffer, 32, "%lld",n);
+  Stream.append(buffer);
+  return *this;
+}
+
 namespace {
 struct QuotedString {
   std::string Value;
 
-  QuotedString(std::string Value) : Value(Value) {}
+  explicit QuotedString(std::string Value) : Value(Value) {}
 };
-} // end unnamed namespace
-
-std::ostream &operator<<(std::ostream &OS, const QuotedString &QS) {
-  OS << '"';
-  for (auto C : QS.Value) {
-    switch (C) {
-    case '\\': OS << "\\\\"; break;
-    case '\t': OS << "\\t"; break;
-    case '\n': OS << "\\n"; break;
-    case '\r': OS << "\\r"; break;
-    case '"': OS << "\\\""; break;
-    case '\'': OS << '\''; break; // no need to escape these
-    case '\0': OS << "\\0"; break;
-    default:
-      auto c = static_cast<unsigned char>(C);
-      // Other ASCII control characters should get escaped.
-      if (c < 0x20 || c == 0x7F) {
-        static const char Hexdigit[] = {
-          '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-          'A', 'B', 'C', 'D', 'E', 'F'
-        };
-        OS << "\\x" << Hexdigit[c >> 4] << Hexdigit[c & 0xF];
-      } else {
-        OS << c;
+  
+  
+  DemanglerPrinter &operator<<(DemanglerPrinter &printer,
+                               const QuotedString &QS) {
+    printer << '"';
+    for (auto C : QS.Value) {
+      switch (C) {
+      case '\\': printer << "\\\\"; break;
+      case '\t': printer << "\\t"; break;
+      case '\n': printer << "\\n"; break;
+      case '\r': printer << "\\r"; break;
+      case '"': printer << "\\\""; break;
+      case '\'': printer << '\''; break; // no need to escape these
+      case '\0': printer << "\\0"; break;
+      default:
+        auto c = static_cast<char>(C);
+        // Other ASCII control characters should get escaped.
+        if (c < 0x20 || c == 0x7F) {
+          static const char Hexdigit[] = {
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+            'A', 'B', 'C', 'D', 'E', 'F'
+          };
+          printer << "\\x" << Hexdigit[c >> 4] << Hexdigit[c & 0xF];
+        } else {
+          printer << c;
+        }
+        break;
       }
-      break;
     }
+    printer << '"';
+    return printer;
   }
-  OS << '"';
-  return OS;
-}
+
+
+} // end unnamed namespace
 
 Node::~Node() {
   switch (NodePayloadKind) {
@@ -92,28 +107,6 @@ namespace {
   private:
     Node *Target;
   };
-
-/// A class for printing to a std::string.
-class DemanglerPrinter {
-public:
-  DemanglerPrinter() {}
-
-  template <class T> DemanglerPrinter &operator<<(T &&Value) {
-    Stream << std::forward<T>(Value);
-    return *this;
-  }
-
-  DemanglerPrinter &operator<<(StringRef Value) {
-    Stream.write(Value.data(), Value.size());
-    return *this;
-  }
-
-  /// Destructively take the contents of this stream.
-  std::string str() { return std::move(Stream.str()); }
-
-private:
-  std::stringstream Stream;
-};
 } // end anonymous namespace
 
 static bool isStartOfIdentifier(char c) {
@@ -159,14 +152,15 @@ static Node::Kind nominalTypeMarkerToNodeKind(char c) {
 
 static std::string archetypeName(Node::IndexType index,
                                  Node::IndexType depth) {
-  DemanglerPrinter name;
+  std::string str;
+  DemanglerPrinter name(str);
   do {
     name << (char)('A' + (index % 26));
     index /= 26;
   } while (index);
   if (depth != 0)
     name << depth;
-  return name.str();
+  return str;
 }
 
 namespace {
@@ -1361,11 +1355,12 @@ private:
   }
 
   NodePointer getDependentGenericParamType(unsigned depth, unsigned index) {
-    DemanglerPrinter Name;
-    Name << archetypeName(index, depth);
+    std::string Name;
+    DemanglerPrinter PrintName(Name);
+    PrintName << archetypeName(index, depth);
 
     auto paramTy = NodeFactory::create(Node::Kind::DependentGenericParamType,
-                                       std::move(Name.str()));
+                                       std::move(Name));
     paramTy->addChild(NodeFactory::create(Node::Kind::Index, depth));
     paramTy->addChild(NodeFactory::create(Node::Kind::Index, index));
 
@@ -1764,7 +1759,7 @@ private:
         if (demangleBuiltinSize(size)) {
           return NodeFactory::create(
               Node::Kind::BuiltinTypeName,
-              (DemanglerPrinter() << "Builtin.Float" << size).str());
+              (DemanglerPrinter("") << "Builtin.Float" << size).str());
         }
       }
       if (c == 'i') {
@@ -1772,7 +1767,7 @@ private:
         if (demangleBuiltinSize(size)) {
           return NodeFactory::create(
               Node::Kind::BuiltinTypeName,
-              (DemanglerPrinter() << "Builtin.Int" << size).str());
+              (DemanglerPrinter("") << "Builtin.Int" << size).str());
         }
       }
       if (c == 'v') {
@@ -1786,7 +1781,7 @@ private:
               return nullptr;
             return NodeFactory::create(
                 Node::Kind::BuiltinTypeName,
-                (DemanglerPrinter() << "Builtin.Vec" << elts << "xInt" << size)
+                (DemanglerPrinter("") << "Builtin.Vec" << elts << "xInt" << size)
                     .str());
           }
           if (Mangled.nextIf('f')) {
@@ -1795,13 +1790,13 @@ private:
               return nullptr;
             return NodeFactory::create(
                 Node::Kind::BuiltinTypeName,
-                (DemanglerPrinter() << "Builtin.Vec" << elts << "xFloat"
+                (DemanglerPrinter("") << "Builtin.Vec" << elts << "xFloat"
                                     << size).str());
           }
           if (Mangled.nextIf('p'))
             return NodeFactory::create(
                 Node::Kind::BuiltinTypeName,
-                (DemanglerPrinter() << "Builtin.Vec" << elts << "xRawPointer")
+                (DemanglerPrinter("") << "Builtin.Vec" << elts << "xRawPointer")
                     .str());
         }
       }
@@ -2229,15 +2224,16 @@ swift::Demangle::demangleTypeAsNode(const char *MangledName,
 namespace {
 class NodePrinter {
 private:
+  std::string Str;
   DemanglerPrinter Printer;
   DemangleOptions Options;
   
 public:
-  NodePrinter(DemangleOptions options) : Options(options) {}
+  NodePrinter(DemangleOptions options) : Printer(Str), Options(options) {}
   
   std::string printRoot(NodePointer root) {
     print(root);
-    return Printer.str();
+    return Str;
   }
 
 private:  
@@ -2859,12 +2855,13 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::ExplicitClosure:
   case Node::Kind::ImplicitClosure: {
     auto index = pointer->getChild(1)->getIndex();
-    DemanglerPrinter name;
-    name << '(';
+    std::string name;
+    DemanglerPrinter printName(name);
+    printName << '(';
     if (pointer->getKind() == Node::Kind::ImplicitClosure)
-      name << "implicit ";
-    name << "closure #" << (index + 1) << ")";
-    printEntity(false, false, name.str());
+      printName << "implicit ";
+    printName << "closure #" << (index + 1) << ")";
+    printEntity(false, false, name);
     return;
   }
   case Node::Kind::Global:
@@ -2879,9 +2876,10 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   case Node::Kind::DefaultArgumentInitializer: {
     auto index = pointer->getChild(1);
-    DemanglerPrinter strPrinter;
+    std::string str;
+    DemanglerPrinter strPrinter(str);
     strPrinter << "(default argument " << index->getIndex() << ")";
-    printEntity(false, false, strPrinter.str());
+    printEntity(false, false, str);
     return;
   }
   case Node::Kind::DeclContext:

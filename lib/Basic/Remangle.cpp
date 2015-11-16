@@ -23,8 +23,6 @@
 #include "swift/Basic/UUID.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/StringRef.h"
-#include <ostream>
-#include <sstream>
 #include <vector>
 #include <cstdlib>
 #include <unordered_map>
@@ -72,13 +70,8 @@ static bool isNonAscii(StringRef str) {
   return false;
 }
 
-static std::ostream &operator<<(std::ostream &str, StringRef string) {
-  str.write(string.data(), string.size());
-  return str;
-}
-
 static void mangleIdentifier(StringRef ident, OperatorKind operatorKind,
-                             bool usePunycode, std::ostream &out) {
+                             bool usePunycode, DemanglerPrinter &out) {
   std::string punycodeBuf;
   if (usePunycode) {
     // If the identifier contains non-ASCII character, we mangle 
@@ -125,9 +118,10 @@ static void mangleIdentifier(StringRef ident, OperatorKind operatorKind,
 
 void Demangle::mangleIdentifier(const char *data, size_t length,
                                 OperatorKind operatorKind,
-                                std::ostream &out, bool usePunycode) {
+                                std::string &out, bool usePunycode) {
+  DemanglerPrinter printer(out);
   return ::mangleIdentifier(StringRef(data, length), operatorKind,
-                            usePunycode, out);
+                            usePunycode, printer);
 }
 
 namespace {
@@ -215,14 +209,14 @@ namespace {
       Node::IndexType AbsoluteDepth;
     };
 
-    std::ostream &Out;
+    DemanglerPrinter &Out;
     std::unordered_map<std::string, ArchetypeInfo> Archetypes;
     unsigned AbsoluteArchetypeDepth = 0;
 
     std::unordered_map<SubstitutionEntry, unsigned,
                        SubstitutionEntry::Hasher> Substitutions;
   public:
-    Remangler(std::ostringstream &out) : Out(out) {}
+    Remangler(DemanglerPrinter &out) : Out(out) {}
 
     class EntityContext {
       Remangler &R;
@@ -1581,7 +1575,8 @@ void Remangler::mangleTypeList(Node *node) {
 std::string Demangle::mangleNode(const NodePointer &node) {
   if (!node) return "";
 
-  std::ostringstream str;
-  Remangler(str).mangle(node.get());
-  return str.str();
+  std::string str;
+  DemanglerPrinter printer(str);
+  Remangler(printer).mangle(node.get());
+  return str;
 }

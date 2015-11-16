@@ -33,7 +33,6 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
-#include <sstream>
 
 using namespace swift;
 using namespace Mangle;
@@ -74,10 +73,10 @@ void Mangler::mangleIdentifier(StringRef str, OperatorFixity fixity,
     llvm_unreachable("invalid operator fixity");
   }();
 
-  std::ostringstream stream;
-  Demangle::mangleIdentifier(str.data(), str.size(), operatorKind, stream,
+  std::string buf;
+  Demangle::mangleIdentifier(str.data(), str.size(), operatorKind, buf,
                              UsePunycode);
-  Buffer << stream.str();
+  Buffer << buf;
 }
 
 /// Mangle an identifier into the buffer.
