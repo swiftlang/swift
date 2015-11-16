@@ -42,7 +42,6 @@
 #include "CallingConvention.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
-#include "FormalType.h"
 #include "GenClass.h"
 #include "GenObjC.h"
 #include "GenOpaque.h"

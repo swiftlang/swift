@@ -33,7 +33,6 @@
 
 #include "CallEmission.h"
 #include "Explosion.h"
-#include "FormalType.h"
 #include "GenClass.h"
 #include "GenFunc.h"
 #include "GenHeap.h"
