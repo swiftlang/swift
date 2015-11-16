@@ -4,6 +4,23 @@ import Builtin
 
 typealias I32 = Builtin.Int32
 
+///////////////////////
+// Type Declarations //
+///////////////////////
+
+struct Int {
+  var value : Builtin.Int64
+}
+
+struct Int64 {
+  var value : Builtin.Int64
+}
+
+struct Bool {
+  var value : Builtin.Int1
+}
+
+
 struct A {
   var i : Builtin.Int32
 }
@@ -49,6 +66,13 @@ struct D {
 struct Wrapper {
   var value : Builtin.Int32
 }
+
+class AB {
+  var value: Int
+  init(value: Int)
+   deinit 
+}
+
 
 sil @use : $@convention(thin) (Builtin.Int32) -> ()
 sil @use_64 : $@convention(thin) (Builtin.Int64) -> ()
@@ -274,3 +298,30 @@ bb0(%0 : $B, %1 : $X):
   %13 = tuple ()                                  // user: %14
   return %13 : $()                                // id: %14
 }
+
+// Make sure we RLE the second load.
+//
+// CHECK-LABEL: test_simple_rle_in_class
+// CHECK: load
+// CHECK-NOT: load
+// CHECK: cond_fail
+sil hidden @test_simple_rle_in_class : $@convention(thin) (@owned AB) -> Int {
+bb0(%0 : $AB):
+  debug_value %0 : $AB  // let a                  // id: %1
+  %2 = ref_element_addr %0 : $AB, #AB.value       // user: %3
+  %3 = load %2 : $*Int                            // user: %6
+  %4 = ref_element_addr %0 : $AB, #AB.value       // user: %5
+  %5 = load %4 : $*Int                            // user: %7
+  %6 = struct_extract %3 : $Int, #Int.value       // user: %9
+  %7 = struct_extract %5 : $Int, #Int.value       // user: %9
+  %8 = integer_literal $Builtin.Int1, -1          // user: %9
+  %9 = builtin "sadd_with_overflow_Int64"(%6 : $Builtin.Int64, %7 : $Builtin.Int64, %8 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // users: %10, %11
+  %10 = tuple_extract %9 : $(Builtin.Int64, Builtin.Int1), 0 // user: %13
+  %11 = tuple_extract %9 : $(Builtin.Int64, Builtin.Int1), 1 // user: %12
+  cond_fail %11 : $Builtin.Int1                   // id: %12
+  %13 = struct $Int (%10 : $Builtin.Int64)        // user: %15
+  strong_release %0 : $AB                         // id: %14
+  return %13 : $Int                               // id: %15
+}
+
+
