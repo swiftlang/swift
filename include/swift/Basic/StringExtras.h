@@ -22,6 +22,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Allocator.h"
 #include <iterator>
 #include <string>
@@ -365,6 +366,22 @@ public:
   StringRef copyString(StringRef string);
 };
 
+/// Describes a set of names with an inheritance relationship.
+class InheritedNameSet {
+  const InheritedNameSet *Parent;
+  llvm::StringSet<> Names;
+
+public:
+  /// Construct a new inherited name set with the given parent.
+  explicit InheritedNameSet(const InheritedNameSet *parent) : Parent(parent) { }
+
+  // Add a new name to the set.
+  void add(StringRef name);
+
+  /// Determine whether this set includes the given name.
+  bool contains(StringRef name) const;
+};
+
 /// Omit needless words for a declaration.
 ///
 /// \param baseName The base name of the declaration. This value may be
@@ -388,6 +405,8 @@ public:
 ///
 /// \param isProperty Whether this is the name of a property.
 ///
+/// \param allPropertyNames The set of property names in the enclosing context.
+///
 /// \param scratch Scratch space that will be used for modifications beyond
 /// just chopping names.
 ///
@@ -400,6 +419,7 @@ bool omitNeedlessWords(StringRef &baseName,
                        ArrayRef<OmissionTypeName> paramTypes,
                        bool returnsSelf,
                        bool isProperty,
+                       const InheritedNameSet *allPropertyNames,
                        StringScratchSpace &scratch);
 }
 

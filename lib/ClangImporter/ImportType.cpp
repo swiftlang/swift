@@ -2088,12 +2088,21 @@ DeclName ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
   // Omit needless words.
   StringRef baseName = name.getBaseName().str();
   StringScratchSpace scratch;
+
+  // Find the property names.
+  const InheritedNameSet *allPropertyNames = nullptr;
+  auto contextType = getClangDeclContextType(dc);
+  if (!contextType.isNull()) {
+    if (auto objcPtrType = contextType->getAsObjCInterfacePointerType())
+      if (auto objcClassDecl = objcPtrType->getInterfaceDecl())
+        allPropertyNames = SwiftContext.getAllPropertyNames(objcClassDecl);
+  }
+
   if (!omitNeedlessWords(baseName, argNames, firstParamName,
                          getClangTypeNameForOmission(resultType),
-                         getClangTypeNameForOmission(
-                           getClangDeclContextType(dc)),
+                         getClangTypeNameForOmission(contextType),
                          paramTypes, returnsSelf, /*isProperty=*/false,
-                         scratch))
+                         allPropertyNames, scratch))
     return name;
 
   /// Retrieve a replacement identifier.

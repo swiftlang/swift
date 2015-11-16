@@ -1897,11 +1897,20 @@ static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
     }
   }
 
+  // Find the set of property names.
+  const InheritedNameSet *allPropertyNames = nullptr;
+  if (contextType) {
+    if (auto classDecl = contextType->getClassOrBoundGenericClass()) {
+      allPropertyNames = Context.getAllPropertyNames(classDecl);
+    }
+  }
+
   StringScratchSpace scratch;
   if (!swift::omitNeedlessWords(baseNameStr, argNameStrs, firstParamName,
                                 getTypeNameForOmission(resultType),
                                 getTypeNameForOmission(contextType),
-                                paramTypes, returnsSelf, false, scratch))
+                                paramTypes, returnsSelf, false,
+                                allPropertyNames, scratch))
     return None;
 
   /// Retrieve a replacement identifier.
@@ -1954,12 +1963,22 @@ static Optional<Identifier> omitNeedlessWords(VarDecl *var) {
   while (auto optObjectTy = type->getAnyOptionalObjectType())
     type = optObjectTy;
 
+  // Find the set of property names.
+  const InheritedNameSet *allPropertyNames = nullptr;
+  if (contextType) {
+    if (auto classDecl = contextType->getClassOrBoundGenericClass()) {
+      allPropertyNames = Context.getAllPropertyNames(classDecl);
+    }
+  }
+
+
   // Omit needless words.
   StringScratchSpace scratch;
   OmissionTypeName typeName = getTypeNameForOmission(var->getType());
   OmissionTypeName contextTypeName = getTypeNameForOmission(contextType);
   if (omitNeedlessWords(name, { }, "", typeName, contextTypeName, { },
-                        /*returnsSelf=*/false, true, scratch)) {
+                        /*returnsSelf=*/false, true, allPropertyNames,
+                        scratch)) {
     return Context.getIdentifier(name);
   }
 

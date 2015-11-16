@@ -26,8 +26,6 @@
 
 // Note: "with" parameters.
 // CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, withObject: AnyObject?)
-
-// Note: "with" parameters drop the "with".
 // CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, withObject: AnyObject?, withObject: AnyObject?)
 
 // Note: id -> "Object".
@@ -198,3 +196,10 @@
 
 // Look through typedefs of pointers.
 // CHECK-APPKIT: func layoutAt(_: NSPointPointer)
+
+// The presence of a property prevents us from stripping redundant
+// type information from the base name.
+// CHECK-APPKIT: func addGestureRecognizer(_: NSGestureRecognizer)
+// CHECK-APPKIT: func removeGestureRecognizer(_: NSGestureRecognizer)
+// CHECK-APPKIT: func favoriteViewFor(_: NSGestureRecognizer) -> NSView?
+// CHECK-APPKIT: func addLayoutConstraints(_: Set<NSLayoutConstraint>)

@@ -421,6 +421,20 @@ StringRef StringScratchSpace::copyString(StringRef string) {
   return StringRef(static_cast<char *>(memory), string.size());
 }
 
+void InheritedNameSet::add(StringRef name) {
+  Names.insert(name);
+}
+
+bool InheritedNameSet::contains(StringRef name) const {
+  auto set = this;
+  do {
+    if (set->Names.count(name) > 0) return true;
+    set = set->Parent;
+  } while (set);
+
+  return false;
+}
+
 /// Wrapper for camel_case::toLowercaseWord that uses string scratch space.
 static StringRef toLowercaseWord(StringRef string, StringScratchSpace &scratch){
   llvm::SmallString<32> scratchStr;
@@ -477,6 +491,7 @@ static bool isVacuousName(StringRef name) {
 static StringRef omitNeedlessWords(StringRef name,
                                    OmissionTypeName typeName,
                                    NameRole role,
+                                   const InheritedNameSet *allPropertyNames,
                                    StringScratchSpace &scratch) {
   // If we have no name or no type name, there is nothing to do.
   if (name.empty() || typeName.empty()) return name;
@@ -540,7 +555,7 @@ static StringRef omitNeedlessWords(StringRef name,
         = name.substr(0, nameWordRevIter.base().getPosition()-1);
       auto newShortenedNameWord
         = omitNeedlessWords(shortenedNameWord, typeName.CollectionElement,
-                            NameRole::Partial, scratch);
+                            NameRole::Partial, allPropertyNames, scratch);
       if (shortenedNameWord != newShortenedNameWord) {
         anyMatches = true;
         unsigned targetSize = newShortenedNameWord.size();
@@ -604,6 +619,38 @@ static StringRef omitNeedlessWords(StringRef name,
 
       case PartOfSpeech::Verb:
       case PartOfSpeech::Gerund:
+        // Don't prune redundant type information from the base name if
+        // there is a corresponding property (either singular or plural).
+        if (allPropertyNames && role == NameRole::BaseName) {
+          SmallString<16> localScratch;
+          auto removedText = name.substr(nameWordRevIter.base().getPosition());
+          auto removedName = camel_case::toLowercaseWord(removedText,
+                                                         localScratch);
+
+          // A property with exactly this name.
+          if (allPropertyNames->contains(removedName)) return name;
+
+          // From here on, we'll be working with scratch space.
+          if (removedName.data() != localScratch.data())
+            localScratch = removedName;
+
+          if (localScratch.back() == 'y') {
+            // If the last letter is a 'y', try 'ies'.
+            localScratch.pop_back();
+            localScratch += "ies";
+            if (allPropertyNames->contains(localScratch)) return name;
+          } else {
+            // Otherwise, add an 's' and try again.
+            localScratch += 's';
+            if (allPropertyNames->contains(localScratch)) return name;
+
+            // Alternatively, try to add 'es'.
+            localScratch.pop_back();
+            localScratch += "es";
+            if (allPropertyNames->contains(localScratch)) return name;
+          }
+        }
+
         // Strip off the part of the name that is redundant with
         // type information.
         name = name.substr(0, nameWordRevIter.base().getPosition());
@@ -693,6 +740,7 @@ bool swift::omitNeedlessWords(StringRef &baseName,
                               ArrayRef<OmissionTypeName> paramTypes,
                               bool returnsSelf,
                               bool isProperty,
+                              const InheritedNameSet *allPropertyNames,
                               StringScratchSpace &scratch) {
   bool anyChanges = false;
 
@@ -735,6 +783,7 @@ bool swift::omitNeedlessWords(StringRef &baseName,
                                 baseName,
                                 returnsSelf ? contextType : resultType,
                                 NameRole::Property,
+                                allPropertyNames,
                                 scratch);
       if (newBaseName != baseName) {
         baseName = newBaseName;
@@ -768,7 +817,11 @@ bool swift::omitNeedlessWords(StringRef &baseName,
 
     // Omit needless words from the name.
     StringRef name = role == NameRole::BaseName ? baseName : argNames[i];
-    StringRef newName = ::omitNeedlessWords(name, paramTypes[i], role, scratch);
+    StringRef newName = ::omitNeedlessWords(name, paramTypes[i], role,
+                                            role == NameRole::BaseName 
+                                              ? allPropertyNames
+                                              : nullptr,
+                                            scratch);
 
     // Did the name change?
     if (name != newName)

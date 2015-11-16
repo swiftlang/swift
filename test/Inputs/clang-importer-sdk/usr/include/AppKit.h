@@ -281,3 +281,16 @@ typedef NSPoint *NSPointPointer;
 -(void)setContentHuggingPriority:(NSLayoutPriority)priority;
 -(void)layoutAtPoint:(NSPointPointer)point;
 @end
+
+@interface NSGestureRecognizer : NSObject
+@end
+
+@interface NSView (Gestures)
+@property (readonly, copy) NSArray<__kindof NSGestureRecognizer *> *gestureRecognizers;
+- (void)addGestureRecognizer:(nonnull NSGestureRecognizer *)gestureRecognizer;
+- (void)removeGestureRecognizer:(nonnull NSGestureRecognizer *)gestureRecognizer;
+- (nullable NSView *)favoriteViewForGestureRecognizer:(nonnull NSGestureRecognizer *)gestureRecognizer;
+
+- (nonnull NSSet<NSLayoutConstraint *> *)layoutConstraints;
+- (void)addLayoutConstraints:(nonnull NSSet<NSLayoutConstraint *> *)layoutConstraints;
+@end

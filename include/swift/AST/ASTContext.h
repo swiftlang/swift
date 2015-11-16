@@ -44,6 +44,7 @@
 namespace clang {
   class Decl;
   class MacroInfo;
+  class ObjCInterfaceDecl;
 }
 
 namespace swift {
@@ -65,6 +66,7 @@ namespace swift {
   class FunctionType;
   class ArchetypeType;
   class Identifier;
+  class InheritedNameSet;
   class ModuleDecl;
   class ModuleLoader;
   class NominalTypeDecl;
@@ -798,6 +800,14 @@ public:
   void setArchetypeBuilder(CanGenericSignature sig,
                            ModuleDecl *mod,
                            std::unique_ptr<ArchetypeBuilder> builder);
+
+  /// Retrieve the inherited name set for the given class.
+  const InheritedNameSet *getAllPropertyNames(ClassDecl *classDecl);
+
+  /// Retrieve the inherited name set for the given Objective-C class.
+  const InheritedNameSet *getAllPropertyNames(
+                            clang::ObjCInterfaceDecl *classDecl);
+
 private:
   friend class Decl;
   Optional<RawComment> getRawComment(const Decl *D);

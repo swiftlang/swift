@@ -30,6 +30,8 @@
 #include "swift/AST/RawComment.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/StringExtras.h"
+#include "clang/AST/DeclObjC.h"
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/Preprocessor.h"
 #include "llvm/Support/Allocator.h"
@@ -231,6 +233,16 @@ struct ASTContext::Implementation {
   /// \brief Stored archetype builders.
   llvm::DenseMap<std::pair<GenericSignature *, ModuleDecl *>,
                  std::unique_ptr<ArchetypeBuilder>> ArchetypeBuilders;
+
+  /// The set of property names that show up in the defining module of a
+  /// class.
+  llvm::DenseMap<const ClassDecl *, std::unique_ptr<InheritedNameSet>>
+    AllProperties;
+
+  /// The set of property names that show up in the defining module of
+  /// an Objective-C class.
+  llvm::DenseMap<const clang::ObjCInterfaceDecl *,
+                 std::unique_ptr<InheritedNameSet>> AllPropertiesObjC;
 
   /// \brief Structure that captures data that is segregated into different
   /// arenas.
@@ -3500,4 +3512,117 @@ void ASTContext::unregisterLazyArchetype(const ArchetypeType *archetype) {
   auto known = Impl.LazyArchetypes.find(archetype);
   assert(known != Impl.LazyArchetypes.end());
   Impl.LazyArchetypes.erase(known);
+}
+
+const InheritedNameSet *ASTContext::getAllPropertyNames(ClassDecl *classDecl) {
+  // If this class was defined in Objective-C, perform the lookup based on
+  // the Objective-C class.
+  if (auto objcClass = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
+                         classDecl->getClangDecl())) {
+    return getAllPropertyNames(
+             const_cast<clang::ObjCInterfaceDecl *>(objcClass));
+  }
+
+  // If we already have this information, return it.
+  auto known = Impl.AllProperties.find(classDecl);
+  if (known != Impl.AllProperties.end()) return known->second.get();
+
+  // Otherwise, get information from our superclass first.
+  if (auto resolver = getLazyResolver())
+    resolver->resolveSuperclass(classDecl);
+
+  const InheritedNameSet *parentSet = nullptr;
+  if (auto superclass = classDecl->getSuperclass()) {
+    if (auto superclassDecl = superclass->getClassOrBoundGenericClass()) {
+      parentSet = getAllPropertyNames(superclassDecl);
+    }
+  }
+
+  // Create the set of properties.
+  known = Impl.AllProperties.insert(
+            {classDecl, llvm::make_unique<InheritedNameSet>(parentSet) }).first;
+
+  // Local function to add properties from the given set.
+  auto addProperties = [&](DeclRange members) {
+    for (auto member : members) {
+      auto var = dyn_cast<VarDecl>(member);
+      if (!var || var->getName().empty()) continue;
+
+      known->second->add(var->getName().str());
+    }
+  };
+
+  // Collect property names from the class.
+  addProperties(classDecl->getMembers());
+
+  // Collect property names from all extensions in the same module as the class.
+  auto module = classDecl->getParentModule();
+  for (auto ext : classDecl->getExtensions()) {
+    if (ext->getParentModule() != module) continue;
+    addProperties(ext->getMembers());
+  }
+
+  return known->second.get();
+}
+
+const InheritedNameSet *ASTContext::getAllPropertyNames(
+                          clang::ObjCInterfaceDecl *classDecl) {
+  classDecl = classDecl->getCanonicalDecl();
+
+  // If we already have this information, return it.
+  auto known = Impl.AllPropertiesObjC.find(classDecl);
+  if (known != Impl.AllPropertiesObjC.end()) return known->second.get();
+
+  // Otherwise, get information from our superclass first.
+  const InheritedNameSet *parentSet = nullptr;
+  if (auto superclassDecl = classDecl->getSuperClass()) {
+    parentSet = getAllPropertyNames(superclassDecl);
+  }
+
+  // Create the set of properties.
+  known = Impl.AllPropertiesObjC.insert(
+            {classDecl, llvm::make_unique<InheritedNameSet>(parentSet) }).first;
+
+  // Local function to add properties from the given set.
+  auto addProperties = [&](clang::DeclContext::decl_range members) {
+    for (auto member : members) {
+      // Add Objective-C property names.
+      if (auto property = dyn_cast<clang::ObjCPropertyDecl>(member)) {
+        known->second->add(property->getName());
+        continue;
+      }
+
+      // Add no-parameter, non-void method names.
+      if (auto method = dyn_cast<clang::ObjCMethodDecl>(member)) {
+        if (method->getSelector().isUnarySelector() &&
+            !method->getReturnType()->isVoidType()) {
+          known->second->add(method->getSelector().getNameForSlot(0));
+          continue;
+        }
+      }
+    }
+  };
+
+  // Dig out the class definition.
+  auto classDef = classDecl->getDefinition();
+  if (!classDef) return known->second.get();
+
+  // Collect property names from the class definition.
+  addProperties(classDef->decls());
+
+  // Dig out the module that owns the class definition.
+  auto module = classDef->getImportedOwningModule();
+  if (module) module = module->getTopLevelModule();
+
+  // Collect property names from all categories and extensions in the same
+  // module as the class.
+  for (auto category : classDef->known_categories()) {
+    auto categoryModule = category->getImportedOwningModule();
+    if (categoryModule) categoryModule = categoryModule->getTopLevelModule();
+    if (module != categoryModule) continue;
+
+    addProperties(category->decls());
+  }
+
+  return known->second.get();
 }

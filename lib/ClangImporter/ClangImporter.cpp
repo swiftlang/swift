@@ -1365,9 +1365,19 @@ ClangImporter::Implementation::importName(const clang::NamedDecl *D,
                                   objcProperty->getType());
         StringScratchSpace scratch;
         StringRef name = result.str();
+
+        // Find the property names.
+        const InheritedNameSet *allPropertyNames = nullptr;
+        if (!contextType.isNull()) {
+          if (auto objcPtrType = contextType->getAsObjCInterfacePointerType())
+            if (auto objcClassDecl = objcPtrType->getInterfaceDecl())
+              allPropertyNames = SwiftContext.getAllPropertyNames(
+                                   objcClassDecl);
+        }
+
         if (omitNeedlessWords(name, { }, "", propertyTypeName, contextTypeName,
                               { }, /*returnsSelf=*/false, /*isProperty=*/true,
-                              scratch)) {
+                              allPropertyNames, scratch)) {
           result = SwiftContext.getIdentifier(name);
         }
       }
