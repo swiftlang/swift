@@ -46,11 +46,6 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
         << " and " << getSecondType().getString();
     break;
 
-  case OutOfOrderArgument:
-    out << "out-of-order argument " << getValue() << " should come before "
-        << getSecondValue();
-    break;
-
   case MissingArgument:
     out << "missing argument for parameter " << getValue();
     break;
@@ -652,25 +647,6 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
       return true;
     }
     // FIXME: diagnose other cases
-    return false;
-
-  case Failure::OutOfOrderArgument:
-      if (0)
-    if (auto tuple = dyn_cast_or_null<TupleExpr>(anchor)) {
-      unsigned firstIdx = failure.getValue();
-      Identifier first = tuple->getElementName(firstIdx);
-      unsigned secondIdx = failure.getSecondValue();
-      Identifier second = tuple->getElementName(secondIdx);
-      if (!first.empty()  && !second.empty()) {
-        tc.diagnose(tuple->getElementNameLoc(firstIdx),
-                    diag::argument_out_of_order, first, second)
-          .highlight(tuple->getElement(firstIdx)->getSourceRange())
-          .highlight(SourceRange(tuple->getElementNameLoc(secondIdx),
-                                 tuple->getElement(secondIdx)->getEndLoc()));
-        return true;
-      }
-    }
-    // FIXME: Can this even happen?
     return false;
 
   case Failure::MissingArgument: {

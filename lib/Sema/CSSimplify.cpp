@@ -537,12 +537,7 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
     }
 
     virtual void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) {
-      if (!CS.shouldRecordFailures())
-        return;
-
-      CS.recordFailure(CS.getConstraintLocator(Locator),
-                       Failure::OutOfOrderArgument,
-                       argIdx, prevArgIdx);
+      return;
     }
 
     virtual bool relabelArguments(ArrayRef<Identifier> newNames) {

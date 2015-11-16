@@ -365,8 +365,6 @@ public:
     IsNotBridgedToObjectiveC,
     /// \brief The type is not allowed to be an l-value.
     IsForbiddenLValue,
-    /// Out-of-order arguments.
-    OutOfOrderArgument,
     /// Missing argument in a call.
     MissingArgument,
     /// Extra argument in a call.
@@ -443,10 +441,6 @@ public:
     case NoPublicInitializers:
       return Profile(id, locator, kind, resolvedOverloadSets, getFirstType(),
                     value);
-
-    case OutOfOrderArgument:
-      return Profile(id, locator, kind, resolvedOverloadSets, value, value2);
-
     case ExtraArgument:
       return Profile(id, locator, kind, resolvedOverloadSets, value, value2);
     }
