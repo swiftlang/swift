@@ -414,9 +414,9 @@ static NSString *_getClassDescription(Class cls) {
   // Adopt the same CFTypeID as NSObject.
   static CFTypeID result;
   static dispatch_once_t predicate;
-  dispatch_once(&predicate, ^{
+  dispatch_once_f(&predicate, &result, [](void *resultAddr) {
     id obj = [[NSObject alloc] init];
-    result = [obj _cfTypeID];
+    *(CFTypeID*)resultAddr = [obj _cfTypeID];
     [obj release];
   });
   return result;
