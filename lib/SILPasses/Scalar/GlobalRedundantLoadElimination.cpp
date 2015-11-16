@@ -376,9 +376,6 @@ bool BBState::setupRLE(RLEContext &Ctx, SILInstruction *I, SILValue Mem) {
   // forwardable values are recorded in the function.
   //
   RedundantLoads[I] = TheForwardingValue;
-  // Make sure we cache this constructed SILValue so that we could use it
-  // later.
-  MaterializedValues[L] = TheForwardingValue;
   return true;
 }
 
