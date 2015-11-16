@@ -46,7 +46,6 @@
 #include "Linking.h"
 
 #include <initializer_list>
-#include <sstream>
 
 using namespace swift;
 using namespace irgen;
@@ -533,13 +532,15 @@ llvm::AttributeSet IRGenModule::constructInitialAttributes() {
 
   std::vector<std::string> &Features = ClangOpts.Features;
   if (!Features.empty()) {
-    std::stringstream S;
-    std::copy(Features.begin(), Features.end(),
-              std::ostream_iterator<std::string>(S, ","));
-    // The drop_back gets rid of the trailing space.
+    SmallString<64> allFeatures;
+    interleave(Features, [&](const std::string &s) {
+      allFeatures.append(s);
+    }, [&]{
+      allFeatures.push_back(',');
+    });
     attrsUpdated = attrsUpdated.addAttribute(LLVMContext,
                      llvm::AttributeSet::FunctionIndex, "target-features",
-                     StringRef(S.str()).drop_back(1));
+                     allFeatures);
   }
   return attrsUpdated;
 }
