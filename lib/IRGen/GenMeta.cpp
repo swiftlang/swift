@@ -2610,7 +2610,8 @@ namespace {
                                         argTys, /*isVarArg*/ false);
       llvm::Function *f = llvm::Function::Create(ty,
                                            llvm::GlobalValue::PrivateLinkage,
-                                           "create_generic_metadata",
+                                           llvm::Twine("create_generic_metadata_")
+                                               + super::Target->getName().str(),
                                            &IGM.Module);
       f->setAttributes(IGM.constructInitialAttributes());
       

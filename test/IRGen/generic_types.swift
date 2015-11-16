@@ -12,7 +12,7 @@ import Swift
 // CHECK: [[D:%C13generic_types1D]] = type
 
 // CHECK: @_TMPC13generic_types1A = global [[A_METADATA_T:{.*\* } }]] {
-// CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[A_METADATA_CREATE:@[a-z0-9_]+]],
+// CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_A,
 // CHECK:   i32 344,
 // CHECK:   i16 1,
 // CHECK:   i16 16,
@@ -36,7 +36,7 @@ import Swift
 // CHECK:   %C13generic_types1A* (i64, %C13generic_types1A*)* @_TFC13generic_types1AcfT1ySi_GS0_x_
 // CHECK: }
 // CHECK: @_TMPC13generic_types1B = global [[B_METADATA_T:{.* } }]] {
-// CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[B_METADATA_CREATE:@[a-z0-9_.]+]],
+// CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_B,
 // CHECK:   i32 336,
 // CHECK:   i16 1,
 // CHECK:   i16 16,
@@ -78,7 +78,7 @@ import Swift
 // CHECK:   void (%Si*, [[D]]*)* @_TTVFC13generic_types1D3runfSiT_
 // CHECK: }
 
-// CHECK: define private %swift.type* [[A_METADATA_CREATE]](%swift.type_pattern*, i8**) {{.*}} {
+// CHECK: define private %swift.type* @create_generic_metadata_A(%swift.type_pattern*, i8**) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[T0:%.*]] = load i8*, i8** %1
 // CHECK:   %T = bitcast i8* [[T0]] to %swift.type*
@@ -91,7 +91,7 @@ import Swift
 // CHECK:   ret %swift.type* [[METADATA]]
 // CHECK: }
 
-// CHECK: define private %swift.type* [[B_METADATA_CREATE]](%swift.type_pattern*, i8**) {{.*}} {
+// CHECK: define private %swift.type* @create_generic_metadata_B(%swift.type_pattern*, i8**) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[T0:%.*]] = load i8*, i8** %1
 // CHECK:   %T = bitcast i8* [[T0]] to %swift.type*

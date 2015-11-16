@@ -117,7 +117,7 @@ import Swift
 // CHECK: }
 
 // CHECK: @_TMPO4enum16DynamicSingleton = global { {{.*}}* } {
-// CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[DYNAMIC_SINGLETON_CREATE:@create_generic_metadata[0-9]*]]
+// CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_DynamicSingleton
 // CHECK:   @_TMnO4enum16DynamicSingleton
 // CHECK:   i8* null
 // CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO4enum16DynamicSingleton to i8*)
@@ -161,7 +161,7 @@ import Swift
 
 
 // CHECK: @_TMPO4enum20DynamicSinglePayload = global { {{.*}}* } {
-// CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[DYNAMIC_SINGLE_PAYLOAD_CREATE:@create_generic_metadata[.0-9]*]]
+// CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_DynamicSinglePayload
 // CHECK:   i8* null
 // CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO4enum20DynamicSinglePayload to i8*)
 // CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO4enum20DynamicSinglePayload to i8*)
@@ -2538,7 +2538,7 @@ bb4:
 
 // -- Fill function for dynamic singleton. The value witness table flags just
 //    get copied over from the element.
-// CHECK: define private %swift.type* [[DYNAMIC_SINGLETON_CREATE]](%swift.type_pattern*, i8**) {{.*}} {
+// CHECK: define private %swift.type* @create_generic_metadata_DynamicSingleton(%swift.type_pattern*, i8**) {{.*}} {
 // CHECK:   [[T0:%.*]] = load i8*, i8** %1
 // CHECK:   [[T:%.*]] = bitcast i8* [[T0]] to %swift.type*
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata(%swift.type_pattern* %0, i8** %1)
@@ -2586,7 +2586,7 @@ bb4:
 
 // -- Fill function for dynamic single-payload. Call into the runtime to
 //    calculate the size.
-// CHECK: define private %swift.type* [[DYNAMIC_SINGLE_PAYLOAD_CREATE]](%swift.type_pattern*, i8**) {{.*}} {
+// CHECK: define private %swift.type* @create_generic_metadata_DynamicSinglePayload(%swift.type_pattern*, i8**) {{.*}} {
 // CHECK:   call void @swift_initEnumValueWitnessTableSinglePayload
 
 // CHECK-64-LABEL: define linkonce_odr hidden void @_TwxsV4enum17StructWithWeakVar(%swift.opaque* %dest, i32 %index, %swift.type* %Self)

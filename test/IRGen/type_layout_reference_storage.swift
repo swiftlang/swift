@@ -4,8 +4,8 @@ class C {}
 protocol P: class {}
 protocol Q: class {}
 
-// CHECK: @_TMPV29type_layout_reference_storage26ReferenceStorageTypeLayout = global {{.*}} [[CREATE_GENERIC_METADATA:@create_generic_metadata[0-9.]*]]
-// CHECK: define private %swift.type* [[CREATE_GENERIC_METADATA]]
+// CHECK: @_TMPV29type_layout_reference_storage26ReferenceStorageTypeLayout = global {{.*}} @create_generic_metadata_ReferenceStorageTypeLayout
+// CHECK: define private %swift.type* @create_generic_metadata_ReferenceStorageTypeLayout
 struct ReferenceStorageTypeLayout<T> {
   var z: T
 
