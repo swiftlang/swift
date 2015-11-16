@@ -2,8 +2,11 @@
 // RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience -O %s
 
 import resilient_struct
+import resilient_enum
 
 // CHECK: %Si = type <{ [[INT:i32|i64]] }>
+
+// CHECK-LABEL: @_TMPV17struct_resilience26StructWithResilientStorage = global
 
 // Resilient structs from outside our resilience domain are manipulated via
 // value witnesses
@@ -92,7 +95,75 @@ public func functionWithMyResilientTypes(s: MySize, f: MySize -> MySize) -> MySi
   return f(s)
 }
 
+// Structs with resilient storage from a different resilience domain require
+// runtime metadata instantiation, just like generics.
+
+public struct StructWithResilientStorage {
+  public let s: Size
+  public let ss: (Size, Size)
+  public let n: Int
+}
+
+// Make sure we call a function to access metadata of structs with
+// resilient layout, and go through the field offset vector in the
+// metadata when accessing stored properties.
+
+// CHECK-LABEL: define {{i32|i64}} @_TFV17struct_resilience26StructWithResilientStorageg1nSi(%V17struct_resilience26StructWithResilientStorage* {{.*}})
+// CHECK: [[METADATA:%.*]] = call %swift.type* @_TMaV17struct_resilience26StructWithResilientStorage()
+// CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to [[INT]]*
+// CHECK-NEXT: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_ADDR]], i32 3
+// CHECK-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[FIELD_OFFSET_VECTOR]], i32 2
+// CHECK-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_PTR]]
+// CHECK-NEXT: [[STRUCT_ADDR:%.*]] = bitcast %V17struct_resilience26StructWithResilientStorage* %0 to i8*
+// CHECK-NEXT: [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, i8* [[STRUCT_ADDR]], [[INT]] [[FIELD_OFFSET]]
+// CHECK-NEXT: [[FIELD_PTR:%.*]] = bitcast i8* [[FIELD_ADDR]] to %Si*
+// CHECK-NEXT: [[FIELD_PAYLOAD_PTR:%.*]] = getelementptr inbounds %Si, %Si* [[FIELD_PTR]], i32 0, i32 0
+// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = load [[INT]], [[INT]]* [[FIELD_PAYLOAD_PTR]]
+// CHECK-NEXT: ret [[INT]] [[FIELD_PAYLOAD]]
+
+
+// Indirect enums with resilient payloads are still fixed-size.
+
+public struct StructWithIndirectResilientEnum {
+  public let s: FunnyShape
+  public let n: Int
+}
+
+
+// CHECK-LABEL: define {{i32|i64}} @_TFV17struct_resilience31StructWithIndirectResilientEnumg1nSi(%V17struct_resilience31StructWithIndirectResilientEnum* {{.*}})
+// CHECK: [[FIELD_PTR:%.*]] = getelementptr inbounds %V17struct_resilience31StructWithIndirectResilientEnum, %V17struct_resilience31StructWithIndirectResilientEnum* %0, i32 0, i32 1
+// CHECK-NEXT: [[FIELD_PAYLOAD_PTR:%.*]] = getelementptr inbounds %Si, %Si* [[FIELD_PTR]], i32 0, i32 0
+// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = load i64, i64* [[FIELD_PAYLOAD_PTR]]
+// CHECK-NEXT: ret i64 [[FIELD_PAYLOAD]]
+
+
 // Public metadata accessor for our resilient struct
 
 // CHECK-LABEL: define %swift.type* @_TMaV17struct_resilience6MySize()
 // CHECK: ret %swift.type* bitcast (i64* getelementptr inbounds {{.*}} @_TMfV17struct_resilience6MySize, i32 0, i32 1) to %swift.type*)
+
+
+// FIXME: this is bogus
+
+// CHECK-LABEL: define private %swift.type* @create_generic_metadata_StructWithResilientStorage(%swift.type_pattern*, i8**)
+// CHECK: [[FIELDS:%.*]] = alloca [3 x i8**]
+// CHECK: [[RESULT:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata(%swift.type_pattern* %0, i8** %1)
+// CHECK: [[RESULT_ADDR:%.*]] = bitcast %swift.type* [[RESULT]] to i8**
+// CHECK: [[VWT:%.*]] = getelementptr inbounds i8*, i8** [[RESULT_ADDR]], i32 7
+// CHECK: [[VWT_ADDR:%.*]] = bitcast i8** [[VWT]] to i8*
+
+// CHECK: [[RESULT_ADDR2:%.*]] = bitcast %swift.type* %2 to [[INT]]*
+// CHECK: [[FIELD_OFFSETS_ADDR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[RESULT_ADDR:%.*]], i32 3
+// CHECK: [[FIELDS_ADDR:%.*]] = getelementptr inbounds [3 x i8**], [3 x i8**]* [[FIELDS]], i32 0, i32 0
+
+// CHECK: [[FIELD_1:%.*]] = getelementptr inbounds i8**, i8*** [[FIELDS_ADDR]], i32 0
+// CHECK: store i8** [[SIZE_AND_ALIGNMENT:%.*]], i8*** [[FIELD_1]]
+
+// CHECK: [[FIELD_2:%.*]] = getelementptr inbounds i8**, i8*** [[FIELDS_ADDR]], i32 1
+// CHECK: store i8** [[SIZE_AND_ALIGNMENT:%.*]], i8*** [[FIELD_2]]
+
+// CHECK: [[FIELD_3:%.*]] = getelementptr inbounds i8**, i8*** [[FIELDS_ADDR]], i32 2
+// CHECK: store i8** [[SIZE_AND_ALIGNMENT:getelementptr inbounds (.*)]], i8*** [[FIELD_3]]
+
+// CHECK: call void @swift_initStructMetadata_UniversalStrategy([[INT]] 3, i8*** [[FIELDS_ADDR]], [[INT]]* [[FIELD_OFFSETS_ADDR]], i8** [[VWT]])
+// CHECK: ret %swift.type* [[RESULT]]

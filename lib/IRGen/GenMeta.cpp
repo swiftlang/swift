@@ -196,6 +196,11 @@ static bool hasMetadataPattern(IRGenModule &IGM, NominalTypeDecl *theDecl) {
   if (theDecl->isGenericContext())
     return true;
 
+  // If we have fields of resilient type, the metadata still has to be
+  // initialized at runtime.
+  if (!IGM.getTypeInfoForUnlowered(theDecl->getDeclaredType()).isFixedSize())
+    return true;
+
   return false;
 }
 
@@ -304,6 +309,19 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
 
   // Okay, we need to call swift_getGenericMetadata.
   assert(metadata->getType() == IGF.IGM.TypeMetadataPatternPtrTy);
+
+  // If we have a pattern but no generic substitutions, we're just
+  // doing resilient type layout.
+  if (isPattern && !theDecl->isGenericContext()) {
+    llvm::Constant *getter = IGF.IGM.getGetResilientMetadataFn();
+
+    auto result = IGF.Builder.CreateCall(getter, {metadata});
+    result->setDoesNotThrow();
+    result->addAttribute(llvm::AttributeSet::FunctionIndex,
+                         llvm::Attribute::ReadNone);
+    IGF.setScopedLocalTypeData(theType, LocalTypeData::forMetatype(), result);
+    return result;
+  }
 
   // Grab the substitutions.
   auto boundGeneric = cast<BoundGenericType>(theType);
@@ -2682,9 +2700,10 @@ namespace {
       llvm::Value *args = params.claimNext();
 
       // Bind the generic arguments.
-      auto &generics = *super::Target->getGenericParamsOfContext();
+      auto generics = super::Target->getGenericParamsOfContext();
       Address argsArray(args, IGM.getPointerAlignment());
-      emitPolymorphicParametersFromArray(IGF, generics, argsArray);
+      if (generics)
+        emitPolymorphicParametersFromArray(IGF, *generics, argsArray);
 
       // Allocate the metadata.
       llvm::Value *metadataValue =
