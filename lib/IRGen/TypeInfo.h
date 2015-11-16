@@ -190,16 +190,6 @@ protected:
   }
 
 public:
-  /// Sets whether this type is POD.  Should only be called during
-  /// completion of a forward-declaration.
-  void setPOD(IsPOD_t isPOD) { POD = unsigned(isPOD); }
-
-  /// Sets whether this type is bitwise-takable.  Should only be called during
-  /// completion of a forward-declaration.
-  void setBitwiseTakable(IsBitwiseTakable_t takable) {
-    BitwiseTakable = unsigned(takable);
-  }
-  
   /// Whether this type info has been completely converted.
   bool isComplete() const { return !StorageAlignment.isZero(); }
 
