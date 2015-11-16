@@ -278,7 +278,8 @@ namespace {
       OS << ')';
     }
   };
-  
+ 
+  LLVM_ATTRIBUTE_USED
   inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
                                        const AvailabilitySet &AS) {
     AS.dump(OS);
