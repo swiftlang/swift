@@ -2188,8 +2188,6 @@ const {
 #define SWIFT_PROTOCOL_CONFORMANCES_SECTION ".swift2_protocol_conformances_start"
 #endif
 
-// FIXME: Implement this callback on non-apple platforms.
-
 // std:once_flag token to install the dyld callback to enqueue images for
 // protocol conformance lookup.
 static std::once_flag InstallProtocolConformanceAddImageCallbackOnce;
@@ -2385,23 +2383,25 @@ static int _addImageProtocolConformances(struct dl_phdr_info *info,
 #endif
 
 static void installCallbacksToInspectDylib() {
-  // TODO: Generic types, subclasses, foreign classes
-  std::call_once(InstallProtocolConformanceAddImageCallbackOnce, [](){
-#if defined(__APPLE__) && defined(__MACH__)
+  static OnceToken_t token;
+  auto callback = [](void*) {
+  #if defined(__APPLE__) && defined(__MACH__)
     // Install our dyld callback if we haven't already.
-    // Dyld will invoke this on our behalf for all images that have already been
-    // loaded.
+    // Dyld will invoke this on our behalf for all images that have already
+    // been loaded.
     _dyld_register_func_for_add_image(_addImageProtocolConformances);
-#elif defined(__ELF__)
+  #elif defined(__ELF__)
     // Search the loaded dls. Unlike the above, this only searches the already
     // loaded ones.
     // FIXME: Find a way to have this continue to happen after.
     // rdar://problem/19045112
     dl_iterate_phdr(_addImageProtocolConformances, nullptr);
-#else
-#error No known mechanism to inspect loaded dynamic libraries on this platform.
-#endif
-  });
+  #else
+  # error No known mechanism to inspect dynamic libraries on this platform.
+  #endif
+  };
+  
+  SWIFT_ONCE_F(token, callback, nullptr);
 }
 
 static size_t hashTypeProtocolPair(const void *type,

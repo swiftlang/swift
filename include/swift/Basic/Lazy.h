@@ -22,16 +22,22 @@
 
 namespace swift {
 
+#ifdef __APPLE__
+  using OnceToken_t = dispatch_once_t;
+# define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
+  dispatch_once_f(&TOKEN, CONTEXT, FUNC)
+#else
+  using OnceToken_t = std::once_flag;
+# define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
+  std::call_once(TOKEN, FUNC, CONTEXT)
+#endif
+  
 /// A template for lazily-constructed, zero-initialized, leaked-on-exit
 /// global objects.
 template <class T> class Lazy {
   typename std::aligned_storage<sizeof(T), alignof(T)>::type Value;
 
-#ifdef __APPLE__
-  dispatch_once_t OnceToken;
-#else
-  std::once_flag OnceToken;
-#endif
+  OnceToken_t OnceToken;
 
 public:
   T &get();
@@ -59,11 +65,7 @@ template <typename T> inline T &Lazy<T>::get() {
   static_assert(std::is_literal_type<Lazy<T>>::value,
                 "Lazy<T> must be a literal type");
 
-#ifdef __APPLE__
-  dispatch_once_f(&OnceToken, this, lazyInitCallback);
-#else
-  std::call_once(OnceToken, lazyInitCallback, this);
-#endif
+  SWIFT_ONCE_F(OnceToken, lazyInitCallback, this);
   return unsafeGetAlreadyInitialized();
 }
 
