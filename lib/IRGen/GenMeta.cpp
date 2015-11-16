@@ -395,21 +395,37 @@ bool irgen::hasKnownVTableEntry(IRGenModule &IGM,
   return hasKnownSwiftImplementation(IGM, theClass);
 }
 
+/// If we have a non-generic struct or enum whose size does not
+/// depend on any opaque resilient types, we can access metadata
+/// directly. Otherwise, call an accessor.
+///
+/// FIXME: Really, we want to use accessors for any nominal type
+/// defined in a different module, too.
+static bool isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
+  if (isa<StructType>(type) || isa<EnumType>(type))
+    if (IGM.getTypeInfoForLowered(type).isFixedSize())
+      return true;
+
+  return false;
+}
+
 /// Return the standard access strategy for getting a non-dependent
 /// type metadata object.
-MetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
+MetadataAccessStrategy
+irgen::getTypeMetadataAccessStrategy(IRGenModule &IGM, CanType type,
+                                     bool preferDirectAccess) {
   assert(!type->hasArchetype());
 
   // Non-generic structs, enums, and classes are special cases.
   auto nominal = dyn_cast<NominalType>(type);
-  if (nominal && !isa<ProtocolType>(nominal) &&
-      !nominal->getDecl()->isGenericContext()) {
+  if (nominal && !isa<ProtocolType>(nominal)) {
+    assert(!nominal->getDecl()->isGenericContext());
 
-    // Struct and enum metadata can be accessed directly.
-    if (!isa<ClassType>(nominal))
+    if (preferDirectAccess &&
+        isTypeMetadataAccessTrivial(IGM, type))
       return MetadataAccessStrategy::Direct;
 
-    // Classes require accessors.
+    // Everything else requires accessors.
     switch (getDeclLinkage(nominal->getDecl())) {
     case FormalLinkage::PublicUnique:
       return MetadataAccessStrategy::PublicUniqueAccessor;
@@ -996,24 +1012,19 @@ initialize_super:
 }
 
 /// Emit the body of a lazy cache accessor.
+///
+/// If cacheVariable is null, we perform the direct access every time.
+/// This is used for metadata accessors that come about due to resilience,
+/// where the direct access is completely trivial.
 void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
                                         llvm::Function *accessor,
                                         llvm::GlobalVariable *cacheVariable,
          const llvm::function_ref<llvm::Value*(IRGenFunction &IGF)> &getValue) {
-  llvm::Constant *null =
-    llvm::ConstantPointerNull::get(
-                        cast<llvm::PointerType>(cacheVariable->getValueType()));
-
   accessor->setDoesNotThrow();
 
   // This function is logically 'readnone': the caller does not need
   // to reason about any side effects or stores it might perform.
   accessor->setDoesNotAccessMemory();
-
-  // Set up the cache variable.
-  cacheVariable->setInitializer(null);
-  cacheVariable->setAlignment(IGM.getPointerAlignment().getValue());
-  Address cache(cacheVariable, IGM.getPointerAlignment());
 
   IRGenFunction IGF(IGM, accessor);
   if (IGM.DebugInfo)
@@ -1021,6 +1032,21 @@ void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
 
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(IGF, accessor);
+
+  // If there's no cache variable, just perform the direct access.
+  if (cacheVariable == nullptr) {
+    IGF.Builder.CreateRet(getValue(IGF));
+    return;
+  }
+
+  // Set up the cache variable.
+  llvm::Constant *null =
+    llvm::ConstantPointerNull::get(
+                        cast<llvm::PointerType>(cacheVariable->getValueType()));
+
+  cacheVariable->setInitializer(null);
+  cacheVariable->setAlignment(IGM.getPointerAlignment().getValue());
+  Address cache(cacheVariable, IGM.getPointerAlignment());
 
   // Okay, first thing, check the cache variable.
   //
@@ -1086,8 +1112,15 @@ static llvm::Function *getTypeMetadataAccessFunction(IRGenModule &IGM,
     return accessor;
 
   // Okay, define the accessor.
-  auto cacheVariable = cast<llvm::GlobalVariable>(
-             IGM.getAddrOfTypeMetadataLazyCacheVariable(type, ForDefinition));
+  llvm::GlobalVariable *cacheVariable = nullptr;
+
+  // If our preferred access method is to go via an accessor, it means
+  // there is some non-trivial computation that needs to be cached.
+  if (!isTypeMetadataAccessTrivial(IGM, type)) {
+    cacheVariable = cast<llvm::GlobalVariable>(
+        IGM.getAddrOfTypeMetadataLazyCacheVariable(type, ForDefinition));
+  }
+
   emitLazyCacheAccessFunction(IGM, accessor, cacheVariable,
                               [&](IRGenFunction &IGF) -> llvm::Value* {
     emitDirectTypeMetadataInitialization(IGF, type);
@@ -1095,6 +1128,22 @@ static llvm::Function *getTypeMetadataAccessFunction(IRGenModule &IGM,
   });
 
   return accessor;
+}
+
+/// Force a public metadata access function into existence if necessary
+/// for the given type.
+static void maybeEmitTypeMetadataAccessFunction(IRGenModule &IGM,
+                                                NominalTypeDecl *theDecl) {
+  CanType declaredType = theDecl->getDeclaredType()->getCanonicalType();
+
+  // FIXME: Also do this for generic structs.
+  // FIXME: Internal types with availability from another module can be
+  // referenced from @_transparent functions.
+  if (!theDecl->isGenericContext() &&
+      (isa<ClassDecl>(theDecl) ||
+       theDecl->getFormalAccess() == Accessibility::Public ||
+       !IGM.getTypeInfoForLowered(declaredType).isFixedSize()))
+    (void) getTypeMetadataAccessFunction(IGM, declaredType, ForDefinition);
 }
 
 /// Emit a call to the type metadata accessor for the given function.
@@ -1121,7 +1170,8 @@ static llvm::Value *emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF,
 /// Produce the type metadata pointer for the given type.
 llvm::Value *IRGenFunction::emitTypeMetadataRef(CanType type) {
   if (!type->hasArchetype()) {
-    switch (getTypeMetadataAccessStrategy(type)) {
+    switch (getTypeMetadataAccessStrategy(IGM, type,
+                                          /*preferDirectAccess=*/true)) {
     case MetadataAccessStrategy::Direct:
       return emitDirectTypeMetadataRef(*this, type);
     case MetadataAccessStrategy::PublicUniqueAccessor:
@@ -3548,8 +3598,6 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
                               const StructLayout &layout) {
   assert(!classDecl->isForeign());
 
-  CanType declaredType = classDecl->getDeclaredType()->getCanonicalType();
-
   // TODO: classes nested within generic types
   llvm::Constant *init;
   bool isPattern;
@@ -3566,10 +3614,11 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
     init = builder.getInit();
     isPattern = false;
     hasRuntimeBase = builder.hasRuntimeBase();
-
-    // Force the type metadata access function into existence.
-    (void) getTypeMetadataAccessFunction(IGM, declaredType, ForDefinition);
   }
+
+  maybeEmitTypeMetadataAccessFunction(IGM, classDecl);
+
+  CanType declaredType = classDecl->getDeclaredType()->getCanonicalType();
 
   // For now, all type metadata is directly stored.
   bool isIndirect = false;
@@ -4410,10 +4459,13 @@ void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
     isPattern = false;
   }
 
+  maybeEmitTypeMetadataAccessFunction(IGM, structDecl);
+
+  CanType declaredType = structDecl->getDeclaredType()->getCanonicalType();
+
   // For now, all type metadata is directly stored.
   bool isIndirect = false;
 
-  CanType declaredType = structDecl->getDeclaredType()->getCanonicalType();
   IGM.defineTypeMetadata(declaredType, isIndirect, isPattern,
                          /*isConstant*/!isPattern, init);
 }
@@ -4541,11 +4593,14 @@ void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
     init = builder.getInit();
     isPattern = false;
   }
-  
+
+  maybeEmitTypeMetadataAccessFunction(IGM, theEnum);
+
+  CanType declaredType = theEnum->getDeclaredType()->getCanonicalType();
+
   // For now, all type metadata is directly stored.
   bool isIndirect = false;
   
-  CanType declaredType = theEnum->getDeclaredType()->getCanonicalType();
   IGM.defineTypeMetadata(declaredType, isIndirect, isPattern,
                          /*isConstant*/!isPattern, init);
 }

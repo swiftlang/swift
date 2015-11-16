@@ -273,7 +273,9 @@ namespace irgen {
   };
 
   /// Determine how the given type metadata should be accessed.
-  MetadataAccessStrategy getTypeMetadataAccessStrategy(CanType type);
+  MetadataAccessStrategy getTypeMetadataAccessStrategy(IRGenModule &IGM,
+                                                       CanType type,
+                                                       bool preferDirectAccess);
   
   /// Get the runtime identifier for a special protocol, if any.
   SpecialProtocol getSpecialProtocolID(ProtocolDecl *P);

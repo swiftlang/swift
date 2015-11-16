@@ -52,6 +52,7 @@ enum class StructTypeInfoKind {
 };
 
 static StructTypeInfoKind getStructTypeInfoKind(const TypeInfo &type) {
+  // FIXME: check that this is not a resilient struct type
   return (StructTypeInfoKind) type.getSubclassKind();
 }
 

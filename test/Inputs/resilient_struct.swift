@@ -26,13 +26,54 @@ public struct Size {
   public mutating func mutantMethod() {}
 }
 
-// Fixed-layout struct with resilient-layout members
+// Fixed-layout struct with resilient members
 @_fixed_layout public struct Rectangle {
   public let p: Point
   public let s: Size
+  public let color: Int
 
-  public init(p: Point, s: Size) {
+  public init(p: Point, s: Size, color: Int) {
     self.p = p
     self.s = s
+    self.color = color
+  }
+}
+
+// More complicated resilient structs for runtime tests
+public struct ResilientBool {
+  public let b: Bool
+
+  public init(b: Bool) {
+    self.b = b
+  }
+}
+
+public struct ResilientInt {
+  public let i: Int
+
+  public init(i: Int) {
+    self.i = i
+  }
+}
+
+public struct ResilientDouble {
+  public let d: Double
+
+  public init(d: Double) {
+    self.d = d
+  }
+}
+
+@_fixed_layout public struct ResilientLayoutRuntimeTest {
+  public let b1: ResilientBool
+  public let i: ResilientInt
+  public let b2: ResilientBool
+  public let d: ResilientDouble
+
+  public init(b1: ResilientBool, i: ResilientInt, b2: ResilientBool, d: ResilientDouble) {
+    self.b1 = b1
+    self.i = i
+    self.b2 = b2
+    self.d = d
   }
 }
