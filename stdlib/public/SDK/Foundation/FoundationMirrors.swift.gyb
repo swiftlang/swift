@@ -62,7 +62,7 @@ ${getMirrorDecl("NSRange")} {
   var summary: String { return "(\(_value.location),\(_value.length))" }
   
   var quickLookObject: PlaygroundQuickLook? {
-    return .Some(.Range(UInt64(_value.location),UInt64(_value.length)))
+    return .Some(.Range(Int64(_value.location),Int64(_value.length)))
   }
 }
 

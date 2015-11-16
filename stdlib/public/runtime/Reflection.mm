@@ -130,7 +130,7 @@ struct PlaygroundQuickLook {
     double x, y;
   };
   struct Interval {
-    uint64_t loc,len;
+    int64_t loc,len;
   };
   
   union {

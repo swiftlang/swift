@@ -642,7 +642,7 @@ public enum PlaygroundQuickLook {
   /// A range.
   ///
   /// Uses explicit values to avoid coupling a particular Cocoa type.
-  case Range(UInt64, UInt64)
+  case Range(Int64, Int64)
 
   /// A GUI view.
   ///

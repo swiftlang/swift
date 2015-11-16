@@ -2243,6 +2243,18 @@ Reflection.test("NSObject is properly CustomDebugStringConvertible") {
   expectEqual(String(reflecting: object), object.debugDescription)
 }
 
+Reflection.test("NSRange QuickLook") {
+  let rng = NSRange(location:-9223372036854775808, length:5)
+  let ql = PlaygroundQuickLook(reflecting: rng)
+  switch ql {
+    case .Range(let loc, let len):
+    expectEqual(loc, -9223372036854775808)
+    expectEqual(len, 5)
+    default:
+    expectFalse(true, "PlaygroundQuickLook for NSRange did not match Range")
+  }
+}
+
 var BitTwiddlingTestSuite = TestSuite("BitTwiddling")
 
 func computeCountLeadingZeroes(x: Int64) -> Int64 {
