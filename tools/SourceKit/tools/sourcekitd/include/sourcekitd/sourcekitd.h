@@ -77,6 +77,7 @@
 # define SOURCEKITD_NONNULL2 __attribute__((__nonnull__(2)))
 # define SOURCEKITD_NONNULL3 __attribute__((__nonnull__(3)))
 # define SOURCEKITD_NONNULL_ALL __attribute__((__nonnull__))
+# define SOURCEKITD_DEPRECATED(m) __attribute__((deprecated(m)))
 #else
 # define SOURCEKITD_WARN_RESULT
 # define SOURCEKITD_NONNULL1
@@ -719,8 +720,16 @@ sourcekitd_set_notification_handler(sourcekitd_response_receiver_t receiver);
 
 typedef sourcekitd_uid_t(^sourcekitd_uid_handler_t)(const char* uidStr);
 
-SOURCEKITD_PUBLIC
+SOURCEKITD_PUBLIC SOURCEKITD_DEPRECATED("use sourcekitd_set_uid_handlers")
 void sourcekitd_set_uid_handler(sourcekitd_uid_handler_t handler);
+
+typedef sourcekitd_uid_t(^sourcekitd_uid_from_str_handler_t)(const char* uidStr);
+typedef const char *(^sourcekitd_str_from_uid_handler_t)(sourcekitd_uid_t uid);
+
+SOURCEKITD_PUBLIC
+void
+sourcekitd_set_uid_handlers(sourcekitd_uid_from_str_handler_t uid_from_str,
+                            sourcekitd_str_from_uid_handler_t str_from_uid);
 
 #endif
 

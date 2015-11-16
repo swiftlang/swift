@@ -15,6 +15,7 @@
 #include "SourceKit/Support/Concurrency.h"
 #include "SourceKit/Support/UIdent.h"
 
+#include "llvm/Support/Mutex.h"
 #include "llvm/Support/Path.h"
 
 // FIXME: Portability ?
@@ -29,16 +30,30 @@
 
 using namespace SourceKit;
 
-typedef sourcekitd_uid_t (^sourcekitd_uid_handler_t)(const char* uidStr);
+static llvm::sys::Mutex GlobalHandlersMtx;
 static sourcekitd_uid_handler_t UidMappingHandler;
+static sourcekitd_str_from_uid_handler_t StrFromUidMappingHandler;
 
 void
 sourcekitd_set_uid_handler(sourcekitd_uid_handler_t handler) {
+  llvm::sys::ScopedLock L(GlobalHandlersMtx);
   sourcekitd_uid_handler_t newHandler = Block_copy(handler);
-  dispatch_async(dispatch_get_main_queue(), ^{
-    Block_release(UidMappingHandler);
-    UidMappingHandler = newHandler;
-  });
+  Block_release(UidMappingHandler);
+  UidMappingHandler = newHandler;
+}
+
+void
+sourcekitd_set_uid_handlers(sourcekitd_uid_from_str_handler_t uid_from_str,
+                            sourcekitd_str_from_uid_handler_t str_from_uid) {
+  llvm::sys::ScopedLock L(GlobalHandlersMtx);
+
+  sourcekitd_uid_handler_t newUIDFromStrHandler = Block_copy(uid_from_str);
+  Block_release(UidMappingHandler);
+  UidMappingHandler = newUIDFromStrHandler;
+
+  sourcekitd_str_from_uid_handler_t newStrFromUIDHandler = Block_copy(str_from_uid);
+  Block_release(StrFromUidMappingHandler);
+  StrFromUidMappingHandler = newStrFromUIDHandler;
 }
 
 sourcekitd_uid_t sourcekitd::SKDUIDFromUIdent(UIdent UID) {
@@ -57,6 +72,9 @@ sourcekitd_uid_t sourcekitd::SKDUIDFromUIdent(UIdent UID) {
 }
 
 UIdent sourcekitd::UIdentFromSKDUID(sourcekitd_uid_t uid) {
+  if (StrFromUidMappingHandler)
+    return UIdent(StrFromUidMappingHandler(uid));
+
   return UIdent::getFromOpaqueValue(uid);
 }
 

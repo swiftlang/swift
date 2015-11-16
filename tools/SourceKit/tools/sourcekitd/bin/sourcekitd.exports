@@ -33,6 +33,7 @@ sourcekitd_send_request_sync
 sourcekitd_set_interrupted_connection_handler
 sourcekitd_set_notification_handler
 sourcekitd_set_uid_handler
+sourcekitd_set_uid_handlers
 sourcekitd_shutdown
 sourcekitd_uid_get_from_buf
 sourcekitd_uid_get_from_cstr
