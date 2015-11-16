@@ -304,10 +304,7 @@ public:
       : SM(SM), Loc(Loc), Kind(Kind) {}
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-    if (SM.rangeContainsTokenLoc(S->getSourceRange(), Loc))
-      return { true, S };
-    else
-      return { false, S };
+    return { SM.rangeContainsTokenLoc(S->getSourceRange(), Loc), S };
   }
 
   Stmt *walkToStmtPost(Stmt *S) override {
