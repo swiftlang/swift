@@ -678,6 +678,10 @@ bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
     return false;
   }
 
+  if (Options.SkipImports && isa<ImportDecl>(D)) {
+    return false;
+  }
+
   if (Options.SkipImplicit && D->isImplicit())
     return false;
 

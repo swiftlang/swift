@@ -116,7 +116,7 @@ if target == '':
 sdkroot = subprocess.check_output(['xcrun', '--show-sdk-path', '--sdk', sdk]).rstrip()
 print('SDK Root = %s' % (sdkroot))
 
-swift_ide_test_cmd = [swift_ide_test, '-print-module', '-source-filename', source_filename, '-sdk', sdkroot, '-target', target, '-module-print-skip-overlay', '-skip-unavailable', '-module-print-submodules', '-skip-parameter-names', '-module-to-print=%s' % (module)]
+swift_ide_test_cmd = [swift_ide_test, '-print-module', '-source-filename', source_filename, '-sdk', sdkroot, '-target', target, '-module-print-skip-overlay', '-skip-unavailable', '-module-print-submodules', '-skip-parameter-names', '-skip-imports', '-module-to-print=%s' % (module)]
 omit_needless_words_args = ['-enable-omit-needless-words', '-enable-infer-default-arguments']
 
 # Determine the output files.
