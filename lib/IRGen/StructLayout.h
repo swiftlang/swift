@@ -223,6 +223,7 @@ private:
   bool IsFixedLayout = true;
   IsPOD_t IsKnownPOD = IsPOD;
   IsBitwiseTakable_t IsKnownBitwiseTakable = IsBitwiseTakable;
+  IsFixedSize_t IsKnownAlwaysFixedSize = IsFixedSize;
 public:
   StructLayoutBuilder(IRGenModule &IGM) : IGM(IGM) {}
 
@@ -249,12 +250,18 @@ public:
 
   /// Return whether the structure is known to be POD in the local
   /// resilience scope.
-  IsPOD_t isKnownPOD() const { return IsKnownPOD; }
+  IsPOD_t isPOD() const { return IsKnownPOD; }
 
   /// Return whether the structure is known to be bitwise-takable in the local
   /// resilience scope.
-  IsBitwiseTakable_t isKnownBitwiseTakable() const {
+  IsBitwiseTakable_t isBitwiseTakable() const {
     return IsKnownBitwiseTakable;
+  }
+
+  /// Return whether the structure is known to be fixed-size in all
+  /// resilience scopes.
+  IsFixedSize_t isAlwaysFixedSize() const {
+    return IsKnownAlwaysFixedSize;
   }
 
   /// Return the size of the structure built so far.
@@ -307,10 +314,9 @@ class StructLayout {
   /// alignment are exact.
   bool IsFixedLayout;
 
-  /// Whether the elements in this layout are all POD.
   IsPOD_t IsKnownPOD;
-  /// Whether the elements in this layout are all bitwise-takable.
   IsBitwiseTakable_t IsKnownBitwiseTakable;
+  IsFixedSize_t IsKnownAlwaysFixedSize = IsFixedSize;
   
   CanType ASTTy;
   llvm::Type *Ty;
@@ -339,8 +345,9 @@ public:
       MinimumSize(builder.getSize()),
       SpareBits(builder.getSpareBits()),
       IsFixedLayout(builder.isFixedLayout()),
-      IsKnownPOD(builder.isKnownPOD()),
-      IsKnownBitwiseTakable(builder.isKnownBitwiseTakable()),
+      IsKnownPOD(builder.isPOD()),
+      IsKnownBitwiseTakable(builder.isBitwiseTakable()),
+      IsKnownAlwaysFixedSize(builder.isAlwaysFixedSize()),
       ASTTy(astTy),
       Ty(type),
       Elements(elements.begin(), elements.end()) {}
@@ -356,9 +363,12 @@ public:
   const SpareBitVector &getSpareBits() const { return SpareBits; }
   SpareBitVector &getSpareBits() { return SpareBits; }
   bool isKnownEmpty() const { return isFixedLayout() && MinimumSize.isZero(); }
-  IsPOD_t isKnownPOD() const { return IsKnownPOD; }
-  IsBitwiseTakable_t isKnownBitwiseTakable() const {
+  IsPOD_t isPOD() const { return IsKnownPOD; }
+  IsBitwiseTakable_t isBitwiseTakable() const {
     return IsKnownBitwiseTakable;
+  }
+  IsFixedSize_t isAlwaysFixedSize() const {
+    return IsKnownAlwaysFixedSize;
   }
 
   bool isFixedLayout() const { return IsFixedLayout; }

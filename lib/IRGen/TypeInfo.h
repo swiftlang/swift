@@ -131,10 +131,14 @@ protected:
 
   TypeInfo(llvm::Type *Type, Alignment A, IsPOD_t pod,
            IsBitwiseTakable_t bitwiseTakable,
+           IsFixedSize_t alwaysFixedSize,
            SpecialTypeInfoKind stik)
     : NextConverted(0), StorageType(Type), StorageAlignment(A),
-      POD(pod), BitwiseTakable(bitwiseTakable), STIK(stik),
-      SubclassKind(InvalidSubclassKind) {}
+      POD(pod), BitwiseTakable(bitwiseTakable),
+      AlwaysFixedSize(alwaysFixedSize), STIK(stik),
+      SubclassKind(InvalidSubclassKind) {
+    assert(STIK >= STIK_Fixed || !AlwaysFixedSize);
+  }
 
   /// Change the minimum alignment of a stored value of this type.
   void setStorageAlignment(Alignment alignment) {
@@ -164,6 +168,10 @@ private:
   
   /// Whether this type is known to be bitwise-takable.
   unsigned BitwiseTakable : 1;
+
+  /// Whether this type can be assumed to have a fixed size from all
+  /// resilience domains.
+  unsigned AlwaysFixedSize : 1;
 
   /// The kind of supplemental API this type has, if any.
   unsigned STIK : 3;
@@ -233,6 +241,21 @@ public:
   /// FixedTypeInfo.
   IsFixedSize_t isFixedSize() const {
     return IsFixedSize_t(STIK >= STIK_Fixed);
+  }
+
+  /// Whether this type is known to be fixed-size in the given
+  /// resilience domain.  If true, spare bits can be used.
+  IsFixedSize_t isFixedSize(ResilienceScope scope) const {
+    switch (scope) {
+    case ResilienceScope::Component:
+      return isFixedSize();
+    case ResilienceScope::Universal:
+      // We can't be universally fixed size if we're not locally
+      // fixed size.
+      assert((isFixedSize() || AlwaysFixedSize == IsNotFixedSize) &&
+             "IsFixedSize vs IsAlwaysFixedSize mismatch");
+      return IsFixedSize_t(AlwaysFixedSize);
+    }
   }
 
   /// Whether this type is known to be loadable in the local

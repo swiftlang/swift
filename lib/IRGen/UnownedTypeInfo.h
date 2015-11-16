@@ -29,12 +29,13 @@ class UnownedTypeInfo : public LoadableTypeInfo {
 protected:
   UnownedTypeInfo(llvm::Type *type, Size size,
                   const SpareBitVector &spareBits, Alignment align)
-    : LoadableTypeInfo(type, size, spareBits, align, IsNotPOD, STIK_Unowned) {}
+    : LoadableTypeInfo(type, size, spareBits, align,
+                       IsNotPOD, IsFixedSize, STIK_Unowned) {}
 
   UnownedTypeInfo(llvm::Type *type, Size size,
                   SpareBitVector &&spareBits, Alignment align)
     : LoadableTypeInfo(type, size, std::move(spareBits), align,
-                       IsNotPOD, STIK_Unowned) {}
+                       IsNotPOD, IsFixedSize, STIK_Unowned) {}
 
 public:
   // No API yet.

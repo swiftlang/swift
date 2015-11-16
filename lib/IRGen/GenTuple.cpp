@@ -187,9 +187,11 @@ namespace {
                           unsigned explosionSize,
                           llvm::Type *ty,
                           Size size, SpareBitVector &&spareBits,
-                          Alignment align, IsPOD_t isPOD)
+                          Alignment align, IsPOD_t isPOD,
+                          IsFixedSize_t alwaysFixedSize)
       : TupleTypeInfoBase(fields, explosionSize,
-                          ty, size, std::move(spareBits), align, isPOD)
+                          ty, size, std::move(spareBits), align, isPOD,
+                          alwaysFixedSize)
       {}
 
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
@@ -210,9 +212,10 @@ namespace {
     // FIXME: Spare bits between tuple elements.
     FixedTupleTypeInfo(ArrayRef<TupleFieldInfo> fields, llvm::Type *ty,
                        Size size, SpareBitVector &&spareBits, Alignment align,
-                       IsPOD_t isPOD, IsBitwiseTakable_t isBT)
+                       IsPOD_t isPOD, IsBitwiseTakable_t isBT,
+                       IsFixedSize_t alwaysFixedSize)
       : TupleTypeInfoBase(fields, ty, size, std::move(spareBits), align,
-                          isPOD, isBT)
+                          isPOD, isBT, alwaysFixedSize)
     {}
 
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
@@ -294,8 +297,9 @@ namespace {
                                         layout.getSize(),
                                         std::move(layout.getSpareBits()),
                                         layout.getAlignment(),
-                                        layout.isKnownPOD(),
-                                        layout.isKnownBitwiseTakable());
+                                        layout.isPOD(),
+                                        layout.isBitwiseTakable(),
+                                        layout.isAlwaysFixedSize());
     }
 
     LoadableTupleTypeInfo *createLoadable(ArrayRef<TupleFieldInfo> fields,
@@ -305,15 +309,16 @@ namespace {
                                            layout.getType(), layout.getSize(),
                                            std::move(layout.getSpareBits()),
                                            layout.getAlignment(),
-                                           layout.isKnownPOD());
+                                           layout.isPOD(),
+                                           layout.isAlwaysFixedSize());
     }
 
     NonFixedTupleTypeInfo *createNonFixed(ArrayRef<TupleFieldInfo> fields,
                                           StructLayout &&layout) {
       return NonFixedTupleTypeInfo::create(fields, layout.getType(),
                                            layout.getAlignment(),
-                                           layout.isKnownPOD(),
-                                           layout.isKnownBitwiseTakable());
+                                           layout.isPOD(),
+                                           layout.isBitwiseTakable());
     }
 
     TupleFieldInfo getFieldInfo(unsigned index,

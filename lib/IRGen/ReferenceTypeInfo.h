@@ -34,7 +34,8 @@ protected:
   // FIXME: Get spare bits for pointers from a TargetInfo-like structure.
   ReferenceTypeInfo(llvm::Type *type, Size size, SpareBitVector spareBits,
                     Alignment align)
-    : LoadableTypeInfo(type, size, spareBits, align, IsNotPOD, STIK_Reference)
+    : LoadableTypeInfo(type, size, spareBits, align, IsNotPOD,
+                       IsFixedSize, STIK_Reference)
   {}
 
 public:

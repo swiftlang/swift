@@ -206,7 +206,8 @@ protected:
   PODSingleScalarTypeInfo(StorageType *storage, Size size,
                           SpareBitVector spareBits,
                           Alignment align, T &&...args)
-    : SingleScalarTypeInfo<Derived, Base>(storage, size, spareBits, align, IsPOD,
+    : SingleScalarTypeInfo<Derived, Base>(storage, size, spareBits, align,
+                                          IsPOD, IsFixedSize,
                                           ::std::forward<T>(args)...) {}
 
 private:

@@ -30,12 +30,12 @@ protected:
   WeakTypeInfo(llvm::Type *type, Size size, Alignment align,
                const SpareBitVector &spareBits)
     : FixedTypeInfo(type, size, spareBits, align, IsNotPOD,
-                    IsNotBitwiseTakable, STIK_Weak) {}
+                    IsNotBitwiseTakable, IsFixedSize, STIK_Weak) {}
 
   WeakTypeInfo(llvm::Type *type, Size size, Alignment align,
                SpareBitVector &&spareBits)
     : FixedTypeInfo(type, size, std::move(spareBits), align, IsNotPOD,
-                    IsNotBitwiseTakable, STIK_Weak) {}
+                    IsNotBitwiseTakable, IsFixedSize, STIK_Weak) {}
 
 public:
   virtual void weakLoadStrong(IRGenFunction &IGF, Address addr,

@@ -635,7 +635,8 @@ namespace {
     BlockStorageTypeInfo(llvm::Type *type, Size size, Alignment align,
                          SpareBitVector &&spareBits,
                          IsPOD_t pod, IsBitwiseTakable_t bt, Size captureOffset)
-      : IndirectTypeInfo(type, size, std::move(spareBits), align, pod, bt),
+      : IndirectTypeInfo(type, size, std::move(spareBits), align, pod, bt,
+                         IsFixedSize),
         CaptureOffset(captureOffset)
     {}
     

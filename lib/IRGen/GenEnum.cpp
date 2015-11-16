@@ -125,10 +125,13 @@ namespace {
 
   public:
     SingletonEnumImplStrategy(IRGenModule &IGM,
-                              TypeInfoKind tik, unsigned NumElements,
+                              TypeInfoKind tik,
+                              IsFixedSize_t alwaysFixedSize,
+                              unsigned NumElements,
                               std::vector<Element> &&WithPayload,
                               std::vector<Element> &&WithNoPayload)
-      : EnumImplStrategy(IGM, tik, NumElements,
+      : EnumImplStrategy(IGM, tik, alwaysFixedSize,
+                         NumElements,
                          std::move(WithPayload),
                          std::move(WithNoPayload))
     {
@@ -534,10 +537,13 @@ namespace {
 
   public:
     NoPayloadEnumImplStrategyBase(IRGenModule &IGM,
-                                  TypeInfoKind tik, unsigned NumElements,
-                           std::vector<Element> &&WithPayload,
-                           std::vector<Element> &&WithNoPayload)
-      : SingleScalarTypeInfo(IGM, tik, NumElements,
+                                  TypeInfoKind tik,
+                                  IsFixedSize_t alwaysFixedSize,
+                                  unsigned NumElements,
+                                  std::vector<Element> &&WithPayload,
+                                  std::vector<Element> &&WithNoPayload)
+      : SingleScalarTypeInfo(IGM, tik, alwaysFixedSize,
+                             NumElements,
                              std::move(WithPayload),
                              std::move(WithNoPayload))
     {
@@ -719,10 +725,13 @@ namespace {
   {
   public:
     NoPayloadEnumImplStrategy(IRGenModule &IGM,
-                              TypeInfoKind tik, unsigned NumElements,
+                              TypeInfoKind tik,
+                              IsFixedSize_t alwaysFixedSize,
+                              unsigned NumElements,
                               std::vector<Element> &&WithPayload,
                               std::vector<Element> &&WithNoPayload)
-      : NoPayloadEnumImplStrategyBase(IGM, tik, NumElements,
+      : NoPayloadEnumImplStrategyBase(IGM, tik, alwaysFixedSize,
+                                      NumElements,
                                       std::move(WithPayload),
                                       std::move(WithNoPayload))
     {
@@ -844,10 +853,13 @@ namespace {
 
   public:
     CCompatibleEnumImplStrategy(IRGenModule &IGM,
-                                TypeInfoKind tik, unsigned NumElements,
+                                TypeInfoKind tik,
+                                IsFixedSize_t alwaysFixedSize,
+                                unsigned NumElements,
                                 std::vector<Element> &&WithPayload,
                                 std::vector<Element> &&WithNoPayload)
-      : NoPayloadEnumImplStrategyBase(IGM, tik, NumElements,
+      : NoPayloadEnumImplStrategyBase(IGM, tik, alwaysFixedSize,
+                                      NumElements,
                                       std::move(WithPayload),
                                       std::move(WithNoPayload))
     {
@@ -948,15 +960,17 @@ namespace {
   public:
     PayloadEnumImplStrategyBase(IRGenModule &IGM,
                                 TypeInfoKind tik,
+                                IsFixedSize_t alwaysFixedSize,
                                 unsigned NumElements,
                                 std::vector<Element> &&WithPayload,
                                 std::vector<Element> &&WithNoPayload,
                                 EnumPayloadSchema schema)
-      : EnumImplStrategy(IGM, tik, NumElements,
+      : EnumImplStrategy(IGM, tik, alwaysFixedSize,
+                         NumElements,
                          std::move(WithPayload),
                          std::move(WithNoPayload)),
-        PayloadSchema(schema),
-        PayloadElementCount(0)
+                         PayloadSchema(schema),
+                         PayloadElementCount(0)
     {
       assert(ElementsWithPayload.size() >= 1);
       if (PayloadSchema) {
@@ -1203,15 +1217,18 @@ namespace {
 
   public:
     SinglePayloadEnumImplStrategy(IRGenModule &IGM,
-                                  TypeInfoKind tik, unsigned NumElements,
+                                  TypeInfoKind tik,
+                                  IsFixedSize_t alwaysFixedSize,
+                                  unsigned NumElements,
                                   std::vector<Element> &&WithPayload,
                                   std::vector<Element> &&WithNoPayload)
-      : PayloadEnumImplStrategyBase(IGM, tik, NumElements,
-                                std::move(WithPayload),
-                                std::move(WithNoPayload),
+      : PayloadEnumImplStrategyBase(IGM, tik, alwaysFixedSize,
+                                    NumElements,
+                                    std::move(WithPayload),
+                                    std::move(WithNoPayload),
                                 getPreferredPayloadSchema(WithPayload.front())),
-        CopyDestroyKind(Normal),
-        Refcounting(ReferenceCounting::Native)
+                                    CopyDestroyKind(Normal),
+                                    Refcounting(ReferenceCounting::Native)
     {
       assert(ElementsWithPayload.size() == 1);
 
@@ -2538,8 +2555,6 @@ namespace {
     CopyDestroyStrategy CopyDestroyKind;
     ReferenceCounting Refcounting;
 
-    bool ConstrainedByRuntimeLayout : 1;
-
     static EnumPayloadSchema getPayloadSchema(ArrayRef<Element> payloads) {
       // TODO: We might be able to form a nicer schema if the payload elements
       // share a schema. For now just use a generic schema.
@@ -2556,16 +2571,17 @@ namespace {
 
   public:
     MultiPayloadEnumImplStrategy(IRGenModule &IGM,
-                                 TypeInfoKind tik, unsigned NumElements,
+                                 TypeInfoKind tik,
+                                 IsFixedSize_t alwaysFixedSize,
+                                 unsigned NumElements,
                                  std::vector<Element> &&WithPayload,
-                                 std::vector<Element> &&WithNoPayload,
-                                 bool constrainedByRuntimeLayout)
-      : PayloadEnumImplStrategyBase(IGM, tik, NumElements,
+                                 std::vector<Element> &&WithNoPayload)
+      : PayloadEnumImplStrategyBase(IGM, tik, alwaysFixedSize,
+                                    NumElements,
                                     std::move(WithPayload),
                                     std::move(WithNoPayload),
                                     getPayloadSchema(WithPayload)),
-        CopyDestroyKind(Normal),
-        ConstrainedByRuntimeLayout(constrainedByRuntimeLayout)
+                                    CopyDestroyKind(Normal)
     {
       assert(ElementsWithPayload.size() > 1);
 
@@ -4027,10 +4043,9 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
 {
   unsigned numElements = 0;
   TypeInfoKind tik = Loadable;
+  IsFixedSize_t alwaysFixedSize = IsFixedSize;
   std::vector<Element> elementsWithPayload;
   std::vector<Element> elementsWithNoPayload;
-
-  bool constrainedByRuntimeLayout = false;
 
   for (auto elt : theEnum->getAllElements()) {
     numElements++;
@@ -4060,10 +4075,11 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
       = TC.tryGetCompleteTypeInfo(origArgLoweredTy.getSwiftRValueType());
     assert(origArgTI && "didn't complete type info?!");
 
-    // If the unsubstituted argument is dependent, then we need to constrain
-    // our layout optimizations to what the runtime can reproduce.
-    if (!isa<FixedTypeInfo>(origArgTI))
-      constrainedByRuntimeLayout = true;
+    // If the unsubstituted argument contains a generic parameter type, or if
+    // the substituted argument is not universally fixed-size, we need to
+    // constrain our layout optimizations to what the runtime can reproduce.
+    if (!origArgTI->isFixedSize(ResilienceScope::Universal))
+      alwaysFixedSize = IsNotFixedSize;
 
     auto loadableOrigArgTI = dyn_cast<LoadableTypeInfo>(origArgTI);
     if (loadableOrigArgTI && loadableOrigArgTI->isKnownEmpty()) {
@@ -4080,6 +4096,12 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
         tik = Opaque;
       else if (!substArgTI->isLoadable() && tik > Fixed)
         tik = Fixed;
+
+      // If the substituted argument contains a type that is not universally
+      // fixed-size, we need to constrain our layout optimizations to what
+      // the runtime can reproduce.
+      if (!substArgTI->isFixedSize(ResilienceScope::Universal))
+        alwaysFixedSize = IsNotFixedSize;
     }
   }
 
@@ -4091,28 +4113,33 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
   // Enums imported from Clang or marked with @objc use C-compatible layout.
   if (theEnum->hasClangNode() || theEnum->isObjC()) {
     assert(elementsWithPayload.size() == 0 && "C enum with payload?!");
-    return new CCompatibleEnumImplStrategy(TC.IGM, tik, numElements,
-                                       std::move(elementsWithPayload),
-                                       std::move(elementsWithNoPayload));
+    assert(alwaysFixedSize == IsFixedSize && "C enum with resilient payload?!");
+    return new CCompatibleEnumImplStrategy(TC.IGM, tik, alwaysFixedSize,
+                                           numElements,
+                                           std::move(elementsWithPayload),
+                                           std::move(elementsWithNoPayload));
   }
 
   if (numElements <= 1)
-    return new SingletonEnumImplStrategy(TC.IGM, tik, numElements,
-                                    std::move(elementsWithPayload),
-                                    std::move(elementsWithNoPayload));
+    return new SingletonEnumImplStrategy(TC.IGM, tik, alwaysFixedSize,
+                                         numElements,
+                                         std::move(elementsWithPayload),
+                                         std::move(elementsWithNoPayload));
   if (elementsWithPayload.size() > 1)
-    return new MultiPayloadEnumImplStrategy(TC.IGM, tik, numElements,
-                                    std::move(elementsWithPayload),
-                                    std::move(elementsWithNoPayload),
-                                    constrainedByRuntimeLayout);
+    return new MultiPayloadEnumImplStrategy(TC.IGM, tik, alwaysFixedSize,
+                                            numElements,
+                                            std::move(elementsWithPayload),
+                                            std::move(elementsWithNoPayload));
   if (elementsWithPayload.size() == 1)
-    return new SinglePayloadEnumImplStrategy(TC.IGM, tik, numElements,
-                                    std::move(elementsWithPayload),
-                                    std::move(elementsWithNoPayload));
+    return new SinglePayloadEnumImplStrategy(TC.IGM, tik, alwaysFixedSize,
+                                             numElements,
+                                             std::move(elementsWithPayload),
+                                             std::move(elementsWithNoPayload));
 
-  return new NoPayloadEnumImplStrategy(TC.IGM, tik, numElements,
-                                      std::move(elementsWithPayload),
-                                      std::move(elementsWithNoPayload));
+  return new NoPayloadEnumImplStrategy(TC.IGM, tik, alwaysFixedSize,
+                                       numElements,
+                                       std::move(elementsWithPayload),
+                                       std::move(elementsWithNoPayload));
 }
 
 namespace {
@@ -4185,8 +4212,10 @@ namespace {
   public:
     FixedEnumTypeInfo(EnumImplStrategy &strategy,
                        llvm::StructType *T, Size S, SpareBitVector SB,
-                       Alignment A, IsPOD_t isPOD, IsBitwiseTakable_t isBT)
-      : EnumTypeInfoBase(strategy, T, S, std::move(SB), A, isPOD, isBT) {}
+                       Alignment A, IsPOD_t isPOD, IsBitwiseTakable_t isBT,
+                       IsFixedSize_t alwaysFixedSize)
+      : EnumTypeInfoBase(strategy, T, S, std::move(SB), A, isPOD, isBT,
+                         alwaysFixedSize) {}
 
     /// \group Methods delegated to the EnumImplStrategy
 
@@ -4208,8 +4237,10 @@ namespace {
     // FIXME: Derive spare bits from element layout.
     LoadableEnumTypeInfo(EnumImplStrategy &strategy,
                           llvm::StructType *T, Size S, SpareBitVector SB,
-                          Alignment A, IsPOD_t isPOD)
-      : EnumTypeInfoBase(strategy, T, S, std::move(SB), A, isPOD) {}
+                          Alignment A, IsPOD_t isPOD,
+                          IsFixedSize_t alwaysFixedSize)
+      : EnumTypeInfoBase(strategy, T, S, std::move(SB), A, isPOD,
+                         alwaysFixedSize) {}
 
     unsigned getExplosionSize() const override {
       return Strategy.getExplosionSize();
@@ -4317,11 +4348,13 @@ EnumImplStrategy::getFixedEnumTypeInfo(llvm::StructType *T, Size S,
   case Opaque:
     llvm_unreachable("not valid");
   case Fixed:
-    mutableTI = new FixedEnumTypeInfo(*this, T, S, std::move(SB), A, isPOD, isBT);
+    mutableTI = new FixedEnumTypeInfo(*this, T, S, std::move(SB), A, isPOD, isBT,
+                                      AlwaysFixedSize);
     break;
   case Loadable:
     assert(isBT && "loadable enum not bitwise takable?!");
-    mutableTI = new LoadableEnumTypeInfo(*this, T, S, std::move(SB), A, isPOD);
+    mutableTI = new LoadableEnumTypeInfo(*this, T, S, std::move(SB), A, isPOD,
+                                         AlwaysFixedSize);
     break;
   }
   TI = mutableTI;
@@ -4341,7 +4374,8 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
     return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this, enumTy,
                                                          Size(0), {},
                                                          alignment,
-                                                         IsPOD));
+                                                         IsPOD,
+                                                         AlwaysFixedSize));
   } else {
     const TypeInfo &eltTI = *getSingleton();
 
@@ -4366,6 +4400,7 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
       auto alignment = fixedEltTI.getFixedAlignment();
       applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/true,
                             alignment);
+
       return getFixedEnumTypeInfo(enumTy,
                         fixedEltTI.getFixedSize(),
                         fixedEltTI.getSpareBits(),
@@ -4407,7 +4442,7 @@ NoPayloadEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
 
   return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this,
                                    enumTy, tagSize, std::move(spareBits),
-                                   alignment, IsPOD));
+                                   alignment, IsPOD, AlwaysFixedSize));
 }
 
 TypeInfo *
@@ -4446,11 +4481,15 @@ CCompatibleEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
   applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/true,
                         alignment);
 
+  assert(!TC.IGM.isResilient(theEnum, ResilienceScope::Universal) &&
+         "C-compatible enums cannot be resilient");
+
   return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this, enumTy,
                                                rawFixedTI.getFixedSize(),
                                                rawFixedTI.getSpareBits(),
                                                alignment,
-                                               IsPOD));
+                                               IsPOD,
+                                               IsFixedSize));
 }
 
 TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
@@ -4587,7 +4626,7 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
     // The runtime currently does not track spare bits, so we can't use them
     // if the type is layout-dependent. (Even when the runtime does, it will
     // likely only track a subset of the spare bits.)
-    if (ConstrainedByRuntimeLayout) {
+    if (!AlwaysFixedSize) {
       if (CommonSpareBits.size() < payloadBits)
         CommonSpareBits.extendWithClearBits(payloadBits);
       continue;

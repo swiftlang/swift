@@ -243,7 +243,7 @@ namespace {
       : StructTypeInfoBase(StructTypeInfoKind::ClangRecordTypeInfo,
                            fields, explosionSize,
                            storageType, size, std::move(spareBits),
-                           align, IsPOD) {
+                           align, IsPOD, IsFixedSize) {
     }
 
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
@@ -268,11 +268,12 @@ namespace {
                            unsigned explosionSize,
                            llvm::Type *storageType, Size size,
                            SpareBitVector &&spareBits,
-                           Alignment align, IsPOD_t isPOD)
+                           Alignment align, IsPOD_t isPOD,
+                           IsFixedSize_t alwaysFixedSize)
       : StructTypeInfoBase(StructTypeInfoKind::LoadableStructTypeInfo,
                            fields, explosionSize,
                            storageType, size, std::move(spareBits),
-                           align, isPOD)
+                           align, isPOD, alwaysFixedSize)
     {}
 
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
@@ -296,10 +297,11 @@ namespace {
     // FIXME: Spare bits between struct members.
     FixedStructTypeInfo(ArrayRef<StructFieldInfo> fields, llvm::Type *T,
                         Size size, SpareBitVector &&spareBits,
-                        Alignment align, IsPOD_t isPOD, IsBitwiseTakable_t isBT)
+                        Alignment align, IsPOD_t isPOD, IsBitwiseTakable_t isBT,
+                        IsFixedSize_t alwaysFixedSize)
       : StructTypeInfoBase(StructTypeInfoKind::FixedStructTypeInfo,
                            fields, T, size, std::move(spareBits), align,
-                           isPOD, isBT)
+                           isPOD, isBT, alwaysFixedSize)
     {}
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
       return None;
@@ -454,7 +456,8 @@ namespace {
                                             layout.getSize(),
                                             std::move(layout.getSpareBits()),
                                             layout.getAlignment(),
-                                            layout.isKnownPOD());
+                                            layout.isPOD(),
+                                            layout.isAlwaysFixedSize());
     }
 
     FixedStructTypeInfo *createFixed(ArrayRef<StructFieldInfo> fields,
@@ -463,16 +466,17 @@ namespace {
                                          layout.getSize(),
                                          std::move(layout.getSpareBits()),
                                          layout.getAlignment(),
-                                         layout.isKnownPOD(),
-                                         layout.isKnownBitwiseTakable());
+                                         layout.isPOD(),
+                                         layout.isBitwiseTakable(),
+                                         layout.isAlwaysFixedSize());
     }
 
     NonFixedStructTypeInfo *createNonFixed(ArrayRef<StructFieldInfo> fields,
                                            StructLayout &&layout) {
       return NonFixedStructTypeInfo::create(fields, layout.getType(),
                                             layout.getAlignment(),
-                                            layout.isKnownPOD(),
-                                            layout.isKnownBitwiseTakable());
+                                            layout.isPOD(),
+                                            layout.isBitwiseTakable());
     }
 
     StructFieldInfo getFieldInfo(unsigned index,

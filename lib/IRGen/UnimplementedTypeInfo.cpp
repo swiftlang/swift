@@ -28,6 +28,7 @@ UnimplementedTypeInfo::UnimplementedTypeInfo(IRGenModule &IGM,
              Alignment(1),
              IsNotPOD,
              IsNotBitwiseTakable,
+             IsFixedSize,
              STIK_Unimplemented)
 {}
 

@@ -292,7 +292,7 @@ class OpaqueExistentialTypeInfo :
                             llvm::Type *ty, Size size, Alignment align)
     : super(protocols, ty, size,
             SpareBitVector::getConstant(size.getValueInBits(), false), align,
-            IsNotPOD, IsNotBitwiseTakable) {}
+            IsNotPOD, IsNotBitwiseTakable, IsFixedSize) {}
 
 public:
   OpaqueExistentialLayout getLayout() const {
@@ -865,7 +865,7 @@ public:
                                     const SpareBitVector &spareBits,
                                     Size size, Alignment align)
     : ScalarExistentialTypeInfoBase(storedProtocols, ty, size,
-                                    spareBits, align, IsPOD) {}
+                                    spareBits, align, IsPOD, IsFixedSize) {}
 
   const LoadableTypeInfo &
   getPayloadTypeInfoForExtraInhabitants(IRGenModule &IGM) const {
@@ -1062,7 +1062,8 @@ class ExistentialMetatypeTypeInfo
                               Alignment align,
                               const LoadableTypeInfo &metatypeTI)
     : ScalarExistentialTypeInfoBase(storedProtocols, ty, size,
-                                    std::move(spareBits), align, IsPOD),
+                                    std::move(spareBits), align, IsPOD,
+                                    IsFixedSize),
       MetatypeTI(metatypeTI) {}
 
 public:

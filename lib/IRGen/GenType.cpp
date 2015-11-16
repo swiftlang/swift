@@ -623,7 +623,8 @@ namespace {
   /// A TypeInfo implementation for empty types.
   struct EmptyTypeInfo : ScalarTypeInfo<EmptyTypeInfo, LoadableTypeInfo> {
     EmptyTypeInfo(llvm::Type *ty)
-      : ScalarTypeInfo(ty, Size(0), SpareBitVector{}, Alignment(1), IsPOD) {}
+      : ScalarTypeInfo(ty, Size(0), SpareBitVector{}, Alignment(1), IsPOD,
+                       IsFixedSize) {}
     unsigned getExplosionSize() const override { return 0; }
     void getSchema(ExplosionSchema &schema) const override {}
     void loadAsCopy(IRGenFunction &IGF, Address addr,
@@ -673,7 +674,8 @@ namespace {
                           Size size,
                           SpareBitVector &&spareBits,
                           Alignment align)
-      : ScalarTypeInfo(storage, size, std::move(spareBits), align, IsPOD),
+      : ScalarTypeInfo(storage, size, std::move(spareBits), align, IsPOD,
+                       IsFixedSize),
         ScalarType(scalarType)
     {}
     
@@ -757,7 +759,7 @@ namespace {
                       SpareBitVector &&spareBits,
                       Alignment align)
       : IndirectTypeInfo(storage, size, std::move(spareBits), align,
-                         IsNotPOD, IsNotBitwiseTakable) {}
+                         IsNotPOD, IsNotBitwiseTakable, IsFixedSize) {}
 
     void assignWithCopy(IRGenFunction &IGF, Address dest,
                         Address src, SILType T) const override {

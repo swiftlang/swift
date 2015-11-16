@@ -88,14 +88,16 @@ StructLayout::StructLayout(IRGenModule &IGM, CanType astTy,
     IsFixedLayout = true;
     IsKnownPOD = IsPOD;
     IsKnownBitwiseTakable = IsBitwiseTakable;
+    IsKnownAlwaysFixedSize = IsFixedSize;
     Ty = (typeToFill ? typeToFill : IGM.OpaquePtrTy->getElementType());
   } else {
     MinimumAlign = builder.getAlignment();
     MinimumSize = builder.getSize();
     SpareBits = std::move(builder.getSpareBits());
     IsFixedLayout = builder.isFixedLayout();
-    IsKnownPOD = builder.isKnownPOD();
-    IsKnownBitwiseTakable = builder.isKnownBitwiseTakable();
+    IsKnownPOD = builder.isPOD();
+    IsKnownBitwiseTakable = builder.isBitwiseTakable();
+    IsKnownAlwaysFixedSize = builder.isAlwaysFixedSize();
     if (typeToFill) {
       builder.setAsBodyOfStruct(typeToFill);
       Ty = typeToFill;
@@ -103,6 +105,13 @@ StructLayout::StructLayout(IRGenModule &IGM, CanType astTy,
       Ty = builder.getAsAnonStruct();
     }
   }
+
+  // If the struct is not @_fixed_layout, it will have a dynamic
+  // layout outside of its resilience domain.
+  if (astTy && astTy->getAnyNominal())
+    if (IGM.isResilient(astTy->getAnyNominal(), ResilienceScope::Universal))
+      IsKnownAlwaysFixedSize = IsNotFixedSize;
+
   assert(typeToFill == nullptr || Ty == typeToFill);
   if (ASTTy)
     applyLayoutAttributes(IGM, ASTTy, IsFixedLayout, MinimumAlign);
@@ -201,6 +210,7 @@ bool StructLayoutBuilder::addFields(llvm::MutableArrayRef<ElementLayout> elts,
     auto &eltTI = elt.getType();
     IsKnownPOD &= eltTI.isPOD(ResilienceScope::Component);
     IsKnownBitwiseTakable &= eltTI.isBitwiseTakable(ResilienceScope::Component);
+    IsKnownAlwaysFixedSize &= eltTI.isFixedSize(ResilienceScope::Universal);
     
     // If the element type is empty, it adds nothing.
     if (eltTI.isKnownEmpty()) {
@@ -291,6 +301,8 @@ void StructLayoutBuilder::addNonFixedSizeElement(ElementLayout &elt) {
   // maximum alignment, if there is one), these are part and parcel.
   IsFixedLayout = false;
   addElementAtNonFixedOffset(elt);
+
+  assert(!IsKnownAlwaysFixedSize);
 }
 
 /// Add an empty element to the aggregate.

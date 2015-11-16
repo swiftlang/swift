@@ -133,16 +133,18 @@ protected:
   IRGenModule &IGM;
   const TypeInfo *TI = nullptr;
   TypeInfoKind TIK;
+  IsFixedSize_t AlwaysFixedSize;
   unsigned NumElements;
   
   EnumImplStrategy(IRGenModule &IGM,
                    TypeInfoKind tik,
+                   IsFixedSize_t alwaysFixedSize,
                    unsigned NumElements,
                    std::vector<Element> &&ElementsWithPayload,
                    std::vector<Element> &&ElementsWithNoPayload)
   : ElementsWithPayload(std::move(ElementsWithPayload)),
     ElementsWithNoPayload(std::move(ElementsWithNoPayload)),
-    IGM(IGM), TIK(tik),
+    IGM(IGM), TIK(tik), AlwaysFixedSize(alwaysFixedSize),
     NumElements(NumElements)
   {}
   
