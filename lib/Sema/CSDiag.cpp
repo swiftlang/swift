@@ -1107,15 +1107,17 @@ namespace {
   /// The result is captured in this enum value, where the earlier entries are
   /// most specific.
   enum CandidateCloseness {
-    CC_ExactMatch,            ///< This is a perfect match for the arguments.
-    CC_Unavailable,           ///< Marked unavailable with the @available attr.
-    CC_NonLValueInOut,       ///< First argument is inout but no lvalue present.
-    CC_OneArgumentMismatch,   ///< All arguments except one match.
-    CC_SelfMismatch,          ///< Self argument mismatches.
-    CC_ArgumentMismatch,      ///< Argument list mismatch.
-    CC_ArgumentLabelMismatch, ///< Argument label mismatch.
-    CC_ArgumentCountMismatch, ///< This candidate has wrong # arguments.
-    CC_GeneralMismatch        ///< Something else is wrong.
+    CC_ExactMatch,              ///< This is a perfect match for the arguments.
+    CC_Unavailable,             ///< Marked unavailable with @available.
+    CC_NonLValueInOut,          ///< First arg is inout but no lvalue present.
+    CC_OneArgumentNearMismatch, ///< All arguments except one match, near miss.
+    CC_OneArgumentMismatch,     ///< All arguments except one match.
+    CC_SelfMismatch,            ///< Self argument mismatches.
+    CC_ArgumentNearMismatch,    ///< Argument list mismatch, near miss.
+    CC_ArgumentMismatch,        ///< Argument list mismatch.
+    CC_ArgumentLabelMismatch,   ///< Argument label mismatch.
+    CC_ArgumentCountMismatch,   ///< This candidate has wrong # arguments.
+    CC_GeneralMismatch          ///< Something else is wrong.
   };
 
   /// This is a candidate for a callee, along with an uncurry level.
@@ -1284,6 +1286,30 @@ void CalleeCandidateInfo::filterList(ClosenessPredicate predicate) {
 }
 
 
+
+/// Given an incompatible argument being passed to a parameter, decide whether
+/// it is a "near" miss or not.  We consider something to be a near miss if it
+/// is due to a common sort of problem (e.g. function type passed to wrong
+/// function type, or T? passed to something expecting T) where a far miss is a
+/// completely incompatible type (Int where Float is expected).  The notion of a
+/// near miss is used to refine overload sets to a smaller candidate set that is
+/// the most relevant options.
+static bool argumentMismatchIsNearMiss(Type argType, Type paramType) {
+  // If T? was passed to something expecting T, then it is a near miss.
+  if (auto argOptType = argType->getOptionalObjectType())
+    if (argOptType->isEqual(paramType))
+      return true;
+  
+  // If these are both function types, then they are near misses.  We consider
+  // incompatible function types to be near so that functions and non-function
+  // types are considered far.
+  if (argType->is<AnyFunctionType>() && paramType->is<AnyFunctionType>())
+    return true;
+  
+  // Otherwise, this is some other sort of incompatibility.
+  return false;
+}
+
 /// Determine how close an argument list is to an already decomposed argument
 /// list.
 static CandidateCloseness
@@ -1325,6 +1351,13 @@ evaluateCloseness(Type candArgListType, ArrayRef<CallArgParam> actualArgs,
   // If we found a mapping, check to see if the matched up arguments agree in
   // their type and count the number of mismatched arguments.
   unsigned mismatchingArgs = 0;
+  
+  // We classify an argument mismatch as being a "near" miss if it is a very
+  // likely match due to a common sort of problem (e.g. wrong flags on a
+  // function type, optional where none was expected, etc).  This allows us to
+  // heuristically filter large overload sets better.
+  bool mismatchesAreNearMisses = true;
+  
   for (unsigned i = 0, e = paramBindings.size(); i != e; ++i) {
     // bindings specifify the arguments that source the parameter.  The only
     // case in which this returns a non-singular value is when there are varargs
@@ -1343,10 +1376,15 @@ evaluateCloseness(Type candArgListType, ArrayRef<CallArgParam> actualArgs,
       // FIXME: Right now, a "matching" overload is one with a parameter whose
       // type is identical to one of the argument types. We can obviously do
       // something more sophisticated with this.
-      // FIXME: We definitely need to handle archetypes for same-type constraints.
+      // FIXME: Definitely need to handle archetypes for same-type constraints.
       // FIXME: Use TC.isConvertibleTo?
-      if (!argType->getRValueType()->isEqual(paramType))
-        ++mismatchingArgs;
+      if (argType->getRValueType()->isEqual(paramType))
+        continue;
+      
+      ++mismatchingArgs;
+      
+      // Keep track of whether this argument was a near miss or not.
+      mismatchesAreNearMisses &= argumentMismatchIsNearMiss(argType, paramType);
     }
   }
   
@@ -1360,8 +1398,16 @@ evaluateCloseness(Type candArgListType, ArrayRef<CallArgParam> actualArgs,
   
   // If we have exactly one argument mismatching, classify it specially, so that
   // close matches are prioritized against obviously wrong ones.
-  if (mismatchingArgs == 1)
+  if (mismatchingArgs == 1) {
+    if (mismatchesAreNearMisses)
+      return actualArgs.size() != 1 ? CC_OneArgumentNearMismatch :CC_ArgumentNearMismatch;
+    
     return actualArgs.size() != 1 ? CC_OneArgumentMismatch :CC_ArgumentMismatch;
+  }
+  
+  // FIXME: Why isn't this an ArgumentMismatch error?
+  // Related to the isCallExpr hack at the top of suggestPotentialOverloads.
+  //return CC_ArgumentMismatch;
   
   return CC_GeneralMismatch;
 }
@@ -3049,8 +3095,8 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     // type information, use that one candidate as the type information for
     // subexpr checking.
     //
-    // TODO: If all candidates have the same type for some argument, we could pass
-    // down partial information.
+    // TODO: If all candidates have the same type for some argument, we could
+    // pass down partial information.
     if (candidates.size() == 1 && !argType)
       argType = candidates[0].getArgumentType();
   }

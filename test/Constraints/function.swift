@@ -54,7 +54,7 @@ func dangerous() throws {}
 
 func test() {
   process {         // expected-error {{cannot invoke 'process' with an argument list of type '(() throws -> ())'}}
-    // expected-note @-1 {{overloads for 'process' exist with these partially matching parameter lists: (UInt, () -> Void), (UInt)}}
+    // expected-note @-1 {{expected an argument list of type '(UInt, () -> Void)'}}
     try dangerous()
     test()
   }
