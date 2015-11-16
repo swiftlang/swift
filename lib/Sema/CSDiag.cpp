@@ -1110,9 +1110,9 @@ namespace {
     CC_ExactMatch,              ///< This is a perfect match for the arguments.
     CC_Unavailable,             ///< Marked unavailable with @available.
     CC_NonLValueInOut,          ///< First arg is inout but no lvalue present.
+    CC_SelfMismatch,            ///< Self argument mismatches.
     CC_OneArgumentNearMismatch, ///< All arguments except one match, near miss.
     CC_OneArgumentMismatch,     ///< All arguments except one match.
-    CC_SelfMismatch,            ///< Self argument mismatches.
     CC_ArgumentNearMismatch,    ///< Argument list mismatch, near miss.
     CC_ArgumentMismatch,        ///< Argument list mismatch.
     CC_ArgumentLabelMismatch,   ///< Argument label mismatch.
@@ -1397,7 +1397,7 @@ evaluateCloseness(Type candArgListType, ArrayRef<CallArgParam> actualArgs,
   
   // If we have exactly one argument mismatching, classify it specially, so that
   // close matches are prioritized against obviously wrong ones.
-  if (mismatchingArgs == 1 && actualArgs.size() != 1)
+  if (mismatchingArgs == 1)
     return mismatchesAreNearMisses ? CC_OneArgumentNearMismatch
                                    : CC_OneArgumentMismatch;
   
@@ -3348,7 +3348,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     return false;
   }
 
-  // If the closes matches all mismatch on self, we either have something that
+  // If the closest matches all mismatch on self, we either have something that
   // cannot be subscripted, or an ambiguity.
   if (calleeInfo.closeness == CC_SelfMismatch) {
     diagnose(SE->getLoc(), diag::cannot_subscript_base, baseType)
@@ -3498,13 +3498,11 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   
   calleeInfo.filterList(argExpr->getType(), hasTrailingClosure);
 
-  if (calleeInfo.closeness == CC_Unavailable) {
-    if (CS->TC.diagnoseExplicitUnavailability(calleeInfo[0].decl,
-                                              callExpr->getLoc(),
-                                              CS->DC, nullptr))
-      return true;
-    return false;
-  }
+  // Handle uses of unavailable symbols.
+  if (calleeInfo.closeness == CC_Unavailable)
+    return CS->TC.diagnoseExplicitUnavailability(calleeInfo[0].decl,
+                                                 callExpr->getLoc(),
+                                                 CS->DC, nullptr);
   
   // A common error is to apply an operator that only has inout forms (e.g. ++)
   // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
@@ -3512,7 +3510,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   if (calleeInfo.closeness == CC_NonLValueInOut) {
     Diag<StringRef> subElementDiagID;
     Diag<Type> rvalueDiagID;
-    
     Expr *diagExpr = nullptr;
     
     if (isa<PrefixUnaryExpr>(callExpr) || isa<PostfixUnaryExpr>(callExpr)) {
@@ -3534,24 +3531,61 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     }
   }
   
+  // Handle argument label mismatches.
+  if (calleeInfo.closeness == CC_ArgumentLabelMismatch) {
+    auto args = decomposeArgParamType(argExpr->getType());
+
+    // If we have multiple candidates that we fail to match, just say we have
+    // the wrong labels and list the candidates out.
+    if (calleeInfo.size() != 1) {
+      // TODO: It would be nice to use an analog of getTypeListString that
+      // doesn't include the argument types.
+      diagnose(callExpr->getLoc(), diag::wrong_argument_labels_overload,
+               getParamListAsString(args))
+        .highlight(argExpr->getSourceRange());
+
+      // Did the user intend on invoking a different overload?
+      calleeInfo.suggestPotentialOverloads(fnExpr->getLoc());
+      return true;
+    }
+
+    SmallVector<Identifier, 4> correctNames;
+
+    // If we have a single candidate that failed to match the argument list,
+    // attempt to use matchCallArguments to diagnose the problem.
+    struct OurListener : public MatchCallArgumentListener {
+      SmallVectorImpl<Identifier> &correctNames;
+    public:
+      OurListener(SmallVectorImpl<Identifier> &correctNames)
+        : correctNames(correctNames) {}
+      void extraArgument(unsigned argIdx) override {}
+      void missingArgument(unsigned paramIdx) override {}
+      void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override {}
+      bool relabelArguments(ArrayRef<Identifier> newNames) override {
+        correctNames.append(newNames.begin(), newNames.end());
+        return true;
+      }
+    } listener(correctNames);
+
+    // Use matchCallArguments to determine how close the argument list is (in
+    // shape) to the specified candidates parameters.  This ignores the concrete
+    // types of the arguments, looking only at the argument labels etc.
+    SmallVector<ParamBinding, 4> paramBindings;
+    auto params = decomposeArgParamType(calleeInfo[0].getArgumentType());
+    if (matchCallArguments(args, params, hasTrailingClosure,/*allowFixes:*/true,
+                           listener, paramBindings) &&
+        !correctNames.empty() &&
+        CS->diagnoseArgumentLabelError(argExpr, correctNames,
+                                       /*isSubscript=*/false)) {
+      return true;
+
+    }
+  }
+
+
   // Otherwise, we have a generic failure.  Diagnose it with a generic error
   // message now.
   auto overloadName = calleeInfo.declName;
-  
-  if (isa<PrefixUnaryExpr>(callExpr) || isa<PostfixUnaryExpr>(callExpr)) {
-    // If we found an exact match, this must be a problem with a conversion from
-    // the result of the call to the expected type.  Diagnose this as a
-    // conversion failure.
-    if (calleeInfo.closeness == CC_ExactMatch)
-      return false;
-    
-    assert(!overloadName.empty());
-    diagnose(argExpr->getLoc(), diag::cannot_apply_unop_to_arg, overloadName,
-             argExpr->getType());
-    
-    calleeInfo.suggestPotentialOverloads(argExpr->getLoc());
-    return true;
-  }
   
   if (isa<BinaryExpr>(callExpr) && isa<TupleExpr>(argExpr)) {
     auto argTuple = cast<TupleExpr>(argExpr);
@@ -3604,64 +3638,22 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     return true;
   }
   
-  
   // If we found an exact match, this must be a problem with a conversion from
   // the result of the call to the expected type.  Diagnose this as a
   // conversion failure.
   if (calleeInfo.closeness == CC_ExactMatch)
     return false;
-
-  if (calleeInfo.closeness == CC_ArgumentLabelMismatch) {
-    auto args = decomposeArgParamType(argExpr->getType());
-
-    // If we have multiple candidates that we fail to match, just say we have
-    // the wrong labels and list the candidates out.
-    if (calleeInfo.size() != 1) {
-      // TODO: It would be nice to use an analog of getTypeListString that
-      // doesn't include the argument types.
-      diagnose(callExpr->getLoc(), diag::wrong_argument_labels_overload,
-               getParamListAsString(args))
-        .highlight(argExpr->getSourceRange());
-
-      // Did the user intend on invoking a different overload?
-      calleeInfo.suggestPotentialOverloads(fnExpr->getLoc());
-      return true;
-    }
-
-    SmallVector<Identifier, 4> correctNames;
-
-    // If we have a single candidate that failed to match the argument list,
-    // attempt to use matchCallArguments to diagnose the problem.
-    struct OurListener : public MatchCallArgumentListener {
-      SmallVectorImpl<Identifier> &correctNames;
-    public:
-      OurListener(SmallVectorImpl<Identifier> &correctNames)
-        : correctNames(correctNames) {}
-      void extraArgument(unsigned argIdx) override {}
-      void missingArgument(unsigned paramIdx) override {}
-      void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override {}
-      bool relabelArguments(ArrayRef<Identifier> newNames) override {
-        correctNames.append(newNames.begin(), newNames.end());
-        return true;
-      }
-    } listener(correctNames);
-
-    // Use matchCallArguments to determine how close the argument list is (in
-    // shape) to the specified candidates parameters.  This ignores the concrete
-    // types of the arguments, looking only at the argument labels etc.
-    SmallVector<ParamBinding, 4> paramBindings;
-    auto params = decomposeArgParamType(calleeInfo[0].getArgumentType());
-    if (matchCallArguments(args, params, hasTrailingClosure,/*allowFixes:*/true,
-                           listener, paramBindings) &&
-        !correctNames.empty() &&
-        CS->diagnoseArgumentLabelError(argExpr, correctNames,
-                                       /*isSubscript=*/false)) {
-      return true;
-
-    }
+  
+  // Generate specific error messages for unary operators.
+  if (isa<PrefixUnaryExpr>(callExpr) || isa<PostfixUnaryExpr>(callExpr)) {
+    assert(!overloadName.empty());
+    diagnose(argExpr->getLoc(), diag::cannot_apply_unop_to_arg, overloadName,
+             argExpr->getType());
+    
+    calleeInfo.suggestPotentialOverloads(argExpr->getLoc());
+    return true;
   }
 
-  
   bool isInitializer = isa<TypeExpr>(fnExpr);
 
   std::string argString = getTypeListString(argExpr->getType());
@@ -3700,7 +3692,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     
     return true;
   }
-
   
   // If we have an argument list (i.e., a scalar, or a non-zero-element tuple)
   // then diagnose with some specificity about the arguments.
