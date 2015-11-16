@@ -612,6 +612,9 @@ ERROR(extra_named_single_element_tuple,sema_tcc,none,
       "access its element", (StringRef))
 ERROR(argument_out_of_order,sema_tcc,none,
       "argument %0 must precede argument %1", (Identifier, Identifier))
+ERROR(argument_out_of_order_named_unnamed,sema_tcc,none,
+      "argument %0 must precede unnamed parameter #%1", (Identifier, unsigned))
+
 ERROR(missing_argument_named,sema_tcc,none,
       "missing argument for parameter %0 in call", (Identifier))
 ERROR(missing_argument_positional,sema_tcc,none,

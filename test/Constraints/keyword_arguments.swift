@@ -137,8 +137,7 @@ variadics1(x: 1, y: 2, 1, 2)
 variadics1(x: 1, y: 2, 1, 2, 3)
 
 // Using various (out-of-order)
-// FIXME: Poor diagnostic.
-variadics1(1, 2, 3, 4, 5, x: 6, y: 7) // expected-error{{cannot invoke 'variadics1' with an argument list of type '(Int, Int, Int, Int, Int, x: Int, y: Int)'}} expected-note{{expected an argument list of type '(x: Int, y: Int, Int...)'}}
+variadics1(1, 2, 3, 4, 5, x: 6, y: 7) // expected-error{{argument 'x' must precede unnamed parameter #0}}
 
 func variadics2(x x: Int, y: Int = 2, z: Int...) { }
 
@@ -202,6 +201,22 @@ variadics4()
 // Using variadics (in-order, some missing)
 variadics4(y: 0, x: 1, 2, 3) // expected-error{{extra argument in call}}
 variadics4(z: 1, x: 1) // FIXME: error
+
+func variadics5(x: Int, y: Int, _ z: Int...) { }
+
+// Using variadics (in-order, complete)
+variadics5(1, y: 2)
+variadics5(1, y: 2, 1)
+variadics5(1, y: 2, 1, 2)
+variadics5(1, y: 2, 1, 2, 3)
+
+// Using various (out-of-order)
+variadics5(1, 2, 3, 4, 5, 6, y: 7) // expected-error{{argument 'y' must precede unnamed parameter #1}}
+variadics5(y: 1, 2, 3, 4, 5, 6, 7) // expected-error{{missing argument for parameter #1 in call}}
+
+func outOfOrder(a : Int, b: Int) {
+  outOfOrder(b: 42, 52)  // expected-error {{argument '_' must precede argument 'b'}}
+}
 
 // -------------------------------------------
 // Missing arguments

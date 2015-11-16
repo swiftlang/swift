@@ -655,6 +655,7 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
     return false;
 
   case Failure::OutOfOrderArgument:
+      if (0)
     if (auto tuple = dyn_cast_or_null<TupleExpr>(anchor)) {
       unsigned firstIdx = failure.getValue();
       Identifier first = tuple->getElementName(firstIdx);
@@ -3498,13 +3499,91 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   
   calleeInfo.filterList(argExpr->getType(), hasTrailingClosure);
 
+
+  // If we filtered this down to exactly one candidate, see if we can produce
+  // an extremely specific error about it.
+  if (calleeInfo.size() == 1) {
+    if (calleeInfo.closeness == CC_ArgumentLabelMismatch) {
+      auto args = decomposeArgParamType(argExpr->getType());
+      SmallVector<Identifier, 4> correctNames;
+      unsigned OOOArgIdx = ~0U, OOOPrevArgIdx = ~0U;
+      
+      // If we have a single candidate that failed to match the argument list,
+      // attempt to use matchCallArguments to diagnose the problem.
+      struct OurListener : public MatchCallArgumentListener {
+        SmallVectorImpl<Identifier> &correctNames;
+        unsigned &OOOArgIdx, &OOOPrevArgIdx;
+
+      public:
+        OurListener(SmallVectorImpl<Identifier> &correctNames,
+                    unsigned &OOOArgIdx, unsigned &OOOPrevArgIdx)
+           : correctNames(correctNames),
+             OOOArgIdx(OOOArgIdx), OOOPrevArgIdx(OOOPrevArgIdx) {}
+        void extraArgument(unsigned argIdx) override {}
+        void missingArgument(unsigned paramIdx) override {}
+        void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override{
+          OOOArgIdx = argIdx;
+          OOOPrevArgIdx = prevArgIdx;
+        }
+        bool relabelArguments(ArrayRef<Identifier> newNames) override {
+          correctNames.append(newNames.begin(), newNames.end());
+          return true;
+        }
+      } listener(correctNames, OOOArgIdx, OOOPrevArgIdx);
+
+      // Use matchCallArguments to determine how close the argument list is (in
+      // shape) to the specified candidates parameters.  This ignores the
+      // concrete types of the arguments, looking only at the argument labels.
+      SmallVector<ParamBinding, 4> paramBindings;
+      auto params = decomposeArgParamType(calleeInfo[0].getArgumentType());
+      if (matchCallArguments(args, params, hasTrailingClosure,
+                             /*allowFixes:*/true, listener, paramBindings)) {
+       
+        // If this is a argument label mismatch, then diagnose that error now.
+        if (!correctNames.empty() &&
+            CS->diagnoseArgumentLabelError(argExpr, correctNames,
+                                           /*isSubscript=*/false))
+          return true;
+        
+        // If we have an out-of-order argument, diagnose it as such.
+        if (OOOArgIdx != ~0U && isa<TupleExpr>(callExpr->getArg())) {
+          auto tuple = cast<TupleExpr>(callExpr->getArg());
+          Identifier first = tuple->getElementName(OOOArgIdx);
+          Identifier second = tuple->getElementName(OOOPrevArgIdx);
+
+          SourceLoc diagLoc;
+          if (!first.empty())
+            diagLoc = tuple->getElementNameLoc(OOOArgIdx);
+          else
+            diagLoc = tuple->getElement(OOOArgIdx)->getStartLoc();
+          
+          if (!second.empty()) {
+            diagnose(diagLoc,
+                     diag::argument_out_of_order, first, second)
+            .highlight(tuple->getElement(OOOArgIdx)->getSourceRange())
+            .highlight(SourceRange(tuple->getElementNameLoc(OOOPrevArgIdx),
+                               tuple->getElement(OOOPrevArgIdx)->getEndLoc()));
+            return true;
+          }
+          
+          diagnose(diagLoc, diag::argument_out_of_order_named_unnamed, first,
+                   OOOPrevArgIdx)
+            .highlight(tuple->getElement(OOOArgIdx)->getSourceRange())
+            .highlight(tuple->getElement(OOOPrevArgIdx)->getSourceRange());
+          return true;
+        }
+      }
+    }
+  }
+  
+  
   // Handle uses of unavailable symbols.
   if (calleeInfo.closeness == CC_Unavailable)
     return CS->TC.diagnoseExplicitUnavailability(calleeInfo[0].decl,
                                                  callExpr->getLoc(),
                                                  CS->DC, nullptr);
   
-  // A common error is to apply an operator that only has inout forms (e.g. ++)
+  // A common error is to apply an operator that only has inout forms (e.g. +=)
   // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
   // case.
   if (calleeInfo.closeness == CC_NonLValueInOut) {
@@ -3531,61 +3610,28 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     }
   }
   
-  // Handle argument label mismatches.
+  // Handle argument label mismatches when we have multiple candidates.
   if (calleeInfo.closeness == CC_ArgumentLabelMismatch) {
     auto args = decomposeArgParamType(argExpr->getType());
 
     // If we have multiple candidates that we fail to match, just say we have
     // the wrong labels and list the candidates out.
-    if (calleeInfo.size() != 1) {
-      // TODO: It would be nice to use an analog of getTypeListString that
-      // doesn't include the argument types.
-      diagnose(callExpr->getLoc(), diag::wrong_argument_labels_overload,
-               getParamListAsString(args))
-        .highlight(argExpr->getSourceRange());
+    
+    // TODO: It would be nice to use an analog of getTypeListString that
+    // doesn't include the argument types.
+    diagnose(callExpr->getLoc(), diag::wrong_argument_labels_overload,
+             getParamListAsString(args))
+      .highlight(argExpr->getSourceRange());
 
-      // Did the user intend on invoking a different overload?
-      calleeInfo.suggestPotentialOverloads(fnExpr->getLoc());
-      return true;
-    }
-
-    SmallVector<Identifier, 4> correctNames;
-
-    // If we have a single candidate that failed to match the argument list,
-    // attempt to use matchCallArguments to diagnose the problem.
-    struct OurListener : public MatchCallArgumentListener {
-      SmallVectorImpl<Identifier> &correctNames;
-    public:
-      OurListener(SmallVectorImpl<Identifier> &correctNames)
-        : correctNames(correctNames) {}
-      void extraArgument(unsigned argIdx) override {}
-      void missingArgument(unsigned paramIdx) override {}
-      void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override {}
-      bool relabelArguments(ArrayRef<Identifier> newNames) override {
-        correctNames.append(newNames.begin(), newNames.end());
-        return true;
-      }
-    } listener(correctNames);
-
-    // Use matchCallArguments to determine how close the argument list is (in
-    // shape) to the specified candidates parameters.  This ignores the concrete
-    // types of the arguments, looking only at the argument labels etc.
-    SmallVector<ParamBinding, 4> paramBindings;
-    auto params = decomposeArgParamType(calleeInfo[0].getArgumentType());
-    if (matchCallArguments(args, params, hasTrailingClosure,/*allowFixes:*/true,
-                           listener, paramBindings) &&
-        !correctNames.empty() &&
-        CS->diagnoseArgumentLabelError(argExpr, correctNames,
-                                       /*isSubscript=*/false)) {
-      return true;
-
-    }
+    // Did the user intend on invoking a different overload?
+    calleeInfo.suggestPotentialOverloads(fnExpr->getLoc());
+    return true;
   }
 
-
+  auto overloadName = calleeInfo.declName;
+  
   // Otherwise, we have a generic failure.  Diagnose it with a generic error
   // message now.
-  auto overloadName = calleeInfo.declName;
   
   if (isa<BinaryExpr>(callExpr) && isa<TupleExpr>(argExpr)) {
     auto argTuple = cast<TupleExpr>(argExpr);
@@ -3654,8 +3700,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     return true;
   }
 
-  bool isInitializer = isa<TypeExpr>(fnExpr);
-
   std::string argString = getTypeListString(argExpr->getType());
 
   // If we couldn't get the name of the callee, then it must be something of a
@@ -3695,6 +3739,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   
   // If we have an argument list (i.e., a scalar, or a non-zero-element tuple)
   // then diagnose with some specificity about the arguments.
+  bool isInitializer = isa<TypeExpr>(fnExpr);
   if (isa<TupleExpr>(argExpr) &&
       cast<TupleExpr>(argExpr)->getNumElements() == 0) {
     // Emit diagnostics that say "no arguments".
