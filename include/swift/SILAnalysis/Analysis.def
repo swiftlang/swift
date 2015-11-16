@@ -23,18 +23,18 @@
 #define ANALYSIS(NAME)
 #endif
 
-ANALYSIS(CallGraph)
-ANALYSIS(Dominance)
-ANALYSIS(PostDominance)
-ANALYSIS(SideEffect)
-ANALYSIS(Escape)
 ANALYSIS(Alias)
-ANALYSIS(Loop)
-ANALYSIS(InductionVariable)
-ANALYSIS(PostOrder)
+ANALYSIS(CallGraph)
 ANALYSIS(ClassHierarchy)
-ANALYSIS(RCIdentity)
 ANALYSIS(Destructor)
+ANALYSIS(Dominance)
+ANALYSIS(Escape)
+ANALYSIS(InductionVariable)
+ANALYSIS(Loop)
 ANALYSIS(LoopRegion)
+ANALYSIS(PostDominance)
+ANALYSIS(PostOrder)
+ANALYSIS(RCIdentity)
+ANALYSIS(SideEffect)
 
 #undef ANALYSIS
