@@ -22,6 +22,7 @@
 
 namespace swift {
 
+class BasicCalleeAnalysis;
 class CallGraphAnalysis;
 class CallGraph;
 
@@ -265,6 +266,9 @@ private:
   /// The allocator for the map values in Function2Effects.
   llvm::SpecificBumpPtrAllocator<FunctionEffects> Allocator;
   
+  /// Callee analysis, used for determining the callees at call sites.
+  BasicCalleeAnalysis *BCA;
+
   /// This analysis depends on the call graph.
   CallGraphAnalysis *CGA;
   
@@ -286,11 +290,10 @@ private:
   void analyzeFunction(SILFunction *F, WorkListType &WorkList, CallGraph &CG);
   
   /// Analyise the side-effects of a single SIL instruction.
-  void analyzeInstruction(FunctionEffects &Effects, SILInstruction *I,
-                          CallGraph &CG);
+  void analyzeInstruction(FunctionEffects &Effects, SILInstruction *I);
 
   /// Get the side-effects of a call site.
-  void getEffectsOfApply(FunctionEffects &FE, FullApplySite FAS, CallGraph &CG,
+  void getEffectsOfApply(FunctionEffects &FE, FullApplySite FAS,
                          bool isRecomputing);
   
   /// Gets or creates FunctionEffects for \p F. If \a isRecomputing is true,
