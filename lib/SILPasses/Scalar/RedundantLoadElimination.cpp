@@ -98,7 +98,7 @@
 using namespace swift;
 
 static llvm::cl::opt<bool> EnableGlobalRLE("enable-global-redundant-load-elim",
-                                           llvm::cl::init(true));
+                                           llvm::cl::init(false));
 
 STATISTIC(NumForwardedLoads, "Number of loads forwarded");
 
