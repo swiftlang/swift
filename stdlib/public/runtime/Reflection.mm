@@ -542,9 +542,9 @@ StringMirrorTuple swift_EnumMirror_subscript(intptr_t i,
   // Copy the payload since the projection is destructive.
   BoxPair pair = swift_allocBox(type);
 
-  owner = pair.heapObject;
-  type->vw_initializeWithTake(pair.value, const_cast<OpaqueValue *>(value));
-  value = type->vw_destructiveProjectEnumData(pair.value);
+  owner = pair.first;
+  type->vw_initializeWithTake(pair.second, const_cast<OpaqueValue *>(value));
+  value = type->vw_destructiveProjectEnumData(pair.second);
 
   // If the payload is indirect, we need to jump through the box to get it.
   if (indirect) {
@@ -1112,12 +1112,12 @@ MagicMirror::MagicMirror(OpaqueValue *value, const Metadata *T,
   BoxPair box = swift_allocBox(T);
   
   if (take)
-    T->vw_initializeWithTake(box.value, value);
+    T->vw_initializeWithTake(box.second, value);
   else
-    T->vw_initializeWithCopy(box.value, value);
-  std::tie(T, Self, MirrorWitness) = getImplementationForType(T, box.value);
+    T->vw_initializeWithCopy(box.second, value);
+  std::tie(T, Self, MirrorWitness) = getImplementationForType(T, box.second);
   
-  Data = {box.heapObject, box.value, T};
+  Data = {box.first, box.second, T};
 }
   
 /// MagicMirror ownership-sharing subvalue constructor.
@@ -1263,11 +1263,3 @@ MirrorReturn swift::swift_unsafeReflectAny(HeapObject *owner,
   ::new (&result) MagicMirror(owner, mirrorValue, mirrorType);
   return MirrorReturn(result);
 }
-
-extern "C" void
-swift_stdlib_getDemangledMetatypeName(const Metadata *type,
-                                      bool qualified, String *outString) {
-  std::string name = nameForMetadata(type, qualified);
-  swift_stringFromUTF8InRawMemory(outString, name.data(), name.length());
-}
-

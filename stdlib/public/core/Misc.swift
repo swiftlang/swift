@@ -70,18 +70,17 @@ func _withUninitializedString<R>(
   return (bodyResult, stringResult)
 }
 
-@asmname("swift_stdlib_getDemangledMetatypeName")
-public func _stdlib_getDemangledMetatypeNameImpl(type: Any.Type, qualified: Bool, _ result: UnsafeMutablePointer<String>)
+@asmname("swift_getTypeName")
+public func _getTypeName(type: Any.Type, qualified: Bool)
+  -> (UnsafePointer<UInt8>, Int)
 
 /// Returns the demangled qualified name of a metatype.
 @warn_unused_result
 public // @testable
 func _typeName(type: Any.Type, qualified: Bool = true) -> String {
-  let stringPtr = UnsafeMutablePointer<String>.alloc(1)
-  _stdlib_getDemangledMetatypeNameImpl(type, qualified: qualified, stringPtr)
-  let result = stringPtr.move()
-  stringPtr.dealloc(1)
-  return result
+  let (stringPtr, count) = _getTypeName(type, qualified: qualified)
+  return ._fromWellFormedCodeUnitSequence(UTF8.self,
+    input: UnsafeBufferPointer(start: stringPtr, count: count))
 }
 
 /// Returns `floor(log(x))`.  This equals to the position of the most

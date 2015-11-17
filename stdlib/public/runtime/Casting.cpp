@@ -24,6 +24,7 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "swift/Runtime/Debug.h"
 #include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
@@ -342,12 +343,55 @@ static void _buildNameForMetadata(const Metadata *type,
   result += "<<<invalid type>>>";
 }
 
-// Return a user-comprehensible name for the given type.
+/// Return a user-comprehensible name for the given type.
 std::string swift::nameForMetadata(const Metadata *type,
                                    bool qualified) {
   std::string result;
   _buildNameForMetadata(type, TypeSyntaxLevel::Type, qualified, result);
   return result;
+}
+
+extern "C"
+TwoWordPair<const char *, uintptr_t>::Return
+swift_getTypeName(const Metadata *type, bool qualified) {
+  using Pair = TwoWordPair<const char *, uintptr_t>;
+  using Key = llvm::PointerIntPair<const Metadata *, 1, bool>;
+  
+  static pthread_rwlock_t TypeNameCacheLock = PTHREAD_RWLOCK_INITIALIZER;
+  static Lazy<llvm::DenseMap<Key, std::pair<const char *, size_t>>>
+    TypeNameCache;
+  
+  Key key(type, qualified);
+  auto &cache = TypeNameCache.get();
+  
+  pthread_rwlock_rdlock(&TypeNameCacheLock);
+  auto found = cache.find(key);
+  if (found != cache.end()) {
+    auto result = found->second;
+    pthread_rwlock_unlock(&TypeNameCacheLock);
+    return Pair{result.first, result.second};
+  }
+  
+  pthread_rwlock_unlock(&TypeNameCacheLock);
+  pthread_rwlock_wrlock(&TypeNameCacheLock);
+  // Someone may have beaten us to the write lock.
+  found = cache.find(key);
+  if (found != cache.end()) {
+    auto result = found->second;
+    pthread_rwlock_unlock(&TypeNameCacheLock);
+    return Pair{result.first, result.second};
+  }
+  
+  // Build the metadata name.
+  auto name = nameForMetadata(type, qualified);
+  // Copy it to memory we can reference forever.
+  auto size = name.size();
+  auto result = (char*)malloc(size + 1);
+  memcpy(result, name.data(), size);
+  result[size] = 0;
+  cache.insert({key, {result, size}});
+  pthread_rwlock_unlock(&TypeNameCacheLock);
+  return Pair{result, size};
 }
 
 /// Report a dynamic cast failure.
@@ -982,7 +1026,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
     BoxPair destBox = swift_allocError(srcDynamicType, errorWitness,
                                        srcDynamicValue,
                /*isTake*/ canTake && (flags & DynamicCastFlags::TakeOnSuccess));
-    *destBoxAddr = reinterpret_cast<SwiftError*>(destBox.heapObject);
+    *destBoxAddr = reinterpret_cast<SwiftError*>(destBox.first);
     maybeDeallocateSourceAfterSuccess();
     return true;
   }
@@ -1922,7 +1966,7 @@ static id dynamicCastValueToNSError(OpaqueValue *src,
                                     DynamicCastFlags flags) {
   BoxPair errorBox = swift_allocError(srcType, srcErrorTypeWitness, src,
                             /*isTake*/ flags & DynamicCastFlags::TakeOnSuccess);
-  return swift_bridgeErrorTypeToNSError((SwiftError*)errorBox.heapObject);
+  return swift_bridgeErrorTypeToNSError((SwiftError*)errorBox.first);
 }
 #endif
 

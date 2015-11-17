@@ -66,14 +66,19 @@ extern "C" HeapObject *swift_initStackObject(HeapMetadata const *metadata,
 /// object did escape to some other location.
 extern "C" void swift_verifyEndOfLifetime(HeapObject *object);
 
-/// The structure returned by swift_allocPOD and swift_allocBox.
-struct BoxPair {
-  /// The pointer to the heap object.
-  HeapObject *heapObject;
+/// A structure that's two pointers in size.
+///
+/// C functions can use the TwoWordPair::Return type to return a value in
+/// two registers, compatible with Swift's calling convention for tuples
+/// and structs of two word-sized elements.
+template<typename A, typename B>
+struct TwoWordPair {
+  A first;
+  B second;
   
-  /// The pointer to the value inside the box.
-  OpaqueValue *value;
-  
+  TwoWordPair() = default;
+  TwoWordPair(A first, B second);
+
   // FIXME: rdar://16257592 arm codegen does't call swift_allocBox correctly.
   // Structs are returned indirectly on these platforms, but we want to return
   // in registers, so cram the result into an unsigned long long.
@@ -84,18 +89,14 @@ struct BoxPair {
   
   operator Return() const {
     union {
-      BoxPair value;
+      TwoWordPair value;
       Return mangled;
     } reinterpret = {*this};
     
     return reinterpret.mangled;
   }
   
-  BoxPair() = default;
-  BoxPair(HeapObject *h, OpaqueValue *v)
-    : heapObject(h), value(v) {}
-  
-  /*implicit*/ BoxPair(Return r) {
+  /*implicit*/ TwoWordPair(Return r) {
     union {
       Return mangled;
       BoxPair value;
@@ -104,9 +105,23 @@ struct BoxPair {
     *this = reinterpret.value;
   }
 #else
-  using Return = BoxPair;
+  using Return = TwoWordPair;
 #endif
 };
+  
+template<typename A, typename B>
+inline TwoWordPair<A,B>::TwoWordPair(A first, B second)
+  : first(first), second(second)
+{
+  static_assert(sizeof(A) == sizeof(void*),
+                "first type must be word-sized");
+  static_assert(sizeof(B) == sizeof(void*),
+                "second type must be word-sized");
+  static_assert(alignof(TwoWordPair) == alignof(void*),
+                "pair must be word-aligned");
+}
+  
+using BoxPair = TwoWordPair<HeapObject *, OpaqueValue *>;
 
 /// Allocates a heap object with POD value semantics. The returned memory is
 /// uninitialized outside of the heap object header. The object has an
