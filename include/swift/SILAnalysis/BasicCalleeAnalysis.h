@@ -129,6 +129,7 @@ public:
       return;
 
     delete Cache;
+    Cache = nullptr;
   }
 
   virtual void invalidate(SILFunction *F, PreserveKind K) { invalidate(K); }
