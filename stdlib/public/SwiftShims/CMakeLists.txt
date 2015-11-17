@@ -91,8 +91,8 @@ swift_install_in_component(compiler
 # Install Clang headers under the Swift library so that an installed Swift's
 # module importer can find the compiler headers corresponding to its Clang.
 swift_install_in_component(clang-builtin-headers
-    DIRECTORY "${clang_headers_location}"
-    DESTINATION "lib/swift"
+    DIRECTORY "${clang_headers_location}/"
+    DESTINATION "lib/swift/clang"
     PATTERN "*.h")
 
 # Alternatively, install a symbolic link to the Clang resource directory.
