@@ -38,7 +38,7 @@ add_custom_command_target(unused_var
 # Symlink in the Clang headers.
 # First extract the "version" used for Clang's resource directory.
 string(REGEX MATCH "[0-9]+\\.[0-9]+(\\.[0-9]+)?" CLANG_VERSION
-  ${LLVM_PACKAGE_VERSION})
+  "${LLVM_PACKAGE_VERSION}")
 set(clang_headers_locations
     "${LLVM_LIBRARY_DIR}/clang/${CLANG_VERSION}"
 
