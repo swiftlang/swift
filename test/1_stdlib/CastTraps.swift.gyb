@@ -36,6 +36,10 @@ class ObjCClass2 : NSObject { }
 % objectTypes.append(['NSDateFormatter', 'NSNumberFormatter'])
 // non-Swift Objective-C class
 
+% protocolTypes.append('a.Proto1')
+% protocolTypes.append('a.Proto2')
+protocol Proto1 { }
+protocol Proto2 { }
 % protocolTypes.append('NSURLSessionDelegate')
 // non-Swift Objective-C protocol
 

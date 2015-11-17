@@ -934,7 +934,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
     if (!_conformsToProtocols(srcDynamicValue, srcDynamicType,
                               targetType->Protocols,
                               destExistential->getWitnessTables())) {
-      return _fail(src, srcType, targetType, flags);
+      return _fail(srcDynamicValue, srcDynamicType, targetType, flags);
     }
 
     auto object = *(reinterpret_cast<HeapObject**>(srcDynamicValue));
@@ -953,7 +953,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
     if (!_conformsToProtocols(srcDynamicValue, srcDynamicType,
                               targetType->Protocols,
                               destExistential->getWitnessTables()))
-      return _fail(src, srcType, targetType, flags);
+      return _fail(srcDynamicValue, srcDynamicType, targetType, flags);
 
     // Fill in the type and value.
     destExistential->Type = srcDynamicType;
@@ -977,7 +977,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
     if (!_conformsToProtocols(srcDynamicValue, srcDynamicType,
                               targetType->Protocols,
                               &errorWitness))
-      return _fail(src, srcType, targetType, flags);
+      return _fail(srcDynamicValue, srcDynamicType, targetType, flags);
     
     BoxPair destBox = swift_allocError(srcDynamicType, errorWitness,
                                        srcDynamicValue,
