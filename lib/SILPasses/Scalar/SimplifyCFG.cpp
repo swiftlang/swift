@@ -20,7 +20,6 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/SimplifyInstruction.h"
-#include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/CFG.h"
 #include "swift/SILPasses/Utils/Local.h"
@@ -69,7 +68,6 @@ namespace {
     // Dominance and post-dominance info for the current function
     DominanceInfo *DT = nullptr;
     PostDominanceInfo *PDT = nullptr;
-    CallGraph *CG = nullptr;
 
     bool ShouldVerify;
     bool EnableJumpThread;
@@ -1914,8 +1912,6 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
                                            TAI->getSubstitutions(),
                                            Args, CalleeFnTy->hasErrorResult());
 
-    CallGraphEditor(CG).replaceApplyWithNew(TAI, NewAI);
-
     auto Loc = TAI->getLoc();
     auto *NormalBB = TAI->getNormalBB();
 
@@ -2622,8 +2618,6 @@ bool SimplifyCFG::run() {
 
   DT = nullptr;
   PDT = nullptr;
-  auto *CGA = PM->getAnalysis<CallGraphAnalysis>();
-  CG = CGA->getCallGraphOrNull();
 
   // Perform SROA on BB arguments.
   Changed |= splitBBArguments(Fn);
