@@ -11,3 +11,9 @@ import resilient_struct
   indirect case Parallelogram(Size)
   indirect case Trapezoid(Size)
 }
+
+// Resilient enum
+public enum Medium {
+  case Paper
+  case Canvas
+}

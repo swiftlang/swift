@@ -1693,14 +1693,24 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
       }
     }
 
-    // Check to see if we need a default block.
-    // FIXME: If the enum is resilient, then we always need a default block.
-    for (auto elt : sourceType.getEnumOrBoundGenericEnum()->getAllElements()) {
-      if (!caseToIndex.count(elt)) {
-        defaultBB = SGF.createBasicBlock(curBB);
-        break;
+    // We always need a default block if the enum is resilient.
+    // If the enum is @_fixed_layout, we only need one if the
+    // switch is not exhaustive.
+    bool exhaustive = false;
+    auto enumDecl = sourceType.getEnumOrBoundGenericEnum();
+    if (enumDecl->hasFixedLayout(SGF.SGM.M.getSwiftModule())) {
+      exhaustive = true;
+
+      for (auto elt : enumDecl->getAllElements()) {
+        if (!caseToIndex.count(elt)) {
+          exhaustive = false;
+          break;
+        }
       }
     }
+
+    if (!exhaustive)
+      defaultBB = SGF.createBasicBlock(curBB);
   }
 
   assert(caseBBs.size() == caseInfos.size());
