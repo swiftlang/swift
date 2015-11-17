@@ -18,6 +18,7 @@
 #else
 #include <mutex>
 #endif
+#include "swift/Basic/Malloc.h"
 #include "swift/Basic/type_traits.h"
 
 namespace swift {
@@ -54,7 +55,7 @@ public:
 private:
   static void lazyInitCallback(void *Argument) {
     auto self = reinterpret_cast<Lazy *>(Argument);
-    ::new (&self->unsafeGetAlreadyInitialized()) T();
+    ::new (&self->unsafeGetAlreadyInitialized(), InPlace) T();
   }
 
   Lazy(const Lazy &) = delete;

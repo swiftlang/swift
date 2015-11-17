@@ -49,22 +49,6 @@
 
 namespace swift {
 namespace metadataimpl {
-  enum InPlace_t { InPlace };
-}
-}
-
-/// A slightly more efficient version of the global placement operator new.
-///
-/// Unlike the standard global placement operator new, this operator
-/// is not declared noexcept, which means it is not allowed to return
-/// null under the language semantics, which eliminates an unnecessary
-/// null check that the compiler would otherwise have to insert.
-/// (C++ is dumb.)
-void *operator new(size_t size, void *ptr,
-                   swift::metadataimpl::InPlace_t _);
-
-namespace swift {
-namespace metadataimpl {
 
 // concept Box<typename T> {
 //   using type = T;

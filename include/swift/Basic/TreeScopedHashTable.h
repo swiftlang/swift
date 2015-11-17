@@ -18,6 +18,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Allocator.h"
+#include "swift/Basic/Malloc.h"
 #include <utility>
 
 namespace swift {
@@ -52,7 +53,7 @@ public:
     TreeScopedHashTableVal *New =
         Allocator.template Allocate<TreeScopedHashTableVal>();
     // Set up the value.
-    new (New) TreeScopedHashTableVal(key, val);
+    new (New, InPlace) TreeScopedHashTableVal(key, val);
     New->NextInScope = NextInScope;
     New->NextForKey = NextForKey;
     return New;

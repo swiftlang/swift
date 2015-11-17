@@ -15,6 +15,7 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
 #include "swift/Runtime/Concurrent.h"
+#include "swift/Runtime/Metadata.h"
 #include <mutex>
 #include <condition_variable>
 
@@ -105,7 +106,7 @@ public:
                                    numArguments * sizeof(void*) +
                                    payloadSize);
     void *resultPtr = (char*)buffer + numArguments * sizeof(void*);
-    auto result = new (resultPtr) Impl(numArguments);
+    auto result = new (resultPtr, InPlace) Impl(numArguments);
 
     // Copy the arguments into the right place for the key.
     memcpy(buffer, arguments,

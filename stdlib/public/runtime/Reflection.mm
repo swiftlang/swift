@@ -303,46 +303,46 @@ extern "C"
 void swift_MagicMirrorData_summary(const Metadata *T, String *result) {
   switch (T->getKind()) {
     case MetadataKind::Class:
-      new (result) String("(Class)");
+      new (result, InPlace) String("(Class)");
       break;
     case MetadataKind::Struct:
-      new (result) String("(Struct)");
+      new (result, InPlace) String("(Struct)");
       break;
     case MetadataKind::Enum:
-      new (result) String("(Enum Value)");
+      new (result, InPlace) String("(Enum Value)");
       break;
     case MetadataKind::Opaque:
-      new (result) String("(Opaque Value)");
+      new (result, InPlace) String("(Opaque Value)");
       break;
     case MetadataKind::Tuple:
-      new (result) String("(Tuple)");
+      new (result, InPlace) String("(Tuple)");
       break;
     case MetadataKind::Function:
-      new (result) String("(Function)");
+      new (result, InPlace) String("(Function)");
       break;
     case MetadataKind::Existential:
-      new (result) String("(Existential)");
+      new (result, InPlace) String("(Existential)");
       break;
     case MetadataKind::Metatype:
-      new (result) String("(Metatype)");
+      new (result, InPlace) String("(Metatype)");
       break;
     case MetadataKind::ObjCClassWrapper:
-      new (result) String("(Objective-C Class Wrapper)");
+      new (result, InPlace) String("(Objective-C Class Wrapper)");
       break;
     case MetadataKind::ExistentialMetatype:
-      new (result) String("(ExistentialMetatype)");
+      new (result, InPlace) String("(ExistentialMetatype)");
       break;
     case MetadataKind::ForeignClass:
-      new (result) String("(Foreign Class)");
+      new (result, InPlace) String("(Foreign Class)");
       break;
     case MetadataKind::HeapLocalVariable:
-      new (result) String("(Heap Local Variable)");
+      new (result, InPlace) String("(Heap Local Variable)");
       break;
     case MetadataKind::HeapGenericLocalVariable:
-      new (result) String("(Heap Generic Local Variable)");
+      new (result, InPlace) String("(Heap Generic Local Variable)");
       break;
     case MetadataKind::ErrorObject:
-      new (result) String("(ErrorType Object)");
+      new (result, InPlace) String("(ErrorType Object)");
       break;
   }
 }
@@ -984,7 +984,7 @@ static Mirror getMirrorForSuperclass(const ClassMetadata *sup,
 #endif
 
   Mirror resultBuf;
-  MagicMirror *result = ::new (&resultBuf) MagicMirror;
+  MagicMirror *result = ::new (&resultBuf, InPlace) MagicMirror;
   
   result->Self = &ClassSuperMirrorMetadata;
   result->MirrorWitness = &ClassSuperMirrorWitnessTable;
@@ -1003,7 +1003,7 @@ static Mirror ObjC_getMirrorForSuperclass(Class sup,
                                           const OpaqueValue *value,
                                           const Metadata *type) {
   Mirror resultBuf;
-  MagicMirror *result = ::new (&resultBuf) MagicMirror;
+  MagicMirror *result = ::new (&resultBuf, InPlace) MagicMirror;
   
   result->Self = &ObjCSuperMirrorMetadata;
   result->MirrorWitness = &ObjCSuperMirrorWitnessTable;
@@ -1228,7 +1228,7 @@ MirrorReturn swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
   // Take the value, unless we projected a subvalue from it. We don't want to
   // deal with partial value deinitialization.
   bool take = mirrorValue == value;
-  ::new (&result) MagicMirror(mirrorValue, mirrorType, take);
+  ::new (&result, InPlace) MagicMirror(mirrorValue, mirrorType, take);
   // Destroy the whole original value if we couldn't take it.
   if (!take)
     T->vw_destroy(value);
@@ -1260,6 +1260,6 @@ MirrorReturn swift::swift_unsafeReflectAny(HeapObject *owner,
   // Otherwise, fall back to MagicMirror.
   // Consumes 'owner'.
   Mirror result;
-  ::new (&result) MagicMirror(owner, mirrorValue, mirrorType);
+  ::new (&result, InPlace) MagicMirror(owner, mirrorValue, mirrorType);
   return MirrorReturn(result);
 }

@@ -54,9 +54,6 @@
 using namespace swift;
 using namespace metadataimpl;
 
-void *operator new(size_t size, void *ptr,
-                   swift::metadataimpl::InPlace_t _) { return ptr; };
-
 void *MetadataAllocator::alloc(size_t size) {
 #if defined(__APPLE__)
   const uintptr_t pagesizeMask = vm_page_mask;
