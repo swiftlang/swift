@@ -508,15 +508,14 @@ void DSEContext::updateGenKillSetForRead(SILInstruction *I, BBState *S,
   // the genset accordingly.
   MemLocation &R = MemLocationVault[bit];
   for (unsigned i = 0; i < S->MemLocationCount; ++i) {
-    if (!S->BBGenSet.test(i))
-      continue;
     MemLocation &L = MemLocationVault[i];
     if (!L.isMayAliasMemLocation(R, AA))
       continue;
     S->BBGenSet.reset(i);
+    // Update the kill set, we need to be conservative about kill set. Kill set
+    // kills any MemLocation that this currently MemLocation mayalias.
+    S->BBKillSet.set(i);
   }
-  // Update the kill set.
-  S->BBKillSet.set(bit);
 }
 
 bool DSEContext::updateWriteSetForWrite(SILInstruction *I, BBState *S,

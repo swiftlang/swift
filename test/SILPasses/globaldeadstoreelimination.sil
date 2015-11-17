@@ -1399,3 +1399,34 @@ bb2:                                              // Preds: bb1
   dealloc_stack %2#0 : $*@local_storage S1        // id: %19
   return %18 : $()                                // id: %20
 }
+
+
+// Make sure the load in bb1 prevents the store in bb0 to be eliminated. we have a bug
+// in constructing kill set when it is not conservative enough. i.e. this test case
+// makes sure the killset for bb1 includes the kill for the store in bb2.
+//
+// CHECK-LABEL: conservative_kill_set_class
+// CHECK: bb0
+// CHECK: store
+// CHECK: br bb1
+sil hidden @conservative_kill_set_class : $@convention(thin) (@owned foo, @owned foo) -> () {
+bb0(%0 : $foo, %1 : $foo):
+  %4 = integer_literal $Builtin.Int64, 10         // user: %5
+  %5 = struct $Int (%4 : $Builtin.Int64)          // user: %7
+  %6 = ref_element_addr %0 : $foo, #foo.a    // user: %17
+  store %5 to %6 : $*Int
+  br bb1
+
+bb1:
+  %7 = ref_element_addr %1 : $foo, #foo.a    // user: %17
+  %8 = load %7 : $*Int
+  br bb2
+
+bb2:
+  %9 = integer_literal $Builtin.Int64, 10         // user: %5
+  %10 = struct $Int (%9 : $Builtin.Int64)          // user: %7
+  %11 = ref_element_addr %0 : $foo, #foo.a    // user: %17
+  store %5 to %6 : $*Int
+  %18 = tuple ()                                  // user: %19
+  return %18 : $()                                // id: %19
+}
