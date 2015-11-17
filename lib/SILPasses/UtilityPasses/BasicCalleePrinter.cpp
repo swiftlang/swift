@@ -22,6 +22,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SILPasses/Transforms.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
