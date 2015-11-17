@@ -16,7 +16,7 @@ set(SCALAR_SOURCES
     Scalar/DeadObjectElimination.cpp
     Scalar/SILCodeMotion.cpp
     Scalar/StackPromotion.cpp
-    Scalar/GlobalDeadStoreElimination.cpp
+    Scalar/DeadStoreElimination.cpp
     Scalar/SILLowerAggregateInstrs.cpp
     Scalar/GlobalRedundantLoadElimination.cpp
     Scalar/SILMem2Reg.cpp
