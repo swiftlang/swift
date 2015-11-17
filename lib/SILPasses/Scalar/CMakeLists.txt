@@ -18,6 +18,6 @@ set(SCALAR_SOURCES
     Scalar/StackPromotion.cpp
     Scalar/DeadStoreElimination.cpp
     Scalar/SILLowerAggregateInstrs.cpp
-    Scalar/GlobalRedundantLoadElimination.cpp
+    Scalar/RedundantLoadElimination.cpp
     Scalar/SILMem2Reg.cpp
     PARENT_SCOPE)
