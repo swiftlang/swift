@@ -615,3 +615,10 @@ func someFunction() -> () {
   return someOtherFunction  // expected-error {{unexpected non-void return value in void function}}
 }
 
+// <rdar://problem/23560128> QoI: trying to mutate an optional dictionary result produces bogus diagnostic
+func r23560128() {
+  var a : (Int,Int)?
+  a.0 = 42  // expected-error {{value of optional type '(Int, Int)?' not unwrapped; did you mean to use '!' or '?'?}} {{4-4=!}}
+}
+
+

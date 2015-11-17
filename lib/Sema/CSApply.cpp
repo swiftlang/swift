@@ -5700,6 +5700,19 @@ namespace {
   };
 }
 
+/// Emit the fixes computed as part of the solution, returning true if we were
+/// able to emit an error message, or false if none of the fixits worked out.
+bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
+  bool diagnosed = false;
+  for (unsigned i = 0, e = solution.Fixes.size(); i != e; ++i)
+    diagnosed |= applySolutionFix(E, solution, i);
+
+  return diagnosed;
+}
+
+
+
+
 /// \brief Apply the specified Fix # to this solution, producing a fixit hint
 /// diagnostic for it and returning true.  If the fixit hint turned out to be
 /// bogus, this returns false and doesn't emit anything.
@@ -6083,15 +6096,14 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
   // If any fixes needed to be applied to arrive at this solution, resolve
   // them to specific expressions.
   if (!solution.Fixes.empty()) {
-    bool diagnosed = false;
-    for (unsigned i = 0, e = solution.Fixes.size(); i != e; ++i)
-      diagnosed |= applySolutionFix(expr, solution, i);
-    
+    // If we can diagnose the problem with the fixits that we've pre-assumed,
+    // do so now.
+    if (applySolutionFixes(expr, solution))
+      return nullptr;
+
     // If we didn't manage to diagnose anything well, so fall back to
     // diagnosing mining the system to construct a reasonable error message.
-    if (!diagnosed)
-      diagnoseFailureForExpr(expr);
-
+    diagnoseFailureForExpr(expr);
     return nullptr;
   }
 

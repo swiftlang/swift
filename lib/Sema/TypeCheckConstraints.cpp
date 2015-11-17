@@ -1721,6 +1721,16 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
     return objectTv;
   }
 
+  // Otherwise, the destination is erroneous.  If there are FixIt hints
+  // introduced into the system, they may well be the reason that this isn't an
+  // lvalue.  Emit them if present.
+  if (!Fixes.empty()) {
+    auto solution = finalize(FreeTypeVariableBinding::Allow);
+    if (applySolutionFixes(dest, solution))
+      return Type();
+  }
+
+  // Otherwise, it is a structural problem, diagnose that.
   diagnoseAssignmentFailure(dest, destTy, equalLoc);
   return Type();
 }

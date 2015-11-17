@@ -1425,6 +1425,10 @@ private:
   /// constraint system for further exploration.
   void applySolution(const Solution &solution);
 
+  /// Emit the fixes computed as part of the solution, returning true if we were
+  /// able to emit an error message, or false if none of the fixits worked out.
+  bool applySolutionFixes(Expr *E, const Solution &solution);
+
   /// \brief Apply the specified Fix # to this solution, producing a fixit hint
   /// diagnostic for it and returning true.  If the fixit hint turned out to be
   /// bogus, this returns false and doesn't emit anything.
