@@ -32,6 +32,7 @@
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Config.h"
+#include "swift/IDE/Utils.h"
 #include "swift/Sema/CodeCompletionTypeChecking.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"

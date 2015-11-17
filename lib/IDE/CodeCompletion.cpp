@@ -1252,78 +1252,74 @@ void CodeCompletionCallbacksImpl::completeExpr() {
   deliverCompletionResults();
 }
 
-namespace {
-class ArchetypeTransformer {
-  DeclContext *DC;
-  Type BaseTy;
-  llvm::DenseMap<TypeBase *, Type> Cache;
-  TypeSubstitutionMap Map;
+ArchetypeTransformer::ArchetypeTransformer(DeclContext *DC, Type Ty) :
+    DC(DC), BaseTy(Ty->getRValueType()){
+  auto D = BaseTy->getNominalOrBoundGenericNominal();
+  if (!D)
+    return;
+  SmallVector<Type, 3> Scrach;
+  auto Params = D->getGenericParamTypes();
+  auto Args = BaseTy->getAllGenericArgs(Scrach);
+  assert(Params.size() == Args.size());
+  for (unsigned I = 0, N = Params.size(); I < N; I ++) {
+    Map[Params[I]->getCanonicalType()->castTo<GenericTypeParamType>()] = Args[I];
+  }
+}
 
-public:
-  ArchetypeTransformer(DeclContext *DC, Type Ty) : DC(DC), BaseTy(Ty->getRValueType()){
-    auto D = BaseTy->getNominalOrBoundGenericNominal();
-    if (!D)
-      return;
-    SmallVector<Type, 3> Scrach;
-    auto Params = D->getGenericParamTypes();
-    auto Args = BaseTy->getAllGenericArgs(Scrach);
-    assert(Params.size() == Args.size());
-    for (unsigned I = 0, N = Params.size(); I < N; I ++) {
-      Map[Params[I]->getCanonicalType()->castTo<GenericTypeParamType>()] = Args[I];
+llvm::function_ref<Type(Type)> ArchetypeTransformer::getTransformerFunc() {
+  if (TheFunc)
+    return TheFunc;
+  TheFunc = [&](Type Ty) {
+    if (Ty->getKind() != TypeKind::Archetype)
+      return Ty;
+    if (Cache.count(Ty.getPointer()) > 0) {
+      return Cache[Ty.getPointer()];
     }
-  }
-
-  std::function<Type(Type)> getTransformerFunc() {
-    return [&](Type Ty) {
-      if (Ty->getKind() != TypeKind::Archetype)
-        return Ty;
-      if (Cache.count(Ty.getPointer()) > 0) {
-        return Cache[Ty.getPointer()];
-      }
-      Type Result = Ty;
-      auto *RootArc = cast<ArchetypeType>(Result.getPointer());
-      llvm::SmallVector<Identifier, 1> Names;
-      bool SelfDerived = false;
-      for(auto *AT = RootArc; AT; AT = AT->getParent()) {
-        if(!AT->getSelfProtocol())
-          Names.insert(Names.begin(), AT->getName());
-        else
-          SelfDerived = true;
-      }
-      if (SelfDerived) {
-        if (auto MT = checkMemberType(*DC, BaseTy, Names)) {
-          if (auto NAT = dyn_cast<NameAliasType>(MT.getPointer())) {
-            Result = NAT->getSinglyDesugaredType();
-          } else {
-            Result =  MT;
-          }
-        }
-      } else {
-        Result = Ty.subst(DC->getParentModule(), Map, SubstFlags::IgnoreMissing);
-      }
-
-      auto ATT = dyn_cast<ArchetypeType>(Result.getPointer());
-      if (ATT && !ATT->getParent()) {
-        auto Conformances = ATT->getConformsTo();
-        if (Conformances.size() == 1) {
-          Result = Conformances[0]->getDeclaredType();
-        } else if (!Conformances.empty()) {
-          llvm::SmallVector<Type, 3> ConformedTypes;
-          for (auto PD : Conformances) {
-            ConformedTypes.push_back(PD->getDeclaredType());
-          }
-          Result = ProtocolCompositionType::get(DC->getASTContext(),
-                                                ConformedTypes);
+    Type Result = Ty;
+    auto *RootArc = cast<ArchetypeType>(Result.getPointer());
+    llvm::SmallVector<Identifier, 1> Names;
+    bool SelfDerived = false;
+    for(auto *AT = RootArc; AT; AT = AT->getParent()) {
+      if(!AT->getSelfProtocol())
+        Names.insert(Names.begin(), AT->getName());
+      else
+        SelfDerived = true;
+    }
+    if (SelfDerived) {
+      if (auto MT = checkMemberType(*DC, BaseTy, Names)) {
+        if (auto NAT = dyn_cast<NameAliasType>(MT.getPointer())) {
+          Result = NAT->getSinglyDesugaredType();
+        } else {
+          Result =  MT;
         }
       }
-      if (Result->getKind() != TypeKind::Archetype)
-        Result = Result.transform(getTransformerFunc());
-      Cache[Ty.getPointer()] = Result;
-      return Result;
-    };
-  }
-};
+    } else {
+      Result = Ty.subst(DC->getParentModule(), Map, SubstFlags::IgnoreMissing);
+    }
 
+    auto ATT = dyn_cast<ArchetypeType>(Result.getPointer());
+    if (ATT && !ATT->getParent()) {
+      auto Conformances = ATT->getConformsTo();
+      if (Conformances.size() == 1) {
+        Result = Conformances[0]->getDeclaredType();
+      } else if (!Conformances.empty()) {
+        llvm::SmallVector<Type, 3> ConformedTypes;
+        for (auto PD : Conformances) {
+          ConformedTypes.push_back(PD->getDeclaredType());
+        }
+        Result = ProtocolCompositionType::get(DC->getASTContext(),
+                                              ConformedTypes);
+      }
+    }
+    if (Result->getKind() != TypeKind::Archetype)
+      Result = Result.transform(getTransformerFunc());
+    Cache[Ty.getPointer()] = Result;
+    return Result;
+  };
+  return TheFunc;
+}
+
+namespace {
 static bool isTopLevelContext(const DeclContext *DC) {
   for (; DC && DC->isLocalContext(); DC = DC->getParent()) {
     switch (DC->getContextKind()) {

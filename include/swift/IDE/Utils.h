@@ -43,6 +43,7 @@ namespace swift {
   class SourceLoc;
   class Type;
   class Decl;
+  class DeclContext;
   class ClangNode;
   class ClangImporter;
 
@@ -176,6 +177,17 @@ private:
   bool tryResolve(ModuleEntity Mod, SourceLoc Loc);
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                bool IsOpenBracket) override;
+};
+
+class ArchetypeTransformer {
+  DeclContext *DC;
+  Type BaseTy;
+  llvm::DenseMap<TypeBase *, Type> Cache;
+  TypeSubstitutionMap Map;
+  std::function<Type(Type)> TheFunc = nullptr;
+public:
+  ArchetypeTransformer(DeclContext *DC, Type Ty);
+  llvm::function_ref<Type(Type)> getTransformerFunc();
 };
 } // namespace ide
 } // namespace swift
