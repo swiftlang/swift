@@ -35,6 +35,11 @@ add_custom_command_target(unused_var
     DEPENDS "${sources}"
     COMMENT "Copying SwiftShims module to ${output_dir}")
 
+if ("${LLVM_PACKAGE_VERSION}" STREQUAL "")
+  message(FATAL_ERROR
+          "LLVM_PACKAGE_VERSION must be set before including subdirectories")
+endif()
+
 # Symlink in the Clang headers.
 # First extract the "version" used for Clang's resource directory.
 string(REGEX MATCH "[0-9]+\\.[0-9]+(\\.[0-9]+)?" CLANG_VERSION

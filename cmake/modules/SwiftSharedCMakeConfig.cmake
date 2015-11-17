@@ -278,6 +278,7 @@ macro(swift_common_unified_build_config product)
   set(CLANG_BUILD_INCLUDE_DIR "${CMAKE_BINARY_DIR}/tools/clang/include")
   set(${product}_NATIVE_LLVM_TOOLS_PATH "${CMAKE_BINARY_DIR}/bin")
   set(${product}_NATIVE_CLANG_TOOLS_PATH "${CMAKE_BINARY_DIR}/bin")
+  set(LLVM_PACKAGE_VERSION ${PACKAGE_VERSION})
 
   # If cmark was checked out into tools/cmark, expect to build it as
   # part of the unified build.
