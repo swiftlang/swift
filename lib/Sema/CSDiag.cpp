@@ -1163,7 +1163,7 @@ namespace {
 
     /// True if the call site for this callee syntactically has a trailing
     /// closure specified.
-    bool HasTrailingClosure;
+    bool hasTrailingClosure;
     
     /// This is the list of candidates identified.
     SmallVector<UncurriedCandidate, 4> candidates;
@@ -1171,19 +1171,38 @@ namespace {
     /// This tracks how close the candidates are, after filtering.
     CandidateCloseness closeness = CC_GeneralMismatch;
     
+    /// When we have a candidate that differs by a single argument mismatch, we
+    /// keep track of which argument passed to the call is failed, and what the
+    /// expected type is.  If the candidate set disagrees, or if there is more
+    /// than a single argument mismatch, then this is "{ -1, Type() }".
+    struct FailedArgumentInfo {
+      int argumentNumber = -1;      ///< Arg # at the call site.
+      Type parameterType = Type();  ///< Expected type at the decl site.
+      
+      bool operator!=(const FailedArgumentInfo &other) {
+        if (argumentNumber != other.argumentNumber) return true;
+        // parameterType can be null, and isEqual doesn't handle this.
+        if (!parameterType || !other.parameterType)
+          return parameterType.getPointer() != other.parameterType.getPointer();
+        return !parameterType->isEqual(other.parameterType);
+      }
+    };
+    FailedArgumentInfo failedArgument = FailedArgumentInfo();
+    
     /// Analyze a function expr and break it into a candidate set.  On failure,
     /// this leaves the candidate list empty.
-    CalleeCandidateInfo(Expr *Fn, bool HasTrailingClosure,
+    CalleeCandidateInfo(Expr *Fn, bool hasTrailingClosure,
                         ConstraintSystem *CS)
-      : CS(CS), HasTrailingClosure(HasTrailingClosure) {
+      : CS(CS), hasTrailingClosure(hasTrailingClosure) {
       collectCalleeCandidates(Fn);
     }
 
     CalleeCandidateInfo(ArrayRef<OverloadChoice> candidates,
-                        unsigned UncurryLevel, bool HasTrailingClosure,
+                        unsigned UncurryLevel, bool hasTrailingClosure,
                         ConstraintSystem *CS);
 
-    typedef const std::function<CandidateCloseness(UncurriedCandidate)>
+    typedef std::pair<CandidateCloseness, FailedArgumentInfo> ClosenessResultTy;
+    typedef const std::function<ClosenessResultTy(UncurriedCandidate)>
     &ClosenessPredicate;
 
     /// After the candidate list is formed, it can be filtered down to discard
@@ -1237,32 +1256,38 @@ void CalleeCandidateInfo::filterList(ClosenessPredicate predicate) {
 
   // Now that we have the candidate list, figure out what the best matches from
   // the candidate list are, and remove all the ones that aren't at that level.
-  SmallVector<CandidateCloseness, 4> closenessList;
+  SmallVector<ClosenessResultTy, 4> closenessList;
   closenessList.reserve(candidates.size());
   for (auto decl : candidates) {
     auto declCloseness = predicate(decl);
     
     // If this candidate otherwise matched but was marked unavailable, then
     // treat it as unavailable, which is a very close failure.
-    if (declCloseness == CC_ExactMatch &&
+    if (declCloseness.first == CC_ExactMatch &&
         decl.decl->getAttrs().isUnavailable(CS->getASTContext()) &&
         !CS->TC.getLangOpts().DisableAvailabilityChecking)
-      declCloseness = CC_Unavailable;
+      declCloseness.first = CC_Unavailable;
     
     closenessList.push_back(declCloseness);
-    closeness = std::min(closeness, closenessList.back());
+    closeness = std::min(closeness, closenessList.back().first);
   }
 
   // Now that we know the minimum closeness, remove all the elements that aren't
-  // as close.
+  // as close.  Keep track of argument failure information if the entire
+  // matching candidate set agrees.
   unsigned NextElt = 0;
   for (unsigned i = 0, e = candidates.size(); i != e; ++i) {
     // If this decl in the result list isn't a close match, ignore it.
-    if (closeness != closenessList[i])
+    if (closeness != closenessList[i].first)
       continue;
-
+    
     // Otherwise, preserve it.
     candidates[NextElt++] = candidates[i];
+    
+    if (NextElt == 1)
+      failedArgument = closenessList[i].second;
+    else if (failedArgument != closenessList[i].second)
+      failedArgument = FailedArgumentInfo();
   }
 
   candidates.erase(candidates.begin()+NextElt, candidates.end());
@@ -1294,8 +1319,9 @@ static bool argumentMismatchIsNearMiss(Type argType, Type paramType) {
 }
 
 /// Determine how close an argument list is to an already decomposed argument
-/// list.
-static CandidateCloseness
+/// list.  If the closeness is a miss by a single argument, then this returns
+/// information about that failure.
+static std::pair<CandidateCloseness, CalleeCandidateInfo::FailedArgumentInfo>
 evaluateCloseness(Type candArgListType, ArrayRef<CallArgParam> actualArgs,
                   bool argsHaveTrailingClosure) {
   auto candArgs = decomposeArgParamType(candArgListType);
@@ -1329,7 +1355,7 @@ evaluateCloseness(Type candArgListType, ArrayRef<CallArgParam> actualArgs,
                          /*allowFixes:*/ true,
                          listener, paramBindings))
     // On error, get our closeness from whatever problem the listener saw.
-    return listener.getResult();
+    return { listener.getResult(), {}};
 
   // If we found a mapping, check to see if the matched up arguments agree in
   // their type and count the number of mismatched arguments.
@@ -1340,11 +1366,12 @@ evaluateCloseness(Type candArgListType, ArrayRef<CallArgParam> actualArgs,
   // function type, optional where none was expected, etc).  This allows us to
   // heuristically filter large overload sets better.
   bool mismatchesAreNearMisses = true;
+
+  CalleeCandidateInfo::FailedArgumentInfo failureInfo;
   
   for (unsigned i = 0, e = paramBindings.size(); i != e; ++i) {
-    // bindings specifify the arguments that source the parameter.  The only
-    // case in which this returns a non-singular value is when there are varargs
-    // in play.
+    // Bindings specify the arguments that source the parameter.  The only case
+    // this returns a non-singular value is when there are varargs in play.
     auto &bindings = paramBindings[i];
     auto paramType = candArgs[i].Ty;
     
@@ -1368,25 +1395,32 @@ evaluateCloseness(Type candArgListType, ArrayRef<CallArgParam> actualArgs,
       
       // Keep track of whether this argument was a near miss or not.
       mismatchesAreNearMisses &= argumentMismatchIsNearMiss(argType, paramType);
+      
+      failureInfo.argumentNumber = argNo;
+      failureInfo.parameterType = paramType;
     }
   }
   
   if (mismatchingArgs == 0)
-    return CC_ExactMatch;
+    return { CC_ExactMatch, {}};
   
   // Check to see if the first argument expects an inout argument, but is not
   // an lvalue.
   if (candArgs[0].Ty->is<InOutType>() && !actualArgs[0].Ty->isLValueType())
-    return CC_NonLValueInOut;
+    return { CC_NonLValueInOut, {}};
   
   // If we have exactly one argument mismatching, classify it specially, so that
   // close matches are prioritized against obviously wrong ones.
-  if (mismatchingArgs == 1)
-    return mismatchesAreNearMisses ? CC_OneArgumentNearMismatch
-                                   : CC_OneArgumentMismatch;
+  if (mismatchingArgs == 1) {
+    auto closeness = mismatchesAreNearMisses ? CC_OneArgumentNearMismatch
+                                             : CC_OneArgumentMismatch;
+    // Return information about the single failing argument.
+    return { closeness, failureInfo };
+  }
   
-  return mismatchesAreNearMisses ? CC_ArgumentNearMismatch
-                                 : CC_ArgumentMismatch;
+  auto closeness = mismatchesAreNearMisses ? CC_ArgumentNearMismatch
+                                           : CC_ArgumentMismatch;
+  return { closeness, {}};
 }
 
 void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
@@ -1534,12 +1568,12 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
 void CalleeCandidateInfo::filterList(ArrayRef<CallArgParam> actualArgs) {
   // Now that we have the candidate list, figure out what the best matches from
   // the candidate list are, and remove all the ones that aren't at that level.
-  filterList([&](UncurriedCandidate candidate) -> CandidateCloseness {
+  filterList([&](UncurriedCandidate candidate) -> ClosenessResultTy {
     auto inputType = candidate.getArgumentType();
     // If this isn't a function or isn't valid at this uncurry level, treat it
     // as a general mismatch.
-    if (!inputType) return CC_GeneralMismatch;
-    return evaluateCloseness(inputType, actualArgs, HasTrailingClosure);
+    if (!inputType) return { CC_GeneralMismatch, {}};
+    return evaluateCloseness(inputType, actualArgs, hasTrailingClosure);
   });
 }
 
@@ -1548,14 +1582,14 @@ void CalleeCandidateInfo::filterContextualMemberList(Expr *argExpr) {
 
   // If the argument is not present then we expect members without arguments.
   if (!argExpr) {
-    return filterList([&](UncurriedCandidate candidate) -> CandidateCloseness {
+    return filterList([&](UncurriedCandidate candidate) -> ClosenessResultTy {
       auto inputType = candidate.getArgumentType();
       // If this candidate has no arguments, then we're a match.
-      if (!inputType) return CC_ExactMatch;
+      if (!inputType) return { CC_ExactMatch, {}};
       
       // Otherwise, if this is a function candidate with an argument, we
       // mismatch argument count.
-      return CC_ArgumentCountMismatch;
+      return { CC_ArgumentCountMismatch, {}};
     });
   }
   
@@ -1598,9 +1632,9 @@ void CalleeCandidateInfo::filterContextualMemberList(Expr *argExpr) {
 
 CalleeCandidateInfo::CalleeCandidateInfo(ArrayRef<OverloadChoice> overloads,
                                          unsigned uncurryLevel,
-                                         bool HasTrailingClosure,
+                                         bool hasTrailingClosure,
                                          ConstraintSystem *CS)
-  : CS(CS), HasTrailingClosure(HasTrailingClosure) {
+  : CS(CS), hasTrailingClosure(hasTrailingClosure) {
   for (auto cand : overloads) {
     if (cand.isDecl())
       candidates.push_back({ cand.getDecl(), uncurryLevel });
@@ -3282,11 +3316,12 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   auto indexType = indexExpr->getType();
 
   auto decomposedIndexType = decomposeArgParamType(indexType);
-  calleeInfo.filterList([&](UncurriedCandidate cand) -> CandidateCloseness
+  calleeInfo.filterList([&](UncurriedCandidate cand) ->
+                                 CalleeCandidateInfo::ClosenessResultTy
   {
     // Classify how close this match is.  Non-subscript decls don't match.
     auto *SD = dyn_cast<SubscriptDecl>(cand.decl);
-    if (!SD) return CC_GeneralMismatch;
+    if (!SD) return { CC_GeneralMismatch, {}};
     
     // Check to make sure the base expr type is convertible to the expected base
     // type.
@@ -3297,11 +3332,14 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
         !CS->TC.isConvertibleTo(baseType, instanceTy, CS->DC)) {
       selfConstraint = CC_SelfMismatch;
     }
-
+    
     // Explode out multi-index subscripts to find the best match.
-    return std::max(evaluateCloseness(SD->getIndicesType(),decomposedIndexType,
-                              /*FIXME: Subscript trailing closures*/false),
-                    selfConstraint);
+    auto indexResult =
+      evaluateCloseness(SD->getIndicesType(), decomposedIndexType,
+                        /*FIXME: Subscript trailing closures*/false);
+    if (selfConstraint > indexResult.first)
+      return {selfConstraint, {}};
+    return indexResult;
   });
 
   // TODO: Is there any reason to check for CC_NonLValueInOut here?
