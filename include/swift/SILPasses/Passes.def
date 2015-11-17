@@ -38,6 +38,9 @@ PASS(AllocBoxToStack, "allocbox-to-stack",
      "Promote heap allocations to stack allocations")
 PASS(ArrayCountPropagation, "array-count-propagation",
      "Propagate the count of arrays")
+PASS(BasicCalleePrinter, "basic-callee-printer",
+     "Construct basic callee analysis and use it to print callees "
+     "for testing purposes")
 PASS(CFGPrinter, "view-cfg",
      "View the CFG of all passed in functions")
 PASS(COWArrayOpts, "cowarray-opt",

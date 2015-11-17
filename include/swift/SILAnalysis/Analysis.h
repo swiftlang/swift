@@ -74,6 +74,13 @@ namespace swift {
                                       // did not change the overall flow
                                       // of the code.
 
+      /// The pass does not delete any functions.
+      ///
+      /// The intent behind this is so that analyses that cache
+      /// SILFunction * to be able to be invalidated and later
+      /// recomputed so that they are not holding dangling pointers.
+      Functions = 0x4,
+
       /// This Top in case we add a different top besides ProgramFlow.
       All = ProgramFlow,
     };

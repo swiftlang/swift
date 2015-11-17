@@ -24,6 +24,7 @@
 #endif
 
 ANALYSIS(Alias)
+ANALYSIS(BasicCallee)
 ANALYSIS(CallGraph)
 ANALYSIS(ClassHierarchy)
 ANALYSIS(Destructor)

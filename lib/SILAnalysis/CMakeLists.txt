@@ -3,6 +3,7 @@ add_swift_library(swiftSILAnalysis
   AliasAnalysis.cpp
   Analysis.cpp
   ArraySemantic.cpp
+  BasicCalleeAnalysis.cpp
   CFG.cpp
   CallGraph.cpp
   ClassHierarchyAnalysis.cpp

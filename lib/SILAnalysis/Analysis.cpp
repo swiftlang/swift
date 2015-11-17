@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-analysis"
 #include "swift/SILAnalysis/Analysis.h"
+#include "swift/SILAnalysis/BasicCalleeAnalysis.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/IVAnalysis.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
@@ -49,4 +50,8 @@ SILAnalysis *swift::createPostOrderAnalysis(SILModule *M) {
 
 SILAnalysis *swift::createClassHierarchyAnalysis(SILModule *M) {
   return new ClassHierarchyAnalysis(M);
+}
+
+SILAnalysis *swift::createBasicCalleeAnalysis(SILModule *M) {
+  return new BasicCalleeAnalysis(M);
 }
