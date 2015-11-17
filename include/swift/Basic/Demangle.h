@@ -407,6 +407,10 @@ private:
   std::string &Stream;
 };
 
+/// Is a character considered a digit by the demangling grammar?
+///
+/// Yes, this is equivalent to the standard C isdigit(3), but some platforms
+/// give isdigit suboptimal implementations.
 static inline bool isDigit(int c) {
   return c >= '0' && c <= '9';
 }
