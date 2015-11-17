@@ -251,9 +251,6 @@ namespace {
     /// \p Caller and the inliner needs to reject this inlining request.
     bool hasInliningCycle(SILFunction *Caller, SILFunction *Callee);
 
-    void removeApply(FullApplySite Apply, CallGraph &CG,
-                     llvm::SmallVectorImpl<FullApplySite> &NewApplies);
-
     FullApplySite devirtualizeUpdatingCallGraph(FullApplySite Apply,
                                                 CallGraph &CG);
 
