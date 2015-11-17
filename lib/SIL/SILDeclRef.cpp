@@ -405,7 +405,7 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
     // As a special case, functions can have external asm names.
     // Use the asm name only for the original non-thunked, non-curried entry
     // point.
-    if (auto AsmA = c.getDecl()->getAttrs().getAttribute<AsmnameAttr>())
+    if (auto AsmA = c.getDecl()->getAttrs().getAttribute<SILGenNameAttr>())
       if (!c.isForeignToNativeThunk() && !c.isNativeToForeignThunk()
           && !c.isCurried) {
         buffer << AsmA->Name;

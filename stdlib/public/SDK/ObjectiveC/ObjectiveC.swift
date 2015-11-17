@@ -195,10 +195,10 @@ public struct NSZone : NilLiteralConvertible {
 //===----------------------------------------------------------------------===//
 
 @warn_unused_result
-@asmname("objc_autoreleasePoolPush")
+@_silgen_name("objc_autoreleasePoolPush")
 func __pushAutoreleasePool() -> COpaquePointer
 
-@asmname("objc_autoreleasePoolPop")
+@_silgen_name("objc_autoreleasePoolPop")
 func __popAutoreleasePool(pool: COpaquePointer)
 
 public func autoreleasepool(@noescape code: () -> Void) {

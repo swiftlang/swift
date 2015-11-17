@@ -60,26 +60,26 @@ func _isStdlibInternalChecksEnabled() -> Bool {
 #endif
 }
 
-@asmname("swift_reportFatalErrorInFile")
+@_silgen_name("swift_reportFatalErrorInFile")
 func _reportFatalErrorInFile(
   prefix: UnsafePointer<UInt8>, _ prefixLength: UInt,
   _ message: UnsafePointer<UInt8>, _ messageLength: UInt,
   _ file: UnsafePointer<UInt8>, _ fileLength: UInt,
   _ line: UInt)
 
-@asmname("swift_reportFatalError")
+@_silgen_name("swift_reportFatalError")
 func _reportFatalError(
   prefix: UnsafePointer<UInt8>, _ prefixLength: UInt,
   _ message: UnsafePointer<UInt8>, _ messageLength: UInt)
 
-@asmname("swift_reportUnimplementedInitializerInFile")
+@_silgen_name("swift_reportUnimplementedInitializerInFile")
 func _reportUnimplementedInitializerInFile(
   className: UnsafePointer<UInt8>, _ classNameLength: UInt,
   _ initName: UnsafePointer<UInt8>, _ initNameLength: UInt,
   _ file: UnsafePointer<UInt8>, _ fileLength: UInt,
   _ line: UInt, _ column: UInt)
 
-@asmname("swift_reportUnimplementedInitializer")
+@_silgen_name("swift_reportUnimplementedInitializer")
 func _reportUnimplementedInitializer(
   className: UnsafePointer<UInt8>, _ classNameLength: UInt,
   _ initName: UnsafePointer<UInt8>, _ initNameLength: UInt)

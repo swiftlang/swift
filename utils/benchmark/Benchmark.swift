@@ -22,7 +22,7 @@
 // This file will be removed as soon as rdar://14747929 is fixed.
 //
 ////////////////////////////////////////////////////////////////////////////////
-@asmname("mach_absolute_time") func __mach_absolute_time__() -> UInt64
+@_silgen_name("mach_absolute_time") func __mach_absolute_time__() -> UInt64
 
 var stringBenchmarkWords: String[] = [
   "woodshed",

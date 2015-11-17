@@ -24,7 +24,7 @@ import Darwin
 
 #if USE_DIRECTLY
 
-@asmname("global")
+@_silgen_name("global")
 func global() -> Int32
 
 if global() != 42 {

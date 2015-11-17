@@ -8,7 +8,7 @@
 import ObjectiveC
 
 // FIXME: <rdar://problem/19302805> Crash when NSClassFromString returns nil
-@asmname("objc_lookUpClass")
+@_silgen_name("objc_lookUpClass")
 func lookUpClassOpaque(name: UnsafePointer<CChar>) -> COpaquePointer
 
 let ptr = lookUpClassOpaque("ClassFromLibrary")

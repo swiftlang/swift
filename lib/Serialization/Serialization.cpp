@@ -1552,10 +1552,10 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
   }
 #include "swift/AST/Attr.def"
 
-  case DAK_Asmname: {
-    auto *theAttr = cast<AsmnameAttr>(DA);
-    auto abbrCode = DeclTypeAbbrCodes[AsmnameDeclAttrLayout::Code];
-    AsmnameDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
+  case DAK_SILGenName: {
+    auto *theAttr = cast<SILGenNameAttr>(DA);
+    auto abbrCode = DeclTypeAbbrCodes[SILGenNameDeclAttrLayout::Code];
+    SILGenNameDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                       theAttr->isImplicit(),
                                       theAttr->Name);
     return;

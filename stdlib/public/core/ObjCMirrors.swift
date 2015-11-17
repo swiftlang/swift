@@ -11,9 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #if _runtime(_ObjC)
-@asmname("swift_ObjCMirror_count") 
+@_silgen_name("swift_ObjCMirror_count") 
 func _getObjCCount(_: _MagicMirrorData) -> Int
-@asmname("swift_ObjCMirror_subscript") 
+@_silgen_name("swift_ObjCMirror_subscript") 
 func _getObjCChild(_: Int, _: _MagicMirrorData) -> (String, _MirrorType)
 
 @objc protocol _DebugDescriptionProxy {

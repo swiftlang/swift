@@ -6,7 +6,7 @@
 import Swift
 import CoreGraphics
 
-@asmname("vprintf")
+@_silgen_name("vprintf")
 func c_vprintf(format: UnsafePointer<Int8>, _ args: CVaListPointer)
 
 func my_printf(format: String, _ arguments: CVarArgType...) {

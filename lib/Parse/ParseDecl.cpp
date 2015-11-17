@@ -563,7 +563,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
-  case DAK_Asmname: {
+  case DAK_SILGenName: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
@@ -591,7 +591,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       return false;
     }
 
-    // Diagnose using @asmname in a local scope.  These don't
+    // Diagnose using @_silgen_name in a local scope.  These don't
     // actually work.
     if (CurDeclContext->isLocalContext()) {
       // Emit an error, but do not discard the attribute.  This enables
@@ -600,7 +600,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     }
 
     if (!DiscardAttribute)
-      Attributes.add(new (Context) AsmnameAttr(AsmName.getValue(), AtLoc,
+      Attributes.add(new (Context) SILGenNameAttr(AsmName.getValue(), AtLoc,
                                                AttrRange, /*Implicit=*/false));
 
     break;
@@ -1240,7 +1240,7 @@ bool Parser::parseVersionTuple(clang::VersionTuple &Version,
 
 /// \verbatim
 ///   attribute:
-///     'asmname' '(' identifier ')'
+///     '_silgen_name' '(' identifier ')'
 ///     'semantics' '(' identifier ')'
 ///     'infix' '=' numeric_constant
 ///     'unary'
@@ -3204,8 +3204,8 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
     // FIXME: Use outer '{' loc if isImplicitGet.
     bool ExternalAsmName = false;
     if (!isImplicitGet && !consumeIf(tok::l_brace)) {
-      // asmname'd accessors don't need bodies.
-      if (!Attributes.hasAttribute<AsmnameAttr>()) {
+      // _silgen_name'd accessors don't need bodies.
+      if (!Attributes.hasAttribute<SILGenNameAttr>()) {
         diagnose(Tok, diag::expected_lbrace_accessor,
                  getAccessorNameForDiagnostic(Kind, addressorKind));
         return true;

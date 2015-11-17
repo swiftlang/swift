@@ -1,5 +1,5 @@
 
-@asmname("unknown")
+@_silgen_name("unknown")
 public func unknown() -> ()
 
 public func doSomething() {

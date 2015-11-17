@@ -144,12 +144,12 @@ public var stderr : UnsafeMutablePointer<FILE> {
 //===----------------------------------------------------------------------===//
 
 @warn_unused_result
-@asmname("_swift_Darwin_open") 
+@_silgen_name("_swift_Darwin_open") 
 func _swift_Darwin_open(path: UnsafePointer<CChar>,
   _ oflag: CInt, _ mode: mode_t) -> CInt
 
 @warn_unused_result
-@asmname("_swift_Darwin_openat")
+@_silgen_name("_swift_Darwin_openat")
 func _swift_Darwin_openat(fd: CInt,
   _ path: UnsafePointer<CChar>,
   _ oflag: CInt, _ mode: mode_t) -> CInt
@@ -253,14 +253,14 @@ public var SEM_FAILED: UnsafeMutablePointer<sem_t> {
 }
 
 @warn_unused_result
-@asmname("_swift_Darwin_sem_open2")
+@_silgen_name("_swift_Darwin_sem_open2")
 internal func _swift_Darwin_sem_open2(
   name: UnsafePointer<CChar>,
   _ oflag: CInt
 ) -> UnsafeMutablePointer<sem_t>
 
 @warn_unused_result
-@asmname("_swift_Darwin_sem_open4")
+@_silgen_name("_swift_Darwin_sem_open4")
 internal func _swift_Darwin_sem_open4(
   name: UnsafePointer<CChar>,
   _ oflag: CInt,

@@ -135,7 +135,7 @@ struct SwiftError : SwiftErrorHeader {
   SwiftError &operator=(const SwiftError &) = delete;
   SwiftError &operator=(SwiftError &&) = delete;
 };
-  
+
 /// Allocate a catchable error object.
 ///
 /// If value is nonnull, it should point to a value of \c type, which will be

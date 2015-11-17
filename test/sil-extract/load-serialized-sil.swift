@@ -41,7 +41,7 @@
 // CHECK-NOT: sil {{.*}} @_TFVs1XCfT_S_ : $@convention(thin) (@thin X.Type) -> X
 // SIB-CHECK-NOT: sil {{.*}} @_TFVs1XCfT_S_ : $@convention(thin) (@thin X.Type) -> X
 
-@asmname("unknown")
+@_silgen_name("unknown")
 public func unknown() -> ()
 
 struct X {

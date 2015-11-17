@@ -51,13 +51,13 @@ public func differentWrapped<
   return a.getValue() != b.getValue()
 }
 
-@noreturn @asmname("exit") public func exit ()->()
+@noreturn @_silgen_name("exit") public func exit ()->()
 
 @noreturn public func testNoReturnAttr() -> () { exit() }
 @noreturn public func testNoReturnAttrPoly<T>(x x: T) -> () { exit() }
 
 
-@asmname("primitive") public func primitive()
+@_silgen_name("primitive") public func primitive()
 
 public protocol EqualOperator {
   func ==(x: Self, y: Self) -> Bool

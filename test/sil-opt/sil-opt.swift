@@ -45,7 +45,7 @@
 // SIB-CHECK-NEXT: struct $X ()
 // SIB-CHECK-NEXT: return
 
-@asmname("unknown")
+@_silgen_name("unknown")
 public func unknown() -> ()
 
 struct X {

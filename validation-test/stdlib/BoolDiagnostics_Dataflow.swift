@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
 
-@asmname("opaque")
+@_silgen_name("opaque")
 func opaque() -> Int
 
 func test_constantFoldAnd1() -> Int {

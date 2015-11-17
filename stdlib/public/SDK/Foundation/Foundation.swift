@@ -69,7 +69,7 @@ class NSSimpleCString {}
 class NSConstantString {}
 
 @warn_unused_result
-@asmname("swift_convertStringToNSString")
+@_silgen_name("swift_convertStringToNSString")
 public // COMPILER_INTRINSIC
 func _convertStringToNSString(string: String) -> NSString {
   return string._bridgeToObjectiveC()
@@ -1046,12 +1046,12 @@ extension CGRectEdge {
 public typealias NSErrorPointer = AutoreleasingUnsafeMutablePointer<NSError?>
 
 @warn_unused_result
-@asmname("swift_convertNSErrorToErrorType")
+@_silgen_name("swift_convertNSErrorToErrorType")
 public // COMPILER_INTRINSIC
 func _convertNSErrorToErrorType(error: NSError?) -> ErrorType
 
 @warn_unused_result
-@asmname("swift_convertErrorTypeToNSError")
+@_silgen_name("swift_convertErrorTypeToNSError")
 public // COMPILER_INTRINSIC
 func _convertErrorTypeToNSError(error: ErrorType) -> NSError
 
@@ -1224,7 +1224,7 @@ extension NSDictionary {
 // NSUndoManager
 //===----------------------------------------------------------------------===//
 
-@asmname("NS_Swift_NSUndoManager_registerUndoWithTargetHandler")
+@_silgen_name("NS_Swift_NSUndoManager_registerUndoWithTargetHandler")
 internal func NS_Swift_NSUndoManager_registerUndoWithTargetHandler(
   self_: AnyObject,
   _ target: AnyObject,
@@ -1250,20 +1250,20 @@ extension NSUndoManager {
 //===----------------------------------------------------------------------===//
 
 @warn_unused_result
-@asmname("NS_Swift_NSCoder_decodeObject")
+@_silgen_name("NS_Swift_NSCoder_decodeObject")
 internal func NS_Swift_NSCoder_decodeObject(
   self_: AnyObject,
   _ error: NSErrorPointer) -> AnyObject?
 
 @warn_unused_result
-@asmname("NS_Swift_NSCoder_decodeObjectForKey")
+@_silgen_name("NS_Swift_NSCoder_decodeObjectForKey")
 internal func NS_Swift_NSCoder_decodeObjectForKey(
   self_: AnyObject,
   _ key: AnyObject,
   _ error: NSErrorPointer) -> AnyObject?
 
 @warn_unused_result
-@asmname("NS_Swift_NSCoder_decodeObjectOfClassForKey")
+@_silgen_name("NS_Swift_NSCoder_decodeObjectOfClassForKey")
 internal func NS_Swift_NSCoder_decodeObjectOfClassForKey(
   self_: AnyObject,
   _ cls: AnyObject,
@@ -1271,7 +1271,7 @@ internal func NS_Swift_NSCoder_decodeObjectOfClassForKey(
   _ error: NSErrorPointer) -> AnyObject?
 
 @warn_unused_result
-@asmname("NS_Swift_NSCoder_decodeObjectOfClassesForKey")
+@_silgen_name("NS_Swift_NSCoder_decodeObjectOfClassesForKey")
 internal func NS_Swift_NSCoder_decodeObjectOfClassesForKey(
   self_: AnyObject,
   _ classes: NSSet?,
@@ -1348,7 +1348,7 @@ extension NSCoder {
 //===----------------------------------------------------------------------===//
 
 @warn_unused_result
-@asmname("NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData")
+@_silgen_name("NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData")
 internal func NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData(
   self_: AnyObject,
   _ data: AnyObject,

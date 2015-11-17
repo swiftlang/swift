@@ -54,23 +54,23 @@
 // CHECK: dealloc_ref [stack] [[A3]]
 // CHECK: return
 
-@asmname("unknown0")
+@_silgen_name("unknown0")
 func unknown0() -> ()
-@asmname("unknown1")
+@_silgen_name("unknown1")
 func unknown1() -> ()
-@asmname("unknown2")
+@_silgen_name("unknown2")
 func unknown2() -> ()
-@asmname("unknown3")
+@_silgen_name("unknown3")
 func unknown3() -> ()
-@asmname("unknown4")
+@_silgen_name("unknown4")
 func unknown4() -> ()
-@asmname("unknown5")
+@_silgen_name("unknown5")
 func unknown5() -> ()
-@asmname("unknown6")
+@_silgen_name("unknown6")
 func unknown6() -> ()
-@asmname("unknown7")
+@_silgen_name("unknown7")
 func unknown7() -> ()
-@asmname("unknown8")
+@_silgen_name("unknown8")
 func unknown8() -> ()
 
 protocol P1 {

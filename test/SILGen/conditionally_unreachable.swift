@@ -6,7 +6,7 @@
 
 import Swift
 
-@asmname("foo") func foo()
+@_silgen_name("foo") func foo()
 
 func condUnreachable() {
   if Int32(Builtin.assert_configuration()) == 0 {

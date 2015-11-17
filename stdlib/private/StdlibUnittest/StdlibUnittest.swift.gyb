@@ -444,7 +444,7 @@ var _testSuiteNameToIndex: [String : Int] = [:]
 
 let _stdlibUnittestStreamPrefix = "__STDLIB_UNITTEST__"
 
-@asmname("swift_stdlib_installTrapInterceptor")
+@_silgen_name("swift_stdlib_installTrapInterceptor")
 func _stdlib_installTrapInterceptor()
 
 func _childProcess() {
@@ -966,7 +966,7 @@ public class TestSuite {
 }
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
-@asmname("swift_stdlib_getSystemVersionPlistProperty")
+@_silgen_name("swift_stdlib_getSystemVersionPlistProperty")
 func _stdlib_getSystemVersionPlistPropertyImpl(
   propertyName: UnsafePointer<CChar>) -> UnsafePointer<CChar>
 

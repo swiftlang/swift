@@ -5,7 +5,7 @@
 // stdlib_binary_only implies public external linkage in other modules we would
 // get linking errors.
 
-@asmname("unknown")
+@_silgen_name("unknown")
 public func unknown() -> ()
 
 @inline(never)

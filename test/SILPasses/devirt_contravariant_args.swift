@@ -10,11 +10,11 @@
 // CHECK: return
 // CHECK-NEXT: }
 
-@asmname("unknownC0")
+@_silgen_name("unknownC0")
 func unknownC0(c : C0) -> ()
-@asmname("unknownC1")
+@_silgen_name("unknownC1")
 func unknownC1(c : C1) -> ()
-@asmname("unknownC2")
+@_silgen_name("unknownC2")
 func unknownC2(c : C2) -> ()
 
 protocol P {}

@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -O -module-name devirt_default_case -disable-func-sig-opts -emit-sil %s | FileCheck -check-prefix=CHECK -check-prefix=CHECK-NORMAL %s
 // RUN: %target-swift-frontend -O -module-name devirt_default_case -disable-func-sig-opts -emit-sil -enable-testing %s | FileCheck -check-prefix=CHECK -check-prefix=CHECK-TESTABLE %s
 
-@asmname("action")
+@_silgen_name("action")
 func action(n:Int)->()
 
 // public class

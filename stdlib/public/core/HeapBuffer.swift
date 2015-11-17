@@ -14,7 +14,7 @@ import SwiftShims
 typealias _HeapObject = SwiftShims.HeapObject
 
 @warn_unused_result
-@asmname("swift_bufferAllocate")
+@_silgen_name("swift_bufferAllocate")
 func _swift_bufferAllocate(
   bufferType: AnyClass, _ size: Int, _ alignMask: Int) -> AnyObject
 

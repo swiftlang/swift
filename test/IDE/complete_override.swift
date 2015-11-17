@@ -158,7 +158,7 @@ protocol ProtocolE {
 // WITH_PE-DAG: Decl[InstanceVar]/Super:    var protoEVarRO: Int{{; name=.+$}}
 // WITH_PE: End completions
 
-@noreturn @asmname("exit")
+@noreturn @_silgen_name("exit")
 func exit()
 
 class BaseA {

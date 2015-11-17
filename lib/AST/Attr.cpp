@@ -289,8 +289,8 @@ void DeclAttribute::print(ASTPrinter &Printer,
     Printer << "@_alignment(" << cast<AlignmentAttr>(this)->Value << ")";
     break;
 
-  case DAK_Asmname:
-    Printer << "@asmname(\"" << cast<AsmnameAttr>(this)->Name << "\")";
+  case DAK_SILGenName:
+    Printer << "@_silgen_name(\"" << cast<SILGenNameAttr>(this)->Name << "\")";
     break;
 
   case DAK_Available: {
@@ -417,8 +417,8 @@ StringRef DeclAttribute::getAttrName() const {
   case DAK_##CLASS: \
     return #NAME;
 #include "swift/AST/Attr.def"
-  case DAK_Asmname:
-    return "asmname";
+  case DAK_SILGenName:
+    return "_silgen_name";
   case DAK_Alignment:
     return "_alignment";
   case DAK_SwiftNativeObjCRuntimeBase:

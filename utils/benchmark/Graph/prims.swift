@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@asmname("mach_absolute_time") func __mach_absolute_time__() -> UInt64
+@_silgen_name("mach_absolute_time") func __mach_absolute_time__() -> UInt64
 
 struct Node {
   var id : Int

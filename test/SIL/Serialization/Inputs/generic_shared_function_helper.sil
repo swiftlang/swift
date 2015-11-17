@@ -1,6 +1,6 @@
 import Swift
 
-@asmname("public_func") public func public_func<T>() -> T?
+@_silgen_name("public_func") public func public_func<T>() -> T?
 
 
 sil public_external @impl_func : $@convention(thin) <T> (@out Optional<T>) -> ()

@@ -517,11 +517,11 @@ func accessUnavailableProperties(o: ClassWithUnavailableProperties) {
       // expected-note@-2 {{add 'if #available' version check}}
 }
 
-// asmname
+// _silgen_name
 
-@asmname("SomeName")
+@_silgen_name("SomeName")
 @available(OSX, introduced=10.10)
-func funcWithasmnameAvailableOn10_10(p: ClassAvailableOn10_10?) -> ClassAvailableOn10_10
+func funcWith_silgen_nameAvailableOn10_10(p: ClassAvailableOn10_10?) -> ClassAvailableOn10_10
 
 // Enums
 

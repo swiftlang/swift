@@ -8,8 +8,8 @@ import SwiftPrivate
 import StdlibUnittest
 import Foundation
 
-@asmname("random") func random() -> UInt32
-@asmname("srandomdev") func srandomdev()
+@_silgen_name("random") func random() -> UInt32
+@_silgen_name("srandomdev") func srandomdev()
 
 protocol TestableUnicodeCodec : UnicodeCodecType {
   typealias CodeUnit : IntegerType

@@ -13,7 +13,7 @@
 
 struct Int32 {}
 
-@asmname("unknown1")
+@_silgen_name("unknown1")
 func unknown1() -> ()
 
 protocol P {

@@ -256,14 +256,14 @@ swift::swift_getErrorValue(const SwiftError *errorObject,
   return _swift_getErrorValue(errorObject, scratch, out);
 }
 
-// @asmname("swift_stdlib_getErrorDomainNSString")
+// @_silgen_name("swift_stdlib_getErrorDomainNSString")
 // public func _stdlib_getErrorDomainNSString<T : ErrorType>
 //   (x: UnsafePointer<T>) -> AnyObject
 extern "C" NSString *swift_stdlib_getErrorDomainNSString(
                                                  const OpaqueValue *error,
                                                  const Metadata *T,
                                                  const WitnessTable *ErrorType);
-// @asmname("swift_stdlib_getErrorCode")
+// @_silgen_name("swift_stdlib_getErrorCode")
 // public func _stdlib_getErrorCode<T : ErrorType>(x: UnsafePointer<T>) -> Int
 extern "C" NSInteger swift_stdlib_getErrorCode(const OpaqueValue *error,
                                                const Metadata *T,
@@ -339,7 +339,7 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
                                     DynamicCastFlags flags) {
   Class TheNSErrorClass = [NSError class];
   static CFTypeID TheCFErrorTypeID = CFErrorGetTypeID();
-  // @asmname("swift_stdlib_bridgeNSErrorToErrorType")
+  // @_silgen_name("swift_stdlib_bridgeNSErrorToErrorType")
   // public func _stdlib_bridgeNSErrorToErrorType<
   //   T : _ObjectiveCBridgeableErrorType
   // >(error: NSError, out: UnsafeMutablePointer<T>) -> Bool {

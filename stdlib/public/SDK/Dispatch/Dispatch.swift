@@ -75,7 +75,7 @@ public var DISPATCH_QUEUE_CONCURRENT : dispatch_queue_attr_t {
 }
 
 @warn_unused_result
-@asmname("_swift_dispatch_queue_concurrent")
+@_silgen_name("_swift_dispatch_queue_concurrent")
 internal func _swift_dispatch_queue_concurrent() -> dispatch_queue_attr_t
 
 // dispatch/data.h
@@ -84,7 +84,7 @@ public var dispatch_data_empty : dispatch_data_t {
 }
 
 @warn_unused_result
-@asmname("_swift_dispatch_data_empty")
+@_silgen_name("_swift_dispatch_data_empty")
 internal func _swift_dispatch_data_empty() -> dispatch_data_t
 
 // dispatch/source.h
@@ -151,48 +151,48 @@ public var DISPATCH_SOURCE_TYPE_WRITE: dispatch_source_type_t {
 }
 
 @warn_unused_result
-@asmname("_swift_dispatch_source_type_DATA_ADD")
+@_silgen_name("_swift_dispatch_source_type_DATA_ADD")
 internal func _swift_dispatch_source_type_data_add() -> dispatch_source_type_t
 
 @warn_unused_result
-@asmname("_swift_dispatch_source_type_DATA_OR")
+@_silgen_name("_swift_dispatch_source_type_DATA_OR")
 internal func _swift_dispatch_source_type_data_or() -> dispatch_source_type_t
 
 @warn_unused_result
-@asmname("_swift_dispatch_source_type_MACH_SEND")
+@_silgen_name("_swift_dispatch_source_type_MACH_SEND")
 internal func _swift_dispatch_source_type_mach_send() -> dispatch_source_type_t
 
 @warn_unused_result
-@asmname("_swift_dispatch_source_type_MACH_RECV")
+@_silgen_name("_swift_dispatch_source_type_MACH_RECV")
 internal func _swift_dispatch_source_type_mach_recv() -> dispatch_source_type_t
 
 @warn_unused_result
-@asmname("_swift_dispatch_source_type_MEMORYPRESSURE")
+@_silgen_name("_swift_dispatch_source_type_MEMORYPRESSURE")
 internal func _swift_dispatch_source_type_memorypressure()
   -> dispatch_source_type_t
 
 @warn_unused_result
-@asmname("_swift_dispatch_source_type_PROC")
+@_silgen_name("_swift_dispatch_source_type_PROC")
 internal func _swift_dispatch_source_type_proc() -> dispatch_source_type_t
 
 @warn_unused_result
-@asmname("_swift_dispatch_source_type_READ")
+@_silgen_name("_swift_dispatch_source_type_READ")
 internal func _swift_dispatch_source_type_read() -> dispatch_source_type_t
 
 @warn_unused_result
-@asmname("_swift_dispatch_source_type_SIGNAL")
+@_silgen_name("_swift_dispatch_source_type_SIGNAL")
 internal func _swift_dispatch_source_type_signal() -> dispatch_source_type_t
 
 @warn_unused_result
-@asmname("_swift_dispatch_source_type_TIMER")
+@_silgen_name("_swift_dispatch_source_type_TIMER")
 internal func _swift_dispatch_source_type_timer() -> dispatch_source_type_t
 
 @warn_unused_result
-@asmname("_swift_dispatch_source_type_VNODE")
+@_silgen_name("_swift_dispatch_source_type_VNODE")
 internal func _swift_dispatch_source_type_vnode() -> dispatch_source_type_t
 
 @warn_unused_result
-@asmname("_swift_dispatch_source_type_WRITE")
+@_silgen_name("_swift_dispatch_source_type_WRITE")
 internal func _swift_dispatch_source_type_write() -> dispatch_source_type_t
 
 // dispatch/time.h

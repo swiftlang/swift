@@ -13,7 +13,7 @@
 @_exported import GameplayKit
 
 @warn_unused_result
-@asmname("GK_Swift_GKEntity_componentForClass")
+@_silgen_name("GK_Swift_GKEntity_componentForClass")
 internal func GK_Swift_GKEntity_componentForClass(
   self_: AnyObject,
   _ componentClass: AnyObject) -> AnyObject?
@@ -33,7 +33,7 @@ extension GKEntity {
 }
 
 @warn_unused_result
-@asmname("GK_Swift_GKStateMachine_stateForClass")
+@_silgen_name("GK_Swift_GKStateMachine_stateForClass")
 internal func GK_Swift_GKStateMachine_stateForClass(
   self_: AnyObject,
   _ stateClass: AnyObject) -> AnyObject?

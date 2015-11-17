@@ -70,7 +70,7 @@ func _withUninitializedString<R>(
   return (bodyResult, stringResult)
 }
 
-@asmname("swift_getTypeName")
+@_silgen_name("swift_getTypeName")
 public func _getTypeName(type: Any.Type, qualified: Bool)
   -> (UnsafePointer<UInt8>, Int)
 

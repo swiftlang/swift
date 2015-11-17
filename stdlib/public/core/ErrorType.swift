@@ -27,14 +27,14 @@ extension ErrorType {
 // Helper functions for the C++ runtime to have easy access to domain and
 // code as Objective-C values.
 @warn_unused_result
-@asmname("swift_stdlib_getErrorDomainNSString")
+@_silgen_name("swift_stdlib_getErrorDomainNSString")
 public func _stdlib_getErrorDomainNSString<T : ErrorType>(x: UnsafePointer<T>)
 -> AnyObject {
   return x.memory._domain._bridgeToObjectiveCImpl()
 }
 
 @warn_unused_result
-@asmname("swift_stdlib_getErrorCode")
+@_silgen_name("swift_stdlib_getErrorCode")
 public func _stdlib_getErrorCode<T : ErrorType>(x: UnsafePointer<T>) -> Int {
   return x.memory._code
 }
@@ -42,19 +42,19 @@ public func _stdlib_getErrorCode<T : ErrorType>(x: UnsafePointer<T>) -> Int {
 // Known function for the compiler to use to coerce `ErrorType` instances to
 // `NSError`.
 @warn_unused_result
-@asmname("swift_bridgeErrorTypeToNSError")
+@_silgen_name("swift_bridgeErrorTypeToNSError")
 public func _bridgeErrorTypeToNSError(e: ErrorType) -> AnyObject
 #endif
 
 /// Invoked by the compiler when the subexpression of a `try!` expression
 /// throws an error.
-@asmname("swift_unexpectedError")
+@_silgen_name("swift_unexpectedError")
 public func _unexpectedError(error: ErrorType) {
   preconditionFailure("'try!' expression unexpectedly raised an error: \(String(reflecting: error))")
 }
 
 /// Invoked by the compiler when code at top level throws an uncaught error.
-@asmname("swift_errorInMain")
+@_silgen_name("swift_errorInMain")
 public func _errorInMain(error: ErrorType) {
   fatalError("Error raised at top level: \(String(reflecting: error))")
 }

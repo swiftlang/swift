@@ -1,5 +1,5 @@
 
-@asmname("evil") public func _evil()
+@_silgen_name("evil") public func _evil()
 
 public func id<U>(u : U) -> U {
   _evil()

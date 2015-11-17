@@ -3021,7 +3021,7 @@ extern "C" const Metadata *swift_getBridgedNonVerbatimObjectiveCType(
   return nullptr;
 }
 
-// @asmname("swift_bridgeNonVerbatimFromObjectiveC")
+// @_silgen_name("swift_bridgeNonVerbatimFromObjectiveC")
 // func _bridgeNonVerbatimFromObjectiveC<NativeType>(
 //     x: AnyObject, 
 //     nativeType: NativeType.Type
@@ -3063,7 +3063,7 @@ swift_bridgeNonVerbatimFromObjectiveC(
   swift::crash("value type is not bridged to Objective-C");
 }
 
-// @asmname("swift_bridgeNonVerbatimFromObjectiveCConditional")
+// @_silgen_name("swift_bridgeNonVerbatimFromObjectiveCConditional")
 // func _bridgeNonVerbatimFromObjectiveCConditional<NativeType>(
 //   x: AnyObject, 
 //   nativeType: T.Type,

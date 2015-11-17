@@ -47,7 +47,7 @@ public:
   bool visitDeclAttribute(DeclAttribute *A) = delete;
 
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
-  IGNORED_ATTR(Asmname)
+  IGNORED_ATTR(SILGenName)
   IGNORED_ATTR(Available)
   IGNORED_ATTR(Convenience)
   IGNORED_ATTR(Effects)
@@ -612,7 +612,7 @@ public:
 
     IGNORED_ATTR(AutoClosure)
     IGNORED_ATTR(Alignment)
-    IGNORED_ATTR(Asmname)
+    IGNORED_ATTR(SILGenName)
     IGNORED_ATTR(Dynamic)
     IGNORED_ATTR(Exported)
     IGNORED_ATTR(Convenience)

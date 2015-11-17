@@ -115,7 +115,7 @@ struct PrintOptions {
   bool PrintImplicitAttrs = true;
 
   /// Whether to print decl attributes that are only used internally,
-  /// such as asmname, transparent, etc.
+  /// such as _silgen_name, transparent, etc.
   bool PrintUserInaccessibleAttrs = true;
 
   /// List of attribute kinds that should not be printed.

@@ -31,7 +31,7 @@ class D : C {
 
 }
 
-@asmname("TestSwiftObjectNSObject") 
+@_silgen_name("TestSwiftObjectNSObject") 
 func TestSwiftObjectNSObject(c: C, _ d: D)
 
 TestSwiftObjectNSObject(C(), D())

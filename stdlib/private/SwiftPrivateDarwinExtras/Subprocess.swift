@@ -20,25 +20,25 @@ import Glibc
 // swift_posix_spawn isn't available in the public watchOS SDK, we sneak by the
 // unavailable attribute declaration here of the APIs that we need.
 
-@asmname("posix_spawn_file_actions_init")
+@_silgen_name("posix_spawn_file_actions_init")
 func swift_posix_spawn_file_actions_init(
   file_actions: UnsafeMutablePointer<posix_spawn_file_actions_t>) -> CInt
 
-@asmname("posix_spawn_file_actions_destroy")
+@_silgen_name("posix_spawn_file_actions_destroy")
 func swift_posix_spawn_file_actions_destroy(
   file_actions: UnsafeMutablePointer<posix_spawn_file_actions_t>) -> CInt
 
-@asmname("posix_spawn_file_actions_addclose")
+@_silgen_name("posix_spawn_file_actions_addclose")
 func swift_posix_spawn_file_actions_addclose(file_actions:
   UnsafeMutablePointer<posix_spawn_file_actions_t>, _ filedes: CInt) -> CInt
 
-@asmname("posix_spawn_file_actions_adddup2")
+@_silgen_name("posix_spawn_file_actions_adddup2")
 func swift_posix_spawn_file_actions_adddup2(
   file_actions: UnsafeMutablePointer<posix_spawn_file_actions_t>,
   _ filedes: CInt,
   _ newfiledes: CInt) -> CInt
 
-@asmname("posix_spawn")
+@_silgen_name("posix_spawn")
 func swift_posix_spawn(
   pid: UnsafeMutablePointer<pid_t>,
   _ file: UnsafePointer<Int8>,
@@ -225,7 +225,7 @@ public func runChild(args: [String])
 }
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
-@asmname("_NSGetEnviron")
+@_silgen_name("_NSGetEnviron")
 func _NSGetEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>>>
 #endif
 

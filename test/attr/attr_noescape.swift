@@ -152,7 +152,7 @@ class SomeClass {
 
 
 // Implicit conversions (in this case to @convention(block)) are ok.
-@asmname("whatever")
+@_silgen_name("whatever")
 func takeNoEscapeAsObjCBlock(@noescape _: @convention(block) () -> Void)
 func takeNoEscapeTest2(@noescape fn : () -> ()) {
   takeNoEscapeAsObjCBlock(fn)

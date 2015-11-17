@@ -12,10 +12,10 @@ public struct ObjCBool : BooleanType {
   }
 }
 
-@asmname("swift_BoolToObjCBool")
+@_silgen_name("swift_BoolToObjCBool")
 func _convertBoolToObjCBool(x: Bool) -> ObjCBool
 
-@asmname("swift_ObjCBoolToBool")
+@_silgen_name("swift_ObjCBoolToBool")
 func _convertObjCBoolToBool(x: ObjCBool) -> Bool
 
 

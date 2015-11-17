@@ -3,10 +3,10 @@
 @_exported import ObjectiveC
 @_exported import Foundation // clang module
 
-@asmname("swift_StringToNSString")
+@_silgen_name("swift_StringToNSString")
 func _convertStringToNSString(string: String) -> NSString
 
-@asmname("swift_NSStringToString")
+@_silgen_name("swift_NSStringToString")
 func _convertNSStringToString(nsstring: NSString?) -> String
 
 // NSArray bridging entry points

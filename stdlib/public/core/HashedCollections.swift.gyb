@@ -243,7 +243,7 @@ internal var _hashContainerDefaultMaxLoadFactorInverse: Double {
 ///
 /// This function is part of the runtime because `Bool` type is bridged to
 /// `ObjCBool`, which is in Foundation overlay.
-@asmname("swift_stdlib_NSObject_isEqual")
+@_silgen_name("swift_stdlib_NSObject_isEqual")
 internal func _stdlib_NSObject_isEqual(lhs: AnyObject, _ rhs: AnyObject) -> Bool
 #endif
 
@@ -765,7 +765,7 @@ extension Set : CustomStringConvertible, CustomDebugStringConvertible {
 }
 
 #if _runtime(_ObjC)
-@asmname("swift_stdlib_CFSetGetValues")
+@_silgen_name("swift_stdlib_CFSetGetValues")
 func _stdlib_CFSetGetValues(nss: _NSSetType, _: UnsafeMutablePointer<AnyObject>)
 
 /// Equivalent to `NSSet.allObjects`, but does not leave objects on the

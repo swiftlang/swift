@@ -4,22 +4,22 @@
 @_exported import ObjectiveC
 
 // String/NSString bridging functions.
-@asmname("swift_StringToNSString") internal
+@_silgen_name("swift_StringToNSString") internal
 func _convertStringToNSString(string: String) -> NSString
 
-@asmname("swift_NSStringToString") internal
+@_silgen_name("swift_NSStringToString") internal
 func _convertNSStringToString(nsstring: NSString?) -> String
 
-@asmname("swift_ArrayToNSArray") internal
+@_silgen_name("swift_ArrayToNSArray") internal
 func _convertArrayToNSArray<T>(array: Array<T>) -> NSArray
 
-@asmname("swift_NSArrayToArray") internal
+@_silgen_name("swift_NSArrayToArray") internal
 func _convertNSArrayToArray<T>(nsstring: NSArray?) -> Array<T>
 
-@asmname("swift_DictionaryToNSDictionary") internal
+@_silgen_name("swift_DictionaryToNSDictionary") internal
 func _convertDictionaryToNSDictionary<K: Hashable, V>(array: Dictionary<K, V>) -> NSDictionary
 
-@asmname("swift_NSDictionaryToDictionary") internal
+@_silgen_name("swift_NSDictionaryToDictionary") internal
 func _convertNSDictionaryToDictionary<K: Hashable, V>(nsstring: NSDictionary?) -> Dictionary<K, V>
 
 // NSSet bridging entry points

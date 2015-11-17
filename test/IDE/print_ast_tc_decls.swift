@@ -500,8 +500,8 @@ protocol d0150_TestClassProtocol : class {}
 // PASS_COMMON-LABEL: {{^}}@objc protocol d0151_TestClassProtocol {{{$}}
 
 
-@noreturn @asmname("exit") func d0160_testNoReturn()
-// PASS_COMMON-LABEL: {{^}}@asmname("exit"){{$}}
+@noreturn @_silgen_name("exit") func d0160_testNoReturn()
+// PASS_COMMON-LABEL: {{^}}@_silgen_name("exit"){{$}}
 // PASS_COMMON-NEXT: {{^}}@noreturn func d0160_testNoReturn(){{$}}
 
 @noreturn func d0161_testNoReturn() { d0160_testNoReturn() }

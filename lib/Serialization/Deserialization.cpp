@@ -1789,11 +1789,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (isDeclAttrRecord(recordID)) {
       DeclAttribute *Attr = nullptr;
       switch (recordID) {
-      case decls_block::Asmname_DECL_ATTR: {
+      case decls_block::SILGenName_DECL_ATTR: {
         bool isImplicit;
-        serialization::decls_block::AsmnameDeclAttrLayout::readRecord(
+        serialization::decls_block::SILGenNameDeclAttrLayout::readRecord(
             scratch, isImplicit);
-        Attr = new (ctx) AsmnameAttr(blobData, isImplicit);
+        Attr = new (ctx) SILGenNameAttr(blobData, isImplicit);
         break;
       }
 

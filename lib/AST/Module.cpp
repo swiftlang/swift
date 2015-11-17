@@ -421,7 +421,7 @@ VarDecl *Module::getDSOHandle() {
                                      type, Files[0]);
   handleVar->setImplicit(true);
   handleVar->getAttrs().add(
-    new (ctx) AsmnameAttr("__dso_handle", /*Implicit=*/true));
+    new (ctx) SILGenNameAttr("__dso_handle", /*Implicit=*/true));
   handleVar->setAccessibility(Accessibility::Internal);
   DSOHandleAndFlags.setPointer(handleVar);
   return handleVar;

@@ -24,8 +24,8 @@ func testslice(s: Array<Int>) {
   _ = s[0...1]
 }
 
-@asmname("malloc") func c_malloc(size: Int) -> UnsafeMutablePointer<Void>
-@asmname("free") func c_free(p: UnsafeMutablePointer<Void>)
+@_silgen_name("malloc") func c_malloc(size: Int) -> UnsafeMutablePointer<Void>
+@_silgen_name("free") func c_free(p: UnsafeMutablePointer<Void>)
 
 class Vector<T> {
   var length : Int

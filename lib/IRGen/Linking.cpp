@@ -221,7 +221,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   //   entity ::= declaration                     // other declaration
   case Kind::Function:
     // As a special case, functions can have external asm names.
-    if (auto AsmA = getDecl()->getAttrs().getAttribute<AsmnameAttr>()) {
+    if (auto AsmA = getDecl()->getAttrs().getAttribute<SILGenNameAttr>()) {
       buffer << AsmA->Name;
       return;
     }

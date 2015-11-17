@@ -3,7 +3,7 @@ public protocol P {
   func doSomething()
 }
 
-@asmname("unknown") public
+@_silgen_name("unknown") public
 func unknown() -> ()
 
 public class Y : P {

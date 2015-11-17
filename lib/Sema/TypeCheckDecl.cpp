@@ -3794,9 +3794,9 @@ public:
     if (decl->isInvalid() || decl->isImplicit() || decl->hasClangNode())
       return false;
 
-    // Functions can have asmname, semantics, and NSManaged attributes.
+    // Functions can have _silgen_name, semantics, and NSManaged attributes.
     if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-      if (func->getAttrs().hasAttribute<AsmnameAttr>() ||
+      if (func->getAttrs().hasAttribute<SILGenNameAttr>() ||
           func->getAttrs().hasAttribute<SemanticsAttr>() ||
           func->getAttrs().hasAttribute<NSManagedAttr>())
         return false;
@@ -4778,7 +4778,7 @@ public:
 
     UNINTERESTING_ATTR(Accessibility)
     UNINTERESTING_ATTR(Alignment)
-    UNINTERESTING_ATTR(Asmname)
+    UNINTERESTING_ATTR(SILGenName)
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(IBAction)
     UNINTERESTING_ATTR(IBDesignable)

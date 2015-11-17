@@ -612,7 +612,7 @@ public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 // 2) C99 requires this behavior for fmod*()
 // 3) C++11 requires this behavior for std::fmod*()
 @warn_unused_result
-@asmname("_swift_fmod${cFuncSuffix(bits)}")
+@_silgen_name("_swift_fmod${cFuncSuffix(bits)}")
 public func % (lhs: ${Self}, rhs: ${Self}) -> ${Self}
 
 // See Bool.swift for && and ||

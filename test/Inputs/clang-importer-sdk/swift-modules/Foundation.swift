@@ -2,10 +2,10 @@
 @_exported import CoreGraphics
 @_exported import Foundation
 
-@asmname("swift_StringToNSString") internal
+@_silgen_name("swift_StringToNSString") internal
 func _convertStringToNSString(string: String) -> NSString
 
-@asmname("swift_NSStringToString") internal
+@_silgen_name("swift_NSStringToString") internal
 func _convertNSStringToString(nsstring: NSString?) -> String
 
 public func == (lhs: NSObject, rhs: NSObject) -> Bool {
@@ -221,8 +221,8 @@ extension NSError : ErrorType {
   public var _code: Int { return code }
 }
 
-@asmname("swift_convertNSErrorToErrorType")
+@_silgen_name("swift_convertNSErrorToErrorType")
 func _convertNSErrorToErrorType(string: NSError?) -> ErrorType
 
-@asmname("swift_convertErrorTypeToNSError")
+@_silgen_name("swift_convertErrorTypeToNSError")
 func _convertErrorTypeToNSError(string: ErrorType) -> NSError

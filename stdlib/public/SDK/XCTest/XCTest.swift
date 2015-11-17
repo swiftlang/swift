@@ -15,7 +15,7 @@
 import CoreGraphics
 
 /// Returns the current test case, so we can use free functions instead of methods for the overlay.
-@asmname("_XCTCurrentTestCaseBridge") func _XCTCurrentTestCaseBridge() -> XCTestCase
+@_silgen_name("_XCTCurrentTestCaseBridge") func _XCTCurrentTestCaseBridge() -> XCTestCase
 
 // --- Failure Formatting ---
 
@@ -43,7 +43,7 @@ func _XCTFailureDescription(assertionType: _XCTAssertionType, _ formatIndex: UIn
 
 // --- Exception Support ---
 
-@asmname("_XCTRunThrowableBlockBridge")
+@_silgen_name("_XCTRunThrowableBlockBridge")
 func _XCTRunThrowableBlockBridge(@noescape _: @convention(block) () -> Void) -> NSDictionary
 
 /// The Swift-style result of evaluating a block which may throw an exception.

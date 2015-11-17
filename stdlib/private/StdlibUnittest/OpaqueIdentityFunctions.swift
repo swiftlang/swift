@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@asmname("swift_stdlib_getPointer")
+@_silgen_name("swift_stdlib_getPointer")
 func _stdlib_getPointer(x: COpaquePointer) -> COpaquePointer
 
 public func _opaqueIdentity<T>(x: T) -> T {

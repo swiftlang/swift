@@ -130,7 +130,7 @@ public protocol _MirrorType {
 /// for an arbitrary object. The memory pointed to by "out" is initialized with
 /// the summary string.
 @warn_unused_result
-@asmname("swift_getSummary")
+@_silgen_name("swift_getSummary")
 public // COMPILER_INTRINSIC
 func _getSummary<T>(out: UnsafeMutablePointer<String>, x: T) {
   out.initialize(_reflect(x).summary)
@@ -141,7 +141,7 @@ func _getSummary<T>(out: UnsafeMutablePointer<String>, x: T) {
 /// to an implementation in the runtime that structurally reflects values
 /// of any type.
 @warn_unused_result
-@asmname("swift_reflectAny")
+@_silgen_name("swift_reflectAny")
 public func _reflect<T>(x: T) -> _MirrorType
 
 /// Unsafely produce a mirror for a value in memory whose lifetime is
@@ -149,7 +149,7 @@ public func _reflect<T>(x: T) -> _MirrorType
 /// This lets containers with heap storage vend mirrors for their elements
 /// without unnecessary copying of the underlying value.
 @warn_unused_result
-@asmname("swift_unsafeReflectAny")
+@_silgen_name("swift_unsafeReflectAny")
 internal func _unsafeReflect<T>(
   owner: Builtin.NativeObject,
   ptr: UnsafeMutablePointer<T>
@@ -267,7 +267,7 @@ internal struct _LeafMirror<T>: _MirrorType {
 
 // -- Implementation details for the runtime's _MirrorType implementation
 
-@asmname("swift_MagicMirrorData_summary")
+@_silgen_name("swift_MagicMirrorData_summary")
 func _swift_MagicMirrorData_summaryImpl(
   metadata: Any.Type, _ result: UnsafeMutablePointer<String>
 )
@@ -278,17 +278,17 @@ public struct _MagicMirrorData {
   let metadata: Any.Type
 
   var value: Any {
-    @asmname("swift_MagicMirrorData_value")get
+    @_silgen_name("swift_MagicMirrorData_value")get
   }
   var valueType: Any.Type {
-    @asmname("swift_MagicMirrorData_valueType")get
+    @_silgen_name("swift_MagicMirrorData_valueType")get
   }
 
   public var objcValue: Any {
-    @asmname("swift_MagicMirrorData_objcValue")get
+    @_silgen_name("swift_MagicMirrorData_objcValue")get
   }
   public var objcValueType: Any.Type {
-    @asmname("swift_MagicMirrorData_objcValueType")get
+    @_silgen_name("swift_MagicMirrorData_objcValueType")get
   }
 
   var summary: String {
@@ -325,10 +325,10 @@ internal struct _TupleMirror : _MirrorType {
   var valueType: Any.Type { return data.valueType }
   var objectIdentifier: ObjectIdentifier? { return nil }
   var count: Int {
-    @asmname("swift_TupleMirror_count")get
+    @_silgen_name("swift_TupleMirror_count")get
   }
   subscript(i: Int) -> (String, _MirrorType) {
-    @asmname("swift_TupleMirror_subscript")get
+    @_silgen_name("swift_TupleMirror_subscript")get
   }
   var summary: String { return "(\(count) elements)" }
   var quickLookObject: PlaygroundQuickLook? { return nil }
@@ -342,10 +342,10 @@ struct _StructMirror : _MirrorType {
   var valueType: Any.Type { return data.valueType }
   var objectIdentifier: ObjectIdentifier? { return nil }
   var count: Int {
-    @asmname("swift_StructMirror_count")get
+    @_silgen_name("swift_StructMirror_count")get
   }
   subscript(i: Int) -> (String, _MirrorType) {
-    @asmname("swift_StructMirror_subscript")get
+    @_silgen_name("swift_StructMirror_subscript")get
   }
 
   var summary: String {
@@ -362,13 +362,13 @@ struct _EnumMirror : _MirrorType {
   var valueType: Any.Type { return data.valueType }
   var objectIdentifier: ObjectIdentifier? { return nil }
   var count: Int {
-    @asmname("swift_EnumMirror_count")get
+    @_silgen_name("swift_EnumMirror_count")get
   }
   var caseName: UnsafePointer<CChar> {
-    @asmname("swift_EnumMirror_caseName")get
+    @_silgen_name("swift_EnumMirror_caseName")get
   }
   subscript(i: Int) -> (String, _MirrorType) {
-    @asmname("swift_EnumMirror_subscript")get
+    @_silgen_name("swift_EnumMirror_subscript")get
   }
   var summary: String {
     let maybeCaseName = String.fromCString(self.caseName)
@@ -383,16 +383,16 @@ struct _EnumMirror : _MirrorType {
 }
 
 @warn_unused_result
-@asmname("swift_ClassMirror_count")
+@_silgen_name("swift_ClassMirror_count")
 func _getClassCount(_: _MagicMirrorData) -> Int
 
 @warn_unused_result
-@asmname("swift_ClassMirror_subscript")
+@_silgen_name("swift_ClassMirror_subscript")
 func _getClassChild(_: Int, _: _MagicMirrorData) -> (String, _MirrorType)
 
 #if _runtime(_ObjC)
 @warn_unused_result
-@asmname("swift_ClassMirror_quickLookObject")
+@_silgen_name("swift_ClassMirror_quickLookObject")
 public func _getClassPlaygroundQuickLook(
   data: _MagicMirrorData
 ) -> PlaygroundQuickLook?

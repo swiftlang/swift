@@ -352,7 +352,7 @@ struct _Buffer72 {
 % end
 
 @warn_unused_result
-@asmname("swift_float${bits}ToString")
+@_silgen_name("swift_float${bits}ToString")
 func _float${bits}ToStringImpl(
   buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt, _ value: Float${bits}
@@ -382,7 +382,7 @@ func _float${bits}ToString(value: Float${bits}) -> String {
 % end
 
 @warn_unused_result
-@asmname("swift_int64ToString")
+@_silgen_name("swift_int64ToString")
 func _int64ToStringImpl(
   buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt, _ value: Int64,
@@ -421,7 +421,7 @@ func _int64ToString(
 }
 
 @warn_unused_result
-@asmname("swift_uint64ToString")
+@_silgen_name("swift_uint64ToString")
 func _uint64ToStringImpl(
   buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt, _ value: UInt64, _ radix: Int64, _ uppercase: Bool

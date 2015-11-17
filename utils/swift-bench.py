@@ -101,10 +101,10 @@ class SwiftBenchHarness:
     self.log("Processing source file: %s." % name, 2)
 
     header = """
-@asmname("mach_absolute_time") func __mach_absolute_time__() -> UInt64
-@asmname("opaqueGetInt32")
+@_silgen_name("mach_absolute_time") func __mach_absolute_time__() -> UInt64
+@_silgen_name("opaqueGetInt32")
 func _opaqueGetInt32(x: Int) -> Int
-@asmname("opaqueGetInt64")
+@_silgen_name("opaqueGetInt64")
 func _opaqueGetInt64(x: Int) -> Int
 
 @inline(never)

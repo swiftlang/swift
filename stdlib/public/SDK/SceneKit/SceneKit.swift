@@ -168,7 +168,7 @@ extension SCNGeometryElement {
 }
 
 @warn_unused_result
-@asmname("SCN_Swift_SCNSceneSource_entryWithIdentifier")
+@_silgen_name("SCN_Swift_SCNSceneSource_entryWithIdentifier")
 internal func SCN_Swift_SCNSceneSource_entryWithIdentifier(
   self_: AnyObject,
   _ uid: NSString,

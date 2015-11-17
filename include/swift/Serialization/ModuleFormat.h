@@ -894,7 +894,7 @@ namespace decls_block {
     AccessibilityKindField, // accessibility
     BCArray<IdentifierIDField> // name components
     // The record is trailed by:
-    // - its asmname, if any
+    // - its _silgen_name, if any
     // - its generic parameters, if any
     // - body parameter patterns
   >;
@@ -1198,10 +1198,10 @@ namespace decls_block {
     BCVBR<5> // index
   >;
 
-  using AsmnameDeclAttrLayout = BCRecordLayout<
-    Asmname_DECL_ATTR,
+  using SILGenNameDeclAttrLayout = BCRecordLayout<
+    SILGenName_DECL_ATTR,
     BCFixed<1>, // implicit flag
-    BCBlob      // asmname
+    BCBlob      // _silgen_name
   >;
   
   using AlignmentDeclAttrLayout = BCRecordLayout<

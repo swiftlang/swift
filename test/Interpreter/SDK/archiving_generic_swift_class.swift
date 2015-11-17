@@ -35,7 +35,7 @@ func WEXITSTATUS(status: Int32) -> Int32 {
 }
 
 // FIXME: "environ" should be in the Darwin overlay too
-@asmname("_NSGetEnviron")
+@_silgen_name("_NSGetEnviron")
 func _NSGetEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>>>
 
 var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>> {

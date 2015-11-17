@@ -13,17 +13,17 @@
 // CHECK: apply [[UNKNOWN3a]]
 // CHECK: return
 
-@asmname("unknown1a")
+@_silgen_name("unknown1a")
 func unknown1a() -> ()
-@asmname("unknown1b")
+@_silgen_name("unknown1b")
 func unknown1b() -> ()
-@asmname("unknown2a")
+@_silgen_name("unknown2a")
 func unknown2a() -> ()
-@asmname("unknown2b")
+@_silgen_name("unknown2b")
 func unknown2b() -> ()
-@asmname("unknown3a")
+@_silgen_name("unknown3a")
 func unknown3a() -> ()
-@asmname("unknown3b")
+@_silgen_name("unknown3b")
 func unknown3b() -> ()
 
 struct Int32 {}

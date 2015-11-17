@@ -3,7 +3,7 @@ import Foundation
 
 // Fix the ARGV type of NSApplicationMain, which nonsensically takes
 // argv as a const char**.
-@asmname("NSApplicationMain")
+@_silgen_name("NSApplicationMain")
 public func NSApplicationMain(
   argc: Int32, _ argv: UnsafeMutablePointer<UnsafeMutablePointer<CChar>>
 ) -> Int32

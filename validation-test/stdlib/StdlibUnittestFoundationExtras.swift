@@ -69,7 +69,7 @@ FoundationExtrasTests.test("withOverriddenNSLocaleCurrentLocale(String)") {
   }
 }
 
-@asmname("objc_autorelease")
+@_silgen_name("objc_autorelease")
 func objc_autorelease(ref: AnyObject)
 
 FoundationExtrasTests.test("objc_autorelease()") {

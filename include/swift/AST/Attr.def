@@ -77,7 +77,7 @@ TYPE_ATTR(thick)
 // SimpleDeclAttr<DAK_##NAME>.
 //
 
-DECL_ATTR(asmname, Asmname,
+DECL_ATTR(_silgen_name, SILGenName,
           OnFunc | OnConstructor | OnDestructor | LongAttribute |
           UserInaccessible, 0)
 

@@ -267,7 +267,7 @@ func testSwitchEnumBoolTuple(b1: Bool, b2: Bool, xi: Int) -> Int {
 }
 
 
-@noreturn @asmname("exit") func exit() -> ()
+@noreturn @_silgen_name("exit") func exit() -> ()
 func reachableThroughNonFoldedPredecessor(@autoclosure fn: () -> Bool = false) {
   if !_fastPath(fn()) {
     exit()

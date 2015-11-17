@@ -307,7 +307,7 @@ extension String {
 ///   * an unspecified value less than zero if `lhs < rhs`,
 ///   * zero if `lhs == rhs`,
 ///   * an unspecified value greater than zero  if `lhs > rhs`.
-@asmname("swift_stdlib_compareNSStringDeterministicUnicodeCollation")
+@_silgen_name("swift_stdlib_compareNSStringDeterministicUnicodeCollation")
 public func _stdlib_compareNSStringDeterministicUnicodeCollation(
   lhs: AnyObject, _ rhs: AnyObject
 )-> Int32
@@ -446,11 +446,11 @@ extension String {
 
 #if _runtime(_ObjC)
 @warn_unused_result
-@asmname("swift_stdlib_NSStringNFDHashValue")
+@_silgen_name("swift_stdlib_NSStringNFDHashValue")
 func _stdlib_NSStringNFDHashValue(str: AnyObject) -> Int
 
 @warn_unused_result
-@asmname("swift_stdlib_NSStringASCIIHashValue")
+@_silgen_name("swift_stdlib_NSStringASCIIHashValue")
 func _stdlib_NSStringASCIIHashValue(str: AnyObject) -> Int
 #endif
 
@@ -523,7 +523,7 @@ extension String {
   ///
   /// Low-level construction interface used by introspection
   /// implementation in the runtime library.
-  @asmname("swift_stringFromUTF8InRawMemory")
+  @_silgen_name("swift_stringFromUTF8InRawMemory")
   public // COMPILER_INTRINSIC
   static func _fromUTF8InRawMemory(
     resultStorage: UnsafeMutablePointer<String>,
@@ -754,11 +754,11 @@ extension String {
 }
 #if _runtime(_ObjC)
 @warn_unused_result
-@asmname("swift_stdlib_NSStringLowercaseString")
+@_silgen_name("swift_stdlib_NSStringLowercaseString")
 func _stdlib_NSStringLowercaseString(str: AnyObject) -> _CocoaStringType
 
 @warn_unused_result
-@asmname("swift_stdlib_NSStringUppercaseString")
+@_silgen_name("swift_stdlib_NSStringUppercaseString")
 func _stdlib_NSStringUppercaseString(str: AnyObject) -> _CocoaStringType
 #else
 @warn_unused_result

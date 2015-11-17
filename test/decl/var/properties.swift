@@ -952,24 +952,24 @@ struct AbstractPropertyStruct<T> : AbstractPropertyProtocol {
   var a : T
 }
 
-// Allow asmname accessors without bodies.
-var asmnameGet1: Int {
-  @asmname("get1") get
+// Allow _silgen_name accessors without bodies.
+var _silgen_nameGet1: Int {
+  @_silgen_name("get1") get
   set { }
 }
 
-var asmnameGet2: Int {
+var _silgen_nameGet2: Int {
   set { }
-  @asmname("get2") get
+  @_silgen_name("get2") get
 }
 
-var asmnameGet3: Int {
-  @asmname("get3") get
+var _silgen_nameGet3: Int {
+  @_silgen_name("get3") get
 }
 
-var asmnameGetSet: Int {
-  @asmname("get4") get
-  @asmname("set4") set
+var _silgen_nameGetSet: Int {
+  @_silgen_name("get4") get
+  @_silgen_name("set4") set
 }
 
 

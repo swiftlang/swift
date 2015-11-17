@@ -175,7 +175,7 @@ func _conditionallyUnreachable() {
 }
 
 @warn_unused_result
-@asmname("swift_isClassOrObjCExistential")
+@_silgen_name("swift_isClassOrObjCExistential")
 func _swift_isClassOrObjCExistential<T>(x: T.Type) -> Bool
 
 /// Returns `true` iff `T` is a class type or an `@objc` existential such as
@@ -327,7 +327,7 @@ internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
 }
 
 @warn_unused_result
-@asmname("_swift_class_getInstancePositiveExtentSize_native")
+@_silgen_name("_swift_class_getInstancePositiveExtentSize_native")
 func _swift_class_getInstancePositiveExtentSize_native(theClass: AnyClass) -> UInt
 
 /// - Returns: `class_getInstanceSize(theClass)`.
@@ -343,7 +343,7 @@ internal func _class_getInstancePositiveExtentSize(theClass: AnyClass) -> Int {
 }
 
 @warn_unused_result
-@asmname("_swift_isClass")
+@_silgen_name("_swift_isClass")
 public func _swift_isClass(x: Any) -> Bool
 
 //===--- Builtin.BridgeObject ---------------------------------------------===//

@@ -553,21 +553,21 @@ public:
  typedef SimpleDeclAttr<DAK_##CLASS> CLASS##Attr;
 #include "swift/AST/Attr.def"
 
-/// Defines the @asmname attribute.
-class AsmnameAttr : public DeclAttribute {
+/// Defines the @_silgen_name attribute.
+class SILGenNameAttr : public DeclAttribute {
 public:
-  AsmnameAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
-    : DeclAttribute(DAK_Asmname, AtLoc, Range, Implicit),
+  SILGenNameAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
+    : DeclAttribute(DAK_SILGenName, AtLoc, Range, Implicit),
       Name(Name) {}
 
-  AsmnameAttr(StringRef Name, bool Implicit)
-    : AsmnameAttr(Name, SourceLoc(), SourceRange(), /*Implicit=*/true) {}
+  SILGenNameAttr(StringRef Name, bool Implicit)
+    : SILGenNameAttr(Name, SourceLoc(), SourceRange(), /*Implicit=*/true) {}
 
   /// The symbol name.
   const StringRef Name;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Asmname;
+    return DA->getKind() == DAK_SILGenName;
   }
 };
 

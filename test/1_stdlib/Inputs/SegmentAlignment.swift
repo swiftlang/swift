@@ -3,5 +3,5 @@ import SpriteKit
 
 class C : SKView { }
 
-@asmname("Test") func Test()
+@_silgen_name("Test") func Test()
 Test()
