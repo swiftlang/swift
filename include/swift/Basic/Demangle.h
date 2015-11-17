@@ -406,6 +406,10 @@ private:
   std::string &Stream;
 };
 
+static inline bool isDigit(int c) {
+  return c >= '0' && c <= '9';
+}
+  
 } // end namespace Demangle
 } // end namespace swift
 

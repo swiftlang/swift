@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Support/MathExtras.h"
+#include "swift/Basic/Demangle.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/Lazy.h"
@@ -2389,7 +2390,7 @@ static char *scanIdentifier(const char *&mangled)
     if (*mangled == '0') goto fail;  // length may not be zero
 
     size_t length = 0;
-    while (isdigit(*mangled)) {
+    while (Demangle::isDigit(*mangled)) {
       size_t oldlength = length;
       length *= 10;
       length += *mangled++ - '0';
