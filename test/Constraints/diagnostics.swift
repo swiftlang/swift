@@ -629,3 +629,8 @@ var example21890157: ExampleStruct21890157?
 example21890157.property = "confusing"  // expected-error {{value of optional type 'ExampleStruct21890157?' not unwrapped; did you mean to use '!' or '?'?}} {{16-16=!}}
 
 
+struct UnaryOp {}
+
+_ = -UnaryOp() // expected-error {{unary operator '-' cannot be applied to an operand of type 'UnaryOp'}}
+// expected-note @-1 {{overloads for '-' exist with these partially matching parameter lists: (Float), (Double),}}
+
