@@ -1157,22 +1157,31 @@ namespace {
   class CalleeCandidateInfo {
     ConstraintSystem *CS;
   public:
+    /// This is the name of the callee as extracted from the call expression.
+    /// This can be empty in cases like calls to closure exprs.
     std::string declName;
 
+    /// True if the call site for this callee syntactically has a trailing
+    /// closure specified.
+    bool HasTrailingClosure;
+    
     /// This is the list of candidates identified.
     SmallVector<UncurriedCandidate, 4> candidates;
 
-    /// This tracks how close the match is.
+    /// This tracks how close the candidates are, after filtering.
     CandidateCloseness closeness = CC_GeneralMismatch;
     
     /// Analyze a function expr and break it into a candidate set.  On failure,
     /// this leaves the candidate list empty.
-    CalleeCandidateInfo(Expr *Fn, ConstraintSystem *CS) : CS(CS) {
+    CalleeCandidateInfo(Expr *Fn, bool HasTrailingClosure,
+                        ConstraintSystem *CS)
+      : CS(CS), HasTrailingClosure(HasTrailingClosure) {
       collectCalleeCandidates(Fn);
     }
 
     CalleeCandidateInfo(ArrayRef<OverloadChoice> candidates,
-                        unsigned UncurryLevel, ConstraintSystem *CS);
+                        unsigned UncurryLevel, bool HasTrailingClosure,
+                        ConstraintSystem *CS);
 
     typedef const std::function<CandidateCloseness(UncurriedCandidate)>
     &ClosenessPredicate;
@@ -1180,11 +1189,9 @@ namespace {
     /// After the candidate list is formed, it can be filtered down to discard
     /// obviously mismatching candidates and compute a "closeness" for the
     /// resultant set.
-    void filterList(ArrayRef<CallArgParam> actualArgs,
-                    bool argsHaveTrailingClosure);
-    void filterList(Type actualArgsType, bool argsHaveTrailingClosure) {
-      return filterList(decomposeArgParamType(actualArgsType),
-                        argsHaveTrailingClosure);
+    void filterList(ArrayRef<CallArgParam> actualArgs);
+    void filterList(Type actualArgsType) {
+      return filterList(decomposeArgParamType(actualArgsType));
     }
     void filterList(ClosenessPredicate predicate);
     void filterContextualMemberList(Expr *argExpr);
@@ -1524,8 +1531,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
 /// After the candidate list is formed, it can be filtered down to discard
 /// obviously mismatching candidates and compute a "closeness" for the
 /// resultant set.
-void CalleeCandidateInfo::filterList(ArrayRef<CallArgParam> actualArgs,
-                                     bool isTrailingClosure) {
+void CalleeCandidateInfo::filterList(ArrayRef<CallArgParam> actualArgs) {
   // Now that we have the candidate list, figure out what the best matches from
   // the candidate list are, and remove all the ones that aren't at that level.
   filterList([&](UncurriedCandidate candidate) -> CandidateCloseness {
@@ -1533,7 +1539,7 @@ void CalleeCandidateInfo::filterList(ArrayRef<CallArgParam> actualArgs,
     // If this isn't a function or isn't valid at this uncurry level, treat it
     // as a general mismatch.
     if (!inputType) return CC_GeneralMismatch;
-    return evaluateCloseness(inputType, actualArgs, isTrailingClosure);
+    return evaluateCloseness(inputType, actualArgs, HasTrailingClosure);
   });
 }
 
@@ -1559,12 +1565,9 @@ void CalleeCandidateInfo::filterContextualMemberList(Expr *argExpr) {
   // the ParenExpr goes missing.
   auto *argTuple = dyn_cast<TupleExpr>(argExpr);
   if (!argTuple) {
-    bool isTrailingClosure = false;
     // If we have a single argument, look through the paren expr.
-    if (auto *PE = dyn_cast<ParenExpr>(argExpr)) {
+    if (auto *PE = dyn_cast<ParenExpr>(argExpr))
       argExpr = PE->getSubExpr();
-      isTrailingClosure = PE->hasTrailingClosure();
-    }
     
     Type argType = URT;
     // If the argument has an & specified, then we expect an lvalue.
@@ -1573,7 +1576,7 @@ void CalleeCandidateInfo::filterContextualMemberList(Expr *argExpr) {
     
     CallArgParam param;
     param.Ty = argType;
-    return filterList(param, isTrailingClosure);
+    return filterList(param);
   }
   
   // If we have a tuple expression, form a tuple type.
@@ -1590,12 +1593,14 @@ void CalleeCandidateInfo::filterContextualMemberList(Expr *argExpr) {
     ArgElts.push_back(param);
   }
 
-  return filterList(ArgElts, argTuple->hasTrailingClosure());
+  return filterList(ArgElts);
 }
 
 CalleeCandidateInfo::CalleeCandidateInfo(ArrayRef<OverloadChoice> overloads,
                                          unsigned uncurryLevel,
-                                         ConstraintSystem *CS) : CS(CS) {
+                                         bool HasTrailingClosure,
+                                         ConstraintSystem *CS)
+  : CS(CS), HasTrailingClosure(HasTrailingClosure) {
   for (auto cand : overloads) {
     if (cand.isDecl())
       candidates.push_back({ cand.getDecl(), uncurryLevel });
@@ -2803,7 +2808,7 @@ bool FailureDiagnosis::diagnoseCalleeResultContextualConversionError() {
     return true;
   
   // Based on that, compute an overload set.
-  CalleeCandidateInfo calleeInfo(callee, CS);
+  CalleeCandidateInfo calleeInfo(callee, /*hasTrailingClosure*/false, CS);
 
   switch (calleeInfo.size()) {
   case 0:
@@ -3266,7 +3271,9 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
 
   
   
-  CalleeCandidateInfo calleeInfo(result.ViableCandidates, 0, CS);
+  CalleeCandidateInfo calleeInfo(result.ViableCandidates, 0,
+                                 /*FIXME: Subscript trailing closures*/
+                                 /*hasTrailingClosure*/false, CS);
 
   auto indexExpr = typeCheckArgumentChildIndependently(SE->getIndex(),
                                                        Type(), calleeInfo);
@@ -3389,6 +3396,17 @@ namespace {
   };
 }
 
+/// Return true if the argument of a CallExpr (or related node) has a trailing
+/// closure.
+static bool callArgHasTrailingClosure(Expr *E) {
+  if (!E) return false;
+  if (auto *PE = dyn_cast<ParenExpr>(E))
+    return PE->hasTrailingClosure();
+  else if (auto *TE = dyn_cast<TupleExpr>(E))
+    return TE->hasTrailingClosure();
+  return false;
+}
+
 bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // Type check the function subexpression to resolve a type for it if possible.
   auto fnExpr = typeCheckChildIndependently(callExpr->getFn());
@@ -3440,9 +3458,11 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     return true;
   }
   
+  bool hasTrailingClosure = callArgHasTrailingClosure(callExpr->getArg());
+  
   // Collect a full candidate list of callees based on the partially type
   // checked function.
-  CalleeCandidateInfo calleeInfo(fnExpr, CS);
+  CalleeCandidateInfo calleeInfo(fnExpr, hasTrailingClosure, CS);
   
   // Filter the candidate list based on the argument we may or may not have.
   calleeInfo.filterContextualMemberList(callExpr->getArg());
@@ -3468,13 +3488,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   if (!argExpr)
     return true; // already diagnosed.
 
-  bool hasTrailingClosure = false;
-  if (auto *PE = dyn_cast<ParenExpr>(callExpr->getArg()))
-    hasTrailingClosure = PE->hasTrailingClosure();
-  else if (auto *TE = dyn_cast<TupleExpr>(callExpr->getArg()))
-    hasTrailingClosure = TE->hasTrailingClosure();
-  
-  calleeInfo.filterList(argExpr->getType(), hasTrailingClosure);
+  calleeInfo.filterList(argExpr->getType());
 
 
   // If we filtered this down to exactly one candidate, see if we can produce
@@ -3609,7 +3623,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   
   // Otherwise, we have a generic failure.  Diagnose it with a generic error
   // message now.
-  
   if (isa<BinaryExpr>(callExpr) && isa<TupleExpr>(argExpr)) {
     auto argTuple = cast<TupleExpr>(argExpr);
     auto lhsExpr = argTuple->getElement(0), rhsExpr = argTuple->getElement(1);
@@ -4259,10 +4272,13 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
                                   E->getLoc());
     return true;
   }
+  
+  bool hasTrailingClosure = callArgHasTrailingClosure(E->getArgument());
 
   // Dump all of our viable candidates into a CalleeCandidateInfo (with an
   // uncurry level of 1 to represent the contextual type) and sort it out.
-  CalleeCandidateInfo candidateInfo(result.ViableCandidates, 1, CS);
+  CalleeCandidateInfo candidateInfo(result.ViableCandidates, 1,
+                                    hasTrailingClosure, CS);
 
   // Filter the candidate list based on the argument we may or may not have.
   candidateInfo.filterContextualMemberList(E->getArgument());
