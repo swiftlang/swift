@@ -105,7 +105,7 @@ public struct UnicodeScalar :
       return "\\\'"
     } else if self == "\"" {
       return "\\\""
-    } else if _isPrintableASCII() {
+    } else if _isPrintableASCII {
       return String(self)
     } else if self == "\0" {
       return "\\0"
@@ -148,31 +148,27 @@ public struct UnicodeScalar :
 
   /// Returns true if this is an ASCII character (code point 0 to 127
   /// inclusive).
-  @warn_unused_result
-  public func isASCII() -> Bool {
+  public var isASCII: Bool {
     return value <= 127
   }
 
   // FIXME: Locales make this interesting
-  @warn_unused_result
-  func _isAlpha() -> Bool {
+  internal var _isAlpha: Bool {
     return (self >= "A" && self <= "Z") || (self >= "a" && self <= "z")
   }
 
   // FIXME: Is there a similar term of art in Unicode?
-  @warn_unused_result
-  public func _isASCIIDigit() -> Bool {
+  public var _isASCIIDigit: Bool {
     return self >= "0" && self <= "9"
   }
 
   // FIXME: Unicode makes this interesting
-  @warn_unused_result
-  func _isDigit() -> Bool {
-    return _isASCIIDigit()
+  internal var _isDigit: Bool {
+    return _isASCIIDigit
   }
 
   // FIXME: Unicode and locales make this interesting
-  var _uppercase: UnicodeScalar {
+  internal var _uppercase: UnicodeScalar {
     if self >= "a" && self <= "z" {
       return UnicodeScalar(UInt32(self) &- 32)
     } else if self >= "à" && self <= "þ" && self != "÷" {
@@ -182,7 +178,7 @@ public struct UnicodeScalar :
   }
 
   // FIXME: Unicode and locales make this interesting
-  var _lowercase: UnicodeScalar {
+  internal var _lowercase: UnicodeScalar {
     if self >= "A" && self <= "Z" {
       return UnicodeScalar(UInt32(self) &+ 32)
     } else if self >= "À" && self <= "Þ" && self != "×" {
@@ -192,9 +188,8 @@ public struct UnicodeScalar :
   }
 
   // FIXME: Unicode makes this interesting.
-  @warn_unused_result
   public // @testable
-  func _isSpace() -> Bool {
+  var _isSpace: Bool {
     // FIXME: The constraint-based type checker goes painfully exponential
     // when we turn this into one large expression. Break it up for now,
     // until we can optimize the constraint solver better.
@@ -204,8 +199,7 @@ public struct UnicodeScalar :
   }
 
   // FIXME: Unicode makes this interesting.
-  @warn_unused_result
-  func _isPrintableASCII() -> Bool {
+  internal var _isPrintableASCII: Bool {
     return (self >= UnicodeScalar(0o040) && self <= UnicodeScalar(0o176))
   }
 }

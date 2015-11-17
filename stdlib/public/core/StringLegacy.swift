@@ -55,20 +55,17 @@ extension String {
   }
 
   @warn_unused_result
-  func _isAll(@noescape predicate: (UnicodeScalar) -> Bool) -> Bool {
+  internal func _isAll(@noescape predicate: (UnicodeScalar) -> Bool) -> Bool {
     for c in unicodeScalars { if !predicate(c) { return false } }
 
     return true
   }
 
-  @warn_unused_result
-  func _isAlpha() -> Bool { return _isAll({ $0._isAlpha() }) }
+  internal var _isAlpha: Bool { return _isAll({ $0._isAlpha }) }
 
-  @warn_unused_result
-  func _isDigit() -> Bool { return _isAll({ $0._isDigit() }) }
+  internal var _isDigit: Bool { return _isAll({ $0._isDigit }) }
 
-  @warn_unused_result
-  func _isSpace() -> Bool { return _isAll({ $0._isSpace() }) }
+  internal var _isSpace: Bool { return _isAll({ $0._isSpace }) }
 }
 
 #if _runtime(_ObjC)

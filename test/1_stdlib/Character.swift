@@ -289,11 +289,11 @@ UnicodeScalarTests.test("UInt32(_: UnicodeScalar),UInt64(_: UnicodeScalar)") {
 }
 
 UnicodeScalarTests.test("isASCII()") {
-  expectTrue(UnicodeScalar(0).isASCII())
-  expectTrue(("A" as UnicodeScalar).isASCII())
-  expectTrue(UnicodeScalar(127).isASCII())
-  expectFalse(UnicodeScalar(128).isASCII())
-  expectFalse(UnicodeScalar(256).isASCII())
+  expectTrue(UnicodeScalar(0).isASCII)
+  expectTrue(("A" as UnicodeScalar).isASCII)
+  expectTrue(UnicodeScalar(127).isASCII)
+  expectFalse(UnicodeScalar(128).isASCII)
+  expectFalse(UnicodeScalar(256).isASCII)
 }
 
 UnicodeScalarTests.test("Comparable") {

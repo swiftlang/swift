@@ -150,7 +150,7 @@ public struct StaticString
     self._startPtrOrData =
       unsafeBitCast(UInt(UInt32(unicodeScalar)), OpaquePointer.self)._rawValue
     self._lengthInBytes = 0._builtinWordValue
-    self._flags = UnicodeScalar(_builtinUnicodeScalarLiteral: unicodeScalar).isASCII()
+    self._flags = UnicodeScalar(_builtinUnicodeScalarLiteral: unicodeScalar).isASCII
       ? (0x3 as UInt8)._value
       : (0x1 as UInt8)._value
   }
