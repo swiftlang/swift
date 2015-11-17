@@ -929,10 +929,7 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   Arguments.push_back("-o");
   Arguments.push_back(context.Output.getPrimaryOutputFilename().c_str());
 
-  auto Linker = "ld";
-  if (auto *Arg = context.Args.getLastArg(options::OPT_linker_path))
-    Linker = Arg->getValue();
-  return std::make_pair(Linker, Arguments);
+  return std::make_pair("ld", Arguments);
 }
 
 #if defined(SWIFT_ENABLE_TARGET_LINUX)
@@ -1046,10 +1043,7 @@ toolchains::Linux::constructInvocation(const LinkJobAction &job,
   Arguments.push_back("-o");
   Arguments.push_back(context.Output.getPrimaryOutputFilename().c_str());
 
-  auto Linker = "clang++";
-  if (auto *Arg = context.Args.getLastArg(options::OPT_linker_path))
-    Linker = Arg->getValue();
-  return std::make_pair(Linker, Arguments);
+  return std::make_pair("clang++", Arguments);
 }
 
 #endif // SWIFT_ENABLE_TARGET_LINUX

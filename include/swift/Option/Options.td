@@ -408,11 +408,6 @@ def resource_dir : Separate<["-"], "resource-dir">,
   MetaVarName<"</usr/lib/swift>">,
   HelpText<"The directory that holds the compiler resource files">;
 
-def linker_path : Separate<["-"], "linker-path">,
-  Flags<[FrontendOption, HelpHidden]>,
-  MetaVarName<"<arg>">,
-  HelpText<"The path to the linker or C++ driver to use for linking">;
-
 def target : Separate<["-"], "target">,
   Flags<[FrontendOption, ModuleWrapOption]>,
   HelpText<"Generate code for the given target">;
