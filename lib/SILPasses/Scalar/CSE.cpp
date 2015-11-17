@@ -625,6 +625,9 @@ bool CSE::canHandle(SILInstruction *Inst) {
   if (auto *WMI = dyn_cast<WitnessMethodInst>(Inst)) {
     return !WMI->isVolatile();
   }
+  if (auto *EMI = dyn_cast<ExistentialMetatypeInst>(Inst)) {
+    return !EMI->getOperand().getType().isAddress();
+  }
   switch (Inst->getKind()) {
     case ValueKind::FunctionRefInst:
     case ValueKind::GlobalAddrInst:
@@ -639,7 +642,6 @@ bool CSE::canHandle(SILInstruction *Inst) {
     case ValueKind::TupleElementAddrInst:
     case ValueKind::MetatypeInst:
     case ValueKind::ValueMetatypeInst:
-    case ValueKind::ExistentialMetatypeInst:
     case ValueKind::ObjCProtocolInst:
     case ValueKind::RefElementAddrInst:
     case ValueKind::IndexRawPointerInst:
