@@ -9,7 +9,6 @@ set(SWIFT_CONFIGURED_SDKS)
 function(_report_sdk prefix)
   message(STATUS "${SWIFT_SDK_${prefix}_NAME} SDK:")
   message(STATUS "  Path: ${SWIFT_SDK_${prefix}_PATH}")
-  message(STATUS "  Path (public): ${SWIFT_SDK_${prefix}_PUBLIC_PATH}")
   message(STATUS "  Version: ${SWIFT_SDK_${prefix}_VERSION}")
   message(STATUS "  Build number: ${SWIFT_SDK_${prefix}_BUILD_NUMBER}")
   message(STATUS "  Deployment version: ${SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION}")
@@ -40,7 +39,7 @@ endfunction()
 #   )
 #
 # Sadly there are three OS naming conventions.
-# xcrun SDK name:   macosx iphoneos iphonesimulator (+ "internal" or version)
+# xcrun SDK name:   macosx iphoneos iphonesimulator (+ version)
 # -mOS-version-min: macosx ios      ios-simulator
 # swift -triple:    macosx ios      ios
 #
@@ -48,8 +47,6 @@ endfunction()
 # defines a number of variables:
 #
 #   SWIFT_SDK_${prefix}_NAME                Display name for the SDK
-#   SWIFT_SDK_${prefix}_PATH                Path to the SDK (possibly internal)
-#   SWIFT_SDK_${prefix}_PUBLIC_PATH         Path to the public SDK
 #   SWIFT_SDK_${prefix}_VERSION             SDK version number (e.g., 10.9, 7.0)
 #   SWIFT_SDK_${prefix}_BUILD_NUMBER        SDK build number (e.g., 14A389a)
 #   SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION  Deployment version (e.g., 10.9, 7.0)
@@ -68,50 +65,17 @@ macro(configure_sdk_darwin
   set(SWIFT_SDK_${prefix}_PATH "" CACHE PATH "Path to the ${name} SDK")
 
   if(NOT SWIFT_SDK_${prefix}_PATH)
-    if(${SWIFT_DARWIN_USE_INTERNAL_SDK})
-      # If requested, require the internal SDK.
-      execute_process(
-          COMMAND "xcrun" "--sdk" "${xcrun_name}.internal" "--show-sdk-path"
-          OUTPUT_VARIABLE SWIFT_SDK_${prefix}_PATH
-          OUTPUT_STRIP_TRAILING_WHITESPACE)
-      if(NOT EXISTS "${SWIFT_SDK_${prefix}_PATH}/System/Library/PrivateFrameworks")
-        message(FATAL_ERROR "Internal ${name} SDK not found at SWIFT_SDK_${prefix}_PATH.")
-      endif()
-    endif()
-  endif()
-
-  if(NOT SWIFT_SDK_${prefix}_PATH)
     execute_process(
         COMMAND "xcrun" "--sdk" "${xcrun_name}" "--show-sdk-path"
-        OUTPUT_VARIABLE SWIFT_SDK_${prefix}_PUBLIC_PATH
+        OUTPUT_VARIABLE SWIFT_SDK_${prefix}_PATH
         OUTPUT_STRIP_TRAILING_WHITESPACE)
-    if(NOT EXISTS "${SWIFT_SDK_${prefix}_PUBLIC_PATH}/System/Library/Frameworks/module.map")
-      message(FATAL_ERROR "${name} SDK not found at SWIFT_SDK_${prefix}_PUBLIC_PATH.")
+    if(NOT EXISTS "${SWIFT_SDK_${prefix}_PATH}/System/Library/Frameworks/module.map")
+      message(FATAL_ERROR "${name} SDK not found at ${SWIFT_SDK_${prefix}_PATH}.")
     endif()
-
-    set(SWIFT_SDK_${prefix}_PATH "${SWIFT_SDK_${prefix}_PUBLIC_PATH}")
-  endif()
-
-  # Find the internal SDK if the user has not specified to use an external ICU
-  # library. Otherwise, we will just use the regular SDK.
-  set(SWIFT_SDK_${prefix}_INTERNAL_PATH "" CACHE PATH "Path to the internal ${name} SDK")
-  if (NOT SWIFT_DARWIN_ICU_INCLUDE_PATH)
-    if ("${prefix}" STREQUAL "IOS_SIMULATOR" OR
-        "${prefix}" STREQUAL "WATCHOS_SIMULATOR" OR
-        "${prefix}" STREQUAL "TVOS_SIMULATOR")
-      set(SWIFT_SDK_${prefix}_INTERNAL_PATH "${SWIFT_SDK_${prefix}_PATH}")
-    else()
-      execute_process(
-        COMMAND "xcrun" "--sdk" "${xcrun_name}.internal" "--show-sdk-path"
-        OUTPUT_VARIABLE SWIFT_SDK_${prefix}_INTERNAL_PATH
-        OUTPUT_STRIP_TRAILING_WHITESPACE)
-    endif()
-  else()
-    set(SWIFT_SDK_${prefix}_INTERNAL_PATH "${SWIFT_SDK_${prefix}_PATH}")
   endif()
 
   if(NOT EXISTS "${SWIFT_SDK_${prefix}_PATH}/System/Library/Frameworks/module.map")
-    message(FATAL_ERROR "${name} SDK not found at SWIFT_SDK_${prefix}_PATH.")
+    message(FATAL_ERROR "${name} SDK not found at ${SWIFT_SDK_${prefix}_PATH}.")
   endif()
 
   # Determine the SDK version we found.
@@ -151,8 +115,6 @@ macro(configure_sdk_unix
 
   set(SWIFT_SDK_${prefix}_NAME "${name}")
   set(SWIFT_SDK_${prefix}_PATH "/")
-  set(SWIFT_SDK_${prefix}_PUBLIC_PATH "/")
-  set(SWIFT_SDK_${prefix}_INTERNAL_PATH "/")
   set(SWIFT_SDK_${prefix}_VERSION "don't use")
   set(SWIFT_SDK_${prefix}_BUILD_NUMBER "don't use")
   set(SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION "don't use")

@@ -40,24 +40,18 @@ endfunction()
 
 
 function(_add_variant_c_compile_link_flags
-    sdk arch build_type enable_assertions use_internal_sdk result_var_name)
+    sdk arch build_type enable_assertions result_var_name)
   set(result
     ${${result_var_name}}
     "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}")
 
-  if(use_internal_sdk)
-    list(APPEND result
-      "-isysroot" "${SWIFT_SDK_${sdk}_INTERNAL_PATH}")
-  else()
-    list(APPEND result
-      "-isysroot" "${SWIFT_SDK_${sdk}_PATH}")
-  endif()
+  list(APPEND result
+    "-isysroot" "${SWIFT_SDK_${sdk}_PATH}")
 
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     list(APPEND result
         "-arch" "${arch}"
         "-F" "${SWIFT_SDK_${sdk}_PATH}/../../../Developer/Library/Frameworks"
-        "-F" "${SWIFT_SDK_${sdk}_PATH}/../../../Developer/AppleInternal/Library/Frameworks"
         "-m${SWIFT_SDK_${sdk}_VERSION_MIN_NAME}-version-min=${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION}")
   endif()
 
@@ -65,7 +59,7 @@ function(_add_variant_c_compile_link_flags
 endfunction()
 
 function(_add_variant_c_compile_flags
-    sdk arch build_type enable_assertions use_internal_sdk result_var_name)
+    sdk arch build_type enable_assertions result_var_name)
   set(result ${${result_var_name}})
 
   _add_variant_c_compile_link_flags(
@@ -73,7 +67,6 @@ function(_add_variant_c_compile_flags
       "${arch}"
       "${build_type}"
       "${enable_assertions}"
-      ${use_internal_sdk}
       result)
 
   is_build_type_optimized("${build_type}" optimized)
@@ -114,8 +107,7 @@ function(_add_variant_swift_compile_flags
 
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     list(APPEND result
-        "-F" "${SWIFT_SDK_${sdk}_PATH}/../../../Developer/Library/Frameworks"
-        "-F" "${SWIFT_SDK_${sdk}_PATH}/../../../Developer/AppleInternal/Library/Frameworks")
+        "-F" "${SWIFT_SDK_${sdk}_PATH}/../../../Developer/Library/Frameworks")
   endif()
 
   is_build_type_optimized("${build_type}" optimized)
@@ -138,7 +130,7 @@ function(_add_variant_swift_compile_flags
 endfunction()
 
 function(_add_variant_link_flags
-    sdk arch build_type enable_assertions use_internal_sdk result_var_name)
+    sdk arch build_type enable_assertions result_var_name)
 
   if("${sdk}" STREQUAL "")
     message(FATAL_ERROR "Should specify an SDK")
@@ -155,7 +147,6 @@ function(_add_variant_link_flags
       "${arch}"
       "${build_type}"
       "${enable_assertions}"
-      ${use_internal_sdk}
       result)
 
   if("${sdk}" STREQUAL "LINUX")
@@ -630,7 +621,6 @@ endfunction()
 #   _add_swift_library_single(
 #     target
 #     name
-#     [USE_INTERNAL_SDK]
 #     [SHARED]
 #     [SDK sdk]
 #     [ARCHITECTURE architecture]
@@ -711,15 +701,12 @@ endfunction()
 # INSTALL_IN_COMPONENT comp
 #   The Swift installation component that this library belongs to.
 #
-# USE_INTERNAL_SDK
-#   Use the 'internal' sdk variant.
-#
 # source1 ...
 #   Sources to add into this library
 function(_add_swift_library_single target name)
   set(SWIFTLIB_SINGLE_options
       SHARED IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY
-      API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE USE_INTERNAL_SDK)
+      API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE)
   cmake_parse_arguments(SWIFTLIB_SINGLE
     "${SWIFTLIB_SINGLE_options}"
     "SDK;ARCHITECTURE;INSTALL_IN_COMPONENT"
@@ -1033,14 +1020,12 @@ function(_add_swift_library_single target name)
       "${SWIFTLIB_SINGLE_ARCHITECTURE}"
       "${build_type}"
       "${enable_assertions}"
-      ${SWIFTLIB_SINGLE_USE_INTERNAL_SDK}
       c_compile_flags)
   _add_variant_link_flags(
       "${SWIFTLIB_SINGLE_SDK}"
       "${SWIFTLIB_SINGLE_ARCHITECTURE}"
       "${build_type}"
       "${enable_assertions}"
-      ${SWIFTLIB_SINGLE_USE_INTERNAL_SDK}
       link_flags)
 
   # Handle gold linker flags for shared libraries.
@@ -1228,15 +1213,12 @@ endfunction()
 # INSTALL_IN_COMPONENT comp
 #   The Swift installation component that this library belongs to.
 #
-# USE_INTERNAL_SDK
-#   Use the 'internal' sdk variant.
-#
 # source1 ...
 #   Sources to add into this library.
 function(add_swift_library name)
   set(SWIFTLIB_options
       SHARED IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY TARGET_LIBRARY
-      API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE USE_INTERNAL_SDK)
+      API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE)
   cmake_parse_arguments(SWIFTLIB
     "${SWIFTLIB_options}"
     "INSTALL_IN_COMPONENT"
@@ -1372,7 +1354,6 @@ function(add_swift_library name)
         _add_swift_library_single(
           ${VARIANT_NAME}
           ${name}
-          ${SWIFTLIB_USE_INTERNAL_SDK_keyword}
           ${SWIFTLIB_SHARED_keyword}
           ${SWIFTLIB_SOURCES}
           SDK ${sdk}
@@ -1519,7 +1500,6 @@ function(add_swift_library name)
     _add_swift_library_single(
       ${name}
       ${name}
-      ${SWIFTLIB_USE_INTERNAL_SDK_keyword}
       ${SWIFTLIB_SHARED_keyword}
       ${SWIFTLIB_SOURCES}
       SDK ${sdk}
