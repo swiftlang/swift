@@ -2355,6 +2355,17 @@ void ConstraintSystem::print(raw_ostream &out) {
     failedConstraint->print(out, &getTypeChecker().Context.SourceMgr);
     out << "\n";
   }
+
+  if (!Fixes.empty()) {
+    out << "\nFixes:\n";
+    for (auto &fix : Fixes) {
+      out.indent(2);
+      fix.first.print(out, this);
+      out << " @ ";
+      fix.second->dump(&getTypeChecker().Context.SourceMgr, out);
+      out << "\n";
+    }
+  }
 }
 
 /// Determine the semantics of a checked cast operation.

@@ -268,7 +268,7 @@ enum class FixKind : uint8_t {
   CoerceToCheckedCast,
 };
 
-/// Desribes a fix that can be applied to a constraint before visiting it.
+/// Describes a fix that can be applied to a constraint before visiting it.
 class Fix {
   FixKind Kind;
   uint16_t Data;
