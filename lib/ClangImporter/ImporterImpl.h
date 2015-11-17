@@ -707,7 +707,8 @@ public:
              const llvm::SmallBitVector &nonNullArgs,
              const Optional<api_notes::ObjCMethodInfo> &knownMethod,
              Optional<unsigned> errorParamIndex,
-             bool returnsSelf);
+             bool returnsSelf,
+             bool isInstanceMethod);
 
   /// \brief Converts the given Swift identifier for Clang.
   clang::DeclarationName exportName(Identifier name);

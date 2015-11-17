@@ -802,11 +802,13 @@ public:
                            std::unique_ptr<ArchetypeBuilder> builder);
 
   /// Retrieve the inherited name set for the given class.
-  const InheritedNameSet *getAllPropertyNames(ClassDecl *classDecl);
+  const InheritedNameSet *getAllPropertyNames(ClassDecl *classDecl,
+                                              bool forInstance);
 
   /// Retrieve the inherited name set for the given Objective-C class.
   const InheritedNameSet *getAllPropertyNames(
-                            clang::ObjCInterfaceDecl *classDecl);
+                            clang::ObjCInterfaceDecl *classDecl,
+                            bool forInstance);
 
 private:
   friend class Decl;

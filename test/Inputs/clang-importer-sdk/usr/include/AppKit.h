@@ -293,4 +293,8 @@ typedef NSPoint *NSPointPointer;
 
 - (nonnull NSSet<NSLayoutConstraint *> *)layoutConstraints;
 - (void)addLayoutConstraints:(nonnull NSSet<NSLayoutConstraint *> *)layoutConstraints;
+
++ (NSRect)rect;
+- (void)addRect:(NSRect)rect;
++ (void)conjureRect:(NSRect)rect;
 @end

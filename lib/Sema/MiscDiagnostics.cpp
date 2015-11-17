@@ -1901,7 +1901,8 @@ static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
   const InheritedNameSet *allPropertyNames = nullptr;
   if (contextType) {
     if (auto classDecl = contextType->getClassOrBoundGenericClass()) {
-      allPropertyNames = Context.getAllPropertyNames(classDecl);
+      allPropertyNames = Context.getAllPropertyNames(classDecl,
+                                                     afd->isInstanceMember());
     }
   }
 
@@ -1967,7 +1968,8 @@ static Optional<Identifier> omitNeedlessWords(VarDecl *var) {
   const InheritedNameSet *allPropertyNames = nullptr;
   if (contextType) {
     if (auto classDecl = contextType->getClassOrBoundGenericClass()) {
-      allPropertyNames = Context.getAllPropertyNames(classDecl);
+      allPropertyNames = Context.getAllPropertyNames(classDecl,
+                                                     var->isInstanceMember());
     }
   }
 

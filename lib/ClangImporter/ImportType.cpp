@@ -2036,7 +2036,8 @@ DeclName ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
            const llvm::SmallBitVector &nonNullArgs,
            const Optional<api_notes::ObjCMethodInfo> &knownMethod,
            Optional<unsigned> errorParamIndex,
-           bool returnsSelf) {
+           bool returnsSelf,
+           bool isInstanceMethod) {
   ASTContext &ctx = SwiftContext;
 
   // Collect the argument names.
@@ -2095,7 +2096,8 @@ DeclName ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
   if (!contextType.isNull()) {
     if (auto objcPtrType = contextType->getAsObjCInterfacePointerType())
       if (auto objcClassDecl = objcPtrType->getInterfaceDecl())
-        allPropertyNames = SwiftContext.getAllPropertyNames(objcClassDecl);
+        allPropertyNames = SwiftContext.getAllPropertyNames(objcClassDecl,
+                                                            isInstanceMethod);
   }
 
   if (!omitNeedlessWords(baseName, argNames, firstParamName,
@@ -2303,7 +2305,8 @@ Type ClangImporter::Implementation::importMethodType(
                    nonNullArgs,
                    knownMethod,
                    errorInfo ? Optional<unsigned>(errorInfo->ParamIndex) : None,
-                   clangDecl->hasRelatedResultType());
+                   clangDecl->hasRelatedResultType(),
+                   clangDecl->isInstanceMethod());
   }
 
   // Import the parameters.

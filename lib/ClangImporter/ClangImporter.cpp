@@ -1372,7 +1372,8 @@ ClangImporter::Implementation::importName(const clang::NamedDecl *D,
           if (auto objcPtrType = contextType->getAsObjCInterfacePointerType())
             if (auto objcClassDecl = objcPtrType->getInterfaceDecl())
               allPropertyNames = SwiftContext.getAllPropertyNames(
-                                   objcClassDecl);
+                                   objcClassDecl,
+                                   /*forInstance=*/true);
         }
 
         if (omitNeedlessWords(name, { }, "", propertyTypeName, contextTypeName,

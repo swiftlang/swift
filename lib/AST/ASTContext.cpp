@@ -236,12 +236,12 @@ struct ASTContext::Implementation {
 
   /// The set of property names that show up in the defining module of a
   /// class.
-  llvm::DenseMap<const ClassDecl *, std::unique_ptr<InheritedNameSet>>
-    AllProperties;
+  llvm::DenseMap<std::pair<const ClassDecl *, char>,
+                 std::unique_ptr<InheritedNameSet>> AllProperties;
 
   /// The set of property names that show up in the defining module of
   /// an Objective-C class.
-  llvm::DenseMap<const clang::ObjCInterfaceDecl *,
+  llvm::DenseMap<std::pair<const clang::ObjCInterfaceDecl *, char>,
                  std::unique_ptr<InheritedNameSet>> AllPropertiesObjC;
 
   /// \brief Structure that captures data that is segregated into different
@@ -3514,17 +3514,19 @@ void ASTContext::unregisterLazyArchetype(const ArchetypeType *archetype) {
   Impl.LazyArchetypes.erase(known);
 }
 
-const InheritedNameSet *ASTContext::getAllPropertyNames(ClassDecl *classDecl) {
+const InheritedNameSet *ASTContext::getAllPropertyNames(ClassDecl *classDecl,
+                                                        bool forInstance) {
   // If this class was defined in Objective-C, perform the lookup based on
   // the Objective-C class.
   if (auto objcClass = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
                          classDecl->getClangDecl())) {
     return getAllPropertyNames(
-             const_cast<clang::ObjCInterfaceDecl *>(objcClass));
+             const_cast<clang::ObjCInterfaceDecl *>(objcClass),
+             forInstance);
   }
 
   // If we already have this information, return it.
-  auto known = Impl.AllProperties.find(classDecl);
+  auto known = Impl.AllProperties.find({classDecl, forInstance});
   if (known != Impl.AllProperties.end()) return known->second.get();
 
   // Otherwise, get information from our superclass first.
@@ -3534,19 +3536,21 @@ const InheritedNameSet *ASTContext::getAllPropertyNames(ClassDecl *classDecl) {
   const InheritedNameSet *parentSet = nullptr;
   if (auto superclass = classDecl->getSuperclass()) {
     if (auto superclassDecl = superclass->getClassOrBoundGenericClass()) {
-      parentSet = getAllPropertyNames(superclassDecl);
+      parentSet = getAllPropertyNames(superclassDecl, forInstance);
     }
   }
 
   // Create the set of properties.
   known = Impl.AllProperties.insert(
-            {classDecl, llvm::make_unique<InheritedNameSet>(parentSet) }).first;
+            { std::pair<const ClassDecl *, char>(classDecl, forInstance),
+              llvm::make_unique<InheritedNameSet>(parentSet) }).first;
 
   // Local function to add properties from the given set.
   auto addProperties = [&](DeclRange members) {
     for (auto member : members) {
       auto var = dyn_cast<VarDecl>(member);
       if (!var || var->getName().empty()) continue;
+      if (var->isInstanceMember() != forInstance) continue;
 
       known->second->add(var->getName().str());
     }
@@ -3566,36 +3570,42 @@ const InheritedNameSet *ASTContext::getAllPropertyNames(ClassDecl *classDecl) {
 }
 
 const InheritedNameSet *ASTContext::getAllPropertyNames(
-                          clang::ObjCInterfaceDecl *classDecl) {
+                          clang::ObjCInterfaceDecl *classDecl,
+                          bool forInstance) {
   classDecl = classDecl->getCanonicalDecl();
 
   // If we already have this information, return it.
-  auto known = Impl.AllPropertiesObjC.find(classDecl);
+  auto known = Impl.AllPropertiesObjC.find({classDecl, forInstance});
   if (known != Impl.AllPropertiesObjC.end()) return known->second.get();
 
   // Otherwise, get information from our superclass first.
   const InheritedNameSet *parentSet = nullptr;
   if (auto superclassDecl = classDecl->getSuperClass()) {
-    parentSet = getAllPropertyNames(superclassDecl);
+    parentSet = getAllPropertyNames(superclassDecl, forInstance);
   }
 
   // Create the set of properties.
   known = Impl.AllPropertiesObjC.insert(
-            {classDecl, llvm::make_unique<InheritedNameSet>(parentSet) }).first;
+            { std::pair<const clang::ObjCInterfaceDecl *, char>(classDecl,
+                                                                forInstance),
+              llvm::make_unique<InheritedNameSet>(parentSet) }).first;
 
   // Local function to add properties from the given set.
   auto addProperties = [&](clang::DeclContext::decl_range members) {
     for (auto member : members) {
       // Add Objective-C property names.
       if (auto property = dyn_cast<clang::ObjCPropertyDecl>(member)) {
-        known->second->add(property->getName());
+        if (forInstance)
+          known->second->add(property->getName());
         continue;
       }
 
       // Add no-parameter, non-void method names.
       if (auto method = dyn_cast<clang::ObjCMethodDecl>(member)) {
         if (method->getSelector().isUnarySelector() &&
-            !method->getReturnType()->isVoidType()) {
+            !method->getReturnType()->isVoidType() &&
+            !method->hasRelatedResultType() &&
+            method->isInstanceMethod() == forInstance) {
           known->second->add(method->getSelector().getNameForSlot(0));
           continue;
         }

@@ -203,3 +203,5 @@
 // CHECK-APPKIT: func removeGestureRecognizer(_: NSGestureRecognizer)
 // CHECK-APPKIT: func favoriteViewFor(_: NSGestureRecognizer) -> NSView?
 // CHECK-APPKIT: func addLayoutConstraints(_: Set<NSLayoutConstraint>)
+// CHECK-APPKIT: func add(_: NSRect)
+// CHECK-APPKIT: class func conjureRect(_: NSRect)
