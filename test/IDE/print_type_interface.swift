@@ -48,13 +48,13 @@ class C2 {
 // RUN: %target-swift-ide-test -print-type-interface -pos=43:6 -source-filename %s | FileCheck %s -check-prefix=TYPE3
 
 
-// TYPE2:      public class D<T> {
+// TYPE2:      public class D<T1> {
 // TYPE2-NEXT:   public func foo()
 // TYPE2-NEXT:   public func conditionalFunc1()
 // TYPE2-NEXT:   public func unconditionalFunc1()
 // TYPE2-NEXT: }
 
-// TYPE3:      public class D<T> {
+// TYPE3:      public class D<Int> {
 // TYPE3-NEXT:   public func foo()
 // TYPE3-NEXT:   public func unconditionalFunc1()
 // TYPE3-NEXT: }

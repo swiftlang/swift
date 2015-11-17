@@ -74,7 +74,7 @@ bool ASTPrinter::printTypeInterface(Type Ty, llvm::raw_ostream &OS) {
   if (!Ty)
     return false;
   Ty = Ty->getRValueType();
-  PrintOptions Options = PrintOptions::printInterface();
+  PrintOptions Options = PrintOptions::printTypeInterface(Ty.getPointer());
    if (auto ND = Ty->getNominalOrBoundGenericNominal()) {
      Options.printExtensionContentAsMembers = [&](const ExtensionDecl *ED) {
        return isExtensionApplied(*ND->getDeclContext(), Ty, ED);
@@ -594,18 +594,31 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
 
   Printer << "<";
   bool IsFirst = true;
-  for (auto GP : Params->getParams()) {
-    if (IsFirst) {
-      IsFirst = false;
-    } else {
-      Printer << ", ";
+  SmallVector<Type, 4> Scrach;
+  if (Options.InstantiateArchetype) {
+    auto ArgArr = Options.TypeToPrint->getAllGenericArgs(Scrach);
+    for (auto Arg : ArgArr) {
+      if (IsFirst) {
+        IsFirst = false;
+      } else {
+        Printer << ", ";
+      }
+      auto NM = Arg->getAnyNominal();
+      assert(NM && "Cannot get nominal type.");
+      Printer << NM->getNameStr();
     }
-
-    Printer.printName(GP->getName());
-    printInherited(GP);
+  } else {
+    for (auto GP : Params->getParams()) {
+      if (IsFirst) {
+        IsFirst = false;
+      } else {
+        Printer << ", ";
+      }
+      Printer.printName(GP->getName());
+      printInherited(GP);
+    }
+    printWhereClause(Params->getRequirements());
   }
-
-  printWhereClause(Params->getRequirements());
   Printer << ">";
 }
 

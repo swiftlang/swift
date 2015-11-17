@@ -20,6 +20,7 @@ namespace swift {
 class GenericParamList;
 class CanType;
 class ExtensionDecl;
+class TypeBase;
 enum DeclAttrKind : unsigned;
 
 /// Options for printing AST nodes.
@@ -187,6 +188,12 @@ struct PrintOptions {
   /// \brief Print types with alternative names from their canonical names.
   llvm::DenseMap<CanType, Identifier> *AlternativeTypeNames = nullptr;
 
+  /// \brief When printing a type interface, register the type to print.
+  TypeBase *TypeToPrint = nullptr;
+
+  /// \brief When printing a type interface, whether we instantiate archetypes.
+  bool InstantiateArchetype = false;
+
   /// Retrieve the set of options for verbose printing to users.
   static PrintOptions printVerbose() {
     PrintOptions result;
@@ -224,6 +231,13 @@ struct PrintOptions {
     result.SkipImplicit = true;
     result.SkipPrivateStdlibDecls = true;
     result.SkipDeinit = true;
+    return result;
+  }
+
+  static PrintOptions printTypeInterface(TypeBase *T) {
+    PrintOptions result = printInterface();
+    result.TypeToPrint = T;
+    result.InstantiateArchetype = true;
     return result;
   }
 
