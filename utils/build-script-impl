@@ -210,12 +210,6 @@ function set_deployment_target_based_options() {
     case $deployment_target in
         linux-x86_64)
             SWIFT_HOST_VARIANT_ARCH="x86_64"
-            if [[ "$BUILD_NINJA" ]]; then
-                llvm_cmake_options=(-DCMAKE_MAKE_PROGRAM="$(build_directory build ninja)/ninja")
-                swift_cmake_options=(-DCMAKE_MAKE_PROGRAM="$(build_directory build ninja)/ninja")
-                cmark_cmake_options=(-DCMAKE_MAKE_PROGRAM="$(build_directory build ninja)/ninja")
-                swiftpm_cmake_options=(-DCMAKE_MAKE_PROGRAM="$(build_directory build ninja)/ninja")
-            fi
             ;;
         macosx-* | iphoneos-* | iphonesimulator-* | \
           appletvos-* | appletvsimulator-* | \
