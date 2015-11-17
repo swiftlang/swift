@@ -50,6 +50,8 @@ class EscapeAnalysis : public SILAnalysis {
     /// Represents a points-to relationship: a pointer points to a content.
     /// The destination node must always be of type Content. For each pointer p
     /// there is also a points-to edge p -> c, where c is the content node for p.
+    /// We use the points-to relationship also for a ref_element_addr
+    /// projection (see NodeType::Content).
     PointsTo = 0,
     
     /// Represents an assignment: "a = b" creates a defer-edge a -> b.
@@ -69,8 +71,14 @@ class EscapeAnalysis : public SILAnalysis {
     
     /// Represents the "memory content" to which a pointer points to.
     /// The "content" represents all stored properties of the referenced object.
-    /// Note that currently we don't consider projections and we summarize all
-    /// stored properties of an object into a single "content".
+    /// We also treat the elements of a referece-counted object as a "content"
+    /// of that object. Although ref_element_addr is just a pointer addition, we
+    /// treat it as a "pointer" pointing to the elements. Having this additional
+    /// indirection in the graph, we avoid letting a reference escape just
+    /// because an element address escapes.
+    /// Note that currently we don't consider other projections and we summarize
+    /// all stored properties of an object into a single "content".
+    ///
     Content,
     
     /// A function argument, which is just a special case of Value type.
@@ -78,13 +86,7 @@ class EscapeAnalysis : public SILAnalysis {
 
     /// The function return value, which is also just a special case of Value
     /// type.
-    Return,
-
-    /// A ref_element_addr, which is also just a special case of Value type.
-    /// There is only a single RefElement node for all ref_element_addrs of a
-    /// reference. The purpose of having such a node is to model the fact that
-    /// a reference cannot escape even if a ref_element_addr escapes.
-    RefElement
+    Return
   };
 
   /// Indicates to what a value escapes. Note: the order of values is important.
@@ -214,28 +216,8 @@ private:
           return false;
       }
       To->Preds.push_back(Predecessor(this, EdgeType::Defer));
-      if (To->Type == NodeType::RefElement && !defersTo.empty()) {
-        /// We keep the RefElement nodes at the head of defersTo to speed up
-        /// the lookup for such a successor.
-        defersTo.insert(defersTo.begin(), To);
-      } else {
-        defersTo.push_back(To);
-      }
+      defersTo.push_back(To);
       return true;
-    }
-
-    /// Returns a defer-successor of type RefElement for the node or null if
-    /// the node doesn't have one.
-    CGNode *getRefElementNode() const {
-      if (defersTo.empty())
-        return nullptr;
-
-      // RefElement successors are always at the head of the list.
-      CGNode *First = defersTo[0];
-      if (First->Type != NodeType::RefElement)
-        return nullptr;
-
-      return First;
     }
 
     /// Sets the outgoing points-to edge. The \p To node must be a Content node.
@@ -450,10 +432,6 @@ public:
 
     /// Gets or creates a content node to which \a AddrNode points to.
     CGNode *getContentNode(CGNode *AddrNode);
-
-    /// Gets or creates the unique RefElement node for the \p RefNode which
-    /// represents an object reference.
-    CGNode *getRefElementNode(CGNode *RefNode);
 
     /// Get or creates a pseudo node for the function return value.
     CGNode *getReturnNode(ReturnInst *RI) {

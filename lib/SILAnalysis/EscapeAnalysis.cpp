@@ -90,12 +90,6 @@ EscapeAnalysis::CGNode *EscapeAnalysis::ConnectionGraph::getNode(ValueBase *V) {
 
   CGNode * &Node = Values2Nodes[V];
   if (!Node) {
-    if (auto *REAI = dyn_cast<RefElementAddrInst>(V)) {
-      /// Create a separate node for ref_element_addr.
-      CGNode *BasedNode = getNode(REAI->getOperand());
-      assert(BasedNode && "operand of ref_element_addr must always have a node");
-      return getRefElementNode(BasedNode);
-    }
     if (SILArgument *Arg = dyn_cast<SILArgument>(V)) {
       if (Arg->isFunctionArg()) {
         Node = allocNode(V, NodeType::Argument);
@@ -108,19 +102,6 @@ EscapeAnalysis::CGNode *EscapeAnalysis::ConnectionGraph::getNode(ValueBase *V) {
     }
   }
   return Node->getMergeTarget();
-}
-
-EscapeAnalysis::CGNode *EscapeAnalysis::ConnectionGraph::
-getRefElementNode(CGNode *RefNode) {
-  /// All ref_element_addr of a reference share a single node.
-  if (CGNode *ExistingRENode = RefNode->getRefElementNode())
-    return ExistingRENode;
-
-  CGNode *Node = allocNode(RefNode->V, NodeType::RefElement);
-  RefNode->addDefered(Node);
-  if (RefNode->pointsTo)
-    Node->setPointsTo(RefNode->pointsTo);
-  return Node;
 }
 
 EscapeAnalysis::CGNode *EscapeAnalysis::ConnectionGraph::getContentNode(
@@ -616,9 +597,6 @@ std::string CGForDotView::getNodeLabel(const Node *Node) const {
     case swift::EscapeAnalysis::NodeType::Return:
       O << "return";
       break;
-    case swift::EscapeAnalysis::NodeType::RefElement:
-      O << "refelement";
-      break;
     default: {
       std::string Inst;
       llvm::raw_string_ostream OI(Inst);
@@ -765,7 +743,6 @@ const char *EscapeAnalysis::CGNode::getTypeStr() const {
     case NodeType::Content:    return "Con";
     case NodeType::Argument:   return "Arg";
     case NodeType::Return:     return "Ret";
-    case NodeType::RefElement: return "REl";
   }
 }
 
@@ -900,13 +877,7 @@ void EscapeAnalysis::ConnectionGraph::verifyStructure() const {
         assert(PredNode->getPointsToEdge() == Nd);
       }
     }
-    bool InRefElements = true;
     for (CGNode *Def : Nd->defersTo) {
-      if (Def->Type == NodeType::RefElement) {
-        assert(InRefElements && "RefElement node is not first in defersTo");
-      } else {
-        InRefElements = false;
-      }
       assert(Def->findPred(Predecessor(Nd, EdgeType::Defer)) != Def->Preds.end());
       assert(Def != Nd);
     }
@@ -1099,11 +1070,16 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         }
         return;
       case ArrayCallKind::kGetElement:
-        // This is like a load.
+        // This is like a load from a ref_element_addr.
         if (FAS.getArgument(0).getType().isAddress()) {
           if (CGNode *AddrNode = ConGraph->getNode(ASC.getSelf())) {
             if (CGNode *DestNode = ConGraph->getNode(FAS.getArgument(0))) {
-              CGNode *ArrayContent = ConGraph->getContentNode(AddrNode);
+              // One content node for going from the array buffer pointer to
+              // the element address (like ref_element_addr).
+              CGNode *RefElement = ConGraph->getContentNode(AddrNode);
+              // Another content node to actually load the element.
+              CGNode *ArrayContent = ConGraph->getContentNode(RefElement);
+              // The content of the destination address.
               CGNode *DestContent = ConGraph->getContentNode(DestNode);
               ConGraph->defer(DestContent, ArrayContent);
               return;
@@ -1115,7 +1091,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         // This is like a ref_element_addr.
         if (CGNode *SelfNode = ConGraph->getNode(ASC.getSelf())) {
           ConGraph->defer(ConGraph->getNode(I),
-                          ConGraph->getRefElementNode(SelfNode));
+                          ConGraph->getContentNode(SelfNode));
         }
         return;
       default:
@@ -1157,7 +1133,6 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case ValueKind::SwitchEnumInst:
     case ValueKind::DebugValueInst:
     case ValueKind::DebugValueAddrInst:
-    case ValueKind::RefElementAddrInst:
       // These instructions don't have any effect on escaping.
       return;
     case ValueKind::StrongReleaseInst:
@@ -1170,14 +1145,8 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         // the object itself (because it will be a dangling pointer after
         // deallocation).
         CGNode *CapturedByDeinit = ConGraph->getContentNode(AddrNode);
-        SILType ReleasedType = OpV.getType();
-        // The deinit of a box or thick function does not capture anything,
-        // but may call the deinit of the boxed value. So we can go down
-        // one pointsTo-level again.
-        if (ReleasedType.is<SILBoxType>() ||
-            ReleasedType.is<SILFunctionType>() ||
-            // Similarly, the deinit of an array does not capture its elements.
-            isArrayOrArrayStorage(OpV)) {
+        CapturedByDeinit = ConGraph->getContentNode(CapturedByDeinit);
+        if (isArrayOrArrayStorage(OpV)) {
           CapturedByDeinit = ConGraph->getContentNode(CapturedByDeinit);
         }
         ConGraph->setEscapesGlobal(CapturedByDeinit);
@@ -1186,6 +1155,8 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     }
     case ValueKind::LoadInst:
     case ValueKind::LoadWeakInst:
+    // We treat ref_element_addr like a load (see NodeType::Content).
+    case ValueKind::RefElementAddrInst:
       if (isPointer(I)) {
         CGNode *AddrNode = ConGraph->getNode(I->getOperand(0));
         if (!AddrNode) {
