@@ -26,7 +26,6 @@
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILAnalysis/ArraySemantic.h"
-#include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/SimplifyInstruction.h"
 #include "swift/SILAnalysis/SideEffectAnalysis.h"
@@ -397,14 +396,10 @@ public:
   /// their lookup.
   ScopedHTType *AvailableValues;
 
-  /// The call graph - We are removing apply instructions. The call graph needs
-  /// to be updated.
-  CallGraph *CG;
-  
   SideEffectAnalysis *SEA;
 
-  CSE(bool RunsOnHighLevelSil, CallGraph *CG, SideEffectAnalysis *SEA)
-      : CG(CG), SEA(SEA), RunsOnHighLevelSil(RunsOnHighLevelSil) {}
+  CSE(bool RunsOnHighLevelSil, SideEffectAnalysis *SEA)
+      : SEA(SEA), RunsOnHighLevelSil(RunsOnHighLevelSil) {}
 
   bool processFunction(SILFunction &F, DominanceInfo *DT);
   
@@ -531,7 +526,6 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     // Dead instructions should just be removed.
     if (isInstructionTriviallyDead(Inst)) {
       DEBUG(llvm::dbgs() << "SILCSE DCE: " << *Inst << '\n');
-      CallGraphEditor(CG).removeEdgeIfPresent(Inst);
       eraseFromParentWithDebugInsts(Inst, I);
       Changed = true;
       ++NumSimplify;
@@ -544,7 +538,6 @@ bool CSE::processNode(DominanceInfoNode *Node) {
       DEBUG(llvm::dbgs() << "SILCSE SIMPLIFY: " << *Inst << "  to: " << *V
             << '\n');
       SILValue(Inst, 0).replaceAllUsesWith(V);
-      CallGraphEditor(CG).removeEdgeIfPresent(Inst);
       Inst->eraseFromParent();
       Changed = true;
       ++NumSimplify;
@@ -566,7 +559,6 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     if (ValueBase *V = AvailableValues->lookup(Inst)) {
       DEBUG(llvm::dbgs() << "SILCSE CSE: " << *Inst << "  to: " << *V << '\n');
       Inst->replaceAllUsesWith(V);
-      CallGraphEditor(CG).removeEdgeIfPresent(Inst);
       Inst->eraseFromParent();
       Changed = true;
       ++NumCSE;
@@ -695,13 +687,11 @@ class SILCSE : public SILFunctionTransform {
 
     DominanceAnalysis* DA = getAnalysis<DominanceAnalysis>();
 
-    // Call Graph Analysis in case we need to perform Call Graph updates.
-    auto *CGA = PM->getAnalysis<CallGraphAnalysis>();
     auto *SEA = PM->getAnalysis<SideEffectAnalysis>();
 
-    CSE C(RunsOnHighLevelSil, CGA->getCallGraphOrNull(), SEA);
+    CSE C(RunsOnHighLevelSil, SEA);
     if (C.processFunction(*getFunction(), DA->get(getFunction())))
-      invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
+      invalidateAnalysis(SILAnalysis::PreserveKind::Branches);
   }
 
   StringRef getName() override {
