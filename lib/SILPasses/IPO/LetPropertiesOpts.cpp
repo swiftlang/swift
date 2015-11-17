@@ -166,13 +166,15 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
       Cloner.clone();
       SILInstruction *I = &*std::prev(Load->getIterator());
       SILBuilderWithScope<1> B(Load);
-      for (auto Use : Load->getUses()) {
-        if (isa<StoreInst>(Use->getUser()))
+      for (auto UI = Load->use_begin(), E = Load->use_end(); UI != E;) {
+        auto *User = UI->getUser();
+        ++UI;
+        if (isa<StoreInst>(User))
           continue;
 
-        replaceLoadSequence(Use->getUser(), I, B);
-        eraseUsesOfInstruction(Use->getUser());
-        Use->getUser()->eraseFromParent();
+        replaceLoadSequence(User, I, B);
+        eraseUsesOfInstruction(User);
+        User->eraseFromParent();
         ++NumReplaced;
       }
       HasChanged = true;
@@ -195,12 +197,14 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
       Cloner.clone();
       SILInstruction *I = &*std::prev(Load->getIterator());
       SILBuilderWithScope<1> B(Load);
-      for (auto Use : Load->getUses()) {
-        if (isa<StoreInst>(Use->getUser()))
+      for (auto UI = Load->use_begin(), E = Load->use_end(); UI != E;) {
+        auto *User = UI->getUser();
+        ++UI;
+        if (isa<StoreInst>(User))
           continue;
-        replaceLoadSequence(Use->getUser(), I, B);
-        eraseUsesOfInstruction(Use->getUser());
-        Use->getUser()->eraseFromParent();
+        replaceLoadSequence(User, I, B);
+        eraseUsesOfInstruction(User);
+        User->eraseFromParent();
         ++NumReplaced;
       }
       HasChanged = true;
