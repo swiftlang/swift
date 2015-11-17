@@ -119,8 +119,13 @@ class DCE : public SILFunctionTransform {
            ControllingInfoMap.empty() && ReverseDependencies.empty() &&
            "Expected to start with empty data structures!");
 
-    if (!precomputeControlInfo(*F))
+    if (!precomputeControlInfo(*F)) {
+      LiveValues.clear();
+      LiveBlocks.clear();
+      ControllingInfoMap.clear();
+      ReverseDependencies.clear();
       return;
+    }
 
     markLive(*F);
     if (removeDead(*F)) {
