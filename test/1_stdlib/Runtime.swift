@@ -2244,11 +2244,11 @@ Reflection.test("NSObject is properly CustomDebugStringConvertible") {
 }
 
 Reflection.test("NSRange QuickLook") {
-  let rng = NSRange(location:-9223372036854775808, length:5)
+  let rng = NSRange(location:Int.min, length:5)
   let ql = PlaygroundQuickLook(reflecting: rng)
   switch ql {
   case .Range(let loc, let len):
-    expectEqual(loc, -9223372036854775808)
+    expectEqual(loc, Int64(Int.min))
     expectEqual(len, 5)
   default:
     expectUnreachable("PlaygroundQuickLook for NSRange did not match Range")
