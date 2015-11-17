@@ -99,7 +99,7 @@ struct TwoWordPair {
   /*implicit*/ TwoWordPair(Return r) {
     union {
       Return mangled;
-      BoxPair value;
+      TwoWordPair value;
     } reinterpret = {r};
     
     *this = reinterpret.value;
