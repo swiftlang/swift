@@ -1,4 +1,4 @@
-//===---- GlobalDeadStoreElimination.cpp - SIL Dead Store Elimination -----===//
+//===---- DeadStoreElimination.cpp - SIL Dead Store Elimination -----===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -878,7 +878,7 @@ void DSEContext::run() {
 
 namespace {
 
-class GlobalDeadStoreElimination : public SILFunctionTransform {
+class DeadStoreElimination : public SILFunctionTransform {
 public:
   StringRef getName() override { return "SIL Dead Store Elimination"; }
 
@@ -895,6 +895,6 @@ public:
 
 } // end anonymous namespace
 
-SILTransform *swift::createGlobalDeadStoreElimination() {
-  return new GlobalDeadStoreElimination();
+SILTransform *swift::createDeadStoreElimination() {
+  return new DeadStoreElimination();
 }

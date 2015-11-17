@@ -87,7 +87,7 @@ PASS(ARCSequenceOpts, "arc-sequence-opts",
      "retain/release sequenes")
 PASS(GlobalRedundantLoadElimination, "global-redundant-load-elim",
      "Multiple basic block redundant load elimination")
-PASS(GlobalDeadStoreElimination, "global-dead-store-elim",
+PASS(DeadStoreElimination, "dead-store-elim",
      "Multiple basic block dead store elimination")
 PASS(GlobalOpt, "global-opt",
      "Global variable optimizations")
