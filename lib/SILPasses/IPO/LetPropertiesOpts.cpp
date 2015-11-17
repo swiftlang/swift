@@ -156,7 +156,9 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
 
   unsigned NumReplaced = 0;
 
-  for (auto Load: Loads) {
+  for (auto LoadI = Loads.begin(), E = Loads.end(); LoadI != E;) {
+    auto Load = *LoadI;
+    ++LoadI;
     // Look for any instructions accessing let properties.
     if (isa<RefElementAddrInst>(Load)) {
       // Copy the initializer into the function
