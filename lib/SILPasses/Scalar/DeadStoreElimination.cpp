@@ -174,7 +174,13 @@ public:
 
   /// Constructors.
   BBState() : BB(nullptr) {}
-  BBState(SILBasicBlock *B, unsigned lcnt) : BB(B), MemLocationCount(lcnt) {
+  BBState(SILBasicBlock *B) : BB(B) {}
+
+  /// Return the current basic block.
+  SILBasicBlock *getBB() const { return BB; }
+
+  void init(unsigned lcnt) {
+    MemLocationCount = lcnt;
     // The initial state of WriteSetIn should be all 1's. Otherwise the
     // dataflow solution could be too conservative.
     //
@@ -254,7 +260,10 @@ class DSEContext {
   llvm::BumpPtrAllocator BPA;
 
   /// Map every basic block to its location state.
-  llvm::DenseMap<SILBasicBlock *, BBState> BBToLocState;
+  llvm::DenseMap<SILBasicBlock *, BBState*> BBToLocState;
+
+  /// Keeps the actual BBStates.
+  std::vector<BBState> BBStates;
 
   /// Keeps all the locations for the current function. The BitVector in each
   /// BBState is then laid on top of it to keep track of which MemLocation
@@ -268,7 +277,7 @@ class DSEContext {
   MemLocationIndexMap LocToBitIndex;
 
   /// Return the BBState for the basic block this basic block belongs to.
-  BBState *getBBLocState(SILBasicBlock *B) { return &BBToLocState[B]; }
+  BBState *getBBLocState(SILBasicBlock *B) { return BBToLocState[B]; }
 
   /// Return the BBState for the basic block this instruction belongs to.
   BBState *getBBLocState(SILInstruction *I) {
@@ -823,8 +832,18 @@ void DSEContext::run() {
   // For all basic blocks in the function, initialize a BB state. Since we
   // know all the locations accessed in this function, we can resize the bit
   // vector to the approproate size.
+  //
+  // DenseMap has a minimum size of 64, while many functions do not have over
+  // 64 basic blocks. Therefore, allocate the BBState in a vector and use pointer
+  // in BBToLocState to access them.
   for (auto &B : *F) {
-    BBToLocState[&B] = BBState(&B, MemLocationVault.size());
+    BBStates.push_back(BBState(&B));
+    BBStates.back().init(MemLocationVault.size());
+  }
+
+  // Initialize the BBToLocState mapping.
+  for (auto &S : BBStates) {
+    BBToLocState[S.getBB()] = &S;
   }
 
   // Generate the genset and killset for each basic block.
