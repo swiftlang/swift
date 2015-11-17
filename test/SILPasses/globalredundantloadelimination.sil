@@ -426,33 +426,6 @@ bb0(%0 : $*Optional<B>):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @load_to_load_forwarding_diamonds : $@convention(thin) (@inout Builtin.Int32) -> Builtin.Int32 {
-// CHECK: load
-// CHECK-NOT: load
-// CHECK: return
-sil @load_to_load_forwarding_diamonds : $@convention(thin) (@inout Builtin.Int32) -> Builtin.Int32 {
-bb0(%0 : $*Builtin.Int32):
-  %1 = load %0 : $*Builtin.Int32
-  // Simple diamond.
-  cond_br undef, bb1, bb2
-
-bb1:
-  br bb3
-
-bb2:
-  br bb3
-
-bb3:
-  // Triangle
-  cond_br undef, bb4, bb5
-
-bb4:
-  br bb5
-
-bb5:
-  %2 = load %0 : $*Builtin.Int32
-  return %2 : $Builtin.Int32
-}
 
 // CHECK-LABEL: sil @load_to_load_conflicting_branches_diamond : $@convention(thin) (@inout Builtin.Int32) -> () {
 // CHECK: bb0(
