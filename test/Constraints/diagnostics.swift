@@ -621,4 +621,11 @@ func r23560128() {
   a.0 = 42  // expected-error {{value of optional type '(Int, Int)?' not unwrapped; did you mean to use '!' or '?'?}} {{4-4=!}}
 }
 
+// <rdar://problem/21890157> QoI: wrong error message when accessing properties on optional structs without unwrapping
+struct ExampleStruct21890157 {
+  var property = "property"
+}
+var example21890157: ExampleStruct21890157?
+example21890157.property = "confusing"  // expected-error {{value of optional type 'ExampleStruct21890157?' not unwrapped; did you mean to use '!' or '?'?}} {{16-16=!}}
+
 
