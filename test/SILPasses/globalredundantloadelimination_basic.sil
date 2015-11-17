@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -module-name Swift -global-redundant-load-elim -dce
+// RUN: %target-sil-opt -enable-sil-verify-all %s -module-name Swift -global-redundant-load-elim -dce  |  FileCheck %s
 
 import Builtin
 
