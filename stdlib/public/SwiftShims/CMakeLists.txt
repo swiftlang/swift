@@ -54,11 +54,7 @@ foreach(loc ${clang_headers_locations})
   endif()
 endforeach()
 if("${clang_headers_location}" STREQUAL "")
-  if(SWIFT_BUILT_STANDALONE)
-    message(FATAL_ERROR "Clang headers were not found")
-  else()
-    set(clang_headers_location "${LLVM_LIBRARY_DIR}/clang")
-  endif()
+  message(FATAL_ERROR "Clang headers were not found")
 endif()
 
 add_custom_command_target(unused_var
@@ -69,11 +65,11 @@ add_custom_command_target(unused_var
       "${clang_headers_location}"
       "${SWIFTLIB_DIR}/clang"
 
-    # Create a broken symlink that points to '../clang'.  It is not used when
-    # running Swift tools from the build tree directly, but we will install it
-    # in such a way that it points to Clang installation.  If the link can be
-    # resolved, CMake would try to follow it when installing the project under
-    # certain conditions.
+    # Create a broken symlink that points to '../clang/$VERSION'.  It is not
+    # used when running Swift tools from the build tree directly, but we will
+    # install it in such a way that it points to Clang installation.  If the 
+    # link can be resolved, CMake would try to follow it when installing the
+    # project under certain conditions.
     COMMAND
       "${CMAKE_COMMAND}" "-E" "make_directory" "${SWIFTLIB_DIR}/install-tmp/install-tmp"
     COMMAND
@@ -81,7 +77,7 @@ add_custom_command_target(unused_var
       "${SWIFTLIB_DIR}/install-tmp/install-tmp/clang"
     COMMAND
       "${CMAKE_COMMAND}" "-E" "create_symlink"
-      "../clang"
+      "../clang/${CLANG_VERSION}"
       "${SWIFTLIB_DIR}/install-tmp/install-tmp/clang"
     CUSTOM_TARGET_NAME "symlink_clang_headers"
     OUTPUT "${SWIFTLIB_DIR}/clang" "${SWIFTLIB_DIR}/install-tmp/install-tmp/clang"
@@ -95,7 +91,7 @@ swift_install_in_component(compiler
 # Install Clang headers under the Swift library so that an installed Swift's
 # module importer can find the compiler headers corresponding to its Clang.
 swift_install_in_component(clang-builtin-headers
-    DIRECTORY "${SWIFT_PATH_TO_CLANG_BUILD}/lib/clang"
+    DIRECTORY "${clang_headers_location}"
     DESTINATION "lib/swift"
     PATTERN "*.h")
 
