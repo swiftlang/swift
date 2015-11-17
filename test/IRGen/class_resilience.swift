@@ -59,7 +59,7 @@ public class ClassWithIndirectResilientEnum {
 
 
 // CHECK-LABEL: define {{i32|i64}} @_TFC16class_resilience24ClassWithResilientLayoutg5colorSi(%C16class_resilience24ClassWithResilientLayout*)
-// CHECK: [[OFFSET:%.*]] = load [[INT]], [[INT]]* @_TWvdvC16class_resilience24ClassWithResilientLayout5colorSi, align 8
+// CHECK: [[OFFSET:%.*]] = load [[INT]], [[INT]]* @_TWvdvC16class_resilience24ClassWithResilientLayout5colorSi
 // CHECK-NEXT: [[PTR:%.*]] = bitcast %C16class_resilience24ClassWithResilientLayout* %0 to i8*
 // CHECK-NEXT: [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, i8* [[PTR]], [[INT]] [[OFFSET]]
 // CHECK-NEXT: [[FIELD_PTR:%.*]] = bitcast i8* [[FIELD_ADDR]] to %Si*

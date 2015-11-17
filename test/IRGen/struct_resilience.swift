@@ -133,14 +133,14 @@ public struct StructWithIndirectResilientEnum {
 // CHECK-LABEL: define {{i32|i64}} @_TFV17struct_resilience31StructWithIndirectResilientEnumg1nSi(%V17struct_resilience31StructWithIndirectResilientEnum* {{.*}})
 // CHECK: [[FIELD_PTR:%.*]] = getelementptr inbounds %V17struct_resilience31StructWithIndirectResilientEnum, %V17struct_resilience31StructWithIndirectResilientEnum* %0, i32 0, i32 1
 // CHECK-NEXT: [[FIELD_PAYLOAD_PTR:%.*]] = getelementptr inbounds %Si, %Si* [[FIELD_PTR]], i32 0, i32 0
-// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = load i64, i64* [[FIELD_PAYLOAD_PTR]]
-// CHECK-NEXT: ret i64 [[FIELD_PAYLOAD]]
+// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = load [[INT]], [[INT]]* [[FIELD_PAYLOAD_PTR]]
+// CHECK-NEXT: ret [[INT]] [[FIELD_PAYLOAD]]
 
 
 // Public metadata accessor for our resilient struct
 
 // CHECK-LABEL: define %swift.type* @_TMaV17struct_resilience6MySize()
-// CHECK: ret %swift.type* bitcast (i64* getelementptr inbounds {{.*}} @_TMfV17struct_resilience6MySize, i32 0, i32 1) to %swift.type*)
+// CHECK: ret %swift.type* bitcast ([[INT]]* getelementptr inbounds {{.*}} @_TMfV17struct_resilience6MySize, i32 0, i32 1) to %swift.type*)
 
 
 // FIXME: this is bogus
