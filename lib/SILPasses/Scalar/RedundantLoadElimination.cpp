@@ -1,4 +1,4 @@
-//===------ GlobalRedundantLoadElimination.cpp - SIL Load Forwarding ------===//
+//===------ RedundantLoadElimination.cpp - SIL Load Forwarding ------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -927,7 +927,7 @@ bool RLEContext::run() {
 
 namespace {
 
-class GlobalRedundantLoadElimination : public SILFunctionTransform {
+class RedundantLoadElimination : public SILFunctionTransform {
 
   /// The entry point to the transformation.
   void run() override {
@@ -950,6 +950,6 @@ class GlobalRedundantLoadElimination : public SILFunctionTransform {
 
 } // end anonymous namespace
 
-SILTransform *swift::createGlobalRedundantLoadElimination() {
-  return new GlobalRedundantLoadElimination();
+SILTransform *swift::createRedundantLoadElimination() {
+  return new RedundantLoadElimination();
 }
