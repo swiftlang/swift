@@ -81,12 +81,66 @@ class AB {
    deinit 
 }
 
+enum XYZ {
+  case A
+  case B((Int32, Int32))
+  case C(Int32)
+}
+
+
 sil @use : $@convention(thin) (Builtin.Int32) -> ()
 sil @use_64 : $@convention(thin) (Builtin.Int64) -> ()
 sil @use_2_64 : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> ()
 sil @use_a : $@convention(thin) (@in A) -> ()
 sil @escaped_a_ptr : $@convention(thin) (@out A) -> ()
 sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
+
+// Make sure the switch does not affect the forwarding of the load.
+// switch_enum can not have BBArgument, but the %17 = load %2 : $*Int32 is not produced in the
+// switch basic block.
+// CHECK-LABEL: load_elimination_disregard_switch_enum
+// CHECK: bb8
+// CHECK-NOT: load
+// CHECK: return
+sil @load_elimination_disregard_switch_enum : $@convention(thin) (Int32, Int32, @inout Int32) -> Int32 {
+// %0                                             // user: %4
+// %1                                             // user: %4
+// %2                                             // users: %17, %19
+bb0(%0 : $Int32, %1 : $Int32, %2 : $*Int32):
+  cond_br undef, bb7, bb1                         // id: %3
+
+bb1:                                              // Preds: bb0
+  %4 = tuple (%0 : $Int32, %1 : $Int32)           // user: %5
+  %5 = enum $XYZ, #XYZ.B!enumelt.1, %4 : $(Int32, Int32) // user: %6
+  switch_enum %5 : $XYZ, case #XYZ.A!enumelt: bb2, case #XYZ.B!enumelt.1: bb4, case #XYZ.C!enumelt.1: bb6 // id: %6
+
+bb2:                                              // Preds: bb1
+  br bb3                                          // id: %7
+
+bb3:                                              // Preds: bb2
+  %8 = integer_literal $Builtin.Int32, 0          // user: %9
+  %9 = struct $Int32 (%8 : $Builtin.Int32)
+  br bb5                                          // id: %10
+
+// %11                                            // user: %12
+bb4(%11 : $(Int32, Int32)):                       // Preds: bb1
+  %12 = tuple_extract %11 : $(Int32, Int32), 0
+  br bb5                                          // id: %13
+
+bb5:                                              // Preds: bb4 bb5 bb6
+  br bb5                                          // id: %14
+
+bb6(%15 : $Int32):                                // Preds: bb1
+  br bb5                                          // id: %16
+
+bb7:                                              // Preds: bb0
+  %17 = load %2 : $*Int32
+  br bb8                                          // id: %18
+
+bb8:                                              // Preds: bb3 bb7
+  %19 = load %2 : $*Int32                         // user: %20
+  return %19 : $Int32                             // id: %20
+}
 
 
 // The load should be eliminated here. but currently is not ... Look into why

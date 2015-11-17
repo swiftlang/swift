@@ -1,4 +1,4 @@
-//===------ RedundantLoadElimination.cpp - SIL Load Forwarding ------===//
+//===-------- RedundantLoadElimination.cpp - SIL Load Forwarding ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -148,6 +148,14 @@ static bool isReachable(SILBasicBlock *Block) {
   return false;
 }
 
+static bool isForwardableEdge(SILBasicBlock *BB) {
+  if (auto *TI = BB->getTerminator()) {
+    if (isa<CondBranchInst>(TI) || isa<BranchInst>(TI))
+      return true;
+  }
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 //                            RLEContext Interface
 //===----------------------------------------------------------------------===//
@@ -181,6 +189,10 @@ class RLEContext {
   /// A map from each BasicBlock to its BBState.
   llvm::DenseMap<SILBasicBlock *, BBState> BBToLocState;
 
+  /// A map for each basic block and whether its predecessors have forwardable
+  /// edges.
+  llvm::DenseMap<SILBasicBlock *, bool> ForwardableEdge;
+
 public:
   RLEContext(SILFunction *F, AliasAnalysis *AA,
              PostOrderFunctionInfo::reverse_range RPOT);
@@ -209,6 +221,9 @@ public:
   /// Go to the predecessors of the given basic block, compute the value
   /// for the given MemLocation.
   SILValue computePredecessorCoveringValue(SILBasicBlock *B, MemLocation &L); 
+
+  /// Return true if all the predecessors of the basic block can have BBArgument.
+  bool withTransistivelyForwardableEdges(SILBasicBlock *BB);
 
   /// Given a MemLocation, try to collect all the LoadStoreValues for this
   /// MemLocation in the given basic block. If a LoadStoreValue is a covering
@@ -708,6 +723,39 @@ RLEContext::RLEContext(SILFunction *F, AliasAnalysis *AA,
   }
 }
 
+bool RLEContext::withTransistivelyForwardableEdges(SILBasicBlock *BB) {
+  // Have we processed this basic block before ?
+  if (ForwardableEdge.find(BB) != ForwardableEdge.end())
+    return ForwardableEdge[BB];
+
+  // Look at all predecessors whether have forwardable edges.
+  llvm::DenseSet<SILBasicBlock *> Visited;
+  llvm::SmallVector<SILBasicBlock *, 16> Worklist;
+  for (auto Pred : BB->getPreds()) {
+    Worklist.push_back(Pred);
+    Visited.insert(Pred);
+  }
+
+  while (!Worklist.empty()) {
+    auto *CurBB = Worklist.back();
+    Worklist.pop_back();
+
+    if (!isForwardableEdge(CurBB)) {
+      ForwardableEdge[BB] = false;
+      return false;
+    }
+
+    for (auto Pred : CurBB->getPreds()) {
+      if (Visited.find(Pred) == Visited.end()) {
+        Visited.insert(Pred);
+        Worklist.push_back(Pred);
+      }
+    }
+  }
+  ForwardableEdge[BB] = true;
+  return true;
+}
+
 SILValue RLEContext::computePredecessorCoveringValue(SILBasicBlock *BB,
                                                      MemLocation &L) {
   // This is a covering value, need to go to each of the predecessors to
@@ -719,16 +767,11 @@ SILValue RLEContext::computePredecessorCoveringValue(SILBasicBlock *BB,
   // *NOTE* This is a strong argument in favor of representing PHI nodes
   // separately from SILArguments.
   //
-  // TODO: this is overly conservative, we should only check basic blocks
-  // which are relevant. Or better, we can create a trampoline basic block
-  // if the predecessor has a non-edgevalue terminator inst.
+  // TODO: we can create a trampoline basic block if the predecessor has
+  // a non-edgevalue terminator inst.
   //
-  for (auto &BB : *BB->getParent()) {
-    if (auto *TI = BB.getTerminator())
-      if (!isa<CondBranchInst>(TI) && !isa<BranchInst>(TI) &&
-          !isa<ReturnInst>(TI) && !isa<UnreachableInst>(TI))
-        return SILValue();
-  }
+  if (!withTransistivelyForwardableEdges(BB))
+    return SILValue();
 
   // At this point, we know this MemLocation has available value and we also
   // know we can forward a SILValue from every predecesor. It is safe to
