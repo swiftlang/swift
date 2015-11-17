@@ -32,7 +32,6 @@
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Config.h"
-#include "swift/IDE/Utils.h"
 #include "swift/Sema/CodeCompletionTypeChecking.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
@@ -45,6 +44,63 @@
 #include <algorithm>
 
 using namespace swift;
+namespace swift {
+class PrinterArchetypeTransformer {
+  Type BaseTy;
+  DeclContext *DC;
+  llvm::DenseMap<TypeBase *, Type> Cache;
+  llvm::DenseMap<StringRef, Type> IdMap;
+
+public:
+  PrinterArchetypeTransformer(Type Ty, DeclContext *DC) :
+    BaseTy(Ty->getRValueType()), DC(DC){
+    (void) this->DC;
+    auto D = BaseTy->getNominalOrBoundGenericNominal();
+    if (!D || !D->getGenericParams())
+      return;
+    SmallVector<Type, 3> Scrach;
+    auto Args = BaseTy->getAllGenericArgs(Scrach);
+    const auto ParamDecls = D->getGenericParams()->getParams();
+    assert(ParamDecls.size() == Args.size());
+
+    // Map type parameter names with their instantiating arguments.
+    for(unsigned I = 0, N = ParamDecls.size(); I < N; I ++) {
+      IdMap[ParamDecls[I]->getName().str()] = Args[I];
+    }
+  }
+
+  Type transformByName(Type Ty) {
+    if (Ty->getKind() != TypeKind::Archetype)
+      return Ty;
+
+    // First, we try to find the map from cache.
+    if (Cache.count(Ty.getPointer()) > 0) {
+      return Cache[Ty.getPointer()];
+    }
+    auto Id = cast<ArchetypeType>(Ty.getPointer())->getName().str();
+    auto Result = Ty;
+
+    // Iterate the IdMap to find the argument type of the given param name.
+    for (auto It = IdMap.begin(); It != IdMap.end(); ++ It) {
+      if (Id == It->getFirst()) {
+        Result = It->getSecond();
+        break;
+      }
+    }
+
+    // Put the result into cache.
+    Cache[Ty.getPointer()] = Result;
+    return Result;
+  }
+};
+}
+
+PrintOptions PrintOptions::printTypeInterface(Type T, DeclContext *DC) {
+  PrintOptions result = printInterface();
+  result.pTransformer = std::make_shared<PrinterArchetypeTransformer>(T, DC);
+  result.TypeToPrint = T.getPointer();
+  return result;
+}
 
 std::string ASTPrinter::sanitizeUtf8(StringRef Text) {
   llvm::SmallString<256> Builder;
@@ -71,11 +127,12 @@ std::string ASTPrinter::sanitizeUtf8(StringRef Text) {
   return Builder.str();
 }
 
-bool ASTPrinter::printTypeInterface(Type Ty, llvm::raw_ostream &OS) {
+bool ASTPrinter::printTypeInterface(Type Ty, DeclContext *DC,
+                                    llvm::raw_ostream &OS) {
   if (!Ty)
     return false;
   Ty = Ty->getRValueType();
-  PrintOptions Options = PrintOptions::printTypeInterface(Ty.getPointer());
+  PrintOptions Options = PrintOptions::printTypeInterface(Ty.getPointer(), DC);
    if (auto ND = Ty->getNominalOrBoundGenericNominal()) {
      Options.printExtensionContentAsMembers = [&](const ExtensionDecl *ED) {
        return isExtensionApplied(*ND->getDeclContext(), Ty, ED);
@@ -86,9 +143,9 @@ bool ASTPrinter::printTypeInterface(Type Ty, llvm::raw_ostream &OS) {
   return false;
 }
 
-bool ASTPrinter::printTypeInterface(Type Ty, std::string &Buffer) {
+bool ASTPrinter::printTypeInterface(Type Ty, DeclContext *DC, std::string &Buffer) {
   llvm::raw_string_ostream OS(Buffer);
-  auto Result = printTypeInterface(Ty, OS);
+  auto Result = printTypeInterface(Ty, DC, OS);
   OS.str();
   return Result;
 }
@@ -351,6 +408,13 @@ class PrintAST : public ASTVisitor<PrintAST> {
   }
 
   void printTypeLoc(const TypeLoc &TL) {
+    if (Options.pTransformer && TL.getType()) {
+      if (auto RT = Options.pTransformer->transformByName(TL.getType())) {
+        PrintOptions FreshOptions;
+        RT.print(Printer, FreshOptions);
+        return;
+      }
+    }
     // Print a TypeRepr if instructed to do so by options, or if the type
     // is null.
     if ((Options.PreferTypeRepr && TL.hasLocation()) ||
@@ -596,7 +660,7 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
   Printer << "<";
   bool IsFirst = true;
   SmallVector<Type, 4> Scrach;
-  if (Options.InstantiateArchetype) {
+  if (Options.pTransformer) {
     auto ArgArr = Options.TypeToPrint->getAllGenericArgs(Scrach);
     for (auto Arg : ArgArr) {
       if (IsFirst) {
@@ -1749,7 +1813,12 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     Type ResultTy = decl->getResultType();
     if (ResultTy && !ResultTy->isEqual(TupleType::getEmpty(Context))) {
       Printer << " -> ";
-      ResultTy->print(Printer, Options);
+      if (Options.pTransformer) {
+        ResultTy = Options.pTransformer->transformByName(ResultTy);
+        PrintOptions FreshOptions;
+        ResultTy->print(Printer, FreshOptions);
+      } else
+        ResultTy->print(Printer, Options);
     }
 
     if (!Options.FunctionDefinitions || !decl->getBody()) {

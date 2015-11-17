@@ -21,7 +21,10 @@ class GenericParamList;
 class CanType;
 class ExtensionDecl;
 class TypeBase;
+class DeclContext;
+class Type;
 enum DeclAttrKind : unsigned;
+class PrinterArchetypeTransformer;
 
 /// Options for printing AST nodes.
 ///
@@ -191,8 +194,7 @@ struct PrintOptions {
   /// \brief When printing a type interface, register the type to print.
   TypeBase *TypeToPrint = nullptr;
 
-  /// \brief When printing a type interface, whether we instantiate archetypes.
-  bool InstantiateArchetype = false;
+  std::shared_ptr<PrinterArchetypeTransformer> pTransformer;
 
   /// Retrieve the set of options for verbose printing to users.
   static PrintOptions printVerbose() {
@@ -234,12 +236,7 @@ struct PrintOptions {
     return result;
   }
 
-  static PrintOptions printTypeInterface(TypeBase *T) {
-    PrintOptions result = printInterface();
-    result.TypeToPrint = T;
-    result.InstantiateArchetype = true;
-    return result;
-  }
+  static PrintOptions printTypeInterface(Type T, DeclContext *DC);
 
   /// Retrive the print options that are suitable to print the testable interface.
   static PrintOptions printTestableInterface() {

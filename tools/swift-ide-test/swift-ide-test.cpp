@@ -2263,7 +2263,7 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
     llvm::errs() << "Cannot get type of the sema token.\n";
     return 1;
   }
-  ASTPrinter::printTypeInterface(SemaT.Ty, llvm::outs());
+  ASTPrinter::printTypeInterface(SemaT.Ty, SemaT.DC, llvm::outs());
   return 0;
 }
 

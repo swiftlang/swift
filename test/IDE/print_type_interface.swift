@@ -27,14 +27,6 @@ public protocol P1 { }
 public class T1 : P1 { }
 public class D<T> { public func foo() {}}
 
-extension D where T : P1 {
-  public func conditionalFunc1() {}
-}
-
-extension D {
-  public func unconditionalFunc1(){}
-}
-
 class C2 {
   func f() {
     let D1 = D<T1>()
@@ -44,17 +36,29 @@ class C2 {
   }
 }
 
-// RUN: %target-swift-ide-test -print-type-interface -pos=42:6 -source-filename %s | FileCheck %s -check-prefix=TYPE2
-// RUN: %target-swift-ide-test -print-type-interface -pos=43:6 -source-filename %s | FileCheck %s -check-prefix=TYPE3
+// RUN: %target-swift-ide-test -print-type-interface -pos=34:6 -source-filename %s | FileCheck %s -check-prefix=TYPE2
+// RUN: %target-swift-ide-test -print-type-interface -pos=35:6 -source-filename %s | FileCheck %s -check-prefix=TYPE3
 
+extension D where T : P1 {
+  public func conditionalFunc1() {}
+  public func conditionalFunc2(t : T) -> T {return t}
+}
 
-// TYPE2:      public class D<T1> {
-// TYPE2-NEXT:   public func foo()
-// TYPE2-NEXT:   public func conditionalFunc1()
-// TYPE2-NEXT:   public func unconditionalFunc1()
+extension D {
+  public func unconditionalFunc1(){}
+  public func unconditionalFunc2(t : T) -> T {return t}
+}
+
+// TYPE2:       public class D<T1> {
+// TYPE2-NEXT:    public func foo()
+// TYPE2-NEXT:    public func conditionalFunc1()
+// TYPE2-NEXT:    public func conditionalFunc2(t: T1) -> T1
+// TYPE2-NEXT:    public func unconditionalFunc1()
+// TYPE2-NEXT:    public func unconditionalFunc2(t: T1) -> T1
 // TYPE2-NEXT: }
 
 // TYPE3:      public class D<Int> {
 // TYPE3-NEXT:   public func foo()
 // TYPE3-NEXT:   public func unconditionalFunc1()
+// TYPE3-NEXT:   public func unconditionalFunc2(t: Int) -> Int
 // TYPE3-NEXT: }

@@ -391,7 +391,8 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   Info.OverrideUSRs = OverUSRs;
   Info.AnnotatedRelatedDeclarations = AnnotatedRelatedDecls;
   Info.IsSystem = IsSystem;
-  Info.TypeInteface = ASTPrinter::printTypeInterface(Ty, TypeInterface) ?
+  Info.TypeInteface = ASTPrinter::printTypeInterface(Ty, VD->getDeclContext(),
+                                                     TypeInterface) ?
     StringRef(TypeInterface) : StringRef();
   Receiver(Info);
   return false;

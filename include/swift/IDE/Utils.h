@@ -138,11 +138,12 @@ struct SemaToken {
   bool IsRef = true;
   bool IsKeywordArgument = false;
   Type Ty;
+  DeclContext *DC = nullptr;
 
   SemaToken() = default;
   SemaToken(ValueDecl *ValueD, TypeDecl *CtorTyRef, SourceLoc Loc, bool IsRef,
             Type Ty) : ValueD(ValueD), CtorTyRef(CtorTyRef), Loc(Loc),
-            IsRef(IsRef), Ty(Ty) { }
+            IsRef(IsRef), Ty(Ty), DC(ValueD->getDeclContext()) {}
   SemaToken(ModuleEntity Mod, SourceLoc Loc) : Mod(Mod), Loc(Loc) { }
 
   bool isValid() const { return ValueD != nullptr || Mod; }
@@ -179,17 +180,18 @@ private:
                                bool IsOpenBracket) override;
 };
 
+} // namespace ide
+
 class ArchetypeTransformer {
+  std::function<Type(Type)> TheFunc = nullptr;
   DeclContext *DC;
   Type BaseTy;
   llvm::DenseMap<TypeBase *, Type> Cache;
   TypeSubstitutionMap Map;
-  std::function<Type(Type)> TheFunc = nullptr;
 public:
   ArchetypeTransformer(DeclContext *DC, Type Ty);
   llvm::function_ref<Type(Type)> getTransformerFunc();
 };
-} // namespace ide
 } // namespace swift
 
 #endif // SWIFT_IDE_UTILS_H

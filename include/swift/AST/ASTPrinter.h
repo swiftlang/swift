@@ -20,6 +20,7 @@
 
 namespace swift {
   class Decl;
+  class DeclContext;
   class ModuleEntity;
   class TypeDecl;
   class Type;
@@ -103,8 +104,8 @@ public:
 
   /// To sanitize a malformatted utf8 string to a well-formatted one.
   static std::string sanitizeUtf8(StringRef Text);
-  static bool printTypeInterface(Type Ty, std::string &Result);
-  static bool printTypeInterface(Type Ty, llvm::raw_ostream &Out);
+  static bool printTypeInterface(Type Ty, DeclContext *DC, std::string &Result);
+  static bool printTypeInterface(Type Ty, DeclContext *DC, llvm::raw_ostream &Out);
 
 private:
   virtual void anchor();
