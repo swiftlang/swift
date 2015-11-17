@@ -57,6 +57,12 @@ For Ubuntu, you'll need the following development dependencies:
 Note: LLDB currently requires at least swig-1.3.40 but will successfully build
 with version 2 shipped with Ubuntu.
 
+If you are building on Ubuntu 14.04 LTS, you'll need to upgrade your clang
+compiler for C++14 support and create a symlink:
+
+     sudo apt-get install clang-3.6
+     sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-3.6 100
+     sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-3.6 100
 
 ### Getting Sources for Swift and Related Projects
 
