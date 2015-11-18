@@ -25,6 +25,7 @@ struct CGForDotView;
 
 namespace swift {
 
+class BasicCalleeAnalysis;
 class CallGraphAnalysis;
 class CallGraph;
 
@@ -568,6 +569,9 @@ private:
   /// The Array<Element> type of the stdlib.
   NominalTypeDecl *ArrayType;
 
+  /// Callee analysis, used for determining the callees at call sites.
+  BasicCalleeAnalysis *BCA;
+  
   /// This analysis depends on the call graph.
   CallGraphAnalysis *CGA;
   
@@ -600,6 +604,10 @@ private:
   /// does not handle applys of known callees. This is done afterwards in
   /// mergeAllCallees.
   void buildConnectionGraphs(FunctionInfo *FInfo);
+
+  /// Returns true if all called functions from an apply site are known and not
+  /// external.
+  bool allCalleeFunctionsVisible(FullApplySite FAS);
 
   /// Updates the graph by analysing instruction \p I.
   void analyzeInstruction(SILInstruction *I, FunctionInfo *FInfo);

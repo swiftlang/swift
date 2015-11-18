@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-escape"
 #include "swift/SILAnalysis/EscapeAnalysis.h"
+#include "swift/SILAnalysis/BasicCalleeAnalysis.h"
 #include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILAnalysis/ArraySemantic.h"
 #include "swift/SILPasses/PassManager.h"
@@ -834,6 +835,7 @@ EscapeAnalysis::EscapeAnalysis(SILModule *M) :
 
 
 void EscapeAnalysis::initialize(SILPassManager *PM) {
+  BCA = PM->getAnalysis<BasicCalleeAnalysis>();
   CGA = PM->getAnalysis<CallGraphAnalysis>();
 }
 
@@ -975,13 +977,11 @@ void EscapeAnalysis::buildConnectionGraphs(FunctionInfo *FInfo) {
   FInfo->Valid = true;
 }
 
-/// Returns true if all called functions from an apply site are known and not
-/// external.
-static bool allCalleeFunctionsVisible(FullApplySite FAS, CallGraph &CG) {
-  if (CG.canCallUnknownFunction(FAS.getInstruction()))
+bool EscapeAnalysis::allCalleeFunctionsVisible(FullApplySite FAS) {
+  auto Callees = BCA->getCalleeList(FAS);
+  if (Callees.isIncomplete())
     return false;
 
-  auto Callees = CG.getCallees(FAS.getInstruction());
   for (SILFunction *Callee : Callees) {
     if (Callee->isExternalDeclaration())
       return false;
@@ -1047,7 +1047,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         break;
     }
 
-    if (allCalleeFunctionsVisible(FAS, CGA->getCallGraph())) {
+    if (allCalleeFunctionsVisible(FAS)) {
       // We handle this apply site afterwards by merging the callee graph(s)
       // into the caller graph.
       FInfo->KnownCallees.push_back(FAS);
