@@ -48,7 +48,7 @@ public:
       : M(M), BCA(BCA), NextDFSNum(0) {}
 
   /// Get the SCCs in bottom-up order.
-  ArrayRef<SCC> getSCCsBottomUp() {
+  ArrayRef<SCC> getSCCs() {
     if (!TheSCCs.empty())
       return TheSCCs;
 
@@ -58,11 +58,11 @@ public:
 
   /// Get a flattened view of all functions in all the SCCs in
   /// bottom-up order
-  ArrayRef<SILFunction *> getFunctionsBottomUp() {
+  ArrayRef<SILFunction *> getFunctions() {
     if (!TheFunctions.empty())
       return TheFunctions;
 
-    for (auto SCC : getSCCsBottomUp())
+    for (auto SCC : getSCCs())
       for (auto *F : SCC)
         TheFunctions.push_back(F);
 

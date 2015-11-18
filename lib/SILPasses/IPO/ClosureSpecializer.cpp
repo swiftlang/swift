@@ -850,7 +850,7 @@ public:
     BottomUpFunctionOrder Ordering(*getModule(), BCA);
 
     // Specialize going bottom-up.
-    for (auto *F : Ordering.getFunctionsBottomUp()) {
+    for (auto *F : Ordering.getFunctions()) {
       // Don't optimize functions that are marked with the opt.never
       // attribute.
       if (!F->shouldOptimize())
