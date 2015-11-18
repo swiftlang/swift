@@ -419,6 +419,7 @@ bb0(%0 : $Int64):
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
 // CHECK-NEXT:    Con %0.1 Esc: A, Succ: (%0.2)
 // CHECK-NEXT:    Con %0.2 Esc: G, Succ: 
+// CHECK-NEXT:    Arg %1 Esc: A, Succ: 
 // CHECK-NEXT:  End
 sil @closure3 : $@convention(thin) (@owned @box Int64, @inout Int64) -> Int64 {
 bb0(%0 : $@box Int64, %1 : $*Int64):
@@ -537,6 +538,31 @@ bb2:
 
 bb3(%8 : $LinkedNode):
   return %8 : $LinkedNode
+}
+
+// A single-cycle recursion test.
+
+// CHECK-LABEL: CG of single_cycle_recursion
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.2)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ: (%0.2)
+// CHECK-NEXT:    Con %0.2 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Val %5 Esc: A, Succ: (%0.2), %0.1
+// CHECK-NEXT:    Val %7 Esc: A, Succ: %0, %5
+// CHECK-NEXT:    Ret  Esc: A, Succ: %7
+// CHECK-NEXT:  End
+sil @single_cycle_recursion : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode {
+bb0(%0 : $LinkedNode):
+  cond_br undef, bb1, bb2(%0 : $LinkedNode)
+
+bb1:
+  %1 = ref_element_addr %0 : $LinkedNode, #LinkedNode.next
+  %2 = load %1 : $*LinkedNode
+  %3 = function_ref @single_cycle_recursion : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode
+  %4 = apply %3(%2) : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode
+  br bb2(%4 : $LinkedNode)
+
+bb2(%5 : $LinkedNode):
+  return %5 : $LinkedNode
 }
 
 // Test if a try_apply is repressented correctly in the connection graph.
@@ -669,6 +695,7 @@ bb0(%0 : $ErrorClass):
 }
 
 // CHECK-LABEL: CG of arraysemantics_is_native
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: 
 // CHECK-NEXT:  End
 sil @arraysemantics_is_native : $@convention(thin) (Array<X>) -> () {
 bb0(%0 : $Array<X>):
@@ -680,6 +707,7 @@ bb0(%0 : $Array<X>):
 }
 
 // CHECK-LABEL: CG of arraysemantics_is_native_no_typecheck
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: 
 // CHECK-NEXT:  End
 sil @arraysemantics_is_native_no_typecheck : $@convention(thin) (Array<X>) -> () {
 bb0(%0 : $Array<X>):
@@ -691,6 +719,7 @@ bb0(%0 : $Array<X>):
 }
 
 // CHECK-LABEL: CG of arraysemantics_check_subscript
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: 
 // CHECK-NEXT:  End
 sil @arraysemantics_check_subscript : $@convention(thin) (Array<X>) -> () {
 bb0(%0 : $Array<X>):
@@ -707,6 +736,7 @@ bb0(%0 : $Array<X>):
 }
 
 // CHECK-LABEL: CG of arraysemantics_check_index
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: 
 // CHECK-NEXT:  End
 sil @arraysemantics_check_index : $@convention(thin) (Array<X>) -> () {
 bb0(%0 : $Array<X>):
@@ -742,6 +772,7 @@ bb0(%io : $*X, %1 : $Array<X>):
 }
 
 // CHECK-LABEL: CG of arraysemantics_make_mutable
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: 
 // CHECK-NEXT:  End
 sil @arraysemantics_make_mutable : $@convention(thin) (@inout Array<X>) -> () {
 bb0(%0 : $*Array<X>):
@@ -770,6 +801,7 @@ bb0(%0 : $Array<X>):
 }
 
 // CHECK-LABEL: CG of arraysemantics_get_count
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: 
 // CHECK-NEXT:  End
 sil @arraysemantics_get_count : $@convention(thin) (Array<X>) -> () {
 bb0(%0 : $Array<X>):
@@ -782,6 +814,7 @@ bb0(%0 : $Array<X>):
 }
 
 // CHECK-LABEL: CG of arraysemantics_get_capacity
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: 
 // CHECK-NEXT:  End
 sil @arraysemantics_get_capacity : $@convention(thin) (Array<X>) -> () {
 bb0(%0 : $Array<X>):

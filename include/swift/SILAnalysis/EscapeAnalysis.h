@@ -348,16 +348,6 @@ public:
     /// Use points for CGNode::UsePoints.
     llvm::SmallVector<ValueBase *, 32> UsePoints;
 
-    /// The callsites from which we have to merge the callee graphs.
-    llvm::SmallVector<FullApplySite, 8> KnownCallees;
-    
-    /// If true, at least one of the callee graphs has changed. We have to merge
-    /// them again.
-    bool NeedMergeCallees = false;
-
-    /// Set to false when the analysis for the function is invalidated.
-    bool Valid = true;
-
     /// True if the CGNode::UsePoints are computed.
     bool UsePointsComputed = false;
 
@@ -412,28 +402,11 @@ public:
     ConnectionGraph(SILFunction *F) : F(F) {
     }
 
-    bool isValid() const { return Valid; }
-
-    /// Removes all nodes from the graph and sets it to invalid.
-    void invalidate();
+    /// Removes all nodes from the graph.
+    void clear();
 
     SILFunction *getFunction() const { return F; }
     
-    void addKnownCallee(FullApplySite FAS) { KnownCallees.push_back(FAS); }
-    
-    const llvm::SmallVectorImpl<FullApplySite> &getKnownCallees() {
-      return KnownCallees;
-    }
-
-    void setNeedMergeCallees() { NeedMergeCallees = true; }
-
-    // Returns true if we need to merge callee graphs and sets the flag to false.
-    bool handleMergeCallees() {
-      bool Result = NeedMergeCallees;
-      NeedMergeCallees = false;
-      return Result;
-    }
-
     /// Gets or creates a node for a value \p V.
     /// If V is a projection(-path) then the base of the projection(-path) is
     /// taken. This means the node is always created for the "outermost" value
@@ -554,12 +527,38 @@ private:
     MaxGraphMerges = 4
   };
 
+  /// All the information we keep for a function.
+  struct FunctionInfo {
+    FunctionInfo(SILFunction *F) : Graph(F), SummaryGraph(F) { }
+
+    /// The connection graph for the function. This is what clients of the
+    /// analysis will see.
+    /// On invalidation, this graph is invalidated and recomputed on demand.
+    ConnectionGraph Graph;
+
+    /// The summary graph for the function. It is used when computing the
+    /// connection graph of caller functions.
+    /// This graph is _not_ be invalidated on invalidation. It is only updated
+    /// when explicitly calling recompute().
+    ConnectionGraph SummaryGraph;
+
+    /// The callsites from which we have to merge the callee graphs.
+    llvm::SmallVector<FullApplySite, 8> KnownCallees;
+
+    /// If true, at least one of the callee graphs has changed. We have to merge
+    /// them again.
+    bool NeedMergeCallees = false;
+
+    /// True if the Graph is valid.
+    bool Valid = false;
+  };
+
   /// The connection graphs for all functions (does not include external
   /// functions).
-  llvm::DenseMap<SILFunction *, ConnectionGraph *> Function2ConGraph;
+  llvm::DenseMap<SILFunction *, FunctionInfo *> Function2Info;
   
   /// The allocator for the connection graphs in Function2ConGraph.
-  llvm::SpecificBumpPtrAllocator<ConnectionGraph> Allocator;
+  llvm::SpecificBumpPtrAllocator<FunctionInfo> Allocator;
 
   /// Cache for isPointer().
   llvm::DenseMap<SILType, bool> isPointerCache;
@@ -597,12 +596,13 @@ private:
       ConGraph->setEscapesGlobal(Node);
   }
 
-  /// Builds the connection graph for a function, but does not handle applys to
-  /// known callees. This is done afterwards by mergeAllCallees.
-  void buildConnectionGraph(SILFunction *F, ConnectionGraph *ConGraph);
+  /// Builds the connection graph and the summary graph for a function, but
+  /// does not handle applys of known callees. This is done afterwards in
+  /// mergeAllCallees.
+  void buildConnectionGraphs(FunctionInfo *FInfo);
 
   /// Updates the graph by analysing instruction \p I.
-  void analyzeInstruction(SILInstruction *I, ConnectionGraph *ConGraph);
+  void analyzeInstruction(SILInstruction *I, FunctionInfo *FInfo);
 
   /// Returns true if \p V is an Array or the storage reference of an array.
   bool isArrayOrArrayStorage(SILValue V);
@@ -611,7 +611,7 @@ private:
   void setAllEscaping(SILInstruction *I, ConnectionGraph *ConGraph);
 
   /// Merge the graphs of all known callees into this graph.
-  bool mergeAllCallees(ConnectionGraph *ConGraph, CallGraph &CG);
+  bool mergeAllCallees(FunctionInfo *FInfo, CallGraph &CG);
 
   /// Merges the graph of a callee function into the graph of
   /// a caller function, whereas \p FAS is the call-site.
@@ -619,13 +619,12 @@ private:
                         ConnectionGraph *CallerGraph,
                         ConnectionGraph *CalleeGraph);
 
-  /// Create a summary graph \p SummaryGraph from \p Graph. It just contains
-  /// the content nodes of \p Graph.
-  void createSummaryGraph(ConnectionGraph *SummaryGraph,
-                          ConnectionGraph *Graph);
+  /// Merge the \p Graph into \p SummaryGraph.
+  bool mergeSummaryGraph(ConnectionGraph *SummaryGraph,
+                         ConnectionGraph *Graph);
 
   /// Set all arguments and return values of all callees to global escaping.
-  void finalizeGraphConservatively(ConnectionGraph *ConGraph);
+  void finalizeGraphsConservatively(FunctionInfo *FInfo);
 
   friend struct ::CGForDotView;
 
@@ -639,44 +638,51 @@ public:
   virtual void initialize(SILPassManager *PM);
 
   /// Gets or creates a connection graph for \a F.
-  ConnectionGraph *getConnectionGraph(SILFunction *F) const {
-    ConnectionGraph *CG = Function2ConGraph.lookup(F);
-    if (CG && CG->isValid())
-      return CG;
-    return nullptr;
+  ConnectionGraph *getConnectionGraph(SILFunction *F) {
+    FunctionInfo *&FInfo = Function2Info[F];
+    if (!FInfo)
+      FInfo = new (Allocator.Allocate()) FunctionInfo(F);
+
+    if (!FInfo->Valid)
+      buildConnectionGraphs(FInfo);
+
+    return &FInfo->Graph;
   }
   
   /// Recomputes the connection graphs for all functions the module.
   void recompute();
 
   virtual void invalidate(PreserveKind K) {
-    Function2ConGraph.clear();
+    Function2Info.clear();
     Allocator.DestroyAll();
     shouldRecompute = true;
   }
   
   virtual void invalidate(SILFunction *F, PreserveKind K) {
-    if (auto *ConGraph = getConnectionGraph(F)) {
-      ConGraph->invalidate();
+    if (FunctionInfo *FInfo = Function2Info.lookup(F)) {
+      FInfo->Graph.clear();
+      FInfo->KnownCallees.clear();
+      FInfo->Valid = false;
       shouldRecompute = true;
     }
   }
 
   virtual void verify() const {
 #ifndef NDEBUG
-    for (auto Iter : Function2ConGraph) {
-      ConnectionGraph *ConGraph = Iter.second;
-      if (ConGraph)
-        ConGraph->verify();
+    for (auto Iter : Function2Info) {
+      FunctionInfo *FInfo = Iter.second;
+      FInfo->Graph.verify();
+      FInfo->SummaryGraph.verify();
     }
 #endif
   }
 
   virtual void verify(SILFunction *F) const {
 #ifndef NDEBUG
-    ConnectionGraph *ConGraph = Function2ConGraph.lookup(F);
-    if (ConGraph)
-      ConGraph->verify();
+    if (FunctionInfo *FInfo = Function2Info.lookup(F)) {
+      FInfo->Graph.verify();
+      FInfo->SummaryGraph.verify();
+    }
 #endif
   }
 
