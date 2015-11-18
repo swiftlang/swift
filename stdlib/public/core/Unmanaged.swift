@@ -38,18 +38,6 @@ public struct Unmanaged<Instance : AnyObject> {
     return Unmanaged(_private: unsafeBitCast(value, Instance.self))
   }
 
-  /// Unsafely turn an unmanaged class reference into an opaque
-  /// C pointer.
-  ///
-  /// This operation does not change reference counts.
-  ///
-  ///     let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
-  @_transparent
-  @warn_unused_result
-  public func toOpaque() -> OpaquePointer {
-    return unsafeBitCast(_value, OpaquePointer.self)
-  }
-
   /// Create an unmanaged reference with an unbalanced retain.
   /// The object will leak if nothing eventually balances the retain.
   ///

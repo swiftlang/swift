@@ -68,8 +68,7 @@ public func _stdlib_pthread_create_block<Argument, Result>(
   let context = PthreadBlockContextImpl(block: start_routine, arg: arg)
   // We hand ownership off to `invokeBlockContext` through its void context
   // argument.
-  let contextAsOpaque = Unmanaged.passRetained(context)
-    .toOpaque()
+  let contextAsOpaque = OpaquePointer(Unmanaged.passRetained(context))
   let contextAsVoidPointer = UnsafeMutablePointer<Void>(contextAsOpaque)
 
   var threadID: pthread_t = nil

@@ -114,6 +114,18 @@ public struct OpaquePointer : Equatable, Hashable, NilLiteralConvertible {
     self._rawValue = source._rawValue
   }
 
+  /// Unsafely convert an unmanaged class reference to an opaque
+  /// C pointer.
+  ///
+  /// This operation does not change reference counts.
+  ///
+  ///     let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
+  // FIXME: example code does not use the commented initializer
+  @transparent
+  public init<T>(_ source: Unmanaged<T>) {
+    self = unsafeBitCast(source._value, OpaquePointer.self)
+  }
+
   /// Determine whether the given pointer is null.
   @_transparent
   var _isNull : Bool {
