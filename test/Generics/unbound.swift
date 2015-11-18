@@ -94,3 +94,15 @@ class SomeClassWithInvalidMethod {
   }
 }
 
+// <rdar://problem/20792596> QoI: Cannot invoke with argument list (T), expected an argument list of (T)
+protocol r20792596P {}
+
+// expected-note @+1 {{in call to function 'foor20792596'}}
+func foor20792596<T: r20792596P>(x: T) -> T {
+  return x
+}
+
+func callfoor20792596<T>(x: T) -> T {
+  return foor20792596(x) // expected-error {{generic parameter 'T' could not be inferred}}
+}
+

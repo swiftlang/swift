@@ -51,7 +51,6 @@ func basictest() {
   // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists:}}
 
 
-  // FIXME rdar://22333090 - Improve diagnostic.
   var x9 : Int16 = x8 + 1 // expected-error{{cannot convert value of type 'Int8' to expected argument type 'Int16'}}
 
   // Various tuple types.
