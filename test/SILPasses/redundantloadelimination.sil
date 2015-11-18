@@ -527,7 +527,7 @@ bb3:                                              // Preds: bb1 bb2
 // CHECK-NOT: load
 // CHECK: bb3
 // CHECK-NOT: load
-// CHECK: load
+// CHECK: return 
 sil @load_to_load_irreducible_loop : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $Int32
@@ -565,7 +565,38 @@ bb3:
   return %9999 : $()
 }
 
-sil @xload_to_load_loop : $@convention(thin) () -> () {
+// Forward store %1 and store %2 such that load %3 becomes an identity trivial cast.
+// Both loads from %0 will be eliminated.
+// CHECK-LABEL: sil @test_read_dependence_allows_forwarding_multi_bb_2 : $@convention(thin) (@inout A, A, A) -> A {
+// CHECK: bb1
+// CHECK: load
+// CHECK-NOT: load
+// CHECK: bb2
+sil @test_read_dependence_allows_forwarding_multi_bb_2 : $@convention(thin) (@inout A, A, A) -> A {
+bb0(%0 : $*A, %1 : $A, %2 : $A):
+  store %1 to %0 : $*A
+  %3 = unchecked_addr_cast %0 : $*A to $*A
+  %4 = unchecked_addr_cast %3 : $*A to $*A
+  br bb1
+
+bb1:
+  // This means that the first store is not dead.
+  %6 = load %3 : $*A
+  %7 = load %0 : $*A
+  %8 = load %0 : $*A
+  %22 = function_ref @use_a : $@convention(thin) (A) -> ()
+  %123 = apply %22(%6) : $@convention(thin) (A) -> ()
+  %223 = apply %22(%7) : $@convention(thin) (A) -> ()
+  %323 = apply %22(%8) : $@convention(thin) (A) -> ()
+  store %2 to %0 : $*A
+  cond_br undef, bb1, bb2
+
+bb2:
+  return %7 : $A
+}
+
+// CHECK-LABEL: sil @load_to_load_loop
+sil @load_to_load_loop : $@convention(thin) () -> () {
 bb0:
   %101 = alloc_stack $Int32
   %102 = alloc_stack $Int32
@@ -600,32 +631,4 @@ bb2:
   return %9999 : $()
 }
 
-// Forward store %1 and store %2 such that load %3 becomes an identity trivial cast.
-// Both loads from %0 will be eliminated.
-// CHECK-LABEL: sil @test_read_dependence_allows_forwarding_multi_bb_2 : $@convention(thin) (@inout A, A, A) -> A {
-// CHECK: bb1
-// CHECK: load
-// CHECK-NOT: load
-// CHECK: bb2
-sil @test_read_dependence_allows_forwarding_multi_bb_2 : $@convention(thin) (@inout A, A, A) -> A {
-bb0(%0 : $*A, %1 : $A, %2 : $A):
-  store %1 to %0 : $*A
-  %3 = unchecked_addr_cast %0 : $*A to $*A
-  %4 = unchecked_addr_cast %3 : $*A to $*A
-  br bb1
 
-bb1:
-  // This means that the first store is not dead.
-  %6 = load %3 : $*A
-  %7 = load %0 : $*A
-  %8 = load %0 : $*A
-  %22 = function_ref @use_a : $@convention(thin) (A) -> ()
-  %123 = apply %22(%6) : $@convention(thin) (A) -> ()
-  %223 = apply %22(%7) : $@convention(thin) (A) -> ()
-  %323 = apply %22(%8) : $@convention(thin) (A) -> ()
-  store %2 to %0 : $*A
-  cond_br undef, bb1, bb2
-
-bb2:
-  return %7 : $A
-}
