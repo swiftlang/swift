@@ -2053,8 +2053,8 @@ NOTE(remove_label_for_tuple_pattern,sema_tcp,none,
 ERROR(tuple_pattern_in_non_tuple_context,sema_tcp,none,
       "tuple pattern cannot match values of the non-tuple type %0", (Type))
 ERROR(closure_argument_list_tuple,sema_tcp,none,
-      "contextual type for closure argument list expects %0 argument%s0, "
-      "but %1 were specified", (unsigned, unsigned))
+      "contextual closure type %0 expects %1 argument%s1, "
+      "but %2 were used in closure body", (Type, unsigned, unsigned))
 ERROR(closure_argument_list_missing,sema_tcp,none,
       "contextual type for closure argument list expects %0 argument%s0, "
       "which cannot be implicitly ignored", (unsigned))

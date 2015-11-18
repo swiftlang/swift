@@ -4043,8 +4043,12 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
         return true;
       }
       
+      // Okay, the wrong number of arguments was used, complain about that.
+      // Before doing so, strip attributes off the function type so that they
+      // don't confuse the issue.
+      fnType = FunctionType::get(fnType->getInput(), fnType->getResult());
       diagnose(params->getStartLoc(), diag::closure_argument_list_tuple,
-               inferredArgCount, actualArgCount);
+               fnType, inferredArgCount, actualArgCount);
       return true;
     }
     

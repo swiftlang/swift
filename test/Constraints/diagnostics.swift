@@ -412,7 +412,7 @@ func f20371273() {
 func rdar21078316() {
   var foo : [String : String]?
   var bar : [(String, String)]?
-  bar = foo.map { ($0, $1) }  // expected-error {{contextual type for closure argument list expects 1 argument, but 2 were specified}}
+  bar = foo.map { ($0, $1) }  // expected-error {{contextual closure type '([String : String]) -> [(String, String)]' expects 1 argument, but 2 were used in closure body}}
 }
 
 

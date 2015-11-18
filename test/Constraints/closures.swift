@@ -115,24 +115,24 @@ var _: (Int)-> Int = { 0 }
 // expected-error @+1 {{contextual type for closure argument list expects 2 arguments, which cannot be implicitly ignored}} {{28-28=_,_ in }}
 var _: (Int, Int)-> Int = {0}
 
-// expected-error @+1 {{contextual type for closure argument list expects 2 arguments, but 3 were specified}}
+// expected-error @+1 {{contextual closure type '(Int, Int) -> Int' expects 2 arguments, but 3 were used in closure body}}
 var _: (Int,Int)-> Int = {$0+$1+$2}
 
-// expected-error @+1 {{contextual type for closure argument list expects 3 arguments, but 2 were specified}}
+// expected-error @+1 {{contextual closure type '(Int, Int, Int) -> Int' expects 3 arguments, but 2 were used in closure body}}
 var _: (Int, Int, Int)-> Int = {$0+$1}
 
 
 var _: ()-> Int = {a in 0}
 
-// expected-error @+1 {{contextual type for closure argument list expects 1 argument, but 2 were specified}}
+// expected-error @+1 {{contextual closure type '(Int) -> Int' expects 1 argument, but 2 were used in closure body}}
 var _: (Int)-> Int = {a,b in 0}
 
-// expected-error @+1 {{contextual type for closure argument list expects 1 argument, but 3 were specified}}
+// expected-error @+1 {{contextual closure type '(Int) -> Int' expects 1 argument, but 3 were used in closure body}}
 var _: (Int)-> Int = {a,b,c in 0}
 
 var _: (Int, Int)-> Int = {a in 0}
 
-// expected-error @+1 {{contextual type for closure argument list expects 3 arguments, but 2 were specified}}
+// expected-error @+1 {{contextual closure type '(Int, Int, Int) -> Int' expects 3 arguments, but 2 were used in closure body}}
 var _: (Int, Int, Int)-> Int = {a, b in a+b}
 
 // <rdar://problem/15998821> Fail to infer types for closure that takes an inout argument
@@ -157,3 +157,8 @@ func r15998821() {
   let g = { x in x = 3 }
   take_closure(g)
 }
+
+// <rdar://problem/22602657> better diagnostics for closures w/o "in" clause
+var _: (Int,Int)-> Int = {$0+$1+$2}  // expected-error {{contextual closure type '(Int, Int) -> Int' expects 2 arguments, but 3 were used in closure body}}
+
+
