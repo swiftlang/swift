@@ -496,7 +496,7 @@ void LoopTreeOptimization::analyzeCurrentLoop(
         // function calls and add them later to SafeReads.
         SideEffectAnalysis::FunctionEffects E;
         SEA->getEffects(E, AI);
-        if (E.getMemBehavior(true) <= SILInstruction::MemoryBehavior::MayRead)
+        if (E.getMemBehavior(false) <= SILInstruction::MemoryBehavior::MayRead)
           ReadOnlyApplies.push_back(AI);
       }
       if (Inst.mayHaveSideEffects()) {
