@@ -73,6 +73,7 @@ KNOWN_SETTINGS=(
     swift-stdlib-enable-assertions "1"           "enable assertions in Swift"
     lldb-build-type             "Debug"          "the CMake build variant for LLDB"
     llbuild-build-type          "Debug"          "the CMake build variant for llbuild"
+    foundation-build-type       "Debug"          "the build variant for Foundation"
     llbuild-enable-assertions   "1"              "enable assertions in llbuild"
     enable-asan                 ""               "enable AddressSanitizer"
     cmake                       ""               "path to the cmake binary"
@@ -1706,6 +1707,8 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 continue
                 ;;
             foundation)
+                # the configuration script requires knowing about XCTest's location for building and running the tests
+                XCTEST_BUILD_DIR=$(build_directory $deployment_target xctest)
                 SWIFTC_BIN="$(build_directory_bin $deployment_target swift)/swiftc"
                 SWIFT_BIN="$(build_directory_bin $deployment_target swift)/swift"
                 SWIFT_BUILD_PATH="$(build_directory $deployment_target swift)"
@@ -1720,7 +1723,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 set -x
                 pushd "${FOUNDATION_SOURCE_DIR}"
                 SWIFTC="${SWIFTC_BIN}" CLANG="${LLVM_BIN}"/clang SWIFT="${SWIFT_BIN}" \
-                      SDKROOT="${SWIFT_BUILD_PATH}" BUILD_DIR="${build_dir}" ./configure
+                      SDKROOT="${SWIFT_BUILD_PATH}" BUILD_DIR="${build_dir}" DSTROOT="${INSTALL_DESTDIR}" PREFIX="${INSTALL_PREFIX}" LDFLAGS="-L${XCTEST_BUILD_DIR}" ./configure "${FOUNDATION_BUILD_TYPE}"
                 $NINJA_BIN
                 popd
                 { set +x; } 2>/dev/null
@@ -1900,7 +1903,12 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                 if [[ "$SKIP_TEST_FOUNDATION" ]]; then
                     continue
                 fi
-                # FIXME: We don't test foundation, yet...
+                build_dir=$(build_directory $deployment_target $product)
+                XCTEST_BUILD_DIR=$(build_directory $deployment_target xctest)
+                pushd "${FOUNDATION_SOURCE_DIR}"
+                $NINJA_BIN TestFoundation
+                LD_LIBRARY_PATH="${INSTALL_DESTDIR}"/"${INSTALL_PREFIX}"/lib/swift/:"${build_dir}/Foundation":"${XCTEST_BUILD_DIR}":$LD_LIBRARY_PATH "${build_dir}"/TestFoundation/TestFoundation
+                popd
                 continue
                 ;;
             *)
@@ -2048,7 +2056,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
 								build_dir=$(build_directory $deployment_target $product)
                 set -x
                 pushd "${FOUNDATION_SOURCE_DIR}"
-                DSTROOT="${INSTALL_DESTDIR}" BUILD_DIR="${build_dir}" ./install
+                $NINJA_BIN install
                 popd
                 { set +x; } 2>/dev/null
 
