@@ -1117,7 +1117,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     value = IGF.Builder.CreateBitCast(value, enumTy);
     auto enumAddr = type.getAddressForPointer(value);
 
-    llvm::Value *result = strategy.emitGetEnumTag(IGF, enumAddr, concreteType);
+    llvm::Value *result = strategy.emitGetEnumTag(IGF, concreteType, enumAddr);
     result = IGF.Builder.CreateZExtOrTrunc(result, IGF.IGM.Int32Ty);
 
     IGF.Builder.CreateRet(result);
@@ -1131,7 +1131,8 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     auto &strategy = getEnumImplStrategy(IGM, concreteType);
     if (strategy.getElementsWithPayload().size() > 0) {
       strategy.destructiveProjectDataForLoad(
-          IGF, Address(value, type.getBestKnownAlignment()));
+          IGF, concreteType,
+          Address(value, type.getBestKnownAlignment()));
     }
 
     IGF.Builder.CreateRet(value);

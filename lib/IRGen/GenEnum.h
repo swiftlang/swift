@@ -9,21 +9,6 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-//  This file implements IR generation for algebraic data types (ADTs,
-//  or 'enum' types) in Swift.  This includes creating the IR type as
-//  well as emitting the basic access operations.
-//
-//  The current scheme is that all such types with are represented
-//  with an initial word indicating the variant, followed by an enum
-//  of all the possibilities.  This is obviously completely acceptable
-//  to everyone and will not benefit from further refinement.
-//
-//  As a completely unimportant premature optimization, we do emit
-//  types with only a single variant as simple structs wrapping that
-//  variant.
-//
-//===----------------------------------------------------------------------===//
 
 #ifndef __SWIFT_IRGen_GenEnum_H__
 #define __SWIFT_IRGen_GenEnum_H__
@@ -207,7 +192,9 @@ public:
   ArrayRef<Element> getElementsWithNoPayload() const {
     return ElementsWithNoPayload;
   }
-  
+
+  unsigned getTagIndex(EnumElementDecl *Case) const;
+
   /// Map the given element to the appropriate index in the
   /// discriminator type.
   /// Returns -1 if this is not supported by the enum implementation.
@@ -239,38 +226,38 @@ public:
   /// Return the enum case tag for the given value. Payload cases come first,
   /// followed by non-payload cases.
   virtual llvm::Value *emitGetEnumTag(IRGenFunction &IGF,
-                                      Address enumAddr,
-                                      SILType T) const = 0;
+                                      SILType T,
+                                      Address enumAddr) const = 0;
 
   /// Project the address of the data for a case. Does not check or modify
   /// the referenced enum value.
   /// Corresponds to the SIL 'init_enum_data_addr' instruction.
-  virtual Address projectDataForStore(IRGenFunction &IGF,
-                                      EnumElementDecl *elt,
-                                      Address enumAddr) const = 0;
+  Address projectDataForStore(IRGenFunction &IGF,
+                              EnumElementDecl *elt,
+                              Address enumAddr) const;
 
   /// Overlay the tag value for a case onto a data value in memory.
   /// Corresponds to the SIL 'inject_enum_addr' instruction.
   virtual void storeTag(IRGenFunction &IGF,
-                        EnumElementDecl *elt,
+                        SILType T,
                         Address enumAddr,
-                        SILType T) const = 0;
+                        EnumElementDecl *elt) const = 0;
   
   /// Clears tag bits from within the payload of an enum in memory and
   /// projects the address of the data for a case. Does not check
   /// the referenced enum value.
   /// Performs the block argument binding for a SIL
   /// 'switch_enum_addr' instruction.
-  virtual Address destructiveProjectDataForLoad(IRGenFunction &IGF,
-                                                EnumElementDecl *elt,
-                                                Address enumAddr) const = 0;
+  Address destructiveProjectDataForLoad(IRGenFunction &IGF,
+                                        SILType T,
+                                        Address enumAddr,
+                                        EnumElementDecl *Case) const;
 
   /// Clears tag bits from within the payload of an enum in memory and
   /// projects the address of the data for a case. Does not check
   /// the referenced enum value.
-  /// Used for the ProjectCasePayload function pointer in the enum's
-  /// NominalTypeDescriptor.
   virtual void destructiveProjectDataForLoad(IRGenFunction &IGF,
+                                             SILType T,
                                              Address enumAddr) const = 0;
 
   /// Return an i1 value that indicates whether the specified indirect enum

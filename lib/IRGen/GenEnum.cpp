@@ -14,14 +14,84 @@
 //  or 'enum' types) in Swift.  This includes creating the IR type as
 //  well as emitting the basic access operations.
 //
-//  The current scheme is that all such types with are represented
-//  with an initial word indicating the variant, followed by an enum
-//  of all the possibilities.  This is obviously completely acceptable
-//  to everyone and will not benefit from further refinement.
+//  An abstract enum value consists of a payload portion, sized to hold the
+//  largest possible payload value, and zero or more tag bits, to select
+//  between cases. The payload might be zero sized, if the enum consists
+//  entirely of empty cases, or there might not be any tag bits, if the
+//  lowering is able to pack all of them into the payload itself.
 //
-//  As a completely unimportant premature optimization, we do emit
-//  types with only a single variant as simple structs wrapping that
-//  variant.
+//  An abstract enum value can be thought of as supporting three primary
+//  operations:
+//  1) GetEnumTag: Getting the current case of an enum value.
+//  2) ProjectEnumPayload: Destructively stripping tag bits from the enum
+//     value, leaving behind the payload value, if any, at the beginning of
+//     the old enum value.
+//  3) InjectEnumCase: Given a payload value placed inside an uninitialized
+//     enum value, inject tag bits for a specified case, producing a
+//     fully-formed enum value.
+//
+//  Enum type lowering needs to derive implementations of the above for
+//  an enum type. It does this by classifying the enum along two
+//  orthogonal axes: the loadability of the enum value, and the payload
+//  implementation strategy.
+//
+//  The first axis deals with special behavior of fixed-size loadable and
+//  address-only enums. Fixed-size loadable enums are represented as
+//  explosions of values, the address-only lowering uses more general
+//  operations.
+//
+//  The second axis essentially deals with how the case discriminator, or
+//  tag, is represented within an enum value. Payload and no-payload cases
+//  are counted and the enum is classified into the following categories:
+//
+//  1) If the enum only has one case, it can be lowered as the type of the
+//     case itself, and no tag bits are necessary.
+//
+//  2) If the enum only has no-payload cases, only tag bits are necessary,
+//     with the cases mapping to integers, in AST order.
+//
+//  3) If the enum has a single payload case and one or more no-payload cases,
+//     we attempt to map the no-payload cases to extra inhabitants of the
+//     payload type. If enough extra inhabitants are available, no tag bits
+//     are needed, otherwise more are added as necessary.
+//
+//     Extra inhabitant information can be obtained at runtime through the
+//     value witness table, so there are no layout differences between a
+//     generic enum type and a substituted type.
+//
+//     Since each extra inhabitant corresponds to a specific bit pattern
+//     that is known to be invalid given the payload type, projection of
+//     the payload value is a no-op.
+//
+//     For example, if the payload type is a single retainable pointer,
+//     the first 4KB of memory addresses are known not to correspond to
+//     valid memory, and so the enum can contain up to 4095 empty cases
+//     in addition to the payload case before any additional storage is
+//     required.
+//
+//  4) If the enum has multiple payload cases, the layout attempts to pack
+//     the tag bits into the common spare bits of all of the payload cases.
+//
+//     Spare bit information is not available at runtime, so spare bits can
+//     only be used if all payload types are fixed-size in all resilience
+//     domains.
+//
+//     Since spare bits correspond to bits which are known to be zero for
+//     all valid representations of the payload type, they must be stripped
+//     out before the payload value can be manipulated. This means spare
+//     bits cannot be used if the payload value is address-only, because
+//     there is no way to strip the spare bits in that case without
+//     modifying the value in-place.
+//
+//     For example, on a 64-bit platform, the least significant 3 bits of
+//     a retainable pointer are always zero, so a multi-payload enum can
+//     have up to 8 retainable pointer payload cases before any additional
+//     storage is required.
+//
+//  Indirect enum cases are implemented by substituting in a SILBox type
+//  for the payload, resulting in a fixed-size lowering for recursive
+//  enums.
+//
 //
 //===----------------------------------------------------------------------===//
 
@@ -94,6 +164,65 @@ loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc, Address addr) const {
   llvm::report_fatal_error("loadRefcountedPtr: Invalid SIL in IRGen");
 }
 
+Address
+irgen::EnumImplStrategy::projectDataForStore(IRGenFunction &IGF,
+                                             EnumElementDecl *elt,
+                                             Address enumAddr)
+const {
+  auto payloadI = std::find_if(ElementsWithPayload.begin(),
+                               ElementsWithPayload.end(),
+     [&](const Element &e) { return e.decl == elt; });
+
+  // Empty payload addresses can be left undefined.
+  if (payloadI == ElementsWithPayload.end()) {
+    return IGF.getTypeInfoForUnlowered(elt->getArgumentType())
+      .getUndefAddress();
+  }
+
+  // Payloads are all placed at the beginning of the value.
+  return IGF.Builder.CreateBitCast(enumAddr,
+                           payloadI->ti->getStorageType()->getPointerTo());
+}
+
+Address
+irgen::EnumImplStrategy::destructiveProjectDataForLoad(IRGenFunction &IGF,
+                                                       SILType enumType,
+                                                       Address enumAddr,
+                                                       EnumElementDecl *Case)
+const {
+  auto payloadI = std::find_if(ElementsWithPayload.begin(),
+                           ElementsWithPayload.end(),
+                           [&](const Element &e) { return e.decl == Case; });
+
+  // Empty payload addresses can be left undefined.
+  if (payloadI == ElementsWithPayload.end()) {
+    return IGF.getTypeInfoForUnlowered(Case->getArgumentType())
+      .getUndefAddress();
+  }
+
+  destructiveProjectDataForLoad(IGF, enumType, enumAddr);
+
+  // Payloads are all placed at the beginning of the value.
+  return IGF.Builder.CreateBitCast(enumAddr,
+                           payloadI->ti->getStorageType()->getPointerTo());
+}
+
+unsigned
+irgen::EnumImplStrategy::getTagIndex(EnumElementDecl *Case) const {
+  unsigned tagIndex = 0;
+  for (auto &payload : ElementsWithPayload) {
+    if (payload.decl == Case)
+      return tagIndex;
+    ++tagIndex;
+  }
+  for (auto &payload : ElementsWithNoPayload) {
+    if (payload.decl == Case)
+      return tagIndex;
+    ++tagIndex;
+  }
+  llvm_unreachable("couldn't find case");
+}
+
 namespace {
   /// Implementation strategy for singleton enums, with zero or one cases.
   class SingletonEnumImplStrategy final : public EnumImplStrategy {
@@ -140,12 +269,12 @@ namespace {
     }
 
     TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
-                                      SILType Type,
-                                      EnumDecl *theEnum,
-                                      llvm::StructType *enumTy) override;
+                                     SILType Type,
+                                     EnumDecl *theEnum,
+                                     llvm::StructType *enumTy) override;
 
     llvm::Value *
-    emitGetEnumTag(IRGenFunction &IGF, Address enumAddr, SILType T)
+    emitGetEnumTag(IRGenFunction &IGF, SILType T, Address enumAddr)
     const override {
       return llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
     }
@@ -212,26 +341,16 @@ namespace {
         getLoadableSingleton()->reexplode(IGF, params, out);
     }
 
-    Address projectDataForStore(IRGenFunction &IGF,
-                                EnumElementDecl *elt,
-                                Address enumAddr) const override {
-      return getSingletonAddress(IGF, enumAddr);
-    }
-
-    Address destructiveProjectDataForLoad(IRGenFunction &IGF,
-                                          EnumElementDecl *elt,
-                                          Address enumAddr) const override {
-      return getSingletonAddress(IGF, enumAddr);
-    }
-
     void destructiveProjectDataForLoad(IRGenFunction &IGF,
+                                       SILType T,
                                        Address enumAddr) const override {
+      // No tag, nothing to do.
     }
 
     void storeTag(IRGenFunction &IGF,
-                  EnumElementDecl *elt,
+                  SILType T,
                   Address enumAddr,
-                  SILType T) const override {
+                  EnumElementDecl *Case) const override {
       // No tag, nothing to do.
     }
 
@@ -554,7 +673,7 @@ namespace {
     bool needsPayloadSizeInMetadata() const override { return false; }
 
     llvm::Value *
-    emitGetEnumTag(IRGenFunction &IGF, Address enumAddr, SILType T)
+    emitGetEnumTag(IRGenFunction &IGF, SILType T, Address enumAddr)
     const override {
       Explosion value;
       loadAsTake(IGF, enumAddr, value);
@@ -631,25 +750,18 @@ namespace {
       out.add(getDiscriminatorIdxConst(elt));
     }
 
-    Address projectDataForStore(IRGenFunction &IGF,
-                                EnumElementDecl *elt,
-                                Address enumAddr) const override {
-      llvm_unreachable("cannot project data for no-payload cases");
-    }
-    Address destructiveProjectDataForLoad(IRGenFunction &IGF,
-                                          EnumElementDecl *elt,
-                                          Address enumAddr) const override {
-      llvm_unreachable("cannot project data for no-payload cases");
-    }
     void destructiveProjectDataForLoad(IRGenFunction &IGF,
+                                       SILType T,
                                        Address enumAddr) const override {
       llvm_unreachable("cannot project data for no-payload cases");
     }
 
-    void storeTag(IRGenFunction &IGF, EnumElementDecl *elt, Address enumAddr,
-                  SILType T)
+    void storeTag(IRGenFunction &IGF,
+                  SILType T,
+                  Address enumAddr,
+                  EnumElementDecl *Case)
     const override {
-      llvm::Value *discriminator = getDiscriminatorIdxConst(elt);
+      llvm::Value *discriminator = getDiscriminatorIdxConst(Case);
       Address discriminatorAddr
         = IGF.Builder.CreateStructGEP(enumAddr, 0, Size(0));
       IGF.Builder.CreateStore(discriminator, discriminatorAddr);
@@ -1279,7 +1391,7 @@ namespace {
     /// is used for reflection where we want the payload cases to start at
     /// zero.
     llvm::Value *
-    emitGetEnumTag(IRGenFunction &IGF, Address enumAddr, SILType T)
+    emitGetEnumTag(IRGenFunction &IGF, SILType T, Address enumAddr)
     const override {
       auto value = loadPayloadTag(IGF, enumAddr, T);
       return IGF.Builder.CreateAdd(value,
@@ -1294,30 +1406,14 @@ namespace {
       return IGF.Builder.CreateBitCast(addr,
                          getPayloadTypeInfo().getStorageType()->getPointerTo());
     }
-    Address projectDataForStore(IRGenFunction &IGF, EnumElementDecl *elt,
-                                Address enumAddr) const override {
-      // Addresses of empty values can be undefined.
-      if (elt != getPayloadElement())
-        return IGF.getTypeInfoForUnlowered(elt->getArgumentType())
-          .getUndefAddress();
-      return projectPayloadData(IGF, enumAddr);
-    }
-    Address destructiveProjectDataForLoad(IRGenFunction &IGF,
-                                          EnumElementDecl *elt,
-                                          Address enumAddr) const override {
-      // Addresses of empty values can be undefined.
-      if (elt != getPayloadElement())
-        return IGF.getTypeInfoForUnlowered(elt->getArgumentType())
-          .getUndefAddress();
-      return projectPayloadData(IGF, enumAddr);
-    }
     void destructiveProjectDataForLoad(IRGenFunction &IGF,
+                                       SILType T,
                                        Address enumAddr) const override {
     }
 
     TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
-                                      SILType Type,
-                                      EnumDecl *theEnum,
+                                     SILType Type,
+                                     EnumDecl *theEnum,
                                       llvm::StructType *enumTy) override;
   private:
     TypeInfo *completeFixedLayout(TypeConverter &TC,
@@ -2310,19 +2406,19 @@ namespace {
     }
 
     void storeTag(IRGenFunction &IGF,
-                  EnumElementDecl *elt,
+                  SILType T,
                   Address enumAddr,
-                  SILType T) const override {
+                  EnumElementDecl *Case) const override {
       if (TIK < Fixed) {
         // If the enum isn't fixed-layout, get the runtime to do this for us.
         llvm::Value *payload = emitPayloadMetadataForLayout(IGF, T);
         llvm::Value *caseIndex;
-        if (elt == getPayloadElement()) {
+        if (Case == getPayloadElement()) {
           caseIndex = llvm::ConstantInt::getSigned(IGF.IGM.Int32Ty, -1);
         } else {
           auto found = std::find_if(ElementsWithNoPayload.begin(),
                                     ElementsWithNoPayload.end(),
-                                    [&](Element a) { return a.decl == elt; });
+                                    [&](Element a) { return a.decl == Case; });
           assert(found != ElementsWithNoPayload.end() &&
                  "case not in enum?!");
           unsigned caseIndexVal = found - ElementsWithNoPayload.begin();
@@ -2342,7 +2438,7 @@ namespace {
         return;
       }
 
-      if (elt == getPayloadElement()) {
+      if (Case == getPayloadElement()) {
         // The data occupies the entire payload. If we have extra tag bits,
         // zero them out.
         if (ExtraTagBitCount > 0)
@@ -2353,7 +2449,7 @@ namespace {
 
       // Store the discriminator for the no-payload case.
       APInt payloadValue, extraTag;
-      std::tie(payloadValue, extraTag) = getNoPayloadCaseValue(IGF.IGM, elt);
+      std::tie(payloadValue, extraTag) = getNoPayloadCaseValue(IGF.IGM, Case);
       auto &C = IGF.IGM.getLLVMContext();
       auto payload = EnumPayload::fromBitPattern(IGF.IGM, payloadValue,
                                                  PayloadSchema);
@@ -2640,9 +2736,9 @@ namespace {
     }
 
     TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
-                                      SILType Type,
-                                      EnumDecl *theEnum,
-                                      llvm::StructType *enumTy) override;
+                                     SILType Type,
+                                     EnumDecl *theEnum,
+                                     llvm::StructType *enumTy) override;
 
   private:
     TypeInfo *completeFixedLayout(TypeConverter &TC,
@@ -2818,7 +2914,7 @@ namespace {
   public:
 
     llvm::Value *
-    emitGetEnumTag(IRGenFunction &IGF, Address addr, SILType T)
+    emitGetEnumTag(IRGenFunction &IGF, SILType T, Address addr)
     const override {
       if (TIK < Fixed) {
         // Ask the runtime to extract the dynamically-placed tag.
@@ -2906,22 +3002,7 @@ namespace {
       
       // Use the runtime to dynamically switch.
       auto tag = loadDynamicTag(IGF, enumAddr, T);
-      // Test the tag. Payload cases come first, followed by no-payload cases.
-      // The runtime handles distinguishing empty cases for us.
-      unsigned tagIndex = 0;
-      for (auto &payload : ElementsWithPayload) {
-        if (payload.decl == Case)
-          goto found_case;
-        ++tagIndex;
-      }
-      for (auto &payload : ElementsWithNoPayload) {
-        if (payload.decl == Case)
-          goto found_case;
-        ++tagIndex;
-      }
-      llvm_unreachable("couldn't find case");
-      
-    found_case:
+      unsigned tagIndex = getTagIndex(Case);
       llvm::Value *expectedTag
         = llvm::ConstantInt::get(IGF.IGM.Int32Ty, tagIndex);
       return IGF.Builder.CreateICmpEQ(tag, expectedTag);
@@ -3114,7 +3195,7 @@ namespace {
       };
 
       auto *tagSwitch = IGF.Builder.CreateSwitch(tag, unreachableBB,
-                     ElementsWithPayload.size() + ElementsWithNoPayload.size());
+                                                 NumElements);
 
       unsigned tagIndex = 0;
       
@@ -3131,10 +3212,9 @@ namespace {
         tagSwitch->addCase(tagVal, blockForCase(elt.decl));
         ++tagIndex;
       }
-      
-      assert(tagIndex ==
-               ElementsWithPayload.size()+ElementsWithNoPayload.size());
-      
+
+      assert(tagIndex == NumElements);
+
       // Delete the unreachable default block if we didn't use it, or emit it
       // if we did.
       if (unreachableBB->use_empty()) {
@@ -3620,7 +3700,7 @@ namespace {
           // data.
           // FIXME: This is totally broken if someone concurrently accesses
           // a supposedly-immutable value as we're copying it.
-          preparePayloadForLoad(IGF, src, tagIndex);
+          destructiveProjectDataForLoad(IGF, T, src);
 
           // Do the take/copy of the payload.
           Address srcData = IGF.Builder.CreateBitCast(src,
@@ -3704,7 +3784,7 @@ namespace {
         forNontrivialPayloads(IGF, tag,
           [&](unsigned tagIndex, EnumImplStrategy::Element elt) {
             // Clear tag bits out of the payload area, if any.
-            preparePayloadForLoad(IGF, addr, tagIndex);
+            destructiveProjectDataForLoad(IGF, T, addr);
             // Destroy the data.
             Address dataAddr = IGF.Builder.CreateBitCast(addr,
                                       elt.ti->getStorageType()->getPointerTo());
@@ -3714,45 +3794,6 @@ namespace {
         return;
       }
       }
-    }
-
-  private:
-    /// Clear any tag bits stored in the payload area of the given address.
-    void preparePayloadForLoad(IRGenFunction &IGF, Address enumAddr,
-                               unsigned tagIndex) const {
-      // If the case has non-zero tag bits stored in spare bits, we need to
-      // mask them out before the data can be read.
-      unsigned numSpareBits = PayloadTagBits.count();
-      if (numSpareBits > 0) {
-        unsigned spareTagBits = numSpareBits >= 32
-          ? tagIndex : tagIndex & ((1U << numSpareBits) - 1U);
-
-        if (spareTagBits != 0) {
-          Address payloadAddr = projectPayload(IGF, enumAddr);
-          auto payload = EnumPayload::load(IGF, payloadAddr, PayloadSchema);
-          auto spareBitMask = ~PayloadTagBits.asAPInt();
-          payload.emitApplyAndMask(IGF, spareBitMask);
-          payload.store(IGF, payloadAddr);
-        }
-      }
-    }
-
-    Address projectDataForStore(IRGenFunction &IGF,
-                                EnumElementDecl *elt,
-                                Address enumAddr) const override {
-      auto payloadI = std::find_if(ElementsWithPayload.begin(),
-                                   ElementsWithPayload.end(),
-         [&](const Element &e) { return e.decl == elt; });
-
-      // Empty payload addresses can be left undefined.
-      if (payloadI == ElementsWithPayload.end()) {
-        return IGF.getTypeInfoForUnlowered(elt->getArgumentType())
-          .getUndefAddress();
-      }
-
-      // Payloads are all placed at the beginning of the value.
-      return IGF.Builder.CreateBitCast(enumAddr,
-                               payloadI->ti->getStorageType()->getPointerTo());
     }
 
   private:
@@ -3834,13 +3875,13 @@ namespace {
   public:
 
     void storeTag(IRGenFunction &IGF,
-                  EnumElementDecl *elt,
+                  SILType T,
                   Address enumAddr,
-                  SILType T) const override {
+                  EnumElementDecl *Case) const override {
       // See whether this is a payload or empty case we're emitting.
       auto payloadI = std::find_if(ElementsWithPayload.begin(),
                                    ElementsWithPayload.end(),
-                               [&](const Element &e) { return e.decl == elt; });
+                               [&](const Element &e) { return e.decl == Case; });
       if (payloadI != ElementsWithPayload.end()) {
         unsigned index = payloadI - ElementsWithPayload.begin();
 
@@ -3849,7 +3890,7 @@ namespace {
 
       auto emptyI = std::find_if(ElementsWithNoPayload.begin(),
                                  ElementsWithNoPayload.end(),
-                               [&](const Element &e) { return e.decl == elt; });
+                               [&](const Element &e) { return e.decl == Case; });
       assert(emptyI != ElementsWithNoPayload.end() && "case not in enum");
       unsigned index = emptyI - ElementsWithNoPayload.begin();
       
@@ -3858,30 +3899,9 @@ namespace {
       storeNoPayloadTag(IGF, enumAddr, index, T);
     }
 
-    Address destructiveProjectDataForLoad(IRGenFunction &IGF,
-                                          EnumElementDecl *elt,
-                                          Address enumAddr) const override {
-      auto payloadI = std::find_if(ElementsWithPayload.begin(),
-                               ElementsWithPayload.end(),
-                               [&](const Element &e) { return e.decl == elt; });
-
-      // Empty payload addresses can be left undefined.
-      if (payloadI == ElementsWithPayload.end()) {
-        return IGF.getTypeInfoForUnlowered(elt->getArgumentType())
-          .getUndefAddress();
-      }
-
-      unsigned index = payloadI - ElementsWithPayload.begin();
-
-      preparePayloadForLoad(IGF, enumAddr, index);
-
-      // Payloads are all placed at the beginning of the value.
-      return IGF.Builder.CreateBitCast(enumAddr,
-                               payloadI->ti->getStorageType()->getPointerTo());
-    }
-    
     /// Clear any tag bits stored in the payload area of the given address.
     void destructiveProjectDataForLoad(IRGenFunction &IGF,
+                                       SILType T,
                                        Address enumAddr) const override {
       // If the case has non-zero tag bits stored in spare bits, we need to
       // mask them out before the data can be read.
@@ -4211,9 +4231,9 @@ namespace {
   class FixedEnumTypeInfo : public EnumTypeInfoBase<FixedTypeInfo> {
   public:
     FixedEnumTypeInfo(EnumImplStrategy &strategy,
-                       llvm::StructType *T, Size S, SpareBitVector SB,
-                       Alignment A, IsPOD_t isPOD, IsBitwiseTakable_t isBT,
-                       IsFixedSize_t alwaysFixedSize)
+                      llvm::StructType *T, Size S, SpareBitVector SB,
+                      Alignment A, IsPOD_t isPOD, IsBitwiseTakable_t isBT,
+                      IsFixedSize_t alwaysFixedSize)
       : EnumTypeInfoBase(strategy, T, S, std::move(SB), A, isPOD, isBT,
                          alwaysFixedSize) {}
 
@@ -4236,9 +4256,9 @@ namespace {
   public:
     // FIXME: Derive spare bits from element layout.
     LoadableEnumTypeInfo(EnumImplStrategy &strategy,
-                          llvm::StructType *T, Size S, SpareBitVector SB,
-                          Alignment A, IsPOD_t isPOD,
-                          IsFixedSize_t alwaysFixedSize)
+                         llvm::StructType *T, Size S, SpareBitVector SB,
+                         Alignment A, IsPOD_t isPOD,
+                         IsFixedSize_t alwaysFixedSize)
       : EnumTypeInfoBase(strategy, T, S, std::move(SB), A, isPOD,
                          alwaysFixedSize) {}
 
@@ -4363,9 +4383,9 @@ EnumImplStrategy::getFixedEnumTypeInfo(llvm::StructType *T, Size S,
 
 TypeInfo *
 SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
-                                                 SILType Type,
-                                                 EnumDecl *theEnum,
-                                                 llvm::StructType *enumTy) {
+                                                  SILType Type,
+                                                  EnumDecl *theEnum,
+                                                  llvm::StructType *enumTy) {
   if (ElementsWithPayload.empty()) {
     enumTy->setBody(ArrayRef<llvm::Type*>{}, /*isPacked*/ true);
     Alignment alignment(1);
@@ -4584,9 +4604,9 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeDynamicLayout(
 
 TypeInfo *
 SinglePayloadEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
-                                                SILType type,
-                                                EnumDecl *theEnum,
-                                                llvm::StructType *enumTy) {
+                                                      SILType type,
+                                                      EnumDecl *theEnum,
+                                                      llvm::StructType *enumTy) {
   if (TIK >= Fixed)
     return completeFixedLayout(TC, type, theEnum, enumTy);
   return completeDynamicLayout(TC, type, theEnum, enumTy);
@@ -4768,9 +4788,9 @@ TypeInfo *MultiPayloadEnumImplStrategy::completeDynamicLayout(
 
 TypeInfo *
 MultiPayloadEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
-                                                SILType Type,
-                                                EnumDecl *theEnum,
-                                                llvm::StructType *enumTy) {
+                                                     SILType Type,
+                                                     EnumDecl *theEnum,
+                                                     llvm::StructType *enumTy) {
   if (TIK >= Fixed)
     return completeFixedLayout(TC, Type, theEnum, enumTy);
   
@@ -4889,7 +4909,7 @@ Address irgen::emitDestructiveProjectEnumAddressForLoad(IRGenFunction &IGF,
                                                    Address enumAddr,
                                                    EnumElementDecl *theCase) {
   return getEnumImplStrategy(IGF.IGM, enumTy)
-    .destructiveProjectDataForLoad(IGF, theCase, enumAddr);
+    .destructiveProjectDataForLoad(IGF, enumTy, enumAddr, theCase);
 }
 
 void irgen::emitStoreEnumTagToAddress(IRGenFunction &IGF,
@@ -4897,7 +4917,7 @@ void irgen::emitStoreEnumTagToAddress(IRGenFunction &IGF,
                                        Address enumAddr,
                                        EnumElementDecl *theCase) {
   getEnumImplStrategy(IGF.IGM, enumTy)
-    .storeTag(IGF, theCase, enumAddr, enumTy);
+    .storeTag(IGF, enumTy, enumAddr, theCase);
 }
 
 /// Gather spare bits into the low bits of a smaller integer value.
