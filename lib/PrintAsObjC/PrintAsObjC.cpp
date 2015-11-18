@@ -91,7 +91,8 @@ static Identifier getNameForObjC(const ValueDecl *VD,
 namespace {
 class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
                     private TypeVisitor<ObjCPrinter, void, 
-                                        Optional<OptionalTypeKind>> {
+                                        Optional<OptionalTypeKind>>
+{
   friend ASTVisitor;
   friend TypeVisitor;
 
@@ -120,7 +121,8 @@ public:
   }
 
   bool shouldInclude(const ValueDecl *VD) {
-    return VD->isObjC() && VD->getFormalAccess() >= minRequiredAccess &&
+    return (VD->isObjC() || VD->getAttrs().hasAttribute<CDeclAttr>()) &&
+      VD->getFormalAccess() >= minRequiredAccess &&
       !(isa<ConstructorDecl>(VD) && 
         cast<ConstructorDecl>(VD)->hasStubImplementation());
   }
@@ -333,8 +335,33 @@ private:
     return true;
   }
 
-  void printAbstractFunction(AbstractFunctionDecl *AFD, bool isClassMethod,
-                             bool isNSUIntegerSubscript = false) {
+  Type getForeignResultType(AbstractFunctionDecl *AFD,
+                            FunctionType *methodTy,
+                            Optional<ForeignErrorConvention> errorConvention) {
+    // A foreign error convention can affect the result type as seen in
+    // Objective-C.
+    if (errorConvention) {
+      switch (errorConvention->getKind()) {
+      case ForeignErrorConvention::ZeroResult:
+      case ForeignErrorConvention::NonZeroResult:
+        // The error convention provides the result type.
+        return errorConvention->getResultType();
+
+      case ForeignErrorConvention::NilResult:
+        // Errors are propagated via 'nil' returns.
+        return OptionalType::get(methodTy->getResult());
+
+      case ForeignErrorConvention::NonNilError:
+      case ForeignErrorConvention::ZeroPreservedResult:
+        break;
+      }
+    }
+    return methodTy->getResult();
+  }
+                                          
+  void printAbstractFunctionAsMethod(AbstractFunctionDecl *AFD,
+                                     bool isClassMethod,
+                                     bool isNSUIntegerSubscript = false) {
     printDocumentationComment(AFD);
     if (isClassMethod)
       os << "+ (";
@@ -349,32 +376,11 @@ private:
       }
     }
 
-    Type rawMethodTy = AFD->getType()->castTo<AnyFunctionType>()->getResult();
-    auto methodTy = rawMethodTy->castTo<FunctionType>();
-
-    // A foreign error convention can affect the result type as seen in
-    // Objective-C.
     Optional<ForeignErrorConvention> errorConvention
       = AFD->getForeignErrorConvention();
-    Type resultTy = methodTy->getResult();
-    if (errorConvention) {
-      switch (errorConvention->getKind()) {
-      case ForeignErrorConvention::ZeroResult:
-      case ForeignErrorConvention::NonZeroResult:
-        // The error convention provides the result type.
-        resultTy = errorConvention->getResultType();
-        break;
-
-      case ForeignErrorConvention::NilResult:
-        // Errors are propagated via 'nil' returns.
-        resultTy = OptionalType::get(resultTy);
-        break;
-
-      case ForeignErrorConvention::NonNilError:
-      case ForeignErrorConvention::ZeroPreservedResult:
-        break;
-      }
-    }
+    Type rawMethodTy = AFD->getType()->castTo<AnyFunctionType>()->getResult();
+    auto methodTy = rawMethodTy->castTo<FunctionType>();
+    auto resultTy = getForeignResultType(AFD, methodTy, errorConvention);
 
     // Constructors and methods returning DynamicSelf return
     // instancetype.    
@@ -464,15 +470,63 @@ private:
 
     os << ";\n";
   }
+  
+  void printSingleFunctionParam(const ParamDecl *param) {
+    // The type name may be multi-part.
+    PrintMultiPartType multiPart(*this);
+    visitPart(param->getType(), OTK_None);
+    auto name = param->getName();
+    if (name.empty())
+      return;
+    
+    os << ' ' << name;
+    if (isClangKeyword(name))
+      os << "_";
+  }
 
+  void printAbstractFunctionAsFunction(FuncDecl *FD) {
+    printDocumentationComment(FD);
+    Optional<ForeignErrorConvention> errorConvention
+      = FD->getForeignErrorConvention();
+    auto resultTy = getForeignResultType(FD,
+                                         FD->getType()->castTo<FunctionType>(),
+                                         errorConvention);
+    
+    // The result type may be a partial function type we need to close
+    // up later.
+    PrintMultiPartType multiPart(*this);
+    visitPart(resultTy, OTK_None);
+    
+    assert(FD->getAttrs().hasAttribute<CDeclAttr>()
+           && "not a cdecl function");
+    
+    os << ' ' << FD->getAttrs().getAttribute<CDeclAttr>()->Name << '(';
+    
+    assert(FD->getParameterLists().size() == 1 && "not a C-compatible func");
+    auto params = FD->getParameterLists().back();
+    interleave(*params,
+               [&](const ParamDecl *param) {
+                 printSingleFunctionParam(param);
+               },
+               [&]{ os << ", "; });
+    
+    os << ')';
+    
+    // Finish the result type.
+    multiPart.finish();
+    
+    os << ';';
+  }
+    
   void visitFuncDecl(FuncDecl *FD) {
-    assert(FD->getDeclContext()->isTypeContext() &&
-           "cannot handle free functions right now");
-    printAbstractFunction(FD, FD->isStatic());
+    if (FD->getDeclContext()->isTypeContext())
+      printAbstractFunctionAsMethod(FD, FD->isStatic());
+    else
+      printAbstractFunctionAsFunction(FD);
   }
 
   void visitConstructorDecl(ConstructorDecl *CD) {
-    printAbstractFunction(CD, false);
+    printAbstractFunctionAsMethod(CD, false);
   }
 
   bool maybePrintIBOutletCollection(Type ty) {
@@ -514,9 +568,9 @@ private:
 
     if (VD->isStatic()) {
       // Objective-C doesn't have class properties. Just print the accessors.
-      printAbstractFunction(VD->getGetter(), true);
+      printAbstractFunctionAsMethod(VD->getGetter(), true);
       if (auto setter = VD->getSetter())
-        printAbstractFunction(setter, true);
+        printAbstractFunctionAsMethod(setter, true);
       return;
     }
 
@@ -635,9 +689,9 @@ private:
       isNSUIntegerSubscript = isNSUInteger(indexParam->getType());
     }
 
-    printAbstractFunction(SD->getGetter(), false, isNSUIntegerSubscript);
+    printAbstractFunctionAsMethod(SD->getGetter(), false, isNSUIntegerSubscript);
     if (auto setter = SD->getSetter())
-      printAbstractFunction(setter, false, isNSUIntegerSubscript);
+      printAbstractFunctionAsMethod(setter, false, isNSUIntegerSubscript);
   }
 
   /// Visit part of a type, such as the base of a pointer type.
@@ -1169,6 +1223,33 @@ private:
                                  Optional<OptionalTypeKind> optionalKind) {
     visitPart(RST->getReferentType(), optionalKind);
   }
+  
+  /// RAII class for printing multi-part C types, such as functions and arrays.
+  class PrintMultiPartType {
+    ObjCPrinter &Printer;
+    decltype(ObjCPrinter::openFunctionTypes) savedFunctionTypes;
+    
+    PrintMultiPartType(const PrintMultiPartType &) = delete;
+  public:
+    PrintMultiPartType(ObjCPrinter &Printer)
+      : Printer(Printer) {
+      savedFunctionTypes.swap(Printer.openFunctionTypes);
+    }
+    
+    void finish() {
+      auto &openFunctionTypes = Printer.openFunctionTypes;
+      while (!openFunctionTypes.empty()) {
+        const FunctionType *openFunctionTy = openFunctionTypes.pop_back_val();
+        Printer.finishFunctionType(openFunctionTy);
+      }
+      openFunctionTypes = std::move(savedFunctionTypes);
+      savedFunctionTypes.clear();
+    }
+    
+    ~PrintMultiPartType() {
+      finish();
+    }
+  };
 
   /// Print a full type, optionally declaring the given \p name.
   ///
@@ -1180,9 +1261,7 @@ public:
              Identifier name = Identifier()) {
     PrettyStackTraceType trace(M.getASTContext(), "printing", ty);
 
-    decltype(openFunctionTypes) savedFunctionTypes;
-    savedFunctionTypes.swap(openFunctionTypes);
-
+    PrintMultiPartType multiPart(*this);
     visitPart(ty, optionalKind);
     if (!name.empty()) {
       os << ' ' << name;
@@ -1190,12 +1269,6 @@ public:
         os << '_';
       }
     }
-    while (!openFunctionTypes.empty()) {
-      const FunctionType *openFunctionTy = openFunctionTypes.pop_back_val();
-      finishFunctionType(openFunctionTy);
-    }
-
-    openFunctionTypes = std::move(savedFunctionTypes);
   }
 };
 
@@ -1483,6 +1556,14 @@ public:
     seenTypes[CD] = { EmissionState::Defined, true };
     forwardDeclareMemberTypes(CD->getMembers());
     printer.print(CD);
+    return true;
+  }
+  
+  bool writeFunc(const FuncDecl *FD) {
+    if (addImport(FD))
+      return true;
+
+    printer.print(FD);
     return true;
   }
 
@@ -1834,6 +1915,8 @@ public:
           success = writeProtocol(PD);
         else if (auto ED = dyn_cast<EnumDecl>(D))
           success = writeEnum(ED);
+        else if (auto ED = dyn_cast<FuncDecl>(D))
+          success = writeFunc(ED);
         else
           llvm_unreachable("unknown top-level ObjC value decl");
 

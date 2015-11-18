@@ -372,6 +372,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
     if (cast<AutoClosureAttr>(this)->isEscaping())
       Printer << "(escaping)";
     break;
+      
+  case DAK_CDecl:
+    Printer << "@_cdecl(\"" << cast<CDeclAttr>(this)->Name << "\")";
+    break;
+
   case DAK_ObjC: {
     Printer.printAttrName("@objc");
     llvm::SmallString<32> scratch;
@@ -487,6 +492,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_silgen_name";
   case DAK_Alignment:
     return "_alignment";
+  case DAK_CDecl:
+    return "_cdecl";
   case DAK_SwiftNativeObjCRuntimeBase:
     return "_swift_native_objc_runtime_base";
   case DAK_Semantics:

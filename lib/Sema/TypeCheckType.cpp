@@ -2633,9 +2633,10 @@ bool TypeChecker::isRepresentableInObjC(
   if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
     if (FD->isAccessor()) {
       // Accessors can only be @objc if the storage declaration is.
+      // Global computed properties may however @_cdecl their accessors.
       auto storage = FD->getAccessorStorageDecl();
       validateDecl(storage);
-      if (!storage->isObjC()) {
+      if (!storage->isObjC() && Reason != ObjCReason::ExplicitlyCDecl) {
         if (Diagnose) {
           auto error = FD->isGetter()
                     ? (isa<VarDecl>(storage) 
@@ -2690,7 +2691,8 @@ bool TypeChecker::isRepresentableInObjC(
     isSpecialInit = init->isObjCZeroParameterWithLongSelector();
 
   if (!isSpecialInit &&
-      !isParamListRepresentableInObjC(*this, AFD, AFD->getParameterList(1),
+      !isParamListRepresentableInObjC(*this, AFD,
+                                      AFD->getParameterLists().back(),
                                       Reason)) {
     if (!Diagnose) {
       // Return as soon as possible if we are not producing diagnostics.
@@ -2826,7 +2828,7 @@ bool TypeChecker::isRepresentableInObjC(
     // If the selector did not provide an index for the error, find
     // the last parameter that is not a trailing closure.
     if (!foundErrorParameterIndex) {
-      auto *paramList = AFD->getParameterList(1);
+      auto *paramList = AFD->getParameterLists().back();
       errorParameterIndex = paramList->size();
       while (errorParameterIndex > 0) {
         // Skip over trailing closures.

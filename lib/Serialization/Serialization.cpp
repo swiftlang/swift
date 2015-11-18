@@ -1621,7 +1621,16 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
                                       theAttr->Name);
     return;
   }
-  
+
+  case DAK_CDecl: {
+    auto *theAttr = cast<CDeclAttr>(DA);
+    auto abbrCode = DeclTypeAbbrCodes[CDeclDeclAttrLayout::Code];
+    CDeclDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                    theAttr->isImplicit(),
+                                    theAttr->Name);
+    return;
+  }
+
   case DAK_Alignment: {
     auto *theAlignment = cast<AlignmentAttr>(DA);
     auto abbrCode = DeclTypeAbbrCodes[AlignmentDeclAttrLayout::Code];

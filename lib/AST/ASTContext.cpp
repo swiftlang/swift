@@ -1908,7 +1908,10 @@ void AbstractFunctionDecl::setForeignErrorConvention(
 
 Optional<ForeignErrorConvention>
 AbstractFunctionDecl::getForeignErrorConvention() const {
-  if (!isObjC() || !isBodyThrowing()) return None;
+  if (!isObjC() && !getAttrs().hasAttribute<CDeclAttr>())
+    return None;
+  if (!isBodyThrowing())
+    return None;
   auto &conventionsMap = getASTContext().Impl.ForeignErrorConventions;
   auto it = conventionsMap.find(this);
   if (it == conventionsMap.end()) return None;

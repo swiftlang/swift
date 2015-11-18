@@ -565,6 +565,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
+  case DAK_CDecl:
   case DAK_SILGenName: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
@@ -601,9 +602,16 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       diagnose(Loc, diag::attr_only_at_non_local_scope, AttrName);
     }
 
-    if (!DiscardAttribute)
-      Attributes.add(new (Context) SILGenNameAttr(AsmName.getValue(), AtLoc,
+    if (!DiscardAttribute) {
+      if (DK == DAK_SILGenName)
+        Attributes.add(new (Context) SILGenNameAttr(AsmName.getValue(), AtLoc,
+                                                AttrRange, /*Implicit=*/false));
+      else if (DK == DAK_CDecl)
+        Attributes.add(new (Context) CDeclAttr(AsmName.getValue(), AtLoc,
                                                AttrRange, /*Implicit=*/false));
+      else
+        llvm_unreachable("out of sync with switch");
+    }
 
     break;
   }

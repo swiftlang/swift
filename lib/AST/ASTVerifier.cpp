@@ -2200,8 +2200,9 @@ struct ASTNodeBase {};
         abort();
       }
 
-      if (AFD->getForeignErrorConvention() && !AFD->isObjC()) {
-        Out << "foreign error convention on non-@objc function\n";
+      if (AFD->getForeignErrorConvention()
+          && !AFD->isObjC() && !AFD->getAttrs().hasAttribute<CDeclAttr>()) {
+        Out << "foreign error convention on non-@objc, non-@_cdecl function\n";
         AFD->dump(Out);
         abort();
       }
