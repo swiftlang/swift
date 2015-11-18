@@ -3,6 +3,7 @@ set(UTILITYPASSES_SOURCES
   UtilityPasses/BasicCalleePrinter.cpp
   UtilityPasses/CFGPrinter.cpp
   UtilityPasses/CallGraphPrinter.cpp
+  UtilityPasses/FunctionOrderPrinter.cpp
   UtilityPasses/IVInfoPrinter.cpp
   UtilityPasses/InstCount.cpp
   UtilityPasses/Link.cpp

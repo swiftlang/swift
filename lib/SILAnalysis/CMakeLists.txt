@@ -10,6 +10,7 @@ add_swift_library(swiftSILAnalysis
   ColdBlockInfo.cpp
   DestructorAnalysis.cpp
   EscapeAnalysis.cpp
+  FunctionOrder.cpp
   IVAnalysis.cpp
   LoopAnalysis.cpp
   LoopRegionAnalysis.cpp
