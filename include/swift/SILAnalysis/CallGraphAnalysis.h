@@ -51,7 +51,9 @@ public:
   }
 
   virtual void invalidate(SILAnalysis::InvalidationKind K) {
-    if (K & InvalidationKind::Calls) {
+    bool invalidateCalls = K & InvalidationKind::Calls;
+    bool invalidateFuncs = K & InvalidationKind::Functions;
+    if (invalidateCalls || invalidateFuncs) {
       delete CG;
       CG = nullptr;
     }
