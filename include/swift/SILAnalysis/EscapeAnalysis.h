@@ -329,9 +329,6 @@ public:
     /// Backlink to the graph's function.
     SILFunction *F;
 
-    /// Backlink to the parent escape analysis.
-    EscapeAnalysis *EA;
-
     /// Mapping from pointer SIL values to nodes in the graph. Such a value can
     /// never be a projection, because in case of projection-instruction the
     /// based operand value is used instead.
@@ -412,7 +409,7 @@ public:
 
   public:
     /// Constructs a connection graph for a function.
-    ConnectionGraph(SILFunction *F, EscapeAnalysis *EA) : F(F), EA(EA) {
+    ConnectionGraph(SILFunction *F) : F(F) {
     }
 
     bool isValid() const { return Valid; }
@@ -442,12 +439,7 @@ public:
     /// taken. This means the node is always created for the "outermost" value
     /// where V is contained.
     /// Returns null, if V is not a "pointer".
-    CGNode *getNode(ValueBase *V);
-
-    /// Gets or creates a node for a SILValue (same as above).
-    CGNode *getNode(SILValue V) {
-      return getNode(V.getDef());
-    }
+    CGNode *getOrCreateNode(ValueBase *V);
 
     /// Gets or creates a content node to which \a AddrNode points to.
     CGNode *getContentNode(CGNode *AddrNode);
@@ -503,12 +495,6 @@ public:
       // point to one.
       if (Node->Type != NodeType::Content)
         getContentNode(Node);
-    }
-
-    /// If V is a pointer, set it to global escaping.
-    void setEscapesGlobal(SILValue V) {
-      if (CGNode *Node = getNode(V))
-        setEscapesGlobal(Node);
     }
 
     /// Creates a defer-edge between \p From and \p To.
@@ -592,6 +578,24 @@ private:
   /// Returns true if \p V is a "pointer" value.
   /// See EscapeAnalysis::NodeType::Value.
   bool isPointer(ValueBase *V);
+
+  /// Gets or creates a node for a value \p V.
+  /// If V is a projection(-path) then the base of the projection(-path) is
+  /// taken. This means the node is always created for the "outermost" value
+  /// where V is contained.
+  /// Returns null, if V is not a "pointer".
+  CGNode *getNode(ConnectionGraph *ConGraph, ValueBase *V);
+
+  /// Gets or creates a node for a SILValue (same as above).
+  CGNode *getNode(ConnectionGraph *ConGraph, SILValue V) {
+    return getNode(ConGraph, V.getDef());
+  }
+
+  /// If V is a pointer, set it to global escaping.
+  void setEscapesGlobal(ConnectionGraph *ConGraph, SILValue V) {
+    if (CGNode *Node = getNode(ConGraph, V))
+      ConGraph->setEscapesGlobal(Node);
+  }
 
   /// Builds the connection graph for a function, but does not handle applys to
   /// known callees. This is done afterwards by mergeAllCallees.
