@@ -39,7 +39,7 @@ class FunctionOrderPrinterPass : public SILModuleTransform {
     BottomUpFunctionOrder Orderer(M, BCA);
 
     llvm::outs() << "Bottom up function order:\n";
-    auto SCCs = Orderer.getBottomUpSCCs();
+    auto SCCs = Orderer.getSCCsBottomUp();
     for (auto &SCC : SCCs) {
       std::string Indent;
 

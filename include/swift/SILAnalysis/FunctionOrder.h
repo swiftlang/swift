@@ -31,7 +31,9 @@ public:
   typedef TinyPtrVector<SILFunction *> SCC;
 
 private:
+  SILModule &M;
   llvm::SmallVector<SCC, 32> TheSCCs;
+  llvm::SmallVector<SILFunction *, 32> TheFunctions;
 
   // The callee analysis we use to determine the callees at each call site.
   BasicCalleeAnalysis *BCA;
@@ -43,11 +45,29 @@ private:
 
 public:
   BottomUpFunctionOrder(SILModule &M, BasicCalleeAnalysis *BCA)
-      : BCA(BCA), NextDFSNum(0) {
+      : M(M), BCA(BCA), NextDFSNum(0) {}
+
+  /// Get the SCCs in bottom-up order.
+  ArrayRef<SCC> getSCCsBottomUp() {
+    if (!TheSCCs.empty())
+      return TheSCCs;
+
     FindSCCs(M);
+    return TheSCCs;
   }
 
-  ArrayRef<SCC> getBottomUpSCCs() { return TheSCCs; }
+  /// Get a flattened view of all functions in all the SCCs in
+  /// bottom-up order
+  ArrayRef<SILFunction *> getFunctionsBottomUp() {
+    if (!TheFunctions.empty())
+      return TheFunctions;
+
+    for (auto SCC : getSCCsBottomUp())
+      for (auto *F : SCC)
+        TheFunctions.push_back(F);
+
+    return TheFunctions;
+  }
 
 private:
   void DFS(SILFunction *F);
