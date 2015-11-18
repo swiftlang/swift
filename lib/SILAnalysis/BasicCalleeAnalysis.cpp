@@ -88,8 +88,7 @@ void CalleeCache::computeClassMethodCalleesForClass(ClassDecl *CD) {
     bool canCallUnknown = !calleesAreStaticallyKnowable(M, Method);
 
     // Update the callees for this method and all the methods it
-    // overrides by inserting the call graph node for the function
-    // that this method invokes.
+    // overrides by adding this function to their lists.
     do {
       auto &TheCallees = getOrCreateCalleesForMethod(Method);
       assert(TheCallees.getPointer() && "Unexpected null callees!");
@@ -187,7 +186,7 @@ CalleeList CalleeCache::getCalleeListForCalleeKind(SILValue Callee) const {
   switch (Callee->getKind()) {
   default:
     assert(!isa<MethodInst>(Callee) &&
-           "Unhandled method instruction in call graph construction!");
+           "Unhandled method instruction in callee determination!");
     return CalleeList();
 
   case ValueKind::ThinToThickFunctionInst:
