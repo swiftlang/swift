@@ -515,9 +515,20 @@ public:
   /// Set the debug scope for all SILInstructions that where emitted
   /// from when we entered the last scope up to the current one.
   void setDebugScopeForInsertedInstrs(SILDebugScope *DS) {
-    while (LastInsnWithoutScope < InsertedInstrs.size()) {
-      InsertedInstrs[LastInsnWithoutScope++]->setDebugScope(DS);
+    // This is just a workaround.
+    // Check that instruction really belongs to a function being processed.
+    unsigned LastIdx = LastInsnWithoutScope, EndIdx = InsertedInstrs.size();
+    for (auto &BB: F) {
+      for (auto &I: BB) {
+        for (unsigned i = LastIdx; i < EndIdx; ++i) {
+          if (&I == InsertedInstrs[i]) {
+            InsertedInstrs[i]->setDebugScope(DS);
+            break;
+          }
+        }
+      }
     }
+    LastInsnWithoutScope = EndIdx;
   }
 
   //===--------------------------------------------------------------------===//
