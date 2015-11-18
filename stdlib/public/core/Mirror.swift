@@ -86,7 +86,7 @@ public struct Mirror {
   case Customized(()->Mirror)
 
   /// Suppress the representation of all ancestor classes.  The
-  /// resulting `Mirror`'s `superclassMirror()` is `nil`.
+  /// resulting `Mirror`'s `superclassMirror` is `nil`.
   case Suppressed
   }
 
@@ -323,7 +323,7 @@ public struct Mirror {
   /// The static type of the subject being reflected.
   ///
   /// This type may differ from the subject's dynamic type when `self`
-  /// is the `superclassMirror()` of another mirror.
+  /// is the `superclassMirror` of another mirror.
   public let subjectType: Any.Type
 
   /// A collection of `Child` elements describing the structure of the
@@ -333,8 +333,7 @@ public struct Mirror {
   /// Suggests a display style for the reflected subject.
   public let displayStyle: DisplayStyle?
 
-  @warn_unused_result
-  public func superclassMirror() -> Mirror? {
+  public var superclassMirror: Mirror? {
     return _makeSuperclassMirror()
   }
 
