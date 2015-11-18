@@ -4414,6 +4414,18 @@ public:
       markAsObjC(TC, FD, isObjC, errorConvention);
     }
     
+    // If the function is exported to C, it must be representable in (Obj-)C.
+    if (auto CDeclAttr = FD->getAttrs().getAttribute<swift::CDeclAttr>()) {
+      Optional<ForeignErrorConvention> errorConvention;
+      if (TC.isRepresentableInObjC(FD, ObjCReason::ExplicitlyCDecl,
+                                   errorConvention)) {
+        if (FD->isBodyThrowing()) {
+          FD->setForeignErrorConvention(*errorConvention);
+          TC.diagnose(CDeclAttr->getLocation(), diag::cdecl_throws);
+        }
+      }
+    }
+    
     inferDynamic(TC.Context, FD);
 
     TC.checkDeclAttributes(FD);
@@ -5056,6 +5068,7 @@ public:
 
     UNINTERESTING_ATTR(Accessibility)
     UNINTERESTING_ATTR(Alignment)
+    UNINTERESTING_ATTR(CDecl)
     UNINTERESTING_ATTR(SILGenName)
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(IBAction)

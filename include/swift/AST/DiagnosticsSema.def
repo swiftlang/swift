@@ -836,6 +836,14 @@ ERROR(no_objc_tagged_pointer_not_class_protocol,none,
 ERROR(swift_native_objc_runtime_base_not_on_root_class,none,
       "@_swift_native_objc_runtime_base_not_on_root_class can only be applied "
       "to root classes", ())
+
+ERROR(cdecl_not_at_top_level,none,
+      "@_cdecl can only be applied to global functions", ())
+ERROR(cdecl_empty_name,none,
+      "@_cdecl symbol name cannot be empty", ())
+ERROR(cdecl_throws,none,
+      "raising errors from @_cdecl functions is not supported", ())
+
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
 ERROR(access_control_in_protocol,none,
@@ -2487,7 +2495,7 @@ ERROR(objc_enum_case_multi,none,
       "'@objc' enum case declaration defines multiple enum cases with the same Objective-C name", ())
 
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{marked dynamic|marked @objc|marked @IBOutlet|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override}"
+#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override}"
 
 ERROR(objc_invalid_on_var,none,
       "property cannot be %" OBJC_ATTR_SELECT "0 "

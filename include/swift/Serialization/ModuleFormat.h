@@ -43,7 +43,7 @@ const unsigned char MODULE_DOC_SIGNATURE[] = { 0xE2, 0x9C, 0xA8, 0x07 };
 
 /// Serialized module format major version number.
 ///
-/// Always 0 for Swift 1.0.
+/// Always 0 for Swift 1.x and 2.x.
 const uint16_t VERSION_MAJOR = 0;
 
 /// Serialized module format minor version number.
@@ -53,7 +53,8 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 239; // multiple results for SILFunctionType
+/// describe what change you made.
+const uint16_t VERSION_MINOR = 240; // Last change: @_cdecl
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -1223,6 +1224,13 @@ namespace decls_block {
     BCFixed<1>, // implicit flag
     BCBlob      // _silgen_name
   >;
+
+  using CDeclDeclAttrLayout = BCRecordLayout<
+    CDecl_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    BCBlob      // _silgen_name
+  >;
+
   
   using AlignmentDeclAttrLayout = BCRecordLayout<
     Alignment_DECL_ATTR,

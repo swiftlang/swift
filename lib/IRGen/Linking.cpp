@@ -232,7 +232,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
 
   //   entity ::= declaration                     // other declaration
   case Kind::Function:
-    // As a special case, functions can have external asm names.
+    // As a special case, functions can have manually mangled names.
     if (auto AsmA = getDecl()->getAttrs().getAttribute<SILGenNameAttr>()) {
       mangler.append(AsmA->Name);
       return mangler.finalize(buffer);
