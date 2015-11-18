@@ -1284,7 +1284,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
         apple)
             # User-visible versions of the compiler.
             CLANG_USER_VISIBLE_VERSION="6.1.0"
-            SWIFT_USER_VISIBLE_VERSION="2.1"
+            SWIFT_USER_VISIBLE_VERSION="2.2"
 
             llvm_cmake_options=(
                 "${llvm_cmake_options[@]}"

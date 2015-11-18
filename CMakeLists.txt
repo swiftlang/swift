@@ -62,7 +62,7 @@ option(SWIFT_ENABLE_TARGET_TVOS
     "Enable compiler support for targeting tvOS"
     TRUE)
 
-set(SWIFT_VERSION "2.1" CACHE STRING
+set(SWIFT_VERSION "2.2" CACHE STRING
     "The user-visible version of the Swift compiler")
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
