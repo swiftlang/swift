@@ -91,7 +91,7 @@ enum XYZ {
 sil @use : $@convention(thin) (Builtin.Int32) -> ()
 sil @use_64 : $@convention(thin) (Builtin.Int64) -> ()
 sil @use_2_64 : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> ()
-sil @use_a : $@convention(thin) (@in A) -> ()
+sil @use_a : $@convention(thin) (A) -> ()
 sil @escaped_a_ptr : $@convention(thin) (@out A) -> ()
 sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
 
@@ -466,3 +466,173 @@ bb5:
   return %2 : $Builtin.Int32
 }
 
+
+// CHECK-LABEL: sil @load_to_load_conflicting_branches_diamond : $@convention(thin) (@inout Builtin.Int32) -> () {
+// CHECK: bb0(
+// CHECK: load
+// CHECK: bb1:
+// CHECK-NOT: load
+// CHECK: store
+// CHECK-NOT: load
+// CHECK: bb2:
+// CHECK: bb3:
+// CHECK: load
+sil @load_to_load_conflicting_branches_diamond : $@convention(thin) (@inout Builtin.Int32) -> () {
+// %0                                             // users: %1, %4, %9, %11, %16, %21 
+bb0(%0 : $*Builtin.Int32):
+  %1 = load %0 : $*Builtin.Int32                  // user: %2
+  %2 = builtin "trunc_Int32_Int1"(%1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br undef, bb1, bb2                         // id: %3
+
+bb1:                                              // Preds: bb0 
+  %4 = load %0 : $*Builtin.Int32                  // users: %6, %8, %10 
+  // function_ref use 
+  %5 = function_ref @use : $@convention(thin) (Builtin.Int32) -> () // user: %6
+  %6 = apply %5(%4) : $@convention(thin) (Builtin.Int32) -> ()
+  %7 = integer_literal $Builtin.Int32, 2          // user: %9
+  %8 = builtin "trunc_Int32_Int1"(%4 : $Builtin.Int32) : $Builtin.Int1
+  store %7 to %0 : $*Builtin.Int32                // id: %9
+  %10 = builtin "trunc_Int32_Int1"(%4 : $Builtin.Int32) : $Builtin.Int1
+  %11 = load %0 : $*Builtin.Int32                 // users: %13, %14 
+  // function_ref use 
+  %12 = function_ref @use : $@convention(thin) (Builtin.Int32) -> () // user: %13 
+  %13 = apply %12(%11) : $@convention(thin) (Builtin.Int32) -> ()
+  %14 = builtin "trunc_Int32_Int1"(%11 : $Builtin.Int32) : $Builtin.Int1
+  br bb3                                          // id: %15 
+
+bb2:                                              // Preds: bb0 
+  %16 = load %0 : $*Builtin.Int32                 // users: %18, %19 
+  // function_ref use 
+  %17 = function_ref @use : $@convention(thin) (Builtin.Int32) -> () // user: %18 
+  %18 = apply %17(%16) : $@convention(thin) (Builtin.Int32) -> ()
+  %19 = builtin "trunc_Int32_Int1"(%16 : $Builtin.Int32) : $Builtin.Int1
+  br bb3                                          // id: %20 
+
+bb3:                                              // Preds: bb1 bb2 
+  %21 = load %0 : $*Builtin.Int32                 // user: %23 
+  // function_ref use 
+  %22 = function_ref @use : $@convention(thin) (Builtin.Int32) -> () // user: %23 
+  %23 = apply %22(%21) : $@convention(thin) (Builtin.Int32) -> ()
+  %24 = tuple ()                                  // user: %25 
+  return %24 : $()                                // id: %25 
+}
+
+// CHECK-LABEL: load_to_load_irreducible_loop
+// CHECK: bb0
+// CHECK: load
+// CHECK: bb1
+// CHECK-NOT: load
+// CHECK: store
+// CHECK: bb2
+// CHECK-NOT: load
+// CHECK: bb3
+// CHECK-NOT: load
+// CHECK: load
+sil @load_to_load_irreducible_loop : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Int32
+  %99 = struct_element_addr %0#1 : $*Int32, #Int32.value
+  %1 = load %99 : $*Builtin.Int32
+  builtin "trunc_Int32_Int1"(%1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = load %99 : $*Builtin.Int32
+  %4 = integer_literal $Builtin.Int32, 2
+  %22 = function_ref @use : $@convention(thin) (Builtin.Int32) -> () // user: %23 
+  %23 = apply %22(%3) : $@convention(thin) (Builtin.Int32) -> ()
+  store %4 to %99 : $*Builtin.Int32
+  builtin "trunc_Int32_Int1"(%3 : $Builtin.Int32) : $Builtin.Int1
+  %5 = load %99 : $*Builtin.Int32
+  %24 = apply %22(%5) : $@convention(thin) (Builtin.Int32) -> ()
+  builtin "trunc_Int32_Int1"(%5 : $Builtin.Int32) : $Builtin.Int1
+  cond_br undef, bb2, bb3
+
+bb2:
+  %6 = load %99 : $*Builtin.Int32
+  %25 = function_ref @use : $@convention(thin) (Builtin.Int32) -> () // user: %23 
+  %26 = apply %25(%6) : $@convention(thin) (Builtin.Int32) -> ()
+  builtin "trunc_Int32_Int1"(%6 : $Builtin.Int32) : $Builtin.Int1
+  cond_br undef, bb1, bb3
+
+bb3:
+  %7 = load %99 : $*Builtin.Int32
+  %125 = function_ref @use : $@convention(thin) (Builtin.Int32) -> () // user: %23 
+  %126 = apply %125(%7) : $@convention(thin) (Builtin.Int32) -> ()
+  builtin "trunc_Int32_Int1"(%7 : $Builtin.Int32) : $Builtin.Int1
+  dealloc_stack %0#0 : $*@local_storage Int32
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: load_to_load_loop
+// CHECK: bb1
+// CHECK-NOT: load
+// CHECK: cond_br
+// CHECK: bb2
+// CHECK-NOT: load
+// CHECK: return
+sil @load_to_load_loop : $@convention(thin) () -> () {
+bb0:
+  %101 = alloc_stack $Int32
+  %102 = alloc_stack $Int32
+  %0 = struct_element_addr %101#1 : $*Int32, #Int32.value
+  %1 = struct_element_addr %102#1 : $*Int32, #Int32.value
+  %2 = load %0 : $*Builtin.Int32
+  %99 = load %1 : $*Builtin.Int32
+  %125 = function_ref @use : $@convention(thin) (Builtin.Int32) -> () // user: %23 
+  %126 = apply %125(%2) : $@convention(thin) (Builtin.Int32) -> ()
+  %127 = apply %125(%99) : $@convention(thin) (Builtin.Int32) -> ()
+  br bb1
+
+bb1:
+  %4 = load %0 : $*Builtin.Int32
+  %5 = integer_literal $Builtin.Int32, 2
+  %1125 = function_ref @use : $@convention(thin) (Builtin.Int32) -> () // user: %23 
+  %1126 = apply %1125(%4) : $@convention(thin) (Builtin.Int32) -> ()
+  store %5 to %0 : $*Builtin.Int32
+  builtin "trunc_Int32_Int1"(%4 : $Builtin.Int32) : $Builtin.Int1
+  %6 = load %0 : $*Builtin.Int32
+  %11125 = function_ref @use : $@convention(thin) (Builtin.Int32) -> () // user: %23 
+  %11126 = apply %11125(%6) : $@convention(thin) (Builtin.Int32) -> ()
+  cond_br undef, bb1, bb2
+
+bb2:
+  %7 = load %0 : $*Builtin.Int32
+  %111125 = function_ref @use : $@convention(thin) (Builtin.Int32) -> () // user: %23 
+  %111126 = apply %111125(%7) : $@convention(thin) (Builtin.Int32) -> ()
+  dealloc_stack %102#0 : $*@local_storage Int32
+  dealloc_stack %101#0 : $*@local_storage Int32
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Forward store %1 and store %2 such that load %3 becomes an identity trivial cast.
+// Both loads from %0 will be eliminated.
+// CHECK-LABEL: sil @test_read_dependence_allows_forwarding_multi_bb_2 : $@convention(thin) (@inout A, A, A) -> A {
+// CHECK: bb1
+// CHECK: load
+// CHECK-NOT: load
+// CHECK: bb2
+sil @test_read_dependence_allows_forwarding_multi_bb_2 : $@convention(thin) (@inout A, A, A) -> A {
+bb0(%0 : $*A, %1 : $A, %2 : $A):
+  store %1 to %0 : $*A
+  %3 = unchecked_addr_cast %0 : $*A to $*A
+  %4 = unchecked_addr_cast %3 : $*A to $*A
+  br bb1
+
+bb1:
+  // This means that the first store is not dead.
+  %6 = load %3 : $*A
+  %7 = load %0 : $*A
+  %8 = load %0 : $*A
+  %22 = function_ref @use_a : $@convention(thin) (A) -> ()
+  %123 = apply %22(%6) : $@convention(thin) (A) -> ()
+  %223 = apply %22(%7) : $@convention(thin) (A) -> ()
+  %323 = apply %22(%8) : $@convention(thin) (A) -> ()
+  store %2 to %0 : $*A
+  cond_br undef, bb1, bb2
+
+bb2:
+  return %7 : $A
+}
