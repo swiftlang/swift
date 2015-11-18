@@ -104,7 +104,7 @@ void ReleaseDevirtualizer::run() {
     }
   }
   if (Changed) {
-    invalidateAnalysis(SILAnalysis::PreserveKind::Branches);
+    invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
   }
 }
 

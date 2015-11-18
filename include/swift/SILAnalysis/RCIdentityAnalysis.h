@@ -81,7 +81,7 @@ public:
     return new RCIdentityFunctionInfo(DA);
   }
 
-  virtual bool shouldInvalidate(SILAnalysis::PreserveKind K) override {
+  virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {
     return true;
   }
 

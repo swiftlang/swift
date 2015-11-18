@@ -333,8 +333,9 @@ void CapturePropagation::run() {
     }
   }
 
-  if (HasChanged)
-    invalidateAnalysis(SILAnalysis::PreserveKind::Branches);
+  if (HasChanged) {
+    invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
+  }
 }
 
 SILTransform *swift::createCapturePropagation() {

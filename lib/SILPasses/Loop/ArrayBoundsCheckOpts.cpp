@@ -1255,8 +1255,10 @@ public:
       if (ShouldReportBoundsChecks) { reportBoundsChecks(F); };
     }
 
-    if (Changed)
-      PM->invalidateAnalysis(F, SILAnalysis::PreserveKind::Branches);
+    if (Changed) {
+      PM->invalidateAnalysis(F,
+                          SILAnalysis::InvalidationKind::CallsAndInstructions);
+    }
   }
 };
 }

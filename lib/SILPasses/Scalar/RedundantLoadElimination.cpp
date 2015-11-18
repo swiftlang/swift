@@ -997,8 +997,9 @@ class RedundantLoadElimination : public SILFunctionTransform {
     auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
 
     RLEContext RLE(F, AA, PO->getReversePostOrder());
-    if (RLE.run())
-      invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
+    if (RLE.run()) {
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    }
   }
 
   StringRef getName() override { return "SIL Redundant Load Elimination"; }

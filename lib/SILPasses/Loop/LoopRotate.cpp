@@ -460,7 +460,7 @@ class LoopRotation : public SILFunctionTransform {
       // We preserve loop info and the dominator tree.
       DA->lockInvalidation();
       LA->lockInvalidation();
-      PM->invalidateAnalysis(F, SILAnalysis::PreserveKind::Nothing);
+      PM->invalidateAnalysis(F, SILAnalysis::InvalidationKind::WholeFunction);
       DA->unlockInvalidation();
       LA->unlockInvalidation();
     }

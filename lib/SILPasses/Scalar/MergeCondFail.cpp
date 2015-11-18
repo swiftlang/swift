@@ -47,10 +47,10 @@ public:
 
   void run() override {
     bool Changed = false;
-
+    auto *F = getFunction();
     // Merge cond_fail instructions if there is no side-effect or read in
     // between them.
-    for (auto &BB : *getFunction()) {
+    for (auto &BB : *F) {
       // Per basic block list of cond_fails to merge.
       SmallVector<CondFailInst *, 16> CondFailToMerge;
       for (auto InstIt = BB.begin(), End = BB.end(); InstIt != End;) {
@@ -80,9 +80,10 @@ public:
       if (CondFailToMerge.size() > 1)
         Changed |= mergeCondFails(CondFailToMerge);
     }
-    if (Changed)
-      PM->invalidateAnalysis(getFunction(),
-                             SILAnalysis::PreserveKind::ProgramFlow);
+    
+    if (Changed) {
+      PM->invalidateAnalysis(F, SILAnalysis::InvalidationKind::Instructions);
+    }
   }
 
   /// \brief Try to merge the cond_fail instructions. Returns true if any could

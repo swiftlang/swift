@@ -1552,8 +1552,9 @@ class COWArrayOptPass : public SILFunctionTransform {
     for (auto *L : Loops)
       HasChanged |= COWArrayOpt(RCIA, L, DA).run();
 
-    if (HasChanged)
-      invalidateAnalysis(SILAnalysis::PreserveKind::Branches);
+      if (HasChanged) {
+        invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
+      }
   }
 
   StringRef getName() override { return "SIL COW Array Optimization"; }
@@ -2286,7 +2287,7 @@ void ArrayPropertiesSpecializer::specializeLoopNest() {
 
   // We have potentially cloned a loop - invalidate loop info.
   LoopAnalysis->invalidate(Header->getParent(),
-                           SILAnalysis::PreserveKind::Nothing);
+                           SILAnalysis::InvalidationKind::Nothing);
 }
 
 namespace {
@@ -2346,7 +2347,7 @@ class SwiftArrayOptPass : public SILFunctionTransform {
       // We preserve the dominator tree. Let's invalidate everything
       // else.
       DA->lockInvalidation();
-      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::WholeFunction);
       DA->unlockInvalidation();
     }
   }

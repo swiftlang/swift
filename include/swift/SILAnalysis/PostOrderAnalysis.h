@@ -97,8 +97,8 @@ protected:
     return new PostOrderFunctionInfo(F);
   }
 
-  virtual bool shouldInvalidate(SILAnalysis::PreserveKind K) override {
-    return !(K & PreserveKind::Branches);
+  virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {
+    return K & InvalidationKind::Branches;
   }
 
 public:

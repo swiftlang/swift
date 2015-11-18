@@ -29,60 +29,46 @@ namespace swift {
   class SILAnalysis {
   public:
     /// This is a list of values that allow passes to communicate to analysis
-    /// which traits of the code were preserved. Based on this information
+    /// which traits of the code were invalidated. Based on this information
     /// the analysis can decide if it needs to be invalidated. This information
-    /// may refer to a specific function or to a list of functions depending
-    /// on the context in which it is used.
-    enum PreserveKind : unsigned {
-      /// The pass does not preserve any analysis trait.
+    /// may refer to a specific function or to the whole module depending on
+    /// the context in which it is used.
+    enum InvalidationKind : unsigned {
+      /// The pass does not change anithing.
       Nothing = 0x0,
 
-      /// The pass did not modify any call instructions.
-      ///
-      /// The intention of this preserve kind is twofold:
-      ///
-      /// 1. Allow analyses like the CallGraphAnalysis that store pointers to
-      /// apply instructions and SILFunctions to invalidate their stored
-      /// information, preventing dangling pointers.
-      /// 2. Allow analyses like the CallGraphAnalysis to know to search for new
-      /// edges in the callgraph.
-      Calls = 0x1,
+      /// The pass created, deleted or rearranged some instructions in a
+      /// function.
+      Instructions = 0x1,
 
-      /// The pass did not modify any branch edges in the CFG beyond reordering
-      /// them in the successor or predecessor list of a BB.
+      /// The pass modified some calls (apply instructions).
       ///
-      /// The intention of this preserve kind is to tell analyses like the
-      /// Dominance Analysis and the Post Order Analysis that the underlying CFG
-      /// has been changed up to reordering of branch edges in the successor or
-      /// predecessor lists of a BB. Unlike the "Calls" preservation kind this
-      /// is not meant to prevent dangling pointers. This is because all CFG
-      /// related analyses are able to store basic blocks instead of
-      /// terminators. This allows for certain useful transformations to occur
-      /// without requiring recomputation of the dominator tree or CFG post
-      /// order. Some of these transformations are:
+      /// The intention of this invalidation kind is to allow analysis that
+      /// rely on a specific call graph structure to recompute themselves.
+      Calls = 0x2,
+
+      /// A pass has invalidated some branches in the program.
       ///
-      /// 1. Converting a branch from one type of branch to another type that
-      /// preserves the CFG. Ex: Convering a checked_cast_addr_br =>
-      /// checked_cast_br.
-      /// 2. Canonicalizing a conditional branch by inverting its branch
-      /// condition.
-      Branches = 0x2,
+      /// The intention of this invalidation kind is to tell analyses like the
+      /// Dominance Analysis and the PostOrder Analysis that the underlying CFG
+      /// has been modified.
+      Branches = 0x4,
 
-      /// This is a list of combined traits that is defined to make the use of
-      /// the invalidation API more convenient.
-      ProgramFlow = Calls | Branches, // The pass changed some instructions but
-                                      // did not change the overall flow
-                                      // of the code.
-
-      /// The pass does not delete any functions.
+      /// The pass delete or created new functions.
       ///
       /// The intent behind this is so that analyses that cache
-      /// SILFunction * to be able to be invalidated and later
+      /// SILFunction* to be able to be invalidated and later
       /// recomputed so that they are not holding dangling pointers.
-      Functions = 0x4,
+      Functions = 0x8,
 
-      /// This Top in case we add a different top besides ProgramFlow.
-      All = ProgramFlow,
+      /// Convenience states:
+      WholeFunction = Calls | Branches | Instructions,
+
+      CallsAndInstructions = Calls | Instructions,
+
+      BranchesAndInstructions = Branches | Instructions,
+
+      Everything = Functions | Calls | Branches | Instructions,
     };
 
     /// A list of the known analysis.
@@ -125,10 +111,10 @@ namespace swift {
     bool isLocked() { return invalidationLock; }
 
     /// Invalidate all information in this analysis.
-    virtual void invalidate(PreserveKind K) {}
+    virtual void invalidate(InvalidationKind K) {}
 
     /// Invalidate all of the information for a specific function.
-    virtual void invalidate(SILFunction *F, PreserveKind K) {}
+    virtual void invalidate(SILFunction *F, InvalidationKind K) {}
 
     /// Verify the state of this analysis.
     virtual void verify() const {}
@@ -157,7 +143,7 @@ namespace swift {
 
     /// Return True if the analysis should be invalidated given trait \K is
     /// preserved.
-    virtual bool shouldInvalidate(SILAnalysis::PreserveKind K) = 0;
+    virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) = 0;
 
     /// A stub function that verifies the specific AnalysisTy \p A. This is
     /// meant to be overridden by subclasses.
@@ -172,7 +158,7 @@ namespace swift {
       return it.second;
     }
 
-    virtual void invalidate(SILAnalysis::PreserveKind K) override {
+    virtual void invalidate(SILAnalysis::InvalidationKind K) override {
       if (!shouldInvalidate(K)) return;
 
       for (auto D : Storage)
@@ -182,7 +168,7 @@ namespace swift {
     }
 
     virtual void invalidate(SILFunction *F,
-                            SILAnalysis::PreserveKind K) override {
+                            SILAnalysis::InvalidationKind K) override {
       if (!shouldInvalidate(K)) return;
 
       auto &it = Storage.FindAndConstruct(F);

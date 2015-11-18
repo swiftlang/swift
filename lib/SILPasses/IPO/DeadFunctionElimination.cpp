@@ -403,7 +403,7 @@ public:
         CallGraphEditor(CG).eraseFunction(F);
         NeedUpdate = true;
         CGA->lockInvalidation();
-        DFEPass->invalidateAnalysis(F, SILAnalysis::PreserveKind::Nothing);
+        DFEPass->invalidateAnalysis(F, SILAnalysis::InvalidationKind::Everything);
         CGA->unlockInvalidation();
       }
     }
@@ -510,7 +510,8 @@ public:
         if (tryToConvertExternalDefinitionIntoDeclaration(F)) {
           NeedUpdate = true;
           CGA->lockInvalidation();
-          DFEPass->invalidateAnalysis(F, SILAnalysis::PreserveKind::Nothing);
+          DFEPass->invalidateAnalysis(F,
+                                    SILAnalysis::InvalidationKind::Everything);
           CGA->unlockInvalidation();
         }
       }

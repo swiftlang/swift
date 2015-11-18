@@ -831,7 +831,7 @@ class AllocBoxToStack : public SILFunctionTransform {
       // Currently we need it invalidate it because we clone functions and
       // replace partial_apply instructions which may be used by apply
       // instructions.
-      invalidateAnalysis(SILAnalysis::PreserveKind::Branches);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
     }
   }
 

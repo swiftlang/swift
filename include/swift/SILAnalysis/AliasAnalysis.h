@@ -136,9 +136,9 @@ public:
     return getMemoryBehavior(Inst, V) == MemoryBehavior::MayHaveSideEffects;
   }
 
-  virtual void invalidate(SILAnalysis::PreserveKind K) { AliasCache.clear(); }
+  virtual void invalidate(SILAnalysis::InvalidationKind K) { AliasCache.clear(); }
 
-  virtual void invalidate(SILFunction *, SILAnalysis::PreserveKind K) {
+  virtual void invalidate(SILFunction *, SILAnalysis::InvalidationKind K) {
     invalidate(K);
   }
 };

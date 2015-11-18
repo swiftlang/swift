@@ -660,13 +660,13 @@ public:
   /// Recomputes the connection graphs for all functions the module.
   void recompute();
 
-  virtual void invalidate(PreserveKind K) {
+  virtual void invalidate(InvalidationKind K) {
     Function2Info.clear();
     Allocator.DestroyAll();
     shouldRecompute = true;
   }
   
-  virtual void invalidate(SILFunction *F, PreserveKind K) {
+  virtual void invalidate(SILFunction *F, InvalidationKind K) {
     if (FunctionInfo *FInfo = Function2Info.lookup(F)) {
       FInfo->Graph.clear();
       FInfo->KnownCallees.clear();

@@ -50,14 +50,14 @@ public:
     return *CG;
   }
 
-  virtual void invalidate(SILAnalysis::PreserveKind K) {
-    if (K & PreserveKind::Calls) return;
-
-    delete CG;
-    CG = nullptr;
+  virtual void invalidate(SILAnalysis::InvalidationKind K) {
+    if (K & InvalidationKind::Calls) {
+      delete CG;
+      CG = nullptr;
+    }
   }
 
-  virtual void invalidate(SILFunction *, SILAnalysis::PreserveKind K) {
+  virtual void invalidate(SILFunction *, SILAnalysis::InvalidationKind K) {
     invalidate(K);
   }
 

@@ -332,12 +332,12 @@ public:
   void getEffects(FunctionEffects &FE, FullApplySite FAS);
   
   /// No invalidation is needed. See comment for SideEffectAnalysis.
-  virtual void invalidate(PreserveKind K) {
+  virtual void invalidate(InvalidationKind K) {
     shouldRecompute = true;
   }
   
   /// No invalidation is needed. See comment for SideEffectAnalysis.
-  virtual void invalidate(SILFunction *F, PreserveKind K) {
+  virtual void invalidate(SILFunction *F, InvalidationKind K) {
     invalidate(K);
   }
 };

@@ -113,10 +113,11 @@ public:
 
   void run() override {
     bool Changed = false;
-    DT = PM->getAnalysis<DominanceAnalysis>()->get(getFunction());
-    PO = getAnalysis<PostOrderAnalysis>()->get(getFunction());
+    auto *F = getFunction();
+    DT = PM->getAnalysis<DominanceAnalysis>()->get(F);
+    PO = getAnalysis<PostOrderAnalysis>()->get(F);
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
-    LoopInfo = LA->get(getFunction());
+    LoopInfo = LA->get(F);
 
     auto postOrder = PO->getPostOrder();
 
@@ -149,8 +150,8 @@ public:
 
     }
 
-    if (Changed) PM->invalidateAnalysis(getFunction(),
-                             SILAnalysis::PreserveKind::ProgramFlow);
+    if (Changed) PM->invalidateAnalysis(F,
+                             SILAnalysis::InvalidationKind::Instructions);
   }
 
 

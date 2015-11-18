@@ -28,7 +28,7 @@ class ExternalDefsToDecls : public SILModuleTransform {
       if (isAvailableExternally(linkage) && F.isDefinition() &&
           !hasSharedVisibility(linkage)) {
         F.convertToDeclaration();
-        invalidateAnalysis(&F, SILAnalysis::PreserveKind::Nothing);
+        invalidateAnalysis(&F, SILAnalysis::InvalidationKind::WholeFunction);
       }
     }
   }

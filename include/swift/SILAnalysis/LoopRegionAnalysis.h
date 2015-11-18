@@ -916,8 +916,8 @@ public:
     return new LoopRegionFunctionInfo(F, POA->get(F), SLA->get(F));
   }
 
-  virtual bool shouldInvalidate(SILAnalysis::PreserveKind K) override {
-    return !(K & PreserveKind::Branches);
+  virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {
+    return K & InvalidationKind::Branches;
   }
 };
 

@@ -786,7 +786,7 @@ namespace {
   class NoReturnFolding : public SILModuleTransform {
     void run() override {
       performNoReturnFunctionProcessing(getModule());
-      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::WholeFunction);
     }
     
     StringRef getName() override { return "NoReturnFolding"; }
@@ -802,7 +802,7 @@ namespace {
   class DiagnoseUnreachable : public SILModuleTransform {
     void run() override {
       performSILDiagnoseUnreachable(getModule());
-      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::WholeFunction);
     }
 
     StringRef getName() override { return "Diagnose Unreachable"; }

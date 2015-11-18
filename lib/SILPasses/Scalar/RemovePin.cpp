@@ -164,7 +164,7 @@ public:
 
     if (Changed)
       PM->invalidateAnalysis(getFunction(),
-                             SILAnalysis::PreserveKind::ProgramFlow);
+                             SILAnalysis::InvalidationKind::Instructions);
   }
 
   /// Pin uses are safe if:

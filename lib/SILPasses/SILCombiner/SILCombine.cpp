@@ -351,7 +351,7 @@ class SILCombine : public SILFunctionTransform {
 
     if (Changed) {
       // Invalidate everything.
-      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::WholeFunction);
     }
   }
 

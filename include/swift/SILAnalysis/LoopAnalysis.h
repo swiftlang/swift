@@ -38,9 +38,8 @@ public:
     return S->getKind() == AnalysisKind::Loop;
   }
 
-  virtual bool shouldInvalidate(SILAnalysis::PreserveKind K) override {
-    bool branchesPreserved = K & PreserveKind::Branches;
-    return !branchesPreserved;
+  virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {
+    return K & InvalidationKind::Branches;
   }
 
   // Computes loop information for the given function using dominance

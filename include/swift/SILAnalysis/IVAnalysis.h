@@ -95,7 +95,7 @@ public:
   }
 
   /// For now we always invalidate.
-  virtual bool shouldInvalidate(SILAnalysis::PreserveKind K) override {
+  virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {
     return true;
   }
 };

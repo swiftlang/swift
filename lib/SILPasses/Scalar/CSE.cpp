@@ -690,8 +690,9 @@ class SILCSE : public SILFunctionTransform {
     auto *SEA = PM->getAnalysis<SideEffectAnalysis>();
 
     CSE C(RunsOnHighLevelSil, SEA);
-    if (C.processFunction(*getFunction(), DA->get(getFunction())))
-      invalidateAnalysis(SILAnalysis::PreserveKind::Branches);
+    if (C.processFunction(*getFunction(), DA->get(getFunction()))) {
+      invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
+    }
   }
 
   StringRef getName() override {

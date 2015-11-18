@@ -1056,8 +1056,9 @@ public:
     }
 
     // If we changed anything, invalidate the call graph.
-    if (Changed)
-      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
+    if (Changed) {
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
+    }
   }
 
   StringRef getName() override { return "Function Signature Optimization"; }

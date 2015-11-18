@@ -124,15 +124,14 @@ public:
     return S->getKind() == AnalysisKind::BasicCallee;
   }
 
-  virtual void invalidate(SILAnalysis::PreserveKind K) {
-    if (K & PreserveKind::Functions)
-      return;
-
-    delete Cache;
-    Cache = nullptr;
+  virtual void invalidate(SILAnalysis::InvalidationKind K) {
+    if (K & InvalidationKind::Functions) {
+      delete Cache;
+      Cache = nullptr;
+    }
   }
 
-  virtual void invalidate(SILFunction *F, PreserveKind K) { invalidate(K); }
+  virtual void invalidate(SILFunction *F, InvalidationKind K) { invalidate(K); }
 
   CalleeList getCalleeList(FullApplySite FAS) {
     if (!Cache)

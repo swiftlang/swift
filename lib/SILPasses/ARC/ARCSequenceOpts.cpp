@@ -226,24 +226,25 @@ namespace {
 class ARCSequenceOpts : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
+    auto *F = getFunction();
+
     // If ARC optimizations are disabled, don't optimize anything and bail.
     if (!getOptions().EnableARCOptimizations)
       return;
 
     auto *LA = getAnalysis<SILLoopAnalysis>();
-    auto *LI = LA->get(getFunction());
+    auto *LI = LA->get(F);
 
     // Canonicalize the loops, invalidating if we need to.
     if (EnableLoopARC) {
       auto *DA = getAnalysis<DominanceAnalysis>();
-      auto *DI = DA->get(getFunction());
+      auto *DI = DA->get(F);
 
       if (canonicalizeAllLoops(DI, LI)) {
         // We preserve loop info and the dominator tree.
         DA->lockInvalidation();
         LA->lockInvalidation();
-        PM->invalidateAnalysis(getFunction(),
-                               SILAnalysis::PreserveKind::Nothing);
+        PM->invalidateAnalysis(F, SILAnalysis::InvalidationKind::WholeFunction);
         DA->unlockInvalidation();
         LA->unlockInvalidation();
       }
@@ -251,15 +252,15 @@ class ARCSequenceOpts : public SILFunctionTransform {
 
     auto *AA = getAnalysis<AliasAnalysis>();
     auto *POTA = getAnalysis<PostOrderAnalysis>();
-    auto *RCFI = getAnalysis<RCIdentityAnalysis>()->get(getFunction());
+    auto *RCFI = getAnalysis<RCIdentityAnalysis>()->get(F);
     LoopRegionFunctionInfo *LRFI = nullptr;
 
     if (EnableLoopARC)
-      LRFI = getAnalysis<LoopRegionAnalysis>()->get(getFunction());
+      LRFI = getAnalysis<LoopRegionAnalysis>()->get(F);
 
-    if (processFunction(*getFunction(), false, AA, POTA, LRFI, LI, RCFI)) {
-      processFunction(*getFunction(), true, AA, POTA, LRFI, LI, RCFI);
-      invalidateAnalysis(SILAnalysis::PreserveKind::Branches);
+    if (processFunction(*F, false, AA, POTA, LRFI, LI, RCFI)) {
+        processFunction(*F, true, AA, POTA, LRFI, LI, RCFI);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
     }
   }
 

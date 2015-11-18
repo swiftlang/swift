@@ -319,7 +319,7 @@ class SILSROA : public SILFunctionTransform {
           " *****\n");
 
     if (runSROAOnFunction(*F))
-      invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
   StringRef getName() override { return "SROA"; }

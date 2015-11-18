@@ -517,8 +517,9 @@ class GlobalPropertyOptPass : public SILModuleTransform {
     
     bool Changed = GlobalPropertyOpt(*M).run();
     
-    if (Changed)
-      invalidateAnalysis(SILAnalysis::PreserveKind::Branches);
+    if (Changed) {
+      invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
+    }
   }
   
   StringRef getName() override { return "GlobalPropertyOpt"; }

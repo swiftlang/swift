@@ -129,14 +129,13 @@ class DCE : public SILFunctionTransform {
 
     markLive(*F);
     if (removeDead(*F)) {
-      unsigned P = SILAnalysis::PreserveKind::Nothing;
+      using InvalidationKind = SILAnalysis::InvalidationKind;
 
-      if (!BranchesChanged)
-        P |= SILAnalysis::PreserveKind::Branches;
-      if (!CallsChanged)
-        P |= SILAnalysis::PreserveKind::Calls;
+      unsigned Inv = InvalidationKind::Instructions;
+      if (CallsChanged)        Inv |= (unsigned) InvalidationKind::Calls;
+      if (BranchesChanged)     Inv |= (unsigned) InvalidationKind::Branches;
 
-      invalidateAnalysis((SILAnalysis::PreserveKind)P);
+      invalidateAnalysis(SILAnalysis::InvalidationKind(Inv));
     }
 
     LiveValues.clear();

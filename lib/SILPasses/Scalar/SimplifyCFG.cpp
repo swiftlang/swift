@@ -2636,8 +2636,8 @@ bool SimplifyCFG::run() {
 
   if (Changed) {
     // Force dominator recomputation since we modifed the cfg.
-    DA->invalidate(&Fn, SILAnalysis::PreserveKind::Nothing);
-    PDA->invalidate(&Fn, SILAnalysis::PreserveKind::Nothing);
+    DA->invalidate(&Fn, SILAnalysis::InvalidationKind::Everything);
+    PDA->invalidate(&Fn, SILAnalysis::InvalidationKind::Everything);
   }
 
   Changed |= dominatorBasedSimplify(DA, PDA);
@@ -3372,7 +3372,7 @@ public:
     if (SimplifyCFG(*getFunction(), PM, getOptions().VerifyAll,
                     EnableJumpThread)
             .run())
-      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::WholeFunction);
   }
 
   StringRef getName() override { return "Simplify CFG"; }
@@ -3409,8 +3409,9 @@ public:
     bool Changed =
         splitAllCriticalEdges(Fn, OnlyNonCondBrEdges, nullptr, nullptr);
 
-    if (Changed)
-      invalidateAnalysis(SILAnalysis::PreserveKind::Calls);
+    if (Changed) {
+      invalidateAnalysis(SILAnalysis::InvalidationKind::BranchesAndInstructions);
+    }
   }
 
   StringRef getName() override { return "Split Critical Edges"; }
@@ -3424,8 +3425,9 @@ public:
   /// The entry point to the transformation.
   void run() override {
     if (SimplifyCFG(*getFunction(), PM, getOptions().VerifyAll, false)
-            .simplifyBlockArgs())
-      invalidateAnalysis(SILAnalysis::PreserveKind::Calls);
+        .simplifyBlockArgs()) {
+      invalidateAnalysis(SILAnalysis::InvalidationKind::BranchesAndInstructions);
+    }
   }
   
   StringRef getName() override { return "Simplify Block Args"; }
@@ -3437,8 +3439,9 @@ public:
   SROABBArgs() {}
 
   void run() override {
-    if (splitBBArguments(*getFunction()))
-      invalidateAnalysis(SILAnalysis::PreserveKind::Calls);
+    if (splitBBArguments(*getFunction())) {
+      invalidateAnalysis(SILAnalysis::InvalidationKind::BranchesAndInstructions);
+    }
   }
 
   StringRef getName() override { return "SROA BB Arguments"; }

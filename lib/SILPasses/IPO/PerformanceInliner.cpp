@@ -964,12 +964,12 @@ bool SILPerformanceInliner::devirtualizeAndSpecializeApplies(
       if (NewCallee->isDefinition())
         NewRefs.insert(NewCallee);
 
-      // Invalidate analyses, but lock the call graph since we
-      // maintain it, and also indicate that we preserve branches
-      // since we've only touched applies.
+
+      // TODO: Do we need to invalidate everything at this point?
+      // What about side-effects analysis? What about type analysis?
       CGA->lockInvalidation();
       MT->invalidateAnalysis(Apply.getFunction(),
-                             SILAnalysis::PreserveKind::Branches);
+                             SILAnalysis::InvalidationKind::Everything);
       CGA->unlockInvalidation();
     }
   }
@@ -1131,7 +1131,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
 
     NewApplies.insert(NewApplies.end(), AppliesFromInlinee.begin(),
                       AppliesFromInlinee.end());
-    DA->invalidate(Caller, SILAnalysis::PreserveKind::Nothing);
+    DA->invalidate(Caller, SILAnalysis::InvalidationKind::Nothing);
     NumFunctionsInlined++;
   }
 
@@ -1208,7 +1208,8 @@ void SILPerformanceInliner::inlineDevirtualizeAndSpecialize(
         // Invalidate analyses, but lock the call graph since we
         // maintain it.
         CGA->lockInvalidation();
-        MT->invalidateAnalysis(WorkItem, SILAnalysis::PreserveKind::Nothing);
+        MT->invalidateAnalysis(WorkItem,
+                               SILAnalysis::InvalidationKind::WholeFunction);
         CGA->unlockInvalidation();
 
         // FIXME: Update inlineCallsIntoFunction to collect all

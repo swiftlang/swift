@@ -46,9 +46,8 @@ public:
     return new DominanceInfo(F);
   }
 
-  virtual bool shouldInvalidate(SILAnalysis::PreserveKind K) override {
-    bool branchesPreserved = K & PreserveKind::Branches;
-    return !branchesPreserved;
+  virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {
+    return K & InvalidationKind::Branches;
   }
 };
 
@@ -75,9 +74,8 @@ public:
     return new PostDominanceInfo(F);
   }
 
-  virtual bool shouldInvalidate(SILAnalysis::PreserveKind K) override {
-    bool branchesPreserved = K & PreserveKind::Branches;
-    return !branchesPreserved;
+  virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {
+    return K & InvalidationKind::Branches;
   }
 };
 

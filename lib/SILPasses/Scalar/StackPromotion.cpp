@@ -486,10 +486,11 @@ private:
         case StackPromoter::ChangeState::None:
           break;
         case StackPromoter::ChangeState::Insts:
-          invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
+          invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
           break;
-        case StackPromoter::ChangeState::Calls:
-          invalidateAnalysis(SILAnalysis::PreserveKind::Branches);
+        case StackPromoter::ChangeState::Calls: {
+          invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
+        }
           break;
       }
     }

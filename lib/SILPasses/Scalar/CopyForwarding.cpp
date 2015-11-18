@@ -378,8 +378,8 @@ public:
     if (HasChangedCFG) {
       // We are only invalidating the analysis that we use internally.
       // We'll invalidate the analysis that are used by other passes at the end.
-      DomAnalysis->invalidate(F, SILAnalysis::PreserveKind::Nothing);
-      PostOrder->invalidate(F, SILAnalysis::PreserveKind::Nothing);
+      DomAnalysis->invalidate(F, SILAnalysis::InvalidationKind::Everything);
+      PostOrder->invalidate(F, SILAnalysis::InvalidationKind::Everything);
     }
     CurrentDef = SILValue();
     IsLoadedFrom = false;
@@ -1071,7 +1071,7 @@ class CopyForwardingPass : public SILFunctionTransform
     // Perform NRVO
     for (auto Copy : NRVOCopies) {
       performNRVO(Copy);
-      invalidateAnalysis(SILAnalysis::PreserveKind::Branches);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
     }
 
     // Perform Copy Forwarding.
@@ -1094,11 +1094,12 @@ class CopyForwardingPass : public SILFunctionTransform
         Forwarding.forwardCopiesOf(Def, getFunction());
       } while (Forwarding.hasForwardedToCopy());
     }
-    if (Forwarding.hasChangedCFG())
+    if (Forwarding.hasChangedCFG()) {
       // We've split critical edges so we can't preserve CFG.
-      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
-    else
-      invalidateAnalysis(SILAnalysis::PreserveKind::Branches);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::WholeFunction);
+    } else {
+      invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
+      }
   }
 
   StringRef getName() override { return "Copy Forwarding"; }

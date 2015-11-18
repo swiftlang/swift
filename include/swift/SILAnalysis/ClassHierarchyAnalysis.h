@@ -45,7 +45,7 @@ public:
     return S->getKind() == AnalysisKind::ClassHierarchy;
   }
 
-  virtual void invalidate(SILAnalysis::PreserveKind K) {
+  virtual void invalidate(SILAnalysis::InvalidationKind K) {
     // Nothing can invalidate the ClassHierarchyAnalysis!
   }
 
@@ -88,7 +88,7 @@ public:
     return ProtocolImplementationsCache.count(C);
   }
 
-  virtual void invalidate(SILFunction *F, SILAnalysis::PreserveKind K) {
+  virtual void invalidate(SILFunction *F, SILAnalysis::InvalidationKind K) {
     invalidate(K);
   }
 

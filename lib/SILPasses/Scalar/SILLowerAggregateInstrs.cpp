@@ -260,8 +260,9 @@ class SILLowerAggregate : public SILFunctionTransform {
     DEBUG(llvm::dbgs() << "***** LowerAggregate on function: " <<
           F->getName() << " *****\n");
     bool Changed = processFunction(*F);
-    if (Changed)
-      invalidateAnalysis(SILAnalysis::PreserveKind::Branches);
+    if (Changed) {
+      invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
+    }
   }
 
   StringRef getName() override { return "Lower Aggregate Instructions"; }

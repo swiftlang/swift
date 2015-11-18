@@ -566,7 +566,7 @@ public:
     if (Changed) {
       LA->lockInvalidation();
       DA->lockInvalidation();
-      PM->invalidateAnalysis(F, SILAnalysis::PreserveKind::Nothing);
+      PM->invalidateAnalysis(F, SILAnalysis::InvalidationKind::WholeFunction);
       LA->unlockInvalidation();
       DA->unlockInvalidation();
     }

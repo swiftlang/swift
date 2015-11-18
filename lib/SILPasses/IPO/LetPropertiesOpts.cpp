@@ -442,7 +442,7 @@ class LetPropertiesOptPass : public SILModuleTransform
   void run() override {
     if (LetPropertiesOpt(getModule()).run()) {
       // Program flow is not changed by this pass.
-      invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
   }
 

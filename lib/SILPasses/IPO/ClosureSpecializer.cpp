@@ -866,7 +866,7 @@ public:
     // Invalidate everything since we delete calls as well as add new
     // calls and branches.
     if (Changed) {
-      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
     }
 
     // If for testing purposes we were asked to not eliminate dead closures,

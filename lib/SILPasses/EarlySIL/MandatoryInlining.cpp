@@ -485,7 +485,7 @@ class MandatoryInlining : public SILModuleTransform {
       M->eraseFunction(&F);
     }
 
-    invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
+    invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
   }
 
   StringRef getName() override { return "Mandatory Inlining"; }

@@ -217,8 +217,8 @@ public:
     }
 
     if (Changed) {
-      PM->invalidateAnalysis(getFunction(),
-                             SILAnalysis::PreserveKind::Branches);
+      PM->invalidateAnalysis(&Fn,
+                           SILAnalysis::InvalidationKind::CallsAndInstructions);
     }
   }
 };

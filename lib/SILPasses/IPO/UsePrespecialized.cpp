@@ -47,8 +47,9 @@ class UsePrespecialized: public SILModuleTransform {
   void run() override {
     auto &M = *getModule();
     for (auto &F : M) {
-      if (replaceByPrespecialized(F))
-        invalidateAnalysis(&F, SILAnalysis::PreserveKind::Branches);
+      if (replaceByPrespecialized(F)) {
+        invalidateAnalysis(&F, SILAnalysis::InvalidationKind::Everything);
+      }
     }
   }
 
