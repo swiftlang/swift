@@ -951,6 +951,7 @@ bool RLEContext::run() {
   } while (ForwardSetChanged || LastIteration);
 
   // Finally, perform the redundant load replacements.
+  llvm::DenseSet<SILInstruction *> InstsToRemove;
   bool SILChanged = false;
   for (auto &X : BBToLocState) {
     for (auto &F : X.second.getRL()) {
@@ -958,8 +959,21 @@ bool RLEContext::run() {
                          << F.second);
       SILChanged = true;
       SILValue(F.first).replaceAllUsesWith(F.second);
+      InstsToRemove.insert(F.first);
       ++NumForwardedLoads;
     }
+  }
+
+  // Erase the instructions recursively, this way, we get rid of pass
+  // dependence on DCE.
+  for (auto &X : InstsToRemove) {
+    // It is possible that the instruction still has uses, because it could be
+    // used as the replacement Value, i.e. F.second, for some other RLE pairs.
+    //
+    // TODO: we should fix this, otherwise we are missing RLE opportunities.
+    if (!X->use_empty())
+      continue;
+    recursivelyDeleteTriviallyDeadInstructions(X, true);
   }
   return SILChanged;
 }
