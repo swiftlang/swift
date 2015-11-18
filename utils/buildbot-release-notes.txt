@@ -1,5 +1,13 @@
 Latest
 ------
+* Three new doc comment fields, namely "- keyword:", "- recommended:"
+  and "- recommendedover:", allow Swift users to cooperate with code
+  completion engine to deliver more effective code completion results.
+  The "- keyword:" field specifies concepts that are not fully manifested in
+  declaration names. "- recommended:" indicates other declarations are preferred
+  to the one decorated; to the contrary, "- recommendedover:" indicates
+  the decorated declaration is preferred to those declarations whose names
+  are specified.
 
 * Designated class initializers declared as failable or throwing may now
   return nil or throw an error, respectively, before the object has been
