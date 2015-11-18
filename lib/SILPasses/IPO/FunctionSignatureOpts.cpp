@@ -12,7 +12,8 @@
 
 #define DEBUG_TYPE "sil-function-signature-opts"
 #include "swift/SILPasses/Passes.h"
-#include "swift/SILAnalysis/CallGraphAnalysis.h"
+#include "swift/SILAnalysis/BasicCalleeAnalysis.h"
+#include "swift/SILAnalysis/FunctionOrder.h"
 #include "swift/SILAnalysis/RCIdentityAnalysis.h"
 #include "swift/SILAnalysis/ARCAnalysis.h"
 #include "swift/SILPasses/Transforms.h"
@@ -981,13 +982,11 @@ public:
 
   void run() override {
     SILModule *M = getModule();
-    auto *CGA = getAnalysis<CallGraphAnalysis>();
+    auto *BCA = getAnalysis<BasicCalleeAnalysis>();
     auto *RCIA = getAnalysis<RCIdentityAnalysis>();
     llvm::BumpPtrAllocator Allocator;
 
     DEBUG(llvm::dbgs() << "**** Optimizing Function Signatures ****\n\n");
-
-    CallGraph &CG = CGA->getOrBuildCallGraph();
 
     // Construct a map from Callee -> Call Site Set.
 
@@ -1029,7 +1028,8 @@ public:
       }
     }
 
-    for (auto *F : CG.getBottomUpFunctionOrder()) {
+    BottomUpFunctionOrder BottomUpOrder(*M, BCA);
+    for (auto *F : BottomUpOrder.getFunctions()) {
       // Don't optimize callees that should not be optimized.
       if (!F->shouldOptimize())
         continue;
