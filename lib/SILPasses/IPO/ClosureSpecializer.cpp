@@ -61,9 +61,10 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SILAnalysis/CallGraphAnalysis.h"
-#include "swift/SILAnalysis/ValueTracking.h"
+#include "swift/SILAnalysis/BasicCalleeAnalysis.h"
 #include "swift/SILAnalysis/CFG.h"
+#include "swift/SILAnalysis/FunctionOrder.h"
+#include "swift/SILAnalysis/ValueTracking.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/SILInliner.h"
 #include "llvm/ADT/Statistic.h"
@@ -841,16 +842,17 @@ public:
   SILClosureSpecializerTransform() {}
 
   void run() override {
-    auto *CGA = getAnalysis<CallGraphAnalysis>();
+    auto *BCA = getAnalysis<BasicCalleeAnalysis>();
 
     bool Changed = false;
     ClosureSpecializer C;
 
-    // Specialize going bottom-up in the call graph.
-    auto &CG = CGA->getOrBuildCallGraph();
-    for (auto *F : CG.getBottomUpFunctionOrder()) {
+    BottomUpFunctionOrder Ordering(*getModule(), BCA);
 
-      // Don't optimize functions that are marked with the opt.never attribute.
+    // Specialize going bottom-up.
+    for (auto *F : Ordering.getFunctionsBottomUp()) {
+      // Don't optimize functions that are marked with the opt.never
+      // attribute.
       if (!F->shouldOptimize())
         return;
 
