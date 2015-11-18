@@ -102,14 +102,14 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
 }
 
 SILFunction::~SILFunction() {
-#ifndef NDEBUG
   // If the function is recursive, a function_ref inst inside of the function
   // will give the function a non-zero ref count triggering the assertion. Thus
   // we drop all instruction references before we erase.
+  // We also need to drop all references if instructions are allocated using
+  // an allocator that may recycle freed memory.
   dropAllReferences();
   assert(RefCount == 0 &&
          "Function cannot be deleted while function_ref's still exist");
-#endif
 }
 
 void SILFunction::setDeclContext(Decl *D) {
