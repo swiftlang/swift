@@ -3656,8 +3656,8 @@ namespace {
         SWIFT_FALLTHROUGH;
         
       case Normal: {
-        // If the enum is loadable, it's better to do this directly using values,
-        // so we don't need to RMW tag bits in place.
+        // If the enum is loadable, do this directly using values, since we
+        // have to strip spare bits from the payload.
         if (TI->isLoadable()) {
           Explosion tmpSrc;
           if (isTake)
@@ -3667,6 +3667,12 @@ namespace {
           initialize(IGF, tmpSrc, dest);
           return;
         }
+
+        // If the enum is address-only, we better not have any spare bits,
+        // otherwise we have no way of copying the original payload without
+        // destructively modifying it in place.
+        assert(PayloadTagBits.none() &&
+               "address-only multi-payload enum layout cannot use spare bits");
 
         llvm::Value *tag = loadPayloadTag(IGF, src, T);
 
@@ -3696,27 +3702,16 @@ namespace {
           swi->addCase(llvm::ConstantInt::get(tagTy, tagIndex), caseBB);
           IGF.Builder.emitBlock(caseBB);
 
-          // Temporarily clear the tag bits from the source so we can use the
-          // data.
-          // FIXME: This is totally broken if someone concurrently accesses
-          // a supposedly-immutable value as we're copying it.
-          destructiveProjectDataForLoad(IGF, T, src);
-
           // Do the take/copy of the payload.
           Address srcData = IGF.Builder.CreateBitCast(src,
                                   payloadTI.getStorageType()->getPointerTo());
           Address destData = IGF.Builder.CreateBitCast(dest,
                                     payloadTI.getStorageType()->getPointerTo());
 
-          if (isTake) {
+          if (isTake)
             payloadTI.initializeWithTake(IGF, destData, srcData, PayloadT);
-            // We don't need to preserve the old value.
-          } else {
+          else
             payloadTI.initializeWithCopy(IGF, destData, srcData, PayloadT);
-            // Replant the tag bits, if any, in the source.
-            if (PayloadTagBits.count() > 0)
-              storePayloadTag(IGF, src, tagIndex, T);
-          }
 
           // Plant spare bit tag bits, if any, into the new value.
           storePayloadTag(IGF, dest, tagIndex, T);
