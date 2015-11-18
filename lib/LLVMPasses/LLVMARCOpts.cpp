@@ -16,7 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "swift-arc-opts"
+#define DEBUG_TYPE "swift-llvm-arc-opts"
 #include "swift/LLVMPasses/Passes.h"
 #include "ARCEntryPointBuilder.h"
 #include "LLVMARCOpts.h"
@@ -971,12 +971,12 @@ static bool performGeneralOptimizations(Function &F, ARCEntryPointBuilder &B,
 char SwiftARCOpt::ID = 0;
 
 INITIALIZE_PASS_BEGIN(SwiftARCOpt,
-                      "swift-arc-optimize", "Swift ARC optimization",
+                      "swift-llvm-arc-optimize", "Swift LLVM ARC optimization",
                       false, false)
 INITIALIZE_PASS_DEPENDENCY(SwiftAAWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(SwiftRCIdentity)
 INITIALIZE_PASS_END(SwiftARCOpt,
-                    "swift-arc-optimize", "Swift ARC optimization",
+                    "swift-llvm-arc-optimize", "Swift LLVM ARC optimization",
                     false, false)
 
 // Optimization passes.
