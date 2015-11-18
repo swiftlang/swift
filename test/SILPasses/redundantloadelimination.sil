@@ -565,14 +565,7 @@ bb3:
   return %9999 : $()
 }
 
-// CHECK-LABEL: load_to_load_loop
-// CHECK: bb1
-// CHECK-NOT: load
-// CHECK: cond_br
-// CHECK: bb2
-// CHECK-NOT: load
-// CHECK: return
-sil @load_to_load_loop : $@convention(thin) () -> () {
+sil @xload_to_load_loop : $@convention(thin) () -> () {
 bb0:
   %101 = alloc_stack $Int32
   %102 = alloc_stack $Int32
