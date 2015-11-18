@@ -1392,13 +1392,13 @@ void IRGenSILFunction::emitSILFunction() {
   // Map the entry bb.
   LoweredBBs[&*CurSILFn->begin()] = LoweredBB(&*CurFn->begin(), {});
   // Create LLVM basic blocks for the other bbs.
-  for (SILBasicBlock *bb = CurSILFn->begin()->getNextNode();
-       bb != CurSILFn->end(); bb = bb->getNextNode()) {
+  for (auto bi = std::next(CurSILFn->begin()), be = CurSILFn->end(); bi != be;
+       ++bi) {
     // FIXME: Use the SIL basic block's name.
     llvm::BasicBlock *llBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
-    auto phis = emitPHINodesForBBArgs(*this, bb, llBB);
+    auto phis = emitPHINodesForBBArgs(*this, &*bi, llBB);
     CurFn->getBasicBlockList().push_back(llBB);
-    LoweredBBs[bb] = LoweredBB(llBB, std::move(phis));
+    LoweredBBs[&*bi] = LoweredBB(llBB, std::move(phis));
   }
 
   auto entry = LoweredBBs.begin();
@@ -3386,18 +3386,21 @@ static bool tryDeferFixedSizeBufferInitialization(IRGenSILFunction &IGF,
   // if the alloc_stack is dominated by copy_addrs into it on all paths.
   // For now, check only that the copy_addr is the first use within the same
   // block.
-  const SILInstruction *inst = allocInst;
-  while ((inst = inst->getNextNode()) && !isa<TermInst>(inst)) {
-    // Does this instruction use the allocation?
-    for (auto &operand : inst->getAllOperands())
-      if (operand.get() == addressValue)
-        goto is_use;
-    
-    continue;
-  
-  is_use:
+  for (auto ii = std::next(allocInst->getIterator()),
+            ie = std::prev(allocInst->getParent()->end());
+       ii != ie; ++ii) {
+    auto *inst = &*ii;
+
+    // Does this instruction use the allocation? If not, continue.
+    auto Ops = inst->getAllOperands();
+    if (std::none_of(Ops.begin(), Ops.end(),
+                     [&addressValue](const Operand &Op) {
+                       return Op.get() == addressValue;
+                     }))
+      continue;
+
     // Is this a copy?
-    auto copy = dyn_cast<swift::CopyAddrInst>(inst);
+    auto *copy = dyn_cast<swift::CopyAddrInst>(inst);
     if (!copy)
       return false;
 

@@ -1881,7 +1881,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
   }
   
   // Before the memory allocation, store zero in the control variable.
-  B.setInsertionPoint(TheMemory.MemoryInst->getNextNode());
+  B.setInsertionPoint(&*std::next(TheMemory.MemoryInst->getIterator()));
   SILValue ControlVariableAddr = ControlVariableBox;
   auto Zero = B.createIntegerLiteral(Loc, IVType, 0);
   B.createStore(Loc, Zero, ControlVariableAddr);
