@@ -416,7 +416,7 @@ extension Collection
 
 
 
-/// The lazy `Collection` returned by `reverse(c)` where `c` is a
+/// The lazy `Collection` returned by `c.reversed()` where `c` is a
 /// `Collection` with an `Index` conforming to `${IndexProtocol}`.
 public struct _prext_ReverseCollection<Base : Collection>
   : Collection, __prext_ReverseCollection {

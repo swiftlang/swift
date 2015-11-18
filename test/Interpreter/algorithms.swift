@@ -19,7 +19,7 @@ fib()
 
 // From: <rdar://problem/17796401>
 // FIXME: <rdar://problem/21993692> type checker too slow
-let two_oneA = [1, 2, 3, 4].lazy.reverse()
+let two_oneA = [1, 2, 3, 4].lazy.reversed()
 let two_one = Array(two_oneA.filter { $0 % 2 == 0 }.map { $0 / 2 })
 print(two_one)
 // CHECK: [2, 1]

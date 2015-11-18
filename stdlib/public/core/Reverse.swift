@@ -123,17 +123,17 @@ extension _ReverseCollection
 /// A Collection that presents the elements of its `Base` collection
 /// in reverse order.
 ///
-/// - Note: This type is the result of `x.reverse()` where `x` is a
+/// - Note: This type is the result of `x.reversed()` where `x` is a
 ///   collection having bidirectional indices.
 ///
-/// The `reverse()` method is always lazy when applied to a collection
+/// The `reversed()` method is always lazy when applied to a collection
 /// with bidirectional indices, but does not implicitly confer
 /// laziness on algorithms applied to its result.  In other words, for
 /// ordinary collections `c` having bidirectional indices:
 ///
-/// * `c.reverse()` does not create new storage
-/// * `c.reverse().map(f)` maps eagerly and returns a new array
-/// * `c.lazy.reverse().map(f)` maps lazily and returns a `LazyMapCollection`
+/// * `c.reversed()` does not create new storage
+/// * `c.reversed().map(f)` maps eagerly and returns a new array
+/// * `c.lazy.reversed().map(f)` maps lazily and returns a `LazyMapCollection`
 ///
 /// - See also: `ReverseRandomAccessCollection`
 public struct ReverseCollection<
@@ -163,7 +163,7 @@ public struct ReverseCollection<
 /// A Collection that presents the elements of its `Base` collection
 /// in reverse order.
 ///
-/// - Note: This type is the result of `x.reverse()` where `x` is a
+/// - Note: This type is the result of `x.reversed()` where `x` is a
 ///   collection having random access indices.
 /// - See also: `ReverseCollection`
 public struct ReverseRandomAccessCollection<
@@ -197,7 +197,7 @@ extension Collection where Index : BidirectionalIndex {
   ///
   /// - Complexity: O(1)
   @warn_unused_result
-  public func reverse() -> ReverseCollection<Self> {
+  public func reversed() -> ReverseCollection<Self> {
     return ReverseCollection(self)
   }
 }
@@ -207,7 +207,7 @@ extension Collection where Index : RandomAccessIndex {
   ///
   /// - Complexity: O(1)
   @warn_unused_result
-  public func reverse() -> ReverseRandomAccessCollection<Self> {
+  public func reversed() -> ReverseRandomAccessCollection<Self> {
     return ReverseRandomAccessCollection(self)
   }
 }
@@ -218,7 +218,7 @@ where Index : BidirectionalIndex, Elements.Index : BidirectionalIndex {
   ///
   /// - Complexity: O(1)
   @warn_unused_result
-  public func reverse() -> LazyCollection<
+  public func reversed() -> LazyCollection<
     ReverseCollection<Elements>
   > {
     return ReverseCollection(elements).lazy
@@ -231,7 +231,7 @@ where Index : RandomAccessIndex, Elements.Index : RandomAccessIndex {
   ///
   /// - Complexity: O(1)
   @warn_unused_result
-  public func reverse() -> LazyCollection<
+  public func reversed() -> LazyCollection<
     ReverseRandomAccessCollection<Elements>
   > {
     return ReverseRandomAccessCollection(elements).lazy

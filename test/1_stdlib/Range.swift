@@ -33,7 +33,7 @@ var RangeTestSuite = TestSuite("Range")
 RangeTestSuite.test("ReverseRange") {
   // We no longer have a ReverseRange, but we can still make sure that
   // lazy reversal works correctly.
-  expectEqualSequence((0..<10).lazy.reverse(), [9, 8, 7, 6, 5, 4, 3, 2, 1, 0])
+  expectEqualSequence((0..<10).lazy.reversed(), [9, 8, 7, 6, 5, 4, 3, 2, 1, 0])
 }
 
 func isEquatable<E : Equatable>(e: E) {}

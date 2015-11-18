@@ -211,20 +211,20 @@ tests.test("ForwardCollection") {
 
 tests.test("BidirectionalCollection") {
   let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
-  let fc0 = AnyForwardCollection(a0.lazy.reverse())
+  let fc0 = AnyForwardCollection(a0.lazy.reversed())
   
   let bc0_ = AnyBidirectionalCollection(fc0)         // upgrade!
   expectNotEmpty(bc0_)
   let bc0 = bc0_!
   expectTrue(fc0 === bc0)
 
-  let fc1 = AnyForwardCollection(a0.lazy.reverse()) // new collection
+  let fc1 = AnyForwardCollection(a0.lazy.reversed()) // new collection
   expectFalse(fc1 === fc0)
 
   let fc2 = AnyForwardCollection(bc0)                // downgrade
   expectTrue(fc2 === bc0)
   
-  let a1 = ContiguousArray(bc0.lazy.reverse())
+  let a1 = ContiguousArray(bc0.lazy.reversed())
   expectEqual(a0, a1)
   for e in a0 {
     let i = bc0.indexOf(e)
@@ -247,7 +247,7 @@ tests.test("BidirectionalCollection") {
 
 tests.test("RandomAccessCollection") {
   let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
-  let fc0 = AnyForwardCollection(a0.lazy.reverse())
+  let fc0 = AnyForwardCollection(a0.lazy.reversed())
   let rc0_ = AnyRandomAccessCollection(fc0)         // upgrade!
   expectNotEmpty(rc0_)
   let rc0 = rc0_!
@@ -259,7 +259,7 @@ tests.test("RandomAccessCollection") {
   let fc1 = AnyBidirectionalCollection(rc0)         // downgrade
   expectTrue(fc1 === rc0)
   
-  let a1 = ContiguousArray(rc0.lazy.reverse())
+  let a1 = ContiguousArray(rc0.lazy.reversed())
   expectEqual(a0, a1)
   for e in a0 {
     let i = rc0.indexOf(e)

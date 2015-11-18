@@ -355,7 +355,7 @@ extension Sequence {
 }
 
 //===----------------------------------------------------------------------===//
-// reverse()
+// reversed()
 //===----------------------------------------------------------------------===//
 
 extension Sequence {
@@ -364,7 +364,7 @@ extension Sequence {
   ///
   /// Complexity: O(`self.length`).
   @warn_unused_result
-  public func reverse() -> [${GElement}] {
+  public func reversed() -> [${GElement}] {
     // FIXME(performance): optimize to 1 pass?  But Array(self) can be
     // optimized to a memcpy() sometimes.  Those cases are usually collections,
     // though.

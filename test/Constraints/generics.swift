@@ -143,9 +143,9 @@ func f1<
   S: Collection 
   where S.Index: BidirectionalIndex
 >(seq: S) {
-  let x = (seq.indices).lazy.reverse()
+  let x = (seq.indices).lazy.reversed()
   SomeIterator(elements: seq, indices: x) // expected-warning{{unused}}
-  SomeIterator(elements: seq, indices: seq.indices.reverse()) // expected-warning{{unused}}
+  SomeIterator(elements: seq, indices: seq.indices.reversed()) // expected-warning{{unused}}
 }
 
 // <rdar://problem/16078944>

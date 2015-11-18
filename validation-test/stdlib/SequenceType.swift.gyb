@@ -639,14 +639,14 @@ SequenceTypeTests.test("reduce") {
 }
 
 //===----------------------------------------------------------------------===//
-// reverse()
+// reversed()
 //===----------------------------------------------------------------------===//
 
 SequenceTypeTests.test("reverse/Sequence") {
   for test in reverseTests {
     let s = MinimalSequence<OpaqueValue<Int>>(
       elements: test.sequence.map(OpaqueValue.init))
-    var result = s.reverse()
+    var result = s.reversed()
     expectType([OpaqueValue<Int>].self, &result)
     expectEqual(
       test.expected, result.map { $0.value },
@@ -659,7 +659,7 @@ SequenceTypeTests.test("reverse/WhereIndexIsBidirectional,BidirectionalReverseVi
   for test in reverseTests {
     let s = MinimalBidirectionalCollection<OpaqueValue<Int>>(
       elements: test.sequence.map(OpaqueValue.init))
-    var result = s.reverse()
+    var result = s.reversed()
     expectType(
       ReverseCollection<MinimalBidirectionalCollection<OpaqueValue<Int>>>.self,
       &result)
@@ -678,7 +678,7 @@ SequenceTypeTests.test("reverse/WhereIndexIsRandomAccess,RandomAccessReverseView
   for test in reverseTests {
     let s = MinimalRandomAccessCollection<OpaqueValue<Int>>(
       elements: test.sequence.map(OpaqueValue.init))
-    var result = s.reverse()
+    var result = s.reversed()
     expectType(
       ReverseRandomAccessCollection<MinimalRandomAccessCollection<OpaqueValue<Int>>>.self,
       &result)

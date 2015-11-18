@@ -287,12 +287,12 @@ LazyTestSuite.test("LazyCollection.array") {
 }
 
 %  if ReversedType is not None:
-LazyTestSuite.test("LazyCollection.reverse") {
+LazyTestSuite.test("LazyCollection.reversed") {
   let base = Minimal${traversal}Collection(
     elements: [ 0, 30, 10, 90 ].map(OpaqueValue.init),
     underestimatedLength: .Value(42))
   let lazyCollection = base.lazy
-  var reversed = lazyCollection.reverse()
+  var reversed = lazyCollection.reversed()
   expectType(
     LazyCollection<${ReversedType}<Minimal${traversal}Collection<OpaqueValue<Int>>>>.self,
     &reversed)
@@ -301,7 +301,7 @@ LazyTestSuite.test("LazyCollection.reverse") {
     [ 90, 10, 30, 0 ].map(OpaqueValue.init) as [OpaqueValue<Int>],
     reversed) { $0.value == $1.value }
 
-  var reversedTwice = reversed.reverse()
+  var reversedTwice = reversed.reversed()
   expectType(
     LazyCollection<${ReversedType}<${ReversedType}<Minimal${traversal}Collection<OpaqueValue<Int>>>>>.self,
     &reversedTwice)
@@ -592,23 +592,23 @@ tests.test("ReverseCollection") {
   let r = 0..<12
   checkRandomAccessCollection(
     expected,
-    r.reverse())
+    r.reversed())
 
   // Check that the reverse collection is still eager
   do {
     var calls = 0
-    _ = r.reverse().map { _ in ++calls }
+    _ = r.reversed().map { _ in ++calls }
     expectEqual(r.length, calls)
   }
   
   checkBidirectionalCollection(
     "raboof".characters,
-    "foobar".characters.reverse())
+    "foobar".characters.reversed())
 
   // Check that the reverse collection is still eager
   do {
     var calls = 0
-    _ = "foobar".characters.reverse().map { _ in ++calls }
+    _ = "foobar".characters.reversed().map { _ in ++calls }
     expectEqual("foobar".characters.length, calls)
   }
 }
@@ -633,7 +633,7 @@ tests.test("ReverseCollection/Lazy") {
     typealias LazyReversedBase = LazyCollection<
       ReverseRandomAccessCollection<Base>>
 
-    let reversed = base.reverse()
+    let reversed = base.reversed()
     ExpectType<LazyReversedBase>.test(reversed)
     
     var calls = 0
@@ -655,7 +655,7 @@ tests.test("ReverseCollection/Lazy") {
     typealias LazyReversedBase = LazyCollection<
       ReverseCollection<Base>>
 
-    let reversed = base.reverse()
+    let reversed = base.reversed()
     ExpectType<LazyReversedBase>.test(reversed)
     
     var calls = 0

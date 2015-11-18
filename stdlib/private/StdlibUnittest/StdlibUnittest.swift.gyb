@@ -105,7 +105,7 @@ public struct SourceLocStack {
 func _printStackTrace(stackTrace: SourceLocStack?) {
   guard let s = stackTrace where !s.locs.isEmpty else { return }
   print("stacktrace:")
-  for (i, loc) in s.locs.reverse().enumerated {
+  for (i, loc) in s.locs.reversed().enumerated {
     let comment = (loc.comment != nil) ? " ; \(loc.comment!)" : ""
     print("  #\(i): \(loc.file):\(loc.line)\(comment)")
   }
