@@ -276,9 +276,7 @@ updatePointsTo(CGNode *InitialNode, CGNode *pointsTo) {
       }
     }
   }
-  for (CGNode *Node : WorkList) {
-    Node->isInWorkList = false;
-  }
+  clearWorkListFlags(WorkList);
 }
 
 void EscapeAnalysis::ConnectionGraph::propagateEscapeStates() {
@@ -373,141 +371,90 @@ getUsePoints(llvm::SmallPtrSetImpl<ValueBase *> &Values, CGNode *Node) {
   }
 }
 
-bool EscapeAnalysis::ConnectionGraph::mergeCalleeGraph(FullApplySite FAS,
-                                              ConnectionGraph *CalleeGraph) {
+bool EscapeAnalysis::ConnectionGraph::mergeFrom(ConnectionGraph *SourceGraph,
+                                                CGNodeMap &Mapping) {
   // The main point of the merging algorithm is to map each content node in the
-  // callee graph to a content node in this (caller) graph. This may require to
-  // create new nodes or to merge existing nodes in the caller graph.
-  CGNodeMap Callee2CallerMapping;
-  llvm::SmallVector<CGNode *, 8> MappedNodes;
+  // source graph to a content node in this (destination) graph. This may
+  // require to create new nodes or to merge existing nodes in this graph.
 
-  // First map the callee parameters to the caller arguments.
-  SILFunction *Callee = CalleeGraph->F;
-  unsigned numCallerArgs = FAS.getNumArguments();
-  unsigned numCalleeArgs = Callee->getArguments().size();
-  assert(numCalleeArgs >= numCallerArgs);
-  for (unsigned Idx = 0; Idx < numCalleeArgs; ++Idx) {
-    // If there are more callee parameters than arguments it means that the
-    // callee is the result of a partial_apply - a thick function. A thick
-    // thick function also references the boxed partially applied arguments.
-    // Therefore we map all the extra callee paramters to the callee operand
-    // of the apply site.
-    SILValue CallerArg = (Idx < numCallerArgs ? FAS.getArgument(Idx) :
-                                                FAS.getCallee());
-    if (CGNode *CalleeNd = CalleeGraph->getNode(Callee->getArgument(Idx))) {
-      CGNode *CallerNd = getNode(CallerArg);
-      assert(CallerNd);
-      Callee2CallerMapping.insert(CalleeNd, CallerNd);
-      MappedNodes.push_back(CalleeNd);
-      CalleeNd->isInWorkList = true;
-    }
-  }
-
-  // Map the return value.
-  if (CalleeGraph->ReturnNode) {
-    ValueBase *CallerReturnVal = nullptr;
-    if (auto *TAI = dyn_cast<TryApplyInst>(FAS.getInstruction())) {
-      CallerReturnVal = TAI->getNormalBB()->getBBArg(0);
-    } else {
-      CallerReturnVal = FAS.getInstruction();
-    }
-    CGNode *CallerRetNd = getNode(CallerReturnVal);
-    assert(CallerRetNd);
-    Callee2CallerMapping.insert(CalleeGraph->ReturnNode, CallerRetNd);
-    MappedNodes.push_back(CalleeGraph->ReturnNode);
-    CalleeGraph->ReturnNode->isInWorkList = true;
-  }
-
-  // First step: replicate the points-to edges and the content nodes in the
-  // caller graph.
+  // First step: replicate the points-to edges and the content nodes of the
+  // source graph in this graph.
   bool Changed = false;
   bool NodesMerged;
   do {
     NodesMerged = false;
-    for (unsigned Idx = 0; Idx < MappedNodes.size(); ++Idx) {
-      CGNode *CalleeNd = MappedNodes[Idx];
-      CGNode *CallerNd = Callee2CallerMapping.get(CalleeNd);
-      assert(CallerNd);
+    for (unsigned Idx = 0; Idx < Mapping.getMappedNodes().size(); ++Idx) {
+      CGNode *SourceNd = Mapping.getMappedNodes()[Idx];
+      CGNode *DestNd = Mapping.get(SourceNd);
+      assert(DestNd);
       
-      if (CalleeNd->getEscapeState() >= EscapeState::Global) {
-        // We don't need to merge the callee subgraph of nodes which have the
+      if (SourceNd->getEscapeState() >= EscapeState::Global) {
+        // We don't need to merge the source subgraph of nodes which have the
         // global escaping state set.
         // Just set global escaping in the caller node and that's it.
-        Changed |= CallerNd->mergeEscapeState(EscapeState::Global);
+        Changed |= DestNd->mergeEscapeState(EscapeState::Global);
         continue;
       }
 
-      CGNode *CalleePT = CalleeNd->pointsTo;
-      if (!CalleePT)
+      CGNode *SourcePT = SourceNd->pointsTo;
+      if (!SourcePT)
         continue;
 
-      CGNode *MappedCallerPT = Callee2CallerMapping.get(CalleePT);
-      if (!CallerNd->pointsTo) {
+      CGNode *MappedDestPT = Mapping.get(SourcePT);
+      if (!DestNd->pointsTo) {
         // The following getContentNode() will create a new content node.
         Changed = true;
       }
-      CGNode *CallerPT = getContentNode(CallerNd);
-      if (MappedCallerPT) {
-        // We already found the caller node through another path.
-        if (CallerPT != MappedCallerPT) {
-          // There are two content nodes in the caller which map to the same
-          // content node in the callee -> we have to merge the caller nodes.
-          scheduleToMerge(CallerPT, MappedCallerPT);
+      CGNode *DestPT = getContentNode(DestNd);
+      if (MappedDestPT) {
+        // We already found the destination node through another path.
+        if (DestPT != MappedDestPT) {
+          // There are two content nodes in this graph which map to the same
+          // content node in the source graph -> we have to merge them.
+          scheduleToMerge(DestPT, MappedDestPT);
           mergeAllScheduledNodes();
           Changed = true;
           NodesMerged = true;
         }
+        assert(SourcePT->isInWorkList);
       } else {
-        // It's the first time we see the caller node, so we add it to the
+        // It's the first time we see the destination node, so we add it to the
         // mapping.
-        Callee2CallerMapping.insert(CalleePT, CallerPT);
-      }
-      if (!CalleePT->isInWorkList) {
-        MappedNodes.push_back(CalleePT);
-        CalleePT->isInWorkList = true;
+        Mapping.add(SourcePT, DestPT);
       }
     }
   } while (NodesMerged);
 
-  for (CGNode *CalleeNd : MappedNodes) {
-    CalleeNd->isInWorkList = false;
-  }
+  clearWorkListFlags(Mapping.getMappedNodes());
 
-  // Second step: add the callee's graph defer edges to the caller graph.
-  for (CGNode *CalleeNd : MappedNodes) {
-    Changed |= addDeferEdgesFromCallee(CalleeNd, Callee2CallerMapping);
-  }
-  return Changed;
-}
-
-bool EscapeAnalysis::ConnectionGraph::addDeferEdgesFromCallee(
-                  CGNode *CalleeSource, const CGNodeMap &Callee2CallerMapping) {
+  // Second step: add the source graph's defer edges to this graph.
   llvm::SmallVector<CGNode *, 8> WorkList;
-  WorkList.push_back(CalleeSource);
-  CalleeSource->isInWorkList = true;
-  CGNode *Source = Callee2CallerMapping.get(CalleeSource);
-  assert(Source && "node should have been merged to caller graph");
-  
-  // Collect all nodes which are reachable from the CalleeSource via a path
-  // which only contains defer-edges.
-  bool Changed = false;
-  for (unsigned Idx = 0; Idx < WorkList.size(); ++Idx) {
-    CGNode *CalleeNode = WorkList[Idx];
-    CGNode *Node = Callee2CallerMapping.get(CalleeNode);
-    // Create the edge in the caller graph. Note: this may trigger merging of
-    // content nodes in the caller graph.
-    if (Node)
-      Changed |= defer(Source, Node);
+  for (CGNode *SourceNd : Mapping.getMappedNodes()) {
+    assert(WorkList.empty());
+    WorkList.push_back(SourceNd);
+    SourceNd->isInWorkList = true;
+    CGNode *DestFrom = Mapping.get(SourceNd);
+    assert(DestFrom && "node should have been merged to the graph");
 
-    for (auto *Defered : CalleeNode->defersTo) {
-      if (!Defered->isInWorkList) {
-        WorkList.push_back(Defered);
-        Defered->isInWorkList = true;
+    // Collect all nodes which are reachable from the SourceNd via a path
+    // which only contains defer-edges.
+    for (unsigned Idx = 0; Idx < WorkList.size(); ++Idx) {
+      CGNode *SourceReachable = WorkList[Idx];
+      CGNode *DestReachable = Mapping.get(SourceReachable);
+      // Create the edge in this graph. Note: this may trigger merging of
+      // content nodes.
+      if (DestReachable)
+        Changed |= defer(DestFrom, DestReachable);
+
+      for (auto *Defered : SourceReachable->defersTo) {
+        if (!Defered->isInWorkList) {
+          WorkList.push_back(Defered);
+          Defered->isInWorkList = true;
+        }
       }
     }
-  }
-  for (CGNode *CalleeNode : WorkList) {
-    CalleeNode->isInWorkList = false;
+    clearWorkListFlags(WorkList);
+    WorkList.clear();
   }
   return Changed;
 }
@@ -588,7 +535,8 @@ CGForDotView::CGForDotView(const EscapeAnalysis::ConnectionGraph *CG) :
 std::string CGForDotView::getNodeLabel(const Node *Node) const {
   std::string Label;
   llvm::raw_string_ostream O(Label);
-  O << '%' << InstToIDMap.lookup(Node->OrigNode->V) << '\n';
+  if (ValueBase *V = Node->OrigNode->V)
+    O << '%' << InstToIDMap.lookup(V) << '\n';
   
   switch (Node->OrigNode->Type) {
     case swift::EscapeAnalysis::NodeType::Content:
@@ -614,7 +562,8 @@ std::string CGForDotView::getNodeLabel(const Node *Node) const {
   if (!Node->OrigNode->matchPointToOfDefers()) {
     O << "\nPT mismatch: ";
     if (Node->OrigNode->pointsTo) {
-      O << '%' << Node->Graph->InstToIDMap[Node->OrigNode->pointsTo->V];
+      if (ValueBase *V = Node->OrigNode->pointsTo->V)
+        O << '%' << Node->Graph->InstToIDMap[V];
     } else {
       O << "null";
     }
@@ -730,7 +679,12 @@ void EscapeAnalysis::ConnectionGraph::viewCG() const {
 }
 
 void EscapeAnalysis::CGNode::dump() const {
-  llvm::errs() << getTypeStr() << ": " << *V;
+  llvm::errs() << getTypeStr();
+  if (V)
+    llvm::errs() << ": " << *V;
+  else
+    llvm::errs() << '\n';
+
   if (mergeTo) {
     llvm::errs() << "   -> merged to ";
     mergeTo->dump();
@@ -761,6 +715,7 @@ void EscapeAnalysis::ConnectionGraph::print(llvm::raw_ostream &OS) const {
 
   // Assign the same IDs to SILValues as the SILPrinter does.
   llvm::DenseMap<const ValueBase *, unsigned> InstToIDMap;
+  InstToIDMap[nullptr] = (unsigned)-1;
   F->numberValues(InstToIDMap);
 
   // Assign consecutive subindices for nodes which map to the same value.
@@ -782,12 +737,14 @@ void EscapeAnalysis::ConnectionGraph::print(llvm::raw_ostream &OS) const {
 
   auto NodeStr = [&](CGNode *Nd) -> std::string {
     std::string Str;
-    llvm::raw_string_ostream OS(Str);
-    OS << '%' << InstToIDMap[Nd->V];
-    unsigned Idx = Node2Subindex[Nd];
-    if (Idx != 0)
-      OS << '.' << Idx;
-    OS.flush();
+    if (Nd->V) {
+      llvm::raw_string_ostream OS(Str);
+      OS << '%' << InstToIDMap[Nd->V];
+      unsigned Idx = Node2Subindex[Nd];
+      if (Idx != 0)
+        OS << '.' << Idx;
+      OS.flush();
+    }
     return Str;
   };
 
@@ -1227,7 +1184,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       break;
     case ValueKind::ReturnInst:
       if (CGNode *ValueNd = ConGraph->getNode(cast<ReturnInst>(I)->getOperand())) {
-        ConGraph->defer(ConGraph->getReturnNode(cast<ReturnInst>(I)),
+        ConGraph->defer(ConGraph->getReturnNode(),
                                  ValueNd);
       }
       return;
@@ -1362,7 +1319,7 @@ bool EscapeAnalysis::mergeAllCallees(ConnectionGraph *ConGraph, CallGraph &CG) {
       ConnectionGraph *CalleeCG = getConnectionGraph(Callee);
       assert(CalleeCG);
       assert (CalleeCG != ConGraph && "no support for CG self cycles yet");
-      Changed |= ConGraph->mergeCalleeGraph(FAS, CalleeCG);
+      Changed |= mergeCalleeGraph(FAS, ConGraph, CalleeCG);
     }
   }
 
@@ -1372,6 +1329,62 @@ bool EscapeAnalysis::mergeAllCallees(ConnectionGraph *ConGraph, CallGraph &CG) {
   }
   return false;
 }
+
+bool EscapeAnalysis::mergeCalleeGraph(FullApplySite FAS,
+                                      ConnectionGraph *CallerGraph,
+                                      ConnectionGraph *CalleeGraph) {
+  CGNodeMap Callee2CallerMapping;
+
+  // First map the callee parameters to the caller arguments.
+  SILFunction *Callee = CalleeGraph->getFunction();
+  unsigned numCallerArgs = FAS.getNumArguments();
+  unsigned numCalleeArgs = Callee->getArguments().size();
+  assert(numCalleeArgs >= numCallerArgs);
+  for (unsigned Idx = 0; Idx < numCalleeArgs; ++Idx) {
+    // If there are more callee parameters than arguments it means that the
+    // callee is the result of a partial_apply - a thick function. A thick
+    // function also references the boxed partially applied arguments.
+    // Therefore we map all the extra callee paramters to the callee operand
+    // of the apply site.
+    SILValue CallerArg = (Idx < numCallerArgs ? FAS.getArgument(Idx) :
+                          FAS.getCallee());
+    if (CGNode *CalleeNd = CalleeGraph->getNode(Callee->getArgument(Idx))) {
+      Callee2CallerMapping.add(CalleeNd, CallerGraph->getNode(CallerArg));
+    }
+  }
+
+  // Map the return value.
+  if (CGNode *RetNd = CalleeGraph->getReturnNodeOrNull()) {
+    ValueBase *CallerReturnVal = nullptr;
+    if (auto *TAI = dyn_cast<TryApplyInst>(FAS.getInstruction())) {
+      CallerReturnVal = TAI->getNormalBB()->getBBArg(0);
+    } else {
+      CallerReturnVal = FAS.getInstruction();
+    }
+    CGNode *CallerRetNd = CallerGraph->getNode(CallerReturnVal);
+    Callee2CallerMapping.add(RetNd, CallerRetNd);
+  }
+  return CallerGraph->mergeFrom(CalleeGraph, Callee2CallerMapping);
+}
+
+void EscapeAnalysis::createSummaryGraph(ConnectionGraph *SummaryGraph,
+                                        ConnectionGraph *Graph) {
+
+  // Make a 1-to-1 mapping of all arguments and the return value.
+  CGNodeMap Mapping;
+  SILFunction *F = Graph->getFunction();
+  for (SILArgument *Arg : F->getArguments()) {
+    if (CGNode *ArgNd = Graph->getNode(Arg)) {
+      Mapping.add(ArgNd, SummaryGraph->getNode(Arg));
+    }
+  }
+  if (CGNode *RetNd = Graph->getReturnNodeOrNull()) {
+    Mapping.add(RetNd, SummaryGraph->getReturnNode());
+  }
+  // Merging actually creates the summary graph.
+  SummaryGraph->mergeFrom(Graph, Mapping);
+}
+
 
 void EscapeAnalysis::finalizeGraphConservatively(ConnectionGraph *ConGraph) {
   for (FullApplySite FAS : ConGraph->getKnownCallees()) {

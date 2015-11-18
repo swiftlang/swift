@@ -281,18 +281,33 @@ private:
 
   /// Mapping from nodes in a calleee-graph to nodes in a caller-graph.
   class CGNodeMap {
+    /// The map itself.
     llvm::DenseMap<CGNode *, CGNode *> Map;
+
+    /// The list of source nodes (= keys in Map), which is used as a work-list.
+    llvm::SmallVector<CGNode *, 8> MappedNodes;
   public:
-    void insert(CGNode *From, CGNode *To) {
-      assert(!From->isMerged && !To->isMerged);
+
+    /// Adds a mapping and pushes the \p From node into the work-list
+    /// MappedNodes.
+    void add(CGNode *From, CGNode *To) {
+      assert(From && To && !From->isMerged && !To->isMerged);
       Map[From] = To;
+      if (!From->isInWorkList) {
+        MappedNodes.push_back(From);
+        From->isInWorkList = true;
+      }
     }
+    /// Looks up a node in the mapping.
     CGNode *get(CGNode *From) const {
       auto Iter = Map.find(From);
       if (Iter == Map.end())
         return nullptr;
 
       return Iter->second->getMergeTarget();
+    }
+    const SmallVectorImpl<CGNode *> &getMappedNodes() const {
+      return MappedNodes;
     }
   };
 
@@ -387,9 +402,13 @@ public:
     /// content node is scheduled to be merged with \p pointsTo.
     void updatePointsTo(CGNode *InitialNode, CGNode *pointsTo);
 
-    /// Merges all defer-edges from the callee graph.
-    bool addDeferEdgesFromCallee(CGNode *CalleeSource,
-                                   const CGNodeMap &Callee2CallerMapping);
+    /// Utility function to clear the isInWorkList flags of all nodes in
+    /// \p WorkList.
+    static void clearWorkListFlags(const SmallVectorImpl<CGNode *> &WorkList) {
+      for (CGNode *Node : WorkList) {
+        Node->isInWorkList = false;
+      }
+    }
 
   public:
     /// Constructs a connection graph for a function.
@@ -434,11 +453,16 @@ public:
     CGNode *getContentNode(CGNode *AddrNode);
 
     /// Get or creates a pseudo node for the function return value.
-    CGNode *getReturnNode(ReturnInst *RI) {
+    CGNode *getReturnNode() {
       if (!ReturnNode) {
-        ReturnNode = allocNode(RI, NodeType::Return);
+        ReturnNode = allocNode(nullptr, NodeType::Return);
         ReturnNode->mergeEscapeState(EscapeState::Arguments);
       }
+      return ReturnNode;
+    }
+
+    /// Returns the node for the function return value if present.
+    CGNode *getReturnNodeOrNull() const {
       return ReturnNode;
     }
 
@@ -504,8 +528,9 @@ public:
     /// e.g. release or apply instructions.
     void getUsePoints(llvm::SmallPtrSetImpl<ValueBase *> &Values, CGNode *Node);
 
-    /// Merges the graph of a callee function (called by \p FAS) into this graph.
-    bool mergeCalleeGraph(FullApplySite FAS, ConnectionGraph *CalleeGraph);
+    /// Merges the \p SourceGraph into this graph. The \p Mapping contains the
+    /// initial node mapping of the nodes to start the merge.
+    bool mergeFrom(ConnectionGraph *SourceGraph, CGNodeMap &Mapping);
 
     /// Propagates the escape states through the graph.
     void propagateEscapeStates();
@@ -583,6 +608,17 @@ private:
 
   /// Merge the graphs of all known callees into this graph.
   bool mergeAllCallees(ConnectionGraph *ConGraph, CallGraph &CG);
+
+  /// Merges the graph of a callee function into the graph of
+  /// a caller function, whereas \p FAS is the call-site.
+  bool mergeCalleeGraph(FullApplySite FAS,
+                        ConnectionGraph *CallerGraph,
+                        ConnectionGraph *CalleeGraph);
+
+  /// Create a summary graph \p SummaryGraph from \p Graph. It just contains
+  /// the content nodes of \p Graph.
+  void createSummaryGraph(ConnectionGraph *SummaryGraph,
+                          ConnectionGraph *Graph);
 
   /// Set all arguments and return values of all callees to global escaping.
   void finalizeGraphConservatively(ConnectionGraph *ConGraph);
