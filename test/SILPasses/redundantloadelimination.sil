@@ -104,6 +104,69 @@ sil @escaped_a_ptr : $@convention(thin) (@out A) -> ()
 sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
 sil @init_twofield : $@convention(thin) (@thin TwoField.Type) -> TwoField
 
+// Check that we don't crash if the address is an unchecked_addr_cast.
+// CHECK-LABEL: sil @test_unchecked_addr_cast
+// CHECK-NOT: load
+// CHECK: return
+sil @test_unchecked_addr_cast : $@convention(thin) (@inout A, A) -> A {
+bb0(%0 : $*A, %1 : $A):
+  %2 = unchecked_addr_cast %0 : $*A to $*A
+  store %1 to %2 : $*A
+  %l1 = load %2 : $*A
+  return %l1 : $A
+}
+
+// Multi-BB version of the previous test.
+// CHECK-LABEL: sil @test_forwarding_ignoring_unchecked_addr_cast2 : $@convention(thin) (@inout A, A, A) -> A {
+// CHECK: bb1
+// CHECK-NOT: load
+// CHECK: cond_br
+sil @test_forwarding_ignoring_unchecked_addr_cast2 : $@convention(thin) (@inout A, A, A) -> A {
+bb0(%0 : $*A, %1 : $A, %2: $A):
+  %3 = unchecked_addr_cast %0 : $*A to $*A
+  store %1 to %3 : $*A
+  br bb1
+
+bb1:
+  %5 = load %3 : $*A
+  %6 = load %3 : $*A
+  store %2 to %3 : $*A
+  cond_br undef, bb1, bb2
+
+bb2:
+  return %5 : $A
+}
+
+// CHECK-LABEL: sil @test_read_dependence_allows_forwarding_multi_bb_1 : $@convention(thin) (@inout A, A) -> A {
+// CHECK: bb0
+// CHECK: store
+// CHECK: bb1
+// CHECK: store
+// CHECK-NOT: load 
+// CHECK: cond_br
+sil @test_read_dependence_allows_forwarding_multi_bb_1 : $@convention(thin) (@inout A, A) -> A {
+bb0(%0 : $*A, %1 : $A):
+  store %1 to %0 : $*A
+  %2 = unchecked_addr_cast %0 : $*A to $*A
+  %3 = unchecked_addr_cast %2 : $*A to $*A
+  br bb1
+
+bb1:
+  // This means that the first store is not dead.
+  %4 = load %3 : $*A
+  // But we still should be able to forward this load.
+  %5 = load %0 : $*A
+  // We need to dedup this store to trigger the self loop
+  // forwarding. Once we do the full optimistic data flow this will no
+  // longer be needed.
+  %6 = load %0 : $*A
+  store %1 to %0 : $*A
+  cond_br undef, bb1, bb2
+
+bb2:
+  return %5 : $A
+}
+
 // DISABLE this test for now. it seems DCE is not getting rid of the load in bb8 after the RLE happens.
 //
 // Make sure the switch does not affect the forwarding of the load.
