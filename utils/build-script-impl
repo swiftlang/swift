@@ -1242,6 +1242,24 @@ function should_build_perftestsuite() {
     echo $(true_false "${BUILD_SWIFT_PERF_TESTSUITE}")
 }
 
+function set_swiftpm_bootstrap_command() {
+    swiftpm_bootstrap_command=()
+    
+    SWIFTC_BIN="$(build_directory_bin $deployment_target swift)/swiftc"
+    LLBUILD_BIN="$(build_directory_bin $deployment_target llbuild)/swift-build-tool"
+    if [ ! -e "${LLBUILD_BIN}" ]; then
+        echo "Error: Cannot build swiftpm without llbuild (swift-build-tool)."
+        exit 1
+    fi
+    swiftpm_bootstrap_command=("${SWIFTPM_SOURCE_DIR}/Utilities/bootstrap" "${swiftpm_bootstrap_options[@]}")
+    if [[ "${VERBOSE_BUILD}" ]] ; then
+        swiftpm_bootstrap_command=("${swiftpm_bootstrap_command[@]}" -v)
+    fi
+    swiftpm_bootstrap_command=("${swiftpm_bootstrap_command[@]}" --swiftc="${SWIFTC_BIN}")
+    swiftpm_bootstrap_command=("${swiftpm_bootstrap_command[@]}" --sbt="${LLBUILD_BIN}")
+    swiftpm_bootstrap_command=("${swiftpm_bootstrap_command[@]}" --build="${build_dir}")
+}
+
 mkdir -p "${BUILD_DIR}"
 
 #
@@ -1680,16 +1698,9 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 )
                 ;;
             swiftpm)
-                SWIFTC_BIN="$(build_directory_bin $deployment_target swift)/swiftc"
-                LLBUILD_BIN="$(build_directory_bin $deployment_target llbuild)/swift-build-tool"
-                if [ ! -e "${LLBUILD_BIN}" ]; then
-                    echo "Error: Cannot build swiftpm without llbuild (swift-build-tool)."
-                    exit 1
-                fi
+                set_swiftpm_bootstrap_command
                 set -x
-                "$SWIFTPM_SOURCE_DIR"/Utilities/bootstrap -v "${swiftpm_bootstrap_options[@]}" \
-                                     --swiftc="${SWIFTC_BIN}" --sbt="${LLBUILD_BIN}" \
-                                     --build="${build_dir}"
+                "${swiftpm_bootstrap_command[@]}"
                 { set +x; } 2>/dev/null
                 
                 # swiftpm installs itself with a bootstrap method. No further cmake building is performed.
@@ -1997,24 +2008,14 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 if [[ -z "${INSTALL_SWIFTPM}" ]] ; then
                     continue
                 fi
-                SWIFTC_BIN="$(build_directory_bin $deployment_target swift)/swiftc"
-                LLBUILD_BIN="$(build_directory_bin $deployment_target llbuild)/swift-build-tool"
-                if [ ! -e "${LLBUILD_BIN}" ]; then
-                    echo "Error: Cannot install swiftpm without llbuild (swift-build-tool)."
-                    exit 1
-                fi
-
                 if [[ -z "${INSTALL_DESTDIR}" ]] ; then
                     echo "error: --install-destdir is required"
                     exit 1
                 fi
 
                 echo "--- Installing ${product} ---"
-                build_dir=$(build_directory $deployment_target $product)
                 set -x
-                "$SWIFTPM_SOURCE_DIR"/Utilities/bootstrap -v "${swiftpm_bootstrap_options[@]}" \
-                                     --swiftc="${SWIFTC_BIN}" --sbt="${LLBUILD_BIN}" \
-                                     --build="${build_dir}" --prefix="${INSTALL_DESTDIR}"/"${INSTALL_PREFIX}" install
+                "${swiftpm_bootstrap_command[@]}" --prefix="${INSTALL_DESTDIR}"/"${INSTALL_PREFIX}" install
                 { set +x; } 2>/dev/null
                 # As swiftpm bootstraps the installation itself, we break early here.
                 continue
