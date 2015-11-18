@@ -132,10 +132,7 @@ void *SILModule::allocate(unsigned Size, unsigned Align) const {
 }
 
 void *SILModule::allocateInst(unsigned Size, unsigned Align) const {
-  if (true || getASTContext().LangOpts.UseMalloc)
-    return AlignedAlloc(Size, Align);
-
-  return BPA.Allocate(Size, Align);
+  return AlignedAlloc(Size, Align);
 }
 
 SILWitnessTable *
