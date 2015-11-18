@@ -49,10 +49,10 @@ enum class StructTypeInfoKind {
   FixedStructTypeInfo,
   ClangRecordTypeInfo,
   NonFixedStructTypeInfo,
+  ResilientStructTypeInfo
 };
 
 static StructTypeInfoKind getStructTypeInfoKind(const TypeInfo &type) {
-  // FIXME: check that this is not a resilient struct type
   return (StructTypeInfoKind) type.getSubclassKind();
 }
 
@@ -718,6 +718,8 @@ private:
     return structTI.as<FixedStructTypeInfo>().op(IGF, __VA_ARGS__);    \
   case StructTypeInfoKind::NonFixedStructTypeInfo:                     \
     return structTI.as<NonFixedStructTypeInfo>().op(IGF, __VA_ARGS__); \
+  case StructTypeInfoKind::ResilientStructTypeInfo:                    \
+    llvm_unreachable("resilient structs are opaque");                  \
   }                                                                    \
   llvm_unreachable("bad struct type info kind!");                      \
 } while(0)
@@ -758,7 +760,9 @@ namespace {
   {
   public:
     ResilientStructTypeInfo(llvm::Type *T)
-      : ResilientTypeInfo(T) { }
+      : ResilientTypeInfo(T) {
+      setSubclassKind((unsigned) StructTypeInfoKind::ResilientStructTypeInfo);
+    }
   };
 }
 
