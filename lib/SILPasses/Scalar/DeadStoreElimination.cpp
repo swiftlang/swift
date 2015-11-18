@@ -124,7 +124,8 @@ constexpr unsigned MaxPartialDeadStoreCountLimit = 1;
 /// initialized to the intersection of WriteSetIns of all successors of the
 /// basic block.
 ///
-/// Initially WriteSetIn is set to true. After the basic block is processed, if its
+/// Initially WriteSetIn is set to true. After the basic block is processed, if
+/// its
 /// WriteSetOut is different from WriteSetIn, WriteSetIn is initialized to the
 /// value of WriteSetOut and the data flow is rerun.
 ///
@@ -196,7 +197,7 @@ public:
     //
     WriteSetIn.resize(MemLocationCount, true);
     WriteSetOut.resize(MemLocationCount, false);
-   
+
     // GenSet and KillSet initially empty.
     BBGenSet.resize(MemLocationCount, false);
     BBKillSet.resize(MemLocationCount, false);
@@ -260,7 +261,7 @@ class DSEContext {
   llvm::BumpPtrAllocator BPA;
 
   /// Map every basic block to its location state.
-  llvm::DenseMap<SILBasicBlock *, BBState*> BBToLocState;
+  llvm::DenseMap<SILBasicBlock *, BBState *> BBToLocState;
 
   /// Keeps the actual BBStates.
   std::vector<BBState> BBStates;
@@ -362,6 +363,7 @@ class DSEContext {
   /// projection path.
   SILValue createExtract(SILValue Base, Optional<ProjectionPath> &Path,
                          SILInstruction *Inst, bool IsValExtract);
+
 public:
   /// Constructor.
   DSEContext(SILFunction *F, SILModule *M, SILPassManager *PM,
@@ -457,7 +459,7 @@ void DSEContext::mergeSuccessorStates(SILBasicBlock *BB) {
         continue;
       C->startTrackingMemLocation(i);
     }
-     return;
+    return;
   }
 
   // Use the first successor as the base condition.
@@ -483,7 +485,7 @@ void DSEContext::invalidateMemLocationBase(SILInstruction *I,
     }
     return;
   }
-  
+
   for (unsigned i = 0; i < S->MemLocationCount; ++i) {
     if (!S->WriteSetOut.test(i))
       continue;
@@ -585,7 +587,7 @@ void DSEContext::processRead(SILInstruction *I, BBState *S, SILValue Mem,
   // Make sure that the MemLocation getType() returns the same type as the
   // loaded type.
   if (auto *LI = dyn_cast<LoadInst>(I)) {
-    (void) LI;
+    (void)LI;
     assert(LI->getOperand().getType().getObjectType() == L.getType() &&
            "MemLocation returns different type");
   }
@@ -602,7 +604,7 @@ void DSEContext::processRead(SILInstruction *I, BBState *S, SILValue Mem,
   } else {
     for (auto &E : Locs) {
       // This is the last iteration, compute WriteSetOut and perform the dead
-      // store elimination. 
+      // store elimination.
       updateWriteSetForRead(I, S, getMemLocationBit(E));
     }
   }
@@ -634,8 +636,8 @@ void DSEContext::processWrite(SILInstruction *I, BBState *S, SILValue Val,
   // Make sure that the MemLocation getType() returns the same type as the
   // stored type.
   if (auto *SI = dyn_cast<StoreInst>(I)) {
-    (void) SI;
-    assert(SI->getDest().getType().getObjectType() == L.getType() && 
+    (void)SI;
+    assert(SI->getDest().getType().getObjectType() == L.getType() &&
            "MemLocation returns different type");
   }
 
@@ -647,14 +649,14 @@ void DSEContext::processWrite(SILInstruction *I, BBState *S, SILValue Val,
   llvm::BitVector V(Locs.size());
   if (BuildGenKillSet) {
     for (auto &E : Locs) {
-        // Only building the gen and kill sets here.
-        updateGenKillSetForWrite(I, S, getMemLocationBit(E));
+      // Only building the gen and kill sets here.
+      updateGenKillSetForWrite(I, S, getMemLocationBit(E));
     }
   } else {
     unsigned idx = 0;
     for (auto &E : Locs) {
       // This is the last iteration, compute WriteSetOut and perform the dead
-      // store elimination. 
+      // store elimination.
       if (updateWriteSetForWrite(I, S, getMemLocationBit(E)))
         V.set(idx);
       Dead &= V.test(idx);
@@ -834,7 +836,8 @@ void DSEContext::run() {
   // vector to the approproate size.
   //
   // DenseMap has a minimum size of 64, while many functions do not have over
-  // 64 basic blocks. Therefore, allocate the BBState in a vector and use pointer
+  // 64 basic blocks. Therefore, allocate the BBState in a vector and use
+  // pointer
   // in BBToLocState to access them.
   for (auto &B : *F) {
     BBStates.push_back(BBState(&B));
@@ -860,7 +863,7 @@ void DSEContext::run() {
     WorkList.push_back(B);
   }
 
-  while(!WorkList.empty()) {
+  while (!WorkList.empty()) {
     SILBasicBlock *BB = WorkList.pop_back_val();
     if (processBasicBlockWithGenKillSet(BB)) {
       for (auto X : BB->getPreds())
