@@ -696,7 +696,6 @@ protocol B23086402 {
 
 // <rdar://problem/23550816> QoI: Poor diagnostic in argument list of "print" (varargs related)
 func test23086402(a: A23086402) {
-  print(a.b.c + "")  // expected-error {{binary operator '+' cannot be applied to operands of type '[String]' and 'String'}}
-  // expected-note @-1 {{expected an argument list of type '(String, String)'}}
+  print(a.b.c + "")  // expected-error {{cannot convert value of type '[String]' to expected argument type 'String'}}
 }
 

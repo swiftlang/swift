@@ -719,14 +719,11 @@ func testOptionalTypeParsing(a : AnyObject) -> String {
 func testParenExprInTheWay() {
   let x = 42
   
-  if x & 4.0 {}  // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}}
-  // expected-note @-1 {{expected an argument list of type '(Int, Int)'}}
+  if x & 4.0 {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
-  if (x & 4.0) {}   // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}}
-  // expected-note @-1 {{expected an argument list of type '(Int, Int)'}}
+  if (x & 4.0) {}   // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
-  if !(x & 4.0) {}  // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}}
-  // expected-note @-1 {{expected an argument list of type '(Int, Int)'}}
+  if !(x & 4.0) {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
   
   if x & x {} // expected-error {{type 'Int' does not conform to protocol 'BooleanType'}}

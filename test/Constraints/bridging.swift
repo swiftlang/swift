@@ -235,12 +235,12 @@ func rdar19831919() {
 // <rdar://problem/19831698> Incorrect 'as' fixits offered for invalid literal expressions
 func rdar19831698() {
   var v70 = true + 1 // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and 'Int'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (UnsafeMutablePointer<Memory>, Int), (UnsafePointer<Memory>, Int)}}
-  var v71 = true + 1.0 // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and 'Double'}} expected-note {{expected an argument list of type '(Double, Double)'}}
+  var v71 = true + 1.0 // expected-error{{cannot convert value of type 'Bool' to expected argument type 'Double'}}
   var v72 = true + true // expected-error{{binary operator '+' cannot be applied to two 'Bool' operands}}
   // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists:}}
   var v73 = true + [] // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and '[_]'}}
   // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists:}}
-  var v75 = true + "str" // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and 'String'}} expected-note {{expected an argument list of type '(String, String)'}}
+  var v75 = true + "str" // expected-error{{cannot convert value of type 'Bool' to expected argument type 'String'}}
 }
 
 // <rdar://problem/19836341> Incorrect fixit for NSString? to String? conversions

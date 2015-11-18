@@ -1179,6 +1179,8 @@ namespace {
       int argumentNumber = -1;      ///< Arg # at the call site.
       Type parameterType = Type();  ///< Expected type at the decl site.
       
+      bool isValid() const { return argumentNumber != -1; }
+      
       bool operator!=(const FailedArgumentInfo &other) {
         if (argumentNumber != other.argumentNumber) return true;
         // parameterType can be null, and isEqual doesn't handle this.
@@ -3604,7 +3606,42 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       }
     }
   }
-  
+
+  // If we have a failure where the candidate set differs on exactly one
+  // argument, and where we have a consistent mismatch across the candidate set
+  // (often because there is only one candidate in the set), then diagnose this
+  // as a specific problem of passing something of the wrong type into a
+  // parameter.
+  if ((calleeInfo.closeness == CC_OneArgumentMismatch ||
+       calleeInfo.closeness == CC_OneArgumentNearMismatch) &&
+      calleeInfo.failedArgument.isValid()) {
+    // Map the argument number into an argument expression.
+    TCCOptions options = TCC_ForceRecheck;
+    if (calleeInfo.failedArgument.parameterType->is<InOutType>())
+      options |= TCC_AllowLValue;
+    
+    Expr *badArgExpr;
+    if (auto *TE = dyn_cast<TupleExpr>(argExpr))
+      badArgExpr = TE->getElement(calleeInfo.failedArgument.argumentNumber);
+    else if (auto *PE = dyn_cast<ParenExpr>(argExpr)) {
+      assert(calleeInfo.failedArgument.argumentNumber == 0 &&
+             "Unexpected argument #");
+      badArgExpr = PE->getSubExpr();
+    } else {
+      assert(calleeInfo.failedArgument.argumentNumber == 0 &&
+             "Unexpected argument #");
+      badArgExpr = argExpr;
+    }
+
+    // Re-type-check the argument with the expected type of the candidate set.
+    // This should produce a specific and tailored diagnostic saying that the
+    // type mismatches with expectations.
+    if (!typeCheckChildIndependently(badArgExpr,
+                                     calleeInfo.failedArgument.parameterType,
+                                     CTP_CallArgument, options))
+      return true;
+  }
+      
   
   // Handle uses of unavailable symbols.
   if (calleeInfo.closeness == CC_Unavailable)

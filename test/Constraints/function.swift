@@ -53,8 +53,7 @@ func process(line: UInt = __LINE__) -> Int { return 0 }
 func dangerous() throws {}
 
 func test() {
-  process {         // expected-error {{cannot invoke 'process' with an argument list of type '(() throws -> ())'}}
-    // expected-note @-1 {{expected an argument list of type '(UInt, () -> Void)'}}
+  process {         // expected-error {{invalid conversion from throwing function of type '() throws -> ()' to non-throwing function type '() -> Void'}}
     try dangerous()
     test()
   }
