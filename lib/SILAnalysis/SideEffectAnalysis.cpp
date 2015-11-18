@@ -12,7 +12,6 @@
 
 #define DEBUG_TYPE "sil-sea"
 #include "swift/SILAnalysis/SideEffectAnalysis.h"
-#include "swift/SILAnalysis/BasicCalleeAnalysis.h"
 #include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILAnalysis/ArraySemantic.h"
 #include "swift/SILPasses/PassManager.h"
@@ -257,7 +256,7 @@ void SideEffectAnalysis::analyzeFunction(SILFunction *F,
   // Check all instructions of the function
   for (auto &BB : *F) {
     for (auto &I : BB) {
-      analyzeInstruction(NewEffects, &I);
+      analyzeInstruction(NewEffects, &I, CG);
       DEBUG(if (RefEffects.mergeFrom(NewEffects))
               llvm::dbgs() << "  " << NewEffects << "\t changed in " << I);
     }
@@ -273,10 +272,10 @@ void SideEffectAnalysis::analyzeFunction(SILFunction *F,
 }
 
 void SideEffectAnalysis::analyzeInstruction(FunctionEffects &FE,
-                                            SILInstruction *I) {
+                                            SILInstruction *I, CallGraph &CG) {
   if (FullApplySite FAS = FullApplySite::isa(I)) {
     FunctionEffects ApplyEffects;
-    getEffectsOfApply(ApplyEffects, FAS, true);
+    getEffectsOfApply(ApplyEffects, FAS, CG, true);
     FE.mergeFromApply(ApplyEffects, FAS);
     return;
   }
@@ -359,7 +358,7 @@ void SideEffectAnalysis::analyzeInstruction(FunctionEffects &FE,
 }
 
 void SideEffectAnalysis::getEffectsOfApply(FunctionEffects &ApplyEffects,
-                                           FullApplySite FAS,
+                                           FullApplySite FAS, CallGraph &CG,
                                            bool isRecomputing) {
   
   assert(ApplyEffects.ParamEffects.size() == 0 &&
@@ -370,22 +369,20 @@ void SideEffectAnalysis::getEffectsOfApply(FunctionEffects &ApplyEffects,
   if (getSemanticEffects(ApplyEffects, FAS))
     return;
 
-  auto Callees = BCA->getCalleeList(FAS);
-  if (Callees.isIncomplete()) {
+  if (CG.canCallUnknownFunction(FAS.getInstruction())) {
     ApplyEffects.setWorstEffects();
     return;
   }
 
   // We can see all the callees. So we just merge the effects from all of
   // them.
-  for (auto *F : Callees) {
+  for (auto *F : CG.getCallees(FAS.getInstruction())) {
     auto *E = getFunctionEffects(F, isRecomputing);
     ApplyEffects.mergeFrom(*E);
   }
 }
 
 void SideEffectAnalysis::initialize(SILPassManager *PM) {
-  BCA = PM->getAnalysis<BasicCalleeAnalysis>();
   CGA = PM->getAnalysis<CallGraphAnalysis>();
 }
 
@@ -417,7 +414,12 @@ void SideEffectAnalysis::recompute() {
 }
 
 void SideEffectAnalysis::getEffects(FunctionEffects &FE, FullApplySite FAS) {
-  getEffectsOfApply(FE, FAS, false);
+  CallGraph *CG = CGA->getCallGraphOrNull();
+  if (CG) {
+    getEffectsOfApply(FE, FAS, *CG, false);
+    return;
+  }
+  FE.setWorstEffects();
 }
 
 SILAnalysis *swift::createSideEffectAnalysis(SILModule *M) {
