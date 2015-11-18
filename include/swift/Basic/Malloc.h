@@ -22,21 +22,6 @@
 #include <cstdlib>
 
 namespace swift {
-  enum InPlace_t { InPlace };
-}
-
-/// A slightly more efficient version of the global placement operator new.
-///
-/// Unlike the standard global placement operator new, this operator
-/// is not declared noexcept, which means it is not allowed to return
-/// null under the language semantics, which eliminates an unnecessary
-/// null check that the compiler would otherwise have to insert.
-/// (C++ is dumb.)
-inline void *operator new(size_t size, void *ptr, swift::InPlace_t) {
-  return ptr;
-}
-
-namespace swift {
 
 // FIXME: Use C11 aligned_alloc or Windows _aligned_malloc if available.
 inline void *AlignedAlloc(size_t size, size_t align) {

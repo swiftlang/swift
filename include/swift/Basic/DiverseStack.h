@@ -289,7 +289,7 @@ public:
   /// Push a new object onto the stack.
   template <class U, class... A> U &push(A && ...args) {
     pushNewStorage(sizeof(U));
-    return *::new (Begin, InPlace) U(::std::forward<A>(args)...);
+    return *::new (Begin) U(::std::forward<A>(args)...);
   }
 
   /// Pop an object off the stack.

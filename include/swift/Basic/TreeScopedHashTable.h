@@ -53,7 +53,7 @@ public:
     TreeScopedHashTableVal *New =
         Allocator.template Allocate<TreeScopedHashTableVal>();
     // Set up the value.
-    new (New, InPlace) TreeScopedHashTableVal(key, val);
+    new (New) TreeScopedHashTableVal(key, val);
     New->NextInScope = NextInScope;
     New->NextForKey = NextForKey;
     return New;

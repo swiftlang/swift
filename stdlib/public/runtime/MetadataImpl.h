@@ -105,11 +105,11 @@ struct NativeBox {
   }
 
   static T *initializeWithCopy(T *dest, T *src) {
-    return new (dest, InPlace) T(*src);
+    return new (dest) T(*src);
   }
 
   static T *initializeWithTake(T *dest, T *src) {
-    T *result = new (dest, InPlace) T(std::move(*src));
+    T *result = new (dest) T(std::move(*src));
     src->T::~T();
     return result;
   }
@@ -122,7 +122,7 @@ struct NativeBox {
     
     T *r = dest;
     while (n--) {
-      new (dest, InPlace) T(*src);
+      new (dest) T(*src);
       dest = next(dest); src = next(src);
     }
     return r;
@@ -136,7 +136,7 @@ struct NativeBox {
     
     T *r = dest;
     while (n--) {
-      new (dest, InPlace) T(*src);
+      new (dest) T(*src);
       dest = next(dest); src = next(src);
     }
     return r;
@@ -152,7 +152,7 @@ struct NativeBox {
     dest = next(dest, n); src = next(src, n);
     while (n--) {
       dest = prev(dest); src = prev(src);
-      new (dest, InPlace) T(*src);
+      new (dest) T(*src);
     }
     return r;
   }

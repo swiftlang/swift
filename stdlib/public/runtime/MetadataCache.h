@@ -106,7 +106,7 @@ public:
                                    numArguments * sizeof(void*) +
                                    payloadSize);
     void *resultPtr = (char*)buffer + numArguments * sizeof(void*);
-    auto result = new (resultPtr, InPlace) Impl(numArguments);
+    auto result = new (resultPtr) Impl(numArguments);
 
     // Copy the arguments into the right place for the key.
     memcpy(buffer, arguments,

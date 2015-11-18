@@ -163,7 +163,7 @@ private:
   }
   Node(Kind k, std::string &&t)
       : NodeKind(k), NodePayloadKind(PayloadKind::Text) {
-    new (&TextPayload, InPlace) std::string(std::move(t));
+    new (&TextPayload) std::string(std::move(t));
   }
   Node(Kind k, IndexType index)
       : NodeKind(k), NodePayloadKind(PayloadKind::Index) {

@@ -55,7 +55,7 @@ public:
 private:
   static void lazyInitCallback(void *Argument) {
     auto self = reinterpret_cast<Lazy *>(Argument);
-    ::new (&self->unsafeGetAlreadyInitialized(), InPlace) T();
+    ::new (&self->unsafeGetAlreadyInitialized()) T();
   }
 
   Lazy(const Lazy &) = delete;

@@ -271,14 +271,14 @@ public:
   /// Add a new object onto the end of the list.
   template <class U, class... A> U &add(A && ...args) {
     char *storage = addNewStorage(sizeof(U));
-    U &newObject = *::new (storage, InPlace) U(::std::forward<A>(args)...);
+    U &newObject = *::new (storage) U(::std::forward<A>(args)...);
     return newObject;
   }
 
   /// Add a new object onto the end of the list with some extra storage.
   template <class U, class... A> U &addWithExtra(size_t extra, A && ...args) {
     char *storage = addNewStorage(sizeof(U) + extra);
-    U &newObject = *::new (storage, InPlace) U(::std::forward<A>(args)...);
+    U &newObject = *::new (storage) U(::std::forward<A>(args)...);
     return newObject;
   }
 };
