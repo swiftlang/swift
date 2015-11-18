@@ -25,8 +25,7 @@ public enum UnicodeDecodingResult {
 
   /// Return true if `self` indicates no more unicode scalars are
   /// available.
-  @warn_unused_result
-  public func isEmptyInput() -> Bool {
+  public var isEmptyInput: Bool {
     switch self {
     case .EmptyInput:
       return true
@@ -706,7 +705,7 @@ public func transcode<
   var inputDecoder = inputEncoding.init()
   var hadError = false
   for var scalar = inputDecoder.decode(&input);
-          !scalar.isEmptyInput();
+          !scalar.isEmptyInput;
           scalar = inputDecoder.decode(&input) {
     switch scalar {
     case .ScalarValue(let us):
