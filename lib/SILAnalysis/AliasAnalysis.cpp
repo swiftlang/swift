@@ -265,10 +265,9 @@ static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
 /// Uses a bunch of ad-hoc rules to disambiguate a GEP instruction against
 /// another pointer. We know that V1 is a GEP, but we don't know anything about
 /// V2. O1, O2 are getUnderlyingObject of V1, V2 respectively.
-static
 AliasAnalysis::AliasResult
-aliasAddressProjection(AliasAnalysis &AA, SILValue V1, SILValue V2, SILValue O1,
-                       SILValue O2) {
+AliasAnalysis::aliasAddressProjection(SILValue V1, SILValue V2,
+                                      SILValue O1, SILValue O2) {
 
   // If V2 is also a gep instruction with a must-alias or not-aliasing base
   // pointer, figure out if the indices of the GEPs tell us anything about the
@@ -290,7 +289,7 @@ aliasAddressProjection(AliasAnalysis &AA, SILValue V1, SILValue V2, SILValue O1,
          "underlying object may not be a projection");
 
   // Do the base pointers alias?
-  AliasAnalysis::AliasResult BaseAlias = AA.alias(O1, O2);
+  AliasAnalysis::AliasResult BaseAlias = aliasInner(O1, O2);
 
   // If the underlying objects are not aliased, the projected values are also
   // not aliased.
@@ -533,6 +532,16 @@ static bool typesMayAlias(SILType T1, SILType T2, SILType TBAA1Ty,
 AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2,
                                                 SILType TBAAType1,
                                                 SILType TBAAType2) {
+  auto Result = aliasInner(V1, V2, TBAAType1, TBAAType2);
+  AliasCache.clear();
+  return Result;
+}
+
+/// The main AA entry point. Performs various analyses on V1, V2 in an attempt
+/// to disambiguate the two values.
+AliasAnalysis::AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
+                                                     SILType TBAAType1,
+                                                     SILType TBAAType2) {
 #ifndef NDEBUG
   // If alias analysis is disabled, always return may alias.
   if (!shouldRunAA())
@@ -606,7 +615,7 @@ AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2,
   // If V1 is an address projection, attempt to use information from the
   // aggregate type tree to disambiguate it from V2.
   if (Projection::isAddrProjection(V1)) {
-    AliasResult Result = aliasAddressProjection(*this, V1, V2, O1, O2);
+    AliasResult Result = aliasAddressProjection(V1, V2, O1, O2);
     if (Result != AliasResult::MayAlias)
       return cacheValue(Key, Result);
   }

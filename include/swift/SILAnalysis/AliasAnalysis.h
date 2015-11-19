@@ -51,6 +51,13 @@ private:
 
   AliasResult cacheValue(AliasCacheKey Key, AliasResult Result);
 
+  AliasResult aliasAddressProjection(SILValue V1, SILValue V2,
+                                     SILValue O1, SILValue O2);
+
+  /// Perform an alias query to see if V1, V2 refer to the same values.
+  AliasResult aliasInner(SILValue V1, SILValue V2,
+                         SILType TBAAType1 = SILType(),
+                         SILType TBAAType2 = SILType());  
 public:
   AliasAnalysis(SILModule *M) :
     SILAnalysis(AnalysisKind::Alias), Mod(M), SEA(nullptr) {}
