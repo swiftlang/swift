@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-dead-function-elimination"
-#include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SIL/PatternMatch.h"
@@ -51,7 +50,6 @@ protected:
   };
 
   SILModule *Module;
-  CallGraphAnalysis *CGA;
 
   llvm::DenseMap<AbstractFunctionDecl *, MethodInfo *> MethodInfos;
   llvm::SpecificBumpPtrAllocator<MethodInfo> MethodInfoAllocator;
@@ -251,8 +249,8 @@ protected:
   }
 
 public:
-  FunctionLivenessComputation(SILModule *module, CallGraphAnalysis *CGA) :
-    Module(module), CGA(CGA) {}
+  FunctionLivenessComputation(SILModule *module) :
+    Module(module) {}
 
   /// The main entry point of the optimization.
   bool findAliveFunctions() {
@@ -373,8 +371,8 @@ class DeadFunctionElimination : FunctionLivenessComputation {
   }
 
 public:
-  DeadFunctionElimination(SILModule *module, CallGraphAnalysis *CGA)
-      : FunctionLivenessComputation(module, CGA) {}
+  DeadFunctionElimination(SILModule *module)
+      : FunctionLivenessComputation(module) {}
 
   /// The main entry point of the optimization.
   void eliminateFunctions(SILModuleTransform *DFEPass) {
@@ -384,13 +382,11 @@ public:
 
     removeDeadEntriesFromTables();
 
-    CallGraph *CG = CGA->getCallGraphOrNull();
-
     // First drop all references so that we don't get problems with non-zero
     // reference counts of dead functions.
     for (SILFunction &F : *Module)
       if (!isAlive(&F))
-        CallGraphEditor(CG).dropAllReferences(&F);
+        F.dropAllReferences();
 
     // Next step: delete all dead functions.
     bool NeedUpdate = false;
@@ -400,11 +396,9 @@ public:
       if (!isAlive(F)) {
         DEBUG(llvm::dbgs() << "  erase dead function " << F->getName() << "\n");
         NumDeadFunc++;
-        CallGraphEditor(CG).eraseFunction(F);
+        Module->eraseFunction(F);
         NeedUpdate = true;
-        CGA->lockInvalidation();
         DFEPass->invalidateAnalysis(F, SILAnalysis::InvalidationKind::Everything);
-        CGA->unlockInvalidation();
       }
     }
   }
@@ -475,22 +469,21 @@ class ExternalFunctionDefinitionsElimination : FunctionLivenessComputation {
 
     DEBUG(llvm::dbgs() << "  removed external function " << F->getName()
           << "\n");
-    CallGraph *CG = CGA->getCallGraphOrNull();
-    CallGraphEditor(CG).dropAllReferences(F);
+    F->dropAllReferences();
     auto &Blocks = F->getBlocks();
     Blocks.clear();
     assert(F->isExternalDeclaration() &&
            "Function should be an external declaration");
     if (F->getRefCount() == 0)
-      CallGraphEditor(CG).eraseFunction(F);
+      F->getModule().eraseFunction(F);
 
     NumEliminatedExternalDefs++;
     return true;
   }
 
 public:
-  ExternalFunctionDefinitionsElimination(SILModule *module, CallGraphAnalysis *CGA)
-      : FunctionLivenessComputation(module, CGA) {}
+  ExternalFunctionDefinitionsElimination(SILModule *module)
+      : FunctionLivenessComputation(module) {}
 
   /// Eliminate bodies of external functions which are not alive.
   ///
@@ -509,10 +502,8 @@ public:
       if (!isAlive(F)) {
         if (tryToConvertExternalDefinitionIntoDeclaration(F)) {
           NeedUpdate = true;
-          CGA->lockInvalidation();
           DFEPass->invalidateAnalysis(F,
                                     SILAnalysis::InvalidationKind::Everything);
-          CGA->unlockInvalidation();
         }
       }
     }
@@ -529,8 +520,6 @@ namespace {
 
 class SILDeadFuncElimination : public SILModuleTransform {
   void run() override {
-    auto *CGA = getAnalysis<CallGraphAnalysis>();
-
     DEBUG(llvm::dbgs() << "Running DeadFuncElimination\n");
 
     // The deserializer caches functions that it deserializes so that if it is
@@ -540,7 +529,7 @@ class SILDeadFuncElimination : public SILModuleTransform {
     // can eliminate such functions.
     getModule()->invalidateSILLoaderCaches();
 
-    DeadFunctionElimination deadFunctionElimination(getModule(), CGA);
+    DeadFunctionElimination deadFunctionElimination(getModule());
     deadFunctionElimination.eliminateFunctions(this);
   }
   
@@ -549,8 +538,6 @@ class SILDeadFuncElimination : public SILModuleTransform {
 
 class SILExternalFuncDefinitionsElimination : public SILModuleTransform {
   void run() override {
-    auto *CGA = getAnalysis<CallGraphAnalysis>();
-
     DEBUG(llvm::dbgs() << "Running ExternalFunctionDefinitionsElimination\n");
 
     // The deserializer caches functions that it deserializes so that if it is
@@ -560,7 +547,7 @@ class SILExternalFuncDefinitionsElimination : public SILModuleTransform {
     // can eliminate the definitions of such functions.
     getModule()->invalidateSILLoaderCaches();
 
-    ExternalFunctionDefinitionsElimination EFDFE(getModule(), CGA);
+    ExternalFunctionDefinitionsElimination EFDFE(getModule());
     EFDFE.eliminateFunctions(this);
  }
 
