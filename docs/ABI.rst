@@ -612,7 +612,23 @@ layout is as follows:
 
   * For an enum:
 
-    + TODO: Offsets 2-5 are always zero.
+    + The **number of payload cases** and **payload size offset** are stored
+      at **offset 2**. The least significant 24 bits are the number of payload
+      cases, and the most significant 8 bits are the offset of the payload
+      size in the type metadata, if present.
+    + The **number of no-payload cases** is stored at **offset 3**.
+    + The **case names** are referenced as a doubly-null-terminated list of
+      C strings at **offset 4**. The names are ordered such that payload cases
+      come first, followed by no-payload cases. Within each half of the list,
+      the order of names corresponds to the order of cases in the enum
+      declaration.
+    + The **case type accessor** is a function pointer at **offset 5**. If
+      non-null, the function takes a pointer to an instance of type metadata
+      for the enum, and returns a pointer to an array of type metadata
+      references for the types of the cases of that instance. The order matches
+      that of the case name list. This function is similar to the field type
+      accessor for a struct, except also the least significant bit of each
+      element in the result is set if the enum case is an **indirect case**.
 
 - If the nominal type is generic, a pointer to the **metadata pattern** that
   is used to form instances of the type is stored at **offset 6**. The pointer
@@ -1047,6 +1063,8 @@ the outermost depth::
 Value Witnesses
 ~~~~~~~~~~~~~~~
 
+TODO: document these
+
 ::
 
   value-witness-kind ::= 'al'           // allocateBuffer
@@ -1065,11 +1083,11 @@ Value Witnesses
   value-witness-kind ::= 'pr'           // projectBuffer
   value-witness-kind ::= 'xs'           // storeExtraInhabitant
   value-witness-kind ::= 'xg'           // getExtraInhabitantIndex
-  value-witness-kind ::= 'ug'           // getEnumTag
-  value-witness-kind ::= 'up'           // inplaceProjectEnumData
   value-witness-kind ::= 'Cc'           // initializeArrayWithCopy
   value-witness-kind ::= 'Tt'           // initializeArrayWithTakeFrontToBack
   value-witness-kind ::= 'tT'           // initializeArrayWithTakeBackToFront
+  value-witness-kind ::= 'ug'           // getEnumTag
+  value-witness-kind ::= 'up'           // destructiveProjectEnumData
 
 ``<value-witness-kind>`` differentiates the kinds of value
 witness functions for a type.
