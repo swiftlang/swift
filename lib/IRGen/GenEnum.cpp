@@ -92,6 +92,9 @@
 //  for the payload, resulting in a fixed-size lowering for recursive
 //  enums.
 //
+//  For all lowerings except ResilientEnumImplStrategy, the primary enum
+//  operations are open-coded at usage sites. Resilient enums are accessed
+//  by invoking the value witnesses for these operations.
 //
 //===----------------------------------------------------------------------===//
 
@@ -112,6 +115,7 @@
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
 #include "NonFixedTypeInfo.h"
+#include "ResilientTypeInfo.h"
 #include "GenMeta.h"
 #include "GenProto.h"
 #include "GenType.h"
@@ -4047,6 +4051,305 @@ namespace {
       return result;
     }
   };
+
+  class ResilientEnumImplStrategy final
+    : public EnumImplStrategy
+  {
+  public:
+    ResilientEnumImplStrategy(IRGenModule &IGM,
+                              unsigned NumElements,
+                              std::vector<Element> &&WithPayload,
+                              std::vector<Element> &&WithNoPayload)
+      : EnumImplStrategy(IGM, Opaque, IsFixedSize,
+                         NumElements,
+                         std::move(WithPayload),
+                         std::move(WithNoPayload))
+    { }
+
+    TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
+                                     SILType Type,
+                                     EnumDecl *theEnum,
+                                     llvm::StructType *enumTy) override;
+
+    void destructiveProjectDataForLoad(IRGenFunction &IGF,
+                                       SILType T,
+                                       Address enumAddr) const override {
+      emitDestructiveProjectEnumDataCall(IGF, T, enumAddr.getAddress());
+    }
+
+    void storeTag(IRGenFunction &IGF,
+                  SILType T,
+                  Address enumAddr,
+                  EnumElementDecl *Case) const override {
+      llvm_unreachable("resilient enums cannot be constructed directly");
+    }
+
+    llvm::Value *
+    emitIndirectCaseTest(IRGenFunction &IGF, SILType T,
+                         Address enumAddr,
+                         EnumElementDecl *Case) const override {
+      llvm::Value *tag = emitGetEnumTagCall(IGF, T, enumAddr.getAddress());
+      llvm::Value *expectedTag = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
+                                                        getTagIndex(Case));
+      return IGF.Builder.CreateICmpEQ(tag, expectedTag);
+    }
+
+    void emitIndirectSwitch(IRGenFunction &IGF,
+                            SILType T,
+                            Address enumAddr,
+                            ArrayRef<std::pair<EnumElementDecl*,
+                                               llvm::BasicBlock*>> dests,
+                            llvm::BasicBlock *defaultDest) const override {
+      // Switch on the tag value.
+      llvm::Value *tag = emitGetEnumTagCall(IGF, T, enumAddr.getAddress());
+
+      // Create a map of the destination blocks for quicker lookup.
+      llvm::DenseMap<EnumElementDecl*,llvm::BasicBlock*> destMap(dests.begin(),
+                                                                 dests.end());
+
+      // Create an unreachable branch for unreachable switch defaults.
+      auto &C = IGF.IGM.getLLVMContext();
+      auto *unreachableBB = llvm::BasicBlock::Create(C);
+
+      // If there was no default branch in SIL, use the unreachable branch as
+      // the default.
+      if (!defaultDest)
+        defaultDest = unreachableBB;
+
+      auto *tagSwitch = IGF.Builder.CreateSwitch(tag, defaultDest, NumElements);
+
+      unsigned tagIndex = 0;
+      
+      // Payload tags come first.
+      for (auto &elt : ElementsWithPayload) {
+        auto found = destMap.find(elt.decl);
+        if (found != destMap.end()) {
+          auto tagVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty, tagIndex);
+          tagSwitch->addCase(tagVal, found->second);
+        }
+        ++tagIndex;
+      }
+
+      // Next come empty tags.
+      for (auto &elt : ElementsWithNoPayload) {
+        auto found = destMap.find(elt.decl);
+        if (found != destMap.end()) {
+          auto tagVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty, tagIndex);
+          tagSwitch->addCase(tagVal, found->second);
+        }
+        ++tagIndex;
+      }
+
+      assert(tagIndex == NumElements);
+
+      // Delete the unreachable default block if we didn't use it, or emit it
+      // if we did.
+      if (unreachableBB->use_empty()) {
+        delete unreachableBB;
+      } else {
+        IGF.Builder.emitBlock(unreachableBB);
+        IGF.Builder.CreateUnreachable();
+      }
+    }
+
+    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                        SILType T)
+    const override {
+      emitAssignWithCopyCall(IGF, T,
+                             dest.getAddress(), src.getAddress());
+    }
+
+    void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
+                        SILType T)
+    const override {
+      emitAssignWithTakeCall(IGF, T,
+                             dest.getAddress(), src.getAddress());
+    }
+
+    void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                            SILType T)
+    const override {
+      emitInitializeWithCopyCall(IGF, T,
+                                 dest.getAddress(), src.getAddress());
+    }
+
+    void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
+                            SILType T)
+    const override {
+      emitInitializeWithTakeCall(IGF, T,
+                                 dest.getAddress(), src.getAddress());
+    }
+
+    void destroy(IRGenFunction &IGF, Address addr, SILType T)
+    const override {
+      emitDestroyCall(IGF, T, addr.getAddress());
+    }
+
+    // \group Operations for loadable enums
+
+    ClusteredBitVector
+    getTagBitsForPayloads() const override {
+      llvm_unreachable("resilient enums are always indirect");
+    }
+
+    ClusteredBitVector
+    getBitPatternForNoPayloadElement(EnumElementDecl *theCase)
+    const override {
+      llvm_unreachable("resilient enums are always indirect");
+    }
+
+    ClusteredBitVector
+    getBitMaskForNoPayloadElements() const override {
+      llvm_unreachable("resilient enums are always indirect");
+    }
+
+    void initializeFromParams(IRGenFunction &IGF, Explosion &params,
+                              Address dest, SILType T) const override {
+      llvm_unreachable("resilient enums are always indirect");
+    }
+  
+    void emitValueInjection(IRGenFunction &IGF,
+                            EnumElementDecl *elt,
+                            Explosion &params,
+                            Explosion &out) const override {
+      llvm_unreachable("resilient enums are always indirect");
+    }
+
+    llvm::Value *
+    emitValueCaseTest(IRGenFunction &IGF, Explosion &value,
+                      EnumElementDecl *Case) const override {
+      llvm_unreachable("resilient enums are always indirect");
+    }
+
+    void emitValueSwitch(IRGenFunction &IGF,
+                         Explosion &value,
+                         ArrayRef<std::pair<EnumElementDecl*,
+                                            llvm::BasicBlock*>> dests,
+                         llvm::BasicBlock *defaultDest) const override {
+      llvm_unreachable("resilient enums are always indirect");
+    }
+
+    void emitValueProject(IRGenFunction &IGF,
+                          Explosion &inValue,
+                          EnumElementDecl *theCase,
+                          Explosion &out) const override {
+      llvm_unreachable("resilient enums are always indirect");
+    }
+
+    void getSchema(ExplosionSchema &schema) const override {
+      llvm_unreachable("resilient enums are always indirect");
+    }
+
+    unsigned getExplosionSize() const override {
+      llvm_unreachable("resilient enums are always indirect");
+    }
+
+    void loadAsCopy(IRGenFunction &IGF, Address addr,
+                            Explosion &e) const override {
+      llvm_unreachable("resilient enums are always indirect");
+    }
+
+    void loadAsTake(IRGenFunction &IGF, Address addr,
+                            Explosion &e) const override {
+      llvm_unreachable("resilient enums are always indirect");
+    }
+
+    void assign(IRGenFunction &IGF, Explosion &e,
+                        Address addr) const override {
+      llvm_unreachable("resilient enums are always indirect");
+    }
+
+    void initialize(IRGenFunction &IGF, Explosion &e,
+                            Address addr) const override {
+      llvm_unreachable("resilient enums are always indirect");
+    }
+
+    void reexplode(IRGenFunction &IGF, Explosion &src,
+                           Explosion &dest) const override {
+      llvm_unreachable("resilient enums are always indirect");
+    }
+
+    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest)
+    const override {
+      llvm_unreachable("resilient enums are always indirect");
+    }
+
+    void consume(IRGenFunction &IGF, Explosion &src) const override {
+      llvm_unreachable("resilient enums are always indirect");
+    }
+
+    void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
+      llvm_unreachable("resilient enums are always indirect");
+    }
+
+    void packIntoEnumPayload(IRGenFunction &IGF,
+                             EnumPayload &outerPayload,
+                             Explosion &src,
+                             unsigned offset) const override {
+      llvm_unreachable("resilient enums are always indirect");
+    }
+
+    void unpackFromEnumPayload(IRGenFunction &IGF,
+                               const EnumPayload &outerPayload,
+                               Explosion &dest,
+                               unsigned offset) const override {
+      llvm_unreachable("resilient enums are always indirect");
+    }
+
+    /// \group Operations for emitting type metadata
+
+    llvm::Value *
+    emitGetEnumTag(IRGenFunction &IGF, SILType T, Address addr)
+    const override {
+      llvm_unreachable("resilient enums cannot be defined");
+    }
+    
+    bool needsPayloadSizeInMetadata() const override {
+      llvm_unreachable("resilient enums cannot be defined");
+    }
+
+    void initializeMetadata(IRGenFunction &IGF,
+                            llvm::Value *metadata,
+                            llvm::Value *vwtable,
+                            SILType T) const override {
+      llvm_unreachable("resilient enums cannot be defined");
+    }
+
+    /// \group Extra inhabitants
+
+    bool mayHaveExtraInhabitants(IRGenModule &) const override {
+      return true;
+    }
+
+    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
+                                         Address src,
+                                         SILType T) const override {
+      return emitGetExtraInhabitantIndexCall(IGF, T, src.getAddress());
+    }
+
+    void storeExtraInhabitant(IRGenFunction &IGF,
+                              llvm::Value *index,
+                              Address dest,
+                              SILType T) const override {
+      emitStoreExtraInhabitantCall(IGF, T, index, dest.getAddress());
+    }
+
+    APInt
+    getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
+      llvm_unreachable("resilient enum is not fixed size");
+    }
+    
+    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
+      llvm_unreachable("resilient enum is not fixed size");
+    }
+
+    APInt
+    getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                 unsigned bits,
+                                 unsigned index) const override {
+      llvm_unreachable("resilient enum is not fixed size");
+    }
+  };
 } // end anonymous namespace
 
 EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
@@ -4121,6 +4424,18 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
   assert(numElements == elementsWithPayload.size()
            + elementsWithNoPayload.size()
          && "not all elements accounted for");
+
+  // Resilient enums are manipulated as opaque values, except we still
+  // make the following assumptions:
+  // 1) Physical case indices won't change
+  // 2) The indirect-ness of cases won't change
+  // 3) Payload types won't change in a non-resilient way
+  if (TC.IGM.isResilient(theEnum, ResilienceScope::Component)) {
+    return new ResilientEnumImplStrategy(TC.IGM,
+                                         numElements,
+                                         std::move(elementsWithPayload),
+                                         std::move(elementsWithNoPayload));
+  }
 
   // Enums imported from Clang or marked with @objc use C-compatible layout.
   if (theEnum->hasClangNode() || theEnum->isObjC()) {
@@ -4330,6 +4645,16 @@ namespace {
                          IsPOD_t pod,
                          IsBitwiseTakable_t bt)
       : EnumTypeInfoBase(strategy, irTy, align, pod, bt) {}
+  };
+
+  /// TypeInfo for dynamically-sized enum types.
+  class ResilientEnumTypeInfo
+    : public EnumTypeInfoBase<ResilientTypeInfo<ResilientEnumTypeInfo>>
+  {
+  public:
+    ResilientEnumTypeInfo(EnumImplStrategy &strategy,
+                          llvm::Type *irTy)
+      : EnumTypeInfoBase(strategy, irTy) {}
   };
 } // end anonymous namespace
 
@@ -4789,12 +5114,26 @@ MultiPayloadEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
   return completeDynamicLayout(TC, Type, theEnum, enumTy);
 }
 
+TypeInfo *
+ResilientEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
+                                                  SILType Type,
+                                                  EnumDecl *theEnum,
+                                                  llvm::StructType *enumTy) {
+  return registerEnumTypeInfo(new ResilientEnumTypeInfo(*this, enumTy));
+}
+
 const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
                                                EnumDecl *theEnum) {
-  llvm::StructType *convertedStruct = IGM.createNominalType(theEnum);
+  llvm::StructType *storageType;
+
+  // Resilient enum types lower down to the same opaque type.
+  if (IGM.isResilient(theEnum, ResilienceScope::Component))
+    storageType = cast<llvm::StructType>(IGM.OpaquePtrTy->getElementType());
+  else
+    storageType = IGM.createNominalType(theEnum);
 
   // Create a forward declaration for that type.
-  addForwardDecl(key, convertedStruct);
+  addForwardDecl(key, storageType);
   
   SILType loweredTy = SILType::getPrimitiveAddressType(type);
 
@@ -4803,7 +5142,7 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
 
   // Create the TI.
   auto *ti = strategy->completeEnumTypeLayout(*this, loweredTy,
-                                              theEnum, convertedStruct);
+                                              theEnum, storageType);
   // Assert that the layout query functions for fixed-layout enums work, for
   // LLDB's sake.
 #ifndef NDEBUG

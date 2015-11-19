@@ -1132,10 +1132,16 @@ namespace {
         }
       }
 
-      // If the whole enum is indirect, then it's always loadable and
-      // nontrivial.
-      if (D->isIndirect())
+      // If the whole enum is indirect, we lower it as if all payload
+      // cases were indirect. This means a fixed-layout indirect enum
+      // is always loadable and nontrivial. A resilient indirect enum
+      // is still address only, because we don't know how many bits
+      // are used for the discriminator.
+      if (D->isIndirect()) {
+        if (isAddressOnly)
+          return handleAddressOnly(OrigType);
         return new (TC, Dependent) LoadableEnumTypeLowering(OrigType);
+      }
 
       // If any of the enum elements have address-only data, the enum is
       // address-only.

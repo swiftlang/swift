@@ -165,7 +165,18 @@ namespace irgen {
                                             SILType T,
                                             llvm::Value *index,
                                             llvm::Value *destObject);
-  
+
+  /// Emit a call to the 'getEnumTag' operation.
+  llvm::Value *emitGetEnumTagCall(IRGenFunction &IGF,
+                                  SILType T,
+                                  llvm::Value *srcObject);
+
+  /// Emit a call to the 'destructiveProjectEnumData' operation.
+  /// The type must be dynamically known to have enum witnesses.
+  void emitDestructiveProjectEnumDataCall(IRGenFunction &IGF,
+                                          SILType T,
+                                          llvm::Value *srcObject);
+
   /// Emit a load of the 'size' value witness.
   llvm::Value *emitLoadOfSize(IRGenFunction &IGF, SILType T);
 

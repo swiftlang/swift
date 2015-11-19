@@ -651,6 +651,34 @@ llvm::Value *irgen::emitStoreExtraInhabitantCall(IRGenFunction &IGF,
   return call;
 }
 
+/// Emit a call to the 'getEnumTag' operation.
+llvm::Value *irgen::emitGetEnumTagCall(IRGenFunction &IGF,
+                                       SILType T,
+                                       llvm::Value *srcObject) {
+  auto metadata = IGF.emitTypeMetadataRefForLayout(T);
+  llvm::Value *fn = IGF.emitValueWitnessForLayout(T,
+                                       ValueWitness::GetEnumTag);
+  llvm::CallInst *call =
+    IGF.Builder.CreateCall(fn, {srcObject, metadata});
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  setHelperAttributes(call);
+  return call;
+}
+
+/// Emit a call to the 'destructiveProjectEnumData' operation.
+/// The type must be dynamically known to have enum witnesses.
+void irgen::emitDestructiveProjectEnumDataCall(IRGenFunction &IGF,
+                                               SILType T,
+                                               llvm::Value *srcObject) {
+  auto metadata = IGF.emitTypeMetadataRefForLayout(T);
+  llvm::Value *fn = IGF.emitValueWitnessForLayout(T,
+                                      ValueWitness::DestructiveProjectEnumData);
+  llvm::CallInst *call =
+    IGF.Builder.CreateCall(fn, {srcObject, metadata});
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  setHelperAttributes(call);
+}
+
 /// Load the 'size' value witness from the given table as a size_t.
 llvm::Value *irgen::emitLoadOfSize(IRGenFunction &IGF, SILType T) {
   return IGF.emitValueWitnessForLayout(T, ValueWitness::Size);

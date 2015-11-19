@@ -14,6 +14,18 @@ import resilient_struct
 
 // Resilient enum
 public enum Medium {
+  // Empty cases
   case Paper
   case Canvas
+
+  // Indirect case
+  indirect case Pamphlet(Medium)
+
+  // Case with resilient payload
+  case Postcard(Size)
+}
+
+// Indirect resilient enum
+public indirect enum IndirectApproach {
+  case Angle(Double)
 }
