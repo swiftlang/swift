@@ -156,8 +156,7 @@ SILPassManager::SILPassManager(SILModule *M, llvm::StringRef Stage) :
   }
 }
 
-bool SILPassManager::
-runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
+bool SILPassManager::runFunctionPasses(PassList FuncTransforms) {
   const SILOptions &Options = getOptions();
 
   for (auto &F : *Mod) {
@@ -227,13 +226,14 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
       }
 
       ++NumPassesRun;
+      // Request that we stop this optimization phase.
       if (Mod->getStage() == SILStage::Canonical
           && NumPassesRun >= SILNumOptPassesToRun)
-        return false;
+        return true;
     }
   }
 
-  return true;
+  return false;
 }
 
 void SILPassManager::runOneIteration() {
@@ -267,9 +267,11 @@ void SILPassManager::runOneIteration() {
 
     // Run module transformations on the module.
     if (SILModuleTransform *SMT = llvm::dyn_cast<SILModuleTransform>(ST)) {
-      // Run all function passes that we've seen since the last module pass. If
-      // one of the passes asked us to stop the pass pipeline, return false.
-      if (!runFunctionPasses(PendingFuncTransforms))
+      // Run all function passes that we've seen since the last module pass.
+      // Stop stop this optimization phase if one of the passes requested to
+      // stop.
+      bool NeedToStop = runFunctionPasses(PendingFuncTransforms);
+      if (NeedToStop)
         return;
 
       PendingFuncTransforms.clear();

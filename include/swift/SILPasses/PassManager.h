@@ -154,9 +154,12 @@ class SILPassManager {
 #define PASS(ID, NAME, DESCRIPTION) void add##ID();
 #include "Passes.def"
 
-  protected:
-  bool runFunctionPasses(
-    llvm::ArrayRef<SILFunctionTransform *> FuncTransforms);
+  typedef llvm::ArrayRef<SILFunctionTransform *> PassList;
+  private:
+  /// Run the passes in \p FuncTransforms. Return true
+  /// if the pass manager requested to stop the execution
+  /// of the optimization cycle (this is a debug feature).
+  bool runFunctionPasses(PassList FuncTransforms);
 };
 
 } // end namespace swift
