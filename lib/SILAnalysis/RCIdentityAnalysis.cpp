@@ -473,11 +473,6 @@ SILValue RCIdentityFunctionInfo::getRCIdentityRootInner(SILValue V,
   if (RecursionDepth >= MaxRecursionDepth)
     return SILValue();
 
-  // First check the cache.
-  auto Pair = Cache.find(V);
-  if (Pair != Cache.end())
-    return Pair->second;
-
   SILValue NewValue = stripRCIdentityPreservingOps(V, RecursionDepth);
   if (!NewValue)
     return SILValue();
@@ -487,7 +482,7 @@ SILValue RCIdentityFunctionInfo::getRCIdentityRootInner(SILValue V,
   if (NewValue == V)
     return V;
 
-  return Cache[V] = NewValue;
+  return NewValue;
 }
 
 SILValue RCIdentityFunctionInfo::getRCIdentityRoot(SILValue V) {

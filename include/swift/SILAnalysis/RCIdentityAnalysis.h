@@ -31,7 +31,6 @@ class DominanceAnalysis;
 
 /// This class is a simple wrapper around an identity cache.
 class RCIdentityFunctionInfo {
-  llvm::DenseMap<SILValue, SILValue> Cache;
   llvm::DenseSet<SILArgument *> VisitedArgs;
   DominanceAnalysis *DA;
 
@@ -40,7 +39,7 @@ class RCIdentityFunctionInfo {
   enum { MaxRecursionDepth = 16 };
 
 public:
-  RCIdentityFunctionInfo(DominanceAnalysis *D) : Cache(), VisitedArgs(),
+  RCIdentityFunctionInfo(DominanceAnalysis *D) : VisitedArgs(),
   DA(D) {}
 
   SILValue getRCIdentityRoot(SILValue V);
