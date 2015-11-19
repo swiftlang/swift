@@ -550,7 +550,7 @@ extension Sequence {
 internal func _copySequenceToNativeArrayBuffer<
   S : Sequence
 >(source: S) -> _ContiguousArrayBuffer<S.Iterator.Element> {
-  let initialCapacity = source.underestimateLength()
+  let initialCapacity = source.underestimatedLength()
   var builder =
     _UnsafePartiallyInitializedContiguousArrayBuffer<S.Iterator.Element>(
       initialCapacity: initialCapacity)

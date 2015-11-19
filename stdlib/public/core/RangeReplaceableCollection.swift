@@ -357,7 +357,7 @@ public func +<
   where S.Iterator.Element == C.Iterator.Element
 >(lhs: S, rhs: C) -> C {
   var result = C()
-  result.reserveCapacity(rhs.length + numericCast(rhs.underestimateLength()))
+  result.reserveCapacity(rhs.length + numericCast(rhs.underestimatedLength()))
   result.appendContentsOf(lhs)
   result.appendContentsOf(rhs)
   return result

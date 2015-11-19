@@ -80,7 +80,7 @@ extension LazyCollection : Sequence {
   /// `self`, **nondestructively**.
   ///
   /// - Complexity: O(N).
-  public func underestimateLength() -> Int { return _base.underestimateLength() }
+  public func underestimatedLength() -> Int { return _base.underestimatedLength() }
 
   public func _copyToNativeArrayBuffer() 
      -> _ContiguousArrayBuffer<Base.Iterator.Element> {

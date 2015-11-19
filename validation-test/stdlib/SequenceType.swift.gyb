@@ -706,15 +706,15 @@ SequenceTypeTests.test("filter/Sequence/Dispatch") {
 
 SequenceTypeTests.test("filter/Sequence/Semantics") {
   for test in filterTests {
-    for underestimateLengthBehavior in [
-      UnderestimateLengthBehavior.Precise,
-      UnderestimateLengthBehavior.Half,
-      UnderestimateLengthBehavior.Value(0)
+    for underestimatedLengthBehavior in [
+      UnderestimatedLengthBehavior.Precise,
+      UnderestimatedLengthBehavior.Half,
+      UnderestimatedLengthBehavior.Value(0)
     ] {
       
       let s = DefaultedSequence<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init),
-        underestimatedLength: underestimateLengthBehavior)
+        underestimatedLength: underestimatedLengthBehavior)
       
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
@@ -749,7 +749,7 @@ var MinimalSequenceWithCustomMap_timesMapWasCalled: Int = 0
 % for Implementation in [ 'Default', 'Custom' ]:
 
 struct MinimalSequenceWith${Implementation}Map<Element> : Sequence {
-  init(_ data: [Element], underestimatedLength: UnderestimateLengthBehavior) {
+  init(_ data: [Element], underestimatedLength: UnderestimatedLengthBehavior) {
     self._data = MinimalSequence(
       elements: data, underestimatedLength: underestimatedLength)
   }
@@ -819,14 +819,14 @@ SequenceTypeTests.test(
   "map/Sequence/${Implementation}Implementation/${dispatch}"
 ) {
   for test in mapTests {
-    for underestimateLengthBehavior in [
-      UnderestimateLengthBehavior.Precise,
-      UnderestimateLengthBehavior.Half,
-      UnderestimateLengthBehavior.Value(0)
+    for underestimatedLengthBehavior in [
+      UnderestimatedLengthBehavior.Precise,
+      UnderestimatedLengthBehavior.Half,
+      UnderestimatedLengthBehavior.Value(0)
     ] {
       let s = MinimalSequenceWith${Implementation}Map<OpaqueValue<Int>>(
         test.sequence.map(OpaqueValue.init),
-        underestimatedLength: underestimateLengthBehavior)
+        underestimatedLength: underestimatedLengthBehavior)
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
@@ -864,13 +864,13 @@ SequenceTypeTests.test(
 
 SequenceTypeTests.test("flatMap/Sequence") {
   for test in flatMapTests {
-    for underestimateLengthBehavior in [
-      UnderestimateLengthBehavior.Precise,
-      UnderestimateLengthBehavior.Value(0)
+    for underestimatedLengthBehavior in [
+      UnderestimatedLengthBehavior.Precise,
+      UnderestimatedLengthBehavior.Value(0)
     ] {
       let s = MinimalSequence<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init),
-        underestimatedLength: underestimateLengthBehavior)
+        underestimatedLength: underestimatedLengthBehavior)
       let closureLifetimeTracker = LifetimeTracked(0)
       var timesClosureWasCalled = 0
       var result = s.flatMap {
@@ -902,13 +902,13 @@ ${LazyFlatMapTest}
 
 SequenceTypeTests.test("flatMap/Sequence/TransformProducesOptional") {
   for test in flatMapToOptionalTests {
-    for underestimateLengthBehavior in [
-      UnderestimateLengthBehavior.Precise,
-      UnderestimateLengthBehavior.Value(0)
+    for underestimatedLengthBehavior in [
+      UnderestimatedLengthBehavior.Precise,
+      UnderestimatedLengthBehavior.Value(0)
     ] {
       let s = MinimalSequence<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init),
-        underestimatedLength: underestimateLengthBehavior)
+        underestimatedLength: underestimatedLengthBehavior)
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
@@ -1051,7 +1051,7 @@ SequenceTypeTests.test("zip") {
 }
 
 //===----------------------------------------------------------------------===//
-// underestimateLength()
+// underestimatedLength()
 //===----------------------------------------------------------------------===//
 
 struct SequenceWithDefaultUnderestimateLength : Sequence {
@@ -1065,7 +1065,7 @@ struct SequenceWithDefaultUnderestimateLength : Sequence {
   }
 }
 
-SequenceTypeTests.test("underestimateLength/Sequence/DefaultImplementation") {
+SequenceTypeTests.test("underestimatedLength/Sequence/DefaultImplementation") {
   let s = SequenceWithDefaultUnderestimateLength()
   expectEqual(0, callGenericUnderestimatedLength(s))
 }
@@ -1082,14 +1082,14 @@ struct SequenceWithCustomUnderestimateLength : Sequence {
     ).iterator()
   }
 
-  func underestimateLength() -> Int {
+  func underestimatedLength() -> Int {
     return _underestimatedLength
   }
 
   let _underestimatedLength: Int
 }
 
-SequenceTypeTests.test("underestimateLength/Sequence/CustomImplementation") {
+SequenceTypeTests.test("underestimatedLength/Sequence/CustomImplementation") {
   do {
     let s = SequenceWithCustomUnderestimateLength(underestimatedLength: 5)
     expectEqual(5, callGenericUnderestimatedLength(s))

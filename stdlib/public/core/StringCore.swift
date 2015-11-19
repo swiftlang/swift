@@ -686,7 +686,7 @@ extension _StringCore : RangeReplaceableCollection {
       }
     }
 
-    let growth = s.underestimateLength()
+    let growth = s.underestimatedLength()
     var iter = s.iterator()
 
     if _fastPath(growth > 0) {

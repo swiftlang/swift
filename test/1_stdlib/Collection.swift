@@ -218,15 +218,15 @@ struct SequenceOnly<T : Sequence> : Sequence {
 }
 
 func testUnderestimateLength() {
-  // CHECK: testing underestimateLength
-  print("testing underestimateLength")
+  // CHECK: testing underestimatedLength
+  print("testing underestimatedLength")
   // CHECK-NEXT: random access: 4
-  print("random access: \(array.underestimateLength())")
+  print("random access: \(array.underestimatedLength())")
   // CHECK-NEXT: bidirectional: 5
-  print("bidirectional: \(dict.underestimateLength())")
+  print("bidirectional: \(dict.underestimatedLength())")
   // CHECK-NEXT: Sequence only: 0
   let s = SequenceOnly(base: array)
-  print("Sequence only: \(s.underestimateLength())")
+  print("Sequence only: \(s.underestimatedLength())")
 }
 testUnderestimateLength()
 

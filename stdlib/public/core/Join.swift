@@ -131,7 +131,7 @@ public struct JoinSequence<
       (s: Base) -> Int in
       var r = 0
       for chunk in s {
-        r += separatorSize + chunk.underestimateLength()
+        r += separatorSize + chunk.underestimatedLength()
       }
       return r - separatorSize
     }

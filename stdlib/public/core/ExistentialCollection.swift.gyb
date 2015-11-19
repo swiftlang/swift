@@ -118,7 +118,7 @@ internal func _typeID(instance: AnyObject) -> ObjectIdentifier {
 internal class _AnySequenceBox<Element> {
   internal func iterator() -> AnyIterator<Element> { _abstract() }
 
-  internal func _underestimateLength() -> Int { _abstract() }
+  internal func _underestimatedLength() -> Int { _abstract() }
 
   internal func _initializeTo(ptr: UnsafeMutablePointer<Element>)
     -> UnsafeMutablePointer<Element> {
@@ -149,8 +149,8 @@ internal class _${Kind}Box<S : ${Kind}>
   override func iterator() -> AnyIterator<Element> {
     return AnyIterator(_base.iterator())
   }
-  override func _underestimateLength() -> Int {
-    return _base.underestimateLength()
+  override func _underestimatedLength() -> Int {
+    return _base.underestimatedLength()
   }
   override func _initializeTo(ptr: UnsafeMutablePointer<Element>)
     -> UnsafeMutablePointer<Element> {
@@ -233,8 +233,8 @@ public struct AnySequence<Element> : Sequence {
 
 % for Kind in ['Sequence'] + [t + 'Collection' for t in traversals]:
 extension Any${Kind} {
-  public func underestimateLength() -> Int {
-    return _box._underestimateLength()
+  public func underestimatedLength() -> Int {
+    return _box._underestimatedLength()
   }
 
   public func _initializeTo(ptr: UnsafeMutablePointer<Element>)

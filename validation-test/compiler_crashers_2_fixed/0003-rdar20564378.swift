@@ -7,7 +7,7 @@ public protocol Q_SequenceDefaults {
 }
 
 extension Q_SequenceDefaults {
-  public final func underestimateLength() -> Int { return 0 }
+  public final func underestimatedLength() -> Int { return 0 }
   public final func preprocessingPass<R>(body: (Self)->R) -> R? {
     return nil
   }
@@ -15,7 +15,7 @@ extension Q_SequenceDefaults {
   /// Create a ContiguousArray containing the elements of `self`,
   /// in the same order.
   public final func copyToContiguousArray() -> ContiguousArray<Iterator.Element> {
-    let initialCapacity = underestimateLength()
+    let initialCapacity = underestimatedLength()
 
     var result = _ContiguousArrayBuffer<Iterator.Element>(
       length: initialCapacity, minimumCapacity: 0)
@@ -60,7 +60,7 @@ public protocol Q_Sequence : Q_SequenceDefaults {
   /// self, **nondestructively**.
   ///
   /// Complexity: O(N)
-  func underestimateLength() -> Int
+  func underestimatedLength() -> Int
 
   /// If `self` is multi-pass (i.e., a `Collection`), invoke the function
   /// on `self` and return its result.  Otherwise, return `nil`.
@@ -99,7 +99,7 @@ extension Q_CollectionDefaults {
     return distance(startIndex, endIndex)
   }
   
-  public final func underestimateLength() -> Int {
+  public final func underestimatedLength() -> Int {
     let n = length().toIntMax()
     return n > IntMax(Int.max) ? Int.max : Int(n)
   }

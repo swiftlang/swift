@@ -989,7 +989,7 @@ public func += <
 >(inout lhs: ${Self}<Element>, rhs: S) {
   let oldLength = lhs.length
   let capacity = lhs.capacity
-  let newLength = oldLength + rhs.underestimateLength()
+  let newLength = oldLength + rhs.underestimatedLength()
 
   if newLength > capacity {
     lhs.reserveCapacity(

@@ -94,7 +94,7 @@ public class SequenceLog {
     return LoggingSequence(LoggingSequence(s))
   }
   public static var iterator = TypeIndexed(0)
-  public static var underestimateLength = TypeIndexed(0)
+  public static var underestimatedLength = TypeIndexed(0)
   public static var map = TypeIndexed(0)
   public static var filter = TypeIndexed(0)
   public static var _customContainsEquatableElement = TypeIndexed(0)
@@ -116,9 +116,9 @@ extension LoggingSequenceType
     return LoggingIterator(base.iterator())
   }
 
-  public func underestimateLength() -> Int {
-    ++Log.underestimateLength[selfType]
-    return base.underestimateLength()
+  public func underestimatedLength() -> Int {
+    ++Log.underestimatedLength[selfType]
+    return base.underestimatedLength()
   }
 
   public func map<T>(

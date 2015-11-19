@@ -270,7 +270,7 @@ public class SequenceLog {
   }
   public static var forEach = TypeIndexed(0)
   public static var iterator = TypeIndexed(0)
-  public static var underestimateLength = TypeIndexed(0)
+  public static var underestimatedLength = TypeIndexed(0)
   public static var map = TypeIndexed(0)
   public static var filter = TypeIndexed(0)
   public static var dropFirst = TypeIndexed(0)
@@ -452,9 +452,9 @@ public struct Logging${Kind}<Base: ${Kind}> : ${Kind}, LoggingType {
     return LoggingIterator(base.iterator())
   }
 
-  public func underestimateLength() -> Int {
-    ++Log.underestimateLength[selfType]
-    return base.underestimateLength()
+  public func underestimatedLength() -> Int {
+    ++Log.underestimatedLength[selfType]
+    return base.underestimatedLength()
   }
 
   public func forEach(

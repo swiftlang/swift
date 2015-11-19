@@ -1923,7 +1923,7 @@ public func checkSequence<
     sameValue: sameValue)
 
   expectGE(
-    expectedLength, sequence.underestimateLength(), ${trace})
+    expectedLength, sequence.underestimatedLength(), ${trace})
 
   // Check that _initializeTo does the right thing if we can do so
   // without destroying the sequence.
@@ -2547,7 +2547,7 @@ extension MinimalIterator : _MinimalIteratorProtocol {}
 // MinimalSequence
 //===----------------------------------------------------------------------===//
 
-public enum UnderestimateLengthBehavior {
+public enum UnderestimatedLengthBehavior {
   /// Return the actual number of elements.
   case Precise
 
@@ -2571,14 +2571,14 @@ public protocol StrictSequence : Sequence {
 extension StrictSequence {
   public init<S : Sequence where S.Iterator.Element == Element>(
     elements: S,
-    underestimatedLength: UnderestimateLengthBehavior = .Value(0)
+    underestimatedLength: UnderestimatedLengthBehavior = .Value(0)
   ) {
     self.init(base: MinimalSequence(
       elements: elements, underestimatedLength: underestimatedLength))
   }
 
-  public func underestimateLength() -> Int {
-    return base.underestimateLength()
+  public func underestimatedLength() -> Int {
+    return base.underestimatedLength()
   }
 }
 
@@ -2595,7 +2595,7 @@ extension StrictSequence where Iterator : _MinimalIteratorProtocol {
 public struct MinimalSequence<T> : Sequence, CustomDebugStringConvertible {
   public init<S : Sequence where S.Iterator.Element == T>(
     elements: S,
-    underestimatedLength: UnderestimateLengthBehavior = .Value(0)
+    underestimatedLength: UnderestimatedLengthBehavior = .Value(0)
   ) {
     let data = Array(elements)
     self._sharedState = _MinimalIteratorSharedState(data)
@@ -2619,7 +2619,7 @@ public struct MinimalSequence<T> : Sequence, CustomDebugStringConvertible {
     return MinimalIterator(_sharedState)
   }
 
-  public func underestimateLength() -> Int {
+  public func underestimatedLength() -> Int {
     return Swift.max(
       0, self._sharedState.underestimatedLength - self._sharedState.i)
   }
@@ -3321,14 +3321,14 @@ public protocol ${Protocol} : ${'MutableCollection' if mutable else 'Collection'
 extension ${Protocol} {
   public init<S : Sequence where S.Iterator.Element == Element>(
     elements: S,
-    underestimatedLength: UnderestimateLengthBehavior = .Value(0)
+    underestimatedLength: UnderestimatedLengthBehavior = .Value(0)
   ) {
     self.init(base:
       ${Self}(elements: elements, underestimatedLength: underestimatedLength))
   }
 
-  public func underestimateLength() -> Int {
-    return base.underestimateLength()
+  public func underestimatedLength() -> Int {
+    return base.underestimatedLength()
   }
 }
 
@@ -3365,7 +3365,7 @@ extension ${Protocol} where Index : _MinimalIndex {
 public struct ${Self}<T> : ${'MutableCollection' if mutable else 'Collection'} {
   public init<S : Sequence where S.Iterator.Element == T>(
     elements: S,
-    underestimatedLength: UnderestimateLengthBehavior = .Value(0)
+    underestimatedLength: UnderestimatedLengthBehavior = .Value(0)
   ) {
     self._elements = Array(elements)
 
@@ -3374,16 +3374,16 @@ public struct ${Self}<T> : ${'MutableCollection' if mutable else 'Collection'} {
 
     switch underestimatedLength {
     case .Precise:
-      self.underestimatedLength = _elements.length
+      _underestimatedLength = _elements.length
 
     case .Half:
-      self.underestimatedLength = _elements.length / 2
+      _underestimatedLength = _elements.length / 2
 
     case .Overestimate:
-      self.underestimatedLength = _elements.length * 3 + 5
+      _underestimatedLength = _elements.length * 3 + 5
 
     case .Value(let length):
-      self.underestimatedLength = length
+      _underestimatedLength = length
     }
   }
 
@@ -3420,11 +3420,11 @@ public struct ${Self}<T> : ${'MutableCollection' if mutable else 'Collection'} {
 %     end
   }
 
-  public func underestimateLength() -> Int {
-    return underestimatedLength
+  public func underestimatedLength() -> Int {
+    return _underestimatedLength
   }
 
-  public var underestimatedLength: Int
+  internal var _underestimatedLength: Int
 
   internal var _elements: [T]
   internal let _collectionState: _CollectionState
@@ -3495,7 +3495,7 @@ public struct ${Self}<T> : RangeReplaceableCollection {
   /// history.  No other instance has the same modification history.
   public init<S : Sequence where S.Iterator.Element == T>(
     elements: S,
-    underestimatedLength: UnderestimateLengthBehavior = .Value(0)
+    underestimatedLength: UnderestimatedLengthBehavior = .Value(0)
   ) {
     self.elements = Array(elements)
 
@@ -3504,21 +3504,21 @@ public struct ${Self}<T> : RangeReplaceableCollection {
 
     switch underestimatedLength {
     case .Precise:
-      self.underestimatedLength = self.elements.length
+      _underestimatedLength = self.elements.length
 
     case .Half:
-      self.underestimatedLength = self.elements.length / 2
+      _underestimatedLength = self.elements.length / 2
 
     case .Overestimate:
-      self.underestimatedLength = self.elements.length * 3 + 5
+      _underestimatedLength = self.elements.length * 3 + 5
 
     case .Value(let length):
-      self.underestimatedLength = length
+      _underestimatedLength = length
     }
   }
 
   public init() {
-    self.underestimatedLength = 0
+    _underestimatedLength = 0
     self.elements = []
     self._collectionState =
       _CollectionState(name: "\(self.dynamicType)", length: 0)
@@ -3527,7 +3527,7 @@ public struct ${Self}<T> : RangeReplaceableCollection {
   public init<
     S : Sequence where S.Iterator.Element == T
   >(_ elements: S) {
-    self.underestimatedLength = 0
+    _underestimatedLength = 0
     self.elements = Array(elements)
     self._collectionState =
       _CollectionState(newRootStateForLength: self.elements.length)
@@ -3537,8 +3537,8 @@ public struct ${Self}<T> : RangeReplaceableCollection {
     return MinimalIterator(elements)
   }
 
-  public func underestimateLength() -> Int {
-    return underestimatedLength
+  public func underestimatedLength() -> Int {
+    return _underestimatedLength
   }
 
   public var startIndex: ${Index} {
@@ -3654,7 +3654,7 @@ public struct ${Self}<T> : RangeReplaceableCollection {
       operation: operation)._nextState
   }
 
-  public var underestimatedLength: Int
+  public var _underestimatedLength: Int
   public var reservedCapacity: Int = 0
 
   public var elements: [T]

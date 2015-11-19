@@ -32,7 +32,7 @@ public func scan<
   S : Sequence, U
 >(seq: S, _ initial: U, _ combine: (U, S.Iterator.Element) -> U) -> [U] {
   var result: [U] = []
-  result.reserveCapacity(seq.underestimateLength())
+  result.reserveCapacity(seq.underestimatedLength())
   var runningResult = initial
   for element in seq {
     runningResult = combine(runningResult, element)

@@ -270,7 +270,7 @@ public struct ${Collection}<
     return position._innerCollection![position._inner!]
   }
 
-  public func underestimateLength() -> Int {
+  public func underestimatedLength() -> Int {
     // To return any estimate of the number of elements, we have to start
     // evaluating the collections.  That is a bad default for `flatMap()`, so
     // just return zero.

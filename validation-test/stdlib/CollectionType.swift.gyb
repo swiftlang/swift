@@ -51,7 +51,7 @@ var MinimalForwardCollectionWithCustomFilter_timesFilterWasCalled: Int = 0
 struct MinimalForwardCollectionWith${Implementation}Filter<Element>
   : Collection {
 
-  init(_ data: [Element], underestimatedLength: UnderestimateLengthBehavior) {
+  init(_ data: [Element], underestimatedLength: UnderestimatedLengthBehavior) {
     self._data = MinimalForwardCollection(
       elements: data, underestimatedLength: underestimatedLength)
   }
@@ -132,14 +132,14 @@ func callGenericCollectionFilter<S : Collection>(
 
 CollectionTypeTests.test("filter/Collection/${Implementation}Implementation/${dispatch}") {
   for test in filterTests {
-    for underestimateLengthBehavior in [
-      UnderestimateLengthBehavior.Precise,
-      UnderestimateLengthBehavior.Half,
-      UnderestimateLengthBehavior.Value(0)
+    for underestimatedLengthBehavior in [
+      UnderestimatedLengthBehavior.Precise,
+      UnderestimatedLengthBehavior.Half,
+      UnderestimatedLengthBehavior.Value(0)
     ] {
       let s = MinimalForwardCollectionWith${Implementation}Filter<OpaqueValue<Int>>(
         test.sequence.map(OpaqueValue.init),
-        underestimatedLength: underestimateLengthBehavior)
+        underestimatedLength: underestimatedLengthBehavior)
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
@@ -183,7 +183,7 @@ var MinimalForwardCollectionWithCustomMap_timesMapWasCalled: Int = 0
 struct MinimalForwardCollectionWith${Implementation}Map<Element>
   : Collection {
 
-  init(_ data: [Element], underestimatedLength: UnderestimateLengthBehavior) {
+  init(_ data: [Element], underestimatedLength: UnderestimatedLengthBehavior) {
     self._data = MinimalForwardCollection(
       elements: data, underestimatedLength: underestimatedLength)
   }
@@ -266,16 +266,16 @@ CollectionTypeTests.test(
   "map/Collection/${Implementation}Implementation/${dispatch}"
 ) {
   for test in mapTests {
-    for underestimateLengthBehavior in [
-      UnderestimateLengthBehavior.Precise,
-      UnderestimateLengthBehavior.Half,
-      UnderestimateLengthBehavior.Value(0)
+    for underestimatedLengthBehavior in [
+      UnderestimatedLengthBehavior.Precise,
+      UnderestimatedLengthBehavior.Half,
+      UnderestimatedLengthBehavior.Value(0)
     ] {
       let s = MinimalForwardCollectionWith${Implementation}Map<
         OpaqueValue<Int>
       >(
         test.sequence.map(OpaqueValue.init),
-        underestimatedLength: underestimateLengthBehavior)
+        underestimatedLength: underestimatedLengthBehavior)
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
@@ -320,10 +320,10 @@ CollectionTypeTests.test(
 ${LazyFlatMapTest}
 
 //===----------------------------------------------------------------------===//
-// underestimateLength()
+// underestimatedLength()
 //===----------------------------------------------------------------------===//
 
-CollectionTypeTests.test("underestimateLength/Collection/DefaultImplementation") {
+CollectionTypeTests.test("underestimatedLength/Collection/DefaultImplementation") {
   do {
     let s = CollectionWithDefaultUnderestimateLength(length: 0)
     expectEqual(0, callGenericUnderestimatedLength(s))
@@ -360,14 +360,14 @@ struct CollectionWithCustomUnderestimateLength : Collection {
     return OpaqueValue(0xffff)
   }
 
-  func underestimateLength() -> Int {
+  func underestimatedLength() -> Int {
     return _underestimatedLength
   }
 
   let _underestimatedLength: Int
 }
 
-CollectionTypeTests.test("underestimateLength/Collection/CustomImplementation") {
+CollectionTypeTests.test("underestimatedLength/Collection/CustomImplementation") {
   do {
     let s = CollectionWithCustomUnderestimateLength(underestimatedLength: 0)
     expectEqual(0, callGenericUnderestimatedLength(s))
