@@ -1096,7 +1096,7 @@ class CopyForwardingPass : public SILFunctionTransform
     }
     if (Forwarding.hasChangedCFG()) {
       // We've split critical edges so we can't preserve CFG.
-      invalidateAnalysis(SILAnalysis::InvalidationKind::WholeFunction);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
     } else {
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
       }

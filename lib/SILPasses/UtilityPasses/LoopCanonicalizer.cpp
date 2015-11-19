@@ -50,7 +50,7 @@ class LoopCanonicalizer : public SILFunctionTransform {
       // We preserve loop info and the dominator tree.
       DA->lockInvalidation();
       LA->lockInvalidation();
-      PM->invalidateAnalysis(F, SILAnalysis::InvalidationKind::WholeFunction);
+      PM->invalidateAnalysis(F, SILAnalysis::InvalidationKind::FunctionBody);
       DA->unlockInvalidation();
       LA->unlockInvalidation();
     }

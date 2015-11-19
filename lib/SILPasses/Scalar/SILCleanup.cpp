@@ -63,7 +63,7 @@ class SILCleanup : public swift::SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     cleanFunction(*getFunction());
-    invalidateAnalysis(SILAnalysis::InvalidationKind::WholeFunction);
+    invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
   }
 
   StringRef getName() override { return "SIL Cleanup"; }

@@ -1000,7 +1000,7 @@ class PredictableMemoryOptimizations : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     if (optimizeMemoryAllocations(*getFunction()))
-      invalidateAnalysis(SILAnalysis::InvalidationKind::WholeFunction);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
   }
 
   StringRef getName() override { return "Predictable Memory Opts"; }

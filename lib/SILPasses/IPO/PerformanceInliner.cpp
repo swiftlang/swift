@@ -1209,7 +1209,7 @@ void SILPerformanceInliner::inlineDevirtualizeAndSpecialize(
         // maintain it.
         CGA->lockInvalidation();
         MT->invalidateAnalysis(WorkItem,
-                               SILAnalysis::InvalidationKind::WholeFunction);
+                               SILAnalysis::InvalidationKind::FunctionBody);
         CGA->unlockInvalidation();
 
         // FIXME: Update inlineCallsIntoFunction to collect all

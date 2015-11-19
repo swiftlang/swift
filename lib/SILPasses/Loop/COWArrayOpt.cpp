@@ -2287,7 +2287,7 @@ void ArrayPropertiesSpecializer::specializeLoopNest() {
 
   // We have potentially cloned a loop - invalidate loop info.
   LoopAnalysis->invalidate(Header->getParent(),
-                           SILAnalysis::InvalidationKind::WholeFunction);
+                           SILAnalysis::InvalidationKind::FunctionBody);
 }
 
 namespace {
@@ -2347,7 +2347,7 @@ class SwiftArrayOptPass : public SILFunctionTransform {
       // We preserve the dominator tree. Let's invalidate everything
       // else.
       DA->lockInvalidation();
-      invalidateAnalysis(SILAnalysis::InvalidationKind::WholeFunction);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
       DA->unlockInvalidation();
     }
   }

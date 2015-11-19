@@ -530,7 +530,7 @@ namespace {
         Changed |= tryToSpeculateTarget(AI, CHA);
 
       if (Changed) {
-        invalidateAnalysis(SILAnalysis::InvalidationKind::WholeFunction);
+        invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
       }
     }
 

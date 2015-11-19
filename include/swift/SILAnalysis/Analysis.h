@@ -62,7 +62,7 @@ namespace swift {
       Functions = 0x8,
 
       /// Convenience states:
-      WholeFunction = Calls | Branches | Instructions,
+      FunctionBody = Calls | Branches | Instructions,
 
       CallsAndInstructions = Calls | Instructions,
 

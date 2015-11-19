@@ -2488,14 +2488,14 @@ class DefiniteInitialization : public SILFunctionTransform {
   void run() override {
     // Walk through and promote all of the alloc_box's that we can.
     if (checkDefiniteInitialization(*getFunction())) {
-      invalidateAnalysis(SILAnalysis::InvalidationKind::WholeFunction);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
     }
 
     DEBUG(getFunction()->verify());
 
     // Lower raw-sil only instructions used by this pass, like "assign".
     if (lowerRawSILOperations(*getFunction()))
-      invalidateAnalysis(SILAnalysis::InvalidationKind::WholeFunction);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
   }
 
   StringRef getName() override { return "Definite Initialization"; }

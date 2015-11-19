@@ -3372,7 +3372,7 @@ public:
     if (SimplifyCFG(*getFunction(), PM, getOptions().VerifyAll,
                     EnableJumpThread)
             .run())
-      invalidateAnalysis(SILAnalysis::InvalidationKind::WholeFunction);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
   }
 
   StringRef getName() override { return "Simplify CFG"; }
