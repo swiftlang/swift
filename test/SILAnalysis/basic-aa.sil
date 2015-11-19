@@ -9,6 +9,10 @@ import Swift
 // Type Declarations //
 ///////////////////////
 
+struct Int {
+  var value : Builtin.Int64
+}
+
 enum E { 
         case A
         case B
