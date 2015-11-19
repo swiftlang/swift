@@ -59,7 +59,6 @@ KNOWN_SETTINGS=(
     build-dir                   ""               "out-of-tree build directory; default is in-tree. **This argument is required**"
     darwin-xcrun-toolchain      "default"        "the name of the toolchain to use on Darwin"
     build-ninja                 ""               "build the Ninja tool"
-    skip-build-swig             ""               "don't build the Swig tool, even if we're building lldb"
     cmark-build-type            "Debug"          "the CMake build variant for CommonMark (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
     lldb-extra-cmake-args       ""               "extra command line args to pass to lldb cmake"
     lldb-test-with-curses       ""               "run test lldb test runner using curses terminal control"
@@ -815,7 +814,6 @@ esac
 # Calculate source directories for each product.
 #
 NINJA_SOURCE_DIR="$WORKSPACE/ninja"
-SWIG_SOURCE_DIR="$WORKSPACE/swig"
 SWIFT_SOURCE_DIR="$WORKSPACE/swift"
 LLVM_SOURCE_DIR="$WORKSPACE/llvm"
 CMARK_SOURCE_DIR="$WORKSPACE/cmark"
@@ -824,17 +822,6 @@ LLBUILD_SOURCE_DIR="$WORKSPACE/llbuild"
 SWIFTPM_SOURCE_DIR="$WORKSPACE/swiftpm"
 XCTEST_SOURCE_DIR="$WORKSPACE/XCTest"
 FOUNDATION_SOURCE_DIR="$WORKSPACE/Foundation"
-
-if [[ "$SKIP_BUILD_LLDB" ]]; then
-  SKIP_BUILD_SWIG=1
-fi
-
-if [[ ! "$SKIP_BUILD_SWIG" ]]; then
-  if [[ ! -d $SWIG_SOURCE_DIR ]]; then
-    (echo "swig isn't in the tree and can't be checked out by RC.  Please provide a swig-1 source directory at $SWIG_SOURCE_DIR." && \
-     exit 1)
-  fi
-fi
 
 if [[ ! -d $CMARK_SOURCE_DIR ]]; then
   echo "$CMARK_SOURCE_DIR not found. Attempting to clone ..."
@@ -877,9 +864,6 @@ if [ ! -d "${CLANG_SOURCE_DIR}" ] ; then
 fi
 
 PRODUCTS=(cmark llvm swift)
-if [[ ! "${SKIP_BUILD_SWIG}" ]] ; then
-     PRODUCTS=("${PRODUCTS[@]}" swig)
-fi
 if [[ ! "${SKIP_BUILD_LLDB}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" lldb)
 fi
@@ -1106,9 +1090,6 @@ function build_directory_bin() {
             swift)
                 echo "${root}/${SWIFT_BUILD_TYPE}/bin"
                 ;;
-            swig)
-                echo "${root}"
-                ;;
             lldb)
                 ;;
             llbuild)
@@ -1208,8 +1189,6 @@ function cmake_config_opt() {
                 ;;
             swift)
                 echo "--config ${SWIFT_BUILD_TYPE}"
-                ;;
-            swig)
                 ;;
             lldb)
                 ;;
@@ -1598,20 +1577,6 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 skip_build=$SKIP_BUILD_SWIFT
                 ;;
 
-            swig)
-                swig_build_dir=$(build_directory $deployment_target swig)
-                if [[ "${RECONFIGURE}" || ! -f "${swig_build_dir}/Install/bin/swig" ]] ; then
-                    swig_install_dir="${swig_build_dir}/Install"
-                    mkdir -p ${swig_install_dir}
-                    pushd ${swig_build_dir}
-                    "${SWIG_SOURCE_DIR}"/configure --prefix="${swig_install_dir}"
-                    make
-                    make install
-                    popd
-                fi
-                continue
-                ;;
-
             lldb)
                 if [ ! -d "$LLDB_SOURCE_DIR" ]; then
                     echo "error: lldb not found in ${LLDB_SOURCE_DIR}"
@@ -1621,7 +1586,6 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                     echo "error: lldb can only build with ninja"
                     exit 1
                 fi
-                swig_build_dir=$(build_directory $deployment_target swig)
                 cmark_build_dir=$(build_directory $deployment_target cmark)
                 lldb_build_dir=$(build_directory $deployment_target lldb)
                 swift_build_dir=$(build_directory $deployment_target swift)
@@ -1647,7 +1611,6 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                             -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
                             -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
                             -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
-                            -DLLDB_PATH_TO_SWIG_BIN:PATH="${swig_build_dir}/Install/bin"
                             "${LLDB_SOURCE_DIR}"
                         )
                         ;;
@@ -1661,7 +1624,6 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                             LLDB_PATH_TO_CLANG_BUILD="${llvm_build_dir}"
                             LLDB_PATH_TO_SWIFT_BUILD="${swift_build_dir}"
                             LLDB_PATH_TO_CMARK_BUILD="${cmark_build_dir}"
-                            LLDB_PATH_TO_SWIG="${swig_build_dir}/Install/bin/swig"
                             SYMROOT="${lldb_build_dir}"
                             OBJROOT="${lldb_build_dir}"
                         )
@@ -1844,9 +1806,6 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                     )
                 fi
                 ;;
-            swig)
-                continue # We don't test swig.
-                ;;
             lldb)
                 if [[ "$SKIP_TEST_LLDB" ]]; then
                     continue
@@ -1979,9 +1938,6 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 if [[ -z "${INSTALL_SWIFT}" ]] ; then
                     continue
                 fi
-                ;;
-            swig)
-                continue # We don't install swig.
                 ;;
             lldb)
                 if [[ -z "${INSTALL_LLDB}" ]] ; then
