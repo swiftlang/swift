@@ -109,7 +109,7 @@ static bool isMultiUnderlyingObjectValue(SILValue V) {
     return true;
   // We are only interested in basic block SILArguments as those are the
   // ones we can collect all the possible incoming values.
-  if (SILArgument *SA = dyn_cast<SILArgument>(V))
+  if (auto *SA = dyn_cast<SILArgument>(V))
     if (!SA->isFunctionArg())
       return true;
   return false;
