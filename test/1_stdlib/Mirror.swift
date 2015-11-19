@@ -44,12 +44,12 @@ extension Mirror {
 
 mirrors.test("RandomAccessStructure") {
   struct Eggs : CustomReflectable {
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(self, unlabeledChildren: ["aay", "bee", "cee"])
     }
   }
 
-  let x = Eggs().customMirror()
+  let x = Eggs().customMirror
   
   expectEqual("[nil: \"aay\", nil: \"bee\", nil: \"cee\"]", x.testDescription)
 }
@@ -76,7 +76,7 @@ func find(substring: String, within domain: String) -> String.Index? {
 
 mirrors.test("ForwardStructure") {
   struct DoubleYou : CustomReflectable {
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(
         self,
         unlabeledChildren: Set(letters.characters),
@@ -84,7 +84,7 @@ mirrors.test("ForwardStructure") {
     }
   }
 
-  let w = DoubleYou().customMirror()
+  let w = DoubleYou().customMirror
   expectEqual(.Set, w.displayStyle)
   expectEqual(letters.characters.length, numericCast(w.children.length))
   
@@ -99,7 +99,7 @@ mirrors.test("ForwardStructure") {
 
 mirrors.test("BidirectionalStructure") {
   struct Why : CustomReflectable {
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(
         self,
         unlabeledChildren: letters.characters,
@@ -108,7 +108,7 @@ mirrors.test("BidirectionalStructure") {
   }
 
   // Test that the basics seem to work
-  let y = Why().customMirror()
+  let y = Why().customMirror
   expectEqual(.Collection, y.displayStyle)
 
   let description = y.testDescription
@@ -119,33 +119,33 @@ mirrors.test("BidirectionalStructure") {
 
 mirrors.test("LabeledStructure") {
   struct Zee : CustomReflectable, CustomStringConvertible {
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(self, children: ["bark": 1, "bite": 0])
     }
     var description: String { return "Zee" }
   }
 
-  let z = Zee().customMirror()
+  let z = Zee().customMirror
   expectEqual("[bark: 1, bite: 0]", z.testDescription)
   expectEmpty(z.displayStyle)
 
   struct Zee2 : CustomReflectable {
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(
         self, children: ["bark": 1, "bite": 0], displayStyle: .Dictionary)
     }
   }
-  let z2 = Zee2().customMirror()
+  let z2 = Zee2().customMirror
   expectEqual(.Dictionary, z2.displayStyle)
   expectEqual("[bark: 1, bite: 0]", z2.testDescription)
 
   struct Heterogeny : CustomReflectable {
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(
         self, children: ["bark": 1, "bite": Zee()])
     }
   }
-  let h = Heterogeny().customMirror()
+  let h = Heterogeny().customMirror
   expectEqual("[bark: 1, bite: Zee]", h.testDescription)
 }
 
@@ -239,7 +239,7 @@ mirrors.test("Class/Root/Uncustomized") {
 mirrors.test("Class/Root/superclass:.Generated") {
   class B : CustomReflectable {
     var b: String = "two"
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(
         self, children: [ "bee": b ], ancestorRepresentation: .Generated)
     }
@@ -257,7 +257,7 @@ mirrors.test("Class/Root/superclass:.Generated") {
 mirrors.test("class/Root/superclass:<default>") {
   class C : CustomReflectable {
     var c: UInt = 3
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(self, children: [ "sea": c + 1 ])
     }
   }
@@ -296,7 +296,7 @@ mirrors.test("class/UncustomizedSuper/Synthesized/Implicit") {
 
   class B : A, CustomReflectable {
     var b: UInt = 42
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(self, children: [ "bee": b ])
     }
   }
@@ -315,7 +315,7 @@ mirrors.test("class/UncustomizedSuper/Synthesized/Explicit") {
 
   class B : A, CustomReflectable {
     var b: UInt = 42
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(
         self, children: [ "bee": b ], ancestorRepresentation: .Generated)
     }
@@ -333,7 +333,7 @@ mirrors.test("class/UncustomizedSuper/Synthesized/Explicit") {
 mirrors.test("class/CustomizedSuper/Synthesized") {
   class A : CustomReflectable {
     var a: Int = 1
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(self, children: [ "aye": a ])
     }
   }
@@ -345,7 +345,7 @@ mirrors.test("class/CustomizedSuper/Synthesized") {
     // ancestorRepresentation: .Customized(super.customMirror) or, in
     // rare cases, ancestorRepresentation: .Suppressed.  However, it
     // has an expected behavior, which we test here.
-    override func customMirror() -> Mirror {
+    override var customMirror: Mirror {
       return Mirror(self, children: [ "bee": b ])
     }
   }
@@ -391,7 +391,7 @@ mirrors.test("class/ObjCUncustomizedSuper/Synthesized/Implicit") {
 
   class B : A, CustomReflectable {
     var b: UInt = 42
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(self, children: [ "bee": b ])
     }
   }
@@ -412,7 +412,7 @@ mirrors.test("class/ObjCUncustomizedSuper/Synthesized/Explicit") {
 
   class B : A, CustomReflectable {
     var b: UInt = 42
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(
         self, children: [ "bee": b ], ancestorRepresentation: .Generated)
     }
@@ -432,7 +432,7 @@ mirrors.test("class/ObjCUncustomizedSuper/Synthesized/Explicit") {
 mirrors.test("class/ObjCCustomizedSuper/Synthesized") {
   class A : NSDateFormatter, CustomReflectable {
     var a: Int = 1
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(self, children: [ "aye": a ])
     }
   }
@@ -444,7 +444,7 @@ mirrors.test("class/ObjCCustomizedSuper/Synthesized") {
     // ancestorRepresentation: .Customized(super.customMirror) or, in
     // rare cases, ancestorRepresentation: .Suppressed.  However, it
     // has an expected behavior, which we test here.
-    override func customMirror() -> Mirror {
+    override var customMirror: Mirror {
       return Mirror(self, children: [ "bee": b ])
     }
   }
@@ -471,7 +471,7 @@ mirrors.test("class/ObjCCustomizedSuper/Synthesized") {
 mirrors.test("Class/Root/NoSuperclassMirror") {
   class B : CustomReflectable {
     var b: String = "two"
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(
         self, children: [ "bee": b ], ancestorRepresentation: .Suppressed)
     }
@@ -489,7 +489,7 @@ mirrors.test("class/UncustomizedSuper/NoSuperclassMirror") {
 
   class B : A, CustomReflectable {
     var b: UInt = 42
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(
         self, children: [ "bee": b ], ancestorRepresentation: .Suppressed)
     }
@@ -503,14 +503,14 @@ mirrors.test("class/UncustomizedSuper/NoSuperclassMirror") {
 mirrors.test("class/CustomizedSuper/NoSuperclassMirror") {
   class A : CustomReflectable {
     var a: Int = 1
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(self, children: [ "aye": a ])
     }
   }
 
   class B : A {
     var b: UInt = 42
-    override func customMirror() -> Mirror {
+    override var customMirror: Mirror {
       return Mirror(
         self, children: [ "bee": b ], ancestorRepresentation: .Suppressed)
     }
@@ -525,7 +525,7 @@ mirrors.test("class/CustomizedSuper/NoSuperclassMirror") {
 mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Direct") {
   class A : CustomReflectable {
     var a: Int = 1
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(self, children: [ "aye": a ])
     }
   }
@@ -533,10 +533,10 @@ mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Direct") {
   // B inherits A directly
   class B : A {
     var b: UInt = 42
-    override func customMirror() -> Mirror {
+    override var customMirror: Mirror {
       return Mirror(
         self, children: [ "bee": b ],
-        ancestorRepresentation: .Customized(super.customMirror)
+        ancestorRepresentation: .Customized({ super.customMirror })
         )
     }
   }
@@ -553,7 +553,7 @@ mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Direct") {
 mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Indirect") {
   class A : CustomReflectable {
     var a: Int = 1
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(self, children: [ "aye": a ])
     }
   }
@@ -565,10 +565,10 @@ mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Indirect") {
   // B inherits A indirectly through X and Y
   class B : Y {
     var b: UInt = 42
-    override func customMirror() -> Mirror {
+    override var customMirror: Mirror {
       return Mirror(
         self, children: [ "bee": b ],
-        ancestorRepresentation: .Customized(super.customMirror))
+        ancestorRepresentation: .Customized({ super.customMirror }))
     }
   }
 
@@ -592,7 +592,7 @@ mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Indirect") {
 mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Indirect2") {
   class A : CustomLeafReflectable {
     var a: Int = 1
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(
         self, children: [ "aye": a ])
     }
@@ -605,10 +605,10 @@ mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Indirect2") {
   // B inherits A indirectly through X and Y
   class B : Y {
     var b: UInt = 42
-    override func customMirror() -> Mirror {
+    override var customMirror: Mirror {
       return Mirror(
         self, children: [ "bee": b ],
-        ancestorRepresentation: .Customized(super.customMirror))
+        ancestorRepresentation: .Customized({ super.customMirror }))
     }
   }
 
@@ -625,7 +625,7 @@ mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Indirect2") {
 mirrors.test("class/Cluster") {
   class A : CustomLeafReflectable {
     var a: Int = 1
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(
         self, children: [ "aye": a ])
     }
@@ -672,7 +672,7 @@ mirrors.test("Addressing") {
   expectEqual("three", m1.descendant(".0", "[2]") as? String)
 
   struct Zee : CustomReflectable {
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(self, children: ["bark": 1, "bite": 0])
     }
   }
