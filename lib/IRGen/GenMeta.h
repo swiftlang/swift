@@ -214,7 +214,8 @@ namespace irgen {
                                       llvm::Value *base,
                                       SILType baseType,
                                       SILDeclRef method,
-                                      CanSILFunctionType methodType);
+                                      CanSILFunctionType methodType,
+                                      bool useSuperVTable);
 
   /// \brief Load a reference to the protocol descriptor for the given protocol.
   ///

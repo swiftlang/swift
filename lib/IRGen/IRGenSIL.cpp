@@ -4540,10 +4540,28 @@ void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
 }
 
 void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
-  assert(i->getMember().isForeign && "super_method to non_objc callee");
-  setLoweredObjCMethodBounded(SILValue(i, 0), i->getMember(),
-                              i->getOperand().getType(),
-                              /*startAtSuper=*/true);
+  if (i->getMember().isForeign) {
+    setLoweredObjCMethodBounded(SILValue(i, 0), i->getMember(),
+                                i->getOperand().getType(),
+                                /*startAtSuper=*/true);
+    return;
+  }
+
+  auto base = getLoweredExplosion(i->getOperand());
+  auto baseType = i->getOperand().getType();
+  llvm::Value *baseValue = base.claimNext();
+
+  auto method = i->getMember();
+  auto methodType = i->getType().castTo<SILFunctionType>();
+
+  llvm::Value *fnValue = emitVirtualMethodValue(*this, baseValue,
+                                                baseType,
+                                                method, methodType,
+                                                /*useSuperVTable*/ true);
+  fnValue = Builder.CreateBitCast(fnValue, IGM.Int8PtrTy);
+  Explosion e;
+  e.add(fnValue);
+  setLoweredExplosion(SILValue(i, 0), e);
 }
 
 void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
@@ -4564,7 +4582,8 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   // FIXME: better explosion kind, map as static.
   llvm::Value *fnValue = emitVirtualMethodValue(*this, baseValue,
                                                 i->getOperand().getType(),
-                                                method, methodType);
+                                                method, methodType,
+                                                /*useSuperVTable*/ false);
   fnValue = Builder.CreateBitCast(fnValue, IGM.Int8PtrTy);
   Explosion e;
   e.add(fnValue);

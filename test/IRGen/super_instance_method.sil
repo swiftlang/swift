@@ -1,0 +1,64 @@
+// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+public class Parent {
+  public func foo() {}
+}
+
+public class Child : Parent {}
+
+public class Grandchild : Child {
+  override public func foo() { super.foo() }
+}
+
+// test.Parent.foo () -> ()
+sil @_TFC4test6Parent3foofT_T_ : $@convention(method) (@guaranteed Parent) -> () {
+// %0                                             // user: %1
+bb0(%0 : $Parent):
+  debug_value %0 : $Parent  // let self           // id: %1
+  %2 = tuple ()                                   // user: %3
+  return %2 : $()                                 // id: %3
+}
+
+// test.Grandchild.foo () -> ()
+sil @_TFC4test10Grandchild3foofT_T_ : $@convention(method) (@guaranteed Grandchild) -> () {
+// %0                                             // users: %1, %2, %3
+bb0(%0 : $Grandchild):
+  debug_value %0 : $Grandchild  // let self       // id: %1
+  strong_retain %0 : $Grandchild                  // id: %2
+  %3 = upcast %0 : $Grandchild to $Child          // user: %4
+  %4 = upcast %3 : $Child to $Parent              // users: %6, %7
+  // function_ref test.Parent.foo () -> ()
+  %5 = super_method %0 : $Grandchild, #Parent.foo!1 : (Parent) -> () -> (), $@convention(method) (@guaranteed Parent) -> ()
+  %6 = apply %5(%4) : $@convention(method) (@guaranteed Parent) -> ()
+  strong_release %4 : $Parent                     // id: %7
+  %8 = tuple ()                                   // user: %9
+  return %8 : $()                                 // id: %9
+}
+
+sil_vtable Parent {
+  #Parent.foo!1: _TFC4test6Parent3foofT_T_	// test.Parent.foo () -> ()
+}
+
+sil_vtable Child {
+  #Parent.foo!1: _TFC4test6Parent3foofT_T_	// test.Parent.foo () -> ()
+}
+
+sil_vtable Grandchild {
+  #Parent.foo!1: _TFC4test10Grandchild3foofT_T_	// test.Grandchild.foo () -> ()
+}
+
+// CHECK: define void @_TFC4test10Grandchild3foofT_T_(%C21super_instance_method10Grandchild*)
+// CHECK: [[OPAQUE_GRANDCHILD:%[0-9]+]] = bitcast %C21super_instance_method10Grandchild* %0 to %swift.type**
+// CHECK: [[GRANDCHILD_METADATA:%\..*]] = load %swift.type*, %swift.type** [[OPAQUE_GRANDCHILD]]
+// CHECK: [[OPAQUE_METADATA:%[0-9]+]] = bitcast %swift.type* [[GRANDCHILD_METADATA]] to %swift.type**
+// CHECK: [[SUPER_METADATA_PTR:%[0-9]+]] = getelementptr inbounds %swift.type*, %swift.type** [[OPAQUE_METADATA]], i32 1
+// CHECK: [[SUPER_METADATA:%[0-9]+]] = load %swift.type*, %swift.type** [[SUPER_METADATA_PTR]]
+// CHECK: [[FOO_VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%C21super_instance_method6Parent*)*, void (%C21super_instance_method6Parent*)**
+// CHECK: [[FOO_FNPTR:%[0-9]+]] = load void (%C21super_instance_method6Parent*)*, void (%C21super_instance_method6Parent*)** [[FOO_VTABLE_SLOT]]
+// CHECK: call void

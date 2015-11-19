@@ -4298,7 +4298,8 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                                            llvm::Value *base,
                                            SILType baseType,
                                            SILDeclRef method,
-                                           CanSILFunctionType methodType) {
+                                           CanSILFunctionType methodType,
+                                           bool useSuperVTable) {
   AbstractFunctionDecl *methodDecl
     = cast<AbstractFunctionDecl>(method.getDecl());
 
@@ -4315,6 +4316,11 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   } else {
     metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType,
                                                 /*suppress cast*/ true);
+  }
+
+  if (useSuperVTable) {
+    auto superField = emitAddressOfSuperclassRefInClassMetadata(IGF, metadata);
+    metadata = IGF.Builder.CreateLoad(superField);
   }
 
   // Use the type of the method we were type-checked against, not the
