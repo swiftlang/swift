@@ -574,17 +574,20 @@ std::string CGForDotView::getNodeAttributes(const Node *Node) const {
     default:
       break;
   }
+  if (Orig->getEscapeState() != swift::EscapeAnalysis::EscapeState::None &&
+      !attr.empty())
+    attr += ',';
+  
   switch (Orig->getEscapeState()) {
     case swift::EscapeAnalysis::EscapeState::None:
       break;
+    case swift::EscapeAnalysis::EscapeState::Return:
+      attr += "color=\"green\"";
+      break;
     case swift::EscapeAnalysis::EscapeState::Arguments:
-      if (!attr.empty())
-        attr += ',';
       attr += "color=\"blue\"";
       break;
     case swift::EscapeAnalysis::EscapeState::Global:
-      if (!attr.empty())
-        attr += ',';
       attr += "color=\"red\"";
       break;
   }
@@ -754,6 +757,9 @@ void EscapeAnalysis::ConnectionGraph::print(llvm::raw_ostream &OS) const {
         }
         break;
       }
+      case EscapeState::Return:
+        OS << 'R';
+        break;
       case EscapeState::Arguments:
         OS << 'A';
         break;

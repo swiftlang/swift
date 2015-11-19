@@ -94,9 +94,16 @@ class EscapeAnalysis : public SILAnalysis {
   enum class EscapeState : char {
 
     /// The node's value does not escape.
+    /// The value points to a locally allocated object who's lifetime ends in
+    /// the same function.
     None,
+    
+    /// The node's value escapes through the return value.
+    /// The value points to a locally allocated object which escapes via the
+    /// return instruction.
+    Return,
 
-    /// The node's value escapes through a function argument or return value.
+    /// The node's value escapes through a function argument.
     Arguments,
 
     /// The node's value escapes to any global or unidentified memory.
@@ -422,7 +429,7 @@ public:
     CGNode *getReturnNode() {
       if (!ReturnNode) {
         ReturnNode = allocNode(nullptr, NodeType::Return);
-        ReturnNode->mergeEscapeState(EscapeState::Arguments);
+        ReturnNode->mergeEscapeState(EscapeState::Return);
       }
       return ReturnNode;
     }
