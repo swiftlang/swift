@@ -52,9 +52,11 @@ enum Either<LTy, RTy> {
   case Right(RTy)
 }
 
-sil @guaranteed_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+sil [fragile] @guaranteed_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 
-sil @owned_return : $@convention(thin) () -> (@owned @box Builtin.Int32)
+sil [fragile] @owned_return : $@convention(thin) () -> (@owned @box Builtin.Int32)
+
+sil [fragile] @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorType
 
 /////////////////
 // Basic Tests //
@@ -1906,4 +1908,26 @@ bb0:
   strong_release %2 : $@callee_owned (@box Builtin.Int32) -> ()
   %9999 = tuple()
   return %9999 : $()
+}
+
+// CHECK-LABEL: sil [fragile] @try_apply_test : $@convention(thin) (Builtin.NativeObject) -> @error ErrorType {
+// CHECK: bb0
+// CHECK: strong_retain
+// CHECK: bb1
+// CHECK: strong_release
+// CHECK: bb2
+// CHECK: strong_release
+sil [fragile] @try_apply_test : $@convention(thin) (Builtin.NativeObject) -> @error ErrorType {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  %1 = function_ref @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorType
+  try_apply %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorType, normal bb1, error bb2
+
+bb1(%2 : $()):
+  strong_release %0 : $Builtin.NativeObject
+  return undef : $()
+
+bb2(%3 : $ErrorType):
+  strong_release %0 : $Builtin.NativeObject
+  throw %3 : $ErrorType
 }

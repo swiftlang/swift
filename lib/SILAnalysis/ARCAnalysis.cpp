@@ -577,26 +577,28 @@ valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
 bool
 swift::
 mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
-  // Only applies can require a guaranteed lifetime. If we don't have one, bail.
-  auto *AI = dyn_cast<ApplyInst>(User);
-  if (!AI)
+  // Only full apply sites can require a guaranteed lifetime. If we don't have
+  // one, bail.
+  if (!isa<FullApplySite>(User))
     return false;
 
-  // Ok, we have an apply. If the apply has no arguments, we don't need to worry
-  // about any guaranteed parameters.
-  if (!AI->getNumOperands())
+  FullApplySite FAS(User);
+
+  // Ok, we have a full apply site. If the apply has no arguments, we don't need
+  // to worry about any guaranteed parameters.
+  if (!FAS.getNumArguments())
     return false;
 
-  // Ok, we have an apply with arguments. Look at the function type and iterate
-  // through the function parameters. If any of the parameters are guaranteed,
-  // attempt to prove that the passed in parameter can not alias Ptr. If we
-  // fail, return true.
-  CanSILFunctionType FType = AI->getSubstCalleeType();
+  // Ok, we have an apply site with arguments. Look at the function type and
+  // iterate through the function parameters. If any of the parameters are
+  // guaranteed, attempt to prove that the passed in parameter can not alias
+  // Ptr. If we fail, return true.
+  CanSILFunctionType FType = FAS.getSubstCalleeType();
   auto Params = FType->getParameters();
   for (unsigned i : indices(Params)) {    
     if (!Params[i].isGuaranteed())
       continue;
-    SILValue Op = AI->getArgument(i);
+    SILValue Op = FAS.getArgument(i);
     for (int i = 0, e = Ptr->getNumTypes(); i < e; i++)
       if (!AA->isNoAlias(Op, SILValue(Ptr.getDef(), i)))
         return true;
