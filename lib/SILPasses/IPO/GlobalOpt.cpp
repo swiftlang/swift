@@ -713,6 +713,11 @@ SILGlobalVariable *SILGlobalOpt::getVariableOfGlobalInit(SILFunction *AddrF) {
 }
 
 static bool canBeChangedExternally(SILGlobalVariable *SILG) {
+
+  // Don't assume anything about globals which are imported from other modules.
+  if (isAvailableExternally(SILG->getLinkage()))
+    return true;
+
   // Use access specifiers from the declarations,
   // if possible.
   if (auto *Decl = SILG->getDecl()) {
