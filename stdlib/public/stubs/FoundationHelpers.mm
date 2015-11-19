@@ -77,3 +77,8 @@ _swift_stdlib_CFStringFindWithOptions(CFStringRef theString,
   return CFStringFindWithOptions(theString, stringToFind, rangeToSearch,
                                  searchOptions, result);
 }
+
+extern "C" CFStringRef
+_swift_stdlib_objcDebugDescription(id __nonnull nsObject) {
+  return (__bridge CFStringRef)[nsObject debugDescription];
+}

@@ -87,6 +87,8 @@ _swift_stdlib_CFStringFindWithOptions(_swift_shims_CFStringRef __nonnull theStri
                         _swift_shims_CFRange rangeToSearch,
                         _swift_shims_CFStringCompareFlags searchOptions,
                         _swift_shims_CFRange *__nullable result);
+
+_swift_shims_CFStringRef __nonnull _swift_stdlib_objcDebugDescription(id __nonnull nsObject);
 #endif // __OBJC2__
 
 #endif // SWIFT_STDLIB_SHIMS_COREFOUNDATIONSHIMS_H

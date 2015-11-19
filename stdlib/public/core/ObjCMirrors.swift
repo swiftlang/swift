@@ -10,19 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SwiftShims
+
 #if _runtime(_ObjC)
 @_silgen_name("swift_ObjCMirror_count") 
 func _getObjCCount(_: _MagicMirrorData) -> Int
 @_silgen_name("swift_ObjCMirror_subscript") 
 func _getObjCChild(_: Int, _: _MagicMirrorData) -> (String, _MirrorType)
 
-@objc protocol _DebugDescriptionProxy {
-  var debugDescription: _CocoaStringType {get}
-}
-
 func _getObjCSummary(data: _MagicMirrorData) -> String {
-  let theObject = data._loadValue() as _DebugDescriptionProxy
-  return _cocoaStringToSwiftString_NonASCII(theObject.debugDescription)
+  let theDescription = _swift_stdlib_objcDebugDescription(data._loadValue())
+  return _cocoaStringToSwiftString_NonASCII(theDescription)
 }
 
 public // SPI(runtime)
