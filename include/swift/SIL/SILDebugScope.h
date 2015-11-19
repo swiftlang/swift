@@ -91,28 +91,7 @@ public:
   }
 
   /// Return a (cached) deep copy of a scope.
-  const SILDebugScope *getOrCreateClonedScope(const SILDebugScope *OrigScope) {
-    if (!OrigScope)
-      return nullptr;
-
-    auto it = ClonedScopeCache.find(OrigScope);
-    if (it != ClonedScopeCache.end())
-      return it->second;
-
-    auto ClonedScope = new (NewFn.getModule()) SILDebugScope(*OrigScope);
-    if (OrigScope->InlinedCallSite) {
-      // For inlined functions, we need to rewrite the inlined call site.
-      ClonedScope->InlinedCallSite =
-          getOrCreateClonedScope(OrigScope->InlinedCallSite);
-    } else {
-      ClonedScope->SILFn = &NewFn;
-      ClonedScope->Parent = getOrCreateClonedScope(OrigScope->Parent);
-    }
-    // Create an inline scope for the cloned instruction.
-    assert(ClonedScopeCache.find(OrigScope) == ClonedScopeCache.end());
-    ClonedScopeCache.insert({OrigScope, ClonedScope});
-    return ClonedScope;
-  }
+  const SILDebugScope *getOrCreateClonedScope(const SILDebugScope *OrigScope);
 };
 
 /// A SILLocation together with a SILDebugScope.
