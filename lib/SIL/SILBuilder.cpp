@@ -290,17 +290,10 @@ SILBuilder::getOrCreateDebugLocation(SILLocation Loc, const SILDebugScope *DS) {
   // Check whether the location already exists.
   SILDebugLocation TmpLoc(Loc, DS);
   auto *&L = DebugLocs[SILDebugLocationID(TmpLoc)];
-  if (L) {
-    if (!(*L == TmpLoc)) {
-      DebugLocs[SILDebugLocationID(TmpLoc)];
-    }
-    assert(*L == TmpLoc);
+  if (L)
     return L;
-  }
  
   // It's new, allocate it on our own allocator and insert it into the set.
   L = new (F.getModule()) SILDebugLocation(Loc, DS);
-  assert(*L == TmpLoc);
-  assert(*DebugLocs[SILDebugLocationID(TmpLoc)] == TmpLoc);
   return L;
 }
