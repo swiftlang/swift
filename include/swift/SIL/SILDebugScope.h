@@ -94,7 +94,7 @@ public:
   const SILDebugScope *getOrCreateClonedScope(const SILDebugScope *OrigScope);
 };
 
-/// A SILLocation together with a SILDebugScope.
+/// A SILLocation paired with a SILDebugScope.
 class SILDebugLocation : public SILAllocated<SILDebugLocation> {
   SILLocation Location;
   const SILDebugScope *Scope = nullptr;
@@ -109,7 +109,7 @@ public:
   }
 };
 
-/// For use in a DenseMap.
+/// Fingerprint a SILDebugLocation for use in a DenseMap.
 typedef std::pair<std::pair<const void *, unsigned>, const void *> DebugLocKey;
 struct SILDebugLocationID : public DebugLocKey {
   SILDebugLocationID(const SILDebugLocation &L)
