@@ -623,8 +623,8 @@ AliasAnalysis::handleMultiUnderlyingObjectAlias(SILValue V1, SILValue V2) {
   // Return MayAlias if any pair does not have a NoAlias relation.
   for (auto &M : V1Base) {
     for (auto &N : V2Base) {
-      AliasAnalysis::AliasResult R = alias(M, N, findTypedAccessType(M),
-                                           findTypedAccessType(N));
+      AliasAnalysis::AliasResult R = aliasInner(M, N, findTypedAccessType(M),
+                                                findTypedAccessType(N));
       // Return MayAlias whenever we have 1 non-NoAlias pair. This is a
       // tradeoff between compilation time and being conservative. 
       if (R != AliasResult::NoAlias)
