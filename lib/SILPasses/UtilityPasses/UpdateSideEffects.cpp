@@ -13,7 +13,6 @@
 #define DEBUG_TYPE "update-sea"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILAnalysis/SideEffectAnalysis.h"
-#include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILPasses/Transforms.h"
 #include "llvm/Support/CommandLine.h"
 
