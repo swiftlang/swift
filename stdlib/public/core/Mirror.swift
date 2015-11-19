@@ -663,7 +663,7 @@ extension PlaygroundQuickLook {
   ///
   /// If the dynamic type of `subject` conforms to
   /// `CustomPlaygroundQuickLookable`, returns the result of calling
-  /// its `customPlaygroundQuickLook` method.  Otherwise, returns
+  /// its `customPlaygroundQuickLook` property.  Otherwise, returns
   /// a `PlaygroundQuickLook` synthesized for `subject` by the
   /// language.  Note that in some cases the result may be
   /// `.Text(String(reflecting: subject))`.
@@ -674,7 +674,7 @@ extension PlaygroundQuickLook {
   /// mutations is unspecified.
   public init(reflecting subject: Any) {
     if let customized = subject as? CustomPlaygroundQuickLookable {
-      self = customized.customPlaygroundQuickLook()
+      self = customized.customPlaygroundQuickLook
     }
     else {
       if let q = _reflect(subject).quickLookObject {
@@ -699,8 +699,7 @@ public protocol CustomPlaygroundQuickLookable {
   ///
   /// - Note: If `Self` has value semantics, the `Mirror` should be
   ///   unaffected by subsequent mutations of `self`.
-  @warn_unused_result
-  func customPlaygroundQuickLook() -> PlaygroundQuickLook
+  var customPlaygroundQuickLook: PlaygroundQuickLook { get }
 }
 
 

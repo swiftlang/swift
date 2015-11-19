@@ -705,7 +705,7 @@ mirrors.test("Invalid Path Type")
 mirrors.test("PlaygroundQuickLook") {
   // Customization works.
   struct CustomQuickie : CustomPlaygroundQuickLookable {
-    func customPlaygroundQuickLook() -> PlaygroundQuickLook {
+    var customPlaygroundQuickLook: PlaygroundQuickLook {
       return .Point(1.25, 42)
     }
   }
