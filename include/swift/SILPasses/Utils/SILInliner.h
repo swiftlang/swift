@@ -70,24 +70,15 @@ private:
   void visitDebugValueInst(DebugValueInst *Inst);
   void visitDebugValueAddrInst(DebugValueAddrInst *Inst);
 
-  SILDebugScope *getOrCreateInlineScope(SILInstruction *Orig);
+  const SILDebugScope *getOrCreateInlineScope(const SILDebugScope *DS);
 
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
-    if (IKind == InlineKind::MandatoryInline)
-      // Transparent functions are inheriting the location of the call
-      // site. No soup, err, debugging for you!
-      Cloned->setDebugScope(CallSiteScope);
-    else
-      // Create an inlined version of the scope.
-      Cloned->setDebugScope(getOrCreateInlineScope(Orig));
-
     // Call client-supplied callback function.
     if (Callback)
       Callback(Orig, Cloned);
 
-    // We intentionally do not call
-    // SILClonerWithScopes<SILInliner>::postProcess() here as it does
-    // the wrong thing for inlined functions.
+    // We just updated the debug scope information. Intentionally
+    // don't call SILClonerWithScopes<SILInliner>::postProcess().
     SILCloner<SILInliner>::postProcess(Orig, Cloned);
   }
 
@@ -101,6 +92,16 @@ private:
       MandatoryInlinedLocation::getMandatoryInlinedLocation((Decl*)nullptr);
   }
 
+  const SILDebugScope *remapScope(const SILDebugScope *DS) {
+    if (IKind == InlineKind::MandatoryInline)
+      // Transparent functions are absorbed into the call
+      // site. No soup, err, debugging for you!
+      return CallSiteScope;
+    else
+      // Create an inlined version of the scope.
+      return getOrCreateInlineScope(DS);
+  }
+
   InlineKind IKind;
   
   SILBasicBlock *CalleeEntryBB;
@@ -111,9 +112,10 @@ private:
   /// Alternatively, it can be the SIL file location of the call site (in case
   /// of SIL-to-SIL transformations).
   Optional<SILLocation> Loc;
-  SILDebugScope *CallSiteScope;
+  const SILDebugScope *CallSiteScope;
   SILFunction *CalleeFunction;
-  llvm::SmallDenseMap<SILDebugScope *, SILDebugScope *> InlinedScopeCache;
+  llvm::SmallDenseMap<const SILDebugScope *,
+                      const SILDebugScope *> InlinedScopeCache;
   CloneCollector::CallbackType Callback;
 };
 

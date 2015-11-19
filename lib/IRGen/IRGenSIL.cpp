@@ -582,7 +582,7 @@ public:
   template <typename StorageType>
   void emitDebugVariableDeclaration(StorageType Storage,
                                     DebugTypeInfo Ty,
-                                    SILDebugScope *DS,
+                                    const SILDebugScope *DS,
                                     StringRef Name) {
     assert(IGM.DebugInfo && "debug info not enabled");
 

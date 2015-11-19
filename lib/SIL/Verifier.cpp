@@ -519,7 +519,7 @@ public:
   }
 
   /// Return the SIL function of a SILDebugScope's ancestor.
-  static SILFunction *getFunction(SILDebugScope *DS) {
+  static SILFunction *getFunction(const SILDebugScope *DS) {
     if (DS->InlinedCallSite)
       return getFunction(DS->InlinedCallSite);
     if (DS->Parent)

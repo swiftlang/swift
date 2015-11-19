@@ -286,10 +286,6 @@ public:
 
   ASTContext &getASTContext() const { return SGM.M.getASTContext(); }
 
-  /// This is used to keep track of all SILInstructions inserted by \c B.
-  SmallVector<SILInstruction*, 32> InsertedInstrs;
-  size_t LastInsnWithoutScope = 0;
-
   /// The first block in the postmatter section of the function, if
   /// anything has been built there.
   ///
@@ -344,7 +340,6 @@ public:
   std::vector<PatternMatchContext*> SwitchStack;
   /// Keep track of our current nested scope.
   std::vector<SILDebugScope*> DebugScopeStack;
-  SILDebugScope *MainScope = nullptr;
 
   /// The cleanup depth and BB for when the operand of a
   /// BindOptionalExpr is a missing value.
@@ -493,42 +488,23 @@ public:
 
   SourceManager &getSourceManager() { return SGM.M.getASTContext().SourceMgr; }
 
-  /// enterDebugScope - Push a new debug scope and set its parent pointer.
-  void enterDebugScope(SILDebugScope *DS) {
-    if (DebugScopeStack.size())
-      DS->setParent(DebugScopeStack.back());
-    else {
-      DS->setParent(F.getDebugScope());
-      MainScope = DS;
-    }
+  /// Push a new debug scope and set its parent pointer.
+  void enterDebugScope(SILLocation Loc) {
+    auto *Parent =
+        DebugScopeStack.size() ? DebugScopeStack.back() : F.getDebugScope();
+    auto *DS = new (SGM.M) SILDebugScope(Loc, getFunction(), Parent);
     DebugScopeStack.push_back(DS);
-    setDebugScopeForInsertedInstrs(DS->Parent);
+    B.setCurrentDebugScope(DS);
   }
 
-  /// enterDebugScope - return to the previous debug scope.
+  /// Return to the previous debug scope.
   void leaveDebugScope() {
-    assert(DebugScopeStack.size());
-    setDebugScopeForInsertedInstrs(DebugScopeStack.back());
     DebugScopeStack.pop_back();
-  }
-
-  /// Set the debug scope for all SILInstructions that where emitted
-  /// from when we entered the last scope up to the current one.
-  void setDebugScopeForInsertedInstrs(SILDebugScope *DS) {
-    // This is just a workaround.
-    // Check that instruction really belongs to a function being processed.
-    unsigned LastIdx = LastInsnWithoutScope, EndIdx = InsertedInstrs.size();
-    for (auto &BB: F) {
-      for (auto &I: BB) {
-        for (unsigned i = LastIdx; i < EndIdx; ++i) {
-          if (&I == InsertedInstrs[i]) {
-            InsertedInstrs[i]->setDebugScope(DS);
-            break;
-          }
-        }
-      }
+    if (DebugScopeStack.size())
+      B.setCurrentDebugScope(DebugScopeStack.back());
+    else {
+      B.setCurrentDebugScope(F.getDebugScope());
     }
-    LastInsnWithoutScope = EndIdx;
   }
 
   //===--------------------------------------------------------------------===//

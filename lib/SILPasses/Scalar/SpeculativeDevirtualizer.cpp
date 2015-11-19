@@ -48,6 +48,7 @@ STATISTIC(NumTargetsPredicted, "Number of monomorphic functions predicted");
 // A utility function for cloning the apply instruction.
 static FullApplySite CloneApply(FullApplySite AI, SILBuilder &Builder) {
   // Clone the Apply.
+  Builder.setCurrentDebugScope(AI.getDebugScope());
   auto Args = AI.getArguments();
   SmallVector<SILValue, 8> Ret(Args.size());
   for (unsigned i = 0, e = Args.size(); i != e; ++i)
@@ -78,7 +79,7 @@ static FullApplySite CloneApply(FullApplySite AI, SILBuilder &Builder) {
     llvm_unreachable("Trying to clone an unsupported apply instruction");
   }
 
-  NAI.getInstruction()->setDebugScope(AI.getDebugScope());
+  NAI.getInstruction();
   return NAI;
 }
 
@@ -108,7 +109,7 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
 
   SILBasicBlock *Continue = Entry->splitBasicBlock(It);
 
-  SILBuilderWithScope<> Builder(Entry, AI.getDebugScope());
+  SILBuilderWithScope Builder(Entry, AI.getInstruction());
   // Create the checked_cast_branch instruction that checks at runtime if the
   // class instance is identical to the SILType.
 
@@ -119,8 +120,8 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
                                        Virt);
   It = CCBI->getIterator();
 
-  SILBuilder VirtBuilder(Virt);
-  SILBuilder IdenBuilder(Iden);
+  SILBuilderWithScope VirtBuilder(Virt, AI.getInstruction());
+  SILBuilderWithScope IdenBuilder(Iden, AI.getInstruction());
   // This is the class reference downcasted into subclass SubType.
   SILValue DownCastedClassInstance = Iden->getBBArg(0);
 
@@ -133,11 +134,9 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   if (auto *Release =
           dyn_cast<StrongReleaseInst>(std::next(Continue->begin()))) {
     if (Release->getOperand() == CMI->getOperand()) {
-      VirtBuilder.createStrongRelease(Release->getLoc(), CMI->getOperand())
-          ->setDebugScope(Release->getDebugScope());
+      VirtBuilder.createStrongRelease(Release->getLoc(), CMI->getOperand());
       IdenBuilder.createStrongRelease(Release->getLoc(),
-                                      DownCastedClassInstance)
-          ->setDebugScope(Release->getDebugScope());
+                                      DownCastedClassInstance);
       Release->eraseFromParent();
     }
   }
@@ -147,11 +146,9 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   SILArgument *Arg = Continue->createBBArg(AI.getType());
   if (!isa<TryApplyInst>(AI)) {
     IdenBuilder.createBranch(AI.getLoc(), Continue,
-        ArrayRef<SILValue>(IdenAI.getInstruction()))->setDebugScope(
-        AI.getDebugScope());
+                             ArrayRef<SILValue>(IdenAI.getInstruction()));
     VirtBuilder.createBranch(AI.getLoc(), Continue,
-        ArrayRef<SILValue>(VirtAI.getInstruction()))->setDebugScope(
-        AI.getDebugScope());
+                             ArrayRef<SILValue>(VirtAI.getInstruction()));
   }
 
   // Remove the old Apply instruction.
@@ -488,7 +485,7 @@ static bool tryToSpeculateTarget(FullApplySite AI,
   // a direct call of this remaining implementation.
   if (LastCCBI && SubTypeValue == LastCCBI->getOperand()) {
     // Remove last checked_cast_br, because it will always succeed.
-    SILBuilderWithScope<1> B(LastCCBI);
+    SILBuilderWithScope B(LastCCBI);
     auto CastedValue = B.createUncheckedBitCast(LastCCBI->getLoc(),
                                                 LastCCBI->getOperand(),
                                                 LastCCBI->getCastType());

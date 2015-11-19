@@ -30,7 +30,7 @@ ApplySite swift::replaceWithSpecializedFunction(ApplySite AI,
     Arguments.push_back(Op.get());
   }
 
-  SILBuilderWithScope<2> Builder(AI.getInstruction());
+  SILBuilderWithScope Builder(AI.getInstruction());
   FunctionRefInst *FRI = Builder.createFunctionRef(Loc, NewF);
 
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))

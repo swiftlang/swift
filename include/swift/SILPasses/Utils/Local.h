@@ -284,12 +284,15 @@ class BaseThreadingCloner : public SILClonerWithScopes<BaseThreadingCloner> {
   // A map of old to new available values.
   SmallVector<std::pair<ValueBase *, SILValue>, 16> AvailVals;
 
-  BaseThreadingCloner(SILFunction &To)
-    : SILClonerWithScopes(To), FromBB(nullptr), DestBB(nullptr) {}
+  /// If WithinFunction is true, the debug scopes of the cloned
+  /// instructions will not be updated.
+  BaseThreadingCloner(SILFunction &To, bool WithinFunction)
+      : SILClonerWithScopes(To, WithinFunction), FromBB(nullptr),
+        DestBB(nullptr) {}
 
-  BaseThreadingCloner(SILFunction &To,
-                      SILBasicBlock *From, SILBasicBlock *Dest)
-    : SILClonerWithScopes(To), FromBB(From), DestBB(Dest) {}
+  BaseThreadingCloner(SILFunction &To, SILBasicBlock *From, SILBasicBlock *Dest)
+      : SILClonerWithScopes(To, From->getParent() == &To), FromBB(From),
+        DestBB(Dest) {}
 
   void process(SILInstruction *I) { visit(I); }
 
@@ -313,7 +316,7 @@ class BaseThreadingCloner : public SILClonerWithScopes<BaseThreadingCloner> {
 
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
     DestBB->push_back(Cloned);
-    SILClonerWithScopes<BaseThreadingCloner>::postProcess(Orig, Cloned);
+    SILCloner<BaseThreadingCloner>::postProcess(Orig, Cloned);
     // A terminator defines no values. Keeping terminators in the AvailVals list
     // is problematic because terminators get replaced during SSA update.
     if (!isa<TermInst>(Orig))
@@ -348,7 +351,7 @@ public:
     }
 
     // Redirect the branch.
-    SILBuilderWithScope<1>(BI).createBranch(BI->getLoc(), EdgeBB, BI->getArgs());
+    SILBuilderWithScope(BI).createBranch(BI->getLoc(), EdgeBB, BI->getArgs());
     BI->eraseFromParent();
     return EdgeBB;
   }
@@ -363,35 +366,37 @@ public:
 /// Helper class for cloning of basic blocks.
 class BasicBlockCloner : public BaseThreadingCloner {
   public:
-  BasicBlockCloner(SILBasicBlock *From, SILBasicBlock *To = nullptr)
-    : BaseThreadingCloner(To ? *To->getParent() : *From->getParent()) {
-    FromBB = From;
-    if (To == nullptr) {
-      // Create a new BB that is to be used as a target
-      // for cloning.
-      To = From->getParent()->createBasicBlock();
-      for (auto *Arg : FromBB->getBBArgs()) {
-        To->createBBArg(Arg->getType(), Arg->getDecl());
+    BasicBlockCloner(SILBasicBlock *From, SILBasicBlock *To = nullptr,
+                     bool WithinFunction = true)
+        : BaseThreadingCloner(To ? *To->getParent() : *From->getParent(),
+                              WithinFunction) {
+      FromBB = From;
+      if (To == nullptr) {
+        // Create a new BB that is to be used as a target
+        // for cloning.
+        To = From->getParent()->createBasicBlock();
+        for (auto *Arg : FromBB->getBBArgs()) {
+          To->createBBArg(Arg->getType(), Arg->getDecl());
+        }
+      }
+      DestBB = To;
+
+      // Populate the value map so that uses of the BBArgs in the SrcBB are
+      // replaced with the BBArgs of the DestBB.
+      for (unsigned i = 0, e = FromBB->bbarg_size(); i != e; ++i) {
+        ValueMap[FromBB->getBBArg(i)] = DestBB->getBBArg(i);
+        AvailVals.push_back(
+            std::make_pair(FromBB->getBBArg(i), DestBB->getBBArg(i)));
       }
     }
-    DestBB = To;
 
-    // Populate the value map so that uses of the BBArgs in the SrcBB are
-    // replaced with the BBArgs of the DestBB.
-    for (unsigned i = 0, e = FromBB->bbarg_size(); i != e; ++i) {
-      ValueMap[FromBB->getBBArg(i)] = DestBB->getBBArg(i);
-      AvailVals.push_back(
-        std::make_pair(FromBB->getBBArg(i), DestBB->getBBArg(i)));
+    // Clone all instructions of the FromBB into DestBB
+    void clone() {
+      for (auto &I : *FromBB)
+        process(&I);
     }
-  }
 
-  // Clone all instructions of the FromBB into DestBB
-  void clone() {
-    for (auto &I : *FromBB)
-      process(&I);
-  }
-
-  SILBasicBlock *getDestBB() { return DestBB; }
+    SILBasicBlock *getDestBB() { return DestBB; }
 };
 
 /// Helper function to perform SSA updates in case of jump threading. Set

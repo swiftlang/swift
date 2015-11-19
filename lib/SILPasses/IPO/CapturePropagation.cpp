@@ -118,11 +118,14 @@ protected:
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
     assert(IsCloningConstant == (Orig->getFunction() != OrigF) &&
            "Expect only cloned constants from the caller function.");
-    if (IsCloningConstant) {
-      Cloned->setDebugScope(getBuilder().getFunction().getDebugScope());
-      SILCloner<CapturePropagationCloner>::postProcess(Orig, Cloned);
-    } else
-      SILClonerWithScopes<CapturePropagationCloner>::postProcess(Orig, Cloned);
+    SILClonerWithScopes<CapturePropagationCloner>::postProcess(Orig, Cloned);
+  }
+
+  const SILDebugScope *remapScope(const SILDebugScope *DS) {
+    if (IsCloningConstant)
+      return getBuilder().getFunction().getDebugScope();
+    else
+      return SILClonerWithScopes<CapturePropagationCloner>::remapScope(DS);
   }
 
   void cloneConstValue(SILValue Const);
@@ -249,7 +252,7 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
 
 void CapturePropagation::rewritePartialApply(PartialApplyInst *OrigPAI,
                                              SILFunction *SpecialF) {
-  SILBuilderWithScope<2> Builder(OrigPAI);
+  SILBuilderWithScope Builder(OrigPAI);
   auto FuncRef = Builder.createFunctionRef(OrigPAI->getLoc(), SpecialF);
   auto NewPAI = Builder.createPartialApply(OrigPAI->getLoc(),
                                            FuncRef,

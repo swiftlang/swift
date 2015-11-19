@@ -525,7 +525,7 @@ AggregateAvailableValues(SILInstruction *Inst, SILType LoadTy,
   }
   
   
-  SILBuilderWithScope<16> B(Inst);
+  SILBuilderWithScope B(Inst);
   
   if (TupleType *TT = LoadTy.getAs<TupleType>()) {
     SmallVector<SILValue, 4> ResultElts;
@@ -739,7 +739,7 @@ bool AllocOptimize::promoteDestroyAddr(DestroyAddrInst *DAI) {
   DEBUG(llvm::dbgs() << "  *** Promoting destroy_addr: " << *DAI << "\n");
   DEBUG(llvm::dbgs() << "      To value: " << *NewVal.getDef() << "\n");
   
-  SILBuilderWithScope<1>(DAI).emitReleaseValueOperation(DAI->getLoc(), NewVal);
+  SILBuilderWithScope(DAI).emitReleaseValueOperation(DAI->getLoc(), NewVal);
   DAI->eraseFromParent();
   return true;
 }
@@ -757,6 +757,7 @@ void AllocOptimize::explodeCopyAddr(CopyAddrInst *CAI) {
   // Keep track of the new instructions emitted.
   SmallVector<SILInstruction*, 4> NewInsts;
   SILBuilder B(CAI, &NewInsts);
+  B.setCurrentDebugScope(CAI->getDebugScope());
   
   // Use type lowering to lower the copyaddr into a load sequence + store
   // sequence appropriate for the type.
@@ -801,7 +802,6 @@ void AllocOptimize::explodeCopyAddr(CopyAddrInst *CAI) {
   // Update the instructions that touch the memory.  NewInst can grow as this
   // iterates, so we can't use a foreach loop.
   for (auto *NewInst : NewInsts) {
-    NewInst->setDebugScope(CAI->getDebugScope());
     switch (NewInst->getKind()) {
     default:
       NewInst->dump();

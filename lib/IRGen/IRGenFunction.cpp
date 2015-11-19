@@ -32,7 +32,7 @@ using namespace irgen;
 
 IRGenFunction::IRGenFunction(IRGenModule &IGM,
                              llvm::Function *Fn,
-                             SILDebugScope *DbgScope,
+                             const SILDebugScope *DbgScope,
                              Optional<SILLocation> DbgLoc)
   : IGM(IGM), Builder(IGM.getLLVMContext()),
     CurFn(Fn),  DbgScope(DbgScope)

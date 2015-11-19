@@ -268,7 +268,7 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
                              SILFunction *NewF) {
   FullApplySite AI = CSDesc.getApplyInst();
   SILInstruction *Closure = CSDesc.getClosure();
-  SILBuilderWithScope<2> Builder(Closure);
+  SILBuilderWithScope Builder(Closure);
   FunctionRefInst *FRI = Builder.createFunctionRef(AI.getLoc(), NewF);
 
   // Create the args for the new apply by removing the closure argument...
@@ -407,7 +407,7 @@ void CallSiteDescriptor::extendArgumentLifetime(SILValue Arg) const {
          "Need a post-dominating release(s)");
 
   // Extend the lifetime of a captured argument to cover the callee.
-  SILBuilderWithScope<2> Builder(getClosure());
+  SILBuilderWithScope Builder(getClosure());
   Builder.createRetainValue(getClosure()->getLoc(), Arg);
   for (auto *I : CInfo->Lifetime.getLastUsers()) {
     auto It = SILBasicBlock::iterator(*I);

@@ -289,10 +289,9 @@ void SILGenFunction::emitGlobalAccessor(VarDecl *global,
   SILType rawPointerSILTy
     = getLoweredLoadableType(getASTContext().TheRawPointerType);
   addr = B.createAddressToPointer(global, addr, rawPointerSILTy);
-  B.createReturn(global, addr);
-  if (!MainScope)
-    MainScope = F.getDebugScope();
-  setDebugScopeForInsertedInstrs(MainScope);
+  auto *ret = B.createReturn(global, addr);
+  (void)ret;
+  assert(ret->getDebugScope() && "instruction without scope");
 }
 
 void SILGenFunction::emitGlobalGetter(VarDecl *global,

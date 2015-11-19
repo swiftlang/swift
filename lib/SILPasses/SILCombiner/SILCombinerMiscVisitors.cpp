@@ -97,18 +97,17 @@ SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
   for (int i = 0, e = SEAI->getNumCases(); i < e; ++i)
     Cases.push_back(SEAI->getCase(i));
 
-
+  Builder.setCurrentDebugScope(SEAI->getDebugScope());
   SILBasicBlock *Default = SEAI->hasDefault() ? SEAI->getDefaultBB() : 0;
   LoadInst *EnumVal = Builder.createLoad(SEAI->getLoc(), SEAI->getOperand());
-  EnumVal->setDebugScope(SEAI->getDebugScope());
-  Builder.createSwitchEnum(SEAI->getLoc(), EnumVal, Default, Cases)
-    ->setDebugScope(SEAI->getDebugScope());
+  Builder.createSwitchEnum(SEAI->getLoc(), EnumVal, Default, Cases);
   return eraseInstFromFunction(*SEAI);
 }
 
 SILInstruction *SILCombiner::visitSelectEnumAddrInst(SelectEnumAddrInst *SEAI) {
   // Canonicalize a select_enum_addr: if the default refers to exactly one case,
   // then replace the default with that case.
+  Builder.setCurrentDebugScope(SEAI->getDebugScope());
   if (SEAI->hasDefault()) {
     NullablePtr<EnumElementDecl> elementDecl = SEAI->getUniqueCaseForDefault();
     if (elementDecl.isNonNull()) {
@@ -144,10 +143,8 @@ SILInstruction *SILCombiner::visitSelectEnumAddrInst(SelectEnumAddrInst *SEAI) {
   SILValue Default = SEAI->hasDefault() ? SEAI->getDefaultResult() : SILValue();
   LoadInst *EnumVal = Builder.createLoad(SEAI->getLoc(),
                                           SEAI->getEnumOperand());
-  EnumVal->setDebugScope(SEAI->getDebugScope());
   auto *I = Builder.createSelectEnum(SEAI->getLoc(), EnumVal, SEAI->getType(),
                                      Default, Cases);
-  I->setDebugScope(SEAI->getDebugScope());
   return I;
 }
 
@@ -301,7 +298,6 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   if (IEI && !OEI) {
     auto *ConcAlloc = Builder.createAllocStack(AS->getLoc(),
                                                 IEI->getLoweredConcreteType());
-    ConcAlloc->setDebugScope(AS->getDebugScope());
     SILValue(IEI, 0).replaceAllUsesWith(ConcAlloc->getAddressResult());
     eraseInstFromFunction(*IEI);
 
@@ -310,8 +306,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
       ++UI;
       if (auto *DA = dyn_cast<DestroyAddrInst>(Op->getUser())) {
         Builder.setInsertionPoint(DA);
-        Builder.createDestroyAddr(DA->getLoc(), SILValue(ConcAlloc, 1))
-          ->setDebugScope(DA->getDebugScope());
+        Builder.createDestroyAddr(DA->getLoc(), SILValue(ConcAlloc, 1));
         eraseInstFromFunction(*DA);
         continue;
       }
@@ -321,8 +316,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
 
       auto *DS = cast<DeallocStackInst>(Op->getUser());
       Builder.setInsertionPoint(DS);
-      Builder.createDeallocStack(DS->getLoc(), SILValue(ConcAlloc, 0))
-          ->setDebugScope(DS->getDebugScope());
+      Builder.createDeallocStack(DS->getLoc(), SILValue(ConcAlloc, 0));
       eraseInstFromFunction(*DS);
     }
 
@@ -346,8 +340,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
     if (auto *CopyAddr = dyn_cast<CopyAddrInst>(Op->getUser())) {
       if (CopyAddr->isTakeOfSrc() && CopyAddr->getSrc().getDef() != AS) {
         Builder.setInsertionPoint(CopyAddr);
-        Builder.createDestroyAddr(CopyAddr->getLoc(), CopyAddr->getSrc())
-            ->setDebugScope(CopyAddr->getDebugScope());
+        Builder.createDestroyAddr(CopyAddr->getLoc(), CopyAddr->getSrc());
       }
     }
 
@@ -378,9 +371,9 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
 
 SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   // (load (upcast-ptr %x)) -> (upcast-ref (load %x))
+  Builder.setCurrentDebugScope(LI->getDebugScope());
   if (auto *UI = dyn_cast<UpcastInst>(LI->getOperand())) {
     auto NewLI = Builder.createLoad(LI->getLoc(), UI->getOperand());
-    NewLI->setDebugScope(LI->getDebugScope());
     return Builder.createUpcast(LI->getLoc(), NewLI, LI->getType());
   }
 
@@ -428,9 +421,7 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
     // a new projection. Create the new address projection.
     auto I = Proj.createAddrProjection(Builder, LI->getLoc(), LI->getOperand());
     LastProj = &Proj;
-    I.get()->setDebugScope(LI->getDebugScope());
     LastNewLoad = Builder.createLoad(LI->getLoc(), I.get());
-    LastNewLoad->setDebugScope(LI->getDebugScope());
     replaceInstUsesWith(*Inst, LastNewLoad, 0);
     eraseInstFromFunction(*Inst);
   }
@@ -639,6 +630,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   // dependency in between the enum and its data.
 
   assert(IEAI->getOperand().getType().isAddress() && "Must be an address");
+  Builder.setCurrentDebugScope(IEAI->getDebugScope());
 
   if (IEAI->getOperand().getType().isAddressOnly(IEAI->getModule())) {
     // Check for the following pattern inside the current basic block:
@@ -719,7 +711,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
       }
 
       // Replace switch_enum_addr by a branch instruction.
-      SILBuilderWithScope<1> B(SEI);
+      SILBuilderWithScope B(SEI);
       SmallVector<std::pair<EnumElementDecl *, SILValue>, 8> CaseValues;
       SmallVector<std::pair<SILValue, SILBasicBlock *>, 8> CaseBBs;
 
@@ -758,9 +750,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     EnumInst *E =
       Builder.createEnum(IEAI->getLoc(), SILValue(), IEAI->getElement(),
                           IEAI->getOperand().getType().getObjectType());
-    E->setDebugScope(IEAI->getDebugScope());
-    Builder.createStore(IEAI->getLoc(), E, IEAI->getOperand())
-      ->setDebugScope(IEAI->getDebugScope());
+    Builder.createStore(IEAI->getLoc(), E, IEAI->getOperand());
     return eraseInstFromFunction(*IEAI);
   }
 
@@ -795,9 +785,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
       Builder.createEnum(DataAddrInst->getLoc(), SI->getSrc(),
                           DataAddrInst->getElement(),
                           DataAddrInst->getOperand().getType().getObjectType());
-  E->setDebugScope(DataAddrInst->getDebugScope());
-  Builder.createStore(DataAddrInst->getLoc(), E, DataAddrInst->getOperand())
-    ->setDebugScope(DataAddrInst->getDebugScope());
+  Builder.createStore(DataAddrInst->getLoc(), E, DataAddrInst->getOperand());
   // Cleanup.
   eraseInstFromFunction(*SI);
   eraseInstFromFunction(*DataAddrInst);
@@ -855,7 +843,7 @@ visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
 
   // Grab the EnumAddr.
   SILLocation Loc = TEDAI->getLoc();
-  SILDebugScope *Scope = TEDAI->getDebugScope();
+  Builder.setCurrentDebugScope(TEDAI->getDebugScope());
   SILValue EnumAddr = TEDAI->getOperand();
   EnumElementDecl *EnumElt = TEDAI->getElement();
   SILType PayloadType = TEDAI->getType().getObjectType();
@@ -869,9 +857,7 @@ visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
 
     // Insert a new Load of the enum and extract the data from that.
     auto *Ld = Builder.createLoad(Loc, EnumAddr);
-    Ld->setDebugScope(Scope);
     auto *D = Builder.createUncheckedEnumData(Loc, Ld, EnumElt, PayloadType);
-    D->setDebugScope(Scope);
 
     // Replace all uses of the old load with the data and erase the old load.
     replaceInstUsesWith(*L, D, 0);
@@ -1023,6 +1009,7 @@ SILInstruction *SILCombiner::visitTupleExtractInst(TupleExtractInst *TEI) {
   if (TEI->getFieldNo() != 1)
     return nullptr;
 
+  Builder.setCurrentDebugScope(TEI->getDebugScope());
   if (auto *BI = dyn_cast<BuiltinInst>(TEI->getOperand()))
     if (!canOverflow(BI))
       return Builder.createIntegerLiteral(TEI->getLoc(), TEI->getType(),
@@ -1032,10 +1019,10 @@ SILInstruction *SILCombiner::visitTupleExtractInst(TupleExtractInst *TEI) {
 
 SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *FLI) {
   // fix_lifetime(alloc_stack) -> fix_lifetime(load(alloc_stack))
+  Builder.setCurrentDebugScope(FLI->getDebugScope());
   if (auto *AI = dyn_cast<AllocStackInst>(FLI->getOperand())) {
     if (FLI->getOperand().getType().isLoadable(FLI->getModule())) {
       auto Load = Builder.createLoad(FLI->getLoc(), SILValue(AI, 1));
-      Load->setDebugScope(FLI->getDebugScope());
       return Builder.createFixLifetime(FLI->getLoc(), SILValue(Load, 0));
     }
   }
@@ -1049,12 +1036,12 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
   // %2 = alloc_ref_dynamic %1 : $X.Type, Y
   // ->
   // alloc_ref X
+  Builder.setCurrentDebugScope(ARDI->getDebugScope());
   if (MetatypeInst *MI = dyn_cast<MetatypeInst>(ARDI->getOperand())) {
     auto &Mod = ARDI->getModule();
     auto SILInstanceTy = MI->getType().getMetatypeInstanceType(Mod);
     auto *ARI = Builder.createAllocRef(ARDI->getLoc(), SILInstanceTy,
                                        ARDI->isObjC(), false);
-    ARI->setDebugScope(ARDI->getDebugScope());
     return ARI;
   }
 
@@ -1074,7 +1061,6 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
       auto SILInstanceTy = CCBI->getCastType().getMetatypeInstanceType(Mod);
       auto *ARI = Builder.createAllocRef(ARDI->getLoc(), SILInstanceTy,
                                          ARDI->isObjC(), false);
-      ARI->setDebugScope(ARDI->getDebugScope());
       return ARI;
     }
   }

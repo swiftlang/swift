@@ -152,7 +152,7 @@ static SILInstruction *optimizeBuiltinWithSameOperands(SILBuilder &Builder,
     SILType Ty = I->getType();
     SILType IntTy = Ty.getTupleElementType(0);
     SILType BoolTy = Ty.getTupleElementType(1);
-    SILBuilderWithScope<4> B(I);
+    SILBuilderWithScope B(I);
     SILValue Elements[] = {
       B.createIntegerLiteral(I->getLoc(), IntTy, /* Result */ 0),
       B.createIntegerLiteral(I->getLoc(), BoolTy, /* Overflow */ 0)
@@ -219,24 +219,20 @@ static SILInstruction *createIndexAddrFrom(IndexRawPointerInst *I,
                                            SILValue Ptr, SILValue Distance,
                                            SILType RawPointerTy,
                                            SILBuilder &Builder) {
+  Builder.setCurrentDebugScope(I->getDebugScope());
   SILType InstanceType =
     Metatype->getType().getMetatypeInstanceType(I->getModule());
 
   auto *NewPTAI = Builder.createPointerToAddress(
     I->getLoc(), Ptr, InstanceType.getAddressType());
-  NewPTAI->setDebugScope(I->getDebugScope());
 
   auto *DistanceAsWord =
       Builder.createBuiltin(I->getLoc(), TruncOrBitCast->getName(),
                              TruncOrBitCast->getType(), {}, Distance);
-  DistanceAsWord->setDebugScope(I->getDebugScope());
 
   auto *NewIAI = Builder.createIndexAddr(I->getLoc(), NewPTAI, DistanceAsWord);
-  NewIAI->setDebugScope(I->getDebugScope());
-
   auto *NewATPI =
     Builder.createAddressToPointer(I->getLoc(), NewIAI, RawPointerTy);
-  NewATPI->setDebugScope(I->getDebugScope());
   return NewATPI;
 }
 

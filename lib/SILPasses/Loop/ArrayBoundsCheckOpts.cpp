@@ -727,7 +727,7 @@ struct InductionInfo {
   bool isValid() { return Start && End; }
   operator bool() { return isValid(); }
 
-  SILDebugScope *getDebugScope() { return Inc->getDebugScope(); }
+  SILInstruction *getInstruction() { return Inc; }
 
   SILValue getFirstValue() {
     return Start;
@@ -925,8 +925,7 @@ public:
                              DominanceInfo *DT) {
     ApplyInst *AI = CheckToHoist;
     SILLocation Loc = AI->getLoc();
-    SILBuilderWithScope<> Builder(Preheader->getTerminator(),
-                                  AI->getDebugScope());
+    SILBuilderWithScope Builder(Preheader->getTerminator(), AI);
 
     // Get the first induction value.
     auto FirstVal = Ind->getFirstValue();
@@ -1125,8 +1124,7 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
   if (IVarsFound)
     for (auto *Arg: Header->getBBArgs())
       if (auto *IV = IndVars[Arg]) {
-        SILBuilderWithScope<> B(Preheader->getTerminator(),
-                                IV->getDebugScope());
+        SILBuilderWithScope B(Preheader->getTerminator(), IV->getInstruction());
         IV->checkOverflow(B);
       }
 

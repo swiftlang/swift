@@ -116,9 +116,8 @@ public:
 
   llvm::Function *CurFn;
 
-  IRGenFunction(IRGenModule &IGM,
-                llvm::Function *fn,
-                SILDebugScope* DbgScope = nullptr,
+  IRGenFunction(IRGenModule &IGM, llvm::Function *fn,
+                const SILDebugScope *DbgScope = nullptr,
                 Optional<SILLocation> DbgLoc = None);
   ~IRGenFunction();
 
@@ -236,7 +235,7 @@ public:
   llvm::Value *emitObjCSelectorRefLoad(StringRef selector);
 
   /// Return the SILDebugScope for this function.
-  SILDebugScope* getDebugScope() const { return DbgScope; }
+  const SILDebugScope *getDebugScope() const { return DbgScope; }
   llvm::Value *coerceValue(llvm::Value *value, llvm::Type *toTy,
                            const llvm::DataLayout &);
 
@@ -247,7 +246,7 @@ public:
 
 private:
   llvm::Instruction *AllocaIP;
-  SILDebugScope* DbgScope;
+  const SILDebugScope *DbgScope;
 
 //--- Reference-counting methods -----------------------------------------------
 public:

@@ -44,7 +44,7 @@ static SILInstruction *constructResultWithOverflowTuple(BuiltinInst *BI,
 
   // Construct the folded instruction - a tuple of two literals, the
   // result and overflow.
-  SILBuilderWithScope<4> B(BI);
+  SILBuilderWithScope B(BI);
   SILLocation Loc = BI->getLoc();
   SILValue Result[] = {
     B.createIntegerLiteral(Loc, ResTy1, Res),
@@ -198,7 +198,7 @@ static SILInstruction *constantFoldCompare(BuiltinInst *BI,
   auto *RHS = dyn_cast<IntegerLiteralInst>(Args[1]);
   if (LHS && RHS) {
     APInt Res = constantFoldComparison(LHS->getValue(), RHS->getValue(), ID);
-    SILBuilderWithScope<1> B(BI);
+    SILBuilderWithScope B(BI);
     return B.createIntegerLiteral(BI->getLoc(), BI->getType(), Res);
   }
 
@@ -265,7 +265,7 @@ constantFoldAndCheckDivision(BuiltinInst *BI, BuiltinValueKind ID,
   }
 
   // Add the literal instruction to represnet the result of the division.
-  SILBuilderWithScope<1> B(BI);
+  SILBuilderWithScope B(BI);
   return B.createIntegerLiteral(BI->getLoc(), BI->getType(), ResVal);
 }
 
@@ -329,7 +329,7 @@ static SILInstruction *constantFoldBinary(BuiltinInst *BI,
 
     APInt ResI = constantFoldBitOperation(LHSI, RHSI, ID);
     // Add the literal instruction to represent the result.
-    SILBuilderWithScope<1> B(BI);
+    SILBuilderWithScope B(BI);
     return B.createIntegerLiteral(BI->getLoc(), BI->getType(), ResI);
   }
   case BuiltinValueKind::FAdd:
@@ -360,7 +360,7 @@ static SILInstruction *constantFoldBinary(BuiltinInst *BI,
     }
 
     // Add the literal instruction to represent the result.
-    SILBuilderWithScope<1> B(BI);
+    SILBuilderWithScope B(BI);
     return B.createFloatLiteral(BI->getLoc(), BI->getType(), LHSF);
   }
   }
@@ -611,7 +611,7 @@ case BuiltinValueKind::id:
     APInt CastResV = constantFoldCast(V->getValue(), Builtin);
 
     // Add the literal instruction to represent the result of the cast.
-    SILBuilderWithScope<1> B(BI);
+    SILBuilderWithScope B(BI);
     return B.createIntegerLiteral(BI->getLoc(), BI->getType(), CastResV);
   }
 
@@ -662,7 +662,7 @@ case BuiltinValueKind::id:
     }
 
     // The call to the builtin should be replaced with the constant value.
-    SILBuilderWithScope<1> B(BI);
+    SILBuilderWithScope B(BI);
     return B.createFloatLiteral(Loc, BI->getType(), TruncVal);
   }
 
@@ -686,7 +686,7 @@ case BuiltinValueKind::id:
     }
 
     // The call to the builtin should be replaced with the constant value.
-    SILBuilderWithScope<1> B(BI);
+    SILBuilderWithScope B(BI);
     return B.createFloatLiteral(Loc, BI->getType(), TruncVal);
   }
 
@@ -889,7 +889,7 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
       if (auto *BI = dyn_cast<BuiltinInst>(I)) {
         if (isApplyOfBuiltin(*BI, BuiltinValueKind::AssertConf)) {
           // Instantiate the constant.
-          SILBuilderWithScope<1> B(BI);
+          SILBuilderWithScope B(BI);
           auto AssertConfInt = B.createIntegerLiteral(
             BI->getLoc(), BI->getType(), AssertConfiguration);
           BI->replaceAllUsesWith(AssertConfInt);

@@ -404,8 +404,8 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
   // at the beginning of the funtion.
   auto &Entry = ABI->getFunction()->front();
   SILBuilder BuildAlloc(&Entry, Entry.begin());
+  BuildAlloc.setCurrentDebugScope(ABI->getDebugScope());
   auto *ASI = BuildAlloc.createAllocStack(ABI->getLoc(), ABI->getElementType());
-  ASI->setDebugScope(ABI->getDebugScope());
 
   // Replace all uses of the address of the box's contained value with
   // the address of the stack location.
@@ -433,13 +433,13 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
       if (isa<DeallocBoxInst>(LastRelease))
         continue;
 
-      SILBuilderWithScope<1> BuildDestroy(LastRelease);
+      SILBuilderWithScope BuildDestroy(LastRelease);
       BuildDestroy.emitDestroyAddrAndFold(Loc, PointerResult);
     }
   }
 
   for (auto Return : Returns) {
-    SILBuilderWithScope<1> BuildDealloc(Return);
+    SILBuilderWithScope BuildDealloc(Return);
     BuildDealloc.createDeallocStack(Loc, ASI->getContainerResult());
   }
 
@@ -621,7 +621,7 @@ DeadParamCloner::visitStrongRetainInst(StrongRetainInst *Inst) {
 }
 
 static void emitStrongReleaseAfter(SILValue V, SILInstruction *I) {
-  SILBuilderWithScope<2> Builder(std::next(SILBasicBlock::iterator(I)));
+  SILBuilderWithScope Builder(std::next(SILBasicBlock::iterator(I)));
   Builder.emitStrongReleaseAndFold(I->getLoc(), V);
 }
 
@@ -721,7 +721,7 @@ specializePartialApply(PartialApplyInst *PartialApply,
     }
   }
 
-  SILBuilderWithScope<2> Builder(PartialApply);
+  SILBuilderWithScope Builder(PartialApply);
 
   // Build the function_ref and partial_apply.
   SILValue FunctionRef = Builder.createFunctionRef(PartialApply->getLoc(),

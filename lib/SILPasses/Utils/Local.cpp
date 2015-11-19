@@ -289,7 +289,7 @@ void swift::placeFuncRef(ApplyInst *AI, DominanceInfo *DT) {
 /// instruction.
 TermInst *swift::addArgumentToBranch(SILValue Val, SILBasicBlock *Dest,
                                      TermInst *Branch) {
-  SILBuilderWithScope<2> Builder(Branch);
+  SILBuilderWithScope Builder(Branch);
 
   if (CondBranchInst *CBI = dyn_cast<CondBranchInst>(Branch)) {
     SmallVector<SILValue, 8> TrueArgs;
@@ -759,6 +759,8 @@ void StringConcatenationOptimizer::adjustEncodings() {
     return;
   }
 
+  Builder.setCurrentDebugScope(AI->getDebugScope());
+
   // If one of the string literals is UTF8 and another one is UTF16,
   // convert the UTF8-encoded string literal into UTF16-encoding first.
   if (SLILeft->getEncoding() == StringLiteralInst::Encoding::UTF8 &&
@@ -768,7 +770,6 @@ void StringConcatenationOptimizer::adjustEncodings() {
     // Convert UTF8 representation into UTF16.
     SLILeft = Builder.createStringLiteral(AI->getLoc(), SLILeft->getValue(),
                                           StringLiteralInst::Encoding::UTF16);
-    SLILeft->setDebugScope(AI->getDebugScope());
   }
 
   if (SLIRight->getEncoding() == StringLiteralInst::Encoding::UTF8 &&
@@ -778,7 +779,6 @@ void StringConcatenationOptimizer::adjustEncodings() {
     // Convert UTF8 representation into UTF16.
     SLIRight = Builder.createStringLiteral(AI->getLoc(), SLIRight->getValue(),
                                            StringLiteralInst::Encoding::UTF16);
-    SLIRight->setDebugScope(AI->getDebugScope());
   }
 
   // It should be impossible to have two operands with different
@@ -839,17 +839,16 @@ SILInstruction *StringConcatenationOptimizer::optimize() {
   auto Encoding = SLILeft->getEncoding();
 
   // Create a concatenated string literal.
+  Builder.setCurrentDebugScope(AI->getDebugScope());
   auto LV = SLILeft->getValue();
   auto RV = SLIRight->getValue();
   auto *NewSLI =
       Builder.createStringLiteral(AI->getLoc(), LV + Twine(RV), Encoding);
-  NewSLI->setDebugScope(AI->getDebugScope());
   Arguments.push_back(NewSLI);
 
   // Length of the concatenated literal according to its encoding.
   auto *Len = Builder.createIntegerLiteral(
       AI->getLoc(), AILeft->getOperand(2).getType(), getConcatenatedLength());
-  Len->setDebugScope(AI->getDebugScope());
   Arguments.push_back(Len);
 
   // isAscii flag for UTF8-encoded string literals.
@@ -858,7 +857,6 @@ SILInstruction *StringConcatenationOptimizer::optimize() {
     auto ILType = AILeft->getOperand(3).getType();
     auto *Ascii =
         Builder.createIntegerLiteral(AI->getLoc(), ILType, intmax_t(IsAscii));
-    Ascii->setDebugScope(AI->getDebugScope());
     Arguments.push_back(Ascii);
   }
 
@@ -951,7 +949,7 @@ void swift::releasePartialApplyCapturedArg(SILBuilder &Builder, SILLocation Loc,
 static void releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *PAI,
                                                   ReleaseTracker &Tracker,
                                                   InstModCallbacks Callbacks) {
-  SILBuilderWithScope<16> Builder(PAI);
+  SILBuilderWithScope Builder(PAI);
   SILLocation Loc = PAI->getLoc();
   CanSILFunctionType PAITy =
       dyn_cast<SILFunctionType>(PAI->getCallee().getType().getSwiftType());
@@ -1196,7 +1194,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   CanType CanBridgedTy(BridgedTargetTy);
   SILType SILBridgedTy = SILType::getPrimitiveObjectType(CanBridgedTy);
 
-  SILBuilderWithScope<1> Builder(Inst);
+  SILBuilderWithScope Builder(Inst);
   SILValue SrcOp;
   SILInstruction *NewI = nullptr;
 
@@ -1423,7 +1421,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   bool isCurrentModuleBridgeToObjectiveC = false;
 
   // Generate code to invoke _bridgeToObjectiveC
-  SILBuilderWithScope<1> Builder(Inst);
+  SILBuilderWithScope Builder(Inst);
 
   auto Members = Source.getNominalOrBoundGenericNominal()->lookupDirect(
       M.getASTContext().Id_bridgeToObjectiveC);
@@ -1606,7 +1604,7 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
   auto *FailureBB = Inst->getFailureBB();
   auto &Mod = Inst->getModule();
 
-  SILBuilderWithScope<1> Builder(Inst);
+  SILBuilderWithScope Builder(Inst);
 
   // Try to determine the outcome of the cast from a known type
   // to a protocol type at compile-time.
@@ -1697,7 +1695,7 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       return nullptr;
 
     // We know the dynamic type of the operand.
-    SILBuilderWithScope<1> Builder(Inst);
+    SILBuilderWithScope Builder(Inst);
     auto Loc = Inst->getLoc();
     auto *SuccessBB = Inst->getSuccessBB();
     auto *FailureBB = Inst->getFailureBB();
@@ -1747,7 +1745,7 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
     return nullptr;
   }
 
-  SILBuilderWithScope<1> Builder(Inst);
+  SILBuilderWithScope Builder(Inst);
 
   if (Feasibility == DynamicCastFeasibility::WillFail) {
     auto *NewI = Builder.createBranch(Loc, FailureBB);
@@ -1856,7 +1854,7 @@ optimizeCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
             && canUseScalarCheckedCastInstructions(Inst->getModule(),
                 MI->getType().getSwiftRValueType(),
                 Dest.getType().getObjectType().getSwiftRValueType())) {
-          SILBuilderWithScope<1> B(Inst);
+          SILBuilderWithScope B(Inst);
           auto NewI = B.createCheckedCastBranch(
               Loc, false /*isExact*/, SILValue(MI, 0),
               Dest.getType().getObjectType(), SuccessBB, FailureBB);
@@ -1896,7 +1894,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   // checked_cond_br %1, ....
   if (auto *IEMI = dyn_cast<InitExistentialMetatypeInst>(Op)) {
     if (auto *MI = dyn_cast<MetatypeInst>(IEMI->getOperand())) {
-      SILBuilderWithScope<1> B(Inst);
+      SILBuilderWithScope B(Inst);
       auto *NewI = B.createCheckedCastBranch(Loc, /* isExact */ false, MI,
                                 LoweredTargetType,
                                 SuccessBB,
@@ -1958,7 +1956,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
                                          EMT->getRepresentation());
         auto CanMetaTy = CanMetatypeType::CanTypeWrapper(MetaTy);
         auto SILMetaTy = SILType::getPrimitiveObjectType(CanMetaTy);
-        SILBuilderWithScope<1> B(Inst);
+        SILBuilderWithScope B(Inst);
         auto *MI = B.createMetatype(FoundIEI->getLoc(), SILMetaTy);
 
         auto *NewI = B.createCheckedCastBranch(Loc, /* isExact */ false, MI,
@@ -2013,7 +2011,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
         auto *MetaTy = MetatypeType::get(ConcreteTy, EMT->getRepresentation());
         auto CanMetaTy = CanMetatypeType::CanTypeWrapper(MetaTy);
         auto SILMetaTy = SILType::getPrimitiveObjectType(CanMetaTy);
-        SILBuilderWithScope<1> B(Inst);
+        SILBuilderWithScope B(Inst);
         auto *MI = B.createMetatype(FoundIERI->getLoc(), SILMetaTy);
 
         auto *NewI = B.createCheckedCastBranch(Loc, /* isExact */ false, MI,
@@ -2053,7 +2051,7 @@ optimizeUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *Inst) {
   if (Feasibility == DynamicCastFeasibility::WillFail) {
     // Remove the cast and insert a trap, followed by an
     // unreachable instruction.
-    SILBuilderWithScope<1> Builder(Inst);
+    SILBuilderWithScope Builder(Inst);
     auto *Trap = Builder.createBuiltinTrap(Loc);
     Inst->replaceAllUsesWithUndef();
     EraseInstAction(Inst);
@@ -2071,7 +2069,7 @@ optimizeUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *Inst) {
       return nullptr;
     }
 
-    SILBuilderWithScope<1> Builder(Inst);
+    SILBuilderWithScope Builder(Inst);
 
     // Try to apply the bridged casts optimizations
     auto SourceType = LoweredSourceType.getSwiftRValueType();
@@ -2137,7 +2135,7 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
   if (Feasibility == DynamicCastFeasibility::WillFail) {
     // Remove the cast and insert a trap, followed by an
     // unreachable instruction.
-    SILBuilderWithScope<1> Builder(Inst);
+    SILBuilderWithScope Builder(Inst);
     SILInstruction *NewI = Builder.createBuiltinTrap(Loc);
     // mem2reg's invariants get unhappy if we don't try to
     // initialize a loadable result.
@@ -2184,7 +2182,7 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
     if (isBridgingCast(SourceType, TargetType))
       return nullptr;
 
-    SILBuilderWithScope<1> Builder(Inst);
+    SILBuilderWithScope Builder(Inst);
     if (!emitSuccessfulIndirectUnconditionalCast(Builder, Mod.getSwiftModule(),
                                             Loc, Inst->getConsumptionKind(),
                                             Src, SourceType,

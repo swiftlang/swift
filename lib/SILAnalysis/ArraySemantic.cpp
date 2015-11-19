@@ -327,17 +327,15 @@ static SILValue hoistOrCopySelf(ApplyInst *SemanticsCall,
 
   // Emit matching release for owned self if we are moving the original call.
   if (!LeaveOriginal && IsOwnedSelf)
-    SILBuilder(SemanticsCall)
-        .createReleaseValue(SemanticsCall->getLoc(), Self)
-        ->setDebugScope(SemanticsCall->getDebugScope());
+    SILBuilderWithScope(SemanticsCall)
+        .createReleaseValue(SemanticsCall->getLoc(), Self);
 
   auto NewArrayStructValue = copyArrayLoad(Self, InsertBefore, DT);
 
   // Retain the array.
   if (IsOwnedSelf)
-    SILBuilder(InsertBefore)
-        .createRetainValue(SemanticsCall->getLoc(), NewArrayStructValue)
-        ->setDebugScope(SemanticsCall->getDebugScope());
+    SILBuilderWithScope(InsertBefore, SemanticsCall)
+      .createRetainValue(SemanticsCall->getLoc(), NewArrayStructValue);
 
   return NewArrayStructValue;
 }
@@ -423,7 +421,7 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
 void swift::ArraySemanticsCall::removeCall() {
   if (getSelfParameterConvention(SemanticsCall) ==
       ParameterConvention::Direct_Owned)
-    SILBuilderWithScope<1>(SemanticsCall)
+    SILBuilderWithScope(SemanticsCall)
         .createReleaseValue(SemanticsCall->getLoc(), getSelf());
 
   SemanticsCall->eraseFromParent();

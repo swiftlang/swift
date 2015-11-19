@@ -51,7 +51,8 @@ SILInstruction *SILBuilder::tryCreateUncheckedRefCast(SILLocation Loc,
   if (!SILType::canRefCast(Op.getType(), ResultTy, M))
     return nullptr;
 
-  return insert(new (M) UncheckedRefCastInst(Loc, Op, ResultTy));
+  return insert(
+      new (M) UncheckedRefCastInst(createSILDebugLocation(Loc), Op, ResultTy));
 }
 
 // Create the appropriate cast instruction based on result type.
@@ -60,14 +61,16 @@ SILInstruction *SILBuilder::createUncheckedBitCast(SILLocation Loc,
                                                    SILType Ty) {
   auto &M = F.getModule();
   if (Ty.isTrivial(M))
-    return insert(new (M) UncheckedTrivialBitCastInst(Loc, Op, Ty));
+    return insert(new (M) UncheckedTrivialBitCastInst(
+        createSILDebugLocation(Loc), Op, Ty));
 
   if (auto refCast = tryCreateUncheckedRefCast(Loc, Op, Ty))
     return refCast;  
 
   // The destination type is nontrivial, and may be smaller than the source
   // type, so RC identity cannot be assumed.
-  return insert(new (M) UncheckedBitwiseCastInst(Loc, Op, Ty));
+  return insert(
+      new (M) UncheckedBitwiseCastInst(createSILDebugLocation(Loc), Op, Ty));
 }
 
 BranchInst *SILBuilder::createBranch(SILLocation Loc,
@@ -280,4 +283,24 @@ SILValue SILBuilder::emitObjCToThickMetatype(SILLocation Loc, SILValue Op,
 
   // Just create the objc_to_thick_metatype instruction.
   return createObjCToThickMetatype(Loc, Op, Ty);
+}
+
+SILDebugLocation *
+SILBuilder::getOrCreateDebugLocation(SILLocation Loc, const SILDebugScope *DS) {
+  // Check whether the location already exists.
+  SILDebugLocation TmpLoc(Loc, DS);
+  auto *&L = DebugLocs[SILDebugLocationID(TmpLoc)];
+  if (L) {
+    if (!(*L == TmpLoc)) {
+      DebugLocs[SILDebugLocationID(TmpLoc)];
+    }
+    assert(*L == TmpLoc);
+    return L;
+  }
+ 
+  // It's new, allocate it on our own allocator and insert it into the set.
+  L = new (F.getModule()) SILDebugLocation(Loc, DS);
+  assert(*L == TmpLoc);
+  assert(*DebugLocs[SILDebugLocationID(TmpLoc)] == TmpLoc);
+  return L;
 }

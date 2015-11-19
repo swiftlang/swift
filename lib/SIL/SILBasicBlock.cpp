@@ -16,6 +16,7 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
@@ -145,15 +146,18 @@ transferNodesFromList(llvm::ilist_traits<SILBasicBlock> &SrcTraits,
 
   // If we are asked to splice into the same function, don't update parent
   // pointers.
-  if (Parent == SrcTraits.Parent) return;
+  if (Parent == SrcTraits.Parent)
+    return;
 
   ScopeCloner ScopeCloner(*Parent);
+  SILBuilder B(*Parent);
 
   // If splicing blocks not in the same function, update the parent pointers.
   for (; First != Last; ++First) {
     First->Parent = Parent;
     for (auto &II : *First)
-      II.setDebugScope(ScopeCloner.getOrCreateClonedScope(II.getDebugScope()));
+      II.setDebugScope(B,
+                       ScopeCloner.getOrCreateClonedScope(II.getDebugScope()));
   }
 }
 

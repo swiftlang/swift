@@ -514,9 +514,8 @@ bool CopyForwarding::propagateCopy(CopyAddrInst *CopyInst) {
     if (!CopyInst->isInitializationOfDest()) {
       // Replace the original copy with a destroy. We may be able to hoist it
       // more in another pass but don't currently iterate.
-      SILBuilder(CopyInst).createDestroyAddr(CopyInst->getLoc(),
-                                             CopyInst->getDest())
-        ->setDebugScope(CopyInst->getDebugScope());
+      SILBuilderWithScope(CopyInst)
+          .createDestroyAddr(CopyInst->getLoc(), CopyInst->getDest());
     }
     CopyInst->eraseFromParent();
     HasChanged = true;
@@ -704,8 +703,7 @@ bool CopyForwarding::forwardPropagateCopy(
       assert(!Copy->isInitializationOfDest() && "expected a deinit");
 
       DestroyAddrInst *Destroy =
-        SILBuilderWithScope<1>(SI, Copy->getDebugScope())
-          .createDestroyAddr(Copy->getLoc(), CopyDest);
+          SILBuilderWithScope(Copy).createDestroyAddr(Copy->getLoc(), CopyDest);
       Copy->setIsInitializationOfDest(IsInitialization);
 
       assert(ValueUses.back()->getUser() == Copy && "bad value use");
@@ -781,8 +779,7 @@ bool CopyForwarding::backwardPropagateCopy(
   // init copy may be eliminater later.
   if (auto Copy = dyn_cast<CopyAddrInst>(&*SI)) {
     if (Copy->getDest() == CopySrc && !Copy->isInitializationOfDest()) {
-      SILBuilder(SI).createDestroyAddr(Copy->getLoc(), CopySrc)
-        ->setDebugScope(Copy->getDebugScope());
+      SILBuilderWithScope(Copy).createDestroyAddr(Copy->getLoc(), CopySrc);
       Copy->setIsInitializationOfDest(IsInitialization);
     }
   }
@@ -845,8 +842,8 @@ bool CopyForwarding::hoistDestroy(SILInstruction *DestroyPoint,
       return false;
 
     DEBUG(llvm::dbgs() << "  Hoisting to Use:" << *Inst);
-    SILBuilder(std::next(SI)).createDestroyAddr(DestroyLoc, CurrentDef)
-      ->setDebugScope(Inst->getDebugScope());
+    SILBuilderWithScope(std::next(SI), Inst)
+        .createDestroyAddr(DestroyLoc, CurrentDef);
     HasChanged = true;
     return true;
   }
@@ -879,7 +876,7 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
 
   bool HoistedDestroyFound = false;
   SILLocation HoistedDestroyLoc = F->getLocation();
-  SILDebugScope *HoistedDebugScope = nullptr;
+  const SILDebugScope *HoistedDebugScope = nullptr;
 
   for (auto *Destroy : DestroyPoints) {
     // If hoistDestroy returns false, it was not worth hoisting.
@@ -939,8 +936,9 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
 
       // We make no attempt to use the best DebugLoc, because in all known
       // cases, we only have one.
-      SILBuilder(SuccBB->begin()).createDestroyAddr(HoistedDestroyLoc, CurrentDef)
-        ->setDebugScope(HoistedDebugScope);
+      SILBuilder B(SuccBB->begin());
+      B.setCurrentDebugScope(HoistedDebugScope);
+      B.createDestroyAddr(HoistedDestroyLoc, CurrentDef);
       HasChanged = true;
     }
   }

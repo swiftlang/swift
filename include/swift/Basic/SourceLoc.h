@@ -59,6 +59,8 @@ public:
     return SourceLoc();
   }
 
+  const void *getOpaquePointerValue() const { return Value.getPointer(); }
+
   /// Print out the SourceLoc.  If this location is in the same buffer
   /// as specified by \c LastBufferID, then we don't print the filename.  If
   /// not, we do print the filename, and then update \c LastBufferID with the

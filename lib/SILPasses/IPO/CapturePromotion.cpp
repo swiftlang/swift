@@ -867,7 +867,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
 
   // Initialize a SILBuilder and create a function_ref referencing the cloned
   // closure.
-  SILBuilderWithScope<8> B(PAI);
+  SILBuilderWithScope B(PAI);
   SILValue FnVal = B.createFunctionRef(PAI->getLoc(), ClonedFn);
   SILType FnTy = FnVal.getType();
 

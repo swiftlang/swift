@@ -276,6 +276,7 @@ void PartialApplyCombiner::releaseTemporaries() {
 /// as its callee.
 void PartialApplyCombiner::processSingleApply(FullApplySite AI) {
   Builder.setInsertionPoint(AI.getInstruction());
+  Builder.setCurrentDebugScope(AI.getDebugScope());
 
   // Prepare the args.
   SmallVector<SILValue, 8> Args;
@@ -306,6 +307,7 @@ void PartialApplyCombiner::processSingleApply(FullApplySite AI) {
   }
 
   Builder.setInsertionPoint(InsertionPoint);
+  Builder.setCurrentDebugScope(AI.getDebugScope());
 
   // The thunk that implements the partial apply calls the closure function
   // that expects all arguments to be consumed by the function. However, the
@@ -349,8 +351,6 @@ void PartialApplyCombiner::processSingleApply(FullApplySite AI) {
       Builder.createApply(AI.getLoc(), FRI, FnType, ResultTy, Subs, Args,
                            cast<ApplyInst>(AI)->isNonThrowing());
 
-  NAI.getInstruction()->setDebugScope(AI.getDebugScope());
-
   // We also need to release the partial_apply instruction itself because it
   // is consumed by the apply_instruction.
   if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
@@ -358,23 +358,20 @@ void PartialApplyCombiner::processSingleApply(FullApplySite AI) {
     for (auto Arg : ToBeReleasedArgs) {
       Builder.emitReleaseValueOperation(PAI->getLoc(), Arg);
     }
-    Builder.createStrongRelease(AI.getLoc(), PAI)
-      ->setDebugScope(AI.getDebugScope());
+    Builder.createStrongRelease(AI.getLoc(), PAI);
     Builder.setInsertionPoint(TAI->getErrorBB()->begin());
     // Release the non-consumed parameters.
     for (auto Arg : ToBeReleasedArgs) {
       Builder.emitReleaseValueOperation(PAI->getLoc(), Arg);
     }
-    Builder.createStrongRelease(AI.getLoc(), PAI)
-      ->setDebugScope(AI.getDebugScope());
+    Builder.createStrongRelease(AI.getLoc(), PAI);
     Builder.setInsertionPoint(AI.getInstruction());
   } else {
     // Release the non-consumed parameters.
     for (auto Arg : ToBeReleasedArgs) {
       Builder.emitReleaseValueOperation(PAI->getLoc(), Arg);
     }
-    Builder.createStrongRelease(AI.getLoc(), PAI)
-      ->setDebugScope(AI.getDebugScope());
+    Builder.createStrongRelease(AI.getLoc(), PAI);
   }
   // Update the set endpoints.
   if (Lifetime.LastUsers.count(AI.getInstruction())) {
@@ -457,6 +454,7 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
 
   // Ok, we can now perform our transformation. Grab AI's operands and the
   // relevant types from the ConvertFunction function type and AI.
+  Builder.setCurrentDebugScope(AI.getDebugScope());
   OperandValueArrayRef Ops = AI.getArgumentsWithoutIndirectResult();
   auto OldOpTypes = SubstCalleeTy->getParameterSILTypes();
   auto NewOpTypes = ConvertCalleeTy->getParameterSILTypes();
@@ -477,13 +475,11 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
     if (OldOpType.isAddress()) {
       assert(NewOpType.isAddress() && "Addresses should map to addresses.");
       auto UAC = Builder.createUncheckedAddrCast(AI.getLoc(), Op, NewOpType);
-      UAC->setDebugScope(AI.getDebugScope());
       Args.push_back(UAC);
     } else if (OldOpType.isHeapObjectReferenceType()) {
       assert(NewOpType.isHeapObjectReferenceType() &&
              "refs should map to refs.");
       auto URC = Builder.createUncheckedRefCast(AI.getLoc(), Op, NewOpType);
-      URC->setDebugScope(AI.getDebugScope());
       Args.push_back(URC);
     } else {
       Args.push_back(Op);
@@ -502,7 +498,6 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
                               ConvertCalleeTy->getSILResult(),
                               ArrayRef<Substitution>(), Args,
                               cast<ApplyInst>(AI)->isNonThrowing());
-  NAI->setDebugScope(AI.getDebugScope());
   return NAI;
 }
 
@@ -740,6 +735,7 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
   }
 
   FullApplySite NewAI;
+  Builder.setCurrentDebugScope(AI.getDebugScope());
 
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))
     NewAI = Builder.createTryApply(AI.getLoc(), AI.getCallee(),
@@ -751,8 +747,6 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
                                  NewSubstCalleeType,
                                  AI.getType(), Substitutions, Args,
                                  cast<ApplyInst>(AI)->isNonThrowing());
-
-  NewAI.getInstruction()->setDebugScope(AI.getDebugScope());
 
   if (isa<ApplyInst>(NewAI))
     replaceInstUsesWith(*AI.getInstruction(), NewAI.getInstruction(), 0);
@@ -1071,10 +1065,10 @@ static ApplyInst *optimizeCastThroughThinFunctionPointer(
       SILType::getPrimitiveObjectType(ConvertCalleeTy->substGenericArgs(
           AI->getModule(), AI->getModule().getSwiftModule(), Subs));
 
+  Builder.setCurrentDebugScope(AI->getDebugScope());
   ApplyInst *NewApply = Builder.createApply(
       AI->getLoc(), OrigThinFun, NewSubstCalleeType, AI->getType(), Subs, Args,
                                              AI->isNonThrowing());
-  NewApply->setDebugScope(AI->getDebugScope());
 
   return NewApply;
 }
@@ -1138,7 +1132,7 @@ static void emitMatchingRCAdjustmentsForCall(ApplyInst *Call, SILValue OnX) {
   assert(Call->getNumArguments() == 1 && "Expect a unary call");
 
   // Emit a retain for the @owned return.
-  SILBuilderWithScope<> Builder(Call);
+  SILBuilderWithScope Builder(Call);
   Builder.createRetainValue(Call->getLoc(), OnX);
 
   // Emit a release for the @owned parameter, or none for a @guaranteed
@@ -1205,12 +1199,12 @@ bool SILCombiner::optimizeIdentityCastComposition(ApplyInst *FInverse,
     // X might not be strong_retain/release'able. Replace it by a
     // retain/release_value on X instead.
     if (isa<StrongRetainInst>(User)) {
-      SILBuilderWithScope<>(User).createRetainValue(User->getLoc(), X);
+      SILBuilderWithScope(User).createRetainValue(User->getLoc(), X);
       eraseInstFromFunction(*User);
       continue;
     }
     if (isa<StrongReleaseInst>(User)) {
-      SILBuilderWithScope<>(User).createReleaseValue(User->getLoc(), X);
+      SILBuilderWithScope(User).createReleaseValue(User->getLoc(), X);
       eraseInstFromFunction(*User);
       continue;
     }
@@ -1233,6 +1227,7 @@ bool SILCombiner::optimizeIdentityCastComposition(ApplyInst *FInverse,
 }
 
 SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
+  Builder.setCurrentDebugScope(AI->getDebugScope());
   // apply{partial_apply(x,y)}(z) -> apply(z,x,y) is triggered
   // from visitPartialApplyInst(), so bail here.
   if (isa<PartialApplyInst>(AI->getCallee()))
@@ -1298,7 +1293,6 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
                                       substTy, AI->getType(),
                                       AI->getSubstitutions(), Arguments,
                                       AI->isNonThrowing());
-    NewAI->setDebugScope(AI->getDebugScope());
     return NewAI;
   }
 
@@ -1399,6 +1393,7 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
       SILLocation Loc = AI->getLoc();
       eraseApply(AI, Users);
       Builder.setInsertionPoint(BB);
+      Builder.setCurrentDebugScope(AI->getDebugScope());
 
       // Replace the try_apply with a cond_br false, which will be removed by
       // SimplifyCFG. We don't want to modify the CFG in SILCombine.
@@ -1429,7 +1424,6 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
                                          substTy,
                                          AI->getSubstitutions(), Arguments,
                                          AI->getNormalBB(), AI->getErrorBB());
-    NewAI->setDebugScope(AI->getDebugScope());
     return NewAI;
   }
 

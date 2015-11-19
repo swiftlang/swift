@@ -176,10 +176,6 @@ emitEpilog(SILLocation TopLevel, bool UsesCustomEpilog) {
       returnValue = emitEmptyTuple(CleanupLocation::get(TopLevel));
 
     B.createReturn(returnLoc, returnValue);
-
-    if (!MainScope)
-      MainScope = F.getDebugScope();
-    setDebugScopeForInsertedInstrs(MainScope);
   }
   
   emitRethrowEpilog(TopLevel);

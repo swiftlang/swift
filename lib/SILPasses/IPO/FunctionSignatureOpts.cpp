@@ -679,7 +679,7 @@ rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer,
   for (auto FAS : CallSites) {
     auto *AI = FAS.getInstruction();
 
-    SILBuilderWithScope<16> Builder(AI);
+    SILBuilderWithScope Builder(AI);
 
     FunctionRefInst *FRI = Builder.createFunctionRef(AI->getLoc(), NewF);
 
@@ -742,8 +742,8 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
                             FunctionAnalyzer &Analyzer) {
   // TODO: What is the proper location to use here?
   SILLocation Loc = BB->getParent()->getLocation();
-  SILBuilderWithScope<16> Builder(BB,
-                                  BB->getParent()->getDebugScope());
+  SILBuilder Builder(BB);
+  Builder.setCurrentDebugScope(BB->getParent()->getDebugScope());
 
   FunctionRefInst *FRI = Builder.createFunctionRef(Loc, NewF);
 
@@ -820,7 +820,6 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
   // optimization is done later by modifying the function signature elements
   // themselves.
   SILFunction *NewF = Analyzer.createEmptyFunctionWithOptimizedSig(NewFName);
-
   // Then we transfer the body of F to NewF. At this point, the arguments of the
   // first BB will not match.
   NewF->spliceBody(F);
@@ -830,8 +829,8 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
   SILBasicBlock *NewFEntryBB = &*NewF->begin();
   MutableArrayRef<ArgumentDescriptor> ArgDescs = Analyzer.getArgDescList();
   unsigned ArgOffset = 0;
-  SILBuilderWithScope<16> Builder(NewFEntryBB->begin(),
-                                  NewFEntryBB->getParent()->getDebugScope());  
+  SILBuilder Builder(NewFEntryBB->begin());
+  Builder.setCurrentDebugScope(NewFEntryBB->getParent()->getDebugScope());
   for (auto &ArgDesc : ArgDescs) {
     // We always need to reset the insertion point in case we delete the first
     // instruction.

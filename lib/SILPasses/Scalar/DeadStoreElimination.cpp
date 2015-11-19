@@ -882,7 +882,7 @@ void DSEContext::run() {
     // Create the stores that are alive.
     for (auto &I : getBBLocState(&BB)->LiveStores) {
       SILInstruction *IT = cast<SILInstruction>(I.first)->getNextNode();
-      SILBuilderWithScope<16> Builder(IT);
+      SILBuilderWithScope Builder(IT);
       Builder.createStore(I.first.getLoc().getValue(), I.second, I.first);
     }
     // Delete the dead stores.

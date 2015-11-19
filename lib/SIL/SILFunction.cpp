@@ -38,7 +38,7 @@ SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
                                  ClassVisibility_t classVisibility,
                                  Inline_t inlineStrategy, EffectsKind E,
                                  SILFunction *insertBefore,
-                                 SILDebugScope *debugScope,
+                                 const SILDebugScope *debugScope,
                                  DeclContext *DC) {
   // Get a StringMapEntry for the function.  As a sop to error cases,
   // allow the name to have an empty string.
@@ -70,7 +70,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
                          ClassVisibility_t classVisibility,
                          Inline_t inlineStrategy, EffectsKind E,
                          SILFunction *InsertBefore,
-                         SILDebugScope *DebugScope,
+                         const SILDebugScope *DebugScope,
                          DeclContext *DC)
   : Module(Module),
     Name(Name),

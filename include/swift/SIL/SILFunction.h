@@ -86,7 +86,7 @@ private:
   DeclContext *DeclCtx;
 
   /// The source location and scope of the function.
-  SILDebugScope *DebugScope;
+  const SILDebugScope *DebugScope;
 
   /// The function's bare attribute. Bare means that the function is SIL-only
   /// and does not require debug info.
@@ -162,7 +162,7 @@ private:
               ClassVisibility_t classVisibility,
               Inline_t inlineStrategy, EffectsKind E,
               SILFunction *insertBefore,
-              SILDebugScope *debugScope,
+              const SILDebugScope *debugScope,
               DeclContext *DC);
 
 public:
@@ -178,7 +178,7 @@ public:
                              Inline_t inlineStrategy = InlineDefault,
                              EffectsKind EK = EffectsKind::Unspecified,
                              SILFunction *InsertBefore = nullptr,
-                             SILDebugScope *DebugScope = nullptr,
+                             const SILDebugScope *DebugScope = nullptr,
                              DeclContext *DC = nullptr);
   ~SILFunction();
 
@@ -380,10 +380,10 @@ public:
   }
 
   /// Initialize the debug scope of the function.
-  void setDebugScope(SILDebugScope *DS) { DebugScope = DS; }
+  void setDebugScope(const SILDebugScope *DS) { DebugScope = DS; }
 
   /// Get the source location of the function.
-  SILDebugScope *getDebugScope() const { return DebugScope; }
+  const SILDebugScope *getDebugScope() const { return DebugScope; }
 
   /// Get this function's bare attribute.
   IsBare_t isBare() const { return IsBare_t(Bare); }

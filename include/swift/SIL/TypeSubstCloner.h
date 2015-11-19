@@ -93,6 +93,7 @@ protected:
   }
 
   void visitClassMethodInst(ClassMethodInst *Inst) {
+    getBuilder().setCurrentDebugScope(super::getOpScope(Inst->getDebugScope()));
     doPostProcess(Inst,
                   getBuilder().createClassMethod(getOpLocation(Inst->getLoc()),
                                                  getOpValue(Inst->getOperand()),
@@ -115,11 +116,11 @@ protected:
       TempSubstList.push_back(asImpl().getOpSubstitution(Sub));
     }
 
-    SILBuilder &Builder = getBuilder();
-    auto N = Builder.createBuiltin(getOpLocation(Inst->getLoc()),
-                                   Inst->getName(),
-                                   getOpType(Inst->getType()),
-                                   TempSubstList, Args);
+    getBuilder().setCurrentDebugScope(super::getOpScope(Inst->getDebugScope()));
+    auto N = getBuilder().createBuiltin(getOpLocation(Inst->getLoc()),
+                                        Inst->getName(),
+                                        getOpType(Inst->getType()),
+                                        TempSubstList, Args);
     doPostProcess(Inst, N);
   }
   
@@ -129,6 +130,7 @@ protected:
     // Handle recursions by replacing the apply to the callee with an apply to
     // the newly specialized function, but only if substitutions are the same.
     SILBuilder &Builder = getBuilder();
+    Builder.setCurrentDebugScope(super::getOpScope(Inst->getDebugScope()));
     SILValue CalleeVal = Inst->getCallee();
     if (!Inlining) {
       FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
@@ -162,6 +164,7 @@ protected:
     // the newly specialized function.
     SILValue CalleeVal = Inst->getCallee();
     SILBuilderWithPostProcess<TypeSubstCloner, 4> Builder(this, Inst);
+    Builder.setCurrentDebugScope(super::getOpScope(Inst->getDebugScope()));
     if (!Inlining) {
       FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
       if (FRI && FRI->getReferencedFunction() == Inst->getFunction()) {
@@ -216,10 +219,10 @@ protected:
     }
 
     // We already subst so getOpConformance is not needed.
-    SILBuilder &Builder = getBuilder();
+    getBuilder().setCurrentDebugScope(super::getOpScope(Inst->getDebugScope()));
     doPostProcess(
         Inst,
-        Builder.createWitnessMethod(
+        getBuilder().createWitnessMethod(
             getOpLocation(Inst->getLoc()), newLookupType, Conformance,
             Inst->getMember(), getOpType(Inst->getType()),
             Inst->hasOperand() ? getOpValue(Inst->getOperand()) : SILValue(),
@@ -237,6 +240,7 @@ protected:
     SILBasicBlock *failBB = getOpBasicBlock(inst->getFailureBB());
 
     SILBuilderWithPostProcess<TypeSubstCloner, 16> B(this, inst);
+    B.setCurrentDebugScope(super::getOpScope(inst->getDebugScope()));
 
     // Try to use the scalar cast instruction.
     if (canUseScalarCheckedCastInstructions(B.getModule(),

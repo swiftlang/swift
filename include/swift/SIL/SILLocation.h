@@ -24,7 +24,6 @@
 namespace swift {
 
 class SourceLoc;
-class SILDebugScope;
 
 /// This is a pointer to the AST node that a SIL instruction was
 /// derived from. This may be null if AST information is unavailable or
@@ -83,7 +82,7 @@ protected:
   ASTNodeTy ASTNode;
 
   union SpecificLoc {
-    SpecificLoc() {}
+    SpecificLoc() : DebugLoc() {}
     /// If coming from a .sil file, this is the location in the .sil file.
     SourceLoc SILFileSourceLoc;
     /// Sometimes the location for diagnostics needs to be
@@ -153,7 +152,7 @@ protected:
       : KindData(unsigned(K) | Flags) {}
 
   SILLocation(Stmt *S, LocationKind K, unsigned Flags = 0)
-      : ASTNode(S), KindData(unsigned(K) | Flags) {}
+    : ASTNode(S), KindData(unsigned(K) | Flags) {}
 
   SILLocation(Expr *E, LocationKind K, unsigned Flags = 0)
       : ASTNode(E), KindData(unsigned(K) | Flags) {}
@@ -335,6 +334,15 @@ public:
   /// Pretty-print the value.
   void dump(const SourceManager &SM) const;
   void print(raw_ostream &OS, const SourceManager &SM) const;
+
+  /// Returns an opaque pointer value for the debug location that may
+  /// be used to unique debug locations.
+  const void *getOpaquePointerValue() const {
+    if (hasSILFileSourceLoc())
+      return getSILFileSourceLoc().getOpaquePointerValue();
+    return ASTNode.getOpaqueValue();
+  }
+  unsigned getOpaqueKind() const { return KindData; }
 
   inline bool operator==(const SILLocation& R) const {
     return KindData == R.KindData &&

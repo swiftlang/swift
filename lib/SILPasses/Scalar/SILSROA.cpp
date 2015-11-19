@@ -196,7 +196,7 @@ bool SROAMemoryUseAnalyzer::analyze() {
 void
 SROAMemoryUseAnalyzer::
 createAllocas(llvm::SmallVector<AllocStackInst *, 4> &NewAllocations) {
-  SILBuilderWithScope<16> B(AI);
+  SILBuilderWithScope B(AI);
   SILType Type = AI->getType(1).getObjectType();
 
   if (TT) {
@@ -227,7 +227,7 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
 
   // Change any aggregate loads into field loads + aggregate structure.
   for (auto *LI : Loads) {
-    SILBuilderWithScope<16> B(LI);
+    SILBuilderWithScope B(LI);
     llvm::SmallVector<SILValue, 4> Elements;
     for (auto *NewAI : NewAllocations)
       Elements.push_back(B.createLoad(LI->getLoc(), SILValue(NewAI, 1)));
@@ -239,7 +239,7 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
 
   // Change any aggregate stores into extracts + field stores.
   for (auto *SI : Stores) {
-    SILBuilderWithScope<16> B(SI);
+    SILBuilderWithScope B(SI);
     for (unsigned EltNo : indices(NewAllocations))
       B.createStore(SI->getLoc(),
                     createAggProjection(B, SI->getLoc(), SI->getSrc(), EltNo),
@@ -259,17 +259,15 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
   llvm::SmallVector<DeallocStackInst *, 4> ToRemove;
   for (auto *Operand : getNonDebugUses(SILValue(AI, 0))) {
     SILInstruction *User = Operand->getUser();
-    SILBuilder B(User);
+    SILBuilderWithScope B(User);
 
     // If the use is a DSI, add it to our memory analysis so that if we can chop
     // up allocas, we also chop up the relevant dealloc stack insts.
     if (auto *DSI = dyn_cast<DeallocStackInst>(User)) {
       DEBUG(llvm::dbgs() << "        Found DeallocStackInst!\n");
       // Create the allocations in reverse order.
-      for (auto *NewAI : swift::reversed(NewAllocations)) {
-        auto NewDSI = B.createDeallocStack(DSI->getLoc(), SILValue(NewAI));
-        NewDSI->setDebugScope(DSI->getDebugScope());
-      }
+      for (auto *NewAI : swift::reversed(NewAllocations))
+        B.createDeallocStack(DSI->getLoc(), SILValue(NewAI));
       ToRemove.push_back(DSI);
     }
   }

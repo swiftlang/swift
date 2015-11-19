@@ -363,7 +363,7 @@ void CheckedCastBrJumpThreading::modifyCFGForFailurePreds() {
   FailureBBCloner->clone();
   TargetFailureBB = FailureBBCloner->getDestBB();
   auto *TI = TargetFailureBB->getTerminator();
-  SILBuilderWithScope<1> Builder(TI);
+  SILBuilderWithScope Builder(TI);
   // This BB copy branches to a FailureBB.
   Builder.createBranch(TI->getLoc(), FailureBB);
   TI->eraseFromParent();
@@ -388,7 +388,7 @@ void CheckedCastBrJumpThreading::modifyCFGForSuccessPreds() {
       SuccessBBCloner->clone();
       TargetSuccessBB = SuccessBBCloner->getDestBB();
       auto *TI = TargetSuccessBB->getTerminator();
-      SILBuilderWithScope<1> Builder(TI);
+      SILBuilderWithScope Builder(TI);
       SmallVector<SILValue, 8> SuccessBBArgs;
       // Take argument value from the dominating BB.
       SuccessBBArgs.push_back(DomSuccessBB->getBBArg(0));

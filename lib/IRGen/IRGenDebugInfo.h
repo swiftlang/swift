@@ -82,7 +82,7 @@ class IRGenDebugInfo {
   IRGenModule &IGM;
 
   // Various caches.
-  llvm::DenseMap<SILDebugScope *, llvm::TrackingMDNodeRef> ScopeCache;
+  llvm::DenseMap<const SILDebugScope *, llvm::TrackingMDNodeRef> ScopeCache;
   llvm::DenseMap<const char *, llvm::TrackingMDNodeRef> DIFileCache;
   llvm::DenseMap<TypeBase *, llvm::TrackingMDNodeRef> DITypeCache;
   llvm::StringMap<llvm::TrackingMDNodeRef> DIModuleCache;
@@ -99,7 +99,7 @@ class IRGenDebugInfo {
   llvm::DIType *InternalType; /// Catch-all type for opaque internal types.
 
   Location LastDebugLoc;    /// The last location that was emitted.
-  SILDebugScope *LastScope; /// The scope of that last location.
+  const SILDebugScope *LastScope; /// The scope of that last location.
   bool IsLibrary;           /// Whether this is a libary or a top level module.
 #ifndef NDEBUG
   /// The basic block where the location was last changed.
@@ -108,7 +108,7 @@ class IRGenDebugInfo {
 #endif
 
   /// Used by pushLoc.
-  SmallVector<std::pair<Location, SILDebugScope *>, 8> LocationStack;
+  SmallVector<std::pair<Location, const SILDebugScope *>, 8> LocationStack;
 
   // FIXME: move this to something more local in type generation.
   CanGenericSignature CurGenerics;
@@ -136,7 +136,7 @@ public:
 
   /// Update the IRBuilder's current debug location to the location
   /// Loc and the lexical scope DS.
-  void setCurrentLoc(IRBuilder &Builder, SILDebugScope *DS,
+  void setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
                      Optional<SILLocation> Loc = None);
 
   void clearLoc(IRBuilder &Builder) {
@@ -160,7 +160,7 @@ public:
 
   /// Emit the final line 0 location for the unified trap block at the
   /// end of the function.
-  void setArtificialTrapLocation(IRBuilder &Builder, SILDebugScope *Scope) {
+  void setArtificialTrapLocation(IRBuilder &Builder, const SILDebugScope *Scope) {
     auto DL = llvm::DebugLoc::get(0, 0, getOrCreateScope(Scope));
     Builder.SetCurrentDebugLocation(DL);
   }
@@ -173,7 +173,7 @@ public:
   /// \param Fn The IR representation of the function.
   /// \param Rep The calling convention of the function.
   /// \param Ty The signature of the function.
-  llvm::DISubprogram *emitFunction(SILModule &SILMod, SILDebugScope *DS,
+  llvm::DISubprogram *emitFunction(SILModule &SILMod, const SILDebugScope *DS,
                                    llvm::Function *Fn,
                                    SILFunctionTypeRepresentation Rep,
                                    SILType Ty, DeclContext *DeclCtx = nullptr);
@@ -196,7 +196,7 @@ public:
   /// the Builder's current debug location.
   void emitVariableDeclaration(IRBuilder &Builder,
                                ArrayRef<llvm::Value *> Storage,
-                               DebugTypeInfo Ty, SILDebugScope *DS,
+                               DebugTypeInfo Ty, const SILDebugScope *DS,
                                StringRef Name, unsigned ArgNo = 0,
                                IndirectionKind = DirectValue,
                                ArtificialKind = RealValue);
@@ -205,14 +205,14 @@ public:
   /// emitVariableDeclaration internally.
   void emitStackVariableDeclaration(IRBuilder &Builder,
                                     ArrayRef<llvm::Value *> Storage,
-                                    DebugTypeInfo Ty, SILDebugScope *DS,
+                                    DebugTypeInfo Ty, const SILDebugScope *DS,
                                     StringRef Name,
                                     IndirectionKind Indirection = DirectValue);
 
   /// Convenience function for variables that are function arguments.
   void emitArgVariableDeclaration(IRBuilder &Builder,
                                   ArrayRef<llvm::Value *> Storage,
-                                  DebugTypeInfo Ty, SILDebugScope *DS,
+                                  DebugTypeInfo Ty, const SILDebugScope *DS,
                                   StringRef Name, unsigned ArgNo,
                                   IndirectionKind = DirectValue,
                                   ArtificialKind = RealValue);
@@ -221,7 +221,7 @@ public:
   void emitDbgIntrinsic(llvm::BasicBlock *BB, llvm::Value *Storage,
                         llvm::DILocalVariable *Var, llvm::DIExpression *Expr,
                         unsigned Line, unsigned Col, llvm::DILocalScope *Scope,
-                        SILDebugScope *DS);
+                        const SILDebugScope *DS);
 
   /// Create debug metadata for a global variable.
   void emitGlobalVariableDeclaration(llvm::GlobalValue *Storage, StringRef Name,
@@ -247,9 +247,9 @@ private:
   llvm::DIType *createType(DebugTypeInfo DbgTy, StringRef MangledName,
                            llvm::DIScope *Scope, llvm::DIFile *File);
   llvm::DIType *getOrCreateType(DebugTypeInfo DbgTy);
-  llvm::DIScope *getOrCreateScope(SILDebugScope *DS);
+  llvm::DIScope *getOrCreateScope(const SILDebugScope *DS);
   llvm::DIScope *getOrCreateContext(DeclContext *DC);
-  llvm::MDNode *createInlinedAt(SILDebugScope *Scope);
+  llvm::MDNode *createInlinedAt(const SILDebugScope *Scope);
 
   llvm::DIFile *getOrCreateFile(const char *Filename);
   llvm::DIType *getOrCreateDesugaredType(Type Ty, DebugTypeInfo DTI);
@@ -330,8 +330,9 @@ public:
 class ArtificialLocation : public AutoRestoreLocation {
 public:
   /// \brief Set the current location to line 0, but within scope DS.
-  ArtificialLocation(SILDebugScope *DS, IRGenDebugInfo *DI, IRBuilder &Builder)
-    : AutoRestoreLocation(DI) {
+  ArtificialLocation(const SILDebugScope *DS, IRGenDebugInfo *DI,
+                     IRBuilder &Builder)
+      : AutoRestoreLocation(DI) {
     if (DI) {
       auto DL = llvm::DebugLoc::get(0, 0, DI->getOrCreateScope(DS));
       Builder.SetCurrentDebugLocation(DL);

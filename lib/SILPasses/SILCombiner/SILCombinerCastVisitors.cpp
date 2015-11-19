@@ -73,6 +73,8 @@ SILInstruction *SILCombiner::visitUpcastInst(UpcastInst *UCI) {
 SILInstruction *
 SILCombiner::
 visitPointerToAddressInst(PointerToAddressInst *PTAI) {
+  Builder.setCurrentDebugScope(PTAI->getDebugScope());
+
   // If we reach this point, we know that the types must be different since
   // otherwise simplifyInstruction would have handled the identity case. This is
   // always legal to do since address-to-pointer pointer-to-address implies
@@ -140,7 +142,6 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
         auto DistanceAsWord = Builder.createBuiltin(
             PTAI->getLoc(), Trunc->getName(), Trunc->getType(), {}, Distance);
 
-        NewPTAI->setDebugScope(PTAI->getDebugScope());
         return Builder.createIndexAddr(PTAI->getLoc(), NewPTAI, DistanceAsWord);
       }
     }
@@ -182,7 +183,6 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
       SILValue Distance = Bytes->getArguments()[0];
       auto *NewPTAI =
           Builder.createPointerToAddress(PTAI->getLoc(), Ptr, PTAI->getType());
-      NewPTAI->setDebugScope(PTAI->getDebugScope());
       return Builder.createIndexAddr(PTAI->getLoc(), NewPTAI, Distance);
     }
   }
@@ -192,6 +192,7 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
 
 SILInstruction *
 SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
+  Builder.setCurrentDebugScope(UADCI->getDebugScope());
   SILModule &Mod = UADCI->getModule();
 
   // (unchecked-addr-cast (unchecked-addr-cast x X->Y) Y->Z)
@@ -247,7 +248,6 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
 
   SILValue Op = UADCI->getOperand();
   SILLocation Loc = UADCI->getLoc();
-  SILDebugScope *Scope = UADCI->getDebugScope();
 
   // Ok, we have all loads. Lets simplify this. Go back through the loads a
   // second time, rewriting them into a load + bitcast from our source.
@@ -259,10 +259,8 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
 
     // Insert a new load from our source and bitcast that as appropriate.
     LoadInst *NewLoad = Builder.createLoad(Loc, Op);
-    NewLoad->setDebugScope(Scope);
     auto *BitCast = Builder.createUncheckedBitCast(Loc, NewLoad,
                                                     OutputTy.getObjectType());
-    BitCast->setDebugScope(Scope);
     // Replace all uses of the old load with the new bitcasted result and erase
     // the old load.
     replaceInstUsesWith(*L, BitCast, 0);
@@ -323,15 +321,12 @@ SILCombiner::visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI) {
     return nullptr;
  
   SILLocation Loc = URCI->getLoc();
-  SILDebugScope *Scope = URCI->getDebugScope();
+  Builder.setCurrentDebugScope(URCI->getDebugScope());
   LoadInst *load = Builder.createLoad(Loc, URCI->getSrc());
-  load->setDebugScope(Scope);
   auto *cast = Builder.tryCreateUncheckedRefCast(Loc, load,
                                                  DestTy.getObjectType());
   assert(cast && "SILBuilder cannot handle reference-castable types");
-  cast->setDebugScope(Scope);
-  StoreInst *store = Builder.createStore(Loc, cast, URCI->getDest());
-  store->setDebugScope(Scope);
+  Builder.createStore(Loc, cast, URCI->getDest());
 
   return eraseInstFromFunction(*URCI);
 }

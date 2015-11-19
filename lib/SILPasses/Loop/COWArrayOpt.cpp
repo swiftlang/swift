@@ -2043,8 +2043,6 @@ protected:
   }
 
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
-    if (auto *Scope = Orig->getDebugScope())
-      Cloned->setDebugScope(Scope);
     SILCloner<RegionCloner>::postProcess(Orig, Cloned);
   }
 

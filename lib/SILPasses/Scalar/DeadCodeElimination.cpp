@@ -434,11 +434,10 @@ void DCE::replaceBranchWithJump(SILInstruction *Inst, SILBasicBlock *Block) {
       assert(!LiveValues.count(*A) && "Unexpected live block argument!");
       Args.push_back(SILUndef::get((*A)->getType(), (*A)->getModule()));
     }
-    Branch = SILBuilder(Inst).createBranch(Inst->getLoc(), Block, Args)
-      ->setDebugScope(Inst->getDebugScope());
+    Branch =
+        SILBuilderWithScope(Inst).createBranch(Inst->getLoc(), Block, Args);
   } else {
-    Branch = SILBuilder(Inst).createBranch(Inst->getLoc(), Block)
-      ->setDebugScope(Inst->getDebugScope());
+    Branch = SILBuilderWithScope(Inst).createBranch(Inst->getLoc(), Block);
   }
   DEBUG(llvm::dbgs() << "Inserted unconditional branch:\n");
   DEBUG(Branch->dump());

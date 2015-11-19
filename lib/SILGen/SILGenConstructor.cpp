@@ -660,7 +660,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     B.createBranch(loc, failureExitBB, nilResult);
 
     B.setInsertionPoint(failureExitBB);
-    B.createReturn(loc, failureExitArg)->setDebugScope(F.getDebugScope());
+    B.createReturn(loc, failureExitArg);
 
     FailDest = JumpDest(failureBB, Cleanups.getCleanupsDepth(), ctor);
   }
@@ -730,7 +730,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     if (failureExitBB)
       B.createBranch(returnLoc, failureExitBB, selfArg);
     else
-      B.createReturn(returnLoc, selfArg)->setDebugScope(F.getDebugScope());
+      B.createReturn(returnLoc, selfArg);
   }
 }
 

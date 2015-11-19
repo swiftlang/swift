@@ -281,8 +281,8 @@ static void
 promoteDebugValueAddr(DebugValueAddrInst *DVAI, SILValue Value, SILBuilder &B) {
   assert(Value.isValid() && "Expected valid value");
   B.setInsertionPoint(DVAI);
-  B.createDebugValue(DVAI->getLoc(), Value)
-    ->setDebugScope(DVAI->getDebugScope());
+  B.setCurrentDebugScope(DVAI->getDebugScope());
+  B.createDebugValue(DVAI->getLoc(), Value);
   DVAI->eraseFromParent();
 }
 
@@ -351,7 +351,7 @@ static void replaceDestroy(DestroyAddrInst *DAI, SILValue NewValue) {
 
   assert(NewValue.isValid() && "Expected a value to release!");
 
-  SILBuilderWithScope<16> Builder(DAI);
+  SILBuilderWithScope Builder(DAI);
 
   auto Ty = DAI->getOperand().getType();
   auto &TL = DAI->getModule().getTypeLowering(Ty);

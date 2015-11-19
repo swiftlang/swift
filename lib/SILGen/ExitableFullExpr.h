@@ -39,8 +39,7 @@ public:
     : SGF(SGF), Scope(SGF.Cleanups, loc),
       ExitDest(SGF.B.splitBlockForFallthrough(),
                SGF.Cleanups.getCleanupsDepth(), loc) {
-        SGF.enterDebugScope(new (SGF.SGM.M)
-                            SILDebugScope(loc, SGF.getFunction()));
+    SGF.enterDebugScope(loc);
   }
   ~ExitableFullExpr() {
     SGF.leaveDebugScope();

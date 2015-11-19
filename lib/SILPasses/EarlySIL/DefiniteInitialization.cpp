@@ -1558,16 +1558,12 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &InstInfo) {
     unsigned NumElements = InstInfo.NumElements;
 
     SmallVector<SILInstruction*, 4> InsertedInsts;
-    SILBuilder B(Inst, &InsertedInsts);
-
-    auto DebugScope = AI->getDebugScope();
-
+    SILBuilderWithScope B(Inst, &InsertedInsts);
     LowerAssignInstruction(B, AI, InitKind);
 
     // If lowering of the assign introduced any new loads or stores, keep track
     // of them.
     for (auto I : InsertedInsts) {
-      I->setDebugScope(DebugScope);
       if (isa<StoreInst>(I)) {
         NonLoadUses[I] = Uses.size();
         Uses.push_back(DIMemoryUse(I, Kind, FirstElement, NumElements));
@@ -1591,7 +1587,7 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
   if (TheMemory.isClassInitSelf()) {
     auto Loc = Release->getLoc();
     
-    SILBuilderWithScope<4> B(Release);
+    SILBuilderWithScope B(Release);
     B.setInsertionPoint(InsertPt);
 
     SILValue Pointer = Release->getOperand(0);
@@ -1812,8 +1808,8 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
 
   // Create the control variable as the first instruction in the function (so
   // that it is easy to destroy the stack location.
-  SILBuilderWithScope<16> B(TheMemory.getFunctionEntryPoint(),
-                            TheMemory.getFunction().getDebugScope());
+  SILBuilder B(TheMemory.getFunctionEntryPoint());
+  B.setCurrentDebugScope(TheMemory.getFunction().getDebugScope());
   SILType IVType =
     SILType::getBuiltinIntegerType(NumMemoryElements, Module.getASTContext());
   auto *ControlVariableBox = B.createAllocStack(Loc, IVType);
@@ -1953,7 +1949,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
 /// to emit branching logic when an element may or may not be initialized.
 void LifetimeChecker::
 handleConditionalDestroys(SILValue ControlVariableAddr) {
-  SILBuilderWithScope<16> B(TheMemory.MemoryInst);
+  SILBuilderWithScope B(TheMemory.MemoryInst);
   Identifier ShiftRightFn, TruncateFn;
 
   unsigned NumMemoryElements = TheMemory.NumElements;
@@ -2449,7 +2445,7 @@ static bool lowerRawSILOperations(SILFunction &Fn) {
 
       // Unprocessed assigns just lower into assignments, not initializations.
       if (auto *AI = dyn_cast<AssignInst>(Inst)) {
-        SILBuilderWithScope<4> B(AI);
+        SILBuilderWithScope B(AI);
         LowerAssignInstruction(B, AI, IsNotInitialization);
         // Assign lowering may split the block. If it did,
         // reset our iteration range to the block after the insertion.

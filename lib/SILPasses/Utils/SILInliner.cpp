@@ -72,8 +72,7 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
     // Performance inlining. Construct a proper inline scope pointing
     // back to the call site.
     CallSiteScope = new (F.getModule())
-      SILDebugScope(AI.getLoc(), F, AIScope);
-    CallSiteScope->InlinedCallSite = AIScope->InlinedCallSite;
+      SILDebugScope(AI.getLoc(), F, AIScope, AIScope->InlinedCallSite);
   }
   assert(CallSiteScope && "call site has no scope");
 
@@ -153,8 +152,7 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
     if (ReturnInst *RI = dyn_cast<ReturnInst>(BI->first->getTerminator())) {
       auto thrownValue = remapValue(RI->getOperand());
       getBuilder().createBranch(Loc.getValue(), ReturnToBB,
-                                thrownValue)
-        ->setDebugScope(AIScope);
+                                thrownValue);
       continue;
     }
 
@@ -171,8 +169,7 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
       auto tryAI = cast<TryApplyInst>(AI);
       auto returnedValue = remapValue(TI->getOperand());
       getBuilder().createBranch(Loc.getValue(), tryAI->getErrorBB(),
-                                returnedValue)
-        ->setDebugScope(AIScope);
+                                returnedValue);
       continue;
     }
 
@@ -202,12 +199,9 @@ void SILInliner::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
   return SILCloner<SILInliner>::visitDebugValueAddrInst(Inst);
 }
 
-SILDebugScope *SILInliner::getOrCreateInlineScope(SILInstruction *Orig) {
-  auto CalleeScope = Orig->getDebugScope();
-  // We need to fake a scope to add the inline info to it.
-  if (!CalleeScope)
-    CalleeScope = Orig->getFunction()->getDebugScope();
-
+const SILDebugScope *
+SILInliner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
+  assert(CalleeScope);
   auto it = InlinedScopeCache.find(CalleeScope);
   if (it != InlinedScopeCache.end())
     return it->second;

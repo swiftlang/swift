@@ -48,7 +48,7 @@ static void fixupReferenceCounts(SILBasicBlock::iterator I, SILLocation Loc,
                                  SmallVectorImpl<SILValue> &CaptureArgs) {
   // Either release the callee (which the apply would have done) or remove a
   // retain that happens to be the immediately preceding instruction.
-  SILBuilderWithScope<16> B(I);
+  SILBuilderWithScope B(I);
   auto *NewRelease = B.emitStrongReleaseAndFold(Loc, CalleeValue);
 
   // Important: we move the insertion point before this new release, just in
@@ -116,7 +116,7 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
     // source of the store and erase it.
     if (SRI) {
       if (CalleeValue.isValid())
-        SILBuilderWithScope<1>(SRI)
+        SILBuilderWithScope(SRI)
             .emitStrongReleaseAndFold(SRI->getLoc(), CalleeValue);
       SRI->eraseFromParent();
     }

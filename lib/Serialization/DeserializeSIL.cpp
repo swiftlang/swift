@@ -239,13 +239,12 @@ SILValue SILDeserializer::getLocalValue(ValueID Id, unsigned ResultNum,
   // Otherwise, this is a forward reference.  Create a dummy node to represent
   // it until we see a real definition.
   std::vector<SILValue> &Placeholders = ForwardMRVLocalValues[Id];
-  SourceLoc Loc;
   if (Placeholders.size() <= ResultNum)
     Placeholders.resize(ResultNum+1);
 
   if (!Placeholders[ResultNum])
     Placeholders[ResultNum] =
-      new (SILMod) GlobalAddrInst(SILFileLocation(Loc), Type);
+      new (SILMod) GlobalAddrInst(nullptr, Type);
   return Placeholders[ResultNum];
 }
 
@@ -457,9 +456,9 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   fn->setBare(IsBare);
   if (!fn->hasLocation()) fn->setLocation(loc);
 
-  SILDebugScope *DS = fn->getDebugScope();
+  const SILDebugScope *DS = fn->getDebugScope();
   if (!DS) {
-    DS= new (SILMod) SILDebugScope(loc, *fn);
+    DS = new (SILMod) SILDebugScope(loc, *fn);
     fn->setDebugScope(DS);
   }
 
@@ -630,8 +629,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   if (!BB)
     return true;
 
-  SmallVector<SILInstruction*, 1> InsertedInsn;
-  SILBuilder Builder(BB, &InsertedInsn);
+  SILBuilder Builder(BB);
+  Builder.setCurrentDebugScope(Fn->getDebugScope());
   unsigned OpCode = 0, TyCategory = 0, TyCategory2 = 0, TyCategory3 = 0,
            ValResNum = 0, ValResNum2 = 0, Attr = 0,
            NumSubs = 0, NumConformances = 0, IsNonThrowingApply = 0;
@@ -1734,9 +1733,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
   if (ResultVal->hasValue())
     setLocalValue(ResultVal, ++LastValueID);
-
-  for (auto I : InsertedInsn)
-    I->setDebugScope(I->getFunction()->getDebugScope());
 
   return false;
 }

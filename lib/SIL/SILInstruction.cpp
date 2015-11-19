@@ -42,11 +42,20 @@ Optional<SILLocation> SILValue::getLoc() const {
   return None;
 }
 
-SILInstruction *SILInstruction::setDebugScope(SILDebugScope *DS) {
-  if (DebugScope && DebugScope->InlinedCallSite)
+SILLocation SILInstruction::getLoc() const { return Location.getLocation(); }
+
+const SILDebugScope *SILInstruction::getDebugScope() const {
+  return Location.getScope();
+}
+
+void SILInstruction::setDebugScope(SILBuilder &B, const SILDebugScope *DS) {
+  if (getDebugScope() && getDebugScope()->InlinedCallSite)
     assert(DS->InlinedCallSite && "throwing away inlined scope info");
-  DebugScope = DS;
-  return this;
+
+  assert(DS->InlinedCallSite || DS->SILFn == getFunction() &&
+         "scope of a non-inlined instruction points to different function");
+
+  Location = *B.getOrCreateDebugLocation(getLoc(), DS);
 }
 
 //===----------------------------------------------------------------------===//
@@ -771,11 +780,11 @@ bool SILInstruction::mayRelease() const {
 }
 
 namespace {
-  class TrivialCloner : public SILClonerWithScopes<TrivialCloner> {
+  class TrivialCloner : public SILCloner<TrivialCloner> {
     friend class SILCloner<TrivialCloner>;
     friend class SILVisitor<TrivialCloner>;
     SILInstruction *Result = nullptr;
-    TrivialCloner(SILFunction *F) : SILClonerWithScopes(*F) {}
+    TrivialCloner(SILFunction *F) : SILCloner(*F) {}
   public:
 
     static SILInstruction *doIt(SILInstruction *I) {
@@ -785,8 +794,11 @@ namespace {
     }
 
     void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
+      assert(Orig->getFunction() == &getBuilder().getFunction() &&
+             "cloning between functions is not supported");
+
       Result = Cloned;
-      SILClonerWithScopes<TrivialCloner>::postProcess(Orig, Cloned);
+      SILCloner<TrivialCloner>::postProcess(Orig, Cloned);
     }
     SILValue remapValue(SILValue Value) {
       return Value;
