@@ -70,6 +70,9 @@ public:
   
   SideEffectAnalysis *getSideEffectAnalysis() const { return SEA; }
 
+  /// Perform alias analysis on SILValues with multiple underlying objects.
+  AliasResult handleMultiUnderlyingObjectAlias(SILValue V1, SILValue V2);
+
   /// Perform an alias query to see if V1, V2 refer to the same values.
   AliasResult alias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
                     SILType TBAAType2 = SILType());
