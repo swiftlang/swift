@@ -32,8 +32,8 @@ namespace {
 ///
 /// TODO:
 ///
-/// - Use CallGraphAnalysis to move initializers to the module's public entry
-///   points.
+/// - Analyze the module to move initializers to the module's public
+///   entry points.
 ///
 /// - Convert trivial initializers to static initialization. This requires
 ///   serializing globals.
