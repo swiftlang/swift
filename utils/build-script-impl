@@ -2106,19 +2106,21 @@ if [[ "${DARWIN_INSTALL_EXTRACT_SYMBOLS}" ]] ; then
     # Copy executables and shared libraries from the INSTALL_DESTDIR to
     # INSTALL_SYMROOT and run dsymutil on them.
     (cd "${INSTALL_DESTDIR}" &&
-     find ./"${INSTALL_PREFIX}" -perm -0111 -type f -print | cpio -pdm "${INSTALL_SYMROOT}")
+     find ./"${TOOLCHAIN_PREFIX}" -perm -0111 -type f -print | cpio -pdm "${INSTALL_SYMROOT}")
 
     # Run dsymutil on executables and shared libraries.
     #
     # Exclude shell scripts.
     (cd "${INSTALL_SYMROOT}" &&
-     find ./"${INSTALL_PREFIX}" -perm -0111 -type f -print | \
+     find ./"${TOOLCHAIN_PREFIX}" -perm -0111 -type f -print | \
        grep -v swift-stdlib-tool | \
+       grep -v crashlog.py | \
+       grep -v symbolication.py | \
        xargs -n 1 -P $(get_dsymutil_parallelism) $(xcrun_find_tool dsymutil))
 
     # Strip executables, shared libraries and static libraries in
     # INSTALL_DESTDIR.
-    find "${INSTALL_DESTDIR}"/"${INSTALL_PREFIX}" \
+    find "${INSTALL_DESTDIR}"/"${TOOLCHAIN_PREFIX}" \
       \( -perm -0111 -or -name "*.a" \) -type f -print | \
       xargs -n 1 -P $(get_dsymutil_parallelism) $(xcrun_find_tool strip) -S
 
