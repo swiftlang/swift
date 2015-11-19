@@ -266,7 +266,9 @@ public:
   }
 
 private:
-  
+  /// The module being processed.
+  SILModule &M;
+
   /// All the side-effect information for the whole module.
   llvm::DenseMap<SILFunction *, FunctionEffects *> Function2Effects;
   
@@ -319,9 +321,9 @@ private:
   }
   
 public:
-  SideEffectAnalysis(SILModule *M) :
-    SILAnalysis(AnalysisKind::SideEffect), CGA(nullptr), shouldRecompute(true) {
-  }
+  SideEffectAnalysis(SILModule *M)
+      : SILAnalysis(AnalysisKind::SideEffect), M(*M), CGA(nullptr),
+        shouldRecompute(true) {}
 
   static bool classof(const SILAnalysis *S) {
     return S->getKind() == AnalysisKind::SideEffect;

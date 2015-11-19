@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-sea"
 #include "swift/SILAnalysis/SideEffectAnalysis.h"
 #include "swift/SILAnalysis/BasicCalleeAnalysis.h"
+#include "swift/SILAnalysis/FunctionOrder.h"
 #include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILAnalysis/ArraySemantic.h"
 #include "swift/SILPasses/PassManager.h"
@@ -402,14 +403,16 @@ void SideEffectAnalysis::recompute() {
 
   WorkListType WorkList;
 
-  CallGraph &CG = CGA->getOrBuildCallGraph();
-  auto BottomUpFunctions = CG.getBottomUpFunctionOrder();
-  
+  BottomUpFunctionOrder BottomUpOrder(M, BCA);
+  auto BottomUpFunctions = BottomUpOrder.getFunctions();
+
   // Copy the bottom-up function list into the worklist.
   for (auto I = BottomUpFunctions.rbegin(), E = BottomUpFunctions.rend();
        I != E; ++I)
     WorkList.insert(*I);
-  
+
+  CallGraph &CG = CGA->getOrBuildCallGraph();
+
   // Iterate until the side-effect information stabilizes.
   while (!WorkList.empty()) {
     auto *F = WorkList.pop_back_val();
