@@ -60,7 +60,8 @@ static bool mayWriteTo(AliasAnalysis *AA, SideEffectAnalysis *SEA,
                        WriteSet &MayWrites, ApplyInst *AI) {
   SideEffectAnalysis::FunctionEffects E;
   SEA->getEffects(E, AI);
-  assert(E.getMemBehavior(true) <= SILInstruction::MemoryBehavior::MayRead &&
+  assert(E.getMemBehavior(RetainObserveKind::IgnoreRetains) <=
+         SILInstruction::MemoryBehavior::MayRead &&
          "apply should only read from memory");
   if (E.getGlobalEffects().mayRead() && !MayWrites.empty()) {
     // We don't know which memory is read in the callee. Therefore we bail if
