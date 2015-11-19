@@ -15,6 +15,7 @@
 
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILAnalysis/Analysis.h"
+#include "swift/SILAnalysis/SideEffectAnalysis.h"
 #include "llvm/ADT/DenseMap.h"
 
 namespace swift {
@@ -96,11 +97,13 @@ public:
   /// TODO: When ref count behavior is separated from generic memory behavior,
   /// the IgnoreRefCountIncrements flag will be unnecessary.
   MemoryBehavior getMemoryBehavior(SILInstruction *Inst, SILValue V,
-                                   bool IgnoreRefCountIncrements=false);
+                                   RetainObserveKind =
+                                   RetainObserveKind::ObserveRetains);
 
   /// Returns true if Inst may read from memory in a manner that affects V.
   bool mayReadFromMemory(SILInstruction *Inst, SILValue V) {
-    MemoryBehavior B = getMemoryBehavior(Inst, V, true/*IgnoreRefCountIncs*/);
+    MemoryBehavior B = getMemoryBehavior(Inst, V,
+                                         RetainObserveKind::IgnoreRetains);
     return B == MemoryBehavior::MayRead ||
       B == MemoryBehavior::MayReadWrite ||
       B == MemoryBehavior::MayHaveSideEffects;
@@ -108,7 +111,8 @@ public:
 
   /// Returns true if Inst may write to memory in a manner that affects V.
   bool mayWriteToMemory(SILInstruction *Inst, SILValue V) {
-    MemoryBehavior B = getMemoryBehavior(Inst, V, true/*IgnoreRefCountIncs*/);
+    MemoryBehavior B = getMemoryBehavior(Inst, V,
+                                         RetainObserveKind::IgnoreRetains);
     return B == MemoryBehavior::MayWrite ||
       B == MemoryBehavior::MayReadWrite ||
       B == MemoryBehavior::MayHaveSideEffects;
@@ -117,7 +121,7 @@ public:
   /// Returns true if Inst may read or write to memory in a manner that affects
   /// V.
   bool mayReadOrWriteMemory(SILInstruction *Inst, SILValue V) {
-    auto B = getMemoryBehavior(Inst, V, true/*IgnoreRefCountIncs*/);
+    auto B = getMemoryBehavior(Inst, V, RetainObserveKind::IgnoreRetains);
     return B != MemoryBehavior::None;
   }
 

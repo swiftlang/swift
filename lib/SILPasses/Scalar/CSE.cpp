@@ -603,7 +603,8 @@ bool CSE::canHandle(SILInstruction *Inst) {
     // Note that the function also may not contain any retains. And there are
     // functions which are read-none and have a retain, e.g. functions which
     // _convert_ a global_addr to a reference and retain it.
-    if (Effects.getMemBehavior(false) == SILInstruction::MemoryBehavior::None)
+    auto MB = Effects.getMemBehavior(RetainObserveKind::ObserveRetains);
+    if (MB == SILInstruction::MemoryBehavior::None)
       return true;
     
     return false;

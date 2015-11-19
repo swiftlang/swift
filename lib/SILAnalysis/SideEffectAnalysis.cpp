@@ -23,12 +23,13 @@ using namespace swift;
 using FunctionEffects = SideEffectAnalysis::FunctionEffects;
 using Effects = SideEffectAnalysis::Effects;
 
-SILInstruction::MemoryBehavior FunctionEffects::getMemBehavior(bool IgnoreRetains) const {
-  if ((!IgnoreRetains && mayAllocObjects()) || mayReadRC())
+SILInstruction::MemoryBehavior FunctionEffects::getMemBehavior(RetainObserveKind ScanKind) const {
+
+  if ((ScanKind == RetainObserveKind::ObserveRetains && mayAllocObjects()) || mayReadRC())
     return SILInstruction::MemoryBehavior::MayHaveSideEffects;
   
   // Start with the global effects.
-  auto Behavior = GlobalEffects.getMemBehavior(IgnoreRetains);
+  auto Behavior = GlobalEffects.getMemBehavior(ScanKind);
   
   // Add effects from the parameters.
   for (auto Iter = ParamEffects.begin(), End = ParamEffects.end();
@@ -36,7 +37,7 @@ SILInstruction::MemoryBehavior FunctionEffects::getMemBehavior(bool IgnoreRetain
        Behavior < SILInstruction::MemoryBehavior::MayHaveSideEffects;
        ++Iter) {
     const Effects &ParamEffect = *Iter;
-    auto ArgBehavior = ParamEffect.getMemBehavior(IgnoreRetains);
+    auto ArgBehavior = ParamEffect.getMemBehavior(ScanKind);
     if (ArgBehavior > Behavior)
       Behavior = ArgBehavior;
   }

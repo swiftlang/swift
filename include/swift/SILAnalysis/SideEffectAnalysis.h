@@ -26,6 +26,11 @@ class BasicCalleeAnalysis;
 class CallGraphAnalysis;
 class CallGraph;
 
+
+/// An enum to represent the kind of scan we perform when we calculate
+/// side effects.
+enum class RetainObserveKind {ObserveRetains, IgnoreRetains};
+
 /// The SideEffectAnalysis provides information about side-effects of SIL
 /// functions. Side-effect information is provided per function and includes:
 /// Does the function read or write memory? Does the function retain or release
@@ -91,13 +96,14 @@ public:
     bool mayRelease() const { return Releases; }
 
     /// Gets the memory behavior considering the global effects and
-    /// all parameter effects. If \p IgnoreRetains is false, retain
+    /// all parameter effects. If \p ScanKind equals ignoreRetains then retain
     /// instructions are considered as side effects.
-    SILInstruction::MemoryBehavior getMemBehavior(bool IgnoreRetains) const {
+    SILInstruction::MemoryBehavior
+      getMemBehavior(RetainObserveKind ScanKind) const {
       if (mayRelease())
         return SILInstruction::MemoryBehavior::MayHaveSideEffects;
       
-      if (!IgnoreRetains && mayRetain())
+      if (ScanKind == RetainObserveKind::ObserveRetains && mayRetain())
         return SILInstruction::MemoryBehavior::MayHaveSideEffects;
       
       if (mayWrite())
@@ -216,10 +222,11 @@ public:
     /// release instructions, e.g. isUnique?
     bool mayReadRC() const { return ReadsRC; }
 
-    /// Gets the overall memory behavior considering the global effects and
-    /// all parameter effects. If \p IgnoreRetains is false, retain
+    /// Gets the memory behavior considering the global effects and
+    /// all parameter effects. If \p ScanKind equals ignoreRetains then retain
     /// instructions are considered as side effects.
-    SILInstruction::MemoryBehavior getMemBehavior(bool IgnoreRetains) const;
+    SILInstruction::MemoryBehavior
+      getMemBehavior(RetainObserveKind ScanKind) const;
 
     /// Get the global effects for the function. These are effects which cannot
     /// be associated to a specific parameter, e.g. writes to global variables

@@ -89,10 +89,11 @@ class MemoryBehaviorVisitor
 
   /// Should we treat instructions that increment ref counts as None instead of
   /// MayHaveSideEffects.
-  bool IgnoreRefCountIncrements;
+  RetainObserveKind IgnoreRefCountIncrements;
 
 public:
-  MemoryBehaviorVisitor(AliasAnalysis &AA, SILValue V, bool IgnoreRefCountIncs)
+  MemoryBehaviorVisitor(AliasAnalysis &AA, SILValue V,
+                        RetainObserveKind IgnoreRefCountIncs)
       : AA(AA), V(V), IgnoreRefCountIncrements(IgnoreRefCountIncs) {}
 
   SILType getTypedAccessType() {
@@ -174,7 +175,7 @@ public:
   // memory this will be unnecessary.
 #define REFCOUNTINC_MEMBEHAVIOR_INST(Name)                                     \
   MemBehavior visit##Name(Name *I) {                                           \
-    if (IgnoreRefCountIncrements)                                              \
+    if (IgnoreRefCountIncrements == RetainObserveKind::IgnoreRetains)          \
       return MemBehavior::None;                                                \
     return I->getMemoryBehavior();                                             \
   }
@@ -275,7 +276,8 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
 
   // We can ignore mayTrap().
   if (ApplyEffects.mayReadRC() ||
-      (!IgnoreRefCountIncrements && ApplyEffects.mayAllocObjects())) {
+      (IgnoreRefCountIncrements == RetainObserveKind::ObserveRetains &&
+       ApplyEffects.mayAllocObjects())) {
     Behavior = MemBehavior::MayHaveSideEffects;
   } else {
     auto &GlobalEffects = ApplyEffects.getGlobalEffects();
@@ -347,7 +349,7 @@ MemBehavior MemoryBehaviorVisitor::visitReleaseValueInst(ReleaseValueInst *SI) {
 
 SILInstruction::MemoryBehavior
 AliasAnalysis::getMemoryBehavior(SILInstruction *Inst, SILValue V,
-                                 bool IgnoreRefCountIncrements) {
+                                 RetainObserveKind IgnoreRefCountIncrements) {
   DEBUG(llvm::dbgs() << "GET MEMORY BEHAVIOR FOR:\n    " << *Inst << "    "
                      << *V.getDef());
   return MemoryBehaviorVisitor(*this, V, IgnoreRefCountIncrements).visit(Inst);
