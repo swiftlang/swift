@@ -349,6 +349,11 @@ build the Debug variant of the Swift standard library and SDK overlay""",
         action="store_const",
         const="Debug",
         dest="cmark_build_variant")
+    build_variant_override_group.add_argument("--debug-foundation",
+        help="build the Debug variant of Foundation",
+        action="store_const",
+        const="Debug",
+        dest="foundation_build_variant")
 
     assertions_group = parser.add_mutually_exclusive_group(required=False)
     assertions_group.add_argument("--assertions",
@@ -512,6 +517,9 @@ placed""",
 
     if args.lldb_build_variant is None:
         args.lldb_build_variant = args.build_variant
+
+    if args.foundation_build_variant is None:
+        args.foundation_build_variant = args.build_variant
 
     # Assertions are enabled by default.
     if args.assertions is None:
@@ -692,6 +700,10 @@ placed""",
         "--cmake-generator", args.cmake_generator,
         "--workspace", SWIFT_SOURCE_ROOT
     ]
+    if args.build_foundation:
+        build_script_impl_args += [
+            "--foundation-build-type", args.foundation_build_variant
+        ]   
     build_script_impl_args += build_script_impl_inferred_args
 
     # If we have extra_swift_args, combine all of them together and then add
