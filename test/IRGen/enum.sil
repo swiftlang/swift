@@ -90,6 +90,11 @@ import Swift
 //    the element type.
 // CHECK: %O4enum20DynamicSinglePayload = type <{}>
 // CHECK: [[DYNAMIC_SINGLE_EMPTY_PAYLOAD:%O4enum20DynamicSinglePayload\.[0-9]+]] = type <{ [1 x i8] }>
+
+// -- Address-only multi-payload enums. We can't use spare bits.
+// CHECK-64: %O4enum32MultiPayloadAddressOnlySpareBits = type <{ [16 x i8], [1 x i8] }>
+// CHECK-32: %O4enum32MultiPayloadAddressOnlySpareBits = type <{ [8 x i8], [1 x i8] }>
+
 // CHECK: [[DYNAMIC_SINGLETON:%O4enum16DynamicSingleton.*]] = type <{}>
 
 // -- Dynamic metadata template carries a value witness table pattern
@@ -2339,6 +2344,25 @@ entry(%m : $*MultiPayloadAddressOnlyFixed):
   return undef : $()
 }
 
+// Even if spare bits are available in an address-only payload,
+// we cannot use them.
+
+struct AddressOnlySpareBitsPayload {
+  weak var x: C?
+  var y: C
+}
+
+enum MultiPayloadAddressOnlySpareBits {
+  case X(AddressOnlySpareBitsPayload)
+  case Y(AddressOnlySpareBitsPayload)
+}
+
+// CHECK-LABEL: define void @multi_payload_address_only_spare_bits(%O4enum32MultiPayloadAddressOnlySpareBits* noalias nocapture dereferenceable({{.*}}))
+sil @multi_payload_address_only_spare_bits : $@convention(thin) (@in MultiPayloadAddressOnlySpareBits) -> () {
+entry(%m : $*MultiPayloadAddressOnlySpareBits):
+  destroy_addr %m : $*MultiPayloadAddressOnlySpareBits
+  return undef : $()
+}
 
 // Force the storage types to all be generated.
 typealias AllConcreteTestEnums = (
