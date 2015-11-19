@@ -17,10 +17,8 @@ import SwiftShims
 // variables, allowing the core stdlib to remain decoupled from
 // Foundation.
 
-/// Effectively a proxy for NSString that doesn't mention it by
-/// name.  NSString's conformance to this protocol is declared in
-/// Foundation.
-@objc public protocol _CocoaStringType {}
+/// Effectively an untyped NSString that doesn't require foundation.
+public typealias _CocoaStringType = AnyObject
 
 public // @testable
 func _stdlib_binary_CFStringCreateCopy(
@@ -28,7 +26,7 @@ func _stdlib_binary_CFStringCreateCopy(
 ) -> _CocoaStringType {
   let result = _swift_stdlib_CFStringCreateCopy(nil, source)
   Builtin.release(result)
-  return unsafeBitCast(result, _CocoaStringType.self)
+  return result
 }
 
 public // @testable
@@ -147,16 +145,11 @@ extension String {
       return
     }
 
-    // Treat it as a CF object because presumably that's what these
-    // things tend to be, and CF has a fast path that avoids
-    // objc_msgSend
-    let cfValue = unsafeBitCast(_cocoaString, _CocoaStringType.self)
-
     // "copy" it into a value to be sure nobody will modify behind
     // our backs.  In practice, when value is already immutable, this
     // just does a retain.
     let cfImmutableValue: _swift_shims_CFStringRef
-      = _stdlib_binary_CFStringCreateCopy(cfValue)
+      = _stdlib_binary_CFStringCreateCopy(_cocoaString)
 
     let length = _swift_stdlib_CFStringGetLength(cfImmutableValue)
 

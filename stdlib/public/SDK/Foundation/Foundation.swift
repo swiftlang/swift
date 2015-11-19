@@ -120,7 +120,6 @@ extension NSString : StringLiteralConvertible {
 //===----------------------------------------------------------------------===//
 // New Strings
 //===----------------------------------------------------------------------===//
-extension NSString : _CocoaStringType {}
 
 //
 // Conversion from NSString to Swift's native representation
