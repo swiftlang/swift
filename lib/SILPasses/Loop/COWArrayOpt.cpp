@@ -2287,7 +2287,7 @@ void ArrayPropertiesSpecializer::specializeLoopNest() {
 
   // We have potentially cloned a loop - invalidate loop info.
   LoopAnalysis->invalidate(Header->getParent(),
-                           SILAnalysis::InvalidationKind::Nothing);
+                           SILAnalysis::InvalidationKind::WholeFunction);
 }
 
 namespace {

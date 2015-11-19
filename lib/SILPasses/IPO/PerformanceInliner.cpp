@@ -1131,7 +1131,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
 
     NewApplies.insert(NewApplies.end(), AppliesFromInlinee.begin(),
                       AppliesFromInlinee.end());
-    DA->invalidate(Caller, SILAnalysis::InvalidationKind::Nothing);
+    DA->invalidate(Caller, SILAnalysis::InvalidationKind::Everything);
     NumFunctionsInlined++;
   }
 

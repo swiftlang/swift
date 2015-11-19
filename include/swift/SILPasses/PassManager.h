@@ -89,12 +89,15 @@ class SILPassManager {
 
   ///  \brief Broadcast the invalidation of the module to all analysis.
   void invalidateAnalysis(SILAnalysis::InvalidationKind K) {
+    assert(K != SILAnalysis::InvalidationKind::Nothing &&
+           "Invalidation call must invalidate some trait");
+
     for (auto AP : Analysis)
       if (!AP->isLocked())
         AP->invalidate(K);
-    
+
     currentPassHasInvalidated = true;
-    
+
     // Assume that all functions have changed. Clear all masks of all functions.
     CompletedPassesMap.clear();
   }
