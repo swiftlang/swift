@@ -288,6 +288,7 @@ SILValue SILBuilder::emitObjCToThickMetatype(SILLocation Loc, SILValue Op,
 SILDebugLocation *
 SILBuilder::getOrCreateDebugLocation(SILLocation Loc, const SILDebugScope *DS) {
   // Check whether the location already exists.
+  assert(DS && "empty debug scope");
   SILDebugLocation TmpLoc(Loc, DS);
   auto *&L = DebugLocs[SILDebugLocationID(TmpLoc)];
   if (L)
