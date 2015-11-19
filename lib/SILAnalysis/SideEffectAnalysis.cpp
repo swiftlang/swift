@@ -18,11 +18,12 @@
 #include "swift/SILPasses/PassManager.h"
 #include "swift/SIL/SILArgument.h"
 
-
 using namespace swift;
 
-SILInstruction::MemoryBehavior
-SideEffectAnalysis::FunctionEffects::getMemBehavior(bool IgnoreRetains) const {
+using FunctionEffects = SideEffectAnalysis::FunctionEffects;
+using Effects = SideEffectAnalysis::Effects;
+
+SILInstruction::MemoryBehavior FunctionEffects::getMemBehavior(bool IgnoreRetains) const {
   if ((!IgnoreRetains && mayAllocObjects()) || mayReadRC())
     return SILInstruction::MemoryBehavior::MayHaveSideEffects;
   
@@ -42,7 +43,7 @@ SideEffectAnalysis::FunctionEffects::getMemBehavior(bool IgnoreRetains) const {
   return Behavior;
 }
 
-bool SideEffectAnalysis::FunctionEffects::mergeFrom(const FunctionEffects &RHS) {
+bool FunctionEffects::mergeFrom(const FunctionEffects &RHS) {
   bool Changed = mergeFlags(RHS);
   Changed |= GlobalEffects.mergeFrom(RHS.GlobalEffects);
   Changed |= LocalEffects.mergeFrom(RHS.LocalEffects);
@@ -60,7 +61,7 @@ bool SideEffectAnalysis::FunctionEffects::mergeFrom(const FunctionEffects &RHS) 
   return Changed;
 }
 
-bool SideEffectAnalysis::FunctionEffects::mergeFromApply(
+bool FunctionEffects::mergeFromApply(
                   const FunctionEffects &ApplyEffects, FullApplySite FAS) {
   bool Changed = mergeFlags(ApplyEffects);
   Changed |= GlobalEffects.mergeFrom(ApplyEffects.GlobalEffects);
@@ -75,7 +76,7 @@ bool SideEffectAnalysis::FunctionEffects::mergeFromApply(
   return Changed;
 }
 
-void SideEffectAnalysis::FunctionEffects::dump() {
+void FunctionEffects::dump() {
   llvm::errs() << *this << '\n';
 }
 
@@ -114,8 +115,7 @@ static SILValue skipValueProjections(SILValue V) {
   llvm_unreachable("there is no escape from an infinite loop");
 }
 
-SideEffectAnalysis::Effects *
-SideEffectAnalysis::FunctionEffects::getEffectsOn(SILValue Addr) {
+Effects *FunctionEffects::getEffectsOn(SILValue Addr) {
   SILValue BaseAddr = skipValueProjections(skipAddrProjections(Addr));
   switch (BaseAddr->getKind()) {
     case swift::ValueKind::SILArgument: {
