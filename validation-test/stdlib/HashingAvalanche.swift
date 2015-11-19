@@ -5,6 +5,13 @@
 import SwiftPrivate
 import StdlibUnittest
 
+// Also import modules which are used by StdlibUnittest internally. This is
+// needed to link all required libraries in case we serialize StdlibUnittest.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 var HashingTestSuite = TestSuite("Hashing")
 
 func avalancheTest(bits: Int, _ hashUnderTest: (UInt64) -> UInt64, _ pValue: Double) {

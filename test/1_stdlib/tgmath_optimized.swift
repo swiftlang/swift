@@ -8,6 +8,13 @@
 import Darwin
 import StdlibUnittest
 
+// Also import modules which are used by StdlibUnittest internally. This is
+// needed to link all required libraries in case we serialize StdlibUnittest.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 var TGMathTestSuite = TestSuite("tgmath")
 
 let minusOneDouble = Double(-1.0)

@@ -10,6 +10,13 @@
 
 import StdlibUnittest
 
+// Also import modules which are used by StdlibUnittest internally. This is
+// needed to link all required libraries in case we serialize StdlibUnittest.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 // Note: in this file, we need to go through opaque functions to load
 // constants.  This is to to check runtime behaviour and ensure the constant is
 // not folded.

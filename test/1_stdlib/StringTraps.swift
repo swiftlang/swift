@@ -12,6 +12,13 @@
 import StdlibUnittest
 import Foundation
 
+// Also import modules which are used by StdlibUnittest internally. This is
+// needed to link all required libraries in case we serialize StdlibUnittest.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 var StringTraps = TestSuite("StringTraps")
 
 StringTraps.test("startIndex/predecessor")

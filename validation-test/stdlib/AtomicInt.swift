@@ -8,6 +8,14 @@
 import SwiftPrivate
 import StdlibUnittest
 
+// Also import modules which are used by StdlibUnittest internally. This is
+// needed to link all required libraries in case we serialize StdlibUnittest.
+import SwiftPrivate
+import SwiftPrivatePthreadExtras
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 final class HeapBool {
   var value: Bool
   init(_ value: Bool) {

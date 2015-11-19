@@ -13,6 +13,13 @@
 import StdlibUnittest
 import Foundation
 
+// Also import modules which are used by StdlibUnittest internally. This is
+// needed to link all required libraries in case we serialize StdlibUnittest.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 struct NotBridgedKeyTy : Equatable, Hashable {
   init(_ value: Int) {
     self.value = value
