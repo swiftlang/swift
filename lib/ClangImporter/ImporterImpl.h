@@ -17,6 +17,7 @@
 #ifndef SWIFT_CLANG_IMPORTER_IMPL_H
 #define SWIFT_CLANG_IMPORTER_IMPL_H
 
+#include "SwiftLookupTable.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/LazyResolver.h"
@@ -251,6 +252,7 @@ public:
   const bool ImportForwardDeclarations;
   const bool OmitNeedlessWords;
   const bool InferDefaultArguments;
+  const bool UseSwiftLookupTables;
 
   constexpr static const char * const moduleImportBufferName =
     "<swift-imported-modules>";
@@ -288,6 +290,9 @@ private:
   /// The flag is \c true if there has ever been a type resolver assigned, i.e.
   /// if type checking has begun.
   llvm::PointerIntPair<LazyResolver *, 1, bool> typeResolver;
+
+  /// The Swift lookup table for the bridging header.
+  SwiftLookupTable BridgingHeaderLookupTable;
 
 public:
   /// \brief Mapping of already-imported declarations.
@@ -1177,6 +1182,9 @@ public:
       ASD->setSetterAccessibility(Accessibility::Public);
     return D;
   }
+
+  /// Dump the Swift-specific name lookup tables we generate.
+  void dumpSwiftLookupTables();
 };
 
 }

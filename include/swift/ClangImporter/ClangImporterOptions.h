@@ -73,6 +73,10 @@ public:
   // If true, infer default arguments for nullable pointers (nil) and
   // option sets ([]).
   bool InferDefaultArguments = false;
+
+  /// If true, we should use the Swift name lookup tables rather than
+  /// Clang's name lookup facilities.
+  bool UseSwiftLookupTables = false;
 };
 
 } // end namespace swift

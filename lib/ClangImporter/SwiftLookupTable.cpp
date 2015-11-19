@@ -1,0 +1,139 @@
+//===--- SwiftLookupTable.cpp - Swift Lookup Table ------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file implements support for Swift name lookup tables stored in Clang
+// modules.
+//
+//===----------------------------------------------------------------------===//
+#include "SwiftLookupTable.h"
+#include "swift/Basic/STLExtras.h"
+#include "clang/AST/DeclObjC.h"
+using namespace swift;
+
+bool SwiftLookupTable::matchesContext(clang::DeclContext *foundContext,
+                                      clang::DeclContext *requestedContext) {
+  /// If the requested context was null, we match.
+  if (!requestedContext)
+    return true;
+
+  // If the contexts match, we match.
+  if (foundContext == requestedContext)
+    return true;
+
+  // If we found something in an Objective-C protocol to which a class
+  // conforms, we match.
+  if (auto objcProto = dyn_cast<clang::ObjCProtocolDecl>(foundContext)) {
+    if (auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(requestedContext)) {
+      return objcClass->ClassImplementsProtocol(objcProto,
+                                                /*lookupCategory=*/true);
+    }
+  }
+
+  return false;
+}
+
+void SwiftLookupTable::addEntry(DeclName name, clang::NamedDecl *decl) {
+  clang::DeclContext *context
+    = decl->getDeclContext()->getRedeclContext()->getPrimaryContext();
+
+  // First, check whether there is already a full name entry.
+  auto knownFull = FullNameTable.find(name);
+  if (knownFull == FullNameTable.end()) {
+    // We didn't have a full name entry, so record that in the base
+    // name table.
+    BaseNameTable[name.getBaseName()].push_back(name);
+
+    // Insert the entry into the full name table. We're done.
+    FullTableEntry newEntry;
+    newEntry.Context = context;
+    newEntry.Decls.push_back(decl);
+    (void)FullNameTable.insert({name, { newEntry }});
+    return;
+  }
+
+  // Check whether there is already an entry with the same context.
+  auto &fullEntries = knownFull->second;
+  for (auto &fullEntry : fullEntries) {
+    if (fullEntry.Context == context) {
+      fullEntry.Decls.push_back(decl);
+      return;
+    }
+  }
+
+  // This is a new context for this name. Add it.
+  FullTableEntry newEntry;
+  newEntry.Context = context;
+  newEntry.Decls.push_back(decl);
+  fullEntries.push_back(newEntry);
+}
+
+void SwiftLookupTable::dump() const {
+  // Dump the base name -> full name mappings.
+  SmallVector<Identifier, 4> baseNames;
+  for (const auto &entry : BaseNameTable) {
+    baseNames.push_back(entry.first);
+  }
+  std::sort(baseNames.begin(), baseNames.end(),
+            [&](Identifier x, Identifier y) {
+              return x.compare(y) < 0;
+            });
+  llvm::errs() << "Base -> full name mappings:\n";
+  for (auto baseName : baseNames) {
+    llvm::errs() << "  " << baseName.str() << " --> ";
+    const auto &fullNames = BaseNameTable.find(baseName)->second;
+    interleave(fullNames.begin(), fullNames.end(),
+               [](DeclName fullName) {
+                 llvm::errs() << fullName;
+               },
+               [] {
+                 llvm::errs() << ", ";
+               });
+    llvm::errs() << "\n";
+  }
+  llvm::errs() << "\n";
+
+  // Dump the full name -> full table entry mappings.
+  SmallVector<DeclName, 4> fullNames;
+  for (const auto &entry : FullNameTable) {
+    fullNames.push_back(entry.first);
+  }
+  std::sort(fullNames.begin(), fullNames.end(),
+            [](DeclName x, DeclName y) {
+              return x.compare(y) < 0;
+            });
+  llvm::errs() << "Full name -> entry mappings:\n";
+  for (auto fullName : fullNames) {
+    llvm::errs() << "  " << fullName << ":\n";
+    const auto &fullEntries = FullNameTable.find(fullName)->second;
+    for (const auto &fullEntry : fullEntries) {
+      llvm::errs() << "    ";
+      if (fullEntry.Context->isTranslationUnit()) {
+        llvm::errs() << "TU";
+      } else if (auto named = dyn_cast<clang::NamedDecl>(fullEntry.Context)) {
+        named->printName(llvm::errs());
+        llvm::errs();
+      } else {
+        llvm::errs() << "<unknown>";
+      }
+      llvm::errs() << ": ";
+
+      interleave(fullEntry.Decls.begin(), fullEntry.Decls.end(),
+                 [](clang::NamedDecl *decl) {
+                   decl->printName(llvm::errs());
+                 },
+                 [] {
+                   llvm::errs() << ", ";
+                 });
+      llvm::errs() << "\n";
+    }
+  }
+}

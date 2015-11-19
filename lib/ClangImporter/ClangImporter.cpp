@@ -736,9 +736,18 @@ bool ClangImporter::Implementation::importHeader(
 
   clang::Parser::DeclGroupPtrTy parsed;
   while (!Parser->ParseTopLevelDecl(parsed)) {
-    if (trackParsedSymbols && parsed) {
+    if (parsed && (trackParsedSymbols || UseSwiftLookupTables)) {
       for (auto *D : parsed.get()) {
-        addBridgeHeaderTopLevelDecls(D);
+        if (trackParsedSymbols)
+          addBridgeHeaderTopLevelDecls(D);
+
+        if (UseSwiftLookupTables) {
+          if (auto named = dyn_cast<clang::NamedDecl>(D)) {
+            Identifier name = importName(named);
+            if (!name.empty())
+              BridgingHeaderLookupTable.addEntry(name, named);
+          }
+        }
       }
     }
   }
@@ -1021,7 +1030,8 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
     InferImplicitProperties(opts.InferImplicitProperties),
     ImportForwardDeclarations(opts.ImportForwardDeclarations),
     OmitNeedlessWords(opts.OmitNeedlessWords),
-    InferDefaultArguments(opts.InferDefaultArguments)
+    InferDefaultArguments(opts.InferDefaultArguments),
+    UseSwiftLookupTables(opts.UseSwiftLookupTables)
 {
   // Add filters to determine if a Clang availability attribute
   // applies in Swift, and if so, what is the cutoff for deprecated
@@ -3305,4 +3315,12 @@ void ClangImporter::getMangledName(raw_ostream &os,
     Impl.Mangler.reset(Impl.getClangASTContext().createMangleContext());
 
   Impl.Mangler->mangleName(clangDecl, os);
+}
+
+void ClangImporter::dumpSwiftLookupTables() {
+  Impl.dumpSwiftLookupTables();
+}
+
+void ClangImporter::Implementation::dumpSwiftLookupTables() {
+  BridgingHeaderLookupTable.dump();
 }
