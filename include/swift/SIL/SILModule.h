@@ -499,12 +499,12 @@ public:
              bool PrintASTDecls = true) const;
 
   /// Allocate memory using the module's internal allocator.
-  void *allocate(unsigned Size, unsigned Align) const;
+  void *allocate(unsigned Size, unsigned Align) const {
+    if (getASTContext().LangOpts.UseMalloc)
+      return AlignedAlloc(Size, Align);
 
-  /// Allocate memory for an instruction using the module's internal allocator.
-  void *allocateInst(unsigned Size, unsigned Align) const;
-
-
+    return BPA.Allocate(Size, Align);
+  }
 
   /// \brief Looks up the llvm intrinsic ID and type for the builtin function.
   ///
