@@ -14,9 +14,9 @@ struct Int {
 }
 
 enum E { 
-        case A
-        case B
-        case C
+  case A
+  case B
+  case C
 }
 
 class Base { } 
@@ -38,7 +38,6 @@ sil @foo_init : $@convention(thin) (@thick foo.Type) -> @owned foo
 // CHECK: (0):   %12 = argument of bb3 : $foo
 // CHECK: NoAlias
 sil hidden @silargument_alias_check : $@convention(thin) (Bool) -> () {
-// %0                                             // users: %1, %2
 bb0(%0 : $Bool):
   %1 = alloc_ref $foo
   %2 = struct_extract %0 : $Bool, #Bool._value    // user: %3
@@ -56,7 +55,6 @@ bb2:                                              // Preds: bb0
   %10 = apply %8(%9) : $@convention(thin) (@thick foo.Type) -> @owned foo // user: %11
   br bb3(%10 : $foo)                              // id: %11
 
-// %12                                            // users: %13, %16, %19, %20
 bb3(%12 : $foo):                                  // Preds: bb1 bb2
   strong_retain %12 : $foo                        // id: %13
   %14 = integer_literal $Builtin.Int64, 12        // user: %15
@@ -99,7 +97,6 @@ bb4:                                              // Preds: bb2
   %16 = integer_literal $Builtin.Int64, 3         // user: %17 
   br bb5(%16 : $Builtin.Int64)                    // id: %17 
 
-// %18                                            // user: %19 
 bb5(%18 : $Builtin.Int64):                        // Preds: bb1 bb3 bb4 
   return %18 : $Builtin.Int64                     // id: %19 
 }
