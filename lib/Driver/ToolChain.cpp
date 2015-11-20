@@ -50,6 +50,7 @@ ToolChain::constructJob(const JobAction &JA,
         constructInvocation(cast<K##Action>(JA), context); \
     break;
   CASE(CompileJob)
+  CASE(InterpretJob)
   CASE(BackendJob)
   CASE(MergeModuleJob)
   CASE(ModuleWrapJob)

@@ -62,6 +62,9 @@ protected:
   constructInvocation(const CompileJobAction &job,
                       const JobContext &context) const;
   virtual std::pair<const char *, llvm::opt::ArgStringList>
+  constructInvocation(const InterpretJobAction &job,
+                      const JobContext &context) const;
+  virtual std::pair<const char *, llvm::opt::ArgStringList>
   constructInvocation(const BackendJobAction &job,
                       const JobContext &context) const;
   virtual std::pair<const char *, llvm::opt::ArgStringList>

@@ -216,10 +216,8 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     break;
   }
   case OutputInfo::Mode::Immediate:
-    FrontendModeOption = "-interpret";
-    break;
   case OutputInfo::Mode::REPL:
-    llvm_unreachable("REPL mode handled elsewhere");
+    llvm_unreachable("REPL and immediate modes handled elsewhere");
   case OutputInfo::Mode::UpdateCode:
     // Make sure that adding '-update-code' will permit accepting all arguments
     // '-c' accepts.
@@ -257,16 +255,16 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     }
     break;
   }
-  case OutputInfo::Mode::SingleCompile:
-  case OutputInfo::Mode::Immediate: {
+  case OutputInfo::Mode::SingleCompile: {
     for (const Action *A : context.InputActions) {
       cast<InputAction>(A)->getInputArg().render(context.Args, Arguments);
     }
     break;
   }
-  case OutputInfo::Mode::REPL: {
-    llvm_unreachable("REPL mode handled elsewhere");
-  }
+
+  case OutputInfo::Mode::Immediate:
+  case OutputInfo::Mode::REPL:
+    llvm_unreachable("REPL and immediate modes handled elsewhere");
   }
 
   if (context.Args.hasArg(options::OPT_parse_stdlib))
@@ -286,19 +284,6 @@ ToolChain::constructInvocation(const CompileJobAction &job,
 
   Arguments.push_back("-module-name");
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));
-
-  // Mode-specific arguments.
-  switch (context.OI.CompilerMode) {
-  case OutputInfo::Mode::StandardCompile:
-  case OutputInfo::Mode::SingleCompile:
-  case OutputInfo::Mode::UpdateCode:
-    break;
-  case OutputInfo::Mode::Immediate:
-  case OutputInfo::Mode::REPL:
-    context.Args.AddAllArgs(Arguments, options::OPT_l, options::OPT_framework,
-                            options::OPT_L);
-    break;
-  }
 
   const std::string &ModuleOutputPath =
     context.Output.getAdditionalOutputForType(types::ID::TY_SwiftModuleFile);
@@ -363,15 +348,50 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   if (context.Args.hasArg(options::OPT_embed_bitcode_marker))
     Arguments.push_back("-embed-bitcode-marker");
 
-  // The immediate arguments must be last.
-  if (context.OI.CompilerMode == OutputInfo::Mode::Immediate)
-    context.Args.AddLastArg(Arguments, options::OPT__DASH_DASH);
-
   auto program = SWIFT_EXECUTABLE_NAME;
   if (context.OI.CompilerMode == OutputInfo::Mode::UpdateCode)
     program = SWIFT_UPDATE_NAME;
 
   return std::make_pair(program, Arguments);
+}
+
+std::pair<const char *, llvm::opt::ArgStringList>
+ToolChain::constructInvocation(const InterpretJobAction &job,
+                               const JobContext &context) const {
+  assert(context.OI.CompilerMode == OutputInfo::Mode::Immediate);
+  ArgStringList Arguments;
+
+  Arguments.push_back("-frontend");
+  Arguments.push_back("-interpret");
+
+  assert(context.Inputs.empty() &&
+         "The Swift frontend does not expect to be fed any input Jobs!");
+
+  for (const Action *A : context.InputActions) {
+    cast<InputAction>(A)->getInputArg().render(context.Args, Arguments);
+  }
+
+  if (context.Args.hasArg(options::OPT_parse_stdlib))
+    Arguments.push_back("-disable-objc-attr-requires-foundation-module");
+
+  addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
+                        Arguments);
+
+  // Pass the optimization level down to the frontend.
+  context.Args.AddLastArg(Arguments, options::OPT_O_Group);
+
+  context.Args.AddLastArg(Arguments, options::OPT_parse_sil);
+
+  Arguments.push_back("-module-name");
+  Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));
+
+  context.Args.AddAllArgs(Arguments, options::OPT_l, options::OPT_framework,
+                          options::OPT_L);
+
+  // The immediate arguments must be last.
+  context.Args.AddLastArg(Arguments, options::OPT__DASH_DASH);
+
+  return std::make_pair(SWIFT_EXECUTABLE_NAME, Arguments);
 }
 
 std::pair<const char *, llvm::opt::ArgStringList>

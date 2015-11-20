@@ -1234,14 +1234,8 @@ void Driver::buildActions(const ToolChain &TC,
         break;
       }
     }
-    SWIFT_FALLTHROUGH;
-  }
-  case OutputInfo::Mode::Immediate: {
-    if (Inputs.empty())
-      return;
 
     // Create a single CompileJobAction for all of the driver's inputs.
-    // Don't create a CompileJobAction if there are no inputs, though.
     std::unique_ptr<Action> CA(new CompileJobAction(OI.CompilerOutputType));
     for (const InputPair &Input : Inputs) {
       types::ID InputType = Input.first;
@@ -1252,6 +1246,21 @@ void Driver::buildActions(const ToolChain &TC,
     AllModuleInputs.push_back(CA.get());
     AllLinkerInputs.push_back(CA.release());
     break;
+  }
+  case OutputInfo::Mode::Immediate: {
+    if (Inputs.empty())
+      return;
+
+    assert(OI.CompilerOutputType == types::TY_Nothing);
+    std::unique_ptr<Action> CA(new InterpretJobAction());
+    for (const InputPair &Input : Inputs) {
+      types::ID InputType = Input.first;
+      const Arg *InputArg = Input.second;
+
+      CA->addInput(new InputAction(*InputArg, InputType));
+    }
+    Actions.push_back(CA.release());
+    return;
   }
   case OutputInfo::Mode::REPL: {
     if (!Inputs.empty()) {
