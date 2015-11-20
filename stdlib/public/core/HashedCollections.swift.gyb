@@ -3383,7 +3383,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
       _sanityCheck(key == value, "bridging did not preserve equality")
       return key
 %elif Self == 'Dictionary':
-      return (key, value._unsafeUnwrap())
+      return (key, value._unsafelyUnwrapped)
 %end
 #else
       _sanityCheckFailure("internal error: unexpected cocoa ${Self}")

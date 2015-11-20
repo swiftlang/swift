@@ -106,7 +106,7 @@ internal func _cocoaStringSlice(
 ) -> _StringCore {
   _sanityCheck(target.hasCocoaBuffer)
   
-  let cfSelf: _swift_shims_CFStringRef = target.cocoaBuffer.unsafeUnwrap()
+  let cfSelf: _swift_shims_CFStringRef = target.cocoaBuffer.unsafelyUnwrapped
   
   _sanityCheck(
     _swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
@@ -123,7 +123,7 @@ internal func _cocoaStringSlice(
 internal func _cocoaStringSubscript(
   target: _StringCore, _ position: Int
 ) -> UTF16.CodeUnit {
-  let cfSelf: _swift_shims_CFStringRef = target.cocoaBuffer.unsafeUnwrap()
+  let cfSelf: _swift_shims_CFStringRef = target.cocoaBuffer.unsafelyUnwrapped
 
   _sanityCheck(_swift_stdlib_CFStringGetCharactersPtr(cfSelf)._isNull,
     "Known contiguously-stored strings should already be converted to Swift")

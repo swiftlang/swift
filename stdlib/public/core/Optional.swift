@@ -59,32 +59,34 @@ public enum Optional<Wrapped> : _Reflectable, NilLiteralConvertible {
   /// - Requires: `nonEmpty != nil`.  In particular, in -O builds, no test
   ///   is performed to ensure that `nonEmpty` actually is non-nil.
   ///
-  /// - Warning: Trades safety for performance.  Use `unsafeUnwrap`
+  /// - Warning: Trades safety for performance.  Use `unsafelyUnwrapped`
   ///   only when `nonEmpty!` has proven to be a performance problem and
   ///   you are confident that, always, `nonEmpty != nil`.  It is better
   ///   than an `unsafeBitCast` because it's more restrictive, and
   ///   because checking is still performed in debug builds.
-  @inline(__always)
-  @warn_unused_result
-  public func unsafeUnwrap() -> Wrapped {
-    if let x = self {
-      return x
+  public var unsafelyUnwrapped: Wrapped {
+    @inline(__always)
+    get {
+      if let x = self {
+        return x
+      }
+      _debugRequirementFailure("unsafelyUnwrapped of nil optional")
     }
-    _debugRequirementFailure("unsafeUnwrap of nil optional")
   }
 
-  /// - Returns: `unsafeUnwrap(nonEmpty)`.
+  /// - Returns: `unsafelyUnwrapped`.
   ///
   /// This version is for internal stdlib use; it avoids any checking
   /// overhead for users, even in Debug builds.
-  @inline(__always)
-  @warn_unused_result
   public // SPI(SwiftExperimental)
-  func _unsafeUnwrap() -> Wrapped {
-    if let x = self {
-      return x
+  var _unsafelyUnwrapped: Wrapped {
+    @inline(__always)
+    get {
+      if let x = self {
+        return x
+      }
+      _sanityCheckFailure("_unsafelyUnwrapped of nil optional")
     }
-    _sanityCheckFailure("_unsafeUnwrap of nil optional")
   }
 
 }
