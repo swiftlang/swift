@@ -27,6 +27,14 @@ class MyArrayContainer<T> {
   deinit
 }
 
+struct Container {
+  var array: MyArray<MyStruct>
+}
+
+struct ContainerContainer {
+  var container: Container
+}
+
 sil [_semantics "array.make_mutable"] @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
 sil [_semantics "array.get_count"] @guaranteed_array_get_count : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
 sil [_semantics "array.get_capacity"] @guaranteed_array_get_capacity : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
@@ -1012,4 +1020,85 @@ bb6(%23 : $Builtin.Int64):
   %72 = function_ref @unknown : $@convention(thin) () -> ()
   %73 = apply %72() : $@convention(thin) () -> ()
   cond_br undef, bb5, bb6(%26 : $Builtin.Int64)
+}
+
+// CHECK-LABEL: sil @hoist_projections
+// CHECK: bb0([[CONTAINER:%[0-9]+]]
+// CHECK: [[CONTAINER2:%.*]] = struct_element_addr [[CONTAINER]] : $*ContainerContainer
+// CHECK: [[ARRAY:%.*]] = struct_element_addr [[CONTAINER2]] : $*Container,
+// CHECK: [[FUN:%[0-9]+]] = function_ref @array_make_mutable
+// CHECK: apply [[FUN]]([[ARRAY]]
+// CHECK: bb1
+// CHECK-NOT: array_make_mutable
+// CHECK-NOT: apply [[FUN]]
+sil @hoist_projections : $@convention(thin) (@inout ContainerContainer, @inout Builtin.Int1) -> () {
+bb0(%0 : $*ContainerContainer, %1 : $*Builtin.Int1):
+  br bb1
+
+bb1:
+  %2 = struct_element_addr %0 : $*ContainerContainer, #ContainerContainer.container
+  br bb3(%2 : $*Container)
+
+bb3(%3: $*Container):
+  %4 = struct_element_addr %3 : $*Container, #Container.array
+  %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %6 = apply %5(%4) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  cond_br undef, bb1, bb2
+
+bb2:
+  %7 = tuple()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil @hoist_projections2
+// CHECK: bb0([[CONTAINER:%[0-9]+]]
+// CHECK: [[CONTAINER2:%.*]] = struct_element_addr [[CONTAINER]] : $*ContainerContainer
+// CHECK: [[ARRAY:%.*]] = struct_element_addr [[CONTAINER2]] : $*Container,
+// CHECK: [[FUN:%[0-9]+]] = function_ref @array_make_mutable
+// CHECK: apply [[FUN]]([[ARRAY]]
+// CHECK: bb1
+// CHECK-NOT: array_make_mutable
+// CHECK-NOT: apply [[FUN]]
+sil @hoist_projections2 : $@convention(thin) (@inout ContainerContainer, @inout Builtin.Int1) -> () {
+bb0(%0 : $*ContainerContainer, %1 : $*Builtin.Int1):
+  br bb1
+
+bb1:
+  %2 = struct_element_addr %0 : $*ContainerContainer, #ContainerContainer.container
+  %3 = struct_element_addr %2 : $*Container, #Container.array
+  br bb3(%3 : $*MyArray<MyStruct>)
+
+bb3(%4 : $*MyArray<MyStruct>):
+  %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %6 = apply %5(%4) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  cond_br undef, bb1, bb2
+
+bb2:
+  %7 = tuple()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil @hoist_projections3
+// CHECK: bb0([[CONTAINER:%[0-9]+]]
+// CHECK: [[CONTAINER2:%.*]] = struct_element_addr [[CONTAINER]] : $*ContainerContainer
+// CHECK: [[ARRAY:%.*]] = struct_element_addr [[CONTAINER2]] : $*Container,
+// CHECK: [[FUN:%[0-9]+]] = function_ref @array_make_mutable
+// CHECK: apply [[FUN]]([[ARRAY]]
+// CHECK: bb1
+// CHECK-NOT: array_make_mutable
+// CHECK-NOT: apply [[FUN]]
+sil @hoist_projections3 : $@convention(thin) (@inout ContainerContainer, @inout Builtin.Int1) -> () {
+bb0(%0 : $*ContainerContainer, %1 : $*Builtin.Int1):
+  br bb1
+
+bb1:
+  %2 = struct_element_addr %0 : $*ContainerContainer, #ContainerContainer.container
+  %3 = struct_element_addr %2 : $*Container, #Container.array
+  %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %6 = apply %5(%3) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  cond_br undef, bb1, bb2
+
+bb2:
+  %7 = tuple()
+  return %7 : $()
 }
