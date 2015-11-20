@@ -718,6 +718,13 @@ public:
   /// \brief Converts the given Swift identifier for Clang.
   clang::DeclarationName exportName(Identifier name);
 
+  /// Imports the full name of the given Clang declaration into Swift.
+  ///
+  /// Note that this may result in a name very different from the Clang name,
+  /// so it should not be used when referencing Clang symbols.
+  DeclName importFullName(const clang::NamedDecl *D,
+                          bool &hasCustomName);
+
   /// Imports the name of the given Clang decl into Swift.
   ///
   /// Note that this may result in a name different from the Clang name, so it

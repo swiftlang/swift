@@ -2715,18 +2715,8 @@ namespace {
         return nullptr;
 
       // Determine the name of the function.
-      DeclName name;
       bool hasCustomName;
-      if (auto *customNameAttr = decl->getAttr<clang::SwiftNameAttr>()) {
-        name = parseDeclName(customNameAttr->getName());
-        hasCustomName = true;
-      }
-
-      if (!name) {
-        name = Impl.importName(decl);
-        hasCustomName = false;
-      }
-
+      DeclName name = Impl.importFullName(decl, hasCustomName);
       if (!name)
         return nullptr;
 
@@ -2998,43 +2988,6 @@ namespace {
       return result;
     }
 
-    /// Parse a stringified Swift DeclName, e.g. "init(frame:)".
-    DeclName parseDeclName(StringRef Name) {
-      if (Name.back() != ')')
-        return {};
-
-      StringRef BaseName, Parameters;
-      std::tie(BaseName, Parameters) = Name.split('(');
-      if (!Lexer::isIdentifier(BaseName) || BaseName == "_")
-        return {};
-
-      if (Parameters.empty())
-        return {};
-      Parameters = Parameters.drop_back(); // ')'
-
-      Identifier BaseID = Impl.SwiftContext.getIdentifier(BaseName);
-      if (Parameters.empty())
-        return DeclName(Impl.SwiftContext, BaseID, {});
-
-      if (Parameters.back() != ':')
-        return {};
-
-      SmallVector<Identifier, 4> ParamIDs;
-      do {
-        StringRef NextParam;
-        std::tie(NextParam, Parameters) = Parameters.split(':');
-
-        if (!Lexer::isIdentifier(NextParam))
-          return {};
-        Identifier NextParamID;
-        if (NextParam != "_")
-          NextParamID = Impl.SwiftContext.getIdentifier(NextParam);
-        ParamIDs.push_back(NextParamID);
-      } while (!Parameters.empty());
-
-      return DeclName(Impl.SwiftContext, BaseID, ParamIDs);
-    }
-
     /// If the given method is a factory method, import it as a constructor
     Optional<ConstructorDecl *>
     importFactoryMethodAsConstructor(Decl *member,
@@ -3056,9 +3009,8 @@ namespace {
       // Check whether we're allowed to try.
       switch (Impl.getFactoryAsInit(objcClass, decl)) {
       case FactoryAsInitKind::AsInitializer:
-        if (auto *customNameAttr = decl->getAttr<clang::SwiftNameAttr>()) {
-          initName = parseDeclName(customNameAttr->getName());
-          hasCustomName = true;
+        if (decl->hasAttr<clang::SwiftNameAttr>()) {
+          initName = Impl.importFullName(decl, hasCustomName);
           break;
         }
         // FIXME: We probably should stop using this codepath. It won't ever
@@ -3170,8 +3122,7 @@ namespace {
       bool hasCustomName;
       if (auto *customNameAttr = decl->getAttr<clang::SwiftNameAttr>()) {
         if (!customNameAttr->getName().startswith("init(")) {
-          name = parseDeclName(customNameAttr->getName());
-          hasCustomName = true;
+          name = Impl.importFullName(decl, hasCustomName);
         }
       }
       if (!name) {

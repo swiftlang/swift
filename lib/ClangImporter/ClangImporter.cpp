@@ -743,8 +743,8 @@ bool ClangImporter::Implementation::importHeader(
 
         if (UseSwiftLookupTables) {
           if (auto named = dyn_cast<clang::NamedDecl>(D)) {
-            Identifier name = importName(named);
-            if (!name.empty())
+            bool hasCustomName;
+            if (DeclName name = importFullName(named, hasCustomName))
               BridgingHeaderLookupTable.addEntry(name, named);
           }
         }
@@ -1286,6 +1286,206 @@ ClangImporter::Implementation::exportName(Identifier name) {
     return clang::DeclarationName();
 
   return ident;
+}
+
+/// Parse a stringified Swift DeclName, e.g. "init(frame:)".
+static DeclName parseDeclName(ASTContext &ctx, StringRef Name) {
+  if (Name.back() != ')') {
+    if (Lexer::isIdentifier(Name) && Name != "_")
+      return ctx.getIdentifier(Name);
+
+    return {};
+  }
+
+  StringRef BaseName, Parameters;
+  std::tie(BaseName, Parameters) = Name.split('(');
+  if (!Lexer::isIdentifier(BaseName) || BaseName == "_")
+    return {};
+
+  if (Parameters.empty())
+    return {};
+  Parameters = Parameters.drop_back(); // ')'
+
+  Identifier BaseID = ctx.getIdentifier(BaseName);
+  if (Parameters.empty())
+    return DeclName(ctx, BaseID, {});
+
+  if (Parameters.back() != ':')
+    return {};
+
+  SmallVector<Identifier, 4> ParamIDs;
+  do {
+    StringRef NextParam;
+    std::tie(NextParam, Parameters) = Parameters.split(':');
+
+    if (!Lexer::isIdentifier(NextParam))
+      return {};
+    Identifier NextParamID;
+    if (NextParam != "_")
+      NextParamID = ctx.getIdentifier(NextParam);
+    ParamIDs.push_back(NextParamID);
+  } while (!Parameters.empty());
+
+  return DeclName(ctx, BaseID, ParamIDs);
+}
+
+DeclName ClangImporter::Implementation::importFullName(
+           const clang::NamedDecl *D,
+           bool &hasCustomName) {
+  // If we have a swift_name attribute, use that.
+  if (auto *nameAttr = D->getAttr<clang::SwiftNameAttr>()) {
+    hasCustomName = true;
+    return parseDeclName(SwiftContext, nameAttr->getName());
+  }
+
+  // We don't have a customized name.
+  hasCustomName = false;
+
+  // For empty names, there is nothing to do.
+  if (D->getDeclName().isEmpty()) return { };
+
+  /// Whether the result is a function name.
+  bool isFunction = false;
+  StringRef baseName;
+  SmallVector<StringRef, 4> argumentNames;
+  switch (D->getDeclName().getNameKind()) {
+  case clang::DeclarationName::CXXConstructorName:
+  case clang::DeclarationName::CXXConversionFunctionName:
+  case clang::DeclarationName::CXXDestructorName:
+  case clang::DeclarationName::CXXLiteralOperatorName:
+  case clang::DeclarationName::CXXOperatorName:
+  case clang::DeclarationName::CXXUsingDirective:
+    // Handling these is part of C++ interoperability.
+    return { };
+
+  case clang::DeclarationName::Identifier:
+    // Map the identifier.
+    baseName = D->getDeclName().getAsIdentifierInfo()->getName();
+    break;
+
+  case clang::DeclarationName::ObjCMultiArgSelector:
+  case clang::DeclarationName::ObjCOneArgSelector:
+  case clang::DeclarationName::ObjCZeroArgSelector: {
+    // Map the Objective-C selector directly.
+    auto selector = D->getDeclName().getObjCSelector();
+    baseName = selector.getNameForSlot(0);
+    for (unsigned index = 0, numArgs = selector.getNumArgs(); index != numArgs;
+         ++index) {
+      if (index == 0)
+        argumentNames.push_back("");
+      else
+        argumentNames.push_back(selector.getNameForSlot(index));
+    }
+
+    isFunction = true;
+    break;
+  }
+  }
+
+  // Local function to determine whether the given declaration is subject to
+  // a swift_private attribute.
+  auto hasSwiftPrivate = [this](const clang::NamedDecl *D) {
+    if (D->hasAttr<clang::SwiftPrivateAttr>())
+      return true;
+
+    // Enum constants that are not imported as members should be considered
+    // private if the parent enum is marked private.
+    if (auto *ECD = dyn_cast<clang::EnumConstantDecl>(D)) {
+      auto *ED = cast<clang::EnumDecl>(ECD->getDeclContext());
+      switch (classifyEnum(ED)) {
+        case EnumKind::Constants:
+        case EnumKind::Unknown:
+          if (ED->hasAttr<clang::SwiftPrivateAttr>())
+            return true;
+          if (auto *enumTypedef = ED->getTypedefNameForAnonDecl())
+            if (enumTypedef->hasAttr<clang::SwiftPrivateAttr>())
+              return true;
+          break;
+
+        case EnumKind::Enum:
+        case EnumKind::Options:
+          break;
+      }
+    }
+
+    return false;
+  };
+
+  // Omit needless words.
+  StringScratchSpace omitNeedlessWordsScratch;
+  if (OmitNeedlessWords) {
+    // Objective-C properties.
+    if (auto objcProperty = dyn_cast<clang::ObjCPropertyDecl>(D)) {
+      auto contextType = getClangDeclContextType(D->getDeclContext());
+      if (!contextType.isNull()) {
+        auto contextTypeName = getClangTypeNameForOmission(contextType);
+        auto propertyTypeName = getClangTypeNameForOmission(
+                                  objcProperty->getType());
+        // Find the property names.
+        const InheritedNameSet *allPropertyNames = nullptr;
+        if (!contextType.isNull()) {
+          if (auto objcPtrType = contextType->getAsObjCInterfacePointerType())
+            if (auto objcClassDecl = objcPtrType->getInterfaceDecl())
+              allPropertyNames = SwiftContext.getAllPropertyNames(
+                                   objcClassDecl,
+                                   /*forInstance=*/true);
+        }
+
+        (void)omitNeedlessWords(baseName, { }, "", propertyTypeName,
+                                contextTypeName, { }, /*returnsSelf=*/false,
+                                /*isProperty=*/true, allPropertyNames,
+                                omitNeedlessWordsScratch);
+      }
+    }
+  }
+
+  // If this declaration has the swift_private attribute, prepend "__" to the
+  // appropriate place.
+  SmallString<16> swiftPrivateScratch;
+  if (hasSwiftPrivate(D)) {
+    swiftPrivateScratch = "__";
+
+    if (baseName == "init") {
+      // For initializers, prepend "__" to the first argument name.
+      if (argumentNames.empty()) {
+        // swift_private cannot actually do anything here. Just drop the
+        // declaration.
+        // FIXME: Diagnose this?
+        return { };
+      }
+
+      swiftPrivateScratch += argumentNames[0];
+      argumentNames[0] = swiftPrivateScratch;
+    } else {
+      // For all other entities, prepend "__" to the base name.
+      swiftPrivateScratch += baseName;
+      baseName = swiftPrivateScratch;
+    }
+  }
+
+  // We cannot import when the base name is not an identifier.
+  if (!Lexer::isIdentifier(baseName))
+    return { };
+
+  // Get the identifier for the base name.
+  Identifier baseNameId = SwiftContext.getIdentifier(baseName);
+
+  // If we have a non-function name, just return the base name.
+  if (!isFunction) return baseNameId;
+
+  // Convert the argument names.
+  SmallVector<Identifier, 4> argumentNameIds;
+  for (auto argName : argumentNames) {
+    if (argumentNames.empty() || !Lexer::isIdentifier(argName)) {
+      argumentNameIds.push_back(Identifier());
+      continue;
+    }
+
+    argumentNameIds.push_back(SwiftContext.getIdentifier(argName));
+  }
+
+  // Build the result.
+  return DeclName(SwiftContext, baseNameId, argumentNameIds);
 }
 
 Identifier
