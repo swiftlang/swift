@@ -2759,26 +2759,6 @@ public:
                         return true;
                       }),
             "entry point argument types do not match function type");
-
-
-    // TBAA requirement for all address arguments.
-    require(std::equal(entry->bbarg_begin(), entry->bbarg_end(),
-                       ti->getParameters().begin(),
-                       [&](SILArgument *bbarg, SILParameterInfo paramInfo) {
-                         if (!bbarg->getType().isAddress())
-                           return true;
-                         switch (paramInfo.getConvention()) {
-                         default:
-                           return false;
-                         case ParameterConvention::Indirect_In:
-                         case ParameterConvention::Indirect_Inout:
-                         case ParameterConvention::Indirect_Out:
-                         case ParameterConvention::Indirect_In_Guaranteed:
-                           return true;
-                         }
-                       }),
-            "entry point address argument must have a nonaliasing calling "
-            "convention");
   }
 
   void verifyEpilogBlocks(SILFunction *F) {

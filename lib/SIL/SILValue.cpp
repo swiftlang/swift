@@ -98,9 +98,8 @@ SILValue SILValue::stripCasts() {
     V = stripSinglePredecessorArgs(V);
 
     auto K = V->getKind();
-    if (isRCIdentityPreservingCast(K)
-        || K == ValueKind::UncheckedTrivialBitCastInst
-        || K == ValueKind::MarkDependenceInst) {
+    if (isRCIdentityPreservingCast(K) ||
+        K == ValueKind::UncheckedTrivialBitCastInst) {
       V = cast<SILInstruction>(V.getDef())->getOperand(0);
       continue;
     }

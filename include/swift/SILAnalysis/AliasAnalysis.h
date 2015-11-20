@@ -157,9 +157,10 @@ public:
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
                               AliasAnalysis::AliasResult R);
 
-/// If this value is an address that obeys strict TBAA, return the address type.
-/// Otherwise, return an empty type.
-SILType computeTBAAType(SILValue V);
+/// Look at the origin/user ValueBase of V to see if any of them are
+/// TypedAccessOracle which enable one to ascertain via undefined behavior the
+/// "true" type of the instruction.
+SILType findTypedAccessType(SILValue V);
 
 /// Check if V points to a let-variable.
 bool isLetPointer(SILValue V);

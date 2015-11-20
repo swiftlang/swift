@@ -21,6 +21,50 @@
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
+//                               TBAA Utilities
+//===----------------------------------------------------------------------===//
+
+/// Is this an instruction that can act as a type "oracle" allowing typed access
+/// TBAA to know what the real types associated with the SILInstruction are.
+static bool isTypedAccessOracle(SILInstruction *I) {
+  switch (I->getKind()) {
+  case ValueKind::RefElementAddrInst:
+  case ValueKind::StructElementAddrInst:
+  case ValueKind::TupleElementAddrInst:
+  case ValueKind::UncheckedTakeEnumDataAddrInst:
+  case ValueKind::LoadInst:
+  case ValueKind::StoreInst:
+  case ValueKind::AllocStackInst:
+  case ValueKind::AllocBoxInst:
+  case ValueKind::DeallocStackInst:
+  case ValueKind::DeallocBoxInst:
+    return true;
+  default:
+    return false;
+  }
+}
+
+/// Look at the origin/user ValueBase of V to see if any of them are
+/// TypedAccessOracle which enable one to ascertain via undefined behavior the
+/// "true" type of the instruction.
+SILType swift::findTypedAccessType(SILValue V) {
+  // First look at the origin of V and see if we have any instruction that is a
+  // typed oracle.
+  if (auto *I = dyn_cast<SILInstruction>(V))
+    if (isTypedAccessOracle(I))
+      return V.getType();
+
+  // Then look at any uses of V that potentially could act as a typed access
+  // oracle.
+  for (auto Use : V.getUses())
+    if (isTypedAccessOracle(Use->getUser()))
+      return V.getType();
+
+  // Otherwise return an empty SILType
+  return SILType();
+}
+
+//===----------------------------------------------------------------------===//
 //                       Memory Behavior Implementation
 //===----------------------------------------------------------------------===//
 
@@ -52,9 +96,9 @@ public:
                         RetainObserveKind IgnoreRefCountIncs)
       : AA(AA), V(V), IgnoreRefCountIncrements(IgnoreRefCountIncs) {}
 
-  SILType getValueTBAAType() {
+  SILType getTypedAccessType() {
     if (!TypedAccessTy)
-      TypedAccessTy = computeTBAAType(V);
+      TypedAccessTy = findTypedAccessType(V);
     return *TypedAccessTy;
   }
 
@@ -146,8 +190,8 @@ public:
 } // end anonymous namespace
 
 MemBehavior MemoryBehaviorVisitor::visitLoadInst(LoadInst *LI) {
-  if (AA.isNoAlias(LI->getOperand(), V, computeTBAAType(LI->getOperand()),
-                   getValueTBAAType())) {
+  if (AA.isNoAlias(LI->getOperand(), V, LI->getOperand().getType(),
+                   getTypedAccessType())) {
     DEBUG(llvm::dbgs() << "  Load Operand does not alias inst. Returning "
                           "None.\n");
     return MemBehavior::None;
@@ -166,8 +210,8 @@ MemBehavior MemoryBehaviorVisitor::visitStoreInst(StoreInst *SI) {
 
   // If the store dest cannot alias the pointer in question, then the
   // specified value can not be modified by the store.
-  if (AA.isNoAlias(SI->getDest(), V, computeTBAAType(SI->getDest()),
-                   getValueTBAAType())) {
+  if (AA.isNoAlias(SI->getDest(), V, SI->getDest().getType(),
+                   getTypedAccessType())) {
     DEBUG(llvm::dbgs() << "  Store Dst does not alias inst. Returning "
                           "None.\n");
     return MemBehavior::None;
@@ -248,7 +292,7 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
         SILValue Arg = AI->getArgument(Idx);
         // We only consider the argument effects if the argument aliases V.
         if (!Arg.getType().isAddress() ||
-            !AA.isNoAlias(Arg, V, computeTBAAType(Arg), getValueTBAAType())) {
+            !AA.isNoAlias(Arg, V, Arg.getType(), getTypedAccessType())) {
           Behavior = ArgBehavior;
         }
       }

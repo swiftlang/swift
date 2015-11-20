@@ -33,9 +33,10 @@ sil @baz_init : $@convention(thin) (@thick baz.Type) -> @owned baz
 sil @goo_init : $@convention(thin) (@thick goo.Type) -> @owned goo 
 
 // CHECK-LABEL: no_parent_child_relation_reftype_tests
-// CHECK: PAIR #13.
-// CHECK: (1):   %0 = alloc_stack $boo
-// CHECK: (1):   %1 = alloc_stack $baz
+
+// CHECK: PAIR #54.
+// CHECK: (0):   %4 = apply %2(%3) : $@convention(thin) (@thick boo.Type) -> @owned boo
+// CHECK: (0):   %8 = apply %6(%7) : $@convention(thin) (@thick baz.Type) -> @owned baz
 // CHECK: NoAlias
 sil hidden @no_parent_child_relation_reftype_tests : $@convention(thin) () -> () {
 bb0:
@@ -899,30 +900,3 @@ sil @tuple_tests : $@convention(thin) () -> () {
   return %9999 : $()
 }
 
-// Check that TBAA fails when the root is unchecked_addr_cast or
-// pointer_to_address.
-//
-// CHECK-LABEL: @tbaa_dump
-// CHECK:      PAIR #2.
-// CHECK-NEXT: (0):   %0 = argument of bb0 : $*Builtin.Int64
-// CHECK-NEXT: (0):   %3 = unchecked_addr_cast %0 : $*Builtin.Int64 to $*Builtin.Int32
-// CHECK-NEXT: MayAlias
-// CHECK:      PAIR #5.
-// CHECK-NEXT: (0):   %0 = argument of bb0 : $*Builtin.Int64
-// CHECK-NEXT: (0):   %7 = pointer_to_address %6 : $Builtin.RawPointer to $*Builtin.Int32
-// FIXME: This should be MayAlias unless the pointer_to_address instruction
-//        comes with a "must not alias" flag.
-// CHECK-NEXT: NoAlias
-sil @tbaa_dump : $@convention(thin) (@in Builtin.Int64) -> Builtin.Int64 {
-bb0(%0 : $*Builtin.Int64):
-  %1 = integer_literal $Builtin.Int64, 42
-  store %1 to %0 : $*Builtin.Int64
-  %3 = unchecked_addr_cast %0 : $*Builtin.Int64 to $*Builtin.Int32
-  %4 = integer_literal $Builtin.Int32, 0
-  store %4 to %3 : $*Builtin.Int32
-  %6 = address_to_pointer %0 : $*Builtin.Int64 to $Builtin.RawPointer
-  %7 = pointer_to_address %6 : $Builtin.RawPointer to $*Builtin.Int32
-  store %4 to %7 : $*Builtin.Int32
-  %8 = load %0 : $*Builtin.Int64
-  return %8 : $Builtin.Int64
-}
