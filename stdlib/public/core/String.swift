@@ -827,7 +827,7 @@ extension String {
   /// Return `self` converted to lower case.
   ///
   /// - Complexity: O(n)
-  public var lowercased: String {
+  public func lowercased() -> String {
     if self._core.isASCII {
       let length = self._core.length
       let source = self._core.startASCII
@@ -868,7 +868,7 @@ extension String {
   /// Return `self` converted to upper case.
   ///
   /// - Complexity: O(n)
-  public var uppercased: String {
+  public func uppercased() -> String {
     if self._core.isASCII {
       let length = self._core.length
       let source = self._core.startASCII
