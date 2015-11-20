@@ -158,7 +158,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   // Function Application
   INST(ApplyInst, SILInstruction, MayHaveSideEffects, MayRelease)
   INST(PartialApplyInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
-  INST(BuiltinInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
+  INST(BuiltinInst, SILInstruction, MayHaveSideEffects, MayRelease)
 
   // Metatypes
   INST(MetatypeInst, SILInstruction, None, DoesNotRelease)

@@ -774,7 +774,34 @@ bool SILInstruction::mayRelease() const {
     // copy_addr without initialization can cause a release.
     return CopyAddr->isInitializationOfDest() ==
            IsInitialization_t::IsNotInitialization;
-    break;
+  }
+
+  case ValueKind::BuiltinInst: {
+    auto *BI = cast<BuiltinInst>(this);
+    // Builtins without side effects also do not release.
+    if (!BI->mayHaveSideEffects())
+      return false;
+    // If this is a builtin which might have side effect, but its side
+    // effects do not cause reference counts to be decremented, return false.
+    if (auto Kind = BI->getBuiltinKind()) {
+      switch (Kind.getValue()) {
+        case BuiltinValueKind::CopyArray:
+          return false;
+        default:
+          break;
+      }
+    }
+    if (auto ID = BI->getIntrinsicID()) {
+      switch (ID.getValue()) {
+        case llvm::Intrinsic::memcpy:
+        case llvm::Intrinsic::memmove:
+        case llvm::Intrinsic::memset:
+          return false;
+        default:
+          break;
+      }
+    }
+    return true;
   }
   }
 }
