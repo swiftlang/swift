@@ -28,9 +28,6 @@
 
 using namespace swift;
 
-using SILValueSet = llvm::DenseSet<SILValue>;
-using SILValueList = llvm::SmallVector<SILValue, 8>;
-
 //===----------------------------------------------------------------------===//
 //                                AA Debugging
 //===----------------------------------------------------------------------===//
@@ -100,80 +97,6 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
   case AliasAnalysis::AliasResult::MustAlias:
     return OS << "MustAlias";
   }
-}
-
-/// Return true if the SILValue is the result of multiple SILValues, e.g.
-/// select_enum, silargument.
-static bool isMultiUnderlyingObjectValue(SILValue V) {
-  if (isa<SelectEnumInst>(V))
-    return true;
-  // We are only interested in basic block SILArguments as those are the
-  // ones we can collect all the possible incoming values.
-  if (auto *SA = dyn_cast<SILArgument>(V))
-    if (!SA->isFunctionArg())
-      return true;
-  return false;
-}
-
-/// Get the first level underlying objects, e.g. in case of select_enum,
-/// look to the possible underlying objects from all the cases.
-static bool getFirstLevelUnderlyingObjects(SILValue V, SILValueSet &Cache,
-                                           SILValueList &WorkList) {
-  // Look through SILArgument.
-  if (auto *SA = dyn_cast<SILArgument>(V)) {
-    SILValueList Args;
-    bool Succ = SA->getIncomingValues(Args);
-    // Unable to get SILValue for every predecessor.
-    if (!Succ)
-      return false;
-    for (auto &X : Args) {
-      if (Cache.count(X))
-        continue;
-      // We have not seen this SILValue before.
-      Cache.insert(X);
-      WorkList.push_back(X);
-    }
-  }
-
-  // Look through SelectEnumInst.
-  if (auto *SE = dyn_cast<SelectEnumInst>(V)) {
-    unsigned CaseNum = SE->getNumCases();
-    for (unsigned i = 0; i < CaseNum; ++i) {
-      SILValue C = SE->getCase(i).second;
-      if (Cache.count(C))
-        continue;
-      // We have not seen this SILValue before.
-      Cache.insert(C);
-      WorkList.push_back(C);
-    }
-  }
-  return true;
-}
-
-/// Collect all the underlying objects for the given SILValue. Return false
-/// if fail to collect all possible underlying objects.
-static bool getTransistiveUnderlyingObjects(SILValue V, SILValueList &Objs) {
-  // Cache keeps track of what has been processed, so that we do not collected
-  // it again.
-  SILValueSet Cache;
-  SILValueList WorkList;
-
-  // Start with the given SILValue.
-  WorkList.push_back(V);
-  while(!WorkList.empty()) {
-    SILValue V = WorkList.pop_back_val();
-    if (isMultiUnderlyingObjectValue(V)) {
-      if (getFirstLevelUnderlyingObjects(V, Cache, WorkList))
-        continue;
-      // Failed to get all possible underlying value, bail out.
-      return false; 
-    }
-  
-    // This is single base SILValue.
-    Objs.push_back(V);
-    Cache.insert(V);
-  }
-  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -604,37 +527,6 @@ static bool typesMayAlias(SILType T1, SILType T2, SILType TBAA1Ty,
 //                                Entry Points
 //===----------------------------------------------------------------------===//
 
-AliasAnalysis::AliasResult
-AliasAnalysis::handleMultiUnderlyingObjectAlias(SILValue V1, SILValue V2) {
-  const unsigned AliasQueryLimit = 16;
-  SmallVector<SILValue, 8> V1Base, V2Base;
-  // Collect the transistive closure of all the SILValue V1 and V2 can
-  // point to. If for some reason we can not collect all the possible
-  // underlying objects, return MayAlias to be conservative.
-  if (!getTransistiveUnderlyingObjects(V1, V1Base) ||
-      !getTransistiveUnderlyingObjects(V2, V2Base))
-    return AliasResult::MayAlias;
-
-  // An mxn alias analysis query, bail out if this results in too many
-  // alias queries.
-  if (V1Base.size() * V2Base.size() > AliasQueryLimit)
-    return AliasResult::MayAlias;
-
-  // Return MayAlias if any pair does not have a NoAlias relation.
-  for (auto &M : V1Base) {
-    for (auto &N : V2Base) {
-      AliasAnalysis::AliasResult R = aliasInner(M, N, findTypedAccessType(M),
-                                                findTypedAccessType(N));
-      // Return MayAlias whenever we have 1 non-NoAlias pair. This is a
-      // tradeoff between compilation time and being conservative. 
-      if (R != AliasResult::NoAlias)
-        return AliasResult::MayAlias;
-    }
-  }
-
-  return AliasResult::NoAlias;
-}
-
 /// The main AA entry point. Performs various analyses on V1, V2 in an attempt
 /// to disambiguate the two values.
 AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2,
@@ -697,13 +589,8 @@ AliasAnalysis::AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
     }
   }
 
-  // Ok, we need to actually compute an Alias Analysis result for V1, V2. First
-  // find whether V1, V2 potentially have multiple underlying objects.
-  if (isMultiUnderlyingObjectValue(V1) || isMultiUnderlyingObjectValue(V2))
-    return handleMultiUnderlyingObjectAlias(V1, V2);
-    
-  // At this point, V1 and V2 are both single base SIlValues, begin by
-  // finding the "base" of V1, V2 by stripping off all casts and GEPs.
+  // Ok, we need to actually compute an Alias Analysis result for V1, V2. Begin
+  // by finding the "base" of V1, V2 by stripping off all casts and GEPs.
   SILValue O1 = getUnderlyingObject(V1);
   SILValue O2 = getUnderlyingObject(V2);
   DEBUG(llvm::dbgs() << "        Underlying V1:" << *O1.getDef());
@@ -738,7 +625,6 @@ AliasAnalysis::AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   // alias.
   return AliasResult::MayAlias;
 }
-
 
 /// Check if this is the address of a "let" member.
 /// Nobody can write into let members.

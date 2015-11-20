@@ -70,11 +70,6 @@ public:
   
   SideEffectAnalysis *getSideEffectAnalysis() const { return SEA; }
 
-  /// Perform alias queries to see if \p V1, \p V2 can refer to the same value.
-  /// \p V1 and \p V2 may be SILValues with multiple underlying objects. e.g.
-  /// SILArgument. \returns MayAlias or NoAlias.
-  AliasResult handleMultiUnderlyingObjectAlias(SILValue V1, SILValue V2);
-
   /// Perform an alias query to see if V1, V2 refer to the same values.
   AliasResult alias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
                     SILType TBAAType2 = SILType());
