@@ -734,15 +734,15 @@ public:
   /// \sa importName(clang::DeclarationName, StringRef)
   Identifier importName(const clang::NamedDecl *D, StringRef removePrefix = "");
   
-  /// \brief Import the given Clang name into Swift.
+  /// \brief Import the given Clang identifier into Swift.
   ///
-  /// \param name The Clang name to map into Swift.
+  /// \param identifier The Clang identifier to map into Swift.
   ///
   /// \param removePrefix The prefix to remove from the Clang name to produce
   /// the Swift name. If the Clang name does not start with this prefix,
   /// nothing is removed.
-  Identifier importDeclName(clang::DeclarationName name,
-                            StringRef removePrefix = "");
+  Identifier importIdentifier(const clang::IdentifierInfo *identifier,
+                              StringRef removePrefix = "");
 
   /// Import an Objective-C selector.
   ObjCSelector importSelector(clang::Selector selector);

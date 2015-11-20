@@ -5108,7 +5108,7 @@ namespace {
                                    name,
                                    None);
       result->computeType();
-      addObjCAttribute(result, Impl.importDeclName(decl->getDeclName()));
+      addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
 
       if (declaredNative)
         markMissingSwiftDecl(result);
@@ -5193,7 +5193,7 @@ namespace {
         result->setSuperclass(Type());
         result->setCheckedInheritanceClause();
         result->setAddedImplicitInitializers(); // suppress all initializers
-        addObjCAttribute(result, Impl.importDeclName(decl->getDeclName()));
+        addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
         Impl.registerExternalDecl(result);
         return result;
       };
@@ -5262,7 +5262,7 @@ namespace {
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
       result->setCircularityCheck(CircularityCheck::Checked);
       result->setAddedImplicitInitializers();
-      addObjCAttribute(result, Impl.importDeclName(decl->getDeclName()));
+      addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
 
       if (declaredNative)
         markMissingSwiftDecl(result);
