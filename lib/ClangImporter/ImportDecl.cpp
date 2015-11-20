@@ -2720,7 +2720,7 @@ namespace {
 
       // Determine the name of the function.
       bool hasCustomName;
-      DeclName name = Impl.importFullName(decl, hasCustomName);
+      DeclName name = Impl.importFullName(decl, &hasCustomName);
       if (!name)
         return nullptr;
 
@@ -3014,7 +3014,7 @@ namespace {
       switch (Impl.getFactoryAsInit(objcClass, decl)) {
       case FactoryAsInitKind::AsInitializer:
         if (decl->hasAttr<clang::SwiftNameAttr>()) {
-          initName = Impl.importFullName(decl, hasCustomName);
+          initName = Impl.importFullName(decl, &hasCustomName);
           break;
         }
         // FIXME: We probably should stop using this codepath. It won't ever
@@ -3126,7 +3126,7 @@ namespace {
       bool hasCustomName;
       if (auto *customNameAttr = decl->getAttr<clang::SwiftNameAttr>()) {
         if (!customNameAttr->getName().startswith("init(")) {
-          name = Impl.importFullName(decl, hasCustomName);
+          name = Impl.importFullName(decl, &hasCustomName);
         }
       }
       if (!name) {

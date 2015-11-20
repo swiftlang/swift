@@ -726,17 +726,19 @@ public:
   ///
   /// Note that this may result in a name very different from the Clang name,
   /// so it should not be used when referencing Clang symbols.
-  DeclName importFullName(const clang::NamedDecl *D) {
-    bool hasCustomName;
-    return importFullName(D, hasCustomName);
-  }
-
-  /// Imports the full name of the given Clang declaration into Swift.
   ///
-  /// Note that this may result in a name very different from the Clang name,
-  /// so it should not be used when referencing Clang symbols.
+  /// \param D The Clang declaration whose name should be imported.
+  ///
+  /// \param hasCustomName If non-null, will be set to indicate whether the
+  /// name was provided directly via a C swift_name attribute.
+  ///
+  /// \param effectiveContext If non-null, will be set to the effective
+  /// Clang declaration context in which the declaration will be imported.
+  /// This can differ from D's redeclaration context when the Clang importer
+  /// introduces nesting, e.g., for enumerators within an NS_ENUM.
   DeclName importFullName(const clang::NamedDecl *D,
-                          bool &hasCustomName);
+                          bool *hasCustomName = nullptr,
+                          clang::DeclContext **effectiveContext = nullptr);
 
   /// Imports the name of the given Clang decl into Swift.
   ///

@@ -53,8 +53,7 @@ static bool matchesExistingDecl(clang::Decl *decl, clang::Decl *existingDecl) {
 
 void SwiftLookupTable::addEntry(DeclName name, clang::NamedDecl *decl,
                                 clang::DeclContext *effectiveContext) {
-  clang::DeclContext *context
-    = decl->getDeclContext()->getRedeclContext()->getPrimaryContext();
+  clang::DeclContext *context = effectiveContext->getPrimaryContext();
 
   // First, check whether there is already a full name entry.
   auto knownFull = FullNameTable.find(name);

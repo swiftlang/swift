@@ -953,7 +953,6 @@ static int doDumpAPI(const CompilerInvocation &InitInvok,
 
 static int doDumpImporterLookupTables(const CompilerInvocation &InitInvok,
                                       StringRef SourceFilename) {
-  auto &FEOpts = InitInvok.getFrontendOptions();
   if (options::ImportObjCHeader.empty()) {
     llvm::errs() << "implicit header required\n";
     llvm::cl::PrintHelpMessage();

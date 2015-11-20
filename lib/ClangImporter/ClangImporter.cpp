@@ -706,10 +706,8 @@ void ClangImporter::Implementation::addEntryToLookupTable(
        SwiftLookupTable &table, clang::NamedDecl *named)
 {
   // If we have a name to import as, add this entry to the table.
-  if (DeclName name = importFullName(named)) {
-    clang::DeclContext *effectiveContext
-      = named->getDeclContext()->getRedeclContext() ->getPrimaryContext();
-
+  clang::DeclContext *effectiveContext;
+  if (DeclName name = importFullName(named, nullptr, &effectiveContext)) {
     table.addEntry(name, named, effectiveContext);
   }
 
@@ -1353,15 +1351,46 @@ static DeclName parseDeclName(ASTContext &ctx, StringRef Name) {
 
 DeclName ClangImporter::Implementation::importFullName(
            const clang::NamedDecl *D,
-           bool &hasCustomName) {
+           bool *hasCustomName,
+           clang::DeclContext **effectiveContext) {
+  // Compute the effective context, if requested.
+  if (effectiveContext) {
+    auto dc = const_cast<clang::DeclContext *>(D->getDeclContext());
+
+    // Enumerators can end up within their enclosing enum or in the global
+    // scope, depending how their enclosing enumeration is imported.
+    if (isa<clang::EnumConstantDecl>(D)) {
+      auto enumDecl = cast<clang::EnumDecl>(dc);
+      switch (classifyEnum(enumDecl)) {
+      case EnumKind::Enum:
+      case EnumKind::Options:
+        // Enums are mapped to Swift enums, Options to Swift option sets.
+        *effectiveContext = enumDecl;
+        break;
+
+      case EnumKind::Constants:
+      case EnumKind::Unknown:
+        // The enum constant goes into the redeclaration context of the
+        // enum.
+        *effectiveContext = enumDecl->getRedeclContext();
+        break;
+      }
+    } else {
+      // Everything else goes into its redeclaration context.
+      *effectiveContext = dc->getRedeclContext();
+    }
+  }
+
   // If we have a swift_name attribute, use that.
   if (auto *nameAttr = D->getAttr<clang::SwiftNameAttr>()) {
-    hasCustomName = true;
+    if (hasCustomName)
+      *hasCustomName = true;
     return parseDeclName(SwiftContext, nameAttr->getName());
   }
 
   // We don't have a customized name.
-  hasCustomName = false;
+  if (hasCustomName)
+    *hasCustomName = false;
 
   // For empty names, there is nothing to do.
   if (D->getDeclName().isEmpty()) return { };

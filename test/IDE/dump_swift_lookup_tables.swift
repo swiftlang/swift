@@ -24,13 +24,13 @@
 // CHECK-NEXT:   Point:
 // CHECK-NEXT:     TU: SNPoint
 // CHECK-NEXT:   Rouge:
-// CHECK-NEXT:     TU: SNColorRed
+// CHECK-NEXT:     SNColorChoice: SNColorRed
 // CHECK-NEXT:   SNColorBlue:
-// CHECK-NEXT:     TU: SNColorBlue
+// CHECK-NEXT:     SNColorChoice: SNColorBlue
 // CHECK-NEXT:   SNColorChoice:
 // CHECK-NEXT:     TU: SNColorChoice, SNColorChoice
 // CHECK-NEXT:   SNColorGreen:
-// CHECK-NEXT:     TU: SNColorGreen
+// CHECK-NEXT:     SNColorChoice: SNColorGreen
 // CHECK-NEXT:   SomeStruct:
 // CHECK-NEXT:     TU: SNSomeStruct
 // CHECK-NEXT:   __SNTransposeInPlace:
