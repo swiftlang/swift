@@ -8,8 +8,9 @@
 import SwiftPrivate
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This is
-// needed to link all required libraries in case we serialize StdlibUnittest.
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
 import SwiftPrivate
 import SwiftPrivatePthreadExtras
 #if _runtime(_ObjC)
