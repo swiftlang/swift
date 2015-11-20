@@ -452,9 +452,9 @@ public struct Logging${Kind}<Base: ${Kind}> : ${Kind}, LoggingType {
     return LoggingIterator(base.iterator())
   }
 
-  public func underestimatedLength() -> Int {
+  public var underestimatedLength: Int {
     ++Log.underestimatedLength[selfType]
-    return base.underestimatedLength()
+    return base.underestimatedLength
   }
 
   public func forEach(

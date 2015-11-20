@@ -25,6 +25,15 @@ protocol _SequenceWrapper {
   var _base: Base {get}
 }
 
+extension _SequenceWrapper where
+  Self : Sequence,
+  Self.Iterator == Self.Base.Iterator {
+
+  public var underestimatedLength: Int {
+    return _base.underestimatedLength
+  }
+}
+
 extension Sequence
   where
   Self : _SequenceWrapper,
@@ -35,10 +44,6 @@ extension Sequence
   /// - Complexity: O(1).
   public func iterator() -> Base.Iterator {
     return self._base.iterator()
-  }
-
-  public func underestimatedLength() -> Int {
-    return _base.underestimatedLength()
   }
 
   @warn_unused_result

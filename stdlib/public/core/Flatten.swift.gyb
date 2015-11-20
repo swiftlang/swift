@@ -270,12 +270,10 @@ public struct ${Collection}<
     return position._innerCollection![position._inner!]
   }
 
-  public func underestimatedLength() -> Int {
-    // To return any estimate of the number of elements, we have to start
-    // evaluating the collections.  That is a bad default for `flatMap()`, so
-    // just return zero.
-    return 0
-  }
+  // To return any estimate of the number of elements, we have to start
+  // evaluating the collections.  That is a bad default for `flatMap()`, so
+  // just return zero.
+  public var underestimatedLength: Int { return 0 }
 
   public func _copyToNativeArrayBuffer()
     -> _ContiguousArrayBuffer<Base.Iterator.Element.Iterator.Element> {

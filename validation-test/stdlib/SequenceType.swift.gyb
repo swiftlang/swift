@@ -1051,7 +1051,7 @@ SequenceTypeTests.test("zip") {
 }
 
 //===----------------------------------------------------------------------===//
-// underestimatedLength()
+// underestimatedLength
 //===----------------------------------------------------------------------===//
 
 struct SequenceWithDefaultUnderestimateLength : Sequence {
@@ -1082,7 +1082,7 @@ struct SequenceWithCustomUnderestimateLength : Sequence {
     ).iterator()
   }
 
-  func underestimatedLength() -> Int {
+  var underestimatedLength: Int {
     return _underestimatedLength
   }
 

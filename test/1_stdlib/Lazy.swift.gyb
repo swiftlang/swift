@@ -164,7 +164,7 @@ LazyTestSuite.test("LazySequence<Sequence>/underestimatedLength") {
     underestimatedLength: .Value(42))
   var lazySeq = s.lazy
   expectType(LazySequence<MinimalSequence<OpaqueValue<Int>>>.self, &lazySeq)
-  expectEqual(42, lazySeq.underestimatedLength())
+  expectEqual(42, lazySeq.underestimatedLength)
 }
 
 %for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
@@ -179,7 +179,7 @@ LazyTestSuite.test("LazySequence<${traversal}Collection>/underestimatedLength") 
       Minimal${traversal}Collection<OpaqueValue<Int>>
     >.self,
     &lazySeq)
-  expectEqual(42, lazySeq.underestimatedLength())
+  expectEqual(42, lazySeq.underestimatedLength)
 }
 
 %end
@@ -196,7 +196,7 @@ LazyTestSuite.test("MapSequence<Sequence>/underestimatedLength") {
   expectType(
     LazyMapSequence<MinimalSequence<OpaqueValue<Int>>, OpaqueValue<Int32>>.self,
     &lazyMap)
-  expectEqual(42, lazyMap.underestimatedLength())
+  expectEqual(42, lazyMap.underestimatedLength)
 }
 
 struct SequenceWithCustomUnderestimateLength : Sequence {
@@ -208,9 +208,9 @@ struct SequenceWithCustomUnderestimateLength : Sequence {
     return _data.iterator()
   }
 
-  func underestimatedLength() -> Int {
+  var underestimatedLength: Int {
     ++SequenceWithCustomUnderestimateLength.timesUnderestimateLengthWasCalled
-    return _data.underestimatedLength()
+    return _data.underestimatedLength
   }
 
   static var timesUnderestimateLengthWasCalled: Int = 0
@@ -250,7 +250,7 @@ LazyTestSuite.test("MapCollection<${traversal}Collection>/underestimatedLength")
       Minimal${traversal}Collection<OpaqueValue<Int>>, OpaqueValue<Int32>
     >.self,
     &lazyMap)
-  expectEqual(42, lazyMap.underestimatedLength())
+  expectEqual(42, lazyMap.underestimatedLength)
 }
 
 %end
@@ -393,7 +393,7 @@ func expectSequencePassthrough<
 
   SequenceLog.iterator.expectIncrement(baseType) { _ = s.iterator() }
   SequenceLog.underestimatedLength.expectIncrement(baseType) {
-    _ = s.underestimatedLength()
+    _ = s.underestimatedLength
   }
   SequenceLog._customContainsEquatableElement.expectIncrement(baseType) {
     _ = s._customContainsEquatableElement(arbitraryElement)
@@ -515,7 +515,7 @@ tests.test("MapSequence/Passthrough") {
   let base = LoggingSequence(expected)
   let mapped = base.lazy.map { OpaqueValue(Double($0.value) / 2.0) }
   CollectionLog.underestimatedLength.expectIncrement(base.dynamicType) {
-    _ = mapped.underestimatedLength()
+    _ = mapped.underestimatedLength
   }
   // Not exactly passthrough because we wrap the result
   CollectionLog.iterator.expectIncrement(base.dynamicType) {
@@ -576,7 +576,7 @@ tests.test("LazyMapCollection/Passthrough") {
     _ = mapped.first
   }
   CollectionLog.underestimatedLength.expectIncrement(base.dynamicType) {
-    _ = mapped.underestimatedLength()
+    _ = mapped.underestimatedLength
   }
   // Not exactly passthrough because we wrap the result
   CollectionLog.iterator.expectIncrement(base.dynamicType) {

@@ -254,7 +254,7 @@ extension Collection {
   /// `self`, *nondestructively*.
   ///
   /// - Complexity: O(`length`).
-  public func underestimatedLength() -> Int {
+  public var underestimatedLength: Int {
     return numericCast(length)
   }
 

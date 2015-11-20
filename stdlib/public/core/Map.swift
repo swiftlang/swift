@@ -52,8 +52,8 @@ public struct LazyMapSequence<Base : Sequence, Element>
   /// `self`, **nondestructively**.
   ///
   /// - Complexity: O(N).
-  public func underestimatedLength() -> Int {
-    return _base.underestimatedLength()
+  public var underestimatedLength: Int {
+    return _base.underestimatedLength
   }
 
   /// Create an instance with elements `transform(x)` for each element
@@ -103,8 +103,8 @@ public struct LazyMapCollection<Base : Collection, Element>
     return LazyMapIterator(_base: _base.iterator(), _transform: _transform)
   }
 
-  public func underestimatedLength() -> Int {
-    return _base.underestimatedLength()
+  public var underestimatedLength: Int {
+    return _base.underestimatedLength
   }
 
   /// Returns the number of elements.

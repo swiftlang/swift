@@ -84,8 +84,7 @@ public protocol Sequence {
   /// `self`, **nondestructively**.
   ///
   /// - Complexity: O(N).
-  @warn_unused_result
-  func underestimatedLength() -> Int
+  var underestimatedLength: Int { get }
 
   /// Return an `Array` containing the results of mapping `transform`
   /// over `self`.
@@ -297,7 +296,7 @@ extension Sequence {
   public func map<T>(
     @noescape transform: (Iterator.Element) throws -> T
   ) rethrows -> [T] {
-    let initialCapacity = underestimatedLength()
+    let initialCapacity = underestimatedLength
     var result = ContiguousArray<T>()
     result.reserveCapacity(initialCapacity)
 
@@ -421,7 +420,7 @@ extension Sequence {
     // and return it. This saves memory for sequences particularly longer
     // than `maxLength`.
     var ringBuffer: [Iterator.Element] = []
-    ringBuffer.reserveCapacity(Swift.min(maxLength, underestimatedLength()))
+    ringBuffer.reserveCapacity(Swift.min(maxLength, underestimatedLength))
 
     var i = ringBuffer.startIndex
 
@@ -515,8 +514,7 @@ extension Sequence {
   /// `self`, **nondestructively**.
   ///
   /// - Complexity: O(N).
-  @warn_unused_result
-  public func underestimatedLength() -> Int {
+  public var underestimatedLength: Int {
     return 0
   }
 

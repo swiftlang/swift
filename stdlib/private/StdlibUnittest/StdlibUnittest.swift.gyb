@@ -1923,7 +1923,7 @@ public func checkSequence<
     sameValue: sameValue)
 
   expectGE(
-    expectedLength, sequence.underestimatedLength(), ${trace})
+    expectedLength, sequence.underestimatedLength, ${trace})
 
   // Check that _initializeTo does the right thing if we can do so
   // without destroying the sequence.
@@ -2577,8 +2577,8 @@ extension StrictSequence {
       elements: elements, underestimatedLength: underestimatedLength))
   }
 
-  public func underestimatedLength() -> Int {
-    return base.underestimatedLength()
+  public var underestimatedLength: Int {
+    return base.underestimatedLength
   }
 }
 
@@ -2619,7 +2619,7 @@ public struct MinimalSequence<T> : Sequence, CustomDebugStringConvertible {
     return MinimalIterator(_sharedState)
   }
 
-  public func underestimatedLength() -> Int {
+  public var underestimatedLength: Int {
     return Swift.max(
       0, self._sharedState.underestimatedLength - self._sharedState.i)
   }
@@ -3327,8 +3327,8 @@ extension ${Protocol} {
       ${Self}(elements: elements, underestimatedLength: underestimatedLength))
   }
 
-  public func underestimatedLength() -> Int {
-    return base.underestimatedLength()
+  public var underestimatedLength: Int {
+    return base.underestimatedLength
   }
 }
 
@@ -3420,7 +3420,7 @@ public struct ${Self}<T> : ${'MutableCollection' if mutable else 'Collection'} {
 %     end
   }
 
-  public func underestimatedLength() -> Int {
+  public var underestimatedLength: Int {
     return _underestimatedLength
   }
 
@@ -3537,7 +3537,7 @@ public struct ${Self}<T> : RangeReplaceableCollection {
     return MinimalIterator(elements)
   }
 
-  public func underestimatedLength() -> Int {
+  public var underestimatedLength: Int {
     return _underestimatedLength
   }
 

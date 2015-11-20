@@ -109,16 +109,18 @@ public protocol LoggingSequenceType  : Sequence, LoggingType {
   typealias Iterator : IteratorProtocol = LoggingIterator<Base.Iterator>
 }
 
+extension LoggingSequenceType {
+  public var underestimatedLength: Int {
+    ++SequenceLog.underestimatedLength[selfType]
+    return base.underestimatedLength
+  }
+}
+
 extension LoggingSequenceType
   where Log == SequenceLog, Iterator == LoggingIterator<Base.Iterator> {
   public func iterator() -> LoggingIterator<Base.Iterator> {
     ++Log.iterator[selfType]
     return LoggingIterator(base.iterator())
-  }
-
-  public func underestimatedLength() -> Int {
-    ++Log.underestimatedLength[selfType]
-    return base.underestimatedLength()
   }
 
   public func map<T>(

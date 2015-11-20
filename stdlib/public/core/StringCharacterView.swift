@@ -312,7 +312,7 @@ extension String.CharacterView : RangeReplaceableCollection {
   public mutating func appendContentsOf<
     S : Sequence where S.Iterator.Element == Character
   >(newElements: S) {
-    reserveCapacity(_core.length + newElements.underestimatedLength())
+    reserveCapacity(_core.length + newElements.underestimatedLength)
     for c in newElements {
       self.append(c)
     }

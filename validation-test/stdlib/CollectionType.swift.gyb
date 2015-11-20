@@ -12,7 +12,7 @@ var CollectionTypeTests = TestSuite("Collection")
 
 % import gyb
 
-struct CollectionWithDefaultUnderestimateLength : Collection {
+struct CollectionWithDefaultUnderestimatedLength : Collection {
   init(length: Int) {
     self._length = length
   }
@@ -320,16 +320,16 @@ CollectionTypeTests.test(
 ${LazyFlatMapTest}
 
 //===----------------------------------------------------------------------===//
-// underestimatedLength()
+// underestimatedLength
 //===----------------------------------------------------------------------===//
 
 CollectionTypeTests.test("underestimatedLength/Collection/DefaultImplementation") {
   do {
-    let s = CollectionWithDefaultUnderestimateLength(length: 0)
+    let s = CollectionWithDefaultUnderestimatedLength(length: 0)
     expectEqual(0, callGenericUnderestimatedLength(s))
   }
   do {
-    let s = CollectionWithDefaultUnderestimateLength(length: 5)
+    let s = CollectionWithDefaultUnderestimatedLength(length: 5)
     expectEqual(5, callGenericUnderestimatedLength(s))
   }
 }
@@ -360,7 +360,7 @@ struct CollectionWithCustomUnderestimateLength : Collection {
     return OpaqueValue(0xffff)
   }
 
-  func underestimatedLength() -> Int {
+  var underestimatedLength: Int {
     return _underestimatedLength
   }
 

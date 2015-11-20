@@ -217,18 +217,18 @@ struct SequenceOnly<T : Sequence> : Sequence {
   func iterator() -> T.Iterator { return base.iterator() }
 }
 
-func testUnderestimateLength() {
+func testUnderestimatedLength() {
   // CHECK: testing underestimatedLength
   print("testing underestimatedLength")
   // CHECK-NEXT: random access: 4
-  print("random access: \(array.underestimatedLength())")
+  print("random access: \(array.underestimatedLength)")
   // CHECK-NEXT: bidirectional: 5
-  print("bidirectional: \(dict.underestimatedLength())")
+  print("bidirectional: \(dict.underestimatedLength)")
   // CHECK-NEXT: Sequence only: 0
   let s = SequenceOnly(base: array)
-  print("Sequence only: \(s.underestimatedLength())")
+  print("Sequence only: \(s.underestimatedLength)")
 }
-testUnderestimateLength()
+testUnderestimatedLength()
 
 func testIsEmptyFirstLast() {
   // CHECK: testing isEmpty
