@@ -6957,18 +6957,17 @@ static void validateFixedLayoutAttribute(TypeChecker &TC,
                                          NominalTypeDecl *D) {
   DeclAttributes &Attrs = D->getAttrs();
 
-  if (Attrs.hasAttribute<FixedLayoutAttr>())
+  // FIXME: Add a per-module serialized HasFixedLayout flag, instead of
+  // giving every decl this attribute.
+
+  if (Attrs.hasAttribute<FixedLayoutAttr>() ||
+      TC.Context.LangOpts.EnableResilience)
     return;
 
   // Since -enable-resilience should not change how we call into
   // existing compiled modules, make all value types @_fixed_layout
   // when the frontend is not run with the -enable-resilience flag.
-  if (!TC.Context.LangOpts.EnableResilience &&
-      D->getFormalAccess() == Accessibility::Public)
-    Attrs.add(new (TC.Context) FixedLayoutAttr(/*IsImplicit*/ true));
-  // @objc enums are always @_fixed_layout.
-  else if (isa<EnumDecl>(D) && D->isObjC())
-    Attrs.add(new (TC.Context) FixedLayoutAttr(/*IsImplicit*/ true));
+  Attrs.add(new (TC.Context) FixedLayoutAttr(/*IsImplicit*/ true));
 }
 
 static void validateAttributes(TypeChecker &TC, Decl *D) {
