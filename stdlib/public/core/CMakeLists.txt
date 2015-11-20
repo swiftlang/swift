@@ -109,9 +109,9 @@ set(SWIFTLIB_ESSENTIAL
   UnicodeScalar.swift
   UnicodeTrie.swift.gyb
   UnavailableStringAPIs.swift.gyb
-  Unmanaged.swift
   UnsafeBufferPointer.swift.gyb
   UnsafePointer.swift.gyb
+  UnsafeReference.swift
   )
 
 # The complete list of sources in the core standard library.  Includes

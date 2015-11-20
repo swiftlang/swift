@@ -874,7 +874,7 @@ static bool isCFAudited(ImportTypeKind importKind) {
   }
 }
 
-/// Turn T into Unmanaged<T>.
+/// Turn T into UnsafeReference<T>.
 static Type getUnmanagedType(ClangImporter::Implementation &impl,
                              Type payloadType) {
   NominalTypeDecl *unmanagedDecl = impl.SwiftContext.getUnmanagedDecl();
@@ -992,7 +992,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
       return Type();
 
     assert(boundGenericTy->getGenericArgs().size() == 1 &&
-           "signature of Unmanaged has changed");
+           "signature of UnsafeReference has changed");
 
     auto resultTy = boundGenericTy->getGenericArgs().front();
     if (OTK != OTK_None)
@@ -1127,11 +1127,11 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
 
   if (importKind == ImportTypeKind::RecordField &&
       importedType->isAnyClassReferenceType()) {
-    // Wrap retainable struct fields in Unmanaged.
+    // Wrap retainable struct fields in UnsafeReference.
     // FIXME: Eventually we might get C++-like support for strong pointers in
     // structs, at which point we should really be checking the lifetime
     // qualifiers.
-    // FIXME: This should apply to blocks as well, but Unmanaged is constrained
+    // FIXME: This should apply to blocks as well, but UnsafeReference is constrained
     // to AnyObject.
     importedType = getUnmanagedType(impl, importedType);
   }
@@ -2077,7 +2077,7 @@ Type ClangImporter::Implementation::importMethodType(
     if (swiftResultTy &&
         clangDecl->getMethodFamily() == clang::OMF_performSelector) {
       // performSelector methods that return 'id' should be imported into Swift
-      // as returning Unmanaged<AnyObject>.
+      // as returning UnsafeReference<AnyObject>.
       Type nonOptionalTy =
           swiftResultTy->getAnyOptionalObjectType(OptionalityOfReturn);
       if (!nonOptionalTy)

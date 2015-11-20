@@ -80,7 +80,7 @@ func _stdlib_atomicInitializeARCRef(
   object target: UnsafeMutablePointer<AnyObject?>,
   desired: AnyObject) -> Bool {
   var expected: OpaquePointer = nil
-  let desiredPtr = OpaquePointer(Unmanaged.passRetained(desired))
+  let desiredPtr = OpaquePointer(bitPattern: UnsafeReference(retaining: desired))
   let wonRace = _stdlib_atomicCompareExchangeStrongPtrImpl(
     object: UnsafeMutablePointer(target),
     expected: &expected,
@@ -88,7 +88,7 @@ func _stdlib_atomicInitializeARCRef(
   if !wonRace {
     // Some other thread initialized the value.  Balance the retain that we
     // performed on 'desired'.
-    Unmanaged.passUnretained(desired).release()
+    UnsafeReference(withoutRetaining: desired).release()
   }
   return wonRace
 }
@@ -250,7 +250,7 @@ func _stdlib_atomicLoadARCRef(
   let result = _swift_stdlib_atomicLoadPtrImpl(
     object: UnsafeMutablePointer(target))
   if result != nil {
-    return Unmanaged<AnyObject>.fromOpaque(result).takeUnretainedValue()
+    return UnsafeReference<AnyObject>(bitPattern: result).object
   }
   return nil
 }

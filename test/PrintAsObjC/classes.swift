@@ -208,7 +208,7 @@ class NotObjC {}
 
   func honorRenames(_: ClassWithCustomName) {}
 
-  func unmanaged(_: Unmanaged<AnyObject>) -> Unmanaged<Methods>? { return nil }
+  func unmanaged(_: UnsafeReference<AnyObject>) -> UnsafeReference<Methods>? { return nil }
 }
 
 typealias AliasForNSRect = NSRect
@@ -421,7 +421,7 @@ public class NonObjCClass { }
   weak var weakOther: Properties?
   unowned var unownedOther: Properties = .shared
   unowned(unsafe) var unmanagedOther: Properties = .shared
-  var unmanagedByDecl: Unmanaged<Properties>?
+  var unmanagedByDecl: UnsafeReference<Properties>?
 
   weak var weakProto: MyProtocol?
   weak var weakCF: CFTypeRef?

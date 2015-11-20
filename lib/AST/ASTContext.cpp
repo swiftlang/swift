@@ -143,7 +143,7 @@ struct ASTContext::Implementation {
   NominalTypeDecl *AutoreleasingUnsafeMutablePointerDecl = nullptr;
   VarDecl *AutoreleasingUnsafeMutablePointerMemoryDecl = nullptr;
 
-  /// The declaration of Swift.Unmanaged<T>
+  /// The declaration of Swift.UnsafeReference<T>
   NominalTypeDecl *UnmanagedDecl = nullptr;
 
   /// The declaration of Swift.Void.
@@ -710,7 +710,7 @@ NominalTypeDecl *ASTContext::getAutoreleasingUnsafeMutablePointerDecl() const {
 
 NominalTypeDecl *ASTContext::getUnmanagedDecl() const {
   if (!Impl.UnmanagedDecl)
-    Impl.UnmanagedDecl = findStdlibType(*this, "Unmanaged", 1);
+    Impl.UnmanagedDecl = findStdlibType(*this, "UnsafeReference", 1);
   
   return Impl.UnmanagedDecl;
 }

@@ -4074,7 +4074,7 @@ BEGIN_CAN_TYPE_WRAPPER(UnownedStorageType, ReferenceStorageType)
 END_CAN_TYPE_WRAPPER(UnownedStorageType, ReferenceStorageType)
 
 /// \brief The storage type of a variable with @unowned(unsafe)
-/// ownership semantics, akin to the library Unmanaged<> type.
+/// ownership semantics, akin to the library UnsafeReference<> type.
 class UnmanagedStorageType : public ReferenceStorageType {
   friend class ReferenceStorageType;
   UnmanagedStorageType(Type referent, const ASTContext *C,

@@ -392,7 +392,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     UnsafeMutablePointer,
     UnsafePointer,
     AutoreleasingUnsafeMutablePointer,
-    Unmanaged,
+    UnsafeReference,
     CFunctionPointer,
   } kind = llvm::StringSwitch<StructKind>(swiftStructDecl->getName().str())
     .Case("UnsafeMutablePointer", StructKind::UnsafeMutablePointer)
@@ -400,7 +400,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     .Case(
       "AutoreleasingUnsafeMutablePointer",
         StructKind::AutoreleasingUnsafeMutablePointer)
-    .Case("Unmanaged", StructKind::Unmanaged)
+    .Case("UnsafeReference", StructKind::UnsafeReference)
     .Case("CFunctionPointer", StructKind::CFunctionPointer)
     .Default(StructKind::Invalid);
   
@@ -412,7 +412,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
                      " Clang module!");
       
   case StructKind::UnsafeMutablePointer:
-  case StructKind::Unmanaged:
+  case StructKind::UnsafeReference:
   case StructKind::AutoreleasingUnsafeMutablePointer: {
     assert(args.size() == 1 &&
            "*Pointer<T> should have a single generic argument!");

@@ -422,7 +422,7 @@ public:
   /// Retrieve the declaration of Swift.AutoreleasingUnsafeMutablePointer<T>.
   NominalTypeDecl *getAutoreleasingUnsafeMutablePointerDecl() const;
 
-  /// Retrieve the declaration of Swift.Unmanaged<T>.
+  /// Retrieve the declaration of Swift.UnsafeReference<T>.
   NominalTypeDecl *getUnmanagedDecl() const;
 
   /// Retrieve the declaration of the "pointee" property of a pointer type.

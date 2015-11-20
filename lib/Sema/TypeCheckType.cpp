@@ -3071,7 +3071,7 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
 
   auto NTD = T->getAnyNominal();
 
-  // Unmanaged<T> can be represented in Objective-C if T is an @objc class
+  // UnsafeReference<T> can be represented in Objective-C if T is an @objc class
   // or protocol.
   if (NTD == Context.getUnmanagedDecl()) {
     auto BGT = T->getAs<BoundGenericType>();

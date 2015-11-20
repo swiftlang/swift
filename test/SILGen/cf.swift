@@ -9,7 +9,7 @@ func useEmAll(model: CCMagnetismModel) {
 // CHECK: function_ref @CCPowerSupplyGetDefault : $@convention(c) () -> @autoreleased ImplicitlyUnwrappedOptional<CCPowerSupply>
   let power = CCPowerSupplyGetDefault()
 
-// CHECK: function_ref @CCRefrigeratorCreate : $@convention(c) (ImplicitlyUnwrappedOptional<CCPowerSupply>) -> ImplicitlyUnwrappedOptional<Unmanaged<CCRefrigerator>>
+// CHECK: function_ref @CCRefrigeratorCreate : $@convention(c) (ImplicitlyUnwrappedOptional<CCPowerSupply>) -> ImplicitlyUnwrappedOptional<UnsafeReference<CCRefrigerator>>
   let unmanagedFridge = CCRefrigeratorCreate(power)
 
 // CHECK: function_ref @CCRefrigeratorSpawn : $@convention(c) (ImplicitlyUnwrappedOptional<CCPowerSupply>) -> @owned ImplicitlyUnwrappedOptional<CCRefrigerator>
@@ -27,7 +27,7 @@ func useEmAll(model: CCMagnetismModel) {
 // CHECK: function_ref @CCRefrigeratorDestroy : $@convention(c) (@owned ImplicitlyUnwrappedOptional<CCRefrigerator>) -> ()
   CCRefrigeratorDestroy(clone)
 
-// CHECK: class_method [volatile] %0 : $CCMagnetismModel, #CCMagnetismModel.refrigerator!1.foreign : CCMagnetismModel -> () -> Unmanaged<CCRefrigerator>! , $@convention(objc_method) (CCMagnetismModel) -> ImplicitlyUnwrappedOptional<Unmanaged<CCRefrigerator>>
+// CHECK: class_method [volatile] %0 : $CCMagnetismModel, #CCMagnetismModel.refrigerator!1.foreign : CCMagnetismModel -> () -> UnsafeReference<CCRefrigerator>! , $@convention(objc_method) (CCMagnetismModel) -> ImplicitlyUnwrappedOptional<UnsafeReference<CCRefrigerator>>
   let f0 = model.refrigerator()
 
 // CHECK: class_method [volatile] %0 : $CCMagnetismModel, #CCMagnetismModel.getRefrigerator!1.foreign : CCMagnetismModel -> () -> CCRefrigerator! , $@convention(objc_method) (CCMagnetismModel) -> @autoreleased ImplicitlyUnwrappedOptional<CCRefrigerator>

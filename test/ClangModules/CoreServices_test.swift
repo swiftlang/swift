@@ -12,7 +12,7 @@ func test(url: CFURL, ident: CSIdentity) {
 
   _ = kCollectionNoAttributes // expected-error{{use of unresolved identifier 'kCollectionNoAttributes'}}
 
-  var name: Unmanaged<CFString>? = nil
+  var name: UnsafeReference<CFString>? = nil
   _ = LSCopyDisplayNameForURL(url, &name) as OSStatus // okay
 
   let unicharArray: [UniChar] = [ 0x61, 0x62, 0x63, 0x2E, 0x64 ]

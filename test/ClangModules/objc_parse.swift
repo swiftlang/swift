@@ -38,7 +38,7 @@ func instanceMethods(b: B) {
   b.setEnabled(true)
 
   // SEL
-  b.perform("isEqual:", withObject:b)
+  b.performSelector("isEqual:", withObject:b)
   if let result = b.perform("getAsProto", withObject:nil) {
     _ = result.takeUnretainedValue()
   }
