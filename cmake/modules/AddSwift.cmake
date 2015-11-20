@@ -615,6 +615,22 @@ function(_add_swift_lipo_target target output)
   endif()
 endfunction()
 
+# After target 'dst_target' is built from its own object files, merge the
+# contents of 'src_target' into it. 'dst_target' and 'src_target' must be
+# static-library targets.
+function(_target_merge_static_library dst_target src_target)
+  add_dependencies("${dst_target}" "${src_target}")
+  set(unpack_dir "${CMAKE_BINARY_DIR}/tmp/unpack/${dst_target}")
+  add_custom_command(TARGET "${dst_target}" POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${unpack_dir}"
+    COMMAND pushd "${unpack_dir}"
+    COMMAND "${CMAKE_AR}" -x "$<TARGET_FILE:${src_target}>"
+    COMMAND "${CMAKE_AR}" -r "$<TARGET_FILE:${dst_target}>" ./*.o
+    COMMAND popd
+    COMMAND "${CMAKE_COMMAND}" -E remove_directory "${unpack_dir}"
+  )
+endfunction()
+
 # Add a single variant of a new Swift library.
 #
 # Usage:
@@ -1107,6 +1123,15 @@ function(_add_swift_library_single target name)
       LINK_FLAGS " ${link_flags} -L${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR} -L${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR} -L${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
     target_link_libraries("${target_static}" PRIVATE
         ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
+
+    if("${name}" STREQUAL "swiftCore")
+      # Have libswiftCore.a include the contents of the private libraries it
+      # depends on, so statically linking clients don't have to know about
+      # them.
+      foreach(private_link_library ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
+        _target_merge_static_library("${target_static}" "${private_link_library}")
+      endforeach()
+    endif()
   endif()
 
   # Do not add code here.
