@@ -236,3 +236,34 @@ bool swift::canonicalizeAllLoops(DominanceInfo *DT, SILLoopInfo *LI) {
 
   return MadeChange;
 }
+
+//===----------------------------------------------------------------------===//
+//                                Loop Visitor
+//===----------------------------------------------------------------------===//
+
+void SILLoopVisitor::run() {
+  // We visit the loop nest inside out via a depth first, post order using
+  // this
+  // worklist.
+  llvm::SmallVector<std::pair<SILLoop *, bool>, 32> Worklist;
+  for (auto *L : LI->getTopLevelLoops()) {
+    Worklist.push_back({L, L->empty()});
+  }
+
+  while (Worklist.size()) {
+    SILLoop *L;
+    bool Visited;
+    std::tie(L, Visited) = Worklist.pop_back_val();
+
+    if (!Visited) {
+      Worklist.push_back({L, true});
+      for (auto *SubLoop : L->getSubLoops()) {
+        Worklist.push_back({SubLoop, SubLoop->empty()});
+      }
+      continue;
+    }
+    runOnLoop(L);
+  }
+
+  runOnFunction(F);
+}

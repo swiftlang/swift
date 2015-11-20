@@ -20,6 +20,7 @@
 
 namespace swift {
 
+class SILFunction;
 class SILBasicBlock;
 class SILLoop;
 class DominanceInfo;
@@ -33,6 +34,24 @@ bool canonicalizeLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI);
 /// Canonicalize all loops in the function F for which \p LI contains loop
 /// information. We update loop info and dominance info while we do this.
 bool canonicalizeAllLoops(DominanceInfo *DT, SILLoopInfo *LI);
+
+/// A visitor that visits loops in a function in a bottom up order. It only
+/// performs the visit.
+class SILLoopVisitor {
+  SILFunction *F;
+  SILLoopInfo *LI;
+
+public:
+  SILLoopVisitor(SILFunction *Func, SILLoopInfo *LInfo) : F(Func), LI(LInfo) {}
+  virtual ~SILLoopVisitor() {}
+
+  void run();
+
+  SILFunction *getFunction() const { return F; }
+
+  virtual void runOnLoop(SILLoop *L) = 0;
+  virtual void runOnFunction(SILFunction *F) = 0;
+};
 
 } // end swift namespace
 
