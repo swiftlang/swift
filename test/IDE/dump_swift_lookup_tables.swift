@@ -3,12 +3,12 @@
 
 // CHECK:      Base -> full name mappings:
 // CHECK-NEXT:   Bar --> Bar
+// CHECK-NEXT:   Blue --> Blue
+// CHECK-NEXT:   Green --> Green
 // CHECK-NEXT:   MyInt --> MyInt
 // CHECK-NEXT:   Point --> Point
 // CHECK-NEXT:   Rouge --> Rouge
-// CHECK-NEXT:   SNColorBlue --> SNColorBlue
 // CHECK-NEXT:   SNColorChoice --> SNColorChoice
-// CHECK-NEXT:   SNColorGreen --> SNColorGreen
 // CHECK-NEXT:   SomeStruct --> SomeStruct
 // CHECK-NEXT:   __SNTransposeInPlace --> __SNTransposeInPlace
 // CHECK-NEXT:   makeSomeStruct --> makeSomeStruct(x:y:), makeSomeStruct(x:)
@@ -19,18 +19,18 @@
 // CHECK:      Full name -> entry mappings:
 // CHECK-NEXT:   Bar:
 // CHECK-NEXT:     TU: SNFoo
+// CHECK-NEXT:   Blue:
+// CHECK-NEXT:     SNColorChoice: SNColorBlue
+// CHECK-NEXT:   Green:
+// CHECK-NEXT:     SNColorChoice: SNColorGreen
 // CHECK-NEXT:   MyInt:
 // CHECK-NEXT:     TU: SNIntegerType
 // CHECK-NEXT:   Point:
 // CHECK-NEXT:     TU: SNPoint
 // CHECK-NEXT:   Rouge:
 // CHECK-NEXT:     SNColorChoice: SNColorRed
-// CHECK-NEXT:   SNColorBlue:
-// CHECK-NEXT:     SNColorChoice: SNColorBlue
 // CHECK-NEXT:   SNColorChoice:
 // CHECK-NEXT:     TU: SNColorChoice, SNColorChoice
-// CHECK-NEXT:   SNColorGreen:
-// CHECK-NEXT:     SNColorChoice: SNColorGreen
 // CHECK-NEXT:   SomeStruct:
 // CHECK-NEXT:     TU: SNSomeStruct
 // CHECK-NEXT:   __SNTransposeInPlace:

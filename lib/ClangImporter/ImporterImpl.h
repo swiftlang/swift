@@ -503,6 +503,10 @@ private:
     }
   };
 
+  /// Retrieve the prefix to be stripped from the names of the enum constants
+  /// within the given enum.
+  StringRef getEnumConstantNamePrefix(const clang::EnumDecl *enumDecl);
+
 public:
   /// \brief Keep track of enum constant values that have been imported.
   llvm::DenseMap<std::pair<const clang::EnumDecl *, llvm::APSInt>,
@@ -740,15 +744,6 @@ public:
                           bool *hasCustomName = nullptr,
                           clang::DeclContext **effectiveContext = nullptr);
 
-  /// Imports the name of the given Clang decl into Swift.
-  ///
-  /// Note that this may result in a name different from the Clang name, so it
-  /// should not be used when referencing Clang symbols. (In particular, it
-  /// should not be put into \c \@objc attributes.)
-  ///
-  /// \sa importName(clang::DeclarationName, StringRef)
-  Identifier importName(const clang::NamedDecl *D, StringRef removePrefix = "");
-  
   /// \brief Import the given Clang identifier into Swift.
   ///
   /// \param identifier The Clang identifier to map into Swift.

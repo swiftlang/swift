@@ -323,101 +323,6 @@ static bool isNSDictionaryMethod(const clang::ObjCMethodDecl *MD,
   return true;
 }
 
-/// \brief Returns the common prefix of two strings at camel-case word
-/// granularity.
-///
-/// For example, given "NSFooBar" and "NSFooBas", returns "NSFoo"
-/// (not "NSFooBa"). The returned StringRef is a slice of the "a" argument.
-///
-/// If either string has a non-identifier character immediately after the
-/// prefix, \p followedByNonIdentifier will be set to \c true. If both strings
-/// have identifier characters after the prefix, \p followedByNonIdentifier will
-/// be set to \c false. Otherwise, \p followedByNonIdentifier will not be
-/// changed from its initial value.
-///
-/// This is used to derive the common prefix of enum constants so we can elide
-/// it from the Swift interface.
-static StringRef getCommonWordPrefix(StringRef a, StringRef b,
-                                     bool &followedByNonIdentifier) {
-  auto aWords = camel_case::getWords(a), bWords = camel_case::getWords(b);
-  auto aI = aWords.begin(), aE = aWords.end(),
-       bI = bWords.begin(), bE = bWords.end();
-
-  unsigned prevLength = 0;
-  unsigned prefixLength = 0;
-  for ( ; aI != aE && bI != bE; ++aI, ++bI) {
-    if (*aI != *bI) {
-      followedByNonIdentifier = false;
-      break;
-    }
-
-    prevLength = prefixLength;
-    prefixLength = aI.getPosition() + aI->size();
-  }
-
-  // Avoid creating a prefix where the rest of the string starts with a number.
-  if ((aI != aE && !Lexer::isIdentifier(*aI)) ||
-      (bI != bE && !Lexer::isIdentifier(*bI))) {
-    followedByNonIdentifier = true;
-    prefixLength = prevLength;
-  }
-
-  return a.slice(0, prefixLength);
-}
-
-/// Returns the common word-prefix of two strings, allowing the second string
-/// to be a common English plural form of the first.
-///
-/// For example, given "NSProperty" and "NSProperties", the full "NSProperty"
-/// is returned. Given "NSMagicArmor" and "NSMagicArmory", only
-/// "NSMagic" is returned.
-///
-/// The "-s", "-es", and "-ies" patterns cover every plural NS_OPTIONS name
-/// in Cocoa and Cocoa Touch.
-///
-/// \see getCommonWordPrefix
-static StringRef getCommonPluralPrefix(StringRef singular, StringRef plural) {
-  assert(!plural.empty());
-
-  if (singular.empty())
-    return singular;
-
-  bool ignored;
-  StringRef commonPrefix = getCommonWordPrefix(singular, plural, ignored);
-  if (commonPrefix.size() == singular.size() || plural.back() != 's')
-    return commonPrefix;
-
-  StringRef leftover = singular.substr(commonPrefix.size());
-  StringRef firstLeftoverWord = camel_case::getFirstWord(leftover);
-  StringRef commonPrefixPlusWord =
-      singular.substr(0, commonPrefix.size() + firstLeftoverWord.size());
-
-  // Is the plural string just "[singular]s"?
-  plural = plural.drop_back();
-  if (plural.endswith(firstLeftoverWord))
-    return commonPrefixPlusWord;
-
-  if (plural.empty() || plural.back() != 'e')
-    return commonPrefix;
-
-  // Is the plural string "[singular]es"?
-  plural = plural.drop_back();
-  if (plural.endswith(firstLeftoverWord))
-    return commonPrefixPlusWord;
-
-  if (plural.empty() || !(plural.back() == 'i' && singular.back() == 'y'))
-    return commonPrefix;
-
-  // Is the plural string "[prefix]ies" and the singular "[prefix]y"?
-  plural = plural.drop_back();
-  firstLeftoverWord = firstLeftoverWord.drop_back();
-  if (plural.endswith(firstLeftoverWord))
-    return commonPrefixPlusWord;
-
-  return commonPrefix;
-}
-
-
 /// Build the \c rawValue property trivial getter for an option set or
 /// unknown enum.
 ///
@@ -1832,131 +1737,12 @@ namespace {
       return constructor;
     }
     
-    /// Get the Swift name for an enum constant.
-    static Identifier getEnumConstantName(ClangImporter::Implementation &impl,
-                                          const clang::EnumConstantDecl *decl,
-                                          const clang::EnumDecl *clangEnum) {
-      if (auto *nameAttr = decl->getAttr<clang::SwiftNameAttr>()) {
-        StringRef customName = nameAttr->getName();
-        if (Lexer::isIdentifier(customName))
-          return impl.SwiftContext.getIdentifier(customName);
-      }
-
-      StringRef enumPrefix = impl.EnumConstantNamePrefixes.lookup(clangEnum);
-      return impl.importName(decl, enumPrefix);
-    }
-
-    /// Determine the common prefix to remove from the element names of an
-    /// enum. We'll elide this prefix from then names in
-    /// the Swift interface because Swift enum cases are naturally namespaced
-    /// by the enum type.
-    void computeEnumCommonWordPrefix(const clang::EnumDecl *decl,
-                                     Identifier enumName) {
-      auto ec = decl->enumerator_begin(), ecEnd = decl->enumerator_end();
-      if (ec == ecEnd)
-        return;
-
-      auto isNonDeprecatedWithoutCustomName =
-          [](const clang::EnumConstantDecl *elem) -> bool {
-        if (elem->hasAttr<clang::SwiftNameAttr>())
-          return false;
-
-        clang::VersionTuple maxVersion{~0U, ~0U, ~0U};
-        switch (elem->getAvailability(nullptr, maxVersion)) {
-        case clang::AR_Available:
-        case clang::AR_NotYetIntroduced:
-          for (auto attr : elem->attrs()) {
-            if (auto annotate = dyn_cast<clang::AnnotateAttr>(attr)) {
-              if (annotate->getAnnotation() == "swift1_unavailable")
-                return false;
-            }
-            if (auto avail = dyn_cast<clang::AvailabilityAttr>(attr)) {
-              if (avail->getPlatform()->getName() == "swift")
-                return false;
-            }
-          }
-          return true;
-        case clang::AR_Deprecated:
-        case clang::AR_Unavailable:
-          return false;
-        }
-      };
-
-      auto firstNonDeprecated = std::find_if(ec, ecEnd,
-                                             isNonDeprecatedWithoutCustomName);
-      bool hasNonDeprecated = (firstNonDeprecated != ecEnd);
-      if (hasNonDeprecated) {
-        ec = firstNonDeprecated;
-      } else {
-        // Advance to the first case without a custom name, deprecated or not.
-        while (ec != ecEnd && (*ec)->hasAttr<clang::SwiftNameAttr>())
-          ++ec;
-        if (ec == ecEnd)
-          return;
-      }
-
-      StringRef commonPrefix = (*ec)->getName();
-      bool followedByNonIdentifier = false;
-      for (++ec; ec != ecEnd; ++ec) {
-        const clang::EnumConstantDecl *elem = *ec;
-        if (hasNonDeprecated) {
-          if (!isNonDeprecatedWithoutCustomName(elem))
-            continue;
-        } else {
-          if (elem->hasAttr<clang::SwiftNameAttr>())
-            continue;
-        }
-
-        commonPrefix = getCommonWordPrefix(commonPrefix, elem->getName(),
-                                           followedByNonIdentifier);
-        if (commonPrefix.empty())
-          break;
-      }
-
-      if (!commonPrefix.empty()) {
-        StringRef checkPrefix = commonPrefix;
-
-        // Account for the 'kConstant' naming convention on enumerators.
-        if (checkPrefix[0] == 'k') {
-          bool canDropK;
-          if (checkPrefix.size() >= 2)
-            canDropK = clang::isUppercase(checkPrefix[1]);
-          else
-            canDropK = !followedByNonIdentifier;
-
-          if (canDropK)
-            checkPrefix = checkPrefix.drop_front();
-        }
-
-        // Account for the enum being imported using
-        // __attribute__((swift_private)). This is a little ad hoc, but it's a
-        // rare case anyway.
-        StringRef enumNameStr = enumName.str();
-        if (enumNameStr.startswith("__") && !checkPrefix.startswith("__"))
-          enumNameStr = enumNameStr.drop_front(2);
-
-        StringRef commonWithEnum = getCommonPluralPrefix(checkPrefix,
-                                                         enumNameStr);
-        size_t delta = commonPrefix.size() - checkPrefix.size();
-
-        // Account for the 'EnumName_Constant' convention on enumerators.
-        if (commonWithEnum.size() < checkPrefix.size() &&
-            checkPrefix[commonWithEnum.size()] == '_' &&
-            !followedByNonIdentifier) {
-          delta += 1;
-        }
-
-        commonPrefix = commonPrefix.slice(0, commonWithEnum.size() + delta);
-      }
-      Impl.EnumConstantNamePrefixes.insert({decl, commonPrefix});
-    }
-    
     /// Import an NS_ENUM constant as a case of a Swift enum.
     Decl *importEnumCase(const clang::EnumConstantDecl *decl,
                          const clang::EnumDecl *clangEnum,
                          EnumDecl *theEnum) {
       auto &context = Impl.SwiftContext;
-      auto name = getEnumConstantName(Impl, decl, clangEnum);
+      auto name = Impl.importFullName(decl).getBaseName();
       if (name.empty())
         return nullptr;
       
@@ -2009,7 +1795,7 @@ namespace {
     Decl *importOptionConstant(const clang::EnumConstantDecl *decl,
                                const clang::EnumDecl *clangEnum,
                                NominalTypeDecl *theStruct) {
-      auto name = getEnumConstantName(Impl, decl, clangEnum);
+      auto name = Impl.importFullName(decl).getBaseName();
       if (name.empty())
         return nullptr;
       
@@ -2034,11 +1820,11 @@ namespace {
                               EnumElementDecl *original,
                               const clang::EnumDecl *clangEnum,
                               NominalTypeDecl *importedEnum) {
-      auto name = getEnumConstantName(Impl, alias, clangEnum);
+      auto name = Impl.importFullName(alias).getBaseName();
       if (name.empty())
         return nullptr;
       
-      // Construct the original constant. Enum constants witbout payloads look
+      // Construct the original constant. Enum constants without payloads look
       // like simple values, but actually have type 'MyEnum.Type -> MyEnum'.
       auto constantRef = new (Impl.SwiftContext) DeclRefExpr(original,
                                                              SourceLoc(),
@@ -2130,7 +1916,6 @@ namespace {
       structDecl->addMember(labeledValueConstructor);
       structDecl->addMember(patternBinding);
       structDecl->addMember(var);
-      computeEnumCommonWordPrefix(decl, name);
       return structDecl;
     }
     
@@ -2298,8 +2083,6 @@ namespace {
         enumDecl->addMember(rawValueBinding);
         
         result = enumDecl;
-        computeEnumCommonWordPrefix(decl, name);
-        
         break;
       }
           
@@ -2593,7 +2376,7 @@ namespace {
     Decl *VisitEnumConstantDecl(const clang::EnumConstantDecl *decl) {
       auto clangEnum = cast<clang::EnumDecl>(decl->getDeclContext());
       
-      auto name = getEnumConstantName(Impl, decl, clangEnum);
+      auto name = Impl.importFullName(decl).getBaseName();
       if (name.empty())
         return nullptr;
 
@@ -6442,7 +6225,6 @@ ClangImporter::Implementation::getSpecialTypedefKind(clang::TypedefNameDecl *dec
 
 Identifier
 ClangImporter::getEnumConstantName(const clang::EnumConstantDecl *enumConstant){
-  auto clangEnum = cast<clang::EnumDecl>(enumConstant->getDeclContext());
-  return SwiftDeclConverter::getEnumConstantName(Impl, enumConstant, clangEnum);
+  return Impl.importFullName(enumConstant).getBaseName();
 }
 
