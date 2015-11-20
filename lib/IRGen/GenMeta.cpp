@@ -2941,9 +2941,9 @@ namespace {
     void addValueWitnessTable() {
       ClassDecl *cls = Target;
       
-      auto type = (cls->checkObjCAncestry() != ObjCClassKind::NonObjC
-                   ? this->IGM.Context.TheUnknownObjectType
-                   : this->IGM.Context.TheNativeObjectType);
+      auto type = (cls->checkObjCAncestry() != ObjCClassKind::NonObjC)
+        ? CanType(this->IGM.Context.TheUnknownObjectType)
+        : CanType(this->IGM.Context.TheNativeObjectType);
       auto wtable = this->IGM.getAddrOfValueWitnessTable(type);
       addWord(wtable);
     }
@@ -4743,11 +4743,7 @@ namespace {
     // Visitor methods.
 
     void addValueWitnessTable() {
-      // Without Objective-C interop, foreign classes must still use
-      // Swift native reference counting.
-      auto type = (IGM.ObjCInterop
-                   ? IGM.Context.TheUnknownObjectType
-                   : IGM.Context.TheNativeObjectType);
+      auto type = IGM.Context.TheUnknownObjectType;
       auto wtable = IGM.getAddrOfValueWitnessTable(type);
       addWord(wtable);
     }
