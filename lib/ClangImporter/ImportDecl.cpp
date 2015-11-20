@@ -1064,12 +1064,16 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
 /// generated name will most likely be unique.
 static Identifier getClangDeclName(ClangImporter::Implementation &Impl,
                                    const clang::TagDecl *decl) {
-  if (decl->getDeclName() || decl->hasAttr<clang::SwiftNameAttr>())
-    return Impl.importName(decl);
-  else if (auto *typedefForAnon = decl->getTypedefNameForAnonDecl())
-    return Impl.importName(typedefForAnon);
+  // Import the name of this declaration.
+  Identifier name = Impl.importFullName(decl).getBaseName();
+  if (!name.empty()) return name;
 
-  Identifier name;
+  // If that didn't succeed, check whether this is an anonymous tag declaration
+  // with a corresponding typedef-name declaration.
+  if (decl->getDeclName().isEmpty()) {
+    if (auto *typedefForAnon = decl->getTypedefNameForAnonDecl())
+      return Impl.importFullName(typedefForAnon).getBaseName();
+  }
 
   if (!decl->isRecord())
     return name;
@@ -1518,7 +1522,7 @@ namespace {
     }
 
     Decl *VisitTypedefNameDecl(const clang::TypedefNameDecl *Decl) {
-      auto Name = Impl.importName(Decl);
+      auto Name = Impl.importFullName(Decl).getBaseName();
       if (Name.empty())
         return nullptr;
 
@@ -2684,7 +2688,7 @@ namespace {
             return nullptr;
         }
       }
-      auto name = Impl.importName(decl);
+      auto name = Impl.importFullName(decl).getBaseName();
       if (name.empty())
         return nullptr;
 
@@ -2790,7 +2794,7 @@ namespace {
 
     Decl *VisitFieldDecl(const clang::FieldDecl *decl) {
       // Fields are imported as variables.
-      auto name = Impl.importName(decl);
+      auto name = Impl.importFullName(decl).getBaseName();
       if (name.empty())
         return nullptr;
 
@@ -2836,7 +2840,7 @@ namespace {
         return nullptr;
 
       // Variables are imported as... variables.
-      auto name = Impl.importName(decl);
+      auto name = Impl.importFullName(decl).getBaseName();
       if (name.empty())
         return nullptr;
 
@@ -5019,7 +5023,7 @@ namespace {
     }
     
     Decl *VisitObjCProtocolDecl(const clang::ObjCProtocolDecl *decl) {
-      Identifier name = Impl.importName(decl);
+      Identifier name = Impl.importFullName(decl).getBaseName();
       if (name.empty())
         return nullptr;
 
@@ -5173,7 +5177,7 @@ namespace {
     }
 
     Decl *VisitObjCInterfaceDecl(const clang::ObjCInterfaceDecl *decl) {
-      auto name = Impl.importName(decl);
+      auto name = Impl.importFullName(decl).getBaseName();
       if (name.empty())
         return nullptr;
 
@@ -5389,7 +5393,7 @@ namespace {
 
     Decl *VisitObjCPropertyDecl(const clang::ObjCPropertyDecl *decl,
                                 DeclContext *dc) {
-      auto name = Impl.importName(decl);
+      auto name = Impl.importFullName(decl).getBaseName();
       if (name.empty())
         return nullptr;
 

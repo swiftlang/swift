@@ -722,6 +722,15 @@ public:
   ///
   /// Note that this may result in a name very different from the Clang name,
   /// so it should not be used when referencing Clang symbols.
+  DeclName importFullName(const clang::NamedDecl *D) {
+    bool hasCustomName;
+    return importFullName(D, hasCustomName);
+  }
+
+  /// Imports the full name of the given Clang declaration into Swift.
+  ///
+  /// Note that this may result in a name very different from the Clang name,
+  /// so it should not be used when referencing Clang symbols.
   DeclName importFullName(const clang::NamedDecl *D,
                           bool &hasCustomName);
 

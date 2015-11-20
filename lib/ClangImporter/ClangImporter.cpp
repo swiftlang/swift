@@ -743,8 +743,7 @@ bool ClangImporter::Implementation::importHeader(
 
         if (UseSwiftLookupTables) {
           if (auto named = dyn_cast<clang::NamedDecl>(D)) {
-            bool hasCustomName;
-            if (DeclName name = importFullName(named, hasCustomName))
+            if (DeclName name = importFullName(named))
               BridgingHeaderLookupTable.addEntry(name, named);
           }
         }

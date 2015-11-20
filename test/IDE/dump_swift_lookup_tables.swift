@@ -3,6 +3,8 @@
 
 // CHECK:      Base -> full name mappings:
 // CHECK-NEXT:   Bar --> Bar
+// CHECK-NEXT:   MyInt --> MyInt
+// CHECK-NEXT:   Point --> Point
 // CHECK-NEXT:   SomeStruct --> SomeStruct
 // CHECK-NEXT:   __SNTransposeInPlace --> __SNTransposeInPlace
 // CHECK-NEXT:   makeSomeStruct --> makeSomeStruct(x:y:), makeSomeStruct(x:)
@@ -10,6 +12,10 @@
 // CHECK:      Full name -> entry mappings:
 // CHECK-NEXT:   Bar:
 // CHECK-NEXT:     TU: SNFoo
+// CHECK-NEXT:   MyInt:
+// CHECK-NEXT:     TU: SNIntegerType
+// CHECK-NEXT:   Point:
+// CHECK-NEXT:     TU: SNPoint
 // CHECK-NEXT:   SomeStruct:
 // CHECK-NEXT:     TU: SNSomeStruct
 // CHECK-NEXT:   __SNTransposeInPlace:

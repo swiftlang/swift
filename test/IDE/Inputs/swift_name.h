@@ -13,5 +13,12 @@ struct SNSomeStruct SNMakeSomeStruct(double X, double Y) SWIFT_NAME(makeSomeStru
 
 struct SNSomeStruct SNMakeSomeStructForX(double X) SWIFT_NAME(makeSomeStruct(x:));
 
+// Renaming typedefs.
+typedef int SNIntegerType SWIFT_NAME(MyInt);
+
 // swift_private attribute
 void SNTransposeInPlace(struct SNSomeStruct *value) __attribute__((swift_private));
+
+typedef struct {
+  double x, y, z;
+} SNPoint SWIFT_NAME(Point);
