@@ -435,6 +435,22 @@ bool EscapeAnalysis::ConnectionGraph::mergeFrom(ConnectionGraph *SourceGraph,
   return Changed;
 }
 
+EscapeAnalysis::CGNode *EscapeAnalysis::ConnectionGraph::
+getNode(ValueBase *V, EscapeAnalysis *EA) {
+  if (isa<FunctionRefInst>(V))
+    return nullptr;
+
+  if (!V->hasValue())
+    return nullptr;
+
+  if (!EA->isPointer(V))
+    return nullptr;
+
+  V = skipProjections(V);
+
+  return getOrCreateNode(V);
+}
+
 /// Returns true if \p V is a use of \p Node, i.e. V may (indirectly)
 /// somehow refer to the Node's value.
 /// Use-points are only values which are relevant for lifeness computation,
@@ -483,6 +499,8 @@ struct CGForDotView {
 
   std::vector<Node> Nodes;
 
+  SILFunction *F;
+
   const EscapeAnalysis::ConnectionGraph *OrigGraph;
 
   // The same IDs as the SILPrinter uses.
@@ -493,7 +511,7 @@ struct CGForDotView {
 };
 
 CGForDotView::CGForDotView(const EscapeAnalysis::ConnectionGraph *CG) :
-    OrigGraph(CG) {
+    F(CG->F), OrigGraph(CG) {
   Nodes.resize(CG->Nodes.size());
   llvm::DenseMap<EscapeAnalysis::CGNode *, Node *> Orig2Node;
   int idx = 0;
@@ -639,7 +657,7 @@ namespace llvm {
     DOTGraphTraits(bool isSimple = false) : DefaultDOTGraphTraits(isSimple) {}
 
     static std::string getGraphName(const CGForDotView *Graph) {
-      return "CG for " + Graph->OrigGraph->getFunction()->getName().str();
+      return "CG for " + Graph->F->getName().str();
     }
 
     std::string getNodeLabel(const CGForDotView::Node *Node,
@@ -917,31 +935,13 @@ bool EscapeAnalysis::isPointer(ValueBase *V) {
   return IP;
 }
 
-EscapeAnalysis::CGNode *EscapeAnalysis::getNode(ConnectionGraph *ConGraph,
-                                                ValueBase *V) {
-  if (isa<FunctionRefInst>(V))
-    return nullptr;
-
-  if (!V->hasValue())
-    return nullptr;
-
-  if (!isPointer(V))
-    return nullptr;
-
-  V = skipProjections(V);
-
-  return ConGraph->getOrCreateNode(V);
-}
-
 void EscapeAnalysis::buildConnectionGraphs(FunctionInfo *FInfo) {
   ConnectionGraph *ConGraph = &FInfo->Graph;
-  SILFunction *F = ConGraph->getFunction();
-
   // We use a worklist for iteration to visit the blocks in dominance order.
   llvm::SmallPtrSet<SILBasicBlock*, 32> VisitedBlocks;
   llvm::SmallVector<SILBasicBlock *, 16> WorkList;
-  VisitedBlocks.insert(&*F->begin());
-  WorkList.push_back(&*F->begin());
+  VisitedBlocks.insert(&*ConGraph->F->begin());
+  WorkList.push_back(&*ConGraph->F->begin());
 
   while (!WorkList.empty()) {
     SILBasicBlock *BB = WorkList.pop_back_val();
@@ -957,14 +957,14 @@ void EscapeAnalysis::buildConnectionGraphs(FunctionInfo *FInfo) {
   }
 
   // Second step: create defer-edges for block arguments.
-  for (SILBasicBlock &BB : *F) {
+  for (SILBasicBlock &BB : *ConGraph->F) {
     if (!linkBBArgs(&BB))
       continue;
 
     // Create defer-edges from the block arguments to it's values in the
     // predecessor's terminator instructions.
     for (SILArgument *BBArg : BB.getBBArgs()) {
-      CGNode *ArgNode = getNode(ConGraph, BBArg);
+      CGNode *ArgNode = ConGraph->getNode(BBArg, this);
       if (!ArgNode)
         continue;
 
@@ -977,7 +977,7 @@ void EscapeAnalysis::buildConnectionGraphs(FunctionInfo *FInfo) {
       }
 
       for (SILValue Src : Incoming) {
-        CGNode *SrcArg = getNode(ConGraph, Src);
+        CGNode *SrcArg = ConGraph->getNode(Src, this);
         if (SrcArg) {
           ConGraph->defer(ArgNode, SrcArg);
         } else {
@@ -1025,20 +1025,20 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         // array.uninitialized may have a first argument which is the
         // allocated array buffer. The call is like a struct(buffer)
         // instruction.
-        if (CGNode *BufferNode = getNode(ConGraph, FAS.getArgument(0))) {
-          ConGraph->defer(getNode(ConGraph, I), BufferNode);
+        if (CGNode *BufferNode = ConGraph->getNode(FAS.getArgument(0), this)) {
+          ConGraph->defer(ConGraph->getNode(I, this), BufferNode);
         }
         return;
       case ArrayCallKind::kGetArrayOwner:
-        if (CGNode *BufferNode = getNode(ConGraph, ASC.getSelf())) {
-          ConGraph->defer(getNode(ConGraph, I), BufferNode);
+        if (CGNode *BufferNode = ConGraph->getNode(ASC.getSelf(), this)) {
+          ConGraph->defer(ConGraph->getNode(I, this), BufferNode);
         }
         return;
       case ArrayCallKind::kGetElement:
         // This is like a load from a ref_element_addr.
         if (FAS.getArgument(0).getType().isAddress()) {
-          if (CGNode *AddrNode = getNode(ConGraph, ASC.getSelf())) {
-            if (CGNode *DestNode = getNode(ConGraph, FAS.getArgument(0))) {
+          if (CGNode *AddrNode = ConGraph->getNode(ASC.getSelf(), this)) {
+            if (CGNode *DestNode = ConGraph->getNode(FAS.getArgument(0), this)) {
               // One content node for going from the array buffer pointer to
               // the element address (like ref_element_addr).
               CGNode *RefElement = ConGraph->getContentNode(AddrNode);
@@ -1054,8 +1054,8 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         break;
       case ArrayCallKind::kGetElementAddress:
         // This is like a ref_element_addr.
-        if (CGNode *SelfNode = getNode(ConGraph, ASC.getSelf())) {
-          ConGraph->defer(getNode(ConGraph, I),
+        if (CGNode *SelfNode = ConGraph->getNode(ASC.getSelf(), this)) {
+          ConGraph->defer(ConGraph->getNode(I, this),
                           ConGraph->getContentNode(SelfNode));
         }
         return;
@@ -1104,7 +1104,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case ValueKind::ReleaseValueInst:
     case ValueKind::UnownedReleaseInst: {
       SILValue OpV = I->getOperand(0);
-      if (CGNode *AddrNode = getNode(ConGraph, OpV)) {
+      if (CGNode *AddrNode = ConGraph->getNode(OpV, this)) {
         // A release instruction may deallocate the pointer operand. This may
         // capture any content of the released object, but not the pointer to
         // the object itself (because it will be a dangling pointer after
@@ -1123,10 +1123,10 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     // We treat ref_element_addr like a load (see NodeType::Content).
     case ValueKind::RefElementAddrInst:
       if (isPointer(I)) {
-        CGNode *AddrNode = getNode(ConGraph, I->getOperand(0));
+        CGNode *AddrNode = ConGraph->getNode(I->getOperand(0), this);
         if (!AddrNode) {
           // A load from an address we don't handle -> be conservative.
-          CGNode *ValueNode = getNode(ConGraph, I);
+          CGNode *ValueNode = ConGraph->getNode(I, this);
           ConGraph->setEscapesGlobal(ValueNode);
           return;
         }
@@ -1138,8 +1138,8 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       return;
     case ValueKind::StoreInst:
     case ValueKind::StoreWeakInst:
-      if (CGNode *ValueNode = getNode(ConGraph, I->getOperand(StoreInst::Src))) {
-        CGNode *AddrNode = getNode(ConGraph, I->getOperand(StoreInst::Dest));
+      if (CGNode *ValueNode = ConGraph->getNode(I->getOperand(StoreInst::Src), this)) {
+        CGNode *AddrNode = ConGraph->getNode(I->getOperand(StoreInst::Dest), this);
         if (AddrNode) {
           // Create a defer-edge from the content to the stored value.
           CGNode *PointsTo = ConGraph->getContentNode(AddrNode);
@@ -1154,10 +1154,10 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       // The result of a partial_apply is a thick function which stores the
       // boxed partial applied arguments. We create defer-edges from the
       // partial_apply values to the arguments.
-      CGNode *ResultNode = getNode(ConGraph, I);
+      CGNode *ResultNode = ConGraph->getNode(I, this);
       assert(ResultNode && "thick functions must have a CG node");
       for (const Operand &Op : I->getAllOperands()) {
-        if (CGNode *ArgNode = getNode(ConGraph, Op.get())) {
+        if (CGNode *ArgNode = ConGraph->getNode(Op.get(), this)) {
           ConGraph->defer(ResultNode, ArgNode);
         }
       }
@@ -1170,7 +1170,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       // resulting aggregate value.
       CGNode *ResultNode = nullptr;
       for (const Operand &Op : I->getAllOperands()) {
-        if (CGNode *FieldNode = getNode(ConGraph, Op.get())) {
+        if (CGNode *FieldNode = ConGraph->getNode(Op.get(), this)) {
           if (!ResultNode) {
             // A small optimization to reduce the graph size: we re-use the
             // first field node as result node.
@@ -1186,12 +1186,12 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     }
     case ValueKind::UncheckedRefCastInst:
       // A cast is almost like a projection.
-      if (CGNode *OpNode = getNode(ConGraph, I->getOperand(0))) {
+      if (CGNode *OpNode = ConGraph->getNode(I->getOperand(0), this)) {
         ConGraph->setNode(I, OpNode);
       }
       break;
     case ValueKind::ReturnInst:
-      if (CGNode *ValueNd = getNode(ConGraph, cast<ReturnInst>(I)->getOperand())) {
+      if (CGNode *ValueNd = ConGraph->getNode(cast<ReturnInst>(I)->getOperand(), this)) {
         ConGraph->defer(ConGraph->getReturnNode(),
                                  ValueNd);
       }
@@ -1289,13 +1289,13 @@ void EscapeAnalysis::recompute() {
       // should alwasy be the case, but who knows?
       if (Iteration >= MaxGraphMerges) {
         DEBUG(llvm::dbgs() << "  finalize " <<
-              FInfo->Graph.getFunction()->getName() << '\n');
+              FInfo->Graph.F->getName() << '\n');
         finalizeGraphsConservatively(FInfo);
         continue;
       }
 
       DEBUG(llvm::dbgs() << "  merge into " <<
-            FInfo->Graph.getFunction()->getName() << '\n');
+            FInfo->Graph.F->getName() << '\n');
 
       // Merge the callee-graphs into the graph of the current function.
       if (!mergeAllCallees(FInfo, CG))
@@ -1310,7 +1310,7 @@ void EscapeAnalysis::recompute() {
         continue;
 
       // Trigger another graph merging action in all caller functions.
-      auto &CallerSet = CG.getCallerEdges(FInfo->Graph.getFunction());
+      auto &CallerSet = CG.getCallerEdges(FInfo->Graph.F);
       for (CallGraphEdge *CallerEdge : CallerSet) {
         if (!CallerEdge->canCallUnknownFunction()) {
           SILFunction *Caller = CallerEdge->getInstruction()->getFunction();
@@ -1349,7 +1349,7 @@ bool EscapeAnalysis::mergeCalleeGraph(FullApplySite FAS,
   CGNodeMap Callee2CallerMapping;
 
   // First map the callee parameters to the caller arguments.
-  SILFunction *Callee = CalleeGraph->getFunction();
+  SILFunction *Callee = CalleeGraph->F;
   unsigned numCallerArgs = FAS.getNumArguments();
   unsigned numCalleeArgs = Callee->getArguments().size();
   assert(numCalleeArgs >= numCallerArgs);
@@ -1361,8 +1361,8 @@ bool EscapeAnalysis::mergeCalleeGraph(FullApplySite FAS,
     // of the apply site.
     SILValue CallerArg = (Idx < numCallerArgs ? FAS.getArgument(Idx) :
                           FAS.getCallee());
-    if (CGNode *CalleeNd = getNode(CalleeGraph, Callee->getArgument(Idx))) {
-      Callee2CallerMapping.add(CalleeNd, getNode(CallerGraph, CallerArg));
+    if (CGNode *CalleeNd = CalleeGraph->getNode(Callee->getArgument(Idx), this)) {
+      Callee2CallerMapping.add(CalleeNd, CallerGraph->getNode(CallerArg, this));
     }
   }
 
@@ -1374,7 +1374,7 @@ bool EscapeAnalysis::mergeCalleeGraph(FullApplySite FAS,
     } else {
       CallerReturnVal = FAS.getInstruction();
     }
-    CGNode *CallerRetNd = getNode(CallerGraph, CallerReturnVal);
+    CGNode *CallerRetNd = CallerGraph->getNode(CallerReturnVal, this);
     Callee2CallerMapping.add(RetNd, CallerRetNd);
   }
   return CallerGraph->mergeFrom(CalleeGraph, Callee2CallerMapping);
@@ -1385,10 +1385,9 @@ bool EscapeAnalysis::mergeSummaryGraph(ConnectionGraph *SummaryGraph,
 
   // Make a 1-to-1 mapping of all arguments and the return value.
   CGNodeMap Mapping;
-  SILFunction *F = Graph->getFunction();
-  for (SILArgument *Arg : F->getArguments()) {
-    if (CGNode *ArgNd = getNode(Graph, Arg)) {
-      Mapping.add(ArgNd, getNode(SummaryGraph, Arg));
+  for (SILArgument *Arg : Graph->F->getArguments()) {
+    if (CGNode *ArgNd = Graph->getNode(Arg, this)) {
+      Mapping.add(ArgNd, SummaryGraph->getNode(Arg, this));
     }
   }
   if (CGNode *RetNd = Graph->getReturnNodeOrNull()) {

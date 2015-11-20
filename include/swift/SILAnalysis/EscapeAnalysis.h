@@ -362,6 +362,13 @@ public:
     /// The allocator for nodes.
     llvm::SpecificBumpPtrAllocator<CGNode> NodeAllocator;
 
+    /// Constructs a connection graph for a function.
+    ConnectionGraph(SILFunction *F) : F(F) {
+    }
+
+    /// Removes all nodes from the graph.
+    void clear();
+    
     /// Allocates a node of a given type.
     CGNode *allocNode(ValueBase *V, NodeType Type) {
       CGNode *Node = new (NodeAllocator.Allocate()) CGNode(V, Type);
@@ -405,16 +412,6 @@ public:
       }
     }
 
-  public:
-    /// Constructs a connection graph for a function.
-    ConnectionGraph(SILFunction *F) : F(F) {
-    }
-
-    /// Removes all nodes from the graph.
-    void clear();
-
-    SILFunction *getFunction() const { return F; }
-    
     /// Gets or creates a node for a value \p V.
     /// If V is a projection(-path) then the base of the projection(-path) is
     /// taken. This means the node is always created for the "outermost" value
@@ -495,6 +492,20 @@ public:
     /// Propagates the escape states through the graph.
     void propagateEscapeStates();
 
+  public:
+
+    /// Gets or creates a node for a value \p V.
+    /// If V is a projection(-path) then the base of the projection(-path) is
+    /// taken. This means the node is always created for the "outermost" value
+    /// where V is contained.
+    /// Returns null, if V is not a "pointer".
+    CGNode *getNode(ValueBase *V, EscapeAnalysis *EA);
+
+    /// Gets or creates a node for a SILValue (same as above).
+    CGNode *getNode(SILValue V, EscapeAnalysis *EA) {
+      return getNode(V.getDef(), EA);
+    }
+
     /// Returns the number of use-points of a node.
     int getNumUsePoints(CGNode *Node) {
       assert(!Node->escapes() &&
@@ -536,6 +547,7 @@ public:
     void verifyStructure() const;
 
     friend struct ::CGForDotView;
+    friend class EscapeAnalysis;
   };
 
 private:
@@ -599,21 +611,9 @@ private:
   /// See EscapeAnalysis::NodeType::Value.
   bool isPointer(ValueBase *V);
 
-  /// Gets or creates a node for a value \p V.
-  /// If V is a projection(-path) then the base of the projection(-path) is
-  /// taken. This means the node is always created for the "outermost" value
-  /// where V is contained.
-  /// Returns null, if V is not a "pointer".
-  CGNode *getNode(ConnectionGraph *ConGraph, ValueBase *V);
-
-  /// Gets or creates a node for a SILValue (same as above).
-  CGNode *getNode(ConnectionGraph *ConGraph, SILValue V) {
-    return getNode(ConGraph, V.getDef());
-  }
-
   /// If V is a pointer, set it to global escaping.
   void setEscapesGlobal(ConnectionGraph *ConGraph, SILValue V) {
-    if (CGNode *Node = getNode(ConGraph, V))
+    if (CGNode *Node = ConGraph->getNode(V, this))
       ConGraph->setEscapesGlobal(Node);
   }
 

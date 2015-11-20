@@ -45,9 +45,11 @@ class StackPromoter {
 
   // Some analysis we need.
 
+  SILFunction *F;
   EscapeAnalysis::ConnectionGraph *ConGraph;
   DominanceInfo *DT;
   PostDominanceInfo *PDT;
+  EscapeAnalysis *EA;
 
   // Pseudo-functions for (de-)allocating array buffers on the stack.
 
@@ -138,9 +140,10 @@ class StackPromoter {
 
 public:
 
-  StackPromoter(EscapeAnalysis::ConnectionGraph *ConGraph,
-                DominanceInfo *DT, PostDominanceInfo *PDT) :
-    ConGraph(ConGraph), DT(DT), PDT(PDT) { }
+  StackPromoter(SILFunction *F, EscapeAnalysis::ConnectionGraph *ConGraph,
+                DominanceInfo *DT, PostDominanceInfo *PDT,
+                EscapeAnalysis *EA) :
+    F(F), ConGraph(ConGraph), DT(DT), PDT(PDT), EA(EA) { }
 
   /// What did the optimization change?
   enum class ChangeState {
@@ -175,7 +178,7 @@ static bool isPromotableAllocInst(SILInstruction *I) {
 
 StackPromoter::ChangeState StackPromoter::promote() {
   // Search the whole function for stack promotable allocations.
-  for (SILBasicBlock &BB : *ConGraph->getFunction()) {
+  for (SILBasicBlock &BB : *F) {
     for (auto Iter = BB.begin(); Iter != BB.end();) {
       // The allocaiton instruction may be moved, so increment Iter prior to
       // doing the optimization.
@@ -286,7 +289,7 @@ bool StackPromoter::canPromoteAlloc(SILInstruction *AI,
                                     SILInstruction *&DeallocInsertionPoint) {
   AllocInsertionPoint = nullptr;
   DeallocInsertionPoint = nullptr;
-  auto *Node = ConGraph->getNodeOrNull(AI);
+  auto *Node = ConGraph->getNode(AI, EA);
   if (!Node)
     return false;
 
@@ -467,7 +470,7 @@ private:
 
     SILFunction *F = getFunction();
     if (auto *ConGraph = EA->getConnectionGraph(F)) {
-      StackPromoter promoter(ConGraph, DA->get(F), PDA->get(F));
+      StackPromoter promoter(F, ConGraph, DA->get(F), PDA->get(F), EA);
       switch (promoter.promote()) {
         case StackPromoter::ChangeState::None:
           break;
