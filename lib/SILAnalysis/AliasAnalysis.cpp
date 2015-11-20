@@ -344,6 +344,83 @@ AliasAnalysis::aliasAddressProjection(SILValue V1, SILValue V2,
 //                                TBAA
 //===----------------------------------------------------------------------===//
 
+/// Is this an instruction that can act as a type "oracle" allowing typed access
+/// TBAA to know what the real types associated with the SILInstruction are.
+static bool isTypedAccessOracle(SILInstruction *I) {
+  switch (I->getKind()) {
+  case ValueKind::RefElementAddrInst:
+  case ValueKind::StructElementAddrInst:
+  case ValueKind::TupleElementAddrInst:
+  case ValueKind::UncheckedTakeEnumDataAddrInst:
+  case ValueKind::LoadInst:
+  case ValueKind::StoreInst:
+  case ValueKind::AllocStackInst:
+  case ValueKind::AllocBoxInst:
+  case ValueKind::DeallocStackInst:
+  case ValueKind::DeallocBoxInst:
+    return true;
+  default:
+    return false;
+  }
+}
+
+/// Return true if the given value is an instruction or block argument that is
+/// known to produce a nonaliasing address with respect to TBAA rules (i.e. the
+/// pointer is not type punned). The only way to produce an aliasing typed
+/// address is with pointer_to_address (via UnsafePointer) or
+/// unchecked_addr_cast (via Builtin.reinterpretCast). Consequently, if the
+/// given value is directly derived from a memory location, it cannot
+/// alias. Call arguments also cannot alias because they must follow @in, @out,
+/// @inout, or @in_guaranteed conventions.
+///
+/// FIXME: pointer_to_address should contain a flag that indicates whether the
+/// address is aliasing. Currently, we aggressively assume that
+/// pointer-to-address is never used for type punning, which is not yet
+/// clearly specified by our UnsafePointer API.
+static bool isAddressRootTBAASafe(SILValue V) {
+  if (auto *Arg = dyn_cast<SILArgument>(V))
+    return Arg->isFunctionArg();
+
+  switch (V->getKind()) {
+  default:
+    return false;
+  case ValueKind::AllocStackInst:
+  case ValueKind::AllocBoxInst:
+  case ValueKind::PointerToAddressInst:
+    return true;
+  }
+}
+
+/// Look at the origin/user ValueBase of V to see if any of them are
+/// TypedAccessOracle which enable one to ascertain via undefined behavior the
+/// "true" type of the instruction.
+static SILType findTypedAccessType(SILValue V) {
+  // First look at the origin of V and see if we have any instruction that is a
+  // typed oracle.
+  if (auto *I = dyn_cast<SILInstruction>(V))
+    if (isTypedAccessOracle(I))
+      return V.getType();
+
+  // Then look at any uses of V that potentially could act as a typed access
+  // oracle.
+  for (auto Use : V.getUses())
+    if (isTypedAccessOracle(Use->getUser()))
+      return V.getType();
+
+  // Otherwise return an empty SILType
+  return SILType();
+}
+
+SILType swift::computeTBAAType(SILValue V) {
+  if (isAddressRootTBAASafe(getUnderlyingObject(V)))
+    return findTypedAccessType(V);
+
+  // FIXME: add ref_element_addr check here. TBAA says that objects cannot be
+  // type punned.
+
+  return SILType();
+}
+
 static bool typedAccessTBAABuiltinTypesMayAlias(SILType LTy, SILType RTy,
                                                 SILModule &Mod) {
   assert(LTy != RTy && "LTy should have already been shown to not equal RTy to "
