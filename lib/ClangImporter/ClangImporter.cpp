@@ -702,6 +702,30 @@ bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework) {
   return false;
 }
 
+void ClangImporter::Implementation::addEntryToLookupTable(
+       SwiftLookupTable &table, clang::NamedDecl *named)
+{
+  // If we have a name to import as, add this entry to the table.
+  if (DeclName name = importFullName(named)) {
+    clang::DeclContext *effectiveContext
+      = named->getDeclContext()->getRedeclContext() ->getPrimaryContext();
+
+    table.addEntry(name, named, effectiveContext);
+  }
+
+  // Walk the members of any context that can have nested members.
+  if (isa<clang::TagDecl>(named) ||
+      isa<clang::ObjCInterfaceDecl>(named) ||
+      isa<clang::ObjCProtocolDecl>(named) ||
+      isa<clang::ObjCCategoryDecl>(named)) {
+    clang::DeclContext *dc = cast<clang::DeclContext>(named);
+    for (auto member : dc->decls()) {
+      if (auto namedMember = dyn_cast<clang::NamedDecl>(member))
+        addEntryToLookupTable(table, namedMember);
+    }
+  }
+}
+
 bool ClangImporter::Implementation::importHeader(
     Module *adapter, StringRef headerName, SourceLoc diagLoc,
     bool trackParsedSymbols,
@@ -743,8 +767,7 @@ bool ClangImporter::Implementation::importHeader(
 
         if (UseSwiftLookupTables) {
           if (auto named = dyn_cast<clang::NamedDecl>(D)) {
-            if (DeclName name = importFullName(named))
-              BridgingHeaderLookupTable.addEntry(name, named);
+            addEntryToLookupTable(BridgingHeaderLookupTable, named);
           }
         }
       }

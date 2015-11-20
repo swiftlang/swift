@@ -28,7 +28,7 @@ typedef int SNIntegerType SWIFT_NAME(MyInt);
 
 // Renaming enumerations.
 SWIFT_ENUM(unsigned char, SNColorChoice) {
-  SNColorRed,
+  SNColorRed SWIFT_NAME(Rouge),
   SNColorGreen,
   SNColorBlue
 };

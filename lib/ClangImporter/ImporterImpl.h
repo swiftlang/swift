@@ -625,6 +625,10 @@ public:
   void addBridgeHeaderTopLevelDecls(clang::Decl *D);
   bool shouldIgnoreBridgeHeaderTopLevelDecl(clang::Decl *D);
 
+  /// Add the given named declaration as an entry to the given Swift name
+  /// lookup table, including any of its child entries.
+  void addEntryToLookupTable(SwiftLookupTable &table, clang::NamedDecl *named);
+
 public:
   void registerExternalDecl(Decl *D) {
     RegisteredExternalDecls.push_back(D);

@@ -71,7 +71,9 @@ public:
   ///
   /// \param name The Swift name of the entry.
   /// \param decl The Clang declaration to add.
-  void addEntry(DeclName name, clang::NamedDecl *decl);
+  /// \param effectiveContext The effective context in which name lookup occurs.
+  void addEntry(DeclName name, clang::NamedDecl *decl,
+                clang::DeclContext *effectiveContext);
 
   /// Lookup the set of declarations with the given base name.
   ///

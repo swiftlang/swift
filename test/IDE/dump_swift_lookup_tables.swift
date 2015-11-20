@@ -5,10 +5,16 @@
 // CHECK-NEXT:   Bar --> Bar
 // CHECK-NEXT:   MyInt --> MyInt
 // CHECK-NEXT:   Point --> Point
+// CHECK-NEXT:   Rouge --> Rouge
+// CHECK-NEXT:   SNColorBlue --> SNColorBlue
 // CHECK-NEXT:   SNColorChoice --> SNColorChoice
+// CHECK-NEXT:   SNColorGreen --> SNColorGreen
 // CHECK-NEXT:   SomeStruct --> SomeStruct
 // CHECK-NEXT:   __SNTransposeInPlace --> __SNTransposeInPlace
 // CHECK-NEXT:   makeSomeStruct --> makeSomeStruct(x:y:), makeSomeStruct(x:)
+// CHECK-NEXT:   x --> x
+// CHECK-NEXT:   y --> y
+// CHECK-NEXT:   z --> z
 
 // CHECK:      Full name -> entry mappings:
 // CHECK-NEXT:   Bar:
@@ -17,8 +23,14 @@
 // CHECK-NEXT:     TU: SNIntegerType
 // CHECK-NEXT:   Point:
 // CHECK-NEXT:     TU: SNPoint
+// CHECK-NEXT:   Rouge:
+// CHECK-NEXT:     TU: SNColorRed
+// CHECK-NEXT:   SNColorBlue:
+// CHECK-NEXT:     TU: SNColorBlue
 // CHECK-NEXT:   SNColorChoice:
-// CHECK-NEXT:     TU: SNColorChoice, SNColorChoice{{$}}
+// CHECK-NEXT:     TU: SNColorChoice, SNColorChoice
+// CHECK-NEXT:   SNColorGreen:
+// CHECK-NEXT:     TU: SNColorGreen
 // CHECK-NEXT:   SomeStruct:
 // CHECK-NEXT:     TU: SNSomeStruct
 // CHECK-NEXT:   __SNTransposeInPlace:
@@ -27,3 +39,10 @@
 // CHECK-NEXT:     TU: SNMakeSomeStructForX
 // CHECK-NEXT:   makeSomeStruct(x:y:):
 // CHECK-NEXT:     TU: SNMakeSomeStruct
+// CHECK-NEXT:   x:
+// CHECK-NEXT:     SNSomeStruct: X
+// CHECK-NEXT:     SNPoint: x
+// CHECK-NEXT:   y:
+// CHECK-NEXT:     SNPoint: y
+// CHECK-NEXT:   z:
+// CHECK-NEXT:     SNPoint: z

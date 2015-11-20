@@ -51,7 +51,8 @@ static bool matchesExistingDecl(clang::Decl *decl, clang::Decl *existingDecl) {
   return false;
 }
 
-void SwiftLookupTable::addEntry(DeclName name, clang::NamedDecl *decl) {
+void SwiftLookupTable::addEntry(DeclName name, clang::NamedDecl *decl,
+                                clang::DeclContext *effectiveContext) {
   clang::DeclContext *context
     = decl->getDeclContext()->getRedeclContext()->getPrimaryContext();
 
@@ -89,6 +90,22 @@ void SwiftLookupTable::addEntry(DeclName name, clang::NamedDecl *decl) {
   newEntry.Context = context;
   newEntry.Decls.push_back(decl);
   fullEntries.push_back(newEntry);
+}
+
+static void printName(clang::NamedDecl *named, llvm::raw_ostream &out) {
+  // If there is a name, print it.
+  if (!named->getDeclName().isEmpty()) {
+    named->printName(out);
+    return;
+  }
+
+  // If this is an anonymous tag declaration with a typedef name, use that.
+  if (auto tag = dyn_cast<clang::TagDecl>(named)) {
+    if (auto typedefName = tag->getTypedefNameForAnonDecl()) {
+      printName(typedefName, out);
+      return;
+    }
+  }
 }
 
 void SwiftLookupTable::dump() const {
@@ -134,8 +151,7 @@ void SwiftLookupTable::dump() const {
       if (fullEntry.Context->isTranslationUnit()) {
         llvm::errs() << "TU";
       } else if (auto named = dyn_cast<clang::NamedDecl>(fullEntry.Context)) {
-        named->printName(llvm::errs());
-        llvm::errs();
+        printName(named, llvm::errs());
       } else {
         llvm::errs() << "<unknown>";
       }
