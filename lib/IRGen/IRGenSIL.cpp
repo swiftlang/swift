@@ -1568,6 +1568,7 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
     if (IGM.DebugInfo) {
       // Set the debug info location for I, if applicable.
       SILLocation ILoc = I.getLoc();
+      auto DS = I.getDebugScope();
       // Handle cleanup locations.
       if (ILoc.getKind() == SILLocation::CleanupKind) {
         // Cleanup locations point to the decl of the the value that
@@ -1591,13 +1592,13 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
         if (!KeepCurrentLocation) {
           assert(BB->getTerminator());
           ILoc = BB->getTerminator()->getLoc();
+          DS = BB->getTerminator()->getDebugScope();
         }
       } else if (InCleanupBlock) {
         KeepCurrentLocation = false;
         InCleanupBlock = false;
       }
 
-      auto DS = I.getDebugScope();
       assert((!DS || (DS->SILFn == CurSILFn || DS->InlinedCallSite)) &&
              "insn was not inlined, but belongs to a different function");
 
@@ -1612,7 +1613,8 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
 
       // Ignore scope-less instructions and have IRBuilder reuse the
       // previous location and scope.
-      if (DS && !KeepCurrentLocation)
+      if (DS && !KeepCurrentLocation &&
+          !(ILoc.isInPrologue() && ILoc.getKind() == SILLocation::CleanupKind))
         IGM.DebugInfo->setCurrentLoc(Builder, DS, ILoc);
 
       // Function argument handling.

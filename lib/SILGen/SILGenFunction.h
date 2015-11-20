@@ -502,9 +502,9 @@ public:
     DebugScopeStack.pop_back();
     if (DebugScopeStack.size())
       B.setCurrentDebugScope(DebugScopeStack.back());
-    else {
-      B.setCurrentDebugScope(F.getDebugScope());
-    }
+    // Don't reset the debug scope after leaving the outermost scope,
+    // because the debugger is not expecting the function epilogue to
+    // be in a different scope.
   }
 
   //===--------------------------------------------------------------------===//
