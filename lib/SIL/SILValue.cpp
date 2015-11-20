@@ -206,6 +206,7 @@ void Operand::hoistAddressProjections(SILInstruction *InsertBefore,
                                       DominanceInfo *DomTree) {
   SILValue V = get();
   SILInstruction *Prev = nullptr;
+  auto *InsertPt = InsertBefore;
   while (true) {
     SILValue Incoming = stripSinglePredecessorArgs(V);
 
@@ -215,11 +216,13 @@ void Operand::hoistAddressProjections(SILInstruction *InsertBefore,
         // If we are the operand itself set the operand to the incoming
         // arugment.
         set(Incoming);
+        V = Incoming;
       } else {
         // Otherwise, set the previous projections operand to the incoming
         // argument.
         assert(Prev && "Must have seen a projection");
         Prev->setOperand(0, Incoming);
+        V = Incoming;
       }
     }
 
@@ -235,7 +238,8 @@ void Operand::hoistAddressProjections(SILInstruction *InsertBefore,
 
       // Move the current projection and memorize it for the next iteration.
       Prev = Inst;
-      Inst->moveBefore(InsertBefore);
+      Inst->moveBefore(InsertPt);
+      InsertPt = Inst;
       V = Inst->getOperand(0);
       continue;
     }
