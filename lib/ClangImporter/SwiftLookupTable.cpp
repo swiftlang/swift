@@ -41,6 +41,16 @@ bool SwiftLookupTable::matchesContext(clang::DeclContext *foundContext,
   return false;
 }
 
+/// Determine whether the new declarations matches an existing declaration.
+static bool matchesExistingDecl(clang::Decl *decl, clang::Decl *existingDecl) {
+  // If the canonical declarations are equivalent, we have a match.
+  if (decl->getCanonicalDecl() == existingDecl->getCanonicalDecl()) {
+    return true;
+  }
+
+  return false;
+}
+
 void SwiftLookupTable::addEntry(DeclName name, clang::NamedDecl *decl) {
   clang::DeclContext *context
     = decl->getDeclContext()->getRedeclContext()->getPrimaryContext();
@@ -64,6 +74,11 @@ void SwiftLookupTable::addEntry(DeclName name, clang::NamedDecl *decl) {
   auto &fullEntries = knownFull->second;
   for (auto &fullEntry : fullEntries) {
     if (fullEntry.Context == context) {
+      // Check whether this entry matches any existing entry.
+      for (auto existingDecl : fullEntry.Decls) {
+        if (matchesExistingDecl(decl, existingDecl)) return;
+      }
+
       fullEntry.Decls.push_back(decl);
       return;
     }
