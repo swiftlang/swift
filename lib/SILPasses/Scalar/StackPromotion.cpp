@@ -281,17 +281,6 @@ SILFunction *StackPromoter::getBufferDeallocFunc(SILFunction *OrigFunc,
   return BufferDeallocFunc;
 }
 
-
-
-#ifndef NDEBUG
-// Just for debugging.
-static void dumpUsePoints(const llvm::SmallPtrSetImpl<ValueBase *> &UsePoints) {
-  for (ValueBase *V : UsePoints) {
-    V->dump();
-  }
-}
-#endif
-
 bool StackPromoter::canPromoteAlloc(SILInstruction *AI,
                                     SILInstruction *&AllocInsertionPoint,
                                     SILInstruction *&DeallocInsertionPoint) {
@@ -310,9 +299,7 @@ bool StackPromoter::canPromoteAlloc(SILInstruction *AI,
 
   // Get all interesting uses of the object (e.g. release instructions). This
   // includes uses of objects where the allocation is stored to.
-  llvm::SmallPtrSet<ValueBase *, 32> UsePoints;
-  ConGraph->getUsePoints(UsePoints, Node);
-  int NumUsePointsToFind = UsePoints.size();
+  int NumUsePointsToFind = ConGraph->getNumUsePoints(Node);
   if (NumUsePointsToFind == 0) {
     // There should always be at least one release for an allocated object.
     // But in case all pathes from this block end in unreachable then the
@@ -320,7 +307,6 @@ bool StackPromoter::canPromoteAlloc(SILInstruction *AI,
     // case.
     return false;
   }
-  DEBUG(dumpUsePoints(UsePoints));
 
   // In the following we check two requirements for stack promotion:
   // 1) Are all uses in the same control region as the alloc? E.g. if the
@@ -351,7 +337,7 @@ bool StackPromoter::canPromoteAlloc(SILInstruction *AI,
     } else {
       // Track all uses in the block arguments.
       for (SILArgument *BBArg : BB->getBBArgs()) {
-        if (UsePoints.count(BBArg) != 0)
+        if (ConGraph->isUsePoint(BBArg, Node))
           NumUsePointsToFind--;
       }
       // Make sure that the EndBlock is not inside a loop (which does not
@@ -413,7 +399,7 @@ bool StackPromoter::canPromoteAlloc(SILInstruction *AI,
         StackDepth--;
       }
       // Track a use.
-      if (UsePoints.count(&I) != 0)
+      if (ConGraph->isUsePoint(&I, Node) != 0)
         NumUsePointsToFind--;
     }
     if (WorkList.empty()) {

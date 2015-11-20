@@ -353,8 +353,8 @@ public:
     /// NodeType::Return.
     CGNode *ReturnNode = nullptr;
 
-    /// Use points for CGNode::UsePoints.
-    llvm::SmallVector<ValueBase *, 32> UsePoints;
+    /// Mapping of use points to bit indices in CGNode::UsePoints.
+    llvm::DenseMap<ValueBase *, int> UsePoints;
 
     /// True if the CGNode::UsePoints are computed.
     bool UsePointsComputed = false;
@@ -460,7 +460,8 @@ public:
         return -1;
 
       int Idx = (int)UsePoints.size();
-      UsePoints.push_back(V);
+      assert(UsePoints.count(V) == 0 && "value is already a use-point");
+      UsePoints[V] = Idx;
       Node->setUsePointBit(Idx);
       return Idx;
     }
@@ -487,20 +488,29 @@ public:
       return EdgeAdded;
     }
 
-    /// Computes the use point information.
-    void computeUsePoints();
-
-    /// Gets the arguments/instructions where the node's value is used.
-    /// It only includes values which are relevant for lifeness computation,
-    /// e.g. release or apply instructions.
-    void getUsePoints(llvm::SmallPtrSetImpl<ValueBase *> &Values, CGNode *Node);
-
     /// Merges the \p SourceGraph into this graph. The \p Mapping contains the
     /// initial node mapping of the nodes to start the merge.
     bool mergeFrom(ConnectionGraph *SourceGraph, CGNodeMap &Mapping);
 
     /// Propagates the escape states through the graph.
     void propagateEscapeStates();
+
+    /// Returns the number of use-points of a node.
+    int getNumUsePoints(CGNode *Node) {
+      assert(!Node->escapes() &&
+             "Use points are only valid for non-escaping nodes");
+      computeUsePoints();
+      return Node->UsePoints.count();
+    }
+
+    /// Returns true if \p V is a use of \p Node, i.e. V may (indirectly)
+    /// somehow refer to the Node's value.
+    /// Use-points are only values which are relevant for lifeness computation,
+    /// e.g. release or apply instructions.
+    bool isUsePoint(ValueBase *V, CGNode *Node);
+
+    /// Computes the use point information.
+    void computeUsePoints();
 
     /// Debug print the graph.
     void print(llvm::raw_ostream &OS) const;

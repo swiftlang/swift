@@ -347,18 +347,6 @@ void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
   UsePointsComputed = true;
 }
 
-void EscapeAnalysis::ConnectionGraph::
-getUsePoints(llvm::SmallPtrSetImpl<ValueBase *> &Values, CGNode *Node) {
-  assert(!Node->escapes() && "Use points are only valid for non-escaping nodes");
-
-  computeUsePoints();
-
-  for (unsigned VIdx = Node->UsePoints.find_first(); VIdx != -1u;
-       VIdx = Node->UsePoints.find_next(VIdx)) {
-    Values.insert(UsePoints[VIdx]);
-  }
-}
-
 bool EscapeAnalysis::ConnectionGraph::mergeFrom(ConnectionGraph *SourceGraph,
                                                 CGNodeMap &Mapping) {
   // The main point of the merging algorithm is to map each content node in the
@@ -445,6 +433,23 @@ bool EscapeAnalysis::ConnectionGraph::mergeFrom(ConnectionGraph *SourceGraph,
     WorkList.clear();
   }
   return Changed;
+}
+
+/// Returns true if \p V is a use of \p Node, i.e. V may (indirectly)
+/// somehow refer to the Node's value.
+/// Use-points are only values which are relevant for lifeness computation,
+/// e.g. release or apply instructions.
+bool EscapeAnalysis::ConnectionGraph::isUsePoint(ValueBase *V, CGNode *Node) {
+  assert(Node->getEscapeState() < EscapeState::Global &&
+         "Use points are only valid for non-escaping nodes");
+  computeUsePoints();
+  auto Iter = UsePoints.find(V);
+  if (Iter == UsePoints.end())
+    return false;
+  int Idx = Iter->second;
+  if (Idx >= (int)Node->UsePoints.size())
+    return false;
+  return Node->UsePoints.test(Idx);
 }
 
 
@@ -744,6 +749,11 @@ void EscapeAnalysis::ConnectionGraph::print(llvm::raw_ostream &OS) const {
   }
   sortNodes(SortedNodes);
 
+  llvm::DenseMap<int, ValueBase *> Idx2UsePoint;
+  for (auto Iter : UsePoints) {
+    Idx2UsePoint[Iter.second] = Iter.first;
+  }
+
   for (CGNode *Nd : SortedNodes) {
     OS << "  " << Nd->getTypeStr() << ' ' << NodeStr(Nd) << " Esc: ";
     switch (Nd->getEscapeState()) {
@@ -751,7 +761,7 @@ void EscapeAnalysis::ConnectionGraph::print(llvm::raw_ostream &OS) const {
         const char *Separator = "";
         for (unsigned VIdx = Nd->UsePoints.find_first(); VIdx != -1u;
              VIdx = Nd->UsePoints.find_next(VIdx)) {
-          ValueBase *V = UsePoints[VIdx];
+          ValueBase *V = Idx2UsePoint[VIdx];
           OS << Separator << '%' << InstToIDMap[V];
           Separator = ",";
         }
