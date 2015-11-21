@@ -148,7 +148,8 @@ static void addCommonFrontendArgs(const ToolChain &TC,
     arguments.push_back("-color-diagnostics");
 }
 
-std::pair<const char *, llvm::opt::ArgStringList>
+
+ToolChain::InvocationInfo
 ToolChain::constructInvocation(const CompileJobAction &job,
                                const JobContext &context) const {
   ArgStringList Arguments;
@@ -352,10 +353,10 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   if (context.OI.CompilerMode == OutputInfo::Mode::UpdateCode)
     program = SWIFT_UPDATE_NAME;
 
-  return std::make_pair(program, Arguments);
+  return {program, Arguments};
 }
 
-std::pair<const char *, llvm::opt::ArgStringList>
+ToolChain::InvocationInfo
 ToolChain::constructInvocation(const InterpretJobAction &job,
                                const JobContext &context) const {
   assert(context.OI.CompilerMode == OutputInfo::Mode::Immediate);
@@ -391,10 +392,10 @@ ToolChain::constructInvocation(const InterpretJobAction &job,
   // The immediate arguments must be last.
   context.Args.AddLastArg(Arguments, options::OPT__DASH_DASH);
 
-  return std::make_pair(SWIFT_EXECUTABLE_NAME, Arguments);
+  return {SWIFT_EXECUTABLE_NAME, Arguments};
 }
 
-std::pair<const char *, llvm::opt::ArgStringList>
+ToolChain::InvocationInfo
 ToolChain::constructInvocation(const BackendJobAction &job,
                                const JobContext &context) const {
   assert(context.Args.hasArg(options::OPT_embed_bitcode));
@@ -524,10 +525,10 @@ ToolChain::constructInvocation(const BackendJobAction &job,
   // Disable all llvm IR level optimizations.
   Arguments.push_back("-disable-llvm-optzns");
 
-  return std::make_pair(SWIFT_EXECUTABLE_NAME, Arguments);
+  return {SWIFT_EXECUTABLE_NAME, Arguments};
 }
 
-std::pair<const char *, llvm::opt::ArgStringList>
+ToolChain::InvocationInfo
 ToolChain::constructInvocation(const MergeModuleJobAction &job,
                                const JobContext &context) const {
   ArgStringList Arguments;
@@ -577,10 +578,10 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   if (context.OI.CompilerMode == OutputInfo::Mode::UpdateCode)
     program = SWIFT_UPDATE_NAME;
 
-  return std::make_pair(program, Arguments);
+  return {program, Arguments};
 }
 
-std::pair<const char *, llvm::opt::ArgStringList>
+ToolChain::InvocationInfo
 ToolChain::constructInvocation(const ModuleWrapJobAction &job,
                                const JobContext &context) const {
   ArgStringList Arguments;
@@ -599,10 +600,10 @@ ToolChain::constructInvocation(const ModuleWrapJobAction &job,
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
-  return std::make_pair(SWIFT_EXECUTABLE_NAME, Arguments);
+  return {SWIFT_EXECUTABLE_NAME, Arguments};
 }
 
-std::pair<const char *, llvm::opt::ArgStringList>
+ToolChain::InvocationInfo
 ToolChain::constructInvocation(const REPLJobAction &job,
                                const JobContext &context) const {
   assert(context.Inputs.empty());
@@ -632,7 +633,7 @@ ToolChain::constructInvocation(const REPLJobAction &job,
     FrontendArgs.insert(FrontendArgs.begin(), {"-frontend", "-repl"});
     FrontendArgs.push_back("-module-name");
     FrontendArgs.push_back(context.Args.MakeArgString(context.OI.ModuleName));
-    return std::make_pair(SWIFT_EXECUTABLE_NAME, FrontendArgs);
+    return {SWIFT_EXECUTABLE_NAME, FrontendArgs};
   }
 
   // Squash important frontend options into a single argument for LLDB.
@@ -645,11 +646,11 @@ ToolChain::constructInvocation(const REPLJobAction &job,
   ArgStringList Arguments;
   Arguments.push_back(context.Args.MakeArgString(std::move(SingleArg)));
 
-  return std::make_pair("lldb", Arguments);
+  return {"lldb", Arguments};
 }
 
 
-std::pair<const char *, llvm::opt::ArgStringList>
+ToolChain::InvocationInfo
 ToolChain::constructInvocation(const GenerateDSYMJobAction &job,
                                const JobContext &context) const {
   assert(context.Inputs.size() == 1);
@@ -666,16 +667,16 @@ ToolChain::constructInvocation(const GenerateDSYMJobAction &job,
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
-  return std::make_pair("dsymutil", Arguments);
+  return {"dsymutil", Arguments};
 }
 
-std::pair<const char *, llvm::opt::ArgStringList>
+ToolChain::InvocationInfo
 ToolChain::constructInvocation(const AutolinkExtractJobAction &job,
                                const JobContext &context) const {
   llvm_unreachable("autolink extraction not implemented for this toolchain");
 }
 
-std::pair<const char *, llvm::opt::ArgStringList>
+ToolChain::InvocationInfo
 ToolChain::constructInvocation(const LinkJobAction &job,
                                const JobContext &context) const {
   llvm_unreachable("linking not implemented for this toolchain");
@@ -746,7 +747,7 @@ static bool findXcodeClangPath(llvm::SmallVectorImpl<char> &path) {
   return !path.empty();
 }
 
-std::pair<const char *, llvm::opt::ArgStringList>
+ToolChain::InvocationInfo
 toolchains::Darwin::constructInvocation(const LinkJobAction &job,
                                         const JobContext &context) const {
   assert(context.Output.getPrimaryOutputType() == types::TY_Image &&
@@ -944,12 +945,12 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   Arguments.push_back("-o");
   Arguments.push_back(context.Output.getPrimaryOutputFilename().c_str());
 
-  return std::make_pair("ld", Arguments);
+  return {"ld", Arguments};
 }
 
 #if defined(SWIFT_ENABLE_TARGET_LINUX)
 
-std::pair<const char *, llvm::opt::ArgStringList>
+ToolChain::InvocationInfo
 toolchains::Linux::constructInvocation(const AutolinkExtractJobAction &job,
                                        const JobContext &context) const {
   assert(context.Output.getPrimaryOutputType() == types::TY_AutolinkFile);
@@ -962,10 +963,10 @@ toolchains::Linux::constructInvocation(const AutolinkExtractJobAction &job,
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
-  return std::make_pair("swift-autolink-extract", Arguments);
+  return {"swift-autolink-extract", Arguments};
 }
 
-std::pair<const char *, llvm::opt::ArgStringList>
+ToolChain::InvocationInfo
 toolchains::Linux::constructInvocation(const LinkJobAction &job,
                                        const JobContext &context) const {
   const Driver &D = getDriver();
@@ -1058,7 +1059,7 @@ toolchains::Linux::constructInvocation(const LinkJobAction &job,
   Arguments.push_back("-o");
   Arguments.push_back(context.Output.getPrimaryOutputFilename().c_str());
 
-  return std::make_pair("clang++", Arguments);
+  return {"clang++", Arguments};
 }
 
 #endif // SWIFT_ENABLE_TARGET_LINUX

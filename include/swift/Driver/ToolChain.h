@@ -58,33 +58,39 @@ protected:
     const OutputInfo &OI;
   };
 
-  virtual std::pair<const char *, llvm::opt::ArgStringList>
+  /// Packs together information chosen by toolchains to create jobs.
+  struct InvocationInfo {
+    const char *ExecutableName;
+    llvm::opt::ArgStringList Arguments;
+  };
+
+  virtual InvocationInfo
   constructInvocation(const CompileJobAction &job,
                       const JobContext &context) const;
-  virtual std::pair<const char *, llvm::opt::ArgStringList>
+  virtual InvocationInfo
   constructInvocation(const InterpretJobAction &job,
                       const JobContext &context) const;
-  virtual std::pair<const char *, llvm::opt::ArgStringList>
+  virtual InvocationInfo
   constructInvocation(const BackendJobAction &job,
                       const JobContext &context) const;
-  virtual std::pair<const char *, llvm::opt::ArgStringList>
+  virtual InvocationInfo
   constructInvocation(const MergeModuleJobAction &job,
                       const JobContext &context) const;
-  virtual std::pair<const char *, llvm::opt::ArgStringList>
+  virtual InvocationInfo
   constructInvocation(const ModuleWrapJobAction &job,
                       const JobContext &context) const;
 
-  virtual std::pair<const char *, llvm::opt::ArgStringList>
+  virtual InvocationInfo
   constructInvocation(const REPLJobAction &job,
                       const JobContext &context) const;
 
-  virtual std::pair<const char *, llvm::opt::ArgStringList>
+  virtual InvocationInfo
   constructInvocation(const GenerateDSYMJobAction &job,
                       const JobContext &context) const;
-  virtual std::pair<const char *, llvm::opt::ArgStringList>
+  virtual InvocationInfo
   constructInvocation(const AutolinkExtractJobAction &job,
                       const JobContext &context) const;
-  virtual std::pair<const char *, llvm::opt::ArgStringList>
+  virtual InvocationInfo
   constructInvocation(const LinkJobAction &job,
                       const JobContext &context) const;
 
