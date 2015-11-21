@@ -175,6 +175,14 @@ KNOWN_SETTINGS=(
     swift-runtime-enable-dtrace "0"              "Enable runtime dtrace support"
     swift-runtime-enable-leak-checker   "0"              "Enable leaks checking routines in the runtime"
     use-gold-linker             ""               "Enable using the gold linker"
+    toolchain-bundle-identifier           ""               "CFBundleIdentifier for xctoolchain info plist"
+    toolchain-display-name                ""               "Display Name for xctoolcain info plist"
+    toolchain-name              ""               "File name for xctoolchain"
+    toolchain-version           ""               "Version for xctoolchain info plist and installer pkg"
+    toolchain-application-cert  ""               "Application Cert name to codesign xctoolchain"
+    toolchain-installer-cert    ""               "Installer Cert name to create installer pkg"
+    toolchain-installer-package ""               "The path to installer pkg"
+
 )
 
 function toupper() {
@@ -2114,6 +2122,28 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
         echo "--- Copy swift-stdlib-tool ---"
         cp "${SWIFT_SOURCE_DIR}/utils/swift-stdlib-tool-substitute" "${INSTALL_DESTDIR}/${INSTALL_PREFIX}/bin/swift-stdlib-tool"
       fi
+      
+      #Create plist for xctoolchain 
+      echo "-- Create Info.plist --"
+      PLISTBUDDY_BIN="/usr/libexec/PlistBuddy"
+      TOOLCHAIN_INSTALL_LOCATION="/Library/Developer/Toolchains/${TOOLCHAIN_NAME}.xctoolchain/usr/lib"
+
+      ${PLISTBUDDY_BIN} -c "Add DisplayName string '${TOOLCHAIN_DISPLAY_NAME}'" "${TOOLCHAIN_PREFIX}/Info.plist"
+      ${PLISTBUDDY_BIN} -c "Add Version string '${TOOLCHAIN_VERSION}'" "${TOOLCHAIN_PREFIX}/Info.plist"
+      ${PLISTBUDDY_BIN} -c "Add CFBundleIdentifier string '${TOOLCHAIN_BUNDLE_IDENTIFIER}'" "${TOOLCHAIN_PREFIX}/Info.plist"
+      ${PLISTBUDDY_BIN} -c "Add ReportProblemURL string 'https://bugs.swift.com/'" "${TOOLCHAIN_PREFIX}/Info.plist"
+      ${PLISTBUDDY_BIN} -c "Add OverrideEnvironment::DYLD_LIBRARY_PATH string '${TOOLCHAIN_INSTALL_LOCATION}/usr/lib'" "${TOOLCHAIN_PREFIX}/Info.plist"
+      chmod a+r "${TOOLCHAIN_PREFIX}/Info.plist"
+
+      if [[ "${APPLICATION_CERT}" ]] ; then
+        echo "-- Codesign xctoolchain --"
+        "${SWIFT_SOURCE_DIR}/utils/toolchain-codesign" "${TOOLCHAIN_APPLICATION_CERT}" "${TOOLCHAIN_PREFIX}" 
+      fi
+      if [[ "${INSTALLER_PACKAGE}" ]] ; then
+        echo "-- Create Installer --"
+        "${SWIFT_SOURCE_DIR}/utils/toolchain-installer" "${TOOLCHAIN_PREFIX}" "${TOOLCHAIN_BUNDLE_IDENTIFIER}" "${TOOLCHAIN_INSTALLER_CERT}" "${TOOLCHAIN_INSTALLER_PACKAGE}" "${TOOLCHAIN_INSTALL_LOCATION}" "${TOOLCHAIN_VERSION}"
+      fi 
+
       (cd "${INSTALL_DESTDIR}" &&
         tar -c -z -f "${INSTALLABLE_PACKAGE}" "${TOOLCHAIN_PREFIX/#\/}")
     else
