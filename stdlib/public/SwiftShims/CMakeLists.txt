@@ -44,22 +44,28 @@ endif()
 # First extract the "version" used for Clang's resource directory.
 string(REGEX MATCH "[0-9]+\\.[0-9]+(\\.[0-9]+)?" CLANG_VERSION
   "${LLVM_PACKAGE_VERSION}")
-set(clang_headers_locations
-    "${LLVM_LIBRARY_DIR}/clang/${CLANG_VERSION}"
 
-    # FIXME: if we want to support separate Clang builds and mix different
-    # build configurations of Clang and Swift, this line should be adjusted.
-    "${SWIFT_PATH_TO_CLANG_BUILD}/${CMAKE_CFG_INTDIR}/lib/clang/${CLANG_VERSION}")
+if(SWIFT_BUILT_STANDALONE)
+  set(clang_headers_locations
+      "${LLVM_LIBRARY_DIR}/clang/${CLANG_VERSION}"
 
-set(clang_headers_location)
-foreach(loc ${clang_headers_locations})
-  if(EXISTS "${loc}")
-    set(clang_headers_location "${loc}")
-    break()
+      # FIXME: if we want to support separate Clang builds and mix different
+      # build configurations of Clang and Swift, this line should be adjusted.
+      "${SWIFT_PATH_TO_CLANG_BUILD}/${CMAKE_CFG_INTDIR}/lib/clang/${CLANG_VERSION}")
+
+  set(clang_headers_location)
+  foreach(loc ${clang_headers_locations})
+  message(WARNING "go: ${loc}")
+    if(EXISTS "${loc}")
+      set(clang_headers_location "${loc}")
+      break()
+    endif()
+  endforeach()
+  if("${clang_headers_location}" STREQUAL "")
+    message(FATAL_ERROR "Clang headers were not found")
   endif()
-endforeach()
-if("${clang_headers_location}" STREQUAL "")
-  message(FATAL_ERROR "Clang headers were not found")
+else() # NOT SWIFT_BUILT_STANDALONE
+  set(clang_headers_location "${LLVM_LIBRARY_DIR}/clang/${CLANG_VERSION}")
 endif()
 
 add_custom_command_target(unused_var
