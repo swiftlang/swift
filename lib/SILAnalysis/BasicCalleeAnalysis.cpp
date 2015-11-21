@@ -22,29 +22,14 @@
 using namespace swift;
 
 void CalleeCache::sortAndUniqueCallees() {
-  llvm::DenseMap<SILFunction *, unsigned int> FunctionEnumeration;
-
-  // Enumerate the functions in the module to use as keys in sorting.
-  unsigned int count = 0;
-  for (auto &F : M)
-    FunctionEnumeration[&F] = count++;
-
-  auto Lookup = [&FunctionEnumeration](SILFunction *F) -> unsigned int {
-    auto It = FunctionEnumeration.find(F);
-    assert(It != FunctionEnumeration.end() &&
-           "Function unexpectedly not found in enumeration!");
-
-    return It->second;
-  };
-
   // Sort the callees for each decl and remove duplicates.
   for (auto &Pair : TheCache) {
     auto &Callees = *Pair.second.getPointer();
 
     // Sort by enumeration number so that clients get a stable order.
     std::sort(Callees.begin(), Callees.end(),
-              [&Lookup](SILFunction *Left, SILFunction *Right) {
-                return Lookup(Left) < Lookup(Right);
+              [](SILFunction *Left, SILFunction *Right) {
+                return Left->getName().compare(Right->getName());
               });
 
     // Remove duplicates.
