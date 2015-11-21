@@ -1989,7 +1989,7 @@ void Driver::printActions(const ActionList &Actions) const {
 
 void Driver::printJobs(const Compilation &C) const {
   for (const Job *J : C.getJobs())
-    J->printCommandLine(llvm::outs());
+    J->printCommandLineAndEnvironment(llvm::outs());
 }
 
 void Driver::printVersion(const ToolChain &TC, raw_ostream &OS) const {

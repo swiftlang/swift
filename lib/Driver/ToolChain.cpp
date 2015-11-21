@@ -42,24 +42,24 @@ ToolChain::constructJob(const JobAction &JA,
                         const OutputInfo &OI) const {
   JobContext context{inputs, *output, inputActions, args, OI};
 
-  InvocationInfo invocationInfo;
-  switch (JA.getKind()) {
-#define CASE(K) case Action::K: \
-    invocationInfo = constructInvocation(cast<K##Action>(JA), context); \
-    break;
-  CASE(CompileJob)
-  CASE(InterpretJob)
-  CASE(BackendJob)
-  CASE(MergeModuleJob)
-  CASE(ModuleWrapJob)
-  CASE(LinkJob)
-  CASE(GenerateDSYMJob)
-  CASE(AutolinkExtractJob)
-  CASE(REPLJob)
+  auto invocationInfo = [&]() -> InvocationInfo {
+    switch (JA.getKind()) {
+  #define CASE(K) case Action::K: \
+      return constructInvocation(cast<K##Action>(JA), context);
+    CASE(CompileJob)
+    CASE(InterpretJob)
+    CASE(BackendJob)
+    CASE(MergeModuleJob)
+    CASE(ModuleWrapJob)
+    CASE(LinkJob)
+    CASE(GenerateDSYMJob)
+    CASE(AutolinkExtractJob)
+    CASE(REPLJob)
 #undef CASE
-  case Action::Input:
-    llvm_unreachable("not a JobAction");
-  }
+    case Action::Input:
+      llvm_unreachable("not a JobAction");
+    }
+  }();
 
   // Special-case the Swift frontend.
   const char *executablePath = nullptr;
@@ -84,7 +84,8 @@ ToolChain::constructJob(const JobAction &JA,
 
   return llvm::make_unique<Job>(JA, std::move(inputs), std::move(output),
                                 executablePath,
-                                std::move(invocationInfo.Arguments));
+                                std::move(invocationInfo.Arguments),
+                                std::move(invocationInfo.ExtraEnvironment));
 }
 
 std::string

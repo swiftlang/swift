@@ -85,7 +85,19 @@ void Job::printArguments(raw_ostream &os,
 }
 
 void Job::dump() const {
-  printCommandLine(llvm::errs());
+  printCommandLineAndEnvironment(llvm::errs());
+}
+
+void Job::printCommandLineAndEnvironment(raw_ostream &Stream,
+                                         StringRef Terminator) const {
+  printCommandLine(Stream, /*Terminator=*/"");
+  if (!ExtraEnvironment.empty()) {
+    Stream << "  #";
+    for (auto &pair : ExtraEnvironment) {
+      Stream << " " << pair.first << "=" << pair.second;
+    }
+  }
+  Stream << "\n";
 }
 
 void Job::printCommandLine(raw_ostream &os, StringRef Terminator) const {

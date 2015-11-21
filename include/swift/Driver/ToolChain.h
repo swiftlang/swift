@@ -62,6 +62,11 @@ protected:
   struct InvocationInfo {
     const char *ExecutableName;
     llvm::opt::ArgStringList Arguments;
+    std::vector<std::pair<const char *, const char *>> ExtraEnvironment;
+
+    InvocationInfo(const char *name, llvm::opt::ArgStringList args,
+                   decltype(ExtraEnvironment) extraEnv = {})
+      : ExecutableName(name), Arguments(args), ExtraEnvironment(extraEnv) {}
   };
 
   virtual InvocationInfo
