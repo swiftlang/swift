@@ -18,10 +18,12 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/Mutex.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/Threading.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/YAMLParser.h"
+#include <mutex>
 
 using namespace SourceKit;
 using namespace sourcekitd;
@@ -395,15 +397,31 @@ void sourcekitd::enableLogging(StringRef LoggerName) {
 // Public API
 //============================================================================//
 
-void sourcekitd_initialize(void) {
-  llvm::install_fatal_error_handler(fatal_error_handler, 0);
+static llvm::sys::Mutex GlobalInitMtx;
+static unsigned gInitRefCount = 0;
 
-  sourcekitd::enableLogging("sourcekit");
+void sourcekitd_initialize(void) {
+  llvm::sys::ScopedLock L(GlobalInitMtx);
+  ++gInitRefCount;
+  if (gInitRefCount > 1)
+    return;
+
+  static std::once_flag flag;
+  std::call_once(flag, []() {
+    llvm::install_fatal_error_handler(fatal_error_handler, 0);
+    sourcekitd::enableLogging("sourcekit");
+  });
+
   LOG_INFO_FUNC(High, "initializing");
   sourcekitd::initialize();
 }
 
 void sourcekitd_shutdown(void) {
+  llvm::sys::ScopedLock L(GlobalInitMtx);
+  --gInitRefCount;
+  if (gInitRefCount > 0)
+    return;
+
   LOG_INFO_FUNC(High, "shutting down");
   sourcekitd::shutdown();
 }

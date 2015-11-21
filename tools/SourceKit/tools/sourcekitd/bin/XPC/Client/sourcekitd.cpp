@@ -77,8 +77,10 @@ sourcekitd_uid_t sourcekitd::SKDUIDFromUIdent(UIdent UID) {
 }
 
 UIdent sourcekitd::UIdentFromSKDUID(sourcekitd_uid_t uid) {
-  if (StrFromUidMappingHandler)
-    return UIdent(StrFromUidMappingHandler(uid));
+  if (StrFromUidMappingHandler) {
+    if (const char *str = StrFromUidMappingHandler(uid))
+      return UIdent(str);
+  }
 
   return UIdent::getFromOpaqueValue(uid);
 }
