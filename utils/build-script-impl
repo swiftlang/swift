@@ -1711,7 +1711,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 set -x
                 pushd "${FOUNDATION_SOURCE_DIR}"
                 SWIFTC="${SWIFTC_BIN}" CLANG="${LLVM_BIN}"/clang SWIFT="${SWIFT_BIN}" \
-                      SDKROOT="${SWIFT_BUILD_PATH}" BUILD_DIR="${build_dir}" DSTROOT="${INSTALL_DESTDIR}" PREFIX="${INSTALL_PREFIX}" SWIFTCFLAGS="-I${XCTEST_BUILD_DIR}" LDFLAGS="-L${XCTEST_BUILD_DIR}" ./configure "${FOUNDATION_BUILD_TYPE}"
+                      SDKROOT="${SWIFT_BUILD_PATH}" BUILD_DIR="${build_dir}" DSTROOT="${INSTALL_DESTDIR}" PREFIX="${INSTALL_PREFIX}" ./configure "${FOUNDATION_BUILD_TYPE}" -DXCTEST_BUILD_DIR=${XCTEST_BUILD_DIR}
                 $NINJA_BIN
                 popd
                 { set +x; } 2>/dev/null
