@@ -1599,6 +1599,17 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                         )
                 fi
 
+                # Figure out if we think this is a buildbot build.
+                # This will influence the lldb version line.
+                if [ ! -z "$JENKINS_HOME" -a ! -z "$JOB_NAME" -a ! -z "$BUILD_NUMBER" ]; then
+                    LLDB_IS_BUILDBOT_BUILD=1
+                else
+                    LLDB_IS_BUILDBOT_BUILD=0
+                fi
+
+                # Get the build date
+                LLDB_BUILD_DATE=`date +%Y-%m-%d`
+
                 case "$(uname -s)" in
                     Linux)
                         cmake_options=(
@@ -1612,6 +1623,8 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                             -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
                             -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
                             -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
+                            -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
+                            -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
                             "${LLDB_SOURCE_DIR}"
                         )
                         ;;
@@ -1625,6 +1638,8 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                             LLDB_PATH_TO_CLANG_BUILD="${llvm_build_dir}"
                             LLDB_PATH_TO_SWIFT_BUILD="${swift_build_dir}"
                             LLDB_PATH_TO_CMARK_BUILD="${cmark_build_dir}"
+                            LLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
+                            LLDB_BUILD_DATE="\"${LLDB_BUILD_DATE}\""
                             SYMROOT="${lldb_build_dir}"
                             OBJROOT="${lldb_build_dir}"
                         )
