@@ -28,10 +28,24 @@ class SideEffectAnalysis;
 /// needed since we do not have an "analysis" infrastructure.
 class AliasAnalysis : public SILAnalysis {
 public:
-  /// The result of an alias query. This is based off of LLVM's alias
-  /// analysis so see LLVM's documentation for more information.
+
+  /// This enum describes the different kinds of aliasing relations between
+  /// pointers.
   ///
-  /// FIXME: PartialAlias?
+  /// NoAlias: There is never dependence between memory referenced by the two
+  ///          pointers. Example: Two pointers pointing to non-overlapping
+  ///          memory ranges.
+  ///
+  /// MayAlias: Two pointers might refer to the same memory location.
+  ///
+  ///
+  /// PartialAlias: The two memory locations are known to be overlapping
+  ///               but do not start at the same address.
+  ///
+  ///
+  /// MustAlias: The two memory locations always start at exactly the same
+  ///            location. The pointers are equal.
+  ///
   enum class AliasResult : unsigned {
     NoAlias=0,      ///< The two values have no dependencies on each
                     ///  other.
