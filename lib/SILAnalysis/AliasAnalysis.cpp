@@ -699,10 +699,8 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   return AliasResult::MayAlias;
 }
 
-/// Check if this is the address of a "let" member.
-/// Nobody can write into let members.
 bool swift::isLetPointer(SILValue V) {
-  // Traverse the "access" path for V and check that starts with "let"
+  // Traverse the "access" path for V and check that it starts with "let"
   // and everything along this path is a value-type (i.e. struct or tuple).
 
   // Is this an address of a "let" class member?

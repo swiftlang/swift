@@ -113,7 +113,8 @@ public:
   MemoryBehavior getMemoryBehavior(SILInstruction *Inst, SILValue V,
                                    RetainObserveKind);
 
-  /// Returns true if Inst may read from memory in a manner that affects V.
+  /// Returns true if \p Inst may read from memory in a manner that
+  /// affects V.
   bool mayReadFromMemory(SILInstruction *Inst, SILValue V) {
     MemoryBehavior B = getMemoryBehavior(Inst, V,
                                          RetainObserveKind::IgnoreRetains);
@@ -122,7 +123,8 @@ public:
       B == MemoryBehavior::MayHaveSideEffects;
   }
 
-  /// Returns true if Inst may write to memory in a manner that affects V.
+  /// Returns true if \p Inst may write to memory in a manner that
+  /// affects V.
   bool mayWriteToMemory(SILInstruction *Inst, SILValue V) {
     MemoryBehavior B = getMemoryBehavior(Inst, V,
                                          RetainObserveKind::IgnoreRetains);
@@ -131,8 +133,8 @@ public:
       B == MemoryBehavior::MayHaveSideEffects;
   }
 
-  /// Returns true if Inst may read or write to memory in a manner that affects
-  /// V.
+  /// Returns true if \p Inst may read or write to memory in a manner that
+  /// affects V.
   bool mayReadOrWriteMemory(SILInstruction *Inst, SILValue V) {
     auto B = getMemoryBehavior(Inst, V, RetainObserveKind::IgnoreRetains);
     return B != MemoryBehavior::None;
@@ -169,7 +171,8 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 /// Otherwise, return an empty type.
 SILType computeTBAAType(SILValue V);
 
-/// Check if V points to a let-variable.
+/// Check if \p V points to a let-member.
+/// Nobody can write into let members.
 bool isLetPointer(SILValue V);
 
 } // end namespace swift
