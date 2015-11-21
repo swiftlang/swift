@@ -305,8 +305,8 @@ MemBehavior MemoryBehaviorVisitor::visitReleaseValueInst(ReleaseValueInst *SI) {
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
-SILInstruction::MemoryBehavior
-AliasAnalysis::getMemoryBehavior(SILInstruction *Inst, SILValue V,
+MemBehavior
+AliasAnalysis::computeMemoryBehavior(SILInstruction *Inst, SILValue V,
                                  RetainObserveKind IgnoreRefCountIncrements) {
   DEBUG(llvm::dbgs() << "GET MEMORY BEHAVIOR FOR:\n    " << *Inst << "    "
                      << *V.getDef());
