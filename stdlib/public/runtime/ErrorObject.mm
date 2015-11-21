@@ -23,6 +23,7 @@
 
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/ObjCBridge.h"
+#include "swift/Basic/Lazy.h"
 #include "ErrorObject.h"
 #include "Private.h"
 #include <dlfcn.h>
@@ -83,7 +84,7 @@ using namespace swift;
     return (NSDictionary*)userInfo;
   } else {
     // -[NSError userInfo] never returns nil on OS X 10.8 or later.
-    static NSDictionary *emptyDict = @{};
+    NSDictionary *emptyDict = SWIFT_LAZY_CONSTANT(@{});
     return emptyDict;
   }
 }
@@ -91,13 +92,11 @@ using namespace swift;
 @end
 
 Class swift::getNSErrorClass() {
-  static auto TheNSError = [NSError class];
-  return TheNSError;
+  return SWIFT_LAZY_CONSTANT([NSError class]);
 }
 
 static Class getSwiftNativeNSErrorClass() {
-  static auto TheSwiftNativeNSError = [_SwiftNativeNSError class];
-  return TheSwiftNativeNSError;
+  return SWIFT_LAZY_CONSTANT([_SwiftNativeNSError class]);
 }
 
 /// Allocate a catchable error object.
@@ -183,8 +182,8 @@ static const WitnessTable *getNSErrorConformanceToErrorType() {
   // to assume that that's been linked in if a user is using NSError in their
   // Swift source.
   
-  static auto TheWitnessTable = dlsym(RTLD_DEFAULT,
-                                   "_TWPCSo7CFErrors9ErrorType10Foundation");
+  auto TheWitnessTable = SWIFT_LAZY_CONSTANT(dlsym(RTLD_DEFAULT,
+                                   "_TWPCSo7CFErrors9ErrorType10Foundation"));
   assert(TheWitnessTable &&
          "Foundation overlay not loaded, or CFError: ErrorType conformance "
          "not available");
@@ -337,20 +336,21 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
                                     const Metadata *srcType,
                                     const Metadata *destType,
                                     DynamicCastFlags flags) {
-  Class TheNSErrorClass = [NSError class];
-  static CFTypeID TheCFErrorTypeID = CFErrorGetTypeID();
+  Class NSErrorClass = getNSErrorClass();
+  
+  auto CFErrorTypeID = SWIFT_LAZY_CONSTANT(CFErrorGetTypeID());
   // @_silgen_name("swift_stdlib_bridgeNSErrorToErrorType")
   // public func _stdlib_bridgeNSErrorToErrorType<
   //   T : _ObjectiveCBridgeableErrorType
   // >(error: NSError, out: UnsafeMutablePointer<T>) -> Bool {
-  static auto bridgeNSErrorToErrorType
-    = reinterpret_cast<bool (*)(NSError *, OpaqueValue*, const Metadata *,
-                                const WitnessTable *)>
-        (dlsym(RTLD_DEFAULT, "swift_stdlib_bridgeNSErrorToErrorType"));
+  auto bridgeNSErrorToErrorType = SWIFT_LAZY_CONSTANT(
+        reinterpret_cast<bool (*)(NSError *, OpaqueValue*, const Metadata *,
+                                  const WitnessTable *)>
+          (dlsym(RTLD_DEFAULT, "swift_stdlib_bridgeNSErrorToErrorType")));
   // protocol _ObjectiveCBridgeableErrorType
-  static auto TheObjectiveCBridgeableErrorTypeProtocol
-    = reinterpret_cast<const ProtocolDescriptor *>
-        (dlsym(RTLD_DEFAULT, "_TMp10Foundation30_ObjectiveCBridgeableErrorType"));
+  auto TheObjectiveCBridgeableErrorTypeProtocol = SWIFT_LAZY_CONSTANT(
+    reinterpret_cast<const ProtocolDescriptor *>(dlsym(RTLD_DEFAULT,
+                         "_TMp10Foundation30_ObjectiveCBridgeableErrorType")));
 
   // If the Foundation overlay isn't loaded, then NSErrors can't be bridged.
   if (!bridgeNSErrorToErrorType || !TheObjectiveCBridgeableErrorTypeProtocol)
@@ -360,13 +360,13 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
   switch (srcType->getKind()) {
   case MetadataKind::Class:
     // Native class should be an NSError subclass.
-    if (![(Class)srcType isSubclassOfClass: TheNSErrorClass])
+    if (![(Class)srcType isSubclassOfClass: NSErrorClass])
       return false;
     break;
   case MetadataKind::ForeignClass: {
     // Foreign class should be CFError.
     CFTypeRef srcInstance = *reinterpret_cast<CFTypeRef *>(src);
-    if (CFGetTypeID(srcInstance) != TheCFErrorTypeID)
+    if (CFGetTypeID(srcInstance) != CFErrorTypeID)
       return false;
     break;
   }
@@ -374,7 +374,7 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
     // ObjC class should be an NSError subclass.
     auto srcWrapper = static_cast<const ObjCClassWrapperMetadata *>(srcType);
     if (![(Class)srcWrapper->getClassObject()
-            isSubclassOfClass: TheNSErrorClass])
+            isSubclassOfClass: NSErrorClass])
       return false;
     break;
   }

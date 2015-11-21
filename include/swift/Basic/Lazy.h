@@ -32,7 +32,7 @@ namespace swift {
 # define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
   std::call_once(TOKEN, FUNC, CONTEXT)
 #endif
-  
+
 /// A template for lazily-constructed, zero-initialized, leaked-on-exit
 /// global objects.
 template <class T> class Lazy {
@@ -40,8 +40,14 @@ template <class T> class Lazy {
 
   OnceToken_t OnceToken;
 
+  static void defaultInitCallback(void *ValueAddr) {
+    ::new (ValueAddr) T();
+  }
+  
 public:
-  T &get();
+  using Type = T;
+  
+  T &get(void (*initCallback)(void *) = defaultInitCallback);
 
   /// Get the value, assuming it must have already been initialized by this
   /// point.
@@ -53,23 +59,25 @@ public:
   T &operator*() { return get(); }
 
 private:
-  static void lazyInitCallback(void *Argument) {
-    auto self = reinterpret_cast<Lazy *>(Argument);
-    ::new (&self->unsafeGetAlreadyInitialized()) T();
-  }
-
   Lazy(const Lazy &) = delete;
   Lazy &operator=(const Lazy &) = delete;
 };
 
-template <typename T> inline T &Lazy<T>::get() {
+template <typename T> inline T &Lazy<T>::get(void (*initCallback)(void*)) {
   static_assert(std::is_literal_type<Lazy<T>>::value,
                 "Lazy<T> must be a literal type");
 
-  SWIFT_ONCE_F(OnceToken, lazyInitCallback, this);
+  SWIFT_ONCE_F(OnceToken, initCallback, &Value);
   return unsafeGetAlreadyInitialized();
 }
 
 } // namespace swift
+
+#define SWIFT_LAZY_CONSTANT(INITIAL_VALUE) \
+  ({ \
+    using T = std::remove_reference<decltype(INITIAL_VALUE)>::type; \
+    static Lazy<T> TheLazy; \
+    TheLazy.get([](void *ValueAddr){ ::new(ValueAddr) T{INITIAL_VALUE}; });\
+  })
 
 #endif // SWIFT_BASIC_LAZY_H

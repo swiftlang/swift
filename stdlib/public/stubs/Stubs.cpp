@@ -28,6 +28,7 @@
 #include <limits>
 #include "llvm/ADT/StringExtras.h"
 #include "swift/Runtime/Debug.h"
+#include "swift/Basic/Lazy.h"
 
 static uint64_t uint64ToStringImpl(char *Buffer, uint64_t Value,
                                    int64_t Radix, bool Uppercase,
@@ -108,8 +109,7 @@ static locale_t makeCLocale() {
 }
 
 static locale_t getCLocale() {
-  static locale_t CLocale = makeCLocale();
-  return CLocale;
+  return SWIFT_LAZY_CONSTANT(makeCLocale());
 }
 #endif
 
