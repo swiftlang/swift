@@ -29,7 +29,8 @@ void CalleeCache::sortAndUniqueCallees() {
     // Sort by enumeration number so that clients get a stable order.
     std::sort(Callees.begin(), Callees.end(),
               [](SILFunction *Left, SILFunction *Right) {
-                return Left->getName().compare(Right->getName());
+                // Check if Right's lexicographical order is greater than Left.
+                return 1 == Right->getName().compare(Left->getName());
               });
 
     // Remove duplicates.
