@@ -2128,20 +2128,20 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
       PLISTBUDDY_BIN="/usr/libexec/PlistBuddy"
       TOOLCHAIN_INSTALL_LOCATION="/Library/Developer/Toolchains/${DARWIN_TOOLCHAIN_NAME}.xctoolchain"
 
-      ${PLISTBUDDY_BIN} -c "Add DisplayName string '${DARWIN_TOOLCHAIN_DISPLAY_NAME}'" "${TOOLCHAIN_PREFIX}/Info.plist"
-      ${PLISTBUDDY_BIN} -c "Add Version string '${DARWIN_TOOLCHAIN_VERSION}'" "${TOOLCHAIN_PREFIX}/Info.plist"
-      ${PLISTBUDDY_BIN} -c "Add CFBundleIdentifier string '${DARWIN_TOOLCHAIN_BUNDLE_IDENTIFIER}'" "${TOOLCHAIN_PREFIX}/Info.plist"
-      ${PLISTBUDDY_BIN} -c "Add ReportProblemURL string 'https://bugs.swift.org/'" "${TOOLCHAIN_PREFIX}/Info.plist"
-      ${PLISTBUDDY_BIN} -c "Add OverrideEnvironment::DYLD_LIBRARY_PATH string '${DARWIN_TOOLCHAIN_INSTALL_LOCATION}/usr/lib'" "${TOOLCHAIN_PREFIX}/Info.plist"
-      chmod a+r "${TOOLCHAIN_PREFIX}/Info.plist"
+      ${PLISTBUDDY_BIN} -c "Add DisplayName string '${DARWIN_TOOLCHAIN_DISPLAY_NAME}'" "${INSTALL_DESTDIR}/${TOOLCHAIN_PREFIX}/Info.plist"
+      ${PLISTBUDDY_BIN} -c "Add Version string '${DARWIN_TOOLCHAIN_VERSION}'" "${INSTALL_DESTDIR}/${TOOLCHAIN_PREFIX}/Info.plist"
+      ${PLISTBUDDY_BIN} -c "Add CFBundleIdentifier string '${DARWIN_TOOLCHAIN_BUNDLE_IDENTIFIER}'" "${INSTALL_DESTDIR}/${TOOLCHAIN_PREFIX}/Info.plist"
+      ${PLISTBUDDY_BIN} -c "Add ReportProblemURL string 'https://bugs.swift.org/'" "${INSTALL_DESTDIR}/${TOOLCHAIN_PREFIX}/Info.plist"
+      ${PLISTBUDDY_BIN} -c "Add OverrideEnvironment::DYLD_LIBRARY_PATH string '${DARWIN_TOOLCHAIN_INSTALL_LOCATION}/usr/lib'" "${INSTALL_DESTDIR}/${TOOLCHAIN_PREFIX}/Info.plist"
+      chmod a+r "${INSTALL_DESTDIR}/${TOOLCHAIN_PREFIX}/Info.plist"
 
       if [[ "${DARWIN_TOOLCHAIN_APPLICATION_CERT}" ]] ; then
         echo "-- Codesign xctoolchain --"
-        "${SWIFT_SOURCE_DIR}/utils/toolchain-codesign" "${DARWIN_TOOLCHAIN_APPLICATION_CERT}" "${TOOLCHAIN_PREFIX}" 
+        "${SWIFT_SOURCE_DIR}/utils/toolchain-codesign" "${DARWIN_TOOLCHAIN_APPLICATION_CERT}" "${INSTALL_DESTDIR}/${TOOLCHAIN_PREFIX}" 
       fi
       if [[ "${DARWIN_TOOLCHAIN_INSTALLER_PACKAGE}" ]] ; then
         echo "-- Create Installer --"
-        "${SWIFT_SOURCE_DIR}/utils/toolchain-installer" "${TOOLCHAIN_PREFIX}" "${DARWIN_TOOLCHAIN_BUNDLE_IDENTIFIER}" \
+        "${SWIFT_SOURCE_DIR}/utils/toolchain-installer" "${INSTALL_DESTDIR}/${TOOLCHAIN_PREFIX}" "${DARWIN_TOOLCHAIN_BUNDLE_IDENTIFIER}" \
         "${DARWIN_TOOLCHAIN_INSTALLER_CERT}" "${DARWIN_TOOLCHAIN_INSTALLER_PACKAGE}" "${DARWIN_TOOLCHAIN_INSTALL_LOCATION}" \
         "${DARWIN_TOOLCHAIN_VERSION}"
       fi 
