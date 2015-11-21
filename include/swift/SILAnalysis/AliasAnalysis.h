@@ -111,8 +111,7 @@ public:
   /// TODO: When ref count behavior is separated from generic memory behavior,
   /// the IgnoreRefCountIncrements flag will be unnecessary.
   MemoryBehavior getMemoryBehavior(SILInstruction *Inst, SILValue V,
-                                   RetainObserveKind =
-                                   RetainObserveKind::ObserveRetains);
+                                   RetainObserveKind);
 
   /// Returns true if Inst may read from memory in a manner that affects V.
   bool mayReadFromMemory(SILInstruction *Inst, SILValue V) {
@@ -141,7 +140,8 @@ public:
 
   /// Returns true if Inst may have side effects in a manner that affects V.
   bool mayHaveSideEffects(SILInstruction *Inst, SILValue V) {
-    MemoryBehavior B = getMemoryBehavior(Inst, V);
+    MemoryBehavior B = getMemoryBehavior(Inst, V,
+                                         RetainObserveKind::ObserveRetains);
     return B == MemoryBehavior::MayWrite ||
       B == MemoryBehavior::MayReadWrite ||
       B == MemoryBehavior::MayHaveSideEffects;
@@ -151,7 +151,8 @@ public:
   /// V. This is independent of whether or not Inst may write to V and is meant
   /// to encode notions such as ref count modifications.
   bool mayHavePureSideEffects(SILInstruction *Inst, SILValue V) {
-    return getMemoryBehavior(Inst, V) == MemoryBehavior::MayHaveSideEffects;
+    return getMemoryBehavior(Inst, V, RetainObserveKind::ObserveRetains) ==
+           MemoryBehavior::MayHaveSideEffects;
   }
 
   virtual void invalidate(SILAnalysis::InvalidationKind K) { AliasCache.clear(); }
