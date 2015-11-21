@@ -1857,10 +1857,6 @@ bool NominalTypeDecl::hasFixedLayout() const {
     return true;
   }
 
-  // Objective-C enums always have a fixed layout.
-  if (isa<EnumDecl>(this) && isObjC())
-    return true;
-
   // Otherwise, access via indirect "resilient" interfaces.
   return false;
 }
