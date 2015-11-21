@@ -12,10 +12,11 @@
 
 /// An iterator that produces one or fewer instances of `Element`.
 public struct IteratorOverOne<Element> : IteratorProtocol, Sequence {
-  /// Construct an instance that generates `element!`, or an empty
-  /// sequence if `element == nil`.
-  public init(_ element: Element?) {
-    self.elements = element
+  /// Construct an instance that generates `_element!`, or an empty
+  /// sequence if `_element == nil`.
+  public // @testable
+  init(_elements: Element?) {
+    self._elements = _elements
   }
 
   /// Advance to the next element and return it, or `nil` if no next
@@ -25,11 +26,12 @@ public struct IteratorOverOne<Element> : IteratorProtocol, Sequence {
   ///   since the copy was made, and no preceding call to `self.next()`
   ///   has returned `nil`.
   public mutating func next() -> Element? {
-    let result = elements
-    elements = nil
+    let result = _elements
+    _elements = nil
     return result
   }
-  var elements: Element?
+
+  internal var _elements: Element?
 }
 
 /// A collection containing a single element of type `Element`.
@@ -57,7 +59,7 @@ public struct CollectionOfOne<Element> : Collection {
   ///
   /// - Complexity: O(1).
   public func iterator() -> IteratorOverOne<Element> {
-    return IteratorOverOne(element)
+    return IteratorOverOne(_elements: element)
   }
 
   /// Access the element at `position`.

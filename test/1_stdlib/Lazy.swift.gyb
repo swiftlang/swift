@@ -85,11 +85,13 @@ extension IteratorOverOne where Element : TestProtocol1 {
 LazyTestSuite.test("IteratorOverOne") {
   checkIterator(
     [] as Array<OpaqueValue<Int>>,
-    IteratorOverOne(nil as Optional<OpaqueValue<Int>>)) { $0.value == $1.value }
+    IteratorOverOne(_elements: nil as Optional<OpaqueValue<Int>>))
+  { $0.value == $1.value }
 
   checkIterator(
     [ OpaqueValue(42) ] as Array<OpaqueValue<Int>>,
-    IteratorOverOne(OpaqueValue(42))) { $0.value == $1.value }
+    IteratorOverOne(_elements: OpaqueValue(42)))
+  { $0.value == $1.value }
 }
 
 //===----------------------------------------------------------------------===//
