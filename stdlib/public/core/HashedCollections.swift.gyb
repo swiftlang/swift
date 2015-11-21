@@ -467,48 +467,48 @@ public struct Set<Element : Hashable> :
     }
   }
 
-  /// Returns `true` iff `maybeSuperset` contains every member of `self`.
+  /// Returns `true` iff `possibleSuperset` contains every member of `self`.
   @warn_unused_result
   public func isSubsetOf<
     S : Sequence where S.Iterator.Element == Element
-  >(maybeSuperset: S) -> Bool {
+  >(possibleSuperset: S) -> Bool {
     // FIXME(performance): isEmpty fast path, here and elsewhere.
-    let other = maybeSuperset as? Set<Element> ?? Set(maybeSuperset)
+    let other = possibleSuperset as? Set<Element> ?? Set(possibleSuperset)
     let (isSubset, isEqual) = _compareSets(self, other)
     return isSubset || isEqual
   }
 
-  /// Returns `true` iff `maybeStrictSuperset` contains every member
+  /// Returns `true` iff `possibleStrictSuperset` contains every member
   /// of `self`, and at least one other element.
   @warn_unused_result
   public func isStrictSubsetOf<
     S : Sequence where S.Iterator.Element == Element
-  >(maybeStrictSuperset: S) -> Bool {
+  >(possibleStrictSuperset: S) -> Bool {
     // FIXME: code duplication.
     let other =
-      maybeStrictSuperset as? Set<Element> ?? Set(maybeStrictSuperset)
+      possibleStrictSuperset as? Set<Element> ?? Set(possibleStrictSuperset)
     let (isSubset, isEqual) = _compareSets(self, other)
     return isSubset && !isEqual
   }
 
-  /// Returns `true` iff `self` contains every element of `maybeSubset`.
+  /// Returns `true` iff `self` contains every element of `possibleSubset`.
   @warn_unused_result
   public func isSupersetOf<
     S : Sequence where S.Iterator.Element == Element
-  >(maybeSubset: S) -> Bool {
+  >(possibleSubset: S) -> Bool {
     // FIXME(performance): Don't build a set; just ask if every element is in
     // `self`.
-    let other = maybeSubset as? Set<Element> ?? Set(maybeSubset)
+    let other = possibleSubset as? Set<Element> ?? Set(possibleSubset)
     return other.isSubsetOf(self)
   }
 
   /// Returns `true` iff `self` contains every element of
-  /// `maybeStrictSubset`, and at least one other element.
+  /// `possibleStrictSubset`, and at least one other element.
   @warn_unused_result
   public func isStrictSupersetOf<
     S : Sequence where S.Iterator.Element == Element
-  >(maybeStrictSubset: S) -> Bool {
-    let other = maybeStrictSubset as? Set<Element> ?? Set(maybeStrictSubset)
+  >(possibleStrictSubset: S) -> Bool {
+    let other = possibleStrictSubset as? Set<Element> ?? Set(possibleStrictSubset)
     return other.isStrictSubsetOf(self)
   }
 
