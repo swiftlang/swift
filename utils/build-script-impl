@@ -175,13 +175,13 @@ KNOWN_SETTINGS=(
     swift-runtime-enable-dtrace "0"              "Enable runtime dtrace support"
     swift-runtime-enable-leak-checker   "0"              "Enable leaks checking routines in the runtime"
     use-gold-linker             ""               "Enable using the gold linker"
-    toolchain-bundle-identifier           ""               "CFBundleIdentifier for xctoolchain info plist"
-    toolchain-display-name                ""               "Display Name for xctoolcain info plist"
-    toolchain-name              ""               "File name for xctoolchain"
-    toolchain-version           ""               "Version for xctoolchain info plist and installer pkg"
-    toolchain-application-cert  ""               "Application Cert name to codesign xctoolchain"
-    toolchain-installer-cert    ""               "Installer Cert name to create installer pkg"
-    toolchain-installer-package ""               "The path to installer pkg"
+    darwin-toolchain-bundle-identifier ""        "CFBundleIdentifier for xctoolchain info plist"
+    darwin-toolchain-display-name      ""        "Display Name for xctoolcain info plist"
+    darwin-toolchain-name              ""        "Directory name for xctoolchain"
+    darwin-toolchain-version           ""        "Version for xctoolchain info plist and installer pkg"
+    darwin-toolchain-application-cert  ""        "Application Cert name to codesign xctoolchain"
+    darwin-toolchain-installer-cert    ""        "Installer Cert name to create installer pkg"
+    darwin-toolchain-installer-package ""        "The path to installer pkg"
 
 )
 
@@ -2126,22 +2126,24 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
       #Create plist for xctoolchain 
       echo "-- Create Info.plist --"
       PLISTBUDDY_BIN="/usr/libexec/PlistBuddy"
-      TOOLCHAIN_INSTALL_LOCATION="/Library/Developer/Toolchains/${TOOLCHAIN_NAME}.xctoolchain/usr/lib"
+      TOOLCHAIN_INSTALL_LOCATION="/Library/Developer/Toolchains/${DARWIN_TOOLCHAIN_NAME}.xctoolchain"
 
-      ${PLISTBUDDY_BIN} -c "Add DisplayName string '${TOOLCHAIN_DISPLAY_NAME}'" "${TOOLCHAIN_PREFIX}/Info.plist"
-      ${PLISTBUDDY_BIN} -c "Add Version string '${TOOLCHAIN_VERSION}'" "${TOOLCHAIN_PREFIX}/Info.plist"
-      ${PLISTBUDDY_BIN} -c "Add CFBundleIdentifier string '${TOOLCHAIN_BUNDLE_IDENTIFIER}'" "${TOOLCHAIN_PREFIX}/Info.plist"
-      ${PLISTBUDDY_BIN} -c "Add ReportProblemURL string 'https://bugs.swift.com/'" "${TOOLCHAIN_PREFIX}/Info.plist"
-      ${PLISTBUDDY_BIN} -c "Add OverrideEnvironment::DYLD_LIBRARY_PATH string '${TOOLCHAIN_INSTALL_LOCATION}/usr/lib'" "${TOOLCHAIN_PREFIX}/Info.plist"
+      ${PLISTBUDDY_BIN} -c "Add DisplayName string '${DARWIN_TOOLCHAIN_DISPLAY_NAME}'" "${TOOLCHAIN_PREFIX}/Info.plist"
+      ${PLISTBUDDY_BIN} -c "Add Version string '${DARWIN_TOOLCHAIN_VERSION}'" "${TOOLCHAIN_PREFIX}/Info.plist"
+      ${PLISTBUDDY_BIN} -c "Add CFBundleIdentifier string '${DARWIN_TOOLCHAIN_BUNDLE_IDENTIFIER}'" "${TOOLCHAIN_PREFIX}/Info.plist"
+      ${PLISTBUDDY_BIN} -c "Add ReportProblemURL string 'https://bugs.swift.org/'" "${TOOLCHAIN_PREFIX}/Info.plist"
+      ${PLISTBUDDY_BIN} -c "Add OverrideEnvironment::DYLD_LIBRARY_PATH string '${DARWIN_TOOLCHAIN_INSTALL_LOCATION}/usr/lib'" "${TOOLCHAIN_PREFIX}/Info.plist"
       chmod a+r "${TOOLCHAIN_PREFIX}/Info.plist"
 
-      if [[ "${APPLICATION_CERT}" ]] ; then
+      if [[ "${DARWIN_TOOLCHAIN_APPLICATION_CERT}" ]] ; then
         echo "-- Codesign xctoolchain --"
-        "${SWIFT_SOURCE_DIR}/utils/toolchain-codesign" "${TOOLCHAIN_APPLICATION_CERT}" "${TOOLCHAIN_PREFIX}" 
+        "${SWIFT_SOURCE_DIR}/utils/toolchain-codesign" "${DARWIN_TOOLCHAIN_APPLICATION_CERT}" "${TOOLCHAIN_PREFIX}" 
       fi
-      if [[ "${INSTALLER_PACKAGE}" ]] ; then
+      if [[ "${DARWIN_TOOLCHAIN_INSTALLER_PACKAGE}" ]] ; then
         echo "-- Create Installer --"
-        "${SWIFT_SOURCE_DIR}/utils/toolchain-installer" "${TOOLCHAIN_PREFIX}" "${TOOLCHAIN_BUNDLE_IDENTIFIER}" "${TOOLCHAIN_INSTALLER_CERT}" "${TOOLCHAIN_INSTALLER_PACKAGE}" "${TOOLCHAIN_INSTALL_LOCATION}" "${TOOLCHAIN_VERSION}"
+        "${SWIFT_SOURCE_DIR}/utils/toolchain-installer" "${TOOLCHAIN_PREFIX}" "${DARWIN_TOOLCHAIN_BUNDLE_IDENTIFIER}" \
+        "${DARWIN_TOOLCHAIN_INSTALLER_CERT}" "${DARWIN_TOOLCHAIN_INSTALLER_PACKAGE}" "${DARWIN_TOOLCHAIN_INSTALL_LOCATION}" \
+        "${DARWIN_TOOLCHAIN_VERSION}"
       fi 
 
       (cd "${INSTALL_DESTDIR}" &&
