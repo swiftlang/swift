@@ -621,7 +621,7 @@ tests.test("UTF8 indexes") {
   // Test all valid subranges si0..<si1 of positions in s.  ds is
   // always si0.distanceTo(si1)
   for si0 in s.indices {
-    for (ds, si1) in (si0..<s.endIndex).enumerated {
+    for (ds, si1) in (si0..<s.endIndex).enumerated() {
       
       // Map those unicode scalar indices into utf8 indices
       let u8i1 = si1.samePositionIn(u8)

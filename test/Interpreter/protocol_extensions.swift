@@ -57,15 +57,15 @@ extension Collection where Self.Iterator.Element : Equatable {
 print(["a", "b", "c", "d", "e"].myIndexOf("d")!)
 
 extension Sequence {
-  final public func myEnumerate() -> EnumeratedSequence<Self> {
-    return self.enumerated
+  final public func myEnumerated() -> EnumeratedSequence<Self> {
+    return self.enumerated()
   }
 }
 
 // CHECK: (0, a)
 // CHECK-NEXT: (1, b)
 // CHECK-NEXT: (2, c)
-for (index, element) in ["a", "b", "c"].myEnumerate() {
+for (index, element) in ["a", "b", "c"].myEnumerated() {
   print("(\(index), \(element))")
 }
 

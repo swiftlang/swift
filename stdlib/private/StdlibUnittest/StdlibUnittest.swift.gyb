@@ -105,7 +105,7 @@ public struct SourceLocStack {
 func _printStackTrace(stackTrace: SourceLocStack?) {
   guard let s = stackTrace where !s.locs.isEmpty else { return }
   print("stacktrace:")
-  for (i, loc) in s.locs.reversed().enumerated {
+  for (i, loc) in s.locs.reversed().enumerated() {
     let comment = (loc.comment != nil) ? " ; \(loc.comment!)" : ""
     print("  #\(i): \(loc.file):\(loc.line)\(comment)")
   }
@@ -2222,8 +2222,8 @@ public func checkRangeReplaceable<
   // comparison later.
   let source = Array<A.Iterator.Element>(makeCollection())
 
-  for (ix, i) in source.indices.enumerated {
-    for (jx_, j) in (i..<source.endIndex).enumerated {
+  for (ix, i) in source.indices.enumerated() {
+    for (jx_, j) in (i..<source.endIndex).enumerated() {
       let jx = jx_ + ix
       
       let oldLength = jx - ix
@@ -2250,7 +2250,7 @@ public func checkRangeReplaceable<
             &a, "\(actualLength) != expected length \(expectedLength)")
         }
         
-        for (kx, k) in a.indices.enumerated {
+        for (kx, k) in a.indices.enumerated() {
           let expectedValue = kx < ix ? nth(source, kx)
           : kx < jx + growth ? nth(newValues, kx - ix)
           : nth(source, kx - growth)

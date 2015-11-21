@@ -34,8 +34,8 @@ ObjectiveCTests.test("NSObject/Hashable") {
     NSObjectWithCustomHashable(value: 20, hashValue: 100),
     NSObjectWithCustomHashable(value: 30, hashValue: 300),
   ]
-  for (i, object1) in objects.enumerated {
-    for (j, object2) in objects.enumerated {
+  for (i, object1) in objects.enumerated() {
+    for (j, object2) in objects.enumerated() {
       checkHashable(
         object1._value == object2._value,
         object1,

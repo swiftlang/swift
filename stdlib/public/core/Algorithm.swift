@@ -62,7 +62,7 @@ public func max<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
 /// starting at zero, along with the elements of the underlying
 /// `Base`:
 ///
-///     var iterator = ["foo", "bar"].enumerated.iterator()
+///     var iterator = ["foo", "bar"].enumerated().iterator()
 ///     iterator.next() // (0, "foo")
 ///     iterator.next() // (1, "bar")
 ///     iterator.next() // nil
@@ -94,13 +94,13 @@ public struct EnumeratedIterator<
   }
 }
 
-/// The type of the `enumerated` property.
+/// The type of the `enumerated()` property.
 ///
 /// `EnumeratedSequence` is a sequence of pairs (*n*, *x*), where *n*s
 /// are consecutive `Int`s starting at zero, and *x*s are the elements
 /// of a `Base` `Sequence`:
 ///
-///     var s = ["foo", "bar"].enumerated
+///     var s = ["foo", "bar"].enumerated()
 ///     Array(s) // [(0, "foo"), (1, "bar")]
 public struct EnumeratedSequence<Base : Sequence> : Sequence {
   internal var _base: Base

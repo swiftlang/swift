@@ -19,7 +19,7 @@ GElement = "Iterator.Element"
 }%
 
 //===----------------------------------------------------------------------===//
-// enumerated
+// enumerated()
 //===----------------------------------------------------------------------===//
 
 extension Sequence {
@@ -27,7 +27,7 @@ extension Sequence {
   /// *n*s are consecutive `Int`s starting at zero, and *x*s are
   /// the elements of `self`:
   ///
-  ///     > for (n, c) in "Swift".characters.enumerated {
+  ///     > for (n, c) in "Swift".characters.enumerated() {
   ///         print("\(n): '\(c)'")
   ///       }
   ///     0: 'S'
@@ -35,7 +35,7 @@ extension Sequence {
   ///     2: 'i'
   ///     3: 'f'
   ///     4: 't'
-  public var enumerated: EnumeratedSequence<Self> {
+  public func enumerated() -> EnumeratedSequence<Self> {
     return EnumeratedSequence(_base: self)
   }
 }
