@@ -167,12 +167,12 @@ public struct Mirror {
   }
   
   @warn_unused_result
-  internal static func _superclassIterator<T: Any>(
-    subject: T, _ ancestorRepresentation: AncestorRepresentation
+  internal static func _superclassIterator<Subject : Any>(
+    subject: Subject, _ ancestorRepresentation: AncestorRepresentation
   ) -> ()->Mirror? {
 
     if let subject = subject as? AnyObject,
-      let subjectClass = T.self as? AnyClass,
+      let subjectClass = Subject.self as? AnyClass,
       let superclass = _getSuperclass(subjectClass) {
 
       switch ancestorRepresentation {
@@ -212,14 +212,14 @@ public struct Mirror {
   /// initializers of `AnyBidirectionalCollection` and
   /// `AnyRandomAccessCollection` for details.
   public init<
-    T, C: Collection where C.Iterator.Element == Child
+    Subject, C : Collection where C.Iterator.Element == Child
   >(
-    _ subject: T,
+    _ subject: Subject,
     children: C,
     displayStyle: DisplayStyle? = nil,
     ancestorRepresentation: AncestorRepresentation = .Generated
   ) {
-    self.subjectType = T.self
+    self.subjectType = Subject.self
     self._makeSuperclassMirror = Mirror._superclassIterator(
       subject, ancestorRepresentation)
       
@@ -260,14 +260,14 @@ public struct Mirror {
   /// initializers of `AnyBidirectionalCollection` and
   /// `AnyRandomAccessCollection` for details.
   public init<
-    T, C: Collection
+    Subject, C: Collection
   >(
-    _ subject: T,
+    _ subject: Subject,
     unlabeledChildren: C,
     displayStyle: DisplayStyle? = nil,
     ancestorRepresentation: AncestorRepresentation = .Generated
   ) {
-    self.subjectType = T.self
+    self.subjectType = Subject.self
     self._makeSuperclassMirror = Mirror._superclassIterator(
       subject, ancestorRepresentation)
       
@@ -302,13 +302,13 @@ public struct Mirror {
   ///   `AnyRandomAccessCollection` later.  See the failable
   ///   initializers of `AnyBidirectionalCollection` and
   /// `AnyRandomAccessCollection` for details.
-  public init<T>(
-    _ subject: T,
+  public init<Subject>(
+    _ subject: Subject,
     children: DictionaryLiteral<String, Any>,
     displayStyle: DisplayStyle? = nil,
     ancestorRepresentation: AncestorRepresentation = .Generated
   ) {
-    self.subjectType = T.self
+    self.subjectType = Subject.self
     self._makeSuperclassMirror = Mirror._superclassIterator(
       subject, ancestorRepresentation)
       
@@ -768,17 +768,17 @@ extension DictionaryLiteral : Collection {
 extension String {
   /// Initialize `self` with the textual representation of `instance`.
   ///
-  /// * If `T` conforms to `Streamable`, the result is obtained by
-  ///   calling `instance.writeTo(s)` on an empty string s.
-  /// * Otherwise, if `T` conforms to `CustomStringConvertible`, the
+  /// * If `Subject` conforms to `Streamable`, the result is obtained by
+  ///   calling `instance.writeTo(s)` on an empty string `s`.
+  /// * Otherwise, if `Subject` conforms to `CustomStringConvertible`, the
   ///   result is `instance`'s `description`
-  /// * Otherwise, if `T` conforms to `CustomDebugStringConvertible`,
+  /// * Otherwise, if `Subject` conforms to `CustomDebugStringConvertible`,
   ///   the result is `instance`'s `debugDescription`
   /// * Otherwise, an unspecified result is supplied automatically by
   ///   the Swift standard library.
   ///
-  /// - SeeAlso: `String.init<T>(reflecting: T)`
-  public init<T>(_ instance: T) {
+  /// - SeeAlso: `String.init<Subject>(reflecting: Subject)`
+  public init<Subject>(_ instance: Subject) {
     self.init()
     _print_unlocked(instance, &self)
   }
@@ -786,20 +786,20 @@ extension String {
   /// Initialize `self` with a detailed textual representation of
   /// `subject`, suitable for debugging.
   ///
-  /// * If `T` conforms to `CustomDebugStringConvertible`, the result
+  /// * If `Subject` conforms to `CustomDebugStringConvertible`, the result
   ///   is `subject`'s `debugDescription`.
   ///
-  /// * Otherwise, if `T` conforms to `CustomStringConvertible`, the result
-  ///   is `subject`'s `description`.
+  /// * Otherwise, if `Subject` conforms to `CustomStringConvertible`,
+  ///   the result is `subject`'s `description`.
   ///
-  /// * Otherwise, if `T` conforms to `Streamable`, the result is
-  ///   obtained by calling `subject.writeTo(s)` on an empty string s.
+  /// * Otherwise, if `Subject` conforms to `Streamable`, the result is
+  ///   obtained by calling `subject.writeTo(s)` on an empty string `s`.
   ///
   /// * Otherwise, an unspecified result is supplied automatically by
   ///   the Swift standard library.
   ///
-  /// - SeeAlso: `String.init<T>(T)`
-  public init<T>(reflecting subject: T) {
+  /// - SeeAlso: `String.init<Subject>(Subject)`
+  public init<Subject>(reflecting subject: Subject) {
     self.init()
     debugPrint(subject, terminator: "", toStream: &self)
   }
