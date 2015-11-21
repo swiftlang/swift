@@ -94,6 +94,41 @@ void SwiftLookupTable::addEntry(DeclName name, clang::NamedDecl *decl,
 static void printName(clang::NamedDecl *named, llvm::raw_ostream &out) {
   // If there is a name, print it.
   if (!named->getDeclName().isEmpty()) {
+    // If we have an Objective-C method, print the class name along
+    // with '+'/'-'.
+    if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(named)) {
+      out << (objcMethod->isInstanceMethod() ? '-' : '+') << '[';
+      if (auto classDecl = objcMethod->getClassInterface()) {
+        classDecl->printName(out);
+        out << ' ';
+      } else if (auto proto = dyn_cast<clang::ObjCProtocolDecl>(
+                                objcMethod->getDeclContext())) {
+        proto->printName(out);
+        out << ' ';
+      }
+      named->printName(out);
+      out << ']';
+      return;
+    }
+
+    // If we have an Objective-C property, print the class name along
+    // with the property name.
+    if (auto objcProperty = dyn_cast<clang::ObjCPropertyDecl>(named)) {
+      auto dc = objcProperty->getDeclContext();
+      if (auto classDecl = dyn_cast<clang::ObjCInterfaceDecl>(dc)) {
+        classDecl->printName(out);
+        out << '.';
+      } else if (auto categoryDecl = dyn_cast<clang::ObjCCategoryDecl>(dc)) {
+        categoryDecl->getClassInterface()->printName(out);
+        out << '.';
+      } else if (auto proto = dyn_cast<clang::ObjCProtocolDecl>(dc)) {
+        proto->printName(out);
+        out << '.';
+      }
+      named->printName(out);
+      return;
+    }
+
     named->printName(out);
     return;
   }
@@ -158,7 +193,10 @@ void SwiftLookupTable::dump() const {
 
       interleave(fullEntry.Decls.begin(), fullEntry.Decls.end(),
                  [](clang::NamedDecl *decl) {
-                   decl->printName(llvm::errs());
+                   if (auto named = dyn_cast<clang::NamedDecl>(decl))
+                     printName(named, llvm::errs());
+                   else
+                     decl->printName(llvm::errs());
                  },
                  [] {
                    llvm::errs() << ", ";

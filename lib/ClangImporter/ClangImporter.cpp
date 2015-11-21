@@ -1579,6 +1579,10 @@ DeclName ClangImporter::Implementation::importFullName(
            const clang::NamedDecl *D,
            bool *hasCustomName,
            clang::DeclContext **effectiveContext) {
+  // Objective-C categories and extensions don't have names.
+  if (isa<clang::ObjCCategoryDecl>(D))
+    return { };
+
   // Compute the effective context, if requested.
   if (effectiveContext) {
     auto dc = const_cast<clang::DeclContext *>(D->getDeclContext());
@@ -1604,6 +1608,12 @@ DeclName ClangImporter::Implementation::importFullName(
     } else {
       // Everything else goes into its redeclaration context.
       *effectiveContext = dc->getRedeclContext();
+    }
+
+    // Anything in an Objective-C category or extension is adjusted to the
+    // class context.
+    if (auto category = dyn_cast<clang::ObjCCategoryDecl>(*effectiveContext)) {
+      *effectiveContext = category->getClassInterface();
     }
   }
 
