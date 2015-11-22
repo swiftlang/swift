@@ -1,6 +1,7 @@
 set(SCALAR_SOURCES
     Scalar/AllocBoxToStack.cpp
     Scalar/ArrayCountPropagation.cpp
+    Scalar/ArrayElementValuePropagation.cpp
     Scalar/MergeCondFail.cpp
     Scalar/SILSROA.cpp
     Scalar/CSE.cpp
