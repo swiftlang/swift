@@ -533,3 +533,32 @@ SILValue swift::ArraySemanticsCall::getArrayValue() const {
 
   return SILValue();
 }
+
+SILValue swift::ArraySemanticsCall::getArrayElementStoragePointer() const {
+  if (getKind() == ArrayCallKind::kArrayUninitialized) {
+    TupleExtractInst *ArrayElementStorage = nullptr;
+    for (auto *Op : SemanticsCall->getUses()) {
+      auto *TupleElt = dyn_cast<TupleExtractInst>(Op->getUser());
+      if (!TupleElt)
+        return SILValue();
+      switch (TupleElt->getFieldNo()) {
+      default:
+        return SILValue();
+      case 0: {
+        // Ignore the array value.
+        break;
+      }
+      case 1:
+        // Should only have one tuple extract after CSE.
+        if (ArrayElementStorage)
+          return SILValue();
+        ArrayElementStorage = TupleElt;
+        break;
+      }
+    }
+    return SILValue(ArrayElementStorage);
+  }
+
+  return SILValue();
+}
+
