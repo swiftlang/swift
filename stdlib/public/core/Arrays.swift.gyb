@@ -24,6 +24,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// This type is used as a result of the _checkSubscript call to associate the
+/// call with the array access call it guards.
+public struct _DependenceToken {}
 
 %{
   arrayTypes = [
@@ -216,9 +219,12 @@ public struct ${Self}<Element>
       
       // Make sure the index is in range and wasNativeTypeChecked is
       // still valid.
-      _checkSubscript(index, wasNativeTypeChecked: wasNativeTypeChecked)
+      let token = _checkSubscript(
+        index, wasNativeTypeChecked: wasNativeTypeChecked)
 
-      return _getElement(index, wasNativeTypeChecked: wasNativeTypeChecked)
+      return _getElement(
+        index, wasNativeTypeChecked: wasNativeTypeChecked,
+        matchingSubscriptCheck: token)
     }
 %elif Self == 'ContiguousArray':
     addressWithNativeOwner {
@@ -372,13 +378,16 @@ public struct ${Self}<Element>
   /// ≤ index < count`.
   @_semantics("array.check_subscript")
   public // @testable
-  func _checkSubscript(index: Int, wasNativeTypeChecked: Bool) {
+  func _checkSubscript(
+    index: Int, wasNativeTypeChecked: Bool
+  ) -> _DependenceToken {
 #if _runtime(_ObjC)
     _buffer._checkInoutAndNativeTypeCheckedBounds(
       index, wasNativeTypeChecked: wasNativeTypeChecked)
 #else
     _buffer._checkValidSubscript(index)
 #endif
+    return _DependenceToken()
   }
 % end
 
@@ -393,7 +402,11 @@ public struct ${Self}<Element>
   @_semantics("array.get_element")
   @inline(__always)
   public // @testable
-  func _getElement(index: Int, wasNativeTypeChecked : Bool) -> Element {
+  func _getElement(
+    index: Int,
+    wasNativeTypeChecked : Bool,
+    matchingSubscriptCheck: _DependenceToken
+  ) -> Element {
 #if ${'_runtime(_ObjC)' if Self == 'Array' else 'false'}
     return _buffer.getElement(index, wasNativeTypeChecked: wasNativeTypeChecked)
 #else
