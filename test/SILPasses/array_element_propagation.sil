@@ -1,0 +1,208 @@
+// RUN: %target-sil-opt -array-element-propagation %s | FileCheck %s
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct MyInt {
+  @sil_stored var _value: Builtin.Int64
+}
+
+struct MyBool {}
+struct _MyDependenceToken {}
+
+struct _MyBridgeStorage {
+  @sil_stored var rawValue : Builtin.BridgeObject
+}
+
+struct _MyArrayBuffer<T> {
+  @sil_stored var _storage : _MyBridgeStorage
+}
+
+
+struct MyArray<T> {
+  @sil_stored var _buffer : _MyArrayBuffer<T>
+}
+
+sil @swift_bufferAllocate : $@convention(thin)() -> @owned AnyObject
+sil [_semantics "array.uninitialized"] @adoptStorage : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
+sil [_semantics "array.props.isNativeTypeChecked"] @hoistableIsNativeTypeChecked : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyBool
+sil [_semantics "array.check_subscript"] @checkSubscript : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> _MyDependenceToken
+sil [_semantics "array.get_element"] @getElement : $@convention(method) (@out MyInt, MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> ()
+sil @unknown_array_use : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyBool
+
+// CHECK-LABEL: sil @propagate01
+// CHECK:    struct $MyInt
+// CHECK:   [[V0:%.*]] = integer_literal $Builtin.Int64, 0
+// CHECK:   [[I0:%.*]] = struct $MyInt ([[V0]] : $Builtin.Int64)
+// CHECK:   [[V1:%.*]] = integer_literal $Builtin.Int64, 1
+// CHECK:   [[I1:%.*]] = struct $MyInt ([[V1]] : $Builtin.Int64)
+// CHECK:   [[V2:%.*]] = integer_literal $Builtin.Int64, 2
+// CHECK:   [[I2:%.*]] = struct $MyInt ([[V2]] : $Builtin.Int64)
+// CHECK:   [[S0:%.*]] = alloc_stack $MyInt
+// CHECK:   [[HFUN:%.*]] = function_ref @hoistableIsNativeTypeChecked
+// CHECK-NOT: apply [[HFUN]]
+// CHECK:   [[CFUN:%.*]] = function_ref @checkSubscript
+// CHECK-NOT: apply [[CFUN]]
+// CHECK:   [[GFUN:%.*]] = function_ref @getElement
+// CHECK-NOT: apply [[GFUN]]
+// CHECK-NOT: apply [[HFUN]]
+// CHECK-NOT: apply [[CFUN]]
+// CHECK-NOT: apply [[GFUN]]
+// CHECK:   store [[I0]] to [[S0]]
+// CHECK:   [[S1:%.*]] = alloc_stack $MyInt
+// CHECK:   store [[I1]] to [[S1]]
+// CHECK:   [[S2:%.*]] = alloc_stack $MyInt
+// CHECK:   store [[I2]] to [[S2]]
+// CHECK: return
+
+sil @propagate01 : $@convention(thin) () -> () {
+  %0 = function_ref @swift_bufferAllocate : $@convention(thin) () -> @owned AnyObject
+  %1 = integer_literal $Builtin.Int64, 3
+  %2 = struct $MyInt (%1 : $Builtin.Int64)
+  %3 = apply %0() : $@convention(thin) () -> @owned AnyObject
+  %4 = metatype $@thin MyArray<MyInt>.Type
+  %5 = function_ref @adoptStorage : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
+  %6 = apply %5(%3, %2, %4) : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
+  %7 = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 0
+  %8 = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 1
+  debug_value %7 : $MyArray<MyInt>
+  debug_value %8 : $UnsafeMutablePointer<MyInt>
+  %9 = struct_extract %8 : $UnsafeMutablePointer<MyInt>, #UnsafeMutablePointer._rawValue
+  %10 = pointer_to_address %9 : $Builtin.RawPointer to $*MyInt
+  %11 = integer_literal $Builtin.Int64, 0
+  %12 = struct $MyInt (%11 : $Builtin.Int64)
+  store %12 to %10 : $*MyInt
+  %13 = integer_literal $Builtin.Word, 1
+  %14 = index_addr %10 : $*MyInt, %13 : $Builtin.Word
+  %15 = integer_literal $Builtin.Int64, 1
+  %16 = struct $MyInt (%15 : $Builtin.Int64)
+  store %16 to %14 : $*MyInt
+  %17 = integer_literal $Builtin.Word, 2
+  %18 = index_addr %10 : $*MyInt, %17 : $Builtin.Word
+  %19 = integer_literal $Builtin.Int64, 2
+  %20 = struct $MyInt (%19 : $Builtin.Int64)
+  store %20 to %18 : $*MyInt
+  %23 = struct_extract %7 : $MyArray<MyInt>, #MyArray._buffer
+  %24 = struct_extract %23 : $_MyArrayBuffer<MyInt>, #_MyArrayBuffer._storage
+  %25 = struct_extract %24 : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
+  %26 = alloc_stack $MyInt
+  debug_value %7 : $MyArray<MyInt>
+  %27 = function_ref @hoistableIsNativeTypeChecked : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyBool
+  %28 = apply %27(%7) : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyBool
+  debug_value %28 : $MyBool                        // id: %104
+  %29 = function_ref @checkSubscript : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> _MyDependenceToken
+  %30 = apply %29(%12, %28, %7) : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> _MyDependenceToken
+  debug_value %30 : $_MyDependenceToken
+  %31 = function_ref @getElement : $@convention(method) (@out MyInt, MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> ()
+  %32 = apply %31(%26#1, %12, %28, %30, %7) : $@convention(method) (@out MyInt, MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> ()
+  %35 = alloc_stack $MyInt
+  debug_value %16 : $MyInt
+  debug_value %7 : $MyArray<MyInt>
+  debug_value %28 : $MyBool
+  strong_retain %25 : $Builtin.BridgeObject
+  %36 = apply %29(%16, %28, %7) : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> _MyDependenceToken
+  debug_value %36 : $_MyDependenceToken
+  %37 = apply %31(%35#1, %16, %28, %36, %7) : $@convention(method) (@out MyInt, MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> ()
+  strong_release %25 : $Builtin.BridgeObject
+  %44 = alloc_stack $MyInt
+  debug_value %7 : $MyArray<MyInt>
+  debug_value %28 : $MyBool
+  strong_retain %25 : $Builtin.BridgeObject
+  %45 = apply %29(%20, %28, %7) : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> _MyDependenceToken
+  debug_value %45 : $_MyDependenceToken
+  %46 = apply %31(%44#1, %20, %28, %45, %7) : $@convention(method) (@out MyInt, MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> ()
+  strong_release %25 : $Builtin.BridgeObject
+  %52 = tuple ()
+  dealloc_stack %44#0 : $*@local_storage MyInt
+  dealloc_stack %35#0 : $*@local_storage MyInt
+  dealloc_stack %26#0 : $*@local_storage MyInt
+  strong_release %25 : $Builtin.BridgeObject
+  return %52 : $()
+}
+
+// CHECK-LABEL: sil @repeated_initialization
+// CHECK:   [[GFUN:%.*]] = function_ref @getElement
+// CHECK:   apply [[GFUN]]
+// CHECK:   apply [[GFUN]]
+// CHECK: return
+
+sil @repeated_initialization : $@convention(thin) () -> () {
+  %0 = function_ref @swift_bufferAllocate : $@convention(thin) () -> @owned AnyObject
+  %1 = integer_literal $Builtin.Int64, 2
+  %2 = struct $MyInt (%1 : $Builtin.Int64)
+  %3 = apply %0() : $@convention(thin) () -> @owned AnyObject
+  %4 = metatype $@thin MyArray<MyInt>.Type
+  %5 = function_ref @adoptStorage : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
+  %6 = apply %5(%3, %2, %4) : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
+  %7 = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 0
+  %8 = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 1
+  %9 = struct_extract %8 : $UnsafeMutablePointer<MyInt>, #UnsafeMutablePointer._rawValue
+  %10 = pointer_to_address %9 : $Builtin.RawPointer to $*MyInt
+  %11 = integer_literal $Builtin.Int64, 0
+  %12 = struct $MyInt (%11 : $Builtin.Int64)
+  store %12 to %10 : $*MyInt
+  %13 = integer_literal $Builtin.Word, 0
+  %14 = index_addr %10 : $*MyInt, %13 : $Builtin.Word
+  %15 = integer_literal $Builtin.Int64, 1
+  %16 = struct $MyInt (%15 : $Builtin.Int64)
+  store %16 to %14 : $*MyInt
+  %23 = struct_extract %7 : $MyArray<MyInt>, #MyArray._buffer
+  %24 = struct_extract %23 : $_MyArrayBuffer<MyInt>, #_MyArrayBuffer._storage
+  %25 = struct_extract %24 : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
+  %26 = alloc_stack $MyInt
+  %27 = function_ref @hoistableIsNativeTypeChecked : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyBool
+  %28 = apply %27(%7) : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyBool
+  %29 = function_ref @checkSubscript : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> _MyDependenceToken
+  %30 = apply %29(%12, %28, %7) : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> _MyDependenceToken
+  %31 = function_ref @getElement : $@convention(method) (@out MyInt, MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> ()
+  %32 = apply %31(%26#1, %12, %28, %30, %7) : $@convention(method) (@out MyInt, MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> ()
+  %35 = alloc_stack $MyInt
+  strong_retain %25 : $Builtin.BridgeObject
+  %36 = apply %29(%16, %28, %7) : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> _MyDependenceToken
+  %37 = apply %31(%35#1, %16, %28, %36, %7) : $@convention(method) (@out MyInt, MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> ()
+  strong_release %25 : $Builtin.BridgeObject
+  %52 = tuple ()
+  dealloc_stack %35#0 : $*@local_storage MyInt
+  dealloc_stack %26#0 : $*@local_storage MyInt
+  strong_release %25 : $Builtin.BridgeObject
+  return %52 : $()
+}
+
+// CHECK-LABEL: sil @unknown_use
+// CHECK:   [[GFUN:%.*]] = function_ref @getElement
+// CHECK:   apply [[GFUN]]
+// CHECK: return
+
+sil @unknown_use : $@convention(thin) () -> () {
+  %0 = function_ref @swift_bufferAllocate : $@convention(thin) () -> @owned AnyObject
+  %1 = integer_literal $Builtin.Int64, 2
+  %2 = struct $MyInt (%1 : $Builtin.Int64)
+  %3 = apply %0() : $@convention(thin) () -> @owned AnyObject
+  %4 = metatype $@thin MyArray<MyInt>.Type
+  %5 = function_ref @adoptStorage : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
+  %6 = apply %5(%3, %2, %4) : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
+  %7 = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 0
+  %8 = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 1
+  %9 = struct_extract %8 : $UnsafeMutablePointer<MyInt>, #UnsafeMutablePointer._rawValue
+  %10 = pointer_to_address %9 : $Builtin.RawPointer to $*MyInt
+  %11 = integer_literal $Builtin.Int64, 0
+  %12 = struct $MyInt (%11 : $Builtin.Int64)
+  store %12 to %10 : $*MyInt
+  %23 = struct_extract %7 : $MyArray<MyInt>, #MyArray._buffer
+  %24 = struct_extract %23 : $_MyArrayBuffer<MyInt>, #_MyArrayBuffer._storage
+  %25 = struct_extract %24 : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
+  %26 = alloc_stack $MyInt
+  %27 = function_ref @hoistableIsNativeTypeChecked : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyBool
+  %28 = apply %27(%7) : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyBool
+  %29 = function_ref @checkSubscript : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> _MyDependenceToken
+  %30 = apply %29(%12, %28, %7) : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> _MyDependenceToken
+  %31 = function_ref @getElement : $@convention(method) (@out MyInt, MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> ()
+  %32 = apply %31(%26#1, %12, %28, %30, %7) : $@convention(method) (@out MyInt, MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> ()
+  %33 = function_ref @unknown_array_use : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyBool
+  %34 = apply %33(%7) : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyBool
+  %52 = tuple ()
+  dealloc_stack %26#0 : $*@local_storage MyInt
+  strong_release %25 : $Builtin.BridgeObject
+  return %52 : $()
+}

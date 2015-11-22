@@ -38,6 +38,8 @@ PASS(AllocBoxToStack, "allocbox-to-stack",
      "Promote heap allocations to stack allocations")
 PASS(ArrayCountPropagation, "array-count-propagation",
      "Propagate the count of arrays")
+PASS(ArrayElementPropagation, "array-element-propagation",
+     "Propagate the value of array elements")
 PASS(BasicCalleePrinter, "basic-callee-printer",
      "Construct basic callee analysis and use it to print callees "
      "for testing purposes")
