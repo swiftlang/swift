@@ -56,14 +56,10 @@ public:
   };
 
 private:
-  using AliasCacheKey = std::pair<SILValue, SILValue>;
-  llvm::DenseMap<AliasCacheKey, AliasResult> AliasCache;
   SILModule *Mod;
   SideEffectAnalysis *SEA;
 
   using MemoryBehavior = SILInstruction::MemoryBehavior;
-
-  AliasResult cacheValue(AliasCacheKey Key, AliasResult Result);
 
   AliasResult aliasAddressProjection(SILValue V1, SILValue V2,
                                      SILValue O1, SILValue O2);
@@ -154,7 +150,7 @@ public:
     return MemoryBehavior::MayHaveSideEffects == B;
   }
 
-  virtual void invalidate(SILAnalysis::InvalidationKind K) { AliasCache.clear(); }
+  virtual void invalidate(SILAnalysis::InvalidationKind K) { }
 
   virtual void invalidate(SILFunction *, SILAnalysis::InvalidationKind K) {
     invalidate(K);

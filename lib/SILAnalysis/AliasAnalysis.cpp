@@ -76,11 +76,6 @@ static inline bool shouldRunBasicAA() {
 
 #endif
 
-static llvm::cl::opt<bool>
-    CacheAAResults("cache-aa-results",
-                   llvm::cl::desc("Should AA results be cached"),
-                   llvm::cl::init(true));
-
 //===----------------------------------------------------------------------===//
 //                                 Utilities
 //===----------------------------------------------------------------------===//
@@ -605,9 +600,7 @@ static bool typesMayAlias(SILType T1, SILType T2, SILType TBAA1Ty,
 AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2,
                                  SILType TBAAType1,
                                  SILType TBAAType2) {
-  auto Result = aliasInner(V1, V2, TBAAType1, TBAAType2);
-  AliasCache.clear();
-  return Result;
+  return aliasInner(V1, V2, TBAAType1, TBAAType2);
 }
 
 /// The main AA entry point. Performs various analyses on V1, V2 in an attempt
@@ -644,24 +637,6 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   DEBUG(llvm::dbgs() << "        After Cast Stripping V1:" << *V1.getDef());
   DEBUG(llvm::dbgs() << "        After Cast Stripping V2:" << *V2.getDef());
 
-  // Create a key to lookup if we have already computed an alias result for V1,
-  // V2. Canonicalize our cache keys so that the pointer with the lower address
-  // is always the first element of the pair. This ensures we do not pollute our
-  // cache with two entries with the same key, albeit with the key's fields
-  // swapped.
-  auto Key = V1 < V2? std::make_pair(V1, V2) : std::make_pair(V2, V1);
-
-  // If we find our key in the cache, just return the alias result.
-  if (CacheAAResults) {
-    auto Pair = AliasCache.find(Key);
-    if (Pair != AliasCache.end()) {
-      DEBUG(llvm::dbgs() << "      Found value in the cache: " << Pair->second
-                         << "\n");
-
-      return Pair->second;
-    }
-  }
-
   // Ok, we need to actually compute an Alias Analysis result for V1, V2. Begin
   // by finding the "base" of V1, V2 by stripping off all casts and GEPs.
   SILValue O1 = getUnderlyingObject(V1);
@@ -672,7 +647,7 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   // If O1 and O2 do not equal, see if we can prove that they can not be the
   // same object. If we can, return No Alias.
   if (O1 != O2 && aliasUnequalObjects(O1, O2))
-    return cacheValue(Key, AliasResult::NoAlias);
+    return AliasResult::NoAlias;
 
   // Ok, either O1, O2 are the same or we could not prove anything based off of
   // their inequality. Now we climb up use-def chains and attempt to do tricks
@@ -690,9 +665,8 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   if (Projection::isAddrProjection(V1)) {
     AliasResult Result = aliasAddressProjection(V1, V2, O1, O2);
     if (Result != AliasResult::MayAlias)
-      return cacheValue(Key, Result);
+      return Result;
   }
-
 
   // We could not prove anything. Be conservative and return that V1, V2 may
   // alias.
@@ -727,13 +701,6 @@ bool swift::isLetPointer(SILValue V) {
   return false;
 }
 
-AliasResult AliasAnalysis::cacheValue(AliasCacheKey Key, AliasResult Result) {
-  if (!CacheAAResults)
-    return Result;
-  DEBUG(llvm::dbgs() << "Caching Alias Result: " << Result << "\n" << Key.first
-                     << Key.second << "\n");
-  return AliasCache[Key] = Result;
-}
 
 void AliasAnalysis::initialize(SILPassManager *PM) {
   SEA = PM->getAnalysis<SideEffectAnalysis>();
