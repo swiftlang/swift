@@ -194,10 +194,6 @@ struct _SliceBuffer<Element> : _ArrayBufferType {
     return target + c
   }
 
-  var arrayPropertyIsNative : Bool {
-    return _hasNativeBuffer
-  }
-
   /// True, if the array is native and does not need a deferred type check.
   var arrayPropertyIsNativeTypeChecked : Bool {
     return _hasNativeBuffer

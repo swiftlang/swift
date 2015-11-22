@@ -23,7 +23,6 @@ class DominanceInfo;
 /// of the called function.
 enum class ArrayCallKind {
   kNone = 0,
-  kArrayPropsIsNative,
   kArrayPropsIsNativeTypeChecked,
   kCheckSubscript,
   kCheckIndex,
@@ -82,11 +81,8 @@ public:
   /// Get the index for operations that have one.
   SILValue getIndex() const;
 
-  /// Get the array.props.isNative argument.
-  SILValue getArrayPropertyIsNative() const;
-
-  /// Get the array.props.needsElementTypeCheck argument.
-  SILValue getArrayPropertyNeedsTypeCheck() const;
+  /// Get the array.props.isNativeTypeChecked argument.
+  SILValue getArrayPropertyIsNativeTypeChecked() const;
 
   /// Get the count used for this array initialization.
   ///

@@ -120,7 +120,6 @@ bool ArrayAllocation::analyseArrayValueUses() {
 static bool doesNotChangeArrayCount(ArraySemanticsCall &C) {
   switch (C.getKind()) {
   default: return false;
-  case ArrayCallKind::kArrayPropsIsNative:
   case ArrayCallKind::kArrayPropsIsNativeTypeChecked:
   case ArrayCallKind::kCheckSubscript:
   case ArrayCallKind::kCheckIndex:
