@@ -185,7 +185,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
 }
 
 /// Maximum amount of ValueCapture queries.
-static unsigned const Threshold = 32;
+static unsigned const ValueCaptureSearchThreshold = 32;
 
 namespace {
 
@@ -205,8 +205,8 @@ enum CaptureException : unsigned {
 /// case to be conservative, we must assume it is captured.
 /// FIXME: Maybe put this on SILValue?
 static bool valueMayBeCaptured(SILValue V, CaptureException Exception) {
-  llvm::SmallVector<Operand *, Threshold> Worklist;
-  llvm::SmallPtrSet<Operand *, Threshold> Visited;
+  llvm::SmallVector<Operand *, ValueCaptureSearchThreshold> Worklist;
+  llvm::SmallPtrSet<Operand *, ValueCaptureSearchThreshold> Visited;
   unsigned Count = 0;
 
   DEBUG(llvm::dbgs() << "        Checking for capture.\n");
@@ -216,7 +216,7 @@ static bool valueMayBeCaptured(SILValue V, CaptureException Exception) {
   for (auto *UI : V.getUses()) {
     // If we have more uses than the threshold, be conservative and bail so we
     // don't use too much compile time.
-    if (Count++ >= Threshold)
+    if (Count++ >= ValueCaptureSearchThreshold)
       return true;
     Visited.insert(UI);
     Worklist.push_back(UI);
@@ -238,7 +238,7 @@ static bool valueMayBeCaptured(SILValue V, CaptureException Exception) {
       for (auto *UI : Inst->getUses()) {
         // If we have more uses than the threshold, be conservative and bail
         // so we don't use too much compile time.
-        if (Count++ >= Threshold)
+        if (Count++ >= ValueCaptureSearchThreshold)
           return true;
 
         if (Visited.insert(UI).second) {
