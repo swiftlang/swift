@@ -2126,7 +2126,7 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
       #Create plist for xctoolchain 
       echo "-- Create Info.plist --"
       PLISTBUDDY_BIN="/usr/libexec/PlistBuddy"
-      TOOLCHAIN_INSTALL_LOCATION="/Library/Developer/Toolchains/${DARWIN_TOOLCHAIN_NAME}.xctoolchain"
+      DARWIN_TOOLCHAIN_INSTALL_LOCATION="/Library/Developer/Toolchains/${DARWIN_TOOLCHAIN_NAME}.xctoolchain"
       if [[ -f "${INSTALL_DESTDIR}/${TOOLCHAIN_PREFIX}/Info.plist" ]] ; then
         echo "-- Removing: ${INSTALL_DESTDIR}/${TOOLCHAIN_PREFIX}/Info.plist"
         rm "${INSTALL_DESTDIR}/${TOOLCHAIN_PREFIX}/Info.plist"
