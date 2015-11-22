@@ -98,6 +98,13 @@ public:
   /// Returns SILValue() if this is not an array initialization call.
   SILValue getArrayValue() const;
 
+  /// Get the array element storage pointer returned by an array initialization
+  /// call.
+  ///
+  /// Returns SILValue() if this is not an array initialization call or the call
+  /// can't be parsed.
+  SILValue getArrayElementStoragePointer() const;
+
   /// Remove the semantics call replacing it by a release of any @owned
   /// parameter.
   void removeCall();
