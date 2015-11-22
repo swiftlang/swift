@@ -426,6 +426,10 @@ public:
   /// imported as methods into Swift.
   bool isAccessibilityDecl(const clang::Decl *objCMethodOrProp);
 
+  /// Determine whether this method is an Objective-C "init" method
+  /// that will be imported as a Swift initializer.
+  bool isInitMethod(const clang::ObjCMethodDecl *method);
+
 private:
   /// \brief Generation number that is used for crude versioning.
   ///

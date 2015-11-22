@@ -1655,8 +1655,10 @@ DeclName ClangImporter::Implementation::importFullName(
 
   /// Whether the result is a function name.
   bool isFunction = false;
+  bool isInitializer = false;
   StringRef baseName;
   SmallVector<StringRef, 4> argumentNames;
+  SmallString<16> selectorSplitScratch;
   switch (D->getDeclName().getNameKind()) {
   case clang::DeclarationName::CXXConstructorName:
   case clang::DeclarationName::CXXConversionFunctionName:
@@ -1675,15 +1677,55 @@ DeclName ClangImporter::Implementation::importFullName(
   case clang::DeclarationName::ObjCMultiArgSelector:
   case clang::DeclarationName::ObjCOneArgSelector:
   case clang::DeclarationName::ObjCZeroArgSelector: {
+    auto objcMethod = cast<clang::ObjCMethodDecl>(D);
+    isInitializer = isInitMethod(objcMethod);
+
     // Map the Objective-C selector directly.
     auto selector = D->getDeclName().getObjCSelector();
-    baseName = selector.getNameForSlot(0);
+    if (isInitializer)
+      baseName = "init";
+    else
+      baseName = selector.getNameForSlot(0);
     for (unsigned index = 0, numArgs = selector.getNumArgs(); index != numArgs;
          ++index) {
-      if (index == 0)
-        argumentNames.push_back("");
-      else
+      if (index == 0) {
+        argumentNames.push_back(StringRef());
+      } else {
         argumentNames.push_back(selector.getNameForSlot(index));
+      }
+    }
+
+    // For initializers, compute the first argument name.
+    if (isInitializer) {
+      // Skip over the 'init'.
+      auto argName = selector.getNameForSlot(0).substr(4);
+
+      // Drop "With" if present after the "init".
+      bool droppedWith = false;
+      if (argName.startswith("With")) {
+        argName = argName.substr(4);
+        droppedWith = true;
+      }
+
+      // Lowercase the remaining argument name.
+      argName = camel_case::toLowercaseWord(argName, selectorSplitScratch);
+
+      // If we dropped "with" and ended up with a reserved name,
+      // put "with" back.
+      if (droppedWith && isSwiftReservedName(argName)) {
+        selectorSplitScratch = "with";
+        selectorSplitScratch += selector.getNameForSlot(0).substr(8);
+        argName = selectorSplitScratch;
+      }
+
+      // Set the first argument name to be the name we computed. If
+      // there is no first argument, create one for this purpose.
+      if (argumentNames.empty() && !argName.empty()) {
+        // FIXME: Record what happened here for the caller?
+        argumentNames.push_back(argName);
+      } else {
+        argumentNames[0] = argName;
+      }
     }
 
     isFunction = true;
@@ -1825,17 +1867,15 @@ DeclName ClangImporter::Implementation::importFullName(
   if (hasSwiftPrivate(D)) {
     swiftPrivateScratch = "__";
 
-    if (baseName == "init") {
+    if (isInitializer) {
       // For initializers, prepend "__" to the first argument name.
       if (argumentNames.empty()) {
-        // swift_private cannot actually do anything here. Just drop the
-        // declaration.
-        // FIXME: Diagnose this?
-        return { };
+        // FIXME: Record that we did this.
+        argumentNames.push_back("__");
+      } else {
+        swiftPrivateScratch += argumentNames[0];
+        argumentNames[0] = swiftPrivateScratch;
       }
-
-      swiftPrivateScratch += argumentNames[0];
-      argumentNames[0] = swiftPrivateScratch;
     } else {
       // For all other entities, prepend "__" to the base name.
       swiftPrivateScratch += baseName;
@@ -2570,6 +2610,19 @@ ClangImporter::Implementation::isAccessibilityDecl(const clang::Decl *decl) {
     return true;
 
   return false;
+}
+
+bool ClangImporter::Implementation::isInitMethod(
+       const clang::ObjCMethodDecl *method) {
+  // init methods are always instance methods.
+  if (!method->isInstanceMethod()) return false;
+
+  // init methods must be classified as such by Clang.
+  if (method->getMethodFamily() != clang::OMF_init) return false;
+
+  // Swift restriction: init methods must start with the word "init".
+  auto selector = method->getSelector();
+  return camel_case::getFirstWord(selector.getNameForSlot(0)) == "init";
 }
 
 #pragma mark Name lookup

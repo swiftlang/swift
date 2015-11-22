@@ -14,7 +14,7 @@
 // CHECK-NEXT:   doubleProperty --> doubleProperty{{$}}
 // CHECK-NEXT:   extensionMethodWithX --> extensionMethodWithX(_:y:)
 // CHECK-NEXT:   floatProperty --> floatProperty{{$}}
-// CHECK-NEXT:   initWithFloat --> initWithFloat(_:)
+// CHECK-NEXT:   init --> init(float:), init(withDefault:)
 // CHECK-NEXT:   instanceMethodWithX --> instanceMethodWithX(_:y:z:)
 // CHECK-NEXT:   protoInstanceMethodWithX --> protoInstanceMethodWithX(_:y:)
 // CHECK-NEXT:   setAccessibilityFloat --> setAccessibilityFloat(_:)
@@ -43,8 +43,10 @@
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass extensionMethodWithX:y:]
 // CHECK-NEXT:   floatProperty:
 // CHECK-NEXT:     SNSomeClass: SNSomeClass.floatProperty
-// CHECK-NEXT:   initWithFloat(_:):
+// CHECK-NEXT:   init(float:):
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass initWithFloat:]
+// CHECK-NEXT:   init(withDefault:):
+// CHECK-NEXT:     SNSomeClass: -[SNSomeClass initWithDefault]
 // CHECK-NEXT:   instanceMethodWithX(_:y:z:):
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass instanceMethodWithX:y:z:]
 // CHECK-NEXT:   protoInstanceMethodWithX(_:y:):

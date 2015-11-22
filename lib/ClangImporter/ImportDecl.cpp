@@ -2879,8 +2879,7 @@ namespace {
                               DeclContext *dc,
                               bool forceClassMethod = false) {
       // If we have an init method, import it as an initializer.
-      if (decl->getMethodFamily() == clang::OMF_init &&
-          isReallyInitMethod(decl)) {
+      if (Impl.isInitMethod(decl)) {
         // Cannot force initializers into class methods.
         if (forceClassMethod)
           return nullptr;
@@ -3069,27 +3068,6 @@ namespace {
       return result;
     }
 
-  private:
-    /// Check whether the given name starts with the given word.
-    static bool startsWithWord(StringRef name, StringRef word) {
-      if (name.size() < word.size()) return false;
-      return ((name.size() == word.size() || !islower(name[word.size()])) &&
-              name.startswith(word));
-    }
-
-    /// Determine whether the given Objective-C method, which Clang classifies
-    /// as an init method, is considered an init method in Swift.
-    static bool isReallyInitMethod(const clang::ObjCMethodDecl *method) {
-      if (!method->isInstanceMethod())
-        return false;
-
-      auto selector = method->getSelector();
-      auto first = selector.getIdentifierInfoForSlot(0);
-      if (!first) return false;
-
-      return startsWithWord(first->getName(), "init");
-    }
-
   public:
     /// \brief Given an imported method, try to import it as some kind of
     /// special declaration, e.g., a constructor or subscript.
@@ -3241,9 +3219,7 @@ namespace {
                                        Optional<CtorInitializerKind> kind,
                                        bool required) {
       // Only methods in the 'init' family can become constructors.
-      assert(objcMethod->getMethodFamily() == clang::OMF_init &&
-             "Not an init method");
-      assert(isReallyInitMethod(objcMethod) && "Not a real init method");
+      assert(Impl.isInitMethod(objcMethod) && "Not a real init method");
 
       // Check whether we've already created the constructor.
       auto known = Impl.Constructors.find({objcMethod, dc});
@@ -4552,8 +4528,7 @@ namespace {
             continue;
 
           // When mirroring an initializer, make it designated and required.
-          if (objcMethod->getMethodFamily() == clang::OMF_init &&
-              isReallyInitMethod(objcMethod)) {
+          if (Impl.isInitMethod(objcMethod)) {
             // Import the constructor.
             if (auto imported = importConstructor(
                                   objcMethod, dc, /*implicit=*/true,
