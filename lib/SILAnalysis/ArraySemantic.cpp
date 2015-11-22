@@ -186,6 +186,9 @@ SILValue swift::ArraySemanticsCall::getIndex() const {
          getKind() == ArrayCallKind::kGetElement ||
          getKind() == ArrayCallKind::kGetElementAddress);
 
+  if (getKind() == ArrayCallKind::kGetElement)
+    return SemanticsCall->getArgument(1);
+
   return SemanticsCall->getArgument(0);
 }
 
@@ -252,6 +255,10 @@ bool swift::ArraySemanticsCall::canHoist(SILInstruction *InsertBefore,
   case ArrayCallKind::kGetCount:
   case ArrayCallKind::kGetCapacity:
     return canHoistArrayArgument(SemanticsCall, getSelf(), InsertBefore, DT);
+
+  case ArrayCallKind::kGetElement:
+    // Not implemented yet.
+    return false;
 
   case ArrayCallKind::kCheckSubscript: {
     auto IsNativeArg = getArrayPropertyIsNativeTypeChecked();
@@ -395,6 +402,14 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
       } else {
         NewArrayProps = IsNative.copyTo(InsertBefore, DT);
       }
+
+      // Replace all uses of the check subscript call by a use of the empty
+      // dependence. The check subscript call is no longer associated with
+      // another operation.
+      auto EmptyDep = SILBuilderWithScope(SemanticsCall)
+                          .createStruct(SemanticsCall->getLoc(),
+                                        SemanticsCall->getType(), {});
+      SemanticsCall->replaceAllUsesWith(EmptyDep);
     }
 
     // Hoist the call.
@@ -405,6 +420,7 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
       // Set the array.props argument.
       Call->setArgument(1, NewArrayProps);
     }
+
 
     return Call;
   }
@@ -427,6 +443,36 @@ void swift::ArraySemanticsCall::removeCall() {
       ParameterConvention::Direct_Owned)
     SILBuilderWithScope(SemanticsCall)
         .createReleaseValue(SemanticsCall->getLoc(), getSelf());
+
+  switch (getKind()) {
+  default: break;
+  case ArrayCallKind::kCheckSubscript: {
+    // Remove all uses with the empty tuple ().
+    auto EmptyDep = SILBuilderWithScope(SemanticsCall)
+                        .createStruct(SemanticsCall->getLoc(),
+                                      SemanticsCall->getType(), {});
+    SemanticsCall->replaceAllUsesWith(EmptyDep);
+  }
+  break;
+  case ArrayCallKind::kGetElement: {
+    // Remove the matching isNativeTypeChecked and check_subscript call.
+    ArraySemanticsCall IsNative(SemanticsCall->getArgument(2).getDef(),
+                                "array.props.isNativeTypeChecked");
+    ArraySemanticsCall SubscriptCheck(SemanticsCall->getArgument(3).getDef(),
+                                      "array.check_subscript");
+    if (SubscriptCheck)
+      SubscriptCheck.removeCall();
+
+    // array.isNativeTypeChecked might be shared among several get_element
+    // calls. The last user should delete it.
+    if (IsNative && getSingleNonDebugUser(*IsNative) == SemanticsCall) {
+      deleteAllDebugUses(IsNative);
+      (*IsNative).replaceAllUsesWithUndef();
+      IsNative.removeCall();
+    }
+  }
+  break;
+  }
 
   SemanticsCall->eraseFromParent();
   SemanticsCall = nullptr;
@@ -562,3 +608,32 @@ SILValue swift::ArraySemanticsCall::getArrayElementStoragePointer() const {
   return SILValue();
 }
 
+bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
+  assert(getKind() == ArrayCallKind::kGetElement &&
+         "Must be a get_element call");
+  // We only handle loadable types.
+  if (!V.getType().isLoadable(SemanticsCall->getModule()))
+   return false;
+
+  auto Dest = SemanticsCall->getArgument(0);
+
+  // Expect an alloc_stack initialization.
+  auto *ASI = dyn_cast<AllocStackInst>(Dest);
+  if (!ASI)
+    return false;
+
+  // Expect a check_subscript call or the empty dependence dependence.
+  auto SubscriptCheck = SemanticsCall->getArgument(3);
+  ArraySemanticsCall Check(SubscriptCheck.getDef(), "array.check_subscript");
+  auto *EmptyDep = dyn_cast<StructInst>(SubscriptCheck);
+  if (!Check && (!EmptyDep || !EmptyDep->getElements().empty()))
+    return false;
+
+  SILBuilderWithScope Builder(SemanticsCall);
+  auto &ValLowering = Builder.getModule().getTypeLowering(V.getType());
+  ValLowering.emitRetainValue(Builder, SemanticsCall->getLoc(), V);
+  ValLowering.emitStoreOfCopy(Builder, SemanticsCall->getLoc(), V, Dest,
+                              IsInitialization_t::IsInitialization);
+  removeCall();
+  return true;
+}

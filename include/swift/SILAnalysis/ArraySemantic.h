@@ -109,6 +109,15 @@ public:
   /// parameter.
   void removeCall();
 
+  /// Replace a call to get_element by a value.
+  ///
+  /// Preconditions:
+  /// The value \p V must dominate this get_element call.
+  /// This must be a get_element call.
+  ///
+  /// Returns true on success, false otherwise.
+  bool replaceByValue(SILValue V);
+
   /// Hoist the call to the insert point.
   void hoist(SILInstruction *InsertBefore, DominanceInfo *DT) {
     hoistOrCopy(InsertBefore, DT, false);
