@@ -283,13 +283,6 @@ public struct ${Self}<Element>
 
   //===--- private --------------------------------------------------------===//
 
-  @warn_unused_result
-  @_semantics("array.props.isNative")
-  public // @testable
-  func _getArrayPropertyIsNative() -> Bool {
-   return _buffer.arrayPropertyIsNative
-  }
-
   /// Returns true if the array is native and does not need a deferred
   /// type check.  May be hoisted by the optimizer, which means its
   /// results may be stale by the time they are used if there is an

@@ -44,7 +44,6 @@ bool swift::ArraySemanticsCall::isValidSignature() {
   switch (getKind()) {
   // All other calls can be consider valid.
   default: break;
-  case ArrayCallKind::kArrayPropsIsNative:
   case ArrayCallKind::kArrayPropsIsNativeTypeChecked: {
     // @guaranteed/@owned Self
     if (SemanticsCall->getNumArguments() != 1)
@@ -140,7 +139,6 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() const {
 
   auto Kind =
       llvm::StringSwitch<ArrayCallKind>(F->getSemanticsString())
-          .Case("array.props.isNative", ArrayCallKind::kArrayPropsIsNative)
           .Case("array.props.isNativeTypeChecked",
                 ArrayCallKind::kArrayPropsIsNativeTypeChecked)
           .Case("array.init", ArrayCallKind::kArrayInit)
@@ -231,18 +229,16 @@ bool swift::ArraySemanticsCall::canHoist(SILInstruction *InsertBefore,
     break;
 
   case ArrayCallKind::kCheckIndex:
-  case ArrayCallKind::kArrayPropsIsNative:
   case ArrayCallKind::kArrayPropsIsNativeTypeChecked:
   case ArrayCallKind::kGetElementAddress:
   case ArrayCallKind::kGetCount:
   case ArrayCallKind::kGetCapacity:
     return canHoistArrayArgument(SemanticsCall, getSelf(), InsertBefore, DT);
 
-  case ArrayCallKind::kCheckSubscript:
-  case ArrayCallKind::kGetElement: {
-    auto IsNativeArg = getArrayPropertyIsNative();
-    ArraySemanticsCall IsNative(IsNativeArg.getDef(), "array.props.isNative",
-                                true);
+  case ArrayCallKind::kCheckSubscript: {
+    auto IsNativeArg = getArrayPropertyIsNativeTypeChecked();
+    ArraySemanticsCall IsNative(IsNativeArg.getDef(),
+                                "array.props.isNativeTypeChecked", true);
     if (!IsNative) {
       // Do we have a constant parameter?
       auto *SI = dyn_cast<StructInst>(IsNativeArg);
@@ -252,15 +248,6 @@ bool swift::ArraySemanticsCall::canHoist(SILInstruction *InsertBefore,
         return false;
     } else if (!IsNative.canHoist(InsertBefore, DT))
       // Otherwise, we must be able to hoist the function call.
-      return false;
-
-    if (Kind == ArrayCallKind::kCheckSubscript)
-      return canHoistArrayArgument(SemanticsCall, getSelf(), InsertBefore, DT);
-
-    // Can we hoist the needsElementTypeCheck argument.
-    ArraySemanticsCall TypeCheck(getArrayPropertyNeedsTypeCheck().getDef(),
-                                 "array.props.needsElementTypeCheck", true);
-    if (!TypeCheck || !TypeCheck.canHoist(InsertBefore, DT))
       return false;
 
     return canHoistArrayArgument(SemanticsCall, getSelf(), InsertBefore, DT);
@@ -348,7 +335,6 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
 
   auto Kind = getKind();
   switch (Kind) {
-  case ArrayCallKind::kArrayPropsIsNative:
   case ArrayCallKind::kArrayPropsIsNativeTypeChecked:
   case ArrayCallKind::kGetCount:
   case ArrayCallKind::kGetCapacity: {
@@ -372,22 +358,22 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
     SILValue NewArrayProps;
     if (Kind == ArrayCallKind::kCheckSubscript) {
       // Copy the array.props argument call.
-      auto IsNativeArg = getArrayPropertyIsNative();
-      ArraySemanticsCall IsNative(IsNativeArg.getDef(), "array.props.isNative",
-                                 true);
+      auto IsNativeArg = getArrayPropertyIsNativeTypeChecked();
+      ArraySemanticsCall IsNative(IsNativeArg.getDef(),
+                                  "array.props.isNativeTypeChecked", true);
       if (!IsNative) {
         // Do we have a constant parameter?
         auto *SI = dyn_cast<StructInst>(IsNativeArg);
         assert(SI && isa<IntegerLiteralInst>(SI->getOperand(0)) &&
                "Must have a constant parameter or an array.props.isNative call "
                "as argument");
-        SI->moveBefore(
-            &*DT->findNearestCommonDominator(InsertBefore->getParent(),
-                                             SI->getParent())->begin());
+        SI->moveBefore(&*DT->findNearestCommonDominator(
+                               InsertBefore->getParent(), SI->getParent())
+                             ->begin());
         auto *IL = cast<IntegerLiteralInst>(SI->getOperand(0));
-        IL->moveBefore(
-            &*DT->findNearestCommonDominator(InsertBefore->getParent(),
-                                             IL->getParent())->begin());
+        IL->moveBefore(&*DT->findNearestCommonDominator(
+                               InsertBefore->getParent(), IL->getParent())
+                             ->begin());
       } else {
         NewArrayProps = IsNative.copyTo(InsertBefore, DT);
       }
@@ -428,17 +414,8 @@ void swift::ArraySemanticsCall::removeCall() {
   SemanticsCall = nullptr;
 }
 
-static bool hasArrayPropertyNeedsTypeCheck(ArrayCallKind Kind,
-                                           unsigned &ArgIdx) {
-  switch (Kind) {
-  default: break;
-  case ArrayCallKind::kGetElement:
-    ArgIdx = 2;
-    return true;
-  }
-  return false;
-}
-static bool hasArrayPropertyIsNative(ArrayCallKind Kind, unsigned &ArgIdx) {
+static bool hasArrayPropertyIsNativeTypeChecked(ArrayCallKind Kind,
+                                                unsigned &ArgIdx) {
   switch (Kind) {
   default: break;
 
@@ -450,19 +427,10 @@ static bool hasArrayPropertyIsNative(ArrayCallKind Kind, unsigned &ArgIdx) {
   return false;
 }
 
-SILValue swift::ArraySemanticsCall::getArrayPropertyIsNative() const {
+SILValue
+swift::ArraySemanticsCall::getArrayPropertyIsNativeTypeChecked() const {
   unsigned ArgIdx = 0;
-  bool HasArg = hasArrayPropertyIsNative(getKind(), ArgIdx);
-  (void)HasArg;
-  assert(HasArg &&
-         "Must have an array.props argument");
-
-  return SemanticsCall->getArgument(ArgIdx);
-}
-
-SILValue swift::ArraySemanticsCall::getArrayPropertyNeedsTypeCheck() const {
-  unsigned ArgIdx = 0;
-  bool HasArg = hasArrayPropertyNeedsTypeCheck(getKind(), ArgIdx);
+  bool HasArg = hasArrayPropertyIsNativeTypeChecked(getKind(), ArgIdx);
   (void)HasArg;
   assert(HasArg &&
          "Must have an array.props argument");

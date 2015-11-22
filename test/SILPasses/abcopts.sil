@@ -969,7 +969,7 @@ sil public_external [_semantics "array.check_subscript"] @checkbounds_no_meth : 
     unreachable
 }
 
-sil public_external [_semantics "array.props.isNative"] @arrayPropertyIsNative : $@convention(method) (@owned ArrayInt) -> Bool {
+sil public_external [_semantics "array.props.isNativeTypeChecked"] @arrayPropertyIsNative : $@convention(method) (@owned ArrayInt) -> Bool {
   bb0(%0: $ArrayInt):
     unreachable
 }
