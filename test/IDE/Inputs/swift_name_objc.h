@@ -43,3 +43,6 @@ SWIFT_NAME(SomeProtocol)
 @protocol SNCollision
 @end
 
+@protocol NSAccessibility
+@property (nonatomic) float accessibilityFloat;
+@end

@@ -705,10 +705,31 @@ bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework) {
 void ClangImporter::Implementation::addEntryToLookupTable(
        SwiftLookupTable &table, clang::NamedDecl *named)
 {
-  // If we have a name to import as, add this entry to the table.
-  clang::DeclContext *effectiveContext;
-  if (DeclName name = importFullName(named, nullptr, &effectiveContext)) {
-    table.addEntry(name, named, effectiveContext);
+  // Determine whether this declaration is suppressed in Swift.
+  bool suppressDecl = false;
+  if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(named)) {
+    // If this member is a method that is a getter or setter for a
+    // property, don't add it into the table. property names and
+    // getter names (by choosing to only have a property).
+    //
+    // Note that this is suppressed for certain accessibility declarations,
+    // which are imported as getter/setter pairs and not properties.
+    if (objcMethod->isPropertyAccessor() && !isAccessibilityDecl(objcMethod)) {
+      suppressDecl = true;
+    }
+  } else if (auto objcProperty = dyn_cast<clang::ObjCPropertyDecl>(named)) {
+    // Suppress certain accessibility properties; they're imported as
+    // getter/setter pairs instead.
+    if (isAccessibilityDecl(objcProperty))
+      suppressDecl = true;
+  }
+
+  if (!suppressDecl) {
+    // If we have a name to import as, add this entry to the table.
+    clang::DeclContext *effectiveContext;
+    if (DeclName name = importFullName(named, nullptr, &effectiveContext)) {
+      table.addEntry(name, named, effectiveContext);
+    }
   }
 
   // Walk the members of any context that can have nested members.
@@ -1579,7 +1600,8 @@ DeclName ClangImporter::Implementation::importFullName(
            const clang::NamedDecl *D,
            bool *hasCustomName,
            clang::DeclContext **effectiveContext) {
-  // Objective-C categories and extensions don't have names.
+  // Objective-C categories and extensions don't have names, despite
+  // being "named" declarations.
   if (isa<clang::ObjCCategoryDecl>(D))
     return { };
 
