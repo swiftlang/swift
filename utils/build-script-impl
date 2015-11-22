@@ -2127,7 +2127,10 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
       echo "-- Create Info.plist --"
       PLISTBUDDY_BIN="/usr/libexec/PlistBuddy"
       TOOLCHAIN_INSTALL_LOCATION="/Library/Developer/Toolchains/${DARWIN_TOOLCHAIN_NAME}.xctoolchain"
-
+      if [[ -f "${INSTALL_DESTDIR}/${TOOLCHAIN_PREFIX}/Info.plist" ]] ; then
+        echo "-- Removing: ${INSTALL_DESTDIR}/${TOOLCHAIN_PREFIX}/Info.plist"
+        rm "${INSTALL_DESTDIR}/${TOOLCHAIN_PREFIX}/Info.plist"
+      fi
       ${PLISTBUDDY_BIN} -c "Add DisplayName string '${DARWIN_TOOLCHAIN_DISPLAY_NAME}'" "${INSTALL_DESTDIR}/${TOOLCHAIN_PREFIX}/Info.plist"
       ${PLISTBUDDY_BIN} -c "Add Version string '${DARWIN_TOOLCHAIN_VERSION}'" "${INSTALL_DESTDIR}/${TOOLCHAIN_PREFIX}/Info.plist"
       ${PLISTBUDDY_BIN} -c "Add CFBundleIdentifier string '${DARWIN_TOOLCHAIN_BUNDLE_IDENTIFIER}'" "${INSTALL_DESTDIR}/${TOOLCHAIN_PREFIX}/Info.plist"
