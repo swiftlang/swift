@@ -5,6 +5,7 @@
 
 // CHECK:      Base -> full name mappings:
 // CHECK-NEXT:   SNCollision --> SNCollision
+// CHECK-NEXT:   SNCollisionProtocol --> SNCollisionProtocol
 // CHECK-NEXT:   SomeClass --> SomeClass
 // CHECK-NEXT:   SomeProtocol --> SomeProtocol
 // CHECK-NEXT:   categoryMethodWithX --> categoryMethodWithX(_:y:), categoryMethodWithX(_:y:z:)
@@ -19,7 +20,9 @@
 
 // CHECK:      Full name -> entry mappings:
 // CHECK-NEXT:   SNCollision:
-// CHECK-NEXT:     TU: SNCollision, SNCollision
+// CHECK-NEXT:     TU: SNCollision{{$}}
+// CHECK-NEXT:   SNCollisionProtocol:
+// CHECK-NEXT:     TU: SNCollision{{$}}
 // CHECK-NEXT:   SomeClass:
 // CHECK-NEXT:     TU: SNSomeClass
 // CHECK-NEXT:   SomeProtocol:

@@ -1679,6 +1679,67 @@ DeclName ClangImporter::Implementation::importFullName(
       baseName = baseName.substr(removePrefix.size());
   }
 
+  // Objective-C protocols may have the suffix "Protocol" appended if
+  // the non-suffixed name would conflict with another entity in the
+  // same top-level module.
+  SmallString<16> baseNameWithProtocolSuffix;
+  if (auto objcProto = dyn_cast<clang::ObjCProtocolDecl>(D)) {
+    if (objcProto->hasDefinition()) {
+      // Test to see if there is a value with the same name as the protocol
+      // in the same module.
+      // FIXME: This will miss macros.
+      auto clangModule = getClangSubmoduleForDecl(objcProto);
+      if (clangModule.hasValue() && clangModule.getValue())
+        clangModule = clangModule.getValue()->getTopLevelModule();
+
+      auto isInSameModule = [&](const clang::Decl *D) -> bool {
+        auto declModule = getClangSubmoduleForDecl(D);
+        if (!declModule.hasValue())
+          return false;
+        // Handle the bridging header case. This is pretty nasty since things
+        // can get added to it *later*, but there's not much we can do.
+        if (!declModule.getValue())
+          return *clangModule == nullptr;
+        return *clangModule == declModule.getValue()->getTopLevelModule();
+      };
+
+      // Allow this lookup to find hidden names.  We don't want the
+      // decision about whether to rename the protocol to depend on
+      // what exactly the user has imported.  Indeed, if we're being
+      // asked to resolve a serialization cross-reference, the user
+      // may not have imported this module at all, which means a
+      // normal lookup wouldn't even find the protocol!
+      //
+      // Meanwhile, we don't need to worry about finding unwanted
+      // hidden declarations from different modules because we do a
+      // module check before deciding that there's a conflict.
+      bool hasConflict = false;
+      clang::LookupResult lookupResult(getClangSema(), D->getDeclName(),
+                                       clang::SourceLocation(),
+                                       clang::Sema::LookupOrdinaryName);
+      lookupResult.setAllowHidden(true);
+      lookupResult.suppressDiagnostics();
+
+      if (getClangSema().LookupName(lookupResult, /*scope=*/nullptr)) {
+        hasConflict = std::any_of(lookupResult.begin(), lookupResult.end(),
+                                  isInSameModule);
+      }
+      if (!hasConflict) {
+        lookupResult.clear(clang::Sema::LookupTagName);
+        if (getClangSema().LookupName(lookupResult, /*scope=*/nullptr)) {
+          hasConflict = std::any_of(lookupResult.begin(), lookupResult.end(),
+                                    isInSameModule);
+        }
+      }
+
+      if (hasConflict) {
+        baseNameWithProtocolSuffix = baseName;
+        baseNameWithProtocolSuffix += SWIFT_PROTOCOL_SUFFIX;
+        baseName = baseNameWithProtocolSuffix;
+      }
+    }
+  }
+
   // Local function to determine whether the given declaration is subject to
   // a swift_private attribute.
   auto hasSwiftPrivate = [this](const clang::NamedDecl *D) {

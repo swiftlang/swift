@@ -4825,59 +4825,6 @@ namespace {
 
       decl = decl->getDefinition();
 
-      // Test to see if there is a value with the same name as the protocol
-      // in the same module.
-      // FIXME: This will miss macros.
-      auto clangModule = Impl.getClangSubmoduleForDecl(decl);
-      if (clangModule.hasValue() && clangModule.getValue())
-        clangModule = clangModule.getValue()->getTopLevelModule();
-
-      auto isInSameModule = [&](const clang::Decl *D) -> bool {
-        auto declModule = Impl.getClangSubmoduleForDecl(D);
-        if (!declModule.hasValue())
-          return false;
-        // Handle the bridging header case. This is pretty nasty since things
-        // can get added to it *later*, but there's not much we can do.
-        if (!declModule.getValue())
-          return *clangModule == nullptr;
-        return *clangModule == declModule.getValue()->getTopLevelModule();
-      };
-
-      // Allow this lookup to find hidden names.  We don't want the
-      // decision about whether to rename the protocol to depend on
-      // what exactly the user has imported.  Indeed, if we're being
-      // asked to resolve a serialization cross-reference, the user
-      // may not have imported this module at all, which means a
-      // normal lookup wouldn't even find the protocol!
-      //
-      // Meanwhile, we don't need to worry about finding unwanted
-      // hidden declarations from different modules because we do a
-      // module check before deciding that there's a conflict.
-      bool hasConflict = false;
-      clang::LookupResult lookupResult(Impl.getClangSema(), decl->getDeclName(),
-                                       clang::SourceLocation(),
-                                       clang::Sema::LookupOrdinaryName);
-      lookupResult.setAllowHidden(true);
-      lookupResult.suppressDiagnostics();
-
-      if (Impl.getClangSema().LookupName(lookupResult, /*scope=*/nullptr)) {
-        hasConflict = std::any_of(lookupResult.begin(), lookupResult.end(),
-                                  isInSameModule);
-      }
-      if (!hasConflict) {
-        lookupResult.clear(clang::Sema::LookupTagName);
-        if (Impl.getClangSema().LookupName(lookupResult, /*scope=*/nullptr)) {
-          hasConflict = std::any_of(lookupResult.begin(), lookupResult.end(),
-                                    isInSameModule);
-        }
-      }
-
-      if (hasConflict) {
-        SmallString<64> nameBuf{name.str()};
-        nameBuf += SWIFT_PROTOCOL_SUFFIX;
-        name = Impl.SwiftContext.getIdentifier(nameBuf.str());
-      }
-
       auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
         return nullptr;
