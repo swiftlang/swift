@@ -130,8 +130,8 @@ extension Sequence ${"" if preds else "where Iterator.Element : Equatable"} {
 if preds:
   comment = """
   /// Return true iff `self` begins with elements equivalent to those of
-  /// `other`, using `isEquivalent` as the equivalence test.  Return true if
-  /// `other` is empty.
+  /// `possiblePrefix`, using `isEquivalent` as the equivalence test.
+  /// Return true if `possiblePrefix` is empty.
   ///
   /// - Requires: `isEquivalent` is an
   ///   [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation)."""
@@ -139,23 +139,23 @@ if preds:
   rethrows_ = "rethrows "
 else:
   comment = """
-  /// Return true iff the initial elements of `self` are equal to `prefix`.
-  /// Return true if `other` is empty."""
+  /// Return true iff the initial elements of `self` are equal to
+  /// `possiblePrefix`. Return true if `possiblePrefix` is empty."""
   rethrows_ = ""
 }%
   ${comment}
   @warn_unused_result
   public func startsWith<
-    OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
+    PossiblePrefix : Sequence where PossiblePrefix.${GElement} == ${GElement}
   >(
-    other: OtherSequence${"," if preds else ""}
+    possiblePrefix: PossiblePrefix${"," if preds else ""}
 %   if preds:
     @noescape isEquivalent: (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> Bool {
-    var otherIterator = other.iterator()
+    var possiblePrefixIterator = possiblePrefix.iterator()
     for e0 in self {
-      if let e1 = otherIterator.next() {
+      if let e1 = possiblePrefixIterator.next() {
         if ${"try !isEquivalent(e0, e1)" if preds else "e0 != e1"} {
           return false
         }
@@ -164,7 +164,7 @@ else:
         return true
       }
     }
-    return otherIterator.next() == nil
+    return possiblePrefixIterator.next() == nil
   }
 }
 
