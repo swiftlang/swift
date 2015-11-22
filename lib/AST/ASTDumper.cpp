@@ -850,6 +850,7 @@ namespace {
         OS << "\n";
         printRec(TLCD->getBody());
       }
+      OS << ')';
     }
     
     void visitIfConfigDecl(IfConfigDecl *ICD) {
