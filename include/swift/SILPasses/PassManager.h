@@ -10,13 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SILAnalysis/Analysis.h"
+#include "swift/SILPasses/Passes.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "swift/SILAnalysis/Analysis.h"
-#include "Passes.h"
 
 #ifndef SWIFT_SILPASSES_PASSMANAGER_H
 #define SWIFT_SILPASSES_PASSMANAGER_H
