@@ -285,7 +285,6 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       if (vl.box) {
         B.createStrongRetain(loc, vl.box);
         capturedArgs.push_back(emitManagedRValueWithCleanup(vl.box));
-        capturedArgs.push_back(ManagedValue::forLValue(vl.value));
       } else {
         // Address only 'let' values are passed by box.  This isn't great, in
         // that a variable captured by multiple closures will be boxed for each
@@ -297,7 +296,6 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         auto boxAddress = SILValue(allocBox, 1);
         B.createCopyAddr(loc, vl.value, boxAddress, IsNotTake,IsInitialization);
         capturedArgs.push_back(emitManagedRValueWithCleanup(SILValue(allocBox, 0)));
-        capturedArgs.push_back(ManagedValue::forLValue(boxAddress));
       }
 
       break;
@@ -578,8 +576,6 @@ static void forwardCaptureArgs(SILGenFunction &gen,
     SILType boxTy = SILType::getPrimitiveObjectType(
         SILBoxType::get(ty.getSwiftRValueType()));
     addSILArgument(boxTy, vd);
-    // Forward the captured value address.
-    addSILArgument(ty, vd);
     break;
   }
 

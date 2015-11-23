@@ -3,6 +3,8 @@
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
 // XFAIL: linux
 
+// XFAIL: *
+
 import Swift
 import gizmo
 

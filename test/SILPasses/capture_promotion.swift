@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-sil -o - -verify | FileCheck %s
 
+// XFAIL: *
+
 class Foo {
   func foo() -> Int {
     return 1

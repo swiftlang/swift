@@ -2498,10 +2498,17 @@ enum class ParameterConvention {
   Indirect_In_Guaranteed,
 
   /// This argument is passed indirectly, i.e. by directly passing the address
-  /// of an object in memory.  The object is instantaneously valid on entry, and
-  /// it must be instantaneously valid on exit.  The callee may assume that the
-  /// address does not alias any valid object.
+  /// of an object in memory.  The object is always valid, but the callee may
+  /// assume that the address does not alias any valid object and reorder loads
+  /// stores to the parameter as long as the whole object remains valid. Invalid
+  /// single-threaded aliasing may produce inconsistent results, but should
+  /// remain memory safe.
   Indirect_Inout,
+  
+  /// This argument is passed indirectly, i.e. by directly passing the address
+  /// of an object in memory. The object is allowed to be aliased by other
+  /// well-typed references.
+  //TODO: Indirect_Aliased,
 
   /// This argument is passed indirectly, i.e. by directly passing the address
   /// of an uninitialized object in memory.  The callee is responsible for
