@@ -25,7 +25,7 @@ function(swift_configure_lit_site_cfg source_path destination_path installed_nam
 endfunction()
 
 function(normalize_boolean_spelling var_name)
-  if("${var_name}")
+  if(${var_name})
     set("${var_name}" TRUE PARENT_SCOPE)
   else()
     set("${var_name}" FALSE PARENT_SCOPE)
