@@ -442,29 +442,34 @@ static bool typedAccessTBAABuiltinTypesMayAlias(SILType LTy, SILType RTy,
   return false;
 }
 
-/// Return true if LTyRef and RTyRef have a parent-child relationship, i.e.
-/// the objects with the given types mayalias.
+/// Return true if the type \p Parent is a parent of \p Child in the
+/// class hierarchy.
+static bool isParentClass(SILType Parent, SILType Child) {
+  SILType T = SILType();
+
+  // Walk the class hiearchy to see whether Parent and Child have a
+  // parent-child relationship.
+  T = Child;
+  do {
+    // There is a parent-child relationship.
+    if (T == Parent)
+      return true;
+
+    T = T.getSuperclass(nullptr);
+  } while(T);
+
+  return false;
+}
+
+/// Returns true if the reference types \p LTy and \pRTy may alias.
 static bool referenceTypeTBAAMayAlias(SILType LTy, SILType RTy) {
+
   // Walk the type hiearchy to see whether LTy and RTy have a parent-child
   // relationship.
-  SILType C = SILType();
-  // Walk from LTy to RTy.
-  C = LTy;
-  do {
-    // There is a parent-child relationship.
-    if (C == RTy)
-      return true;
-    C = C.getSuperclass(nullptr);
-  } while(C);
-
-  // Walk from RTy to LTy.
-  C = RTy;
-  do {
-    // There is a parent-child relationship.
-    if (C == LTy)
-      return true;
-    C = C.getSuperclass(nullptr);
-  } while(C);
+  if (isParentClass(LTy, RTy) ||
+      isParentClass(RTy, LTy)) {
+    return true;
+  }
 
   return false;
 }
