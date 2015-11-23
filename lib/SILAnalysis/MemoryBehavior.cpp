@@ -66,18 +66,20 @@ public:
     // If we do not have any more information, just use the general memory
     // behavior implementation.
     auto Behavior = Inst->getMemoryBehavior();
-    if (!isLetPointer(V))
+    bool ReadOnlyAccess = isLetPointer(V);
+
+    // If this is a regular read-write access then return the computed memory
+    // behavior.
+    if (!ReadOnlyAccess)
       return Behavior;
 
+    // If this is a read-only access to 'let variable' then we can strip away
+    // the write access.
     switch (Behavior) {
-    case MemBehavior::MayHaveSideEffects:
-      return MemBehavior::MayRead;
-    case MemBehavior::MayReadWrite:
-      return MemBehavior::MayRead;
-    case MemBehavior::MayWrite:
-      return MemBehavior::None;
-    default:
-      return Behavior;
+    case MemBehavior::MayHaveSideEffects: return MemBehavior::MayRead;
+    case MemBehavior::MayReadWrite:       return MemBehavior::MayRead;
+    case MemBehavior::MayWrite:           return MemBehavior::None;
+    default: return Behavior;
     }
   }
 
@@ -303,8 +305,8 @@ MemBehavior MemoryBehaviorVisitor::visitReleaseValueInst(ReleaseValueInst *SI) {
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
-SILInstruction::MemoryBehavior
-AliasAnalysis::getMemoryBehavior(SILInstruction *Inst, SILValue V,
+MemBehavior
+AliasAnalysis::computeMemoryBehavior(SILInstruction *Inst, SILValue V,
                                  RetainObserveKind IgnoreRefCountIncrements) {
   DEBUG(llvm::dbgs() << "GET MEMORY BEHAVIOR FOR:\n    " << *Inst << "    "
                      << *V.getDef());

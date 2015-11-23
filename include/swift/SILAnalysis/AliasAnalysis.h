@@ -28,10 +28,24 @@ class SideEffectAnalysis;
 /// needed since we do not have an "analysis" infrastructure.
 class AliasAnalysis : public SILAnalysis {
 public:
-  /// The result of an alias query. This is based off of LLVM's alias
-  /// analysis so see LLVM's documentation for more information.
+
+  /// This enum describes the different kinds of aliasing relations between
+  /// pointers.
   ///
-  /// FIXME: PartialAlias?
+  /// NoAlias: There is never dependence between memory referenced by the two
+  ///          pointers. Example: Two pointers pointing to non-overlapping
+  ///          memory ranges.
+  ///
+  /// MayAlias: Two pointers might refer to the same memory location.
+  ///
+  ///
+  /// PartialAlias: The two memory locations are known to be overlapping
+  ///               but do not start at the same address.
+  ///
+  ///
+  /// MustAlias: The two memory locations always start at exactly the same
+  ///            location. The pointers are equal.
+  ///
   enum class AliasResult : unsigned {
     NoAlias=0,      ///< The two values have no dependencies on each
                     ///  other.
@@ -42,14 +56,10 @@ public:
   };
 
 private:
-  using AliasCacheKey = std::pair<SILValue, SILValue>;
-  llvm::DenseMap<AliasCacheKey, AliasResult> AliasCache;
   SILModule *Mod;
   SideEffectAnalysis *SEA;
 
   using MemoryBehavior = SILInstruction::MemoryBehavior;
-
-  AliasResult cacheValue(AliasCacheKey Key, AliasResult Result);
 
   AliasResult aliasAddressProjection(SILValue V1, SILValue V2,
                                      SILValue O1, SILValue O2);
@@ -70,84 +80,77 @@ public:
   
   SideEffectAnalysis *getSideEffectAnalysis() const { return SEA; }
 
-  /// Perform an alias query to see if V1, V2 refer to the same values.
-  AliasResult alias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
+  /// Compute the alias properties of the pointers \p V1 and \p V2.
+  /// The optional arguments \pTBAAType1 and \p TBAAType2 specify the exact
+  /// types that the pointers access.
+  AliasResult alias(SILValue V1, SILValue V2,
+                    SILType TBAAType1 = SILType(),
                     SILType TBAAType2 = SILType());
 
-  /// Convenience method that returns true if V1 and V2 must alias.
-  bool isMustAlias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
-                   SILType TBAAType2 = SILType()) {
-    return alias(V1, V2, TBAAType1, TBAAType2) == AliasResult::MustAlias;
+#define ALIAS_PROPERTY_CONVENIENCE_METHOD(KIND)   \
+  bool is##KIND(SILValue V1, SILValue V2,         \
+                SILType TBAAType1 = SILType(),    \
+                SILType TBAAType2 = SILType()) {  \
+    return alias(V1, V2, TBAAType1, TBAAType2) == AliasResult::KIND; \
   }
 
-  /// Convenience method that returns true if V1 and V2 partially alias.
-  bool isPartialAlias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
-                      SILType TBAAType2 = SILType()) {
-    return alias(V1, V2, TBAAType1, TBAAType2) == AliasResult::PartialAlias;
-  }
+  ALIAS_PROPERTY_CONVENIENCE_METHOD(MustAlias)
+  ALIAS_PROPERTY_CONVENIENCE_METHOD(PartialAlias)
+  ALIAS_PROPERTY_CONVENIENCE_METHOD(NoAlias)
+  ALIAS_PROPERTY_CONVENIENCE_METHOD(MayAlias)
 
-  /// Convenience method that returns true if V1, V2 can not alias.
-  bool isNoAlias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
-                 SILType TBAAType2 = SILType()) {
-    return alias(V1, V2, TBAAType1, TBAAType2) == AliasResult::NoAlias;
-  }
-
-  /// Convenience method that returns true if V1, V2 may alias.
-  bool isMayAlias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
-                  SILType TBAAType2 = SILType()) {
-    return alias(V1, V2, TBAAType1, TBAAType2) == AliasResult::MayAlias;
-  }
+#undef ALIAS_PROPERTY_CONVENIENCE_METHOD
 
   /// Use the alias analysis to determine the memory behavior of Inst with
   /// respect to V.
   ///
   /// TODO: When ref count behavior is separated from generic memory behavior,
   /// the IgnoreRefCountIncrements flag will be unnecessary.
-  MemoryBehavior getMemoryBehavior(SILInstruction *Inst, SILValue V,
-                                   RetainObserveKind =
-                                   RetainObserveKind::ObserveRetains);
+  MemoryBehavior computeMemoryBehavior(SILInstruction *Inst, SILValue V,
+                                       RetainObserveKind);
 
-  /// Returns true if Inst may read from memory in a manner that affects V.
+  /// Returns true if \p Inst may read from memory in a manner that
+  /// affects V.
   bool mayReadFromMemory(SILInstruction *Inst, SILValue V) {
-    MemoryBehavior B = getMemoryBehavior(Inst, V,
-                                         RetainObserveKind::IgnoreRetains);
+    auto B = computeMemoryBehavior(Inst, V, RetainObserveKind::IgnoreRetains);
     return B == MemoryBehavior::MayRead ||
-      B == MemoryBehavior::MayReadWrite ||
-      B == MemoryBehavior::MayHaveSideEffects;
+           B == MemoryBehavior::MayReadWrite ||
+           B == MemoryBehavior::MayHaveSideEffects;
   }
 
-  /// Returns true if Inst may write to memory in a manner that affects V.
+  /// Returns true if \p Inst may write to memory in a manner that
+  /// affects V.
   bool mayWriteToMemory(SILInstruction *Inst, SILValue V) {
-    MemoryBehavior B = getMemoryBehavior(Inst, V,
-                                         RetainObserveKind::IgnoreRetains);
+    auto B = computeMemoryBehavior(Inst, V, RetainObserveKind::IgnoreRetains);
     return B == MemoryBehavior::MayWrite ||
-      B == MemoryBehavior::MayReadWrite ||
-      B == MemoryBehavior::MayHaveSideEffects;
+           B == MemoryBehavior::MayReadWrite ||
+           B == MemoryBehavior::MayHaveSideEffects;
   }
 
-  /// Returns true if Inst may read or write to memory in a manner that affects
-  /// V.
+  /// Returns true if \p Inst may read or write to memory in a manner that
+  /// affects V.
   bool mayReadOrWriteMemory(SILInstruction *Inst, SILValue V) {
-    auto B = getMemoryBehavior(Inst, V, RetainObserveKind::IgnoreRetains);
-    return B != MemoryBehavior::None;
+    auto B = computeMemoryBehavior(Inst, V, RetainObserveKind::IgnoreRetains);
+    return MemoryBehavior::None != B;
   }
 
   /// Returns true if Inst may have side effects in a manner that affects V.
   bool mayHaveSideEffects(SILInstruction *Inst, SILValue V) {
-    MemoryBehavior B = getMemoryBehavior(Inst, V);
+    auto B = computeMemoryBehavior(Inst, V, RetainObserveKind::ObserveRetains);
     return B == MemoryBehavior::MayWrite ||
-      B == MemoryBehavior::MayReadWrite ||
-      B == MemoryBehavior::MayHaveSideEffects;
+           B == MemoryBehavior::MayReadWrite ||
+           B == MemoryBehavior::MayHaveSideEffects;
   }
 
   /// Returns true if Inst may have side effects in a manner that affects
   /// V. This is independent of whether or not Inst may write to V and is meant
   /// to encode notions such as ref count modifications.
   bool mayHavePureSideEffects(SILInstruction *Inst, SILValue V) {
-    return getMemoryBehavior(Inst, V) == MemoryBehavior::MayHaveSideEffects;
+    auto B = computeMemoryBehavior(Inst, V, RetainObserveKind::ObserveRetains);
+    return MemoryBehavior::MayHaveSideEffects == B;
   }
 
-  virtual void invalidate(SILAnalysis::InvalidationKind K) { AliasCache.clear(); }
+  virtual void invalidate(SILAnalysis::InvalidationKind K) { }
 
   virtual void invalidate(SILFunction *, SILAnalysis::InvalidationKind K) {
     invalidate(K);
@@ -161,7 +164,8 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 /// Otherwise, return an empty type.
 SILType computeTBAAType(SILValue V);
 
-/// Check if V points to a let-variable.
+/// Check if \p V points to a let-member.
+/// Nobody can write into let members.
 bool isLetPointer(SILValue V);
 
 } // end namespace swift

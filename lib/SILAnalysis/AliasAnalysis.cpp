@@ -76,26 +76,18 @@ static inline bool shouldRunBasicAA() {
 
 #endif
 
-static llvm::cl::opt<bool>
-    CacheAAResults("cache-aa-results",
-                   llvm::cl::desc("Should AA results be cached"),
-                   llvm::cl::init(true));
-
 //===----------------------------------------------------------------------===//
 //                                 Utilities
 //===----------------------------------------------------------------------===//
 
-llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
-                                     AliasAnalysis::AliasResult R) {
+using AliasResult = AliasAnalysis::AliasResult;
+
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS, AliasResult R) {
   switch (R) {
-  case AliasAnalysis::AliasResult::NoAlias:
-    return OS << "NoAlias";
-  case AliasAnalysis::AliasResult::MayAlias:
-    return OS << "MayAlias";
-  case AliasAnalysis::AliasResult::PartialAlias:
-    return OS << "PartialAlias";
-  case AliasAnalysis::AliasResult::MustAlias:
-    return OS << "MustAlias";
+  case AliasResult::NoAlias:      return OS << "NoAlias";
+  case AliasResult::MayAlias:     return OS << "MayAlias";
+  case AliasResult::PartialAlias: return OS << "PartialAlias";
+  case AliasResult::MustAlias:    return OS << "MustAlias";
   }
 }
 
@@ -265,9 +257,8 @@ static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
 /// Uses a bunch of ad-hoc rules to disambiguate a GEP instruction against
 /// another pointer. We know that V1 is a GEP, but we don't know anything about
 /// V2. O1, O2 are getUnderlyingObject of V1, V2 respectively.
-AliasAnalysis::AliasResult
-AliasAnalysis::aliasAddressProjection(SILValue V1, SILValue V2,
-                                      SILValue O1, SILValue O2) {
+AliasResult AliasAnalysis::aliasAddressProjection(SILValue V1, SILValue V2,
+                                                  SILValue O1, SILValue O2) {
 
   // If V2 is also a gep instruction with a must-alias or not-aliasing base
   // pointer, figure out if the indices of the GEPs tell us anything about the
@@ -278,9 +269,9 @@ AliasAnalysis::aliasAddressProjection(SILValue V1, SILValue V2,
     // must alias relation on O1. This ensures that given an alloc_stack and a
     // gep from that alloc_stack, we say that they partially alias.
     if (isSameValueOrGlobal(O1, V2.stripCasts()))
-      return AliasAnalysis::AliasResult::PartialAlias;
+      return AliasResult::PartialAlias;
 
-    return AliasAnalysis::AliasResult::MayAlias;
+    return AliasResult::MayAlias;
   }
   
   assert(!Projection::isAddrProjection(O1) &&
@@ -289,12 +280,12 @@ AliasAnalysis::aliasAddressProjection(SILValue V1, SILValue V2,
          "underlying object may not be a projection");
 
   // Do the base pointers alias?
-  AliasAnalysis::AliasResult BaseAlias = aliasInner(O1, O2);
+  AliasResult BaseAlias = aliasInner(O1, O2);
 
   // If the underlying objects are not aliased, the projected values are also
   // not aliased.
-  if (BaseAlias == AliasAnalysis::AliasResult::NoAlias)
-    return AliasAnalysis::AliasResult::NoAlias;
+  if (BaseAlias == AliasResult::NoAlias)
+    return AliasResult::NoAlias;
 
   // Let's do alias checking based on projections.
   auto V1Path = ProjectionPath::getAddrProjectionPath(O1, V1, true);
@@ -311,15 +302,15 @@ AliasAnalysis::aliasAddressProjection(SILValue V1, SILValue V2,
   // horizon) or enable Projection to represent a cast as a special sort of
   // projection.
   if (!V1Path || !V2Path)
-    return AliasAnalysis::AliasResult::MayAlias;
+    return AliasResult::MayAlias;
 
   auto R = V1Path->computeSubSeqRelation(*V2Path);
 
   // If all of the projections are equal (and they have the same base pointer),
   // the two GEPs must be the same.
-  if (BaseAlias == AliasAnalysis::AliasResult::MustAlias &&
+  if (BaseAlias == AliasResult::MustAlias &&
       R == SubSeqRelation_t::Equal)
-    return AliasAnalysis::AliasResult::MustAlias;
+    return AliasResult::MustAlias;
 
   // The two GEPs do not alias if they are accessing different fields, even if
   // we don't know the base pointers. Different fields should not overlap.
@@ -327,16 +318,16 @@ AliasAnalysis::aliasAddressProjection(SILValue V1, SILValue V2,
   // TODO: Replace this with a check on the computed subseq relation. See the
   // TODO in computeSubSeqRelation.
   if (V1Path->hasNonEmptySymmetricDifference(V2Path.getValue()))
-    return AliasAnalysis::AliasResult::NoAlias;
+    return AliasResult::NoAlias;
 
   // If one of the GEPs is a super path of the other then they partially
   // alias. W
-  if (BaseAlias == AliasAnalysis::AliasResult::MustAlias &&
+  if (BaseAlias == AliasResult::MustAlias &&
       isStrictSubSeqRelation(R))
-    return AliasAnalysis::AliasResult::PartialAlias;
+    return AliasResult::PartialAlias;
 
   // We failed to prove anything. Be conservative and return MayAlias.
-  return AliasAnalysis::AliasResult::MayAlias;
+  return AliasResult::MayAlias;
 }
 
 
@@ -606,19 +597,17 @@ static bool typesMayAlias(SILType T1, SILType T2, SILType TBAA1Ty,
 
 /// The main AA entry point. Performs various analyses on V1, V2 in an attempt
 /// to disambiguate the two values.
-AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2,
-                                                SILType TBAAType1,
-                                                SILType TBAAType2) {
-  auto Result = aliasInner(V1, V2, TBAAType1, TBAAType2);
-  AliasCache.clear();
-  return Result;
+AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2,
+                                 SILType TBAAType1,
+                                 SILType TBAAType2) {
+  return aliasInner(V1, V2, TBAAType1, TBAAType2);
 }
 
 /// The main AA entry point. Performs various analyses on V1, V2 in an attempt
 /// to disambiguate the two values.
-AliasAnalysis::AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
-                                                     SILType TBAAType1,
-                                                     SILType TBAAType2) {
+AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
+                                      SILType TBAAType1,
+                                      SILType TBAAType2) {
 #ifndef NDEBUG
   // If alias analysis is disabled, always return may alias.
   if (!shouldRunAA())
@@ -648,24 +637,6 @@ AliasAnalysis::AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   DEBUG(llvm::dbgs() << "        After Cast Stripping V1:" << *V1.getDef());
   DEBUG(llvm::dbgs() << "        After Cast Stripping V2:" << *V2.getDef());
 
-  // Create a key to lookup if we have already computed an alias result for V1,
-  // V2. Canonicalize our cache keys so that the pointer with the lower address
-  // is always the first element of the pair. This ensures we do not pollute our
-  // cache with two entries with the same key, albeit with the key's fields
-  // swapped.
-  auto Key = V1 < V2? std::make_pair(V1, V2) : std::make_pair(V2, V1);
-
-  // If we find our key in the cache, just return the alias result.
-  if (CacheAAResults) {
-    auto Pair = AliasCache.find(Key);
-    if (Pair != AliasCache.end()) {
-      DEBUG(llvm::dbgs() << "      Found value in the cache: " << Pair->second
-                         << "\n");
-
-      return Pair->second;
-    }
-  }
-
   // Ok, we need to actually compute an Alias Analysis result for V1, V2. Begin
   // by finding the "base" of V1, V2 by stripping off all casts and GEPs.
   SILValue O1 = getUnderlyingObject(V1);
@@ -676,7 +647,7 @@ AliasAnalysis::AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   // If O1 and O2 do not equal, see if we can prove that they can not be the
   // same object. If we can, return No Alias.
   if (O1 != O2 && aliasUnequalObjects(O1, O2))
-    return cacheValue(Key, AliasResult::NoAlias);
+    return AliasResult::NoAlias;
 
   // Ok, either O1, O2 are the same or we could not prove anything based off of
   // their inequality. Now we climb up use-def chains and attempt to do tricks
@@ -694,19 +665,16 @@ AliasAnalysis::AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   if (Projection::isAddrProjection(V1)) {
     AliasResult Result = aliasAddressProjection(V1, V2, O1, O2);
     if (Result != AliasResult::MayAlias)
-      return cacheValue(Key, Result);
+      return Result;
   }
-
 
   // We could not prove anything. Be conservative and return that V1, V2 may
   // alias.
   return AliasResult::MayAlias;
 }
 
-/// Check if this is the address of a "let" member.
-/// Nobody can write into let members.
 bool swift::isLetPointer(SILValue V) {
-  // Traverse the "access" path for V and check that starts with "let"
+  // Traverse the "access" path for V and check that it starts with "let"
   // and everything along this path is a value-type (i.e. struct or tuple).
 
   // Is this an address of a "let" class member?
@@ -733,14 +701,6 @@ bool swift::isLetPointer(SILValue V) {
   return false;
 }
 
-AliasAnalysis::AliasResult AliasAnalysis::cacheValue(AliasCacheKey Key,
-                                                     AliasResult Result) {
-  if (!CacheAAResults)
-    return Result;
-  DEBUG(llvm::dbgs() << "Caching Alias Result: " << Result << "\n" << Key.first
-                     << Key.second << "\n");
-  return AliasCache[Key] = Result;
-}
 
 void AliasAnalysis::initialize(SILPassManager *PM) {
   SEA = PM->getAnalysis<SideEffectAnalysis>();
