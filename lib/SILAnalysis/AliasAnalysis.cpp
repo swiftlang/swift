@@ -531,13 +531,14 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy, SILModule &Mod) {
   ClassDecl *LTyClass = LTy.getClassOrBoundGenericClass();
 
   // The Builtin reference types can alias any class instance.
-  if (RTy.is<BuiltinUnknownObjectType>() && LTyClass)
-    return true;
-  if (RTy.is<BuiltinNativeObjectType>() && LTyClass)
-    return true;
-  if (RTy.is<BuiltinBridgeObjectType>() && LTyClass)
-    return true;
-  
+  if (LTyClass) {
+    if (RTy.is<BuiltinUnknownObjectType>() ||
+        RTy.is<BuiltinNativeObjectType>()  ||
+        RTy.is<BuiltinBridgeObjectType>()) {
+      return true;
+    }
+  }
+
   // If one type is an aggregate and it contains the other type then the record
   // reference may alias the aggregate reference.
   if (LTy.aggregateContainsRecord(RTy, Mod) ||
