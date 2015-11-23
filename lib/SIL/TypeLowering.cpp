@@ -1958,11 +1958,9 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
       inputFields.push_back(TupleTypeElt(captureType));
       break;
     case CaptureKind::Box: {
-      // Capture the owning NativeObject and the address of the value.
+      // Capture the owning box.
       CanType boxTy = SILBoxType::get(captureType);
       inputFields.push_back(boxTy);
-      auto lvType = CanInOutType::get(captureType);
-      inputFields.push_back(TupleTypeElt(lvType));
       break;
     }
     }
@@ -2027,6 +2025,8 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
         
     case CaptureKind::StorageAddress:
       // No-escape stored decls are captured by their raw address.
+      // FIXME: 'inout' is semantically incorrect for a capture, since
+      // it is allowed to alias captured references.
       inputFields.push_back(TupleTypeElt(CanInOutType::get(captureType)));
       break;
 
@@ -2035,12 +2035,9 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
       inputFields.push_back(TupleTypeElt(captureType));
       break;
     case CaptureKind::Box: {
-      // Capture the owning NativeObject and the address of the value.
+      // Capture the owning box.
       CanType boxTy = SILBoxType::get(captureType);
-
       inputFields.push_back(boxTy);
-      auto lvType = CanInOutType::get(captureType);
-      inputFields.push_back(TupleTypeElt(lvType));
       break;
     }
     }

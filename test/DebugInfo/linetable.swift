@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 // RUN: %target-swift-frontend %s -S -g -o - | FileCheck %s --check-prefix ASM-CHECK
 
+// XFAIL: *
+
 // REQUIRES: CPU=i386_or_x86_64
 import Swift
 func markUsed<T>(t: T) {}

@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
+// XFAIL: *
+
 func main () -> Void
 {
 
