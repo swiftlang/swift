@@ -522,7 +522,7 @@ void Remangler::mangleFunctionSignatureSpecializationParam(Node *node) {
     }
     Out << '_';
     return;
-  case FunctionSigSpecializationParamKind::InOutToValue:
+  case FunctionSigSpecializationParamKind::BoxToValue:
     Out << "i_";
     return;
   default:

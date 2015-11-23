@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-sil -o - -verify | FileCheck %s
 
-// XFAIL: *
-
 class Foo {
   func foo() -> Int {
     return 1
@@ -24,11 +22,11 @@ func test_capture_promotion() -> () -> Int {
 
 // CHECK-NOT: alloc_box
 
-// CHECK: [[CLOSURE0_PROMOTE0:%.*]] = function_ref @_TTSf2d_i_d_i_d_i___TFF17capture_promotion22test_capture_promotionFT_FT_SiU_FT_Si
+// CHECK: [[CLOSURE0_PROMOTE0:%.*]] = function_ref @_TTSf2i_i_i___TFF17capture_promotion22test_capture_promotionFT_FT_SiU_FT_Si
 // CHECK: partial_apply [[CLOSURE0_PROMOTE0]]({{%[0-9]*}}, {{%[0-9]*}}, {{%[0-9]*}})
 
   return { x + y.foo() + z.x }
 }
 
-// CHECK: sil shared @_TTSf2d_i_d_i_d_i___TFF17capture_promotion22test_capture_promotionFT_FT_SiU_FT_Si : $@convention(thin) (Int, @owned Foo, @owned Baz) -> Int
+// CHECK: sil shared @_TTSf2i_i_i___TFF17capture_promotion22test_capture_promotionFT_FT_SiU_FT_Si : $@convention(thin) (Int, @owned Foo, @owned Baz) -> Int
 
