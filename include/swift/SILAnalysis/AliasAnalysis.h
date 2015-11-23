@@ -80,26 +80,33 @@ public:
   
   SideEffectAnalysis *getSideEffectAnalysis() const { return SEA; }
 
-  /// Compute the alias properties of the pointers \p V1 and \p V2.
-  /// The optional arguments \pTBAAType1 and \p TBAAType2 specify the exact
-  /// types that the pointers access.
-  AliasResult alias(SILValue V1, SILValue V2,
-                    SILType TBAAType1 = SILType(),
+  /// Perform an alias query to see if V1, V2 refer to the same values.
+  AliasResult alias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
                     SILType TBAAType2 = SILType());
 
-#define ALIAS_PROPERTY_CONVENIENCE_METHOD(KIND)   \
-  bool is##KIND(SILValue V1, SILValue V2,         \
-                SILType TBAAType1 = SILType(),    \
-                SILType TBAAType2 = SILType()) {  \
-    return alias(V1, V2, TBAAType1, TBAAType2) == AliasResult::KIND; \
+  /// Convenience method that returns true if V1 and V2 must alias.
+  bool isMustAlias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
+                   SILType TBAAType2 = SILType()) {
+    return alias(V1, V2, TBAAType1, TBAAType2) == AliasResult::MustAlias;
   }
 
-  ALIAS_PROPERTY_CONVENIENCE_METHOD(MustAlias)
-  ALIAS_PROPERTY_CONVENIENCE_METHOD(PartialAlias)
-  ALIAS_PROPERTY_CONVENIENCE_METHOD(NoAlias)
-  ALIAS_PROPERTY_CONVENIENCE_METHOD(MayAlias)
+  /// Convenience method that returns true if V1 and V2 partially alias.
+  bool isPartialAlias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
+                      SILType TBAAType2 = SILType()) {
+    return alias(V1, V2, TBAAType1, TBAAType2) == AliasResult::PartialAlias;
+  }
 
-#undef ALIAS_PROPERTY_CONVENIENCE_METHOD
+  /// Convenience method that returns true if V1, V2 can not alias.
+  bool isNoAlias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
+                 SILType TBAAType2 = SILType()) {
+    return alias(V1, V2, TBAAType1, TBAAType2) == AliasResult::NoAlias;
+  }
+
+  /// Convenience method that returns true if V1, V2 may alias.
+  bool isMayAlias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
+                  SILType TBAAType2 = SILType()) {
+    return alias(V1, V2, TBAAType1, TBAAType2) == AliasResult::MayAlias;
+  }
 
   /// Use the alias analysis to determine the memory behavior of Inst with
   /// respect to V.
