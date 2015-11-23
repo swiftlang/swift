@@ -14,8 +14,8 @@ import Builtin
 // CHECK-NEXT: public_bottom
 // CHECK-NEXT: public_middle
 // CHECK-NEXT: public_top
-// CHECK-NEXT: private_derived_foo
 // CHECK-NEXT: private_base_foo
+// CHECK-NEXT: private_derived_foo
 // CHECK-NEXT: call_private
 // CHECK-NEXT: internal_base_foo
 // CHECK-NEXT: internal_derived_foo
