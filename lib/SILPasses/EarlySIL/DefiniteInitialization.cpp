@@ -1089,10 +1089,14 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
   }
 
   Diag<StringRef, bool> DiagMessage;
-  if (isa<MarkFunctionEscapeInst>(Inst))
-    DiagMessage = diag::global_variable_function_use_uninit;
-  else
-    DiagMessage = diag::variable_escape_before_initialized;
+  if (isa<MarkFunctionEscapeInst>(Inst)) {
+    if (Inst->getLoc().isASTNode<AbstractClosureExpr>())
+      DiagMessage = diag::variable_closure_use_uninit;
+    else
+      DiagMessage = diag::variable_function_use_uninit;
+  } else {
+    DiagMessage = diag::variable_closure_use_uninit;
+  }
 
   diagnoseInitError(Use, DiagMessage);
 }

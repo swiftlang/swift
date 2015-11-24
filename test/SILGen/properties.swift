@@ -675,9 +675,10 @@ func propertyWithDidSetTakingOldValue() {
 // CHECK-NEXT:  debug_value %5 : $Int
 // CHECK-NEXT:  assign %0 to %3 : $*Int
 // CHECK-NEXT:  strong_retain %1 : $@box Int
+// CHECK-NEXT:  mark_function_escape %3
 // CHECK-NEXT:  // function_ref
-// CHECK-NEXT:  %9 = function_ref @_TFF10properties32propertyWithDidSetTakingOldValueFT_T_WL_1pSi : $@convention(thin) (Int, @owned @box Int, @inout Int) -> ()
-// CHECK-NEXT:  %10 = apply %9(%5, %1, %3) : $@convention(thin) (Int, @owned @box Int, @inout Int) -> ()
+// CHECK-NEXT:  %9 = function_ref @_TFF10properties32propertyWithDidSetTakingOldValueFT_T_WL_1pSi : $@convention(thin) (Int, @owned @box Int) -> ()
+// CHECK-NEXT:  %10 = apply %9(%5, %1) : $@convention(thin) (Int, @owned @box Int) -> ()
 // CHECK-NEXT:  strong_release %1 : $@box Int
 // CHECK-NEXT:  %12 = tuple ()
 // CHECK-NEXT:  return %12 : $()

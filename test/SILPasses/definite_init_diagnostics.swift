@@ -3,8 +3,6 @@
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
 // XFAIL: linux
 
-// XFAIL: *
-
 import Swift
 import gizmo
 
@@ -59,7 +57,7 @@ func test2() {
 
   // expected-warning @+1 {{variable 'b1' was never mutated}} {{3-6=let}}
   var b1 : Int        // expected-note {{variable defined here}}
-  takes_closure {     // expected-error {{variable 'b1' used before being initialized}}
+  takes_closure {     // expected-error {{variable 'b1' captured by a closure before being initialized}}
     markUsed(b1)
   }
 

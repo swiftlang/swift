@@ -223,6 +223,10 @@ void SILGenFunction::emitCaptures(SILLocation loc,
                                   AnyFunctionRef TheClosure,
                                   SmallVectorImpl<ManagedValue> &capturedArgs) {
   auto captureInfo = SGM.Types.getLoweredLocalCaptures(TheClosure);
+  // For boxed captures, we need to mark the contained variables as having
+  // escaped for DI diagnostics.
+  SmallVector<SILValue, 2> escapesToMark;
+  
   for (auto capture : captureInfo.getCaptures()) {
     auto *vd = capture.getDecl();
 
@@ -285,6 +289,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       if (vl.box) {
         B.createStrongRetain(loc, vl.box);
         capturedArgs.push_back(emitManagedRValueWithCleanup(vl.box));
+        escapesToMark.push_back(vl.value);
       } else {
         // Address only 'let' values are passed by box.  This isn't great, in
         // that a variable captured by multiple closures will be boxed for each
@@ -301,6 +306,12 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       break;
     }
     }
+  }
+  
+  // Mark box addresses as captured for DI purposes. The values must have
+  // been fully initialized before we close over them.
+  if (!escapesToMark.empty()) {
+    B.createMarkFunctionEscape(loc, escapesToMark);
   }
 }
 
