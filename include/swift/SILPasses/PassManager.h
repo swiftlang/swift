@@ -60,7 +60,7 @@ class SILPassManager {
   /// Set to true when a pass invalidates an analysis.
   bool currentPassHasInvalidated = false;
   
-  public:
+public:
   /// C'tor. It creates and registers all analysis passes, which are defined
   /// in Analysis.def.
   SILPassManager(SILModule *M, llvm::StringRef Stage = "");
@@ -155,7 +155,7 @@ class SILPassManager {
 #include "Passes.def"
 
   typedef llvm::ArrayRef<SILFunctionTransform *> PassList;
-  private:
+private:
   /// Run the passes in \p FuncTransforms. Return true
   /// if the pass manager requested to stop the execution
   /// of the optimization cycle (this is a debug feature).
