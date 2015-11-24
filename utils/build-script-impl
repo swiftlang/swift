@@ -2123,7 +2123,7 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
         cp "${SWIFT_SOURCE_DIR}/utils/swift-stdlib-tool-substitute" "${INSTALL_DESTDIR}/${INSTALL_PREFIX}/bin/swift-stdlib-tool"
       fi
       
-      # Create plist for xctoolchain
+      # Create plist for xctoolchain.
       echo "-- Create Info.plist --"
       PLISTBUDDY_BIN="/usr/libexec/PlistBuddy"
 
