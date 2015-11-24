@@ -359,10 +359,11 @@ void SILPassManager::run() {
           F.dump(Options.EmitVerboseSIL);
         }
         if (!SILPrintOnlyFuns.empty() &&
-            F.getName().find(SILPrintOnlyFuns, 0) != StringRef::npos)
+            F.getName().find(SILPrintOnlyFuns, 0) != StringRef::npos) {
           llvm::dbgs() << "*** SIL function before transformation ("
                        << NumOptimizationIterations << ") ***\n";
           F.dump(Options.EmitVerboseSIL);
+        }
       }
     }
   }
