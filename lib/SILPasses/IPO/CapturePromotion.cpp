@@ -650,7 +650,9 @@ isNonmutatingCapture(SILArgument *BoxArg) {
             return false;
         continue;
       }
-      if (!isa<LoadInst>(O->getUser()) && !isa<DebugValueAddrInst>(O->getUser()))
+      if (!isa<LoadInst>(O->getUser())
+          && !isa<DebugValueAddrInst>(O->getUser())
+          && !isa<MarkFunctionEscapeInst>(O->getUser()))
         return false;
     }
   }
@@ -665,6 +667,10 @@ isNonmutatingCapture(SILArgument *BoxArg) {
 static bool
 isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
   auto *U = O->getUser();
+  // Marking the boxed value as escaping is OK. It's just a DI annotation.
+  if (isa<MarkFunctionEscapeInst>(U))
+    return true;
+  
   // A store or assign is ok if the alloc_box is the destination.
   if (isa<StoreInst>(U) || isa<AssignInst>(U)) {
     if (O->getOperandNumber() != 1)
