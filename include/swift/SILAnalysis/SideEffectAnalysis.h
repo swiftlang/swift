@@ -49,6 +49,7 @@ enum class RetainObserveKind {ObserveRetains, IgnoreRetains};
 class SideEffectAnalysis : public SILAnalysis {
 public:
 
+  using MemoryBehavior = SILInstruction::MemoryBehavior;
   /// Set \p dest if \p src is set and return true if \p dest was not set
   /// before.
   static bool updateFlag(bool &dest, bool src) {
@@ -98,22 +99,21 @@ public:
     /// Gets the memory behavior considering the global effects and
     /// all parameter effects. If \p ScanKind equals ignoreRetains then retain
     /// instructions are considered as side effects.
-    SILInstruction::MemoryBehavior
-      getMemBehavior(RetainObserveKind ScanKind) const {
+    MemoryBehavior getMemBehavior(RetainObserveKind ScanKind) const {
       if (mayRelease())
-        return SILInstruction::MemoryBehavior::MayHaveSideEffects;
+        return MemoryBehavior::MayHaveSideEffects;
       
       if (ScanKind == RetainObserveKind::ObserveRetains && mayRetain())
-        return SILInstruction::MemoryBehavior::MayHaveSideEffects;
+        return MemoryBehavior::MayHaveSideEffects;
       
       if (mayWrite())
-        return mayRead() ? SILInstruction::MemoryBehavior::MayReadWrite :
-                           SILInstruction::MemoryBehavior::MayWrite;
+        return mayRead() ? MemoryBehavior::MayReadWrite :
+                           MemoryBehavior::MayWrite;
       
       if (mayRead())
-        return SILInstruction::MemoryBehavior::MayRead;
+        return MemoryBehavior::MayRead;
       
-      return SILInstruction::MemoryBehavior::None;
+      return MemoryBehavior::None;
     }
 
     /// Merge effects from \p RHS.
@@ -225,8 +225,7 @@ public:
     /// Gets the memory behavior considering the global effects and
     /// all parameter effects. If \p ScanKind equals ignoreRetains then retain
     /// instructions are considered as side effects.
-    SILInstruction::MemoryBehavior
-      getMemBehavior(RetainObserveKind ScanKind) const;
+    MemoryBehavior getMemBehavior(RetainObserveKind ScanKind) const;
 
     /// Get the global effects for the function. These are effects which cannot
     /// be associated to a specific parameter, e.g. writes to global variables

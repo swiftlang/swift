@@ -23,24 +23,28 @@ using namespace swift;
 
 using FunctionEffects = SideEffectAnalysis::FunctionEffects;
 using Effects = SideEffectAnalysis::Effects;
+using MemoryBehavior = SILInstruction::MemoryBehavior;
 
-SILInstruction::MemoryBehavior FunctionEffects::getMemBehavior(RetainObserveKind ScanKind) const {
+MemoryBehavior
+FunctionEffects::getMemBehavior(RetainObserveKind ScanKind) const {
 
-  if ((ScanKind == RetainObserveKind::ObserveRetains && mayAllocObjects()) || mayReadRC())
-    return SILInstruction::MemoryBehavior::MayHaveSideEffects;
+  bool Observe = (ScanKind == RetainObserveKind::ObserveRetains);
+  if ((Observe && mayAllocObjects()) || mayReadRC())
+    return MemoryBehavior::MayHaveSideEffects;
   
   // Start with the global effects.
   auto Behavior = GlobalEffects.getMemBehavior(ScanKind);
   
   // Add effects from the parameters.
-  for (auto Iter = ParamEffects.begin(), End = ParamEffects.end();
-       Iter != End &&
-       Behavior < SILInstruction::MemoryBehavior::MayHaveSideEffects;
-       ++Iter) {
-    const Effects &ParamEffect = *Iter;
-    auto ArgBehavior = ParamEffect.getMemBehavior(ScanKind);
+  for (auto &ParamEffect : ParamEffects) {
+    MemoryBehavior ArgBehavior = ParamEffect.getMemBehavior(ScanKind);
+
     if (ArgBehavior > Behavior)
       Behavior = ArgBehavior;
+
+    // Stop the scan if we've reached the highest level of side effect.
+    if (Behavior == MemoryBehavior::MayHaveSideEffects)
+      break;
   }
   return Behavior;
 }
@@ -340,19 +344,19 @@ void SideEffectAnalysis::analyzeInstruction(FunctionEffects &FE,
   
   // Check the general memory behavior for instructions we didn't handle above.
   switch (I->getMemoryBehavior()) {
-    case SILInstruction::MemoryBehavior::None:
+    case MemoryBehavior::None:
       break;
-    case SILInstruction::MemoryBehavior::MayRead:
+    case MemoryBehavior::MayRead:
       FE.GlobalEffects.Reads = true;
       break;
-    case SILInstruction::MemoryBehavior::MayWrite:
+    case MemoryBehavior::MayWrite:
       FE.GlobalEffects.Writes = true;
       break;
-    case SILInstruction::MemoryBehavior::MayReadWrite:
+    case MemoryBehavior::MayReadWrite:
       FE.GlobalEffects.Reads = true;
       FE.GlobalEffects.Writes = true;
       break;
-    case SILInstruction::MemoryBehavior::MayHaveSideEffects:
+    case MemoryBehavior::MayHaveSideEffects:
       FE.setWorstEffects();
       break;
   }
