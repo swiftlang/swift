@@ -1,5 +1,5 @@
 #!/bin/bash
-#===--- build-script-impl - Implementation details of build-script ---------===#
+#===--- toolchain-codesign - Creates code signed xctoolchain ---------------===#
 #
 ## This source file is part of the Swift.org open source project
 ##
