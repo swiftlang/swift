@@ -34,8 +34,9 @@ using MemBehavior = SILInstruction::MemoryBehavior;
 class MemoryBehaviorVisitor
     : public SILInstructionVisitor<MemoryBehaviorVisitor, MemBehavior> {
 
-  /// The alias analysis for any queries we may need.
-  AliasAnalysis &AA;
+  AliasAnalysis *AA;
+
+  SideEffectAnalysis *SEA;
 
   /// The value we are attempting to discover memory behavior relative to.
   SILValue V;
@@ -45,12 +46,12 @@ class MemoryBehaviorVisitor
 
   /// Should we treat instructions that increment ref counts as None instead of
   /// MayHaveSideEffects.
-  RetainObserveKind IgnoreRefCountIncrements;
+  RetainObserveKind InspectionMode;
 
 public:
-  MemoryBehaviorVisitor(AliasAnalysis &AA, SILValue V,
+  MemoryBehaviorVisitor(AliasAnalysis *AA, SideEffectAnalysis *SEA, SILValue V,
                         RetainObserveKind IgnoreRefCountIncs)
-      : AA(AA), V(V), IgnoreRefCountIncrements(IgnoreRefCountIncs) {}
+      : AA(AA), SEA(SEA), V(V), InspectionMode(IgnoreRefCountIncs) {}
 
   SILType getValueTBAAType() {
     if (!TypedAccessTy)
@@ -98,7 +99,7 @@ public:
 #define OPERANDALIAS_MEMBEHAVIOR_INST(Name)                             \
   MemBehavior visit##Name(Name *I) {                                    \
     for (Operand &Op : I->getAllOperands()) {                           \
-      if (!AA.isNoAlias(Op.get(), V)) {                                 \
+      if (!AA->isNoAlias(Op.get(), V)) {                                 \
         DEBUG(llvm::dbgs() << "  " #Name                                \
               " does alias inst. Returning  Normal behavior.\n");       \
         return I->getMemoryBehavior();                                  \
@@ -133,7 +134,7 @@ public:
   // memory this will be unnecessary.
 #define REFCOUNTINC_MEMBEHAVIOR_INST(Name)                                     \
   MemBehavior visit##Name(Name *I) {                                           \
-    if (IgnoreRefCountIncrements == RetainObserveKind::IgnoreRetains)          \
+    if (InspectionMode == RetainObserveKind::IgnoreRetains)          \
       return MemBehavior::None;                                                \
     return I->getMemoryBehavior();                                             \
   }
@@ -148,7 +149,7 @@ public:
 } // end anonymous namespace
 
 MemBehavior MemoryBehaviorVisitor::visitLoadInst(LoadInst *LI) {
-  if (AA.isNoAlias(LI->getOperand(), V, computeTBAAType(LI->getOperand()),
+  if (AA->isNoAlias(LI->getOperand(), V, computeTBAAType(LI->getOperand()),
                    getValueTBAAType())) {
     DEBUG(llvm::dbgs() << "  Load Operand does not alias inst. Returning "
                           "None.\n");
@@ -168,7 +169,7 @@ MemBehavior MemoryBehaviorVisitor::visitStoreInst(StoreInst *SI) {
 
   // If the store dest cannot alias the pointer in question, then the
   // specified value can not be modified by the store.
-  if (AA.isNoAlias(SI->getDest(), V, computeTBAAType(SI->getDest()),
+  if (AA->isNoAlias(SI->getDest(), V, computeTBAAType(SI->getDest()),
                    getValueTBAAType())) {
     DEBUG(llvm::dbgs() << "  Store Dst does not alias inst. Returning "
                           "None.\n");
@@ -228,29 +229,29 @@ MemBehavior MemoryBehaviorVisitor::visitTryApplyInst(TryApplyInst *AI) {
 MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
 
   SideEffectAnalysis::FunctionEffects ApplyEffects;
-  AA.getSideEffectAnalysis()->getEffects(ApplyEffects, AI);
+  SEA->getEffects(ApplyEffects, AI);
 
   MemBehavior Behavior = MemBehavior::None;
 
   // We can ignore mayTrap().
   if (ApplyEffects.mayReadRC() ||
-      (IgnoreRefCountIncrements == RetainObserveKind::ObserveRetains &&
+      (InspectionMode == RetainObserveKind::ObserveRetains &&
        ApplyEffects.mayAllocObjects())) {
     Behavior = MemBehavior::MayHaveSideEffects;
   } else {
     auto &GlobalEffects = ApplyEffects.getGlobalEffects();
-    Behavior = GlobalEffects.getMemBehavior(IgnoreRefCountIncrements);
+    Behavior = GlobalEffects.getMemBehavior(InspectionMode);
 
     // Check all parameter effects.
     for (unsigned Idx = 0, End = AI->getNumArguments();
          Idx < End && Behavior < MemBehavior::MayHaveSideEffects; ++Idx) {
       auto &ArgEffect = ApplyEffects.getParameterEffects()[Idx];
-      auto ArgBehavior = ArgEffect.getMemBehavior(IgnoreRefCountIncrements);
+      auto ArgBehavior = ArgEffect.getMemBehavior(InspectionMode);
       if (ArgBehavior > Behavior) {
         SILValue Arg = AI->getArgument(Idx);
         // We only consider the argument effects if the argument aliases V.
         if (!Arg.getType().isAddress() ||
-            !AA.isNoAlias(Arg, V, computeTBAAType(Arg), getValueTBAAType())) {
+            !AA->isNoAlias(Arg, V, computeTBAAType(Arg), getValueTBAAType())) {
           Behavior = ArgBehavior;
         }
       }
@@ -307,8 +308,9 @@ MemBehavior MemoryBehaviorVisitor::visitReleaseValueInst(ReleaseValueInst *SI) {
 
 MemBehavior
 AliasAnalysis::computeMemoryBehavior(SILInstruction *Inst, SILValue V,
-                                 RetainObserveKind IgnoreRefCountIncrements) {
+                                 RetainObserveKind InspectionMode) {
   DEBUG(llvm::dbgs() << "GET MEMORY BEHAVIOR FOR:\n    " << *Inst << "    "
                      << *V.getDef());
-  return MemoryBehaviorVisitor(*this, V, IgnoreRefCountIncrements).visit(Inst);
+  assert(SEA && "SideEffectsAnalysis must be initialized!");
+  return MemoryBehaviorVisitor(this, SEA, V, InspectionMode).visit(Inst);
 }

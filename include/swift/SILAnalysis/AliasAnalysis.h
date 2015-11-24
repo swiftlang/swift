@@ -78,8 +78,6 @@ public:
   
   virtual void initialize(SILPassManager *PM);
   
-  SideEffectAnalysis *getSideEffectAnalysis() const { return SEA; }
-
   /// Perform an alias query to see if V1, V2 refer to the same values.
   AliasResult alias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
                     SILType TBAAType2 = SILType());
@@ -112,7 +110,7 @@ public:
   /// respect to V.
   ///
   /// TODO: When ref count behavior is separated from generic memory behavior,
-  /// the IgnoreRefCountIncrements flag will be unnecessary.
+  /// the InspectionMode flag will be unnecessary.
   MemoryBehavior computeMemoryBehavior(SILInstruction *Inst, SILValue V,
                                        RetainObserveKind);
 
