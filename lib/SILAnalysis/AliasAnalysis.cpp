@@ -442,38 +442,6 @@ static bool typedAccessTBAABuiltinTypesMayAlias(SILType LTy, SILType RTy,
   return false;
 }
 
-/// Return true if the type \p Parent is a parent of \p Child in the
-/// class hierarchy.
-static bool isParentClass(SILType Parent, SILType Child) {
-  SILType T = SILType();
-
-  // Walk the class hiearchy to see whether Parent and Child have a
-  // parent-child relationship.
-  T = Child;
-  do {
-    // There is a parent-child relationship.
-    if (T == Parent)
-      return true;
-
-    T = T.getSuperclass(nullptr);
-  } while(T);
-
-  return false;
-}
-
-/// Returns true if the reference types \p LTy and \pRTy may alias.
-static bool referenceTypeTBAAMayAlias(SILType LTy, SILType RTy) {
-
-  // Walk the type hiearchy to see whether LTy and RTy have a parent-child
-  // relationship.
-  if (isParentClass(LTy, RTy) ||
-      isParentClass(RTy, LTy)) {
-    return true;
-  }
-
-  return false;
-}
-
 /// \brief return True if the types \p LTy and \p RTy may alias.
 ///
 /// Currently this only implements typed access based TBAA. See the TBAA section
@@ -488,13 +456,6 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy, SILModule &Mod) {
   if (LTy == RTy)
     return true;
 
-  // If 2 reference types have no parent-child relationship, then they can
-  // not alias.
-  if (!LTy.isAddress() && !RTy.isAddress()) {
-    if (LTy.isHeapObjectReferenceType() && RTy.isHeapObjectReferenceType())
-      return referenceTypeTBAAMayAlias(LTy, RTy);
-  }
- 
   // Typed access based TBAA only occurs on pointers. If we reach this point and
   // do not have a pointer, be conservative and return that the two types may
   // alias. *NOTE* This ensures we return may alias for local_storage.
