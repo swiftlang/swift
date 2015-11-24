@@ -585,16 +585,21 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy, SILModule &Mod) {
   return true;
 }
 
-static bool typesMayAlias(SILType T1, SILType T2, SILType TBAA1Ty,
-                          SILType TBAA2Ty, SILModule &Mod) {
-  // Perform type access based TBAA if we have TBAA info.
-  if (TBAA1Ty && TBAA2Ty)
-    return typedAccessTBAAMayAlias(TBAA1Ty, TBAA2Ty, Mod);
+bool AliasAnalysis::typesMayAlias(SILType T1, SILType T2) {
+  // Both types need to be valid.
+  if (!T2 || !T1)
+    return true;
 
-  // Otherwise perform class based TBAA on the passed in refs.
-  //
-  // FIXME: Implement class based TBAA.
-  return true;
+  // Check if we've already computed the TBAA relation.
+  auto Key = std::make_pair(T1, T2);
+  auto Res = TypesMayAliasCache.find(Key);
+  if (Res != TypesMayAliasCache.end()) {
+    return Res->second;
+  }
+
+  bool MA = typedAccessTBAAMayAlias(T1, T2, *Mod);
+  TypesMayAliasCache[Key] = MA;
+  return MA;
 }
 
 //===----------------------------------------------------------------------===//
@@ -629,7 +634,7 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
 
   // Pass in both the TBAA types so we can perform typed access TBAA and the
   // actual types of V1, V2 so we can perform class based TBAA.
-  if (!typesMayAlias(V1.getType(), V2.getType(), TBAAType1, TBAAType2, *Mod))
+  if (!typesMayAlias(TBAAType1, TBAAType2))
     return AliasResult::NoAlias;
 
 #ifndef NDEBUG
