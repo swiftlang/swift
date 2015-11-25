@@ -25,22 +25,32 @@ using namespace swift;
 
 namespace {
 
-class LoopRegionViewText : public SILFunctionTransform {
+class LoopRegionViewText : public SILModuleTransform {
   void run() override {
-    auto *Fn = getFunction();
-    llvm::outs() << "@" << Fn->getName() << "@\n";
-    PM->getAnalysis<LoopRegionAnalysis>()->get(Fn)->dump();
-    llvm::outs() << "\n";
-    llvm::outs().flush();
+    invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
+    LoopRegionAnalysis *LRA = PM->getAnalysis<LoopRegionAnalysis>();
+    for (auto &Fn : *getModule()) {
+      if (Fn.isExternalDeclaration()) continue;
+
+      llvm::outs() << "@" << Fn.getName() << "@\n";
+      LRA->get(&Fn)->dump();
+      llvm::outs() << "\n";
+      llvm::outs().flush();
+    }
   }
 
   virtual StringRef getName() override { return "LoopRegionViewText"; }
 };
 
-class LoopRegionViewCFG : public SILFunctionTransform {
+class LoopRegionViewCFG : public SILModuleTransform {
   void run() override {
-    auto *Fn = getFunction();
-    PM->getAnalysis<LoopRegionAnalysis>()->get(Fn)->viewLoopRegions();
+
+    LoopRegionAnalysis *LRA = PM->getAnalysis<LoopRegionAnalysis>();
+
+    auto *M = getModule();
+    for (auto &Fn : M->getFunctions()) {
+      LRA->get(&Fn)->viewLoopRegions();
+    }
   }
   virtual StringRef getName() override { return "LoopRegionViewCFG"; }
 };

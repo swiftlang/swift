@@ -18,7 +18,7 @@ using namespace swift;
 
 namespace {
 
-class IVInfoPrinter : public SILFunctionTransform {
+class IVInfoPrinter : public SILModuleTransform {
 
   StringRef getName() override { return "SIL IV Information Printer"; }
 
@@ -38,35 +38,39 @@ class IVInfoPrinter : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     auto *IV = PM->getAnalysis<IVAnalysis>();
-    auto *F = getFunction();
-    auto &Info = *IV->get(F);
 
-    bool FoundIV = false;
+    for (auto &F : *getModule()) {
+      if (F.isExternalDeclaration()) continue;
 
-    for (auto &BB : *F) {
-      for (auto A : BB.getBBArgs())
-        if (Info.isInductionVariable(A)) {
-          if (!FoundIV)
-            llvm::errs() << "Induction variables for function: " <<
-              F->getName() << "\n";
+      auto &Info = *IV->get(&F);
 
-          FoundIV = true;
-          dumpIV(Info.getInductionVariableHeader(A), A);
-        }
+      bool FoundIV = false;
 
-      for (auto &I : BB)
-        if (Info.isInductionVariable(&I)) {
-          if (!FoundIV)
-            llvm::errs() << "Induction variables for function: " <<
-              F->getName() << "\n";
+      for (auto &BB : F) {
+        for (auto A : BB.getBBArgs())
+          if (Info.isInductionVariable(A)) {
+            if (!FoundIV)
+              llvm::errs() << "Induction variables for function: " <<
+              F.getName() << "\n";
 
-          FoundIV = true;
-          dumpIV(Info.getInductionVariableHeader(&I), &I);
-        }
+            FoundIV = true;
+            dumpIV(Info.getInductionVariableHeader(A), A);
+          }
+
+        for (auto &I : BB)
+          if (Info.isInductionVariable(&I)) {
+            if (!FoundIV)
+              llvm::errs() << "Induction variables for function: " <<
+              F.getName() << "\n";
+
+            FoundIV = true;
+            dumpIV(Info.getInductionVariableHeader(&I), &I);
+          }
+      }
+      
+      if (FoundIV)
+        llvm::errs() << "\n";
     }
-
-    if (FoundIV)
-      llvm::errs() << "\n";
   }
 };
 

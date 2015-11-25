@@ -54,7 +54,7 @@ static llvm::cl::opt<MLKind> MemLocationKinds(
 
 namespace {
 
-class MemLocationPrinter : public SILFunctionTransform {
+class MemLocationPrinter : public SILModuleTransform {
 
   /// Dumps the expansions of SILType accessed in the function.
   /// This tests the expandTypeIntoLeafProjectionPaths function, which is
@@ -187,20 +187,23 @@ class MemLocationPrinter : public SILFunctionTransform {
   }
 
   void run() override {
-    SILFunction &Fn = *getFunction();
-    llvm::outs() << "@" << Fn.getName() << "\n";
-    switch (MemLocationKinds) {
-    case MLKind::OnlyTypeExpansion:
-      printTypeExpansion(Fn);
-      break;
-    case MLKind::OnlyExpansion:
-      printMemExpansion(Fn);
-      break;
-    case MLKind::OnlyReduction:
-      printMemReduction(Fn);
-      break;
-    default:
-      break;
+    for (auto &Fn : *getModule()) {
+      if (Fn.isExternalDeclaration()) continue;
+
+      llvm::outs() << "@" << Fn.getName() << "\n";
+      switch (MemLocationKinds) {
+        case MLKind::OnlyTypeExpansion:
+          printTypeExpansion(Fn);
+          break;
+        case MLKind::OnlyExpansion:
+          printMemExpansion(Fn);
+          break;
+        case MLKind::OnlyReduction:
+          printMemReduction(Fn);
+          break;
+        default:
+          break;
+      }
     }
   }
 

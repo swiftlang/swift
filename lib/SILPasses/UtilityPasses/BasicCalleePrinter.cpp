@@ -30,7 +30,7 @@ using namespace swift;
 
 namespace {
 
-class BasicCalleePrinterPass : public SILFunctionTransform {
+class BasicCalleePrinterPass : public SILModuleTransform {
   BasicCalleeAnalysis *BCA;
 
   void printCallees(FullApplySite FAS) {
@@ -51,12 +51,13 @@ class BasicCalleePrinterPass : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     BCA = getAnalysis<BasicCalleeAnalysis>();
-    auto &F = *getFunction();
-
-    for (auto &B : F)
-      for (auto &I : B)
-        if (auto FAS = FullApplySite::isa(&I))
-          printCallees(FAS);
+    for (auto &Fn : *getModule()) {
+      if (Fn.isExternalDeclaration()) continue;
+      for (auto &B : Fn)
+        for (auto &I : B)
+          if (auto FAS = FullApplySite::isa(&I))
+            printCallees(FAS);
+    }
   }
 
   StringRef getName() override { return "Basic Callee Printer"; }

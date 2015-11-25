@@ -21,27 +21,30 @@ using namespace swift;
 
 namespace {
 
-class LoopInfoPrinter : public SILFunctionTransform {
+class LoopInfoPrinter : public SILModuleTransform {
 
   StringRef getName() override { return "SIL Loop Information Printer"; }
 
   /// The entry point to the transformation.
   void run() override {
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
-    assert(LA);
-    SILFunction *F = getFunction();
-    assert(F);
-    SILLoopInfo *LI = LA->get(F);
-    assert(LI);
+    assert(LA && "Invalid LoopAnalysis");
+    for (auto &Fn : *getModule()) {
+      if (Fn.isExternalDeclaration()) continue;
 
-    if (LI->empty()) {
-      llvm::errs() << "No loops in " << F->getName() << "\n";
-      return;
-    }
+      SILLoopInfo *LI = LA->get(&Fn);
+      assert(LI && "Invalid loop info for function");
 
-    llvm::errs() << "Loops in " << F->getName() << "\n";
-    for (auto *LoopIt : *LI) {
-      LoopIt->dump();
+
+      if (LI->empty()) {
+        llvm::errs() << "No loops in " << Fn.getName() << "\n";
+        return;
+      }
+
+      llvm::errs() << "Loops in " << Fn.getName() << "\n";
+      for (auto *LoopIt : *LI) {
+        LoopIt->dump();
+      }
     }
   }
 };
