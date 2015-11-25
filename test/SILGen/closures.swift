@@ -117,7 +117,7 @@ func anon_read_only_capture(x: Int) -> Int {
 
   return ({ x })()
   // -- func expression
-  // CHECK: [[ANON:%[0-9]+]] = function_ref @[[CLOSURE_NAME:_TFF8closures22anon_read_only_capture.*]] : $@convention(thin) (@inout Int) -> Int
+  // CHECK: [[ANON:%[0-9]+]] = function_ref @[[CLOSURE_NAME:_TFF8closures22anon_read_only_capture.*]] : $@convention(thin) (@inout_aliasable Int) -> Int
   // -- apply expression
   // CHECK: [[RET:%[0-9]+]] = apply [[ANON]]([[XBOX]]#1)
   // -- cleanup
@@ -137,7 +137,7 @@ func small_closure_capture(x: Int) -> Int {
 
   return { x }()
   // -- func expression
-  // CHECK: [[ANON:%[0-9]+]] = function_ref @[[CLOSURE_NAME:_TFF8closures21small_closure_capture.*]] : $@convention(thin) (@inout Int) -> Int
+  // CHECK: [[ANON:%[0-9]+]] = function_ref @[[CLOSURE_NAME:_TFF8closures21small_closure_capture.*]] : $@convention(thin) (@inout_aliasable Int) -> Int
   // -- apply expression
   // CHECK: [[RET:%[0-9]+]] = apply [[ANON]]([[XBOX]]#1)
   // -- cleanup
@@ -209,8 +209,8 @@ class SomeClass {
 class SomeGenericClass<T> {
   deinit {
     var i: Int = zero
-    // CHECK: [[C1REF:%[0-9]+]] = function_ref @_TFFC8closures16SomeGenericClassdU_FT_Si : $@convention(thin) (@inout Int) -> Int
-    // CHECK: apply [[C1REF]]([[IBOX:%[0-9]+]]#1) : $@convention(thin) (@inout Int) -> Int
+    // CHECK: [[C1REF:%[0-9]+]] = function_ref @_TFFC8closures16SomeGenericClassdU_FT_Si : $@convention(thin) (@inout_aliasable Int) -> Int
+    // CHECK: apply [[C1REF]]([[IBOX:%[0-9]+]]#1) : $@convention(thin) (@inout_aliasable Int) -> Int
     var x = { i + zero } ()
 
     // CHECK: [[C2REF:%[0-9]+]] = function_ref @_TFFC8closures16SomeGenericClassdU0_FT_Si : $@convention(thin) () -> Int
@@ -222,7 +222,7 @@ class SomeGenericClass<T> {
     var z = { _ = T.self } ()
   }
 
-  // CHECK-LABEL: sil shared @_TFFC8closures16SomeGenericClassdU_FT_Si : $@convention(thin) (@inout Int) -> Int
+  // CHECK-LABEL: sil shared @_TFFC8closures16SomeGenericClassdU_FT_Si : $@convention(thin) (@inout_aliasable Int) -> Int
 
   // CHECK-LABEL: sil shared @_TFFC8closures16SomeGenericClassdU0_FT_Si : $@convention(thin) () -> Int
 
@@ -333,11 +333,11 @@ struct StructWithMutatingMethod {
 // CHECK: bb0(%0 : $*StructWithMutatingMethod):
 // CHECK-NEXT: %1 = alloc_box $StructWithMutatingMethod  // var self, argno: 1 // users: %2, %5, %7, %8
 // CHECK-NEXT: copy_addr %0 to [initialization] %1#1 : $*StructWithMutatingMethod // id: %2
-// CHECK: [[CLOSURE:%[0-9]+]] = function_ref @_TFFV8closures24StructWithMutatingMethod14mutatingMethod{{.*}} : $@convention(thin) (@inout StructWithMutatingMethod) -> Int
-// CHECK: partial_apply [[CLOSURE]](%1#1) : $@convention(thin) (@inout StructWithMutatingMethod) -> Int
+// CHECK: [[CLOSURE:%[0-9]+]] = function_ref @_TFFV8closures24StructWithMutatingMethod14mutatingMethod{{.*}} : $@convention(thin) (@inout_aliasable StructWithMutatingMethod) -> Int
+// CHECK: partial_apply [[CLOSURE]](%1#1) : $@convention(thin) (@inout_aliasable StructWithMutatingMethod) -> Int
 
 // Check that the closure body only takes the pointer.
-// CHECK-LABEL: sil shared @_TFFV8closures24StructWithMutatingMethod14mutatingMethod{{.*}} : $@convention(thin) (@inout StructWithMutatingMethod) -> Int {
+// CHECK-LABEL: sil shared @_TFFV8closures24StructWithMutatingMethod14mutatingMethod{{.*}} : $@convention(thin) (@inout_aliasable StructWithMutatingMethod) -> Int {
 // CHECK:       bb0(%0 : $*StructWithMutatingMethod):
 
 class SuperBase {

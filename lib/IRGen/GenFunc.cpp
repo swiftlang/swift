@@ -176,11 +176,12 @@ static void addIndirectValueParameterAttributes(IRGenModule &IGM,
 static void addInoutParameterAttributes(IRGenModule &IGM,
                                         llvm::AttributeSet &attrs,
                                         const TypeInfo &ti,
-                                        unsigned argIndex) {
+                                        unsigned argIndex,
+                                        bool aliasable) {
   llvm::AttrBuilder b;
   // Aliasing inouts is unspecified, but we still want aliasing to be memory-
   // safe, so we can't mark inouts as noalias at the LLVM level.
-  // They can't be captured without doing unsafe stuff, though.
+  // They still can't be captured without doing unsafe stuff, though.
   b.addAttribute(llvm::Attribute::NoCapture);
   // The inout must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
@@ -1320,7 +1321,7 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
 
 void SignatureExpansion::expand(SILParameterInfo param) {
   auto &ti = IGM.getTypeInfo(param.getSILType());
-  switch (param.getConvention()) {
+  switch (auto conv = param.getConvention()) {
   case ParameterConvention::Indirect_Out:
     assert(ParamIRTypes.empty());
     addIndirectReturnAttributes(IGM, Attrs);
@@ -1335,7 +1336,9 @@ void SignatureExpansion::expand(SILParameterInfo param) {
     return;
 
   case ParameterConvention::Indirect_Inout:
-    addInoutParameterAttributes(IGM, Attrs, ti, ParamIRTypes.size());
+  case ParameterConvention::Indirect_InoutAliasable:
+    addInoutParameterAttributes(IGM, Attrs, ti, ParamIRTypes.size(),
+                          conv == ParameterConvention::Indirect_InoutAliasable);
     addPointerParameter(IGM.getStorageType(param.getSILType()));
     return;
 
@@ -2883,9 +2886,9 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
     case clang::CodeGen::ABIArgInfo::Direct: {
       auto toTy = AI.getCoerceToType();
 
-      // inout parameters are bridged as Clang pointer types. For now, this
+      // Mutating parameters are bridged as Clang pointer types. For now, this
       // only ever comes up with Clang-generated accessors.
-      if (params[i - firstParam].isIndirectInOut()) {
+      if (params[i - firstParam].isIndirectMutating()) {
         assert(paramType.isAddress() && "SIL type is not an address?");
 
         auto addr = in.claimNext();
@@ -3376,6 +3379,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   case ParameterConvention::Direct_Deallocating:
     llvm_unreachable("callables do not have destructors");
   case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
   case ParameterConvention::Indirect_Out:
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_In_Guaranteed:
@@ -3445,6 +3449,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
     case ParameterConvention::Direct_Deallocating:
     case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_InoutAliasable:
     case ParameterConvention::Indirect_Out:
       llvm_unreachable("should never happen!");
     }
@@ -3510,7 +3515,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
         dependsOnContextLifetime = true;
         break;
       case ParameterConvention::Indirect_Inout:
-        // Load the add ress of the inout parameter.
+      case ParameterConvention::Indirect_InoutAliasable:
+        // Load the address of the inout parameter.
         cast<LoadableTypeInfo>(fieldTI).loadAsCopy(subIGF, fieldAddr, param);
         break;
       case ParameterConvention::Direct_Guaranteed:
@@ -3733,6 +3739,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
       
     // Capture inout parameters by pointer.
     case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_InoutAliasable:
       argLoweringTy = argType.getSwiftType();
       break;
       
@@ -3840,7 +3847,9 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   // still need to build a thunk, but we don't need to allocate anything.
   if ((hasSingleSwiftRefcountedContext == Yes ||
        hasSingleSwiftRefcountedContext == Thunkable) &&
-      *singleRefcountedConvention != ParameterConvention::Indirect_Inout) {
+      *singleRefcountedConvention != ParameterConvention::Indirect_Inout &&
+      *singleRefcountedConvention !=
+        ParameterConvention::Indirect_InoutAliasable) {
     assert(bindings.empty());
     assert(args.size() == 1);
 
@@ -3911,6 +3920,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
       case ParameterConvention::Direct_Guaranteed:
       case ParameterConvention::Direct_Deallocating:
       case ParameterConvention::Indirect_Inout:
+      case ParameterConvention::Indirect_InoutAliasable:
         cast<LoadableTypeInfo>(fieldLayout.getType())
           .initialize(IGF, args, fieldAddr);
         break;

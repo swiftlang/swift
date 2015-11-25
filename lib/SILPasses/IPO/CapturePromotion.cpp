@@ -934,10 +934,17 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
 
       // Load and copy from the address value, passing the result as an argument
       // to the new closure.
-      auto AddrValue = cast<AllocBoxInst>(BoxValue)->getAddressResult();
-      auto &typeLowering = M.getTypeLowering(AddrValue.getType());
+      SILValue Addr = cast<AllocBoxInst>(BoxValue)->getAddressResult();
+      // If the address is marked uninitialized, load through the mark, so that
+      // DI can reason about it.
+      if (Addr.hasOneUse())
+        if (auto MUI = dyn_cast<MarkUninitializedInst>(
+                                                   Addr.use_begin()->getUser()))
+          Addr = SILValue(MUI);
+
+      auto &typeLowering = M.getTypeLowering(Addr.getType());
       Args.push_back(
-        typeLowering.emitLoadOfCopy(B, PAI->getLoc(), AddrValue, IsNotTake));
+        typeLowering.emitLoadOfCopy(B, PAI->getLoc(), Addr, IsNotTake));
       ++NumCapturesPromoted;
     } else {
       Args.push_back(PAI->getOperand(OpNo));

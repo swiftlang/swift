@@ -2662,8 +2662,10 @@ public:
     require(invokeTy->getParameters().size() >= 1,
             "invoke function must take at least one parameter");
     auto storageParam = invokeTy->getParameters()[0];
-    require(storageParam.getConvention() == ParameterConvention::Indirect_Inout,
-            "invoke function must take block storage as @inout parameter");
+    require(storageParam.getConvention() ==
+              ParameterConvention::Indirect_InoutAliasable,
+            "invoke function must take block storage as @inout_aliasable "
+            "parameter");
     require(storageParam.getType() == storageTy,
             "invoke function must take block storage type as first parameter");
     
@@ -2769,12 +2771,13 @@ public:
                            return false;
                          case ParameterConvention::Indirect_In:
                          case ParameterConvention::Indirect_Inout:
+                         case ParameterConvention::Indirect_InoutAliasable:
                          case ParameterConvention::Indirect_Out:
                          case ParameterConvention::Indirect_In_Guaranteed:
                            return true;
                          }
                        }),
-            "entry point address argument must have a nonaliasing calling "
+            "entry point address argument must have an indirect calling "
             "convention");
   }
 
