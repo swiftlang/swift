@@ -521,6 +521,7 @@ static void lookupVisibleMemberDeclsImpl(
 }
 
 namespace {
+
 struct FoundDeclTy {
   ValueDecl *D;
   DeclVisibilityKind Reason;
@@ -536,6 +537,33 @@ struct FoundDeclTy {
     return LHS.D < RHS.D;
   }
 };
+
+} // end anonymous namespace
+
+namespace llvm {
+
+template <> struct DenseMapInfo<FoundDeclTy> {
+  static inline FoundDeclTy getEmptyKey() {
+    return FoundDeclTy{nullptr, DeclVisibilityKind::LocalVariable};
+  }
+
+  static inline FoundDeclTy getTombstoneKey() {
+    return FoundDeclTy{reinterpret_cast<ValueDecl *>(0x1),
+                       DeclVisibilityKind::LocalVariable};
+  }
+
+  static unsigned getHashValue(const FoundDeclTy &Val) {
+    return llvm::hash_combine(unsigned(Val.Reason), Val.D);
+  }
+
+  static bool isEqual(const FoundDeclTy &LHS, const FoundDeclTy &RHS) {
+    return LHS == RHS;
+  }
+};
+
+} // end llvm namespace
+
+namespace {
 
 /// Similar to swift::conflicting, but lenient about protocol extensions which
 /// don't affect code completion's concept of overloading.
