@@ -34,7 +34,8 @@ enum class KnownProtocolKind : uint8_t;
 
 /// Records dependencies on files outside of the current module.
 class DependencyTracker {
-  llvm::SetVector<std::string, std::vector<std::string>> paths;
+  llvm::SetVector<std::string, std::vector<std::string>,
+                  llvm::SmallSet<std::string, 16>> paths;
 
 public:
   /// Adds a file as a dependency.
