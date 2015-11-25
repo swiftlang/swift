@@ -2992,3 +2992,16 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   return %90 : $()
 }
 
+// CHECK-LABEL: sil @project_alloc_box
+sil @project_alloc_box : $@convention(thin) () -> Builtin.Int32 {
+entry:
+  // CHECK: [[BOX:%.*]] = alloc_box
+  %b = alloc_box $Builtin.Int32
+  %0 = integer_literal $Builtin.Int32, 0
+  store %0 to %b#1 : $*Builtin.Int32
+  %p = project_box %b#0 : $@box Builtin.Int32
+  // CHECK: [[RET:%.*]] = load [[BOX]]#1
+  // CHECK: return [[RET]]
+  %r = load %p : $*Builtin.Int32
+  return %r : $Builtin.Int32
+}
