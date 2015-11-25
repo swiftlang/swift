@@ -126,6 +126,9 @@ namespace swift {
     /// default so that only functions which are able to provide the function
     /// specific verification will do so.
     virtual void verify(SILFunction *F) const { verify(); }
+
+    /// Verify that the function \p F can be used by the analysis.
+    static void verifyFunction(SILFunction *F);
   };
 
   /// An abstract base class that implements the boiler plate of cacheing and
@@ -152,6 +155,10 @@ namespace swift {
   public:
     /// Returns an analysis provider for a specific function \p F.
     AnalysisTy *get(SILFunction *F) {
+
+      // Check that the analysis can handle this function.
+      verifyFunction(F);
+
       auto &it = Storage.FindAndConstruct(F);
       if (!it.second)
         it.second = newFunctionAnalysis(F);

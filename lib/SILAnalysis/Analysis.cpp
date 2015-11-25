@@ -28,6 +28,11 @@
 
 using namespace swift;
 
+void SILAnalysis::verifyFunction(SILFunction *F) {
+  // Only functions with bodies can be analyzed by the analysis.
+  assert(F->isDefinition() && "Can't analyze external functions");
+}
+
 SILAnalysis *swift::createCallGraphAnalysis(SILModule *M) {
   return new CallGraphAnalysis(M);
 }
