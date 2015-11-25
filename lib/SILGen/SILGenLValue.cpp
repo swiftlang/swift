@@ -724,7 +724,7 @@ namespace {
                                  AccessKind kind) const override {
       SILDeclRef accessor = getAccessor(gen, kind);
       auto accessorType = gen.SGM.Types.getConstantFunctionType(accessor);
-      if (accessorType->getSelfParameter().isIndirectInOut()) {
+      if (accessorType->getSelfParameter().isIndirectMutating()) {
         return AccessKind::ReadWrite;
       } else {
         return AccessKind::Read;

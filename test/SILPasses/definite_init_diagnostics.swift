@@ -61,6 +61,12 @@ func test2() {
     markUsed(b1)
   }
 
+  var b1a : Int        // expected-note {{variable defined here}}
+  takes_closure {     // expected-error {{variable 'b1a' captured by a closure before being initialized}}
+    b1a += 1
+    markUsed(b1a)
+  }
+
   var b2 = 4
   takes_closure {     // ok.
     markUsed(b2)

@@ -2507,8 +2507,9 @@ enum class ParameterConvention {
   
   /// This argument is passed indirectly, i.e. by directly passing the address
   /// of an object in memory. The object is allowed to be aliased by other
-  /// well-typed references.
-  //TODO: Indirect_Aliased,
+  /// well-typed references, but is not allowed to be escaped. This is the
+  /// convention used by mutable captures in @noescape closures.
+  Indirect_InoutAliasable,
 
   /// This argument is passed indirectly, i.e. by directly passing the address
   /// of an uninitialized object in memory.  The callee is responsible for
@@ -2538,6 +2539,7 @@ inline bool isIndirectParameter(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
   case ParameterConvention::Indirect_Out:
   case ParameterConvention::Indirect_In_Guaranteed:
     return true;
@@ -2557,6 +2559,7 @@ inline bool isConsumedParameter(ParameterConvention conv) {
     return true;
 
   case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
   case ParameterConvention::Indirect_Out:
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Guaranteed:
@@ -2577,6 +2580,7 @@ inline bool isGuaranteedParameter(ParameterConvention conv) {
     return true;
 
   case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
   case ParameterConvention::Indirect_Out:
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Direct_Unowned:
@@ -2594,6 +2598,7 @@ inline bool isDeallocatingParameter(ParameterConvention conv) {
 
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
   case ParameterConvention::Indirect_Out:
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Direct_Unowned:
@@ -2606,19 +2611,20 @@ inline bool isDeallocatingParameter(ParameterConvention conv) {
 
 /// A parameter type and the rules for passing it.
 class SILParameterInfo {
-  llvm::PointerIntPair<CanType, 3, ParameterConvention> TypeAndConvention;
+  CanType Ty;
+  ParameterConvention Convention;
 public:
-  SILParameterInfo() = default;
+  SILParameterInfo() : Ty(), Convention((ParameterConvention)0) {}
   SILParameterInfo(CanType type, ParameterConvention conv)
-    : TypeAndConvention(type, conv) {
+    : Ty(type), Convention(conv) {
     assert(type->isLegalSILType() && "SILParameterInfo has illegal SIL type");
   }
 
   CanType getType() const {
-    return TypeAndConvention.getPointer();
+    return Ty;
   }
   ParameterConvention getConvention() const {
-    return TypeAndConvention.getInt();
+    return Convention;
   }
   bool isIndirect() const {
     return isIndirectParameter(getConvention());
@@ -2630,6 +2636,10 @@ public:
 
   bool isIndirectInOut() const {
     return getConvention() == ParameterConvention::Indirect_Inout;
+  }
+  bool isIndirectMutating() const {
+    return getConvention() == ParameterConvention::Indirect_Inout
+        || getConvention() == ParameterConvention::Indirect_InoutAliasable;
   }
   bool isIndirectResult() const {
     return getConvention() == ParameterConvention::Indirect_Out;
@@ -2682,7 +2692,8 @@ public:
   }
 
   void profile(llvm::FoldingSetNodeID &id) {
-    id.AddPointer(TypeAndConvention.getOpaqueValue());
+    id.AddPointer(Ty.getPointer());
+    id.AddInteger((unsigned)Convention);
   }
 
   void dump() const;
@@ -2696,7 +2707,7 @@ public:
   }
 
   bool operator==(SILParameterInfo rhs) const {
-    return TypeAndConvention == rhs.TypeAndConvention;
+    return Ty == rhs.Ty && Convention == rhs.Convention;
   }
   bool operator!=(SILParameterInfo rhs) const {
     return !(*this == rhs);

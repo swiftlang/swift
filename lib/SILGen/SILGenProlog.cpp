@@ -99,6 +99,7 @@ public:
       return std::move(gen.emitManagedRetain(loc, arg));
 
     case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_InoutAliasable:
       // An inout parameter is +0 and guaranteed, but represents an lvalue.
       return ManagedValue::forLValue(arg);
 

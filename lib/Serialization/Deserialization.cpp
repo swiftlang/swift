@@ -3152,6 +3152,7 @@ Optional<swift::ParameterConvention> getActualParameterConvention(uint8_t raw) {
   CASE(Indirect_In)
   CASE(Indirect_Out)
   CASE(Indirect_Inout)
+  CASE(Indirect_InoutAliasable)
   CASE(Indirect_In_Guaranteed)
   CASE(Direct_Owned)
   CASE(Direct_Unowned)

@@ -1421,8 +1421,13 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
     noteUninitializedMembers(Use);
     return;
   }
-
-  diagnoseInitError(Use, diag::variable_used_before_initialized);
+  
+  // If this is a load into a promoted closure capture, diagnose properly as
+  // a capture.
+  if (isa<LoadInst>(Inst) && Inst->getLoc().isASTNode<AbstractClosureExpr>())
+    diagnoseInitError(Use, diag::variable_closure_use_uninit);
+  else
+    diagnoseInitError(Use, diag::variable_used_before_initialized);
 }
 
 /// handleSuperInitUse - When processing a 'self' argument on a class, this is
