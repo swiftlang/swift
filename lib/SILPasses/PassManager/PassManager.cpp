@@ -146,7 +146,13 @@ static void printModule(SILModule *Mod, bool EmitVerboseSIL) {
 
 SILPassManager::SILPassManager(SILModule *M, llvm::StringRef Stage) :
   Mod(M), StageName(Stage) {
-  
+
+#ifndef NDEBUG
+    // Check that the module that the pass manager is asked to process is
+    // valid.
+    Mod->verify();
+#endif
+
 #define ANALYSIS(NAME) \
   Analysis.push_back(create##NAME##Analysis(Mod));
 #include "swift/SILAnalysis/Analysis.def"

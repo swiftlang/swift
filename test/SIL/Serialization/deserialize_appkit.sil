@@ -5,4 +5,7 @@
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 
+// REQUIRES: rdar://23667534
+
+
 // CHECK-NOT: Unknown
