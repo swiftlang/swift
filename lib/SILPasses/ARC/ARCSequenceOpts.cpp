@@ -156,13 +156,14 @@ void CodeMotionOrDeleteCallback::processMatchingSet(ARCMatchingSet &MatchSet) {
 }
 
 //===----------------------------------------------------------------------===//
-//                              Top Level Driver
+//                             Non Loop Optimizer
 //===----------------------------------------------------------------------===//
 
-static bool processFunction(SILFunction &F, bool FreezePostDomRelease,
-                            AliasAnalysis *AA, PostOrderAnalysis *POTA,
-                            LoopRegionFunctionInfo *LRFI, SILLoopInfo *LI,
-                            RCIdentityFunctionInfo *RCIA) {
+static bool processFunctionWithoutLoopSupport(SILFunction &F,
+                                              bool FreezePostDomRelease,
+                                              AliasAnalysis *AA,
+                                              PostOrderAnalysis *POTA,
+                                              RCIdentityFunctionInfo *RCIA) {
   // GlobalARCOpts seems to be taking up a lot of compile time when running on
   // globalinit_func. Since that is not *that* interesting from an ARC
   // perspective (i.e. no ref count operations in a loop), disable it on such
@@ -177,8 +178,76 @@ static bool processFunction(SILFunction &F, bool FreezePostDomRelease,
   // Construct our context once. A context contains the RPOT as well as maps
   // that contain state for each BB in F. This is a major place where the
   // optimizer allocates memory in one large chunk.
-  auto *Ctx = createARCMatchingSetComputationContext(F, AA, POTA, LRFI, LI,
-                                                     RCIA, EnableLoopARC);
+  auto *Ctx = createARCMatchingSetComputationContext(F, AA, POTA, nullptr,
+                                                     nullptr, RCIA, false);
+
+  // If Ctx is null, we failed to initialize and can not do anything so just
+  // return false.
+  if (!Ctx) {
+    DEBUG(llvm::dbgs() << "    Failed to initialize matching set computation "
+                          "context! Bailing!\n");
+    return false;
+  }
+
+  CodeMotionOrDeleteCallback Callback;
+  // Until we do not remove any instructions or have nested increments,
+  // decrements...
+  while (true) {
+    // Compute matching sets of increments, decrements, and their insertion
+    // points.
+    //
+    // We need to blot pointers we remove after processing an individual pointer
+    // so we don't process pairs after we have paired them up. Thus we pass in a
+    // lambda that performs the work for us.
+    bool ShouldRunAgain =
+        computeARCMatchingSet(Ctx, FreezePostDomRelease, Callback);
+
+    Changed |= Callback.madeChange();
+
+    // If we did not remove any instructions or have any nested increments, do
+    // not perform another iteration.
+    if (!ShouldRunAgain)
+      break;
+
+    // Otherwise, perform another iteration.
+    DEBUG(llvm::dbgs() << "\n<<< Made a Change! Reprocessing Function! >>>\n");
+  }
+
+  // Now that we have finished our computation, destroy the matching set
+  // computation context.
+  destroyARCMatchingSetComputationContext(Ctx);
+
+  DEBUG(llvm::dbgs() << "\n");
+
+  // Return true if we moved or deleted any instructions.
+  return Changed;
+}
+
+//===----------------------------------------------------------------------===//
+//                               Loop Optimizer
+//===----------------------------------------------------------------------===//
+
+static bool
+processFunctionWithLoopSupport(SILFunction &F, bool FreezePostDomRelease,
+                               AliasAnalysis *AA, PostOrderAnalysis *POTA,
+                               LoopRegionFunctionInfo *LRFI, SILLoopInfo *LI,
+                               RCIdentityFunctionInfo *RCIA) {
+  // GlobalARCOpts seems to be taking up a lot of compile time when running on
+  // globalinit_func. Since that is not *that* interesting from an ARC
+  // perspective (i.e. no ref count operations in a loop), disable it on such
+  // functions temporarily in order to unblock others. This should be removed.
+  if (F.getName().startswith("globalinit_"))
+    return false;
+
+  DEBUG(llvm::dbgs() << "***** Processing " << F.getName() << " *****\n");
+
+  bool Changed = false;
+
+  // Construct our context once. A context contains the RPOT as well as maps
+  // that contain state for each BB in F. This is a major place where the
+  // optimizer allocates memory in one large chunk.
+  auto *Ctx =
+      createARCMatchingSetComputationContext(F, AA, POTA, LRFI, LI, RCIA, true);
 
   // If Ctx is null, we failed to initialize and can not do anything so just
   // return false.
@@ -222,6 +291,10 @@ static bool processFunction(SILFunction &F, bool FreezePostDomRelease,
   return Changed;
 }
 
+//===----------------------------------------------------------------------===//
+//                              Top Level Driver
+//===----------------------------------------------------------------------===//
+
 namespace {
 class ARCSequenceOpts : public SILFunctionTransform {
   /// The entry point to the transformation.
@@ -237,8 +310,8 @@ class ARCSequenceOpts : public SILFunctionTransform {
       auto *POTA = getAnalysis<PostOrderAnalysis>();
       auto *RCFI = getAnalysis<RCIdentityAnalysis>()->get(F);
 
-      if (processFunction(*F, false, AA, POTA, nullptr, nullptr, RCFI)) {
-        processFunction(*F, true, AA, POTA, nullptr, nullptr, RCFI);
+      if (processFunctionWithoutLoopSupport(*F, false, AA, POTA, RCFI)) {
+        processFunctionWithoutLoopSupport(*F, true, AA, POTA, RCFI);
         invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
       }
       return;
@@ -264,14 +337,15 @@ class ARCSequenceOpts : public SILFunctionTransform {
     auto *RCFI = getAnalysis<RCIdentityAnalysis>()->get(F);
     auto *LRFI = getAnalysis<LoopRegionAnalysis>()->get(F);
 
-    if (processFunction(*F, false, AA, POTA, LRFI, LI, RCFI)) {
-        processFunction(*F, true, AA, POTA, LRFI, LI, RCFI);
+    if (processFunctionWithLoopSupport(*F, false, AA, POTA, LRFI, LI, RCFI)) {
+      processFunctionWithLoopSupport(*F, true, AA, POTA, LRFI, LI, RCFI);
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
     }
   }
 
   StringRef getName() override { return "ARC Sequence Opts"; }
 };
+
 } // end anonymous namespace
 
 
