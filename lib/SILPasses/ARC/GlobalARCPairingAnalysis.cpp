@@ -360,7 +360,7 @@ bool ARCMatchingSetBuilder::matchUpIncDecSetsForPtr() {
 //                            ARC Pairing Context
 //===----------------------------------------------------------------------===//
 
-bool ARCPairingContext::performMatching(ARCMatchingSetCallback &Callback) {
+bool ARCPairingContext::performMatching(CodeMotionOrDeleteCallback &Callback) {
   bool MatchedPair = false;
 
   DEBUG(llvm::dbgs() << "**** Computing ARC Matching Sets for " << F.getName()
@@ -404,9 +404,15 @@ bool ARCPairingContext::performMatching(ARCMatchingSetCallback &Callback) {
 //                                  Loop ARC
 //===----------------------------------------------------------------------===//
 
-void LoopARCPairingContext::processLoop(const LoopRegion *Region,
-                                        bool FreezePostDomReleases,
-                                        ARCMatchingSetCallback &Callback) {
+void LoopARCPairingContext::runOnLoop(SILLoop *L) {
+  processRegion(LRFI->getRegion(L));
+}
+
+void LoopARCPairingContext::runOnFunction(SILFunction *F) {
+  processRegion(LRFI->getTopLevelRegion());
+}
+
+void LoopARCPairingContext::processRegion(const LoopRegion *Region) {
   bool NestingDetected = Evaluator.runOnLoop(Region, FreezePostDomReleases);
   bool MatchedPair = Context.performMatching(Callback);
   Context.DecToIncStateMap.clear();
@@ -421,36 +427,4 @@ void LoopARCPairingContext::processLoop(const LoopRegion *Region,
   }
 
   Evaluator.summarizeLoop(Region);
-}
-
-bool LoopARCPairingContext::run(bool FreezePostDomReleases,
-                                ARCMatchingSetCallback &Callback) {
-  // We visit the loop nest inside out via a depth first, post order using this
-  // worklist.
-  llvm::SmallVector<std::pair<SILLoop *, bool>, 32> Worklist;
-  for (auto *L : SLI->getTopLevelLoops()) {
-    Worklist.push_back({L, L->empty()});
-  }
-
-  while (Worklist.size()) {
-    SILLoop *L;
-    bool Visited;
-    std::tie(L, Visited) = Worklist.pop_back_val();
-
-    if (!Visited) {
-      Worklist.push_back({L, true});
-      for (auto *SubLoop : L->getSubLoops()) {
-        Worklist.push_back({SubLoop, SubLoop->empty()});
-      }
-      continue;
-    }
-
-    processLoop(LRFI->getRegion(L), FreezePostDomReleases, Callback);
-  }
-
-  processLoop(LRFI->getTopLevelRegion(), FreezePostDomReleases, Callback);
-
-  // We always return false since we are iterating internally rather than
-  // externally.
-  return false;
 }

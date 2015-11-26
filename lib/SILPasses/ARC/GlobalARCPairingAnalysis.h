@@ -16,6 +16,7 @@
 #include "GlobalARCSequenceDataflow.h"
 #include "GlobalLoopARCSequenceDataflow.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/SILPasses/Utils/LoopUtils.h"
 #include "llvm/ADT/SetVector.h"
 
 namespace swift {
@@ -31,13 +32,31 @@ class RCIdentityFunctionInfo;
 /// A set of matching reference count increments, decrements, increment
 /// insertion pts, and decrement insertion pts.
 struct ARCMatchingSet {
+
+  /// The pointer that this ARCMatchingSet is providing matching increment and
+  /// decrement sets for.
+  ///
+  /// TODO: This should really be called RCIdentity.
   SILValue Ptr;
+
+  /// The set of reference count increments that were paired.
   llvm::SetVector<SILInstruction *> Increments;
+
+  /// An insertion point for an increment means the earliest point in the
+  /// program after the increment has occured that the increment can be moved to
+  /// without moving the increment over an instruction that may decrement a
+  /// reference count.
   llvm::SetVector<SILInstruction *> IncrementInsertPts;
+
+  /// The set of reference count decrements that were paired.
   llvm::SetVector<SILInstruction *> Decrements;
+
+  /// An insertion point for a decrement means the latest point in the program
+  /// before the decrement that the optimizer conservatively assumes that a
+  /// reference counted value could be used.
   llvm::SetVector<SILInstruction *> DecrementInsertPts;
 
-  // This is a data structure that can not be moved.
+  // This is a data structure that can not be moved or copied.
   ARCMatchingSet() = default;
   ARCMatchingSet(const ARCMatchingSet &) = delete;
   ARCMatchingSet(ARCMatchingSet &&) = delete;
@@ -53,24 +72,31 @@ struct ARCMatchingSet {
   }
 };
 
-/// A structure that via its virtual calls recieves the results of the analysis.
-///
-/// TODO: We could potentially pass in all of the matching sets as a list and
-/// use less virtual calls at the cost of potentially greater numbers of moves.
-struct ARCMatchingSetCallback {
-  virtual ~ARCMatchingSetCallback() = default;
+class CodeMotionOrDeleteCallback {
+  bool Changed = false;
+  llvm::SmallVector<SILInstruction *, 16> InstructionsToDelete;
 
+public:
   /// This call should process \p Set and modify any internal state of
   /// ARCMatchingSetCallback given \p Set. This call should not remove any
   /// instructions since any removed instruction might be used as an insertion
   /// point for another retain, release pair.
-  virtual void processMatchingSet(ARCMatchingSet &Set) {}
+  void processMatchingSet(ARCMatchingSet &Set);
 
-  /// This call should perform any deletion of instructions necessary. It is run
-  /// strictly after all computation has been completed.
-  virtual void finalize() {}
+  // Delete instructions after we have processed all matching sets so that we do
+  // not remove instructions that may be insertion points for other retain,
+  // releases.
+  void finalize() {
+    while (!InstructionsToDelete.empty()) {
+      InstructionsToDelete.pop_back_val()->eraseFromParent();
+    }
+  }
+
+  bool madeChange() const { return Changed; }
 };
 
+/// A wrapper around the results of the bottomup/topdown dataflow that knows how
+/// to pair the retains/releases in those results.
 struct ARCPairingContext {
   SILFunction &F;
   BlotMapVector<SILInstruction *, TopDownRefCountState> DecToIncStateMap;
@@ -79,9 +105,14 @@ struct ARCPairingContext {
 
   ARCPairingContext(SILFunction &F, RCIdentityFunctionInfo *RCIA)
       : F(F), DecToIncStateMap(), IncToDecStateMap(), RCIA(RCIA) {}
-  bool performMatching(ARCMatchingSetCallback &Callback);
+  bool performMatching(CodeMotionOrDeleteCallback &Callback);
 };
 
+/// A composition of an ARCSequenceDataflowEvaluator and an
+/// ARCPairingContext. The evaluator performs top down/bottom up dataflows
+/// clearing the dataflow at loop boundaries. Then the results of the evaluator
+/// are placed into the ARCPairingContext and then the ARCPairingContext is used
+/// to pair retains/releases.
 struct BlockARCPairingContext {
   ARCPairingContext Context;
   ARCSequenceDataflowEvaluator Evaluator;
@@ -91,7 +122,7 @@ struct BlockARCPairingContext {
       : Context(F, RCFI), Evaluator(F, AA, POTA, RCFI, Context.DecToIncStateMap,
                                     Context.IncToDecStateMap) {}
 
-  bool run(bool FreezePostDomReleases, ARCMatchingSetCallback &Callback) {
+  bool run(bool FreezePostDomReleases, CodeMotionOrDeleteCallback &Callback) {
     bool NestingDetected = Evaluator.run(FreezePostDomReleases);
     Evaluator.clear();
 
@@ -100,23 +131,36 @@ struct BlockARCPairingContext {
   }
 };
 
-struct LoopARCPairingContext {
+/// A composition of a LoopARCSequenceDataflowEvaluator and an
+/// ARCPairingContext. The loop nest is processed bottom up. For each loop, we
+/// run the evaluator on the loop and then use the ARCPairingContext to pair
+/// retains/releases and eliminate them.
+struct LoopARCPairingContext : SILLoopVisitor {
   ARCPairingContext Context;
   LoopARCSequenceDataflowEvaluator Evaluator;
   LoopRegionFunctionInfo *LRFI;
   SILLoopInfo *SLI;
+  CodeMotionOrDeleteCallback Callback;
+  bool FreezePostDomReleases = false;
 
   LoopARCPairingContext(SILFunction &F, AliasAnalysis *AA,
                         LoopRegionFunctionInfo *LRFI, SILLoopInfo *SLI,
                         RCIdentityFunctionInfo *RCFI)
-      : Context(F, RCFI),
+      : SILLoopVisitor(&F, SLI), Context(F, RCFI),
         Evaluator(F, AA, LRFI, SLI, RCFI, Context.DecToIncStateMap,
                   Context.IncToDecStateMap),
-        LRFI(LRFI), SLI(SLI) {}
+        LRFI(LRFI), SLI(SLI), Callback() {}
 
-  bool run(bool FreezePostDomReleases, ARCMatchingSetCallback &Callback);
-  void processLoop(const LoopRegion *R, bool FreezePostDomReleases,
-                   ARCMatchingSetCallback &Callback);
+  bool process(bool FreezePDReleases) {
+    FreezePostDomReleases = FreezePDReleases;
+    run();
+    return Callback.madeChange();
+  }
+
+  void runOnLoop(SILLoop *L) override;
+  void runOnFunction(SILFunction *F) override;
+
+  void processRegion(const LoopRegion *R);
 };
 
 } // end swift namespace

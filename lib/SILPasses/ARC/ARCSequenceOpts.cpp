@@ -77,27 +77,9 @@ static SILInstruction *createDecrement(SILValue Ptr, SILInstruction *InsertPt) {
   return B.createReleaseValue(Loc, Ptr);
 }
 
-namespace {
-
-class CodeMotionOrDeleteCallback : public ARCMatchingSetCallback {
-  bool Changed = false;
-  llvm::SmallVector<SILInstruction *, 16> InstructionsToDelete;
-
-public:
-  virtual void processMatchingSet(ARCMatchingSet &Set) override final;
-
-  // Delete instructions after we have processed all matching sets so that we do
-  // not remove instructions that may be insertion points for other retain,
-  // releases.
-  virtual void finalize() override final {
-    while (!InstructionsToDelete.empty()) {
-      InstructionsToDelete.pop_back_val()->eraseFromParent();
-    }
-  }
-
-  bool madeChange() const { return Changed; }
-};
-}
+//===----------------------------------------------------------------------===//
+//                             Mutating Callback
+//===----------------------------------------------------------------------===//
 
 // This routine takes in the ARCMatchingSet \p MatchSet and inserts new
 // increments, decrements at the insertion points and adds the old increment,
@@ -222,35 +204,8 @@ processFunctionWithLoopSupport(SILFunction &F, bool FreezePostDomReleases,
 
   DEBUG(llvm::dbgs() << "***** Processing " << F.getName() << " *****\n");
 
-  bool Changed = false;
   LoopARCPairingContext Context(F, AA, LRFI, LI, RCFI);
-  CodeMotionOrDeleteCallback Callback;
-  // Until we do not remove any instructions or have nested increments,
-  // decrements...
-  while (true) {
-    // Compute matching sets of increments, decrements, and their insertion
-    // points.
-    //
-    // We need to blot pointers we remove after processing an individual pointer
-    // so we don't process pairs after we have paired them up. Thus we pass in a
-    // lambda that performs the work for us.
-    bool ShouldRunAgain = Context.run(FreezePostDomReleases, Callback);
-
-    Changed |= Callback.madeChange();
-
-    // If we did not remove any instructions or have any nested increments, do
-    // not perform another iteration.
-    if (!ShouldRunAgain)
-      break;
-
-    // Otherwise, perform another iteration.
-    DEBUG(llvm::dbgs() << "\n<<< Made a Change! Reprocessing Function! >>>\n");
-  }
-
-  DEBUG(llvm::dbgs() << "\n");
-
-  // Return true if we moved or deleted any instructions.
-  return Changed;
+  return Context.process(FreezePostDomReleases);
 }
 
 //===----------------------------------------------------------------------===//
