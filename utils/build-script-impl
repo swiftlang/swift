@@ -2149,7 +2149,7 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
         echo "-- Create Installer --"
         "${SWIFT_SOURCE_DIR}/utils/toolchain-installer" "${INSTALL_DESTDIR}/${TOOLCHAIN_PREFIX}" "${DARWIN_TOOLCHAIN_BUNDLE_IDENTIFIER}" \
         "${DARWIN_TOOLCHAIN_INSTALLER_CERT}" "${DARWIN_TOOLCHAIN_INSTALLER_PACKAGE}" "${DARWIN_TOOLCHAIN_INSTALL_LOCATION}" \
-        "${DARWIN_TOOLCHAIN_VERSION}"
+        "${DARWIN_TOOLCHAIN_VERSION}" "${SWIFT_SOURCE_DIR}/utils/darwin-installer-scripts"
       fi 
 
       (cd "${INSTALL_DESTDIR}" &&
