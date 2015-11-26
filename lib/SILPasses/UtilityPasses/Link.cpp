@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SILAnalysis/CallGraph.h"
-#include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SIL/SILModule.h"
@@ -38,20 +36,15 @@ void swift::performSILLinking(SILModule *M, bool LinkAll) {
 
 namespace {
 
+/// Copies code from the standard library into the user program to enable
+/// optimizations.
 class SILLinker : public SILModuleTransform {
 
-  /// The entry point to the transformation.
   void run() override {
-    // Copies code from the standard library into the user program to enable
-    // optimizations.
-    auto *CGA = PM->getAnalysis<CallGraphAnalysis>();
-    auto *CG = CGA->getCallGraphOrNull();
-    CallGraphLinkerEditor Editor(CG);
     SILModule &M = *getModule();
     for (auto &Fn : M)
-      if (M.linkFunction(&Fn, SILModule::LinkingMode::LinkAll,
-                         Editor.getCallback()))
-          invalidateAnalysis(&Fn, SILAnalysis::InvalidationKind::Instructions);
+      if (M.linkFunction(&Fn, SILModule::LinkingMode::LinkAll))
+          invalidateAnalysis(&Fn, SILAnalysis::InvalidationKind::Everything);
   }
 
   StringRef getName() override { return "SIL Linker"; }
