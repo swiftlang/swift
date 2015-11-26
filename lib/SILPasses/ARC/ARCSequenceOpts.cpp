@@ -232,31 +232,37 @@ class ARCSequenceOpts : public SILFunctionTransform {
     if (!getOptions().EnableARCOptimizations)
       return;
 
+    if (!EnableLoopARC) {
+      auto *AA = getAnalysis<AliasAnalysis>();
+      auto *POTA = getAnalysis<PostOrderAnalysis>();
+      auto *RCFI = getAnalysis<RCIdentityAnalysis>()->get(F);
+
+      if (processFunction(*F, false, AA, POTA, nullptr, nullptr, RCFI)) {
+        processFunction(*F, true, AA, POTA, nullptr, nullptr, RCFI);
+        invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
+      }
+      return;
+    }
+
     auto *LA = getAnalysis<SILLoopAnalysis>();
     auto *LI = LA->get(F);
+    auto *DA = getAnalysis<DominanceAnalysis>();
+    auto *DI = DA->get(F);
 
     // Canonicalize the loops, invalidating if we need to.
-    if (EnableLoopARC) {
-      auto *DA = getAnalysis<DominanceAnalysis>();
-      auto *DI = DA->get(F);
-
-      if (canonicalizeAllLoops(DI, LI)) {
-        // We preserve loop info and the dominator tree.
-        DA->lockInvalidation();
-        LA->lockInvalidation();
-        PM->invalidateAnalysis(F, SILAnalysis::InvalidationKind::FunctionBody);
-        DA->unlockInvalidation();
-        LA->unlockInvalidation();
-      }
+    if (canonicalizeAllLoops(DI, LI)) {
+      // We preserve loop info and the dominator tree.
+      DA->lockInvalidation();
+      LA->lockInvalidation();
+      PM->invalidateAnalysis(F, SILAnalysis::InvalidationKind::FunctionBody);
+      DA->unlockInvalidation();
+      LA->unlockInvalidation();
     }
 
     auto *AA = getAnalysis<AliasAnalysis>();
     auto *POTA = getAnalysis<PostOrderAnalysis>();
     auto *RCFI = getAnalysis<RCIdentityAnalysis>()->get(F);
-    LoopRegionFunctionInfo *LRFI = nullptr;
-
-    if (EnableLoopARC)
-      LRFI = getAnalysis<LoopRegionAnalysis>()->get(F);
+    auto *LRFI = getAnalysis<LoopRegionAnalysis>()->get(F);
 
     if (processFunction(*F, false, AA, POTA, LRFI, LI, RCFI)) {
         processFunction(*F, true, AA, POTA, LRFI, LI, RCFI);
