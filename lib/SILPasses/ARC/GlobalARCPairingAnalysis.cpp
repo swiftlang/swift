@@ -357,29 +357,10 @@ bool ARCMatchingSetBuilder::matchUpIncDecSetsForPtr() {
 }
 
 //===----------------------------------------------------------------------===//
-//                    ARC Matching Set Computation Context
+//                            ARC Pairing Context
 //===----------------------------------------------------------------------===//
 
-namespace swift {
-
-struct ARCMatchingSetComputationContext {
-  SILFunction &F;
-  BlotMapVector<SILInstruction *, TopDownRefCountState> DecToIncStateMap;
-  BlotMapVector<SILInstruction *, BottomUpRefCountState> IncToDecStateMap;
-  RCIdentityFunctionInfo *RCIA;
-
-  ARCMatchingSetComputationContext(SILFunction &F, RCIdentityFunctionInfo *RCIA)
-      : F(F), DecToIncStateMap(), IncToDecStateMap(), RCIA(RCIA) {}
-  virtual ~ARCMatchingSetComputationContext() {}
-  virtual bool run(bool FreezePostDomReleases,
-                   ARCMatchingSetCallback &Callback) = 0;
-  bool performMatching(ARCMatchingSetCallback &Callback);
-};
-
-} // end swift namespace
-
-bool ARCMatchingSetComputationContext::performMatching(
-    ARCMatchingSetCallback &Callback) {
+bool ARCPairingContext::performMatching(ARCMatchingSetCallback &Callback) {
   bool MatchedPair = false;
 
   DEBUG(llvm::dbgs() << "**** Computing ARC Matching Sets for " << F.getName()
@@ -420,84 +401,30 @@ bool ARCMatchingSetComputationContext::performMatching(
 }
 
 //===----------------------------------------------------------------------===//
-//                                 Block ARC
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-struct BlockARCMatchingSetComputationContext
-    : ARCMatchingSetComputationContext {
-
-  ARCSequenceDataflowEvaluator Evaluator;
-
-  BlockARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA,
-                                        PostOrderAnalysis *POTA,
-                                        RCIdentityFunctionInfo *RCFI)
-      : ARCMatchingSetComputationContext(F, RCFI),
-        Evaluator(F, AA, POTA, RCIA, DecToIncStateMap, IncToDecStateMap) {}
-  virtual ~BlockARCMatchingSetComputationContext() override final {}
-
-  virtual bool run(bool FreezePostDomReleases,
-                   ARCMatchingSetCallback &Callback) override final {
-    bool NestingDetected = Evaluator.run(FreezePostDomReleases);
-    Evaluator.clear();
-
-    bool MatchedPair = performMatching(Callback);
-    return NestingDetected && MatchedPair;
-  }
-};
-
-} // end anonymous namespace
-
-//===----------------------------------------------------------------------===//
 //                                  Loop ARC
 //===----------------------------------------------------------------------===//
 
-namespace {
-
-struct LoopARCMatchingSetComputationContext : ARCMatchingSetComputationContext {
-  LoopARCSequenceDataflowEvaluator Evaluator;
-  LoopRegionFunctionInfo *LRFI;
-  SILLoopInfo *SLI;
-
-  LoopARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA,
-                                       LoopRegionFunctionInfo *LRFI,
-                                       SILLoopInfo *SLI,
-                                       RCIdentityFunctionInfo *RCFI)
-      : ARCMatchingSetComputationContext(F, RCFI),
-        Evaluator(F, AA, LRFI, SLI, RCIA, DecToIncStateMap, IncToDecStateMap),
-        LRFI(LRFI), SLI(SLI) {}
-  virtual ~LoopARCMatchingSetComputationContext() override final {}
-
-  virtual bool run(bool FreezePostDomReleases,
-                   ARCMatchingSetCallback &Callback) override final;
-  void processLoop(const LoopRegion *R, bool FreezePostDomReleases,
-                   ARCMatchingSetCallback &Callback);
-};
-
-} // end anonymous namespace
-
-void LoopARCMatchingSetComputationContext::processLoop(
-    const LoopRegion *Region, bool FreezePostDomReleases,
-    ARCMatchingSetCallback &Callback) {
+void LoopARCPairingContext::processLoop(const LoopRegion *Region,
+                                        bool FreezePostDomReleases,
+                                        ARCMatchingSetCallback &Callback) {
   bool NestingDetected = Evaluator.runOnLoop(Region, FreezePostDomReleases);
-  bool MatchedPair = performMatching(Callback);
-  DecToIncStateMap.clear();
-  IncToDecStateMap.clear();
+  bool MatchedPair = Context.performMatching(Callback);
+  Context.DecToIncStateMap.clear();
+  Context.IncToDecStateMap.clear();
 
   while (NestingDetected && MatchedPair) {
     Evaluator.clearLoopState(Region);
     NestingDetected = Evaluator.runOnLoop(Region, FreezePostDomReleases);
-    MatchedPair = performMatching(Callback);
-    DecToIncStateMap.clear();
-    IncToDecStateMap.clear();
+    MatchedPair = Context.performMatching(Callback);
+    Context.DecToIncStateMap.clear();
+    Context.IncToDecStateMap.clear();
   }
 
   Evaluator.summarizeLoop(Region);
 }
 
-bool LoopARCMatchingSetComputationContext::run(
-    bool FreezePostDomReleases, ARCMatchingSetCallback &Callback) {
+bool LoopARCPairingContext::run(bool FreezePostDomReleases,
+                                ARCMatchingSetCallback &Callback) {
   // We visit the loop nest inside out via a depth first, post order using this
   // worklist.
   llvm::SmallVector<std::pair<SILLoop *, bool>, 32> Worklist;
@@ -526,42 +453,4 @@ bool LoopARCMatchingSetComputationContext::run(
   // We always return false since we are iterating internally rather than
   // externally.
   return false;
-}
-
-//===----------------------------------------------------------------------===//
-//                           Top Level EntryPoints
-//===----------------------------------------------------------------------===//
-
-ARCMatchingSetComputationContext *swift::createARCMatchingSetComputationContext(
-    SILFunction &F, AliasAnalysis *AA, PostOrderAnalysis *POTA,
-    LoopRegionFunctionInfo *LRFI, SILLoopInfo *SLI,
-    RCIdentityFunctionInfo *RCFI, bool EnableLoopARC) {
-  unsigned Size = F.size();
-
-  // We do not handle CFGs with more than INT_MAX BBs. Fail gracefully.
-  if (Size > unsigned(INT_MAX))
-    return nullptr;
-
-  // We pass in size to avoid expensively recomputing size over and over
-  // again. Currently F has to do a walk to perform that computation.
-  if (EnableLoopARC) {
-    return new LoopARCMatchingSetComputationContext(F, AA, LRFI, SLI, RCFI);
-  }
-  return new BlockARCMatchingSetComputationContext(F, AA, POTA, RCFI);
-}
-
-void
-swift::
-destroyARCMatchingSetComputationContext(ARCMatchingSetComputationContext *Ctx) {
-  delete Ctx;
-}
-
-bool swift::computeARCMatchingSet(ARCMatchingSetComputationContext *Ctx,
-                                  bool FreezePostDomReleases,
-                                  ARCMatchingSetCallback &Callback) {
-
-  DEBUG(llvm::dbgs() << "**** Performing ARC Dataflow for " << Ctx->F.getName()
-                     << " ****\n");
-
-  return Ctx->run(FreezePostDomReleases, Callback);
 }

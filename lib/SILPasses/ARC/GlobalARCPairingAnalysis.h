@@ -13,6 +13,8 @@
 #ifndef SWIFT_SILPASSES_GLOBALARCPAIRINGANALYSIS_H
 #define SWIFT_SILPASSES_GLOBALARCPAIRINGANALYSIS_H
 
+#include "GlobalARCSequenceDataflow.h"
+#include "GlobalLoopARCSequenceDataflow.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/SetVector.h"
 
@@ -51,21 +53,6 @@ struct ARCMatchingSet {
   }
 };
 
-/// An opaque context that contains cached information that can be used on
-/// multiple calls to computeARCMatchingSet on the same function.
-struct ARCMatchingSetComputationContext;
-
-/// Create an opaque arc mutation set computation context for SILFunction F
-/// using AliasAnalysis AA.
-ARCMatchingSetComputationContext *createARCMatchingSetComputationContext(
-    SILFunction &F, AliasAnalysis *AA, PostOrderAnalysis *POTA,
-    LoopRegionFunctionInfo *LRFI, SILLoopInfo *SLI,
-    RCIdentityFunctionInfo *RCIA, bool EnableLoopARC = false);
-
-/// Destroy the context.
-void
-destroyARCMatchingSetComputationContext(ARCMatchingSetComputationContext *Ctx);
-
 /// A structure that via its virtual calls recieves the results of the analysis.
 ///
 /// TODO: We could potentially pass in all of the matching sets as a list and
@@ -84,17 +71,53 @@ struct ARCMatchingSetCallback {
   virtual void finalize() {}
 };
 
-/// Use the opaque context to recompute the matching set for the input function.
-///
-/// \param Ctx The opaque context for the computation.
-/// \param FreezeOwningPtrEpiloqueReleases Should we not attempt to move, remove
-/// epilogue release pointers and instead use them as post dominating releases
-/// for other pointers.
-/// \param Callback The callback used to propagate information to analysis
-/// users.
-bool computeARCMatchingSet(ARCMatchingSetComputationContext *Ctx,
-                           bool FreezeOwningPtrEpiloqueReleases,
-                           ARCMatchingSetCallback &Callback);
+struct ARCPairingContext {
+  SILFunction &F;
+  BlotMapVector<SILInstruction *, TopDownRefCountState> DecToIncStateMap;
+  BlotMapVector<SILInstruction *, BottomUpRefCountState> IncToDecStateMap;
+  RCIdentityFunctionInfo *RCIA;
+
+  ARCPairingContext(SILFunction &F, RCIdentityFunctionInfo *RCIA)
+      : F(F), DecToIncStateMap(), IncToDecStateMap(), RCIA(RCIA) {}
+  bool performMatching(ARCMatchingSetCallback &Callback);
+};
+
+struct BlockARCPairingContext {
+  ARCPairingContext Context;
+  ARCSequenceDataflowEvaluator Evaluator;
+
+  BlockARCPairingContext(SILFunction &F, AliasAnalysis *AA,
+                         PostOrderAnalysis *POTA, RCIdentityFunctionInfo *RCFI)
+      : Context(F, RCFI), Evaluator(F, AA, POTA, RCFI, Context.DecToIncStateMap,
+                                    Context.IncToDecStateMap) {}
+
+  bool run(bool FreezePostDomReleases, ARCMatchingSetCallback &Callback) {
+    bool NestingDetected = Evaluator.run(FreezePostDomReleases);
+    Evaluator.clear();
+
+    bool MatchedPair = Context.performMatching(Callback);
+    return NestingDetected && MatchedPair;
+  }
+};
+
+struct LoopARCPairingContext {
+  ARCPairingContext Context;
+  LoopARCSequenceDataflowEvaluator Evaluator;
+  LoopRegionFunctionInfo *LRFI;
+  SILLoopInfo *SLI;
+
+  LoopARCPairingContext(SILFunction &F, AliasAnalysis *AA,
+                        LoopRegionFunctionInfo *LRFI, SILLoopInfo *SLI,
+                        RCIdentityFunctionInfo *RCFI)
+      : Context(F, RCFI),
+        Evaluator(F, AA, LRFI, SLI, RCFI, Context.DecToIncStateMap,
+                  Context.IncToDecStateMap),
+        LRFI(LRFI), SLI(SLI) {}
+
+  bool run(bool FreezePostDomReleases, ARCMatchingSetCallback &Callback);
+  void processLoop(const LoopRegion *R, bool FreezePostDomReleases,
+                   ARCMatchingSetCallback &Callback);
+};
 
 } // end swift namespace
 

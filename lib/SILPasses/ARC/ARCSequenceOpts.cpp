@@ -160,7 +160,7 @@ void CodeMotionOrDeleteCallback::processMatchingSet(ARCMatchingSet &MatchSet) {
 //===----------------------------------------------------------------------===//
 
 static bool processFunctionWithoutLoopSupport(SILFunction &F,
-                                              bool FreezePostDomRelease,
+                                              bool FreezePostDomReleases,
                                               AliasAnalysis *AA,
                                               PostOrderAnalysis *POTA,
                                               RCIdentityFunctionInfo *RCIA) {
@@ -174,21 +174,7 @@ static bool processFunctionWithoutLoopSupport(SILFunction &F,
   DEBUG(llvm::dbgs() << "***** Processing " << F.getName() << " *****\n");
 
   bool Changed = false;
-
-  // Construct our context once. A context contains the RPOT as well as maps
-  // that contain state for each BB in F. This is a major place where the
-  // optimizer allocates memory in one large chunk.
-  auto *Ctx = createARCMatchingSetComputationContext(F, AA, POTA, nullptr,
-                                                     nullptr, RCIA, false);
-
-  // If Ctx is null, we failed to initialize and can not do anything so just
-  // return false.
-  if (!Ctx) {
-    DEBUG(llvm::dbgs() << "    Failed to initialize matching set computation "
-                          "context! Bailing!\n");
-    return false;
-  }
-
+  BlockARCPairingContext Context(F, AA, POTA, RCIA);
   CodeMotionOrDeleteCallback Callback;
   // Until we do not remove any instructions or have nested increments,
   // decrements...
@@ -199,8 +185,7 @@ static bool processFunctionWithoutLoopSupport(SILFunction &F,
     // We need to blot pointers we remove after processing an individual pointer
     // so we don't process pairs after we have paired them up. Thus we pass in a
     // lambda that performs the work for us.
-    bool ShouldRunAgain =
-        computeARCMatchingSet(Ctx, FreezePostDomRelease, Callback);
+    bool ShouldRunAgain = Context.run(FreezePostDomReleases, Callback);
 
     Changed |= Callback.madeChange();
 
@@ -212,10 +197,6 @@ static bool processFunctionWithoutLoopSupport(SILFunction &F,
     // Otherwise, perform another iteration.
     DEBUG(llvm::dbgs() << "\n<<< Made a Change! Reprocessing Function! >>>\n");
   }
-
-  // Now that we have finished our computation, destroy the matching set
-  // computation context.
-  destroyARCMatchingSetComputationContext(Ctx);
 
   DEBUG(llvm::dbgs() << "\n");
 
@@ -228,10 +209,10 @@ static bool processFunctionWithoutLoopSupport(SILFunction &F,
 //===----------------------------------------------------------------------===//
 
 static bool
-processFunctionWithLoopSupport(SILFunction &F, bool FreezePostDomRelease,
+processFunctionWithLoopSupport(SILFunction &F, bool FreezePostDomReleases,
                                AliasAnalysis *AA, PostOrderAnalysis *POTA,
                                LoopRegionFunctionInfo *LRFI, SILLoopInfo *LI,
-                               RCIdentityFunctionInfo *RCIA) {
+                               RCIdentityFunctionInfo *RCFI) {
   // GlobalARCOpts seems to be taking up a lot of compile time when running on
   // globalinit_func. Since that is not *that* interesting from an ARC
   // perspective (i.e. no ref count operations in a loop), disable it on such
@@ -242,21 +223,7 @@ processFunctionWithLoopSupport(SILFunction &F, bool FreezePostDomRelease,
   DEBUG(llvm::dbgs() << "***** Processing " << F.getName() << " *****\n");
 
   bool Changed = false;
-
-  // Construct our context once. A context contains the RPOT as well as maps
-  // that contain state for each BB in F. This is a major place where the
-  // optimizer allocates memory in one large chunk.
-  auto *Ctx =
-      createARCMatchingSetComputationContext(F, AA, POTA, LRFI, LI, RCIA, true);
-
-  // If Ctx is null, we failed to initialize and can not do anything so just
-  // return false.
-  if (!Ctx) {
-    DEBUG(llvm::dbgs() << "    Failed to initialize matching set computation "
-          "context! Bailing!\n");
-    return false;
-  }
-
+  LoopARCPairingContext Context(F, AA, LRFI, LI, RCFI);
   CodeMotionOrDeleteCallback Callback;
   // Until we do not remove any instructions or have nested increments,
   // decrements...
@@ -267,8 +234,7 @@ processFunctionWithLoopSupport(SILFunction &F, bool FreezePostDomRelease,
     // We need to blot pointers we remove after processing an individual pointer
     // so we don't process pairs after we have paired them up. Thus we pass in a
     // lambda that performs the work for us.
-    bool ShouldRunAgain =
-        computeARCMatchingSet(Ctx, FreezePostDomRelease, Callback);
+    bool ShouldRunAgain = Context.run(FreezePostDomReleases, Callback);
 
     Changed |= Callback.madeChange();
 
@@ -280,10 +246,6 @@ processFunctionWithLoopSupport(SILFunction &F, bool FreezePostDomRelease,
     // Otherwise, perform another iteration.
     DEBUG(llvm::dbgs() << "\n<<< Made a Change! Reprocessing Function! >>>\n");
   }
-
-  // Now that we have finished our computation, destroy the matching set
-  // computation context.
-  destroyARCMatchingSetComputationContext(Ctx);
 
   DEBUG(llvm::dbgs() << "\n");
 
