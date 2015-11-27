@@ -203,23 +203,22 @@ public:
   }
 
   /// Emit field names for enum reflection.
-  virtual llvm::Constant *emitCaseNames(IRGenModule &IGM) const;
+  virtual llvm::Constant *emitCaseNames() const;
 
   /// \brief Return the bits used for discriminators for payload cases.
   ///
   /// These bits are populated in increasing value according to the order of
   /// the getElementsWithPayload() array, starting from zero for the first
   /// element with payload.
-  virtual ClusteredBitVector getTagBitsForPayloads(IRGenModule &IGM) const = 0;
+  virtual ClusteredBitVector getTagBitsForPayloads() const = 0;
   
   /// Return the bit pattern used for the given no-payload case.
   virtual ClusteredBitVector
-  getBitPatternForNoPayloadElement(IRGenModule &IGM,
-                                   EnumElementDecl *theCase) const = 0;
+  getBitPatternForNoPayloadElement(EnumElementDecl *theCase) const = 0;
 
   /// Return the bit mask used to test for no-payload cases.
   virtual ClusteredBitVector
-  getBitMaskForNoPayloadElements(IRGenModule &IGM) const = 0;
+  getBitMaskForNoPayloadElements() const = 0;
 
   /// \group Indirect enum operations
   

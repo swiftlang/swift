@@ -2478,7 +2478,7 @@ namespace {
       // # empty cases
       addConstantInt32(strategy.getElementsWithNoPayload().size());
 
-      addWord(strategy.emitCaseNames(IGM));
+      addWord(strategy.emitCaseNames());
 
       // Build the case type accessor.
       llvm::Function *caseTypeVectorAccessor

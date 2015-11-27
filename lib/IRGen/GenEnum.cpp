@@ -142,7 +142,7 @@ void irgen::EnumImplStrategy::initializeFromParams(IRGenFunction &IGF,
   TI->initializeWithTake(IGF, dest, src, T);
 }
 
-llvm::Constant *EnumImplStrategy::emitCaseNames(IRGenModule &IGM) const {
+llvm::Constant *EnumImplStrategy::emitCaseNames() const {
   // Build the list of case names, payload followed by no-payload.
   llvm::SmallString<64> fieldNames;
   for (auto &payloadCase : getElementsWithPayload()) {
@@ -609,7 +609,7 @@ namespace {
       return getFixedSingleton()->getFixedExtraInhabitantMask(IGM);
     }
 
-    ClusteredBitVector getTagBitsForPayloads(IRGenModule &IGM) const override {
+    ClusteredBitVector getTagBitsForPayloads() const override {
       // No tag bits, there's only one payload.
       ClusteredBitVector result;
       if (getSingleton())
@@ -619,14 +619,13 @@ namespace {
     }
 
     ClusteredBitVector
-    getBitPatternForNoPayloadElement(IRGenModule &IGM,
-                                     EnumElementDecl *theCase) const override {
+    getBitPatternForNoPayloadElement(EnumElementDecl *theCase) const override {
       // There's only a no-payload element if the type is empty.
       return {};
     }
 
     ClusteredBitVector
-    getBitMaskForNoPayloadElements(IRGenModule &IGM) const override {
+    getBitMaskForNoPayloadElements() const override {
       // All bits are significant.
       return ClusteredBitVector::getConstant(
                      cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits(),
@@ -800,7 +799,7 @@ namespace {
 
     static constexpr IsPOD_t IsScalarPOD = IsPOD;
 
-    ClusteredBitVector getTagBitsForPayloads(IRGenModule &IGM) const override {
+    ClusteredBitVector getTagBitsForPayloads() const override {
       // No tag bits; no-payload enums always use fixed representations.
       return ClusteredBitVector::getConstant(
                     cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits(),
@@ -808,8 +807,7 @@ namespace {
     }
 
     ClusteredBitVector
-    getBitPatternForNoPayloadElement(IRGenModule &IGM,
-                                     EnumElementDecl *theCase) const override {
+    getBitPatternForNoPayloadElement(EnumElementDecl *theCase) const override {
       auto bits
         = getBitVectorFromAPInt(getDiscriminatorIdxConst(theCase)->getValue());
       bits.extendWithClearBits(cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits());
@@ -817,7 +815,7 @@ namespace {
     }
 
     ClusteredBitVector
-    getBitMaskForNoPayloadElements(IRGenModule &IGM) const override {
+    getBitMaskForNoPayloadElements() const override {
       // All bits are significant.
       return ClusteredBitVector::getConstant(
                        cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits(),
@@ -1014,7 +1012,7 @@ namespace {
       llvm_unreachable("no extra inhabitants");
     }
 
-    llvm::Constant *emitCaseNames(IRGenModule &IGM) const override {
+    llvm::Constant *emitCaseNames() const override {
       // C enums have arbitrary values and we don't preserve the mapping
       // between the case and raw value at runtime, so don't emit any
       // case names at all so that reflection can give up in this case.
@@ -1511,7 +1509,7 @@ namespace {
       // Non-payload cases use extra inhabitants, if any, or are discriminated
       // by setting the tag bits.
       APInt payloadTag, extraTag;
-      std::tie(payloadTag, extraTag) = getNoPayloadCaseValue(IGF.IGM, Case);
+      std::tie(payloadTag, extraTag) = getNoPayloadCaseValue(Case);
 
       auto &ti = getFixedPayloadTypeInfo();
       bool hasExtraInhabitants = ti.getFixedExtraInhabitantCount(IGF.IGM) > 0;
@@ -1814,7 +1812,7 @@ namespace {
     // Get the payload and extra tag (if any) parts of the discriminator for
     // a no-data case.
     std::pair<APInt, APInt>
-    getNoPayloadCaseValue(IRGenModule &IGM, EnumElementDecl *elt) const {
+    getNoPayloadCaseValue(EnumElementDecl *elt) const {
       assert(elt != getPayloadElement());
 
       unsigned payloadSize
@@ -1877,7 +1875,7 @@ namespace {
       // Non-payload cases use extra inhabitants, if any, or are discriminated
       // by setting the tag bits.
       APInt payloadPattern, extraTag;
-      std::tie(payloadPattern, extraTag) = getNoPayloadCaseValue(IGF.IGM, elt);
+      std::tie(payloadPattern, extraTag) = getNoPayloadCaseValue(elt);
       auto payload = EnumPayload::fromBitPattern(IGF.IGM, payloadPattern,
                                                  PayloadSchema);
       payload.explode(IGF.IGM, out);
@@ -2449,7 +2447,7 @@ namespace {
 
       // Store the discriminator for the no-payload case.
       APInt payloadValue, extraTag;
-      std::tie(payloadValue, extraTag) = getNoPayloadCaseValue(IGF.IGM, Case);
+      std::tie(payloadValue, extraTag) = getNoPayloadCaseValue(Case);
       auto &C = IGF.IGM.getLLVMContext();
       auto payload = EnumPayload::fromBitPattern(IGF.IGM, payloadValue,
                                                  PayloadSchema);
@@ -2557,10 +2555,9 @@ namespace {
     }
 
     ClusteredBitVector
-    getBitPatternForNoPayloadElement(IRGenModule &IGM,
-                                     EnumElementDecl *theCase) const override {
+    getBitPatternForNoPayloadElement(EnumElementDecl *theCase) const override {
       APInt payloadPart, extraPart;
-      std::tie(payloadPart, extraPart) = getNoPayloadCaseValue(IGM, theCase);
+      std::tie(payloadPart, extraPart) = getNoPayloadCaseValue(theCase);
       ClusteredBitVector bits;
 
       if (PayloadBitCount > 0)
@@ -2581,7 +2578,7 @@ namespace {
     }
 
     ClusteredBitVector
-    getBitMaskForNoPayloadElements(IRGenModule &IGM) const override {
+    getBitMaskForNoPayloadElements() const override {
       // Use the extra inhabitants mask from the payload.
       auto &payloadTI = getFixedPayloadTypeInfo();
       ClusteredBitVector extraInhabitantsMask;
@@ -2596,7 +2593,7 @@ namespace {
       return extraInhabitantsMask;
     }
 
-    ClusteredBitVector getTagBitsForPayloads(IRGenModule &IGM) const override {
+    ClusteredBitVector getTagBitsForPayloads() const override {
       // We only have tag bits if we spilled extra bits.
       ClusteredBitVector result;
       unsigned payloadSize
@@ -2843,9 +2840,10 @@ namespace {
     }
 
     APInt getEmptyCasePayload(IRGenModule &IGM,
-                                    unsigned tagIndex, unsigned idx) const {
+                              unsigned tagIndex,
+                              unsigned idx) const {
       // The payload may be empty.
-      if (CommonSpareBits.size() == 0)
+      if (CommonSpareBits.empty())
         return APInt();
       
       APInt v = interleaveSpareBits(IGM, PayloadTagBits,
@@ -3353,7 +3351,7 @@ namespace {
     }
 
     std::pair<APInt, APInt>
-    getNoPayloadCaseValue(IRGenModule &IGM, unsigned index) const {
+    getNoPayloadCaseValue(unsigned index) const {
       // Figure out the tag and payload for the empty case.
       unsigned numCaseBits = getNumCaseBits();
       unsigned tag, tagIndex;
@@ -3387,7 +3385,7 @@ namespace {
     void emitNoPayloadInjection(IRGenFunction &IGF, Explosion &out,
                                 unsigned index) const {
       APInt payloadVal, extraTag;
-      std::tie(payloadVal, extraTag) = getNoPayloadCaseValue(IGF.IGM, index);
+      std::tie(payloadVal, extraTag) = getNoPayloadCaseValue(index);
       
       auto payload = EnumPayload::fromBitPattern(IGF.IGM, payloadVal,
                                                  PayloadSchema);
@@ -3842,7 +3840,7 @@ namespace {
 
       // We can just primitive-store the representation for the empty case.
       APInt payloadValue, extraTag;
-      std::tie(payloadValue, extraTag) = getNoPayloadCaseValue(IGF.IGM, index);
+      std::tie(payloadValue, extraTag) = getNoPayloadCaseValue(index);
       
       auto payload = EnumPayload::fromBitPattern(IGF.IGM, payloadValue,
                                                  PayloadSchema);
@@ -3989,8 +3987,7 @@ namespace {
     }
 
     ClusteredBitVector
-    getBitPatternForNoPayloadElement(IRGenModule &IGM,
-                                     EnumElementDecl *theCase) const override {
+    getBitPatternForNoPayloadElement(EnumElementDecl *theCase) const override {
       assert(TIK >= Fixed);
 
       APInt payloadPart, extraPart;
@@ -4002,7 +3999,7 @@ namespace {
 
       unsigned index = emptyI - ElementsWithNoPayload.begin();
 
-      std::tie(payloadPart, extraPart) = getNoPayloadCaseValue(IGM, index);
+      std::tie(payloadPart, extraPart) = getNoPayloadCaseValue(index);
       ClusteredBitVector bits;
       
       if (CommonSpareBits.size() > 0)
@@ -4023,7 +4020,7 @@ namespace {
     }
 
     ClusteredBitVector
-    getBitMaskForNoPayloadElements(IRGenModule &IGM) const override {
+    getBitMaskForNoPayloadElements() const override {
       assert(TIK >= Fixed);
 
       // All bits are significant.
@@ -4033,7 +4030,7 @@ namespace {
                        true);
     }
 
-    ClusteredBitVector getTagBitsForPayloads(IRGenModule &IGM) const override {
+    ClusteredBitVector getTagBitsForPayloads() const override {
       assert(TIK >= Fixed);
       
       ClusteredBitVector result = PayloadTagBits;
@@ -4827,7 +4824,7 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
     SpareBitVector spareBits;
     fixedTI->applyFixedSpareBitsMask(spareBits);
 
-    auto bitMask = strategy->getBitMaskForNoPayloadElements(IGM);
+    auto bitMask = strategy->getBitMaskForNoPayloadElements();
     assert(bitMask.size() == fixedTI->getFixedSize().getValueInBits());
     DEBUG(llvm::dbgs() << "  no-payload mask:\t";
           displayBitMask(bitMask));
@@ -4835,7 +4832,7 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
           displayBitMask(spareBits));
 
     for (auto &elt : strategy->getElementsWithNoPayload()) {
-      auto bitPattern = strategy->getBitPatternForNoPayloadElement(IGM, elt.decl);
+      auto bitPattern = strategy->getBitPatternForNoPayloadElement(elt.decl);
       assert(bitPattern.size() == fixedTI->getFixedSize().getValueInBits());
       DEBUG(llvm::dbgs() << "  no-payload case " << elt.decl->getName().str()
                          << ":\t";
@@ -4845,7 +4842,7 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
       maskedBitPattern &= spareBits;
       assert(maskedBitPattern.none() && "no-payload case occupies spare bits?!");
     }
-    auto tagBits = strategy->getTagBitsForPayloads(IGM);
+    auto tagBits = strategy->getTagBitsForPayloads();
     assert(tagBits.count() >= 32
             || (1U << tagBits.count())
                >= strategy->getElementsWithPayload().size());
