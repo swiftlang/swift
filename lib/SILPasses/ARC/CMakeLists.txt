@@ -1,11 +1,11 @@
 set(ARC_SOURCES
-  ARC/ARCSequenceOpts.cpp
   ARC/ARCBBState.cpp
+  ARC/ARCRegionState.cpp
+  ARC/ARCSequenceOpts.cpp
   ARC/GlobalARCPairingAnalysis.cpp
   ARC/GlobalARCSequenceDataflow.cpp
   ARC/GlobalLoopARCSequenceDataflow.cpp
   ARC/RCStateTransition.cpp
   ARC/RCStateTransitionVisitors.cpp  
   ARC/RefCountState.cpp
-  ARC/ARCRegionState.cpp
   PARENT_SCOPE)
