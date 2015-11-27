@@ -542,8 +542,9 @@ typedef unsigned getEnumTag(const OpaqueValue *src,
 /// bits, leaving behind a value of the inhabited case payload type.
 /// If the case is indirect, the payload can then be projected from the box
 /// with swift_projectBox().
-typedef OpaqueValue *destructiveProjectEnumData(OpaqueValue *src,
-                                                const Metadata *self);
+typedef void destructiveProjectEnumData(OpaqueValue *src,
+                                        const Metadata *self);
+
 
 } // end namespace value_witness_types
 
@@ -1066,8 +1067,8 @@ public:
   unsigned vw_getEnumTag(const OpaqueValue *value) const {
     return getValueWitnesses()->_asEVWT()->getEnumTag(value, this);
   }
-  OpaqueValue *vw_destructiveProjectEnumData(OpaqueValue *value) const {
-    return getValueWitnesses()->_asEVWT()->destructiveProjectEnumData(value, this);
+  void vw_destructiveProjectEnumData(OpaqueValue *value) const {
+    getValueWitnesses()->_asEVWT()->destructiveProjectEnumData(value, this);
   }
   
   /// Get the nominal type descriptor if this metadata describes a nominal type,

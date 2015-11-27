@@ -171,14 +171,15 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
       ->getPointerTo();
   }
 
-  /// U *(*destructiveProjectEnumData)(T *obj, M *self);
+  /// void (*destructiveProjectEnumData)(T *obj, M *self);
   case ValueWitness::DestructiveProjectEnumData: {
+    llvm::Type *voidTy = IGM.VoidTy;
     llvm::Type *ptrTy = IGM.OpaquePtrTy;
     llvm::Type *metaTy = IGM.TypeMetadataPtrTy;
 
     llvm::Type *args[] = {ptrTy, metaTy};
 
-    return llvm::FunctionType::get(ptrTy, args, /*isVarArg*/ false)
+    return llvm::FunctionType::get(voidTy, args, /*isVarArg*/ false)
       ->getPointerTo();
   }
 

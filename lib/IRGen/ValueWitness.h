@@ -286,9 +286,9 @@ enum class ValueWitness : unsigned {
   /// Given a valid object of this enum type, extracts the tag value indicating
   /// which case of the enum is inhabited.
   GetEnumTag = First_EnumValueWitness,
-  ///   U *(*destructiveProjectEnumData)(T *obj, unsigned tag, M *self);
+  ///   void (*destructiveProjectEnumData)(T *obj, M *self);
   /// Given a valid object of this enum type, destructively extracts the
-  /// associated payload and returns a pointer to that payload.
+  /// associated payload.
   DestructiveProjectEnumData,
   Last_EnumValueWitness = DestructiveProjectEnumData,
 

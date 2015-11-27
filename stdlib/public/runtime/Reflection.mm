@@ -544,7 +544,8 @@ StringMirrorTuple swift_EnumMirror_subscript(intptr_t i,
 
   owner = pair.first;
   type->vw_initializeWithTake(pair.second, const_cast<OpaqueValue *>(value));
-  value = type->vw_destructiveProjectEnumData(pair.second);
+  type->vw_destructiveProjectEnumData(pair.second);
+  value = pair.second;
 
   // If the payload is indirect, we need to jump through the box to get it.
   if (indirect) {

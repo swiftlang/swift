@@ -1135,7 +1135,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
           Address(value, type.getBestKnownAlignment()));
     }
 
-    IGF.Builder.CreateRet(value);
+    IGF.Builder.CreateRetVoid();
     return;
   }
 

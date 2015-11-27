@@ -32,7 +32,7 @@ import Builtin
 // CHECK:   i8* null,
 // CHECK:   i8* null,
 // CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwugO20enum_value_semantics20SinglePayloadTrivial to i8*),
-// CHECK:   i8* bitcast (%swift.opaque* (%swift.opaque*, %swift.type*)* @_TwupO20enum_value_semantics20SinglePayloadTrivial to i8*)
+// CHECK:   i8* bitcast (void (%swift.opaque*, %swift.type*)* @_TwupO20enum_value_semantics20SinglePayloadTrivial to i8*)
 // CHECK: ]
 
 // CHECK: @_TMfO20enum_value_semantics20SinglePayloadTrivial = internal constant { {{.*}}* } {
@@ -68,7 +68,7 @@ import Builtin
 // CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO20enum_value_semantics23SinglePayloadNontrivial to i8*)
 // CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO20enum_value_semantics23SinglePayloadNontrivial to i8*)
 // CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwugO20enum_value_semantics23SinglePayloadNontrivial to i8*),
-// CHECK:   i8* bitcast (%swift.opaque* (%swift.opaque*, %swift.type*)* @_TwupO20enum_value_semantics23SinglePayloadNontrivial to i8*)
+// CHECK:   i8* bitcast (void (%swift.opaque*, %swift.type*)* @_TwupO20enum_value_semantics23SinglePayloadNontrivial to i8*)
 // CHECK: ]
 
 // CHECK: @_TMfO20enum_value_semantics23SinglePayloadNontrivial = internal constant { {{.*}}* } {
