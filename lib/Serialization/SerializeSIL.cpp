@@ -263,6 +263,10 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   // as available externally.
   if (NoBody) {
     Linkage = addExternalToLinkage(Linkage);
+
+    // We do not allow external declarations with shared visibility.
+    if (hasSharedVisibility(Linkage))
+      Linkage = SILLinkage::PublicExternal;
   }
 
   SILFunctionLayout::emitRecord(
