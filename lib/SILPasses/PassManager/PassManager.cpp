@@ -19,6 +19,7 @@
 #include "swift/SILPasses/Transforms.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "swift/SILAnalysis/FunctionOrder.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/TimeValue.h"
@@ -159,20 +160,30 @@ SILPassManager::SILPassManager(SILModule *M, llvm::StringRef Stage) :
 bool SILPassManager::runFunctionPasses(PassList FuncTransforms) {
   const SILOptions &Options = getOptions();
 
-  for (auto &F : *Mod) {
-    if (F.empty())
+  BasicCalleeAnalysis *BCA = getAnalysis<BasicCalleeAnalysis>();
+  BottomUpFunctionOrder BottomUpOrder(*Mod, BCA);
+  auto BottomUpFunctions = BottomUpOrder.getFunctions();
+
+  for (auto I = BottomUpFunctions.rbegin(),
+            E = BottomUpFunctions.rend();
+            I != E; ++I) {
+    SILFunction *F = *I;
+
+    if (F->empty())
       continue;
 
     // Don't optimize functions that are marked with the opt.never attribute.
-    if (!F.shouldOptimize())
+    if (!F->shouldOptimize())
       continue;
 
-    CompletedPasses &completedPasses = CompletedPassesMap[&F];
+    CompletedPasses &completedPasses = CompletedPassesMap[F];
+
+
 
     for (auto SFT : FuncTransforms) {
       PrettyStackTraceSILFunctionTransform X(SFT);
       SFT->injectPassManager(this);
-      SFT->injectFunction(&F);
+      SFT->injectFunction(F);
       
       // If nothing changed since the last run of this pass, we can skip this
       // pass.
@@ -187,13 +198,13 @@ bool SILPassManager::runFunctionPasses(PassList FuncTransforms) {
       if (SILPrintPassName)
         llvm::dbgs() << "#" << NumPassesRun << " Stage: " << StageName
                      << " Pass: " << SFT->getName()
-                     << ", Function: " << F.getName() << "\n";
+                     << ", Function: " << F->getName() << "\n";
 
-      if (doPrintBefore(SFT, &F)) {
+      if (doPrintBefore(SFT, F)) {
         llvm::dbgs() << "*** SIL function before " << StageName << " "
                      << SFT->getName() << " (" << NumOptimizationIterations
                      << ") ***\n";
-        F.dump(Options.EmitVerboseSIL);
+        F->dump(Options.EmitVerboseSIL);
       }
 
       llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
@@ -202,17 +213,17 @@ bool SILPassManager::runFunctionPasses(PassList FuncTransforms) {
       if (SILPrintPassTime) {
         auto Delta = llvm::sys::TimeValue::now().nanoseconds() -
           StartTime.nanoseconds();
-        llvm::dbgs() << Delta << " (" << SFT->getName() << "," << F.getName()
+        llvm::dbgs() << Delta << " (" << SFT->getName() << "," << F->getName()
                      << ")\n";
       }
 
       // If this pass invalidated anything, print and verify.
-      if (doPrintAfter(SFT, &F,
+      if (doPrintAfter(SFT, F,
                        currentPassHasInvalidated && SILPrintAll)) {
         llvm::dbgs() << "*** SIL function after " << StageName << " "
                      << SFT->getName() << " (" << NumOptimizationIterations
                      << ") ***\n";
-        F.dump(Options.EmitVerboseSIL);
+        F->dump(Options.EmitVerboseSIL);
       }
 
       // Remember if this pass didn't change anything.
@@ -221,8 +232,8 @@ bool SILPassManager::runFunctionPasses(PassList FuncTransforms) {
 
       if (Options.VerifyAll &&
           (currentPassHasInvalidated || SILVerifyWithoutInvalidation)) {
-        F.verify();
-        verifyAnalyses(&F);
+        F->verify();
+        verifyAnalyses(F);
       }
 
       ++NumPassesRun;
