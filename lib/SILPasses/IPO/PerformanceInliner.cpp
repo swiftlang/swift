@@ -15,9 +15,11 @@
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/Projection.h"
+#include "swift/SILAnalysis/BasicCalleeAnalysis.h"
+#include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILAnalysis/ColdBlockInfo.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
-#include "swift/SILAnalysis/CallGraphAnalysis.h"
+#include "swift/SILAnalysis/FunctionOrder.h"
 #include "swift/SILAnalysis/LoopAnalysis.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
@@ -1302,6 +1304,7 @@ public:
   }
 
   void run() override {
+    BasicCalleeAnalysis *BCA = PM->getAnalysis<BasicCalleeAnalysis>();
     CallGraphAnalysis *CGA = PM->getAnalysis<CallGraphAnalysis>();
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
@@ -1314,8 +1317,8 @@ public:
     SILPerformanceInliner Inliner(getOptions().InlineThreshold,
                                   WhatToInline);
 
-    auto &CG = CGA->getOrBuildCallGraph();
-    auto BottomUpFunctions = CG.getBottomUpFunctionOrder();
+    BottomUpFunctionOrder BottomUpOrder(*getModule(), BCA);
+    auto BottomUpFunctions = BottomUpOrder.getFunctions();
 
     // Copy the bottom-up function list into a worklist.
     llvm::SmallVector<SILFunction *, 32> WorkList;
