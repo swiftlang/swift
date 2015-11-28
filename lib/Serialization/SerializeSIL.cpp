@@ -255,6 +255,16 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   if (hasSharedVisibility(Linkage))
     Linkage = SILLinkage::Shared;
 
+  // Check if we need to emit a body for this function.
+  bool NoBody = DeclOnly || isAvailableExternally(Linkage) ||
+                F.isExternalDeclaration();
+
+  // If we don't emit a function body then make sure to mark the decleration
+  // as available externally.
+  if (NoBody) {
+    Linkage = addExternalToLinkage(Linkage);
+  }
+
   SILFunctionLayout::emitRecord(
       Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
       (unsigned)F.isTransparent(), (unsigned)F.isFragile(),
@@ -262,7 +272,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.getInlineStrategy(), (unsigned)F.getEffectsKind(),
       FnID, SemanticsID);
 
-  if (DeclOnly || isAvailableExternally(Linkage) || F.isExternalDeclaration())
+  if (NoBody)
     return;
 
   // Write the body's context archetypes, unless we don't actually have a body.

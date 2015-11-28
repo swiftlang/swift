@@ -110,6 +110,19 @@ inline SILLinkage stripExternalFromLinkage(SILLinkage linkage) {
   return linkage;
 }
 
+/// Add the 'external' attribute to \p linkage.
+inline SILLinkage addExternalToLinkage(SILLinkage linkage) {
+  if (linkage == SILLinkage::Public)
+    return SILLinkage::PublicExternal;
+  if (linkage == SILLinkage::Hidden)
+    return SILLinkage::HiddenExternal;
+  if (linkage == SILLinkage::Shared)
+    return SILLinkage::SharedExternal;
+  if (linkage == SILLinkage::Private)
+    return SILLinkage::PrivateExternal;
+  return linkage;
+}
+
 /// Return whether the linkage indicates that an object has a
 /// definition outside the current SILModule.
 inline bool isAvailableExternally(SILLinkage linkage) {
