@@ -3860,9 +3860,9 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
 /// Return true if this type is known to be an ArrayType.
 static bool isKnownToBeArrayType(Type ty) {
   if (!ty) return false;
-  
+
   auto bgt = ty->getAs<BoundGenericType>();
-  if (!bgt) return nullptr;
+  if (!bgt) return false;
 
   auto &ctx = bgt->getASTContext();
   return bgt->getDecl() == ctx.getArrayDecl();
