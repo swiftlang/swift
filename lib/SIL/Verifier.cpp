@@ -782,9 +782,6 @@ public:
       break;
     case llvm::Intrinsic::ctlz: // llvm.ctlz
     case llvm::Intrinsic::cttz: // llvm.cttz
-      require(!isa<SILArgument>(BI->getArguments()[1]),
-              "is_zero_undef argument of bit counting intrinsics must be an "
-              "integer literal");
       break;
     case llvm::Intrinsic::memcpy:
     case llvm::Intrinsic::memmove:
