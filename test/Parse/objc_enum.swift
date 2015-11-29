@@ -29,3 +29,9 @@ class Bar {
   @objc func foo(x: Foo) {}
   @objc func nonObjC(x: NonObjCEnum) {} //expected-error{{type of the parameter cannot be represented in Objective-C}} //expected-note{{non-'@objc' enums cannot be represented in Objective-C}}
 }
+
+// <rdar://problem/23681566> @objc enums with payloads rejected with no source location info
+@objc enum r23681566 : Int {  // expected-note {{declared raw type 'Int' here}}
+  case Foo(progress: Int)     // expected-error {{enum with raw type cannot have cases with arguments}}
+}
+

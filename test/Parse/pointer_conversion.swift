@@ -243,6 +243,10 @@ func f23202128() {
   let pipe: [Int32] = [0, 0]  // expected-note {{change 'let' to 'var' to make it mutable}}}}
   UMP(&pipe)  // expected-error {{cannot pass immutable value as inout argument: 'pipe' is a 'let' constant}}
 
+  var pipe2: [Int] = [0, 0]
+  UMP(&pipe2) // expected-error {{cannot convert value of type '[Int]' to expected argument type 'Int32'}}
+
+  
   UP(pipe)    // ok
   UP(&pipe)   // expected-error {{'&' is not allowed passing array value as 'UnsafePointer<Int32>' argument}} {{6-7=}}
 }

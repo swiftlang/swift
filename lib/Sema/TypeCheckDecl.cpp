@@ -2603,6 +2603,9 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
   llvm::SmallDenseMap<RawValueKey, RawValueSource, 8> uniqueRawValues;
 
   for (auto elt : ED->getAllElements()) {
+    // Make sure the element is checked out before we poke at it.
+    TC.validateDecl(elt);
+    
     if (elt->isInvalid())
       continue;
 
