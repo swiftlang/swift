@@ -25,22 +25,22 @@ func mutablePointerArguments(p: UnsafeMutablePointer<Int>,
   var i: Int = 0
   var f: Float = 0
   takesMutablePointer(&i)
-  takesMutablePointer(&f) // expected-error{{'&' used with non-inout argument of type 'UnsafeMutablePointer<Int>'}}
+  takesMutablePointer(&f) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
   takesMutablePointer(i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'UnsafeMutablePointer<Int>'}}
   takesMutablePointer(f) // expected-error{{cannot convert value of type 'Float' to expected argument type 'UnsafeMutablePointer<Int>'}}
   var ii: [Int] = [0, 1, 2]
   var ff: [Float] = [0, 1, 2]
   takesMutablePointer(&ii)
-  takesMutablePointer(&ff) // expected-error{{'&' used with non-inout argument of type 'UnsafeMutablePointer<Int>'}}
+  takesMutablePointer(&ff) // expected-error{{cannot convert value of type '[Float]' to expected argument type 'Int'}}
   takesMutablePointer(ii) // expected-error{{cannot convert value of type '[Int]' to expected argument type 'UnsafeMutablePointer<Int>'}}
   takesMutablePointer(ff) // expected-error{{cannot convert value of type '[Float]' to expected argument type 'UnsafeMutablePointer<Int>'}}
 
-  takesMutableArrayPointer(&i) // expected-error{{'&' used with non-inout argument of type 'UnsafeMutablePointer<[Int]>' (aka 'UnsafeMutablePointer<Array<Int>>')}}
+  takesMutableArrayPointer(&i) // expected-error{{cannot convert value of type 'Int' to expected argument type '[Int]'}}
   takesMutableArrayPointer(&ii)
 
   // We don't allow these conversions outside of function arguments.
-  var x: UnsafeMutablePointer<Int> = &i // expected-error{{'&' used with non-inout argument of type 'UnsafeMutablePointer<Int>'}}
-  x = &ii // expected-error{{'&' used with non-inout argument of type 'UnsafeMutablePointer<Int>'}}
+  var x: UnsafeMutablePointer<Int> = &i // expected-error{{cannot pass immutable value of type 'Int' as inout argument}}
+  x = &ii // expected-error{{cannot assign value of type '[Int]' to type 'Int'}}
   _ = x
 }
 
@@ -69,9 +69,9 @@ func mutableVoidPointerArguments(p: UnsafeMutablePointer<Int>,
   takesMutableVoidPointer(ff) // expected-error{{cannot convert value of type '[Int]' to expected argument type 'UnsafeMutablePointer<Void>' (aka 'UnsafeMutablePointer<()>')}}
 
   // We don't allow these conversions outside of function arguments.
-  var x: UnsafeMutablePointer<Void> = &i // expected-error{{'&' used with non-inout argument of type 'UnsafeMutablePointer<Void>' (aka 'UnsafeMutablePointer<()>')}}
+  var x: UnsafeMutablePointer<Void> = &i // expected-error{{cannot convert value of type 'inout Int' to specified type 'UnsafeMutablePointer<Void>' (aka 'UnsafeMutablePointer<()>')}}
   x = p // expected-error{{cannot assign value of type 'UnsafeMutablePointer<Int>' to type 'UnsafeMutablePointer<Void>' (aka 'UnsafeMutablePointer<()>')}}
-  x = &ii // expected-error{{'&' used with non-inout argument of type 'UnsafeMutablePointer<Void>' (aka 'UnsafeMutablePointer<()>')}}
+  x = &ii // expected-error{{cannot assign value of type 'inout [Int]' (aka 'inout Array<Int>') to type 'UnsafeMutablePointer<Void>' (aka 'UnsafeMutablePointer<()>')}}
   _ = x
 }
 
@@ -86,11 +86,11 @@ func constPointerArguments(p: UnsafeMutablePointer<Int>,
   var i: Int = 0
   var f: Float = 0
   takesConstPointer(&i)
-  takesConstPointer(&f) // expected-error{{'&' used with non-inout argument of type 'UnsafePointer<Int>'}}
+  takesConstPointer(&f) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
   var ii: [Int] = [0, 1, 2]
   var ff: [Float] = [0, 1, 2]
   takesConstPointer(&ii)
-  takesConstPointer(&ff) // expected-error{{'&' used with non-inout argument of type 'UnsafePointer<Int>'}}
+  takesConstPointer(&ff) // expected-error{{cannot convert value of type '[Float]' to expected argument type 'Int'}}
   takesConstPointer(ii)
   takesConstPointer(ff) // expected-error{{cannot convert value of type '[Float]' to expected argument type 'UnsafePointer<Int>'}}
   takesConstPointer([0, 1, 2])
@@ -98,7 +98,7 @@ func constPointerArguments(p: UnsafeMutablePointer<Int>,
   takesConstPointer([0.0, 1.0, 2.0]) // expected-error{{cannot convert value of type 'Double' to expected element type 'Int'}}
 
   // We don't allow these conversions outside of function arguments.
-  var x: UnsafePointer<Int> = &i // expected-error{{'&' used with non-inout argument of type 'UnsafePointer<Int>'}}
+  var x: UnsafePointer<Int> = &i // expected-error{{cannot pass immutable value of type 'Int' as inout argument}}
   x = ii // expected-error{{cannot assign value of type '[Int]' to type 'UnsafePointer<Int>'}}
   x = p // expected-error{{cannot assign value of type 'UnsafeMutablePointer<Int>' to type 'UnsafePointer<Int>'}}
   x = ap // expected-error{{cannot assign value of type 'AutoreleasingUnsafeMutablePointer<Int>' to type 'UnsafePointer<Int>'}}
@@ -132,7 +132,7 @@ func constVoidPointerArguments(p: UnsafeMutablePointer<Int>,
 takesConstVoidPointer([0.0, 1.0, 2.0])  // expected-error {{cannot convert value of type 'Double' to expected element type '()'}}
 
   // We don't allow these conversions outside of function arguments.
-  var x: UnsafePointer<Void> = &i // expected-error{{'&' used with non-inout argument of type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
+  var x: UnsafePointer<Void> = &i // expected-error{{cannot convert value of type 'inout Int' to specified type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
   x = ii // expected-error{{cannot assign value of type '[Int]' to type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
   x = p // expected-error{{cannot assign value of type 'UnsafeMutablePointer<Int>' to type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
   x = fp // expected-error{{cannot assign value of type 'UnsafeMutablePointer<Float>' to type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
@@ -152,9 +152,9 @@ func stringArguments(s: String) {
 
   takesMutableVoidPointer(s) // expected-error{{cannot convert value of type 'String' to expected argument type 'UnsafeMutablePointer<Void>' (aka 'UnsafeMutablePointer<()>')}}
   takesMutableInt8Pointer(s) // expected-error{{cannot convert value of type 'String' to expected argument type 'UnsafeMutablePointer<Int8>'}}
-  takesMutableInt8Pointer(&s) // expected-error{{'&' used with non-inout argument of type 'UnsafeMutablePointer<Int8>'}}
+  takesMutableInt8Pointer(&s) // expected-error{{cannot convert value of type 'String' to expected argument type 'Int8'}}
   takesMutablePointer(s) // expected-error{{cannot convert value of type 'String' to expected argument type 'UnsafeMutablePointer<Int>'}}
-  takesMutablePointer(&s) // expected-error{{'&' used with non-inout argument of type 'UnsafeMutablePointer<Int>'}}
+  takesMutablePointer(&s) // expected-error{{cannot convert value of type 'String' to expected argument type 'Int'}}
 }
 
 func autoreleasingPointerArguments(p: UnsafeMutablePointer<Int>,
@@ -169,14 +169,14 @@ func autoreleasingPointerArguments(p: UnsafeMutablePointer<Int>,
   takesAutoreleasingPointer(&c)
   takesAutoreleasingPointer(c) // expected-error{{cannot convert value of type 'C' to expected argument type 'AutoreleasingUnsafeMutablePointer<C>'}}
   var d: D = D()
-  takesAutoreleasingPointer(&d) // expected-error{{'&' used with non-inout argument of type 'AutoreleasingUnsafeMutablePointer<C>'}}
+  takesAutoreleasingPointer(&d) // expected-error{{cannot convert value of type 'D' to expected argument type 'C'}}
   takesAutoreleasingPointer(d) // expected-error{{cannot convert value of type 'D' to expected argument type 'AutoreleasingUnsafeMutablePointer<C>'}}
   var cc: [C] = [C(), C()]
   var dd: [D] = [D(), D()]
-  takesAutoreleasingPointer(&cc) // expected-error{{'&' used with non-inout argument of type 'AutoreleasingUnsafeMutablePointer<C>'}}
-  takesAutoreleasingPointer(&dd) // expected-error{{'&' used with non-inout argument of type 'AutoreleasingUnsafeMutablePointer<C>'}}
+  takesAutoreleasingPointer(&cc) // expected-error{{cannot convert value of type '[C]' to expected argument type 'C'}}
+  takesAutoreleasingPointer(&dd) // expected-error{{cannot convert value of type '[D]' to expected argument type 'C'}}
 
-  let _: AutoreleasingUnsafeMutablePointer<C> = &c // expected-error{{'&' used with non-inout argument of type 'AutoreleasingUnsafeMutablePointer<C>'}}
+  let _: AutoreleasingUnsafeMutablePointer<C> = &c // expected-error{{cannot pass immutable value of type 'C' as inout argument}}
 }
 
 func pointerConstructor(x: UnsafeMutablePointer<Int>) -> UnsafeMutablePointer<Float> {
@@ -215,3 +215,24 @@ func addressConversion(p: UnsafeMutablePointer<Int>, x: Int) {
   var x = x
   let _: Bool = p == &x
 }
+
+// <rdar://problem/23271868> QoI: Non-descriptive error message in Swift when passing immutable unsafe pointer instead of mutable
+func f23271868() {
+  var viewport: Int = 1 // intentionally incorrect type, not Int32
+  func GLKProject(a : UnsafeMutablePointer<Int32>) {}
+  GLKProject(&viewport)  // expected-error {{cannot convert value of type 'Int' to expected argument type 'Int32'}}
+
+  func GLKProjectUP(a : UnsafePointer<Int32>) {}
+  func UP_Void(a : UnsafePointer<Void>) {}
+  func UMP_Void(a : UnsafeMutablePointer<Void>) {}
+  UP_Void(&viewport)
+  UMP_Void(&viewport)
+
+  let cst = 42  // expected-note 2 {{change 'let' to 'var' to make it mutable}}
+  UP_Void(&cst)  // expected-error {{cannot pass immutable value as inout argument: 'cst' is a 'let' constant}}
+  UMP_Void(&cst)  // expected-error {{cannot pass immutable value as inout argument: 'cst' is a 'let' constant}}
+}
+
+
+
+

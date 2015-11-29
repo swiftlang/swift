@@ -3856,12 +3856,41 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
   return false;
 }
 
+/// If the specific type is UnsafePointer<T>, UnsafeMutablePointer<T>, or
+/// AutoreleasingUnsafeMutablePointer<T>, return T.
+static Type getPointerElementType(Type ty) {
+  // Must be a generic type.
+  auto bgt = ty->getAs<BoundGenericType>();
+  if (!bgt) return Type();
+  
+  // Must be UnsafeMutablePointer or UnsafePointer.
+  auto &ctx = bgt->getASTContext();
+  if (bgt->getDecl() != ctx.getUnsafeMutablePointerDecl() &&
+      bgt->getDecl() != ctx.getUnsafePointerDecl() &&
+      bgt->getDecl() != ctx.getAutoreleasingUnsafeMutablePointerDecl())
+    return Type();
+
+  return bgt->getGenericArgs()[0];
+}
+
+
+
 bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
   // If we have a contextual type, it must be an inout type.
   auto contextualType = CS->getContextualType();
-  
   if (contextualType) {
-    if (!contextualType->is<InOutType>()) {
+    // If the contextual type is one of the UnsafePointer<T> types, then the
+    // contextual type of the subexpression must be T.
+    if (auto pointerEltType = getPointerElementType(contextualType)) {
+      // If the element type is Void, then we allow any input type, since
+      // everything is convertable to UnsafePointer<Void>
+      if (pointerEltType->isVoid())
+        contextualType = Type();
+      else
+        contextualType = pointerEltType;
+    } else if (contextualType->is<InOutType>()) {
+      contextualType = contextualType->getInOutObjectType();
+    } else {
       // If the caller expected something inout, but we didn't have
       // something of inout type, diagnose it.
       diagnose(IOE->getLoc(), diag::extra_address_of, contextualType)
@@ -3869,7 +3898,6 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
         .fixItRemove(IOE->getStartLoc());
       return true;
     }
-    contextualType = contextualType->getInOutObjectType();
   }
   
   auto subExpr = typeCheckChildIndependently(IOE->getSubExpr(), contextualType,
