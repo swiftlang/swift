@@ -139,3 +139,6 @@ picking up new targets, file removals, or file additions.
 
 See docs/Testing.rst.
 
+## Contributing to Swift
+
+Contributions to Swift are welcomed and encouraged! Please see the [Contributing to Swift guide](https://swift.org/contributing/).
