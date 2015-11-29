@@ -230,22 +230,19 @@ namespace {
     /// B into A.
     llvm::DenseSet<std::pair<StringRef, StringRef>> InlinedFunctions;
 
-    SILFunction *getEligibleFunction(FullApplySite AI, CallGraph &CG);
-    
+    SILFunction *getEligibleFunction(FullApplySite AI);
+
     bool isProfitableToInline(FullApplySite AI, unsigned loopDepthOfAI,
                               DominanceAnalysis *DA,
                               SILLoopAnalysis *LA,
                               ConstantTracker &constTracker);
-    
+
     void visitColdBlocks(SmallVectorImpl<FullApplySite> &AppliesToInline,
-                         SILBasicBlock *root, DominanceInfo *DT,
-                         CallGraph &CG);
+                         SILBasicBlock *root, DominanceInfo *DT);
 
     void collectAppliesToInline(SILFunction *Caller,
                                 SmallVectorImpl<FullApplySite> &Applies,
-                                DominanceAnalysis *DA,
-                                SILLoopAnalysis *LA,
-                                CallGraph &CG);
+                                DominanceAnalysis *DA, SILLoopAnalysis *LA);
 
     /// This method is responsible for breaking recursive cycles
     /// in the inliner (some of which are only exposed via devirtualization).
@@ -546,9 +543,8 @@ bool SILPerformanceInliner::hasInliningCycle(SILFunction *Caller,
 }
 
 // Returns the callee of an apply_inst if it is basically inlinable.
-SILFunction *SILPerformanceInliner::
-getEligibleFunction(FullApplySite AI, CallGraph &CG) {
- 
+SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
+
   SILFunction *Callee = AI.getCalleeFunction();
   
   if (!Callee) {
@@ -983,11 +979,9 @@ bool SILPerformanceInliner::devirtualizeAndSpecializeApplies(
   return ChangedAny;
 }
 
-void SILPerformanceInliner::collectAppliesToInline(SILFunction *Caller,
-                                        SmallVectorImpl<FullApplySite> &Applies,
-                                                   DominanceAnalysis *DA,
-                                                   SILLoopAnalysis *LA,
-                                                   CallGraph &CG) {
+void SILPerformanceInliner::collectAppliesToInline(
+    SILFunction *Caller, SmallVectorImpl<FullApplySite> &Applies,
+    DominanceAnalysis *DA, SILLoopAnalysis *LA) {
   DominanceInfo *DT = DA->get(Caller);
   SILLoopInfo *LI = LA->get(Caller);
 
@@ -1010,7 +1004,7 @@ void SILPerformanceInliner::collectAppliesToInline(SILFunction *Caller,
 
       DEBUG(llvm::dbgs() << "    Check:" << *I);
 
-      auto *Callee = getEligibleFunction(AI, CG);
+      auto *Callee = getEligibleFunction(AI);
       if (Callee) {
         if (isProfitableToInline(AI, loopDepth, DA, LA, constTracker))
           InitialCandidates.push_back(AI);
@@ -1019,7 +1013,7 @@ void SILPerformanceInliner::collectAppliesToInline(SILFunction *Caller,
     domOrder.pushChildrenIf(block, [&] (SILBasicBlock *child) {
       if (ColdBlockInfo::isSlowPath(block, child)) {
         // Handle cold blocks separately.
-        visitColdBlocks(InitialCandidates, child, DT, CG);
+        visitColdBlocks(InitialCandidates, child, DT);
         return false;
       }
       return true;
@@ -1070,7 +1064,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
   // don't change anything yet so that the dominator information
   // remains valid.
   SmallVector<FullApplySite, 8> AppliesToInline;
-  collectAppliesToInline(Caller, AppliesToInline, DA, LA, CG);
+  collectAppliesToInline(Caller, AppliesToInline, DA, LA);
 
   if (AppliesToInline.empty())
     return false;
@@ -1264,11 +1258,9 @@ void SILPerformanceInliner::inlineDevirtualizeAndSpecialize(
 
 // Find functions in cold blocks which are forced to be inlined.
 // All other functions are not inlined in cold blocks.
-void SILPerformanceInliner::visitColdBlocks(SmallVectorImpl<FullApplySite> &
-                                            AppliesToInline,
-                                            SILBasicBlock *Root,
-                                            DominanceInfo *DT,
-                                            CallGraph &CG) {
+void SILPerformanceInliner::visitColdBlocks(
+    SmallVectorImpl<FullApplySite> &AppliesToInline, SILBasicBlock *Root,
+    DominanceInfo *DT) {
   DominanceOrder domOrder(Root, DT);
   while (SILBasicBlock *block = domOrder.getNext()) {
     for (SILInstruction &I : *block) {
@@ -1276,7 +1268,7 @@ void SILPerformanceInliner::visitColdBlocks(SmallVectorImpl<FullApplySite> &
       if (!AI)
         continue;
 
-      auto *Callee = getEligibleFunction(AI, CG);
+      auto *Callee = getEligibleFunction(AI);
       if (Callee && isProfitableInColdBlock(Callee)) {
         DEBUG(llvm::dbgs() << "    inline in cold block:" <<  *AI);
         AppliesToInline.push_back(AI);
