@@ -3856,24 +3856,34 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
   return false;
 }
 
+
+/// Return true if this type is known to be an ArrayType.
+static bool isKnownToBeArrayType(Type ty) {
+  if (!ty) return false;
+  
+  auto bgt = ty->getAs<BoundGenericType>();
+  if (!bgt) return nullptr;
+
+  auto &ctx = bgt->getASTContext();
+  return bgt->getDecl() == ctx.getArrayDecl();
+}
+
 /// If the specific type is UnsafePointer<T>, UnsafeMutablePointer<T>, or
-/// AutoreleasingUnsafeMutablePointer<T>, return T.
-static Type getPointerElementType(Type ty) {
+/// AutoreleasingUnsafeMutablePointer<T>, return the BoundGenericType for it.
+static BoundGenericType *getKnownUnsafePointerType(Type ty) {
   // Must be a generic type.
   auto bgt = ty->getAs<BoundGenericType>();
-  if (!bgt) return Type();
+  if (!bgt) return nullptr;
   
   // Must be UnsafeMutablePointer or UnsafePointer.
   auto &ctx = bgt->getASTContext();
   if (bgt->getDecl() != ctx.getUnsafeMutablePointerDecl() &&
       bgt->getDecl() != ctx.getUnsafePointerDecl() &&
       bgt->getDecl() != ctx.getAutoreleasingUnsafeMutablePointerDecl())
-    return Type();
+    return nullptr;
 
-  return bgt->getGenericArgs()[0];
+  return bgt;
 }
-
-
 
 bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
   // If we have a contextual type, it must be an inout type.
@@ -3881,13 +3891,39 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
   if (contextualType) {
     // If the contextual type is one of the UnsafePointer<T> types, then the
     // contextual type of the subexpression must be T.
-    if (auto pointerEltType = getPointerElementType(contextualType)) {
+    if (auto pointerType = getKnownUnsafePointerType(contextualType)) {
+      auto pointerEltType = pointerType->getGenericArgs()[0];
+      
       // If the element type is Void, then we allow any input type, since
       // everything is convertable to UnsafePointer<Void>
       if (pointerEltType->isVoid())
         contextualType = Type();
       else
         contextualType = pointerEltType;
+      
+      // Furthermore, if the subexpr type is already known to be an array type,
+      // then we must have an attempt at an array to pointer conversion.
+      if (isKnownToBeArrayType(IOE->getSubExpr()->getType())) {
+        // If we're converting to an UnsafeMutablePointer, then the pointer to
+        // the first element is being passed in.  The array is ok, so long as
+        // it is mutable.
+        if (pointerType->getDecl() ==
+            CS->getASTContext().getUnsafeMutablePointerDecl()) {
+          if (contextualType)
+            contextualType = ArraySliceType::get(contextualType);
+        } else if (pointerType->getDecl() ==
+                   CS->getASTContext().getUnsafePointerDecl()) {
+          // If we're converting to an UnsafePointer, then the programmer
+          // specified an & unnecessarily.  Produce a fixit hint to remove it.
+          diagnose(IOE->getLoc(), diag::extra_address_of_unsafepointer,
+                   pointerType)
+            .highlight(IOE->getSourceRange())
+            .fixItRemove(IOE->getStartLoc());
+          return true;
+        }
+      }
+      
+      
     } else if (contextualType->is<InOutType>()) {
       contextualType = contextualType->getInOutObjectType();
     } else {

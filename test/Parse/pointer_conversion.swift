@@ -128,6 +128,8 @@ func constVoidPointerArguments(p: UnsafeMutablePointer<Int>,
   takesConstVoidPointer(&ff)
   takesConstVoidPointer(ii)
   takesConstVoidPointer(ff)
+                                
+  // TODO: These two should be accepted, tracked by rdar://17444930.
   takesConstVoidPointer([0, 1, 2]) // expected-error {{cannot convert value of type 'Int' to expected element type '()'}}
 takesConstVoidPointer([0.0, 1.0, 2.0])  // expected-error {{cannot convert value of type 'Double' to expected element type '()'}}
 
@@ -233,6 +235,17 @@ func f19478919() {
   UMP_Void(&cst)  // expected-error {{cannot pass immutable value as inout argument: 'cst' is a 'let' constant}}
 }
 
+// <rdar://problem/23202128> QoI: Poor diagnostic with let vs. var passed to C function
+func f23202128() {
+  func UP(p: UnsafePointer<Int32>) {}
+  func UMP(p: UnsafeMutablePointer<Int32>) {}
+
+  let pipe: [Int32] = [0, 0]  // expected-note {{change 'let' to 'var' to make it mutable}}}}
+  UMP(&pipe)  // expected-error {{cannot pass immutable value as inout argument: 'pipe' is a 'let' constant}}
+
+  UP(pipe)    // ok
+  UP(&pipe)   // expected-error {{'&' is not allowed passing array value as 'UnsafePointer<Int32>' argument}} {{6-7=}}
+}
 
 
 

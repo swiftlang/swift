@@ -590,6 +590,9 @@ ERROR(missing_address_of,sema_tcc,none,
 ERROR(extra_address_of,sema_tcc,none,
       "'&' used with non-inout argument of type %0",
       (Type))
+ERROR(extra_address_of_unsafepointer,sema_tcc,none,
+      "'&' is not allowed passing array value as %0 argument",
+      (Type))
 
 ERROR(missing_init_on_metatype_initialization,sema_tcc,none,
       "initializing from a metatype value must reference 'init' explicitly",
