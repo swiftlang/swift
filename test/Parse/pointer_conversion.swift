@@ -216,8 +216,8 @@ func addressConversion(p: UnsafeMutablePointer<Int>, x: Int) {
   let _: Bool = p == &x
 }
 
-// <rdar://problem/23271868> QoI: Non-descriptive error message in Swift when passing immutable unsafe pointer instead of mutable
-func f23271868() {
+// <rdar://problem/19478919> QoI: poor error: '&' used with non-inout argument of type 'UnsafeMutablePointer<Int32>'
+func f19478919() {
   var viewport: Int = 1 // intentionally incorrect type, not Int32
   func GLKProject(a : UnsafeMutablePointer<Int32>) {}
   GLKProject(&viewport)  // expected-error {{cannot convert value of type 'Int' to expected argument type 'Int32'}}
