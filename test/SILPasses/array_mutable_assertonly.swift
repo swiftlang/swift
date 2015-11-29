@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -O -emit-sil -Xllvm -debug-only=cowarray-opts -primary-file %s 2>&1 | FileCheck %s
-// REQUIRES: asserts,swift_stdlib_no_asserts,optimized_stdlib
+// REQUIRES: rdar://23681223
+// asserts,swift_stdlib_no_asserts,optimized_stdlib
 
 // CHECK-LABEL: COW Array Opts in Func {{.*}}inoutarr{{.*}}
 // CHECK: Hoisting make_mutable
