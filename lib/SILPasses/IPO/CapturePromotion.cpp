@@ -320,23 +320,11 @@ ClosureCloner::ClosureCloner(SILFunction *Orig, StringRef ClonedName,
 
 /// Compute the SILParameterInfo list for the new cloned closure.
 ///
-/// SILGen always closes over boxes such that the container address is
-/// first. Thus we know that:
-///
-/// 1. By assumption, all indices that is a box container value is in
-///    PromotableIndices.
-/// 2. All box address values must have the box container value previous to
-///    it implying that PromotableIndices.count(ParamIndex - 1) will be true.
-/// 3. The first parameter can *never* be a box address value since there
-///    does not exist any previous box container that is able to be
-///    associated with it.
-///
 /// Our goal as a result of this transformation is to:
 ///
 /// 1. Let through all arguments not related to a promotable box.
-/// 2. Do not add any container box value arguments to the cloned closure.
-/// 3. Add the address box value argument to the cloned closure with the
-///    appropriate transformations.
+/// 2. Replace container box value arguments for the cloned closure with the
+///    transformed address or value argument.
 static void
 computeNewArgInterfaceTypes(SILFunction *F,
                             IndicesSet &PromotableIndices,
