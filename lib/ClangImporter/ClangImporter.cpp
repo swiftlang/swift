@@ -51,7 +51,6 @@
 #include "clang/Rewrite/Frontend/Rewriters.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
-#include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CrashRecoveryContext.h"
 #include "llvm/Support/Path.h"
@@ -59,27 +58,6 @@
 #include <memory>
 
 using namespace swift;
-
-//===--------------------------------------------------------------------===//
-// Importer statistics
-//===--------------------------------------------------------------------===//
-#define DEBUG_TYPE "Clang module importer"
-STATISTIC(NumNullaryMethodNames,
-          "nullary selectors imported");
-STATISTIC(NumUnaryMethodNames,
-          "unary selectors imported");
-STATISTIC(NumNullaryInitMethodsMadeUnary,
-          "nullary Objective-C init methods turned into unary initializers");
-STATISTIC(NumMultiMethodNames,
-          "multi-part selector method names imported");
-STATISTIC(NumMethodsMissingFirstArgName,
-          "selectors where the first argument name is missing");
-STATISTIC(NumInitsDroppedWith,
-          "# of initializer selectors from which \"with\" was dropped");
-STATISTIC(NumInitsPrepositionSplit,
-          "# of initializer selectors where the split was on a preposition");
-STATISTIC(NumInitsNonPrepositionSplit,
-          "# of initializer selectors where the split wasn't on a preposition");
 
 // Commonly-used Clang classes.
 using clang::CompilerInstance;
@@ -725,7 +703,7 @@ void ClangImporter::Implementation::addEntryToLookupTable(
   if (!suppressDecl) {
     // If we have a name to import as, add this entry to the table.
     clang::DeclContext *effectiveContext;
-    if (DeclName name = importFullName(named, &effectiveContext)) {
+    if (DeclName name = importFullName(named, None, &effectiveContext)) {
       table.addEntry(name, named, effectiveContext);
     }
   }
@@ -1636,6 +1614,7 @@ static bool shouldMakeSelectorNonVariadic(clang::Selector selector) {
 
 auto ClangImporter::Implementation::importFullName(
        const clang::NamedDecl *D,
+       ImportNameOptions options,
        clang::DeclContext **effectiveContext) -> ImportedName {
   ImportedName result;
 
@@ -1680,20 +1659,36 @@ auto ClangImporter::Implementation::importFullName(
 
   // If we have a swift_name attribute, use that.
   if (auto *nameAttr = D->getAttr<clang::SwiftNameAttr>()) {
+    bool skipCustomName = false;
+
     // If we have an Objective-C method that is being mapped to an
     // initializer (e.g., a factory method whose name doesn't fit the
     // convention for factory methods), make sure that it can be
     // imported as an initializer.
     if (auto method = dyn_cast<clang::ObjCMethodDecl>(D)) {
       unsigned initPrefixLength;
-      if (nameAttr->getName().startswith("init(") &&
-          !shouldImportAsInitializer(method, initPrefixLength, result.InitKind))
-        return { };
+      if (nameAttr->getName().startswith("init(")) {
+        if (!shouldImportAsInitializer(method, initPrefixLength,
+                                       result.InitKind)) {
+          // We cannot import this as an initializer anyway.
+          return { };
+        }
+
+        // If this swift_name attribute maps a factory method to an
+        // initializer and we were asked not to do so, ignore the
+        // custom name.
+        if (options.contains(ImportNameFlags::SuppressFactoryMethodAsInit) &&
+            (result.InitKind == CtorInitializerKind::Factory ||
+             result.InitKind == CtorInitializerKind::ConvenienceFactory))
+          skipCustomName = true;
+      }
     }
 
-    result.HasCustomName = true;
-    result.Imported = parseDeclName(SwiftContext, nameAttr->getName());
-    return result;
+    if (!skipCustomName) {
+      result.HasCustomName = true;
+      result.Imported = parseDeclName(SwiftContext, nameAttr->getName());
+      return result;
+    }
   }
 
   // For empty names, there is nothing to do.
@@ -1727,6 +1722,15 @@ auto ClangImporter::Implementation::importFullName(
     auto objcMethod = cast<clang::ObjCMethodDecl>(D);
     isInitializer = shouldImportAsInitializer(objcMethod, initializerPrefixLen,
                                               result.InitKind);
+
+    // If we would import a factory method as an initializer but were
+    // asked not to, don't consider this as an initializer.
+    if (isInitializer &&
+        options.contains(ImportNameFlags::SuppressFactoryMethodAsInit) &&
+        (result.InitKind == CtorInitializerKind::Factory ||
+         result.InitKind == CtorInitializerKind::ConvenienceFactory)) {
+      isInitializer = false;
+    }
 
     // Map the Objective-C selector directly.
     auto selector = D->getDeclName().getObjCSelector();
@@ -1997,139 +2001,6 @@ ClangImporter::Implementation::importIdentifier(
   return SwiftContext.getIdentifier(name);
 }
 
-/// Import an argument name.
-static Identifier importArgName(ASTContext &ctx, StringRef name,
-                                bool dropWith, bool isSwiftPrivate) {
-  // Simple case: empty name.
-  if (name.empty()) {
-    if (isSwiftPrivate)
-      return ctx.getIdentifier("__");
-    return Identifier();
-  }
-
-  SmallString<32> scratch;
-  auto words = camel_case::getWords(name);
-  auto firstWord = *words.begin();
-  StringRef argName = name;
-
-  // If we're dropping "with", handle that now.
-  if (dropWith) {
-    // If the first word is "with"...
-    if (name.size() > 4 &&
-        camel_case::sameWordIgnoreFirstCase(firstWord, "with")) {
-      // Drop it.
-      ++NumInitsDroppedWith;
-
-      auto iter = words.begin();
-      ++iter;
-
-      argName = name.substr(iter.getPosition());
-      // Don't drop "with" if the resulting arg is a reserved name.
-      if (ClangImporter::Implementation::isSwiftReservedName(
-                              camel_case::toLowercaseWord(argName, scratch))) {
-        argName = name;
-      }
-    } else {
-      // If we're tracking statistics, check whether the name starts with
-      // a preposition.
-      if (llvm::AreStatisticsEnabled()) {
-        if (getPrepositionKind(firstWord))
-          ++NumInitsPrepositionSplit;
-        else
-          ++NumInitsNonPrepositionSplit;
-      }
-
-      argName = name;
-    }
-  }
-
-  /// Lowercase the first word to form the argument name.
-  argName = camel_case::toLowercaseWord(argName, scratch);
-  if (!isSwiftPrivate)
-    return ctx.getIdentifier(argName);
-
-  SmallString<32> prefixed{"__"};
-  prefixed.append(argName);
-  return ctx.getIdentifier(prefixed.str());
-}
-
-/// Map an Objective-C selector name to a Swift method name.
-static DeclName mapSelectorName(ASTContext &ctx,
-                                ObjCSelector selector,
-                                bool isInitializer,
-                                bool isSwiftPrivate) {
-  // Zero-argument selectors.
-  if (selector.getNumArgs() == 0) {
-    ++NumNullaryMethodNames;
-
-    auto name = selector.getSelectorPieces()[0];
-    StringRef nameText = name.empty()? "" : name.str();
-
-    if (!isInitializer) {
-      if (!isSwiftPrivate)
-        return DeclName(ctx, name, {});
-
-      SmallString<32> newName{"__"};
-      newName.append(nameText);
-      return DeclName(ctx, ctx.getIdentifier(newName.str()), {});
-    }
-
-    // Simple case for initializers.
-    if (nameText == "init" && !isSwiftPrivate)
-      return DeclName(ctx, name, { });
-
-    // This is an initializer with no parameters but a name that
-    // contains more than 'init', so synthesize an argument to capture
-    // what follows 'init'.
-    ++NumNullaryInitMethodsMadeUnary;
-    assert(camel_case::getFirstWord(nameText).equals("init"));
-    auto baseName = ctx.Id_init;
-    auto argName = importArgName(ctx, nameText.substr(4), /*dropWith=*/true,
-                                 isSwiftPrivate);
-    return DeclName(ctx, baseName, argName);
-  }
-
-  // Determine the base name and first argument name.
-  Identifier baseName;
-  SmallVector<Identifier, 2> argumentNames;
-  Identifier firstPiece = selector.getSelectorPieces()[0];
-  StringRef firstPieceText = firstPiece.empty()? "" : firstPiece.str();
-  if (isInitializer) {
-    assert(camel_case::getFirstWord(firstPieceText).equals("init"));
-    baseName = ctx.Id_init;
-    argumentNames.push_back(importArgName(ctx, firstPieceText.substr(4),
-                                          /*dropWith=*/true, isSwiftPrivate));
-  } else {
-    baseName = firstPiece;
-    if (isSwiftPrivate) {
-      SmallString<32> newName{"__"};
-      newName.append(firstPieceText);
-      baseName = ctx.getIdentifier(newName);
-    }
-    argumentNames.push_back(Identifier());
-  }
-
-  if (argumentNames[0].empty())
-    ++NumMethodsMissingFirstArgName;
-
-  // Determine the remaining argument names.
-  unsigned n = selector.getNumArgs();
-  if (n == 1)
-    ++NumUnaryMethodNames;
-  else
-    ++NumMultiMethodNames;
-
-  for (auto piece : selector.getSelectorPieces().slice(1)) {
-    if (piece.empty())
-      argumentNames.push_back(piece);
-    else
-      argumentNames.push_back(importArgName(ctx, piece.str(),
-                                            /*dropWith=*/false,
-                                            /*isSwiftPrivate=*/false));
-  }
-  return DeclName(ctx, baseName, argumentNames);
-}
-
 namespace {
   /// Function object used to create Clang selectors from strings.
   class CreateSelector {
@@ -2228,26 +2099,6 @@ ClangImporter::Implementation::exportSelector(ObjCSelector selector) {
     pieces.push_back(exportName(piece).getAsIdentifierInfo());
   return getClangASTContext().Selectors.getSelector(selector.getNumArgs(),
                                                     pieces.data());
-}
-
-
-DeclName
-ClangImporter::Implementation::mapSelectorToDeclName(ObjCSelector selector,
-                                                     bool isInitializer,
-                                                     bool isSwiftPrivate)
-{
-  // Check whether we've already mapped this selector.
-  auto known = SelectorMappings.find({selector, isInitializer});
-  if (known != SelectorMappings.end())
-    return known->second;
-
-  // Map the selector.
-  auto result = mapSelectorName(SwiftContext, selector, isInitializer,
-                                isSwiftPrivate);
-
-  // Cache the result and return.
-  SelectorMappings[{selector, isInitializer}] = result;
-  return result;
 }
 
 /// Translate the "nullability" notion from API notes into an optional type

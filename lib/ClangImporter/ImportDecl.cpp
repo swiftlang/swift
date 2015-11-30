@@ -2854,22 +2854,11 @@ namespace {
       if (methodAlreadyImported(selector, isInstance, dc))
         return nullptr;
 
-      DeclName name;
-      bool hasCustomName;
-      if (auto *customNameAttr = decl->getAttr<clang::SwiftNameAttr>()) {
-        if (!customNameAttr->getName().startswith("init(")) {
-          auto importedName = Impl.importFullName(decl);
-          name = importedName.Imported;
-          hasCustomName = importedName.HasCustomName;
-        }
-      }
-      if (!name) {
-        hasCustomName = false;
-        bool isSwiftPrivate = decl->hasAttr<clang::SwiftPrivateAttr>();
-        name = Impl.mapSelectorToDeclName(selector, /*isInitializer=*/false,
-                                          isSwiftPrivate);
-      }
-      if (!name)
+      auto importedName
+        = Impl.importFullName(decl,
+                              ClangImporter::Implementation::ImportNameFlags
+                                ::SuppressFactoryMethodAsInit);
+      if (!importedName)
         return nullptr;
 
       assert(dc->getDeclaredTypeOfContext() && "Method in non-type context?");
@@ -2897,6 +2886,7 @@ namespace {
         kind = SpecialMethodKind::NSDictionarySubscriptGetter;
 
       // Import the type that this method will have.
+      DeclName name = importedName.Imported;
       Optional<ForeignErrorConvention> errorConvention;
       auto type = Impl.importMethodType(decl,
                                         decl->getReturnType(),
@@ -2905,7 +2895,7 @@ namespace {
                                         decl->isVariadic(),
                                         decl->hasAttr<clang::NoReturnAttr>(),
                                         isInSystemModule(dc),
-                                        hasCustomName,
+                                        importedName.HasCustomName,
                                         bodyPatterns,
                                         name,
                                         errorConvention,

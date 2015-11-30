@@ -310,9 +310,6 @@ public:
   llvm::SmallDenseMap<const clang::TypedefNameDecl *, MappedTypeNameKind, 16>
     SpecialTypedefNames;
 
-  /// Mapping from Objective-C selectors to method names.
-  llvm::DenseMap<std::pair<ObjCSelector, char>, DeclName> SelectorMappings;
-
   /// Is the given identifier a reserved name in Swift?
   static bool isSwiftReservedName(StringRef name);
 
@@ -769,6 +766,15 @@ public:
     explicit operator bool() const { return static_cast<bool>(Imported); }
   };
 
+  /// Flags that control the import of names in importFullName.
+  enum class ImportNameFlags {
+    /// Suppress the factory-method-as-initializer transformation.
+    SuppressFactoryMethodAsInit = 0x01,
+  };
+
+  /// Options that control the import of names in importFullName.
+  typedef OptionSet<ImportNameFlags> ImportNameOptions;
+
   /// Imports the full name of the given Clang declaration into Swift.
   ///
   /// Note that this may result in a name very different from the Clang name,
@@ -781,6 +787,7 @@ public:
   /// This can differ from D's redeclaration context when the Clang importer
   /// introduces nesting, e.g., for enumerators within an NS_ENUM.
   ImportedName importFullName(const clang::NamedDecl *D,
+                              ImportNameOptions options = None,
                               clang::DeclContext **effectiveContext = nullptr);
 
   /// \brief Import the given Clang identifier into Swift.
@@ -801,18 +808,6 @@ public:
 
   /// Export a Swift Objective-C selector as a Clang Objective-C selector.
   clang::Selector exportSelector(ObjCSelector selector);
-
-  /// Map the given selector to a declaration name.
-  ///
-  /// \param selector The selector to map.
-  ///
-  /// \param isInitializer Whether this name should be mapped as an
-  /// initializer.
-  ///
-  /// \param isSwiftPrivate Whether this name is for a declaration marked with
-  /// the 'swift_private' attribute.
-  DeclName mapSelectorToDeclName(ObjCSelector selector, bool isInitializer,
-                                 bool isSwiftPrivate);
 
   /// \brief Import the given Swift source location into Clang.
   clang::SourceLocation exportSourceLoc(SourceLoc loc);
