@@ -582,7 +582,7 @@ public:
 static bool shouldDisableCleanupOnFailurePath(ManagedValue value,
                                               EnumElementDecl *elementDecl,
                                               SILGenFunction &SGF) {
-  // If the enum is trivial, then there is no cleanup to disabled.
+  // If the enum is trivial, then there is no cleanup to disable.
   if (value.isPlusZeroRValueOrTrivial()) return false;
   
   // Check all of the members of the enum.  If any have a non-trivial payload,

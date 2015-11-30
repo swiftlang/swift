@@ -125,7 +125,7 @@ public:
     Address,
 
     /// This LoweredValue corresponds to a SIL address value owned by an
-    /// uninitialized fixed-size buffer. The initializatio
+    /// uninitialized fixed-size buffer.
     UnallocatedAddressInBuffer,
     
     /// The following kinds correspond to SIL non-address values.
