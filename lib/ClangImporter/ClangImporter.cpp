@@ -74,8 +74,6 @@ STATISTIC(NumMultiMethodNames,
           "multi-part selector method names imported");
 STATISTIC(NumMethodsMissingFirstArgName,
           "selectors where the first argument name is missing");
-STATISTIC(NumFactoryMethodsNullary,
-          "# of factory methods not mapped due to nullary with long name");
 STATISTIC(NumInitsDroppedWith,
           "# of initializer selectors from which \"with\" was dropped");
 STATISTIC(NumInitsPrepositionSplit,
@@ -1731,9 +1729,11 @@ auto ClangImporter::Implementation::importFullName(
 
       // Set the first argument name to be the name we computed. If
       // there is no first argument, create one for this purpose.
-      if (argumentNames.empty() && !argName.empty()) {
-        // FIXME: Record what happened here for the caller?
-        argumentNames.push_back(argName);
+      if (argumentNames.empty()) {
+        if (!argName.empty()) {
+          // FIXME: Record what happened here for the caller?
+          argumentNames.push_back(argName);
+        }
       } else {
         argumentNames[0] = argName;
       }
@@ -1881,6 +1881,12 @@ auto ClangImporter::Implementation::importFullName(
     if (isInitializer) {
       // For initializers, prepend "__" to the first argument name.
       if (argumentNames.empty()) {
+        // FIXME: ... unless it was from a factory method, for historical
+        // reasons.
+        if (result.InitKind == CtorInitializerKind::Factory ||
+            result.InitKind == CtorInitializerKind::ConvenienceFactory)
+          return result;
+
         // FIXME: Record that we did this.
         argumentNames.push_back("__");
       } else {
@@ -2194,50 +2200,6 @@ ClangImporter::Implementation::mapSelectorToDeclName(ObjCSelector selector,
   // Cache the result and return.
   SelectorMappings[{selector, isInitializer}] = result;
   return result;
-}
-
-DeclName ClangImporter::Implementation::mapFactorySelectorToInitializerName(
-    ObjCSelector selector,
-    StringRef className,
-    bool isSwiftPrivate) {
-  // See if we can match the class name to the beginning of the first selector
-  // piece.
-  auto firstPiece = selector.getSelectorPieces()[0];
-  StringRef firstArgLabel = matchLeadingTypeName(firstPiece.str(), className);
-  if (firstArgLabel.size() == firstPiece.str().size())
-    return DeclName();
-
-  // Form the first argument label.
-  llvm::SmallString<32> scratch;
-  SmallVector<Identifier, 4> argumentNames;
-  argumentNames.push_back(
-    importArgName(SwiftContext,
-                  camel_case::toLowercaseWord(firstArgLabel, scratch),
-                  /*dropWith=*/true,
-                  isSwiftPrivate));
-
-  // Handle nullary factory methods.
-  if (selector.getNumArgs() == 0) {
-    if (argumentNames[0].empty())
-      return DeclName(SwiftContext, SwiftContext.Id_init, { });
-
-    // We don't have a convenience place to put the remaining argument name,
-    // so leave it as a factory method.
-    ++NumFactoryMethodsNullary;
-    return DeclName();
-  }
-
-  // Map the remaining selector pieces.
-  for (auto piece : selector.getSelectorPieces().slice(1)) {
-    if (piece.empty())
-      argumentNames.push_back(piece);
-    else
-      argumentNames.push_back(importArgName(SwiftContext, piece.str(),
-                                            /*dropWith=*/false,
-                                            /*isSwiftPrivate=*/false));
-  }
-
-  return DeclName(SwiftContext, SwiftContext.Id_init, argumentNames);
 }
 
 /// Translate the "nullability" notion from API notes into an optional type
@@ -2674,6 +2636,11 @@ bool ClangImporter::Implementation::shouldImportAsInitializer(
     StringRef firstArgLabel = matchLeadingTypeName(firstPiece,
                                                    objcClass->getName());
     if (firstArgLabel.size() == firstPiece.size())
+      return false;
+
+    // FIXME: Factory methods cannot have dummy parameters added for
+    // historical reasons.
+    if (!firstArgLabel.empty() && method->getSelector().getNumArgs() == 0)
       return false;
 
     // Store the prefix length.

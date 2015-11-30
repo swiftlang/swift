@@ -48,8 +48,6 @@
 #define DEBUG_TYPE "Clang module importer"
 
 STATISTIC(NumTotalImportedEntities, "# of imported clang entities");
-STATISTIC(NumFactoryMethodsWrongResult,
-          "# of factory methods not mapped due to an incorrect result type");
 STATISTIC(NumFactoryMethodsAsInitializers,
           "# of factory methods mapped to initializers");
 
@@ -2783,75 +2781,22 @@ namespace {
                                      const clang::ObjCMethodDecl *decl,
                                      ObjCSelector selector,
                                      DeclContext *dc) {
-      // Only class methods can be mapped to constructors.
-      if (!decl->isClassMethod())
+      // Import the full name of the method.
+      auto importedName = Impl.importFullName(decl);
+
+      // Check that we imported an initializer name.
+      DeclName initName = importedName;
+      if (initName.getBaseName() != Impl.SwiftContext.Id_init) return None;
+
+      // ... that came from a factory method.
+      if (importedName.InitKind != CtorInitializerKind::Factory &&
+          importedName.InitKind != CtorInitializerKind::ConvenienceFactory)
         return None;
-
-      // Said class methods must be in an actual class.
-      auto objcClass = decl->getClassInterface();
-      if (!objcClass)
-        return None;
-
-      DeclName initName;
-      bool hasCustomName;
-
-      // Check whether we're allowed to try.
-      switch (Impl.getFactoryAsInit(objcClass, decl)) {
-      case FactoryAsInitKind::AsInitializer:
-        if (decl->hasAttr<clang::SwiftNameAttr>()) {
-          auto importedName = Impl.importFullName(decl);
-          initName = importedName.Imported;
-          hasCustomName = importedName.HasCustomName;
-          break;
-        }
-        // FIXME: We probably should stop using this codepath. It won't ever
-        // succeed.
-        SWIFT_FALLTHROUGH;
-
-      case FactoryAsInitKind::Infer: {
-        // Check whether the name fits the pattern.
-        bool isSwiftPrivate = decl->hasAttr<clang::SwiftPrivateAttr>();
-        initName =
-            Impl.mapFactorySelectorToInitializerName(selector,
-                                                     objcClass->getName(),
-                                                     isSwiftPrivate);
-        hasCustomName = false;
-        break;
-      }
-      case FactoryAsInitKind::AsClassMethod:
-        return None;
-      }
-
-      if (!initName)
-        return None;
-
-      // Check the result type to determine what kind of initializer we can
-      // create (if any).
-      CtorInitializerKind initKind;
-      if (decl->hasRelatedResultType()) {
-        // instancetype factory methods become convenience factory initializers.
-        initKind = CtorInitializerKind::ConvenienceFactory;
-      } else if (auto objcPtr = decl->getReturnType()
-                                  ->getAs<clang::ObjCObjectPointerType>()) {
-        if (objcPtr->getInterfaceDecl() == objcClass) {
-          initKind = CtorInitializerKind::Factory;
-        } else {
-          // FIXME: Could allow a subclass here, but the rest of the compiler
-          // isn't prepared for that yet.
-          // Not a factory method.
-          ++NumFactoryMethodsWrongResult;
-          return None;
-        }
-      } else {
-        // Not a factory method.
-        ++NumFactoryMethodsWrongResult;
-        return None;
-      }
 
       bool redundant = false;
-      auto result = importConstructor(decl, dc, false, initKind,
+      auto result = importConstructor(decl, dc, false, importedName.InitKind,
                                       /*required=*/false, selector, initName,
-                                      hasCustomName,
+                                      importedName.HasCustomName,
                                       {decl->param_begin(), decl->param_size()},
                                       decl->isVariadic(), redundant);
       if (result)
@@ -2865,7 +2810,8 @@ namespace {
         // TODO: Could add a replacement string?
         llvm::SmallString<64> message;
         llvm::raw_svector_ostream os(message);
-        os << "use object construction '" << objcClass->getName() << "(";
+        os << "use object construction '"
+           << decl->getClassInterface()->getName() << "(";
         for (auto arg : initName.getArgumentNames()) {
           os << arg << ":";
         }
