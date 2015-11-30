@@ -3326,10 +3326,13 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     if (!SD) return { CC_GeneralMismatch, {}};
     
     // Check to make sure the base expr type is convertible to the expected base
-    // type.
+    // type.  We check either the getter, or if it isn't present, the addressor.
     auto selfConstraint = CC_ExactMatch;
+    auto getter = SD->getGetter();
+    if (!getter) getter = SD->getAddressor();
+    
     auto instanceTy =
-      SD->getGetter()->getImplicitSelfDecl()->getType()->getInOutObjectType();
+     getter->getImplicitSelfDecl()->getType()->getInOutObjectType();
     if (!isUnresolvedOrTypeVarType(baseType) &&
         !CS->TC.isConvertibleTo(baseType, instanceTy, CS->DC)) {
       selfConstraint = CC_SelfMismatch;
