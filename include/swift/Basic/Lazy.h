@@ -75,8 +75,8 @@ template <typename T> inline T &Lazy<T>::get(void (*initCallback)(void*)) {
 
 #define SWIFT_LAZY_CONSTANT(INITIAL_VALUE) \
   ({ \
-    using T = std::remove_reference<decltype(INITIAL_VALUE)>::type; \
-    static Lazy<T> TheLazy; \
+    using T = ::std::remove_reference<decltype(INITIAL_VALUE)>::type; \
+    static ::swift::Lazy<T> TheLazy; \
     TheLazy.get([](void *ValueAddr){ ::new(ValueAddr) T{INITIAL_VALUE}; });\
   })
 
