@@ -1216,6 +1216,11 @@ class VarDeclUsageChecker : public ASTWalker {
   /// This is a mapping from an OpaqueValue to the expression that initialized
   /// it.
   llvm::SmallDenseMap<OpaqueValueExpr*, Expr*> OpaqueValueMap;
+  
+  /// This is a mapping from VarDecls to the if/while/guard statement that they
+  /// occur in, when they are in a pattern in a StmtCondition.
+  llvm::SmallDenseMap<VarDecl*, LabeledConditionalStmt*> StmtConditionForVD;
+  
   bool sawError = false;
   
   VarDeclUsageChecker(const VarDeclUsageChecker &) = delete;
@@ -1340,6 +1345,18 @@ public:
     // for them.
     if (auto *ICS = dyn_cast<IfConfigStmt>(S))
       handleIfConfig(ICS);
+      
+    // Keep track of an association between vardecls and the StmtCondition that
+    // they are bound in for IfStmt, GuardStmt, WhileStmt, etc.
+    if (auto LCS = dyn_cast<LabeledConditionalStmt>(S)) {
+      for (auto &cond : LCS->getCond())
+        if (auto pat = cond.getPatternOrNull()) {
+          pat->forEachVariable([&](VarDecl *VD) {
+            StmtConditionForVD[VD] = LCS;
+          });
+        }
+    }
+      
     return { true, S };
   }
 
@@ -1408,6 +1425,60 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
             .fixItReplace(SourceRange(pbd->getLoc(), var->getLoc()), "_");
           continue;
         }
+      
+      // If the variable is defined in a pattern in an if/while/guard statement,
+      // see if we can produce a tuned fixit.  When we have something like:
+      //
+      //    if let x = <expr> {
+      //
+      // we prefer to rewrite it to:
+      //
+      //    if <expr> != nil {
+      //
+      if (auto SC = StmtConditionForVD[var]) {
+        // We only handle the "if let" case right now, since it is vastly the
+        // most common situation that people run into.
+        if (SC->getCond().size() == 1) {
+          auto pattern = SC->getCond()[0].getPattern();
+          if (auto OSP = dyn_cast<OptionalSomePattern>(pattern))
+            if (auto LP = dyn_cast<VarPattern>(OSP->getSubPattern()))
+              if (isa<NamedPattern>(LP->getSubPattern())) {
+                auto initExpr = SC->getCond()[0].getInitializer();
+                auto beforeExprLoc =
+                  initExpr->getStartLoc().getAdvancedLocOrInvalid(-1);
+                if (beforeExprLoc.isValid()) {
+                  unsigned noParens = initExpr->canAppendCallParentheses();
+                  
+                  // If the subexpr is an "as?" cast, we can rewrite it to
+                  // be an "is" test.
+                  bool isIsTest = false;
+                  if (isa<ConditionalCheckedCastExpr>(initExpr) &&
+                      !initExpr->isImplicit()) {
+                    noParens = isIsTest = true;
+                  }
+                  
+                  auto diagIF = TC.diagnose(var->getLoc(),
+                                            diag::pbd_never_used_stmtcond,
+                                            var->getName());
+                  auto introducerLoc = SC->getCond()[0].getIntroducerLoc();
+                  diagIF.fixItReplace(SourceRange(introducerLoc, beforeExprLoc),
+                                      &"("[noParens]);
+                  
+                  if (isIsTest) {
+                    // If this was an "x as? T" check, rewrite it to "x is T".
+                    auto CCE = cast<ConditionalCheckedCastExpr>(initExpr);
+                    diagIF.fixItReplace(SourceRange(CCE->getLoc(),
+                                                    CCE->getQuestionLoc()),
+                                        "is");
+                  } else {
+                    diagIF.fixItInsertAfter(initExpr->getEndLoc(),
+                                            &") != nil"[noParens]);
+                  }
+                  continue;
+                }
+              }
+        }
+      }
       
       // Otherwise, this is something more complex, perhaps
       //    let (a,b) = foo()

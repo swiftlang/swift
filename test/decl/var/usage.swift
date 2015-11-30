@@ -219,3 +219,28 @@ func testFixitsInStatementsWithPatterns(a : Int?) {
       _ = b
   }
 }
+
+
+// <rdar://22774938> QoI: "never used" in an "if let" should rewrite expression to use != nil
+func test(a : Int?, b : Any) {
+  if true == true, let x = a {   // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{24-25=_}}
+  }
+  if let x = a, y = a {  // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{10-11=_}}
+    _ = y
+  }
+
+  // Simple case, insert a comparison with nil.
+  if let x = a {  // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{6-14=}} {{15-15= != nil}}
+  }
+
+  // General case, need to insert parentheses.
+  if let x = a ?? a {}  // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{6-14=(}} {{20-20=) != nil}}
+  
+  // Special case, we can turn this into an 'is' test.
+  if let x = b as? Int {  // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{6-14=}} {{16-19=is}}
+  }
+
+  
+}
+
+
