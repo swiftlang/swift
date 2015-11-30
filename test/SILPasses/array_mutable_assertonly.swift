@@ -1,10 +1,22 @@
-// RUN: %target-swift-frontend -O -emit-sil -Xllvm -debug-only=cowarray-opts -primary-file %s 2>&1 | FileCheck %s
-// REQUIRES: rdar://23681223
+// RUN: %target-swift-frontend -O -emit-sil -Xllvm -debug-only=cowarray-opts -primary-file %s 2>&1 | FileCheck %s --check-prefix=TEST1
+// RUN: %target-swift-frontend -O -emit-sil -Xllvm -debug-only=cowarray-opts -primary-file %s 2>&1 | FileCheck %s --check-prefix=TEST2
+// RUN: %target-swift-frontend -O -emit-sil -Xllvm -debug-only=cowarray-opts -primary-file %s 2>&1 | FileCheck %s --check-prefix=TEST3
+// RUN: %target-swift-frontend -O -emit-sil -Xllvm -debug-only=cowarray-opts -primary-file %s 2>&1 | FileCheck %s --check-prefix=TEST4
+// RUN: %target-swift-frontend -O -emit-sil -Xllvm -debug-only=cowarray-opts -primary-file %s 2>&1 | FileCheck %s --check-prefix=TEST5
+// RUN: %target-swift-frontend -O -emit-sil -Xllvm -debug-only=cowarray-opts -primary-file %s 2>&1 | FileCheck %s --check-prefix=TEST6
+// RUN: %target-swift-frontend -O -emit-sil -Xllvm -debug-only=cowarray-opts -primary-file %s 2>&1 | FileCheck %s --check-prefix=TEST7
+// RUN: %target-swift-frontend -O -emit-sil -Xllvm -debug-only=cowarray-opts -primary-file %s 2>&1 | FileCheck %s --check-prefix=TEST8
+// RUN: %target-swift-frontend -O -emit-sil -Xllvm -debug-only=cowarray-opts -primary-file %s 2>&1 | FileCheck %s --check-prefix=TEST9
+// RUN: %target-swift-frontend -O -emit-sil -Xllvm -debug-only=cowarray-opts -primary-file %s 2>&1 | FileCheck %s --check-prefix=TEST10
+// RUN: %target-swift-frontend -O -emit-sil -Xllvm -debug-only=cowarray-opts -primary-file %s 2>&1 | FileCheck %s --check-prefix=TEST11
+// RUN: %target-swift-frontend -O -emit-sil -Xllvm -debug-only=cowarray-opts -primary-file %s 2>&1 | FileCheck %s --check-prefix=TEST12
+// RUN: %target-swift-frontend -O -emit-sil -Xllvm -debug-only=cowarray-opts -primary-file %s 2>&1 | FileCheck %s --check-prefix=TEST13
 // asserts,swift_stdlib_no_asserts,optimized_stdlib
 
-// CHECK-LABEL: COW Array Opts in Func {{.*}}inoutarr{{.*}}
-// CHECK: Hoisting make_mutable
-// CHECK: COW Array Opts
+// TEST1-LABEL: COW Array Opts in Func {{.*}}inoutarr{{.*}}
+// TEST1: Hoisting make_mutable
+// TEST1: COW Array Opts
+
 func inoutarr(inout a: [Int]) {
   for i in 0..<a.count {
     a[i] = 0
@@ -15,14 +27,15 @@ struct S {
   var a: [Int]
 }
 
-// CHECK-LABEL: COW Array Opts in Func {{.*}}arrelt{{.*}}
-// CHECK: Hoisting make_mutable
-// CHECK: COW Array Opts
+// TEST2-LABEL: COW Array Opts in Func {{.*}}arrelt{{.*}}
+// TEST2: Hoisting make_mutable
+// TEST2: COW Array Opts
 func arrelt(inout s: S) {
   for i in 0..<s.a.count {
     s.a[i] = 0
   }
 }
+
 
 class ArrayInClass {
   final var A : [Int]
@@ -35,16 +48,18 @@ class ArrayInClass {
     C = [[]]
   }
 
-  // CHECK-LABEL: COW Array Opts in Func {{.*}}hoistInClass{{.*}}
-  // CHECK: Hoisting make_mutable
+  // TEST3-LABEL: COW Array Opts in Func {{.*}}hoistInClass{{.*}}
+  // TEST3: Hoisting make_mutable
+  // TEST3: COW Array Opts
   func hoistInClass() {
     for i in 0..<A.count {
       A[i] = 0
     }
   }
 
-  // CHECK-LABEL: COW Array Opts in Func {{.*}}hoistInClass2Arr{{.*}}
-  // CHECK: Hoisting make_mutable
+  // TEST4-LABEL: COW Array Opts in Func {{.*}}hoistInClass2Arr{{.*}}
+  // TEST4: Hoisting make_mutable
+  // TEST4: COW Array Opts
   func hoistInClass2Arr() {
     for i in 0..<A.count {
       A[i] = 0
@@ -52,9 +67,9 @@ class ArrayInClass {
     }
   }
 
-  // CHECK-LABEL: COW Array Opts in Func {{.*}}dontHoistInClassAppend{{.*}}
-  // CHECK-NOT: Hoisting make_mutable
-  // CHECK: COW Array Opts in Func
+  // TEST5-LABEL: COW Array Opts in Func {{.*}}dontHoistInClassAppend{{.*}}
+  // TEST5-NOT: Hoisting make_mutable
+  // TEST5: COW Array Opts in Func
   func dontHoistInClassAppend() {
     for i in 0..<A.count {
       A[i] = 0
@@ -69,13 +84,14 @@ struct Array2d {
   var rows : Int
 }
 
-// CHECK-LABEL: COW Array Opts in Func {{.*}}test2DArrayLoop{{.*}}
-// CHECK:        Array Opts in Loop Loop at depth 2
-// CHECK-NOT:   COW Array Opts in
-// CHECK:        Hoisting make_mutable
-// CHECK:        Array Opts in Loop Loop at depth 1
-// CHECK-NOT:   COW Array Opts in
-// CHECK:        Hoisting make_mutable
+// TEST6-LABEL: COW Array Opts in Func {{.*}}test2DArrayLoop{{.*}}
+// TEST6:        Array Opts in Loop Loop at depth 2
+// TEST6-NOT:   COW Array Opts in
+// TEST6:        Hoisting make_mutable
+// TEST6:        Array Opts in Loop Loop at depth 1
+// TEST6-NOT:   COW Array Opts in
+// TEST6:        Hoisting make_mutable
+// TEST6:   COW Array Opts in
 
 func test2DArrayLoop(inout A : Array2d) {
   for r in 0 ..< A.rows {
@@ -87,18 +103,18 @@ func test2DArrayLoop(inout A : Array2d) {
 
 class AClass {}
 
-// CHECK-LABEL: COW Array Opts in Func {{.*}}hoistArrayOfClasses{{.*}}
-// CHECK: Hoisting make_mutable
-
+// TEST7-LABEL: COW Array Opts in Func {{.*}}hoistArrayOfClasses{{.*}}
+// TEST7: Hoisting make_mutable
+// TEST7: COW Array Opts
 func hoistArrayOfClasses(inout A : [AClass], x: AClass) {
   for i in 0 ..< A.count {
     A[i] = x
   }
 }
 
-// CHECK-LABEL: COW Array Opts in Func {{.*}}hoistMutableOfAppend{{.*}}
-// CHECK: Hoisting make_mutable
-// CHECK: COW Array Opts
+// TEST8-LABEL: COW Array Opts in Func {{.*}}hoistMutableOfAppend{{.*}}
+// TEST8: Hoisting make_mutable
+// TEST8: COW Array Opts
 
 func hoistMutableOfAppend(inout A : [Int]) {
   for i in 0 ..< 10 {
@@ -114,9 +130,9 @@ class ArrayHolder {
   final var A : [[Int]]
   init() { A = [] }
 
-// CHECK-LABEL: COW Array Opts in Func {{.*}}hoist2DArrayInClass
-// CHECK: Hoisting make_mutable
-// CHECK: COW Array Opts
+// TEST9-LABEL: COW Array Opts in Func {{.*}}hoist2DArrayInClass
+// TEST9: Hoisting make_mutable
+// TEST9: COW Array Opts
 
   func hoist2DArrayInClass() {
     for i in 0 ..< 10 {
@@ -126,8 +142,9 @@ class ArrayHolder {
     }
   }
 
-// CHECK-LABEL: COW Array Opts in Func {{.*}}dontHoist2DArray
-// CHECK-NOT: Hoisting make_mutable
+// TEST10-LABEL: COW Array Opts in Func {{.*}}dontHoist2DArray
+// TEST10-NOT: Hoisting make_mutable
+// TEST10: COW Array Opts
 
   func dontHoist2DArray(){
     var escape : [Int] = []
@@ -140,8 +157,9 @@ class ArrayHolder {
     use(escape)
   }
 
-// CHECK-LABEL: COW Array Opts in Func {{.*}}dontHoist2DArray2
-// CHECK-NOT: Hoisting make_mutable
+// TEST11-LABEL: COW Array Opts in Func {{.*}}dontHoist2DArray2
+// TEST11-NOT: Hoisting make_mutable
+// TEST11: COW Array Opts
 
   func dontHoist2DArray2(){
     let b = [0]
@@ -153,9 +171,9 @@ class ArrayHolder {
     }
   }
 
-// CHECK-LABEL: COW Array Opts in Func {{.*}}dontHoist2DArray3
-// CHECK-NOT: Hoisting make_mutable
-// CHECK: COW Array Opts
+// TEST12-LABEL: COW Array Opts in Func {{.*}}dontHoist2DArray3
+// TEST12-NOT: Hoisting make_mutable
+// TEST12: COW Array Opts
 
   func dontHoist2DArray3() {
     for i in 0 ..< A.count {
@@ -167,9 +185,9 @@ class ArrayHolder {
   }
 }
 
-// CHECK-LABEL: COW Array Opts in Func {{.*}}hoist2DArray
-// CHECK: Hoisting make_mutable
-// CHECK: COW Array Opts
+// TEST13-LABEL: COW Array Opts in Func {{.*}}hoist2DArray
+// TEST13: Hoisting make_mutable
+// TEST13: COW Array Opts
 
 func hoist2DArray(inout a: [[Int]]) {
   for i in 0 ..< a.count {
