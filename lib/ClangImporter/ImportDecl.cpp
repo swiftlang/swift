@@ -3108,54 +3108,6 @@ namespace {
       }
     }
     
-    /// Map an init method to a Swift declaration name.
-    ///
-    /// Some special cased remappings also change the parameter signature of the
-    /// imported initializer, such as to drop vararg parameters.
-    ///
-    /// All parameters are in/out parameters.
-    DeclName
-    mapInitSelectorToDeclName(ObjCSelector &selector,
-                              ArrayRef<const clang::ParmVarDecl *> &args,
-                              bool &variadic,
-                              bool isSwiftPrivate) {
-      auto &C = Impl.SwiftContext;
-      
-      // Map a few initializers to non-variadic versions that drop the
-      // variadic parameter.
-      if (variadic && shouldMakeSelectorNonVariadic(selector)) {
-        selector = ObjCSelector(C, selector.getNumArgs() - 1,
-                                selector.getSelectorPieces().slice(0,
-                                      selector.getSelectorPieces().size() - 1));
-        args = args.slice(0, args.size() - 1);
-        variadic = false;
-      }
-      
-      return Impl.mapSelectorToDeclName(selector, /*initializer*/true,
-                                        isSwiftPrivate);
-    }
-
-    static bool shouldMakeSelectorNonVariadic(ObjCSelector selector) {
-      // This is UIActionSheet's designated initializer.
-      if (selector.isNonNullarySelector({ "initWithTitle",
-                                          "delegate",
-                                          "cancelButtonTitle",
-                                          "destructiveButtonTitle",
-                                          "otherButtonTitles" }))
-        return true;
-
-      // This is UIAlertView's designated initializer.
-      if (selector.isNonNullarySelector({ "initWithTitle",
-                                          "message",
-                                          "delegate",
-                                          "cancelButtonTitle",
-                                          "otherButtonTitles" }))
-        return true;
-
-      // Nothing else for now.
-      return false;
-    }
-
     /// \brief Given an imported method, try to import it as a constructor.
     ///
     /// Objective-C methods in the 'init' family are imported as
@@ -3188,14 +3140,21 @@ namespace {
         objcMethod->param_begin(),
         objcMethod->param_end()
       };
-      bool isSwiftPrivate = objcMethod->hasAttr<clang::SwiftPrivateAttr>();
+
       bool variadic = objcMethod->isVariadic();
-      DeclName name = mapInitSelectorToDeclName(selector, params, variadic,
-                                                isSwiftPrivate);
+      auto importedName = Impl.importFullName(objcMethod);
+      if (!importedName) return nullptr;
+
+      // If we dropped the variadic, handle it now.
+      if (importedName.DroppedVariadic) {
+        params = params.slice(1);
+        variadic = false;
+      }
 
       bool redundant;
       return importConstructor(objcMethod, dc, implicit, kind, required,
-                               selector, name, /*customName=*/false, params,
+                               selector, importedName,
+                               importedName.HasCustomName, params,
                                variadic, redundant);
     }
 
