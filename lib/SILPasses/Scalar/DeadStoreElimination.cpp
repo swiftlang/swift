@@ -125,9 +125,8 @@ constexpr unsigned MaxPartialDeadStoreCountLimit = 1;
 /// basic block.
 ///
 /// Initially WriteSetIn is set to true. After the basic block is processed, if
-/// its
-/// WriteSetOut is different from WriteSetIn, WriteSetIn is initialized to the
-/// value of WriteSetOut and the data flow is rerun.
+/// its WriteSetOut is different from WriteSetIn, WriteSetIn is initialized to
+/// the value of WriteSetOut and the data flow is rerun.
 ///
 /// Instructions in each basic block are processed in post-order as follows:
 ///
@@ -137,7 +136,7 @@ constexpr unsigned MaxPartialDeadStoreCountLimit = 1;
 ///    any location it may alias with from the WriteSetOut.
 ///
 /// 3. When an instruction reads from  memory in an unknown way, the WriteSetOut
-///    bit is cleared if the instruction can read the MemLocation.
+///    bit is cleared if the instruction can read the corresponding MemLocation.
 ///
 class BBState {
 public:
@@ -203,8 +202,8 @@ public:
     BBKillSet.resize(MemLocationCount, false);
   }
 
-  /// Check whether the WriteSetIn has changed. If it does, we need to reiterate
-  /// to reach fixed point.
+  /// Check whether the WriteSetIn has changed. If it does, we need to rerun
+  /// the data flow to reach fixed point.
   bool updateWriteSetIn();
 
   /// Functions to manipulate the write set.
