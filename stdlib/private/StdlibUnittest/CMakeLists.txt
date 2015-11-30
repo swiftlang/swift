@@ -48,7 +48,6 @@ add_swift_library(swiftStdlibUnittest SHARED IS_STDLIB
 
   PRIVATE_LINK_LIBRARIES ${swift_stdlib_unittest_private_link_libraries}
   SWIFT_MODULE_DEPENDS ${swift_stdlib_unittest_module_depends}
-  SWIFT_COMPILE_FLAGS -Xfrontend -sil-serialize-all
   FRAMEWORK_DEPENDS ${swift_stdlib_unittest_framework_depends}
   INSTALL_IN_COMPONENT stdlib-experimental)
 
