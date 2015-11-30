@@ -275,6 +275,9 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     // Enable modules.
     "-fmodules",
 
+    // Enable implicit module maps
+    "-fimplicit-module-maps",
+
     // Don't emit LLVM IR.
     "-fsyntax-only",
 
