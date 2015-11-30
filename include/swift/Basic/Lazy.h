@@ -26,11 +26,11 @@ namespace swift {
 #ifdef __APPLE__
   using OnceToken_t = dispatch_once_t;
 # define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
-  dispatch_once_f(&TOKEN, CONTEXT, FUNC)
+  ::dispatch_once_f(&TOKEN, CONTEXT, FUNC)
 #else
   using OnceToken_t = std::once_flag;
 # define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
-  std::call_once(TOKEN, FUNC, CONTEXT)
+  ::std::call_once(TOKEN, FUNC, CONTEXT)
 #endif
 
 /// A template for lazily-constructed, zero-initialized, leaked-on-exit
