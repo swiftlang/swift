@@ -529,6 +529,9 @@ void DSEContext::updateWriteSetForRead(BBState *S, unsigned bit) {
 void DSEContext::updateGenKillSetForRead(BBState *S, unsigned bit) {
   // Start tracking the read to this MemLocation in the killset and update
   // the genset accordingly.
+  //
+  // Even though, MemLocations are canonicalized, we still need to consult
+  // alias analysis to determine whether 2 MemLocations are disjointed.
   MemLocation &R = MemLocationVault[bit];
   for (unsigned i = 0; i < S->MemLocationNum; ++i) {
     MemLocation &L = MemLocationVault[i];
@@ -594,13 +597,14 @@ void DSEContext::processRead(SILInstruction *I, BBState *S, SILValue Mem,
     return;
   }
 
+#ifndef NDEBUG
   // Make sure that the MemLocation getType() returns the same type as the
   // loaded type.
   if (auto *LI = dyn_cast<LoadInst>(I)) {
-    (void)LI;
     assert(LI->getOperand().getType().getObjectType() == L.getType() &&
            "MemLocation returns different type");
   }
+#endif
 
   // Expand the given Mem into individual fields and process them as
   // separate reads.
@@ -643,13 +647,14 @@ void DSEContext::processWrite(SILInstruction *I, BBState *S, SILValue Val,
   if (!L.isValid())
     return;
 
+#ifndef NDEBUG
   // Make sure that the MemLocation getType() returns the same type as the
   // stored type.
   if (auto *SI = dyn_cast<StoreInst>(I)) {
-    (void)SI;
     assert(SI->getDest().getType().getObjectType() == L.getType() &&
            "MemLocation returns different type");
   }
+#endif
 
   // Expand the given Mem into individual fields and process them as separate
   // writes.
