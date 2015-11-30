@@ -121,7 +121,7 @@ struct FixedSizedRefArrayOfOptional<T>
   {
     buffer = Storage.Buffer(Storage.self, capacity, capacity)
     for var i = 0; i < capacity; ++i {
-      (buffer.baseAddress + i).initializeMemory(.None)
+      (buffer.baseAddress + i).initializePointee(.None)
     }
 
     buffer.value = capacity

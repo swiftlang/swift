@@ -138,7 +138,7 @@ public protocol _Mirror {
 @_silgen_name("swift_getSummary")
 public // COMPILER_INTRINSIC
 func _getSummary<T>(out: UnsafeMutablePointer<String>, x: T) {
-  out.initializeMemory(_reflect(x).summary)
+  out.initializePointee(_reflect(x).summary)
 }
 
 /// Produce a mirror for any value. If the value's type conforms to

@@ -151,9 +151,9 @@ public struct ${Self}<Pointee>
   /// - Postcondition: The pointee is initalized; the value should eventually
   ///   be destroyed or moved from to avoid leaks.
   // FIXME: add tests (since the `count` has been added)
-  public func initializeMemory(newValue: Pointee, count: Int = 1) {
+  public func initializePointee(newValue: Pointee, count: Int = 1) {
     _debugRequire(count >= 0,
-      "${Self}.initializeMemory with negative count")
+      "${Self}.initializePointee with negative count")
     // Must not use `initializeFrom` with a `Collection` as that will introduce
     // a cycle.
     for offset in 0..<count {
@@ -249,7 +249,7 @@ public struct ${Self}<Pointee>
       Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // This builtin is equivalent to:
     // for i in 0..<count {
-    //   (self + i).initializeMemory((source + i).move())
+    //   (self + i).initializePointee((source + i).move())
     // }
   }
 
@@ -282,7 +282,7 @@ public struct ${Self}<Pointee>
     // var src = source + count
     // var dst = self + count
     // while dst != self {
-    //   (--dst).initializeMemory((--src).move())
+    //   (--dst).initializePointee((--src).move())
     // }
   }
 
@@ -311,7 +311,7 @@ public struct ${Self}<Pointee>
       Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // This builtin is equivalent to:
     // for i in 0..<count {
-    //   (self + i).initializeMemory(source[i])
+    //   (self + i).initializePointee(source[i])
     // }
   }
 
@@ -365,7 +365,7 @@ public struct ${Self}<Pointee>
   ///
   /// - Postcondition: The memory is uninitialized.
   public func deinitializePointee(count count: Int = 1) {
-    _debugRequire(count >= 0, "${Self}.deinitializeMemory with negative count")
+    _debugRequire(count >= 0, "${Self}.deinitializePointee with negative count")
     // FIXME: optimization should be implemented, where if the `count` value
     // is 1, the `Builtin.destroy(Pointee.self, _rawValue)` gets called.
     Builtin.destroyArray(Pointee.self, _rawValue, count._builtinWordValue)

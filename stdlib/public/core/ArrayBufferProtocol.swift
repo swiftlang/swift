@@ -167,7 +167,7 @@ extension _ArrayBufferProtocol {
       }
       // Initialize the hole left by sliding the tail forward
       for j in oldTailIndex..<newTailIndex {
-        (elements + j).initializeMemory(newValues[i])
+        (elements + j).initializePointee(newValues[i])
         i._successorInPlace()
       }
       _expectEnd(i, newValues)

@@ -108,7 +108,7 @@ final class TestManagedBuffer<T> : ManagedBuffer<LengthAndCapacity,T> {
     
     withUnsafeMutablePointerToElements {
       (p: UnsafeMutablePointer<T>)->() in
-      (p + length).initializeMemory(x)
+      (p + length).initializePointee(x)
     }
     self.length = length + 2
   }

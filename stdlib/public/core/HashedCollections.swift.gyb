@@ -1643,7 +1643,7 @@ internal struct _BitMap {
 
   internal func initializeToZero() {
     for i in 0 ..< numberOfWords {
-      (values + i).initializeMemory(0)
+      (values + i).initializePointee(0)
     }
   }
 
@@ -1982,7 +1982,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   internal func initializeKey(k: Key, at i: Int) {
     _sanityCheck(!isInitializedEntry(i))
 
-    (keys + i).initializeMemory(k)
+    (keys + i).initializePointee(k)
     initializedEntries[i] = true
     _fixLifetime(self)
   }
@@ -1990,7 +1990,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   @_transparent
   internal func moveInitializeFrom(from: Storage, at: Int, toEntryAt: Int) {
     _sanityCheck(!isInitializedEntry(toEntryAt))
-    (keys + toEntryAt).initializeMemory((from.keys + at).take())
+    (keys + toEntryAt).initializePointee((from.keys + at).take())
     from.initializedEntries[at] = false
     initializedEntries[toEntryAt] = true
   }
@@ -2008,8 +2008,8 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   internal func initializeKey(k: Key, value v: Value, at i: Int) {
     _sanityCheck(!isInitializedEntry(i))
 
-    (keys + i).initializeMemory(k)
-    (values + i).initializeMemory(v)
+    (keys + i).initializePointee(k)
+    (values + i).initializePointee(v)
     initializedEntries[i] = true
     _fixLifetime(self)
   }
@@ -2017,8 +2017,8 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   @_transparent
   internal func moveInitializeFrom(from: Storage, at: Int, toEntryAt: Int) {
     _sanityCheck(!isInitializedEntry(toEntryAt))
-    (keys + toEntryAt).initializeMemory((from.keys + at).take())
-    (values + toEntryAt).initializeMemory((from.values + at).take())
+    (keys + toEntryAt).initializePointee((from.keys + at).take())
+    (values + toEntryAt).initializePointee((from.values + at).take())
     from.initializedEntries[at] = false
     initializedEntries[toEntryAt] = true
   }
@@ -2331,7 +2331,7 @@ internal struct _BridgedNative${Self}Storage {
   internal func initializeKey(k: AnyObject, at i: Int) {
     _sanityCheck(!isInitializedEntry(i))
 
-    (keys + i).initializeMemory(k)
+    (keys + i).initializePointee(k)
     initializedEntries[i] = true
     _fixLifetime(self)
   }
@@ -2341,8 +2341,8 @@ internal struct _BridgedNative${Self}Storage {
   ) {
     _sanityCheck(!isInitializedEntry(i))
 
-    (keys + i).initializeMemory(k)
-    (values + i).initializeMemory(v)
+    (keys + i).initializePointee(k)
+    (values + i).initializePointee(v)
     initializedEntries[i] = true
     _fixLifetime(self)
   }

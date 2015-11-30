@@ -591,7 +591,7 @@ extension Sequence
     } else {
       var p = ptr
       for x in self {
-        p.initializeMemory(x)
+        p.initializePointee(x)
         p += 1
       }
       return p

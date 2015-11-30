@@ -42,7 +42,7 @@ internal class PthreadBlockContextImpl<Argument, Result>: PthreadBlockContext {
 
   override func run() -> UnsafeMutablePointer<Void> {
     let result = UnsafeMutablePointer<Result>(allocatingCapacity: 1)
-    result.initializeMemory(block(arg))
+    result.initializePointee(block(arg))
     return UnsafeMutablePointer(result)
   }
 }

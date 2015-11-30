@@ -173,7 +173,7 @@ struct _HeapBuffer<Value, Element> : Equatable {
     let object: AnyObject = _swift_bufferAllocate(
       storageClass, totalSize, alignMask)
     self._storage = Builtin.castToNativeObject(object)
-    self._value.initializeMemory(initializer)
+    self._value.initializePointee(initializer)
   }
 
   public // @testable

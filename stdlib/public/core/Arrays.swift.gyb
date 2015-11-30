@@ -511,7 +511,7 @@ extension ${Self} : _ArrayProtocol {
     var p: UnsafeMutablePointer<Element>
     (self, p) = ${Self}._allocateUninitialized(length)
     for _ in 0..<length {
-      p.initializeMemory(repeatedValue)
+      p.initializePointee(repeatedValue)
       p += 1
     }
   }
@@ -670,7 +670,7 @@ extension ${Self} : _ArrayProtocol {
     _sanityCheck(_buffer.capacity >= _buffer.length + 1)
 
     _buffer.length = oldLength + 1
-    (_buffer.firstElementAddress + oldLength).initializeMemory(newElement)
+    (_buffer.firstElementAddress + oldLength).initializePointee(newElement)
   }
 
   /// Append `newElement` to the ${Self}.
@@ -899,7 +899,7 @@ internal struct _InitializeMemoryFromCollection<
     var p = rawMemory
     var q = newValues.startIndex
     for _ in 0..<length {
-      p.initializeMemory(newValues[q])
+      p.initializePointee(newValues[q])
       q = q.successor()
       p += 1
     }
@@ -1161,7 +1161,7 @@ internal struct _InitializePointer<T> : _PointerFunction {
   internal func call(rawMemory: UnsafeMutablePointer<T>, length: Int) {
     _sanityCheck(length == 1)
     // FIXME: it would be better if we could find a way to move, here
-    rawMemory.initializeMemory(newValue)
+    rawMemory.initializePointee(newValue)
   }
 
   @_transparent
@@ -1236,7 +1236,7 @@ internal func _arrayAppendSequence<
     let base = buffer.firstElementAddress
 
     while (nextItem != nil) && length < capacity {
-      (base + length++).initializeMemory(nextItem!)
+      (base + length++).initializePointee(nextItem!)
       nextItem = stream.next()
     }
     buffer.length = length
