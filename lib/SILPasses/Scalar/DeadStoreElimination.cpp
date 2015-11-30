@@ -287,22 +287,20 @@ class DSEContext {
   /// MemLocation read has been extracted, expanded and mapped to the bit
   /// position in the bitvector. update the gen kill set using the bit
   /// position.
-  void updateGenKillSetForRead(SILInstruction *I, BBState *S, unsigned bit);
+  void updateGenKillSetForRead(BBState *S, unsigned bit);
 
   /// MemLocation written has been extracted, expanded and mapped to the bit
   /// position in the bitvector. update the gen kill set using the bit
   /// position.
-  void updateGenKillSetForWrite(SILInstruction *I, BBState *S, unsigned bit);
+  void updateGenKillSetForWrite(BBState *S, unsigned bit);
 
   /// MemLocation read has been extracted, expanded and mapped to the bit
   /// position in the bitvector. process it using the bit position.
-  void updateWriteSetForRead(SILInstruction *Inst, BBState *State,
-                             unsigned Bit);
+  void updateWriteSetForRead(BBState *S, unsigned Bit);
 
   /// MemLocation written has been extracted, expanded and mapped to the bit
   /// position in the bitvector. process it using the bit position.
-  bool updateWriteSetForWrite(SILInstruction *Inst, BBState *State,
-                              unsigned Bit);
+  bool updateWriteSetForWrite(BBState *S, unsigned Bit);
 
   /// There is a read to a location, expand the location into individual fields
   /// before processing them.
@@ -494,11 +492,9 @@ void DSEContext::invalidateMemLocationBase(SILInstruction *I,
   }
 }
 
-void DSEContext::updateWriteSetForRead(SILInstruction *I, BBState *S,
-                                       unsigned bit) {
+void DSEContext::updateWriteSetForRead(BBState *S, unsigned bit) {
   // Remove any may/must-aliasing stores to the MemLocation, as they cant be
-  // used
-  // to kill any upward visible stores due to the intefering load.
+  // used to kill any upward visible stores due to the intefering load.
   MemLocation &R = MemLocationVault[bit];
   for (unsigned i = 0; i < S->MemLocationCount; ++i) {
     if (!S->isTrackingMemLocation(i))
@@ -507,13 +503,12 @@ void DSEContext::updateWriteSetForRead(SILInstruction *I, BBState *S,
     if (!L.isMayAliasMemLocation(R, AA))
       continue;
     DEBUG(llvm::dbgs() << "Loc Removal: " << MemLocationVault[i].getBase()
-                       << "Instruction: " << *I << "\n");
+                       << "\n");
     S->stopTrackingMemLocation(i);
   }
 }
 
-void DSEContext::updateGenKillSetForRead(SILInstruction *I, BBState *S,
-                                         unsigned bit) {
+void DSEContext::updateGenKillSetForRead(BBState *S, unsigned bit) {
   // Start tracking the read to this MemLocation in the killset and update
   // the genset accordingly.
   MemLocation &R = MemLocationVault[bit];
@@ -528,8 +523,7 @@ void DSEContext::updateGenKillSetForRead(SILInstruction *I, BBState *S,
   }
 }
 
-bool DSEContext::updateWriteSetForWrite(SILInstruction *I, BBState *S,
-                                        unsigned bit) {
+bool DSEContext::updateWriteSetForWrite(BBState *S, unsigned bit) {
   // If a tracked store must aliases with this store, then this store is dead.
   bool IsDead = false;
   MemLocation &R = MemLocationVault[bit];
@@ -548,13 +542,12 @@ bool DSEContext::updateWriteSetForWrite(SILInstruction *I, BBState *S,
 
   // Track this new store.
   DEBUG(llvm::dbgs() << "Loc Insertion: " << MemLocationVault[bit].getBase()
-                     << "Instruction: " << *I << "\n");
+                     << "\n");
   S->startTrackingMemLocation(bit);
   return IsDead;
 }
 
-void DSEContext::updateGenKillSetForWrite(SILInstruction *I, BBState *S,
-                                          unsigned bit) {
+void DSEContext::updateGenKillSetForWrite(BBState *S, unsigned bit) {
   // Start tracking the store to this MemLoation.
   S->BBGenSet.set(bit);
 }
@@ -598,13 +591,13 @@ void DSEContext::processRead(SILInstruction *I, BBState *S, SILValue Mem,
   if (BuildGenKillSet) {
     for (auto &E : Locs) {
       // Only building the gen and kill sets for now.
-      updateGenKillSetForRead(I, S, getMemLocationBit(E));
+      updateGenKillSetForRead(S, getMemLocationBit(E));
     }
   } else {
     for (auto &E : Locs) {
       // This is the last iteration, compute WriteSetOut and perform the dead
       // store elimination.
-      updateWriteSetForRead(I, S, getMemLocationBit(E));
+      updateWriteSetForRead(S, getMemLocationBit(E));
     }
   }
 }
@@ -649,14 +642,14 @@ void DSEContext::processWrite(SILInstruction *I, BBState *S, SILValue Val,
   if (BuildGenKillSet) {
     for (auto &E : Locs) {
       // Only building the gen and kill sets here.
-      updateGenKillSetForWrite(I, S, getMemLocationBit(E));
+      updateGenKillSetForWrite(S, getMemLocationBit(E));
     }
   } else {
     unsigned idx = 0;
     for (auto &E : Locs) {
       // This is the last iteration, compute WriteSetOut and perform the dead
       // store elimination.
-      if (updateWriteSetForWrite(I, S, getMemLocationBit(E)))
+      if (updateWriteSetForWrite(S, getMemLocationBit(E)))
         V.set(idx);
       Dead &= V.test(idx);
       ++idx;
