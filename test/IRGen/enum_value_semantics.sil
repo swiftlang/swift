@@ -2,9 +2,6 @@
 
 // REQUIRES: CPU=x86_64
 
-// FIXME: rdar://problem/19648117 Needs splitting objc parts out
-// XFAIL: linux
-
 import Builtin
 
 // CHECK: @_TWVO20enum_value_semantics20SinglePayloadTrivial = constant [25 x i8*] [
@@ -64,7 +61,9 @@ import Builtin
 // --                         0x250007
 // CHECK:   i8* inttoptr (i64 2424839 to i8*),
 // CHECK:   i8* inttoptr (i64 8 to i8*),
-// CHECK:   i8* inttoptr (i64 2147483644 to i8*)
+// --                         on Darwin, first 4GB are unmapped: 0x7ffffffc
+// --                         on Linux, only safe to assume first 4KB: 0x7fd
+// CHECK:   i8* inttoptr (i64 {{2045|2147483644}} to i8*)
 // CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO20enum_value_semantics23SinglePayloadNontrivial to i8*)
 // CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO20enum_value_semantics23SinglePayloadNontrivial to i8*)
 // CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwugO20enum_value_semantics23SinglePayloadNontrivial to i8*),
