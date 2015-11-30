@@ -79,7 +79,10 @@ extension Bool {
   }
   
   @_transparent
-  public var _value: Builtin.Int1 {
+  // Renamed from _value to __value, because the deserializer crashes
+  // if stdlib is compiled with -sil-serialize-all (rdar://problem/23620491).
+  // TODO: rename it back to _value when the deserializer is fixed.
+  public var __value: Builtin.Int1 {
     return Builtin.trunc_Int${word_bits}_Int1((self ? 1 : 0)._value)
   }
 }
@@ -108,7 +111,7 @@ public func _assertCond(
   if _isDebugAssertConfiguration() {
     precondition(ok, message, file: file, line: line)
   }
-  Builtin.condfail((!ok)._value)
+  Builtin.condfail((!ok).__value)
 }
 
 //===--- Prototype Implementation -----------------------------------------===//
@@ -679,13 +682,13 @@ public struct ${Self}
     
     let (newStorage, overflow) = (
       Builtin.${u}${x.llvmName}_Int${bits}(self._storage, rhs._storage),
-      false._value)
+      false.__value)
 
 %         else:
 
     let (newStorage, overflow)
     = Builtin.${u}${x.llvmName}_with_overflow_Int${bits}(
-      self._storage, rhs._storage, false._value)
+      self._storage, rhs._storage, false.__value)
 %         end
 
     return (
@@ -725,7 +728,7 @@ public struct ${Self}
   @warn_unused_result
   public func countLeadingZeros() -> Word {
     return ${Self}(
-      Builtin.int_ctlz_Int${bits}(self._storage, false._value))._lowWord
+      Builtin.int_ctlz_Int${bits}(self._storage, false.__value))._lowWord
   }
   
   @_transparent
