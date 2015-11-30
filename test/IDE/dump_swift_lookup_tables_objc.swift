@@ -14,11 +14,10 @@
 // CHECK-NEXT:   doubleProperty --> doubleProperty{{$}}
 // CHECK-NEXT:   extensionMethodWithX --> extensionMethodWithX(_:y:)
 // CHECK-NEXT:   floatProperty --> floatProperty{{$}}
-// CHECK-NEXT:   init --> init(float:), init(withDefault:)
+// CHECK-NEXT:   init --> init(float:), init(withDefault:), init(double:), init(withTry:){{$}}
 // CHECK-NEXT:   instanceMethodWithX --> instanceMethodWithX(_:y:z:)
 // CHECK-NEXT:   protoInstanceMethodWithX --> protoInstanceMethodWithX(_:y:)
 // CHECK-NEXT:   setAccessibilityFloat --> setAccessibilityFloat(_:)
-// CHECK-NEXT:   someClassWithDouble --> someClassWithDouble(_:)
 
 // CHECK:      Full name -> entry mappings:
 // CHECK-NEXT:   NSAccessibility:
@@ -43,15 +42,17 @@
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass extensionMethodWithX:y:]
 // CHECK-NEXT:   floatProperty:
 // CHECK-NEXT:     SNSomeClass: SNSomeClass.floatProperty
+// CHECK-NEXT:   init(double:):
+// CHECK-NEXT:     SNSomeClass: +[SNSomeClass someClassWithDouble:]
 // CHECK-NEXT:   init(float:):
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass initWithFloat:]
 // CHECK-NEXT:   init(withDefault:):
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass initWithDefault]
+// CHECK-NEXT:   init(withTry:):
+// CHECK-NEXT:     SNSomeClass: +[SNSomeClass someClassWithTry:]
 // CHECK-NEXT:   instanceMethodWithX(_:y:z:):
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass instanceMethodWithX:y:z:]
 // CHECK-NEXT:   protoInstanceMethodWithX(_:y:):
 // CHECK-NEXT:     SNSomeProtocol: -[SNSomeProtocol protoInstanceMethodWithX:y:]
 // CHECK-NEXT:   setAccessibilityFloat(_:):
 // CHECK-NEXT:     NSAccessibility: -[NSAccessibility setAccessibilityFloat:]
-// CHECK-NEXT:   someClassWithDouble(_:):
-// CHECK-NEXT:     SNSomeClass: +[SNSomeClass someClassWithDouble:]

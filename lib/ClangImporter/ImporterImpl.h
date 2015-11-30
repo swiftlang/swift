@@ -430,6 +430,20 @@ public:
   /// that will be imported as a Swift initializer.
   bool isInitMethod(const clang::ObjCMethodDecl *method);
 
+  /// Determine whether this Objective-C method should be imported as
+  /// an initializer.
+  ///
+  /// \param prefixLength Will be set to the length of the prefix that
+  /// should be stripped from the first selector piece, e.g., "init"
+  /// or the restated name of the class in a factory method.
+  ///
+  ///  \param kind Will be set to the kind of initializer being
+  ///  imported. Note that this does not distinguish designated
+  ///  vs. convenience; both will be classified as "designated".
+  bool shouldImportAsInitializer(const clang::ObjCMethodDecl *method,
+                                 unsigned &prefixLength,
+                                 CtorInitializerKind &kind);
+
 private:
   /// \brief Generation number that is used for crude versioning.
   ///

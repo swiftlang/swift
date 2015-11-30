@@ -1643,6 +1643,19 @@ DeclName ClangImporter::Implementation::importFullName(
   if (auto *nameAttr = D->getAttr<clang::SwiftNameAttr>()) {
     if (hasCustomName)
       *hasCustomName = true;
+
+    // If we have an Objective-C method that is being mapped to an
+    // initializer (e.g., a factory method whose name doesn't fit the
+    // convention for factory methods), make sure that it can be
+    // imported as an initializer.
+    if (auto method = dyn_cast<clang::ObjCMethodDecl>(D)) {
+      unsigned initPrefixLength;
+      CtorInitializerKind kind;
+      if (nameAttr->getName().startswith("init(") &&
+          !shouldImportAsInitializer(method, initPrefixLength, kind))
+        return { };
+    }
+
     return parseDeclName(SwiftContext, nameAttr->getName());
   }
 
@@ -1656,6 +1669,8 @@ DeclName ClangImporter::Implementation::importFullName(
   /// Whether the result is a function name.
   bool isFunction = false;
   bool isInitializer = false;
+  unsigned initializerPrefixLen;
+  CtorInitializerKind initKind;
   StringRef baseName;
   SmallVector<StringRef, 4> argumentNames;
   SmallString<16> selectorSplitScratch;
@@ -1678,7 +1693,8 @@ DeclName ClangImporter::Implementation::importFullName(
   case clang::DeclarationName::ObjCOneArgSelector:
   case clang::DeclarationName::ObjCZeroArgSelector: {
     auto objcMethod = cast<clang::ObjCMethodDecl>(D);
-    isInitializer = isInitMethod(objcMethod);
+    isInitializer = shouldImportAsInitializer(objcMethod, initializerPrefixLen,
+                                              initKind);
 
     // Map the Objective-C selector directly.
     auto selector = D->getDeclName().getObjCSelector();
@@ -1697,8 +1713,8 @@ DeclName ClangImporter::Implementation::importFullName(
 
     // For initializers, compute the first argument name.
     if (isInitializer) {
-      // Skip over the 'init'.
-      auto argName = selector.getNameForSlot(0).substr(4);
+      // Skip over the prefix.
+      auto argName = selector.getNameForSlot(0).substr(initializerPrefixLen);
 
       // Drop "With" if present after the "init".
       bool droppedWith = false;
@@ -1714,7 +1730,8 @@ DeclName ClangImporter::Implementation::importFullName(
       // put "with" back.
       if (droppedWith && isSwiftReservedName(argName)) {
         selectorSplitScratch = "with";
-        selectorSplitScratch += selector.getNameForSlot(0).substr(8);
+        selectorSplitScratch += selector.getNameForSlot(0).substr(
+                                  initializerPrefixLen + 4);
         argName = selectorSplitScratch;
       }
 
@@ -2623,6 +2640,75 @@ bool ClangImporter::Implementation::isInitMethod(
   // Swift restriction: init methods must start with the word "init".
   auto selector = method->getSelector();
   return camel_case::getFirstWord(selector.getNameForSlot(0)) == "init";
+}
+
+bool ClangImporter::Implementation::shouldImportAsInitializer(
+       const clang::ObjCMethodDecl *method,
+       unsigned &prefixLength,
+       CtorInitializerKind &kind) {
+  /// Is this an initializer?
+  if (isInitMethod(method)) {
+    prefixLength = 4;
+    kind = CtorInitializerKind::Designated;
+    return true;
+  }
+
+  // It must be a class method.
+  if (!method->isClassMethod()) return false;
+
+  // Said class methods must be in an actual class.
+  auto objcClass = method->getClassInterface();
+  if (!objcClass) return false;
+
+  // Check whether we should try to import this factory method as an
+  // initializer.
+  switch (getFactoryAsInit(objcClass, method)) {
+  case FactoryAsInitKind::AsInitializer:
+    // Okay; check for the correct result type below.
+    prefixLength = 0;
+    break;
+
+  case FactoryAsInitKind::Infer: {
+    // See if we can match the class name to the beginning of the first
+    // selector piece.
+    auto firstPiece = method->getSelector().getNameForSlot(0);
+    StringRef firstArgLabel = matchLeadingTypeName(firstPiece,
+                                                   objcClass->getName());
+    if (firstArgLabel.size() == firstPiece.size())
+      return false;
+
+    // Store the prefix length.
+    prefixLength = firstPiece.size() - firstArgLabel.size();
+
+    // Continue checking the result type, below.
+    break;
+  }
+
+  case FactoryAsInitKind::AsClassMethod:
+    return false;
+  }
+
+  // Determine whether we have a suitable return type.
+  if (method->hasRelatedResultType()) {
+    // When the factory method has an "instancetype" result type, we
+    // can import it as a convenience factory method.
+    kind = CtorInitializerKind::ConvenienceFactory;
+  } else if (auto objcPtr = method->getReturnType()
+                              ->getAs<clang::ObjCObjectPointerType>()) {
+    if (objcPtr->getInterfaceDecl() != objcClass) {
+      // FIXME: Could allow a subclass here, but the rest of the compiler
+      // isn't prepared for that yet.
+      return false;
+    }
+
+    // Factory initializer.
+    kind = CtorInitializerKind::Factory;
+  } else {
+    // Not imported as an initializer.
+    return false;
+  }
+
+  return true;
 }
 
 #pragma mark Name lookup

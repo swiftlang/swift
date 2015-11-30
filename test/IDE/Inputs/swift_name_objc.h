@@ -19,6 +19,8 @@ SWIFT_NAME(SomeClass)
 - (instancetype)initWithDefault;
 - (void)instanceMethodWithX:(float)x y:(float)y z:(float)z;
 + (instancetype)someClassWithDouble:(double)d;
++ (instancetype)someClassWithTry:(BOOL)shouldTry;
++ (NSObject *)buildWithObject:(NSObject *)object SWIFT_NAME(init(object:));
 
 @property (readonly,nonatomic) float floatProperty;
 @property (readwrite,nonatomic) double doubleProperty;
