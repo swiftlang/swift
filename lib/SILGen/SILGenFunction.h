@@ -146,12 +146,9 @@ enum class ApplyOptions : unsigned {
   /// No special treatment is required.
   None = 0,
 
-  /// This call is transparent.
-  Transparent = 0x1,
-
   /// Suppress the error-handling edge out of the call.  This should
   /// be used carefully; it's used to implement features like 'rethrows'.
-  DoesNotThrow = 0x2,
+  DoesNotThrow = 0x1,
 };
 inline ApplyOptions operator|(ApplyOptions lhs, ApplyOptions rhs) {
   return ApplyOptions(unsigned(lhs) | unsigned(rhs));

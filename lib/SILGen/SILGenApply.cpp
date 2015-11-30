@@ -226,27 +226,23 @@ private:
   CanType OrigFormalInterfaceType;
   CanAnyFunctionType SubstFormalType;
   Optional<SILLocation> SpecializeLoc;
-  bool IsTransparent;
   bool HasSubstitutions = false;
 
   // The pointer back to the AST node that produced the callee.
   SILLocation Loc;
 
 
-public:
-  void setTransparent(bool T) { IsTransparent = T; }
 private:
 
   Callee(ManagedValue indirectValue,
          CanType origFormalType,
          CanAnyFunctionType substFormalType,
-         bool isTransparent, SILLocation L)
+         SILLocation L)
     : kind(Kind::IndirectValue),
       IndirectValue(indirectValue),
       OrigFormalOldType(origFormalType),
       OrigFormalInterfaceType(origFormalType),
       SubstFormalType(substFormalType),
-      IsTransparent(isTransparent),
       Loc(L)
   {}
 
@@ -273,7 +269,6 @@ private:
       OrigFormalInterfaceType(getConstantFormalInterfaceType(gen, SILValue(),
                                                            standaloneFunction)),
       SubstFormalType(substFormalType),
-      IsTransparent(standaloneFunction.isTransparent()),
       Loc(l)
   {
   }
@@ -289,7 +284,6 @@ private:
       OrigFormalInterfaceType(getConstantFormalInterfaceType(gen, selfValue,
                                                              methodName)),
       SubstFormalType(substFormalType),
-      IsTransparent(false),
       Loc(l)
   {
   }
@@ -419,12 +413,11 @@ public:
   static Callee forIndirect(ManagedValue indirectValue,
                             CanType origFormalType,
                             CanAnyFunctionType substFormalType,
-                            bool isTransparent,
                             SILLocation l) {
     return Callee(indirectValue,
                   origFormalType,
                   substFormalType,
-                  isTransparent, l);
+                  l);
   }
   static Callee forDirect(SILGenFunction &gen, SILDeclRef c,
                           CanAnyFunctionType substFormalType,
@@ -514,7 +507,6 @@ public:
   getAtUncurryLevel(SILGenFunction &gen, unsigned level) const {
     ManagedValue mv;
     ApplyOptions options = ApplyOptions::None;
-    if (IsTransparent) options |= ApplyOptions::Transparent;
     SILConstantInfo constantInfo;
     Optional<SILDeclRef> constant = None;
 
@@ -528,8 +520,6 @@ public:
     case Kind::StandaloneFunction: {
       assert(level <= StandaloneFunction.uncurryLevel
              && "uncurrying past natural uncurry level of standalone function");
-      if (level < StandaloneFunction.uncurryLevel)
-        options -= ApplyOptions::Transparent;
       constant = StandaloneFunction.atUncurryLevel(level);
 
       // If we're currying a direct reference to a class-dispatched method,
@@ -554,7 +544,6 @@ public:
       if (level < Method.MethodName.uncurryLevel) {
         SILValue ref = gen.emitGlobalFunctionRef(Loc, *constant, constantInfo);
         mv = ManagedValue::forUnmanaged(ref);
-        options -= ApplyOptions::Transparent;
         break;
       }
 
@@ -596,7 +585,6 @@ public:
       if (level < Method.MethodName.uncurryLevel) {
         SILValue ref = gen.emitGlobalFunctionRef(Loc, *constant, constantInfo);
         mv = ManagedValue::forUnmanaged(ref);
-        options -= ApplyOptions::Transparent;
         break;
       }
 
@@ -925,39 +913,16 @@ public:
 
   /// Fall back to an unknown, indirect callee.
   void visitExpr(Expr *e) {
-    // This marks all calls to auto closure typed variables as transparent.
-    // As of writing, local variable auto closures are currently allowed by
-    // the parser, but the plan is that they will be disallowed, so this will
-    // actually only apply to auto closure parameters, which is what we want
-    auto *t = e->getType()->castTo<AnyFunctionType>();
-    bool isTransparent = t->getExtInfo().isAutoClosure();
-
     ManagedValue fn = SGF.emitRValueAsSingleValue(e);
     auto origType = cast<AnyFunctionType>(e->getType()->getCanonicalType());
-    setCallee(Callee::forIndirect(fn, origType, getSubstFnType(), isTransparent,
-                                  e));
+    setCallee(Callee::forIndirect(fn, origType, getSubstFnType(), e));
   }
 
   void visitLoadExpr(LoadExpr *e) {
-    bool isTransparent = false;
-    if (DeclRefExpr *d = dyn_cast<DeclRefExpr>(e->getSubExpr())) {
-      // This marks all calls to auto closure typed variables as transparent.
-      // As of writing, local variable auto closures are currently allowed by
-      // the parser, but the plan is that they will be disallowed, so this will
-      // actually only apply to auto closure parameters, which is what we want
-      Type Ty = d->getDecl()->getType()->getInOutObjectType();
-
-      // If the decl type is a function type, figure out if it is an auto
-      // closure.
-      if (auto *AnyF = Ty->getAs<AnyFunctionType>()) {
-        isTransparent = AnyF->getExtInfo().isAutoClosure();
-      }
-    }
     // TODO: preserve the function pointer at its original abstraction level
     ManagedValue fn = SGF.emitRValueAsSingleValue(e);
     auto origType = cast<AnyFunctionType>(e->getType()->getCanonicalType());
-    setCallee(Callee::forIndirect(fn, origType, getSubstFnType(),
-                                  isTransparent, e));
+    setCallee(Callee::forIndirect(fn, origType, getSubstFnType(), e));
   }
 
   /// Add a call site to the curry.
@@ -1538,11 +1503,6 @@ public:
                                                : SILDeclRef::Kind::Initializer,
                                SILDeclRef::ConstructAtBestResilienceExpansion),
                                   getSubstFnType(useAllocatingCtor), fn));
-      // In direct peer delegation cases, do not mark the apply as @transparent
-      // even if the underlying implementation is @transparent.  This is a hack
-      // but is important because transparent inlining happends before DI, and
-      // DI needs to see the call to the delegated constructor.
-      ApplyCallee->setTransparent(false);
     }
 
     // Set up the substitutions, if we have any.
