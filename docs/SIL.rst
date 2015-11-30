@@ -449,8 +449,24 @@ number of ways:
     the value held there.
 
   - An ``@inout`` parameter is indirect.  The address must be of an
-    initialized object, and the function must leave an initialized
-    object there upon exit.
+    initialized object. The memory must remain initialized for the duration
+    of the call until the function returns. The function may mutate the
+    pointee, and furthermore may weakly assume that there are no aliasing
+    reads from or writes to the argument, though must preserve a valid
+    value at the argument so that well-ordered aliasing violations do not
+    compromise memory safety. This allows for optimizations such as local
+    load and store propagation, introduction or elimination of temporary
+    copies, and promotion of the ``@inout`` parameter to an ``@owned`` direct
+    parameter and result pair, but does not admit "take" optimization out
+    of the parameter or other optimization that would leave memory in an
+    uninitialized state.
+
+  - An ``@inout_aliasable`` parameter is indirect. The address must be of an
+    initialized object. The memory must remain initialized for the duration
+    of the call until the function returns. The function may mutate the
+    pointee, and must assume that other aliases may mutate it as well. These
+    aliases however can be assumed to be well-typed and well-ordered; ill-typed
+    accesses and data races to the parameter are still undefined.
 
   - An ``@out`` parameter is indirect.  The address must be of an
     uninitialized object; the function is responsible for initializing
