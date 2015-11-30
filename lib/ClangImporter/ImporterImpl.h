@@ -753,6 +753,11 @@ public:
     /// swift_name attribute.
     bool HasCustomName = false;
 
+    /// Whether this was one of a special class of Objective-C
+    /// initializers for which we drop the variadic argument rather
+    /// than refuse to import the initializer.
+    bool DroppedVariadic = false;
+
     /// For an initializer, the kind of initializer to import.
     CtorInitializerKind InitKind;
 

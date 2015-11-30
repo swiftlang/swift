@@ -1594,6 +1594,46 @@ StringRef ClangImporter::Implementation::getEnumConstantNamePrefix(
   return commonPrefix;
 }
 
+/// Determine whether the given Clang selector matches the given
+/// selector pieces.
+static bool isNonNullarySelector(clang::Selector selector,
+                                 ArrayRef<StringRef> pieces) {
+  unsigned n = selector.getNumArgs();
+  if (n == 0) return false;
+  if (n != pieces.size()) return false;
+
+  for (unsigned i = 0; i != n; ++i) {
+    if (selector.getNameForSlot(i) != pieces[i]) return false;
+  }
+
+  return true;
+}
+
+/// Whether we should make a variadic method with the given selector
+/// non-variadic.
+static bool shouldMakeSelectorNonVariadic(clang::Selector selector) {
+  // This is UIActionSheet's designated initializer.
+  if (isNonNullarySelector(selector,
+                           { "initWithTitle",
+                             "delegate",
+                             "cancelButtonTitle",
+                             "destructiveButtonTitle",
+                             "otherButtonTitles" }))
+    return true;
+
+  // This is UIAlertView's designated initializer.
+  if (isNonNullarySelector(selector,
+                           { "initWithTitle",
+                             "message",
+                             "delegate",
+                             "cancelButtonTitle",
+                             "otherButtonTitles" }))
+    return true;
+
+  // Nothing else for now.
+  return false;
+}
+
 auto ClangImporter::Implementation::importFullName(
        const clang::NamedDecl *D,
        clang::DeclContext **effectiveContext) -> ImportedName {
@@ -1694,8 +1734,16 @@ auto ClangImporter::Implementation::importFullName(
       baseName = "init";
     else
       baseName = selector.getNameForSlot(0);
-    for (unsigned index = 0, numArgs = selector.getNumArgs(); index != numArgs;
-         ++index) {
+
+    // If we have a variadic method for which we need to drop the last
+    // selector piece, do so now.
+    unsigned numArgs = selector.getNumArgs();
+    if (objcMethod->isVariadic() && shouldMakeSelectorNonVariadic(selector)) {
+      --numArgs;
+      result.DroppedVariadic = true;
+    }
+
+    for (unsigned index = 0; index != numArgs; ++index) {
       if (index == 0) {
         argumentNames.push_back(StringRef());
       } else {

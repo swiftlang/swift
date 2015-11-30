@@ -49,3 +49,7 @@ SWIFT_NAME(SomeProtocol)
 @protocol NSAccessibility
 @property (nonatomic) float accessibilityFloat;
 @end
+
+@interface UIActionSheet : NSObject
+-(instancetype)initWithTitle:(const char *)title delegate:(id)delegate cancelButtonTitle:(const char *)cancelButtonTitle destructiveButtonTitle:(const char *)destructiveButtonTitle otherButtonTitles:(const char *)otherButtonTitles, ...;
+@end

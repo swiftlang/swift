@@ -9,12 +9,13 @@
 // CHECK-NEXT:   SNCollisionProtocol --> SNCollisionProtocol
 // CHECK-NEXT:   SomeClass --> SomeClass
 // CHECK-NEXT:   SomeProtocol --> SomeProtocol
+// CHECK-NEXT:   UIActionSheet --> UIActionSheet
 // CHECK-NEXT:   accessibilityFloat --> accessibilityFloat()
 // CHECK-NEXT:   categoryMethodWithX --> categoryMethodWithX(_:y:), categoryMethodWithX(_:y:z:)
 // CHECK-NEXT:   doubleProperty --> doubleProperty{{$}}
 // CHECK-NEXT:   extensionMethodWithX --> extensionMethodWithX(_:y:)
 // CHECK-NEXT:   floatProperty --> floatProperty{{$}}
-// CHECK-NEXT:   init --> init(float:), init(withDefault:), init(double:), init(withTry:), init(uint8:){{$}}
+// CHECK-NEXT:   init --> init(float:), init(withDefault:), init(double:), init(withTry:), init(uint8:), init(title:delegate:cancelButtonTitle:destructiveButtonTitle:)
 // CHECK-NEXT:   instanceMethodWithX --> instanceMethodWithX(_:y:z:)
 // CHECK-NEXT:   protoInstanceMethodWithX --> protoInstanceMethodWithX(_:y:)
 // CHECK-NEXT:   setAccessibilityFloat --> setAccessibilityFloat(_:)
@@ -30,6 +31,8 @@
 // CHECK-NEXT:     TU: SNSomeClass
 // CHECK-NEXT:   SomeProtocol:
 // CHECK-NEXT:     TU: SNSomeProtocol
+// CHECK-NEXT:   UIActionSheet:
+// CHECK-NEXT:     TU: UIActionSheet
 // CHECK-NEXT:   accessibilityFloat():
 // CHECK-NEXT:     NSAccessibility: -[NSAccessibility accessibilityFloat]
 // CHECK-NEXT:   categoryMethodWithX(_:y:):
@@ -46,6 +49,8 @@
 // CHECK-NEXT:     SNSomeClass: +[SNSomeClass someClassWithDouble:]
 // CHECK-NEXT:   init(float:):
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass initWithFloat:]
+// CHECK-NEXT:   init(title:delegate:cancelButtonTitle:destructiveButtonTitle:):
+// CHECK-NEXT:     UIActionSheet: -[UIActionSheet initWithTitle:delegate:cancelButtonTitle:destructiveButtonTitle:otherButtonTitles:]
 // CHECK-NEXT:   init(uint8:):
 // CHECK-NEXT:     SNSomeClass: +[SNSomeClass buildWithUnsignedChar:]
 // CHECK-NEXT:   init(withDefault:):
