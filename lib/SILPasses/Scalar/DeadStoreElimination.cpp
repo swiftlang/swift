@@ -47,6 +47,13 @@
 /// minimum number of stores possible using the reduce function. This is done
 /// so that we do not bloat SIL IR.
 ///
+/// Another way to implement the DSE optimization is to keep the instructions
+/// that read and/or write memory without breaking the memory read/written
+/// using the ProjectionPath. However, this can easily lead to loss of
+/// opportunities, e.g. a read that only kills part of a store may need to be
+/// treated as killing the entire store.  However, using ProjectionPath does
+/// lead to more memory uses.
+///
 /// TODO: Handle same value store in DSE, currently handled in RLE.
 ///
 /// e.g.
@@ -144,7 +151,7 @@ public:
   SILBasicBlock *BB;
 
   /// Keep the number of MemLocations in the LocationVault.
-  unsigned MemLocationCount;
+  unsigned MemLocationNum;
 
   /// A bit vector for which the ith bit represents the ith MemLocation in
   /// MemLocationVault. If the bit is set, then the location currently has an
@@ -180,7 +187,7 @@ public:
   SILBasicBlock *getBB() const { return BB; }
 
   void init(unsigned lcnt) {
-    MemLocationCount = lcnt;
+    MemLocationNum = lcnt;
     // The initial state of WriteSetIn should be all 1's. Otherwise the
     // dataflow solution could be too conservative.
     //
@@ -194,12 +201,12 @@ public:
     // However, by doing so, we can only eliminate the dead stores after the
     // data flow stablizes.
     //
-    WriteSetIn.resize(MemLocationCount, true);
-    WriteSetOut.resize(MemLocationCount, false);
+    WriteSetIn.resize(MemLocationNum, true);
+    WriteSetOut.resize(MemLocationNum, false);
 
     // GenSet and KillSet initially empty.
-    BBGenSet.resize(MemLocationCount, false);
-    BBKillSet.resize(MemLocationCount, false);
+    BBGenSet.resize(MemLocationNum, false);
+    BBKillSet.resize(MemLocationNum, false);
   }
 
   /// Check whether the WriteSetIn has changed. If it does, we need to rerun
@@ -474,7 +481,7 @@ void DSEContext::invalidateMemLocationBase(SILInstruction *I,
   // invalidate any locations with the same base.
   BBState *S = getBBLocState(I);
   if (BuildGenKillSet) {
-    for (unsigned i = 0; i < S->MemLocationCount; ++i) {
+    for (unsigned i = 0; i < S->MemLocationNum; ++i) {
       if (MemLocationVault[i].getBase().getDef() != I)
         continue;
       S->BBGenSet.reset(i);
@@ -483,7 +490,7 @@ void DSEContext::invalidateMemLocationBase(SILInstruction *I,
     return;
   }
 
-  for (unsigned i = 0; i < S->MemLocationCount; ++i) {
+  for (unsigned i = 0; i < S->MemLocationNum; ++i) {
     if (!S->WriteSetOut.test(i))
       continue;
     if (MemLocationVault[i].getBase().getDef() != I)
@@ -496,7 +503,7 @@ void DSEContext::updateWriteSetForRead(BBState *S, unsigned bit) {
   // Remove any may/must-aliasing stores to the MemLocation, as they cant be
   // used to kill any upward visible stores due to the intefering load.
   MemLocation &R = MemLocationVault[bit];
-  for (unsigned i = 0; i < S->MemLocationCount; ++i) {
+  for (unsigned i = 0; i < S->MemLocationNum; ++i) {
     if (!S->isTrackingMemLocation(i))
       continue;
     MemLocation &L = MemLocationVault[i];
@@ -512,7 +519,7 @@ void DSEContext::updateGenKillSetForRead(BBState *S, unsigned bit) {
   // Start tracking the read to this MemLocation in the killset and update
   // the genset accordingly.
   MemLocation &R = MemLocationVault[bit];
-  for (unsigned i = 0; i < S->MemLocationCount; ++i) {
+  for (unsigned i = 0; i < S->MemLocationNum; ++i) {
     MemLocation &L = MemLocationVault[i];
     if (!L.isMayAliasMemLocation(R, AA))
       continue;
@@ -527,7 +534,7 @@ bool DSEContext::updateWriteSetForWrite(BBState *S, unsigned bit) {
   // If a tracked store must aliases with this store, then this store is dead.
   bool IsDead = false;
   MemLocation &R = MemLocationVault[bit];
-  for (unsigned i = 0; i < S->MemLocationCount; ++i) {
+  for (unsigned i = 0; i < S->MemLocationNum; ++i) {
     if (!S->isTrackingMemLocation(i))
       continue;
     // If 2 locations may alias, we can still keep both stores.
@@ -744,7 +751,7 @@ void DSEContext::processUnknownReadMemInst(SILInstruction *I,
   BBState *S = getBBLocState(I);
   // Update the gen kill set.
   if (BuildGenKillSet) {
-    for (unsigned i = 0; i < S->MemLocationCount; ++i) {
+    for (unsigned i = 0; i < S->MemLocationNum; ++i) {
       if (!AA->mayReadFromMemory(I, MemLocationVault[i].getBase()))
         continue;
       S->BBKillSet.set(i);
@@ -756,7 +763,7 @@ void DSEContext::processUnknownReadMemInst(SILInstruction *I,
   // We do not know what this instruction does or the memory that it *may*
   // touch. Hand it to alias analysis to see whether we need to invalidate
   // any MemLocation.
-  for (unsigned i = 0; i < S->MemLocationCount; ++i) {
+  for (unsigned i = 0; i < S->MemLocationNum; ++i) {
     if (!S->isTrackingMemLocation(i))
       continue;
     if (!AA->mayReadFromMemory(I, MemLocationVault[i].getBase()))
@@ -827,10 +834,9 @@ void DSEContext::run() {
   // know all the locations accessed in this function, we can resize the bit
   // vector to the approproate size.
   //
-  // DenseMap has a minimum size of 64, while many functions do not have over
-  // 64 basic blocks. Therefore, allocate the BBState in a vector and use
-  // pointer
-  // in BBToLocState to access them.
+  // DenseMap has a minimum size of 64, while many functions do not have more
+  // than 64 basic blocks. Therefore, allocate the BBState in a vector and use
+  // pointer in BBToLocState to access them.
   for (auto &B : *F) {
     BBStates.push_back(BBState(&B));
     BBStates.back().init(MemLocationVault.size());
@@ -871,7 +877,7 @@ void DSEContext::run() {
 
   // Finally, delete the dead stores and create the live stores.
   for (SILBasicBlock &BB : *F) {
-    // Create the stores that are alive.
+    // Create the stores that are alive due to partial dead stores.
     for (auto &I : getBBLocState(&BB)->LiveStores) {
       SILInstruction *IT = cast<SILInstruction>(I.first)->getNextNode();
       SILBuilderWithScope Builder(IT);
