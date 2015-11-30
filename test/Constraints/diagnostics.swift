@@ -638,14 +638,14 @@ _ = -UnaryOp() // expected-error {{unary operator '-' cannot be applied to an op
 // <rdar://problem/23433271> Swift compiler segfault in failure diagnosis
 func f23433271(x : UnsafePointer<Int>) {}
 func segfault23433271(a : UnsafeMutablePointer<Void>) {
-  f23433271(a[0])  // expected-error {{cannot subscript a value of type 'UnsafeMutablePointer<Void>' (aka 'UnsafeMutablePointer<()>')}}
+  f23433271(a[0])  // expected-error {{cannot convert value of type 'Void' (aka '()') to expected argument type 'UnsafePointer<Int>'}}
 }
 
 // <rdar://problem/22058555> crash in cs diags in withCString
 func r22058555() {
   var firstChar: UInt8 = 0
   "abc".withCString { chars in
-    firstChar = chars[0]  // expected-error {{cannot subscript a value of type 'UnsafePointer<Int8>'}}
+    firstChar = chars[0]  // expected-error {{cannot assign value of type 'Int8' to type 'UInt8'}}
   }
 }
 

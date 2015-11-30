@@ -3334,6 +3334,8 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     auto instanceTy =
      getter->getImplicitSelfDecl()->getType()->getInOutObjectType();
     if (!isUnresolvedOrTypeVarType(baseType) &&
+        // TODO: We're not handling archetypes well here.
+        !instanceTy->hasArchetype() &&
         !CS->TC.isConvertibleTo(baseType, instanceTy, CS->DC)) {
       selfConstraint = CC_SelfMismatch;
     }
