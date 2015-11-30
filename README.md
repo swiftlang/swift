@@ -73,8 +73,8 @@ compiler for C++14 support and create a symlink:
      git clone git@github.com:/apple/swift-cmark.git cmark
      git clone git@github.com:/apple/swift-llbuild.git llbuild
      git clone git@github.com:/apple/swift-package-manager.git swiftpm
-     git clone git@github.com:/apple/swift-corelibs-xctest.git XCTest
-     git clone git@github.com:/apple/swift-corelibs-foundation.git Foundation
+     git clone git@github.com:/apple/swift-corelibs-xctest.git 
+     git clone git@github.com:/apple/swift-corelibs-foundation.git 
 
 
 [CMake](http://cmake.org) is the core infrastructure used to configure builds of
