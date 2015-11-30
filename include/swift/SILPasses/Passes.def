@@ -46,7 +46,7 @@ PASS(CFGPrinter, "view-cfg",
 PASS(COWArrayOpts, "cowarray-opt",
      "COW Array optimizations")
 PASS(CSE, "cse",
-     "Constant subexpression elimination")
+     "Common subexpression elimination")
 PASS(CallGraphPrinter, "call-graph-printer",
      "Construct and print the call graph for use in testing")
 PASS(CapturePromotion, "capture-promotion",
@@ -99,7 +99,7 @@ PASS(GlobalOpt, "global-opt",
 PASS(GlobalPropertyOpt, "global-property-opt",
      "Optimize properties")
 PASS(HighLevelCSE, "high-level-cse",
-     "Constant subexpression elimination on High-level SIL")
+     "Common subexpression elimination on High-level SIL")
 PASS(HighLevelLICM, "high-level-licm",
      "High Level Loop invariant code motion")
 PASS(IVInfoPrinter, "iv-info-printer",
