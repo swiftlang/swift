@@ -744,6 +744,26 @@ public:
   /// \brief Converts the given Swift identifier for Clang.
   clang::DeclarationName exportName(Identifier name);
 
+  /// Describes a name that was imported from Clang.
+  struct ImportedName {
+    /// The imported name.
+    DeclName Imported;
+
+    /// Whether this name was explicitly specified via a Clang
+    /// swift_name attribute.
+    bool HasCustomName = false;
+
+    /// For an initializer, the kind of initializer to import.
+    CtorInitializerKind InitKind;
+
+    /// Produce just the imported name, for clients that don't care
+    /// about the details.
+    operator DeclName() const { return Imported; }
+
+    /// Whether any name was imported.
+    explicit operator bool() const { return static_cast<bool>(Imported); }
+  };
+
   /// Imports the full name of the given Clang declaration into Swift.
   ///
   /// Note that this may result in a name very different from the Clang name,
@@ -751,16 +771,12 @@ public:
   ///
   /// \param D The Clang declaration whose name should be imported.
   ///
-  /// \param hasCustomName If non-null, will be set to indicate whether the
-  /// name was provided directly via a C swift_name attribute.
-  ///
   /// \param effectiveContext If non-null, will be set to the effective
   /// Clang declaration context in which the declaration will be imported.
   /// This can differ from D's redeclaration context when the Clang importer
   /// introduces nesting, e.g., for enumerators within an NS_ENUM.
-  DeclName importFullName(const clang::NamedDecl *D,
-                          bool *hasCustomName = nullptr,
-                          clang::DeclContext **effectiveContext = nullptr);
+  ImportedName importFullName(const clang::NamedDecl *D,
+                              clang::DeclContext **effectiveContext = nullptr);
 
   /// \brief Import the given Clang identifier into Swift.
   ///

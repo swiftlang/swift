@@ -21,7 +21,7 @@ SWIFT_NAME(SomeClass)
 + (instancetype)someClassWithDouble:(double)d;
 + (instancetype)someClassWithTry:(BOOL)shouldTry;
 + (NSObject *)buildWithObject:(NSObject *)object SWIFT_NAME(init(object:));
-
++ (instancetype)buildWithUnsignedChar:(unsigned char)uint8 SWIFT_NAME(init(uint8:));
 @property (readonly,nonatomic) float floatProperty;
 @property (readwrite,nonatomic) double doubleProperty;
 @end

@@ -727,7 +727,7 @@ void ClangImporter::Implementation::addEntryToLookupTable(
   if (!suppressDecl) {
     // If we have a name to import as, add this entry to the table.
     clang::DeclContext *effectiveContext;
-    if (DeclName name = importFullName(named, nullptr, &effectiveContext)) {
+    if (DeclName name = importFullName(named, &effectiveContext)) {
       table.addEntry(name, named, effectiveContext);
     }
   }
@@ -1573,7 +1573,7 @@ StringRef ClangImporter::Implementation::getEnumConstantNamePrefix(
     // Account for the enum being imported using
     // __attribute__((swift_private)). This is a little ad hoc, but it's a
     // rare case anyway.
-    Identifier enumName = importFullName(decl).getBaseName();
+    Identifier enumName = importFullName(decl).Imported.getBaseName();
     StringRef enumNameStr = enumName.str();
     if (enumNameStr.startswith("__") && !checkPrefix.startswith("__"))
       enumNameStr = enumNameStr.drop_front(2);
@@ -1596,14 +1596,15 @@ StringRef ClangImporter::Implementation::getEnumConstantNamePrefix(
   return commonPrefix;
 }
 
-DeclName ClangImporter::Implementation::importFullName(
-           const clang::NamedDecl *D,
-           bool *hasCustomName,
-           clang::DeclContext **effectiveContext) {
+auto ClangImporter::Implementation::importFullName(
+       const clang::NamedDecl *D,
+       clang::DeclContext **effectiveContext) -> ImportedName {
+  ImportedName result;
+
   // Objective-C categories and extensions don't have names, despite
   // being "named" declarations.
   if (isa<clang::ObjCCategoryDecl>(D))
-    return { };
+    return result;
 
   // Compute the effective context, if requested.
   if (effectiveContext) {
@@ -1641,36 +1642,29 @@ DeclName ClangImporter::Implementation::importFullName(
 
   // If we have a swift_name attribute, use that.
   if (auto *nameAttr = D->getAttr<clang::SwiftNameAttr>()) {
-    if (hasCustomName)
-      *hasCustomName = true;
-
     // If we have an Objective-C method that is being mapped to an
     // initializer (e.g., a factory method whose name doesn't fit the
     // convention for factory methods), make sure that it can be
     // imported as an initializer.
     if (auto method = dyn_cast<clang::ObjCMethodDecl>(D)) {
       unsigned initPrefixLength;
-      CtorInitializerKind kind;
       if (nameAttr->getName().startswith("init(") &&
-          !shouldImportAsInitializer(method, initPrefixLength, kind))
+          !shouldImportAsInitializer(method, initPrefixLength, result.InitKind))
         return { };
     }
 
-    return parseDeclName(SwiftContext, nameAttr->getName());
+    result.HasCustomName = true;
+    result.Imported = parseDeclName(SwiftContext, nameAttr->getName());
+    return result;
   }
 
-  // We don't have a customized name.
-  if (hasCustomName)
-    *hasCustomName = false;
-
   // For empty names, there is nothing to do.
-  if (D->getDeclName().isEmpty()) return { };
+  if (D->getDeclName().isEmpty()) return result;
 
   /// Whether the result is a function name.
   bool isFunction = false;
   bool isInitializer = false;
   unsigned initializerPrefixLen;
-  CtorInitializerKind initKind;
   StringRef baseName;
   SmallVector<StringRef, 4> argumentNames;
   SmallString<16> selectorSplitScratch;
@@ -1682,7 +1676,7 @@ DeclName ClangImporter::Implementation::importFullName(
   case clang::DeclarationName::CXXOperatorName:
   case clang::DeclarationName::CXXUsingDirective:
     // Handling these is part of C++ interoperability.
-    return { };
+    return result;
 
   case clang::DeclarationName::Identifier:
     // Map the identifier.
@@ -1694,7 +1688,7 @@ DeclName ClangImporter::Implementation::importFullName(
   case clang::DeclarationName::ObjCZeroArgSelector: {
     auto objcMethod = cast<clang::ObjCMethodDecl>(D);
     isInitializer = shouldImportAsInitializer(objcMethod, initializerPrefixLen,
-                                              initKind);
+                                              result.InitKind);
 
     // Map the Objective-C selector directly.
     auto selector = D->getDeclName().getObjCSelector();
@@ -1902,27 +1896,32 @@ DeclName ClangImporter::Implementation::importFullName(
 
   // We cannot import when the base name is not an identifier.
   if (!Lexer::isIdentifier(baseName))
-    return { };
+    return result;
 
   // Get the identifier for the base name.
   Identifier baseNameId = SwiftContext.getIdentifier(baseName);
 
-  // If we have a non-function name, just return the base name.
-  if (!isFunction) return baseNameId;
+  // For functions, we need to form a complete name.
+  if (isFunction) {
+    // Convert the argument names.
+    SmallVector<Identifier, 4> argumentNameIds;
+    for (auto argName : argumentNames) {
+      if (argumentNames.empty() || !Lexer::isIdentifier(argName)) {
+        argumentNameIds.push_back(Identifier());
+        continue;
+      }
 
-  // Convert the argument names.
-  SmallVector<Identifier, 4> argumentNameIds;
-  for (auto argName : argumentNames) {
-    if (argumentNames.empty() || !Lexer::isIdentifier(argName)) {
-      argumentNameIds.push_back(Identifier());
-      continue;
+      argumentNameIds.push_back(SwiftContext.getIdentifier(argName));
     }
 
-    argumentNameIds.push_back(SwiftContext.getIdentifier(argName));
+    // Build the result.
+    result.Imported = DeclName(SwiftContext, baseNameId, argumentNameIds);
+  } else {
+    // For non-functions, just use the base name.
+    result.Imported = baseNameId;
   }
 
-  // Build the result.
-  return DeclName(SwiftContext, baseNameId, argumentNameIds);
+  return result;
 }
 
 Identifier

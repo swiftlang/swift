@@ -1425,7 +1425,7 @@ Type ClangImporter::Implementation::importFunctionType(
     }
 
     // Figure out the name for this parameter.
-    Identifier bodyName = importFullName(param).getBaseName();
+    Identifier bodyName = importFullName(param).Imported.getBaseName();
 
     // Retrieve the argument name.
     Identifier name;
@@ -2427,7 +2427,7 @@ Type ClangImporter::Implementation::importMethodType(
     }
 
     // Figure out the name for this parameter.
-    Identifier bodyName = importFullName(param).getBaseName();
+    Identifier bodyName = importFullName(param).Imported.getBaseName();
 
     // Figure out the name for this argument, which comes from the method name.
     Identifier name;
