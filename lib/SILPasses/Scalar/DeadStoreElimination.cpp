@@ -242,6 +242,17 @@ bool BBState::isTrackingMemLocation(unsigned bit) {
 
 void BBState::initialize(const BBState &Succ) { WriteSetOut = Succ.WriteSetIn; }
 
+/// Intersect is very frequently performed, so it is important to make it as
+/// cheap as possible.
+/// 
+/// To do so, we canonicalize MemLocations, i.e. traced back to the underlying
+/// object. Therefore, no need to do a O(N^2) comparison to figure out what is
+/// dead along all successors. 
+///
+/// NOTE: Canonicalizing does not solve the problem entirely. i.e. it is still
+/// possible that 2 MemLocations with different bases that happen to be the
+/// same object and field. In such case, we would miss a dead store
+/// opportunity. But this happens less often with canonicalization.
 void BBState::intersect(const BBState &Succ) { WriteSetOut &= Succ.WriteSetIn; }
 
 //===----------------------------------------------------------------------===//
