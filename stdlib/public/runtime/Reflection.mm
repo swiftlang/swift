@@ -309,6 +309,7 @@ void swift_MagicMirrorData_summary(const Metadata *T, String *result) {
       new (result) String("(Struct)");
       break;
     case MetadataKind::Enum:
+    case MetadataKind::Optional:
       new (result) String("(Enum Value)");
       break;
     case MetadataKind::Opaque:
@@ -381,6 +382,7 @@ recur:
   case MetadataKind::Class:
   case MetadataKind::Opaque:
   case MetadataKind::Enum:
+  case MetadataKind::Optional:
   case MetadataKind::Function:
   case MetadataKind::Metatype:
     break;
@@ -1149,6 +1151,7 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
         T, &StructMirrorMetadata, &StructMirrorWitnessTable);
       
   case MetadataKind::Enum:
+  case MetadataKind::Optional:
     return std::make_tuple(
         T, &EnumMirrorMetadata, &EnumMirrorWitnessTable);
 

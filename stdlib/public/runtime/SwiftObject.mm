@@ -1059,6 +1059,7 @@ extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolUnconditional(
   // Other kinds of type can never conform to ObjC protocols.
   case MetadataKind::Struct:
   case MetadataKind::Enum:
+  case MetadataKind::Optional:
   case MetadataKind::Opaque:
   case MetadataKind::Tuple:
   case MetadataKind::Function:
@@ -1106,6 +1107,7 @@ extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolConditional(
   // Other kinds of type can never conform to ObjC protocols.
   case MetadataKind::Struct:
   case MetadataKind::Enum:
+  case MetadataKind::Optional:
   case MetadataKind::Opaque:
   case MetadataKind::Tuple:
   case MetadataKind::Function:
@@ -1237,7 +1239,8 @@ static Demangle::NodePointer _buildDemanglingForMetadata(const Metadata *type) {
     return _buildDemanglingForNominalType(Node::Kind::BoundGenericClass,
                                           type, classType->getDescription());
   }
-  case MetadataKind::Enum: {
+  case MetadataKind::Enum:
+  case MetadataKind::Optional: {
     auto structType = static_cast<const EnumMetadata *>(type);
     return _buildDemanglingForNominalType(Node::Kind::BoundGenericEnum,
                                           type, structType->Description);

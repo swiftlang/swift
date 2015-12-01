@@ -380,6 +380,7 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
   }
   // Not a class.
   case MetadataKind::Enum:
+  case MetadataKind::Optional:
   case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
