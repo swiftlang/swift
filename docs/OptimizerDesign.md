@@ -1,7 +1,5 @@
-:orphan:
 
-Design of the Swift optimizer
-=============================
+### Design of the Swift optimizer
 
 This document describes the design of the Swift Optimizer. It is intended for
 developers who wish to debug, improve or simply understand what the Swift
@@ -9,8 +7,7 @@ optimizer does. Basic familiarity with the Swift programming language and
 knowledge of compiler optimizations is required.
 
 
-Optimization pipeline overview
-===============================
+### Optimization pipeline overview
 
 The Swift compiler translates textual swift programs into LLVM-IR and uses
 multiple representations in between. The Swift frontend is responsible for
@@ -50,8 +47,8 @@ higher-level optimizations. For example, the ARC optimizer and devirtualizer
 need SSA representation to analyze the program, and dead-code-elimination is a
 prerequisite to the array optimizations.
 
-The Swift Pass Manager
-======================
+### The Swift Pass Manager
+
 The Swift pass manager is the unit that executes optimization
 passes on the functions in the swift module. Unlike the LLVM optimizer, the
 Swift pass manager does not schedule analysis or optimization passes. The pass
@@ -74,8 +71,8 @@ after specific optimizations and to measure how much time is spent in
 each pass.
 
 
-Optimization passes
-===================
+### Optimization passes
+
 There are two kind of optimization passes in Swift: Function passes, and Module
 passes. Function passes can inspect the entire module but can only modify a
 single function. Function passes can't control the order in which functions in
@@ -92,8 +89,7 @@ type information down the call graph.
 
 This is the structure of a simple function pass:
 
-::
-
+```
   class CSE : public SILFunctionTransform {
     void run() override {
       // .. do stuff ..
@@ -103,10 +99,10 @@ This is the structure of a simple function pass:
       return "CSE";
     }
   };
+```
 
 
-Analysis Invalidation
-=====================
+### Analysis Invalidation
 
 Swift Analysis are very different from LLVM analysis. Swift analysis are simply
 a cache behind some utility that performs computation. For example, the
@@ -118,10 +114,10 @@ The pass manager will return a pointer to the analysis, and optimization passes
 can query the analysis.
 
 The code below requests access to the Dominance analysis.
-::
 
+```
     DominanceAnalysis* DA = getAnalysis<DominanceAnalysis>();
-
+```
 
 Passes that transform the IR are required to invalidate the analysis. However,
 optimization passes are not required to know about all the existing analysis.
@@ -138,26 +134,24 @@ The code below invalidates sends a message to all of the analysis saying that
 some instructions (that are not branches or calls) were modified in the function
 that the current function pass is processing.
 
-.. code-block:: cpp
-
+```
       if (Changed) {
         invalidateAnalysis(InvalidationKind::Instructions);
       }
-
+```
 
 The code below is a part of an analysis that responds to invalidation messages.
 The analysis checks if any calls in the program were modified and invalidates
 the cache for the function that was modified.
 
-.. code-block:: cpp
-
+```
     virtual void invalidate(SILFunction *F,
                             InvalidationKind K) override {
       if (K & InvalidationKind::Calls) {
         Storage[F].clear();
       }
     }
-
+```
 
 The invalidation traits that passes can invalidate are are:
 1. Instructions - some instructions were added, deleted or moved.
@@ -165,8 +159,7 @@ The invalidation traits that passes can invalidate are are:
 3. Branches - branches in the code were added, deleted or modified.
 4. Functions - Some functions were added or deleted.
 
-Semantic Tags
-=============
+### Semantic Tags
 
 The Swift optimizer has optimization passes that target specific data structures
 in the Swift standard library. For example, one optimization can remove the
@@ -176,14 +169,14 @@ optimization can remove array access bounds checks.
 The Swift optimizer can detect code in the standard library if it is marked with
 special attributes  @_semantics, that identifies the functions.
 
-This is an example of the ``@_semantics`` attribute as used by Swift Array:
+This is an example of the *@_semantics* attribute as used by Swift Array:
 
-::
-
+```
   @public @_semantics("array.count")
   func getCount() -> Int {
     return _buffer.count
    }
+```
 
 Notice that as soon as we inline functions that have the @_semantics attribute
 the attribute is lost and the optimizer can't analyze the content of the
@@ -198,14 +191,14 @@ pipeline.
 
 Please refer to the document “High-Level SIL Optimizations” for more details.
 
-Debugging the optimizer
-=======================
+### Debugging the optimizer
+
 TODO.
 
-Whole Module Optimizations
-==========================
+### Whole Module Optimizations
+
 TODO.
 
-List of passes
-==============
+### List of passes
+
 The updated list of passes is available in the file “Passes.def”.
