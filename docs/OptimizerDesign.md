@@ -11,7 +11,7 @@ knowledge of compiler optimizations is required.
 
 The Swift compiler translates textual swift programs into LLVM-IR and uses
 multiple representations in between. The Swift frontend is responsible for
-translating textual swift program into verified, well-formed and typed programs
+translating textual swift program into well-formed and type-checked programs
 that are encoded in the SIL intermediate representation. The frontend emits SIL
 in a phase that's called SILGen (stands for SIL-generation). Next, the swift
 compiler performs a sequence of transformations, such as inlining and constant
