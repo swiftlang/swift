@@ -1890,7 +1890,11 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                 if [[ "$SKIP_TEST_SWIFTPM" ]]; then
                     continue
                 fi
-                # FIXME: We don't test swiftpm, yet...
+                echo "--- Running tests for ${product} ---"
+                set -x
+                "${swiftpm_bootstrap_command[@]}" --build-tests test
+                { set +x; } 2>/dev/null
+                # As swiftpm tests itself, we break early here.
                 continue
                 ;;
             xctest)
@@ -2177,8 +2181,11 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
         pushd "${PKG_TESTS_SANDBOX}"
         tar xzf "${INSTALLABLE_PACKAGE}"
         popd
+
+        set -x
         (cd "${PKG_TESTS_SOURCE_DIR}" &&
                 python "${LIT_EXECUTABLE_PATH}" . -sv --param package-path="${PKG_TESTS_SANDBOX}" --param filecheck="${FILECHECK_EXECUTABLE_PATH}")
+        { set +x; } 2>/dev/null
     fi
 fi
 
