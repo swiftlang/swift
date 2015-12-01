@@ -18,45 +18,41 @@ public class Grandchild : Child {
   }
 }
 
-// static test2.Parent.foo () -> ()
-sil @_TZFC5test26Parent3foofT_T_ : $@convention(thin) (@thick Parent.Type) -> () {
-// %0                                             // user: %1
+sil @Parent_foo : $@convention(thin) (@thick Parent.Type) -> () {
 bb0(%0 : $@thick Parent.Type):
-  debug_value %0 : $@thick Parent.Type  // let self // id: %1
-  %2 = tuple ()                                   // user: %3
-  return %2 : $()                                 // id: %3
+  debug_value %0 : $@thick Parent.Type
+  %2 = tuple ()
+  return %2 : $()
 }
 
-// static test2.Grandchild.foo () -> ()
-sil @_TZFC5test210Grandchild3foofT_T_ : $@convention(thin) (@thick Grandchild.Type) -> () {
-// %0                                             // users: %1, %2
+sil @Grandchild_foo : $@convention(thin) (@thick Grandchild.Type) -> () {
 bb0(%0 : $@thick Grandchild.Type):
-  debug_value %0 : $@thick Grandchild.Type  // let self // id: %1
-  %2 = upcast %0 : $@thick Grandchild.Type to $@thick Child.Type // user: %3
-  %3 = upcast %2 : $@thick Child.Type to $@thick Parent.Type // user: %5
-  %4 = super_method %0 : $@thick Grandchild.Type, #Parent.foo!1 : (Parent.Type) -> () -> (), $@convention(thin) (@thick Parent.Type) -> () // user: %5
+  debug_value %0 : $@thick Grandchild.Type
+  %2 = upcast %0 : $@thick Grandchild.Type to $@thick Child.Type
+  %3 = upcast %2 : $@thick Child.Type to $@thick Parent.Type
+  %4 = super_method %0 : $@thick Grandchild.Type, #Parent.foo!1 : (Parent.Type) -> () -> (), $@convention(thin) (@thick Parent.Type) -> ()
   %5 = apply %4(%3) : $@convention(thin) (@thick Parent.Type) -> ()
-  %6 = tuple ()                                   // user: %7
-  return %6 : $()                                 // id: %7
+  %6 = tuple ()
+  return %6 : $()
 }
 
 sil_vtable Parent {
-  #Parent.foo!1: _TZFC5test26Parent3foofT_T_	// static test2.Parent.foo () -> ()
+  #Parent.foo!1: Parent_foo
 }
 
 sil_vtable Child {
-  #Parent.foo!1: _TZFC5test26Parent3foofT_T_	// static test2.Parent.foo () -> ()
+  #Parent.foo!1: Parent_foo
 }
 
 sil_vtable Grandchild {
-  #Parent.foo!1: _TZFC5test210Grandchild3foofT_T_	// static test2.Grandchild.foo () -> ()
+  #Parent.foo!1: Grandchild_foo
 }
 
-
-// CHECK-LABEL: define void @_TZFC5test210Grandchild3foofT_T_(%swift.type*) #0
+// CHECK-LABEL: define void @Grandchild_foo(%swift.type*) #0
 // CHECK: [[OPAQUE_GRANDCHILD:%[0-9]+]] = bitcast %swift.type* %0 to %swift.type**
 // CHECK: [[SUPER_METADATA_PTR:%[0-9]+]] = getelementptr inbounds %swift.type*, %swift.type** [[OPAQUE_GRANDCHILD]], i32 1
 // CHECK: [[SUPER_METADATA:%[0-9]+]] = load %swift.type*, %swift.type** [[SUPER_METADATA_PTR]]
 // CHECK: [[FOO_VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%swift.type*)*, void (%swift.type*)**
 // CHECK: [[FOO_FNPTR:%[0-9]+]] = load void (%swift.type*)*, void (%swift.type*)** [[FOO_VTABLE_SLOT]]
 // CHECK: call void
+
