@@ -1272,7 +1272,11 @@ if [[ "${BUILD_NINJA}" ]] ; then
         rm -rf "${build_dir}"
         cp -r "${NINJA_SOURCE_DIR}" "${build_dir}"
         if [[ $(uname -s) == "Darwin" ]]; then
-          (cd "${build_dir}" && env CXX=$(xcrun --sdk macosx -find clang++) CFLAGS="-isysroot $(xcrun --sdk macosx --show-sdk-path)" python ./configure.py --bootstrap)
+          (cd "${build_dir}" && \
+            env CXX=$(xcrun --sdk macosx -find clang++) \
+                CFLAGS="-isysroot $(xcrun --sdk macosx --show-sdk-path) -mmacosx-version-min=${DARWIN_DEPLOYMENT_VERSION_OSX}" \
+                LDFLAGS="-mmacosx-version-min=${DARWIN_DEPLOYMENT_VERSION_OSX}" \
+                python ./configure.py --bootstrap)
           { set +x; } 2>/dev/null
         else
           (cd "${build_dir}" && python ./configure.py --bootstrap)
