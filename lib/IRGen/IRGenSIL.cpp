@@ -2104,8 +2104,6 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
       break;
         
     case SILFunctionTypeRepresentation::WitnessMethod:
-      break;
-      
     case SILFunctionTypeRepresentation::Thick:
     case SILFunctionTypeRepresentation::Thin:
     case SILFunctionTypeRepresentation::Method:
