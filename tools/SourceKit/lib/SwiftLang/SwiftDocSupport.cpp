@@ -301,15 +301,11 @@ static void reportAttributes(ASTContext &Ctx,
   static UIdent AvailableAttrKind("source.lang.swift.attribute.availability");
   static UIdent PlatformIOS("source.availability.platform.ios");
   static UIdent PlatformOSX("source.availability.platform.osx");
-#if defined(SWIFT_ENABLE_TARGET_TVOS)
   static UIdent PlatformtvOS("source.availability.platform.tvos");
-#endif // SWIFT_ENABLE_TARGET_TVOS
   static UIdent PlatformWatchOS("source.availability.platform.watchos");
   static UIdent PlatformIOSAppExt("source.availability.platform.ios_app_extension");
   static UIdent PlatformOSXAppExt("source.availability.platform.osx_app_extension");
-#if defined(SWIFT_ENABLE_TARGET_TVOS)
   static UIdent PlatformtvOSAppExt("source.availability.platform.tvos_app_extension");
-#endif // SWIFT_ENABLE_TARGET_TVOS
   static UIdent PlatformWatchOSAppExt("source.availability.platform.watchos_app_extension");
 
   for (auto Attr : D->getAttrs()) {
@@ -322,20 +318,16 @@ static void reportAttributes(ASTContext &Ctx,
         PlatformUID = PlatformIOS; break;
       case PlatformKind::OSX:
         PlatformUID = PlatformOSX; break;
-#if defined(SWIFT_ENABLE_TARGET_TVOS)
       case PlatformKind::tvOS:
         PlatformUID = PlatformtvOS; break;
-#endif // SWIFT_ENABLE_TARGET_TVOS
       case PlatformKind::watchOS:
         PlatformUID = PlatformWatchOS; break;
       case PlatformKind::iOSApplicationExtension:
         PlatformUID = PlatformIOSAppExt; break;
       case PlatformKind::OSXApplicationExtension:
         PlatformUID = PlatformOSXAppExt; break;
-#if defined(SWIFT_ENABLE_TARGET_TVOS)
       case PlatformKind::tvOSApplicationExtension:
         PlatformUID = PlatformtvOSAppExt; break;
-#endif // SWIFT_ENABLE_TARGET_TVOS
       case PlatformKind::watchOSApplicationExtension:
         PlatformUID = PlatformWatchOSAppExt; break;
       }

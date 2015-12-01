@@ -58,10 +58,6 @@ option(SWIFT_ENABLE_TARGET_LINUX
     "Enable compiler support for targeting Linux"
     TRUE)
 
-option(SWIFT_ENABLE_TARGET_TVOS
-    "Enable compiler support for targeting tvOS"
-    TRUE)
-
 set(SWIFT_VERSION "2.2" CACHE STRING
     "The user-visible version of the Swift compiler")
 set(SWIFT_VENDOR "" CACHE STRING
@@ -468,29 +464,27 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
         IOS_SIMULATOR-R  "iOS Release"         IOS_SIMULATOR R "Release")
   endif()
 
-  if(${SWIFT_ENABLE_TARGET_TVOS})
-    is_sdk_requested(TVOS swift_build_tvos)
-    if(swift_build_tvos AND ${swift_can_crosscompile_stdlib})
-      configure_sdk_darwin(
-          TVOS "tvOS" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS}"
-          appletvos tvos tvos "arm64")
-      configure_target_variant(TVOS-DA "tvOS Debug+Asserts"   TVOS DA "Debug+Asserts")
-      configure_target_variant(TVOS-RA "tvOS Release+Asserts" TVOS RA "Release+Asserts")
-      configure_target_variant(TVOS-R  "tvOS Release"         TVOS R "Release")
-    endif()
+  is_sdk_requested(TVOS swift_build_tvos)
+  if(swift_build_tvos AND ${swift_can_crosscompile_stdlib})
+    configure_sdk_darwin(
+        TVOS "tvOS" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS}"
+        appletvos tvos tvos "arm64")
+    configure_target_variant(TVOS-DA "tvOS Debug+Asserts"   TVOS DA "Debug+Asserts")
+    configure_target_variant(TVOS-RA "tvOS Release+Asserts" TVOS RA "Release+Asserts")
+    configure_target_variant(TVOS-R  "tvOS Release"         TVOS R "Release")
+  endif()
 
-    is_sdk_requested(TVOS_SIMULATOR swift_build_tvos_simulator)
-    if(swift_build_tvos_simulator AND ${swift_can_crosscompile_stdlib})
-      configure_sdk_darwin(
-          TVOS_SIMULATOR "tvOS Simulator" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS}"
-          appletvsimulator tvos-simulator tvos "x86_64")
-      configure_target_variant(
-        TVOS_SIMULATOR-DA "tvOS Debug+Asserts"   TVOS_SIMULATOR DA "Debug+Asserts")
-      configure_target_variant(
-        TVOS_SIMULATOR-RA "tvOS Release+Asserts" TVOS_SIMULATOR RA "Release+Asserts")
-      configure_target_variant(
-        TVOS_SIMULATOR-R  "tvOS Release"         TVOS_SIMULATOR R "Release")
-    endif()
+  is_sdk_requested(TVOS_SIMULATOR swift_build_tvos_simulator)
+  if(swift_build_tvos_simulator AND ${swift_can_crosscompile_stdlib})
+    configure_sdk_darwin(
+        TVOS_SIMULATOR "tvOS Simulator" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS}"
+        appletvsimulator tvos-simulator tvos "x86_64")
+    configure_target_variant(
+      TVOS_SIMULATOR-DA "tvOS Debug+Asserts"   TVOS_SIMULATOR DA "Debug+Asserts")
+    configure_target_variant(
+      TVOS_SIMULATOR-RA "tvOS Release+Asserts" TVOS_SIMULATOR RA "Release+Asserts")
+    configure_target_variant(
+      TVOS_SIMULATOR-R  "tvOS Release"         TVOS_SIMULATOR R "Release")
   endif()
 
   is_sdk_requested(WATCHOS swift_build_watchos)

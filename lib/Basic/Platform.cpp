@@ -21,13 +21,11 @@ bool swift::tripleIsiOSSimulator(const llvm::Triple &triple) {
           (arch == llvm::Triple::x86 || arch == llvm::Triple::x86_64));
 }
 
-#if defined(SWIFT_ENABLE_TARGET_TVOS)
 bool swift::tripleIsAppleTVSimulator(const llvm::Triple &triple) {
   llvm::Triple::ArchType arch = triple.getArch();
   return (triple.isTvOS() &&
          (arch == llvm::Triple::x86 || arch == llvm::Triple::x86_64));
 }
-#endif // SWIFT_ENABLE_TARGET_TVOS
 
 bool swift::tripleIsWatchSimulator(const llvm::Triple &triple) {
   llvm::Triple::ArchType arch = triple.getArch();
@@ -36,23 +34,18 @@ bool swift::tripleIsWatchSimulator(const llvm::Triple &triple) {
 }
 
 bool swift::tripleIsAnySimulator(const llvm::Triple &triple) {
-#if defined(SWIFT_ENABLE_TARGET_TVOS)
-  if (tripleIsAppleTVSimulator(triple))
-    return true;
-#endif // SWIFT_ENABLE_TARGET_TVOS
-
-  return tripleIsiOSSimulator(triple) || tripleIsWatchSimulator(triple);
+  return tripleIsiOSSimulator(triple) ||
+      tripleIsWatchSimulator(triple) ||
+      tripleIsAppleTVSimulator(triple);
 }
 
 StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   if (triple.isiOS()) {
-#if defined(SWIFT_ENABLE_TARGET_TVOS)
     if (triple.isTvOS()) {
       if (tripleIsAppleTVSimulator(triple))
         return "appletvsimulator";
       return "appletvos";
     }
-#endif // SWIFT_ENABLE_TARGET_TVOS
 
     if (tripleIsiOSSimulator(triple))
       return "iphonesimulator";
