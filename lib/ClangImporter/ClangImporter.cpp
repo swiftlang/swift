@@ -2302,9 +2302,10 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
           continue;
         auto OwningClangModule = getClangOwningModule(Redeclaration,
                                                       ClangASTContext);
-        OwningClangModule = OwningClangModule->getTopLevelModule();
+        if (OwningClangModule)
+          OwningClangModule = OwningClangModule->getTopLevelModule();
 
-        if (OwningClangModule == ModuleFilter->getClangModule()->getTopLevelModule())
+        if (OwningClangModule == ModuleFilter->getClangModule())
           return true;
       }
     } else if (isa<clang::TagDecl>(D)) {
@@ -2315,9 +2316,10 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
           continue;
         auto OwningClangModule = getClangOwningModule(Redeclaration,
                                                       ClangASTContext);
-        OwningClangModule = OwningClangModule->getTopLevelModule();
+        if (OwningClangModule)
+          OwningClangModule = OwningClangModule->getTopLevelModule();
 
-        if (OwningClangModule == ModuleFilter->getClangModule()->getTopLevelModule())
+        if (OwningClangModule == ModuleFilter->getClangModule())
           return true;
       }
     }
