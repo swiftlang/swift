@@ -308,7 +308,9 @@ use this pattern::
 Features for ``REQUIRES`` and ``XFAIL``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-FIXME: list.
+FIXME: full list.
+
+* ``swift_ast_verifier``: present if the AST verifier is enabled in this build.
 
 When writing a test specific to x86, if possible, prefer ``REQUIRES:
 CPU=i386_or_x86_64`` to ``REQUIRES: CPU=x86_64``.
