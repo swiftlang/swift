@@ -1081,8 +1081,8 @@ SILInstruction *SILCombiner::visitWitnessMethodInst(WitnessMethodInst *WMI) {
   SILWitnessTable *WT;
 
   std::tie(F, WT, Subs) =
-    WMI->getModule().lookUpFunctionInWitnessTable(WMI->getConformance(),
-						                          WMI->getMember());
+      WMI->getModule().lookUpFunctionInWitnessTable(WMI->getConformance(),
+                                                    WMI->getMember());
 
   if (!F)
     return nullptr;

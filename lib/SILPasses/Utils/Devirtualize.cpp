@@ -504,7 +504,7 @@ DevirtualizationResult swift::tryDevirtualizeClassMethod(FullApplySite AI,
 /// witness_method when we've determined the actual function we'll end
 /// up calling.
 static ApplySite devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
-                                            ArrayRef<Substitution> Subs) {
+                                           ArrayRef<Substitution> Subs) {
   // We know the witness thunk and the corresponding set of substitutions
   // required to invoke the protocol method at this point.
   auto &Module = AI.getModule();
@@ -539,8 +539,8 @@ static ApplySite devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   // new argument list, upcasting when required.
   SILBuilderWithScope B(AI.getInstruction());
   for (unsigned ArgN = 0, ArgE = AI.getNumArguments(); ArgN != ArgE; ++ArgN) {
-	SILValue A = AI.getArgument(ArgN);
-	auto ParamType = ParamTypes[ParamTypes.size() - AI.getNumArguments() + ArgN];
+    SILValue A = AI.getArgument(ArgN);
+    auto ParamType = ParamTypes[ParamTypes.size() - AI.getNumArguments() + ArgN];
     if (A.getType() != ParamType)
       A = B.createUpcast(AI.getLoc(), A, ParamType);
 
