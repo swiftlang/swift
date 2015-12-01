@@ -129,7 +129,6 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
         diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
                        "OS X 10.9");
     } else if (triple.isiOS()) {
-#if defined(SWIFT_ENABLE_TARGET_TVOS)
       if (triple.isTvOS()) {
         if (triple.isOSVersionLT(9, 0)) {
           diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
@@ -137,7 +136,6 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
           return;
         }
       }
-#endif // SWIFT_ENABLE_TARGET_TVOS
       if (triple.isOSVersionLT(7))
         diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
                        "iOS 7");
@@ -2024,9 +2022,7 @@ const ToolChain *Driver::getToolChain(const ArgList &Args) const {
     case llvm::Triple::Darwin:
     case llvm::Triple::MacOSX:
     case llvm::Triple::IOS:
-#if defined(SWIFT_ENABLE_TARGET_TVOS)
     case llvm::Triple::TvOS:
-#endif // SWIFT_ENABLE_TARGET_TVOS
     case llvm::Triple::WatchOS:
       TC = new toolchains::Darwin(*this, Target);
       break;

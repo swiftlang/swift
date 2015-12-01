@@ -1,4 +1,3 @@
-// REQUIRES: enable_target_appletvos
 // XFAIL: linux
 
 // Test SDK detection for immediate mode.

@@ -364,11 +364,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     unsigned major, minor, micro;
     if (triple.isiOS()) {
       bool isiOSSimulator = swift::tripleIsiOSSimulator(triple);
-#if defined(SWIFT_ENABLE_TARGET_TVOS)
       if (triple.isTvOS()) {
-#else
-      if (/* DISABLES CODE */ (false)) {
-#endif // SWIFT_ENABLE_TARGET_TVOS
         if (isiOSSimulator)
           minVersionOpt << "-mtvos-simulator-version-min=";
         else
@@ -1031,11 +1027,7 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
   // applies in Swift, and if so, what is the cutoff for deprecated
   // declarations that are now considered unavailable in Swift.
 
-  if (ctx.LangOpts.Target.isiOS()
-#if defined(SWIFT_ENABLE_TARGET_TVOS)
-      && !ctx.LangOpts.Target.isTvOS()
-#endif // SWIFT_ENABLE_TARGET_TVOS
-  ) {
+  if (ctx.LangOpts.Target.isiOS() && !ctx.LangOpts.Target.isTvOS()) {
     if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
       PlatformAvailabilityFilter =
         [](StringRef Platform) { return Platform == "ios"; };
@@ -1052,7 +1044,6 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
     DeprecatedAsUnavailableMessage =
       "APIs deprecated as of iOS 7 and earlier are unavailable in Swift";
   }
-#if defined(SWIFT_ENABLE_TARGET_TVOS)
   else if (ctx.LangOpts.Target.isTvOS()) {
     if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
       PlatformAvailabilityFilter =
@@ -1070,7 +1061,6 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
     DeprecatedAsUnavailableMessage =
       "APIs deprecated as of iOS 7 and earlier are unavailable in Swift";
   }
-#endif // SWIFT_ENABLE_TARGET_TVOS
   else if (ctx.LangOpts.Target.isWatchOS()) {
     if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
       PlatformAvailabilityFilter =

@@ -105,11 +105,6 @@ if(PYTHONINTERP_FOUND)
     list(APPEND SWIFT_TEST_EXTRA_ARGS "--param" "leaks-all")
   endif()
 
-  if(NOT SWIFT_ENABLE_TARGET_APPLETVOS)
-    list(APPEND SWIFT_TEST_EXTRA_ARGS
-         "--param" "swift_enable_target_appletvos=false")
-  endif()
-
   if(NOT CMAKE_CFG_INTDIR STREQUAL ".")
     list(APPEND SWIFT_TEST_EXTRA_ARGS
          "--param" "build_mode=${CMAKE_CFG_INTDIR}")

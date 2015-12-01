@@ -26,5 +26,3 @@
 // LINUX: clang++{{"? }}
 // LINUX: lib/swift/clang/{{[^ ]*}}/lib/linux/libclang_rt.profile-x86_64.a
 
-// REQUIRES: enable_target_appletvos
-

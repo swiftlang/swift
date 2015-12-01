@@ -171,7 +171,6 @@ KNOWN_SETTINGS=(
     sil-verify-all              "0"              "If enabled, run the sil verifier be run after every SIL pass"
     swift-enable-ast-verifier   "1"              "If enabled, and the assertions are enabled, the built Swift compiler will run the AST verifier every time it is invoked"
     swift-enable-target-linux   "1"              "Enable compiler support for targeting Linux"
-    swift-enable-target-appletvos "1"            "Enable compiler support for targeting tvOS"
     swift-runtime-enable-dtrace "0"              "Enable runtime dtrace support"
     swift-runtime-enable-leak-checker   "0"              "Enable leaks checking routines in the runtime"
     use-gold-linker             ""               "Enable using the gold linker"
@@ -1421,7 +1420,6 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
             -D${PRODUCT}_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
             -D${PRODUCT}_PATH_TO_CMARK_SOURCE:PATH="${CMARK_SOURCE_DIR}"
             -D${PRODUCT}_PATH_TO_CMARK_BUILD:PATH="$(build_directory $deployment_target cmark)"
-            -DSWIFT_ENABLE_TARGET_APPLETVOS:BOOL=$(true_false "${SWIFT_ENABLE_TARGET_APPLETVOS}")
         )
 
         if [[ "${CMAKE_GENERATOR}" != "Ninja" ]] ; then

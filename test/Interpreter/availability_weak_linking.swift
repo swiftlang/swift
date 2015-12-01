@@ -17,7 +17,6 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
-// REQUIRES: enable_target_appletvos
 
 import StdlibUnittest
 
