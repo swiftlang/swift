@@ -314,32 +314,17 @@ extension CollectionType {
       return []
     }
 
-    var builder =
-      _UnsafePartiallyInitializedContiguousArrayBuffer<T>(
-        initialCapacity: count)
+    var builder = ContiguousArray<T>()
+    builder.reserveCapacity(count)
 
     var i = self.startIndex
 
-    // FIXME: Type checker doesn't allow a `rethrows` function to catch and
-    // throw an error. It'd be nice to separate the success and failure cleanup
-    // paths more cleanly than this.
-    // Ensure the buffer is left in a destructible state.
-    var finished = false
-    defer {
-      if !finished {
-        _ = builder.finish()
-      }
+    for _ in 0..<count {
+      builder.append(try transform(self[i++]))
     }
 
-    // On the success path, we know we'll have exactly `count` elements
-    // in the buffer, so we can bypass checks.
-    for _ in 0..<count {
-      builder.addWithExistingCapacity(try transform(self[i++]))
-    }
     _expectEnd(i, self)
-    let buffer = builder.finishWithOriginalCount()
-    finished = true
-    return Array(buffer)
+    return Array(builder)
   }
 
   /// Returns a subsequence containing all but the first `n` elements.
