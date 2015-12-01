@@ -3855,7 +3855,7 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
 
   // If the source type is already an error type, we've already posted an error.
   auto srcExpr = typeCheckChildIndependently(assignExpr->getSrc(),
-                                     destType->getLValueOrInOutObjectType(),
+                                             destType->getRValueType(),
                                              CTP_AssignSource);
   if (!srcExpr) return true;
   return false;

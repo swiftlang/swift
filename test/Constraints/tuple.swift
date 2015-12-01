@@ -141,3 +141,14 @@ variadicWithTrailingClosure(y: 0, fn: +)
 variadicWithTrailingClosure(1, 2, 3, fn: +)
 variadicWithTrailingClosure(1, fn: +)
 variadicWithTrailingClosure(fn: +)
+
+
+// <rdar://problem/23700031> QoI: Terrible diagnostic in tuple assignment
+func gcd_23700031<T>(a: T, b: T) {
+  var a = a
+  var b = b
+  (a, b) = (b, a % b)  // expected-error {{binary operator '%' cannot be applied to two 'T' operands}}
+  // expected-note @-1 {{overloads for '%' exist with these partially matching parameter lists: (UInt8, UInt8), (Int8, Int8), (UInt16, UInt16), (Int16, Int16), (UInt32, UInt32), (Int32, Int32), (UInt64, UInt64), (Int64, Int64), (UInt, UInt), (Int, Int), (Float, Float)}}
+}
+
+
