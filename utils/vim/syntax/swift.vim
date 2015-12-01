@@ -12,7 +12,7 @@ syn keyword swiftImport import skipwhite nextgroup=swiftImportModule
 syn match swiftImportModule /\<[A-Za-z_][A-Za-z_0-9]*\>/ contained nextgroup=swiftImportComponent
 syn match swiftImportComponent /\.\<[A-Za-z_][A-Za-z_0-9]*\>/ contained nextgroup=swiftImportComponent
 
-syn keyword swiftKeyword break case continue default do else for if in static switch repeat return where while public internal private skipwhite
+syn keyword swiftKeyword break case continue default do else for if in static switch repeat return where while public internal private mutating nonmutating var let typealias protocol extension skipwhite
 
 syn keyword swiftTypeDefinition class extension protocol struct typealias enum skipwhite nextgroup=swiftTypeName
 syn region swiftTypeAttributes start="\[" end="\]" skipwhite contained nextgroup=swiftTypeName
@@ -20,6 +20,7 @@ syn match swiftTypeName /\<[A-Za-z_][A-Za-z_0-9\.]*\>/ contained nextgroup=swift
 
 syn region swiftTypeParameters start="<" end=">" skipwhite contained
 
+syn keyword swiftMutating mutating skipwhite nextgroup=swiftFuncDefinition
 syn keyword swiftFuncDefinition func skipwhite nextgroup=swiftFuncAttributes,swiftFuncName,swiftOperator
 syn region swiftFuncAttributes start="\[" end="\]" skipwhite contained nextgroup=swiftFuncName,swiftOperator
 syn match swiftFuncName /\<[A-Za-z_][A-Za-z_0-9]*\>/ skipwhite contained nextgroup=swiftTypeParameters
@@ -57,7 +58,11 @@ syn match swiftOperator "\.\.[<.]" skipwhite nextgroup=swiftTypeParameters
 
 syn match swiftChar /'\([^'\\]\|\\\(["'tnr0\\]\|x[0-9a-fA-F]\{2}\|u[0-9a-fA-F]\{4}\|U[0-9a-fA-F]\{8}\)\)'/
 
-syn match swiftLabel /\(get\|set\):\@=/
+syn match swiftLabel /\(\<get\>\|\<set\>\):\@=/
+
+syn match swiftPreproc /^#\<if\>\|^#\<endif\>/
+
+syn match swiftAttribute /@\<\w\+\>/ skipwhite
 
 hi def link swiftImport Include
 hi def link swiftImportModule Title
@@ -90,5 +95,8 @@ hi def link swiftOperator Function
 hi def link swiftChar Character
 hi def link swiftLabel Label
 hi def link swiftNew Operator
+hi def link swiftMutating Statement
+hi def link swiftPreproc PreCondit
+hi def link swiftAttribute Type
 
 let b:current_syntax = "swift"
