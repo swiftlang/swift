@@ -2,39 +2,39 @@
 
 // RUN: rm -rf %t && mkdir %t
 
-// RUN: %target-swift-frontend -emit-dependencies-path - -parse %S/../Inputs/empty.swift | FileCheck -check-prefix=CHECK-BASIC %s
-// RUN: %target-swift-frontend -emit-reference-dependencies-path - -parse -primary-file %S/../Inputs/empty.swift | FileCheck -check-prefix=CHECK-BASIC-YAML %s
+// RUN: %target-swift-frontend -emit-dependencies-path - -parse %S/../Inputs/empty\ file.swift | FileCheck -check-prefix=CHECK-BASIC %s
+// RUN: %target-swift-frontend -emit-reference-dependencies-path - -parse -primary-file %S/../Inputs/empty\ file.swift | FileCheck -check-prefix=CHECK-BASIC-YAML %s
 
-// RUN: %target-swift-frontend -emit-dependencies-path %t.d -emit-reference-dependencies-path %t.swiftdeps -parse -primary-file %S/../Inputs/empty.swift
+// RUN: %target-swift-frontend -emit-dependencies-path %t.d -emit-reference-dependencies-path %t.swiftdeps -parse -primary-file %S/../Inputs/empty\ file.swift
 // RUN: FileCheck -check-prefix=CHECK-BASIC %s < %t.d
 // RUN: FileCheck -check-prefix=CHECK-BASIC-YAML %s < %t.swiftdeps
 
 // CHECK-BASIC-LABEL: - :
-// CHECK-BASIC: Inputs/empty.swift
+// CHECK-BASIC: Inputs/empty\ file.swift
 // CHECK-BASIC: Swift.swiftmodule
 // CHECK-BASIC-NOT: :
 
 // CHECK-BASIC-YAML-LABEL: depends-external:
-// CHECK-BASIC-YAML-NOT: empty.swift
+// CHECK-BASIC-YAML-NOT: empty\ file.swift
 // CHECK-BASIC-YAML: "{{.*}}/Swift.swiftmodule"
 // CHECK-BASIC-YAML-NOT: {{:$}}
 
 
-// RUN: %target-swift-frontend -emit-dependencies-path %t.d -emit-reference-dependencies-path %t.swiftdeps -parse %S/../Inputs/empty.swift 2>&1 | FileCheck -check-prefix=NO-PRIMARY-FILE %s
+// RUN: %target-swift-frontend -emit-dependencies-path %t.d -emit-reference-dependencies-path %t.swiftdeps -parse %S/../Inputs/empty\ file.swift 2>&1 | FileCheck -check-prefix=NO-PRIMARY-FILE %s
 
 // NO-PRIMARY-FILE: warning: ignoring -emit-reference-dependencies (requires -primary-file)
 
 
-// RUN: %target-swift-frontend -emit-dependencies-path - -emit-module %S/../Inputs/empty.swift -o %t/empty.swiftmodule -emit-module-doc-path %t/empty.swiftdoc -emit-objc-header-path %t/empty.h | FileCheck -check-prefix=CHECK-MULTIPLE-OUTPUTS %s
+// RUN: %target-swift-frontend -emit-dependencies-path - -emit-module %S/../Inputs/empty\ file.swift -o %t/empty\ file.swiftmodule -emit-module-doc-path %t/empty\ file.swiftdoc -emit-objc-header-path %t/empty\ file.h | FileCheck -check-prefix=CHECK-MULTIPLE-OUTPUTS %s
 
-// CHECK-MULTIPLE-OUTPUTS-LABEL: empty.swiftmodule :
-// CHECK-MULTIPLE-OUTPUTS: Inputs/empty.swift
+// CHECK-MULTIPLE-OUTPUTS-LABEL: empty\ file.swiftmodule :
+// CHECK-MULTIPLE-OUTPUTS: Inputs/empty\ file.swift
 // CHECK-MULTIPLE-OUTPUTS: Swift.swiftmodule
-// CHECK-MULTIPLE-OUTPUTS-LABEL: empty.swiftdoc :
-// CHECK-MULTIPLE-OUTPUTS: Inputs/empty.swift
+// CHECK-MULTIPLE-OUTPUTS-LABEL: empty\ file.swiftdoc :
+// CHECK-MULTIPLE-OUTPUTS: Inputs/empty\ file.swift
 // CHECK-MULTIPLE-OUTPUTS: Swift.swiftmodule
-// CHECK-MULTIPLE-OUTPUTS-LABEL: empty.h :
-// CHECK-MULTIPLE-OUTPUTS: Inputs/empty.swift
+// CHECK-MULTIPLE-OUTPUTS-LABEL: empty\ file.h :
+// CHECK-MULTIPLE-OUTPUTS: Inputs/empty\ file.swift
 // CHECK-MULTIPLE-OUTPUTS: Swift.swiftmodule
 // CHECK-MULTIPLE-OUTPUTS-NOT: :
 
