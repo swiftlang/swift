@@ -819,6 +819,7 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(SILFunction &SILFn,
                                                  llvm::Function *Fn) {
   auto *DS = SILFn.getDebugScope();
   assert(DS && "SIL function has no debug scope");
+  (void) DS;
   return emitFunction(SILFn.getModule(), SILFn.getDebugScope(), Fn,
                       SILFn.getRepresentation(), SILFn.getLoweredType(),
                       SILFn.getDeclContext());
