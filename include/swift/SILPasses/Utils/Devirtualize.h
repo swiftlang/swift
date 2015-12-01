@@ -40,7 +40,7 @@ namespace swift {
 /// Two elements are required, because a result of the new devirtualized
 /// apply/try_apply instruction (second element) eventually needs to be
 /// casted to produce a properly typed value (first element).
-typedef std::pair<ValueBase *, FullApplySite> DevirtualizationResult;
+typedef std::pair<ValueBase *, ApplySite> DevirtualizationResult;
 
 DevirtualizationResult tryDevirtualizeApply(FullApplySite AI);
 bool isClassWithUnboundGenericParameters(SILType C, SILModule &M);
@@ -49,6 +49,7 @@ DevirtualizationResult devirtualizeClassMethod(FullApplySite AI,
                                                SILValue ClassInstance);
 DevirtualizationResult tryDevirtualizeClassMethod(FullApplySite AI,
                                                   SILValue ClassInstance);
+DevirtualizationResult tryDevirtualizeWitnessMethod(ApplySite AI); 
 }
 
 #endif

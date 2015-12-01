@@ -23,6 +23,7 @@
 #include "swift/SILAnalysis/CFG.h"
 #include "swift/SILAnalysis/ValueTracking.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILPasses/Utils/Devirtualize.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/DenseMap.h"
@@ -1070,3 +1071,33 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
 SILInstruction *SILCombiner::visitEnumInst(EnumInst *EI) {
   return nullptr;
 }
+
+SILInstruction *SILCombiner::visitWitnessMethodInst(WitnessMethodInst *WMI) {
+  // Try to devirtualize a witness_method if it is statically possible.
+  // Many cases are handled by the inliner/devirtualizer, but certain
+  // special cases are not covered there, e.g. partial_apply(witness_method)
+  SILFunction *F;
+  ArrayRef<Substitution> Subs;
+  SILWitnessTable *WT;
+
+  std::tie(F, WT, Subs) =
+    WMI->getModule().lookUpFunctionInWitnessTable(WMI->getConformance(),
+						                          WMI->getMember());
+
+  if (!F)
+    return nullptr;
+
+  for (auto U = WMI->use_begin(), E = WMI->use_end(); U != E;) {
+    auto User = U->getUser();
+    ++U;
+    if (auto AI = ApplySite::isa(User)) {
+      auto Result = tryDevirtualizeWitnessMethod(AI);
+      if (Result.first) {
+        User->replaceAllUsesWith(Result.first);
+        eraseInstFromFunction(*User);
+      }
+    }
+  }
+  return nullptr;
+}
+

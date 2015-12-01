@@ -503,7 +503,7 @@ DevirtualizationResult swift::tryDevirtualizeClassMethod(FullApplySite AI,
 /// Generate a new apply of a function_ref to replace an apply of a
 /// witness_method when we've determined the actual function we'll end
 /// up calling.
-static FullApplySite devirtualizeWitnessMethod(FullApplySite AI, SILFunction *F,
+static ApplySite devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
                                             ArrayRef<Substitution> Subs) {
   // We know the witness thunk and the corresponding set of substitutions
   // required to invoke the protocol method at this point.
@@ -517,7 +517,10 @@ static FullApplySite devirtualizeWitnessMethod(FullApplySite AI, SILFunction *F,
   SmallVector<Substitution, 16> NewSubstList(Subs.begin(), Subs.end());
 
   // Add the non-self-derived substitutions from the original application.
-  for (auto &origSub : AI.getSubstitutionsWithoutSelfSubstitution())
+  ArrayRef<Substitution>  SubstList;
+  SubstList = AI.getSubstitutionsWithoutSelfSubstitution();
+
+  for (auto &origSub : SubstList)
     if (!origSub.getArchetype()->isSelfDerived())
       NewSubstList.push_back(origSub);
 
@@ -531,18 +534,17 @@ static FullApplySite devirtualizeWitnessMethod(FullApplySite AI, SILFunction *F,
   auto Arguments = SmallVector<SILValue, 4>();
 
   auto ParamTypes = SubstCalleeCanType->getParameterSILTypes();
-  // Type of the current parameter being processed
-  auto ParamType = ParamTypes.begin();
 
   // Iterate over the non self arguments and add them to the
   // new argument list, upcasting when required.
   SILBuilderWithScope B(AI.getInstruction());
-  for (SILValue A : AI.getArguments()) {
-    if (A.getType() != *ParamType)
-      A = B.createUpcast(AI.getLoc(), A, *ParamType);
+  for (unsigned ArgN = 0, ArgE = AI.getNumArguments(); ArgN != ArgE; ++ArgN) {
+	SILValue A = AI.getArgument(ArgN);
+	auto ParamType = ParamTypes[ParamTypes.size() - AI.getNumArguments() + ArgN];
+    if (A.getType() != ParamType)
+      A = B.createUpcast(AI.getLoc(), A, ParamType);
 
     Arguments.push_back(A);
-    ++ParamType;
   }
 
   // Replace old apply instruction by a new apply instruction that invokes
@@ -553,7 +555,7 @@ static FullApplySite devirtualizeWitnessMethod(FullApplySite AI, SILFunction *F,
 
   auto SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeCanType);
   auto ResultSILType = SubstCalleeCanType->getSILResult();
-  FullApplySite SAI;
+  ApplySite SAI;
 
   if (auto *A = dyn_cast<ApplyInst>(AI))
     SAI = Builder.createApply(Loc, FRI, SubstCalleeSILType,
@@ -563,6 +565,9 @@ static FullApplySite devirtualizeWitnessMethod(FullApplySite AI, SILFunction *F,
     SAI = Builder.createTryApply(Loc, FRI, SubstCalleeSILType,
                                  NewSubstList, Arguments,
                                  TAI->getNormalBB(), TAI->getErrorBB());
+  if (auto *PAI = dyn_cast<PartialApplyInst>(AI))
+    SAI = Builder.createPartialApply(Loc, FRI, SubstCalleeSILType,
+                                     NewSubstList, Arguments, PAI->getType());
 
   NumWitnessDevirt++;
   return SAI;
@@ -571,7 +576,7 @@ static FullApplySite devirtualizeWitnessMethod(FullApplySite AI, SILFunction *F,
 /// In the cases where we can statically determine the function that
 /// we'll call to, replace an apply of a witness_method with an apply
 /// of a function_ref, returning the new apply.
-static DevirtualizationResult tryDevirtualizeWitnessMethod(FullApplySite AI) {
+DevirtualizationResult swift::tryDevirtualizeWitnessMethod(ApplySite AI) {
   SILFunction *F;
   ArrayRef<Substitution> Subs;
   SILWitnessTable *WT;

@@ -320,14 +320,14 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
           I = II->getIterator();
         else
           I = NewInst->getParentBB()->begin();
-        auto NewAI = NewInstPair.second;
+        auto NewAI = FullApplySite::isa(NewInstPair.second.getInstruction());
         if (!NewAI)
           continue;
 
         InnerAI = NewAI;
       }
 
-      SILLocation Loc = InnerAI.getLoc();
+	  SILLocation Loc = InnerAI.getLoc();
       SILValue CalleeValue = InnerAI.getCallee();
       bool IsThick;
       PartialApplyInst *PAI;

@@ -2104,7 +2104,6 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
       break;
         
     case SILFunctionTypeRepresentation::WitnessMethod:
-      assert(false && "partial_apply of witness functions not implemented");
       break;
       
     case SILFunctionTypeRepresentation::Thick:

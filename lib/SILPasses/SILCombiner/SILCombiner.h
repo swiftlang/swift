@@ -243,7 +243,7 @@ public:
   SILInstruction *visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI);
   SILInstruction *visitEnumInst(EnumInst *EI);
   SILInstruction *visitConvertFunctionInst(ConvertFunctionInst *CFI);
-
+  SILInstruction *visitWitnessMethodInst(WitnessMethodInst *WMI);
 
   /// Instruction visitor helpers.
   SILInstruction *optimizeBuiltinCanBeObjCClass(BuiltinInst *AI);

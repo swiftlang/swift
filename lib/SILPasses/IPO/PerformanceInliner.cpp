@@ -826,7 +826,7 @@ FullApplySite SILPerformanceInliner::devirtualizeUpdatingCallGraph(
   if (!NewInstPair.second)
     return FullApplySite();
 
-  auto NewAI = NewInstPair.second;
+  auto NewAI = FullApplySite::isa(NewInstPair.second.getInstruction());
   CallGraphEditor(&CG).replaceApplyWithNew(Apply, NewAI);
 
   replaceDeadApply(Apply, NewInstPair.first);
