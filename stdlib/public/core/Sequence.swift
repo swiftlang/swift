@@ -295,33 +295,20 @@ extension SequenceType {
     @noescape transform: (Generator.Element) throws -> T
   ) rethrows -> [T] {
     let initialCapacity = underestimateCount()
-    var builder =
-      _UnsafePartiallyInitializedContiguousArrayBuffer<T>(
-        initialCapacity: initialCapacity)
+    var builder = ContiguousArray<T>()
+    builder.reserveCapacity(initialCapacity)
 
     var generator = generate()
 
-    // FIXME: Type checker doesn't allow a `rethrows` function to catch and
-    // throw an error. It'd be nice to separate the success and failure cleanup
-    // paths more cleanly than this.
-    // Ensure the buffer is left in a destructible state.
-    var finished = false
-    defer {
-      if !finished {
-        _ = builder.finish()
-      }
-    }
     // Add elements up to the initial capacity without checking for regrowth.
     for _ in 0..<initialCapacity {
-      builder.addWithExistingCapacity(try transform(generator.next()!))
+      builder.append(try transform(generator.next()!))
     }
     // Add remaining elements, if any.
     while let element = generator.next() {
-      builder.add(try transform(element))
+      builder.append(try transform(element))
     }
-    let buffer = builder.finish()
-    finished = true
-    return Array(buffer)
+    return Array(builder)
   }
 
   /// Return an `Array` containing the elements of `self`,
@@ -330,30 +317,18 @@ extension SequenceType {
   public func filter(
     @noescape includeElement: (Generator.Element) throws -> Bool
   ) rethrows -> [Generator.Element] {
-    var builder =
-      _UnsafePartiallyInitializedContiguousArrayBuffer<Generator.Element>(
-        initialCapacity: 0)
+
+    var builder = ContiguousArray<Generator.Element>()
 
     var generator = generate()
 
-    // FIXME: Type checker doesn't allow a `rethrows` function to catch and
-    // throw an error. It'd be nice to separate the success and failure cleanup
-    // paths more cleanly than this.
-    // Ensure the buffer is left in a destructible state.
-    var finished = false
-    defer {
-      if !finished {
-        _ = builder.finish()
-      }
-    }
     while let element = generator.next() {
       if try includeElement(element) {
-        builder.add(element)
+        builder.append(element)
       }
     }
-    let buffer = builder.finish()
-    finished = true
-    return Array(buffer)
+
+    return Array(builder)
   }
 
   /// Returns a subsequence containing all but the first `n` elements.
