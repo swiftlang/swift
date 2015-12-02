@@ -1179,7 +1179,8 @@ static StringRef getImportedCFTypeName(StringRef name) {
   return name;
 }
 
-static bool isCFTypeDecl(const clang::TypedefNameDecl *Decl) {
+bool ClangImporter::Implementation::isCFTypeDecl(
+       const clang::TypedefNameDecl *Decl) {
   if (auto pointee = CFPointeeInfo::classifyTypedef(Decl))
     return pointee.isValid();
   return false;
@@ -2795,8 +2796,8 @@ namespace {
 
       bool redundant = false;
       auto result = importConstructor(decl, dc, false, importedName.InitKind,
-                                      /*required=*/false, selector, initName,
-                                      importedName.HasCustomName,
+                                      /*required=*/false, selector,
+                                      importedName,
                                       {decl->param_begin(), decl->param_size()},
                                       decl->isVariadic(), redundant);
       if (result)
@@ -2895,8 +2896,8 @@ namespace {
                                         decl->isVariadic(),
                                         decl->hasAttr<clang::NoReturnAttr>(),
                                         isInSystemModule(dc),
-                                        importedName.HasCustomName,
                                         bodyPatterns,
+                                        importedName,
                                         name,
                                         errorConvention,
                                         kind);
@@ -3143,8 +3144,7 @@ namespace {
 
       bool redundant;
       return importConstructor(objcMethod, dc, implicit, kind, required,
-                               selector, importedName,
-                               importedName.HasCustomName, params,
+                               selector, importedName, params,
                                variadic, redundant);
     }
 
@@ -3225,6 +3225,8 @@ namespace {
       return false;
     }
 
+    using ImportedName = ClangImporter::Implementation::ImportedName;
+
     /// \brief Given an imported method, try to import it as a constructor.
     ///
     /// Objective-C methods in the 'init' family are imported as
@@ -3243,8 +3245,7 @@ namespace {
                                        Optional<CtorInitializerKind> kindIn,
                                        bool required,
                                        ObjCSelector selector,
-                                       DeclName name,
-                                       bool hasCustomName,
+                                       ImportedName importedName,
                                        ArrayRef<const clang::ParmVarDecl*> args,
                                        bool variadic,
                                        bool &redundant) {
@@ -3293,14 +3294,15 @@ namespace {
 
       // Import the type that this method will have.
       Optional<ForeignErrorConvention> errorConvention;
+      DeclName name = importedName.Imported;
       auto type = Impl.importMethodType(objcMethod,
                                         objcMethod->getReturnType(),
                                         args,
                                         variadic,
                                         objcMethod->hasAttr<clang::NoReturnAttr>(),
                                         isInSystemModule(dc),
-                                        hasCustomName,
                                         bodyPatterns,
+                                        importedName,
                                         name,
                                         errorConvention,
                                         SpecialMethodKind::Constructor);
@@ -4501,14 +4503,15 @@ namespace {
             assert(ctor->getInitKind() ==
                      CtorInitializerKind::ConvenienceFactory);
 
+            ImportedName importedName = Impl.importFullName(objcMethod);
+            importedName.HasCustomName = true;
             bool redundant;
             if (auto newCtor = importConstructor(objcMethod, classDecl,
                                                  /*implicit=*/true,
                                                  ctor->getInitKind(),
                                                  /*required=*/false, 
                                                  ctor->getObjCSelector(),
-                                                 ctor->getFullName(),
-                                                 /*customName=*/true,
+                                                 importedName,
                                                  objcMethod->parameters(),
                                                  objcMethod->isVariadic(),
                                                  redundant)) {

@@ -718,6 +718,9 @@ public:
   /// or a null type if the DeclContext does not have a correspinding type.
   clang::QualType getClangDeclContextType(const clang::DeclContext *dc);
 
+  /// Determine whether this typedef is a CF type.
+  static bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);
+
   /// Determine the imported CF type for the given typedef-name, or the empty
   /// string if this is not an imported CF type name.
   StringRef getCFTypeName(const clang::TypedefNameDecl *decl);
@@ -741,6 +744,19 @@ public:
   /// \brief Converts the given Swift identifier for Clang.
   clang::DeclarationName exportName(Identifier name);
 
+  /// Information about imported error parameters.
+  struct ImportedErrorInfo {
+    ForeignErrorConvention::Kind Kind;
+    ForeignErrorConvention::IsOwned_t IsOwned;
+
+    /// The index of the error parameter.
+    unsigned ParamIndex;
+
+    /// Whether the parameter is being replaced with "void"
+    /// (vs. removed).
+    bool ReplaceParamWithVoid;
+  };
+
   /// Describes a name that was imported from Clang.
   struct ImportedName {
     /// The imported name.
@@ -757,6 +773,10 @@ public:
 
     /// For an initializer, the kind of initializer to import.
     CtorInitializerKind InitKind;
+
+    /// For names that map Objective-C error handling conventions into
+    /// throwing Swift methods, describes how the mapping is performed.
+    Optional<ImportedErrorInfo> ErrorInfo;
 
     /// Produce just the imported name, for clients that don't care
     /// about the details.
@@ -1103,10 +1123,9 @@ public:
   /// \param isNoReturn Whether the function is noreturn.
   /// \param isFromSystemModule Whether to apply special rules that only apply
   ///   to system APIs.
-  /// \param isCustomName If true, the user has provided this name.
   /// \param bodyPatterns The patterns visible inside the function body.
   ///   whether the created arg/body patterns are different (selector-style).
-  /// \param methodName The name of the imported method.
+  /// \param importedName The name of the imported method.
   /// \param errorConvention Information about the method's error conventions.
   /// \param kind Controls whether we're building a type for a method that
   ///        needs special handling.
@@ -1117,9 +1136,10 @@ public:
                         clang::QualType resultType,
                         ArrayRef<const clang::ParmVarDecl *> params,
                         bool isVariadic, bool isNoReturn,
-                        bool isFromSystemModule, bool isCustomName,
+                        bool isFromSystemModule,
                         SmallVectorImpl<Pattern*> &bodyPatterns,
-                        DeclName &methodName,
+                        ImportedName importedName,
+                        DeclName &name,
                         Optional<ForeignErrorConvention> &errorConvention,
                         SpecialMethodKind kind);
 

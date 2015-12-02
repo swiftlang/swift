@@ -53,3 +53,13 @@ SWIFT_NAME(SomeProtocol)
 @interface UIActionSheet : NSObject
 -(instancetype)initWithTitle:(const char *)title delegate:(id)delegate cancelButtonTitle:(const char *)cancelButtonTitle destructiveButtonTitle:(const char *)destructiveButtonTitle otherButtonTitles:(const char *)otherButtonTitles, ...;
 @end
+
+@interface NSError : NSObject
+@end
+
+@interface NSErrorImports : NSObject
+- (nullable NSObject *)methodAndReturnError:(NSError **)error;
+- (BOOL)methodWithFloat:(float)value error:(NSError **)error;
+- (nullable instancetype)initAndReturnError:(NSError **)error;
+- (nullable instancetype)initWithFloat:(float)value error:(NSError **)error;
+@end
