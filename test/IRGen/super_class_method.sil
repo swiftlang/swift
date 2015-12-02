@@ -49,10 +49,9 @@ sil_vtable Grandchild {
 }
 
 // CHECK-LABEL: define void @Grandchild_foo(%swift.type*) #0
-// CHECK: [[OPAQUE_GRANDCHILD:%[0-9]+]] = bitcast %swift.type* %0 to %swift.type**
-// CHECK: [[SUPER_METADATA_PTR:%[0-9]+]] = getelementptr inbounds %swift.type*, %swift.type** [[OPAQUE_GRANDCHILD]], i32 1
-// CHECK: [[SUPER_METADATA:%[0-9]+]] = load %swift.type*, %swift.type** [[SUPER_METADATA_PTR]]
-// CHECK: [[FOO_VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%swift.type*)*, void (%swift.type*)**
+// CHECK: [[CHILD_METADATA_PTR:%[0-9]+]] = call %swift.type* @_TMaC18super_class_method5Child()
+// CHECK: [[CASTED_CHILD_METADATA_PTR:%[0-9]+]] = bitcast %swift.type* [[CHILD_METADATA_PTR]] to void (%swift.type*)**
+// CHECK: [[FOO_VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%swift.type*)*, void (%swift.type*)** [[CASTED_CHILD_METADATA_PTR]]
 // CHECK: [[FOO_FNPTR:%[0-9]+]] = load void (%swift.type*)*, void (%swift.type*)** [[FOO_VTABLE_SLOT]]
 // CHECK: call void
 
