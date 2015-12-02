@@ -34,7 +34,6 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/TypeVisitor.h"
-#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 
@@ -1246,9 +1245,9 @@ Type ClangImporter::Implementation::importPropertyType(
 
 /// Get a bit vector indicating which arguments are non-null for a
 /// given function or method.
-static llvm::SmallBitVector getNonNullArgs(
-                              const clang::Decl *decl,
-                              ArrayRef<const clang::ParmVarDecl *> params) {
+llvm::SmallBitVector ClangImporter::Implementation::getNonNullArgs(
+                       const clang::Decl *decl,
+                       ArrayRef<const clang::ParmVarDecl *> params) {
   llvm::SmallBitVector result;
   if (!decl)
     return result;
@@ -1705,27 +1704,18 @@ OmissionTypeName ClangImporter::Implementation::getClangTypeNameForOmission(
 }
 
 /// Attempt to omit needless words from the given function name.
-DeclName ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
-           DeclName name,
-           ArrayRef<const clang::ParmVarDecl *> params,
-           clang::QualType resultType,
-           const clang::DeclContext *dc,
-           const llvm::SmallBitVector &nonNullArgs,
-           const Optional<api_notes::ObjCMethodInfo> &knownMethod,
-           Optional<unsigned> errorParamIndex,
-           bool returnsSelf,
-           bool isInstanceMethod) {
-  ASTContext &ctx = SwiftContext;
-
-  // Collect the argument names.
-  SmallVector<StringRef, 4> argNames;
-  for (auto arg : name.getArgumentNames()) {
-    if (arg.empty())
-      argNames.push_back("");
-    else
-      argNames.push_back(arg.str());
-  }
-
+bool ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
+       StringRef &baseName,
+       SmallVectorImpl<StringRef> &argumentNames,
+       ArrayRef<const clang::ParmVarDecl *> params,
+       clang::QualType resultType,
+       const clang::DeclContext *dc,
+       const llvm::SmallBitVector &nonNullArgs,
+       const Optional<api_notes::ObjCMethodInfo> &knownMethod,
+       Optional<unsigned> errorParamIndex,
+       bool returnsSelf,
+       bool isInstanceMethod,
+       StringScratchSpace &scratch) {
   // Collect the parameter type names.
   StringRef firstParamName;
   SmallVector<OmissionTypeName, 4> paramTypes;
@@ -1752,20 +1742,16 @@ DeclName ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
           param->getType(),
           getParamOptionality(param,
                               !nonNullArgs.empty() && nonNullArgs[i],
-                              knownMethod
+                              knownMethod && knownMethod->NullabilityAudited
                                 ? Optional<clang::NullabilityKind>(
                                     knownMethod->getParamTypeInfo(i))
                                 : None),
-          name.getBaseName(), numParams,
+          SwiftContext.getIdentifier(baseName), numParams,
           isLastParameter);
 
     paramTypes.push_back(getClangTypeNameForOmission(param->getType())
                             .withDefaultArgument(hasDefaultArg));
   }
-
-  // Omit needless words.
-  StringRef baseName = name.getBaseName().str();
-  StringScratchSpace scratch;
 
   // Find the property names.
   const InheritedNameSet *allPropertyNames = nullptr;
@@ -1777,35 +1763,12 @@ DeclName ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
                                                             isInstanceMethod);
   }
 
-  if (!omitNeedlessWords(baseName, argNames, firstParamName,
-                         getClangTypeNameForOmission(resultType),
-                         getClangTypeNameForOmission(contextType),
-                         paramTypes, returnsSelf, /*isProperty=*/false,
-                         allPropertyNames, scratch))
-    return name;
-
-  /// Retrieve a replacement identifier.
-  auto getReplacementIdentifier = [&](StringRef name,
-                                      Identifier old) -> Identifier{
-    if (name.empty())
-      return Identifier();
-
-    if (!old.empty() && name == old.str())
-      return old;
-
-    return ctx.getIdentifier(name);
-  };
-
-  Identifier newBaseName = getReplacementIdentifier(baseName,
-                                                    name.getBaseName());
-  SmallVector<Identifier, 4> newArgNames;
-  auto oldArgNames = name.getArgumentNames();
-  for (unsigned i = 0, n = argNames.size(); i != n; ++i) {
-    newArgNames.push_back(getReplacementIdentifier(argNames[i],
-                                                   oldArgNames[i]));
-  }
-
-  return DeclName(ctx, newBaseName, newArgNames);
+  // Omit needless words.
+  return omitNeedlessWords(baseName, argumentNames, firstParamName,
+                           getClangTypeNameForOmission(resultType),
+                           getClangTypeNameForOmission(contextType),
+                           paramTypes, returnsSelf, /*isProperty=*/false,
+                           allPropertyNames, scratch);
 }
 
 /// Retrieve the instance type of the given Clang declaration context.
@@ -2034,20 +1997,6 @@ Type ClangImporter::Implementation::importMethodType(
   CanType errorParamType;
 
   llvm::SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
-
-  // If we should omit needless words and don't have a custom name, do so.
-  if (OmitNeedlessWords && !importedName.HasCustomName && clangDecl &&
-      (kind == SpecialMethodKind::Regular ||
-       kind == SpecialMethodKind::Constructor)) {
-    methodName = omitNeedlessWordsInFunctionName(
-                   methodName, params, resultType,
-                   clangDecl->getDeclContext(),
-                   nonNullArgs,
-                   knownMethod,
-                   errorInfo ? Optional<unsigned>(errorInfo->ParamIndex) : None,
-                   clangDecl->hasRelatedResultType(),
-                   clangDecl->isInstanceMethod());
-  }
 
   // Import the parameters.
   SmallVector<TupleTypeElt, 4> swiftArgParams;

@@ -1,6 +1,9 @@
 // RUN: %target-swift-ide-test -dump-importer-lookup-table -source-filename %s -import-objc-header %S/Inputs/swift_name_objc.h > %t.log 2>&1
 // RUN: FileCheck %s < %t.log
 
+// RUN: %target-swift-ide-test -dump-importer-lookup-table -source-filename %s -import-objc-header %S/Inputs/swift_name_objc.h -enable-omit-needless-words > %t-omit-needless-words.log 2>&1
+// RUN: FileCheck -check-prefix=CHECK-OMIT-NEEDLESS-WORDS %s < %t-omit-needless-words.log
+
 // REQUIRES: objc_interop
 
 // CHECK:      Base -> full name mappings:
@@ -78,3 +81,10 @@
 // CHECK-NEXT:     SNSomeProtocol: -[SNSomeProtocol protoInstanceMethodWithX:y:]
 // CHECK-NEXT:   setAccessibilityFloat(_:):
 // CHECK-NEXT:     NSAccessibility: -[NSAccessibility setAccessibilityFloat:]
+
+// CHECK-OMIT-NEEDLESS-WORDS: Base -> full name mappings:
+// CHECK-OMIT-NEEDLESS-WORDS:   methodWith --> methodWith(_:)
+
+// CHECK-OMIT-NEEDLESS-WORDS: Full name -> entry mappings:
+// CHECK-OMIT-NEEDLESS-WORDS:   methodWith(_:):
+// CHECK-OMIT-NEEDLESS-WORDS:     NSErrorImports: -[NSErrorImports methodWithFloat:error:]

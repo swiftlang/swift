@@ -2146,6 +2146,7 @@ auto ClangImporter::Implementation::importFullName(
   StringRef baseName;
   SmallVector<StringRef, 4> argumentNames;
   SmallString<16> selectorSplitScratch;
+  ArrayRef<const clang::ParmVarDecl *> params;
   switch (D->getDeclName().getNameKind()) {
   case clang::DeclarationName::CXXConstructorName:
   case clang::DeclarationName::CXXConversionFunctionName:
@@ -2185,10 +2186,7 @@ auto ClangImporter::Implementation::importFullName(
       baseName = selector.getNameForSlot(0);
 
     // Get the parameters.
-    ArrayRef<const clang::ParmVarDecl *> params{
-      objcMethod->param_begin(),
-      objcMethod->param_end()
-    };
+    params = { objcMethod->param_begin(), objcMethod->param_end() };
 
     // If we have a variadic method for which we need to drop the last
     // selector piece, do so now.
@@ -2377,6 +2375,23 @@ auto ClangImporter::Implementation::importFullName(
                                 /*isProperty=*/true, allPropertyNames,
                                 omitNeedlessWordsScratch);
       }
+    }
+
+    // Objective-C methods.
+    if (auto method = dyn_cast<clang::ObjCMethodDecl>(D)) {
+      (void)omitNeedlessWordsInFunctionName(
+        baseName,
+        argumentNames,
+        params,
+        method->getReturnType(),
+        method->getDeclContext(),
+        getNonNullArgs(method, params),
+        getKnownObjCMethod(method),
+        result.ErrorInfo ? Optional<unsigned>(result.ErrorInfo->ParamIndex)
+                         : None,
+        method->hasRelatedResultType(),
+        method->isInstanceMethod(),
+        omitNeedlessWordsScratch);
     }
   }
 

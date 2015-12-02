@@ -32,6 +32,7 @@
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include <set>
@@ -730,16 +731,18 @@ public:
   OmissionTypeName getClangTypeNameForOmission(clang::QualType type);
 
   /// Omit needless words in a function name.
-  DeclName omitNeedlessWordsInFunctionName(
-             DeclName name,
-             ArrayRef<const clang::ParmVarDecl *> params,
-             clang::QualType resultType,
-             const clang::DeclContext *dc,
-             const llvm::SmallBitVector &nonNullArgs,
-             const Optional<api_notes::ObjCMethodInfo> &knownMethod,
-             Optional<unsigned> errorParamIndex,
-             bool returnsSelf,
-             bool isInstanceMethod);
+  bool omitNeedlessWordsInFunctionName(
+         StringRef &baseName,
+         SmallVectorImpl<StringRef> &argumentNames,
+         ArrayRef<const clang::ParmVarDecl *> params,
+         clang::QualType resultType,
+         const clang::DeclContext *dc,
+         const llvm::SmallBitVector &nonNullArgs,
+         const Optional<api_notes::ObjCMethodInfo> &knownMethod,
+         Optional<unsigned> errorParamIndex,
+         bool returnsSelf,
+         bool isInstanceMethod,
+         StringScratchSpace &scratch);
 
   /// \brief Converts the given Swift identifier for Clang.
   clang::DeclarationName exportName(Identifier name);
@@ -1107,6 +1110,12 @@ public:
                                Identifier baseName,
                                unsigned numParams,
                                bool isLastParameter);
+
+  /// Retrieve a bit vector containing the non-null argument
+  /// annotations for the given declaration.
+  llvm::SmallBitVector getNonNullArgs(
+                         const clang::Decl *decl,
+                         ArrayRef<const clang::ParmVarDecl *> params);
 
   /// \brief Import the type of an Objective-C method.
   ///
