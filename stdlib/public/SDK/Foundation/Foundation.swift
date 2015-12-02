@@ -62,11 +62,11 @@ extension NSObject : CustomDebugStringConvertible {}
 // Strings
 //===----------------------------------------------------------------------===//
 
-@available(*, unavailable, message="Please use String or NSString") public
-class NSSimpleCString {}
+@available(*, unavailable, message="Please use String or NSString")
+public class NSSimpleCString {}
 
-@available(*, unavailable, message="Please use String or NSString") public
-class NSConstantString {}
+@available(*, unavailable, message="Please use String or NSString")
+public class NSConstantString {}
 
 @warn_unused_result
 @_silgen_name("swift_convertStringToNSString")
