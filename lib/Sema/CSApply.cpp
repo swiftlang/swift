@@ -2651,11 +2651,10 @@ namespace {
       // case (when we turn the inout into an UnsafePointer) than to try to
       // discover that we're in that case right now.
       expr->getSubExpr()->propagateLValueAccessKind(AccessKind::ReadWrite);
-      auto lvTy = expr->getSubExpr()->getType()->castTo<LValueType>();
+      auto objectTy = expr->getSubExpr()->getType()->getRValueType();
 
-      // The type is simply inout.
-      // Compute the type of the inout expression.
-      expr->setType(InOutType::get(lvTy->getObjectType()));
+      // The type is simply inout of whatever the lvalue's object type was.
+      expr->setType(InOutType::get(objectTy));
       return expr;
     }
 
