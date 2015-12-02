@@ -163,9 +163,6 @@ extension LazyCollection : CollectionType {
   public var first: Base.Generator.Element? {
     return _base.first
   }
-
-  @available(*, unavailable, renamed="Base")
-  public typealias S = Void
 }
 
 /// Augment `self` with lazy methods such as `map`, `filter`, etc.
@@ -186,18 +183,6 @@ extension LazyCollectionType {
     return self
   }
 }
-
-@available(*, unavailable, message="Please use the collection's '.lazy' property")
-public func lazy<Base : CollectionType>(s: Base) -> LazyCollection<Base> {
-  fatalError("unavailable")
-}
-
-@available(*, unavailable, renamed="LazyCollection")
-public struct LazyForwardCollection<T> {}
-@available(*, unavailable, renamed="LazyCollection")
-public struct LazyBidirectionalCollection<T> {}
-@available(*, unavailable, renamed="LazyCollection")
-public struct LazyRandomAccessCollection<T> {}
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)

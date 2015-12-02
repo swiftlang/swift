@@ -40,17 +40,6 @@ func foo() -> Int {
 
 func goo(e : ErrorType) {}
 
-struct Test1 : OptionSetType {
-  init(rawValue: Int) {}
-  var rawValue: Int { return 0 }
-}
-
-print("", terminator: "")
-Swift.print("", terminator: "")
-print("", terminator: "\n")
-print("", false, appendNewline: false)
-print("", false)
-
 func ftest1() {
   // Don't replace the variable name with '_'
   let myvar = 0

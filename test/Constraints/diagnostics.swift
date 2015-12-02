@@ -110,12 +110,24 @@ infix operator ***~ {
 func ***~(_: Int, _: String) { }
 i ***~ i // expected-error{{cannot convert value of type 'Int' to expected argument type 'String'}}
 
+@available(*, unavailable, message="call the 'map()' method on the sequence")
+public func myMap<C : CollectionType, T>(
+  source: C, _ transform: (C.Generator.Element) -> T
+) -> [T] {
+  fatalError("unavailable function can't be called")
+}
+
+@available(*, unavailable, message="call the 'map()' method on the optional value")
+public func myMap<T, U>(x: T?, @noescape _ f: (T)->U) -> U? {
+  fatalError("unavailable function can't be called")
+}
+
 // <rdar://problem/20142523>
 // FIXME: poor diagnostic, to be fixed in 20142462. For now, we just want to
 // make sure that it doesn't crash.
 func rdar20142523() {
-  map(0..<10, { x in // expected-error{{cannot invoke 'map' with an argument list of type '(Range<Int>, (_) -> _)'}}
-    // expected-note @-1 {{overloads for 'map' exist with these partially matching parameter lists: (C, (C.Generator.Element) -> T), (T?, @noescape (T) -> U)}}
+  myMap(0..<10, { x in // expected-error{{cannot invoke 'myMap' with an argument list of type '(Range<Int>, (_) -> _)'}}
+    // expected-note @-1 {{overloads for 'myMap' exist with these partially matching parameter lists: (C, (C.Generator.Element) -> T), (T?, @noescape (T) -> U)}}
     ()
     return x  // expected-error {{type of expression is ambiguous without more context}}
   })

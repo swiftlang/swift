@@ -180,13 +180,3 @@ extension SequenceType where Generator.Element : SequenceType {
   }
 }
 
-@available(*, unavailable, message="call the 'joinWithSeparator()' method on the sequence of elements")
-public func join<
-  C : RangeReplaceableCollectionType, S : SequenceType
-  where S.Generator.Element == C
->(
-  separator: C, _ elements: S
-) -> C {
-  fatalError("unavailable function can't be called")
-}
-

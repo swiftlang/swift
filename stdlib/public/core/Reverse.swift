@@ -61,9 +61,6 @@ public struct ReverseIndex<Base: BidirectionalIndexType>
   /// - if `n` != `c.count`, then `c.reverse[self]` is 
   ///   equivalent to `[self.base.predecessor()]`.
   public let base: Base
-
-  @available(*, unavailable, renamed="Base")
-  public typealias I = Base
 }
 
 @warn_unused_result
@@ -98,9 +95,6 @@ public struct ReverseRandomAccessIndex<Base: RandomAccessIndexType>
   public func advancedBy(n: Distance) -> ReverseRandomAccessIndex {
     return ReverseRandomAccessIndex(base.advancedBy(-n))
   }
-
-  @available(*, unavailable, renamed="Base")
-  public typealias I = Base
 }
 
 public protocol _ReverseCollectionType : CollectionType {
@@ -164,9 +158,6 @@ public struct ReverseCollection<
   public typealias Generator = IndexingGenerator<ReverseCollection>
   
   public let _base: Base
-
-  @available(*, unavailable, renamed="Base")
-  public typealias T = Base
 }
 
 /// A Collection that presents the elements of its `Base` collection
@@ -199,9 +190,6 @@ public struct ReverseRandomAccessCollection<
   >
 
   public let _base: Base
-
-  @available(*, unavailable, renamed="Base")
-  public typealias T = Base
 }
 
 extension CollectionType where Index : BidirectionalIndexType {
@@ -249,25 +237,6 @@ where Index : RandomAccessIndexType, Elements.Index : RandomAccessIndexType {
     return ReverseRandomAccessCollection(elements).lazy
   }
 }
-
-/// Return an `Array` containing the elements of `source` in reverse
-/// order.
-@available(*, unavailable, message="call the 'reverse()' method on the collection")
-public func reverse<C:CollectionType where C.Index: BidirectionalIndexType>(
-  source: C
-) -> [C.Generator.Element] {
-  fatalError("unavailable function can't be called")
-}
-
-@available(*, unavailable, renamed="ReverseCollection")
-public struct BidirectionalReverseView<
-  Base : CollectionType where Base.Index : BidirectionalIndexType
-> {}
-
-@available(*, unavailable, renamed="ReverseRandomAccessCollection")
-public struct RandomAccessReverseView<
-  Base : CollectionType where Base.Index : RandomAccessIndexType
-> {}
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)

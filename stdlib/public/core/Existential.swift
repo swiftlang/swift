@@ -18,14 +18,6 @@
 // Policy.swift.  Similar components should usually be defined next to
 // their respective protocols.
 
-/// Unavailable; use `AnyGenerator<T>` instead.
-@available(*, unavailable, renamed="AnyGenerator")
-public struct GeneratorOf<T>  {}
-
-/// Unavailable; use `AnySequence<T>` instead.
-@available(*, unavailable, renamed="AnySequence")
-public struct SequenceOf<T> {}
-
 internal struct _CollectionOf<
   IndexType_ : ForwardIndexType, T
 > : CollectionType {
@@ -60,7 +52,4 @@ internal struct _CollectionOf<
 
   let _subscriptImpl: (IndexType_)->T
 }
-
-@available(*, unavailable, message="SinkOf has been removed. Use (T)->() closures directly instead.")
-public struct SinkOf<T> {}
 

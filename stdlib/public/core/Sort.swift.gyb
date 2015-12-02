@@ -84,27 +84,6 @@ func _insertionSort<
   }
 }
 
-/// Re-order the given `range` of `elements` and return a pivot index
-/// *p*.
-///
-/// - Postcondition: For all *i* in `range.startIndex..<`*p*, and *j*
-///   in *p*`..<range.endIndex`, `less(elements[`*i*`],
-///   elements[`*j*`]) && !less(elements[`*j*`],
-/// elements[`*p*`])`.  Only returns `range.endIndex` when
-/// `elements` is empty.
-${orderingRequirement}
-@available(*, unavailable, message="call the 'partition()' method on the collection")
-public func partition<
-  C: MutableCollectionType where C.Index: RandomAccessIndexType
-  ${"" if p else ", C.Generator.Element : Comparable"}
->(
-  inout elements: C,
-  _ range: Range<C.Index> ${"," if p else ""}
-  ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
-) -> C.Index {
-  fatalError("unavailable function can't be called")
-}
-
 func _partition<
   C: MutableCollectionType where C.Index: RandomAccessIndexType
   ${"" if p else ", C.Generator.Element : Comparable"}
@@ -280,81 +259,6 @@ func _heapSort<
   }
 }
 
-%{
-if p:
-    sortIsUnstable = """\
-/// The sorting algorithm is not stable (can change the relative order of
-/// elements for which `isOrderedBefore` does not establish an order)."""
-else:
-    sortIsUnstable = """\
-/// The sorting algorithm is not stable (can change the relative order of
-/// elements that compare equal)."""
-
-}%
-
-/// Sort `collection` in-place${according}.
-///
-${sortIsUnstable}
-///
-${orderingRequirement}
-@available(*, unavailable, message="call the 'sortInPlace()' method on the collection")
-public func sort<
-  C: MutableCollectionType where C.Index: RandomAccessIndexType
-  ${"" if p else ", C.Generator.Element : Comparable"}
->(
-  inout collection: C ${"," if p else ""}
-  ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
-) {
-  fatalError("unavailable function can't be called")
-}
-
-/// Sort `array` in-place${according}.
-///
-${sortIsUnstable}
-///
-${orderingRequirement}
-% if p:
-@available(*, unavailable, message="call the 'sortInPlace()' method on the collection")
-public func sort<T>(inout array: [T], _ isOrderedBefore: (T, T) -> Bool) {
-% else:
-@available(*, unavailable, message="call the 'sortInPlace()' method on the collection")
-public func sort<T : Comparable>(inout array: [T]) {
-% end
-  fatalError("unavailable function can't be called")
-}
-
-/// Sort `array` in-place${according}.
-///
-${sortIsUnstable}
-///
-${orderingRequirement}
-% if p:
-@available(*, unavailable, message="call the 'sortInPlace()' method on the collection")
-public func sort<T>(
-  inout array: ContiguousArray<T>,
-  _ isOrderedBefore: (T, T) -> Bool
-) {
-% else:
-@available(*, unavailable, message="call the 'sortInPlace()' method on the collection")
-public func sort<T : Comparable>(inout array: ContiguousArray<T>) {
-% end
-  fatalError("unavailable function can't be called")
-}
-
-/// Return an `Array` containing the sorted elements of `source`${according}.
-///
-${sortIsUnstable}
-///
-${orderingRequirement}
-@available(*, unavailable, message="call the 'sort()' method on the collection")
-public func sorted<
-  C: SequenceType${"" if p else " where C.Generator.Element : Comparable"}
->(
-  source: C ${"," if p else ""}
-  ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
-) -> [C.Generator.Element] {
-  fatalError("unavailable function can't be called")
-}
 % end
 // for p in preds
 

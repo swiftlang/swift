@@ -15,26 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
-//===--- Dispatching advance and distance functions -----------------------===//
-// These generic functions are for user consumption; they dispatch to the
-// appropriate implementation for T.
-
-@available(*, unavailable, message="call the 'distanceTo(end)' method on the index")
-public func distance<T : ForwardIndexType>(start: T, _ end: T) -> T.Distance {
-  fatalError("unavailable function can't be called")
-}
-
-@available(*, unavailable, message="call the 'advancedBy(n)' method on the index")
-public func advance<T : ForwardIndexType>(start: T, _ n: T.Distance) -> T {
-  fatalError("unavailable function can't be called")
-}
-
-@available(*, unavailable, message="call the 'advancedBy(n, limit:)' method on the index")
-public func advance<T : ForwardIndexType>(start: T, _ n: T.Distance, _ end: T) -> T {
-  fatalError("unavailable function can't be called")
-}
-
-//===----------------------------------------------------------------------===//
 //===--- ForwardIndexType -------------------------------------------------===//
 
 /// This protocol is an implementation detail of `ForwardIndexType`; do

@@ -16,9 +16,6 @@ public enum Optional<Wrapped> : _Reflectable, NilLiteralConvertible {
   case None
   case Some(Wrapped)
 
-  @available(*, unavailable, renamed="Wrapped")
-  public typealias T = Wrapped
-
   /// Construct a `nil` instance.
   @_transparent
   public init() { self = .None }
@@ -75,26 +72,6 @@ extension Optional : CustomDebugStringConvertible {
       return "nil"
     }
   }
-}
-
-// While this free function may seem obsolete, since an optional is
-// often expressed as (x as Wrapped), it can lead to cleaner usage, i.e.
-//
-//   map(x as Wrapped) { ... }
-// vs
-//   (x as Wrapped).map { ... }
-//
-/// Haskell's fmap for Optionals.
-@available(*, unavailable, message="call the 'map()' method on the optional value")
-public func map<T, U>(x: T?, @noescape _ f: (T)->U) -> U? {
-  fatalError("unavailable function can't be called")
-}
-
-
-/// Returns `f(self)!` iff `self` and `f(self)` are not nil.
-@available(*, unavailable, message="call the 'flatMap()' method on the optional value")
-public func flatMap<T, U>(x: T?, @noescape _ f: (T)->U?) -> U? {
-  fatalError("unavailable function can't be called")
 }
 
 // Intrinsics for use by language features.

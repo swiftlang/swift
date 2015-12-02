@@ -32,11 +32,6 @@ public extension CGPoint {
   init(x: Double, y: Double) {
     self.init(x: CGFloat(x), y: CGFloat(y))
   }
-
-  @available(*, unavailable, renamed="zero")
-  static var zeroPoint: CGPoint {
-    fatalError("can't retrieve unavailable property")
-  }
 }
 
 extension CGPoint : Equatable {}
@@ -61,11 +56,6 @@ public extension CGSize {
   init(width: Double, height: Double) {
     self.init(width: CGFloat(width), height: CGFloat(height))
   }
-
-  @available(*, unavailable, renamed="zero")
-  static var zeroSize: CGSize {
-    fatalError("can't retrieve unavailable property")
-  }
 }
 
 extension CGSize : Equatable {}
@@ -89,11 +79,6 @@ public extension CGVector {
   @_transparent // @fragile
   init(dx: Double, dy: Double) {
     self.init(dx: CGFloat(dx), dy: CGFloat(dy))
-  }
-
-  @available(*, unavailable, renamed="zero")
-  static var zeroVector: CGVector {
-    fatalError("can't retrieve unavailable property")
   }
 }
 
@@ -273,87 +258,6 @@ public extension CGRect {
   @warn_unused_result
   func intersects(rect: CGRect) -> Bool {
     return CGRectIntersectsRect(self, rect)
-  }
-
-  @available(*, unavailable, renamed="zero")
-  static var zeroRect: CGRect {
-    fatalError("can't retrieve unavailable property")
-  }
-
-  @available(*, unavailable, renamed="infinite")
-  static var infiniteRect: CGRect {
-    fatalError("can't retrieve unavailable property")
-  }
-
-  @available(*, unavailable, renamed="null")
-  static var nullRect: CGRect {
-    fatalError("can't retrieve unavailable property")
-  }
-
-  @available(*, unavailable, renamed="standardized")
-  var standardizedRect: CGRect {
-    fatalError("can't retrieve unavailable property")
-  }
-
-  @available(*, unavailable, renamed="integral")
-  var integerRect: CGRect {
-    fatalError("can't retrieve unavailable property")
-  }
-
-  @available(*, unavailable, renamed="standardizeInPlace")
-  mutating func standardize() -> CGRect {
-    fatalError("can't call unavailable function")
-  }
-
-  @available(*, unavailable, renamed="makeIntegralInPlace")
-  mutating func integerize() {
-    fatalError("can't call unavailable function")
-  }
-
-  @available(*, unavailable, renamed="insetBy")
-  func rectByInsetting(dx dx: CGFloat, dy: CGFloat) -> CGRect {
-    fatalError("can't call unavailable function")
-  }
-
-  @available(*, unavailable, renamed="insetInPlace")
-  func inset(dx dx: CGFloat, dy: CGFloat) {
-    fatalError("can't call unavailable function")
-  }
-
-  @available(*, unavailable, renamed="offsetBy")
-  func rectByOffsetting(dx dx: CGFloat, dy: CGFloat) -> CGRect {
-    fatalError("can't call unavailable function")
-  }
-
-  @available(*, unavailable, renamed="offsetInPlace")
-  func offset(dx dx: CGFloat, dy: CGFloat) {
-    fatalError("can't call unavailable function")
-  }
-
-  @available(*, unavailable, renamed="unionInPlace")
-  mutating func union(withRect: CGRect) {
-    fatalError("can't call unavailable function")
-  }
-
-  @available(*, unavailable, renamed="union")
-  func rectByUnion(withRect: CGRect) -> CGRect {
-    fatalError("can't call unavailable function")
-  }
-
-  @available(*, unavailable, renamed="intersectInPlace")
-  mutating func intersect(withRect: CGRect) {
-    fatalError("can't call unavailable function")
-  }
-
-  @available(*, unavailable, renamed="intersect")
-  func rectByIntersecting(withRect: CGRect) -> CGRect {
-    fatalError("can't call unavailable function")
-  }
-
-  @available(*, unavailable, renamed="divide")
-  func rectsByDividing(atDistance: CGFloat, fromEdge: CGRectEdge)
-    -> (slice: CGRect, remainder: CGRect) {
-    fatalError("can't call unavailable function")
   }
 }
 

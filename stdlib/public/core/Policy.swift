@@ -326,10 +326,6 @@ public protocol Hashable : Equatable {
   var hashValue: Int { get }
 }
 
-public protocol _SinkType {}
-@available(*, unavailable, message="SinkType has been removed. Use (T)->() closures directly instead.")
-public typealias SinkType = _SinkType
-
 //===----------------------------------------------------------------------===//
 // Standard pattern matching forms
 //===----------------------------------------------------------------------===//

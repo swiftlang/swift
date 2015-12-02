@@ -655,12 +655,6 @@ public func _leadingZeros(x: Builtin.Int${bits}) -> Builtin.Int${bits} {
 
 //===--- End loop over all integer types ----------------------------------===//
 
-@available(*, unavailable, renamed="Int")
-public typealias Word = Int
-
-@available(*, unavailable, renamed="UInt")
-public typealias UWord = UInt
-
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:

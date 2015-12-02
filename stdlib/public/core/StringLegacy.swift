@@ -140,17 +140,6 @@ extension String {
   }
 }
 
-// Conversions from string to other types.
-extension String {
-  /// If the string represents an integer that fits into an Int, returns
-  /// the corresponding integer.  This accepts strings that match the regular
-  /// expression "[-+]?[0-9]+" only.
-  @available(*, unavailable, message="Use Int() initializer")
-  public func toInt() -> Int? {
-    fatalError("unavailable function can't be called")
-  }
-}
-
 extension String {
   /// Produce a substring of the given string from the given character
   /// index to the end of the string.

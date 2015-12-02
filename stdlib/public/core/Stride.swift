@@ -122,9 +122,6 @@ public func -= <T : UnsignedIntegerType> (
 
 /// A GeneratorType for `StrideTo<Element>`.
 public struct StrideToGenerator<Element : Strideable> : GeneratorType {
-  @available(*, unavailable, renamed="Element")
-  public typealias T = Element
-
   var current: Element
   let end: Element
   let stride: Element.Stride
@@ -144,9 +141,6 @@ public struct StrideToGenerator<Element : Strideable> : GeneratorType {
 /// A `SequenceType` of values formed by striding over a half-open interval.
 public struct StrideTo<Element : Strideable> : SequenceType {
   // FIXME: should really be a CollectionType, as it is multipass
-
-  @available(*, unavailable, renamed="Element")
-  public typealias T = Element
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
@@ -179,18 +173,8 @@ extension Strideable {
   }
 }
 
-@available(*, unavailable, message="call the 'stride(to:by:)' method instead")
-public func stride<
-  T : Strideable
->(from start: T, to end: T, by stride: T.Stride) -> StrideTo<T> {
-  fatalError("unavailable function can't be called")
-}
-
 /// A GeneratorType for `StrideThrough<Element>`.
 public struct StrideThroughGenerator<Element : Strideable> : GeneratorType {
-  @available(*, unavailable, renamed="Element")
-  public typealias T = Element
-
   var current: Element
   let end: Element
   let stride: Element.Stride
@@ -218,9 +202,6 @@ public struct StrideThroughGenerator<Element : Strideable> : GeneratorType {
 /// A `SequenceType` of values formed by striding over a closed interval.
 public struct StrideThrough<Element : Strideable> : SequenceType {
   // FIXME: should really be a CollectionType, as it is multipass
-
-  @available(*, unavailable, renamed="Element")
-  public typealias T = Element
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
@@ -256,9 +237,3 @@ extension Strideable {
   }
 }
 
-@available(*, unavailable, message="call the 'stride(through:by:)' method instead")
-public func stride<
-  T : Strideable
->(from start: T, through end: T, by stride: T.Stride) -> StrideThrough<T> {
-  fatalError("unavailable function can't be called")
-}

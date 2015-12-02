@@ -16,9 +16,6 @@
 public struct LazyMapGenerator<
   Base : GeneratorType, Element
 > : GeneratorType, SequenceType {
-  @available(*, unavailable, renamed="Element")
-  public typealias T = Element
-
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
@@ -72,9 +69,6 @@ public struct LazyMapSequence<Base : SequenceType, Element>
   
   public var _base: Base
   internal var _transform: (Base.Generator.Element)->Element
-
-  @available(*, unavailable, renamed="Element")
-  public typealias T = Element
 }
 
 //===--- Collections ------------------------------------------------------===//
@@ -134,9 +128,6 @@ public struct LazyMapCollection<Base : CollectionType, Element>
   
   public var _base: Base
   var _transform: (Base.Generator.Element)->Element
-
-  @available(*, unavailable, renamed="Element")
-  public typealias T = Element
 }
 
 //===--- Support for s.lazy ----------------------------------------------===//
@@ -164,33 +155,6 @@ extension LazyCollectionType {
     return LazyMapCollection(self.elements, transform: transform)
   }
 }
-
-/// Return an `Array` containing the results of mapping `transform`
-/// over `source`.
-@available(*, unavailable, message="call the 'map()' method on the sequence")
-public func map<C : CollectionType, T>(
-  source: C, _ transform: (C.Generator.Element) -> T
-) -> [T] {
-  fatalError("unavailable function can't be called")
-}
-
-/// Return an `Array` containing the results of mapping `transform`
-/// over `source` and flattening the result.
-@available(*, unavailable, message="call the 'flatMap()' method on the sequence")
-public func flatMap<C : CollectionType, T>(
-  source: C, _ transform: (C.Generator.Element) -> [T]
-) -> [T] {
-  fatalError("unavailable function can't be called")
-}
-
-@available(*, unavailable, renamed="LazyMapGenerator")
-public struct MapSequenceGenerator<Base : GeneratorType, T> {}
-
-@available(*, unavailable, renamed="LazyMapSequence")
-public struct MapSequenceView<Base : SequenceType, T> {}
-
-@available(*, unavailable, renamed="LazyMapCollection")
-public struct MapCollectionView<Base : CollectionType, T> {}
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)

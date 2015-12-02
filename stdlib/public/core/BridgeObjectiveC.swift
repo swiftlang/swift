@@ -341,9 +341,6 @@ internal var _nilNativeObject: AnyObject? {
 public struct AutoreleasingUnsafeMutablePointer<Memory /* TODO : class */>
   : Equatable, NilLiteralConvertible, _PointerType {
 
-  @available(*, unavailable, renamed="Memory")
-  public typealias T = Memory
-
   public let _rawValue: Builtin.RawPointer
 
   @_transparent

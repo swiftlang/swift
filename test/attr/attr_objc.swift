@@ -1694,9 +1694,6 @@ class HasNSManaged {
 
   func mutableAutoreleasingUnsafeMutablePointerToAnyObject(p: AutoreleasingUnsafeMutablePointer<AnyObject>) {}
   // CHECK-LABEL: {{^}} @objc func mutableAutoreleasingUnsafeMutablePointerToAnyObject(p: AutoreleasingUnsafeMutablePointer<AnyObject>) {
-
-  func cFunctionPointer(p: CFunctionPointer<() -> ()>) {} // expected-error{{unavailable}}
-  // CHECK-LABEL: {{^}} func cFunctionPointer(p: <<error type>>) -> <<error type>>
 }
 
 // @objc with nullary names

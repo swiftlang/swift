@@ -147,13 +147,6 @@ public protocol LazySequenceType : SequenceType {
   /// it has a default implementation in a protocol extension that
   /// just returns `self`.
   var elements: Elements {get} 
-  
-  var array: [Generator.Element] {get}
-}
-
-extension LazySequenceType {
-  @available(*, unavailable, message="please construct an Array from your lazy sequence: Array(...)")
-  public var array: [Generator.Element] { fatalError("unavailable") }
 }
 
 /// When there's no special associated `Elements` type, the `elements`
@@ -182,9 +175,6 @@ public struct LazySequence<Base : SequenceType>
 
   /// The `Base` (presumably non-lazy) sequence from which `self` was created.
   public var elements: Base { return _base }
-
-  @available(*, unavailable, renamed="Base")
-  public typealias S = Void
 }
 
 extension SequenceType {
@@ -205,10 +195,5 @@ extension LazySequenceType {
   public var lazy: Self {
     return self
   }
-}
-
-@available(*, unavailable, message="Please use the sequence's '.lazy' property")
-public func lazy<Base : SequenceType>(s: Base) -> LazySequence<Base> {
-  fatalError("unavailable")
 }
 

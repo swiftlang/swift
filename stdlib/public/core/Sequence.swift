@@ -602,14 +602,6 @@ extension SequenceType {
   public func dropLast() -> SubSequence  { return dropLast(1) }
 }
 
-/// Return an underestimate of the number of elements in the given
-/// sequence, without consuming the sequence.  For Sequences that are
-/// actually Collections, this will return `x.count`.
-@available(*, unavailable, message="call the 'underestimateCount()' method on the sequence")
-public func underestimateCount<T : SequenceType>(x: T) -> Int {
-  fatalError("unavailable function can't be called")
-}
-
 extension SequenceType {
   public func _initializeTo(ptr: UnsafeMutablePointer<Generator.Element>)
     -> UnsafeMutablePointer<Generator.Element> {
@@ -632,10 +624,6 @@ extension SequenceType {
 public struct GeneratorSequence<
   Base : GeneratorType
 > : GeneratorType, SequenceType {
-
-  @available(*, unavailable, renamed="Base")
-  public typealias G = Base
-
   /// Construct an instance whose generator is a copy of `base`.
   public init(_ base: Base) {
     _base = base

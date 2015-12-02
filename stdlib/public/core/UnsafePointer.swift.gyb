@@ -40,9 +40,6 @@ public struct ${Self}<Memory>
   : RandomAccessIndexType, Hashable,
     NilLiteralConvertible, _PointerType {
 
-  @available(*, unavailable, renamed="Memory")
-  public typealias T = Memory
-
   public typealias Distance = Int
 
   /// The underlying raw (untyped) pointer.

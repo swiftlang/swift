@@ -159,11 +159,6 @@ public func print<T>(_: T) {}
 @available(*, unavailable, message="Please wrap your tuple argument in parentheses: 'debugPrint((...))'")
 public func debugPrint<T>(_: T) {}
 
-@available(*, unavailable, message="Please use 'terminator: \"\"' instead of 'appendNewline: false': 'print((...), terminator: \"\")'")
-public func print<T>(_: T, appendNewline: Bool) {}
-@available(*, unavailable, message="Please use 'terminator: \"\"' instead of 'appendNewline: false': 'debugPrint((...), terminator: \"\")'")
-public func debugPrint<T>(_: T, appendNewline: Bool) {}
-
 
 //===--- FIXME: Not working due to <rdar://22101775> ----------------------===//
 @available(*, unavailable, message="Please use the 'toStream' label for the target stream: 'print((...), toStream: &...)'")
@@ -171,11 +166,5 @@ public func print<T>(_: T, inout _: OutputStreamType) {}
 @available(*, unavailable, message="Please use the 'toStream' label for the target stream: 'debugPrint((...), toStream: &...))'")
 public func debugPrint<T>(_: T, inout _: OutputStreamType) {}
 
-@available(*, unavailable, message="Please use 'terminator: \"\"' instead of 'appendNewline: false' and use the 'toStream' label for the target stream: 'print((...), terminator: \"\", toStream: &...)'")
-public func print<T>(_: T, inout _: OutputStreamType, appendNewline: Bool) {}
-@available(*, unavailable, message="Please use 'terminator: \"\"' instead of 'appendNewline: false' and use the 'toStream' label for the target stream: 'debugPrint((...), terminator: \"\", toStream: &...)'")
-public func debugPrint<T>(
-  _: T, inout _: OutputStreamType, appendNewline: Bool
-) {}
 //===----------------------------------------------------------------------===//
 //===----------------------------------------------------------------------===//

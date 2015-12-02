@@ -283,55 +283,6 @@ extension UnicodeScalar : Streamable {
   }
 }
 
-//===----------------------------------------------------------------------===//
-// Unavailable APIs
-//===----------------------------------------------------------------------===//
-
-@available(*, unavailable, renamed="CustomDebugStringConvertible")
-public typealias DebugPrintable = CustomDebugStringConvertible
-@available(*, unavailable, renamed="CustomStringConvertible")
-public typealias Printable = CustomStringConvertible
-
-@available(*, unavailable, renamed="print")
-public func println<T, TargetStream : OutputStreamType>(
-    value: T, inout _ target: TargetStream
-) {
-  fatalError("unavailable function can't be called")
-}
-
-@available(*, unavailable, renamed="print")
-public func println<T>(value: T) {
-  fatalError("unavailable function can't be called")
-}
-
-@available(*, unavailable, message="use print(\"\")")
-public func println() {
-  fatalError("unavailable function can't be called")
-}
-
-@available(*, unavailable, renamed="String")
-public func toString<T>(x: T) -> String {
-  fatalError("unavailable function can't be called")
-}
-
-@available(*, unavailable, message="use debugPrint()")
-public func debugPrintln<T, TargetStream : OutputStreamType>(
-    x: T, inout _ target: TargetStream
-) {
-  fatalError("unavailable function can't be called")
-}
-
-@available(*, unavailable, renamed="debugPrint")
-public func debugPrintln<T>(x: T) {
-  fatalError("unavailable function can't be called")
-}
-
-/// Returns the result of `debugPrint`'ing `x` into a `String`.
-@available(*, unavailable, message="use String(reflecting:)")
-public func toDebugString<T>(x: T) -> String {
-  fatalError("unavailable function can't be called")
-}
-
 /// A hook for playgrounds to print through.
 public var _playgroundPrintHook : ((String)->Void)? = {_ in () }
 

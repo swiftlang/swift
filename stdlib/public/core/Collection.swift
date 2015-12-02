@@ -10,11 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-@available(*, unavailable, message="access the 'count' property on the collection")
-public func count <T : CollectionType>(x: T) -> T.Index.Distance {
-  fatalError("unavailable function can't be called")
-}
-
 /// A protocol representing the minimal requirements of
 /// `CollectionType`.
 ///
@@ -606,26 +601,6 @@ extension CollectionType {
   }
 }
 
-/// Returns `true` iff `x` is empty.
-@available(*, unavailable, message="access the 'isEmpty' property on the collection")
-public func isEmpty<C: CollectionType>(x: C) -> Bool {
-  fatalError("unavailable function can't be called")
-}
-
-/// Returns the first element of `x`, or `nil` if `x` is empty.
-@available(*, unavailable, message="access the 'first' property on the collection")
-public func first<C: CollectionType>(x: C) -> C.Generator.Element? {
-  fatalError("unavailable function can't be called")
-}
-
-/// Returns the last element of `x`, or `nil` if `x` is empty.
-@available(*, unavailable, message="access the 'last' property on the collection")
-public func last<C: CollectionType where C.Index: BidirectionalIndexType>(
-  x: C
-) -> C.Generator.Element? {
-  fatalError("unavailable function can't be called")
-}
-
 /// A *collection* that supports subscript assignment.
 ///
 /// For any instance `a` of a type conforming to
@@ -736,17 +711,6 @@ internal func _writeBackMutableSlice<
     "Can not replace a slice of a MutableCollectionType with a slice of a smaller size")
 }
 
-/// Returns the range of `x`'s valid index values.
-///
-/// The result's `endIndex` is the same as that of `x`.  Because
-/// `Range` is half-open, iterating the values of the result produces
-/// all valid subscript arguments for `x`, omitting its `endIndex`.
-@available(*, unavailable, message="access the 'indices' property on the collection")
-public func indices<
-    C : CollectionType>(x: C) -> Range<C.Index> {
-  fatalError("unavailable function can't be called")
-}
-
 /// A *generator* that adapts a *collection* `C` and any *sequence* of
 /// its `Index` type to present the collection's elements in a
 /// permuted order.
@@ -788,32 +752,4 @@ public struct PermutationGenerator<
 public protocol MutableSliceable : CollectionType, MutableCollectionType {
   subscript(_: Range<Index>) -> SubSequence { get set }
 }
-
-@available(*, unavailable, message="Use the dropFirst() method instead.") 
-public func dropFirst<Seq : CollectionType>(s: Seq) -> Seq.SubSequence {
-  fatalError("unavailable function can't be called")
-}
-
-@available(*, unavailable, message="Use the dropLast() method instead.")
-public func dropLast<
-  S : CollectionType
-  where S.Index: BidirectionalIndexType
->(s: S) -> S.SubSequence {
-  fatalError("unavailable function can't be called")
-}
-
-@available(*, unavailable, message="Use the prefix() method.")
-public func prefix<S : CollectionType>(s: S, _ maxLength: Int) -> S.SubSequence {
-  fatalError("unavailable function can't be called")
-}
-
-@available(*, unavailable, message="Use the suffix() method instead.")
-public func suffix<
-  S : CollectionType where S.Index: BidirectionalIndexType
->(s: S, _ maxLength: Int) -> S.SubSequence {
-  fatalError("unavailable function can't be called")
-}
-
-@available(*, unavailable, renamed="CollectionType")
-public struct Sliceable {}
 

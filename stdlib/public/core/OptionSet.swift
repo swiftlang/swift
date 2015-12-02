@@ -162,5 +162,3 @@ extension OptionSetType where RawValue : BitwiseOperationsType {
   }
 }
 
-@available(*, unavailable, renamed="OptionSetType")
-public typealias RawOptionSetType = OptionSetType

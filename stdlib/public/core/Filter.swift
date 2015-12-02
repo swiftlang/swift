@@ -132,9 +132,6 @@ public struct LazyFilterIndex<
   /// The predicate used to determine which elements of `base` are
   /// also elements of `self`.
   internal let _include: (BaseElements.Generator.Element)->Bool
-
-  @available(*, unavailable, renamed="BaseElements")
-  public typealias Base = BaseElements
 }
 
 /// Returns `true` iff `lhs` is identical to `rhs`.
@@ -256,24 +253,6 @@ extension LazyCollectionType {
       self.elements, whereElementsSatisfy: predicate)
   }
 }
-
-/// Return an `Array` containing the elements of `source`,
-/// in order, that satisfy the predicate `includeElement`.
-@available(*, unavailable, message="call the 'filter()' method on the sequence")
-public func filter<S : SequenceType>(
-  source: S, _ includeElement: (S.Generator.Element) -> Bool
-) -> [S.Generator.Element] {
-  fatalError("unavailable function can't be called")
-}
-
-@available(*, unavailable, renamed="FilterSequence")
-public struct FilterSequenceView<Base : SequenceType> {}
-
-@available(*, unavailable, renamed="FilterCollectionIndex")
-public struct FilterCollectionViewIndex<Base: CollectionType> {}
-
-@available(*, unavailable, renamed="FilterCollection")
-public struct FilterCollectionView<Base : CollectionType> {}
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)

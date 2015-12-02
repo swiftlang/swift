@@ -606,15 +606,6 @@ extension String {
   }
 }
 
-extension String {
-  @available(*, unavailable, message="call the 'joinWithSeparator()' method on the sequence of elements")
-  public func join<
-    S : SequenceType where S.Generator.Element == String
-  >(elements: S) -> String {
-    fatalError("unavailable function can't be called")
-  }
-}
-
 extension SequenceType where Generator.Element == String {
 
   /// Interpose the `separator` between elements of `self`, then concatenate

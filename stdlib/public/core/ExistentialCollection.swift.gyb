@@ -31,9 +31,6 @@ internal func _abstract(file: StaticString = __FILE__, line: UInt = __LINE__) {
 /// - seealso:
 ///   - `struct AnySequence<S : SequenceType>`
 public struct AnyGenerator<Element> : GeneratorType {
-  @available(*, unavailable, renamed="Element")
-  public typealias T = Element
-
   /// Create a `GeneratorType` instance that wraps `base` but whose type
   /// depends only on the type of `G.Element`.
   ///
@@ -80,16 +77,6 @@ public struct AnyGenerator<Element> : GeneratorType {
 /// Every `GeneratorType` can also be a `SequenceType`.  Note that
 /// traversing the sequence consumes the generator.
 extension AnyGenerator : SequenceType {}
-
-@available(*, unavailable, renamed="AnyGenerator")
-public func anyGenerator<G: GeneratorType>(base: G) -> AnyGenerator<G.Element> {
-  fatalError("unavailable function can't be called")
-}
-
-@available(*, unavailable, renamed="AnyGenerator")
-public func anyGenerator<Element>(body: ()->Element?) -> AnyGenerator<Element> {
-  fatalError("unavailable function can't be called")
-}
 
 internal struct _ClosureBasedGenerator<Element> : GeneratorType {
   internal init(_ body: () -> Element?) {
@@ -220,9 +207,6 @@ internal struct _ClosureBasedSequence<Generator : GeneratorType>
 ///
 /// - SeeAlso: `AnyGenerator<Element>`.
 public struct AnySequence<Element> : SequenceType {
-  @available(*, unavailable, renamed="Element")
-  public typealias T = Element
-
   /// Wrap and forward operations to to `base`.
   public init<S: SequenceType where S.Generator.Element == Element>(_ base: S) {
     _box = _SequenceBox(base)
@@ -549,9 +533,6 @@ public func !== <
 ///
 /// - SeeAlso: ${', '.join('`Any%sType`' % t for t in (2 * traversals)[ti + 1 : ti + 3]) }
 public struct Any${Traversal}Collection<Element> : AnyCollectionType {
-  @available(*, unavailable, renamed="Element")
-  public typealias T = Element
-
   typealias Box = _AnyCollectionBox<Element>
 
 %   for SubTraversal in traversals[ti:]:

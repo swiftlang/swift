@@ -60,9 +60,6 @@ ${selfDocComment}
 public struct ${Self}<Bound : Comparable>
   : IntervalType, Equatable, CustomStringConvertible, CustomDebugStringConvertible, _Reflectable {
 
-  @available(*, unavailable, renamed="Bound")
-  public typealias T = Bound
-
   /// Construct a copy of `x`.
   public init(_ x: ${Self}) {
     // This initializer exists only so that we can have a descriptive
@@ -169,13 +166,6 @@ extension IntervalType {
   >(other: I) -> Bool {
     return contains(other.start) || other.contains(start)
   }
-}
-
-@available(*, unavailable, message="call the 'overlaps(other)' method on the interval")
-public func overlaps<
-  I0: IntervalType, I1: IntervalType where I0.Bound == I1.Bound
->(lhs: I0, _ rhs: I1) -> Bool {
-  fatalError("unavailable function can't be called")
 }
 
 /// Returns a half-open interval from `start` to `end`.

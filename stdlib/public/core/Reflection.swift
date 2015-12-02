@@ -473,8 +473,3 @@ struct _MetatypeMirror : _MirrorType {
   var disposition: _MirrorDisposition { return .Aggregate }
 }
 
-@available(*, unavailable, message="call the 'Mirror(reflecting:)' initializer")
-public func reflect<T>(x: T) -> _MirrorType {
-  fatalError("unavailable function can't be called")
-}
-

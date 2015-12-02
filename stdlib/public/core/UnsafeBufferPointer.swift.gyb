@@ -15,9 +15,6 @@
 public struct UnsafeBufferPointerGenerator<Element>
   : GeneratorType, SequenceType {
 
-  @available(*, unavailable, renamed="Element")
-  public typealias T = Element
-
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   public mutating func next() -> Element? {
@@ -35,9 +32,6 @@ public struct UnsafeBufferPointerGenerator<Element>
 /// The pointer should be aligned to `alignof(Element.self)`.
 public struct Unsafe${Mutable}BufferPointer<Element>
   : ${Mutable}CollectionType {
-
-  @available(*, unavailable, renamed="Element")
-  public typealias T = Element
 
   /// Always zero, which is the index of the first element in a
   /// non-empty buffer.

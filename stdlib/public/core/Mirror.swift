@@ -823,6 +823,3 @@ extension Mirror : CustomReflectable {
   }
 }
 
-@available(*, unavailable, renamed="PlaygroundQuickLook")
-public typealias QuickLookObject = PlaygroundQuickLook
-

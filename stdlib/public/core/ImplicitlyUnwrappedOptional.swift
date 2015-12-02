@@ -21,9 +21,6 @@ public enum ImplicitlyUnwrappedOptional<Wrapped>
   case None
   case Some(Wrapped)
 
-  @available(*, unavailable, renamed="Wrapped")
-  public typealias T = Wrapped
-
   /// Construct a `nil` instance.
   public init() { self = .None }
 

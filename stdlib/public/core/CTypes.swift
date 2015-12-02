@@ -154,13 +154,6 @@ public func ==(lhs: COpaquePointer, rhs: COpaquePointer) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
-/// The family of C function pointer types.
-///
-/// This type has been removed. Instead of `CFunctionType<(T) -> U>`, a native
-/// function type with the C convention can be used, `@convention(c) (T) -> U`.
-@available(*, unavailable, message="use a function type '@convention(c) (T) -> U'")
-public struct CFunctionPointer<T> {}
-
 /// The corresponding Swift type to `va_list` in imported C APIs.
 public struct CVaListPointer {
   var value: UnsafeMutablePointer<Void>
