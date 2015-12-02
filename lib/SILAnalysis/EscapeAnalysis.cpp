@@ -15,6 +15,7 @@
 #include "swift/SILAnalysis/BasicCalleeAnalysis.h"
 #include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILAnalysis/ArraySemantic.h"
+#include "swift/SILAnalysis/ValueTracking.h"
 #include "swift/SILPasses/PassManager.h"
 #include "swift/SIL/SILArgument.h"
 #include "llvm/Support/GraphWriter.h"
@@ -472,6 +473,30 @@ bool EscapeAnalysis::ConnectionGraph::isUsePoint(ValueBase *V, CGNode *Node) {
   if (Idx >= (int)Node->UsePoints.size())
     return false;
   return Node->UsePoints.test(Idx);
+}
+
+bool EscapeAnalysis::ConnectionGraph::canEscapeTo(CGNode *From, CGNode *To) {
+  // See if we can reach the From-node by transitively visiting the
+  // predecessor nodes of the To-node.
+  // Usually nodes have few predecessor nodes and the graph depth is small.
+  // So this should be fast.
+  llvm::SmallVector<CGNode *, 8> WorkList;
+  WorkList.push_back(From);
+  From->isInWorkList = true;
+  for (unsigned Idx = 0; Idx < WorkList.size(); ++Idx) {
+    CGNode *Reachable = WorkList[Idx];
+    if (Reachable == To)
+      return true;
+    for (Predecessor Pred : Reachable->Preds) {
+      CGNode *PredNode = Pred.getPointer();
+      if (!PredNode->isInWorkList) {
+        PredNode->isInWorkList = true;
+        WorkList.push_back(PredNode);
+      }
+    }
+  }
+  clearWorkListFlags(WorkList);
+  return false;
 }
 
 
@@ -1464,6 +1489,46 @@ void EscapeAnalysis::finalizeGraphsConservatively(FunctionInfo *FInfo) {
   }
   FInfo->Graph.propagateEscapeStates();
   mergeSummaryGraph(&FInfo->SummaryGraph, &FInfo->Graph);
+}
+
+bool EscapeAnalysis::canEscapeToUsePoint(SILValue V, ValueBase *UsePoint,
+                                         ConnectionGraph *ConGraph) {
+  CGNode *Node = ConGraph->getNode(V, this);
+  if (!Node)
+    return false;
+
+  // First check if there are escape pathes which we don't explicitly see
+  // in the graph.
+  switch (Node->getEscapeState()) {
+    case EscapeState::None:
+    case EscapeState::Return:
+      break;
+    case EscapeState::Arguments:
+      if (!isNotAliasingArgument(V))
+        return true;
+      break;
+    case EscapeState::Global:
+      return true;
+  }
+  // No hidden escapes: check if the Node is reachable from the UsePoint.
+  return ConGraph->isUsePoint(UsePoint, Node);
+}
+
+bool EscapeAnalysis::canPointToSameMemory(SILValue V1, SILValue V2,
+                                          ConnectionGraph *ConGraph) {
+  CGNode *Node1 = ConGraph->getNode(V1, this);
+  assert(Node1 && "value is not a pointer");
+  CGNode *Node2 = ConGraph->getNode(V2, this);
+  assert(Node2 && "value is not a pointer");
+
+  // If both nodes escape, the relation of the nodes may not be explicitly
+  // represented in the graph.
+  if (Node1->escapesInsideFunction() && Node2->escapesInsideFunction())
+    return true;
+
+  CGNode *Content1 = ConGraph->getContentNode(Node1);
+  CGNode *Content2 = ConGraph->getContentNode(Node2);
+  return Content1 == Content2;
 }
 
 SILAnalysis *swift::createEscapeAnalysis(SILModule *M) {

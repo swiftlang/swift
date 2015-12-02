@@ -283,8 +283,18 @@ private:
     /// Returns the escape state.
     EscapeState getEscapeState() const { return State; }
 
-    /// Returns true if the node's value escapes from its function.
+    /// Returns true if the node's value escapes within the function or via
+    /// the return instruction.
     bool escapes() const { return getEscapeState() != EscapeState::None; }
+
+    /// Returns true if the node's value escapes within the function. This
+    /// means that any unidentified pointer in the function may alias to
+    /// the node's value.
+    /// Note that in the false-case the node's value can still escape via
+    /// the return instruction.
+    bool escapesInsideFunction() const {
+      return getEscapeState() > EscapeState::Return;
+    }
   };
 
   /// Mapping from nodes in a calleee-graph to nodes in a caller-graph.
@@ -520,6 +530,9 @@ public:
     /// e.g. release or apply instructions.
     bool isUsePoint(ValueBase *V, CGNode *Node);
 
+    /// Returns true if there is a path from \p From to \p To.
+    bool canEscapeTo(CGNode *From, CGNode *To);
+
     /// Computes the use point information.
     void computeUsePoints();
 
@@ -656,6 +669,11 @@ private:
   /// Set all arguments and return values of all callees to global escaping.
   void finalizeGraphsConservatively(FunctionInfo *FInfo);
 
+  /// Returns true if the value \p V can escape to the \p UsePoint, where
+  /// \p UsePoint is either a release-instruction or a function call.
+  bool canEscapeToUsePoint(SILValue V, ValueBase *UsePoint,
+                           ConnectionGraph *ConGraph);
+
   friend struct ::CGForDotView;
 
 public:
@@ -678,7 +696,23 @@ public:
 
     return &FInfo->Graph;
   }
-  
+
+  /// Returns true if the value \p V can escape to the function call \p FAS.
+  /// This means that the called function may access the value \p V.
+  bool canEscapeTo(SILValue V, FullApplySite FAS, ConnectionGraph *ConGraph) {
+    return canEscapeToUsePoint(V, FAS.getInstruction(), ConGraph);
+  }
+
+  /// Returns true if the value \p V can escape to the release-instruction \p
+  /// RI. This means that \p RI may release \p V or any called destructor may
+  /// access (or release) \p V.
+  /// Note that if \p RI is a retain-instruction always false is returned.
+  bool canEscapeTo(SILValue V, RefCountingInst *RI, ConnectionGraph *ConGraph) {
+    return canEscapeToUsePoint(V, RI, ConGraph);
+  }
+
+  bool canPointToSameMemory(SILValue V1, SILValue V2, ConnectionGraph *ConGraph);
+
   /// Recomputes the connection graphs for all functions the module.
   void recompute();
 
