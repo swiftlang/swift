@@ -187,6 +187,9 @@ def dump_clang_diagnostics : Flag<["-"], "dump-clang-diagnostics">,
 def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
   HelpText<"Emit locations during SIL emission">;
 
+def use_native_super_method : Flag<["-"], "use-native-super-method">,
+  HelpText<"Use super_method for super calls in native classes">;
+
 def disable_self_type_mangling : Flag<["-"], "disable-self-type-mangling">,
   HelpText<"Disable including Self type in method type manglings">;
 
