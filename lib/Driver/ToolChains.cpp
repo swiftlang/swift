@@ -747,6 +747,37 @@ static bool findXcodeClangPath(llvm::SmallVectorImpl<char> &path) {
   return !path.empty();
 }
 
+static void addPathEnvironmentVariableIfNeeded(Job::EnvironmentVector &env,
+                                               const char *name,
+                                               const char *separator,
+                                               options::ID optionID,
+                                               const ArgList &args) {
+  auto linkPathOptions = args.filtered(optionID);
+  if (linkPathOptions.begin() == linkPathOptions.end())
+    return;
+
+  std::string newPaths;
+  interleave(linkPathOptions,
+             [&](const Arg *arg) { newPaths.append(arg->getValue()); },
+             [&] { newPaths.append(separator); });
+  if (auto currentPaths = llvm::sys::Process::GetEnv(name)) {
+    newPaths.append(separator);
+    newPaths.append(currentPaths.getValue());
+  }
+  env.emplace_back(name, args.MakeArgString(newPaths));
+}
+
+ToolChain::InvocationInfo
+toolchains::Darwin::constructInvocation(const InterpretJobAction &job,
+                                        const JobContext &context) const {
+  InvocationInfo II = ToolChain::constructInvocation(job, context);
+  addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "DYLD_LIBRARY_PATH",
+                                     ":", options::OPT_L, context.Args);
+  addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "DYLD_FRAMEWORK_PATH",
+                                     ":", options::OPT_F, context.Args);
+  return II;
+}
+
 ToolChain::InvocationInfo
 toolchains::Darwin::constructInvocation(const LinkJobAction &job,
                                         const JobContext &context) const {
@@ -949,6 +980,16 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
 }
 
 #if defined(SWIFT_ENABLE_TARGET_LINUX)
+
+ToolChain::InvocationInfo
+toolchains::Linux::constructInvocation(const InterpretJobAction &job,
+                                       const JobContext &context) const {
+  InvocationInfo II = ToolChain::constructInvocation(job, context);
+  addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "LD_LIBRARY_PATH",
+                                     ":", options::OPT_L, context.Args);
+  return II;
+}
+
 
 ToolChain::InvocationInfo
 toolchains::Linux::constructInvocation(const AutolinkExtractJobAction &job,

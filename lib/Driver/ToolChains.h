@@ -23,6 +23,8 @@ namespace toolchains {
 
 class LLVM_LIBRARY_VISIBILITY Darwin : public ToolChain {
 protected:
+  InvocationInfo constructInvocation(const InterpretJobAction &job,
+                                     const JobContext &context) const override;
   InvocationInfo constructInvocation(const LinkJobAction &job,
                                      const JobContext &context) const override;
 
@@ -38,6 +40,8 @@ public:
 
 class LLVM_LIBRARY_VISIBILITY Linux : public ToolChain {
 protected:
+  InvocationInfo constructInvocation(const InterpretJobAction &job,
+                                     const JobContext &context) const override;
   InvocationInfo constructInvocation(const AutolinkExtractJobAction &job,
                                      const JobContext &context) const override;
   InvocationInfo constructInvocation(const LinkJobAction &job,
