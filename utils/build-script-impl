@@ -1908,6 +1908,7 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                 if [[ "$SKIP_TEST_FOUNDATION" ]]; then
                     continue
                 fi
+                echo "--- Running tests for ${product} ---"
                 build_dir=$(build_directory $deployment_target $product)
                 XCTEST_BUILD_DIR=$(build_directory $deployment_target xctest)
                 pushd "${FOUNDATION_SOURCE_DIR}"
