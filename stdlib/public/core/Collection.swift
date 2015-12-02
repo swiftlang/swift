@@ -314,17 +314,17 @@ extension CollectionType {
       return []
     }
 
-    var builder = ContiguousArray<T>()
-    builder.reserveCapacity(count)
+    var result = ContiguousArray<T>()
+    result.reserveCapacity(count)
 
     var i = self.startIndex
 
     for _ in 0..<count {
-      builder.append(try transform(self[i++]))
+      result.append(try transform(self[i++]))
     }
 
     _expectEnd(i, self)
-    return Array(builder)
+    return Array(result)
   }
 
   /// Returns a subsequence containing all but the first `n` elements.

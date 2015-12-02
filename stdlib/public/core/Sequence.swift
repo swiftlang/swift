@@ -295,20 +295,20 @@ extension SequenceType {
     @noescape transform: (Generator.Element) throws -> T
   ) rethrows -> [T] {
     let initialCapacity = underestimateCount()
-    var builder = ContiguousArray<T>()
-    builder.reserveCapacity(initialCapacity)
+    var result = ContiguousArray<T>()
+    result.reserveCapacity(initialCapacity)
 
     var generator = generate()
 
     // Add elements up to the initial capacity without checking for regrowth.
     for _ in 0..<initialCapacity {
-      builder.append(try transform(generator.next()!))
+      result.append(try transform(generator.next()!))
     }
     // Add remaining elements, if any.
     while let element = generator.next() {
-      builder.append(try transform(element))
+      result.append(try transform(element))
     }
-    return Array(builder)
+    return Array(result)
   }
 
   /// Return an `Array` containing the elements of `self`,
@@ -318,17 +318,17 @@ extension SequenceType {
     @noescape includeElement: (Generator.Element) throws -> Bool
   ) rethrows -> [Generator.Element] {
 
-    var builder = ContiguousArray<Generator.Element>()
+    var result = ContiguousArray<Generator.Element>()
 
     var generator = generate()
 
     while let element = generator.next() {
       if try includeElement(element) {
-        builder.append(element)
+        result.append(element)
       }
     }
 
-    return Array(builder)
+    return Array(result)
   }
 
   /// Returns a subsequence containing all but the first `n` elements.
