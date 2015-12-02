@@ -157,102 +157,12 @@ static bool isForwardableEdge(SILBasicBlock *BB) {
 }
 
 //===----------------------------------------------------------------------===//
-//                            RLEContext Interface
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-class BBState;
-/// This class stores global state that we use when processing and also drives
-/// the computation. We put its interface at the top for use in other parts of
-/// the pass which may want to use this global information.
-class RLEContext {
-  /// The alias analysis that we will use during all computations.
-  AliasAnalysis *AA;
-
-  /// The range that we use to iterate over the reverse post order of the given
-  /// function.
-  PostOrderFunctionInfo::reverse_range ReversePostOrder;
-
-  /// Keeps all the locations for the current function. The BitVector in each
-  /// BBState is then laid on top of it to keep track of which MemLocation
-  /// has a downward available value.
-  std::vector<MemLocation> MemLocationVault;
-
-  /// Caches a list of projection paths to leaf nodes in the given type.
-  TypeExpansionMap TypeExpansionCache;
-
-  /// Contains a map between MemLocation to their index in the MemLocationVault.
-  /// Use for fast lookup.
-  llvm::DenseMap<MemLocation, unsigned> LocToBitIndex;
-
-  /// A map from each BasicBlock to its BBState.
-  llvm::DenseMap<SILBasicBlock *, BBState> BBToLocState;
-
-  /// A map for each basic block and whether its predecessors have forwardable
-  /// edges.
-  llvm::DenseMap<SILBasicBlock *, bool> ForwardableEdge;
-
-public:
-  RLEContext(SILFunction *F, AliasAnalysis *AA,
-             PostOrderFunctionInfo::reverse_range RPOT);
-
-  RLEContext(const RLEContext &) = delete;
-  RLEContext(RLEContext &&) = default;
-  ~RLEContext() = default;
-
-  bool run();
-
-  /// Returns the alias analysis we will use during all computations.
-  AliasAnalysis *getAA() const { return AA; }
-
-  /// Returns the TypeExpansionCache we will use during expanding MemLocations.
-  TypeExpansionMap &getTypeExpansionCache() { return TypeExpansionCache; }
-
-  /// Return the BBState for the basic block this basic block belongs to.
-  BBState &getBBLocState(SILBasicBlock *B) { return BBToLocState[B]; }
-
-  /// Get the bit representing the MemLocation in the MemLocationVault.
-  unsigned getMemLocationBit(const MemLocation &L);
-
-  /// Given the bit, get the MemLocation from the MemLocationVault.
-  MemLocation &getMemLocation(const unsigned index);
-
-  /// Go to the predecessors of the given basic block, compute the value
-  /// for the given MemLocation.
-  SILValue computePredecessorCoveringValue(SILBasicBlock *B, MemLocation &L);
-
-  /// Return true if all the predecessors of the basic block can have
-  /// BBArgument.
-  bool withTransistivelyForwardableEdges(SILBasicBlock *BB);
-
-  /// Given a MemLocation, try to collect all the LoadStoreValues for this
-  /// MemLocation in the given basic block. If a LoadStoreValue is a covering
-  /// value, collectForwardingValues also create a SILArgument for it. As a
-  /// a result, collectForwardingValues may invalidate TerminatorInsts for
-  /// basic blocks.
-  ///
-  /// UseForwardValOut tells whether to use the ForwardValOut or not. i.e.
-  /// when materialize a covering value, we go to each predecessors and
-  /// collect forwarding values from their ForwardValOuts.
-  bool gatherValues(SILBasicBlock *B, MemLocation &L, MemLocationValueMap &Vs,
-                    bool UseForwardValOut);
-
-  /// Dump all the MemLocations in the MemLocationVault.
-  void printMemLocationVault() const {
-    for (auto &X : MemLocationVault) {
-      X.print();
-    }
-  }
-};
-
-} // end anonymous namespace
-
-//===----------------------------------------------------------------------===//
 //                       Basic Block Location State
 //===----------------------------------------------------------------------===//
 namespace {
 
+/// forward declaration.
+class RLEContext;
 /// State of the load store in one basic block which allows for forwarding from
 /// loads, stores -> loads
 class BBState {
@@ -381,6 +291,98 @@ public:
   SILValue computeForwardingValues(RLEContext &Ctx, MemLocation &L,
                                    SILInstruction *InsertPt,
                                    bool UseForwardValOut);
+};
+
+} // end anonymous namespace
+
+
+//===----------------------------------------------------------------------===//
+//                            RLEContext Interface
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// This class stores global state that we use when processing and also drives
+/// the computation. We put its interface at the top for use in other parts of
+/// the pass which may want to use this global information.
+class RLEContext {
+  /// The alias analysis that we will use during all computations.
+  AliasAnalysis *AA;
+
+  /// The range that we use to iterate over the reverse post order of the given
+  /// function.
+  PostOrderFunctionInfo::reverse_range ReversePostOrder;
+
+  /// Keeps all the locations for the current function. The BitVector in each
+  /// BBState is then laid on top of it to keep track of which MemLocation
+  /// has a downward available value.
+  std::vector<MemLocation> MemLocationVault;
+
+  /// Caches a list of projection paths to leaf nodes in the given type.
+  TypeExpansionMap TypeExpansionCache;
+
+  /// Contains a map between MemLocation to their index in the MemLocationVault.
+  /// Use for fast lookup.
+  llvm::DenseMap<MemLocation, unsigned> LocToBitIndex;
+
+  /// A map from each BasicBlock to its BBState.
+  llvm::DenseMap<SILBasicBlock *, BBState> BBToLocState;
+
+  /// A map for each basic block and whether its predecessors have forwardable
+  /// edges.
+  llvm::DenseMap<SILBasicBlock *, bool> ForwardableEdge;
+
+public:
+  RLEContext(SILFunction *F, AliasAnalysis *AA,
+             PostOrderFunctionInfo::reverse_range RPOT);
+
+  RLEContext(const RLEContext &) = delete;
+  RLEContext(RLEContext &&) = default;
+  ~RLEContext() = default;
+
+  bool run();
+
+  /// Returns the alias analysis we will use during all computations.
+  AliasAnalysis *getAA() const { return AA; }
+
+  /// Returns the TypeExpansionCache we will use during expanding MemLocations.
+  TypeExpansionMap &getTypeExpansionCache() { return TypeExpansionCache; }
+
+  /// Return the BBState for the basic block this basic block belongs to.
+  BBState &getBBLocState(SILBasicBlock *B) { return BBToLocState[B]; }
+
+  /// Get the bit representing the MemLocation in the MemLocationVault.
+  unsigned getMemLocationBit(const MemLocation &L);
+
+  /// Given the bit, get the MemLocation from the MemLocationVault.
+  MemLocation &getMemLocation(const unsigned index);
+
+  /// Go to the predecessors of the given basic block, compute the value
+  /// for the given MemLocation.
+  SILValue computePredecessorCoveringValue(SILBasicBlock *B, MemLocation &L);
+
+  /// Return true if all the predecessors of the basic block can have
+  /// BBArgument.
+  bool withTransistivelyForwardableEdges(SILBasicBlock *BB);
+
+  /// Given a MemLocation, try to collect all the LoadStoreValues for this
+  /// MemLocation in the given basic block. If a LoadStoreValue is a covering
+  /// value, collectForwardingValues also create a SILArgument for it. As a
+  /// a result, collectForwardingValues may invalidate TerminatorInsts for
+  /// basic blocks.
+  ///
+  /// UseForwardValOut tells whether to use the ForwardValOut or not. i.e.
+  /// when materialize a covering value, we go to each predecessors and
+  /// collect forwarding values from their ForwardValOuts.
+  bool gatherValues(SILBasicBlock *B, MemLocation &L, MemLocationValueMap &Vs,
+                    bool UseForwardValOut);
+
+  /// Dump all the MemLocations in the MemLocationVault.
+  void printMemLocationVault() const {
+    for (auto &X : MemLocationVault) {
+      X.print();
+    }
+  }
 };
 
 } // end anonymous namespace
