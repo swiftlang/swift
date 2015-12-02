@@ -92,7 +92,7 @@ let _: String = testIS1() // expected-error {{cannot convert value of type 'Int'
 
 func insertA<T>(inout array : [T], elt : T) {
   array.append(T); // expected-error {{cannot invoke 'append' with an argument list of type '((T).Type)'}}
-  // expected-note @-1 {{expected an argument list of type '(Element)'}}
+  // expected-note @-1 {{expected an argument list of type '(T)'}}
 }
 
 // <rdar://problem/17875634> can't append to array of tuples
@@ -112,10 +112,10 @@ func test17875634() {
   // expected-note @-1 {{overloads for '+=' exist with these partially matching parameter lists:}}
 
   match.append(row, col) // expected-error{{cannot invoke 'append' with an argument list of type '(Int, Int)'}}
-  // expected-note @-1 {{expected an argument list of type '(Element)'}}
+  // expected-note @-1 {{expected an argument list of type '(Int, Int)'}}
 
   match.append(1, 2) // expected-error{{cannot invoke 'append' with an argument list of type '(Int, Int)'}}
-  // expected-note @-1 {{expected an argument list of type '(Element)'}}
+  // expected-note @-1 {{expected an argument list of type '(Int, Int)'}}
 
   match.append(coord)
   match.append((1, 2))

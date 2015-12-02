@@ -1104,12 +1104,22 @@ namespace {
   ///     func f(a:Int)(b:Double) -> Int
   /// Uncurry level of 0 indicates that we're looking at the "a" argument, an
   /// uncurry level of 1 indicates that we're looking at the "b" argument.
+  ///
+  /// The declType specifies a specific type to use for this decl that may be
+  /// more resolved than the decls type.  For example, it may have generic
+  /// arguments substituted in.
   struct UncurriedCandidate {
     ValueDecl *decl;
     unsigned level;
+    Type declType;
+
+    UncurriedCandidate(ValueDecl *decl, unsigned level)
+      : decl(decl), level(level), declType(decl->getType()) {
+    }
 
     AnyFunctionType *getUncurriedFunctionType() const {
-      auto type = decl->getType();
+      // Start with the known type of the decl.
+      auto type = declType;
 
       // If this is an operator func decl in a type context, the 'self' isn't
       // actually going to be applied.
@@ -1491,11 +1501,29 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
   if (auto AE = dyn_cast<ApplyExpr>(fn)) {
     collectCalleeCandidates(AE->getFn());
 
+    // If this is a DotSyntaxCallExpr, then the callee is a method, and the
+    // argument list of this apply is the base being applied to the method.
+    // If we have a type for that, capture it so that we can calculate a
+    // substituted type, which resolves many generic arguments.
+    Type baseType;
+
+    // TODO: What about ConstructorRefCallExpr?
+    if (isa<DotSyntaxCallExpr>(AE) &&
+        !isUnresolvedOrTypeVarType(AE->getArg()->getType()))
+      baseType = AE->getArg()->getType()->getLValueOrInOutObjectType();
+
     // If we found a candidate list with a recursive walk, try adjust the curry
     // level for the applied subexpression in this call.
     if (!candidates.empty()) {
-      for (auto &C : candidates)
+      for (auto &C : candidates) {
         C.level += 1;
+
+        // Compute a new substituted type if we have a base type to apply.
+        if (baseType && C.level == 1)
+          C.declType = baseType->getTypeOfMember(CS->DC->getParentModule(),
+                                                 C.decl, nullptr);
+      }
+
       return;
     }
   }
