@@ -299,13 +299,10 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   // Speculate virtual call targets.
   PM.addSpeculativeDevirtualization();
 
-  // Optimize function signatures if we are asked to.
-  //
   // We do this late since it is a pass like the inline caches that we only want
   // to run once very late. Make sure to run at least one round of the ARC
   // optimizer after this.
-  if (Module.getOptions().EnableFuncSigOpts)
-    PM.addFunctionSignatureOpts();
+  PM.addFunctionSignatureOpts();
 
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();

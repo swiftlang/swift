@@ -266,9 +266,6 @@ def use_malloc : Flag<["-"], "use-malloc">,
   HelpText<"Allocate internal data structures using malloc "
            "(for memory debugging)">;
 
-def disable_func_sig_opts : Flag<["-"], "disable-func-sig-opts">,
-  HelpText<"Disable function signature optimizations">;
-
 def interpret : Flag<["-"], "interpret">, HelpText<"Immediate mode">, ModeOpt;
 
 def verify_type_layout : JoinedOrSeparate<["-"], "verify-type-layout">,
