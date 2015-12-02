@@ -395,8 +395,8 @@ ResolvedLocator constraints::resolveLocatorToDecl(
       continue;
     }
 
-    if (auto constructor = dyn_cast<ConstructorRefCallExpr>(anchor)) {
-      anchor = constructor->getFn();
+    if (auto selfApply = dyn_cast<SelfApplyExpr>(anchor)) {
+      anchor = selfApply->getFn();
       continue;
     }
 
@@ -404,12 +404,6 @@ ResolvedLocator constraints::resolveLocatorToDecl(
       anchor = dotSyntax->getRHS();
       continue;
     }
-
-    if (auto dotSyntax = dyn_cast<DotSyntaxCallExpr>(anchor)) {
-      anchor = dotSyntax->getFn();
-      continue;
-    }
-
     break;
   } while (true);
   
@@ -1506,9 +1500,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
     // If we have a type for that, capture it so that we can calculate a
     // substituted type, which resolves many generic arguments.
     Type baseType;
-
-    // TODO: What about ConstructorRefCallExpr?
-    if (isa<DotSyntaxCallExpr>(AE) &&
+    if (isa<SelfApplyExpr>(AE) &&
         !isUnresolvedOrTypeVarType(AE->getArg()->getType()))
       baseType = AE->getArg()->getType()->getLValueOrInOutObjectType();
 
