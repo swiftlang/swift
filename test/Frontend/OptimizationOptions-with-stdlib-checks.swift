@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -module-name OptimizationOptions -disable-func-sig-opts -Onone -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=DEBUG
-// RUN: %target-swift-frontend -module-name OptimizationOptions -disable-func-sig-opts -O -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=RELEASE
-// RUN: %target-swift-frontend -module-name OptimizationOptions -disable-func-sig-opts  -Ounchecked -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=UNCHECKED
-// RUN: %target-swift-frontend -module-name OptimizationOptions -disable-func-sig-opts -Oplayground -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=PLAYGROUND
+// RUN: %target-swift-frontend -module-name OptimizationOptions -Onone -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=DEBUG
+// RUN: %target-swift-frontend -module-name OptimizationOptions -O -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=RELEASE
+// RUN: %target-swift-frontend -module-name OptimizationOptions -Ounchecked -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=UNCHECKED
+// RUN: %target-swift-frontend -module-name OptimizationOptions -Oplayground -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=PLAYGROUND
 
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_stdlib_asserts
