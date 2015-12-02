@@ -278,7 +278,7 @@ class DSEContext {
   llvm::BumpPtrAllocator BPA;
 
   /// Map every basic block to its location state.
-  llvm::DenseMap<SILBasicBlock *, BBState *> BBToLocState;
+  llvm::SmallDenseMap<SILBasicBlock *, BBState, 4> BBToLocState;
 
   /// Keeps the actual BBStates.
   std::vector<BBState> BBStates;
@@ -295,7 +295,7 @@ class DSEContext {
   MemLocationIndexMap LocToBitIndex;
 
   /// Return the BBState for the basic block this basic block belongs to.
-  BBState *getBBLocState(SILBasicBlock *B) { return BBToLocState[B]; }
+  BBState *getBBLocState(SILBasicBlock *B) { return &BBToLocState[B]; }
 
   /// Return the BBState for the basic block this instruction belongs to.
   BBState *getBBLocState(SILInstruction *I) {
@@ -854,13 +854,8 @@ void DSEContext::run() {
   // than 64 basic blocks. Therefore, allocate the BBState in a vector and use
   // pointer in BBToLocState to access them.
   for (auto &B : *F) {
-    BBStates.push_back(BBState(&B));
-    BBStates.back().init(MemLocationVault.size());
-  }
-
-  // Initialize the BBToLocState mapping.
-  for (auto &S : BBStates) {
-    BBToLocState[S.getBB()] = &S;
+    BBToLocState[&B] = BBState(&B);
+    BBToLocState[&B].init(MemLocationVault.size());
   }
 
   // Generate the genset and killset for each basic block.
