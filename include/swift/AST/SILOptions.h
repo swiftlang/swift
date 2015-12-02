@@ -97,6 +97,9 @@ public:
 
   /// Should we use a pass pipeline passed in via a json file? Null by default.
   StringRef ExternalPassPipelineFilename;
+
+  /// Use super_method for native super method calls instead of function_ref.
+  bool UseNativeSuperMethod = false;
 };
 
 } // end namespace swift

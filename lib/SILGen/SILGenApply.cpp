@@ -627,11 +627,12 @@ public:
     case Kind::SuperMethod: {
       assert(level <= Constant.uncurryLevel
              && "uncurrying past natural uncurry level of method");
-      assert(level >= 1
-             && "currying 'self' of super method dispatch not yet supported");
+      assert((level == 0 || level == getNaturalUncurryLevel()) &&
+             "Can only curry self parameter of super method calls");
 
       constant = Constant.atUncurryLevel(level);
       constantInfo = gen.getConstantInfo(*constant);
+
       SILValue methodVal = gen.B.createSuperMethod(Loc,
                                                    SelfValue,
                                                    *constant,
@@ -735,7 +736,10 @@ public:
       return SpecializedEmitter::forDecl(SGM, Constant);
     }
     case Kind::SuperMethod: {
-      return SpecializedEmitter(emitPartialSuperMethod);
+      if (uncurryLevel == 0) {
+        return SpecializedEmitter(emitPartialSuperMethod);
+      }
+      return None;
     }
     case Kind::EnumElement:
     case Kind::IndirectValue:
@@ -1405,7 +1409,13 @@ public:
                  apply);
 
     SILValue superMethod;
-    if (constant.isForeign) {
+    auto *funcDecl = cast<AbstractFunctionDecl>(constant.getDecl());
+
+    auto Opts = SGF.B.getModule().getOptions();
+    if (constant.isForeign ||
+        (Opts.UseNativeSuperMethod && !funcDecl->isFinal())) {
+      // All Objective-C methods and
+      // non-final native Swift methods use dynamic dispatch.
       SILValue Input = super.getValue();
       while (auto *UI = dyn_cast<UpcastInst>(Input))
         Input = UI->getOperand();
@@ -1413,7 +1423,7 @@ public:
       setCallee(Callee::forSuperMethod(SGF, Input, constant,
                                        getSubstFnType(), fn));
     } else {
-      // Native Swift super calls are direct.
+      // Native Swift super calls to final methods are direct.
       setCallee(Callee::forDirect(SGF, constant, getSubstFnType(), fn));
     }
 
@@ -3818,12 +3828,13 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
     return Callee::forClassMethod(gen, self, constant, substAccessorType,
                                   loc);
 
-  // If this is a "super." dispatch, we either do a direct dispatch in the case
-  // of swift classes or an objc super call.
+  // If this is a "super." dispatch, we do a dynamic dispatch for objc methods
+  // or non-final native Swift methods.
   while (auto *upcast = dyn_cast<UpcastInst>(self))
     self = upcast->getOperand();
 
-  if (constant.isForeign)
+  auto Opts = gen.B.getModule().getOptions();
+  if (constant.isForeign || (Opts.UseNativeSuperMethod && !decl->isFinal()))
     return Callee::forSuperMethod(gen, self, constant, substAccessorType,loc);
 
   return Callee::forDirect(gen, constant, substAccessorType, loc);
