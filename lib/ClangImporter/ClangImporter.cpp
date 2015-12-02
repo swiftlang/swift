@@ -2198,7 +2198,7 @@ auto ClangImporter::Implementation::importFullName(
     if (objcMethod->isVariadic() && shouldMakeSelectorNonVariadic(selector)) {
       --numArgs;
       result.DroppedVariadic = true;
-      params = params.slice(1);
+      params = params.drop_back(1);
     }
 
     for (unsigned index = 0; index != numArgs; ++index) {

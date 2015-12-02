@@ -3162,7 +3162,7 @@ namespace {
 
       // If we dropped the variadic, handle it now.
       if (importedName.DroppedVariadic) {
-        params = params.slice(1);
+        params = params.drop_back(1);
         variadic = false;
       }
 
