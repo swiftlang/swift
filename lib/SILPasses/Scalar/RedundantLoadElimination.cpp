@@ -97,9 +97,6 @@
 
 using namespace swift;
 
-static llvm::cl::opt<bool> EnableGlobalRLE("enable-global-redundant-load-elim",
-                                           llvm::cl::init(true));
-
 STATISTIC(NumForwardedLoads, "Number of loads forwarded");
 
 //===----------------------------------------------------------------------===//
@@ -989,8 +986,6 @@ class RedundantLoadElimination : public SILFunctionTransform {
 
   /// The entry point to the transformation.
   void run() override {
-    if (!EnableGlobalRLE)
-      return;
     SILFunction *F = getFunction();
     DEBUG(llvm::dbgs() << "***** Redundant Load Elimination on function: "
                        << F->getName() << " *****\n");
