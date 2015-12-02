@@ -326,7 +326,7 @@ class RLEContext {
   llvm::DenseMap<MemLocation, unsigned> LocToBitIndex;
 
   /// A map from each BasicBlock to its BBState.
-  llvm::DenseMap<SILBasicBlock *, BBState> BBToLocState;
+  llvm::SmallDenseMap<SILBasicBlock *, BBState, 4> BBToLocState;
 
   /// A map for each basic block and whether its predecessors have forwardable
   /// edges.
