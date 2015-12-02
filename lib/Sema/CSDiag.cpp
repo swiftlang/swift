@@ -1143,10 +1143,15 @@ namespace {
         return funcTy->getResult();
       return Type();
     }
-    
+
     void dump() const {
       decl->dumpRef(llvm::errs());
-      llvm::errs() << " - uncurry level " << level << "\n";
+      llvm::errs() << " - uncurry level " << level;
+
+      if (auto FT = getUncurriedFunctionType())
+        llvm::errs() << " - type: " << Type(FT) << "\n";
+      else
+        llvm::errs() << " - type <<NONFUNCTION>>: " << decl->getType() << "\n";
     }
   };
 
