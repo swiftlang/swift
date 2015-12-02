@@ -42,7 +42,7 @@ We also intend to provide tools to detect inadvertent changes in interfaces.
 
 .. contents:: :local:
 
-.. warning:: This document is still in draft stages. Large additions and
+.. warning:: **This document is still in draft stages.** Large additions and
   restructuring are still planned, including:
   
   * A summary for each declaration kind what changes are binary-compatible.
