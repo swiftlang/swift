@@ -8,27 +8,46 @@ import Builtin
 import Swift
 import SwiftShims
 
-class X {
+protocol ClassP : class {
+  func foo()
+}
+
+class X : ClassP {
+  func foo()
+}
+
+class Derived : X {
 }
 
 class Y {
-	@sil_stored var x: X
+  @sil_stored var x: X
 
-	init(newx: X)
+  init(newx: X)
 }
 
-struct Pointer {
-	let y : Y
+protocol P {
+  func foo()
+}
+
+struct Pointer : P {
+  let y : Y
+  func foo()
 }
 
 enum PointerEnum {
-	case B(Pointer, Pointer)
+  case B(Pointer, Pointer)
+}
+
+enum PointerEnum2 {
+  case A
+  case B(Pointer)
+  case C
 }
 
 class LinkedNode {
-	@sil_stored var next: LinkedNode;
+  @sil_stored var next: LinkedNode;
 
-	init(_ n: LinkedNode)
+  init(_ n: LinkedNode)
 }
 
 struct MyError : ErrorType {
@@ -691,7 +710,80 @@ bb1(%7 : $(Pointer, Pointer)):
   return %9 : $Y
 }
 
-// We don't handle existentials currently.
+// CHECK-LABEL: CG of test_select_enum
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: 
+// CHECK-NEXT:    Arg %1 Esc: A, Succ: 
+// CHECK-NEXT:    Arg %2 Esc: A, Succ: 
+// CHECK-NEXT:    Arg %3 Esc: A, Succ: 
+// CHECK-NEXT:    Val %4 Esc: R, Succ: %1, %2, %3
+// CHECK-NEXT:    Ret  Esc: R, Succ: %4
+// CHECK-NEXT:  End
+sil @test_select_enum : $@convention(thin) (PointerEnum2, @owned X, @owned X, @owned X) -> @owned X {
+bb0(%0 : $PointerEnum2, %1 : $X, %2 : $X, %3 : $X):
+  %4 = select_enum %0 : $PointerEnum2, case #PointerEnum2.A!enumelt: %1, case #PointerEnum2.B!enumelt: %2, default %3 : $X
+  return %4 : $X
+}
+
+// CHECK-LABEL: CG of test_select_enum_addr
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: 
+// CHECK-NEXT:    Arg %1 Esc: A, Succ: 
+// CHECK-NEXT:    Arg %2 Esc: A, Succ: 
+// CHECK-NEXT:    Arg %3 Esc: A, Succ: 
+// CHECK-NEXT:    Val %4 Esc: R, Succ: %1, %2, %3
+// CHECK-NEXT:    Ret  Esc: R, Succ: %4
+// CHECK-NEXT:  End
+sil @test_select_enum_addr : $@convention(thin) (@in PointerEnum2, @owned X, @owned X, @owned X) -> @owned X {
+bb0(%0 : $*PointerEnum2, %1 : $X, %2 : $X, %3 : $X):
+  %4 = select_enum_addr %0 : $*PointerEnum2, case #PointerEnum2.A!enumelt: %1, case #PointerEnum2.B!enumelt: %2, default %3 : $X
+  return %4 : $X
+}
+
+// CHECK-LABEL: CG of test_select_value
+// CHECK-NEXT:    Arg %1 Esc: A, Succ: 
+// CHECK-NEXT:    Arg %2 Esc: A, Succ: 
+// CHECK-NEXT:    Arg %3 Esc: A, Succ: 
+// CHECK-NEXT:    Val %6 Esc: R, Succ: %1, %2, %3
+// CHECK-NEXT:    Ret  Esc: R, Succ: %6
+// CHECK-NEXT:  End
+sil @test_select_value : $@convention(thin) (Builtin.Int64, @owned X, @owned X, @owned X) -> @owned X {
+bb0(%0 : $Builtin.Int64, %1 : $X, %2 : $X, %3 : $X):
+  %4 = integer_literal $Builtin.Int64, 0
+  %5 = integer_literal $Builtin.Int64, 1
+  %6 = select_value %0 : $Builtin.Int64, case %4: %1, case %5: %2, default %3 : $X
+  return %6 : $X
+}
+
+// CHECK-LABEL: CG of test_existential_addr
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: 
+// CHECK-NEXT:    Val %1 Esc: , Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: , Succ: (%1.2)
+// CHECK-NEXT:    Con %1.2 Esc: , Succ: %0
+// CHECK-NEXT:  End
+sil @test_existential_addr : $@convention(thin) (@owned Pointer) -> () {
+bb0(%0 : $Pointer):
+  %1 = alloc_stack $P
+  %2 = init_existential_addr %1#1 : $*P, $Pointer
+  store %0 to %2 : $*Pointer
+  %4 = open_existential_addr %1#1 : $*P to $*@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83") P
+  %5 = witness_method $@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83") P, #P.foo!1, %4 : $*@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83") P : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  dealloc_stack %1#0 : $*@local_storage P
+  %7 = tuple ()                                   
+  return %7 : $()                                 
+}
+
+// CHECK-LABEL: CG of test_existential_ref
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: 
+// CHECK-NEXT:  End
+sil @test_existential_ref : $@convention(thin) (@owned X) -> () {
+bb0(%0 : $X):
+  %1 = init_existential_ref %0 : $X : $X, $ClassP
+  %2 = open_existential_ref %1 : $ClassP to $@opened("EC6B6A86-9887-11E5-926E-685B35C48C83") ClassP
+  %3 = witness_method $@opened("EC6B6A86-9887-11E5-926E-685B35C48C83") ClassP, #ClassP.foo!1, %2 : $@opened("EC6B6A86-9887-11E5-926E-685B35C48C83") ClassP : $@convention(witness_method) <τ_0_0 where τ_0_0 : ClassP> (@guaranteed τ_0_0) -> ()
+  %7 = tuple ()                                   
+  return %7 : $()                                 
+}
+
+// We don't handle existential boxes currently.
 // Check that we don't crash on this.
 
 // CHECK-LABEL: CG of test_unknown_store
@@ -704,6 +796,64 @@ bb0(%0 : $ErrorClass):
   store %0 to %2#1 : $*ErrorClass
   %4 = tuple ()
   return %4 : $()
+}
+
+// CHECK-LABEL: CG of test_raw_pointer_to_ref
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: 
+// CHECK-NEXT:    Ret  Esc: R, Succ: %0
+// CHECK-NEXT:  End
+sil @test_raw_pointer_to_ref : $@convention(thin) (@owned X) -> @owned X {
+bb0(%0 : $X):
+  %1 = ref_to_raw_pointer %0 : $X to $Builtin.RawPointer
+  %2 = raw_pointer_to_ref %1 : $Builtin.RawPointer to $X
+  return %2 : $X
+}
+
+// CHECK-LABEL: CG of test_bridge_object_to_ref
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: 
+// CHECK-NEXT:    Ret  Esc: R, Succ: %0
+// CHECK-NEXT:  End
+sil @test_bridge_object_to_ref : $@convention(thin) (@owned X, Builtin.Word) -> @owned X {
+bb0(%0 : $X, %1 : $Builtin.Word):
+  %2 = ref_to_bridge_object %0 : $X, %1 : $Builtin.Word
+  %3 = bridge_object_to_ref %2 : $Builtin.BridgeObject to $X
+  return %3 : $X
+}
+
+// CHECK-LABEL: CG of test_address_to_pointer
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ: %1
+// CHECK-NEXT:    Arg %1 Esc: A, Succ: 
+// CHECK-NEXT:  End
+sil @test_address_to_pointer : $@convention(thin) (@out X, @owned X) -> () {
+bb0(%0 : $*X, %1 : $X):
+  %2 = address_to_pointer %0 : $*X to $Builtin.RawPointer
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to $*X
+  store %1 to %3 : $*X
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: CG of test_casts
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: 
+// CHECK-NEXT:    Ret  Esc: R, Succ: %0
+// CHECK-NEXT:  End
+sil @test_casts : $@convention(thin) (@owned AnyObject) -> @owned X {
+bb0(%0 : $AnyObject):
+  %1 = unchecked_ref_cast %0 : $AnyObject to $Derived
+  %2 = upcast %1 : $Derived to $X
+  return %2 : $X
+}
+
+// CHECK-LABEL: CG of test_unchecked_ref_cast_addr
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: %1
+// CHECK-NEXT:    Arg %1 Esc: A, Succ: 
+// CHECK-NEXT:  End
+sil @test_unchecked_ref_cast_addr : $@convention(thin) <T, U> (@out U, @in T, @thick U.Type) -> () {
+bb0(%0 : $*U, %1 : $*T, %2 : $@thick U.Type):
+  unchecked_ref_cast_addr  T in %1 : $*T to U in %0 : $*U
+  %5 = tuple ()
+  return %5 : $()
 }
 
 // CHECK-LABEL: CG of arraysemantics_is_native

@@ -629,6 +629,11 @@ private:
   /// Updates the graph by analysing instruction \p I.
   void analyzeInstruction(SILInstruction *I, FunctionInfo *FInfo);
 
+  /// Updates the graph by analysing instruction \p SI, which may be a
+  /// select_enum, select_enum_addr or select_value.
+  template<class SelectInst>
+  void analyzeSelectInst(SelectInst *SI, ConnectionGraph *ConGraph);
+
   /// Returns true if \p V is an Array or the storage reference of an array.
   bool isArrayOrArrayStorage(SILValue V);
 

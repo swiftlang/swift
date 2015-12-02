@@ -34,6 +34,8 @@ static bool isProjection(ValueBase *V) {
     case ValueKind::UncheckedEnumDataInst:
     case ValueKind::MarkDependenceInst:
     case ValueKind::PointerToAddressInst:
+    case ValueKind::AddressToPointerInst:
+    case ValueKind::InitEnumDataAddrInst:
       return true;
     default:
       return false;
@@ -46,7 +48,11 @@ static bool isNonWritableMemoryAddress(ValueBase *V) {
     case ValueKind::WitnessMethodInst:
     case ValueKind::ClassMethodInst:
     case ValueKind::SuperMethodInst:
+    case ValueKind::DynamicMethodInst:
     case ValueKind::StringLiteralInst:
+    case ValueKind::ThinToThickFunctionInst:
+    case ValueKind::ThinFunctionToPointerInst:
+    case ValueKind::PointerToThinFunctionInst:
       // These instructions return pointers to memory which can't be a
       // destination of a store.
       return true;
@@ -1098,6 +1104,10 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case ValueKind::SwitchEnumInst:
     case ValueKind::DebugValueInst:
     case ValueKind::DebugValueAddrInst:
+    case ValueKind::ValueMetatypeInst:
+    case ValueKind::InitExistentialMetatypeInst:
+    case ValueKind::OpenExistentialMetatypeInst:
+    case ValueKind::ExistentialMetatypeInst:
       // These instructions don't have any effect on escaping.
       return;
     case ValueKind::StrongReleaseInst:
@@ -1122,6 +1132,9 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case ValueKind::LoadWeakInst:
     // We treat ref_element_addr like a load (see NodeType::Content).
     case ValueKind::RefElementAddrInst:
+    case ValueKind::ProjectBoxInst:
+    case ValueKind::InitExistentialAddrInst:
+    case ValueKind::OpenExistentialAddrInst:
       if (isPointer(I)) {
         CGNode *AddrNode = ConGraph->getNode(I->getOperand(0), this);
         if (!AddrNode) {
@@ -1163,6 +1176,13 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       }
       return;
     }
+    case ValueKind::SelectEnumInst:
+    case ValueKind::SelectEnumAddrInst:
+      analyzeSelectInst(cast<SelectEnumInstBase>(I), ConGraph);
+      return;
+    case ValueKind::SelectValueInst:
+      analyzeSelectInst(cast<SelectValueInst>(I), ConGraph);
+      return;
     case ValueKind::StructInst:
     case ValueKind::TupleInst:
     case ValueKind::EnumInst: {
@@ -1185,11 +1205,31 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       return;
     }
     case ValueKind::UncheckedRefCastInst:
+    case ValueKind::ConvertFunctionInst:
+    case ValueKind::UpcastInst:
+    case ValueKind::InitExistentialRefInst:
+    case ValueKind::OpenExistentialRefInst:
+    case ValueKind::UnownedToRefInst:
+    case ValueKind::RefToUnownedInst:
+    case ValueKind::RawPointerToRefInst:
+    case ValueKind::RefToRawPointerInst:
+    case ValueKind::RefToBridgeObjectInst:
+    case ValueKind::BridgeObjectToRefInst:
+    case ValueKind::UncheckedAddrCastInst:
+    case ValueKind::UnconditionalCheckedCastInst:
       // A cast is almost like a projection.
       if (CGNode *OpNode = ConGraph->getNode(I->getOperand(0), this)) {
         ConGraph->setNode(I, OpNode);
       }
       break;
+    case ValueKind::UncheckedRefCastAddrInst: {
+      auto *URCAI = cast<UncheckedRefCastAddrInst>(I);
+      CGNode *SrcNode = ConGraph->getNode(URCAI->getSrc(), this);
+      CGNode *DestNode = ConGraph->getNode(URCAI->getDest(), this);
+      assert(SrcNode && DestNode && "must have nodes for address operands");
+      ConGraph->defer(DestNode, SrcNode);
+      return;
+    }
     case ValueKind::ReturnInst:
       if (CGNode *ValueNd = ConGraph->getNode(cast<ReturnInst>(I)->getOperand(), this)) {
         ConGraph->defer(ConGraph->getReturnNode(),
@@ -1200,6 +1240,26 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       // We handle all other instructions conservatively.
       setAllEscaping(I, ConGraph);
       return;
+  }
+}
+
+template<class SelectInst> void EscapeAnalysis::
+analyzeSelectInst(SelectInst *SI, ConnectionGraph *ConGraph) {
+  if (auto *ResultNode = ConGraph->getNode(SI, this)) {
+    // Connect all case values to the result value.
+    // Note that this does not include the first operand (the condition).
+    for (unsigned Idx = 0, End = SI->getNumCases(); Idx < End; ++Idx) {
+      SILValue CaseVal = SI->getCase(Idx).second;
+      auto *ArgNode = ConGraph->getNode(CaseVal, this);
+      assert(ArgNode &&
+             "there should be an argument node if there is an result node");
+      ConGraph->defer(ResultNode, ArgNode);
+    }
+    // ... also including the default value.
+    auto *DefaultNode = ConGraph->getNode(SI->getDefaultResult(), this);
+    assert(DefaultNode &&
+           "there should be an argument node if there is an result node");
+    ConGraph->defer(ResultNode, DefaultNode);
   }
 }
 
