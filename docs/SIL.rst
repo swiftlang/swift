@@ -3169,16 +3169,16 @@ select_enum_addr
 ````````````````
 ::
 
-  sil-instruction ::= 'select_enum' sil-operand sil-select-case*
+  sil-instruction ::= 'select_enum_addr' sil-operand sil-select-case*
                       (',' 'default' sil-value)?
                       ':' sil-type
 
-  %n = select_enum %0 : $U,      \
+  %n = select_enum_addr %0 : $*U,      \
     case #U.Case1: %1,           \
     case #U.Case2: %2, /* ... */ \
     default %3 : $T
 
-  // $U must be an enum type
+  // %0 must be the address of an enum type $*U
   // #U.Case1, Case2, etc. must be cases of enum $U
   // %1, %2, %3, etc. must have type $T
   // %n has type $T
