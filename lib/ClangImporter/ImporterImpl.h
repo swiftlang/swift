@@ -724,7 +724,8 @@ public:
 
   /// Determine the imported CF type for the given typedef-name, or the empty
   /// string if this is not an imported CF type name.
-  StringRef getCFTypeName(const clang::TypedefNameDecl *decl);
+  StringRef getCFTypeName(const clang::TypedefNameDecl *decl,
+                          StringRef *secondaryName = nullptr);
 
   /// Retrieve the type name of a Clang type for the purposes of
   /// omitting unneeded words.
@@ -765,6 +766,10 @@ public:
     /// The imported name.
     DeclName Imported;
 
+    /// An additional alias to the imported name, which should be
+    /// recorded in name lookup tables as well.
+    DeclName Alias;
+
     /// Whether this name was explicitly specified via a Clang
     /// swift_name attribute.
     bool HasCustomName = false;
@@ -775,7 +780,7 @@ public:
     bool DroppedVariadic = false;
 
     /// For an initializer, the kind of initializer to import.
-    CtorInitializerKind InitKind;
+    CtorInitializerKind InitKind = CtorInitializerKind::Designated;
 
     /// For names that map Objective-C error handling conventions into
     /// throwing Swift methods, describes how the mapping is performed.

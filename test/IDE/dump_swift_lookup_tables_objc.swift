@@ -7,6 +7,9 @@
 // REQUIRES: objc_interop
 
 // CHECK:      Base -> full name mappings:
+// CHECK-NEXT:   CCItem --> CCItem
+// CHECK-NEXT:   CCItemRef --> CCItemRef
+// CHECK-NEXT:   CFTypeRef --> CFTypeRef
 // CHECK-NEXT:   NSAccessibility --> NSAccessibility
 // CHECK-NEXT:   NSError --> NSError
 // CHECK-NEXT:   NSErrorImports --> NSErrorImports
@@ -15,6 +18,7 @@
 // CHECK-NEXT:   SomeClass --> SomeClass
 // CHECK-NEXT:   SomeProtocol --> SomeProtocol
 // CHECK-NEXT:   UIActionSheet --> UIActionSheet
+// CHECK-NEXT:   __CCItem --> __CCItem
 // CHECK-NEXT:   accessibilityFloat --> accessibilityFloat()
 // CHECK-NEXT:   categoryMethodWithX --> categoryMethodWithX(_:y:), categoryMethodWithX(_:y:z:)
 // CHECK-NEXT:   doubleProperty --> doubleProperty{{$}}
@@ -28,6 +32,12 @@
 // CHECK-NEXT:   setAccessibilityFloat --> setAccessibilityFloat(_:)
 
 // CHECK:      Full name -> entry mappings:
+// CHECK-NEXT:   CCItem:
+// CHECK-NEXT:     TU: CCItemRef
+// CHECK-NEXT:   CCItemRef:
+// CHECK-NEXT:     TU: CCItemRef
+// CHECK-NEXT:   CFTypeRef:
+// CHECK-NEXT:     TU: CFTypeRef
 // CHECK-NEXT:   NSAccessibility:
 // CHECK-NEXT:     TU: NSAccessibility{{$}}
 // CHECK-NEXT:   NSError:
@@ -44,6 +54,8 @@
 // CHECK-NEXT:     TU: SNSomeProtocol
 // CHECK-NEXT:   UIActionSheet:
 // CHECK-NEXT:     TU: UIActionSheet
+// CHECK-NEXT:   __CCItem:
+// CHECK-NEXT:     TU: __CCItem
 // CHECK-NEXT:   accessibilityFloat():
 // CHECK-NEXT:     NSAccessibility: -[NSAccessibility accessibilityFloat]
 // CHECK-NEXT:   categoryMethodWithX(_:y:):

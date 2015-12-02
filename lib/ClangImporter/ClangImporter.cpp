@@ -703,8 +703,12 @@ void ClangImporter::Implementation::addEntryToLookupTable(
   if (!suppressDecl) {
     // If we have a name to import as, add this entry to the table.
     clang::DeclContext *effectiveContext;
-    if (DeclName name = importFullName(named, None, &effectiveContext)) {
-      table.addEntry(name, named, effectiveContext);
+    if (auto importedName = importFullName(named, None, &effectiveContext)) {
+      table.addEntry(importedName.Imported, named, effectiveContext);
+
+      // Also add the alias, if needed.
+      if (importedName.Alias)
+        table.addEntry(importedName.Alias, named, effectiveContext);
     }
   }
 
@@ -2321,6 +2325,19 @@ auto ClangImporter::Implementation::importFullName(
     }
   }
 
+  // Typedef declarations might be CF types that will drop the "Ref"
+  // suffix.
+  bool aliasIsFunction = false;
+  bool aliasIsInitializer = false;
+  StringRef aliasBaseName;
+  SmallVector<StringRef, 4> aliasArgumentNames;
+  if (auto typedefNameDecl = dyn_cast<clang::TypedefNameDecl>(D)) {
+    auto swiftName = getCFTypeName(typedefNameDecl, &aliasBaseName);
+    if (!swiftName.empty()) {
+      baseName = swiftName;
+    }
+  }
+
   // Local function to determine whether the given declaration is subject to
   // a swift_private attribute.
   auto hasSwiftPrivate = [this](const clang::NamedDecl *D) {
@@ -2398,32 +2415,58 @@ auto ClangImporter::Implementation::importFullName(
   // If this declaration has the swift_private attribute, prepend "__" to the
   // appropriate place.
   SmallString<16> swiftPrivateScratch;
+  SmallString<16> swiftPrivateAliasScratch;
   if (hasSwiftPrivate(D)) {
-    swiftPrivateScratch = "__";
+    // Make the given name private.
+    //
+    // Returns true if this is not possible.
+    auto makeNamePrivate = [](bool isInitializer,
+                              StringRef &baseName,
+                              SmallVectorImpl<StringRef> &argumentNames,
+                              CtorInitializerKind initKind,
+                              SmallString<16> &scratch) -> bool {
+      scratch = "__";
 
-    if (isInitializer) {
-      // For initializers, prepend "__" to the first argument name.
-      if (argumentNames.empty()) {
-        // FIXME: ... unless it was from a factory method, for historical
-        // reasons.
-        if (result.InitKind == CtorInitializerKind::Factory ||
-            result.InitKind == CtorInitializerKind::ConvenienceFactory)
-          return result;
+      if (isInitializer) {
+        // For initializers, prepend "__" to the first argument name.
+        if (argumentNames.empty()) {
+          // FIXME: ... unless it was from a factory method, for historical
+          // reasons.
+          if (initKind == CtorInitializerKind::Factory ||
+              initKind == CtorInitializerKind::ConvenienceFactory)
+            return true;
 
-        // FIXME: Record that we did this.
-        argumentNames.push_back("__");
+          // FIXME: Record that we did this.
+          argumentNames.push_back("__");
+        } else {
+          scratch += argumentNames[0];
+          argumentNames[0] = scratch;
+        }
       } else {
-        swiftPrivateScratch += argumentNames[0];
-        argumentNames[0] = swiftPrivateScratch;
+        // For all other entities, prepend "__" to the base name.
+        scratch += baseName;
+        baseName = scratch;
       }
-    } else {
-      // For all other entities, prepend "__" to the base name.
-      swiftPrivateScratch += baseName;
-      baseName = swiftPrivateScratch;
+
+      return false;
+    };
+
+    // Make the name private.
+    if (makeNamePrivate(isInitializer, baseName, argumentNames,
+                        result.InitKind, swiftPrivateScratch))
+      return result;
+
+    // If we have an alias name, make it private as well.
+    if (!aliasBaseName.empty()) {
+      (void)makeNamePrivate(aliasIsInitializer, aliasBaseName,
+                            aliasArgumentNames, CtorInitializerKind::Designated,
+                            swiftPrivateAliasScratch);
     }
   }
 
   result.Imported = formDeclName(baseName, argumentNames, isFunction);
+  result.Alias = formDeclName(aliasBaseName, aliasArgumentNames,
+                              aliasIsFunction);
   return result;
 }
 

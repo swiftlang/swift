@@ -309,10 +309,16 @@ static bool isKeyword(StringRef identifier) {
 static Optional<StringRef> skipTypeSuffix(StringRef typeName) {
   if (typeName.empty()) return None;
 
+  auto lastWord = camel_case::getLastWord(typeName);
+
   // "Type" suffix.
-  if (camel_case::getLastWord(typeName) == "Type" &&
-      typeName.size() > 4) {
+  if (lastWord == "Type" && typeName.size() > 4) {
     return typeName.drop_back(4);
+  }
+
+  // "Ref" suffix.
+  if (lastWord == "Ref" && typeName.size() > 3) {
+    return typeName.drop_back(3);
   }
 
   // \d+D for dimensionality.

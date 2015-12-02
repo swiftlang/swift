@@ -1967,9 +1967,8 @@ Type ClangImporter::Implementation::importMethodType(
                                allowNSUIntegerAsIntInResult,
                                /*isFullyBridgeable*/true,
                                OptionalityOfReturn);
-
     // Adjust the result type for a throwing function.
-    if (errorInfo) {
+    if (swiftResultTy && errorInfo) {
       origSwiftResultTy = swiftResultTy->getCanonicalType();
       swiftResultTy = adjustResultTypeForThrowingFunction(*errorInfo,
                                                           swiftResultTy);

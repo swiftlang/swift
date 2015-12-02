@@ -1181,15 +1181,34 @@ static StringRef getImportedCFTypeName(StringRef name) {
 
 bool ClangImporter::Implementation::isCFTypeDecl(
        const clang::TypedefNameDecl *Decl) {
-  if (auto pointee = CFPointeeInfo::classifyTypedef(Decl))
-    return pointee.isValid();
+  if (CFPointeeInfo::classifyTypedef(Decl))
+    return true;
   return false;
 }
 
 StringRef ClangImporter::Implementation::getCFTypeName(
-            const clang::TypedefNameDecl *decl) {
-  if (isCFTypeDecl(decl))
-    return getImportedCFTypeName(decl->getName());
+            const clang::TypedefNameDecl *decl,
+            StringRef *secondaryName) {
+  if (secondaryName) *secondaryName = "";
+
+  if (auto pointee = CFPointeeInfo::classifyTypedef(decl)) {
+    auto name = decl->getName();
+    if (pointee.isRecord()) {
+      auto resultName = getImportedCFTypeName(name);
+      if (secondaryName && name != resultName)
+        *secondaryName = name;
+
+      return resultName;
+    }
+
+    if (pointee.isTypedef() && secondaryName) {
+      StringRef otherName = getImportedCFTypeName(name);
+      if (otherName != name) 
+        *secondaryName = otherName;
+    }
+
+    return name;
+  }
 
   return "";
 }
@@ -1364,11 +1383,7 @@ namespace {
     }
 
     Type importCFClassType(const clang::TypedefNameDecl *decl,
-                           StringRef name, CFPointeeInfo info) {
-      // If the name ends in 'Ref', drop that from the imported class name.
-      StringRef nameWithoutRef = getImportedCFTypeName(name);
-      Identifier className = Impl.SwiftContext.getIdentifier(nameWithoutRef);
-
+                           Identifier className, CFPointeeInfo info) {
       auto dc = Impl.importDeclContextOf(decl);
       if (!dc) return Type();
 
@@ -1426,7 +1441,8 @@ namespace {
     }
 
     Decl *VisitTypedefNameDecl(const clang::TypedefNameDecl *Decl) {
-      auto Name = Impl.importFullName(Decl).Imported.getBaseName();
+      auto importedName = Impl.importFullName(Decl);
+      auto Name = importedName.Imported.getBaseName();
       if (Name.empty())
         return nullptr;
 
@@ -1448,9 +1464,14 @@ namespace {
           if (auto pointee = CFPointeeInfo::classifyTypedef(Decl)) {
             // If the pointee is a record, consider creating a class type.
             if (pointee.isRecord()) {
-              SwiftType = importCFClassType(Decl, Name.str(), pointee);
+              SwiftType = importCFClassType(Decl, Name, pointee);
               if (!SwiftType) return nullptr;
               NameMapping = MappedTypeNameKind::DefineOnly;
+
+              // If there is an alias (i.e., that doesn't have "Ref"),
+              // use that as the name of the typedef later.
+              if (importedName.Alias)
+                Name = importedName.Alias.getBaseName();
 
             // If the pointee is another CF typedef, create an extra typealias
             // for the name without "Ref", but not a separate type.
@@ -1460,7 +1481,6 @@ namespace {
               if (!underlying)
                 return nullptr;
 
-              // Remove one level of "Ref" from the typealias.
               if (auto typealias = dyn_cast<TypeAliasDecl>(underlying)) {
                 Type doublyUnderlyingTy = typealias->getUnderlyingType();
                 if (isa<NameAliasType>(doublyUnderlyingTy.getPointer()))
@@ -1473,20 +1493,24 @@ namespace {
               if (!DC)
                 return nullptr;
 
-              StringRef nameWithoutRef = getImportedCFTypeName(Name.str());
-              Identifier idWithoutRef =
-                Impl.SwiftContext.getIdentifier(nameWithoutRef);
-              auto aliasWithoutRef =
-                Impl.createDeclWithClangNode<TypeAliasDecl>(Decl,
-                                      Impl.importSourceLoc(Decl->getLocStart()),
-                                      idWithoutRef,
-                                      Impl.importSourceLoc(Decl->getLocation()),
-                                      TypeLoc::withoutLoc(SwiftType),
-                                      DC);
+              // If there is an alias (i.e., that doesn't have "Ref"),
+              // create that separate typedef.
+              if (importedName.Alias) {
+                auto aliasWithoutRef =
+                  Impl.createDeclWithClangNode<TypeAliasDecl>(
+                    Decl,
+                    Impl.importSourceLoc(Decl->getLocStart()),
+                    importedName.Alias.getBaseName(),
+                    Impl.importSourceLoc(Decl->getLocation()),
+                    TypeLoc::withoutLoc(SwiftType),
+                    DC);
 
-              aliasWithoutRef->computeType();
-              SwiftType = aliasWithoutRef->getDeclaredType();
-              NameMapping = MappedTypeNameKind::DefineOnly;
+                aliasWithoutRef->computeType();
+                SwiftType = aliasWithoutRef->getDeclaredType();
+                NameMapping = MappedTypeNameKind::DefineOnly;
+              } else {
+                NameMapping = MappedTypeNameKind::DefineAndUse;
+              }
 
             // If the pointee is 'const void', 
             // 'CFTypeRef', bring it in specifically as AnyObject.

@@ -63,3 +63,6 @@ SWIFT_NAME(SomeProtocol)
 - (nullable instancetype)initAndReturnError:(NSError **)error;
 - (nullable instancetype)initWithFloat:(float)value error:(NSError **)error;
 @end
+
+typedef const void *CFTypeRef __attribute__((objc_bridge(id)));
+typedef const struct __attribute__((objc_bridge(id))) __CCItem *CCItemRef;
