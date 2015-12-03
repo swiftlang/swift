@@ -129,7 +129,7 @@ written within the class definition itself, rather than in an
 extension, because the complete set of designated initializers is part
 of the interface contract with subclasses of a class.
 
-The other, non-designted initializers of a class are called
+The other, non-designated initializers of a class are called
 convenience initializers, which tend to provide additional
 initialization capabilities that are often more convenient for common
 tasks.
