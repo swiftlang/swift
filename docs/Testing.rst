@@ -28,7 +28,7 @@ The LLVM lit-based testsuite
 **Run by**:
 
 * Engineers and contributors are expected to run tests from these testsuites
-  locally before commiting.  (Usually on a single platform, and not necessarily
+  locally before committing.  (Usually on a single platform, and not necessarily
   all tests.)
 
 * Buildbots run all tests, on all supported platforms.

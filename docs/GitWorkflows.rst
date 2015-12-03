@@ -139,7 +139,7 @@ Commit
 
 In SVN, committing always means submitting changes to a remote repository. In
 Git, committing refers to the process of first telling Git to track a change by
-staging the change and then commiting all staged changes into a change in the
+staging the change and then committing all staged changes into a change in the
 local repository. One can have many such commits. Then when one is ready, one
 pushes the new local changes to the remote repository. We go through these steps
 in more detail below:
