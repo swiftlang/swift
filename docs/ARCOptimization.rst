@@ -62,7 +62,7 @@ Identity`` (RC Identity) and RC Identity preserving instructions. An instruction
 ``I`` with n SSA arguments and m SSA results is (i,j) RC Identity preserving if
 performing a ``retain_value`` on the ith SSA argument immediately before ``I``
 is executed is equivalent to performing a ``retain_value`` on the jth SSA result
-of ``I`` immediately following the exection of ``I``. For example in the
+of ``I`` immediately following the execution of ``I``. For example in the
 following, if::
 
     retain_value %x
