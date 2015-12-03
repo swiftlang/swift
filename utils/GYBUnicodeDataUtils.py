@@ -41,7 +41,7 @@ class GraphemeClusterBreakPropertyTable(UnicodeProperty):
     # Note: Numeric values should be consistent with
     # '_GraphemeClusterBreakPropertyValue' enum on the Swift side, and with
     # 'GraphemeClusterBreakProperty' in the compiler C++ code.  If there is a
-    # reason for eithor of those to differ, then this mapping can be overriden
+    # reason for either of those to differ, then this mapping can be overriden
     # after an instance of this class is created.
     numeric_value_table = {
       'Other': 0,
