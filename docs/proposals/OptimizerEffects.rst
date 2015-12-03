@@ -492,7 +492,7 @@ elt2's destructor can't change the uniqueness state of the arrays.::
    setElement(&a.array, elt2, i)
  }
 
-In the the following loop it is not safe to hoist the makeUnique(&a)
+In the following loop it is not safe to hoist the makeUnique(&a)
 call even for trivial types. 'appendAssumingUnique' captures its argument 'a'
 which forces a copy on 'a' on every iteration of the loop.::
 

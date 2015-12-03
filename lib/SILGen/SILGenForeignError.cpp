@@ -230,7 +230,7 @@ emitBridgeReturnValueForForeignError(SILLocation loc,
     return emitIntValue(*this, loc, bridgedType, 0);
 
   // If an error is signalled by a zero result, but we've preserved
-  // the rest of the return value, then just return the the normal
+  // the rest of the return value, then just return the normal
   // result, assuming (hoping!) that it isn't zero.
   case ForeignErrorConvention::ZeroPreservedResult:
     return result;

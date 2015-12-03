@@ -515,7 +515,7 @@ make use of ``self``. This is important uses of ``self``---say,
 calling a method on ``self``---could end up referring to stored
 properties before they are initialized. Consider the following
 Objective-C code, where instance variables are initialized *after* the
-call to the the superclass initializer::
+call to the superclass initializer::
 
   @interface A : NSObject
   - (instancetype)init;

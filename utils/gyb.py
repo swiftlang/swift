@@ -506,7 +506,7 @@ class ParseContext:
 
 
     def nextToken(self):
-        """Move to the the next token"""
+        """Move to the next token"""
         for kind in self.tokens:
             return self.tokenKind
 

@@ -2022,7 +2022,7 @@ static BraceStmt *ConvertClosureToBraceStmt(Expr *E, ASTContext &Ctx) {
   CE->setExplicitResultType(CE->getStartLoc(), empty);
   
   // The trick here is that the ClosureExpr provides a DeclContext for stuff
-  // inside of it, so it isn't safe to just drop it and rip the the BraceStmt
+  // inside of it, so it isn't safe to just drop it and rip the BraceStmt
   // from inside of it.  While we could try to walk the body and update any
   // Decls, ClosureExprs, etc within the body of the ClosureExpr, it is easier
   // to just turn it into BraceStmt(CallExpr(TheClosure, VoidTuple)).  This also
