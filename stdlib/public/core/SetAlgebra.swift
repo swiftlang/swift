@@ -108,7 +108,7 @@ public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
   mutating func exclusiveOrInPlace(other: Self)  
 
   //===--- Requirements with default implementations ----------------------===//
-  /// Return true iff `self.intersect(other).isEmpty`.
+  /// Returns the set of elements contained in `self` but not in `other`.
   @warn_unused_result
   func subtract(other: Self) -> Self
 
