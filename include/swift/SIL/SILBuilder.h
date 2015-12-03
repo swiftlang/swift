@@ -89,8 +89,9 @@ public:
   SILDebugLocation *createSILDebugLocation(SILLocation Loc) {
     // FIXME: Audit all uses and enable this assertion.
     // assert(getCurrentDebugScope() && "no debug scope");
-    return getOrCreateDebugLocation(Loc, getCurrentDebugScope()
-                                             ?: getFunction().getDebugScope());
+    auto Scope = getCurrentDebugScope();
+    return getOrCreateDebugLocation(Loc,
+                                Scope ? Scope : getFunction().getDebugScope());
   }
 
   //===--------------------------------------------------------------------===//
