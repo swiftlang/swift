@@ -29,6 +29,37 @@ public var errno: Int32 {
 // fcntl.h
 //===----------------------------------------------------------------------===//
 
+@warn_unused_result
+@_silgen_name("_swift_Glibc_fcntl")
+internal func _swift_Glibc_fcntl(
+	fd: CInt,
+	_ cmd: CInt,
+	_ value: CInt
+	) ->CInt
+
+@warn_unused_result
+@_silgen_name("_swift_Glibc_fcntlPtr")
+internal func _swift_Glibc_fcntlPtr(
+	fd: CInt,
+	_ cmd: CInt,
+	_ ptr: UnsafeMutablePointer<Void>
+	) ->CInt
+
+@warn_unused_result
+public func fcntl(fd: CInt, cmd: CInt) ->CInt {
+	return _swift_Glibc_fcntl(fd, cmd, 0)
+}
+
+@warn_unused_result
+public func fcntl(fd: CInt, cmd: CInt, value: CInt) ->CInt {
+	return _swift_Glibc_fcntl(fd, cmd, value)
+}
+
+@warn_unused_result
+public func fcntl(fd: CInt, cmd: CInt, ptr: UnsafeMutablePointer<Void>) ->CInt {
+	return _swift_Glibc_fcntlPtr(fd, cmd, ptr)
+}
+
 public var S_IFMT: mode_t   { return mode_t(0o170000) }
 public var S_IFIFO: mode_t  { return mode_t(0o010000) }
 public var S_IFCHR: mode_t  { return mode_t(0o020000) }
@@ -56,6 +87,8 @@ public var S_IXOTH: mode_t  { return mode_t(0o000001) }
 public var S_ISUID: mode_t  { return mode_t(0o004000) }
 public var S_ISGID: mode_t  { return mode_t(0o002000) }
 public var S_ISVTX: mode_t  { return mode_t(0o001000) }
+
+
 
 //===----------------------------------------------------------------------===//
 // signal.h
