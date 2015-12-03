@@ -995,7 +995,7 @@ SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
 
 
 /// Emit the boolean test and/or pattern bindings indicated by the specified
-/// stmt condition.  If the condition fails, control flow is transfered to the
+/// stmt condition.  If the condition fails, control flow is transferred to the
 /// specified JumpDest.  The insertion point is left in the block where the
 /// condition has matched and any bound variables are in scope.
 ///

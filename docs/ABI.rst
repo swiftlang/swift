@@ -992,7 +992,7 @@ mangled in to disambiguate.
     impl-callee-convention impl-function-attribute* generic-signature? '_'
     impl-parameter* '_' impl-result* '_'
   impl-callee-convention ::= 't'              // thin
-  impl-callee-convention ::= impl-convention  // thick, callee transfered with given convention
+  impl-callee-convention ::= impl-convention  // thick, callee transferred with given convention
   impl-convention ::= 'a'                     // direct, autoreleased
   impl-convention ::= 'd'                     // direct, no ownership transfer
   impl-convention ::= 'D'                     // direct, no ownership transfer,
