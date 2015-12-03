@@ -17,7 +17,7 @@ SWIFT_NAME(SomeClass)
 @interface SNSomeClass : NSObject
 - (instancetype)initWithFloat:(float)f;
 - (instancetype)initWithDefault;
-- (void)instanceMethodWithX:(float)x y:(float)y z:(float)z;
+- (void)instanceMethodWithX:(float)x Y:(float)y Z:(float)z;
 + (instancetype)someClassWithDouble:(double)d;
 + (instancetype)someClassWithTry:(BOOL)shouldTry;
 + (NSObject *)buildWithObject:(NSObject *)object SWIFT_NAME(init(object:));

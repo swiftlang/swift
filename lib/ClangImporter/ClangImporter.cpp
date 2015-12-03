@@ -2150,6 +2150,7 @@ auto ClangImporter::Implementation::importFullName(
   StringRef baseName;
   SmallVector<StringRef, 4> argumentNames;
   SmallString<16> selectorSplitScratch;
+  StringScratchSpace stringScratch;
   ArrayRef<const clang::ParmVarDecl *> params;
   switch (D->getDeclName().getNameKind()) {
   case clang::DeclarationName::CXXConstructorName:
@@ -2205,7 +2206,15 @@ auto ClangImporter::Implementation::importFullName(
       if (index == 0) {
         argumentNames.push_back(StringRef());
       } else {
-        argumentNames.push_back(selector.getNameForSlot(index));
+        StringRef argName = selector.getNameForSlot(index);
+
+        // Swift 2 lowercased all subsequent argument names.
+        // Swift 3 may handle this as part of omitting needless words, below,
+        // but don't preempt that here.
+        if (!OmitNeedlessWords)
+          argName = camel_case::toLowercaseWord(argName, stringScratch);
+
+        argumentNames.push_back(argName);
       }
     }
 

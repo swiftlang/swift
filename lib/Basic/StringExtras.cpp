@@ -442,9 +442,10 @@ bool InheritedNameSet::contains(StringRef name) const {
 }
 
 /// Wrapper for camel_case::toLowercaseWord that uses string scratch space.
-static StringRef toLowercaseWord(StringRef string, StringScratchSpace &scratch){
+StringRef camel_case::toLowercaseWord(StringRef string,
+                                      StringScratchSpace &scratch){
   llvm::SmallString<32> scratchStr;
-  StringRef result = camel_case::toLowercaseWord(string, scratchStr);
+  StringRef result = toLowercaseWord(string, scratchStr);
   if (string == result)
     return string;
 

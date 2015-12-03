@@ -84,7 +84,7 @@
 // CHECK-NEXT:   init(withTry:):
 // CHECK-NEXT:     SNSomeClass: +[SNSomeClass someClassWithTry:]
 // CHECK-NEXT:   instanceMethodWithX(_:y:z:):
-// CHECK-NEXT:     SNSomeClass: -[SNSomeClass instanceMethodWithX:y:z:]
+// CHECK-NEXT:     SNSomeClass: -[SNSomeClass instanceMethodWithX:Y:Z:]
 // CHECK-NEXT:   method():
 // CHECK-NEXT:     NSErrorImports: -[NSErrorImports methodAndReturnError:]
 // CHECK-NEXT:   methodWithFloat(_:):
@@ -95,6 +95,7 @@
 // CHECK-NEXT:     NSAccessibility: -[NSAccessibility setAccessibilityFloat:]
 
 // CHECK-OMIT-NEEDLESS-WORDS: Base -> full name mappings:
+// CHECK-OMIT-NEEDLESS-WORDS:   instanceMethodWithX --> instanceMethodWithX(_:y:z:)
 // CHECK-OMIT-NEEDLESS-WORDS:   methodWith --> methodWith(_:)
 
 // CHECK-OMIT-NEEDLESS-WORDS: Full name -> entry mappings:
