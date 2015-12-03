@@ -164,6 +164,13 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
   return;
 }
 
+static unsigned countSwiftArgs(ArrayRef<Pattern *> Patterns) {
+  unsigned N = 0;
+  for (auto p : Patterns)
+      p->forEachVariable([&](VarDecl *) { ++N; });
+  return N;
+}
+
 void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(ctor);
 
@@ -182,9 +189,10 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   assert(!selfTy.getClassOrBoundGenericClass()
          && "can't emit a class ctor here");
 
-  
+  // Self is a curried argument and thus comes last.
+  unsigned N = countSwiftArgs(ctor->getBodyParamPatterns()[1]) + 1;
   // Allocate the local variable for 'self'.
-  emitLocalVariableWithCleanup(selfDecl, false)->finishInitialization(*this);
+  emitLocalVariableWithCleanup(selfDecl, false, N)->finishInitialization(*this);
   
   // Mark self as being uninitialized so that DI knows where it is and how to
   // check for it.

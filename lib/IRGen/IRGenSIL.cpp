@@ -300,12 +300,6 @@ public:
   int EstimatedStackSize = -1;
 
   llvm::MapVector<SILBasicBlock *, LoweredBB> LoweredBBs;
-  // These could also be cached for the entire module which could pay
-  // off in optimized code with lots of inlining of the same functions.
-  // Or, probably even better, stored in the AST.
-  llvm::SmallDenseMap<const VarDecl *, unsigned, 8> ArgNo;
-  llvm::SmallDenseMap<const DeclContext *, unsigned> NumArgs;
-  llvm::SmallDenseMap<const VarDecl *, bool, 8> ArgEmitted;
   
   // Destination basic blocks for condfail traps.
   llvm::SmallVector<llvm::BasicBlock *, 8> FailBBs;
@@ -548,61 +542,24 @@ public:
     copy.push_back(alloca.getAddress());
   }
 
-  /// Determine the Swift argument ordering for a given parameter and
-  /// the total number of arguments per function.
-  // TODO: It would be more efficient to determine this earlier and
-  // store the number in the AST instead.
-  unsigned getArgNo(const VarDecl *D) {
-    unsigned N = 0;
-    if (auto *param = dyn_cast<ParamDecl>(D)) {
-      auto countArgs = [&](const DeclContext *DC, ArrayRef<Pattern*> Patterns) {
-        if (!NumArgs.lookup(DC)) {
-          unsigned I = 0;
-          for (auto p : reversed(Patterns))
-            p->forEachVariable([&](VarDecl *VD) {
-                ArgNo[VD] = ++I;
-                if (VD == D)
-                  N = I;
-            });
-          NumArgs[DC] = I;
-        }
-      };
-      auto *dc = param->getDeclContext();
-      if (auto *fn = dyn_cast<AbstractFunctionDecl>(dc))
-        countArgs(dc, fn->getBodyParamPatterns());
-      else if (auto *closure = dyn_cast<ClosureExpr>(dc))
-        countArgs(dc, closure->getParamPatterns());
-      if (!N)
-        N = ArgNo.lookup(D);
-    }
-    return N;
-  }
-
   /// Emit debug info for a function argument or a local variable.
   template <typename StorageType>
   void emitDebugVariableDeclaration(StorageType Storage,
                                     DebugTypeInfo Ty,
                                     const SILDebugScope *DS,
-                                    StringRef Name) {
+                                    StringRef Name,
+                                    unsigned ArgNo = 0,
+                                    IndirectionKind Indirection = DirectValue) {
     assert(IGM.DebugInfo && "debug info not enabled");
-
-    auto VD = cast<VarDecl>(Ty.getDecl());
-    auto N = getArgNo(VD);
-    if (N) {
-      if (!ArgEmitted.lookup(VD)) {
-        PrologueLocation AutoRestore(IGM.DebugInfo, Builder);
-        IGM.DebugInfo->
-          emitArgVariableDeclaration(Builder, Storage,
-                                     Ty, DS, Name, N, DirectValue);
-        ArgEmitted[VD] = true;
-      }
+    if (ArgNo) {
+      PrologueLocation AutoRestore(IGM.DebugInfo, Builder);
+      IGM.DebugInfo->emitArgVariableDeclaration(Builder, Storage, Ty, DS, Name,
+                                                ArgNo, Indirection);
     } else
-      IGM.DebugInfo->
-        emitStackVariableDeclaration(Builder, Storage,
-                                     Ty, DS, Name, DirectValue);
+      IGM.DebugInfo->emitStackVariableDeclaration(Builder, Storage, Ty, DS,
+                                                  Name, Indirection);
   }
 
-  
   void emitFailBB() {
     if (!FailBBs.empty()) {
       // Move the trap basic blocks to the end of the function.
@@ -1416,6 +1373,23 @@ void IRGenSILFunction::estimateStackSize() {
   }
 }
 
+/// Determine the number of source-level Swift of a function or closure.
+static unsigned countArgs(DeclContext *DC) {
+  unsigned N = 0;
+  auto count = [&](ArrayRef<Pattern *> Patterns) {
+    for (auto p : Patterns)
+      p->forEachVariable([&](VarDecl *VD) { ++N; });
+  };
+
+  if (auto *Fn = dyn_cast<AbstractFunctionDecl>(DC))
+    count(Fn->getBodyParamPatterns());
+  else if (auto *Closure = dyn_cast<AbstractClosureExpr>(DC))
+    count(Closure->getParamPatterns());
+  else
+    llvm_unreachable("unhandled declcontext type");
+  return N;
+}
+
 /// Store the lowered IR representation of Arg in the array
 /// Vals. Returns true if Arg is a byref argument.
 IndirectionKind IRGenSILFunction::
@@ -1435,97 +1409,9 @@ getLoweredArgValue(llvm::SmallVectorImpl<llvm::Value *> &Vals,
 }
 
 void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
-  assert(BB->pred_empty());
-  if (!IGM.DebugInfo)
-    return;
-
-  // We cannot deduce the correct argument ordering without a DeclContent.
-  if (!CurSILFn->getDeclContext())
-    return;
-  
-  // This is the prologue of a function. Emit debug info for all
-  // trivial arguments and any captured and promoted [inout]
-  // variables.
-  unsigned NMax = NumArgs.lookup(CurSILFn->getDeclContext());
-  const VarDecl* LastVD = nullptr;
-  for (auto I = BB->getBBArgs().begin(), E=BB->getBBArgs().end();
-       I != E; ++I) {
-    SILArgument *Arg = *I;
-    unsigned N = 0;
-
-    // Reconstruct the Swift argument numbering.
-    if (auto *VD = dyn_cast_or_null<VarDecl>(Arg->getDecl()))
-      if (VD != LastVD) {
-        N = getArgNo(VD);
-        if (!NMax)
-          NMax = NumArgs.lookup(CurSILFn->getDeclContext());
-        LastVD = VD;
-      }
-
-    if (!Arg->getDecl())
-      continue;
-
-    // Generic and existential types were already handled in
-    // visitAllocStackInst.
-    if (Arg->getType().isExistentialType() ||
-        Arg->getType().getSwiftRValueType()->isTypeParameter() ||
-        Arg->getType().is<ArchetypeType>())
-      continue;
-
-    if (ArgEmitted.lookup(LastVD))
-      continue;
-
-    auto Name = Arg->getDecl()->getNameStr();
-    DebugTypeInfo DTI(const_cast<ValueDecl*>(Arg->getDecl()),
-                      getTypeInfo(Arg->getType()));
-
-    llvm::SmallVector<llvm::Value *, 8> Vals, Copy;
-    bool Deref = getLoweredArgValue(Vals, Arg, Name);
-    // Don't bother emitting swift.refcounted* for now.
-    if (Vals.size() && Vals.back()->getType() == IGM.RefCountedPtrTy)
-      Vals.pop_back();
-
-    // Consolidate all pieces of an exploded multi-argument into one list.
-    for (auto Next = I+1; Next != E; ++Next, ++I) {
-      if ((*Next)->getDecl() != Arg->getDecl())
-        break;
-
-      Deref |= getLoweredArgValue(Vals, *Next, Name);
-    }
-    if (DTI.getType()->getKind() == TypeKind::InOut) {
-      if (!Deref) {
-        // If the value was promoted, unwrap the type.
-        DTI = DebugTypeInfo(DTI.getType()->castTo<InOutType>()->getObjectType(),
-                            DTI.StorageType, DTI.size, DTI.align,
-                            DTI.getDeclContext());
-      }
-
-      // In contrast to by-value captures, inout arguments are encoded
-      // as reference types, so there is no need to emit a deref
-      // operation.
-      Deref = DirectValue;
-    }
-
-    // Emit -O0 shadow copies for by-value parameters to ensure they
-    // are visible until the end of the function.
-    emitShadowCopy(Vals, Name, Copy);
-    // Captures are pointing to the decl of the captured variable.
-    if (LastVD->getDeclContext() != CurSILFn->getDeclContext()) {
-      IGM.DebugInfo->emitArgVariableDeclaration
-        (Builder, Copy, DTI, getDebugScope(), Name, ++NMax,
-         IndirectionKind(Deref), ArtificialValue);
-      ArgEmitted[LastVD] = true;
-    } else if (N) {
-      IGM.DebugInfo->emitArgVariableDeclaration
-        (Builder, Copy, DTI, getDebugScope(), Name, N,
-         IndirectionKind(Deref), RealValue);
-      ArgEmitted[LastVD] = true;
-    }
-  }
-
   // Emit the artificial error result argument.
   auto FnTy = CurSILFn->getLoweredFunctionType();
-  if (FnTy->hasErrorResult()) {
+  if (FnTy->hasErrorResult() && CurSILFn->getDeclContext()) {
     auto ErrorInfo = FnTy->getErrorResult();
     auto ErrorResultSlot = getErrorResultSlot(ErrorInfo.getSILType());
     DebugTypeInfo DTI(ErrorInfo.getType(),
@@ -1534,12 +1420,15 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
                       IGM.getPointerAlignment(),
                       nullptr);
     StringRef Name("$error");
+    // We just need any number that is guranteed to be larger than every
+    // other argument. It is only used for sorting.
+    unsigned ArgNo =
+        countArgs(CurSILFn->getDeclContext()) + 1 + BB->getBBArgs().size();
     IGM.DebugInfo->emitArgVariableDeclaration(
-      Builder, emitShadowCopy(ErrorResultSlot.getAddress(), Name), DTI,
-      getDebugScope(), Name, ++NMax,
-      IndirectValue, ArtificialValue);
+        Builder, emitShadowCopy(ErrorResultSlot.getAddress(), Name), DTI,
+        getDebugScope(), Name, ArgNo,
+        IndirectValue, ArtificialValue);
   }
-
 }
 
 
@@ -3070,7 +2959,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
     return;
 
   VarDecl *Decl = i->getDecl();
-  if (!Decl || ArgEmitted.lookup(Decl))
+  if (!Decl)
     return;
 
   auto SILVal = i->getOperand();
@@ -3080,18 +2969,23 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   StringRef Name = Decl->getNameStr();
   Explosion e = getLoweredExplosion(SILVal);
   DebugTypeInfo DbgTy(Decl, Decl->getType(), getTypeInfo(SILVal.getType()));
+  if (DbgTy.getType()->getKind() == TypeKind::InOut)
+    // An inout type that is described by a debug *value* is a
+    // promoted capture. Unwrap the type.
+    DbgTy.unwrapInOutType();
 
   // Put the value into a stack slot at -Onone.
   llvm::SmallVector<llvm::Value *, 8> Copy;
   emitShadowCopy(e.claimAll(), Name, Copy);
-  emitDebugVariableDeclaration(Copy, DbgTy, i->getDebugScope(), Name);
+  emitDebugVariableDeclaration(Copy, DbgTy, i->getDebugScope(), Name,
+                               i->getVarInfo().getArgNo());
 }
 
 void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   if (!IGM.DebugInfo)
     return;
   VarDecl *Decl = i->getDecl();
-  if (!Decl || ArgEmitted.lookup(Decl))
+  if (!Decl)
     return;
 
   auto SILVal = i->getOperand();
@@ -3102,8 +2996,11 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   auto Addr = getLoweredAddress(SILVal).getAddress();
   DebugTypeInfo DbgTy(Decl, Decl->getType(), getTypeInfo(SILVal.getType()));
   // Put the value into a stack slot at -Onone and emit a debug intrinsic.
-  emitDebugVariableDeclaration(emitShadowCopy(Addr, Name), DbgTy,
-                               i->getDebugScope(), Name);
+  emitDebugVariableDeclaration(
+      emitShadowCopy(Addr, Name), DbgTy, i->getDebugScope(), Name,
+      i->getVarInfo().getArgNo(),
+      (DbgTy.getType()->getKind() == TypeKind::InOut) ? DirectValue
+                                                      : IndirectValue);
 }
 
 void IRGenSILFunction::visitLoadWeakInst(swift::LoadWeakInst *i) {
@@ -3362,7 +3259,8 @@ static void emitDebugDeclarationForAllocStack(IRGenSILFunction &IGF,
       auto DS = i->getDebugScope();
       if (DS) {
         assert(DS->SILFn == IGF.CurSILFn || DS->InlinedCallSite);
-        IGF.emitDebugVariableDeclaration(addr, DbgTy, DS, Name);
+        IGF.emitDebugVariableDeclaration(addr, DbgTy, DS, Name,
+                                         i->getVarInfo().getArgNo());
       }
     }
   }
@@ -3518,12 +3416,11 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
     if (Name == IGM.Context.Id_self.str())
       return;
     auto Indirection = IndirectValue;
-    // LValues are implicitly indirect because of their type.
-    if (Decl->getType()->getKind() == TypeKind::LValue)
+    // LValues and inout args are implicitly indirect because of their type.
+    if (Decl->getType()->getKind() == TypeKind::LValue ||
+        Decl->getType()->getKind() == TypeKind::InOut)
       Indirection = DirectValue;
-    // FIXME: inout arguments that are not promoted are emitted as
-    // arguments and also boxed and thus may show up twice. This may
-    // or may not be bad.
+
     IGM.DebugInfo->emitStackVariableDeclaration
       (Builder,
        emitShadowCopy(addr.getAddress(), Name),

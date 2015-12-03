@@ -29,7 +29,8 @@ sil @AddressOnlyTest : $@convention(thin) (@inout P) -> () {
 bb0(%0 : $*P):           // CHECK: bb0(%0 : $*P):
   %1 = alloc_stack $P
   copy_addr %0 to [initialization] %1#1 : $*P
-  
+
+  // CHECK-NEXT: debug_value_addr %0
   // CHECK-NEXT: open_existential_addr %0 : $*P
   %3 = open_existential_addr %1#1 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P
   %4 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.foo!1, %3 : $*@opened("01234567-89ab-cdef-0123-000000000000") P : $@convention(witness_method) @callee_owned <T: P> (@inout T) -> ()
@@ -66,6 +67,7 @@ bb0(%0 : $*NontrivialStruct):
   %1 = alloc_stack $NontrivialStruct
   copy_addr %0 to [initialization] %1#1 : $*NontrivialStruct
 
+  // CHECK-NEXT: debug_value_addr %0
   // CHECK-NEXT: // function_ref takeNontrivial
   // CHECK-NEXT: function_ref @takeNontrivial
   %3 = function_ref @takeNontrivial : $@convention(method) (@inout NontrivialStruct) -> () // user: %4
