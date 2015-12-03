@@ -2429,7 +2429,7 @@ string_literal
   // %1 has type $Builtin.RawPointer
 
 Creates a reference to a string in the global string table. The result
-is a pointer to the data.  The referenced string is always nul-terminated. The
+is a pointer to the data.  The referenced string is always null-terminated. The
 string literal value is specified using Swift's string
 literal syntax (though ``\()`` interpolations are not allowed).
 
@@ -4005,7 +4005,7 @@ cond_br
 
 Conditionally branches to ``true_label`` if ``%0`` is equal to ``1`` or to
 ``false_label`` if ``%0`` is equal to ``0``, binding the corresponding set of
-values to the the arguments of the chosen destination block.
+values to the arguments of the chosen destination block.
 
 switch_value
 ````````````
