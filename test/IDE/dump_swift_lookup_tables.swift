@@ -1,6 +1,8 @@
 // RUN: %target-swift-ide-test -dump-importer-lookup-table -source-filename %s -import-objc-header %S/Inputs/swift_name.h > %t.log 2>&1
 // RUN: FileCheck %s < %t.log
 
+// REQUIRES: objc_interop
+
 // CHECK:      Base -> full name mappings:
 // CHECK-NEXT:   Bar --> Bar
 // CHECK-NEXT:   Blue --> Blue
