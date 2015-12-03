@@ -944,7 +944,7 @@ Searching
 
   .. Admonition:: Usage Example
 
-     The ``NSString`` semantics can be acheived as follows:
+     The ``NSString`` semantics can be achieved as follows:
 
      .. parsed-literal::
 
@@ -1104,7 +1104,7 @@ Capitalization
 
   .. Admonition:: Usage Example
 
-     The ``NSString`` semantics can be acheived as follows:
+     The ``NSString`` semantics can be achieved as follows:
 
      .. parsed-literal::
 
