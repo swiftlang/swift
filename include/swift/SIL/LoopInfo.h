@@ -46,6 +46,10 @@ public:
     return make_range(begin(), end());
   }
 
+  /// Check whether it is safe to duplicate this instruction when duplicating
+  /// this loop by unrolling or versioning.
+  bool canDuplicate(SILInstruction *Inst) const;
+
 private:
   friend class llvm::LoopInfoBase<SILBasicBlock, SILLoop>;
 
