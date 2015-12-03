@@ -13,9 +13,6 @@ func main() -> Void
     // CHECK: define linkonce_odr hidden i1 @_TFF4main4mainFT_T_U_FTSSSS_Sb(
     // CHECK: %[[RANDOM_STR_ADDR:.*]] = alloca %SS*, align {{(4|8)}}
     // CHECK: store %SS* %{{.*}}, %SS** %[[RANDOM_STR_ADDR]], align {{(4|8)}}
-    // The shadow copying should happen in the prologue, because the
-    // stack pointer will be decremented after it.
-    // CHECK-NOT: !dbg
     // CHECK-NEXT: call void @llvm.dbg.declare(metadata %SS** %[[RANDOM_STR_ADDR]], metadata !{{.*}}, metadata !{{[0-9]+}}), !dbg
     // CHECK-DAG: !DILocalVariable(name: "lhs",{{.*}} line: [[@LINE+5]],
     // CHECK-DAG: !DILocalVariable(name: "rhs",{{.*}} line: [[@LINE+4]],

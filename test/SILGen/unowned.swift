@@ -96,6 +96,7 @@ func test_unowned_let_capture(aC : C) {
 
 // CHECK-LABEL: sil shared @_TFF7unowned24test_unowned_let_captureFCS_1CT_U_FT_Si : $@convention(thin) (@owned @sil_unowned C) -> Int {
 // CHECK: bb0([[ARG:%.*]] : $@sil_unowned C):
+// CHECK-NEXT:   debug_value %0 : $@sil_unowned C // let bC, argno: 1
 // CHECK-NEXT:   strong_retain_unowned [[ARG]] : $@sil_unowned C
 // CHECK-NEXT:   [[UNOWNED_ARG:%.*]] = unowned_to_ref [[ARG]] : $@sil_unowned C to $C
 // CHECK-NEXT:   [[FUN:%.*]] = class_method [[UNOWNED_ARG]] : $C, #C.f!1 : C -> () -> Int , $@convention(method) (@guaranteed C) -> Int
