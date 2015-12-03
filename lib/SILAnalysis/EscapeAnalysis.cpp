@@ -1286,7 +1286,7 @@ void EscapeAnalysis::recompute() {
 
       // Limit the total number of iterations. First to limit compile time,
       // second to make sure that the loop terminates. Theoretically this
-      // should alwasy be the case, but who knows?
+      // should always be the case, but who knows?
       if (Iteration >= MaxGraphMerges) {
         DEBUG(llvm::dbgs() << "  finalize " <<
               FInfo->Graph.F->getName() << '\n');
