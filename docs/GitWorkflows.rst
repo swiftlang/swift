@@ -128,7 +128,7 @@ In Git, instead of performing SVN update, one pulls from the remote repository::
   $ git pull --rebase origin master
 
 This will pull any new remote commits into your local repository and then replay
-your current local commits ontop of those new commits.
+your current local commits on top of those new commits.
 
 By default the '--rebase' flag is not necessary for the Swift repository because
 it is configured to always rebase by setting the 'branch.autosetuprebase' flag
