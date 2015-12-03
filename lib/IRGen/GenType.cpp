@@ -563,7 +563,7 @@ FixedTypeInfo::getSpareBitExtraInhabitantIndex(IRGenFunction &IGF,
   // If we had a valid value, return -1. Otherwise, return the index.
   auto phi = IGF.Builder.CreatePHI(IGF.IGM.Int32Ty, 2);
   phi->addIncoming(llvm::ConstantInt::get(IGF.IGM.Int32Ty, -1), origBB);
-  phi->addIncoming(idx, spareBB);;
+  phi->addIncoming(idx, spareBB);
   
   return phi;
 }

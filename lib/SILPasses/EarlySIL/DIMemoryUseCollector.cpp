@@ -415,7 +415,7 @@ namespace {
     /// the address and the refcount result of the allocation.
     void collectFrom() {
       IsSelfOfNonDelegatingInitializer =
-        TheMemory.isNonDelegatingInit();;
+        TheMemory.isNonDelegatingInit();
 
       // If this is a delegating initializer, collect uses specially.
       if (TheMemory.isDelegatingInit()) {
@@ -1173,7 +1173,7 @@ collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
     // ref_element_addr P, #field lookups up a field.
     if (auto *REAI = dyn_cast<RefElementAddrInst>(User)) {
       assert(EltNumbering.count(REAI->getField()) &&
-             "ref_element_addr not a local field?");;
+             "ref_element_addr not a local field?");
       // Recursively collect uses of the fields.  Note that fields of the class
       // could be tuples, so they may be tracked as independent elements.
       llvm::SaveAndRestore<bool> X(IsSelfOfNonDelegatingInitializer, false);

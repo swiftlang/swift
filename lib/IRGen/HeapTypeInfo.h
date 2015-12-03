@@ -169,13 +169,13 @@ public:
                               Address addr) const override {
     switch (asDerived().getReferenceCounting()) {
     case ReferenceCounting::Native:
-      return LoadedRef(IGF.emitLoadNativeRefcountedPtr(addr), true);;
+      return LoadedRef(IGF.emitLoadNativeRefcountedPtr(addr), true);
     case ReferenceCounting::ObjC:
     case ReferenceCounting::Block:
     case ReferenceCounting::Unknown:
-      return LoadedRef(IGF.emitLoadUnknownRefcountedPtr(addr), true);;
+      return LoadedRef(IGF.emitLoadUnknownRefcountedPtr(addr), true);
     case ReferenceCounting::Bridge:
-      return LoadedRef(IGF.emitLoadBridgeRefcountedPtr(addr), true);;
+      return LoadedRef(IGF.emitLoadBridgeRefcountedPtr(addr), true);
     case ReferenceCounting::Error:
       llvm_unreachable("not supported!");
     }
