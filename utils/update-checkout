@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #===--- update-checkout - Utility to update your local checkouts -----------===#
 #
 # This source file is part of the Swift.org open source project
