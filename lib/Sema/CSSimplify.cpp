@@ -1323,9 +1323,20 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       }
       SWIFT_FALLTHROUGH;
 
+    case TypeMatchKind::Conversion:
+      if (typeVar1 && typeVar2) {
+        auto rep1 = getRepresentative(typeVar1);
+        auto rep2 = getRepresentative(typeVar2);
+        if (rep1 == rep2) {
+          // We already merged these two types, so this constraint is
+          // trivially solved.
+          return SolutionKind::Solved;
+        }
+      }
+      SWIFT_FALLTHROUGH;
+
     case TypeMatchKind::ConformsTo:
     case TypeMatchKind::Subtype:
-    case TypeMatchKind::Conversion:
     case TypeMatchKind::ExplicitConversion:
     case TypeMatchKind::ArgumentConversion:
     case TypeMatchKind::OperatorArgumentTupleConversion:

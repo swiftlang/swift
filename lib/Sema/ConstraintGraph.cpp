@@ -687,6 +687,74 @@ unsigned ConstraintGraph::computeConnectedComponents(
   return numComponents;
 }
 
+bool ConstraintGraph::contractEdges() {
+  llvm::SetVector<std::pair<TypeVariableType *,
+                            TypeVariableType *>> contractions;
+
+  auto tyvars = getTypeVariables();
+  auto didContractEdges = false;
+
+  for (auto tyvar : tyvars) {
+    SmallVector<Constraint *, 4> constraints;
+    gatherConstraints(tyvar, constraints);
+
+    for (auto constraint : constraints) {
+      // Contract binding edges between type variables.
+      if (constraint->getKind() == ConstraintKind::Conversion ||
+          constraint->getKind() == ConstraintKind::Bind ||
+          constraint->getKind() == ConstraintKind::Equal) {
+        if (auto tyvar1 = constraint->getFirstType()->
+                            getAs<TypeVariableType>()) {
+          if (auto tyvar2 = constraint->getSecondType()->
+                            getAs<TypeVariableType>()) {
+
+            auto rep1 = CS.getRepresentative(tyvar1);
+            auto rep2 = CS.getRepresentative(tyvar2);
+
+            if (rep1 != rep2) {
+
+              if (rep1->getImpl().canBindToLValue() ==
+                  rep2->getImpl().canBindToLValue()) {
+
+                // Merge the edges and remove the constraint.
+                CS.mergeEquivalenceClasses(rep1, rep2);
+                didContractEdges = true;
+                removeEdge(constraint);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return didContractEdges;
+}
+
+void ConstraintGraph::removeEdge(Constraint *constraint) {
+
+  for (auto &active : CS.ActiveConstraints) {
+    if (&active == constraint) {
+      CS.ActiveConstraints.erase(constraint);
+      break;
+    }
+  }
+
+  for (auto &inactive : CS.InactiveConstraints) {
+    if (&inactive == constraint) {
+      CS.InactiveConstraints.erase(constraint);
+      break;
+    }
+  }
+
+  removeConstraint(constraint);
+}
+
+void ConstraintGraph::optimize() {
+  // Merge equivalence classes until a fixed point is reached.
+  while(contractEdges()) {}
+}
+
 #pragma mark Debugging output
 
 void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent) {

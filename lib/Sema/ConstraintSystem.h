@@ -878,6 +878,7 @@ public:
   
   friend class Fix;
   friend class OverloadChoice;
+  friend class ConstraintGraph;
 
   class SolverScope;
 
