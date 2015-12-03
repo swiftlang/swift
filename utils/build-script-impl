@@ -194,11 +194,19 @@ function to_varname() {
 }
 
 function get_make_parallelism() {
-    if [ "$(uname -s)" == "Darwin" ] ; then
-        sysctl -n hw.activecpu
-    else
-        echo 8
-    fi
+    case "$(uname -s)" in
+        Linux)
+            nproc
+            ;;
+
+        Darwin)
+            sysctl -n hw.activecpu
+            ;;
+
+        *)
+            echo 8
+            ;;
+    esac
 }
 
 function get_dsymutil_parallelism() {
