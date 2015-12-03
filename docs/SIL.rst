@@ -106,7 +106,7 @@ IR.
 
 - **Generic Specialization** analyzes specialized calls to generic
   functions and generates new specialized version of the
-  functions. Then it rewrites all specialized usages of the gener ic
+  functions. Then it rewrites all specialized usages of the generic
   to a direct call of the appropriate specialized function.
 - **Witness and VTable Devirtualization** for a given type looks up
   the associated method from a class's vtable or a types witness table
@@ -2230,7 +2230,7 @@ unowned_release
   unowned_release %0 : $@unowned T
   // $T must be a reference type
 
-Decrements the unowned reference count of the heap object refereced by
+Decrements the unowned reference count of the heap object referenced by
 ``%0``.  When both its strong and unowned reference counts reach zero,
 the object's memory is deallocated.
 
