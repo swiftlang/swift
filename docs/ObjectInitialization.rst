@@ -468,7 +468,7 @@ primary uses of the ``Self`` return type is for factory methods::
   these methods.
 
 Within the body of this class method, the implicit parameter ``self``
-is a value with type ``View.Type``, i.e., it;s a type value for the
+is a value with type ``View.Type``, i.e., it's a type value for the
 class ``View`` or one of its subclasses. Therefore, the restrictions
 are the same as for any value of type ``View.Type``: one can call
 other class methods and construct new objects using required
