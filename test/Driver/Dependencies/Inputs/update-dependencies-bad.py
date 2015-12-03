@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Fails if the input file is named "bad.swift"; otherwise dispatches to
 # update-dependencies.py.

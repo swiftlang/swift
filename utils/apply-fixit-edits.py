@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 #===--- apply-fixit-edits.py - Tool for applying edits from .remap files ---===#
 #
