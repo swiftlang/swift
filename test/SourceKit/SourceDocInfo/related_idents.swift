@@ -19,6 +19,10 @@ class C2 {
   }()
 }
 
+class C2<Param> {
+	func f(t : Param) -> Param {return t}
+}
+
 // RUN: %sourcekitd-test -req=related-idents -pos=6:17 %s -- -module-name related_idents %s | FileCheck -check-prefix=CHECK1 %s
 // CHECK1: START RANGES
 // CHECK1-NEXT: 1:7 - 2
@@ -42,3 +46,10 @@ class C2 {
 // CHECK4-NEXT: 17:9 - 1
 // CHECK4-NEXT: 18:12 - 1
 // CHECK4-NEXT: END RANGES
+
+// RUN: %sourcekitd-test -req=related-idents -pos=22:12 %s -- -module-name related_idents %s | FileCheck -check-prefix=CHECK5 %s
+// CHECK5:      START RANGES
+// CHECK5-NEXT: 22:10 - 5
+// CHECK5-NEXT: 23:13 - 5
+// CHECK5-NEXT: 23:23 - 5
+// CHECK5-NEXT: END RANGES
