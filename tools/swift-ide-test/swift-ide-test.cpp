@@ -452,6 +452,11 @@ SkipPrivateStdlibDecls("skip-private-stdlib-decls",
                 llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+SkipUnderscoredStdlibProtocols("skip-underscored-stdlib-protocols",
+                llvm::cl::desc("Don't print protocols that start with '_'"),
+                llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 PrintRegularComments("print-regular-comments",
              llvm::cl::desc("Print regular comments from clang module headers"),
              llvm::cl::init(false));
@@ -2556,6 +2561,8 @@ int main(int argc, char *argv[]) {
         = PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
     }
   }
+  PrintOpts.SkipUnderscoredStdlibProtocols =
+    options::SkipUnderscoredStdlibProtocols;
 
   if (PrintOpts.PrintDocumentationComments) {
     InitInvok.getLangOptions().AttachCommentsToDecls = true;

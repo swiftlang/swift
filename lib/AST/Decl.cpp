@@ -382,7 +382,7 @@ bool Decl::isBeingTypeChecked() {
 bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
   const Decl *D = this;
   if (auto ExtD = dyn_cast<ExtensionDecl>(D))
-    return ExtD->getExtendedType().isPrivateStdlibType();
+    return ExtD->getExtendedType().isPrivateStdlibType(whitelistProtocols);
 
   DeclContext *DC = D->getDeclContext()->getModuleScopeContext();
   if (DC->getParentModule()->isBuiltinModule() ||

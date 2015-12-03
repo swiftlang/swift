@@ -775,7 +775,9 @@ bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
       return false;
   }
 
-  if (Options.SkipPrivateStdlibDecls && D->isPrivateStdlibDecl())
+  if (Options.SkipPrivateStdlibDecls &&
+      D->isPrivateStdlibDecl(
+                /*whitelistProtocols=*/!Options.SkipUnderscoredStdlibProtocols))
     return false;
 
   if (Options.SkipEmptyExtensionDecls && isa<ExtensionDecl>(D)) {

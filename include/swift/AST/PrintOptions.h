@@ -97,6 +97,9 @@ struct PrintOptions {
   /// Whether to skip internal stdlib declarations.
   bool SkipPrivateStdlibDecls = false;
 
+  /// Whether to skip underscored stdlib protocols.
+  bool SkipUnderscoredStdlibProtocols = false;
+
   /// Whether to skip extensions that don't add protocols or no members.
   bool SkipEmptyExtensionDecls = true;
 
