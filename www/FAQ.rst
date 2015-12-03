@@ -19,7 +19,7 @@ That said, we do expect Swift to be a better language than C++ in a number of wa
 so why don't we implement the compiler itself in Swift?  There are a couple of
 reasons that bootstrapping is not a good idea, at least in the short term:
 
- * This complicates bringup of the compiler, because you have to move both the
+ * This complicates bring up of the compiler, because you have to move both the
    compiled language and the compiler at the same time as the language evolves.
  * We want the language evolution and direction to be driven by general purpose
    programming challenges, not by the specific needs of compiler hackers.  The
