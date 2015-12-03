@@ -126,7 +126,7 @@ Pass-by-value
 
 In pass-by-value, if `A` is an l-value expression, `foo(A)` copies the
 current value there.  Any modifications `foo` makes to its parameter
-are make to this copy, not to the original l-value.
+are made to this copy, not to the original l-value.
 
 Most modern languages are pass-by-value, with specific functions able
 to opt in to pass-by-reference semantics.  This is exactly what Swift
@@ -345,7 +345,7 @@ just add default arguments at each step) have really awful performance
 because the compiler is adding retains and releases at every single
 level.  It's just not a good convention to adopt by default.  However,
 we might want to consider allowing specific function parameters to opt
-into it; sort comparators are an particularly interesting candidate
+into it; sort comparators are a particularly interesting candidate
 for this.  `unowned` is very similar to C++'s `const &` for things
 like that.
 
