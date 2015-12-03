@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # modify-non-primary-files.py simulates a build where the user is modifying the
 # source files during compilation.

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # update-dependencies.py simulates a Swift compilation for the purposes of
 # dependency analysis. That means it has two tasks:
