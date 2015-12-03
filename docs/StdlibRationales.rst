@@ -175,7 +175,7 @@ Use of ``BooleanType`` in library APIs
 --------------------------------------
 
 Use ``Bool`` instead of a generic function over a ``BooleanType``, unless there
-are special cicrumstances (for example, ``func &&`` is designed to work on all
+are special circumstances (for example, ``func &&`` is designed to work on all
 boolean values so that ``&&`` feels like a part of the language).
 
 ``BooleanType`` is a protocol to which only ``Bool`` and ``ObjCBool`` conform.
