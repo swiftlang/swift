@@ -957,7 +957,7 @@ public:
   /// \returns The named type, or null if the type could not be found.
   Type getNamedSwiftType(Module *module, StringRef name);
 
-  /// \brief Retrieve a specialization of the the named Swift type, e.g.,
+  /// \brief Retrieve a specialization of the named Swift type, e.g.,
   /// UnsafeMutablePointer<T>.
   ///
   /// \param module The name of the module in which the type should occur.

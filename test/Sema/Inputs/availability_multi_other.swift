@@ -1,7 +1,7 @@
 // This file is used by Sema/availability_versions_multi.swift to
 // test that we build enough of the type refinement context as needed to
 // validate declarations when resolving declaration signatures.
-// This file relies on the the minimum deployment target for OS X being 10.9.
+// This file relies on the minimum deployment target for OS X being 10.9.
 
 @available(OSX, introduced=10.11)
 private class PrivateIntroduced10_11 { }

@@ -63,7 +63,7 @@
 /// value) and then aggregate them.
 ///
 /// However, this may introduce a lot of extraction and aggregation which may
-/// not be necessary. i.e. a store the the struct followed by a load from the
+/// not be necessary. i.e. a store the struct followed by a load from the
 /// struct. To solve this problem, when RLE detects that an load instruction
 /// can be replaced by forwarded value, it will try to find minimum # of
 /// extraction necessary to form the forwarded value. It will group the

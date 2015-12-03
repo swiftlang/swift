@@ -80,8 +80,7 @@ public:
 
   /// A stable insertion point in the function.  "Stable" means that
   /// it will point to the same location in the function, even if
-  /// instructions are subsequently added to the the current basic
-  /// block.
+  /// instructions are subsequently added to the current basic block.
   class StableIP {
     /// Either an instruction that we're inserting after or the basic
     /// block that we're inserting at the beginning of.

@@ -614,15 +614,15 @@ bool CheckedCastBrJumpThreading::trySimplify(TermInst *Term) {
     // TODO:
     // If the dominating checked_cast_br is non-exact, then
     // it is in general not safe to assume that current exact cast
-    // would have the same outcome. But if the the dominating
-    // non-exact checked_cast_br fails, then the current exact cast
-    // would always fail as well.
+    // would have the same outcome. But if the dominating non-exact
+    // checked_cast_br fails, then the current exact cast would
+    // always fail as well.
     //
     // If the dominating checked_cast_br is exact then then
     // it is in general not safe to assume that the current non-exact
-    // cast would have the same outcome. But if the the dominating
-    // exact checked_cast_br succeeds, then the current non-exact
-    // cast would always succeed as well.
+    // cast would have the same outcome. But if the dominating exact
+    // checked_cast_br succeeds, then the current non-exact cast
+    // would always succeed as well.
     //
     // TODO: In some specific cases, it is possible to prove that
     // success or failure of the dominating cast is equivalent to
