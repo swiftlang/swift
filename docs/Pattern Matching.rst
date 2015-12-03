@@ -732,7 +732,7 @@ pattern-specific production.  I believe it should be true that, in
 general, match patterns for a production accept a strict superset of
 valid expressions, so that (e.g.) we do not need to disambiguate
 whether an open paren starts a tuple expression or a tuple pattern,
-but can instaed just aggressively parse as a pattern.  Note that
+but can instead just aggressively parse as a pattern.  Note that
 binary operators can mean that, using this strategy, we sometimes have
 to retroactively rewrite a pattern as an expression.
 
