@@ -604,6 +604,27 @@ placed""",
         build_script_impl_inferred_args += [
             "--skip-build-lldb"
         ]
+    else:
+        import platform
+        if platform.system() == "Darwin":
+            # Validate the LLDB build variant, exiting the
+            # build if it is not supported.
+            supported_variants = [
+                "Debug",
+                "Release"
+                ]
+            if args.lldb_build_variant is not None:
+                lldb_build_variant = args.lldb_build_variant
+            else:
+                lldb_build_variant = args.build_variant
+            if lldb_build_variant not in supported_variants:
+                sys.stderr.write(
+                    "The Swift LLDB build does not support build variant %s\n"
+                    % lldb_build_variant)
+                sys.stderr.write(
+                    "Please select one of the following variants: %s\n" %
+                    ", ".join(supported_variants))
+                sys.exit(1)
 
     if not args.build_llbuild:
         build_script_impl_inferred_args += [
