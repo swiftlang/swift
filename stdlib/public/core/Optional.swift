@@ -70,7 +70,7 @@ public enum Optional<Wrapped> : _Reflectable, NilLiteralConvertible {
       if let x = self {
         return x
       }
-      _debugRequirementFailure("unsafelyUnwrapped of nil optional")
+      _stdlibAssertionFailure("unsafelyUnwrapped of nil optional")
     }
   }
 

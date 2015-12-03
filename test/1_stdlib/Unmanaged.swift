@@ -27,7 +27,7 @@ var UnmanagedTests = TestSuite("UnsafeReference")
 UnmanagedTests.test("init(bitPattern:)/trap")
   .skip(.Custom(
     { !_isDebugAssertConfiguration() },
-    reason: "init(bitPattern:) does a _debugRequire() for null pointers"))
+    reason: "init(bitPattern:) does a _stdlibAssert() for null pointers"))
   .code {
   let null: OpaquePointer = getPointer(nil)
   expectCrashLater()

@@ -203,7 +203,7 @@ public func _overflowChecked<T>(
 /// They are meant to be used when the check is not comprehensively checking for
 /// all possible errors.
 @_transparent
-public func _debugRequire(
+public func _stdlibAssert(
   @autoclosure condition: () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UInt = __LINE__
 ) {
@@ -216,7 +216,7 @@ public func _debugRequire(
 }
 
 @_transparent @noreturn
-public func _debugRequirementFailure(
+public func _stdlibAssertionFailure(
   message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UInt = __LINE__) {
   if _isDebugAssertConfiguration() {

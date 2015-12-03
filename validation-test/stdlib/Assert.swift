@@ -34,7 +34,7 @@ func testTrapsAreNoreturn(i: Int) -> Int {
   case 3:
     _requirementFailure("can not happen")
   case 4:
-    _debugRequirementFailure("can not happen")
+    _stdlibAssertionFailure("can not happen")
   case 5:
     _sanityCheckFailure("can not happen")
 
@@ -176,26 +176,26 @@ Assert.test("_requirementFailure")
   _requirementFailure("this should fail")
 }
 
-Assert.test("_debugRequire")
+Assert.test("_stdlibAssert")
   .xfail(.Custom(
     { !_isDebugAssertConfiguration() },
     reason: "debug preconditions are disabled in Release and Unchecked mode"))
   .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
   .code {
   var x = 2
-  _debugRequire(x * 21 == 42, "should not fail")
+  _stdlibAssert(x * 21 == 42, "should not fail")
   expectCrashLater()
-  _debugRequire(x == 42, "this should fail")
+  _stdlibAssert(x == 42, "this should fail")
 }
 
-Assert.test("_debugRequirementFailure")
+Assert.test("_stdlibAssertionFailure")
   .skip(.Custom(
     { !_isDebugAssertConfiguration() },
     reason: "optimizer assumes that the code path is unreachable"))
   .crashOutputMatches("this should fail")
   .code {
   expectCrashLater()
-  _debugRequirementFailure("this should fail")
+  _stdlibAssertionFailure("this should fail")
 }
 
 Assert.test("_sanityCheck")

@@ -152,7 +152,7 @@ public struct ${Self}<Pointee>
   ///   be destroyed or moved from to avoid leaks.
   // FIXME: add tests (since the `count` has been added)
   public func initializePointee(newValue: Pointee, count: Int = 1) {
-    _debugRequire(count >= 0,
+    _stdlibAssert(count >= 0,
       "${Self}.initializePointee with negative count")
     // Must not use `initializeFrom` with a `Collection` as that will introduce
     // a cycle.
@@ -187,9 +187,9 @@ public struct ${Self}<Pointee>
   /// - Requires: The `Pointee`s at `self..<self + count` and
   ///   `source..<source + count` are initialized.
   public func assignFrom(source: ${Self}, count: Int) {
-    _debugRequire(
+    _stdlibAssert(
       count >= 0, "${Self}.assignFrom with negative count")
-    _debugRequire(
+    _stdlibAssert(
       self < source || self >= source + count,
       "assignFrom non-following overlapping range; use assignBackwardFrom")
     for i in 0..<count {
@@ -212,9 +212,9 @@ public struct ${Self}<Pointee>
   /// - Requires: The `Pointee`s at `self..<self + count` and
   ///   `source..<source + count` are initialized.
   public func assignBackwardFrom(source: ${Self}, count: Int) {
-    _debugRequire(
+    _stdlibAssert(
       count >= 0, "${Self}.assignBackwardFrom with negative count")
-    _debugRequire(
+    _stdlibAssert(
       source < self || source >= self + count,
       "${Self}.assignBackwardFrom non-preceding overlapping range; use assignFrom instead")
     for var i = count; --i >= 0; {
@@ -240,9 +240,9 @@ public struct ${Self}<Pointee>
   ///   initialized and the memory at `source..<source + count` is
   ///   uninitialized.
   public func moveInitializeFrom(source: ${Self}, count: Int) {
-    _debugRequire(
+    _stdlibAssert(
       count >= 0, "${Self}.moveInitializeFrom with negative count")
-    _debugRequire(
+    _stdlibAssert(
       self < source || self >= source + count,
       "${Self}.moveInitializeFrom non-following overlapping range; use moveInitializeBackwardFrom")
     Builtin.takeArrayFrontToBack(
@@ -271,9 +271,9 @@ public struct ${Self}<Pointee>
   ///   initialized and the memory at `source..<source + count` is
   ///   uninitialized.
   public func moveInitializeBackwardFrom(source: ${Self}, count: Int) {
-    _debugRequire(
+    _stdlibAssert(
       count >= 0, "${Self}.moveInitializeBackwardFrom with negative count")
-    _debugRequire(
+    _stdlibAssert(
       source < self || source >= self + count,
       "${Self}.moveInitializeBackwardFrom non-preceding overlapping range; use moveInitializeFrom instead")
     Builtin.takeArrayBackToFront(
@@ -302,9 +302,9 @@ public struct ${Self}<Pointee>
   /// - Postcondition: The `Pointee`s at `self..<self + count` and
   ///   `source..<source + count` are initialized.
   public func initializeFrom(source: ${Self}, count: Int) {
-    _debugRequire(
+    _stdlibAssert(
       count >= 0, "${Self}.initializeFrom with negative count")
-    _debugRequire(
+    _stdlibAssert(
       self + count <= source || source + count <= self,
       "${Self}.initializeFrom non-following overlapping range")
     Builtin.copyArray(
@@ -343,9 +343,9 @@ public struct ${Self}<Pointee>
   ///   initialized and the `Pointees` at `source..<source + count`
   ///   are uninitialized.
   public func moveAssignFrom(source: ${Self}, count: Int) {
-    _debugRequire(
+    _stdlibAssert(
       count >= 0, "${Self}.moveAssignFrom with negative count")
-    _debugRequire(
+    _stdlibAssert(
       self + count <= source || source + count <= self,
       "moveAssignFrom overlapping range")
     Builtin.destroyArray(Pointee.self, self._rawValue, count._builtinWordValue)
@@ -365,7 +365,7 @@ public struct ${Self}<Pointee>
   ///
   /// - Postcondition: The memory is uninitialized.
   public func deinitializePointee(count count: Int = 1) {
-    _debugRequire(count >= 0, "${Self}.deinitializePointee with negative count")
+    _stdlibAssert(count >= 0, "${Self}.deinitializePointee with negative count")
     // FIXME: optimization should be implemented, where if the `count` value
     // is 1, the `Builtin.destroy(Pointee.self, _rawValue)` gets called.
     Builtin.destroyArray(Pointee.self, _rawValue, count._builtinWordValue)

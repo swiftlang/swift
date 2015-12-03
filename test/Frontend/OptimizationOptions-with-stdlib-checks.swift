@@ -25,7 +25,7 @@ func test_precondition_check(x: Int, y: Int) -> Int {
 }
 
 func test_partial_safety_check(x: Int, y: Int) -> Int {
-  _debugRequire(x > y, "test partial safety check")
+  _stdlibAssert(x > y, "test partial safety check")
   return x + y
 }
 

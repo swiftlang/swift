@@ -361,7 +361,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   public var pointee: Pointee {
     /// Retrieve the value the pointer points to.
     @_transparent get {
-      _debugRequire(!_isNull)
+      _stdlibAssert(!_isNull)
       // We can do a strong load normally.
       return UnsafeMutablePointer<Pointee>(self).pointee
     }
@@ -372,7 +372,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
     /// in ARC. This autoreleases the argument before trivially
     /// storing it to the referenced memory.
     @_transparent nonmutating set {
-      _debugRequire(!_isNull)
+      _stdlibAssert(!_isNull)
       // Autorelease the object reference.
       typealias OptionalAnyObject = AnyObject?
       Builtin.retain(unsafeBitCast(newValue, OptionalAnyObject.self))
@@ -393,7 +393,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   public subscript(i: Int) -> Pointee {
     @_transparent
     get {
-      _debugRequire(!_isNull)
+      _stdlibAssert(!_isNull)
       // We can do a strong load normally.
       return (UnsafePointer<Pointee>(self) + i).pointee
     }

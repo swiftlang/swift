@@ -122,7 +122,7 @@ public struct UnsafeReference<Object: AnyObject> {
   /// Creates an unsafe holder of an object having the given
   /// `bitPattern`.
   public init(bitPattern: OpaquePointer) {
-    _debugRequire(
+    _stdlibAssert(
       bitPattern != nil,
       "attempt to create an UnsafeReference from a null pointer")
     self.init(withoutRetaining: unsafeBitCast(bitPattern, Object.self))

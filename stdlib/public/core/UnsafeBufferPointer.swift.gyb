@@ -55,14 +55,14 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   /// Access the `i`th element in the buffer.
   public subscript(i: Int) -> Element {
     get {
-      _debugRequire(i >= 0)
-      _debugRequire(i < endIndex)
+      _stdlibAssert(i >= 0)
+      _stdlibAssert(i < endIndex)
       return _position[i]
     }
 %if Mutable:
     nonmutating set {
-      _debugRequire(i >= 0)
-      _debugRequire(i < endIndex)
+      _stdlibAssert(i >= 0)
+      _stdlibAssert(i < endIndex)
       _position[i] = newValue
     }
 %end
