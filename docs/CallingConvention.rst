@@ -1181,7 +1181,7 @@ legal type sequences from the direct results.  If this yields an empty
 sequence, the result type is `void`.  If it yields a single legal
 type, the result type is the corresponding Clang type.  No other could
 actually have come from an imported C declaration, so we don't have
-any real compatiblity requirements; for the convenience of
+any real compatibility requirements; for the convenience of
 interoperation, this is handled by constructing a new C struct which
 contains the corresponding Clang types for the legal type sequence as
 its fields.
