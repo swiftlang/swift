@@ -137,7 +137,7 @@ picking up new targets, file removals, or file additions.
 
 ## Testing Swift
 
-See docs/Testing.rst.
+See [docs/Testing.rst](docs/Testing.rst).
 
 ## Contributing to Swift
 
