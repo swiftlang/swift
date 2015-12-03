@@ -2003,6 +2003,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 if [[ -z "${INSTALL_LLBUILD}" ]] ; then
                     continue
                 fi
+                INSTALL_TARGETS=install-swift-build-tool
                 ;;
             swiftpm)
                 if [[ -z "${INSTALL_SWIFTPM}" ]] ; then
