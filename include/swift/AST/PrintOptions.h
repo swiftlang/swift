@@ -188,6 +188,11 @@ struct PrintOptions {
   /// \brief Whether to print regular comments from clang module headers.
   bool PrintRegularClangComments = false;
 
+  /// When true, printing interface from a source file will print the original
+  /// source text for applicable declarations, in order to preserve the
+  /// formatting.
+  bool PrintOriginalSourceText = false;
+
   /// \brief Print dependent types as references into this generic parameter
   /// list.
   GenericParamList *ContextGenericParams = nullptr;

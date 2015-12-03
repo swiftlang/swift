@@ -461,6 +461,11 @@ PrintRegularComments("print-regular-comments",
              llvm::cl::desc("Print regular comments from clang module headers"),
              llvm::cl::init(false));
 
+static llvm::cl::opt<bool>
+PrintOriginalSourceText("print-original-source",
+             llvm::cl::desc("print the original source text for applicable declarations"),
+             llvm::cl::init(false));
+
 static llvm::cl::opt<std::string>
 CommentsXMLSchema("comments-xml-schema",
                   llvm::cl::desc("Filename of the RelaxNG schema for documentation comments"));
@@ -1801,6 +1806,8 @@ static int doPrintSwiftFileInterface(const CompilerInvocation &InitInvok,
     Printer.reset(new StreamPrinter(llvm::outs()));
 
   PrintOptions Options = PrintOptions::printSwiftFileInterface();
+  if (options::PrintOriginalSourceText)
+    Options.PrintOriginalSourceText = true;
   printSwiftSourceInterface(*CI.getPrimarySourceFile(), *Printer, Options);
 
   return 0;
@@ -2561,8 +2568,10 @@ int main(int argc, char *argv[]) {
         = PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
     }
   }
-  PrintOpts.SkipUnderscoredStdlibProtocols =
-    options::SkipUnderscoredStdlibProtocols;
+  if (options::SkipUnderscoredStdlibProtocols)
+    PrintOpts.SkipUnderscoredStdlibProtocols = true;
+  if (options::PrintOriginalSourceText)
+    PrintOpts.PrintOriginalSourceText = true;
 
   if (PrintOpts.PrintDocumentationComments) {
     InitInvok.getLangOptions().AttachCommentsToDecls = true;

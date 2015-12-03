@@ -31,6 +31,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/Config.h"
 #include "swift/Sema/CodeCompletionTypeChecking.h"
 #include "swift/Strings.h"
@@ -290,6 +291,10 @@ class PrintAST : public ASTVisitor<PrintAST> {
     Printer.callPrintDeclLoc(decl);
     Fn();
     Printer.printDeclNameEndLoc(decl);
+  }
+
+  void printSourceRange(CharSourceRange Range, ASTContext &Ctx) {
+    Printer << Ctx.SourceMgr.extractText(Range);
   }
 
   void printClangDocumentationComment(const clang::Decl *D) {
@@ -1411,13 +1416,20 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
   printAccessibility(decl);
-  if (!Options.SkipIntroducerKeywords)
-    Printer << "enum ";
-  recordDeclLoc(decl,
-    [&]{
-      printNominalDeclName(decl);
-    });
-  printInherited(decl);
+
+  if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
+    ASTContext &Ctx = decl->getASTContext();
+    printSourceRange(CharSourceRange(Ctx.SourceMgr, decl->getStartLoc(),
+                              decl->getBraces().Start.getAdvancedLoc(-1)), Ctx);
+  } else {
+    if (!Options.SkipIntroducerKeywords)
+      Printer << "enum ";
+    recordDeclLoc(decl,
+      [&]{
+        printNominalDeclName(decl);
+      });
+    printInherited(decl);
+  }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(decl);
   }
@@ -1427,13 +1439,20 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
   printAccessibility(decl);
-  if (!Options.SkipIntroducerKeywords)
-    Printer << "struct ";
-  recordDeclLoc(decl,
-    [&]{
-      printNominalDeclName(decl);
-    });
-  printInherited(decl);
+
+  if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
+    ASTContext &Ctx = decl->getASTContext();
+    printSourceRange(CharSourceRange(Ctx.SourceMgr, decl->getStartLoc(),
+                              decl->getBraces().Start.getAdvancedLoc(-1)), Ctx);
+  } else {
+    if (!Options.SkipIntroducerKeywords)
+      Printer << "struct ";
+    recordDeclLoc(decl,
+      [&]{
+        printNominalDeclName(decl);
+      });
+    printInherited(decl);
+  }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(decl);
   }
@@ -1443,14 +1462,21 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
   printAccessibility(decl);
-  if (!Options.SkipIntroducerKeywords)
-    Printer << "class ";
-  recordDeclLoc(decl,
-    [&]{
-      printNominalDeclName(decl);
-    });
 
-  printInherited(decl);
+  if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
+    ASTContext &Ctx = decl->getASTContext();
+    printSourceRange(CharSourceRange(Ctx.SourceMgr, decl->getStartLoc(),
+                              decl->getBraces().Start.getAdvancedLoc(-1)), Ctx);
+  } else {
+    if (!Options.SkipIntroducerKeywords)
+      Printer << "class ";
+    recordDeclLoc(decl,
+      [&]{
+        printNominalDeclName(decl);
+      });
+
+    printInherited(decl);
+  }
 
   if (Options.TypeDefinitions) {
     printMembersOfDecl(decl);
@@ -1461,30 +1487,37 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
   printAccessibility(decl);
-  if (!Options.SkipIntroducerKeywords)
-    Printer << "protocol ";
-  recordDeclLoc(decl,
-    [&]{
-      printNominalDeclName(decl);
-    });
 
-  // Figure out whether we need an explicit 'class' in the inheritance.
-  bool explicitClass = false;
-  if (decl->requiresClass() && !decl->isObjC()) {
-    bool inheritsRequiresClass = false;
-    for (auto proto : decl->getLocalProtocols(
-                        ConformanceLookupKind::OnlyExplicit)) {
-      if (proto->requiresClass()) {
-        inheritsRequiresClass = true;
-        break;
+  if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
+    ASTContext &Ctx = decl->getASTContext();
+    printSourceRange(CharSourceRange(Ctx.SourceMgr, decl->getStartLoc(),
+                              decl->getBraces().Start.getAdvancedLoc(-1)), Ctx);
+  } else {
+    if (!Options.SkipIntroducerKeywords)
+      Printer << "protocol ";
+    recordDeclLoc(decl,
+      [&]{
+        printNominalDeclName(decl);
+      });
+
+    // Figure out whether we need an explicit 'class' in the inheritance.
+    bool explicitClass = false;
+    if (decl->requiresClass() && !decl->isObjC()) {
+      bool inheritsRequiresClass = false;
+      for (auto proto : decl->getLocalProtocols(
+                          ConformanceLookupKind::OnlyExplicit)) {
+        if (proto->requiresClass()) {
+          inheritsRequiresClass = true;
+          break;
+        }
       }
+
+      if (!inheritsRequiresClass)
+        explicitClass = true;
     }
 
-    if (!inheritsRequiresClass)
-      explicitClass = true;
+    printInherited(decl, explicitClass);
   }
-
-  printInherited(decl, explicitClass);
   if (Options.TypeDefinitions) {
     printMembersOfDecl(decl);
   }
@@ -1791,36 +1824,52 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     printDocumentationComment(decl);
     printAttributes(decl);
     printAccessibility(decl);
-    if (!Options.SkipIntroducerKeywords) {
-      if (decl->isStatic() && !decl->isOperator())
-        printStaticKeyword(decl->getCorrectStaticSpelling());
-      if (decl->isMutating() && !decl->getAttrs().hasAttribute<MutatingAttr>())
-        Printer << "mutating ";
-      Printer << "func ";
-    }
-    recordDeclLoc(decl,
-      [&]{
-        if (!decl->hasName())
-          Printer << "<anonymous>";
-        else
-          Printer.printName(decl->getName());
-        if (decl->isGeneric()) {
-          printGenericParams(decl->getGenericParams());
-        }
 
-        printFunctionParameters(decl);
-      });
+    if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
+      ASTContext &Ctx = decl->getASTContext();
+      SourceLoc StartLoc = decl->getStartLoc();
+      SourceLoc EndLoc;
+      if (!decl->getBodyResultTypeLoc().isNull()) {
+        EndLoc = decl->getBodyResultTypeLoc().getSourceRange().End;
+      } else {
+        EndLoc = decl->getSignatureSourceRange().End;
+      }
+      CharSourceRange Range =
+        Lexer::getCharSourceRangeFromSourceRange(Ctx.SourceMgr,
+                                                 SourceRange(StartLoc, EndLoc));
+      printSourceRange(Range, Ctx);
+    } else {
+      if (!Options.SkipIntroducerKeywords) {
+        if (decl->isStatic() && !decl->isOperator())
+          printStaticKeyword(decl->getCorrectStaticSpelling());
+        if (decl->isMutating() && !decl->getAttrs().hasAttribute<MutatingAttr>())
+          Printer << "mutating ";
+        Printer << "func ";
+      }
+      recordDeclLoc(decl,
+        [&]{
+          if (!decl->hasName())
+            Printer << "<anonymous>";
+          else
+            Printer.printName(decl->getName());
+          if (decl->isGeneric()) {
+            printGenericParams(decl->getGenericParams());
+          }
 
-    auto &Context = decl->getASTContext();
-    Type ResultTy = decl->getResultType();
-    if (ResultTy && !ResultTy->isEqual(TupleType::getEmpty(Context))) {
-      Printer << " -> ";
-      if (Options.pTransformer) {
-        ResultTy = Options.pTransformer->transformByName(ResultTy);
-        PrintOptions FreshOptions;
-        ResultTy->print(Printer, FreshOptions);
-      } else
-        ResultTy->print(Printer, Options);
+          printFunctionParameters(decl);
+        });
+
+      auto &Context = decl->getASTContext();
+      Type ResultTy = decl->getResultType();
+      if (ResultTy && !ResultTy->isEqual(TupleType::getEmpty(Context))) {
+        Printer << " -> ";
+        if (Options.pTransformer) {
+          ResultTy = Options.pTransformer->transformByName(ResultTy);
+          PrintOptions FreshOptions;
+          ResultTy->print(Printer, FreshOptions);
+        } else
+          ResultTy->print(Printer, Options);
+      }
     }
 
     if (!Options.FunctionDefinitions || !decl->getBody()) {
