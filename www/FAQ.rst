@@ -15,7 +15,7 @@ Not in the short term.  C++ is a very pragmatic language for implementing
 compilers, since it has good performance characteristics and allows higher-level
 programming idioms than C.
 
-That said, we do expect Swift to a better language than C++ in a number of ways,
+That said, we do expect Swift to be a better language than C++ in a number of ways,
 so why don't we implement the compiler itself in Swift?  There are a couple of
 reasons that bootstrapping is not a good idea, at least in the short term:
 
