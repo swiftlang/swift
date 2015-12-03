@@ -12,7 +12,7 @@ Hard Constraints on Resilience
 ------------------------------
 
 The root of a class hierarchy must remain stable, at pain of
-invalidating the metaclass hierarchy.  Note a Swift class without an
+invalidating the metaclass hierarchy.  Note that a Swift class without an
 explicit base class is implicitly rooted in the SwiftObject
 Objective-C class.
 
