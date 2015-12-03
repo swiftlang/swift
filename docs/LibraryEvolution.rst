@@ -207,7 +207,7 @@ Closed Enums
 By default, a library owner may add new cases to a public enum between releases
 without breaking binary compatibility. As with structs, this results in a fair
 amount of indirection when dealing with enum values, in order to potentially
-accomodate new values.
+accommodate new values.
 
 .. note::
 

@@ -943,7 +943,7 @@ ProjectionTree::computeUsesAndLiveness(SILValue Base) {
 
     // If this node is live due to a non projection user, propagate down its
     // liveness to its children and its children with an empty value to the
-    // worklist so we propagate liveness down to any further descendents.
+    // worklist so we propagate liveness down to any further descendants.
     if (Node->IsLive) {
       DEBUG(llvm::dbgs() << "Node Is Live. Marking Children Live!\n");
       for (unsigned ChildIdx : Node->ChildProjections) {
