@@ -216,7 +216,7 @@ ASTPrinter &ASTPrinter::operator<<(UUID UU) {
   return *this;
 }
 
-/// Determine whether to escape the fiven keyword in the given context.
+/// Determine whether to escape the given keyword in the given context.
 static bool escapeKeywordInContext(StringRef keyword, PrintNameContext context){
   switch (context) {
   case PrintNameContext::Normal:
