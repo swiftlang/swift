@@ -2989,7 +2989,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     auto inheritedTypes = ctx.Allocate<TypeLoc>(rawInheritedIDs.size());
     for_each(inheritedTypes, rawInheritedIDs,
              [this](TypeLoc &tl, uint64_t rawID) {
-      tl = TypeLoc::withoutLoc(getType(rawID));;
+      tl = TypeLoc::withoutLoc(getType(rawID));
     });
     extension->setInherited(inheritedTypes);
     extension->setCheckedInheritanceClause();
