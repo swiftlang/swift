@@ -32,8 +32,8 @@ repository via bash in a terminal. A lot of information since this is supposed
 to be a short, actionable guide. For more information, please see the Git crash
 course guide for SVN users at <https://git-scm.com/course/SVN.html>
 
-*NOTE* When ever when we say the Swift repository we mean any repository in the
- Swift project.
+*NOTE* Whenever we say the Swift repository, we mean any repository in the
+Swift project.
 
 Quicksetup (TLDR)
 -----------------
