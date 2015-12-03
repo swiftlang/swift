@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 #convert line numbers in error messages according to "line directive" comments
 import os
 import sys
