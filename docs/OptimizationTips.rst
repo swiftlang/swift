@@ -54,12 +54,12 @@ this mode will most likely take longer to compile, but may run faster.
 This mode can be enabled using the Xcode build setting 'Whole Module Optimization'.
 
 
-Limiting Language Dynamicism
+Limiting Language Dynamism
 ============================
 
 Swift by default is a very dynamic language like Objective-C. Unlike Objective
 C, Swift gives the programmer the ability to improve runtime performance when
-necessary by removing or reducing this dynamicism. This section goes through
+necessary by removing or reducing this dynamism. This section goes through
 several examples of language constructs that can be used to perform such an
 operation.
 
