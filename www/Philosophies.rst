@@ -47,7 +47,7 @@ For this reason, we want the basic expression and statements in Swift to be
 similar to these languages and/or an obvious small leap over them when it makes
 sense.
 
-This is why we don't want to use python-style intendation rules, for example.
+This is why we don't want to use python-style indentation rules, for example.
 
 We do deviate when there is a strong reason to do so.  The C declarator syntax
 is a complete disaster (write the prototype for 'signal' with no typedefs), so
