@@ -66,15 +66,15 @@ compiler for C++14 support and create a symlink:
 
 ### Getting Sources for Swift and Related Projects
 
-     git clone git@github.com:apple/swift.git swift
-     git clone git@github.com:apple/swift-llvm.git llvm
-     git clone git@github.com:apple/swift-clang.git clang
-     git clone git@github.com:apple/swift-lldb.git lldb
-     git clone git@github.com:apple/swift-cmark.git cmark
-     git clone git@github.com:apple/swift-llbuild.git llbuild
-     git clone git@github.com:apple/swift-package-manager.git swiftpm
-     git clone git@github.com:apple/swift-corelibs-xctest.git
-     git clone git@github.com:apple/swift-corelibs-foundation.git
+     git clone git@github.com/apple/swift.git swift
+     git clone git@github.com/apple/swift-llvm.git llvm
+     git clone git@github.com/apple/swift-clang.git clang
+     git clone git@github.com/apple/swift-lldb.git lldb
+     git clone git@github.com/apple/swift-cmark.git cmark
+     git clone git@github.com/apple/swift-llbuild.git llbuild
+     git clone git@github.com/apple/swift-package-manager.git swiftpm
+     git clone git@github.com/apple/swift-corelibs-xctest.git
+     git clone git@github.com/apple/swift-corelibs-foundation.git
 
 
 [CMake](http://cmake.org) is the core infrastructure used to configure builds of
