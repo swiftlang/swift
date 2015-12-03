@@ -687,7 +687,7 @@ node based on the kind of expression:
 
 *Declaration references*
   Declaration references are rewritten with the precise type of the
-  declaraion as referenced. For overloaded declaration references, the
+  declaration as referenced. For overloaded declaration references, the
   ``Overload*Expr`` node is replaced with a simple declaration
   reference expression. For references to polymorphic functions or
   members of generic types, a ``SpecializeExpr`` node is introduced to
