@@ -2317,6 +2317,7 @@ namespace {
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_Guaranteed:
       case ParameterConvention::Indirect_Inout:
+      case ParameterConvention::Indirect_InoutAliasable:
         if (!isSelfParameter) return;
         if (type->getNominalOrBoundGenericNominal()) {
           considerNewTypeSource(SourceKind::GenericLValueMetadata,

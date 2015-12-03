@@ -717,7 +717,7 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
     assert(address.getType().is<ArchetypeType>());
     auto formalTy = address.getType().getSwiftRValueType();
 
-    if (getSelfParameter().isIndirectInOut()) {
+    if (getSelfParameter().isIndirectMutating()) {
       // Be sure not to consume the cleanup for an inout argument.
       auto selfLV = ManagedValue::forLValue(address.getValue());
       selfValue = ArgumentSource(loc,
@@ -1924,6 +1924,7 @@ ManagedValue SILGenFunction::emitApply(
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_InoutAliasable:
     case ParameterConvention::Indirect_Out:
       // We may need to support this at some point, but currently only imported
       // objc methods are returns_inner_pointer.
@@ -3571,6 +3572,7 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
       // If the accessor wants the value 'inout', always pass the
       // address we were given.  This is semantically required.
       case ParameterConvention::Indirect_Inout:
+      case ParameterConvention::Indirect_InoutAliasable:
         return false;
 
       // If the accessor wants the value 'in', we have to copy if the
@@ -3648,13 +3650,12 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
         return (p && !p->requiresClass());
       };
 #endif
-      assert((!selfParam.isIndirectInOut() ||
+      assert((!selfParam.isIndirectMutating() ||
               (baseFormalType->isAnyClassReferenceType() &&
                isNonClassProtocolMember(accessor.getDecl()))) &&
              "passing unmaterialized r-value as inout argument");
 
       base = emitMaterializeIntoTemporary(*this, loc, base);
-
       if (selfParam.isIndirectInOut()) {
         // Drop the cleanup if we have one.
         auto baseLV = ManagedValue::forLValue(base.getValue());

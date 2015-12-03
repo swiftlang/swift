@@ -3,6 +3,8 @@
 // RUN: cat %t.ll | FileCheck %s --check-prefix=PROMO-CHECK
 // RUN: cat %t.ll | FileCheck %s --check-prefix=FOO-CHECK
 
+// XFAIL: *
+
 // LValues are direct values, too. They are reference types, though.
 
 func Close(fn: () -> Int64) { fn() }

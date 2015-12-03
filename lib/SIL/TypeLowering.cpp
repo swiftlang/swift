@@ -1462,11 +1462,11 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
 
   assert(uncurryLevel == 0);
 
-  // inout types are a special case for lowering, because they get
+  // inout and lvalue types are a special case for lowering, because they get
   // completely removed and represented as 'address' SILTypes.
-  if (auto substInOutType = dyn_cast<InOutType>(substType)) {
+  if (isa<InOutType>(substType) || isa<LValueType>(substType)) {
     // Derive SILType for InOutType from the object type.
-    CanType substObjectType = substInOutType.getObjectType();
+    CanType substObjectType = substType.getLValueOrInOutObjectType();
     AbstractionPattern origObjectType = origType.getLValueObjectType();
 
     SILType loweredType = getLoweredType(origObjectType, substObjectType,
@@ -1950,7 +1950,7 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
         
     case CaptureKind::StorageAddress:
       // No-escape stored decls are captured by their raw address.
-      inputFields.push_back(TupleTypeElt(CanInOutType::get(captureType)));
+      inputFields.push_back(TupleTypeElt(CanLValueType::get(captureType)));
       break;
 
     case CaptureKind::Constant:
@@ -1958,11 +1958,9 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
       inputFields.push_back(TupleTypeElt(captureType));
       break;
     case CaptureKind::Box: {
-      // Capture the owning NativeObject and the address of the value.
+      // Capture the owning box.
       CanType boxTy = SILBoxType::get(captureType);
       inputFields.push_back(boxTy);
-      auto lvType = CanInOutType::get(captureType);
-      inputFields.push_back(TupleTypeElt(lvType));
       break;
     }
     }
@@ -2027,7 +2025,9 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
         
     case CaptureKind::StorageAddress:
       // No-escape stored decls are captured by their raw address.
-      inputFields.push_back(TupleTypeElt(CanInOutType::get(captureType)));
+      // Unlike 'inout', captures are allowed to have well-typed, synchronized
+      // aliasing references, so capture the raw lvalue type instead.
+      inputFields.push_back(TupleTypeElt(CanLValueType::get(captureType)));
       break;
 
     case CaptureKind::Constant:
@@ -2035,12 +2035,9 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
       inputFields.push_back(TupleTypeElt(captureType));
       break;
     case CaptureKind::Box: {
-      // Capture the owning NativeObject and the address of the value.
+      // Capture the owning box.
       CanType boxTy = SILBoxType::get(captureType);
-
       inputFields.push_back(boxTy);
-      auto lvType = CanInOutType::get(captureType);
-      inputFields.push_back(TupleTypeElt(lvType));
       break;
     }
     }

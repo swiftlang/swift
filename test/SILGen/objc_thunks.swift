@@ -401,7 +401,7 @@ func registerAnsible() {
 
 // FIXME: would be nice if we didn't need to re-abstract as much here.
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_oGSQFT_T___dT__XFdCb_dGSQbT_T___dT__ : $@convention(c) (@inout @block_storage @callee_owned (@owned ImplicitlyUnwrappedOptional<() -> ()>) -> (), ImplicitlyUnwrappedOptional<@convention(block) () -> ()>) -> ()
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_oGSQFT_T___dT__XFdCb_dGSQbT_T___dT__ : $@convention(c) (@inout_aliasable @block_storage @callee_owned (@owned ImplicitlyUnwrappedOptional<() -> ()>) -> (), ImplicitlyUnwrappedOptional<@convention(block) () -> ()>) -> ()
 // CHECK: [[HEAP_BLOCK_IUO:%.*]] = copy_block %1
 // CHECK: select_enum [[HEAP_BLOCK_IUO]]
 // CHECK: bb1:

@@ -53,8 +53,8 @@ func curried_function_returns_function(x: Int)(y: Int) -> (z:Int) -> Int {
   return { z in standalone_function(standalone_function(x, y), z) }
 }
 // -- Local function has extra uncurry level with context
-// CHECK-LABEL: sil shared @_TFF9functions33curried_function_returns_function{{.*}} : $@convention(thin) (Builtin.Int64, @owned @box Builtin.Int64, @inout Builtin.Int64, @owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64
-// bb0(%0 : $@box Builtin.Int64, %1 : $*Builtin.Int64, %2 : $@box Builtin.Int64, %3 : $*Builtin.Int64, %4 : $Builtin.Int64):
+// CHECK-LABEL: sil shared @_TFF9functions33curried_function_returns_function{{.*}} : $@convention(thin) (Builtin.Int64, @owned @box Builtin.Int64, @owned @box Builtin.Int64) -> Builtin.Int64
+// bb0(%0 : $@box Builtin.Int64, %1 : $@box Builtin.Int64, %4 : $Builtin.Int64):
 
 struct SomeStruct {
   // -- Constructors and methods are uncurried in 'self'
@@ -581,12 +581,12 @@ func testNoescape() {
 // CHECK-LABEL: functions.testNoescape () -> ()
 // CHECK-NEXT: sil hidden @_TF9functions12testNoescapeFT_T_ : $@convention(thin) () -> ()
 // CHECK: function_ref functions.(testNoescape () -> ()).(closure #1)
-// CHECK-NEXT: function_ref @_TFF9functions12testNoescapeFT_T_U_FT_T_ : $@convention(thin) (@owned @box Int, @inout Int) -> ()
+// CHECK-NEXT: function_ref @_TFF9functions12testNoescapeFT_T_U_FT_T_ : $@convention(thin) (@owned @box Int) -> ()
 
 // Despite being a noescape closure, this needs to capture 'a' by-box so it can
 // be passed to the capturing closure.closure
 // CHECK: functions.(testNoescape () -> ()).(closure #1)
-// CHECK-NEXT: sil shared @_TFF9functions12testNoescapeFT_T_U_FT_T_ : $@convention(thin) (@owned @box Int, @inout Int) -> () {
+// CHECK-NEXT: sil shared @_TFF9functions12testNoescapeFT_T_U_FT_T_ : $@convention(thin) (@owned @box Int) -> () {
 
 
 
@@ -606,10 +606,10 @@ func testNoescape2() {
 // CHECK-LABEL: sil hidden @_TF9functions13testNoescape2FT_T_ : $@convention(thin) () -> () {
 
 // CHECK: // functions.(testNoescape2 () -> ()).(closure #1)
-// CHECK-NEXT: sil shared @_TFF9functions13testNoescape2FT_T_U_FT_T_ : $@convention(thin) (@owned @box Int, @inout Int) -> () {
+// CHECK-NEXT: sil shared @_TFF9functions13testNoescape2FT_T_U_FT_T_ : $@convention(thin) (@owned @box Int) -> () {
 
 // CHECK: // functions.(testNoescape2 () -> ()).(closure #1).(closure #1)
-// CHECK-NEXT: sil shared @_TFFF9functions13testNoescape2FT_T_U_FT_T_U_FT_T_ : $@convention(thin) (@owned @box Int, @inout Int) -> () {
+// CHECK-NEXT: sil shared @_TFFF9functions13testNoescape2FT_T_U_FT_T_U_FT_T_ : $@convention(thin) (@owned @box Int) -> () {
 
 enum PartialApplyEnumPayload<T, U> {
   case Left(T)

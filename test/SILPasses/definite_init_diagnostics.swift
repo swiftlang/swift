@@ -57,8 +57,14 @@ func test2() {
 
   // expected-warning @+1 {{variable 'b1' was never mutated}} {{3-6=let}}
   var b1 : Int        // expected-note {{variable defined here}}
-  takes_closure {     // expected-error {{variable 'b1' used before being initialized}}
+  takes_closure {     // expected-error {{variable 'b1' captured by a closure before being initialized}}
     markUsed(b1)
+  }
+
+  var b1a : Int        // expected-note {{variable defined here}}
+  takes_closure {     // expected-error {{variable 'b1a' captured by a closure before being initialized}}
+    b1a += 1
+    markUsed(b1a)
   }
 
   var b2 = 4

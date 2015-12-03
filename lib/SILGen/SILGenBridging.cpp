@@ -213,6 +213,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_Guaranteed:
       case ParameterConvention::Indirect_Inout:
+      case ParameterConvention::Indirect_InoutAliasable:
       case ParameterConvention::Indirect_Out:
         llvm_unreachable("indirect params to blocks not supported");
       }
@@ -241,6 +242,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
       case ParameterConvention::Indirect_In_Guaranteed:
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_Inout:
+      case ParameterConvention::Indirect_InoutAliasable:
       case ParameterConvention::Indirect_Out:
         llvm_unreachable("indirect arguments to blocks not supported");
       }
@@ -297,8 +299,8 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
 
   // Build the invoke function type.
   SmallVector<SILParameterInfo, 4> params;
-  params.push_back(
-              SILParameterInfo(storageTy, ParameterConvention::Indirect_Inout));
+  params.push_back(SILParameterInfo(storageTy,
+                                 ParameterConvention::Indirect_InoutAliasable));
   std::copy(blockTy->getParameters().begin(),
             blockTy->getParameters().end(),
             std::back_inserter(params));
@@ -1080,6 +1082,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
         param = ManagedValue::forUnmanaged(paramValue);
         break;
       case ParameterConvention::Indirect_Inout:
+      case ParameterConvention::Indirect_InoutAliasable:
         param = ManagedValue::forUnmanaged(paramValue);
         break;
       case ParameterConvention::Indirect_In:

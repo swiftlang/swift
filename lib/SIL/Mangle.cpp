@@ -123,8 +123,8 @@ setArgumentSROA(unsigned ArgNo) {
 
 void
 FunctionSignatureSpecializationMangler::
-setArgumentInOutToValue(unsigned ArgNo) {
-  Args[ArgNo].first = ArgumentModifierIntBase(ArgumentModifier::InOutToValue);
+setArgumentBoxToValue(unsigned ArgNo) {
+  Args[ArgNo].first = ArgumentModifierIntBase(ArgumentModifier::BoxToValue);
 }
 
 void
@@ -240,7 +240,7 @@ void FunctionSignatureSpecializationMangler::mangleArgument(
     return;
   }
 
-  if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::InOutToValue)) {
+  if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::BoxToValue)) {
     os << "i";
     return;
   }
