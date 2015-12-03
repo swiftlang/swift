@@ -426,8 +426,11 @@ bool EscapeAnalysis::ConnectionGraph::mergeFrom(ConnectionGraph *SourceGraph,
       CGNode *DestReachable = Mapping.get(SourceReachable);
       // Create the edge in this graph. Note: this may trigger merging of
       // content nodes.
-      if (DestReachable)
+      if (DestReachable) {
         Changed |= defer(DestFrom, DestReachable);
+        // In case DestFrom is merged during adding the defer-edge.
+        DestFrom = DestFrom->getMergeTarget();
+      }
 
       for (auto *Defered : SourceReachable->defersTo) {
         if (!Defered->isInWorkList) {
