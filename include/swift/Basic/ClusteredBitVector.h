@@ -99,7 +99,7 @@ class ClusteredBitVector {
   ///
   ///  c) 0 < LengthInBits < ChunkSizeInBits.  In this case, Data contains
   ///     a single chunk, with its unused high bits zeroed like in the
-  ///     the out-of-line case.
+  ///     out-of-line case.
   ///
   /// Therefore, an efficient way to test whether all bits are zero:
   /// Data != 0.  (isInlineAndAllClear())  Not *guaranteed* to find

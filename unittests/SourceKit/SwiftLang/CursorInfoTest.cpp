@@ -298,7 +298,7 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueDeclLoc) {
   StringRef TextToReplace = "0";
   replaceText(DocName, findOffset(TextToReplace, Contents), TextToReplace.size(),
               ExpensiveInit);
-  // Edit over the the 'foo' decl.
+  // Edit over the 'foo' decl.
   replaceText(DocName, FooOffs, strlen("foo"), "foo");
 
   // Should wait for the new AST, because the declaration location for the 'foo'
@@ -328,7 +328,7 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueOffset) {
   StringRef TextToReplace = "0";
   replaceText(DocName, findOffset(TextToReplace, Contents), TextToReplace.size(),
               ExpensiveInit);
-  // Edit over the the 'foo' reference.
+  // Edit over the 'foo' reference.
   replaceText(DocName, FooRefOffs, strlen("foo"), "foo");
 
   // Should wait for the new AST, because the cursor location has been edited

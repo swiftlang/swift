@@ -4305,7 +4305,7 @@ ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       }
     }
     
-    // For recovery, again make sure the the user didn't try to spell a switch
+    // For recovery, again make sure the user didn't try to spell a switch
     // case label:
     // 'case Identifier:' or
     // 'case Identifier where ...:'

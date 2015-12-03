@@ -237,7 +237,7 @@ To complete the semantics understood by the optimizer, we define these relations
 
 interferes-with
   
-  Given idempotent ``OpA``, the the sequence "``OpA, OpB, OpA``" is
+  Given idempotent ``OpA``, the sequence "``OpA, OpB, OpA``" is
   semantically equivalent to the sequence "``OpA, OpB``" *iff* ``OpB``
   does not interfere with ``OpA``.
 

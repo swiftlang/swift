@@ -64,7 +64,7 @@ namespace irgen {
     llvm::Value *casted;
   };
 
-  /// \brief Convert the given value to the the exact destination type.
+  /// \brief Convert the given value to the exact destination type.
   FailableCastResult emitClassIdenticalCast(IRGenFunction &IGF,
                                                   llvm::Value *from,
                                                   SILType fromType,

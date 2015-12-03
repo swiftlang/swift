@@ -1075,7 +1075,7 @@ private:
     walkInContext(E->getBase(), MemberAccessContext::Getter);
 
     ValueDecl *D = E->getMember().getDecl();
-    // Diagnose for the the member declaration itself.
+    // Diagnose for the member declaration itself.
     if (diagAvailability(TC, D, E->getNameLoc(), DC)) {
       return;
     }
