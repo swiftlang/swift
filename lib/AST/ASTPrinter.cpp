@@ -1263,6 +1263,7 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
 }
 
 void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
+  printDocumentationComment(decl);
   printAttributes(decl);
   Printer << "extension ";
   recordDeclLoc(decl,
@@ -1922,6 +1923,7 @@ void PrintAST::visitEnumElementDecl(EnumElementDecl *decl) {
 }
 
 void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
+  printDocumentationComment(decl);
   printAttributes(decl);
   printAccessibility(decl);
   recordDeclLoc(decl,

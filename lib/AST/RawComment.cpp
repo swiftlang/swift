@@ -69,7 +69,7 @@ SingleRawComment::SingleRawComment(StringRef RawText, unsigned StartColumn)
 
 static bool canHaveComment(const Decl *D) {
   return !D->hasClangNode() &&
-         isa<ValueDecl>(D) &&
+         (isa<ValueDecl>(D) || isa<ExtensionDecl>(D)) &&
          !isa<ParamDecl>(D) &&
          (!isa<AbstractTypeParamDecl>(D) || isa<AssociatedTypeDecl>(D));
 }
