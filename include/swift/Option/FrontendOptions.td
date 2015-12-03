@@ -280,6 +280,9 @@ def dump_interface_hash : Flag<["-"], "dump-interface-hash">,
    HelpText<"Parse input file(s) and dump interface token hash(es)">,
    ModeOpt;
 
+def dump_api_path : Separate<["-"], "dump-api-path">,
+  HelpText<"The path to output swift interface files for the compiled source files">;
+
 def enable_resilience : Flag<["-"], "enable-resilience">,
    HelpText<"Treat all types as resilient by default">;
 

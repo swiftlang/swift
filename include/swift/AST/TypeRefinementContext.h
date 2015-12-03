@@ -239,7 +239,7 @@ public:
     Children.push_back(Child);
   }
 
-  /// Returns the inner-most TypeRefinementContext descendent of this context
+  /// Returns the inner-most TypeRefinementContext descendant of this context
   /// for the given source location.
   TypeRefinementContext *findMostRefinedSubContext(SourceLoc Loc,
                                                    SourceManager &SM);

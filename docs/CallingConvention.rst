@@ -38,7 +38,7 @@ components, each operating on a different abstraction level:
 
 * the high-level semantics of the call (pass-by-reference
   vs. pass-by-value),
-  
+
 * the ownership and validity conventions about argument and result
   values ("+0" vs. "+1", etc.), and
 
@@ -126,7 +126,7 @@ Pass-by-value
 
 In pass-by-value, if `A` is an l-value expression, `foo(A)` copies the
 current value there.  Any modifications `foo` makes to its parameter
-are make to this copy, not to the original l-value.
+are made to this copy, not to the original l-value.
 
 Most modern languages are pass-by-value, with specific functions able
 to opt in to pass-by-reference semantics.  This is exactly what Swift
@@ -280,7 +280,7 @@ considering here:
   for the value, this convention allows the callee to use the value at
   a later point without taking any extra action to keep it alive.
 
-  The flipside is that this convention requires a lot of extra work
+  The flip side is that this convention requires a lot of extra work
   when a single value is used multiple times in the caller.  For
   example, a value passed in every iteration of a loop will need to be
   copied/retained/whatever each time.
@@ -345,7 +345,7 @@ just add default arguments at each step) have really awful performance
 because the compiler is adding retains and releases at every single
 level.  It's just not a good convention to adopt by default.  However,
 we might want to consider allowing specific function parameters to opt
-into it; sort comparators are an particularly interesting candidate
+into it; sort comparators are a particularly interesting candidate
 for this.  `unowned` is very similar to C++'s `const &` for things
 like that.
 
@@ -1181,7 +1181,7 @@ legal type sequences from the direct results.  If this yields an empty
 sequence, the result type is `void`.  If it yields a single legal
 type, the result type is the corresponding Clang type.  No other could
 actually have come from an imported C declaration, so we don't have
-any real compatiblity requirements; for the convenience of
+any real compatibility requirements; for the convenience of
 interoperation, this is handled by constructing a new C struct which
 contains the corresponding Clang types for the legal type sequence as
 its fields.

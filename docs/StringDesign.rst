@@ -703,7 +703,7 @@ Indexing
     cached, although not in the memory block where the characters are
     stored, since we want a ``String`` to share storage with its
     slices.  Since the body of the ``String`` must already store the
-    ``String``\ 's *byte length*, cacheing the ``length`` would
+    ``String``\ 's *byte length*, caching the ``length`` would
     increase the footprint of the top-level String object.  Finally,
     even if ``length`` were provided, doing things with ``String``
     that depend on a specific numeric ``length`` is error-prone.
@@ -944,7 +944,7 @@ Searching
 
   .. Admonition:: Usage Example
 
-     The ``NSString`` semantics can be acheived as follows:
+     The ``NSString`` semantics can be achieved as follows:
 
      .. parsed-literal::
 
@@ -1104,7 +1104,7 @@ Capitalization
 
   .. Admonition:: Usage Example
 
-     The ``NSString`` semantics can be acheived as follows:
+     The ``NSString`` semantics can be achieved as follows:
 
      .. parsed-literal::
 

@@ -2709,7 +2709,7 @@ public:
     // Ignore the internal members of Optional, like getLogicValue() and
     // _getMirror().
     // These are not commonly used and cause noise and confusion when showing
-    // among the the members of the underlying type. If someone really wants to
+    // among the members of the underlying type. If someone really wants to
     // use them they can write them directly.
 
     return true;

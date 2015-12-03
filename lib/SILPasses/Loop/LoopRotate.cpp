@@ -391,7 +391,7 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
   // the latch.
   Header->moveAfter(Latch);
 
-  // Merge the the old latch with the old header if possible.
+  // Merge the old latch with the old header if possible.
   mergeBasicBlockWithSuccessor(Latch, DT, LI);
 
   // Create a new preheader.

@@ -397,7 +397,7 @@ public:
   ///
   /// Unlike \c setLoweredObjCMethod, which finds the method in the actual
   /// runtime type of the object, this routine starts at the static type of the
-  /// object and searches up the the class hierarchy (toward superclasses).
+  /// object and searches up the class hierarchy (toward superclasses).
   ///
   /// \param searchType The class from which the Objective-C runtime will start
   /// its search for a method.
@@ -1571,8 +1571,8 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
       auto DS = I.getDebugScope();
       // Handle cleanup locations.
       if (ILoc.getKind() == SILLocation::CleanupKind) {
-        // Cleanup locations point to the decl of the the value that
-        // is being destroyed (for diagnostic generation). As far as
+        // Cleanup locations point to the decl of the value that is
+        // being destroyed (for diagnostic generation). As far as
         // the linetable is concerned, cleanups at the end of a
         // lexical scope should point to the cleanup location, which
         // is the location of the last instruction in the basic block.
@@ -2686,7 +2686,7 @@ mapTriviallyToInt(IRGenSILFunction &IGF, const EnumImplStrategy &EIS, SelectEnum
   // Cast to the result type.
   result = IGF.Builder.CreateIntCast(result, resultType, false);
   if (commonOffset != 0) {
-    // The the offset, if any.
+    // The offset, if any.
     auto *offsetConst = llvm::ConstantInt::get(resultType, commonOffset);
     result = IGF.Builder.CreateAdd(result, offsetConst);
   }

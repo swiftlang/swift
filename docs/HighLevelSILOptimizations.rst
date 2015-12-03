@@ -167,7 +167,7 @@ array.props.isCocoa/needsElementTypeCheck -> Bool
   Reads storage descriptors properties (isCocoa, needsElementTypeCheck).
   This is not control dependent or guarded. The optimizer has
   semantic knowledge of the state transfer those properties can not make:
-  An array that is not ``isCocoa`` can not tranfer to ``isCocoa``.
+  An array that is not ``isCocoa`` can not transfer to ``isCocoa``.
   An array that is not ``needsElementTypeCheck`` can not transfer to
   ``needsElementTypeCheck``.
 
@@ -228,7 +228,7 @@ array.mutate_unknown
   dependent. ``mutate_unknown`` also implies the guarding semantics of
   ``make_mutable``. It is not itself guarded by ``make_mutable`` and
   may act as a guard to other mutating operations, such as
-  ``get_element_address``. Combining semantics allows the flexbility in how
+  ``get_element_address``. Combining semantics allows the flexibility in how
   the array copy is implemented in conjunction with implementing
   mutating functionality. This may be more efficient than cleanly
   isolating the copy and mutation code.
@@ -237,7 +237,7 @@ To complete the semantics understood by the optimizer, we define these relations
 
 interferes-with
   
-  Given idempotent ``OpA``, the the sequence "``OpA, OpB, OpA``" is
+  Given idempotent ``OpA``, the sequence "``OpA, OpB, OpA``" is
   semantically equivalent to the sequence "``OpA, OpB``" *iff* ``OpB``
   does not interfere with ``OpA``.
 

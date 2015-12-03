@@ -33,7 +33,7 @@ Goals
 2. It should be possible to receive an ``NSArray`` from Cocoa,
    represent it as an ``Array<AnyObject>``, and pass it right back to
    Cocoa as an ``NSArray`` in O(1) and with no memory allocations.
-      
+
 3. Arrays should be usable as stacks, so we want amortized O(1) append
    and O(1) popBack.  Together with goal #1, this implies a
    ``std::vector``\ -like layout, with a reserved tail memory capacity
@@ -113,7 +113,7 @@ Bridging Rules and Terminology for all Types
       class func _forceBridgeFromObjectiveC(_: _ObjectiveCType) -> Self
     }
 
-  .. Note:: classes and ``@objc`` existentials shall not conform to
+  .. Note:: Classes and ``@objc`` existentials shall not conform to
      ``_BridgedToObjectiveC``, a restriction that's not currently
      enforceable at compile-time.
 
@@ -141,7 +141,7 @@ Bridging Rules and Terminology for all Types
 * For a type ``T`` that is not `bridged verbatim`_,
 
   - if ``T`` conforms to ``BridgedToObjectiveC`` and either
-  
+
     - ``T`` does not conform to ``_ConditionallyBridgedToObjectiveC``
     - or, ``T._isBridgedToObjectiveC()``
 
@@ -182,7 +182,7 @@ conforms to ``_BridgedToObjectiveC``:
 * **Implicit conversions** between ``Array`` types
 
   - **Implicit upcasting** implicitly converts ``Derived[]`` to
-    ``Base[]`` in O(1).  
+    ``Base[]`` in O(1).
   - **Implicit bridging** implicitly converts ``X[]`` to
     ``X._ObjectiveCType[]`` in O(N).
 
@@ -202,7 +202,7 @@ conforms to ``_BridgedToObjectiveC``:
   For example, when a user writes a Swift method taking ``NSView[]``,
   it is exposed to Objective-C as a method taking ``NSArray``, which
   is force-converted to ``NSView[]`` when called from Objective-C.
-     
+
   - **Forced downcasting** converts ``AnyObject[]`` to ``Derived[]`` in
     O(1)
   - **Forced bridging back** converts ``AnyObject[]`` to ``X[]`` in O(N).
@@ -250,7 +250,7 @@ buffer; it will be copied upon its first mutation:
 
 .. _deferred:
 
-Deferrred Checking for Forced Downcasts
+Deferred Checking for Forced Downcasts
 .......................................
 
 In forced downcasts, if any element fails to have dynamic type ``Derived``,

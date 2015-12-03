@@ -118,7 +118,7 @@ public func split<S : CollectionType, R : BooleanType>(
   fatalError("unavailable function can't be called")
 }
 
-/// Returns `true` iff the the initial elements of `s` are equal to `prefix`.
+/// Returns `true` iff the initial elements of `s` are equal to `prefix`.
 @available(*, unavailable, message="call the 'startsWith()' method on the sequence")
 public func startsWith<
   S0 : SequenceType, S1 : SequenceType

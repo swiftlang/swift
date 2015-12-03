@@ -38,7 +38,7 @@
 /// 4. An optimistic iterative intersection-based dataflow is performed on the
 /// gen sets until convergence.
 ///
-/// At the core of RLE, there is the MemLocation class. a MemLocation is an
+/// At the core of RLE, there is the MemLocation class. A MemLocation is an
 /// abstraction of an object field in program. It consists of a base and a
 /// projection path to the field accessed.
 ///
@@ -48,12 +48,12 @@
 /// keeps their available LoadStoreValues. We call it *indivisible* because it
 /// can not be broken down to more MemLocations.
 ///
-/// LoadStoreValues consists of a base - a SILValue from the load or store inst,
+/// LoadStoreValue consists of a base - a SILValue from the load or store inst,
 /// as well as a projection path to which the field it represents. So, a
 /// store to an 2-field struct as mentioned above will generate 2 MemLocations
 /// and 2 LoadStoreValues.
 ///
-/// Every basic block keeps a map between MemLocation <-> LoadStoreValue. By
+/// Every basic block keeps a map between MemLocation and LoadStoreValue. By
 /// keeping the MemLocation and LoadStoreValue in their indivisible form, one
 /// can easily find which part of the load is redundant and how to compute its
 /// forwarding value.
@@ -63,7 +63,7 @@
 /// value) and then aggregate them.
 ///
 /// However, this may introduce a lot of extraction and aggregation which may
-/// not be necessary. i.e. a store the the struct followed by a load from the
+/// not be necessary. i.e. a store the struct followed by a load from the
 /// struct. To solve this problem, when RLE detects that an load instruction
 /// can be replaced by forwarded value, it will try to find minimum # of
 /// extraction necessary to form the forwarded value. It will group the
@@ -74,7 +74,6 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-redundant-load-elim"
-#include "swift/SILPasses/Passes.h"
 #include "swift/SIL/MemLocation.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
@@ -83,17 +82,18 @@
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
 #include "swift/SILAnalysis/ValueTracking.h"
+#include "swift/SILPasses/Passes.h"
+#include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/CFG.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Utils/SILSSAUpdater.h"
-#include "swift/SILPasses/Transforms.h"
 #include "llvm/ADT/BitVector.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Debug.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/None.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
 
 using namespace swift;
 
@@ -169,19 +169,14 @@ class BBState {
   /// A bit vector for which the ith bit represents the ith MemLocation in
   /// MemLocationVault. If the bit is set, then the location currently has an
   /// downward visible value.
-  llvm::BitVector ForwardSetOut;
-
-  /// If ForwardSetIn changes while processing a basicblock, then all its
-  /// predecessors needs to be rerun.
   llvm::BitVector ForwardSetIn;
 
-  /// This is a list of MemLocations and their LoadStoreValues.
-  ///
-  /// TODO: can we create a LoadStoreValue vault so that we do not need to keep
-  /// them per basic block. This would also give ForwardValIn more symmetry.
-  /// i.e. MemLocation and LoadStoreValue both represented as bit vector
-  /// indices.
-  ///
+  /// If ForwardSetOut changes while processing a basicblock, then all its
+  /// successors need to be rerun.
+  llvm::BitVector ForwardSetOut;
+
+  /// This is map between MemLocations and their available values at the
+  /// beginning of this basic block.
   ValueTableMap ForwardValIn;
 
   /// This is map between MemLocations and their available values at the end of
@@ -255,15 +250,17 @@ public:
     ForwardSetOut.resize(bitcnt, reachable);
   }
 
+  /// Returns the current basic block we are processing.
+  SILBasicBlock *getBB() const { return BB; }
+
   /// Returns the ForwardValIn for the current basic block.
   ValueTableMap &getForwardValIn() { return ForwardValIn; }
 
   /// Returns the ForwardValOut for the current basic block.
   ValueTableMap &getForwardValOut() { return ForwardValOut; }
 
-  /// Returns the current basic block we are processing.
-  SILBasicBlock *getBB() const { return BB; }
-
+  /// Returns the redundant loads and their replacement in the currently basic
+  /// block.
   llvm::DenseMap<SILInstruction *, SILValue> &getRL() { return RedundantLoads; }
 
   bool optimize(RLEContext &Ctx, bool PF);
@@ -299,9 +296,8 @@ public:
 
 namespace {
 
-/// This class stores global state that we use when processing and also drives
-/// the computation. We put its interface at the top for use in other parts of
-/// the pass which may want to use this global information.
+/// This class stores global state that we use when computing redudant load and
+/// their replacement in each basic block.
 class RLEContext {
   /// The alias analysis that we will use during all computations.
   AliasAnalysis *AA;
@@ -373,13 +369,6 @@ public:
   /// collect forwarding values from their ForwardValOuts.
   bool gatherValues(SILBasicBlock *B, MemLocation &L, MemLocationValueMap &Vs,
                     bool UseForwardValOut);
-
-  /// Dump all the MemLocations in the MemLocationVault.
-  void printMemLocationVault() const {
-    for (auto &X : MemLocationVault) {
-      X.print();
-    }
-  }
 };
 
 } // end anonymous namespace

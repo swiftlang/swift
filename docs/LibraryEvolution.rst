@@ -141,7 +141,7 @@ entity was first exposed publicly in the current module.
 
 Using the same attribute for both publishing and using versioned APIs helps tie
 the feature together and enforces a consistent set of rules. The one difference
-is that code within a library may always use all other entites declared within
+is that code within a library may always use all other entities declared within
 the library (barring their own availability checks), since the entire library
 is shipped as a unit. That is, even if a particular API was introduced in v1.0,
 its (non-public) implementation may refer to APIs introduced in later versions.
@@ -207,7 +207,7 @@ Closed Enums
 By default, a library owner may add new cases to a public enum between releases
 without breaking binary compatibility. As with structs, this results in a fair
 amount of indirection when dealing with enum values, in order to potentially
-accomodate new values.
+accommodate new values.
 
 .. note::
 
@@ -216,7 +216,7 @@ accomodate new values.
     representation for the value, just as it may discard fields of structs that
     are provably never accessed.
 
-A library owner may opt out of this flexiblity by marking the enum as
+A library owner may opt out of this flexibility by marking the enum as
 ``@closed``. A "closed" enum may not have any ``private`` or ``internal`` cases
 and may not add new cases in the future. This guarantees to clients that the
 enum cases are exhaustive.
@@ -535,7 +535,7 @@ a normal dependency.
 A publicly inlineable function still has a public symbol, which may be used
 when the function is referenced from a client rather than called. This version
 of the function is not subject to the same restrictions as the version that
-may be inlined, and so it may be desireable to compile a function twice: once
+may be inlined, and so it may be desirable to compile a function twice: once
 for inlining, once for maximum performance.
 
 
@@ -647,7 +647,7 @@ for verification. Important cases include but are not limited to:
 - Unsafely-backdated "fragile" attributes as discussed in the `Giving Up
   Flexibility`_ section.
   
-- Unsafe modifications to entites marked with the "fragile" attributes, such as 
+- Unsafe modifications to entities marked with the "fragile" attributes, such as 
   adding a stored property to a ``@fixed_layout`` struct.
 
 

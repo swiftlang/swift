@@ -394,7 +394,8 @@ bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
   if (!FU)
     return false;
   // Check for Swift module and overlays.
-  if (FU->getKind() != FileUnitKind::SerializedAST)
+  if (!DC->getParentModule()->isStdlibModule() &&
+      FU->getKind() != FileUnitKind::SerializedAST)
     return false;
 
   auto hasInternalParameter = [](ArrayRef<const Pattern *> Pats) -> bool {
@@ -434,6 +435,11 @@ bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
       return true;
     if (whitelistProtocols)
       return false;
+  }
+
+  if (auto ImportD = dyn_cast<ImportDecl>(D)) {
+    if (ImportD->getModule()->isSwiftShimsModule())
+      return true;
   }
 
   auto VD = dyn_cast<ValueDecl>(D);

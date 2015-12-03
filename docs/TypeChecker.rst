@@ -486,7 +486,7 @@ down to only simple constraints that are trivially satisfied.
 The simplification process breaks down constraints into simpler
 constraints, and each different kind of constraint is handled by
 different rules based on the Swift type system. The constraints fall
-intofive categories: relational constraints, member constraints,
+into five categories: relational constraints, member constraints,
 type properties, conjunctions, and disjunctions. Only the first three
 kinds of constraints have interesting simplification rules, and are
 discussed in the following sections.
@@ -687,7 +687,7 @@ node based on the kind of expression:
 
 *Declaration references*
   Declaration references are rewritten with the precise type of the
-  declaraion as referenced. For overloaded declaration references, the
+  declaration as referenced. For overloaded declaration references, the
   ``Overload*Expr`` node is replaced with a simple declaration
   reference expression. For references to polymorphic functions or
   members of generic types, a ``SpecializeExpr`` node is introduced to

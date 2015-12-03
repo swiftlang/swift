@@ -1,4 +1,4 @@
-//===--- IntegerArithmeticType.swift.gyb ---------------------*- swift -*--===//
+//===--- IntegerArithmetic.swift.gyb -------------------------*- swift -*--===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 %# Ignore the following admonition; it applies to the resulting .swift file only
 
-// Automatically Generated From IntegerArithmeticType.swift.gyb.  Do Not
-// Edit Directly!
+// Automatically Generated From IntegerArithmetic.swift.gyb.  Do Not Edit
+// Directly!
 
 %{
 integerBinaryOps = [

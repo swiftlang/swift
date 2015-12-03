@@ -4332,7 +4332,7 @@ namespace {
       return subscript;
     }
 
-    /// Import the the accessor and its attributes.
+    /// Import the accessor and its attributes.
     FuncDecl *importAccessor(clang::ObjCMethodDecl *clangAccessor,
                              DeclContext *dc) {
       auto *accessor =
@@ -4711,7 +4711,7 @@ namespace {
 
     /// \brief Import the members of all of the protocols to which the given
     /// Objective-C class, category, or extension explicitly conforms into
-    /// the given list of members, so long as the the method was not already
+    /// the given list of members, so long as the method was not already
     /// declared in the class.
     ///
     /// FIXME: This whole thing is a hack, because name lookup should really

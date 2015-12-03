@@ -833,8 +833,8 @@ FOUNDATION_SOURCE_DIR="$WORKSPACE/swift-corelibs-foundation"
 
 if [[ ! -d $CMARK_SOURCE_DIR ]]; then
   echo "$CMARK_SOURCE_DIR not found. Attempting to clone ..."
-  git clone git@github.com/apple/swift-cmark.git "$CMARK_SOURCE_DIR" || \
-    (echo "Couldn't clone cmark. Please check README.md and visit https:/github.com/apple/swift-cmark for details." && \
+  git clone https://github.com/apple/swift-cmark.git "$CMARK_SOURCE_DIR" || \
+    (echo "Couldn't clone cmark. Please check README.md and visit https://github.com/apple/swift-cmark for details." && \
     exit 1)
 fi
 
@@ -2003,6 +2003,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 if [[ -z "${INSTALL_LLBUILD}" ]] ; then
                     continue
                 fi
+                INSTALL_TARGETS=install-swift-build-tool
                 ;;
             swiftpm)
                 if [[ -z "${INSTALL_SWIFTPM}" ]] ; then
