@@ -69,6 +69,7 @@ enum class ActionType {
   CodeCompletion,
   REPLCodeCompletion,
   DumpCompletionCache,
+  DumpImporterLookupTable,
   SyntaxColoring,
   DumpAPI,
   DumpComments,
@@ -144,6 +145,8 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                       "repl-code-completion", "Perform REPL-style code completion"),
            clEnumValN(ActionType::DumpCompletionCache,
                       "dump-completion-cache", "Dump a code completion cache file"),
+           clEnumValN(ActionType::DumpImporterLookupTable,
+                      "dump-importer-lookup-table", "Dump the Clang importer's lookup tables"),
            clEnumValN(ActionType::SyntaxColoring,
                       "syntax-coloring", "Perform syntax coloring"),
            clEnumValN(ActionType::DumpAPI,
@@ -277,6 +280,12 @@ static llvm::cl::opt<bool>
 InferDefaultArguments(
   "enable-infer-default-arguments",
   llvm::cl::desc("Infer default arguments for imported parameters"),
+  llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
+UseSwiftLookupTables(
+  "enable-swift-name-lookup-tables",
+  llvm::cl::desc("Use Swift-specific name lookup tables in the importer"),
   llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
@@ -938,6 +947,37 @@ static int doDumpAPI(const CompilerInvocation &InitInvok,
 
   // Write the edited buffer to stdout
   RewriteBuf.write(llvm::outs());
+
+  return 0;
+}
+
+static int doDumpImporterLookupTables(const CompilerInvocation &InitInvok,
+                                      StringRef SourceFilename) {
+  if (options::ImportObjCHeader.empty()) {
+    llvm::errs() << "implicit header required\n";
+    llvm::cl::PrintHelpMessage();
+    return 1;
+  }
+
+  CompilerInvocation Invocation(InitInvok);
+  Invocation.addInputFilename(SourceFilename);
+
+  // We must use the Swift lookup tables.
+  Invocation.getClangImporterOptions().UseSwiftLookupTables = true;
+
+  CompilerInstance CI;
+
+  // Display diagnostics to stderr.
+  PrintingDiagnosticConsumer PrintDiags;
+  CI.addDiagnosticConsumer(&PrintDiags);
+  if (CI.setup(Invocation))
+    return 1;
+  CI.performSema();
+
+  auto &Context = CI.getASTContext();
+  auto &Importer = static_cast<ClangImporter &>(
+                     *Context.getClangModuleLoader());
+  Importer.dumpSwiftLookupTables();
 
   return 0;
 }
@@ -2515,6 +2555,8 @@ int main(int argc, char *argv[]) {
     options::OmitNeedlessWords;
   InitInvok.getClangImporterOptions().InferDefaultArguments |=
     options::InferDefaultArguments;
+  InitInvok.getClangImporterOptions().UseSwiftLookupTables |=
+    options::UseSwiftLookupTables;
 
   if (!options::ResourceDir.empty()) {
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
@@ -2616,6 +2658,10 @@ int main(int argc, char *argv[]) {
 
   case ActionType::DumpAPI:
     ExitCode = doDumpAPI(InitInvok, options::SourceFilename);
+    break;
+
+  case ActionType::DumpImporterLookupTable:
+    ExitCode = doDumpImporterLookupTables(InitInvok, options::SourceFilename);
     break;
 
   case ActionType::Structure:
