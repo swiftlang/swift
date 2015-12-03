@@ -1582,7 +1582,7 @@ public:
   /// potentially unavailable API elements
   /// @{
 
-  /// \brief Returns true if the availability of the overridding declaration
+  /// \brief Returns true if the availability of the overriding declaration
   /// makes it a safe override, given the availability of the base declation.
   bool isAvailabilitySafeForOverride(ValueDecl *override, ValueDecl *base);
 
