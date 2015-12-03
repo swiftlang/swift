@@ -834,7 +834,7 @@ FOUNDATION_SOURCE_DIR="$WORKSPACE/swift-corelibs-foundation"
 if [[ ! -d $CMARK_SOURCE_DIR ]]; then
   echo "$CMARK_SOURCE_DIR not found. Attempting to clone ..."
   git clone git@github.com/apple/swift-cmark.git "$CMARK_SOURCE_DIR" || \
-    (echo "Couldn't clone cmark. Please check README.md and visit https:/github.com/apple/swift-cmark for details." && \
+    (echo "Couldn't clone cmark. Please check README.md and visit https://github.com/apple/swift-cmark for details." && \
     exit 1)
 fi
 
