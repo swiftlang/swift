@@ -88,8 +88,6 @@ protected:
     return asImpl().remapLocation(Loc);
   }
   const SILDebugScope *getOpScope(const SILDebugScope *DS) {
-    if (DS && !asImpl().remapScope(DS))
-      asImpl().remapScope(DS);
     return asImpl().remapScope(DS);
   }
   Substitution getOpSubstitution(Substitution sub) {
