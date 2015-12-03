@@ -440,7 +440,7 @@ FloatLiteralConvertible {
   //
   //    - it violates the hell out of the principle of least surprise,
   //    given that programmers have been conditioned by years of using
-  //    other langauges.
+  //    other languages.
   //
   //    - it would introduce a gratuitous minor inefficiency to most
   //    code on the hardware we have today, where IEEE-754 equality is
