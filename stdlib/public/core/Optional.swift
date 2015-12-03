@@ -91,7 +91,7 @@ public func map<T, U>(x: T?, @noescape _ f: (T)->U) -> U? {
 }
 
 
-/// Returns `f(self)!` iff `self` and `f(self)` are not nil.
+/// Returns `f(self)!` if `self` and `f(self)` are not nil.
 @available(*, unavailable, message="call the 'flatMap()' method on the optional value")
 public func flatMap<T, U>(x: T?, @noescape _ f: (T)->U?) -> U? {
   fatalError("unavailable function can't be called")
@@ -161,6 +161,7 @@ public struct _OptionalNilComparisonType : NilLiteralConvertible {
   public init(nilLiteral: ()) {
   }
 }
+
 @_transparent
 @warn_unused_result
 public func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
