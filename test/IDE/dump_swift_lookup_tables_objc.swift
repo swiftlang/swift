@@ -28,8 +28,10 @@
 // CHECK-NEXT:   instanceMethodWithX --> instanceMethodWithX(_:y:z:)
 // CHECK-NEXT:   method --> method()
 // CHECK-NEXT:   methodWithFloat --> methodWithFloat(_:)
+// CHECK-NEXT:   objectAtIndexedSubscript --> objectAtIndexedSubscript(_:)
 // CHECK-NEXT:   protoInstanceMethodWithX --> protoInstanceMethodWithX(_:y:)
 // CHECK-NEXT:   setAccessibilityFloat --> setAccessibilityFloat(_:)
+// CHECK-NEXT:   subscript --> subscript()
 
 // CHECK:      Full name -> entry mappings:
 // CHECK-NEXT:   CCItem:
@@ -89,10 +91,14 @@
 // CHECK-NEXT:     NSErrorImports: -[NSErrorImports methodAndReturnError:]
 // CHECK-NEXT:   methodWithFloat(_:):
 // CHECK-NEXT:     NSErrorImports: -[NSErrorImports methodWithFloat:error:]
+// CHECK-NEXT:   objectAtIndexedSubscript(_:):
+// CHECK-NEXT:     SNSomeClass: -[SNSomeClass objectAtIndexedSubscript:]
 // CHECK-NEXT:   protoInstanceMethodWithX(_:y:):
 // CHECK-NEXT:     SNSomeProtocol: -[SNSomeProtocol protoInstanceMethodWithX:y:]
 // CHECK-NEXT:   setAccessibilityFloat(_:):
 // CHECK-NEXT:     NSAccessibility: -[NSAccessibility setAccessibilityFloat:]
+// CHECK-NEXT:   subscript():
+// CHECK-NEXT:     SNSomeClass: -[SNSomeClass objectAtIndexedSubscript:]
 
 // CHECK-OMIT-NEEDLESS-WORDS: Base -> full name mappings:
 // CHECK-OMIT-NEEDLESS-WORDS:   instanceMethodWithX --> instanceMethodWithX(_:y:z:)

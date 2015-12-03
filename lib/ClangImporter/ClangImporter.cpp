@@ -709,6 +709,11 @@ void ClangImporter::Implementation::addEntryToLookupTable(
       // Also add the alias, if needed.
       if (importedName.Alias)
         table.addEntry(importedName.Alias, named, effectiveContext);
+
+      // Also add the subscript entry, if needed.
+      if (importedName.IsSubscriptAccessor)
+        table.addEntry(DeclName(SwiftContext, SwiftContext.Id_subscript, { }),
+                       named, effectiveContext);
     }
   }
 
@@ -2259,6 +2264,16 @@ auto ClangImporter::Implementation::importFullName(
                                            /*hasCustomName=*/false);
 
     isFunction = true;
+
+    // Is this one of the accessors for subscripts?
+    if (objcMethod->getMethodFamily() == clang::OMF_None &&
+        objcMethod->isInstanceMethod() &&
+        (objcMethod->getSelector() == objectAtIndexedSubscript ||
+         objcMethod->getSelector() == setObjectAtIndexedSubscript ||
+         objcMethod->getSelector() == objectForKeyedSubscript ||
+         objcMethod->getSelector() == setObjectForKeyedSubscript))
+      result.IsSubscriptAccessor = true;
+
     break;
   }
   }

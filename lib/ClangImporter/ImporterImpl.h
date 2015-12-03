@@ -779,6 +779,9 @@ public:
     /// than refuse to import the initializer.
     bool DroppedVariadic = false;
 
+    /// Whether this declaration is a subscript accessor (getter or setter).
+    bool IsSubscriptAccessor = false;
+
     /// For an initializer, the kind of initializer to import.
     CtorInitializerKind InitKind = CtorInitializerKind::Designated;
 
