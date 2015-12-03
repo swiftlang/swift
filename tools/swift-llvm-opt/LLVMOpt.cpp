@@ -12,12 +12,12 @@
 ///
 /// \file
 ///
-/// This is a simple reimplementation of opt that includes support for swift
-/// specific llvm passes. It is meant to make it easier to handle issues related
+/// This is a simple reimplementation of opt that includes support for Swift-
+/// specific LLVM passes. It is meant to make it easier to handle issues related
 /// to transitioning to the new LLVM pass manager (which lacks the dynamicism of
 /// the old pass manager) and also problems during the code base transition to
-/// that pass manager. Additionally it will enable a user to exactly simulates
-/// swift's LLVM pass pipeline by using the same pass pipeline building
+/// that pass manager. Additionally it will enable a user to exactly simulate
+/// Swift's LLVM pass pipeline by using the same pass pipeline building
 /// machinery in IRGen, something not possible with opt.
 ///
 //===----------------------------------------------------------------------===//
@@ -72,7 +72,7 @@ using namespace swift;
 //                            Option Declarations
 //===----------------------------------------------------------------------===//
 
-// The OptimizationList is automatically populated with registered Passes by the
+// The OptimizationList is automatically populated with registered passes by the
 // PassNameParser.
 //
 static llvm::cl::list<const llvm::PassInfo *, bool, llvm::PassNameParser>
