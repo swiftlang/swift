@@ -405,8 +405,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
   auto &Entry = ABI->getFunction()->front();
   SILBuilder BuildAlloc(&Entry, Entry.begin());
   BuildAlloc.setCurrentDebugScope(ABI->getDebugScope());
-  auto *ASI = BuildAlloc.createAllocStack(ABI->getLoc(), ABI->getElementType(),
-                                          ABI->getVarInfo().getArgNo());
+  auto *ASI = BuildAlloc.createAllocStack(ABI->getLoc(), ABI->getElementType());
 
   // Replace all uses of the address of the box's contained value with
   // the address of the stack location.

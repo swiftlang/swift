@@ -1,5 +1,5 @@
-// rdar://problem/23727705:
-// RUN-DISABLED: %target-swift-frontend -O %s -disable-llvm-optzns -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend -O %s -disable-llvm-optzns -emit-ir -g -o - | FileCheck %s
+
 import StdlibUnittest
 
 // CHECK: define {{.*}}i1 {{.*}}4main4sort

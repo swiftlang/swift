@@ -239,8 +239,8 @@ public:
   /// CleanupUninitializedBox cleanup that will be replaced when
   /// initialization is completed.
   LocalVariableInitialization(VarDecl *decl, bool NeedsMarkUninit,
-                              unsigned ArgNo, SILGenFunction &SGF)
-      : decl(decl), SGF(SGF) {
+                              SILGenFunction &SGF)
+    : decl(decl), SGF(SGF) {
     assert(decl->getDeclContext()->isLocalContext() &&
            "can't emit a local var for a non-local var decl");
     assert(decl->hasStorage() && "can't emit storage for a computed variable");
@@ -250,7 +250,7 @@ public:
 
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
-    AllocBoxInst *allocBox = SGF.B.createAllocBox(decl, lType, ArgNo);
+    AllocBoxInst *allocBox = SGF.B.createAllocBox(decl, lType);
     auto box = SILValue(allocBox, 0);
     auto addr = SILValue(allocBox, 1);
 
@@ -1215,11 +1215,10 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
 }
 
 /// Create a LocalVariableInitialization for the uninitialized var.
-InitializationPtr
-SILGenFunction::emitLocalVariableWithCleanup(VarDecl *vd, bool NeedsMarkUninit,
-                                             unsigned ArgNo) {
-  return InitializationPtr(
-      new LocalVariableInitialization(vd, NeedsMarkUninit, ArgNo, *this));
+InitializationPtr SILGenFunction::
+emitLocalVariableWithCleanup(VarDecl *vd, bool NeedsMarkUninit) {
+  return InitializationPtr(new LocalVariableInitialization(vd, NeedsMarkUninit,
+                                                           *this));
 }
 
 /// Create an Initialization for an uninitialized temporary.

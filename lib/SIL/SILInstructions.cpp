@@ -46,9 +46,9 @@ static SILTypeList *getAllocStackType(SILType eltTy, SILFunction &F) {
 }
 
 AllocStackInst::AllocStackInst(SILDebugLocation *Loc, SILType elementType,
-                               SILFunction &F, unsigned ArgNo)
+                               SILFunction &F)
     : AllocationInst(ValueKind::AllocStackInst, Loc,
-                     getAllocStackType(elementType, F)), VarInfo(ArgNo) {}
+                     getAllocStackType(elementType, F)) {}
 
 /// getDecl - Return the underlying variable declaration associated with this
 /// allocation, or null if this is a temporary allocation.
@@ -75,10 +75,9 @@ static SILTypeList *getAllocBoxType(SILType EltTy, SILFunction &F) {
 }
 
 AllocBoxInst::AllocBoxInst(SILDebugLocation *Loc, SILType ElementType,
-                           SILFunction &F, unsigned ArgNo)
+                           SILFunction &F)
     : AllocationInst(ValueKind::AllocBoxInst, Loc,
-                     getAllocBoxType(ElementType, F)),
-      VarInfo(ArgNo) {}
+                     getAllocBoxType(ElementType, F)) {}
 
 /// getDecl - Return the underlying variable declaration associated with this
 /// allocation, or null if this is a temporary allocation.
