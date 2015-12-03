@@ -777,21 +777,19 @@ static bool successorHasLiveIn(SILBasicBlock *BB,
   return false;
 }
 
-// Walk backwards in BB looking for strong_release or dealloc_box of
-// the given value, and add it to Releases.
-static bool addLastRelease(SILValue V, SILBasicBlock *BB,
-                           ReleaseTracker &Tracker) {
+// Walk backwards in BB looking for the last use of a given
+// value, and add it to the set of release points.
+static bool addLastUse(SILValue V, SILBasicBlock *BB,
+                       ReleaseTracker &Tracker) {
   for (auto I = BB->rbegin(); I != BB->rend(); ++I) {
-    if (isa<StrongReleaseInst>(*I) || isa<DeallocBoxInst>(*I) ||
-        isa<ReleaseValueInst>(*I)) {
-      if (I->getOperand(0) != V)
-        continue;
-
-      Tracker.trackLastRelease(&*I);
-      return true;
-    }
+    for (auto &Op : I->getAllOperands())
+      if (Op.get().getDef() == V.getDef()) {
+        Tracker.trackLastRelease(&*I);
+        return true;
+      }
   }
 
+  llvm_unreachable("BB is expected to have a use of a closure");
   return false;
 }
 
@@ -850,7 +848,7 @@ bool swift::getFinalReleasesForValue(SILValue V, ReleaseTracker &Tracker) {
   // release/dealloc.
   for (auto *BB : UseBlocks)
     if (!successorHasLiveIn(BB, LiveIn))
-      if (!addLastRelease(V, BB, Tracker))
+      if (!addLastUse(V, BB, Tracker))
         return false;
 
   return true;
