@@ -383,7 +383,7 @@ for a enum element that has no extra data, or it can be ``T2 -> T0``,
 where ``T2`` is the data associated with the enum element.  For the
 latter case, the actual arguments are parsed as part of the unresolved
 member reference, so that a function application constraint describes
-their conversion to the input tyoe ``T2``.
+their conversion to the input type ``T2``.
 
 Polymorphic Types
 ''''''''''''''''''''''''''''''''''''''''''''''
@@ -668,7 +668,7 @@ choices of the two systems are compared to produce a relative score:
   the other, the solution with the subtype earns +1.
 
 - If an overload set has different selected overloads in the two
-  soluions, the overloads are compared. If the type of the
+  solutions, the overloads are compared. If the type of the
   overload picked in one solution is a subtype of the type of
   the overload picked in the other solution, then first solution earns
   +1.
