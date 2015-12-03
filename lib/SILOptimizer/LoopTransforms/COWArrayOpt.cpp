@@ -1652,7 +1652,7 @@ public:
 
         // Can't clone alloc_stack instructions whose dealloc_stack is outside
         // the loop.
-        if (!canCloneInst(&Inst))
+        if (!Loop->canDuplicate(&Inst))
           return false;
 
         ArraySemanticsCall ArrayPropsInst(&Inst, "array.props", true);
@@ -1669,39 +1669,6 @@ public:
   }
 
 private:
-
-  /// Checks whether we can build SSA form after cloning for values of this
-  /// instruction.
-  bool canCloneInst(SILInstruction *I) {
-    // The dealloc_stack of an alloc_stack must be in the loop, otherwise the
-    // dealloc_stack will be fed by a phi node of two alloc_stacks.
-    if (auto *Alloc = dyn_cast<AllocStackInst>(I)) {
-      for (auto *UI : Alloc->getUses())
-        if (auto *Dealloc = dyn_cast<DeallocStackInst>(UI->getUser()))
-          if (!Loop->contains(Dealloc->getParent()))
-            return false;
-    }
-
-    // CodeGen can't build ssa for objc methods.
-    if (auto *Method = dyn_cast<MethodInst>(I))
-      if (Method->getMember().isForeign)
-        for (auto *UI : Method->getUses()) {
-          if (!Loop->contains(UI->getUser()))
-              return false;
-        }
-
-    // We can't have a phi of two openexistential instructions of different UUID.
-    SILInstruction *OEI = dyn_cast<OpenExistentialAddrInst>(I);
-    if (OEI ||
-        (OEI = dyn_cast<OpenExistentialRefInst>(I)) ||
-        (OEI = dyn_cast<OpenExistentialMetatypeInst>(I))) {
-      for (auto *UI : OEI->getUses())
-        if (!Loop->contains(UI->getUser()))
-          return false;
-    }
-
-    return true;
-  }
 
   /// Strip the struct load and the address projection to the location
   /// holding the array struct.
