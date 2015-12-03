@@ -3643,7 +3643,7 @@ Type ModuleFile::getType(TypeID TID) {
     bool noreturn = false;
     bool throws = false;
 
-    //todo add noreturn serialization.
+    // TODO: add noreturn serialization.
     decls_block::PolymorphicFunctionTypeLayout::readRecord(scratch,
                                                            inputID,
                                                            resultID,
@@ -3679,7 +3679,7 @@ Type ModuleFile::getType(TypeID TID) {
     bool throws = false;
     ArrayRef<uint64_t> genericParamIDs;
 
-    //todo add noreturn serialization.
+    // TODO: add noreturn serialization.
     decls_block::GenericFunctionTypeLayout::readRecord(scratch,
                                                        inputID,
                                                        resultID,
