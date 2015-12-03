@@ -22,7 +22,7 @@ The general SVN workflow consists of the following commands:
 
 1. Checkout: This means checking out/setting up a new repository.
 2. Update: Pulling the latest remote changes into a local repository.
-3. Commiting: Committing a change to the remote repository.
+3. Committing: Committing a change to the remote repository.
 4. Reverting: Reverting a change from a remote repository.
 5. Browsing: Looking at commits.
 
