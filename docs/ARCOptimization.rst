@@ -194,7 +194,7 @@ is_unique performs depends on the argument type:
       dynamic object type uses native swift reference counting:
       (Builtin.UnknownObject, unknown class reference, class existential)
 
-    - Bridged object types allow the dymanic object type check to be
+    - Bridged object types allow the dynamic object type check to be
       bypassed based on the pointer encoding:
       (Builtin.BridgeObject)
 
