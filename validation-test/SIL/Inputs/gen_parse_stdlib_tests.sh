@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 process_count=17
 process_id_max=$(($process_count - 1))

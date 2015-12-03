@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 # A small utility to take the output of a Swift validation test run
 # where some compiler crashers have been fixed, and move them into the

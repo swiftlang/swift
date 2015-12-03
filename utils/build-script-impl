@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #===--- build-script-impl - Implementation details of build-script ---------===#
 #
 ## This source file is part of the Swift.org open source project
@@ -171,6 +171,7 @@ KNOWN_SETTINGS=(
     sil-verify-all              "0"              "If enabled, run the sil verifier be run after every SIL pass"
     swift-enable-ast-verifier   "1"              "If enabled, and the assertions are enabled, the built Swift compiler will run the AST verifier every time it is invoked"
     swift-enable-target-linux   "1"              "Enable compiler support for targeting Linux"
+    swift-enable-target-freebsd "1"              "Enable compiler support for targeting FreeBSD"
     swift-runtime-enable-dtrace "0"              "Enable runtime dtrace support"
     swift-runtime-enable-leak-checker   "0"              "Enable leaks checking routines in the runtime"
     use-gold-linker             ""               "Enable using the gold linker"
@@ -216,6 +217,9 @@ function set_deployment_target_based_options() {
 
     case $deployment_target in
         linux-x86_64)
+            SWIFT_HOST_VARIANT_ARCH="x86_64"
+            ;;
+        freebsd-x86_64)
             SWIFT_HOST_VARIANT_ARCH="x86_64"
             ;;
         macosx-* | iphoneos-* | iphonesimulator-* | \
@@ -741,6 +745,12 @@ case "$(uname -s)" in
         )
         ;;
 
+    FreeBSD)
+        NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
+            "freebsd-x86_64"
+        )
+        ;;
+
     *)
         echo "Unknown operating system"
         exit 1
@@ -809,6 +819,12 @@ case "$(uname -s)" in
             "iphoneos-armv7"
             "appletvos-arm64"
             "watchos-armv7k"
+        )
+        ;;
+
+    FreeBSD)
+        STDLIB_DEPLOYMENT_TARGETS=(
+            "freebsd-x86_64"
         )
         ;;
 
@@ -895,6 +911,10 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
     test_this_target=1
     case $deployment_target in
         linux-*)
+            build_for_this_target=1
+            test_this_target=1
+            ;;
+        freebsd-*)
             build_for_this_target=1
             test_this_target=1
             ;;
@@ -1644,6 +1664,23 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                             "${LLDB_SOURCE_DIR}"
                         )
                         ;;
+                    FreeBSD)
+                        cmake_options=(
+                            "${cmake_options[@]}"
+                            -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
+                            -DCMAKE_INSTALL_PREFIX:PATH="${INSTALL_PREFIX}"
+                            -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
+                            -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
+                            -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
+                            -DLLDB_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
+                            -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
+                            -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
+                            -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
+                            -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
+                            -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
+                            "${LLDB_SOURCE_DIR}"
+                        )
+                        ;;
                     Darwin)
                         # Set up flags to pass to xcodebuild
                         lldb_xcodebuild_options=(
@@ -1796,7 +1833,7 @@ tests_busted ()
 
 for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
     case $deployment_target in
-        linux-* | macosx-*)
+        linux-* | freebsd-* | macosx-*)
             # OK, we can run tests directly.
             ;;
         iphoneos-* | iphonesimulator-* | appletvos-* | appletvsimulator-* | watchos-* | watchsimulator-*)
@@ -1990,6 +2027,8 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 case "$(uname -s)" in
                     Linux)
                         ;;
+                    FreeBSD)
+                        ;;
                     Darwin)
                         set_lldb_build_mode
                         pushd ${LLDB_SOURCE_DIR}
@@ -2026,6 +2065,9 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                     continue
                 fi
                 LIB_TARGET="linux"
+                if [[ `uname -s` == "FreeBSD" ]]; then
+                    LIB_TARGET="freebsd"
+                fi
                 if [[ `uname -s` == "Darwin" ]]; then
                     LIB_TARGET="macosx"
                 fi

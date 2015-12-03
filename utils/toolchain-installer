@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #===--- toolchain-installer - Creates installer pkg for OS X ---------------===#
 #
 ## This source file is part of the Swift.org open source project

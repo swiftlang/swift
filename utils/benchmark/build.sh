@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 if [[ -n "$LLVM_DIR" ]]; then
     BUILD_DIR="$LLVM_DIR/build"
