@@ -396,7 +396,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     invocationArgStrs.push_back("-Xclang");
     invocationArgStrs.push_back("-nostdsysteminc");
   } else {
-    // On Darwin, clang uses -isysroot to specify the include
+    // On Darwin, Clang uses -isysroot to specify the include
     // system root. On other targets, it seems to use --sysroot.
     if (triple.isOSDarwin()) {
       invocationArgStrs.push_back("-isysroot");
@@ -745,7 +745,7 @@ bool ClangImporter::Implementation::importHeader(
   pp.EndSourceFile();
   bumpGeneration();
 
-  // Wrap all clang imports under a swift import decl.
+  // Wrap all Clang imports under a Swift import decl.
   for (auto &Import : BridgeHeaderTopLevelImports) {
     if (auto *ClangImport = Import.dyn_cast<clang::ImportDecl*>()) {
       Import = createImportDecl(SwiftContext, adapter, ClangImport, {});
@@ -2165,7 +2165,7 @@ void ClangImporter::lookupValue(Identifier name, VisibleDeclConsumer &consumer){
 
     // If we *still* haven't found anything, try looking for '<name>Ref'.
     // Eventually, this should be optimized by recognizing this case when
-    // generating the clang module.
+    // generating the Clang module.
     if (!FoundAny && clangIDToLookup) {
       llvm::SmallString<128> buffer;
       buffer += clangIDToLookup->getName();
