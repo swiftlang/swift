@@ -1,4 +1,4 @@
-#!/usr/env bash
+#!/usr/bin/env bash
 
 git clone git@github.com:apple/swift.git swift
 git clone git@github.com:apple/swift-llvm.git llvm
