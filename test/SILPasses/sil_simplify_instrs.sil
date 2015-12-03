@@ -56,7 +56,7 @@ bb0(%x : $Builtin.Int64):
 // CHECK-LABEL: sil @fold_mul_with_overflow_zeros
 // CHECK-NOT: builtin "int_smul_with_overflow_Int64"
 // CHECK: [[RES:%.*]] = integer_literal $Builtin.Int64, 0
-// CHECK-NEXT: return [[RES:%.*]] : $Builtin.Int64
+// CHECK-NEXT: return [[RES]] : $Builtin.Int64
 }
 
 // Simplify arithmetic where one operand is a one and the other is not a constant
