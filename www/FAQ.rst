@@ -45,7 +45,7 @@ replacement":
    having implemented the compiler for it from the ground-up.  We probably know
    its dark corners better than anyone.
  * The Swift team has broad experience with a number of other programming
-   languages, including C/C++/Objective-C, Python, Haskell, Java, Javascript,
+   languages, including C/C++/Objective-C, Python, Haskell, Java, JavaScript,
    C#, ...
  * We know C++ well enough to not want to repeat its mistakes.
 
