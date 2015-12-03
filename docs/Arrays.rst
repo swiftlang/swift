@@ -113,7 +113,7 @@ Bridging Rules and Terminology for all Types
       class func _forceBridgeFromObjectiveC(_: _ObjectiveCType) -> Self
     }
 
-  .. Note:: classes and ``@objc`` existentials shall not conform to
+  .. Note:: Classes and ``@objc`` existentials shall not conform to
      ``_BridgedToObjectiveC``, a restriction that's not currently
      enforceable at compile-time.
 
