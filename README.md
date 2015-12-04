@@ -116,6 +116,9 @@ A basic command to build Swift and run basic tests with Ninja:
 
     utils/build-script -t
 
+Note: To build and run the tests for the swift project, you'll need the
+swift-clang, swift-llvm and swift-cmark projects cloned from GitHub.
+
 ## Develop Swift in Xcode
 
 The Xcode IDE can be used to edit the Swift source code, but it is not currently
