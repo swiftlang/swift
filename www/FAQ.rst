@@ -41,7 +41,7 @@ really dislike C++.  For many reasons you can have hope that Swift
 will end up being a great "successor to Objective-C" instead of a "C++
 replacement":
 
- * The compiler team has expert-level knowledge of Objective-C (the language),
+ * The compiler team has an expert-level knowledge of Objective-C (the language),
    having implemented the compiler for it from the ground-up.  We probably know
    its dark corners better than anyone.
  * The Swift team has broad experience with a number of other programming
