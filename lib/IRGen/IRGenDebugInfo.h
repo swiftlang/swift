@@ -201,22 +201,6 @@ public:
                                IndirectionKind = DirectValue,
                                ArtificialKind = RealValue);
 
-  /// Convenience function for stack-allocated variables. Calls
-  /// emitVariableDeclaration internally.
-  void emitStackVariableDeclaration(IRBuilder &Builder,
-                                    ArrayRef<llvm::Value *> Storage,
-                                    DebugTypeInfo Ty, const SILDebugScope *DS,
-                                    StringRef Name,
-                                    IndirectionKind Indirection = DirectValue);
-
-  /// Convenience function for variables that are function arguments.
-  void emitArgVariableDeclaration(IRBuilder &Builder,
-                                  ArrayRef<llvm::Value *> Storage,
-                                  DebugTypeInfo Ty, const SILDebugScope *DS,
-                                  StringRef Name, unsigned ArgNo,
-                                  IndirectionKind = DirectValue,
-                                  ArtificialKind = RealValue);
-
   /// Emit a dbg.declare or dbg.value intrinsic, depending on Storage.
   void emitDbgIntrinsic(llvm::BasicBlock *BB, llvm::Value *Storage,
                         llvm::DILocalVariable *Var, llvm::DIExpression *Expr,

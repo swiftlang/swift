@@ -553,11 +553,11 @@ public:
     assert(IGM.DebugInfo && "debug info not enabled");
     if (ArgNo) {
       PrologueLocation AutoRestore(IGM.DebugInfo, Builder);
-      IGM.DebugInfo->emitArgVariableDeclaration(Builder, Storage, Ty, DS, Name,
-                                                ArgNo, Indirection);
+      IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, Name,
+                                             ArgNo, Indirection);
     } else
-      IGM.DebugInfo->emitStackVariableDeclaration(Builder, Storage, Ty, DS,
-                                                  Name, Indirection);
+      IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, Name, 0,
+                                             Indirection);
   }
 
   void emitFailBB() {
@@ -1424,10 +1424,9 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
     // other argument. It is only used for sorting.
     unsigned ArgNo =
         countArgs(CurSILFn->getDeclContext()) + 1 + BB->getBBArgs().size();
-    IGM.DebugInfo->emitArgVariableDeclaration(
+    IGM.DebugInfo->emitVariableDeclaration(
         Builder, emitShadowCopy(ErrorResultSlot.getAddress(), Name), DTI,
-        getDebugScope(), Name, ArgNo,
-        IndirectValue, ArtificialValue);
+        getDebugScope(), Name, ArgNo, IndirectValue, ArtificialValue);
   }
 }
 
@@ -3431,11 +3430,10 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
         Decl->getType()->getKind() == TypeKind::InOut)
       Indirection = DirectValue;
 
-    IGM.DebugInfo->emitStackVariableDeclaration
-      (Builder,
-       emitShadowCopy(addr.getAddress(), Name),
-       DebugTypeInfo(Decl, i->getElementType().getSwiftType(), type),
-       i->getDebugScope(), Name, Indirection);
+    IGM.DebugInfo->emitVariableDeclaration(
+        Builder, emitShadowCopy(addr.getAddress(), Name),
+        DebugTypeInfo(Decl, i->getElementType().getSwiftType(), type),
+        i->getDebugScope(), Name, 0, Indirection);
   }
 }
 

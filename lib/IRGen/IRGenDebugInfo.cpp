@@ -863,26 +863,6 @@ void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF,
                           DirectValue, ArtificialValue);
 }
 
-void IRGenDebugInfo::emitStackVariableDeclaration(
-    IRBuilder &B, ArrayRef<llvm::Value *> Storage, DebugTypeInfo DbgTy,
-    const SILDebugScope *DS, StringRef Name, IndirectionKind Indirection) {
-  emitVariableDeclaration(B, Storage, DbgTy, DS, Name, 0, Indirection,
-                          RealValue);
-}
-
-void IRGenDebugInfo::emitArgVariableDeclaration(
-    IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo DbgTy,
-    const SILDebugScope *DS, StringRef Name, unsigned ArgNo,
-    IndirectionKind Indirection, ArtificialKind IsArtificial) {
-  assert(ArgNo > 0);
-  if (Name == IGM.Context.Id_self.str())
-    emitVariableDeclaration(Builder, Storage, DbgTy, DS, Name, ArgNo,
-                            DirectValue, ArtificialValue);
-  else
-    emitVariableDeclaration(Builder, Storage, DbgTy, DS, Name, ArgNo,
-                            Indirection, IsArtificial);
-}
-
 /// Return the DIFile that is the ancestor of Scope.
 llvm::DIFile *IRGenDebugInfo::getFile(llvm::DIScope *Scope) {
   while (!isa<llvm::DIFile>(Scope)) {
@@ -985,6 +965,10 @@ void IRGenDebugInfo::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo DbgTy,
     const SILDebugScope *DS, StringRef Name, unsigned ArgNo,
     IndirectionKind Indirection, ArtificialKind Artificial) {
+  // Self is always an artificial argument.
+  if (ArgNo > 0 && Name == IGM.Context.Id_self.str())
+    Artificial = ArtificialValue;
+
   // FIXME: Make this an assertion.
   // assert(DS && "variable has no scope");
   if (!DS)
