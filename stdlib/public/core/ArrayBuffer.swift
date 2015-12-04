@@ -244,10 +244,17 @@ extension _ArrayBuffer {
         return _native[subRange]
       }
 
-      // Look for contiguous storage in the NSArray
       let nonNative = self._nonNative
       let cocoa = _CocoaArrayWrapper(nonNative)
-      guard let cocoaStorageBaseAddress = cocoa.contiguousStorage(self.indices) else {
+
+      // Look for contiguous storage in the NSArray
+      if let cocoaStorageBaseAddress = cocoa.contiguousStorage(self.indices) {
+        return _SliceBuffer(
+          owner: nonNative,
+          subscriptBaseAddress: UnsafeMutablePointer(cocoaStorageBaseAddress),
+          indices: subRange,
+          hasNativeBuffer: false)
+      } else {
         // No contiguous storage found; we must allocate
         let subRangeCount = subRange.count
         let result = _ContiguousArrayBuffer<Element>(
@@ -262,11 +269,6 @@ extension _ArrayBuffer {
 
         return _SliceBuffer(result, shiftedToStartIndex: subRange.startIndex)
       }
-      return _SliceBuffer(
-        owner: nonNative,
-        subscriptBaseAddress: UnsafeMutablePointer(cocoaStorageBaseAddress),
-        indices: subRange,
-        hasNativeBuffer: false)
     }
     set {
       fatalError("not implemented")
