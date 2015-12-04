@@ -193,7 +193,7 @@ To build a debuggable Swift standard library:
 
   [~/src/s]$ ./swift/utils/build-script -R --debug-swift-stdlib
 
-iOS build targets are always configured and present, but are not build by
+iOS build targets are always configured and present, but are not built by
 default.  To build the standard library for OS X, iOS simulator and iOS device:
 
   [~/src/s]$ ./swift/utils/build-script -R -i
