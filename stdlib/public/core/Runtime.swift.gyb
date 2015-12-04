@@ -247,12 +247,11 @@ public // @testable
 func _stdlib_atomicLoadARCRef(
   object target: UnsafeMutablePointer<AnyObject?>
 ) -> AnyObject? {
-  let result = _swift_stdlib_atomicLoadPtrImpl(
-    object: UnsafeMutablePointer(target))
-  if result != nil {
-    return Unmanaged<AnyObject>.fromOpaque(result).takeUnretainedValue()
+  guard let result = _swift_stdlib_atomicLoadPtrImpl(
+    object: UnsafeMutablePointer(target)) {
+    return nil
   }
-  return nil
+  return Unmanaged<AnyObject>.fromOpaque(result).takeUnretainedValue()
 }
 
 % for operation in [ 'Add', 'And', 'Or', 'Xor' ]:
