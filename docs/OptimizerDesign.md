@@ -191,6 +191,46 @@ pipeline.
 
 Please refer to the document “High-Level SIL Optimizations” for more details.
 
+
+### Instruction Invalidation in SIL
+
+Swift Passes and Analysis often keep instruction pointers in internal data
+structures such as Map or Set.  A good example of such data structure is a list
+of visited instructions, or a map between a SILValue and the memory aliasing
+effects of the value.
+
+Passes and utilities delete instructions in many different places in the
+optimizer. When instructions are deleted pointers that are saved inside maps in
+the different data structures become invalid. These pointers point to
+deallocated memory locations. In some cases malloc allocates new instructions
+with the same address as the freed instruction. Instruction reallocation bugs
+are often difficult to detect because hash maps return values that are logically
+incorrect.
+
+LLVM handles this problem by keeping ValueHandles, which are a kind of smart
+pointers that handle instruction deletion and replaceAllUsesWith events.
+ValueHandles are special uses of llvm values. One problem with this approach is
+that value handles require additional memory per-value and require doing extra
+work when working with values.
+
+The Swift optimizer approach is to let the Context (currently a part of the
+SILModule) handle the invalidation of instructions. When instructions are
+deleted the context notifies a list of listeners. The invalidation mechanism is
+relatively efficient and incur a cost only when instructions are deleted. Every
+time an instruction is deleted the context notifies all of the listeners that
+requested to be notified. A typical notifications list is very short and is made
+of the registered Analysis and the currently executed Pass.
+
+Passes and Analysis are registered by the PassManager to receive instruction
+deletion notifications. Passes and Analysis simply need to implement the
+following virtual method:
+
+```
+  virtual void handleNotification(swift::ValueBase *Value) override {
+    llvm::errs()<<"SILCombine Deleting: " << Value<<"\n";
+  }
+```
+
 ### Debugging the optimizer
 
 TODO.

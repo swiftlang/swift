@@ -219,7 +219,7 @@ public:
     if (!ParentOrFixed.is<TypeVariableType *>())
       return true;
 
-    // Check whether the representatative is different from our own type
+    // Check whether the representative is different from our own type
     // variable.
     return ParentOrFixed.get<TypeVariableType *>() != getTypeVariable();
   }
