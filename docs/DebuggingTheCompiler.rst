@@ -43,7 +43,7 @@ Here is how to dump the IR after the main phases of the swift compiler
 
     swiftc -emit-ir -Xfrontend -disable-llvm-optzns -O file.swift
 
-4. **LLVM passes**. To print the LLVM IR afer LLVM passes::
+4. **LLVM passes**. To print the LLVM IR after LLVM passes::
 
     swiftc -emit-ir -O file.swift
 
