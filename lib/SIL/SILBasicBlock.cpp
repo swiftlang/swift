@@ -37,6 +37,12 @@ SILBasicBlock::SILBasicBlock(SILFunction *parent, SILBasicBlock *afterBB)
   }
 }
 SILBasicBlock::~SILBasicBlock() {
+  // Notify the delete handlers that the instructions in this block are
+  // being deleted.
+  for (auto I = begin(), E = end(); I != E; ++I) {
+    getModule().notifyDeleteHandlers(&*I);
+  }
+
   // iplist's destructor is going to destroy the InstList.
 }
 
@@ -69,6 +75,8 @@ void SILBasicBlock::push_front(SILInstruction *I) {
 }
 
 void SILBasicBlock::remove(SILInstruction *I) {
+  // Notify the delete handlers that this instruction is going away.
+  getModule().notifyDeleteHandlers(&*I);
   InstList.remove(I);
 }
 

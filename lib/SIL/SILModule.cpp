@@ -664,3 +664,20 @@ lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member) {
 
   return nullptr;
 }
+
+
+void SILModule::
+registerDeleteNotificationHandler(DeleteNotificationHandler* Handler) {
+  NotificationHandlers.insert(Handler);
+}
+
+void SILModule::
+removeDeleteNotificationHandler(DeleteNotificationHandler* Handler) {
+  NotificationHandlers.remove(Handler);
+}
+
+void SILModule::notifyDeleteHandlers(SILInstruction *Item) {
+  for (auto *Handler : NotificationHandlers) {
+    Handler->handleDeleteNotification(Item);
+  }
+}

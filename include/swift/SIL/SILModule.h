@@ -27,6 +27,7 @@
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
+#include "swift/SIL/Notifications.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILWitnessTable.h"
@@ -178,6 +179,10 @@ private:
   /// The options passed into this SILModule.
   SILOptions &Options;
 
+  /// A list of clients that need to be notified when an instruction
+  /// invalidation message is sent.
+  llvm::SetVector<DeleteNotificationHandler*> NotificationHandlers;
+
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
   SILModule(ModuleDecl *M, SILOptions &Options, const DeclContext *associatedDC,
@@ -192,6 +197,16 @@ private:
 
 public:
   ~SILModule();
+
+  /// Add a delete notification handler \p Handler to the module context.
+  void registerDeleteNotificationHandler(DeleteNotificationHandler* Handler);
+
+  /// Remove the delete notification handler \p Handler from the module context.
+  void removeDeleteNotificationHandler(DeleteNotificationHandler* Handler);
+
+  /// Send the invalidation message that \p Inst is being deleted to all
+  /// registered handlers. The order of handlers is deterministic but arbitrary.
+  void notifyDeleteHandlers(SILInstruction *Inst);
 
   /// \brief Get a uniqued pointer to a SIL type list.
   SILTypeList *getSILTypeList(ArrayRef<SILType> Types) const;
