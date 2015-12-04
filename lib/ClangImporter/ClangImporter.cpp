@@ -1693,7 +1693,7 @@ static bool isBoolType(ClangImporter::Implementation &importer,
 
 static bool isIntegerType(clang::QualType clangType) {
   if (auto builtinTy = clangType->getAs<clang::BuiltinType>()) {
-    return (builtinTy->getKind() >= clang::BuiltinType::Char_U &&
+    return (builtinTy->getKind() >= clang::BuiltinType::Bool &&
             builtinTy->getKind() <= clang::BuiltinType::UInt128) ||
            (builtinTy->getKind() >= clang::BuiltinType::SChar &&
             builtinTy->getKind() <= clang::BuiltinType::Int128);
