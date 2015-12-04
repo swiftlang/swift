@@ -116,7 +116,7 @@ A basic command to build Swift and run basic tests with Ninja:
 
     utils/build-script -t
 
-## Develop Swift in Xcode
+## Developing Swift in Xcode
 
 The Xcode IDE can be used to edit the Swift source code, but it is not currently
 fully supported as a build environment for SDKs other than OS X. If you'd like
