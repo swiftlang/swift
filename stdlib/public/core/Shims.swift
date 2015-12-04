@@ -25,7 +25,7 @@ internal func _makeSwiftNSFastEnumerationState()
     extra: (0, 0, 0, 0, 0))
 }
 
-/// A dummy value that is be used as the target for `mutationsPtr` in fast
+/// A dummy value to be used as the target for `mutationsPtr` in fast
 /// enumeration implementations.
 var _fastEnumerationStorageMutationsTarget: CUnsignedLong = 0
 
