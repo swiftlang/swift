@@ -1,5 +1,5 @@
 /* Common styles */
-.body { color: black; background: white; margin: 0 0 0 0 }
+.body { color: black; background: white; margin: 0; }
 
 /* No borders on image links */
 a:link img, a:visited img { border-style: none }
@@ -9,8 +9,7 @@ address     { clear: right; }
 
 
 table       { border: 2px solid black;
-  border-collapse: collapse; margin-top: 1em; margin-left: 1em;
-  margin-right: 1em; margin-bottom: 1em; }
+  border-collapse: collapse; margin: 1em; }
 tr, td      { border: 2px solid gray; padding: 4pt 4pt 2pt 2pt; }
 th          { border: 2px solid gray; font-weight: bold; font-size: 105%;
   background: url("http://llvm.org/img/lines.gif");
@@ -26,35 +25,34 @@ h1, h2 {
   border-style: solid none solid none;
   text-align: center;
   vertical-align: middle;
-/*  padding-left: 0pt;*/
   padding-top: 1px;
-  padding-bottom: 2px
+  padding-bottom: 2px;
 }
 
 
 h1 {
   text-align: center; font-size: 22pt;
-  margin: 20pt 0pt 0pt 0pt; 
+  margin: 20pt 0 0 0; 
 }
 
 .doc_title, .title { text-align: left;   font-size: 25pt }
 
 h2, .doc_subsection { width: 100%;
   text-align: left;  font-size: 12pt;
-  padding: 4pt 4pt 4pt 4pt;
-  margin: 1.5em 5em 0.5em 0em
+  padding: 4pt;
+  margin: 1.5em 5em 0.5em 0;
 }
 
 h3 {
-  margin: 2.0em 0.5em 0.5em 0em;
+  margin: 2.0em 0.5em 0.5em 0;
   font-weight: bold; font-style: oblique;
   border-bottom: 1px solid #999999; font-size: 12pt;
   width: 75%;
-  clear:both;
+  clear: both;
 }
 
 body p {
-  margin: 1em 0pt 0pt 15pt; 
+  margin: 1em 0 0 15pt; 
 }
 
 
@@ -72,6 +70,6 @@ pre.example {
   float: right;
   width: 33%;
   background: #C0C0FF;
-  padding: 1em 1em 1em 1em;
-  margin: 0em 0em 0em 1em; 
+  padding: 1em;
+  margin: 0 0 0 1em; 
 }
