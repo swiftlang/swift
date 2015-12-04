@@ -2946,10 +2946,9 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   StringRef Name = Decl->getNameStr();
   Explosion e = getLoweredExplosion(SILVal);
   DebugTypeInfo DbgTy(Decl, Decl->getType(), getTypeInfo(SILVal.getType()));
-  if (DbgTy.getType()->getKind() == TypeKind::InOut)
-    // An inout type that is described by a debug *value* is a
-    // promoted capture. Unwrap the type.
-    DbgTy.unwrapInOutType();
+  // An inout/lvalue type that is described by a debug value has been
+  // promoted by an optimization pass. Unwrap the type.
+  DbgTy.unwrapLValueOrInOutType();
 
   // Put the value into a stack slot at -Onone.
   llvm::SmallVector<llvm::Value *, 8> Copy;
@@ -3236,12 +3235,11 @@ static void emitDebugDeclarationForAllocStack(IRGenSILFunction &IGF,
   if (IGF.IGM.DebugInfo && Decl) {
     auto *Pattern = Decl->getParentPattern();
     if (!Pattern || !Pattern->isImplicit()) {
+      auto DbgTy = DebugTypeInfo(Decl, type);
       // Discard any inout or lvalue qualifiers. Since the object itself
       // is stored in the alloca, emitting it as a reference type would
       // be wrong.
-      auto DbgTy = DebugTypeInfo(Decl,
-                                 Decl->getType()->getLValueOrInOutObjectType(),
-                                 type);
+      DbgTy.unwrapLValueOrInOutType();
       auto Name = Decl->getName().empty() ? "_" : Decl->getName().str();
       auto DS = i->getDebugScope();
       if (DS) {
