@@ -70,7 +70,7 @@ type), with a few additional rules:
 
 - A member may be overridden whenever it is accessible.
 
-The implicit memberwise initializer for a struct has the minimum access level
+The implicit member-wise initializer for a struct has the minimum access level
 of all of the struct's stored properties, except that if all properties are
 ``public`` the initializer is ``internal``. The implicit no-argument
 initializer for structs and classes follows the default access level for the
@@ -78,7 +78,7 @@ type.
 
 Currently, enum cases always have the same access level as the enclosing enum.
 
-Deinitializers are only invoked by the runtime and do not nominally have access.
+De-initializers are only invoked by the runtime and do not nominally have access.
 Internally, the compiler represents them as having the same access level as the
 enclosing type.
 
@@ -153,8 +153,8 @@ A tuple type's access level is the minimum of the access levels of its
 elements. A function type's access level is the minimum of the access levels of
 its input and return types.
 
-A typealias may have any access level up to the access level of the type it
-aliases. That is, a ``private`` typealias can refer to an ``public`` type, but
+A type-alias may have any access level up to the access level of the type it
+aliases. That is, a ``private`` type-alias can refer to an ``public`` type, but
 not the other way around. This includes associated types used to satisfy
 protocol conformances.
 
@@ -167,7 +167,7 @@ or other extensions from outside the module. Therefore, members of a subclass
 or extension will not conflict with or inadvertently be considered to override
 non-accessible members of the superclass.
 
-Both ``private`` and ``internal`` increase opportunities for devirtualization,
+Both ``private`` and ``internal`` increase opportunities for de-virtualization,
 though it is still possible to put a subclass of a ``private`` class within the
 same file.
 
