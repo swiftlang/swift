@@ -173,7 +173,9 @@ namespace swift {
         Target.getiOSVersion(major, minor, revision);
       } else if (Target.isWatchOS()) {
         Target.getOSVersion(major, minor, revision);
-      } else if (Target.isOSLinux() || Target.getTriple().empty()) {
+      } else if (Target.isOSLinux() || Target.isOSFreeBSD() ||
+                 Target.getTriple().empty())
+      {
         major = minor = revision = 0;
       } else {
         llvm_unreachable("Unsupported target OS");
