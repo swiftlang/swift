@@ -140,7 +140,7 @@ func testTuple() {
   tup.x = 1
 
   // <rdar://problem/20927707> QoI: 'variable was never mutated' noisy when only part of a destructured tuple is mutated
-  var (tupA, tupB) = (1,2)  // don't warn about tupB being changable to a 'let'.
+  var (tupA, tupB) = (1,2)  // don't warn about tupB being changeable to a 'let'.
   tupA += tupB
 
 }
