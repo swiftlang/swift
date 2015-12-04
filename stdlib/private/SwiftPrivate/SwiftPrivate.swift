@@ -12,7 +12,7 @@
 
 import SwiftShims
 
-/// Convert the given numeric value to a hexidecimal string.
+/// Convert the given numeric value to a hexadecimal string.
 public func asHex<T : IntegerType>(x: T) -> String {
   return "0x" + String(x.toIntMax(), radix: 16)
 }
