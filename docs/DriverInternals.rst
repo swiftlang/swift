@@ -114,7 +114,7 @@ Analysis` for more information.
 The Compilation's TaskQueue controls the low-level aspects of managing
 subprocesses. Multiple Jobs may execute simultaneously, but communication with
 the parent process (the driver) is handled on a single thread. The level of
-parellelism may be controlled by a compiler flag.
+parallelism may be controlled by a compiler flag.
 
 If a Job does not finish successfully, the Compilation needs to record which
 jobs have failed, so that they get rebuilt next time the user tries to build
