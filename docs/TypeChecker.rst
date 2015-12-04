@@ -805,7 +805,7 @@ an overloaded function. Additionally, when comparing two solutions to
 the same constraint system, overload sets present in both solutions
 can be found by comparing the locators for each of the overload
 choices made in each solution. Naturally, all of these operations
-require locators to be uniqued, which occurs in the constraint system
+require locators to be unique, which occurs in the constraint system
 itself.
 
 Simplifying Locators

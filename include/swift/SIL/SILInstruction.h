@@ -168,7 +168,13 @@ public:
 
   MemoryBehavior getMemoryBehavior() const;
   ReleasingBehavior getReleasingBehavior() const;
+
+  /// Returns true if the instruction may release any object.
   bool mayRelease() const;
+
+  /// Returns true if the instruction may release or may read the reference
+  /// count of any object.
+  bool mayReleaseOrReadRefCount() const;
 
   /// Can this instruction abort the program in some manner?
   bool mayTrap() const;

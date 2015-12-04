@@ -38,6 +38,7 @@ public:
   enum ActionClass {
     Input = 0,
     CompileJob,
+    InterpretJob,
     BackendJob,
     MergeModuleJob,
     ModuleWrapJob,
@@ -161,6 +162,19 @@ public:
 
   static bool classof(const Action *A) {
     return A->getKind() == Action::CompileJob;
+  }
+};
+
+class InterpretJobAction : public JobAction {
+private:
+  virtual void anchor();
+
+public:
+  explicit InterpretJobAction()
+      : JobAction(Action::InterpretJob, llvm::None, types::TY_Nothing) {}
+
+  static bool classof(const Action *A) {
+    return A->getKind() == Action::InterpretJob;
   }
 };
 

@@ -15,6 +15,7 @@
 #include "swift/SILAnalysis/BasicCalleeAnalysis.h"
 #include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILAnalysis/ArraySemantic.h"
+#include "swift/SILAnalysis/ValueTracking.h"
 #include "swift/SILPasses/PassManager.h"
 #include "swift/SIL/SILArgument.h"
 #include "llvm/Support/GraphWriter.h"
@@ -34,6 +35,8 @@ static bool isProjection(ValueBase *V) {
     case ValueKind::UncheckedEnumDataInst:
     case ValueKind::MarkDependenceInst:
     case ValueKind::PointerToAddressInst:
+    case ValueKind::AddressToPointerInst:
+    case ValueKind::InitEnumDataAddrInst:
       return true;
     default:
       return false;
@@ -46,7 +49,11 @@ static bool isNonWritableMemoryAddress(ValueBase *V) {
     case ValueKind::WitnessMethodInst:
     case ValueKind::ClassMethodInst:
     case ValueKind::SuperMethodInst:
+    case ValueKind::DynamicMethodInst:
     case ValueKind::StringLiteralInst:
+    case ValueKind::ThinToThickFunctionInst:
+    case ValueKind::ThinFunctionToPointerInst:
+    case ValueKind::PointerToThinFunctionInst:
       // These instructions return pointers to memory which can't be a
       // destination of a store.
       return true;
@@ -419,8 +426,11 @@ bool EscapeAnalysis::ConnectionGraph::mergeFrom(ConnectionGraph *SourceGraph,
       CGNode *DestReachable = Mapping.get(SourceReachable);
       // Create the edge in this graph. Note: this may trigger merging of
       // content nodes.
-      if (DestReachable)
+      if (DestReachable) {
         Changed |= defer(DestFrom, DestReachable);
+        // In case DestFrom is merged during adding the defer-edge.
+        DestFrom = DestFrom->getMergeTarget();
+      }
 
       for (auto *Defered : SourceReachable->defersTo) {
         if (!Defered->isInWorkList) {
@@ -466,6 +476,30 @@ bool EscapeAnalysis::ConnectionGraph::isUsePoint(ValueBase *V, CGNode *Node) {
   if (Idx >= (int)Node->UsePoints.size())
     return false;
   return Node->UsePoints.test(Idx);
+}
+
+bool EscapeAnalysis::ConnectionGraph::canEscapeTo(CGNode *From, CGNode *To) {
+  // See if we can reach the From-node by transitively visiting the
+  // predecessor nodes of the To-node.
+  // Usually nodes have few predecessor nodes and the graph depth is small.
+  // So this should be fast.
+  llvm::SmallVector<CGNode *, 8> WorkList;
+  WorkList.push_back(From);
+  From->isInWorkList = true;
+  for (unsigned Idx = 0; Idx < WorkList.size(); ++Idx) {
+    CGNode *Reachable = WorkList[Idx];
+    if (Reachable == To)
+      return true;
+    for (Predecessor Pred : Reachable->Preds) {
+      CGNode *PredNode = Pred.getPointer();
+      if (!PredNode->isInWorkList) {
+        PredNode->isInWorkList = true;
+        WorkList.push_back(PredNode);
+      }
+    }
+  }
+  clearWorkListFlags(WorkList);
+  return false;
 }
 
 
@@ -1098,6 +1132,10 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case ValueKind::SwitchEnumInst:
     case ValueKind::DebugValueInst:
     case ValueKind::DebugValueAddrInst:
+    case ValueKind::ValueMetatypeInst:
+    case ValueKind::InitExistentialMetatypeInst:
+    case ValueKind::OpenExistentialMetatypeInst:
+    case ValueKind::ExistentialMetatypeInst:
       // These instructions don't have any effect on escaping.
       return;
     case ValueKind::StrongReleaseInst:
@@ -1122,6 +1160,9 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case ValueKind::LoadWeakInst:
     // We treat ref_element_addr like a load (see NodeType::Content).
     case ValueKind::RefElementAddrInst:
+    case ValueKind::ProjectBoxInst:
+    case ValueKind::InitExistentialAddrInst:
+    case ValueKind::OpenExistentialAddrInst:
       if (isPointer(I)) {
         CGNode *AddrNode = ConGraph->getNode(I->getOperand(0), this);
         if (!AddrNode) {
@@ -1163,6 +1204,13 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       }
       return;
     }
+    case ValueKind::SelectEnumInst:
+    case ValueKind::SelectEnumAddrInst:
+      analyzeSelectInst(cast<SelectEnumInstBase>(I), ConGraph);
+      return;
+    case ValueKind::SelectValueInst:
+      analyzeSelectInst(cast<SelectValueInst>(I), ConGraph);
+      return;
     case ValueKind::StructInst:
     case ValueKind::TupleInst:
     case ValueKind::EnumInst: {
@@ -1185,11 +1233,31 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       return;
     }
     case ValueKind::UncheckedRefCastInst:
+    case ValueKind::ConvertFunctionInst:
+    case ValueKind::UpcastInst:
+    case ValueKind::InitExistentialRefInst:
+    case ValueKind::OpenExistentialRefInst:
+    case ValueKind::UnownedToRefInst:
+    case ValueKind::RefToUnownedInst:
+    case ValueKind::RawPointerToRefInst:
+    case ValueKind::RefToRawPointerInst:
+    case ValueKind::RefToBridgeObjectInst:
+    case ValueKind::BridgeObjectToRefInst:
+    case ValueKind::UncheckedAddrCastInst:
+    case ValueKind::UnconditionalCheckedCastInst:
       // A cast is almost like a projection.
       if (CGNode *OpNode = ConGraph->getNode(I->getOperand(0), this)) {
         ConGraph->setNode(I, OpNode);
       }
       break;
+    case ValueKind::UncheckedRefCastAddrInst: {
+      auto *URCAI = cast<UncheckedRefCastAddrInst>(I);
+      CGNode *SrcNode = ConGraph->getNode(URCAI->getSrc(), this);
+      CGNode *DestNode = ConGraph->getNode(URCAI->getDest(), this);
+      assert(SrcNode && DestNode && "must have nodes for address operands");
+      ConGraph->defer(DestNode, SrcNode);
+      return;
+    }
     case ValueKind::ReturnInst:
       if (CGNode *ValueNd = ConGraph->getNode(cast<ReturnInst>(I)->getOperand(), this)) {
         ConGraph->defer(ConGraph->getReturnNode(),
@@ -1200,6 +1268,26 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       // We handle all other instructions conservatively.
       setAllEscaping(I, ConGraph);
       return;
+  }
+}
+
+template<class SelectInst> void EscapeAnalysis::
+analyzeSelectInst(SelectInst *SI, ConnectionGraph *ConGraph) {
+  if (auto *ResultNode = ConGraph->getNode(SI, this)) {
+    // Connect all case values to the result value.
+    // Note that this does not include the first operand (the condition).
+    for (unsigned Idx = 0, End = SI->getNumCases(); Idx < End; ++Idx) {
+      SILValue CaseVal = SI->getCase(Idx).second;
+      auto *ArgNode = ConGraph->getNode(CaseVal, this);
+      assert(ArgNode &&
+             "there should be an argument node if there is an result node");
+      ConGraph->defer(ResultNode, ArgNode);
+    }
+    // ... also including the default value.
+    auto *DefaultNode = ConGraph->getNode(SI->getDefaultResult(), this);
+    assert(DefaultNode &&
+           "there should be an argument node if there is an result node");
+    ConGraph->defer(ResultNode, DefaultNode);
   }
 }
 
@@ -1404,6 +1492,46 @@ void EscapeAnalysis::finalizeGraphsConservatively(FunctionInfo *FInfo) {
   }
   FInfo->Graph.propagateEscapeStates();
   mergeSummaryGraph(&FInfo->SummaryGraph, &FInfo->Graph);
+}
+
+bool EscapeAnalysis::canEscapeToUsePoint(SILValue V, ValueBase *UsePoint,
+                                         ConnectionGraph *ConGraph) {
+  CGNode *Node = ConGraph->getNode(V, this);
+  if (!Node)
+    return false;
+
+  // First check if there are escape pathes which we don't explicitly see
+  // in the graph.
+  switch (Node->getEscapeState()) {
+    case EscapeState::None:
+    case EscapeState::Return:
+      break;
+    case EscapeState::Arguments:
+      if (!isNotAliasingArgument(V))
+        return true;
+      break;
+    case EscapeState::Global:
+      return true;
+  }
+  // No hidden escapes: check if the Node is reachable from the UsePoint.
+  return ConGraph->isUsePoint(UsePoint, Node);
+}
+
+bool EscapeAnalysis::canPointToSameMemory(SILValue V1, SILValue V2,
+                                          ConnectionGraph *ConGraph) {
+  CGNode *Node1 = ConGraph->getNode(V1, this);
+  assert(Node1 && "value is not a pointer");
+  CGNode *Node2 = ConGraph->getNode(V2, this);
+  assert(Node2 && "value is not a pointer");
+
+  // If both nodes escape, the relation of the nodes may not be explicitly
+  // represented in the graph.
+  if (Node1->escapesInsideFunction() && Node2->escapesInsideFunction())
+    return true;
+
+  CGNode *Content1 = ConGraph->getContentNode(Node1);
+  CGNode *Content2 = ConGraph->getContentNode(Node2);
+  return Content1 == Content2;
 }
 
 SILAnalysis *swift::createEscapeAnalysis(SILModule *M) {

@@ -63,7 +63,7 @@ struct CustomGenericCollection<Key> : DictionaryLiteralConvertible {
   // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[TypeAlias]/CurrNominal:        Key[#Key#]; name=Key
   // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[TypeAlias]/CurrNominal:        Value[#Value#]; name=Value
   // GENERIC_PARAM_AND_ASSOC_TYPE: End completions
-  
+
   var count: Int { #^GENERIC_PARAM_AND_ASSOC_TYPE^# }
 }
 
@@ -159,3 +159,9 @@ func rdar22834017() {
 }
 // FIXME: We could provide a useful completion here. rdar://problem/22846558
 // INVALID_TYPE_INIT-NOT: Begin completions
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_23173692 | FileCheck %s -check-prefix=RDAR_23173692
+func rdar23173692() {
+  return IndexingGenerator(#^RDAR_23173692^#)
+}
+// RDAR_23173692: Begin completions

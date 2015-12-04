@@ -806,6 +806,16 @@ bool SILInstruction::mayRelease() const {
   }
 }
 
+bool SILInstruction::mayReleaseOrReadRefCount() const {
+  switch (getKind()) {
+  case ValueKind::IsUniqueInst:
+  case ValueKind::IsUniqueOrPinnedInst:
+    return true;
+  default:
+    return mayRelease();
+  }
+}
+
 namespace {
   class TrivialCloner : public SILCloner<TrivialCloner> {
     friend class SILCloner<TrivialCloner>;
