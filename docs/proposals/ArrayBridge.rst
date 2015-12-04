@@ -71,7 +71,7 @@ significant.  For example, the design above would pose significant performance
 problems for arrays of integers, because every subscript operation would have to
 check to see if the representation is an NSArray, realize it is not, then do the
 constant time index into the native representation.  Beyond requiring an extra
-check, this check would disable optimizations that can provide a signficant
+check, this check would disable optimizations that can provide a significant
 performance win (like auto-vectorization).
 
 However, the inherent limitations of ``NSArray`` mean that we can

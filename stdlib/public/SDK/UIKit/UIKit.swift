@@ -21,7 +21,7 @@ import Foundation
 @_transparent // @fragile
 @warn_unused_result
 public func == (lhs: UIEdgeInsets, rhs: UIEdgeInsets) -> Bool {
-  return lhs.top == rhs.top  && 
+  return lhs.top == rhs.top &&
          lhs.left == rhs.left &&
          lhs.bottom == rhs.bottom &&
          lhs.right == rhs.right
@@ -32,7 +32,7 @@ extension UIEdgeInsets : Equatable {}
 @_transparent // @fragile
 @warn_unused_result
 public func == (lhs: UIOffset, rhs: UIOffset) -> Bool {
-  return lhs.horizontal == rhs.horizontal  &&
+  return lhs.horizontal == rhs.horizontal &&
          lhs.vertical == rhs.vertical
 }
 
@@ -46,16 +46,16 @@ extension UIOffset : Equatable {}
 
 #if !os(watchOS) && !os(tvOS)
 public extension UIDeviceOrientation {
-  var isLandscape: Bool { 
-    get { return self == .LandscapeLeft  ||  self == .LandscapeRight } 
+  var isLandscape: Bool {
+    get { return self == .LandscapeLeft || self == .LandscapeRight }
   }
 
-  var isPortrait: Bool { 
-    get { return self == .Portrait  ||  self == .PortraitUpsideDown } 
+  var isPortrait: Bool {
+    get { return self == .Portrait || self == .PortraitUpsideDown }
   }
 
   var isFlat: Bool {
-    get { return self == .FaceUp  ||  self == .FaceDown } 
+    get { return self == .FaceUp || self == .FaceDown }
   }
 
   var isValidInterfaceOrientation: Bool {
@@ -81,7 +81,7 @@ public func UIDeviceOrientationIsLandscape(
 public func UIDeviceOrientationIsPortrait(
   orientation: UIDeviceOrientation
 ) -> Bool {
-  return orientation.isPortrait 
+  return orientation.isPortrait
 }
 
 @warn_unused_result
@@ -98,12 +98,12 @@ public func UIDeviceOrientationIsValidInterfaceOrientation(
 
 #if !os(watchOS) && !os(tvOS)
 public extension UIInterfaceOrientation {
-  var isLandscape: Bool { 
-    get { return self == .LandscapeLeft  ||  self == .LandscapeRight } 
+  var isLandscape: Bool {
+    get { return self == .LandscapeLeft || self == .LandscapeRight }
   }
 
-  var isPortrait: Bool { 
-    get { return self == .Portrait  ||  self == .PortraitUpsideDown } 
+  var isPortrait: Bool {
+    get { return self == .Portrait || self == .PortraitUpsideDown }
   }
 }
 
@@ -173,7 +173,7 @@ struct _UIViewMirror : _MirrorType {
 
   var _v : UIView
   
-  init(_ v : UIView) {_v = v}
+  init(_ v : UIView) { _v = v }
   
   var value: Any { get { return _v } }
   
@@ -187,7 +187,7 @@ struct _UIViewMirror : _MirrorType {
     _preconditionFailure("_MirrorType access out of bounds")
   }
   
-  var summary: String { get { return ""} }
+  var summary: String { get { return "" } }
   
   var quickLookObject: PlaygroundQuickLook? {
       // iOS 7 or greater only

@@ -22,7 +22,7 @@ The general SVN workflow consists of the following commands:
 
 1. Checkout: This means checking out/setting up a new repository.
 2. Update: Pulling the latest remote changes into a local repository.
-3. Commiting: Committing a change to the remote repository.
+3. Committing: Committing a change to the remote repository.
 4. Reverting: Reverting a change from a remote repository.
 5. Browsing: Looking at commits.
 
@@ -32,8 +32,8 @@ repository via bash in a terminal. A lot of information since this is supposed
 to be a short, actionable guide. For more information, please see the Git crash
 course guide for SVN users at <https://git-scm.com/course/SVN.html>
 
-*NOTE* When ever when we say the Swift repository we mean any repository in the
- Swift project.
+*NOTE* Whenever we say the Swift repository, we mean any repository in the
+Swift project.
 
 Quicksetup (TLDR)
 -----------------
@@ -43,7 +43,7 @@ to perform a simple repo setup for the Swift repository::
 
   $ git config --global user.name "<My Name>"
   $ git config --global user.email "<My Email>"
-  $ mkdir swift-source && cd swift-soure
+  $ mkdir swift-source && cd swift-source
   $ git clone <LLVM_REPO_URL>
   $ git clone <CLANG_REPO_URL>
   $ git clone <SWIFT_REPO_URL>
@@ -128,7 +128,7 @@ In Git, instead of performing SVN update, one pulls from the remote repository::
   $ git pull --rebase origin master
 
 This will pull any new remote commits into your local repository and then replay
-your current local commits ontop of those new commits.
+your current local commits on top of those new commits.
 
 By default the '--rebase' flag is not necessary for the Swift repository because
 it is configured to always rebase by setting the 'branch.autosetuprebase' flag
@@ -139,7 +139,7 @@ Commit
 
 In SVN, committing always means submitting changes to a remote repository. In
 Git, committing refers to the process of first telling Git to track a change by
-staging the change and then commiting all staged changes into a change in the
+staging the change and then committing all staged changes into a change in the
 local repository. One can have many such commits. Then when one is ready, one
 pushes the new local changes to the remote repository. We go through these steps
 in more detail below:

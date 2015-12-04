@@ -4,7 +4,7 @@
 Pervasive Philosophies Guiding the Swift Language Design
 ========================================================
 
-This are just notes, in no particular order.
+These are just notes, in no particular order.
 
 Don't Repeat Yourself
 ---------------------
@@ -41,13 +41,13 @@ functionality as well as basic data-types.
 Familiarity to Programmers in the C Family of Languages
 -------------------------------------------------------
 
-"Semicolon and curly brace" langauges are very popular, including C, 
+"Semicolon and curly brace" languages are very popular, including C, 
 Objective-C, C++ etc, but also Java, Javascript, Ruby, and many other languages.
 For this reason, we want the basic expression and statements in Swift to be
 similar to these languages and/or an obvious small leap over them when it makes
 sense.
 
-This is why we don't want to use python-style intendation rules, for example.
+This is why we don't want to use python-style indentation rules, for example.
 
 We do deviate when there is a strong reason to do so.  The C declarator syntax
 is a complete disaster (write the prototype for 'signal' with no typedefs), so
@@ -56,7 +56,7 @@ we must change it.
 Innovation is not a Goal Unto Itself
 ------------------------------------
 
-Being different from all other langauges is not a goal.  Language design
+Being different from all other languages is not a goal.  Language design
 is not a new field.  It is better to borrow good, proven, ideas from other 
 languages than it is to be novel in areas that don't need to change.  This
 is pragmatic language implementation, not open-ended language research.

@@ -115,7 +115,7 @@ function godocs_nodeToText(node) {
   for (var j = 0; j != node.childNodes.length; j++) {
     var child = node.childNodes[j];
     if (child.nodeType == TEXT_NODE) {
-      if (child.nodeValue != '[Top]') { //ok, that's a hack, but it works.
+      if (child.nodeValue != '[Top]') { // Ok, that's a hack, but it works.
         text = text + child.nodeValue;
       }
     } else {

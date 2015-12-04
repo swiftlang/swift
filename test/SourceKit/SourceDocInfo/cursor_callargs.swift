@@ -17,7 +17,7 @@ c1.meth(0, passFloat: 0)
 // RUN: %sourcekitd-test -req=cursor -pos=7:14 %s -- %s | FileCheck -check-prefix=CHECK-METH %s
 // CHECK-METH: source.lang.swift.ref.function.method.instance (4:8-4:38)
 
-// Make sure we don't highlight all "meth" occurences when pointing at "withFloat:".
+// Make sure we don't highlight all "meth" occurrences when pointing at "withFloat:".
 // RUN: %sourcekitd-test -req=related-idents -pos=7:15 %s -- %s | FileCheck -check-prefix=CHECK-IDS %s
 // CHECK-IDS:      START RANGES
 // CHECK-IDS-NEXT: END RANGES

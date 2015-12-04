@@ -167,7 +167,7 @@ bool SROAMemoryUseAnalyzer::analyze() {
     }
 
     // If the use is a struct_element_addr, add it to the worklist so we check
-    // if it or one of its descendents escape.
+    // if it or one of its descendants escape.
     if (auto *ASI = dyn_cast<StructElementAddrInst>(User)) {
       DEBUG(llvm::dbgs() << "        Found a struct subprojection!\n");
       ExtractInsts.push_back(ASI);
@@ -175,7 +175,7 @@ bool SROAMemoryUseAnalyzer::analyze() {
     }
 
     // If the use is a tuple_element_addr, add it to the worklist so we check
-    // if it or one of its descendents escape.
+    // if it or one of its descendants escape.
     if (auto *TSI = dyn_cast<TupleElementAddrInst>(User)) {
       DEBUG(llvm::dbgs() << "        Found a tuple subprojection!\n");
       ExtractInsts.push_back(TSI);

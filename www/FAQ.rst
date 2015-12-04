@@ -15,7 +15,7 @@ Not in the short term.  C++ is a very pragmatic language for implementing
 compilers, since it has good performance characteristics and allows higher-level
 programming idioms than C.
 
-That said, we do expect Swift to a better language than C++ in a number of ways,
+That said, we do expect Swift to be a better language than C++ in a number of ways,
 so why don't we implement the compiler itself in Swift?  There are a couple of
 reasons that bootstrapping is not a good idea, at least in the short term:
 
@@ -37,15 +37,15 @@ Won't the design and evolution of Swift be warped by being too C++-centric?
 ---------------------------------------------------------------------------
 
 This is a common question from Objective-C programmers, primarily those who
-really dislike C++.  There are a lot of reasons you can have hope that Swift
-will end up being a great "successor to Objective-C instead of a "C++
+really dislike C++.  For many reasons you can have hope that Swift
+will end up being a great "successor to Objective-C" instead of a "C++
 replacement":
 
  * The compiler team has expert-level knowledge of Objective-C (the language),
    having implemented the compiler for it from the ground-up.  We probably know
    its dark corners better than anyone.
  * The Swift team has broad experience with a number of other programming
-   languages, including C/C++/Objective-C, Python, Haskell, Java, Javascript,
+   languages, including C/C++/Objective-C, Python, Haskell, Java, JavaScript,
    C#, ...
  * We know C++ well enough to not want to repeat its mistakes.
 

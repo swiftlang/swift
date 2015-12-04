@@ -1,6 +1,6 @@
 include(CMakeParseArguments)
 
-# Use ${cmake_2_8_12_KEYWORD} intead of KEYWORD in target_link_libraries().
+# Use ${cmake_2_8_12_KEYWORD} instead of KEYWORD in target_link_libraries().
 # These variables are used by LLVM's CMake code.
 set(cmake_2_8_12_INTERFACE INTERFACE)
 set(cmake_2_8_12_PRIVATE PRIVATE)
@@ -29,7 +29,7 @@ endif()
 #     Path to llvm include directory.
 #
 #   [OBJ_ROOT_DIR objRootDir]
-#     Path tp llvm build tree.
+#     Path to llvm build tree.
 #
 #   [SOURCE_DIR srcDir]
 #     Path to llvm source tree.

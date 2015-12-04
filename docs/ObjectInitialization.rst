@@ -129,7 +129,7 @@ written within the class definition itself, rather than in an
 extension, because the complete set of designated initializers is part
 of the interface contract with subclasses of a class.
 
-The other, non-designted initializers of a class are called
+The other, non-designated initializers of a class are called
 convenience initializers, which tend to provide additional
 initialization capabilities that are often more convenient for common
 tasks.
@@ -468,7 +468,7 @@ primary uses of the ``Self`` return type is for factory methods::
   these methods.
 
 Within the body of this class method, the implicit parameter ``self``
-is a value with type ``View.Type``, i.e., it;s a type value for the
+is a value with type ``View.Type``, i.e., it's a type value for the
 class ``View`` or one of its subclasses. Therefore, the restrictions
 are the same as for any value of type ``View.Type``: one can call
 other class methods and construct new objects using required
@@ -515,7 +515,7 @@ make use of ``self``. This is important uses of ``self``---say,
 calling a method on ``self``---could end up referring to stored
 properties before they are initialized. Consider the following
 Objective-C code, where instance variables are initialized *after* the
-call to the the superclass initializer::
+call to the superclass initializer::
 
   @interface A : NSObject
   - (instancetype)init;

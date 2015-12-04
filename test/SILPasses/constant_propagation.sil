@@ -38,7 +38,7 @@ bb0:
 // CHECK-NOT: integer_literal $Builtin.Int64, 0
 // CHECK-NOT: builtin
 // CHECK: [[RES:%.*]] = integer_literal $Builtin.Int64, 7
-// CHECK-NEXT: return [[RES:%.*]] : $Builtin.Int64
+// CHECK-NEXT: return [[RES]] : $Builtin.Int64
 }
 
 // Fold casts. (This test assumes that DCE does not run, otherwise the unreachable blocks will get removed.)

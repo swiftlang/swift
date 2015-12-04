@@ -277,7 +277,7 @@ extension String {
   /// Returns a capitalized representation of the `String`
   /// using the specified locale.
   @warn_unused_result
-  public func capitalizedStringWithLocale(locale: NSLocale?) -> String{
+  public func capitalizedStringWithLocale(locale: NSLocale?) -> String {
     return _ns.capitalizedStringWithLocale(locale) as String
   }
 

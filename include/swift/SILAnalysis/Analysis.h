@@ -15,6 +15,7 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
+#include "swift/SIL/Notifications.h"
 #include <vector>
 
 #ifndef SWIFT_SILANALYSIS_ANALYSIS_H
@@ -26,7 +27,7 @@ namespace swift {
   class SILPassManager;
 
   /// The base class for all SIL-level analysis.
-  class SILAnalysis {
+  class SILAnalysis : public DeleteNotificationHandler {
   public:
     /// This is a list of values that allow passes to communicate to analysis
     /// which traits of the code were invalidated. Based on this information

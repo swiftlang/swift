@@ -188,7 +188,7 @@ bb0(%0 : $S1):
   return %9999 : $()
 }
 
-// This test checks where we have a multiple level heirarchy, the root is dead,
+// This test checks where we have a multiple level hierarchy, the root is dead,
 // but the root has all fields used. This means that we should extract
 // everything, but we should not "reform" the aggregate.
 // CHECK-LABEL: sil [fragile] [thunk] @multiple_level_all_root_fields_used_callee : $@convention(thin) (S2) -> (Builtin.Int16, Builtin.Int64) {

@@ -383,7 +383,7 @@ for a enum element that has no extra data, or it can be ``T2 -> T0``,
 where ``T2`` is the data associated with the enum element.  For the
 latter case, the actual arguments are parsed as part of the unresolved
 member reference, so that a function application constraint describes
-their conversion to the input tyoe ``T2``.
+their conversion to the input type ``T2``.
 
 Polymorphic Types
 ''''''''''''''''''''''''''''''''''''''''''''''
@@ -486,7 +486,7 @@ down to only simple constraints that are trivially satisfied.
 The simplification process breaks down constraints into simpler
 constraints, and each different kind of constraint is handled by
 different rules based on the Swift type system. The constraints fall
-intofive categories: relational constraints, member constraints,
+into five categories: relational constraints, member constraints,
 type properties, conjunctions, and disjunctions. Only the first three
 kinds of constraints have interesting simplification rules, and are
 discussed in the following sections.
@@ -668,7 +668,7 @@ choices of the two systems are compared to produce a relative score:
   the other, the solution with the subtype earns +1.
 
 - If an overload set has different selected overloads in the two
-  soluions, the overloads are compared. If the type of the
+  solutions, the overloads are compared. If the type of the
   overload picked in one solution is a subtype of the type of
   the overload picked in the other solution, then first solution earns
   +1.
@@ -687,7 +687,7 @@ node based on the kind of expression:
 
 *Declaration references*
   Declaration references are rewritten with the precise type of the
-  declaraion as referenced. For overloaded declaration references, the
+  declaration as referenced. For overloaded declaration references, the
   ``Overload*Expr`` node is replaced with a simple declaration
   reference expression. For references to polymorphic functions or
   members of generic types, a ``SpecializeExpr`` node is introduced to

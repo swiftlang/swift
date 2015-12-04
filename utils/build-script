@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #===--- build-script - The ultimate tool for building Swift ----------------===#
 #
 ## This source file is part of the Swift.org open source project
@@ -138,11 +138,11 @@ SWIFT_SOURCE_ROOT: a directory containing the source for LLVM, Clang, Swift.
    $SWIFT_SOURCE_ROOT/llvm
                      /clang
                      /swift
-                     /lldb       (optional)
-                     /llbuild    (optional)
-                     /swiftpm    (optional, requires llbuild)
-                     /XCTest     (optional)
-                     /Foundation (optional)
+                     /lldb                      (optional)
+                     /llbuild                   (optional)
+                     /swiftpm                   (optional, requires llbuild)
+                     /swift-corelibs-xctest     (optional)
+                     /swift-corelibs-foundation (optional)
 
 SWIFT_BUILD_ROOT: a directory in which to create out-of-tree builds.
                   Defaults to "$SWIFT_SOURCE_ROOT/build/".

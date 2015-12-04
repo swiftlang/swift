@@ -28,7 +28,7 @@ The LLVM lit-based testsuite
 **Run by**:
 
 * Engineers and contributors are expected to run tests from these testsuites
-  locally before commiting.  (Usually on a single platform, and not necessarily
+  locally before committing.  (Usually on a single platform, and not necessarily
   all tests.)
 
 * Buildbots run all tests, on all supported platforms.
@@ -55,7 +55,7 @@ For day-to-day work on the Swift compiler, using check-swift should be
 sufficient.  The buildbot runs validation tests, so if those are accidentally
 broken, it should not go unnoticed.
 
-Before commiting a large change to a compiler (especially a language change),
+Before committing a large change to a compiler (especially a language change),
 or API changes to the standard library, it is recommended to run validation
 test suite.
 
@@ -264,7 +264,7 @@ Other substitutions:
 * ``%sdk``: FIXME.
 * ``%gyb``: FIXME.
 
-* ``%platform-module-dir``: absolute path of the directory where the stdandard
+* ``%platform-module-dir``: absolute path of the directory where the standard
   library module file for the target platform is stored.  For example,
   ``/.../lib/swift/macosx``.
 

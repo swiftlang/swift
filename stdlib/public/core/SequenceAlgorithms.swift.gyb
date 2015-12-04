@@ -140,7 +140,7 @@ if preds:
   rethrows_ = "rethrows "
 else:
   comment = """
-  /// Return true iff the the initial elements of `self` are equal to `prefix`.
+  /// Return true iff the initial elements of `self` are equal to `prefix`.
   /// Return true if `other` is empty."""
   rethrows_ = ""
 }%

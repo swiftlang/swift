@@ -153,6 +153,7 @@ SILPassManager::SILPassManager(SILModule *M, llvm::StringRef Stage) :
 
   for (SILAnalysis *A : Analysis) {
     A->initialize(this);
+    M->registerDeleteNotificationHandler(A);
   }
 }
 
@@ -197,7 +198,9 @@ bool SILPassManager::runFunctionPasses(PassList FuncTransforms) {
       }
 
       llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
+      Mod->registerDeleteNotificationHandler(SFT);
       SFT->run();
+      Mod->removeDeleteNotificationHandler(SFT);
 
       if (SILPrintPassTime) {
         auto Delta = llvm::sys::TimeValue::now().nanoseconds() -
@@ -298,7 +301,9 @@ void SILPassManager::runOneIteration() {
       }
 
       llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
+      Mod->registerDeleteNotificationHandler(SMT);
       SMT->run();
+      Mod->removeDeleteNotificationHandler(SMT);
 
       if (SILPrintPassTime) {
         auto Delta = llvm::sys::TimeValue::now().nanoseconds() -
@@ -378,6 +383,7 @@ SILPassManager::~SILPassManager() {
 
   // delete the analyis.
   for (auto A : Analysis) {
+    Mod->removeDeleteNotificationHandler(A);
     assert(!A->isLocked() &&
            "Deleting a locked analysis. Did we forget to unlock ?");
     delete A;

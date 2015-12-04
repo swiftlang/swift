@@ -309,10 +309,16 @@ static bool isKeyword(StringRef identifier) {
 static Optional<StringRef> skipTypeSuffix(StringRef typeName) {
   if (typeName.empty()) return None;
 
+  auto lastWord = camel_case::getLastWord(typeName);
+
   // "Type" suffix.
-  if (camel_case::getLastWord(typeName) == "Type" &&
-      typeName.size() > 4) {
+  if (lastWord == "Type" && typeName.size() > 4) {
     return typeName.drop_back(4);
+  }
+
+  // "Ref" suffix.
+  if (lastWord == "Ref" && typeName.size() > 3) {
+    return typeName.drop_back(3);
   }
 
   // \d+D for dimensionality.
@@ -436,9 +442,10 @@ bool InheritedNameSet::contains(StringRef name) const {
 }
 
 /// Wrapper for camel_case::toLowercaseWord that uses string scratch space.
-static StringRef toLowercaseWord(StringRef string, StringScratchSpace &scratch){
+StringRef camel_case::toLowercaseWord(StringRef string,
+                                      StringScratchSpace &scratch){
   llvm::SmallString<32> scratchStr;
-  StringRef result = camel_case::toLowercaseWord(string, scratchStr);
+  StringRef result = toLowercaseWord(string, scratchStr);
   if (string == result)
     return string;
 

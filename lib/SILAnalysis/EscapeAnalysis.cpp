@@ -879,7 +879,7 @@ static bool linkBBArgs(SILBasicBlock *BB) {
   if (BB == &BB->getParent()->front())
     return false;
   // We don't need to link to the try_apply's normal result argument, because
-  // we handle it separatly in setAllEscaping() and mergeCalleeGraph().
+  // we handle it separately in setAllEscaping() and mergeCalleeGraph().
   if (SILBasicBlock *SinglePred = BB->getSinglePredecessor()) {
     auto *TAI = dyn_cast<TryApplyInst>(SinglePred->getTerminator());
     if (TAI && BB == TAI->getNormalBB())
@@ -1286,7 +1286,7 @@ void EscapeAnalysis::recompute() {
 
       // Limit the total number of iterations. First to limit compile time,
       // second to make sure that the loop terminates. Theoretically this
-      // should alwasy be the case, but who knows?
+      // should always be the case, but who knows?
       if (Iteration >= MaxGraphMerges) {
         DEBUG(llvm::dbgs() << "  finalize " <<
               FInfo->Graph.F->getName() << '\n');

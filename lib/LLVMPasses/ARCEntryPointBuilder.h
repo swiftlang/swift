@@ -165,7 +165,7 @@ private:
   /// getRetain - Return a callable function for swift_retain.
   Constant *getRetain() {
     if (Retain)
-      return Retain.get();;
+      return Retain.get();
     auto *ObjectPtrTy = getObjectPtrTy();
 
     auto &M = getModule();
@@ -180,7 +180,7 @@ private:
   /// getRelease - Return a callable function for swift_release.
   Constant *getRelease() {
     if (Release)
-      return Release.get();;
+      return Release.get();
     auto *ObjectPtrTy = getObjectPtrTy();
 
     auto &M = getModule();

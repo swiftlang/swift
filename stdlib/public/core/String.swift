@@ -95,7 +95,7 @@ import SwiftShims
 ///
 /// `String` is bridged to Objective-C as `NSString`, and a `String`
 /// that originated in Objective-C may store its characters in an
-/// `NSString`.  Since any arbitrary subclass of `NSSString` can
+/// `NSString`.  Since any arbitrary subclass of `NSString` can
 /// become a `String`, there are no guarantees about representation or
 /// efficiency in this case.  Since `NSString` is immutable, it is
 /// just as though the storage was shared by some copy: the first in
@@ -296,7 +296,7 @@ extension String {
 /// Compare two strings using the Unicode collation algorithm in the
 /// deterministic comparison mode.  (The strings which are equivalent according
 /// to their NFD form are considered equal.  Strings which are equivalent
-/// according to the plain Unicode collation algorithm are additionaly ordered
+/// according to the plain Unicode collation algorithm are additionally ordered
 /// based on their NFD.)
 ///
 /// See Unicode Technical Standard #10.

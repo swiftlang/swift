@@ -1273,7 +1273,7 @@ private:
 
     // If the starting version range is not completely contained in the
     // false flow version range then it must be the case that false flow range
-    // is strictly smaller than the the starting range (because the false flow
+    // is strictly smaller than the starting range (because the false flow
     // range *is* contained in the starting range), so we should introduce a
     // new refinement for the false flow.
     if (!StartingTRC->getPotentialVersions().isContainedIn(FalseFlow)) {
@@ -1487,7 +1487,7 @@ void TypeChecker::diagnosePotentialUnavailability(
 /// This class finds the innermost nodes of interest by walking
 /// down the root until it has found the target range (in a Pre-visitor)
 /// and then recording the innermost node on the way back up in the
-/// the Post-visitors. It does its best to not search unnecessary subtrees,
+/// Post-visitors. It does its best to not search unnecessary subtrees,
 /// although this is complicated by the fact that not all nodes have
 /// source range information.
 class InnermostAncestorFinder : private ASTWalker {
@@ -1911,8 +1911,8 @@ static void fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
   SourceLoc InsertLoc;
 
   // To avoid exposing the pattern binding declaration to the user, get the
-  // descriptive kind from one of the VarDecls. We get the the Fix-It
-  // location from the PatternBindingDecl unless the VarDecl has attributes,
+  // descriptive kind from one of the VarDecls. We get the Fix-It location
+  // from the PatternBindingDecl unless the VarDecl has attributes,
   // in which case we get the start location of the VarDecl attributes.
   DeclAttributes AttrsForLoc;
   if (KindForDiagnostic == DescriptiveDeclKind::PatternBinding) {

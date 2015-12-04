@@ -100,7 +100,7 @@ func bar(x: Int) -> (Int, Float) {
 class C2 {
   typealias WW = Int
   var p = 0
-  
+
   func meth(x: Int) {}
 }
 
@@ -109,7 +109,7 @@ func test2(x: C2) {
   x.meth(0)
 }
 
-// CHECK: class <Class>GenCls</Class><T> {
+// CHECK: class <Class>GenCls</Class><<GenericTypeParam>T</GenericTypeParam>> {
 class GenCls<T> {
   // CHECK: <Constructor>init</Constructor>() {}
   init() {}

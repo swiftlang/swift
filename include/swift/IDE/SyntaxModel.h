@@ -44,11 +44,11 @@ enum class SyntaxNodeKind : uint8_t {
   CommentMarker,
   CommentURL,
   TypeId,
-  /// #if/#else/#endif occurence.
+  /// #if/#else/#endif occurrence.
   BuildConfigKeyword,
   /// An identifier in a #if condition.
   BuildConfigId,
-  /// Any occurence of '@<attribute-name>' anywhere.
+  /// Any occurrence of '@<attribute-name>' anywhere.
   AttributeId,
   /// A "resolved/active" attribute. Mis-applied attributes will be AttributeId.
   AttributeBuiltin,

@@ -377,7 +377,7 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
     L = LastDebugLoc;
   }
 
-  //FIXME: Enable this assertion.
+  // FIXME: Enable this assertion.
   //assert(lineNumberIsSane(Builder, L.Line) &&
   //       "-Onone, but line numbers are not monotonically increasing within bb");
   LastDebugLoc = L;
