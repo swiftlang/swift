@@ -93,10 +93,11 @@ it next to the other projects and it will be bootstrapped automatically:
 
     git clone git@github.com:martine/ninja.git
 
-You can also use a third-party packaging tool like [Homebrew](http://brew.sh) to
-install CMake and Ninja on OS X:
+You can also use a third-party packaging tool like [Homebrew](http://brew.sh) or
+[MacPorts](https://macports.org) to install CMake and Ninja on OS X:
 
     brew install cmake ninja
+    sudo port install cmake ninja
 
 ### Building Swift
 
