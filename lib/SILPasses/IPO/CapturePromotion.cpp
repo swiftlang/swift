@@ -495,10 +495,10 @@ ClosureCloner::populateCloned() {
 /// debug_value, otherwise it is handled normally.
 void ClosureCloner::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
   SILValue Operand = Inst->getOperand();
-  if (SILArgument *A = dyn_cast<SILArgument>(Operand)) {
+  if (auto *A = dyn_cast<ProjectBoxInst>(Operand)) {
     assert(Operand.getResultNumber() == 0);
-    auto I = AddrArgumentMap.find(A);
-    if (I != AddrArgumentMap.end()) {
+    auto I = ProjectBoxArgumentMap.find(A);
+    if (I != ProjectBoxArgumentMap.end()) {
       getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
       getBuilder().createDebugValue(Inst->getLoc(), I->second,
                                     Inst->getVarInfo().getArgNo());
