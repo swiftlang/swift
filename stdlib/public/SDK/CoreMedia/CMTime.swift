@@ -67,7 +67,6 @@ extension CMTime {
 
   public func convertScale(newTimescale: Int32, method: CMTimeRoundingMethod)
     -> CMTime {
-
     return CMTimeConvertScale(self, newTimescale, method)
   }
 }
