@@ -2028,12 +2028,12 @@ const ToolChain *Driver::getToolChain(const ArgList &Args) const {
       break;
 #if defined(SWIFT_ENABLE_TARGET_LINUX)
     case llvm::Triple::Linux:
-      TC = new toolchains::Linux(*this, Target);
+      TC = new toolchains::Unix(*this, Target);
       break;
 #endif // SWIFT_ENABLE_TARGET_LINUX
 #if defined(SWIFT_ENABLE_TARGET_FREEBSD)
     case llvm::Triple::FreeBSD:
-      TC = new toolchains::FreeBSD(*this, Target);
+      TC = new toolchains::Unix(*this, Target);
       break;
 #endif // SWIFT_ENABLE_TARGET_FREEBSD
     default:
