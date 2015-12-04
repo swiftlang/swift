@@ -385,7 +385,7 @@ SHOW_DIRECTORIES       = YES
 # version control system). Doxygen will invoke the program by executing (via 
 # popen()) the command <command> <input-file>, where <command> is the value of 
 # the FILE_VERSION_FILTER tag, and <input-file> is the name of an input file 
-# provided by doxygen. Whatever the progam writes to standard output 
+# provided by doxygen. Whatever the program writes to standard output 
 # is used as the file version. See the manual for examples.
 
 #FILE_VERSION_FILTER    = 
@@ -418,7 +418,7 @@ WARN_IF_UNDOCUMENTED   = NO
 
 WARN_IF_DOC_ERROR      = YES
 
-# This WARN_NO_PARAMDOC option can be abled to get warnings for 
+# This WARN_NO_PARAMDOC option can be enabled to get warnings for 
 # functions that are documented, but have no documentation for their parameters 
 # or return value. If set to NO (the default) doxygen will only warn about 
 # wrong or incomplete parameter documentation, but not about the absence of 
