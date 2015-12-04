@@ -2224,17 +2224,24 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
     fi
     if [[ "${TEST_INSTALLABLE_PACKAGE}" ]] ; then
         PKG_TESTS_SOURCE_DIR="${WORKSPACE}/swift-package-tests"
-        PKG_TESTS_SANDBOX="/tmp/swift_package_sandbox"
+        PKG_TESTS_SANDBOX_PARENT="/tmp/swift_package_sandbox"
+
+        if [[ "$(uname -s)" == "Darwin" ]] ; then
+            PKG_TESTS_SANDBOX="${PKG_TESTS_SANDBOX_PARENT}"/"${TOOLCHAIN_PREFIX}"
+        else # Linux
+            PKG_TESTS_SANDBOX="${PKG_TESTS_SANDBOX_PARENT}"
+        fi
+
         LIT_EXECUTABLE_PATH="${LLVM_SOURCE_DIR}/utils/lit/lit.py"
         FILECHECK_EXECUTABLE_PATH="$(build_directory_bin $deployment_target llvm)/FileCheck"
-
-        rm -rf "${PKG_TESTS_SANDBOX}"
-        mkdir "${PKG_TESTS_SANDBOX}"
-        pushd "${PKG_TESTS_SANDBOX}"
+        echo "-- Test Installable Package --"
+        set -x
+        rm -rf "${PKG_TESTS_SANDBOX_PARENT}"
+        mkdir -p "${PKG_TESTS_SANDBOX}"
+        pushd "${PKG_TESTS_SANDBOX_PARENT}"
         tar xzf "${INSTALLABLE_PACKAGE}"
         popd
 
-        set -x
         (cd "${PKG_TESTS_SOURCE_DIR}" &&
                 python "${LIT_EXECUTABLE_PATH}" . -sv --param package-path="${PKG_TESTS_SANDBOX}" --param filecheck="${FILECHECK_EXECUTABLE_PATH}")
         { set +x; } 2>/dev/null
