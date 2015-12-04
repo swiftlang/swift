@@ -77,7 +77,7 @@ func testMultiArray(i : Int, j : Int, array : [[Int]]) {
        &global_array[0][i])
   
   // TODO: This is obviously the same writeback problem, but isn't detectable
-  // with the current level of sophisitication in SILGen.
+  // with the current level of sophistication in SILGen.
   swap(&array[1+0][j], &array[1+0][i])
 
   swap(&global_array[0][j], &array[j][i])  // ok
@@ -105,7 +105,7 @@ func testMultiArrayWithoutAddressors(
        &global_array_without_addressors[0][i])   // expected-error {{inout writeback through subscript occurs in multiple arguments to call, introducing invalid aliasing}}
 
   // TODO: This is obviously the same writeback problem, but isn't detectable
-  // with the current level of sophisitication in SILGen.
+  // with the current level of sophistication in SILGen.
   swap(&array[1+0][j], &array[1+0][i])
 
   swap(&global_array_without_addressors[0][j], &array[j][i])  // ok
