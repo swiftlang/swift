@@ -1454,7 +1454,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
             -D${PRODUCT}_PATH_TO_CMARK_BUILD:PATH="$(build_directory $deployment_target cmark)"
         )
 
-        if [[ "${CMAKE_GENERATOR}" != "Ninja" ]] ; then
+        if [[ "${CMAKE_GENERATOR}" == "Xcode" ]] ; then
             swift_cmake_options=(
                 "${swift_cmake_options[@]-}"
                 -D${PRODUCT}_CMARK_LIBRARY_DIR:PATH=$(build_directory $deployment_target cmark)/src/$CMARK_BUILD_TYPE
@@ -1521,7 +1521,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 ;;
 
             swift)
-                cmake_options=(${COMMON_CMAKE_OPTIONS[@]})
+                cmake_options=("${COMMON_CMAKE_OPTIONS[@]}")
                 if [[ "$USE_GOLD_LINKER" ]]; then
                     # Swift will selectively use the gold linker on all
                     # parts except building the standard library.  We
