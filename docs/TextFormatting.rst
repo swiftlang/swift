@@ -129,8 +129,7 @@ Debug Printing
 
 Via compiler magic, *everything* conforms to the ``CustomDebugStringConvertible``
 protocol. To change the debug representation for a type, you don't
-need to declare conformance: simply give the type a ``debugFormat()``
-::
+need to declare conformance: simply give the type a ``debugFormat()``::
 
   /// \brief A thing that can be printed in the REPL and the Debugger
   protocol CustomDebugStringConvertible {
@@ -199,7 +198,7 @@ Because it's not always efficient to construct a ``String``
 representation before writing an object to a stream, we provide a
 ``Streamable`` protocol, for types that can write themselves into an
 ``OutputStream``. Every ``Streamable`` is also a ``CustomStringConvertible``,
-naturally ::
+naturally::
 
   protocol Streamable : CustomStringConvertible {
     func writeTo<T: OutputStream>(target: [inout] T)
@@ -426,7 +425,7 @@ would also make ``OutputStream`` adapters a *bit* simpler to use
 because you'd never need to “write back” explicitly onto the target
 stream. However, stateful ``OutputStream`` adapters would still need a
 ``close()`` method, which makes a perfect place to return a copy of
-the underlying stream, which can then be “written back.”  :
+the underlying stream, which can then be “written back”:
 
 .. parsed-literal::
 
