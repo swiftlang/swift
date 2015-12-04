@@ -488,6 +488,17 @@ static unsigned countDefaultArguments(AbstractFunctionDecl *func) {
 /// "Specialized" is essentially a form of subtyping, defined below.
 static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
                                   ValueDecl *decl1, ValueDecl *decl2) {
+
+
+  if (tc.getLangOpts().DebugConstraintSolver) {
+    auto &log = tc.Context.TypeCheckerDebug->getStream();
+    log << "Comparing declarations \n";
+    decl1->print(log); 
+    log << "\nand\n";
+    decl2->print(log);
+    log << "\n";
+  }
+
   // If the kinds are different, there's nothing we can do.
   // FIXME: This is wrong for type declarations, which we're skipping
   // entirely.
