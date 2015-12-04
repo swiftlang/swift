@@ -55,3 +55,9 @@ who spend a lot of time writing C++ code are some of the most expert people at
 explaining its varied faults.  Don't consider use of C++ to be the same as
 "love" for it. :)
 
+How can I contribute to Swift?
+------------------------------
+
+Contributions to Swift are welcomed and encouraged! Please see the [Contributing to Swift guide](https://swift.org/contributing/).
+To give clarity of what is expected of our members, Swift has adopted the code of conduct defined by the Contributor Covenant. This document is used across many open source communities, and we think it articulates our values well. For more, see the [website](https://swift.org/community/#code-of-conduct).
+
