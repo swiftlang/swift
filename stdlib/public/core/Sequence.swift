@@ -583,6 +583,18 @@ extension SequenceType where Generator.Element : Equatable {
     return split(maxSplit, allowEmptySlices: allowEmptySlices,
       isSeparator: { $0 == separator })
   }
+
+  /// Return an `Array` containing the elements of `self`
+  @warn_unused_result
+  public func uniq() -> [Generator.Element] {
+    return reduce(Array<Generator.Element>()) { (arr, element) -> [Generator.Element] in
+      if arr.contains({ $0 == element }) { return arr }
+
+      var newArr = arr
+      newArr.append(element)
+      return newArr
+    }
+  }
 }
 
 extension SequenceType {
