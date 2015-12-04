@@ -66,7 +66,7 @@ Driver::Driver(StringRef DriverExecutable,
     DefaultTargetTriple(llvm::sys::getDefaultTargetTriple()) {
       
   // The driver kind must be parsed prior to parsing arguments, since that
-  // affects how argumens are parsed.
+  // affects how arguments are parsed.
   parseDriverKind(Args.slice(1));
 }
 
@@ -852,7 +852,7 @@ static bool isSDKTooOld(StringRef sdkPath, const llvm::Triple &target) {
 void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
                              const InputList &Inputs, OutputInfo &OI) const {
   // By default, the driver does not link its output; this will be updated
-  // appropariately below if linking is required.
+  // appropriately below if linking is required.
 
   if (driverKind == DriverKind::Interactive) {
     OI.CompilerMode = OutputInfo::Mode::Immediate;
