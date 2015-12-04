@@ -18,8 +18,13 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include <vector>
 
+namespace swift {
+class CapturedValue;
+}
+
 namespace llvm {
 class raw_ostream;
+template <> struct DenseMapInfo<swift::CapturedValue>;
 }
 
 namespace swift {
@@ -30,7 +35,12 @@ class FuncDecl;
 /// that indicate how it is captured.
 class CapturedValue {
   llvm::PointerIntPair<ValueDecl*, 2, unsigned> Value;
+
+  explicit CapturedValue(llvm::PointerIntPair<ValueDecl*, 2, unsigned> V) : Value(V) {}
+
 public:
+  friend struct llvm::DenseMapInfo<CapturedValue>;
+
   enum {
     /// IsDirect is set when a VarDecl with storage *and* accessors is captured
     /// by its storage address.  This happens in the accessors for the VarDecl.
@@ -64,7 +74,36 @@ public:
   }
 };
 
+} // end swift namespace
 
+namespace llvm {
+
+template <> struct DenseMapInfo<swift::CapturedValue> {
+  using CapturedValue = swift::CapturedValue;
+
+  using PtrIntPairDenseMapInfo =
+      DenseMapInfo<llvm::PointerIntPair<swift::ValueDecl *, 2, unsigned>>;
+
+  static inline swift::CapturedValue getEmptyKey() {
+    return CapturedValue{PtrIntPairDenseMapInfo::getEmptyKey()};
+  }
+
+  static inline CapturedValue getTombstoneKey() {
+    return CapturedValue{PtrIntPairDenseMapInfo::getTombstoneKey()};
+  }
+
+  static unsigned getHashValue(const CapturedValue &Val) {
+    return PtrIntPairDenseMapInfo::getHashValue(Val.Value);
+  }
+
+  static bool isEqual(const CapturedValue &LHS, const CapturedValue &RHS) {
+    return PtrIntPairDenseMapInfo::isEqual(LHS.Value, RHS.Value);
+  }
+};
+
+} // end llvm namespace
+
+namespace swift {
 
 /// \brief Stores information about captured variables.
 class CaptureInfo {
