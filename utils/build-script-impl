@@ -182,6 +182,7 @@ KNOWN_SETTINGS=(
     darwin-toolchain-application-cert  ""        "Application Cert name to codesign xctoolchain"
     darwin-toolchain-installer-cert    ""        "Installer Cert name to create installer pkg"
     darwin-toolchain-installer-package ""        "The path to installer pkg"
+    build-jobs ""                                "The number of parallel build jobs to use"
 
 )
 
@@ -1049,9 +1050,16 @@ case "${CMAKE_GENERATOR}" in
         if [[ "${VERBOSE_BUILD}" ]] ; then
             BUILD_ARGS="${BUILD_ARGS} -v"
         fi
+        if [[ "${BUILD_JOBS}" ]] ; then
+            BUILD_ARGS="${BUILD_ARGS} -j${BUILD_JOBS}"
+        fi
         ;;
     'Unix Makefiles')
-        BUILD_ARGS="${BUILD_ARGS:--j$(get_make_parallelism)}"
+        if [[ "${BUILD_JOBS}" ]] ; then
+            BUILD_ARGS="${BUILD_ARGS} -j${BUILD_JOBS}"
+        else
+            BUILD_ARGS="${BUILD_ARGS:--j$(get_make_parallelism)}"
+        fi
         if [[ "${VERBOSE_BUILD}" ]] ; then
             BUILD_ARGS="${BUILD_ARGS} VERBOSE=1"
         fi
@@ -1061,6 +1069,9 @@ case "${CMAKE_GENERATOR}" in
         # but since we're not using proper Xcode 4 schemes, this is the
         # only way to get target-level parallelism.
         BUILD_ARGS="${BUILD_ARGS} -parallelizeTargets"
+        if [[ "${BUILD_JOBS}" ]] ; then
+            BUILD_ARGS="${BUILD_ARGS} -jobs ${BUILD_JOBS}"
+        fi
         BUILD_TARGET_FLAG="-target"
         COMMON_CMAKE_OPTIONS=(
             "${COMMON_CMAKE_OPTIONS[@]}"
