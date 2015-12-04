@@ -296,7 +296,7 @@ extension String {
 /// Compare two strings using the Unicode collation algorithm in the
 /// deterministic comparison mode.  (The strings which are equivalent according
 /// to their NFD form are considered equal.  Strings which are equivalent
-/// according to the plain Unicode collation algorithm are additionaly ordered
+/// according to the plain Unicode collation algorithm are additionally ordered
 /// based on their NFD.)
 ///
 /// See Unicode Technical Standard #10.
