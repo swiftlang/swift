@@ -2930,7 +2930,7 @@ public:
 
     if (!IsSecondPass) {
       for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
-        // Type check each VarDecl in that his PatternBinding handles.
+        // Type check each VarDecl that this PatternBinding handles.
         visitBoundVars(PBD->getPattern(i));
 
         // If we have a type but no initializer, check whether the type is
