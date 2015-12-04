@@ -20,6 +20,7 @@
 #include <sys/errno.h>
 #include <unistd.h>
 #include <climits>
+#include <cstdarg>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
