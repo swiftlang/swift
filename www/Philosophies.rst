@@ -4,7 +4,7 @@
 Pervasive Philosophies Guiding the Swift Language Design
 ========================================================
 
-This are just notes, in no particular order.
+These are just notes, in no particular order.
 
 Don't Repeat Yourself
 ---------------------
