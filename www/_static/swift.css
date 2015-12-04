@@ -40,7 +40,7 @@ th {
   border: 2px solid gray;
   font-weight: bold;
   font-size: 105%;
-  background: url("http://llvm.org/img/lines.gif");
+  background-image: url(http://llvm.org/img/lines.gif);
   font-family: "Georgia,Palatino,Times,Roman,SanSerif";
   text-align: center;
   vertical-align: middle;
@@ -50,7 +50,7 @@ th {
 h1,
 h2 {
   color: black;
-  background: url("http://llvm.org/img/lines.gif");
+  background-image: url(http://llvm.org/img/lines.gif);
   font-family: "Georgia,Palatino,Times,Roman,SanSerif";
   font-weight: bold;
   border-width: 1px;
