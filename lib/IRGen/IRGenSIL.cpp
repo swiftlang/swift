@@ -575,8 +575,6 @@ public:
   //===--------------------------------------------------------------------===//
 
   void visitSILBasicBlock(SILBasicBlock *BB);
-  IndirectionKind getLoweredArgValue(llvm::SmallVectorImpl<llvm::Value *> &Vals,
-                                     SILArgument *Arg, StringRef Name);
 
   void emitFunctionArgDebugInfo(SILBasicBlock *BB);
 
@@ -1388,24 +1386,6 @@ static unsigned countArgs(DeclContext *DC) {
   else
     llvm_unreachable("unhandled declcontext type");
   return N;
-}
-
-/// Store the lowered IR representation of Arg in the array
-/// Vals. Returns true if Arg is a byref argument.
-IndirectionKind IRGenSILFunction::
-getLoweredArgValue(llvm::SmallVectorImpl<llvm::Value *> &Vals,
-                   SILArgument *Arg, StringRef Name) {
-  const LoweredValue &LoweredArg = getLoweredValue(Arg);
-  if (LoweredArg.isAddress()) {
-    Vals.push_back(LoweredArg.getAddress().getAddress());
-    return IndirectValue;
-  } else if (LoweredArg.kind == LoweredValue::Kind::Explosion) {
-    Explosion e = LoweredArg.getExplosion(*this);
-    for (auto val : e.claimAll())
-      Vals.push_back(val);
-  } else
-    llvm_unreachable("unhandled argument kind");
-  return DirectValue;
 }
 
 void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
