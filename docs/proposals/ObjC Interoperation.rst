@@ -330,7 +330,7 @@ difference between a stored property and its underlying storage,
 For another example, code 
 class might access 
 
-In bot hcaess, t makes sense to organize the code that way,
+In both cases, t makes sense to organize the code that way,
 but Objective C punishes the performance of that code in order to
 reserve the language's 
 

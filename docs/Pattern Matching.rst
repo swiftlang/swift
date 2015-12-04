@@ -26,7 +26,7 @@ Swift has a pretty small set of types right now:
 * Function types.
 * Tuples. Heterogeneous fixed-length products. Swift's system
   provides two basic kinds of element: positional and labelled.
-* Arrays. Homogenous fixed-length aggregates.
+* Arrays. Homogeneous fixed-length aggregates.
 * Algebraic data types (ADTs), introduce by enum.  Nominal closed
   disjoint unions of heterogeneous types.
 * Struct types.  Nominal heterogeneous fixed-length products.

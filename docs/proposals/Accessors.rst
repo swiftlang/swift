@@ -1296,7 +1296,7 @@ Code generation patterns
 The signatures and access patterns for addressors will need to change
 in order to ensure memory-safety.
 
-``mutableAddress`` currentlys returns an ``UnsafeMutablePointer``; it
+``mutableAddress`` currently returns an ``UnsafeMutablePointer``; it
 will need to return ``(Builtin.NativeObject?, UnsafeMutablePointer)``.
 The owner pointer must be a native object; we cannot efficiently
 support either uniqueness checking or the NSM bit on non-Swift
