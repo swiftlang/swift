@@ -66,6 +66,8 @@ compiler for C++14 support and create a symlink:
 
 ### Getting Sources for Swift and Related Projects
 
+     git clone https://github.com/apple/swift.git swift
+     cd swift
      ./utils/update-checkout --clone
 
 [CMake](http://cmake.org) is the core infrastructure used to configure builds of
