@@ -615,7 +615,7 @@ internal func _copyCollectionToNativeArrayBuffer<
     (p++).initialize(source[i++])
   }
   _expectEnd(i, source)
-  return result;
+  return result
 }
 
 /// A "builder" interface for initializing array buffers.

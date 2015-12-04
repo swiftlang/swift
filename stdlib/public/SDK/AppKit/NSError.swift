@@ -28,14 +28,14 @@ public extension NSCocoaError {
   }
 
   public var isServiceError: Bool {
-    return rawValue >= 66560 && rawValue <= 66817;
+    return rawValue >= 66560 && rawValue <= 66817
   }
 
   public var isSharingServiceError: Bool {
-    return rawValue >= 67072 && rawValue <= 67327;
+    return rawValue >= 67072 && rawValue <= 67327
   }
 
   public var isTextReadWriteError: Bool {
-    return rawValue >= 65792 && rawValue <= 66303;
+    return rawValue >= 65792 && rawValue <= 66303
   }
 }
