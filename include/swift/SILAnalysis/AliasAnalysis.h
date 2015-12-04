@@ -22,6 +22,7 @@ namespace swift {
 
 class SILValue;
 class SILInstruction;
+class ValueBase;
 class SideEffectAnalysis;
 
 /// This class is a simple wrapper around an alias analysis cache. This is
@@ -82,7 +83,7 @@ private:
   bool typesMayAlias(SILType T1, SILType T2);
 
 
-  virtual void handleDeleteNotification(SILInstruction *I) override {
+  virtual void handleDeleteNotification(ValueBase *I) override {
   }
 
 public:
