@@ -570,6 +570,10 @@ bool COWArrayOpt::isRetainReleasedBeforeMutate(SILInstruction *RetainInst,
 bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
 
   for (auto *UseInst : AddressUsers) {
+
+    if (isDebugInst(UseInst))
+      continue;
+
     if (auto *AI = dyn_cast<ApplyInst>(UseInst)) {
       if (ArraySemanticsCall(AI))
         continue;
@@ -1741,6 +1745,9 @@ private:
   /// new array onto it.
   bool checkSafeArrayAddressUses(UserList &AddressUsers) {
     for (auto *UseInst : AddressUsers) {
+
+      if (isDebugInst(UseInst))
+        continue;
 
       if (isa<DeallocStackInst>(UseInst)) {
         // Handle destruction of a local array.
