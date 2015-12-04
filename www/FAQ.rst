@@ -37,7 +37,7 @@ Won't the design and evolution of Swift be warped by being too C++-centric?
 ---------------------------------------------------------------------------
 
 This is a common question from Objective-C programmers, primarily those who
-really dislike C++.  There are a lot of reasons you can have hope that Swift
+really dislike C++.  For many reasons you can have hope that Swift
 will end up being a great "successor to Objective-C" instead of a "C++
 replacement":
 
