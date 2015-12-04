@@ -26,11 +26,10 @@ public struct LazyMapGenerator<
   ///   since the copy was made, and no preceding call to `self.next()`
   ///   has returned `nil`.
   public mutating func next() -> Element? {
-    let x = _base.next()
-    if x != nil {
-      return _transform(x!)
+    guard let x = _base.next() else {
+          return nil
     }
-    return nil
+    return _transform(x)
   }
 
   public var base: Base { return _base }
