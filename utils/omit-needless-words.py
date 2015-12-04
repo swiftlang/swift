@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 # This tool helps assess the impact of automatically applying
 # heuristics that omit 'needless' words from APIs imported from Clang

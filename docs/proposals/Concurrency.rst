@@ -629,7 +629,7 @@ use actors can scale to support millions of concurrent actors because actors are
 not backed by a live thread or by a stack.
 
 In Swift actors could be implemented using classes that inherit from the generic
-``Actor`` class.  The generic parameter determins the type of messages that the
+``Actor`` class.  The generic parameter determines the type of messages that the
 actor can accept. The message type needs to be of ``CopyableType`` to ensure the
 safety of the model.  The actor class exposes two methods: ``send`` and
 ``accept``. Messages are sent to actors using the ``send`` method and they never

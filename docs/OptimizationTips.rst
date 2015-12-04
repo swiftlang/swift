@@ -54,8 +54,8 @@ this mode will most likely take longer to compile, but may run faster.
 This mode can be enabled using the Xcode build setting 'Whole Module Optimization'.
 
 
-Limiting Language Dynamicism
-============================
+Reducing Dynamic Dispatch
+=========================
 
 Swift by default is a very dynamic language like Objective-C. Unlike Objective
 C, Swift gives the programmer the ability to improve runtime performance when
@@ -557,6 +557,7 @@ If it makes sense to limit the adoption of protocols to classes then mark
 protocols as class-only protocols to get better runtime performance.
 
 ::
+
   protocol Pingable : class { func ping() -> Int }
 
 .. https://developer.apple.com/library/ios/documentation/Swift/Conceptual/Swift_Programming_Language/Protocols.html

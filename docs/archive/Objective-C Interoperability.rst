@@ -320,7 +320,7 @@ Methods marked as "overrideable API" only have Objective-C entry points:
 - Less to think about, maximum compatibility.
 - Penalizes future Swift clients (and potentially Objective-C clients?).
 
-Methods marked as "overrideable API" have both Objective-C and Swift entry 
+Methods marked as "overridable API" have both Objective-C and Swift entry 
 points:
 
 - Requires teaching Clang to emit Swift vtables.

@@ -193,6 +193,13 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitNominalTypeDecl(NominalTypeDecl *NTD) {
+    if(auto GPS = NTD->getGenericParams()) {
+      for (auto GP : GPS->getParams()) {
+        if (doIt(GP))
+          return true;
+      }
+    }
+
     for (auto &Inherit : NTD->getInherited()) {
       if (doIt(Inherit))
         return true;

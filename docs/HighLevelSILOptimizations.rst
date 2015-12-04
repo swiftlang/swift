@@ -335,13 +335,13 @@ readwrite
 Optimize semantics attribute
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The optimize attribute adds function-sepcific directives to the optimizer.
+The optimize attribute adds function-specific directives to the optimizer.
 
 The optimize attribute supports the following tags:
 
 sil.never
 
-   The sil optimizer should not optimize this funciton.
+   The sil optimizer should not optimize this function.
 
   Example:
   @_semantics("optimize.sil.never")

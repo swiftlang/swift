@@ -879,7 +879,7 @@ static bool linkBBArgs(SILBasicBlock *BB) {
   if (BB == &BB->getParent()->front())
     return false;
   // We don't need to link to the try_apply's normal result argument, because
-  // we handle it separatly in setAllEscaping() and mergeCalleeGraph().
+  // we handle it separately in setAllEscaping() and mergeCalleeGraph().
   if (SILBasicBlock *SinglePred = BB->getSinglePredecessor()) {
     auto *TAI = dyn_cast<TryApplyInst>(SinglePred->getTerminator());
     if (TAI && BB == TAI->getNormalBB())

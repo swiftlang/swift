@@ -43,7 +43,7 @@ to perform a simple repo setup for the Swift repository::
 
   $ git config --global user.name "<My Name>"
   $ git config --global user.email "<My Email>"
-  $ mkdir swift-source && cd swift-soure
+  $ mkdir swift-source && cd swift-source
   $ git clone <LLVM_REPO_URL>
   $ git clone <CLANG_REPO_URL>
   $ git clone <SWIFT_REPO_URL>

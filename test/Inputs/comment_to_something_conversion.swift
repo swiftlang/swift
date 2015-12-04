@@ -94,15 +94,15 @@ enum A012_AttachToEntities {
   func f1() {}
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f1()</Name><USR>s:FC14swift_ide_test5Brief2f1FT_T_</USR><Declaration>func f1()</Declaration><Abstract><Para>Aaa.</Para></Abstract><Discussion><Para>Bbb.</Para></Discussion></Function>]
 
-  ///Aaa.
+  /// Aaa.
   ///
   ///> Bbb.
   func f2() {}
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f2()</Name><USR>s:FC14swift_ide_test5Brief2f2FT_T_</USR><Declaration>func f2()</Declaration><Abstract><Para>Aaa.</Para></Abstract><Discussion><Para>Bbb.</Para></Discussion></Function>]
 
-  ///Aaa.
+  /// Aaa.
   ///
-  ///Bbb.
+  /// Bbb.
   func f3() {}
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f3()</Name><USR>s:FC14swift_ide_test5Brief2f3FT_T_</USR><Declaration>func f3()</Declaration><Abstract><Para>Aaa.</Para></Abstract><Discussion><Para>Bbb.</Para></Discussion></Function>]
 }

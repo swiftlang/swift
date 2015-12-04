@@ -497,7 +497,7 @@ int Compilation::performJobsImpl() {
     Diags.diagnose(SourceLoc(), diag::error_command_signalled,
                    SignalledCmd->getSource().getClassName());
 
-    // Since the task signalled, so unconditionally set result to -2.
+    // Since the task signalled, unconditionally set result to -2.
     Result = -2;
 
     return TaskFinishedResponse::StopExecution;

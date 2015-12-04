@@ -151,7 +151,7 @@ referent. Consider the following sequence of rules:
     is deallocated.
 
 (3) A different source-level variable pointing at the same referent
-    must not be changed/invalidated by such a call
+    must not be changed/invalidated by such a call.
 
 (4) If such a variable exists, the compiler must guarantee the
     refcount is > 1 going into the call.

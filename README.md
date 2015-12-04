@@ -66,6 +66,22 @@ compiler for C++14 support and create a symlink:
 
 ### Getting Sources for Swift and Related Projects
 
+	For those checking out sources as read-only:
+
+     git clone https://github.com/apple/swift.git swift
+     git clone https://github.com/apple/swift-llvm.git llvm
+     git clone https://github.com/apple/swift-clang.git clang
+     git clone https://github.com/apple/swift-lldb.git lldb
+     git clone https://github.com/apple/swift-cmark.git cmark
+     git clone https://github.com/apple/swift-llbuild.git llbuild
+     git clone https://github.com/apple/swift-package-manager.git swiftpm
+     git clone https://github.com/apple/swift-corelibs-xctest.git
+     git clone https://github.com/apple/swift-corelibs-foundation.git
+
+	For those who plan on regular making direct commits, cloning over
+	SSH may provide a better experience (which requires uploading 
+	SSH keys to GitHub):
+
      git clone git@github.com:apple/swift.git swift
      git clone git@github.com:apple/swift-llvm.git llvm
      git clone git@github.com:apple/swift-clang.git clang
@@ -75,7 +91,6 @@ compiler for C++14 support and create a symlink:
      git clone git@github.com:apple/swift-package-manager.git swiftpm
      git clone git@github.com:apple/swift-corelibs-xctest.git
      git clone git@github.com:apple/swift-corelibs-foundation.git
-
 
 [CMake](http://cmake.org) is the core infrastructure used to configure builds of
 Swift and its companion projects; at least version 2.8.12.2 is required. Your
@@ -93,10 +108,14 @@ it next to the other projects and it will be bootstrapped automatically:
 
     git clone git@github.com:martine/ninja.git
 
-You can also use a third-party packaging tool like [Homebrew](http://brew.sh) to
-install CMake and Ninja on OS X:
+You can also install CMake and Ninja on OS X using a third-party
+packaging tool like [Homebrew](http://brew.sh)…
 
     brew install cmake ninja
+
+…or [MacPorts](https://macports.org).
+
+    sudo port install cmake ninja
 
 ### Building Swift
 
@@ -116,7 +135,7 @@ A basic command to build Swift and run basic tests with Ninja:
 
     utils/build-script -t
 
-## Develop Swift in Xcode
+## Developing Swift in Xcode
 
 The Xcode IDE can be used to edit the Swift source code, but it is not currently
 fully supported as a build environment for SDKs other than OS X. If you'd like
@@ -142,3 +161,14 @@ See [docs/Testing.rst](docs/Testing.rst).
 ## Contributing to Swift
 
 Contributions to Swift are welcomed and encouraged! Please see the [Contributing to Swift guide](https://swift.org/contributing/).
+
+To be a truly great community, Swift.org needs to welcome developers from all
+walks of life, with different backgrounds, and with a wide range of experience.
+A diverse and friendly community will have more great ideas, more unique
+perspectives, and produce more great code. We will work diligently to make the
+Swift community welcoming to everyone.
+
+To give clarity of what is expected of our members, Swift has adopted the
+code of conduct defined by the Contributor Covenant. This document is used
+across many open source communities, and we think it articulates our values
+well. For more, see [the website](https://swift.org/community/#code-of-conduct).

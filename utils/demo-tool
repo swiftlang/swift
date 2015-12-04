@@ -93,7 +93,7 @@ a JSON document listing the commands to run, as in::
     { "command" : "echo Hello" }
   ]
 
-or, alternately, it should be a text filed delimited by '>>>', as in::
+or, alternately, it should be a text file delimited by '>>>', as in::
 
   >>>
   ls
