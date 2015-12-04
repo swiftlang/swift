@@ -1,9 +1,9 @@
 # Doxyfile 1.4.4
 
 # This file describes the settings to be used by the documentation system
-# doxygen (www.doxygen.org) for a project
+# doxygen (www.doxygen.org) for a project.
 #
-# All text after a hash (#) is considered a comment and will be ignored
+# All text after a hash (#) is considered a comment and will be ignored.
 # The format is:
 #       TAG = value [value, ...]
 # For lists items can also be appended using:
