@@ -74,9 +74,9 @@ public func min<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
 /// Returns the greater of `x` and `y`.
 @warn_unused_result
 public func max<T : Comparable>(x: T, _ y: T) -> T {
-  var r = y
-  if y < x {
-    r = x
+  var r = x
+  if y >= r {
+    r = y
   }
   return r
 }
@@ -84,15 +84,15 @@ public func max<T : Comparable>(x: T, _ y: T) -> T {
 /// Returns the greatest argument passed.
 @warn_unused_result
 public func max<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
-  var r = y
-  if r < x {
-    r = x
+  var r = x
+  if y >= r {
+    r = y
   }
-  if r < z {
+  if z >= r {
     r = z
   }
   for t in rest {
-    if r < t {
+    if t >= r {
       r = t
     }
   }
