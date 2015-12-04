@@ -227,7 +227,7 @@ man_pages = [
 #  dir menu entry, description, category)
 texinfo_documents = [
   ('index', 'Swift', u'Swift Documentation',
-   u'LLVM project', 'Swift', 'One line description of project.',
+   u'LLVM project', 'Swift', 'LadekarSunil One line description of project.',
    'Miscellaneous'),
 ]
 
