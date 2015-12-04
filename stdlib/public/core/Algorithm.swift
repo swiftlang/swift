@@ -47,7 +47,7 @@ public func find<
 @warn_unused_result
 public func min<T : Comparable>(x: T, _ y: T) -> T {
   var r = x
-  if y < x {
+  if y < r {
     r = y
   }
   return r
@@ -57,7 +57,7 @@ public func min<T : Comparable>(x: T, _ y: T) -> T {
 @warn_unused_result
 public func min<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
   var r = x
-  if y < x {
+  if y < r {
     r = y
   }
   if z < r {
@@ -85,14 +85,14 @@ public func max<T : Comparable>(x: T, _ y: T) -> T {
 @warn_unused_result
 public func max<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
   var r = y
-  if y < x {
+  if r < x {
     r = x
   }
   if r < z {
     r = z
   }
   for t in rest {
-    if t >= r {
+    if r < t {
       r = t
     }
   }
