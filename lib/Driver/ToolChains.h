@@ -53,3 +53,10 @@ public:
 };
 
 #endif // SWIFT_ENABLE_TARGET_(LINUX|FREEBSD)
+
+} // end namespace toolchains
+} // end namespace driver
+} // end namespace swift
+
+#endif
+
