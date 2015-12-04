@@ -35,7 +35,7 @@ Here is how to dump the IR after the main phases of the swift compiler
   get what you want to see.
 
 #. **Performance SIL passes**. To print the SIL after the complete SIL
-   oprimization pipeline::
+   optimization pipeline::
 
     swiftc -emit-sil -O file-swift
 
@@ -63,7 +63,7 @@ Debugging on SIL Level
 Options for Dumping the SIL
 ```````````````````````````
 
-Often it is not sufficient to dump the SIL at the begin or end of the
+Often it is not sufficient to dump the SIL at the beginning or end of the
 optimization pipeline.
 The SILPassManager supports useful options to dump the SIL also between
 pass runs.
@@ -235,7 +235,7 @@ Then by running ``lldb test -s test.lldb``, lldb will:
    the function that the function pointer was passed to.
 
 Using LLDB scripts can enable one to use complex debugger workflows without
-needing to retype the various commands perfectly everytime.
+needing to retype the various commands perfectly every time.
 
 Debugging Swift Executables
 ---------------------------
