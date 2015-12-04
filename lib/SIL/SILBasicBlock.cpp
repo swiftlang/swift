@@ -118,6 +118,12 @@ SILArgument *SILBasicBlock::insertBBArg(bbarg_iterator Iter, SILType Ty,
   return new (getModule()) SILArgument(this, Iter, Ty, D);
 }
 
+void SILBasicBlock::eraseBBArg(int Index) {
+  // Notify the delete handlers that this BB argument is going away.
+  getModule().notifyDeleteHandlers(getBBArg(Index));
+  BBArgList.erase(BBArgList.begin() + Index);
+}
+
 /// \brief Splits a basic block into two at the specified instruction.
 ///
 /// Note that all the instructions BEFORE the specified iterator
