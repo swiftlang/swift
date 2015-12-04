@@ -751,15 +751,21 @@ static void addPathEnvironmentVariableIfNeeded(Job::EnvironmentVector &env,
                                                const char *name,
                                                const char *separator,
                                                options::ID optionID,
-                                               const ArgList &args) {
+                                               const ArgList &args,
+                                               StringRef extraEntry = "") {
   auto linkPathOptions = args.filtered(optionID);
-  if (linkPathOptions.begin() == linkPathOptions.end())
+  if (linkPathOptions.begin() == linkPathOptions.end() && extraEntry.empty())
     return;
 
   std::string newPaths;
   interleave(linkPathOptions,
              [&](const Arg *arg) { newPaths.append(arg->getValue()); },
              [&] { newPaths.append(separator); });
+  if (!extraEntry.empty()) {
+    if (!newPaths.empty())
+      newPaths.append(separator);
+    newPaths.append(extraEntry.data(), extraEntry.size());
+  }
   if (auto currentPaths = llvm::sys::Process::GetEnv(name)) {
     newPaths.append(separator);
     newPaths.append(currentPaths.getValue());
@@ -767,12 +773,39 @@ static void addPathEnvironmentVariableIfNeeded(Job::EnvironmentVector &env,
   env.emplace_back(name, args.MakeArgString(newPaths));
 }
 
+/// Get the runtime library link path, which is platform-specific and found
+/// relative to the compiler.
+static void getRuntimeLibraryPath(SmallVectorImpl<char> &runtimeLibPath,
+                                  const llvm::opt::ArgList &args,
+                                  const ToolChain &TC) {
+  // FIXME: Duplicated from CompilerInvocation, but in theory the runtime
+  // library link path and the standard library module import path don't
+  // need to be the same.
+  if (const Arg *A = args.getLastArg(options::OPT_resource_dir)) {
+    StringRef value = A->getValue();
+    runtimeLibPath.append(value.begin(), value.end());
+  } else {
+    auto programPath = TC.getDriver().getSwiftProgramPath();
+    runtimeLibPath.append(programPath.begin(), programPath.end());
+    llvm::sys::path::remove_filename(runtimeLibPath); // remove /swift
+    llvm::sys::path::remove_filename(runtimeLibPath); // remove /bin
+    llvm::sys::path::append(runtimeLibPath, "lib", "swift");
+  }
+  llvm::sys::path::append(runtimeLibPath,
+                          getPlatformNameForTriple(TC.getTriple()));
+}
+
 ToolChain::InvocationInfo
 toolchains::Darwin::constructInvocation(const InterpretJobAction &job,
                                         const JobContext &context) const {
   InvocationInfo II = ToolChain::constructInvocation(job, context);
+
+  SmallString<128> runtimeLibraryPath;
+  getRuntimeLibraryPath(runtimeLibraryPath, context.Args, *this);
+
   addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "DYLD_LIBRARY_PATH",
-                                     ":", options::OPT_L, context.Args);
+                                     ":", options::OPT_L, context.Args,
+                                     runtimeLibraryPath);
   addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "DYLD_FRAMEWORK_PATH",
                                      ":", options::OPT_F, context.Args);
   return II;
@@ -893,21 +926,8 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
 
   // Add the runtime library link path, which is platform-specific and found
   // relative to the compiler.
-  // FIXME: Duplicated from CompilerInvocation, but in theory the runtime
-  // library link path and the standard library module import path don't
-  // need to be the same.
-  llvm::SmallString<128> RuntimeLibPath;
-
-  if (const Arg *A = context.Args.getLastArg(options::OPT_resource_dir)) {
-    RuntimeLibPath = A->getValue();
-  } else {
-    RuntimeLibPath = D.getSwiftProgramPath();
-    llvm::sys::path::remove_filename(RuntimeLibPath); // remove /swift
-    llvm::sys::path::remove_filename(RuntimeLibPath); // remove /bin
-    llvm::sys::path::append(RuntimeLibPath, "lib", "swift");
-  }
-  llvm::sys::path::append(RuntimeLibPath,
-                          getPlatformNameForTriple(getTriple()));
+  SmallString<128> RuntimeLibPath;
+  getRuntimeLibraryPath(RuntimeLibPath, context.Args, *this);
   Arguments.push_back("-L");
   Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
 
@@ -985,8 +1005,13 @@ ToolChain::InvocationInfo
 toolchains::Linux::constructInvocation(const InterpretJobAction &job,
                                        const JobContext &context) const {
   InvocationInfo II = ToolChain::constructInvocation(job, context);
+
+  SmallString<128> runtimeLibraryPath;
+  getRuntimeLibraryPath(runtimeLibraryPath, context.Args, *this);
+
   addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "LD_LIBRARY_PATH",
-                                     ":", options::OPT_L, context.Args);
+                                     ":", options::OPT_L, context.Args,
+                                     runtimeLibraryPath);
   return II;
 }
 
