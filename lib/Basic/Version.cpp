@@ -189,7 +189,7 @@ Version Version::parseVersionString(StringRef VersionString,
   SmallString<16> digits;
   llvm::raw_svector_ostream OS(digits);
   SmallVector<std::pair<StringRef, SourceRange>, 5> SplitComponents;
-  // Skip over quote character in string literal
+  // Skip over quote character in string literal.
 
   splitVersionComponents(SplitComponents, VersionString, Loc, Diags);
 
