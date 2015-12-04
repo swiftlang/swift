@@ -87,7 +87,7 @@ public:
   static const bool IsScalarPOD = false;
 
   void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {
-    IGF.emitScalarRelease(value, asDerived().getReferenceCounting());
+    IGF.emitStrongRelease(value, asDerived().getReferenceCounting());
   }
 
   void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
@@ -95,49 +95,19 @@ public:
   }
 
   void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {
-    IGF.emitScalarRetainCall(value, asDerived().getReferenceCounting());
+    IGF.emitStrongRetain(value, asDerived().getReferenceCounting());
   }
 
   void emitScalarRetainUnowned(IRGenFunction &IGF, llvm::Value *value) const {
-    switch (asDerived().getReferenceCounting()) {
-    case ReferenceCounting::Native:
-      return IGF.emitRetainUnowned(value);
-    case ReferenceCounting::ObjC:
-    case ReferenceCounting::Block:
-    case ReferenceCounting::Unknown:
-      return IGF.emitUnknownRetainUnowned(value);
-    case ReferenceCounting::Bridge:
-    case ReferenceCounting::Error:
-      llvm_unreachable("not supported!");
-    }
+    IGF.emitStrongRetainUnowned(value, asDerived().getReferenceCounting());
   }
 
   void emitScalarUnownedRelease(IRGenFunction &IGF, llvm::Value *value) const {
-    switch (asDerived().getReferenceCounting()) {
-    case ReferenceCounting::Native:
-      return IGF.emitUnownedRelease(value);
-    case ReferenceCounting::ObjC:
-    case ReferenceCounting::Block:
-    case ReferenceCounting::Unknown:
-      return IGF.emitUnknownUnownedRelease(value);
-    case ReferenceCounting::Bridge:
-    case ReferenceCounting::Error:
-      llvm_unreachable("not supported!");
-    }
+    IGF.emitUnownedRelease(value, asDerived().getReferenceCounting());
   }
 
   void emitScalarUnownedRetain(IRGenFunction &IGF, llvm::Value *value) const {
-    switch (asDerived().getReferenceCounting()) {
-    case ReferenceCounting::Native:
-      return IGF.emitUnownedRetain(value);
-    case ReferenceCounting::ObjC:
-    case ReferenceCounting::Block:
-    case ReferenceCounting::Unknown:
-      return IGF.emitUnknownUnownedRetain(value);
-    case ReferenceCounting::Bridge:
-    case ReferenceCounting::Error:
-      llvm_unreachable("not supported!");
-    }
+    IGF.emitUnownedRetain(value, asDerived().getReferenceCounting());
   }
 
   void retain(IRGenFunction &IGF, Explosion &e) const override {

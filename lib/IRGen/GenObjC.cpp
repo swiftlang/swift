@@ -51,7 +51,7 @@
 using namespace swift;
 using namespace irgen;
 
-void IRGenFunction::emitObjCRelease(llvm::Value *value) {
+void IRGenFunction::emitObjCStrongRelease(llvm::Value *value) {
   // Get an appropriately-cast function pointer.
   auto fn = IGM.getObjCReleaseFn();
   if (value->getType() != IGM.ObjCPtrTy) {
@@ -84,8 +84,8 @@ static llvm::Constant *getCastOfRetainFn(IRGenModule &IGM,
   return llvm::ConstantExpr::getBitCast(fn, fnTy->getPointerTo(0));
 }
 
-void IRGenFunction::emitObjCRetain(llvm::Value *v, Explosion &explosion) {
-  explosion.add(emitObjCRetainCall(v));
+void IRGenFunction::emitObjCStrongRetain(llvm::Value *v) {
+  emitObjCRetainCall(v);
 }
 
 llvm::Value *IRGenFunction::emitObjCRetainCall(llvm::Value *value) {
@@ -866,7 +866,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
       subIGF.emitObjCAutoreleaseCall(self);
     }
     // Release the context.
-    subIGF.emitRelease(context);
+    subIGF.emitNativeStrongRelease(context);
   };
   
   // Emit the call and produce the return value.
