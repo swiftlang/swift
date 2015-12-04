@@ -19,7 +19,7 @@ Options:
     -a           Show sizes of additional sections
     -c           Show functions by category
     -l           List all functions (can be a very long list)
-    -s           Summarize the sizes of multiple files instead of listing each file separatly
+    -s           Summarize the sizes of multiple files instead of listing each file separately
 
 Environment variables:
     SWIFT_NEW_BUILDDIR   The old build-dir
