@@ -81,6 +81,10 @@ private:
   /// Returns True if memory of type \p T1 and \p T2 may alias.
   bool typesMayAlias(SILType T1, SILType T2);
 
+
+  virtual void handleDeleteNotification(SILInstruction *I) override {
+  }
+
 public:
   AliasAnalysis(SILModule *M) :
     SILAnalysis(AnalysisKind::Alias), Mod(M), SEA(nullptr) {}
@@ -89,7 +93,7 @@ public:
     return S->getKind() == AnalysisKind::Alias;
   }
   
-  virtual void initialize(SILPassManager *PM);
+  virtual void initialize(SILPassManager *PM) override;
   
   /// Perform an alias query to see if V1, V2 refer to the same values.
   AliasResult alias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
@@ -168,9 +172,10 @@ public:
     return MemoryBehavior::MayHaveSideEffects == B;
   }
 
-  virtual void invalidate(SILAnalysis::InvalidationKind K) { }
+  virtual void invalidate(SILAnalysis::InvalidationKind K) override { }
 
-  virtual void invalidate(SILFunction *, SILAnalysis::InvalidationKind K) {
+  virtual void invalidate(SILFunction *,
+                          SILAnalysis::InvalidationKind K) override {
     invalidate(K);
   }
 };
