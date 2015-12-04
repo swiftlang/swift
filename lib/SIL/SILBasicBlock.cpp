@@ -75,12 +75,12 @@ void SILBasicBlock::push_front(SILInstruction *I) {
 }
 
 void SILBasicBlock::remove(SILInstruction *I) {
-  // Notify the delete handlers that this instruction is going away.
-  getModule().notifyDeleteHandlers(&*I);
   InstList.remove(I);
 }
 
 void SILBasicBlock::erase(SILInstruction *I) {
+  // Notify the delete handlers that this instruction is going away.
+  getModule().notifyDeleteHandlers(&*I);
   InstList.erase(I);
 }
 
