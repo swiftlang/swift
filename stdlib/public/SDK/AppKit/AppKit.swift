@@ -50,7 +50,7 @@ struct _NSViewMirror : _MirrorType {
 
   var _v : NSView
   
-  init(_ v : NSView) {_v = v}
+  init(_ v : NSView) { _v = v }
   
   var value: Any { get { return _v } }
   
