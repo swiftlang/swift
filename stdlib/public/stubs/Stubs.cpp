@@ -16,6 +16,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if defined(__FreeBSD__)
+#define _WITH_GETLINE
+#endif
+
 #include <sys/resource.h>
 #include <sys/errno.h>
 #include <unistd.h>
