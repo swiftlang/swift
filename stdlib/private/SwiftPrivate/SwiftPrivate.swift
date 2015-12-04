@@ -18,7 +18,7 @@ public func asHex<T : IntegerType>(x: T) -> String {
 }
 
 /// Convert the given sequence of numeric values to a string representing
-/// their hexidecimal values.
+/// their hexadecimal values.
 public func asHex<
   S: SequenceType
 where
