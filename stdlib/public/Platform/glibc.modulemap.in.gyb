@@ -19,15 +19,28 @@
 /// It's not named just Glibc so that it doesn't conflict in the event of a
 /// future official glibc modulemap.
 module SwiftGlibc [system] {
+% if CMAKE_SDK in ["LINUX", "FREEBSD"]:
   link "pthread"
+% end
+
   link "dl"
 
   // C standard library
   module C {
+% if CMAKE_SDK in ["LINUX", "FREEBSD"]:
     module complex {
       header "@GLIBC_INCLUDE_PATH@/complex.h"
       export *
     }
+% end
+
+% if CMAKE_SDK in ["LINUX", "ANDROID"]:
+    module features {
+      header "@GLIBC_INCLUDE_PATH@/features.h"
+      export *
+    }
+% end
+
     module ctype {
       header "@GLIBC_INCLUDE_PATH@/ctype.h"
       export *
@@ -36,13 +49,6 @@ module SwiftGlibc [system] {
       header "@GLIBC_INCLUDE_PATH@/errno.h"
       export *
     }
-
-% if CMAKE_SDK in ["LINUX"]:
-    module features {
-      header "@GLIBC_INCLUDE_PATH@/features.h"
-      export *
-    }
-% end
 
     module fenv {
       header "@GLIBC_INCLUDE_PATH@/fenv.h"
@@ -133,19 +139,89 @@ module SwiftGlibc [system] {
 
   // POSIX
   module POSIX {
+% if CMAKE_SDK in ["LINUX"]:
+    module wait {
+      header "@GLIBC_INCLUDE_PATH@/wait.h"
+      export *
+    }
+% end
+
+% if CMAKE_SDK in ["LINUX", "FREEBSD"]:
     module aio {
       header "@GLIBC_INCLUDE_PATH@/aio.h"
       export *
     }
+    module cpio {
+      header "@GLIBC_INCLUDE_PATH@/cpio.h"
+      export *
+    }
+    module fmtmsg {
+      header "@GLIBC_INCLUDE_PATH@/fmtmsg.h"
+      export *
+    }
+    module ftw {
+      header "@GLIBC_INCLUDE_PATH@/ftw.h"
+      export *
+    }
+    module glob {
+      header "@GLIBC_INCLUDE_PATH@/glob.h"
+      export *
+    }
+    module iconv {
+      header "@GLIBC_INCLUDE_PATH@/iconv.h"
+      export *
+    }
+    module langinfo {
+      header "@GLIBC_INCLUDE_PATH@/langinfo.h"
+      export *
+    }
+    module monetary {
+      header "@GLIBC_INCLUDE_PATH@/monetary.h"
+      export *
+    }
+    module netdb {
+      header "@GLIBC_INCLUDE_PATH@/netdb.h"
+      export *
+    }
+    module nl_types {
+      header "@GLIBC_INCLUDE_PATH@/nl_types.h"
+      export *
+    }
+    module search {
+      header "@GLIBC_INCLUDE_PATH@/search.h"
+      export *
+    }
+    module spawn {
+      header "@GLIBC_INCLUDE_PATH@/spawn.h"
+      export *
+    }
+    module syslog {
+      header "@GLIBC_INCLUDE_PATH@/syslog.h"
+      export *
+    }
+    module tar {
+      header "@GLIBC_INCLUDE_PATH@/tar.h"
+      export *
+    }
+    module ulimit {
+      header "@GLIBC_INCLUDE_PATH@/ulimit.h"
+      export *
+    }
+    module utmpx {
+      header "@GLIBC_INCLUDE_PATH@/utmpx.h"
+      export *
+    }
+    module wordexp {
+      header "@GLIBC_INCLUDE_PATH@/wordexp.h"
+      export *
+    }
+% end
+
     module arpa {
       module inet {
         header "@GLIBC_INCLUDE_PATH@/arpa/inet.h"
         export *
       }
-      export *
-    }
-    module cpio {
-      header "@GLIBC_INCLUDE_PATH@/cpio.h"
       export *
     }
     module dirent {
@@ -160,48 +236,20 @@ module SwiftGlibc [system] {
       header "@GLIBC_INCLUDE_PATH@/fcntl.h"
       export *
     }
-    module fmtmsg {
-      header "@GLIBC_INCLUDE_PATH@/fmtmsg.h"
-      export *
-    }
     module fnmatch {
       header "@GLIBC_INCLUDE_PATH@/fnmatch.h"
-      export *
-    }
-    module ftw {
-      header "@GLIBC_INCLUDE_PATH@/ftw.h"
-      export *
-    }
-    module glob {
-      header "@GLIBC_INCLUDE_PATH@/glob.h"
       export *
     }
     module grp {
       header "@GLIBC_INCLUDE_PATH@/grp.h"
       export *
     }
-    module iconv {
-      header "@GLIBC_INCLUDE_PATH@/iconv.h"
-      export *
-    }
     module ioctl {
       header "@GLIBC_ARCH_INCLUDE_PATH@/sys/ioctl.h"
       export *
     }
-    module langinfo {
-      header "@GLIBC_INCLUDE_PATH@/langinfo.h"
-      export *
-    }
     module libgen {
       header "@GLIBC_INCLUDE_PATH@/libgen.h"
-      export *
-    }
-    module monetary {
-      header "@GLIBC_INCLUDE_PATH@/monetary.h"
-      export *
-    }
-    module netdb {
-      header "@GLIBC_INCLUDE_PATH@/netdb.h"
       export *
     }
     module net {
@@ -221,10 +269,6 @@ module SwiftGlibc [system] {
         header "@GLIBC_INCLUDE_PATH@/netinet/tcp.h"
         export *
       }
-    }
-    module nl_types {
-      header "@GLIBC_INCLUDE_PATH@/nl_types.h"
-      export *
     }
     module poll {
       header "@GLIBC_INCLUDE_PATH@/poll.h"
@@ -246,16 +290,8 @@ module SwiftGlibc [system] {
       header "@GLIBC_INCLUDE_PATH@/sched.h"
       export *
     }
-    module search {
-      header "@GLIBC_INCLUDE_PATH@/search.h"
-      export *
-    }
     module semaphore {
       header "@GLIBC_INCLUDE_PATH@/semaphore.h"
-      export *
-    }
-    module spawn {
-      header "@GLIBC_INCLUDE_PATH@/spawn.h"
       export *
     }
     module strings {
@@ -265,6 +301,21 @@ module SwiftGlibc [system] {
 
     module sys {
       export *
+
+% if CMAKE_SDK in ["LINUX", "FREEBSD"]:
+      module sem {
+        header "@GLIBC_ARCH_INCLUDE_PATH@/sys/sem.h"
+        export *
+      }
+      module shm {
+        header "@GLIBC_ARCH_INCLUDE_PATH@/sys/shm.h"
+        export *
+      }
+      module statvfs {
+        header "@GLIBC_ARCH_INCLUDE_PATH@/sys/statvfs.h"
+        export *
+      }
+% end
 
       module ipc {
         header "@GLIBC_ARCH_INCLUDE_PATH@/sys/ipc.h"
@@ -286,24 +337,12 @@ module SwiftGlibc [system] {
         header "@GLIBC_ARCH_INCLUDE_PATH@/sys/select.h"
         export *
       }
-      module sem {
-        header "@GLIBC_ARCH_INCLUDE_PATH@/sys/sem.h"
-        export *
-      }
-      module shm {
-        header "@GLIBC_ARCH_INCLUDE_PATH@/sys/shm.h"
-        export *
-      }
       module socket {
         header "@GLIBC_ARCH_INCLUDE_PATH@/sys/socket.h"
         export *
       }
       module stat {
         header "@GLIBC_ARCH_INCLUDE_PATH@/sys/stat.h"
-        export *
-      }
-      module statvfs {
-        header "@GLIBC_ARCH_INCLUDE_PATH@/sys/statvfs.h"
         export *
       }
       module time {
@@ -335,20 +374,8 @@ module SwiftGlibc [system] {
         export *
       }
     }
-    module syslog {
-      header "@GLIBC_INCLUDE_PATH@/syslog.h"
-      export *
-    }
-    module tar {
-      header "@GLIBC_INCLUDE_PATH@/tar.h"
-      export *
-    }
     module termios {
       header "@GLIBC_INCLUDE_PATH@/termios.h"
-      export *
-    }
-    module ulimit {
-      header "@GLIBC_INCLUDE_PATH@/ulimit.h"
       export *
     }
     module unistd {
@@ -357,20 +384,6 @@ module SwiftGlibc [system] {
     }
     module utime {
       header "@GLIBC_INCLUDE_PATH@/utime.h"
-      export *
-    }
-    module utmpx {
-      header "@GLIBC_INCLUDE_PATH@/utmpx.h"
-      export *
-    }
-% if CMAKE_SDK in ["LINUX"]:
-    module wait {
-      header "@GLIBC_INCLUDE_PATH@/wait.h"
-      export *
-    }
-% end
-    module wordexp {
-      header "@GLIBC_INCLUDE_PATH@/wordexp.h"
       export *
     }
   }

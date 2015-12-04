@@ -122,6 +122,7 @@ KNOWN_SETTINGS=(
     skip-build-watchos          ""               "set to skip building Swift stdlibs for Apple watchOS"
     skip-build-watchos-device   ""               "set to skip building Swift stdlibs for Apple watchOS devices (i.e. build simulators only)"
     skip-build-watchos-simulator ""              "set to skip building Swift stdlibs for Apple watchOS simulators (i.e. build devices only)"
+    skip-build-android          ""               "set to skip building Swift stdlibs for Android"
     skip-build-lldb             ""               "set to skip building LLDB"
     skip-build-llbuild          ""               "set to skip building llbuild"
     skip-build-swiftpm          ""               "set to skip building swiftpm"
@@ -206,6 +207,13 @@ KNOWN_SETTINGS=(
     darwin-toolchain-installer-package ""        "The path to installer pkg"
     build-jobs                         ""        "The number of parallel build jobs to use"
     darwin-toolchain-alias             ""        "Swift alias for toolchain"
+    android-ndk                        ""        "An absolute path to the NDK that will be used as a libc implementation for Android builds"
+    android-ndk-version                ""        "A version of the NDK to use when building for Android. Currently only 21 or above is supported"
+    android-ndk-toolchain-version      ""        "A version of the toolchain to use when building for Android. Use 4.8 for 32-bit builds, 4.9 for 64-bit builds"
+    android-icu-uc                     ""        "Path to a directory containing libicuuc.so"
+    android-icu-uc-include             ""        "Path to a directory containing headers for libicuuc"
+    android-icu-i18n                   ""        "Path to a directory containing libicui18n.so"
+    android-icu-i18n-include           ""        "Path to a directory containing headers libicui18n"
     export-compile-commands            ""        "set to generate JSON compilation databases for each build product"
 )
 
@@ -895,6 +903,7 @@ case "$(uname -s -m)" in
     Linux\ x86_64)
         STDLIB_DEPLOYMENT_TARGETS=(
             "linux-x86_64"
+            "android-armv7"
         )
         ;;
     Linux\ armv6*)
@@ -1111,6 +1120,12 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
         watchsimulator-*)
             build_for_this_target=$(not ${SKIP_BUILD_WATCHOS_SIMULATOR})
             test_this_target=$(not ${SKIP_TEST_WATCHOS_SIMULATOR})
+            ;;
+        android-*)
+            build_for_this_target=$(not ${SKIP_BUILD_ANDROID})
+            # FIXME: Allow Android host tests to be enabled/disabled by the
+            #        build script.
+            test_this_target=
             ;;
         *)
             echo "Unknown compiler deployment target: ${deployment_target}"
@@ -1369,6 +1384,9 @@ function common_cross_c_flags() {
             ;;
         watchos-armv7k)
             echo "-arch armv7k -mwatchos-version-min=${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
+            ;;
+        android-armv7)
+            echo "-arch armv7"
             ;;
     esac
 }
@@ -1711,6 +1729,19 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_ENABLE_GOLD_LINKER=TRUE
+                    )
+                fi
+
+                if [[ ! "${SKIP_BUILD_ANDROID}" ]]; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_ANDROID_NDK_PATH:STRING="${ANDROID_NDK}"
+                        -DSWIFT_ANDROID_NDK_TOOLCHAIN_VERSION:STRING="${ANDROID_NDK_TOOLCHAIN_VERSION}"
+                        -DSWIFT_ANDROID_SDK_PATH:STRING="${ANDROID_NDK}/platforms/android-${ANDROID_NDK_VERSION}/arch-arm"
+                        -DSWIFT_ANDROID_ICU_UC:STRING="${ANDROID_ICU_UC}"
+                        -DSWIFT_ANDROID_ICU_UC_INCLUDE:STRING="${ANDROID_ICU_UC_INCLUDE}"
+                        -DSWIFT_ANDROID_ICU_I18N:STRING="${ANDROID_ICU_I18N}"
+                        -DSWIFT_ANDROID_ICU_I18N_INCLUDE:STRING="${ANDROID_ICU_I18N_INCLUDE}"
                     )
                 fi
 
@@ -2144,7 +2175,7 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
         linux-* | freebsd-* | macosx-* | cygwin-*)
             # OK, we can run tests directly.
             ;;
-        iphoneos-* | iphonesimulator-* | appletvos-* | appletvsimulator-* | watchos-* | watchsimulator-*)
+        iphoneos-* | iphonesimulator-* | appletvos-* | appletvsimulator-* | watchos-* | watchsimulator-* | android-* )
             # FIXME: remove this
             # echo "Don't know how to run tests for ${deployment_target}"
             continue

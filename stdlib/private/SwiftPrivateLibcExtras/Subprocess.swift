@@ -13,9 +13,15 @@
 import SwiftPrivate
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD)
+#elseif os(Linux) || os(FreeBSD) || os(Android)
 import Glibc
 #endif
+
+
+// posix_spawn is not available on Android.
+#if !os(Android)
+// swift_posix_spawn isn't available in the public watchOS SDK, we sneak by the
+// unavailable attribute declaration here of the APIs that we need.
 
 // FIXME: Come up with a better way to deal with APIs that are pointers on some
 // platforms but not others.
@@ -24,9 +30,6 @@ typealias swift_posix_spawn_file_actions_t = posix_spawn_file_actions_t
 #else
 typealias swift_posix_spawn_file_actions_t = posix_spawn_file_actions_t?
 #endif
-
-// posix_spawn isn't available in the public watchOS SDK, we sneak by the
-// unavailable attribute declaration here of the APIs that we need.
 
 @_silgen_name("posix_spawn_file_actions_init")
 func swift_posix_spawn_file_actions_init(
@@ -57,6 +60,7 @@ func swift_posix_spawn(
   _ attrp: UnsafePointer<posix_spawnattr_t>?,
   _ argv: UnsafePointer<UnsafeMutablePointer<Int8>?>,
   _ envp: UnsafePointer<UnsafeMutablePointer<Int8>?>?) -> CInt
+#endif
 
 /// Calls POSIX `pipe()`.
 func posixPipe() -> (readFD: CInt, writeFD: CInt) {
@@ -71,12 +75,74 @@ func posixPipe() -> (readFD: CInt, writeFD: CInt) {
 /// stderr.
 public func spawnChild(_ args: [String])
   -> (pid: pid_t, stdinFD: CInt, stdoutFD: CInt, stderrFD: CInt) {
+  // The stdout, stdin, and stderr from the child process will be redirected
+  // to these pipes.
+  let childStdout = posixPipe()
+  let childStdin = posixPipe()
+  let childStderr = posixPipe()
+
+#if os(Android)
+  // posix_spawn isn't available on Android. Instead, we fork and exec.
+  // To correctly communicate the exit status of the child process to this
+  // (parent) process, we'll use this pipe.
+  let childToParentPipe = posixPipe()
+
+  let pid = fork()
+  precondition(pid >= 0, "fork() failed")
+  if pid == 0 {
+    // pid of 0 means we are now in the child process.
+    // Capture the output before executing the program.
+    dup2(childStdout.writeFD, STDOUT_FILENO)
+    dup2(childStdin.readFD, STDIN_FILENO)
+    dup2(childStderr.writeFD, STDERR_FILENO)
+
+    // Set the "close on exec" flag on the parent write pipe. This will
+    // close the pipe if the execve() below successfully executes a child
+    // process.
+    let closeResult = fcntl(childToParentPipe.writeFD, F_SETFD, FD_CLOEXEC)
+    let closeErrno = errno
+    precondition(
+      closeResult == 0,
+      "Could not set the close behavior of the child-to-parent pipe; " +
+      "errno: \(closeErrno)")
+
+    // Start the executable. If execve() does not encounter an error, the
+    // code after this block will never be executed, and the parent write pipe
+    // will be closed.
+    withArrayOfCStrings([Process.arguments[0]] + args) {
+      execve(Process.arguments[0], $0, _getEnviron())
+    }
+
+    // If execve() encountered an error, we write the errno encountered to the
+    // parent write pipe.
+    let errnoSize = sizeof(errno.dynamicType)
+    var execveErrno = errno
+    let writtenBytes = withUnsafePointer(&execveErrno) {
+      write(childToParentPipe.writeFD, UnsafePointer($0), errnoSize)
+    }
+
+    let writeErrno = errno
+    if writtenBytes > 0 && writtenBytes < errnoSize {
+      // We were able to write some of our error, but not all of it.
+      // FIXME: Retry in this case.
+      preconditionFailure("Unable to write entire error to child-to-parent " +
+                          "pipe.")
+    } else if writtenBytes == 0 {
+      preconditionFailure("Unable to write error to child-to-parent pipe.")
+    } else if writtenBytes < 0 {
+      preconditionFailure("An error occurred when writing error to " +
+                          "child-to-parent pipe; errno: \(writeErrno)")
+    }
+
+    // Close the pipe when we're done writing the error.
+    close(childToParentPipe.writeFD)
+  }
+#else
   var fileActions = _make_posix_spawn_file_actions_t()
   if swift_posix_spawn_file_actions_init(&fileActions) != 0 {
     preconditionFailure("swift_posix_spawn_file_actions_init() failed")
   }
 
-  let childStdin = posixPipe()
   // Close the write end of the pipe on the child side.
   if swift_posix_spawn_file_actions_addclose(
     &fileActions, childStdin.writeFD) != 0 {
@@ -89,7 +155,6 @@ public func spawnChild(_ args: [String])
     preconditionFailure("swift_posix_spawn_file_actions_adddup2() failed")
   }
 
-  let childStdout = posixPipe()
   // Close the read end of the pipe on the child side.
   if swift_posix_spawn_file_actions_addclose(
     &fileActions, childStdout.readFD) != 0 {
@@ -102,7 +167,6 @@ public func spawnChild(_ args: [String])
     preconditionFailure("swift_posix_spawn_file_actions_adddup2() failed")
   }
 
-  let childStderr = posixPipe()
   // Close the read end of the pipe on the child side.
   if swift_posix_spawn_file_actions_addclose(
     &fileActions, childStderr.readFD) != 0 {
@@ -136,6 +200,7 @@ public func spawnChild(_ args: [String])
   if swift_posix_spawn_file_actions_destroy(&fileActions) != 0 {
     preconditionFailure("swift_posix_spawn_file_actions_destroy() failed")
   }
+#endif
 
   // Close the read end of the pipe on the parent side.
   if close(childStdin.readFD) != 0 {
@@ -155,6 +220,7 @@ public func spawnChild(_ args: [String])
   return (pid, childStdin.writeFD, childStdout.readFD, childStderr.readFD)
 }
 
+#if !os(Android)
 #if os(Linux)
 internal func _make_posix_spawn_file_actions_t()
   -> swift_posix_spawn_file_actions_t {
@@ -165,6 +231,7 @@ internal func _make_posix_spawn_file_actions_t()
   -> swift_posix_spawn_file_actions_t {
   return nil
 }
+#endif
 #endif
 
 internal func _readAll(_ fd: CInt) -> String {
@@ -261,6 +328,8 @@ internal func _getEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<CChar>?
   return _NSGetEnviron().pointee
 #elseif os(FreeBSD)
   return environ;
+#elseif os(Android)
+  return environ
 #else
   return __environ
 #endif
