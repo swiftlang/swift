@@ -66,6 +66,22 @@ compiler for C++14 support and create a symlink:
 
 ### Getting Sources for Swift and Related Projects
 
+	For those checking out sources as read-only:
+
+     git clone https://github.com/apple/swift.git swift
+     git clone https://github.com/apple/swift-llvm.git llvm
+     git clone https://github.com/apple/swift-clang.git clang
+     git clone https://github.com/apple/swift-lldb.git lldb
+     git clone https://github.com/apple/swift-cmark.git cmark
+     git clone https://github.com/apple/swift-llbuild.git llbuild
+     git clone https://github.com/apple/swift-package-manager.git swiftpm
+     git clone https://github.com/apple/swift-corelibs-xctest.git
+     git clone https://github.com/apple/swift-corelibs-foundation.git
+
+	For those who plan on regular making direct commits, cloning over
+	SSH may provide a better experience (which requires uploading 
+	SSH keys to GitHub):
+
      git clone git@github.com:apple/swift.git swift
      git clone git@github.com:apple/swift-llvm.git llvm
      git clone git@github.com:apple/swift-clang.git clang
@@ -75,7 +91,6 @@ compiler for C++14 support and create a symlink:
      git clone git@github.com:apple/swift-package-manager.git swiftpm
      git clone git@github.com:apple/swift-corelibs-xctest.git
      git clone git@github.com:apple/swift-corelibs-foundation.git
-
 
 [CMake](http://cmake.org) is the core infrastructure used to configure builds of
 Swift and its companion projects; at least version 2.8.12.2 is required. Your
