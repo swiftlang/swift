@@ -89,7 +89,7 @@ pygments_style = 'friendly'
 # -- Options for HTML output ---------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
-# a list of built in themes.
+# a list of builtin themes.
 html_theme = 'haiku'
 
 # Theme options are theme-specific and customize the look and feel of a theme
@@ -117,8 +117,8 @@ html_theme_path = ["."]
 html_favicon = 'favicon.ico'
 
 # Add any paths that contain custom static files (such as style sheets) here,
-# relative to this directory. They are copied after the built in static files,
-# so a file named "default.css" will overwrite the built in "default.css".
+# relative to this directory. They are copied after the builtin static files,
+# so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
