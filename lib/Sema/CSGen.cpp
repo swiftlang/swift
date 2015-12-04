@@ -752,7 +752,10 @@ namespace {
       }
       
       Type paramTy = fnTy->getInput();
-      auto paramTupleTy = paramTy->castTo<TupleType>();
+      auto paramTupleTy = paramTy->getAs<TupleType>();
+      if (!paramTupleTy || paramTupleTy->getNumElements() != 2)
+        return false;
+      
       auto firstParamTy = paramTupleTy->getElement(0).getType();
       auto secondParamTy = paramTupleTy->getElement(1).getType();
       
