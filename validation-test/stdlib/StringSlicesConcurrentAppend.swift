@@ -66,7 +66,7 @@ func sliceConcurrentAppendThread(tid: ThreadID) {
     barrier()
 
     // Verify that contents look good.
-    if tid == .Master {
+    if tid == .Leader {
       expectEqual("abcdef", privateString)
     } else {
       expectEqual("abcghi", privateString)
