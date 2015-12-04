@@ -129,7 +129,7 @@ When a ``Baz`` is copied by any of the “big three” operations (variable
 initialization, assignment, or function argument passing), even as
 part of a larger ``struct``, its ``[clone]`` member is ``clone()``\ d.
 Because ``Foo`` itself has a ``[clone]`` member, that is ``clone()``\ d
-also.  Therfore copying a ``Baz`` object ``clone()``\ s a ``Foo`` and
+also.  Therefore copying a ``Baz`` object ``clone()``\ s a ``Foo`` and
 ``clone()``\ ing a ``Foo`` ``clone()``\ s a ``FooValue``.  
 
 All ``struct``\ s are ``Clonable`` by default, with ``clone()`` delivering
