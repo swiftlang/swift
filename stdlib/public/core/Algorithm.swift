@@ -46,11 +46,7 @@ public func find<
 /// Returns the lesser of `x` and `y`.
 @warn_unused_result
 public func min<T : Comparable>(x: T, _ y: T) -> T {
-  var r = x
-  if y < x {
-    r = y
-  }
-  return r
+  return x < y ? x : y
 }
 
 /// Returns the least argument passed.
@@ -74,11 +70,7 @@ public func min<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
 /// Returns the greater of `x` and `y`.
 @warn_unused_result
 public func max<T : Comparable>(x: T, _ y: T) -> T {
-  var r = y
-  if y < x {
-    r = x
-  }
-  return r
+  return x > y ? x : y
 }
 
 /// Returns the greatest argument passed.
