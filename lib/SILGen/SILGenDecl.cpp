@@ -1157,9 +1157,10 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
     auto ed = cast<EnumDecl>(d);
     // Emit the enum cases and derived conformance methods for the type.
     for (auto member : ed->getMembers()) {
-      if (auto elt = dyn_cast<EnumElementDecl>(member))
-        emitEnumConstructor(elt);
-      else if (auto func = dyn_cast<FuncDecl>(member))
+      if (auto elt = dyn_cast<EnumElementDecl>(member)) {
+        if (elt->hasArgumentType())
+          emitEnumConstructor(elt);
+      } else if (auto func = dyn_cast<FuncDecl>(member))
         emitFunction(func);
       else if (auto ctor = dyn_cast<ConstructorDecl>(member))
         emitConstructor(ctor);
