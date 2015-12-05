@@ -762,6 +762,12 @@ public:
   // Type conversions for expr emission and thunks
   //===--------------------------------------------------------------------===//
 
+  ManagedValue emitInjectEnum(SILLocation loc,
+                              ArgumentSource payload,
+                              SILType enumTy,
+                              EnumElementDecl *element,
+                              SGFContext C);
+
   ManagedValue emitInjectOptional(SILLocation loc,
                                   ManagedValue v,
                                   CanType inputFormalType,
