@@ -167,7 +167,7 @@ See [docs/Testing.rst](docs/Testing.rst).
 
 Contributions to Swift are welcomed and encouraged! Please see the [Contributing to Swift guide](https://swift.org/contributing/).
 
-To be a truly great community, Swift.org needs to welcome developers from all
+To be a truly great community, [Swift.org](https://swift.org/) needs to welcome developers from all
 walks of life, with different backgrounds, and with a wide range of experience.
 A diverse and friendly community will have more great ideas, more unique
 perspectives, and produce more great code. We will work diligently to make the
