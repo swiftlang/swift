@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Writing High-Performance Swift Code
 ===================================
 

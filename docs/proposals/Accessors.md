@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Optimizing Accessors in Swift
 =============================
 
@@ -1291,5 +1287,3 @@ Let me summarize what I'm proposing:
         meaningful owners. This patch is not yet committed.
     -   The optimizer reacts to the above. When both are settled, they
         can be committed.
-
-

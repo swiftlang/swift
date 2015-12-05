@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Optimizer Effects: Summarizing and specifing function side effects
 ==================================================================
 

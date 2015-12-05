@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Interaction with Objective-C
 ============================
 
@@ -418,14 +414,14 @@ declared `@public`.:
       func g()
     }
 
-    struct X : P { // OK, X is not @public, so neither is its 
+    struct X : P { // OK, X is not @public, so neither is its
       func f() {}  // conformance to P, and therefore f
       func g() {}  // can be non-@public
     }
 
     protocol P1 {}
 
-    @public struct Y : P1 {} // Y is @public so its 
+    @public struct Y : P1 {} // Y is @public so its
                              // conformance to P1 is, too.
 
     @public

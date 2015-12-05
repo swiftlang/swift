@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 <style>
 table.docutils td, table.docutils th {
     border: 1px solid #aaa;

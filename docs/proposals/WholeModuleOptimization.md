@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Whole Module Optimization in Swift
 ==================================
 

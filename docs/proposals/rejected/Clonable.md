@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Clonable
 ========
 
@@ -127,7 +123,7 @@ marked `[clone]`:
 
     class Foo : Clonable {
         var count : Int
-        var [clone] myValue : FooValue 
+        var [clone] myValue : FooValue
         var somethingIJustReferTo : Bar
     }
 

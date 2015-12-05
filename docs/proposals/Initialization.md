@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Initialization
 ==============
 
@@ -13,9 +9,9 @@ superclass subobject gets initialized. The typical way to do so is
 through the use of superclass delegation:
 
     class A {
-      var x: Int 
+      var x: Int
 
-      init(x: Int) { 
+      init(x: Int) {
         self.x = x  
       }
     }

@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Dependency Analysis
 ===================
 
@@ -110,4 +106,3 @@ Complications
 -   If a build stops in the middle, we need to make sure the next build
     takes care of anything that was scheduled to be rebuilt but didn't
     get rebuilt this time.
-

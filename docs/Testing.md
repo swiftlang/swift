@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Testing Swift
 =============
 

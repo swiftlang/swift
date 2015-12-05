@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Swift Binary Serialization Format
 =================================
 

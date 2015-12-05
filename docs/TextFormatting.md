@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Text Formatting in Swift
 ========================
 
@@ -251,14 +247,14 @@ The following code is a scaled-down version of the formatting code used
 for `Int`. It represents an example of how a relatively complicated
 `format(…)` might be written:
 
-    protocol CustomStringConvertibleInteger 
+    protocol CustomStringConvertibleInteger
       : IntegerLiteralConvertible, Comparable, SignedNumber, CustomStringConvertible {
       func %(lhs: Self, rhs: Self) -> Self
       func /(lhs: Self, rhs: Self) -> Self
       constructor(x: Int)
       func toInt() -> Int
 
-      func format(radix: Int = 10, fill: String = " ", width: Int = 0) 
+      func format(radix: Int = 10, fill: String = " ", width: Int = 0)
         -> RadixFormat<This> {
 
         return RadixFormat(this, radix: radix, fill: fill, width: width)
@@ -273,7 +269,7 @@ for `Int`. It represents an example of how a relatively complicated
       }
 
       // Write the given positive value to stream
-      func _writePositive<T:CustomStringConvertibleInteger, S: OutputStream>( 
+      func _writePositive<T:CustomStringConvertibleInteger, S: OutputStream>(
         value: T, stream: [inout] S
       ) -> Int {
         if value == 0 { return 0 }

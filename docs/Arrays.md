@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 The Swift Array Design
 ======================
 

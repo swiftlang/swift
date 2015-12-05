@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Remote mirrors proposal
 =======================
 

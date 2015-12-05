@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 This proposal describes the work required to address
 rdar://problem/18216578.
 

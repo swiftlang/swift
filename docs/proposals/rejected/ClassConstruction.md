@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Integrating Swift Constructors with Objective-C
 ===============================================
 

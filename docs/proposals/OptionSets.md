@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 SUMMARY: Option sets should be structs of Bools, with a protocol to
 provide bitwise-ish operations.
 

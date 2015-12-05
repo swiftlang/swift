@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 ARC Optimization for Swift
 ==========================
 

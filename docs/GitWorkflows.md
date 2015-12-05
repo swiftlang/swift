@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Git Workflows
 =============
 

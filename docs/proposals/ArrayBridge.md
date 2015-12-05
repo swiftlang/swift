@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Bridging Swift Arrays to/from Cocoa
 ===================================
 

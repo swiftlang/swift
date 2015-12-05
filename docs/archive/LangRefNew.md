@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Swift Language Reference Manual
 ===============================
 

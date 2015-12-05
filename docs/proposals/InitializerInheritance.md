@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Initializer Inheritance
 =======================
 
@@ -200,7 +196,7 @@ examples:
     }
 
     class B3 : A {
-      var counter: Int 
+      var counter: Int
 
       init withInitialCount(initialCount: Int)  { // subobject initializer
         counter = initialCount
@@ -213,7 +209,7 @@ examples:
         self.init(withInitialCount: initialCount)
       }
 
-      // does not inherit A's init(), because init withTitle(String) is not 
+      // does not inherit A's init(), because init withTitle(String) is not
       // overridden.
     }
 
@@ -298,8 +294,8 @@ subclass. For example:
     class E2 : D {
       var title: String
 
-      @virtual init() { 
-        title = "Unnamed" 
+      @virtual init() {
+        title = "Unnamed"
         super.init()
       }
 
@@ -309,11 +305,11 @@ subclass. For example:
     class E3 : D {
       var title: String
 
-      @virtual init() -> Self { 
+      @virtual init() -> Self {
         self.init(withTitle: "Unnamed")
       }
 
-      init withTitle(title: String) { 
+      init withTitle(title: String) {
         self.title = title
         super.init()
       }

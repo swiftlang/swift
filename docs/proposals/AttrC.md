@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Eventually, we would like to write Swift modules which define pure-C
 entry points for top-level functions, and be able to export more data
 types to C code.

@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Sequences And Collections in Swift
 ==================================
 
@@ -33,7 +29,7 @@ Because this construct is generic, `s`{.sourceCode} could be
 In Swift, all of the above are called **sequences**, an abstraction
 represented by the `SequenceType`{.sourceCode} protocol:
 
-    protocol SequenceType { 
+    protocol SequenceType {
       typealias Generator : GeneratorType
       func generate() -> Generator
     }
@@ -123,7 +119,7 @@ need to implement a generic `for`{.sourceCode}…`in`{.sourceCode} loop.
 > support for buffering would fit nicely into the scheme, should it
 > prove important:
 >
->     public protocol BufferedGeneratorType 
+>     public protocol BufferedGeneratorType
 >       : GeneratorType {
 >       var latest: Element? {get}
 >     }
@@ -132,17 +128,17 @@ need to implement a generic `for`{.sourceCode}…`in`{.sourceCode} loop.
 > `GeneratorType`{.sourceCode} to create a \`BufferedGeneratorType\`:
 >
 >     /// Add buffering to any GeneratorType G
->     struct BufferedGenerator<G: GeneratorType> 
+>     struct BufferedGenerator<G: GeneratorType>
 >       : BufferedGeneratorType {
 >
->       public init(_ baseGenerator: G) { 
+>       public init(_ baseGenerator: G) {
 >         self._baseGenerator = baseGenerator
 >       }
->       public func next() -> Element? { 
+>       public func next() -> Element? {
 >         latest = _baseGenerator.next() ?? latest
->         return latest 
+>         return latest
 >       }
->       public private(set) var 
+>       public private(set) var
 >         latest: G.Element? = nil
 >       private var _baseGenerator: G
 >     }
@@ -156,7 +152,7 @@ requires reading elements from beginning to end. For example:
     // Return an array containing the elements of `source`, with
     // `separator` interposed between each consecutive pair.
     func array<S: SequenceType>(
-      source: S, 
+      source: S,
       withSeparator separator: S.Generator.Element
     ) -> [S.Generator.Element] {
       var result: [S.Generator.Element] = []

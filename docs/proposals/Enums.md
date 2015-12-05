@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Swift supports what type theory calls "algebraic data types", or ADTs,
 which are an amalgam of two familiar C-family language features, enums
 and unions. They are similar to enums in that they allow collections of

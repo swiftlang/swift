@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 We have a pretty good user model for C pointer interop now, but the
 language model still needs improvement. Building the user model on top
 of implicit conversions has a number of undesirable side effects. We end

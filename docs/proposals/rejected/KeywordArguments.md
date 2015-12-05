@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 > **warning**
 >
 > This proposal was rejected. We explored a number of alternate

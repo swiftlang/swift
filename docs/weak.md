@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Weak References
 ===============
 
@@ -1099,4 +1095,3 @@ The library should consider providing the following types:
     referent and a `() -> ()`{.sourceCode} function and which causes the
     function to be run (on a well-known dispatch queue?) when the object
     is finalized.
-

@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Debugging the Swift Compiler
 ============================
 

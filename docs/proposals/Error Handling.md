@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Swift Error Handling Model
 ==========================
 

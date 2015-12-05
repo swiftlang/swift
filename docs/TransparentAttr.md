@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 `@_transparent`
 ===============
 
@@ -73,4 +69,3 @@ Current implementation limitations
     frontend invocation), including `@inline(__always)` and
     `@_transparent` functions. This is semantically a bug.
     rdar://problem/15366167
-

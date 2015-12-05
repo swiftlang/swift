@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Objective-C Interoperability
 ============================
 

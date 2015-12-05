@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Scope and introduction
 ======================
 

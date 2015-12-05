@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Swift Memory and Concurrency Model
 ==================================
 

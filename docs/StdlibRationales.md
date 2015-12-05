@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Rationales for the Swift standard library designs
 =================================================
 

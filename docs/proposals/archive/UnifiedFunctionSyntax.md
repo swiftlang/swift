@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Unified Function Syntax via Selector Splitting
 ==============================================
 
@@ -156,7 +152,7 @@ To refer to the complete method name, place the method name in
 backticks, as in this reference to an optional method in a delegate:
 
     if let method = delegate.`tableView(_:viewForTableColumn:row:)` {
-      // ... 
+      // ...
     }
 
 Initializers
@@ -509,5 +505,3 @@ special circumstances that affect inclusion or exclusion from the list.
 +-------------------+------------+------------+-------------------------------+
 | Worth             | No         |            |                               |
 +-------------------+------------+------------+-------------------------------+
-
-

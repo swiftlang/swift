@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 High-Level Optimizations in SIL
 ===============================
 

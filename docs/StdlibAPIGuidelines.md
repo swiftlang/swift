@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Swift Standard Library API Design Guide
 =======================================
 
@@ -141,4 +137,3 @@ library, but are compatible with the Cocoa guidelines.
     convey that.
 -   `C`{.sourceCode} is used as a prefix to denote types corresponding
     to C language types, e.g. `CChar`{.sourceCode}.
-

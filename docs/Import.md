@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 > **warning**
 >
 > This document represents an early proposal for `import` syntax and

@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 In-Place Operations
 ===================
 

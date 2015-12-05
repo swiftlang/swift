@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Swift Program Structure and Compilation Model
 =============================================
 
@@ -394,4 +390,3 @@ There are several different possibilities to look at in the future:
     format independent. There is no reason that we need to keep using
     actual macho .o files if it turns out to be inconvenient. We
     obviously must keep around macho executables and dylibs.
-

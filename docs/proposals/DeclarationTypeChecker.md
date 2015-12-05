@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Declaration Type Checker
 ========================
 

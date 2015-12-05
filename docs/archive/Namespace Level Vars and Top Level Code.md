@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 > **warning**
 >
 > This document was used in planning Swift 1.0; it has not been kept
@@ -136,4 +132,3 @@ should:
     maps to in swift syntax, so it is obvious how to use it.
 4.  Not having headers forces us to have really great
     tools support/integration.
-

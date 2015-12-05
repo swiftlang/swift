@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Copy-On-Write Optimization of `inout` Values
 ============================================
 

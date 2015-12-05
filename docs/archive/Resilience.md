@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Resilience
 ==========
 
@@ -618,4 +614,3 @@ Break it down by types of declarations.
 -   enum - called out so that we can have an extensible thing that
     promises no data fields. Always an i32 when resilient.
 -   const - fragile by default, as if a var otherwise
-

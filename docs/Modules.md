@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 A module is the primary unit of code sharing in Swift. This document
 describes the experience of using modules in Swift: what they are and
 what they provide for the user.

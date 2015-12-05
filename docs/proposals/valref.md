@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Values and References
 =====================
 
@@ -556,4 +552,3 @@ example:
     particular suggestions. One argument in favor of a change: `struct`
     comes with a strong connotation of weakness or second-class-ness for
     some people.
-

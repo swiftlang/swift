@@ -1,7 +1,3 @@
-orphan
-
-:   
-
 Value Semantics in Swift
 ========================
 
@@ -170,7 +166,7 @@ Here’s a version of cycle\_length that works when state is a mutable
 value type:
 
     func cycle_length<State>(
-      s : State, mutate : ( [inout] State )->() 
+      s : State, mutate : ( [inout] State )->()
     ) -> Int
       requires State : EqualityComparable
     {
