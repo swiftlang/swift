@@ -20,8 +20,10 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Identifier.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include <utility>
 
 namespace clang {
 class NamedDecl;
@@ -40,20 +42,32 @@ namespace swift {
 /// entities based on their Swift names, and is used by the Clang
 /// importer to satisfy the Swift compiler's queries.
 class SwiftLookupTable {
+public:
+  /// The kind of context in which a name occurs.
+  enum class ContextKind : uint8_t {
+    /// A translation unit.
+    TranslationUnit = 0,
+    /// A tag declaration (struct, enum, union, C++ class).
+    Tag,
+    /// An Objective-C class.
+    ObjCClass,
+    /// An Objective-C protocol.
+    ObjCProtocol,
+  };
+
   /// An entry in the table of C entities indexed by full Swift name.
   struct FullTableEntry {
     /// The context in which the entities with the given name occur, e.g.,
     /// a class, struct, translation unit, etc.
-    ///
-    /// Many Clang DeclContexts can have redeclarations, so this entry
     /// is always the canonical DeclContext for the entity.
-    clang::DeclContext *Context;
+    std::pair<ContextKind, StringRef> Context;
 
     /// The set of Clang declarations with this name and in this
     /// context.
     llvm::TinyPtrVector<clang::NamedDecl *> Decls;
   };
 
+private:
   /// A table mapping from the full name of Swift entities to all of
   /// the C entities that have that name, in all contexts.
   llvm::DenseMap<DeclName, SmallVector<FullTableEntry, 2>> FullNameTable;
@@ -62,11 +76,11 @@ class SwiftLookupTable {
   /// full Swift names based on that identifier.
   llvm::DenseMap<Identifier, SmallVector<DeclName, 2>> BaseNameTable;
 
-  /// Determine whether the given context we found matches the
-  /// requested context.
-  bool matchesContext(clang::DeclContext *foundContext,
-                      clang::DeclContext *requestedContext);
 public:
+  /// Translate a Clang DeclContext into a context kind and name.
+  llvm::Optional<std::pair<ContextKind, StringRef>>
+  translateContext(clang::DeclContext *context);
+
   /// Add an entry to the lookup table.
   ///
   /// \param name The Swift name of the entry.
