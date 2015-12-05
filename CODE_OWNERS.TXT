@@ -4,9 +4,7 @@ They are also the gatekeepers for their part of Swift, with the final word on
 what goes in or not.
 
 The list is sorted by surname and formatted to allow easy grepping and
-beautification by scripts.  The fields are: name (N), email (E), web-address
-(W), PGP key ID and fingerprint (P), description (D), and snail-mail address
-(S).
+beautification by scripts.  The fields are: name (N), email (E) and description (D).
 
 N: David Abrahams
 E: dabrahams@apple.com
