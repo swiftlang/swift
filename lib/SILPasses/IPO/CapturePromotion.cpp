@@ -257,7 +257,7 @@ void ReachabilityInfo::compute() {
       if (!Changed) {
         // If we have not detected a change yet, then calculate new
         // reachabilities into a new bit vector so we can determine if any
-        // change has occured.
+        // change has occurred.
         NewSet = CurSet;
         for (auto PI = BB.pred_begin(), PE = BB.pred_end(); PI != PE; ++PI) {
           unsigned PredID = BlockMap[*PI];

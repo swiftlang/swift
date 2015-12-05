@@ -347,7 +347,7 @@ the programmer ensure that both the client and function both agree that
 <code>archives</code> is an in-out argument.  And <i>just as importantly</i>,
 that <code>archivePath</code> is <b>not</b> to be modified within
 <code>_checkPathForArchiveAndAddToArray</code>.  However if
-<code>archivePath</code> is a mutable object with reference semantics, we loose
+<code>archivePath</code> is a mutable object with reference semantics, we lose
 that ability to locally reason about this code, even in Swift.
 </p>
 
