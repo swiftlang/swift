@@ -180,6 +180,46 @@ static CanSILFunctionType getDynamicMethodLoweredType(SILGenFunction &gen,
   return replaceSelfTypeForDynamicLookup(ctx, methodTy, selfTy, methodName);
 }
 
+/// Emit a sequence of instructions to partially apply the self
+/// parameter of a super method invocation.
+static ManagedValue emitPartialSuperMethod(SILGenFunction &SGF,
+                                           SILDeclRef constant,
+                                           SILLocation loc,
+                                           ArrayRef<Substitution> subs,
+                                           ArrayRef<ManagedValue> values,
+                                           CanFunctionType formalApplyType,
+                                           SGFContext C) {
+
+  assert(values.size() == 1 &&
+         "Can only partially apply the self parameater of a super method call");
+
+  auto upcastedSelf = values.back();
+
+  auto self = cast<UpcastInst>(upcastedSelf.getValue())->getOperandRef().get();
+
+  auto constantInfo = SGF.getConstantInfo(constant);
+  SILValue superMethodVal = SGF.B.createSuperMethod(loc,
+                                                    self,
+                                                    constant,
+                                                    constantInfo.getSILType(),
+                                                    /*volatile*/
+                                                      constant.isForeign);
+
+  auto closureTy = SILGenBuilder::getPartialApplyResultType(
+    constantInfo.getSILType(),
+    1,
+    SGF.B.getModule(),
+    subs);
+
+  SILValue partialApply = SGF.B.createPartialApply(loc,
+                                                   superMethodVal,
+                                                   constantInfo.getSILType(),
+                                                   subs,
+                                                   { upcastedSelf.forward(SGF) },
+                                                   closureTy);
+  return ManagedValue::forUnmanaged(partialApply);
+}
+
 namespace {
 
 /// Abstractly represents a callee, and knows how to emit the entry point
@@ -650,6 +690,10 @@ public:
     return Substitutions;
   }
 
+  SILDeclRef getMethodName() const {
+    return Method.MethodName;
+  }
+
   /// Return a specialized emission function if this is a function with a known
   /// lowering, such as a builtin, or return null if there is no specialized
   /// emitter.
@@ -663,9 +707,11 @@ public:
     case Kind::StandaloneFunction: {
       return SpecializedEmitter::forDecl(SGM, StandaloneFunction);
     }
+    case Kind::SuperMethod: {
+      return SpecializedEmitter(emitPartialSuperMethod);
+    }
     case Kind::IndirectValue:
     case Kind::ClassMethod:
-    case Kind::SuperMethod:
     case Kind::WitnessMethod:
     case Kind::DynamicMethod:
       return None;
@@ -3230,6 +3276,15 @@ namespace {
         } else if (specializedEmitter->isLateEmitter()) {
           auto emitter = specializedEmitter->getLateEmitter();
           result = emitter(gen,
+                           uncurriedLoc.getValue(),
+                           callee.getSubstitutions(),
+                           uncurriedArgs,
+                           formalApplyType,
+                           uncurriedContext);
+        } else if (specializedEmitter->isLatePartialSuperEmitter()) {
+          auto emitter = specializedEmitter->getLatePartialSuperEmitter();
+          result = emitter(gen,
+                           callee.getMethodName(),
                            uncurriedLoc.getValue(),
                            callee.getSubstitutions(),
                            uncurriedArgs,
