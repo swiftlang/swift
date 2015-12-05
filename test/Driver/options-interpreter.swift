@@ -1,4 +1,5 @@
 // FIXME: This is failing on some of Apple's internal CI.
+// FIXME: <rdar://problem/23771412> Fix test/Driver/{environment.swift,options-interpreter.swift}
 // REQUIRES: disabled
 
 // RUN: not %swift_driver -deprecated-integrated-repl -emit-module 2>&1 | FileCheck -check-prefix=IMMEDIATE_NO_MODULE %s
