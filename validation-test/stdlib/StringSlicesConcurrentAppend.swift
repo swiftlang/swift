@@ -25,13 +25,13 @@ extension String {
 // different non-shared strings that point to the same shared buffer.
 
 enum ThreadID {
-  case Leader
-  case Follower
+  case Master
+  case Slave
 }
 
 var barrierVar: UnsafeMutablePointer<_stdlib_pthread_barrier_t> = nil
 var sharedString: String = ""
-var followerString: String = ""
+var slaveString: String = ""
 
 func barrier() {
   var ret = _stdlib_pthread_barrier_wait(barrierVar)
@@ -41,7 +41,7 @@ func barrier() {
 func sliceConcurrentAppendThread(tid: ThreadID) {
   for i in 0..<100 {
     barrier()
-    if tid == .Leader {
+    if tid == .Master {
       // Get a fresh buffer.
       sharedString = ""
       sharedString.appendContentsOf("abc")
@@ -57,7 +57,7 @@ func sliceConcurrentAppendThread(tid: ThreadID) {
     barrier()
 
     // Append to the private string.
-    if tid == .Leader {
+    if tid == .Master {
       privateString.appendContentsOf("def")
     } else {
       privateString.appendContentsOf("ghi")
@@ -66,7 +66,7 @@ func sliceConcurrentAppendThread(tid: ThreadID) {
     barrier()
 
     // Verify that contents look good.
-    if tid == .Leader {
+    if tid == .Master {
       expectEqual("abcdef", privateString)
     } else {
       expectEqual("abcghi", privateString)
@@ -74,14 +74,14 @@ func sliceConcurrentAppendThread(tid: ThreadID) {
     expectEqual("abc", sharedString)
 
     // Verify that only one thread took ownership of the buffer.
-    if tid == .Follower {
-      followerString = privateString
+    if tid == .Slave {
+      slaveString = privateString
     }
     barrier()
-    if tid == .Leader {
+    if tid == .Master {
       expectTrue(
         (privateString.bufferID == sharedString.bufferID) !=
-          (followerString.bufferID == sharedString.bufferID))
+          (slaveString.bufferID == sharedString.bufferID))
     }
   }
 }
@@ -93,9 +93,9 @@ StringTestSuite.test("SliceConcurrentAppend") {
   expectEqual(0, ret)
 
   let (createRet1, tid1) = _stdlib_pthread_create_block(
-    nil, sliceConcurrentAppendThread, .Leader)
+    nil, sliceConcurrentAppendThread, .Master)
   let (createRet2, tid2) = _stdlib_pthread_create_block(
-    nil, sliceConcurrentAppendThread, .Follower)
+    nil, sliceConcurrentAppendThread, .Slave)
 
   expectEqual(0, createRet1)
   expectEqual(0, createRet2)
@@ -114,4 +114,3 @@ StringTestSuite.test("SliceConcurrentAppend") {
 }
 
 runAllTests()
-
