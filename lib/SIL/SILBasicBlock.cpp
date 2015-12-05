@@ -43,6 +43,11 @@ SILBasicBlock::~SILBasicBlock() {
     getModule().notifyDeleteHandlers(&*I);
   }
 
+  // Invalidate all of the basic block arguments.
+  for (auto *Arg : BBArgList) {
+    getModule().notifyDeleteHandlers(Arg);
+  }
+
   // iplist's destructor is going to destroy the InstList.
 }
 
@@ -75,12 +80,12 @@ void SILBasicBlock::push_front(SILInstruction *I) {
 }
 
 void SILBasicBlock::remove(SILInstruction *I) {
-  // Notify the delete handlers that this instruction is going away.
-  getModule().notifyDeleteHandlers(&*I);
   InstList.remove(I);
 }
 
 void SILBasicBlock::erase(SILInstruction *I) {
+  // Notify the delete handlers that this instruction is going away.
+  getModule().notifyDeleteHandlers(&*I);
   InstList.erase(I);
 }
 
@@ -100,10 +105,18 @@ void SILBasicBlock::removeFromParent() {
 SILArgument *SILBasicBlock::replaceBBArg(unsigned i, SILType Ty,
                                          const ValueDecl *D) {
   SILModule &M = getParent()->getModule();
+
+
   assert(BBArgList[i]->use_empty() && "Expected no uses of the old BB arg!");
+
+  // Notify the delete handlers that this argument is being deleted.
+  M.notifyDeleteHandlers(BBArgList[i]);
 
   auto *NewArg = new (M) SILArgument(Ty, D);
   NewArg->setParent(this);
+
+  // TODO: When we switch to malloc/free allocation we'll be leaking memory
+  // here.
   BBArgList[i] = NewArg;
 
   return NewArg;
@@ -116,6 +129,12 @@ SILArgument *SILBasicBlock::createBBArg(SILType Ty, const ValueDecl *D) {
 SILArgument *SILBasicBlock::insertBBArg(bbarg_iterator Iter, SILType Ty,
                                         const ValueDecl *D) {
   return new (getModule()) SILArgument(this, Iter, Ty, D);
+}
+
+void SILBasicBlock::eraseBBArg(int Index) {
+  // Notify the delete handlers that this BB argument is going away.
+  getModule().notifyDeleteHandlers(getBBArg(Index));
+  BBArgList.erase(BBArgList.begin() + Index);
 }
 
 /// \brief Splits a basic block into two at the specified instruction.

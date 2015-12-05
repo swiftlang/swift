@@ -8,9 +8,8 @@ throw MyError.A
 
 // CHECK: sil @main
 // CHECK: [[ERR:%.*]] = alloc_existential_box $ErrorType, $MyError
-// CHECK: [[T0:%.*]] = function_ref @_TFO15toplevel_errors7MyError1AFMS0_S0_
-// CHECK: [[T1:%.*]] = apply [[T0]](
-// CHECK: store [[T1]] to [[ERR]]#1 : $*MyError
+// CHECK: [[T0:%.*]] = enum $MyError, #MyError.A!enumelt
+// CHECK: store [[T0]] to [[ERR]]#1 : $*MyError
 // CHECK: builtin "willThrow"([[ERR]]#0 : $ErrorType)
 // CHECK: br bb2([[ERR]]#0 : $ErrorType)
 

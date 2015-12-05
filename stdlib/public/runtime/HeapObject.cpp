@@ -362,17 +362,17 @@ size_t swift::swift_retainCount(HeapObject *object) {
   return object->refCount.getCount();
 }
 
-size_t swift::swift_weakRetainCount(HeapObject *object) {
+size_t swift::swift_unownedRetainCount(HeapObject *object) {
   return object->weakRefCount.getCount();
 }
 
-void swift::swift_weakRetain(HeapObject *object) {
+void swift::swift_unownedRetain(HeapObject *object) {
   if (!object) return;
 
   object->weakRefCount.increment();
 }
 
-void swift::swift_weakRelease(HeapObject *object) {
+void swift::swift_unownedRelease(HeapObject *object) {
   if (!object) return;
 
   if (object->weakRefCount.decrementShouldDeallocate()) {
@@ -386,13 +386,13 @@ void swift::swift_weakRelease(HeapObject *object) {
   }
 }
 
-void swift::swift_weakRetain_n(HeapObject *object, int n) {
+void swift::swift_unownedRetain_n(HeapObject *object, int n) {
   if (!object) return;
 
   object->weakRefCount.increment(n);
 }
 
-void swift::swift_weakRelease_n(HeapObject *object, int n) {
+void swift::swift_unownedRelease_n(HeapObject *object, int n) {
   if (!object) return;
 
   if (object->weakRefCount.decrementShouldDeallocateN(n)) {
@@ -446,7 +446,7 @@ static bool _swift_isDeallocating_(HeapObject *object) {
 }
 auto swift::_swift_isDeallocating = _swift_isDeallocating_;
 
-void swift::swift_retainUnowned(HeapObject *object) {
+void swift::swift_unownedRetainStrong(HeapObject *object) {
   if (!object) return;
   assert(object->weakRefCount.getCount() &&
          "object is not currently weakly retained");
@@ -455,7 +455,21 @@ void swift::swift_retainUnowned(HeapObject *object) {
     _swift_abortRetainUnowned(object);
 }
 
-void swift::swift_checkUnowned(HeapObject *object) {
+void swift::swift_unownedRetainStrongAndRelease(HeapObject *object) {
+  if (!object) return;
+  assert(object->weakRefCount.getCount() &&
+         "object is not currently weakly retained");
+
+  if (! object->refCount.tryIncrement())
+    _swift_abortRetainUnowned(object);
+
+  // This should never cause a deallocation.
+  bool dealloc = object->weakRefCount.decrementShouldDeallocate();
+  assert(!dealloc && "retain-strong-and-release caused dealloc?");
+  (void) dealloc;
+}
+
+void swift::swift_unownedCheck(HeapObject *object) {
   if (!object) return;
   assert(object->weakRefCount.getCount() &&
          "object is not currently weakly retained");
@@ -612,7 +626,7 @@ void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize,
   if (object->weakRefCount.getCount() == 1) {
     swift_slowDealloc(object, allocatedSize, allocatedAlignMask);
   } else {
-    swift_weakRelease(object);
+    swift_unownedRelease(object);
   }
 }
 
@@ -623,21 +637,21 @@ extern "C" void swift_fixLifetime(OpaqueValue *value) {
 
 void swift::swift_weakInit(WeakReference *ref, HeapObject *value) {
   ref->Value = value;
-  swift_weakRetain(value);
+  swift_unownedRetain(value);
 }
 
 void swift::swift_weakAssign(WeakReference *ref, HeapObject *newValue) {
-  swift_weakRetain(newValue);
+  swift_unownedRetain(newValue);
   auto oldValue = ref->Value;
   ref->Value = newValue;
-  swift_weakRelease(oldValue);
+  swift_unownedRelease(oldValue);
 }
 
 HeapObject *swift::swift_weakLoadStrong(WeakReference *ref) {
   auto object = ref->Value;
   if (object == nullptr) return nullptr;
   if (object->refCount.isDeallocating()) {
-    swift_weakRelease(object);
+    swift_unownedRelease(object);
     ref->Value = nullptr;
     return nullptr;
   }
@@ -653,7 +667,7 @@ HeapObject *swift::swift_weakTakeStrong(WeakReference *ref) {
 void swift::swift_weakDestroy(WeakReference *ref) {
   auto tmp = ref->Value;
   ref->Value = nullptr;
-  swift_weakRelease(tmp);
+  swift_unownedRelease(tmp);
 }
 
 void swift::swift_weakCopyInit(WeakReference *dest, WeakReference *src) {
@@ -663,10 +677,10 @@ void swift::swift_weakCopyInit(WeakReference *dest, WeakReference *src) {
   } else if (object->refCount.isDeallocating()) {
     src->Value = nullptr;
     dest->Value = nullptr;
-    swift_weakRelease(object);
+    swift_unownedRelease(object);
   } else {
     dest->Value = object;
-    swift_weakRetain(object);
+    swift_unownedRetain(object);
   }
 }
 
@@ -675,20 +689,20 @@ void swift::swift_weakTakeInit(WeakReference *dest, WeakReference *src) {
   dest->Value = object;
   if (object != nullptr && object->refCount.isDeallocating()) {
     dest->Value = nullptr;
-    swift_weakRelease(object);
+    swift_unownedRelease(object);
   }
 }
 
 void swift::swift_weakCopyAssign(WeakReference *dest, WeakReference *src) {
   if (auto object = dest->Value) {
-    swift_weakRelease(object);
+    swift_unownedRelease(object);
   }
   swift_weakCopyInit(dest, src);
 }
 
 void swift::swift_weakTakeAssign(WeakReference *dest, WeakReference *src) {
   if (auto object = dest->Value) {
-    swift_weakRelease(object);
+    swift_unownedRelease(object);
   }
   swift_weakTakeInit(dest, src);
 }

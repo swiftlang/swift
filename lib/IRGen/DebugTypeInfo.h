@@ -72,8 +72,8 @@ namespace swift {
         else return DeclOrContext.get<DeclContext*>();
       }
 
-      void unwrapInOutType() {
-        Type = Type->castTo<InOutType>()->getObjectType().getPointer();
+      void unwrapLValueOrInOutType() {
+        Type = Type->getLValueOrInOutObjectType().getPointer();
       }
 
       bool isNull() const { return Type == nullptr; }

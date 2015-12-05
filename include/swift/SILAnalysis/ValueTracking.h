@@ -27,6 +27,10 @@ class SILValue;
 /// nothing left to strip.
 SILValue getUnderlyingObject(SILValue V);
 
+/// Returns true if \p V is a function argument which may not alias to
+/// any other pointer in the function.
+bool isNotAliasingArgument(SILValue V);
+
 /// Return true if the pointer is to a function-local object that never escapes
 /// from the function.
 bool isNonEscapingLocalObject(SILValue V);

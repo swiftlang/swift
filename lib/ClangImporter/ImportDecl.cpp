@@ -3162,6 +3162,8 @@ namespace {
 
       // If we dropped the variadic, handle it now.
       if (importedName.DroppedVariadic) {
+        selector = ObjCSelector(Impl.SwiftContext, selector.getNumArgs()-1,
+                                selector.getSelectorPieces().drop_back());
         params = params.drop_back(1);
         variadic = false;
       }

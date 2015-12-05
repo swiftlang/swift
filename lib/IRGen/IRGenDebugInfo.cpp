@@ -863,26 +863,6 @@ void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF,
                           DirectValue, ArtificialValue);
 }
 
-void IRGenDebugInfo::emitStackVariableDeclaration(
-    IRBuilder &B, ArrayRef<llvm::Value *> Storage, DebugTypeInfo DbgTy,
-    const SILDebugScope *DS, StringRef Name, IndirectionKind Indirection) {
-  emitVariableDeclaration(B, Storage, DbgTy, DS, Name, 0, Indirection,
-                          RealValue);
-}
-
-void IRGenDebugInfo::emitArgVariableDeclaration(
-    IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo DbgTy,
-    const SILDebugScope *DS, StringRef Name, unsigned ArgNo,
-    IndirectionKind Indirection, ArtificialKind IsArtificial) {
-  assert(ArgNo > 0);
-  if (Name == IGM.Context.Id_self.str())
-    emitVariableDeclaration(Builder, Storage, DbgTy, DS, Name, ArgNo,
-                            DirectValue, ArtificialValue);
-  else
-    emitVariableDeclaration(Builder, Storage, DbgTy, DS, Name, ArgNo,
-                            Indirection, IsArtificial);
-}
-
 /// Return the DIFile that is the ancestor of Scope.
 llvm::DIFile *IRGenDebugInfo::getFile(llvm::DIScope *Scope) {
   while (!isa<llvm::DIFile>(Scope)) {
@@ -985,6 +965,10 @@ void IRGenDebugInfo::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo DbgTy,
     const SILDebugScope *DS, StringRef Name, unsigned ArgNo,
     IndirectionKind Indirection, ArtificialKind Artificial) {
+  // Self is always an artificial argument.
+  if (ArgNo > 0 && Name == IGM.Context.Id_self.str())
+    Artificial = ArtificialValue;
+
   // FIXME: Make this an assertion.
   // assert(DS && "variable has no scope");
   if (!DS)
@@ -1016,16 +1000,15 @@ void IRGenDebugInfo::emitVariableDeclaration(
   if (Artificial || DITy->isArtificial() || DITy == InternalType)
     Flags |= llvm::DINode::FlagArtificial;
 
+  // LValues, inout args, and Archetypes are implicitly indirect by
+  // virtue of their DWARF type.
+  if (DbgTy.getType()->getKind() == TypeKind::InOut ||
+      DbgTy.getType()->hasArchetype())
+    Indirection = DirectValue;
+
   // Create the descriptor for the variable.
   llvm::DILocalVariable *Var = nullptr;
-  llvm::DIExpression *Expr = DBuilder.createExpression();
 
-  if (Indirection) {
-    // Classes are always passed by reference.
-    int64_t Addr[] = { llvm::dwarf::DW_OP_deref };
-    Expr = DBuilder.createExpression(Addr);
-    // FIXME: assert(Flags == 0 && "Complex variables cannot have flags");
-  }
   /// This could be Opts.Optimize if we would also unique DIVariables here.
   bool Optimized = false;
   Var = (ArgNo > 0)
@@ -1043,6 +1026,10 @@ void IRGenDebugInfo::emitVariableDeclaration(
   ElementSizes EltSizes(DITy, DIRefMap, IndirectEnumCases);
   auto Dim = EltSizes.getNext();
   for (llvm::Value *Piece : Storage) {
+    SmallVector<uint64_t, 3> Operands;
+    if (Indirection)
+      Operands.push_back(llvm::dwarf::DW_OP_deref);
+
     // There are variables without storage, such as "struct { func foo() {} }".
     // Emit them as constant 0.
     if (isa<llvm::UndefValue>(Piece))
@@ -1069,13 +1056,9 @@ void IRGenDebugInfo::emitVariableDeclaration(
       assert(Dim.SizeInBits < VarSizeInBits
              && "piece covers entire var");
       assert(OffsetInBits+Dim.SizeInBits <= VarSizeInBits && "pars > totum");
-      SmallVector<uint64_t, 3> Elts;
-      if (Indirection)
-        Elts.push_back(llvm::dwarf::DW_OP_deref);
-      Elts.push_back(llvm::dwarf::DW_OP_bit_piece);
-      Elts.push_back(OffsetInBits);
-      Elts.push_back(Dim.SizeInBits);
-      Expr = DBuilder.createExpression(Elts);
+      Operands.push_back(llvm::dwarf::DW_OP_bit_piece);
+      Operands.push_back(OffsetInBits);
+      Operands.push_back(Dim.SizeInBits);
 
       auto Size = Dim.SizeInBits;
       Dim = EltSizes.getNext();
@@ -1083,13 +1066,15 @@ void IRGenDebugInfo::emitVariableDeclaration(
         llvm::RoundUpToAlignment(Size, Dim.AlignInBits ? Dim.AlignInBits
                                                        : SizeOfByte);
     }
-    emitDbgIntrinsic(BB, Piece, Var, Expr, Line, Loc.Col, Scope, DS);
+    emitDbgIntrinsic(BB, Piece, Var, DBuilder.createExpression(Operands), Line,
+                     Loc.Col, Scope, DS);
   }
 
   // Emit locationless intrinsic for variables that were optimized away.
   if (Storage.size() == 0) {
     auto *undef = llvm::UndefValue::get(DbgTy.StorageType);
-    emitDbgIntrinsic(BB, undef, Var, Expr, Line, Loc.Col, Scope, DS);
+    emitDbgIntrinsic(BB, undef, Var, DBuilder.createExpression(), Line, Loc.Col,
+                     Scope, DS);
   }
 }
 

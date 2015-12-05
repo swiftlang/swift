@@ -1,0 +1,4 @@
+module foo {
+  header "foo.h"
+  link "foo"
+}

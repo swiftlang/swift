@@ -241,7 +241,7 @@ public:
   }
 
   /// \brief Retrieve the source location that points just past the
-  /// end of the token refered to by \c Loc.
+  /// end of the token referred to by \c Loc.
   ///
   /// \param SM The source manager in which the given source location
   /// resides.

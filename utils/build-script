@@ -193,7 +193,7 @@ To build a debuggable Swift standard library:
 
   [~/src/s]$ ./swift/utils/build-script -R --debug-swift-stdlib
 
-iOS build targets are always configured and present, but are not build by
+iOS build targets are always configured and present, but are not built by
 default.  To build the standard library for OS X, iOS simulator and iOS device:
 
   [~/src/s]$ ./swift/utils/build-script -R -i
@@ -477,6 +477,13 @@ also build for Apple watchos, but disallow tests that require an watchOS device"
 name of the directory under $SWIFT_BUILD_ROOT where the build products will be
 placed""",
         metavar="PATH")
+
+    parser.add_argument("-j", "--jobs",
+        help="""
+the number of parallel build jobs to use""",
+        type=int,
+        dest="build_jobs")
+
     parser.add_argument("--extra-swift-args", help=textwrap.dedent("""
     Pass through extra flags to swift in the form of a cmake list 'module_regexp;flag'. Can
     be called multiple times to add multiple such module_regexp flag pairs. All semicolons
@@ -700,6 +707,8 @@ placed""",
         "--cmake-generator", args.cmake_generator,
         "--workspace", SWIFT_SOURCE_ROOT
     ]
+    if args.build_jobs:
+        build_script_impl_args += ["--build-jobs", str(args.build_jobs)]
     if args.build_foundation:
         build_script_impl_args += [
             "--foundation-build-type", args.foundation_build_variant

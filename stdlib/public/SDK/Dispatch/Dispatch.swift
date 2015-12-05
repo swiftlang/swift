@@ -67,10 +67,10 @@ public var DISPATCH_QUEUE_PRIORITY_BACKGROUND: dispatch_queue_priority_t {
 @warn_unused_result
 public func dispatch_get_global_queue(identifier: qos_class_t,
                                       _ flags: UInt) -> dispatch_queue_t {
-  return dispatch_get_global_queue(Int(identifier.rawValue), flags);
+  return dispatch_get_global_queue(Int(identifier.rawValue), flags)
 }
 
-public var DISPATCH_QUEUE_CONCURRENT : dispatch_queue_attr_t {
+public var DISPATCH_QUEUE_CONCURRENT: dispatch_queue_attr_t {
   return _swift_dispatch_queue_concurrent()
 }
 
@@ -79,7 +79,7 @@ public var DISPATCH_QUEUE_CONCURRENT : dispatch_queue_attr_t {
 internal func _swift_dispatch_queue_concurrent() -> dispatch_queue_attr_t
 
 // dispatch/data.h
-public var dispatch_data_empty : dispatch_data_t {
+public var dispatch_data_empty: dispatch_data_t {
   return _swift_dispatch_data_empty()
 }
 

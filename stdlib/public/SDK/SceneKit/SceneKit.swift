@@ -121,7 +121,8 @@ extension SCNMatrix4 {
 
 extension float4x4 {
   public init(_ m: SCNMatrix4) {
-    self.init([ float4(Float(m.m11), Float(m.m12), Float(m.m13), Float(m.m14)),
+    self.init([
+      float4(Float(m.m11), Float(m.m12), Float(m.m13), Float(m.m14)),
       float4(Float(m.m21), Float(m.m22), Float(m.m23), Float(m.m24)),
       float4(Float(m.m31), Float(m.m32), Float(m.m33), Float(m.m34)),
       float4(Float(m.m41), Float(m.m42), Float(m.m43), Float(m.m44))
@@ -131,7 +132,8 @@ extension float4x4 {
 
 extension double4x4 {
   public init(_ m: SCNMatrix4) {
-    self.init([ double4(Double(m.m11), Double(m.m12), Double(m.m13), Double(m.m14)),
+    self.init([
+      double4(Double(m.m11), Double(m.m12), Double(m.m13), Double(m.m14)),
       double4(Double(m.m21), Double(m.m22), Double(m.m23), Double(m.m24)),
       double4(Double(m.m31), Double(m.m32), Double(m.m33), Double(m.m34)),
       double4(Double(m.m41), Double(m.m42), Double(m.m43), Double(m.m44))

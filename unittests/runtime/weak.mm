@@ -291,13 +291,13 @@ TEST(WeakTest, objc_weak_release_after_strong_release) {
   void *o = make_objc_object();
   // strong 1, unowned 0
 
-  swift_unknownWeakRetain(o);
+  swift_unknownUnownedRetain(o);
   // strong 1, unowned 1
 
   swift_unknownRelease(o);
   // strong 0, unowned 1 -- object gets greedily deallocated by ObjC runtime
   ASSERT_EQ(1U, DestroyedObjCCount);
   
-  swift_unknownWeakRelease(o);
+  swift_unknownUnownedRelease(o);
   // strong 0, unowned 0
 }

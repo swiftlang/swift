@@ -170,8 +170,6 @@ KNOWN_SETTINGS=(
     extra-swift-args            ""               "Extra arguments to pass to swift modules which match regex. Assumed to be a flattened cmake list consisting of [module_regexp, args, module_regexp, args, ...]"
     sil-verify-all              "0"              "If enabled, run the sil verifier be run after every SIL pass"
     swift-enable-ast-verifier   "1"              "If enabled, and the assertions are enabled, the built Swift compiler will run the AST verifier every time it is invoked"
-    swift-enable-target-linux   "1"              "Enable compiler support for targeting Linux"
-    swift-enable-target-freebsd "1"              "Enable compiler support for targeting FreeBSD"
     swift-runtime-enable-dtrace "0"              "Enable runtime dtrace support"
     swift-runtime-enable-leak-checker   "0"              "Enable leaks checking routines in the runtime"
     use-gold-linker             ""               "Enable using the gold linker"
@@ -182,6 +180,7 @@ KNOWN_SETTINGS=(
     darwin-toolchain-application-cert  ""        "Application Cert name to codesign xctoolchain"
     darwin-toolchain-installer-cert    ""        "Installer Cert name to create installer pkg"
     darwin-toolchain-installer-package ""        "The path to installer pkg"
+    build-jobs ""                                "The number of parallel build jobs to use"
 
 )
 
@@ -1049,9 +1048,16 @@ case "${CMAKE_GENERATOR}" in
         if [[ "${VERBOSE_BUILD}" ]] ; then
             BUILD_ARGS="${BUILD_ARGS} -v"
         fi
+        if [[ "${BUILD_JOBS}" ]] ; then
+            BUILD_ARGS="${BUILD_ARGS} -j${BUILD_JOBS}"
+        fi
         ;;
     'Unix Makefiles')
-        BUILD_ARGS="${BUILD_ARGS:--j$(get_make_parallelism)}"
+        if [[ "${BUILD_JOBS}" ]] ; then
+            BUILD_ARGS="${BUILD_ARGS} -j${BUILD_JOBS}"
+        else
+            BUILD_ARGS="${BUILD_ARGS:--j$(get_make_parallelism)}"
+        fi
         if [[ "${VERBOSE_BUILD}" ]] ; then
             BUILD_ARGS="${BUILD_ARGS} VERBOSE=1"
         fi
@@ -1061,6 +1067,9 @@ case "${CMAKE_GENERATOR}" in
         # but since we're not using proper Xcode 4 schemes, this is the
         # only way to get target-level parallelism.
         BUILD_ARGS="${BUILD_ARGS} -parallelizeTargets"
+        if [[ "${BUILD_JOBS}" ]] ; then
+            BUILD_ARGS="${BUILD_ARGS} -jobs ${BUILD_JOBS}"
+        fi
         BUILD_TARGET_FLAG="-target"
         COMMON_CMAKE_OPTIONS=(
             "${COMMON_CMAKE_OPTIONS[@]}"
@@ -1414,7 +1423,6 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
         -DSWIFT_VERIFY_ALL:BOOL=$(true_false "${SIL_VERIFY_ALL}")
         -DSWIFT_RUNTIME_ENABLE_DTRACE:BOOL=$(true_false "${SWIFT_RUNTIME_ENABLE_DTRACE}")
         -DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER:BOOL=$(true_false "${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
-        -DSWIFT_ENABLE_TARGET_LINUX:BOOL=$(true_false "${SWIFT_ENABLE_TARGET_LINUX}")
     )
 
     for product in "${PRODUCTS[@]}"; do
@@ -1454,7 +1462,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
             -D${PRODUCT}_PATH_TO_CMARK_BUILD:PATH="$(build_directory $deployment_target cmark)"
         )
 
-        if [[ "${CMAKE_GENERATOR}" != "Ninja" ]] ; then
+        if [[ "${CMAKE_GENERATOR}" == "Xcode" ]] ; then
             swift_cmake_options=(
                 "${swift_cmake_options[@]-}"
                 -D${PRODUCT}_CMARK_LIBRARY_DIR:PATH=$(build_directory $deployment_target cmark)/src/$CMARK_BUILD_TYPE
@@ -1521,7 +1529,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 ;;
 
             swift)
-                cmake_options=(${COMMON_CMAKE_OPTIONS[@]})
+                cmake_options=("${COMMON_CMAKE_OPTIONS[@]}")
                 if [[ "$USE_GOLD_LINKER" ]]; then
                     # Swift will selectively use the gold linker on all
                     # parts except building the standard library.  We
@@ -2224,17 +2232,24 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
     fi
     if [[ "${TEST_INSTALLABLE_PACKAGE}" ]] ; then
         PKG_TESTS_SOURCE_DIR="${WORKSPACE}/swift-package-tests"
-        PKG_TESTS_SANDBOX="/tmp/swift_package_sandbox"
+        PKG_TESTS_SANDBOX_PARENT="/tmp/swift_package_sandbox"
+
+        if [[ "$(uname -s)" == "Darwin" ]] ; then
+            PKG_TESTS_SANDBOX="${PKG_TESTS_SANDBOX_PARENT}"/"${TOOLCHAIN_PREFIX}"
+        else # Linux
+            PKG_TESTS_SANDBOX="${PKG_TESTS_SANDBOX_PARENT}"
+        fi
+
         LIT_EXECUTABLE_PATH="${LLVM_SOURCE_DIR}/utils/lit/lit.py"
         FILECHECK_EXECUTABLE_PATH="$(build_directory_bin $deployment_target llvm)/FileCheck"
-
-        rm -rf "${PKG_TESTS_SANDBOX}"
-        mkdir "${PKG_TESTS_SANDBOX}"
-        pushd "${PKG_TESTS_SANDBOX}"
+        echo "-- Test Installable Package --"
+        set -x
+        rm -rf "${PKG_TESTS_SANDBOX_PARENT}"
+        mkdir -p "${PKG_TESTS_SANDBOX}"
+        pushd "${PKG_TESTS_SANDBOX_PARENT}"
         tar xzf "${INSTALLABLE_PACKAGE}"
         popd
 
-        set -x
         (cd "${PKG_TESTS_SOURCE_DIR}" &&
                 python "${LIT_EXECUTABLE_PATH}" . -sv --param package-path="${PKG_TESTS_SANDBOX}" --param filecheck="${FILECHECK_EXECUTABLE_PATH}")
         { set +x; } 2>/dev/null

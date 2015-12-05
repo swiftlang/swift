@@ -2337,20 +2337,16 @@ RValue RValueEmitter::visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E,
     ManagedValue bitcastMV = ManagedValue(bitcast, result.getCleanup());
     return RValue(SGF, E, bitcastMV);
   }
-  
-  // Create a buffer for the result if this is an address-only optional.
-  auto &optTL = SGF.getTypeLowering(E->getType());
-  if (!optTL.isAddressOnly()) {
-    auto result = SGF.emitRValueAsSingleValue(E->getSubExpr());
-    result = SGF.getOptionalSomeValue(E, result, optTL);
-    return RValue(SGF, E, result);
-  }
-  
-  SILValue optAddr = SGF.getBufferForExprResult(E, optTL.getLoweredType(), C);
-  
-  SGF.emitInjectOptionalValueInto(E, E->getSubExpr(), optAddr, optTL);
-  
-  ManagedValue result = SGF.manageBufferForExprResult(optAddr, optTL, C);
+
+  OptionalTypeKind OTK;
+  E->getType()->getAnyOptionalObjectType(OTK);
+  assert(OTK != OTK_None);
+
+  auto someDecl = SGF.getASTContext().getOptionalSomeDecl(OTK);
+
+  ManagedValue result = SGF.emitInjectEnum(E, ArgumentSource(E->getSubExpr()),
+                                           SGF.getLoweredType(E->getType()),
+                                           someDecl, C);
   if (result.isInContext())
     return RValue();
   return RValue(SGF, E, result);

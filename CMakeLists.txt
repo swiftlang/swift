@@ -54,10 +54,6 @@ option(SWIFT_INCLUDE_DOCS
     "Create targets for building docs."
     TRUE)
 
-option(SWIFT_ENABLE_TARGET_LINUX
-    "Enable compiler support for targeting Linux"
-    TRUE)
-
 set(SWIFT_VERSION "2.2" CACHE STRING
     "The user-visible version of the Swift compiler")
 set(SWIFT_VENDOR "" CACHE STRING
@@ -400,6 +396,19 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
   set(SWIFT_HOST_VARIANT_ARCH "x86_64")
 
   set(SWIFT_PRIMARY_VARIANT_SDK_default "LINUX")
+  set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
+elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
+  configure_sdk_unix(FREEBSD "FreeBSD" "freebsd" "freebsd" "x86_64" "x86_64-freebsd10")
+
+  set(CMAKE_EXECUTABLE_FORMAT "ELF")
+
+  set(SWIFT_HOST_VARIANT "freebsd" CACHE STRING
+      "Deployment OS for Swift host tools (the compiler) [freebsd].")
+
+  set(SWIFT_HOST_VARIANT_SDK "FREEBSD")
+  set(SWIFT_HOST_VARIANT_ARCH "x86_64")
+
+  set(SWIFT_PRIMARY_VARIANT_SDK_default "FREEBSD")
   set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   # Set defaults.

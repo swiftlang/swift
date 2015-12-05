@@ -25,7 +25,7 @@ Swift signatures of imported Objective-C APIs. Compiled API notes
 files reside in the Swift module directory, i.e., the same directory
 where the `.swiftmodule` file would reside for the Swift overlay of
 that module. For system modules, the path depends on the platform
-and architecture
+and architecture.
 
 Platform  | Path
 :------------- | :-------------

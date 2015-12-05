@@ -553,11 +553,11 @@ public:
     assert(IGM.DebugInfo && "debug info not enabled");
     if (ArgNo) {
       PrologueLocation AutoRestore(IGM.DebugInfo, Builder);
-      IGM.DebugInfo->emitArgVariableDeclaration(Builder, Storage, Ty, DS, Name,
-                                                ArgNo, Indirection);
+      IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, Name,
+                                             ArgNo, Indirection);
     } else
-      IGM.DebugInfo->emitStackVariableDeclaration(Builder, Storage, Ty, DS,
-                                                  Name, Indirection);
+      IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, Name, 0,
+                                             Indirection);
   }
 
   void emitFailBB() {
@@ -575,8 +575,6 @@ public:
   //===--------------------------------------------------------------------===//
 
   void visitSILBasicBlock(SILBasicBlock *BB);
-  IndirectionKind getLoweredArgValue(llvm::SmallVectorImpl<llvm::Value *> &Vals,
-                                     SILArgument *Arg, StringRef Name);
 
   void emitFunctionArgDebugInfo(SILBasicBlock *BB);
 
@@ -830,9 +828,7 @@ emitPHINodesForBBArgs(IRGenSILFunction &IGF,
     if (!silBB->empty()) {
       SILInstruction &I = *silBB->begin();
       auto DS = I.getDebugScope();
-      // FIXME: This should be an assertion.
-      if (!DS || (DS->SILFn != IGF.CurSILFn && !DS->InlinedCallSite))
-        DS = IGF.CurSILFn->getDebugScope();
+      assert(DS && (DS->SILFn == IGF.CurSILFn || DS->InlinedCallSite));
       IGF.IGM.DebugInfo->setCurrentLoc(IGF.Builder, DS, I.getLoc());
     }
   }
@@ -1390,24 +1386,6 @@ static unsigned countArgs(DeclContext *DC) {
   return N;
 }
 
-/// Store the lowered IR representation of Arg in the array
-/// Vals. Returns true if Arg is a byref argument.
-IndirectionKind IRGenSILFunction::
-getLoweredArgValue(llvm::SmallVectorImpl<llvm::Value *> &Vals,
-                   SILArgument *Arg, StringRef Name) {
-  const LoweredValue &LoweredArg = getLoweredValue(Arg);
-  if (LoweredArg.isAddress()) {
-    Vals.push_back(LoweredArg.getAddress().getAddress());
-    return IndirectValue;
-  } else if (LoweredArg.kind == LoweredValue::Kind::Explosion) {
-    Explosion e = LoweredArg.getExplosion(*this);
-    for (auto val : e.claimAll())
-      Vals.push_back(val);
-  } else
-    llvm_unreachable("unhandled argument kind");
-  return DirectValue;
-}
-
 void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
   // Emit the artificial error result argument.
   auto FnTy = CurSILFn->getLoweredFunctionType();
@@ -1424,10 +1402,9 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
     // other argument. It is only used for sorting.
     unsigned ArgNo =
         countArgs(CurSILFn->getDeclContext()) + 1 + BB->getBBArgs().size();
-    IGM.DebugInfo->emitArgVariableDeclaration(
+    IGM.DebugInfo->emitVariableDeclaration(
         Builder, emitShadowCopy(ErrorResultSlot.getAddress(), Name), DTI,
-        getDebugScope(), Name, ArgNo,
-        IndirectValue, ArtificialValue);
+        getDebugScope(), Name, ArgNo, IndirectValue, ArtificialValue);
   }
 }
 
@@ -2969,27 +2946,15 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   StringRef Name = Decl->getNameStr();
   Explosion e = getLoweredExplosion(SILVal);
   DebugTypeInfo DbgTy(Decl, Decl->getType(), getTypeInfo(SILVal.getType()));
-  if (DbgTy.getType()->getKind() == TypeKind::InOut)
-    // An inout type that is described by a debug *value* is a
-    // promoted capture. Unwrap the type.
-    DbgTy.unwrapInOutType();
+  // An inout/lvalue type that is described by a debug value has been
+  // promoted by an optimization pass. Unwrap the type.
+  DbgTy.unwrapLValueOrInOutType();
 
   // Put the value into a stack slot at -Onone.
   llvm::SmallVector<llvm::Value *, 8> Copy;
   emitShadowCopy(e.claimAll(), Name, Copy);
   emitDebugVariableDeclaration(Copy, DbgTy, i->getDebugScope(), Name,
                                i->getVarInfo().getArgNo());
-}
-
-/// InOut- and Archetypes are already implicitly indirect.
-static IndirectionKind getIndirectionForDebugValueAddr(swift::TypeBase *Ty) {
-  switch (Ty->getKind()) {
-  case TypeKind::InOut:
-  case TypeKind::Archetype:
-    return DirectValue;
-  default:
-    return IndirectValue;
-  }
 }
 
 void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
@@ -3007,10 +2972,9 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   auto Addr = getLoweredAddress(SILVal).getAddress();
   DebugTypeInfo DbgTy(Decl, Decl->getType(), getTypeInfo(SILVal.getType()));
   // Put the value into a stack slot at -Onone and emit a debug intrinsic.
-  emitDebugVariableDeclaration(
-      emitShadowCopy(Addr, Name), DbgTy, i->getDebugScope(), Name,
-      i->getVarInfo().getArgNo(),
-      getIndirectionForDebugValueAddr(DbgTy.getType()));
+  emitDebugVariableDeclaration(emitShadowCopy(Addr, Name), DbgTy,
+                               i->getDebugScope(), Name,
+                               i->getVarInfo().getArgNo(), IndirectValue);
 }
 
 void IRGenSILFunction::visitLoadWeakInst(swift::LoadWeakInst *i) {
@@ -3077,7 +3041,7 @@ void IRGenSILFunction::visitCopyBlockInst(CopyBlockInst *i) {
 void IRGenSILFunction::visitStrongPinInst(swift::StrongPinInst *i) {
   Explosion lowered = getLoweredExplosion(i->getOperand());
   llvm::Value *object = lowered.claimNext();
-  llvm::Value *pinHandle = emitTryPin(object);
+  llvm::Value *pinHandle = emitNativeTryPin(object);
 
   Explosion result;
   result.add(pinHandle);
@@ -3087,7 +3051,7 @@ void IRGenSILFunction::visitStrongPinInst(swift::StrongPinInst *i) {
 void IRGenSILFunction::visitStrongUnpinInst(swift::StrongUnpinInst *i) {
   Explosion lowered = getLoweredExplosion(i->getOperand());
   llvm::Value *pinHandle = lowered.claimNext();
-  emitUnpin(pinHandle);
+  emitNativeUnpin(pinHandle);
 }
 
 void IRGenSILFunction::visitStrongRetainInst(swift::StrongRetainInst *i) {
@@ -3259,12 +3223,11 @@ static void emitDebugDeclarationForAllocStack(IRGenSILFunction &IGF,
   if (IGF.IGM.DebugInfo && Decl) {
     auto *Pattern = Decl->getParentPattern();
     if (!Pattern || !Pattern->isImplicit()) {
+      auto DbgTy = DebugTypeInfo(Decl, type);
       // Discard any inout or lvalue qualifiers. Since the object itself
       // is stored in the alloca, emitting it as a reference type would
       // be wrong.
-      auto DbgTy = DebugTypeInfo(Decl,
-                                 Decl->getType()->getLValueOrInOutObjectType(),
-                                 type);
+      DbgTy.unwrapLValueOrInOutType();
       auto Name = Decl->getName().empty() ? "_" : Decl->getName().str();
       auto DS = i->getDebugScope();
       if (DS) {
@@ -3425,17 +3388,11 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
     // arguments.
     if (Name == IGM.Context.Id_self.str())
       return;
-    auto Indirection = IndirectValue;
-    // LValues and inout args are implicitly indirect because of their type.
-    if (Decl->getType()->getKind() == TypeKind::LValue ||
-        Decl->getType()->getKind() == TypeKind::InOut)
-      Indirection = DirectValue;
 
-    IGM.DebugInfo->emitStackVariableDeclaration
-      (Builder,
-       emitShadowCopy(addr.getAddress(), Name),
-       DebugTypeInfo(Decl, i->getElementType().getSwiftType(), type),
-       i->getDebugScope(), Name, Indirection);
+    IGM.DebugInfo->emitVariableDeclaration(
+        Builder, emitShadowCopy(addr.getAddress(), Name),
+        DebugTypeInfo(Decl, i->getElementType().getSwiftType(), type),
+        i->getDebugScope(), Name, 0, IndirectValue);
   }
 }
 

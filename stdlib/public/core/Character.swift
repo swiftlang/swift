@@ -66,8 +66,8 @@ public struct Character :
     isASCII: Builtin.Int1) {
     self = Character(
       String(
-        _builtinExtendedGraphemeClusterLiteral: start, 
-        byteSize: byteSize, 
+        _builtinExtendedGraphemeClusterLiteral: start,
+        byteSize: byteSize,
         isASCII: isASCII))
   }
 

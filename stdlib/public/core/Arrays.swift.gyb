@@ -140,7 +140,7 @@ if True:
 /// sequence of mutating operations causes elements to be copied into
 /// unique, contiguous storage which may cost `O(N)` time and space,
 /// where `N` is the length of the array (or more, if the underlying
-/// `NSArray` is has unusual performance characteristics).
+/// `NSArray` has unusual performance characteristics).
 ///
 /// Bridging to Objective-C
 /// -----------------------
@@ -618,7 +618,7 @@ extension ${Self} : _ArrayType {
   /// - Postcondition: `capacity >= minimumCapacity` and the array has
   ///   mutable contiguous storage.
   ///
-  /// - Complexity: O(`count`).
+  /// - Complexity: O(`self.count`).
   @_semantics("array.mutate_unknown")
   public mutating func reserveCapacity(minimumCapacity: Int) {
     if _buffer.requestUniqueMutableBackingBuffer(minimumCapacity) == nil {
@@ -722,7 +722,7 @@ extension ${Self} : _ArrayType {
   ///
   /// - Requires: `i <= count`.
   ///
-  /// - Complexity: O(`count`).
+  /// - Complexity: O(`self.count`).
   public mutating func insert(newElement: Element, atIndex i: Int) {
     _checkIndex(i)
     self.replaceRange(i..<i, with: CollectionOfOne(newElement))
@@ -732,7 +732,7 @@ extension ${Self} : _ArrayType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`count`).
+  /// - Complexity: O(`self.count`).
   public mutating func removeAtIndex(index: Int) -> Element {
     let result = self[index]
     self.replaceRange(index..<(index + 1), with: EmptyCollection())

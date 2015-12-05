@@ -87,6 +87,8 @@ public:
     NewlyAdded
   };
 
+  using EnvironmentVector = std::vector<std::pair<const char *, const char *>>;
+
 private:
   /// The action which caused the creation of this Job, and the conditions
   /// under which it must be run.
@@ -103,7 +105,14 @@ private:
 
   /// The list of program arguments (not including the implicit first argument,
   /// which will be the Executable).
+  ///
+  /// These argument strings must be kept alive as long as the Job is alive.
   llvm::opt::ArgStringList Arguments;
+
+  /// Additional variables to set in the process environment when running.
+  ///
+  /// These strings must be kept alive as long as the Job is alive.
+  EnvironmentVector ExtraEnvironment;
 
   /// The modification time of the main input file, if any.
   llvm::sys::TimeValue InputModTime = llvm::sys::TimeValue::MaxTime();
@@ -113,10 +122,12 @@ public:
       SmallVectorImpl<const Job *> &&Inputs,
       std::unique_ptr<CommandOutput> Output,
       const char *Executable,
-      llvm::opt::ArgStringList Arguments)
+      llvm::opt::ArgStringList Arguments,
+      EnvironmentVector ExtraEnvironment = {})
       : SourceAndCondition(&Source, Condition::Always),
         Inputs(std::move(Inputs)), Output(std::move(Output)),
-        Executable(Executable), Arguments(std::move(Arguments)) {}
+        Executable(Executable), Arguments(std::move(Arguments)),
+        ExtraEnvironment(std::move(ExtraEnvironment)) {}
 
   const Action &getSource() const { return *SourceAndCondition.getPointer(); }
 
@@ -141,9 +152,20 @@ public:
     return InputModTime;
   }
 
+  ArrayRef<std::pair<const char *, const char *>> getExtraEnvironment() const {
+    return ExtraEnvironment;
+  }
+
   /// Print the command line for this Job to the given \p stream,
   /// terminating output with the given \p terminator.
   void printCommandLine(raw_ostream &Stream, StringRef Terminator = "\n") const;
+
+  /// Print the command line for this Job to the given \p stream,
+  /// and include any extra environment variables that will be set.
+  ///
+  /// \sa printCommandLine
+  void printCommandLineAndEnvironment(raw_ostream &Stream,
+                                      StringRef Terminator = "\n") const;
 
   void dump() const LLVM_ATTRIBUTE_USED;
 

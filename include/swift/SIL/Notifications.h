@@ -15,9 +15,9 @@
 
 namespace swift {
 
-class SILInstruction;
+class ValueBase;
 
-/// A protocol (or inferface) for handling instruction deletion notifications.
+/// A protocol (or inferface) for handling value deletion notifications.
 ///
 /// This class is used as a base class for any class that need to accept
 /// instruction deletion notification messages. This is used by passes and
@@ -29,7 +29,7 @@ struct DeleteNotificationHandler {
   virtual ~DeleteNotificationHandler() {}
 
   /// Handle the invalidation message for the value \p Value.
-  virtual void handleDeleteNotification(swift::SILInstruction *Instr) { }
+  virtual void handleDeleteNotification(swift::ValueBase *Value) { }
 };
 
 } // end swift namespace

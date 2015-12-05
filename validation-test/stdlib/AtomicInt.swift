@@ -16,6 +16,11 @@ import SwiftPrivatePthreadExtras
 #if _runtime(_ObjC)
 import ObjectiveC
 #endif
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
+import Darwin
+#elseif os(Linux)
+import Glibc
+#endif
 
 final class HeapBool {
   var value: Bool

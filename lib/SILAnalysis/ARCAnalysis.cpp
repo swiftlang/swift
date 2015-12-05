@@ -87,103 +87,11 @@ static bool canApplyDecrementRefCount(ApplyInst *AI, SILValue Ptr,
                                    Ptr, AA);
 }
 
-static bool canBuiltinNeverDecrementRefCounts(BuiltinInst *BI) {
-  // If we have a builtin that is side effect free, we can commute the
-  // builtin and the retain.
-  if (!BI->mayHaveSideEffects())
-    return true;
-
-  // If this is an instruction which might have side effect, but its side
-  // effects do not cause reference counts to be decremented, return false.
-  //
-  // If this is expanded, refactor it into a method with a string switch.
-  if (auto Kind = BI->getBuiltinKind()) {
-    switch (Kind.getValue()) {
-    case BuiltinValueKind::CopyArray:
-      return true;
-    default:
-      break;
-    }
-  }
-
-  if (auto ID = BI->getIntrinsicID()) {
-    switch (ID.getValue()) {
-    case llvm::Intrinsic::memcpy:
-    case llvm::Intrinsic::memmove:
-    case llvm::Intrinsic::memset:
-      return true;
-    default:
-      break;
-    }
-  }
-
-  return false;
-}
-
-static bool canApplyDecrementRefCount(BuiltinInst *BI, SILValue Ptr,
-                                      AliasAnalysis *AA) {
-  if (canBuiltinNeverDecrementRefCounts(BI))
-    return false;
-
-  return canApplyDecrementRefCount(BI->getArguments(), Ptr, AA);
-}
-
-/// Is the may have side effects user by the definition of its value kind unable
-/// to decrement ref counts.
-///
-/// Although is_unique will never decrement a refcount, it must appear to do so
-/// from the perspective of the optimizer. This forces a separate retain to be
-/// preserved for any original source level copy.
-static bool canDecrementRefCountsByValueKind(SILInstruction *User) {
-  assert(User->getMemoryBehavior()
-           ==  SILInstruction::MemoryBehavior::MayHaveSideEffects &&
-         "Invalid argument. Function is only applicable to isntructions with "
-         "side effects.");
-  switch (User->getKind()) {
-  case ValueKind::DeallocStackInst:
-  case ValueKind::StrongRetainInst:
-  case ValueKind::StrongRetainAutoreleasedInst:
-  case ValueKind::StrongRetainUnownedInst:
-  case ValueKind::UnownedRetainInst:
-  case ValueKind::RetainValueInst:
-  case ValueKind::PartialApplyInst:
-  case ValueKind::FixLifetimeInst:
-  case ValueKind::CopyBlockInst:
-  case ValueKind::CondFailInst:
-  case ValueKind::StrongPinInst:
-    return false;
-
-  case ValueKind::CopyAddrInst:
-    // We only decrement ref counts if we are not initializing dest.
-    return !cast<CopyAddrInst>(User)->isInitializationOfDest();
-
-  case ValueKind::CheckedCastAddrBranchInst: {
-    // If we do not take on success, we do not touch ref counts.
-    auto *CCABI = cast<CheckedCastAddrBranchInst>(User);
-    return shouldTakeOnSuccess(CCABI->getConsumptionKind());
-  }
-  default:
-    return true;
-  }
-}
-
 bool swift::mayDecrementRefCount(SILInstruction *User,
                                  SILValue Ptr, AliasAnalysis *AA) {
-  // If we have an instruction that does not have *pure* side effects, it can
-  // not affect ref counts.
-  //
-  // This distinguishes in between a "write" side effect and ref count side
-  // effects.
-  if (User->getMemoryBehavior() !=
-      SILInstruction::MemoryBehavior::MayHaveSideEffects)
-    return false;
-
-  // Ok, we know that this instruction's generic behavior is
-  // "MayHaveSideEffects". That is a criterion (it has effects not represented
-  // by use-def chains) that is broader than ours (does it effect a particular
-  // pointers ref counts). Thus begin by attempting to prove that the type of
-  // instruction that the user is by definition can not decrement ref counts.
-  if (!canDecrementRefCountsByValueKind(User))
+  // First do a basic check, mainly based on the type of instruction.
+  // Reading the RC is as "bad" as releasing.
+  if (!User->mayReleaseOrReadRefCount())
     return false;
 
   // Ok, this instruction may have ref counts. If it is an apply, attempt to
@@ -191,7 +99,7 @@ bool swift::mayDecrementRefCount(SILInstruction *User,
   if (auto *AI = dyn_cast<ApplyInst>(User))
     return canApplyDecrementRefCount(AI, Ptr, AA);
   if (auto *BI = dyn_cast<BuiltinInst>(User))
-    return canApplyDecrementRefCount(BI, Ptr, AA);
+    return canApplyDecrementRefCount(BI->getArguments(), Ptr, AA);
 
   // We can not conservatively prove that this instruction can not decrement the
   // ref count of Ptr. So assume that it does.
@@ -200,24 +108,6 @@ bool swift::mayDecrementRefCount(SILInstruction *User,
 
 bool swift::mayCheckRefCount(SILInstruction *User) {
   return isa<IsUniqueInst>(User) || isa<IsUniqueOrPinnedInst>(User);
-}
-
-// Attempt to prove conservatively that Inst can never decrement reference
-// counts
-bool swift::canNeverDecrementRefCounts(SILInstruction *Inst) {
-  if (Inst->getMemoryBehavior() !=
-      SILInstruction::MemoryBehavior::MayHaveSideEffects)
-    return true;
-
-  if (!canDecrementRefCountsByValueKind(Inst))
-    return true;
-
-  if (auto *BI = dyn_cast<BuiltinInst>(Inst))
-    return canBuiltinNeverDecrementRefCounts(BI);
-
-  // We can not prove that Inst can never decrement or use ref counts. Be
-  // conservative.
-  return false;
 }
 
 //===----------------------------------------------------------------------===//
