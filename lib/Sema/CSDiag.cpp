@@ -2252,7 +2252,7 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
   return;
 }
 
-// In the absense of a better conversion constraint failure, point out the
+// In the absence of a better conversion constraint failure, point out the
 // inability to find an appropriate overload.
 bool FailureDiagnosis::diagnoseGeneralOverloadFailure(Constraint *constraint) {
   Constraint *bindOverload = constraint;

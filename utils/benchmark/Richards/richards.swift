@@ -339,7 +339,7 @@ struct Richards {
     if v2.count == 0 {
       return holdself()
     }
-    // Orignal C impl masks with MAXINT. Why?
+    // Original C impl masks with MAXINT. Why?
     if (v1.taskid & 1) == 0 {
       v1 = Task.Val1.TaskID(v1.taskid >> 1)
       return release(TIDevA)

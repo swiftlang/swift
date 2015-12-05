@@ -1146,6 +1146,7 @@ public:
   Constraint *failedConstraint = nullptr;
 
   /// \brief Failures that occured while solving.
+  /// \brief Failures that occurred while solving.
   ///
   /// FIXME: We really need to track overload sets and type variable bindings
   /// to make any sense of this data. Also, it probably belongs within

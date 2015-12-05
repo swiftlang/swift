@@ -395,7 +395,7 @@ private:
     llvm::SmallVector<SubregionID, 16> Subregions;
 
     /// A map from RPO number of a subregion loop's preheader to a subloop
-    /// regions id. This is neccessary since we represent a loop in the
+    /// regions id. This is necessary since we represent a loop in the
     /// Subregions array by the RPO number of its header.
     llvm::SmallVector<std::pair<unsigned, unsigned>, 2> Subloops;
 

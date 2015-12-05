@@ -100,7 +100,7 @@ class IRGenDebugInfo {
 
   Location LastDebugLoc;    /// The last location that was emitted.
   const SILDebugScope *LastScope; /// The scope of that last location.
-  bool IsLibrary;           /// Whether this is a libary or a top level module.
+  bool IsLibrary;           /// Whether this is a library or a top level module.
 #ifndef NDEBUG
   /// The basic block where the location was last changed.
   llvm::BasicBlock *LastBasicBlock;
