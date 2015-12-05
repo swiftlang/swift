@@ -79,7 +79,7 @@ For those checking out sources as read-only:
      git clone https://github.com/apple/swift-corelibs-xctest.git
      git clone https://github.com/apple/swift-corelibs-foundation.git
 
-For those who plan on regular making direct commits, cloning over
+For those who plan on regularly making direct commits, cloning over
 SSH may provide a better experience (which requires uploading 
 SSH keys to GitHub):
 
