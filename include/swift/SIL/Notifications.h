@@ -17,7 +17,7 @@ namespace swift {
 
 class ValueBase;
 
-/// A protocol (or inferface) for handling instruction deletion notifications.
+/// A protocol (or inferface) for handling value deletion notifications.
 ///
 /// This class is used as a base class for any class that need to accept
 /// instruction deletion notification messages. This is used by passes and
