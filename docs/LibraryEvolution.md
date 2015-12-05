@@ -62,11 +62,11 @@ Introduction
 ============
 
 This model is intended to serve library designers whose libraries will
-evolve over time. Such libraries must be both backwards-compatible,
-meaning that existing clients should continue to work even when the
-library is updated, and forwards-compatible, meaning that future clients
-will be able run using the current version of the library. In simple
-terms:
+evolve over time. Such libraries must be both
+[backwards-compatible](#backwards-compatible), meaning that existing clients
+should continue to work even when the library is updated, and
+[forwards-compatible](#forwards-compatible), meaning that future clients will be
+able run using the current version of the library. In simple terms:
 
 -   Last year's apps should work with this year's library.
 -   Next year's apps should work with this year's library.
@@ -158,7 +158,8 @@ Swift libraries are strongly encouraged to use [semantic
 versioning](http://semver.org), but this is not enforced by the
 language.
 
-Some `internal` entities may also use `@available`. See Pinning\_ below.
+Some `internal` entities may also use `@available`. See [Pinning](#pinning)
+below.
 
 Giving Up Flexibility
 =====================
@@ -169,7 +170,7 @@ Fixed-layout Structs
 By default, a library owner may add members to a public struct between
 releases without breaking binary compatibility. This requires a certain
 amount of care and indirection when dealing with values of struct type
-to account for the struct's size and non-trivial fields not being known
+to account for the struct's size and non-[trivial](#trivial) fields not being known
 in advance, which of course has performance implications.
 
 To opt out of this flexibility, a struct may be marked `@fixed_layout`.
@@ -345,7 +346,7 @@ considered to have `shared` linkage.)
 
 ### Pinning
 
-An availability-pinned entity is simply an `internal` member, free
+An [availability-pinned](#availability-pinned) entity is simply an `internal` member, free
 function, or global binding that has been marked `@available`. This
 promises that the entity will be available at link time in the
 containing module's binary. This makes it safe to refer to such an
@@ -455,10 +456,10 @@ Advanced users may want to promise more specific things about various
 types. These are similar to the internal `effects` attribute we have for
 functions, except that they can be enforced by the compiler.
 
--   `trivial`: Promises that the type is trivial. Note that this is not
-    a recursive property; a trivial type may still require indirection
-    due to having an unknown size, and so a type containing that type is
-    not considered trivial.
+-   [`trivial`](#trivial): Promises that the type is [trivial](#trivial). Note
+    that this is not a recursive property; a trivial type may still require
+    indirection due to having an unknown size, and so a type containing that
+    type is not considered trivial.
 -   `size_in_bits(N)`: Promises that the type is not larger than a
     certain size. (It may be smaller.)
 -   `no_payload`: Promises that an enum does not have payloads on any of
@@ -490,9 +491,9 @@ several ways. For example:
 
 In order to make sure client code doesn't make unsafe assumptions,
 queries about properties that may change between library versions must
-be parameterized with the availability context that is using the entity.
-An availability context is a set of minimum platform and library
-versions that can be assumed present for code executing within the
+be parameterized with the [availability context](#availability-context) that is
+using the entity. An availability context is a set of minimum platform and
+library versions that can be assumed present for code executing within the
 context. This allows the compiler to answer the question, "Given what I
 know about where this code will be executed, what can I assume about a
 particular entity being used?".
@@ -519,9 +520,9 @@ Inlineable Code
 By default, the availability context for a library always includes the
 latest version of the library itself, since that code is always
 distributed as a unit. However, this is not true for functions that have
-been marked inlineable (see Inlineable Functions\_ above). Inlineable
-code must be treated as if it is outside the current module, since once
-it's inlined it will be.
+been marked inlineable (see [Inlineable Functions](#inlineable-functions)
+above). Inlineable code must be treated as if it is outside the current module,
+since once it's inlined it will be.
 
 For inlineable code, the availability context is exactly the same as the
 equivalent non-inlineable code except that the assumed version of the
@@ -553,7 +554,7 @@ priority.
 Resilience Domains
 ==================
 
-As described in the Introduction\_, the features and considerations
+As described in the [Introduction](#introduction), the features and considerations
 discussed in this document do not apply to libraries distributed in a
 bundle with their clients. In this case, a client can rely on all the
 current implementation details of its libraries when compiling, since
@@ -622,9 +623,9 @@ provides.
 
 > **note**
 >
-> This may feel like a regression from Objective-C, where duck typing
-> would allow a `Wand` to be passed as an `id <MagicType>` without ill
-> effects. However, `Wand` would still fail a `-conformsToProtocol:`
+> This may feel like a regression from Objective-C, where [duck
+> typing](#duck-typing) would allow a `Wand` to be passed as an `id <MagicType>`
+> without ill effects. However, `Wand` would still fail a `-conformsToProtocol:`
 > check in version 1.0 of the library, and so whether or not the client
 > code will work is dependent on what should be implementation details
 > of the library.
@@ -642,8 +643,7 @@ not limited to:
 -   Incompatible modifications to public entities, such as added
     protocol conformances lacking versioning information.
 -   Unsafely-backdated "fragile" attributes as discussed in the
-    Giving Up
-    Flexibility\_ section.
+    [Giving Up Flexibility](#giving-up-flexibility) section.
 -   Unsafe modifications to entities marked with the "fragile"
     attributes, such as adding a stored property to a
     `@fixed_layout` struct.
@@ -692,3 +692,77 @@ implicit dependencies on specific versions of libraries.
 
 Glossary
 ========
+
+###### ABI
+  The runtime contract for using a particular API (or for an entire library),
+  including things like symbol names, calling conventions, and type layout
+  information. Stands for "Application Binary Interface".
+
+###### API
+  An [entity](#entity) in a library that a [client](#client) may use, or the collection of all
+  such entities in a library. (If contrasting with [SPI](#spi), only those entities
+  that are available to arbitrary clients.) Marked `public` in
+  Swift. Stands for "Application Programming Interface".
+
+###### availability context
+  The collection of library and platform versions that can be assumed, at
+  minimum, to be present in a certain block of code. Availability contexts
+  are always properly nested, and the global availability context includes
+  the module's minimum deployment target and minimum dependency versions.
+
+###### availability-pinned
+  See [Pinning](#pinning).
+
+###### backwards-compatible
+  A modification to an API that does not break existing clients. May also
+  describe the API in question.
+
+###### binary compatibility
+  A general term encompassing both backwards- and forwards-compatibility
+  concerns. Also known as "ABI compatibility".
+
+###### client
+  A target that depends on a particular library. It's usually easiest to
+  think of this as an application, but it could be another library.
+  (In certain cases, the "library" is itself an application, such as when
+  using Xcode's unit testing support.)
+
+###### duck typing
+  In Objective-C, the ability to treat a class instance as having an
+  unrelated type, as long as the instance handles all messages sent to it.
+  (Note that this is a dynamic constraint.)
+
+###### entity
+  A type, function, member, or global in a Swift program.
+
+###### forwards-compatible
+  An API that is designed to handle future clients, perhaps allowing certain
+  changes to be made without changing the ABI.
+
+###### fragility attribute
+  See [A Unifying Theme](#a-unifying-theme).
+
+###### module
+  The primary unit of code sharing in Swift. Code in a module is always built
+  together, though it may be spread across several source files.
+
+###### performance assertion
+  See [Other Promises About Types](#other-promises-about-types).
+
+###### resilience domain
+  A grouping for code that will always be recompiled and distributed
+  together, and can thus take advantage of details about a type
+  even if it changes in the future.
+
+###### SPI
+  A subset of [API](#api) that is only available to certain clients. Stands for
+  "System Programming Interface".
+
+###### target
+  In this document, a collection of code in a single Swift module that is
+  built together; a "compilation unit". Roughly equivalent to a target in
+  Xcode.
+
+###### trivial
+  A value whose assignment just requires a fixed-size bit-for-bit copy
+  without any indirection or reference-counting operations.
