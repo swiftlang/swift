@@ -31,7 +31,7 @@ enum ThreadID {
 
 var barrierVar: UnsafeMutablePointer<_stdlib_pthread_barrier_t> = nil
 var sharedString: String = ""
-var SlaveString: String = ""
+var slaveString: String = ""
 
 func barrier() {
   var ret = _stdlib_pthread_barrier_wait(barrierVar)
@@ -75,13 +75,13 @@ func sliceConcurrentAppendThread(tid: ThreadID) {
 
     // Verify that only one thread took ownership of the buffer.
     if tid == .Slave {
-      SlaveString = privateString
+      slaveString = privateString
     }
     barrier()
     if tid == .Master {
       expectTrue(
         (privateString.bufferID == sharedString.bufferID) !=
-          (SlaveString.bufferID == sharedString.bufferID))
+          (slaveString.bufferID == sharedString.bufferID))
     }
   }
 }
