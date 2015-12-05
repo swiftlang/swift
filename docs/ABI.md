@@ -155,11 +155,11 @@ bits for tag if necessary. If the data type's binary representation has
 of the type but which do not form valid values of that type, they are
 used to represent the no-data cases, with extra inhabitants in order of
 ascending numeric value matching no-data cases in declaration order. If
-the type has *spare bits* (see [Multi-Payload Enums](#multi-payload-enums)), they are used to
-form extra inhabitants. The enum value is then represented as an integer
-with the storage size in bits of the data type. Extra inhabitants of the
-payload type not used by the enum type become extra inhabitants of the
-enum type itself.
+the type has *spare bits* (see [Multi-Payload Enums](#multi-payload-enums)),
+they are used to form extra inhabitants. The enum value is then represented as
+an integer with the storage size in bits of the data type. Extra inhabitants of
+the payload type not used by the enum type become extra inhabitants of the enum
+type itself.
 
     enum CharOrSectionMarker { => LLVM i32
       case Paragraph            => i32 0x0020_0000
@@ -316,21 +316,22 @@ All metadata records share a common header, with the following fields:
         runtime information.
     -   [Tuple metadata](#tuple-metadata) has a kind of **9**.
     -   [Function metadata](#function-metadata) has a kind of **10**.
-    -   [Protocol metadata](#protocol-metadata) has a kind of **12**. This is used for
-        protocol types, for protocol compositions, and for the "any"
+    -   [Protocol metadata](#protocol-metadata) has a kind of **12**. This is
+        used for protocol types, for protocol compositions, and for the "any"
         type `protocol<>`.
     -   [Metatype metadata](#metatype-metadata) has a kind of **13**.
-    -   [Class metadata](#class-metadata), instead of a kind, has an *isa pointer* in its
-        kind slot, pointing to the class's metaclass record. This isa
-        pointer is guaranteed to have an integer value larger than
-        **4096** and so can be discriminated from non-class kind values.
+    -   [Class metadata](#class-metadata), instead of a kind, has an
+        *isa pointer* in its kind slot, pointing to the class's metaclass
+        record. This isa pointer is guaranteed to have an integer value larger
+        than **4096** and so can be discriminated from non-class kind values.
 
 ### Struct Metadata
 
-In addition to the [common metadata layout](#common-metadata-layout) fields, struct metadata
-records contain the following fields:
+In addition to the [common metadata layout](#common-metadata-layout) fields,
+struct metadata records contain the following fields:
 
--   The [nominal type descriptor](#nominal-type-descriptor) is referenced at **offset 1**.
+-   The [nominal type descriptor](#nominal-type-descriptor) is referenced at
+    **offset 1**.
 -   A reference to the **parent** metadata record is stored at **offset
     2**. For structs that are members of an enclosing nominal type, this
     is a reference to the enclosing type's metadata. For top-level
@@ -342,16 +343,17 @@ records contain the following fields:
     of the struct, in `var` declaration order, the field's offset in
     bytes from the beginning of the struct is stored as a
     pointer-sized integer.
--   If the struct is generic, then the [generic parameter vector](#generic-parameter-vector) begins
-    at **offset 3+n**, where **n** is the number of fields in
-    the struct.
+-   If the struct is generic, then the [generic parameter
+    vector](#generic-parameter-vector) begins at **offset 3+n**, where **n** is
+    the number of fields in the struct.
 
 ### Enum Metadata
 
-In addition to the [common metadata layout](#common-metadata-layout) fields, enum metadata
-records contain the following fields:
+In addition to the [common metadata layout](#common-metadata-layout) fields,
+enum metadata records contain the following fields:
 
--   The [nominal type descriptor](#nominal-type-descriptor) is referenced at **offset 1**.
+-   The [nominal type descriptor](#nominal-type-descriptor) is referenced at
+    **offset 1**.
 -   A reference to the **parent** metadata record is stored at **offset
     2**. For enums that are members of an enclosing nominal type, this
     is a reference to the enclosing type's metadata. For top-level
@@ -359,13 +361,13 @@ records contain the following fields:
 
     TODO: The parent pointer is currently always null.
 
--   If the enum is generic, then the [generic parameter vector](#generic-parameter-vector) begins
-    at **offset 3**.
+-   If the enum is generic, then the [generic parameter
+    vector](#generic-parameter-vector) begins at **offset 3**.
 
 ### Tuple Metadata
 
-In addition to the [common metadata layout](#common-metadata-layout) fields, tuple metadata
-records contain the following fields:
+In addition to the [common metadata layout](#common-metadata-layout) fields,
+tuple metadata records contain the following fields:
 
 -   The **number of elements** in the tuple is a pointer-sized integer
     at **offset 1**.
@@ -385,8 +387,8 @@ records contain the following fields:
 
 ### Function Metadata
 
-In addition to the [common metadata layout](#common-metadata-layout) fields, function metadata
-records contain the following fields:
+In addition to the [common metadata layout](#common-metadata-layout) fields,
+function metadata records contain the following fields:
 
 -   The number of arguments to the function is stored at **offset 1**.
 -   A reference to the **result type** metadata record is stored at
@@ -403,19 +405,21 @@ records contain the following fields:
     If the function takes no **inout** arguments, there will be only one
     pointer in the vector for the following cases:
 
-    -   0 arguments: a [tuple metadata](#tuple-metadata) record for the empty tuple
+    -   0 arguments: a [tuple metadata](#tuple-metadata) record for the empty
+        tuple
     -   1 argument: the first and only argument's metadata record
-    -   &gt;1 argument: a [tuple metadata](#tuple-metadata) record containing the
-        arguments
+    -   &gt;1 argument: a [tuple metadata](#tuple-metadata) record containing
+        the arguments
 
 ### Protocol Metadata
 
-In addition to the [common metadata layout](#common-metadata-layout) fields, protocol metadata
-records contain the following fields:
+In addition to the [common metadata layout](#common-metadata-layout) fields,
+protocol metadata records contain the following fields:
 
 -   A **layout flags** word is stored at **offset 1**. The bits of this
-    word describe the [existential container layout](#existential-container-layout) used to represent
-    values of the type. The word is laid out as follows:
+    word describe the [existential container
+    layout](#existential-container-layout) used to represent values of the type.
+    The word is laid out as follows:
 
     -   The **number of witness tables** is stored in the least
         significant 31 bits. Values of the protocol type contain this
@@ -437,15 +441,15 @@ records contain the following fields:
     this is one. For a protocol composition type `protocol<P, Q, ...>`,
     this is the number of protocols.
 -   The **protocol descriptor vector** begins at **offset 3**. This is
-    an inline array of pointers to the [protocol descriptor](#protocol-descriptor) for every
-    protocol in the composition, or the single protocol descriptor for a
-    protocol type. For an "any" type, there is no protocol
-    descriptor vector.
+    an inline array of pointers to the [protocol
+    descriptor](#protocol-descriptor) for every protocol in the composition, or
+    the single protocol descriptor for a protocol type. For an "any" type, there
+    is no protocol descriptor vector.
 
 ### Metatype Metadata
 
-In addition to the [common metadata layout](#common-metadata-layout) fields, metatype metadata
-records contain the following fields:
+In addition to the [common metadata layout](#common-metadata-layout) fields,
+metatype metadata records contain the following fields:
 
 -   A reference to the metadata record for the **instance type** that
     the metatype represents is stored at **offset 1**.
@@ -491,8 +495,8 @@ value for all of its ancestor classes.
 -   The **class object address point** is a 32-bit field following the
     class object size. This is the number of bytes of storage in the
     class metadata object.
--   The [nominal type descriptor](#nominal-type-descriptor) for the most-derived class type is
-    referenced at an offset immediately following the class object
+-   The [nominal type descriptor](#nominal-type-descriptor) for the most-derived
+    class type is referenced at an offset immediately following the class object
     address point. This is **offset 8** on a 64-bit platform or **offset
     11** on a 32-bit platform.
 -   For each Swift class in the class's inheritance hierarchy, in order
@@ -506,8 +510,8 @@ value for all of its ancestor classes.
 
         TODO: The parent pointer is currently always null.
 
-    -   If the class is generic, its [generic parameter vector](#generic-parameter-vector) is
-        stored inline.
+    -   If the class is generic, its [generic parameter
+        vector](#generic-parameter-vector) is stored inline.
     -   The **vtable** is stored inline and contains a function pointer
         to the implementation of every method of the class in
         declaration order.
@@ -684,9 +688,9 @@ follows:
         the protocol's methods is done through a witness table, which is
         either passed as an extra parameter to generic functions or
         included in the [existential
-        container layout](#existential-container-layout) of protocol types. It is unset if dispatch is
-        done through `objc_msgSend` and requires no additional
-        information to accompany a value of conforming type.
+        container layout](#existential-container-layout) of protocol types. It
+        is unset if dispatch is done through `objc_msgSend` and requires no
+        additional information to accompany a value of conforming type.
     -   **Bit 31** is set by the Objective-C runtime when it has done
         its initialization of the protocol record. It is unused by the
         Swift runtime.
