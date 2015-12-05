@@ -64,5 +64,8 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   if (triple.isOSLinux())
     return "linux";
 
+  if (triple.isOSFreeBSD())
+    return "freebsd";
+
   return "";
 }

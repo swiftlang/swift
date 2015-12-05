@@ -154,9 +154,13 @@ else()
   #  -Wl,--whole-archive swiftRuntime -Wl,--no-whole-archive)
   list(APPEND swift_core_private_link_libraries swiftRuntime swiftStdlibStubs)
   find_package(ICU REQUIRED COMPONENTS uc i18n)
+  list(APPEND swift_core_private_link_libraries
+      ${ICU_UC_LIBRARY} ${ICU_I18N_LIBRARY})
+endif()
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   find_package(BSD REQUIRED)
   list(APPEND swift_core_private_link_libraries
-      ${ICU_UC_LIBRARY} ${ICU_I18N_LIBRARY}
       ${BSD_LIBRARIES})
 endif()
 
