@@ -142,9 +142,8 @@ func testEnumExtension() {
   MyEnum.onetransp.tr3()
   // CHECK-APPLY: sil hidden @_TF21transparent_attribute17testEnumExtensionFT_T_
   // CHECK: [[TR3:%[0-9]+]] = function_ref @_TFO21transparent_attribute6MyEnum3tr3
-  // CHECK: [[INIT:%[0-9]+]] = function_ref @_TFO21transparent_attribute6MyEnum9onetransp
-  // CHECK: apply [[INIT]]
-  // CHECK: apply [[TR3]]
+  // CHECK: [[INIT:%[0-9]+]] = enum $MyEnum, #MyEnum.onetransp!enumelt
+  // CHECK: apply [[TR3]]([[INIT]])
 }
 
 struct testVarDecl {

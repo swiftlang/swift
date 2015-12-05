@@ -230,8 +230,12 @@ public:
   enum class Kind {
     /// An indirect function value.
     IndirectValue,
+
     /// A direct standalone function call, referenceable by a FunctionRefInst.
     StandaloneFunction,
+
+    /// Enum case constructor call.
+    EnumElement,
 
     VirtualMethod_First,
       /// A method call using class method dispatch.
@@ -462,6 +466,13 @@ public:
                           SILLocation l) {
     return Callee(gen, c, substFormalType, l);
   }
+  static Callee forEnumElement(SILGenFunction &gen, SILDeclRef c,
+                               CanAnyFunctionType substFormalType,
+                               SILLocation l) {
+    assert(isa<EnumElementDecl>(c.getDecl()));
+    return Callee(Kind::EnumElement, gen, SILValue(),
+                  c, substFormalType, l);
+  }
   static Callee forClassMethod(SILGenFunction &gen, SILValue selfValue,
                                SILDeclRef name,
                                CanAnyFunctionType substFormalType,
@@ -530,12 +541,18 @@ public:
       return 0;
 
     case Kind::StandaloneFunction:
+    case Kind::EnumElement:
     case Kind::ClassMethod:
     case Kind::SuperMethod:
     case Kind::WitnessMethod:
     case Kind::DynamicMethod:
       return Constant.uncurryLevel;
     }
+  }
+
+  EnumElementDecl *getEnumElementDecl() {
+    assert(kind == Kind::EnumElement);
+    return cast<EnumElementDecl>(Constant.getDecl());
   }
 
   std::tuple<ManagedValue, CanSILFunctionType,
@@ -566,6 +583,20 @@ public:
             constant = constant->asDirectReference(true);
       
       constantInfo = gen.getConstantInfo(*constant);
+      SILValue ref = gen.emitGlobalFunctionRef(Loc, *constant, constantInfo);
+      mv = ManagedValue::forUnmanaged(ref);
+      break;
+    }
+    case Kind::EnumElement: {
+      assert(level <= Constant.uncurryLevel
+             && "uncurrying past natural uncurry level of enum constructor");
+      constant = Constant.atUncurryLevel(level);
+      constantInfo = gen.getConstantInfo(*constant);
+
+      // We should not end up here if the enum constructor call is fully
+      // applied.
+      assert(constant->isCurried);
+
       SILValue ref = gen.emitGlobalFunctionRef(Loc, *constant, constantInfo);
       mv = ManagedValue::forUnmanaged(ref);
       break;
@@ -706,6 +737,7 @@ public:
     case Kind::SuperMethod: {
       return SpecializedEmitter(emitPartialSuperMethod);
     }
+    case Kind::EnumElement:
     case Kind::IndirectValue:
     case Kind::ClassMethod:
     case Kind::WitnessMethod:
@@ -1246,8 +1278,12 @@ public:
       subs = e->getDeclRef().getSubstitutions();
     }
     
-    setCallee(Callee::forDirect(SGF, constant, substFnType, e));
-  
+    // Enum case constructor references are open-coded.
+    if (isa<EnumElementDecl>(e->getDecl()))
+      setCallee(Callee::forEnumElement(SGF, constant, substFnType, e));
+    else
+      setCallee(Callee::forDirect(SGF, constant, substFnType, e));
+
     // If there are substitutions, add them, always at depth 0.
     if (!subs.empty())
       ApplyCallee->setSubstitutions(SGF, e, subs, 0);
@@ -3320,6 +3356,11 @@ namespace {
       uncurriedSites[0].convertToPlusOneFromPlusZero(gen);
     }
 
+    /// Is this a fully-applied enum element constructor call?
+    bool isEnumElementConstructor() {
+      return (callee.kind == Callee::Kind::EnumElement && uncurries == 0);
+    }
+
     /// Emit the fully-formed call.
     ManagedValue apply(SGFContext C = SGFContext()) {
       assert(!applied && "already applied!");
@@ -3351,6 +3392,16 @@ namespace {
         // because that's what the specialized emitters expect.
         origFormalType = AbstractionPattern(formalType);
         substFnType = gen.getLoweredType(formalType, uncurryLevel)
+          .castTo<SILFunctionType>();
+      } else if (isEnumElementConstructor()) {
+        // Enum payloads are always stored at the abstraction level
+        // of the unsubstituted payload type. This means that unlike
+        // with specialized emitters above, enum constructors use
+        // the AST-level abstraction pattern, to ensure that function
+        // types in payloads are re-abstracted correctly.
+        assert(!AssumedPlusZeroSelf);
+        substFnType = gen.getLoweredType(origFormalType, formalType,
+                                         uncurryLevel)
           .castTo<SILFunctionType>();
       } else {
         std::tie(mv, substFnType, foreignError, initialOptions) =
@@ -3399,6 +3450,32 @@ namespace {
                          argument,
                          formalApplyType,
                          uncurriedContext);
+      } else if (isEnumElementConstructor()) {
+        // If we have a fully-applied enum element constructor, open-code
+        // the construction.
+        EnumElementDecl *element = callee.getEnumElementDecl();
+
+        SILLocation uncurriedLoc = uncurriedSites[0].Loc;
+
+        // Ignore metatype argument
+        claimNextParamClause(origFormalType);
+        claimNextParamClause(formalType);
+        std::move(uncurriedSites[0]).forward().getAsSingleValue(gen);
+
+        // Get the payload argument.
+        ArgumentSource payload;
+        if (element->hasArgumentType()) {
+          assert(uncurriedSites.size() == 2);
+          claimNextParamClause(origFormalType);
+          claimNextParamClause(formalType);
+          payload = std::move(uncurriedSites[1]).forward();
+        } else {
+          assert(uncurriedSites.size() == 1);
+        }
+
+        result = gen.emitInjectEnum(uncurriedLoc, std::move(payload),
+                                    substFnType->getSemanticResultSILType(),
+                                    element, uncurriedContext);
 
       // Otherwise, emit the uncurried arguments now and perform
       // the call.
