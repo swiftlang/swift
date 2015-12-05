@@ -7,13 +7,13 @@ func test() {
   var z : y   // expected-error {{'y' is not a type}}
 }
 
-var b : Int -> Int = {$0}
+var b : Int -> Int = { $0 }
 
 var c2 : (field : Int)  // expected-error {{cannot create a single-element tuple with an element label}}{{11-19=}}
 
-var d2 : () -> Int = { 4}
+var d2 : () -> Int = { 4 }
 
-var d3 : () -> Float = {4 }
+var d3 : () -> Float = { 4 }
 
 var d4 : () -> Int = { d2 }  // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}} {{26-26=()}}
 
@@ -55,8 +55,6 @@ func test_array_construct<T>(_: T) {
   _ = [UnsafeMutablePointer<Int?>]()  // Nesting.
   _ = [([UnsafeMutablePointer<Int>])]()
   _ = [(String, Float)]()
-
-  
 }
 
 // <rdar://problem/15295763> default constructing an optional fails to typecheck
