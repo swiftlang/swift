@@ -25,18 +25,17 @@ The JSON Descriptor Format
 
 The general format is as follows:
 
-> \[
->
-> :   
->
->     \[
->
->     :   "PASS\_MANAGER\_ID", "run\_n\_times"|"run\_to\_fixed\_point",
->         count, "PASS1", "PASS2", ...
->
->     ### \],
->
-> \]
+```
+[
+  [
+    "PASS_MANAGER_ID",
+    "run_n_times"|"run_to_fixed_point",
+    count,
+    "PASS1", "PASS2", ...
+  ],
+  ...
+]
+```
 
 Where "id" is printed out when we process the action, "action" can be
 one of "run\_n\_times", "run\_to\_fixed\_point" and "passes" is a list
