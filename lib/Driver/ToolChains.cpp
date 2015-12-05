@@ -999,8 +999,8 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
 }
 
 ToolChain::InvocationInfo
-toolchains::Unix::constructInvocation(const InterpretJobAction &job,
-                                      const JobContext &context) const {
+toolchains::GenericUnix::constructInvocation(const InterpretJobAction &job,
+                                             const JobContext &context) const {
   InvocationInfo II = ToolChain::constructInvocation(job, context);
 
   SmallString<128> runtimeLibraryPath;
@@ -1014,8 +1014,8 @@ toolchains::Unix::constructInvocation(const InterpretJobAction &job,
 
 
 ToolChain::InvocationInfo
-toolchains::Unix::constructInvocation(const AutolinkExtractJobAction &job,
-                                      const JobContext &context) const {
+toolchains::GenericUnix::constructInvocation(const AutolinkExtractJobAction &job,
+                                             const JobContext &context) const {
   assert(context.Output.getPrimaryOutputType() == types::TY_AutolinkFile);
 
   ArgStringList Arguments;
@@ -1030,8 +1030,8 @@ toolchains::Unix::constructInvocation(const AutolinkExtractJobAction &job,
 }
 
 ToolChain::InvocationInfo
-toolchains::Unix::constructInvocation(const LinkJobAction &job,
-                                      const JobContext &context) const {
+toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
+                                             const JobContext &context) const {
   const Driver &D = getDriver();
 
   assert(context.Output.getPrimaryOutputType() == types::TY_Image &&

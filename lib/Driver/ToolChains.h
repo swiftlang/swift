@@ -36,7 +36,7 @@ public:
 
 };
 
-class LLVM_LIBRARY_VISIBILITY Unix : public ToolChain {
+class LLVM_LIBRARY_VISIBILITY GenericUnix : public ToolChain {
 protected:
   InvocationInfo constructInvocation(const InterpretJobAction &job,
                                      const JobContext &context) const override;
@@ -46,8 +46,8 @@ protected:
                                      const JobContext &context) const override;
 
 public:
-  Unix(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
-  ~Unix() = default;
+  GenericUnix(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
+  ~GenericUnix() = default;
 };
 
 } // end namespace toolchains
