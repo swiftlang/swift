@@ -102,7 +102,7 @@ void PostDominanceInfo::verify() const {
   PostDominanceInfo OtherDT(F);
 
   // And compare.
-  if (errorOccuredOnComparison(OtherDT)) {
+  if (errorOccurredOnComparison(OtherDT)) {
     llvm::errs() << "PostDominatorTree is not up to date!\nComputed:\n";
     print(llvm::errs());
     llvm::errs() << "\nActual:\n";
