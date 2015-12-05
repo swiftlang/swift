@@ -2063,5 +2063,1230 @@ welcome.
     var y: NSMatchingOptions = nil
 
 
-Release notes for older releases are available at
 
+2014-01-22
+----------
+
+* The swift binary no longer has an SDK set by default. Instead, you must do
+ one of the following:
+   - pass an explicit "-sdk /path/to/sdk"
+   - set SDKROOT in your environment
+   - run swift through xcrun, which sets SDKROOT for you
+
+* 'let' declarations can now be used as struct/class properties.  A 'let' 
+ property is mutable within init(), and immutable everywhere else.
+
+   class C {
+     let x = 42
+     let y : Int
+     init(y : Int) {
+       self.y = y   // ok, self.y is mutable in init()
+     }
+
+     func test() {
+       y = 42       // error: 'y' isn't mutable
+     }
+   }
+
+* The immutability model for structs and enums is complete, and arguments are
+ immutable by default.  This allows the compiler to reject mutations of
+ temporary objects, catching common bugs.  For example, this is rejected:
+
+   func setTo4(a : Double[]) {
+     a[10] = 4.0     // error: 'a' isn't mutable
+   }
+   ...
+   setTo4(someArray)
+
+ since "a" is semantically a copy of the array passed into the function.  The
+ proper fix in this case is to mark the argument is @inout, so the effect is
+ visible in the caller:
+
+   func setTo4(a : @inout Double[]) {
+     a[10] = 4.0     // ok: 'a' is a mutable reference
+   }
+   ...
+   setTo4(&someArray)
+
+ Alternatively, if you really just want a local copy of the argument, you can
+ mark it var.  The effects aren't visible in the caller, but this can be
+ convenient in some cases:
+
+   func doStringStuff(var s : String) {
+     s += "foo"
+     print(s)
+   }
+
+* Objective-C instance variables are no longer imported from headers written in
+ Objective-C. Previously, they would appear as properties within the
+ Objective-C class, but trying to access them would result in a crash.
+ Additionally, their names can conflict with property names, which confuses
+ the Swift compiler, and there are no patterns in our frameworks that expect
+ you to access a parent or other class's instance variables directly. Use
+ properties instead.
+
+* The NSObject protocol is now imported under the name
+ "NSObjectProtocol" (rather than "NSObjectProto").
+
+2014-01-15
+----------
+
+* Improved deallocation of Swift classes that inherit from Objective-C
+ classes: Swift destructors are implemented as -dealloc methods that
+ automatically call the superclass's -dealloc. Stored properties are
+ released right before the object is deallocated (using the same
+ mechanism as ARC), allowing properties to be safely used in
+ destructors.
+
+* Subclasses of NSManagedObject are now required to provide initial
+ values for each of their stored properties. This permits
+ initialization of these stored properties directly after +alloc to
+ provide memory safety with CoreData's dynamic subclassing scheme.
+
+* 'let' declarations are continuing to make slow progress. Curried
+  and selector-style arguments are now immutable by default, and
+  'let' declarations now get proper debug information.
+
+2014-01-08
+----------
+
+* The "static" keyword changed to "type". One can now define "type
+ functions" and "type variables" which are functions and variables
+ defined on a type (rather than on an instance of the type), e.g.,
+
+   class X {
+     type func factory() -> X { ... }
+
+     type var version: Int
+   }
+
+ The use of "static" was actively misleading, since type methods
+ on classes are dynamically dispatched (the same as Objective-C
+ "+" methods).
+
+ Note that "type" is a context-sensitive keyword; it can still be
+ used as an identifier.
+
+* Strings have a new native UTF-16 representation that can be
+ converted back and forth to NSString at minimal cost. String
+ literals are emitted as UTF-16 for string types that support it
+ (including Swift's String).
+
+* Initializers can now delegate to other initializers within the same
+ class by calling 'self.init'. For example:
+
+   class A { }
+
+   class B : A {
+     var title: String
+
+     init() {
+       // note: cannot access self before delegating
+       self.init(withTitle: "My Title")
+     }
+
+     init withTitle(title: String) {
+       self.title = title
+       super.init()
+     }
+   }
+
+
+* Objective-C protocols no longer have the "Proto" suffix unless there
+ is a collision with a class name. For example, UITableViewDelegate is
+ now imported as "UITableViewDelegate" rather than
+ "UITableViewDelegateProto". Where there is a conflict with a class,
+ the protocol will be suffixed with "Proto", as in "NSObject" (the
+ class) and "NSObjectProto" (the protocol).
+
+2014-01-01
+----------
+
+* Happy New Year
+
+* Division and remainder arithmetic now trap on overflow. Like with the other
+ operators, one can use the "masking" alternatives to get non-trapping
+ behavior. The behavior of the non-trapping masking operators is defined:
+   x &/ 0 == 0
+   x &% 0 == 0
+   SIGNED_MIN_FOR_TYPE &/ -1 == -1 // i.e. Int8: -0x80 / -1 == -0x80
+   SIGNED_MIN_FOR_TYPE &% -1 == 0
+
+* Protocol conformance checking for @mutating methods is now implemented: an
+ @mutating struct method only fulfills a protocol requirement if the protocol
+ method was itself marked @mutating:
+
+   protocol P {
+     func nonmutating()
+     @mutating
+     func mutating()
+   }
+
+   struct S : P {
+     // Error, @mutating method cannot implement non-@mutating requirement.
+     @mutating
+     func nonmutating() {}
+
+     // Ok, mutating allowed, but not required.
+     func mutating() {}
+   }
+
+ As before, class methods never need to be marked @mutating (and indeed, they
+ aren't allowed to be marked as such).
+
+
+2013-12-25
+----------
+
+* Merry Christmas
+
+* The setters of properties on value types (structs/enums) are now @mutating by
+ default.  To mark a setter non-mutating, use the @!mutating attribute.
+
+* Compiler inserts calls to super.init() into the class initializers that do
+ not call any initializers explicitly.
+
+* A "map" method with the semantics of Haskell's "fmap" was added to
+ Array<T>.  Map applies a function f: T->U to the values stored in
+ the array and returns an Array<U>.  So,
+
+   (swift) func names(x: Int[]) -> String[] {
+             return x.map { "<" + String($0) + ">" }
+           }
+   (swift) names(Array<Int>())
+   // r0 : String[] = []
+   (swift) names([3, 5, 7, 9])
+   // r1 : String[] = ["<3>", "<5>", "<7>", "<9>"]
+
+2013-12-18
+----------
+
+* Global variables and static properties are now lazily initialized on first
+ use. Where you would use dispatch_once to lazily initialize a singleton
+ object in Objective-C, you can simply declare a global variable with an
+ initializer in Swift. Like dispatch_once, this lazy initialization is thread
+ safe.
+
+ Unlike C++ global variable constructors, Swift global variables and
+ static properties now never emit static constructors (and thereby don't
+ raise build warnings). Also unlike C++, lazy initialization naturally follows
+ dependency order, so global variable initializers that cross module
+ boundaries don't have undefined behavior or fragile link order dependencies.
+
+* Swift has the start of an immutability model for value types. As part of this,
+ you can now declare immutable value bindings with a new 'let' declaration,
+ which is semantically similar to defining a get-only property:
+
+   let x = foo()
+   print(x)        // ok
+   x = bar()       // error: cannot modify an immutable value
+   swap(&x, &y)    // error: cannot pass an immutable value as @inout parameter
+   x.clear()       // error: cannot call mutating method on immutable value
+   getX().clear()  // error: cannot mutate a temporary
+
+ In the case of bindings of class type, the bound object itself is still
+ mutable, but you cannot change the binding.
+
+   let r = Rocket()
+   r.blastOff()    // Ok, your rocket is mutable.
+   r = Rocket()    // error: cannot modify an immutable binding.
+
+ In addition to the 'let' declaration itself, 'self' on classes, and a few
+ other minor things have switched to immutable bindings.
+
+ A pivotal part of this is that methods of value types (structs and enums) need
+ to indicate whether they can mutate self - mutating methods need to be
+ disallowed on let values (and get-only property results, temporaries, etc) but
+ non-mutating methods need to be allowed.  The default for a method is that it
+ does not mutate 'self', though you can opt into mutating behavior with a new
+ @mutating attribute:
+
+   struct MyWeirdCounter {
+     var count : Int
+
+     func empty() -> Bool { return count == 0 }
+
+     @mutating
+     func reset() {
+       count = 0
+     }
+     ...
+   }
+
+   let x = MyWeirdCounter()
+   x.empty()   // ok
+   x.reset()   // error, cannot mutate immutable 'let' value
+
+  One missing piece is that the compiler does not yet reject mutations of self
+  in a method that isn't marked @mutating.  That will be coming soon.  Related
+  to methods are properties.  Getters and setters can be marked mutating as
+  well:
+
+  extension MyWeirdCounter {
+     var myproperty : Int {
+     get:
+       return 42
+
+     @mutating
+     set:
+       count = value*2
+     }
+   }
+
+ The intention is for setters to default to mutating, but this has not been 
+ implemented yet.  There is more to come here.
+
+* A "map" method with the semantics of Haskell's "fmap" was added to
+ Optional<T>.  Map applies a function f: T->U to any value stored in
+ an Optional<T>, and returns an Optional<U>.  So,
+
+   (swift) func nameOf(x: Int?) -> String? {
+             return x.map { "<" + String($0) + ">" }
+           }
+  (swift)
+  (swift) var no = nameOf(.None) // Empty optional in...
+  // no : String? = <unprintable value>
+  (swift) no ? "yes" : "no"      // ...empty optional out
+  // r0 : String = "no"
+  (swift)
+  (swift) nameOf(.Some(42))      // Non-empty in
+  // r1 : String? = <unprintable value>
+  (swift) nameOf(.Some(42))!     // Non-empty out
+  // r2 : String = "<42>"
+
+* Cocoa types declared with the NS_OPTIONS macro are now available in Swift.
+ Like NS_ENUM types, their values are automatically shortened based
+ on the common prefix of the value names in Objective-C, and the name can
+ be elided when type context provides it. They can be used in 'if' statements
+ using the '&', '|', '^', and '~' operators as in C:
+
+   var options: NSJSONWritingOptions = .PrettyPrinted
+   if options & .PrettyPrinted {
+     println("pretty-printing enabled")
+   }
+
+ We haven't yet designed a convenient way to author NS_OPTIONS-like types
+ in Swift.
+
+2013-12-11
+----------
+
+* Objective-C 'id' is now imported as 'AnyObject' (formerly known as
+ 'DynamicLookup'), Objective-C 'Class' is imported as 'AnyClass'.
+
+* The casting syntax "x as T" now permits both implicit conversions
+ (in which case it produces a value of type T) and for
+ runtime-checked casts (in which case it produces a value of type T?
+ that will be .Some(casted x) on success and .None on failure). An
+ example:
+
+   func f(x: AnyObject, y: NSControl) {
+     var view = y as NSView                  // has type 'NSView'
+     var maybeView = x as NSView             // has type NSView?
+   }
+
+* The precedence levels of binary operators has been redefined, with a much 
+ simpler model than C's.  This is with a goal to define away classes of bugs
+ such as those caught by Clang's -Wparentheses warnings, and to make it 
+ actually possible for normal humans to reason about the precedence 
+ relationships without having to look them up.
+
+ We ended up with 6 levels, from tightest binding to loosest:
+   exponentiative: <<, >>
+   multiplicative: *, /, %, &
+   additive: +, -, |, ^
+   comparative: ==, !=, <, <=, >=, >
+   conjunctive: &&
+   disjunctive: ||
+
+* The "Enumerable" protocol has been renamed "Sequence".
+
+* The "Char" type has been renamed "UnicodeScalar".  The preferred
+ unit of string fragments for users is called "Character".
+
+* Initialization semantics for classes, structs and enums init methods are now
+ properly diagnosed by the compiler.  Instance variables now follow the same
+ initialization rules as local variables: they must be defined before use.  The
+ initialization model requires that all properties with storage in the current
+ class be initialized before super.init is called (or, in a root class, before 
+ any method is called on self, and before the final return).
+
+ For example, this will yield an error:
+
+   class SomeClass : SomeBase {
+     var x : Int
+
+     init() {
+       // error: property 'self.x' not initialized at super.init call
+       super.init()
+     }
+   }
+
+ A simple fix for this is to change the property definition to "var x = 0",
+ or to explicitly assign to it before calling super.init().
+
+* Relatedly, the compiler now diagnoses incorrect calls to super.init().  It
+ validates that any path through an initializer calls super.init() exactly once,
+ that all ivars are defined before the call to super.init, and that any uses 
+ which require the entire object to be initialized come after the super.init 
+ call.
+
+* Type checker performance has improved considerably (but we still
+ have much work to do here).
+
+2013-12-04
+----------
+
+* The "slice" versus "array" subtlety is now dead. Slice<T> has been folded
+ into Array<T> and T[] is just sugar for Array<T>.
+
+
+2013-11-20
+----------
+* Unreachable code warning has been added:
+
+   var y: Int = 1
+   if y == 1 { // note: condition always evaluates to true
+     return y
+   } 
+   return 1 // warning: will never be executed
+
+* Overflows on integer type conversions are now detected at runtime and, when 
+ dealing with constants, at compile time:
+
+   var i: Int = -129
+   var i8 = Int8(i) 
+   // error: integer overflows when converted from 'Int' to 'Int8'
+
+   var si = Int8(-1)
+   var ui = UInt8(si) 
+   // error: negative integer cannot be converted to unsigned type 'UInt8'
+
+* 'def' keyword was changed back to 'func'.
+
+2013-11-13
+----------
+
+* Objective-C-compatible protocols can now contain optional
+ requirements, indicated by the @optional attribute:
+
+   @class_protocol @objc protocol NSWobbling {
+     @optional def wobble()
+   }
+
+ A class that conforms to the NSWobbling protocol above can (but does
+ not have to) implement wobble. When referring to the 'wobble'
+ method for a value of type NSWobbling (or a value of generic type
+ that is bounded by NSWobbling), the result is an optional value
+ indicating whether the underlying object actually responds to the
+ given selector, using the same mechanism as messaging 'id'. One can
+ use '!' to assume that the method is always there, '?' to chain the
+ optional, or conditional branches to handle each case distinctly:
+
+   def tryToWobble(w : NSWobbling) {
+     w.wobble()   // error: cannot call a value of optional type
+     w.wobble!()  // okay: calls -wobble, but fails at runtime if not there
+     w.wobble?()  // okay: calls -wobble only if it's there, otherwise no-op
+     if w.wobble {
+       // okay: we know -wobble is there
+     } else {
+       // okay: we know -wobble is not there
+     }
+   }
+
+* Enums from Cocoa that are declared with the NS_ENUM macro are now imported
+ into Swift as Swift enums. Like all Swift enums, the constants of the Cocoa
+ enum are scoped as members of the enum type, so the importer strips off the
+ common prefix of all of the constant names in the enum when forming the Swift
+ interface. For example, this Objective-C declaration:
+
+   typedef NS_ENUM(NSInteger, NSComparisonResult) {
+     NSOrderedAscending,
+     NSOrderedSame,
+     NSOrderedDescending,
+   };
+
+ shows up in Swift as:
+
+   enum NSComparisonResult : Int {
+     case Ascending, Same, Descending
+   }
+
+ The enum cases can then take advantage of type inference from context.
+ In Objective-C, you would write:
+
+   NSNumber *foo = [NSNumber numberWithInt: 1];
+   NSNumber *bar = [NSNumber numberWithInt: 2];
+
+   switch ([foo compare: bar]) {
+   case NSOrderedAscending:
+     NSLog(@"ascending\n");
+     break;
+   case NSOrderedSame:
+     NSLog(@"same\n");
+     break;
+   case NSOrderedDescending:
+     NSLog(@"descending\n");
+     break;
+   }
+
+ In Swift, this becomes:
+
+   var foo: NSNumber = 1
+   var bar: NSNumber = 2
+
+   switch foo.compare(bar) {
+   case .Ascending:
+     println("ascending")
+   case .Same:
+     println("same")
+   case .Descending:
+     println("descending")
+   }
+
+* Work has begun on implementing static properties. Currently they are supported
+ for nongeneric structs and enums.
+
+   struct Foo {
+     static var foo: Int = 2
+   }
+   enum Bar {
+     static var bar: Int = 3
+   }
+   println(Foo.foo)
+   println(Bar.bar)
+
+2013-11-06
+----------
+
+* 'func' keyword was changed to 'def'.
+
+* Implicit conversions are now allowed from an optional type 'T?' to another
+ optional type 'U?' if 'T' is implicitly convertible to 'U'. For example,
+ optional subclasses convert to their optional base classes:
+
+   class Base {}
+   class Derived : Base {}
+
+   var d: Derived? = Derived()
+   var b: Base? = d
+
+2013-10-30
+----------
+
+* Type inference for variables has been improved, allowing any
+ variable to have its type inferred from its initializer, including
+ global and instance variables:
+
+   class MyClass {
+     var size = 0 // inferred to Int
+   }
+
+   var name = "Swift"
+
+ Additionally, the arguments of a generic type can also be inferred
+ from the initializer:
+
+   // infers Dictionary<String, Int>
+   var dict: Dictionary = ["Hello": 1, "World": 2]
+
+
+2013-10-23
+----------
+
+* Missing return statement from a non-Void function is diagnosed as an error.
+
+* Vector<T> has been replaced with Array<T>. This is a complete rewrite to use
+ value-semantics and copy-on-write behavior. The former means that you never
+ need to defensively copy again (or remember to attribute a property as "copy")
+ and the latter yields better performance than defensive copying. Dictionary<T>
+ is next.
+
+* 'switch' can now pattern-match into structs and classes, using the syntax
+ 'case Type(property1: pattern1, property2: pattern2, ...):'.
+
+   struct Point { var x, y: Double }
+   struct Size { var w, h: Double }
+   struct Rect { var origin: Point; var size: Size }
+
+   var square = Rect(Point(0, 0), Size(10, 10))
+
+   switch square {
+   case Rect(size: Size(w: var w, h: var h)) where w == h:
+     println("square")
+   case Rect(size: Size(w: var w, h: var h)) where w > h:
+     println("long rectangle")
+   default:
+     println("tall rectangle")
+   }
+
+ Currently only stored properties ("ivars" in ObjC terminology) are
+ supported by the implementation.
+
+* Array and dictionary literals allow an optional trailing comma:
+
+   var a = [ 1, 2, ]
+   var d = [ "a": 1, "b": 2, ]
+
+2013-10-16
+----------
+* Unlike in Objective-C, objects of type 'id' in Swift do not
+  implicitly convert to any class type. For example, the following
+  code is ill-formed:
+
+     func getContentViewBounds(window : NSWindow) -> NSRect {
+       var view : NSView = window.contentView() // error: 'id' doesn't implicitly convert to NSView
+      return view.bounds()
+     }
+
+  because contentView() returns an 'id'. One can now use the postfix
+  '!' operator to allow an object of type 'id' to convert to any class
+  type, e.g.,
+
+     func getContentViewBounds(window : NSWindow) -> NSRect {
+       var view : NSView = window.contentView()! // ok: checked conversion to NSView
+      return view.bounds()
+     }
+
+  The conversion is checked at run-time, and the program will fail if
+  the object is not an NSView. This is shorthand for
+
+      var view : NSView = (window.contentView() as NSView)!
+
+  which checks whether the content view is an NSView (via the "as
+  NSView"). That operation returns an optional NSView (written
+  NSView?) and the '!' operation assumes that the cast succeeded,
+  i.e., that the optional has a value in it.
+
+* The unconditional checked cast syntax 'x as! T' has been removed. Many cases
+  where conversion from 'id' is necessary can now be handled by postfix '!'
+  (see above). Fully general unconditional casts can still be expressed using
+  'as' and postfix '!' together, '(x as T)!'.
+
+* The old "square bracket" attribute syntax has been removed.
+
+* Overflows on construction of integer and floating point values from integer 
+  literals that are too large to fit the type are now reported by the compiler.
+  Here are some examples:
+
+      var x = Int8(-129)
+      // error: integer literal overflows when stored into 'Int8'
+
+      var y : Int = 0xFFFF_FFFF_FFFF_FFFF_F
+      // error: integer literal overflows when stored into 'Int'
+
+  Overflows in constant integer expressions are also reported by the compiler.
+
+      var x : Int8 = 125
+      var y : Int8 = x + 125
+      // error: arithmetic operation '125 + 125' (on type 'Int8') results in 
+      //        an overflow
+
+* Division by zero in constant expressions is now detected by the compiler:
+
+      var z: Int = 0
+      var x = 5 / z  // error: division by zero
+
+* Generic structs with type parameters as field types are now fully supported.
+
+      struct Pair<T, U> {
+        var first: T
+        var second: U
+      }
+
+2013-10-09
+----------
+* Autorelease pools can now be created using the 'autoreleasepool' function. 
+
+    autoreleasepool {
+      // code
+    }
+
+  Note that the wrapped code is a closure, so constructs like 'break' and 
+  'continue' and 'return' do not behave as they would inside an Objective-C 
+  @autoreleasepool statement.
+
+* Enums can now declare a "raw type", and cases can declare "raw values",
+  similar to the integer underlying type of C enums:
+
+    // Declare the underlying type as in Objective-C or C++11, with
+    // ': Type'
+    enum AreaCode : Int {
+      // Assign explicit values to cases with '='
+      case SanFrancisco = 415
+      case EastBay = 510
+      case Peninsula = 650
+      case SanJose = 408
+      // Values are also assignable by implicit auto-increment
+      case Galveston // = 409
+      case Baltimore // = 410
+    }
+
+  This introduces 'fromRaw' and 'toRaw' methods on the enum to perform
+  conversions from and to the raw type:
+
+    /* As if declared:
+        extension AreaCode {
+          // Take a raw value, and produce the corresponding enum value,
+          // or None if there is no corresponding enum value
+          static func fromRaw(raw:Int) -> AreaCode?
+
+
+          // Return the corresponding raw value for 'self'
+          func toRaw() -> Int
+        }
+     */
+
+    AreaCode.fromRaw(415) // => .Some(.SanFrancisco)
+    AreaCode.fromRaw(111) // => .None
+    AreaCode.SanJose.toRaw() // => 408
+
+  Raw types are not limited to integer types--they can additionally be
+  character, floating-point, or string values:
+
+    enum State : String {
+      case CA = "California"
+      case OR = "Oregon"
+      case WA = "Washington"
+    }
+
+    enum SquareRootOfInteger : Float {
+      case One = 1.0
+      case Two = 1.414
+      case Three = 1.732
+      case Four = 2.0
+    }
+
+  Raw types are currently limited to simple C-like enums with no payload cases.
+  The raw values are currently restricted to simple literal values; expressions
+  such as "1 + 1" or references to other enum cases are not yet supported.
+  Raw values are also currently required to be unique for each case in an enum.
+
+  Enums with raw types implicitly conform to the 'RawRepresentable' protocol,
+  which exposes the fromRaw and toRaw methods to generics:
+
+    protocol RawRepresentable {
+      typealias RawType
+      static func fromRaw(raw: RawType) -> Self?
+      func toRaw() -> RawType
+    }
+
+* Attribute syntax has been redesigned (see rdar://10700853 and rdar://14462729)
+  so that attributes now preceed the declaration and use the @ character to
+  signify them.  Where before you might have written:
+  
+    func [someattribute=42] foo(a : Int) {}
+  
+  you now write:
+  
+    @someattribute=42
+    func foo(a : Int) {}
+
+  This flows a lot better (attributes don't push the name for declarations away),
+  and means that square brackets are only used for array types, collection
+  literals, and subscripting operations.
+
+* The 'for' loop now uses the Generator protocol instead of the Enumerator
+  protocol to iterate a sequence. This protocol looks like this:
+
+    protocol Generator {
+      typealias Element
+      func next() -> Element?
+    }
+
+  The single method next() advances the generator and returns an
+  Optional, which is either .Some(value), wrapping the next value out
+  of the underlying sequence, or .None to signal that there are no
+  more elements. This is an improvement over the previous Enumerator
+  protocol because it eliminates the separate isEmpty() query and
+  better reflects the semantics of ephemeral sequences like
+  un-buffered input streams.
+
+2013-10-02
+----------
+* The [byref] attribute has been renamed to [inout].  When applied to a logical
+  property, the getter is invoked before a call and the setter is applied to
+  write back the result.  "inout" conveys this better and aligns with existing
+  Objective-C practice better.
+
+* [inout] arguments can now be captured into closures. The semantics of a
+  inout capture are that the captured variable is an independent local variable
+  of the callee, and the inout is updated to contain the value of that local
+  variable at function exit. 
+
+  In the common case, most closure arguments do not outlive the duration of
+  their callee, and the observable behavior is unchanged.  However, if the
+  captured variable outlives the function, you can observe this.  For example, 
+  this code:
+
+    func foo(x : [inout] Int) -> () -> Int {
+      func bar() -> Int {
+        x += 1
+        return x
+      }
+      // Call 'bar' once while the inout is active.
+      bar()
+      return bar
+    }
+
+    var x = 219
+    var f = foo(&x)
+    // x is updated to the value of foo's local x at function exit.
+    println("global x = \(x)")
+    // These calls only update the captured local 'x', which is now independent
+    // of the inout parameter.
+    println("local x = \(f())")
+    println("local x = \(f())")
+    println("local x = \(f())")
+
+    println("global x = \(x)")
+
+  will print:
+
+    global x = 220
+    local x = 221
+    local x = 222
+    local x = 223
+    global x = 220
+
+  In no case will you end up with a dangling pointer or other unsafe construct.
+
+* 'x as T' now performs a checked cast to 'T?', producing '.Some(t)' if the
+  cast succeeds, or '.None' if the cast fails.
+
+* The ternary expression ('x ? y : z') now requires whitespace between the
+  first expression and the question mark.  This permits '?' to be used
+  as a postfix operator.
+
+* A significant new piece of syntactic sugar has been added to ease working
+  with optional values.  The '?' postfix operator is analogous to '!', but
+  instead of asserting on None, it causes all the following postfix
+  operators to get skipped and return None.
+
+  In a sense, this generalizes (and makes explicit) the Objective-C behavior
+  where message sends to nil silently produce the zero value of the result.
+
+  For example, this code
+
+    object?.parent.notifyChildEvent?(object!, .didExplode)
+
+  first checks whether 'object' has a value; if so, it drills to its
+  parent and checks whether that object implements the 'notifyChildEvent'
+  method; if so, it calls that method.  (Note that we do not yet have
+  generalized optional methods.)
+
+  This code:
+
+    var titleLength = object?.title.length
+
+  checks whether 'object' has a value and, if so, asks for the length of
+  its title.  'titleLength' wil have type 'Int?', and if 'object' was
+  missing, the variable will be initialized to None.
+
+* Objects with type 'id' can now be used as the receiver of property
+  accesses and subscript operations to get (but not set) values. The
+  result is of optional type. For example, for a variable 'obj' of
+  type 'id', the expression
+
+    obj[0]
+
+  will produce a value of type 'id', which will either contain the
+  result of the message send objectAtIndexedSubscript(0) (wrapped in an
+  optional type) or, if the object does not respond to
+  objectAtIndexedSubscript:, an empty optional. The same approach
+  applies to property accesses.
+
+* '_' can now be used not only in 'var' bindings, but in assignments as well,
+  to ignore elements of a tuple assignment, or to explicitly ignore values.
+
+    var a = (1, 2.0, 3)
+    var x = 0, y = 0
+    _ = a           // explicitly load and discard 'a'
+    (x, _, y) = a   // assign a.0 to x and a.2 to y
+
+2013-09-24
+----------
+* The 'union' keyword has been replaced with 'enum'.  Unions and enums
+  are semantically identical in swift (the former just has data 
+  associated with its discriminators) and 'enum' is the vastly more
+  common case.  For more rationale, please see docs/proposals/Enums.rst
+  in the Swift source tree.
+
+* The Optional type 'T?' is now represented as an enum:
+
+    enum Optional<T> {
+      case None
+      case Some(T)
+    }
+
+  This means that, in addition to the existing Optional APIs, it can be
+  pattern-matched with switch:
+
+    var x : X?, y : Y?
+    switch (x, y) {
+    // Both are present
+    case (.Some(var a), .Some(var b)):
+      println("both")
+
+    // One is present
+    case (.Some, .None):
+    case (.None, .Some):
+      println("one")
+
+    // Neither is present
+    case (.None, .None):
+      println("neither")
+    }
+
+* Enums now allow multiple cases to be declared in a comma-separated list
+  in a single 'case' declaration:
+
+    enum Color {
+      case Red, Green, Blue
+    }
+
+* The Objective-C 'id' and 'Class' types now support referring to
+  methods declared in any class or protocol without a downcast. For
+  example, given a variable "sender" of type "id", one can refer to
+  -isEqual: with:
+
+    sender.isEqual
+
+  The actual object may or may not respond to -isEqual, so this
+  expression returns result of optional type whose value is determined via a
+  compiler-generated -respondsToSelector send. When it succeeds, the
+  optional contains the method; when it fails, the optional is empty. 
+
+  To safely test the optional, one can use, e.g.,
+
+    var senderIsEqual = sender.isEqual
+    if senderIsEqual {
+      // this will never trigger an "unrecognized selector" failure
+      var equal = senderIsEqual!(other)
+    } else {
+      // sender does not respond to -isEqual:
+    }
+
+  When you *know* that the method is there, you can use postfix '!' to
+  force unwrapping of the optional, e.g.,
+
+   sender.isEqual!(other)
+
+  This will fail at runtime if in fact sender does not respond to -isEqual:.
+  We have some additional syntactic optimizations planned for testing
+  an optional value and handling both the success and failure cases
+  concisely. Watch this space.
+
+* Weak references now always have optional type.  If a weak variable
+  has an explicit type, it must be an optional type:
+
+    var [weak] x : NSObject?
+
+  If the variable is not explicitly typed, its type will still be
+  inferred to be an optional type.
+
+* There is now an implicit conversion from T to T?.
+
+2013-09-17
+----------
+* Constructor syntax has been improved to align better with
+  Objective-C's init methods. The "constructor" keyword has been
+  replaced with "init", and the selector style of declaration used for
+  func declarations is now supported. For example:
+
+    class Y : NSObject {
+      init withInt(i : Int) string(s : String) {
+        super.init() // call superclass initializer
+      }
+    }
+
+  One can use this constructor to create a Y object with, e.g.,
+
+    Y(withInt:17, string:"Hello")
+
+  Additionally, the rules regarding the selector corresponding to such
+  a declaration have been revised. The selector for the above
+  initializer is "initWithInt:string:"; the specific rules are
+  described in the documentation. 
+
+  Finally, Swift initializers now introduce Objective-C entry points,
+  so a declaration such as:
+
+    class X : NSObject {
+      init() {
+        super.init()
+      }
+    }
+
+  Overrides NSObject's '-init' method (which it calls first) as well
+  as introducing the 'allocating' entry point so that one can create a
+  new 'X' instance with the syntax 'X()'.
+
+* Variables in top-level code (i.e. scripts, but not global variables in
+  libraries) that lack an initializer now work just like local variables:
+  they must be explicitly assigned-to sometime before any use, instead of
+  being default constructed.  Instance variables are still on the TODO 
+  list.
+
+* Generic unions with a single payload case and any number of empty cases
+  are now implemented, for example:
+
+    union Maybe<T> {
+      case Some(T)
+      case None
+    }
+
+    union Tristate<T> {
+      case Initialized(T)
+      case Initializing
+      case Uninitialized
+    }
+
+  Generic unions with multiple payload cases are still not yet implemented.
+
+2013-09-11
+----------
+* The implementation now supports partial application of class and struct
+  methods:
+
+    (swift) class B { func foo() { println("B") } }
+    (swift) class D : B { func foo() { println("D") } }
+    (swift) var foo = B().foo
+    // foo : () -> () = <unprintable value>
+    (swift) foo()
+    B
+    (swift) foo = D().foo
+    (swift) foo()
+    D
+
+  Support for partial application of Objective-C class methods and methods in
+  generic contexts is still incomplete.
+
+2013-09-04
+----------
+* Local variable declarations without an initializer are no longer implicitly
+  constructed.  The compiler now verifies that they are initialized on all
+  paths leading to a use of the variable.  This means that constructs like this
+  are now allowed:
+  
+    var p : SomeProtocol
+    if whatever {
+      p = foo()
+    } else {
+      p = bar()
+    }
+  
+  where before, the compiler would reject the definition of "p" saying that it
+  needed an initializer expression.
+  
+  Since all local variables must be initialized before use, simple things like
+  this are now rejected as well:
+  
+    var x : Int
+    print(x)
+
+  The fix is to initialize the value on all paths, or to explicitly default
+  initialize the value in the declaration, e.g. with "var x = 0" or with
+  "var x = Int()" (which works for any default-constructible type).
+
+* The implementation now supports unions containing protocol types and weak
+  reference types.
+
+* The type annotation syntax, 'x as T', has been removed from the language.
+  The checked cast operations 'x as! T' and 'x is T' still remain.
+
+2013-08-28
+----------
+* 'this' has been renamed to 'self'.  Similarly, 'This' has been renamed to
+  'Self'.
+
+* Swift now supports unions. Unlike C unions, Swift's 'union' is type-safe
+  and always knows what type it contains at runtime. Union members are labeled
+  using 'case' declarations; each case may have a different set of
+  types or no type:
+
+    union MaybeInt {
+      case Some(Int)
+      case None
+    }
+
+    union HTMLTag {
+      case A(href:String)
+      case IMG(src:String, alt:String)
+      case BR
+    }
+
+  Each 'case' with a type defines a static constructor function for the union
+  type. 'case' declarations without types become static members:
+
+    var br = HTMLTag.BR
+    var a = HTMLTag.A(href:"http://www.apple.com/")
+    // 'HTMLTag' scope deduced for '.IMG' from context
+    var img : HTMLTag = .IMG(src:"http://www.apple.com/mac-pro.png",
+                             alt:"The new Mac Pro")
+
+  Cases can be pattern-matched using 'switch':
+
+    switch tag {
+    case .BR:
+      println("<br>")
+    case .IMG(var src, var alt):
+      println("<img src=\"\(escape(src))\" alt=\"\(escape(alt))\">")
+    case .A(var href):
+      println("<a href=\"\(escape(href))\">")
+    }
+
+  Due to implementation limitations, recursive unions are not yet supported.
+
+* Swift now supports autolinking, so importing frameworks or Swift libraries
+  should no longer require adding linker flags or modifying your project file.
+
+2013-08-14
+----------
+* Swift now supports weak references by applying the [weak] attribute to a
+  variable declaration.
+
+    (swift) var x = NSObject()
+    // x : NSObject = <NSObject: 0x7f95d5804690>
+    (swift) var [weak] w = x
+    // w : NSObject = <NSObject: 0x7f95d5804690>
+    (swift) w == nil
+    // r2 : Bool = false
+    (swift) x = NSObject()
+    (swift) w == nil
+    // r3 : Bool = true
+
+  Swift also supports a special form of weak reference, called [unowned], for
+  references that should never be nil but are required to be weak to break
+  cycles, such as parent or sibling references. Accessing an [unowned]
+  reference asserts that the reference is still valid and implicitly promotes
+  the loaded reference to a strong reference, so it does not need to be loaded
+  and checked for nullness before use like a true [weak] reference.
+
+    class Parent {
+      var children : Array<Child>
+
+      func addChild(c:Child) {
+        c.parent = this
+        children.append(c)
+      }
+    }
+
+    class Child {
+      var [unowned] parent : Parent
+    }
+
+2013-07-31
+----------
+* Numeric literals can now use underscores as separators. For example:
+
+    var billion = 1_000_000_000
+    var crore = 1_00_00_000
+    var MAXINT = 0x7FFF_FFFF_FFFF_FFFF
+    var SMALLEST_DENORM = 0x0.0000_0000_0000_1p-1022
+
+* Types conforming to protocols now must always declare the conformance in
+  their inheritance clause.
+
+* The build process now produces serialized modules for the standard library,
+  greatly improving build times.
+
+2013-07-24
+----------
+* Arithmetic operators "+", "-", "*", and "/" on integer types now do
+  overflow checking and trap on overflow. A parallel set of masking operators,
+  "&+", "&-", "&*", and "&/", are defined to perform two's complement wrapping
+  arithmetic for all signed and unsigned integer types.
+
+* Debugger support. Swift has a "-g" command line switch that turns on
+  debug info for the compiled output. Using the standard lldb debugger
+  this will allow single-stepping through Swift programs, printing
+  backtraces, and navigating through stack frames; all in sync with
+  the corresponding Swift source code. An unmodified lldb cannot
+  inspect any variables.
+
+  Example session:
+    $ echo 'println("Hello World")' >hello.swift
+    $ swift hello.swift -c -g -o hello.o
+    $ ld hello.o "-dynamic" "-arch" "x86_64" "-macosx_version_min" "10.9.0" \
+         -framework Foundation lib/swift/libswift_stdlib_core.dylib \
+         lib/swift/libswift_stdlib_posix.dylib -lSystem -o hello
+    $ lldb hello
+    Current executable set to 'hello' (x86_64).
+    (lldb) b top_level_code
+    Breakpoint 1: where = hello`top_level_code + 26 at hello.swift:1, addre...
+    (lldb) r
+    Process 38592 launched: 'hello' (x86_64)
+    Process 38592 stopped
+    * thread #1: tid = 0x1599fb, 0x0000000100000f2a hello`top_level_code + ...
+        frame #0: 0x0000000100000f2a hello`top_level_code + 26 at hello.shi...
+    -> 1         println("Hello World")
+    (lldb) bt
+    * thread #1: tid = 0x1599fb, 0x0000000100000f2a hello`top_level_code + ...
+        frame #0: 0x0000000100000f2a hello`top_level_code + 26 at hello.shi...
+        frame #1: 0x0000000100000f5c hello`main + 28
+        frame #2: 0x00007fff918605fd libdyld.dylib`start + 1
+        frame #3: 0x00007fff918605fd libdyld.dylib`start + 1
+
+  Also try "s", "n", "up", "down".
+
+2013-07-17
+----------
+* Swift now has a 'switch' statement, supporting pattern matching of
+  multiple values with variable bindings, guard expressions, and range
+  comparisons. For example:
+
+    func classifyPoint(point:(Int, Int)) {
+      switch point {
+      case (0, 0):
+        println("origin")
+
+      case (_, 0):
+        println("on the x axis")
+
+      case (0, _):
+        println("on the y axis")
+
+      case (var x, var y) where x == y:
+        println("on the y = x diagonal")
+
+      case (var x, var y) where -x == y:
+        println("on the y = -x diagonal")
+
+      case (-10..10, -10..10):
+        println("close to the origin")
+
+      case (var x, var y):
+        println("length \(sqrt(x*x + y*y))")
+      }
+    }
+
+2013-07-10
+----------
+* Swift has a new closure syntax. The new syntax eliminates the use of
+  pipes. Instead, the closure signature is written the same way as a
+  function type and is separated from the body by the "in"
+  keyword. For example:
+
+    sort(fruits) { (lhs : String, rhs : String) -> Bool in
+      return lhs > rhs 
+    }
+
+  When the types are omitted, one can also omit the parentheses, e.g.,
+
+    sort(fruits) { lhs, rhs in lhs > rhs }
+
+  Closures with no parameters or that use the anonymous parameters
+  ($0, $1, etc.) don't need the 'in', e.g.,
+
+    sort(fruits) { $0 > $1 }
+
+* nil can now be used without explicit casting. Previously, 'nil' had
+  type NSObject, so one would have to write (e.g.) 'nil as! NSArray'
+  to create a nil NSArray. Now, 'nil' picks up the type of its
+  context.
+
+* POSIX.EnvironmentVariables and swift.CommandLineArguments global variables
+  were merged into a swift.Process variable.  Now you can access command line
+  arguments with Process.arguments.  In order to acces environment variables
+  add "import POSIX" and use Process.environmentVariables.
