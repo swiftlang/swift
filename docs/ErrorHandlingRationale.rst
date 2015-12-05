@@ -768,7 +768,7 @@ not free:
   which on our platforms means a function call because we're not
   willing to commit to anything more specific in the ABI.
 
-* Jumping across arbitary frames invalidates the callee-save
+* Jumping across arbitrary frames invalidates the callee-save
   registers, so the registering frame must save them all eagerly.  In
   calling conventions with many callee-save registers, this can be
   very expensive.  However, this is only necessary when it's possible
