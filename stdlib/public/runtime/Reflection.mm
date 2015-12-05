@@ -1264,3 +1264,17 @@ MirrorReturn swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
     T->vw_destroy(value);
   return MirrorReturn(result);
 }
+
+// NB: This function is not used directly in the Swift codebase, but is
+// exported for Xcode support. Please coordinate before changing.
+extern "C" void swift_stdlib_demangleName(const char *mangledName,
+                                          size_t mangledNameLength,
+                                          String *demangledName) {
+  auto options = Demangle::DemangleOptions();
+  options.DisplayDebuggerGeneratedModule = false;
+  auto result =
+      Demangle::demangleSymbolAsString(mangledName,
+                                       mangledNameLength,
+                                       options);
+  new (demangledName) String(result.data(), result.size());
+}
