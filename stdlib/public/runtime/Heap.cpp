@@ -23,10 +23,10 @@
 using namespace swift;
 
 void *swift::swift_slowAlloc(size_t size, size_t alignMask) {
-  void *p = aligned_alloc(alignMask, size);
-  // errno will contain error codes if p is a nullptr:
+  void *p;
+  if (!posix_memalign(&p, alignMask, size)) swift::crash("Could not allocate memory");
+  // The return value from posix memalign if not zero will be either of:
   // ENOMEM: insufficient in system memory, EINVAL: alignMask is not a power of two.
-  if (!p) swift::crash("Could not allocate memory.");
   return p;
 }
 
