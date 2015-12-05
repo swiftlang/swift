@@ -665,6 +665,16 @@ Runtime.test("typeName") {
   expectEqual("protocol<>.Protocol", _typeName(a.dynamicType))
 }
 
+Runtime.test("demangleName") {
+  expectEqual("", _stdlib_demangleName(""))
+  expectEqual("abc", _stdlib_demangleName("abc"))
+  expectEqual("\0", _stdlib_demangleName("\0"))
+  expectEqual("Swift.Double", _stdlib_demangleName("_TtSd"))
+  expectEqual("x.a : x.Foo<x.Foo<x.Foo<Swift.Int, Swift.Int>, x.Foo<Swift.Int, Swift.Int>>, x.Foo<x.Foo<Swift.Int, Swift.Int>, x.Foo<Swift.Int, Swift.Int>>>",
+      _stdlib_demangleName("_Tv1x1aGCS_3FooGS0_GS0_SiSi_GS0_SiSi__GS0_GS0_SiSi_GS0_SiSi___"))
+  expectEqual("Foobar", _stdlib_demangleName("_TtC13__lldb_expr_46Foobar"))
+}
+
 Runtime.test("_stdlib_atomicCompareExchangeStrongPtr") {
   typealias IntPtr = UnsafeMutablePointer<Int>
   var origP1 = IntPtr(bitPattern: 0x10101010)
