@@ -4313,9 +4313,10 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     if (auto metaTy = dyn_cast<MetatypeType>(baseType.getSwiftRValueType()))
       baseType = SILType::getPrimitiveObjectType(metaTy.getInstanceType());
 
-    auto superType = baseType.getSuperclass(/*resolver=*/nullptr);
-    metadata = emitClassHeapMetadataRef(IGF, superType.getSwiftRValueType(),
+    metadata = emitClassHeapMetadataRef(IGF, baseType.getSwiftRValueType(),
                                         MetadataValueType::TypeMetadata);
+    auto superField = emitAddressOfSuperclassRefInClassMetadata(IGF, metadata);
+    metadata = IGF.Builder.CreateLoad(superField);
   } else {
     if ((isa<FuncDecl>(methodDecl) && cast<FuncDecl>(methodDecl)->isStatic()) ||
         (isa<ConstructorDecl>(methodDecl) &&
