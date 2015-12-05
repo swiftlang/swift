@@ -45,7 +45,7 @@ protocol _ArrayType
   /// - Postcondition: `capacity >= minimumCapacity` and the array has
   ///   mutable contiguous storage.
   ///
-  /// - Complexity: O(`count`).
+  /// - Complexity: O(`self.count`).
   mutating func reserveCapacity(minimumCapacity: Int)
 
   /// Operator form of `appendContentsOf`.
