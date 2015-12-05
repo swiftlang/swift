@@ -13,7 +13,7 @@
 #include "IRGenModule.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclGroup.h"
-#include "clang/AST/DataRecursiveASTVisitor.h"
+#include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
@@ -22,7 +22,7 @@ using namespace irgen;
 
 namespace {
 class ClangDeclRefFinder
-    : public clang::DataRecursiveASTVisitor<ClangDeclRefFinder> {
+    : public clang::RecursiveASTVisitor<ClangDeclRefFinder> {
   std::function<void(const clang::DeclRefExpr *)> callback;
 public:
   template <typename Fn>

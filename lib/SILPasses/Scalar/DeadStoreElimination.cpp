@@ -895,7 +895,7 @@ void DSEContext::run() {
   for (SILBasicBlock &BB : *F) {
     // Create the stores that are alive due to partial dead stores.
     for (auto &I : getBBLocState(&BB)->LiveStores) {
-      SILInstruction *IT = cast<SILInstruction>(I.first)->getNextNode();
+      auto *IT = &*std::next(cast<SILInstruction>(I.first)->getIterator());
       SILBuilderWithScope Builder(IT);
       Builder.createStore(I.first.getLoc().getValue(), I.second, I.first);
     }

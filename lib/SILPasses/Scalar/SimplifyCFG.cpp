@@ -3013,7 +3013,7 @@ bool simplifySwitchEnumToSelectEnum(SILBasicBlock *BB, unsigned ArgNum,
   // Do not replace the bbarg
   SmallVector<SILValue, 4> Args;
   Args.push_back(SelectInst);
-  B.setInsertionPoint(SelectInst->getNextNode());
+  B.setInsertionPoint(&*std::next(SelectInst->getIterator()));
   B.createBranch(SEI->getLoc(), BB, Args);
   // Remove switch_enum instruction
   SEI->getParent()->getTerminator()->eraseFromParent();
