@@ -36,8 +36,6 @@ public:
 
 };
 
-#if defined(SWIFT_ENABLE_TARGET_LINUX)
-
 class LLVM_LIBRARY_VISIBILITY Linux : public ToolChain {
 protected:
   InvocationInfo constructInvocation(const InterpretJobAction &job,
@@ -51,8 +49,6 @@ public:
   Linux(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
   ~Linux() = default;
 };
-
-#endif // SWIFT_ENABLE_TARGET_LINUX
 
 } // end namespace toolchains
 } // end namespace driver

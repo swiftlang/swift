@@ -998,8 +998,6 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   return {"ld", Arguments};
 }
 
-#if defined(SWIFT_ENABLE_TARGET_LINUX)
-
 ToolChain::InvocationInfo
 toolchains::Linux::constructInvocation(const InterpretJobAction &job,
                                        const JobContext &context) const {
@@ -1126,6 +1124,4 @@ toolchains::Linux::constructInvocation(const LinkJobAction &job,
 
   return {"clang++", Arguments};
 }
-
-#endif // SWIFT_ENABLE_TARGET_LINUX
 

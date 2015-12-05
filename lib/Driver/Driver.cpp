@@ -2035,11 +2035,9 @@ const ToolChain *Driver::getToolChain(const ArgList &Args) const {
     case llvm::Triple::WatchOS:
       TC = new toolchains::Darwin(*this, Target);
       break;
-#if defined(SWIFT_ENABLE_TARGET_LINUX)
     case llvm::Triple::Linux:
       TC = new toolchains::Linux(*this, Target);
       break;
-#endif // SWIFT_ENABLE_TARGET_LINUX
     default:
       TC = nullptr;
     }
