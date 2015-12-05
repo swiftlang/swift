@@ -32,4 +32,4 @@ var y2: [String : ] // expected-error{{expected dictionary value type}}
 
 struct NotHashable { }
 
-var nh1 : [NotHashable : Int ] // expected-error{{'NotHashable' does not conform to protocol 'Hashable'}}
+var nh1 : [NotHashable : Int] // expected-error{{'NotHashable' does not conform to protocol 'Hashable'}}

@@ -83,8 +83,7 @@ private:
   bool typesMayAlias(SILType T1, SILType T2);
 
 
-  virtual void handleDeleteNotification(ValueBase *I) override {
-  }
+  virtual void handleDeleteNotification(ValueBase *I) override { }
 
 public:
   AliasAnalysis(SILModule *M) :
