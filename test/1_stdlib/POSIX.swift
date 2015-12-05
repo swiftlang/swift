@@ -116,14 +116,14 @@ POSIXTests.test("fcntl F_GETFL/F_SETFL success with file") {
   expectEqual(0, flags)
 	
   // Change to APPEND mode...
-  var rc = fcntl(fd, cmd: F_SETFL, O_APPEND)
+  var rc = fcntl(fd, cmd: F_SETFL, value: O_APPEND)
   expectEqual(0, rc)
 	
   flags = fcntl(fd, cmd: F_GETFL)
   expectEqual(O_APPEND, flags)
 	
   // Change back...
-  rc = fcntl(fd, cmd: F_SETFL, 0)
+  rc = fcntl(fd, cmd: F_SETFL, value: 0)
   expectEqual(0, rc)
 
   flags = fcntl(fd, cmd: F_GETFL)
@@ -142,22 +142,22 @@ POSIXTests.test("fcntl block and unblocking sockets success") {
   let sock = socket(PF_INET, 1, 0)
   expectGT(0, sock)
 	
-  var flags = fcntl(sock, F_GETFL)
-  expectEqual(2, flags)
+  var flags = fcntl(sock, cmd:F_GETFL)
+  expectGE(0, flags)
 	
   // Change mode of socket to non-blocking...
   var rc = fcntl(sock, cmd: F_SETFL, value: flags | ~O_NONBLOCK)
   expectEqual(0, rc)
 	
-  flags = fcntl(sock, F_GETFL)
-  expectEqual(4194510, flags)
+  flags = fcntl(sock, cmd: F_GETFL)
+  expectGE(0, flags)
 	
   // Change back to blocking...
   rc = fcntl(sock, cmd: F_SETFL, value: flags & ~O_NONBLOCK)
   expectEqual(0, rc)
 	
-  flags = fcntl(sock, F_GETFL)
-  expectEqual(2, flags)
+  flags = fcntl(sock, cmd: F_GETFL)
+  expectGE(0, flags)
 	
   // Clean up...
   rc = close(sock)
