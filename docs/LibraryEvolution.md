@@ -1,12 +1,7 @@
-<!-- -->
-
-Author
-
-:   Jordan Rose
-
-Author
-
-:   John McCall
+---
+title: Library Evolution Support in Swift ("Resilience")
+authors: Jordan Rose, John McCall
+---
 
 One of Swift's primary design goals is to allow efficient execution of
 code without sacrificing load-time abstraction of implementation.
