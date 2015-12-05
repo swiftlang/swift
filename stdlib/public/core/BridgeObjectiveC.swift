@@ -300,7 +300,7 @@ public func _isBridgedVerbatimToObjectiveC<T>(_: T.Type) -> Bool {
 
 /// Retrieve the Objective-C type to which the given type is bridged.
 @warn_unused_result
-public func _getBridgedObjectiveCType<T>(_: T.Type) -> Any.Type?  {
+public func _getBridgedObjectiveCType<T>(_: T.Type) -> Any.Type? {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return T.self
   }

@@ -2271,7 +2271,7 @@ namespace {
 #  if __APPLE__
       assert((!Success && Data <= 0xFFFFFFFFU) ||
              (Success && Data > 0xFFFFFFFFU));
-#  elif __linux__
+#  elif __linux__ || __FreeBSD__
       assert((!Success && Data <= 0x0FFFU) ||
              (Success && Data > 0x0FFFU));
 #  else
@@ -2306,7 +2306,7 @@ namespace {
 #if __LP64__
 #  if __APPLE__
       return Data > 0xFFFFFFFFU;
-#  elif __linux__
+#  elif __linux__ || __FreeBSD__
       return Data > 0x0FFFU;
 #  else
 #    error "port me"

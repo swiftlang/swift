@@ -150,7 +150,7 @@ Instance variables can be explicitly declared ``val`` or ``ref``::
 When a value is copied, all of its instance variables declared ``val``
 (implicitly or explicitly) are copied.  Instance variables declared
 ``ref`` merely have their reference counts incremented (i.e. the
-refrence is copied).  Therefore, when the defaults are in play, the
+reference is copied).  Therefore, when the defaults are in play, the
 semantic rules already defined for Swift are preserved.
 
 The new rules are as follows:

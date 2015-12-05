@@ -12,6 +12,8 @@ set(swiftDriver_sources
   Types.cpp
   )
 
+set(swiftDriver_targetDefines)
+
 add_swift_library(swiftDriver
   ${swiftDriver_sources}
   DEPENDS SwiftOptions
