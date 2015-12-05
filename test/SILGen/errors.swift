@@ -21,10 +21,9 @@ func make_a_cat() throws -> Cat {
 
 // CHECK: sil hidden @_TF6errors15dont_make_a_cat{{.*}} : $@convention(thin) () -> (@owned Cat, @error ErrorType) {
 // CHECK:      [[BOX:%.*]] = alloc_existential_box $ErrorType, $HomeworkError
-// CHECK:      [[T0:%.*]] = function_ref @_TFO6errors13HomeworkError7TooHardFMS0_S0_ : $@convention(thin) (@thin HomeworkError.Type) -> @owned HomeworkError
-// CHECK-NEXT: [[T1:%.*]] = metatype $@thin HomeworkError.Type
-// CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
-// CHECK-NEXT: store [[T2]] to [[BOX]]#1
+// CHECK-NEXT: [[T0:%.*]] = metatype $@thin HomeworkError.Type
+// CHECK-NEXT: [[T1:%.*]] = enum $HomeworkError, #HomeworkError.TooHard!enumelt
+// CHECK-NEXT: store [[T1]] to [[BOX]]#1
 // CHECK-NEXT: builtin "willThrow"
 // CHECK-NEXT: throw [[BOX]]#0
 func dont_make_a_cat() throws -> Cat {
@@ -33,10 +32,9 @@ func dont_make_a_cat() throws -> Cat {
 
 // CHECK: sil hidden @_TF6errors11dont_return{{.*}} : $@convention(thin) <T> (@out T, @in T) -> @error ErrorType {
 // CHECK:      [[BOX:%.*]] = alloc_existential_box $ErrorType, $HomeworkError
-// CHECK:      [[T0:%.*]] = function_ref @_TFO6errors13HomeworkError7TooMuchFMS0_S0_ : $@convention(thin) (@thin HomeworkError.Type) -> @owned HomeworkError
-// CHECK-NEXT: [[T1:%.*]] = metatype $@thin HomeworkError.Type
-// CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
-// CHECK-NEXT: store [[T2]] to [[BOX]]#1
+// CHECK-NEXT: [[T0:%.*]] = metatype $@thin HomeworkError.Type
+// CHECK-NEXT: [[T1:%.*]] = enum $HomeworkError, #HomeworkError.TooMuch!enumelt
+// CHECK-NEXT: store [[T1]] to [[BOX]]#1
 // CHECK-NEXT: builtin "willThrow"
 // CHECK-NEXT: destroy_addr %1 : $*T
 // CHECK-NEXT: throw [[BOX]]#0
