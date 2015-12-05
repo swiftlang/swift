@@ -75,12 +75,12 @@ void SILBasicBlock::push_front(SILInstruction *I) {
 }
 
 void SILBasicBlock::remove(SILInstruction *I) {
-  // Notify the delete handlers that this instruction is going away.
-  getModule().notifyDeleteHandlers(&*I);
   InstList.remove(I);
 }
 
 void SILBasicBlock::erase(SILInstruction *I) {
+  // Notify the delete handlers that this instruction is going away.
+  getModule().notifyDeleteHandlers(&*I);
   InstList.erase(I);
 }
 
@@ -116,6 +116,12 @@ SILArgument *SILBasicBlock::createBBArg(SILType Ty, const ValueDecl *D) {
 SILArgument *SILBasicBlock::insertBBArg(bbarg_iterator Iter, SILType Ty,
                                         const ValueDecl *D) {
   return new (getModule()) SILArgument(this, Iter, Ty, D);
+}
+
+void SILBasicBlock::eraseBBArg(int Index) {
+  // Notify the delete handlers that this BB argument is going away.
+  getModule().notifyDeleteHandlers(getBBArg(Index));
+  BBArgList.erase(BBArgList.begin() + Index);
 }
 
 /// \brief Splits a basic block into two at the specified instruction.

@@ -54,10 +54,6 @@ option(SWIFT_INCLUDE_DOCS
     "Create targets for building docs."
     TRUE)
 
-option(SWIFT_ENABLE_TARGET_LINUX
-    "Enable compiler support for targeting Linux"
-    TRUE)
-
 set(SWIFT_VERSION "2.2" CACHE STRING
     "The user-visible version of the Swift compiler")
 set(SWIFT_VENDOR "" CACHE STRING

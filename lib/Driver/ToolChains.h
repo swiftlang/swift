@@ -36,8 +36,6 @@ public:
 
 };
 
-#if defined(SWIFT_ENABLE_TARGET_LINUX) || defined(SWIFT_ENABLE_TARGET_FREEBSD)
-
 class LLVM_LIBRARY_VISIBILITY Unix : public ToolChain {
 protected:
   InvocationInfo constructInvocation(const InterpretJobAction &job,
@@ -51,8 +49,6 @@ public:
   Unix(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
   ~Unix() = default;
 };
-
-#endif // SWIFT_ENABLE_TARGET_(LINUX|FREEBSD)
 
 } // end namespace toolchains
 } // end namespace driver

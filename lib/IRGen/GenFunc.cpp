@@ -471,7 +471,9 @@ namespace {
       e.add(IGF.Builder.CreateLoad(fnAddr, fnAddr->getName()+".load"));
 
       Address dataAddr = projectData(IGF, address);
-      IGF.emitLoadAndRetain(dataAddr, e);
+      auto data = IGF.Builder.CreateLoad(dataAddr);
+      IGF.emitNativeStrongRetain(data);
+      e.add(data);
     }
 
     void loadAsTake(IRGenFunction &IGF, Address addr,
@@ -491,7 +493,7 @@ namespace {
       IGF.Builder.CreateStore(e.claimNext(), fnAddr);
 
       Address dataAddr = projectData(IGF, address);
-      IGF.emitAssignRetained(e.claimNext(), dataAddr);
+      IGF.emitNativeStrongAssign(e.claimNext(), dataAddr);
     }
 
     void initialize(IRGenFunction &IGF, Explosion &e,
@@ -502,19 +504,20 @@ namespace {
 
       // Store the data pointer, if any, transferring the +1.
       Address dataAddr = projectData(IGF, address);
-      IGF.emitInitializeRetained(e.claimNext(), dataAddr);
+      IGF.emitNativeStrongInit(e.claimNext(), dataAddr);
     }
 
     void copy(IRGenFunction &IGF, Explosion &src,
               Explosion &dest) const override {
       src.transferInto(dest, 1);
-      
-      IGF.emitRetain(src.claimNext(), dest);
+      auto data = src.claimNext();
+      IGF.emitNativeStrongRetain(data);
+      dest.add(data);
     }
     
     void consume(IRGenFunction &IGF, Explosion &src) const override {
       src.claimNext();
-      IGF.emitRelease(src.claimNext());
+      IGF.emitNativeStrongRelease(src.claimNext());
     }
 
     void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
@@ -524,31 +527,32 @@ namespace {
 
     void retain(IRGenFunction &IGF, Explosion &e) const override {
       e.claimNext();
-      IGF.emitRetainCall(e.claimNext());
+      IGF.emitNativeStrongRetain(e.claimNext());
     }
     
     void release(IRGenFunction &IGF, Explosion &e) const override {
       e.claimNext();
-      IGF.emitRelease(e.claimNext());
+      IGF.emitNativeStrongRelease(e.claimNext());
     }
 
     void retainUnowned(IRGenFunction &IGF, Explosion &e) const override {
       e.claimNext();
-      IGF.emitRetainUnowned(e.claimNext());
+      IGF.emitNativeStrongRetainUnowned(e.claimNext());
     }
     
     void unownedRetain(IRGenFunction &IGF, Explosion &e) const override {
       e.claimNext();
-      IGF.emitUnownedRetain(e.claimNext());
+      IGF.emitNativeUnownedRetain(e.claimNext());
     }
 
     void unownedRelease(IRGenFunction &IGF, Explosion &e) const override {
       e.claimNext();
-      IGF.emitUnownedRelease(e.claimNext());
+      IGF.emitNativeUnownedRelease(e.claimNext());
     }
 
     void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
-      IGF.emitRelease(IGF.Builder.CreateLoad(projectData(IGF, addr)));
+      auto data = IGF.Builder.CreateLoad(projectData(IGF, addr));
+      IGF.emitNativeStrongRelease(data);
     }
     
     void packIntoEnumPayload(IRGenFunction &IGF,
@@ -3420,7 +3424,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     switch (argConvention) {
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Direct_Owned:
-      if (!consumesContext) subIGF.emitRetainCall(rawData);
+      if (!consumesContext) subIGF.emitNativeStrongRetain(rawData);
       break;
 
     case ParameterConvention::Indirect_In_Guaranteed:
@@ -3428,7 +3432,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       dependsOnContextLifetime = true;
       if (outType->getCalleeConvention() ==
             ParameterConvention::Direct_Unowned) {
-        subIGF.emitRetainCall(rawData);
+        subIGF.emitNativeStrongRetain(rawData);
         consumesContext = true;
       }
       break;
@@ -3557,7 +3561,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     // so we can tail call. The safety of this assumes that neither this release
     // nor any of the loads can throw.
     if (consumesContext && !dependsOnContextLifetime)
-      subIGF.emitRelease(rawData);
+      subIGF.emitNativeStrongRelease(rawData);
   }
 
   // Derive the callee function pointer.  If we found a function
@@ -3650,7 +3654,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   
   // If the parameters depended on the context, consume the context now.
   if (rawData && consumesContext && dependsOnContextLifetime)
-    subIGF.emitRelease(rawData);
+    subIGF.emitNativeStrongRelease(rawData);
   
   // FIXME: Reabstract the result value as substituted.
 

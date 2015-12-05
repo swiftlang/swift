@@ -159,6 +159,10 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
   WeakReferencePtrTy =
     createStructPointerType(*this, "swift.weak", { RefCountedPtrTy });
 
+  // Native unowned references are just a pointer.
+  UnownedReferencePtrTy =
+    createStructPointerType(*this, "swift.unowned", { RefCountedPtrTy });
+
   // A type metadata record is the structure pointed to by the canonical
   // address point of a type metadata.  This is at least one word, and
   // potentially more than that, past the start of the actual global

@@ -828,9 +828,7 @@ emitPHINodesForBBArgs(IRGenSILFunction &IGF,
     if (!silBB->empty()) {
       SILInstruction &I = *silBB->begin();
       auto DS = I.getDebugScope();
-      // FIXME: This should be an assertion.
-      if (!DS || (DS->SILFn != IGF.CurSILFn && !DS->InlinedCallSite))
-        DS = IGF.CurSILFn->getDebugScope();
+      assert(DS && (DS->SILFn == IGF.CurSILFn || DS->InlinedCallSite));
       IGF.IGM.DebugInfo->setCurrentLoc(IGF.Builder, DS, I.getLoc());
     }
   }
@@ -3056,7 +3054,7 @@ void IRGenSILFunction::visitCopyBlockInst(CopyBlockInst *i) {
 void IRGenSILFunction::visitStrongPinInst(swift::StrongPinInst *i) {
   Explosion lowered = getLoweredExplosion(i->getOperand());
   llvm::Value *object = lowered.claimNext();
-  llvm::Value *pinHandle = emitTryPin(object);
+  llvm::Value *pinHandle = emitNativeTryPin(object);
 
   Explosion result;
   result.add(pinHandle);
@@ -3066,7 +3064,7 @@ void IRGenSILFunction::visitStrongPinInst(swift::StrongPinInst *i) {
 void IRGenSILFunction::visitStrongUnpinInst(swift::StrongUnpinInst *i) {
   Explosion lowered = getLoweredExplosion(i->getOperand());
   llvm::Value *pinHandle = lowered.claimNext();
-  emitUnpin(pinHandle);
+  emitNativeUnpin(pinHandle);
 }
 
 void IRGenSILFunction::visitStrongRetainInst(swift::StrongRetainInst *i) {

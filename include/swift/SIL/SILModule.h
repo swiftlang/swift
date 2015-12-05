@@ -204,9 +204,9 @@ public:
   /// Remove the delete notification handler \p Handler from the module context.
   void removeDeleteNotificationHandler(DeleteNotificationHandler* Handler);
 
-  /// Send the invalidation message that \p Inst is being deleted to all
+  /// Send the invalidation message that \p V is being deleted to all
   /// registered handlers. The order of handlers is deterministic but arbitrary.
-  void notifyDeleteHandlers(SILInstruction *Inst);
+  void notifyDeleteHandlers(ValueBase *V);
 
   /// \brief Get a uniqued pointer to a SIL type list.
   SILTypeList *getSILTypeList(ArrayRef<SILType> Types) const;

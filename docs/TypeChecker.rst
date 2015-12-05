@@ -319,7 +319,7 @@ and types generated from the primary expression kinds are:
   of some type.
 
 **Ternary operator**
-  A ternary operator``x ? y : z`` generates a number of
+  A ternary operator ``x ? y : z`` generates a number of
   constraints. The type ``T(x)`` must conform to the ``LogicValue``
   protocol to determine which branch is taken. Then, a new type
   variable ``T0`` is introduced to capture the result type, and the

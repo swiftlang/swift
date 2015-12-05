@@ -398,10 +398,7 @@ public:
                       SILType T) const override {
     Address destValue = projectValue(IGF, dest);
     Address srcValue = projectValue(IGF, src);
-    if (Refcounting == ReferenceCounting::Native)
-      IGF.emitWeakCopyAssign(destValue, srcValue);
-    else
-      IGF.emitUnknownWeakCopyAssign(destValue, srcValue);
+    IGF.emitWeakCopyAssign(destValue, srcValue, Refcounting);
     emitCopyOfTables(IGF, dest, src);
   }
 
@@ -410,10 +407,7 @@ public:
                           SILType T) const override {
     Address destValue = projectValue(IGF, dest);
     Address srcValue = projectValue(IGF, src);
-    if (Refcounting == ReferenceCounting::Native)
-      IGF.emitWeakCopyInit(destValue, srcValue);
-    else
-      IGF.emitUnknownWeakCopyInit(destValue, srcValue);
+    IGF.emitWeakCopyInit(destValue, srcValue, Refcounting);
     emitCopyOfTables(IGF, dest, src);
   }
 
@@ -422,10 +416,7 @@ public:
                       SILType T) const override {
     Address destValue = projectValue(IGF, dest);
     Address srcValue = projectValue(IGF, src);
-    if (Refcounting == ReferenceCounting::Native)
-      IGF.emitWeakTakeAssign(destValue, srcValue);
-    else
-      IGF.emitUnknownWeakTakeAssign(destValue, srcValue);
+    IGF.emitWeakTakeAssign(destValue, srcValue, Refcounting);
     emitCopyOfTables(IGF, dest, src);
   }
 
@@ -434,20 +425,14 @@ public:
                           SILType T) const override {
     Address destValue = projectValue(IGF, dest);
     Address srcValue = projectValue(IGF, src);
-    if (Refcounting == ReferenceCounting::Native)
-      IGF.emitWeakTakeInit(destValue, srcValue);
-    else
-      IGF.emitUnknownWeakTakeInit(destValue, srcValue);
+    IGF.emitWeakTakeInit(destValue, srcValue, Refcounting);
     emitCopyOfTables(IGF, dest, src);
   }
 
   void destroy(IRGenFunction &IGF, Address existential,
                SILType T) const override {
     Address valueAddr = projectValue(IGF, existential);
-    if (Refcounting == ReferenceCounting::Native)
-      IGF.emitWeakDestroy(valueAddr);
-    else
-      IGF.emitUnknownWeakDestroy(valueAddr);
+    IGF.emitWeakDestroy(valueAddr, Refcounting);
   }
 
   /// Given an explosion with multiple pointer elements in them, pack them
@@ -496,12 +481,8 @@ public:
                       Explosion &out) const override {
     Explosion temp;
     Address valueAddr = projectValue(IGF, existential);
-    if (Refcounting == ReferenceCounting::Native)
-      temp.add(IGF.emitWeakLoadStrong(valueAddr,
-                                      IGF.IGM.RefCountedPtrTy));
-    else
-      temp.add(IGF.emitUnknownWeakLoadStrong(valueAddr,
-                                            IGF.IGM.UnknownRefCountedPtrTy));
+    llvm::Type *resultType = IGF.IGM.getReferenceType(Refcounting);
+    temp.add(IGF.emitWeakLoadStrong(valueAddr, resultType, Refcounting));
     emitLoadOfTables(IGF, existential, temp);
     mergeExplosion(temp, out, IGF);
   }
@@ -510,12 +491,8 @@ public:
                       Explosion &out) const override {
     Explosion temp;
     Address valueAddr = projectValue(IGF, existential);
-    if (Refcounting == ReferenceCounting::Native)
-      temp.add(IGF.emitWeakTakeStrong(valueAddr,
-                                      IGF.IGM.RefCountedPtrTy));
-    else
-      temp.add(IGF.emitUnknownWeakTakeStrong(valueAddr,
-                                            IGF.IGM.UnknownRefCountedPtrTy));
+    llvm::Type *resultType = IGF.IGM.getReferenceType(Refcounting);
+    temp.add(IGF.emitWeakTakeStrong(valueAddr, resultType, Refcounting));
     emitLoadOfTables(IGF, existential, temp);
     mergeExplosion(temp, out, IGF);
   }
@@ -526,16 +503,10 @@ public:
     decomposeExplosion(in, temp, IGF);
 
     llvm::Value *value = temp.claimNext();
-    if (Refcounting == ReferenceCounting::Native)
-      assert(value->getType() == IGF.IGM.RefCountedPtrTy);
-    else
-      assert(value->getType() == IGF.IGM.UnknownRefCountedPtrTy);
+    assert(value->getType() == IGF.IGM.getReferenceType(Refcounting));
     emitStoreOfTables(IGF, temp, existential);
     Address valueAddr = projectValue(IGF, existential);
-    if (Refcounting == ReferenceCounting::Native)
-      IGF.emitWeakInit(value, valueAddr);
-    else
-      IGF.emitUnknownWeakInit(value, valueAddr);
+    IGF.emitWeakInit(value, valueAddr, Refcounting);
   }
 
   void weakAssign(IRGenFunction &IGF, Explosion &in,
@@ -544,16 +515,10 @@ public:
     decomposeExplosion(in, temp, IGF);
 
     llvm::Value *value = temp.claimNext();
-    if (Refcounting == ReferenceCounting::Native)
-      assert(value->getType() == IGF.IGM.RefCountedPtrTy);
-    else
-      assert(value->getType() == IGF.IGM.UnknownRefCountedPtrTy);
+    assert(value->getType() == IGF.IGM.getReferenceType(Refcounting));
     emitStoreOfTables(IGF, temp, existential);
     Address valueAddr = projectValue(IGF, existential);
-    if (Refcounting == ReferenceCounting::Native)
-      IGF.emitWeakAssign(value, valueAddr);
-    else
-      IGF.emitUnknownWeakAssign(value, valueAddr);
+    IGF.emitWeakAssign(value, valueAddr, Refcounting);
   }
 };
 
@@ -837,17 +802,11 @@ public:
   }
 
   void emitPayloadRetain(IRGenFunction &IGF, llvm::Value *value) const {
-    if (Refcounting == ReferenceCounting::Native)
-      IGF.emitUnownedRetain(value);
-    else
-      IGF.emitUnknownUnownedRetain(value);
+    IGF.emitUnownedRetain(value, Refcounting);
   }
 
   void emitPayloadRelease(IRGenFunction &IGF, llvm::Value *value) const {
-    if (Refcounting == ReferenceCounting::Native)
-      IGF.emitUnownedRelease(value);
-    else
-      IGF.emitUnknownUnownedRelease(value);
+    IGF.emitUnownedRelease(value, Refcounting);
   }
 
   void emitPayloadFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
@@ -930,62 +889,36 @@ public:
   }
 
   void retain(IRGenFunction &IGF, Explosion &e) const override {
-    // The instance is treated as unknown-refcounted.
-    if (Refcounting == ReferenceCounting::Native)
-      IGF.emitRetainCall(e.claimNext());
-    else
-      IGF.emitUnknownRetainCall(e.claimNext());
+    IGF.emitStrongRetain(e.claimNext(), Refcounting);
     e.claim(getNumStoredProtocols());
   }
 
   void release(IRGenFunction &IGF, Explosion &e) const override {
-    // The instance is treated as unknown-refcounted.
-    if (Refcounting == ReferenceCounting::Native)
-      IGF.emitRelease(e.claimNext());
-    else
-      IGF.emitUnknownRelease(e.claimNext());
+    IGF.emitStrongRelease(e.claimNext(), Refcounting);
     e.claim(getNumStoredProtocols());
   }
 
   void retainUnowned(IRGenFunction &IGF, Explosion &e) const override {
-    // The instance is treated as unknown-refcounted.
-    if (Refcounting == ReferenceCounting::Native)
-      IGF.emitRetainUnowned(e.claimNext());
-    else
-      IGF.emitUnknownRetainUnowned(e.claimNext());
+    IGF.emitStrongRetainUnowned(e.claimNext(), Refcounting);
     e.claim(getNumStoredProtocols());
   }
 
   void unownedRetain(IRGenFunction &IGF, Explosion &e) const override {
-    // The instance is treated as unknown-refcounted.
-    if (Refcounting == ReferenceCounting::Native)
-      IGF.emitUnownedRetain(e.claimNext());
-    else
-      IGF.emitUnknownUnownedRetain(e.claimNext());
+    IGF.emitUnownedRetain(e.claimNext(), Refcounting);
     e.claim(getNumStoredProtocols());
   }
 
   void unownedRelease(IRGenFunction &IGF, Explosion &e) const override {
-    // The instance is treated as unknown-refcounted.
-    if (Refcounting == ReferenceCounting::Native)
-      IGF.emitUnownedRelease(e.claimNext());
-    else
-      IGF.emitUnknownUnownedRelease(e.claimNext());
+    IGF.emitUnownedRelease(e.claimNext(), Refcounting);
     e.claim(getNumStoredProtocols());
   }
 
   void emitPayloadRetain(IRGenFunction &IGF, llvm::Value *value) const {
-    if (Refcounting == ReferenceCounting::Native)
-      IGF.emitRetainCall(value);
-    else
-      IGF.emitUnknownRetainCall(value);
+    IGF.emitStrongRetain(value, Refcounting);
   }
 
   void emitPayloadRelease(IRGenFunction &IGF, llvm::Value *value) const {
-    if (Refcounting == ReferenceCounting::Native)
-      IGF.emitRelease(value);
-    else
-      IGF.emitUnknownRelease(value);
+    IGF.emitStrongRelease(value, Refcounting);
   }
 
   void emitPayloadFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {

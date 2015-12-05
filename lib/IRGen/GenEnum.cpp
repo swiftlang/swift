@@ -1998,7 +1998,7 @@ namespace {
                                  llvm::Value *ptr) const {
       switch (CopyDestroyKind) {
       case NullableRefcounted:
-        IGF.emitScalarRetainCall(ptr, Refcounting);
+        IGF.emitStrongRetain(ptr, Refcounting);
         return;
       case POD:
       case Normal:
@@ -2022,7 +2022,7 @@ namespace {
                                   llvm::Value *ptr) const {
       switch (CopyDestroyKind) {
       case NullableRefcounted:
-        IGF.emitScalarRelease(ptr, Refcounting);
+        IGF.emitStrongRelease(ptr, Refcounting);
         return;
       case POD:
       case Normal:
@@ -2808,7 +2808,7 @@ namespace {
                                  llvm::Value *ptr) const {
       switch (CopyDestroyKind) {
       case TaggedRefcounted:
-        IGF.emitScalarRetainCall(ptr, Refcounting);
+        IGF.emitStrongRetain(ptr, Refcounting);
         return;
       case POD:
       case BitwiseTakable:
@@ -2834,7 +2834,7 @@ namespace {
                                   llvm::Value *ptr) const {
       switch (CopyDestroyKind) {
       case TaggedRefcounted:
-        IGF.emitScalarRelease(ptr, Refcounting);
+        IGF.emitStrongRelease(ptr, Refcounting);
         return;
       case POD:
       case BitwiseTakable:

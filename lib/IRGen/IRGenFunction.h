@@ -253,53 +253,118 @@ public:
   llvm::Value *emitUnmanagedAlloc(const HeapLayout &layout,
                                   const llvm::Twine &name,
                                   const HeapNonFixedOffsets *offsets = 0);
-  void emitLoadAndRetain(Address addr, Explosion &explosion);
-  void emitAssignRetained(llvm::Value *value, Address addr);
-  void emitInitializeRetained(llvm::Value *value, Address addr);
-  void emitScalarRetainCall(llvm::Value *value, ReferenceCounting refcounting);
-  void emitScalarRelease(llvm::Value *value, ReferenceCounting refcounting);
-  void emitRetain(llvm::Value *value, Explosion &explosion);
-  void emitRetainCall(llvm::Value *value);
-  void emitRelease(llvm::Value *value);
-  void emitRetainUnowned(llvm::Value *value);
-  llvm::Value *emitTryPin(llvm::Value *object);
-  void emitUnpin(llvm::Value *handle);
-  void emitUnownedRetain(llvm::Value *value);
-  void emitUnownedRelease(llvm::Value *value);
+
+  // Functions that don't care about the reference-counting style.
   void emitFixLifetime(llvm::Value *value);
-  void emitWeakInit(llvm::Value *value, Address dest);
-  void emitWeakAssign(llvm::Value *value, Address dest);
-  llvm::Value *emitWeakLoadStrong(Address src, llvm::Type *type);
-  llvm::Value *emitWeakTakeStrong(Address src, llvm::Type *type);
-  void emitWeakDestroy(Address addr);
-  void emitWeakCopyInit(Address destAddr, Address srcAddr);
-  void emitWeakTakeInit(Address destAddr, Address srcAddr);
-  void emitWeakCopyAssign(Address destAddr, Address srcAddr);
-  void emitWeakTakeAssign(Address destAddr, Address srcAddr);
-  void emitObjCRetain(llvm::Value *value, Explosion &explosion);
+
+  // Routines that are generic over the reference-counting style:
+  //   - strong references
+  void emitStrongRetain(llvm::Value *value, ReferenceCounting refcounting);
+  void emitStrongRelease(llvm::Value *value, ReferenceCounting refcounting);
+
+  //   - unowned references
+  void emitUnownedRetain(llvm::Value *value, ReferenceCounting style);
+  void emitUnownedRelease(llvm::Value *value, ReferenceCounting style);
+  void emitStrongRetainUnowned(llvm::Value *value, ReferenceCounting style);
+  void emitStrongRetainAndUnownedRelease(llvm::Value *value,
+                                         ReferenceCounting style);
+  void emitUnownedInit(llvm::Value *val, Address dest, ReferenceCounting style);
+  void emitUnownedAssign(llvm::Value *value, Address dest,
+                         ReferenceCounting style);
+  void emitUnownedCopyInit(Address destAddr, Address srcAddr,
+                           ReferenceCounting style);
+  void emitUnownedTakeInit(Address destAddr, Address srcAddr,
+                           ReferenceCounting style);
+  void emitUnownedCopyAssign(Address destAddr, Address srcAddr,
+                             ReferenceCounting style);
+  void emitUnownedTakeAssign(Address destAddr, Address srcAddr,
+                             ReferenceCounting style);
+  llvm::Value *emitUnownedLoadStrong(Address src, llvm::Type *resultType,
+                                     ReferenceCounting style);
+  llvm::Value *emitUnownedTakeStrong(Address src, llvm::Type *resultType,
+                                     ReferenceCounting style);
+  void emitUnownedDestroy(Address addr, ReferenceCounting style);
+
+  //   - weak references
+  void emitWeakInit(llvm::Value *ref, Address dest, ReferenceCounting style);
+  void emitWeakAssign(llvm::Value *ref, Address dest, ReferenceCounting style);
+  void emitWeakCopyInit(Address destAddr, Address srcAddr,
+                        ReferenceCounting style);
+  void emitWeakTakeInit(Address destAddr, Address srcAddr,
+                        ReferenceCounting style);
+  void emitWeakCopyAssign(Address destAddr, Address srcAddr,
+                          ReferenceCounting style);
+  void emitWeakTakeAssign(Address destAddr, Address srcAddr,
+                          ReferenceCounting style);
+  llvm::Value *emitWeakLoadStrong(Address src, llvm::Type *resultType,
+                                  ReferenceCounting style);
+  llvm::Value *emitWeakTakeStrong(Address src, llvm::Type *resultType,
+                                  ReferenceCounting style);
+  void emitWeakDestroy(Address addr, ReferenceCounting style);
+
+  // Routines for the Swift native reference-counting style.
+  //   - strong references
+  void emitNativeStrongAssign(llvm::Value *value, Address addr);
+  void emitNativeStrongInit(llvm::Value *value, Address addr);
+  void emitNativeStrongRetain(llvm::Value *value);
+  void emitNativeStrongRelease(llvm::Value *value);
+  //   - unowned references
+  void emitNativeUnownedRetain(llvm::Value *value);
+  void emitNativeUnownedRelease(llvm::Value *value);
+  void emitNativeStrongRetainUnowned(llvm::Value *value);
+  void emitNativeStrongRetainAndUnownedRelease(llvm::Value *value);
+  void emitNativeUnownedInit(llvm::Value *val, Address dest);
+  void emitNativeUnownedAssign(llvm::Value *value, Address dest);
+  void emitNativeUnownedCopyInit(Address destAddr, Address srcAddr);
+  void emitNativeUnownedTakeInit(Address destAddr, Address srcAddr);
+  void emitNativeUnownedCopyAssign(Address destAddr, Address srcAddr);
+  void emitNativeUnownedTakeAssign(Address destAddr, Address srcAddr);
+  llvm::Value *emitNativeUnownedLoadStrong(Address src, llvm::Type *resultType);
+  llvm::Value *emitNativeUnownedTakeStrong(Address src, llvm::Type *resultType);
+  void emitNativeUnownedDestroy(Address addr);
+  //   - weak references
+  void emitNativeWeakInit(llvm::Value *value, Address dest);
+  void emitNativeWeakAssign(llvm::Value *value, Address dest);
+  llvm::Value *emitNativeWeakLoadStrong(Address src, llvm::Type *type);
+  llvm::Value *emitNativeWeakTakeStrong(Address src, llvm::Type *type);
+  void emitNativeWeakDestroy(Address addr);
+  void emitNativeWeakCopyInit(Address destAddr, Address srcAddr);
+  void emitNativeWeakTakeInit(Address destAddr, Address srcAddr);
+  void emitNativeWeakCopyAssign(Address destAddr, Address srcAddr);
+  void emitNativeWeakTakeAssign(Address destAddr, Address srcAddr);
+  //   - other operations
+  llvm::Value *emitNativeTryPin(llvm::Value *object);
+  void emitNativeUnpin(llvm::Value *handle);
+
+  // Routines for the ObjC reference-counting style.
+  void emitObjCStrongRetain(llvm::Value *value);
   llvm::Value *emitObjCRetainCall(llvm::Value *value);
   llvm::Value *emitObjCAutoreleaseCall(llvm::Value *value);
-  void emitObjCRelease(llvm::Value *value);
+  void emitObjCStrongRelease(llvm::Value *value);
+
   llvm::Value *emitBlockCopyCall(llvm::Value *value);
   void emitBlockRelease(llvm::Value *value);
 
-  /// Emit a retain of a class instance with unknown retain semantics, and
-  /// return the retained value.
-  llvm::Value *emitUnknownRetainCall(llvm::Value *value);
-  /// Emit a release of a class instance with unknown retain semantics.
-  void emitUnknownRelease(llvm::Value *value);
+  // Routines for an unknown reference-counting style (meaning,
+  // dynamically something compatible with either the ObjC or Swift styles).
+  //   - strong references
+  void emitUnknownStrongRetain(llvm::Value *value);
+  void emitUnknownStrongRelease(llvm::Value *value);
+  //   - unowned references
   void emitUnknownUnownedRetain(llvm::Value *value);
   void emitUnknownUnownedRelease(llvm::Value *value);
-  void emitUnknownRetainUnowned(llvm::Value *value);
-  /// Emit a retain of a class instance with bridge retain semantics, and
-  /// return the retained value.
-  llvm::Value *emitBridgeRetainCall(llvm::Value *value);
-  /// Emit a release of a class instance with bridge retain semantics.
-  void emitBridgeRelease(llvm::Value *value);
-  void emitBridgeRetainUnowned(llvm::Value *value);
-  void emitErrorRetain(llvm::Value *value);
-  llvm::Value *emitErrorRetainCall(llvm::Value *value);
-  void emitErrorRelease(llvm::Value *value);
+  void emitUnknownStrongRetainUnowned(llvm::Value *value);
+  void emitUnknownStrongRetainAndUnownedRelease(llvm::Value *value);
+  void emitUnknownUnownedInit(llvm::Value *val, Address dest);
+  void emitUnknownUnownedAssign(llvm::Value *value, Address dest);
+  void emitUnknownUnownedCopyInit(Address destAddr, Address srcAddr);
+  void emitUnknownUnownedTakeInit(Address destAddr, Address srcAddr);
+  void emitUnknownUnownedCopyAssign(Address destAddr, Address srcAddr);
+  void emitUnknownUnownedTakeAssign(Address destAddr, Address srcAddr);
+  llvm::Value *emitUnknownUnownedLoadStrong(Address src, llvm::Type *resultTy);
+  llvm::Value *emitUnknownUnownedTakeStrong(Address src, llvm::Type *resultTy);
+  void emitUnknownUnownedDestroy(Address addr);
+  //   - weak references
   void emitUnknownWeakDestroy(Address addr);
   void emitUnknownWeakCopyInit(Address destAddr, Address srcAddr);
   void emitUnknownWeakTakeInit(Address destAddr, Address srcAddr);
@@ -309,6 +374,15 @@ public:
   void emitUnknownWeakAssign(llvm::Value *value, Address dest);
   llvm::Value *emitUnknownWeakLoadStrong(Address src, llvm::Type *type);
   llvm::Value *emitUnknownWeakTakeStrong(Address src, llvm::Type *type);
+
+  // Routines for the Builtin.NativeObject reference-counting style.
+  void emitBridgeStrongRetain(llvm::Value *value);
+  void emitBridgeStrongRelease(llvm::Value *value);
+
+  // Routines for the ErrorType reference-counting style.
+  void emitErrorStrongRetain(llvm::Value *value);
+  void emitErrorStrongRelease(llvm::Value *value);
+
   llvm::Value *emitLoadNativeRefcountedPtr(Address addr);
   llvm::Value *emitLoadUnknownRefcountedPtr(Address addr);
   llvm::Value *emitLoadBridgeRefcountedPtr(Address addr);

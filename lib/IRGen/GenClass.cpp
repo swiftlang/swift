@@ -672,7 +672,7 @@ static bool getInstanceSizeByMethod(IRGenFunction &IGF,
 
   // Retain 'self' if necessary.
   if (fnType->getParameters()[0].isConsumed()) {
-    IGF.emitRetainCall(selfValue);
+    IGF.emitNativeStrongRetain(selfValue);
   }
 
   // Adjust down to the defining subclass type if necessary.

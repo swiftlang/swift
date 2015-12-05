@@ -351,6 +351,7 @@ public:
   llvm::StructType *RefCountedStructTy;/// %swift.refcounted = type { ... }
   llvm::PointerType *RefCountedPtrTy;  /// %swift.refcounted*
   llvm::PointerType *WeakReferencePtrTy;/// %swift.weak_reference*
+  llvm::PointerType *UnownedReferencePtrTy;/// %swift.unowned_reference*
   llvm::Constant *RefCountedNull;      /// %swift.refcounted* null
   llvm::StructType *FunctionPairTy;    /// { i8*, %swift.refcounted* }
   llvm::FunctionType *DeallocatingDtorTy; /// void (%swift.refcounted*)
