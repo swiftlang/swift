@@ -542,16 +542,6 @@ bool SILPerformanceInliner::hasInliningCycle(SILFunction *Caller,
   return InlinedBefore;
 }
 
-
-static bool calleeIsSelfRecursive(SILFunction *Callee) {
-  for (auto &BB : *Callee)
-    for (auto &I : BB)
-      if (auto Apply = FullApplySite::isa(&I))
-        if (Apply.getCalleeFunction() == Callee)
-          return true;
-  return false;
-}
-
 // Returns the callee of an apply_inst if it is basically inlinable.
 SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
 
@@ -634,16 +624,6 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
           Callee->getName() << ".\n");
     return nullptr;
   }
-
-  // Inlining self-recursive functions into other functions can result
-  // in excessive code duplication since we run the inliner multiple
-  // times in our pipeline.
-  if (calleeIsSelfRecursive(Callee)) {
-    DEBUG(llvm::dbgs() << "        FAIL: Callee is self-recursive in " <<
-          Callee->getName() << ".\n");
-    return nullptr;
-  }
-
   DEBUG(llvm::dbgs() << "        Eligible callee: " <<
         Callee->getName() << "\n");
   
