@@ -2975,6 +2975,159 @@ void ArgEmitter::emitShuffle(TupleShuffleExpr *E,
 }
 
 namespace {
+/// Cleanup to destroy an uninitialized box.
+class DeallocateUninitializedBox : public Cleanup {
+  SILValue box;
+public:
+  DeallocateUninitializedBox(SILValue box) : box(box) {}
+
+  void emit(SILGenFunction &gen, CleanupLocation l) override {
+    gen.B.createDeallocBox(l, box);
+  }
+};
+} // end anonymous namespace
+
+static CleanupHandle enterDeallocBoxCleanup(SILGenFunction &gen, SILValue box) {
+  gen.Cleanups.pushCleanup<DeallocateUninitializedBox>(box);
+  return gen.Cleanups.getTopCleanup();
+}
+
+/// This is an initialization for a box.
+class BoxInitialization : public SingleBufferInitialization {
+  SILValue box;
+  SILValue addr;
+  CleanupHandle uninitCleanup;
+  CleanupHandle initCleanup;
+
+public:
+  BoxInitialization(SILValue box, SILValue addr,
+                    CleanupHandle uninitCleanup,
+                    CleanupHandle initCleanup)
+    : box(box), addr(addr),
+      uninitCleanup(uninitCleanup),
+      initCleanup(initCleanup) {}
+
+  void finishInitialization(SILGenFunction &gen) override {
+    gen.Cleanups.setCleanupState(uninitCleanup, CleanupState::Dead);
+    if (initCleanup.isValid())
+        gen.Cleanups.setCleanupState(initCleanup, CleanupState::Active);
+  }
+
+  SILValue getAddressOrNull() const override {
+    return addr;
+  }
+
+  ManagedValue getManagedBox() const {
+    return ManagedValue(box, initCleanup);
+  }
+};
+
+/// Emits SIL instructions to create an enum value. Attempts to avoid
+/// unnecessary copies by emitting the payload directly into the enum
+/// payload, or into the box in the case of an indirect payload.
+ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
+                                            ArgumentSource payload,
+                                            SILType enumTy,
+                                            EnumElementDecl *element,
+                                            SGFContext C) {
+  // Easy case -- no payload
+  if (!payload) {
+    if (enumTy.isLoadable(SGM.M)) {
+      return emitManagedRValueWithCleanup(
+        B.createEnum(loc, SILValue(), element,
+                     enumTy.getObjectType()));
+    }
+
+    // Emit the enum directly into the context if possible
+    SILValue resultSlot = getBufferForExprResult(loc, enumTy, C);
+    B.createInjectEnumAddr(loc, resultSlot, element);
+    return manageBufferForExprResult(resultSlot,
+                                     getTypeLowering(enumTy), C);
+  }
+
+  ManagedValue payloadMV;
+  AbstractionPattern origFormalType(element->getArgumentType());
+  auto &payloadTL = getTypeLowering(origFormalType,
+                                    payload.getSubstType());
+
+  SILType loweredPayloadType = payloadTL.getLoweredType();
+
+  // If the payload is indirect, emit it into a heap allocated box.
+  //
+  // To avoid copies, evaluate it directly into the box, being
+  // careful to stage the cleanups so that if the expression
+  // throws, we know to deallocate the uninitialized box.
+  if (element->isIndirect() ||
+      element->getParentEnum()->isIndirect()) {
+    auto box = B.createAllocBox(loc, payloadTL.getLoweredType());
+
+    CleanupHandle initCleanup = enterDestroyCleanup(box);
+    Cleanups.setCleanupState(initCleanup, CleanupState::Dormant);
+    CleanupHandle uninitCleanup = enterDeallocBoxCleanup(*this, box);
+
+    BoxInitialization dest(box, box->getAddressResult(),
+                           uninitCleanup, initCleanup);
+
+    std::move(payload).forwardInto(*this, origFormalType,
+                                   &dest, payloadTL);
+
+    payloadMV = dest.getManagedBox();
+    loweredPayloadType = payloadMV.getType();
+  }
+
+  // Loadable with payload
+  if (enumTy.isLoadable(SGM.M)) {
+    if (!payloadMV) {
+      // If the payload was indirect, we already evaluated it and
+      // have a single value. Otherwise, evaluate the payload.
+      payloadMV = std::move(payload).getAsSingleValue(*this, origFormalType);
+    }
+
+    SILValue argValue = payloadMV.forward(*this);
+
+    return emitManagedRValueWithCleanup(
+               B.createEnum(loc, argValue, element,
+                            enumTy.getObjectType()));
+  }
+
+  // Address-only with payload
+  SILValue resultSlot = getBufferForExprResult(loc, enumTy, C);
+
+  SILValue resultData =
+      B.createInitEnumDataAddr(loc, resultSlot, element,
+                               loweredPayloadType.getAddressType());
+
+  if (payloadMV) {
+    // If the payload was indirect, we already evaluated it and
+    // have a single value. Store it into the result.
+    B.createStore(loc, payloadMV.forward(*this), resultData);
+  } else if (payloadTL.isLoadable()) {
+    // The payload of this specific enum case might be loadable
+    // even if the overall enum is address-only.
+    payloadMV = std::move(payload).getAsSingleValue(*this, origFormalType);
+    B.createStore(loc, payloadMV.forward(*this), resultData);
+  } else {
+    // The payload is address-only. Evaluate it directly into
+    // the enum.
+    CleanupHandle cleanup = enterDestroyCleanup(resultSlot);
+    Cleanups.setCleanupState(cleanup, CleanupState::Dormant);
+
+    TemporaryInitialization dest(resultData, cleanup);
+    std::move(payload).forwardInto(*this, origFormalType,
+                                   &dest, payloadTL);
+
+    // Kill the old cleanup -- we're going to enter a new one.
+    Cleanups.setCleanupState(cleanup, CleanupState::Dead);
+  }
+
+  // The payload is initialized, now apply the tag.
+  B.createInjectEnumAddr(loc, resultSlot, element);
+
+  return manageBufferForExprResult(resultSlot,
+                                   getTypeLowering(enumTy), C);
+}
+
+namespace {
   /// A structure for conveniently claiming sets of uncurried parameters.
   struct ParamLowering {
     ArrayRef<SILParameterInfo> Params;
