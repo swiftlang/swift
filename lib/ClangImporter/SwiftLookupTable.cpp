@@ -19,28 +19,6 @@
 #include "clang/AST/DeclObjC.h"
 using namespace swift;
 
-bool SwiftLookupTable::matchesContext(clang::DeclContext *foundContext,
-                                      clang::DeclContext *requestedContext) {
-  /// If the requested context was null, we match.
-  if (!requestedContext)
-    return true;
-
-  // If the contexts match, we match.
-  if (foundContext == requestedContext)
-    return true;
-
-  // If we found something in an Objective-C protocol to which a class
-  // conforms, we match.
-  if (auto objcProto = dyn_cast<clang::ObjCProtocolDecl>(foundContext)) {
-    if (auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(requestedContext)) {
-      return objcClass->ClassImplementsProtocol(objcProto,
-                                                /*lookupCategory=*/true);
-    }
-  }
-
-  return false;
-}
-
 /// Determine whether the new declarations matches an existing declaration.
 static bool matchesExistingDecl(clang::Decl *decl, clang::Decl *existingDecl) {
   // If the canonical declarations are equivalent, we have a match.
@@ -51,9 +29,38 @@ static bool matchesExistingDecl(clang::Decl *decl, clang::Decl *existingDecl) {
   return false;
 }
 
+Optional<std::pair<SwiftLookupTable::ContextKind, StringRef>>
+SwiftLookupTable::translateContext(clang::DeclContext *context) {
+  // Translation unit context.
+  if (context->isTranslationUnit())
+    return std::make_pair(ContextKind::TranslationUnit, StringRef());
+
+  // Tag declaration context.
+  if (auto tag = dyn_cast<clang::TagDecl>(context)) {
+    if (tag->getIdentifier())
+      return std::make_pair(ContextKind::Tag, tag->getName());
+    if (auto typedefDecl = tag->getTypedefNameForAnonDecl())
+      return std::make_pair(ContextKind::Tag, typedefDecl->getName());
+    return None;
+  }
+
+  // Objective-C class context.
+  if (auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(context))
+    return std::make_pair(ContextKind::ObjCClass, objcClass->getName());
+
+  // Objective-C protocol context.
+  if (auto objcProtocol = dyn_cast<clang::ObjCProtocolDecl>(context))
+    return std::make_pair(ContextKind::ObjCProtocol, objcProtocol->getName());
+
+  return None;
+}
+
 void SwiftLookupTable::addEntry(DeclName name, clang::NamedDecl *decl,
                                 clang::DeclContext *effectiveContext) {
-  clang::DeclContext *context = effectiveContext->getPrimaryContext();
+  // Translate the context.
+  auto contextOpt = translateContext(effectiveContext);
+  if (!contextOpt) return;
+  auto context = *contextOpt;
 
   // First, check whether there is already a full name entry.
   auto knownFull = FullNameTable.find(name);
@@ -86,7 +93,7 @@ void SwiftLookupTable::addEntry(DeclName name, clang::NamedDecl *decl,
 
   // This is a new context for this name. Add it.
   FullTableEntry newEntry;
-  newEntry.Context = context;
+  newEntry.Context = context;;
   newEntry.Decls.push_back(decl);
   fullEntries.push_back(newEntry);
 }
@@ -181,13 +188,15 @@ void SwiftLookupTable::dump() const {
     llvm::errs() << "  " << fullName << ":\n";
     const auto &fullEntries = FullNameTable.find(fullName)->second;
     for (const auto &fullEntry : fullEntries) {
-      llvm::errs() << "    ";
-      if (fullEntry.Context->isTranslationUnit()) {
+      switch (fullEntry.Context.first) {
+      case ContextKind::TranslationUnit:
         llvm::errs() << "TU";
-      } else if (auto named = dyn_cast<clang::NamedDecl>(fullEntry.Context)) {
-        printName(named, llvm::errs());
-      } else {
-        llvm::errs() << "<unknown>";
+        break;
+
+      case ContextKind::Tag:
+      case ContextKind::ObjCClass:
+      case ContextKind::ObjCProtocol:
+        llvm::errs() << fullEntry.Context.second;
       }
       llvm::errs() << ": ";
 

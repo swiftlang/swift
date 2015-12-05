@@ -676,8 +676,8 @@ removeDeleteNotificationHandler(DeleteNotificationHandler* Handler) {
   NotificationHandlers.remove(Handler);
 }
 
-void SILModule::notifyDeleteHandlers(ValueBase *Item) {
+void SILModule::notifyDeleteHandlers(ValueBase *V) {
   for (auto *Handler : NotificationHandlers) {
-    Handler->handleDeleteNotification(Item);
+    Handler->handleDeleteNotification(V);
   }
 }

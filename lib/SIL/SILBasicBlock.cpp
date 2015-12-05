@@ -43,6 +43,11 @@ SILBasicBlock::~SILBasicBlock() {
     getModule().notifyDeleteHandlers(&*I);
   }
 
+  // Invalidate all of the basic block arguments.
+  for (auto *Arg : BBArgList) {
+    getModule().notifyDeleteHandlers(Arg);
+  }
+
   // iplist's destructor is going to destroy the InstList.
 }
 
@@ -100,10 +105,18 @@ void SILBasicBlock::removeFromParent() {
 SILArgument *SILBasicBlock::replaceBBArg(unsigned i, SILType Ty,
                                          const ValueDecl *D) {
   SILModule &M = getParent()->getModule();
+
+
   assert(BBArgList[i]->use_empty() && "Expected no uses of the old BB arg!");
+
+  // Notify the delete handlers that this argument is being deleted.
+  M.notifyDeleteHandlers(BBArgList[i]);
 
   auto *NewArg = new (M) SILArgument(Ty, D);
   NewArg->setParent(this);
+
+  // TODO: When we switch to malloc/free allocation we'll be leaking memory
+  // here.
   BBArgList[i] = NewArg;
 
   return NewArg;

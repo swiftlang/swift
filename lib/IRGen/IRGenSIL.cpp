@@ -2946,27 +2946,15 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   StringRef Name = Decl->getNameStr();
   Explosion e = getLoweredExplosion(SILVal);
   DebugTypeInfo DbgTy(Decl, Decl->getType(), getTypeInfo(SILVal.getType()));
-  if (DbgTy.getType()->getKind() == TypeKind::InOut)
-    // An inout type that is described by a debug *value* is a
-    // promoted capture. Unwrap the type.
-    DbgTy.unwrapInOutType();
+  // An inout/lvalue type that is described by a debug value has been
+  // promoted by an optimization pass. Unwrap the type.
+  DbgTy.unwrapLValueOrInOutType();
 
   // Put the value into a stack slot at -Onone.
   llvm::SmallVector<llvm::Value *, 8> Copy;
   emitShadowCopy(e.claimAll(), Name, Copy);
   emitDebugVariableDeclaration(Copy, DbgTy, i->getDebugScope(), Name,
                                i->getVarInfo().getArgNo());
-}
-
-/// InOut- and Archetypes are already implicitly indirect.
-static IndirectionKind getIndirectionForDebugValueAddr(swift::TypeBase *Ty) {
-  switch (Ty->getKind()) {
-  case TypeKind::InOut:
-  case TypeKind::Archetype:
-    return DirectValue;
-  default:
-    return IndirectValue;
-  }
 }
 
 void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
@@ -2984,10 +2972,9 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   auto Addr = getLoweredAddress(SILVal).getAddress();
   DebugTypeInfo DbgTy(Decl, Decl->getType(), getTypeInfo(SILVal.getType()));
   // Put the value into a stack slot at -Onone and emit a debug intrinsic.
-  emitDebugVariableDeclaration(
-      emitShadowCopy(Addr, Name), DbgTy, i->getDebugScope(), Name,
-      i->getVarInfo().getArgNo(),
-      getIndirectionForDebugValueAddr(DbgTy.getType()));
+  emitDebugVariableDeclaration(emitShadowCopy(Addr, Name), DbgTy,
+                               i->getDebugScope(), Name,
+                               i->getVarInfo().getArgNo(), IndirectValue);
 }
 
 void IRGenSILFunction::visitLoadWeakInst(swift::LoadWeakInst *i) {
@@ -3236,12 +3223,11 @@ static void emitDebugDeclarationForAllocStack(IRGenSILFunction &IGF,
   if (IGF.IGM.DebugInfo && Decl) {
     auto *Pattern = Decl->getParentPattern();
     if (!Pattern || !Pattern->isImplicit()) {
+      auto DbgTy = DebugTypeInfo(Decl, type);
       // Discard any inout or lvalue qualifiers. Since the object itself
       // is stored in the alloca, emitting it as a reference type would
       // be wrong.
-      auto DbgTy = DebugTypeInfo(Decl,
-                                 Decl->getType()->getLValueOrInOutObjectType(),
-                                 type);
+      DbgTy.unwrapLValueOrInOutType();
       auto Name = Decl->getName().empty() ? "_" : Decl->getName().str();
       auto DS = i->getDebugScope();
       if (DS) {
@@ -3402,16 +3388,11 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
     // arguments.
     if (Name == IGM.Context.Id_self.str())
       return;
-    auto Indirection = IndirectValue;
-    // LValues and inout args are implicitly indirect because of their type.
-    if (Decl->getType()->getKind() == TypeKind::LValue ||
-        Decl->getType()->getKind() == TypeKind::InOut)
-      Indirection = DirectValue;
 
     IGM.DebugInfo->emitVariableDeclaration(
         Builder, emitShadowCopy(addr.getAddress(), Name),
         DebugTypeInfo(Decl, i->getElementType().getSwiftType(), type),
-        i->getDebugScope(), Name, 0, Indirection);
+        i->getDebugScope(), Name, 0, IndirectValue);
   }
 }
 
