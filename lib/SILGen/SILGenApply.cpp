@@ -3145,15 +3145,10 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
   } else {
     // The payload is address-only. Evaluate it directly into
     // the enum.
-    CleanupHandle cleanup = enterDestroyCleanup(resultSlot);
-    Cleanups.setCleanupState(cleanup, CleanupState::Dormant);
 
-    TemporaryInitialization dest(resultData, cleanup);
+    TemporaryInitialization dest(resultData, CleanupHandle::invalid());
     std::move(payload).forwardInto(*this, origFormalType,
                                    &dest, payloadTL);
-
-    // Kill the old cleanup -- we're going to enter a new one.
-    Cleanups.setCleanupState(cleanup, CleanupState::Dead);
   }
 
   // The payload is initialized, now apply the tag.
