@@ -2235,7 +2235,7 @@ void ArrayPropertiesSpecializer::specializeLoopNest() {
   auto *CheckBlock = splitBasicBlockAndBranch(B,
       HoistableLoopPreheader->getTerminator(), DomTree, nullptr);
 
-  // Get the exit blocks of the orignal loop.
+  // Get the exit blocks of the original loop.
   auto *Header = CheckBlock->getSingleSuccessor();
   assert(Header);
 

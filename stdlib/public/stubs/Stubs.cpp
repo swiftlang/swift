@@ -191,7 +191,7 @@ extern "C" uint64_t swift_float80ToString(char *Buffer, size_t BufferLength,
 /// line.  Can be NULL if no characters were read.
 ///
 /// \returns Size of character data returned in \c LinePtr, or -1
-/// if an error occured, or EOF was reached.
+/// if an error occurred, or EOF was reached.
 extern "C" ssize_t swift_stdlib_readLine_stdin(char **LinePtr) {
   size_t Capacity = 0;
   return getline(LinePtr, &Capacity, stdin);
