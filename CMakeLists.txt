@@ -398,7 +398,7 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
   set(SWIFT_PRIMARY_VARIANT_SDK_default "LINUX")
   set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
-  configure_sdk_unix(FREEBSD "FreeBSD" "freebsd" "freebsd" "x86_64" "x86_64-freebsd10")
+  configure_sdk_unix(FREEBSD "FreeBSD" "freebsd" "freebsd" "x86_64" "x86_64-unknown-freebsd10")
 
   set(CMAKE_EXECUTABLE_FORMAT "ELF")
 
