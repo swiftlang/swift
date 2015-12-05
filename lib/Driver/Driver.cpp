@@ -2036,8 +2036,6 @@ const ToolChain *Driver::getToolChain(const ArgList &Args) const {
       TC = new toolchains::Darwin(*this, Target);
       break;
     case llvm::Triple::Linux:
-      TC = new toolchains::GenericUnix(*this, Target);
-      break;
     case llvm::Triple::FreeBSD:
       TC = new toolchains::GenericUnix(*this, Target);
       break;
