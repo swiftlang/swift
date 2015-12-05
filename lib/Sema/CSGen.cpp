@@ -2667,7 +2667,7 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
   // Remove implicit conversions from the expression.
   expr = expr->walk(SanitizeExpr(getTypeChecker()));
 
-  // Wall the expression to associate labeled arguments.
+  // Walk the expression to associate labeled arguments.
   expr->walk(ArgumentLabelWalker(*this, expr));
 
   // Walk the expression, generating constraints.
