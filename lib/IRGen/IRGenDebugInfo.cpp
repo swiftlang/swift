@@ -1000,6 +1000,12 @@ void IRGenDebugInfo::emitVariableDeclaration(
   if (Artificial || DITy->isArtificial() || DITy == InternalType)
     Flags |= llvm::DINode::FlagArtificial;
 
+  // LValues, inout args, and Archetypes are implicitly indirect by
+  // virtue of their DWARF type.
+  if (DbgTy.getType()->getKind() == TypeKind::InOut ||
+      DbgTy.getType()->hasArchetype())
+    Indirection = DirectValue;
+
   // Create the descriptor for the variable.
   llvm::DILocalVariable *Var = nullptr;
 

@@ -2957,17 +2957,6 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
                                i->getVarInfo().getArgNo());
 }
 
-/// InOut- and Archetypes are already implicitly indirect.
-static IndirectionKind getIndirectionForDebugValueAddr(swift::TypeBase *Ty) {
-  switch (Ty->getKind()) {
-  case TypeKind::InOut:
-  case TypeKind::Archetype:
-    return DirectValue;
-  default:
-    return IndirectValue;
-  }
-}
-
 void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   if (!IGM.DebugInfo)
     return;
@@ -2983,10 +2972,9 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   auto Addr = getLoweredAddress(SILVal).getAddress();
   DebugTypeInfo DbgTy(Decl, Decl->getType(), getTypeInfo(SILVal.getType()));
   // Put the value into a stack slot at -Onone and emit a debug intrinsic.
-  emitDebugVariableDeclaration(
-      emitShadowCopy(Addr, Name), DbgTy, i->getDebugScope(), Name,
-      i->getVarInfo().getArgNo(),
-      getIndirectionForDebugValueAddr(DbgTy.getType()));
+  emitDebugVariableDeclaration(emitShadowCopy(Addr, Name), DbgTy,
+                               i->getDebugScope(), Name,
+                               i->getVarInfo().getArgNo(), IndirectValue);
 }
 
 void IRGenSILFunction::visitLoadWeakInst(swift::LoadWeakInst *i) {
@@ -3400,16 +3388,11 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
     // arguments.
     if (Name == IGM.Context.Id_self.str())
       return;
-    auto Indirection = IndirectValue;
-    // LValues and inout args are implicitly indirect because of their type.
-    if (Decl->getType()->getKind() == TypeKind::LValue ||
-        Decl->getType()->getKind() == TypeKind::InOut)
-      Indirection = DirectValue;
 
     IGM.DebugInfo->emitVariableDeclaration(
         Builder, emitShadowCopy(addr.getAddress(), Name),
         DebugTypeInfo(Decl, i->getElementType().getSwiftType(), type),
-        i->getDebugScope(), Name, 0, Indirection);
+        i->getDebugScope(), Name, 0, IndirectValue);
   }
 }
 
