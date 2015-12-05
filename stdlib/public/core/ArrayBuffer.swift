@@ -244,32 +244,31 @@ extension _ArrayBuffer {
         return _native[subRange]
       }
 
-      // Look for contiguous storage in the NSArray
       let nonNative = self._nonNative
       let cocoa = _CocoaArrayWrapper(nonNative)
-      let cocoaStorageBaseAddress = cocoa.contiguousStorage(self.indices)
 
-      if cocoaStorageBaseAddress != nil {
+      // Look for contiguous storage in the NSArray
+      if let cocoaStorageBaseAddress = cocoa.contiguousStorage(self.indices) {
         return _SliceBuffer(
           owner: nonNative,
           subscriptBaseAddress: UnsafeMutablePointer(cocoaStorageBaseAddress),
           indices: subRange,
           hasNativeBuffer: false)
+      } else {
+        // No contiguous storage found; we must allocate
+        let subRangeCount = subRange.count
+        let result = _ContiguousArrayBuffer<Element>(
+          count: subRangeCount, minimumCapacity: 0)
+
+        // Tell Cocoa to copy the objects into our storage
+        cocoa.buffer.getObjects(
+          UnsafeMutablePointer(result.firstElementAddress),
+          range: _SwiftNSRange(
+            location: subRange.startIndex,
+            length: subRangeCount))
+
+        return _SliceBuffer(result, shiftedToStartIndex: subRange.startIndex)
       }
-
-      // No contiguous storage found; we must allocate
-      let subRangeCount = subRange.count
-      let result = _ContiguousArrayBuffer<Element>(
-        count: subRangeCount, minimumCapacity: 0)
-
-      // Tell Cocoa to copy the objects into our storage
-      cocoa.buffer.getObjects(
-        UnsafeMutablePointer(result.firstElementAddress),
-        range: _SwiftNSRange(
-          location: subRange.startIndex,
-          length: subRangeCount))
-
-      return _SliceBuffer(result, shiftedToStartIndex: subRange.startIndex)
     }
     set {
       fatalError("not implemented")
