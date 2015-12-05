@@ -256,12 +256,9 @@ public:
 private:
   union {
     ManagedValue IndirectValue;
-    SILDeclRef StandaloneFunction;
-    struct {
-      SILValue SelfValue;
-      SILDeclRef MethodName;
-    } Method;
+    SILDeclRef Constant;
   };
+  SILValue SelfValue;
   ArrayRef<Substitution> Substitutions;
   CanType OrigFormalOldType;
   CanType OrigFormalInterfaceType;
@@ -304,7 +301,7 @@ private:
   Callee(SILGenFunction &gen, SILDeclRef standaloneFunction,
          CanAnyFunctionType substFormalType,
          SILLocation l)
-    : kind(Kind::StandaloneFunction), StandaloneFunction(standaloneFunction),
+    : kind(Kind::StandaloneFunction), Constant(standaloneFunction),
       OrigFormalOldType(getConstantFormalType(gen, SILValue(),
                                               standaloneFunction)),
       OrigFormalInterfaceType(getConstantFormalInterfaceType(gen, SILValue(),
@@ -320,7 +317,7 @@ private:
          SILDeclRef methodName,
          CanAnyFunctionType substFormalType,
          SILLocation l)
-    : kind(methodKind), Method{selfValue, methodName},
+    : kind(methodKind), Constant(methodName), SelfValue(selfValue),
       OrigFormalOldType(getConstantFormalType(gen, selfValue, methodName)),
       OrigFormalInterfaceType(getConstantFormalInterfaceType(gen, selfValue,
                                                              methodName)),
@@ -437,9 +434,9 @@ private:
 
     // Replace it with the dynamic self type.
     OrigFormalOldType = OrigFormalInterfaceType
-      = getDynamicMethodFormalType(SGM, Method.SelfValue,
-                                   Method.MethodName.getDecl(),
-                                   Method.MethodName, methodType);
+      = getDynamicMethodFormalType(SGM, SelfValue,
+                                   Constant.getDecl(),
+                                   Constant, methodType);
 
     // Add a self clause to the substituted type.
     auto origFormalType = cast<AnyFunctionType>(OrigFormalOldType);
@@ -533,13 +530,11 @@ public:
       return 0;
 
     case Kind::StandaloneFunction:
-      return StandaloneFunction.uncurryLevel;
-
     case Kind::ClassMethod:
     case Kind::SuperMethod:
     case Kind::WitnessMethod:
     case Kind::DynamicMethod:
-      return Method.MethodName.uncurryLevel;
+      return Constant.uncurryLevel;
     }
   }
 
@@ -559,14 +554,14 @@ public:
       break;
 
     case Kind::StandaloneFunction: {
-      assert(level <= StandaloneFunction.uncurryLevel
+      assert(level <= Constant.uncurryLevel
              && "uncurrying past natural uncurry level of standalone function");
-      constant = StandaloneFunction.atUncurryLevel(level);
+      constant = Constant.atUncurryLevel(level);
 
       // If we're currying a direct reference to a class-dispatched method,
       // make sure we emit the right set of thunks.
-      if (constant->isCurried && StandaloneFunction.hasDecl())
-        if (auto func = StandaloneFunction.getAbstractFunctionDecl())
+      if (constant->isCurried && Constant.hasDecl())
+        if (auto func = Constant.getAbstractFunctionDecl())
           if (gen.getMethodDispatch(func) == MethodDispatch::Class)
             constant = constant->asDirectReference(true);
       
@@ -576,13 +571,13 @@ public:
       break;
     }
     case Kind::ClassMethod: {
-      assert(level <= Method.MethodName.uncurryLevel
+      assert(level <= Constant.uncurryLevel
              && "uncurrying past natural uncurry level of method");
-      constant = Method.MethodName.atUncurryLevel(level);
+      constant = Constant.atUncurryLevel(level);
       constantInfo = gen.getConstantInfo(*constant);
 
       // If the call is curried, emit a direct call to the curry thunk.
-      if (level < Method.MethodName.uncurryLevel) {
+      if (level < Constant.uncurryLevel) {
         SILValue ref = gen.emitGlobalFunctionRef(Loc, *constant, constantInfo);
         mv = ManagedValue::forUnmanaged(ref);
         break;
@@ -590,7 +585,7 @@ public:
 
       // Otherwise, do the dynamic dispatch inline.
       SILValue methodVal = gen.B.createClassMethod(Loc,
-                                                   Method.SelfValue,
+                                                   SelfValue,
                                                    *constant,
                                                    /*volatile*/
                                                      constant->isForeign);
@@ -599,15 +594,15 @@ public:
       break;
     }
     case Kind::SuperMethod: {
-      assert(level <= Method.MethodName.uncurryLevel
+      assert(level <= Constant.uncurryLevel
              && "uncurrying past natural uncurry level of method");
       assert(level >= 1
              && "currying 'self' of super method dispatch not yet supported");
 
-      constant = Method.MethodName.atUncurryLevel(level);
+      constant = Constant.atUncurryLevel(level);
       constantInfo = gen.getConstantInfo(*constant);
       SILValue methodVal = gen.B.createSuperMethod(Loc,
-                                                   Method.SelfValue,
+                                                   SelfValue,
                                                    *constant,
                                                    constantInfo.getSILType(),
                                                    /*volatile*/
@@ -617,13 +612,13 @@ public:
       break;
     }
     case Kind::WitnessMethod: {
-      assert(level <= Method.MethodName.uncurryLevel
+      assert(level <= Constant.uncurryLevel
              && "uncurrying past natural uncurry level of method");
-      constant = Method.MethodName.atUncurryLevel(level);
+      constant = Constant.atUncurryLevel(level);
       constantInfo = gen.getConstantInfo(*constant);
 
       // If the call is curried, emit a direct call to the curry thunk.
-      if (level < Method.MethodName.uncurryLevel) {
+      if (level < Constant.uncurryLevel) {
         SILValue ref = gen.emitGlobalFunctionRef(Loc, *constant, constantInfo);
         mv = ManagedValue::forUnmanaged(ref);
         break;
@@ -636,7 +631,7 @@ public:
       // existential type.
       SILValue OpenedExistential;
       if (!archetype->getOpenedExistentialType().isNull())
-        OpenedExistential = Method.SelfValue;
+        OpenedExistential = SelfValue;
 
       SILValue fn = gen.B.createWitnessMethod(Loc,
                                   archetype,
@@ -651,20 +646,20 @@ public:
     case Kind::DynamicMethod: {
       assert(level >= 1
              && "currying 'self' of dynamic method dispatch not yet supported");
-      assert(level <= Method.MethodName.uncurryLevel
+      assert(level <= Constant.uncurryLevel
              && "uncurrying past natural uncurry level of method");
 
-      auto constant = Method.MethodName.atUncurryLevel(level);
+      auto constant = Constant.atUncurryLevel(level);
       constantInfo = gen.getConstantInfo(constant);
 
       auto closureType =
         replaceSelfTypeForDynamicLookup(gen.getASTContext(),
                                 constantInfo.SILFnType,
-                                Method.SelfValue.getType().getSwiftRValueType(),
-                                Method.MethodName);
+                                SelfValue.getType().getSwiftRValueType(),
+                                Constant);
 
       SILValue fn = gen.B.createDynamicMethod(Loc,
-                          Method.SelfValue,
+                          SelfValue,
                           constant,
                           SILType::getPrimitiveObjectType(closureType),
                           /*volatile*/ constant.isForeign);
@@ -692,7 +687,7 @@ public:
   }
 
   SILDeclRef getMethodName() const {
-    return Method.MethodName;
+    return Constant;
   }
 
   /// Return a specialized emission function if this is a function with a known
@@ -706,7 +701,7 @@ public:
 
     switch (kind) {
     case Kind::StandaloneFunction: {
-      return SpecializedEmitter::forDecl(SGM, StandaloneFunction);
+      return SpecializedEmitter::forDecl(SGM, Constant);
     }
     case Kind::SuperMethod: {
       return SpecializedEmitter(emitPartialSuperMethod);
