@@ -694,107 +694,75 @@ Glossary
 ========
 
 ##### ABI
-  The runtime contract for using a particular API (or for an entire library),
+  - The runtime contract for using a particular API (or for an entire library),
   including things like symbol names, calling conventions, and type layout
   information. Stands for "Application Binary Interface".
 
----
-
 ##### API
-  An [entity](#entity) in a library that a [client](#client) may use, or the collection of all
+  - An [entity](#entity) in a library that a [client](#client) may use, or the collection of all
   such entities in a library. (If contrasting with [SPI](#spi), only those entities
   that are available to arbitrary clients.) Marked `public` in
   Swift. Stands for "Application Programming Interface".
 
----
-
 ##### availability context
-  The collection of library and platform versions that can be assumed, at
+  - The collection of library and platform versions that can be assumed, at
   minimum, to be present in a certain block of code. Availability contexts
   are always properly nested, and the global availability context includes
   the module's minimum deployment target and minimum dependency versions.
 
----
-
 ##### availability-pinned
-  See [Pinning](#pinning).
-
----
+  - See [Pinning](#pinning).
 
 ##### backwards-compatible
-  A modification to an API that does not break existing clients. May also
+  - A modification to an API that does not break existing clients. May also
   describe the API in question.
 
----
-
 ##### binary compatibility
-  A general term encompassing both backwards- and forwards-compatibility
+  - A general term encompassing both backwards- and forwards-compatibility
   concerns. Also known as "ABI compatibility".
 
----
-
 ##### client
-  A target that depends on a particular library. It's usually easiest to
+  - A target that depends on a particular library. It's usually easiest to
   think of this as an application, but it could be another library.
   (In certain cases, the "library" is itself an application, such as when
   using Xcode's unit testing support.)
 
----
-
 ##### duck typing
-  In Objective-C, the ability to treat a class instance as having an
+  - In Objective-C, the ability to treat a class instance as having an
   unrelated type, as long as the instance handles all messages sent to it.
   (Note that this is a dynamic constraint.)
 
----
-
 ##### entity
-  A type, function, member, or global in a Swift program.
-
----
+  - A type, function, member, or global in a Swift program.
 
 ##### forwards-compatible
-  An API that is designed to handle future clients, perhaps allowing certain
+  - An API that is designed to handle future clients, perhaps allowing certain
   changes to be made without changing the ABI.
 
----
-
 ##### fragility attribute
-  See [A Unifying Theme](#a-unifying-theme).
-
----
+  - See [A Unifying Theme](#a-unifying-theme).
 
 ##### module
-  The primary unit of code sharing in Swift. Code in a module is always built
+  - The primary unit of code sharing in Swift. Code in a module is always built
   together, though it may be spread across several source files.
 
----
-
 ##### performance assertion
-  See [Other Promises About Types](#other-promises-about-types).
-
----
+  - See [Other Promises About Types](#other-promises-about-types).
 
 ##### resilience domain
-  A grouping for code that will always be recompiled and distributed
+  - A grouping for code that will always be recompiled and distributed
   together, and can thus take advantage of details about a type
   even if it changes in the future.
 
----
-
 ##### SPI
-  A subset of [API](#api) that is only available to certain clients. Stands for
+  - A subset of [API](#api) that is only available to certain clients. Stands for
   "System Programming Interface".
 
----
-
 ##### target
-  In this document, a collection of code in a single Swift module that is
+  - In this document, a collection of code in a single Swift module that is
   built together; a "compilation unit". Roughly equivalent to a target in
   Xcode.
 
----
-
 ##### trivial
-  A value whose assignment just requires a fixed-size bit-for-bit copy
+  - A value whose assignment just requires a fixed-size bit-for-bit copy
   without any indirection or reference-counting operations.
