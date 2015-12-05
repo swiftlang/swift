@@ -1069,8 +1069,8 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
 
   auto *Preheader = Loop->getLoopPreheader();
   if (!Preheader) {
-    // TODO: create one if neccessary.
     // TODO: create one if necessary.
+
     return false;
   }
 
