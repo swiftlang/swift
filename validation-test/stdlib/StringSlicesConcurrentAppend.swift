@@ -26,12 +26,12 @@ extension String {
 
 enum ThreadID {
   case Primary
-  case Replica
+  case Secondary
 }
 
 var barrierVar: UnsafeMutablePointer<_stdlib_pthread_barrier_t> = nil
 var sharedString: String = ""
-var replicaString: String = ""
+var secondaryString: String = ""
 
 func barrier() {
   var ret = _stdlib_pthread_barrier_wait(barrierVar)
@@ -74,14 +74,14 @@ func sliceConcurrentAppendThread(tid: ThreadID) {
     expectEqual("abc", sharedString)
 
     // Verify that only one thread took ownership of the buffer.
-    if tid == .Replica {
-      replicaString = privateString
+    if tid == .Secondary {
+      secondaryString = privateString
     }
     barrier()
     if tid == .Primary {
       expectTrue(
         (privateString.bufferID == sharedString.bufferID) !=
-          (replicaString.bufferID == sharedString.bufferID))
+          (secondaryString.bufferID == sharedString.bufferID))
     }
   }
 }
@@ -95,7 +95,7 @@ StringTestSuite.test("SliceConcurrentAppend") {
   let (createRet1, tid1) = _stdlib_pthread_create_block(
     nil, sliceConcurrentAppendThread, .Primary)
   let (createRet2, tid2) = _stdlib_pthread_create_block(
-    nil, sliceConcurrentAppendThread, .Replica)
+    nil, sliceConcurrentAppendThread, .Secondary)
 
   expectEqual(0, createRet1)
   expectEqual(0, createRet2)
