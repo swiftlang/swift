@@ -222,8 +222,9 @@ static ManagedValue emitPartialSuperMethod(SILGenFunction &SGF,
 
 namespace {
 
-/// Abstractly represents a callee, and knows how to emit the entry point
-/// reference for a callee at any valid uncurry level.
+/// Abstractly represents a callee, which may be a constant or function value,
+/// and knows how to perform dynamic dispatch and reference the appropriate
+/// entry point at any valid uncurry level.
 class Callee {
 public:
   enum class Kind {
@@ -834,12 +835,28 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
                               constant, substFnType, loc);
 }
 
-/// An ASTVisitor for building SIL function calls.
+/// An ASTVisitor for decomposing a a nesting of ApplyExprs into an initial
+/// Callee and a list of CallSites. The CallEmission class below uses these
+/// to generate the actual SIL call.
 ///
-/// Nested ApplyExprs applied to an underlying curried function or method
-/// reference are flattened into a single SIL apply to the most uncurried entry
-/// point fitting the call site, avoiding pointless intermediate closure
-/// construction.
+/// Formally, an ApplyExpr in the AST always has a single argument, which may
+/// be of tuple type, possibly empty. Also, some callees have a formal type
+/// which is curried -- for example, methods have type Self -> Arg -> Result.
+///
+/// However, SIL functions take zero or more parameters and the natural entry
+/// point of a method takes Self as an additional argument, rather than
+/// returning a partial application.
+///
+/// Therefore, nested ApplyExprs applied to a constant are flattened into a
+/// single call of the most uncurried entry point fitting the call site.
+/// This avoids intermediate closure construction.
+///
+/// For example, a method reference 'self.method' decomposes into curry thunk
+/// as the callee, with a single call site '(self)'.
+///
+/// On the other hand, a call of a method 'self.method(x)(y)' with a function
+/// return type decomposes into the method's natural entry point as the callee,
+/// and two call sites, first '(x, self)' then '(y)'.
 class SILGenApply : public Lowering::ExprVisitor<SILGenApply> {
 public:
   /// The SILGenFunction that we are emitting SIL into.
@@ -1200,7 +1217,7 @@ public:
                         SILDeclRef::ConstructAtNaturalUncurryLevel,
                         SGF.SGM.requiresObjCDispatch(e->getDecl()));
 
-    // Otherwise, we have a direct call.
+    // Otherwise, we have a statically-dispatched call.
     CanFunctionType substFnType = getSubstFnType();
     ArrayRef<Substitution> subs;
     
@@ -2988,6 +3005,8 @@ namespace {
     }
   };
 
+  /// An application of possibly unevaluated arguments in the form of an
+  /// ArgumentSource to a Callee.
   class CallSite {
   public:
     SILLocation Loc;
@@ -3027,6 +3046,7 @@ namespace {
 
     bool throws() const { return Throws; }
 
+    /// Evaluate arguments and begin any inout formal accesses.
     void emit(SILGenFunction &gen, AbstractionPattern origParamType,
               ParamLowering &lowering, SmallVectorImpl<ManagedValue> &args,
               SmallVectorImpl<InOutArgument> &inoutArgs,
@@ -3039,6 +3059,7 @@ namespace {
       emitter.emitTopLevel(std::move(ArgValue), origParamType);
     }
 
+    /// Take the arguments for special processing, in place of the above.
     ArgumentSource &&forward() && {
       return std::move(ArgValue);
     }
@@ -3079,6 +3100,18 @@ namespace {
     }
   };
 
+  /// Once the Callee and CallSites have been prepared by SILGenApply,
+  /// generate SIL for a fully-formed call.
+  ///
+  /// The lowered function type of the callee defines an abstraction pattern
+  /// for evaluating argument values of tuple type directly into explosions of
+  /// scalars where possible.
+  ///
+  /// If there are more call sites than the natural uncurry level, they are
+  /// have to be applied recursively to each intermediate callee.
+  ///
+  /// Also inout formal access and parameter and result conventions are
+  /// handled here, with some special logic required for calls with +0 self.
   class CallEmission {
     SILGenFunction &gen;
 
@@ -3091,6 +3124,7 @@ namespace {
     bool AssumedPlusZeroSelf;
 
   public:
+    /// Create an emission for a call of the given callee.
     CallEmission(SILGenFunction &gen, Callee &&callee,
                  WritebackScope &&writebackScope,
                  bool assumedPlusZeroSelf = false)
@@ -3102,6 +3136,8 @@ namespace {
         AssumedPlusZeroSelf(assumedPlusZeroSelf)
     {}
 
+    /// Add a level of function application by passing in its possibly
+    /// unevaluated arguments and their formal type.
     void addCallSite(CallSite &&site) {
       assert(!applied && "already applied!");
 
@@ -3115,7 +3151,9 @@ namespace {
       // Otherwise, apply these arguments to the result of the previous call.
       extraSites.push_back(std::move(site));
     }
-
+    
+    /// Add a level of function application by passing in its possibly
+    /// unevaluated arguments and their formal type
     template<typename...T>
     void addCallSite(T &&...args) {
       addCallSite(CallSite{std::forward<T>(args)...});
@@ -3134,12 +3172,15 @@ namespace {
       uncurriedSites[0].convertToPlusOneFromPlusZero(gen);
     }
 
+    /// Emit the fully-formed call.
     ManagedValue apply(SGFContext C = SGFContext()) {
       assert(!applied && "already applied!");
 
       applied = true;
 
-      // Get the callee value at the needed uncurry level.
+      // Get the callee value at the needed uncurry level, uncurrying as
+      // much as possible. If the number of calls is less than the natural
+      // uncurry level, the callee emission might create a curry thunk.
       unsigned uncurryLevel = callee.getNaturalUncurryLevel() - uncurries;
 
       // Get either the specialized emitter for a known function, or the
@@ -3263,6 +3304,8 @@ namespace {
         args = {};
 
         // Emit the uncurried call.
+
+        // Handle a regular call.
         if (!specializedEmitter) {
           result = gen.emitApply(uncurriedLoc.getValue(), mv,
                                  callee.getSubstitutions(),
@@ -3273,6 +3316,7 @@ namespace {
                                  initialOptions, None,
                                  foreignError,
                                  uncurriedContext);
+        // Handle a specialized emitter operating on evaluated arguments.
         } else if (specializedEmitter->isLateEmitter()) {
           auto emitter = specializedEmitter->getLateEmitter();
           result = emitter(gen,
@@ -3281,6 +3325,7 @@ namespace {
                            uncurriedArgs,
                            formalApplyType,
                            uncurriedContext);
+        // Special case for superclass method calls.
         } else if (specializedEmitter->isLatePartialSuperEmitter()) {
           auto emitter = specializedEmitter->getLatePartialSuperEmitter();
           result = emitter(gen,
@@ -3290,6 +3335,8 @@ namespace {
                            uncurriedArgs,
                            formalApplyType,
                            uncurriedContext);
+
+        // Builtins.
         } else {
           assert(specializedEmitter->isNamedBuiltin());
           auto builtinName = specializedEmitter->getBuiltinName();

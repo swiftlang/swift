@@ -37,7 +37,7 @@ class SILGenModule;
 /// Some kind of specialized emitter for a builtin function.
 class SpecializedEmitter {
 public:
-  /// A special function for emitting a call after the arguments
+  /// A special function for emitting a call before the arguments
   /// have already been emitted.
   using EarlyEmitter = ManagedValue (SILGenFunction &,
                                      SILLocation,
