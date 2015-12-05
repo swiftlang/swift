@@ -102,7 +102,7 @@ import SwiftShims
 /// any sequence of mutating operations causes elements to be copied
 /// into unique, contiguous storage which may cost `O(N)` time and
 /// space, where `N` is the length of the string representation (or
-/// more, if the underlying `NSString` is has unusual performance
+/// more, if the underlying `NSString` has unusual performance
 /// characteristics).
 public struct String {
   /// An empty `String`.
