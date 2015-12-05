@@ -9,8 +9,17 @@ import Darwin
 import Glibc
 #endif
 
+// Swift.String has an optimization that allows us to append to a shared string
+// buffer.  Make sure that it works correctly when two threads try to append to
+// different non-shared strings that point to the same shared buffer.
+
 var StringTestSuite = TestSuite("String")
 
+// Specific to test:
+// We need to know what the internal ID of the buffer is so we can check that only
+// one thread owns a buffer.
+//
+// TODO: explain why we're looking for a specific capacity.
 extension String {
   var bufferID: UInt {
     return unsafeBitCast(_core._owner, UInt.self)
@@ -20,18 +29,16 @@ extension String {
   }
 }
 
-// Swift.String has an optimization that allows us to append to a shared string
-// buffer.  Make sure that it works correctly when two threads try to append to
-// different non-shared strings that point to the same shared buffer.
-
+// OwnerThread is the thread we expect to end up owning sharedString
+// OtherThread is the thread we expect to *not* own sharedString
 enum ThreadID {
-  case Leader
-  case Follower
+  case OwnerThread
+  case OtherThread
 }
 
 var barrierVar: UnsafeMutablePointer<_stdlib_pthread_barrier_t> = nil
 var sharedString: String = ""
-var followerString: String = ""
+var otherThreadString: String = ""
 
 func barrier() {
   var ret = _stdlib_pthread_barrier_wait(barrierVar)
@@ -41,7 +48,7 @@ func barrier() {
 func sliceConcurrentAppendThread(tid: ThreadID) {
   for i in 0..<100 {
     barrier()
-    if tid == .Leader {
+    if tid == .OwnerThread {
       // Get a fresh buffer.
       sharedString = ""
       sharedString.appendContentsOf("abc")
@@ -52,12 +59,15 @@ func sliceConcurrentAppendThread(tid: ThreadID) {
     barrier()
 
     // Get a private string.
+    // we *should* be able to change this as we wish without modifying the underlying string.
     var privateString = sharedString
 
     barrier()
 
     // Append to the private string.
-    if tid == .Leader {
+    // This should invoke a deep copy somewhere along the line,
+    // but NOT change the underlying sharedString buffer.
+    if tid == .OwnerThread {
       privateString.appendContentsOf("def")
     } else {
       privateString.appendContentsOf("ghi")
@@ -66,22 +76,33 @@ func sliceConcurrentAppendThread(tid: ThreadID) {
     barrier()
 
     // Verify that contents look good.
-    if tid == .Leader {
+    // if our current thread is the OwnerThread, it should be "abcdef"
+    // if our current thread is NOT OwnerThread, it should be "abcghi"
+    // However, sharedString should NOT be changed, and should be "abc" no matter what.
+    if tid == .OwnerThread {
       expectEqual("abcdef", privateString)
     } else {
       expectEqual("abcghi", privateString)
     }
+    
+    // sharedString should not have been touched.
     expectEqual("abc", sharedString)
 
     // Verify that only one thread took ownership of the buffer.
-    if tid == .Follower {
-      followerString = privateString
+    if tid == .OtherThread {
+      otherThreadString = privateString
     }
     barrier()
-    if tid == .Leader {
+    if tid == .OwnerThread {
+      // We expect that 
+      // privateString.bufferID == sharedString.bufferID
+      //  - OR - 
+      // otherThreadString.bufferID == sharedString.bufferID
+      //
+      // but not both. 
       expectTrue(
         (privateString.bufferID == sharedString.bufferID) !=
-          (followerString.bufferID == sharedString.bufferID))
+          (otherThreadString.bufferID == sharedString.bufferID))
     }
   }
 }
