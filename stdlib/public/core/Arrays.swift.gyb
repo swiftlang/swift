@@ -140,7 +140,7 @@ if True:
 /// sequence of mutating operations causes elements to be copied into
 /// unique, contiguous storage which may cost `O(N)` time and space,
 /// where `N` is the length of the array (or more, if the underlying
-/// `NSArray` is has unusual performance characteristics).
+/// `NSArray` has unusual performance characteristics).
 ///
 /// Bridging to Objective-C
 /// -----------------------
