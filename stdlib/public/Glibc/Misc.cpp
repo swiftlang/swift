@@ -1,4 +1,4 @@
-//===--- Misc.c - Glibc overlay helpers -----------------------------------===//
+//===--- Misc.cpp - Glibc overlay helpers ---------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -14,11 +14,11 @@
 
 extern "C" int
 _swift_Glibc_fcntl(int fd, int cmd, int value) {
-	return fcntl(fd, cmd, value);
+  return fcntl(fd, cmd, value);
 }
 
 extern "C" int
 _swift_Glibc_fcntlPtr(int fd, int cmd, void* ptr) {
-	return fcntl(fd, cmd, ptr);
+  return fcntl(fd, cmd, ptr);
 }
 
