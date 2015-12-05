@@ -788,7 +788,7 @@ public struct NSIndexSetGenerator : GeneratorType {
   public typealias Element = Int
 
   internal let _set: NSIndexSet
-  internal var _first: Bool = true
+  internal var _first = true
   internal var _current: Int?
 
   internal init(set: NSIndexSet) {

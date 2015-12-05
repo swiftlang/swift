@@ -600,7 +600,7 @@ public func XCTAssertEqualWithAccuracy<T : FloatingPointType>(@autoclosure expre
     let expressionValue1 = expressionValue1Optional!
     let expressionValue2 = expressionValue2Optional!
     
-    var equalWithAccuracy: Bool = false
+    var equalWithAccuracy = false
     
     switch (expressionValue1, expressionValue2, accuracy) {
     case let (expressionValue1Double as Double, expressionValue2Double as Double, accuracyDouble as Double):
@@ -668,7 +668,7 @@ public func XCTAssertNotEqualWithAccuracy<T : FloatingPointType>(@autoclosure ex
     let expressionValue1 = expressionValue1Optional!
     let expressionValue2 = expressionValue2Optional!
     
-    var notEqualWithAccuracy: Bool = false
+    var notEqualWithAccuracy = false
     
     switch (expressionValue1, expressionValue2, accuracy) {
     case let (expressionValue1Double as Double, expressionValue2Double as Double, accuracyDouble as Double):

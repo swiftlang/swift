@@ -14,8 +14,8 @@ import SwiftShims
 
 public struct _FDInputStream {
   public let fd: CInt
-  public var isClosed: Bool = false
-  public var isEOF: Bool = false
+  public var isClosed = false
+  public var isEOF = false
   internal var _buffer = [UInt8](count: 256, repeatedValue: 0)
   internal var _bufferUsed: Int = 0
 
@@ -93,7 +93,7 @@ public struct _Stderr : OutputStreamType {
 
 public struct _FDOutputStream : OutputStreamType {
   public let fd: CInt
-  public var isClosed: Bool = false
+  public var isClosed = false
 
   public init(fd: CInt) {
     self.fd = fd
