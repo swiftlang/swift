@@ -713,25 +713,20 @@ bool ConstraintGraph::contractEdges() {
             auto rep2 = CS.getRepresentative(tyvar2);
 
             if (rep1 != rep2) {
+              if (CS.TC.getLangOpts().DebugConstraintSolver) {
+                auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+                if (CS.solverState)
+                  log.indent(CS.solverState->depth * 2);
 
-              if (rep1->getImpl().canBindToLValue() ==
-                  rep2->getImpl().canBindToLValue()) {
-
-                if (CS.TC.getLangOpts().DebugConstraintSolver) {
-                  auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
-                  if (CS.solverState)
-                    log.indent(CS.solverState->depth * 2);
-
-                  log << "Contracting constraint ";
-                  constraint->print(log, &CS.getASTContext().SourceMgr);
-                  log << "\n";
-                }
-
-                // Merge the edges and remove the constraint.
-                CS.mergeEquivalenceClasses(rep1, rep2);
-                didContractEdges = true;
-                removeEdge(constraint);
+                log << "Contracting constraint ";
+                constraint->print(log, &CS.getASTContext().SourceMgr);
+                log << "\n";
               }
+
+              // Merge the edges and remove the constraint.
+              CS.mergeEquivalenceClasses(rep1, rep2);
+              didContractEdges = true;
+              removeEdge(constraint);
             }
           }
         }

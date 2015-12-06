@@ -1291,6 +1291,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           assignFixedType(typeVar1, type2);
         }
         return SolutionKind::Solved;
+      } else if (typeVar1 && typeVar2) {
+        auto rep1 = getRepresentative(typeVar1);
+        auto rep2 = getRepresentative(typeVar2);
+        if (rep1 == rep2) {
+          return SolutionKind::Solved;
+        }
       }
       return SolutionKind::Unsolved;
     }
