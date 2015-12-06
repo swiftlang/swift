@@ -84,7 +84,7 @@ void IterativeTypeChecker::satisfy(TypeCheckRequest request) {
 
   // Add this request to the stack of active requests.
   ActiveRequests.push_back(request);
-  defer([&] { ActiveRequests.pop_back(); });
+  defer { ActiveRequests.pop_back(); };
 
   while (true) {
     // Process this requirement, enumerating dependencies if anything else needs
