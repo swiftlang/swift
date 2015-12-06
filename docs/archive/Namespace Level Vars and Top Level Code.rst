@@ -68,10 +68,10 @@ does top level code and multiple actors.  As such, the logical semantics are:
    lazily.
 3. Source files that have TLC are each initialized in a deterministic order: The
    dependence graph of domains is respected (lower level domains are initialized
-   before dependent ones), and the source files withing a domain are initialized
+   before dependent ones), and the source files within a domain are initialized
    in some deterministic order (perhaps according to their filename or
    something, TBD).
-4. Within a source file with TLC, the TLC is run top down in determinstic order
+4. Within a source file with TLC, the TLC is run top down in deterministic order
    whenever the file's initializer is run.  This initializer executes in the
    context of the "first" actor, which is created on behalf of the program by
    the runtime library.
