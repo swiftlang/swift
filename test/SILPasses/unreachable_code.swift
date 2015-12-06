@@ -3,7 +3,7 @@ func ifFalse() -> Int {
   if false { // expected-note {{always evaluates to false}}
     return 0 // expected-warning {{will never be executed}}
   } else {
-    return 1  
+    return 1
   }
 }
 
@@ -22,7 +22,7 @@ func userCode() {}
 func whileTrue() {
   var x = 0
   while true { // expected-note {{always evaluates to true}}
-    x++
+    x += 1
   }
   userCode() // expected-warning {{will never be executed}}
 }
@@ -38,9 +38,9 @@ func whileTrueReachable(v: Int) -> () {
     if v == 0 {
       break
     }
-    x++
+    x += 1
   }
-  x--  
+  x -= 1
 }
 
 func whileTrueTwoPredecessorsEliminated() -> () {
@@ -49,20 +49,20 @@ func whileTrueTwoPredecessorsEliminated() -> () {
     if false {
       break
     }
-    x++
+    x += 1
   }
   userCode()  // expected-warning {{will never be executed}}
 }
 
 func unreachableBranch() -> Int {
   if false { // expected-note {{always evaluates to false}}
-    // FIXME: It'd be nice if the warning were on 'if true' instead of the 
+    // FIXME: It'd be nice if the warning were on 'if true' instead of the
     // body.
     if true {
       return 0 // expected-warning {{will never be executed}}
-    } 
+    }
   } else {
-    return 1  
+    return 1
   }
 }
 
@@ -81,8 +81,8 @@ func testIfTrueTransparent() {
 }
 
 // We should not report unreachable user code inside generic instantiations.
-// TODO: This test should start failing after we add support for generic 
-// specialization in SIL. To fix it, add generic instantiation detection 
+// TODO: This test should start failing after we add support for generic
+// specialization in SIL. To fix it, add generic instantiation detection
 // within the DeadCodeElimination pass to address the corresponding FIXME note.
 protocol HavingGetCond {
   func getCond() -> Bool
@@ -119,52 +119,52 @@ func testSwitchEnum(xi: Int) -> Int {
   case .One:
     userCode() // expected-note {{will never be executed}}
   case .Two:
-    x--  
+    x -= 1
   case .Three:
-    x--  
+    x -= 1
   }
 
   switch cond { // no warning
   default:
-    x++
+    x += 1
   }
 
   switch cond { // no warning
-  case .Two: 
-    x++
+  case .Two:
+    x += 1
   }
 
   switch cond {
   case .One:
-    x++
+    x += 1
   } // expected-error{{switch must be exhaustive}}
 
   switch cond {
   case .One:
-    x++
+    x += 1
   case .Three:
-    x++
+    x += 1
   } // expected-error{{switch must be exhaustive}}
 
   switch cond { // expected-warning{{switch condition evaluates to a constant}}
-  case .Two: 
-    x++
-  default: 
+  case .Two:
+    x += 1
+  default:
     userCode() // expected-note{{will never be executed}}
   }
 
   switch cond { // expected-warning{{switch condition evaluates to a constant}}
-  case .One: 
+  case .One:
     userCode() // expected-note{{will never be executed}}
-  default: 
-    x--
+  default:
+    x -= 1
   }
-  
+
   return x;
 }
 
 
-// Treat nil as .None and do not emit false 
+// Treat nil as .None and do not emit false
 // non-exhaustive warning.
 func testSwitchEnumOptionalNil(x: Int?) -> Int {
   switch x { // no warning
@@ -180,27 +180,27 @@ func testSwitchEnumOptionalNil(x: Int?) -> Int {
 func testSwitchEnumBool(b: Bool, xi: Int) -> Int {
   var x = xi
   let Cond = b
-  
+
   switch Cond { // no warning
   default:
-    x++
+    x += 1
   }
 
   switch Cond {
   case true:
-    x++
+    x += 1
   } // expected-error{{switch must be exhaustive}}
 
   switch Cond {
   case false:
-    x++
+    x += 1
   } // expected-error{{switch must be exhaustive}}
 
   switch Cond { // no warning
   case true:
-    x++
+    x += 1
   case false:
-    x--
+    x -= 1
   }
 
   return x
@@ -210,57 +210,57 @@ func testSwitchOptionalBool (b:Bool?, xi: Int) -> Int {
   var x = xi
   switch b { // No warning
   case .Some(true):
-    x++
+    x += 1
   case .Some(false):
-    x++
+    x += 1
   case .None:
-    x--
+    x -= 1
   }
 
   switch b {
   case .Some(true):
-    x++
+    x += 1
   case .None:
-    x-- 
+    x -= 1
   } // expected-error{{switch must be exhaustive}}
 
   return xi
 }
 
-// Do not emit false non-exhaustive warnings if both 
+// Do not emit false non-exhaustive warnings if both
 // true and false are covered for a boolean element of a tuple.
 func testSwitchEnumBoolTuple(b1: Bool, b2: Bool, xi: Int) -> Int {
   var x = xi
   let Cond = (b1, b2)
-  
+
   switch Cond { // no warning
   default:
-    x++
+    x += 1
   }
 
   switch Cond {
   case (true, true):
-    x++
+    x += 1
     // FIXME: Two expect statements are written, because unreachable diagnostics produces N errors
     // for non-exhaustive switches on tuples of N elements
   } // expected-error{{switch must be exhaustive}} expected-error{{switch must be exhaustive}}
 
   switch Cond {
   case (false, true):
-    x++
+    x += 1
     // FIXME: Two expect statements are written, because unreachable diagnostics produces N errors
     // for non-exhaustive switches on tuples of N elements
   } // expected-error{{switch must be exhaustive}} expected-error{{switch must be exhaustive}}
 
   switch Cond { // no warning
   case (true, true):
-    x++
+    x += 1
   case (true, false):
-    x++
+    x += 1
   case (false, true):
-    x--
+    x -= 1
   case (false, false):
-    x--
+    x -= 1
   }
 
   return x
@@ -280,7 +280,7 @@ func intConstantTest() -> Int{
   if y == 1 { // expected-note {{condition always evaluates to true}}
     return y
   }
-  
+
   return 1 // expected-warning {{will never be executed}}
 }
 
@@ -300,12 +300,12 @@ test_single_statement_closure() {
 }
 
 class C { }
-class Super { 
+class Super {
   var s = C()
   deinit { // no-warning
   }
 }
-class D : Super { 
+class D : Super {
   var c = C()
   deinit { // no-warning
     exit()

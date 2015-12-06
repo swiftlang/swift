@@ -44,7 +44,7 @@ class TestClass {
 
   init() {
     lazy var localvar = 42  // expected-error {{lazy is only valid for members of a struct or class}} {{5-10=}}
-    localvar++
+    localvar += 1
     _ = localvar
   }
 }
@@ -56,7 +56,7 @@ struct StructTest {
   mutating func f1() -> Int {
     return p1
   }
-  
+
   // expected-note @+1 {{mark method 'mutating' to make 'self' mutable}} {{3-3=mutating }}
   func f2() -> Int {
     return p1  // expected-error {{cannot use mutating getter on immutable value: 'self' is immutable}}
@@ -75,5 +75,3 @@ class CaptureListInLazyProperty {
   lazy var closure: () -> Int = { [weak self] in return self!.i }
   var i = 42
 }
-
-

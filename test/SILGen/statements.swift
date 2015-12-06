@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -parse-as-library -emit-silgen -verify %s | FileCheck %s
 
-class MyClass { 
+class MyClass {
   func foo() { }
 }
 
@@ -41,20 +41,20 @@ func assignment(x: Int, y: Int) {
 
 func if_test(x: Int, y: Bool) {
   if (y) {
-   bar(x);
+   bar(x)
   }
-  bar(x);
+  bar(x)
 }
 
 // CHECK-LABEL: sil hidden  @_TF10statements7if_test
 
 func if_else(x: Int, y: Bool) {
   if (y) {
-   bar(x);
+   bar(x)
   } else {
-   foo(x, y);
+   foo(x, y)
   }
-  bar(x);
+  bar(x)
 }
 
 // CHECK-LABEL: sil hidden  @_TF10statements7if_else
@@ -62,14 +62,14 @@ func if_else(x: Int, y: Bool) {
 func nested_if(x: Int, y: Bool, z: Bool) {
   if (y) {
     if (z) {
-      bar(x);
+      bar(x)
     }
   } else {
     if (z) {
-      foo(x, y);
+      foo(x, y)
     }
   }
-  bar(x);
+  bar(x)
 }
 
 // CHECK-LABEL: sil hidden  @_TF10statements9nested_if
@@ -77,11 +77,11 @@ func nested_if(x: Int, y: Bool, z: Bool) {
 func nested_if_merge_noret(x: Int, y: Bool, z: Bool) {
   if (y) {
     if (z) {
-      bar(x);
+      bar(x)
     }
   } else {
     if (z) {
-      foo(x, y);
+      foo(x, y)
     }
   }
 }
@@ -91,15 +91,15 @@ func nested_if_merge_noret(x: Int, y: Bool, z: Bool) {
 func nested_if_merge_ret(x: Int, y: Bool, z: Bool) -> Int {
   if (y) {
     if (z) {
-      bar(x);
+      bar(x)
     }
-    return 1;
+    return 1
   } else {
     if (z) {
-      foo(x, y);
+      foo(x, y)
     }
   }
-  return 2;
+  return 2
 }
 
 // CHECK-LABEL: sil hidden  @_TF10statements19nested_if_merge_ret
@@ -118,8 +118,8 @@ func else_break(x: Int, y: Bool, z: Bool) {
 func loop_with_break(x: Int, _ y: Bool, _ z: Bool) -> Int {
   while (x > 2) {
    if (y) {
-     bar(x);
-     break;
+     bar(x)
+     break
    }
   }
 }
@@ -129,12 +129,12 @@ func loop_with_break(x: Int, _ y: Bool, _ z: Bool) -> Int {
 func loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
   while (x > 2) {
     if (y) {
-     bar(x);
-     continue;
+     bar(x)
+     continue
     }
-    loop_with_break(x, y, z);
+    loop_with_break(x, y, z)
   }
-  bar(x);
+  bar(x)
 }
 
 // CHECK-LABEL: sil hidden  @_TF10statements18loop_with_continue
@@ -142,16 +142,16 @@ func loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
 func do_loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
   repeat {
     if (x < 42) {
-     bar(x);
-     continue;
+     bar(x)
+     continue
     }
-    loop_with_break(x, y, z);
+    loop_with_break(x, y, z)
   }
-  while (x > 2);
-  bar(x);
+  while (x > 2)
+  bar(x)
 }
 
-// CHECK-LABEL: sil hidden  @_TF10statements21do_loop_with_continue 
+// CHECK-LABEL: sil hidden  @_TF10statements21do_loop_with_continue
 
 
 // CHECK-LABEL: sil hidden  @{{.*}}for_loops1
@@ -160,17 +160,15 @@ func for_loops1(x: Int, c: Bool) {
   for i in 1..<100 {
     markUsed(i)
   }
-  
-  for ; x < 40;  {
+
+  while (x < 40) {
    markUsed(x)
-   ++x
+   x += 1
   }
-  
-  for var i = 0; i < 100; ++i {
-  }
-  
-  for let i = 0; i < 100; i {
-  }
+
+  for i in 0..<100 {}
+
+  for i in 0..<100 {}
 }
 
 // CHECK-LABEL: sil hidden  @{{.*}}for_loops2
@@ -185,7 +183,7 @@ func for_loops2() {
     obj.foo()
   }
 
-  return 
+  return
 }
 
 func void_return() {
@@ -240,8 +238,8 @@ func for_each_loop(x: [C]) {
 // CHECK-LABEL: sil hidden @{{.*}}test_break
 func test_break(i : Int) {
   switch i {
-  case (let x) where x != 17: 
-    if x == 42 { break } 
+  case (let x) where x != 17:
+    if x == 42 { break }
     markUsed(x)
   default:
     break
@@ -362,7 +360,7 @@ func test_do() {
     // CHECK: [[OBJ:%.*]] = apply [[CTOR]](
     let obj = MyClass()
     _ = obj
-    
+
     // CHECK: [[BAR:%.*]] = function_ref @_TF10statements3barFSiT_
     // CHECK: integer_literal $Builtin.Int2048, 1
     // CHECK: apply [[BAR]](
@@ -448,7 +446,7 @@ func defer_test1() {
   defer { callee1() }
   defer { callee2() }
   callee3()
-  
+
   // CHECK: [[C3:%.*]] = function_ref @{{.*}}callee3FT_T_
   // CHECK: apply [[C3]]
   // CHECK: [[C2:%.*]] = function_ref @{{.*}}_TFF10statements11defer_test1FT_T_L0_6$deferFT_T_
@@ -468,7 +466,7 @@ func defer_test2(cond : Bool) {
   // CHECK: apply [[C3]]
   // CHECK: br [[LOOP:bb[0-9]+]]
   callee3()
-  
+
 // CHECK: [[LOOP]]:
 // test the condition.
 // CHECK:  [[CONDTRUE:%.*]] = apply {{.*}}(%0)
@@ -485,7 +483,7 @@ func defer_test2(cond : Bool) {
     callee2()
     break
   }
-  
+
 // CHECK: [[EXIT]]:
 // CHECK: [[C3:%.*]] = function_ref @{{.*}}callee3FT_T_
 // CHECK: apply [[C3]]
@@ -690,4 +688,3 @@ func let_else_tuple_binding(a : (Int, Int)?) -> Int {
   // CHECK-NEXT:   debug_value %6 : $Int  // let y
   // CHECK-NEXT:   return %4 : $Int
 }
-

@@ -4,7 +4,7 @@
 var x: Int! = 0
 x! = 2
 print(x) // CHECK: 2
-x!++
+x! += 1
 print(x) // CHECK-NEXT: 3
 
 var sequences = ["fibonacci": [1, 1, 2, 3, 0]]

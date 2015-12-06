@@ -7,17 +7,17 @@ import Foundation
 
 var activeXObjects: Int = 0
 
-class X { 
+class X {
   var value: Int
 
-  init(value: Int) { 
-    self.value = value 
+  init(value: Int) {
+    self.value = value
 
-    ++activeXObjects
+    activeXObjects += 1
   }
 
   deinit {
-    --activeXObjects
+    activeXObjects -= 1
   }
 }
 
@@ -30,7 +30,7 @@ func testConvertArrayOfImplicitUnwrappedClass() {
   let classNSArr1 = classArr1 as NSArray
   // CHECK: Class array count = 2
   print("Class array count = \(classNSArr1.count)")
- 
+
   // CHECK: Element 0 has value 1
   // CHECK: Element 1 has value 2
   for (index, obj) in classNSArr1.enumerate() {
@@ -117,7 +117,7 @@ func testConvertToArrayOfImplicitUnwrappedClass() {
   nsarr.addObject(X(value: 2))
 
   var arr: [X!] = _convertNSArrayToArray(nsarr)
-  
+
   // CHECK: Class array count = 2
   // CHECK: Element 0 has value X(1)
   // CHECK: Element 1 has value X(2)
@@ -141,7 +141,7 @@ func testConvertToArrayOfImplicitUnwrappedString() {
   nsarr.addObject(NSString(string: "World"))
 
   var arr: [String!] = _convertNSArrayToArray(nsarr)
-  
+
   // CHECK: String array count = 2
   // CHECK: Element 0 has value Hello
   // CHECK: Element 1 has value World

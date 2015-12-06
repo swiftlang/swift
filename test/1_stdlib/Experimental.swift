@@ -38,8 +38,8 @@ ExperimentalTestSuite.test("ComposeOperator/CountCalls") {
 
   var aCalled = 0
   var bCalled = 0
-  func a(_: A) -> B { ++aCalled; return B() }
-  func b(_: B) -> C { ++bCalled; return C() }
+  func a(_: A) -> B { aCalled += 1; return B() }
+  func b(_: B) -> C { bCalled += 1; return C() }
 
   var result = b ∘ a
   expectEqual(0, aCalled)
@@ -56,8 +56,8 @@ struct C {}
 
 var aCalled = 0
 var bCalled = 0
-func a(_: A) -> B { ++aCalled; return B() }
-func b(_: B) -> C { ++bCalled; return C() }
+func a(_: A) -> B { aCalled += 1; return B() }
+func b(_: B) -> C { bCalled += 1; return C() }
 
 ExperimentalTestSuite.test("ComposeOperator/CountCalls/Workaround") {
   var result = b ∘ a
@@ -69,4 +69,3 @@ ExperimentalTestSuite.test("ComposeOperator/CountCalls/Workaround") {
 }
 
 runAllTests()
-

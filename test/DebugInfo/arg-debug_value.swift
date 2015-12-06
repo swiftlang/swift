@@ -11,5 +11,5 @@ class Foo {
   // CHECK-NEXT: %[[SELF:.*]] = alloca
   // CHECK-NEXT: store %C4main3Foo* %0, %C4main3Foo** %[[SELF]]
   // CHECK-NEXT: call void @llvm.dbg.declare({{.*}}%[[SELF]]
-	init () { x = g++ }
+	init () { x = g; g += 1 }
 }

@@ -6,7 +6,7 @@ extension SequenceType {
   final var myCount: Int {
     var result = 0
     for _ in self {
-      ++result
+	  result += 1
     }
     return result
   }
@@ -57,7 +57,7 @@ extension CollectionType where Self.Generator.Element : Equatable {
 print(["a", "b", "c", "d", "e"].myIndexOf("d")!)
 
 extension SequenceType {
-  final public func myEnumerate() -> EnumerateSequence<Self> { 
+  final public func myEnumerate() -> EnumerateSequence<Self> {
     return EnumerateSequence(self)
   }
 }
@@ -72,7 +72,7 @@ for (index, element) in ["a", "b", "c"].myEnumerate() {
 extension SequenceType {
   final public func myReduce<T>(
     initial: T, @noescape combine: (T, Self.Generator.Element) -> T
-  ) -> T { 
+  ) -> T {
     var result = initial
     for value in self {
       result = combine(result, value)

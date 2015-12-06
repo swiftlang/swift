@@ -35,7 +35,7 @@
 //
 //    Dictionary<K,V> (a struct)
 //    +---+
-//    | * | 
+//    | * |
 //    +-|-+
 //      |
 //      V  DictionaryBufferOwner<K,V>
@@ -60,7 +60,7 @@
 //
 //    Dictionary<K,V> (a struct)
 //    +---+
-//    | * | 
+//    | * |
 //    +-|-+
 //      |  +---+
 //      |  |   |
@@ -116,11 +116,11 @@ struct FixedSizedRefArrayOfOptional<T>
 {
   typealias Storage = FixedSizedRefArrayOfOptionalStorage<T>
   let buffer: Storage.Buffer
-  
+
   init(capacity: Int)
   {
     buffer = Storage.Buffer(Storage.self, capacity, capacity)
-    for var i = 0; i < capacity; ++i {
+	for i in 0..<capacity {
       (buffer.baseAddress + i).initialize(.None)
     }
 
@@ -181,11 +181,12 @@ struct DictionaryIndex<Element> : BidirectionalIndexType {
   typealias Index = DictionaryIndex<Element>
 
   func predecessor() -> Index {
-    var j = self.offset
-    while --j > 0 {
+    var j = self.offset - 1
+    while j > 0 {
       if buffer[j] != nil {
         return Index(buffer: buffer, offset: j)
       }
+	  j -= 1
     }
     return self
   }
@@ -200,7 +201,7 @@ struct DictionaryIndex<Element> : BidirectionalIndexType {
         break
       }
       // end workaround
-      ++i
+      i += 1
     }
     return Index(buffer: buffer, offset: i)
   }
@@ -275,7 +276,7 @@ struct Dictionary<Key: Hashable, Value> : CollectionType, SequenceType {
       _buffer[i.offset] = Element(key: key, value: value)
 
       if !found {
-        ++_count
+        _count += 1
       }
     }
   }
@@ -331,7 +332,7 @@ struct Dictionary<Key: Hashable, Value> : CollectionType, SequenceType {
 
   func _find(k: Key, startBucket: Int) -> (Index,Bool) {
     var bucket = startBucket
-    
+
 
     // The invariant guarantees there's always a hole, so we just loop
     // until we find one.
@@ -360,7 +361,7 @@ struct Dictionary<Key: Hashable, Value> : CollectionType, SequenceType {
 
     // remove the element
     _buffer[pos.offset] = .None
-    --_count
+    _count -= 1
 
     // If we've put a hole in a chain of contiguous elements, some
     // element after the hole may belong where the new hole is.

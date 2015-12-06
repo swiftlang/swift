@@ -17,10 +17,10 @@ import MirrorObjC
 var nsObjectCanaryCount = 0
 @objc class NSObjectCanary : NSObject {
   override init() {
-    ++nsObjectCanaryCount
+    nsObjectCanaryCount += 1
   }
   deinit {
-    --nsObjectCanaryCount
+    nsObjectCanaryCount -= 1
   }
 }
 
@@ -31,10 +31,10 @@ struct NSObjectCanaryStruct {
 var swiftObjectCanaryCount = 0
 class SwiftObjectCanary {
   init() {
-    ++swiftObjectCanaryCount
+    swiftObjectCanaryCount += 1
   }
   deinit {
-    --swiftObjectCanaryCount
+    swiftObjectCanaryCount -= 1
   }
 }
 
@@ -825,7 +825,7 @@ Runtime.test("casting AnyObject to class metatypes") {
   do {
     var nso: NSObject = SomeNSObjectSubclass()
     expectTrue(nso as? AnyClass == nil)
-    
+
     nso = (SomeNSObjectSubclass.self as AnyObject) as! NSObject
     expectTrue(nso as? Any.Type == SomeNSObjectSubclass.self)
     expectTrue(nso as? AnyClass == SomeNSObjectSubclass.self)
@@ -909,14 +909,14 @@ RuntimeFoundationWrappers.test("_stdlib_NSObject_isEqual/NoLeak") {
 var nsStringCanaryCount = 0
 @objc class NSStringCanary : NSString {
   override init() {
-    ++nsStringCanaryCount
+    nsStringCanaryCount += 1
     super.init()
   }
   required init(coder: NSCoder) {
     fatalError("don't call this initializer")
   }
   deinit {
-    --nsStringCanaryCount
+    nsStringCanaryCount -= 1
   }
   @objc override var length: Int {
     return 0
@@ -2150,8 +2150,8 @@ Reflection.test("TupleMirror/NoLeak") {
   }
 }
 
-// A struct type and class type whose NominalTypeDescriptor.FieldNames 
-// data is exactly eight bytes long. FieldNames data of exactly 
+// A struct type and class type whose NominalTypeDescriptor.FieldNames
+// data is exactly eight bytes long. FieldNames data of exactly
 // 4 or 8 or 16 bytes was once miscompiled on arm64.
 struct EightByteFieldNamesStruct {
   let abcdef = 42
@@ -2266,7 +2266,7 @@ func computeCountLeadingZeroes(x: Int64) -> Int64 {
   var r: Int64 = 64
   while x != 0 {
     x >>= 1
-    r--
+    r -= 1
   }
   return r
 }
@@ -2396,4 +2396,3 @@ AvailabilityVersionsTestSuite.test("_stdlib_isOSVersionAtLeast") {
 }
 
 runAllTests()
-

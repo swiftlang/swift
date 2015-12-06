@@ -17,8 +17,8 @@ protocol OtherClassProtocol : class {
 }
 
 class NoisyError : ErrorType, OtherProtocol, OtherClassProtocol {
-  init() { ++NoisyErrorLifeCount }
-  deinit { ++NoisyErrorDeathCount }
+  init() { NoisyErrorLifeCount += 1 }
+  deinit { NoisyErrorDeathCount += 1}
 
   let _domain = "NoisyError"
   let _code = 123

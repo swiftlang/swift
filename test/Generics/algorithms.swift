@@ -41,7 +41,7 @@ func count<R : GeneratorType where R.Element : Eq>
   var result = 0
   for x in GeneratorSequence(range) {
     if x == value {
-      ++result
+      result += 1
     }
   }
   return result
@@ -53,7 +53,7 @@ func countIf<
   var result = 0
   for x in GeneratorSequence(range) {
     if predicate(x) {
-      ++result
+      result += 1
     }
   }
   return result
@@ -67,7 +67,7 @@ func equal<R1 : GeneratorType, R2 : GeneratorType where R1.Element : Eq,
   var range2 = range2
   var e1 = range1.next()
   var e2 = range2.next()
-    
+
   while (e1 != nil) && (e2 != nil) {
     if e1! != e2! {
       return false
@@ -85,7 +85,7 @@ func equalIf<R1 : GeneratorType, R2 : GeneratorType>
   var range2 = range2
   var e1 = range1.next()
   var e2 = range2.next()
-    
+
   while (e1 != nil) && (e2 != nil) {
     if !predicate(e1!, e2!) {
       return false
@@ -105,7 +105,7 @@ func mismatch<R1 : GeneratorType, R2 : GeneratorType where R1.Element : Eq,
 
   while true {
     let e1 = range1.next(), e2 = range2.next()
-    
+
     if (e1 == nil) || (e2 == nil) || e1! != e2! { break }
     _ = prev1.next()
     _ = prev2.next()
@@ -123,7 +123,7 @@ func mismatchIf<R1 : GeneratorType, R2 : GeneratorType>
 
   while true {
     let e1 = range1.next(), e2 = range2.next()
-    
+
     if (e1 == nil) || (e2 == nil) || !predicate(e1!, e2!) { break }
     _ = prev1.next()
     _ = prev2.next()

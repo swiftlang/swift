@@ -35,8 +35,9 @@ var nextTrackedSerialNumber = 0
 
 final class Tracked : ForwardIndexType, CustomStringConvertible {
   required init(_ value: Int) {
-    ++trackedCount
-    serialNumber = ++nextTrackedSerialNumber
+    trackedCount += 1
+    nextTrackedSerialNumber += 1
+    serialNumber = nextTrackedSerialNumber
     self.value = value
   }
   

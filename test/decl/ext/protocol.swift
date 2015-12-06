@@ -240,19 +240,19 @@ protocol P6 {
 }
 
 // S6a uses P5.reqP6a
-struct S6a : P5 { 
+struct S6a : P5 {
   func reqP5a() { }
 }
 
 extension S6a : P6 { }
 
 // S6b uses P5.reqP6a
-struct S6b : P5, P6 { 
+struct S6b : P5, P6 {
   func reqP5a() { }
 }
 
 // S6c uses P5.reqP6a
-struct S6c : P6 { 
+struct S6c : P6 {
 }
 
 extension S6c : P5 {
@@ -260,7 +260,7 @@ extension S6c : P5 {
 }
 
 // S6d does not use P5.reqP6a
-struct S6d : P6 { 
+struct S6d : P6 {
   func reqP6a() { }
 }
 
@@ -361,7 +361,7 @@ struct MyIndexedGenerator<C : _MyCollection> : GeneratorType {
   mutating func next() -> C._Element? {
     if index == container.myEndIndex { return nil }
     let result = container[index]
-    ++index
+    index = index.successor()
     return result
   }
 }
@@ -373,7 +373,7 @@ struct OtherIndexedGenerator<C : _MyCollection> : GeneratorType {
   mutating func next() -> C._Element? {
     if index == container.myEndIndex { return nil }
     let result = container[index]
-    ++index
+    index = index.successor()
     return result
   }
 }
@@ -480,7 +480,7 @@ extension PConforms8 {
 
 struct SConforms8a : PConforms8 { }
 
-struct SConforms8b : PConforms8 { 
+struct SConforms8b : PConforms8 {
   func method() -> String { return "" }
   var property: String { return "" }
   subscript (i: String) -> String { return i }
@@ -491,7 +491,7 @@ func testSConforms8b() {
   _ = s
 }
 
-struct SConforms8c : PConforms8 { 
+struct SConforms8c : PConforms8 {
   func method() -> String { return "" }
 }
 

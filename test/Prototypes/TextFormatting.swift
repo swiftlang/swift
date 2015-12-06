@@ -200,7 +200,7 @@ func _writePositive<T:XPrintableInteger, S: XOutputStream>(
   var rest: T = value / radix
   var nDigits = _writePositive(rest, &stream, args)
   var digit = UInt32((value % radix).toInt())
-  var baseCharOrd : UInt32 = digit <= 9 ? UnicodeScalar("0").value 
+  var baseCharOrd : UInt32 = digit <= 9 ? UnicodeScalar("0").value
                                         : UnicodeScalar("A").value - 10
   stream.append(String(UnicodeScalar(baseCharOrd + digit)))
   return nDigits + 1
@@ -217,19 +217,19 @@ func _writeSigned<T:XPrintableInteger, S: XOutputStream>(
 
   if value == 0 {
     result = "0"
-    ++width
+    width += 1
   }
   else {
     var absVal = abs(value)
     if (value < 0) {
       target.append("-")
-      ++width
+      width += 1
     }
     width += _writePositive(absVal, &result, args)
   }
 
   while width < args.width {
-    ++width
+    width += 1
     target.append(args.fill)
   }
   target.append(result)
