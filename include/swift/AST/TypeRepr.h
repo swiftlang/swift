@@ -393,7 +393,7 @@ private:
 /// \endcode
 class ArrayTypeRepr : public TypeRepr {
   // FIXME: Tail allocation. Use bits to determine whether Base/Size are
-  // availble.
+  // available.
   TypeRepr *Base;
   llvm::PointerIntPair<ExprHandle *, 1, bool> SizeAndOldSyntax;
   SourceRange Brackets;
