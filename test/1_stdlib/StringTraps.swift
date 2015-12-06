@@ -42,9 +42,7 @@ StringTraps.test("endIndex/successor")
   .code {
   var s = "abc"
   var i = s.startIndex
-  i = i.successor()
-  i = i.successor()
-  i = i.successor()
+  i = i.advancedBy(3)
   expectCrashLater()
   i = i.successor()
 }
@@ -56,9 +54,7 @@ StringTraps.test("subscript(_:)/endIndex")
   .code {
   var s = "abc"
   var i = s.startIndex
-  i = i.successor()
-  i = i.successor()
-  i = i.successor()
+  i = i.advancedBy(3)
   expectCrashLater()
   s[i]
 }
@@ -70,9 +66,7 @@ StringTraps.test("UTF8ViewEndIndexSuccessor")
   .code {
   var s = "abc"
   var i = s.utf8.startIndex
-  i = i.successor()
-  i = i.successor()
-  i = i.successor()
+  i = i.advancedBy(3)
   expectCrashLater()
   i = i.successor()
 }
@@ -84,9 +78,7 @@ StringTraps.test("UTF8ViewSubscript/endIndex")
   .code {
   var s = "abc"
   var i = s.utf8.startIndex
-  i = i.successor()
-  i = i.successor()
-  i = i.successor()
+  i = i.advancedBy(3)
   expectCrashLater()
   s.utf8[i]
 }
@@ -110,9 +102,7 @@ StringTraps.test("UTF16ViewSubscript/endIndex")
   .code {
   var s = "abc"
   var i = s.utf16.startIndex
-  i = i.successor()
-  i = i.successor()
-  i = i.successor()
+  i = i.advancedBy(3)
   expectCrashLater()
   s.utf16[i]
 }
