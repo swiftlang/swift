@@ -1145,50 +1145,50 @@ Time warp
 
   - `Elements` are now tuples, so you can write
 
-        ```swift
-        for (k, v) in d {
-          // ...
-        }
-        ```
+    ```swift
+    for (k, v) in d {
+      // ...
+    }
+    ```
 
   - `keys` and `values` properties, which are `Collections` projecting
     the corresponding aspect of each element.  `Dictionary` indices are
     usable with their `keys` and `values` properties, so:
 
-        ```swift
-        for i in indices(d) {
-          let (k, v) = d[i]
-          assert(k == d.keys[i])
-          assert(v == d.values[i])
-        }
-        ```
+    ```swift
+    for i in indices(d) {
+      let (k, v) = d[i]
+      assert(k == d.keys[i])
+      assert(v == d.values[i])
+    }
+    ```
 
 * Semicolon can be used as a single no-op statement in otherwise empty cases in
   `switch` statements:
 
-      ```swift
-      switch x {
-      case 1, 2, 3:
-        print("x is 1, 2 or 3")
-      default:
-        ;
-      }
-      ```
+    ```swift
+    switch x {
+    case 1, 2, 3:
+      print("x is 1, 2 or 3")
+    default:
+      ;
+    }
+    ```
 
 * `override` is now a context sensitive keyword, instead of an attribute:
 
-      ```swift
-      class Base {
-        var property: Int { return 0 }
-        func instanceFunc() {}
-        class func classFunc() {}
-      }
-      class Derived : Base {
-        override var property: Int { return 1 }
-        override func instanceFunc() {}
-        override class func classFunc() {}
-      }
-      ```
+    ```swift
+    class Base {
+      var property: Int { return 0 }
+      func instanceFunc() {}
+      class func classFunc() {}
+    }
+    class Derived : Base {
+      override var property: Int { return 1 }
+      override func instanceFunc() {}
+      override class func classFunc() {}
+    }
+    ```
 
 2014-04-02
 ----------
