@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module %s | FileCheck %s
+// RUN: %target-swift-frontend -use-native-super-method -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module %s | FileCheck %s
 
 var zero: Int = 0
 
@@ -638,7 +638,7 @@ class rdar16151899Derived : rdar16151899Base {
     override init() {
         super.init()
         // CHECK: upcast {{.*}} : $rdar16151899Derived to $rdar16151899Base
-        // CHECK-NEXT: function_ref properties.rdar16151899Base.init
+        // CHECK-NEXT: super_method {{%[0-9]+}} : $rdar16151899Derived, #rdar16151899Base.init!initializer.1
 
         // This should not be a direct access, it should call the setter in the
         // base.
@@ -700,8 +700,7 @@ class DerivedProperty : BaseProperty {
 // CHECK: sil hidden @_TFC10properties15DerivedProperty24super_property_reference
 // CHECK: bb0(%0 : $DerivedProperty):
 // CHECK:  [[BASEPTR:%[0-9]+]] = upcast %0 : $DerivedProperty to $BaseProperty
-// CHECK:  // function_ref properties.BaseProperty.x.getter
-// CHECK:  [[FN:%[0-9]+]] = function_ref @_TFC10properties12BasePropertyg1x
+// CHECK:  [[FN:%[0-9]+]] = super_method %0 : $DerivedProperty, #BaseProperty.x!getter.1
 // CHECK:  apply [[FN]]([[BASEPTR]]) : $@convention(method) (@guaranteed BaseProperty) -> Int // user: %7
 
 
