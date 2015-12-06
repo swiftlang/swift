@@ -320,7 +320,8 @@ extension CollectionType {
     var i = self.startIndex
 
     for _ in 0..<count {
-      result.append(try transform(self[i++]))
+      result.append(try transform(self[i]))
+      i = i.successor()
     }
 
     _expectEnd(i, self)
@@ -593,7 +594,8 @@ extension SequenceType
     } else {
       var p = ptr
       for x in self {
-        p++.initialize(x)
+        p.initialize(x)
+        p = p.successor()
       }
       return p
     }
@@ -724,8 +726,8 @@ internal func _writeBackMutableSlice<
     newElementIndex != newElementsEndIndex {
 
     self_[selfElementIndex] = slice[newElementIndex]
-    ++selfElementIndex
-    ++newElementIndex
+    selfElementIndex = selfElementIndex.successor()
+    newElementIndex = newElementIndex.successor()
   }
 
   _precondition(

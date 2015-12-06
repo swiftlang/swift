@@ -240,7 +240,7 @@ internal class _DropFirstSequence<Base : GeneratorType>
         dropped = limit
         return nil
       }
-      ++dropped
+      dropped += 1
     }
     return generator.next()
   }
@@ -270,7 +270,7 @@ internal class _PrefixSequence<Base : GeneratorType> : SequenceType, GeneratorTy
 
   internal func next() -> Base.Element? {
     if taken >= maxLength { return nil }
-    ++taken
+    taken += 1
 
     if let next = generator.next() {
       return next
@@ -613,7 +613,8 @@ extension SequenceType {
     -> UnsafeMutablePointer<Generator.Element> {
     var p = UnsafeMutablePointer<Generator.Element>(ptr)
     for x in GeneratorSequence(self.generate()) {
-      p++.initialize(x)
+      p.initialize(x)
+      p = p.successor()
     }
     return p
   }

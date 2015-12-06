@@ -83,7 +83,8 @@ public func _arrayForceCast<SourceElement, TargetElement>(
         _precondition(
           bridged != nil, "array element cannot be bridged to Objective-C")
         // FIXME: should be an unsafeDowncast, but for <rdar://problem/18638230>
-        p++.initialize(unsafeBitCast(bridged!, TargetElement.self))
+        p.initialize(unsafeBitCast(bridged!, TargetElement.self))
+        p = p.successor()
       }
     }
     return Array(_ArrayBuffer(buf, shiftedToStartIndex: 0))
@@ -162,7 +163,8 @@ ElementwiseBridging:
       if _slowPath(value == nil) {
         break ElementwiseBridging
       }
-      p++.initialize(value!)
+      p.initialize(value!)
+      p = p.successor()
     }
     return Array(_ArrayBuffer(buf, shiftedToStartIndex: 0))
   }

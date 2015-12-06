@@ -34,7 +34,8 @@ public struct _stdlib_ShardedAtomicCounter {
     let hardwareConcurrency = _stdlib_getHardwareConcurrency()
     let count = max(8, hardwareConcurrency * hardwareConcurrency)
     let shards = UnsafeMutablePointer<Int>.alloc(count)
-    for var i = 0; i != count; i++ {
+    for i in 0...count {
+    //for var i = 0; i != count; i++ {
       (shards + i).initialize(0)
     }
     self._shardsPtr = shards
@@ -72,7 +73,8 @@ public struct _stdlib_ShardedAtomicCounter {
 
     public mutating func randomInt() -> Int {
       var result = 0
-      for var i = 0; i != Int._sizeInBits; ++i {
+      for i in 0...Int._sizeInBits {
+      //for var i = 0; i != Int._sizeInBits; ++i {
         result = (result << 1) | (_state & 1)
         _state = (_state >> 1) ^ (-(_state & 1) & Int(bitPattern: 0xD0000001))
       }
