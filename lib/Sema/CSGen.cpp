@@ -53,7 +53,7 @@ static ValueDecl *findReferencedDecl(Expr *expr, SourceLoc &loc) {
 }
 
 /// \brief Return 'true' if the decl in question refers to an operator that
-/// could be added to the global scope via a delayed protcol conformance.
+/// could be added to the global scope via a delayed protocol conformance.
 /// Currently, this is only true for '==', which is added via an Equatable
 /// conformance.
 static bool isDelayedOperatorDecl(ValueDecl *vd) {
@@ -337,7 +337,7 @@ namespace {
   /// of the overload set and call arguments.
   ///
   /// \param expr The application.
-  /// \param isFavored Determine wheth the given overload is favored.
+  /// \param isFavored Determine whether the given overload is favored.
   /// \param createReplacements If provided, a function that creates a set of
   /// replacement fallback constraints.
   /// \param mustConsider If provided, a function to detect the presence of
@@ -752,7 +752,10 @@ namespace {
       }
       
       Type paramTy = fnTy->getInput();
-      auto paramTupleTy = paramTy->castTo<TupleType>();
+      auto paramTupleTy = paramTy->getAs<TupleType>();
+      if (!paramTupleTy || paramTupleTy->getNumElements() != 2)
+        return false;
+      
       auto firstParamTy = paramTupleTy->getElement(0).getType();
       auto secondParamTy = paramTupleTy->getElement(1).getType();
       
@@ -2664,7 +2667,7 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
   // Remove implicit conversions from the expression.
   expr = expr->walk(SanitizeExpr(getTypeChecker()));
 
-  // Wall the expression to associate labeled argumets.
+  // Walk the expression to associate labeled arguments.
   expr->walk(ArgumentLabelWalker(*this, expr));
 
   // Walk the expression, generating constraints.
@@ -2740,7 +2743,7 @@ public:
       return ConstraintGenerator::visitUnresolvedMemberExpr(Expr);
     }
     // Otherwise, create a type variable saying we know nothing about this expr.
-    assert(!VT && "cannot reassign type viriable.");
+    assert(!VT && "cannot reassign type variable.");
     return VT = createFreeTypeVariableType(Expr);
   }
 
@@ -2750,7 +2753,7 @@ public:
       return ConstraintGenerator::visitParenExpr(Expr);
     }
     // Otherwise, create a type variable saying we know nothing about this expr.
-    assert(!VT && "cannot reassign type viriable.");
+    assert(!VT && "cannot reassign type variable.");
     return VT = createFreeTypeVariableType(Expr);
   }
 
@@ -2760,7 +2763,7 @@ public:
       return ConstraintGenerator::visitTupleExpr(Expr);
     }
     // Otherwise, create a type variable saying we know nothing about this expr.
-    assert(!VT && "cannot reassign type viriable.");
+    assert(!VT && "cannot reassign type variable.");
     return VT = createFreeTypeVariableType(Expr);
   }
 

@@ -138,7 +138,7 @@ func _injectNothingIntoOptional<Wrapped>() -> Wrapped? {
 // Comparisons
 @warn_unused_result
 public func == <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
-  switch (lhs,rhs) {
+  switch (lhs, rhs) {
   case let (l?, r?):
     return l == r
   case (nil, nil):
@@ -230,8 +230,8 @@ internal struct _OptionalMirror<Wrapped> : _MirrorType {
   var count: Int { return (_value != nil) ? 1 : 0 }
 
   subscript(i: Int) -> (String, _MirrorType) {
-    switch (_value,i) {
-    case (.Some(let contents),0) : return ("Some",_reflect(contents))
+    switch (_value, i) {
+    case (.Some(let contents), 0) : return ("Some", _reflect(contents))
     default: _preconditionFailure("cannot extract this child index")
     }
   }
@@ -251,7 +251,7 @@ internal struct _OptionalMirror<Wrapped> : _MirrorType {
 
 @warn_unused_result
 public func < <T : Comparable> (lhs: T?, rhs: T?) -> Bool {
-  switch (lhs,rhs) {
+  switch (lhs, rhs) {
   case let (l?, r?):
     return l < r
   case (nil, _?):
@@ -263,7 +263,7 @@ public func < <T : Comparable> (lhs: T?, rhs: T?) -> Bool {
 
 @warn_unused_result
 public func > <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
-  switch (lhs,rhs) {
+  switch (lhs, rhs) {
   case let (l?, r?):
     return l > r
   default:
@@ -273,7 +273,7 @@ public func > <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
 
 @warn_unused_result
 public func <= <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
-  switch (lhs,rhs) {
+  switch (lhs, rhs) {
   case let (l?, r?):
     return l <= r
   default:
@@ -283,7 +283,7 @@ public func <= <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
 
 @warn_unused_result
 public func >= <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
-  switch (lhs,rhs) {
+  switch (lhs, rhs) {
   case let (l?, r?):
     return l >= r
   default:

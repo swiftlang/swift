@@ -28,6 +28,7 @@ const char *Action::getClassName(ActionClass AC) {
   switch (AC) {
     case Input: return "input";
     case CompileJob: return "compile";
+    case InterpretJob: return "interpret";
     case BackendJob: return "backend";
     case MergeModuleJob: return "merge-module";
     case ModuleWrapJob: return "modulewrap";
@@ -45,6 +46,8 @@ void InputAction::anchor() {}
 void JobAction::anchor() {}
 
 void CompileJobAction::anchor() {}
+
+void InterpretJobAction::anchor() {}
 
 void BackendJobAction::anchor() {}
 

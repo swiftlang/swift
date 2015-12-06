@@ -1,5 +1,5 @@
 //===----------------------------------------------------------------------===//
-// SourceKit README
+//                              SourceKit README
 //===----------------------------------------------------------------------===//
 
 Welcome to SourceKit! SourceKit is a framework for supporting IDE features like
@@ -9,7 +9,7 @@ infrastructure that an IDE needs for excellent language support.
 SourceKit currently only supports the Swift language.
 
 //===----------------------------------------------------------------------===//
-//                Linking to the SourceKit C API
+//                       Linking to the SourceKit C API
 //===----------------------------------------------------------------------===//
 
 The stable C API for SourceKit is provided via the sourcekitd.framework which 

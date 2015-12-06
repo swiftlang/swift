@@ -42,47 +42,50 @@ ToolChain::constructJob(const JobAction &JA,
                         const OutputInfo &OI) const {
   JobContext context{inputs, *output, inputActions, args, OI};
 
-  const char *executableName;
-  llvm::opt::ArgStringList arguments;
-  switch (JA.getKind()) {
-#define CASE(K) case Action::K: \
-    std::tie(executableName, arguments) = \
-        constructInvocation(cast<K##Action>(JA), context); \
-    break;
-  CASE(CompileJob)
-  CASE(BackendJob)
-  CASE(MergeModuleJob)
-  CASE(ModuleWrapJob)
-  CASE(LinkJob)
-  CASE(GenerateDSYMJob)
-  CASE(AutolinkExtractJob)
-  CASE(REPLJob)
+  auto invocationInfo = [&]() -> InvocationInfo {
+    switch (JA.getKind()) {
+  #define CASE(K) case Action::K: \
+      return constructInvocation(cast<K##Action>(JA), context);
+    CASE(CompileJob)
+    CASE(InterpretJob)
+    CASE(BackendJob)
+    CASE(MergeModuleJob)
+    CASE(ModuleWrapJob)
+    CASE(LinkJob)
+    CASE(GenerateDSYMJob)
+    CASE(AutolinkExtractJob)
+    CASE(REPLJob)
 #undef CASE
-  case Action::Input:
-    llvm_unreachable("not a JobAction");
-  }
+    case Action::Input:
+      llvm_unreachable("not a JobAction");
+    }
+  }();
 
   // Special-case the Swift frontend.
   const char *executablePath = nullptr;
-  if (StringRef(SWIFT_EXECUTABLE_NAME) == executableName) {
+  if (StringRef(SWIFT_EXECUTABLE_NAME) == invocationInfo.ExecutableName) {
     executablePath = getDriver().getSwiftProgramPath().c_str();
   } else {
-    std::string relativePath = findProgramRelativeToSwift(executableName);
+    std::string relativePath =
+        findProgramRelativeToSwift(invocationInfo.ExecutableName);
     if (!relativePath.empty()) {
       executablePath = args.MakeArgString(relativePath);
     } else {
-      auto systemPath = llvm::sys::findProgramByName(executableName);
+      auto systemPath =
+          llvm::sys::findProgramByName(invocationInfo.ExecutableName);
       if (systemPath) {
         executablePath = args.MakeArgString(systemPath.get());
       } else {
         // For debugging purposes.
-        executablePath = executableName;
+        executablePath = invocationInfo.ExecutableName;
       }
     }
   }
 
   return llvm::make_unique<Job>(JA, std::move(inputs), std::move(output),
-                                executablePath, std::move(arguments));
+                                executablePath,
+                                std::move(invocationInfo.Arguments),
+                                std::move(invocationInfo.ExtraEnvironment));
 }
 
 std::string

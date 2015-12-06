@@ -1595,7 +1595,7 @@ ASTContext::takeDelayedConformanceDiags(NormalProtocolConformance *conformance){
 
 size_t ASTContext::getTotalMemory() const {
   size_t Size = sizeof(*this) +
-    //LoadedModules ?
+    // LoadedModules ?
     // ExternalDefinitions ?
     llvm::capacity_in_bytes(CanonicalGenericTypeParamTypeNames) +
     // RemappedTypes ?

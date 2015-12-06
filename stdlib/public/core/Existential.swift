@@ -20,7 +20,7 @@
 
 /// Unavailable; use `AnyGenerator<T>` instead.
 @available(*, unavailable, renamed="AnyGenerator")
-public struct GeneratorOf<T>  {}
+public struct GeneratorOf<T> {}
 
 /// Unavailable; use `AnySequence<T>` instead.
 @available(*, unavailable, renamed="AnySequence")

@@ -17,6 +17,7 @@
 #ifndef SWIFT_CLANG_IMPORTER_IMPL_H
 #define SWIFT_CLANG_IMPORTER_IMPL_H
 
+#include "SwiftLookupTable.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/LazyResolver.h"
@@ -31,6 +32,7 @@
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include <set>
@@ -251,6 +253,7 @@ public:
   const bool ImportForwardDeclarations;
   const bool OmitNeedlessWords;
   const bool InferDefaultArguments;
+  const bool UseSwiftLookupTables;
 
   constexpr static const char * const moduleImportBufferName =
     "<swift-imported-modules>";
@@ -289,6 +292,9 @@ private:
   /// if type checking has begun.
   llvm::PointerIntPair<LazyResolver *, 1, bool> typeResolver;
 
+  /// The Swift lookup table for the bridging header.
+  SwiftLookupTable BridgingHeaderLookupTable;
+
 public:
   /// \brief Mapping of already-imported declarations.
   llvm::DenseMap<const clang::Decl *, Decl *> ImportedDecls;
@@ -304,9 +310,6 @@ public:
   /// ObjCBool.
   llvm::SmallDenseMap<const clang::TypedefNameDecl *, MappedTypeNameKind, 16>
     SpecialTypedefNames;
-
-  /// Mapping from Objective-C selectors to method names.
-  llvm::DenseMap<std::pair<ObjCSelector, char>, DeclName> SelectorMappings;
 
   /// Is the given identifier a reserved name in Swift?
   static bool isSwiftReservedName(StringRef name);
@@ -421,6 +424,24 @@ public:
   /// imported as methods into Swift.
   bool isAccessibilityDecl(const clang::Decl *objCMethodOrProp);
 
+  /// Determine whether this method is an Objective-C "init" method
+  /// that will be imported as a Swift initializer.
+  bool isInitMethod(const clang::ObjCMethodDecl *method);
+
+  /// Determine whether this Objective-C method should be imported as
+  /// an initializer.
+  ///
+  /// \param prefixLength Will be set to the length of the prefix that
+  /// should be stripped from the first selector piece, e.g., "init"
+  /// or the restated name of the class in a factory method.
+  ///
+  ///  \param kind Will be set to the kind of initializer being
+  ///  imported. Note that this does not distinguish designated
+  ///  vs. convenience; both will be classified as "designated".
+  bool shouldImportAsInitializer(const clang::ObjCMethodDecl *method,
+                                 unsigned &prefixLength,
+                                 CtorInitializerKind &kind);
+
 private:
   /// \brief Generation number that is used for crude versioning.
   ///
@@ -497,6 +518,10 @@ private:
       return lhs == rhs;
     }
   };
+
+  /// Retrieve the prefix to be stripped from the names of the enum constants
+  /// within the given enum.
+  StringRef getEnumConstantNamePrefix(const clang::EnumDecl *enumDecl);
 
 public:
   /// \brief Keep track of enum constant values that have been imported.
@@ -620,6 +645,10 @@ public:
   void addBridgeHeaderTopLevelDecls(clang::Decl *D);
   bool shouldIgnoreBridgeHeaderTopLevelDecl(clang::Decl *D);
 
+  /// Add the given named declaration as an entry to the given Swift name
+  /// lookup table, including any of its child entries.
+  void addEntryToLookupTable(SwiftLookupTable &table, clang::NamedDecl *named);
+
 public:
   void registerExternalDecl(Decl *D) {
     RegisteredExternalDecls.push_back(D);
@@ -690,47 +719,117 @@ public:
   /// or a null type if the DeclContext does not have a correspinding type.
   clang::QualType getClangDeclContextType(const clang::DeclContext *dc);
 
+  /// Determine whether this typedef is a CF type.
+  static bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);
+
   /// Determine the imported CF type for the given typedef-name, or the empty
   /// string if this is not an imported CF type name.
-  StringRef getCFTypeName(const clang::TypedefNameDecl *decl);
+  StringRef getCFTypeName(const clang::TypedefNameDecl *decl,
+                          StringRef *secondaryName = nullptr);
 
   /// Retrieve the type name of a Clang type for the purposes of
   /// omitting unneeded words.
   OmissionTypeName getClangTypeNameForOmission(clang::QualType type);
 
   /// Omit needless words in a function name.
-  DeclName omitNeedlessWordsInFunctionName(
-             DeclName name,
-             ArrayRef<const clang::ParmVarDecl *> params,
-             clang::QualType resultType,
-             const clang::DeclContext *dc,
-             const llvm::SmallBitVector &nonNullArgs,
-             const Optional<api_notes::ObjCMethodInfo> &knownMethod,
-             Optional<unsigned> errorParamIndex,
-             bool returnsSelf,
-             bool isInstanceMethod);
+  bool omitNeedlessWordsInFunctionName(
+         StringRef &baseName,
+         SmallVectorImpl<StringRef> &argumentNames,
+         ArrayRef<const clang::ParmVarDecl *> params,
+         clang::QualType resultType,
+         const clang::DeclContext *dc,
+         const llvm::SmallBitVector &nonNullArgs,
+         const Optional<api_notes::ObjCMethodInfo> &knownMethod,
+         Optional<unsigned> errorParamIndex,
+         bool returnsSelf,
+         bool isInstanceMethod,
+         StringScratchSpace &scratch);
 
   /// \brief Converts the given Swift identifier for Clang.
   clang::DeclarationName exportName(Identifier name);
 
-  /// Imports the name of the given Clang decl into Swift.
+  /// Information about imported error parameters.
+  struct ImportedErrorInfo {
+    ForeignErrorConvention::Kind Kind;
+    ForeignErrorConvention::IsOwned_t IsOwned;
+
+    /// The index of the error parameter.
+    unsigned ParamIndex;
+
+    /// Whether the parameter is being replaced with "void"
+    /// (vs. removed).
+    bool ReplaceParamWithVoid;
+  };
+
+  /// Describes a name that was imported from Clang.
+  struct ImportedName {
+    /// The imported name.
+    DeclName Imported;
+
+    /// An additional alias to the imported name, which should be
+    /// recorded in name lookup tables as well.
+    DeclName Alias;
+
+    /// Whether this name was explicitly specified via a Clang
+    /// swift_name attribute.
+    bool HasCustomName = false;
+
+    /// Whether this was one of a special class of Objective-C
+    /// initializers for which we drop the variadic argument rather
+    /// than refuse to import the initializer.
+    bool DroppedVariadic = false;
+
+    /// Whether this declaration is a subscript accessor (getter or setter).
+    bool IsSubscriptAccessor = false;
+
+    /// For an initializer, the kind of initializer to import.
+    CtorInitializerKind InitKind = CtorInitializerKind::Designated;
+
+    /// For names that map Objective-C error handling conventions into
+    /// throwing Swift methods, describes how the mapping is performed.
+    Optional<ImportedErrorInfo> ErrorInfo;
+
+    /// Produce just the imported name, for clients that don't care
+    /// about the details.
+    operator DeclName() const { return Imported; }
+
+    /// Whether any name was imported.
+    explicit operator bool() const { return static_cast<bool>(Imported); }
+  };
+
+  /// Flags that control the import of names in importFullName.
+  enum class ImportNameFlags {
+    /// Suppress the factory-method-as-initializer transformation.
+    SuppressFactoryMethodAsInit = 0x01,
+  };
+
+  /// Options that control the import of names in importFullName.
+  typedef OptionSet<ImportNameFlags> ImportNameOptions;
+
+  /// Imports the full name of the given Clang declaration into Swift.
   ///
-  /// Note that this may result in a name different from the Clang name, so it
-  /// should not be used when referencing Clang symbols. (In particular, it
-  /// should not be put into \c \@objc attributes.)
+  /// Note that this may result in a name very different from the Clang name,
+  /// so it should not be used when referencing Clang symbols.
   ///
-  /// \sa importName(clang::DeclarationName, StringRef)
-  Identifier importName(const clang::NamedDecl *D, StringRef removePrefix = "");
-  
-  /// \brief Import the given Clang name into Swift.
+  /// \param D The Clang declaration whose name should be imported.
   ///
-  /// \param name The Clang name to map into Swift.
+  /// \param effectiveContext If non-null, will be set to the effective
+  /// Clang declaration context in which the declaration will be imported.
+  /// This can differ from D's redeclaration context when the Clang importer
+  /// introduces nesting, e.g., for enumerators within an NS_ENUM.
+  ImportedName importFullName(const clang::NamedDecl *D,
+                              ImportNameOptions options = None,
+                              clang::DeclContext **effectiveContext = nullptr);
+
+  /// \brief Import the given Clang identifier into Swift.
+  ///
+  /// \param identifier The Clang identifier to map into Swift.
   ///
   /// \param removePrefix The prefix to remove from the Clang name to produce
   /// the Swift name. If the Clang name does not start with this prefix,
   /// nothing is removed.
-  Identifier importDeclName(clang::DeclarationName name,
-                            StringRef removePrefix = "");
+  Identifier importIdentifier(const clang::IdentifierInfo *identifier,
+                              StringRef removePrefix = "");
 
   /// Import an Objective-C selector.
   ObjCSelector importSelector(clang::Selector selector);
@@ -740,34 +839,6 @@ public:
 
   /// Export a Swift Objective-C selector as a Clang Objective-C selector.
   clang::Selector exportSelector(ObjCSelector selector);
-
-  /// Map the given selector to a declaration name.
-  ///
-  /// \param selector The selector to map.
-  ///
-  /// \param isInitializer Whether this name should be mapped as an
-  /// initializer.
-  ///
-  /// \param isSwiftPrivate Whether this name is for a declaration marked with
-  /// the 'swift_private' attribute.
-  DeclName mapSelectorToDeclName(ObjCSelector selector, bool isInitializer,
-                                 bool isSwiftPrivate);
-
-  /// Try to map the given selector, which may be the name of a factory method,
-  /// to the name of an initializer.
-  ///
-  /// \param selector The selector to map.
-  ///
-  /// \param className The name of the class in which the method occurs.
-  ///
-  /// \param isSwiftPrivate Whether this name is for a declaration marked with
-  /// the 'swift_private' attribute.
-  ///
-  /// \returns the initializer name for this factory method, or an empty
-  /// name if this selector does not fit the pattern.
-  DeclName mapFactorySelectorToInitializerName(ObjCSelector selector,
-                                               StringRef className,
-                                               bool isSwiftPrivate);
 
   /// \brief Import the given Swift source location into Clang.
   clang::SourceLocation exportSourceLoc(SourceLoc loc);
@@ -957,7 +1028,7 @@ public:
   /// \returns The named type, or null if the type could not be found.
   Type getNamedSwiftType(Module *module, StringRef name);
 
-  /// \brief Retrieve a specialization of the the named Swift type, e.g.,
+  /// \brief Retrieve a specialization of the named Swift type, e.g.,
   /// UnsafeMutablePointer<T>.
   ///
   /// \param module The name of the module in which the type should occur.
@@ -1048,6 +1119,12 @@ public:
                                unsigned numParams,
                                bool isLastParameter);
 
+  /// Retrieve a bit vector containing the non-null argument
+  /// annotations for the given declaration.
+  llvm::SmallBitVector getNonNullArgs(
+                         const clang::Decl *decl,
+                         ArrayRef<const clang::ParmVarDecl *> params);
+
   /// \brief Import the type of an Objective-C method.
   ///
   /// This routine should be preferred when importing function types for
@@ -1063,10 +1140,9 @@ public:
   /// \param isNoReturn Whether the function is noreturn.
   /// \param isFromSystemModule Whether to apply special rules that only apply
   ///   to system APIs.
-  /// \param isCustomName If true, the user has provided this name.
   /// \param bodyPatterns The patterns visible inside the function body.
   ///   whether the created arg/body patterns are different (selector-style).
-  /// \param methodName The name of the imported method.
+  /// \param importedName The name of the imported method.
   /// \param errorConvention Information about the method's error conventions.
   /// \param kind Controls whether we're building a type for a method that
   ///        needs special handling.
@@ -1077,9 +1153,10 @@ public:
                         clang::QualType resultType,
                         ArrayRef<const clang::ParmVarDecl *> params,
                         bool isVariadic, bool isNoReturn,
-                        bool isFromSystemModule, bool isCustomName,
+                        bool isFromSystemModule,
                         SmallVectorImpl<Pattern*> &bodyPatterns,
-                        DeclName &methodName,
+                        ImportedName importedName,
+                        DeclName &name,
                         Optional<ForeignErrorConvention> &errorConvention,
                         SpecialMethodKind kind);
 
@@ -1177,6 +1254,9 @@ public:
       ASD->setSetterAccessibility(Accessibility::Public);
     return D;
   }
+
+  /// Dump the Swift-specific name lookup tables we generate.
+  void dumpSwiftLookupTables();
 };
 
 }

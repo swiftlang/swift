@@ -215,6 +215,7 @@ private:
                                  TypeSubstitutionMap &InterfaceSubs,
                                  IndicesSet &PromotableIndices);
 
+  void visitDebugValueAddrInst(DebugValueAddrInst *Inst);
   void visitStrongReleaseInst(StrongReleaseInst *Inst);
   void visitStructElementAddrInst(StructElementAddrInst *Inst);
   void visitLoadInst(LoadInst *Inst);
@@ -256,7 +257,7 @@ void ReachabilityInfo::compute() {
       if (!Changed) {
         // If we have not detected a change yet, then calculate new
         // reachabilities into a new bit vector so we can determine if any
-        // change has occured.
+        // change has occurred.
         NewSet = CurSet;
         for (auto PI = BB.pred_begin(), PE = BB.pred_end(); PI != PE; ++PI) {
           unsigned PredID = BlockMap[*PI];
@@ -509,6 +510,25 @@ ClosureCloner::populateCloned() {
   }
 }
 
+/// Handle a debug_value_addr instruction during cloning of a closure;
+/// if its operand is the promoted address argument then lower it to a
+/// debug_value, otherwise it is handled normally.
+void ClosureCloner::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
+  SILValue Operand = Inst->getOperand();
+  if (SILArgument *A = dyn_cast<SILArgument>(Operand)) {
+    assert(Operand.getResultNumber() == 0);
+    auto I = AddrArgumentMap.find(A);
+    if (I != AddrArgumentMap.end()) {
+      getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+      getBuilder().createDebugValue(Inst->getLoc(), I->second,
+                                    Inst->getVarInfo().getArgNo());
+      return;
+    }
+  }
+
+  SILCloner<ClosureCloner>::visitDebugValueAddrInst(Inst);
+}
+
 /// \brief Handle a strong_release instruction during cloning of a closure; if
 /// it is a strong release of a promoted box argument, then it is replaced wit
 /// a ReleaseValue of the new object type argument, otherwise it is handled
@@ -621,7 +641,7 @@ isNonmutatingCapture(SILArgument *BoxArg, SILArgument *AddrArg) {
           return false;
       continue;
     }
-    if (!isa<LoadInst>(O->getUser()))
+    if (!isa<LoadInst>(O->getUser()) && !isa<DebugValueAddrInst>(O->getUser()))
       return false;
   }
 

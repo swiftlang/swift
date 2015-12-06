@@ -480,7 +480,7 @@ the leading ``init`` keyword, including (e.g.) methods starting with
 tagged as being in the ``init`` family in Objective-C (via the
 ``objc_method_family`` attribute in Clang). We consider these cases to
 be rare enough that we don't want to pessimize the conventional
-``init`` methods to accomodate them.
+``init`` methods to accommodate them.
 
 Designated Initializers
 ~~~~~~~~~~~~~~~~~~~~~~~

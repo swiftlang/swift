@@ -297,8 +297,9 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   // init_existential_addr then we can promote the allocation of the init
   // existential.
   if (IEI && !OEI) {
-    auto *ConcAlloc = Builder.createAllocStack(AS->getLoc(),
-                                                IEI->getLoweredConcreteType());
+    auto *ConcAlloc =
+        Builder.createAllocStack(AS->getLoc(), IEI->getLoweredConcreteType(),
+                                 AS->getVarInfo().getArgNo());
     SILValue(IEI, 0).replaceAllUsesWith(ConcAlloc->getAddressResult());
     eraseInstFromFunction(*IEI);
 

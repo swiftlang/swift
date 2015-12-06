@@ -27,7 +27,7 @@ TEST(FunctionNameDemangleTests, CorrectlyDemangles) {
   EXPECT_STREQ(DemangledName, OutputBuffer);
   EXPECT_EQ(Result, strlen(DemangledName));
 
-  // Make sure the SynthesizeSugarOnTypes option is functioning
+  // Make sure the SynthesizeSugarOnTypes option is functioning.
   const char *FunctionNameWithSugar = "_TF4main3fooFT3argGSqGSaSi___T_";
   const char *DemangledNameWithSugar = "main.foo (arg : [Swift.Int]?) -> ()";
 

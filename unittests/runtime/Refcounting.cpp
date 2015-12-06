@@ -144,15 +144,15 @@ TEST(RefcountingTest, unowned_retain_release_n) {
   size_t value = 0;
   auto object = allocTestObject(&value, 1);
   EXPECT_EQ(0u, value);
-  swift_weakRetain_n(object, 32);
-  swift_weakRetain(object);
-  EXPECT_EQ(34u, swift_weakRetainCount(object));
-  swift_weakRelease_n(object, 31);
-  EXPECT_EQ(3u, swift_weakRetainCount(object));
-  swift_weakRelease(object);
-  EXPECT_EQ(2u, swift_weakRetainCount(object));
-  swift_weakRelease_n(object, 1);
-  EXPECT_EQ(1u, swift_weakRetainCount(object));
+  swift_unownedRetain_n(object, 32);
+  swift_unownedRetain(object);
+  EXPECT_EQ(34u, swift_unownedRetainCount(object));
+  swift_unownedRelease_n(object, 31);
+  EXPECT_EQ(3u, swift_unownedRetainCount(object));
+  swift_unownedRelease(object);
+  EXPECT_EQ(2u, swift_unownedRetainCount(object));
+  swift_unownedRelease_n(object, 1);
+  EXPECT_EQ(1u, swift_unownedRetainCount(object));
   swift_release(object);
   EXPECT_EQ(1u, value);
 }

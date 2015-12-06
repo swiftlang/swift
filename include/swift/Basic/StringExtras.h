@@ -51,6 +51,14 @@ namespace swift {
   /// Determine the part of speech for the given word.
   PartOfSpeech getPartOfSpeech(StringRef word);
 
+  /// Scratch space used for returning a set of StringRefs.
+  class StringScratchSpace {
+    llvm::BumpPtrAllocator Allocator;
+
+  public:
+    StringRef copyString(StringRef string);
+  };
+
   namespace camel_case {
     class WordIterator;
 
@@ -219,6 +227,16 @@ namespace swift {
     /// unchanged.
     StringRef toLowercaseWord(StringRef string, SmallVectorImpl<char> &scratch);
 
+    /// Lowercase the first word within the given camelCase string.
+    ///
+    /// \param string The string to lowercase.
+    /// \param scratch Scratch buffer used to form the resulting string.
+    ///
+    /// \returns the string with the first word lowercased. When the
+    /// first word is an acronym, the string will be returned
+    /// unchanged.
+    StringRef toLowercaseWord(StringRef string, StringScratchSpace &scratch);
+
     /// Sentence-case the given camelCase string by turning the first
     /// letter into an uppercase letter.
     ///
@@ -357,14 +375,6 @@ struct OmissionTypeName {
 /// For example, matching "stringByAppendingString" to the type "NSString"
 /// would produce "ByAppendingString".
 StringRef matchLeadingTypeName(StringRef name, OmissionTypeName typeName);
-
-/// Scratch space used for returning a set of StringRefs.
-class StringScratchSpace {
-  llvm::BumpPtrAllocator Allocator;
-
-public:
-  StringRef copyString(StringRef string);
-};
 
 /// Describes a set of names with an inheritance relationship.
 class InheritedNameSet {

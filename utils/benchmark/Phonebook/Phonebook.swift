@@ -56,8 +56,8 @@ for first in words {
 
 func benchStringSort() {
   let start = __mach_absolute_time__()
-  for (var i = 0; i < 100; i++) {
-    var t = Names;
+  for i in 0..<100 {
+    var t = Names
     sort(&t)
   }
   let delta = __mach_absolute_time__() - start

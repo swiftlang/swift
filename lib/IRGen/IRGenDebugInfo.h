@@ -100,7 +100,7 @@ class IRGenDebugInfo {
 
   Location LastDebugLoc;    /// The last location that was emitted.
   const SILDebugScope *LastScope; /// The scope of that last location.
-  bool IsLibrary;           /// Whether this is a libary or a top level module.
+  bool IsLibrary;           /// Whether this is a library or a top level module.
 #ifndef NDEBUG
   /// The basic block where the location was last changed.
   llvm::BasicBlock *LastBasicBlock;
@@ -200,22 +200,6 @@ public:
                                StringRef Name, unsigned ArgNo = 0,
                                IndirectionKind = DirectValue,
                                ArtificialKind = RealValue);
-
-  /// Convenience function for stack-allocated variables. Calls
-  /// emitVariableDeclaration internally.
-  void emitStackVariableDeclaration(IRBuilder &Builder,
-                                    ArrayRef<llvm::Value *> Storage,
-                                    DebugTypeInfo Ty, const SILDebugScope *DS,
-                                    StringRef Name,
-                                    IndirectionKind Indirection = DirectValue);
-
-  /// Convenience function for variables that are function arguments.
-  void emitArgVariableDeclaration(IRBuilder &Builder,
-                                  ArrayRef<llvm::Value *> Storage,
-                                  DebugTypeInfo Ty, const SILDebugScope *DS,
-                                  StringRef Name, unsigned ArgNo,
-                                  IndirectionKind = DirectValue,
-                                  ArtificialKind = RealValue);
 
   /// Emit a dbg.declare or dbg.value intrinsic, depending on Storage.
   void emitDbgIntrinsic(llvm::BasicBlock *BB, llvm::Value *Storage,

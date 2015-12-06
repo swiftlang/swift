@@ -326,7 +326,7 @@ efficient random access; that property is determined by the protocol
 conformances of its `Index` type.
 
 **Forward indices** are the simplest and most general, capturing the
-capabilites of indices into a singly-linked list:
+capabilities of indices into a singly-linked list:
 
 1. advance to the next position
 2. detect the end position

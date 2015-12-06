@@ -41,7 +41,7 @@ class GraphemeClusterBreakPropertyTable(UnicodeProperty):
     # Note: Numeric values should be consistent with
     # '_GraphemeClusterBreakPropertyValue' enum on the Swift side, and with
     # 'GraphemeClusterBreakProperty' in the compiler C++ code.  If there is a
-    # reason for eithor of those to differ, then this mapping can be overriden
+    # reason for either of those to differ, then this mapping can be overridden
     # after an instance of this class is created.
     numeric_value_table = {
       'Other': 0,
@@ -270,7 +270,7 @@ class UnicodeTrieGenerator(object):
             [ j for j in range(i << self.supp_second_level_index_bits, (i + 1) << self.supp_second_level_index_bits) ]
                 for i in range(0, self.supp_first_level_index_max + 1) ]
 
-        # An arry of supp data blocks.
+        # An array of supp data blocks.
         self.supp_data = [
             [ -1 for i in range(0, 1 << self.supp_data_offset_bits) ]
                 for i in range(0, (self.supp_first_level_index_max + 1) * (1 << self.supp_second_level_index_bits)) ]

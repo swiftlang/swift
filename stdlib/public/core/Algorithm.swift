@@ -118,7 +118,7 @@ public func split<S : CollectionType, R : BooleanType>(
   fatalError("unavailable function can't be called")
 }
 
-/// Returns `true` iff the the initial elements of `s` are equal to `prefix`.
+/// Returns `true` iff the initial elements of `s` are equal to `prefix`.
 @available(*, unavailable, message="call the 'startsWith()' method on the sequence")
 public func startsWith<
   S0 : SequenceType, S1 : SequenceType
@@ -177,9 +177,8 @@ public struct EnumerateGenerator<
   ///
   /// - Requires: No preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> Element? {
-    let b = base.next()
-    if b == nil { return .None }
-    return .Some((index: count++, element: b!))
+    guard let b = base.next() else { return .None }
+    return .Some((index: count++, element: b))
   }
 }
 

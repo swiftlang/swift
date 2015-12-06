@@ -43,7 +43,7 @@ struct ARCMatchingSet {
   llvm::SetVector<SILInstruction *> Increments;
 
   /// An insertion point for an increment means the earliest point in the
-  /// program after the increment has occured that the increment can be moved to
+  /// program after the increment has occurred that the increment can be moved to
   /// without moving the increment over an instruction that may decrement a
   /// reference count.
   llvm::SetVector<SILInstruction *> IncrementInsertPts;

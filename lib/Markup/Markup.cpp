@@ -16,7 +16,6 @@
 #include "swift/Markup/LineList.h"
 #include "swift/Markup/Markup.h"
 #include "cmark.h"
-#include "node.h"
 
 using namespace llvm;
 using namespace markup;
@@ -60,15 +59,7 @@ StringRef getLiteralContent(MarkupContext &MC, LineList &LL, cmark_node *Node) {
   // its parent.
   auto Literal = cmark_node_get_literal(Node);
   assert(Literal != nullptr);
-  size_t Length = 0;
-  switch (cmark_node_get_type(Node)) {
-  case CMARK_NODE_CODE_BLOCK:
-    Length = Node->as.code.literal.len;
-    break;
-  default:
-    Length = Node->as.literal.len;
-  }
-  return MC.allocateCopy(StringRef(Literal, Length));
+  return MC.allocateCopy(StringRef(Literal));
 }
 
 ParseResult<MarkupASTNode>

@@ -355,6 +355,8 @@ class SILCombine : public SILFunctionTransform {
     }
   }
 
+  virtual void handleDeleteNotification(ValueBase *I) override { }
+
   StringRef getName() override { return "SIL Combine"; }
 };
 

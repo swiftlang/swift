@@ -357,11 +357,11 @@ void llvm::markup::dump(const MarkupASTNode *Node, llvm::raw_ostream &OS,
                         unsigned indent) {
   auto dumpChildren = [](const ArrayRef<const MarkupASTNode *> Children,
                          llvm::raw_ostream &OS, unsigned indent) {
-    OS << "\n";
+    OS << '\n';
     for (auto Child = Children.begin(); Child != Children.end(); Child++) {
       llvm::markup::dump(*Child, OS, indent + 1);
       if (Child != Children.end() - 1)
-        OS << "\n";
+        OS << '\n';
     }
   };
 
@@ -390,10 +390,10 @@ void llvm::markup::dump(const MarkupASTNode *Node, llvm::raw_ostream &OS,
   };
 
   for (unsigned i = 0; i < indent; ++i) {
-    OS << " ";
+    OS << ' ';
   }
 
-  OS << "(";
+  OS << '(';
   switch (Node->getKind()) {
   case llvm::markup::ASTNodeKind::Document: {
     OS << "Document: Children=" << Node->getChildren().size();
@@ -485,7 +485,7 @@ void llvm::markup::dump(const MarkupASTNode *Node, llvm::raw_ostream &OS,
     auto L = cast<Link>(Node);
     OS << "Link: Destination=";
     simpleEscapingPrint(L->getDestination(), OS);
-    OS << " " << "Children=" << L->getChildren().size();
+    OS << ' ' << "Children=" << L->getChildren().size();
     dumpChildren(Node->getChildren(), OS, indent + 1);
     break;
   }
@@ -493,7 +493,7 @@ void llvm::markup::dump(const MarkupASTNode *Node, llvm::raw_ostream &OS,
     auto I = cast<Image>(Node);
     OS << "Image: Destination=";
     simpleEscapingPrint(I->getDestination(), OS);
-    OS << " " << "Children=" << I->getChildren().size();
+    OS << ' ' << "Children=" << I->getChildren().size();
     dumpChildren(Node->getChildren(), OS, indent + 1);
     break;
   }
@@ -518,5 +518,5 @@ void llvm::markup::dump(const MarkupASTNode *Node, llvm::raw_ostream &OS,
   default:
     llvm_unreachable("Can't dump Markup AST Node: unknown node kind");
   }
-  OS << ")";
+  OS << ')';
 }

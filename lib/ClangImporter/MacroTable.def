@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the database of macros that should be suppresed during
+// This file defines the database of macros that should be suppressed during
 // API import.
 //
 // ===---------------------------------------------------------------------===//

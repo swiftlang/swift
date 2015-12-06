@@ -415,7 +415,7 @@ namespace {
     /// the address and the refcount result of the allocation.
     void collectFrom() {
       IsSelfOfNonDelegatingInitializer =
-        TheMemory.isNonDelegatingInit();;
+        TheMemory.isNonDelegatingInit();
 
       // If this is a delegating initializer, collect uses specially.
       if (TheMemory.isDelegatingInit()) {
@@ -749,22 +749,16 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
-    // init_existential_addr is modeled as an initialization store, where the
-    // uses are treated as subelement accesses.
+    // init_existential_addr is modeled as an initialization store.
     if (isa<InitExistentialAddrInst>(User)) {
       assert(!InStructSubElement &&
              "init_existential_addr should not apply to struct subelements");
       Uses.push_back(DIMemoryUse(User, DIUseKind::Initialization,
                                  BaseEltNo, 1));
-
-      // Set the "InEnumSubElement" flag (so we don't consider tuple indexes to
-      // index across elements) and recursively process the uses.
-      llvm::SaveAndRestore<bool> X(InEnumSubElement, true);
-      collectUses(SILValue(User, 0), BaseEltNo);
       continue;
     }
     
-    // inject_enum_addr is treated as a store unconditionally.
+    // inject_enum_addr is modeled as an initialization store.
     if (isa<InjectEnumAddrInst>(User)) {
       assert(!InStructSubElement &&
              "inject_enum_addr the subelement of a struct unless in a ctor");
@@ -1173,7 +1167,7 @@ collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
     // ref_element_addr P, #field lookups up a field.
     if (auto *REAI = dyn_cast<RefElementAddrInst>(User)) {
       assert(EltNumbering.count(REAI->getField()) &&
-             "ref_element_addr not a local field?");;
+             "ref_element_addr not a local field?");
       // Recursively collect uses of the fields.  Note that fields of the class
       // could be tuples, so they may be tracked as independent elements.
       llvm::SaveAndRestore<bool> X(IsSelfOfNonDelegatingInitializer, false);

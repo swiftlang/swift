@@ -12,7 +12,7 @@
 %   all_arithmetic_comparison_operator_names() + all_integer_or_real_assignment_operator_names()
 
 % count = 0
-//TODO: Verify the type of the result
+// TODO: Verify the type of the result
 
 func testIteratedOperations() {
 % for typesToTest, operatorsToTest in zip([all_integer_type_names(), all_numeric_type_names()], \

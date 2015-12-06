@@ -19,7 +19,7 @@ Options:
     -a           Show sizes of additional sections
     -c           Show functions by category
     -l           List all functions (can be a very long list)
-    -s           Summarize the sizes of multiple files instead of listing each file separatly
+    -s           Summarize the sizes of multiple files instead of listing each file separately
 
 Environment variables:
     SWIFT_NEW_BUILDDIR   The old build-dir
@@ -33,8 +33,8 @@ How to specify files:
     Example:
         cmpcodesize
 
-2) One ore more pathes relative to the build-dirs (can be a pattern):
-    Compares that files in the new and old build-dirs.
+2) One or more paths relative to the build-dirs (can be a pattern):
+    Compares the files in the new and old build-dirs.
     Aliases:
         O          => bin/PerfTests_O
         Ounchecked => bin/PerfTests_Ounchecked

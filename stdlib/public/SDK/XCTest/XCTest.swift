@@ -153,7 +153,7 @@ public func XCTAssertNotNil(@autoclosure expression: () -> Any?, _ message: Stri
 
 public func XCTAssert( @autoclosure expression: () -> BooleanType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)  -> Void {
   // XCTAssert is just a cover for XCTAssertTrue.
-  XCTAssertTrue(expression, message, file: file, line: line);
+  XCTAssertTrue(expression, message, file: file, line: line)
 }
 
 public func XCTAssertTrue(@autoclosure expression: () -> BooleanType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {

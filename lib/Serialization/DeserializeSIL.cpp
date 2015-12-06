@@ -538,7 +538,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
       // If CurrentBB is empty, just return fn. The code in readSILInstruction
       // assumes that such a situation means that fn is a declaration. Thus it
       // is using return false to mean two different things, error a failure
-      // occured and this is a declaration. Work around that for now.
+      // occurred and this is a declaration. Work around that for now.
       if (!CurrentBB)
         return fn;
 

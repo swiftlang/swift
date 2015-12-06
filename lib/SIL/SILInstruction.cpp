@@ -357,7 +357,7 @@ namespace {
       // We have already checked the operands. Make sure that the tuple types
       // match up.
       TupleType *TT1 = cast<TupleInst>(LHS)->getTupleType();
-      return TT1 == RHS->getTupleType();;
+      return TT1 == RHS->getTupleType();
     }
 
     bool visitTupleExtractInst(const TupleExtractInst *RHS) {
@@ -803,6 +803,16 @@ bool SILInstruction::mayRelease() const {
     }
     return true;
   }
+  }
+}
+
+bool SILInstruction::mayReleaseOrReadRefCount() const {
+  switch (getKind()) {
+  case ValueKind::IsUniqueInst:
+  case ValueKind::IsUniqueOrPinnedInst:
+    return true;
+  default:
+    return mayRelease();
   }
 }
 

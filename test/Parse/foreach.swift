@@ -35,5 +35,7 @@ func for_each(r: Range<Int>, iir: IntRange<Int>) {
   for i in r sum = sum + i; // expected-error{{expected '{' to start the body of for-each loop}}
   for let x in 0..<10 {} // expected-error {{'let' pattern is already in an immutable context}} {{7-11=}}
 
-  for var x in 0..<10 {} // expected-error {{Use of 'var' binding here is not allowed}} {{7-11=}}
+  // FIXME: rdar://problem/23378003
+  // This will eventually become an error.
+  for var x in 0..<10 {} // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{7-11=}}
 }

@@ -418,7 +418,7 @@ void ARCRegionState::summarizeBlock(SILBasicBlock *BB) {
   SummarizedInterestingInsts.clear();
 
   for (auto &I : *BB)
-    if (!canNeverUseValues(&I) || !canNeverDecrementRefCounts(&I))
+    if (!canNeverUseValues(&I) || I.mayReleaseOrReadRefCount())
       SummarizedInterestingInsts.push_back(&I);
 }
 

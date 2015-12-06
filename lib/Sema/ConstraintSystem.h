@@ -219,7 +219,7 @@ public:
     if (!ParentOrFixed.is<TypeVariableType *>())
       return true;
 
-    // Check whether the representatative is different from our own type
+    // Check whether the representative is different from our own type
     // variable.
     return ParentOrFixed.get<TypeVariableType *>() != getTypeVariable();
   }
@@ -1145,7 +1145,7 @@ public:
 
   Constraint *failedConstraint = nullptr;
 
-  /// \brief Failures that occured while solving.
+  /// \brief Failures that occurred while solving.
   ///
   /// FIXME: We really need to track overload sets and type variable bindings
   /// to make any sense of this data. Also, it probably belongs within

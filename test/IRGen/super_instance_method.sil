@@ -49,9 +49,11 @@ sil_vtable Grandchild {
 }
 
 // CHECK-LABEL: define void @Grandchild_foo(%C21super_instance_method10Grandchild*)
-// CHECK: [[CHILD_METADATA_PTR:%[0-9]+]] = call %swift.type* @_TMaC21super_instance_method5Child()
-// CHECK: [[CASTED_CHILD_METADATA_PTR:%[0-9]+]] = bitcast %swift.type* [[CHILD_METADATA_PTR]] to void (%C21super_instance_method6Parent*)**
-// CHECK: [[FOO_VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%C21super_instance_method6Parent*)*, void (%C21super_instance_method6Parent*)** [[CASTED_CHILD_METADATA_PTR]]
+// CHECK: [[GRANDCHILD_METADATA_PTR:%[0-9]+]] = call %swift.type* @_TMaC21super_instance_method10Grandchild()
+// CHECK: [[OPAQUE_METADATA_PTR:%[0-9]+]] = bitcast %swift.type* %4 to %swift.type**
+// CHECK: [[SUPER_METADATA_PTR:%[0-9]+]] = getelementptr inbounds %swift.type*, %swift.type** [[OPAQUE_METADATA_PTR]], i32 1
+// CHECK: [[SUPER_METADATA:%[0-9]+]] = load %swift.type*, %swift.type** [[SUPER_METADATA_PTR]]
+// CHECK: [[PARENT_METADATA:%[0-9]+]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%C21super_instance_method6Parent*)**
+// CHECK: [[FOO_VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%C21super_instance_method6Parent*)*, void (%C21super_instance_method6Parent*)** [[PARENT_METADATA]]
 // CHECK: [[FOO_FN_PTR:%[0-9]+]] = load void (%C21super_instance_method6Parent*)*, void (%C21super_instance_method6Parent*)** [[FOO_VTABLE_SLOT]]
 // CHECK: call void
-

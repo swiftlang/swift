@@ -2922,9 +2922,9 @@ void ConformanceChecker::resolveTypeWitnesses() {
   // Track when we are checking type witnesses.
   ProtocolConformanceState initialState = Conformance->getState();
   Conformance->setState(ProtocolConformanceState::CheckingTypeWitnesses);
-  defer([&] {
+  defer {
     Conformance->setState(initialState);
-  });
+  };
 
   for (auto member : Proto->getMembers()) {
     auto assocType = dyn_cast<AssociatedTypeDecl>(member);
@@ -3251,11 +3251,11 @@ void ConformanceChecker::resolveTypeWitnesses() {
       valueWitnesses.push_back({inferredReq.first, witnessReq.Witness});
       if (witnessReq.Witness->getDeclContext()->isProtocolExtensionContext())
         ++numValueWitnessesInProtocolExtensions;
-      defer([&]{
+      defer {
         if (witnessReq.Witness->getDeclContext()->isProtocolExtensionContext())
           --numValueWitnessesInProtocolExtensions;
         valueWitnesses.pop_back();
-      });
+      };
 
       // Introduce each of the type witnesses into the hash table.
       bool failed = false;
@@ -3635,7 +3635,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   // Note that we're resolving this witness.
   assert(ResolvingWitnesses.count(requirement) == 0 && "Currently resolving");
   ResolvingWitnesses.insert(requirement);
-  defer([&]{ ResolvingWitnesses.erase(requirement); });
+  defer { ResolvingWitnesses.erase(requirement); };
 
   // Make sure we've validated the requirement.
   if (!requirement->hasType())
@@ -3934,7 +3934,7 @@ checkConformsToProtocol(TypeChecker &TC,
 
   // Note that we are checking this conformance now.
   conformance->setState(ProtocolConformanceState::Checking);
-  defer([&] { conformance->setState(ProtocolConformanceState::Complete); });
+  defer { conformance->setState(ProtocolConformanceState::Complete); };
 
   // If the protocol requires a class, non-classes are a non-starter.
   if (Proto->requiresClass() && !canT->getClassOrBoundGenericClass()) {
@@ -4197,6 +4197,11 @@ bool TypeChecker::isProtocolExtensionUsable(DeclContext *dc, Type type,
   // Unconstrained protocol extensions are always usable.
   if (!protocolExtension->isConstrainedExtension())
     return true;
+
+  // If the type still has parameters, the constrained extension is considered
+  // unusable.
+  if (type->hasTypeParameter())
+    return false;
 
   // Set up a constraint system where we open the generic parameters of the
   // protocol extension.

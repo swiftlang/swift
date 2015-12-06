@@ -24,13 +24,13 @@ Swift has a pretty small set of types right now:
 * Fundamental types: currently i1, i8, i16, i32, and i64; 
   float and double; eventually maybe others.
 * Function types.
-* Tuples. Heterogenous fixed-length products. Swift's system
+* Tuples. Heterogeneous fixed-length products. Swift's system
   provides two basic kinds of element: positional and labelled.
-* Arrays. Homogenous fixed-length aggregates.
+* Arrays. Homogeneous fixed-length aggregates.
 * Algebraic data types (ADTs), introduce by enum.  Nominal closed
-  disjoint unions of heterogenous types.
-* Struct types.  Nominal heterogenous fixed-length products.
-* Class types.  Nominal, subtypeable heterogenous fixed-length products
+  disjoint unions of heterogeneous types.
+* Struct types.  Nominal heterogeneous fixed-length products.
+* Class types.  Nominal, subtypeable heterogeneous fixed-length products
   with identity.
 * Protocol and protocol-composition types.
 
@@ -171,7 +171,7 @@ Default
 .......
 
 I keep going back and forth about having a "default" case-introducer.
-On the one hand, I kindof want to encourage total matches.  On the
+On the one hand, I kind of want to encourage total matches.  On the
 other hand, (1) having it is consistent with C, (2) it's not an
 unnatural style, and (3) there are cases where exhaustive switching
 isn't going to be possible.  We can certainly recommend complete
@@ -274,7 +274,7 @@ fallthrough".
 
 Chris seems motivated to eventually add an explicit 'fallthrough'
 statement. If we did this, my preference would be to generalize it by
-allowing the match to be reperformed with a new value, e.g.
+allowing the match to be performed again with a new value, e.g.
 :code:`fallthrough(something)`, at least optionally.  I think having
 local functions removes a lot of the impetus, but not so much as to
 render the feature worthless.
@@ -419,7 +419,7 @@ Assignment
 ..........
 
 This is a bit iffy. It's a lot like var bindings, but it doesn't have a keyword,
-so it's really kindof ambiguous given the pattern grammar.
+so it's really kind of ambiguous given the pattern grammar.
 
 Also, l-value patterns are weird. I can come up with semantics for this, but I
 don't know what the neighbors will think::
@@ -511,7 +511,7 @@ equal to this expression, but allow some holes and some more complex
 'matcher' values".  But it's possible that it instead might be really
 badly confusing.  We'll see!  It'll be fun!
 
-This kindof forces us to have parallel pattern grammars for the two
+This kind of forces us to have parallel pattern grammars for the two
 major clients:
 
 - Match patterns are used in :code:`switch` and :code:`matches`, where
@@ -574,7 +574,7 @@ Annotation patterns
 
 In an exhaustive pattern, you can annotate an arbitrary sub-pattern
 with a type.  This is useful in an exhaustive pattern: the type of a
-variable isn't always inferrable (or correctly inferrable), and types
+variable isn't always inferable (or correctly inferable), and types
 in function signatures are generally outright required.  It's not as
 useful in a match pattern, and the colon can be grammatically awkward
 there, so we disallow it.
@@ -732,7 +732,7 @@ pattern-specific production.  I believe it should be true that, in
 general, match patterns for a production accept a strict superset of
 valid expressions, so that (e.g.) we do not need to disambiguate
 whether an open paren starts a tuple expression or a tuple pattern,
-but can instaed just aggressively parse as a pattern.  Note that
+but can instead just aggressively parse as a pattern.  Note that
 binary operators can mean that, using this strategy, we sometimes have
 to retroactively rewrite a pattern as an expression.
 

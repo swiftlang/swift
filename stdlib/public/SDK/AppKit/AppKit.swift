@@ -30,7 +30,7 @@ struct _NSCursorMirror : _MirrorType {
     _preconditionFailure("_MirrorType access out of bounds")
   }
 
-  var summary: String { return ""}
+  var summary: String { return "" }
 
   var quickLookObject: PlaygroundQuickLook? {
     return .Some(.Image(_value.image))
@@ -50,7 +50,7 @@ struct _NSViewMirror : _MirrorType {
 
   var _v : NSView
   
-  init(_ v : NSView) {_v = v}
+  init(_ v : NSView) { _v = v }
   
   var value: Any { get { return _v } }
   
@@ -64,7 +64,7 @@ struct _NSViewMirror : _MirrorType {
     _preconditionFailure("_MirrorType access out of bounds")
   }
   
-  var summary: String { get { return ""} }
+  var summary: String { get { return "" } }
   
   var quickLookObject: PlaygroundQuickLook? { get {
       // adapted from the Xcode QuickLooks implementation

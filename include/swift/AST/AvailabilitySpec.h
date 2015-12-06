@@ -96,7 +96,7 @@ public:
 /// deployment target. This specification is designed to ease porting
 /// to new platforms. Because new platforms typically branch from
 /// existing platforms, the wildcard allows an #available() check to do the
-/// "right" thing (executing the the guarded branch) on the new platform without
+/// "right" thing (executing the guarded branch) on the new platform without
 /// requiring a modification to every availablity guard in the program. Note
 /// that we still do compile-time availability checking with '*', so the
 /// compiler will still catch references to potentially unavailable symbols.

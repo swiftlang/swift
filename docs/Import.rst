@@ -118,7 +118,7 @@ Declaration imports
 -------------------
 
 Individual declaration imports shadow whole-module imports, as described above.
-If two declarations with the same name are invidually imported from different
+If two declarations with the same name are individually imported from different
 modules, references to either import must be qualified::
 
   import class abcde.E

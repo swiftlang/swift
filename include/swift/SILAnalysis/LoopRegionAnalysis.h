@@ -395,7 +395,7 @@ private:
     llvm::SmallVector<SubregionID, 16> Subregions;
 
     /// A map from RPO number of a subregion loop's preheader to a subloop
-    /// regions id. This is neccessary since we represent a loop in the
+    /// regions id. This is necessary since we represent a loop in the
     /// Subregions array by the RPO number of its header.
     llvm::SmallVector<std::pair<unsigned, unsigned>, 2> Subloops;
 
@@ -887,9 +887,9 @@ private:
                                      LoopTy *L,
                                      PostOrderFunctionInfo *PI);
 
-  /// Recursively visit all the descendents of Parent. If there is a non-local
+  /// Recursively visit all the descendants of Parent. If there is a non-local
   /// successor edge path that points to a dead edge in Parent, mark the
-  /// descendent non-local successor edge as dead.
+  /// descendant non-local successor edge as dead.
   void propagateLivenessDownNonLocalSuccessorEdges(LoopRegion *Parent);
 };
 

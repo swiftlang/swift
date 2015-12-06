@@ -1190,6 +1190,7 @@ void swift::runREPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   // Disable the REPL on other platforms; our current implementation is tied
   // to histedit.h.
   llvm::report_fatal_error("Compiler-internal integrated REPL unimplemented "
-                           "for this platform");
+                           "for this platform; use the LLDB-enhanced REPL "
+                           "instead.");
 }
 #endif

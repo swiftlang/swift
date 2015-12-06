@@ -56,6 +56,7 @@ sil @unknown : $@convention(thin) () -> ()
 // CHECK-NOT: apply [[FUN]]
 sil @simple_hoist : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
+  debug_value_addr %0 : $*MyArray<MyStruct>
   %2 = load %0 : $*MyArray<MyStruct>
   br bb1
 

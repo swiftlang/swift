@@ -159,7 +159,7 @@ functions don't return lazy collection wrappers that refer to users' closures.
 The consequence is that all users' closures are ``@noescape``, except in an
 explicitly lazy context.
 
-Based on this rule, we conclude that ``enumeraate()``, ``zip()`` and
+Based on this rule, we conclude that ``enumerate(), ``zip()`` and
 ``reverse()`` return lazy wrappers, but ``filter()`` and ``map()`` don't.  For
 the first three functions being lazy is the right default, since usually the
 result is immediately consumed by for-in, so we don't want to allocate memory
@@ -175,7 +175,7 @@ Use of ``BooleanType`` in library APIs
 --------------------------------------
 
 Use ``Bool`` instead of a generic function over a ``BooleanType``, unless there
-are special cicrumstances (for example, ``func &&`` is designed to work on all
+are special circumstances (for example, ``func &&`` is designed to work on all
 boolean values so that ``&&`` feels like a part of the language).
 
 ``BooleanType`` is a protocol to which only ``Bool`` and ``ObjCBool`` conform.

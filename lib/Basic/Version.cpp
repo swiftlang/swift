@@ -59,7 +59,7 @@ namespace version {
 /// Print a string of the form "LLVM xxxxx, Clang yyyyy, Swift zzzzz",
 /// where each placeholder is the revision for the associated repository.
 static void printFullRevisionString(raw_ostream &out) {
-  // Abitrarily truncate to 10 characters. This should be enough to unique
+  // Arbitrarily truncate to 10 characters. This should be enough to unique
   // Git hashes for the time being, and certainly enough for SVN revisions,
   // while keeping the version string from being ridiculously long.
 #if defined(LLVM_REVISION)
@@ -189,7 +189,7 @@ Version Version::parseVersionString(StringRef VersionString,
   SmallString<16> digits;
   llvm::raw_svector_ostream OS(digits);
   SmallVector<std::pair<StringRef, SourceRange>, 5> SplitComponents;
-  // Skip over quote character in string literal
+  // Skip over quote character in string literal.
 
   splitVersionComponents(SplitComponents, VersionString, Loc, Diags);
 

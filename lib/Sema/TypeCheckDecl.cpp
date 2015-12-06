@@ -356,7 +356,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     {
       bool iBTC = decl->isBeingTypeChecked();
       decl->setIsBeingTypeChecked();
-      defer([&]{decl->setIsBeingTypeChecked(iBTC); });
+      defer {decl->setIsBeingTypeChecked(iBTC); };
 
       // Validate the type.
       if (validateType(inherited, DC, options, resolver)) {
@@ -1219,9 +1219,9 @@ static void validatePatternBindingDecl(TypeChecker &tc,
 
   // On any path out of this function, make sure to mark the binding as done
   // being type checked.
-  defer([&]{
+  defer {
     binding->setIsBeingTypeChecked(false);
-  });
+  };
 
   // Resolve the pattern.
   auto *pattern = tc.resolvePattern(binding->getPattern(entryNumber),
@@ -2930,7 +2930,7 @@ public:
 
     if (!IsSecondPass) {
       for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
-        // Type check each VarDecl in that his PatternBinding handles.
+        // Type check each VarDecl that this PatternBinding handles.
         visitBoundVars(PBD->getPattern(i));
 
         // If we have a type but no initializer, check whether the type is
@@ -6239,7 +6239,7 @@ static Type checkExtensionGenericParams(
   };
 
   ext->setIsBeingTypeChecked(true);
-  defer([ext] { ext->setIsBeingTypeChecked(false); });
+  defer { ext->setIsBeingTypeChecked(false); };
 
   // Validate the generic type signature.
   bool invalid = false;
