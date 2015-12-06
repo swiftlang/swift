@@ -1295,10 +1295,13 @@
           <code>T?</code>.</li>
       </ul>
       To support these intrinsic use cases, the library is required to
-      provide four functions with these exact signatures:
+      provide functions with these exact signatures:
       <ul>
-        <li><code>func _preconditionOptionalHasValue<T>(inout v : T?)</code>
+        <li><code>func _doesOptionalHaveValueAsBool<T>(v : T?) -> Bool</code></li>
+        <li><code>func _diagnoseUnexpectedNilOptional()</code></li>
         <li><code>func _getOptionalValue<T>(v : T?) -> T</code></li>
+        <li><code>func _injectValueIntoOptional<T>(v : T) -> T?</code></li>
+        <li><code>func _injectNothingIntoOptional<T>() -> T?</code></li>
       </ul>
     </p>
 
@@ -1317,7 +1320,7 @@
       var b : Int? = .None
         
       <i>// Declare an array of optionals:</i>
-      var c : Int?[] = new Int?[4]
+      var c : [Int?] = [10, nil, 42]
     </pre>
 
   <!-- _____________________________________________________________________ -->
