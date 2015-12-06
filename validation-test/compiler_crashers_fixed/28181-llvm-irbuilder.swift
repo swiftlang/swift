@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend %s -parse
+// RUN: %target-swift-frontend %s -parse
 
 struct A {
     func a() -> String {
