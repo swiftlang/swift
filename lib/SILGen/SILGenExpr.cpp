@@ -71,7 +71,7 @@ ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v) {
 
 ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v,
                                                const TypeLowering &lowering) {
-  assert(lowering.getLoweredType() == v.getType());
+  assert(lowering.getLoweredType().getSwiftRValueType() == v.getType().getSwiftRValueType());
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(v);
   
