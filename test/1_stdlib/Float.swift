@@ -129,7 +129,7 @@ func testSubnormal() {
       _preconditionFailure("unhandled float kind")
   }
   var positiveSubnormal: TestFloat = 1.0
-  for var i = 0; i < iterations; i++ {
+  for i in 0..<iterations {
     positiveSubnormal /= 2.0 as TestFloat
   }
   checkSubnormal(positiveSubnormal)
@@ -138,7 +138,7 @@ func testSubnormal() {
   _precondition(positiveSubnormal != 0.0)
 
   var negativeSubnormal: TestFloat = -1.0
-  for var i = 0; i < iterations; i++ {
+  for i in 0..<iterations {
     negativeSubnormal /= 2.0 as TestFloat
   }
   checkSubnormal(negativeSubnormal)

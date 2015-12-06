@@ -202,7 +202,7 @@ NSStringAPIs.test("init(UTF8String:)") {
   var i = 0
   for b in s.utf8 {
     up[i] = b
-    i++
+    i += 1
   }
   up[i] = 0
   expectOptionalEqual(s, String(UTF8String: UnsafePointer(up)))
