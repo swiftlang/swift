@@ -574,6 +574,11 @@ extension String {
   public subscript(subRange: Range<Index>) -> String {
     return String(characters[subRange])
   }
+  
+  subscript (range: Range<Int>) -> String {
+      let endIndex = min(self.characters.count, range.endIndex)
+      return substringWithRange(Range(start: startIndex.advancedBy(range.startIndex), end: startIndex.advancedBy(endIndex)))
+  }
 }
 
 extension String {
