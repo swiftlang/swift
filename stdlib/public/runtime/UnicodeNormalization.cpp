@@ -185,7 +185,7 @@ int32_t _swift_stdlib_unicode_compare_utf8_utf8(const char *LeftString,
 
 // These functions use murmurhash2 in its 32 and 64bit forms, which are
 // differentiated by the constants defined below. This seems like a good choice
-// for now because it operates efficiently in blocks rather than bytes, and 
+// for now because it operates efficiently in blocks rather than bytes, and
 // the data returned from the collation iterator comes in 4byte chunks.
 #if __arm__ || __i386__
 #define HASH_SEED 0x88ddcc21

@@ -37,7 +37,7 @@ func funcdecl5(a: Int, _ y: Int) {
 
 
   var testfunc : ((), Int) -> Int
-  testfunc(          
+  testfunc(
            {$0+1})  // expected-error {{missing argument for parameter #2 in call}}
 
   funcdecl5(1, 2) // recursion.

@@ -94,7 +94,7 @@ public struct LazyFilterSequence<Base : SequenceType>
 /// `p` in its underlying collection `c` such that `c[p]`
 /// satisfies the predicate with which the `LazyFilterIndex` was
 /// initialized.
-/// 
+///
 /// - Note: The performance of advancing a `LazyFilterIndex`
 ///   depends on how sparsely the filtering predicate is satisfied,
 ///   and may not offer the usual performance given by models of

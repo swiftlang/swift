@@ -9,7 +9,7 @@ func prefix(with: String) -> <T>(() -> T) -> String { func b
 clanType, Bool) -> Bool {
 )
 }
-strs d 
+strs d
     typealias b> : b {
     typealias d = h
     typealias e = a<c<h>, d>

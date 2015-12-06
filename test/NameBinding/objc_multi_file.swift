@@ -35,7 +35,7 @@ class SubSubB : SubB {
 
 class SubSubB2 : SubB {
   // okay: doesn't conflict with hidden initializer
-  func initWithWibble(s: String) { } 
+  func initWithWibble(s: String) { }
 }
 
 // rdar://problem/19941580

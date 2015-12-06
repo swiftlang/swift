@@ -53,7 +53,7 @@ public:
 /// A witness to a specific element of a protocol.  Every
 /// ProtocolTypeInfo stores one of these for each declaration in the
 /// protocol.
-/// 
+///
 /// The structure of a witness varies by the type of declaration:
 ///   - a function requires a single witness, the function;
 ///   - a variable requires two witnesses, a getter and a setter;

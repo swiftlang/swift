@@ -31,7 +31,7 @@ func overflow_check() {
 }
 
 // Coercion chaining.
-struct meters : IntegerLiteralConvertible { 
+struct meters : IntegerLiteralConvertible {
   var value : Int8
   
   init(_ value: Int8) {

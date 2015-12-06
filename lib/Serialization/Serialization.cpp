@@ -1671,7 +1671,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     }
     auto abbrCode = DeclTypeAbbrCodes[ObjCDeclAttrLayout::Code];
     ObjCDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                   theAttr->isImplicit(), 
+                                   theAttr->isImplicit(),
                                    theAttr->isNameImplicit(), numArgs, pieces);
     return;
   }
@@ -3106,7 +3106,7 @@ void Serializer::writeType(Type ty) {
     if (!allGenericArgsInDecl) {
 #ifndef NDEBUG
       if (someGenericArgsInDecl && isDeclXRef(generic->getDecl()))
-        // Emit warning message. 
+        // Emit warning message.
         llvm::errs() << "Serialization: we may have two copied of Archetype\n";
 #endif
       genericArgIDs.clear();

@@ -2150,8 +2150,8 @@ Reflection.test("TupleMirror/NoLeak") {
   }
 }
 
-// A struct type and class type whose NominalTypeDescriptor.FieldNames 
-// data is exactly eight bytes long. FieldNames data of exactly 
+// A struct type and class type whose NominalTypeDescriptor.FieldNames
+// data is exactly eight bytes long. FieldNames data of exactly
 // 4 or 8 or 16 bytes was once miscompiled on arm64.
 struct EightByteFieldNamesStruct {
   let abcdef = 42

@@ -167,7 +167,7 @@ namespace irgen {
   /// Build an Objective-C method descriptor for the given subscript's
   /// getter and setter methods.
   std::pair<llvm::Constant *, llvm::Constant *>
-  emitObjCSubscriptMethodDescriptors(IRGenModule &IGM, 
+  emitObjCSubscriptMethodDescriptors(IRGenModule &IGM,
                                      SubscriptDecl *subscript);
 
   /// True if the FuncDecl requires an ObjC method descriptor.

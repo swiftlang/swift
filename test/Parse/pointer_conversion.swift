@@ -7,13 +7,13 @@ class D {}
 
 func takesMutablePointer(x: UnsafeMutablePointer<Int>) {}
 func takesMutableVoidPointer(x: UnsafeMutablePointer<Void>) {}
-func takesMutableInt8Pointer(x: UnsafeMutablePointer<Int8>) {} 
-func takesMutableArrayPointer(x: UnsafeMutablePointer<[Int]>) {} 
+func takesMutableInt8Pointer(x: UnsafeMutablePointer<Int8>) {}
+func takesMutableArrayPointer(x: UnsafeMutablePointer<[Int]>) {}
 func takesConstPointer(x: UnsafePointer<Int>) -> Character { return "x" }
 func takesConstInt8Pointer(x: UnsafePointer<Int8>) {}
 func takesConstUInt8Pointer(x: UnsafePointer<UInt8>) {}
 func takesConstVoidPointer(x: UnsafePointer<Void>) {}
-func takesAutoreleasingPointer(x: AutoreleasingUnsafeMutablePointer<C>) {} 
+func takesAutoreleasingPointer(x: AutoreleasingUnsafeMutablePointer<C>) {}
 
 func mutablePointerArguments(p: UnsafeMutablePointer<Int>,
                              cp: UnsafePointer<Int>,

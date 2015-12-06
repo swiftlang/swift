@@ -35,7 +35,7 @@ static unsigned getNumLowObjCReservedBits(IRGenModule &IGM) {
 /// Return the number of extra inhabitants for a pointer that reserves
 /// the given number of low bits.
 static unsigned getPointerExtraInhabitantCount(IRGenModule &IGM,
-                                               unsigned numReservedLowBits) {  
+                                               unsigned numReservedLowBits) {
   // FIXME: We could also make extra inhabitants using spare bits, but we
   // probably don't need to.
   uint64_t rawCount =
@@ -135,7 +135,7 @@ static llvm::Value *getPointerExtraInhabitantIndex(IRGenFunction &IGF,
 
     // Shift away the reserved bits.
     if (numReservedLowBits) {
-      index = IGF.Builder.CreateLShr(index, 
+      index = IGF.Builder.CreateLShr(index,
                     llvm::ConstantInt::get(IGF.IGM.SizeTy, numReservedLowBits));
     }
 
@@ -153,7 +153,7 @@ static llvm::Value *getPointerExtraInhabitantIndex(IRGenFunction &IGF,
   auto phi = IGF.Builder.CreatePHI(IGF.IGM.Int32Ty, phiValues.size());
   for (auto &entry : phiValues) {
     phi->addIncoming(entry.second, entry.first);
-  }  
+  }
   return phi;
 }
 

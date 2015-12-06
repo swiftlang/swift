@@ -288,7 +288,7 @@ bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
 }
 
 /// parseTypeIdentifier
-///   
+///
 ///   type-identifier:
 ///     identifier generic-args? ('.' identifier generic-args?)*
 ///
@@ -387,7 +387,7 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
 }
 
 /// parseTypeComposition
-///   
+///
 ///   type-composition:
 ///     'protocol' '<' type-composition-list? '>'
 ///
@@ -437,7 +437,7 @@ ParserResult<ProtocolCompositionTypeRepr> Parser::parseTypeComposition() {
     // Skip until we hit the '>'.
     skipUntilGreaterInTypeList(/*protocolComposition=*/true);
     if (startsWithGreater(Tok))
-      EndLoc = consumeStartingGreater();    
+      EndLoc = consumeStartingGreater();
   } else {
     EndLoc = consumeStartingGreater();
   }
@@ -674,7 +674,7 @@ ParserResult<TypeRepr> Parser::parseTypeCollection() {
   parseMatchingToken(tok::r_square, rsquareLoc,
                      colonLoc.isValid()
                        ? diag::expected_rbracket_dictionary_type
-                       : diag::expected_rbracket_array_type, 
+                       : diag::expected_rbracket_array_type,
                      lsquareLoc);
 
   // If we couldn't parse anything for one of the types, propagate the error.

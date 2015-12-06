@@ -99,8 +99,8 @@ static VarDecl *createSelfDecl(DeclContext *DC, bool isStaticMethod,
   if (isInOut)
     selfType = InOutType::get(selfType);
 
-  VarDecl *selfDecl = new (C) ParamDecl(/*IsLet*/isLet, SourceLoc(), 
-                                        Identifier(), SourceLoc(), C.Id_self, 
+  VarDecl *selfDecl = new (C) ParamDecl(/*IsLet*/isLet, SourceLoc(),
+                                        Identifier(), SourceLoc(), C.Id_self,
                                         selfType, DC);
   selfDecl->setImplicit();
   return selfDecl;
@@ -1203,7 +1203,7 @@ StringRef ClangImporter::Implementation::getCFTypeName(
 
     if (pointee.isTypedef() && secondaryName) {
       StringRef otherName = getImportedCFTypeName(name);
-      if (otherName != name) 
+      if (otherName != name)
         *secondaryName = otherName;
     }
 
@@ -1512,7 +1512,7 @@ namespace {
                 NameMapping = MappedTypeNameKind::DefineAndUse;
               }
 
-            // If the pointee is 'const void', 
+            // If the pointee is 'const void',
             // 'CFTypeRef', bring it in specifically as AnyObject.
             } else if (pointee.isConstVoid()) {
               auto proto = Impl.SwiftContext.getProtocol(
@@ -2843,7 +2843,7 @@ namespace {
         os << ")'";
         member->getAttrs().add(
           AvailableAttr::createUnconditional(
-            Impl.SwiftContext, 
+            Impl.SwiftContext,
             Impl.SwiftContext.AllocateCopy(os.str())));
       }
 
@@ -2975,7 +2975,7 @@ namespace {
 
         // Update the method type with the new result type.
         auto methodTy = type->castTo<FunctionType>();
-        type = FunctionType::get(methodTy->getInput(), resultTy, 
+        type = FunctionType::get(methodTy->getInput(), resultTy,
                                  methodTy->getExtInfo());
 
         // Create the interface type of the method.
@@ -3433,7 +3433,7 @@ namespace {
 
       // Create the actual constructor.
       auto result = Impl.createDeclWithClangNode<ConstructorDecl>(objcMethod,
-                      name, SourceLoc(), failability, SourceLoc(), selfPat, 
+                      name, SourceLoc(), failability, SourceLoc(), selfPat,
                       bodyPatterns.back(), /*GenericParams=*/nullptr,
                       SourceLoc(), dc);
 
@@ -4257,7 +4257,7 @@ namespace {
           // If this is a factory method, try to import it as a constructor.
           if (auto factory = importFactoryMethodAsConstructor(
                                member,
-                               objcMethod, 
+                               objcMethod,
                                Impl.importSelector(objcMethod->getSelector()),
                                swiftContext)) {
             if (*factory)
@@ -4535,7 +4535,7 @@ namespace {
             if (auto newCtor = importConstructor(objcMethod, classDecl,
                                                  /*implicit=*/true,
                                                  ctor->getInitKind(),
-                                                 /*required=*/false, 
+                                                 /*required=*/false,
                                                  ctor->getObjCSelector(),
                                                  importedName,
                                                  objcMethod->parameters(),
@@ -5884,7 +5884,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
       selfTy = MetatypeType::get(selfTy);
 
     getterArgs.push_back(
-      Pattern::buildImplicitSelfParameter(SourceLoc(), 
+      Pattern::buildImplicitSelfParameter(SourceLoc(),
                                           TypeLoc::withoutLoc(selfTy),
                                           dc));
   }

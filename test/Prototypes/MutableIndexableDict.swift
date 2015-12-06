@@ -35,7 +35,7 @@
 //
 //    Dictionary<K,V> (a struct)
 //    +---+
-//    | * | 
+//    | * |
 //    +-|-+
 //      |
 //      V  DictionaryBufferOwner<K,V>
@@ -60,7 +60,7 @@
 //
 //    Dictionary<K,V> (a struct)
 //    +---+
-//    | * | 
+//    | * |
 //    +-|-+
 //      |  +---+
 //      |  |   |

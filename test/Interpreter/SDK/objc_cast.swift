@@ -455,12 +455,12 @@ if let boolArr = obj as? [Bool] {
   print("Numbers-as-bools failed")
 }
 
-class Base : NSObject { 
+class Base : NSObject {
   override var description: String {
     return "Base"
   }
 }
-class Derived : Base { 
+class Derived : Base {
   override var description: String {
     return "Derived"
   }
@@ -505,7 +505,7 @@ if let dict = obj as? Dictionary<Derived, Derived> {
 
 let strArray: AnyObject = ["hello", "world"]
 let intArray: AnyObject = [1, 2, 3]
-let dictArray: AnyObject = [["hello" : 1, "world" : 2], 
+let dictArray: AnyObject = [["hello" : 1, "world" : 2],
                             ["swift" : 1, "speedy" : 2]]
 
 // CHECK: Dictionary<String, AnyObject> is
@@ -530,7 +530,7 @@ if let dict = obj as? Dictionary<String, [Int]> {
   print("Not a Dictionary<String, Int>")
 }
 
-// CHECK: [Dictionary<String, Int>] is 
+// CHECK: [Dictionary<String, Int>] is
 obj = dictArray
 if let array = obj as? [Dictionary<String, Int>] {
   print("[Dictionary<String, Int>] is \(array)")
@@ -575,7 +575,7 @@ if let array = obj as? Dictionary<String, [Dictionary<String, String>]> {
   print("Not a Dictionary<String, [Dictionary<String, String>]>[]")
 }
 
-// Helper function that downcasts 
+// Helper function that downcasts
 func downcastToStringArrayOptOpt(obj: AnyObject??!!) {
   if let strArrOptOpt = obj as? [String]?? {
     if let strArrOpt = strArrOptOpt {

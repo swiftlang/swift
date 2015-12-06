@@ -11,7 +11,7 @@ protocol ClassConstrainedProto : class {}
 func takesAnyObject(x: AnyObject) {}
 
 func concreteTypes() {
-  takesAnyObject(C.self) 
+  takesAnyObject(C.self)
   // TODO: Better error messages
   takesAnyObject(S.self) // expected-error{{argument type 'S.Type' does not conform to expected type 'AnyObject'}}
   takesAnyObject(ClassConstrainedProto.self) // expected-error{{argument type 'ClassConstrainedProto.Protocol' does not conform to expected type 'AnyObject'}}

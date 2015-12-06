@@ -64,11 +64,11 @@ struct B {
 
  static let VOLUME3 = I + 10
  
- static var PROP1: Double { 
+ static var PROP1: Double {
    return PI
  }
  
- static var PROP2: Int { 
+ static var PROP2: Int {
    return I * J - I
  }
 
@@ -101,11 +101,11 @@ class C {
 
  static let VOLUME3 = I + 10
  
- static var PROP1: Double { 
+ static var PROP1: Double {
    return PI
  }
  
- static var PROP2: Int { 
+ static var PROP2: Int {
    return I * J - I
  }
 
@@ -265,11 +265,11 @@ public func test_static_class_let_int_complex() -> Int {
 // CHECK-NEXT: load
 @inline(never)
 public func test_var_double() -> Double {
-  return VPI + 1.0 
+  return VPI + 1.0
 }
 
 // CHECK-LABEL: sil [noinline] @_TF25globalopt_let_propagation12test_var_intFT_Si
-// CHECK: bb0: 
+// CHECK: bb0:
 // CHECK-NEXT: global_addr
 // CHECK-NEXT: struct_element_addr
 // CHECK-NEXT: load

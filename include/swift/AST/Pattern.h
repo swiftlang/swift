@@ -229,7 +229,7 @@ public:
   
   /// walk - This recursively walks the AST rooted at this pattern.
   Pattern *walk(ASTWalker &walker);
-  Pattern *walk(ASTWalker &&walker) { return walk(walker); }  
+  Pattern *walk(ASTWalker &&walker) { return walk(walker); }
 };
 
 /// A pattern consisting solely of grouping parentheses around a

@@ -75,7 +75,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
   ASTWalker &Walker;
   
-  /// \brief RAII object that sets the parent of the walk context 
+  /// \brief RAII object that sets the parent of the walk context
   /// appropriately.
   class SetParentRAII {
     ASTWalker &Walker;
@@ -369,7 +369,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
   Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) { return E; }
 
-  Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) { 
+  Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     if (E->getArgument()) {
       if (auto arg = doIt(E->getArgument())) {
         E->setArgument(arg);
@@ -378,7 +378,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
       return nullptr;
     }
-    return E; 
+    return E;
   }
 
   Expr *visitOpaqueValueExpr(OpaqueValueExpr *E) { return E; }
@@ -710,7 +710,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     E2 = doIt(E->getRHS());
     if (E2 == nullptr) return nullptr;
     E->setRHS(E2);
-    return E;      
+    return E;
   }
 
   Expr *visitExplicitCastExpr(ExplicitCastExpr *E) {

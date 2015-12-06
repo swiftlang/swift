@@ -10,7 +10,7 @@ class A {
   init(m: Int)
   convenience init(n: Int)
   func foo() -> Int32
-   deinit 
+   deinit
 }
 
 // test.A.foo (test.A)() -> Swift.Int32

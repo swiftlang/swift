@@ -65,7 +65,7 @@ public:
     IsNotReplaced = false, IsReplaced = true
   };
 
-private:  
+private:
   unsigned TheKind : 8;
   unsigned ErrorIsOwned : 1;
   unsigned ErrorParameterIsReplaced : 1;

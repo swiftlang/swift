@@ -6,6 +6,6 @@
 
 var d: Int -> Int = {
     e $0 d)
-func a(b: Int = 0) 
+func a(b: Int = 0)
 let c= a
 c()

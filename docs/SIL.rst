@@ -11,13 +11,13 @@ Abstract
 SIL is an SSA-form IR with high-level semantic information designed to implement
 the Swift programming language. SIL accommodates the following use cases:
 
-- A set of guaranteed high-level optimizations that provide a predictable 
+- A set of guaranteed high-level optimizations that provide a predictable
   baseline for runtime and diagnostic behavior.
 - Diagnostic dataflow analysis passes that enforce Swift language requirements,
   such as definitive initialization of variables and constructors, code
   reachability, switch coverage.
 - High-level optimization passes, including retain/release optimization,
-  dynamic method devirtualization, closure inlining, memory allocation promotion, 
+  dynamic method devirtualization, closure inlining, memory allocation promotion,
   and generic function instantiation.
 - A stable distribution format that can be used to distribute "fragile"
   inlineable or generic code with Swift library modules, to be optimized into
@@ -79,8 +79,8 @@ predictable.
   of which performs capture analysis to promote ``alloc_box`` instructions to
   ``alloc_stack``, and the second of which promotes non-address-exposed ``alloc_stack``
   instructions to SSA registers.
-- **Constant propagation** folds constant expressions and propagates the constant values. 
-  If an arithmetic overflow occurs during the constant expression computation, a diagnostic 
+- **Constant propagation** folds constant expressions and propagates the constant values.
+  If an arithmetic overflow occurs during the constant expression computation, a diagnostic
   is issued.
 - **Return analysis** verifies that each function returns a value on every
   code path and doesn't "fall of the end" of its definition, which is an error.
@@ -606,7 +606,7 @@ types. Function types are transformed in order to encode additional attributes:
     @convention(*convention*)
 
   attribute. This is similar to the language-level ``@convention``
-  attribute, though SIL extends the set of supported conventions with 
+  attribute, though SIL extends the set of supported conventions with
   additional distinctions not exposed at the language level:
 
   - ``@convention(thin)`` indicates a "thin" function reference, which uses
@@ -811,7 +811,7 @@ Some SIL instructions need to reference Swift declarations directly. These
 references are introduced with the ``#`` sigil followed by the fully qualified
 name of the Swift declaration. Some Swift declarations are
 decomposed into multiple entities at the SIL level. These are distinguished by
-following the qualified name with ``!`` and one or more ``.``-separated component 
+following the qualified name with ``!`` and one or more ``.``-separated component
 entity discriminators:
 
 - ``getter``: the getter function for a ``var`` declaration
@@ -873,7 +873,7 @@ different SIL modules are *linked*, i.e. treated as the same object.
 A linkage is *external* if it ends with the suffix ``external``.  An
 object must be a definition if its linkage is not external.
 
-All functions, global variables, and witness tables have linkage. 
+All functions, global variables, and witness tables have linkage.
 The default linkage of a definition is ``public``.  The default linkage of a
 declaration is ``public_external``.  (These may eventually change to ``hidden``
 and ``hidden_external``, respectively.)
@@ -2538,7 +2538,7 @@ dynamic_method
   // #X.method!1 must be a reference to an @objc method of any class
   // or protocol type
   //
-  // The "self" argument of the method type $@thin U -> V must be 
+  // The "self" argument of the method type $@thin U -> V must be
   //   Builtin.ObjCPointer
 
 Looks up the implementation of an Objective-C method with the same
@@ -2551,13 +2551,13 @@ It is undefined behavior if the dynamic type of the operand does not
 have an implementation for the Objective-C method with the selector to
 which the ``dynamic_method`` instruction refers, or if that
 implementation has parameter or result types that are incompatible
-with the method referenced by ``dynamic_method``. 
+with the method referenced by ``dynamic_method``.
 This instruction should only be used in cases where its result will be
 immediately consumed by an operation that performs the selector check
 itself (e.g., an ``apply`` that lowers to ``objc_msgSend``).
 To query whether the operand has an implementation for the given
 method and safely handle the case where it does not, use
-`dynamic_method_br`_. 
+`dynamic_method_br`_.
 
 Function Application
 ~~~~~~~~~~~~~~~~~~~~
@@ -3314,8 +3314,8 @@ open_existential_addr
   %1 = open_existential_addr %0 : $*P to $*@opened P
   // %0 must be of a $*P type for non-class protocol or protocol composition
   //   type P
-  // $*@opened P must be a unique archetype that refers to an opened 
-  // existential type P. 
+  // $*@opened P must be a unique archetype that refers to an opened
+  // existential type P.
   // %1 will be of type $*P
 
 Obtains the address of the concrete value inside the existential
@@ -3348,14 +3348,14 @@ open_existential_ref
 
   %1 = open_existential_ref %0 : $P to $@opened P
   // %0 must be of a $P type for a class protocol or protocol composition
-  // $@opened P must be a unique archetype that refers to an opened 
+  // $@opened P must be a unique archetype that refers to an opened
   //   existential type P
   // %1 will be of type $@opened P
 
 Extracts the class instance reference from a class existential
 container. The protocol conformances associated with this existential
-container are associated directly with the archetype ``@opened P``. This 
-pointer can be used with any operation on archetypes, such as 
+container are associated directly with the archetype ``@opened P``. This
+pointer can be used with any operation on archetypes, such as
 ``witness_method``. When the operand is of metatype type, the result
 will be the metatype of the opened archetype.
 
@@ -3428,7 +3428,7 @@ Projects the address of the value inside a boxed existential container, and
 uses the enclosed type and protocol conformance metadata to bind the
 opened archetype ``$@opened P``. The result address is dependent on both
 the owning box and the enclosing function; in order to "open" a boxed
-existential that has directly adopted a class reference, temporary scratch 
+existential that has directly adopted a class reference, temporary scratch
 space may need to have been allocated.
 
 dealloc_existential_box
@@ -4183,7 +4183,7 @@ dynamic_method_br
 `````````````````
 ::
 
-  sil-terminator ::= 'dynamic_method_br' sil-operand ',' sil-decl-ref 
+  sil-terminator ::= 'dynamic_method_br' sil-operand ',' sil-decl-ref
                        ',' sil-identifier ',' sil-identifier
 
   dynamic_method_br %0 : $P, #X.method!1, bb1, bb2

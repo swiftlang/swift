@@ -1,11 +1,11 @@
 // RUN: %target-swift-frontend -emit-silgen -emit-verbose-sil %s | FileCheck %s
 
-// FIXME: Not sure if this an ideal source info for the branch - 
+// FIXME: Not sure if this an ideal source info for the branch -
 // it points to if, not the last instruction in the block.
 func ifexpr() -> Int {
-  var x : Int = 0; 
+  var x : Int = 0;
   if true {
-    x++; 
+    x++;
   }
   return x;
   // CHECK-LABEL: sil hidden  @_TF13sil_locations6ifexprFT_Si
@@ -16,9 +16,9 @@ func ifexpr() -> Int {
 }
 
 func ifelseexpr() -> Int {
-  var x : Int = 0; 
+  var x : Int = 0;
   if true {
-    x++; 
+    x++;
   } else {
     x--;
   }
@@ -32,12 +32,12 @@ func ifelseexpr() -> Int {
   // CHECK: return {{.*}} // {{.*}} line:[[@LINE-7]]:3:return
 }
 
-// The source locations are handled differently here - since 
-// the return is unified, we keep the location of the return(not the if) 
+// The source locations are handled differently here - since
+// the return is unified, we keep the location of the return(not the if)
 // in the branch.
 func ifexpr_return() -> Int {
   if true {
-    return 5; 
+    return 5;
   }
   return 6;
   // CHECK-LABEL: sil hidden  @_TF13sil_locations13ifexpr_returnFT_Si
@@ -125,7 +125,7 @@ func multipleReturnsImplicitAndExplicit() {
 }
 
 func simplifiedImplicitReturn() -> () {
-  var y = 0 
+  var y = 0
   // CHECK-LABEL: sil hidden  @_TF13sil_locations24simplifiedImplicitReturnFT_T_
   // CHECK: return {{.*}} // {{.*}} line:[[@LINE+1]]:1:imp_return
 }
@@ -165,7 +165,7 @@ func testIf() {
   // FIXME: Missing location info here.
   // CHECK: function_ref
   // CHECK: apply
-  // 
+  //
   //
   //
   // CHECK: br {{.*}}                                            // {{.*}} line:[[@LINE-13]]:6
@@ -207,7 +207,7 @@ func testTuples() {
   // CHECK: integer_literal $Builtin.Int2048, 2                      {{.*}} line:[[@LINE-7]]:12
   // CHECK: integer_literal $Builtin.Int2048, 3                      {{.*}} line:[[@LINE-8]]:14
   // CHECK: tuple_element_addr                                       {{.*}} line:[[@LINE-8]]:12
-  // CHECK: tuple_element_addr                                       {{.*}} line:[[@LINE-9]]:16  
+  // CHECK: tuple_element_addr                                       {{.*}} line:[[@LINE-9]]:16
 }
 
 // Test tuple emploding/exploding.
@@ -246,7 +246,7 @@ func interpolated_string(x: Int, y: String) -> String {
 
 
 func int(x: Int) {}
-func tuple() -> (Int, Float) { return (1, 1.0) }  
+func tuple() -> (Int, Float) { return (1, 1.0) }
 func tuple_element(x: (Int, Float)) {
   int(tuple().0)
   // CHECK-LABEL: sil hidden @_TF13sil_locations13tuple_element
@@ -390,7 +390,7 @@ func testRepeatWhile() {
   // CHECK: br         {{.*}} line:[[@LINE-6]]:3
   // CHECK: cond_br {{.*}} line:[[@LINE-5]]:11
   // Loop back branch:
-  // CHECK: br         {{.*}} line:[[@LINE-7]]:11  
+  // CHECK: br         {{.*}} line:[[@LINE-7]]:11
 }
 
 

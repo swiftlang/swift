@@ -14,7 +14,7 @@
 
 =====================================
  Bridging Swift Arrays to/from Cocoa
-=====================================   
+=====================================
 
 :Authors: Chris Lattner, Joe Groff, Dave Abrahams
           

@@ -86,7 +86,7 @@ class ConformanceLookupTable {
   class ConformanceSource {
     llvm::PointerIntPair<void *, 2, ConformanceEntryKind> Storage;
 
-    ConformanceSource(void *ptr, ConformanceEntryKind kind) 
+    ConformanceSource(void *ptr, ConformanceEntryKind kind)
       : Storage(ptr, kind) { }
 
   public:
@@ -152,14 +152,14 @@ class ConformanceLookupTable {
     /// for the inheriting class.
     ClassDecl *getInheritingClass() const {
       assert(getKind() == ConformanceEntryKind::Inherited);
-      return static_cast<ClassDecl *>(Storage.getPointer());      
+      return static_cast<ClassDecl *>(Storage.getPointer());
     }
 
     /// For an explicit conformance, retrieve the declaration context
     /// that specifies the conformance.
     DeclContext *getExplicitDeclContext() const {
       assert(getKind() == ConformanceEntryKind::Explicit);
-      return static_cast<DeclContext *>(Storage.getPointer());      
+      return static_cast<DeclContext *>(Storage.getPointer());
     }
 
     /// For a synthesized conformance, retrieve the nominal type decl
@@ -401,7 +401,7 @@ class ConformanceLookupTable {
   /// \param superclassExt If non-null, the superclass extension from
   /// which conformances will be inherited. If null, the conformances
   /// on the superclass declaration itself will be inherited.
-  void inheritConformances(ClassDecl *classDecl, 
+  void inheritConformances(ClassDecl *classDecl,
                            ClassDecl *superclassDecl,
                            ExtensionDecl *superclassExt,
                            LazyResolver *resolver);
@@ -436,10 +436,10 @@ public:
   /// \param conformances Will be populated with the set of protocol
   /// conformances found for this protocol and nominal type.
   ///
-  /// \returns true if any conformances were found. 
+  /// \returns true if any conformances were found.
   bool lookupConformance(ModuleDecl *module,
                          NominalTypeDecl *nominal,
-                         ProtocolDecl *protocol, 
+                         ProtocolDecl *protocol,
                          LazyResolver *resolver,
                          SmallVectorImpl<ProtocolConformance *> &conformances);
 

@@ -15,19 +15,19 @@
 //===----------------------------------------------------------------------===//
 // ALAssetsLibrary.h
 //===----------------------------------------------------------------------===//
-extension ALAssetsLibrary { 
+extension ALAssetsLibrary {
   @nonobjc
-  public func enumerateGroupsWithTypes(types: UInt32, 
+  public func enumerateGroupsWithTypes(types: UInt32,
       usingBlock enumerationBlock: ALAssetsLibraryGroupsEnumerationResultsBlock!,
       failureBlock: ALAssetsLibraryAccessFailureBlock!) {
     var types = types
     if (types == ALAssetsGroupAll) {
-      types = ALAssetsGroupLibrary | ALAssetsGroupAlbum | ALAssetsGroupEvent | 
-              ALAssetsGroupFaces | ALAssetsGroupSavedPhotos | 
+      types = ALAssetsGroupLibrary | ALAssetsGroupAlbum | ALAssetsGroupEvent |
+              ALAssetsGroupFaces | ALAssetsGroupSavedPhotos |
               ALAssetsGroupPhotoStream
     }
-    return enumerateGroupsWithTypes(ALAssetsGroupType(types), 
-                                    usingBlock: enumerationBlock, 
+    return enumerateGroupsWithTypes(ALAssetsGroupType(types),
+                                    usingBlock: enumerationBlock,
                                     failureBlock: failureBlock)
 
   }

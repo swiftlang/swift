@@ -155,8 +155,8 @@ class BaseWithDefaults {
 }
 
 class DerivedWithoutDefaults : BaseWithDefaults {
-   override func a(object: AnyObject?) { 
-     super.a(object)   
+   override func a(object: AnyObject?) {
+     super.a(object)
    }
 }
 

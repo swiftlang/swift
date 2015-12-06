@@ -753,7 +753,7 @@ void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint) const {
   LastDeclAndKind.setPointer(member);
 }
 
-void IterableDeclContext::setLoader(LazyMemberLoader *loader, 
+void IterableDeclContext::setLoader(LazyMemberLoader *loader,
                                     uint64_t contextData) {
   LazyLoader = loader;
   LazyLoaderContextData = contextData;

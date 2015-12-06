@@ -1694,7 +1694,7 @@ struct ASTNodeBase {};
         dumpRef(decl);
         Out << " doesn't have a complete set of protocols\n";
         abort();
-      }      
+      }
     }
 
     /// Check the given explicit protocol conformance.
@@ -1757,7 +1757,7 @@ struct ASTNodeBase {};
           if (!normal->hasTypeWitness(assocType)) {
             dumpRef(decl);
             Out << " is missing type witness for "
-                << conformance->getProtocol()->getName().str() 
+                << conformance->getProtocol()->getName().str()
                 << "." << assocType->getName().str()
                 << "\n";
             abort();
@@ -1781,7 +1781,7 @@ struct ASTNodeBase {};
           if (!normal->hasWitness(req)) {
             dumpRef(decl);
             Out << " is missing witness for "
-                << conformance->getProtocol()->getName().str() 
+                << conformance->getProtocol()->getName().str()
                 << "." << req->getName().str()
                 << "\n";
             abort();
@@ -1873,10 +1873,10 @@ struct ASTNodeBase {};
 
       // Verify that the optionality of the result type of the
       // initializer matches the failability of the initializer.
-      if (!CD->isInvalid() && 
-          CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal() 
+      if (!CD->isInvalid() &&
+          CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal()
             != Ctx.getOptionalDecl() &&
-          CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal() 
+          CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal()
             != Ctx.getImplicitlyUnwrappedOptionalDecl()) {
         OptionalTypeKind resultOptionality = OTK_None;
         CD->getResultType()->getAnyOptionalObjectType(resultOptionality);
@@ -1887,7 +1887,7 @@ struct ASTNodeBase {};
         }
 
         // Also check the interface type.
-        if (auto genericFn 
+        if (auto genericFn
               = CD->getInterfaceType()->getAs<GenericFunctionType>()) {
           resultOptionality = OTK_None;
           genericFn->getResult()->castTo<AnyFunctionType>()->getResult()

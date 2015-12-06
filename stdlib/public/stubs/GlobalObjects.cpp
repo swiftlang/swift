@@ -31,7 +31,7 @@ extern "C" _SwiftEmptyArrayStorage _swiftEmptyArrayStorage = {
   
   // _SwiftArrayBodyStorage body;
   {
-    0, // int count;                                    
+    0, // int count;
     1  // unsigned int _capacityAndFlags; 1 means elementTypeIsBridgedVerbatim
   }
 };

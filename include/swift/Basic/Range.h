@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 //  This file provides classes and functions for conveniently working
-//  with ranges, 
+//  with ranges,
 //
 //  reversed returns an iterator_range out of the reverse iterators of a type.
 //

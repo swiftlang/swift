@@ -4,7 +4,7 @@
 // RUN: %target-repl-run-simple-swift -F %t | FileCheck %s
 
 // REQUIRES: swift_repl
-// REQUIRES: objc_interop 
+// REQUIRES: objc_interop
 
 import VerySmallObjCFramework
 

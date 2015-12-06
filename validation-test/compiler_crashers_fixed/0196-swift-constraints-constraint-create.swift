@@ -75,7 +75,7 @@ class r {
 class w: r, n {
     k v: ))] = []
 }
-class n<x : n> 
+class n<x : n>
 class A: A {
 }
 class B : C {
@@ -83,7 +83,7 @@ class B : C {
 typealias C = B
 protocol f {
     k g d {
-    k d 
+    k d
     k k
 }
 j j<l : d> : d {
@@ -120,7 +120,7 @@ func p<p>() -> (p, p -> p) -> p {
     })
 }
 j(k(m, k(2, 3)))
-func l(p: j) -> <n>(() -> n 
+func l(p: j) -> <n>(() -> n
 func f(k: Any, j: Any) -> (((Any, Any) -> Any) -> c
 k)
 func c<i>() -> (i, i -> i) -> i {
@@ -208,7 +208,7 @@ func j<f: l: e -> e = {
 protocol k {
    class func j()
 }
-class e: k{  class func j 
+class e: k{  class func j
 func b(c) -> <d>(() -> d)
 protocol A {
     func c() -> String
@@ -448,7 +448,7 @@ func prefix(with: String) -> <T>(() -> T) -> String { func b
 clanType, Bool) -> Bool {
 )
 }
-strs d 
+strs d
     typealias b> : b {
     typealias d = h
     typealias e = a<c<h>, d>
@@ -629,7 +629,7 @@ func n(r: (((t, t) -> t) -> t)) -> t {
 class a<f : b, g : b where f.d == g> {
 }
 protocol b {
-    typealias d 
+    typealias d
     typealias e
 }
 struct c<h : b> : b {
@@ -652,7 +652,7 @@ protocol k : w { func v <h: h m h.p == k>(l: h.p) {
     }
 }
 protocol h {
-    n  func w(w: 
+    n  func w(w:
 }
 class h<u : h> {
 o

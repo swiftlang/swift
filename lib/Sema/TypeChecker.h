@@ -1085,7 +1085,7 @@ public:
   /// \returns the type of \p expr on success, None otherwise.
   /// FIXME: expr may still be modified...
   Optional<Type> getTypeOfExpressionWithoutApplying(
-      Expr *&expr, DeclContext *dc, 
+      Expr *&expr, DeclContext *dc,
       FreeTypeVariableBinding allowFreeTypeVariables =
                               FreeTypeVariableBinding::Disallow,
       ExprTypeCheckListener *listener = nullptr);
@@ -1325,7 +1325,7 @@ public:
   ///
   /// \param name The name of the method to call.
   ///
-  /// \param arguments The arguments to 
+  /// \param arguments The arguments to
   ///
   /// \param brokenProtocolDiag Diagnostic to emit if the protocol is broken.
   ///
@@ -1445,7 +1445,7 @@ public:
   /// \brief Look up a member type within the given type.
   ///
   /// This routine looks for member types with the given name within the
-  /// given type. 
+  /// given type.
   ///
   /// \param dc The context that needs the member.
   /// \param type The type in which we will look for a member type.

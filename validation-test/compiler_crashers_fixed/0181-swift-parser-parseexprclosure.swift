@@ -19,7 +19,7 @@ func j<f: l: e -> e = {
 protocol k {
    class func j()
 }
-class e: k{  class func j 
+class e: k{  class func j
 func i(c: () -> ()) {
 }
 class a {
@@ -72,7 +72,7 @@ i(e())
 class a<f : g, g : g where f.f == g> {
 }
 protocol g {
-    typealias f 
+    typealias f
     typealias e
 }
 struct c<h : g> : g {
@@ -83,7 +83,7 @@ func prefix(with: String) -> <T>(() -> T) -> String { func b
 clanType, Bool) -> Bool {
 )
 }
-strs d 
+strs d
     typealias b> : b {
     typealias d = h
     typealias e = a<c<h>, d>
@@ -91,7 +91,7 @@ strs d
 class a<f : b, g : b where f.d == g> {
 }
 protocol b {
-    typealias d 
+    typealias d
     typealias e
 }
 struct c<h : b> : b {

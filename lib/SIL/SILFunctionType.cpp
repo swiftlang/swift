@@ -663,7 +663,7 @@ namespace {
     ParameterConvention
     getIndirectSelfParameter(const AbstractionPattern &type) const override {
       return ParameterConvention::Indirect_In_Guaranteed;
-    }    
+    }
 
     static bool classof(const Conventions *C) {
       return C->getKind() == ConventionsKind::Default;

@@ -53,7 +53,7 @@
 #define SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS 0
 
 /// The ObjC runtime will not use pointer values for which
-/// ``pointer & SWIFT_ABI_XXX_OBJC_RESERVED_BITS_MASK == 0 && 
+/// ``pointer & SWIFT_ABI_XXX_OBJC_RESERVED_BITS_MASK == 0 &&
 /// pointer & SWIFT_ABI_XXX_SWIFT_SPARE_BITS_MASK != 0``.
 
 /*********************************** i386 *************************************/
@@ -72,7 +72,7 @@
 #define SWIFT_ABI_DARWIN_X86_64_LEAST_VALID_POINTER (4ULL*1024*1024*1024)
 
 // Only the bottom 56 bits are used, and heap objects are eight-byte-aligned.
-// 
+//
 #define SWIFT_ABI_X86_64_SWIFT_SPARE_BITS_MASK 0xFF00000000000007ULL
 
 // Objective-C reserves the high and low bits for tagged pointers.

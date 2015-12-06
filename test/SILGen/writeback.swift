@@ -150,7 +150,7 @@ funge(x: &addressOnly)
 // CHECK: dealloc_stack [[TEMP]]#0 : $*@local_storage Fungible
 
 // Test that writeback occurs with generic properties.
-// <rdar://problem/16525257> 
+// <rdar://problem/16525257>
 
 protocol Runcible {
   typealias Frob: Frobable
@@ -164,7 +164,7 @@ protocol Frobable {
   var anse: Anse { get set }
 }
 
-// CHECK-LABEL: sil hidden @_TF9writeback12test_generic 
+// CHECK-LABEL: sil hidden @_TF9writeback12test_generic
 // CHECK:         witness_method $Runce, #Runcible.frob!materializeForSet.1
 // CHECK:         witness_method $Runce.Frob, #Frobable.anse!setter.1
 func test_generic<Runce: Runcible>(inout runce runce: Runce, anse: Runce.Frob.Anse) {

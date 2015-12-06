@@ -180,7 +180,7 @@ public:
   }
 
   /// Retrieve the non-type witness for the given requirement.
-  ConcreteDeclRef getWitness(ValueDecl *requirement, 
+  ConcreteDeclRef getWitness(ValueDecl *requirement,
                              LazyResolver *resolver) const;
 
   /// Apply the given function object to each value witness within this
@@ -335,7 +335,7 @@ public:
   /// Get the protocol being conformed to.
   ProtocolDecl *getProtocol() const { return ProtocolAndState.getPointer(); }
 
-  /// Retrieve the location of this 
+  /// Retrieve the location of this
   SourceLoc getLoc() const { return Loc; }
 
   /// Get the declaration context that contains the conforming extension or
@@ -376,7 +376,7 @@ public:
                       TypeDecl *typeDecl) const;
 
   /// Retrieve the value witness corresponding to the given requirement.
-  ConcreteDeclRef getWitness(ValueDecl *requirement, 
+  ConcreteDeclRef getWitness(ValueDecl *requirement,
                              LazyResolver *resolver) const;
 
   /// Determine whether the protocol conformance has a witness for the given
@@ -522,7 +522,7 @@ public:
                              LazyResolver *resolver) const;
 
   /// Retrieve the value witness corresponding to the given requirement.
-  ConcreteDeclRef getWitness(ValueDecl *requirement, 
+  ConcreteDeclRef getWitness(ValueDecl *requirement,
                              LazyResolver *resolver) const;
 
 
@@ -619,7 +619,7 @@ public:
   }
 
   /// Retrieve the value witness corresponding to the given requirement.
-  ConcreteDeclRef getWitness(ValueDecl *requirement, 
+  ConcreteDeclRef getWitness(ValueDecl *requirement,
                              LazyResolver *resolver) const {
     return InheritedConformance->getWitness(requirement, resolver);
   }

@@ -35,7 +35,7 @@ public enum FloatingPointClassification {
 
 extension FloatingPointClassification : Equatable {}
 
-public 
+public
 func ==(lhs: FloatingPointClassification, rhs: FloatingPointClassification) -> Bool {
   switch (lhs, rhs) {
   case (.SignalingNaN, .SignalingNaN),

@@ -1,4 +1,4 @@
-module gizmo { 
-  header "Gizmo.h" 
+module gizmo {
+  header "Gizmo.h"
   export *
 }

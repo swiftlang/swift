@@ -13,12 +13,12 @@
 #include <fcntl.h>
 #include <semaphore.h>
 
-extern "C" int 
+extern "C" int
 _swift_Darwin_open(const char *path, int oflag, mode_t mode) {
   return open(path, oflag, mode);
 }
 
-extern "C" int 
+extern "C" int
 _swift_Darwin_openat(int fd, const char *path, int oflag, mode_t mode) {
   return openat(fd, path, oflag, mode);
 }

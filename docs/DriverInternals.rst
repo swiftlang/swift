@@ -24,10 +24,10 @@ Driver Stages
 The compiler driver for Swift roughly follows the same design as Clang's
 compiler driver:
 
-1. Parse: Command-line arguments are parsed into ``Arg``\ s. A ToolChain is 
+1. Parse: Command-line arguments are parsed into ``Arg``\ s. A ToolChain is
    selected based on the current platform.
-2. Pipeline: Based on the arguments and inputs, a tree of ``Action``\ s is 
-   generated. These are the high-level processing steps that need to occur, 
+2. Pipeline: Based on the arguments and inputs, a tree of ``Action``\ s is
+   generated. These are the high-level processing steps that need to occur,
    such as "compile this file" or "link the output of all compilation actions".
 3. Bind: The ToolChain converts the ``Action``\ s into a set of ``Job``\ s.
    These are individual commands that need to be run, such as

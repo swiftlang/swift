@@ -16,7 +16,7 @@
 ///     struct PackagingOptions : OptionSetType {
 ///       let rawValue: Int
 ///       init(rawValue: Int) { self.rawValue = rawValue }
-///     
+///
 ///       static let Box = PackagingOptions(rawValue: 1)
 ///       static let Carton = PackagingOptions(rawValue: 2)
 ///       static let Bag = PackagingOptions(rawValue: 4)

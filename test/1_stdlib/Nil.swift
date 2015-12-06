@@ -32,12 +32,12 @@ do {
 }
 
 var selNil: Selector = nil
-if selNil == nil { 
+if selNil == nil {
   print("ok selNil == nil")
   // CHECK: ok selNil == nil
 }
 selNil = nil
-if selNil == nil { 
+if selNil == nil {
   print("ok selNil == nil")
   // CHECK: ok selNil == nil
 }

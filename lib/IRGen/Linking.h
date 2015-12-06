@@ -39,7 +39,7 @@ namespace llvm {
   class FunctionType;
 }
 
-namespace swift {  
+namespace swift {
 namespace irgen {
 class TypeInfo;
 class IRGenModule;
@@ -212,7 +212,7 @@ class LinkEntity {
       && k <= Kind::ProtocolWitnessTableLazyCacheVariable;
   }
 
-  void setForDecl(Kind kind, 
+  void setForDecl(Kind kind,
                   ValueDecl *decl, ResilienceExpansion explosionKind,
                   unsigned uncurryLevel) {
     assert(isDeclKind(kind));
@@ -496,7 +496,7 @@ class LinkInfo {
   ForDefinition_t ForDefinition;
 
 public:
-  /// Compute linkage information for the given 
+  /// Compute linkage information for the given
   static LinkInfo get(IRGenModule &IGM, const LinkEntity &entity,
                       ForDefinition_t forDefinition);
 

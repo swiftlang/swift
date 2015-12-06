@@ -28,7 +28,7 @@ f2(`class`: 5)
 
 
 // # diagnostics.
-func g1(#a x: Int, #b y: Int) { } 
+func g1(#a x: Int, #b y: Int) { }
 // expected-warning@-1{{extraneous '#' in parameter}}{{9-10=}}
 // expected-warning@-2{{extraneous '#' in parameter}}{{20-21=}}
 
@@ -56,7 +56,7 @@ class X {
 infix operator +++ { }
 func +++(#lhs: Int, // expected-error{{operator cannot have keyword arguments}}{{10-11=}}
          rhs x: Int) -> Int { // expected-error{{operator cannot have keyword arguments}}{{10-14=}}
-  return lhs + x 
+  return lhs + x
 }
 
 

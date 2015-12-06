@@ -464,7 +464,7 @@ except that they can be enforced by the compiler.
   having an unknown size, and so a type containing that type is not considered
   trivial.
 
-- ``size_in_bits(N)``: Promises that the type is not larger than a certain 
+- ``size_in_bits(N)``: Promises that the type is not larger than a certain
   size. (It may be smaller.)
 
 - ``no_payload``: Promises that an enum does not have payloads on any of its
@@ -584,7 +584,7 @@ assume that version of the library will be present at runtime.
 Protocol Conformances
 =====================
 
-Consider this scenario: a library is released containing both a ``MagicType`` 
+Consider this scenario: a library is released containing both a ``MagicType``
 protocol and a ``Wand`` struct. ``Wand`` satisfies all the requirements of the
 ``MagicType`` protocol, but the conformance was never actually declared in the
 library. Someone files a bug, and it gets fixed in version 1.1.
@@ -641,13 +641,13 @@ for verification. Important cases include but are not limited to:
 
 - Removal of public entities.
 
-- Incompatible modifications to public entities, such as added protocol 
+- Incompatible modifications to public entities, such as added protocol
   conformances lacking versioning information.
   
 - Unsafely-backdated "fragile" attributes as discussed in the `Giving Up
   Flexibility`_ section.
   
-- Unsafe modifications to entities marked with the "fragile" attributes, such as 
+- Unsafe modifications to entities marked with the "fragile" attributes, such as
   adding a stored property to a ``@fixed_layout`` struct.
 
 
@@ -709,7 +709,7 @@ Glossary
   API
     An `entity` in a library that a `client` may use, or the collection of all
     such entities in a library. (If contrasting with `SPI`, only those entities
-    that are available to arbitrary clients.) Marked ``public`` in 
+    that are available to arbitrary clients.) Marked ``public`` in
     Swift. Stands for "Application Programming Interface".
 
   availability context
@@ -726,7 +726,7 @@ Glossary
     describe the API in question.
 
   binary compatibility
-    A general term encompassing both backwards- and forwards-compatibility 
+    A general term encompassing both backwards- and forwards-compatibility
     concerns. Also known as "ABI compatibility".
 
   client
@@ -768,7 +768,7 @@ Glossary
 
   target
     In this document, a collection of code in a single Swift module that is
-    built together; a "compilation unit". Roughly equivalent to a target in 
+    built together; a "compilation unit". Roughly equivalent to a target in
     Xcode.
 
   trivial

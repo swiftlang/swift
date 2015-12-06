@@ -55,7 +55,7 @@ func recover_colon_arrow_4 : { }       // expected-error {{expected '->' after f
 
 func recover_missing_body_1() // expected-error {{expected '{' in body of function declaration}}
 func recover_missing_body_2() // expected-error {{expected '{' in body of function declaration}}
-    -> Int 
+    -> Int
 
 // Ensure that we don't skip over the 'func g' over to the right paren in
 // function g, while recovering from parse error in f() parameter tuple.  We

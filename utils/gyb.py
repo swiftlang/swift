@@ -54,7 +54,7 @@ tokenizeRE = re.compile(
 # %-lines and %{...}-blocks
     # \n? # absorb one preceding newline
     ^
-    (?: 
+    (?:
       (?P<gybLines>
         (?P<_indent> [\ \t]* % (?! [{%] ) [\ \t]* ) (?! [\ \t] | '''+linesClose+r''' ) .*
         ( \n (?P=_indent) (?! '''+linesClose+r''' ) .* ) *
@@ -74,7 +74,7 @@ tokenizeRE = re.compile(
 
 # Literal text
 | (?P<literal> '''+literalText+r'''
-    (?: 
+    (?:
       # newline that doesn't precede space+%
       (?: \n (?! [\ \t]* %[^%] ) )
       '''+literalText+r'''
@@ -140,7 +140,7 @@ def tokenizePythonToUnmatchedCloseCurly(sourceText, start, lineStarts):
     
 def tokenizeTemplate(templateText):
     r"""Given the text of a template, returns an iterator over
-(tokenType,token,match) tuples.  
+(tokenType,token,match) tuples.
 
     **Note**: this is template syntax tokenization, not Python
     tokenization.
@@ -220,7 +220,7 @@ def tokenizeTemplate(templateText):
         
         # pull out the one matched key (ignoring internal patterns starting with _)
         ((kind, text), ) = (
-            (kind,text) for (kind,text) in m.groupdict().items() 
+            (kind,text) for (kind,text) in m.groupdict().items()
             if text is not None and kind[0] != '_')
                 
         if kind in ('literal', 'symbol'):
@@ -304,7 +304,7 @@ def splitGybLines(sourceLines):
         for tokenKind, tokenText, tokenStart, (tokenEndLine, tokenEndCol), lineText \
             in tokenize.generate_tokens(sourceLines.__iter__().next):
 
-            if tokenKind in (tokenize.COMMENT, tokenize.ENDMARKER): 
+            if tokenKind in (tokenize.COMMENT, tokenize.ENDMARKER):
                 continue
 
             if tokenText == '\n' and lastTokenText == ':':
@@ -375,7 +375,7 @@ class ParseContext:
     def tokenGenerator(self, baseTokens):
         r""" Given an iterator over (kind, text, match) triples (see
         tokenizeTemplate above), return a refined iterator over
-        tokenKinds.  
+        tokenKinds.
 
         Among other adjustments to the elements found by baseTokens,
         this refined iterator tokenizes python code embedded in
@@ -481,8 +481,8 @@ class ParseContext:
 
                 # Strip off the leading indentation and %-sign
                 sourceLines = re.split(
-                    '^' + re.escape(indentation), 
-                    self.tokenMatch.group('gybLines')+'\n', 
+                    '^' + re.escape(indentation),
+                    self.tokenMatch.group('gybLines')+'\n',
                     flags=re.MULTILINE)[1:]
                 
                 if codeStartsWithDedentKeyword(sourceLines):
@@ -557,7 +557,7 @@ class ASTNode(object):
             return ' []'
 
         return '\n'.join(
-            ['', indent + '['] 
+            ['', indent + '[']
             + [ x.__str__(indent + 4*' ') for x in self.children ]
             + [indent + ']'])
 
@@ -652,7 +652,7 @@ class Code(ASTNode):
     def execute(self, context):
         # Save __children__ from the local bindings
         saveChildren = context.localBindings.get('__children__')
-        # Execute the code with our __children__ in scope 
+        # Execute the code with our __children__ in scope
         context.localBindings['__children__'] = self.children
         result = eval(self.code, context.localBindings)
         assert context.localBindings['__children__'] is self.children
@@ -967,7 +967,7 @@ def main():
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description='Generate Your Boilerplate!', epilog='''    
+        description='Generate Your Boilerplate!', epilog='''
     A GYB template consists of the following elements:
 
       - Literal text which is inserted directly into the output
@@ -999,7 +999,7 @@ def main():
           - Hello -
         %{
              x = 42
-             def succ(a): 
+             def succ(a):
                  return a+1
         }%
 

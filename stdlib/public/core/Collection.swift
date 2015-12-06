@@ -789,7 +789,7 @@ public protocol MutableSliceable : CollectionType, MutableCollectionType {
   subscript(_: Range<Index>) -> SubSequence { get set }
 }
 
-@available(*, unavailable, message="Use the dropFirst() method instead.") 
+@available(*, unavailable, message="Use the dropFirst() method instead.")
 public func dropFirst<Seq : CollectionType>(s: Seq) -> Seq.SubSequence {
   fatalError("unavailable function can't be called")
 }

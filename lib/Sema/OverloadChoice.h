@@ -63,7 +63,7 @@ enum class OverloadChoiceKind : int {
 
 /// \brief Describes a particular choice within an overload set.
 ///
-/// 
+///
 class OverloadChoice {
   enum : unsigned {
     /// Indicates whether this overload was immediately specialized.
@@ -163,14 +163,14 @@ public:
   /// specialized with <...>.
   ///
   /// This value only has meaning when there is no base type.
-  bool isSpecialized() const { 
+  bool isSpecialized() const {
     return BaseAndBits.getInt() & IsSpecializedBit;
   }
   
   /// \brief Determines the kind of overload choice this is.
   OverloadChoiceKind getKind() const {
     switch (DeclOrKind & 0x03) {
-    case 0x00: 
+    case 0x00:
       if (BaseAndBits.getInt() & IsBridgedBit)
         return OverloadChoiceKind::DeclViaBridge;
       if (BaseAndBits.getInt() & IsUnwrappedOptionalBit)

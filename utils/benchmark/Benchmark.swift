@@ -1100,7 +1100,7 @@ func benchRC4_internal(messageLen : Int, iterations : Int, validate : Bool) {
 
   var LongData : UInt8[] = new UInt8[messageLen]
 
-  // Generate a long message. 
+  // Generate a long message.
   for i in 0..messageLen {
     LongData[i] = SecretData[i % SecretData.count]
   }

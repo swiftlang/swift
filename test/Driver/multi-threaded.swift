@@ -25,25 +25,25 @@
 
 // MODULE: -frontend
 // MODULE-DAG: -num-threads 4
-// MODULE-DAG: {{[^ ]*}}/Inputs/main.swift {{[^ ]*}}/multi-threaded.swift 
+// MODULE-DAG: {{[^ ]*}}/Inputs/main.swift {{[^ ]*}}/multi-threaded.swift
 // MODULE-DAG: -o test.swiftmodule
 // MODULE-NOT: ld
 
 // ASSEMBLY: -frontend
 // ASSEMBLY-DAG: -num-threads 4
-// ASSEMBLY-DAG: {{[^ ]*}}/Inputs/main.swift {{[^ ]*}}/multi-threaded.swift 
+// ASSEMBLY-DAG: {{[^ ]*}}/Inputs/main.swift {{[^ ]*}}/multi-threaded.swift
 // ASSEMBLY-DAG: -o /build/main.s -o /build/multi-threaded.s
 // ASSEMBLY-NOT: ld
 
 // OBJECT: -frontend
 // OBJECT-DAG: -num-threads 4
-// OBJECT-DAG: {{[^ ]*}}/Inputs/main.swift {{[^ ]*}}/multi-threaded.swift 
-// OBJECT-DAG: -o main.o -o multi-threaded.o 
+// OBJECT-DAG: {{[^ ]*}}/Inputs/main.swift {{[^ ]*}}/multi-threaded.swift
+// OBJECT-DAG: -o main.o -o multi-threaded.o
 // OBJECT-NOT: ld
 
 // BITCODE: -frontend
 // BITCODE-DAG: -num-threads 4
-// BITCODE-DAG: {{[^ ]*}}/Inputs/main.swift {{[^ ]*}}/multi-threaded.swift 
+// BITCODE-DAG: {{[^ ]*}}/Inputs/main.swift {{[^ ]*}}/multi-threaded.swift
 // BITCODE-DAG: -o main.bc -o multi-threaded.bc
 // BITCODE-DAG: -frontend -c -primary-file main.bc {{.*}} -o {{[^ ]*}}main.o
 // BITCODE-DAG: -frontend -c -primary-file multi-threaded.bc {{.*}} -o {{[^ ]*}}multi-threaded.o
@@ -55,7 +55,7 @@
 
 // EXEC: -frontend
 // EXEC-DAG: -num-threads 4
-// EXEC-DAG: {{[^ ]*}}/Inputs/main.swift {{[^ ]*}}/multi-threaded.swift 
+// EXEC-DAG: {{[^ ]*}}/Inputs/main.swift {{[^ ]*}}/multi-threaded.swift
 // EXEC-DAG:  -o /tmp/main{{[^ ]*}}.o -o /tmp/multi-threaded{{[^ ]*}}.o
 // EXEC: ld
 // EXEC: /tmp/main{{[^ ]*}}.o /tmp/multi-threaded{{[^ ]*}}.o

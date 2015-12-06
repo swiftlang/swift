@@ -9,7 +9,7 @@ var totalsum = nonTrivialInit(true)
 // 1) hoisted out of the loop (by GlobalOpt) and
 // 2) inlined
 
-//CHECK-LABEL: sil {{.*}}testit 
+//CHECK-LABEL: sil {{.*}}testit
 //CHECK: {{^bb0}}
 //CHECK: globalinit_
 //CHECK-NOT: {{^bb0}}

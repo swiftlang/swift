@@ -129,7 +129,7 @@ enum class ValueWitness : unsigned {
   ///
   /// Given an invalid buffer, initialize it by taking the value
   /// of the source object.  The source object becomes invalid.
-  /// Returns the dest object.  
+  /// Returns the dest object.
   InitializeBufferWithTake,
 
   ///   T *(*initializeWithTake)(T *dest, T *src, M *self);
@@ -147,7 +147,7 @@ enum class ValueWitness : unsigned {
   AssignWithTake,
 
   ///   T *(*allocateBuffer)(B *buffer, M *self);
-  /// 
+  ///
   /// Given a buffer in an invalid state, make it the owner of storage
   /// for an uninitialized object of this type.  Return the address of
   /// that object.

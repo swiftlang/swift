@@ -159,7 +159,7 @@ func lookUpManyTopLevelNames() {
   _ = OtherFileOuterType.InnerType()
 
   // CHECK-DAG: !private "OtherFileAliasForSecret"
-  _ = OtherFileAliasForSecret.constant  
+  _ = OtherFileAliasForSecret.constant
 
   // CHECK-DAG: !private "otherFileUse"
   // CHECK-DAG: !private "otherFileGetImpl"
@@ -296,7 +296,7 @@ func outerPrivate3() {
 // CHECK-DAG: !private "PrivateTopLevelTy1"
 private extension Use4 {
   var privateTy1: PrivateTopLevelTy1? { return nil }
-} 
+}
 // CHECK-DAG: !private "PrivateTopLevelTy2"
 // CHECK-DAG: "PrivateProto2"
 extension Private2 : PrivateProto2 {

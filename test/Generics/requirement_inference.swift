@@ -1,15 +1,15 @@
 // RUN: %target-parse-verify-swift -parse %s -verify
-// RUN: %target-parse-verify-swift -parse -debug-generic-signatures %s > %t.dump 2>&1 
+// RUN: %target-parse-verify-swift -parse -debug-generic-signatures %s > %t.dump 2>&1
 // RUN: FileCheck %s < %t.dump
 
-protocol P1 { 
+protocol P1 {
   func p1()
 }
 
 protocol P2 : P1 { }
 
 
-struct X1<T : P1> { 
+struct X1<T : P1> {
   func getT() -> T { }
 }
 
@@ -19,7 +19,7 @@ class X2<T : P1> {
 
 class X3 { }
 
-struct X4<T : X3> { 
+struct X4<T : X3> {
   func getT() -> T { }
 }
 
@@ -161,7 +161,7 @@ protocol P7 : P6 {
 
 // CHECK-LABEL: P7.nestedSameType1()@
 // CHECK: Canonical generic signature for mangling: <τ_0_0 where τ_0_0 : P7, τ_0_0.AssocP6.Element : P6, τ_0_0.AssocP6.Element == τ_0_0.AssocP7.AssocP6.Element>
-extension P7 where AssocP6.Element : P6, 
+extension P7 where AssocP6.Element : P6,
         AssocP7.AssocP6.Element : P6,
         AssocP6.Element == AssocP7.AssocP6.Element {
   func nestedSameType1() { }

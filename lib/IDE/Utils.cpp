@@ -111,7 +111,7 @@ ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
   SourceCompleteResult SCR;
   SCR.IsComplete = !P.isInputIncomplete();
     
-  // Use the same code that was in the REPL code to track the indent level 
+  // Use the same code that was in the REPL code to track the indent level
   // for now. In the future we should get this from the Parser if possible.
 
   CharSourceRange entireRange = SM.getRangeForBuffer(BufferID);

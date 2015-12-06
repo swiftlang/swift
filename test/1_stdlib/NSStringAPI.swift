@@ -21,9 +21,9 @@ class NonContiguousNSString : NSString {
     fatalError("don't call this initializer")
   }
 
-  override init() { 
+  override init() {
     _value = []
-    super.init() 
+    super.init()
   }
 
   init(_ value: [UInt16]) {
@@ -192,7 +192,7 @@ NSStringAPIs.test("init(contentsOfURL:usedEncoding:error:)") {
 
 NSStringAPIs.test("init(withCString_:encoding:)") {
   expectOptionalEqual("foo, a basmati bar!",
-      String(CString: 
+      String(CString:
           "foo, a basmati bar!", encoding: String.defaultCStringEncoding()))
 }
 
@@ -263,7 +263,7 @@ func expectLocalizedEquality(
   _ localeID: String? = nil,
   @autoclosure _ message: ()->String = "",
   showFrame: Bool = true,
-  stackTrace: SourceLocStack = SourceLocStack(),  
+  stackTrace: SourceLocStack = SourceLocStack(),
   file: String = __FILE__, line: UInt = __LINE__
 ) {
   let trace = stackTrace.pushIf(showFrame, file: file, line: line)
@@ -494,7 +494,7 @@ NSStringAPIs.test("initWithData(_:encoding:)") {
   expectEmpty(String(data: data, encoding: NSNonLossyASCIIStringEncoding))
   
   expectEqualSequence(
-    "あいう".characters, 
+    "あいう".characters,
     String(data: data, encoding: NSUTF8StringEncoding)!.characters)
 }
 

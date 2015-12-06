@@ -452,7 +452,7 @@ to implement. We can now see how Self types interact with subtype
 polymorphism. For example, say we have two values of type Comparable, and we try
 to compare them::
 
-  var x : Comparable = ... 
+  var x : Comparable = ...
   var y : Comparable = ...
   if x.isEqual(y) { // well-typed?
   }
@@ -741,7 +741,7 @@ consider a binary search algorithm::
   
    func binarySearch<
       C : EnumerableCollection where C.Element : Comparable
-   >(collection : C, value : C.Element) 
+   >(collection : C, value : C.Element)
      -> C.EnumeratorType
    {
      // We can perform log(N) comparisons, but EnumerableCollection
@@ -750,17 +750,17 @@ consider a binary search algorithm::
 
    protocol RandomAccessEnumerator : Enumerator {
      // splits a range in half, returning both halves
-     func split() -> (Enumerator, Enumerator) 
+     func split() -> (Enumerator, Enumerator)
    }
 
    func binarySearch<
-      C : EnumerableCollection 
-       where C.Element : Comparable, 
+      C : EnumerableCollection
+       where C.Element : Comparable,
                  C.EnumeratorType: RandomAccessEnumerator
-   >(collection : C, value : C.Element) 
+   >(collection : C, value : C.Element)
      -> C.EnumeratorType
    {
-     // We can perform log(N) comparisons and log(N) range splits, 
+     // We can perform log(N) comparisons and log(N) range splits,
      // so this is logarithmic time
    }
 
@@ -778,7 +778,7 @@ minimal requirements::
     C : EnumerableCollection where C.Element : Ordered
   >(
     collection : C, value : C.Element
-  ) -> C.EnumeratorType 
+  ) -> C.EnumeratorType
   {
     binarySearch(collection, value)
   }

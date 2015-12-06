@@ -1285,7 +1285,7 @@ bool ModelASTWalker::processComment(CharSourceRange Range) {
   if (!passNode(Node))
     return false;
 
-  return searchForURL(AfterMarker);  
+  return searchForURL(AfterMarker);
 }
 
 bool ModelASTWalker::findUrlStartingLoc(StringRef Text,

@@ -455,7 +455,7 @@ public enum Numbers {
 
 // Check that one of the switch_enum instructions can be
 // converted into select_enum instructions, even though
-// the destination block is used as a target also by 
+// the destination block is used as a target also by
 // another switch_enum instruction
 
 // CHECK_WITH_CODEMOTION-LABEL: sil @FormSelectEnumFromTwoSelectSwitches

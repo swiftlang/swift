@@ -713,7 +713,7 @@ static void emitUnaryRefCountCall(IRGenFunction &IGF,
   // Emit the call.
   llvm::CallInst *call = IGF.Builder.CreateCall(fn, value);
   call->setCallingConv(IGF.IGM.RuntimeCC);
-  call->setDoesNotThrow();  
+  call->setDoesNotThrow();
 }
 
 /// Emit a copy-like call to perform a ref-counting operation.
@@ -738,7 +738,7 @@ static void emitCopyLikeCall(IRGenFunction &IGF,
   // Emit the call.
   llvm::CallInst *call = IGF.Builder.CreateCall(fn, {dest, src});
   call->setCallingConv(IGF.IGM.RuntimeCC);
-  call->setDoesNotThrow();  
+  call->setDoesNotThrow();
 }
 
 /// Emit a call to a function with a loadWeak-like signature.

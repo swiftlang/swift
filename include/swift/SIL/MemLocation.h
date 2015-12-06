@@ -37,7 +37,7 @@ class MemLocation;
 class LoadStoreValue;
 
 //===----------------------------------------------------------------------===//
-//                           SILValue Projection 
+//                           SILValue Projection
 //===----------------------------------------------------------------------===//
 
 /// This class contains a SILValue base and a ProjectionPath. It is used as
@@ -160,9 +160,9 @@ public:
     // If type is not the same, then SILValueProjections different.
     if (Kind != RHS.Kind)
       return false;
-    // Return true if this is a TombstoneKey or EmptyKey. 
+    // Return true if this is a TombstoneKey or EmptyKey.
     if (Kind == EmptyKey || Kind == TombstoneKey)
-      return true; 
+      return true;
     // If Base is different, then SILValueProjections different.
     if (Base != RHS.Base)
       return false;
@@ -348,7 +348,7 @@ using TypeExpansionMap = llvm::DenseMap<SILType, ProjectionPathList>;
 /// This class represents a field in an allocated object. It consists of a
 /// base that is the tracked SILValue, and a projection path to the
 /// represented field.
-/// 
+///
 /// The base here will point to the actual object this inst is accessing,
 /// not this particular field. We call this MemLocation canonicalization.
 ///
@@ -383,7 +383,7 @@ public:
   MemLocation(SILValue B) : SILValueProjection(B) { initialize(B); }
   MemLocation(SILValue B, ProjectionPath &P, KeyKind Kind = NormalKey)
       : SILValueProjection(B, P, Kind) {}
-  MemLocation(KeyKind Kind) : SILValueProjection(Kind) {} 
+  MemLocation(KeyKind Kind) : SILValueProjection(Kind) {}
 
   /// Copy constructor.
   MemLocation(const MemLocation &RHS) : SILValueProjection(RHS) {}

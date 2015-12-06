@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-struct X { 
+struct X {
   var b = true, i = 17
 
   var d : Dictionary = [0 : "Zero", 1 : "One", 2 : "Two"]
@@ -13,6 +13,6 @@ func testX(inout x: X) {
 }
 
 struct Broken {
-  var b = True // expected-error{{use of unresolved identifier 'True'}} 
+  var b = True // expected-error{{use of unresolved identifier 'True'}}
 }
 

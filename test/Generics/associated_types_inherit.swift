@@ -1,10 +1,10 @@
 // RUN: %target-parse-verify-swift
 
-class C { 
+class C {
   func f() {}
 }
 
-class D : C { 
+class D : C {
 }
 
 class E { }

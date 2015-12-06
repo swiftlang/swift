@@ -12,10 +12,10 @@ superclass subobject gets initialized. The typical way to do so is
 through the use of superclass delegation::
 
   class A {
-    var x: Int 
+    var x: Int
 
-    init(x: Int) { 
-      self.x = x  
+    init(x: Int) {
+      self.x = x
     }
   }
 
@@ -82,7 +82,7 @@ is initializing all of the instance variables of ``A``: new instance
 variables could be added to ``A`` in a future version (these would not
 be properly initialized) and existing instance variables could become
 computed properties (these would be initialized when they shouldn't
-be). 
+be).
 
 Initializer Inheritance
 -----------------------
@@ -255,14 +255,14 @@ init method. The existence of this init method allows object
 construction from Objective-C (both directly via ``[[A alloc]
 init:5]`` and indirectly via, e.g., ``[obj initWithCoder:coder]``)
 and initialization of the superclass subobject when an Objective-C class
-inherits from a Swift class (e.g., ``[super initWithCoder:coder]``). 
+inherits from a Swift class (e.g., ``[super initWithCoder:coder]``).
 
 Note that, while Swift's initializers are not inherited and cannot
 override, this is only true *in Swift code*. If a subclass defines an
 initializer with the same Objective-C selector as an initializer in
 its superclass, the Objective-C init method produced for the former
 will override the Objective-C init method produced for the
-latter. 
+latter.
 
 Objective-C Restrictions
 ~~~~~~~~~~~~~~~~~~~~~~~~

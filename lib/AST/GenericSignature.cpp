@@ -40,7 +40,7 @@ GenericSignature::GenericSignature(ArrayRef<GenericTypeParamType *> params,
     CanonicalSignatureOrASTContext = &getASTContext(params, requirements);
 }
 
-ArrayRef<GenericTypeParamType *> 
+ArrayRef<GenericTypeParamType *>
 GenericSignature::getInnermostGenericParams() const {
   auto params = getGenericParams();
 
@@ -204,7 +204,7 @@ GenericSignature::getCanonicalManglingSignature(ModuleDecl &M) const {
   // Otherwise, we need to compute it.
   // Dump the generic signature into an ArchetypeBuilder that will figure out
   // the minimal set of requirements.
-  std::unique_ptr<ArchetypeBuilder> builder(new ArchetypeBuilder(M, 
+  std::unique_ptr<ArchetypeBuilder> builder(new ArchetypeBuilder(M,
                                                                  Context.Diags));
   
   builder->addGenericSignature(canonical, /*adoptArchetypes*/ false,

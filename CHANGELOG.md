@@ -61,7 +61,7 @@ Latest
 Time warp
 ---------
 
-  *Changes between Xcode 6.1 (Swift 1.1) through Xcode 7.1  
+  *Changes between Xcode 6.1 (Swift 1.1) through Xcode 7.1
   (Swift 2.1) have been lost.  Contributions to rectify this would be
   welcome.*
 
@@ -444,7 +444,7 @@ Time warp
   `@` sign.
 
 * The `@prefix`, `@infix`, and `@postfix` attributes have been changed to
-  declaration modifiers, so they are no longer spelled with an `@` sign.  
+  declaration modifiers, so they are no longer spelled with an `@` sign.
   Operator declarations have been rearranged from `operator prefix +` to
   `prefix operator +` for consistency.
 
@@ -1522,12 +1522,12 @@ Time warp
       var key: CryptoKey
 
       init withKey(key: CryptoKey) -> Self {
-        self.init(withKey: key, title: "Default title")        
+        self.init(withKey: key, title: "Default title")
       }
 
       init withKey(key: CryptoKey) title(String) {
         self.key = key
-        super.init(withTitle: title)        
+        super.init(withTitle: title)
       }
     }
     ```

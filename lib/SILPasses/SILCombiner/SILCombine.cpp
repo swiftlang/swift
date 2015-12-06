@@ -230,7 +230,7 @@ void SILCombineWorklist::addInitialGroup(ArrayRef<SILInstruction *> List) {
         << " instrs to worklist\n");
   while (!List.empty()) {
     SILInstruction *I = List.back();
-    List = List.slice(0, List.size()-1);    
+    List = List.slice(0, List.size()-1);
     WorklistMap.insert(std::make_pair(I, Worklist.size()));
     Worklist.push_back(I);
     }

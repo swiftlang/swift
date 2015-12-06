@@ -12,8 +12,8 @@ import Foundation
 
 struct Foo<T> { var x: T }
 
-class Bar : NSObject { 
-  var foo: Foo<Int> 
+class Bar : NSObject {
+  var foo: Foo<Int>
 
   init(foo: Foo<Int>) {
     self.foo = foo

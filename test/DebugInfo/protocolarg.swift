@@ -10,7 +10,7 @@ protocol IGiveOutInts {
 }
 
 class SomeImplementor : IGiveOutInts {
-  init() {} 
+  init() {}
   func callMe() -> Int64 { return 1 }
 }
 

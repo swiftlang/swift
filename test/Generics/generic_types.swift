@@ -246,7 +246,7 @@ extension Bar {
   struct Inner2 {
     func f(x: Int) -> Nested {
       return x
-    }    
+    }
   }
   */
 }
@@ -262,7 +262,7 @@ class XArray : ArrayLiteralConvertible {
 
 class YArray : XArray {
   typealias Element = Int
-  required init(arrayLiteral elements: Int...) { 
+  required init(arrayLiteral elements: Int...) {
     super.init()
   }
 }

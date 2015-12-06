@@ -75,7 +75,7 @@ struct Y1 {
 struct A0 {
   subscript // expected-error{{expected '(' for subscript parameters}}
     i : Int // expected-error{{expected declaration}}
-     -> Int { 
+     -> Int {
     get {
       return stored
     }

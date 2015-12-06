@@ -23,7 +23,7 @@ assertCollection(0..<10)
 // failing because the error message improves, obviously, update the
 // test!
 
-let r0: Range = 10..<100        
+let r0: Range = 10..<100
 let r1: Range = UInt(10)..<100
 let r2: Range = 10...100
 let r3: Range = UInt(10)...100

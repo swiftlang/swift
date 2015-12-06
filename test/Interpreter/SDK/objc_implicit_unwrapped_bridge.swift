@@ -7,11 +7,11 @@ import Foundation
 
 var activeXObjects: Int = 0
 
-class X { 
+class X {
   var value: Int
 
-  init(value: Int) { 
-    self.value = value 
+  init(value: Int) {
+    self.value = value
 
     ++activeXObjects
   }

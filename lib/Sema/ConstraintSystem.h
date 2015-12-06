@@ -199,14 +199,14 @@ public:
   constraints::ConstraintGraphNode *getGraphNode() const { return GraphNode; }
 
   /// Set the corresponding node in the constraint graph.
-  void setGraphNode(constraints::ConstraintGraphNode *newNode) { 
-    GraphNode = newNode; 
+  void setGraphNode(constraints::ConstraintGraphNode *newNode) {
+    GraphNode = newNode;
   }
 
   /// Retrieve the index into the constraint graph's list of type variables.
-  unsigned getGraphIndex() const { 
+  unsigned getGraphIndex() const {
     assert(GraphNode && "Graph node isn't set");
-    return GraphIndex; 
+    return GraphIndex;
   }
 
   /// Set the index into the constraint graph's list of type variables.
@@ -359,7 +359,7 @@ struct ResolvedOverloadSetListItem;
 /// \brief Describes a failure.
 class Failure : public llvm::FoldingSetNode {
 public:
-  /// \brief The various kinds of failures that can occur 
+  /// \brief The various kinds of failures that can occur
   enum FailureKind {
     /// \brief The type is not bridged to an Objective-C type.
     IsNotBridgedToObjectiveC,
@@ -1034,7 +1034,7 @@ public:
                                         TypeVariableType *baseTypeVar,
                                         AssociatedTypeDecl *assocType,
                                         TypeVariableType *memberTypeVar,
-                                        Type &replacementType) { 
+                                        Type &replacementType) {
     return true;
   }
 };
@@ -1267,7 +1267,7 @@ private:
     ConstraintSystem &CS;
 
     /// Old value of DebugConstraintSolver.
-    /// FIXME: Move the "debug constraint solver" bit into the constraint 
+    /// FIXME: Move the "debug constraint solver" bit into the constraint
     /// system itself.
     bool OldDebugConstraintSolver;
 
@@ -1307,7 +1307,7 @@ public:
   ///
   /// This will be non-null when we're actively solving the constraint
   /// system, and carries temporary state related to the current path
-  /// we're exploring. 
+  /// we're exploring.
   SolverState *solverState = nullptr;
 
   /// A mapping from the constraint locators for references to various
@@ -1709,7 +1709,7 @@ public:
   /// Add a constraint that binds an overload set to a specific choice.
   void addBindOverloadConstraint(Type boundTy, OverloadChoice choice,
                                  ConstraintLocator *locator) {
-    addConstraint(Constraint::createBindOverload(*this, boundTy, choice, 
+    addConstraint(Constraint::createBindOverload(*this, boundTy, choice,
                                                  locator));
   }
 
@@ -1759,11 +1759,11 @@ public:
   ///
   /// \param locator The location used to describe this member access.
   ///
-  /// \param options Options to be supplied to type variable creation if 
+  /// \param options Options to be supplied to type variable creation if
   /// a new type is created.
   ///
   /// \returns the type variable representing the member type.
-  TypeVariableType *getMemberType(TypeVariableType *baseTypeVar, 
+  TypeVariableType *getMemberType(TypeVariableType *baseTypeVar,
                                   AssociatedTypeDecl *assocType,
                                   ConstraintLocatorBuilder locator,
                                   unsigned options);
@@ -1801,7 +1801,7 @@ public:
   ///
   /// \param type The type to simplify.
   ///
-  /// \param typeVar Will receive the type variable at which simplification 
+  /// \param typeVar Will receive the type variable at which simplification
   /// stopped, which has no fixed type.
   ///
   /// \param wantRValue Whether this routine should look through
@@ -1819,7 +1819,7 @@ public:
   /// \param type The fixed type to which the type variable will be bound.
   ///
   /// \param updateState Whether to update the state based on this binding.
-  /// False when we're only assigning a type as part of reconstructing 
+  /// False when we're only assigning a type as part of reconstructing
   /// a complete solution from partial solutions.
   void assignFixedType(TypeVariableType *typeVar, Type type,
                        bool updateState = true);
@@ -2188,10 +2188,10 @@ private:
   ///
   /// \param flags Flags that indicate how the constraint should be
   /// simplified.
-  /// 
+  ///
   /// \param locator Locator describing where this construction
   /// occurred.
-  SolutionKind simplifyConstructionConstraint(Type valueType, 
+  SolutionKind simplifyConstructionConstraint(Type valueType,
                                               FunctionType *fnType,
                                               unsigned flags,
                                               ConstraintLocator *locator);

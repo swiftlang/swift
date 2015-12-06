@@ -42,7 +42,7 @@ class PureSwiftNoDescription {
 
 FoundationPrinting.test("NSArrayDescription") {
   var array = NSArray(objects:PureSwiftDescription(), PureSwiftNoDescription())
-  var expected = 
+  var expected =
     "(\n" +
     "    awesome,\n" +
     "    \"main.PureSwiftNoDescription\"\n" +

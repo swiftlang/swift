@@ -250,7 +250,7 @@ typedef void destroyBuffer(ValueBuffer *buffer, const Metadata *self);
 ///   self->initalizeBufferWithCopy(dest, self->projectBuffer(src), self)
 ///
 /// This operation does not need to be safe aginst 'dest' and 'src' aliasing.
-/// 
+///
 /// Preconditions:
 ///   'dest' is an unallocated buffer
 /// Postconditions:
@@ -263,7 +263,7 @@ typedef OpaqueValue *initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
 
 /// Given an allocated or initialized buffer, derive a pointer to
 /// the object.
-/// 
+///
 /// Invariants:
 ///   'buffer' is an allocated or initialized buffer
 typedef OpaqueValue *projectBuffer(ValueBuffer *buffer,
@@ -306,7 +306,7 @@ typedef OpaqueValue *initializeBufferWithCopy(ValueBuffer *dest,
 /// the value.
 ///
 /// This operation does not need to be safe aginst 'dest' and 'src' aliasing.
-/// 
+///
 /// Returns the dest object.
 ///
 /// Preconditions:
@@ -323,7 +323,7 @@ typedef OpaqueValue *initializeWithCopy(OpaqueValue *dest,
 /// other.
 ///
 /// This operation must be safe aginst 'dest' and 'src' aliasing.
-/// 
+///
 /// Returns the dest object.
 ///
 /// Invariants:
@@ -338,7 +338,7 @@ typedef OpaqueValue *assignWithCopy(OpaqueValue *dest,
 /// uninitialized.
 ///
 /// This operation does not need to be safe aginst 'dest' and 'src' aliasing.
-/// 
+///
 /// Returns the dest object.
 ///
 /// Preconditions:
@@ -360,7 +360,7 @@ typedef OpaqueValue *initializeBufferWithTake(ValueBuffer *dest,
 /// bytes.
 ///
 /// This operation does not need to be safe aginst 'dest' and 'src' aliasing.
-/// 
+///
 /// Returns the dest object.
 ///
 /// Preconditions:
@@ -448,7 +448,7 @@ typedef void destroyArray(OpaqueValue *array, size_t n,
 /// the value.
 ///
 /// This operation does not need to be safe aginst 'dest' and 'src' aliasing.
-/// 
+///
 /// Returns the dest object.
 ///
 /// Preconditions:
@@ -469,7 +469,7 @@ typedef OpaqueValue *initializeArrayWithCopy(OpaqueValue *dest,
 /// This operation does not need to be safe against 'dest' and 'src' fully
 /// overlapping. 'dest' may partially overlap the head of 'src', because the
 /// values are taken as if in front-to-back order.
-/// 
+///
 /// Returns the dest object.
 ///
 /// Preconditions:
@@ -490,7 +490,7 @@ typedef OpaqueValue *initializeArrayWithTakeFrontToBack(OpaqueValue *dest,
 /// This operation does not need to be safe against 'dest' and 'src' fully
 /// overlapping. 'dest' may partially overlap the tail of 'src', because the
 /// values are taken as if in back-to-front order.
-/// 
+///
 /// Returns the dest object.
 ///
 /// Preconditions:
@@ -1218,7 +1218,7 @@ struct NominalTypeDescriptor {
 
       /// True if metadata records for this type have a field offset vector for
       /// its stored properties.
-      bool hasFieldOffsetVector() const { return FieldOffsetVectorOffset != 0; }      
+      bool hasFieldOffsetVector() const { return FieldOffsetVectorOffset != 0; }
     } Class;
     
     /// Information about struct types.
@@ -2717,7 +2717,7 @@ inline constexpr unsigned swift_getHeapObjectExtraInhabitantCount() {
   return (LeastValidPointerValue >> ObjCReservedLowBits) > INT_MAX
     ? (unsigned)INT_MAX
     : (unsigned)(LeastValidPointerValue >> ObjCReservedLowBits);
-}  
+}
 
 /// Calculate the numeric index of an extra inhabitant of a function
 /// pointer in memory.
@@ -2776,7 +2776,7 @@ extern "C" void swift_printAny(OpaqueValue *value, const Metadata *type);
 /// Returns true if the name was successfully decoded.
 /// On success, *outModule and *outClass must be freed with free().
 extern "C" bool
-swift_demangleSimpleClass(const char *mangledName, 
+swift_demangleSimpleClass(const char *mangledName,
                           char **outModule, char **outClass);
   
 

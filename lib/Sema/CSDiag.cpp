@@ -2319,7 +2319,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
     if (anchor)
       resolvedAnchorToExpr = true;
     else
-      anchor = locator->getAnchor();    
+      anchor = locator->getAnchor();
   }
 
   Type fromType = CS->simplifyType(constraint->getFirstType());
@@ -4874,7 +4874,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
           solution.dump(log);
           log << "\n";
         }
-      }        
+      }
 
       if (diagnoseAmbiguity(*this, viable, expr)) {
         return true;

@@ -197,7 +197,7 @@ bool DiagnosticEngine::isDiagnosticFatal(DiagID ID) const {
 ///
 /// \returns The string leading up to the delimiter, or the empty string
 /// if no delimiter is found.
-static StringRef 
+static StringRef
 skipToDelimiter(StringRef &Text, char Delim1, char Delim2 = 0) {
   unsigned Depth = 0;
 
@@ -223,7 +223,7 @@ skipToDelimiter(StringRef &Text, char Delim1, char Delim2 = 0) {
   return Result;
 }
 
-static void formatDiagnosticText(StringRef InText, 
+static void formatDiagnosticText(StringRef InText,
                                  ArrayRef<DiagnosticArgument> Args,
                                  llvm::raw_ostream &Out);
 
@@ -249,7 +249,7 @@ static void formatSelectionArgument(StringRef ModifierArguments,
 
 /// \brief Format a single diagnostic argument and write it to the given
 /// stream.
-static void formatDiagnosticArgument(StringRef Modifier, 
+static void formatDiagnosticArgument(StringRef Modifier,
                                      StringRef ModifierArguments,
                                      ArrayRef<DiagnosticArgument> Args,
                                      unsigned ArgIndex,
@@ -259,7 +259,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
   case DiagnosticArgumentKind::Integer:
     if (Modifier == "select") {
       assert(Arg.getAsInteger() >= 0 && "Negative selection index");
-      formatSelectionArgument(ModifierArguments, Args, Arg.getAsInteger(), 
+      formatSelectionArgument(ModifierArguments, Args, Arg.getAsInteger(),
                               Out);
     } else if (Modifier == "s") {
       if (Arg.getAsInteger() != 1)
@@ -272,7 +272,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
 
   case DiagnosticArgumentKind::Unsigned:
     if (Modifier == "select") {
-      formatSelectionArgument(ModifierArguments, Args, Arg.getAsUnsigned(), 
+      formatSelectionArgument(ModifierArguments, Args, Arg.getAsUnsigned(),
                               Out);
     } else if (Modifier == "s") {
       if (Arg.getAsUnsigned() != 1)
@@ -389,7 +389,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
 
 /// \brief Format the given diagnostic text and place the result in the given
 /// buffer.
-static void formatDiagnosticText(StringRef InText, 
+static void formatDiagnosticText(StringRef InText,
                                  ArrayRef<DiagnosticArgument> Args,
                                  llvm::raw_ostream &Out) {
   while (!InText.empty()) {
@@ -437,7 +437,7 @@ static void formatDiagnosticText(StringRef InText,
     }
       
     // Parse the digit sequence into an argument index.
-    unsigned ArgIndex;      
+    unsigned ArgIndex;
     bool Result = InText.substr(0, Length).getAsInteger(10, ArgIndex);
     assert(!Result && "Unparseable argument index value?");
     (void)Result;

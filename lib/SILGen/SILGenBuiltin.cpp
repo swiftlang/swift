@@ -73,7 +73,7 @@ static ManagedValue emitBuiltinRetain(SILGenFunction &gen,
   // The value was produced at +1; we can produce an unbalanced
   // retain simply by disabling the cleanup.
   args[0].forward(gen);
-  return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));    
+  return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
 }
 
 static ManagedValue emitBuiltinRelease(SILGenFunction &gen,
@@ -86,7 +86,7 @@ static ManagedValue emitBuiltinRelease(SILGenFunction &gen,
   // release we need to leave the cleanup intact and then do a *second*
   // release.
   gen.B.createReleaseValue(loc, args[0].getValue());
-  return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));    
+  return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
 }
 
 static ManagedValue emitBuiltinAutorelease(SILGenFunction &gen,
@@ -98,7 +98,7 @@ static ManagedValue emitBuiltinAutorelease(SILGenFunction &gen,
   // The value was produced at +1, so to produce an unbalanced
   // autorelease we need to leave the cleanup intact.
   gen.B.createAutoreleaseValue(loc, args[0].getValue());
-  return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));    
+  return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
 }
 
 static bool requireIsOptionalNativeObject(SILGenFunction &gen,
@@ -506,7 +506,7 @@ emitBuiltinCastReference(SILGenFunction &gen,
   auto &toTL = gen.getTypeLowering(toTy);
   assert(!fromTL.isTrivial() && !toTL.isTrivial() && "expected ref type");
 
-  if (fromTL.isLoadable() || toTL.isLoadable()) { 
+  if (fromTL.isLoadable() || toTL.isLoadable()) {
     if (auto refCast = gen.B.tryCreateUncheckedRefCast(loc, args[0].getValue(),
                                                        toTL.getLoweredType())) {
       // Create a reference cast, forwarding the cleanup.
@@ -1039,7 +1039,7 @@ SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
   if (function.kind != SILDeclRef::Kind::Func)
     return None;
   if (!function.hasDecl())
-    return None;  
+    return None;
   ValueDecl *decl = function.getDecl();
   if (!isa<BuiltinUnit>(decl->getDeclContext()))
     return None;

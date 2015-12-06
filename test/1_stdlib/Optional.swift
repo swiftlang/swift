@@ -17,10 +17,10 @@ extension ImplicitlyUnwrappedOptional where Wrapped : TestProtocol1 {
 }
 
 var x : Optional<Int> = nil
-if x != nil { 
+if x != nil {
   print("x is non-empty!")
 }
-else { 
+else {
   print("an empty optional is logically false")
 }
 // CHECK: an empty optional is logically false
@@ -37,17 +37,17 @@ x = .Some(0)
 x = .Some(1)
 
 if x != nil {
-  print("a non-empty optional is logically true") 
-} else { 
+  print("a non-empty optional is logically true")
+} else {
   assert(false, "x is empty!")
 }
 // CHECK: a non-empty optional is logically true
 
-if x == nil { 
+if x == nil {
   print("logical negation fails 0")
 }
-else { 
-  print("logical negation works 0") 
+else {
+  print("logical negation works 0")
 }
 // CHECK: logical negation works 0
 

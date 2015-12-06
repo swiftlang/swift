@@ -98,7 +98,7 @@ module SwiftGlibc [system] {
     // module stddef {
     //   header "/usr/include/stddef.h"
     //   export *
-    // }    
+    // }
     // module stdint {
     //   header "/usr/include/stdint.h"
     //   export *

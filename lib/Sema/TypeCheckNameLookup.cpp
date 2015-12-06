@@ -316,7 +316,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
   if (auto metaT = type->getAs<AnyMetatypeType>())
     type = metaT->getInstanceType();
   
-  // Callers must cope with dependent types directly.  
+  // Callers must cope with dependent types directly.
   assert(!type->isTypeParameter());
          
   // Look for members with the given name.
@@ -325,7 +325,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
   if (options.contains(NameLookupFlags::KnownPrivate))
     subOptions |= NL_KnownNonCascadingDependency;
   if (options.contains(NameLookupFlags::ProtocolMembers))
-    subOptions |= NL_ProtocolMembers;    
+    subOptions |= NL_ProtocolMembers;
 
   if (!dc->lookupQualified(type, name, subOptions, this, decls))
     return result;

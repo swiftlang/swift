@@ -1160,7 +1160,7 @@ namespace {
       assert(gen.InWritebackScope &&
              "offsetting l-value for modification without writeback scope");
 
-      SILDeclRef addressor = gen.getAddressorDeclRef(decl, accessKind, 
+      SILDeclRef addressor = gen.getAddressorDeclRef(decl, accessKind,
                                                      IsDirectAccessorUse);
       auto args =
         std::move(*this).prepareAccessorArgs(gen, loc, base, addressor);
@@ -1833,7 +1833,7 @@ void LValue::addMemberSubscriptComponent(SILGenFunction &gen, SILLocation loc,
                                indexExprForDiagnostics, &indices);
   } else {
     assert(strategy == AccessStrategy::Addressor);
-    auto storageType = 
+    auto storageType =
       gen.SGM.Types.getSubstitutedStorageType(decl, formalRValueType);
     add<AddressorComponent>(decl, isSuper, /*direct*/ true,
                             subs, baseFormalType, typeData, storageType,
@@ -2564,7 +2564,7 @@ struct MaterializeForSetEmitter {
                                  ManagedValue self, RValue &&indices,
                                  SILValue resultBuffer,
                                  SILValue callbackBuffer,
-                                 SILFunction *&callback); 
+                                 SILFunction *&callback);
   SILFunction *createSetterCallback(const TypeLowering *indicesTL,
                                     CanType indicesFormalType);
 
@@ -2748,7 +2748,7 @@ void MaterializeForSetEmitter::emit(SILGenFunction &gen, ManagedValue self,
 }
 
 /// Recursively walk into the given formal index type, expanding tuples,
-/// in order to 
+/// in order to
 static void translateIndices(SILGenFunction &gen, SILLocation loc,
                              AbstractionPattern pattern, CanType formalType,
                              ArrayRef<ManagedValue> &sourceIndices,
@@ -2888,7 +2888,7 @@ SILFunction *MaterializeForSetEmitter::createCallback(GeneratorFn generator) {
   SILResultInfo result = {
     TupleType::getEmpty(ctx), ResultConvention::Unowned
   };
-  auto extInfo = 
+  auto extInfo =
     SILFunctionType::ExtInfo()
       .withRepresentation(SILFunctionTypeRepresentation::Thin);
 
@@ -3087,7 +3087,7 @@ namespace {
     void emit(SILGenFunction &gen, CleanupLocation loc) override {
       gen.B.createDeallocValueBuffer(loc, ValueType, Buffer);
     }
-  }; 
+  };
 }
 
 /// Emit a materializeForSet callback that stores the value from the

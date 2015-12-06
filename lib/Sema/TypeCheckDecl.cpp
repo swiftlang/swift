@@ -1424,7 +1424,7 @@ void swift::configureConstructorType(ConstructorDecl *ctor,
   }
 
   // Use the argument names in the argument type.
-  argType = argType->getRelabeledType(ctor->getASTContext(), 
+  argType = argType->getRelabeledType(ctor->getASTContext(),
                                       ctor->getFullName().getArgumentNames());
 
   auto extInfo = AnyFunctionType::ExtInfo().withThrows(throws);
@@ -3386,7 +3386,7 @@ public:
       if (!pbd)
         continue;
 
-      if (pbd->isStatic() || !pbd->hasStorage() || 
+      if (pbd->isStatic() || !pbd->hasStorage() ||
           isDefaultInitializable(pbd) || pbd->isInvalid())
         continue;
 
@@ -4247,7 +4247,7 @@ public:
     // Determine the input and result types of this function.
     auto fnType = type->castTo<AnyFunctionType>();
     Type inputType = fnType->getInput();
-    Type resultType = dropResultOptionality(fnType->getResult(), 
+    Type resultType = dropResultOptionality(fnType->getResult(),
                                             uncurryLevel - 1);
     
     // Produce the resulting function type.
@@ -4257,8 +4257,8 @@ public:
                                       fnType->getExtInfo());
     }
     
-    assert(!isa<PolymorphicFunctionType>(fnType));  
-    return FunctionType::get(inputType, resultType, fnType->getExtInfo());    
+    assert(!isa<PolymorphicFunctionType>(fnType));
+    return FunctionType::get(inputType, resultType, fnType->getExtInfo());
   }
 
   /// Diagnose overrides of '(T) -> T?' with '(T!) -> T!'.
@@ -4862,7 +4862,7 @@ public:
       }
 
       // FIXME: Customize message to the kind of thing.
-      TC.diagnose(Override, diag::override_final, 
+      TC.diagnose(Override, diag::override_final,
                   Override->getDescriptiveKind());
       TC.diagnose(Base, diag::overridden_here);
     }
@@ -5417,7 +5417,7 @@ public:
       CD->overwriteType(ErrorType::get(TC.Context));
       CD->setInvalid();
     } else {
-      configureConstructorType(CD, outerGenericParams, SelfTy, 
+      configureConstructorType(CD, outerGenericParams, SelfTy,
                                CD->getBodyParamPatterns()[1]->getType(),
                                CD->getThrowsLoc().isValid());
     }
@@ -5471,7 +5471,7 @@ public:
           CD->getOverriddenDecl()->getFailability() == OTK_None) {
         TC.diagnose(CD, diag::failable_initializer_override,
                     CD->getFullName());
-        TC.diagnose(CD->getOverriddenDecl(), 
+        TC.diagnose(CD->getOverriddenDecl(),
                     diag::nonfailable_initializer_override_here,
                     CD->getOverriddenDecl()->getFullName());
       }
@@ -5974,7 +5974,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
           }
         } else {
           D->setType(ErrorType::get(Context));
-        }      
+        }
       } else {
         // FIXME: This case is hit when code completion occurs in a function
         // parameter list. Previous parameters are definitely in scope, but
@@ -6502,12 +6502,12 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
         break;
       case 3:
         diag.emplace(tc.diagnose(varLoc, diag::note_no_in_class_init_3plus,
-                                 vars[0]->getName(), vars[1]->getName(), 
+                                 vars[0]->getName(), vars[1]->getName(),
                                  vars[2]->getName(), false));
         break;
       default:
         diag.emplace(tc.diagnose(varLoc, diag::note_no_in_class_init_3plus,
-                                 vars[0]->getName(), vars[1]->getName(), 
+                                 vars[0]->getName(), vars[1]->getName(),
                                  vars[2]->getName(), true));
         break;
       }
@@ -7029,11 +7029,11 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
         // names. Complain and recover by chopping off everything
         // after the first name.
         if (objcName->getNumArgs() > 0) {
-          int which = isa<ClassDecl>(D)? 0 
+          int which = isa<ClassDecl>(D)? 0
                     : isa<ProtocolDecl>(D)? 1
                     : 2;
           SourceLoc firstNameLoc = objcAttr->getNameLocs().front();
-          SourceLoc afterFirstNameLoc = 
+          SourceLoc afterFirstNameLoc =
             Lexer::getLocForEndOfToken(TC.Context.SourceMgr, firstNameLoc);
           TC.diagnose(firstNameLoc, diag::objc_name_req_nullary, which)
             .fixItRemoveChars(afterFirstNameLoc, objcAttr->getRParenLoc());
@@ -7069,10 +7069,10 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
 
         unsigned numArgumentNames = objcName->getNumArgs();
         if (numArgumentNames != numParameters) {
-          TC.diagnose(objcAttr->getNameLocs().front(), 
+          TC.diagnose(objcAttr->getNameLocs().front(),
                       diag::objc_name_func_mismatch,
-                      isa<FuncDecl>(func), 
-                      numArgumentNames, 
+                      isa<FuncDecl>(func),
+                      numArgumentNames,
                       numArgumentNames != 1,
                       numParameters,
                       numParameters != 1,

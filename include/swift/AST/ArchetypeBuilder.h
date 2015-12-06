@@ -69,11 +69,11 @@ public:
     /// The requirement was part of a protocol requirement, e.g., an
     /// inherited protocol or a requirement on an associated type.
     Protocol,
-    /// 
+    ///
     /// The requirement was inferred from part of the signature.
     Inferred,
     /// The requirement came from an outer scope.
-    /// FIXME: eliminate this in favor of keeping requirement sources in 
+    /// FIXME: eliminate this in favor of keeping requirement sources in
     /// GenericSignatures, at least non-canonical ones?
     OuterScope,
   };
@@ -148,7 +148,7 @@ private:
   
   /// \brief Add a new superclass requirement specifying that the given
   /// potential archetype has the given type as an ancestor.
-  bool addSuperclassRequirement(PotentialArchetype *T, 
+  bool addSuperclassRequirement(PotentialArchetype *T,
                                 Type Superclass,
                                 RequirementSource Source);
 
@@ -429,27 +429,27 @@ class ArchetypeBuilder::PotentialArchetype {
     : ParentOrParam(Parent), NameOrAssociatedType(Name), Representative(this),
       IsRecursive(false), Invalid(false), SubstitutingConcreteType(false),
       RecursiveConcreteType(false), Renamed(false)
-  { 
+  {
     assert(Parent != nullptr && "Not an associated type?");
     EquivalenceClass.push_back(this);
   }
 
   /// \brief Construct a new potential archetype for an associated type.
   PotentialArchetype(PotentialArchetype *Parent, AssociatedTypeDecl *AssocType)
-    : ParentOrParam(Parent), NameOrAssociatedType(AssocType), 
+    : ParentOrParam(Parent), NameOrAssociatedType(AssocType),
       Representative(this), IsRecursive(false), Invalid(false),
       SubstitutingConcreteType(false), RecursiveConcreteType(false),
       Renamed(false)
-  { 
+  {
     assert(Parent != nullptr && "Not an associated type?");
     EquivalenceClass.push_back(this);
   }
 
   /// \brief Construct a new potential archetype for a generic parameter.
-  PotentialArchetype(GenericTypeParamType *GenericParam, 
+  PotentialArchetype(GenericTypeParamType *GenericParam,
                      ProtocolDecl *RootProtocol,
                      Identifier Name)
-    : ParentOrParam(GenericParam), RootProtocol(RootProtocol), 
+    : ParentOrParam(GenericParam), RootProtocol(RootProtocol),
       NameOrAssociatedType(Name), Representative(this), IsRecursive(false),
       Invalid(false), SubstitutingConcreteType(false),
       RecursiveConcreteType(false), Renamed(false)
@@ -474,8 +474,8 @@ public:
 
   /// Retrieve the parent of this potential archetype, which will be non-null
   /// when this potential archetype is an associated type.
-  PotentialArchetype *getParent() const { 
-    return ParentOrParam.dyn_cast<PotentialArchetype *>(); 
+  PotentialArchetype *getParent() const {
+    return ParentOrParam.dyn_cast<PotentialArchetype *>();
   }
 
   /// Retrieve the generic parameter at the root of this potential archetype.
@@ -500,7 +500,7 @@ public:
   /// Retrieve the generic type parameter for this potential
   /// archetype, if it corresponds to a generic parameter.
   GenericTypeParamType *getGenericParam() const {
-    return ParentOrParam.dyn_cast<GenericTypeParamType *>(); 
+    return ParentOrParam.dyn_cast<GenericTypeParamType *>();
   }
 
   /// Retrieve the set of protocols to which this type conforms.
@@ -521,7 +521,7 @@ public:
   /// Retrieve the requirement source for the superclass requirement.
   const RequirementSource &getSuperclassSource() const {
     return *SuperclassSource;
-  } 
+  }
 
   /// Retrieve the set of nested types.
   const llvm::MapVector<Identifier, llvm::TinyPtrVector<PotentialArchetype *>> &

@@ -244,8 +244,8 @@ static NSString *_getClassDescription(Class cls) {
 
 - (void)doesNotRecognizeSelector: (SEL) sel {
   Class cls = (Class) _swift_getClassOfAllocated(self);
-  fatalError("Unrecognized selector %c[%s %s]\n", 
-             class_isMetaClass(cls) ? '+' : '-', 
+  fatalError("Unrecognized selector %c[%s %s]\n",
+             class_isMetaClass(cls) ? '+' : '-',
              class_getName(cls), sel_getName(sel));
 }
 
@@ -1116,7 +1116,7 @@ swift::swift_dynamicCastObjCClassUnconditional(const void *object,
   }
 
   Class sourceType = object_getClass((id)object);
-  swift_dynamicCastFailure(reinterpret_cast<const Metadata *>(sourceType), 
+  swift_dynamicCastFailure(reinterpret_cast<const Metadata *>(sourceType),
                            targetType);
 }
 
@@ -1248,7 +1248,7 @@ extern "C" id swift_dynamicCastObjCProtocolUnconditional(id object,
   for (size_t i = 0; i < numProtocols; ++i) {
     if (![object conformsToProtocol:protocols[i]]) {
       Class sourceType = object_getClass(object);
-      swift_dynamicCastFailure(sourceType, class_getName(sourceType), 
+      swift_dynamicCastFailure(sourceType, class_getName(sourceType),
                                protocols[i], protocol_getName(protocols[i]));
     }
   }
@@ -1558,7 +1558,7 @@ swift::swift_dynamicCastForeignClassMetatype(const ClassMetadata *sourceType,
 const ClassMetadata *
 swift::swift_dynamicCastForeignClassMetatypeUnconditional(
   const ClassMetadata *sourceType,
-  const ClassMetadata *targetType) 
+  const ClassMetadata *targetType)
 {
   // FIXME: Actually compare CFTypeIDs, once they arae available in
   // the metadata.
@@ -1574,9 +1574,9 @@ bool swift::_swift_usesNativeSwiftReferenceCounting_nonNull(
 #if SWIFT_OBJC_INTEROP
     return !isObjCTaggedPointer(object) &&
       usesNativeSwiftReferenceCounting_allocated(object);
-#else 
+#else
     return true;
-#endif 
+#endif
 }
 
 bool swift::swift_isUniquelyReferenced_nonNull_native(
@@ -1598,7 +1598,7 @@ bool swift::swift_isUniquelyReferencedNonObjC_nonNull(const void* object) {
   return
 #if SWIFT_OBJC_INTEROP
     _swift_usesNativeSwiftReferenceCounting_nonNull(object) &&
-#endif 
+#endif
     swift_isUniquelyReferenced_nonNull_native((HeapObject*)object);
 }
 
@@ -1668,7 +1668,7 @@ bool swift::swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(
   return
 #if SWIFT_OBJC_INTEROP
     _swift_usesNativeSwiftReferenceCounting_nonNull(object) &&
-#endif 
+#endif
     swift_isUniquelyReferencedOrPinned_nonNull_native(
                                                     (const HeapObject*)object);
 }

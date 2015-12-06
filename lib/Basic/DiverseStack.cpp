@@ -42,7 +42,7 @@ void DiverseStackBase::pushNewStorageSlow(std::size_t needed) {
   Begin -= needed;
 
   if (!wasInline) delete[] oldAllocation;
-}  
+}
 
 char *DiverseListBase::addNewStorageSlow(std::size_t needed) {
   bool wasInline = isAllocatedInline();
@@ -67,4 +67,4 @@ char *DiverseListBase::addNewStorageSlow(std::size_t needed) {
   if (!wasInline) delete[] oldBegin;
 
   return Begin + oldSize;
-}  
+}

@@ -117,7 +117,7 @@ public var stdin : UnsafeMutablePointer<FILE> {
   }
   set {
     __stdinp = newValue
-  }   
+  }
 }
 
 public var stdout : UnsafeMutablePointer<FILE> {
@@ -126,7 +126,7 @@ public var stdout : UnsafeMutablePointer<FILE> {
   }
   set {
     __stdoutp = newValue
-  }   
+  }
 }
 
 public var stderr : UnsafeMutablePointer<FILE> {
@@ -135,7 +135,7 @@ public var stderr : UnsafeMutablePointer<FILE> {
   }
   set {
     __stderrp = newValue
-  }   
+  }
 }
 
 
@@ -144,7 +144,7 @@ public var stderr : UnsafeMutablePointer<FILE> {
 //===----------------------------------------------------------------------===//
 
 @warn_unused_result
-@_silgen_name("_swift_Darwin_open") 
+@_silgen_name("_swift_Darwin_open")
 func _swift_Darwin_open(path: UnsafePointer<CChar>,
   _ oflag: CInt, _ mode: mode_t) -> CInt
 

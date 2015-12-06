@@ -196,7 +196,7 @@ public:
     case Kind::LValue: return true;
     case Kind::Expr: return asKnownExpr()->getType()->is<InOutType>();
     }
-    llvm_unreachable("bad kind");    
+    llvm_unreachable("bad kind");
   }
 
   SILLocation getLocation() const & {

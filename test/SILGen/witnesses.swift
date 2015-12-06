@@ -169,7 +169,7 @@ final class ConformingClass : X {
   // CHECK-NEXT:    %3 = load %2 : $*ConformingClass
   // CHECK-NEXT:    strong_retain %3 : $ConformingClass
   // CHECK-NEXT:    %5 = load %1 : $*ConformingClass
-  // CHECK:         %6 = function_ref @_TFC9witnesses15ConformingClass9selfTypes 
+  // CHECK:         %6 = function_ref @_TFC9witnesses15ConformingClass9selfTypes
   // CHECK-NEXT:    %7 = apply %6(%5, %3) : $@convention(method) (@owned ConformingClass, @guaranteed ConformingClass) -> @owned ConformingClass
   // CHECK-NEXT:    store %7 to %0 : $*ConformingClass
   // CHECK-NEXT:    %9 = tuple ()

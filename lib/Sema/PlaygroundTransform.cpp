@@ -73,7 +73,7 @@ private:
     };
     TargetKinds TargetKind = TargetKinds::None;
 
-    BracePair(const SourceRange &BR) : 
+    BracePair(const SourceRange &BR) :
       BraceRange(BR) { }
   };
 
@@ -174,7 +174,7 @@ public:
                 bool HP) :
     RNG(RNG), Context(C), TypeCheckDC(DC), HighPerformance(HP), CF(*this) { }
     
-  Stmt *transformStmt(Stmt *S) { 
+  Stmt *transformStmt(Stmt *S) {
     switch (S->getKind()) {
     default:
       return S;
@@ -352,7 +352,7 @@ public:
       return std::make_pair(Added<Expr*>(nullptr), nullptr);
     case ExprKind::DeclRef: {
       ValueDecl *D = cast<DeclRefExpr>(E)->getDecl();
-      Added<Expr *> DRE = 
+      Added<Expr *> DRE =
         new (Context) DeclRefExpr(ConcreteDeclRef(D),
                                   cast<DeclRefExpr>(E)->getLoc(),
                                   true, // implicit
@@ -442,7 +442,7 @@ public:
       }
       llvm::errs() << Text << "\n";
     }
-    bool hadError() { 
+    bool hadError() {
       return error;
     }
   };
@@ -467,7 +467,7 @@ public:
       }
       return true;
     }
-    bool hadError() { 
+    bool hadError() {
       return error;
     }
   };
@@ -728,7 +728,7 @@ public:
     // FIXME: This is a band-aid used to work around the fact that the
     // above code can introduce null elements into the vector. The
     // right fix is to avoid doing that above.
-    Elements.erase(std::remove_if(Elements.begin(), Elements.end(), 
+    Elements.erase(std::remove_if(Elements.begin(), Elements.end(),
                                   [](ASTNode node) {
                                     return node.isNull();
                                   }),
@@ -797,7 +797,7 @@ public:
   }
 
   std::pair<PatternBindingDecl*, VarDecl*>
-    maybeFixupPrintArgument(ApplyExpr *Print) { 
+    maybeFixupPrintArgument(ApplyExpr *Print) {
     Expr *ArgTuple = Print->getArg();
     if (ParenExpr *PE = dyn_cast<ParenExpr>(ArgTuple)) {
       std::pair<PatternBindingDecl*, VarDecl*> PV =
@@ -935,7 +935,7 @@ public:
     std::uniform_int_distribution<unsigned int> Distribution(0, 0x7fffffffu);
     const unsigned int id_num = Distribution(RNG);
     ::snprintf(id_buf, buf_size, "%u", id_num);
-    Expr *IDExpr = new (Context) IntegerLiteralExpr(id_buf, 
+    Expr *IDExpr = new (Context) IntegerLiteralExpr(id_buf,
                                                     SourceLoc(), true);
     
     Expr *LoggerArgExprs[] = {
@@ -944,7 +944,7 @@ public:
         IDExpr
       };
 
-    return buildLoggerCallWithArgs("$builtin_log_with_id", 
+    return buildLoggerCallWithArgs("$builtin_log_with_id",
                                    MutableArrayRef<Expr *>(LoggerArgExprs),
                                    SR);
   }
@@ -1021,13 +1021,13 @@ public:
     ::snprintf(end_line_buf, buf_size, "%d", EndLC.first);
     ::snprintf(end_column_buf, buf_size, "%d", EndLC.second);
 
-    Expr *StartLine = new (Context) IntegerLiteralExpr(start_line_buf, 
+    Expr *StartLine = new (Context) IntegerLiteralExpr(start_line_buf,
                                                        SR.End, true);
     Expr *EndLine = new (Context) IntegerLiteralExpr(end_line_buf,
                                                      SR.End, true);
-    Expr *StartColumn = new (Context) IntegerLiteralExpr(start_column_buf, 
+    Expr *StartColumn = new (Context) IntegerLiteralExpr(start_column_buf,
                                                          SR.End, true);
-    Expr *EndColumn = new (Context) IntegerLiteralExpr(end_column_buf, 
+    Expr *EndColumn = new (Context) IntegerLiteralExpr(end_column_buf,
                                                        SR.End, true);
 
     std::pair<PatternBindingDecl *, VarDecl *> PV =
@@ -1047,9 +1047,9 @@ public:
         EndColumn
       };
 
-    TupleExpr *SendDataArgs = TupleExpr::createImplicit(Context, 
+    TupleExpr *SendDataArgs = TupleExpr::createImplicit(Context,
                                                         SendDataArgExprs, { });
-    UnresolvedDeclRefExpr *SendDataRef = 
+    UnresolvedDeclRefExpr *SendDataRef =
       new (Context) UnresolvedDeclRefExpr(
         Context.getIdentifier("$builtin_send_data"),
         DeclRefKind::Ordinary,

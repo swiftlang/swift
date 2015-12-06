@@ -156,10 +156,10 @@ enum RawTypeCircularityA : RawTypeCircularityB, IntegerLiteralConvertible { // e
   }
 }
 
-enum RawTypeCircularityB : RawTypeCircularityA, IntegerLiteralConvertible { // expected-note {{enum 'RawTypeCircularityB' declared here}} 
+enum RawTypeCircularityB : RawTypeCircularityA, IntegerLiteralConvertible { // expected-note {{enum 'RawTypeCircularityB' declared here}}
   case Willamette, Columbia, Sandy, Multnomah
 
-  init(integerLiteral value: Int) { 
+  init(integerLiteral value: Int) {
     self = .Willamette
   }
 }
@@ -357,7 +357,7 @@ enum DuplicateMembers7 : String {
 // Refs to duplicated enum cases shouldn't crash the compiler.
 // rdar://problem/20922401
 func check20922401() -> String {
-  let x: DuplicateMembers1 = .Foo 
+  let x: DuplicateMembers1 = .Foo
   switch x {
     case .Foo:
       return "Foo"

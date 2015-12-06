@@ -80,7 +80,7 @@ static void addSwiftStackPromotionPass(const PassManagerBuilder &Builder,
     PM.add(createSwiftStackPromotionPass());
 }
 
-// FIXME: Copied from clang/lib/CodeGen/CGObjCMac.cpp. 
+// FIXME: Copied from clang/lib/CodeGen/CGObjCMac.cpp.
 // These should be moved to a single definition shared by clang and swift.
 enum ImageInfoFlags {
   eImageInfo_FixAndContinue      = (1 << 0),

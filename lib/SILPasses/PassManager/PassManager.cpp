@@ -337,7 +337,7 @@ void SILPassManager::runOneIteration() {
 
     // Run function transformation on all functions.
     if (SILFunctionTransform *SFT = llvm::dyn_cast<SILFunctionTransform>(ST)) {
-      PendingFuncTransforms.push_back(SFT);      
+      PendingFuncTransforms.push_back(SFT);
       continue;
     }
 

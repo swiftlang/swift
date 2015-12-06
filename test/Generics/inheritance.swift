@@ -55,7 +55,7 @@ class Y<T> : X<[T]> {
 
 func testGenericInherit() {
   let yi : Y<Int>
-  _ = yi.f() as [Int] 
+  _ = yi.f() as [Int]
 }
 
 
@@ -64,13 +64,13 @@ enum SE<T> : T { case X } // expected-error{{raw type 'T' is not convertible fro
 // expected-error@-1{{type 'SE<T>' does not conform to protocol 'RawRepresentable'}}
 
 // Also need Equatable for init?(RawValue)
-enum SE2<T : IntegerLiteralConvertible> 
+enum SE2<T : IntegerLiteralConvertible>
   : T // expected-error{{RawRepresentable 'init' cannot be synthesized because raw type 'T' is not Equatable}}
 { case X }
 
 // ... but not if init?(RawValue) is directly implemented some other way.
-enum SE3<T : IntegerLiteralConvertible> : T { 
-  case X 
+enum SE3<T : IntegerLiteralConvertible> : T {
+  case X
 
   init?(rawValue: T) {
     self = SE3.X

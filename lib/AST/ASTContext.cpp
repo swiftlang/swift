@@ -225,7 +225,7 @@ struct ASTContext::Implementation {
   /// Mapping from archetypes with lazily-resolved nested types to the
   /// archetype builder and potential archetype corresponding to that
   /// archetype.
-  llvm::DenseMap<const ArchetypeType *, 
+  llvm::DenseMap<const ArchetypeType *,
                  std::pair<ArchetypeBuilder *,
                            ArchetypeBuilder::PotentialArchetype *>>
     LazyArchetypes;
@@ -1040,7 +1040,7 @@ static bool isGenericIntrinsic(FuncDecl *fn, CanType &input, CanType &output,
 }
 
 // Find library intrinsic function.
-static FuncDecl *findLibraryFunction(const ASTContext &ctx, FuncDecl *&cache, 
+static FuncDecl *findLibraryFunction(const ASTContext &ctx, FuncDecl *&cache,
                                      StringRef name, LazyResolver *resolver) {
   if (cache) return cache;
 
@@ -1709,7 +1709,7 @@ namespace {
     SourceFile &SF;
 
   public:
-    OrderDeclarationsWithSourceFileAndClassBias(SourceManager &srcMgr, 
+    OrderDeclarationsWithSourceFileAndClassBias(SourceManager &srcMgr,
                                                 SourceFile &sf)
       : SrcMgr(srcMgr), SF(sf) { }
 
@@ -2023,9 +2023,9 @@ static void removeValidObjCConflictingMethods(
                                    }
 
                                    return false;
-                                 } 
+                                 }
                                  
-                                 if (auto ctor 
+                                 if (auto ctor
                                        = dyn_cast<ConstructorDecl>(method)) {
                                    if (ctor->hasStubImplementation())
                                      return true;
@@ -2041,7 +2041,7 @@ static void removeValidObjCConflictingMethods(
 /// Determine whether the should associate a conflict among the given
 /// set of methods with the specified source file.
 static bool shouldAssociateConflictWithSourceFile(
-              SourceFile &sf, 
+              SourceFile &sf,
               ArrayRef<AbstractFunctionDecl *> methods) {
   bool anyInSourceFile = false;
   bool anyInOtherSourceFile = false;
@@ -2061,7 +2061,7 @@ static bool shouldAssociateConflictWithSourceFile(
       anyInOtherSourceFile = true;
   }
 
-  return anyInSourceFile || 
+  return anyInSourceFile ||
     (!anyInOtherSourceFile && anyClassMethodsInSourceFile);
 }
 
@@ -3081,7 +3081,7 @@ ArraySliceType *ArraySliceType::get(Type base) {
 }
 
 DictionaryType *DictionaryType::get(Type keyType, Type valueType) {
-  auto properties = keyType->getRecursiveProperties() 
+  auto properties = keyType->getRecursiveProperties()
                   | valueType->getRecursiveProperties();
   auto arena = getArena(properties);
 
@@ -3091,7 +3091,7 @@ DictionaryType *DictionaryType::get(Type keyType, Type valueType) {
     = C.Impl.getArena(arena).DictionaryTypes[{keyType, valueType}];
   if (entry) return entry;
 
-  return entry = new (C, arena) DictionaryType(C, keyType, valueType, 
+  return entry = new (C, arena) DictionaryType(C, keyType, valueType,
                                                properties);
 }
 

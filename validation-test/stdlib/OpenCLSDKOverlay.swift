@@ -7,7 +7,7 @@
 // Abstract:   A simple "Hello World" compute example showing basic usage of OpenCL which
 //             calculates the mathematical square (X[i] = pow(X[i],2)) for a buffer of
 //             floating point values.
-//             
+//
 //
 // Version:    <1.0>
 //
@@ -84,7 +84,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   var global: size_t                      // global domain size for our calculation
   var local: size_t = 0                       // local domain size for our calculation
 
-  var device_id: cl_device_id = nil             // compute device id 
+  var device_id: cl_device_id = nil             // compute device id
   var context: cl_context                 // compute context
   var commands: cl_command_queue          // compute command queue
   var program: cl_program                 // compute program
@@ -111,7 +111,7 @@ tests.test("clSetKernelArgsListAPPLE") {
     exit(EXIT_FAILURE)
   }
   
-  // Create a compute context 
+  // Create a compute context
   //
   context = clCreateContext(nil, 1, &device_id, nil, nil, &err)
   if (context == nil)
@@ -177,9 +177,9 @@ tests.test("clSetKernelArgsListAPPLE") {
   {
     print("Error: Failed to allocate device memory!")
     exit(1)
-  }    
+  }
   
-  // Write our data set into the input array in device memory 
+  // Write our data set into the input array in device memory
   //
   err = clEnqueueWriteBuffer(commands, input, cl_bool(CL_TRUE), 0, sizeof(Float.self) * count, data, 0, nil, nil)
   if (err != CL_SUCCESS)

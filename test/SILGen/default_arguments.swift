@@ -222,7 +222,7 @@ class ReabstractDefaultArgument<T> {
 // function_ref reabstraction thunk helper from @callee_owned (@unowned Swift.Int, @unowned Swift.Int) -> (@unowned Swift.Bool) to @callee_owned (@in Swift.Int, @in Swift.Int) -> (@unowned Swift.Bool)
 // CHECK: %6 = function_ref @_TTRXFo_dSidSi_dSb_XFo_iSiiSi_dSb_ : $@convention(thin) (@in Int, @in Int, @owned @callee_owned (Int, Int) -> Bool) -> Bool
 // CHECK-NEXT: %7 = partial_apply %6(%5) : $@convention(thin) (@in Int, @in Int, @owned @callee_owned (Int, Int) -> Bool) -> Bool
-// CHECK-NEXT: apply [[INITFN]]<Int>(%7, 
+// CHECK-NEXT: apply [[INITFN]]<Int>(%7,
 
 func testDefaultArgumentReabstraction() {
   ReabstractDefaultArgument<Int>()

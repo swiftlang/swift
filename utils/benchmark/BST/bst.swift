@@ -97,7 +97,7 @@ class BST {
     let leftDepth = depthIn(n.left)
     let rightDepth = depthIn(n.right)
     return max(leftDepth, rightDepth) + 1
-  }        
+  }
 
   func size() -> Int {
     return sizeIn(root)

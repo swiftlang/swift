@@ -180,7 +180,7 @@ allowed to throw is rejected by the compiler.
 It isn't possible to overload functions solely based on whether the
 functions throw.  That is, this is not legal::
 
-  func foo() { 
+  func foo() {
   func foo() throws {
 
 A throwing method cannot override a non-throwing method or satisfy a
@@ -299,7 +299,7 @@ generalized ``do`` statement::
     // a conditionally-executed catch clause
 
   } catch _ {
-    // a catch-all clause.  
+    // a catch-all clause.
   }
 
 As with ``switch`` statements, Swift makes an effort to understand

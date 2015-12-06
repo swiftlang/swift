@@ -17,7 +17,7 @@ func testExternalPrivate() {
 }
 
 //PRIMARY-FILE-LABEL: sil hidden @_TF13devirt_access20testInternalInternalFT_T_
-//PRIMARY-FILE: class_method 
+//PRIMARY-FILE: class_method
 //WHOLE-MODULE-LABEL: sil hidden @_TF13devirt_access20testInternalInternalFT_T_
 //WHOLE-MODULE: function_ref @_TF13devirt_access16getInternalClassFT_CS_13InternalClass
 //WHOLE-MODULE: return
@@ -27,8 +27,8 @@ func testInternalInternal() {
 }
 
 //PRIMARY-FILE-LABEL: sil hidden @_TF13devirt_access19testInternalPrivateFT_T_
-//PRIMARY-FILE: function_ref @_TF13devirt_access16getInternalClassFT_CS_13InternalClass 
-//PRIMARY-FILE: function_ref @_TF13devirt_access9invokeFooFCS_13InternalClassT_ 
+//PRIMARY-FILE: function_ref @_TF13devirt_access16getInternalClassFT_CS_13InternalClass
+//PRIMARY-FILE: function_ref @_TF13devirt_access9invokeFooFCS_13InternalClassT_
 //PRIMARY-FILE: return
 //WHOLE-MODULE-LABEL: sil hidden @_TF13devirt_access19testInternalPrivateFT_T_
 //WHOLE-MODULE: function_ref @_TF13devirt_access16getInternalClassFT_CS_13InternalClass

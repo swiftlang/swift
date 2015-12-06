@@ -263,7 +263,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   // An Objective-C class reference;  not a swift mangling.
   case Kind::ObjCClass: {
     llvm::SmallString<64> nameBuffer;
-    buffer << "OBJC_CLASS_$_" 
+    buffer << "OBJC_CLASS_$_"
            << cast<ClassDecl>(getDecl())->getObjCRuntimeName(nameBuffer);
     return;
   }

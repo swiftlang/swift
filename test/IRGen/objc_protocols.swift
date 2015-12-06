@@ -169,7 +169,7 @@ func objc_swift_protocol_composition
   // CHECK: [[RUNCE:%.*]] = load i8*, i8** @"\01L_selector(runce)", align 8
   // CHECK: bitcast %objc_object* %0 to [[OBJTYPE:.*]]*
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OBJTYPE]]*, i8*)*)([[OBJTYPE]]* {{%.*}}, i8* [[RUNCE]])
-  /* TODO: Abstraction difference from ObjC protocol composition to 
+  /* TODO: Abstraction difference from ObjC protocol composition to
    * opaque protocol
   x.anse()
    */

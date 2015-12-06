@@ -57,4 +57,4 @@ typealias e : B(t: SequenceType, f<T>, e)
 f() -> Int = f, i(")
 enum B : c(f(c(x(""")
 enum A = [Byte])
-func g<C: B.a: 
+func g<C: B.a:

@@ -21,7 +21,7 @@ func getDescription(o: NSObject) -> String {
 // CHECK:  [[T0:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
 // CHECK:  apply [[T0]]<String>([[NATIVE_BUF:%.*]]#1,
 // CHECK:  [[NATIVE:%.*]] = load [[NATIVE_BUF]]
-// CHECK:  return [[NATIVE]] 
+// CHECK:  return [[NATIVE]]
 // CHECK:}
 
 func getUppercaseString(s: NSString) -> String {

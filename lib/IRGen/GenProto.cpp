@@ -2526,7 +2526,7 @@ namespace {
           DidUseLastSource = true;
         }
       } else {
-        Fulfillments.insert(std::make_pair(key, 
+        Fulfillments.insert(std::make_pair(key,
                                    Fulfillment(sourceIndex, std::move(path))));
         DidUseLastSource = true;
       }
@@ -2841,7 +2841,7 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
   case Component::Kind::Impossible:
     llvm_unreachable("following an impossible path!");
 
-  } 
+  }
   llvm_unreachable("bad metata path component");
 }
 

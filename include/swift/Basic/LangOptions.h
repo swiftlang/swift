@@ -236,7 +236,7 @@ namespace swift {
 
   private:
     llvm::SmallVector<std::pair<std::string, std::string>, 2>
-        TargetConfigOptions; 
+        TargetConfigOptions;
     llvm::SmallVector<std::string, 2> BuildConfigOptions;
   };
 }

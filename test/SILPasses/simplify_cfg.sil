@@ -1405,7 +1405,7 @@ enum IntEnum : Int32 {
 // CHECK-DAG: [[X11:%[0-9]+]] = enum $Optional<IntEnum>, #Optional.Some!enumelt.1, [[X10]] : $IntEnum
 // CHECK-DAG: [[X12:%[0-9]+]] = enum $IntEnum, #IntEnum.E0!enumelt
 // CHECK-DAG: [[X13:%[0-9]+]] = enum $Optional<IntEnum>, #Optional.Some!enumelt.1, [[X12]] : $IntEnum
-// CHECK-DAG: [[X14:%[0-9]+]] = select_value %0 : $Builtin.Int32, case [[X6]]: [[X8]], case [[X9]]: [[X11]], case [[X2]]: [[X13]], default [[X5]] : $Optional<IntEnum> 
+// CHECK-DAG: [[X14:%[0-9]+]] = select_value %0 : $Builtin.Int32, case [[X6]]: [[X8]], case [[X9]]: [[X11]], case [[X2]]: [[X13]], default [[X5]] : $Optional<IntEnum>
 // CHECK-DAG: return [[X14]] : $Optional<IntEnum>
 sil @create_select_value : $@convention(thin) (Builtin.Int32) -> Optional<IntEnum> {
 bb0(%0 : $Builtin.Int32):

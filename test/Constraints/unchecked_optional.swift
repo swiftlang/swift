@@ -7,7 +7,7 @@ class A {
   func do_b(x: Float) {}
 
   func do_c(x x: Int) {}
-  func do_c(y y: Int) {} 
+  func do_c(y y: Int) {}
 }
 
 func test0(a : A!) {

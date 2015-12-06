@@ -94,7 +94,7 @@ PriorityQueue::popHeap() {
          "known non-empty.");
 
   // Copy the current heap head before doing anything.
-  CostQueueElt Result = Heap.front();  
+  CostQueueElt Result = Heap.front();
 
   // Swap the heap head with the last heap element and pop the heap.
   std::swap(Heap.front(), Heap.back());

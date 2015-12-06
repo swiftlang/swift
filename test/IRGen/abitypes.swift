@@ -92,7 +92,7 @@ class Foo {
 
   // Ensure that MyRect is passed as an indirect-byval on x86_64 because we run out of registers for direct arguments
   // x86_64-macosx: define hidden float @_TToFC8abitypes3Foo25getXFromRectIndirectByVal{{.*}}(i8*, i8*, float, float, float, float, float, float, float, %VSC6MyRect* byval align 4) unnamed_addr {{.*}} {
-  dynamic func getXFromRectIndirectByVal(_: Float, second _: Float, 
+  dynamic func getXFromRectIndirectByVal(_: Float, second _: Float,
                                        third _: Float, fourth _: Float,
                                        fifth _: Float, sixth _: Float,
                                        seventh _: Float, withRect r: MyRect)

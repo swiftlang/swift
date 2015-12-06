@@ -22,7 +22,7 @@ import gizmo
 
   // Bridging set results
   // CHECK-LABEL: sil hidden [thunk] @_TToFC17objc_set_bridging3Foo17bridge_Set_result{{.*}} : $@convention(objc_method) (Foo) -> @autoreleased NSSet {
-  func bridge_Set_result() -> Set<Foo> { 
+  func bridge_Set_result() -> Set<Foo> {
     // CHECK: bb0([[SELF:%[0-9]+]] : $Foo):
     // CHECK: strong_retain [[SELF]] : $Foo
     // CHECK: [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC17objc_set_bridging3Foo17bridge_Set_result{{.*}} : $@convention(method) (@guaranteed Foo) -> @owned Set<Foo>

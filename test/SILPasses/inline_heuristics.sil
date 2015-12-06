@@ -33,7 +33,7 @@ enum E {
 // CHECK: apply [[C]](
 // CHECK: return
 
-// LOG-LABEL: Visiting Function: testDirectClosure 
+// LOG-LABEL: Visiting Function: testDirectClosure
 // LOG: Eligible callee: takeDirectClosure
 // LOG: Boost: apply const function
 

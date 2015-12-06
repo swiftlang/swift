@@ -55,11 +55,11 @@ namespace {
   /// file scope level so it will be set up correctly for this purpose.
   ///
   /// Creating an instance of this object will cause it to figure out
-  /// whether we are in the debugger function, whether it needs to swap 
+  /// whether we are in the debugger function, whether it needs to swap
   /// the Decl that is currently being parsed.
   /// If you have created the object, instead of returning the result
   /// with makeParserResult, use the object's fixupParserResult.  If
-  /// no swap has occurred, these methods will work the same.  
+  /// no swap has occurred, these methods will work the same.
   /// If the decl has been moved, then Parser::markWasHandled will be
   /// called on the Decl, and you should call declWasHandledAlready
   /// before you consume the Decl to see if you actually need to
@@ -350,7 +350,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       !isInSILMode()) {
     diagnose(Loc, diag::only_allowed_in_sil, AttrName);
     DiscardAttribute = true;
-  }  
+  }
 
   // Filled in during parsing.  If there is a duplicate
   // diagnostic this can be used for better error presentation.
@@ -991,7 +991,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
           consumeToken();
           sawColon = true;
           continue;
-        } 
+        }
         
         // If we see a closing parentheses, we're done.
         if (Tok.is(tok::r_paren)) {
@@ -1063,7 +1063,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     SourceLoc lParenLoc = consumeToken();
     bool invalid = false;
     do {
-      // If we see a closing parenthesis, 
+      // If we see a closing parenthesis,
       if (Tok.is(tok::r_paren))
         break;
 
@@ -1107,7 +1107,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         if (Tok.isNot(tok::r_paren))
           skipUntil(tok::r_paren);
         invalid = true;
-        break;        
+        break;
       }
 
       // Dig out the string.
@@ -1128,7 +1128,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       switch (*known) {
       case KnownParameter::Message:
         whichParam = &message;
-        break; 
+        break;
 
       case KnownParameter::MutableVariant:
         whichParam = &mutableVariant;
@@ -1136,7 +1136,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       }
 
       if (!whichParam->empty()) {
-        diagnose(nameLoc, diag::attr_warn_unused_result_duplicate_parameter, 
+        diagnose(nameLoc, diag::attr_warn_unused_result_duplicate_parameter,
                  name);
       }
 
@@ -2948,7 +2948,7 @@ static AddressorKind getMutableAddressorKind(Token &tok) {
   }
 }
 
-/// Returns an accessor kind that 
+/// Returns an accessor kind that
 static StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind,
                                               AddressorKind addressorKind) {
   switch (accessorKind) {
@@ -2977,7 +2977,7 @@ static StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind,
     }
     llvm_unreachable("bad addressor kind");
   }
-  llvm_unreachable("bad accessor kind");  
+  llvm_unreachable("bad accessor kind");
 }
 
 static void diagnoseRedundantAccessors(Parser &P, SourceLoc loc,
@@ -3451,7 +3451,7 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
     // Don't allow both.
     } else if (Addressor && Get) {
       P.diagnose(Addressor->getLoc(), diag::addressor_with_getter,
-                 isa<SubscriptDecl>(storage));      
+                 isa<SubscriptDecl>(storage));
       ignoreInvalidAccessor(Get);
     }
 
@@ -3558,7 +3558,7 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
     storage->makeComputedWithMutableAddress(LBLoc, Get, Set, nullptr,
                                             MutableAddressor, RBLoc);
     return;
-  } 
+  }
 
   // Otherwise, this must be a get/set property.  The set is optional,
   // but get is not.
@@ -3895,7 +3895,7 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
 ///
 /// \verbatim
 ///   decl-func:
-///     attribute-list? ('static' | 'class')? 'mutating'? 'func' 
+///     attribute-list? ('static' | 'class')? 'mutating'? 'func'
 ///               any-identifier generic-params? func-signature stmt-brace?
 /// \endverbatim
 ///
@@ -3932,10 +3932,10 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   Token NonglobalTok = Tok;
   bool  NonglobalError = false;
 
-  if (!(Flags & PD_AllowTopLevel) && 
+  if (!(Flags & PD_AllowTopLevel) &&
       !(Flags & PD_InProtocol) &&
       Tok.isAnyOperator()) {
-    // Postpone complaining about this error till we see if the 
+    // Postpone complaining about this error till we see if the
     // DCC wants to move it below.
     NonglobalError = true;
   }
@@ -4561,7 +4561,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
 ///      protocol-head '{' protocol-member* '}'
 ///
 ///   protocol-head:
-///     'protocol' attribute-list identifier inheritance? 
+///     'protocol' attribute-list identifier inheritance?
 ///
 ///   protocol-member:
 ///      decl-func
@@ -4931,7 +4931,7 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   return makeParserResult(DD);
 }
 
-ParserResult<OperatorDecl> 
+ParserResult<OperatorDecl>
 Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   SourceLoc OperatorLoc = consumeToken(tok::kw_operator);
   bool AllowTopLevel = Flags.contains(PD_AllowTopLevel);

@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the Sema interface which implement hooks invoked by the 
+// This file defines the Sema interface which implement hooks invoked by the
 // parser to build the AST.
 //
 //===----------------------------------------------------------------------===//

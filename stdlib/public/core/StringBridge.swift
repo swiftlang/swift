@@ -76,11 +76,11 @@ internal func _cocoaStringToContiguous(
   let startIndex = range.startIndex
   let count = range.endIndex - startIndex
 
-  let buffer = _StringBuffer(capacity: max(count, minimumCapacity), 
+  let buffer = _StringBuffer(capacity: max(count, minimumCapacity),
                              initialSize: count, elementWidth: 2)
 
   _swift_stdlib_CFStringGetCharacters(
-    source, _swift_shims_CFRange(location: startIndex, length: count), 
+    source, _swift_shims_CFRange(location: startIndex, length: count),
     UnsafeMutablePointer<_swift_shims_UniChar>(buffer.start))
   
   return buffer

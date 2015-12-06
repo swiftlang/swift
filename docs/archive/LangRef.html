@@ -92,7 +92,7 @@
     import-kind ::= 'func'
     
     import-path ::= <a href="#any-identifier">any-identifier</a> ('.' <a href="#any-identifier">any-identifier</a>)*
-  </pre>  
+  </pre>
   
   <p>'import' declarations allow named values and types to be accessed with
   local names, even when they are defined in other modules and namespaces.  See
@@ -104,7 +104,7 @@
   swift file do not affect name lookup in another file. import directives can
   only occur at the top level of a file, not within a function or namespace.</p>
   
-  <p>An import without an explicit import-kind names a module; all of the 
+  <p>An import without an explicit import-kind names a module; all of the
   module's members are imported into the current scope. The module's name is
   also imported into the current scope in order to allow qualified access to
   the module's members, which can be useful for disambiguation.</p>
@@ -115,7 +115,7 @@
   module itself is <em>not</em> accessible, nor any other decls within the
   module.</p>
   
-  <p>Different import-kinds perform different filters on the decls within a 
+  <p>Different import-kinds perform different filters on the decls within a
   module:</p>
   
   <ul>
@@ -289,7 +289,7 @@
     }
     
     <i>// A more realistic example on a trivial type.</i>
-    struct bankaccount { 
+    struct bankaccount {
       amount : Int
     
      static func bankaccount() -> bankaccount {
@@ -398,7 +398,7 @@
       f1(DataSearchFlags.None)  <i>// Use of constructor with qualified identifier</i>
       f1(.None)                 <i>// Use of constructor with context sensitive type inference</i>
     
-      <i>// "None" has no type argument, so the constructor's type is "DataSearchFlags".</i> 
+      <i>// "None" has no type argument, so the constructor's type is "DataSearchFlags".</i>
       var a : DataSearchFlags = .None
     }
     
@@ -442,7 +442,7 @@
   <p>The body of a 'struct' is a list of decls. Stored (non-computed) 'var'
      decls declare members with storage in the struct. Other declarations act
      like they would in an <a href="#decl-extension">extension</a> of the
-     struct type.</p>  
+     struct type.</p>
 
   <p>Here are a few simple examples:</p>
 
@@ -495,7 +495,7 @@
     to store the "isa"/vtable in the struct so that virtual method dispatch
     could be implemented, and this has additional storage costs. None of these
     tradeoffs make sense for the intended use cases we have in mind for structs
-    (Ints, Floats, Points, Rects, UUIDs, IP addresses, C struct interop, etc, 
+    (Ints, Floats, Points, Rects, UUIDs, IP addresses, C struct interop, etc,
     etc). Said differently: we're trying to force a hard wall
     between types that need indirect access by their nature and those types
     that need direct access by their nature. The former are called classes. The
@@ -512,7 +512,7 @@
   </pre>
 
   <p>A class declares a reference type referring to an object which can contain
-     data members and have methods.  Classes support single inheritance; 
+     data members and have methods.  Classes support single inheritance;
      a parent class should be listed as the first type in the
      inheritance list.</p>
 
@@ -854,10 +854,10 @@
   
   <p>The <tt>autoclosure</tt> attribute modifies a <a
   href="#type-function">function type</a>, changing the behavior of any
-  assignment into (or initialization of) a value with the function type. 
+  assignment into (or initialization of) a value with the function type.
   Instead of requiring that the rvalue and lvalue have the same function type,
-  an "auto closing" function type requires its initializer expression to have 
-  the same type as the function's result type, and it implicitly binds a 
+  an "auto closing" function type requires its initializer expression to have
+  the same type as the function's result type, and it implicitly binds a
   closure over this expression.  This is typically useful for function arguments
   that want to capture computation that can be run lazily.</p>
   
@@ -890,20 +890,20 @@
     attribute-noreturn ::= 'noreturn'
   </pre>
 
-  <p>Attribute <tt>noreturn</tt> is only valid in the attribute list of a 
-	function declaration or in the attribute list of a <tt>type</tt> 
+  <p>Attribute <tt>noreturn</tt> is only valid in the attribute list of a
+	function declaration or in the attribute list of a <tt>type</tt>
 	that describes a syntactic function type.
   </p>
 
-  <p><tt>noreturn</tt> indicates to the compiler that the function will not 
-	return to the caller. This attribute should be used to suppress the 
+  <p><tt>noreturn</tt> indicates to the compiler that the function will not
+	return to the caller. This attribute should be used to suppress the
 	uninitialized variable, missing return warnings and errors. The compiler is
-	also allowed to more aggressively optimize the code in presence of this 
+	also allowed to more aggressively optimize the code in presence of this
 	attribute.
   </p>
 
-  <p>If a function with no a <tt>noreturn</tt> attribute contains a 
-	<tt>return</tt> statement, an error will be raised. 
+  <p>If a function with no a <tt>noreturn</tt> attribute contains a
+	<tt>return</tt> statement, an error will be raised.
   </p>
 
   
@@ -932,7 +932,7 @@
   
   <p id="metatype">Each type has a corresponding <i>metatype</i>, with the same
     name as the type, that is injected into the standard name lookup scope when
-    a type is <a href="#decl">declared</a>.  This allows access to '<a 
+    a type is <a href="#decl">declared</a>.  This allows access to '<a
     href="#decl-func">static functions</a>' through dot syntax.  For example:</p>
   
   <pre class="example">
@@ -1094,12 +1094,12 @@
   <p>The result type of a function type must
      be <a href="#materializable">materializable</a>.  The argument type of a
      function is always required to be parenthesized (a tuple).  The  behavior
-     of function types may be modified with the <a 
+     of function types may be modified with the <a
       href="#attribute-autoclosure"><tt>autoclosure</tt> attribute</a>.</p>
 
-  <p>Because of the grammar structure, a nested function type like 
+  <p>Because of the grammar structure, a nested function type like
      "(a) -&gt; (b) -&gt; c" is parsed as "(a) -&gt; ((b) -&gt; c)".  This means
-     that if 
+     that if
      you declare this that you can pass it one argument to get a function that
      "takes b and returns c" or you can pass two arguments to "get a c".  This
      is known as <a href="http://en.wikipedia.org/wiki/Currying">currying</a>.
@@ -1134,7 +1134,7 @@
   <!-- ===================================================================== -->
   
   <div class="commentary">
-    'enum' types are known as <a 
+    'enum' types are known as <a
       href="http://en.wikipedia.org/wiki/Algebraic_data_type">algebraic data
       types</a> (ADTs) by the broader programming language community.
     We name them 'enum' after C enums, because ADTs
@@ -1149,7 +1149,7 @@
   
   <p>an enum type is defined by a <a href="#decl-enum">enum decl</a>.
 
-  <p>Values of enum type may not be default initialized unless the user 
+  <p>Values of enum type may not be default initialized unless the user
   provides a no-argument constructor.</p>
 
   <p>The enum metatype has a member corresponding to each declared element.
@@ -1267,7 +1267,7 @@
     <div class="commentary">
       Similar constructs exist in Haskell (<a
       href="http://hackage.haskell.org/packages/archive/base/latest/doc/html/Data-Maybe.html">Maybe</a>),
-      the Boost library (<a 
+      the Boost library (<a
       href="http://www.boost.org/doc/libs/1_54_0/libs/optional/doc/html/index.html">Optional</a>),
       and C++14 (<a href="http://en.cppreference.com/w/cpp/utility/optional">optional</a>).
     </div>
@@ -1276,9 +1276,9 @@
       type-optional ::= type-simple '?'-postfix
     </pre>
 
-    <p>An optional type is syntactic sugar for the library type 
-    Optional&lt;T&gt;. This is a <a href="#decl-enum">enum</a> with two 
-    cases: None and Some, used to represent a value that may or may not be 
+    <p>An optional type is syntactic sugar for the library type
+    Optional&lt;T&gt;. This is a <a href="#decl-enum">enum</a> with two
+    cases: None and Some, used to represent a value that may or may not be
     present.</p>
 
     <p>Swift provides a number of special, builtin behaviors involving
@@ -1613,7 +1613,7 @@ ill-formed if the type does not conform to the protocol.</p>
     the type of the operand is checked at runtime, and if it is
     castable to <tt>T</tt>, the <tt>Optional</tt> result contains
     the result of the cast. If the cast fails, the result contains
-    <tt>.None</tt>. The latter is only permissible when 
+    <tt>.None</tt>. The latter is only permissible when
     <tt>T</tt> is a subtype of the compile-time type of <tt>x</tt>.
     An example:
 
@@ -1749,8 +1749,8 @@ ill-formed if the type does not conform to the protocol.</p>
   <p>A raw identifier refers to a value found via <a
      href="#namebind_value_lookup_unqual">unqualified value lookup</a>, and has
      the type of the declaration returned by name lookup and overload
-     resolution.  Value declarations are installed with <a 
-     href="#decl-var">var</a> and the syntactic sugar forms like <a 
+     resolution.  Value declarations are installed with <a
+     href="#decl-var">var</a> and the syntactic sugar forms like <a
      href="decl-func">func</a> declarations.</p>
 
   <p>If an identifier refers to a generic type, an instance of that generic may
@@ -1914,7 +1914,7 @@ ill-formed if the type does not conform to the protocol.</p>
       })
 
       <i>// Error, not enough context to infer the type of $0.</i>
-      var x = { $0 } 
+      var x = { $0 }
     }
   </pre>
   
@@ -1949,7 +1949,7 @@ ill-formed if the type does not conform to the protocol.</p>
     expr-delayed-identifier ::= '.' <a href="#identifier">identifier</a> <a href="#expr-paren">expr-paren</a>?
   </pre>
   
-  <p>A delayed identifier expression refers to a case of an <a 
+  <p>A delayed identifier expression refers to a case of an <a
     href="type-enum">enum</a> type or a type member of a nominal
     type, without knowing which type it is referring to.  The
     expression is resolved to a member of a concrete type through
@@ -2262,7 +2262,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   <!-- ********************************************************************* -->
 
   <div class="commentary">
-    Statements can only exist in contexts that are themselves a stmt.  
+    Statements can only exist in contexts that are themselves a stmt.
     Statements have no type, they just induce control flow changes.  We choose
     to use constructs that will be familiar to a broad range of C/Java
     programmers.
@@ -2288,7 +2288,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   top-level code.</p>
 
   <pre class="example">
-    <i>// A function with some statements.</i> 
+    <i>// A function with some statements.</i>
     func fib(v : Int) -&gt; Int {
       if v &lt; 2 {
         return v
@@ -2323,7 +2323,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
     stmt-return ::= 'return'
   </pre>
   
-  <p>The return statement sets the return value of the current <a 
+  <p>The return statement sets the return value of the current <a
      href="#decl-func">func declaration</a> or <a href="#expr-closure">closure
      expression</a> and transfers control out of the function.  It sets the
      return value by converting the specified expression result (or '()' if
@@ -2539,7 +2539,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   as some set of requirements that specify the capabilities that any
   corresponding generic argument might have. For example, the generic
   parameter <code>T : CustomStringConvertible</code> requires that any generic
-  argument substituted for the generic parameter <code>T</code> 
+  argument substituted for the generic parameter <code>T</code>
   conform to the protocol <code>CustomStringConvertible</code>. Similarly, a generic
   parameter <code>U : SomeClass</code> requires that any generic
   argument substituted for the generic parameter <code>U</code>
@@ -2552,7 +2552,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   CustomStringConvertible&gt;</code>, which is equivalent to <code>&lt;T :
   CustomStringConvertible&gt;</code>), as well as same-type requirements that
   require two types to be identical (e.g., <code>&lt;T : Collection, U
-  : Collection where T.Element == U.Element&gt;</code>). 
+  : Collection where T.Element == U.Element&gt;</code>).
 
   <!-- ===================================================================== -->
   <h3 id="generic-args">Generic Arguments</h3>
@@ -2589,7 +2589,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   <p>Name binding in swift is performed in different ways depending on what
   language entity is being considered:</p>
   
-  <p>Value names (for <a 
+  <p>Value names (for <a
   href="#decl-var">var</a> and <a href="#decl-func">func</a> declarations) and
   type names (for <a href="#decl-typealias">typealias</a>, <a
   href="#decl-enum">enum</a>, and <a href="#decl-struct">struct</a>

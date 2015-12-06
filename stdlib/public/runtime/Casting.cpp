@@ -396,32 +396,32 @@ swift_getTypeName(const Metadata *type, bool qualified) {
 
 /// Report a dynamic cast failure.
 // This is noinline with asm("") to preserve this frame in stack traces.
-// We want "dynamicCastFailure" to appear in crash logs even we crash 
+// We want "dynamicCastFailure" to appear in crash logs even we crash
 // during the diagnostic because some Metadata is invalid.
 LLVM_ATTRIBUTE_NORETURN
 LLVM_ATTRIBUTE_NOINLINE
-void 
-swift::swift_dynamicCastFailure(const void *sourceType, const char *sourceName, 
-                                const void *targetType, const char *targetName, 
+void
+swift::swift_dynamicCastFailure(const void *sourceType, const char *sourceName,
+                                const void *targetType, const char *targetName,
                                 const char *message) {
   asm("");
 
   swift::fatalError("Could not cast value of type '%s' (%p) to '%s' (%p)%s%s\n",
-                    sourceName, sourceType, 
-                    targetName, targetType, 
-                    message ? ": " : ".", 
+                    sourceName, sourceType,
+                    targetName, targetType,
+                    message ? ": " : ".",
                     message ? message : "");
 }
 
 LLVM_ATTRIBUTE_NORETURN
-void 
+void
 swift::swift_dynamicCastFailure(const Metadata *sourceType,
-                                const Metadata *targetType, 
+                                const Metadata *targetType,
                                 const char *message) {
   std::string sourceName = nameForMetadata(sourceType);
   std::string targetName = nameForMetadata(targetType);
 
-  swift_dynamicCastFailure(sourceType, sourceName.c_str(), 
+  swift_dynamicCastFailure(sourceType, sourceName.c_str(),
                            targetType, targetName.c_str(), message);
 }
 
@@ -909,7 +909,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
       reinterpret_cast<ClassExistentialContainer*>(dest);
 
     // If the source type is a value type, it cannot possibly conform
-    // to a class-bounded protocol. 
+    // to a class-bounded protocol.
     switch (srcDynamicType->getKind()) {
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Metatype: {
@@ -942,7 +942,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
 #if SWIFT_OBJC_INTEROP
       // If the source type is bridged to Objective-C, try to bridge.
       if (auto srcBridgeWitness = findBridgeWitness(srcDynamicType)) {
-        DynamicCastFlags subFlags 
+        DynamicCastFlags subFlags
           = flags - (DynamicCastFlags::TakeOnSuccess |
                      DynamicCastFlags::DestroyOnFailure);
         bool success = _dynamicCastValueToClassExistentialViaObjCBridgeable(
@@ -1778,7 +1778,7 @@ static bool _dynamicCastMetatypeToExistentialMetatype(OpaqueValue *dest,
   // unless we've already done so.  There's no harm in doing this even if
   // the cast fails.
   if (writeDestMetatype)
-    *((const Metadata **) dest) = srcMetatype;  
+    *((const Metadata **) dest) = srcMetatype;
 
   // Recurse.
   auto srcInstanceType = srcMetatypeMetatype->InstanceType;
@@ -2248,7 +2248,7 @@ namespace {
 
   struct ConformanceCacheEntry {
   private:
-    const void *Type; 
+    const void *Type;
     const ProtocolDescriptor *Proto;
     uintptr_t Data;
     // All Darwin 64-bit platforms reserve the low 2^32 of address space, which
@@ -2826,7 +2826,7 @@ static bool _dynamicCastValueToClassExistentialViaObjCBridgeable(
   if (flags & DynamicCastFlags::Unconditional)
     subFlags |= DynamicCastFlags::Unconditional;
   bool success = _dynamicCastToExistential(
-                   dest, 
+                   dest,
                    (OpaqueValue *)&srcBridgedObject,
                    swift_getObjectType(srcBridgedObject),
                    targetType,
@@ -2900,7 +2900,7 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
   }
 
   // Initialize the buffer as an empty optional.
-  swift_storeEnumTagSinglePayload((OpaqueValue *)optDestBuffer, targetType, 
+  swift_storeEnumTagSinglePayload((OpaqueValue *)optDestBuffer, targetType,
                                   0, 1);
 
   // Perform the bridging operation.
@@ -3022,7 +3022,7 @@ extern "C" const Metadata *swift_getBridgedNonVerbatimObjectiveCType(
 
 // @_silgen_name("swift_bridgeNonVerbatimFromObjectiveC")
 // func _bridgeNonVerbatimFromObjectiveC<NativeType>(
-//     x: AnyObject, 
+//     x: AnyObject,
 //     nativeType: NativeType.Type
 //     inout result: T?
 // )
@@ -3064,7 +3064,7 @@ swift_bridgeNonVerbatimFromObjectiveC(
 
 // @_silgen_name("swift_bridgeNonVerbatimFromObjectiveCConditional")
 // func _bridgeNonVerbatimFromObjectiveCConditional<NativeType>(
-//   x: AnyObject, 
+//   x: AnyObject,
 //   nativeType: T.Type,
 //   inout result: T?
 // ) -> Bool
@@ -3094,7 +3094,7 @@ swift_bridgeNonVerbatimFromObjectiveCConditional(
   // Check whether we can downcast the source value to the Objective-C
   // type.
   auto sourceValueAsObjectiveCType =
-    const_cast<void*>(swift_dynamicCastUnknownClass(sourceValue, 
+    const_cast<void*>(swift_dynamicCastUnknownClass(sourceValue,
                                                     objectiveCType));
   if (!sourceValueAsObjectiveCType)
     return fail();

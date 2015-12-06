@@ -17,7 +17,7 @@ public struct Repeat<Element> : CollectionType {
   public typealias T = Element
 
   /// A type that represents a valid position in the collection.
-  /// 
+  ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = Int

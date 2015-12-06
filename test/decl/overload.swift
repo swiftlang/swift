@@ -12,7 +12,7 @@ var var_redecl3: (Int) -> () { get {} } // expected-note {{previously declared h
 var var_redecl3: () -> () { get {} } // expected-error {{invalid redeclaration of 'var_redecl3'}}
 
 var var_redecl4: Int // expected-note 2{{previously declared here}}
-var var_redecl4: Int // expected-error {{invalid redeclaration of 'var_redecl4'}} 
+var var_redecl4: Int // expected-error {{invalid redeclaration of 'var_redecl4'}}
 var var_redecl4: Int // expected-error {{invalid redeclaration of 'var_redecl4'}}
 
 
@@ -148,7 +148,7 @@ func ovl_generic3<T : P2>(x: T) {} // OK
 // Redeclarations within nominal types
 struct X { }
 struct Y { }
-struct Z { 
+struct Z {
   var a : X, // expected-note{{previously declared here}}
   a : Y // expected-error{{invalid redeclaration of 'a'}}
 }
@@ -162,7 +162,7 @@ struct X2 {
   typealias IntAlias = Int
   func f(a a : IntAlias) {} // expected-error{{invalid redeclaration of 'f(a:)'}}
 }
-struct X3 { 
+struct X3 {
   func f(a a : Int) {} // expected-note{{previously declared here}}
   func f(a a : IntAlias) {} // expected-error{{invalid redeclaration of 'f(a:)'}}
   typealias IntAlias = Int

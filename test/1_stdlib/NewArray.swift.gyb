@@ -26,8 +26,8 @@ import StdlibUnittest
 // Instead of testing with Int elements, we use this wrapper class
 // that can help us track allocations and find issues with object
 // lifetime inside Array implementations.
-final class X : ForwardIndexType, Comparable, CustomStringConvertible, 
-                IntegerLiteralConvertible 
+final class X : ForwardIndexType, Comparable, CustomStringConvertible,
+                IntegerLiteralConvertible
 {
   required init(_ value: Int) {
     ++xCount
@@ -98,7 +98,7 @@ func checkReallocation<T : _ArrayType>(
 
 func checkEqual<
     S1 : SequenceType, S2 : SequenceType
-  where 
+  where
     S1.Generator.Element == S2.Generator.Element,
     S1.Generator.Element : Equatable
 >(a1: S1, _ a2: S2, _ expected: Bool) {
@@ -187,7 +187,7 @@ test(ArraySlice<X>.self, "ArraySlice")
 func testAsArray() {
   print("== AsArray ==")
   var w: ContiguousArray<X> = [4, 2, 1]
-  // CHECK: == AsArray == 
+  // CHECK: == AsArray ==
   
   let x = ContiguousArray(w)
   print(bufferID(w) == bufferID(x))
@@ -198,7 +198,7 @@ func testAsArray() {
   // CHECK-NEXT: true
 
   // Because of their indirection, arrays of classes can share
-  // buffers.  
+  // buffers.
   let y1 = Array(y)
   print(bufferID(y1) == bufferID(y))
   // CHECK-NEXT: true
@@ -298,7 +298,7 @@ func testSlice() {
   // bSlice += X(11)..<X(13)
 
   // Writing into b does not change bSlice
-  b[4] = 41        
+  b[4] = 41
   print("bSlice1: \(bSlice)")      // CHECK-NEXT: bSlice1: [3, 4, 5, 6, 7]
 
   // Writing into bSlice does not change b

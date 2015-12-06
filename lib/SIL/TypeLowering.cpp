@@ -664,7 +664,7 @@ namespace {
       assert(structDecl);
       
       for (auto prop : structDecl->getStoredProperties()) {
-        SILType propTy = silTy.getFieldType(prop, M);        
+        SILType propTy = silTy.getFieldType(prop, M);
         children.push_back(Child{prop, M.Types.getTypeLowering(propTy)});
       }
     }
@@ -1185,7 +1185,7 @@ namespace {
     }
 
     const TypeLowering *visitDynamicSelfType(CanDynamicSelfType type) {
-      return LowerType(TC, cast<DynamicSelfType>(OrigType).getSelfType(), 
+      return LowerType(TC, cast<DynamicSelfType>(OrigType).getSelfType(),
                        Dependent)
                .visit(type.getSelfType());
     }
@@ -1797,7 +1797,7 @@ static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
 
 /// Retrieve the type of the ivar initializer or destroyer method for
 /// a class.
-static CanAnyFunctionType getIVarInitDestroyerType(ClassDecl *cd, 
+static CanAnyFunctionType getIVarInitDestroyerType(ClassDecl *cd,
                                                    bool isObjC,
                                                    ASTContext &ctx,
                                                    bool isDestroyer) {
@@ -1814,7 +1814,7 @@ static CanAnyFunctionType getIVarInitDestroyerType(ClassDecl *cd,
   
   resultType = CanFunctionType::get(emptyTupleTy, resultType, extInfo);
   if (auto params = cd->getGenericParams())
-    return CanPolymorphicFunctionType::get(classType, resultType, params, 
+    return CanPolymorphicFunctionType::get(classType, resultType, params,
                                            extInfo);
   return CanFunctionType::get(classType, resultType, extInfo);
 }
@@ -2223,7 +2223,7 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c) {
   
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator:
-    return getDestructorType(cast<DestructorDecl>(vd), 
+    return getDestructorType(cast<DestructorDecl>(vd),
                              c.kind == SILDeclRef::Kind::Deallocator,
                              Context,
                              c.isForeign);

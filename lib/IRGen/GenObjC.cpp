@@ -1046,7 +1046,7 @@ static SILDeclRef getObjCMethodRef(AbstractFunctionDecl *method) {
 }
 
 static CanSILFunctionType getObjCMethodType(IRGenModule &IGM,
-                                            AbstractFunctionDecl *method) {  
+                                            AbstractFunctionDecl *method) {
   return IGM.SILMod->Types.getConstantFunctionType(getObjCMethodRef(method));
 }
 
@@ -1317,22 +1317,22 @@ llvm::Constant *irgen::emitObjCMethodDescriptor(IRGenModule &IGM,
   return llvm::ConstantStruct::getAnon(IGM.getLLVMContext(), fields);
 }
 
-Optional<llvm::Constant*> 
+Optional<llvm::Constant*>
 irgen::emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM, ClassDecl *cd,
                                          bool isDestroyer) {
   // Check whether we have an implementation.
-  Optional<llvm::Function*> objcImpl 
+  Optional<llvm::Function*> objcImpl
     = IGM.getAddrOfIVarInitDestroy(cd, isDestroyer, /*isForeign=*/ true,
                                    NotForDefinition);
   if (!objcImpl)
     return None;
 
   /// The first element is the selector.
-  SILDeclRef declRef = SILDeclRef(cd, 
+  SILDeclRef declRef = SILDeclRef(cd,
                                   isDestroyer? SILDeclRef::Kind::IVarDestroyer
                                              : SILDeclRef::Kind::IVarInitializer,
                                   ResilienceExpansion::Minimal,
-                                  1, 
+                                  1,
                                   /*foreign*/ true);
   Selector selector(declRef);
   llvm::Constant *selectorRef = IGM.getAddrOfObjCMethodName(selector.str());

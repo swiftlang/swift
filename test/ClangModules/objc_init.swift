@@ -31,7 +31,7 @@ extension URLDocument {
 }
 
 class MyDocument1 : URLDocument {
-  override init() { 
+  override init() {
     super.init()
   }
 }
@@ -52,7 +52,7 @@ class MyDocument2 : URLDocument {
 }
 
 class MyDocument3 : NSAwesomeDocument {
-  override init() { 
+  override init() {
     super.init()
   }
 }
@@ -63,7 +63,7 @@ func createMyDocument3(URL: NSURL) {
   _ = md
 }
 
-class MyInterestingDesignated : NSInterestingDesignatedSub { 
+class MyInterestingDesignated : NSInterestingDesignatedSub {
   override init(string str: String) {
     super.init(string: str)
   }

@@ -483,7 +483,7 @@ public:
 class DeclIterator {
   Decl *Current;
 
-public: 
+public:
   typedef std::forward_iterator_tag iterator_category;
   typedef Decl *value_type;
   typedef Decl *reference;
@@ -504,7 +504,7 @@ public:
   }
 
   friend bool operator==(DeclIterator lhs, DeclIterator rhs) {
-    return lhs.Current == rhs.Current; 
+    return lhs.Current == rhs.Current;
   }
 
   friend bool operator!=(DeclIterator lhs, DeclIterator rhs) {
@@ -517,7 +517,7 @@ public:
 typedef IteratorRange<DeclIterator> DeclRange;
 
 /// The kind of an \c IterableDeclContext.
-enum class IterableDeclContextKind : uint8_t {  
+enum class IterableDeclContextKind : uint8_t {
   NominalTypeDecl,
   ExtensionDecl,
 };
@@ -533,7 +533,7 @@ class IterableDeclContext {
 
   /// The last declaration in this context, used for efficient insertion,
   /// along with the kind of iterable declaration context.
-  mutable llvm::PointerIntPair<Decl *, 2, IterableDeclContextKind> 
+  mutable llvm::PointerIntPair<Decl *, 2, IterableDeclContextKind>
     LastDeclAndKind;
 
   /// Lazy member loader, if any.
@@ -584,7 +584,7 @@ public:
   /// Check whether there are lazily-loaded members.
   bool isLazy() const {
     return LazyLoader != nullptr;
-  }  
+  }
 
   /// Set the loader for lazily-loaded members.
   void setLoader(LazyMemberLoader *loader, uint64_t contextData);

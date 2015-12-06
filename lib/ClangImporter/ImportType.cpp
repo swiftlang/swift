@@ -319,7 +319,7 @@ namespace {
       return Type();
     }
     
-    ImportResult VisitPointerType(const clang::PointerType *type) {      
+    ImportResult VisitPointerType(const clang::PointerType *type) {
       auto pointeeQualType = type->getPointeeType();
 
       // Special case for NSZone*, which has its own Swift wrapper.
@@ -1441,7 +1441,7 @@ Type ClangImporter::Implementation::importFunctionType(
                                      /*IsLet*/ true,
                                      SourceLoc(), name,
                                      importSourceLoc(param->getLocation()),
-                                     bodyName, swiftParamTy, 
+                                     bodyName, swiftParamTy,
                                      ImportedHeaderUnit);
 
     if (addNoEscapeAttr) {
@@ -1491,7 +1491,7 @@ Type ClangImporter::Implementation::importFunctionType(
   // Form the body patterns.
   bodyPatterns.push_back(TuplePattern::create(SwiftContext, SourceLoc(),
                                               bodyPatternElts, SourceLoc()));
-  bodyPatterns.back()->setType(bodyParamsTy);  
+  bodyPatterns.back()->setType(bodyParamsTy);
   
   FunctionType::ExtInfo extInfo;
   extInfo = extInfo.withIsNoReturn(isNoReturn);
@@ -2148,7 +2148,7 @@ Type ClangImporter::Implementation::importMethodType(
       = createDeclWithClangNode<ParamDecl>(param,
                                      /*IsLet*/ true, SourceLoc(), name,
                                      importSourceLoc(param->getLocation()),
-                                     bodyName, swiftParamTy, 
+                                     bodyName, swiftParamTy,
                                      ImportedHeaderUnit);
 
     if (addNoEscapeAttr) {
@@ -2175,7 +2175,7 @@ Type ClangImporter::Implementation::importMethodType(
 
   // If we have a constructor with no parameters and a name with an
   // argument name, synthesize a Void parameter with that name.
-  if (kind == SpecialMethodKind::Constructor && params.empty() && 
+  if (kind == SpecialMethodKind::Constructor && params.empty() &&
       argNames.size() == 1) {
     addEmptyTupleParameter(argNames[0]);
   }

@@ -264,7 +264,7 @@ func callUnavailableInitializer() {
       // expected-note@-1 {{add @available attribute to enclosing global function}}
       // expected-note@-2 {{add 'if #available' version check}}
   
-  let i = ClassWithUnavailableInitializer.self 
+  let i = ClassWithUnavailableInitializer.self
   _ = i.init()
   _ = i.init(5) // expected-error {{'init' is only available on OS X 10.10 or newer}}
       // expected-note@-1 {{add @available attribute to enclosing global function}}
@@ -592,7 +592,7 @@ func useEnums() {
       case .WithAvailableByEnumElementPayload(let p):
         markUsed("WithAvailableByEnumElementPayload")
 
-        // For the moment, we do not incorporate enum element availability into 
+        // For the moment, we do not incorporate enum element availability into
         // TRC construction. Perhaps we should?
         functionTakingEnumIntroducedOn10_11(p)  // expected-error {{'functionTakingEnumIntroducedOn10_11' is only available on OS X 10.11 or newer}}
           // expected-note@-1 {{add @available attribute to enclosing global function}}
@@ -648,7 +648,7 @@ func classAvailability() {
   o10_10.someMethod()
   
   let _ = o10_9.someProp
-  let _ = o10_10.someProp 
+  let _ = o10_10.someProp
 }
 
 func castingUnavailableClass(o : AnyObject) {
@@ -670,7 +670,7 @@ protocol Createable {
 }
 
 @available(OSX, introduced=10.10)
-class ClassAvailableOn10_10_Createable : Createable { 
+class ClassAvailableOn10_10_Createable : Createable {
   required init() {}
 }
 
@@ -873,7 +873,7 @@ class SubWithLargerMemberAvailability : SuperWithLimitedMemberAvailability {
   
   @available(OSX, introduced=10.9)
   override var someProperty: Int {
-    get { 
+    get {
       let _ = super.someProperty // expected-error {{'someProperty' is only available on OS X 10.10 or newer}}
           // expected-note@-1 {{add @available attribute to enclosing class}}
           // expected-note@-2 {{add 'if #available' version check}}

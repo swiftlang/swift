@@ -38,7 +38,7 @@ func testFactoryWithLaterIntroducedInit() {
 
   // Don't prefer more available convience factory initializer over less
   // available designated initializer
-  _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flim:5) // expected-error {{'init(flim:)' is only available on OS X 10.11 or newer}} 
+  _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flim:5) // expected-error {{'init(flim:)' is only available on OS X 10.11 or newer}}
     // expected-note @-1 {{add 'if #available' version check}}
     // expected-note @-2 {{add @available attribute to enclosing global function}}
   
@@ -49,11 +49,11 @@ func testFactoryWithLaterIntroducedInit() {
   
   // Don't prefer more available factory initializer over less
   // available designated initializer
-  _ = NSHavingFactoryAndLaterConvenienceInit(flim:5) // expected-error {{'init(flim:)' is only available on OS X 10.11 or newer}} 
+  _ = NSHavingFactoryAndLaterConvenienceInit(flim:5) // expected-error {{'init(flim:)' is only available on OS X 10.11 or newer}}
   // expected-note @-1 {{add 'if #available' version check}}
   // expected-note @-2 {{add @available attribute to enclosing global function}}
 
-  _ = NSHavingFactoryAndLaterConvenienceInit(flam:5) // expected-error {{'init(flam:)' is only available on OS X 10.11 or newer}} 
+  _ = NSHavingFactoryAndLaterConvenienceInit(flam:5) // expected-error {{'init(flam:)' is only available on OS X 10.11 or newer}}
   // expected-note @-1 {{add 'if #available' version check}}
   // expected-note @-2 {{add @available attribute to enclosing global function}}
 

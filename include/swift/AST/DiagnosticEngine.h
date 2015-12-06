@@ -49,7 +49,7 @@ namespace swift {
 
   /// \brief Describes a diagnostic along with its argument types.
   ///
-  /// The diagnostics header introduces instances of this type for each 
+  /// The diagnostics header introduces instances of this type for each
   /// diagnostic, which provide both the set of argument types (used to
   /// check/convert the arguments at each call site) and the diagnostic ID
   /// (for other information about the diagnostic).
@@ -118,11 +118,11 @@ namespace swift {
       : Kind(DiagnosticArgumentKind::String), StringVal(S) {
     }
 
-    DiagnosticArgument(int I) 
+    DiagnosticArgument(int I)
       : Kind(DiagnosticArgumentKind::Integer), IntegerVal(I) {
     }
 
-    DiagnosticArgument(unsigned I) 
+    DiagnosticArgument(unsigned I)
       : Kind(DiagnosticArgumentKind::Unsigned), UnsignedVal(I) {
     }
 
@@ -248,7 +248,7 @@ namespace swift {
   };
   
   /// Diagnostic - This is a specific instance of a diagnostic along with all of
-  /// the DiagnosticArguments that it requires. 
+  /// the DiagnosticArguments that it requires.
   class Diagnostic {
   public:
     typedef DiagnosticInfo::FixIt FixIt;
@@ -267,8 +267,8 @@ namespace swift {
     Diagnostic(Diag<ArgTypes...> ID,
                typename detail::PassArgument<ArgTypes>::type... VArgs)
       : ID(ID.ID) {
-      DiagnosticArgument DiagArgs[] = { 
-        DiagnosticArgument(0), std::move(VArgs)... 
+      DiagnosticArgument DiagArgs[] = {
+        DiagnosticArgument(0), std::move(VArgs)...
       };
       Args.append(DiagArgs + 1, DiagArgs + 1 + sizeof...(VArgs));
     }
@@ -320,7 +320,7 @@ namespace swift {
     DiagnosticEngine *Engine;
     bool IsActive;
     
-    /// \brief Create a new in-flight diagnostic. 
+    /// \brief Create a new in-flight diagnostic.
     ///
     /// This constructor is only available to the DiagnosticEngine.
     InFlightDiagnostic(DiagnosticEngine &Engine)
@@ -332,7 +332,7 @@ namespace swift {
 
   public:
     /// \brief Create an active but unattached in-flight diagnostic.
-    /// 
+    ///
     /// The resulting diagnostic can be used as a dummy, accepting the
     /// syntax to add additional information to a diagnostic without
     /// actually emitting a diagnostic.
@@ -481,7 +481,7 @@ namespace swift {
     ///
     /// \returns An in-flight diagnostic, to which additional information can
     /// be attached.
-    InFlightDiagnostic diagnose(SourceLoc Loc, DiagID ID, 
+    InFlightDiagnostic diagnose(SourceLoc Loc, DiagID ID,
                                 ArrayRef<DiagnosticArgument> Args) {
       assert(!ActiveDiagnostic && "Already have an active diagnostic");
       ActiveDiagnostic = Diagnostic(ID, Args);
@@ -515,7 +515,7 @@ namespace swift {
     /// \param Args The diagnostic arguments, which will be converted to
     /// the types expected by the diagnostic \p ID.
     template<typename ...ArgTypes>
-    InFlightDiagnostic 
+    InFlightDiagnostic
     diagnose(SourceLoc Loc, Diag<ArgTypes...> ID,
              typename detail::PassArgument<ArgTypes>::type... Args) {
       assert(!ActiveDiagnostic && "Already have an active diagnostic");

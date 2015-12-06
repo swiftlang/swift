@@ -2192,7 +2192,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     ArrayRef<uint64_t> argNameIDs;
 
     decls_block::ConstructorLayout::readRecord(scratch, contextID,
-                                               rawFailability, isImplicit, 
+                                               rawFailability, isImplicit,
                                                isObjC, hasStubImplementation,
                                                storedInitKind,
                                                signatureID, interfaceID,
@@ -3617,7 +3617,7 @@ Type ModuleFile::getType(TypeID TID) {
     auto parentTy = getType(parentID);
 
     // Check the first ID to decide if we are using indices to the Decl's
-    // Archetypes. 
+    // Archetypes.
     SmallVector<Type, 8> genericArgs;
     if (rawArgumentIDs.size() > 1 && rawArgumentIDs[0] == INT32_MAX) {
       for (unsigned i = 1; i < rawArgumentIDs.size(); i++) {

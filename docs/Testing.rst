@@ -220,7 +220,7 @@ code for the target that is not the build machine:
 
 * ``%target-clang``: run the system's ``clang++`` for the target.
 
-  If you want to run the ``clang`` executable that was built alongside 
+  If you want to run the ``clang`` executable that was built alongside
   Swift, use ``%clang`` instead.
 
 * ``%target-ld``: run ``ld`` configured with flags pointing to the standard

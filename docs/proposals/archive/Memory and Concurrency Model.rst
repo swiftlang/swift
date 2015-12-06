@@ -7,7 +7,7 @@ Swift Memory and Concurrency Model
 ==================================
 
 .. warning:: This is a very early design document discussing the features of
-  a possible Swift concurrency model. It should not be taken as a plan of 
+  a possible Swift concurrency model. It should not be taken as a plan of
   record.
 
 The goal of this writeup is to provide a safe and efficient way to model,

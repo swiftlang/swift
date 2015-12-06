@@ -23,7 +23,7 @@ extension SequenceType
 
   public func _customContainsEquatableElement(
     element: Base.Generator.Element
-  ) -> Bool? { 
+  ) -> Bool? {
     return _base._customContainsEquatableElement(element)
   }
   
@@ -99,7 +99,7 @@ public protocol _prext_LazySequenceType : SequenceType {
   /// Note: this property need not be implemented by conforming types,
   /// it has a default implementation in a protocol extension that
   /// just returns `self`.
-  var elements: Elements {get} 
+  var elements: Elements {get}
   
   /// An Array, created on-demand, containing the elements of this
   /// lazy SequenceType.

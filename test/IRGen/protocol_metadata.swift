@@ -7,7 +7,7 @@ protocol A { func a() }
 protocol B { func b() }
 protocol C : class { func c() }
 @objc protocol O { func o() }
-@objc protocol OPT { 
+@objc protocol OPT {
   optional func opt()
   optional static func static_opt()
 
@@ -57,7 +57,7 @@ protocol ABO : A, B, O { func abo() }
 // CHECK:   %swift.protocol* @_TMp17protocol_metadata1A,
 // CHECK:   %swift.protocol* @_TMp17protocol_metadata1B
 // CHECK: }
-// CHECK: @_TMp17protocol_metadata2AB = constant %swift.protocol { 
+// CHECK: @_TMp17protocol_metadata2AB = constant %swift.protocol {
 // CHECK:   [[AB_INHERITED]]
 // CHECK:   i32 72, i32 7
 // CHECK: }

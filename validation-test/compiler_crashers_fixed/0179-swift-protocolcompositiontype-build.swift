@@ -120,7 +120,7 @@ protocol k : w { func v <h: h m h.p == k>(l: h.p) {
     }
 }
 protocol h {
-    n  func w(w: 
+    n  func w(w:
 }
 class h<u : h> {
 class A: A {
@@ -141,7 +141,7 @@ func e(h: b) -> <f>(() -> f) -> b {
 class f<d : d, j : d k d.l == j> {
 }
 protocol d {
-    i l 
+    i l
     i i
 }
 struct l<l : d> : d {

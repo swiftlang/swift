@@ -187,7 +187,7 @@ var rdar16654075e = { () -> () in
   A().foo()
 }
 
-class C { 
+class C {
   init(string: String) { } // expected-note{{overridden declaration is here}}
   required init(double: Double) { } // expected-note 3{{overridden required initializer is here}}
 

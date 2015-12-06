@@ -49,7 +49,7 @@ DevirtualizationResult devirtualizeClassMethod(FullApplySite AI,
                                                SILValue ClassInstance);
 DevirtualizationResult tryDevirtualizeClassMethod(FullApplySite AI,
                                                   SILValue ClassInstance);
-DevirtualizationResult tryDevirtualizeWitnessMethod(ApplySite AI); 
+DevirtualizationResult tryDevirtualizeWitnessMethod(ApplySite AI);
 }
 
 #endif

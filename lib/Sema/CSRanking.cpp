@@ -802,7 +802,7 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
       // A declaration found directly beats any declaration found via dynamic
       // lookup, bridging, or optional unwrapping.
       if (choice1.getKind() == OverloadChoiceKind::Decl &&
-          (choice2.getKind() == OverloadChoiceKind::DeclViaDynamic || 
+          (choice2.getKind() == OverloadChoiceKind::DeclViaDynamic ||
            choice2.getKind() == OverloadChoiceKind::DeclViaBridge ||
            choice2.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional)) {
         ++score1;
@@ -1001,7 +1001,7 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
     }
 
     // If one type is an implicitly unwrapped optional of the other,
-    // prefer the non-optional.    
+    // prefer the non-optional.
     bool type1Better = false;
     bool type2Better = false;
     if (auto type1Obj = type1->getImplicitlyUnwrappedOptionalObjectType()) {

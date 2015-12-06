@@ -21,7 +21,7 @@ When type theorists consider a programming language, we break it down like this:
 
 Swift has a pretty small set of types right now:
 
-* Fundamental types: currently i1, i8, i16, i32, and i64; 
+* Fundamental types: currently i1, i8, i16, i32, and i64;
   float and double; eventually maybe others.
 * Function types.
 * Tuples. Heterogeneous fixed-length products. Swift's system

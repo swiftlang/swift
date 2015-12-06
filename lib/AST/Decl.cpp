@@ -288,7 +288,7 @@ DeclContext *Decl::getDeclContextForModule() const {
   return nullptr;
 }
 
-void Decl::setDeclContext(DeclContext *DC) { 
+void Decl::setDeclContext(DeclContext *DC) {
   Context = DC;
 }
 
@@ -306,11 +306,11 @@ Module *Decl::getModuleContext() const {
 // Helper functions to verify statically whether source-location
 // functions have been overridden.
 typedef const char (&TwoChars)[2];
-template<typename Class> 
+template<typename Class>
 inline char checkSourceLocType(SourceLoc (Class::*)() const);
 inline TwoChars checkSourceLocType(SourceLoc (Decl::*)() const);
 
-template<typename Class> 
+template<typename Class>
 inline char checkSourceRangeType(SourceRange (Class::*)() const);
 inline TwoChars checkSourceRangeType(SourceRange (Decl::*)() const);
 
@@ -968,7 +968,7 @@ void ExtensionDecl::setMemberLoader(LazyMemberLoader *resolver,
 
 void ExtensionDecl::setConformanceLoader(LazyMemberLoader *resolver,
                                          uint64_t contextData) {
-  assert(!ExtensionDeclBits.HaveConformanceLoader && 
+  assert(!ExtensionDeclBits.HaveConformanceLoader &&
          "Already have a conformance loader");
   ExtensionDeclBits.HaveConformanceLoader = true;
   getASTContext().recordConformanceLoader(this, resolver, contextData);
@@ -2744,7 +2744,7 @@ void AbstractStorageDecl::configureSetRecord(GetSetRecord *getSetInfo,
       assert(!fn->hasAccessibility() ||
              fn->getFormalAccess() == setterAccess.getValue());
       fn->overwriteAccessibility(setterAccess.getValue());
-    }    
+    }
   };
 
   if (setter) {
@@ -3041,7 +3041,7 @@ ObjCSelector AbstractStorageDecl::getObjCSetterSelector(
   // property name capitalized and preceded by 'set'.
   auto var = cast<VarDecl>(this);
   auto result = VarDecl::getDefaultObjCSetterSelector(
-                  ctx, 
+                  ctx,
                   var->getObjCPropertyName());
 
   // Cache the result, so we don't perform string manipulation again.
@@ -4000,7 +4000,7 @@ bool FuncDecl::isOverridingDecl(const FuncDecl *Method) const {
 }
 
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
-                                 OptionalTypeKind Failability, 
+                                 OptionalTypeKind Failability,
                                  SourceLoc FailabilityLoc,
                                  Pattern *SelfBodyParam, Pattern *BodyParams,
                                  GenericParamList *GenericParams,
@@ -4026,8 +4026,8 @@ void ConstructorDecl::setBodyParams(Pattern *selfPattern, Pattern *bodyParams) {
   setDeclContextOfPatternVars(bodyParams, this);
   
   assert(!getFullName().isSimpleName() && "Constructor name must be compound");
-  assert(!bodyParams || 
-         (getFullName().getArgumentNames().size() 
+  assert(!bodyParams ||
+         (getFullName().getArgumentNames().size()
           == bodyParams->numTopLevelVariables()));
 }
 

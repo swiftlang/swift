@@ -82,4 +82,4 @@ typealias e = g("""))
 i<T>(object1, e
 class B == b("ab"""\(n: C<T where T: d = c() -> Any) ->)
 func b.init()
-class func c: c<f = { c, b = 
+class func c: c<f = { c, b =

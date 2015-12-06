@@ -986,9 +986,9 @@ static void emitInitializeSuperclassOfMetaclass(IRGenFunction &IGF,
   // The superclass of the metaclass is the metaclass of the superclass.
 
   // Read the superclass's metaclass.
-  llvm::Value *superMetaClass = 
+  llvm::Value *superMetaClass =
       emitLoadOfObjCHeapMetadataRef(IGF, superMetadata);
-  superMetaClass = IGF.Builder.CreateBitCast(superMetaClass, 
+  superMetaClass = IGF.Builder.CreateBitCast(superMetaClass,
                                              IGF.IGM.TypeMetadataPtrTy);
 
   // Write to the new metaclass's superclass field.
@@ -3417,7 +3417,7 @@ namespace {
         metaclassPtrSlot = IGF.Builder.CreateBitCast(metaclassPtrSlot,
                                         IGF.IGM.ObjCClassPtrTy->getPointerTo());
         IGF.Builder.CreateStore(
-          llvm::ConstantPointerNull::get(IGF.IGM.ObjCClassPtrTy), 
+          llvm::ConstantPointerNull::get(IGF.IGM.ObjCClassPtrTy),
           metaclassPtrSlot);
       }
       
@@ -3450,7 +3450,7 @@ namespace {
         rodataPtrSlot = IGF.Builder.CreateBitCast(rodataPtrSlot,
                                               IGF.IGM.IntPtrTy->getPointerTo());
         
-        IGF.Builder.CreateStore(llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 1), 
+        IGF.Builder.CreateStore(llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 1),
                                                                 rodataPtrSlot);
       }
 
@@ -3661,7 +3661,7 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
                /*isConstant*/ false, init, section);
 
   // Add non-generic classes to the ObjC class list.
-  if (IGM.ObjCInterop && !isPattern && !isIndirect && !hasRuntimeBase) {    
+  if (IGM.ObjCInterop && !isPattern && !isIndirect && !hasRuntimeBase) {
     // Emit the ObjC class symbol to make the class visible to ObjC.
     if (classDecl->isObjC()) {
       emitObjCClassSymbol(IGM, classDecl, var);
@@ -3985,7 +3985,7 @@ llvm::Value *irgen::emitClassFieldOffset(IRGenFunction &IGF,
 std::pair<llvm::Value *, llvm::Value *>
 irgen::emitClassFragileInstanceSizeAndAlignMask(IRGenFunction &IGF,
                                                 ClassDecl *theClass,
-                                                llvm::Value *metadata) {  
+                                                llvm::Value *metadata) {
   // If the class has fragile fixed layout, return the constant size and
   // alignment.
   if (llvm::Constant *size
@@ -4240,7 +4240,7 @@ llvm::Value *irgen::emitClassHeapMetadataRefForMetatype(IRGenFunction &IGF,
   // TODO: if we guaranteed that this load couldn't crash, we could use
   // a select here instead, which might be profitable.
   IGF.Builder.emitBlock(wrapBB);
-  auto classFromWrapper = 
+  auto classFromWrapper =
     emitInvariantLoadFromMetadataAtIndex(IGF, metatype, 1, IGF.IGM.TypeMetadataPtrTy);
   IGF.Builder.CreateBr(contBB);
 
@@ -4427,7 +4427,7 @@ namespace {
     CanType unboundType
       = decl->getDeclaredTypeOfContext()->getCanonicalType();
     
-    dependent = hasDependentValueWitnessTable(IGM, unboundType);    
+    dependent = hasDependentValueWitnessTable(IGM, unboundType);
     if (dependent)
       return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     else

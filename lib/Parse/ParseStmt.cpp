@@ -666,7 +666,7 @@ ParserResult<Stmt> Parser::parseStmtContinue() {
 ///
 ///   stmt-return:
 ///     'return' expr?
-///   
+///
 ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
   SourceLoc ReturnLoc = consumeToken(tok::kw_return);
 
@@ -1374,7 +1374,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
   return Status;
 }
 
-/// 
+///
 ///   stmt-if:
 ///     'if' condition stmt-brace stmt-if-else?
 ///   stmt-if-else:
@@ -1749,7 +1749,7 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
   return makeParserResult(ICS);
 }
 
-/// 
+///
 ///   stmt-while:
 ///     (identifier ':')? 'while' expr-basic stmt-brace
 ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
@@ -1832,7 +1832,7 @@ ParserResult<Stmt> Parser::parseStmtRepeat(LabeledStmtInfo labelInfo) {
                                     whileLoc, body.get()));
 }
 
-/// 
+///
 ///   stmt-do:
 ///     (identifier ':')? 'do' stmt-brace
 ///     (identifier ':')? 'do' stmt-brace stmt-catch+
@@ -1850,7 +1850,7 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
 
   // If the next token is 'catch', this is a 'do'/'catch' statement.
   if (Tok.is(tok::kw_catch)) {
-    // Parse 'catch' clauses 
+    // Parse 'catch' clauses
     SmallVector<CatchStmt*, 4> allClauses;
     do {
       ParserResult<CatchStmt> clause = parseStmtCatch();
@@ -2254,7 +2254,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
                             Third.getPtrOrNull(), Body.get()));
 }
 
-/// 
+///
 ///   stmt-for-each:
 ///     (identifier ':')? 'for' pattern 'in' expr-basic \
 ///             ('where' expr-basic)? stmt-brace

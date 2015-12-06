@@ -56,14 +56,14 @@ CanAnyFunctionType adjustFunctionType(CanAnyFunctionType type,
 inline CanAnyFunctionType adjustFunctionType(CanAnyFunctionType t,
                                           SILFunctionType::Representation rep) {
   auto extInfo = t->getExtInfo().withSILRepresentation(rep);
-  return adjustFunctionType(t, extInfo);  
+  return adjustFunctionType(t, extInfo);
 }
 
 /// Change the given function type's representation.
 inline CanAnyFunctionType adjustFunctionType(CanAnyFunctionType t,
                                           AnyFunctionType::Representation rep) {
   auto extInfo = t->getExtInfo().withRepresentation(rep);
-  return adjustFunctionType(t, extInfo);  
+  return adjustFunctionType(t, extInfo);
 }
   
 /// Given a SIL function type, return a type that is identical except
@@ -114,11 +114,11 @@ private:
   };
   unsigned Flags;
 
-protected:  
+protected:
   TypeLowering(SILType type, IsTrivial_t isTrivial,
                IsAddressOnly_t isAddressOnly,
                IsReferenceCounted_t isRefCounted)
-    : LoweredType(type), Flags((isTrivial ? IsTrivialFlag : 0U) | 
+    : LoweredType(type), Flags((isTrivial ? IsTrivialFlag : 0U) |
                                (isAddressOnly ? IsAddressOnlyFlag : 0U) |
                                (isRefCounted ? IsReferenceCountedFlag : 0U)) {}
 

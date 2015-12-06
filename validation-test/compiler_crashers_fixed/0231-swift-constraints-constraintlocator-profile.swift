@@ -19,7 +19,7 @@ class g {
     typealias k = k
 }
 func m(c: b) -> <
-  e ^(l: m, h) -> 
+  e ^(l: m, h) ->
  d g n()
 }
 class h: l

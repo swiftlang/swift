@@ -88,7 +88,7 @@ let _: () -> Any = {
   return 0
 }
 
-let _: () -> Int = { 
+let _: () -> Int = {
   () -> String in  // expected-error {{declared closure result 'String' is incompatible with contextual type 'Int'}}
   return ""
 }

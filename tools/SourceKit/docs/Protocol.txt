@@ -4,7 +4,7 @@ For specific details related to Swift see SwiftSupport.txt
 The format is
 {
     <KEY>: (type) // comments
-    ... 
+    ...
 }
 
 "{ }" indicates dictionary
@@ -57,7 +57,7 @@ $ sourcekitd-test -req=complete -cc-offset=<offset> <file> [-- <compiler args>]
 
 // If "SourceText" is provided, "SourceFile" is ignored. Not specifying either one is erroneous.
 // If <key.hash> is provided and matches the hash of the indexed file then the
-// <key.entities> entry will be missing from the response. 
+// <key.entities> entry will be missing from the response.
 Request:
 {
     <key.request>:          (UID) <source.request.indexsource>
@@ -69,7 +69,7 @@ Request:
 }
 
 // If <key.hash> was provided in the indexing request and matches the hash in the response
-// then the <key.entities> entry will be missing from the response. 
+// then the <key.entities> entry will be missing from the response.
 Response:
 {
     <key.dependencies>: (array) [dependency*]  // array of zero or more dependencies

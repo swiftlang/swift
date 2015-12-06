@@ -38,6 +38,6 @@ let succeeds: Int = 1, f1)
 class A<T : A> {
 }
 class c {
-    func b((Any, c))(a: (Any, AnyObj c() -> Str rn 
+    func b((Any, c))(a: (Any, AnyObj c() -> Str rn
 func e<T where Tj d.        h  }b
 }

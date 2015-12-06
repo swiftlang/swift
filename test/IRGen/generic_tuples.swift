@@ -10,7 +10,7 @@
 // CHECK: [[TUPLE_TYPE:%swift.tuple_type]] = type { [[TYPE]], i64, i8*, [0 x %swift.tuple_element_type] }
 // CHECK: %swift.tuple_element_type = type { [[TYPE]]*, i64 }
 
-func dup<T>(x: T) -> (T, T) { 
+func dup<T>(x: T) -> (T, T) {
   var x = x
   return (x,x)
 }

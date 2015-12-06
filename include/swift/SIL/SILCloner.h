@@ -1256,9 +1256,9 @@ SILCloner<ImplClass>::visitOpenExistentialAddrInst(OpenExistentialAddrInst *Inst
   // Create a new archetype for this opened existential type.
   auto archetypeTy
     = Inst->getType().getSwiftRValueType()->castTo<ArchetypeType>();
-  assert(OpenedExistentialSubs.count(archetypeTy) == 0 && 
+  assert(OpenedExistentialSubs.count(archetypeTy) == 0 &&
          "Already substituted opened existential archetype?");
-  OpenedExistentialSubs[archetypeTy] 
+  OpenedExistentialSubs[archetypeTy]
     = ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType());
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
@@ -1280,7 +1280,7 @@ visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *Inst) {
     openedType = cast<MetatypeType>(openedType).getInstanceType();
   }
   auto archetypeTy = cast<ArchetypeType>(openedType);
-  OpenedExistentialSubs[archetypeTy] 
+  OpenedExistentialSubs[archetypeTy]
     = ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType());
 
   if (!Inst->getOperand().getType().canUseExistentialRepresentation(
@@ -1307,7 +1307,7 @@ visitOpenExistentialRefInst(OpenExistentialRefInst *Inst) {
   // Create a new archetype for this opened existential type.
   auto archetypeTy
     = Inst->getType().getSwiftRValueType()->castTo<ArchetypeType>();
-  OpenedExistentialSubs[archetypeTy] 
+  OpenedExistentialSubs[archetypeTy]
     = ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType());
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
@@ -1324,7 +1324,7 @@ visitOpenExistentialBoxInst(OpenExistentialBoxInst *Inst) {
   // Create a new archetype for this opened existential type.
   auto archetypeTy
     = Inst->getType().getSwiftRValueType()->castTo<ArchetypeType>();
-  OpenedExistentialSubs[archetypeTy] 
+  OpenedExistentialSubs[archetypeTy]
     = ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType());
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));

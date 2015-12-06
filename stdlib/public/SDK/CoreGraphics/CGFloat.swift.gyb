@@ -208,13 +208,13 @@ extension CGFloat : _Reflectable {
 
 @_transparent extension Double {
   public init(_ value: CGFloat) {
-    self = Double(value.native) 
+    self = Double(value.native)
   }
 }
 
 @_transparent extension Float {
   public init(_ value: CGFloat) {
-    self = Float(value.native) 
+    self = Float(value.native)
   }
 }
 
@@ -280,14 +280,14 @@ public prefix func -- (inout x: CGFloat) -> CGFloat {
 public postfix func ++ (inout x: CGFloat) -> CGFloat {
   let tmp = x
   x.native += 1.0
-  return tmp 
+  return tmp
 }
 
 @_transparent
 public postfix func -- (inout x: CGFloat) -> CGFloat {
   let tmp = x
   x.native -= 1.0
-  return tmp 
+  return tmp
 }
 
 // CGFloat arithmetic
@@ -738,9 +738,9 @@ extension CGFloat : _CVarArgPassedAsDouble, _CVarArgAlignedType {
     return native._cVarArgEncoding
   }
 
-  /// Return the required alignment in bytes of 
+  /// Return the required alignment in bytes of
   /// the value returned by `_cVarArgEncoding`.
-  public var _cVarArgAlignment: Int { 
+  public var _cVarArgAlignment: Int {
     return native._cVarArgAlignment
   }
 }

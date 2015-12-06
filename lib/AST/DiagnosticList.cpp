@@ -22,7 +22,7 @@ enum class swift::DiagID : uint32_t {
 #include "swift/AST/DiagnosticsAll.def"
 };
 
-// Define all of the diagnostic objects and initialize them with their 
+// Define all of the diagnostic objects and initialize them with their
 // diagnostic IDs.
 namespace swift {
   namespace diag {

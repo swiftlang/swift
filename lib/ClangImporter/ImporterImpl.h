@@ -218,8 +218,8 @@ namespace api_notes = clang::api_notes;
 using api_notes::FactoryAsInitKind;
 
 /// \brief Implementation of the Clang importer.
-class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation 
-  : public LazyMemberLoader 
+class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation
+  : public LazyMemberLoader
 {
   friend class ClangImporter;
 
@@ -367,7 +367,7 @@ public:
   getKnownGlobalFunction(const clang::FunctionDecl *function);
 
   /// Determine whether the given class has designated initializers,
-  /// consulting 
+  /// consulting
   bool hasDesignatedInitializers(const clang::ObjCInterfaceDecl *classDecl);
 
   /// Determine whether the given method is a designated initializer
@@ -859,7 +859,7 @@ public:
   bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro);
 
   /// \brief Classify the given Clang enumeration type to describe how it
-  /// should be imported 
+  /// should be imported
   EnumKind classifyEnum(const clang::EnumDecl *decl);
 
   /// Import attributes from the given Clang declaration to its Swift

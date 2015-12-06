@@ -291,7 +291,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
     // Resolve the 'as' or 'is' expression.
     assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
     assert(RHS == as && "'as' with non-type RHS?!");
-    as->setSubExpr(LHS);    
+    as->setSubExpr(LHS);
     return makeResultExpr(as);
   }
   
@@ -299,7 +299,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
   Expr *ArgElts[] = { LHS, RHS };
   auto ArgElts2 = TC.Context.AllocateCopy(MutableArrayRef<Expr*>(ArgElts));
   TupleExpr *Arg = TupleExpr::create(TC.Context,
-                                     SourceLoc(), 
+                                     SourceLoc(),
                                      ArgElts2, { }, { }, SourceLoc(),
                                      /*hasTrailingClosure=*/false,
                                      LHS->isImplicit() && RHS->isImplicit());

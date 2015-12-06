@@ -196,7 +196,7 @@ func logical_struct_in_reftype_set(inout value: Val, z1: Int) {
   // CHECK: [[MAT_RESULT:%[0-9]+]] = apply [[MAT_VAL_PROP_METHOD]]([[T0]], [[STORAGE]]#1, [[VAL_REF]])
   // CHECK: [[T0:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Ref, @thick Ref.Type) -> ()>), 0
   // CHECK: [[T1:%[0-9]+]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Val
-  // CHECK: [[OPT_CALLBACK:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Ref, @thick Ref.Type) -> ()>), 1  
+  // CHECK: [[OPT_CALLBACK:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Ref, @thick Ref.Type) -> ()>), 1
   // CHECK: [[VAL_REF_VAL_PROP_MAT:%.*]] = mark_dependence [[T1]] : $*Val on [[VAL_REF]]
   // CHECK: [[V_R_VP_Z_TUPLE_MAT:%[0-9]+]] = alloc_stack $(Int, Int)
   // CHECK: [[LD:%[0-9]+]] = load [[VAL_REF_VAL_PROP_MAT]]
@@ -598,7 +598,7 @@ func local_observing_property(arg: Int) {
   localproperty = arg
 }
 
-// This is the local_observing_property function itself.  First alloc and 
+// This is the local_observing_property function itself.  First alloc and
 // initialize the property to the argument value.
 
 // CHECK-LABEL: sil hidden @{{.*}}local_observing_property
@@ -647,7 +647,7 @@ class rdar16151899Derived : rdar16151899Base {
         // CHECK:  [[BASEPTR:%[0-9]+]] = upcast {{.*}} : $rdar16151899Derived to $rdar16151899Base
         // CHECK: load{{.*}}Int
         // CHECK-NEXT: [[SETTER:%[0-9]+]] = class_method {{.*}} : $rdar16151899Base, #rdar16151899Base.x!setter.1 : rdar16151899Base
-        // CHECK-NEXT: apply [[SETTER]]({{.*}}, [[BASEPTR]]) 
+        // CHECK-NEXT: apply [[SETTER]]({{.*}}, [[BASEPTR]])
     }
 }
 
@@ -838,7 +838,7 @@ class GenericClass<T> {
   init() { fatalError("scaffold") }
 }
 
-// CHECK-LABEL: sil hidden @_TF10properties12genericPropsFGCS_12GenericClassSS_T_ 
+// CHECK-LABEL: sil hidden @_TF10properties12genericPropsFGCS_12GenericClassSS_T_
 func genericProps(x: GenericClass<String>) {
   // CHECK: class_method %0 : $GenericClass<String>, #GenericClass.x!getter.1
   let _ = x.x
@@ -890,7 +890,7 @@ class r19254812Derived: r19254812Base{
   
 // Accessing the "pi" property should not retain/release self.
 // CHECK-LABEL: sil hidden @_TFC10properties16r19254812Derivedc
-// CHECK: [[SELFMUI:%[0-9]+]] = mark_uninitialized [derivedself] 
+// CHECK: [[SELFMUI:%[0-9]+]] = mark_uninitialized [derivedself]
 
 // Initialization of the pi field: no retains/releases.
 // CHECK:  [[SELF:%[0-9]+]] = load [[SELFMUI]] : $*r19254812Derived

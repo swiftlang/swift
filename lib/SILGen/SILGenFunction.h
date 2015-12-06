@@ -299,7 +299,7 @@ public:
   /// If the current function section is Ordinary, and
   /// StartOfPostmatter is non-null, the current insertion block
   /// should be ordered before that.
-  ///  
+  ///
   /// If the current function section is Postmatter, StartOfPostmatter
   /// is non-null and the current insertion block is ordered after
   /// that (inclusive).
@@ -513,7 +513,7 @@ public:
   /// \brief Emits code for a ClosureExpr.
   void emitClosure(AbstractClosureExpr *ce);
   /// Generates code for a class destroying destructor. This
-  /// emits the body code from the DestructorDecl, calls the base class 
+  /// emits the body code from the DestructorDecl, calls the base class
   /// destructor, then implicitly releases the elements of the class.
   void emitDestroyingDestructor(DestructorDecl *dd);
 
@@ -656,7 +656,7 @@ public:
   /// first block.  (This is clearly desirable behavior when blocks
   /// are created by different emissions; it's just a little
   /// counter-intuitive within a single emission.)
-  SILBasicBlock *createBasicBlock(SILBasicBlock *afterBB = nullptr);  
+  SILBasicBlock *createBasicBlock(SILBasicBlock *afterBB = nullptr);
 
   /// Create a new basic block at the end of the given function
   /// section.
@@ -666,7 +666,7 @@ public:
   /// out to be unneeded.
   ///
   /// This should be called instead of eraseFromParent() in order to
-  /// keep SILGen's internal bookkeeping consistent. 
+  /// keep SILGen's internal bookkeeping consistent.
   ///
   /// The block should be empty and have no predecessors.
   void eraseBasicBlock(SILBasicBlock *block);
@@ -1003,7 +1003,7 @@ public:
   /// Returns a reference to a function value that dynamically dispatches
   /// the function in a runtime-modifiable way.
   SILValue emitDynamicMethodRef(SILLocation loc, SILDeclRef constant,
-                                SILConstantInfo constantInfo);  
+                                SILConstantInfo constantInfo);
 
   /// Returns a reference to a constant in local context. This will return a
   /// retained closure object reference if the constant refers to a local func
@@ -1050,7 +1050,7 @@ public:
                                         SILDeclRef accessor);
 
   SILDeclRef getGetterDeclRef(AbstractStorageDecl *decl,
-                              bool isDirectAccessorUse);  
+                              bool isDirectAccessorUse);
   ManagedValue emitGetAccessor(SILLocation loc, SILDeclRef getter,
                                ArrayRef<Substitution> substitutions,
                                ArgumentSource &&optionalSelfValue,
@@ -1058,7 +1058,7 @@ public:
                                RValue &&optionalSubscripts, SGFContext C);
 
   SILDeclRef getSetterDeclRef(AbstractStorageDecl *decl,
-                              bool isDirectAccessorUse);  
+                              bool isDirectAccessorUse);
   void emitSetAccessor(SILLocation loc, SILDeclRef setter,
                        ArrayRef<Substitution> substitutions,
                        ArgumentSource &&optionalSelfValue,
@@ -1066,7 +1066,7 @@ public:
                        RValue &&optionalSubscripts, RValue &&value);
 
   SILDeclRef getMaterializeForSetDeclRef(AbstractStorageDecl *decl,
-                                         bool isDirectAccessorUse);  
+                                         bool isDirectAccessorUse);
   std::pair<SILValue, SILValue>
   emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
                                 ArrayRef<Substitution> substitutions,

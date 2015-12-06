@@ -5,7 +5,7 @@ func f2(_: Int = 5) -> Int { }
 func f3(_: Int...) -> Int { }
 
 class A { }
-class B : A { 
+class B : A {
   func iAmAB() {}
   func createB() -> B { return B() }
 }
@@ -112,7 +112,7 @@ class C {
   var a: Int = 1
 }
 var co: C? = nil
-var ciuo: C! = nil 
+var ciuo: C! = nil
 
 if co {} // expected-error{{optional type 'C?' cannot be used as a boolean; test for '!= nil' instead}}{{4-4=(}} {{6-6= != nil)}}
 if ciuo {} // expected-error{{optional type 'C!' cannot be used as a boolean; test for '!= nil' instead}}{{4-4=(}} {{8-8= != nil)}}

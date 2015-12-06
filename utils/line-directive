@@ -75,7 +75,7 @@ def run():
                 line = '%s:%s:%s:%s\n' % (file, line_num, int(m.group(3)), m.group(4))
             else:
                 m = assertion_pattern.match(l)
-                if m: 
+                if m:
                     file, line_num = map_line(m.group(3), int(m.group(5)))
                     line = '%s%s %s%s%s%s\n' % (m.group(1), m.group(2), file, m.group(4), line_num, m.group(6))
             sys.stdout.write(line)
