@@ -46,7 +46,9 @@ extension String {
         if idx == core.endIndex {
           return .None
         }
-        return self.core[idx++]
+        let type = self.core[idx]
+        idx += 1
+        return type
       }
     }
 
@@ -73,11 +75,11 @@ extension String {
       /// - Requires: The previous value is representable.
       @warn_unused_result
       public func predecessor() -> Index {
-        var i = _position
-        let codeUnit = _core[--i]
+        var i = _position - 1
+        let codeUnit = _core[i]
         if _slowPath((codeUnit >> 10) == 0b1101_11) {
           if i != 0 && (_core[i - 1] >> 10) == 0b1101_10 {
-            --i
+            i -= 1
           }
         }
         return Index(i, _core)

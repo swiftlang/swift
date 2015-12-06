@@ -614,7 +614,7 @@ extension SequenceType {
     var p = UnsafeMutablePointer<Generator.Element>(ptr)
     for x in GeneratorSequence(self.generate()) {
       p.initialize(x)
-      p = p.successor()
+      p += 1
     }
     return p
   }

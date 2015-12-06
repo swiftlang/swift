@@ -613,7 +613,7 @@ internal func _copyCollectionToNativeArrayBuffer<
   for _ in 0..<count {
     // FIXME(performance): use _initializeTo().
     p.initialize(source[i])
-    p = p.successor()
+    p += 1
     i = i.successor()
   }
   _expectEnd(i, source)
@@ -672,7 +672,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
     remainingCapacity--
 
     p.initialize(element)
-    p = p.successor()
+    p += 1
   }
 
   /// Finish initializing the buffer, adjusting its count to the final

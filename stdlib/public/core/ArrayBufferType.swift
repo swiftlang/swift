@@ -160,7 +160,7 @@ extension _ArrayBufferType {
       var i = newValues.startIndex
       for j in subRange {
         elements[j] = newValues[i]
-        i = i.successor()
+        i = i._successorInPlace()
       }
       // Initialize the hole left by sliding the tail forward
       for j in oldTailIndex..<newTailIndex {

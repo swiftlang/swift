@@ -595,7 +595,7 @@ extension SequenceType
       var p = ptr
       for x in self {
         p.initialize(x)
-        p = p.successor()
+        p += 1
       }
       return p
     }
