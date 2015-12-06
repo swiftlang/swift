@@ -62,7 +62,8 @@ tests.test("AnyGenerator") {
   expectEqual(["0", "1", "2", "3", "4"], Array(countStrings()))
 
   var x = 7
-  let g = AnyGenerator { x < 15 ? x++ : nil }
+  let g = AnyGenerator { x < 15 ? x : nil }
+  x += 1
   expectEqual([ 7, 8, 9, 10, 11, 12, 13, 14 ], Array(g))
 }
 
@@ -88,32 +89,32 @@ struct InstrumentedIndex<I : RandomAccessIndexType> : RandomAccessIndexType {
   }
 
   func successor() -> InstrumentedIndex {
-    ++callCounts["successor"]!
+    callCounts["successor"]! += 1
     return InstrumentedIndex(base.successor())
   }
 
   mutating func _successorInPlace() {
-    ++callCounts["_successorInPlace"]!
+    callCounts["_successorInPlace"]! += 1
     base._successorInPlace()
   }
 
   func predecessor() -> InstrumentedIndex {
-    ++callCounts["predecessor"]!
+    callCounts["predecessor"]! += 1
     return InstrumentedIndex(base.predecessor())
   }
 
   mutating func _predecessorInPlace() {
-    ++callCounts["_predecessorInPlace"]!
+    callCounts["_predecessorInPlace"]! += 1
     base._predecessorInPlace()
   }
 
   func advancedBy(distance: Distance) -> InstrumentedIndex {
-    ++callCounts["advancedBy"]!
+    callCounts["advancedBy"]! += 1
     return InstrumentedIndex(base.advancedBy(distance))
   }
 
   func distanceTo(other: InstrumentedIndex) -> Distance {
-    ++callCounts["distanceTo"]!
+    callCounts["distanceTo"]! += 1
     return base.distanceTo(other.base)
   }
 }
@@ -177,10 +178,11 @@ tests.test("BidirectionalIndex") {
   i = i.predecessor()
   expectEqual(1, callCounts["predecessor"])
   expectEqual(0, callCounts["_predecessorInPlace"])
-  --i
+  i -= 1
   expectEqual(1, callCounts["predecessor"])
   expectEqual(1, callCounts["_predecessorInPlace"])
-  var x = i--
+  var x = i
+  i -= 1
   expectEqual(2, callCounts["predecessor"])
   expectEqual(1, callCounts["_predecessorInPlace"])
   _blackHole(x)

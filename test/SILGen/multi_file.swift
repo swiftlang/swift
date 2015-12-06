@@ -33,7 +33,7 @@ func finalVarsAreDevirtualized(obj: FinalPropertyClass) {
 // rdar://18448869
 // CHECK-LABEL: sil hidden @_TF10multi_file34finalVarsDontNeedMaterializeForSetFCS_27ObservingPropertyFinalClassT_
 func finalVarsDontNeedMaterializeForSet(obj: ObservingPropertyFinalClass) {
-  obj.foo++
+  obj.foo += 1
   // CHECK: function_ref @_TFC10multi_file27ObservingPropertyFinalClassg3fooSi
   // CHECK: function_ref @_TFC10multi_file27ObservingPropertyFinalClasss3fooSi
 }

@@ -179,7 +179,7 @@ func missingControllingExprInFor() {
 // expected-error@-1{{expected ';' in 'for' statement}}
 // expected-error@-2{{braced block}}
   }
-  
+
 // The #if block is used to provide a scope for the for stmt to force it to end
 // where necessary to provoke the crash.
 #if true  // <rdar://problem/21679557> compiler crashes on "for{{"
@@ -187,7 +187,7 @@ func missingControllingExprInFor() {
   // expected-note @+1 2 {{to match this opening '{'}}
 for{{
 #endif  // expected-error 2 {{expected '}' at end of closure}}
-  
+
 #if true
   // expected-error @+1 {{missing initialization in a 'for' statement}}
   for{
@@ -363,7 +363,7 @@ struct ErrorTypeInVarDeclArrayType3 {
       // expected-error @-1{{expected expression for size of array type}}
       // expected-error @-2{{expected ']' in array type}}
   ;
-  var v2 : Int 
+  var v2 : Int
 }
 
 struct ErrorTypeInVarDeclArrayType4 {
@@ -671,7 +671,7 @@ class r22240342 {
     foo {  // expected-error {{use of unresolved identifier 'foo'}}
       let issueView = 42
       issueView.delegate = 12
-      
+
     }
     return 42
     }()
@@ -704,5 +704,3 @@ func test23719432() {
   var x = 42
   &(Int:x)  // expected-error {{'&' can only appear immediately in a call argument list}}
 }
-
-

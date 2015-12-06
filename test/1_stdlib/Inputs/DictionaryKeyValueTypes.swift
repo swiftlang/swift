@@ -428,7 +428,7 @@ struct TestBridgedValueTy : CustomStringConvertible, _ObjectiveCBridgeable {
   }
 
   func _bridgeToObjectiveC() -> TestObjCValueTy {
-    TestBridgedValueTy.bridgeOperations++
+    TestBridgedValueTy.bridgeOperations += 1
     return TestObjCValueTy(value)
   }
 
@@ -436,7 +436,7 @@ struct TestBridgedValueTy : CustomStringConvertible, _ObjectiveCBridgeable {
     x: TestObjCValueTy,
     inout result: TestBridgedValueTy?
   ) {
-    TestBridgedValueTy.bridgeOperations++
+    TestBridgedValueTy.bridgeOperations += 1
     result = TestBridgedValueTy(x.value)
   }
 
@@ -637,7 +637,7 @@ func slurpFastEnumerationFromSwift(
     for i in 0..<returnedCount {
       let value: AnyObject = state.itemsPtr[i]!
       sink(value)
-      ++itemsReturned
+      itemsReturned += 1
     }
     if maxItems != nil && itemsReturned >= maxItems! {
       return
@@ -681,7 +681,7 @@ func slurpFastEnumerationFromSwift(
       let value: AnyObject = d.objectForKey(key)!
       let kv = (key, value)
       sink(kv)
-      ++itemsReturned
+      itemsReturned += 1
     }
     if maxItems != nil && itemsReturned >= maxItems! {
       return
@@ -796,9 +796,9 @@ func _checkArrayFastEnumerationImpl(
 ) {
   let expectedContentsWithoutIdentity =
   _makeExpectedArrayContents(expected)
-  
+
   var expectedContents = [ExpectedArrayElement]()
-  
+
   for i in 0..<3 {
     var actualContents = [ExpectedArrayElement]()
     let sink = {
@@ -819,7 +819,7 @@ func _checkArrayFastEnumerationImpl(
     if i == 0 {
       expectedContents = actualContents
     }
-    
+
     expectEqualSequence(expectedContents, actualContents)
   }
 }
@@ -999,7 +999,7 @@ func slurpFastEnumerationFromSwift(
     for i in 0..<returnedCount {
       let value: AnyObject = state.itemsPtr[i]!
       sink(value)
-      ++itemsReturned
+      itemsReturned += 1
     }
     if maxItems != nil && itemsReturned >= maxItems! {
       return
@@ -1260,4 +1260,3 @@ func getBridgedNSArrayOfValueTypeCustomBridged(
 
   return bridged
 }
-
