@@ -814,6 +814,13 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(DeclRefExpr *E) {
+      if (E->getType()->is<InOutType>()) {
+        PrettyStackTraceExpr debugStack(Ctx, "verifying decl reference", E);
+        Out << "reference with inout type "
+          << E->getType().getString() << "\n";
+        E->dump(Out);
+        abort();
+      }
       if (E->getType()->is<PolymorphicFunctionType>()) {
         PrettyStackTraceExpr debugStack(Ctx, "verifying decl reference", E);
         Out << "unspecialized reference with polymorphic type "
