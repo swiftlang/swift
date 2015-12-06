@@ -29,10 +29,10 @@ StringTraps.test("startIndex/predecessor")
   .code {
   var s = "abc"
   var i = s.startIndex
-  ++i
-  --i
+  i = i.successor()
+  i = i.predecessor()
   expectCrashLater()
-  --i
+  i = i.predecessor()
 }
 
 StringTraps.test("endIndex/successor")
@@ -42,11 +42,11 @@ StringTraps.test("endIndex/successor")
   .code {
   var s = "abc"
   var i = s.startIndex
-  ++i
-  ++i
-  ++i
+  i = i.successor()
+  i = i.successor()
+  i = i.successor()
   expectCrashLater()
-  ++i
+  i = i.successor()
 }
 
 StringTraps.test("subscript(_:)/endIndex")
@@ -56,9 +56,9 @@ StringTraps.test("subscript(_:)/endIndex")
   .code {
   var s = "abc"
   var i = s.startIndex
-  ++i
-  ++i
-  ++i
+  i = i.successor()
+  i = i.successor()
+  i = i.successor()
   expectCrashLater()
   s[i]
 }
@@ -70,11 +70,11 @@ StringTraps.test("UTF8ViewEndIndexSuccessor")
   .code {
   var s = "abc"
   var i = s.utf8.startIndex
-  ++i
-  ++i
-  ++i
+  i = i.successor()
+  i = i.successor()
+  i = i.successor()
   expectCrashLater()
-  ++i
+  i = i.successor()
 }
 
 StringTraps.test("UTF8ViewSubscript/endIndex")
@@ -84,9 +84,9 @@ StringTraps.test("UTF8ViewSubscript/endIndex")
   .code {
   var s = "abc"
   var i = s.utf8.startIndex
-  ++i
-  ++i
-  ++i
+  i = i.successor()
+  i = i.successor()
+  i = i.successor()
   expectCrashLater()
   s.utf8[i]
 }
@@ -98,7 +98,7 @@ StringTraps.test("UTF16ViewSubscript/DecrementedStartIndex")
   .code {
   var s = "abc"
   var i = s.utf16.startIndex
-  --i
+  i = i.predecessor()
   expectCrashLater()
   s.utf16[i]
 }
@@ -110,9 +110,9 @@ StringTraps.test("UTF16ViewSubscript/endIndex")
   .code {
   var s = "abc"
   var i = s.utf16.startIndex
-  ++i
-  ++i
-  ++i
+  i = i.successor()
+  i = i.successor()
+  i = i.successor()
   expectCrashLater()
   s.utf16[i]
 }
