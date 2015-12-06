@@ -25,107 +25,107 @@ module SwiftGlibc [system] {
   // C standard library
   module C {
     module complex {
-      header "/usr/include/complex.h"
+      header "@GLIBC_INCLUDE_PATH@/complex.h"
       export *
     }
     module ctype {
-      header "/usr/include/ctype.h"
+      header "@GLIBC_INCLUDE_PATH@/ctype.h"
       export *
     }
     module errno {
-      header "/usr/include/errno.h"
+      header "@GLIBC_INCLUDE_PATH@/errno.h"
       export *
     }
 
     // glibc specific
     module features {
-      header "/usr/include/features.h"
+      header "@GLIBC_INCLUDE_PATH@/features.h"
       export *
     }
 
     module fenv {
-      header "/usr/include/fenv.h"
+      header "@GLIBC_INCLUDE_PATH@/fenv.h"
       export *
     }
     
     // note: supplied by compiler
     // module float {
-    //   header "/usr/include/float.h"
+    //   header "@GLIBC_INCLUDE_PATH@/float.h"
     //   export *
     // }
     
     module inttypes {
-      header "/usr/include/inttypes.h"
+      header "@GLIBC_INCLUDE_PATH@/inttypes.h"
       export *
     }
     
     // note: potentially supplied by compiler
     // module iso646 {
-    //   header "/usr/include/iso646.h"
+    //   header "@GLIBC_INCLUDE_PATH@/iso646.h"
     //   export *
     // }
     // module limits {
-    //   header "/usr/include/limits.h"
+    //   header "@GLIBC_INCLUDE_PATH@/limits.h"
     //   export *
     // }
     
     module locale {
-      header "/usr/include/locale.h"
+      header "@GLIBC_INCLUDE_PATH@/locale.h"
       export *
     }
     module math {
-      header "/usr/include/math.h"
+      header "@GLIBC_INCLUDE_PATH@/math.h"
       export *
     }
     module setjmp {
-      header "/usr/include/setjmp.h"
+      header "@GLIBC_INCLUDE_PATH@/setjmp.h"
       export *
     }
     module signal {
-      header "/usr/include/signal.h"
+      header "@GLIBC_INCLUDE_PATH@/signal.h"
       export *
     }
 
     // note: supplied by the compiler
     // module stdarg {
-    //   header "/usr/include/stdarg.h"
+    //   header "@GLIBC_INCLUDE_PATH@/stdarg.h"
     //   export *
     // }
     // module stdbool {
-    //   header "/usr/include/stdbool.h"
+    //   header "@GLIBC_INCLUDE_PATH@/stdbool.h"
     //   export *
     // }
     // module stddef {
-    //   header "/usr/include/stddef.h"
+    //   header "@GLIBC_INCLUDE_PATH@/stddef.h"
     //   export *
     // }    
     // module stdint {
-    //   header "/usr/include/stdint.h"
+    //   header "@GLIBC_INCLUDE_PATH@/stdint.h"
     //   export *
     // }
     
     module stdio {
-      header "/usr/include/stdio.h"
+      header "@GLIBC_INCLUDE_PATH@/stdio.h"
       export *
     }
     module stdlib {
-      header "/usr/include/stdlib.h"
+      header "@GLIBC_INCLUDE_PATH@/stdlib.h"
       export *
       export stddef
     }
     module string {
-      header "/usr/include/string.h"
+      header "@GLIBC_INCLUDE_PATH@/string.h"
       export *
     }
 
     // note: supplied by the compiler
     // explicit module tgmath {
-    //   header "/usr/include/tgmath.h"
+    //   header "@GLIBC_INCLUDE_PATH@/tgmath.h"
     //   export *
     // }
     
     module time {
-      header "/usr/include/time.h"
+      header "@GLIBC_INCLUDE_PATH@/time.h"
       export *
     }
   }
@@ -133,132 +133,132 @@ module SwiftGlibc [system] {
   // POSIX
   module POSIX {
     module aio {
-      header "/usr/include/aio.h"
+      header "@GLIBC_INCLUDE_PATH@/aio.h"
       export *
     }
     module arpa {
       module inet {
-        header "/usr/include/arpa/inet.h"
+        header "@GLIBC_INCLUDE_PATH@/arpa/inet.h"
         export *
       }
       export *
     }
     module cpio {
-      header "/usr/include/cpio.h"
+      header "@GLIBC_INCLUDE_PATH@/cpio.h"
       export *
     }
     module dirent {
-      header "/usr/include/dirent.h"
+      header "@GLIBC_INCLUDE_PATH@/dirent.h"
       export *
     }
     module dlfcn {
-      header "/usr/include/dlfcn.h"
+      header "@GLIBC_INCLUDE_PATH@/dlfcn.h"
       export *
     }
     module fcntl {
-      header "/usr/include/fcntl.h"
+      header "@GLIBC_INCLUDE_PATH@/fcntl.h"
       export *
     }
     module fmtmsg {
-      header "/usr/include/fmtmsg.h"
+      header "@GLIBC_INCLUDE_PATH@/fmtmsg.h"
       export *
     }
     module fnmatch {
-      header "/usr/include/fnmatch.h"
+      header "@GLIBC_INCLUDE_PATH@/fnmatch.h"
       export *
     }
     module ftw {
-      header "/usr/include/ftw.h"
+      header "@GLIBC_INCLUDE_PATH@/ftw.h"
       export *
     }
     module glob {
-      header "/usr/include/glob.h"
+      header "@GLIBC_INCLUDE_PATH@/glob.h"
       export *
     }
     module grp {
-      header "/usr/include/grp.h"
+      header "@GLIBC_INCLUDE_PATH@/grp.h"
       export *
     }
     module iconv {
-      header "/usr/include/iconv.h"
+      header "@GLIBC_INCLUDE_PATH@/iconv.h"
       export *
     }
     module ioctl {
-      header "/usr/include/x86_64-linux-gnu/sys/ioctl.h"
+      header "@GLIBC_ARCH_INCLUDE_PATH@/sys/ioctl.h"
       export *
     }
     module langinfo {
-      header "/usr/include/langinfo.h"
+      header "@GLIBC_INCLUDE_PATH@/langinfo.h"
       export *
     }
     module libgen {
-      header "/usr/include/libgen.h"
+      header "@GLIBC_INCLUDE_PATH@/libgen.h"
       export *
     }
     module monetary {
-      header "/usr/include/monetary.h"
+      header "@GLIBC_INCLUDE_PATH@/monetary.h"
       export *
     }
     module netdb {
-      header "/usr/include/netdb.h"
+      header "@GLIBC_INCLUDE_PATH@/netdb.h"
       export *
     }
     module net {
       module if {
-        header "/usr/include/net/if.h"
+        header "@GLIBC_INCLUDE_PATH@/net/if.h"
         export *
       }
     }
     module netinet {
       module in {
-        header "/usr/include/netinet/in.h"
+        header "@GLIBC_INCLUDE_PATH@/netinet/in.h"
         export *
 
-        exclude header "/usr/include/netinet6/in6.h"
+        exclude header "@GLIBC_INCLUDE_PATH@/netinet6/in6.h"
       }
       module tcp {
-        header "/usr/include/netinet/tcp.h"
+        header "@GLIBC_INCLUDE_PATH@/netinet/tcp.h"
         export *
       }
     }
     module nl_types {
-      header "/usr/include/nl_types.h"
+      header "@GLIBC_INCLUDE_PATH@/nl_types.h"
       export *
     }
     module poll {
-      header "/usr/include/poll.h"
+      header "@GLIBC_INCLUDE_PATH@/poll.h"
       export *
     }
     module pthread {
-      header "/usr/include/pthread.h"
+      header "@GLIBC_INCLUDE_PATH@/pthread.h"
       export *
     }
     module pwd {
-      header "/usr/include/pwd.h"
+      header "@GLIBC_INCLUDE_PATH@/pwd.h"
       export *
     }
     module regex {
-      header "/usr/include/regex.h"
+      header "@GLIBC_INCLUDE_PATH@/regex.h"
       export *
     }
     module sched {
-      header "/usr/include/sched.h"
+      header "@GLIBC_INCLUDE_PATH@/sched.h"
       export *
     }
     module search {
-      header "/usr/include/search.h"
+      header "@GLIBC_INCLUDE_PATH@/search.h"
       export *
     }
     module semaphore {
-      header "/usr/include/semaphore.h"
+      header "@GLIBC_INCLUDE_PATH@/semaphore.h"
       export *
     }
     module spawn {
-      header "/usr/include/spawn.h"
+      header "@GLIBC_INCLUDE_PATH@/spawn.h"
       export *
     }
     module strings {
-      header "/usr/include/strings.h"
+      header "@GLIBC_INCLUDE_PATH@/strings.h"
       export *
     }
 
@@ -266,108 +266,108 @@ module SwiftGlibc [system] {
       export *
 
       module ipc {
-        header "/usr/include/x86_64-linux-gnu/sys/ipc.h"
+        header "@GLIBC_ARCH_INCLUDE_PATH@/sys/ipc.h"
         export *
       }
       module mman {
-        header "/usr/include/x86_64-linux-gnu/sys/mman.h"
+        header "@GLIBC_ARCH_INCLUDE_PATH@/sys/mman.h"
         export *
       }
       module msg {
-        header "/usr/include/x86_64-linux-gnu/sys/msg.h"
+        header "@GLIBC_ARCH_INCLUDE_PATH@/sys/msg.h"
         export *
       }
       module resource {
-        header "/usr/include/x86_64-linux-gnu/sys/resource.h"
+        header "@GLIBC_ARCH_INCLUDE_PATH@/sys/resource.h"
         export *
       }
       module select {
-        header "/usr/include/x86_64-linux-gnu/sys/select.h"
+        header "@GLIBC_ARCH_INCLUDE_PATH@/sys/select.h"
         export *
       }
       module sem {
-        header "/usr/include/x86_64-linux-gnu/sys/sem.h"
+        header "@GLIBC_ARCH_INCLUDE_PATH@/sys/sem.h"
         export *
       }
       module shm {
-        header "/usr/include/x86_64-linux-gnu/sys/shm.h"
+        header "@GLIBC_ARCH_INCLUDE_PATH@/sys/shm.h"
         export *
       }
       module socket {
-        header "/usr/include/x86_64-linux-gnu/sys/socket.h"
+        header "@GLIBC_ARCH_INCLUDE_PATH@/sys/socket.h"
         export *
       }
       module stat {
-        header "/usr/include/x86_64-linux-gnu/sys/stat.h"
+        header "@GLIBC_ARCH_INCLUDE_PATH@/sys/stat.h"
         export *
       }
       module statvfs {
-        header "/usr/include/x86_64-linux-gnu/sys/statvfs.h"
+        header "@GLIBC_ARCH_INCLUDE_PATH@/sys/statvfs.h"
         export *
       }
       module time {
-        header "/usr/include/x86_64-linux-gnu/sys/time.h"
+        header "@GLIBC_ARCH_INCLUDE_PATH@/sys/time.h"
         export *
       }
       module times {
-        header "/usr/include/x86_64-linux-gnu/sys/times.h"
+        header "@GLIBC_ARCH_INCLUDE_PATH@/sys/times.h"
         export *
       }
       module types {
-        header "/usr/include/x86_64-linux-gnu/sys/types.h"
+        header "@GLIBC_ARCH_INCLUDE_PATH@/sys/types.h"
         export *
       }
       module uio {
-        header "/usr/include/x86_64-linux-gnu/sys/uio.h"
+        header "@GLIBC_ARCH_INCLUDE_PATH@/sys/uio.h"
         export *
       }
       module un {
-        header "/usr/include/x86_64-linux-gnu/sys/un.h"
+        header "@GLIBC_ARCH_INCLUDE_PATH@/sys/un.h"
         export *
       }
       module utsname {
-        header "/usr/include/x86_64-linux-gnu/sys/utsname.h"
+        header "@GLIBC_ARCH_INCLUDE_PATH@/sys/utsname.h"
         export *
       }
       module wait {
-        header "/usr/include/x86_64-linux-gnu/sys/wait.h"
+        header "@GLIBC_ARCH_INCLUDE_PATH@/sys/wait.h"
         export *
       }
     }
     module syslog {
-      header "/usr/include/syslog.h"
+      header "@GLIBC_INCLUDE_PATH@/syslog.h"
       export *
     }
     module tar {
-      header "/usr/include/tar.h"
+      header "@GLIBC_INCLUDE_PATH@/tar.h"
       export *
     }
     module termios {
-      header "/usr/include/termios.h"
+      header "@GLIBC_INCLUDE_PATH@/termios.h"
       export *
     }
     module ulimit {
-      header "/usr/include/ulimit.h"
+      header "@GLIBC_INCLUDE_PATH@/ulimit.h"
       export *
     }
     module unistd {
-      header "/usr/include/unistd.h"
+      header "@GLIBC_INCLUDE_PATH@/unistd.h"
       export *
     }
     module utime {
-      header "/usr/include/utime.h"
+      header "@GLIBC_INCLUDE_PATH@/utime.h"
       export *
     }
     module utmpx {
-      header "/usr/include/utmpx.h"
+      header "@GLIBC_INCLUDE_PATH@/utmpx.h"
       export *
     }
     module wait {
-      header "/usr/include/wait.h"
+      header "@GLIBC_INCLUDE_PATH@/wait.h"
       export *
     }
     module wordexp {
-      header "/usr/include/wordexp.h"
+      header "@GLIBC_INCLUDE_PATH@/wordexp.h"
       export *
     }
   }
