@@ -188,8 +188,8 @@ enum SomeUnion {
 
 
 
-sil @_TO1t9SomeUnion1yfMS0_FCS_9SomeClassS0_ : $@convention(thin) (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion 
-sil @_TC1t9SomeClassCfMS0_FT_S0_ : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass 
+sil @_TO1t9SomeUnion1yfMS0_FCS_9SomeClassS0_ : $@convention(thin) (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion
+sil @_TC1t9SomeClassCfMS0_FT_S0_ : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass
 
 // CHECK-LABEL: sil @union_test
 sil @union_test : $@convention(thin) () -> () {

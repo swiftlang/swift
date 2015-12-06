@@ -754,7 +754,7 @@ RValue RValueEmitter::visitFloatLiteralExpr(FloatLiteralExpr *E,
                 ManagedValue::forUnmanaged(SGF.B.createFloatLiteral(E)));
 }
 
-RValue RValueEmitter::visitBooleanLiteralExpr(BooleanLiteralExpr *E, 
+RValue RValueEmitter::visitBooleanLiteralExpr(BooleanLiteralExpr *E,
                                               SGFContext C) {
   auto i1Ty = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
   SILValue boolValue = SGF.B.createIntegerLiteral(E, i1Ty, E->getValue());
@@ -1024,7 +1024,7 @@ RValue RValueEmitter::visitDerivedToBaseExpr(DerivedToBaseExpr *E,
   if (original.getType() == loweredResultTy)
     return RValue(SGF, E, original);
 
-  SILValue converted = SGF.B.createUpcast(E, original.getValue(), 
+  SILValue converted = SGF.B.createUpcast(E, original.getValue(),
                                           loweredResultTy);
   return RValue(SGF, E, ManagedValue(converted, original.getCleanup()));
 }
@@ -1318,7 +1318,7 @@ RValue RValueEmitter::visitCovariantFunctionConversionExpr(
   CanAnyFunctionType destTy
     = cast<AnyFunctionType>(e->getType()->getCanonicalType());
   SILType resultType = SGF.getLoweredType(destTy);
-  SILValue result = SGF.B.createConvertFunction(e, 
+  SILValue result = SGF.B.createConvertFunction(e,
                                                 original.forward(SGF),
                                                 resultType);
   return RValue(SGF, e, SGF.emitManagedRValueWithCleanup(result));
@@ -1748,7 +1748,7 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
                                                CanType resultType,
                                              AbstractionPattern origResultType,
                                                SGFContext C) {
-  SILDeclRef generator 
+  SILDeclRef generator
     = SILDeclRef::getDefaultArgGenerator(defaultArgsOwner.getDecl(),
                                          destIndex);
 
@@ -2014,7 +2014,7 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
   }
 
   case MagicIdentifierLiteralExpr::DSOHandle: {
-    auto Val = SGF.emitRValueForDecl(E, SGF.SGM.SwiftModule->getDSOHandle(), 
+    auto Val = SGF.emitRValueForDecl(E, SGF.SGM.SwiftModule->getDSOHandle(),
                                      E->getType(),
                                      AccessSemantics::Ordinary,
                                      C);
@@ -2209,7 +2209,7 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
       usesObjCAllocator(classDecl)) {
     // Check whether the new self is null.
     SILValue isNonnullSelf = SGF.B.createIsNonnull(E, newSelf.getValue());
-    Condition cond = SGF.emitCondition(isNonnullSelf, E, 
+    Condition cond = SGF.emitCondition(isNonnullSelf, E,
                                        /*hasFalseCode=*/false,
                                        /*invertValue=*/true,
                                        { });
@@ -2252,7 +2252,7 @@ static bool mayLieAboutNonOptionalReturn(ValueDecl *decl) {
   // Properties of non-optional reference type that were imported from
   // Objective-C.
   if (auto var = dyn_cast<VarDecl>(decl)) {
-    return var->hasClangNode() && 
+    return var->hasClangNode() &&
       var->getType()->getReferenceStorageReferent()->hasReferenceSemantics();
   }
 

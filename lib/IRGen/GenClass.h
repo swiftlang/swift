@@ -77,7 +77,7 @@ namespace irgen {
                                    bool objc, int &StackAllocSize);
 
   /// Emit an allocation of a class using a metadata value.
-  llvm::Value *emitClassAllocationDynamic(IRGenFunction &IGF, 
+  llvm::Value *emitClassAllocationDynamic(IRGenFunction &IGF,
                                           llvm::Value *metadata,
                                           SILType selfType,
                                           bool objc);

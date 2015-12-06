@@ -24,4 +24,4 @@ typealias C = B
 class A<T : A> {
 }
 class c {
-    f   var : 
+    f   var :

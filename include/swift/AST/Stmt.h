@@ -452,7 +452,7 @@ public:
 };
 
 /// An individual 'catch' clause.
-/// 
+///
 /// This isn't really an independent statement any more than CaseStmt
 /// is; it's just a structural part of a DoCatchStmt.
 class CatchStmt : public Stmt {

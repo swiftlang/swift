@@ -56,7 +56,7 @@ namespace {
       if (n.N != 0) out << (n.N - 1);
       return (out << '_');
     }
-  };        
+  };
 }
         
 /// Mangle a StringRef as an identifier into a buffer.
@@ -121,7 +121,7 @@ void Mangler::mangleContextOf(const ValueDecl *decl, BindGenerics shouldBind) {
   if (isa<ProtocolDecl>(decl) && clangDecl) {
     assert(isa<clang::ObjCProtocolDecl>(clangDecl));
     Buffer << "So";
-    return; 
+    return;
   }
 
   // Declarations provided by a C module have a special context mangling.

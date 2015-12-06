@@ -296,7 +296,7 @@ if __name__ == '__main__':
     # TODO: This name sucks.
     checkAndUpdatePerfTestSuite(sourceDir)
 
-    workCacheDir = collectBenchmarks(exeNames, tree_ish=None, repeat=args.repeat, build_script_args=args.build_script_args)    
+    workCacheDir = collectBenchmarks(exeNames, tree_ish=None, repeat=args.repeat, build_script_args=args.build_script_args)
     baselineCacheDir = collectBenchmarks(exeNames, tree_ish=args.baseline, repeat=args.repeat, build_script_args=args.build_script_args)
     
     if baselineCacheDir == workCacheDir:

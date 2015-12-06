@@ -173,7 +173,7 @@ tests.test("ManagedBufferPointer/SizeValidation/TestmanagedBuffer") {
     bufferClass: TestManagedBuffer<LifetimeTracked>.self,
     minimumCapacity: 10
   ) {
-    buffer, getRealCapacity in 
+    buffer, getRealCapacity in
     CountAndCapacity(
       count: LifetimeTracked(0), capacity: getRealCapacity(buffer))
   }
@@ -194,7 +194,7 @@ tests.test("ManagedBufferPointer") {
       bufferClass: TestManagedBuffer<LifetimeTracked>.self,
       minimumCapacity: 10
     ) {
-      buffer, getRealCapacity in 
+      buffer, getRealCapacity in
       CountAndCapacity(
         count: LifetimeTracked(0), capacity: getRealCapacity(buffer))
     }

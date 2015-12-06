@@ -430,7 +430,7 @@ Here's another example of an out-parameter:
 
 .. code-block:: objc
 
-  - (instancetype)initWithContentsOfURL:(NSURL *)url encoding:(NSStringEncoding)enc error:(NSError **)error;  
+  - (instancetype)initWithContentsOfURL:(NSURL *)url encoding:(NSStringEncoding)enc error:(NSError **)error;
 
 Out-parameters have some nice advantages.  First, they're a reliable
 source of marking; even if the actual propagation gets separated from

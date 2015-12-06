@@ -924,7 +924,7 @@ unsigned Lexer::lexUnicodeEscape(const char *&CurPtr, Lexer *Diags) {
 /// 'StopQuote'), this returns ~0U and leaves 'CurPtr' pointing to the terminal
 /// quote.  If this is a malformed character sequence, it emits a diagnostic
 /// (when EmitDiagnostics is true) and returns ~1U.
-/// 
+///
 ///   character_escape  ::= [\][\] | [\]t | [\]n | [\]r | [\]" | [\]' | [\]0
 ///   character_escape  ::= unicode_character_escape
 unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
@@ -1318,7 +1318,7 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
       break;
     }
     
-    if (CharValue < 0x80) 
+    if (CharValue < 0x80)
       TempString.push_back(CharValue);
     else
       EncodeToUTF8(CharValue, TempString);

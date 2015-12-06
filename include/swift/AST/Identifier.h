@@ -495,7 +495,7 @@ namespace llvm {
     static bool isEqual(swift::DeclName LHS, swift::DeclName RHS) {
       return LHS.getOpaqueValue() == RHS.getOpaqueValue();
     }
-  };  
+  };
 
   // ObjCSelectors hash just like pointers.
   template<> struct DenseMapInfo<swift::ObjCSelector> {

@@ -103,7 +103,7 @@ void SILGenFunction::emitInjectOptionalValueInto(SILLocation loc,
   B.createInjectEnumAddr(loc, dest, someDecl);
 }
 
-void SILGenFunction::emitInjectOptionalNothingInto(SILLocation loc, 
+void SILGenFunction::emitInjectOptionalNothingInto(SILLocation loc,
                                                    SILValue dest,
                                                    const TypeLowering &optTL) {
   OptionalTypeKind OTK;

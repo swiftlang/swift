@@ -15,7 +15,7 @@ class SwiftLexer(RegexLexer):
 
     flags = re.MULTILINE | re.DOTALL
 
-    _isa = r'([a-zA-Z_][a-zA-Z0-9_]*)(\s+)(:)(\s+)([A-Z0-9_][a-zA-Z0-9_]*)' 
+    _isa = r'([a-zA-Z_][a-zA-Z0-9_]*)(\s+)(:)(\s+)([A-Z0-9_][a-zA-Z0-9_]*)'
     _isa_comma = r'([a-zA-Z_][a-zA-Z0-9_]*)(\s+)(:)(\s+)([A-Z0-9_][a-zA-Z0-9_]*)(,\s?)'
     _name = r'[a-zA-Z_][a-zA-Z0-9_?]*'
 
@@ -127,7 +127,7 @@ class SwiftLexer(RegexLexer):
 
         'class-name' : [
             (r'[A-Z][a-zA-Z0-9_?]*', Name.Constant),
-            (r'(\[)([0-9]+)(\])', bygroups(Operator, Number.Integer, Operator)), 
+            (r'(\[)([0-9]+)(\])', bygroups(Operator, Number.Integer, Operator)),
             (r'<', Punctuation, 'generic-type'),
             (r'\.\(', Punctuation, 'arg-list'),
             (r'\(', Punctuation, 'type-cast'),
@@ -142,14 +142,14 @@ class SwiftLexer(RegexLexer):
             (r'\s?[\s\n]', Whitespace, '#pop'),
         ],
             
-        'var-decl' : [ 
+        'var-decl' : [
             (r'(\[)([\w\s,]*)(\])(\s+)', bygroups(Punctuation, Name.Attribute, Punctuation, Whitespace)),
             include('tuple'),
             include('var-isa-comma'),
             include('var-isa-pop'),
             include('var-name'),
             (r',\s+', Punctuation, 'var-decl'),
-            include('ws-pop'), 
+            include('ws-pop'),
         ],
 
         'for-loop' : [
@@ -185,7 +185,7 @@ class SwiftLexer(RegexLexer):
             (r'[A-Z][a-zA-Z0-9_?]*', Name.Class),
             (r'\s', Whitespace),
             (r'<', Punctuation, 'generic-type'),
-        ], 
+        ],
 
         'arg-list' : [
             (r',\s?', Punctuation),
@@ -222,7 +222,7 @@ class SwiftConsoleLexer(RegexLexer):
 
     flags = re.MULTILINE | re.DOTALL
 
-    _isa = r'([a-zA-Z_][a-zA-Z0-9_]*)(\s+)(:)(\s+)([A-Z0-9_][a-zA-Z0-9_]*)' 
+    _isa = r'([a-zA-Z_][a-zA-Z0-9_]*)(\s+)(:)(\s+)([A-Z0-9_][a-zA-Z0-9_]*)'
     _isa_comma = r'([a-zA-Z_][a-zA-Z0-9_]*)(\s+)(:)(\s+)([A-Z0-9_][a-zA-Z0-9_]*)(,\s?)'
     _name = r'[a-zA-Z_][a-zA-Z0-9_?]*'
 

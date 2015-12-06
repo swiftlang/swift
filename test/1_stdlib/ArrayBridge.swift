@@ -343,7 +343,7 @@ func testExplicitlyBridged() {
 
   // Make sure we can bridge back.
   let roundTripBridgedSwifts
-    = Swift._forceBridgeFromObjectiveC(bridgedSwiftsAsNSArray, 
+    = Swift._forceBridgeFromObjectiveC(bridgedSwiftsAsNSArray,
                                        [BridgedSwift].self)
   // CHECK-NEXT-NOT: [BridgedSwift#[[id00]](42), BridgedSwift#[[id01]](17)]
   // CHECK-NEXT: [BridgedSwift#[[id10:[0-9]+]](42), BridgedSwift#[[id11:[0-9]+]](17)]
@@ -361,7 +361,7 @@ func testExplicitlyBridged() {
   print("bridgedBackSwifts      = \(bridgedBackSwifts)")
   
   // all: verbatim,  not, and doesn't bridge
-  // implicit conversions to/from NSArray 
+  // implicit conversions to/from NSArray
   // [Base] -> [Derived] and [Derived] -> [Base] where Base can be AnyObject
   // defining @objc method taking [T] and returning [T]
 
@@ -538,7 +538,7 @@ func testRoundTrip() {
   
   // CHECK-NEXT: ---Returned Array---
   print("---Returned Array---")
-  // CHECK-NEXT: bridge operations (from, to) = (0, 0)  
+  // CHECK-NEXT: bridge operations (from, to) = (0, 0)
   BridgedSwift.printStats()
 }
 testRoundTrip()

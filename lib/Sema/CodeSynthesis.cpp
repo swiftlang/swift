@@ -54,7 +54,7 @@ static VarDecl *getParamDeclAtIndex(FuncDecl *fn, unsigned index) {
   }
 
   auto firstParamPattern = params[index].getPattern();
-  return firstParamPattern->getSingleVar();    
+  return firstParamPattern->getSingleVar();
 }
 
 static VarDecl *getFirstParamDecl(FuncDecl *fn) {
@@ -2066,7 +2066,7 @@ static Expr *forwardArguments(TypeChecker &tc, ClassDecl *classDecl,
       } while (true);
     }
 
-    if (values.size() == 1 && 
+    if (values.size() == 1 &&
         (argumentNames.empty() || argumentNames[0].empty()))
       return new (tc.Context) ParenExpr(SourceLoc(), values[0], SourceLoc(),
                                         /*hasTrailingClosure=*/false);
@@ -2151,7 +2151,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                                        SourceLoc(), ctx.Id_self,
                                        Type(), classDecl);
   selfDecl->setImplicit();
-  Pattern *selfBodyPattern 
+  Pattern *selfBodyPattern
     = new (ctx) NamedPattern(selfDecl, /*Implicit=*/true);
   selfBodyPattern = new (ctx) TypedPattern(selfBodyPattern, TypeLoc());
 
@@ -2222,7 +2222,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   bodyParamPatterns->setType(argType);
 
   // Create the initializer declaration.
-  auto ctor = new (ctx) ConstructorDecl(superclassCtor->getFullName(), 
+  auto ctor = new (ctx) ConstructorDecl(superclassCtor->getFullName(),
                                         classDecl->getBraces().Start,
                                         superclassCtor->getFailability(),
                                         SourceLoc(),
@@ -2244,7 +2244,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   cast<TypedPattern>(selfBodyPattern)->getSubPattern()->setType(selfType);
 
   // Set the type of the initializer.
-  configureConstructorType(ctor, outerGenericParams, selfType, 
+  configureConstructorType(ctor, outerGenericParams, selfType,
                            bodyParamPatterns->getType(),
                            superclassCtor->isBodyThrowing());
   if (superclassCtor->isObjC()) {

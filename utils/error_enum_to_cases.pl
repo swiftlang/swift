@@ -32,7 +32,7 @@ foreach $line (<STDIN>) {
       $availability = "  \@available(OSX, $osx) \@available(iOS, $ios)\n";
     }
 
-    # If the full name ends in "Minimum" or "Maximum", it's for a range. 
+    # If the full name ends in "Minimum" or "Maximum", it's for a range.
     my $rangeName = "";
     if ($fullname =~ /(Minimum|Maximum)$/) {
       $rangeName = substr $PREMATCH, $prefixLength;

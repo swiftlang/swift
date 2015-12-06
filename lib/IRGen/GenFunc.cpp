@@ -291,7 +291,7 @@ namespace {
       CurValue.Indirect = address;
     }
 
-    bool isInvalid() const { return CurState == State::Invalid; } 
+    bool isInvalid() const { return CurState == State::Invalid; }
     bool isDirect() const { return CurState == State::Direct; }
     bool isIndirect() const { return CurState == State::Indirect; }
 
@@ -521,7 +521,7 @@ namespace {
     }
 
     void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
-      src.claimNext();      
+      src.claimNext();
       IGF.emitFixLifetime(src.claimNext());
     }
 
@@ -2315,7 +2315,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
       break;
     default:
       llvm_unreachable("out of sync with if condition");
-    }    
+    }
     return;
   }
   

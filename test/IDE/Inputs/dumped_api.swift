@@ -44,20 +44,20 @@ public class _AnyGeneratorBase {}
 public class AnyGenerator<T> : _AnyGeneratorBase, GeneratorType {
   /// Initialize the instance.  May only be called from a subclass
   /// initializer.
-  override public init() 
+  override public init()
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
   /// Note: subclasses must override this method.
-  public func next() -> T? 
+  public func next() -> T?
 }
 
 /// Every `GeneratorType` can also be a `SequenceType`.  Note that
 /// traversing the sequence consumes the generator.
 extension AnyGenerator : SequenceType {
   /// Returns `self`.
-  public func generate() -> AnyGenerator 
+  public func generate() -> AnyGenerator
 }
 
 /// Return a `GeneratorType` instance that wraps `base` but whose type
@@ -74,7 +74,7 @@ extension AnyGenerator : SequenceType {
 ///         = lazyStrings.generate()
 ///       return anyGenerator(g)
 ///     }
-public func anyGenerator<G: GeneratorType>(base: G) -> AnyGenerator<G.Element> 
+public func anyGenerator<G: GeneratorType>(base: G) -> AnyGenerator<G.Element>
 
 
 /// Return a `GeneratorType` instance whose `next` method invokes
@@ -85,7 +85,7 @@ public func anyGenerator<G: GeneratorType>(base: G) -> AnyGenerator<G.Element>
 ///     var x = 7
 ///     let g = anyGenerator { x < 15 ? x++ : nil }
 ///     let a = Array(g) // [ 7, 8, 9, 10, 11, 12, 13, 14 ]
-public func anyGenerator<T>(nextImplementation: ()->T?) -> AnyGenerator<T> 
+public func anyGenerator<T>(nextImplementation: ()->T?) -> AnyGenerator<T>
 
 
 
@@ -107,49 +107,49 @@ public func anyGenerator<T>(nextImplementation: ()->T?) -> AnyGenerator<T>
 public struct AnySequence<T> : SequenceType {
 
   /// Wrap and forward operations to to `base`
-  public init<S: SequenceType where S.Generator.Element == T>(_ base: S) 
+  public init<S: SequenceType where S.Generator.Element == T>(_ base: S)
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// Complexity: O(1)
-  public func generate() -> AnyGenerator<Element> 
+  public func generate() -> AnyGenerator<Element>
 
 }
 
 public func ~> <Element>(
   source: AnySequence<Element>,
   ptr: (_InitializeTo, UnsafeMutablePointer<Element>)
-) 
+)
 
 extension AnySequence {
-  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> 
+  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element>
 }
 
 public func ~> <Element>(
   source: AnyForwardCollection<Element>,
   ptr: (_InitializeTo, UnsafeMutablePointer<Element>)
-) 
+)
 
 extension AnyForwardCollection {
-  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> 
+  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element>
 }
 
 public func ~> <Element>(
   source: AnyBidirectionalCollection<Element>,
   ptr: (_InitializeTo, UnsafeMutablePointer<Element>)
-) 
+)
 
 extension AnyBidirectionalCollection {
-  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> 
+  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element>
 }
 
 public func ~> <Element>(
   source: AnyRandomAccessCollection<Element>,
   ptr: (_InitializeTo, UnsafeMutablePointer<Element>)
-) 
+)
 
 extension AnyRandomAccessCollection {
-  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> 
+  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element>
 }
 
 //===--- ForwardIndex -----------------------------------------------------===//
@@ -179,13 +179,13 @@ public struct AnyForwardIndex : ForwardIndexType {
   public typealias Distance = IntMax
 
   /// Wrap and forward operations to `base`.
-  public init<BaseIndex: ForwardIndexType>(_ base: BaseIndex) 
+  public init<BaseIndex: ForwardIndexType>(_ base: BaseIndex)
 
   /// Return the next consecutive value in a discrete sequence of
   /// `AnyForwardIndex` values.
   ///
   /// Requires: `self` has a well-defined successor.
-  public func successor() -> AnyForwardIndex 
+  public func successor() -> AnyForwardIndex
 
 
 
@@ -197,23 +197,23 @@ public struct AnyForwardIndex : ForwardIndexType {
 
 public func ~> (
   start: AnyForwardIndex, other : (_Distance, AnyForwardIndex)
-) -> AnyForwardIndex.Distance 
+) -> AnyForwardIndex.Distance
 
 public func ~> (
   start: AnyForwardIndex, distance : (_Advance, AnyForwardIndex.Distance)
-) -> AnyForwardIndex 
+) -> AnyForwardIndex
 
 public func ~> (
   start: AnyForwardIndex,
   args: (_Advance, (AnyForwardIndex.Distance, AnyForwardIndex))
-) -> AnyForwardIndex 
+) -> AnyForwardIndex
 
 /// Return true iff `lhs` and `rhs` wrap equal underlying
 /// `AnyForwardIndex`s.
 ///
 /// Requires: the types of indices wrapped by `lhs` and `rhs` are
 /// identical.
-public func == (lhs: AnyForwardIndex, rhs: AnyForwardIndex) -> Bool 
+public func == (lhs: AnyForwardIndex, rhs: AnyForwardIndex) -> Bool
 
 /// A wrapper over an underlying `BidirectionalIndexType` that hides
 /// the specific underlying type.
@@ -223,19 +223,19 @@ public struct AnyBidirectionalIndex : BidirectionalIndexType {
   public typealias Distance = IntMax
 
   /// Wrap and forward operations to `base`.
-  public init<BaseIndex: BidirectionalIndexType>(_ base: BaseIndex) 
+  public init<BaseIndex: BidirectionalIndexType>(_ base: BaseIndex)
 
   /// Return the next consecutive value in a discrete sequence of
   /// `AnyBidirectionalIndex` values.
   ///
   /// Requires: `self` has a well-defined successor.
-  public func successor() -> AnyBidirectionalIndex 
+  public func successor() -> AnyBidirectionalIndex
 
   /// Return the previous consecutive value in a discrete sequence of
   /// `AnyBidirectionalIndex` values.
   ///
   /// Requires: `self` has a well-defined predecessor.
-  public func predecessor() -> AnyBidirectionalIndex 
+  public func predecessor() -> AnyBidirectionalIndex
 
 
   //===--- private --------------------------------------------------------===//
@@ -246,23 +246,23 @@ public struct AnyBidirectionalIndex : BidirectionalIndexType {
 
 public func ~> (
   start: AnyBidirectionalIndex, other : (_Distance, AnyBidirectionalIndex)
-) -> AnyBidirectionalIndex.Distance 
+) -> AnyBidirectionalIndex.Distance
 
 public func ~> (
   start: AnyBidirectionalIndex, distance : (_Advance, AnyBidirectionalIndex.Distance)
-) -> AnyBidirectionalIndex 
+) -> AnyBidirectionalIndex
 
 public func ~> (
   start: AnyBidirectionalIndex,
   args: (_Advance, (AnyBidirectionalIndex.Distance, AnyBidirectionalIndex))
-) -> AnyBidirectionalIndex 
+) -> AnyBidirectionalIndex
 
 /// Return true iff `lhs` and `rhs` wrap equal underlying
 /// `AnyBidirectionalIndex`s.
 ///
 /// Requires: the types of indices wrapped by `lhs` and `rhs` are
 /// identical.
-public func == (lhs: AnyBidirectionalIndex, rhs: AnyBidirectionalIndex) -> Bool 
+public func == (lhs: AnyBidirectionalIndex, rhs: AnyBidirectionalIndex) -> Bool
 
 /// A wrapper over an underlying `RandomAccessIndexType` that hides
 /// the specific underlying type.
@@ -272,32 +272,32 @@ public struct AnyRandomAccessIndex : RandomAccessIndexType {
   public typealias Distance = IntMax
 
   /// Wrap and forward operations to `base`.
-  public init<BaseIndex: RandomAccessIndexType>(_ base: BaseIndex) 
+  public init<BaseIndex: RandomAccessIndexType>(_ base: BaseIndex)
 
   /// Return the next consecutive value in a discrete sequence of
   /// `AnyRandomAccessIndex` values.
   ///
   /// Requires: `self` has a well-defined successor.
-  public func successor() -> AnyRandomAccessIndex 
+  public func successor() -> AnyRandomAccessIndex
 
   /// Return the previous consecutive value in a discrete sequence of
   /// `AnyRandomAccessIndex` values.
   ///
   /// Requires: `self` has a well-defined predecessor.
-  public func predecessor() -> AnyRandomAccessIndex 
+  public func predecessor() -> AnyRandomAccessIndex
 
   /// Return the minimum number of applications of `successor` or
   /// `predecessor` required to reach `other` from `self`.
   ///
   /// Requires: `self` and `other` wrap instances of the same type.
-  public func distanceTo(other: AnyRandomAccessIndex) -> Distance 
+  public func distanceTo(other: AnyRandomAccessIndex) -> Distance
 
   /// Return `self` offset by `n` steps.
   ///
   /// - Returns: If `n > 0`, the result of applying `successor` to
   ///   `self` `n` times.  If `n < 0`, the result of applying
   ///   `predecessor` to `self` `n` times. Otherwise, `self`.
-  public func advancedBy(amount: Distance) -> AnyRandomAccessIndex 
+  public func advancedBy(amount: Distance) -> AnyRandomAccessIndex
 
   //===--- private --------------------------------------------------------===//
 
@@ -307,23 +307,23 @@ public struct AnyRandomAccessIndex : RandomAccessIndexType {
 
 public func ~> (
   start: AnyRandomAccessIndex, other : (_Distance, AnyRandomAccessIndex)
-) -> AnyRandomAccessIndex.Distance 
+) -> AnyRandomAccessIndex.Distance
 
 public func ~> (
   start: AnyRandomAccessIndex, distance : (_Advance, AnyRandomAccessIndex.Distance)
-) -> AnyRandomAccessIndex 
+) -> AnyRandomAccessIndex
 
 public func ~> (
   start: AnyRandomAccessIndex,
   args: (_Advance, (AnyRandomAccessIndex.Distance, AnyRandomAccessIndex))
-) -> AnyRandomAccessIndex 
+) -> AnyRandomAccessIndex
 
 /// Return true iff `lhs` and `rhs` wrap equal underlying
 /// `AnyRandomAccessIndex`s.
 ///
 /// Requires: the types of indices wrapped by `lhs` and `rhs` are
 /// identical.
-public func == (lhs: AnyRandomAccessIndex, rhs: AnyRandomAccessIndex) -> Bool 
+public func == (lhs: AnyRandomAccessIndex, rhs: AnyRandomAccessIndex) -> Bool
 
 //===--- Collections ------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
@@ -344,12 +344,12 @@ public protocol AnyCollectionType : CollectionType {
 /// Return true iff `lhs` and `rhs` store the same underlying collection.
 public func === <
   L: AnyCollectionType, R: AnyCollectionType
->(lhs: L, rhs: R) -> Bool 
+>(lhs: L, rhs: R) -> Bool
 
 /// Return false iff `lhs` and `rhs` store the same underlying collection.
 public func !== <
   L: AnyCollectionType, R: AnyCollectionType
->(lhs: L, rhs: R) -> Bool 
+>(lhs: L, rhs: R) -> Bool
 
 /// A type-erased wrapper over any collection with at least
 /// forward indices.
@@ -368,7 +368,7 @@ public struct AnyForwardCollection<Element> : AnyCollectionType {
   public init<
     C: CollectionType
       where C.Index: ForwardIndexType, C.Generator.Element == Element
-  >(_ base: C) 
+  >(_ base: C)
 
   /// Create an `AnyForwardCollection` having the same underlying
   /// collection as `other`.
@@ -376,7 +376,7 @@ public struct AnyForwardCollection<Element> : AnyCollectionType {
   /// Postcondition: the result is `===` to `other`.
   ///
   /// Complexity: O(1)
-  public init(_ other: AnyForwardCollection<Element>) 
+  public init(_ other: AnyForwardCollection<Element>)
   /// Create an `AnyForwardCollection` that stores `base` as its
   /// underlying collection.
   ///
@@ -384,7 +384,7 @@ public struct AnyForwardCollection<Element> : AnyCollectionType {
   public init<
     C: CollectionType
       where C.Index: BidirectionalIndexType, C.Generator.Element == Element
-  >(_ base: C) 
+  >(_ base: C)
 
   /// Create an `AnyForwardCollection` having the same underlying
   /// collection as `other`.
@@ -392,7 +392,7 @@ public struct AnyForwardCollection<Element> : AnyCollectionType {
   /// Postcondition: the result is `===` to `other`.
   ///
   /// Complexity: O(1)
-  public init(_ other: AnyBidirectionalCollection<Element>) 
+  public init(_ other: AnyBidirectionalCollection<Element>)
   /// Create an `AnyForwardCollection` that stores `base` as its
   /// underlying collection.
   ///
@@ -400,7 +400,7 @@ public struct AnyForwardCollection<Element> : AnyCollectionType {
   public init<
     C: CollectionType
       where C.Index: RandomAccessIndexType, C.Generator.Element == Element
-  >(_ base: C) 
+  >(_ base: C)
 
   /// Create an `AnyForwardCollection` having the same underlying
   /// collection as `other`.
@@ -408,34 +408,34 @@ public struct AnyForwardCollection<Element> : AnyCollectionType {
   /// Postcondition: the result is `===` to `other`.
   ///
   /// Complexity: O(1)
-  public init(_ other: AnyRandomAccessCollection<Element>) 
+  public init(_ other: AnyRandomAccessCollection<Element>)
 
 
   /// Return a *generator* over the elements of this *collection*.
   ///
   /// Complexity: O(1)
-  public func generate() -> AnyGenerator<Element> 
+  public func generate() -> AnyGenerator<Element>
 
   /// The position of the first element in a non-empty collection.
   ///
   /// Identical to `endIndex` in an empty collection.
-  public var startIndex: AnyForwardIndex 
+  public var startIndex: AnyForwardIndex
 
   /// The collection's "past the end" position.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
   /// `successor()`.
-  public var endIndex: AnyForwardIndex 
+  public var endIndex: AnyForwardIndex
 
   /// Access the element indicated by `position`.
   ///
   /// Requires: `position` indicates a valid position in `self` and
   /// `position != endIndex`.
-  public subscript(position: AnyForwardIndex) -> Element 
+  public subscript(position: AnyForwardIndex) -> Element
 
   /// Uniquely identifies the stored underlying collection.
-  public var underlyingCollectionID: ObjectIdentifier 
+  public var underlyingCollectionID: ObjectIdentifier
 
 }
 /// A type-erased wrapper over any collection with at least
@@ -455,7 +455,7 @@ public struct AnyBidirectionalCollection<Element> : AnyCollectionType {
   public init<
     C: CollectionType
       where C.Index: BidirectionalIndexType, C.Generator.Element == Element
-  >(_ base: C) 
+  >(_ base: C)
 
   /// Create an `AnyBidirectionalCollection` having the same underlying
   /// collection as `other`.
@@ -463,7 +463,7 @@ public struct AnyBidirectionalCollection<Element> : AnyCollectionType {
   /// Postcondition: the result is `===` to `other`.
   ///
   /// Complexity: O(1)
-  public init(_ other: AnyBidirectionalCollection<Element>) 
+  public init(_ other: AnyBidirectionalCollection<Element>)
   /// Create an `AnyBidirectionalCollection` that stores `base` as its
   /// underlying collection.
   ///
@@ -471,7 +471,7 @@ public struct AnyBidirectionalCollection<Element> : AnyCollectionType {
   public init<
     C: CollectionType
       where C.Index: RandomAccessIndexType, C.Generator.Element == Element
-  >(_ base: C) 
+  >(_ base: C)
 
   /// Create an `AnyBidirectionalCollection` having the same underlying
   /// collection as `other`.
@@ -479,7 +479,7 @@ public struct AnyBidirectionalCollection<Element> : AnyCollectionType {
   /// Postcondition: the result is `===` to `other`.
   ///
   /// Complexity: O(1)
-  public init(_ other: AnyRandomAccessCollection<Element>) 
+  public init(_ other: AnyRandomAccessCollection<Element>)
 
   /// If the indices of the underlying collection stored by `other`
   /// satisfy `BidirectionalIndexType`, create an
@@ -487,33 +487,33 @@ public struct AnyBidirectionalCollection<Element> : AnyCollectionType {
   /// collection as `other`.  Otherwise, the result is `nil`.
   ///
   /// Complexity: O(1)
-  public init?(_ other: AnyForwardCollection<Element>) 
+  public init?(_ other: AnyForwardCollection<Element>)
 
   /// Return a *generator* over the elements of this *collection*.
   ///
   /// Complexity: O(1)
-  public func generate() -> AnyGenerator<Element> 
+  public func generate() -> AnyGenerator<Element>
 
   /// The position of the first element in a non-empty collection.
   ///
   /// Identical to `endIndex` in an empty collection.
-  public var startIndex: AnyBidirectionalIndex 
+  public var startIndex: AnyBidirectionalIndex
 
   /// The collection's "past the end" position.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
   /// `successor()`.
-  public var endIndex: AnyBidirectionalIndex 
+  public var endIndex: AnyBidirectionalIndex
 
   /// Access the element indicated by `position`.
   ///
   /// Requires: `position` indicates a valid position in `self` and
   /// `position != endIndex`.
-  public subscript(position: AnyBidirectionalIndex) -> Element 
+  public subscript(position: AnyBidirectionalIndex) -> Element
 
   /// Uniquely identifies the stored underlying collection.
-  public var underlyingCollectionID: ObjectIdentifier 
+  public var underlyingCollectionID: ObjectIdentifier
 
 }
 /// A type-erased wrapper over any collection with at least
@@ -533,7 +533,7 @@ public struct AnyRandomAccessCollection<Element> : AnyCollectionType {
   public init<
     C: CollectionType
       where C.Index: RandomAccessIndexType, C.Generator.Element == Element
-  >(_ base: C) 
+  >(_ base: C)
 
   /// Create an `AnyRandomAccessCollection` having the same underlying
   /// collection as `other`.
@@ -541,7 +541,7 @@ public struct AnyRandomAccessCollection<Element> : AnyCollectionType {
   /// Postcondition: the result is `===` to `other`.
   ///
   /// Complexity: O(1)
-  public init(_ other: AnyRandomAccessCollection<Element>) 
+  public init(_ other: AnyRandomAccessCollection<Element>)
 
   /// If the indices of the underlying collection stored by `other`
   /// satisfy `RandomAccessIndexType`, create an
@@ -549,40 +549,40 @@ public struct AnyRandomAccessCollection<Element> : AnyCollectionType {
   /// collection as `other`.  Otherwise, the result is `nil`.
   ///
   /// Complexity: O(1)
-  public init?(_ other: AnyForwardCollection<Element>) 
+  public init?(_ other: AnyForwardCollection<Element>)
   /// If the indices of the underlying collection stored by `other`
   /// satisfy `RandomAccessIndexType`, create an
   /// `AnyRandomAccessCollection` having the same underlying
   /// collection as `other`.  Otherwise, the result is `nil`.
   ///
   /// Complexity: O(1)
-  public init?(_ other: AnyBidirectionalCollection<Element>) 
+  public init?(_ other: AnyBidirectionalCollection<Element>)
 
   /// Return a *generator* over the elements of this *collection*.
   ///
   /// Complexity: O(1)
-  public func generate() -> AnyGenerator<Element> 
+  public func generate() -> AnyGenerator<Element>
 
   /// The position of the first element in a non-empty collection.
   ///
   /// Identical to `endIndex` in an empty collection.
-  public var startIndex: AnyRandomAccessIndex 
+  public var startIndex: AnyRandomAccessIndex
 
   /// The collection's "past the end" position.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
   /// `successor()`.
-  public var endIndex: AnyRandomAccessIndex 
+  public var endIndex: AnyRandomAccessIndex
 
   /// Access the element indicated by `position`.
   ///
   /// Requires: `position` indicates a valid position in `self` and
   /// `position != endIndex`.
-  public subscript(position: AnyRandomAccessIndex) -> Element 
+  public subscript(position: AnyRandomAccessIndex) -> Element
 
   /// Uniquely identifies the stored underlying collection.
-  public var underlyingCollectionID: ObjectIdentifier 
+  public var underlyingCollectionID: ObjectIdentifier
 
 }
 

@@ -171,7 +171,7 @@ enum class DescriptiveDeclKind : uint8_t {
   PostfixOperator,
   TypeAlias,
   GenericTypeParam,
-  AssociatedType,  
+  AssociatedType,
   Enum,
   Struct,
   Class,
@@ -320,7 +320,7 @@ class alignas(1 << DeclAlignInBits) Decl {
     unsigned : NumDeclBits;
     unsigned AlreadyInLookupTable : 1;
 
-    /// Whether we have already checked whether this declaration is a 
+    /// Whether we have already checked whether this declaration is a
     /// redeclaration.
     unsigned CheckedRedeclaration : 1;
   };
@@ -870,9 +870,9 @@ public:
   // or by doing a placement new.
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = alignof(Decl));
-  void *operator new(size_t Bytes, void *Mem) { 
-    assert(Mem); 
-    return Mem; 
+  void *operator new(size_t Bytes, void *Mem) {
+    assert(Mem);
+    return Mem;
   }
 };
 
@@ -1609,7 +1609,7 @@ public:
 
 /// ExtensionDecl - This represents a type extension containing methods
 /// associated with the type.  This is not a ValueDecl and has no Type because
-/// there are no runtime values of the Extension's type.  
+/// there are no runtime values of the Extension's type.
 class ExtensionDecl final : public Decl, public DeclContext,
                             public IterableDeclContext {
   SourceLoc ExtensionLoc;  // Location of 'extension' keyword.
@@ -1812,7 +1812,7 @@ public:
     return C->getContextKind() == DeclContextKind::ExtensionDecl;
   }
   static bool classof(const IterableDeclContext *C) {
-    return C->getIterableContextKind() 
+    return C->getIterableContextKind()
              == IterableDeclContextKind::ExtensionDecl;
   }
 
@@ -2151,8 +2151,8 @@ public:
 
   /// Determine whether we have already checked whether this
   /// declaration is a redeclaration.
-  bool alreadyCheckedRedeclaration() const { 
-    return ValueDeclBits.CheckedRedeclaration; 
+  bool alreadyCheckedRedeclaration() const {
+    return ValueDeclBits.CheckedRedeclaration;
   }
 
   /// Set whether we have already checked this declaration as a
@@ -2348,7 +2348,7 @@ public:
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_ValueDecl &&
            D->getKind() <= DeclKind::Last_ValueDecl;
-  }  
+  }
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -2921,7 +2921,7 @@ public:
   /// \param conformances Will be populated with the set of protocol
   /// conformances found for this protocol.
   ///
-  /// \returns true if any conformances were found. 
+  /// \returns true if any conformances were found.
   bool lookupConformance(
          ModuleDecl *module, ProtocolDecl *protocol,
          SmallVectorImpl<ProtocolConformance *> &conformances) const;
@@ -3239,7 +3239,7 @@ public:
 
   //// Whether this class requires all of its stored properties to
   //// have initializers in the class definition.
-  bool requiresStoredPropertyInits() const { 
+  bool requiresStoredPropertyInits() const {
     return ClassDeclBits.RequiresStoredPropertyInits;
   }
 
@@ -4026,7 +4026,7 @@ protected:
 
   VarDecl(DeclKind Kind, bool IsStatic, bool IsLet, SourceLoc NameLoc,
           Identifier Name, Type Ty, DeclContext *DC)
-    : AbstractStorageDecl(Kind, DC, Name, NameLoc) 
+    : AbstractStorageDecl(Kind, DC, Name, NameLoc)
   {
     VarDeclBits.IsUserAccessible = true;
     VarDeclBits.IsStatic = IsStatic;
@@ -4166,8 +4166,8 @@ public:
   bool isImplicitSelf() const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) { 
-    return D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Param; 
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Param;
   }
 };
 
@@ -4177,10 +4177,10 @@ class ParamDecl : public VarDecl {
   SourceLoc ArgumentNameLoc;
 
 public:
-  ParamDecl(bool isLet, SourceLoc argumentNameLoc, 
+  ParamDecl(bool isLet, SourceLoc argumentNameLoc,
             Identifier argumentName, SourceLoc parameterNameLoc,
             Identifier parameterName, Type ty, DeclContext *dc)
-    : VarDecl(DeclKind::Param, /*IsState=*/false, isLet, parameterNameLoc, 
+    : VarDecl(DeclKind::Param, /*IsState=*/false, isLet, parameterNameLoc,
               parameterName, ty, dc),
       ArgumentName(argumentName), ArgumentNameLoc(argumentNameLoc) { }
 
@@ -4209,7 +4209,7 @@ public:
   }
 
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) { 
+  static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Param;
   }
 };
@@ -4850,7 +4850,7 @@ public:
   bool hasDynamicSelf() const { return FuncDeclBits.HasDynamicSelf; }
 
   /// Set whether this function has a dynamic \c Self return or not.
-  void setDynamicSelf(bool hasDynamicSelf) { 
+  void setDynamicSelf(bool hasDynamicSelf) {
     FuncDeclBits.HasDynamicSelf = hasDynamicSelf;
   }
   
@@ -5162,10 +5162,10 @@ class ConstructorDecl : public AbstractFunctionDecl {
   ConstructorDecl *OverriddenDecl = nullptr;
 
 public:
-  ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc, 
+  ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
                   OptionalTypeKind Failability, SourceLoc FailabilityLoc,
                   Pattern *SelfBodyParam, Pattern *BodyParams,
-                  GenericParamList *GenericParams, 
+                  GenericParamList *GenericParams,
                   SourceLoc throwsLoc, DeclContext *Parent);
 
   void setBodyParams(Pattern *selfPattern, Pattern *bodyParams);

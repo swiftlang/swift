@@ -84,7 +84,7 @@ ProtocolConformance::getTypeWitnessSubstAndDecl(AssociatedTypeDecl *assocType,
 }
 
 const Substitution &
-ProtocolConformance::getTypeWitness(AssociatedTypeDecl *assocType, 
+ProtocolConformance::getTypeWitness(AssociatedTypeDecl *assocType,
                                     LazyResolver *resolver) const {
   return getTypeWitnessSubstAndDecl(assocType, resolver).first;
 }
@@ -218,7 +218,7 @@ bool NormalProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
 
 std::pair<const Substitution &, TypeDecl *>
 NormalProtocolConformance::getTypeWitnessSubstAndDecl(
-                      AssociatedTypeDecl *assocType, 
+                      AssociatedTypeDecl *assocType,
                       LazyResolver *resolver) const {
   if (Resolver)
     resolveLazyInfo();
@@ -247,7 +247,7 @@ void NormalProtocolConformance::setTypeWitness(
 
   /// Retrieve the value witness corresponding to the given requirement.
 ConcreteDeclRef NormalProtocolConformance::getWitness(
-                  ValueDecl *requirement, 
+                  ValueDecl *requirement,
                   LazyResolver *resolver) const {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Request type witness");
   if (Resolver)
@@ -290,7 +290,7 @@ SpecializedProtocolConformance::SpecializedProtocolConformance(
 }
 
 bool SpecializedProtocolConformance::hasTypeWitness(
-                      AssociatedTypeDecl *assocType, 
+                      AssociatedTypeDecl *assocType,
                       LazyResolver *resolver) const {
   return TypeWitnesses.find(assocType) != TypeWitnesses.end() ||
          GenericConformance->hasTypeWitness(assocType, resolver);
@@ -298,7 +298,7 @@ bool SpecializedProtocolConformance::hasTypeWitness(
 
 std::pair<const Substitution &, TypeDecl *>
 SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
-                      AssociatedTypeDecl *assocType, 
+                      AssociatedTypeDecl *assocType,
                       LazyResolver *resolver) const {
   // If we've already created this type witness, return it.
   auto known = TypeWitnesses.find(assocType);

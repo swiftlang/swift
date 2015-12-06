@@ -36,7 +36,7 @@ func test1a() -> unionSearchFlags {
 
 func test1b(b : Bool) {
   _ = 123
-  _ = .description == 1 // expected-error{{type of expression is ambiguous without more context}} 
+  _ = .description == 1 // expected-error{{type of expression is ambiguous without more context}}
 }
 
 enum MaybeInt {
@@ -132,7 +132,7 @@ extension CGSize {
   }
 }
 
-struct CGRect { 
+struct CGRect {
   var origin : CGPoint,
   size : CGSize
   
@@ -206,7 +206,7 @@ struct EmptyStruct {
   func foo() {}
 }
 
-func f() { 
+func f() {
   let a : UnionTest1
   a.bar()
   UnionTest1.baz()  // dot syntax access to a static method.
@@ -246,7 +246,7 @@ func units(x: Int) -> distance {
 
 
 
-var %% : distance -> distance // expected-error {{expected pattern}} 
+var %% : distance -> distance // expected-error {{expected pattern}}
 
 func badTupleElement() {
   typealias X = (x : Int, y : Int)

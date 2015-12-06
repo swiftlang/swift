@@ -526,7 +526,7 @@ protocol Initializer {
 // TABLE-NEXT:  method #Initializer.init!allocator.1: @_TTWV14witness_tables20HasInitializerStructS_11InitializerS_FS1_C{{.*}}
 // TABLE-NEXT: }
 // SYMBOL: sil hidden [transparent] [thunk] @_TTWV14witness_tables20HasInitializerStructS_11InitializerS_FS1_C{{.*}} : $@convention(witness_method) (@out HasInitializerStruct, Arg, @thick HasInitializerStruct.Type) -> ()
-struct HasInitializerStruct : Initializer { 
+struct HasInitializerStruct : Initializer {
   init(arg: Arg) { }
 }
 

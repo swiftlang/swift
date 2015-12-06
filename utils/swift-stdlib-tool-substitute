@@ -14,7 +14,7 @@
 
 # swift-stdlib-tool substitute for toolchains.
 #
-# This stand-in for swift-stdlib-tool runs the real swift-stdlib-tool 
+# This stand-in for swift-stdlib-tool runs the real swift-stdlib-tool
 # from the XcodeDefault toolchain in $DEVELOPER_DIR.
 
 self_path=$0

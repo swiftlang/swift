@@ -511,7 +511,7 @@ llvm::AttributeSet IRGenModule::getAllocAttrs() {
 /// Construct initial attributes from options.
 llvm::AttributeSet IRGenModule::constructInitialAttributes() {
   llvm::AttributeSet attrsUpdated;
-  // Add DisableFPElim. 
+  // Add DisableFPElim.
   if (!Opts.DisableFPElim) {
     attrsUpdated = attrsUpdated.addAttribute(LLVMContext,
                      llvm::AttributeSet::FunctionIndex,
@@ -720,10 +720,10 @@ void IRGenModule::emitAutolinkInfo() {
     auto EntriesConstant = llvm::ConstantDataArray::getString(
       LLVMContext, EntriesString, /*AddNull=*/false);
 
-    auto var = new llvm::GlobalVariable(*getModule(), 
+    auto var = new llvm::GlobalVariable(*getModule(),
                                         EntriesConstant->getType(), true,
                                         llvm::GlobalValue::PrivateLinkage,
-                                        EntriesConstant, 
+                                        EntriesConstant,
                                         "_swift1_autolink_entries");
     var->setSection(".swift1_autolink_entries");
     var->setAlignment(getPointerAlignment().getValue());

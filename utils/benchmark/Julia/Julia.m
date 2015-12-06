@@ -149,7 +149,7 @@ int main(int argc, char *argv[]) {
   drawJulia(context, Rect, maxc);
 
   CGImageRef image = CGBitmapContextCreateImage(context);
-  NSURL *URL = [[NSURL fileURLWithPath:[NSString stringWithCString:out_name encoding:NSASCIIStringEncoding]] absoluteURL];  
+  NSURL *URL = [[NSURL fileURLWithPath:[NSString stringWithCString:out_name encoding:NSASCIIStringEncoding]] absoluteURL];
   NSLog(@"%@", URL);
   assert(image);
   assert(URL);

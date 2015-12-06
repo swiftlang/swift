@@ -97,7 +97,7 @@ extension SequenceType where Generator.Element : SequenceType {
 }
 
 extension LazySequenceType
-  where Elements.Generator.Element == Generator.Element, 
+  where Elements.Generator.Element == Generator.Element,
     Generator.Element : SequenceType {
   /// A concatenation of the elements of `self`.
   @warn_unused_result
@@ -114,7 +114,7 @@ extension LazySequenceType
 %   constraints = '%(Base)sGenerator.Element : CollectionType'
 %   if traversal == 'Bidirectional':
 %     constraints += ''',
-%   %(Base)sIndex : BidirectionalIndexType, 
+%   %(Base)sIndex : BidirectionalIndexType,
 %   %(Base)sGenerator.Element.Index : BidirectionalIndexType'''
 %   Index = Collection + 'Index'
 public struct ${Index}<
@@ -199,7 +199,7 @@ public struct ${Index}<
 
 @warn_unused_result
 public func == <BaseElements> (
-  lhs: ${Index}<BaseElements>, 
+  lhs: ${Index}<BaseElements>,
   rhs: ${Index}<BaseElements>
 ) -> Bool {
   return lhs._outer == rhs._outer && lhs._inner == rhs._inner
@@ -295,7 +295,7 @@ extension CollectionType where ${constraints % {'Base': ''}} {
 }
 
 extension LazyCollectionType
-  where ${constraints % {'Base': ''}}, 
+  where ${constraints % {'Base': ''}},
   ${constraints % {'Base': 'Elements.'}},
   Generator.Element == Elements.Generator.Element {
   /// A concatenation of the elements of `self`.

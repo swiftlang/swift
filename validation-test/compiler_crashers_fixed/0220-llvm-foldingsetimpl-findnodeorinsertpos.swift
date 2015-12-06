@@ -86,5 +86,5 @@ struct c<h : b> : b {
     typealias e = a<c<h>, d>
 }
 import Foundation
-class d<c>: NSObject 
+class d<c>: NSObject
 }

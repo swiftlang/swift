@@ -363,7 +363,7 @@ struct ErrorTypeInVarDeclArrayType3 {
       // expected-error @-1{{expected expression for size of array type}}
       // expected-error @-2{{expected ']' in array type}}
   ;
-  var v2 : Int 
+  var v2 : Int
 }
 
 struct ErrorTypeInVarDeclArrayType4 {

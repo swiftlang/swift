@@ -208,7 +208,7 @@ func class_existential_is_class(p: ClassBound) -> Bool {
   // CHECK: checked_cast_br {{%.*}} to $C
 }
 
-// CHECK-LABEL: sil hidden @_TF13generic_casts27optional_anyobject_to_classFGSqPs9AnyObject__GSqCS_1C_ 
+// CHECK-LABEL: sil hidden @_TF13generic_casts27optional_anyobject_to_classFGSqPs9AnyObject__GSqCS_1C_
 // CHECK:         checked_cast_br {{%.*}} : $AnyObject to $C
 func optional_anyobject_to_class(p: AnyObject?) -> C? {
   return p as? C

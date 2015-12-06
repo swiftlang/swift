@@ -44,7 +44,7 @@
 
   #if TESTABLE
     @testable import testability_client
-  #else 
+  #else
     import testability_client
   #endif
 

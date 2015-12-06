@@ -238,9 +238,9 @@ tests.test("index-mapping/utf8-to-unicode-scalar") {
 tests.test("index-mapping/utf16-to-unicode-scalar") {
   let winterUtf16UnicodeScalars: [UnicodeScalar?] = [
     UnicodeScalar(0x1f3c2), nil,
-    UnicodeScalar(0x2603), 
-    UnicodeScalar(0x2745), 
-    UnicodeScalar(0x2746), 
+    UnicodeScalar(0x2603),
+    UnicodeScalar(0x2745),
+    UnicodeScalar(0x2746),
     UnicodeScalar(0x2744), UnicodeScalar(0xfe0e),
     UnicodeScalar(0x26c4), UnicodeScalar(0xfe0f),
     UnicodeScalar(0x2744), UnicodeScalar(0xfe0f)
@@ -454,9 +454,9 @@ tests.test("index-mapping/utf8-to-unicode-scalar") {
 tests.test("index-mapping/utf16-to-unicode-scalar") {
   let winterUtf16UnicodeScalars: [UnicodeScalar?] = [
     UnicodeScalar(0x1f3c2), nil,
-    UnicodeScalar(0x2603), 
-    UnicodeScalar(0x2745), 
-    UnicodeScalar(0x2746), 
+    UnicodeScalar(0x2603),
+    UnicodeScalar(0x2745),
+    UnicodeScalar(0x2746),
     UnicodeScalar(0x2744), UnicodeScalar(0xfe0e),
     UnicodeScalar(0x26c4), UnicodeScalar(0xfe0f),
     UnicodeScalar(0x2744), UnicodeScalar(0xfe0f),
@@ -629,7 +629,7 @@ tests.test("UTF8 indexes") {
         //===--- loop condition -------------------------------------------===//
         let b = u8[u8i0a]
         let isLeadingByte = !UTF8.isContinuation(b)
-        if dsa == ds && isLeadingByte { break } // 
+        if dsa == ds && isLeadingByte { break } //
         //===--------------------------------------------------------------===//
         
         expectNotEqual(u8i0a, u8i1) // We're not there yet
@@ -676,7 +676,7 @@ tests.test("UTF16->String") {
   let s = summer + winter + winter + summer
   let v = s.utf16
   for i in v.indices {
-    for j in i..<v.endIndex {      
+    for j in i..<v.endIndex {
       if let si = i.samePositionIn(s) {
         if let sj = j.samePositionIn(s) {
           expectEqual(s[si..<sj], String(v[i..<j])!)
@@ -692,7 +692,7 @@ tests.test("UTF8->String") {
   let s = summer + winter + winter + summer
   let v = s.utf8
   for i in v.indices {
-    for j in i..<v.endIndex {      
+    for j in i..<v.endIndex {
       if let si = i.samePositionIn(s) {
         if let sj = j.samePositionIn(s) {
           expectEqual(s[si..<sj], String(v[i..<j])!)

@@ -462,7 +462,7 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
     gen.VarLocs[VD] = SILGenFunction::VarLoc::get(val);
     if (auto *AllocStack = dyn_cast<AllocStackInst>(val))
       AllocStack->setArgNo(ArgNo);
-    else 
+    else
       gen.B.createDebugValue(Loc, val, ArgNo);
     if (!lowering.isTrivial())
       gen.enterDestroyCleanup(val);

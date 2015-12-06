@@ -118,4 +118,4 @@ return "
 typealias R
 }
 }
-func e(b: Int = 
+func e(b: Int =

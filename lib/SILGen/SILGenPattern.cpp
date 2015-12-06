@@ -131,7 +131,7 @@ static bool isDirectlyRefutablePattern(const Pattern *p) {
   case PatternKind::Typed:
   case PatternKind::Var:
     return isDirectlyRefutablePattern(p->getSemanticsProvidingPattern());
-  }  
+  }
   llvm_unreachable("bad pattern");
 }
 
@@ -198,7 +198,7 @@ static unsigned getNumSpecializationsRecursive(const Pattern *p, unsigned n) {
   case PatternKind::Typed:
   case PatternKind::Var:
     return getNumSpecializationsRecursive(p->getSemanticsProvidingPattern(), n);
-  }  
+  }
   llvm_unreachable("bad pattern");
 }
 
@@ -506,7 +506,7 @@ public:
     Columns.push_back(CasePattern);
     if (CaseGuardExpr)
       NumRemainingSpecializations = AlwaysRefutable;
-    else 
+    else
       NumRemainingSpecializations = getNumSpecializations(Columns[0]);
   }
 
@@ -1559,7 +1559,7 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
 
   // Produce the value at +1.
   ManagedValue substValue = SGF.getManagedValue(loc, src);
-  ManagedValue origValue = 
+  ManagedValue origValue =
     SGF.emitSubstToOrigValue(loc, substValue, abstraction, sourceType);
   return ConsumableManagedValue::forOwned(origValue);
 }
@@ -1651,7 +1651,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
   {
     // Create destination blocks for all the cases.
     llvm::DenseMap<EnumElementDecl*, unsigned> caseToIndex;
-    for (auto &row : rows) {    
+    for (auto &row : rows) {
       EnumElementDecl *elt;
       Pattern *subPattern = nullptr;
       if (auto eep = dyn_cast<EnumElementPattern>(row.Pattern)) {

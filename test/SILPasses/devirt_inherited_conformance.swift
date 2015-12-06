@@ -107,7 +107,7 @@ public protocol Comparable {
 }
 
 // Define a custom operator to be used instead of ==
-infix operator --- { associativity left precedence 140 } 
+infix operator --- { associativity left precedence 140 }
 
 // Simple is a protocol tat simply defines an operator and
 // a few methods with different number of arguments.
@@ -194,7 +194,7 @@ public func testCompareComparable() -> Bool {
 }
 
 public func BooCall<T:Simple>(x:T, _ y:T) -> Bool {
-  return x.boo(y, y) 
+  return x.boo(y, y)
 }
 
 // Check that a call of inherited Simple.boo can be devirtualized.

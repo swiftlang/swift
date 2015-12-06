@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend %s -parse 
+// RUN: not %target-swift-frontend %s -parse
 // rdar://17242486
 protocol a {
   typealias d

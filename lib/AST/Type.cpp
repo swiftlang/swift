@@ -52,7 +52,7 @@ void *TypeBase::operator new(size_t bytes, const ASTContext &ctx,
 }
 
 bool CanType::isActuallyCanonicalOrNull() const {
-  return getPointer() == 0 || 
+  return getPointer() == 0 ||
          getPointer() == llvm::DenseMapInfo<TypeBase*>::getTombstoneKey() ||
          getPointer()->isCanonical();
 }
@@ -752,7 +752,7 @@ static Type getStrippedType(const ASTContext &context, Type type,
     
     // An unlabeled 1-element tuple type is represented as a parenthesized
     // type.
-    if (elements.size() == 1 && !elements[0].isVararg() && 
+    if (elements.size() == 1 && !elements[0].isVararg() &&
         !elements[0].hasName())
       return ParenType::get(context, elements[0].getType());
     
@@ -765,10 +765,10 @@ Type TypeBase::getUnlabeledType(ASTContext &Context) {
                          /*defaultArgs=*/true);
 }
 
-Type TypeBase::getRelabeledType(ASTContext &ctx, 
+Type TypeBase::getRelabeledType(ASTContext &ctx,
                                 ArrayRef<Identifier> labels) {
   if (auto tupleTy = dyn_cast<TupleType>(this)) {
-    assert(labels.size() == tupleTy->getNumElements() && 
+    assert(labels.size() == tupleTy->getNumElements() &&
            "Wrong number of labels");
     SmallVector<TupleTypeElt, 4> elements;
     unsigned i = 0;
@@ -777,7 +777,7 @@ Type TypeBase::getRelabeledType(ASTContext &ctx,
       if (elt.getName() != labels[i])
         anyChanged = true;
 
-      elements.push_back(TupleTypeElt(elt.getType(), labels[i], 
+      elements.push_back(TupleTypeElt(elt.getType(), labels[i],
                                       elt.getDefaultArgKind(), elt.isVararg()));
       ++i;
     }
@@ -794,7 +794,7 @@ Type TypeBase::getRelabeledType(ASTContext &ctx,
 
   // Create a one-element tuple to capture the label.
   TupleTypeElt elt(this, labels[0]);
-  return TupleType::get(elt, ctx);  
+  return TupleType::get(elt, ctx);
 }
 
 Type TypeBase::getWithoutDefaultArgs(const ASTContext &Context) {
@@ -1890,7 +1890,7 @@ int TupleType::getElementForScalarInit() const {
     }
     
     // Otherwise, remember this field number.
-    FieldWithoutDefault = i;    
+    FieldWithoutDefault = i;
   }
   
   // If all the elements have default values, the scalar initializes the first
@@ -2026,7 +2026,7 @@ ArchetypeType::NestedType ArchetypeType::getNestedType(Identifier Name) const {
              ErrorType::get(
                const_cast<ArchetypeType *>(this)->getASTContext()));
 
-  // If the type is null, lazily resolve it. 
+  // If the type is null, lazily resolve it.
   if (!Pos->second) {
     resolveNestedType(*Pos);
   }

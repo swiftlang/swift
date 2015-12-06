@@ -2,7 +2,7 @@
 
 // Test that we emit a call to super.init at the end of the initializer, when none has been previously added.
 
-class Parent { 
+class Parent {
   init() {}
 }
 
@@ -20,7 +20,7 @@ class SomeDerivedClass : Parent {
 // CHECK-NEXT: [[INITCALL1:%[0-9]+]] = function_ref @_TFC30auto_generated_super_init_call6Parentc
 // CHECK-NEXT: [[RES1:%[0-9]+]] = apply [[INITCALL1]]([[PARENT]])
 // CHECK-NEXT: [[DOWNCAST:%[0-9]+]] = unchecked_ref_cast [[RES1]] : $Parent to $SomeDerivedClass
-// CHECK-NEXT: store [[DOWNCAST]] to [[SELF]] : $*SomeDerivedClass 
+// CHECK-NEXT: store [[DOWNCAST]] to [[SELF]] : $*SomeDerivedClass
   }
   
   init(x: Int) {
@@ -39,7 +39,7 @@ class SomeDerivedClass : Parent {
     return
 // Check that we are emittng the super.init expr into the epilog block.
     
-// CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call16SomeDerivedClassc{{.*}} : $@convention(method) (Bool, @owned SomeDerivedClass) -> @owned SomeDerivedClass    
+// CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call16SomeDerivedClassc{{.*}} : $@convention(method) (Bool, @owned SomeDerivedClass) -> @owned SomeDerivedClass
 // CHECK: bb4:
 // CHECK: [[SELFLOAD:%[0-9]+]] = load [[SELF:%[0-9]+]] : $*SomeDerivedClass
 // CHECK: function_ref @_TFC30auto_generated_super_init_call6Parentc{{.*}} : $@convention(method) (@owned Parent) -> @owned Parent
@@ -61,7 +61,7 @@ class SomeDerivedClass : Parent {
     }
       
     super.init()
-// CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call16SomeDerivedClassc{{.*}} : $@convention(method) (Bool, Int, @owned SomeDerivedClass) -> @owned SomeDerivedClass    
+// CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call16SomeDerivedClassc{{.*}} : $@convention(method) (Bool, Int, @owned SomeDerivedClass) -> @owned SomeDerivedClass
 // CHECK: function_ref @_TFC30auto_generated_super_init_call6Parentc{{.*}} : $@convention(method) (@owned Parent) -> @owned Parent
 // CHECK-NOT: function_ref @_TFC30auto_generated_super_init_call6Parentc
 // CHECK: return
@@ -110,7 +110,7 @@ class ChildOfParentWithNoExplicitInit2 : ParentWithNoExplicitInit2 {
   override init() {
     y = 10
 // CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call32ChildOfParentWithNoExplicitInit2c
-// CHECK: function_ref @_TFC30auto_generated_super_init_call25ParentWithNoExplicitInit2c{{.*}} : $@convention(method) (@owned ParentWithNoExplicitInit2) -> @owned ParentWithNoExplicitInit2   
+// CHECK: function_ref @_TFC30auto_generated_super_init_call25ParentWithNoExplicitInit2c{{.*}} : $@convention(method) (@owned ParentWithNoExplicitInit2) -> @owned ParentWithNoExplicitInit2
   }
 }
 

@@ -1168,7 +1168,7 @@ func testStructWithComputedProperty(s s : StructWithComputedProperty) {
 // <rdar://problem/17272985>
 enum ABC { case A, B, C }
 
-// CHECK-LABEL: sil hidden @_TF6switch18testTupleWildcardsFTOS_3ABCS0__T_ 
+// CHECK-LABEL: sil hidden @_TF6switch18testTupleWildcardsFTOS_3ABCS0__T_
 // CHECK:         [[X:%.*]] = tuple_extract {{%.*}} : $(ABC, ABC), 0
 // CHECK:         [[Y:%.*]] = tuple_extract {{%.*}} : $(ABC, ABC), 1
 // CHECK:         switch_enum [[X]] : $ABC, case #ABC.A!enumelt: [[X_A:bb[0-9]+]], default [[X_NOT_A:bb[0-9]+]]

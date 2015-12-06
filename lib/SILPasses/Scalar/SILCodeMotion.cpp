@@ -1109,7 +1109,7 @@ public:
   /// Top level merging function for predecessors.
   void mergePredecessorStates(BBToDataflowStateMap &BBToStateMap);
 
-  /// 
+  ///
   void mergeSinglePredTermInfoIntoState(BBToDataflowStateMap &BBToStateMap,
                                         SILBasicBlock *Pred);
 

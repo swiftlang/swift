@@ -49,8 +49,8 @@ namespace {
 /// The layout of protocol<>.
 using Any = OpaqueExistentialContainer;
 
-// Swift assumes Any is returned in memory. 
-// Use AnyReturn to guarantee that even on architectures 
+// Swift assumes Any is returned in memory.
+// Use AnyReturn to guarantee that even on architectures
 // where Any would be returned in registers.
 struct AnyReturn {
   Any any;
@@ -105,7 +105,7 @@ struct String {
     swift_stringFromUTF8InRawMemory(this, concatenated, len1 + len2);
     free(concatenated);
   }
-#if SWIFT_OBJC_INTEROP  
+#if SWIFT_OBJC_INTEROP
   explicit String(NSString *s)
     // FIXME: Use the usual NSString bridging entry point.
     : String([s UTF8String])
@@ -750,7 +750,7 @@ StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
   
 // -- Mirror witnesses for ObjC classes.
 
-#if SWIFT_OBJC_INTEROP  
+#if SWIFT_OBJC_INTEROP
 
 extern "C" const Metadata _TMSb; // Bool
 extern "C" const Metadata _TMSi; // Int
@@ -908,7 +908,7 @@ StringMirrorTuple swift_ObjCMirror_subscript(intptr_t i,
 #else
   // ObjC makes no guarantees about the state of ivars, so we can't safely
   // introspect them in the general case.
-  abort();  
+  abort();
 #endif
 }
 

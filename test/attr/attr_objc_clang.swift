@@ -20,7 +20,7 @@ class infer_instanceVar1 {
   }
 }
 
-class ObjC_Class1 : NSObject, Hashable { 
+class ObjC_Class1 : NSObject, Hashable {
   var hashValue: Int { return 0 }
 }
 
@@ -28,7 +28,7 @@ func ==(lhs: ObjC_Class1, rhs: ObjC_Class1) -> Bool {
   return true
 }
 
-@objc class ObjC_Class2 : Hashable { 
+@objc class ObjC_Class2 : Hashable {
   var hashValue: Int { return 0 }
 }
 

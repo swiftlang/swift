@@ -10,7 +10,7 @@ func test_unavailable_because_deprecated() {
   // We don't currently treat these unavailable, but the policy decision
   // hasn't been made yet.
   // rdar://problem/20948019 tracks changing this, if needed, when the
-  // policy decision is made. 
+  // policy decision is made.
   print(NSRealMemoryAvailable()) // expected-warning {{'NSRealMemoryAvailable()' was deprecated in watchOS 2.0}}
 }
 

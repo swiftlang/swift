@@ -163,7 +163,7 @@ extension String {
     return String(rng[startIndex..<rng.endIndex])
   }
 
-  /// Split the given string at the given delimiter character, returning 
+  /// Split the given string at the given delimiter character, returning
   /// the strings before and after that character (neither includes the character
   /// found) and a boolean value indicating whether the delimiter was found.
   public func _splitFirst(delim: UnicodeScalar)
@@ -172,8 +172,8 @@ extension String {
     let rng = unicodeScalars
     for i in rng.indices {
       if rng[i] == delim {
-        return (String(rng[rng.startIndex..<i]), 
-                String(rng[i.successor()..<rng.endIndex]), 
+        return (String(rng[rng.startIndex..<i]),
+                String(rng[i.successor()..<rng.endIndex]),
                 true)
       }
     }
@@ -181,7 +181,7 @@ extension String {
   }
 
   /// Split the given string at the first character for which the given
-  /// predicate returns true. Returns the string before that character, the 
+  /// predicate returns true. Returns the string before that character, the
   /// character that matches, the string after that character, and a boolean value
   /// indicating whether any character was found.
   public func _splitFirstIf(@noescape predicate: (UnicodeScalar) -> Bool)
@@ -191,8 +191,8 @@ extension String {
     for i in rng.indices {
       if predicate(rng[i]) {
         return (String(rng[rng.startIndex..<i]),
-                rng[i], 
-                String(rng[i.successor()..<rng.endIndex]), 
+                rng[i],
+                String(rng[i.successor()..<rng.endIndex]),
                 true)
       }
     }

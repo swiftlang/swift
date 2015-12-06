@@ -8,4 +8,4 @@ import Foundat= 0) {
 }
 let c = a
 c()
-func b(c) -> <d>d) 
+func b(c) -> <d>d)

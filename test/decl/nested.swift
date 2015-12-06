@@ -40,14 +40,14 @@ class OuterNonGenericClass {
   enum InnerNonGeneric {
     case Baz
     case Zab
-  } 
+  }
 }
 
 class OuterGenericClass<T> {
   enum InnerNonGeneric { // expected-error {{type 'InnerNonGeneric' nested in generic type 'OuterGenericClass' is not allowed}}
     case Baz
     case Zab
-  } 
+  }
 
   protocol InnerProtocol { // expected-error{{declaration is only valid at file scope}}
     typealias Rooster

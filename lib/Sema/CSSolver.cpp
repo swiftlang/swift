@@ -46,7 +46,7 @@ STATISTIC(LargestSolutionAttemptNumber, "# of the largest solution attempt");
 /// type variable.
 ///
 /// \returns the type to bind to, if the binding is okay.
-static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs, 
+static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
                                          TypeVariableType *typeVar, Type type) {
   if (!type)
     return None;
@@ -199,7 +199,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   CurrentScore += solution.getFixedScore();
 
   // Assign fixed types to the type variables solved by this solution.
-  llvm::SmallPtrSet<TypeVariableType *, 4> 
+  llvm::SmallPtrSet<TypeVariableType *, 4>
     knownTypeVariables(TypeVariables.begin(), TypeVariables.end());
   for (auto binding : solution.typeBindings) {
     // If we haven't seen this type variable before, record it now.
@@ -221,7 +221,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
                                                 overload.second.choice,
                                                 overload.first,
                                                 overload.second.openedFullType,
-                                                overload.second.openedType};    
+                                                overload.second.openedType};
   }
 
   // Register constraint restrictions.
@@ -267,7 +267,7 @@ void ConstraintSystem::restoreTypeVariableBindings(unsigned numBindings) {
 ///
 /// The direct supertype S of a type T is a supertype of T (e.g., T < S)
 /// such that there is no type U where T < U and U < S.
-static SmallVector<Type, 4> 
+static SmallVector<Type, 4>
 enumerateDirectSupertypes(TypeChecker &tc, Type type) {
   SmallVector<Type, 4> result;
 
@@ -417,7 +417,7 @@ ConstraintSystem::SolverState::~SolverState() {
   #include "ConstraintSolverStats.def"
 
   // Update the "largest" statistics if this system is larger than the
-  // previous one.  
+  // previous one.
   // FIXME: This is not at all thread-safe.
   if (NumStatesExplored > LargestNumStatesExplored.Value) {
     LargestSolutionAttemptNumber.Value = SolutionAttempt-1;
@@ -470,7 +470,7 @@ ConstraintSystem::SolverScope::~SolverScope() {
   }
 
   // Add the retired constraints back into circulation.
-  cs.InactiveConstraints.splice(cs.InactiveConstraints.end(), 
+  cs.InactiveConstraints.splice(cs.InactiveConstraints.end(),
                                 cs.solverState->retiredConstraints,
                                 cs.solverState->retiredConstraints.begin(),
                                 firstRetired);
@@ -535,7 +535,7 @@ namespace {
     AllowedBindingKind Kind;
 
     /// The defaulted protocol associated with this binding.
-    Optional<ProtocolDecl *> DefaultedProtocol;    
+    Optional<ProtocolDecl *> DefaultedProtocol;
   };
 
   struct PotentialBindings {
@@ -561,7 +561,7 @@ namespace {
 
     /// Compare two sets of bindings, where \c x < y indicates that
     /// \c x is a better set of bindings that \c y.
-    friend bool operator<(const PotentialBindings &x, 
+    friend bool operator<(const PotentialBindings &x,
                           const PotentialBindings &y) {
       return std::make_tuple(x.FullyBound,
                              x.SubtypeOfExistentialType,
@@ -716,7 +716,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       result.InvolvesTypeVariables = true;
       continue;
 
-    case ConstraintKind::ConformsTo: 
+    case ConstraintKind::ConformsTo:
     case ConstraintKind::SelfObjectOfProtocol: {
       // FIXME: Can we always assume that the type variable is the lower bound?
       TypeVariableType *lowerTypeVar = nullptr;
@@ -794,7 +794,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       // If our type variable shows up in the base type, there's
       // nothing to do.
       // FIXME: Can we avoid simplification here?
-      if (typeVarOccursInType(cs, typeVar, 
+      if (typeVarOccursInType(cs, typeVar,
                               cs.simplifyType(constraint->getFirstType()),
                               result.InvolvesTypeVariables)) {
         continue;
@@ -803,7 +803,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       // If the type variable is in the list of member type
       // variables, it is fully bound.
       // FIXME: Can we avoid simplification here?
-      if (typeVarOccursInType(cs, typeVar, 
+      if (typeVarOccursInType(cs, typeVar,
                               cs.simplifyType(constraint->getSecondType()),
                               result.InvolvesTypeVariables)) {
         result.FullyBound = true;
@@ -812,8 +812,8 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     }
 
     // Handle relational constraints.
-    assert(constraint->getClassification() 
-             == ConstraintClassification::Relational && 
+    assert(constraint->getClassification()
+             == ConstraintClassification::Relational &&
            "only relational constraints handled here");
     
     auto first = cs.simplifyType(constraint->getFirstType());
@@ -1102,11 +1102,11 @@ static bool tryTypeVariableBindings(
       // If we have a protocol with a default type, look for alternative
       // types to the default.
       if (tryCount == 0 && binding.DefaultedProtocol) {
-        KnownProtocolKind knownKind 
+        KnownProtocolKind knownKind
           = *((*binding.DefaultedProtocol)->getKnownProtocolKind());
         for (auto altType : cs.getAlternativeLiteralTypes(knownKind)) {
           if (exploredTypes.insert(altType->getCanonicalType()).second)
-            newBindings.push_back({altType, AllowedBindingKind::Subtypes, 
+            newBindings.push_back({altType, AllowedBindingKind::Subtypes,
                                    binding.DefaultedProtocol});
         }
       }
@@ -1292,22 +1292,22 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
   auto returnAllConstraints = [&] {
     assert(InactiveConstraints.empty() && "Already have constraints?");
     for (unsigned component = 0; component != numComponents; ++component) {
-      InactiveConstraints.splice(InactiveConstraints.end(), 
+      InactiveConstraints.splice(InactiveConstraints.end(),
                                  constraintBuckets[component]);
     }
   };
 
   // Compute the partial solutions produced for each connected component.
-  std::unique_ptr<SmallVector<Solution, 4>[]> 
+  std::unique_ptr<SmallVector<Solution, 4>[]>
     partialSolutions(new SmallVector<Solution, 4>[numComponents]);
   Optional<Score> PreviousBestScore = solverState->BestScore;
   for (unsigned component = 0; component != numComponents; ++component) {
-    assert(InactiveConstraints.empty() && 
+    assert(InactiveConstraints.empty() &&
            "Some constraints were not transferred?");
     ++solverState->NumComponentsSplit;
 
     // Collect the constraints for this component.
-    InactiveConstraints.splice(InactiveConstraints.end(), 
+    InactiveConstraints.splice(InactiveConstraints.end(),
                                constraintBuckets[component]);
 
     // Collect the type variables that are not part of a different
@@ -1315,7 +1315,7 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
     // component as well as already-resolved type variables.
     // FIXME: The latter could be avoided if we had already
     // substituted all of those other type variables through.
-    llvm::SmallVector<TypeVariableType *, 16> allTypeVariables 
+    llvm::SmallVector<TypeVariableType *, 16> allTypeVariables
       = std::move(TypeVariables);
     for (auto typeVar : allTypeVariables) {
       auto known = typeVarComponent.find(typeVar);
@@ -1329,16 +1329,16 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
     bool failed;
     if (TC.getLangOpts().DebugConstraintSolver) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
-      log.indent(solverState->depth * 2) << "(solving component #" 
+      log.indent(solverState->depth * 2) << "(solving component #"
                                          << component << "\n";
     }
     {
       // Introduce a scope for this partial solution.
       SolverScope scope(*this);
-      llvm::SaveAndRestore<SolverScope *> 
+      llvm::SaveAndRestore<SolverScope *>
         partialSolutionScope(solverState->PartialSolutionScope, &scope);
 
-      failed = solveSimplified(partialSolutions[component], 
+      failed = solveSimplified(partialSolutions[component],
                                allowFreeTypeVariables);
     }
 
@@ -1349,7 +1349,7 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
     if (failed) {
       if (TC.getLangOpts().DebugConstraintSolver) {
         auto &log = getASTContext().TypeCheckerDebug->getStream();
-        log.indent(solverState->depth * 2) << "failed component #" 
+        log.indent(solverState->depth * 2) << "failed component #"
                                            << component << ")\n";
       }
       
@@ -1360,7 +1360,7 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
 
     if (TC.getLangOpts().DebugConstraintSolver) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
-      log.indent(solverState->depth * 2) << "finished component #" 
+      log.indent(solverState->depth * 2) << "finished component #"
                                          << component << ")\n";
     }
     
@@ -1437,7 +1437,7 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
       if (n == 1) {
         done = true;
         break;
-      } 
+      }
 
       // Zero out the indices from here to the end.
       for (unsigned i = n-1; i != numComponents; ++i)
@@ -1540,7 +1540,7 @@ bool ConstraintSystem::solveSimplified(
 
   // If we have a binding that does not involve type variables, or we have
   // no other option, go ahead and try the bindings for this type variable.
-  if (bestBindings && 
+  if (bestBindings &&
       (disjunctions.empty() ||
        (!bestBindings.InvolvesTypeVariables && !bestBindings.FullyBound &&
         bestBindings.LiteralBinding == LiteralBindingKind::None))) {

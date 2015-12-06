@@ -597,13 +597,13 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
   return IGF.Builder.CreateBitCast(val, destType);
 }
 
-llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF, 
+llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
                                                llvm::Value *metadata,
                                                SILType selfType,
                                                bool objc) {
   // If we need to use Objective-C allocation, do so.
   if (objc) {
-    return emitObjCAllocObjectCall(IGF, metadata, 
+    return emitObjCAllocObjectCall(IGF, metadata,
                                    selfType.getSwiftRValueType());
   }
 
@@ -858,8 +858,8 @@ namespace {
       visitMembers(theClass);
 
       if (Lowering::usesObjCAllocator(theClass)) {
-        addIVarInitializer(); 
-        addIVarDestroyer(); 
+        addIVarInitializer();
+        addIVarDestroyer();
       }
     }
     
@@ -1258,7 +1258,7 @@ namespace {
     }
 
     /// Destructors need to be collected into the instance methods
-    /// list 
+    /// list
     void visitDestructorDecl(DestructorDecl *destructor) {
       auto classDecl = cast<ClassDecl>(destructor->getDeclContext());
       if (Lowering::usesObjCAllocator(classDecl) &&
@@ -1700,7 +1700,7 @@ namespace {
                                         /*constant*/ true,
                                         llvm::GlobalVariable::PrivateLinkage,
                                         init,
-                                        Twine(nameBase) 
+                                        Twine(nameBase)
                                           + getEntityName(nameBuffer)
                                           + (TheExtension
                                              ? Twine("_$_") + CategoryName.str()

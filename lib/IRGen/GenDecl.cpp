@@ -2190,7 +2190,7 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
                                      TypeMetadataAddress::AddressPoint,
                                      isPattern);
 
-  auto DbgTy = ObjCClass 
+  auto DbgTy = ObjCClass
     ? DebugTypeInfo(ObjCClass, ObjCClassPtrTy,
                     getPointerSize(), getPointerAlignment())
     : DebugTypeInfo(MetatypeType::get(concreteType),
@@ -2283,11 +2283,11 @@ Optional<llvm::Function*> IRGenModule::getAddrOfIVarInitDestroy(
                             bool isDestroyer,
                             bool isForeign,
                             ForDefinition_t forDefinition) {
-  SILDeclRef silRef(cd, 
+  SILDeclRef silRef(cd,
                     isDestroyer? SILDeclRef::Kind::IVarDestroyer
-                               : SILDeclRef::Kind::IVarInitializer, 
+                               : SILDeclRef::Kind::IVarInitializer,
                     ResilienceExpansion::Minimal,
-                    SILDeclRef::ConstructAtNaturalUncurryLevel, 
+                    SILDeclRef::ConstructAtNaturalUncurryLevel,
                     isForeign);
 
   // Find the SILFunction for the ivar initializer or destroyer.

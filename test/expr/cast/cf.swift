@@ -58,7 +58,7 @@ func testAnyObjectToCF(anyObject: AnyObject) {
 }
 
 func testUncheckableCasts(anyObject: AnyObject, nsObject: NSObject,
-                          anyObjectType: AnyObject.Type, 
+                          anyObjectType: AnyObject.Type,
                           nsObjectType: NSObject.Type) {
   if let _ = anyObject as? CFString { } // expected-error{{conditional downcast to CoreFoundation type 'CFString' will always succeed}}
   if let _ = nsObject as? CFString { } // expected-error{{conditional downcast to CoreFoundation type 'CFString' will always succeed}}

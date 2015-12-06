@@ -30,7 +30,7 @@ protocol Test2 {
 
 func test1() {
   var v1: Test
-  var s: String 
+  var s: String
   
   v1.setTitle(s)
   v1.creator = "Me"                   // expected-error {{cannot assign to property: 'creator' is a get-only property}}
@@ -283,7 +283,7 @@ struct DictionaryIntInt {
 }
 
 func testSubscripting(iis: IntIntSubscriptable, i_s: IntSubscriptable) { // expected-error{{has Self or associated type requirements}}
-  var i: Int = iis[17] 
+  var i: Int = iis[17]
   var i2 = i_s[17] // expected-error{{member 'subscript' cannot be used on value of protocol type 'IntSubscriptable'; use a generic constraint instead}}
 }
 

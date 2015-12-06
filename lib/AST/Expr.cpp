@@ -920,9 +920,9 @@ SourceLoc TupleExpr::getEndLoc() const {
 }
 
 TupleExpr::TupleExpr(SourceLoc LParenLoc, ArrayRef<Expr *> SubExprs,
-                     ArrayRef<Identifier> ElementNames, 
+                     ArrayRef<Identifier> ElementNames,
                      ArrayRef<SourceLoc> ElementNameLocs,
-                     SourceLoc RParenLoc, bool HasTrailingClosure, 
+                     SourceLoc RParenLoc, bool HasTrailingClosure,
                      bool Implicit, Type Ty)
   : Expr(ExprKind::Tuple, Implicit, Ty),
     LParenLoc(LParenLoc), RParenLoc(RParenLoc),
@@ -935,11 +935,11 @@ TupleExpr::TupleExpr(SourceLoc LParenLoc, ArrayRef<Expr *> SubExprs,
   assert(LParenLoc.isValid() == RParenLoc.isValid() &&
          "Mismatched parenthesis location information validity");
   assert(ElementNames.empty() || ElementNames.size() == SubExprs.size());
-  assert(ElementNameLocs.empty() || 
+  assert(ElementNameLocs.empty() ||
          ElementNames.size() == ElementNameLocs.size());
 
   // Copy elements.
-  memcpy(getElements().data(), SubExprs.data(), 
+  memcpy(getElements().data(), SubExprs.data(),
          SubExprs.size() * sizeof(Expr *));
 
   // Copy element names, if provided.
@@ -956,11 +956,11 @@ TupleExpr::TupleExpr(SourceLoc LParenLoc, ArrayRef<Expr *> SubExprs,
 }
 
 TupleExpr *TupleExpr::create(ASTContext &ctx,
-                             SourceLoc LParenLoc, 
+                             SourceLoc LParenLoc,
                              ArrayRef<Expr *> SubExprs,
-                             ArrayRef<Identifier> ElementNames, 
+                             ArrayRef<Identifier> ElementNames,
                              ArrayRef<SourceLoc> ElementNameLocs,
-                             SourceLoc RParenLoc, bool HasTrailingClosure, 
+                             SourceLoc RParenLoc, bool HasTrailingClosure,
                              bool Implicit, Type Ty) {
   unsigned size = sizeof(TupleExpr);
   size += SubExprs.size() * sizeof(Expr*);
@@ -971,10 +971,10 @@ TupleExpr *TupleExpr::create(ASTContext &ctx,
                              RParenLoc, HasTrailingClosure, Implicit, Ty);
 }
 
-TupleExpr *TupleExpr::createEmpty(ASTContext &ctx, SourceLoc LParenLoc, 
+TupleExpr *TupleExpr::createEmpty(ASTContext &ctx, SourceLoc LParenLoc,
                                   SourceLoc RParenLoc, bool Implicit) {
-  return create(ctx, LParenLoc, { }, { }, { }, RParenLoc, 
-                /*HasTrailingClosure=*/false, Implicit, 
+  return create(ctx, LParenLoc, { }, { }, { }, RParenLoc,
+                /*HasTrailingClosure=*/false, Implicit,
                 TupleType::getEmpty(ctx));
 }
 

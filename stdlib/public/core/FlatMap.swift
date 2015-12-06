@@ -12,7 +12,7 @@
 
 extension LazySequenceType {
   /// Returns the concatenated results of mapping `transform` over
-  /// `self`.  Equivalent to 
+  /// `self`.  Equivalent to
   ///
   ///     self.map(transform).flatten()
   ///
@@ -28,7 +28,7 @@ extension LazySequenceType {
 
 extension LazyCollectionType {
   /// Returns the concatenated results of mapping `transform` over
-  /// `self`.  Equivalent to 
+  /// `self`.  Equivalent to
   ///
   ///     self.map(transform).flatten()
   ///
@@ -47,7 +47,7 @@ extension LazyCollectionType {
 extension LazyCollectionType where Elements.Index : BidirectionalIndexType
 {
   /// Returns the concatenated results of mapping `transform` over
-  /// `self`.  Equivalent to 
+  /// `self`.  Equivalent to
   ///
   ///     self.map(transform).flatten()
   ///

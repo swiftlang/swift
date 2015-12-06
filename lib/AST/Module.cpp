@@ -432,7 +432,7 @@ VarDecl *Module::getDSOHandle() {
     file->name args;
 
 void Module::lookupValue(AccessPathTy AccessPath, DeclName Name,
-                         NLKind LookupKind, 
+                         NLKind LookupKind,
                          SmallVectorImpl<ValueDecl*> &Result) const {
   FORWARD(lookupValue, (AccessPath, Name, LookupKind, Result));
 }

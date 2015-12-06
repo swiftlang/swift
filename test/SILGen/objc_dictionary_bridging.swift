@@ -21,7 +21,7 @@ import gizmo
 
   // Bridging dictionary results
   // CHECK-LABEL: sil hidden [thunk] @_TToFC24objc_dictionary_bridging3Foo24bridge_Dictionary_result{{.*}} : $@convention(objc_method) (Foo) -> @autoreleased NSDictionary
-  func bridge_Dictionary_result() -> Dictionary<Foo, Foo> { 
+  func bridge_Dictionary_result() -> Dictionary<Foo, Foo> {
     // CHECK: bb0([[SELF:%[0-9]+]] : $Foo):
     // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC24objc_dictionary_bridging3Foo24bridge_Dictionary_result{{.*}} : $@convention(method) (@guaranteed Foo) -> @owned Dictionary<Foo, Foo>
     // CHECK-NEXT:   [[DICT:%[0-9]+]] = apply [[SWIFT_FN]]([[SELF]]) : $@convention(method) (@guaranteed Foo) -> @owned Dictionary<Foo, Foo>

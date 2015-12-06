@@ -111,7 +111,7 @@ func testOutParametersGood() {
 
 func testOutParametersBad() {
   let fridge: CCRefrigerator?
-  CCRefrigeratorCreateIndirect(fridge) // expected-error {{cannot convert value of type 'CCRefrigerator?' to expected argument type 'UnsafeMutablePointer<CCRefrigerator?>' (aka 'UnsafeMutablePointer<Optional<CCRefrigerator>>')}} 
+  CCRefrigeratorCreateIndirect(fridge) // expected-error {{cannot convert value of type 'CCRefrigerator?' to expected argument type 'UnsafeMutablePointer<CCRefrigerator?>' (aka 'UnsafeMutablePointer<Optional<CCRefrigerator>>')}}
 
   let power: CCPowerSupply?
   CCRefrigeratorGetPowerSupplyIndirect(0, power) // expected-error {{cannot convert value of type 'Int' to expected argument type 'CCRefrigerator!'}}

@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-var func5 : (fn : (Int,Int) -> ()) -> () 
+var func5 : (fn : (Int,Int) -> ()) -> ()
 
 // Default arguments for functions.
 func foo3(a a: Int = 2, b: Int = 3) {}
@@ -70,7 +70,7 @@ vi.g(f:12.5)
 func foo(x: WonkaWibble = 17) { } // expected-error{{use of undeclared type 'WonkaWibble'}}
 
 // Default arguments for initializers.
-class SomeClass2 { 
+class SomeClass2 {
   init(x: Int = 5) {}
 }
 class SomeDerivedClass2 : SomeClass2 {

@@ -473,7 +473,7 @@ public:
   /// valid.
   ///
   /// Good examples: foo.bar, baz().
-  /// Bad examples: 
+  /// Bad examples:
   bool canAppendCallParentheses() const;
 
   /// Produce a mapping from each subexpression to its parent
@@ -508,9 +508,9 @@ public:
   void *operator new(size_t Bytes) throw() = delete;
   void operator delete(void *Data) throw() = delete;
 
-  void *operator new(size_t Bytes, void *Mem) { 
-    assert(Mem); 
-    return Mem; 
+  void *operator new(size_t Bytes, void *Mem) {
+    assert(Mem);
+    return Mem;
   }
 };
 
@@ -849,7 +849,7 @@ class ObjectLiteralExpr : public LiteralExpr {
 public:
   ObjectLiteralExpr(SourceLoc LLitLoc, Identifier Name, SourceLoc NameLoc,
                     Expr *Arg, SourceLoc RLitLoc, bool implicit = false)
-    : LiteralExpr(ExprKind::ObjectLiteral, implicit), 
+    : LiteralExpr(ExprKind::ObjectLiteral, implicit),
       Name(Name), Arg(Arg), SemanticExpr(nullptr),
       LLitLoc(LLitLoc), NameLoc(NameLoc), RLitLoc(RLitLoc) {}
 
@@ -1370,7 +1370,7 @@ class DynamicSubscriptExpr : public DynamicLookupExpr {
   ConcreteDeclRef Member;
 
 public:
-  DynamicSubscriptExpr(Expr *base, Expr *index, 
+  DynamicSubscriptExpr(Expr *base, Expr *index,
                        ConcreteDeclRef member)
     : DynamicLookupExpr(ExprKind::DynamicSubscript),
       Base(base), Index(index), Member(member) { }
@@ -1408,7 +1408,7 @@ class UnresolvedMemberExpr : public Expr {
   Identifier Name;
   Expr *Argument;
 
-public:  
+public:
   UnresolvedMemberExpr(SourceLoc dotLoc, SourceLoc nameLoc,
                        Identifier name, Expr *argument)
     : Expr(ExprKind::UnresolvedMember, /*Implicit=*/false),
@@ -1623,7 +1623,7 @@ class TupleExpr : public Expr {
       return { };
 
     return { reinterpret_cast<Identifier *>(
-               getElements().data() + getNumElements()), 
+               getElements().data() + getNumElements()),
              getNumElements() };
   }
 
@@ -1633,28 +1633,28 @@ class TupleExpr : public Expr {
       return { };
     
     return { reinterpret_cast<SourceLoc *>(
-               getElementNamesBuffer().data() + getNumElements()), 
+               getElementNamesBuffer().data() + getNumElements()),
              getNumElements() };
   }
 
   TupleExpr(SourceLoc LParenLoc, ArrayRef<Expr *> SubExprs,
-            ArrayRef<Identifier> ElementNames, 
+            ArrayRef<Identifier> ElementNames,
             ArrayRef<SourceLoc> ElementNameLocs,
-            SourceLoc RParenLoc, bool HasTrailingClosure, bool Implicit, 
+            SourceLoc RParenLoc, bool HasTrailingClosure, bool Implicit,
             Type Ty);
 
 public:
   /// Create a tuple.
   static TupleExpr *create(ASTContext &ctx,
-                           SourceLoc LParenLoc, 
+                           SourceLoc LParenLoc,
                            ArrayRef<Expr *> SubExprs,
-                           ArrayRef<Identifier> ElementNames, 
+                           ArrayRef<Identifier> ElementNames,
                            ArrayRef<SourceLoc> ElementNameLocs,
-                           SourceLoc RParenLoc, bool HasTrailingClosure, 
+                           SourceLoc RParenLoc, bool HasTrailingClosure,
                            bool Implicit, Type Ty = Type());
 
   /// Create an empty tuple.
-  static TupleExpr *createEmpty(ASTContext &ctx, SourceLoc LParenLoc, 
+  static TupleExpr *createEmpty(ASTContext &ctx, SourceLoc LParenLoc,
                                 SourceLoc RParenLoc, bool Implicit);
 
   /// Create an implicit tuple with no source information.
@@ -1690,12 +1690,12 @@ public:
   }
 
   /// Whether this tuple has element names.
-  bool hasElementNames() const { 
+  bool hasElementNames() const {
     return TupleExprBits.HasElementNames;
   }
 
   /// Retrieve the element names for a tuple.
-  ArrayRef<Identifier> getElementNames() const { 
+  ArrayRef<Identifier> getElementNames() const {
     if (!hasElementNames())
       return { };
 
@@ -1710,7 +1710,7 @@ public:
   }
   
   /// Whether this tuple has element name locations.
-  bool hasElementNameLocs() const { 
+  bool hasElementNameLocs() const {
     return TupleExprBits.HasElementNameLocations;
   }
 
@@ -1720,7 +1720,7 @@ public:
       return { };
 
     return { reinterpret_cast<const SourceLoc *>(
-               getElementNames().data() + getNumElements()), 
+               getElementNames().data() + getNumElements()),
              getNumElements() };
   }
 
@@ -2006,7 +2006,7 @@ public:
   void setBase(Expr *e) { SubExpr = e; }
 
   unsigned getFieldNumber() const { return FieldNo; }
-  SourceLoc getNameLoc() const { return NameLoc; }  
+  SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getDotLoc() const { return DotLoc; }
   
   SourceLoc getStartLoc() const { return getBase()->getStartLoc(); }
@@ -2055,11 +2055,11 @@ public:
   SourceLoc getEndLoc() const {
     return (QuestionLoc.isInvalid() ? SubExpr->getEndLoc() : QuestionLoc);
   }
-  SourceLoc getLoc() const { 
+  SourceLoc getLoc() const {
     if (isImplicit())
       return SubExpr->getLoc();
 
-    return getQuestionLoc(); 
+    return getQuestionLoc();
   }
   SourceLoc getQuestionLoc() const { return QuestionLoc; }
 
@@ -2162,7 +2162,7 @@ public:
                       OpaqueValueExpr *opaqueValue,
                       Expr *subExpr)
     : Expr(ExprKind::OpenExistential, /*Implicit=*/ true, subExpr->getType()),
-      ExistentialValue(existentialValue), OpaqueValue(opaqueValue), 
+      ExistentialValue(existentialValue), OpaqueValue(opaqueValue),
       SubExpr(subExpr) { }
 
   SWIFT_FORWARD_SOURCE_LOCS_TO(SubExpr)
@@ -2384,7 +2384,7 @@ private:
   MutableArrayRef<Expr *> CallerDefaultArgs;
 
 public:
-  TupleShuffleExpr(Expr *subExpr, ArrayRef<int> elementMapping, 
+  TupleShuffleExpr(Expr *subExpr, ArrayRef<int> elementMapping,
                    SourceIsScalar_t isSourceScalar,
                    ConcreteDeclRef defaultArgsOwner,
                    ArrayRef<unsigned> VariadicArgs,
@@ -3143,7 +3143,7 @@ public:
   SourceRange getSourceRange() const { return Loc; }
   
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::OpaqueValue; 
+    return E->getKind() == ExprKind::OpaqueValue;
   }
 };
 
@@ -3224,8 +3224,8 @@ public:
     return (argLoc.isValid() ? argLoc : getFn()->getEndLoc());
   }
   
-  SourceLoc getLoc() const { 
-    SourceLoc FnLoc = getFn()->getLoc(); 
+  SourceLoc getLoc() const {
+    SourceLoc FnLoc = getFn()->getLoc();
     return FnLoc.isValid() ? FnLoc : getArg()->getLoc();
   }
   
@@ -3653,7 +3653,7 @@ class AssignExpr : public Expr {
   Expr *Src;
   SourceLoc EqualLoc;
 
-public:  
+public:
   AssignExpr(Expr *Dest, SourceLoc EqualLoc, Expr *Src, bool Implicit)
     : Expr(ExprKind::Assign, Implicit),
       Dest(Dest), Src(Src), EqualLoc(EqualLoc) {}

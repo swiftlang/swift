@@ -693,7 +693,7 @@ public:
       if (unsigned N = VDI->getVarInfo().getArgNo())
         *this << ", argno: " << N;
     }
-  }  
+  }
 
   void visitAllocStackInst(AllocStackInst *AVI) {
     *this << "alloc_stack " << AVI->getElementType();
@@ -1634,7 +1634,7 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose,
 /// Pretty-print the SILFunction's name using SIL syntax,
 /// '@function_mangled_name'.
 void SILFunction::printName(raw_ostream &OS) const {
-  OS << "@" << Name;  
+  OS << "@" << Name;
 }
 
 /// Pretty-print a global variable to the designated stream.

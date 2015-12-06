@@ -141,7 +141,7 @@ extern "C" void swift_reportFatalError(const char *prefix,
 }
 
 // Report a call to an unimplemented initializer.
-// <file>: <line>: <column>: fatal error: use of unimplemented 
+// <file>: <line>: <column>: fatal error: use of unimplemented
 // initializer '<initName>' for class 'className'
 extern "C" void swift_reportUnimplementedInitializerInFile(
     const char *className, intptr_t classNameLength, const char *initName,

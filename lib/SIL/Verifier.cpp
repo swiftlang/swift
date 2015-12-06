@@ -1760,7 +1760,7 @@ public:
 
     CanType operandInstTy =
       operandType.castTo<ExistentialMetatypeType>().getInstanceType();
-    CanType resultInstTy = 
+    CanType resultInstTy =
       resultType.castTo<MetatypeType>().getInstanceType();
 
     while (auto operandMetatype =
@@ -2398,8 +2398,8 @@ public:
             "switch_value operand should be either of an integer "
             "or function type");
 
-    auto ult = [](const SILValue &a, const SILValue &b) { 
-      return a == b || a < b; 
+    auto ult = [](const SILValue &a, const SILValue &b) {
+      return a == b || a < b;
     };
 
     std::set<SILValue, decltype(ult)> cases(ult);

@@ -79,7 +79,7 @@ extension Int : _ObjectiveCBridgeable {
     return NSNumber()
   }
   public static func _forceBridgeFromObjectiveC(
-    x: NSNumber, 
+    x: NSNumber,
     inout result: Int?
   ) {
   }

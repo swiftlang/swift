@@ -1498,7 +1498,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createSelectValue(Loc, Cond, ResultTy,
                                           DefaultVal, CaseValuesAndResults);
     break;
-  }  
+  }
   case ValueKind::EnumInst: {
     // Format: a type, an operand and a decl ID. Use SILTwoOperandsLayout: type,
     // (DeclID + hasOperand), and an operand.

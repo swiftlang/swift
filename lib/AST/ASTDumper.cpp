@@ -261,7 +261,7 @@ namespace {
     }
     
     void visitIsPattern(IsPattern *P) {
-      printCommon(P, "pattern_is") 
+      printCommon(P, "pattern_is")
         << ' ' << getCheckedCastKindName(P->getCastKind()) << ' ';
       P->getCastTypeLoc().getType().print(OS);
       if (auto sub = P->getSubPattern()) {
@@ -1438,7 +1438,7 @@ public:
   }
 
   void visitBooleanLiteralExpr(BooleanLiteralExpr *E) {
-    printCommon(E, "boolean_literal_expr") 
+    printCommon(E, "boolean_literal_expr")
       << " value=" << (E->getValue() ? "true" : "false")
       << ')';
   }
@@ -2595,7 +2595,7 @@ namespace {
         OS << "=";
         OS << nestedType.first.str() << " ";
         if (!nestedType.second) {
-          PrintWithColorRAII(OS, TypeColor) << "unresolved";          
+          PrintWithColorRAII(OS, TypeColor) << "unresolved";
         } else if (auto concrete = nestedType.second.getAsConcreteType()) {
           PrintWithColorRAII(OS, TypeColor) << "concrete";
           OS << "=" << concrete.getString();

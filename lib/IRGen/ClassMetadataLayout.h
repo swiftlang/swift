@@ -199,10 +199,10 @@ private:
     else {
       auto ctor = cast<ConstructorDecl>(fn);
       if (ctor->isRequired())
-        maybeAddMethod(fn, SILDeclRef::Kind::Allocator, explosionLevel, 
+        maybeAddMethod(fn, SILDeclRef::Kind::Allocator, explosionLevel,
                        uncurryLevel);
-      maybeAddMethod(fn, SILDeclRef::Kind::Initializer, explosionLevel, 
-                     uncurryLevel);      
+      maybeAddMethod(fn, SILDeclRef::Kind::Initializer, explosionLevel,
+                     uncurryLevel);
     }
   }
 

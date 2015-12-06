@@ -56,7 +56,7 @@ protocol k : k {
 class k<f : l, q : l p f.q == q> {
 }
 protocol l {
-    j q 
+    j q
     j o
 }
 struct n<r : l>

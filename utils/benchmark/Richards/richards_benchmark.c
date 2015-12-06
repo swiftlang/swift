@@ -1,7 +1,7 @@
 
-/*  C version of the systems programming language benchmark 
-**  Author:  M. J. Jordan  Cambridge Computer Laboratory. 
-**  
+/*  C version of the systems programming language benchmark
+**  Author:  M. J. Jordan  Cambridge Computer Laboratory.
+**
 **  Modified by:  M. Richards, Nov 1996
 **    to be ANSI C and runnable on 64 bit machines + other minor changes
 **  Modified by:  M. Richards, 20 Oct 1998

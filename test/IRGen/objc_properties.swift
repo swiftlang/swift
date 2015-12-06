@@ -23,7 +23,7 @@
 
   @objc(wobble) var wibble : SomeObject
 
-  init() { 
+  init() {
     bareIvar = SomeObject()
     wibble  = SomeObject()
   }

@@ -889,7 +889,7 @@ StringTests.test(
   "forall x: Int8, y: Int8 . x < 128 ==> x <ascii y == x <unicode y") {
   let asciiDomain = (0..<128).map({ String(UnicodeScalar($0)) })
   expectEqualMethodsForDomain(
-    asciiDomain, asciiDomain, 
+    asciiDomain, asciiDomain,
     String._compareDeterministicUnicodeCollation, String._compareASCII)
 }
 

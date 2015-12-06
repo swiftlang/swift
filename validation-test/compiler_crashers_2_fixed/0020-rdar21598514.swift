@@ -192,7 +192,7 @@ extension LoggingCollectionType {
   subscript(_prext_bounds: Range<Base.Index>) -> Base._prext_SubSequence {
     ++CollectionLog.subscriptRange[selfType]
     return base[_prext_bounds]
-  }    
+  }
 
   var isEmpty: Bool {
     ++CollectionLog.isEmpty[selfType]

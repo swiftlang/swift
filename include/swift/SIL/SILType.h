@@ -597,7 +597,7 @@ inline SILType SILResultInfo::getSILType() const {
 inline SILType SILFunctionType::getSemanticResultSILType() const {
   return (hasIndirectResult() ? getIndirectResult().getSILType()
                               : getResult().getSILType());
-}  
+}
   
 inline SILType SILBlockStorageType::getCaptureAddressType() const {
   return SILType::getPrimitiveAddressType(getCaptureType());

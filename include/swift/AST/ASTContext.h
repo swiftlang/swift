@@ -204,7 +204,7 @@ public:
 
   // FIXME: Once DenseMap learns about move semantics, use std::unique_ptr
   // and remove the explicit delete loop in the destructor.
-  typedef llvm::DenseMap<std::pair<CanType, ProtocolDecl *>, 
+  typedef llvm::DenseMap<std::pair<CanType, ProtocolDecl *>,
                          ConformanceEntry> ConformsToMap;
   
   /// \brief The list of external definitions imported by this context.
@@ -559,7 +559,7 @@ public:
   ///
   /// Note that this routine is only usable when a constraint system
   /// is active.
-  Type getTypeVariableMemberType(TypeVariableType *baseTypeVar, 
+  Type getTypeVariableMemberType(TypeVariableType *baseTypeVar,
                                  AssociatedTypeDecl *assocType);
 
   /// Adds a search path to SearchPathOpts, unless it is already present.

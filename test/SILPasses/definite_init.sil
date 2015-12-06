@@ -337,7 +337,7 @@ bb0:
 
 
 struct ContainsNativeObject {
-  var x : Int 
+  var x : Int
   var y : Builtin.NativeObject
 }
 
@@ -467,7 +467,7 @@ entry(%a : $*C):
 
 // CHECK-LABEL: sil @conditional_init
 // This test checks conditional destruction logic.  Because the value is only
-// initialized on some paths, we need to either hoist up the destroy_addr or 
+// initialized on some paths, we need to either hoist up the destroy_addr or
 // emit a boolean control value to make sure the value is only destroyed if
 //  actually initialized.
 sil @conditional_init : $@convention(thin) (Bool) -> () {
@@ -597,7 +597,7 @@ bb0(%0 : $RootClassWithIVars, %1 : $Int):
 // CHECK-LABEL: sil @rootclass_test3
 sil @rootclass_test3 : $@convention(method) (@owned RootClassWithIVars, Int) -> @owned RootClassWithIVars {
 bb0(%0 : $RootClassWithIVars, %1 : $Int):
-  %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars  
+  %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars
 
   %11 = ref_element_addr %3 : $RootClassWithIVars, #RootClassWithIVars.y
   assign %1 to %11 : $*Int
@@ -661,7 +661,7 @@ bb0(%0 : $DerivedClassWithIVars):
   return %18 : $DerivedClassWithIVars
 }
 
-struct MyStruct : P {} 
+struct MyStruct : P {}
 
 //CHECK-LABEL: @self_init_assert_instruction
 //CHECK:  apply
@@ -879,7 +879,7 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
   %4 = mark_uninitialized [delegatingself] %2#1 : $*DerivedClassWithNontrivialStoredProperties
   store %0 to %4 : $*DerivedClassWithNontrivialStoredProperties
 
-  destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties 
+  destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties
   dealloc_stack %2#0 : $*@local_storage DerivedClassWithNontrivialStoredProperties
 
   %13 = tuple ()

@@ -4,5 +4,5 @@
 @end
 
 int UIApplicationMain(int argc, char **argv,
-                      NSString *principalClassName, 
+                      NSString *principalClassName,
                       NSString *delegateClassName);

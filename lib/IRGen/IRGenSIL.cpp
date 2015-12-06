@@ -184,7 +184,7 @@ public:
   
   LoweredValue(LoweredValue &&lv)
     : kind(lv.kind)
-  {    
+  {
     switch (kind) {
     case Kind::Address:
     case Kind::UnallocatedAddressInBuffer:
@@ -887,7 +887,7 @@ static ArrayRef<SILArgument*> emitEntryPointIndirectReturn(
       IGF.IndirectReturn = retTI.getAddressForPointer(params.claimNext());
     }
     return entry->getBBArgs();
-  }  
+  }
 }
 
 /// Emit a direct parameter that was passed under a C-based CC.
@@ -1743,7 +1743,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
     return emission;
   }
       
-  case LoweredValue::Kind::Explosion: {    
+  case LoweredValue::Kind::Explosion: {
     switch (origCalleeType->getRepresentation()) {
     case SILFunctionType::Representation::Block: {
       assert(!selfValue && "block function with self?");
@@ -1855,7 +1855,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     }
   }
 
-  Explosion llArgs;    
+  Explosion llArgs;
   CallEmission emission =
     getCallEmissionForLoweredValue(*this, origCalleeType, substCalleeType,
                                    calleeLV, selfValue, llArgs,
@@ -3514,7 +3514,7 @@ static bool isStructurallySame(const llvm::Type *T1, const llvm::Type *T2) {
 }
 
 // Emit a trap in the event a type does not match expected layout constraints.
-// 
+//
 // We can hit this case in specialized functions even for correct user code.
 // If the user dynamically checks for correct type sizes in the generic
 // function, a specialized function can contain the (not executed) bitcast
@@ -3698,7 +3698,7 @@ void IRGenSILFunction::visitObjCToThickMetatypeInst(
   Explosion to;
   auto metadata = emitObjCMetadataRefForMetadata(*this, classPtr);
   to.add(metadata);
-  setLoweredExplosion(SILValue(i, 0), to);  
+  setLoweredExplosion(SILValue(i, 0), to);
 }
 
 /// Emit a checked cast sequence. Returns an Address; this may be either

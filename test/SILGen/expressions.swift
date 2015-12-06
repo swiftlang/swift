@@ -15,7 +15,7 @@ struct SillyString : _BuiltinStringLiteralConvertible, StringLiteralConvertible 
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
     byteSize: Builtin.Word,
     isASCII: Builtin.Int1
-  ) { 
+  ) {
   }
 
   init(extendedGraphemeClusterLiteral value: SillyString) { }
@@ -23,7 +23,7 @@ struct SillyString : _BuiltinStringLiteralConvertible, StringLiteralConvertible 
   init(
     _builtinStringLiteral start: Builtin.RawPointer,
     byteSize: Builtin.Word,
-    isASCII: Builtin.Int1) { 
+    isASCII: Builtin.Int1) {
   }
 
   init(stringLiteral value: SillyString) { }
@@ -38,7 +38,7 @@ struct SillyUTF16String : _BuiltinUTF16StringLiteralConvertible, StringLiteralCo
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
     byteSize: Builtin.Word,
     isASCII: Builtin.Int1
-  ) { 
+  ) {
   }
 
   init(extendedGraphemeClusterLiteral value: SillyString) { }
@@ -52,7 +52,7 @@ struct SillyUTF16String : _BuiltinUTF16StringLiteralConvertible, StringLiteralCo
   init(
     _builtinUTF16StringLiteral start: Builtin.RawPointer,
     numberOfCodeUnits: Builtin.Word
-  ) { 
+  ) {
   }
 
   init(stringLiteral value: SillyUTF16String) { }

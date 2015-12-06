@@ -842,7 +842,7 @@ bool SILParser::parseSILTypeWithoutQualifiers(SILType &Result,
   // function body; otherwise, they are visible when parsing the type.
   Optional<Scope> GenericsScope;
   if (!IsFuncDecl)
-    GenericsScope.emplace(&P, ScopeKind::Generics); 
+    GenericsScope.emplace(&P, ScopeKind::Generics);
 
   ParserResult<TypeRepr> TyR = P.parseType(diag::expected_sil_type);
 
@@ -1695,7 +1695,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     (void)error;
     
     if (Negative)
-      value = -value; 
+      value = -value;
     if (value.getBitWidth() != intTy->getGreatestWidth())
       value = value.zextOrTrunc(intTy->getGreatestWidth());
     
@@ -2180,7 +2180,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (Opcode == ValueKind::UnconditionalCheckedCastInst) {
       ResultVal = B.createUnconditionalCheckedCast(InstLoc, Val, ty);
       break;
-    }    
+    }
     // The conditional cast still needs its branch destinations.
     Identifier successBBName, failureBBName;
     SourceLoc successBBLoc, failureBBLoc;

@@ -159,7 +159,7 @@ endmacro()
 # Usage:
 #   add_sourcekit_executable(name     # Name of the executable
 #     [DEPENDS dep1 ...]              # Libraries this executable depends on
-#     [COMPONENT_DEPENDS comp1 ...]   # LLVM components this executable 
+#     [COMPONENT_DEPENDS comp1 ...]   # LLVM components this executable
 #                                     # depends on
 #     [EXCLUDE_FROM_ALL]              # Whether to exclude this executable from
 #                                     # the ALL_BUILD target
@@ -257,7 +257,7 @@ macro(add_sourcekit_framework name)
   swift_common_llvm_config( ${name} ${SOURCEKITFW_COMPONENT_DEPENDS} )
 
   if (EXPORTED_SYMBOL_FILE)
-    add_sourcekit_symbol_exports( ${name} ${EXPORTED_SYMBOL_FILE} ) 
+    add_sourcekit_symbol_exports( ${name} ${EXPORTED_SYMBOL_FILE} )
   endif()
 
   if(SOURCEKITFW_MODULEMAP)
@@ -338,8 +338,8 @@ macro(add_sourcekit_xpc_service name framework_target)
     set(xpc_bin_dir "${xpc_contents_dir}")
   endif()
 
-  set(XPCSERVICE_NAME ${name})  
-  set(XPCSERVICE_IDENTIFIER "com.apple.${name}")  
+  set(XPCSERVICE_NAME ${name})
+  set(XPCSERVICE_IDENTIFIER "com.apple.${name}")
   set(XPCSERVICE_BUNDLE_VERSION "${SOURCEKIT_VERSION_STRING}")
   set(XPCSERVICE_SHORT_VERSION_STRING "1.0")
   configure_file(
@@ -400,7 +400,7 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   endif()
 
   # Choose a deployment target if none was set.
-  set(SOURCEKIT_DEPLOYMENT_TARGET "" CACHE STRING 
+  set(SOURCEKIT_DEPLOYMENT_TARGET "" CACHE STRING
       "Deployment target for SourceKit.")
   if (NOT SOURCEKIT_DEPLOYMENT_TARGET)
     execute_process(COMMAND sw_vers -productVersion
@@ -440,7 +440,7 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   # Add deployment target to C/C++ compiler and linker flags.
   # FIXME: CMAKE_OSX_DEPLOYMENT_TARGET falls over when used for iOS versions.
   if (XCODE)
-    if (${SOURCEKIT_DEPLOYMENT_OS} MATCHES "^macosx") 
+    if (${SOURCEKIT_DEPLOYMENT_OS} MATCHES "^macosx")
       set(CMAKE_XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET ${SOURCEKIT_DEPLOYMENT_TARGET})
     else()
       set(CMAKE_XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET ${SOURCEKIT_DEPLOYMENT_TARGET})

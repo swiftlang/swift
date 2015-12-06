@@ -56,7 +56,7 @@ func s<v : m u v.v == v> (m: v) {
 s( {
     ({})
 }
-t 
+t
 func c<g>() -> (g, g -> g) -> g {
    d b d.f = {
 }

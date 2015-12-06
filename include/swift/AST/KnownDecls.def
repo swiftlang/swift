@@ -26,9 +26,9 @@ FUNC_DECL(DictionaryUpCast, "_dictionaryUpCast")
 FUNC_DECL(DictionaryBridgeToObjectiveC, "_dictionaryBridgeToObjectiveC")
 FUNC_DECL(DictionaryDownCast, "_dictionaryDownCast")
 FUNC_DECL(DictionaryDownCastConditional, "_dictionaryDownCastConditional")
-FUNC_DECL(DictionaryBridgeFromObjectiveC, 
+FUNC_DECL(DictionaryBridgeFromObjectiveC,
           "_dictionaryBridgeFromObjectiveC")
-FUNC_DECL(DictionaryBridgeFromObjectiveCConditional, 
+FUNC_DECL(DictionaryBridgeFromObjectiveCConditional,
           "_dictionaryBridgeFromObjectiveCConditional")
 
 FUNC_DECL(SetUpCast, "_setUpCast")

@@ -9,7 +9,7 @@ class A {
 
   @objc init(prop: Int) { self.prop = prop } // expected-note{{initializer 'init(prop:)' declared here}}
 
-  @objc subscript (i: Int) -> AnyObject { 
+  @objc subscript (i: Int) -> AnyObject {
     get { return self }
     set { } // expected-note{{subscript setter declared here}}
   }
@@ -18,7 +18,7 @@ class A {
 class B : A {
   var x: Int
 
-  init(x: Int) { 
+  init(x: Int) {
     self.x = x
     super.init(prop: x)
   }

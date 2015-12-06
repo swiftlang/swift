@@ -16,7 +16,7 @@
 
 %{
 integerBinaryOps = [
-   (x[:-1], x[-1], x[:-1].capitalize(), 'a result') 
+   (x[:-1], x[-1], x[:-1].capitalize(), 'a result')
     for x in 'add+ subtract- multiply* divide/'.split()
 ] + [ ('remainder', '%', 'Divide', 'the remainder') ]
 }%

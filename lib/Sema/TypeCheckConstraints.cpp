@@ -148,7 +148,7 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
     // Record this match.
     sources[i] = matched;
     consumed[matched] = true;
-  }  
+  }
 
   // Resolve any unmatched elements.
   unsigned fromNext = 0, fromLast = fromTuple.size();
@@ -1363,7 +1363,7 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
   }
 
   // Apply the solution to the expression.
-  auto result = cs.applySolutionShallow(solution, expr, 
+  auto result = cs.applySolutionShallow(solution, expr,
                                         /*suppressDiagnostics=*/false);
   if (!result) {
     // Failure already diagnosed, above, as part of applying the solution.

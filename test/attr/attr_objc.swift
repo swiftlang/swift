@@ -29,11 +29,11 @@ protocol Protocol_Class2 : class {}
 
 @objc extension PlainClass { } // expected-error{{@objc cannot be applied to this declaration}}{{1-7=}}
 
-@objc  
+@objc
 var subject_globalVar: Int // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
 
 var subject_getterSetter: Int {
-  @objc 
+  @objc
   get { // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
     return 0
   }
@@ -43,10 +43,10 @@ var subject_getterSetter: Int {
 }
 
 var subject_global_observingAccesorsVar1: Int = 0 {
-  @objc 
+  @objc
   willSet { // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
   }
-  @objc 
+  @objc
   didSet { // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
   }
 }
@@ -197,7 +197,7 @@ enum subject_enum: Int {
   @objc   // expected-error {{@objc cannot be applied to this declaration}} {{3-9=}}
   case subject_enumElement1
 
-  @objc   
+  @objc
   init() {} // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
 
   @objc
@@ -1348,7 +1348,7 @@ class infer_instanceVar1 {
   var var_ArrayType4: [AnyObject -> AnyObject] // no-error
   // CHECK-LABEL: {{^}}  var var_ArrayType4: [AnyObject -> AnyObject]
 
-  @objc var var_ArrayType4_: [AnyObject -> AnyObject] 
+  @objc var var_ArrayType4_: [AnyObject -> AnyObject]
   // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
   var var_ArrayType5: [Protocol_ObjC1]
@@ -1719,7 +1719,7 @@ class Class_ObjC2 {
 }
 
 @objc() // expected-error{{expected name within parentheses of @objc attribute}}
-class Class_ObjC3 { 
+class Class_ObjC3 {
 }
 
 // @objc with selector names

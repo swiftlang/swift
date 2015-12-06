@@ -64,7 +64,7 @@ The First Parameter
     aPosition.distance\ **To**\ (otherPosition)
 
     // we're not "indexing x"
-    if let position = aSet.index\ **Of**\ (x) { ... } 
+    if let position = aSet.index\ **Of**\ (x) { ... }
 
 * Argument labels are used on first parameters to denote special
   cases:
@@ -72,13 +72,13 @@ The First Parameter
   .. parsed-literal::
 
     // Normal case: result has same value as argument (traps on overflow)
-    Int(aUInt)                           
+    Int(aUInt)
 
     // Special: interprets the sign bit as a high bit, changes value
-    Int(**bitPattern**: aUInt)               
+    Int(**bitPattern**: aUInt)
 
     // Special: keeps only the bits that fit, losing information
-    Int32(**truncatingBitPattern**: anInt64) 
+    Int32(**truncatingBitPattern**: anInt64)
 
 Subsequent Parameters
 ---------------------
@@ -169,7 +169,7 @@ library, but are compatible with the Cocoa guidelines.
     /// Complexity: O(\`count\`)
     mutating func reserveCapacity(**minimumCapacity**: Int)
     
-* Type parameter names of generic types describe the role of the 
+* Type parameter names of generic types describe the role of the
   parameter, e.g.
   
   .. parsed-literal::
@@ -208,7 +208,7 @@ Prefixes and Suffixes
 * `Any` is used as a prefix to denote “type erasure,”
   e.g. `AnySequence<T>` wraps any sequence with element type `T`,
   conforms to `SequenceType` itself, and forwards all operations to the
-  wrapped sequence.  When handling the wrapper, the specific type of 
+  wrapped sequence.  When handling the wrapper, the specific type of
   the wrapped sequence is fully hidden.
 
 * `Custom` is used as a prefix for special protocols that will always

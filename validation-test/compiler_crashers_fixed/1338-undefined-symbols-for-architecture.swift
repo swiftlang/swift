@@ -8,7 +8,7 @@
 
 import Foundation
 @objc protocol A {
-   var a : String { get } 
+   var a : String { get }
 }
 class B : A {
     @NSManaged var a : String

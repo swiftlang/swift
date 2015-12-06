@@ -30,4 +30,4 @@ protocol P {
     func f<T>()(T) -> T
 }
 protocol A {
-    type 
+    type

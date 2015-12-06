@@ -93,7 +93,7 @@ public:
   /// \param DWARFMangling - use the 'Qq' mangling format for
   /// archetypes and the 'a' mangling for alias types.
   /// \param usePunycode - emit modified Punycode instead of UTF-8.
-  Mangler(raw_ostream &buffer, bool DWARFMangling = false, 
+  Mangler(raw_ostream &buffer, bool DWARFMangling = false,
           bool usePunycode = true)
     : Buffer(buffer), DWARFMangling(DWARFMangling), UsePunycode(usePunycode) {}
   void mangleContextOf(const ValueDecl *decl, BindGenerics shouldBind);

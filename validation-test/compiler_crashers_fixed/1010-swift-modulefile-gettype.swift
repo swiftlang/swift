@@ -15,4 +15,4 @@ let v: Array) {
 }
 f<h = A, object2)
 protocol B : b {
-func b(t: 
+func b(t:

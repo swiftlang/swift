@@ -58,7 +58,7 @@ struct GZ<T> {
   var i : T
   func getI() -> T { return i }
 
-  func f1<U>(a: T, b: U) -> (T, U) { 
+  func f1<U>(a: T, b: U) -> (T, U) {
     return (a, b)
   }
   

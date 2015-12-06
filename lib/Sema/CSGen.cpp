@@ -2606,14 +2606,14 @@ namespace {
     llvm::DenseMap<Expr *, Expr *> ParentMap;
 
   public:
-    ArgumentLabelWalker(ConstraintSystem &cs, Expr *expr) 
+    ArgumentLabelWalker(ConstraintSystem &cs, Expr *expr)
       : CS(cs), ParentMap(expr->getParentMap()) { }
 
     void associateArgumentLabels(Expr *arg, ArrayRef<Identifier> labels,
                                  bool labelsArePermanent) {
       // Our parent must be a call.
       auto call = dyn_cast_or_null<CallExpr>(ParentMap[arg]);
-      if (!call) 
+      if (!call)
         return;
 
       // We must have originated at the call argument.
@@ -2650,7 +2650,7 @@ namespace {
           associateArgumentLabels(expr, tuple->getElementNames(), true);
         else {
           llvm::SmallVector<Identifier, 4> names(tuple->getNumElements(),
-                                                 Identifier()); 
+                                                 Identifier());
           associateArgumentLabels(expr, names, false);
         }
       } else if (auto paren = dyn_cast<ParenExpr>(expr)) {

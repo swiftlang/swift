@@ -65,7 +65,7 @@ SILInstruction *SILBuilder::createUncheckedBitCast(SILLocation Loc,
         createSILDebugLocation(Loc), Op, Ty));
 
   if (auto refCast = tryCreateUncheckedRefCast(Loc, Op, Ty))
-    return refCast;  
+    return refCast;
 
   // The destination type is nontrivial, and may be smaller than the source
   // type, so RC identity cannot be assumed.

@@ -115,7 +115,7 @@ variables marked ``[clone]``::
 
   class Foo : Clonable {
       var count : Int
-      var [clone] myValue : FooValue 
+      var [clone] myValue : FooValue
       var somethingIJustReferTo : Bar
   }
 
@@ -130,7 +130,7 @@ initialization, assignment, or function argument passing), even as
 part of a larger ``struct``, its ``[clone]`` member is ``clone()``\ d.
 Because ``Foo`` itself has a ``[clone]`` member, that is ``clone()``\ d
 also.  Therefore copying a ``Baz`` object ``clone()``\ s a ``Foo`` and
-``clone()``\ ing a ``Foo`` ``clone()``\ s a ``FooValue``.  
+``clone()``\ ing a ``Foo`` ``clone()``\ s a ``FooValue``.
 
 All ``struct``\ s are ``Clonable`` by default, with ``clone()`` delivering
 ordinary copy semantics.  Therefore, ::

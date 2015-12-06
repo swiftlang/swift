@@ -1219,7 +1219,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       } else {
         // Otherwise, the closure implicitly forms a call.
         Expr *arg = createArgWithTrailingClosure(Context, SourceLoc(), { },
-                                                 { }, { }, SourceLoc(), 
+                                                 { }, { }, SourceLoc(),
                                                  closure.get());
         Result = makeParserResult(
             ParserStatus(closure),
@@ -1245,7 +1245,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 
     // Check for a ! suffix.
     if (consumeIf(tok::exclaim_postfix)) {
-      Result = makeParserResult(new (Context) ForceValueExpr(Result.get(), 
+      Result = makeParserResult(new (Context) ForceValueExpr(Result.get(),
                                                              TokLoc));
       continue;
     }
@@ -2033,7 +2033,7 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
                                                    DeclRefKind::Ordinary,
                                                    Loc);
     } else {
-      ParserResult<Expr> ParsedSubExpr 
+      ParserResult<Expr> ParsedSubExpr
         = parseExpr(diag::expected_expr_in_expr_list);
       SubExpr = ParsedSubExpr.getPtrOrNull();
       Status = ParsedSubExpr;

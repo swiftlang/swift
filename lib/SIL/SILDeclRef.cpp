@@ -88,7 +88,7 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
                        ResilienceExpansion expansion,
-                       unsigned atUncurryLevel, bool asForeign) 
+                       unsigned atUncurryLevel, bool asForeign)
  : isDirectReference(0), defaultArgIndex(0)
 {
   unsigned naturalUncurryLevel;
@@ -146,7 +146,7 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
     : atUncurryLevel;
   Expansion = (unsigned) expansion;
   
-  isCurried = uncurryLevel != naturalUncurryLevel;  
+  isCurried = uncurryLevel != naturalUncurryLevel;
   isForeign = asForeign;
 }
 
@@ -235,7 +235,7 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   
   // Native function-local declarations have local linkage.
   // FIXME: @objc declarations should be too, but we currently have no way
-  // of marking them "used" other than making them external. 
+  // of marking them "used" other than making them external.
   ValueDecl *d = getDecl();
   DeclContext *moduleContext = d->getDeclContext();
   while (!moduleContext->isModuleScopeContext()) {

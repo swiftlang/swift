@@ -16,7 +16,7 @@ func testUnreachableAfterIfReturn(a: Bool) -> Int {
 }
 
 func testUnreachableForAfterContinue(b: Bool) {
-  for (var i:Int = 0; i<10; i++) { 
+  for (var i:Int = 0; i<10; i++) {
     var y: Int = 300;
     y++;
     if b {
@@ -30,7 +30,7 @@ func testUnreachableForAfterContinue(b: Bool) {
 
 func testUnreachableWhileAfterContinue(b: Bool) {
   var i:Int = 0;
-  while (i<10) { 
+  while (i<10) {
     var y: Int = 300;
     y++;
     if b {

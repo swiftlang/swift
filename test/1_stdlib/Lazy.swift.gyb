@@ -495,7 +495,7 @@ tests.test("LazyMapSequence") {
   
   expectType(
     LazyMapSequence<
-      MinimalSequence<OpaqueValue<Int>>, 
+      MinimalSequence<OpaqueValue<Int>>,
       OpaqueValue<Double>>.self,
     &mapped)
   
@@ -536,7 +536,7 @@ tests.test("LazyMapCollection/${traversal}") {
   
   expectType(
     LazyMapCollection<
-      Minimal${traversal}Collection<OpaqueValue<Int>>, 
+      Minimal${traversal}Collection<OpaqueValue<Int>>,
       OpaqueValue<Double>>.self,
     &mapped)
   
@@ -668,7 +668,7 @@ tests.test("ReverseCollection/Lazy") {
 // the first selects even numbers and the second selects odd numbers,
 // both from an underlying sequence of whole numbers.
 func checkFilterGeneratorBase<
-  S : SequenceType, T : GeneratorType 
+  S : SequenceType, T : GeneratorType
     where S.Generator == LazyFilterGenerator<T>, T.Element == OpaqueValue<Int>
 >(s1: S, _ s2: S) {
   var g1 = s1.generate()
@@ -706,7 +706,7 @@ tests.test("LazyFilterSequence") {
 
   let evens = 0.stride(to: 100, by: 2).map(OpaqueValue.init)
   checkSequence(evens, filtered, resiliencyChecks: .none) {
-    $0.value == $1.value 
+    $0.value == $1.value
   }
   expectEqual(100, calls)
 
@@ -727,7 +727,7 @@ tests.test("LazyFilterSequence") {
 
   // Check that it constructs the same sequence
   checkSequence(evens, filtered, resiliencyChecks: .none) {
-    $0.value == $1.value 
+    $0.value == $1.value
   }
   
   expectEqual(200, calls)

@@ -19,7 +19,7 @@ struct e<r> {
     j p: , () -> ())] = []
 }
 prtocol d {
-    i l 
+    i l
     i i
 }
 struct l<l : d> : d {

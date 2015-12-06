@@ -142,7 +142,7 @@ bb0(%0 : $Int):
 
 
 struct ContainsNativeObject {
-  var x : Int 
+  var x : Int
   var y : Builtin.NativeObject
 }
 

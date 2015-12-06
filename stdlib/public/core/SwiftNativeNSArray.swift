@@ -49,7 +49,7 @@ class _SwiftNativeNSArrayWithContiguousStorage
   }
 }
 
-// Implement the APIs required by NSArray 
+// Implement the APIs required by NSArray
 extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
   @objc internal var count: Int {
     return withUnsafeBufferOfObjects { $0.count }
@@ -223,7 +223,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
 class _SwiftNativeNSArrayWithContiguousStorage {}
 #endif
 
-/// Base class of the heap buffer backing arrays.  
+/// Base class of the heap buffer backing arrays.
 internal class _ContiguousArrayStorageBase
   : _SwiftNativeNSArrayWithContiguousStorage {
 

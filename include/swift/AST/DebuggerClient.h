@@ -55,7 +55,7 @@ public:
   /// This is the second time DebuggerClient is consulted:
   /// after all names in external Modules are checked, the client
   /// gets a chance to add names to the list of candidates that
-  /// have been found in the external module lookup.  
+  /// have been found in the external module lookup.
 
   virtual bool lookupAdditions(Identifier Name, DeclContext *DC,
                                SourceLoc Loc, bool IsTypeLookup,

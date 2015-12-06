@@ -66,7 +66,7 @@ MyObj.blah()
 public func err() {
   // DWARF-CHECK: DW_AT_name{{.*}}NSError
   // DWARF-CHECK: DW_AT_linkage_name{{.*}}_TtCSo7NSError
-  let error = NSError(domain: "myDomain", code: 4, 
+  let error = NSError(domain: "myDomain", code: 4,
                       userInfo: ["a":1,"b":2,"c":3])
 }
 

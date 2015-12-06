@@ -86,7 +86,7 @@ class SomeClass {
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $@thick SomeClass.Type):
   init(x:Int, y:Int) {}
 
-  // CHECK-LABEL: sil hidden @_TFC9functions9SomeClass6method{{.*}} : $@convention(method) (Builtin.Int64, @guaranteed SomeClass) -> () 
+  // CHECK-LABEL: sil hidden @_TFC9functions9SomeClass6method{{.*}} : $@convention(method) (Builtin.Int64, @guaranteed SomeClass) -> ()
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $SomeClass):
   func method(x: Int) {}
 
@@ -342,7 +342,7 @@ func calls(i: Int, j: Int, k: Int) {
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
   // CHECK: [[K:%[0-9]+]] = load [[KADDR]]
-  // CHECK: [[SETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.subscript!setter.1 : SomeClass -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) -> () , $@convention(method) (Builtin.Int64, Builtin.Int64, Builtin.Int64, @guaranteed SomeClass) -> () 
+  // CHECK: [[SETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.subscript!setter.1 : SomeClass -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) -> () , $@convention(method) (Builtin.Int64, Builtin.Int64, Builtin.Int64, @guaranteed SomeClass) -> ()
   // CHECK: apply [[SETTER]]([[K]], [[I]], [[J]], [[C]])
   c[i, j] = k
 

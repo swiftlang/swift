@@ -5,11 +5,11 @@ struct Test0 {}
 var test0 : Test0.Type = Test0.self
 test0 = Test0.self
 
-class Test1a { 
+class Test1a {
   init() { }
   class func foo() {}
 }
-class Test1b : Test1a { 
+class Test1b : Test1a {
   override init() { super.init() }
 }
 

@@ -57,12 +57,12 @@ func test0(c c: C) {
 // CHECK-NEXT: assign [[T2]] to [[T1]] : $*@sil_unowned C
 
   a.x = x
-// CHECK-NEXT: [[T2:%.*]] = load [[X]]#1 : $*@sil_unowned C     
-// CHECK-NEXT:  strong_retain_unowned  [[T2]] : $@sil_unowned C  
+// CHECK-NEXT: [[T2:%.*]] = load [[X]]#1 : $*@sil_unowned C
+// CHECK-NEXT:  strong_retain_unowned  [[T2]] : $@sil_unowned C
 // CHECK-NEXT:  [[T3:%.*]] = unowned_to_ref [[T2]] : $@sil_unowned C to $C
 // CHECK-NEXT:  [[XP:%.*]] = struct_element_addr [[A]] : $*A, #A.x
 // CHECK-NEXT:  [[T4:%.*]] = ref_to_unowned [[T3]] : $C to $@sil_unowned C
-// CHECK-NEXT:  unowned_retain [[T4]] : $@sil_unowned C  
+// CHECK-NEXT:  unowned_retain [[T4]] : $@sil_unowned C
 // CHECK-NEXT:  assign [[T4]] to [[XP]] : $*@sil_unowned C
 // CHECK-NEXT:  strong_release [[T3]] : $C
 }

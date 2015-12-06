@@ -273,7 +273,7 @@ bitwise operations can be applied to them.
   var x: MyOptions = .Foobar() | MyOptions(Bas: true)
 
 This nonuniformity could potentially be addressed by introducing additional
-implicit decls, such as adding implicit static properties corresponding to each 
+implicit decls, such as adding implicit static properties corresponding to each
 individual option::
 
   // Swift

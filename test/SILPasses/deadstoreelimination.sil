@@ -86,7 +86,7 @@ struct S7 {
 class SelfLoop {
   var a: SelfLoop
   init()
-   deinit 
+   deinit
 }
 
 struct S8 {
@@ -157,7 +157,7 @@ bb0:
 //
 // DISABLECHECK-LABEL: NoDeadLocalStoreSimpleStruct
 // DISABLECHECK: bb0
-// DISABLECHECK: store 
+// DISABLECHECK: store
 // DISABLECHECK: return
 sil hidden @NoDeadLocalStoreSimpleStruct : $@convention(thin) () -> () {
 bb0:
@@ -179,7 +179,7 @@ bb0:
 // be turned to a debug_value and thus act as a read on the memory
 // location..
 //
-// DISABLECHECK-LABEL: NoDeadStoreDebugValueAddr 
+// DISABLECHECK-LABEL: NoDeadStoreDebugValueAddr
 // DISABLECHECK: bb0
 // DISABLECHECK: store
 // DISABLECHECK: debug_value_addr
@@ -189,7 +189,7 @@ bb0:
   %1 = integer_literal $Builtin.Int64, 1          // user: %2
   %2 = struct $Int (%1 : $Builtin.Int64)          // user: %3
   store %2 to %0#1 : $*Int                        // id: %3
-  debug_value_addr %0#1 : $*Int  
+  debug_value_addr %0#1 : $*Int
   %4 = tuple ()                                   // user: %6
   dealloc_stack %0#0 : $*@local_storage Int       // id: %5
   return %4 : $()                                 // id: %6
@@ -1254,12 +1254,12 @@ bb0:
   return %9 : $()                                 // id: %11
 }
 
-/// We are not performing partial dead store for store %3 to %0#1 : $*S7, 
+/// We are not performing partial dead store for store %3 to %0#1 : $*S7,
 /// i.e. too many stores generated, but make sure we track the store correctly
 /// so that we can get rid of  store %56 to %57 : $*Int.
 ///
 /// CHECK-LABEL : PartialDeadStoreBailOutProperPropagation
-/// CHECK: bb0 
+/// CHECK: bb0
 /// CHECK-NOT: store
 /// CHECK: function_ref
 sil hidden @PartialDeadStoreBailOutProperPropagation : $@convention(thin) () -> () {
@@ -1286,10 +1286,10 @@ bb0:
 /// we have a case which partial dead store miscompiles a program,
 /// in that case the bitvector is not tracked correctly and we end
 /// up deleting the entire larger store, store %3 to %0#1 : $*S3 in
-/// this case. 
+/// this case.
 ///
 /// CHECK-LABEL: PartialDeadStoreInSimpleSmallStruct
-/// CHECK: apply 
+/// CHECK: apply
 /// CHECK-NEXT: struct_extract
 sil hidden @PartialDeadStoreInSimpleSmallStruct : $@convention(thin) () -> () {
 bb0:
@@ -1314,7 +1314,7 @@ bb0:
 /// CHECK-LABEL: SelfLoopClassTestTypeExpansion
 /// CHECK: [[RET0:%.+]] = struct_extract
 /// CHECK: [[RET1:%.+]] = struct_element_addr
-/// CHECK-NEXT: store [[RET0:%.+]] to [[RET1:%.+]] : $*SelfLoop  
+/// CHECK-NEXT: store [[RET0:%.+]] to [[RET1:%.+]] : $*SelfLoop
 sil hidden @SelfLoopClassTestTypeExpansion : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $S8  // var h                  // users: %4, %7, %13

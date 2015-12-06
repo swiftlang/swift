@@ -75,7 +75,7 @@ data from the literal, and the arguments describe that raw data.
 So, the general runtime behavior is now clear:
 
 1. The compiler generates raw string data.
-2. Some type conforming to _BuiltinStringLiteralConvertible is constructed from 
+2. Some type conforming to _BuiltinStringLiteralConvertible is constructed from
    the raw string data. This will be a standard library type.
 3. Some type conforming to StringLiteralConvertible is constructed from the
    object constructed in step 2. This may be a user-defined type. This is the
@@ -93,11 +93,11 @@ types.
 This algorithm can go forwards or backwards, since it's actually defined in
 terms of constraints, but it's easiest to understand as a linear process.
 
-1. Filter the types provided by the context to only include those that are 
+1. Filter the types provided by the context to only include those that are
    StringLiteralConvertible.
 2. Using the associated StringLiteralType, find the appropriate
    ``_convertFromBuiltinStringLiteral``.
-3. Using the type from step 1, find the appropriate 
+3. Using the type from step 1, find the appropriate
    ``convertFromStringLiteral``.
 4. Build an expression tree with the appropriate calls.
 

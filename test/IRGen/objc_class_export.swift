@@ -88,7 +88,7 @@ struct BigStructWithNativeObjects {
   // CHECK: }
 
   func bounds() -> NSRect {
-    return NSRect(origin: NSPoint(x: 0, y: 0), 
+    return NSRect(origin: NSPoint(x: 0, y: 0),
                   size: NSSize(width: 0, height: 0))
   }
   // CHECK: define internal void @_TToFC17objc_class_export3Foo6boundsfT_VSC6NSRect([[NSRECT]]* noalias nocapture sret, [[OPAQUE4:%.*]]*, i8*) unnamed_addr {{.*}} {

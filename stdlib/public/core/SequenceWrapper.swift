@@ -54,7 +54,7 @@ extension SequenceType
   
   public func _customContainsEquatableElement(
     element: Base.Generator.Element
-  ) -> Bool? { 
+  ) -> Bool? {
     return _base._customContainsEquatableElement(element)
   }
   
@@ -130,7 +130,7 @@ extension CollectionType
   
   public func _customContainsEquatableElement(
     element: Base.Generator.Element
-  ) -> Bool? { 
+  ) -> Bool? {
     return _base._customContainsEquatableElement(element)
   }
   

@@ -390,7 +390,7 @@ public:
   
   /// allowsOwnership() - Are variables of this type permitted to have
   /// ownership attributes?
-  bool allowsOwnership();  
+  bool allowsOwnership();
 
   /// \brief Determine whether this type involves a type variable.
   bool hasTypeVariable() const {
@@ -660,7 +660,7 @@ public:
   NominalTypeDecl *getAnyNominal();
 
   /// getUnlabeledType - Retrieve a version of this type with all labels
-  /// removed at every level. For example, given a tuple type 
+  /// removed at every level. For example, given a tuple type
   /// \code
   /// (p : (x : int, y : int))
   /// \endcode
@@ -864,7 +864,7 @@ public:
 class ErrorType : public TypeBase {
   friend class ASTContext;
   // The Error type is always canonical.
-  ErrorType(ASTContext &C) 
+  ErrorType(ASTContext &C)
     : TypeBase(TypeKind::Error, &C, RecursiveTypeProperties()) { }
 public:
   static Type get(const ASTContext &C);
@@ -1175,7 +1175,7 @@ private:
     : BuiltinType(TypeKind::BuiltinFloat, C), Kind(Kind) {}
 public:
   
-  /// getFPKind - Get the 
+  /// getFPKind - Get the
   FPKind getFPKind() const {
     return Kind;
   }
@@ -1205,7 +1205,7 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinFloatType, BuiltinType)
 class NameAliasType : public TypeBase {
   friend class TypeAliasDecl;
   // NameAliasType are never canonical.
-  NameAliasType(TypeAliasDecl *d) 
+  NameAliasType(TypeAliasDecl *d)
     : TypeBase(TypeKind::NameAlias, nullptr, RecursiveTypeProperties()),
       TheDecl(d) {}
   TypeAliasDecl *const TheDecl;
@@ -1379,7 +1379,7 @@ public:
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, Elements);
   }
-  static void Profile(llvm::FoldingSetNodeID &ID, 
+  static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<TupleTypeElt> Elements);
   
 private:
@@ -1595,7 +1595,7 @@ private:
   BoundGenericStructType(StructDecl *theDecl, Type parent,
                          ArrayRef<Type> genericArgs, const ASTContext *context,
                          RecursiveTypeProperties properties)
-    : BoundGenericType(TypeKind::BoundGenericStruct, 
+    : BoundGenericType(TypeKind::BoundGenericStruct,
                        reinterpret_cast<NominalTypeDecl*>(theDecl), parent,
                        genericArgs, context, properties) {}
   friend class BoundGenericType;
@@ -1692,7 +1692,7 @@ private:
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(EnumType, NominalType)
 
 /// StructType - This represents the type declared by a StructDecl.
-class StructType : public NominalType, public llvm::FoldingSetNode {  
+class StructType : public NominalType, public llvm::FoldingSetNode {
 public:
   /// getDecl() - Returns the decl which declares this type.
   StructDecl *getDecl() const {
@@ -1720,7 +1720,7 @@ private:
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(StructType, NominalType)
 
 /// ClassType - This represents the type declared by a ClassDecl.
-class ClassType : public NominalType, public llvm::FoldingSetNode {  
+class ClassType : public NominalType, public llvm::FoldingSetNode {
 public:
   /// getDecl() - Returns the decl which declares this type.
   ClassDecl *getDecl() const {
@@ -1764,7 +1764,7 @@ enum class MetatypeRepresentation : char {
   /// struct and enum members is completely static.
   Thin,
   /// A thick metatype refers to a complete metatype representation
-  /// that allows introspection and dynamic dispatch. 
+  /// that allows introspection and dynamic dispatch.
   ///
   /// Thick metatypes are used for class and existential metatypes,
   /// which permit dynamic behavior.
@@ -1960,7 +1960,7 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(ModuleType, Type)
 /// };
 /// \endcode
 ///
-/// In this example, \c Self is represented by a 
+/// In this example, \c Self is represented by a
 /// \c DynamicSelfType node whose self type is \c X.
 class DynamicSelfType : public TypeBase {
   Type SelfType;
@@ -2386,7 +2386,7 @@ private:
                           const ExtInfo &Info,
                           const ASTContext &C,
                           RecursiveTypeProperties properties);
-};  
+};
 BEGIN_CAN_TYPE_WRAPPER(PolymorphicFunctionType, AnyFunctionType)
   static CanPolymorphicFunctionType get(CanType input, CanType result,
                                         GenericParamList *params,
@@ -3027,7 +3027,7 @@ public:
   }
 
   using ParameterSILTypeArrayRef
-    = ArrayRefView<SILParameterInfo, SILType, getParameterSILType>;  
+    = ArrayRefView<SILParameterInfo, SILType, getParameterSILType>;
   ParameterSILTypeArrayRef getParameterSILTypes() const {
     return ParameterSILTypeArrayRef(getParameters());
   }
@@ -3242,7 +3242,7 @@ protected:
   // Syntax sugar types are never canonical.
   DictionaryType(const ASTContext &ctx, Type key, Type value,
                  RecursiveTypeProperties properties)
-    : TypeBase(TypeKind::Dictionary, nullptr, properties), 
+    : TypeBase(TypeKind::Dictionary, nullptr, properties),
       Key(key), Value(value), ImplOrContext(&ctx) {}
 
 public:
@@ -3575,7 +3575,7 @@ public:
   /// \param knownID When non-empty, the known ID of the archetype. When empty,
   /// a fresh archetype with a unique ID will be opened.
   static CanTypeWrapper<ArchetypeType>
-                        getOpened(Type existential, 
+                        getOpened(Type existential,
                                   Optional<UUID> knownID = None);
 
   /// Create a new archetype that represents the opened type
@@ -3593,11 +3593,11 @@ public:
 
   /// \brief Retrieve the parent of this archetype, or null if this is a
   /// primary archetype.
-  ArchetypeType *getParent() const { 
-    return ParentOrOpened.dyn_cast<ArchetypeType *>(); 
+  ArchetypeType *getParent() const {
+    return ParentOrOpened.dyn_cast<ArchetypeType *>();
   }
 
-  /// Retrieve the opened existential type 
+  /// Retrieve the opened existential type
   Type getOpenedExistentialType() const {
     return ParentOrOpened.dyn_cast<TypeBase *>();
   }
@@ -3678,8 +3678,8 @@ public:
                       MutableArrayRef<std::pair<Identifier, NestedType>> Nested);
 
   /// isPrimary - Determine whether this is the archetype for a 'primary'
-  /// archetype, e.g., 
-  bool isPrimary() const { 
+  /// archetype, e.g.,
+  bool isPrimary() const {
     return ParentOrOpened.isNull();
   }
 
@@ -3715,7 +3715,7 @@ private:
       AssocTypeOrProto(AssocTypeOrProto), Name(Name),
       isRecursive(isRecursive) { }
 
-  ArchetypeType(const ASTContext &Ctx, 
+  ArchetypeType(const ASTContext &Ctx,
                 Type Existential,
                 ArrayRef<ProtocolDecl *> ConformsTo,
                 Type Superclass, bool isRecursive = false)

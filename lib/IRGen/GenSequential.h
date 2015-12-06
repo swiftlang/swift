@@ -105,7 +105,7 @@ private:
 protected:
   const Impl &asImpl() const { return *static_cast<const Impl*>(this); }
 
-  template <class... As> 
+  template <class... As>
   SequentialTypeInfoImpl(ArrayRef<FieldImpl> fields, As&&...args)
       : Base(std::forward<As>(args)...), NumFields(fields.size()) {
     std::uninitialized_copy(fields.begin(), fields.end(),
@@ -216,17 +216,17 @@ template <class Impl, class Base, class FieldImpl_,
           bool IsLoadable = std::is_base_of<LoadableTypeInfo, Base>::value>
 class SequentialTypeInfo;
 
-/// An implementation of SequentialTypeInfo for non-loadable types. 
+/// An implementation of SequentialTypeInfo for non-loadable types.
 template <class Impl, class Base, class FieldImpl>
 class SequentialTypeInfo<Impl, Base, FieldImpl, /*IsLoadable*/ false>
     : public SequentialTypeInfoImpl<Impl, Base, FieldImpl> {
   typedef SequentialTypeInfoImpl<Impl, Base, FieldImpl> super;
 protected:
-  template <class... As> 
+  template <class... As>
   SequentialTypeInfo(As&&...args) : super(std::forward<As>(args)...) {}
 };
 
-/// An implementation of SequentialTypeInfo for loadable types. 
+/// An implementation of SequentialTypeInfo for loadable types.
 template <class Impl, class Base, class FieldImpl>
 class SequentialTypeInfo<Impl, Base, FieldImpl, /*IsLoadable*/ true>
     : public SequentialTypeInfoImpl<Impl, Base, FieldImpl> {
@@ -237,7 +237,7 @@ class SequentialTypeInfo<Impl, Base, FieldImpl, /*IsLoadable*/ true>
 protected:
   using super::asImpl;
 
-  template <class... As> 
+  template <class... As>
   SequentialTypeInfo(ArrayRef<FieldImpl> fields, unsigned explosionSize,
                      As &&...args)
     : super(fields, std::forward<As>(args)...),
@@ -408,7 +408,7 @@ public:
     } else {
       return asImpl()->createNonFixed(fields, std::move(layout));
     }
-  }  
+  }
 };
 
 } // end namespace irgen

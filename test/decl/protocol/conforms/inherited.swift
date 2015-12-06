@@ -43,7 +43,7 @@ protocol P8 {
 
 // Inheritable: operator requirement.
 protocol P9 {
-  func ==(x: Self, y: Self) -> Bool 
+  func ==(x: Self, y: Self) -> Bool
 }
 
 // Never inheritable: method with 'Self' in a non-contravariant position.
@@ -76,7 +76,7 @@ class A : P1, P2, P3, P4, P5, P6, P7, P8, P9, P10 {
   }
 
   // P4
-  subscript (a: A) -> Int { 
+  subscript (a: A) -> Int {
     get {
       return 5
     }
@@ -105,7 +105,7 @@ class A : P1, P2, P3, P4, P5, P6, P7, P8, P9, P10 {
 func ==(x: A, y: A) -> Bool { return true }
 
 // Class B inherits A; gets all of its conformances.
-class B : A { 
+class B : A {
   required init(int: Int) { }
 }
 
@@ -121,7 +121,7 @@ func testB(b: B) {
 
 // Class A5 conforms to P5 in an inheritable manner.
 class A5 : P5 {
-  // P5 
+  // P5
   func f5() -> Self { return self }
 }
 
@@ -163,7 +163,7 @@ final class A9 : P1, P2, P3, P4, P5, P6, P7, P8, P9, P10 {
   }
 
   // P4
-  subscript (a: A9) -> Int { 
+  subscript (a: A9) -> Int {
     get {
       return 5
     }

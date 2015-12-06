@@ -393,8 +393,8 @@ func test_generic_over_classes()
 // CHECK: ~X(3)
 test_generic_over_classes()
 
-struct S { 
-  var a: Int32; var b: Int64 
+struct S {
+  var a: Int32; var b: Int64
 
   init(_ a: Int32, _ b: Int64) {
     self.a = a

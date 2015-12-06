@@ -399,11 +399,11 @@ swift::swift_getFunctionTypeMetadata1(FunctionTypeFlags flags,
   const void *flagsArgsAndResult[] = {
     reinterpret_cast<const void*>(flags.getIntValue()),
     arg0,
-    static_cast<const void *>(result)                      
-  };                                                       
+    static_cast<const void *>(result)
+  };
   return swift_getFunctionTypeMetadata(flagsArgsAndResult);
-}                                                          
-const FunctionTypeMetadata *                               
+}
+const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata2(FunctionTypeFlags flags,
                                       const void *arg0,
                                       const void *arg1,
@@ -413,12 +413,12 @@ swift::swift_getFunctionTypeMetadata2(FunctionTypeFlags flags,
   const void *flagsArgsAndResult[] = {
     reinterpret_cast<const void*>(flags.getIntValue()),
     arg0,
-    arg1,                                                  
-    static_cast<const void *>(result)                      
-  };                                                       
+    arg1,
+    static_cast<const void *>(result)
+  };
   return swift_getFunctionTypeMetadata(flagsArgsAndResult);
-}                                                          
-const FunctionTypeMetadata *                               
+}
+const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata3(FunctionTypeFlags flags,
                                       const void *arg0,
                                       const void *arg1,
@@ -428,11 +428,11 @@ swift::swift_getFunctionTypeMetadata3(FunctionTypeFlags flags,
          && "wrong number of arguments in function metadata flags?!");
   const void *flagsArgsAndResult[] = {
     reinterpret_cast<const void*>(flags.getIntValue()),
-    arg0,                                                  
-    arg1,                                                  
-    arg2,                                                  
-    static_cast<const void *>(result)                      
-  };                                                       
+    arg0,
+    arg1,
+    arg2,
+    static_cast<const void *>(result)
+  };
   return swift_getFunctionTypeMetadata(flagsArgsAndResult);
 }
 

@@ -14,7 +14,7 @@ func basicTests() -> Int {
 
 // expected-warning@+2 {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{41-45=}}
 // expected-warning@+1 {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{54-58=}}
-func mutableParameter(a : Int, h : Int, var i : Int, var j: Int, 
+func mutableParameter(a : Int, h : Int, var i : Int, var j: Int,
        var g : Int) -> Int { // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{8-12=}}
   g += 1
   swap(&i, &j)

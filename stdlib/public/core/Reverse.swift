@@ -22,7 +22,7 @@ public protocol ReverseIndexType : BidirectionalIndexType {
   ///
   /// If `self` is `advance(c.reverse.startIndex, n)`, then:
   /// - `self.base` is `advance(c.endIndex, -n)`.
-  /// - if `n` != `c.count`, then `c.reverse[self]` is 
+  /// - if `n` != `c.count`, then `c.reverse[self]` is
   ///   equivalent to `[self.base.predecessor()]`.
   var base: Base { get }
 
@@ -58,7 +58,7 @@ public struct ReverseIndex<Base: BidirectionalIndexType>
   ///
   /// If `self` is `advance(c.reverse.startIndex, n)`, then:
   /// - `self.base` is `advance(c.endIndex, -n)`.
-  /// - if `n` != `c.count`, then `c.reverse[self]` is 
+  /// - if `n` != `c.count`, then `c.reverse[self]` is
   ///   equivalent to `[self.base.predecessor()]`.
   public let base: Base
 
@@ -87,7 +87,7 @@ public struct ReverseRandomAccessIndex<Base: RandomAccessIndexType>
   ///
   /// If `self` is `advance(c.reverse.startIndex, n)`, then:
   /// - `self.base` is `advance(c.endIndex, -n)`.
-  /// - if `n` != `c.count`, then `c.reverse[self]` is 
+  /// - if `n` != `c.count`, then `c.reverse[self]` is
   ///   equivalent to `[self.base.predecessor()]`.
   public let base: Base
 

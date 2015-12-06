@@ -86,7 +86,7 @@ namespace {
         CE->getBody()->walk(*this);
         ParentDC = oldParentDC;
         return { false, E };
-      } 
+      }
 
       // Explicit closures start their own sequence.
       if (auto CE = dyn_cast<ClosureExpr>(E)) {
@@ -268,7 +268,7 @@ public:
             SC.TC.diagnose(LS->getLabelInfo().Loc,
                         diag::label_shadowed, LS->getLabelInfo().Name);
             SC.TC.diagnose(PrevLS->getLabelInfo().Loc,
-                           diag::invalid_redecl_prev, 
+                           diag::invalid_redecl_prev,
                            PrevLS->getLabelInfo().Name);
           }
         }
@@ -1258,7 +1258,7 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
     r = new (Context) TryExpr(SourceLoc(), r, Type(), /*Implicit=*/true);
 
   if (typeCheckExpression(r, ctor, Type(), CTP_Unused,
-                          TypeCheckExprFlags::IsDiscarded | 
+                          TypeCheckExprFlags::IsDiscarded |
                           TypeCheckExprFlags::SuppressDiagnostics))
     return nullptr;
   
@@ -1268,7 +1268,7 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
 /// Check a super.init call.
 ///
 /// \returns true if an error occurred.
-static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor, 
+static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor,
                            ApplyExpr *apply, bool implicitlyGenerated) {
   // Make sure we are referring to a designated initializer.
   auto otherCtorRef = dyn_cast<OtherConstructorDeclRefExpr>(

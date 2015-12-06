@@ -930,7 +930,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
       // by bridging the native return value, but we may need to
       // adjust it slightly.
       SILValue bridgedResult =
-        emitBridgeReturnValueForForeignError(loc, nativeResult, 
+        emitBridgeReturnValueForForeignError(loc, nativeResult,
                                              objcFnTy->getRepresentation(),
                                              origNativeResultType,
                                              substNativeResultType,

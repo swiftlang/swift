@@ -38,8 +38,8 @@ using namespace swift;
 using ImportedModule = Module::ImportedModule;
 using ImportOptions = SourceFile::ImportOptions;
 
-namespace {  
-  class NameBinder {    
+namespace {
+  class NameBinder {
   public:
     SourceFile &SF;
     ASTContext &Context;

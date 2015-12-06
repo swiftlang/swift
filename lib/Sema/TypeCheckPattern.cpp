@@ -861,7 +861,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
 /// This allows us to use an arbitrary conditional downcast to
 /// evaluate an "is" / "as" pattern, which includes any kind of
 /// downcast for which we don't have specialized logic.
-static bool coercePatternViaConditionalDowncast(TypeChecker &tc, 
+static bool coercePatternViaConditionalDowncast(TypeChecker &tc,
                                                 Pattern *&pattern,
                                                 DeclContext *dc,
                                                 Type type,
@@ -870,7 +870,7 @@ static bool coercePatternViaConditionalDowncast(TypeChecker &tc,
 
   // FIXME: We can't handle subpatterns here.
   if (isa->getSubPattern()) {
-    tc.diagnose(isa->getLoc(), diag::isa_pattern_value, 
+    tc.diagnose(isa->getLoc(), diag::isa_pattern_value,
                 isa->getCastTypeLoc().getType());
     return false;
   }
@@ -897,7 +897,7 @@ static bool coercePatternViaConditionalDowncast(TypeChecker &tc,
 
   // Form an expression pattern with this match.
   // FIXME: This is lossy; we can't get the value out.
-  pattern = new (tc.Context) ExprPattern(matchRef, /*isResolved=*/true, 
+  pattern = new (tc.Context) ExprPattern(matchRef, /*isResolved=*/true,
                                          /*matchExpr=*/cast, matchVar,
                                          false);
   pattern->setType(isa->getCastTypeLoc().getType());
@@ -1023,7 +1023,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       }
     }
     
-    if (shouldRequireType && 
+    if (shouldRequireType &&
         !(options & TR_FromNonInferredPattern) &&
         !(options & TR_EnumerationVariable)) {
       diagnose(NP->getLoc(), diag::type_inferred_to_undesirable_type,
@@ -1115,7 +1115,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       TypeResolutionOptions subOptions = options - TR_Variadic;
       if (hasEllipsis)
         subOptions |= TR_Variadic;
-      hadError |= coercePatternToType(pattern, dc, CoercionType, subOptions, 
+      hadError |= coercePatternToType(pattern, dc, CoercionType, subOptions,
                                       resolver);
       if (!hadError)
         elt.setPattern(pattern);

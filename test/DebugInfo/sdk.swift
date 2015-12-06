@@ -4,10 +4,10 @@
 // CHECK:          !DICompileUnit({{.*}}producer: "{{(Apple )?Swift version [^"]+}}"
 // CHECK-SAME:                    flags: "
 // CHECK-NOT:                     "
-// CHECK-SAME:                    -resource-dir 
+// CHECK-SAME:                    -resource-dir
 // CHECK-EXPLICIT: !DICompileUnit({{.*}}producer: "{{(Apple )?Swift version [^"]+}}"
 // CHECK-EXPLICIT-SAME:           flags: "
 // CHECK-EXPLICIT-NOT:            "
 // CHECK-EXPLICIT-SAME:           -sdk \22/Weird Location/SDK\22
 // CHECK-EXPLICIT-NOT:            "
-// CHECK-EXPLICIT-SAME:           -resource-dir 
+// CHECK-EXPLICIT-SAME:           -resource-dir

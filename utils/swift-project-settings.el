@@ -11,7 +11,7 @@
 ;===----------------------------------------------------------------------===;
 ;
 ;  Emacs-lisp support for automatically formatting things according to this
-;  project's conventions.  To prevent this file from being automatically 
+;  project's conventions.  To prevent this file from being automatically
 ;  loaded, add (provide 'swift-project-settings) to your .emacs
 ;
 ;===----------------------------------------------------------------------===;
@@ -152,7 +152,7 @@ Swift header should look like.
   "===" v1 "\n"
 
   ;; Use whatever comment character is usual for the current mode in place of "//"
-  (replace-regexp-in-string "//" v1 
+  (replace-regexp-in-string "//" v1
 "//
 // This source file is part of the Swift.org open source project
 //
@@ -167,7 +167,7 @@ Swift header should look like.
   ;; if there was a short description, add a section for a longer
   ;; description and leave the cursor there
   (when v3
-    (replace-regexp-in-string "//" v1 
+    (replace-regexp-in-string "//" v1
 "//
 //  "))
   (when v3 '_)

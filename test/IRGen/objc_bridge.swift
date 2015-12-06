@@ -75,13 +75,13 @@ import Foundation
 // CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @_TToFC11objc_bridge3Bas8nsstrArgfT1sCSo8NSString_T_ to i8*)
 // CHECK:     },
-// CHECK:     { i8*, i8*, i8* } { 
-// CHECK:       i8* getelementptr inbounds ([5 x i8], [5 x i8]* @"\01L_selector_data(init)", i64 0, i64 0), 
+// CHECK:     { i8*, i8*, i8* } {
+// CHECK:       i8* getelementptr inbounds ([5 x i8], [5 x i8]* @"\01L_selector_data(init)", i64 0, i64 0),
 // CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:       i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @_TToFC11objc_bridge3BascfT_S0_ to i8*)
 // CHECK:     },
-// CHECK:     { i8*, i8*, i8* } { 
-// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* @"\01L_selector_data(dealloc)", i64 0, i64 0), 
+// CHECK:     { i8*, i8*, i8* } {
+// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* @"\01L_selector_data(dealloc)", i64 0, i64 0),
 // CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[DEALLOC_SIGNATURE]], i64 0, i64 0),
 // CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*)* @_TToFC11objc_bridge3BasD to i8*)
 // CHECK:     },
@@ -90,8 +90,8 @@ import Foundation
 // CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* @{{[0-9]+}}, i64 0, i64 0),
 // CHECK:       i8* bitcast (void (%3*, i8*, %4*)* @_TToFC11objc_bridge3Bas9acceptSetfGVs3SetS0__T_ to i8*)
 // CHECK:     }
-// CHECK:     { i8*, i8*, i8* } { 
-// CHECK:       i8* getelementptr inbounds ([14 x i8], [14 x i8]* @"\01L_selector_data(.cxx_destruct)", i64 0, i64 0), 
+// CHECK:     { i8*, i8*, i8* } {
+// CHECK:       i8* getelementptr inbounds ([14 x i8], [14 x i8]* @"\01L_selector_data(.cxx_destruct)", i64 0, i64 0),
 // CHECK:       i8* getelementptr inbounds ([3 x i8], [3 x i8]* @{{.*}}, i64 0, i64 0),
 // CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*)* @_TToFC11objc_bridge3BasE to i8*)
 // CHECK:     }
@@ -183,7 +183,7 @@ class Bas : NSObject {
   // CHECK: define internal void @_TToFC11objc_bridge3Bas8nsstrArgfT1sCSo8NSString_T_([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {{.*}} {
   func nsstrArg(s s: NSString) { }
 
-  override init() { 
+  override init() {
     strRealProp = String()
     nsstrRealProp = NSString()
     super.init()

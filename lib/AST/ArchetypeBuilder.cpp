@@ -41,7 +41,7 @@ void RequirementSource::dump(SourceManager *srcMgr) const {
   dump(llvm::errs(), srcMgr);
 }
 
-void RequirementSource::dump(llvm::raw_ostream &out, 
+void RequirementSource::dump(llvm::raw_ostream &out,
                              SourceManager *srcMgr) const {
   switch (getKind()) {
   case Explicit:
@@ -205,7 +205,7 @@ void ArchetypeBuilder::PotentialArchetype::buildFullName(
       if (auto assocType = getResolvedAssociatedType()) {
         result.push_back('[');
         result.push_back('.');
-        result.append(assocType->getProtocol()->getName().str().begin(), 
+        result.append(assocType->getProtocol()->getName().str().begin(),
                       assocType->getProtocol()->getName().str().end());
         result.push_back(']');
       }
@@ -216,7 +216,7 @@ void ArchetypeBuilder::PotentialArchetype::buildFullName(
   result.append(getName().str().begin(), getName().str().end());
 }
 
-Identifier ArchetypeBuilder::PotentialArchetype::getName() const { 
+Identifier ArchetypeBuilder::PotentialArchetype::getName() const {
   if (auto assocType = NameOrAssociatedType.dyn_cast<AssociatedTypeDecl *>())
     return assocType->getName();
   
@@ -254,7 +254,7 @@ void ArchetypeBuilder::PotentialArchetype::resolveAssociatedType(
 }
 
 bool ArchetypeBuilder::PotentialArchetype::addConformance(
-       ProtocolDecl *proto, 
+       ProtocolDecl *proto,
        const RequirementSource &source,
        ArchetypeBuilder &builder) {
   auto rep = getRepresentative();
@@ -685,7 +685,7 @@ ArchetypeBuilder::~ArchetypeBuilder() {
     delete PA.second;
 }
 
-LazyResolver *ArchetypeBuilder::getLazyResolver() const { 
+LazyResolver *ArchetypeBuilder::getLazyResolver() const {
   return Context.getLazyResolver();
 }
 
@@ -846,7 +846,7 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
 bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
        PotentialArchetype *T1,
        PotentialArchetype *T2,
-       RequirementSource Source) 
+       RequirementSource Source)
 {
   auto OrigT1 = T1, OrigT2 = T2;
 
@@ -962,7 +962,7 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   // because then we don't actually have a parameter.
   // FIXME: Should we simply allow this?
   if (T->getNestingDepth() == 0) {
-    Diags.diagnose(Source.getLoc(), 
+    Diags.diagnose(Source.getLoc(),
                    diag::requires_generic_param_made_equal_to_concrete,
                    T->getName());
     return true;
@@ -1196,7 +1196,7 @@ bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
   }
 
   case RequirementKind::SameType:
-    return addSameTypeRequirement(Req.getFirstType(), 
+    return addSameTypeRequirement(Req.getFirstType(),
                                   Req.getSecondType(),
                                   RequirementSource(RequirementSource::Explicit,
                                                     Req.getEqualLoc()));
@@ -1208,7 +1208,7 @@ bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
   llvm_unreachable("Unhandled requirement?");
 }
 
-void ArchetypeBuilder::addRequirement(const Requirement &req, 
+void ArchetypeBuilder::addRequirement(const Requirement &req,
                                       RequirementSource source) {
   switch (req.getKind()) {
   case RequirementKind::Conformance: {
@@ -1269,10 +1269,10 @@ public:
 
   bool hadError() const { return HadError; }
 
-  virtual Action walkToTypePost(Type ty) override { 
+  virtual Action walkToTypePost(Type ty) override {
     auto boundGeneric = ty->getAs<BoundGenericType>();
     if (!boundGeneric)
-      return Action::Continue; 
+      return Action::Continue;
 
     auto genericSig = boundGeneric->getDecl()->getGenericSignature();
     if (!genericSig)
@@ -1310,7 +1310,7 @@ public:
           return Action::Continue;
 
         auto secondType = req.getSecondType().subst(
-                            &Builder.getModule(), 
+                            &Builder.getModule(),
                             substitutions,
                             SubstFlags::IgnoreMissing);
         if (!secondType)
@@ -1356,7 +1356,7 @@ public:
             HadError = true;
             return Action::Stop;
           }
-        } else if (Builder.addSuperclassRequirement(subjectPA, 
+        } else if (Builder.addSuperclassRequirement(subjectPA,
                                                     req.getSecondType(),
                                                     source)) {
           HadError = true;
@@ -1632,19 +1632,19 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
     DenseMap<ProtocolDecl *, RequirementSource> protocolSources;
     for (const auto &conforms : archetype->getConformsTo()) {
       protocols.push_back(conforms.first);
-      assert(protocolSources.count(conforms.first) == 0 && 
+      assert(protocolSources.count(conforms.first) == 0 &&
              "redundant protocol requirement?");
       protocolSources.insert({conforms.first, conforms.second});
     }
 
     // Sort the protocols in canonical order.
-    llvm::array_pod_sort(protocols.begin(), protocols.end(), 
+    llvm::array_pod_sort(protocols.begin(), protocols.end(),
                          ProtocolType::compareProtocols);
 
     // Enumerate the conformance requirements.
     for (auto proto : protocols) {
       assert(protocolSources.count(proto) == 1 && "Missing conformance?");
-      f(RequirementKind::Conformance, archetype, 
+      f(RequirementKind::Conformance, archetype,
         proto->getDeclaredInterfaceType(),
         protocolSources.find(proto)->second);
     }
@@ -1652,7 +1652,7 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
 
   // Local function to visit the nested potential archetypes of the
   // given potential archetype.
-  std::function<void(PotentialArchetype *archetype)> visitNested 
+  std::function<void(PotentialArchetype *archetype)> visitNested
     = [&](PotentialArchetype *archetype) {
     // Collect the nested types, sorted by name.
     SmallVector<std::pair<Identifier, PotentialArchetype*>, 16> nestedTypes;
@@ -1670,7 +1670,7 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
     }
   };
 
-  auto primaryIter = Impl->PotentialArchetypes.begin(), 
+  auto primaryIter = Impl->PotentialArchetypes.begin(),
     primaryIterEnd = Impl->PotentialArchetypes.end();
   while (primaryIter != primaryIterEnd) {
     unsigned depth = primaryIter->first.Depth;
@@ -1681,8 +1681,8 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
     // are structured. Once those lists no longer exist or are no longer
     // "the truth", we can simplify this algorithm considerably.
     auto nextPrimaryIter = primaryIter;
-    for (/*none*/; 
-         (nextPrimaryIter != primaryIterEnd && 
+    for (/*none*/;
+         (nextPrimaryIter != primaryIterEnd &&
           nextPrimaryIter->first.Depth == depth);
          ++nextPrimaryIter) {
       visitPA(nextPrimaryIter->second);
@@ -1702,14 +1702,14 @@ void ArchetypeBuilder::dump() {
 
 void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
   out << "Requirements:";
-  enumerateRequirements([&](RequirementKind kind, 
+  enumerateRequirements([&](RequirementKind kind,
                             PotentialArchetype *archetype,
                             llvm::PointerUnion<Type, PotentialArchetype *> type,
                             RequirementSource source) {
     switch (kind) {
     case RequirementKind::Conformance:
       out << "\n  ";
-      out << archetype->getDebugName() << " : " 
+      out << archetype->getDebugName() << " : "
           << type.get<Type>().getString() << " [";
       source.dump(out, &Context.SourceMgr);
       out << "]";

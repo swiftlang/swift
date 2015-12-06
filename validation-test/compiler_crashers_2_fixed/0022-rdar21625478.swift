@@ -221,7 +221,7 @@ where Index == Base.Index {
   public subscript(_prext_bounds: Range<Base.Index>) -> Base.SubSequence {
     ++CollectionLog.subscriptRange[selfType]
     return base[_prext_bounds]
-  }    
+  }
 
   public var isEmpty: Bool {
     ++CollectionLog.isEmpty[selfType]

@@ -301,7 +301,7 @@ static StringRef toString(ValueWitnessKind k) {
 class Demangler {
   std::vector<NodePointer> Substitutions;
   NameSource Mangled;
-public:  
+public:
   Demangler(llvm::StringRef mangled) : Mangled(mangled) {}
 
 /// Try to demangle a child node of the given kind.  If that fails,
@@ -2236,7 +2236,7 @@ public:
     return Str;
   }
 
-private:  
+private:
   void printChildren(Node::iterator begin,
                      Node::iterator end,
                      const char *sep = nullptr) {
@@ -2445,7 +2445,7 @@ private:
   }
 
   SugarType findSugar(NodePointer pointer) {
-    if (pointer->getNumChildren() == 1 && 
+    if (pointer->getNumChildren() == 1 &&
         pointer->getKind() == Node::Kind::Type)
       return findSugar(pointer->getChild(0));
     
@@ -2468,7 +2468,7 @@ private:
       }
 
       // Swift.ImplicitlyUnwrappedOptional
-      if (isIdentifier(unboundType->getChild(1), 
+      if (isIdentifier(unboundType->getChild(1),
                        "ImplicitlyUnwrappedOptional") &&
           typeArgs->getNumChildren() == 1 &&
           isSwiftModule(unboundType->getChild(0))) {
@@ -2822,7 +2822,7 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
       }
     }
 
-    if (useParens) Printer << ')';      
+    if (useParens) Printer << ')';
   };
 
   Node::Kind kind = pointer->getKind();

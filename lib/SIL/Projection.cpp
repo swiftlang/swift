@@ -616,7 +616,7 @@ void
 ProjectionPath::expandTypeIntoLeafProjectionPaths(SILType B, SILModule *Mod,
                                                   ProjectionPathList &Paths,
                                                   bool OnlyLeafNode) {
-  // Perform a BFS to expand the given type into projectionpath each of 
+  // Perform a BFS to expand the given type into projectionpath each of
   // which contains 1 field from the type.
   ProjectionPathList Worklist;
   llvm::SmallVector<Projection, 8> Projections;

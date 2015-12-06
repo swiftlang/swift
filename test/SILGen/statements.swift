@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -parse-as-library -emit-silgen -verify %s | FileCheck %s
 
-class MyClass { 
+class MyClass {
   func foo() { }
 }
 
@@ -151,7 +151,7 @@ func do_loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
   bar(x);
 }
 
-// CHECK-LABEL: sil hidden  @_TF10statements21do_loop_with_continue 
+// CHECK-LABEL: sil hidden  @_TF10statements21do_loop_with_continue
 
 
 // CHECK-LABEL: sil hidden  @{{.*}}for_loops1
@@ -185,7 +185,7 @@ func for_loops2() {
     obj.foo()
   }
 
-  return 
+  return
 }
 
 func void_return() {
@@ -240,8 +240,8 @@ func for_each_loop(x: [C]) {
 // CHECK-LABEL: sil hidden @{{.*}}test_break
 func test_break(i : Int) {
   switch i {
-  case (let x) where x != 17: 
-    if x == 42 { break } 
+  case (let x) where x != 17:
+    if x == 42 { break }
     markUsed(x)
   default:
     break

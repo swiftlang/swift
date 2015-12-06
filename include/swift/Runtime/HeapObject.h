@@ -21,7 +21,7 @@
 #include <cstdint>
 #include "swift/Runtime/Config.h"
 
-// Bring in the definition of HeapObject 
+// Bring in the definition of HeapObject
 #include "../../../stdlib/public/SwiftShims/HeapObject.h"
 
 namespace swift {
@@ -153,7 +153,7 @@ extern "C" void swift_deallocPOD(HeapObject *obj);
 extern "C" BoxPair::Return swift_allocBox(Metadata const *type);
 
 // Allocate plain old memory. This is the generalized entry point
-// Never returns nil. The returned memory is uninitialized. 
+// Never returns nil. The returned memory is uninitialized.
 //
 // An "alignment mask" is just the alignment (a power of 2) minus 1.
 extern "C" void *swift_slowAlloc(size_t bytes, size_t alignMask);

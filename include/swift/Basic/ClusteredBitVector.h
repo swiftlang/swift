@@ -67,7 +67,7 @@ class ClusteredBitVector {
 
   /// Return the number of chunks required to store a vector of the
   /// given number of bits.
-  static size_t getNumChunksForBits(size_t value) { 
+  static size_t getNumChunksForBits(size_t value) {
     return (value + ChunkSizeInBits - 1) / ChunkSizeInBits;
   }
 
@@ -87,7 +87,7 @@ class ClusteredBitVector {
   ///             |              +---- bits in other chunks
   ///    high bits in last chunk         are uninitialized
   ///      are guaranteed zero
-  /// 
+  ///
   /// The capacity (in bits) is stored at index -1.
   ///
   /// 2) When using inline storage:

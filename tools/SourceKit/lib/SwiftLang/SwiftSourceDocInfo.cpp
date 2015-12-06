@@ -120,7 +120,7 @@ static StringRef getSourceToken(unsigned Offset,
   return L.getTokenAt(Loc).getText();
 }
 
-static llvm::Optional<unsigned> 
+static llvm::Optional<unsigned>
 mapOffsetToOlderSnapshot(unsigned Offset,
                          ImmutableTextSnapshotRef NewSnap,
                          ImmutableTextSnapshotRef OldSnap) {
@@ -146,7 +146,7 @@ mapOffsetToOlderSnapshot(unsigned Offset,
   return Offset;
 }
 
-static llvm::Optional<unsigned> 
+static llvm::Optional<unsigned>
 mapOffsetToNewerSnapshot(unsigned Offset,
                          ImmutableTextSnapshotRef OldSnap,
                          ImmutableTextSnapshotRef NewSnap) {

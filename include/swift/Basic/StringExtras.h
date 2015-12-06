@@ -65,8 +65,8 @@ namespace swift {
     /// A bidirectional iterator that walks through the words in a camelCase
     /// string.
     ///
-    /// Note that this iterator is not technically conforming bidirectional 
-    /// iterator, because it's reference type is not a true reference. But it 
+    /// Note that this iterator is not technically conforming bidirectional
+    /// iterator, because it's reference type is not a true reference. But it
     /// quacks like a duck.
     class WordIterator {
       StringRef String;
@@ -99,7 +99,7 @@ namespace swift {
       typedef std::bidirectional_iterator_tag iterator_category;
 
       WordIterator(StringRef string, unsigned position)
-        : String(string), Position(position) 
+        : String(string), Position(position)
       {
         NextPositionValid = false;
         PrevPositionValid = false;
@@ -162,7 +162,7 @@ namespace swift {
       }
 
       friend bool operator==(const WordIterator &x, const WordIterator &y) {
-        assert(x.String.data() == y.String.data() && 
+        assert(x.String.data() == y.String.data() &&
                x.String.size() == y.String.size() &&
                "comparing word iterators from different strings");
         return x.Position == y.Position;

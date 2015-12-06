@@ -164,7 +164,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
 #if _runtime(_ObjC)
     return proposedElementType is Element.Type
 #else
-    // FIXME: Dynamic casts don't currently work without objc. 
+    // FIXME: Dynamic casts don't currently work without objc.
     // rdar://problem/18801510
     return false
 #endif
@@ -210,7 +210,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
   /// body part of the storage initialized, but not the elements.
   ///
   /// - Warning: The result has uninitialized elements.
-  /// 
+  ///
   /// - Warning: storage may have been stack-allocated, so it's
   ///   crucial not to call, e.g., `malloc_size` on it.
   internal init(count: Int, storage: _ContiguousArrayStorage<Element>) {

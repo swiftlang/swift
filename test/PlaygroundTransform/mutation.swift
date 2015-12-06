@@ -32,5 +32,5 @@ b.mutateIvar()
 // CHECK-NEXT: [{{.*}}] $builtin_log_scope_entry
 // CHECK-NEXT: [{{.*}}] $builtin_log_scope_exit
 // CHECK-NEXT: [{{.*}}] $builtin_log[a='main.A']
-// CHECK-NEXT: [{{.*}}] $builtin_log_scope_exit 
+// CHECK-NEXT: [{{.*}}] $builtin_log_scope_exit
 // CHECK-NEXT: [{{.*}}] $builtin_log[b='main.B']

@@ -12,7 +12,7 @@ class B: A {
   override class func foo() {}
 }
 
-// CHECK-LABEL: sil @_TF22devirt_value_metatypes17testValueMetatypeFCS_1AT_ 
+// CHECK-LABEL: sil @_TF22devirt_value_metatypes17testValueMetatypeFCS_1AT_
 // CHECK: value_metatype $@thick A.Type
 // CHECK: checked_cast_br
 // CHECK: checked_cast_br

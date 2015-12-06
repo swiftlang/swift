@@ -145,7 +145,7 @@
   (set (make-local-variable 'electric-layout-rules)
        '((?\{ . after) (?\} . before)))
   
-  (set (make-local-variable 'font-lock-defaults) 
+  (set (make-local-variable 'font-lock-defaults)
        '(swift-font-lock-keywords) ))
 
 (defun swift-indent-line ()
@@ -184,13 +184,13 @@
         ,(concat
      "^"
        "[ \t]+" "\\(?:(@\\)?"
-       "[A-Z][A-Za-z0-9_]*@" 
+       "[A-Z][A-Za-z0-9_]*@"
      ;; Filename \1
        "\\("
-          "[0-9]*[^0-9\n]" 
-          "\\(?:" 
-             "[^\n :]" "\\|" " [^/\n]" "\\|" ":[^ \n]" 
-          "\\)*?" 
+          "[0-9]*[^0-9\n]"
+          "\\(?:"
+             "[^\n :]" "\\|" " [^/\n]" "\\|" ":[^ \n]"
+          "\\)*?"
        "\\)"
        ":"
        ;; Line number (\2)
@@ -208,10 +208,10 @@
        "[0-9]+[.][ \t]+While .* at \\[?"
      ;; Filename \1
        "\\("
-          "[0-9]*[^0-9\n]" 
-          "\\(?:" 
-             "[^\n :]" "\\|" " [^/\n]" "\\|" ":[^ \n]" 
-          "\\)*?" 
+          "[0-9]*[^0-9\n]"
+          "\\(?:"
+             "[^\n :]" "\\|" " [^/\n]" "\\|" ":[^ \n]"
+          "\\)*?"
        "\\)"
        ":"
        ;; Line number (\2)
@@ -228,10 +228,10 @@
      "^\\(?:assertion failed\\|fatal error\\): \\(?:.*: \\)?file "
      ;; Filename \1
        "\\("
-          "[0-9]*[^0-9\n]" 
-          "\\(?:" 
-             "[^\n :]" "\\|" " [^/\n]" "\\|" ":[^ \n]" 
-          "\\)*?" 
+          "[0-9]*[^0-9\n]"
+          "\\(?:"
+             "[^\n :]" "\\|" " [^/\n]" "\\|" ":[^ \n]"
+          "\\)*?"
        "\\)"
        ", line "
        ;; Line number (\2)

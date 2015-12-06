@@ -1459,7 +1459,7 @@ namespace {
   public:
     ExprRewriter(ConstraintSystem &cs, const Solution &solution,
                  bool suppressDiagnostics)
-      : cs(cs), dc(cs.DC), solution(solution), 
+      : cs(cs), dc(cs.DC), solution(solution),
         SuppressDiagnostics(suppressDiagnostics) { }
 
     ConstraintSystem &getConstraintSystem() const { return cs; }
@@ -1676,7 +1676,7 @@ namespace {
                tc.Context.Id_BooleanLiteralType,
                initName,
                builtinProtocol,
-               Type(BuiltinIntegerType::get(BuiltinIntegerWidth::fixed(1), 
+               Type(BuiltinIntegerType::get(BuiltinIntegerWidth::fixed(1),
                                             tc.Context)),
                builtinInitName,
                nullptr,
@@ -1765,7 +1765,7 @@ namespace {
         if (!forceASCII &&
             tc.conformsToProtocol(type, builtinProtocol, cs.DC,
                                   ConformanceCheckFlags::InExpression)) {
-          builtinLiteralFuncName 
+          builtinLiteralFuncName
             = DeclName(tc.Context, tc.Context.Id_init,
                        { tc.Context.Id_builtinUTF16StringLiteral,
                          tc.Context.getIdentifier("numberOfCodeUnits") });
@@ -1785,7 +1785,7 @@ namespace {
           builtinProtocol = tc.getProtocol(
               expr->getLoc(),
               KnownProtocolKind::BuiltinStringLiteralConvertible);
-          builtinLiteralFuncName 
+          builtinLiteralFuncName
             = DeclName(tc.Context, tc.Context.Id_init,
                        { tc.Context.Id_builtinStringLiteral,
                          tc.Context.getIdentifier("byteSize"),
@@ -2312,7 +2312,7 @@ namespace {
         = selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
       auto result = buildMemberRef(base,
                                    selected.openedFullType,
-                                   expr->getDotLoc(), member, 
+                                   expr->getDotLoc(), member,
                                    expr->getNameLoc(),
                                    selected.openedType,
                                    cs.getConstraintLocator(expr),
@@ -2325,7 +2325,7 @@ namespace {
 
       // If there was an argument, apply it.
       if (auto arg = expr->getArgument()) {
-        ApplyExpr *apply = new (tc.Context) CallExpr(result, arg, 
+        ApplyExpr *apply = new (tc.Context) CallExpr(result, arg,
                                                      /*Implicit=*/false);
         result = finishApply(apply, Type(), cs.getConstraintLocator(expr));
       }
@@ -2371,7 +2371,7 @@ namespace {
                                              baseMetaTy->getInstanceType());
           
           // FIXME: We're dropping side effects in the base here!
-          base = TypeExpr::createImplicitHack(base->getLoc(), classTy, 
+          base = TypeExpr::createImplicitHack(base->getLoc(), classTy,
                                               tc.Context);
         } else {
           // Bridge the base to its corresponding Objective-C object.
@@ -2517,14 +2517,14 @@ namespace {
 
           first = false;
           continue;
-        } 
+        }
 
         typeElements.push_back(elt->getType());
         names.push_back(Identifier());
       }
 
       Type argType = TupleType::get(typeElements, tc.Context);
-      Expr *arg = TupleExpr::create(tc.Context, SourceLoc(), 
+      Expr *arg = TupleExpr::create(tc.Context, SourceLoc(),
                                     expr->getElements(),
                                     names,
                                     { },
@@ -2583,7 +2583,7 @@ namespace {
 
           first = false;
           continue;
-        } 
+        }
 
         typeElements.push_back(elt->getType());
         names.push_back(Identifier());
@@ -2854,7 +2854,7 @@ namespace {
     }
 
     /// Handle optional operands and results in an explicit cast.
-    Expr *handleOptionalBindings(ExplicitCastExpr *cast, 
+    Expr *handleOptionalBindings(ExplicitCastExpr *cast,
                                  Type finalResultType,
                                  bool conditionalCast) {
       auto &tc = cs.getTypeChecker();
@@ -3219,7 +3219,7 @@ namespace {
       
       // Coerce the object type, if necessary.
       auto subExpr = expr->getSubExpr();
-      if (auto objectTy = subExpr->getType()->getAnyOptionalObjectType()) {        
+      if (auto objectTy = subExpr->getType()->getAnyOptionalObjectType()) {
         if (objectTy && !objectTy->isEqual(valueType)) {
           auto coercedSubExpr = coerceToType(subExpr,
                                              OptionalType::get(valueType),
@@ -3277,7 +3277,7 @@ namespace {
         tc.diagnose(injection->getLoc(), diag::inject_forced_downcast,
                     injection->getSubExpr()->getType()->getRValueType());
         auto exclaimLoc = cast->getExclaimLoc();
-        tc.diagnose(exclaimLoc, diag::forced_to_conditional_downcast, 
+        tc.diagnose(exclaimLoc, diag::forced_to_conditional_downcast,
                     injection->getType()->getAnyOptionalObjectType())
           .fixItReplace(exclaimLoc, "?");
         tc.diagnose(cast->getStartLoc(), diag::silence_inject_forced_downcast)
@@ -3289,7 +3289,7 @@ namespace {
     /// Diagnose an optional injection that is probably not what the
     /// user wanted, because it comes from a forced downcast.
     void diagnoseOptionalInjection(InjectIntoOptionalExpr *injection) {
-      // Don't diagnose when we're injecting into 
+      // Don't diagnose when we're injecting into
       auto toOptionalType = injection->getType();
       if (toOptionalType->getImplicitlyUnwrappedOptionalObjectType())
         return;
@@ -5223,7 +5223,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                     covariantResultType);
       else
         result = new (tc.Context) CovariantReturnConversionExpr(
-                                    result, 
+                                    result,
                                     covariantResultType);
     }
 
@@ -5849,7 +5849,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
     return true;
   }
 
-  case FixKind::TupleToScalar: 
+  case FixKind::TupleToScalar:
   case FixKind::ScalarToTuple:
   case FixKind::RelabelCallTuple:
     return diagnoseArgumentLabelError(affected,
@@ -5941,7 +5941,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
 
         current = parentMap[current];
         continue;
-      } 
+      }
       
       // We previously found the reference to fromRaw, so we're
       // looking for the call.
@@ -5950,11 +5950,11 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
         break;
       
       current = parentMap[current];
-      continue;          
+      continue;
     } while (current);
 
     if (fromRawCall) {
-      TC.diagnose(fromRawRef->getNameLoc(), 
+      TC.diagnose(fromRawRef->getNameLoc(),
                   diag::migrate_from_raw_to_init)
         .fixItReplace(SourceRange(fromRawRef->getDotLoc(),
                                   fromRawCall->getArg()->getStartLoc()),
@@ -5982,7 +5982,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
 
         current = parentMap[current];
         continue;
-      } 
+      }
       
       // We previously found the reference to toRaw, so we're
       // looking for the call.
@@ -5991,7 +5991,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
         break;
       
       current = parentMap[current];
-      continue;          
+      continue;
     } while (current);
 
     if (toRawCall) {
@@ -6231,7 +6231,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   Expr *arg;
   if (arguments.size() == 1 &&
       (isVariadicWitness(witness) ||
-       argumentNamesMatch(arguments[0], 
+       argumentNamesMatch(arguments[0],
                           witness->getFullName().getArgumentNames()))) {
     arg = arguments[0];
   } else {
@@ -6405,7 +6405,7 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
   (void)failed;
 
   // Call the builtin method.
-  Expr *arg = TupleExpr::createEmpty(ctx, expr->getStartLoc(), 
+  Expr *arg = TupleExpr::createEmpty(ctx, expr->getStartLoc(),
                                      expr->getEndLoc(), /*Implicit=*/true);
   expr = new (ctx) CallExpr(memberRef, arg, /*Implicit=*/true);
   failed = tc.typeCheckExpressionShallow(expr, cs.DC);

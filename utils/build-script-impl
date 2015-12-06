@@ -1248,7 +1248,7 @@ function cmake_config_opt() {
                 ;;
             foundation)
                 echo "--config ${FOUNDATION_BUILD_TYPE}"
-                ;;            
+                ;;
             *)
                 echo "error: unknown product: ${product}"
                 exit 1
@@ -2215,14 +2215,14 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
 
       if [[ "${DARWIN_TOOLCHAIN_APPLICATION_CERT}" ]] ; then
         echo "-- Codesign xctoolchain --"
-        "${SWIFT_SOURCE_DIR}/utils/toolchain-codesign" "${DARWIN_TOOLCHAIN_APPLICATION_CERT}" "${INSTALL_DESTDIR}/${TOOLCHAIN_PREFIX}" 
+        "${SWIFT_SOURCE_DIR}/utils/toolchain-codesign" "${DARWIN_TOOLCHAIN_APPLICATION_CERT}" "${INSTALL_DESTDIR}/${TOOLCHAIN_PREFIX}"
       fi
       if [[ "${DARWIN_TOOLCHAIN_INSTALLER_PACKAGE}" ]] ; then
         echo "-- Create Installer --"
         "${SWIFT_SOURCE_DIR}/utils/toolchain-installer" "${INSTALL_DESTDIR}/${TOOLCHAIN_PREFIX}" "${DARWIN_TOOLCHAIN_BUNDLE_IDENTIFIER}" \
         "${DARWIN_TOOLCHAIN_INSTALLER_CERT}" "${DARWIN_TOOLCHAIN_INSTALLER_PACKAGE}" "${DARWIN_TOOLCHAIN_INSTALL_LOCATION}" \
         "${DARWIN_TOOLCHAIN_VERSION}" "${SWIFT_SOURCE_DIR}/utils/darwin-installer-scripts"
-      fi 
+      fi
 
       (cd "${INSTALL_DESTDIR}" &&
         tar -c -z -f "${INSTALLABLE_PACKAGE}" "${TOOLCHAIN_PREFIX/#\/}")

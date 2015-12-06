@@ -52,7 +52,7 @@ func p<p>() -> (p, p -> p) -> p {
     })
 }
 j(k(m, k(2, 3)))
-func l(p: j) -> <n>(() -> n 
+func l(p: j) -> <n>(() -> n
 func ^(a: BooleanType, Bool) -> Bool {
     return !(a)
 }
@@ -90,7 +90,7 @@ let o: e = { c, g
     return f(c)
 }(l) -> m) -> p>, e>
 }
-class n<j : n> 
+class n<j : n>
 struct A<T> {
     let a: [(T, () -> ())] = []
 }
@@ -162,7 +162,7 @@ struct A<T> {
     let a: [(T, () - == g> {
 }
 protocol g {
-    typealias f 
+    typealias f
     typealias e
 }
 struct c<h : g> : g {

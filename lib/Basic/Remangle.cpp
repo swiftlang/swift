@@ -74,7 +74,7 @@ static void mangleIdentifier(StringRef ident, OperatorKind operatorKind,
                              bool usePunycode, DemanglerPrinter &out) {
   std::string punycodeBuf;
   if (usePunycode) {
-    // If the identifier contains non-ASCII character, we mangle 
+    // If the identifier contains non-ASCII character, we mangle
     // with an initial X and Punycode the identifier string.
     if (isNonAscii(ident)) {
       out << 'X';
@@ -152,7 +152,7 @@ namespace {
 static size_t deepHash(Node *node) {
   DeepHasher hasher;
   hasher.hash(node);
-  return hasher.value;  
+  return hasher.value;
 }
 
 static bool deepEquals(Node *lhs, Node *rhs) {
@@ -961,7 +961,7 @@ void Remangler::mangleType(Node *node) {
   mangleSingleChildNode(node);
 }
 
-template <size_t N> 
+template <size_t N>
 static bool stripPrefix(StringRef &string, const char (&data)[N]) {
   constexpr size_t prefixLength = N - 1;
   if (!string.startswith(StringRef(data, prefixLength)))

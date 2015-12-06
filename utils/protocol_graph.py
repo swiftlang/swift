@@ -102,7 +102,7 @@ def parseGenericOperator(m):
 def parseProtocol(m):
     child = m.group(1)
     # skip irrelevant protocols
-    if re.match(r'_Builtin.*Convertible', child): return 
+    if re.match(r'_Builtin.*Convertible', child): return
     graph.setdefault(child, set())
     body[child] = bodyLines(m.group(3))
     if m.group(2):
@@ -136,7 +136,7 @@ clusters = dict((c, nodes) for (c, nodes) in clusterBuilder.items() if len(nodes
 # A set of all intra-cluster edges
 clusterEdges = set(
     (s, t) for (c, elements) in clusters.items()
-    for s in elements 
+    for s in elements
     for t in graph[s] if t in elements)
 
 print 'digraph ProtocolHierarchies {'
@@ -172,4 +172,4 @@ for (parent, children) in sorted(graph.items()):
         sorted(child for child in children if not (parent, child) in clusterEdges)),
     print '}'
 
-print '}'    
+print '}'

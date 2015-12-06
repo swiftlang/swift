@@ -157,7 +157,7 @@ bb0:
   %f2 = function_ref @_is_native_X_no_type_check : $@convention(method) (@guaranteed Array<X>) -> Bool
   %r1 = apply %f2(%a2) : $@convention(method) (@guaranteed Array<X>) -> Bool
   return %r1 : $Bool
-} 
+}
 
 // CHECK-LABEL: sil @test_tuple_unknown_member
 // CHECK: [[F:%[0-9]+]] = function_ref @_is_native_X_no_type_check
@@ -172,7 +172,7 @@ bb0(%0 : $Array<X>):
   %f2 = function_ref @_is_native_X_no_type_check : $@convention(method) (@guaranteed Array<X>) -> Bool
   %r1 = apply %f2(%a2) : $@convention(method) (@guaranteed Array<X>) -> Bool
   return %r1 : $Bool
-} 
+}
 
 // CHECK-LABEL: sil @test_unknown_tuple
 // CHECK: [[F:%[0-9]+]] = function_ref @_is_native_X_no_type_check
@@ -187,7 +187,7 @@ bb0:
   %f2 = function_ref @_is_native_X_no_type_check : $@convention(method) (@guaranteed Array<X>) -> Bool
   %r1 = apply %f2(%a2) : $@convention(method) (@guaranteed Array<X>) -> Bool
   return %r1 : $Bool
-} 
+}
 
 // CHECK-LABEL: sil @test_tuple_member_escapes
 // CHECK: [[F:%[0-9]+]] = function_ref @_is_native_X_no_type_check
@@ -206,7 +206,7 @@ bb0:
   %r1 = apply %f2(%a2) : $@convention(method) (@guaranteed Array<X>) -> Bool
   dealloc_stack %s1#0 : $*@local_storage (Array<X>, Builtin.Int64)
   return %r1 : $Bool
-} 
+}
 
 // CHECK-LABEL: sil @test_tuple_phi
 // CHECK: [[I:%[0-9]+]] = integer_literal $Builtin.Int1, -1

@@ -79,7 +79,7 @@ public struct GeneratorOf<T> : GeneratorType, SequenceType {
 
 // rdar://problem/19009056
 public struct LazySequenceOf<S : SequenceType, A where S.Generator.Element == A> : SequenceType {
-  public func generate() -> GeneratorOf<A> { 
+  public func generate() -> GeneratorOf<A> {
     return GeneratorOf<A>({ return nil })
   }
   public subscript(i : A) -> A { return i }

@@ -19,4 +19,4 @@ func a: T) {
 }
 }
 protocol b {
-func b<S : b = 
+func b<S : b =

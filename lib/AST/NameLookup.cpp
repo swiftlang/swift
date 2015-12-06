@@ -140,7 +140,7 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
 
   /// Objective-C initializers are tracked by their context type and
   /// full name.
-  llvm::SmallDenseMap<std::pair<CanType, DeclName>, 
+  llvm::SmallDenseMap<std::pair<CanType, DeclName>,
                       llvm::TinyPtrVector<ConstructorDecl *>>
     ObjCCollidingConstructors;
   bool anyCollisions = false;

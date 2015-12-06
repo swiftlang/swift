@@ -2,7 +2,7 @@
 
 // REQUIRES: objc_interop
 
-class Root : Hashable { 
+class Root : Hashable {
   var hashValue: Int {
     return 0
   }

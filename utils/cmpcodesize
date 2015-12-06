@@ -283,7 +283,7 @@ def compareFunctionSizes(oldFiles, newFiles):
     if onlyInFile2:
         print "Only in new files(s)"
         listFunctionSizes(onlyInFile2)
-        print "Total size of functions only in new file: {}".format(onlyInFile2Size) 
+        print "Total size of functions only in new file: {}".format(onlyInFile2Size)
         print
 
     if inBoth:
@@ -374,7 +374,7 @@ def main():
                     numExpanded += 1
 
         if numExpanded != 0 and numExpanded != len(oldFileArgs):
-            sys.exit("mix of expanded/not-expanded arguments") 
+            sys.exit("mix of expanded/not-expanded arguments")
         if numExpanded == 0:
             if len(oldFileArgs) > 2:
                 sys.exit("too many arguments")

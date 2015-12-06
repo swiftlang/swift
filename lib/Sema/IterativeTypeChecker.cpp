@@ -62,7 +62,7 @@ bool IterativeTypeChecker::breakCycle(TypeCheckRequest request) {
     return breakCycleFor##Request(request.get##PayloadName##Payload());
 
 #include "swift/Sema/TypeCheckRequestKinds.def"
-  }  
+  }
 }
 
 void IterativeTypeChecker::satisfy(TypeCheckRequest request) {

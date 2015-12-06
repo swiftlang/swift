@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  
+//
 //
 //===----------------------------------------------------------------------===//
 
@@ -105,7 +105,7 @@ public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
   /// either `self` or `other`, but not both.
   ///
   /// - Equivalent to replacing `self` with `self.exclusiveOr(other)`
-  mutating func exclusiveOrInPlace(other: Self)  
+  mutating func exclusiveOrInPlace(other: Self)
 
   //===--- Requirements with default implementations ----------------------===//
   /// Returns the set of elements contained in `self` but not in `other`.

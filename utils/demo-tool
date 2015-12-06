@@ -153,7 +153,7 @@ for example::
     # continue.
     for item in demo_script:
         shouldClear = bool(item['clearScreen'])
-        noReturn = bool(item['noReturn'])        
+        noReturn = bool(item['noReturn'])
         command = str(item['command'])
         comment = str(item['comment'])
         
@@ -171,7 +171,7 @@ for example::
                   time.sleep(random.random() * 0.03)
 
             if not noReturn:
-              # Wait for user input, then send a return.        
+              # Wait for user input, then send a return.
               raw_input('press enter to send return...')
               send('\n')
           

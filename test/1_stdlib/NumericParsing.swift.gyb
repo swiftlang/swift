@@ -25,7 +25,7 @@ def maskOfWidth(n):
 
 def inRadix(radix, n, zero = '0'):
   """
-Represent the int n in the given radix.  
+Represent the int n in the given radix.
 Note: the third parameter, zero, is not for user consumption.
   """
   if n < 0: return '-' + inRadix(radix, -n, '')
@@ -43,7 +43,7 @@ radices_to_test = [2, 8, 10, 16, max_radix]
 
 # How many values to test in each radix?  A nice prime number of course.
 number_of_values = 23
-}% 
+}%
 
 import StdlibUnittest
 
@@ -155,13 +155,13 @@ tests.test("${Self}/Basics") {
   // Overflow and underflow.  Interleave with other checks to make
   // sure we're not abusing errno
   expectEqual(0.0, ${Self}("0"))
-  expectEmpty(${Self}("2e99999999999999"))  
+  expectEmpty(${Self}("2e99999999999999"))
   expectEqual(0.0, ${Self}("0"))
-  expectEmpty(${Self}("2e-99999999999999"))  
+  expectEmpty(${Self}("2e-99999999999999"))
   expectEqual(0.0, ${Self}("0"))
-  expectEmpty(${Self}("-2e99999999999999"))  
+  expectEmpty(${Self}("-2e99999999999999"))
   expectEqual(0.0, ${Self}("0"))
-  expectEmpty(${Self}("-2e-99999999999999"))  
+  expectEmpty(${Self}("-2e-99999999999999"))
   expectEqual(0.0, ${Self}("0"))
 }
 

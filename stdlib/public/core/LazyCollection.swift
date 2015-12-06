@@ -82,7 +82,7 @@ extension LazyCollection : SequenceType {
   /// - Complexity: O(N).
   public func underestimateCount() -> Int { return _base.underestimateCount() }
 
-  public func _copyToNativeArrayBuffer() 
+  public func _copyToNativeArrayBuffer()
      -> _ContiguousArrayBuffer<Base.Generator.Element> {
     return _base._copyToNativeArrayBuffer()
   }
@@ -95,7 +95,7 @@ extension LazyCollection : SequenceType {
 
   public func _customContainsEquatableElement(
     element: Base.Generator.Element
-  ) -> Bool? { 
+  ) -> Bool? {
     return _base._customContainsEquatableElement(element)
   }
 }

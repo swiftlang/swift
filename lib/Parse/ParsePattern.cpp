@@ -211,7 +211,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         // Operators can not have API names.
         if (paramContext == ParameterContextKind::Operator &&
             param.PoundLoc.isValid()) {
-          diagnose(param.PoundLoc, 
+          diagnose(param.PoundLoc,
                    diag::parameter_operator_keyword_argument)
             .fixItRemove(param.PoundLoc);
           param.PoundLoc = SourceLoc();
@@ -244,7 +244,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       if (paramContext == ParameterContextKind::Operator &&
           !param.FirstName.empty() &&
           param.SecondNameLoc.isValid()) {
-        diagnose(param.FirstNameLoc, 
+        diagnose(param.FirstNameLoc,
                  diag::parameter_operator_keyword_argument)
           .fixItRemoveChars(param.FirstNameLoc, param.SecondNameLoc);
         param.FirstName = param.SecondName;
@@ -578,7 +578,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
 
     // Turn the parameter clause into argument and body patterns.
     auto pattern = mapParsedParameters(*this, leftParenLoc, params,
-                                       rightParenLoc, 
+                                       rightParenLoc,
                                        isFirstParameterClause,
                                        isFirstParameterClause ? &NamePieces
                                                               : nullptr,
@@ -653,7 +653,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
 
     Status = parseFunctionArguments(NamePieces, bodyPatterns, paramContext,
                                     defaultArgs);
-    FullName = DeclName(Context, SimpleName, 
+    FullName = DeclName(Context, SimpleName,
                         llvm::makeArrayRef(NamePieces.begin() + 1,
                                            NamePieces.end()));
 
@@ -762,14 +762,14 @@ Parser::parseConstructorArguments(DeclName &FullName, Pattern *&BodyPattern,
   SourceLoc leftParenLoc, rightParenLoc;
   
   // Parse the parameter clause.
-  ParserStatus status 
+  ParserStatus status
     = parseParameterClause(leftParenLoc, params, rightParenLoc,
                            &DefaultArgs, ParameterContextKind::Initializer);
 
   // Turn the parameter clause into argument and body patterns.
   llvm::SmallVector<Identifier, 2> namePieces;
   BodyPattern = mapParsedParameters(*this, leftParenLoc, params,
-                                    rightParenLoc, 
+                                    rightParenLoc,
                                     /*isFirstParameterClause=*/true,
                                     &namePieces,
                                     ParameterContextKind::Initializer);

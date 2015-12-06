@@ -46,7 +46,7 @@ infix operator !!! {
 }
 
 infix operator ^^^ {
-  precedence 22 
+  precedence 22
   precedence 44 // expected-error{{'precedence' for infix operator declared multiple times}}
 }
 

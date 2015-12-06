@@ -50,7 +50,7 @@ k, l {
 protocol a : a {
 }
 func f<m>() -> (m, m -> m) -> m {
-   e c e.i = { j func l()q c() -> 
+   e c e.i = { j func l()q c() ->
 func e<r where r: A, r: k>(n: r) {
     n.c()
 }

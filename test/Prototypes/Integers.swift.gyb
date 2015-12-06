@@ -167,7 +167,7 @@ public typealias Word = Int${word_bits}
 public typealias UWord = UInt${word_bits}
 
 public protocol IntegerType
-  : Comparable, ArithmeticType, 
+  : Comparable, ArithmeticType,
     IntegerLiteralConvertible, CustomStringConvertible  {
 
   // Dispatching through these puts less stress on the user reading
@@ -190,7 +190,7 @@ public protocol IntegerType
 
   init<T : IntegerType>(_ source: T)
   
-  init<T : IntegerType>(extendingOrTruncating source: T)  
+  init<T : IntegerType>(extendingOrTruncating source: T)
 }
 
 //===--- Homogeneous comparison -------------------------------------------===//
@@ -268,8 +268,8 @@ public func > <T : IntegerType, U : IntegerType>(lhs: T, rhs: U) -> Bool {
 // These two versions of the operators are not ordered with respect to
 // one another:
 //
-//     <T : Comparable>(T,T) -> Bool 
-//     <T : IntegerType, U : IntegerType>(T,U) -> Bool 
+//     <T : Comparable>(T,T) -> Bool
+//     <T : IntegerType, U : IntegerType>(T,U) -> Bool
 //
 // so we define:
 //
@@ -380,7 +380,7 @@ public func ${x.nonMaskingOperator} <
   T: FixedWidthIntegerType, U: IntegerType
 >(lhs: T, rhs: U) -> T {
   let shift = rhs < -T.bitWidth ? -T.bitWidth
-            : rhs > T.bitWidth ? T.bitWidth 
+            : rhs > T.bitWidth ? T.bitWidth
             : Word(rhs)
   return lhs ${x.nonMaskingOperator} shift
 }
@@ -639,7 +639,7 @@ extension SignedIntegerType where Self : FixedWidthIntegerType {
 %     z = 's' if signed else 'z'
 public struct ${Self}
   : FixedWidthIntegerType, ${Unsigned}IntegerType,
-    _BuiltinIntegerLiteralConvertible {  
+    _BuiltinIntegerLiteralConvertible {
 
   @_transparent
   public init(_builtinIntegerLiteral x: _MaxBuiltinIntegerType) {
@@ -1009,7 +1009,7 @@ tests.test("extendingOrTruncating") {
   expectEqual(0b1111_1100, UInt8(extendingOrTruncating: -1 << 67 - 4 as DWord))
   expectEqual(128, UInt8(extendingOrTruncating: 128 + 1024 as UDWord))
   expectEqual(129, UInt8(extendingOrTruncating: 129 + 1024 as UDWord))
-}  
+}
 
 tests.test("HeterogeneousEquality") {
   expectTrue(-1 as DWord != UDWord.max)

@@ -185,7 +185,7 @@ public func _arrayConditionalCast<SourceElement, TargetElement>(
   source: [SourceElement]
 ) -> [TargetElement]? {
   switch (_ValueOrReference(SourceElement.self), _BridgeStyle(TargetElement.self)) {
-  case (.Value, _): 
+  case (.Value, _):
     _sanityCheckFailure(
       "Conditional cast from array of value types not prevented at compile-time")
   case (.Reference, .Verbatim):

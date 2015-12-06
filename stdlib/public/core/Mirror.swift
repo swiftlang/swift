@@ -36,11 +36,11 @@ public struct Mirror {
   case Generated
 
   /// Suppress the representation of descendant classes that don't
-  /// override `customMirror()`.  
+  /// override `customMirror()`.
   ///
   /// This option may be useful at the root of a class cluster, where
   /// implementation details of descendants should generally not be
-  /// visible to clients.  
+  /// visible to clients.
   case Suppressed
   }
 
@@ -56,7 +56,7 @@ public struct Mirror {
   ///
   /// - Note: This option bypasses any implementation of `customMirror`
   ///   that may be supplied by a `CustomReflectable` ancestor, so this
-  ///   is typically not the right option for a `customMirror`implementation 
+  ///   is typically not the right option for a `customMirror`implementation
     
   /// Generate a default mirror for all ancestor classes.
   ///

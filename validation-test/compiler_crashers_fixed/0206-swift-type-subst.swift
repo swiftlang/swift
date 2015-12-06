@@ -94,7 +94,7 @@ func c<d {
 class a<f : b, g : b where f.d == g> {
 }
 protocol b {
-    typealias d 
+    typealias d
     typealias e
 }
 struct c<h : b> : b {

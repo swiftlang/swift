@@ -81,7 +81,7 @@ func testRedeclarations() {
   let _: UnavailProto3 // expected-error {{is unavailable: last}}
 }
 
-func test_NSZone(z : NSZone) { 
+func test_NSZone(z : NSZone) {
   NSCreateZone(1, 1, true)  // expected-error {{'NSCreateZone' is unavailable}}
   NSSetZoneName(z, "name")  // expected-error {{'NSSetZoneName' is unavailable}}
   NSZoneName(z)             // expected-error {{'NSZoneName' is unavailable}}

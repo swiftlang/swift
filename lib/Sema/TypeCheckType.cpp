@@ -46,7 +46,7 @@ Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType) {
   return ArraySliceType::get(elementType);
 }
 
-Type TypeChecker::getDictionaryType(SourceLoc loc, Type keyType, 
+Type TypeChecker::getDictionaryType(SourceLoc loc, Type keyType,
                                     Type valueType) {
   if (!Context.getDictionaryDecl()) {
     diagnose(loc, diag::sugar_type_not_found, 3);
@@ -744,7 +744,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   // declaration context.
   if (unsatisfiedDependency &&
       (*unsatisfiedDependency)(
-        requestUnqualifiedLookupInDeclContext({ lookupDC, 
+        requestUnqualifiedLookupInDeclContext({ lookupDC,
                                                 comp->getIdentifier(),
                                                 comp->getIdLoc() })))
     return nullptr;
@@ -1188,7 +1188,7 @@ Type TypeChecker::resolveIdentifierType(
   auto ComponentRange = IdType->getComponentRange();
   auto Components = llvm::makeArrayRef(ComponentRange.begin(),
                                        ComponentRange.end());
-  Type result = resolveIdentTypeComponent(*this, DC, Components, options, 
+  Type result = resolveIdentTypeComponent(*this, DC, Components, options,
                                           diagnoseErrors, resolver,
                                           unsatisfiedDependency);
   if (!result) return nullptr;
@@ -1432,7 +1432,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   
   // In SIL *only*, allow @thin, @thick, or @objc_metatype to apply to
   // a metatype.
-  if (attrs.has(TAK_thin) || attrs.has(TAK_thick) || 
+  if (attrs.has(TAK_thin) || attrs.has(TAK_thick) ||
       attrs.has(TAK_objc_metatype)) {
     if (auto SF = DC->getParentSourceFile()) {
       if (SF->Kind == SourceFileKind::SIL) {
@@ -1463,7 +1463,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           // Check for @thick.
           if (attrs.has(TAK_thick)) {
             if (storedRepr)
-              TC.diagnose(repr->getStartLoc(), 
+              TC.diagnose(repr->getStartLoc(),
                           diag::sil_metatype_multiple_reprs);
               
             storedRepr = MetatypeRepresentation::Thick;
@@ -1473,7 +1473,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           // Check for @objc_metatype.
           if (attrs.has(TAK_objc_metatype)) {
             if (storedRepr)
-              TC.diagnose(repr->getStartLoc(), 
+              TC.diagnose(repr->getStartLoc(),
                           diag::sil_metatype_multiple_reprs);
               
             storedRepr = MetatypeRepresentation::ObjC;
@@ -1513,7 +1513,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     for (auto silOnlyAttr : {TAK_callee_owned, TAK_callee_guaranteed}) {
       checkUnsupportedAttr(silOnlyAttr);
     }
-  }  
+  }
 
   // Other function representation attributes are not normally supported at
   // source level, but we want to support them there in SIL files.
@@ -1697,7 +1697,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         attrs.clearAttribute(i);
       }
     }
-  } 
+  }
 
   // If we didn't build the type differently above, build it normally now.
   if (!ty) ty = resolveType(repr, options);
@@ -2113,7 +2113,7 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
   Type valueTy = resolveType(repr->getValue(), withoutContext(options));
   if (!valueTy || valueTy->is<ErrorType>()) return valueTy;
   
-  if (auto dictTy = TC.getDictionaryType(repr->getBrackets().Start, keyTy, 
+  if (auto dictTy = TC.getDictionaryType(repr->getBrackets().Start, keyTy,
                                          valueTy)) {
     // Check the requirements on the generic arguments.
     auto unboundTy = UnboundGenericType::get(TC.Context.getDictionaryDecl(),
@@ -2195,7 +2195,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
       TC.diagnose(repr->getEllipsisLoc(), diag::tuple_ellipsis);
       repr->removeEllipsis();
       complained = true;
-    } 
+    }
 
     // Single-element labeled tuples are not permitted, either.
     if (elements.size() == 1 && elements[0].hasName() &&
@@ -2677,7 +2677,7 @@ bool TypeChecker::isRepresentableInObjC(
       if (!storage->isObjC()) {
         if (Diagnose) {
           auto error = FD->isGetter()
-                    ? (isa<VarDecl>(storage) 
+                    ? (isa<VarDecl>(storage)
                          ? diag::objc_getter_for_nonobjc_property
                          : diag::objc_getter_for_nonobjc_subscript)
                     : (isa<VarDecl>(storage)

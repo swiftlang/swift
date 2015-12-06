@@ -514,7 +514,7 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
   // Print the projection type first.
   OS << "Address Projection Type: ";
   OS << P.getType() << "\n";
-  if (P.isNominalKind()) { 
+  if (P.isNominalKind()) {
     OS << "Field Type: ";
     P.getDecl()->print(OS);
   } else {
@@ -789,7 +789,7 @@ private:
            "Should only create root when ProjectionTreeNodes is empty");
     auto *Node = new (Allocator) ProjectionTreeNode(BaseTy);
     ProjectionTreeNodes.push_back(Node);
-  }  
+  }
 
   ProjectionTreeNode *createChild(ProjectionTreeNode *Parent,
                                   SILType BaseTy,

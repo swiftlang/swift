@@ -39,7 +39,7 @@ struct X0e : P0 { // expected-error{{type 'X0e' does not conform to protocol 'P0
   func f0(_: Double) { } // expected-note{{matching requirement 'f0' to this declaration inferred associated type to 'Double}}
   func f0(_: Int) { } // expected-note{{matching requirement 'f0' to this declaration inferred associated type to 'Int'}}
   func g0(_: Double) { }
-  func g0(_: Int) { } 
+  func g0(_: Int) { }
 }
 
 struct X0f : P0 { // okay: Assoc1 = Int because Float doesn't conform to PSimple

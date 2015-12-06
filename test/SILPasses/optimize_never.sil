@@ -15,13 +15,13 @@ import SwiftShims
 
 public class C {
   @inline(never) func foo() -> Int32
-   deinit 
+   deinit
   init()
 }
 
 public class D : C {
   @inline(never) override func foo() -> Int32
-   deinit 
+   deinit
   override init()
 }
 

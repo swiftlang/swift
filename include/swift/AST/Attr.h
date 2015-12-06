@@ -809,7 +809,7 @@ public:
                           bool implicitName);
 
   /// Create an unnamed Objective-C attribute, i.e., @objc.
-  static ObjCAttr *createUnnamed(ASTContext &Ctx, SourceLoc AtLoc, 
+  static ObjCAttr *createUnnamed(ASTContext &Ctx, SourceLoc AtLoc,
                                  SourceLoc ObjCLoc);
 
   static ObjCAttr *createUnnamedImplicit(ASTContext &Ctx);
@@ -820,8 +820,8 @@ public:
   /// Note that a nullary Objective-C attribute may represent either a
   /// selector for a zero-parameter function or some other Objective-C
   /// entity, such as a class or protocol.
-  static ObjCAttr *createNullary(ASTContext &Ctx, SourceLoc AtLoc, 
-                                 SourceLoc ObjCLoc, SourceLoc LParenLoc, 
+  static ObjCAttr *createNullary(ASTContext &Ctx, SourceLoc AtLoc,
+                                 SourceLoc ObjCLoc, SourceLoc LParenLoc,
                                  SourceLoc NameLoc, Identifier Name,
                                  SourceLoc RParenLoc);
 
@@ -831,13 +831,13 @@ public:
   /// Note that a nullary Objective-C attribute may represent either a
   /// selector for a zero-parameter function or some other Objective-C
   /// entity, such as a class or protocol.
-  static ObjCAttr *createNullary(ASTContext &Ctx, Identifier Name, 
+  static ObjCAttr *createNullary(ASTContext &Ctx, Identifier Name,
                                  bool isNameImplicit);
 
   /// Create a "selector" Objective-C attribute, which has some number
   /// of identifiers followed by colons.
-  static ObjCAttr *createSelector(ASTContext &Ctx, SourceLoc AtLoc, 
-                                  SourceLoc ObjCLoc, SourceLoc LParenLoc, 
+  static ObjCAttr *createSelector(ASTContext &Ctx, SourceLoc AtLoc,
+                                  SourceLoc ObjCLoc, SourceLoc LParenLoc,
                                   ArrayRef<SourceLoc> NameLocs,
                                   ArrayRef<Identifier> Names,
                                   SourceLoc RParenLoc);
@@ -972,7 +972,7 @@ class InlineAttr : public DeclAttribute {
   InlineKind Kind;
 public:
   InlineAttr(SourceLoc atLoc, SourceRange range, InlineKind kind)
-    : DeclAttribute(DAK_Inline, atLoc, range, /*Implicit=*/false), 
+    : DeclAttribute(DAK_Inline, atLoc, range, /*Implicit=*/false),
       Kind(kind) {}
 
   InlineAttr(InlineKind kind)

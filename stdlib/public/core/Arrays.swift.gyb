@@ -210,7 +210,7 @@ public struct ${Self}<Element>
 %if Self == 'Array':
     get {
       // This call may be hoisted or eliminated by the optimizer.  If
-      // there is an inout violation, this value may be stale so needs to be 
+      // there is an inout violation, this value may be stale so needs to be
       // checked again below.
       let wasNativeTypeChecked = _hoistableIsNativeTypeChecked()
       
@@ -237,7 +237,7 @@ public struct ${Self}<Element>
 %end
     mutableAddressWithPinnedNativeOwner {
       _makeMutableAndUniqueOrPinned() // makes the array native, too
-      _checkSubscript_native(index)   
+      _checkSubscript_native(index)
       return (_getElementAddress(index), Builtin.tryPin(_getOwner_native()))
     }
   }
@@ -328,7 +328,7 @@ public struct ${Self}<Element>
       // We are hiding the access to '_buffer.owner' behind
       // _getOwner() to help the compiler hoist uniqueness checks in
       // the case of class or objective c existential typed array
-      // elements. 
+      // elements.
       return _getOwnerWithSemanticLabel_native()
     }
 #endif

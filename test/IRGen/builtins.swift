@@ -194,13 +194,13 @@ func intrinsic_test(inout i32: Builtin.Int32, inout i16: Builtin.Int16) {
 // CHECK: define hidden void @_TF8builtins19sizeof_alignof_testFT_T_()
 func sizeof_alignof_test() {
   // CHECK: store i64 4, i64*
-  var xs = Builtin.sizeof(Int.self) 
+  var xs = Builtin.sizeof(Int.self)
   // CHECK: store i64 4, i64*
-  var xa = Builtin.alignof(Int.self) 
+  var xa = Builtin.alignof(Int.self)
   // CHECK: store i64 1, i64*
-  var ys = Builtin.sizeof(Bool.self) 
+  var ys = Builtin.sizeof(Bool.self)
   // CHECK: store i64 1, i64*
-  var ya = Builtin.alignof(Bool.self) 
+  var ya = Builtin.alignof(Bool.self)
 
 }
 

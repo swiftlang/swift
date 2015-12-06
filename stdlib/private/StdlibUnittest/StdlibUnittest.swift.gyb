@@ -89,13 +89,13 @@ public struct SourceLocStack {
 %{
   TRACE = '''@autoclosure _ message: ()->String = "",
     showFrame: Bool = true,
-    stackTrace: SourceLocStack = SourceLocStack(),  
+    stackTrace: SourceLocStack = SourceLocStack(),
     file: String = __FILE__, line: UInt = __LINE__'''
 
-  # When the parameter list would start with a ${TRACE}, we use 
-  # ${TRACE1} instead, to avoid the warning about an extraneous 
+  # When the parameter list would start with a ${TRACE}, we use
+  # ${TRACE1} instead, to avoid the warning about an extraneous
   # '_' on the first parameter.
-  TRACE1 = TRACE.replace(' _ ', ' ', 1) 
+  TRACE1 = TRACE.replace(' _ ', ' ', 1)
   
   stackTrace = 'stackTrace.pushIf(showFrame, file: file, line: line)'
 
@@ -1508,7 +1508,7 @@ public func checkHashable<T : Hashable>(
 /// generate equality expectations from pairs of positions in
 /// `instances`.
 ///
-/// - Precondition: ${'''`endIndex` is reachable from all 
+/// - Precondition: ${'''`endIndex` is reachable from all
 ///   elements of `instances`.''' if inc == 'inc' else '''all
 ///   elements of `instances` are reachable from `startIndex`.'''}
 public func check${inc.capitalize()}rementable<
@@ -1796,7 +1796,7 @@ public func checkBidirectionalIndex<
 >(
   instances: Instances,
   equalityOracle: (Instances.Index, Instances.Index)->Bool,
-  startIndex: Instances.Generator.Element, 
+  startIndex: Instances.Generator.Element,
   endIndex: Instances.Generator.Element,
   ${TRACE}
 ) {
@@ -1814,7 +1814,7 @@ public func checkBidirectionalIndex<
 }
 
 /// Test that the elements of `instances` satisfy the semantic
-/// requirements of `RandomAccessIndexType`, using 
+/// requirements of `RandomAccessIndexType`, using
 /// `advanceOracle` and 'distanceOracle' to generate expectations
 /// about the results of `advancedBy` and `distanceTo` from pairs of
 /// positions in `instances` and `distances`.
@@ -1833,7 +1833,7 @@ public func checkRandomAccessIndex<
     (Instances.Index, Instances.Index) -> Distances.Generator.Element,
   advanceOracle:
     (Instances.Index, Distances.Index) -> Instances.Generator.Element,
-  startIndex: Instances.Generator.Element, 
+  startIndex: Instances.Generator.Element,
   endIndex: Instances.Generator.Element,
   ${TRACE}
 ) {
@@ -1919,7 +1919,7 @@ public func checkSequence<
 
   // Check that _initializeTo does the right thing if we can do so
   // without destroying the sequence.
-  sequence._preprocessingPass { (sequence)->Void in 
+  sequence._preprocessingPass { (sequence)->Void in
     var count = 0
     for _ in sequence { ++count }
     let buf = UnsafeMutablePointer<S.Generator.Element>.alloc(count)

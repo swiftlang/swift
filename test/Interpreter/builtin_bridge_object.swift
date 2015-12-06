@@ -125,10 +125,10 @@ if true {
 }
 
 var unTaggedString: NSString {
-  return NSString(format: "A long string that won't fit in a tagged pointer")  
+  return NSString(format: "A long string that won't fit in a tagged pointer")
 }
 
-// Try with an un-tagged pointer. 
+// Try with an un-tagged pointer.
 if true {
   let x = unTaggedString
   let bo = nonNativeBridgeObject(x)

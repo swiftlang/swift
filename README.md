@@ -16,11 +16,11 @@ modules, eliminating the need for headers and the code duplication they entail.
 
 ## Documentation
 
-To read the documentation, start by installing the 
-[Sphinx](http://sphinx-doc.org) documentation generator tool (just run 
+To read the documentation, start by installing the
+[Sphinx](http://sphinx-doc.org) documentation generator tool (just run
 `easy_install -U Sphinx` from the command line and you're good to go). Once you
- have that, you can build the Swift documentation by going into `docs` and 
-typing `make`.  This compiles the `.rst` files in the `docs` directory into 
+ have that, you can build the Swift documentation by going into `docs` and
+typing `make`.  This compiles the `.rst` files in the `docs` directory into
 HTML in the `docs/_build/html` directory.
 
 Once built, the best place to start is with the Swift white paper, which gives a
@@ -80,7 +80,7 @@ For those checking out sources as read-only:
      git clone https://github.com/apple/swift-corelibs-foundation.git
 
 For those who plan on regularly making direct commits, cloning over
-SSH may provide a better experience (which requires uploading 
+SSH may provide a better experience (which requires uploading
 SSH keys to GitHub):
 
      git clone git@github.com:apple/swift.git swift

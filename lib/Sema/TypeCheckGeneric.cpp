@@ -77,7 +77,7 @@ Type GenericTypeToArchetypeResolver::resolveSelfAssociatedType(
        Type selfTy,
        DeclContext *DC,
        AssociatedTypeDecl *assocType) {
-  llvm_unreachable("Dependent type after archetype substitution");  
+  llvm_unreachable("Dependent type after archetype substitution");
 }
 
 Type GenericTypeToArchetypeResolver::resolveTypeOfContext(DeclContext *dc) {
@@ -251,7 +251,7 @@ bool TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
            isa<AbstractFunctionDecl>(lookupDC) &&
            "not a proper generic parameter context?");
     options = TR_GenericSignature;
-  }    
+  }
 
   // Visit each of the generic parameters.
   unsigned depth = genericParams->getDepth();
@@ -749,7 +749,7 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     llvm::errs() << "Canonical generic signature for mangling: ";
     sig->getCanonicalManglingSignature(*func->getParentModule())
       ->print(llvm::errs());
-    llvm::errs() << "\n";    
+    llvm::errs() << "\n";
   }
 
   bool hasSelf = func->getDeclContext()->isTypeContext();
@@ -773,7 +773,7 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
       // archetypes rather than dependent types. Replace the
       // archetypes with their corresponding dependent types.
       if (func->isImplicit()) {
-        argTy = getInterfaceTypeFromInternalType(func, argTy); 
+        argTy = getInterfaceTypeFromInternalType(func, argTy);
       }
 
       if (initFuncTy)
@@ -881,7 +881,7 @@ GenericSignature *TypeChecker::validateGenericSignature(
 
   // Type check the generic parameters, treating all generic type
   // parameters as dependent, unresolved.
-  DependentGenericTypeResolver dependentResolver(builder);  
+  DependentGenericTypeResolver dependentResolver(builder);
   if (checkGenericParamList(&builder, genericParams, dc,
                             false, &dependentResolver)) {
     invalid = true;

@@ -4,7 +4,7 @@ protocol P {
   typealias SomeType
 }
 
-protocol P2 { 
+protocol P2 {
   func wonka()
 }
 
@@ -16,7 +16,7 @@ extension Double : P {
   typealias SomeType = Double
 }
 
-func f0(x: Int, 
+func f0(x: Int,
         _ y: Float) { }
 
 func f1(_: (Int, Float) -> Int) { }
@@ -39,7 +39,7 @@ var d : Double
 // Tuple size mismatch.
 f1(
    f4 // expected-error {{cannot convert value of type '(Int) -> Int' to expected argument type '(Int, Float) -> Int'}}
-   ) 
+   )
 
 // Tuple element unused.
 f0(i, i, // expected-error{{extra argument in call}}

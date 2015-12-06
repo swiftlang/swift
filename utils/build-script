@@ -712,7 +712,7 @@ the number of parallel build jobs to use""",
     if args.build_foundation:
         build_script_impl_args += [
             "--foundation-build-type", args.foundation_build_variant
-        ]   
+        ]
     build_script_impl_args += build_script_impl_inferred_args
 
     # If we have extra_swift_args, combine all of them together and then add
