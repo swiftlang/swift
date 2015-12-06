@@ -401,7 +401,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
     return false;
 
   // Promote this alloc_box to an alloc_stack. Insert the alloc_stack
-  // at the beginning of the funtion.
+  // at the beginning of the function.
   auto &Entry = ABI->getFunction()->front();
   SILBuilder BuildAlloc(&Entry, Entry.begin());
   BuildAlloc.setCurrentDebugScope(ABI->getDebugScope());
