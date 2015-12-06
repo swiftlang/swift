@@ -1631,10 +1631,10 @@ Time warp
     }
     ```
 
- * The compiler now warns about cases where a variable is inferred to have
-   `AnyObject`, `AnyClass`, or `()` type, since type inferrence can turn a simple
-   mistake (e.g. failing to cast an `AnyObject` when you meant to) into something
-   with ripple effects.  Here is a simple example:
+* The compiler now warns about cases where a variable is inferred to have
+  `AnyObject`, `AnyClass`, or `()` type, since type inferrence can turn a simple
+  mistake (e.g. failing to cast an `AnyObject` when you meant to) into something
+  with ripple effects.  Here is a simple example:
 
     ```
     t.swift:4:5: warning: variable 'fn' inferred to have type '()', which may be unexpected
@@ -1646,9 +1646,9 @@ Time warp
           : ()
     ```
 
-   If you actually did intend to declare a variable of one of these types, you
-   can silence this warning by adding an explicit type (indicated by the Fixit).
-   See **rdar://15263687 and rdar://16252090** for more rationale.
+  If you actually did intend to declare a variable of one of these types, you
+  can silence this warning by adding an explicit type (indicated by the Fixit).
+  See **rdar://15263687 and rdar://16252090** for more rationale.
 
 * `x.type` has been renamed to `x.dynamicType`, and you can use `type` as a
   regular identifier again.
