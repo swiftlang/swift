@@ -292,7 +292,7 @@ Time warp
 
   Note that the meaning of `UnsafePointer` has changed from mutable to
   immutable. As a result, some of your code may fail to compile when
-  assigning to an `UnsafePointer`'s `.memory` property.  The fix is to
+  assigning to an `UnsafePointer.memory` property.  The fix is to
   change your `UnsafePointer<T>` into an `UnsafeMutablePointer<T>`.
 
 * The optional unwrapping operator `x!` can now be assigned through, and
@@ -369,7 +369,7 @@ Time warp
   initializer requirement must provide a required initializer to
   satisfy that requirement. This ensures that subclasses will also
   conform to the protocol, and will be most visible with classes that
-  conform to NSCoding:
+  conform to `NSCoding`:
 
     ```swift
     class MyClass : NSObject, NSCoding {
