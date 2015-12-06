@@ -702,6 +702,7 @@ bool ConstraintGraph::contractEdges() {
       // Contract binding edges between type variables.
       if (constraint->getKind() == ConstraintKind::Conversion ||
           constraint->getKind() == ConstraintKind::Bind ||
+          constraint->getKind() == ConstraintKind::BindParam ||
           constraint->getKind() == ConstraintKind::Equal) {
         if (auto tyvar1 = constraint->getFirstType()->
                             getAs<TypeVariableType>()) {
@@ -715,6 +716,16 @@ bool ConstraintGraph::contractEdges() {
 
               if (rep1->getImpl().canBindToLValue() ==
                   rep2->getImpl().canBindToLValue()) {
+
+                if (CS.TC.getLangOpts().DebugConstraintSolver) {
+                  auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+                  if (CS.solverState)
+                    log.indent(CS.solverState->depth * 2);
+
+                  log << "Contracting constraint ";
+                  constraint->print(log, &CS.getASTContext().SourceMgr);
+                  log << "\n";
+                }
 
                 // Merge the edges and remove the constraint.
                 CS.mergeEquivalenceClasses(rep1, rep2);
