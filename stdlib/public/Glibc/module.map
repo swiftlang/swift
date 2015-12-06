@@ -362,6 +362,11 @@ module SwiftGlibc [system] {
       header "/usr/include/utmpx.h"
       export *
     }
+    module uuid {
+      header "/usr/include/uuid/uuid.h"
+	  link "uuid"
+      export *
+    }
     module wait {
       header "/usr/include/wait.h"
       export *
