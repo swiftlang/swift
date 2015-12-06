@@ -58,7 +58,7 @@ func benchRC4_internal(messageLen : Int, iterations : Int) {
   var LongData : UInt8[] = new UInt8[messageLen]
 
   // Generate a long message.
-  for (var i = 0; i < messageLen; i++) {
+  for i in  0..<messageLen {
     LongData[i] = SecretData[i % SecretData.count]
   }
 
@@ -67,7 +67,7 @@ func benchRC4_internal(messageLen : Int, iterations : Int) {
 
   let start = __mach_absolute_time__()
 
-  for (var i = 0; i < iterations; i++) {
+  for i in 0..<iterations {
     Enc.encrypt(&LongData)
   }
 
