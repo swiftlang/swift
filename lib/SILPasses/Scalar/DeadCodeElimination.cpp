@@ -106,7 +106,7 @@ class DCE : public SILFunctionTransform {
     PDT = DA->get(F);
 
     // If we have a functions that consists of nothing but a
-    // structrually infinite loop like:
+    // structurally infinite loop like:
     //   while true {}
     // we'll have an empty post dominator tree.
     if (!PDT->getRootNode())
@@ -556,7 +556,7 @@ void DCE::computeLevelNumbers(PostDomTreeNode *Node, unsigned Level) {
 // Structurally infinite loops like:
 //   bb1:
 //     br bb1
-// are not present in the post-dominator tree. Their prescence
+// are not present in the post-dominator tree. Their presence
 // requires significant modifications to the way the rest of the
 // algorithm works. They should be rare, so for now we'll do the most
 // conservative thing and completely bail out, doing no dead code
