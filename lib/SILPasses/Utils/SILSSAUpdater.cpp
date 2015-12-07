@@ -352,7 +352,7 @@ public:
         OperandValueArrayRef Edges =
             getEdgeValuesForTerminator(PredBB->getTerminator(), PhiBB);
 
-        assert(PhiIdx < Edges.size() && "Not enough egdes!");
+        assert(PhiIdx < Edges.size() && "Not enough edges!");
 
         SILValue V = Edges[PhiIdx];
         // Check for the 'not set' sentinel.
