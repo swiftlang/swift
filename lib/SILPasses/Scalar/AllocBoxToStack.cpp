@@ -278,7 +278,7 @@ static SILArgument *getParameterForOperand(SILFunction *F, Operand *O) {
 }
 
 /// Return a pointer to the SILFunction called by Call if we can
-/// determine which funciton that is, and we have a body for that
+/// determine which function that is, and we have a body for that
 /// function. Otherwise return nullptr.
 static SILFunction *getFunctionBody(SILInstruction *Call) {
   if (auto *FRI = getDirectCallee(Call))
