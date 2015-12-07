@@ -68,13 +68,9 @@ public:
   };
 
 private:
-  /// A table mapping from the full name of Swift entities to all of
+  /// A table mapping from the base name of Swift entities to all of
   /// the C entities that have that name, in all contexts.
-  llvm::DenseMap<DeclName, SmallVector<FullTableEntry, 2>> FullNameTable;
-
-  /// A table mapping from the base name of a Swift name to all of the
-  /// full Swift names based on that identifier.
-  llvm::DenseMap<Identifier, SmallVector<DeclName, 2>> BaseNameTable;
+  llvm::DenseMap<StringRef, SmallVector<FullTableEntry, 2>> LookupTable;
 
 public:
   /// Translate a Clang DeclContext into a context kind and name.
