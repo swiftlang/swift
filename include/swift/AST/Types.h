@@ -732,7 +732,7 @@ public:
   /// \code
   /// struct X<T, U> { }
   /// extension X {
-  ///   typealias SomeArray = [T];
+  ///   typealias SomeArray = [T]
   /// }
   /// \endcode
   ///
