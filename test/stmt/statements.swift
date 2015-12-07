@@ -15,11 +15,11 @@ func invalid_semi() {
 
 func nested1(x: Int) {
   var y : Int
-
+  
   func nested2(z: Int) -> Int {
     return x+y+z
   }
-
+  
   nested2(1)
 }
 
@@ -77,7 +77,7 @@ func funcdecl5(a: Int, y: Int) {
   } else {
     f2()
   }
-
+  
   // while statement.
   while (B) {
   }
@@ -121,22 +121,22 @@ SomeGeneric<Int>
 func for_loop() {
   var x = 0
   for ;; { }
-  for i in 1...42 { x = i}
+  for x = 1; x != 42; ++x { }
   for infloopbooltest(); x != 12; infloopbooltest() {}
-
+  
   for ; { } // expected-error {{expected ';' in 'for' statement}}
-
-  for y in 1..<42 {}
-  for y in 1..<42 {}
+  
+  for var y = 1; y != 42; ++y {}
+  for (var y = 1; y != 42; ++y) {}
   var z = 10
-  for (; z != 0; z -= 1) {}
-  for (z = 10; z != 0; z -= 1) {}
-  for var (a,b) = (0,12); a != b; b -= 1 {a += 1}
-  for (var (a,b) = (0,12); a != b; b -= 1) {a += 1}
+  for (; z != 0; --z) {}
+  for (z = 10; z != 0; --z) {}
+  for var (a,b) = (0,12); a != b; --b {++a}
+  for (var (a,b) = (0,12); a != b; --b) {++a}
   var j, k : Int
-  for ((j,k) = (0,10); j != k; k -= 1) {}
-  for var i = 0, j = 0; i * j < 10; i += 1, j += 1 {}
-  for j = 0, k = 52; j < k; j += 1, k -= 1 { }
+  for ((j,k) = (0,10); j != k; --k) {}
+  for var i = 0, j = 0; i * j < 10; i++, j++ {}
+  for j = 0, k = 52; j < k; ++j, --k { }
   // rdar://19540536
   // expected-error@+4{{expected var declaration in a 'for' statement}}
   // expected-error@+3{{expression resolves to an unused function}}
@@ -187,7 +187,7 @@ func tuple_assign() {
 func missing_semicolons() {
   var w = 321
   func g() {}
-  g() w +=1            // expected-error{{consecutive statements}} {{6-6=;}}
+  g() ++w             // expected-error{{consecutive statements}} {{6-6=;}}
   var z = w"hello"    // expected-error{{consecutive statements}} {{12-12=;}}
   class  C {}class  C2 {} // expected-error{{consecutive statements}} {{14-14=;}}
   struct S {}struct S2 {} // expected-error{{consecutive statements}} {{14-14=;}}
@@ -295,7 +295,7 @@ Outer:
     case 139: break   // <rdar://problem/16563853> 'break' should be able to break out of switch statements
     }
   }
-
+  
   // <rdar://problem/16692437> shadowing loop labels should be an error
 Loop:  // expected-note {{previously declared here}}
   for _ in 0...2 {
@@ -314,16 +314,16 @@ Loop:  // expected-note {{previously declared here}}
   default:
     markUsed("")
   }
-
+  
   let x : Int? = 42
-
+  
   // <rdar://problem/16879701> Should be able to pattern match 'nil' against optionals
   switch x {
   case .Some(42): break
   case nil: break
-
+  
   }
-
+  
 }
 
 
@@ -346,10 +346,10 @@ func testMyEnumWithCaseLabels(a : MyEnumWithCaseLabels) {
 // "defer"
 
 func test_defer(a : Int) {
-
+  
   defer { VoidReturn1() }
   defer { breakContinue(1)+42 }
-
+  
   // Ok:
   defer { while false { break } }
 
@@ -360,7 +360,7 @@ func test_defer(a : Int) {
 
 class SomeTestClass {
   var x = 42
-
+  
   func method() {
     defer { x = 97 }  // self. not required here!
   }
@@ -368,7 +368,7 @@ class SomeTestClass {
 
 
 func test_require(x : Int, y : Int??, cond : Bool) {
-
+  
   // These are all ok.
   guard let a = y else {}
   markUsed(a)
@@ -427,13 +427,14 @@ func testThrowNil() throws {
 func for_ignored_lvalue_init() {
   var i = 0
   for i;  // expected-error {{expression resolves to an unused l-value}}
-    i < 10; i += 1 {}
+    i < 10; ++i {}
 }
 
 // rdar://problem/18643692
 func for_loop_multi_iter() {
-  for (var i = 0, x = 0; i < 10; i += 1,
+  for (var i = 0, x = 0; i < 10; i++,
        x) { // expected-error {{expression resolves to an unused l-value}}
-    x -= 1
+    --x
   }
 }
+
