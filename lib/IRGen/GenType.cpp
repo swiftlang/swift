@@ -2032,6 +2032,11 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM,
     // If there's only one stored property, we have the layout of its field.
     auto allFields = structDecl->getStoredProperties();
     auto field = allFields.begin();
+    // If there are no other fields exit early to prevent calling std::next on
+    // an invalid iterator.
+    if (field == allFields.end())
+      return SILType();
+    
     if (std::next(field) == allFields.end())
       return t.getFieldType(*field, *IGM.SILMod);
 
