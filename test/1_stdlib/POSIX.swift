@@ -141,7 +141,7 @@ POSIXTests.test("fcntl block and unblocking sockets success") {
   expectEqual(0, rc)
 	
   flags = fcntl(sock, cmd: F_GETFL)
-  expectGE(0, flags)
+  expectGE(flags | O_NONBLOCK, flags)
 	
   // Change back to blocking...
   rc = fcntl(sock, cmd: F_SETFL, value: flags & ~O_NONBLOCK)
