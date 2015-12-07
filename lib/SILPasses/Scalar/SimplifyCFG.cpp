@@ -1124,7 +1124,7 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
   if (SILBasicBlock *TrampolineDest = getTrampolineDest(DestBB)) {
     SILBuilderWithScope(BI).createBranch(BI->getLoc(), TrampolineDest,
                                             BI->getArgs());
-    // Eliminating the trampoline can expose opportuntities to improve the
+    // Eliminating the trampoline can expose opportunities to improve the
     // new block we branch to.
     if (LoopHeaders.count(DestBB))
       LoopHeaders.insert(BB);
@@ -1161,7 +1161,7 @@ static bool wouldIntroduceCriticalEdge(TermInst *T, SILBasicBlock *DestBB) {
 }
 
 /// Returns the original boolean value, looking through possible invert
-/// builtins. The paramter \p Inverted is inverted if the returned original
+/// builtins. The parameter \p Inverted is inverted if the returned original
 /// value is the inverted value of the passed \p Cond.
 /// If \p onlyAcceptSingleUse is true and the operand of an invert builtin has
 /// more than one use, an invalid SILValue() is returned.
@@ -1210,7 +1210,7 @@ static CondFailInst *getFistCondFail(SILBasicBlock *BB) {
 }
 
 /// If the first side-effect instruction in this block is a cond_fail that
-/// is guarantueed to fail, it is returned.
+/// is guaranteed to fail, it is returned.
 /// The \p Cond is the condition from a cond_br in the predecessor block. The
 /// cond_fail must only fail if \p BB is entered through this predecessor block.
 /// If \p Inverted is true, \p BB is on the false-edge of the cond_br.
@@ -1988,7 +1988,7 @@ bool RemoveUnreachable::run() {
 }
 
 /// Checks if the block contains a cond_fail as first side-effect instruction
-/// and trys to move it to the predecessors (if benefitial). A sequence
+/// and trys to move it to the predecessors (if beneficial). A sequence
 ///
 ///     bb1:
 ///       br bb3(%c)
@@ -2016,7 +2016,7 @@ static bool tryMoveCondFailToPreds(SILBasicBlock *BB) {
     return false;
   
   // Find the underlying condition value of the cond_fail.
-  // We only accept sinlge uses. This is not a correctness check, but we only
+  // We only accept single uses. This is not a correctness check, but we only
   // want to to the optimization if the condition gets dead after moving the
   // cond_fail.
   bool inverted = false;
@@ -2636,7 +2636,7 @@ bool SimplifyCFG::run() {
   PostDominanceAnalysis *PDA = PM->getAnalysis<PostDominanceAnalysis>();
 
   if (Changed) {
-    // Force dominator recomputation since we modifed the cfg.
+    // Force dominator recomputation since we modified the cfg.
     DA->invalidate(&Fn, SILAnalysis::InvalidationKind::Everything);
     PDA->invalidate(&Fn, SILAnalysis::InvalidationKind::Everything);
   }
@@ -3033,7 +3033,7 @@ struct CaseInfo {
   /// The result value.
   SILInstruction *Result = nullptr;
 
-  /// The block which conains the cond_br of the input value comparison
+  /// The block which contains the cond_br of the input value comparison
   /// or the block which assigns the default value.
   SILBasicBlock *CmpOrDefault = nullptr;
 };
@@ -3406,7 +3406,7 @@ public:
   void run() override {
     auto &Fn = *getFunction();
 
-    // Split all critical egdes from all or non only cond_br terminators.
+    // Split all critical edges from all or non only cond_br terminators.
     bool Changed =
         splitAllCriticalEdges(Fn, OnlyNonCondBrEdges, nullptr, nullptr);
 
