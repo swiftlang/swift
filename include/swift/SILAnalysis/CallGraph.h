@@ -346,6 +346,7 @@ public:
 #endif
 
   friend class CallGraphEditor;
+  friend class CallGraphLinkerEditor;
 
   CallGraph(SILModule *M, bool completeModule);
   ~CallGraph();
@@ -598,7 +599,8 @@ class CallGraphLinkerEditor {
   CallGraph *CG;
 
   void callback(SILFunction *F) {
-    CallGraphEditor(CG).addEdgesForFunction(F);
+    if (CG)
+      CG->addEdges(F);
   }
 
 public:
