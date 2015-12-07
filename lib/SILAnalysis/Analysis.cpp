@@ -18,6 +18,7 @@
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
 #include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILAnalysis/ClassHierarchyAnalysis.h"
+#include "swift/SILAnalysis/ProgramTerminationAnalysis.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/SIL/SILModule.h"
@@ -59,4 +60,8 @@ SILAnalysis *swift::createClassHierarchyAnalysis(SILModule *M) {
 
 SILAnalysis *swift::createBasicCalleeAnalysis(SILModule *M) {
   return new BasicCalleeAnalysis(M);
+}
+
+SILAnalysis *swift::createProgramTerminationAnalysis(SILModule *M) {
+  return new ProgramTerminationAnalysis(M);
 }
