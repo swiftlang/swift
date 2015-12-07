@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -use-native-super-method | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -use-native-super-method | FileCheck %s
 
 class Parent {
   func onlyInParent() {}
