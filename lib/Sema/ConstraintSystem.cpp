@@ -959,23 +959,25 @@ void ConstraintSystem::openGeneric(
       continue;
     }
 
-    ArchetypeType *archetype = ArchetypeBuilder::mapTypeIntoContext(dc, gp)
-                                 ->castTo<ArchetypeType>();
-    auto typeVar = createTypeVariable(getConstraintLocator(
+    Type mappedType = ArchetypeBuilder::mapTypeIntoContext(dc, gp);
+    if (mappedType) {
+      ArchetypeType *archetype = mappedType->castTo<ArchetypeType>();
+      auto typeVar = createTypeVariable(getConstraintLocator(
                                         locator.withPathElement(
-                                          LocatorPathElt(archetype))),
-                                      TVO_PrefersSubtypeBinding |
-                                      TVO_MustBeMaterializable);
-    replacements[gp->getCanonicalType()] = typeVar;
+                                        LocatorPathElt(archetype))),
+                                        TVO_PrefersSubtypeBinding |
+                                        TVO_MustBeMaterializable);
+      replacements[gp->getCanonicalType()] = typeVar;
 
-    // Note that we opened a generic parameter to a type variable.
-    if (opener) {
-      Type replacementType;
-      opener->openedGenericParameter(gp, typeVar, replacementType);
+      // Note that we opened a generic parameter to a type variable.
+      if (opener) {
+        Type replacementType;
+        opener->openedGenericParameter(gp, typeVar, replacementType);
 
-      if (replacementType)
-        addConstraint(ConstraintKind::Bind, typeVar, replacementType,
-                      locatorPtr);
+        if (replacementType)
+          addConstraint(ConstraintKind::Bind, typeVar, replacementType,
+                        locatorPtr);
+      }
     }
   }
 
