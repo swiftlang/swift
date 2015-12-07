@@ -1190,7 +1190,7 @@ NSStringAPIs.test("rangeOfString(_:options:range:locale:)") {
     // grapheme cluster boundaries -- these can not be created with public
     // String interface.
     //
-    // FIXME: why does this seach succeed and the above queries fail?  There is
+    // FIXME: why does this search succeed and the above queries fail?  There is
     // no apparent pattern.
     expectEqual("\u{3099}", s[s.rangeOfString("\u{3099}")!])
   }
