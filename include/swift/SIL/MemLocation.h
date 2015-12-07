@@ -363,7 +363,7 @@ using TypeExpansionMap = llvm::DenseMap<SILType, ProjectionPathList>;
 /// the MemLocationVault, and this in turn reduces the # of bits each basic
 /// block keeps.
 ///
-/// Moreover, without canonicalization, its more difficult to implement the
+/// Moreover, without canonicalization, it's more difficult to implement the
 /// intersection operator in DSE/RLE?
 ///
 /// We basically need to compare every pair of MemLocation and find the ones
