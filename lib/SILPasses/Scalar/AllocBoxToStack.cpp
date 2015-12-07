@@ -598,7 +598,7 @@ DeadParamCloner::populateCloned() {
 }
 
 /// \brief Handle a strong_release instruction during cloning of a closure; if
-/// it is a strong release of a promoted box argument, then it is replaced wit
+/// it is a strong release of a promoted box argument, then it is replaced with
 /// a ReleaseValue of the new object type argument, otherwise it is handled
 /// normally.
 void
