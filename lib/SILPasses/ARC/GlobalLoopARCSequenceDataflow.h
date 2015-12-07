@@ -15,6 +15,7 @@
 
 #include "RefCountState.h"
 #include "swift/SILAnalysis/LoopRegionAnalysis.h"
+#include "swift/SILAnalysis/ProgramTerminationAnalysis.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/NullablePtr.h"
 #include "llvm/ADT/MapVector.h"
@@ -74,6 +75,7 @@ public:
   LoopARCSequenceDataflowEvaluator(
       SILFunction &F, AliasAnalysis *AA, LoopRegionFunctionInfo *LRFI,
       SILLoopInfo *SLI, RCIdentityFunctionInfo *RCIA,
+      ProgramTerminationFunctionInfo *PTFI,
       BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
       BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap);
   ~LoopARCSequenceDataflowEvaluator();

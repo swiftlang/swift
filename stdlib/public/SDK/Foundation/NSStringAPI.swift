@@ -1315,7 +1315,7 @@ extension String {
     allowedCharacters: NSCharacterSet
   ) -> String? {
     // FIXME: the documentation states that this method can return nil if the
-    // transformation is not possible, without going into futher details.  The
+    // transformation is not possible, without going into further details.  The
     // implementation can only return nil if malloc() returns nil, so in
     // practice this is not possible.  Still, to be consistent with
     // documentation, we declare the method as returning an optional String.

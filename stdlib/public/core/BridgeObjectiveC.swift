@@ -15,7 +15,7 @@
 /// `_ObjectiveCBridgeable` can be passed to Objective-C as an NSArray or
 /// NSDictionary, respectively.  The elements of the resulting NSArray
 /// or NSDictionary will be the result of calling `_bridgeToObjectiveC`
-/// on each elmeent of the source container.
+/// on each element of the source container.
 public protocol _ObjectiveCBridgeable {
   typealias _ObjectiveCType : AnyObject
 

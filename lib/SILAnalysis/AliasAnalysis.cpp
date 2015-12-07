@@ -28,6 +28,13 @@
 
 using namespace swift;
 
+
+// The AliasAnalysis Cache must not grow beyond this size.
+// We limit the size of the AA cache to 2**14 because we want to limit the
+// memory usage of this cache.
+static const int AliasAnalysisMaxCacheSize = 16384;
+
+
 //===----------------------------------------------------------------------===//
 //                                AA Debugging
 //===----------------------------------------------------------------------===//
@@ -570,9 +577,25 @@ bool AliasAnalysis::typesMayAlias(SILType T1, SILType T2) {
 /// The main AA entry point. Performs various analyses on V1, V2 in an attempt
 /// to disambiguate the two values.
 AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2,
-                                 SILType TBAAType1,
-                                 SILType TBAAType2) {
-  return aliasInner(V1, V2, TBAAType1, TBAAType2);
+                                 SILType TBAAType1, SILType TBAAType2) {
+  AliasKeyTy Key = toAliasKey(V1, V2, TBAAType1, TBAAType2);
+
+  // Check if we've already computed this result.
+  auto It = AliasCache.find(Key);
+  if (It != AliasCache.end()) {
+    return It->second;
+  }
+
+  // Flush the cache if the size of the cache is too large.
+  if (AliasCache.size() > AliasAnalysisMaxCacheSize) {
+    AliasCache.clear();
+    ValueBaseToIndex.clear();
+  }
+
+  // Calculate the aliasing result and store it in the cache.
+  auto Result = aliasInner(V1, V2, TBAAType1, TBAAType2);
+  AliasCache[Key] = Result;
+  return Result;
 }
 
 /// The main AA entry point. Performs various analyses on V1, V2 in an attempt
@@ -673,11 +696,21 @@ bool swift::isLetPointer(SILValue V) {
   return false;
 }
 
-
 void AliasAnalysis::initialize(SILPassManager *PM) {
   SEA = PM->getAnalysis<SideEffectAnalysis>();
 }
 
 SILAnalysis *swift::createAliasAnalysis(SILModule *M) {
   return new AliasAnalysis(M);
+}
+
+AliasKeyTy AliasAnalysis::toAliasKey(SILValue V1, SILValue V2,
+                                     SILType Type1, SILType Type2) {
+  size_t idx1 = ValueBaseToIndex.getIndex(V1.getDef());
+  size_t idx2 = ValueBaseToIndex.getIndex(V2.getDef());
+  unsigned R1 = V1.getResultNumber();
+  unsigned R2 = V2.getResultNumber();
+  void *t1 = Type1.getOpaqueValue();
+  void *t2 = Type2.getOpaqueValue();
+  return {idx1, idx2, R1, R2, t1, t2};
 }

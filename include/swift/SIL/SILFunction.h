@@ -165,7 +165,6 @@ private:
               const SILDebugScope *debugScope,
               DeclContext *DC);
 
-public:
   static SILFunction *create(SILModule &M, SILLinkage linkage, StringRef name,
                              CanSILFunctionType loweredType,
                              GenericParamList *contextGenericParams,
@@ -180,6 +179,8 @@ public:
                              SILFunction *InsertBefore = nullptr,
                              const SILDebugScope *DebugScope = nullptr,
                              DeclContext *DC = nullptr);
+
+public:
   ~SILFunction();
 
   SILModule &getModule() const { return Module; }

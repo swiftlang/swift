@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -use-native-super-method -emit-silgen %s | FileCheck %s
 
 class Foo {
   init() {}
@@ -14,7 +14,7 @@ class Bar: Foo {
   // CHECK-NOT:     strong_retain [[ORIG_SELF]]
   // CHECK:         [[ORIG_SELF_UP:%.*]] = upcast [[ORIG_SELF]]
   // CHECK-NOT:     strong_retain [[ORIG_SELF_UP]]
-  // CHECK:         [[SUPER_INIT:%.*]] = function_ref @_TFC22super_init_refcounting3Fooc
+  // CHECK:         [[SUPER_INIT:%[0-9]+]] = super_method [[ORIG_SELF]] : $Bar, #Foo.init!initializer.1
   // CHECK:         [[NEW_SELF:%.*]] = apply [[SUPER_INIT]]([[ORIG_SELF_UP]])
   // CHECK:         [[NEW_SELF_DOWN:%.*]] = unchecked_ref_cast [[NEW_SELF]]
   // CHECK:         store [[NEW_SELF_DOWN]] to [[SELF_MUI]]
@@ -42,7 +42,7 @@ class Zim: Foo {
   // CHECK-LABEL: sil hidden @_TFC22super_init_refcounting3Zimc
   // CHECK-NOT:     strong_retain
   // CHECK-NOT:     strong_release
-  // CHECK:         function_ref @_TFC22super_init_refcounting3Fooc
+  // CHECK:         super_method {{%[0-9]+}} : $Zim, #Foo.init!initializer.1
 }
 
 class Zang: Foo {
@@ -55,7 +55,7 @@ class Zang: Foo {
   // CHECK-LABEL: sil hidden @_TFC22super_init_refcounting4Zangc
   // CHECK-NOT:     strong_retain
   // CHECK-NOT:     strong_release
-  // CHECK:         function_ref @_TFC22super_init_refcounting3Fooc
+  // CHECK:         super_method {{%[0-9]+}} : $Zang, #Foo.init!initializer.1
 }
 
 class Bad: Foo {
@@ -78,7 +78,7 @@ class Good: Foo {
   // CHECK:         assign {{.*}} to [[X_ADDR]] : $*Int
   // CHECK:         [[SELF_OBJ:%.*]] = load [[SELF]] : $*Good
   // CHECK:         [[SUPER_OBJ:%.*]] = upcast [[SELF_OBJ]] : $Good to $Foo
-  // CHECK:         [[SUPER_INIT:%.*]] = function_ref @_TFC22super_init_refcounting3Fooc
+  // CHECK:         [[SUPER_INIT:%.*]] = super_method [[SELF_OBJ]] : $Good, #Foo.init!initializer.1
   // CHECK:         [[SELF_OBJ:%.*]] = load [[SELF]]
   // CHECK:         [[X_ADDR:%.*]] = ref_element_addr [[SELF_OBJ]] : $Good, #Good.x
   // CHECK:         [[X:%.*]] = load [[X_ADDR]] : $*Int

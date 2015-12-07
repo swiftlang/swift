@@ -141,5 +141,5 @@ func test(N:Int) {
   print("")
 }
 
-// I'm embarassed that I don't know how to read cmd line args.
+// I'm embarrassed that I don't know how to read cmd line args.
 test(1000)

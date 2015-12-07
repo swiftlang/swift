@@ -345,7 +345,7 @@ public:
   friend struct OrderedCallGraph;
 #endif
 
-  friend class CallGraphEditor;
+  friend class CallGraphLinkerEditor;
 
   CallGraph(SILModule *M, bool completeModule);
   ~CallGraph();
@@ -513,92 +513,12 @@ private:
   void computeBottomUpFunctionOrder();
 };
 
-class CallGraphEditor {
-  CallGraph *CG;
-public:
-  CallGraphEditor(CallGraph *CG) : CG(CG) {}
-
-  void replaceApplyWithNew(FullApplySite Old, FullApplySite New);
-  void replaceApplyWithCallSites(FullApplySite Old,
-                         llvm::SmallVectorImpl<SILInstruction *> &NewCallSites);
-
-  /// Detaches the call graph node from function \p Old and attaches it to
-  /// function \a New.
-  void moveNodeToNewFunction(SILFunction *Old, SILFunction *New);
-
-  /// Removes all callee edges from function.
-  void removeAllCalleeEdgesFrom(SILFunction *F);
-
-  /// Removes all caller edges from function.
-  void removeAllCallerEdgesFrom(SILFunction *F);
-
-  /// Creates a new node for function \p F and adds callee edges for all
-  /// call sites in the function.
-  void addNewFunction(SILFunction *F) {
-    if (CG && !CG->tryGetCallGraphNode(F)) {
-      CG->addCallGraphNode(F);
-      CG->addEdges(F);
-    }
-  }
-
-  /// Removes the call graph node of function \p F. The node may have any
-  /// adjacent caller or callee edges.
-  void removeCallGraphNode(SILFunction *F) {
-    if (CG)
-      CG->removeNode(CG->getCallGraphNode(F));
-  }
-
-  /// Removes edges for the instruction \p I.
-  void removeEdgesForInstruction(SILInstruction *I) {
-    if (CG)
-      CG->removeEdgesForInstruction(I);
-  }
-
-  /// Checks which function(s) are called by instruction \p I and adds
-  /// edges to the call graph for it.
-  void addEdgesForInstruction(SILInstruction *I) {
-    if (CG)
-      CG->addEdgesForInstruction(I);
-  }
-
-  /// Update uses of a changed apply site which is not a full apply
-  /// site.  If a use is a full apply site, its call graph edge is
-  /// updated.
-  void updatePartialApplyUses(ApplySite AI);
-
-  void addEdgesForFunction(SILFunction *F) {
-    if (CG)
-      CG->addEdges(F);
-  }
-
-  void removeEdgeIfPresent(SILInstruction *I) {
-    if (CG)
-      if (auto *Edge = CG->tryGetCallGraphEdge(I))
-        CG->removeEdgeFromFunction(Edge, I->getFunction());
-  }
-
-  /// Drops all references in function and removes the references to
-  /// instructions in the function from the call graph.
-  void dropAllReferences(SILFunction *F) {
-    F->dropAllReferences();
-
-    if (CG) {
-      removeAllCalleeEdgesFrom(F);
-      removeAllCallerEdgesFrom(F);
-      CG->removeFunctionFromCalleeSets(F);
-    }
-  }
-
-  /// Erase the function from the module and any references to it from
-  /// the call graph.
-  void eraseFunction(SILFunction *F);
-};
-
 class CallGraphLinkerEditor {
   CallGraph *CG;
 
   void callback(SILFunction *F) {
-    CallGraphEditor(CG).addEdgesForFunction(F);
+    if (CG)
+      CG->addEdges(F);
   }
 
 public:
