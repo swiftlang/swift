@@ -13,6 +13,7 @@
 #ifndef SWIFT_SILANALYSIS_ARCANALYSIS_H
 #define SWIFT_SILANALYSIS_ARCANALYSIS_H
 
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -101,9 +102,6 @@ valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
                                               SILBasicBlock::iterator Start,
                                               SILBasicBlock::iterator End,
                                               AliasAnalysis *AA);
-
-/// Match a call to a trap BB with no ARC relevant side effects.
-bool isARCInertTrapBB(SILBasicBlock *BB);
 
 /// A class that attempts to match owned arguments and corresponding epilogue
 /// releases for a specific function.

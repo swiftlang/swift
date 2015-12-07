@@ -35,18 +35,12 @@
 namespace swift {
 
 class ProgramTerminationFunctionInfo {
-  llvm::SmallPtrSet<SILBasicBlock *, 4> ProgramTerminatingBlocks;
+  llvm::SmallPtrSet<const SILBasicBlock *, 4> ProgramTerminatingBlocks;
 
 public:
-  ProgramTerminationFunctionInfo(SILFunction *F) {
-    for (auto &BB : *F) {
-      if (!isARCInertTrapBB(&BB))
-        continue;
-      ProgramTerminatingBlocks.insert(&BB);
-    }
-  }
+  ProgramTerminationFunctionInfo(const SILFunction *F);
 
-  bool isProgramTerminatingBlock(SILBasicBlock *BB) {
+  bool isProgramTerminatingBlock(const SILBasicBlock *BB) const {
     return ProgramTerminatingBlocks.count(BB);
   }
 };
