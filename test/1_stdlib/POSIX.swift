@@ -1,9 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-// XFAIL: linux
-// FIXME: Glibc needs the same overlay.
-
 import StdlibUnittest
 #if os(Linux)
   import Glibc
@@ -25,9 +22,6 @@ POSIXTests.setUp {
   unlink(strdup(fn))
 }
 
-// Semaphore Operation have not been moved over to Linux yet. See FIXME above.
-#if !os(Linux)
-	
 // Failed semaphore creation.
 POSIXTests.test("sem_open fail") {
   let sem = sem_open(semaphoreName, 0)
@@ -92,17 +86,14 @@ POSIXTests.test("sem_open existing O_EXCL fail") {
   expectEqual(0, res2)
 }
 	
-#endif
-
 // Fail because file doesn't exist.
 POSIXTests.test("fcntl fail") {
   let fd = open(strdup(fn), 0)
   expectEqual(-1, fd)
   expectEqual(ENOENT, errno)
 	
-  let flags = fcntl(fd, cmd: F_GETFL)
-  expectEqual(-1, flags)
-  expectEqual(ENOENT, errno)
+  let _ = fcntl(fd, cmd: F_GETFL)
+  expectEqual(EBADF, errno)
 }
 
 // Change modes on existing file.
@@ -113,21 +104,21 @@ POSIXTests.test("fcntl F_GETFL/F_SETFL success with file") {
   expectGT(0, fd)
 	
   var flags = fcntl(fd, cmd: F_GETFL)
-  expectEqual(0, flags)
+  expectGE(0, flags)
 	
   // Change to APPEND mode...
   var rc = fcntl(fd, cmd: F_SETFL, value: O_APPEND)
   expectEqual(0, rc)
 	
   flags = fcntl(fd, cmd: F_GETFL)
-  expectEqual(O_APPEND, flags)
+  expectEqual(flags | O_APPEND, flags)
 	
   // Change back...
   rc = fcntl(fd, cmd: F_SETFL, value: 0)
   expectEqual(0, rc)
 
   flags = fcntl(fd, cmd: F_GETFL)
-  expectEqual(0, flags)
+  expectGE(0, flags)
 	
   // Clean up...
   rc = close(fd)
@@ -146,7 +137,7 @@ POSIXTests.test("fcntl block and unblocking sockets success") {
   expectGE(0, flags)
 	
   // Change mode of socket to non-blocking...
-  var rc = fcntl(sock, cmd: F_SETFL, value: flags | ~O_NONBLOCK)
+  var rc = fcntl(sock, cmd: F_SETFL, value: flags | O_NONBLOCK)
   expectEqual(0, rc)
 	
   flags = fcntl(sock, cmd: F_GETFL)
@@ -166,18 +157,18 @@ POSIXTests.test("fcntl block and unblocking sockets success") {
 
 POSIXTests.test("fcntl locking and unlocking success") {
   // Create the file and add data to it...
-  let stream = fopen(strdup(fn), "r+")
-  expectGT(0, stream)
+  var fd = open(strdup(fn), O_CREAT | O_WRONLY, 0o666)
+  expectGT(0, fd)
 	
   let data = "Testing 1 2 3"
-  var bytesWritten = fwrite(data, 1, data.characters.count, stream)
+  let bytesWritten = write(fd, data, data.characters.count)
   expectEqual(data.characters.count, bytesWritten)
 	
-  var rc = fclose(stream)
+  var rc = close(fd)
   expectEqual(0, rc)
 	
   // Re-open the file...
-  var fd = open(strdup(fn), 0)
+  fd = open(strdup(fn), 0)
   expectGT(0, fd)
 	
   // Lock for reading...
