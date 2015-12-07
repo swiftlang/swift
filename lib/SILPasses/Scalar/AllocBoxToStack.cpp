@@ -419,7 +419,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
   for (auto UI : ASI->getAddressResult().getUses())
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(UI->getUser())) {
       assert(ASI->getAddressResult().hasOneUse() &&
-             "alloc_stack used by mark_uninialized, but not exclusively!");
+             "alloc_stack used by mark_uninitialized, but not exclusively!");
       PointerResult = MUI;
       break;
     }
