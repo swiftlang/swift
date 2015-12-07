@@ -94,9 +94,9 @@ SSH keys to GitHub):
      git clone git@github.com:apple/swift-corelibs-foundation.git
 
 [CMake](http://cmake.org) is the core infrastructure used to configure builds of
-Swift and its companion projects; at least version 2.8.12.2 is required. Your
+Swift and its companion projects; at least version 2.8.12.2 is required. If you are
 favorite Linux distribution likely already has a CMake package you can install.
-On OS X, you can download the [CMake Binary Distribution](https://cmake.org/install),
+on OS X, you can download the [CMake Binary Distribution](https://cmake.org/install),
 bundled as an application, copy it to /Applications, and add the embedded
 command line tools to your `PATH`:
 
