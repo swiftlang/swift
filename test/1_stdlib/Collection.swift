@@ -111,15 +111,15 @@ func isPalindrome2<
   var b = seq.startIndex, e = seq.endIndex
 
   while (b != e) {
-    e -= 1
+    e = e.predecessor()
     if (b == e) {
       break
     }
     if seq[b] != seq[e] {
-      b += 1
+      b = b.successor()
       return false
     }
-    b += 1
+    b = b.successor()
   }
   return true
 }

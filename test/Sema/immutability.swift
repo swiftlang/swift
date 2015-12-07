@@ -95,7 +95,7 @@ func let_decls() {
 
   
   let e = 42  // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
-  e += 1         // expected-error {{cannot pass immutable value to mutating operator: 'e' is a 'let' constant}}
+  e += 1      // expected-error {{cannot pass immutable value to mutating operator: 'e' is a 'let' constant}}
   
   // <rdar://problem/16306600> QoI: passing a 'let' value as an inout results in an unfriendly diagnostic
   let f = 96 // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}

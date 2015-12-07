@@ -160,11 +160,11 @@ tests.test("ForwardIndex") {
   i = i.successor()
   expectEqual(1, callCounts["successor"])
   expectEqual(0, callCounts["_successorInPlace"])
-  i += 1
+  i = i.successor()
   expectEqual(1, callCounts["successor"])
   expectEqual(1, callCounts["_successorInPlace"])
   var x = i
-  i += 1
+  i = i.successor()
   expectEqual(2, callCounts["successor"])
   expectEqual(1, callCounts["_successorInPlace"])
   _blackHole(x)
@@ -178,11 +178,11 @@ tests.test("BidirectionalIndex") {
   i = i.predecessor()
   expectEqual(1, callCounts["predecessor"])
   expectEqual(0, callCounts["_predecessorInPlace"])
-  i -= 1
+  i = i.predecessor()
   expectEqual(1, callCounts["predecessor"])
   expectEqual(1, callCounts["_predecessorInPlace"])
   var x = i
-  i -= 1
+  i = i.predecessor()
   expectEqual(2, callCounts["predecessor"])
   expectEqual(1, callCounts["_predecessorInPlace"])
   _blackHole(x)

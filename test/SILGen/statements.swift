@@ -690,3 +690,4 @@ func let_else_tuple_binding(a : (Int, Int)?) -> Int {
   // CHECK-NEXT:   debug_value %6 : $Int  // let y
   // CHECK-NEXT:   return %4 : $Int
 }
+

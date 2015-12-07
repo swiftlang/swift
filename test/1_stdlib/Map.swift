@@ -65,8 +65,8 @@ print(">")
 // A GeneratorType with reference semantics
 class Counter : GeneratorType {
   func next() -> Int? {
-	let tmp = n; n += 1
-    return n < end ? tmp : nil
+    let tmp = n; n += 1
+    return tmp < end ? tmp : nil
   }
 
   init(_ n: Int, _ end: Int) {
