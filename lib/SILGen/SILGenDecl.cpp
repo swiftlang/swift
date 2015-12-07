@@ -1765,7 +1765,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   if (witness.isAlwaysInline())
     InlineStrategy = AlwaysInline;
 
-  auto *f = SILFunction::create(M, linkage, nameBuffer,
+  auto *f = M.getOrCreateFunction(linkage, nameBuffer,
                                 witnessSILType.castTo<SILFunctionType>(),
                                 witnessContextParams,
                                 SILLocation(witness.getDecl()),

@@ -372,8 +372,8 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
                  Fn->getLoweredFunctionType(), Ty);
       P.diagnose(It->second.second, diag::sil_prior_reference);
       auto loc = SILFileLocation(Loc);
-      Fn = SILFunction::create(SILMod, SILLinkage::Private, "", Ty,
-                               nullptr, loc, IsNotBare, IsNotTransparent, IsNotFragile);
+      Fn = SILMod.getOrCreateFunction(SILLinkage::Private, "", Ty,
+                                      nullptr, loc, IsNotBare, IsNotTransparent, IsNotFragile);
       Fn->setDebugScope(new (SILMod) SILDebugScope(loc, *Fn));
     }
     
@@ -392,7 +392,7 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
   // defined already.
   if (SILMod.lookUpFunction(Name.str()) != nullptr) {
     P.diagnose(Loc, diag::sil_value_redefinition, Name.str());
-    auto fn = SILFunction::create(SILMod, SILLinkage::Private, "", Ty,
+    auto *fn = SILMod.getOrCreateFunction(SILLinkage::Private, "", Ty,
                                   nullptr, loc, IsNotBare, IsNotTransparent,
                                   IsNotFragile);
     fn->setDebugScope(new (SILMod) SILDebugScope(loc, *fn));
@@ -400,7 +400,7 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
   }
 
   // Otherwise, this definition is the first use of this name.
-  auto fn = SILFunction::create(SILMod, SILLinkage::Private, Name.str(),
+  auto *fn = SILMod.getOrCreateFunction(SILLinkage::Private, Name.str(),
                                 Ty, nullptr, loc, IsNotBare, IsNotTransparent,
                                 IsNotFragile);
   fn->setDebugScope(new (SILMod) SILDebugScope(loc, *fn));
@@ -422,7 +422,7 @@ SILFunction *SILParser::getGlobalNameForReference(Identifier Name,
     if (FnRef->getLoweredFunctionType() != Ty) {
       P.diagnose(Loc, diag::sil_value_use_type_mismatch,
                  Name.str(), FnRef->getLoweredFunctionType(), Ty);
-      FnRef = SILFunction::create(SILMod, SILLinkage::Private, "", Ty, nullptr,
+      FnRef = SILMod.getOrCreateFunction(SILLinkage::Private, "", Ty, nullptr,
                                   loc, IsNotBare, IsNotTransparent,
                                   IsNotFragile);
       FnRef->setDebugScope(new (SILMod) SILDebugScope(loc, *FnRef));
@@ -432,7 +432,7 @@ SILFunction *SILParser::getGlobalNameForReference(Identifier Name,
   
   // If we didn't find a function, create a new one - it must be a forward
   // reference.
-  auto Fn = SILFunction::create(SILMod, SILLinkage::Private,
+  auto *Fn = SILMod.getOrCreateFunction(SILLinkage::Private,
                                 Name.str(), Ty, nullptr, loc, IsNotBare,
                                 IsNotTransparent, IsNotFragile);
   Fn->setDebugScope(new (SILMod) SILDebugScope(loc, *Fn));

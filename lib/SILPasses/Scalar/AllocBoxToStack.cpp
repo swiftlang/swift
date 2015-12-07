@@ -549,8 +549,8 @@ DeadParamCloner::initCloned(SILFunction *Orig,
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getDebugScope())
          && "SILFunction missing DebugScope");
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
-  auto Fn =
-      SILFunction::create(M, SILLinkage::Shared, ClonedName, ClonedTy,
+  auto *Fn =
+    M.getOrCreateFunction(SILLinkage::Shared, ClonedName, ClonedTy,
                           Orig->getContextGenericParams(), Orig->getLocation(),
                           Orig->isBare(), IsNotTransparent, Orig->isFragile(),
                           Orig->isThunk(),
