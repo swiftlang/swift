@@ -769,7 +769,7 @@ func testInsideFunctionCall1() {
   var a = FooStruct()
   a.instanceFunc0(#^INSIDE_FUNCTION_CALL_1^#
 // There should be no other results here because the function call
-// unambigously resolves to overload that takes 0 arguments.
+// unambiguously resolves to overload that takes 0 arguments.
 // INSIDE_FUNCTION_CALL_1: Begin completions
 // INSIDE_FUNCTION_CALL_1-NEXT: Pattern/ExprSpecific: ['('])[#Void#]{{; name=.+$}}
 // INSIDE_FUNCTION_CALL_1-NEXT: End completions
@@ -789,7 +789,7 @@ func testInsideFunctionCall3() {
   FooStruct().instanceFunc1(42, #^INSIDE_FUNCTION_CALL_3^#
 // INSIDE_FUNCTION_CALL_3: Begin completions
 // FIXME: There should be no results here because the function call
-// unambigously resolves to overload that takes 1 argument.
+// unambiguously resolves to overload that takes 1 argument.
 // INSIDE_FUNCTION_CALL_3-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{; name=.+$}}
 // INSIDE_FUNCTION_CALL_3: End completions
 }
