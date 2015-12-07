@@ -68,7 +68,7 @@ import Foundation
 // CHECK-NEXT:   SomeErrorTypeBadness = 9001,
 // CHECK-NEXT:   SomeErrorTypeWorseness = 9002,
 // CHECK-NEXT: };
-// CHECK-NEXT: static NSString * __nonnull const SomeErrorTypeDomain = @"enums.SomeErrorType";
+// CHECK-NEXT: static NSString * _Nonnull const SomeErrorTypeDomain = @"enums.SomeErrorType";
 @objc enum SomeErrorType: Int, ErrorType {
   case Badness = 9001
   case Worseness
@@ -77,7 +77,7 @@ import Foundation
 // CHECK-LABEL: typedef SWIFT_ENUM(NSInteger, SomeOtherErrorType) {
 // CHECK-NEXT:   SomeOtherErrorTypeDomain = 0,
 // CHECK-NEXT: };
-// NEGATIVE-NOT: NSString * __nonnull const SomeOtherErrorTypeDomain
+// NEGATIVE-NOT: NSString * _Nonnull const SomeOtherErrorTypeDomain
 @objc enum SomeOtherErrorType: Int, ErrorType {
   case Domain // collision!
 }

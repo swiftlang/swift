@@ -49,3 +49,8 @@ func f() {
   store.requestAccessToEntityType(<#T##entityType: EKEntityType##EKEntityType#>, completion: nil)
 }
 // CHECK: store.requestAccessToEntityType(EKEntityType, completion: nil)
+
+func f1() {
+  bar(<#T##d: () -> ()##() -> ()#>)
+}
+// CHECK-NOT: bar { () -> () in

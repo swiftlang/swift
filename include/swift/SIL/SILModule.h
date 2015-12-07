@@ -443,6 +443,23 @@ public:
                                    SILDeclRef constant,
                                    ForDefinition_t forDefinition);
 
+  /// \brief Return the declaration of a function, or create it if it does not
+  /// exist.
+  ///
+  /// This signature is a direct copy of the signature of SILFunction::create()
+  /// in order to simplify refactoring all SILFunction creation use-sites to use
+  /// SILModule. Eventually the uses should probably be refactored.
+  SILFunction *getOrCreateFunction(
+      SILLinkage linkage, StringRef name, CanSILFunctionType loweredType,
+      GenericParamList *contextGenericParams, Optional<SILLocation> loc,
+      IsBare_t isBareSILFunction, IsTransparent_t isTrans,
+      IsFragile_t isFragile, IsThunk_t isThunk = IsNotThunk,
+      SILFunction::ClassVisibility_t classVisibility = SILFunction::NotRelevant,
+      Inline_t inlineStrategy = InlineDefault,
+      EffectsKind EK = EffectsKind::Unspecified,
+      SILFunction *InsertBefore = nullptr,
+      const SILDebugScope *DebugScope = nullptr, DeclContext *DC = nullptr);
+
   /// Look up the SILWitnessTable representing the lowering of a protocol
   /// conformance, and collect the substitutions to apply to the referenced
   /// witnesses, if any.

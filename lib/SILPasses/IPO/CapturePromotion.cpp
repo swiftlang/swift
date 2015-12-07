@@ -452,13 +452,11 @@ ClosureCloner::initCloned(SILFunction *Orig, StringRef ClonedName,
          && "SILFunction missing DebugScope");
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
 
-  auto Fn =
-      SILFunction::create(M, Orig->getLinkage(), ClonedName, SubstTy,
-                          Orig->getContextGenericParams(), Orig->getLocation(),
-                          Orig->isBare(), IsNotTransparent, Orig->isFragile(),
-                          Orig->isThunk(),
-                          Orig->getClassVisibility(), Orig->getInlineStrategy(),
-                          Orig->getEffectsKind(), Orig, Orig->getDebugScope());
+  auto *Fn = M.getOrCreateFunction(
+      Orig->getLinkage(), ClonedName, SubstTy, Orig->getContextGenericParams(),
+      Orig->getLocation(), Orig->isBare(), IsNotTransparent, Orig->isFragile(),
+      Orig->isThunk(), Orig->getClassVisibility(), Orig->getInlineStrategy(),
+      Orig->getEffectsKind(), Orig, Orig->getDebugScope());
   Fn->setSemanticsAttr(Orig->getSemanticsAttr());
   Fn->setDeclCtx(Orig->getDeclContext());
   return Fn;
@@ -530,7 +528,7 @@ void ClosureCloner::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
 }
 
 /// \brief Handle a strong_release instruction during cloning of a closure; if
-/// it is a strong release of a promoted box argument, then it is replaced wit
+/// it is a strong release of a promoted box argument, then it is replaced with
 /// a ReleaseValue of the new object type argument, otherwise it is handled
 /// normally.
 void

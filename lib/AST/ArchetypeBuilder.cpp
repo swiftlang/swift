@@ -1771,7 +1771,7 @@ Type ArchetypeBuilder::mapTypeIntoContext(Module *M,
       assert(genericParamsDepth >= depth);
       unsigned skipLevels = genericParamsDepth - depth;
       while (skipLevels > 0) {
-        myGenericParams = genericParams->getOuterParameters();
+        myGenericParams = myGenericParams->getOuterParameters();
         assert(myGenericParams && "Wrong number of levels?");
         --skipLevels;
       }

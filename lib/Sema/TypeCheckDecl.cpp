@@ -3192,6 +3192,18 @@ public:
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
+    if (assocType->isBeingTypeChecked()) {
+
+      if (!assocType->isInvalid()) {
+        assocType->setInvalid();
+        assocType->overwriteType(ErrorType::get(TC.Context));
+        TC.diagnose(assocType->getLoc(), diag::circular_type_alias, assocType->getName());
+      }
+      return;
+    }
+
+    assocType->setIsBeingTypeChecked();
+
     TC.checkDeclAttributesEarly(assocType);
     if (!assocType->hasAccessibility())
       assocType->setAccessibility(assocType->getProtocol()->getFormalAccess());
@@ -3205,6 +3217,8 @@ public:
       defaultDefinition.setInvalidType(TC.Context);
     }
     TC.checkDeclAttributes(assocType);
+
+    assocType->setIsBeingTypeChecked(false);
   }
 
   bool checkUnsupportedNestedGeneric(NominalTypeDecl *NTD) {

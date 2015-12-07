@@ -156,12 +156,13 @@ static bool cacheSpecialization(SILModule &M, SILFunction *F) {
         llvm::dbgs() << "Keep specialization: " << DemangledName << " : "
                      << F->getName() << "\n");
       // Make it public, so that others can refer to it.
-      // NOTE: This function may refer to non-public symbols, which may lead
-      // to problems, if you ever try to inline this function. Therefore,
-      // these specializations should only be used to refer to them,
-      // but should never be inlined!
-      // The general rule could be: Never inline specializations from stdlib!
-
+      //
+      // NOTE: This function may refer to non-public symbols, which may lead to
+      // problems, if you ever try to inline this function. Therefore, these
+      // specializations should only be used to refer to them, but should never
+      // be inlined!  The general rule could be: Never inline specializations
+      // from stdlib!
+      //
       // NOTE: Making these specializations public at this point breaks
       // some optimizations. Therefore, just mark the function.
       // DeadFunctionElimination pass will check if the function is marked

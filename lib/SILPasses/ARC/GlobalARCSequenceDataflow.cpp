@@ -350,14 +350,14 @@ bool ARCSequenceDataflowEvaluator::processBottomUp(
 
 ARCSequenceDataflowEvaluator::ARCSequenceDataflowEvaluator(
     SILFunction &F, AliasAnalysis *AA, PostOrderAnalysis *POA,
-    RCIdentityFunctionInfo *RCIA,
+    RCIdentityFunctionInfo *RCIA, ProgramTerminationFunctionInfo *PTFI,
     BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
     BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap)
     : F(F), AA(AA), POA(POA), RCIA(RCIA), DecToIncStateMap(DecToIncStateMap),
       IncToDecStateMap(IncToDecStateMap),
       // We use a malloced pointer here so we don't need to expose
       // ARCBBStateInfo in the header.
-      BBStateInfo(new ARCBBStateInfo(&F, POA)),
+      BBStateInfo(new ARCBBStateInfo(&F, POA, PTFI)),
       ConsumedArgToReleaseMap(RCIA, &F) {}
 
 bool ARCSequenceDataflowEvaluator::run(bool FreezeOwnedReleases) {

@@ -40,7 +40,7 @@
 ///
 /// When a load or store instruction is encountered, the memory is broken down
 /// to the indivisible components, i.e aggregates are broken down to their
-/// individual fields using the expand function. This gives the flexbility to
+/// individual fields using the expand function. This gives the flexibility to
 /// find exactly which part of the store is alive and which part is dead.
 ///
 /// After the live parts of the store are determined, they are merged into the
@@ -848,7 +848,7 @@ void DSEContext::run() {
 
   // For all basic blocks in the function, initialize a BB state. Since we
   // know all the locations accessed in this function, we can resize the bit
-  // vector to the approproate size.
+  // vector to the appropriate size.
   //
   // DenseMap has a minimum size of 64, while many functions do not have more
   // than 64 basic blocks. Therefore, allocate the BBState in a vector and use

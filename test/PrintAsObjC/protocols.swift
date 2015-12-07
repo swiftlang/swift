@@ -30,7 +30,7 @@ import Foundation
 // CHECK: @protocol CustomName2;
 // CHECK-LABEL: SWIFT_PROTOCOL_NAMED("CustomNameType")
 // CHECK-NEXT: @protocol CustomName{{$}}
-// CHECK-NEXT: - (void)forwardCustomName:(id <CustomName2> __nonnull)_;
+// CHECK-NEXT: - (void)forwardCustomName:(id <CustomName2> _Nonnull)_;
 // CHECK-NEXT: @end
 @objc(CustomName)
 protocol CustomNameType {
@@ -45,7 +45,7 @@ protocol CustomNameType2 {}
 
 // CHECK-LABEL: @protocol Initializers{{$}}
 // CHECK-NEXT: - (nonnull instancetype)init;
-// CHECK-NEXT: - (nonnull instancetype)initWithObject:(id __nonnull)any;
+// CHECK-NEXT: - (nonnull instancetype)initWithObject:(id _Nonnull)any;
 // CHECK-NEXT: @end
 @objc protocol Initializers {
   init()
@@ -55,11 +55,11 @@ protocol CustomNameType2 {}
 // CHECK-LABEL: @protocol Methods{{$}}
 // CHECK-NEXT: - (void)test;
 // CHECK-NEXT: + (void)test2;
-// CHECK-NEXT: - (void)testRawAnyTypes:(id __nonnull)any other:(Class __nonnull)other;
-// CHECK-NEXT: - (void)testSingleProtocolTypes:(id <A> __nonnull)a aAgain:(id <A> __nonnull)a2 b:(id <B> __nonnull)b bAgain:(id <B> __nonnull)b2 both:(id <B> __nonnull)both;
-// CHECK-NEXT: - (void)testSingleProtocolClassTypes:(Class <A> __nonnull)a aAgain:(Class <A> __nonnull)a2 b:(Class <B> __nonnull)b bAgain:(Class <B> __nonnull)b2 both:(Class <B> __nonnull)both;
-// CHECK-NEXT: - (void)testComposition:(id <A, ZZZ> __nonnull)x meta:(Class <A, ZZZ> __nonnull)xClass;
-// CHECK-NEXT: - (void)testOptional:(id <A> __nullable)opt meta:(Class <A> __nullable)m;
+// CHECK-NEXT: - (void)testRawAnyTypes:(id _Nonnull)any other:(Class _Nonnull)other;
+// CHECK-NEXT: - (void)testSingleProtocolTypes:(id <A> _Nonnull)a aAgain:(id <A> _Nonnull)a2 b:(id <B> _Nonnull)b bAgain:(id <B> _Nonnull)b2 both:(id <B> _Nonnull)both;
+// CHECK-NEXT: - (void)testSingleProtocolClassTypes:(Class <A> _Nonnull)a aAgain:(Class <A> _Nonnull)a2 b:(Class <B> _Nonnull)b bAgain:(Class <B> _Nonnull)b2 both:(Class <B> _Nonnull)both;
+// CHECK-NEXT: - (void)testComposition:(id <A, ZZZ> _Nonnull)x meta:(Class <A, ZZZ> _Nonnull)xClass;
+// CHECK-NEXT: - (void)testOptional:(id <A> _Nullable)opt meta:(Class <A> _Nullable)m;
 // CHECK-NEXT: @end
 @objc protocol Methods {
   func test()
@@ -133,9 +133,9 @@ extension NSString : A, ZZZ {}
 
 // CHECK-LABEL: @protocol Properties
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger a;
-// CHECK-NEXT: @property (nonatomic, strong) id <Properties> __nullable b;
+// CHECK-NEXT: @property (nonatomic, strong) id <Properties> _Nullable b;
 // CHECK-NEXT: @optional
-// CHECK-NEXT: @property (nonatomic, readonly, copy) NSString * __nonnull c;
+// CHECK-NEXT: @property (nonatomic, readonly, copy) NSString * _Nonnull c;
 // CHECK-NEXT: @end
 @objc protocol Properties {
   var a: Int { get }
