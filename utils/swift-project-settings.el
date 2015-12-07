@@ -1,20 +1,20 @@
-;===--- swift-project-settings.el - Swift project's format conventions ---===;
+;===---- swift-project-settings.el - Swift project's format conventions ----===;
 ;
-; This source file is part of the Swift.org open source project
+;; This source file is part of the Swift.org open source project
+;;
+;; Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+;; Licensed under Apache License v2.0 with Runtime Library Exception
+;;
+;; See http://swift.org/LICENSE.txt for license information
+;; See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 ;
-; Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
-; Licensed under Apache License v2.0 with Runtime Library Exception
+;===------------------------------------------------------------------------===;
 ;
-; See http://swift.org/LICENSE.txt for license information
-; See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+;;  Emacs-lisp support for automatically formatting things according to this
+;;  project's conventions.  To prevent this file from being automatically 
+;;  loaded, add (provide 'swift-project-settings) to your .emacs
 ;
-;===----------------------------------------------------------------------===;
-;
-;  Emacs-lisp support for automatically formatting things according to this
-;  project's conventions.  To prevent this file from being automatically 
-;  loaded, add (provide 'swift-project-settings) to your .emacs
-;
-;===----------------------------------------------------------------------===;
+;===------------------------------------------------------------------------===;
 
 
 ;; Associate .swift files with swift-mode

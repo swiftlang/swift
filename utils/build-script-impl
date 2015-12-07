@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 #===--- build-script-impl - Implementation details of build-script ---------===#
 #
 ## This source file is part of the Swift.org open source project
