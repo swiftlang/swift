@@ -191,7 +191,7 @@ Solution ConstraintSystem::finalize(
     solution.OpenedExistentialTypes.insert(openedExistential);
   }
 
-  return std::move(solution);
+  return solution;
 }
 
 void ConstraintSystem::applySolution(const Solution &solution) {
