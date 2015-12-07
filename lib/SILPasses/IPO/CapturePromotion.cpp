@@ -452,13 +452,11 @@ ClosureCloner::initCloned(SILFunction *Orig, StringRef ClonedName,
          && "SILFunction missing DebugScope");
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
 
-  auto *Fn =
-    M.getOrCreateFunction(Orig->getLinkage(), ClonedName, SubstTy,
-                          Orig->getContextGenericParams(), Orig->getLocation(),
-                          Orig->isBare(), IsNotTransparent, Orig->isFragile(),
-                          Orig->isThunk(),
-                          Orig->getClassVisibility(), Orig->getInlineStrategy(),
-                          Orig->getEffectsKind(), Orig, Orig->getDebugScope());
+  auto *Fn = M.getOrCreateFunction(
+      Orig->getLinkage(), ClonedName, SubstTy, Orig->getContextGenericParams(),
+      Orig->getLocation(), Orig->isBare(), IsNotTransparent, Orig->isFragile(),
+      Orig->isThunk(), Orig->getClassVisibility(), Orig->getInlineStrategy(),
+      Orig->getEffectsKind(), Orig, Orig->getDebugScope());
   Fn->setSemanticsAttr(Orig->getSemanticsAttr());
   Fn->setDeclCtx(Orig->getDeclContext());
   return Fn;

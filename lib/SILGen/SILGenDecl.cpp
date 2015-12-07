@@ -1765,16 +1765,11 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   if (witness.isAlwaysInline())
     InlineStrategy = AlwaysInline;
 
-  auto *f = M.getOrCreateFunction(linkage, nameBuffer,
-                                witnessSILType.castTo<SILFunctionType>(),
-                                witnessContextParams,
-                                SILLocation(witness.getDecl()),
-                                IsNotBare,
-                                IsTransparent,
-                                makeModuleFragile ? IsFragile : IsNotFragile,
-                                IsThunk,
-                                SILFunction::NotRelevant,
-                                InlineStrategy);
+  auto *f = M.getOrCreateFunction(
+      linkage, nameBuffer, witnessSILType.castTo<SILFunctionType>(),
+      witnessContextParams, SILLocation(witness.getDecl()), IsNotBare,
+      IsTransparent, makeModuleFragile ? IsFragile : IsNotFragile, IsThunk,
+      SILFunction::NotRelevant, InlineStrategy);
 
   f->setDebugScope(new (M)
                    SILDebugScope(RegularLocation(witness.getDecl()), *f));

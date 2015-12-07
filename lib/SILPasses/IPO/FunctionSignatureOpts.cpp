@@ -604,10 +604,11 @@ SILFunction *FunctionAnalyzer::createEmptyFunctionWithOptimizedSig(
   CanSILFunctionType NewFTy = createOptimizedSILFunctionType();
 
   // Create the new function.
-  auto *NewF = M.getOrCreateFunction(F->getLinkage(), NewFName, NewFTy, nullptr, F->getLocation(),
-      F->isBare(), F->isTransparent(), F->isFragile(), F->isThunk(),
-      F->getClassVisibility(), F->getInlineStrategy(), F->getEffectsKind(), 0,
-      F->getDebugScope(), F->getDeclContext());
+  auto *NewF = M.getOrCreateFunction(
+      F->getLinkage(), NewFName, NewFTy, nullptr, F->getLocation(), F->isBare(),
+      F->isTransparent(), F->isFragile(), F->isThunk(), F->getClassVisibility(),
+      F->getInlineStrategy(), F->getEffectsKind(), 0, F->getDebugScope(),
+      F->getDeclContext());
 
   NewF->setDeclCtx(F->getDeclContext());
 
