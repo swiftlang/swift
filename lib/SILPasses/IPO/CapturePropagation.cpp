@@ -233,8 +233,7 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
   CanSILFunctionType NewFTy =
     Lowering::adjustFunctionType(PAI->getType().castTo<SILFunctionType>(),
                                  SILFunctionType::Representation::Thin);
-  SILFunction *NewF = SILFunction::create(
-      *getModule(), SILLinkage::Shared, Name, NewFTy,
+  SILFunction *NewF = getModule()->getOrCreateFunction(SILLinkage::Shared, Name, NewFTy,
       /*contextGenericParams*/ nullptr, OrigF->getLocation(), OrigF->isBare(),
       OrigF->isTransparent(), OrigF->isFragile(), OrigF->isThunk(),
       OrigF->getClassVisibility(),

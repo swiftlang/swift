@@ -604,8 +604,7 @@ SILFunction *FunctionAnalyzer::createEmptyFunctionWithOptimizedSig(
   CanSILFunctionType NewFTy = createOptimizedSILFunctionType();
 
   // Create the new function.
-  SILFunction *NewF = SILFunction::create(
-      M, F->getLinkage(), NewFName, NewFTy, nullptr, F->getLocation(),
+  auto *NewF = M.getOrCreateFunction(F->getLinkage(), NewFName, NewFTy, nullptr, F->getLocation(),
       F->isBare(), F->isTransparent(), F->isFragile(), F->isThunk(),
       F->getClassVisibility(), F->getInlineStrategy(), F->getEffectsKind(), 0,
       F->getDebugScope(), F->getDeclContext());
