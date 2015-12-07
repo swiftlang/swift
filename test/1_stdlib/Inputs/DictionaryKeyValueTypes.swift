@@ -796,9 +796,9 @@ func _checkArrayFastEnumerationImpl(
 ) {
   let expectedContentsWithoutIdentity =
   _makeExpectedArrayContents(expected)
-
+  
   var expectedContents = [ExpectedArrayElement]()
-
+  
   for i in 0..<3 {
     var actualContents = [ExpectedArrayElement]()
     let sink = {
@@ -819,7 +819,7 @@ func _checkArrayFastEnumerationImpl(
     if i == 0 {
       expectedContents = actualContents
     }
-
+    
     expectEqualSequence(expectedContents, actualContents)
   }
 }
@@ -1260,3 +1260,4 @@ func getBridgedNSArrayOfValueTypeCustomBridged(
 
   return bridged
 }
+

@@ -83,7 +83,7 @@ struct InstrumentedIndex<I : RandomAccessIndexType> : RandomAccessIndexType {
   init(_ base: I) {
     self.base = base
   }
-
+  
   static func resetCounts() {
     callCounts = initialCallCounts
   }
@@ -107,7 +107,7 @@ struct InstrumentedIndex<I : RandomAccessIndexType> : RandomAccessIndexType {
     callCounts["_predecessorInPlace"]! += 1
     base._predecessorInPlace()
   }
-
+  
   func advancedBy(distance: Distance) -> InstrumentedIndex {
     callCounts["advancedBy"]! += 1
     return InstrumentedIndex(base.advancedBy(distance))

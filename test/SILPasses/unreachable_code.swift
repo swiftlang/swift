@@ -3,7 +3,7 @@ func ifFalse() -> Int {
   if false { // expected-note {{always evaluates to false}}
     return 0 // expected-warning {{will never be executed}}
   } else {
-    return 1 
+    return 1  
   }
 }
 
@@ -62,7 +62,7 @@ func unreachableBranch() -> Int {
       return 0 // expected-warning {{will never be executed}}
     } 
   } else {
-    return 1 
+    return 1  
   }
 }
 
@@ -147,9 +147,9 @@ func testSwitchEnum(xi: Int) -> Int {
   } // expected-error{{switch must be exhaustive}}
 
   switch cond { // expected-warning{{switch condition evaluates to a constant}}
-  case .Two:
+  case .Two: 
     x += 1
-  default:
+  default: 
     userCode() // expected-note{{will never be executed}}
   }
 
