@@ -5,7 +5,7 @@ func singleBlock() -> Int {
 } // expected-error {{missing return in a function expected to return 'Int'}}
 
 func singleBlock2() -> Int {
-  var y = 0
+  var y = 0 
   y += 1
 } // expected-error {{missing return in a function expected to return 'Int'}}
 
@@ -14,7 +14,7 @@ class MyClassWithClosure {
 }
 
 func multipleBlocksSingleMissing(b: Bool) -> (String, Int) {
-  var y = 0
+  var y = 0 
   if b {
     return ("a", 1)
   } else if (y == 0) {
@@ -23,7 +23,7 @@ func multipleBlocksSingleMissing(b: Bool) -> (String, Int) {
 } // expected-error {{missing return in a function expected to return '(String, Int)'}}
 
 func multipleBlocksAllMissing(x: Int) -> Int {
-  var y : Int = x + 1
+  var y : Int = x + 1 
   while (y > 0 ) {
     y -= 1;
     break;
@@ -49,8 +49,8 @@ func multipleBlocksAllMissing(x: Int) -> Int {
 
 func diagnose_missing_return_in_the_else_branch(i: Bool) -> Int {
   if (i) {
-    exit()
-  }
+    exit() 
+  } 
 } // expected-error {{missing return in a function expected to return 'Int'}}
 
 func diagnose_missing_return_no_error_after_noreturn(i: Bool) -> Int {
@@ -103,7 +103,7 @@ func testUnreachableAfterNoReturn(x: Int) -> Int {
 func testUnreachableAfterNoReturnInADifferentBlock() -> Int {
   let x:Int = 5;
   if true {  // expected-note {{condition always evaluates to true}}
-    exit();
+    exit(); 
   }
   return x; // expected-warning {{will never be executed}}
 }
@@ -119,7 +119,7 @@ func testUnreachableAfterNoReturnFollowedByACall() -> Int {
   let x:Int = 5;
   exit(); // expected-note{{a call to a noreturn function}}
   exit(); // expected-warning {{will never be executed}}
-  return x;
+  return x; 
 }
 
 func testUnreachableAfterNoReturnMethod() -> Int {

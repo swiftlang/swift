@@ -16,12 +16,12 @@ func testReallocation() {
       story += s
       if lastBase != story._core._baseAddress {
         reallocations += 1
-
+        
         // To avoid dumping a vast string here, just write the first
         // part of the story out each time there's a reallocation.
         var intro = story._split(":")[0]
         print("reallocation \(reallocations), with intro \(intro)")
-
+        
         if reallocations >= 30 {
           print("Reallocations exceeded 30")
           return

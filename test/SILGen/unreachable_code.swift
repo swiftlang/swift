@@ -1,8 +1,8 @@
 // RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify
 
 func testUnreachableAfterReturn() -> Int {
-  var x: Int = 3
-  return x
+  var x: Int = 3;
+  return x;
   x += 1 //expected-warning {{code after 'return' will never be executed}}
 }
 
@@ -20,31 +20,31 @@ func testUnreachableForAfterContinue(b: Bool) {
     var y: Int = 300
     y += 1
     if b {
-      break
+      break;
       y += 1 // expected-warning {{code after 'break' will never be executed}}
     }
-    continue
+    continue;
     y -= 1 // expected-warning {{code after 'continue' will never be executed}}
   }
 }
 
 func testUnreachableWhileAfterContinue(b: Bool) {
-  var i:Int = 0
+  var i:Int = 0;
   while (i<10) {
     var y: Int = 300
     y += 1
     if b {
-      break
+      break;
       y += 1 // expected-warning {{code after 'break' will never be executed}}
     }
-    continue
+    continue;
     i += 1 // expected-warning {{code after 'continue' will never be executed}}
   }
 }
 
 func testBreakAndContinue() {
-  var i = 0
-  var m = 0
+  var i = 0;
+  var m = 0;
   for i in 0..<10 {
     m += 1
     if m == 15 {

@@ -69,3 +69,4 @@ ExperimentalTestSuite.test("ComposeOperator/CountCalls/Workaround") {
 }
 
 runAllTests()
+

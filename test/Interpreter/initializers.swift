@@ -23,7 +23,7 @@ class A {
 
   convenience init(int i:Int) {
     printAtDepth("Starting A.init withInt(\(i))")
-	depth += 1
+    depth += 1
     self.init(int:i, string:"hello")
     depth -= 1
     printAtDepth("Ending A.init withInt(\(i))")

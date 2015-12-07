@@ -17,10 +17,10 @@ extension ImplicitlyUnwrappedOptional where Wrapped : TestProtocol1 {
 }
 
 var x : Optional<Int> = nil
-if x != nil {
+if x != nil { 
   print("x is non-empty!")
 }
-else {
+else { 
   print("an empty optional is logically false")
 }
 // CHECK: an empty optional is logically false
@@ -37,17 +37,17 @@ x = .Some(0)
 x = .Some(1)
 
 if x != nil {
-  print("a non-empty optional is logically true")
+  print("a non-empty optional is logically true") 
 } else {
   assert(false, "x is empty!")
 }
 // CHECK: a non-empty optional is logically true
 
-if x == nil {
+if x == nil { 
   print("logical negation fails 0")
 }
-else {
-  print("logical negation works 0")
+else { 
+  print("logical negation works 0") 
 }
 // CHECK: logical negation works 0
 
@@ -99,7 +99,7 @@ print("forced extraction use: \(x!.successor()).")
 
 func testRelation(p: (Int?, Int?) -> Bool) {
   typealias optPair = (Int?, Int?)
-
+  
   let relationships: [optPair] = [
     (1, 1), (1, 2), (2, 1), (1, .None), (.None, 1), (.None, .None)
   ]
@@ -143,10 +143,10 @@ func nilComparison() {
   print(nil == x0) // DISABLED-CHECK-NEXT: true
   print(nil != x0) // DISABLED-CHECK-NEXT: false
   */
-
+  
   let v0: Int? = nil
   let v1: Int? = 1
-
+  
   print(v1 == nil) // CHECK-NEXT: false
   print(v1 != nil) // CHECK-NEXT: true
   print(v0 == nil) // CHECK-NEXT: true
@@ -159,7 +159,7 @@ func nilComparison() {
 
   let _: C? = nil
   let _: C? = C()
-
+  
   /*
   // FIXME: <rdar://problem/17489239> Optional<T>() == nil where T: !Equatable
   print(c1 == nil) // DISABLED-CHECK-NEXT: false
@@ -172,10 +172,10 @@ func nilComparison() {
   print(nil == c0) // DISABLED-CHECK-NEXT: true
   print(nil != c0) // DISABLED-CHECK-NEXT: false
   */
-
+  
   let e0: E? = nil
   let e1: E? = E()
-
+  
   print(e1 == nil) // CHECK-NEXT: false
   print(e1 != nil) // CHECK-NEXT: true
   print(e0 == nil) // CHECK-NEXT: true

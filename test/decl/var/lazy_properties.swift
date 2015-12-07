@@ -56,7 +56,7 @@ struct StructTest {
   mutating func f1() -> Int {
     return p1
   }
-
+ 
   // expected-note @+1 {{mark method 'mutating' to make 'self' mutable}} {{3-3=mutating }}
   func f2() -> Int {
     return p1  // expected-error {{cannot use mutating getter on immutable value: 'self' is immutable}}
@@ -75,3 +75,5 @@ class CaptureListInLazyProperty {
   lazy var closure: () -> Int = { [weak self] in return self!.i }
   var i = 42
 }
+
+

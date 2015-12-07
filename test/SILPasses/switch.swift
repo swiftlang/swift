@@ -10,3 +10,4 @@ func non_fully_covered_switch(x: Int) -> Int {
   } // expected-error{{switch must be exhaustive}}
   return x;
 }
+

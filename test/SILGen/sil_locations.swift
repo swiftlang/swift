@@ -64,7 +64,6 @@ func ifexpr_rval() -> Int {
 
 // TODO: missing info on the first branch.
 func forstmt_empty_cond(i: Int) -> Int {
-    
   for var i=0;; i += 1 {}
     // CHECK-LABEL: sil hidden  @{{.*}}forstmt_empty_cond{{.*}}
     // CHECK: apply {{.*}} line:[[@LINE-2]]:13

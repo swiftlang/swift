@@ -52,7 +52,7 @@ var tests = TestSuite("ExistentialCollection")
 tests.test("AnyGenerator") {
   func countStrings() -> AnyGenerator<String> {
     let lazyStrings = (0..<5).lazy.map { String($0) }
-
+    
     // This is a really complicated type of no interest to our
     // clients.
     let g: LazyMapGenerator<
@@ -74,12 +74,12 @@ let initialCallCounts = [
 ]
 
 var callCounts = initialCallCounts
-
+  
 struct InstrumentedIndex<I : RandomAccessIndexType> : RandomAccessIndexType {
   typealias Distance = I.Distance
 
   var base: I
-
+  
   init(_ base: I) {
     self.base = base
   }
@@ -87,22 +87,22 @@ struct InstrumentedIndex<I : RandomAccessIndexType> : RandomAccessIndexType {
   static func resetCounts() {
     callCounts = initialCallCounts
   }
-
+  
   func successor() -> InstrumentedIndex {
     callCounts["successor"]! += 1
     return InstrumentedIndex(base.successor())
   }
-
+  
   mutating func _successorInPlace() {
     callCounts["_successorInPlace"]! += 1
     base._successorInPlace()
   }
-
+  
   func predecessor() -> InstrumentedIndex {
     callCounts["predecessor"]! += 1
     return InstrumentedIndex(base.predecessor())
   }
-
+  
   mutating func _predecessorInPlace() {
     callCounts["_predecessorInPlace"]! += 1
     base._predecessorInPlace()
@@ -112,7 +112,7 @@ struct InstrumentedIndex<I : RandomAccessIndexType> : RandomAccessIndexType {
     callCounts["advancedBy"]! += 1
     return InstrumentedIndex(base.advancedBy(distance))
   }
-
+  
   func distanceTo(other: InstrumentedIndex) -> Distance {
     callCounts["distanceTo"]! += 1
     return base.distanceTo(other.base)
@@ -207,7 +207,7 @@ tests.test("ForwardCollection") {
 tests.test("BidirectionalCollection") {
   let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
   let fc0 = AnyForwardCollection(a0.lazy.reverse())
-
+  
   let bc0_ = AnyBidirectionalCollection(fc0)         // upgrade!
   expectNotEmpty(bc0_)
   let bc0 = bc0_!
@@ -218,7 +218,7 @@ tests.test("BidirectionalCollection") {
 
   let fc2 = AnyForwardCollection(bc0)                // downgrade
   expectTrue(fc2 === bc0)
-
+  
   let a1 = ContiguousArray(bc0.lazy.reverse())
   expectEqual(a0, a1)
   for e in a0 {
@@ -230,7 +230,7 @@ tests.test("BidirectionalCollection") {
     expectNotEqual(bc0.endIndex, i)
     expectEqual(1, bc0.indices.filter { $0 == i }.count)
   }
-
+  
   // Can't upgrade a non-random-access collection to random access
   let s0 = "Hello, Woyld".characters
   let bc1 = AnyBidirectionalCollection(s0)
@@ -253,7 +253,7 @@ tests.test("RandomAccessCollection") {
 
   let fc1 = AnyBidirectionalCollection(rc0)         // downgrade
   expectTrue(fc1 === rc0)
-
+  
   let a1 = ContiguousArray(rc0.lazy.reverse())
   expectEqual(a0, a1)
   for e in a0 {

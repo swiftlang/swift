@@ -825,7 +825,7 @@ Runtime.test("casting AnyObject to class metatypes") {
   do {
     var nso: NSObject = SomeNSObjectSubclass()
     expectTrue(nso as? AnyClass == nil)
-
+    
     nso = (SomeNSObjectSubclass.self as AnyObject) as! NSObject
     expectTrue(nso as? Any.Type == SomeNSObjectSubclass.self)
     expectTrue(nso as? AnyClass == SomeNSObjectSubclass.self)
@@ -2150,8 +2150,8 @@ Reflection.test("TupleMirror/NoLeak") {
   }
 }
 
-// A struct type and class type whose NominalTypeDescriptor.FieldNames
-// data is exactly eight bytes long. FieldNames data of exactly
+// A struct type and class type whose NominalTypeDescriptor.FieldNames 
+// data is exactly eight bytes long. FieldNames data of exactly 
 // 4 or 8 or 16 bytes was once miscompiled on arm64.
 struct EightByteFieldNamesStruct {
   let abcdef = 42
@@ -2396,3 +2396,4 @@ AvailabilityVersionsTestSuite.test("_stdlib_isOSVersionAtLeast") {
 }
 
 runAllTests()
+
