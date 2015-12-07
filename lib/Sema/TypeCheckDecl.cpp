@@ -3194,12 +3194,11 @@ public:
   void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
     if (assocType->isBeingTypeChecked()) {
 
-      if (!assocType->hasType()) {
+      if (!assocType->isInvalid()) {
         assocType->setInvalid();
         assocType->overwriteType(ErrorType::get(TC.Context));
+        TC.diagnose(assocType->getLoc(), diag::circular_type_alias, assocType->getName());
       }
-
-      TC.diagnose(assocType->getLoc(), diag::circular_type_alias, assocType->getName());
       return;
     }
 
