@@ -236,7 +236,8 @@ bool isLetPointer(SILValue V);
 namespace llvm {
   template <> struct llvm::DenseMapInfo<AliasKeyTy> {
     static inline AliasKeyTy getEmptyKey() {
-      return {0, 0, 0, 0, nullptr, nullptr};
+      auto Allone = std::numeric_limits<size_t>::max();
+      return {Allone, Allone, 0xffff, 0xffff, nullptr, nullptr};
     }
     static inline AliasKeyTy getTombstoneKey() {
       auto Allone = std::numeric_limits<size_t>::max();
