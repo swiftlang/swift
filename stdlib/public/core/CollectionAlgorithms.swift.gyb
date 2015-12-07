@@ -43,10 +43,8 @@ extension CollectionType where ${GElement} : Equatable {
       return result
     }
 
-    for i in self.indices {
-      if self[i] == element {
-        return i
-      }
+    for i in self.indices where self[i] == element {
+      return i
     }
     return nil
   }
@@ -61,10 +59,8 @@ extension CollectionType {
   public func indexOf(
     @noescape predicate: (${GElement}) throws -> Bool
   ) rethrows -> Index? {
-    for i in self.indices {
-      if try predicate(self[i]) {
-        return i
-      }
+    for i in self.indices where try predicate(self[i]) {
+      return i
     }
     return nil
   }
