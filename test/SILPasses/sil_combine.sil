@@ -2993,3 +2993,29 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   return %90 : $()
 }
 
+// CHECK-LABEL: sil @enum_promotion_case3
+// CHECK: bb0([[B_PTR:%[0-9]+]]
+// CHECK-NEXT: [[ALLOCA:%[0-9]+]] = alloc_stack $FakeOptional<B>
+// CHECK-NEXT: strong_release [[B_PTR]]
+// CHECK-NEXT: [[ENUM:%[0-9]+]] = enum $FakeOptional<B>, #FakeOptional.Some!enumelt.1, [[B_PTR]] : $B
+// CHECK-NEXT: store [[ENUM]] to [[ALLOCA]]#1 : $*FakeOptional<B>
+// CHECK-NEXT: [[RESULT:%[0-9]+]] = load [[ALLOCA:%[0-9]+]]#1
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: strong_release [[B_PTR]]
+// CHECK-NEXT: return [[RESULT]]
+sil @enum_promotion_case3 : $@convention(thin) (@owned B) -> @owned FakeOptional<B> {
+bb0(%0 : $B):
+  %2 = alloc_stack $FakeOptional<B>
+  %3 = init_enum_data_addr %2#1 : $*FakeOptional<B>, #FakeOptional.Some!enumelt.1
+  store %0 to %3 : $*B
+
+  // This instruction between the store and the inject_enum_addr should not prevent
+  // the optimization.
+  strong_release %0 : $B
+
+  inject_enum_addr %2#1 : $*FakeOptional<B>, #FakeOptional.Some!enumelt.1
+  %7 = load %2#1 : $*FakeOptional<B>
+  dealloc_stack %2#0 : $*@local_storage FakeOptional<B>
+  strong_release %0 : $B
+  return %7 : $FakeOptional<B>
+}
