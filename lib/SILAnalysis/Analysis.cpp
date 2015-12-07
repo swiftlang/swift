@@ -61,7 +61,3 @@ SILAnalysis *swift::createClassHierarchyAnalysis(SILModule *M) {
 SILAnalysis *swift::createBasicCalleeAnalysis(SILModule *M) {
   return new BasicCalleeAnalysis(M);
 }
-
-SILAnalysis *swift::createProgramTerminationAnalysis(SILModule *M) {
-  return new ProgramTerminationAnalysis(M);
-}
