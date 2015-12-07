@@ -38,7 +38,7 @@ x = .Some(1)
 
 if x != nil {
   print("a non-empty optional is logically true") 
-} else {
+} else { 
   assert(false, "x is empty!")
 }
 // CHECK: a non-empty optional is logically true

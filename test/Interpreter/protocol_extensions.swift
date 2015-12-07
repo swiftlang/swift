@@ -6,7 +6,7 @@ extension SequenceType {
   final var myCount: Int {
     var result = 0
     for _ in self {
-	result += 1
+      result += 1
     }
     return result
   }

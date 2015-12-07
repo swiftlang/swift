@@ -163,7 +163,7 @@ func tupleinout(inout a: (lo: Int, hi: Int)) {
 func test5<T>(x: T, y: T) {
   var a : ((T, T), T)  // expected-note {{variable defined here}}
   a.0 = (x, y)
-
+  
   _ = a     // expected-error {{variable 'a.1' used before being initialized}}
 }
 
@@ -328,8 +328,8 @@ extension NotInitializedUnion {
   }   // expected-error {{return from enum initializer method without storing to 'self'}}
 }
 
-enum NotInitializedGenericUnion<T> { 
-  init() {
+enum NotInitializedGenericUnion<T> {
+  init() { 
   }    // expected-error {{return from enum initializer method without storing to 'self'}}
   case X
 }
@@ -352,7 +352,7 @@ class SomeDerivedClass : SomeClass {
     y = 42
     super.init()
   }
-
+  
   init(a : Bool, b : Bool, c : Bool) {
     y = 42
     super.init()
@@ -374,7 +374,7 @@ class SomeDerivedClass : SomeClass {
     if a { super.init() }
     x = 42        // expected-error {{use of 'self' in property access 'x' before super.init initializes self}}
   }               // expected-error {{super.init isn't called on all paths before returning from initializer}}
-
+  
   func someMethod() {}
   
   init(a : Int) {
@@ -1034,7 +1034,7 @@ struct StructMutatingMethodTest {
   let y : Int
   init() {
     x = 42
-    x += 1     // expected-error {{mutating operator '+=' may not be used on immutable value 'self.x'}}
+    x += 1   // expected-error {{mutating operator '+=' may not be used on immutable value 'self.x'}}
 
     y = 12
     myTransparentFunction(&y)  // expected-error {{immutable value 'self.y' may not be passed inout}}

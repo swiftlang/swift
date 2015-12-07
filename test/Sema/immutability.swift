@@ -189,7 +189,7 @@ struct TestMutableStruct {
     nonmutating
     set {}
   }
-
+  
   // This property has a mutating getter and !mutating setter.
   var weird_property : Int {
     mutating get {}
@@ -237,7 +237,7 @@ protocol ClassBoundProtocolMutating : class {
 protocol MutatingTestProto {
   mutating
   func mutatingfunc()
-
+  
   func nonmutatingfunc()  // expected-note {{protocol requires}}
 }
 
