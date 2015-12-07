@@ -118,6 +118,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         ObjCProtocolMethod,
         SuperInit,
         SelfInit,
+        SuperMethod,
       };
       unsigned kind : 3;
     };
@@ -176,6 +177,21 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         InvalidPartialApplications.insert({ expr, {1, kind} });
         return;
       }
+
+      // Method references based in super cannot be partially applied,
+      // except for the implicit self parameter, unless the method is final,
+      // in which case a super_method instruction won't be used, just thunks
+      // leading to a function_ref.
+      if (auto call = dyn_cast<CallExpr>(expr))
+        if (auto dotSyntaxCall = dyn_cast<DotSyntaxCallExpr>(call->getFn()))
+          if (dotSyntaxCall->isSuper())
+            if (auto fnDeclRef = dyn_cast<DeclRefExpr>(dotSyntaxCall->getFn()))
+              if (auto fn = dyn_cast<FuncDecl>(fnDeclRef->getDecl()))
+                if (!fn->isFinal())
+                  InvalidPartialApplications.insert({
+                    dotSyntaxCall, {fn->getNaturalArgumentCount() - /*self*/ 1,
+                      PartialApplication::SuperMethod}
+                  });
 
       auto fnDeclRef = dyn_cast<DeclRefExpr>(fnExpr);
       if (!fnDeclRef)

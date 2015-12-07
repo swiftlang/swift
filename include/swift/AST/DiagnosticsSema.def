@@ -1847,7 +1847,8 @@ ERROR(partial_application_of_function_invalid,tce_sema,none,
         "'mutating' method|"
         "method in @objc protocol|"
         "'super.init' initializer chain|"
-        "'self.init' initializer delegation"
+        "'self.init' initializer delegation|"
+        "non-final 'super' method"
       "}0 is not allowed",
       (unsigned))
 
