@@ -3173,7 +3173,7 @@ public:
         TAD->getUnderlyingTypeLoc().setInvalidType(TC.Context);
       } else if (TAD->getDeclContext()->isGenericContext()) {
         TAD->setInterfaceType(
-        TC.getInterfaceTypeFromInternalType(TAD->getDeclContext(),
+          TC.getInterfaceTypeFromInternalType(TAD->getDeclContext(),
                                               TAD->getType()));
       }
 
