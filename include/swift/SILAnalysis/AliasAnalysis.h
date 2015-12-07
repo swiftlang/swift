@@ -117,6 +117,9 @@ private:
     ValueBaseToIndex.invalidateValue(I);
   }
 
+  virtual bool needsNotifications() override { return true; }
+
+
 public:
   AliasAnalysis(SILModule *M) :
     SILAnalysis(AnalysisKind::Alias), Mod(M), SEA(nullptr) {}
