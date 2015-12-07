@@ -223,7 +223,7 @@ void DCE::markLive(SILFunction &F) {
   for (auto &BB : F) {
     for (auto &I : BB) {
       if (auto *CFI = dyn_cast<CondFailInst>(&I)) {
-        // A cond_fail is only alive if its (identifyable) producer is alive.
+        // A cond_fail is only alive if its (identifiable) producer is alive.
         if (SILInstruction *Prod = getProducer(CFI)) {
           addReverseDependency(Prod, CFI);
         } else {
