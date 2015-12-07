@@ -655,23 +655,35 @@ private:
     if (!kind)
       return;
 
-    if (printKind == NullabilityPrintKind::After)
+    switch (printKind) {
+    case NullabilityPrintKind::ContextSensitive:
+      switch (*kind) {
+      case OTK_None:
+        os << "nonnull";
+        break;
+      case OTK_Optional:
+        os << "nullable";
+        break;
+      case OTK_ImplicitlyUnwrappedOptional:
+        os << "null_unspecified";
+        break;
+      }
+      break;
+    case NullabilityPrintKind::After:
       os << ' ';
-
-    if (printKind != NullabilityPrintKind::ContextSensitive)
-      os << "__";
-
-    switch (*kind) {
-    case OTK_None:
-      os << "nonnull";
-      break;
-
-    case OTK_Optional:
-      os << "nullable";
-      break;
-
-    case OTK_ImplicitlyUnwrappedOptional:
-      os << "null_unspecified";
+      [[clang::fallthrough]];
+    case NullabilityPrintKind::Before:
+      switch (*kind) {
+      case OTK_None:
+        os << "_Nonnull";
+        break;
+      case OTK_Optional:
+        os << "_Nullable";
+        break;
+      case OTK_ImplicitlyUnwrappedOptional:
+        os << "_Null_unspecified";
+        break;
+      }
       break;
     }
 
@@ -805,7 +817,7 @@ private:
       auto *clangTypeDecl = cast<clang::TypeDecl>(alias->getClangDecl());
       os << clangTypeDecl->getName();
 
-      // Print proper nullability for CF types, but __null_unspecified for
+      // Print proper nullability for CF types, but _Null_unspecified for
       // all other non-object Clang pointer types.
       if (aliasTy->hasReferenceSemantics() ||
           isClangObjectPointerType(clangTypeDecl)) {
@@ -1527,7 +1539,7 @@ public:
         return elem->getName().str() == "Domain";
       });
       if (!hasDomainCase) {
-        os << "static NSString * __nonnull const " << ED->getName()
+        os << "static NSString * _Nonnull const " << ED->getName()
            << "Domain = @\"" << M.getName() << "." << ED->getName() << "\";\n";
       }
     }

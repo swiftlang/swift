@@ -98,7 +98,7 @@ extension NSObject {}
 // CHECK-LABEL: @interface NSString (SWIFT_EXTENSION(extensions))
 // CHECK-NEXT: - (void)test;
 // CHECK-NEXT: + (void)test2;
-// CHECK-NEXT: + (NSString * __nullable)fromColor:(NSColor * __nonnull)color;
+// CHECK-NEXT: + (NSString * _Nullable)fromColor:(NSColor * _Nonnull)color;
 // CHECK-NEXT: @end
 extension NSString {
   func test() {}
