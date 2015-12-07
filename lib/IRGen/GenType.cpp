@@ -2034,7 +2034,7 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM,
     auto field = allFields.begin();
     // If there are no other fields exit early to prevent calling std::next on
     // an invalid iterator.
-    if (field == allFields.end())
+    if (allFields.empty())
       return SILType();
     
     if (std::next(field) == allFields.end())
