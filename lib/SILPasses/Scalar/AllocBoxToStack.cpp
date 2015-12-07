@@ -401,7 +401,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
     return false;
 
   // Promote this alloc_box to an alloc_stack. Insert the alloc_stack
-  // at the beginning of the funtion.
+  // at the beginning of the function.
   auto &Entry = ABI->getFunction()->front();
   SILBuilder BuildAlloc(&Entry, Entry.begin());
   BuildAlloc.setCurrentDebugScope(ABI->getDebugScope());
@@ -549,13 +549,11 @@ DeadParamCloner::initCloned(SILFunction *Orig,
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getDebugScope())
          && "SILFunction missing DebugScope");
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
-  auto Fn =
-      SILFunction::create(M, SILLinkage::Shared, ClonedName, ClonedTy,
-                          Orig->getContextGenericParams(), Orig->getLocation(),
-                          Orig->isBare(), IsNotTransparent, Orig->isFragile(),
-                          Orig->isThunk(),
-                          Orig->getClassVisibility(), Orig->getInlineStrategy(),
-                          Orig->getEffectsKind(), Orig, Orig->getDebugScope());
+  auto *Fn = M.getOrCreateFunction(
+      SILLinkage::Shared, ClonedName, ClonedTy, Orig->getContextGenericParams(),
+      Orig->getLocation(), Orig->isBare(), IsNotTransparent, Orig->isFragile(),
+      Orig->isThunk(), Orig->getClassVisibility(), Orig->getInlineStrategy(),
+      Orig->getEffectsKind(), Orig, Orig->getDebugScope());
   Fn->setSemanticsAttr(Orig->getSemanticsAttr());
   Fn->setDeclCtx(Orig->getDeclContext());
   return Fn;

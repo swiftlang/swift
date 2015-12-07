@@ -49,7 +49,7 @@ To document the reason for marking symbols public, we use comments:
 * symbols that are SPIs for the module X::
 
     public // SPI(X)
-    public _foo() { ... }
+    func _foo() { ... }
 
 `internal`
 ==========

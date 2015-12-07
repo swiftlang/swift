@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib -emit-silgen -verify %s | FileCheck %s
+// RUN: %target-swift-frontend -use-native-super-method -parse-stdlib -emit-silgen -verify %s | FileCheck %s
 
 import Swift
 
@@ -465,8 +465,7 @@ class BaseThrowingInit : HasThrowingInit {
 //   Super delegation.
 // CHECK-NEXT: [[T0:%.*]] = load [[MARKED_BOX]]
 // CHECK-NEXT: [[T2:%.*]] = upcast [[T0]] : $BaseThrowingInit to $HasThrowingInit
-// CHECK-NEXT: function_ref
-// CHECK-NEXT: [[T3:%.*]] = function_ref @_TFC6errors15HasThrowingInitc
+// CHECK-NEXT: [[T3:%[0-9]+]] = super_method [[T0]] : $BaseThrowingInit, #HasThrowingInit.init!initializer.1
 // CHECK-NEXT: apply [[T3]](%0, [[T2]])
 
 // Cleanups for writebacks.
