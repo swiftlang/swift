@@ -3173,7 +3173,7 @@ public:
         TAD->getUnderlyingTypeLoc().setInvalidType(TC.Context);
       } else if (TAD->getDeclContext()->isGenericContext()) {
         TAD->setInterfaceType(
-          TC.getInterfaceTypeFromInternalType(TAD->getDeclContext(),
+        TC.getInterfaceTypeFromInternalType(TAD->getDeclContext(),
                                               TAD->getType()));
       }
 
@@ -3192,6 +3192,19 @@ public:
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
+    if (assocType->isBeingTypeChecked()) {
+
+      if (!assocType->hasType()) {
+        assocType->setInvalid();
+        assocType->overwriteType(ErrorType::get(TC.Context));
+      }
+
+      TC.diagnose(assocType->getLoc(), diag::circular_type_alias, assocType->getName());
+      return;
+    }
+
+    assocType->setIsBeingTypeChecked();
+
     TC.checkDeclAttributesEarly(assocType);
     if (!assocType->hasAccessibility())
       assocType->setAccessibility(assocType->getProtocol()->getFormalAccess());
@@ -3205,6 +3218,8 @@ public:
       defaultDefinition.setInvalidType(TC.Context);
     }
     TC.checkDeclAttributes(assocType);
+
+    assocType->setIsBeingTypeChecked(false);
   }
 
   bool checkUnsupportedNestedGeneric(NominalTypeDecl *NTD) {
