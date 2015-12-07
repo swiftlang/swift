@@ -24,7 +24,7 @@ class Canary {
   }
 
   deinit {
-    Canary.count -= 
+    Canary.count -= 1
   }
 }
 
