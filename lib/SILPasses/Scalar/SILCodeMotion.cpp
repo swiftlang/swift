@@ -24,6 +24,7 @@
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
 #include "swift/SILAnalysis/RCIdentityAnalysis.h"
+#include "swift/SILAnalysis/ProgramTerminationAnalysis.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "llvm/ADT/Optional.h"
@@ -806,9 +807,9 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
 
 static bool tryToSinkRefCountInst(SILBasicBlock::iterator T,
                                   SILBasicBlock::iterator I,
-                                  bool CanSinkToSuccessors,
-                                  AliasAnalysis *AA,
-                                  RCIdentityFunctionInfo *RCIA) {
+                                  bool CanSinkToSuccessors, AliasAnalysis *AA,
+                                  RCIdentityFunctionInfo *RCIA,
+                                  ProgramTerminationFunctionInfo *PTFI) {
   // The following methods should only be attempted if we can sink to our
   // successor.
   if (CanSinkToSuccessors) {
@@ -856,7 +857,7 @@ static bool tryToSinkRefCountInst(SILBasicBlock::iterator T,
   for (auto &Succ : T->getParent()->getSuccessors()) {
     SILBasicBlock *SuccBB = Succ.getBB();
 
-    if (isARCInertTrapBB(SuccBB))
+    if (PTFI->isProgramTerminatingBlock(SuccBB))
       continue;
 
     Builder.setInsertionPoint(&*SuccBB->begin());
@@ -985,7 +986,8 @@ static bool hoistDecrementsToPredecessors(SILBasicBlock *BB, AliasAnalysis *AA,
 /// Try sink a retain as far as possible.  This is either to sucessor BBs,
 /// or as far down the current BB as possible
 static bool sinkRefCountIncrement(SILBasicBlock *BB, AliasAnalysis *AA,
-                                  RCIdentityFunctionInfo *RCIA) {
+                                  RCIdentityFunctionInfo *RCIA,
+                                  ProgramTerminationFunctionInfo *PTFI) {
 
   // Make sure that each one of our successors only has one predecessor,
   // us.
@@ -1019,12 +1021,12 @@ static bool sinkRefCountIncrement(SILBasicBlock *BB, AliasAnalysis *AA,
     //   2. If there are such decrements, move the retain right before that
     //      decrement.
     Changed |= tryToSinkRefCountInst(S->getIterator(), Inst->getIterator(),
-                                     CanSinkToSuccessor, AA, RCIA);
+                                     CanSinkToSuccessor, AA, RCIA, PTFI);
   }
 
   // Handle the first instruction in the BB.
-  Changed |=
-      tryToSinkRefCountInst(S->getIterator(), SI, CanSinkToSuccessor, AA, RCIA);
+  Changed |= tryToSinkRefCountInst(S->getIterator(), SI, CanSinkToSuccessor, AA,
+                                   RCIA, PTFI);
   return Changed;
 }
 
@@ -1669,7 +1671,9 @@ sinkIncrementsOutOfSwitchRegions(AliasAnalysis *AA,
 
 static bool processFunction(SILFunction *F, AliasAnalysis *AA,
                             PostOrderFunctionInfo *PO,
-                            RCIdentityFunctionInfo *RCIA, bool HoistReleases) {
+                            RCIdentityFunctionInfo *RCIA,
+                            ProgramTerminationFunctionInfo *PTFI,
+                            bool HoistReleases) {
 
   bool Changed = false;
 
@@ -1720,7 +1724,7 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
     Changed |= State.process();
 
     // Finally we try to sink retain instructions from this BB to the next BB.
-    Changed |= sinkRefCountIncrement(State.getBB(), AA, RCIA);
+    Changed |= sinkRefCountIncrement(State.getBB(), AA, RCIA, PTFI);
 
     // And hoist decrements to predecessors. This is beneficial if we can then
     // match them up with an increment in some of the predecessors.
@@ -1745,11 +1749,12 @@ public:
     auto *AA = getAnalysis<AliasAnalysis>();
     auto *PO = getAnalysis<PostOrderAnalysis>()->get(F);
     auto *RCIA = getAnalysis<RCIdentityAnalysis>()->get(getFunction());
+    auto *PTFI = getAnalysis<ProgramTerminationAnalysis>()->get(getFunction());
 
     DEBUG(llvm::dbgs() << "***** CodeMotion on function: " << F->getName() <<
           " *****\n");
 
-    if (processFunction(F, AA, PO, RCIA, HoistReleases))
+    if (processFunction(F, AA, PO, RCIA, PTFI, HoistReleases))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
