@@ -221,7 +221,7 @@ class BBState {
   void processWrite(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
                     SILValue Val);
 
-  /// BitVector manipulation fucntions.
+  /// BitVector manipulation functions.
   void clearMemLocations();
   void startTrackingMemLocation(unsigned bit, LoadStoreValue Val);
   void stopTrackingMemLocation(unsigned bit);
@@ -697,7 +697,7 @@ RLEContext::RLEContext(SILFunction *F, AliasAnalysis *AA,
 
   // For all basic blocks in the function, initialize a BB state. Since we
   // know all the locations accessed in this function, we can resize the bit
-  // vector to the approproate size.
+  // vector to the appropriate size.
   for (auto &B : *F) {
     BBToLocState[&B] = BBState();
     // We set the initial state of unreachable block to 0, as we do not have
