@@ -180,7 +180,7 @@ StackPromoter::ChangeState StackPromoter::promote() {
   // Search the whole function for stack promotable allocations.
   for (SILBasicBlock &BB : *F) {
     for (auto Iter = BB.begin(); Iter != BB.end();) {
-      // The allocaiton instruction may be moved, so increment Iter prior to
+      // The allocation instruction may be moved, so increment Iter prior to
       // doing the optimization.
       SILInstruction *I = &*Iter++;
       if (isPromotableAllocInst(I)) {
