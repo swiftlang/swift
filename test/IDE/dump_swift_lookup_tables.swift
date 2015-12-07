@@ -3,22 +3,7 @@
 
 // REQUIRES: objc_interop
 
-// CHECK:      Base -> full name mappings:
-// CHECK-NEXT:   Bar --> Bar
-// CHECK-NEXT:   Blue --> Blue
-// CHECK-NEXT:   Green --> Green
-// CHECK-NEXT:   MyInt --> MyInt
-// CHECK-NEXT:   Point --> Point
-// CHECK-NEXT:   Rouge --> Rouge
-// CHECK-NEXT:   SNColorChoice --> SNColorChoice
-// CHECK-NEXT:   SomeStruct --> SomeStruct
-// CHECK-NEXT:   __SNTransposeInPlace --> __SNTransposeInPlace
-// CHECK-NEXT:   makeSomeStruct --> makeSomeStruct(x:y:), makeSomeStruct(x:)
-// CHECK-NEXT:   x --> x
-// CHECK-NEXT:   y --> y
-// CHECK-NEXT:   z --> z
-
-// CHECK:      Full name -> entry mappings:
+// CHECK:      Base name -> entry mappings:
 // CHECK-NEXT:   Bar:
 // CHECK-NEXT:     TU: SNFoo
 // CHECK-NEXT:   Blue:
@@ -37,10 +22,8 @@
 // CHECK-NEXT:     TU: SNSomeStruct
 // CHECK-NEXT:   __SNTransposeInPlace:
 // CHECK-NEXT:     TU: SNTransposeInPlace
-// CHECK-NEXT:   makeSomeStruct(x:):
-// CHECK-NEXT:     TU: SNMakeSomeStructForX
-// CHECK-NEXT:   makeSomeStruct(x:y:):
-// CHECK-NEXT:     TU: SNMakeSomeStruct
+// CHECK-NEXT:   makeSomeStruct:
+// CHECK-NEXT:     TU: SNMakeSomeStruct, SNMakeSomeStructForX
 // CHECK-NEXT:   x:
 // CHECK-NEXT:     SNSomeStruct: X
 // CHECK-NEXT:     SNPoint: x

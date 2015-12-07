@@ -62,31 +62,19 @@ void SwiftLookupTable::addEntry(DeclName name, clang::NamedDecl *decl,
   if (!contextOpt) return;
   auto context = *contextOpt;
 
-  // First, check whether there is already a full name entry.
-  auto knownFull = FullNameTable.find(name);
-  if (knownFull == FullNameTable.end()) {
-    // We didn't have a full name entry, so record that in the base
-    // name table.
-    BaseNameTable[name.getBaseName()].push_back(name);
+  // Find the list of entries for this base name.
+  auto &entries = LookupTable[name.getBaseName().str()];
+  for (auto &entry : entries) {
+    if (entry.Context == context) {
+      // We have entries for this context.
 
-    // Insert the entry into the full name table. We're done.
-    FullTableEntry newEntry;
-    newEntry.Context = context;
-    newEntry.Decls.push_back(decl);
-    (void)FullNameTable.insert({name, { newEntry }});
-    return;
-  }
-
-  // Check whether there is already an entry with the same context.
-  auto &fullEntries = knownFull->second;
-  for (auto &fullEntry : fullEntries) {
-    if (fullEntry.Context == context) {
       // Check whether this entry matches any existing entry.
-      for (auto existingDecl : fullEntry.Decls) {
+      for (auto existingDecl : entry.Decls) {
         if (matchesExistingDecl(decl, existingDecl)) return;
       }
 
-      fullEntry.Decls.push_back(decl);
+      // Add an entry to this context.
+      entry.Decls.push_back(decl);
       return;
     }
   }
@@ -95,7 +83,7 @@ void SwiftLookupTable::addEntry(DeclName name, clang::NamedDecl *decl,
   FullTableEntry newEntry;
   newEntry.Context = context;;
   newEntry.Decls.push_back(decl);
-  fullEntries.push_back(newEntry);
+  entries.push_back(newEntry);
 }
 
 static void printName(clang::NamedDecl *named, llvm::raw_ostream &out) {
@@ -150,45 +138,19 @@ static void printName(clang::NamedDecl *named, llvm::raw_ostream &out) {
 }
 
 void SwiftLookupTable::dump() const {
-  // Dump the base name -> full name mappings.
-  SmallVector<Identifier, 4> baseNames;
-  for (const auto &entry : BaseNameTable) {
+  // Dump the base name -> full table entry mappings.
+  SmallVector<StringRef, 4> baseNames;
+  for (const auto &entry : LookupTable) {
     baseNames.push_back(entry.first);
   }
-  std::sort(baseNames.begin(), baseNames.end(),
-            [&](Identifier x, Identifier y) {
-              return x.compare(y) < 0;
-            });
-  llvm::errs() << "Base -> full name mappings:\n";
+  llvm::array_pod_sort(baseNames.begin(), baseNames.end());
+  llvm::errs() << "Base name -> entry mappings:\n";
   for (auto baseName : baseNames) {
-    llvm::errs() << "  " << baseName.str() << " --> ";
-    const auto &fullNames = BaseNameTable.find(baseName)->second;
-    interleave(fullNames.begin(), fullNames.end(),
-               [](DeclName fullName) {
-                 llvm::errs() << fullName;
-               },
-               [] {
-                 llvm::errs() << ", ";
-               });
-    llvm::errs() << "\n";
-  }
-  llvm::errs() << "\n";
-
-  // Dump the full name -> full table entry mappings.
-  SmallVector<DeclName, 4> fullNames;
-  for (const auto &entry : FullNameTable) {
-    fullNames.push_back(entry.first);
-  }
-  std::sort(fullNames.begin(), fullNames.end(),
-            [](DeclName x, DeclName y) {
-              return x.compare(y) < 0;
-            });
-  llvm::errs() << "Full name -> entry mappings:\n";
-  for (auto fullName : fullNames) {
-    llvm::errs() << "  " << fullName << ":\n";
-    const auto &fullEntries = FullNameTable.find(fullName)->second;
-    for (const auto &fullEntry : fullEntries) {
-      switch (fullEntry.Context.first) {
+    llvm::errs() << "  " << baseName << ":\n";
+    const auto &entries = LookupTable.find(baseName)->second;
+    for (const auto &entry : entries) {
+      llvm::errs() << "    ";
+      switch (entry.Context.first) {
       case ContextKind::TranslationUnit:
         llvm::errs() << "TU";
         break;
@@ -196,11 +158,11 @@ void SwiftLookupTable::dump() const {
       case ContextKind::Tag:
       case ContextKind::ObjCClass:
       case ContextKind::ObjCProtocol:
-        llvm::errs() << fullEntry.Context.second;
+        llvm::errs() << entry.Context.second;
       }
       llvm::errs() << ": ";
 
-      interleave(fullEntry.Decls.begin(), fullEntry.Decls.end(),
+      interleave(entry.Decls.begin(), entry.Decls.end(),
                  [](clang::NamedDecl *decl) {
                    if (auto named = dyn_cast<clang::NamedDecl>(decl))
                      printName(named, llvm::errs());
