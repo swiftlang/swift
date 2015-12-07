@@ -23,7 +23,6 @@
 using namespace swift;
 
 void *swift::swift_slowAlloc(size_t size, size_t alignMask) {
-  void *p;
   // FIXME: use posix_memalign if alignMask is larger than the system guarantee.
   void *p = malloc(size);
   return p;
