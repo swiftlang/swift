@@ -305,7 +305,7 @@ static bool partialApplyArgumentEscapes(Operand *O) {
 
 /// checkPartialApplyBody - Check the body of a partial apply to see
 /// if the box pointer argument passed to it has uses that would
-/// disqualify it from being protmoted to a stack location.  Return
+/// disqualify it from being promoted to a stack location.  Return
 /// true if this partial apply will not block our promoting the box.
 static bool checkPartialApplyBody(Operand *O) {
   SILFunction *F = getFunctionBody(O->getUser());
