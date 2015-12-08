@@ -46,14 +46,6 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
         << " and " << getSecondType().getString();
     break;
 
-  case MissingArgument:
-    out << "missing argument for parameter " << getValue();
-    break;
-
-  case ExtraArgument:
-    out << "extra argument " << getValue();
-    break;
-
   case NoPublicInitializers:
     out << getFirstType().getString()
         << " does not have any public initializers";
@@ -641,12 +633,6 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
       return true;
     }
     // FIXME: diagnose other cases
-    return false;
-
-  case Failure::MissingArgument:
-    return false;
-    
-  case Failure::ExtraArgument:
     return false;
     
   case Failure::NoPublicInitializers: {
