@@ -779,11 +779,11 @@ func r22211854() {
     func f(x: Int, _ y: Int, _ z: String = "") {}
     func g<T>(x: T, _ y: T, _ z: String = "") {}
 
-    f(1) // expected-error{{cannot invoke 'f' with an argument list of type '(Int)'}} expected-note{{expected an argument list of type '(Int, Int, String)'}}
-    g(1) // expected-error{{cannot invoke 'g' with an argument list of type '(Int)'}} expected-note{{expected an argument list of type '(T, T, String)'}}
+    f(1) // expected-error{{missing argument for parameter #2 in call}}
+    g(1) // expected-error{{missing argument for parameter #2 in call}}
     func h() -> Int { return 1 }
-    f(h() == 1) // expected-error{{cannot invoke 'f' with an argument list of type '(Bool)'}} expected-note{{expected an argument list of type '(Int, Int, String)'}}
-    g(h() == 1) // expected-error{{cannot invoke 'g' with an argument list of type '(Bool)'}} expected-note{{expected an argument list of type '(T, T, String)'}}
+    f(h() == 1) // expected-error{{missing argument for parameter #2 in call}}
+    g(h() == 1) // expected-error{{missing argument for parameter #2 in call}}
 }
 
 // <rdar://problem/22348394> Compiler crash on invoking function with labeled defaulted param with non-labeled argument

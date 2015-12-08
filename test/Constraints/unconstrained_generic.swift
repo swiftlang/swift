@@ -15,8 +15,9 @@ unconstrained(x)
 // FIXME: There's an inconsistency here in call argument matching between
 // rvalues and lvalues. <rdar://problem/17786730>
 unconstrained((x, y))
-unconstrained(x, y) // expected-error{{cannot invoke 'unconstrained' with an argument list of type '(Int, String)'}}
-// expected-note @-1 {{expected an argument list of type '(T)'}}
+
+unconstrained(x,
+              y) // expected-error{{extra argument in call}}
 
 
 let a = 0
