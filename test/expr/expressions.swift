@@ -534,7 +534,7 @@ struct Rule {
 }
 
 var ruleVar: Rule
-ruleVar = Rule("a") // expected-error {{cannot convert value of type 'String' to expected argument type '(target: String, dependencies: String)'}}
+ruleVar = Rule("a") // expected-error {{missing argument for parameter 'dependencies' in call}}
 
 
 class C {
@@ -544,7 +544,8 @@ class C {
   func method() {}
 }
 
-var c = C(3) // expected-error {{cannot convert value of type 'Int' to expected argument type 'C?'}}
+_ = C(3) // expected-error {{missing argument label 'other:' in call}}
+_ = C(other: 3) // expected-error {{cannot convert value of type 'Int' to expected argument type 'C?'}}
 
 //===----------------------------------------------------------------------===//
 // Unary Operators

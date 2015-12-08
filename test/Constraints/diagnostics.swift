@@ -308,12 +308,15 @@ func f7(a: Int)(b : Int) -> Int { // expected-warning{{curried function declarat
 f7(1)(b: 1)
 f7(1.0)(2)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
-f7(1)(1.0)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+f7(1)(1.0)       // expected-error {{missing argument label 'b:' in call}}
+f7(1)(b: 1.0)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
 let f8 = f7(2)
 f8(b: 1)
 f8(10)          // expected-error {{missing argument label 'b:' in call}} {{4-4=b: }}
-f8(1.0)         // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+f8(1.0)         // expected-error {{missing argument label 'b:' in call}}
+f8(b: 1.0)         // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+
 
 class CurriedClass {
   func method1() {}
@@ -352,7 +355,7 @@ _ = CurriedClass.method3(c)(1, 2)        // expected-error {{missing argument la
 _ = CurriedClass.method3(c)(1, b: 2)(32) // expected-error {{cannot call value of non-function type '()'}}
 _ = CurriedClass.method3(1, 2)           // expected-error {{extra argument in call}}
 CurriedClass.method3(c)(1.0, b: 1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-CurriedClass.method3(c)(1)               // expected-error {{cannot convert value of type 'Int' to expected argument type '(Int, b: Int)'}}
+CurriedClass.method3(c)(1)               // expected-error {{missing argument for parameter 'b' in call}}
 
 CurriedClass.method3(c)(c: 1.0)          // expected-error {{missing argument for parameter 'b' in call}}
 
@@ -361,8 +364,8 @@ extension CurriedClass {
   func f() {
     method3(1, b: 2)
     method3()            // expected-error {{missing argument for parameter #1 in call}}
-    method3(42)          // expected-error {{cannot convert value of type 'Int' to expected argument type '(Int, b: Int)'}}
-    method3(self)        // expected-error {{cannot convert value of type 'CurriedClass' to expected argument type '(Int, b: Int)'}}
+    method3(42)          // expected-error {{missing argument for parameter 'b' in call}}
+    method3(self)        // expected-error {{missing argument for parameter 'b' in call}}
   }
 }
 
@@ -513,7 +516,8 @@ class B {
 
 func test(a : B) {
   B.f1(nil)    // expected-error {{nil is not compatible with expected argument type 'AOpts'}}
-  a.function(42, nil) //expected-error {{nil is not compatible with expected argument type 'AOpts'}}
+  a.function(42, a: nil) //expected-error {{nil is not compatible with expected argument type 'AOpts'}}
+  a.function(42, nil) //expected-error {{missing argument label 'a:' in call}}
   a.f2(nil)  // expected-error {{nil is not compatible with expected argument type 'AOpts'}}
 }
 
