@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-#===--- swift-bench.py -------------------------------*- coding: utf-8 -*-===##
-#
+##===--- swift-bench.py -------------------------------*- coding: utf-8 -*-===##
+##
 ## This source file is part of the Swift.org open source project
 ##
 ## Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
@@ -9,31 +9,33 @@
 ##
 ## See http://swift.org/LICENSE.txt for license information
 ## See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-#
-#===----------------------------------------------------------------------===##
-
-# This file implements a test harness for running Swift performance benchmarks.
-#
-# Its input is a set of swift files, containing functions named 'bench_*' that
-# take no arguments and returns Int. The harness makes a separate test from
-# each of these functions, runs all the tests and reports aggregate results.
-#
-# The workflow of the harness is the following:
-#   o Basing on the input files, generate 'processed' files. These files contain
-#     a main function with simple arguments parsing, time measurement utilities
-#     and a loop in which the bench-functions are called.
-#   o When all files are processed, the harness begins to compile them, keeping
-#     track of all compile fails for later results reporting.
-#   o When all files are compiled, the harness begins to run the tests. The
-#     harness chooses a number of iterations for each tests to achieve the best
-#     accuracy in the given time limit (in order to do that, it performs several
-#     auxiliary test runs). When the iteration number is chosen, the measurent
-#     of execution time is actually performed.
-#   o At this point everything is ready, and the harness simply reports the
-#     results.
-#
-# Ideas for the harness improvement and development are welcomed here:
-# rdar://problem/18072938
+##
+##===----------------------------------------------------------------------===##
+##
+### This file implements a test harness for running Swift performance benchmarks.
+###
+### Its input is a set of swift files, containing functions named 'bench_*' that
+### take no arguments and returns Int. The harness makes a separate test from
+### each of these functions, runs all the tests and reports aggregate results.
+###
+### The workflow of the harness is as follows:
+###   o Basing on the input files, generate 'processed' files. These files
+###     contain a main function with simple arguments parsing, time measurement
+###     utilities and a loop in which the bench-functions are called.
+###   o When all files are processed, the harness begins to compile them, keeping
+###     track of all compile fails for later results reporting.
+###   o When all files are compiled, the harness begins to run the tests. The
+###     harness chooses a number of iterations for each tests to achieve the best
+###     accuracy in the given time limit (in order to do that, it performs
+###     several auxiliary test runs). When the iteration number is chosen, the
+###     measurent of execution time is actually performed.
+###   o At this point everything is ready, and the harness simply reports the
+###     results.
+###
+### Ideas for the harness improvement and development are welcomed here:
+### rdar://problem/18072938
+##
+##===----------------------------------------------------------------------===##
 
 import subprocess
 import numpy

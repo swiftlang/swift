@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-#===--- apply-fixit-edits.py - Tool for applying edits from .remap files ---===#
-#
+##===---- apply-fixit-edits.py - Tool for applying edits from .remap files ----===##
+##
 ## This source file is part of the Swift.org open source project
 ##
 ## Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
@@ -9,8 +9,8 @@
 ##
 ## See http://swift.org/LICENSE.txt for license information
 ## See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-#
-#===------------------------------------------------------------------------===#
+##
+##===--------------------------------------------------------------------------===##
 
 
 import subprocess
