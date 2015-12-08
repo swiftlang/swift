@@ -274,10 +274,10 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
   // either be a metatype or an alloc_ref.
   DEBUG(llvm::dbgs() << "        Origin Type: " << ClassOrMetatypeType);
 
-  auto *CMI = cast<ClassMethodInst>(AI.getCallee());
+  auto *MI = cast<MethodInst>(AI.getCallee());
 
   // Find the implementation of the member which should be invoked.
-  auto *F = getTargetClassMethod(Mod, ClassOrMetatypeType, CMI->getMember());
+  auto *F = getTargetClassMethod(Mod, ClassOrMetatypeType, MI->getMember());
 
   // If we do not find any such function, we have no function to devirtualize
   // to... so bail.
@@ -351,9 +351,9 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
   DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI.getInstruction());
 
   SILModule &Mod = AI.getModule();
-  auto *CMI = cast<ClassMethodInst>(AI.getCallee());
+  auto *MI = cast<MethodInst>(AI.getCallee());
   auto ClassOrMetatypeType = ClassOrMetatype.getType();
-  auto *F = getTargetClassMethod(Mod, ClassOrMetatypeType, CMI->getMember());
+  auto *F = getTargetClassMethod(Mod, ClassOrMetatypeType, MI->getMember());
 
   CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
 
@@ -652,6 +652,16 @@ DevirtualizationResult swift::tryDevirtualizeApply(FullApplySite AI) {
     // known.
     if (auto Instance = getInstanceWithExactDynamicType(CMI->getOperand()))
       return tryDevirtualizeClassMethod(AI, Instance);
+  }
+
+  if (isa<SuperMethodInst>(AI.getCallee())) {
+    if (AI.hasSelfArgument()) {
+      return tryDevirtualizeClassMethod(AI, AI.getSelfArgument());
+    }
+
+    // It is an invocation of a class method.
+    // Last operand is the metatype that should be used for dispatching.
+    return tryDevirtualizeClassMethod(AI, AI.getArguments().back());
   }
 
   return std::make_pair(nullptr, FullApplySite());

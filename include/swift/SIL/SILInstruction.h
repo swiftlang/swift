@@ -4351,6 +4351,43 @@ public:
   void setArgument(unsigned i, SILValue V) const {
     getArgumentOperands()[i].set(V);
   }
+
+  /// Return the self argument passed to this instruction.
+  bool hasSelfArgument() const {
+    switch (Inst->getKind()) {
+    case ValueKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->hasSelfArgument();
+    case ValueKind::TryApplyInst:
+      return cast<TryApplyInst>(Inst)->hasSelfArgument();
+    default:
+      llvm_unreachable("not implemented for this instruction!");
+    }
+  }
+
+  /// Return the self argument passed to this instruction.
+  SILValue getSelfArgument() const {
+    switch (Inst->getKind()) {
+    case ValueKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->getSelfArgument();
+    case ValueKind::TryApplyInst:
+      return cast<TryApplyInst>(Inst)->getSelfArgument();
+    default:
+      llvm_unreachable("not implemented for this instruction!");
+    }
+  }
+
+  /// Return the self operand passed to this instruction.
+  Operand &getSelfArgumentOperand() {
+    switch (Inst->getKind()) {
+    case ValueKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->getSelfArgumentOperand();
+    case ValueKind::TryApplyInst:
+      return cast<TryApplyInst>(Inst)->getSelfArgumentOperand();
+    default:
+      llvm_unreachable("not implemented for this instruction!");
+    }
+  }
+
 #undef FOREACH_IMPL_RETURN
 
   static ApplySite getFromOpaqueValue(void *p) {
