@@ -161,6 +161,8 @@ struct LoopARCPairingContext : SILLoopVisitor {
     return true;
   }
 
+  bool madeChange() const { return Callback.madeChange(); }
+
   void runOnLoop(SILLoop *L) override;
   void runOnFunction(SILFunction *F) override;
 
