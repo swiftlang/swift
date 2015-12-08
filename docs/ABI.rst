@@ -1089,6 +1089,7 @@ TODO: document these
   value-witness-kind ::= 'tT'           // initializeArrayWithTakeBackToFront
   value-witness-kind ::= 'ug'           // getEnumTag
   value-witness-kind ::= 'up'           // destructiveProjectEnumData
+  value-witness-kind ::= 'ui'           // destructiveInjectEnumTag
 
 ``<value-witness-kind>`` differentiates the kinds of value
 witness functions for a type.

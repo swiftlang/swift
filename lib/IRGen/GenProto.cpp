@@ -1139,6 +1139,23 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     return;
   }
 
+  case ValueWitness::DestructiveInjectEnumTag: {
+    llvm::Value *value = getArg(argv, "value");
+    auto enumTy = type.getStorageType()->getPointerTo();
+    value = IGF.Builder.CreateBitCast(value, enumTy);
+
+    llvm::Value *tag = getArg(argv, "tag");
+    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
+
+    auto &strategy = getEnumImplStrategy(IGM, concreteType);
+    strategy.emitStoreTag(IGF, concreteType,
+                          Address(value, type.getBestKnownAlignment()),
+                          tag);
+
+    IGF.Builder.CreateRetVoid();
+    return;
+  }
+
   case ValueWitness::Size:
   case ValueWitness::Flags:
   case ValueWitness::Stride:
@@ -1576,6 +1593,7 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
 
   case ValueWitness::GetEnumTag:
   case ValueWitness::DestructiveProjectEnumData:
+  case ValueWitness::DestructiveInjectEnumTag:
     assert(concreteType.getEnumOrBoundGenericEnum());
     goto standard;
   }
