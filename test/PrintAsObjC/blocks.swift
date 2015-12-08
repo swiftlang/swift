@@ -15,22 +15,22 @@ typealias MyTuple = (a: Int, b: AnyObject?)
 typealias MyInt = Int
 
 // CHECK-LABEL: @interface Callbacks
-// CHECK-NEXT: - (void (^ __nonnull)(void))voidBlocks:(void (^ __nonnull)(void))input;
-// CHECK-NEXT: - (void)manyArguments:(void (^ __nonnull)(float, float, double, double))input;
-// CHECK-NEXT: - (void)blockTakesBlock:(void (^ __nonnull)(void (^ __nonnull)(void)))input;
-// CHECK-NEXT: - (void)blockReturnsBlock:(void (^ __nonnull (^ __nonnull)(void))(void))input;
-// CHECK-NEXT: - (void)blockTakesAndReturnsBlock:(uint8_t (^ __nonnull (^ __nonnull)(uint16_t (^ __nonnull)(int16_t)))(int8_t))input;
-// CHECK-NEXT: - (void)blockTakesTwoBlocksAndReturnsBlock:(uint8_t (^ __nonnull (^ __nonnull)(uint16_t (^ __nonnull)(int16_t), uint32_t (^ __nonnull)(int32_t)))(int8_t))input;
-// CHECK-NEXT: - (void (^ __nullable)(NSObject * __nonnull))returnsBlockWithInput;
-// CHECK-NEXT: - (void (^ __nullable)(NSObject * __nonnull))returnsBlockWithParenthesizedInput;
-// CHECK-NEXT: - (void (^ __nullable)(NSObject * __nonnull, NSObject * __nonnull))returnsBlockWithTwoInputs;
-// CHECK-NEXT: - (void)blockWithTypealias:(NSInteger (^ __nonnull)(NSInteger, id __nullable))input;
-// CHECK-NEXT: - (void)blockWithSimpleTypealias:(NSInteger (^ __nonnull)(NSInteger))input;
-// CHECK-NEXT: - (NSInteger (* __nonnull)(NSInteger))functionPointers:(NSInteger (* __nonnull)(NSInteger))input;
-// CHECK-NEXT: - (void)functionPointerTakesAndReturnsFunctionPointer:(NSInteger (* __nonnull (^ __nonnull (* __nonnull)(NSInteger))(NSInteger))(NSInteger))input;
-// CHECK-NEXT: @property (nonatomic, copy) NSInteger (^ __nullable savedBlock)(NSInteger);
-// CHECK-NEXT: @property (nonatomic) NSInteger (* __nonnull savedFunctionPointer)(NSInteger);
-// CHECK-NEXT: @property (nonatomic) NSInteger (* __nullable savedFunctionPointer2)(NSInteger);
+// CHECK-NEXT: - (void (^ _Nonnull)(void))voidBlocks:(void (^ _Nonnull)(void))input;
+// CHECK-NEXT: - (void)manyArguments:(void (^ _Nonnull)(float, float, double, double))input;
+// CHECK-NEXT: - (void)blockTakesBlock:(void (^ _Nonnull)(void (^ _Nonnull)(void)))input;
+// CHECK-NEXT: - (void)blockReturnsBlock:(void (^ _Nonnull (^ _Nonnull)(void))(void))input;
+// CHECK-NEXT: - (void)blockTakesAndReturnsBlock:(uint8_t (^ _Nonnull (^ _Nonnull)(uint16_t (^ _Nonnull)(int16_t)))(int8_t))input;
+// CHECK-NEXT: - (void)blockTakesTwoBlocksAndReturnsBlock:(uint8_t (^ _Nonnull (^ _Nonnull)(uint16_t (^ _Nonnull)(int16_t), uint32_t (^ _Nonnull)(int32_t)))(int8_t))input;
+// CHECK-NEXT: - (void (^ _Nullable)(NSObject * _Nonnull))returnsBlockWithInput;
+// CHECK-NEXT: - (void (^ _Nullable)(NSObject * _Nonnull))returnsBlockWithParenthesizedInput;
+// CHECK-NEXT: - (void (^ _Nullable)(NSObject * _Nonnull, NSObject * _Nonnull))returnsBlockWithTwoInputs;
+// CHECK-NEXT: - (void)blockWithTypealias:(NSInteger (^ _Nonnull)(NSInteger, id _Nullable))input;
+// CHECK-NEXT: - (void)blockWithSimpleTypealias:(NSInteger (^ _Nonnull)(NSInteger))input;
+// CHECK-NEXT: - (NSInteger (* _Nonnull)(NSInteger))functionPointers:(NSInteger (* _Nonnull)(NSInteger))input;
+// CHECK-NEXT: - (void)functionPointerTakesAndReturnsFunctionPointer:(NSInteger (* _Nonnull (^ _Nonnull (* _Nonnull)(NSInteger))(NSInteger))(NSInteger))input;
+// CHECK-NEXT: @property (nonatomic, copy) NSInteger (^ _Nullable savedBlock)(NSInteger);
+// CHECK-NEXT: @property (nonatomic) NSInteger (* _Nonnull savedFunctionPointer)(NSInteger);
+// CHECK-NEXT: @property (nonatomic) NSInteger (* _Nullable savedFunctionPointer2)(NSInteger);
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Callbacks {

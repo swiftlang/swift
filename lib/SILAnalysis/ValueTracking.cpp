@@ -304,7 +304,7 @@ static bool valueMayBeCaptured(SILValue V, CaptureException Exception) {
   return false;
 }
 
-static bool isNoAliasArgument(SILValue V) {
+bool swift::isNotAliasingArgument(SILValue V) {
   auto *Arg = dyn_cast<SILArgument>(V);
   if (!Arg)
     return false;
@@ -323,7 +323,7 @@ bool swift::isNonEscapingLocalObject(SILValue V) {
 
   // If this is a no alias argument then it has not escaped before entering the
   // function. Check if it escapes inside the function.
-  if (isNoAliasArgument(V))
+  if (isNotAliasingArgument(V))
       return !valueMayBeCaptured(V, CaptureException::ReturnsCannotCapture);
 
   // If this is an enum value. If it or its operand does not escape, it is

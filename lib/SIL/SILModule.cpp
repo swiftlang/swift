@@ -398,6 +398,19 @@ SILFunction *SILModule::getOrCreateSharedFunction(SILLocation loc,
                              isThunk, SILFunction::NotRelevant);
 }
 
+SILFunction *SILModule::getOrCreateFunction(
+    SILLinkage linkage, StringRef name, CanSILFunctionType loweredType,
+    GenericParamList *contextGenericParams, Optional<SILLocation> loc,
+    IsBare_t isBareSILFunction, IsTransparent_t isTrans, IsFragile_t isFragile,
+    IsThunk_t isThunk, SILFunction::ClassVisibility_t classVisibility,
+    Inline_t inlineStrategy, EffectsKind EK, SILFunction *InsertBefore,
+    const SILDebugScope *DebugScope, DeclContext *DC) {
+  return SILFunction::create(*this, linkage, name, loweredType,
+                             contextGenericParams, loc, isBareSILFunction,
+                             isTrans, isFragile, isThunk, classVisibility,
+                             inlineStrategy, EK, InsertBefore, DebugScope, DC);
+}
+
 ArrayRef<SILType> ValueBase::getTypes() const {
   // No results.
   if (TypeOrTypeList.isNull())
@@ -663,4 +676,25 @@ lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member) {
   }
 
   return nullptr;
+}
+
+
+void SILModule::
+registerDeleteNotificationHandler(DeleteNotificationHandler* Handler) {
+  // Ask the handler (that can be an analysis, a pass, or some other data
+  // structure) if it wants to receive delete notifications.
+  if (Handler->needsNotifications()) {
+    NotificationHandlers.insert(Handler);
+  }
+}
+
+void SILModule::
+removeDeleteNotificationHandler(DeleteNotificationHandler* Handler) {
+  NotificationHandlers.remove(Handler);
+}
+
+void SILModule::notifyDeleteHandlers(ValueBase *V) {
+  for (auto *Handler : NotificationHandlers) {
+    Handler->handleDeleteNotification(V);
+  }
 }

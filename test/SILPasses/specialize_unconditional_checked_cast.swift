@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -o - -O -disable-func-sig-opts %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -o - -O %s | FileCheck %s
 
 //////////////////
 // Declarations //
@@ -90,22 +90,26 @@ ArchetypeToConcreteConvertUInt8(t: b)
 ArchetypeToConcreteConvertUInt8(t: c)
 ArchetypeToConcreteConvertUInt8(t: f)
 
-// x -> y where x,y are not classes and x is a different type from y.
-// CHECK-LABEL: sil shared [noinline] @_TTSg5Vs6UInt64___TF37specialize_unconditional_checked_cast31ArchetypeToConcreteConvertUInt8{{.*}} : $@convention(thin) (@in UInt64) -> UInt8 {
-// CHECK: bb0
-// CHECK: builtin "int_trap"
-// CHECK: unreachable
-// CHECK-NEXT: }
-
-// x -> y where y is a class but x is not.
-// CHECK-LABEL: sil shared [noinline] @_TTSg5C37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast31ArchetypeToConcreteConvertUInt8{{.*}} : $@convention(thin) (@in C) -> UInt8 {
-// CHECK: bb0
-// CHECK: builtin "int_trap"
-// CHECK: unreachable
-// CHECK-NEXT: }
-
+// order 57%
 // x -> x where x is not a class.
 // CHECK-LABEL: sil shared [noinline] @_TTSg5Vs5UInt8___TF37specialize_unconditional_checked_cast31ArchetypeToConcreteConvertUInt8{{.*}} : $@convention(thin) (@in UInt8) -> UInt8 {
+// CHECK: bb0
+// CHECK-NEXT: debug_value_addr
+// CHECK-NEXT: load
+// CHECK-NEXT: return
+
+// order: 59%
+// x -> y where x,y are classes and x is a super class of y.
+// CHECK-LABEL: sil shared [noinline] @_TTSg5C37specialize_unconditional_checked_cast1D___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertC{{.*}} : $@convention(thin) (@in D) -> @owned C {
+// CHECK: bb0
+// CHECK-NEXT: debug_value_addr
+// CHECK-NEXT: load
+// CHECK-NEXT: upcast
+// CHECK-NEXT: return
+
+// order: 60%
+// x -> x where x is a class.
+// CHECK-LABEL: sil shared [noinline] @_TTSg5C37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertC{{.*}} : $@convention(thin) (@in C) -> @owned C {
 // CHECK: bb0
 // CHECK-NEXT: debug_value_addr
 // CHECK-NEXT: load
@@ -122,34 +126,7 @@ ArchetypeToConcreteConvertC(t: b)
 ArchetypeToConcreteConvertC(t: d)
 ArchetypeToConcreteConvertC(t: e)
 
-// x -> y where x,y are classes, but x is unrelated to y.
-// CHECK-LABEL: sil shared [noinline] @_TTSg5C37specialize_unconditional_checked_cast1E___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertC{{.*}} : $@convention(thin) (@in E) -> @owned C {
-// CHECK: bb0
-// CHECK: builtin "int_trap"
-// CHECK: unreachable
-// CHECK-NEXT: }
 
-// x -> y where x,y are classes and x is a super class of y.
-// CHECK-LABEL: sil shared [noinline] @_TTSg5C37specialize_unconditional_checked_cast1D___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertC{{.*}} : $@convention(thin) (@in D) -> @owned C {
-// CHECK: bb0
-// CHECK-NEXT: debug_value_addr
-// CHECK-NEXT: load
-// CHECK-NEXT: upcast
-// CHECK-NEXT: return
-
-// x -> y where x is a class but y is not.
-// CHECK-LABEL: sil shared [noinline] @_TTSg5Vs5UInt8___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertC{{.*}} : $@convention(thin) (@in UInt8) -> @owned C {
-// CHECK: bb0
-// CHECK: builtin "int_trap"
-// CHECK: unreachable
-// CHECK-NEXT: }
-
-// x -> x where x is a class.
-// CHECK-LABEL: sil shared [noinline] @_TTSg5C37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertC{{.*}} : $@convention(thin) (@in C) -> @owned C {
-// CHECK: bb0
-// CHECK-NEXT: debug_value_addr
-// CHECK-NEXT: load
-// CHECK-NEXT: return
 
 
 @inline(never)
@@ -176,14 +153,6 @@ public func ArchetypeToConcreteConvertE<T>(t t: T) -> E {
 
 ArchetypeToConcreteConvertE(t: c)
 
-// x -> y where x,y are classes, but y is unrelated to x. The idea is
-// to make sure that the fact that y is concrete does not affect the
-// result.
-// CHECK-LABEL: sil shared [noinline] @_TTSg5C37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertE{{.*}} : $@convention(thin) (@in C) -> @owned E {
-// CHECK: bb0
-// CHECK: builtin "int_trap"
-// CHECK: unreachable
-// CHECK-NEXT: }
 
 ///////////////////////////
 // Concrete to Archetype //
@@ -387,3 +356,45 @@ public func ExistentialToArchetype<T>(o o : AnyObject, t : T) -> T {
 ExistentialToArchetype(o: o, t: c)
 ExistentialToArchetype(o: o, t: b)
 ExistentialToArchetype(o: o, t: o)
+
+//order: -5
+// x -> y where y is a class but x is not.
+// CHECK-LABEL: sil shared [noinline] @_TTSf4d___TTSg5C37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast31ArchetypeToConcreteConvertUInt8
+// CHECK: bb0
+// CHECK: builtin "int_trap"
+// CHECK: unreachable
+// CHECK-NEXT: }
+
+//order: -4
+// x -> y where x,y are not classes and x is a different type from y.
+// CHECK-LABEL: sil shared [noinline] @_TTSf4d___TTSg5Vs6UInt64___TF37specialize_unconditional_checked_cast31ArchetypeToConcreteConvertUInt8
+// CHECK: bb0
+// CHECK: builtin "int_trap"
+// CHECK: unreachable
+// CHECK-NEXT: }
+
+// order -3
+// x -> y where x is a class but y is not.
+// CHECK-LABEL: sil shared [noinline] @_TTSf4d___TTSg5Vs5UInt8___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertC
+// CHECK: bb0
+// CHECK: builtin "int_trap"
+// CHECK: unreachable
+// CHECK-NEXT: }
+
+// order -2
+// x -> y where x,y are classes, but x is unrelated to y.
+// CHECK-LABEL: sil shared [noinline] @_TTSf4d___TTSg5C37specialize_unconditional_checked_cast1E___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertC
+// CHECK: bb0
+// CHECK: builtin "int_trap"
+// CHECK: unreachable
+// CHECK-NEXT: }
+
+// order -1
+// x -> y where x,y are classes, but y is unrelated to x. The idea is
+// to make sure that the fact that y is concrete does not affect the
+// result.
+// CHECK-LABEL: sil shared [noinline] @_TTSf4d___TTSg5C37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertE
+// CHECK: bb0
+// CHECK: builtin "int_trap"
+// CHECK: unreachable
+// CHECK-NEXT: }

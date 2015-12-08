@@ -12,13 +12,13 @@
 
 import SwiftShims
 
-/// Convert the given numeric value to a hexidecimal string.
+/// Convert the given numeric value to a hexadecimal string.
 public func asHex<T : IntegerType>(x: T) -> String {
   return "0x" + String(x.toIntMax(), radix: 16)
 }
 
 /// Convert the given sequence of numeric values to a string representing
-/// their hexidecimal values.
+/// their hexadecimal values.
 public func asHex<
   S: SequenceType
 where

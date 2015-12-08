@@ -187,6 +187,9 @@ def dump_clang_diagnostics : Flag<["-"], "dump-clang-diagnostics">,
 def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
   HelpText<"Emit locations during SIL emission">;
 
+def use_native_super_method : Flag<["-"], "use-native-super-method">,
+  HelpText<"Use super_method for super calls in native classes">;
+
 def disable_self_type_mangling : Flag<["-"], "disable-self-type-mangling">,
   HelpText<"Disable including Self type in method type manglings">;
 
@@ -266,9 +269,6 @@ def use_malloc : Flag<["-"], "use-malloc">,
   HelpText<"Allocate internal data structures using malloc "
            "(for memory debugging)">;
 
-def disable_func_sig_opts : Flag<["-"], "disable-func-sig-opts">,
-  HelpText<"Disable function signature optimizations">;
-
 def interpret : Flag<["-"], "interpret">, HelpText<"Immediate mode">, ModeOpt;
 
 def verify_type_layout : JoinedOrSeparate<["-"], "verify-type-layout">,
@@ -282,6 +282,9 @@ def external_pass_pipeline_filename : Separate<["-"], "external-pass-pipeline-fi
 def dump_interface_hash : Flag<["-"], "dump-interface-hash">,
    HelpText<"Parse input file(s) and dump interface token hash(es)">,
    ModeOpt;
+
+def dump_api_path : Separate<["-"], "dump-api-path">,
+  HelpText<"The path to output swift interface files for the compiled source files">;
 
 def enable_resilience : Flag<["-"], "enable-resilience">,
    HelpText<"Treat all types as resilient by default">;

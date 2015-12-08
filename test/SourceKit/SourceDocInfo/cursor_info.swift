@@ -146,7 +146,7 @@ public class SubscriptCursorTest {
 
 // RUN: %sourcekitd-test -req=cursor -pos=28:24 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK12 %s
 // CHECK12: source.lang.swift.decl.var.local (28:23-28:27)
-// CHECK12: <Declaration>let arg1: <Type usr="s:Si">Int</Type></Declaration>
+// CHECK12: <Declaration>var arg1: <Type usr="s:Si">Int</Type></Declaration>
 
 // RUN: %sourcekitd-test -req=cursor -pos=31:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK13 %s
 // CHECK13: source.lang.swift.decl.function.free (31:6-31:37)

@@ -97,7 +97,7 @@ user:
     This rule does not imply that indices should be cheap to convert to actual
     integers.  The offsets for consecutive elements could be non-consecutive
     (e.g., in a hash table with open addressing), or consist of multiple
-    offsets so that the conversion to an integer is non-trival (e.g., in a
+    offsets so that the conversion to an integer is non-trivial (e.g., in a
     tree).
 
     Note that this rule, like all other rules, is an "as if" rule.  As long as

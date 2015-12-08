@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -disable-objc-attr-requires-foundation-module | FileCheck %s
+// RUN: %target-swift-frontend -use-native-super-method -emit-silgen %s -disable-objc-attr-requires-foundation-module | FileCheck %s
 
 protocol Fooable {
   init()
@@ -362,7 +362,6 @@ class D: C {
   // CHECK:         [[SELF1:%.*]] = load [[SELF_ADDR]]
   // CHECK-NEXT:    [[SUPER1:%.*]] = upcast [[SELF1]]
   // CHECK-NOT:     [[SELF_ADDR]]
-  // CHECK-NOT:     [[SELF1]]
   // CHECK:         [[SUPER2:%.*]] = apply {{.*}}([[SUPER1]])
   // CHECK-NEXT:    [[SELF2:%.*]] = unchecked_ref_cast [[SUPER2]]
   // CHECK-NEXT:    store [[SELF2]] to [[SELF_ADDR]]

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib -parse-as-library -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -use-native-super-method -parse-stdlib -parse-as-library -emit-silgen %s | FileCheck %s
 
 import Swift
 
@@ -236,6 +236,7 @@ func generateWithConstant(x : SomeSpecificClass) {
 }
 // CHECK-LABEL: sil shared @_TFF8closures20generateWithConstant
 // CHECK:    bb0([[T0:%.*]] : $SomeSpecificClass):
+// CHECK-NEXT: debug_value %0 : $SomeSpecificClass // let x, argno: 1
 // CHECK-NEXT: [[T1:%.*]] = upcast [[T0]] : $SomeSpecificClass to $SomeClass
 // CHECK-NEXT: return [[T1]]
 
@@ -299,7 +300,7 @@ func closeOverLetLValue() {
 // is loadable even though we capture the value.
 // CHECK-LABEL: sil shared @_TFF8closures18closeOverLetLValueFT_T_U_FT_Si
 // CHECK: bb0(%0 : $ClassWithIntProperty):
-// CHECK-NEXT: [[TMP:%.*]] = alloc_stack $ClassWithIntProperty  // let a
+// CHECK-NEXT: [[TMP:%.*]] = alloc_stack $ClassWithIntProperty  // let a, argno: 1
 // CHECK-NEXT: store %0 to [[TMP]]#1 : $*ClassWithIntProperty
 // CHECK-NEXT: {{.*}} = load [[TMP]]#1 : $*ClassWithIntProperty
 // CHECK-NEXT: {{.*}} = ref_element_addr {{.*}} : $ClassWithIntProperty, #ClassWithIntProperty.x
@@ -327,7 +328,7 @@ struct StructWithMutatingMethod {
 
 // CHECK-LABEL: sil hidden @_TFV8closures24StructWithMutatingMethod14mutatingMethod
 // CHECK: bb0(%0 : $*StructWithMutatingMethod):
-// CHECK-NEXT: %1 = alloc_box $StructWithMutatingMethod  // var self // users: %2, %5, %7, %8
+// CHECK-NEXT: %1 = alloc_box $StructWithMutatingMethod  // var self, argno: 1 // users: %2, %5, %7, %8
 // CHECK-NEXT: copy_addr %0 to [initialization] %1#1 : $*StructWithMutatingMethod // id: %2
 // CHECK: [[CLOSURE:%[0-9]+]] = function_ref @_TFFV8closures24StructWithMutatingMethod14mutatingMethod{{.*}} : $@convention(thin) (@inout StructWithMutatingMethod) -> Int
 // CHECK: partial_apply [[CLOSURE]](%1#1) : $@convention(thin) (@inout StructWithMutatingMethod) -> Int
@@ -351,7 +352,7 @@ class SuperSub : SuperBase {
     // CHECK: [[CLASS_METHOD:%.*]] = class_method %0 : $SuperSub, #SuperSub.boom!1
     // CHECK: = apply [[CLASS_METHOD]](%0)
     // CHECK: [[SUPER:%.*]] = upcast %0 : $SuperSub to $SuperBase
-    // CHECK: [[SUPER_METHOD:%.*]] = function_ref @_TFC8closures9SuperBase4boom
+    // CHECK: [[SUPER_METHOD:%[0-9]+]] = super_method %0 : $SuperSub, #SuperBase.boom!1
     // CHECK: = apply [[SUPER_METHOD]]([[SUPER]])
     // CHECK: return
     func a1() {
@@ -375,8 +376,8 @@ class SuperSub : SuperBase {
       // CHECK: [[CLASS_METHOD:%.*]] = class_method %0 : $SuperSub, #SuperSub.boom!1
       // CHECK: = apply [[CLASS_METHOD]](%0)
       // CHECK: [[SUPER:%.*]] = upcast %0 : $SuperSub to $SuperBase
-      // CHECK: [[METHOD:%.*]] = function_ref @_TFC8closures9SuperBase4boom
-      // CHECK: = apply [[METHOD]]([[SUPER]])
+      // CHECK: [[SUPER_METHOD:%.*]] = super_method %0 : $SuperSub, #SuperBase.boom!1
+      // CHECK: = apply [[SUPER_METHOD]]([[SUPER]])
       // CHECK: return
       func b2() {
         self.boom()
@@ -396,8 +397,8 @@ class SuperSub : SuperBase {
     // CHECK: [[CLASS_METHOD:%.*]] = class_method %0 : $SuperSub, #SuperSub.boom!1
     // CHECK: = apply [[CLASS_METHOD]](%0)
     // CHECK: [[SUPER:%.*]] = upcast %0 : $SuperSub to $SuperBase
-    // CHECK: [[METHOD:%.*]] = function_ref @_TFC8closures9SuperBase4boom
-    // CHECK: = apply [[METHOD]]([[SUPER]])
+    // CHECK: [[SUPER_METHOD:%[0-9]+]] = super_method %0 : $SuperSub, #SuperBase.boom!1
+    // CHECK: = apply [[SUPER_METHOD]]([[SUPER]])
     // CHECK: return
     let c1 = { () -> Void in
       self.boom()
@@ -418,8 +419,8 @@ class SuperSub : SuperBase {
     let d1 = { () -> Void in
       // CHECK-LABEL: sil shared @_TFFFC8closures8SuperSub1d
       // CHECK: [[SUPER:%.*]] = upcast %0 : $SuperSub to $SuperBase
-      // CHECK: [[METHOD:%.*]] = function_ref @_TFC8closures9SuperBase4boom
-      // CHECK: = apply [[METHOD]]([[SUPER]])
+      // CHECK: [[SUPER_METHOD:%.*]] = super_method %0 : $SuperSub, #SuperBase.boom!1
+      // CHECK: = apply [[SUPER_METHOD]]([[SUPER]])
       // CHECK: return
       func d2() {
         super.boom()
@@ -441,8 +442,8 @@ class SuperSub : SuperBase {
     func e1() {
       // CHECK-LABEL: sil shared @_TFFFC8closures8SuperSub1e
       // CHECK: [[SUPER:%.*]] = upcast %0 : $SuperSub to $SuperBase
-      // CHECK: [[METHOD:%.*]] = function_ref @_TFC8closures9SuperBase4boom
-      // CHECK: = apply [[METHOD]]([[SUPER]])
+      // CHECK: [[SUPER_METHOD:%.*]] = super_method %0 : $SuperSub, #SuperBase.boom!1
+      // CHECK: = apply [[SUPER_METHOD]]([[SUPER]])
       // CHECK: return
       let e2 = {
         super.boom()
@@ -464,8 +465,8 @@ class SuperSub : SuperBase {
     let f1 = {
       // CHECK-LABEL: sil shared [transparent] @_TFFFC8closures8SuperSub1f
       // CHECK: [[SUPER:%.*]] = upcast %0 : $SuperSub to $SuperBase
-      // CHECK: [[METHOD:%.*]] = function_ref @_TFC8closures9SuperBase4boom
-      // CHECK: = apply [[METHOD]]([[SUPER]])
+      // CHECK: [[SUPER_METHOD:%.*]] = super_method %0 : $SuperSub, #SuperBase.boom!1
+      // CHECK: = apply [[SUPER_METHOD]]([[SUPER]])
       // CHECK: return
       nil ?? super.boom()
     }
@@ -483,8 +484,8 @@ class SuperSub : SuperBase {
     func g1() {
       // CHECK-LABEL: sil shared [transparent] @_TFFFC8closures8SuperSub1g
       // CHECK: [[SUPER:%.*]] = upcast %0 : $SuperSub to $SuperBase
-      // CHECK: [[METHOD:%.*]] = function_ref @_TFC8closures9SuperBase4boom
-      // CHECK: = apply [[METHOD]]([[SUPER]])
+      // CHECK: [[SUPER_METHOD:%.*]] = super_method %0 : $SuperSub, #SuperBase.boom!1
+      // CHECK: = apply [[SUPER_METHOD]]([[SUPER]])
       // CHECK: return
       nil ?? super.boom()
     }

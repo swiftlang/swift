@@ -15,6 +15,7 @@ add_swift_library(swiftSILAnalysis
   LoopAnalysis.cpp
   LoopRegionAnalysis.cpp
   MemoryBehavior.cpp
+  ProgramTerminationAnalysis.cpp
   RCIdentityAnalysis.cpp
   SideEffectAnalysis.cpp
   SimplifyInstruction.cpp

@@ -12,13 +12,11 @@ func basicTests() -> Int {
   return y
 }
 
-// expected-error@+2 {{Use of 'var' binding here is not allowed}} {{41-45=}}
-// expected-error@+1 {{Use of 'var' binding here is not allowed}} {{54-58=}}
+// expected-warning@+2 {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{41-45=}}
+// expected-warning@+1 {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{54-58=}}
 func mutableParameter(a : Int, h : Int, var i : Int, var j: Int, 
-       var g : Int) -> Int { // expected-error {{Use of 'var' binding here is not allowed}} {{8-12=}}
-  // expected-error@+1 {{left side of mutating operator isn't mutable: 'g' is a 'let' constant}}
+       var g : Int) -> Int { // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{8-12=}}
   g += 1
-  // expected-error@+1 {{cannot pass immutable value as inout argument: 'i' is a 'let' constant}}
   swap(&i, &j)
   return i+g
 }
@@ -102,10 +100,9 @@ func testSubscript() -> [Int] {
 }
 
 
-func testTuple(var x : Int) -> Int { // expected-error {{Use of 'var' binding here is not allowed}} {{16-19=}}
+func testTuple(var x : Int) -> Int { // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{16-19=}}
   var y : Int  // Ok, stored by a tuple
   
-  // expected-error@+1 {{cannot assign to value: 'x' is a 'let' constant}}
   (x, y) = (1,2)
   return y
 }
@@ -140,7 +137,7 @@ func testTuple() {
   tup.x = 1
 
   // <rdar://problem/20927707> QoI: 'variable was never mutated' noisy when only part of a destructured tuple is mutated
-  var (tupA, tupB) = (1,2)  // don't warn about tupB being changable to a 'let'.
+  var (tupA, tupB) = (1,2)  // don't warn about tupB being changeable to a 'let'.
   tupA += tupB
 
 }
@@ -166,9 +163,8 @@ protocol Fooable {
   mutating func mutFoo()
   func immutFoo()
 }
-func testOpenExistential(var x: Fooable, // expected-error {{Use of 'var' binding here is not allowed}} {{26-29=}}
+func testOpenExistential(var x: Fooable, // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{26-29=}}
                          y: Fooable) {
-  // expected-error@+1 {{cannot use mutating member on immutable value}}
   x.mutFoo()
   y.immutFoo()
 }
@@ -177,8 +173,10 @@ func testOpenExistential(var x: Fooable, // expected-error {{Use of 'var' bindin
 func couldThrow() throws {}
 
 func testFixitsInStatementsWithPatterns(a : Int?) {
-  if var b = a,    // expected-error {{Use of 'var' binding here is not allowed}} {{6-9=let}}
-      var b2 = a {  // expected-error {{Use of 'var' binding here is not allowed}} {{7-10=let}}
+  // FIXME: rdar://problem/23378003
+  // This will eventually be an error.
+  if var b = a,    // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{6-9=let}}
+      var b2 = a {  // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{7-10=let}}
     b = 1
     b2 = 1
     _ = b
@@ -186,18 +184,24 @@ func testFixitsInStatementsWithPatterns(a : Int?) {
   }
 
   var g = [1,2,3].generate()
-  while var x = g.next() { // expected-error {{Use of 'var' binding here is not allowed}} {{9-12=let}}
+  // FIXME: rdar://problem/23378003
+  // This will eventually be an error.
+  while var x = g.next() { // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{9-12=let}}
     x = 0
     _ = x
   }
 
-  guard var y = Optional.Some(1) else { // expected-error {{Use of 'var' binding here is not allowed}} {{9-12=let}}
+  // FIXME: rdar://problem/23378003
+  // This will eventually be an error.
+  guard var y = Optional.Some(1) else { // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{9-12=let}}
     return
   }
   y = 0
   _ = y
 
-  for var b in [42] {   // expected-error {{Use of 'var' binding here is not allowed}} {{7-11=}}
+  // FIXME: rdar://problem/23378003
+  // This will eventually be an error.
+  for var b in [42] {   // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{7-11=}}
     b = 42
     _ = b
   }
@@ -208,14 +212,18 @@ func testFixitsInStatementsWithPatterns(a : Int?) {
 
   do {
     try couldThrow()
-  } catch var err {  // expected-error {{Use of 'var' binding here is not allowed}} {{11-14=let}}
+  // FIXME: rdar://problem/23378003
+  // This will eventually be an error.
+  } catch var err {  // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{11-14=let}}
     // expected-warning@-1 {{variable 'err' was never mutated; consider changing to 'let' constant}}
     _ = err
   }
 
   switch a {
-    case var b: // expected-error {{Use of 'var' binding here is not allowed}} {{10-13=let}}
-      // expected-warning@-1 {{was never mutated; consider changing to 'let' constant}}
+    // FIXME: rdar://problem/23378003
+    // This will eventually be an error.
+    case var b: // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{10-13=let}}
+      // expected-warning@-1 {{variable 'b' was never mutated; consider changing to 'let' constant}}
       _ = b
   }
 }

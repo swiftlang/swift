@@ -66,8 +66,8 @@ public struct Character :
     isASCII: Builtin.Int1) {
     self = Character(
       String(
-        _builtinExtendedGraphemeClusterLiteral: start, 
-        byteSize: byteSize, 
+        _builtinExtendedGraphemeClusterLiteral: start,
+        byteSize: byteSize,
         isASCII: isASCII))
   }
 
@@ -120,7 +120,7 @@ public struct Character :
   @warn_unused_result
   static func _smallSize(value: UInt64) -> Int {
     var mask: UInt64 = 0xFF
-    for var i = 0; i < 8; ++i {
+    for i in 0..<8 {
       if (value & mask) == mask {
         return i
       }

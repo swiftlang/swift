@@ -137,7 +137,7 @@ public:
   Type subst(ModuleDecl *module, TypeSubstitutionMap &substitutions,
              SubstOptions options) const;
 
-  bool isPrivateStdlibType() const;
+  bool isPrivateStdlibType(bool whitelistProtocols=true) const;
 
   void dump() const;
   void dump(raw_ostream &os, unsigned indent = 0) const;

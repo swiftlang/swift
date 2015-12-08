@@ -3,14 +3,18 @@
 func markUsed<T>(t: T) {}
 
 func foo(inout x : Int64) {
-  // Make sure the shadow copy is being made in the prologue, but the
-  // code to load the value from the inout storage is not.
-  x = x + 2
+  // Make sure the shadow copy is being made in the prologue or (at
+  // line 0), but the code to load the value from the inout storage is
+  // not.
   // CHECK: %[[X:.*]] = alloca %Vs5Int64*, align {{(4|8)}}
   // CHECK: store %Vs5Int64* %0, %Vs5Int64** %[[X]], align {{(4|8)}}
-  // CHECK-NOT: !dbg
+  // CHECK-SAME: !dbg ![[LOC0:.*]]
   // CHECK-NEXT: call void @llvm.dbg.declare
-  // CHECK-NEXT: getelementptr inbounds %Vs5Int64, %Vs5Int64* %0, i32 0, i32 0, !dbg
+  // CHECK-NEXT: getelementptr inbounds %Vs5Int64, %Vs5Int64* %0, i32 0, i32 0,
+  // CHECK-SAME: !dbg ![[LOC1:.*]]
+  // CHECK: ![[LOC0]] = !DILocation(line: 0,
+  // CHECK: ![[LOC1]] = !DILocation(line: [[@LINE+1]],
+  x = x + 2
 }
 
 func main() {

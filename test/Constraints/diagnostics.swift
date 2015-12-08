@@ -418,7 +418,8 @@ func f20371273() {
 // FIXME: Should complain about not having a return type annotation in the closure.
 [0].map { _ in let r =  (1,2).0;  return r }
 // expected-error @-1 {{cannot invoke 'map' with an argument list of type '(@noescape (Int) throws -> _)'}}
-// expected-note @-2 {{expected an argument list of type '(@noescape (Self.Generator.Element) throws -> T)'}}
+// expected-error @-2 {{cannot convert return expression of type 'Int' to return type 'T'}}
+// expected-note @-3 {{expected an argument list of type '(@noescape Int throws -> T)'}}
 
 // <rdar://problem/21078316> Less than useful error message when using map on optional dictionary type
 func rdar21078316() {
@@ -660,4 +661,11 @@ func r22058555() {
     firstChar = chars[0]  // expected-error {{cannot assign value of type 'Int8' to type 'UInt8'}}
   }
 }
+
+// <rdar://problem/23272739> Poor diagnostic due to contextual constraint
+func r23272739(contentType: String) {
+  let actualAcceptableContentTypes: Set<String> = []
+  return actualAcceptableContentTypes.contains(contentType)  // expected-error {{unexpected non-void return value in void function}}
+}
+
 

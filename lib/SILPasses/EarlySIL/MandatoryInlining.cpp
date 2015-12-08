@@ -327,7 +327,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
         InnerAI = NewAI;
       }
 
-	  SILLocation Loc = InnerAI.getLoc();
+      SILLocation Loc = InnerAI.getLoc();
       SILValue CalleeValue = InnerAI.getCallee();
       bool IsThick;
       PartialApplyInst *PAI;

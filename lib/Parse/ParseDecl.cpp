@@ -3643,7 +3643,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
 
   // No matter what error path we take, make sure the
   // PatternBindingDecl/TopLevel code block are added.
-  defer([&]{
+  defer {
     // If we didn't parse any patterns, don't create the pattern binding decl.
     if (PBDEntries.empty())
       return;
@@ -3683,7 +3683,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     // specific spot to get it in before any accessors, which SILGen seems to
     // want.
     Decls.insert(Decls.begin()+NumDeclsInResult, PBD);
-  });
+  };
 
   do {
     Pattern *pattern;
@@ -4305,7 +4305,7 @@ ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       }
     }
     
-    // For recovery, again make sure the the user didn't try to spell a switch
+    // For recovery, again make sure the user didn't try to spell a switch
     // case label:
     // 'case Identifier:' or
     // 'case Identifier where ...:'

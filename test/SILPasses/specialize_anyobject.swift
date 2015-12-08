@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-func-sig-opts -O -sil-inline-threshold 0 -emit-sil -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend  -O -sil-inline-threshold 0 -emit-sil -primary-file %s | FileCheck %s
 
 // rdar://problem/20338028
 protocol PA: class { }

@@ -27,6 +27,7 @@
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
+#include "swift/SIL/Notifications.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILWitnessTable.h"
@@ -178,6 +179,10 @@ private:
   /// The options passed into this SILModule.
   SILOptions &Options;
 
+  /// A list of clients that need to be notified when an instruction
+  /// invalidation message is sent.
+  llvm::SetVector<DeleteNotificationHandler*> NotificationHandlers;
+
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
   SILModule(ModuleDecl *M, SILOptions &Options, const DeclContext *associatedDC,
@@ -192,6 +197,16 @@ private:
 
 public:
   ~SILModule();
+
+  /// Add a delete notification handler \p Handler to the module context.
+  void registerDeleteNotificationHandler(DeleteNotificationHandler* Handler);
+
+  /// Remove the delete notification handler \p Handler from the module context.
+  void removeDeleteNotificationHandler(DeleteNotificationHandler* Handler);
+
+  /// Send the invalidation message that \p V is being deleted to all
+  /// registered handlers. The order of handlers is deterministic but arbitrary.
+  void notifyDeleteHandlers(ValueBase *V);
 
   /// \brief Get a uniqued pointer to a SIL type list.
   SILTypeList *getSILTypeList(ArrayRef<SILType> Types) const;
@@ -427,6 +442,23 @@ public:
   SILFunction *getOrCreateFunction(SILLocation loc,
                                    SILDeclRef constant,
                                    ForDefinition_t forDefinition);
+
+  /// \brief Return the declaration of a function, or create it if it does not
+  /// exist.
+  ///
+  /// This signature is a direct copy of the signature of SILFunction::create()
+  /// in order to simplify refactoring all SILFunction creation use-sites to use
+  /// SILModule. Eventually the uses should probably be refactored.
+  SILFunction *getOrCreateFunction(
+      SILLinkage linkage, StringRef name, CanSILFunctionType loweredType,
+      GenericParamList *contextGenericParams, Optional<SILLocation> loc,
+      IsBare_t isBareSILFunction, IsTransparent_t isTrans,
+      IsFragile_t isFragile, IsThunk_t isThunk = IsNotThunk,
+      SILFunction::ClassVisibility_t classVisibility = SILFunction::NotRelevant,
+      Inline_t inlineStrategy = InlineDefault,
+      EffectsKind EK = EffectsKind::Unspecified,
+      SILFunction *InsertBefore = nullptr,
+      const SILDebugScope *DebugScope = nullptr, DeclContext *DC = nullptr);
 
   /// Look up the SILWitnessTable representing the lowering of a protocol
   /// conformance, and collect the substitutions to apply to the referenced

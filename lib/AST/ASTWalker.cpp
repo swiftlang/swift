@@ -21,8 +21,8 @@
 //  a node:
 //
 //    - Every node should be walked.  If a node has both syntactic and
-//      semantic components, you should make you visit every node in
-//      both.
+//      semantic components, you should make sure you visit every node
+//      in both.
 //
 //    - Nodes should only be walked once.  So if a node has both
 //      syntactic and semantic components, but the type-checker builds
@@ -193,6 +193,13 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitNominalTypeDecl(NominalTypeDecl *NTD) {
+    if(auto GPS = NTD->getGenericParams()) {
+      for (auto GP : GPS->getParams()) {
+        if (doIt(GP))
+          return true;
+      }
+    }
+
     for (auto &Inherit : NTD->getInherited()) {
       if (doIt(Inherit))
         return true;

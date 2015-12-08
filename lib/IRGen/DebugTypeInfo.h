@@ -71,6 +71,11 @@ namespace swift {
         if (ValueDecl *D = getDecl()) return D->getDeclContext();
         else return DeclOrContext.get<DeclContext*>();
       }
+
+      void unwrapLValueOrInOutType() {
+        Type = Type->getLValueOrInOutObjectType().getPointer();
+      }
+
       bool isNull() const { return Type == nullptr; }
       bool operator==(DebugTypeInfo T) const;
       bool operator!=(DebugTypeInfo T) const;

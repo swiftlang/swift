@@ -258,7 +258,7 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
   def computeItersNumber(self, name):
     scale = 1
     spent = 0
-    # Mesaure time for one iteration
+    # Measure time for one iteration
     # If it's too small, increase number of iteration until it's measurable
     while (spent <= self.minIterTime):
       try:

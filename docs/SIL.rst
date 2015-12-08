@@ -106,7 +106,7 @@ IR.
 
 - **Generic Specialization** analyzes specialized calls to generic
   functions and generates new specialized version of the
-  functions. Then it rewrites all specialized usages of the gener ic
+  functions. Then it rewrites all specialized usages of the generic
   to a direct call of the appropriate specialized function.
 - **Witness and VTable Devirtualization** for a given type looks up
   the associated method from a class's vtable or a types witness table
@@ -2230,7 +2230,7 @@ unowned_release
   unowned_release %0 : $@unowned T
   // $T must be a reference type
 
-Decrements the unowned reference count of the heap object refereced by
+Decrements the unowned reference count of the heap object referenced by
 ``%0``.  When both its strong and unowned reference counts reach zero,
 the object's memory is deallocated.
 
@@ -2429,7 +2429,7 @@ string_literal
   // %1 has type $Builtin.RawPointer
 
 Creates a reference to a string in the global string table. The result
-is a pointer to the data.  The referenced string is always nul-terminated. The
+is a pointer to the data.  The referenced string is always null-terminated. The
 string literal value is specified using Swift's string
 literal syntax (though ``\()`` interpolations are not allowed).
 
@@ -3169,16 +3169,16 @@ select_enum_addr
 ````````````````
 ::
 
-  sil-instruction ::= 'select_enum' sil-operand sil-select-case*
+  sil-instruction ::= 'select_enum_addr' sil-operand sil-select-case*
                       (',' 'default' sil-value)?
                       ':' sil-type
 
-  %n = select_enum %0 : $U,      \
+  %n = select_enum_addr %0 : $*U,      \
     case #U.Case1: %1,           \
     case #U.Case2: %2, /* ... */ \
     default %3 : $T
 
-  // $U must be an enum type
+  // %0 must be the address of an enum type $*U
   // #U.Case1, Case2, etc. must be cases of enum $U
   // %1, %2, %3, etc. must have type $T
   // %n has type $T
@@ -4005,7 +4005,7 @@ cond_br
 
 Conditionally branches to ``true_label`` if ``%0`` is equal to ``1`` or to
 ``false_label`` if ``%0`` is equal to ``0``, binding the corresponding set of
-values to the the arguments of the chosen destination block.
+values to the arguments of the chosen destination block.
 
 switch_value
 ````````````
@@ -4316,7 +4316,7 @@ constant replacement but leave the function application to be serialized to
 sil).
 
 The compiler flag that influences the value of the ``assert_configuration``
-funtion application is the optimization flag: at ``-Onone` the application will
+function application is the optimization flag: at ``-Onone` the application will
 be replaced by ``Debug`` at higher optimization levels the instruction will be
 replaced by ``Release``. Optionally, the value to use for replacement can be
 specified with the ``-AssertConf`` flag which overwrites the value selected by

@@ -12,7 +12,7 @@ Hard Constraints on Resilience
 ------------------------------
 
 The root of a class hierarchy must remain stable, at pain of
-invalidating the metaclass hierarchy.  Note a Swift class without an
+invalidating the metaclass hierarchy.  Note that a Swift class without an
 explicit base class is implicitly rooted in the SwiftObject
 Objective-C class.
 
@@ -992,7 +992,7 @@ mangled in to disambiguate.
     impl-callee-convention impl-function-attribute* generic-signature? '_'
     impl-parameter* '_' impl-result* '_'
   impl-callee-convention ::= 't'              // thin
-  impl-callee-convention ::= impl-convention  // thick, callee transfered with given convention
+  impl-callee-convention ::= impl-convention  // thick, callee transferred with given convention
   impl-convention ::= 'a'                     // direct, autoreleased
   impl-convention ::= 'd'                     // direct, no ownership transfer
   impl-convention ::= 'D'                     // direct, no ownership transfer,

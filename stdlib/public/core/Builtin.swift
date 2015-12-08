@@ -95,7 +95,7 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
   return Int8(Builtin.canBeClass(T.self))
 }
 
-/// Returns the the bits of `x`, interpreted as having type `U`.
+/// Returns the bits of `x`, interpreted as having type `U`.
 ///
 /// - Warning: Breaks the guarantees of Swift's type system; use
 ///   with extreme care.  There's almost always a better way to do

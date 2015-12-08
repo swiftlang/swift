@@ -88,8 +88,6 @@ protected:
     return asImpl().remapLocation(Loc);
   }
   const SILDebugScope *getOpScope(const SILDebugScope *DS) {
-    if (DS && !asImpl().remapScope(DS))
-      asImpl().remapScope(DS);
     return asImpl().remapScope(DS);
   }
   Substitution getOpSubstitution(Substitution sub) {
@@ -670,9 +668,9 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
 
   // Since we want the debug info to survive, we do not remap the location here.
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-                getBuilder().createDebugValue(Inst->getLoc(),
-                                              getOpValue(Inst->getOperand())));
+  doPostProcess(Inst, getBuilder().createDebugValue(
+                          Inst->getLoc(), getOpValue(Inst->getOperand()),
+                          Inst->getVarInfo().getArgNo()));
 }
 template<typename ImplClass>
 void
@@ -686,9 +684,9 @@ SILCloner<ImplClass>::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
   // Do not remap the location for a debug Instruction.
   SILValue OpValue = getOpValue(Inst->getOperand());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-                getBuilder().createDebugValueAddr(Inst->getLoc(),
-                                                  OpValue));
+  doPostProcess(
+      Inst, getBuilder().createDebugValueAddr(Inst->getLoc(), OpValue,
+                                              Inst->getVarInfo().getArgNo()));
 }
 
 

@@ -23,9 +23,10 @@ namespace toolchains {
 
 class LLVM_LIBRARY_VISIBILITY Darwin : public ToolChain {
 protected:
-  std::pair<const char *, llvm::opt::ArgStringList>
-  constructInvocation(const LinkJobAction &job,
-                      const JobContext &context) const override;
+  InvocationInfo constructInvocation(const InterpretJobAction &job,
+                                     const JobContext &context) const override;
+  InvocationInfo constructInvocation(const LinkJobAction &job,
+                                     const JobContext &context) const override;
 
   std::string findProgramRelativeToSwiftImpl(StringRef name) const override;
 
@@ -35,26 +36,23 @@ public:
 
 };
 
-#if defined(SWIFT_ENABLE_TARGET_LINUX)
-
-class LLVM_LIBRARY_VISIBILITY Linux : public ToolChain {
+class LLVM_LIBRARY_VISIBILITY GenericUnix : public ToolChain {
 protected:
-  std::pair<const char *, llvm::opt::ArgStringList>
-  constructInvocation(const AutolinkExtractJobAction &job,
-                      const JobContext &context) const override;
-  std::pair<const char *, llvm::opt::ArgStringList>
-  constructInvocation(const LinkJobAction &job,
-                      const JobContext &context) const override;
+  InvocationInfo constructInvocation(const InterpretJobAction &job,
+                                     const JobContext &context) const override;
+  InvocationInfo constructInvocation(const AutolinkExtractJobAction &job,
+                                     const JobContext &context) const override;
+  InvocationInfo constructInvocation(const LinkJobAction &job,
+                                     const JobContext &context) const override;
 
 public:
-  Linux(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
-  ~Linux() = default;
+  GenericUnix(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
+  ~GenericUnix() = default;
 };
-
-#endif // SWIFT_ENABLE_TARGET_LINUX
 
 } // end namespace toolchains
 } // end namespace driver
 } // end namespace swift
 
 #endif
+

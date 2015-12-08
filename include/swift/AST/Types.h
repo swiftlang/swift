@@ -732,7 +732,7 @@ public:
   /// \code
   /// struct X<T, U> { }
   /// extension X {
-  ///   typealias SomeArray = [T];
+  ///   typealias SomeArray = [T]
   /// }
   /// \endcode
   ///
@@ -3246,7 +3246,7 @@ protected:
       Key(key), Value(value), ImplOrContext(&ctx) {}
 
 public:
-  /// Return a uniqued dicitonary type with the specified key and value types.
+  /// Return a uniqued dictionary type with the specified key and value types.
   static DictionaryType *get(Type keyTy, Type valueTy);
 
   Type getKeyType() const { return Key; }

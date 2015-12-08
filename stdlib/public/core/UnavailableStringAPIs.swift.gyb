@@ -39,7 +39,7 @@ stringSubscriptComment = """
   ///   of character data.
   ///
   /// - `String.chracters` is a collection of extended grapheme
-  ///   clusters, which are an approximation of user-precieved
+  ///   clusters, which are an approximation of user-perceived
   ///   characters.
   ///
   /// Note that when processing strings that contain human-readable
@@ -100,7 +100,7 @@ ${stringSubscriptComment}
   ///
   /// - `String.chracters.count` property returns the number of
   ///   extended grapheme clusters.  Use this API to count the
-  ///   number of user-precieved characters in the string.
+  ///   number of user-perceived characters in the string.
   @available(
     *, unavailable,
     message="there is no universally good answer, see the documentation comment for discussion")

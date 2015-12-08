@@ -23,7 +23,7 @@ import OverrideBase
 class A_Child : Base {
   // CHECK-NEXT: @property (nonatomic, readonly, getter=getProp) NSUInteger prop;
   override var prop: Int { return 0 }
-  // CHECK-NEXT: - (id __nullable)objectAtIndexedSubscript:(NSUInteger)x;
+  // CHECK-NEXT: - (id _Nullable)objectAtIndexedSubscript:(NSUInteger)x;
   override subscript(x: Int) -> AnyObject? { return nil }
 
   // CHECK-NEXT: - (NSUInteger)foo;
@@ -34,10 +34,10 @@ class A_Child : Base {
   override func foo(x: Int, y: Int) -> Int { return x + y }
   
   
-  // CHECK-NEXT: - (BOOL)doThingAndReturnError:(NSError * __nullable * __null_unspecified)error;
+  // CHECK-NEXT: - (BOOL)doThingAndReturnError:(NSError * _Nullable * _Null_unspecified)error;
   override func doThing() throws {}
 
-  // CHECK-NEXT: - (BOOL)doAnotherThingWithError:(NSError * __nullable * __null_unspecified)error;
+  // CHECK-NEXT: - (BOOL)doAnotherThingWithError:(NSError * _Nullable * _Null_unspecified)error;
   override func doAnotherThing() throws {}
 
   // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
@@ -47,7 +47,7 @@ class A_Child : Base {
 class A_Grandchild : A_Child {
   // CHECK-NEXT: @property (nonatomic, readonly, getter=getProp) NSUInteger prop;
   override var prop: Int { return 0 }
-  // CHECK-NEXT: - (id __nullable)objectAtIndexedSubscript:(NSUInteger)x;
+  // CHECK-NEXT: - (id _Nullable)objectAtIndexedSubscript:(NSUInteger)x;
   override subscript(x: Int) -> AnyObject? { return nil }
 
   // CHECK-NEXT: - (NSUInteger)foo;
@@ -73,8 +73,8 @@ class B_GrandchildViaEmpty : B_EmptyChild {
     set {}
   }
 
-  // CHECK-NEXT: - (id __nullable)objectAtIndexedSubscript:(NSUInteger)x;
-  // CHECK-NEXT: - (void)setObject:(id __nullable)newValue atIndexedSubscript:(NSUInteger)x;
+  // CHECK-NEXT: - (id _Nullable)objectAtIndexedSubscript:(NSUInteger)x;
+  // CHECK-NEXT: - (void)setObject:(id _Nullable)newValue atIndexedSubscript:(NSUInteger)x;
   override subscript(x: Int) -> AnyObject? {
     get { return nil }
     set {}
@@ -93,7 +93,7 @@ class B_GrandchildViaEmpty : B_EmptyChild {
 // The output in this class doesn't yet preserve NSUInteger correctly.
 // CHECK-LABEL: @interface FixMe : Base
 class FixMe : Base {
-  // CHECK-NEXT: - (void)callback:(NSInteger (^ __nullable)(void))fn;
+  // CHECK-NEXT: - (void)callback:(NSInteger (^ _Nullable)(void))fn;
   // CLANG: error: conflicting parameter types in declaration of 'callback:'
   override func callback(fn: (() -> Int)?) {}
 

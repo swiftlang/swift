@@ -1424,7 +1424,7 @@ into every file.  Its declarations can only be found by <a href="#expr-dot">dot
 syntax</a>.  It provides access to a small number of primitive representation
 types and operations defined over them that map directly to LLVM IR.
 
-The existance of and details of this module are a private implementation detail
+The existence of and details of this module are a private implementation detail
 used by our implementation of the standard library.  Swift code outside the
 standard library should not be aware of this library, and an independent
 implementation of the swift standard library should be allowed to be

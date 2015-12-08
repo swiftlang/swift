@@ -4309,18 +4309,23 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
 
   // Find the metadata.
   llvm::Value *metadata;
-  if ((isa<FuncDecl>(methodDecl) && cast<FuncDecl>(methodDecl)->isStatic()) ||
-      (isa<ConstructorDecl>(methodDecl) &&
-       method.kind == SILDeclRef::Kind::Allocator)) {
-    metadata = base;
-  } else {
-    metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType,
-                                                /*suppress cast*/ true);
-  }
-
   if (useSuperVTable) {
+    if (auto metaTy = dyn_cast<MetatypeType>(baseType.getSwiftRValueType()))
+      baseType = SILType::getPrimitiveObjectType(metaTy.getInstanceType());
+
+    metadata = emitClassHeapMetadataRef(IGF, baseType.getSwiftRValueType(),
+                                        MetadataValueType::TypeMetadata);
     auto superField = emitAddressOfSuperclassRefInClassMetadata(IGF, metadata);
     metadata = IGF.Builder.CreateLoad(superField);
+  } else {
+    if ((isa<FuncDecl>(methodDecl) && cast<FuncDecl>(methodDecl)->isStatic()) ||
+        (isa<ConstructorDecl>(methodDecl) &&
+         method.kind == SILDeclRef::Kind::Allocator)) {
+      metadata = base;
+    } else {
+      metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType,
+                                                  /*suppress cast*/ true);
+    }
   }
 
   // Use the type of the method we were type-checked against, not the

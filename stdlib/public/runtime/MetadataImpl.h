@@ -269,12 +269,12 @@ struct SwiftRetainableBox :
 struct SwiftUnownedRetainableBox :
     RetainableBoxBase<SwiftUnownedRetainableBox, HeapObject*> {
   static HeapObject *retain(HeapObject *obj) {
-    swift_weakRetain(obj);
+    swift_unownedRetain(obj);
     return obj;
   }
 
   static void release(HeapObject *obj) {
-    swift_weakRelease(obj);
+    swift_unownedRelease(obj);
   }
 };
 
@@ -382,12 +382,12 @@ struct ObjCUnownedRetainableBox
     swift_getHeapObjectExtraInhabitantCount();
 
   static void *retain(void *obj) {
-    swift_unknownWeakRetain(obj);
+    swift_unknownUnownedRetain(obj);
     return obj;
   }
 
   static void release(void *obj) {
-    swift_unknownWeakRelease(obj);
+    swift_unknownUnownedRelease(obj);
   }
 };
 

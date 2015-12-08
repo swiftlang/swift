@@ -111,6 +111,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_dump_api_path)) {
+    Opts.DumpAPIPath = A->getValue();
+  }
+
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
   Opts.EmitSortedSIL |= Args.hasArg(OPT_emit_sorted_sil);
 
@@ -650,6 +654,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                           DiagnosticEngine &Diags, bool isImmediate) {
   using namespace options;
 
+  Opts.AttachCommentsToDecls |= Args.hasArg(OPT_dump_api_path);
+
   Opts.UseMalloc |= Args.hasArg(OPT_use_malloc);
 
   Opts.EnableExperimentalPatterns |=
@@ -991,12 +997,13 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
   Opts.PrintInstCounts |= Args.hasArg(OPT_print_inst_counts);
-  Opts.EnableFuncSigOpts &= !Args.hasArg(OPT_disable_func_sig_opts);
   if (const Arg *A = Args.getLastArg(OPT_external_pass_pipeline_filename))
     Opts.ExternalPassPipelineFilename = A->getValue();
 
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
   Opts.EmitProfileCoverageMapping |= Args.hasArg(OPT_profile_coverage_mapping);
+  Opts.UseNativeSuperMethod |=
+    Args.hasArg(OPT_use_native_super_method);
 
   return false;
 }

@@ -16,7 +16,6 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SILAnalysis/BasicCalleeAnalysis.h"
-#include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILAnalysis/ColdBlockInfo.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/FunctionOrder.h"
@@ -250,22 +249,20 @@ namespace {
     /// \p Caller and the inliner needs to reject this inlining request.
     bool hasInliningCycle(SILFunction *Caller, SILFunction *Callee);
 
-    FullApplySite devirtualizeUpdatingCallGraph(FullApplySite Apply,
-                                                CallGraph &CG);
+    FullApplySite devirtualize(FullApplySite Apply);
 
     bool devirtualizeAndSpecializeApplies(
       llvm::SmallVectorImpl<ApplySite> &Applies,
-        CallGraphAnalysis *CGA,
         SILModuleTransform *MT,
         llvm::SmallVectorImpl<SILFunction *> &WorkList);
 
-    ApplySite specializeGenericUpdatingCallGraph(ApplySite Apply,
-                                                 CallGraph &CG,
-                                  llvm::SmallVectorImpl<ApplySite> &NewApplies);
+    ApplySite specializeGeneric(ApplySite Apply,
+                                llvm::SmallVectorImpl<ApplySite> &NewApplies);
 
-    bool inlineCallsIntoFunction(SILFunction *F, DominanceAnalysis *DA,
-                                 SILLoopAnalysis *LA, CallGraph &CG,
-                              llvm::SmallVectorImpl<FullApplySite> &NewApplies);
+    bool
+    inlineCallsIntoFunction(SILFunction *F, DominanceAnalysis *DA,
+                            SILLoopAnalysis *LA,
+                            llvm::SmallVectorImpl<FullApplySite> &NewApplies);
 
   public:
     SILPerformanceInliner(int threshold,
@@ -275,7 +272,6 @@ namespace {
 
     void inlineDevirtualizeAndSpecialize(SILFunction *WorkItem,
                                          SILModuleTransform *MT,
-                                         CallGraphAnalysis *CGA,
                                          DominanceAnalysis *DA,
                                          SILLoopAnalysis *LA);
   };
@@ -542,6 +538,25 @@ bool SILPerformanceInliner::hasInliningCycle(SILFunction *Caller,
   return InlinedBefore;
 }
 
+// Return true if the callee does few (or no) self-recursive calls.
+static bool calleeHasMinimalSelfRecursion(SILFunction *Callee) {
+  int countSelfRecursiveCalls = 0;
+
+  for (auto &BB : *Callee) {
+    for (auto &I : BB) {
+      if (auto Apply = FullApplySite::isa(&I)) {
+        if (Apply.getCalleeFunction() == Callee)
+          ++countSelfRecursiveCalls;
+
+        if (countSelfRecursiveCalls > 2)
+          return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 // Returns the callee of an apply_inst if it is basically inlinable.
 SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
 
@@ -624,6 +639,17 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
           Callee->getName() << ".\n");
     return nullptr;
   }
+
+  // Inlining self-recursive functions into other functions can result
+  // in excessive code duplication since we run the inliner multiple
+  // times in our pipeline, so we only do it for callees with few
+  // self-recursive calls.
+  if (calleeHasMinimalSelfRecursion(Callee)) {
+    DEBUG(llvm::dbgs() << "        FAIL: Callee is self-recursive in "
+                       << Callee->getName() << ".\n");
+    return nullptr;
+  }
+
   DEBUG(llvm::dbgs() << "        Eligible callee: " <<
         Callee->getName() << "\n");
   
@@ -814,30 +840,38 @@ static bool isProfitableInColdBlock(SILFunction *Callee) {
   return true;
 }
 
+/// FIXME: Total hack to work around issues exposed while ripping call
+///        graph maintenance from the inliner.
+static void tryLinkCallee(FullApplySite Apply) {
+  auto *F = Apply.getCalleeFunction();
+  if (!F || F->isDefinition()) return;
 
-// Attempt to devirtualize, maintaining the call graph if
-// successful. When successful, replaces the old apply with the new
-// one and returns the new one. When unsuccessful returns an empty
-// apply site.
-FullApplySite SILPerformanceInliner::devirtualizeUpdatingCallGraph(
-                                                            FullApplySite Apply,
-                                                                CallGraph &CG) {
+  auto &M = Apply.getFunction()->getModule();
+  M.linkFunction(F, SILModule::LinkingMode::LinkAll);
+}
+
+// Attempt to devirtualize. When successful, replaces the old apply
+// with the new one and returns the new one. When unsuccessful returns
+// an empty apply site.
+FullApplySite SILPerformanceInliner::devirtualize(FullApplySite Apply) {
+
   auto NewInstPair = tryDevirtualizeApply(Apply);
   if (!NewInstPair.second)
     return FullApplySite();
 
-  auto NewAI = FullApplySite::isa(NewInstPair.second.getInstruction());
-  CallGraphEditor(&CG).replaceApplyWithNew(Apply, NewAI);
-
   replaceDeadApply(Apply, NewInstPair.first);
+  auto NewApply = FullApplySite(NewInstPair.second.getInstruction());
 
-  return NewAI;
+  // FIXME: This should not be needed. We should instead be linking
+  // everything in up front, including everything transitively
+  // referenced through vtables and witness tables.
+  tryLinkCallee(NewApply);
+
+  return FullApplySite(NewInstPair.second.getInstruction());
 }
 
-ApplySite SILPerformanceInliner::specializeGenericUpdatingCallGraph(
-                                                                ApplySite Apply,
-                                                                CallGraph &CG,
-                                 llvm::SmallVectorImpl<ApplySite> &NewApplies) {
+ApplySite SILPerformanceInliner::specializeGeneric(
+    ApplySite Apply, llvm::SmallVectorImpl<ApplySite> &NewApplies) {
   assert(NewApplies.empty() && "Expected out parameter for new applies!");
 
   if (!Apply.hasSubstitutions())
@@ -862,15 +896,9 @@ ApplySite SILPerformanceInliner::specializeGenericUpdatingCallGraph(
   if (!Specialized)
     return ApplySite();
 
-  // Add the specialization to the call graph.
-  CallGraphEditor Editor(&CG);
-  if (SpecializedFunction)
-    Editor.addNewFunction(SpecializedFunction);
-
   // Track the new applies from the specialization.
   for (auto NewCallSite : Collector.getInstructionPairs())
-    if (auto NewApply = ApplySite::isa(NewCallSite.first))
-      NewApplies.push_back(NewApply);
+    NewApplies.push_back(ApplySite(NewCallSite.first));
 
   auto FullApply = FullApplySite::isa(Apply.getInstruction());
 
@@ -880,19 +908,14 @@ ApplySite SILPerformanceInliner::specializeGenericUpdatingCallGraph(
 
     // Replace the old apply with the new and delete the old.
     replaceDeadApply(Apply, Specialized.getInstruction());
-    Editor.updatePartialApplyUses(Specialized);
 
     return ApplySite(Specialized);
   }
 
-  // Update call graph edges
-  auto SpecializedFullApply = FullApplySite(Specialized.getInstruction());
-  Editor.replaceApplyWithNew(FullApply, SpecializedFullApply);
-
   // Replace the old apply with the new and delete the old.
   replaceDeadApply(Apply, Specialized.getInstruction());
 
-  return SpecializedFullApply;
+  return Specialized;
 }
 
 static void collectAllAppliesInFunction(SILFunction *F,
@@ -905,10 +928,10 @@ static void collectAllAppliesInFunction(SILFunction *F,
         Applies.push_back(Apply);
 }
 
-// Devirtualize and specialize a group of applies, updating the call
-// graph and returning a worklist of newly exposed function references
-// that should be considered for inlining before continuing with the
-// caller that has the passed-in applies.
+// Devirtualize and specialize a group of applies, returning a
+// worklist of newly exposed function references that should be
+// considered for inlining before continuing with the caller that has
+// the passed-in applies.
 //
 // The returned worklist is stacked such that the last things we want
 // to process are earlier on the list.
@@ -916,12 +939,10 @@ static void collectAllAppliesInFunction(SILFunction *F,
 // Returns true if any changes were made.
 bool SILPerformanceInliner::devirtualizeAndSpecializeApplies(
                                   llvm::SmallVectorImpl<ApplySite> &Applies,
-                                  CallGraphAnalysis *CGA,
                                   SILModuleTransform *MT,
                                llvm::SmallVectorImpl<SILFunction *> &WorkList) {
   assert(WorkList.empty() && "Expected empty worklist for return results!");
 
-  auto &CG = CGA->getCallGraph();
   bool ChangedAny = false;
 
   // The set of all new function references generated by
@@ -936,7 +957,7 @@ bool SILPerformanceInliner::devirtualizeAndSpecializeApplies(
 
     bool ChangedApply = false;
     if (auto FullApply = FullApplySite::isa(Apply.getInstruction())) {
-      if (auto NewApply = devirtualizeUpdatingCallGraph(FullApply, CG)) {
+      if (auto NewApply = devirtualize(FullApply)) {
         ChangedApply = true;
 
         Apply = ApplySite(NewApply.getInstruction());
@@ -944,8 +965,7 @@ bool SILPerformanceInliner::devirtualizeAndSpecializeApplies(
     }
 
     llvm::SmallVector<ApplySite, 4> NewApplies;
-    if (auto NewApply = specializeGenericUpdatingCallGraph(Apply, CG,
-                                                           NewApplies)) {
+    if (auto NewApply = specializeGeneric(Apply, NewApplies)) {
       ChangedApply = true;
 
       Apply = NewApply;
@@ -965,10 +985,8 @@ bool SILPerformanceInliner::devirtualizeAndSpecializeApplies(
 
       // TODO: Do we need to invalidate everything at this point?
       // What about side-effects analysis? What about type analysis?
-      CGA->lockInvalidation();
       MT->invalidateAnalysis(Apply.getFunction(),
                              SILAnalysis::InvalidationKind::Everything);
-      CGA->unlockInvalidation();
     }
   }
 
@@ -1045,7 +1063,6 @@ void SILPerformanceInliner::collectAppliesToInline(
 bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
                                                     DominanceAnalysis *DA,
                                                     SILLoopAnalysis *LA,
-                                                    CallGraph &CG,
                              llvm::SmallVectorImpl<FullApplySite> &NewApplies) {
   // Don't optimize functions that are marked with the opt.never attribute.
   if (!Caller->shouldOptimize())
@@ -1085,11 +1102,10 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
     SmallVector<SILValue, 8> Args;
     for (const auto &Arg : AI.getArguments())
       Args.push_back(Arg);
-    
-    // As we inline and clone we need to collect instructions that
-    // require updates to the call graph.
+
+    // As we inline and clone we need to collect new applies.
     auto Filter = [](SILInstruction *I) -> bool {
-      return I->mayRelease();
+      return bool(FullApplySite::isa(I));
     };
 
     CloneCollector Collector(Filter);
@@ -1111,17 +1127,8 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
     // we expect it to have happened.
     assert(Success && "Expected inliner to inline this function!");
     llvm::SmallVector<FullApplySite, 4> AppliesFromInlinee;
-    llvm::SmallVector<SILInstruction *, 4> NewCallSites;
-    for (auto &P : Collector.getInstructionPairs()) {
-      NewCallSites.push_back(P.first);
-
-      if (auto FullApply = FullApplySite::isa(P.first)) {
-        AppliesFromInlinee.push_back(FullApply);
-      }
-    }
-
-    CallGraphEditor Editor(&CG);
-    Editor.replaceApplyWithCallSites(AI, NewCallSites);
+    for (auto &P : Collector.getInstructionPairs())
+      AppliesFromInlinee.push_back(FullApplySite(P.first));
 
     recursivelyDeleteTriviallyDeadInstructions(AI.getInstruction(), true);
 
@@ -1145,16 +1152,12 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
 void SILPerformanceInliner::inlineDevirtualizeAndSpecialize(
                                                           SILFunction *Caller,
                                                         SILModuleTransform *MT,
-                                                         CallGraphAnalysis *CGA,
                                                           DominanceAnalysis *DA,
                                                           SILLoopAnalysis *LA) {
-  assert(Caller->isDefinition() &&
-         "Expected only defined functions in the call graph!");
+  assert(Caller->isDefinition() && "Expected only functions with bodies!");
 
   llvm::SmallVector<SILFunction *, 4> WorkList;
   WorkList.push_back(Caller);
-
-  auto &CG = CGA->getOrBuildCallGraph();
 
   while (!WorkList.empty()) {
     llvm::SmallVector<ApplySite, 4> WorkItemApplies;
@@ -1166,7 +1169,7 @@ void SILPerformanceInliner::inlineDevirtualizeAndSpecialize(
     // and collect new functions we should inline into as we do
     // so.
     llvm::SmallVector<SILFunction *, 4> NewFuncs;
-    if (devirtualizeAndSpecializeApplies(WorkItemApplies, CGA, MT, NewFuncs)) {
+    if (devirtualizeAndSpecializeApplies(WorkItemApplies, MT, NewFuncs)) {
       WorkList.insert(WorkList.end(), NewFuncs.begin(), NewFuncs.end());
       NewFuncs.clear();
     }
@@ -1199,14 +1202,10 @@ void SILPerformanceInliner::inlineDevirtualizeAndSpecialize(
       // Inlining in turn might result in new applies that we should
       // consider for devirtualization and specialization.
       llvm::SmallVector<FullApplySite, 4> NewApplies;
-      bool Inlined = inlineCallsIntoFunction(WorkItem, DA, LA, CG, NewApplies);
+      bool Inlined = inlineCallsIntoFunction(WorkItem, DA, LA, NewApplies);
       if (Inlined) {
-        // Invalidate analyses, but lock the call graph since we
-        // maintain it.
-        CGA->lockInvalidation();
         MT->invalidateAnalysis(WorkItem,
                                SILAnalysis::InvalidationKind::FunctionBody);
-        CGA->unlockInvalidation();
 
         // FIXME: Update inlineCallsIntoFunction to collect all
         //        remaining applies after inlining, not just those
@@ -1214,8 +1213,8 @@ void SILPerformanceInliner::inlineDevirtualizeAndSpecialize(
         llvm::SmallVector<ApplySite, 4> WorkItemApplies;
         collectAllAppliesInFunction(WorkItem, WorkItemApplies);
 
-        bool Modified = devirtualizeAndSpecializeApplies(WorkItemApplies, CGA,
-                                                         MT, NewFuncs);
+        bool Modified =
+            devirtualizeAndSpecializeApplies(WorkItemApplies, MT, NewFuncs);
         if (Modified) {
           WorkList.insert(WorkList.end(), NewFuncs.begin(), NewFuncs.end());
           NewFuncs.clear();
@@ -1297,7 +1296,6 @@ public:
 
   void run() override {
     BasicCalleeAnalysis *BCA = PM->getAnalysis<BasicCalleeAnalysis>();
-    CallGraphAnalysis *CGA = PM->getAnalysis<CallGraphAnalysis>();
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
 
@@ -1322,8 +1320,7 @@ public:
 
     // Inline functions bottom up from the leafs.
     while (!WorkList.empty()) {
-      Inliner.inlineDevirtualizeAndSpecialize(WorkList.back(), this, CGA, DA,
-                                              LA);
+      Inliner.inlineDevirtualizeAndSpecialize(WorkList.back(), this, DA, LA);
       WorkList.pop_back();
     }
   }

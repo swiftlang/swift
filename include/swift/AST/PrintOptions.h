@@ -97,6 +97,9 @@ struct PrintOptions {
   /// Whether to skip internal stdlib declarations.
   bool SkipPrivateStdlibDecls = false;
 
+  /// Whether to skip underscored stdlib protocols.
+  bool SkipUnderscoredStdlibProtocols = false;
+
   /// Whether to skip extensions that don't add protocols or no members.
   bool SkipEmptyExtensionDecls = true;
 
@@ -184,6 +187,11 @@ struct PrintOptions {
 
   /// \brief Whether to print regular comments from clang module headers.
   bool PrintRegularClangComments = false;
+
+  /// When true, printing interface from a source file will print the original
+  /// source text for applicable declarations, in order to preserve the
+  /// formatting.
+  bool PrintOriginalSourceText = false;
 
   /// \brief Print dependent types as references into this generic parameter
   /// list.

@@ -141,7 +141,7 @@ public protocol LazySequenceType : SequenceType {
   /// of `self` can prevent result types from growing an extra
   /// `LazySequence` layer.  For example,
   ///
-  /// _prext_ example neeeded
+  /// _prext_ example needed
   ///
   /// Note: this property need not be implemented by conforming types,
   /// it has a default implementation in a protocol extension that

@@ -679,8 +679,9 @@ public:
   /// storage for closure captures and local arguments.
   void emitProlog(AnyFunctionRef TheClosure, ArrayRef<Pattern*> paramPatterns,
                   Type resultType);
-  void emitProlog(ArrayRef<Pattern*> paramPatterns,
-                  Type resultType, DeclContext *DeclCtx);
+  /// returns the number of variables in paramPatterns.
+  unsigned emitProlog(ArrayRef<Pattern*> paramPatterns,
+                      Type resultType, DeclContext *DeclCtx);
 
   /// Create SILArguments in the entry block that bind all the values
   /// of the given pattern suitably for being forwarded.
@@ -761,6 +762,12 @@ public:
   // Type conversions for expr emission and thunks
   //===--------------------------------------------------------------------===//
 
+  ManagedValue emitInjectEnum(SILLocation loc,
+                              ArgumentSource payload,
+                              SILType enumTy,
+                              EnumElementDecl *element,
+                              SGFContext C);
+
   ManagedValue emitInjectOptional(SILLocation loc,
                                   ManagedValue v,
                                   CanType inputFormalType,
@@ -803,7 +810,8 @@ public:
   /// The result is a Builtin.Int1.
   SILValue emitDoesOptionalHaveValue(SILLocation loc, SILValue addrOrValue);
 
-  /// \brief Emit a call to the library intrinsic _preconditionOptionalHasValue.
+  /// \brief Emit a switch_enum to call the library intrinsic
+  /// _diagnoseUnexpectedNilOptional if the optional has no value.
   void emitPreconditionOptionalHasValue(SILLocation loc, SILValue addr);
 
   /// \brief Emit a call to the library intrinsic _getOptionalValue
@@ -1458,8 +1466,11 @@ public:
   /// Emit the allocation for a local variable, provides an Initialization
   /// that can be used to initialize it, and registers cleanups in the active
   /// scope.
+  /// \param ArgNo optionally describes this function argument's
+  /// position for debug info.
   std::unique_ptr<Initialization>
-  emitLocalVariableWithCleanup(VarDecl *D, bool NeedsMarkUninit);
+  emitLocalVariableWithCleanup(VarDecl *D, bool NeedsMarkUninit,
+                               unsigned ArgNo = 0);
 
   /// Emit the allocation for a local temporary, provides an
   /// Initialization that can be used to initialize it, and registers

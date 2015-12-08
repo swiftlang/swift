@@ -17,16 +17,14 @@ import subprocess
 import json
 import argparse
 import sys
+import os
 
 def find_remap_files(path):
-    out = None
-    try:
-        out = subprocess.check_output(["find", path, "-name", "*.remap"])
-    except subprocess.CalledProcessError:
-        return None
-    lines = out.split('\n')
-    lines.pop(-1)
-    return lines
+    for root, dirs, files in os.walk(path):
+        for filename in files:
+            if not filename.endswith(".remap"):
+                continue
+            yield os.path.join(root, filename)
 
 def apply_edits(path):
     remap_files = find_remap_files(path)

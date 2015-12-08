@@ -122,6 +122,9 @@ public:
   /// should only be used for debugging and experimental features.
   std::vector<std::string> LLVMArgs;
 
+  /// The path to output swift interface files for the compiled source files.
+  std::string DumpAPIPath;
+
   enum ActionType {
     NoneAction, ///< No specific action
     Parse, ///< Parse and type-check only

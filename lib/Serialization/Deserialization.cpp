@@ -2989,7 +2989,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     auto inheritedTypes = ctx.Allocate<TypeLoc>(rawInheritedIDs.size());
     for_each(inheritedTypes, rawInheritedIDs,
              [this](TypeLoc &tl, uint64_t rawID) {
-      tl = TypeLoc::withoutLoc(getType(rawID));;
+      tl = TypeLoc::withoutLoc(getType(rawID));
     });
     extension->setInherited(inheritedTypes);
     extension->setCheckedInheritanceClause();
@@ -3643,7 +3643,7 @@ Type ModuleFile::getType(TypeID TID) {
     bool noreturn = false;
     bool throws = false;
 
-    //todo add noreturn serialization.
+    // TODO: add noreturn serialization.
     decls_block::PolymorphicFunctionTypeLayout::readRecord(scratch,
                                                            inputID,
                                                            resultID,
@@ -3679,7 +3679,7 @@ Type ModuleFile::getType(TypeID TID) {
     bool throws = false;
     ArrayRef<uint64_t> genericParamIDs;
 
-    //todo add noreturn serialization.
+    // TODO: add noreturn serialization.
     decls_block::GenericFunctionTypeLayout::readRecord(scratch,
                                                        inputID,
                                                        resultID,
@@ -3955,6 +3955,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   SmallVector<uint64_t, 16> scratch;
 
   unsigned kind = DeclTypeCursor.readRecord(entry.ID, scratch);
+  (void) kind;
   assert(kind == NORMAL_PROTOCOL_CONFORMANCE &&
          "registered lazy loader incorrectly");
   NormalProtocolConformanceLayout::readRecord(scratch, protoID,

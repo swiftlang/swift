@@ -65,7 +65,7 @@ private:
   llvm::SmallVector<SILInstruction *, 4> SummarizedInterestingInsts;
 
 public:
-  ARCRegionState(LoopRegion *R);
+  ARCRegionState(LoopRegion *R, bool AllowsLeaks);
 
   /// Is this Region from which we can leak memory safely?
   bool allowsLeaks() const { return AllowsLeaks; }

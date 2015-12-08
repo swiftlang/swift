@@ -3116,23 +3116,23 @@ TypeTraitResult TypeBase::canBeClass() {
   return TypeTraitResult::IsNot;
 }
 
-bool Type::isPrivateStdlibType() const {
+bool Type::isPrivateStdlibType(bool whitelistProtocols) const {
   Type Ty = *this;
   if (!Ty)
     return false;
 
   // A 'public' typealias can have an 'internal' type.
   if (NameAliasType *NAT = dyn_cast<NameAliasType>(Ty.getPointer()))
-    return NAT->getDecl()->isPrivateStdlibDecl();
+    return NAT->getDecl()->isPrivateStdlibDecl(whitelistProtocols);
 
   if (auto Paren = dyn_cast<ParenType>(Ty.getPointer()))
-    return Paren->getUnderlyingType().isPrivateStdlibType();
+    return Paren->getUnderlyingType().isPrivateStdlibType(whitelistProtocols);
 
   if (Type Unwrapped = Ty->getAnyOptionalObjectType())
-    return Unwrapped.isPrivateStdlibType();
+    return Unwrapped.isPrivateStdlibType(whitelistProtocols);
 
   if (auto TyD = Ty->getAnyNominal())
-    if (TyD->isPrivateStdlibDecl())
+    if (TyD->isPrivateStdlibDecl(whitelistProtocols))
       return true;
 
   return false;

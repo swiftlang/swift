@@ -89,9 +89,6 @@ public:
   /// Should we print out instruction counts if -print-stats is passed in?
   bool PrintInstCounts = false;
 
-  /// Should we optimize function signatures?
-  bool EnableFuncSigOpts = true;
-
   /// Instrument code to generate profiling information.
   bool GenerateProfile = false;
 
@@ -100,6 +97,9 @@ public:
 
   /// Should we use a pass pipeline passed in via a json file? Null by default.
   StringRef ExternalPassPipelineFilename;
+
+  /// Use super_method for native super method calls instead of function_ref.
+  bool UseNativeSuperMethod = false;
 };
 
 } // end namespace swift

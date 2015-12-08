@@ -55,6 +55,7 @@
 #include "llvm/Support/YAMLParser.h"
 
 #include <memory>
+#include <unordered_set>
 
 using namespace swift;
 
@@ -921,6 +922,68 @@ static bool performCompile(CompilerInstance &Instance,
   return false;
 }
 
+/// Returns true if an error occurred.
+static bool dumpAPI(Module *Mod, StringRef OutDir) {
+  using namespace llvm::sys;
+
+  auto getOutPath = [&](SourceFile *SF) -> std::string {
+    SmallString<256> Path = OutDir;
+    StringRef Filename = SF->getFilename();
+    path::append(Path, path::filename(Filename));
+    return Path.str();
+  };
+
+  std::unordered_set<std::string> Filenames;
+
+  auto dumpFile = [&](SourceFile *SF) -> bool {
+    SmallString<512> TempBuf;
+    llvm::raw_svector_ostream TempOS(TempBuf);
+
+    PrintOptions PO = PrintOptions::printInterface();
+    PO.PrintOriginalSourceText = true;
+    PO.Indent = 2;
+    PO.PrintAccessibility = false;
+    PO.SkipUnderscoredStdlibProtocols = true;
+    SF->print(TempOS, PO);
+    if (TempOS.str().trim().empty())
+      return false; // nothing to show.
+
+    std::string OutPath = getOutPath(SF);
+    bool WasInserted = Filenames.insert(OutPath).second;
+    if (!WasInserted) {
+      llvm::errs() << "multiple source files ended up with the same dump API "
+                      "filename to write to: " << OutPath << '\n';
+      return true;
+    }
+
+    std::error_code EC;
+    llvm::raw_fd_ostream OS(OutPath, EC, fs::OpenFlags::F_RW);
+    if (EC) {
+      llvm::errs() << "error opening file '" << OutPath << "': "
+                   << EC.message() << '\n';
+      return true;
+    }
+
+    OS << TempOS.str();
+    return false;
+  };
+
+  std::error_code EC = fs::create_directories(OutDir);
+  if (EC) {
+    llvm::errs() << "error creating directory '" << OutDir << "': "
+                 << EC.message() << '\n';
+    return true;
+  }
+
+  for (auto *FU : Mod->getFiles()) {
+    if (SourceFile *SF = dyn_cast<SourceFile>(FU))
+      if (dumpFile(SF))
+        return true;
+  }
+
+  return false;
+}
+
 int frontend_main(ArrayRef<const char *>Args,
                   const char *Argv0, void *MainAddr) {
   llvm::InitializeAllTargets();
@@ -1044,6 +1107,11 @@ int frontend_main(ArrayRef<const char *>Args,
   int ReturnValue = 0;
   bool HadError = performCompile(Instance, Invocation, Args, ReturnValue) ||
                   Instance.getASTContext().hadError();
+
+  if (!HadError && !Invocation.getFrontendOptions().DumpAPIPath.empty()) {
+    HadError = dumpAPI(Instance.getMainModule(),
+                       Invocation.getFrontendOptions().DumpAPIPath);
+  }
 
   if (Invocation.getDiagnosticOptions().VerifyDiagnostics) {
     HadError = verifyDiagnostics(Instance.getSourceMgr(),

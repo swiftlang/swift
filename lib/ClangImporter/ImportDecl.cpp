@@ -48,8 +48,6 @@
 #define DEBUG_TYPE "Clang module importer"
 
 STATISTIC(NumTotalImportedEntities, "# of imported clang entities");
-STATISTIC(NumFactoryMethodsWrongResult,
-          "# of factory methods not mapped due to an incorrect result type");
 STATISTIC(NumFactoryMethodsAsInitializers,
           "# of factory methods mapped to initializers");
 
@@ -322,101 +320,6 @@ static bool isNSDictionaryMethod(const clang::ObjCMethodDecl *MD,
     return false;
   return true;
 }
-
-/// \brief Returns the common prefix of two strings at camel-case word
-/// granularity.
-///
-/// For example, given "NSFooBar" and "NSFooBas", returns "NSFoo"
-/// (not "NSFooBa"). The returned StringRef is a slice of the "a" argument.
-///
-/// If either string has a non-identifier character immediately after the
-/// prefix, \p followedByNonIdentifier will be set to \c true. If both strings
-/// have identifier characters after the prefix, \p followedByNonIdentifier will
-/// be set to \c false. Otherwise, \p followedByNonIdentifier will not be
-/// changed from its initial value.
-///
-/// This is used to derive the common prefix of enum constants so we can elide
-/// it from the Swift interface.
-static StringRef getCommonWordPrefix(StringRef a, StringRef b,
-                                     bool &followedByNonIdentifier) {
-  auto aWords = camel_case::getWords(a), bWords = camel_case::getWords(b);
-  auto aI = aWords.begin(), aE = aWords.end(),
-       bI = bWords.begin(), bE = bWords.end();
-
-  unsigned prevLength = 0;
-  unsigned prefixLength = 0;
-  for ( ; aI != aE && bI != bE; ++aI, ++bI) {
-    if (*aI != *bI) {
-      followedByNonIdentifier = false;
-      break;
-    }
-
-    prevLength = prefixLength;
-    prefixLength = aI.getPosition() + aI->size();
-  }
-
-  // Avoid creating a prefix where the rest of the string starts with a number.
-  if ((aI != aE && !Lexer::isIdentifier(*aI)) ||
-      (bI != bE && !Lexer::isIdentifier(*bI))) {
-    followedByNonIdentifier = true;
-    prefixLength = prevLength;
-  }
-
-  return a.slice(0, prefixLength);
-}
-
-/// Returns the common word-prefix of two strings, allowing the second string
-/// to be a common English plural form of the first.
-///
-/// For example, given "NSProperty" and "NSProperties", the full "NSProperty"
-/// is returned. Given "NSMagicArmor" and "NSMagicArmory", only
-/// "NSMagic" is returned.
-///
-/// The "-s", "-es", and "-ies" patterns cover every plural NS_OPTIONS name
-/// in Cocoa and Cocoa Touch.
-///
-/// \see getCommonWordPrefix
-static StringRef getCommonPluralPrefix(StringRef singular, StringRef plural) {
-  assert(!plural.empty());
-
-  if (singular.empty())
-    return singular;
-
-  bool ignored;
-  StringRef commonPrefix = getCommonWordPrefix(singular, plural, ignored);
-  if (commonPrefix.size() == singular.size() || plural.back() != 's')
-    return commonPrefix;
-
-  StringRef leftover = singular.substr(commonPrefix.size());
-  StringRef firstLeftoverWord = camel_case::getFirstWord(leftover);
-  StringRef commonPrefixPlusWord =
-      singular.substr(0, commonPrefix.size() + firstLeftoverWord.size());
-
-  // Is the plural string just "[singular]s"?
-  plural = plural.drop_back();
-  if (plural.endswith(firstLeftoverWord))
-    return commonPrefixPlusWord;
-
-  if (plural.empty() || plural.back() != 'e')
-    return commonPrefix;
-
-  // Is the plural string "[singular]es"?
-  plural = plural.drop_back();
-  if (plural.endswith(firstLeftoverWord))
-    return commonPrefixPlusWord;
-
-  if (plural.empty() || !(plural.back() == 'i' && singular.back() == 'y'))
-    return commonPrefix;
-
-  // Is the plural string "[prefix]ies" and the singular "[prefix]y"?
-  plural = plural.drop_back();
-  firstLeftoverWord = firstLeftoverWord.drop_back();
-  if (plural.endswith(firstLeftoverWord))
-    return commonPrefixPlusWord;
-
-  return commonPrefix;
-}
-
 
 /// Build the \c rawValue property trivial getter for an option set or
 /// unknown enum.
@@ -1064,12 +967,16 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
 /// generated name will most likely be unique.
 static Identifier getClangDeclName(ClangImporter::Implementation &Impl,
                                    const clang::TagDecl *decl) {
-  if (decl->getDeclName() || decl->hasAttr<clang::SwiftNameAttr>())
-    return Impl.importName(decl);
-  else if (auto *typedefForAnon = decl->getTypedefNameForAnonDecl())
-    return Impl.importName(typedefForAnon);
+  // Import the name of this declaration.
+  Identifier name = Impl.importFullName(decl).Imported.getBaseName();
+  if (!name.empty()) return name;
 
-  Identifier name;
+  // If that didn't succeed, check whether this is an anonymous tag declaration
+  // with a corresponding typedef-name declaration.
+  if (decl->getDeclName().isEmpty()) {
+    if (auto *typedefForAnon = decl->getTypedefNameForAnonDecl())
+      return Impl.importFullName(typedefForAnon).Imported.getBaseName();
+  }
 
   if (!decl->isRecord())
     return name;
@@ -1272,16 +1179,36 @@ static StringRef getImportedCFTypeName(StringRef name) {
   return name;
 }
 
-static bool isCFTypeDecl(const clang::TypedefNameDecl *Decl) {
-  if (auto pointee = CFPointeeInfo::classifyTypedef(Decl))
-    return pointee.isValid();
+bool ClangImporter::Implementation::isCFTypeDecl(
+       const clang::TypedefNameDecl *Decl) {
+  if (CFPointeeInfo::classifyTypedef(Decl))
+    return true;
   return false;
 }
 
 StringRef ClangImporter::Implementation::getCFTypeName(
-            const clang::TypedefNameDecl *decl) {
-  if (isCFTypeDecl(decl))
-    return getImportedCFTypeName(decl->getName());
+            const clang::TypedefNameDecl *decl,
+            StringRef *secondaryName) {
+  if (secondaryName) *secondaryName = "";
+
+  if (auto pointee = CFPointeeInfo::classifyTypedef(decl)) {
+    auto name = decl->getName();
+    if (pointee.isRecord()) {
+      auto resultName = getImportedCFTypeName(name);
+      if (secondaryName && name != resultName)
+        *secondaryName = name;
+
+      return resultName;
+    }
+
+    if (pointee.isTypedef() && secondaryName) {
+      StringRef otherName = getImportedCFTypeName(name);
+      if (otherName != name) 
+        *secondaryName = otherName;
+    }
+
+    return name;
+  }
 
   return "";
 }
@@ -1456,11 +1383,7 @@ namespace {
     }
 
     Type importCFClassType(const clang::TypedefNameDecl *decl,
-                           StringRef name, CFPointeeInfo info) {
-      // If the name ends in 'Ref', drop that from the imported class name.
-      StringRef nameWithoutRef = getImportedCFTypeName(name);
-      Identifier className = Impl.SwiftContext.getIdentifier(nameWithoutRef);
-
+                           Identifier className, CFPointeeInfo info) {
       auto dc = Impl.importDeclContextOf(decl);
       if (!dc) return Type();
 
@@ -1518,7 +1441,8 @@ namespace {
     }
 
     Decl *VisitTypedefNameDecl(const clang::TypedefNameDecl *Decl) {
-      auto Name = Impl.importName(Decl);
+      auto importedName = Impl.importFullName(Decl);
+      auto Name = importedName.Imported.getBaseName();
       if (Name.empty())
         return nullptr;
 
@@ -1540,9 +1464,14 @@ namespace {
           if (auto pointee = CFPointeeInfo::classifyTypedef(Decl)) {
             // If the pointee is a record, consider creating a class type.
             if (pointee.isRecord()) {
-              SwiftType = importCFClassType(Decl, Name.str(), pointee);
+              SwiftType = importCFClassType(Decl, Name, pointee);
               if (!SwiftType) return nullptr;
               NameMapping = MappedTypeNameKind::DefineOnly;
+
+              // If there is an alias (i.e., that doesn't have "Ref"),
+              // use that as the name of the typedef later.
+              if (importedName.Alias)
+                Name = importedName.Alias.getBaseName();
 
             // If the pointee is another CF typedef, create an extra typealias
             // for the name without "Ref", but not a separate type.
@@ -1552,7 +1481,6 @@ namespace {
               if (!underlying)
                 return nullptr;
 
-              // Remove one level of "Ref" from the typealias.
               if (auto typealias = dyn_cast<TypeAliasDecl>(underlying)) {
                 Type doublyUnderlyingTy = typealias->getUnderlyingType();
                 if (isa<NameAliasType>(doublyUnderlyingTy.getPointer()))
@@ -1565,20 +1493,24 @@ namespace {
               if (!DC)
                 return nullptr;
 
-              StringRef nameWithoutRef = getImportedCFTypeName(Name.str());
-              Identifier idWithoutRef =
-                Impl.SwiftContext.getIdentifier(nameWithoutRef);
-              auto aliasWithoutRef =
-                Impl.createDeclWithClangNode<TypeAliasDecl>(Decl,
-                                      Impl.importSourceLoc(Decl->getLocStart()),
-                                      idWithoutRef,
-                                      Impl.importSourceLoc(Decl->getLocation()),
-                                      TypeLoc::withoutLoc(SwiftType),
-                                      DC);
+              // If there is an alias (i.e., that doesn't have "Ref"),
+              // create that separate typedef.
+              if (importedName.Alias) {
+                auto aliasWithoutRef =
+                  Impl.createDeclWithClangNode<TypeAliasDecl>(
+                    Decl,
+                    Impl.importSourceLoc(Decl->getLocStart()),
+                    importedName.Alias.getBaseName(),
+                    Impl.importSourceLoc(Decl->getLocation()),
+                    TypeLoc::withoutLoc(SwiftType),
+                    DC);
 
-              aliasWithoutRef->computeType();
-              SwiftType = aliasWithoutRef->getDeclaredType();
-              NameMapping = MappedTypeNameKind::DefineOnly;
+                aliasWithoutRef->computeType();
+                SwiftType = aliasWithoutRef->getDeclaredType();
+                NameMapping = MappedTypeNameKind::DefineOnly;
+              } else {
+                NameMapping = MappedTypeNameKind::DefineAndUse;
+              }
 
             // If the pointee is 'const void', 
             // 'CFTypeRef', bring it in specifically as AnyObject.
@@ -1828,131 +1760,12 @@ namespace {
       return constructor;
     }
     
-    /// Get the Swift name for an enum constant.
-    static Identifier getEnumConstantName(ClangImporter::Implementation &impl,
-                                          const clang::EnumConstantDecl *decl,
-                                          const clang::EnumDecl *clangEnum) {
-      if (auto *nameAttr = decl->getAttr<clang::SwiftNameAttr>()) {
-        StringRef customName = nameAttr->getName();
-        if (Lexer::isIdentifier(customName))
-          return impl.SwiftContext.getIdentifier(customName);
-      }
-
-      StringRef enumPrefix = impl.EnumConstantNamePrefixes.lookup(clangEnum);
-      return impl.importName(decl, enumPrefix);
-    }
-
-    /// Determine the common prefix to remove from the element names of an
-    /// enum. We'll elide this prefix from then names in
-    /// the Swift interface because Swift enum cases are naturally namespaced
-    /// by the enum type.
-    void computeEnumCommonWordPrefix(const clang::EnumDecl *decl,
-                                     Identifier enumName) {
-      auto ec = decl->enumerator_begin(), ecEnd = decl->enumerator_end();
-      if (ec == ecEnd)
-        return;
-
-      auto isNonDeprecatedWithoutCustomName =
-          [](const clang::EnumConstantDecl *elem) -> bool {
-        if (elem->hasAttr<clang::SwiftNameAttr>())
-          return false;
-
-        clang::VersionTuple maxVersion{~0U, ~0U, ~0U};
-        switch (elem->getAvailability(nullptr, maxVersion)) {
-        case clang::AR_Available:
-        case clang::AR_NotYetIntroduced:
-          for (auto attr : elem->attrs()) {
-            if (auto annotate = dyn_cast<clang::AnnotateAttr>(attr)) {
-              if (annotate->getAnnotation() == "swift1_unavailable")
-                return false;
-            }
-            if (auto avail = dyn_cast<clang::AvailabilityAttr>(attr)) {
-              if (avail->getPlatform()->getName() == "swift")
-                return false;
-            }
-          }
-          return true;
-        case clang::AR_Deprecated:
-        case clang::AR_Unavailable:
-          return false;
-        }
-      };
-
-      auto firstNonDeprecated = std::find_if(ec, ecEnd,
-                                             isNonDeprecatedWithoutCustomName);
-      bool hasNonDeprecated = (firstNonDeprecated != ecEnd);
-      if (hasNonDeprecated) {
-        ec = firstNonDeprecated;
-      } else {
-        // Advance to the first case without a custom name, deprecated or not.
-        while (ec != ecEnd && (*ec)->hasAttr<clang::SwiftNameAttr>())
-          ++ec;
-        if (ec == ecEnd)
-          return;
-      }
-
-      StringRef commonPrefix = (*ec)->getName();
-      bool followedByNonIdentifier = false;
-      for (++ec; ec != ecEnd; ++ec) {
-        const clang::EnumConstantDecl *elem = *ec;
-        if (hasNonDeprecated) {
-          if (!isNonDeprecatedWithoutCustomName(elem))
-            continue;
-        } else {
-          if (elem->hasAttr<clang::SwiftNameAttr>())
-            continue;
-        }
-
-        commonPrefix = getCommonWordPrefix(commonPrefix, elem->getName(),
-                                           followedByNonIdentifier);
-        if (commonPrefix.empty())
-          break;
-      }
-
-      if (!commonPrefix.empty()) {
-        StringRef checkPrefix = commonPrefix;
-
-        // Account for the 'kConstant' naming convention on enumerators.
-        if (checkPrefix[0] == 'k') {
-          bool canDropK;
-          if (checkPrefix.size() >= 2)
-            canDropK = clang::isUppercase(checkPrefix[1]);
-          else
-            canDropK = !followedByNonIdentifier;
-
-          if (canDropK)
-            checkPrefix = checkPrefix.drop_front();
-        }
-
-        // Account for the enum being imported using
-        // __attribute__((swift_private)). This is a little ad hoc, but it's a
-        // rare case anyway.
-        StringRef enumNameStr = enumName.str();
-        if (enumNameStr.startswith("__") && !checkPrefix.startswith("__"))
-          enumNameStr = enumNameStr.drop_front(2);
-
-        StringRef commonWithEnum = getCommonPluralPrefix(checkPrefix,
-                                                         enumNameStr);
-        size_t delta = commonPrefix.size() - checkPrefix.size();
-
-        // Account for the 'EnumName_Constant' convention on enumerators.
-        if (commonWithEnum.size() < checkPrefix.size() &&
-            checkPrefix[commonWithEnum.size()] == '_' &&
-            !followedByNonIdentifier) {
-          delta += 1;
-        }
-
-        commonPrefix = commonPrefix.slice(0, commonWithEnum.size() + delta);
-      }
-      Impl.EnumConstantNamePrefixes.insert({decl, commonPrefix});
-    }
-    
     /// Import an NS_ENUM constant as a case of a Swift enum.
     Decl *importEnumCase(const clang::EnumConstantDecl *decl,
                          const clang::EnumDecl *clangEnum,
                          EnumDecl *theEnum) {
       auto &context = Impl.SwiftContext;
-      auto name = getEnumConstantName(Impl, decl, clangEnum);
+      auto name = Impl.importFullName(decl).Imported.getBaseName();
       if (name.empty())
         return nullptr;
       
@@ -2005,7 +1818,7 @@ namespace {
     Decl *importOptionConstant(const clang::EnumConstantDecl *decl,
                                const clang::EnumDecl *clangEnum,
                                NominalTypeDecl *theStruct) {
-      auto name = getEnumConstantName(Impl, decl, clangEnum);
+      auto name = Impl.importFullName(decl).Imported.getBaseName();
       if (name.empty())
         return nullptr;
       
@@ -2030,11 +1843,11 @@ namespace {
                               EnumElementDecl *original,
                               const clang::EnumDecl *clangEnum,
                               NominalTypeDecl *importedEnum) {
-      auto name = getEnumConstantName(Impl, alias, clangEnum);
+      auto name = Impl.importFullName(alias).Imported.getBaseName();
       if (name.empty())
         return nullptr;
       
-      // Construct the original constant. Enum constants witbout payloads look
+      // Construct the original constant. Enum constants without payloads look
       // like simple values, but actually have type 'MyEnum.Type -> MyEnum'.
       auto constantRef = new (Impl.SwiftContext) DeclRefExpr(original,
                                                              SourceLoc(),
@@ -2126,7 +1939,6 @@ namespace {
       structDecl->addMember(labeledValueConstructor);
       structDecl->addMember(patternBinding);
       structDecl->addMember(var);
-      computeEnumCommonWordPrefix(decl, name);
       return structDecl;
     }
     
@@ -2294,8 +2106,6 @@ namespace {
         enumDecl->addMember(rawValueBinding);
         
         result = enumDecl;
-        computeEnumCommonWordPrefix(decl, name);
-        
         break;
       }
           
@@ -2589,7 +2399,7 @@ namespace {
     Decl *VisitEnumConstantDecl(const clang::EnumConstantDecl *decl) {
       auto clangEnum = cast<clang::EnumDecl>(decl->getDeclContext());
       
-      auto name = getEnumConstantName(Impl, decl, clangEnum);
+      auto name = Impl.importFullName(decl).Imported.getBaseName();
       if (name.empty())
         return nullptr;
 
@@ -2684,7 +2494,7 @@ namespace {
             return nullptr;
         }
       }
-      auto name = Impl.importName(decl);
+      auto name = Impl.importFullName(decl).Imported.getBaseName();
       if (name.empty())
         return nullptr;
 
@@ -2715,20 +2525,12 @@ namespace {
         return nullptr;
 
       // Determine the name of the function.
-      DeclName name;
-      bool hasCustomName;
-      if (auto *customNameAttr = decl->getAttr<clang::SwiftNameAttr>()) {
-        name = parseDeclName(customNameAttr->getName());
-        hasCustomName = true;
-      }
-
-      if (!name) {
-        name = Impl.importName(decl);
-        hasCustomName = false;
-      }
-
-      if (!name)
+      auto importedName = Impl.importFullName(decl);
+      if (!importedName)
         return nullptr;
+
+      DeclName name = importedName.Imported;
+      bool hasCustomName = importedName.HasCustomName;
 
       // Import the function type. If we have parameters, make sure their names
       // get into the resulting function type.
@@ -2800,7 +2602,7 @@ namespace {
 
     Decl *VisitFieldDecl(const clang::FieldDecl *decl) {
       // Fields are imported as variables.
-      auto name = Impl.importName(decl);
+      auto name = Impl.importFullName(decl).Imported.getBaseName();
       if (name.empty())
         return nullptr;
 
@@ -2846,7 +2648,7 @@ namespace {
         return nullptr;
 
       // Variables are imported as... variables.
-      auto name = Impl.importName(decl);
+      auto name = Impl.importFullName(decl).Imported.getBaseName();
       if (name.empty())
         return nullptr;
 
@@ -2998,117 +2800,28 @@ namespace {
       return result;
     }
 
-    /// Parse a stringified Swift DeclName, e.g. "init(frame:)".
-    DeclName parseDeclName(StringRef Name) {
-      if (Name.back() != ')')
-        return {};
-
-      StringRef BaseName, Parameters;
-      std::tie(BaseName, Parameters) = Name.split('(');
-      if (!Lexer::isIdentifier(BaseName) || BaseName == "_")
-        return {};
-
-      if (Parameters.empty())
-        return {};
-      Parameters = Parameters.drop_back(); // ')'
-
-      Identifier BaseID = Impl.SwiftContext.getIdentifier(BaseName);
-      if (Parameters.empty())
-        return DeclName(Impl.SwiftContext, BaseID, {});
-
-      if (Parameters.back() != ':')
-        return {};
-
-      SmallVector<Identifier, 4> ParamIDs;
-      do {
-        StringRef NextParam;
-        std::tie(NextParam, Parameters) = Parameters.split(':');
-
-        if (!Lexer::isIdentifier(NextParam))
-          return {};
-        Identifier NextParamID;
-        if (NextParam != "_")
-          NextParamID = Impl.SwiftContext.getIdentifier(NextParam);
-        ParamIDs.push_back(NextParamID);
-      } while (!Parameters.empty());
-
-      return DeclName(Impl.SwiftContext, BaseID, ParamIDs);
-    }
-
     /// If the given method is a factory method, import it as a constructor
     Optional<ConstructorDecl *>
     importFactoryMethodAsConstructor(Decl *member,
                                      const clang::ObjCMethodDecl *decl,
                                      ObjCSelector selector,
                                      DeclContext *dc) {
-      // Only class methods can be mapped to constructors.
-      if (!decl->isClassMethod())
+      // Import the full name of the method.
+      auto importedName = Impl.importFullName(decl);
+
+      // Check that we imported an initializer name.
+      DeclName initName = importedName;
+      if (initName.getBaseName() != Impl.SwiftContext.Id_init) return None;
+
+      // ... that came from a factory method.
+      if (importedName.InitKind != CtorInitializerKind::Factory &&
+          importedName.InitKind != CtorInitializerKind::ConvenienceFactory)
         return None;
-
-      // Said class methods must be in an actual class.
-      auto objcClass = decl->getClassInterface();
-      if (!objcClass)
-        return None;
-
-      DeclName initName;
-      bool hasCustomName;
-
-      // Check whether we're allowed to try.
-      switch (Impl.getFactoryAsInit(objcClass, decl)) {
-      case FactoryAsInitKind::AsInitializer:
-        if (auto *customNameAttr = decl->getAttr<clang::SwiftNameAttr>()) {
-          initName = parseDeclName(customNameAttr->getName());
-          hasCustomName = true;
-          break;
-        }
-        // FIXME: We probably should stop using this codepath. It won't ever
-        // succeed.
-        SWIFT_FALLTHROUGH;
-
-      case FactoryAsInitKind::Infer: {
-        // Check whether the name fits the pattern.
-        bool isSwiftPrivate = decl->hasAttr<clang::SwiftPrivateAttr>();
-        initName =
-            Impl.mapFactorySelectorToInitializerName(selector,
-                                                     objcClass->getName(),
-                                                     isSwiftPrivate);
-        hasCustomName = false;
-        break;
-      }
-      case FactoryAsInitKind::AsClassMethod:
-        return None;
-      }
-
-      if (!initName)
-        return None;
-
-      // Check the result type to determine what kind of initializer we can
-      // create (if any).
-      CtorInitializerKind initKind;
-      if (decl->hasRelatedResultType()) {
-        // instancetype factory methods become convenience factory initializers.
-        initKind = CtorInitializerKind::ConvenienceFactory;
-      } else if (auto objcPtr = decl->getReturnType()
-                                  ->getAs<clang::ObjCObjectPointerType>()) {
-        if (objcPtr->getInterfaceDecl() == objcClass) {
-          initKind = CtorInitializerKind::Factory;
-        } else {
-          // FIXME: Could allow a subclass here, but the rest of the compiler
-          // isn't prepared for that yet.
-          // Not a factory method.
-          ++NumFactoryMethodsWrongResult;
-          return None;
-        }
-      } else {
-        // Not a factory method.
-        ++NumFactoryMethodsWrongResult;
-        return None;
-      }
 
       bool redundant = false;
-      auto result = importConstructor(decl, dc, false, initKind,
-                                      /*required=*/false, selector, initName,
-                                      hasCustomName,
+      auto result = importConstructor(decl, dc, false, importedName.InitKind,
+                                      /*required=*/false, selector,
+                                      importedName,
                                       {decl->param_begin(), decl->param_size()},
                                       decl->isVariadic(), redundant);
       if (result)
@@ -3122,7 +2835,8 @@ namespace {
         // TODO: Could add a replacement string?
         llvm::SmallString<64> message;
         llvm::raw_svector_ostream os(message);
-        os << "use object construction '" << objcClass->getName() << "(";
+        os << "use object construction '"
+           << decl->getClassInterface()->getName() << "(";
         for (auto arg : initName.getArgumentNames()) {
           os << arg << ":";
         }
@@ -3140,8 +2854,7 @@ namespace {
                               DeclContext *dc,
                               bool forceClassMethod = false) {
       // If we have an init method, import it as an initializer.
-      if (decl->getMethodFamily() == clang::OMF_init &&
-          isReallyInitMethod(decl)) {
+      if (Impl.isInitMethod(decl)) {
         // Cannot force initializers into class methods.
         if (forceClassMethod)
           return nullptr;
@@ -3166,21 +2879,11 @@ namespace {
       if (methodAlreadyImported(selector, isInstance, dc))
         return nullptr;
 
-      DeclName name;
-      bool hasCustomName;
-      if (auto *customNameAttr = decl->getAttr<clang::SwiftNameAttr>()) {
-        if (!customNameAttr->getName().startswith("init(")) {
-          name = parseDeclName(customNameAttr->getName());
-          hasCustomName = true;
-        }
-      }
-      if (!name) {
-        hasCustomName = false;
-        bool isSwiftPrivate = decl->hasAttr<clang::SwiftPrivateAttr>();
-        name = Impl.mapSelectorToDeclName(selector, /*isInitializer=*/false,
-                                          isSwiftPrivate);
-      }
-      if (!name)
+      auto importedName
+        = Impl.importFullName(decl,
+                              ClangImporter::Implementation::ImportNameFlags
+                                ::SuppressFactoryMethodAsInit);
+      if (!importedName)
         return nullptr;
 
       assert(dc->getDeclaredTypeOfContext() && "Method in non-type context?");
@@ -3208,6 +2911,7 @@ namespace {
         kind = SpecialMethodKind::NSDictionarySubscriptGetter;
 
       // Import the type that this method will have.
+      DeclName name = importedName.Imported;
       Optional<ForeignErrorConvention> errorConvention;
       auto type = Impl.importMethodType(decl,
                                         decl->getReturnType(),
@@ -3216,8 +2920,8 @@ namespace {
                                         decl->isVariadic(),
                                         decl->hasAttr<clang::NoReturnAttr>(),
                                         isInSystemModule(dc),
-                                        hasCustomName,
                                         bodyPatterns,
+                                        importedName,
                                         name,
                                         errorConvention,
                                         kind);
@@ -3331,27 +3035,6 @@ namespace {
       return result;
     }
 
-  private:
-    /// Check whether the given name starts with the given word.
-    static bool startsWithWord(StringRef name, StringRef word) {
-      if (name.size() < word.size()) return false;
-      return ((name.size() == word.size() || !islower(name[word.size()])) &&
-              name.startswith(word));
-    }
-
-    /// Determine whether the given Objective-C method, which Clang classifies
-    /// as an init method, is considered an init method in Swift.
-    static bool isReallyInitMethod(const clang::ObjCMethodDecl *method) {
-      if (!method->isInstanceMethod())
-        return false;
-
-      auto selector = method->getSelector();
-      auto first = selector.getIdentifierInfoForSlot(0);
-      if (!first) return false;
-
-      return startsWithWord(first->getName(), "init");
-    }
-
   public:
     /// \brief Given an imported method, try to import it as some kind of
     /// special declaration, e.g., a constructor or subscript.
@@ -3440,54 +3123,6 @@ namespace {
       }
     }
     
-    /// Map an init method to a Swift declaration name.
-    ///
-    /// Some special cased remappings also change the parameter signature of the
-    /// imported initializer, such as to drop vararg parameters.
-    ///
-    /// All parameters are in/out parameters.
-    DeclName
-    mapInitSelectorToDeclName(ObjCSelector &selector,
-                              ArrayRef<const clang::ParmVarDecl *> &args,
-                              bool &variadic,
-                              bool isSwiftPrivate) {
-      auto &C = Impl.SwiftContext;
-      
-      // Map a few initializers to non-variadic versions that drop the
-      // variadic parameter.
-      if (variadic && shouldMakeSelectorNonVariadic(selector)) {
-        selector = ObjCSelector(C, selector.getNumArgs() - 1,
-                                selector.getSelectorPieces().slice(0,
-                                      selector.getSelectorPieces().size() - 1));
-        args = args.slice(0, args.size() - 1);
-        variadic = false;
-      }
-      
-      return Impl.mapSelectorToDeclName(selector, /*initializer*/true,
-                                        isSwiftPrivate);
-    }
-
-    static bool shouldMakeSelectorNonVariadic(ObjCSelector selector) {
-      // This is UIActionSheet's designated initializer.
-      if (selector.isNonNullarySelector({ "initWithTitle",
-                                          "delegate",
-                                          "cancelButtonTitle",
-                                          "destructiveButtonTitle",
-                                          "otherButtonTitles" }))
-        return true;
-
-      // This is UIAlertView's designated initializer.
-      if (selector.isNonNullarySelector({ "initWithTitle",
-                                          "message",
-                                          "delegate",
-                                          "cancelButtonTitle",
-                                          "otherButtonTitles" }))
-        return true;
-
-      // Nothing else for now.
-      return false;
-    }
-
     /// \brief Given an imported method, try to import it as a constructor.
     ///
     /// Objective-C methods in the 'init' family are imported as
@@ -3503,9 +3138,7 @@ namespace {
                                        Optional<CtorInitializerKind> kind,
                                        bool required) {
       // Only methods in the 'init' family can become constructors.
-      assert(objcMethod->getMethodFamily() == clang::OMF_init &&
-             "Not an init method");
-      assert(isReallyInitMethod(objcMethod) && "Not a real init method");
+      assert(Impl.isInitMethod(objcMethod) && "Not a real init method");
 
       // Check whether we've already created the constructor.
       auto known = Impl.Constructors.find({objcMethod, dc});
@@ -3522,14 +3155,22 @@ namespace {
         objcMethod->param_begin(),
         objcMethod->param_end()
       };
-      bool isSwiftPrivate = objcMethod->hasAttr<clang::SwiftPrivateAttr>();
+
       bool variadic = objcMethod->isVariadic();
-      DeclName name = mapInitSelectorToDeclName(selector, params, variadic,
-                                                isSwiftPrivate);
+      auto importedName = Impl.importFullName(objcMethod);
+      if (!importedName) return nullptr;
+
+      // If we dropped the variadic, handle it now.
+      if (importedName.DroppedVariadic) {
+        selector = ObjCSelector(Impl.SwiftContext, selector.getNumArgs()-1,
+                                selector.getSelectorPieces().drop_back());
+        params = params.drop_back(1);
+        variadic = false;
+      }
 
       bool redundant;
       return importConstructor(objcMethod, dc, implicit, kind, required,
-                               selector, name, /*customName=*/false, params,
+                               selector, importedName, params,
                                variadic, redundant);
     }
 
@@ -3610,6 +3251,8 @@ namespace {
       return false;
     }
 
+    using ImportedName = ClangImporter::Implementation::ImportedName;
+
     /// \brief Given an imported method, try to import it as a constructor.
     ///
     /// Objective-C methods in the 'init' family are imported as
@@ -3628,8 +3271,7 @@ namespace {
                                        Optional<CtorInitializerKind> kindIn,
                                        bool required,
                                        ObjCSelector selector,
-                                       DeclName name,
-                                       bool hasCustomName,
+                                       ImportedName importedName,
                                        ArrayRef<const clang::ParmVarDecl*> args,
                                        bool variadic,
                                        bool &redundant) {
@@ -3678,14 +3320,15 @@ namespace {
 
       // Import the type that this method will have.
       Optional<ForeignErrorConvention> errorConvention;
+      DeclName name = importedName.Imported;
       auto type = Impl.importMethodType(objcMethod,
                                         objcMethod->getReturnType(),
                                         args,
                                         variadic,
                                         objcMethod->hasAttr<clang::NoReturnAttr>(),
                                         isInSystemModule(dc),
-                                        hasCustomName,
                                         bodyPatterns,
+                                        importedName,
                                         name,
                                         errorConvention,
                                         SpecialMethodKind::Constructor);
@@ -4332,7 +3975,7 @@ namespace {
       return subscript;
     }
 
-    /// Import the the accessor and its attributes.
+    /// Import the accessor and its attributes.
     FuncDecl *importAccessor(clang::ObjCMethodDecl *clangAccessor,
                              DeclContext *dc) {
       auto *accessor =
@@ -4711,7 +4354,7 @@ namespace {
 
     /// \brief Import the members of all of the protocols to which the given
     /// Objective-C class, category, or extension explicitly conforms into
-    /// the given list of members, so long as the the method was not already
+    /// the given list of members, so long as the method was not already
     /// declared in the class.
     ///
     /// FIXME: This whole thing is a hack, because name lookup should really
@@ -4814,8 +4457,7 @@ namespace {
             continue;
 
           // When mirroring an initializer, make it designated and required.
-          if (objcMethod->getMethodFamily() == clang::OMF_init &&
-              isReallyInitMethod(objcMethod)) {
+          if (Impl.isInitMethod(objcMethod)) {
             // Import the constructor.
             if (auto imported = importConstructor(
                                   objcMethod, dc, /*implicit=*/true,
@@ -4887,14 +4529,15 @@ namespace {
             assert(ctor->getInitKind() ==
                      CtorInitializerKind::ConvenienceFactory);
 
+            ImportedName importedName = Impl.importFullName(objcMethod);
+            importedName.HasCustomName = true;
             bool redundant;
             if (auto newCtor = importConstructor(objcMethod, classDecl,
                                                  /*implicit=*/true,
                                                  ctor->getInitKind(),
                                                  /*required=*/false, 
                                                  ctor->getObjCSelector(),
-                                                 ctor->getFullName(),
-                                                 /*customName=*/true,
+                                                 importedName,
                                                  objcMethod->parameters(),
                                                  objcMethod->isVariadic(),
                                                  redundant)) {
@@ -5068,7 +4711,7 @@ namespace {
     }
     
     Decl *VisitObjCProtocolDecl(const clang::ObjCProtocolDecl *decl) {
-      Identifier name = Impl.importName(decl);
+      Identifier name = Impl.importFullName(decl).Imported.getBaseName();
       if (name.empty())
         return nullptr;
 
@@ -5087,59 +4730,6 @@ namespace {
 
       decl = decl->getDefinition();
 
-      // Test to see if there is a value with the same name as the protocol
-      // in the same module.
-      // FIXME: This will miss macros.
-      auto clangModule = Impl.getClangSubmoduleForDecl(decl);
-      if (clangModule.hasValue() && clangModule.getValue())
-        clangModule = clangModule.getValue()->getTopLevelModule();
-
-      auto isInSameModule = [&](const clang::Decl *D) -> bool {
-        auto declModule = Impl.getClangSubmoduleForDecl(D);
-        if (!declModule.hasValue())
-          return false;
-        // Handle the bridging header case. This is pretty nasty since things
-        // can get added to it *later*, but there's not much we can do.
-        if (!declModule.getValue())
-          return *clangModule == nullptr;
-        return *clangModule == declModule.getValue()->getTopLevelModule();
-      };
-
-      // Allow this lookup to find hidden names.  We don't want the
-      // decision about whether to rename the protocol to depend on
-      // what exactly the user has imported.  Indeed, if we're being
-      // asked to resolve a serialization cross-reference, the user
-      // may not have imported this module at all, which means a
-      // normal lookup wouldn't even find the protocol!
-      //
-      // Meanwhile, we don't need to worry about finding unwanted
-      // hidden declarations from different modules because we do a
-      // module check before deciding that there's a conflict.
-      bool hasConflict = false;
-      clang::LookupResult lookupResult(Impl.getClangSema(), decl->getDeclName(),
-                                       clang::SourceLocation(),
-                                       clang::Sema::LookupOrdinaryName);
-      lookupResult.setAllowHidden(true);
-      lookupResult.suppressDiagnostics();
-
-      if (Impl.getClangSema().LookupName(lookupResult, /*scope=*/nullptr)) {
-        hasConflict = std::any_of(lookupResult.begin(), lookupResult.end(),
-                                  isInSameModule);
-      }
-      if (!hasConflict) {
-        lookupResult.clear(clang::Sema::LookupTagName);
-        if (Impl.getClangSema().LookupName(lookupResult, /*scope=*/nullptr)) {
-          hasConflict = std::any_of(lookupResult.begin(), lookupResult.end(),
-                                    isInSameModule);
-        }
-      }
-
-      if (hasConflict) {
-        SmallString<64> nameBuf{name.str()};
-        nameBuf += SWIFT_PROTOCOL_SUFFIX;
-        name = Impl.SwiftContext.getIdentifier(nameBuf.str());
-      }
-
       auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
         return nullptr;
@@ -5157,7 +4747,7 @@ namespace {
                                    name,
                                    None);
       result->computeType();
-      addObjCAttribute(result, Impl.importDeclName(decl->getDeclName()));
+      addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
 
       if (declaredNative)
         markMissingSwiftDecl(result);
@@ -5222,7 +4812,7 @@ namespace {
     }
 
     Decl *VisitObjCInterfaceDecl(const clang::ObjCInterfaceDecl *decl) {
-      auto name = Impl.importName(decl);
+      auto name = Impl.importFullName(decl).Imported.getBaseName();
       if (name.empty())
         return nullptr;
 
@@ -5242,7 +4832,7 @@ namespace {
         result->setSuperclass(Type());
         result->setCheckedInheritanceClause();
         result->setAddedImplicitInitializers(); // suppress all initializers
-        addObjCAttribute(result, Impl.importDeclName(decl->getDeclName()));
+        addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
         Impl.registerExternalDecl(result);
         return result;
       };
@@ -5311,7 +4901,7 @@ namespace {
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
       result->setCircularityCheck(CircularityCheck::Checked);
       result->setAddedImplicitInitializers();
-      addObjCAttribute(result, Impl.importDeclName(decl->getDeclName()));
+      addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
 
       if (declaredNative)
         markMissingSwiftDecl(result);
@@ -5438,7 +5028,7 @@ namespace {
 
     Decl *VisitObjCPropertyDecl(const clang::ObjCPropertyDecl *decl,
                                 DeclContext *dc) {
-      auto name = Impl.importName(decl);
+      auto name = Impl.importFullName(decl).Imported.getBaseName();
       if (name.empty())
         return nullptr;
 
@@ -6487,7 +6077,6 @@ ClangImporter::Implementation::getSpecialTypedefKind(clang::TypedefNameDecl *dec
 
 Identifier
 ClangImporter::getEnumConstantName(const clang::EnumConstantDecl *enumConstant){
-  auto clangEnum = cast<clang::EnumDecl>(enumConstant->getDeclContext());
-  return SwiftDeclConverter::getEnumConstantName(Impl, enumConstant, clangEnum);
+  return Impl.importFullName(enumConstant).Imported.getBaseName();
 }
 

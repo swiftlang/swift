@@ -87,7 +87,7 @@ objects::
   point = point1
   point0.x = x
   point = point0
-  
+
 Note that ``point.y`` is left unchanged.
 
 Local analysis
@@ -157,7 +157,7 @@ through unexpected aliases::
 Note that, in either solution, you've introduced extra full-value
 loads.  This may be quite expensive, and it's not guaranteed to be
 semantically equivalent.
-  
+
 Performance
 ~~~~~~~~~~~
 
@@ -453,7 +453,7 @@ Nor can this be fixed with a purely local analysis; consider::
 
   class C { var array: [Int] }
   let global_C = C()
-  
+
   func assign(inout value: Int) {
     C.array = []
     value = 0
@@ -606,7 +606,7 @@ General solutions
 ~~~~~~~~~~~~~~~~~
 
 A language generally has six tools for dealing with code it considers
-undesireable.  Some of this terminology is taken from existing
+undesirable.  Some of this terminology is taken from existing
 standards, others not.
 
 * The language may nonetheless take steps to ensure that the code
@@ -916,7 +916,7 @@ I'm almost ready to state the core rule about formal accesses, but
 first I need to build up a few more definitions.
 
 An *abstract storage location* (ASL) is:
-  
+
 * a global variable declaration;
 
 * an ``inout`` parameter declaration, along with a reference
@@ -1106,7 +1106,7 @@ the other FA's DSN set and (2) not from a non-overlapping subobject.
 Are these conditions true?
 
 Recall that an addressor is invoked for an l-value of the form::
-  
+
   base.memory
 
 or::
@@ -1296,7 +1296,7 @@ Code generation patterns
 The signatures and access patterns for addressors will need to change
 in order to ensure memory-safety.
 
-``mutableAddress`` currentlys returns an ``UnsafeMutablePointer``; it
+``mutableAddress`` currently returns an ``UnsafeMutablePointer``; it
 will need to return ``(Builtin.NativeObject?, UnsafeMutablePointer)``.
 The owner pointer must be a native object; we cannot efficiently
 support either uniqueness checking or the NSM bit on non-Swift

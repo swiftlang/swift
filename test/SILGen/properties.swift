@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module %s | FileCheck %s
+// RUN: %target-swift-frontend -use-native-super-method -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module %s | FileCheck %s
 
 var zero: Int = 0
 
@@ -638,7 +638,7 @@ class rdar16151899Derived : rdar16151899Base {
     override init() {
         super.init()
         // CHECK: upcast {{.*}} : $rdar16151899Derived to $rdar16151899Base
-        // CHECK-NEXT: function_ref properties.rdar16151899Base.init
+        // CHECK-NEXT: super_method {{%[0-9]+}} : $rdar16151899Derived, #rdar16151899Base.init!initializer.1
 
         // This should not be a direct access, it should call the setter in the
         // base.
@@ -668,17 +668,18 @@ func propertyWithDidSetTakingOldValue() {
 // CHECK: // properties.(propertyWithDidSetTakingOldValue () -> ()).(p #1).setter : Swift.Int
 // CHECK-NEXT: sil {{.*}} @_TFF10properties32propertyWithDidSetTakingOldValue
 // CHECK: bb0(%0 : $Int, %1 : $@box Int, %2 : $*Int):
-// CHECK-NEXT:  debug_value %0 : $Int
-// CHECK-NEXT:  %4 = load %2 : $*Int
-// CHECK-NEXT:  debug_value %4 : $Int
+// CHECK-NEXT:  debug_value %0 : $Int  // let newValue, argno: 1
+// CHECK-NEXT:  debug_value_addr %2 : $*Int  // var p, argno: 2
+// CHECK-NEXT:  %5 = load %2 : $*Int
+// CHECK-NEXT:  debug_value %5 : $Int
 // CHECK-NEXT:  assign %0 to %2 : $*Int
 // CHECK-NEXT:  strong_retain %1 : $@box Int
 // CHECK-NEXT:  // function_ref
-// CHECK-NEXT:  %8 = function_ref @_TFF10properties32propertyWithDidSetTakingOldValueFT_T_WL_1pSi : $@convention(thin) (Int, @owned @box Int, @inout Int) -> ()
-// CHECK-NEXT:  %9 = apply %8(%4, %1, %2) : $@convention(thin) (Int, @owned @box Int, @inout Int) -> ()
+// CHECK-NEXT:  %9 = function_ref @_TFF10properties32propertyWithDidSetTakingOldValueFT_T_WL_1pSi : $@convention(thin) (Int, @owned @box Int, @inout Int) -> ()
+// CHECK-NEXT:  %10 = apply %9(%5, %1, %2) : $@convention(thin) (Int, @owned @box Int, @inout Int) -> ()
 // CHECK-NEXT:  strong_release %1 : $@box Int
-// CHECK-NEXT:  %11 = tuple ()
-// CHECK-NEXT:  return %11 : $()
+// CHECK-NEXT:  %12 = tuple ()
+// CHECK-NEXT:  return %12 : $()
 // CHECK-NEXT:}
 
 
@@ -699,8 +700,7 @@ class DerivedProperty : BaseProperty {
 // CHECK: sil hidden @_TFC10properties15DerivedProperty24super_property_reference
 // CHECK: bb0(%0 : $DerivedProperty):
 // CHECK:  [[BASEPTR:%[0-9]+]] = upcast %0 : $DerivedProperty to $BaseProperty
-// CHECK:  // function_ref properties.BaseProperty.x.getter
-// CHECK:  [[FN:%[0-9]+]] = function_ref @_TFC10properties12BasePropertyg1x
+// CHECK:  [[FN:%[0-9]+]] = super_method %0 : $DerivedProperty, #BaseProperty.x!getter.1
 // CHECK:  apply [[FN]]([[BASEPTR]]) : $@convention(method) (@guaranteed BaseProperty) -> Int // user: %7
 
 

@@ -98,7 +98,7 @@ void ReleaseDevirtualizer::run() {
       if (isa<ReleaseValueInst>(&I) ||
           isa<StrongReleaseInst>(&I)) {
         LastRelease = &I;
-      } else if (I.mayRelease()) {
+      } else if (I.mayReleaseOrReadRefCount()) {
         LastRelease = nullptr;
       }
     }

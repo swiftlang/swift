@@ -173,7 +173,7 @@ be quite amazing for us to assert that code shouldn't be written that
 way, understanding nothing else about it.  As long as programmers do
 face these issues, the language has some responsibility to help them.
 
-Therefore, in my judgement, promoting the use of universal errors is
+Therefore, in my judgment, promoting the use of universal errors is
 highly problematic.  They undermine the easy comprehension of code,
 and they undermine the language's ability to help the programmer
 reason about errors.  This design will instead focus on explicitly
@@ -577,7 +577,7 @@ they produce, and so many errors just end up falling into broad
 buckets.  Different libraries end up with their own library-specific
 general error classes, and exceptions list end up just restating the
 library's own dependencies or wrapping the underlying errors in ways
-that loses criticial information.
+that loses critical information.
 
 
 Tradeoffs of typed propagation
@@ -768,7 +768,7 @@ not free:
   which on our platforms means a function call because we're not
   willing to commit to anything more specific in the ABI.
 
-* Jumping across arbitary frames invalidates the callee-save
+* Jumping across arbitrary frames invalidates the callee-save
   registers, so the registering frame must save them all eagerly.  In
   calling conventions with many callee-save registers, this can be
   very expensive.  However, this is only necessary when it's possible

@@ -45,8 +45,8 @@ syn keyword swiftBoolean true false
 
 syn region swiftString start=/"/ skip=/\\\\\|\\"/ end=/"/ contains=swiftInterpolation
 syn region swiftInterpolation start=/\\(/ end=/)/ contained
-syn region swiftComment start="/\*" end="\*/" contains=swiftComment
-syn region swiftLineComment start="//" end="$"
+syn region swiftComment start="/\*" end="\*/" contains=swiftComment,swiftLineComment,swiftTodo
+syn region swiftLineComment start="//" end="$" contains=swiftComment,swiftTodo
 
 syn match swiftDecimal /[+\-]\?\<\([0-9][0-9_]*\)\([.][0-9_]*\)\?\([eE][+\-]\?[0-9][0-9_]*\)\?\>/
 syn match swiftHex /[+\-]\?\<0x[0-9A-Fa-f][0-9A-Fa-f_]*\(\([.][0-9A-Fa-f_]*\)\?[pP][+\-]\?[0-9][0-9_]*\)\?\>/
@@ -63,6 +63,8 @@ syn match swiftLabel /\(\<get\>\|\<set\>\):\@=/
 syn match swiftPreproc /^#\<if\>\|^#\<endif\>/
 
 syn match swiftAttribute /@\<\w\+\>/ skipwhite
+
+syn keyword swiftTodo TODO FIXME contained
 
 hi def link swiftImport Include
 hi def link swiftImportModule Title
@@ -98,5 +100,6 @@ hi def link swiftNew Operator
 hi def link swiftMutating Statement
 hi def link swiftPreproc PreCondit
 hi def link swiftAttribute Type
+hi def link swiftTodo Todo
 
 let b:current_syntax = "swift"

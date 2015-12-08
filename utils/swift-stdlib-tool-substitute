@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 #===--- swift-stdlib-tool - stand-in for the real swift-stdlib-tool --------===#
 #

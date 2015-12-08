@@ -144,18 +144,6 @@ func _getSummary<T>(out: UnsafeMutablePointer<String>, x: T) {
 @_silgen_name("swift_reflectAny")
 public func _reflect<T>(x: T) -> _MirrorType
 
-/// Unsafely produce a mirror for a value in memory whose lifetime is
-/// guaranteed by holding a strong reference to a heap object.
-/// This lets containers with heap storage vend mirrors for their elements
-/// without unnecessary copying of the underlying value.
-@warn_unused_result
-@_silgen_name("swift_unsafeReflectAny")
-internal func _unsafeReflect<T>(
-  owner: Builtin.NativeObject,
-  ptr: UnsafeMutablePointer<T>
-) -> _MirrorType
-
-
 /// Dump an object's contents using its mirror to the specified output stream.
 public func dump<T, TargetStream : OutputStreamType>(
     x: T, inout _ targetStream: TargetStream,

@@ -699,3 +699,10 @@ func test23086402(a: A23086402) {
   print(a.b.c + "")  // expected-error {{cannot convert value of type '[String]' to expected argument type 'String'}}
 }
 
+// <rdar://problem/23719432> [practicalswift] Compiler crashes on &(Int:_)
+func test23719432() {
+  var x = 42
+  &(Int:x)  // expected-error {{'&' can only appear immediately in a call argument list}}
+}
+
+

@@ -366,7 +366,102 @@ intptr_t swift_TupleMirror_count(HeapObject *owner,
   auto Tuple = static_cast<const TupleTypeMetadata *>(type);
   return Tuple->NumElements;
 }
+  
+static std::tuple<const _ReflectableWitnessTable *, const Metadata *,
+                  const OpaqueValue *>
+getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
+recur:
+  // If the value is an existential container, look through it to reflect the
+  // contained value.
+  switch (T->getKind()) {
+  case MetadataKind::Tuple:
+  case MetadataKind::Struct:
+  case MetadataKind::ForeignClass:
+  case MetadataKind::ObjCClassWrapper:
+  case MetadataKind::Class:
+  case MetadataKind::Opaque:
+  case MetadataKind::Enum:
+  case MetadataKind::Function:
+  case MetadataKind::Metatype:
+    break;
+      
+  case MetadataKind::Existential: {
+    auto existential
+      = static_cast<const ExistentialTypeMetadata *>(T);
+    
+    // If the existential happens to include the _Reflectable protocol, use
+    // the witness table from the container.
+    unsigned wtOffset = 0;
+    for (unsigned i = 0; i < existential->Protocols.NumProtocols; ++i) {
+      if (existential->Protocols[i] == &_TMps12_Reflectable) {
+        return std::make_tuple(
+            reinterpret_cast<const _ReflectableWitnessTable*>(
+              existential->getWitnessTable(Value, wtOffset)),
+            existential->getDynamicType(Value),
+            existential->projectValue(Value));
+      }
+      if (existential->Protocols[i]->Flags.needsWitnessTable())
+        ++wtOffset;
+    }
+    
+    // Otherwise, unwrap the existential container and do a runtime lookup on
+    // its contained value as usual.
+    T = existential->getDynamicType(Value);
+    Value = existential->projectValue(Value);
 
+    // Existential containers can end up nested in some cases due to generic
+    // abstraction barriers. Recur in case we have a nested existential.
+    goto recur;
+  }
+  case MetadataKind::ExistentialMetatype:
+    // TODO: Should look through existential metatypes too, but it doesn't
+    // really matter yet since we don't have any special mirror behavior for
+    // concrete metatypes yet.
+    break;
+      
+  // Types can't have these kinds.
+  case MetadataKind::HeapLocalVariable:
+  case MetadataKind::HeapGenericLocalVariable:
+  case MetadataKind::ErrorObject:
+    swift::crash("Swift mirror lookup failure");
+  }
+  
+  return std::make_tuple(
+      reinterpret_cast<const _ReflectableWitnessTable*>(
+        swift_conformsToProtocol(T, &_TMps12_Reflectable)),
+      T,
+      Value);
+}
+
+/// Produce a mirror for any value, like swift_reflectAny, but do not consume
+/// the value, so we can produce a mirror for a subobject of a value already
+/// owned by a mirror.
+///
+/// \param owner passed at +1, consumed.
+/// \param value passed unowned.
+static Mirror reflect(HeapObject *owner,
+                      const OpaqueValue *value,
+                      const Metadata *T) {
+  const _ReflectableWitnessTable *witness;
+  const Metadata *mirrorType;
+  const OpaqueValue *mirrorValue;
+  std::tie(witness, mirrorType, mirrorValue)
+    = getReflectableConformance(T, value);
+  
+  // Use the _Reflectable conformance if the object has one.
+  if (witness) {
+    auto result =
+    witness->getMirror(const_cast<OpaqueValue*>(mirrorValue), mirrorType);
+    swift_release(owner);
+    return MirrorReturn(result);
+  }
+  // Otherwise, fall back to MagicMirror.
+  // Consumes 'owner'.
+  Mirror result;
+  ::new (&result) MagicMirror(owner, mirrorValue, mirrorType);
+  return result;
+}
+  
 /// \param owner passed at +1, consumed.
 /// \param value passed unowned.
 extern "C"
@@ -392,11 +487,11 @@ StringMirrorTuple swift_TupleMirror_subscript(intptr_t i,
   auto bytes = reinterpret_cast<const char*>(value);
   auto eltData = reinterpret_cast<const OpaqueValue *>(bytes + elt.Offset);
 
-  // This retain matches the -1 in swift_unsafeReflectAny.
+  // This retain matches the -1 in reflect.
   swift_retain(owner);
 
   // 'owner' is consumed by this call.
-  result.second = swift_unsafeReflectAny(owner, eltData, elt.Type);
+  result.second = reflect(owner, eltData, elt.Type);
 
   return result;
 }
@@ -444,12 +539,12 @@ StringMirrorTuple swift_StructMirror_subscript(intptr_t i,
 
   result.first = String(getFieldName(Struct->Description->Struct.FieldNames, i));
 
-  // This matches the -1 in swift_unsafeReflectAny.
+  // This matches the -1 in reflect.
   swift_retain(owner);
 
   // 'owner' is consumed by this call.
   assert(!fieldType.isIndirect() && "indirect struct fields not implemented");
-  result.second = swift_unsafeReflectAny(owner, fieldData,
+  result.second = reflect(owner, fieldData,
                                          fieldType.getType());
 
   return result;
@@ -553,11 +648,11 @@ StringMirrorTuple swift_EnumMirror_subscript(intptr_t i,
     value = swift_projectBox(const_cast<HeapObject *>(owner));
   }
 
-  // This matches the -1 in swift_unsafeReflectAny.
+  // This matches the -1 in reflect.
   swift_retain(owner);
 
   result.first = String(getFieldName(Description.CaseNames, tag));
-  result.second = swift_unsafeReflectAny(owner, value, payloadType);
+  result.second = reflect(owner, value, payloadType);
 
   return result;
 }
@@ -649,7 +744,7 @@ StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
   
   result.first = String(getFieldName(Clas->getDescription()->Class.FieldNames, i));
   // 'owner' is consumed by this call.
-  result.second = swift_unsafeReflectAny(owner, fieldData, fieldType.getType());
+  result.second = reflect(owner, fieldData, fieldType.getType());
   return result;
 }
   
@@ -808,7 +903,7 @@ StringMirrorTuple swift_ObjCMirror_subscript(intptr_t i,
   StringMirrorTuple result;
   result.first = String(name, strlen(name));
   // 'owner' is consumed by this call.
-  result.second = swift_unsafeReflectAny(owner, ivar, ivarType);
+  result.second = reflect(owner, ivar, ivarType);
   return result;
 #else
   // ObjC makes no guarantees about the state of ivars, so we can't safely
@@ -1129,73 +1224,7 @@ MagicMirror::MagicMirror(HeapObject *owner,
   std::tie(T, Self, MirrorWitness) = getImplementationForType(T, value);
   Data = {owner, value, T};
 }
-  
-static std::tuple<const _ReflectableWitnessTable *, const Metadata *,
-                  const OpaqueValue *>
-getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
-recur:
-  // If the value is an existential container, look through it to reflect the
-  // contained value.
-  switch (T->getKind()) {
-  case MetadataKind::Tuple:
-  case MetadataKind::Struct:
-  case MetadataKind::ForeignClass:
-  case MetadataKind::ObjCClassWrapper:
-  case MetadataKind::Class:
-  case MetadataKind::Opaque:
-  case MetadataKind::Enum:
-  case MetadataKind::Function:
-  case MetadataKind::Metatype:
-    break;
-      
-  case MetadataKind::Existential: {
-    auto existential
-      = static_cast<const ExistentialTypeMetadata *>(T);
-    
-    // If the existential happens to include the _Reflectable protocol, use
-    // the witness table from the container.
-    unsigned wtOffset = 0;
-    for (unsigned i = 0; i < existential->Protocols.NumProtocols; ++i) {
-      if (existential->Protocols[i] == &_TMps12_Reflectable) {
-        return std::make_tuple(
-            reinterpret_cast<const _ReflectableWitnessTable*>(
-              existential->getWitnessTable(Value, wtOffset)),
-            existential->getDynamicType(Value),
-            existential->projectValue(Value));
-      }
-      if (existential->Protocols[i]->Flags.needsWitnessTable())
-        ++wtOffset;
-    }
-    
-    // Otherwise, unwrap the existential container and do a runtime lookup on
-    // its contained value as usual.
-    T = existential->getDynamicType(Value);
-    Value = existential->projectValue(Value);
 
-    // Existential containers can end up nested in some cases due to generic
-    // abstraction barriers. Recur in case we have a nested existential.
-    goto recur;
-  }
-  case MetadataKind::ExistentialMetatype:
-    // TODO: Should look through existential metatypes too, but it doesn't
-    // really matter yet since we don't have any special mirror behavior for
-    // concrete metatypes yet.
-    break;
-      
-  // Types can't have these kinds.
-  case MetadataKind::HeapLocalVariable:
-  case MetadataKind::HeapGenericLocalVariable:
-  case MetadataKind::ErrorObject:
-    swift::crash("Swift mirror lookup failure");
-  }
-  
-  return std::make_tuple(
-      reinterpret_cast<const _ReflectableWitnessTable*>(
-        swift_conformsToProtocol(T, &_TMps12_Reflectable)),
-      T,
-      Value);
-}
-  
 } // end anonymous namespace
 
 /// func reflect<T>(x: T) -> Mirror
@@ -1236,31 +1265,16 @@ MirrorReturn swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
   return MirrorReturn(result);
 }
 
-/// Produce a mirror for any value, like swift_reflectAny, but do not consume
-/// the value, so we can produce a mirror for a subobject of a value already
-/// owned by a mirror.
-///
-/// \param owner passed at +1, consumed.
-/// \param value passed unowned.
-MirrorReturn swift::swift_unsafeReflectAny(HeapObject *owner,
-                                           const OpaqueValue *value,
-                                           const Metadata *T) {
-  const _ReflectableWitnessTable *witness;
-  const Metadata *mirrorType;
-  const OpaqueValue *mirrorValue;
-  std::tie(witness, mirrorType, mirrorValue)
-    = getReflectableConformance(T, value);
-  
-  // Use the _Reflectable conformance if the object has one.
-  if (witness) {
-    auto result =
-        witness->getMirror(const_cast<OpaqueValue*>(mirrorValue), mirrorType);
-    swift_release(owner);
-    return MirrorReturn(result);
-  }
-  // Otherwise, fall back to MagicMirror.
-  // Consumes 'owner'.
-  Mirror result;
-  ::new (&result) MagicMirror(owner, mirrorValue, mirrorType);
-  return MirrorReturn(result);
+// NB: This function is not used directly in the Swift codebase, but is
+// exported for Xcode support. Please coordinate before changing.
+extern "C" void swift_stdlib_demangleName(const char *mangledName,
+                                          size_t mangledNameLength,
+                                          String *demangledName) {
+  auto options = Demangle::DemangleOptions();
+  options.DisplayDebuggerGeneratedModule = false;
+  auto result =
+      Demangle::demangleSymbolAsString(mangledName,
+                                       mangledNameLength,
+                                       options);
+  new (demangledName) String(result.data(), result.size());
 }

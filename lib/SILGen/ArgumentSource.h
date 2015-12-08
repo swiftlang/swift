@@ -256,6 +256,9 @@ public:
   RValue getAsRValue(SILGenFunction &gen, SGFContext C = SGFContext()) &&;
   ManagedValue getAsSingleValue(SILGenFunction &gen,
                                 SGFContext C = SGFContext()) &&;
+  ManagedValue getAsSingleValue(SILGenFunction &gen,
+                                AbstractionPattern origFormalType,
+                                SGFContext C = SGFContext()) &&;
 
   void forwardInto(SILGenFunction &gen, Initialization *dest) &&;
   void forwardInto(SILGenFunction &gen, AbstractionPattern origFormalType,

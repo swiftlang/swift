@@ -11,7 +11,7 @@
 // RUN: FileCheck %s -check-prefix=OVER_MORE_DERIVED_1 < %t.over.txt
 
 //===---
-//===--- Check that we don't show overridden decls (only show the overridding decl).
+//===--- Check that we don't show overridden decls (only show the overriding decl).
 //===---
 
 class FooBase {}

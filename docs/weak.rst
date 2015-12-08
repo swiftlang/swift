@@ -333,7 +333,7 @@ referent when the last strong reference is dropped is
 substantially less useful for the implementation of a weak
 cache.  It is a common access pattern (for, say, a memoizing
 cache) for a value to be looked up many times in rapid
-succession, but for each use to be temporarlly disjoint
+succession, but for each use to be temporarily disjoint
 from the others.  A naive use of weak references in this case
 will simply cause the cache to thrash.  This problem is less
 likely to arise in an environment with nondeterministic
@@ -384,7 +384,7 @@ Optimization
 
 Functions often create a large number of temporary references.  In a
 reference-counting environment like Swift, these references require
-the implementation to implicitly perform operations to incremenet and
+the implementation to implicitly perform operations to increment and
 decrement the reference count.  These operations can be quite fast,
 but they are not free, and our experience has been that the
 accumulated cost can be quite significant.  A straightforward local
@@ -893,7 +893,7 @@ More complicated expressions really ought to be hoisted out to a
 separate variable for legibility anyway.
 
 I do believe that being able to capture the value of a property
-(particulary of :code:`self`) is very important.  In fact, it's
+(particularly of :code:`self`) is very important.  In fact, it's
 important independent of weak references.  It is often possible to
 avoid a reference cycle by simply capturing a specific property value
 instead of the base object.  Capturing by value is also an

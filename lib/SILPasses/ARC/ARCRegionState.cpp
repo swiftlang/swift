@@ -25,11 +25,9 @@ using namespace swift;
 //                               ARCRegionState
 //===----------------------------------------------------------------------===//
 
-ARCRegionState::ARCRegionState(LoopRegion *R)
-    : Region(R), PtrToTopDownState(), PtrToBottomUpState(), AllowsLeaks(false) {
-  if (R->isBlock())
-    AllowsLeaks = isARCInertTrapBB(R->getBlock());
-}
+ARCRegionState::ARCRegionState(LoopRegion *R, bool AllowsLeaks)
+    : Region(R), PtrToTopDownState(), PtrToBottomUpState(),
+      AllowsLeaks(AllowsLeaks) {}
 
 //===---
 // Bottom Up Merge
@@ -418,7 +416,7 @@ void ARCRegionState::summarizeBlock(SILBasicBlock *BB) {
   SummarizedInterestingInsts.clear();
 
   for (auto &I : *BB)
-    if (!canNeverUseValues(&I) || !canNeverDecrementRefCounts(&I))
+    if (!canNeverUseValues(&I) || I.mayReleaseOrReadRefCount())
       SummarizedInterestingInsts.push_back(&I);
 }
 

@@ -57,7 +57,7 @@ TEST_F(VersionRangeLattice, AllIsTopElement) {
   EXPECT_FALSE(All.isContainedIn(Empty));
 }
 
-// Test that Empty acts like the bottom element in the lattice  with respect to
+// Test that Empty acts like the bottom element in the lattice with respect to
 // containment.
 TEST_F(VersionRangeLattice, EmptyIsBottomElement) {
   EXPECT_TRUE(Empty.isContainedIn(Empty));

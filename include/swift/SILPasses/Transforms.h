@@ -12,7 +12,9 @@
 #ifndef SWIFT_SILPASSES_TRANSFORMS_H
 #define SWIFT_SILPASSES_TRANSFORMS_H
 
+#include "swift/SIL/Notifications.h"
 #include "swift/SILPasses/PassManager.h"
+
 
 namespace swift {
   class SILModule;
@@ -20,7 +22,7 @@ namespace swift {
   class PrettyStackTraceSILFunctionTransform;
 
   /// The base class for all SIL-level transformations.
-  class SILTransform {
+  class SILTransform : public DeleteNotificationHandler {
   public:
     /// The kind of transformation passes we use.
     enum class TransformKind {

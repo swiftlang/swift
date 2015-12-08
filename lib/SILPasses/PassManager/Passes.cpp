@@ -262,7 +262,6 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 
-
   // Run two iterations of the mid-level SSA passes.
   PM.setStageName("MidLevel");
   AddSSAPasses(PM, OptimizationLevelKind::MidLevel);
@@ -299,13 +298,10 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   // Speculate virtual call targets.
   PM.addSpeculativeDevirtualization();
 
-  // Optimize function signatures if we are asked to.
-  //
   // We do this late since it is a pass like the inline caches that we only want
   // to run once very late. Make sure to run at least one round of the ARC
   // optimizer after this.
-  if (Module.getOptions().EnableFuncSigOpts)
-    PM.addFunctionSignatureOpts();
+  PM.addFunctionSignatureOpts();
 
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
@@ -340,22 +336,23 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
-  PM.addCodeSinking();
 
   PM.setStageName("LateLoopOpt");
-  PM.addLICM();
 
-  // Perform the final lowering transformations.
+  // Delete dead code and drop the bodies of shared functions.
   PM.addExternalFunctionDefinitionsElimination();
   PM.addDeadFunctionElimination();
 
-  // Optimize overflow checks:
+  // Perform the final lowering transformations.
+  PM.addCodeSinking();
+  PM.addLICM();
+
+  // Optimize overflow checks.
   PM.addRedundantOverflowCheckRemoval();
   PM.addMergeCondFails();
 
   // Remove dead code.
   PM.addDCE();
-  // Clean-up after DCE.
   PM.addSimplifyCFG();
   PM.runOneIteration();
 

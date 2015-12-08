@@ -11,7 +11,7 @@ overlays for system frameworks written in Swift.
 
 Swift has three levels of access control --- private, internal
 and public.  As currently implemented, access control is only
-concerned with API-level issues, not ABI.  THe stdlib does not have a stable ABI,
+concerned with API-level issues, not ABI.  The stdlib does not have a stable ABI,
 and is compiled in "non-resilient" mode with inlining into user code; thus, all
 stdlib symbols are considered ABI and stdlib clients should be recompiled after
 *any* change to the stdlib.
@@ -49,7 +49,7 @@ To document the reason for marking symbols public, we use comments:
 * symbols that are SPIs for the module X::
 
     public // SPI(X)
-    public _foo() { ... }
+    func _foo() { ... }
 
 `internal`
 ==========

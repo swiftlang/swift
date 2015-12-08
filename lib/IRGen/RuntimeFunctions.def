@@ -127,25 +127,25 @@ FUNCTION(CopyPOD,        swift_copyPOD,       RuntimeCC,
          ATTRS(NoUnwind))
 
 // void swift_retain(void *ptr);
-FUNCTION(Retain, swift_retain, RuntimeCC,
+FUNCTION(NativeStrongRetain, swift_retain, RuntimeCC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
 // void swift_release(void *ptr);
-FUNCTION(Release, swift_release, RuntimeCC,
+FUNCTION(NativeStrongRelease, swift_release, RuntimeCC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
 // void *swift_tryPin(void *ptr);
-FUNCTION(TryPin, swift_tryPin, RuntimeCC,
+FUNCTION(NativeTryPin, swift_tryPin, RuntimeCC,
          RETURNS(RefCountedPtrTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
 // void swift_unpin(void *ptr);
-FUNCTION(Unpin, swift_unpin, RuntimeCC,
+FUNCTION(NativeUnpin, swift_unpin, RuntimeCC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
@@ -159,128 +159,116 @@ FUNCTION(FixLifetime, swift_fixLifetime, RuntimeCC,
 // void swift_unknownRetain(void *ptr);
 FUNCTION(UnknownRetain, swift_unknownRetain, RuntimeCC,
          RETURNS(VoidTy),
-         ARGS(RefCountedPtrTy),
+         ARGS(UnknownRefCountedPtrTy),
          ATTRS(NoUnwind))
 
 // void swift_unknownRelease(void *ptr);
 FUNCTION(UnknownRelease, swift_unknownRelease, RuntimeCC,
          RETURNS(VoidTy),
-         ARGS(RefCountedPtrTy),
-         ATTRS(NoUnwind))
-
-
-// void swift_retainUnowned(void *ptr);
-FUNCTION(RetainUnowned,  swift_retainUnowned, RuntimeCC,
-         RETURNS(VoidTy),
-         ARGS(RefCountedPtrTy),
+         ARGS(UnknownRefCountedPtrTy),
          ATTRS(NoUnwind))
 
 // void *swift_bridgeObjectRetain(void *ptr);
-FUNCTION(BridgeObjectRetain, swift_bridgeObjectRetain, RuntimeCC,
+FUNCTION(BridgeObjectStrongRetain, swift_bridgeObjectRetain, RuntimeCC,
          RETURNS(BridgeObjectPtrTy),
          ARGS(BridgeObjectPtrTy),
          ATTRS(NoUnwind))
 
 // void swift_bridgeRelease(void *ptr);
-FUNCTION(BridgeObjectRelease, swift_bridgeObjectRelease, RuntimeCC,
+FUNCTION(BridgeObjectStrongRelease, swift_bridgeObjectRelease, RuntimeCC,
          RETURNS(VoidTy),
          ARGS(BridgeObjectPtrTy),
          ATTRS(NoUnwind))
 
 // error *swift_errorRetain(error *ptr);
-FUNCTION(ErrorRetain, swift_errorRetain, RuntimeCC,
+FUNCTION(ErrorStrongRetain, swift_errorRetain, RuntimeCC,
          RETURNS(ErrorPtrTy),
          ARGS(ErrorPtrTy),
          ATTRS(NoUnwind))
 
 // void swift_errorRelease(void *ptr);
-FUNCTION(ErrorRelease, swift_errorRelease, RuntimeCC,
+FUNCTION(ErrorStrongRelease, swift_errorRelease, RuntimeCC,
          RETURNS(VoidTy),
          ARGS(ErrorPtrTy),
          ATTRS(NoUnwind))
 
-// void swift_weakRetain(void *ptr);
-FUNCTION(UnownedRetain,  swift_weakRetain, RuntimeCC,
+// void swift_unownedRetain(void *ptr);
+FUNCTION(NativeUnownedRetain,  swift_unownedRetain, RuntimeCC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
-// void swift_weakRelease(void *ptr);
-FUNCTION(UnownedRelease, swift_weakRelease,RuntimeCC,
+// void swift_unownedRelease(void *ptr);
+FUNCTION(NativeUnownedRelease, swift_unownedRelease,RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unownedRetainStrong(void *ptr);
+FUNCTION(NativeStrongRetainUnowned, swift_unownedRetainStrong, RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unownedRetainStrongAndRelease(void *ptr);
+FUNCTION(NativeStrongRetainAndUnownedRelease,
+         swift_unownedRetainStrongAndRelease, RuntimeCC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
 // void swift_weakDestroy(WeakReference *object);
-FUNCTION(WeakDestroy,    swift_weakDestroy,   RuntimeCC,
+FUNCTION(NativeWeakDestroy,    swift_weakDestroy,   RuntimeCC,
          RETURNS(VoidTy),
          ARGS(WeakReferencePtrTy),
          ATTRS(NoUnwind))
 
 // void swift_weakInit(WeakReference *object, void *value);
-FUNCTION(WeakInit,       swift_weakInit,      RuntimeCC,
+FUNCTION(NativeWeakInit,       swift_weakInit,      RuntimeCC,
          RETURNS(VoidTy),
          ARGS(WeakReferencePtrTy, RefCountedPtrTy),
          ATTRS(NoUnwind))
 
 // void swift_weakAssign(WeakReference *object, void *value);
-FUNCTION(WeakAssign,     swift_weakAssign,    RuntimeCC,
+FUNCTION(NativeWeakAssign,     swift_weakAssign,    RuntimeCC,
          RETURNS(VoidTy),
          ARGS(WeakReferencePtrTy, RefCountedPtrTy),
          ATTRS(NoUnwind))
 
 // void *swift_weakLoadStrong(WeakReference *object);
-FUNCTION(WeakLoadStrong, swift_weakLoadStrong,RuntimeCC,
+FUNCTION(NativeWeakLoadStrong, swift_weakLoadStrong,RuntimeCC,
          RETURNS(RefCountedPtrTy),
          ARGS(WeakReferencePtrTy),
          ATTRS(NoUnwind))
 
 // void *swift_weakTakeStrong(WeakReference *object);
-FUNCTION(WeakTakeStrong, swift_weakTakeStrong,RuntimeCC,
+FUNCTION(NativeWeakTakeStrong, swift_weakTakeStrong,RuntimeCC,
          RETURNS(RefCountedPtrTy),
          ARGS(WeakReferencePtrTy),
          ATTRS(NoUnwind))
 
 // void swift_weakCopyInit(WeakReference *dest, WeakReference *src);
-FUNCTION(WeakCopyInit,   swift_weakCopyInit,  RuntimeCC,
+FUNCTION(NativeWeakCopyInit,   swift_weakCopyInit,  RuntimeCC,
          RETURNS(VoidTy),
          ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
          ATTRS(NoUnwind))
 
 // void swift_weakTakeInit(WeakReference *dest, WeakReference *src);
-FUNCTION(WeakTakeInit,   swift_weakTakeInit,  RuntimeCC,
+FUNCTION(NativeWeakTakeInit,   swift_weakTakeInit,  RuntimeCC,
          RETURNS(VoidTy),
          ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
          ATTRS(NoUnwind))
 
 // void swift_weakCopyAssign(WeakReference *dest, WeakReference *src);
-FUNCTION(WeakCopyAssign, swift_weakCopyAssign,RuntimeCC,
+FUNCTION(NativeWeakCopyAssign, swift_weakCopyAssign,RuntimeCC,
          RETURNS(VoidTy),
          ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
          ATTRS(NoUnwind))
 
 // void swift_weakTakeAssign(WeakReference *dest, WeakReference *src);
-FUNCTION(WeakTakeAssign, swift_weakTakeAssign,RuntimeCC,
+FUNCTION(NativeWeakTakeAssign, swift_weakTakeAssign,RuntimeCC,
          RETURNS(VoidTy),
          ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
-         ATTRS(NoUnwind))
-
-// void swift_unknownRetainUnowned(void *ptr);
-FUNCTION(UnknownRetainUnowned,  swift_unknownRetainUnowned, RuntimeCC,
-         RETURNS(VoidTy),
-         ARGS(RefCountedPtrTy),
-         ATTRS(NoUnwind))
-
-// void swift_unknownWeakRetain(void *value);
-FUNCTION(UnknownUnownedRetain,  swift_unknownWeakRetain,    RuntimeCC,
-         RETURNS(VoidTy),
-         ARGS(RefCountedPtrTy),
-         ATTRS(NoUnwind))
-
-// void swift_unknownWeakRelease(void *value);
-FUNCTION(UnknownUnownedRelease, swift_unknownWeakRelease,   RuntimeCC,
-         RETURNS(VoidTy),
-         ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
 // void swift_unknownWeakDestroy(WeakReference *object);
@@ -329,6 +317,84 @@ FUNCTION(UnknownWeakTakeInit,   swift_unknownWeakTakeInit,  RuntimeCC,
 FUNCTION(UnknownWeakCopyAssign, swift_unknownWeakCopyAssign,RuntimeCC,
          RETURNS(VoidTy),
          ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownWeakTakeAssign(WeakReference *dest, WeakReference *src);
+FUNCTION(UnknownWeakTakeAssign, swift_unknownWeakTakeAssign,RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownUnownedRetainStrong(void *object);
+FUNCTION(UnknownStrongRetainUnowned, swift_unknownUnownedRetainStrong,RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(UnknownRefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownUnownedRetain(void *object);
+FUNCTION(UnknownUnownedRetain,     swift_unknownUnownedRetain,    RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(UnknownRefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownUnownedRelease(void *object);
+FUNCTION(UnknownUnownedRelease,    swift_unknownUnownedRelease,   RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(UnknownRefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownUnownedDestroy(UnownedReference *object);
+FUNCTION(UnknownUnownedDestroy,    swift_unknownUnownedDestroy,   RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(UnownedReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownUnownedInit(UnownedReference *object, void *value);
+FUNCTION(UnknownUnownedInit,       swift_unknownUnownedInit,      RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(UnownedReferencePtrTy, UnknownRefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownUnownedAssign(UnownedReference *object, void *value);
+FUNCTION(UnknownUnownedAssign,     swift_unknownUnownedAssign,    RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(UnownedReferencePtrTy, UnknownRefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void *swift_unknownUnownedLoad(UnownedReference *object);
+FUNCTION(UnknownUnownedLoadStrong, swift_unknownUnownedLoadStrong,RuntimeCC,
+         RETURNS(UnknownRefCountedPtrTy),
+         ARGS(UnownedReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void *swift_unknownUnownedTake(UnownedReference *object);
+FUNCTION(UnknownUnownedTakeStrong, swift_unknownUnownedTakeStrong,RuntimeCC,
+         RETURNS(UnknownRefCountedPtrTy),
+         ARGS(UnownedReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownUnownedCopyInit(UnownedReference *dest, UnownedReference *src);
+FUNCTION(UnknownUnownedCopyInit,   swift_unknownUnownedCopyInit,  RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(UnownedReferencePtrTy, UnownedReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownUnownedTakeInit(UnownedReference *dest, UnownedReference *src);
+FUNCTION(UnknownUnownedTakeInit,   swift_unknownUnownedTakeInit,  RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(UnownedReferencePtrTy, UnownedReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownUnownedCopyAssign(UnownedReference *dest, UnownedReference *src);
+FUNCTION(UnknownUnownedCopyAssign, swift_unknownUnownedCopyAssign,RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(UnownedReferencePtrTy, UnownedReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownUnownedTakeAssign(UnownedReference *dest, UnownedReference *src);
+FUNCTION(UnknownUnownedTakeAssign, swift_unknownUnownedTakeAssign,RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(UnownedReferencePtrTy, UnownedReferencePtrTy),
          ATTRS(NoUnwind))
 
 // bool swift_isUniquelyReferencedNonObjC(const void *);
@@ -403,12 +469,6 @@ FUNCTION(IsUniquelyReferencedOrPinned_nonNull_native,
          RETURNS(Int1Ty),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind, ZExt))
-
-// void swift_unknownWeakTakeAssign(WeakReference *dest, WeakReference *src);
-FUNCTION(UnknownWeakTakeAssign, swift_unknownWeakTakeAssign,RuntimeCC,
-         RETURNS(VoidTy),
-         ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
-         ATTRS(NoUnwind))
 
 // Metadata *swift_getFunctionTypeMetadata(const void **args);
 FUNCTION(GetFunctionMetadata, swift_getFunctionTypeMetadata, RuntimeCC,

@@ -18,7 +18,7 @@ func doCompare<T : EqualComparable, U : EqualComparable>(t1: T, t2: T, u: U) -> 
   }
 
   return t1.isEqual(u) // expected-error {{cannot invoke 'isEqual' with an argument list of type '(U)'}}
-  // expected-note @-1 {{expected an argument list of type '(Self)'}}
+  // expected-note @-1 {{expected an argument list of type '(T)'}}
 }
 
 protocol MethodLessComparable {
@@ -38,7 +38,7 @@ func existential<T : EqualComparable, U : EqualComparable>(t1: T, t2: T, u: U) {
   var eqComp : EqualComparable = t1 // expected-error{{protocol 'EqualComparable' can only be used as a generic constraint}}
   eqComp = u
   if t1.isEqual(eqComp) {} // expected-error{{cannot invoke 'isEqual' with an argument list of type '(EqualComparable)'}}
-  // expected-note @-1 {{expected an argument list of type '(Self)'}}
+  // expected-note @-1 {{expected an argument list of type '(T)'}}
   if eqComp.isEqual(t2) {} // expected-error{{member 'isEqual' cannot be used on value of protocol type 'EqualComparable'; use a generic constraint instead}}
 }
 
@@ -172,7 +172,7 @@ func staticEqCheck<T : StaticEq, U : StaticEq>(t: T, u: U) {
   if T.isEqual(t, y: t) { return }
   if U.isEqual(u, y: u) { return }
   T.isEqual(t, y: u) // expected-error{{cannot invoke 'isEqual' with an argument list of type '(T, y: U)'}}
-  // expected-note @-1 {{expected an argument list of type '(Self, y: Self)'}}
+  // expected-note @-1 {{expected an argument list of type '(T, y: T)'}}
 }
 
 //===----------------------------------------------------------------------===//

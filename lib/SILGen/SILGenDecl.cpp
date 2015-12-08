@@ -239,8 +239,8 @@ public:
   /// CleanupUninitializedBox cleanup that will be replaced when
   /// initialization is completed.
   LocalVariableInitialization(VarDecl *decl, bool NeedsMarkUninit,
-                              SILGenFunction &SGF)
-    : decl(decl), SGF(SGF) {
+                              unsigned ArgNo, SILGenFunction &SGF)
+      : decl(decl), SGF(SGF) {
     assert(decl->getDeclContext()->isLocalContext() &&
            "can't emit a local var for a non-local var decl");
     assert(decl->hasStorage() && "can't emit storage for a computed variable");
@@ -250,7 +250,7 @@ public:
 
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
-    AllocBoxInst *allocBox = SGF.B.createAllocBox(decl, lType);
+    AllocBoxInst *allocBox = SGF.B.createAllocBox(decl, lType, ArgNo);
     auto box = SILValue(allocBox, 0);
     auto addr = SILValue(allocBox, 1);
 
@@ -995,7 +995,7 @@ SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
 
 
 /// Emit the boolean test and/or pattern bindings indicated by the specified
-/// stmt condition.  If the condition fails, control flow is transfered to the
+/// stmt condition.  If the condition fails, control flow is transferred to the
 /// specified JumpDest.  The insertion point is left in the block where the
 /// condition has matched and any bound variables are in scope.
 ///
@@ -1157,9 +1157,10 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
     auto ed = cast<EnumDecl>(d);
     // Emit the enum cases and derived conformance methods for the type.
     for (auto member : ed->getMembers()) {
-      if (auto elt = dyn_cast<EnumElementDecl>(member))
-        emitEnumConstructor(elt);
-      else if (auto func = dyn_cast<FuncDecl>(member))
+      if (auto elt = dyn_cast<EnumElementDecl>(member)) {
+        if (elt->hasArgumentType())
+          emitEnumConstructor(elt);
+      } else if (auto func = dyn_cast<FuncDecl>(member))
         emitFunction(func);
       else if (auto ctor = dyn_cast<ConstructorDecl>(member))
         emitConstructor(ctor);
@@ -1215,10 +1216,11 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
 }
 
 /// Create a LocalVariableInitialization for the uninitialized var.
-InitializationPtr SILGenFunction::
-emitLocalVariableWithCleanup(VarDecl *vd, bool NeedsMarkUninit) {
-  return InitializationPtr(new LocalVariableInitialization(vd, NeedsMarkUninit,
-                                                           *this));
+InitializationPtr
+SILGenFunction::emitLocalVariableWithCleanup(VarDecl *vd, bool NeedsMarkUninit,
+                                             unsigned ArgNo) {
+  return InitializationPtr(
+      new LocalVariableInitialization(vd, NeedsMarkUninit, ArgNo, *this));
 }
 
 /// Create an Initialization for an uninitialized temporary.
@@ -1763,16 +1765,11 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   if (witness.isAlwaysInline())
     InlineStrategy = AlwaysInline;
 
-  auto *f = SILFunction::create(M, linkage, nameBuffer,
-                                witnessSILType.castTo<SILFunctionType>(),
-                                witnessContextParams,
-                                SILLocation(witness.getDecl()),
-                                IsNotBare,
-                                IsTransparent,
-                                makeModuleFragile ? IsFragile : IsNotFragile,
-                                IsThunk,
-                                SILFunction::NotRelevant,
-                                InlineStrategy);
+  auto *f = M.getOrCreateFunction(
+      linkage, nameBuffer, witnessSILType.castTo<SILFunctionType>(),
+      witnessContextParams, SILLocation(witness.getDecl()), IsNotBare,
+      IsTransparent, makeModuleFragile ? IsFragile : IsNotFragile, IsThunk,
+      SILFunction::NotRelevant, InlineStrategy);
 
   f->setDebugScope(new (M)
                    SILDebugScope(RegularLocation(witness.getDecl()), *f));

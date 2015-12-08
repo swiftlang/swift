@@ -78,6 +78,18 @@ ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &gen,
   }
 }
 
+
+ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &gen,
+                                              AbstractionPattern origFormalType,
+                                              SGFContext C) && {
+  auto loc = getLocation();
+  auto substFormalType = getSubstType();
+  ManagedValue outputValue = std::move(*this).getAsSingleValue(gen);
+  return gen.emitSubstToOrigValue(loc,
+                                  outputValue, origFormalType,
+                                  substFormalType, C);
+}
+
 void ArgumentSource::forwardInto(SILGenFunction &gen, Initialization *dest) && {
   assert(!isLValue());
   if (isRValue()) {
@@ -152,12 +164,10 @@ void ArgumentSource::forwardInto(SILGenFunction &SGF,
 
   // Otherwise, emit as a single independent value.
   SILLocation loc = getLocation();
-  ManagedValue inputValue = std::move(*this).getAsSingleValue(SGF);
-
-  // Reabstract.
   ManagedValue outputValue =
-    SGF.emitSubstToOrigValue(loc, inputValue, origFormalType,
-                             substFormalType, SGFContext(dest));
+      std::move(*this).getAsSingleValue(SGF, origFormalType,
+                                        SGFContext(dest));
+
   if (outputValue.isInContext()) return;
 
   // Use RValue's forward-into-initialization code.  We have to lie to

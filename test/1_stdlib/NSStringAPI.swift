@@ -679,7 +679,7 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
 NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
   var s = "abc あかさた"
   if true {
-    // The largest buffer that can not accomodate the string plus null terminator.
+    // The largest buffer that can not accommodate the string plus null terminator.
     let bufferLength = 16
     var buffer = Array(
       count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
@@ -1190,7 +1190,7 @@ NSStringAPIs.test("rangeOfString(_:options:range:locale:)") {
     // grapheme cluster boundaries -- these can not be created with public
     // String interface.
     //
-    // FIXME: why does this seach succeed and the above queries fail?  There is
+    // FIXME: why does this search succeed and the above queries fail?  There is
     // no apparent pattern.
     expectEqual("\u{3099}", s[s.rangeOfString("\u{3099}")!])
   }

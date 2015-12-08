@@ -736,18 +736,19 @@ bb1:
   return %5 : $()
 }
 
-sil @unbalanced_closure : $@convention(thin) (Builtin.Int32) -> ()
+sil @unbalanced_closure : $@convention(thin) (@guaranteed B) -> ()
 
 // CHECK-LABEL: sil @partial_apply_unbalanced_retain_release
-sil @partial_apply_unbalanced_retain_release : $@convention(thin) (Builtin.Int32) -> () {
+sil @partial_apply_unbalanced_retain_release : $@convention(thin) (@owned B) -> () {
 // CHECK: bb0
-bb0(%0 : $Builtin.Int32):
-  %1 = function_ref @unbalanced_closure : $@convention(thin) (Builtin.Int32) -> ()
-// CHECK: partial_apply
-  %2 = partial_apply %1(%0) : $@convention(thin) (Builtin.Int32) -> ()
+bb0(%0 : $B):
+  %1 = function_ref @unbalanced_closure : $@convention(thin) (@guaranteed B) -> ()
+// CHECK-NOT: partial_apply
+  %2 = partial_apply %1(%0) : $@convention(thin) (@guaranteed B) -> ()
+// Check that the arguments of the closure are released after its last use
+// CHECK-NEXT: strong_release %0 : $B
   strong_retain %2 : $@callee_owned () -> ()
-  %4 = builtin "int_trap"() : $()
-// CHECK: unreachable
+// CHECK-NEXT: unreachable
   unreachable
 }
 
@@ -2837,7 +2838,7 @@ sil @closure_with_in_guaranteed_owened_in_args : $@convention(method) (@in CC2, 
 // Test the peephole performing apply{partial_apply(x,y,z)}(a) -> apply(a,x,y,z)
 // We need to check the following:
 // - all arguments of a partial_apply, which are either results of a stack_alloc or consumed indirect arguments
-//  should be copied into temporaries. This should happen just before tha partial_apply instruction.
+//  should be copied into temporaries. This should happen just before that partial_apply instruction.
 // - The temporaries are allocated at the beginning of the function and deallocated at the end.
 // - Before each apply of the partial_apply, we retain values of any arguments which are of non-address type.
 //   This is required because they could be consumed (i.e. relased by the callee).
@@ -2992,3 +2993,29 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   return %90 : $()
 }
 
+// CHECK-LABEL: sil @enum_promotion_case3
+// CHECK: bb0([[B_PTR:%[0-9]+]]
+// CHECK-NEXT: [[ALLOCA:%[0-9]+]] = alloc_stack $FakeOptional<B>
+// CHECK-NEXT: strong_release [[B_PTR]]
+// CHECK-NEXT: [[ENUM:%[0-9]+]] = enum $FakeOptional<B>, #FakeOptional.Some!enumelt.1, [[B_PTR]] : $B
+// CHECK-NEXT: store [[ENUM]] to [[ALLOCA]]#1 : $*FakeOptional<B>
+// CHECK-NEXT: [[RESULT:%[0-9]+]] = load [[ALLOCA:%[0-9]+]]#1
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: strong_release [[B_PTR]]
+// CHECK-NEXT: return [[RESULT]]
+sil @enum_promotion_case3 : $@convention(thin) (@owned B) -> @owned FakeOptional<B> {
+bb0(%0 : $B):
+  %2 = alloc_stack $FakeOptional<B>
+  %3 = init_enum_data_addr %2#1 : $*FakeOptional<B>, #FakeOptional.Some!enumelt.1
+  store %0 to %3 : $*B
+
+  // This instruction between the store and the inject_enum_addr should not prevent
+  // the optimization.
+  strong_release %0 : $B
+
+  inject_enum_addr %2#1 : $*FakeOptional<B>, #FakeOptional.Some!enumelt.1
+  %7 = load %2#1 : $*FakeOptional<B>
+  dealloc_stack %2#0 : $*@local_storage FakeOptional<B>
+  strong_release %0 : $B
+  return %7 : $FakeOptional<B>
+}

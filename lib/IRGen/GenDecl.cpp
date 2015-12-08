@@ -743,7 +743,7 @@ void IRGenModuleDispatcher::emitGlobalTopLevel() {
 }
 
 void IRGenModule::finishEmitAfterTopLevel() {
-  // Emit the implicit import of the swift standard libary.
+  // Emit the implicit import of the swift standard library.
   if (DebugInfo) {
     std::pair<swift::Identifier, swift::SourceLoc> AccessPath[] = {
       { Context.StdlibModuleName, swift::SourceLoc() }

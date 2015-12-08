@@ -1095,7 +1095,7 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
   CI.performSema();
 
   // NOTE: performSema() may end up with some gruesome error preventing it from
-  // setting primary flie correctly
+  // setting primary file correctly
   if (!CI.getPrimarySourceFile()) {
     IdxConsumer.failed("no primary source file found");
     return;

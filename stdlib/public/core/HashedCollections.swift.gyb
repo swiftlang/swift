@@ -53,7 +53,7 @@ import SwiftShims
 // does not use tombstones.
 //
 // In addition to the native storage `Dictionary` can also wrap an
-// `NSDictionary` in order to allow brdidging `NSDictionary` to `Dictionary` in
+// `NSDictionary` in order to allow bridging `NSDictionary` to `Dictionary` in
 // `O(1)`.
 //
 // Currently native storage uses a data structure like this::
@@ -1075,7 +1075,7 @@ public struct Dictionary<Key : Hashable, Value> :
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`count`).
+  /// - Complexity: O(`self.count`).
   public mutating func removeAtIndex(index: Index) -> Element {
     return _variantStorage.removeAtIndex(index)
   }
@@ -1098,7 +1098,7 @@ public struct Dictionary<Key : Hashable, Value> :
   ///   storage capacity that the collection has, otherwise the underlying
   ///   storage is released.  The default is `false`.
   ///
-  /// Complexity: O(`count`).
+  /// Complexity: O(`self.count`).
   public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
     // The 'will not decrease' part in the documentation comment is worded very
     // carefully.  The capacity can increase if we replace Cocoa storage with

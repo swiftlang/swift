@@ -588,15 +588,13 @@ extension SequenceType where Generator.Element : Equatable {
 extension SequenceType {
   /// Returns a subsequence containing all but the first element.
   ///
-  /// - Requires: `n >= 0`
-  /// - Complexity: O(`n`)
+  /// - Complexity: O(1)
   @warn_unused_result
   public func dropFirst() -> SubSequence { return dropFirst(1) }
 
   /// Returns a subsequence containing all but the last element.
   ///
   /// - Requires: `self` is a finite sequence.
-  /// - Requires: `n >= 0`
   /// - Complexity: O(`self.count`)
   @warn_unused_result
   public func dropLast() -> SubSequence  { return dropLast(1) }

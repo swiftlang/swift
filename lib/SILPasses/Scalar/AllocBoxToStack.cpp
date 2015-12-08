@@ -278,7 +278,7 @@ static SILArgument *getParameterForOperand(SILFunction *F, Operand *O) {
 }
 
 /// Return a pointer to the SILFunction called by Call if we can
-/// determine which funciton that is, and we have a body for that
+/// determine which function that is, and we have a body for that
 /// function. Otherwise return nullptr.
 static SILFunction *getFunctionBody(SILInstruction *Call) {
   if (auto *FRI = getDirectCallee(Call))
@@ -305,7 +305,7 @@ static bool partialApplyArgumentEscapes(Operand *O) {
 
 /// checkPartialApplyBody - Check the body of a partial apply to see
 /// if the box pointer argument passed to it has uses that would
-/// disqualify it from being protmoted to a stack location.  Return
+/// disqualify it from being promoted to a stack location.  Return
 /// true if this partial apply will not block our promoting the box.
 static bool checkPartialApplyBody(Operand *O) {
   SILFunction *F = getFunctionBody(O->getUser());
@@ -401,11 +401,12 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
     return false;
 
   // Promote this alloc_box to an alloc_stack. Insert the alloc_stack
-  // at the beginning of the funtion.
+  // at the beginning of the function.
   auto &Entry = ABI->getFunction()->front();
   SILBuilder BuildAlloc(&Entry, Entry.begin());
   BuildAlloc.setCurrentDebugScope(ABI->getDebugScope());
-  auto *ASI = BuildAlloc.createAllocStack(ABI->getLoc(), ABI->getElementType());
+  auto *ASI = BuildAlloc.createAllocStack(ABI->getLoc(), ABI->getElementType(),
+                                          ABI->getVarInfo().getArgNo());
 
   // Replace all uses of the address of the box's contained value with
   // the address of the stack location.
@@ -418,7 +419,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
   for (auto UI : ASI->getAddressResult().getUses())
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(UI->getUser())) {
       assert(ASI->getAddressResult().hasOneUse() &&
-             "alloc_stack used by mark_uninialized, but not exclusively!");
+             "alloc_stack used by mark_uninitialized, but not exclusively!");
       PointerResult = MUI;
       break;
     }
@@ -548,13 +549,11 @@ DeadParamCloner::initCloned(SILFunction *Orig,
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getDebugScope())
          && "SILFunction missing DebugScope");
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
-  auto Fn =
-      SILFunction::create(M, SILLinkage::Shared, ClonedName, ClonedTy,
-                          Orig->getContextGenericParams(), Orig->getLocation(),
-                          Orig->isBare(), IsNotTransparent, Orig->isFragile(),
-                          Orig->isThunk(),
-                          Orig->getClassVisibility(), Orig->getInlineStrategy(),
-                          Orig->getEffectsKind(), Orig, Orig->getDebugScope());
+  auto *Fn = M.getOrCreateFunction(
+      SILLinkage::Shared, ClonedName, ClonedTy, Orig->getContextGenericParams(),
+      Orig->getLocation(), Orig->isBare(), IsNotTransparent, Orig->isFragile(),
+      Orig->isThunk(), Orig->getClassVisibility(), Orig->getInlineStrategy(),
+      Orig->getEffectsKind(), Orig, Orig->getDebugScope());
   Fn->setSemanticsAttr(Orig->getSemanticsAttr());
   Fn->setDeclCtx(Orig->getDeclContext());
   return Fn;
@@ -599,7 +598,7 @@ DeadParamCloner::populateCloned() {
 }
 
 /// \brief Handle a strong_release instruction during cloning of a closure; if
-/// it is a strong release of a promoted box argument, then it is replaced wit
+/// it is a strong release of a promoted box argument, then it is replaced with
 /// a ReleaseValue of the new object type argument, otherwise it is handled
 /// normally.
 void

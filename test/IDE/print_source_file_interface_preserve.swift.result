@@ -1,0 +1,12 @@
+
+public protocol Prot {
+}
+
+public struct Yoda<
+  Base : GeneratorType
+> : Prot {
+
+    public func down<U>(
+      p: Array<U>
+    ) -> Array<U>
+}

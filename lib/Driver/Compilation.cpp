@@ -262,6 +262,8 @@ int Compilation::performJobsImpl() {
       return;
     }
 
+    assert(Cmd->getExtraEnvironment().empty() &&
+           "not implemented for compilations with multiple jobs");
     State.ScheduledCommands.insert(Cmd);
     TQ->addTask(Cmd->getExecutable(), Cmd->getArguments(), llvm::None,
                 (void *)Cmd);
@@ -497,7 +499,7 @@ int Compilation::performJobsImpl() {
     Diags.diagnose(SourceLoc(), diag::error_command_signalled,
                    SignalledCmd->getSource().getClassName());
 
-    // Since the task signalled, so unconditionally set result to -2.
+    // Since the task signalled, unconditionally set result to -2.
     Result = -2;
 
     return TaskFinishedResponse::StopExecution;
@@ -583,6 +585,9 @@ int Compilation::performSingleCommand(const Job *Cmd) {
 
   const char *ExecPath = Cmd->getExecutable();
   const char **argv = Argv.data();
+
+  for (auto &envPair : Cmd->getExtraEnvironment())
+    setenv(envPair.first, envPair.second, /*replacing=*/true);
 
   return ExecuteInPlace(ExecPath, argv);
 }

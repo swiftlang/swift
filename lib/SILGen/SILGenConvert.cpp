@@ -30,9 +30,8 @@
 using namespace swift;
 using namespace Lowering;
 
-// FIXME: need to sit down and abstract away differences between
-// SGF::emitInjectOptionalInto(), SGF::emitInjectOptionalValueInto(),
-// SGF::getOptionalSomeValue(), and this function...
+// FIXME: With some changes to their callers, all of the below functions
+// could be re-worked to use emitInjectEnum().
 ManagedValue
 SILGenFunction::emitInjectOptional(SILLocation loc,
                                    ManagedValue v,

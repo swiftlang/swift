@@ -354,7 +354,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       }
     }
 
-    // Substitute the the base into the member's type.
+    // Substitute the base into the member's type.
     if (Type memberType = substMemberTypeWithBase(dc->getParentModule(),
                                                   typeDecl, type,
                                                   /*isTypeReference=*/true)) {

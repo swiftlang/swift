@@ -168,7 +168,13 @@ public:
 
   MemoryBehavior getMemoryBehavior() const;
   ReleasingBehavior getReleasingBehavior() const;
+
+  /// Returns true if the instruction may release any object.
   bool mayRelease() const;
+
+  /// Returns true if the instruction may release or may read the reference
+  /// count of any object.
+  bool mayReleaseOrReadRefCount() const;
 
   /// Can this instruction abort the program in some manner?
   bool mayTrap() const;
@@ -316,12 +322,25 @@ public:
   typename std::enable_if<has_result<X>::value, SILType>::type
   getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }\
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == KIND;
   }
+};
+
+
+/// Holds common debug information about local variables and function
+/// arguments that are needed by DebugValueInst, DebugValueAddrInst,
+/// AllocStackInst, and AllocBoxInst.
+class DebugVariable {
+  /// The source function argument position from left to right
+  /// starting with 1 or 0 if this is a local variable.
+  unsigned char ArgNo;
+public:
+  DebugVariable(unsigned ArgNo) : ArgNo(ArgNo) {};
+  unsigned getArgNo() const { return ArgNo; }
 };
 
 //===----------------------------------------------------------------------===//
@@ -368,14 +387,19 @@ public:
 /// reference count) stack memory.  The memory is provided uninitialized.
 class AllocStackInst : public AllocationInst {
   friend class SILBuilder;
+  DebugVariable VarInfo;
 
-  AllocStackInst(SILDebugLocation *Loc, SILType elementType, SILFunction &F);
+  AllocStackInst(SILDebugLocation *Loc, SILType elementType, SILFunction &F,
+                 unsigned ArgNo);
 
 public:
 
   /// getDecl - Return the underlying variable declaration associated with this
   /// allocation, or null if this is a temporary allocation.
   VarDecl *getDecl() const;
+
+  DebugVariable getVarInfo() const { return VarInfo; };
+  void setArgNo(unsigned N) { VarInfo = DebugVariable(N); }
 
   /// getElementType - Get the type of the allocated memory (as opposed to the
   /// (second) type of the instruction itself, which will be an address type).
@@ -463,7 +487,10 @@ public:
 class AllocBoxInst : public AllocationInst {
   friend class SILBuilder;
 
-  AllocBoxInst(SILDebugLocation *DebugLoc, SILType ElementType, SILFunction &F);
+  DebugVariable VarInfo;
+
+  AllocBoxInst(SILDebugLocation *DebugLoc, SILType ElementType, SILFunction &F,
+               unsigned ArgNo);
 
 public:
 
@@ -477,6 +504,8 @@ public:
   /// getDecl - Return the underlying variable declaration associated with this
   /// allocation, or null if this is a temporary allocation.
   VarDecl *getDecl() const;
+
+  DebugVariable getVarInfo() const { return VarInfo; };
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }
@@ -1341,14 +1370,16 @@ public:
 /// types).
 class DebugValueInst : public UnaryInstructionBase<ValueKind::DebugValueInst> {
   friend class SILBuilder;
+  DebugVariable VarInfo;
 
-  DebugValueInst(SILDebugLocation *DebugLoc, SILValue Operand)
-      : UnaryInstructionBase(DebugLoc, Operand) {}
+  DebugValueInst(SILDebugLocation *DebugLoc, SILValue Operand, unsigned ArgNo)
+      : UnaryInstructionBase(DebugLoc, Operand), VarInfo(ArgNo) {}
 
 public:
   /// getDecl - Return the underlying variable declaration that this denotes,
   /// or null if we don't have one.
   VarDecl *getDecl() const;
+  DebugVariable getVarInfo() const { return VarInfo; }
 };
 
 /// Define the start or update to a symbolic variable value (for address-only
@@ -1356,14 +1387,17 @@ public:
 class DebugValueAddrInst
   : public UnaryInstructionBase<ValueKind::DebugValueAddrInst> {
   friend class SILBuilder;
+  DebugVariable VarInfo;
 
-  DebugValueAddrInst(SILDebugLocation *DebugLoc, SILValue Operand)
-      : UnaryInstructionBase(DebugLoc, Operand) {}
+  DebugValueAddrInst(SILDebugLocation *DebugLoc, SILValue Operand,
+                     unsigned ArgNo)
+      : UnaryInstructionBase(DebugLoc, Operand), VarInfo(ArgNo) {}
 
 public:
   /// getDecl - Return the underlying variable declaration that this denotes,
   /// or null if we don't have one.
   VarDecl *getDecl() const;
+  DebugVariable getVarInfo() const { return VarInfo; }
 };
 
 
@@ -4317,6 +4351,43 @@ public:
   void setArgument(unsigned i, SILValue V) const {
     getArgumentOperands()[i].set(V);
   }
+
+  /// Return the self argument passed to this instruction.
+  bool hasSelfArgument() const {
+    switch (Inst->getKind()) {
+    case ValueKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->hasSelfArgument();
+    case ValueKind::TryApplyInst:
+      return cast<TryApplyInst>(Inst)->hasSelfArgument();
+    default:
+      llvm_unreachable("not implemented for this instruction!");
+    }
+  }
+
+  /// Return the self argument passed to this instruction.
+  SILValue getSelfArgument() const {
+    switch (Inst->getKind()) {
+    case ValueKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->getSelfArgument();
+    case ValueKind::TryApplyInst:
+      return cast<TryApplyInst>(Inst)->getSelfArgument();
+    default:
+      llvm_unreachable("not implemented for this instruction!");
+    }
+  }
+
+  /// Return the self operand passed to this instruction.
+  Operand &getSelfArgumentOperand() {
+    switch (Inst->getKind()) {
+    case ValueKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->getSelfArgumentOperand();
+    case ValueKind::TryApplyInst:
+      return cast<TryApplyInst>(Inst)->getSelfArgumentOperand();
+    default:
+      llvm_unreachable("not implemented for this instruction!");
+    }
+  }
+
 #undef FOREACH_IMPL_RETURN
 
   static ApplySite getFromOpaqueValue(void *p) {

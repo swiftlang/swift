@@ -176,7 +176,7 @@ How do we measure progress?
 
 The proposed change is a major architectural shift, and it's only complete when we have eliminated all ad hoc recursion from the front end. There are a few ways in which we can measure progress along the way:
 
-**AST nodes that implement the phase-aware trait**: Eventually, all of our AST nodes will implement the phase-aware trait. The number of AST nodes that do properly implement that trait (reporting current phase, enumerating dependencies for a phase transition) and become part of the dependency graph and priorty queue gives an indication of how far we've gotten.
+**AST nodes that implement the phase-aware trait**: Eventually, all of our AST nodes will implement the phase-aware trait. The number of AST nodes that do properly implement that trait (reporting current phase, enumerating dependencies for a phase transition) and become part of the dependency graph and priority queue gives an indication of how far we've gotten.
 
 **Accessors that check the current phase**: When we're finished, each of the AST's accessors should assert that the AST node is in the appropriate phase. The number of such assertions that have been enabled is an indication of how well the type checker is respecting the dependencies.
 

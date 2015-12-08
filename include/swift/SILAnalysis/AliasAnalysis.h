@@ -13,15 +13,33 @@
 #ifndef SWIFT_SILANALYSIS_ALIASANALYSIS_H
 #define SWIFT_SILANALYSIS_ALIASANALYSIS_H
 
+#include "swift/Basic/ValueEnumerator.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILAnalysis/Analysis.h"
 #include "swift/SILAnalysis/SideEffectAnalysis.h"
 #include "llvm/ADT/DenseMap.h"
 
+namespace {
+  /// A cache for AliasAnalysis.
+  /// This struct represents the argument list to the method 'alias'.
+  /// The two SILValue pointers are mapped to size_t indices because we need
+  /// an efficient way to invalidate them (the mechanism is described below).
+  /// The Type arguments are translated to void* because their
+  /// underlying storage is opaque pointers that never goes away.
+  struct AliasKeyTy {
+    // The SILValue pair:
+    size_t V1, V2;
+    unsigned ResultNo1, ResultNo2;
+    // The TBAAType pair:
+    void *T1, *T2;
+  };
+}
+
 namespace swift {
 
 class SILValue;
 class SILInstruction;
+class ValueBase;
 class SideEffectAnalysis;
 
 /// This class is a simple wrapper around an alias analysis cache. This is
@@ -68,6 +86,16 @@ private:
   /// never change.
   llvm::DenseMap<TBAACacheKey, bool> TypesMayAliasCache;
 
+  /// AliasAnalysis value cache.
+  /// The alias() method uses this map to cache queries.
+  llvm::DenseMap<AliasKeyTy, AliasResult> AliasCache;
+
+  /// The AliasAnalysis cache can't directly map a pair of ValueBase pointers
+  /// to alias results because we'd like to be able to remove deleted pointers
+  /// without having to scan the whole map. So, instead of storing pointers
+  /// we map pointers to indices and store the indices.
+  ValueEnumerator<ValueBase*> ValueBaseToIndex;
+
   using MemoryBehavior = SILInstruction::MemoryBehavior;
 
   AliasResult aliasAddressProjection(SILValue V1, SILValue V2,
@@ -81,6 +109,17 @@ private:
   /// Returns True if memory of type \p T1 and \p T2 may alias.
   bool typesMayAlias(SILType T1, SILType T2);
 
+
+  virtual void handleDeleteNotification(ValueBase *I) override {
+    // The pointer I is going away.  We can't scan the whole cache and remove
+    // all of the occurrences of the pointer. Instead we remove the pointer
+    // from the cache the translates pointers to indices.
+    ValueBaseToIndex.invalidateValue(I);
+  }
+
+  virtual bool needsNotifications() override { return true; }
+
+
 public:
   AliasAnalysis(SILModule *M) :
     SILAnalysis(AnalysisKind::Alias), Mod(M), SEA(nullptr) {}
@@ -89,7 +128,7 @@ public:
     return S->getKind() == AnalysisKind::Alias;
   }
   
-  virtual void initialize(SILPassManager *PM);
+  virtual void initialize(SILPassManager *PM) override;
   
   /// Perform an alias query to see if V1, V2 refer to the same values.
   AliasResult alias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
@@ -168,12 +207,21 @@ public:
     return MemoryBehavior::MayHaveSideEffects == B;
   }
 
-  virtual void invalidate(SILAnalysis::InvalidationKind K) { }
+  /// Encodes the alias query as a AliasKeyTy.
+  /// The parameters to this function are identical to the parameters of alias()
+  /// and this method serializes them into a key for the alias analysis cache.
+  AliasKeyTy toAliasKey(SILValue V1, SILValue V2, SILType Type1, SILType Type2);
 
-  virtual void invalidate(SILFunction *, SILAnalysis::InvalidationKind K) {
+  virtual void invalidate(SILAnalysis::InvalidationKind K) override {
+    AliasCache.clear();
+  }
+
+  virtual void invalidate(SILFunction *,
+                          SILAnalysis::InvalidationKind K) override {
     invalidate(K);
   }
 };
+
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
                               AliasAnalysis::AliasResult R);
@@ -187,5 +235,36 @@ SILType computeTBAAType(SILValue V);
 bool isLetPointer(SILValue V);
 
 } // end namespace swift
+
+namespace llvm {
+  template <> struct llvm::DenseMapInfo<AliasKeyTy> {
+    static inline AliasKeyTy getEmptyKey() {
+      auto Allone = std::numeric_limits<size_t>::max();
+      return {Allone, Allone, 0xffff, 0xffff, nullptr, nullptr};
+    }
+    static inline AliasKeyTy getTombstoneKey() {
+      auto Allone = std::numeric_limits<size_t>::max();
+      return {Allone, Allone, 0xff, 0xff, nullptr, nullptr};
+    }
+    static unsigned getHashValue(const AliasKeyTy Val) {
+      unsigned H = 0;
+      H ^= DenseMapInfo<size_t>::getHashValue(Val.V1);
+      H ^= DenseMapInfo<size_t>::getHashValue(Val.V2);
+      H ^= DenseMapInfo<unsigned>::getHashValue(Val.ResultNo1);
+      H ^= DenseMapInfo<unsigned>::getHashValue(Val.ResultNo2);
+      H ^= DenseMapInfo<void *>::getHashValue(Val.T1);
+      H ^= DenseMapInfo<void *>::getHashValue(Val.T2);
+      return H;
+    }
+    static bool isEqual(const AliasKeyTy LHS, const AliasKeyTy RHS) {
+      return LHS.V1 == RHS.V1 &&
+             LHS.V2 == RHS.V2 &&
+             LHS.ResultNo1 == RHS.ResultNo1 &&
+             LHS.ResultNo2 == RHS.ResultNo2 &&
+             LHS.T1 == RHS.T1 &&
+             LHS.T2 == RHS.T2;
+    }
+  };
+}
 
 #endif
