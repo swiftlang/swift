@@ -508,17 +508,34 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
 //                          Owned Argument Utilities
 //===----------------------------------------------------------------------===//
 
-ConsumedArgToEpilogueReleaseMatcher::
-ConsumedArgToEpilogueReleaseMatcher(RCIdentityFunctionInfo *RCIA,
-                                    SILFunction *F) {
-  // Find the return BB of F. If we fail, then bail.
-  auto ReturnBB = F->findReturnBB();
-  if (ReturnBB != F->end())
-    findMatchingReleases(RCIA, &*ReturnBB);
+ConsumedArgToEpilogueReleaseMatcher::ConsumedArgToEpilogueReleaseMatcher(
+    RCIdentityFunctionInfo *RCFI, SILFunction *F, ExitKind Kind)
+    : F(F), RCFI(RCFI), Kind(Kind) {
+  recompute();
 }
 
-void ConsumedArgToEpilogueReleaseMatcher::
-findMatchingReleases(RCIdentityFunctionInfo *RCIA, SILBasicBlock *BB) {
+void ConsumedArgToEpilogueReleaseMatcher::recompute() {
+  // Find the return BB of F. If we fail, then bail.
+  SILFunction::iterator BB;
+  switch (Kind) {
+  case ExitKind::Return:
+    BB = F->findReturnBB();
+    break;
+  case ExitKind::Throw:
+    BB = F->findThrowBB();
+    break;
+  }
+
+  if (BB == F->end()) {
+    HasBlock = false;
+    return;
+  }
+  HasBlock = true;
+  findMatchingReleases(&*BB);
+}
+
+void ConsumedArgToEpilogueReleaseMatcher::findMatchingReleases(
+    SILBasicBlock *BB) {
   for (auto II = std::next(BB->rbegin()), IE = BB->rend();
        II != IE; ++II) {
     // If we do not have a release_value or strong_release...
@@ -536,7 +553,7 @@ findMatchingReleases(RCIdentityFunctionInfo *RCIA, SILBasicBlock *BB) {
     // Ok, we have a release_value or strong_release. Grab Target and find the
     // RC identity root of its operand.
     SILInstruction *Target = &*II;
-    SILValue Op = RCIA->getRCIdentityRoot(Target->getOperand(0));
+    SILValue Op = RCFI->getRCIdentityRoot(Target->getOperand(0));
 
     // If Op is not a consumed argument, we must break since this is not an Op
     // that is a part of a return sequence. We are being conservative here since
