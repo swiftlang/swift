@@ -42,8 +42,8 @@ f1(
    ) 
 
 // Tuple element unused.
-f0(i, i, // expected-error{{extra argument in call}}
-   i)
+f0(i, i,
+   i) // expected-error{{extra argument in call}}
 
 
 // Position mismatch
@@ -362,7 +362,7 @@ extension CurriedClass {
     method3(1, b: 2)
     method3()            // expected-error {{missing argument for parameter #1 in call}}
     method3(42)          // expected-error {{cannot convert value of type 'Int' to expected argument type '(Int, b: Int)'}}
-    method3(self)        // expected-error {{missing argument for parameter 'b' in call}}
+    method3(self)        // expected-error {{cannot convert value of type 'CurriedClass' to expected argument type '(Int, b: Int)'}}
   }
 }
 

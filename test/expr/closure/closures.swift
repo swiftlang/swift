@@ -38,7 +38,7 @@ func funcdecl5(a: Int, _ y: Int) {
 
   var testfunc : ((), Int) -> Int
   testfunc(          
-           {$0+1})  // expected-error {{missing argument for parameter #2 in call}}
+           {$0+1})  // expected-error {{cannot convert value of type '(Int) -> Int' to expected argument type '((), Int)'}}
 
   funcdecl5(1, 2) // recursion.
 

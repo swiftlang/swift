@@ -643,45 +643,12 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
     // FIXME: diagnose other cases
     return false;
 
-  case Failure::MissingArgument: {
-    Identifier name;
-    unsigned idx = failure.getValue();
-    if (auto tupleTy = failure.getFirstType()->getAs<TupleType>()) {
-      name = tupleTy->getElement(idx).getName();
-    } else {
-      // Scalar.
-      assert(idx == 0);
-    }
-
-    if (name.empty())
-      tc.diagnose(loc, diag::missing_argument_positional, idx+1);
-    else
-      tc.diagnose(loc, diag::missing_argument_named, name);
-    return true;
-  }
-    
-  case Failure::ExtraArgument: {
-    if (auto tuple = dyn_cast_or_null<TupleExpr>(anchor)) {
-      unsigned firstIdx = failure.getValue();
-      auto name = tuple->getElementName(firstIdx);
-      Expr *arg = tuple->getElement(firstIdx);
-      
-      if (firstIdx == tuple->getNumElements()-1 &&
-          tuple->hasTrailingClosure())
-        tc.diagnose(arg->getLoc(), diag::extra_trailing_closure_in_call)
-          .highlight(arg->getSourceRange());
-      else if (name.empty())
-        tc.diagnose(loc, diag::extra_argument_positional)
-          .highlight(arg->getSourceRange());
-      else
-        tc.diagnose(loc, diag::extra_argument_named, name)
-          .highlight(arg->getSourceRange());
-      return true;
-    }
-
+  case Failure::MissingArgument:
     return false;
-  }
-      
+    
+  case Failure::ExtraArgument:
+    return false;
+    
   case Failure::NoPublicInitializers: {
     tc.diagnose(loc, diag::no_accessible_initializers, failure.getFirstType())
       .highlight(range);
@@ -3580,24 +3547,33 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // If we filtered this down to exactly one candidate, see if we can produce
   // an extremely specific error about it.
   if (calleeInfo.size() == 1) {
-    if (calleeInfo.closeness == CC_ArgumentLabelMismatch) {
+    if (calleeInfo.closeness == CC_ArgumentLabelMismatch ||
+        calleeInfo.closeness == CC_ArgumentCountMismatch) {
       auto args = decomposeArgParamType(argExpr->getType());
       SmallVector<Identifier, 4> correctNames;
       unsigned OOOArgIdx = ~0U, OOOPrevArgIdx = ~0U;
+      unsigned extraArgIdx = ~0U, missingParamIdx = ~0U;
       
       // If we have a single candidate that failed to match the argument list,
       // attempt to use matchCallArguments to diagnose the problem.
       struct OurListener : public MatchCallArgumentListener {
         SmallVectorImpl<Identifier> &correctNames;
         unsigned &OOOArgIdx, &OOOPrevArgIdx;
+        unsigned &extraArgIdx, &missingParamIdx;
 
       public:
         OurListener(SmallVectorImpl<Identifier> &correctNames,
-                    unsigned &OOOArgIdx, unsigned &OOOPrevArgIdx)
+                    unsigned &OOOArgIdx, unsigned &OOOPrevArgIdx,
+                    unsigned &extraArgIdx, unsigned &missingParamIdx)
            : correctNames(correctNames),
-             OOOArgIdx(OOOArgIdx), OOOPrevArgIdx(OOOPrevArgIdx) {}
-        void extraArgument(unsigned argIdx) override {}
-        void missingArgument(unsigned paramIdx) override {}
+             OOOArgIdx(OOOArgIdx), OOOPrevArgIdx(OOOPrevArgIdx),
+             extraArgIdx(extraArgIdx), missingParamIdx(missingParamIdx) {}
+        void extraArgument(unsigned argIdx) override {
+          extraArgIdx = argIdx;
+        }
+        void missingArgument(unsigned paramIdx) override {
+          missingParamIdx = paramIdx;
+        }
         void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override{
           OOOArgIdx = argIdx;
           OOOPrevArgIdx = prevArgIdx;
@@ -3606,7 +3582,8 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
           correctNames.append(newNames.begin(), newNames.end());
           return true;
         }
-      } listener(correctNames, OOOArgIdx, OOOPrevArgIdx);
+      } listener(correctNames, OOOArgIdx, OOOPrevArgIdx,
+                 extraArgIdx, missingParamIdx);
 
       // Use matchCallArguments to determine how close the argument list is (in
       // shape) to the specified candidates parameters.  This ignores the
@@ -3616,6 +3593,38 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       if (matchCallArguments(args, params, hasTrailingClosure,
                              /*allowFixes:*/true, listener, paramBindings)) {
        
+        // If we are missing an parameter, diagnose that.
+        if (missingParamIdx != ~0U) {
+          Identifier name = params[missingParamIdx].Label;
+          auto loc = callExpr->getArg()->getStartLoc();
+          if (name.empty())
+            diagnose(loc, diag::missing_argument_positional,
+                        missingParamIdx+1);
+          else
+            diagnose(loc, diag::missing_argument_named, name);
+          return true;
+        }
+        
+        if (extraArgIdx != ~0U) {
+          auto name = args[extraArgIdx].Label;
+          Expr *arg = argExpr;
+          auto tuple = dyn_cast<TupleExpr>(argExpr);
+          if (tuple)
+            arg = tuple->getElement(extraArgIdx);
+          auto loc = arg->getLoc();
+          if (tuple && extraArgIdx == tuple->getNumElements()-1 &&
+              tuple->hasTrailingClosure())
+            diagnose(loc, diag::extra_trailing_closure_in_call)
+              .highlight(arg->getSourceRange());
+          else if (name.empty())
+            diagnose(loc, diag::extra_argument_positional)
+              .highlight(arg->getSourceRange());
+          else
+            diagnose(loc, diag::extra_argument_named, name)
+              .highlight(arg->getSourceRange());
+          return true;
+        }
+        
         // If this is a argument label mismatch, then diagnose that error now.
         if (!correctNames.empty() &&
             CS->diagnoseArgumentLabelError(argExpr, correctNames,
