@@ -687,6 +687,23 @@ unsigned ConstraintGraph::computeConnectedComponents(
   return numComponents;
 }
 
+
+/// For a given constraint kind, decide if we should attempt to eliminate its
+/// edge in the graph.
+static bool shouldContractEdge(ConstraintKind kind) {
+  switch (kind) {
+    case ConstraintKind::Conversion:
+    case ConstraintKind::Bind:
+    case ConstraintKind::BindParam:
+    case ConstraintKind::Equal:
+    case ConstraintKind::BindOverload:
+      return true;
+
+    default:
+      return false;
+  }
+}
+
 bool ConstraintGraph::contractEdges() {
   llvm::SetVector<std::pair<TypeVariableType *,
                             TypeVariableType *>> contractions;
@@ -700,10 +717,7 @@ bool ConstraintGraph::contractEdges() {
 
     for (auto constraint : constraints) {
       // Contract binding edges between type variables.
-      if (constraint->getKind() == ConstraintKind::Conversion ||
-          constraint->getKind() == ConstraintKind::Bind ||
-          constraint->getKind() == ConstraintKind::BindParam ||
-          constraint->getKind() == ConstraintKind::Equal) {
+      if (shouldContractEdge(constraint->getKind())) {
         if (auto tyvar1 = constraint->getFirstType()->
                             getAs<TypeVariableType>()) {
           if (auto tyvar2 = constraint->getSecondType()->
@@ -751,6 +765,24 @@ void ConstraintGraph::removeEdge(Constraint *constraint) {
       CS.InactiveConstraints.erase(constraint);
       break;
     }
+  }
+
+  size_t index = 0;
+  for (auto generated : CS.solverState->generatedConstraints) {
+    if (generated == constraint) {
+      unsigned last = CS.solverState->generatedConstraints.size()-1;
+      auto lastConstraint = CS.solverState->generatedConstraints[last];
+      if (lastConstraint == generated) {
+        CS.solverState->generatedConstraints.pop_back();
+        break;
+      } else {
+        CS.solverState->generatedConstraints[index] = lastConstraint;
+        CS.solverState->generatedConstraints[last] = constraint;
+        CS.solverState->generatedConstraints.pop_back();
+        break;
+      }
+    }
+    index++;
   }
 
   removeConstraint(constraint);
