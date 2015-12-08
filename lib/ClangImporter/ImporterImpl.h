@@ -422,7 +422,7 @@ public:
   ///
   /// These appaer as both properties and methods in ObjC and should be
   /// imported as methods into Swift.
-  bool isAccessibilityDecl(const clang::Decl *objCMethodOrProp);
+  static bool isAccessibilityDecl(const clang::Decl *objCMethodOrProp);
 
   /// Determine whether this method is an Objective-C "init" method
   /// that will be imported as a Swift initializer.
@@ -521,7 +521,8 @@ private:
 
   /// Retrieve the prefix to be stripped from the names of the enum constants
   /// within the given enum.
-  StringRef getEnumConstantNamePrefix(const clang::EnumDecl *enumDecl);
+  StringRef getEnumConstantNamePrefix(clang::Sema &sema,
+                                      const clang::EnumDecl *enumDecl);
 
 public:
   /// \brief Keep track of enum constant values that have been imported.
@@ -647,7 +648,8 @@ public:
 
   /// Add the given named declaration as an entry to the given Swift name
   /// lookup table, including any of its child entries.
-  void addEntryToLookupTable(SwiftLookupTable &table, clang::NamedDecl *named);
+  void addEntryToLookupTable(clang::Sema &clangSema, SwiftLookupTable &table,
+                             clang::NamedDecl *named);
 
 public:
   void registerExternalDecl(Decl *D) {
@@ -819,7 +821,8 @@ public:
   /// introduces nesting, e.g., for enumerators within an NS_ENUM.
   ImportedName importFullName(const clang::NamedDecl *D,
                               ImportNameOptions options = None,
-                              clang::DeclContext **effectiveContext = nullptr);
+                              clang::DeclContext **effectiveContext = nullptr,
+                              clang::Sema *clangSemaOverride = nullptr);
 
   /// \brief Import the given Clang identifier into Swift.
   ///
@@ -860,7 +863,8 @@ public:
 
   /// \brief Classify the given Clang enumeration type to describe how it
   /// should be imported 
-  EnumKind classifyEnum(const clang::EnumDecl *decl);
+  static EnumKind classifyEnum(clang::Preprocessor &pp,
+                               const clang::EnumDecl *decl);
 
   /// Import attributes from the given Clang declaration to its Swift
   /// equivalent.
