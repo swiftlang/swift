@@ -12,11 +12,7 @@ func markUsed<T>(t: T) {}
 class MyClass
 {
     var x : Int64
-    init(input: Int64)
-    {
-        x = 2 * input
-    }
-
+    init(input: Int64) { x = input }
     func do_something(input: Int64) -> Int64
     {
         return x * input;
@@ -47,13 +43,6 @@ func main(x: Int64) -> Void
         }
     )
 
-// ASM-CHECK: .loc	[[FILEID]] [[@LINE+1]] 5
-    call_me (
-        {
-           markUsed(x)
-        }
-    )
-
 // The swift_releases at the end should not jump to the point where
 // that memory was retained/allocated and also not to line 0.
 // ASM-CHECK-NOT: .loc	[[FILEID]] 0 0
@@ -65,6 +54,6 @@ func main(x: Int64) -> Void
 // ASM-CHECK-NOT: retq
 // The end-of-prologue should have a valid location (0 is ok, too).
 // ASM-CHECK: .loc	[[FILEID]] 0 {{[0-9]+}} prologue_end
-// ASM-CHECK: .loc	[[FILEID]] 37 {{[0-9]+}}
+// ASM-CHECK: .loc	[[FILEID]] 33 {{[0-9]+}}
 
 main(30)
