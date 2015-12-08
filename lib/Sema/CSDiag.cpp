@@ -1208,7 +1208,7 @@ namespace {
       collectCalleeCandidates(Fn);
     }
 
-    CalleeCandidateInfo(ArrayRef<OverloadChoice> candidates,
+    CalleeCandidateInfo(Type baseType, ArrayRef<OverloadChoice> candidates,
                         unsigned UncurryLevel, bool hasTrailingClosure,
                         ConstraintSystem *CS);
 
@@ -1657,16 +1657,32 @@ void CalleeCandidateInfo::filterContextualMemberList(Expr *argExpr) {
   return filterList(ArgElts);
 }
 
-CalleeCandidateInfo::CalleeCandidateInfo(ArrayRef<OverloadChoice> overloads,
+CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
+                                         ArrayRef<OverloadChoice> overloads,
                                          unsigned uncurryLevel,
                                          bool hasTrailingClosure,
                                          ConstraintSystem *CS)
   : CS(CS), hasTrailingClosure(hasTrailingClosure) {
+
+  // If we have a useful base type for the candidate set, we'll want to
+  // substitute it into each member.  If not, ignore it.
+  if (isUnresolvedOrTypeVarType(baseType))
+    baseType = Type();
+
   for (auto cand : overloads) {
-    if (cand.isDecl())
-      candidates.push_back({ cand.getDecl(), uncurryLevel });
+    if (!cand.isDecl()) continue;
+
+    auto decl = cand.getDecl();
+    candidates.push_back({ decl, uncurryLevel });
+
+    if (baseType) {
+      auto substType = baseType->getTypeOfMember(CS->DC->getParentModule(),
+                                                 decl, nullptr);
+      if (substType)
+        candidates.back().declType = substType;
+    }
   }
-  
+
   if (!candidates.empty())
     declName = candidates[0].decl->getNameStr().str();
 }
@@ -3332,7 +3348,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
 
   
   
-  CalleeCandidateInfo calleeInfo(result.ViableCandidates, 0,
+  CalleeCandidateInfo calleeInfo(baseType, result.ViableCandidates, 0,
                                  /*FIXME: Subscript trailing closures*/
                                  /*hasTrailingClosure*/false, CS);
 
@@ -3367,7 +3383,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     
     // Explode out multi-index subscripts to find the best match.
     auto indexResult =
-      evaluateCloseness(SD->getIndicesType(), decomposedIndexType,
+      evaluateCloseness(cand.getArgumentType(), decomposedIndexType,
                         /*FIXME: Subscript trailing closures*/false);
     if (selfConstraint > indexResult.first)
       return {selfConstraint, {}};
@@ -4450,7 +4466,7 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
 
   // Dump all of our viable candidates into a CalleeCandidateInfo (with an
   // uncurry level of 1 to represent the contextual type) and sort it out.
-  CalleeCandidateInfo candidateInfo(result.ViableCandidates, 1,
+  CalleeCandidateInfo candidateInfo(baseObjTy, result.ViableCandidates, 1,
                                     hasTrailingClosure, CS);
 
   // Filter the candidate list based on the argument we may or may not have.
