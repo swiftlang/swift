@@ -145,7 +145,7 @@ static uint64_t swift_floatingPointToString(char *Buffer, size_t BufferLength,
   if (BufferLength < 32)
     swift::crash("swift_floatingPointToString: insufficient buffer size");
 
-  const int Precision = std::numeric_limits<T>::digits10;
+  const int Precision = std::numeric_limits<T>::max_digits10;
 
   // Pass a null locale to use the C locale.
   int i = swift_snprintf_l(Buffer, BufferLength, /*locale=*/nullptr, Format,
