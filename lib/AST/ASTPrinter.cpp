@@ -900,7 +900,7 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
   bool inProtocol = isa<ProtocolDecl>(ASD->getDeclContext());
   if (inProtocol ||
       (Options.AbstractAccessors && !Options.FunctionDefinitions)) {
-    bool mutatingGetter = ASD->isGetterMutating();
+    bool mutatingGetter = ASD->getGetter() && ASD->isGetterMutating();
     bool settable = ASD->isSettable(nullptr);
     bool nonmutatingSetter = false;
     if (settable && ASD->isSetterNonMutating() && ASD->isInstanceMember() &&
