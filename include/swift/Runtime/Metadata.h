@@ -545,6 +545,13 @@ typedef unsigned getEnumTag(const OpaqueValue *src,
 typedef void destructiveProjectEnumData(OpaqueValue *src,
                                         const Metadata *self);
 
+/// Given a valid object of an enum case payload's type, destructively add
+/// the tag bits for the given case, leaving behind a fully-formed value of
+/// the enum type. If the enum case does not have a payload, the initial
+/// state of the value can be undefined.
+typedef void destructiveInjectEnumTag(OpaqueValue *src,
+                                      unsigned tag,
+                                      const Metadata *self);
 
 } // end namespace value_witness_types
 
@@ -702,18 +709,22 @@ struct ExtraInhabitantsValueWitnessTable : ValueWitnessTable {
 struct EnumValueWitnessTable : ExtraInhabitantsValueWitnessTable {
   value_witness_types::getEnumTag *getEnumTag;
   value_witness_types::destructiveProjectEnumData *destructiveProjectEnumData;
+  value_witness_types::destructiveInjectEnumTag *destructiveInjectEnumTag;
 
   constexpr EnumValueWitnessTable()
     : ExtraInhabitantsValueWitnessTable(),
       getEnumTag(nullptr),
-      destructiveProjectEnumData(nullptr) {}
+      destructiveProjectEnumData(nullptr),
+      destructiveInjectEnumTag(nullptr) {}
   constexpr EnumValueWitnessTable(
           const ExtraInhabitantsValueWitnessTable &base,
           value_witness_types::getEnumTag *getEnumTag,
-          value_witness_types::destructiveProjectEnumData *destructiveProjectEnumData)
+          value_witness_types::destructiveProjectEnumData *destructiveProjectEnumData,
+          value_witness_types::destructiveInjectEnumTag *destructiveInjectEnumTag)
     : ExtraInhabitantsValueWitnessTable(base),
       getEnumTag(getEnumTag),
-      destructiveProjectEnumData(destructiveProjectEnumData) {}
+      destructiveProjectEnumData(destructiveProjectEnumData),
+      destructiveInjectEnumTag(destructiveInjectEnumTag) {}
 
   static bool classof(const ValueWitnessTable *table) {
     return table->flags.hasEnumWitnesses();
@@ -1069,6 +1080,9 @@ public:
   }
   void vw_destructiveProjectEnumData(OpaqueValue *value) const {
     getValueWitnesses()->_asEVWT()->destructiveProjectEnumData(value, this);
+  }
+  void vw_destructiveInjectEnumTag(OpaqueValue *value, unsigned tag) const {
+    getValueWitnesses()->_asEVWT()->destructiveInjectEnumTag(value, tag, this);
   }
   
   /// Get the nominal type descriptor if this metadata describes a nominal type,
