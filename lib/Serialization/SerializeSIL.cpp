@@ -202,7 +202,7 @@ namespace {
 
   public:
     SILSerializer(Serializer &S, ASTContext &Ctx,
-                  llvm::BitstreamWriter &Out, bool serializeAll)
+                  llvm::BitstreamWriter &Out)
       : S(S), Ctx(Ctx), Out(Out) {}
 
     void writeSILModule(const SILModule *SILMod);
@@ -1692,7 +1692,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
       writeSILVTable(vt);
   }
 
-  // Write out WitnessTables. For now, write out only if EnableSerializeAll.
+  // Write out WitnessTables.
   for (const SILWitnessTable &wt : SILMod->getWitnessTables()) {
     if (wt.getConformance()->getDeclContext()->isChildContextOf(assocDC))
       writeSILWitnessTable(wt);
@@ -1718,10 +1718,10 @@ void SILSerializer::writeSILModule(const SILModule *SILMod) {
   writeIndexTables();
 }
 
-void Serializer::writeSIL(const SILModule *SILMod, bool serializeAllSIL) {
+void Serializer::writeSIL(const SILModule *SILMod) {
   if (!SILMod)
     return;
 
-  SILSerializer SILSer(*this, M->getASTContext(), Out, serializeAllSIL);
+  SILSerializer SILSer(*this, M->getASTContext(), Out);
   SILSer.writeSILModule(SILMod);
 }
