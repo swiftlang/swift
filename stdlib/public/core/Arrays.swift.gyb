@@ -1031,7 +1031,7 @@ public func += <
 /// Create a unique mutable buffer that has enough capacity to hold 'newCount'
 /// elements and at least 'requiredCapacity' elements. Set the count of the new
 /// buffer to 'newCount'. The content of the buffer is uninitialized.
-/// The forumula used to compute the new buffers capacity is:
+/// The formula used to compute the new buffers capacity is:
 ///   max(requiredCapacity, source.capacity)  if newCount <= source.capacity
 ///   max(requiredCapacity, _growArrayCapacity(source.capacity)) otherwise
 @inline(never)
@@ -1046,7 +1046,7 @@ internal func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferType>(
 /// Create a unique mutable buffer that has enough capacity to hold
 /// 'minNewCapacity' elements and set the count of the new buffer to
 /// 'countForNewBuffer'. The content of the buffer uninitialized.
-/// The forumula used to compute the new buffers capacity is:
+/// The formula used to compute the new buffers capacity is:
 ///   max(minNewCapacity, source.capacity) if minNewCapacity <= source.capacity
 ///   max(minNewCapacity, _growArrayCapacity(source.capacity)) otherwise
 @inline(never)
