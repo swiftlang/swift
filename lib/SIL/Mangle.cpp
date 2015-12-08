@@ -128,6 +128,12 @@ setArgumentBoxToValue(unsigned ArgNo) {
 }
 
 void
+FunctionSignatureSpecializationMangler::
+setArgumentBoxToStack(unsigned ArgNo) {
+  Args[ArgNo].first = ArgumentModifierIntBase(ArgumentModifier::BoxToStack);
+}
+
+void
 FunctionSignatureSpecializationMangler::mangleConstantProp(LiteralInst *LI) {
   Mangler &M = getMangler();
   llvm::raw_ostream &os = getBuffer();
@@ -242,6 +248,11 @@ void FunctionSignatureSpecializationMangler::mangleArgument(
 
   if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::BoxToValue)) {
     os << "i";
+    return;
+  }
+
+  if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::BoxToStack)) {
+    os << "k";
     return;
   }
 

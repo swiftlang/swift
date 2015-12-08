@@ -770,6 +770,7 @@ Globals
   funcsigspecializationarginfo ::= 'd'                                           // Dead argument
   funcsigspecializationarginfo ::= 'g' 's'?                                      // Owned => Guaranteed and Exploded if 's' present.
   funcsigspecializationarginfo ::= 's'                                           // Exploded
+  funcsigspecializationarginfo ::= 'k'                                           // Exploded
   funcsigspecializationconstantpropinfo ::= 'fr' mangled-name
   funcsigspecializationconstantpropinfo ::= 'g' mangled-name
   funcsigspecializationconstantpropinfo ::= 'i' 64-bit-integer
