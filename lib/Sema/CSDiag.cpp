@@ -1785,7 +1785,7 @@ bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *argExpr) {
     return true;
   }
   
-  // If this is a argument label mismatch, then diagnose that error now.
+  // If this is an argument label mismatch, then diagnose that error now.
   if (!correctNames.empty() &&
       CS->diagnoseArgumentLabelError(argExpr, correctNames,
                                      /*isSubscript=*/false))

@@ -29,8 +29,8 @@ struct _Prespecialize {
         a[0] = a[j]
       }
 
-      for i1 in a.indices {
-        for i2 in a.indices {
+      for var i1 = 0; i1 < a.count; ++i1 {
+        for var i2 = 0; i2 < a.count; ++i2 {
           a[i1] = a[i2]
         }
       }

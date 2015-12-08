@@ -295,7 +295,6 @@ void GlobalPropertyOpt::scanInstruction(swift::SILInstruction *Inst) {
         // swift array.
         DEBUG(llvm::dbgs() << "      array semantics call: " << *AI);
         return;
-      case ArrayCallKind::kArrayPropsIsNative:
       case ArrayCallKind::kArrayPropsIsNativeTypeChecked:
         // Remember the property-calls for later.
         DEBUG(llvm::dbgs() << "      property check: " << *AI);
@@ -469,8 +468,7 @@ bool GlobalPropertyOpt::replacePropertyCalls() {
       
       ArraySemanticsCall semCall(AI);
       assert(
-        (semCall.getKind() == ArrayCallKind::kArrayPropsIsNative ||
-         semCall.getKind() == ArrayCallKind::kArrayPropsIsNativeTypeChecked) &&
+        (semCall.getKind() == ArrayCallKind::kArrayPropsIsNativeTypeChecked) &&
              "invalid semantics type");
   
       DEBUG(llvm::dbgs() << "  remove property check in function " <<

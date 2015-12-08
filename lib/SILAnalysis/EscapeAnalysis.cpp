@@ -1046,7 +1046,6 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
   if (FAS) {
     ArraySemanticsCall ASC(FAS.getInstruction());
     switch (ASC.getKind()) {
-      case ArrayCallKind::kArrayPropsIsNative:
       case ArrayCallKind::kArrayPropsIsNativeTypeChecked:
       case ArrayCallKind::kCheckSubscript:
       case ArrayCallKind::kCheckIndex:
