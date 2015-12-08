@@ -58,12 +58,29 @@ Latest
 
   **(rdar://problem/21683348)**
 
-Time warp
----------
 
-  *Changes between Xcode 6.1 (Swift 1.1) through Xcode 7.1  
-  (Swift 2.1) have been lost.  Contributions to rectify this would be
-  welcome.*
+2014-10-09 [Xcode 6.1 Release Notes, Swift 1.1]
+----------
+
+* Values of type `Any` can now contain values of function type. **(16406907)**
+
+* Documentation for the standard library (displayed in quick help and in the
+  synthesized header for the Swift module) is improved. **(16462500)**
+
+* Class properties don't need to be marked final to avoid `O(n)` mutations on
+  value semantic types. **(17416120)**
+
+* Casts can now be performed between `CF` types (such as `CFString`, `CGImage`,
+  and `SecIdentity`) and AnyObject. Such casts will always succeed at run-time.
+  For example:
+
+  ```swift
+  var cfStr: CFString = ...
+  var obj: AnyObject = cfStr as AnyObject
+  var cfStr = obj as CFString
+  ```
+
+  **(18088474)**
 
 
 2014-10-09 [Roughly Xcode 6.1, and Swift 1.1]
