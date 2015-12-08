@@ -23,7 +23,6 @@ class DominanceInfo;
 /// of the called function.
 enum class ArrayCallKind {
   kNone = 0,
-  kArrayPropsIsNative,
   kArrayPropsIsNativeTypeChecked,
   kCheckSubscript,
   kCheckIndex,
@@ -82,11 +81,11 @@ public:
   /// Get the index for operations that have one.
   SILValue getIndex() const;
 
-  /// Get the array.props.isNative argument.
-  SILValue getArrayPropertyIsNative() const;
+  /// Get the index as a constant if possible.
+  Optional<int64_t> getConstantIndex() const;
 
-  /// Get the array.props.needsElementTypeCheck argument.
-  SILValue getArrayPropertyNeedsTypeCheck() const;
+  /// Get the array.props.isNativeTypeChecked argument.
+  SILValue getArrayPropertyIsNativeTypeChecked() const;
 
   /// Get the count used for this array initialization.
   ///
@@ -99,9 +98,25 @@ public:
   /// Returns SILValue() if this is not an array initialization call.
   SILValue getArrayValue() const;
 
+  /// Get the array element storage pointer returned by an array initialization
+  /// call.
+  ///
+  /// Returns SILValue() if this is not an array initialization call or the call
+  /// can't be parsed.
+  SILValue getArrayElementStoragePointer() const;
+
   /// Remove the semantics call replacing it by a release of any @owned
   /// parameter.
   void removeCall();
+
+  /// Replace a call to get_element by a value.
+  ///
+  /// Preconditions:
+  /// The value \p V must dominate this get_element call.
+  /// This must be a get_element call.
+  ///
+  /// Returns true on success, false otherwise.
+  bool replaceByValue(SILValue V);
 
   /// Hoist the call to the insert point.
   void hoist(SILInstruction *InsertBefore, DominanceInfo *DT) {

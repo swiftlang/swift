@@ -856,18 +856,6 @@ bb0(%0 : $*U, %1 : $*T, %2 : $@thick U.Type):
   return %5 : $()
 }
 
-// CHECK-LABEL: CG of arraysemantics_is_native
-// CHECK-NEXT:    Arg %0 Esc: A, Succ: 
-// CHECK-NEXT:  End
-sil @arraysemantics_is_native : $@convention(thin) (Array<X>) -> () {
-bb0(%0 : $Array<X>):
-  %f = function_ref @is_native : $@convention(method) (@guaranteed Array<X>) -> Bool
-  %a = apply %f(%0) : $@convention(method) (@guaranteed Array<X>) -> Bool
-
-  %r = tuple()
-  return %r : $()
-}
-
 // CHECK-LABEL: CG of arraysemantics_is_native_no_typecheck
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: 
 // CHECK-NEXT:  End
@@ -988,7 +976,6 @@ bb0(%0 : $Array<X>):
   return %r : $()
 }
 
-sil [_semantics "array.props.isNative"] @is_native : $@convention(method) (@guaranteed Array<X>) -> Bool
 sil [_semantics "array.props.isNativeTypeChecked"] @is_native_type_checked : $@convention(method) (@guaranteed Array<X>) -> Bool
 sil [_semantics "array.check_subscript"] @check_subscript : $@convention(method) (Int32, Bool, @guaranteed Array<X>) -> ()
 sil [_semantics "array.check_index"] @check_index : $@convention(method) (Int32, @guaranteed Array<X>) -> ()

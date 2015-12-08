@@ -244,10 +244,6 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
         elementTypeIsBridgedVerbatim: verbatim))
   }
 
-  var arrayPropertyIsNative : Bool {
-    return true
-  }
-
   /// True, if the array is native and does not need a deferred type check.
   var arrayPropertyIsNativeTypeChecked : Bool {
     return true

@@ -98,7 +98,7 @@ func testMap() {
 }
 
 // <rdar://problem/22414757> "UnresolvedDot" "in wrong phase" assertion from verifier
-[].reduce { $0 + $1 }  // expected-error {{cannot convert value of type '(_, _) -> _' to expected argument type '(_, combine: @noescape (_, _) throws -> _)'}}
+[].reduce { $0 + $1 }  // expected-error {{missing argument for parameter #1 in call}}
 
 
 
