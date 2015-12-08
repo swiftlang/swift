@@ -58,6 +58,34 @@ Latest
 
   **(rdar://problem/21683348)**
 
+2014-12-02 [Xcode 6.1.1]
+----------
+
+* Class methods and initializers that satisfy protocol requirements now properly
+  invoke subclass overrides when called in generic contexts. For example:
+
+    ```swift
+    protocol P {
+      class func foo()
+    }
+
+    class C: P {
+      class func foo() { println("C!") }
+    }
+
+    class D: C {
+      override class func foo() { println("D!") }
+    }
+
+    func foo<T: P>(x: T) {
+      x.dynamicType.foo()
+    }
+
+    foo(C()) // Prints "C!"
+    foo(D()) // Used to incorrectly print "C!", now prints "D!"
+    ```
+
+  **(18828217)**
 
 2014-10-09 [Xcode 6.1 Release Notes, Swift 1.1]
 ----------
