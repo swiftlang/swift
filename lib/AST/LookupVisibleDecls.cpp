@@ -530,11 +530,9 @@ struct FoundDeclTy {
       : D(D), Reason(Reason) {}
 
   friend bool operator==(const FoundDeclTy &LHS, const FoundDeclTy &RHS) {
+    // If this ever changes - e.g. to include Reason - be sure to also update
+    // DenseMapInfo<FoundDeclTy>::getHashValue().
     return LHS.D == RHS.D;
-  }
-
-  friend bool operator<(const FoundDeclTy &LHS, const FoundDeclTy &RHS) {
-    return LHS.D < RHS.D;
   }
 };
 
@@ -553,7 +551,8 @@ template <> struct DenseMapInfo<FoundDeclTy> {
   }
 
   static unsigned getHashValue(const FoundDeclTy &Val) {
-    return llvm::hash_combine(unsigned(Val.Reason), Val.D);
+    // Note: FoundDeclTy::operator== only considers D, so don't hash Reason here.
+    return llvm::hash_value(Val.D);
   }
 
   static bool isEqual(const FoundDeclTy &LHS, const FoundDeclTy &RHS) {
