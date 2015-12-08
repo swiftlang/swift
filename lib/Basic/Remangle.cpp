@@ -525,6 +525,9 @@ void Remangler::mangleFunctionSignatureSpecializationParam(Node *node) {
   case FunctionSigSpecializationParamKind::BoxToValue:
     Out << "i_";
     return;
+  case FunctionSigSpecializationParamKind::BoxToStack:
+    Out << "k_";
+    return;
   default:
     if (kindValue &
         unsigned(FunctionSigSpecializationParamKind::Dead))
