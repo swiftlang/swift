@@ -45,7 +45,7 @@ option(SWIFT_BUILD_STATIC_STDLIB
     FALSE)
 
 option(SWIFT_INCLUDE_BENCHMARKS
-    "Create targets for running swift benchmarks"
+    "Create targets for running Swift benchmarks"
     TRUE)
 
 option(SWIFT_INCLUDE_TESTS "Create targets for building/running tests." TRUE)
@@ -174,7 +174,7 @@ option(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
 #
 
 set(SWIFT_EXPERIMENTAL_EXTRA_FLAGS "" CACHE STRING
-    "Extra flags to pass when compiling swift files.  Use this option *only* for one-off experiments")
+    "Extra flags to pass when compiling Swift files.  Use this option *only* for one-off experiments")
 
 set(SWIFT_EXPERIMENTAL_EXTRA_REGEXP_FLAGS "" CACHE STRING
   "A list of [module_regexp1;flags1;module_regexp2;flags2,...] which can be used to apply specific flags to modules that match a cmake regexp. It always applies the first regexp that matches.")
