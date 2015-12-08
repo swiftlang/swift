@@ -184,7 +184,7 @@ module SwiftGlibc [system] {
       export *
     }
     module ioctl {
-      header "/usr/include/x86_64-linux-gnu/sys/ioctl.h"
+      header "@arch_include_dir@/sys/ioctl.h"
       export *
     }
     module langinfo {
@@ -266,71 +266,71 @@ module SwiftGlibc [system] {
       export *
 
       module ipc {
-        header "/usr/include/x86_64-linux-gnu/sys/ipc.h"
+        header "@arch_include_dir@/sys/ipc.h"
         export *
       }
       module mman {
-        header "/usr/include/x86_64-linux-gnu/sys/mman.h"
+        header "@arch_include_dir@/sys/mman.h"
         export *
       }
       module msg {
-        header "/usr/include/x86_64-linux-gnu/sys/msg.h"
+        header "@arch_include_dir@/sys/msg.h"
         export *
       }
       module resource {
-        header "/usr/include/x86_64-linux-gnu/sys/resource.h"
+        header "@arch_include_dir@/sys/resource.h"
         export *
       }
       module select {
-        header "/usr/include/x86_64-linux-gnu/sys/select.h"
+        header "@arch_include_dir@/sys/select.h"
         export *
       }
       module sem {
-        header "/usr/include/x86_64-linux-gnu/sys/sem.h"
+        header "@arch_include_dir@/sys/sem.h"
         export *
       }
       module shm {
-        header "/usr/include/x86_64-linux-gnu/sys/shm.h"
+        header "@arch_include_dir@/sys/shm.h"
         export *
       }
       module socket {
-        header "/usr/include/x86_64-linux-gnu/sys/socket.h"
+        header "@arch_include_dir@/sys/socket.h"
         export *
       }
       module stat {
-        header "/usr/include/x86_64-linux-gnu/sys/stat.h"
+        header "@arch_include_dir@/sys/stat.h"
         export *
       }
       module statvfs {
-        header "/usr/include/x86_64-linux-gnu/sys/statvfs.h"
+        header "@arch_include_dir@/sys/statvfs.h"
         export *
       }
       module time {
-        header "/usr/include/x86_64-linux-gnu/sys/time.h"
+        header "@arch_include_dir@/sys/time.h"
         export *
       }
       module times {
-        header "/usr/include/x86_64-linux-gnu/sys/times.h"
+        header "@arch_include_dir@/sys/times.h"
         export *
       }
       module types {
-        header "/usr/include/x86_64-linux-gnu/sys/types.h"
+        header "@arch_include_dir@/sys/types.h"
         export *
       }
       module uio {
-        header "/usr/include/x86_64-linux-gnu/sys/uio.h"
+        header "@arch_include_dir@/sys/uio.h"
         export *
       }
       module un {
-        header "/usr/include/x86_64-linux-gnu/sys/un.h"
+        header "@arch_include_dir@/sys/un.h"
         export *
       }
       module utsname {
-        header "/usr/include/x86_64-linux-gnu/sys/utsname.h"
+        header "@arch_include_dir@/sys/utsname.h"
         export *
       }
       module wait {
-        header "/usr/include/x86_64-linux-gnu/sys/wait.h"
+        header "@arch_include_dir@/sys/wait.h"
         export *
       }
     }
