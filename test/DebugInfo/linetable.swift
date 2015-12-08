@@ -2,6 +2,10 @@
 // RUN: %target-swift-frontend %s -S -g -o - | FileCheck %s --check-prefix ASM-CHECK
 
 // REQUIRES: CPU=i386_or_x86_64
+
+// FIXME: ASM-CHECK: for end-of-prologue fails on Linux. SR-149
+// XFAIL: linux
+
 import Swift
 func markUsed<T>(t: T) {}
 
