@@ -4,8 +4,8 @@ public struct Q<T> {
 }
 public func foo<T>(arg: [Q<T>]) {
   // CHECK: define {{.*}}_TF12generic_arg43foourFGSaGVS_1Qx__T_
-  // CHECK: store %swift.bridge* %0, %swift.bridge** %[[ALLOCA:.*]], align
-  // CHECK: call void @llvm.dbg.declare(metadata %swift.bridge** %[[ALLOCA]],
+  // CHECK: store %[[TY:.*]]* %0, %[[TY]]** %[[ALLOCA:.*]], align
+  // CHECK: call void @llvm.dbg.declare(metadata %[[TY]]** %[[ALLOCA]],
   // CHECK-SAME:       metadata ![[ARG:.*]], metadata ![[EXPR:.*]])
   // No deref here: the array argument is passed by value.
   // CHECK: ![[EXPR]] = !DIExpression()
