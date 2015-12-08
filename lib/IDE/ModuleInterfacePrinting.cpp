@@ -493,8 +493,12 @@ void swift::ide::printHeaderInterface(
   };
 
   SmallVector<Decl *, 32> ClangDecls;
+  llvm::SmallPtrSet<Decl *, 32> SeenDecls;
   auto headerReceiver = [&](Decl *D) {
-    ClangDecls.push_back(D);
+    if (SeenDecls.count(D) == 0) {
+      SeenDecls.insert(D);
+      ClangDecls.push_back(D);
+    }
   };
 
   Importer.lookupDeclsFromHeader(Filename, headerFilter, headerReceiver);
