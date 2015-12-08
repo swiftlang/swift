@@ -681,7 +681,11 @@ lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member) {
 
 void SILModule::
 registerDeleteNotificationHandler(DeleteNotificationHandler* Handler) {
-  NotificationHandlers.insert(Handler);
+  // Ask the handler (that can be an analysis, a pass, or some other data
+  // structure) if it wants to receive delete notifications.
+  if (Handler->needsNotifications()) {
+    NotificationHandlers.insert(Handler);
+  }
 }
 
 void SILModule::
