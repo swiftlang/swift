@@ -77,7 +77,6 @@ compiler for C++14 support and create a symlink:
 
 #### Related Project Sources
 
-
 **Via HTTPS**
     cd <local_path_to_swift_repo>
     ./utils/update-checkout --clone
