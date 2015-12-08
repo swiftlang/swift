@@ -4191,7 +4191,7 @@ public:
   ParamDecl(bool isLet, SourceLoc argumentNameLoc, 
             Identifier argumentName, SourceLoc parameterNameLoc,
             Identifier parameterName, Type ty, DeclContext *dc)
-    : VarDecl(DeclKind::Param, /*IsState=*/false, isLet, parameterNameLoc, 
+    : VarDecl(DeclKind::Param, /*IsStatic=*/false, isLet, parameterNameLoc, 
               parameterName, ty, dc),
       ArgumentName(argumentName), ArgumentNameLoc(argumentNameLoc) { }
 
