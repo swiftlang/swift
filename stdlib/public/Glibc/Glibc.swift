@@ -147,8 +147,8 @@ public var SIG_HOLD: __sighandler_t {
 
 /// The value returned by `sem_open()` in the case of failure.
 public var SEM_FAILED: UnsafeMutablePointer<sem_t> {
-  // The value is ABI.  Value verified to be correct for OS X, iOS, watchOS, tvOS and Linux.
-  return UnsafeMutablePointer<sem_t>(bitPattern: -1)
+  // The value is ABI.  Value verified to be correct on Linux.
+  return UnsafeMutablePointer<sem_t>(bitPattern: 0)
 }
 
 @warn_unused_result
