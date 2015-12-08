@@ -58,8 +58,51 @@ Latest
 
   **(rdar://problem/21683348)**
 
+
 2015-09-17 [Xcode 7.1, Swift 2.1]
 ----------
+
+* Enums imported from C now automatically conform to the Equatable protocol, including a default implementation of the == operator.
+This conformance allows you to use C enum pattern matching in switch statements with no additional code. (17287720)
+
+* The NSNumberunsignedIntegerValue property now has the type UInt instead of Int, as do other methods and properties that use the NSUInteger type in Objective-C and whose names contain "unsigned..".
+Most other uses of NSUInteger in system frameworks are imported as Int as they were in Xcode 7. (19134055)
+
+* Field getters and setters are now created for named unions imported from C. In addition, an initializer with a named parameter for the field is provided.
+For example, given the following Objective-C typdef:
+
+typedef union IntOrFloat {
+  int intField;
+  float floatField;
+} IntOrFloat;
+Importing this typedef into Swift generates the following interface:
+struct IntOrFloat {
+  var intField: Int { get set }
+  init(intField: Int)
+
+  var floatField: Float { get set }
+  init(floatField: Float)
+}
+(19660119)
+
+* Bitfield members of C structs are now imported into Swift. (21702107)
+
+* The type dispatch_block_t now refers to the type @convention(block) () -> Void, as it did in Swift 1.2.
+This change allows programs using dispatch_block_create to work as expected, solving an issue that surfaced in Xcode 7.0 with Swift 2.0.
+
+Note: Converting to a Swift closure value and back is not guaranteed to preserve the identity of a dispatch_block_t.
+(22432170)
+
+* Editing a file does not trigger a recompile of files that depend upon it if the edits only modify declarations marked private. (22239821)
+
+* Expressions interpolated in strings may now contain string literals.
+For example, "My name is \(attributes["name"]!)" is now a valid expression. (14050788)
+
+* Error messages produced when the type checker cannot solve its constraint system continue to improve in many cases.
+For example, errors in the body of generic closures (for instance, the argument closure to map) are much more usefully diagnosed. (18835890)
+
+* Conversions between function types are supported, exhibiting covariance in function result types and contravariance in function parameter types.
+For example, it is legal to assign a function of type Any -> Int to a variable of type String -> Any. (19517003)
 
 
 2015-09-17 [Xcode 7.0, Swift 2]
