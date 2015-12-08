@@ -1,17 +1,19 @@
 // RUN: %target-run-stdlib-swift -parse-stdlib %s | FileCheck %s
 // REQUIRES: executable_test
 
-// XFAIL: linux
-
 import Swift
-import CoreGraphics
 
-@_silgen_name("vprintf")
-func c_vprintf(format: UnsafePointer<Int8>, _ args: CVaListPointer)
+#if _runtime(_ObjC)
+import Darwin
+import CoreGraphics
+#else
+import Glibc
+typealias CGFloat = Double
+#endif
 
 func my_printf(format: String, _ arguments: CVarArgType...) {
   withVaList(arguments) {
-    c_vprintf(format, $0)
+    vprintf(format, $0)
   }
 }
 
@@ -35,7 +37,7 @@ func test_varArgs1() {
   
   // CHECK: dig it: 0  0 -1  1 -2  2 -3  3 -4  4 -5  5 -6  6 -7  7 -8  8 -9  9 -10 10 -11 11
   withVaList(args) {
-    c_vprintf(format + "\n", $0)
+    vprintf(format + "\n", $0)
   }
 }
 test_varArgs1()
@@ -48,12 +50,18 @@ func test_varArgs3() {
   args.append(COpaquePointer(bitPattern: 0x1234_5671))
   args.append(UnsafePointer<Int>(bitPattern: 0x1234_5672))
   args.append(UnsafeMutablePointer<Float>(bitPattern: 0x1234_5673))
+
+#if _runtime(_ObjC)
   args.append(AutoreleasingUnsafeMutablePointer<AnyObject>(
         UnsafeMutablePointer<AnyObject>(bitPattern: 0x1234_5674)))
+#else
+  //Linux does not support AutoreleasingUnsafeMutablePointer; put placeholder.
+  args.append(UnsafeMutablePointer<Float>(bitPattern: 0x1234_5674))
+#endif
 
   // CHECK: {{pointers: '(0x)?0*12345670' '(0x)?0*12345671' '(0x)?0*12345672' '(0x)?0*12345673' '(0x)?0*12345674'}}
   withVaList(args) {
-    c_vprintf(format, $0)
+    vprintf(format, $0)
   }
 }
 test_varArgs3()
