@@ -80,4 +80,12 @@ let squares = [ 1, 2, 3 ].reduce([:]) { (dict, n) in // expected-error {{cannot 
   return dict
 }
 
+// <rdar://problem/23670252> QoI: Misleading error message when assigning a value from [String : AnyObject]
+func r23670252(dictionary: [String : AnyObject], someObject: AnyObject) {
+  let color : String?
+  color = dictionary["color"]  // expected-error {{cannot assign value of type 'AnyObject?' to type 'String?'}}
+  _ = color
+}
+
+
 

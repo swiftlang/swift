@@ -773,10 +773,6 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
       if (DataAddrInst && DataAddrInst->getOperand() == IEAI->getOperand())
         break;
     }
-    // Allow all instructions inbetween, which don't have any dependency to
-    // the store.
-    if (AA->mayWriteToMemory(&*II, IEAI->getOperand()))
-      return nullptr;
   }
   // Found the store to this enum payload. Check if the store is the only use.
   if (!DataAddrInst->hasOneUse())
