@@ -853,6 +853,13 @@ FUNCTION(IsClassType,
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
+// bool swift_isOptionalType(type*);
+FUNCTION(IsOptionalType,
+         swift_isOptionalType, RuntimeCC,
+         RETURNS(Int1Ty),
+         ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
 // void swift_once(swift_once_t *predicate,
 //                 void (*function_code)(RefCounted*));
 FUNCTION(Once, swift_once, RuntimeCC,

@@ -353,6 +353,11 @@ BUILTIN_RUNTIME_CALL(UnexpectedError, "unexpectedError", "")
 /// errorInMain: ErrorType -> ()
 BUILTIN_RUNTIME_CALL(ErrorInMain, "errorInMain", "")
 
+/// IsOptionalType : T.Type -> Bool
+/// This builtin takes a metatype and returns true if the metatype's
+/// nominal type is Optional.
+BUILTIN_RUNTIME_CALL(IsOptionalType, "isOptional", "")
+
 #undef BUILTIN_RUNTIME_CALL
 
 // BUILTIN_MISC_OPERATION - Miscellaneous operations without a unifying class.

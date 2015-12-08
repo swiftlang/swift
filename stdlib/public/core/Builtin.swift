@@ -568,3 +568,11 @@ public // @testable
 func _isPOD<T>(type: T.Type) -> Bool {
   return Bool(Builtin.ispod(type))
 }
+
+/// Return true if type is nominally an Optional type.
+@_transparent
+@warn_unused_result
+public // @testable
+func _isOptional<T>(type: T.Type) -> Bool {
+  return Bool(Builtin.isOptional(type))
+}

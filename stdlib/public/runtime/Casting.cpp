@@ -3172,3 +3172,7 @@ extern "C" const Metadata *_swift_getSuperclass_nonNull(
 extern "C" bool swift_isClassType(const Metadata *type) {
   return Metadata::isAnyKindOfClass(type->getKind());
 }
+
+extern "C" bool swift_isOptionalType(const Metadata *type) {
+  return type->getKind() == MetadataKind::Optional;
+}
