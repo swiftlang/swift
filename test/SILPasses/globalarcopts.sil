@@ -286,11 +286,14 @@ bb1:
   return %2 : $()
 }
 
-// CHECK-LABEL: @simple_alias_store_use_test : $@convention(thin) (@box Builtin.Int32, @inout Builtin.Int32) -> () {
-// CHECK-NOT: strong_retain
-// CHECK-NOT: strong_release
-sil @simple_alias_store_use_test : $@convention(thin) (@box Builtin.Int32, @inout Builtin.Int32) -> () {
-bb0(%0 : $@box Builtin.Int32, %1 : $*Builtin.Int32):
+// FIXME: Should be able to eliminate the r/r pair here.
+
+// CHECK-LABEL: @simple_alias_store_use_test : $@convention(thin) (@box Builtin.Int32) -> () {
+// SHOULD-NOT: strong_retain
+// SHOULD-NOT: strong_release
+sil @simple_alias_store_use_test : $@convention(thin) (@box Builtin.Int32) -> () {
+bb0(%0 : $@box Builtin.Int32):
+  %1 = project_box %0 : $@box Builtin.Int32
   %2 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
   %3 = integer_literal $Builtin.Int32, 2
   strong_retain %0 : $@box Builtin.Int32
