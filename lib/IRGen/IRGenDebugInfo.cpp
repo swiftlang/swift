@@ -961,6 +961,24 @@ getStorageSize(const llvm::DataLayout &DL, ArrayRef<llvm::Value *> Storage) {
   return Size(size);
 }
 
+/// LValues, inout args, and Archetypes are implicitly indirect by
+/// virtue of their DWARF type.
+static bool isImplicitlyIndirect(TypeBase *Ty) {
+  switch (Ty->getKind()) {
+  case TypeKind::Paren:
+    return isImplicitlyIndirect(
+        cast<ParenType>(Ty)->getUnderlyingType().getPointer());
+  case TypeKind::NameAlias:
+    return isImplicitlyIndirect(
+        cast<NameAliasType>(Ty)->getSinglyDesugaredType());
+  case TypeKind::InOut:
+  case TypeKind::Archetype:
+    return true;
+  default:
+    return false;
+  }
+}
+
 void IRGenDebugInfo::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo DbgTy,
     const SILDebugScope *DS, StringRef Name, unsigned ArgNo,
@@ -1000,10 +1018,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
   if (Artificial || DITy->isArtificial() || DITy == InternalType)
     Flags |= llvm::DINode::FlagArtificial;
 
-  // LValues, inout args, and Archetypes are implicitly indirect by
-  // virtue of their DWARF type.
-  if (DbgTy.getType()->getKind() == TypeKind::InOut ||
-      DbgTy.getType()->hasArchetype())
+  if (isImplicitlyIndirect(DbgTy.getType()))
     Indirection = DirectValue;
 
   // Create the descriptor for the variable.
