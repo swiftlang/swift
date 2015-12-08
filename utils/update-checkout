@@ -16,7 +16,6 @@ from __future__ import print_function
 import argparse
 import os
 import sys
-import pdb
 
 sys.path.append(os.path.dirname(__file__))
 
@@ -53,20 +52,24 @@ def update_working_copy(repo_path):
         else:
             check_call([ "svn", "update" ])
 
-def obtain_additional_swift_sources():
+def obtain_additional_swift_sources(opts = {'with_ssh': False}):
     additional_repos = {
-        'llvm': 'https://github.com/apple/swift-llvm.git',
-        'clang': 'https://github.com/apple/swift-clang.git',
-        'lldb': 'https://github.com/apple/swift-lldb.git',
-        'cmark': 'https://github.com/apple/swift-cmark.git',
-        'llbuild': 'https://github.com/apple/swift-llbuild.git',
-        'swiftpm': 'https://github.com/apple/swift-package-manager.git',
-        'swift-corelibs-xctest': 'https://github.com/apple/swift-corelibs-xctest.git',
-        'swift-corelibs-foundation': 'https://github.com/apple/swift-corelibs-foundation.git'
+        'llvm': 'apple/swift-llvm',
+        'clang': 'apple/swift-clang',
+        'lldb': 'apple/swift-lldb',
+        'cmark': 'apple/swift-cmark',
+        'llbuild': 'apple/swift-llbuild',
+        'swiftpm': 'apple/swift-package-manager',
+        'swift-corelibs-xctest': 'apple/swift-corelibs-xctest',
+        'swift-corelibs-foundation': 'apple/swift-corelibs-foundation'
     }
     for dir_name, repo in additional_repos.iteritems():
         print("--- Cloning '" + dir_name + "' ---")
-        check_call(['git', 'clone', repo, dir_name])
+        if opts['with_ssh'] == True:
+            remote = "git@github.com:" + repo + '.git'
+        else:
+            remote = "https://github.com/" + repo + '.git'
+        check_call(['git', 'clone', remote, dir_name])
 
 def main():
     parser = argparse.ArgumentParser(
@@ -81,14 +84,19 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     parser.add_argument("--clone",
         help="Obtain Sources for Swift and Related Projects",
         action="store_true")
+    parser.add_argument("--clone-with-ssh",
+        help="Obtain Sources for Swift and Related Projects via SSH",
+        action="store_true")
     args = parser.parse_args()
 
-    if args.all:
-        update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "llbuild"))
-        update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "llvm"))
-        update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "clang"))
+    # if args.all:
+        # update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "llbuild"))
+        # update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "llvm"))
+        # update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "clang"))
     if args.clone:
         obtain_additional_swift_sources()
+    if args.clone_with_ssh:
+        obtain_additional_swift_sources({'with_ssh': True})
 
     update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "swift"))
     update_working_copy(

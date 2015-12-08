@@ -67,31 +67,25 @@ compiler for C++14 support and create a symlink:
 
 ### Getting Sources for Swift and Related Projects
 
-For those checking out sources as read-only:
+#### Swift Sources
 
-     git clone https://github.com/apple/swift.git swift
-     git clone https://github.com/apple/swift-llvm.git llvm
-     git clone https://github.com/apple/swift-clang.git clang
-     git clone https://github.com/apple/swift-lldb.git lldb
-     git clone https://github.com/apple/swift-cmark.git cmark
-     git clone https://github.com/apple/swift-llbuild.git llbuild
-     git clone https://github.com/apple/swift-package-manager.git swiftpm
-     git clone https://github.com/apple/swift-corelibs-xctest.git
-     git clone https://github.com/apple/swift-corelibs-foundation.git
+**Via HTTPS**
+    git clone https://github.com/apple/swift.git
 
-For those who plan on regularly making direct commits, cloning over
-SSH may provide a better experience (which requires uploading 
-SSH keys to GitHub):
+**Via SSH**
+    git clone git@github.com:apple/swift.git
 
-     git clone git@github.com:apple/swift.git swift
-     git clone git@github.com:apple/swift-llvm.git llvm
-     git clone git@github.com:apple/swift-clang.git clang
-     git clone git@github.com:apple/swift-lldb.git lldb
-     git clone git@github.com:apple/swift-cmark.git cmark
-     git clone git@github.com:apple/swift-llbuild.git llbuild
-     git clone git@github.com:apple/swift-package-manager.git swiftpm
-     git clone git@github.com:apple/swift-corelibs-xctest.git
-     git clone git@github.com:apple/swift-corelibs-foundation.git
+#### Related Project Sources
+
+
+**Via HTTPS**
+    cd <local_path_to_swift_repo>
+    ./utils/update-checkout --clone
+
+**Via SSH**
+    cd <local_path_to_swift_repo>
+    ./utils/update-checkout --clone-via-ssh
+
 
 [CMake](http://cmake.org) is the core infrastructure used to configure builds of
 Swift and its companion projects; at least version 2.8.12.2 is required. Your
