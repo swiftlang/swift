@@ -60,7 +60,7 @@ multi-threaded program below.
 
 This program crashes very quickly when it tries to deallocate an already
 deallocated class instance.  To understand the bug try to imagine two threads
-executing the SIL code below in lockstep.  After they both load the same value
+executing the SIL code below in lockstep.  After, they both load the same value
 they both try to release the object.  One thread succeeds and deallocates the
 object while another thread attempts to read the memory of a deallocated
 object::
@@ -202,7 +202,7 @@ variables and unsafe code. Objective-C methods are automatically marked as
 that do not explicitly mark the APIs as reentrant or non-reentrant.
 
 In the example program below the method `fly` may access the global variable
-because it is marked with the attribute `unsafe`. The compile won't allow this
+because it is marked with the attribute `unsafe`. The compiler won't allow this
 method to be executed from a worker-thread.
 
 .. code-block:: swift
