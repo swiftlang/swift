@@ -141,7 +141,8 @@ static int swift_snprintf_l(char *Str, size_t StrSize, locale_t Locale,
 
 template <typename T>
 static uint64_t swift_floatingPointToString(char *Buffer, size_t BufferLength,
-                                            T Value, const char *Format, bool Debug) {
+                                            T Value, const char *Format, 
+                                            bool Debug) {
   if (BufferLength < 32)
     swift::crash("swift_floatingPointToString: insufficient buffer size");
 
