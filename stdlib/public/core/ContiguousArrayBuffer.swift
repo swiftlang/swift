@@ -581,7 +581,7 @@ extension _ContiguousArrayBuffer {
   }
 }
 
-/// This is a fast implemention of _copyToNativeArrayBuffer() for collections.
+/// This is a fast implementation of _copyToNativeArrayBuffer() for collections.
 ///
 /// It avoids the extra retain, release overhead from storing the
 /// ContiguousArrayBuffer into
