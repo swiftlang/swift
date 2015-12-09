@@ -73,7 +73,7 @@ model manually implemented in Objective-C with the ``NSError``
 convention.  Notably, the approach preserves these advantages of this
 convention:
 
-- Whether a method produces an error (or not) is an explicit part of
+- Whether, a method produces an error (or not) is an explicit part of
   its API contract.
 
 - Methods default to *not* producing errors unless they are explicitly
@@ -256,7 +256,7 @@ Throwing an error
 -----------------
 
 The ``throw`` statement begins the propagation of an error.  It always
-take an argument, which can be any value that conforms to the
+takes an argument, which can be any value that conforms to the
 ``ErrorType`` protocol (described below).
 
 ::
@@ -680,7 +680,7 @@ can be overloaded on whether its argument closure throws; the
 overload that takes a throwing closures would itself throw.
 
 There is one minor usability problem here, though.  If the closure
-contains throwing expressions, those expression must be explicitly
+contains throwing expressions, those expressions must be explicitly
 marked within the closure with ``try``.  However, from the compiler's
 perspective, the call to ``autoreleasepool`` is also a call that
 can throw, and so it must also be marked with ``try``::
