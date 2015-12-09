@@ -87,7 +87,8 @@ public:
 
   /// Perform the sequence dataflow, bottom up and top down on the loop region
   /// \p R.
-  bool runOnLoop(const LoopRegion *R, bool FreezeOwnedArgEpilogueReleases);
+  bool runOnLoop(const LoopRegion *R, bool FreezeOwnedArgEpilogueReleases,
+                 bool RecomputePostDomReleases);
 
   /// Summarize the contents of the loop so that loops further up the loop tree
   /// can reason about the loop.

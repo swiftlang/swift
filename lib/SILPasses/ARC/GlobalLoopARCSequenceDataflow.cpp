@@ -271,7 +271,10 @@ LoopARCSequenceDataflowEvaluator::~LoopARCSequenceDataflowEvaluator() {
 }
 
 bool LoopARCSequenceDataflowEvaluator::runOnLoop(
-    const LoopRegion *R, bool FreezeOwnedArgEpilogueReleases) {
+    const LoopRegion *R, bool FreezeOwnedArgEpilogueReleases,
+    bool RecomputePostDomReleases) {
+  if (RecomputePostDomReleases)
+    ConsumedArgToReleaseMap.recompute();
   bool NestingDetected = processLoopBottomUp(R, FreezeOwnedArgEpilogueReleases);
   NestingDetected |= processLoopTopDown(R);
   return NestingDetected;

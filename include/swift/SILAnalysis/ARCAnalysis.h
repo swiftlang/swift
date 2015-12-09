@@ -148,6 +148,13 @@ public:
     return I->second;
   }
 
+  SILInstruction *releaseForArgument(SILValue V) const {
+    auto *Arg = dyn_cast<SILArgument>(V);
+    if (!Arg)
+      return nullptr;
+    return releaseForArgument(Arg);
+  }
+
   /// Recompute the mapping from argument to consumed arg.
   void recompute();
 
