@@ -73,7 +73,7 @@ model manually implemented in Objective-C with the ``NSError``
 convention.  Notably, the approach preserves these advantages of this
 convention:
 
-- Whether, a method produces an error (or not) is an explicit part of
+- Whether a method produces an error (or not) is an explicit part of
   its API contract.
 
 - Methods default to *not* producing errors unless they are explicitly
