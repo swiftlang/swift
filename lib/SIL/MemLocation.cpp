@@ -130,24 +130,23 @@ void MemLocation::expand(MemLocation &Base, SILModule *M, MemLocationList &Locs,
   }
 }
 
-void MemLocation::reduce(MemLocation &Base, SILModule *Mod,
-                         MemLocationSet &Locs) {
+void MemLocation::reduce(MemLocation &Base, SILModule *M, MemLocationSet &Locs) {
   // First, construct the MemLocation by appending the projection path from the
   // accessed node to the leaf nodes.
-  MemLocationList ALocs;
+  MemLocationList Nodes;
   ProjectionPathList Paths;
-  ProjectionPath::expandTypeIntoLeafProjectionPaths(Base.getType(), Mod, Paths,
+  ProjectionPath::expandTypeIntoLeafProjectionPaths(Base.getType(), M, Paths,
                                                     false);
   ProjectionPath &BasePath = Base.getPath().getValue();
   for (auto &X : Paths) {
-    ALocs.push_back(MemLocation(Base.getBase(), X.getValue(), BasePath));
+    Nodes.push_back(MemLocation(Base.getBase(), X.getValue(), BasePath));
   }
 
   // Second, go from leaf nodes to their parents. This guarantees that at the
   // point the parent is processed, its children have been processed already.
-  for (auto I = ALocs.rbegin(), E = ALocs.rend(); I != E; ++I) {
+  for (auto I = Nodes.rbegin(), E = Nodes.rend(); I != E; ++I) {
     MemLocationList FirstLevel;
-    I->getFirstLevelMemLocations(FirstLevel, Mod);
+    I->getFirstLevelMemLocations(FirstLevel, M);
     // Reached the end of the projection tree, this is a leaf node.
     if (FirstLevel.empty())
       continue;
@@ -160,9 +159,7 @@ void MemLocation::reduce(MemLocation &Base, SILModule *Mod,
     // alive.
     bool Alive = true;
     for (auto &X : FirstLevel) {
-      if (Locs.find(X) != Locs.end())
-        continue;
-      Alive = false;
+      Alive &= Locs.find(X) != Locs.end();
     }
 
     // All first level locations are alive, create the new aggregated location.
