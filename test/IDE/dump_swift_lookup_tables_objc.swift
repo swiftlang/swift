@@ -6,7 +6,16 @@
 
 // REQUIRES: objc_interop
 
-// CHECK:      Base name -> entry mappings:
+// CHECK-LABEL: <<ObjectiveC lookup table>>
+// CHECK-NEXT: Base name -> entry mappings:
+// CHECK-NOT: lookup table
+// CHECK:   NSObject:
+// CHECK-NEXT:     TU: NSObject
+// CHECK-NEXT:   NSObjectProtocol:
+// CHECK-NEXT:     TU: NSObject
+
+// CHECK-LABEL: <<Bridging header lookup table>>
+// CHECK-NEXT:      Base name -> entry mappings:
 // CHECK-NEXT:   CCItem:
 // CHECK-NEXT:     TU: CCItemRef
 // CHECK-NEXT:   CCItemRef:

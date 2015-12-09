@@ -28,6 +28,7 @@
 #include "clang/APINotes/APINotesReader.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Frontend/CompilerInstance.h"
+#include "clang/Serialization/ModuleFileExtension.h"
 #include "clang/AST/Attr.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
@@ -219,7 +220,7 @@ using api_notes::FactoryAsInitKind;
 
 /// \brief Implementation of the Clang importer.
 class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation 
-  : public LazyMemberLoader 
+  : public LazyMemberLoader, public clang::ModuleFileExtension
 {
   friend class ClangImporter;
 
@@ -294,6 +295,9 @@ private:
 
   /// The Swift lookup table for the bridging header.
   SwiftLookupTable BridgingHeaderLookupTable;
+
+  /// The Swift lookup tables, per module.
+  llvm::StringMap<std::unique_ptr<SwiftLookupTable>> LookupTables;
 
 public:
   /// \brief Mapping of already-imported declarations.
@@ -1258,6 +1262,20 @@ public:
       ASD->setSetterAccessibility(Accessibility::Public);
     return D;
   }
+
+  // Module file extension overrides
+
+  clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
+  llvm::hash_code hashExtension(llvm::hash_code code) const override;
+
+  std::unique_ptr<clang::ModuleFileExtensionWriter>
+  createExtensionWriter(clang::ASTWriter &writer) override;
+
+  std::unique_ptr<clang::ModuleFileExtensionReader>
+  createExtensionReader(const clang::ModuleFileExtensionMetadata &metadata,
+                        clang::ASTReader &reader,
+                        clang::serialization::ModuleFile &mod,
+                        const llvm::BitstreamCursor &stream) override;
 
   /// Dump the Swift-specific name lookup tables we generate.
   void dumpSwiftLookupTables();
