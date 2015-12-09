@@ -194,17 +194,28 @@ internal func _swift_Darwin_fcntlPtr(
   ) ->CInt
 
 @warn_unused_result
-public func fcntl(fd: CInt, cmd: CInt) ->CInt {
+public func fcntl(
+  fd: CInt,
+  _ cmd: CInt
+  ) ->CInt {
   return _swift_Darwin_fcntl(fd, cmd, 0)
 }
 
 @warn_unused_result
-public func fcntl(fd: CInt, cmd: CInt, value: CInt) ->CInt {
+public func fcntl(
+  fd: CInt,
+  _ cmd: CInt,
+  _ value: CInt
+  ) ->CInt {
   return _swift_Darwin_fcntl(fd, cmd, value)
 }
 
 @warn_unused_result
-public func fcntl(fd: CInt, cmd: CInt, ptr: UnsafeMutablePointer<Void>) ->CInt {
+public func fcntl(
+  fd: CInt,
+  _ cmd: CInt,
+  _ ptr: UnsafeMutablePointer<Void>
+  ) ->CInt {
   return _swift_Darwin_fcntlPtr(fd, cmd, ptr)
 }
 

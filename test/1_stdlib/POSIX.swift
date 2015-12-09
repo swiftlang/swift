@@ -88,7 +88,7 @@ POSIXTests.test("fcntl fail") {
   expectEqual(-1, fd)
   expectEqual(ENOENT, errno)
 	
-  let _ = fcntl(fd, cmd: F_GETFL)
+  let _ = fcntl(fd, F_GETFL)
   expectEqual(EBADF, errno)
 }
 
@@ -99,21 +99,21 @@ POSIXTests.test("fcntl F_GETFL/F_SETFL success with file") {
   let fd = open(strdup(fn), 0)
   expectGT(Int(fd), 0)
 	
-  var flags = fcntl(fd, cmd: F_GETFL)
+  var flags = fcntl(fd, F_GETFL)
   expectGE(Int(flags), 0)
 	
   // Change to APPEND mode...
-  var rc = fcntl(fd, cmd: F_SETFL, value: O_APPEND)
+  var rc = fcntl(fd, F_SETFL, O_APPEND)
   expectEqual(0, rc)
 	
-  flags = fcntl(fd, cmd: F_GETFL)
+  flags = fcntl(fd, F_GETFL)
   expectEqual(flags | O_APPEND, flags)
 	
   // Change back...
-  rc = fcntl(fd, cmd: F_SETFL, value: 0)
+  rc = fcntl(fd, F_SETFL, 0)
   expectEqual(0, rc)
 
-  flags = fcntl(fd, cmd: F_GETFL)
+  flags = fcntl(fd, F_GETFL)
   expectGE(Int(flags), 0)
 	
   // Clean up...
@@ -129,21 +129,21 @@ POSIXTests.test("fcntl block and unblocking sockets success") {
   let sock = socket(PF_INET, 1, 0)
   expectGT(Int(sock), 0)
 	
-  var flags = fcntl(sock, cmd:F_GETFL)
+  var flags = fcntl(sock, F_GETFL)
   expectGE(Int(flags), 0)
 	
   // Change mode of socket to non-blocking...
-  var rc = fcntl(sock, cmd: F_SETFL, value: flags | O_NONBLOCK)
+  var rc = fcntl(sock, F_SETFL, flags | O_NONBLOCK)
   expectEqual(0, rc)
 	
-  flags = fcntl(sock, cmd: F_GETFL)
+  flags = fcntl(sock, F_GETFL)
   expectEqual((flags | O_NONBLOCK), flags)
 	
   // Change back to blocking...
-  rc = fcntl(sock, cmd: F_SETFL, value: flags & ~O_NONBLOCK)
+  rc = fcntl(sock, F_SETFL, flags & ~O_NONBLOCK)
   expectEqual(0, rc)
 	
-  flags = fcntl(sock, cmd: F_GETFL)
+  flags = fcntl(sock, F_GETFL)
   expectGE(Int(flags), 0)
 	
   // Clean up...
@@ -171,13 +171,13 @@ POSIXTests.test("fcntl locking and unlocking success") {
   var flck = flock()
   flck.l_type = Int16(F_RDLCK)
   flck.l_len = off_t(data.characters.count)
-  rc = fcntl(fd, cmd: F_SETLK, ptr: &flck)
+  rc = fcntl(fd, F_SETLK, &flck)
   expectEqual(0, rc)
 	
   // Unlock for reading...
   flck = flock()
   flck.l_type = Int16(F_UNLCK)
-  rc = fcntl(fd, cmd: F_SETLK, ptr: &flck)
+  rc = fcntl(fd, F_SETLK, &flck)
   expectEqual(0, rc)
 	
   // Clean up...
