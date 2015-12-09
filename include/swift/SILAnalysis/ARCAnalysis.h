@@ -217,6 +217,9 @@ public:
 /// FinalRelease.
 bool getFinalReleasesForValue(SILValue Value, ReleaseTracker &Tracker);
 
+/// Match a call to a trap BB with no ARC relevant side effects.
+bool isARCInertTrapBB(const SILBasicBlock *BB);
+
 } // end namespace swift
 
 #endif

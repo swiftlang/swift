@@ -14,8 +14,8 @@
 #define SWIFT_SILPASSES_ARC_GLOBALLOOPARCSEQUENCEDATAFLOW_H
 
 #include "RefCountState.h"
+#include "ProgramTerminationAnalysis.h"
 #include "swift/SILAnalysis/LoopRegionAnalysis.h"
-#include "swift/SILAnalysis/ProgramTerminationAnalysis.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/NullablePtr.h"
 #include "llvm/ADT/MapVector.h"

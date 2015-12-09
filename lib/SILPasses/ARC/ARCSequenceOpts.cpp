@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "arc-sequence-opts"
 #include "swift/SILPasses/Passes.h"
 #include "GlobalARCPairingAnalysis.h"
+#include "ProgramTerminationAnalysis.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
@@ -22,7 +23,6 @@
 #include "swift/SILAnalysis/ARCAnalysis.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
-#include "swift/SILAnalysis/ProgramTerminationAnalysis.h"
 #include "swift/SILAnalysis/RCIdentityAnalysis.h"
 #include "swift/SILAnalysis/LoopRegionAnalysis.h"
 #include "swift/SILAnalysis/LoopAnalysis.h"
@@ -226,10 +226,10 @@ class ARCSequenceOpts : public SILFunctionTransform {
       auto *AA = getAnalysis<AliasAnalysis>();
       auto *POTA = getAnalysis<PostOrderAnalysis>();
       auto *RCFI = getAnalysis<RCIdentityAnalysis>()->get(F);
-      auto *PTFI = getAnalysis<ProgramTerminationAnalysis>()->get(F);
+      ProgramTerminationFunctionInfo PTFI(F);
 
-      if (processFunctionWithoutLoopSupport(*F, false, AA, POTA, RCFI, PTFI)) {
-        processFunctionWithoutLoopSupport(*F, true, AA, POTA, RCFI, PTFI);
+      if (processFunctionWithoutLoopSupport(*F, false, AA, POTA, RCFI, &PTFI)) {
+        processFunctionWithoutLoopSupport(*F, true, AA, POTA, RCFI, &PTFI);
         invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
       }
       return;
@@ -254,9 +254,9 @@ class ARCSequenceOpts : public SILFunctionTransform {
     auto *POTA = getAnalysis<PostOrderAnalysis>();
     auto *RCFI = getAnalysis<RCIdentityAnalysis>()->get(F);
     auto *LRFI = getAnalysis<LoopRegionAnalysis>()->get(F);
-    auto *PTFI = getAnalysis<ProgramTerminationAnalysis>()->get(F);
+    ProgramTerminationFunctionInfo PTFI(F);
 
-    if (processFunctionWithLoopSupport(*F, AA, POTA, LRFI, LI, RCFI, PTFI)) {
+    if (processFunctionWithLoopSupport(*F, AA, POTA, LRFI, LI, RCFI, &PTFI)) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
     }
   }

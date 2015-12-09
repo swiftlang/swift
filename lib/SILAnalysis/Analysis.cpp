@@ -18,7 +18,6 @@
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
 #include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILAnalysis/ClassHierarchyAnalysis.h"
-#include "swift/SILAnalysis/ProgramTerminationAnalysis.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/SIL/SILModule.h"
