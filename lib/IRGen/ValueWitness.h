@@ -290,7 +290,12 @@ enum class ValueWitness : unsigned {
   /// Given a valid object of this enum type, destructively extracts the
   /// associated payload.
   DestructiveProjectEnumData,
-  Last_EnumValueWitness = DestructiveProjectEnumData,
+  ///   void (*destructiveInjectEnumTag)(T *obj, unsigned tag, M *self);
+  /// Given an enum case tag and a valid object of case's payload type,
+  /// destructively inserts the tag into the payload.
+  DestructiveInjectEnumTag,
+
+  Last_EnumValueWitness = DestructiveInjectEnumTag,
 
   Last_ValueWitness = Last_EnumValueWitness,
 };

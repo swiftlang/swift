@@ -38,7 +38,7 @@ SWIFT_NAME(SomeProtocol)
 @interface SNSomeClass (Category1) <SNSomeProtocol>
 - (void)categoryMethodWithX:(float)x y:(float)y;
 - (void)categoryMethodWithX:(float)x y:(float)y z:(float)z;
-- (object)objectAtIndexedSubscript:(NSInteger)index;
+- (id)objectAtIndexedSubscript:(NSInteger)index;
 @end
 
 @interface SNCollision

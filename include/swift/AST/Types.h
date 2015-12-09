@@ -47,6 +47,7 @@ namespace swift {
   class GenericParamList;
   class GenericSignature;
   class Identifier;
+  enum class ResilienceExpansion : unsigned;
   class SILModule;
   class SILType;
   class TypeAliasDecl;
@@ -631,6 +632,10 @@ public:
   /// possibly nil pointer that can be unknown-retained and
   /// unknown-released.
   bool hasRetainablePointerRepresentation();
+
+  /// \brief Given that this type is a reference type, is it known to use
+  /// Swift-native reference counting?
+  bool usesNativeReferenceCounting(ResilienceExpansion resilience);
 
   /// Determines whether this type has a bridgable object
   /// representation, i.e., whether it is always represented as a single
@@ -2498,10 +2503,18 @@ enum class ParameterConvention {
   Indirect_In_Guaranteed,
 
   /// This argument is passed indirectly, i.e. by directly passing the address
-  /// of an object in memory.  The object is instantaneously valid on entry, and
-  /// it must be instantaneously valid on exit.  The callee may assume that the
-  /// address does not alias any valid object.
+  /// of an object in memory.  The object is always valid, but the callee may
+  /// assume that the address does not alias any valid object and reorder loads
+  /// stores to the parameter as long as the whole object remains valid. Invalid
+  /// single-threaded aliasing may produce inconsistent results, but should
+  /// remain memory safe.
   Indirect_Inout,
+  
+  /// This argument is passed indirectly, i.e. by directly passing the address
+  /// of an object in memory. The object is allowed to be aliased by other
+  /// well-typed references, but is not allowed to be escaped. This is the
+  /// convention used by mutable captures in @noescape closures.
+  Indirect_InoutAliasable,
 
   /// This argument is passed indirectly, i.e. by directly passing the address
   /// of an uninitialized object in memory.  The callee is responsible for
@@ -2531,6 +2544,7 @@ inline bool isIndirectParameter(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
   case ParameterConvention::Indirect_Out:
   case ParameterConvention::Indirect_In_Guaranteed:
     return true;
@@ -2550,6 +2564,7 @@ inline bool isConsumedParameter(ParameterConvention conv) {
     return true;
 
   case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
   case ParameterConvention::Indirect_Out:
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Guaranteed:
@@ -2570,6 +2585,7 @@ inline bool isGuaranteedParameter(ParameterConvention conv) {
     return true;
 
   case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
   case ParameterConvention::Indirect_Out:
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Direct_Unowned:
@@ -2587,6 +2603,7 @@ inline bool isDeallocatingParameter(ParameterConvention conv) {
 
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
   case ParameterConvention::Indirect_Out:
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Direct_Unowned:
@@ -2599,19 +2616,20 @@ inline bool isDeallocatingParameter(ParameterConvention conv) {
 
 /// A parameter type and the rules for passing it.
 class SILParameterInfo {
-  llvm::PointerIntPair<CanType, 3, ParameterConvention> TypeAndConvention;
+  CanType Ty;
+  ParameterConvention Convention;
 public:
-  SILParameterInfo() = default;
+  SILParameterInfo() : Ty(), Convention((ParameterConvention)0) {}
   SILParameterInfo(CanType type, ParameterConvention conv)
-    : TypeAndConvention(type, conv) {
+    : Ty(type), Convention(conv) {
     assert(type->isLegalSILType() && "SILParameterInfo has illegal SIL type");
   }
 
   CanType getType() const {
-    return TypeAndConvention.getPointer();
+    return Ty;
   }
   ParameterConvention getConvention() const {
-    return TypeAndConvention.getInt();
+    return Convention;
   }
   bool isIndirect() const {
     return isIndirectParameter(getConvention());
@@ -2623,6 +2641,10 @@ public:
 
   bool isIndirectInOut() const {
     return getConvention() == ParameterConvention::Indirect_Inout;
+  }
+  bool isIndirectMutating() const {
+    return getConvention() == ParameterConvention::Indirect_Inout
+        || getConvention() == ParameterConvention::Indirect_InoutAliasable;
   }
   bool isIndirectResult() const {
     return getConvention() == ParameterConvention::Indirect_Out;
@@ -2675,7 +2697,8 @@ public:
   }
 
   void profile(llvm::FoldingSetNodeID &id) {
-    id.AddPointer(TypeAndConvention.getOpaqueValue());
+    id.AddPointer(Ty.getPointer());
+    id.AddInteger((unsigned)Convention);
   }
 
   void dump() const;
@@ -2689,7 +2712,7 @@ public:
   }
 
   bool operator==(SILParameterInfo rhs) const {
-    return TypeAndConvention == rhs.TypeAndConvention;
+    return Ty == rhs.Ty && Convention == rhs.Convention;
   }
   bool operator!=(SILParameterInfo rhs) const {
     return !(*this == rhs);
@@ -3985,7 +4008,7 @@ BEGIN_CAN_TYPE_WRAPPER(ReferenceStorageType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getReferentType)
 END_CAN_TYPE_WRAPPER(ReferenceStorageType, Type)
 
-/// \brief The storage type of a variable with [unowned] ownership semantics.
+/// \brief The storage type of a variable with @unowned ownership semantics.
 class UnownedStorageType : public ReferenceStorageType {
   friend class ReferenceStorageType;
   UnownedStorageType(Type referent, const ASTContext *C,
@@ -3997,6 +4020,10 @@ public:
     return static_cast<UnownedStorageType*>(
                  ReferenceStorageType::get(referent, Ownership::Unowned, C));
   }
+
+  /// Is this unowned storage type known to be loadable within the given
+  /// resilience scope?
+  bool isLoadable(ResilienceExpansion resilience) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {

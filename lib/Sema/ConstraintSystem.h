@@ -1052,7 +1052,7 @@ struct MemberLookupResult {
     Unsolved,
     
     /// This result indicates that the member reference is erroneous, but was
-    /// already dianosed.  Don't emit another error.
+    /// already diagnosed.  Don't emit another error.
     ErrorAlreadyDiagnosed,
     
     /// This result indicates that the lookup produced candidate lists,

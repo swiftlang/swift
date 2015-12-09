@@ -961,9 +961,9 @@ entry(%0 : $Int):
   // CHECK: store %0 to [[PROJECT]]
   store %0 to %c : $*Int
   // CHECK: [[FUNC:%.*]] = function_ref
-  %f = function_ref @block_invoke : $@convention(c) (@inout @block_storage Int) -> ()
-  // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[STORAGE]]#1 : $*@block_storage Int, invoke [[FUNC]] : $@convention(c) (@inout @block_storage Int) -> (), type $@convention(block) () -> ()
-  %b = init_block_storage_header %s#1 : $*@block_storage Int, invoke %f : $@convention(c) (@inout @block_storage Int) -> (), type $@convention(block) () -> ()
+  %f = function_ref @block_invoke : $@convention(c) (@inout_aliasable @block_storage Int) -> ()
+  // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[STORAGE]]#1 : $*@block_storage Int, invoke [[FUNC]] : $@convention(c) (@inout_aliasable @block_storage Int) -> (), type $@convention(block) () -> ()
+  %b = init_block_storage_header %s#1 : $*@block_storage Int, invoke %f : $@convention(c) (@inout_aliasable @block_storage Int) -> (), type $@convention(block) () -> ()
   // CHECK: dealloc_stack [[STORAGE]]#0 : $*@local_storage @block_storage Int
   dealloc_stack %s#0 : $*@local_storage @block_storage Int
   // CHECK: return [[BLOCK]] : $@convention(block) () -> ()
@@ -1007,7 +1007,7 @@ entry:
   return %p : $Protocol
 }
 
-sil [fragile] @block_invoke : $@convention(c) (@inout @block_storage Int) -> ()
+sil [fragile] @block_invoke : $@convention(c) (@inout_aliasable @block_storage Int) -> ()
 
 
 // Test try_apply and throws

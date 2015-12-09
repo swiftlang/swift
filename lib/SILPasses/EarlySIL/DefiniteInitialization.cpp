@@ -1089,10 +1089,14 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
   }
 
   Diag<StringRef, bool> DiagMessage;
-  if (isa<MarkFunctionEscapeInst>(Inst))
-    DiagMessage = diag::global_variable_function_use_uninit;
-  else
-    DiagMessage = diag::variable_escape_before_initialized;
+  if (isa<MarkFunctionEscapeInst>(Inst)) {
+    if (Inst->getLoc().isASTNode<AbstractClosureExpr>())
+      DiagMessage = diag::variable_closure_use_uninit;
+    else
+      DiagMessage = diag::variable_function_use_uninit;
+  } else {
+    DiagMessage = diag::variable_closure_use_uninit;
+  }
 
   diagnoseInitError(Use, DiagMessage);
 }
@@ -1417,8 +1421,13 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
     noteUninitializedMembers(Use);
     return;
   }
-
-  diagnoseInitError(Use, diag::variable_used_before_initialized);
+  
+  // If this is a load into a promoted closure capture, diagnose properly as
+  // a capture.
+  if (isa<LoadInst>(Inst) && Inst->getLoc().isASTNode<AbstractClosureExpr>())
+    diagnoseInitError(Use, diag::variable_closure_use_uninit);
+  else
+    diagnoseInitError(Use, diag::variable_used_before_initialized);
 }
 
 /// handleSuperInitUse - When processing a 'self' argument on a class, this is
@@ -1542,6 +1551,14 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &InstInfo) {
            "should not modify store_weak that already knows it is initialized");
 
     SW->setIsInitializationOfDest(InitKind);
+    return;
+  }
+
+  if (auto *SU = dyn_cast<StoreUnownedInst>(Inst)) {
+    assert(!SU->isInitializationOfDest() &&
+           "should not modify store_unowned that already knows it is an init");
+
+    SU->setIsInitializationOfDest(InitKind);
     return;
   }
   

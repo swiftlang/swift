@@ -647,6 +647,21 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         continue;
       }
     
+    if (auto SUI = dyn_cast<StoreUnownedInst>(User))
+      if (UI->getOperandNumber() == 1) {
+        DIUseKind Kind;
+        if (InStructSubElement)
+          Kind = DIUseKind::PartialStore;
+        else if (SUI->isInitializationOfDest())
+          Kind = DIUseKind::Initialization;
+        else if (isDefiniteInitFinished)
+          Kind = DIUseKind::Assign;
+        else
+          Kind = DIUseKind::InitOrAssign;
+        Uses.push_back(DIMemoryUse(User, Kind, BaseEltNo, 1));
+        continue;
+      }
+
     if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
       // If this is a copy of a tuple, we should scalarize it so that we don't
       // have an access that crosses elements.
@@ -710,7 +725,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         continue;
 
       // If this is an @inout parameter, it is like both a load and store.
-      case ParameterConvention::Indirect_Inout: {
+      case ParameterConvention::Indirect_Inout:
+      case ParameterConvention::Indirect_InoutAliasable: {
         // If we're in the initializer for a struct, and this is a call to a
         // mutating method, we model that as an escape of self.  If an
         // individual sub-member is passed as inout, then we model that as an

@@ -436,79 +436,6 @@ static NSString *_getClassDescription(Class cls) {
 
 @end
 
-/*****************************************************************************/
-/****************************** WEAK REFERENCES ******************************/
-/*****************************************************************************/
-
-/// A side-table of shared weak references for use by the unowned entry.
-///
-/// FIXME: this needs to be integrated with the ObjC runtime so that
-/// entries will actually get collected.  Also, that would make this just
-/// a simple manipulation of the internal structures there.
-///
-/// FIXME: this is not actually safe; if the ObjC runtime deallocates
-/// the pointer, the keys in UnownedRefs will become dangling
-/// references.  rdar://16968733
-namespace {
-  struct UnownedRefEntry {
-    id Value;
-    size_t Count;
-  };
-}
-
-// The ObjC runtime will hold a point into the UnownedRefEntry,
-// so we require pointers to objects to be stable across rehashes.
-// DenseMap doesn't guarantee that, but std::unordered_map does.
-
-namespace {
-struct UnownedTable {
-  std::unordered_map<const void*, UnownedRefEntry> Refs;
-  std::mutex Mutex;
-};
-}
-
-static Lazy<UnownedTable> UnownedRefs;
-
-static void objc_rootUnownedRetainStrong(id object) {
-  auto &Unowned = UnownedRefs.get();
-
-  std::lock_guard<std::mutex> lock(Unowned.Mutex);
-  auto it = Unowned.Refs.find((const void*) object);
-  assert(it != Unowned.Refs.end());
-  assert(it->second.Count > 0);
-
-  // Do an unbalanced retain.
-  id result = objc_loadWeakRetained(&it->second.Value);
-
-  // If that yielded null, abort.
-  if (!result) _swift_abortRetainUnowned((const void*) object);
-}
-
-static void objc_rootUnownedRetain(id object) {
-  auto &Unowned = UnownedRefs.get();
-
-  std::lock_guard<std::mutex> lock(Unowned.Mutex);
-  auto ins = Unowned.Refs.insert({ (const void*) object, UnownedRefEntry() });
-  if (!ins.second) {
-    ins.first->second.Count++;
-  } else {
-    objc_initWeak(&ins.first->second.Value, object);
-    ins.first->second.Count = 1;
-  }
-}
-
-static void objc_rootUnownedRelease(id object) {
-  auto &Unowned = UnownedRefs.get();
-
-  std::lock_guard<std::mutex> lock(Unowned.Mutex);
-  auto it = Unowned.Refs.find((const void*) object);
-  assert(it != Unowned.Refs.end());
-  assert(it->second.Count > 0);
-  if (--it->second.Count == 0) {
-    objc_destroyWeak(&it->second.Value);
-    Unowned.Refs.erase(it);
-  }
-}
 #endif
 
 /// Decide dynamically whether the given object uses native Swift
@@ -550,21 +477,6 @@ static uintptr_t const objectPointerIsObjCBit = 0x00000002U;
 static bool usesNativeSwiftReferenceCounting_allocated(const void *object) {
   assert(!isObjCTaggedPointerOrNull(object));
   return usesNativeSwiftReferenceCounting(_swift_getClassOfAllocated(object));
-}
-
-static bool usesNativeSwiftReferenceCounting_unowned(const void *object) {
-  auto &Unowned = UnownedRefs.get();
-
-  // If an unknown object is unowned-referenced, it may in fact be implemented
-  // using an ObjC weak reference, which will eagerly deallocate the object
-  // when strongly released. We have to check first whether the object is in
-  // the side table before dereferencing the pointer.
-  if (Unowned.Refs.count(object))
-    return false;
-  // For a natively unowned reference, even after all strong references have
-  // been released, there's enough of a husk left behind to determine its
-  // species.
-  return usesNativeSwiftReferenceCounting_allocated(object);
 }
 
 void swift::swift_unknownRetain_n(void *object, int n) {
@@ -935,29 +847,6 @@ void swift::swift_unknownUnownedTakeAssign(UnownedReference *dest,
   // There's not really anything more efficient to do here than this.
   swift_unknownUnownedDestroy(dest);
   dest->Value = src->Value;
-}
-
-// FIXME: these implementations are inherently broken.
-
-void swift::swift_unknownUnownedRetainStrong(void *object) {
-  if (isObjCTaggedPointerOrNull(object)) return;
-  if (usesNativeSwiftReferenceCounting_unowned(object))
-    return swift_unownedRetainStrong((HeapObject*) object);
-  objc_rootUnownedRetainStrong((id) object);
-}
-
-void swift::swift_unknownUnownedRetain(void *object) {
-  if (isObjCTaggedPointerOrNull(object)) return;
-  if (usesNativeSwiftReferenceCounting_unowned(object))
-    return swift_unownedRetain((HeapObject*) object);
-  objc_rootUnownedRetain((id) object);
-}
-
-void swift::swift_unknownUnownedRelease(void *object) {
-  if (isObjCTaggedPointerOrNull(object)) return;
-  if (usesNativeSwiftReferenceCounting_unowned(object))
-    return swift_unownedRelease((HeapObject*) object);
-  objc_rootUnownedRelease((id) object);
 }
 
 /*****************************************************************************/
