@@ -562,7 +562,7 @@ generic arguments::
     func setElt(elt: T) { t = elt }
   }
 
-With no knowledge of T.deinit() we must assume worst case. SIL effects
+With no knowledge of T.deinit() we must assume the worst case. SIL effects
 analysis following specialization can easily handle such a trivial
 example. But there are two situations to be concerned about:
 
@@ -853,7 +853,7 @@ values, and (3) no calls are made into nonpure code.
     type definition, or it may rely on a type constraint.
 
 (3) Naturally, any calls within the function body must be transitively
-    pure. There is no need to check a calls to the storage
+    pure. There is no need to check calls to the storage
     deinitializer, which should already be guaranteed pure by virtue
     of (2).
 

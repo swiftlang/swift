@@ -786,7 +786,7 @@
   </p>
 
   <p><tt>inout</tt> indicates that the argument will be passed as an "in-out"
-    parameter. The caller must pass an lvalue decorated with the <tt>&</tt>
+    parameter. The caller must pass an lvalue decorated with the <tt>&amp;</tt>
     prefix operator as the argument. Semantically, the value of the argument
     is passed "in" to the callee to a local value, and that local value is
     stored back "out" to the lvalue when the callee exits. This is normally
@@ -837,7 +837,7 @@
   </pre>
 
   <p>The type being annotated must be <a href="#materializable">materializable</a>.
-    The type after annotation is never materializable.</tt>
+    The type after annotation is never materializable.
 
   <p>FIXME: we probably need a const-like variant, which permits
     r-values (and avoids writeback when the l-value is not physical).
