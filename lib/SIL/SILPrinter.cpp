@@ -1255,9 +1255,6 @@ public:
   void visitStrongRetainInst(StrongRetainInst *RI) {
     *this << "strong_retain " << getIDAndType(RI->getOperand());
   }
-  void visitStrongRetainAutoreleasedInst(StrongRetainAutoreleasedInst *RI) {
-    *this << "strong_retain_autoreleased " << getIDAndType(RI->getOperand());
-  }
   void visitStrongReleaseInst(StrongReleaseInst *RI) {
     *this << "strong_release " << getIDAndType(RI->getOperand());
   }
@@ -1335,10 +1332,6 @@ public:
 
   void visitReturnInst(ReturnInst *RI) {
     *this << "return " << getIDAndType(RI->getOperand());
-  }
-  
-  void visitAutoreleaseReturnInst(AutoreleaseReturnInst *RI) {
-    *this << "autorelease_return " << getIDAndType(RI->getOperand());
   }
   
   void visitThrowInst(ThrowInst *TI) {
