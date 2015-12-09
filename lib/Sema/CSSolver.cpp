@@ -70,7 +70,7 @@ static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
   return type;
 }
 
-/// Reconsistitute type sugar, e.g., for array types, dictionary
+/// Reconstitute type sugar, e.g., for array types, dictionary
 /// types, optionals, etc.
 static Type reconstituteSugar(Type type) {
   if (auto boundGeneric = dyn_cast<BoundGenericType>(type.getPointer())) {

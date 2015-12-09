@@ -75,7 +75,7 @@ Latest
 
 * Field getters and setters are now created for named unions imported from C.
   In addition, an initializer with a named parameter for the field is provided.
-  For example, given the following Objective-C `typdef`:
+  For example, given the following Objective-C `typedef`:
 
   ```objc
   typedef union IntOrFloat {

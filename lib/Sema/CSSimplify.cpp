@@ -444,7 +444,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
       if (param.Variadic)
         continue;
 
-      // Parameters with defaults can be unfilfilled.
+      // Parameters with defaults can be unfulfilled.
       if (param.HasDefaultArgument)
         continue;
 

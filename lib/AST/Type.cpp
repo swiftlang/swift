@@ -2125,7 +2125,7 @@ Type ProtocolCompositionType::get(const ASTContext &C,
     return Protocols.front()->getDeclaredType();
 
   // Form the set of canonical protocol types from the protocol
-  // declarations, and use that to buid the canonical composition type.
+  // declarations, and use that to build the canonical composition type.
   SmallVector<Type, 4> CanProtocolTypes;
   std::transform(Protocols.begin(), Protocols.end(),
                  std::back_inserter(CanProtocolTypes),
