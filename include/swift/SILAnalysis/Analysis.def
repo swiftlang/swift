@@ -25,7 +25,6 @@
 
 ANALYSIS(Alias)
 ANALYSIS(BasicCallee)
-ANALYSIS(CallGraph)
 ANALYSIS(ClassHierarchy)
 ANALYSIS(Destructor)
 ANALYSIS(Dominance)

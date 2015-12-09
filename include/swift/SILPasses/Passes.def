@@ -47,8 +47,6 @@ PASS(COWArrayOpts, "cowarray-opt",
      "COW Array optimizations")
 PASS(CSE, "cse",
      "Common subexpression elimination")
-PASS(CallGraphPrinter, "call-graph-printer",
-     "Construct and print the call graph for use in testing")
 PASS(CapturePromotion, "capture-promotion",
      "Promote captures from by-reference to by-value")
 PASS(CapturePropagation, "capture-prop",

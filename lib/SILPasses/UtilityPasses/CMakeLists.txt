@@ -2,7 +2,6 @@ set(UTILITYPASSES_SOURCES
   UtilityPasses/AADumper.cpp
   UtilityPasses/BasicCalleePrinter.cpp
   UtilityPasses/CFGPrinter.cpp
-  UtilityPasses/CallGraphPrinter.cpp
   UtilityPasses/EscapeAnalysisDumper.cpp
   UtilityPasses/FunctionOrderPrinter.cpp
   UtilityPasses/IVInfoPrinter.cpp
