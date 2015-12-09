@@ -2621,7 +2621,7 @@ namespace {
       if (arg != call->getArg())
         return;
 
-      // Dig out the function, looking through, parenthses, ?, and !.
+      // Dig out the function, looking through, parentheses, ?, and !.
       auto fn = call->getFn();
       do {
         fn = fn->getSemanticsProvidingExpr();
