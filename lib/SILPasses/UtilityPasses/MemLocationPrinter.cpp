@@ -72,14 +72,12 @@ class MemLocationPrinter : public SILModuleTransform {
           SILValue V = LI->getOperand();
           // This is an address type, take it object type.
           SILType Ty = V.getType().getObjectType();
-          ProjectionPath::expandTypeIntoLeafProjectionPaths(Ty, M, PPList,
-                                                            true);
+          ProjectionPath::expandTypeIntoLeafProjectionPaths(Ty, M, PPList);
         } else if (auto *SI = dyn_cast<StoreInst>(&II)) {
           SILValue V = SI->getDest();
           // This is an address type, take it object type.
           SILType Ty = V.getType().getObjectType();
-          ProjectionPath::expandTypeIntoLeafProjectionPaths(Ty, M, PPList,
-                                                            true);
+          ProjectionPath::expandTypeIntoLeafProjectionPaths(Ty, M, PPList);
         } else {
           // Not interested in these instructions yet.
           continue;
