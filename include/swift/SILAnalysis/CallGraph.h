@@ -345,8 +345,6 @@ public:
   friend struct OrderedCallGraph;
 #endif
 
-  friend class CallGraphLinkerEditor;
-
   CallGraph(SILModule *M, bool completeModule);
   ~CallGraph();
 
@@ -511,23 +509,6 @@ private:
   void clearBottomUpSCCOrder();
   void computeBottomUpSCCOrder();
   void computeBottomUpFunctionOrder();
-};
-
-class CallGraphLinkerEditor {
-  CallGraph *CG;
-
-  void callback(SILFunction *F) {
-    if (CG)
-      CG->addEdges(F);
-  }
-
-public:
-  CallGraphLinkerEditor(CallGraph *CG) : CG(CG) {}
-
-  std::function<void(SILFunction *)> getCallback() {
-    return std::bind(&CallGraphLinkerEditor::callback, this,
-                     std::placeholders::_1);
-  }
 };
 
 } // end namespace swift
