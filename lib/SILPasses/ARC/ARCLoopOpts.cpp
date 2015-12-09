@@ -21,6 +21,7 @@
 #define DEBUG_TYPE "arc-sequence-opts"
 #include "swift/SILPasses/Passes.h"
 #include "GlobalARCPairingAnalysis.h"
+#include "ProgramTerminationAnalysis.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/LoopAnalysis.h"
@@ -68,11 +69,11 @@ class ARCLoopOpts : public SILFunctionTransform {
     auto *AA = getAnalysis<AliasAnalysis>();
     auto *RCFI = getAnalysis<RCIdentityAnalysis>()->get(F);
     auto *LRFI = getAnalysis<LoopRegionAnalysis>()->get(F);
-    auto *PTFI = getAnalysis<ProgramTerminationAnalysis>()->get(F);
+    ProgramTerminationFunctionInfo PTFI(F);
 
     // Create all of our visitors, register them with the visitor group, and
     // run.
-    LoopARCPairingContext LoopARCContext(*F, AA, LRFI, LI, RCFI, PTFI);
+    LoopARCPairingContext LoopARCContext(*F, AA, LRFI, LI, RCFI, &PTFI);
     SILLoopVisitorGroup VisitorGroup(F, LI);
     VisitorGroup.addVisitor(&LoopARCContext);
     VisitorGroup.run();

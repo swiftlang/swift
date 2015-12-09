@@ -28,7 +28,6 @@
 #ifndef SWIFT_SILANALYSIS_PROGRAMTERMINATIONANALYSIS_H
 #define SWIFT_SILANALYSIS_PROGRAMTERMINATIONANALYSIS_H
 
-#include "swift/SILAnalysis/Analysis.h"
 #include "swift/SILAnalysis/ARCAnalysis.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
@@ -38,37 +37,16 @@ class ProgramTerminationFunctionInfo {
   llvm::SmallPtrSet<const SILBasicBlock *, 4> ProgramTerminatingBlocks;
 
 public:
-  ProgramTerminationFunctionInfo(const SILFunction *F);
+  ProgramTerminationFunctionInfo(const SILFunction *F) {
+    for (const auto &BB : *F) {
+      if (!isARCInertTrapBB(&BB))
+        continue;
+      ProgramTerminatingBlocks.insert(&BB);
+    }
+  }
 
   bool isProgramTerminatingBlock(const SILBasicBlock *BB) const {
     return ProgramTerminatingBlocks.count(BB);
-  }
-};
-
-class ProgramTerminationAnalysis
-    : public FunctionAnalysisBase<ProgramTerminationFunctionInfo> {
-public:
-  ProgramTerminationAnalysis(SILModule *M)
-      : FunctionAnalysisBase<ProgramTerminationFunctionInfo>(
-            AnalysisKind::ProgramTermination) {}
-
-  ProgramTerminationAnalysis(const ProgramTerminationAnalysis &) = delete;
-  ProgramTerminationAnalysis &
-  operator=(const ProgramTerminationAnalysis &) = delete;
-
-  static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::ProgramTermination;
-  }
-
-  virtual void initialize(SILPassManager *PM) override {}
-
-  virtual ProgramTerminationFunctionInfo *
-  newFunctionAnalysis(SILFunction *F) override {
-    return new ProgramTerminationFunctionInfo(F);
-  }
-
-  virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {
-    return K & InvalidationKind::Branches;
   }
 };
 
