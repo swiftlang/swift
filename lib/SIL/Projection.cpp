@@ -615,39 +615,31 @@ ProjectionPath::subtractPaths(const ProjectionPath &LHS, const ProjectionPath &R
 void
 ProjectionPath::expandTypeIntoLeafProjectionPaths(SILType B, SILModule *Mod,
                                                   ProjectionPathList &Paths) {
+
   // Perform a BFS to expand the given type into projectionpath each of 
   // which contains 1 field from the type.
-  ProjectionPathList WorkList;
+  ProjectionPathList Worklist;
   llvm::SmallVector<Projection, 8> Projections;
 
-  // Get the first level projection of the current type.
-  Projection::getFirstLevelAddrProjections(B, *Mod, Projections);
-  for (auto &AP : Projections) {
-    ProjectionPath X;
-    X.Path.push_back(AP);
-    WorkList.push_back(std::move(X));
-  }
-
-  // If the BaseType is a leaf node, push a single empty projection path.
-  if (WorkList.empty()) {
-    ProjectionPath P;
-    Paths.push_back(std::move(P)); 
-    return;
-  }
-
-  // Keep iterating if the worklist is not empty.
-  while (!WorkList.empty()) {
-    Optional<ProjectionPath> Path = WorkList.pop_back_val();
-    SILType ParentTy = Path.getValue().front().getType();
+  // Push an empty projection path to get started.
+  SILType Ty;
+  ProjectionPath P;
+  Worklist.push_back(std::move(P));
+  do {
+    // Get the next level projections based on current projection's type.
+    Optional<ProjectionPath> PP = Worklist.pop_back_val();
+    // Get the current type to process, the very first projection path will be
+    // empty.
+    Ty = PP.getValue().empty() ? B : PP.getValue().front().getType();
 
     // Get the first level projection of the current type.
     Projections.clear();
-    Projection::getFirstLevelAddrProjections(ParentTy, *Mod, Projections);
+    Projection::getFirstLevelAddrProjections(Ty, *Mod, Projections);
 
     // Reached the end of the projection tree, this field can not be expanded
     // anymore.
     if (Projections.empty()) {
-      Paths.push_back(std::move(Path.getValue()));
+      Paths.push_back(std::move(PP.getValue()));
       continue;
     }
 
@@ -668,22 +660,21 @@ ProjectionPath::expandTypeIntoLeafProjectionPaths(SILType B, SILModule *Mod,
     //
     // The worklist would never be empty in this case !.
     //
-    if (ParentTy.getClassOrBoundGenericClass()) {
-      Paths.push_back(std::move(Path.getValue()));
+    if (Ty.getClassOrBoundGenericClass()) {
+      Paths.push_back(std::move(PP.getValue()));
       continue;
     }
-
-    // Keep the intermediate nodes as well.
-    Paths.push_back(std::move(Path.getValue()));
 
     // Keep expanding the location.
     for (auto &P : Projections) {
       ProjectionPath X;
       X.append(P);
-      X.append(Path.getValue());
-      WorkList.push_back(std::move(X));
+      X.append(PP.getValue());
+      Worklist.push_back(std::move(X));
     }
-  }
+    // Keep iterating if the worklist is not empty.
+  } while (!Worklist.empty());
+
 }
 
 void
