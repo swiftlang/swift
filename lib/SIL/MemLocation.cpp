@@ -126,20 +126,20 @@ void MemLocation::expand(MemLocation &Base, SILModule *Mod,
   // initialized with address projection paths. By keeping it consistent makes
   // it easier to implement the getType function for MemLocation.
   //
-  SILType BaseType = Base.getType();
-  if (TECache.find(BaseType) == TECache.end()) {
+  SILType BaseTy = Base.getType();
+  if (TECache.find(BaseTy) == TECache.end()) {
     // There is no cached expansion for this type, build and cache it now.
     ProjectionPathList Paths;
-    ProjectionPath::expandTypeIntoLeafProjectionPaths(BaseType, Mod, Paths,
+    ProjectionPath::expandTypeIntoLeafProjectionPaths(BaseTy, Mod, Paths,
                                                       true);
     for (auto &P : Paths) {
-      TECache[BaseType()].push_back(std::move(P.getValue()));
+      TECache[BaseTy].push_back(std::move(P.getValue()));
     }
   }
 
   // Construct the MemLocation by appending the projection path from the
   // accessed node to the leaf nodes.
-  for (auto &X : TECache[BaseType]) {
+  for (auto &X : TECache[BaseTy]) {
     Locs.push_back(MemLocation::createMemLocation(Base.getBase(), X.getValue(),
                                                   Base.getPath().getValue()));
   }
