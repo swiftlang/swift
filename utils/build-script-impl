@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-#===--- build-script-impl - Implementation details of build-script ---------===#
-#
+
+##===----- build-script-impl - Implementation details of build-script ---------===##
+##
 ## This source file is part of the Swift.org open source project
 ##
 ## Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
@@ -8,8 +9,8 @@
 ##
 ## See http://swift.org/LICENSE.txt for license information
 ## See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-#
-#===------------------------------------------------------------------------===#
+##
+##===--------------------------------------------------------------------------===##
 
 #
 # This script is an implementation detail of other build scripts and should not

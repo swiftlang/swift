@@ -1,26 +1,27 @@
-#===--- protocol_graph.py -------------------------*- coding: utf-8 -*----===#
-#
-# This source file is part of the Swift.org open source project
-#
-# Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
-# Licensed under Apache License v2.0 with Runtime Library Exception
-#
-# See http://swift.org/LICENSE.txt for license information
-# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-#
-#===----------------------------------------------------------------------===#
-#
-# Create a graph of the protocol refinement relationships, associated
-# types, operator requirements, and defaulted generic operators.
-#
-# run as follows to view the Nth-largest connected component in a web browser:
-#
-#   N=0 && rm -f /tmp/protocols.dot && \
-#   python protocol_graph.py stdlib.swift > /tmp/p0.dot && \
-#   (ccomps -zX#$N -o /tmp/protocols.dot /tmp/p0.dot || true) \
-#   && dot -Tsvg /tmp/protocols.dot > /tmp/protocols.svg \
-#   && open /tmp/protocols.svg
-#===----------------------------------------------------------------------===#
+##===--- protocol_graph.py -----------------------------*- coding: utf-8 -*----===##
+##
+## This source file is part of the Swift.org open source project
+##
+## Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+## Licensed under Apache License v2.0 with Runtime Library Exception
+##
+## See http://swift.org/LICENSE.txt for license information
+## See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+##
+##===--------------------------------------------------------------------------===##
+##
+### Create a graph of the protocol refinement relationships, associated
+### types, operator requirements, and defaulted generic operators.
+###
+### run as follows to view the Nth-largest connected component in a web browser:
+###
+###   N=0 && rm -f /tmp/protocols.dot && \
+###   python protocol_graph.py stdlib.swift > /tmp/p0.dot && \
+###   (ccomps -zX#$N -o /tmp/protocols.dot /tmp/p0.dot || true) \
+###   && dot -Tsvg /tmp/protocols.dot > /tmp/protocols.svg \
+###   && open /tmp/protocols.svg
+##
+##===--------------------------------------------------------------------------===##
 
 import re
 import sys
