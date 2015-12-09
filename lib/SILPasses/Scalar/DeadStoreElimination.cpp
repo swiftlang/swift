@@ -93,7 +93,10 @@ STATISTIC(NumDeadStores, "Number of dead stores removed");
 STATISTIC(NumPartialDeadStores, "Number of partial dead stores removed");
 
 /// Are we building the gen/kill sets or actually performing the DSE.
-enum class DSEComputeKind {BuildGenKillSet, PerformDSE};
+enum class DSEComputeKind {
+  BuildGenKillSet,
+  PerformDSE
+};
 
 //===----------------------------------------------------------------------===//
 //                             Utility Functions
