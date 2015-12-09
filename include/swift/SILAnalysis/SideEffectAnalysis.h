@@ -29,7 +29,11 @@ class CallGraph;
 
 /// An enum to represent the kind of scan we perform when we calculate
 /// side effects.
-enum class RetainObserveKind {ObserveRetains, IgnoreRetains, RetainObserveKindEnd};
+enum class RetainObserveKind {
+  ObserveRetains,
+  IgnoreRetains,
+  RetainObserveKindEnd
+};
 
 /// The SideEffectAnalysis provides information about side-effects of SIL
 /// functions. Side-effect information is provided per function and includes:
