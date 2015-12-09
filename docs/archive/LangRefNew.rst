@@ -40,7 +40,7 @@ Basic Goals
 In no particular order, and not explained well:
 
 * Support building great frameworks and applications, with a specific focus on
-  permiting rich and powerful APIs.
+  permitting rich and powerful APIs.
 * Get the defaults right: this reduces the barrier to entry and increases the
   odds that the right thing happens.
 * Through our support for building great APIs, we aim to provide an expressive
