@@ -238,9 +238,6 @@ CallGraphEdge *CallGraph::makeCallGraphEdgeForCallee(FullApplySite Apply,
     SWIFT_FALLTHROUGH;
   case ValueKind::FunctionRefInst: {
     auto *CalleeFn = cast<FunctionRefInst>(Callee)->getReferencedFunction();
-    if (CalleeFn->isExternalDeclaration())
-      M.linkFunction(CalleeFn, SILModule::LinkingMode::LinkAll,
-                     CallGraphLinkerEditor(this).getCallback());
 
     auto *CalleeNode = getOrAddCallGraphNode(CalleeFn);
     return new (Allocator) CallGraphEdge(Apply.getInstruction(), CalleeNode,
@@ -430,10 +427,6 @@ void CallGraph::addEdges(SILFunction *F) {
         continue;
 
       auto *CalleeFn = FRI->getReferencedFunction();
-
-      if (CalleeFn->isExternalDeclaration())
-        M.linkFunction(CalleeFn, SILModule::LinkingMode::LinkAll,
-                       CallGraphLinkerEditor(this).getCallback());
 
       if (CalleeFn->isPossiblyUsedExternally()) {
         auto *CalleeNode = tryGetCallGraphNode(CalleeFn);
