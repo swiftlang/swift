@@ -573,8 +573,11 @@ class alignas(1 << DeclAlignInBits) Decl {
     unsigned : NumTypeDeclBits;
 
     unsigned Recursive : 1;
+
+    /// Whether or not this declaration is currently being type-checked.
+    unsigned BeingTypeChecked : 1;
   };
-  enum { NumAssociatedTypeDeclBits = NumTypeDeclBits + 1 };
+  enum { NumAssociatedTypeDeclBits = NumTypeDeclBits + 2 };
   static_assert(NumAssociatedTypeDeclBits <= 32, "fits in an unsigned");
 
   class ImportDeclBitfields {
@@ -2605,6 +2608,14 @@ public:
   void setIsRecursive() { AssociatedTypeDeclBits.Recursive = true; }
   bool isRecursive() { return AssociatedTypeDeclBits.Recursive; }
 
+  /// Whether the declaration is currently being validated.
+  bool isBeingTypeChecked() { return AssociatedTypeDeclBits.BeingTypeChecked; }
+
+  /// Toggle whether or not the declaration is being validated.
+  void setIsBeingTypeChecked(bool ibt = true) {
+    AssociatedTypeDeclBits.BeingTypeChecked = ibt;
+  }
+
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::AssociatedType;
   }
@@ -4075,9 +4086,9 @@ public:
     ParentPattern = PBD;
   }
   
-  /// Return the Pattern involved in initializing this VarDecl.  Recall that the
-  /// Pattern may be involved in initializing more than just this one vardecl
-  /// though.  For example, if this is a VarDecl for "x", the pattern may be
+  /// Return the Pattern involved in initializing this VarDecl.  However, recall that 
+  /// the Pattern may be involved in initializing more than just this one vardecl.
+  /// For example, if this is a VarDecl for "x", the pattern may be
   /// "(x, y)" and the initializer on the PatternBindingDecl may be "(1,2)" or
   /// "foo()".
   ///
@@ -4095,7 +4106,7 @@ public:
     ParentPattern = S;
   }
 
-  /// Return the initializer involved in this VarDecl.  However, Recall that the
+  /// Return the initializer involved in this VarDecl.  Recall that the
   /// initializer may be involved in initializing more than just this one
   /// vardecl though.  For example, if this is a VarDecl for "x", the pattern
   /// may be "(x, y)" and the initializer on the PatternBindingDecl may be
@@ -4180,7 +4191,7 @@ public:
   ParamDecl(bool isLet, SourceLoc argumentNameLoc, 
             Identifier argumentName, SourceLoc parameterNameLoc,
             Identifier parameterName, Type ty, DeclContext *dc)
-    : VarDecl(DeclKind::Param, /*IsState=*/false, isLet, parameterNameLoc, 
+    : VarDecl(DeclKind::Param, /*IsStatic=*/false, isLet, parameterNameLoc, 
               parameterName, ty, dc),
       ArgumentName(argumentName), ArgumentNameLoc(argumentNameLoc) { }
 

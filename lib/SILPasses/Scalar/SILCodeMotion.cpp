@@ -806,8 +806,7 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
 
 static bool tryToSinkRefCountInst(SILBasicBlock::iterator T,
                                   SILBasicBlock::iterator I,
-                                  bool CanSinkToSuccessors,
-                                  AliasAnalysis *AA,
+                                  bool CanSinkToSuccessors, AliasAnalysis *AA,
                                   RCIdentityFunctionInfo *RCIA) {
   // The following methods should only be attempted if we can sink to our
   // successor.
@@ -1669,7 +1668,8 @@ sinkIncrementsOutOfSwitchRegions(AliasAnalysis *AA,
 
 static bool processFunction(SILFunction *F, AliasAnalysis *AA,
                             PostOrderFunctionInfo *PO,
-                            RCIdentityFunctionInfo *RCIA, bool HoistReleases) {
+                            RCIdentityFunctionInfo *RCIA,
+                            bool HoistReleases) {
 
   bool Changed = false;
 

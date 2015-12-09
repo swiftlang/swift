@@ -356,7 +356,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     {
       bool iBTC = decl->isBeingTypeChecked();
       decl->setIsBeingTypeChecked();
-      defer([&]{decl->setIsBeingTypeChecked(iBTC); });
+      defer {decl->setIsBeingTypeChecked(iBTC); };
 
       // Validate the type.
       if (validateType(inherited, DC, options, resolver)) {
@@ -1219,9 +1219,9 @@ static void validatePatternBindingDecl(TypeChecker &tc,
 
   // On any path out of this function, make sure to mark the binding as done
   // being type checked.
-  defer([&]{
+  defer {
     binding->setIsBeingTypeChecked(false);
-  });
+  };
 
   // Resolve the pattern.
   auto *pattern = tc.resolvePattern(binding->getPattern(entryNumber),
@@ -3192,6 +3192,18 @@ public:
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
+    if (assocType->isBeingTypeChecked()) {
+
+      if (!assocType->isInvalid()) {
+        assocType->setInvalid();
+        assocType->overwriteType(ErrorType::get(TC.Context));
+        TC.diagnose(assocType->getLoc(), diag::circular_type_alias, assocType->getName());
+      }
+      return;
+    }
+
+    assocType->setIsBeingTypeChecked();
+
     TC.checkDeclAttributesEarly(assocType);
     if (!assocType->hasAccessibility())
       assocType->setAccessibility(assocType->getProtocol()->getFormalAccess());
@@ -3205,6 +3217,8 @@ public:
       defaultDefinition.setInvalidType(TC.Context);
     }
     TC.checkDeclAttributes(assocType);
+
+    assocType->setIsBeingTypeChecked(false);
   }
 
   bool checkUnsupportedNestedGeneric(NominalTypeDecl *NTD) {
@@ -6239,7 +6253,7 @@ static Type checkExtensionGenericParams(
   };
 
   ext->setIsBeingTypeChecked(true);
-  defer([ext] { ext->setIsBeingTypeChecked(false); });
+  defer { ext->setIsBeingTypeChecked(false); };
 
   // Validate the generic type signature.
   bool invalid = false;

@@ -210,10 +210,10 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
                                    None,
                                    C);
 
-  return SILFunction::create(M, SILLinkage::Public,
-                             SWIFT_ENTRY_POINT_FUNCTION, topLevelType, nullptr,
-                             Loc, IsBare, IsNotTransparent, IsNotFragile,
-                             IsNotThunk, SILFunction::NotRelevant);
+  return M.getOrCreateFunction(SILLinkage::Public, SWIFT_ENTRY_POINT_FUNCTION,
+                               topLevelType, nullptr, Loc, IsBare,
+                               IsNotTransparent, IsNotFragile, IsNotThunk,
+                               SILFunction::NotRelevant);
 }
 
 SILType SILGenModule::getConstantType(SILDeclRef constant) {
@@ -723,10 +723,9 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
 
   auto *f =
-    SILFunction::create(M, SILLinkage::Private, funcName,
-                        initSILType, nullptr, SILLocation(binding),
-                        IsNotBare, IsNotTransparent,
-                        makeModuleFragile ? IsFragile : IsNotFragile);
+      M.getOrCreateFunction(SILLinkage::Private, funcName, initSILType, nullptr,
+                            SILLocation(binding), IsNotBare, IsNotTransparent,
+                            makeModuleFragile ? IsFragile : IsNotFragile);
   f->setDebugScope(new (M)
                    SILDebugScope(RegularLocation(binding->getInit(pbdEntry)),
                                  *f));

@@ -42,11 +42,10 @@ public:
   ARCBBState() : BB() {}
   ARCBBState(SILBasicBlock *BB) : BB(BB) {}
 
-  void init(SILBasicBlock *NewBB) {
+  void init(SILBasicBlock *NewBB, bool NewIsTrapBB) {
     assert(NewBB && "Cannot set NewBB to a nullptr.");
     BB = NewBB;
-    IsTrapBB = false;
-    initializeTrapStatus();
+    IsTrapBB = NewIsTrapBB;
   }
 
   /// Is this BB a BB that fits the canonical form of a trap?
@@ -138,9 +137,6 @@ public:
   /// BB. Used to create an initial state before we merge in other
   /// predecessors. This is currently a stub.
   void initPredTopDown(ARCBBState &PredBB);
-
-private:
-  void initializeTrapStatus();
 };
 
 class ARCSequenceDataflowEvaluator::ARCBBStateInfoHandle {
@@ -191,7 +187,8 @@ class ARCSequenceDataflowEvaluator::ARCBBStateInfo {
       BackedgeMap;
 
 public:
-  ARCBBStateInfo(SILFunction *F, PostOrderAnalysis *POTA);
+  ARCBBStateInfo(SILFunction *F, PostOrderAnalysis *POTA,
+                 ProgramTerminationFunctionInfo *PTFI);
 
   llvm::Optional<ARCBBStateInfoHandle> getBottomUpBBHandle(SILBasicBlock *BB);
   llvm::Optional<ARCBBStateInfoHandle> getTopDownBBHandle(SILBasicBlock *BB);

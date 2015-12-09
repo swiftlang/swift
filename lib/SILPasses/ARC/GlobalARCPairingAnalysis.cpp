@@ -405,26 +405,45 @@ bool ARCPairingContext::performMatching(CodeMotionOrDeleteCallback &Callback) {
 //===----------------------------------------------------------------------===//
 
 void LoopARCPairingContext::runOnLoop(SILLoop *L) {
-  processRegion(LRFI->getRegion(L));
+  auto *Region = LRFI->getRegion(L);
+  if (processRegion(Region, false, false)) {
+    // We do not recompute for now since we only look at the top function level
+    // for post dominating releases.
+    processRegion(Region, true, false);
+  }
+
+  // Now that we have finished processing the loop, summarize the loop.
+  Evaluator.summarizeLoop(Region);
 }
 
 void LoopARCPairingContext::runOnFunction(SILFunction *F) {
-  processRegion(LRFI->getTopLevelRegion());
+  if (processRegion(LRFI->getTopLevelRegion(), false, false)) {
+    // We recompute the final post dom release since we may have moved the final
+    // post dominated releases.
+    processRegion(LRFI->getTopLevelRegion(), true, true);
+  }
 }
 
-void LoopARCPairingContext::processRegion(const LoopRegion *Region) {
-  bool NestingDetected = Evaluator.runOnLoop(Region, FreezePostDomReleases);
+bool LoopARCPairingContext::processRegion(const LoopRegion *Region,
+                                          bool FreezePostDomReleases,
+                                          bool RecomputePostDomReleases) {
+  bool MadeChange = false;
+  bool NestingDetected = Evaluator.runOnLoop(Region, FreezePostDomReleases,
+                                             RecomputePostDomReleases);
   bool MatchedPair = Context.performMatching(Callback);
+  MadeChange |= MatchedPair;
+  Evaluator.clearLoopState(Region);
   Context.DecToIncStateMap.clear();
   Context.IncToDecStateMap.clear();
 
   while (NestingDetected && MatchedPair) {
-    Evaluator.clearLoopState(Region);
-    NestingDetected = Evaluator.runOnLoop(Region, FreezePostDomReleases);
+    NestingDetected = Evaluator.runOnLoop(Region, FreezePostDomReleases, false);
     MatchedPair = Context.performMatching(Callback);
+    MadeChange |= MatchedPair;
+    Evaluator.clearLoopState(Region);
     Context.DecToIncStateMap.clear();
     Context.IncToDecStateMap.clear();
   }
 
-  Evaluator.summarizeLoop(Region);
+  return MadeChange;
 }

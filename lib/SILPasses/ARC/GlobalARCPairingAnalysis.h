@@ -118,9 +118,11 @@ struct BlockARCPairingContext {
   ARCSequenceDataflowEvaluator Evaluator;
 
   BlockARCPairingContext(SILFunction &F, AliasAnalysis *AA,
-                         PostOrderAnalysis *POTA, RCIdentityFunctionInfo *RCFI)
-      : Context(F, RCFI), Evaluator(F, AA, POTA, RCFI, Context.DecToIncStateMap,
-                                    Context.IncToDecStateMap) {}
+                         PostOrderAnalysis *POTA, RCIdentityFunctionInfo *RCFI,
+                         ProgramTerminationFunctionInfo *PTFI)
+      : Context(F, RCFI),
+        Evaluator(F, AA, POTA, RCFI, PTFI, Context.DecToIncStateMap,
+                  Context.IncToDecStateMap) {}
 
   bool run(bool FreezePostDomReleases, CodeMotionOrDeleteCallback &Callback) {
     bool NestingDetected = Evaluator.run(FreezePostDomReleases);
@@ -141,26 +143,31 @@ struct LoopARCPairingContext : SILLoopVisitor {
   LoopRegionFunctionInfo *LRFI;
   SILLoopInfo *SLI;
   CodeMotionOrDeleteCallback Callback;
-  bool FreezePostDomReleases = false;
 
   LoopARCPairingContext(SILFunction &F, AliasAnalysis *AA,
                         LoopRegionFunctionInfo *LRFI, SILLoopInfo *SLI,
-                        RCIdentityFunctionInfo *RCFI)
+                        RCIdentityFunctionInfo *RCFI,
+                        ProgramTerminationFunctionInfo *PTFI)
       : SILLoopVisitor(&F, SLI), Context(F, RCFI),
-        Evaluator(F, AA, LRFI, SLI, RCFI, Context.DecToIncStateMap,
+        Evaluator(F, AA, LRFI, SLI, RCFI, PTFI, Context.DecToIncStateMap,
                   Context.IncToDecStateMap),
         LRFI(LRFI), SLI(SLI), Callback() {}
 
-  bool process(bool FreezePDReleases) {
-    FreezePostDomReleases = FreezePDReleases;
+  bool process() {
     run();
-    return Callback.madeChange();
+    if (!Callback.madeChange())
+      return false;
+    run();
+    return true;
   }
+
+  bool madeChange() const { return Callback.madeChange(); }
 
   void runOnLoop(SILLoop *L) override;
   void runOnFunction(SILFunction *F) override;
 
-  void processRegion(const LoopRegion *R);
+  bool processRegion(const LoopRegion *R, bool FreezePostDomReleases,
+                     bool RecomputePostDomReleases);
 };
 
 } // end swift namespace

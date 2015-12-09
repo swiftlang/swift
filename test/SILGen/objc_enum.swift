@@ -47,6 +47,6 @@ _ = NSFungingMask.ToTheMax
 
 // CHECK-DAG: sil shared [transparent] [thunk] @_TTWOSC16NSRuncingOptionss16RawRepresentable5gizmoFS0_C
 
-// Extension conformances get linkage occording to the protocol's accessibility, as normal.
+// Extension conformances get linkage according to the protocol's accessibility, as normal.
 // CHECK-DAG: sil_witness_table hidden NSRuncingOptions: Bub module objc_enum
 

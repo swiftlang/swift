@@ -38,7 +38,7 @@ STATISTIC(NumPinPairsRemoved, "Num pin pairs removed");
 using namespace swift;
 
 /// \brief Can this instruction read the pinned bit of the reference count.
-/// Reading the pinned prevents us from moving the pin instructions accross it.
+/// Reading the pinned prevents us from moving the pin instructions across it.
 static bool mayReadPinFlag(SILInstruction *I) {
   auto Kind = I->getKind();
   if (Kind == ValueKind::IsUniqueOrPinnedInst)
@@ -219,7 +219,6 @@ public:
       // NSArray may do arbitrary things including releasing the array.
       return !Call.mayHaveBridgedObjectElementType();
 
-    case ArrayCallKind::kArrayPropsIsNative:
     case ArrayCallKind::kArrayPropsIsNativeTypeChecked:
     case ArrayCallKind::kGetElementAddress:
     case ArrayCallKind::kMakeMutable:

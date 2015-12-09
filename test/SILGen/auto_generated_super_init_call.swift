@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -use-native-super-method -emit-silgen %s | FileCheck %s
 
 // Test that we emit a call to super.init at the end of the initializer, when none has been previously added.
 
@@ -16,8 +16,7 @@ class SomeDerivedClass : Parent {
 // CHECK: integer_literal $Builtin.Int2048, 42
 // CHECK: [[SELFLOAD:%[0-9]+]] = load [[SELF:%[0-9]+]] : $*SomeDerivedClass
 // CHECK-NEXT: [[PARENT:%[0-9]+]] = upcast [[SELFLOAD]] : $SomeDerivedClass to $Parent
-// CHECK-NEXT: function_ref auto_generated_super_init_call.Parent.init
-// CHECK-NEXT: [[INITCALL1:%[0-9]+]] = function_ref @_TFC30auto_generated_super_init_call6Parentc
+// CHECK-NEXT: [[INITCALL1:%[0-9]+]] = super_method [[SELFLOAD]] : $SomeDerivedClass, #Parent.init!initializer.1
 // CHECK-NEXT: [[RES1:%[0-9]+]] = apply [[INITCALL1]]([[PARENT]])
 // CHECK-NEXT: [[DOWNCAST:%[0-9]+]] = unchecked_ref_cast [[RES1]] : $Parent to $SomeDerivedClass
 // CHECK-NEXT: store [[DOWNCAST]] to [[SELF]] : $*SomeDerivedClass 
@@ -26,7 +25,7 @@ class SomeDerivedClass : Parent {
   init(x: Int) {
     y = x
 // CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call16SomeDerivedClassc{{.*}} : $@convention(method) (Int, @owned SomeDerivedClass) -> @owned SomeDerivedClass
-// CHECK: function_ref @_TFC30auto_generated_super_init_call6Parentc{{.*}} : $@convention(method) (@owned Parent) -> @owned Parent
+// CHECK: super_method {{%[0-9]+}} : $SomeDerivedClass, #Parent.init!initializer.1 : Parent.Type -> () -> Parent , $@convention(method) (@owned Parent) -> @owned Parent
   }
 
   init(b: Bool) {
@@ -42,7 +41,7 @@ class SomeDerivedClass : Parent {
 // CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call16SomeDerivedClassc{{.*}} : $@convention(method) (Bool, @owned SomeDerivedClass) -> @owned SomeDerivedClass    
 // CHECK: bb4:
 // CHECK: [[SELFLOAD:%[0-9]+]] = load [[SELF:%[0-9]+]] : $*SomeDerivedClass
-// CHECK: function_ref @_TFC30auto_generated_super_init_call6Parentc{{.*}} : $@convention(method) (@owned Parent) -> @owned Parent
+// CHECK: super_method [[SELFLOAD]] : $SomeDerivedClass, #Parent.init!initializer.1 : Parent.Type -> () -> Parent , $@convention(method) (@owned Parent) -> @owned Parent
 // CHECK-NEXT: apply
 // CHECK-NEXT: unchecked_ref_cast
 // CHECK-NEXT: store
@@ -62,7 +61,7 @@ class SomeDerivedClass : Parent {
       
     super.init()
 // CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call16SomeDerivedClassc{{.*}} : $@convention(method) (Bool, Int, @owned SomeDerivedClass) -> @owned SomeDerivedClass    
-// CHECK: function_ref @_TFC30auto_generated_super_init_call6Parentc{{.*}} : $@convention(method) (@owned Parent) -> @owned Parent
+// CHECK: super_method {{%[0-9]+}} : $SomeDerivedClass, #Parent.init!initializer.1 : Parent.Type -> () -> Parent , $@convention(method) (@owned Parent) -> @owned Parent
 // CHECK-NOT: function_ref @_TFC30auto_generated_super_init_call6Parentc
 // CHECK: return
   }
@@ -72,7 +71,7 @@ class SomeDerivedClass : Parent {
 class HasNoIVars : Parent {
   override init() {
 // CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call10HasNoIVarsc{{.*}} : $@convention(method) (@owned HasNoIVars) -> @owned HasNoIVars
-// CHECK: function_ref @_TFC30auto_generated_super_init_call6Parentc
+// CHECK: super_method {{%[0-9]+}} : $HasNoIVars, #Parent.init!initializer.1
   }
 }
 
@@ -96,7 +95,7 @@ class ChildOfParentWithNoExplicitInit : ParentWithNoExplicitInit {
   override init() {
     y = 10
 // CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call31ChildOfParentWithNoExplicitInitc
-// CHECK: function_ref @_TFC30auto_generated_super_init_call24ParentWithNoExplicitInitc{{.*}} : $@convention(method) (@owned ParentWithNoExplicitInit) -> @owned ParentWithNoExplicitInit
+// CHECK: super_method {{%[0-9]+}} : $ChildOfParentWithNoExplicitInit, #ParentWithNoExplicitInit.init!initializer.1 : ParentWithNoExplicitInit.Type -> () -> ParentWithNoExplicitInit , $@convention(method) (@owned ParentWithNoExplicitInit) -> @owned ParentWithNoExplicitInit
   }
 }
 
@@ -110,7 +109,7 @@ class ChildOfParentWithNoExplicitInit2 : ParentWithNoExplicitInit2 {
   override init() {
     y = 10
 // CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call32ChildOfParentWithNoExplicitInit2c
-// CHECK: function_ref @_TFC30auto_generated_super_init_call25ParentWithNoExplicitInit2c{{.*}} : $@convention(method) (@owned ParentWithNoExplicitInit2) -> @owned ParentWithNoExplicitInit2   
+// CHECK: super_method {{%[0-9]+}} : $ChildOfParentWithNoExplicitInit2, #ParentWithNoExplicitInit2.init!initializer.1 : ParentWithNoExplicitInit2.Type -> () -> ParentWithNoExplicitInit2 , $@convention(method) (@owned ParentWithNoExplicitInit2) -> @owned ParentWithNoExplicitInit2
   }
 }
 

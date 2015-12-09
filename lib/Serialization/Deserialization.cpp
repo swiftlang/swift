@@ -3152,6 +3152,7 @@ Optional<swift::ParameterConvention> getActualParameterConvention(uint8_t raw) {
   CASE(Indirect_In)
   CASE(Indirect_Out)
   CASE(Indirect_Inout)
+  CASE(Indirect_InoutAliasable)
   CASE(Indirect_In_Guaranteed)
   CASE(Direct_Owned)
   CASE(Direct_Unowned)
@@ -3955,6 +3956,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   SmallVector<uint64_t, 16> scratch;
 
   unsigned kind = DeclTypeCursor.readRecord(entry.ID, scratch);
+  (void) kind;
   assert(kind == NORMAL_PROTOCOL_CONFORMANCE &&
          "registered lazy loader incorrectly");
   NormalProtocolConformanceLayout::readRecord(scratch, protoID,

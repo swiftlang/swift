@@ -36,12 +36,16 @@ The StringLiteralConvertible Protocol
 -------------------------------------
 
 Here is the StringLiteralConvertible protocol as defined in the standard
-library's Policy.swift::
+library's CompilerProtocols.swift::
 
   // NOTE: the compiler has builtin knowledge of this protocol
-  protocol StringLiteralConvertible {
+  // Conforming types can be initialized with arbitrary string literals.
+  public protocol StringLiteralConvertible
+    : ExtendedGraphemeClusterLiteralConvertible {
+    
     typealias StringLiteralType : _BuiltinStringLiteralConvertible
-    class func convertFromStringLiteral(value : StringLiteralType) -> Self
+    // Create an instance initialized to `value`.
+    init(stringLiteral value: StringLiteralType)
   }
 
 Curiously, the protocol is not defined in terms of primitive types, but in
@@ -58,13 +62,16 @@ points could be constructed...which may be what's desired in some cases.)
 The _BuiltinStringLiteralConvertible Protocol
 ---------------------------------------------
 
-Policy.swift contains a second protocol::
+CompilerProtocols.swift contains a second protocol::
 
   // NOTE: the compiler has builtin knowledge of this protocol
-  protocol _BuiltinStringLiteralConvertible {
-    class func _convertFromBuiltinStringLiteral(value : Builtin.RawPointer,
-                                                byteSize : Builtin.Int64,
-                                                isASCII: Builtin.Int1) -> Self
+  public protocol _BuiltinStringLiteralConvertible
+    : _BuiltinExtendedGraphemeClusterLiteralConvertible {
+
+    init(
+        _builtinStringLiteral start: Builtin.RawPointer,
+        byteSize: Builtin.Word,
+        isASCII: Builtin.Int1)
   }
 
 The use of builtin types makes it clear that this is *only* for use in the

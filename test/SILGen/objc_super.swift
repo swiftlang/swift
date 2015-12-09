@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen | FileCheck %s
+// RUN: %target-swift-frontend -use-native-super-method -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen | FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -42,7 +42,7 @@ class Wotsit : Hoozit {
 class NonObjCSuperInit : Wotsit {
   // CHECK-LABEL: sil hidden @_TFC10objc_super16NonObjCSuperInitc{{.*}} : $@convention(method) (@owned NonObjCSuperInit) -> @owned NonObjCSuperInit
   init() {
-    // CHECK: function_ref @_TFC10objc_super6Wotsitc{{.*}} : $@convention(method) (NotInObjC<Int>, @owned Wotsit) -> @owned Wotsit
+    // CHECK: super_method {{%[0-9]+}} : $NonObjCSuperInit, #Wotsit.init!initializer.1 : Wotsit.Type -> (nope: NotInObjC<Int>) -> Wotsit , $@convention(method) (NotInObjC<Int>, @owned Wotsit) -> @owned Wotsit
     super.init(nope: NotInObjC<Int>())
   }
 }

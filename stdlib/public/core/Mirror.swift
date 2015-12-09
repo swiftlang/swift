@@ -490,7 +490,7 @@ extension _MirrorType {
 internal extension Mirror {
   /// An adapter that represents a legacy `_MirrorType`'s children as
   /// a `Collection` with integer `Index`.  Note that the performance
-  /// characterstics of the underlying `_MirrorType` may not be
+  /// characteristics of the underlying `_MirrorType` may not be
   /// appropriate for random access!  To avoid this pitfall, convert
   /// mirrors to use the new style, which only present forward
   /// traversal in general.

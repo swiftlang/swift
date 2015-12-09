@@ -130,7 +130,7 @@ import Swift
 
 // -- No-payload enums have extra inhabitants in
 //    their value witness table.
-// CHECK: @_TWVO4enum10NoPayloads = constant [25 x i8*] [
+// CHECK: @_TWVO4enum10NoPayloads = constant [26 x i8*] [
 // -- ...
 // -- size
 // CHECK:   i8* inttoptr ([[WORD]] 1 to i8*),
@@ -148,7 +148,7 @@ import Swift
 
 // -- Single-payload enums take unused extra inhabitants from their payload
 //    as their own.
-// CHECK: @_TWVO4enum19SinglePayloadNested = constant [25 x i8*] [
+// CHECK: @_TWVO4enum19SinglePayloadNested = constant [26 x i8*] [
 // -- ...
 // -- size
 // CHECK:   i8* inttoptr ([[WORD]] 1 to i8*),
@@ -171,7 +171,7 @@ import Swift
 // CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO4enum20DynamicSinglePayload to i8*)
 // CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO4enum20DynamicSinglePayload to i8*)
 
-// CHECK: @_TWVO4enum18MultiPayloadNested = constant [25 x i8*] [
+// CHECK: @_TWVO4enum18MultiPayloadNested = constant [26 x i8*] [
 // CHECK:   i8* inttoptr ([[WORD]] 9 to i8*),
 // CHECK:   i8* inttoptr ([[WORD]] 16 to i8*)
 // CHECK: ]

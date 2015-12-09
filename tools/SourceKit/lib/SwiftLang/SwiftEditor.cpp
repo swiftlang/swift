@@ -2594,6 +2594,13 @@ void SwiftEditorDocument::formatText(unsigned Line, unsigned Length,
   Consumer.recordAffectedLineRange(LineRange.startLine(), LineRange.lineCount());
 }
 
+bool isReturningVoid(SourceManager &SM, CharSourceRange Range) {
+  if (Range.isInvalid())
+    return false;
+  StringRef Text = SM.extractText(Range);
+  return "()" == Text || "Void" == Text;
+}
+
 void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
                                             EditorConsumer &Consumer) {
   auto SyntaxInfo = Impl.getSyntaxInfo();
@@ -2672,8 +2679,7 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
 
         OS << "{ ";
 
-        bool ReturningVoid = ClosureReturnTypeRange.isValid() &&
-                             "Void" == SM.extractText(ClosureReturnTypeRange);
+        bool ReturningVoid = isReturningVoid(SM, ClosureReturnTypeRange);
 
         bool HasSignature = !ClosureParams.empty() ||
                             (ClosureReturnTypeRange.isValid() && !ReturningVoid);
