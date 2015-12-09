@@ -618,6 +618,10 @@ ERROR(argument_out_of_order,sema_tcc,none,
 ERROR(argument_out_of_order_named_unnamed,sema_tcc,none,
       "argument %0 must precede unnamed parameter #%1", (Identifier, unsigned))
 
+ERROR(instance_member_use_on_type,sema_tcc,none,
+      "use of instance member %1 on type %0; "
+      "did you mean to use a value of type %0 instead?", (Type, Identifier))
+
 ERROR(missing_argument_named,sema_tcc,none,
       "missing argument for parameter %0 in call", (Identifier))
 ERROR(missing_argument_positional,sema_tcc,none,
