@@ -384,6 +384,14 @@ public:
   MemLocation(SILValue B, ProjectionPath &P, KeyKind Kind = NormalKey)
       : SILValueProjection(B, P, Kind) {}
   MemLocation(KeyKind Kind) : SILValueProjection(Kind) {} 
+  /// Use the concatenation of the 2 ProjectionPaths as the Path.
+  MemLocation(SILValue B, ProjectionPath &P1, ProjectionPath &P2) 
+      : SILValueProjection(B) {
+    ProjectionPath T;
+    T.append(P1);
+    T.append(P2);
+    Path = std::move(T);
+  }
 
   /// Copy constructor.
   MemLocation(const MemLocation &RHS) : SILValueProjection(RHS) {}
@@ -432,10 +440,6 @@ public:
   //============================//
   //       static functions.    //
   //============================//
-
-  /// Given Base and 2 ProjectionPaths, create a MemLocation out of them.
-  static MemLocation createMemLocation(SILValue Base, ProjectionPath &P1,
-                                       ProjectionPath &P2);
 
   /// Expand this location to all individual fields it contains.
   ///

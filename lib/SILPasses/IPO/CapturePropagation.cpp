@@ -222,7 +222,8 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
   // See if we already have a version of this function in the module. If so,
   // just return it.
   if (auto *NewF = OrigF->getModule().lookUpFunction(Name.str())) {
-    DEBUG(llvm::dbgs() << "  Found an already specialized version of the callee: ";
+    DEBUG(llvm::dbgs()
+              << "  Found an already specialized version of the callee: ";
           NewF->printName(llvm::dbgs()); llvm::dbgs() << "\n");
     return NewF;
   }

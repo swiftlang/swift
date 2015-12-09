@@ -1193,7 +1193,7 @@ namespace {
     /// If the candidate set has been narrowed down to a specific structural
     /// problem, e.g. that there are too few parameters specified or that
     /// argument labels don't match up, diagnose that error and return true.
-    bool diagnoseAnyStructuralArgumentError(Expr *argExpr);
+    bool diagnoseAnyStructuralArgumentError(Expr *fnExpr, Expr *argExpr);
     
     void dump() const LLVM_ATTRIBUTE_USED;
     
@@ -1694,7 +1694,8 @@ suggestPotentialOverloads(SourceLoc loc, bool isResult) {
 /// If the candidate set has been narrowed down to a specific structural
 /// problem, e.g. that there are too few parameters specified or that argument
 /// labels don't match up, diagnose that error and return true.
-bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *argExpr) {
+bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *fnExpr,
+                                                             Expr *argExpr) {
   // TODO: We only handle the situation where there is exactly one candidate
   // here.
   if (size() != 1) return false;
@@ -1705,6 +1706,31 @@ bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *argExpr) {
     return false;
     
   auto args = decomposeArgParamType(argExpr->getType());
+  auto params = decomposeArgParamType(candidates[0].getArgumentType());
+
+  // It is a somewhat common error to try to access an instance method as a
+  // curried member on the type, instead of using an instance, e.g. the user
+  // wrote:
+  //
+  //   Foo.doThing(42, b: 19)
+  //
+  // instead of:
+  //
+  //   myFoo.doThing(42, b: 19)
+  //
+  // Check for this situation and handle it gracefully.
+  if (params.size() == 1 && candidates[0].decl->isInstanceMember() &&
+      candidates[0].level == 0) {
+    if (auto UDE = dyn_cast<UnresolvedDotExpr>(fnExpr))
+      if (isa<TypeExpr>(UDE->getBase())) {
+        auto baseType = candidates[0].getArgumentType();
+        CS->TC.diagnose(UDE->getLoc(), diag::instance_member_use_on_type,
+                        baseType, UDE->getName())
+          .highlight(UDE->getBase()->getSourceRange());
+        return true;
+      }
+  }
+  
   SmallVector<Identifier, 4> correctNames;
   unsigned OOOArgIdx = ~0U, OOOPrevArgIdx = ~0U;
   unsigned extraArgIdx = ~0U, missingParamIdx = ~0U;
@@ -1744,7 +1770,6 @@ bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *argExpr) {
   // shape) to the specified candidates parameters.  This ignores the
   // concrete types of the arguments, looking only at the argument labels.
   SmallVector<ParamBinding, 4> paramBindings;
-  auto params = decomposeArgParamType(candidates[0].getArgumentType());
   if (!matchCallArguments(args, params, hasTrailingClosure,
                           /*allowFixes:*/true, listener, paramBindings))
     return false;
@@ -2035,7 +2060,7 @@ bool FailureDiagnosis::diagnoseConstraintFailure() {
     if (isConversionConstraint(C))
       return rankedConstraints.push_back({C, CR_ConversionConstraint});
 
-    // We occassionally end up with disjunction constraints containing an
+    // We occasionally end up with disjunction constraints containing an
     // original constraint along with one considered with a fix.  If we find
     // this situation, add the original one to our list for diagnosis.
     if (C->getKind() == ConstraintKind::Disjunction) {
@@ -2086,7 +2111,7 @@ bool FailureDiagnosis::diagnoseConstraintFailure() {
     classifyConstraint(&C);
 
   // Okay, now that we've classified all the constraints, sort them by their
-  // priority and priviledge the favored constraints.
+  // priority and privilege the favored constraints.
   std::stable_sort(rankedConstraints.begin(), rankedConstraints.end(),
                    [&] (RCElt LHS, RCElt RHS) {
     // Rank things by their kind as the highest priority.
@@ -3645,7 +3670,8 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // Filter the candidate list based on the argument we may or may not have.
   calleeInfo.filterContextualMemberList(callExpr->getArg());
 
-  if (calleeInfo.diagnoseAnyStructuralArgumentError(callExpr->getArg()))
+  if (calleeInfo.diagnoseAnyStructuralArgumentError(callExpr->getFn(),
+                                                    callExpr->getArg()))
     return true;
   
   Type argType;  // Type of the argument list, if knowable.
@@ -3670,7 +3696,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
 
   calleeInfo.filterList(argExpr->getType());
 
-  if (calleeInfo.diagnoseAnyStructuralArgumentError(argExpr))
+  if (calleeInfo.diagnoseAnyStructuralArgumentError(callExpr->getFn(), argExpr))
     return true;
 
   // If we have a failure where the candidate set differs on exactly one

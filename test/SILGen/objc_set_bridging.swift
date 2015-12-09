@@ -29,7 +29,7 @@ import gizmo
     // CHECK: [[SET:%[0-9]+]] = apply [[SWIFT_FN]]([[SELF]]) : $@convention(method) (@guaranteed Foo) -> @owned Set<Foo>
     // CHECK: [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation18_convertSetToNSSet{{.*}} : $@convention(thin) <τ_0_0 where τ_0_0 : Hashable> (@owned Set<τ_0_0>) -> @owned NSSet
     // CHECK: [[NSSET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[SET]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Hashable> (@owned Set<τ_0_0>) -> @owned NSSet
-    // CHECK: autorelease_return [[NSSET]] : $NSSet
+    // CHECK: return [[NSSET]] : $NSSet
   }
 
   var property: Set<Foo> = Set()
@@ -42,7 +42,7 @@ import gizmo
   // CHECK:   [[SET:%[0-9]+]] = apply [[GETTER]]([[SELF]]) : $@convention(method) (@guaranteed Foo) -> @owned Set<Foo>
   // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation18_convertSetToNSSet{{.*}} : $@convention(thin) <τ_0_0 where τ_0_0 : Hashable> (@owned Set<τ_0_0>) -> @owned NSSet
   // CHECK:   [[NSSET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[SET]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Hashable> (@owned Set<τ_0_0>) -> @owned NSSet
-  // CHECK:   autorelease_return [[NSSET]] : $NSSet
+  // CHECK:   return [[NSSET]] : $NSSet
   
   // Property setter
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC17objc_set_bridging3Foos8property{{.*}} : $@convention(objc_method) (NSSet, Foo) -> () {

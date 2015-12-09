@@ -2073,8 +2073,7 @@ ManagedValue SILGenFunction::emitApply(
       break;
 
     case ResultConvention::Autoreleased:
-      // Autoreleased. Retain using retain_autoreleased.
-      B.createStrongRetainAutoreleased(loc, scalarResult);
+      // Autoreleased. The reclaim is implicit, so the value is effectively +1.
       break;
 
     case ResultConvention::UnownedInnerPointer:

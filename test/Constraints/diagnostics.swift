@@ -166,7 +166,7 @@ func validateSaveButton(text: String) {
 // <rdar://problem/20201968> QoI: poor diagnostic when calling a class method via a metatype
 class r20201968C {
   func blah() {
-    r20201968C.blah()  // expected-error {{missing argument for parameter #1 in call}}
+    r20201968C.blah()  // expected-error {{use of instance member 'blah' on type 'r20201968C'; did you mean to use a value of type 'r20201968C' instead?}}
   }
 }
 
@@ -344,7 +344,7 @@ CurriedClass.method1(2.0)(1)       // expected-error {{cannot convert value of t
 CurriedClass.method2(c)(32)(b: 1)
 _ = CurriedClass.method2(c)
 _ = CurriedClass.method2(c)(32)
-_ = CurriedClass.method2(1,2)      // expected-error {{extra argument in call}}
+_ = CurriedClass.method2(1,2)      // expected-error {{use of instance member 'method2' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
 CurriedClass.method2(c)(1.0)(b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 CurriedClass.method2(c)(1)(b: 1.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 CurriedClass.method2(c)(2)(c: 1.0) // expected-error {{incorrect argument label in call (have 'c:', expected 'b:')}}
@@ -353,7 +353,7 @@ CurriedClass.method3(c)(32, b: 1)
 _ = CurriedClass.method3(c)
 _ = CurriedClass.method3(c)(1, 2)        // expected-error {{missing argument label 'b:' in call}} {{32-32=b: }}
 _ = CurriedClass.method3(c)(1, b: 2)(32) // expected-error {{cannot call value of non-function type '()'}}
-_ = CurriedClass.method3(1, 2)           // expected-error {{extra argument in call}}
+_ = CurriedClass.method3(1, 2)           // expected-error {{use of instance member 'method3' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
 CurriedClass.method3(c)(1.0, b: 1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 CurriedClass.method3(c)(1)               // expected-error {{missing argument for parameter 'b' in call}}
 
@@ -368,6 +368,22 @@ extension CurriedClass {
     method3(self)        // expected-error {{missing argument for parameter 'b' in call}}
   }
 }
+
+extension CurriedClass {
+  func m1(a : Int, b : Int) {}
+  
+  func m2(a : Int) {}
+}
+
+// <rdar://problem/23718816> QoI: "Extra argument" error when accidentally currying a method
+CurriedClass.m1(2, b: 42)   // expected-error {{use of instance member 'm1' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
+
+
+// <rdar://problem/22108559> QoI: Confusing error message when calling an instance method as a class method
+CurriedClass.m2(12)  // expected-error {{cannot convert value of type 'Int' to expected argument type 'CurriedClass'}}
+
+
+
 
 
 // <rdar://problem/19870975> Incorrect diagnostic for failed member lookups within closures passed as arguments ("(_) -> _")

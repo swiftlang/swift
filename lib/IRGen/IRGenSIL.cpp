@@ -667,7 +667,6 @@ public:
   void visitStrongUnpinInst(StrongUnpinInst *i);
   void visitStrongRetainInst(StrongRetainInst *i);
   void visitStrongReleaseInst(StrongReleaseInst *i);
-  void visitStrongRetainAutoreleasedInst(StrongRetainAutoreleasedInst *i);
   void visitStrongRetainUnownedInst(StrongRetainUnownedInst *i);
   void visitUnownedRetainInst(UnownedRetainInst *i);
   void visitUnownedReleaseInst(UnownedReleaseInst *i);
@@ -723,7 +722,6 @@ public:
   void visitBranchInst(BranchInst *i);
   void visitCondBranchInst(CondBranchInst *i);
   void visitReturnInst(ReturnInst *i);
-  void visitAutoreleaseReturnInst(AutoreleaseReturnInst *i);
   void visitThrowInst(ThrowInst *i);
   void visitSwitchValueInst(SwitchValueInst *i);
   void visitSwitchEnumInst(SwitchEnumInst *i);
@@ -2157,16 +2155,17 @@ static void emitReturnInst(IRGenSILFunction &IGF,
 
 void IRGenSILFunction::visitReturnInst(swift::ReturnInst *i) {
   Explosion result = getLoweredExplosion(i->getOperand());
-  emitReturnInst(*this, i->getOperand().getType(), result);
-}
 
-void IRGenSILFunction::visitAutoreleaseReturnInst(AutoreleaseReturnInst *i) {
-  Explosion result = getLoweredExplosion(i->getOperand());
-  assert(result.size() == 1 &&
-         "should have one objc pointer value for autorelease_return");
-  Explosion temp;
-  temp.add(emitObjCAutoreleaseReturnValue(*this, result.claimNext()));
-  emitReturnInst(*this, i->getOperand().getType(), temp);
+  // Implicitly autorelease the return value if the function's result
+  // convention is autoreleased.
+  if (CurSILFn->getLoweredFunctionType()->getResult().getConvention() ==
+        ResultConvention::Autoreleased) {
+    Explosion temp;
+    temp.add(emitObjCAutoreleaseReturnValue(*this, result.claimNext()));
+    result = std::move(temp);
+  }
+
+  emitReturnInst(*this, i->getOperand().getType(), result);
 }
 
 void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
@@ -3066,29 +3065,6 @@ void IRGenSILFunction::visitStrongReleaseInst(swift::StrongReleaseInst *i) {
   Explosion lowered = getLoweredExplosion(i->getOperand());
   auto &ti = cast<ReferenceTypeInfo>(getTypeInfo(i->getOperand().getType()));
   ti.strongRelease(*this, lowered);
-}
-
-void IRGenSILFunction::
-visitStrongRetainAutoreleasedInst(swift::StrongRetainAutoreleasedInst *i) {
-  Explosion lowered = getLoweredExplosion(i->getOperand());
-  llvm::Value *value = lowered.claimNext();
-  value = emitObjCRetainAutoreleasedReturnValue(*this, value);
-
-  // Overwrite the stored explosion value with the result of
-  // objc_retainAutoreleasedReturnValue.  This is actually
-  // semantically important: if the call result is live across this
-  // call, the backend will have to emit instructions that interfere
-  // with the reclaim optimization.
-  //
-  // This is only sound if the retainAutoreleasedReturnValue
-  // immediately follows the call, but that should be reliably true.
-  //
-  // ...the reclaim here should really be implicit in the SIL calling
-  // convention.
-
-  Explosion out;
-  out.add(value);
-  overwriteLoweredExplosion(i->getOperand(), out);
 }
 
 /// Given a SILType which is a ReferenceStorageType, return the type
