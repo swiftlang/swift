@@ -1,6 +1,7 @@
 set(TRANSFORMS_SOURCES
   Transforms/AllocBoxToStack.cpp
   Transforms/ArrayCountPropagation.cpp
+  Transforms/ArrayElementValuePropagation.cpp
   Transforms/CSE.cpp
   Transforms/CopyForwarding.cpp
   Transforms/DeadCodeElimination.cpp
