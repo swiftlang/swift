@@ -3498,20 +3498,21 @@ namespace {
         
         // Special case for superclass method calls.
         if (isPartiallyAppliedSuperMethod(uncurryLevel)) {
-          auto constant = callee.getMethodName();
-          auto loc = uncurriedLoc.getValue();
-          auto subs = callee.getSubstitutions();
           assert(uncurriedArgs.size() == 1 &&
                  "Can only partially apply the self parameater of a super method call");
 
+          auto constant = callee.getMethodName();
+          auto loc = uncurriedLoc.getValue();
+          auto subs = callee.getSubstitutions();
           auto upcastedSelf = uncurriedArgs.back();
           auto self = cast<UpcastInst>(upcastedSelf.getValue())->getOperand();
           auto constantInfo = gen.getConstantInfo(callee.getMethodName());
+          auto functionTy = constantInfo.getSILType();
           SILValue superMethodVal = gen.B.createSuperMethod(
             loc,
             self,
             constant,
-            constantInfo.getSILType(),
+            functionTy,
             /*volatile*/
             constant.isForeign);
 
@@ -3520,11 +3521,17 @@ namespace {
             1,
             gen.B.getModule(),
             subs);
-          
+
+          auto &module = gen.getFunction().getModule();
+
+          auto partialApplyTy = functionTy;
+          if (constantInfo.SILFnType->isPolymorphic() && !subs.empty())
+            partialApplyTy = partialApplyTy.substGenericArgs(module, subs);
+
           SILValue partialApply = gen.B.createPartialApply(
             loc,
             superMethodVal,
-            constantInfo.getSILType(),
+            partialApplyTy,
             subs,
             { upcastedSelf.forward(gen) },
             closureTy);
