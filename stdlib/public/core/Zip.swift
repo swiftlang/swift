@@ -38,11 +38,11 @@ public struct Zip2Generator<
   ///   since the copy was made, and no preceding call to `self.next()`
   ///   has returned `nil`.
   public mutating func next() -> Element? {
-    // The next() function needs to track if it has reached the end.  If we
-    // didn't, and the first sequence is shorter than the second, then, when we
+    // The next() function needs to track if it has reached the end. If we
+    // didn't, and the first sequence is longer than the second, then when we
     // have already exhausted the second sequence, on every subsequent call to
     // next() we would consume and discard one additional element from the
-    // first sequence, even though next() return nil.
+    // first sequence, even though next() is already returning nil.
 
     if _reachedEnd {
       return nil
