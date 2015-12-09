@@ -193,6 +193,9 @@ def use_native_super_method : Flag<["-"], "use-native-super-method">,
 def disable_self_type_mangling : Flag<["-"], "disable-self-type-mangling">,
   HelpText<"Disable including Self type in method type manglings">;
 
+def disable_implicit_optional_conversion : Flag<["-"], "disable-implicit-optional-conversion">,
+  HelpText<"Disable implicit conversions between optional and non-optional types">;
+
 def enable_experimental_patterns : Flag<["-"], "enable-experimental-patterns">,
   HelpText<"Enable experimental 'switch' pattern matching features">;
 
