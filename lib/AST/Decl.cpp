@@ -3099,6 +3099,9 @@ bool VarDecl::isSettable(const DeclContext *UseDC,
   // 'let' parameters are never settable.
   if (isa<ParamDecl>(this))
     return false;
+    
+  if (inClosureCaptureList())
+    return false;
   
   // Properties in structs/classes are only ever mutable in their designated
   // initializer(s).
@@ -3308,6 +3311,9 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
 
   // Don't suggest mutability for explicit function parameters
   if (isa<ParamDecl>(this) && !isImplicitSelf()) return;
+ 
+  // Don't suggest mutability for capture list declarations
+  if (inClosureCaptureList()) return;
 
   // If this is the 'self' argument of a non-mutating method in a value type,
   // suggest adding 'mutating' to the method.

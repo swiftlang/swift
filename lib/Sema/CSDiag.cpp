@@ -957,6 +957,8 @@ static void diagnoseSubElementFailure(Expr *destExpr,
  
     if (VD->isImplicit())
       message += " is immutable";
+    else if (VD->inClosureCaptureList())
+      message += " is part of a capture list";
     else if (VD->isLet())
       message += " is a 'let' constant";
     else if (!VD->isSettable(CS.DC))
