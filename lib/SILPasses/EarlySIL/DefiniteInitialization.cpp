@@ -1553,6 +1553,14 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &InstInfo) {
     SW->setIsInitializationOfDest(InitKind);
     return;
   }
+
+  if (auto *SU = dyn_cast<StoreUnownedInst>(Inst)) {
+    assert(!SU->isInitializationOfDest() &&
+           "should not modify store_unowned that already knows it is an init");
+
+    SU->setIsInitializationOfDest(InitKind);
+    return;
+  }
   
   // If this is an assign, rewrite it based on whether it is an initialization
   // or not.

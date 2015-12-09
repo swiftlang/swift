@@ -46,7 +46,6 @@
 #include "ProtocolInfo.h"
 #include "ResilientTypeInfo.h"
 #include "TypeInfo.h"
-#include "UnownedTypeInfo.h"
 #include "WeakTypeInfo.h"
 
 using namespace swift;
