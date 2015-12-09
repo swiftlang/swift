@@ -2376,10 +2376,18 @@ void CallEmission::emitToUnmappedExplosion(Explosion &out) {
   llvm::Value *result = call.getInstruction();
   if (result->getType()->isVoidTy()) return;
 
+  CanSILFunctionType origFunctionType = getCallee().getOrigFunctionType();
+
+  // If the result was returned autoreleased, implicitly insert the reclaim.
+  if (origFunctionType->getResult().getConvention() ==
+        ResultConvention::Autoreleased) {
+    result = emitObjCRetainAutoreleasedReturnValue(IGF, result);
+  }
+
   // Get the natural IR type in the body of the function that makes
   // the call. This may be different than the IR type returned by the
   // call itself due to ABI type coercion.
-  auto resultType = getCallee().getOrigFunctionType()->getSILResult();
+  auto resultType = origFunctionType->getSILResult();
   auto &resultTI = IGF.IGM.getTypeInfo(resultType);
   auto schema = resultTI.getSchema();
   auto *bodyType = schema.getScalarResultType(IGF.IGM);

@@ -280,8 +280,6 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
     gen.B.createReturn(loc, resultVal);
     break;
   case ResultConvention::Autoreleased:
-    gen.B.createAutoreleaseReturn(loc, resultVal);
-    break;
   case ResultConvention::Owned:
     gen.B.createReturn(loc, resultVal);
     break;
@@ -720,14 +718,12 @@ static void emitObjCReturnValue(SILGenFunction &gen,
 
   // Autorelease the bridged result if necessary.
   switch (resultInfo.getConvention()) {
-  case ResultConvention::Autoreleased:
-    gen.B.createAutoreleaseReturn(loc, result);
-    return;
   case ResultConvention::UnownedInnerPointer:
   case ResultConvention::Unowned:
     assert(gen.getTypeLowering(result.getType()).isTrivial()
            && "nontrivial result is returned unowned?!");
     SWIFT_FALLTHROUGH;
+  case ResultConvention::Autoreleased:
   case ResultConvention::Owned:
     gen.B.createReturn(loc, result);
     return;

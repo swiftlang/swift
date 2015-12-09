@@ -17,7 +17,6 @@ hasNoPrototype()
 // CHECK:   [[NSOBJECT_CTOR:%.*]] = function_ref @_TFCSo8NSObjectC{{.*}} : $@convention(thin) (@thick NSObject.Type) -> @owned NSObject
 // CHECK:   [[ANSIBLE:%.*]] = apply [[ANSIBLE_CTOR]]
 // CHECK:   [[NSANSE_RESULT:%.*]] = apply [[NSANSE]]([[ANSIBLE]])
-// CHECK:   retain_autoreleased [[NSANSE_RESULT]]
 // CHECK:   release_value [[ANSIBLE]] : $ImplicitlyUnwrappedOptional<Ansible>
 // -- Referencing unapplied C function goes through a thunk
 // CHECK:   [[NSANSE:%.*]] = function_ref @_TTOFSC6NSAnseFGSQCSo7Ansible_GSQS__ : $@convention(thin) (@owned ImplicitlyUnwrappedOptional<Ansible>) -> @owned ImplicitlyUnwrappedOptional<Ansible>
@@ -37,7 +36,6 @@ hasNoPrototype()
 // CHECK: bb0(%0 : $ImplicitlyUnwrappedOptional<Ansible>):
 // CHECK:   %1 = function_ref @NSAnse : $@convention(c) (ImplicitlyUnwrappedOptional<Ansible>) -> @autoreleased ImplicitlyUnwrappedOptional<Ansible>
 // CHECK:   %2 = apply %1(%0) : $@convention(c) (ImplicitlyUnwrappedOptional<Ansible>) -> @autoreleased ImplicitlyUnwrappedOptional<Ansible>
-// CHECK:   strong_retain_autoreleased %2 : $ImplicitlyUnwrappedOptional<Ansible>
 // CHECK:   release_value %0 : $ImplicitlyUnwrappedOptional<Ansible>
 // CHECK:   return %2 : $ImplicitlyUnwrappedOptional<Ansible>
 // CHECK: }

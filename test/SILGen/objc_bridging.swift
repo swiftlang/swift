@@ -11,7 +11,6 @@ func getDescription(o: NSObject) -> String {
 // CHECK: bb0({{%.*}} : $NSObject):
 // CHECK:  [[DESCRIPTION:%.*]] = class_method [volatile] {{%.*}} : {{.*}}, #NSObject.description!getter.1.foreign
 // CHECK:  [[OPT_BRIDGED:%.*]] = apply [[DESCRIPTION]]({{%.*}})
-// CHECK:  strong_retain_autoreleased [[OPT_BRIDGED]]
 // CHECK:  select_enum [[OPT_BRIDGED]]
 // CHECK:  [[BRIDGED:%.*]] = unchecked_enum_data [[OPT_BRIDGED]]
 // CHECK:  [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
@@ -34,7 +33,6 @@ func getUppercaseString(s: NSString) -> String {
 // CHECK-NOT: function_ref @swift_StringToNSString
 // CHECK:   [[UPPERCASE_STRING:%.*]] = class_method [volatile] {{%.*}} : {{.*}}, #NSString.uppercaseString!1.foreign
 // CHECK:   [[OPT_BRIDGED:%.*]] = apply [[UPPERCASE_STRING]]({{%.*}})
-// CHECK:   retain_autoreleased [[OPT_BRIDGED]]
 // CHECK:   select_enum [[OPT_BRIDGED]]
 // CHECK:   [[BRIDGED:%.*]] = unchecked_enum_data [[OPT_BRIDGED]]
 // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
@@ -156,7 +154,6 @@ func callBar() -> String {
 // CHECK: bb0:
 // CHECK:   [[BAR:%.*]] = function_ref @bar
 // CHECK:   [[OPT_BRIDGED:%.*]] = apply [[BAR]]()
-// CHECK:   retain_autoreleased [[OPT_BRIDGED]]
 // CHECK:   select_enum [[OPT_BRIDGED]]
 // CHECK:   [[BRIDGED:%.*]] = unchecked_enum_data [[OPT_BRIDGED]]
 // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
@@ -232,7 +229,7 @@ class Bas : NSObject {
   // CHECK:   strong_release [[THIS]]
   // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @swift_StringToNSString
   // CHECK:   [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]([[PROP_COPY]])
-  // CHECK:   autorelease_return [[NSSTR]]
+  // CHECK:   return [[NSSTR]]
   // CHECK: }
 
 
@@ -268,7 +265,7 @@ class Bas : NSObject {
   // CHECK:   [[STR:%.*]] = apply [[GETTER]]([[THIS]])
   // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @swift_StringToNSString
   // CHECK:   [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]([[STR]])
-  // CHECK:   autorelease_return [[NSSTR]]
+  // CHECK:   return [[NSSTR]]
   // CHECK: }
 
   // CHECK-LABEL: sil hidden [thunk] @_TToFC13objc_bridging3Bass11strFakePropSS : $@convention(objc_method) (NSString, Bas) -> () {
@@ -304,7 +301,7 @@ class Bas : NSObject {
   // CHECK:   [[STR:%.*]] = apply [[METHOD]]([[THIS]])
   // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @swift_StringToNSString
   // CHECK:   [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]([[STR]])
-  // CHECK:   autorelease_return [[NSSTR]]
+  // CHECK:   return [[NSSTR]]
   // CHECK: }
   func strArg(s: String) { }
   // CHECK-LABEL: sil hidden [thunk] @_TToFC13objc_bridging3Bas6strArg
@@ -354,7 +351,7 @@ class Bas : NSObject {
   // CHECK:   strong_release [[SELF]]
   // CHECK:   [[CONV_FN:%[0-9]+]] = function_ref @_TF10Foundation22_convertArrayToNSArray{{.*}} : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned NSArray
   // CHECK:   [[NSARRAY:%[0-9]+]] = apply [[CONV_FN]]<AnyObject>([[ARRAY]]) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned NSArray
-  // CHECK:   autorelease_return [[NSARRAY]]
+  // CHECK:   return [[NSARRAY]]
   func arrayResult() -> [AnyObject] { return [] }
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC13objc_bridging3Basg9arrayPropGSaSS_ : $@convention(objc_method) (Bas) -> @autoreleased NSArray

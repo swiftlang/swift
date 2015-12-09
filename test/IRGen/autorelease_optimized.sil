@@ -25,9 +25,8 @@ sil @baz : $@convention(thin) (@owned C) -> () {
 bb0(%0 : $C):
   %1 = function_ref @foo : $@convention(thin) (@owned C) -> @autoreleased C
   %2 = apply %1(%0) : $@convention(thin) (@owned C) -> @autoreleased C
-  strong_retain_autoreleased %2 : $C
 
-// This call is just so that we won't tail-call
+  // This call is just so that we won't tail-call
   // objc_retainAutoreleasedReturnValue, which complicates the test.
   %3 = function_ref @bar : $@convention(thin) (@owned C) -> ()
   apply %3(%2) : $@convention(thin) (@owned C) -> ()

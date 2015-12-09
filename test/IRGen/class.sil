@@ -152,7 +152,7 @@ bb0(%0 : $@thick C.Type):
 // CHECK:         %1 = bitcast %C5class1C* %0 to %objc_object*
 // CHECK:         call %objc_object* @objc_autorelease(%objc_object* %1)
 // CHECK:         ret %C5class1C* %0
-sil @autorelease : $@convention(thin) (@owned C) -> @autoreleased C {
+sil @autorelease : $@convention(thin) (@owned C) -> C {
 entry(%c : $C):
   autorelease_value %c : $C
   return %c : $C
@@ -162,7 +162,7 @@ entry(%c : $C):
 // CHECK:         %1 = inttoptr i64 %0 to %objc_object*
 // CHECK:         call %objc_object* @objc_autorelease(%objc_object* %1)
 // CHECK:         ret i64 %0
-sil @autorelease_optional : $@convention(thin) (@owned C?) -> @autoreleased C? {
+sil @autorelease_optional : $@convention(thin) (@owned C?) -> C? {
 entry(%c : $C?):
   autorelease_value %c : $C?
   return %c : $C?

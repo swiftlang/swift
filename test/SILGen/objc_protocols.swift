@@ -25,15 +25,13 @@ protocol Ansible {
 // CHECK-LABEL: sil hidden  @_TF14objc_protocols12objc_generic
 func objc_generic<T : NSRuncing>(x: T) -> (NSObject, NSObject) {
   return (x.runce(), x.copyRuncing())
-  // -- Result of runce is retain_autoreleased according to default objc conv
+  // -- Result of runce is autoreleased according to default objc conv
   // CHECK: [[METHOD:%.*]] = witness_method [volatile] {{\$.*}},  #NSRuncing.runce!1.foreign
   // CHECK: [[RESULT1:%.*]] = apply [[METHOD]]<T>([[THIS1:%.*]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (τ_0_0) -> @autoreleased NSObject
-  // CHECK: retain_autoreleased [[RESULT1]] : $NSObject
 
   // -- Result of copyRuncing is received retained according to -copy family
   // CHECK: [[METHOD:%.*]] = witness_method [volatile] {{\$.*}},  #NSRuncing.copyRuncing!1.foreign
   // CHECK: [[RESULT2:%.*]] = apply [[METHOD]]<T>([[THIS2:%.*]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (τ_0_0) -> @owned NSObject
-  // CHECK-NOT: retain_autoreleased
 
   // -- Arguments are not consumed by objc calls
   // CHECK: release [[THIS2]]
@@ -42,17 +40,15 @@ func objc_generic<T : NSRuncing>(x: T) -> (NSObject, NSObject) {
 // CHECK-LABEL: sil hidden  @_TF14objc_protocols13objc_protocol
 func objc_protocol(x: NSRuncing) -> (NSObject, NSObject) {
   return (x.runce(), x.copyRuncing())
-  // -- Result of runce is retain_autoreleased according to default objc conv
+  // -- Result of runce is autoreleased according to default objc conv
   // CHECK: [[THIS1:%.*]] = open_existential_ref [[THIS1_ORIG:%.*]] : $NSRuncing to $[[OPENED:@opened(.*) NSRuncing]]
   // CHECK: [[METHOD:%.*]] = witness_method [volatile] $[[OPENED]], #NSRuncing.runce!1.foreign
   // CHECK: [[RESULT1:%.*]] = apply [[METHOD]]<[[OPENED]]>([[THIS1]])
-  // CHECK: retain_autoreleased [[RESULT1]] : $NSObject
 
   // -- Result of copyRuncing is received retained according to -copy family
   // CHECK: [[THIS2:%.*]] = open_existential_ref [[THIS2_ORIG:%.*]] : $NSRuncing to $[[OPENED2:@opened(.*) NSRuncing]]
   // CHECK: [[METHOD:%.*]] = witness_method [volatile] $[[OPENED2]], #NSRuncing.copyRuncing!1.foreign
   // CHECK: [[RESULT2:%.*]] = apply [[METHOD]]<[[OPENED2]]>([[THIS2:%.*]])
-  // CHECK-NOT: retain_autoreleased
 
   // -- Arguments are not consumed by objc calls
   // CHECK: release [[THIS2_ORIG]]
