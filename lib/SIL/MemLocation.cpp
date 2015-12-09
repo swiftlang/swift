@@ -94,14 +94,6 @@ bool MemLocation::isMayAliasMemLocation(const MemLocation &RHS,
   return true;
 }
 
-MemLocation MemLocation::createMemLocation(SILValue Base, ProjectionPath &P1,
-                                           ProjectionPath &P2) {
-  ProjectionPath T;
-  T.append(P1);
-  T.append(P2);
-  return MemLocation(Base, T);
-}
-
 void MemLocation::getFirstLevelMemLocations(MemLocationList &Locs,
                                             SILModule *Mod) {
   SILType Ty = getType();
@@ -115,23 +107,16 @@ void MemLocation::getFirstLevelMemLocations(MemLocationList &Locs,
   }
 }
 
-void MemLocation::expand(MemLocation &Base, SILModule *Mod,
-                         MemLocationList &Locs,
+void MemLocation::expand(MemLocation &Base, SILModule *M, MemLocationList &Locs,
                          TypeExpansionMap &TECache) {
   // To expand a memory location to its indivisible parts, we first get the
   // address projection paths from the accessed type to each indivisible field,
   // i.e. leaf nodes, then we append these projection paths to the Base.
-  //
-  // NOTE: we get the address projection because the Base memory location is
-  // initialized with address projection paths. By keeping it consistent makes
-  // it easier to implement the getType function for MemLocation.
-  //
   SILType BaseTy = Base.getType();
   if (TECache.find(BaseTy) == TECache.end()) {
     // There is no cached expansion for this type, build and cache it now.
     ProjectionPathList Paths;
-    ProjectionPath::expandTypeIntoLeafProjectionPaths(BaseTy, Mod, Paths,
-                                                      true);
+    ProjectionPath::expandTypeIntoLeafProjectionPaths(BaseTy, M, Paths, true);
     for (auto &P : Paths) {
       TECache[BaseTy].push_back(std::move(P.getValue()));
     }
@@ -139,9 +124,9 @@ void MemLocation::expand(MemLocation &Base, SILModule *Mod,
 
   // Construct the MemLocation by appending the projection path from the
   // accessed node to the leaf nodes.
-  for (auto &X : TECache[BaseTy]) {
-    Locs.push_back(MemLocation::createMemLocation(Base.getBase(), X.getValue(),
-                                                  Base.getPath().getValue()));
+  ProjectionPath &BasePath = Base.getPath().getValue();
+  for (auto &P : TECache[BaseTy]) {
+    Locs.push_back(MemLocation(Base.getBase(), P.getValue(), BasePath));
   }
 }
 
@@ -153,9 +138,9 @@ void MemLocation::reduce(MemLocation &Base, SILModule *Mod,
   ProjectionPathList Paths;
   ProjectionPath::expandTypeIntoLeafProjectionPaths(Base.getType(), Mod, Paths,
                                                     false);
+  ProjectionPath &BasePath = Base.getPath().getValue();
   for (auto &X : Paths) {
-    ALocs.push_back(MemLocation::createMemLocation(Base.getBase(), X.getValue(),
-                                                   Base.getPath().getValue()));
+    ALocs.push_back(MemLocation(Base.getBase(), X.getValue(), BasePath));
   }
 
   // Second, go from leaf nodes to their parents. This guarantees that at the
@@ -202,9 +187,9 @@ void MemLocation::expandWithValues(MemLocation &Base, SILValue &Val,
   // Construct the MemLocation and LoadStoreValues by appending the projection
   // path
   // from the accessed node to the leaf nodes.
+  ProjectionPath &BasePath = Base.getPath().getValue();
   for (auto &X : Paths) {
-    Locs.push_back(MemLocation::createMemLocation(Base.getBase(), X.getValue(),
-                                                  Base.getPath().getValue()));
+    Locs.push_back(MemLocation(Base.getBase(), X.getValue(), BasePath));
     Vals.push_back(LoadStoreValue(Val, X.getValue()));
   }
 }
@@ -222,9 +207,9 @@ SILValue MemLocation::reduceWithValues(MemLocation &Base, SILModule *Mod,
   ProjectionPathList Paths;
   ProjectionPath::expandTypeIntoLeafProjectionPaths(Base.getType(), Mod, Paths,
                                                     false);
+  ProjectionPath &BasePath = Base.getPath().getValue();
   for (auto &X : Paths) {
-    ALocs.push_back(MemLocation::createMemLocation(Base.getBase(), X.getValue(),
-                                                   Base.getPath().getValue()));
+    ALocs.push_back(MemLocation(Base.getBase(), X.getValue(), BasePath));
   }
 
   // Second, go from leaf nodes to their parents. This guarantees that at the
