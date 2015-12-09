@@ -139,7 +139,7 @@ void MemLocation::expand(MemLocation &Base, SILModule *Mod,
 
   // Construct the MemLocation by appending the projection path from the
   // accessed node to the leaf nodes.
-  for (auto &X : TypeExpansionVault[Base.getType()]) {
+  for (auto &X : TypeExpansionVault[BaseType]) {
     Locs.push_back(MemLocation::createMemLocation(Base.getBase(), X.getValue(),
                                                   Base.getPath().getValue()));
   }
