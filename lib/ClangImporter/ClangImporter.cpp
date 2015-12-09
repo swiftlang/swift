@@ -742,6 +742,46 @@ void ClangImporter::Implementation::addEntryToLookupTable(
   }
 }
 
+void ClangImporter::Implementation::addMacrosToLookupTable(
+       clang::ASTContext &clangCtx,
+       clang::Preprocessor &pp,
+       SwiftLookupTable &table) {
+  for (const auto &macro : pp.macros(false)) {
+    // Find the local history of this macro directive.
+    clang::MacroDirective *MD = pp.getLocalMacroDirectiveHistory(macro.first);
+    if (!MD) continue;
+
+    // Import the name.
+    auto name = importIdentifier(macro.first);
+    if (name.empty()) continue;
+
+    // Walk the history.
+    for (; MD; MD = MD->getPrevious()) {
+      // Check whether we have a macro defined in this module.
+      auto info = pp.getMacroInfo(macro.first);
+      if (!info || info->isFromASTFile() || info->isBuiltinMacro()) continue;
+      
+      // Only interested in macro definitions.
+      auto *defMD = dyn_cast<clang::DefMacroDirective>(MD);
+      if (!defMD) continue;
+
+      // If we hit a builtin macro, we're done.
+      if (auto info = defMD->getInfo()) {
+        if (info->isBuiltinMacro()) break;
+      }
+
+      // If we hit a macro with invalid or predefined location, we're done.
+      auto loc = defMD->getLocation();
+      if (loc.isInvalid()) break;
+      if (pp.getSourceManager().getFileID(loc) == pp.getPredefinesFileID())
+        break;
+
+      // Add this entry.
+      table.addEntry(name, info, clangCtx.getTranslationUnitDecl());
+    }
+  }
+}
+
 bool ClangImporter::Implementation::importHeader(
     Module *adapter, StringRef headerName, SourceLoc diagLoc,
     bool trackParsedSymbols,
@@ -792,6 +832,11 @@ bool ClangImporter::Implementation::importHeader(
   }
   pp.EndSourceFile();
   bumpGeneration();
+
+  if (UseSwiftLookupTables) {
+    addMacrosToLookupTable(getClangASTContext(), getClangPreprocessor(),
+                           BridgingHeaderLookupTable);
+  }
 
   // Wrap all Clang imports under a Swift import decl.
   for (auto &Import : BridgeHeaderTopLevelImports) {
@@ -4353,6 +4398,9 @@ ClangImporter::Implementation::createExtensionWriter(clang::ASTWriter &writer) {
       // Add this entry to the lookup tabke.
       addEntryToLookupTable(sema, table, named);
     }
+
+    // Add macros to the lookup table.
+    addMacrosToLookupTable(sema.Context, sema.getPreprocessor(), table);
   };
 
   return std::unique_ptr<clang::ModuleFileExtensionWriter>(

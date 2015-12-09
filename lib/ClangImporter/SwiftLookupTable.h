@@ -19,6 +19,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Identifier.h"
+#include "clang/Serialization/ASTBitCodes.h"
 #include "clang/Serialization/ModuleFileExtension.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
@@ -34,6 +35,7 @@ class BitstreamWriter;
 namespace clang {
 class NamedDecl;
 class DeclContext;
+class MacroInfo;
 }
 
 namespace swift {
@@ -76,6 +78,9 @@ public:
   /// Determine whether the given context requires a name to disambiguate.
   static bool contextRequiresName(ContextKind kind);
 
+  /// A single entry referencing either a named declaration or a macro.
+  typedef llvm::PointerUnion<clang::NamedDecl *, clang::MacroInfo *> SingleEntry;
+
   /// An entry in the table of C entities indexed by full Swift name.
   struct FullTableEntry {
     /// The context in which the entities with the given name occur, e.g.,
@@ -83,14 +88,74 @@ public:
     /// is always the canonical DeclContext for the entity.
     std::pair<ContextKind, StringRef> Context;
 
-    /// The set of Clang declarations with this name and in this
-    /// context.
+    /// The set of Clang declarations and macros with this name and in
+    /// this context.
     ///
-    /// The low bit indicates whether we have a clang::serialization::DeclID or
-    /// not. If set, the upper 64 bits are the DeclID; if unset, the whole
-    /// value can be cast to a Decl*.
-    llvm::SmallVector<uint64_t, 2> Decls;
+    /// The low bit indicates whether we have a declaration or macro
+    /// (declaration = unset, macro = set) and the second lowest bit
+    /// indicates whether we have a serialization ID (set = DeclID or
+    /// MacroID, as appropriate) vs. a pointer (unset,
+    /// clang::NamedDecl * or clang::MacroInfo *). In the ID case, the
+    /// upper N-2 bits are the ID value; in the pointer case, the
+    /// lower two bits will always be clear due to the alignment of
+    /// the Clang pointers.
+    llvm::SmallVector<uintptr_t, 2> DeclsOrMacros;
   };
+
+  /// Whether the given entry is a macro entry.
+  static bool isMacroEntry(uintptr_t entry) { return entry & 0x01; }
+
+  /// Whether the given entry is a declaration entry.
+  static bool isDeclEntry(uintptr_t entry) { return !isMacroEntry(entry); }
+
+  /// Whether the given entry is a serialization ID.
+  static bool isSerializationIDEntry(uintptr_t entry) { return (entry & 0x02); }
+
+  /// Whether the given entry is an AST node.
+  static bool isASTNodeEntry(uintptr_t entry) {
+    return !isSerializationIDEntry(entry);
+  }
+
+  /// Retrieve the serialization ID for an entry.
+  static uint32_t getSerializationID(uintptr_t entry) {
+    assert(isSerializationIDEntry(entry) && "Not a serialization entry");
+    return entry >> 2;
+  }
+
+  /// Retrieve the pointer for an entry.
+  static void *getPointerFromEntry(uintptr_t entry) {
+    assert(isASTNodeEntry(entry) && "Not an AST node entry");
+    const uintptr_t mask = ~static_cast<uintptr_t>(0x03);
+    return reinterpret_cast<void *>(entry & mask);
+  }
+
+  /// Encode a Clang named declaration as an entry in the table.
+  static uintptr_t encodeEntry(clang::NamedDecl *decl) {
+    auto bits = reinterpret_cast<uintptr_t>(decl);
+    assert((bits & 0x03) == 0 && "low bits set?");
+    return bits;
+  }
+
+  // Encode a Clang macro as an entry in the table.
+  static uintptr_t encodeEntry(clang::MacroInfo *macro) {
+    auto bits = reinterpret_cast<uintptr_t>(macro);
+    assert((bits & 0x03) == 0 && "low bits set?");
+    return bits | 0x01;
+  }
+
+  /// Encode a declaration ID as an entry in the table.
+  static uintptr_t encodeDeclID(clang::serialization::DeclID id) {
+    auto upper = static_cast<uintptr_t>(id) << 2;
+    assert(upper >> 2 == id);
+    return upper | 0x02;
+  }
+
+  /// Encode a macro ID as an entry in the table.
+  static uintptr_t encodeMacroID(clang::serialization::MacroID id) {
+    auto upper = static_cast<uintptr_t>(id) << 2;
+    assert(upper >> 2 == id);
+    return upper | 0x02 | 0x01;
+  }
 
 private:
   /// A table mapping from the base name of Swift entities to all of
@@ -107,7 +172,10 @@ public:
   explicit SwiftLookupTable(SwiftLookupTableReader *reader) : Reader(reader) { }
 
   /// Maps a stored declaration entry to an actual Clang declaration.
-  clang::NamedDecl *mapStoredDecl(uint64_t &entry);
+  clang::NamedDecl *mapStoredDecl(uintptr_t &entry);
+
+  /// Maps a stored macro entry to an actual Clang macro.
+  clang::MacroInfo *mapStoredMacro(uintptr_t &entry);
 
   /// Translate a Clang DeclContext into a context kind and name.
   llvm::Optional<std::pair<ContextKind, StringRef>>
@@ -116,20 +184,20 @@ public:
   /// Add an entry to the lookup table.
   ///
   /// \param name The Swift name of the entry.
-  /// \param decl The Clang declaration to add.
+  /// \param newEntry The Clang declaration or macro.
   /// \param effectiveContext The effective context in which name lookup occurs.
-  void addEntry(DeclName name, clang::NamedDecl *decl,
+  void addEntry(DeclName name, SingleEntry newEntry,
                 clang::DeclContext *effectiveContext);
 
-  /// Lookup the set of declarations with the given base name.
+  /// Lookup the set of entities with the given base name.
   ///
   /// \param baseName The base name to search for. All results will
   /// have this base name.
   ///
   /// \param searchContext The context in which the resulting set of
-  /// declarations should reside. This may be null to indicate that
+  /// entities should reside. This may be null to indicate that
   /// all results from all contexts should be produced.
-  SmallVector<clang::NamedDecl *, 4>
+  SmallVector<SingleEntry, 4>
   lookup(StringRef baseName, clang::DeclContext *searchContext);
 
   /// Deserialize all entries.

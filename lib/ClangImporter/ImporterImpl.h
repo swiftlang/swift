@@ -655,6 +655,11 @@ public:
   void addEntryToLookupTable(clang::Sema &clangSema, SwiftLookupTable &table,
                              clang::NamedDecl *named);
 
+  /// Add the macros from the given Clang preprocessor to the given
+  /// Swift name lookup table.
+  void addMacrosToLookupTable(clang::ASTContext &clangCtx,
+                              clang::Preprocessor &pp, SwiftLookupTable &table);
+
 public:
   void registerExternalDecl(Decl *D) {
     RegisteredExternalDecls.push_back(D);
