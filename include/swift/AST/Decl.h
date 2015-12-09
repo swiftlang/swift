@@ -364,8 +364,13 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// Whether the decl can be accessed by swift users; for instance,
     /// a.storage for lazy var a is a decl that cannot be accessed.
     unsigned IsUserAccessible : 1;
+    
+    /// \brief Whether this property is assignable by swift users; for instance,
+    /// a weak closure capture is mutable by the runtime, but not user assignable.
+    /// Note that a 'let' property is user assignable (once).
+    unsigned IsUserAssignable : 1;
   };
-  enum { NumVarDeclBits = NumAbstractStorageDeclBits + 5 };
+  enum { NumVarDeclBits = NumAbstractStorageDeclBits + 6 };
   static_assert(NumVarDeclBits <= 32, "fits in an unsigned");
   
   class EnumElementDeclBitfields {
@@ -4040,6 +4045,7 @@ protected:
     : AbstractStorageDecl(Kind, DC, Name, NameLoc) 
   {
     VarDeclBits.IsUserAccessible = true;
+    VarDeclBits.IsUserAssignable = true;
     VarDeclBits.IsStatic = IsStatic;
     VarDeclBits.IsLet = IsLet;
     VarDeclBits.IsDebuggerVar = false;
@@ -4138,6 +4144,10 @@ public:
   /// Is this an immutable 'let' property?
   bool isLet() const { return VarDeclBits.IsLet; }
   void setLet(bool IsLet) { VarDeclBits.IsLet = IsLet; }
+
+  /// Is this assignable by the user?
+  bool isUserAssignable() const { return VarDeclBits.IsUserAssignable; }
+  void setIsUserAssignable(bool IsUserAssignable) { VarDeclBits.IsUserAssignable = IsUserAssignable; }
 
   /// Return true if this vardecl has an initial value bound to it in a way
   /// that isn't represented in the AST with an initializer in the pattern
