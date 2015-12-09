@@ -546,8 +546,8 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
 
   // We make this function bare so we don't have to worry about decls in the
   // SILArgument.
-  auto Fn = SILFunction::create(
-      M, ClosureUser->getLinkage(), ClonedName, ClonedTy,
+  auto *Fn = M.getOrCreateFunction(
+      ClosureUser->getLinkage(), ClonedName, ClonedTy,
       ClosureUser->getContextGenericParams(), ClosureUser->getLocation(),
       IsBare, ClosureUser->isTransparent(), ClosureUser->isFragile(),
       ClosureUser->isThunk(), ClosureUser->getClassVisibility(),

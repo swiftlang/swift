@@ -25,11 +25,9 @@ using namespace swift;
 //                               ARCRegionState
 //===----------------------------------------------------------------------===//
 
-ARCRegionState::ARCRegionState(LoopRegion *R)
-    : Region(R), PtrToTopDownState(), PtrToBottomUpState(), AllowsLeaks(false) {
-  if (R->isBlock())
-    AllowsLeaks = isARCInertTrapBB(R->getBlock());
-}
+ARCRegionState::ARCRegionState(LoopRegion *R, bool AllowsLeaks)
+    : Region(R), PtrToTopDownState(), PtrToBottomUpState(),
+      AllowsLeaks(AllowsLeaks) {}
 
 //===---
 // Bottom Up Merge

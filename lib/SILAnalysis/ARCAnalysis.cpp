@@ -503,94 +503,41 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
 //           Utilities for recognizing trap BBs that are ARC inert
 //===----------------------------------------------------------------------===//
 
-static bool ignoreableApplyInstInUnreachableBlock(ApplyInst *AI) {
-  const char *fatalName =
-    "_TFs18_fatalErrorMessageFTVs12StaticStringS_S_Su_T_";
-  auto *Fn = AI->getCalleeFunction();
-
-  // We use endswith here since if we specialize fatal error we will always
-  // prepend the specialization records to fatalName.
-  if (!Fn || !Fn->getName().endswith(fatalName))
-    return false;
-
-  return true;
-}
-
-static bool ignoreableBuiltinInstInUnreachableBlock(BuiltinInst *BI) {
-  const BuiltinInfo &BInfo = BI->getBuiltinInfo();
-  if (BInfo.ID == BuiltinValueKind::CondUnreachable)
-    return true;
-
-  const IntrinsicInfo &IInfo = BI->getIntrinsicInfo();
-  if (IInfo.ID == llvm::Intrinsic::trap)
-    return true;
-  
-  return false;
-}
-
-/// Match a call to a trap BB with no ARC relevant side effects.
-bool swift::isARCInertTrapBB(SILBasicBlock *BB) {
-  // Do a quick check at the beginning to make sure that our terminator is
-  // actually an unreachable. This ensures that in many cases this function will
-  // exit early and quickly.
-  auto II = BB->rbegin();
-  if (!isa<UnreachableInst>(*II))
-    return false;
-
-  auto IE = BB->rend();
-  while (II != IE) {
-    // Ignore any instructions without side effects.
-    if (!II->mayHaveSideEffects()) {
-      ++II;
-      continue;
-    }
-
-    // Ignore cond fail.
-    if (isa<CondFailInst>(*II)) {
-      ++II;
-      continue;
-    }
-
-    // Check for apply insts that we can ignore.
-    if (auto *AI = dyn_cast<ApplyInst>(&*II)) {
-      if (ignoreableApplyInstInUnreachableBlock(AI)) {
-        ++II;
-        continue;
-      }
-    }
-
-    // Check for builtins that we can ignore.
-    if (auto *BI = dyn_cast<BuiltinInst>(&*II)) {
-      if (ignoreableBuiltinInstInUnreachableBlock(BI)) {
-        ++II;
-        continue;
-      }
-    }
-
-    // If we can't ignore the instruction, return false.
-    return false;
-  }
-
-  // Otherwise, we have an unreachable and every instruction is inert from an
-  // ARC perspective in an unreachable BB.
-  return true;
-}
 
 //===----------------------------------------------------------------------===//
 //                          Owned Argument Utilities
 //===----------------------------------------------------------------------===//
 
-ConsumedArgToEpilogueReleaseMatcher::
-ConsumedArgToEpilogueReleaseMatcher(RCIdentityFunctionInfo *RCIA,
-                                    SILFunction *F) {
-  // Find the return BB of F. If we fail, then bail.
-  auto ReturnBB = F->findReturnBB();
-  if (ReturnBB != F->end())
-    findMatchingReleases(RCIA, &*ReturnBB);
+ConsumedArgToEpilogueReleaseMatcher::ConsumedArgToEpilogueReleaseMatcher(
+    RCIdentityFunctionInfo *RCFI, SILFunction *F, ExitKind Kind)
+    : F(F), RCFI(RCFI), Kind(Kind) {
+  recompute();
 }
 
-void ConsumedArgToEpilogueReleaseMatcher::
-findMatchingReleases(RCIdentityFunctionInfo *RCIA, SILBasicBlock *BB) {
+void ConsumedArgToEpilogueReleaseMatcher::recompute() {
+  ArgInstMap.clear();
+
+  // Find the return BB of F. If we fail, then bail.
+  SILFunction::iterator BB;
+  switch (Kind) {
+  case ExitKind::Return:
+    BB = F->findReturnBB();
+    break;
+  case ExitKind::Throw:
+    BB = F->findThrowBB();
+    break;
+  }
+
+  if (BB == F->end()) {
+    HasBlock = false;
+    return;
+  }
+  HasBlock = true;
+  findMatchingReleases(&*BB);
+}
+
+void ConsumedArgToEpilogueReleaseMatcher::findMatchingReleases(
+    SILBasicBlock *BB) {
   for (auto II = std::next(BB->rbegin()), IE = BB->rend();
        II != IE; ++II) {
     // If we do not have a release_value or strong_release...
@@ -608,7 +555,7 @@ findMatchingReleases(RCIdentityFunctionInfo *RCIA, SILBasicBlock *BB) {
     // Ok, we have a release_value or strong_release. Grab Target and find the
     // RC identity root of its operand.
     SILInstruction *Target = &*II;
-    SILValue Op = RCIA->getRCIdentityRoot(Target->getOperand(0));
+    SILValue Op = RCFI->getRCIdentityRoot(Target->getOperand(0));
 
     // If Op is not a consumed argument, we must break since this is not an Op
     // that is a part of a return sequence. We are being conservative here since
@@ -741,5 +688,81 @@ bool swift::getFinalReleasesForValue(SILValue V, ReleaseTracker &Tracker) {
       if (!addLastUse(V, BB, Tracker))
         return false;
 
+  return true;
+}
+
+//===----------------------------------------------------------------------===//
+//                            Leaking BB Analysis
+//===----------------------------------------------------------------------===//
+
+static bool ignoreableApplyInstInUnreachableBlock(const ApplyInst *AI) {
+  const char *fatalName = "_TFs18_fatalErrorMessageFTVs12StaticStringS_S_Su_T_";
+  const auto *Fn = AI->getCalleeFunction();
+
+  // We use endswith here since if we specialize fatal error we will always
+  // prepend the specialization records to fatalName.
+  if (!Fn || !Fn->getName().endswith(fatalName))
+    return false;
+
+  return true;
+}
+
+static bool ignoreableBuiltinInstInUnreachableBlock(const BuiltinInst *BI) {
+  const BuiltinInfo &BInfo = BI->getBuiltinInfo();
+  if (BInfo.ID == BuiltinValueKind::CondUnreachable)
+    return true;
+
+  const IntrinsicInfo &IInfo = BI->getIntrinsicInfo();
+  if (IInfo.ID == llvm::Intrinsic::trap)
+    return true;
+
+  return false;
+}
+
+/// Match a call to a trap BB with no ARC relevant side effects.
+bool swift::isARCInertTrapBB(const SILBasicBlock *BB) {
+  // Do a quick check at the beginning to make sure that our terminator is
+  // actually an unreachable. This ensures that in many cases this function will
+  // exit early and quickly.
+  auto II = BB->rbegin();
+  if (!isa<UnreachableInst>(*II))
+    return false;
+
+  auto IE = BB->rend();
+  while (II != IE) {
+    // Ignore any instructions without side effects.
+    if (!II->mayHaveSideEffects()) {
+      ++II;
+      continue;
+    }
+
+    // Ignore cond fail.
+    if (isa<CondFailInst>(*II)) {
+      ++II;
+      continue;
+    }
+
+    // Check for apply insts that we can ignore.
+    if (auto *AI = dyn_cast<ApplyInst>(&*II)) {
+      if (ignoreableApplyInstInUnreachableBlock(AI)) {
+        ++II;
+        continue;
+      }
+    }
+
+    // Check for builtins that we can ignore.
+    if (auto *BI = dyn_cast<BuiltinInst>(&*II)) {
+      if (ignoreableBuiltinInstInUnreachableBlock(BI)) {
+        ++II;
+        continue;
+      }
+    }
+
+    // If we can't ignore the instruction, return false.
+    return false;
+  }
+
+  // Otherwise, we have an unreachable and every instruction is inert from an
+  // ARC perspective in an unreachable BB.
   return true;
 }

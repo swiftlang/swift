@@ -16,3 +16,7 @@ public struct S<A: P where A.T == S<A>> {}
 class X<T where T == X> { // expected-error{{same-type requirement makes generic parameter 'T' non-generic}}
     var type: T { return self.dynamicType } // expected-error{{use of undeclared type 'T'}}
 }
+
+protocol Y {
+  typealias Z = Z // expected-error{{type alias 'Z' circularly references itself}}
+}

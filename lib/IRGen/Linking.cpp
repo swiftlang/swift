@@ -55,6 +55,7 @@ static StringRef mangleValueWitness(ValueWitness witness) {
   case ValueWitness::GetExtraInhabitantIndex: return "xg";
   case ValueWitness::GetEnumTag: return "ug";
   case ValueWitness::DestructiveProjectEnumData: return "up";
+  case ValueWitness::DestructiveInjectEnumTag: return "ui";
       
   case ValueWitness::Size:
   case ValueWitness::Flags:

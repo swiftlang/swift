@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -emit-silgen -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend -use-native-super-method -parse-as-library -emit-silgen -primary-file %s | FileCheck %s
 
 struct Buh<T> {
   var x: Int {
@@ -624,7 +624,7 @@ class D : B {
     super.init(y: y)
     // CHECK: [[THIS1:%[0-9]+]] = load [[THISADDR]]
     // CHECK: [[THIS1_SUP:%[0-9]+]] = upcast [[THIS1]] : ${{.*}} to $B
-    // CHECK: [[SUPER_CTOR:%[0-9]+]] = function_ref @_TFC8lifetime1Bc{{.*}}
+    // CHECK: [[SUPER_CTOR:%[0-9]+]] = super_method %12 : $D, #B.init!initializer.1
     // CHECK: [[Y:%[0-9]+]] = load [[YADDR]]
     // CHECK: [[THIS2_SUP:%[0-9]+]] = apply [[SUPER_CTOR]]([[Y]], [[THIS1_SUP]])
     // CHECK: [[THIS2:%[0-9]+]] = unchecked_ref_cast [[THIS2_SUP]] : $B to $D

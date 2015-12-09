@@ -177,9 +177,8 @@ public struct EnumerateGenerator<
   ///
   /// - Requires: No preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> Element? {
-    let b = base.next()
-    if b == nil { return .None }
-    return .Some((index: count++, element: b!))
+    guard let b = base.next() else { return .None }
+    return .Some((index: count++, element: b))
   }
 }
 

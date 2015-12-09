@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 222; // Last change: @_fixed_layout
+const uint16_t VERSION_MINOR = 223; // Last change: SIL @inout_aliasable
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -179,13 +179,14 @@ enum class ParameterConvention : uint8_t {
   Indirect_In,
   Indirect_Out,
   Indirect_Inout,
+  Indirect_InoutAliasable,
   Direct_Owned,
   Direct_Unowned,
   Direct_Guaranteed,
   Indirect_In_Guaranteed,
   Direct_Deallocating,
 };
-using ParameterConventionField = BCFixed<3>;
+using ParameterConventionField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.

@@ -640,6 +640,7 @@ static ManagedValue manageParam(SILGenFunction &gen,
       return gen.emitManagedBufferWithCleanup(copy);
     }
   case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
     return ManagedValue::forLValue(paramValue);
   case ParameterConvention::Indirect_In:
     return gen.emitManagedBufferWithCleanup(paramValue);
@@ -1123,6 +1124,10 @@ namespace {
                             input, *temp.get());
         Outputs.push_back(temp->getManagedAddress());
         return;
+      }
+      case ParameterConvention::Indirect_InoutAliasable: {
+        llvm_unreachable("abstraction difference in aliasable argument not "
+                         "allowed");
       }
       }
 

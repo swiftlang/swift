@@ -1388,6 +1388,7 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
   }
 }
 
+#if SWIFT_OBJC_INTEROP
 /// Do a dynamic cast to the target class.
 static void *_dynamicCastUnknownClass(void *object,
                                       const Metadata *targetType,
@@ -1400,6 +1401,7 @@ static void *_dynamicCastUnknownClass(void *object,
 
   return const_cast<void*>(swift_dynamicCastUnknownClass(object, targetType));
 }
+#endif
 
 static bool _dynamicCastUnknownClassIndirect(OpaqueValue *dest,
                                              void *object,

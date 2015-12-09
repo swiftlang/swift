@@ -306,7 +306,7 @@ static bool verifySILSelfParameterType(SILDeclRef DeclRef,
   // Otherwise, if this function type has a guaranteed self parameter type,
   // make sure that we have a +0 self param.
   return !FTy->getExtInfo().hasGuaranteedSelfParam() ||
-          PInfo.isGuaranteed() || PInfo.isIndirectInOut();
+          PInfo.isGuaranteed() || PInfo.isIndirectMutating();
 }
 
 SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
@@ -396,6 +396,19 @@ SILFunction *SILModule::getOrCreateSharedFunction(SILLocation loc,
   return getOrCreateFunction(loc, name, SILLinkage::Shared,
                              type, isBareSILFunction, isTransparent, isFragile,
                              isThunk, SILFunction::NotRelevant);
+}
+
+SILFunction *SILModule::getOrCreateFunction(
+    SILLinkage linkage, StringRef name, CanSILFunctionType loweredType,
+    GenericParamList *contextGenericParams, Optional<SILLocation> loc,
+    IsBare_t isBareSILFunction, IsTransparent_t isTrans, IsFragile_t isFragile,
+    IsThunk_t isThunk, SILFunction::ClassVisibility_t classVisibility,
+    Inline_t inlineStrategy, EffectsKind EK, SILFunction *InsertBefore,
+    const SILDebugScope *DebugScope, DeclContext *DC) {
+  return SILFunction::create(*this, linkage, name, loweredType,
+                             contextGenericParams, loc, isBareSILFunction,
+                             isTrans, isFragile, isThunk, classVisibility,
+                             inlineStrategy, EK, InsertBefore, DebugScope, DC);
 }
 
 ArrayRef<SILType> ValueBase::getTypes() const {
@@ -668,7 +681,11 @@ lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member) {
 
 void SILModule::
 registerDeleteNotificationHandler(DeleteNotificationHandler* Handler) {
-  NotificationHandlers.insert(Handler);
+  // Ask the handler (that can be an analysis, a pass, or some other data
+  // structure) if it wants to receive delete notifications.
+  if (Handler->needsNotifications()) {
+    NotificationHandlers.insert(Handler);
+  }
 }
 
 void SILModule::

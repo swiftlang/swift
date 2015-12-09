@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -disable-objc-attr-requires-foundation-module %s | FileCheck %s
+// RUN: %target-swift-frontend -use-native-super-method -emit-sil -disable-objc-attr-requires-foundation-module %s | FileCheck %s
 
 // High-level tests that DI handles early returns from failable and throwing
 // initializers properly. The main complication is conditional release of self
@@ -946,8 +946,6 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK:       bb1([[RESULT:%.*]] : $Int)
 // CHECK-NEXT:    [[BASE_SELF:%.*]] = upcast %2
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_TFC35definite_init_failable_initializers14ThrowBaseClasscfzT_S0_
-// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, 1
-// CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]#1
 // CHECK-NEXT:    try_apply [[INIT_FN]]([[BASE_SELF]])
 // CHECK:       bb2([[NEW_SELF:%.*]] : $ThrowBaseClass):
 // CHECK-NEXT:    [[DERIVED_SELF:%.*]] = unchecked_ref_cast [[NEW_SELF]]
@@ -1014,8 +1012,6 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK:         store %2 to [[SELF_BOX]]#1
 // CHECK-NEXT:    [[DERIVED_SELF:%.*]] = upcast %2
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_TFC35definite_init_failable_initializers14ThrowBaseClasscfzT_S0_
-// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, 1
-// CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]#1
 // CHECK-NEXT:    try_apply [[INIT_FN]]([[DERIVED_SELF]])
 // CHECK:       bb1([[NEW_SELF:%.*]] : $ThrowBaseClass):
 // CHECK-NEXT:    [[DERIVED_SELF:%.*]] = unchecked_ref_cast [[NEW_SELF]]
@@ -1064,8 +1060,6 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK:       bb1([[RESULT:%.*]] : $Int):
 // CHECK-NEXT:    [[BASE_SELF:%.*]] = upcast %2
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_TFC35definite_init_failable_initializers14ThrowBaseClasscfT6noFailT__S0_
-// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT:    store [[BIT:%.*]] to [[BITMAP_BOX]]#1
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = apply [[INIT_FN]]([[BASE_SELF]])
 // CHECK-NEXT:    [[DERIVED_SELF:%.*]] = unchecked_ref_cast [[NEW_SELF]]
 // CHECK-NEXT:    store [[DERIVED_SELF]] to [[SELF_BOX]]#1
@@ -1112,8 +1106,6 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK:       bb1([[RESULT:%.*]] : $Int):
 // CHECK-NEXT:    [[BASE_SELF:%.*]] = upcast %3
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_TFC35definite_init_failable_initializers14ThrowBaseClasscfzT_S0_
-// CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Int2, 1
-// CHECK-NEXT:    store [[ONE]] to [[BITMAP_BOX]]#1
 // CHECK-NEXT:    try_apply [[INIT_FN]]([[BASE_SELF]])
 // CHECK:       bb2([[NEW_SELF:%.*]] : $ThrowBaseClass):
 // CHECK-NEXT:    [[DERIVED_SELF:%.*]] = unchecked_ref_cast [[NEW_SELF]]

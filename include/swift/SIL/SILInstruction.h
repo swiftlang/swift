@@ -1401,13 +1401,9 @@ public:
 };
 
 
-
-/// Represents a load from a @weak memory location.
-class LoadWeakInst
-  : public UnaryInstructionBase<ValueKind::LoadWeakInst>
-{
-  friend class SILBuilder;
-
+/// An abstract class representing a load from some kind of reference storage.
+template <ValueKind K>
+class LoadReferenceInstBase : public UnaryInstructionBase<K> {
   static SILType getResultType(SILType operandTy) {
     assert(operandTy.isAddress() && "loading from non-address operand?");
     auto refType = cast<ReferenceStorageType>(operandTy.getSwiftRValueType());
@@ -1416,26 +1412,28 @@ class LoadWeakInst
 
   unsigned IsTake : 1; // FIXME: pack this somewhere
 
-  /// \param DebugLoc The location of the expression that caused the load.
-  /// \param lvalue The SILValue representing the address to
-  ///        use for the load.
-  LoadWeakInst(SILDebugLocation *DebugLoc, SILValue lvalue, IsTake_t isTake)
-      : UnaryInstructionBase(DebugLoc, lvalue, getResultType(lvalue.getType())),
-        IsTake(unsigned(isTake)) {}
+protected:
+  LoadReferenceInstBase(SILDebugLocation *loc, SILValue lvalue, IsTake_t isTake)
+    : UnaryInstructionBase<K>(loc, lvalue, getResultType(lvalue.getType())),
+      IsTake(unsigned(isTake)) {
+  }
 
 public:
   IsTake_t isTake() const { return IsTake_t(IsTake); }
 };
 
-/// Represents a store to a @weak memory location.
-class StoreWeakInst : public SILInstruction {
-  friend class SILBuilder;
-
+/// An abstract class representing a store to some kind of reference storage.
+template <ValueKind K>
+class StoreReferenceInstBase : public SILInstruction {
   enum { Src, Dest };
   FixedOperandList<2> Operands;
   unsigned IsInitializationOfDest : 1; // FIXME: pack this somewhere
-  StoreWeakInst(SILDebugLocation *DebugLoc, SILValue src, SILValue dest,
-                IsInitialization_t isInit);
+protected:
+  StoreReferenceInstBase(SILDebugLocation *loc, SILValue src, SILValue dest,
+                         IsInitialization_t isInit)
+    : SILInstruction(K, loc), Operands(this, src, dest),
+      IsInitializationOfDest(unsigned(isInit)) {
+  }
 
 public:
   SILValue getSrc() const { return Operands[Src].get(); }
@@ -1452,8 +1450,62 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   static bool classof(const ValueBase *V) {
-    return V->getKind() == ValueKind::StoreWeakInst;
+    return V->getKind() == K;
   }
+};
+
+/// Represents a load from a @weak memory location.
+class LoadWeakInst
+  : public LoadReferenceInstBase<ValueKind::LoadWeakInst>
+{
+  friend class SILBuilder;
+
+  /// \param loc The location of the expression that caused the load.
+  /// \param lvalue The SILValue representing the address to
+  ///        use for the load.
+  LoadWeakInst(SILDebugLocation *loc, SILValue lvalue, IsTake_t isTake)
+    : LoadReferenceInstBase(loc, lvalue, isTake) {}
+};
+
+/// Represents a store to a @weak memory location.
+class StoreWeakInst
+  : public StoreReferenceInstBase<ValueKind::StoreWeakInst>
+{
+  friend class SILBuilder;
+
+  StoreWeakInst(SILDebugLocation *loc, SILValue src, SILValue dest,
+                IsInitialization_t isInit)
+    : StoreReferenceInstBase(loc, src, dest, isInit) {}
+};
+
+/// Represents a load from an @unowned memory location.
+///
+/// This is only required for address-only unowned references; for loadable
+/// unowned references, it's better to use a load and a strong_retain_unowned.
+class LoadUnownedInst
+  : public LoadReferenceInstBase<ValueKind::LoadUnownedInst>
+{
+  friend class SILBuilder;
+
+  /// \param loc The location of the expression that caused the load.
+  /// \param lvalue The SILValue representing the address to
+  ///        use for the load.
+  LoadUnownedInst(SILDebugLocation *loc, SILValue lvalue, IsTake_t isTake)
+    : LoadReferenceInstBase(loc, lvalue, isTake) {}
+};
+
+/// Represents a store to an @unowned memory location.
+///
+/// This is only required for address-only unowned references; for loadable
+/// unowned references, it's better to use a ref_to_unowned and a store.
+class StoreUnownedInst
+  : public StoreReferenceInstBase<ValueKind::StoreUnownedInst>
+{
+  friend class SILBuilder;
+
+  StoreUnownedInst(SILDebugLocation *loc, SILValue src, SILValue dest,
+                   IsInitialization_t isInit)
+    : StoreReferenceInstBase(loc, src, dest, isInit) {}
 };
 
 /// CopyAddrInst - Represents a copy from one memory location to another. This
@@ -4351,6 +4403,43 @@ public:
   void setArgument(unsigned i, SILValue V) const {
     getArgumentOperands()[i].set(V);
   }
+
+  /// Return the self argument passed to this instruction.
+  bool hasSelfArgument() const {
+    switch (Inst->getKind()) {
+    case ValueKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->hasSelfArgument();
+    case ValueKind::TryApplyInst:
+      return cast<TryApplyInst>(Inst)->hasSelfArgument();
+    default:
+      llvm_unreachable("not implemented for this instruction!");
+    }
+  }
+
+  /// Return the self argument passed to this instruction.
+  SILValue getSelfArgument() const {
+    switch (Inst->getKind()) {
+    case ValueKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->getSelfArgument();
+    case ValueKind::TryApplyInst:
+      return cast<TryApplyInst>(Inst)->getSelfArgument();
+    default:
+      llvm_unreachable("not implemented for this instruction!");
+    }
+  }
+
+  /// Return the self operand passed to this instruction.
+  Operand &getSelfArgumentOperand() {
+    switch (Inst->getKind()) {
+    case ValueKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->getSelfArgumentOperand();
+    case ValueKind::TryApplyInst:
+      return cast<TryApplyInst>(Inst)->getSelfArgumentOperand();
+    default:
+      llvm_unreachable("not implemented for this instruction!");
+    }
+  }
+
 #undef FOREACH_IMPL_RETURN
 
   static ApplySite getFromOpaqueValue(void *p) {

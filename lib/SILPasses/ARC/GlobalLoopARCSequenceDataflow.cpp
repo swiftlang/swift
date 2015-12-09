@@ -250,13 +250,17 @@ bool LoopARCSequenceDataflowEvaluator::processLoopBottomUp(
 LoopARCSequenceDataflowEvaluator::LoopARCSequenceDataflowEvaluator(
     SILFunction &F, AliasAnalysis *AA, LoopRegionFunctionInfo *LRFI,
     SILLoopInfo *SLI, RCIdentityFunctionInfo *RCFI,
+    ProgramTerminationFunctionInfo *PTFI,
     BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
     BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap)
     : F(F), AA(AA), LRFI(LRFI), SLI(SLI), RCFI(RCFI),
       DecToIncStateMap(DecToIncStateMap), IncToDecStateMap(IncToDecStateMap),
       ConsumedArgToReleaseMap(RCFI, &F) {
   for (auto *R : LRFI->getRegions()) {
-    RegionStateInfo[R] = new (Allocator) ARCRegionState(R);
+    bool AllowsLeaks = false;
+    if (R->isBlock())
+      AllowsLeaks |= PTFI->isProgramTerminatingBlock(R->getBlock());
+    RegionStateInfo[R] = new (Allocator) ARCRegionState(R, AllowsLeaks);
   }
 }
 
@@ -267,7 +271,10 @@ LoopARCSequenceDataflowEvaluator::~LoopARCSequenceDataflowEvaluator() {
 }
 
 bool LoopARCSequenceDataflowEvaluator::runOnLoop(
-    const LoopRegion *R, bool FreezeOwnedArgEpilogueReleases) {
+    const LoopRegion *R, bool FreezeOwnedArgEpilogueReleases,
+    bool RecomputePostDomReleases) {
+  if (RecomputePostDomReleases)
+    ConsumedArgToReleaseMap.recompute();
   bool NestingDetected = processLoopBottomUp(R, FreezeOwnedArgEpilogueReleases);
   NestingDetected |= processLoopTopDown(R);
   return NestingDetected;

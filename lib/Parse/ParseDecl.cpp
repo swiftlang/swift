@@ -2177,6 +2177,19 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
       return nullptr;
   } while (consumeIf(tok::period));
 
+  if (Tok.is(tok::code_complete)) {
+    // We omit the code completion token if it immediately follows the module
+    // identifiers.
+    auto BufferId = SourceMgr.getCodeCompletionBufferID();
+    auto IdEndOffset = SourceMgr.getLocOffsetInBuffer(ImportPath.back().second,
+      BufferId) + ImportPath.back().first.str().size();
+    auto CCTokenOffeset =  SourceMgr.getLocOffsetInBuffer(SourceMgr.
+      getCodeCompletionLoc(), BufferId);
+    if (IdEndOffset == CCTokenOffeset) {
+      consumeToken();
+    }
+  }
+
   if (Kind != ImportKind::Module && ImportPath.size() == 1) {
     diagnose(ImportPath.front().second, diag::decl_expected_module_name);
     return nullptr;

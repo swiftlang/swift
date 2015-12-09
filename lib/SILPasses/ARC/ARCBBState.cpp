@@ -140,8 +140,6 @@ void ARCBBState::initPredTopDown(ARCBBState &PredBBState) {
   PtrToTopDownState = PredBBState.PtrToTopDownState;
 }
 
-void ARCBBState::initializeTrapStatus() { IsTrapBB = isARCInertTrapBB(BB); }
-
 //===----------------------------------------------------------------------===//
 //                               ARCBBStateInfo
 //===----------------------------------------------------------------------===//
@@ -153,7 +151,8 @@ using ARCBBStateInfoHandle = ARCSequenceDataflowEvaluator::ARCBBStateInfoHandle;
 
 } // end anonymous namespace
 
-ARCBBStateInfo::ARCBBStateInfo(SILFunction *F, PostOrderAnalysis *POA)
+ARCBBStateInfo::ARCBBStateInfo(SILFunction *F, PostOrderAnalysis *POA,
+                               ProgramTerminationFunctionInfo *PTFI)
     : BBToBBIDMap(), BBIDToBottomUpBBStateMap(POA->get(F)->size()),
       BBIDToTopDownBBStateMap(POA->get(F)->size()), BackedgeMap() {
 
@@ -164,8 +163,9 @@ ARCBBStateInfo::ARCBBStateInfo(SILFunction *F, PostOrderAnalysis *POA)
     unsigned BBID = BBToBBIDMap.size();
     BBToBBIDMap[BB] = BBID;
 
-    BBIDToBottomUpBBStateMap[BBID].init(BB);
-    BBIDToTopDownBBStateMap[BBID].init(BB);
+    bool IsLeakingBB = PTFI->isProgramTerminatingBlock(BB);
+    BBIDToBottomUpBBStateMap[BBID].init(BB, IsLeakingBB);
+    BBIDToTopDownBBStateMap[BBID].init(BB, IsLeakingBB);
 
     for (auto &Succ : BB->getSuccessors())
       if (SILBasicBlock *SuccBB = Succ.getBB())

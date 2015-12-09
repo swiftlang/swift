@@ -428,7 +428,7 @@ private:
   // StackNode - contains all the needed information to create a stack for doing
   // a depth first traversal of the tree. This includes scopes for values and
   // loads as well as the generation. There is a child iterator so that the
-  // children do not need to be store spearately.
+  // children do not need to be store separately.
   class StackNode {
    public:
     StackNode(ScopedHTType *availableValues, DominanceInfoNode *n,
