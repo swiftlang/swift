@@ -97,7 +97,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   //
   var i = 0
   var count = DATA_SIZE
-  for i in 0..<count {
+  for i = 0; i < count; i++ {
     data[i] = Float(rand()) / Float(RAND_MAX)
   }
   

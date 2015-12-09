@@ -1,0 +1,231 @@
+// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
+
+// REQUIRES: CPU=x86_64
+// XFAIL: linux
+
+//   These types end up in a completely different order with interop disabled.
+// CHECK: [[OPAQUE:%swift.opaque]] = type opaque
+// CHECK: [[TYPE:%swift.type]] = type
+// CHECK: [[C:%C12unowned_objc1C]] = type <{ [[REF:%swift.refcounted]] }>
+// CHECK: [[UNKNOWN:%objc_object]] = type
+// CHECK: [[A:%V12unowned_objc1A]] = type <{ %swift.unowned }>
+
+class C {}
+sil_vtable C {}
+protocol P : class {
+  func explode()
+}
+
+sil @_TFC12unowned_objc1CD : $@convention(method) (C) -> ()
+
+struct A {
+  unowned var x : C
+}
+
+struct B {
+  unowned var x : P
+}
+
+sil @test_weak_rr_class : $@convention(thin) (@sil_unowned C) -> () {
+bb0(%0 : $@sil_unowned C):
+  %1 = unowned_retain %0 : $@sil_unowned C
+  %2 = unowned_release %0 : $@sil_unowned C
+  %3 = tuple ()
+  %4 = return %3 : $()
+}
+// CHECK:    define void @test_weak_rr_class([[C]]*) {{.*}} {
+// CHECK:      call void bitcast (void ([[REF]]*)* @swift_unownedRetain to void ([[C]]*)*)([[C]]* %0)
+// CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_unownedRelease to void ([[C]]*)*)([[C]]* %0)
+// CHECK-NEXT: ret void
+
+// CHECK:    define void @test_unknown_unowned_copies([[UNKNOWN]]*, i8**, [[UNKNOWN]]*, i8**)
+sil @test_unknown_unowned_copies : $@convention(thin) (@owned P, @owned P) -> () {
+bb0(%p : $P, %q : $P):
+
+  // CHECK:      [[X:%.*]] = alloca [[UREF:{ %swift.unowned, i8.. }]], align 8
+  // CHECK-NEXT: [[Y:%.*]] = alloca [[UREF]], align 8
+  %x = alloc_stack $@sil_unowned P
+  %y = alloc_stack $@sil_unowned P
+
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[X]], i32 0, i32 1
+  // CHECK-NEXT: store i8** [[PP:%1]], i8*** [[T0]], align 8
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[X]], i32 0, i32 0
+  // CHECK-NEXT: call void @swift_unknownUnownedInit(%swift.unowned* [[T0]], [[UNKNOWN]]* [[PV:%0]])
+  store_unowned %p to [initialization] %x#1 : $*@sil_unowned P
+
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[Y]], i32 0, i32 0
+  // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[X]], i32 0, i32 0
+  // CHECK-NEXT: call void @swift_unknownUnownedCopyInit(%swift.unowned* [[T0]], %swift.unowned* [[T1]])
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[X]], i32 0, i32 1
+  // CHECK-NEXT: [[WT:%.*]] = load i8**, i8*** [[T0]], align 8
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[Y]], i32 0, i32 1
+  // CHECK-NEXT: store i8** [[WT]], i8*** [[T0]], align 8
+  copy_addr %x#1 to [initialization] %y#1 : $*@sil_unowned P
+
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[X]], i32 0, i32 0
+  // CHECK-NEXT: [[TV:%.*]] = call [[UNKNOWN]]* @swift_unknownUnownedLoadStrong(%swift.unowned* [[T0]])
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[X]], i32 0, i32 1
+  // CHECK-NEXT: [[TP:%.*]] = load i8**, i8*** [[T0]], align 8
+  %t0 = load_unowned %x#1 : $*@sil_unowned P
+
+  // CHECK-NEXT: call void @swift_unknownRelease([[UNKNOWN]]* [[TV]])
+  strong_release %t0 : $P
+
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[Y]], i32 0, i32 0
+  // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[X]], i32 0, i32 0
+  // CHECK-NEXT: call void @swift_unknownUnownedCopyAssign(%swift.unowned* [[T0]], %swift.unowned* [[T1]])
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[X]], i32 0, i32 1
+  // CHECK-NEXT: [[WT:%.*]] = load i8**, i8*** [[T0]], align 8
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[Y]], i32 0, i32 1
+  // CHECK-NEXT: store i8** [[WT]], i8*** [[T0]], align 8
+  copy_addr %x#1 to %y#1 : $*@sil_unowned P
+
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[Y]], i32 0, i32 1
+  // CHECK-NEXT: store i8** [[QP:%3]], i8*** [[T0]], align 8
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[Y]], i32 0, i32 0
+  // CHECK-NEXT: call void @swift_unknownUnownedAssign(%swift.unowned* [[T0]], [[UNKNOWN]]* [[QV:%2]])
+  store_unowned %q to %y#1 : $*@sil_unowned P
+
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[Y]], i32 0, i32 0
+  // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[X]], i32 0, i32 0
+  // CHECK-NEXT: call void @swift_unknownUnownedTakeAssign(%swift.unowned* [[T0]], %swift.unowned* [[T1]])
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[X]], i32 0, i32 1
+  // CHECK-NEXT: [[WT:%.*]] = load i8**, i8*** [[T0]], align 8
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[Y]], i32 0, i32 1
+  // CHECK-NEXT: store i8** [[WT]], i8*** [[T0]], align 8
+  copy_addr [take] %x#1 to %y#1 : $*@sil_unowned P
+
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[X]], i32 0, i32 0
+  // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[Y]], i32 0, i32 0
+  // CHECK-NEXT: call void @swift_unknownUnownedTakeInit(%swift.unowned* [[T0]], %swift.unowned* [[T1]])
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[Y]], i32 0, i32 1
+  // CHECK-NEXT: [[WT:%.*]] = load i8**, i8*** [[T0]], align 8
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[X]], i32 0, i32 1
+  // CHECK-NEXT: store i8** [[WT]], i8*** [[T0]], align 8
+  copy_addr [take] %y#1 to [initialization] %x#1 : $*@sil_unowned P
+
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[Y]], i32 0, i32 0
+  // CHECK-NEXT: [[TV:%.*]] = call [[UNKNOWN]]* @swift_unknownUnownedTakeStrong(%swift.unowned* [[T0]])
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[Y]], i32 0, i32 1
+  // CHECK-NEXT: [[TP:%.*]] = load i8**, i8*** [[T0]], align 8
+  %t1 = load_unowned [take] %y#1 : $*@sil_unowned P
+
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[X]], i32 0, i32 1
+  // CHECK-NEXT: store i8** [[TP]], i8*** [[T0]], align 8
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[X]], i32 0, i32 0
+  // CHECK-NEXT: call void @swift_unknownUnownedInit(%swift.unowned* [[T0]], [[UNKNOWN]]* [[TV]])
+  store_unowned %t1 to [initialization] %x#1 : $*@sil_unowned P
+
+  // CHECK-NEXT: call void @swift_unknownRelease([[UNKNOWN]]* [[TV]])
+  strong_release %t1 : $P
+
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[X]], i32 0, i32 0
+  // CHECK-NEXT: call void @swift_unknownUnownedDestroy(%swift.unowned* [[T0]])
+  destroy_addr %x#1 : $*@sil_unowned P
+
+  dealloc_stack %y#0 : $*@local_storage @sil_unowned P
+  dealloc_stack %x#0 : $*@local_storage @sil_unowned P
+
+  // CHECK-NEXT: call void @swift_unknownRelease([[UNKNOWN]]* [[PV]])
+  strong_release %p : $P
+
+  // CHECK-NEXT: call void @swift_unknownRelease([[UNKNOWN]]* [[QV]])
+  strong_release %q : $P
+
+  // CHECK-NEXT: ret void
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// Value witnesses for A:
+
+//   destroyBuffer
+// CHECK:    define linkonce_odr hidden void @_TwXXV12unowned_objc1A([[BUFFER:\[24 x i8\]]]* [[ARG:%.*]], [[TYPE]]*
+// CHECK:      [[T0:%.*]] = bitcast [[BUFFER]]* [[ARG]] to [[A]]*
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]], [[A]]* [[T0]], i32 0, i32 0
+// CHECK-NEXT: [[T1C:%.*]] = bitcast %swift.unowned* [[T1]] to [[C]]*
+// CHECK-NEXT: [[T2:%.*]] = load [[C]]*, [[C]]** [[T1C]], align 8
+// CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_unownedRelease to void ([[C]]*)*)([[C]]* [[T2]])
+// CHECK-NEXT: ret void
+
+//   initializeBufferWithCopyOfBuffer
+// CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_TwCPV12unowned_objc1A([[BUFFER]]* [[DESTBUF:%.*]], [[BUFFER]]* [[SRCBUF:%.*]], [[TYPE]]*
+// CHECK:      [[DEST:%.*]] = bitcast [[BUFFER]]* [[DESTBUF]] to [[A]]*
+// CHECK-NEXT: [[SRC:%.*]] = bitcast [[BUFFER]]* [[SRCBUF]] to [[A]]*
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[A]], [[A]]* [[DEST]], i32 0, i32 0
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]], [[A]]* [[SRC]], i32 0, i32 0
+// CHECK-NEXT: [[T1C:%.*]] = bitcast %swift.unowned* [[T1]] to [[C]]*
+// CHECK-NEXT: [[T2:%.*]] = load [[C]]*, [[C]]** [[T1C]], align 8
+// CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_unownedRetain to void ([[C]]*)*)([[C]]* [[T2]])
+// CHECK-NEXT: [[T0C:%.*]] = bitcast %swift.unowned* [[T0]] to [[C]]*
+// CHECK-NEXT: store [[C]]* [[T2]], [[C]]** [[T0C]], align 8
+// CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
+// CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
+
+//   destroy
+// CHECK:    define linkonce_odr hidden void @_TwxxV12unowned_objc1A([[OPAQUE]]* [[ARG:%.*]], [[TYPE]]*
+// CHECK:      [[T0:%.*]] = bitcast [[OPAQUE]]* [[ARG]] to [[A]]*
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]], [[A]]* [[T0]], i32 0, i32 0
+// CHECK-NEXT: [[T1C:%.*]] = bitcast %swift.unowned* [[T1]] to [[C]]*
+// CHECK-NEXT: [[T2:%.*]] = load [[C]]*, [[C]]** [[T1C]], align 8
+// CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_unownedRelease to void ([[C]]*)*)([[C]]* [[T2]])
+// CHECK-NEXT: ret void
+
+//   initializeBufferWithCopy
+// CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_TwCpV12unowned_objc1A([[BUFFER]]* [[DESTBUF:%.*]], [[OPAQUE]]* [[SRC_OPQ:%.*]], [[TYPE]]*
+// CHECK:      [[SRC:%.*]] = bitcast [[OPAQUE]]* [[SRC_OPQ]] to [[A]]*
+// CHECK-NEXT: [[DEST:%.*]] = bitcast [[BUFFER]]* [[DESTBUF]] to [[A]]*
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[A]], [[A]]* [[DEST]], i32 0, i32 0
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]], [[A]]* [[SRC]], i32 0, i32 0
+// CHECK-NEXT: [[T1C:%.*]] = bitcast %swift.unowned* [[T1]] to [[C]]*
+// CHECK-NEXT: [[T2:%.*]] = load [[C]]*, [[C]]** [[T1C]], align 8
+// CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_unownedRetain to void ([[C]]*)*)([[C]]* [[T2]])
+// CHECK-NEXT: [[T0C:%.*]] = bitcast %swift.unowned* [[T0]] to [[C]]*
+// CHECK-NEXT: store [[C]]* [[T2]], [[C]]** [[T0C]], align 8
+// CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
+// CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
+
+//   initializeWithCopy
+// CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_TwcpV12unowned_objc1A([[OPAQUE]]* [[DEST_OPQ:%.*]], [[OPAQUE]]* [[SRC_OPQ:%.*]], [[TYPE]]*
+// CHECK:      [[DEST:%.*]] = bitcast [[OPAQUE]]* [[DEST_OPQ]] to [[A]]*
+// CHECK-NEXT: [[SRC:%.*]] = bitcast [[OPAQUE]]* [[SRC_OPQ]] to [[A]]*
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[A]], [[A]]* [[DEST]], i32 0, i32 0
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]], [[A]]* [[SRC]], i32 0, i32 0
+// CHECK-NEXT: [[T1C:%.*]] = bitcast %swift.unowned* [[T1]] to [[C]]*
+// CHECK-NEXT: [[T2:%.*]] = load [[C]]*, [[C]]** [[T1C]], align 8
+// CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_unownedRetain to void ([[C]]*)*)([[C]]* [[T2]])
+// CHECK-NEXT: [[T0C:%.*]] = bitcast %swift.unowned* [[T0]] to [[C]]*
+// CHECK-NEXT: store [[C]]* [[T2]], [[C]]** [[T0C]], align 8
+// CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
+// CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
+
+//   assignWithCopy
+// CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_TwcaV12unowned_objc1A([[OPAQUE]]* [[DEST_OPQ:%.*]], [[OPAQUE]]* [[SRC_OPQ:%.*]], [[TYPE]]*
+// CHECK:      [[DEST:%.*]] = bitcast [[OPAQUE]]* [[DEST_OPQ]] to [[A]]*
+// CHECK-NEXT: [[SRC:%.*]] = bitcast [[OPAQUE]]* [[SRC_OPQ]] to [[A]]*
+// CHECK-NEXT: [[DEST_X:%.*]] = getelementptr inbounds [[A]], [[A]]* [[DEST]], i32 0, i32 0
+// CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds [[A]], [[A]]* [[SRC]], i32 0, i32 0
+// CHECK-NEXT: [[SRC_X_C:%.*]] = bitcast %swift.unowned* [[SRC_X]] to [[C]]*
+// CHECK-NEXT: [[NEW:%.*]] = load [[C]]*, [[C]]** [[SRC_X_C]], align 8
+// CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_unownedRetain to void ([[C]]*)*)([[C]]* [[NEW]])
+// CHECK-NEXT: [[DEST_X_C:%.*]] = bitcast %swift.unowned* [[DEST_X]] to [[C]]*
+// CHECK-NEXT: [[OLD:%.*]] = load [[C]]*, [[C]]** [[DEST_X_C]], align 8
+// CHECK-NEXT: store [[C]]* [[NEW]], [[C]]** [[DEST_X_C]], align 8
+// CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_unownedRelease to void ([[C]]*)*)([[C]]* [[OLD]])
+// CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
+// CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
+
+//   assignWithTake
+// CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_TwtaV12unowned_objc1A([[OPAQUE]]* [[DEST_OPQ:%.*]], [[OPAQUE]]* [[SRC_OPQ:%.*]], [[TYPE]]*
+// CHECK:      [[DEST:%.*]] = bitcast [[OPAQUE]]* [[DEST_OPQ]] to [[A]]*
+// CHECK-NEXT: [[SRC:%.*]] = bitcast [[OPAQUE]]* [[SRC_OPQ]] to [[A]]*
+// CHECK-NEXT: [[DEST_X:%.*]] = getelementptr inbounds [[A]], [[A]]* [[DEST]], i32 0, i32 0
+// CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds [[A]], [[A]]* [[SRC]], i32 0, i32 0
+// CHECK-NEXT: [[SRC_X_C:%.*]] = bitcast %swift.unowned* [[SRC_X]] to [[C]]*
+// CHECK-NEXT: [[NEW:%.*]] = load [[C]]*, [[C]]** [[SRC_X_C]], align 8
+// CHECK-NEXT: [[DEST_X_C:%.*]] = bitcast %swift.unowned* [[DEST_X]] to [[C]]*
+// CHECK-NEXT: [[OLD:%.*]] = load [[C]]*, [[C]]** [[DEST_X_C]], align 8
+// CHECK-NEXT: store [[C]]* [[NEW]], [[C]]** [[DEST_X_C]], align 8
+// CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_unownedRelease to void ([[C]]*)*)([[C]]* [[OLD]])
+// CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
+// CHECK-NEXT: ret [[OPAQUE]]* [[T0]]

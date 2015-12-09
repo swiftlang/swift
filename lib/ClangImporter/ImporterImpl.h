@@ -28,6 +28,7 @@
 #include "clang/APINotes/APINotesReader.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Frontend/CompilerInstance.h"
+#include "clang/Serialization/ModuleFileExtension.h"
 #include "clang/AST/Attr.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
@@ -219,7 +220,7 @@ using api_notes::FactoryAsInitKind;
 
 /// \brief Implementation of the Clang importer.
 class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation 
-  : public LazyMemberLoader 
+  : public LazyMemberLoader, public clang::ModuleFileExtension
 {
   friend class ClangImporter;
 
@@ -294,6 +295,9 @@ private:
 
   /// The Swift lookup table for the bridging header.
   SwiftLookupTable BridgingHeaderLookupTable;
+
+  /// The Swift lookup tables, per module.
+  llvm::StringMap<std::unique_ptr<SwiftLookupTable>> LookupTables;
 
 public:
   /// \brief Mapping of already-imported declarations.
@@ -422,7 +426,7 @@ public:
   ///
   /// These appaer as both properties and methods in ObjC and should be
   /// imported as methods into Swift.
-  bool isAccessibilityDecl(const clang::Decl *objCMethodOrProp);
+  static bool isAccessibilityDecl(const clang::Decl *objCMethodOrProp);
 
   /// Determine whether this method is an Objective-C "init" method
   /// that will be imported as a Swift initializer.
@@ -521,7 +525,8 @@ private:
 
   /// Retrieve the prefix to be stripped from the names of the enum constants
   /// within the given enum.
-  StringRef getEnumConstantNamePrefix(const clang::EnumDecl *enumDecl);
+  StringRef getEnumConstantNamePrefix(clang::Sema &sema,
+                                      const clang::EnumDecl *enumDecl);
 
 public:
   /// \brief Keep track of enum constant values that have been imported.
@@ -647,7 +652,13 @@ public:
 
   /// Add the given named declaration as an entry to the given Swift name
   /// lookup table, including any of its child entries.
-  void addEntryToLookupTable(SwiftLookupTable &table, clang::NamedDecl *named);
+  void addEntryToLookupTable(clang::Sema &clangSema, SwiftLookupTable &table,
+                             clang::NamedDecl *named);
+
+  /// Add the macros from the given Clang preprocessor to the given
+  /// Swift name lookup table.
+  void addMacrosToLookupTable(clang::ASTContext &clangCtx,
+                              clang::Preprocessor &pp, SwiftLookupTable &table);
 
 public:
   void registerExternalDecl(Decl *D) {
@@ -819,7 +830,8 @@ public:
   /// introduces nesting, e.g., for enumerators within an NS_ENUM.
   ImportedName importFullName(const clang::NamedDecl *D,
                               ImportNameOptions options = None,
-                              clang::DeclContext **effectiveContext = nullptr);
+                              clang::DeclContext **effectiveContext = nullptr,
+                              clang::Sema *clangSemaOverride = nullptr);
 
   /// \brief Import the given Clang identifier into Swift.
   ///
@@ -860,7 +872,8 @@ public:
 
   /// \brief Classify the given Clang enumeration type to describe how it
   /// should be imported 
-  EnumKind classifyEnum(const clang::EnumDecl *decl);
+  static EnumKind classifyEnum(clang::Preprocessor &pp,
+                               const clang::EnumDecl *decl);
 
   /// Import attributes from the given Clang declaration to its Swift
   /// equivalent.
@@ -1254,6 +1267,20 @@ public:
       ASD->setSetterAccessibility(Accessibility::Public);
     return D;
   }
+
+  // Module file extension overrides
+
+  clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
+  llvm::hash_code hashExtension(llvm::hash_code code) const override;
+
+  std::unique_ptr<clang::ModuleFileExtensionWriter>
+  createExtensionWriter(clang::ASTWriter &writer) override;
+
+  std::unique_ptr<clang::ModuleFileExtensionReader>
+  createExtensionReader(const clang::ModuleFileExtensionMetadata &metadata,
+                        clang::ASTReader &reader,
+                        clang::serialization::ModuleFile &mod,
+                        const llvm::BitstreamCursor &stream) override;
 
   /// Dump the Swift-specific name lookup tables we generate.
   void dumpSwiftLookupTables();

@@ -98,7 +98,7 @@ extension NSObject {
 // CHECK:   [[T0:%.*]] = enum $Optional<NSString>, #Optional.None!enumelt
 // CHECK:   br bb3([[T0]] : $Optional<NSString>)
 // CHECK: bb3([[T0:%.*]] : $Optional<NSString>):
-// CHECK:   autorelease_return [[T0]] : $Optional<NSString>
+// CHECK:   return [[T0]] : $Optional<NSString>
 
 // CHECK-LABEL: sil hidden [thunk] @_TToFE14foreign_errorsCSo8NSObject7takeInt{{.*}} : $@convention(objc_method) (Int, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, NSObject) -> Bool
 // CHECK: bb0([[I:%[0-9]+]] : $Int, [[ERROR:%[0-9]+]] : $AutoreleasingUnsafeMutablePointer<Optional<NSError>>, [[SELF:%[0-9]+]] : $NSObject)

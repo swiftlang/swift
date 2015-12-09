@@ -40,7 +40,6 @@
 #include "ProtocolInfo.h"
 #include "ReferenceTypeInfo.h"
 #include "ScalarTypeInfo.h"
-#include "UnownedTypeInfo.h"
 #include "WeakTypeInfo.h"
 
 using namespace swift;
@@ -2041,8 +2040,9 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM,
 
   if (auto enumDecl = t.getEnumOrBoundGenericEnum()) {
     auto allCases = enumDecl->getAllElements();
+    
     auto theCase = allCases.begin();
-    if (std::next(theCase) == allCases.end()
+    if (!allCases.empty() && std::next(theCase) == allCases.end()
         && (*theCase)->hasArgumentType())
       return t.getEnumElementType(*theCase, *IGM.SILMod);
 

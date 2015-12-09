@@ -1,6 +1,10 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_IMPORT1 | FileCheck %s -check-prefix=CLANG_IMPORT1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_IMPORT2 | FileCheck %s -check-prefix=CLANG_IMPORT2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_IMPORT3 | FileCheck %s -check-prefix=CLANG_IMPORT3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_IMPORT4 | FileCheck %s -check-prefix=CLANG_IMPORT4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_IMPORT5 | FileCheck %s -check-prefix=CLANG_IMPORT5
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_IMPORT6 | FileCheck %s -check-prefix=CLANG_IMPORT6
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_IMPORT7 | FileCheck %s -check-prefix=CLANG_IMPORT7
 
 // REQUIRES: objc_interop
 
@@ -26,3 +30,15 @@ import Foo.#^CLANG_IMPORT3^#
 
 // CLANG_IMPORT3: Begin completions
 // CLANG_IMPORT3-NEXT: Decl[Module]/OtherModule[FooSub]/NotRecommended:   FooSub[#Module#]; name=FooSub
+
+import Foo#^CLANG_IMPORT4^#
+// CLANG_IMPORT4-NOT: Begin completions
+
+import Foo #^CLANG_IMPORT5^#
+// CLANG_IMPORT5: Begin completions
+
+import Foo.FooSub#^CLANG_IMPORT6^#
+// CLANG_IMPORT6-NOT: Begin completions
+
+import Foo.FooSub #^CLANG_IMPORT7^#
+// CLANG_IMPORT7: Begin completions

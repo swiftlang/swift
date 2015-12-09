@@ -1936,6 +1936,8 @@ SILParameterInfo TypeResolver::resolveSILParameter(
     checkFor(TypeAttrKind::TAK_in, ParameterConvention::Indirect_In);
     checkFor(TypeAttrKind::TAK_out, ParameterConvention::Indirect_Out);
     checkFor(TypeAttrKind::TAK_inout, ParameterConvention::Indirect_Inout);
+    checkFor(TypeAttrKind::TAK_inout_aliasable,
+             ParameterConvention::Indirect_InoutAliasable);
     checkFor(TypeAttrKind::TAK_owned, ParameterConvention::Direct_Owned);
     checkFor(TypeAttrKind::TAK_guaranteed,
              ParameterConvention::Direct_Guaranteed);

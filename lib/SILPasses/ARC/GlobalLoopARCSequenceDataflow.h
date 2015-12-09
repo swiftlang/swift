@@ -14,8 +14,8 @@
 #define SWIFT_SILPASSES_ARC_GLOBALLOOPARCSEQUENCEDATAFLOW_H
 
 #include "RefCountState.h"
+#include "ProgramTerminationAnalysis.h"
 #include "swift/SILAnalysis/LoopRegionAnalysis.h"
-#include "swift/SILAnalysis/ProgramTerminationAnalysis.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/NullablePtr.h"
 #include "llvm/ADT/MapVector.h"
@@ -87,7 +87,8 @@ public:
 
   /// Perform the sequence dataflow, bottom up and top down on the loop region
   /// \p R.
-  bool runOnLoop(const LoopRegion *R, bool FreezeOwnedArgEpilogueReleases);
+  bool runOnLoop(const LoopRegion *R, bool FreezeOwnedArgEpilogueReleases,
+                 bool RecomputePostDomReleases);
 
   /// Summarize the contents of the loop so that loops further up the loop tree
   /// can reason about the loop.

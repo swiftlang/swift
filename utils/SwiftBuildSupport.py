@@ -1,5 +1,5 @@
-#===--- SwiftBuildSupport.py - Utilities for Swift build scripts -----------===#
-#
+##===--- SwiftBuildSupport.py - Utilities for Swift build scripts ---------===##
+##
 ## This source file is part of the Swift.org open source project
 ##
 ## Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
@@ -7,8 +7,8 @@
 ##
 ## See http://swift.org/LICENSE.txt for license information
 ## See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-#
-#===------------------------------------------------------------------------===#
+##
+##===----------------------------------------------------------------------===##
 
 from __future__ import print_function
 

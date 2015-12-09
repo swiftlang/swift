@@ -180,46 +180,6 @@ static CanSILFunctionType getDynamicMethodLoweredType(SILGenFunction &gen,
   return replaceSelfTypeForDynamicLookup(ctx, methodTy, selfTy, methodName);
 }
 
-/// Emit a sequence of instructions to partially apply the self
-/// parameter of a super method invocation.
-static ManagedValue emitPartialSuperMethod(SILGenFunction &SGF,
-                                           SILDeclRef constant,
-                                           SILLocation loc,
-                                           ArrayRef<Substitution> subs,
-                                           ArrayRef<ManagedValue> values,
-                                           CanFunctionType formalApplyType,
-                                           SGFContext C) {
-
-  assert(values.size() == 1 &&
-         "Can only partially apply the self parameater of a super method call");
-
-  auto upcastedSelf = values.back();
-
-  auto self = cast<UpcastInst>(upcastedSelf.getValue())->getOperandRef().get();
-
-  auto constantInfo = SGF.getConstantInfo(constant);
-  SILValue superMethodVal = SGF.B.createSuperMethod(loc,
-                                                    self,
-                                                    constant,
-                                                    constantInfo.getSILType(),
-                                                    /*volatile*/
-                                                      constant.isForeign);
-
-  auto closureTy = SILGenBuilder::getPartialApplyResultType(
-    constantInfo.getSILType(),
-    1,
-    SGF.B.getModule(),
-    subs);
-
-  SILValue partialApply = SGF.B.createPartialApply(loc,
-                                                   superMethodVal,
-                                                   constantInfo.getSILType(),
-                                                   subs,
-                                                   { upcastedSelf.forward(SGF) },
-                                                   closureTy);
-  return ManagedValue::forUnmanaged(partialApply);
-}
-
 namespace {
 
 /// Abstractly represents a callee, which may be a constant or function value,
@@ -627,8 +587,8 @@ public:
     case Kind::SuperMethod: {
       assert(level <= Constant.uncurryLevel
              && "uncurrying past natural uncurry level of method");
-      assert((level == 0 || level == getNaturalUncurryLevel()) &&
-             "Can only curry self parameter of super method calls");
+      assert(level == getNaturalUncurryLevel() &&
+             "Currying the self parameter of super method calls should've been emitted");
 
       constant = Constant.atUncurryLevel(level);
       constantInfo = gen.getConstantInfo(*constant);
@@ -735,15 +695,10 @@ public:
     case Kind::StandaloneFunction: {
       return SpecializedEmitter::forDecl(SGM, Constant);
     }
-    case Kind::SuperMethod: {
-      if (uncurryLevel == 0) {
-        return SpecializedEmitter(emitPartialSuperMethod);
-      }
-      return None;
-    }
     case Kind::EnumElement:
     case Kind::IndirectValue:
     case Kind::ClassMethod:
+    case Kind::SuperMethod:
     case Kind::WitnessMethod:
     case Kind::DynamicMethod:
       return None;
@@ -795,7 +750,7 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
     assert(address.getType().is<ArchetypeType>());
     auto formalTy = address.getType().getSwiftRValueType();
 
-    if (getSelfParameter().isIndirectInOut()) {
+    if (getSelfParameter().isIndirectMutating()) {
       // Be sure not to consume the cleanup for an inout argument.
       auto selfLV = ManagedValue::forLValue(address.getValue());
       selfValue = ArgumentSource(loc,
@@ -2028,6 +1983,7 @@ ManagedValue SILGenFunction::emitApply(
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_InoutAliasable:
     case ParameterConvention::Indirect_Out:
       // We may need to support this at some point, but currently only imported
       // objc methods are returns_inner_pointer.
@@ -2117,8 +2073,7 @@ ManagedValue SILGenFunction::emitApply(
       break;
 
     case ResultConvention::Autoreleased:
-      // Autoreleased. Retain using retain_autoreleased.
-      B.createStrongRetainAutoreleased(loc, scalarResult);
+      // Autoreleased. The reclaim is implicit, so the value is effectively +1.
       break;
 
     case ResultConvention::UnownedInnerPointer:
@@ -3366,6 +3321,12 @@ namespace {
       return (callee.kind == Callee::Kind::EnumElement && uncurries == 0);
     }
 
+    /// True if this is a completely unapplied super method call
+    bool isPartiallyAppliedSuperMethod(unsigned uncurryLevel) {
+      return (callee.kind == Callee::Kind::SuperMethod &&
+              uncurryLevel == 0);
+    }
+
     /// Emit the fully-formed call.
     ManagedValue apply(SGFContext C = SGFContext()) {
       assert(!applied && "already applied!");
@@ -3392,7 +3353,7 @@ namespace {
       AbstractionPattern origFormalType(callee.getOrigFormalType());
       CanAnyFunctionType formalType = callee.getSubstFormalType();
 
-      if (specializedEmitter) {
+      if (specializedEmitter || isPartiallyAppliedSuperMethod(uncurryLevel)) {
         // We want to emit the arguments as fully-substituted values
         // because that's what the specialized emitters expect.
         origFormalType = AbstractionPattern(formalType);
@@ -3534,9 +3495,42 @@ namespace {
         args = {};
 
         // Emit the uncurried call.
+        
+        // Special case for superclass method calls.
+        if (isPartiallyAppliedSuperMethod(uncurryLevel)) {
+          auto constant = callee.getMethodName();
+          auto loc = uncurriedLoc.getValue();
+          auto subs = callee.getSubstitutions();
+          assert(uncurriedArgs.size() == 1 &&
+                 "Can only partially apply the self parameater of a super method call");
 
-        // Handle a regular call.
-        if (!specializedEmitter) {
+          auto upcastedSelf = uncurriedArgs.back();
+          auto self = cast<UpcastInst>(upcastedSelf.getValue())->getOperand();
+          auto constantInfo = gen.getConstantInfo(callee.getMethodName());
+          SILValue superMethodVal = gen.B.createSuperMethod(
+            loc,
+            self,
+            constant,
+            constantInfo.getSILType(),
+            /*volatile*/
+            constant.isForeign);
+
+          auto closureTy = SILGenBuilder::getPartialApplyResultType(
+            constantInfo.getSILType(),
+            1,
+            gen.B.getModule(),
+            subs);
+          
+          SILValue partialApply = gen.B.createPartialApply(
+            loc,
+            superMethodVal,
+            constantInfo.getSILType(),
+            subs,
+            { upcastedSelf.forward(gen) },
+            closureTy);
+          result = ManagedValue::forUnmanaged(partialApply);
+       // Handle a regular call.
+       } else  if (!specializedEmitter) {
           result = gen.emitApply(uncurriedLoc.getValue(), mv,
                                  callee.getSubstitutions(),
                                  uncurriedArgs,
@@ -3555,17 +3549,6 @@ namespace {
                            uncurriedArgs,
                            formalApplyType,
                            uncurriedContext);
-        // Special case for superclass method calls.
-        } else if (specializedEmitter->isLatePartialSuperEmitter()) {
-          auto emitter = specializedEmitter->getLatePartialSuperEmitter();
-          result = emitter(gen,
-                           callee.getMethodName(),
-                           uncurriedLoc.getValue(),
-                           callee.getSubstitutions(),
-                           uncurriedArgs,
-                           formalApplyType,
-                           uncurriedContext);
-
         // Builtins.
         } else {
           assert(specializedEmitter->isNamedBuiltin());
@@ -3904,6 +3887,7 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
       // If the accessor wants the value 'inout', always pass the
       // address we were given.  This is semantically required.
       case ParameterConvention::Indirect_Inout:
+      case ParameterConvention::Indirect_InoutAliasable:
         return false;
 
       // If the accessor wants the value 'in', we have to copy if the
@@ -3981,13 +3965,12 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
         return (p && !p->requiresClass());
       };
 #endif
-      assert((!selfParam.isIndirectInOut() ||
+      assert((!selfParam.isIndirectMutating() ||
               (baseFormalType->isAnyClassReferenceType() &&
                isNonClassProtocolMember(accessor.getDecl()))) &&
              "passing unmaterialized r-value as inout argument");
 
       base = emitMaterializeIntoTemporary(*this, loc, base);
-
       if (selfParam.isIndirectInOut()) {
         // Drop the cleanup if we have one.
         auto baseLV = ManagedValue::forLValue(base.getValue());

@@ -67,6 +67,7 @@ ReferenceCounting irgen::getReferenceCountingForClass(IRGenModule &IGM,
   if (!IGM.ObjCInterop)
     return ReferenceCounting::Native;
 
+  // NOTE: if you change this, change Type::usesNativeReferenceCounting.
   // If the root class is implemented in swift, then we have a swift
   // refcount; otherwise, we have an ObjC refcount.
   if (hasKnownSwiftImplementation(IGM, getRootClass(theClass)))

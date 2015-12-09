@@ -58,12 +58,1570 @@ Latest
 
   **(rdar://problem/21683348)**
 
-Time warp
----------
 
-  *Changes between Xcode 6.1 (Swift 1.1) through Xcode 7.1  
-  (Swift 2.1) have been lost.  Contributions to rectify this would be
-  welcome.*
+2015-09-17 [Xcode 7.1, Swift 2.1]
+----------
+
+* Enums imported from C now automatically conform to the `Equatable` protocol,
+  including a default implementation of the `==` operator. This conformance
+  allows you to use C enum pattern matching in switch statements with no
+  additional code. **(17287720)**
+
+* The `NSNumberunsignedIntegerValue` property now has the type `UInt` instead
+  of `Int`, as do other methods and properties that use the `NSUInteger` type
+  in Objective-C and whose names contain `unsigned..`. Most other uses of
+  `NSUInteger` in system frameworks are imported as `Int` as they were in
+  Xcode 7. **(19134055)**
+
+* Field getters and setters are now created for named unions imported from C.
+  In addition, an initializer with a named parameter for the field is provided.
+  For example, given the following Objective-C `typedef`:
+
+  ```objc
+  typedef union IntOrFloat {
+    int intField;
+    float floatField;
+  } IntOrFloat;
+  ```
+
+  Importing this `typedef` into Swift generates the following interface:
+
+  ```swift
+  struct IntOrFloat {
+    var intField: Int { get set }
+    init(intField: Int)
+
+    var floatField: Float { get set }
+    init(floatField: Float)
+  }
+  ```
+
+  **(19660119)**
+
+* Bitfield members of C structs are now imported into Swift. **(21702107)**
+
+* The type `dispatch_block_t` now refers to the type
+  `@convention(block) () -> Void`, as it did in Swift 1.2.
+  This change allows programs using `dispatch_block_create` to work as expected,
+  solving an issue that surfaced in Xcode 7.0 with Swift 2.0.
+
+  **Note:** Converting to a Swift closure value and back is not guaranteed to
+  preserve the identity of a `dispatch_block_t`.
+  **(22432170)**
+
+* Editing a file does not trigger a recompile of files that depend upon it if
+  the edits only modify declarations marked private. **(22239821)**
+
+* Expressions interpolated in strings may now contain string literals.
+  For example, `My name is \(attributes["name"]!)` is now a valid expression.
+  **(14050788)**
+
+* Error messages produced when the type checker cannot solve its constraint
+  system continue to improve in many cases.
+
+  For example, errors in the body of generic closures (for instance, the
+  argument closure to `map`) are much more usefully diagnosed. **(18835890)**
+
+* Conversions between function types are supported, exhibiting covariance in
+  function result types and contravariance in function parameter types.
+  For example, it is legal to assign a function of type `Any -> Int` to a
+  variable of type `String -> Any`. **(19517003)**
+
+
+2015-09-17 [Xcode 7.0, Swift 2]
+----------
+
+## Swift Language Features
+
+* New `defer` statement. This statement runs cleanup code when the scope is
+  exited, which is particularly useful in conjunction with the new error
+  handling model. For example:
+
+  ```swift
+  func xyz() throws {
+     let f = fopen("x.txt", "r")
+     defer { fclose(f) }
+     try foo(f)                    // f is closed if an error is propagated.
+     let f2 = fopen("y.txt", "r")
+     defer { fclose(f2) }
+     try bar(f, f2)                // f2 is closed, then f is closed if an error is propagated.
+  }                                // f2 is closed, then f is closed on a normal path
+  ```
+
+  **(17302850)**
+
+* Printing values of certain `enum` types shows the enum `case` and payload, if
+  any. This is not supported for `@objc` enums or certain enums with multiple
+  payloads. **(18334936)**
+
+* You can specify availability information on your own declarations with the
+  `@available()` attribute.
+
+  For example:
+
+  ```swift
+  @available(iOS 8.0, OSX 10.10, *)
+  func startUserActivity() -> NSUserActivity {
+    ...
+  }
+  ```
+
+  This code fragment indicates that the `startUserActivity()` method is
+  available on iOS 8.0+, on OS X v10.10+, and on all versions of any other
+  platform. **(20938565)**
+
+* A new `@nonobjc` attribute is introduced to selectively suppress ObjC export
+  for instance members that would otherwise be `@objc`. **(16763754)**
+
+* Nongeneric classes may now inherit from generic classes. **(15520519)**
+
+* Public extensions of generic types are now permitted.
+
+  ```swift
+  public extension Array { … }
+  ```
+
+  **(16974298)**
+
+* Enums now support multiple generic associated values, for example:
+
+  ```swift
+  enum Either<T, U> {
+     case Left(T), Right(U)
+  }
+  ```
+
+  **(15666173)**
+
+* **Protocol extensions**: Extensions can be written for protocol types.
+  With these extensions, methods and properties can be added to any type that
+  conforms to a particular protocol, allowing you to reuse more of your code.
+  This leads to more natural caller side "dot" method syntax that follows the
+  principle of "fluent interfaces" and that makes the definition of generic
+  code simpler (reducing "angle bracket blindness"). **(11735843)**
+
+* **Protocol default implementations**: Protocols can have default
+  implementations for requirements specified in a protocol extension, allowing
+  "mixin" or "trait" like patterns.
+
+* **Availability checking**. Swift reports an error at compile time if you call an
+  API that was introduced in a version of the operating system newer than the
+  currently selected deployment target.
+
+  To check whether a potentially unavailable API is available at runtime, use
+  the new `#available()` condition in an if or guard statement. For example:
+
+  ```swift
+  if #available(iOS 8.0, OSX 10.10, *) {
+    // Use Handoff APIs when available.
+    let activity =
+      NSUserActivity(activityType:"com.example.ShoppingList.view")
+    activity.becomeCurrent()
+  } else {
+    // Fall back when Handoff APIs not available.
+  }
+  ```
+
+  **(14586648)**
+
+* Native support for C function pointers: C functions that take function pointer
+  arguments can be called using closures or global functions, with the
+  restriction that the closure must not capture any of its local context.
+  For example, the standard C qsort function can be invoked as follows:
+
+  ```swift
+  var array = [3, 14, 15, 9, 2, 6, 5]
+  qsort(&array, array.count, sizeofValue(array[0])) { a, b in
+    return Int32(UnsafePointer<Int>(a).memory - UnsafePointer<Int>(b).memory)
+  }
+  print(array)
+  ```
+
+  **(16339559)**
+
+* **Error handling**. You can create functions that `throw`, `catch`, and manage
+  errors in Swift.
+
+  Using this capability, you can surface and deal with recoverable
+  errors, such as "file-not-found" or network timeouts. Swift's error handling
+  interoperates with `NSError`. **(17158652)**
+
+* **Testability**: Tests of Swift 2.0 frameworks and apps are written without
+  having to make internal routines public.
+
+  Use `@testable import {ModuleName}` in your test source code to make all
+  public and internal routines usable. The app or framework target needs to be
+  compiled with the `Enable Testability` build setting set to `Yes`. The `Enable
+  Testability` build setting should be used only in your Debug configuration,
+  because it prohibits optimizations that depend on not exporting internal
+  symbols from the app or framework. **(17732115)**
+
+* if statements can be labeled, and labeled break statements can be used as a
+  jump out of the matching if statement.
+
+  An unlabeled break does not exit the if statement. It exits the enclosing
+  loop or switch statement, or it is illegal if none exists. (19150249)
+
+* A new `x?` pattern can be used to pattern match against optionals as a
+  synonym for `.Some(x)`. **(19382878)**
+
+* Concatenation of Swift string literals, including across multiple lines, is
+  now a guaranteed compile-time optimization, even at `-Onone`. **(19125926)**
+
+* Nested functions can now recursively reference themselves and other nested
+  functions. **(11266246)**
+
+* Improved diagnostics:
+  - A warning has been introduced to encourage the use of let instead of var
+    when appropriate.
+  - A warning has been introduced to signal unused variables.
+  - Invalid mutation diagnostics are more precise.
+  - Unreachable switch cases cause a warning.
+  - The switch statement "exhaustiveness checker" is smarter.
+  **(15975935,20130240)**
+
+* Failable convenience initializers are allowed to return `nil` before calling
+  `self.init`.
+
+  Designated initializers still must initialize all stored properties before
+  returning `nil`; this is a known limitation. **(20193929)**
+
+* A new `readLine()` function has been added to the standard library.
+  **(15911365)**
+
+* **SIMD Support**: Clang extended vectors are imported and usable in Swift.
+
+  This capability enables many graphics and other low-level numeric APIs
+  (for example, `simd.h`) to be usable in Swift.
+
+* New `guard` statement: This statement allows you to model an early exit out
+  of a scope.
+
+  For example:
+
+  ```swift
+  guard let z = bar() else { return }
+  use(z)
+  ```
+
+  The `else` block is required to exit the scope (for example, with `return`,
+  `throw`, `break`, `continue`, and so forth) or end in a call to a `@noreturn`
+  function. **(20109722)**
+
+* Improved pattern matching: `switch`/`case` pattern matching is available to
+  many new conditional control flow statements, including `if`/`case`,
+  `while`/`case`, `guard`/`case`, and `for-in`/`case`. `for-in` statements can
+  also have `where` clauses, which combine to support many of the features of
+  list comprehensions in other languages.
+
+* A new `do` statement allows scopes to be introduced with the `do` statement.
+
+  For example:
+
+  ```swift
+  do {
+      //new scope
+      do {
+          //another scope
+      }
+  }
+  ```
+
+## Swift Enhancements and Changes
+
+* A new keyword `try?` has been added to Swift.
+
+  `try?` attempts to perform an operation that may throw. If the operation
+  succeeds, the result is wrapped in an optional; if it fails (that is, if an
+  error is thrown), the result is `nil` and the error is discarded.
+
+  For example:
+
+  ```swift
+  func produceGizmoUsingTechnology() throws -> Gizmo { … }
+  func produceGizmoUsingMagic() throws -> Gizmo { … }
+
+  if let result = try? produceGizmoUsingTechnology() { return result }
+  if let result = try? produceGizmoUsingMagic() { return result }
+  print("warning: failed to produce a Gizmo in any way")
+  return nil
+  ```
+
+  `try?` always adds an extra level of `Optional` to the result type of the
+  expression being evaluated. If a throwing function's normal return type is
+  `Int?`, the result of calling it with `try?` will be `Int??`, or
+  `Optional<Optional<Int>>`. **(21692467)**
+
+* Type names and enum cases now print and convert to `String` without
+  qualification by default. `debugPrint` or `String(reflecting:)` can still be
+  used to get fully qualified names. For example:
+
+  ```swift
+  enum Fruit { case Apple, Banana, Strawberry }
+  print(Fruit.Apple)      // "Apple"
+  debugPrint(Fruit.Apple) // "MyApp.Fruit.Apple")
+  ```
+
+  **(21788604)**
+
+* C `typedef`s of block types are imported as `typealias`s for Swift closures.
+
+  The primary result of this is that `typedef`s for blocks with a parameter of
+  type `BOOL` are imported as closures with a parameter of type `Bool` (rather
+  than `ObjCBool` as in the previous release). This matches the behavior of
+  block parameters to imported Objective-C methods. **(22013912)**
+
+* The type `Boolean` in `MacTypes.h` is imported as `Bool` in contexts that allow
+  bridging between Swift and Objective-C types.
+
+  In cases where the representation is significant, `Boolean` is imported as a
+  distinct `DarwinBoolean` type, which is `BooleanLiteralConvertible` and can be
+  used in conditions (much like the `ObjCBool` type). **(19013551)**
+
+* Fields of C structs that are marked `__unsafe_unretained` are presented in
+  Swift using `Unmanaged`.
+
+  It is not possible for the Swift compiler to know if these references are
+  really intended to be strong (+1) or unretained (+0). **(19790608)**
+
+* The `NS_REFINED_FOR_SWIFT` macro can be used to move an Objective-C
+  declaration aside to provide a better version of the same API in Swift,
+  while still having the original implementation available. (For example, an
+  Objective-C API that takes a `Class` could offer a more precise parameter
+  type in Swift.)
+
+  The `NS_REFINED_FOR_SWIFT` macro operates differently on different declarations:
+
+  - `init` methods will be imported with the resulting Swift initializer having
+    `__` prepended to its first external parameter name.
+
+    ```objc
+    // Objective-C
+    - (instancetype)initWithClassName:(NSString *)name NS_REFINED_FOR_SWIFT;
+    ```
+
+    ```swift
+    // Swift
+    init(__className: String)
+    ```
+
+  - Other methods will be imported with `__` prepended to their base name.
+
+    ```objc
+    // Objective-C
+    - (NSString *)displayNameForMode:(DisplayMode)mode NS_REFINED_FOR_SWIFT;
+    ```
+
+    ```swift
+    // Swift
+    func __displayNameForMode(mode: DisplayMode) -> String
+    ```
+
+  - Subscript methods will be treated like any other methods and will not be
+    imported as subscripts.
+
+  - Other declarations will have `__` prepended to their name.
+
+    ```objc
+    // Objective-C
+    @property DisplayMode mode NS_REFINED_FOR_SWIFT;
+    ```
+
+    ```swift
+    // Swift
+    var __mode: DisplayMode { get set }
+    ```
+
+  **(20070465)**
+
+* Xcode provides context-sensitive code completions for enum elements and
+  option sets when using the shorter dot syntax. **(16659653)**
+
+* The `NSManaged` attribute can be used with methods as well as properties,
+  for access to Core Data's automatically generated Key-Value-Coding-compliant
+  to-many accessors.
+
+  ```swift
+  @NSManaged var employees: NSSet
+
+  @NSManaged func addEmployeesObject(employee: Employee)
+  @NSManaged func removeEmployeesObject(employee: Employee)
+  @NSManaged func addEmployees(employees: NSSet)
+  @NSManaged func removeEmployees(employees: NSSet)
+  ```
+
+  These can be declared in your `NSManagedObject` subclass. **(17583057)**
+
+* The grammar has been adjusted so that lines beginning with '.' are always
+  parsed as method or property lookups following the previous line, allowing
+  for code formatted like this to work:
+
+  ```swift
+  foo
+    .bar
+    .bas = 68000
+  ```
+
+  It is no longer possible to begin a line with a contextual static member
+  lookup (for example, to say `.staticVar = MyType()`). **(20238557)**
+
+* Code generation for large `struct` and `enum` types has been improved to reduce
+  code size. **(20598289)**
+
+* Nonmutating methods of structs, enums, and protocols may now be partially
+  applied to their self parameter:
+
+  ```swift
+  let a: Set<Int> = [1, 2, 3]
+  let b: [Set<Int>] = [[1], [4]]
+  b.map(a.union) // => [[1, 2, 3], [1, 2, 3, 4]]
+  ```
+
+  **(21091944)**
+
+* Swift documentation comments recognize a new top-level list
+  item: `- Throws: ...`
+
+  This item is used to document what errors can be thrown and why. The
+  documentation appears alongside parameters and return descriptions in Xcode
+  QuickHelp. **(21621679)**
+
+* Unnamed parameters now require an explicit `_:` to indicate that they are
+  unnamed. For example, the following is now an error:
+
+  ```swift
+  func f(Int) { }
+  ```
+
+  and must be written as:
+
+  ```swift
+  func f(_: Int) { }
+  ```
+
+  This simplifies the argument label model and also clarifies why cases like
+  `func f((a: Int, b: Int))` do not have parameters named `a` and `b`.
+  **(16737312)**
+
+* It is now possible to append a tuple to an array. **(17875634)**
+
+* The ability to refer to the 0 element of a scalar value (producing the
+  scalar value itself) has been removed. **(17963034)**
+
+* Variadic parameters can now appear anywhere in the parameter list for a
+  function or initializer. For example:
+
+  ```swift
+  func doSomethingToValues(values: Int... , options: MyOptions = [], fn: (Int) -&gt; Void) { … }
+  ```
+
+  **(20127197)**
+
+* Generic subclasses of Objective-C classes are now supported. **(18505295)**
+
+* If an element of an enum with string raw type does not have an explicit raw
+  value, it will default to the text of the enum's name. For example:
+
+  ```swift
+  enum WorldLayer : String {
+      case Ground, BelowCharacter, Character
+  }
+  ```
+
+  is equivalent to:
+
+  ```swift
+  enum WorldLayer : String {
+      case Ground = "Ground"
+      case BelowCharacter = "BelowCharacter"
+      case Character = "Character"
+  }
+  ```
+
+  **(15819953)**
+
+* The `performSelector` family of APIs is now available for Swift code.
+  **(17227475)**
+
+* When delegating or chaining to a failable initializer (for example, with
+  `self.init(…)` or `super.init(…)`), one can now force-unwrap the result with
+  `!`. For example:
+
+  ```swift
+  extension UIImage {
+    enum AssetIdentifier: String {
+      case Isabella
+      case William
+      case Olivia
+    }
+
+    convenience init(assetIdentifier: AssetIdentifier) {
+      self.init(named: assetIdentifier.rawValue)!
+    }
+  }
+  ```
+
+  **(18497407)**
+
+* Initializers can now be referenced like static methods by referring to
+  `.init` on a static type reference or type object. For example:
+
+  ```swift
+  let x = String.init(5)
+  let stringType = String.self
+  let y = stringType.init(5)
+
+  let oneTwoThree = [1, 2, 3].map(String.init).reduce("", combine: +)
+  ```
+
+  `.init` is still implicit when constructing using a static type, as in
+  `String(5)`. `.init` is required when using dynamic type objects or when
+  referring to the initializer as a function value. **(21375845)**
+
+* Enums and cases can now be marked indirect, which causes the associated
+  value for the enum to be stored indirectly, allowing for recursive data
+  structures to be defined. For example:
+
+  ```swift  
+  enum List<T> {
+    case Nil
+    indirect case Cons(head: T, tail: List<T>)
+  }
+
+  indirect enum Tree<T> {
+    case Leaf(T)
+    case Branch(left: Tree<T>, right: Tree<T>)
+  }
+  ```
+
+  **(21643855)**
+
+* Formatting for Swift expression results has changed significantly when
+  using `po` or `expr -O`. Customization that was introduced has been refined
+  in the following ways:
+
+  - The formatted summary provided by either `debugDescription` or
+    `description` methods will always be used for types that conform to
+    `CustomDebugStringConvertible` or `CustomStringConvertible` respectively.
+    When neither conformance is present, the type name is displayed and
+    reference types also display the referenced address to more closely mimic
+    existing behavior for Objective-C classes.
+
+  - Value types such as enums, tuples, and structs display all members
+    indented below the summary by default, while reference types will not. This
+    behavior can be customized for all types by implementing
+    `CustomReflectable`.
+
+  These output customizations can be bypassed by using `p` or `expr` without
+  the `-O` argument to provide a complete list of all fields and their values.
+  **(21463866)**
+
+* Properties and methods using `Unmanaged` can now be exposed to Objective-C.
+  **(16832080)**
+
+* Applying the `@objc` attribute to a class changes that class's compile-time
+  name in the target's generated Objective-C header as well as changing its
+  runtime name. This applies to protocols as well. For example:
+
+  ```swift
+  // Swift
+  @objc(MyAppDelegate)
+  class AppDelegate : NSObject, UIApplicationDelegate {
+    // ...
+  }
+  ```
+
+  ```objc
+  // Objective-C
+  @interface MyAppDelegate : NSObject <UIApplicationDelegate>
+    // ...
+  @end
+  ```
+
+  **(17469485)**
+
+* Collections containing types that are not Objective-C compatible are no
+  longer considered Objective-C compatible types themselves.
+
+  For example, previously `Array<SwiftClassType>` was permitted as the type
+  of a property marked `@objc`; this is no longer the case. **(19787270)**
+
+* Generic subclasses of Objective-C classes, as well as nongeneric classes
+  that inherit from such a class, require runtime metadata instantiation and
+  cannot be directly named from Objective-C code.
+
+  When support for generic subclasses of Objective-C classes was first added,
+  the generated Objective-C bridging header erroneously listed such classes,
+  which, when used, could lead to incorrect runtime behavior or compile-time
+  errors. This has been fixed.
+
+  The behavior of the `@objc` attribute on a class has been clarified such that
+  applying `@objc` to a class which cannot appear in a bridging header is now
+  an error.
+
+  Note that this change does not result in a change of behavior with valid
+  code because members of a class are implicitly `@objc` if any superclass of
+  the class is an `@objc` class, and all `@objc` classes must inherit from
+  NSObject. **(21342574)**
+
+* The performance of `-Onone` (debug) builds has been improved by using
+  prespecialized instances of generics in the standard library. It produces
+  significantly faster executables in debug builds in many cases, without
+  impacting compile time. **(20486658)**
+
+* `AnyObject` and `NSObject` variables that refer to class objects can be cast
+  back to class object types. For example, this code succeeds:
+
+  ```swift
+  let x: AnyObject = NSObject.self
+  let y = x as! NSObject.Type
+  ```
+
+  Arrays, dictionaries, and sets that contain class objects successfully
+  bridge with `NSArray`, `NSDictionary`, and `NSSet` as well. Objective-C APIs
+  that provide `NSArray<Class> *` objects, such as `-[NSURLSessionConfiguration
+  protocolClasses]`, now work correctly when used in Swift. **(16238475)**
+
+* `print()` and reflection via Mirrors is able to report both the current
+  case and payload for all enums with multiple payload types. The only
+  remaining enum types that do not support reflection are `@objc` enums and
+  enums imported from C. **(21739870)**
+
+* Enum cases with payloads can be used as functions. For example:
+
+  ```swift
+  enum Either<T, U> { case Left(T), Right(U) }
+  let lefts: [Either<Int, String>] = [1, 2, 3].map(Either.Left)
+  let rights: [Either<Int, String>] = ["one", "two", "three"].map(Either.Right)
+  ```
+
+  **(19091028)**
+
+* `ExtensibleCollectionType` has been folded into
+  `RangeReplaceableCollectionType`. In addition, default implementations have
+  been added as methods, which should be used instead of the free Swift
+  module functions related to these protocols. **(18220295)**
+
+## Swift Standard Library
+
+* The standard library moved many generic global functions (such as `map`,
+  `filter`, and `sort`) to be methods written with protocol extensions. This
+  allows those methods to be pervasively available on all sequence and
+  collection types and allowed the removal of the global functions.
+
+* Deprecated enum elements no longer affect the names of nondeprecated
+  elements when an Objective-C enum is imported into Swift. This may cause
+  the Swift names of some enum elements to change. **(17686122)**
+
+* All enums imported from C are `RawRepresentable`, including those not
+  declared with `NS_ENUM` or `NS_OPTIONS`. As part of this change, the value
+  property of such enums has been renamed `rawValue`. **(18702016)**
+
+* Swift documentation comments use a syntax based on the Markdown format,
+  aligning them with rich comments in playgrounds.
+
+  - Outermost list items are interpreted as special fields and are highlighted
+    in Xcode QuickHelp.
+
+  - There are two methods of documenting parameters: parameter outlines and
+    separate parameter fields. You can mix and match these forms as you see
+    fit in any order or continuity throughout the doc comment. Because these
+    are parsed as list items, you can nest arbitrary content underneath them.
+
+  - Parameter outline syntax:
+
+    ```swift
+    - Parameters:
+      - x: ...
+      - y: ...
+    ```
+
+  - Separate parameter fields:
+
+    ```swift
+    - parameter x: ...
+    - parameter y: ...
+    ```
+
+  - Documenting return values:
+
+    ```swift
+    - returns: ...
+    ```
+
+  Other special fields are highlighted in QuickHelp, as well as rendering
+  support for all of Markdown. (20180161)
+
+* The `CFunctionPointer<T -> U>` type has been removed. C function types are
+  specified using the new `@convention(c)` attribute. Like other function
+  types, `@convention(c) T -> U` is not nullable unless made optional. The
+  `@objc_block` attribute for specifying block types has also been removed and
+  replaced with `@convention(block)`.
+
+* Methods and functions have the same rules for parameter names. You can omit
+  providing an external parameter name with `_`. To further simplify the model,
+  the shorthand `#` for specifying a parameter name has been removed, as have
+  the special rules for default arguments.
+
+  ```swift
+  // Declaration
+    func printFunction(str: String, newline: Bool)
+    func printMethod(str: String, newline: Bool)
+    func printFunctionOmitParameterName(str: String, _  newline: Bool)
+
+  // Call
+    printFunction("hello", newline: true)
+    printMethod("hello", newline: true)
+    printFunctionOmitParameterName("hello", true)
+  ```
+
+  **(17218256)**
+
+* `NS_OPTIONS` types get imported as conforming to the `OptionSetType` protocol,
+  which presents a set-like interface for options. Instead of using bitwise
+  operations such as:
+
+  ```swift
+  // Swift 1.2:
+  object.invokeMethodWithOptions(.OptionA | .OptionB)
+  object.invokeMethodWithOptions(nil)
+
+  if options @ .OptionC == .OptionC {
+    // .OptionC is set
+  }
+  ```
+
+  Option sets support set literal syntax, and set-like methods such as contains:
+
+  ```swift
+  object.invokeMethodWithOptions([.OptionA, .OptionB])
+  object.invokeMethodWithOptions([])
+
+  if options.contains(.OptionC) {
+    // .OptionC is set
+  }
+  ```
+
+  A new option set type can be written in Swift as a struct that conforms to
+  the `OptionSetType` protocol. If the type specifies a `rawValue` property and
+  option constants as `static let` constants, the standard library will provide
+  default implementations of the rest of the option set API:
+
+  ```swift
+  struct MyOptions: OptionSetType {
+    let rawValue: Int
+
+    static let TuringMachine  = MyOptions(rawValue: 1)
+    static let LambdaCalculus = MyOptions(rawValue: 2)
+    static let VonNeumann     = MyOptions(rawValue: 4)
+  }
+
+  let churchTuring: MyOptions = [.TuringMachine, .LambdaCalculus]
+  ```
+
+  **(18069205)**
+
+* Type annotations are no longer allowed in patterns and are considered part
+  of the outlying declaration. This means that code previously written as:
+
+  ```swift
+  var (a : Int, b : Float) = foo()
+  ```
+
+  needs to be written as:
+
+  ```swift
+  var (a,b) : (Int, Float) = foo()
+  ```
+
+  if an explicit type annotation is needed. The former syntax was ambiguous
+  with tuple element labels. **(20167393)**
+
+* The `do`/`while` loop is renamed to `repeat`/`while` to make it obvious
+  whether a statement is a loop from its leading keyword.
+
+  In Swift 1.2:
+
+  ```swift
+  do {
+  ...
+  } while <condition>
+  In Swift 2.0:
+  repeat {
+  ...
+  } while <condition>
+  ```
+
+  **(20336424)**
+
+* `forEach` has been added to `SequenceType`. This lets you iterate over
+  elements of a sequence, calling a body closure on each. For example:
+
+  ```swift
+  (0..<10).forEach {
+    print($0)
+  }
+  ```
+
+  This is very similar to the following:
+
+  ```swift
+  for x in 0..<10 {
+    print(x)
+  }
+  ```
+
+  But take note of the following differences:
+
+  - Unlike for-in loops, you can't use `break` or `continue` to exit the current
+    call of the body closure or skip subsequent calls.
+
+  - Also unlike for-in loops, using `return` in the body closure only exits from
+    the current call to the closure, not any outer scope, and won't skip
+    subsequent calls.
+
+  **(18231840)**
+
+* The `Word` and `UWord` types have been removed from the standard library; use
+  `Int` and `UInt` instead. **(18693488)**
+
+* Most standard library APIs that take closures or `@autoclosure` parameters
+  now use `rethrows`. This allows the closure parameters to methods like `map`
+  and `filter` to throw errors, and allows short-circuiting operators like `&&`,
+  `||`, and `??` to work with expressions that may produce errors.
+  **(21345565)**
+
+* SIMD improvements: Integer vector types in the simd module now only support
+  unchecked arithmetic with wraparound semantics using the `&+`, `&-`, and `&*`
+  operators, in order to better support the machine model for vectors.
+  The `+`, `-`, and `*` operators are unavailable on integer vectors, and Xcode
+  automatically suggests replacing them with the wrapping operators.
+
+  Code generation for vector types in the simd module has been improved to
+  better utilize vector hardware, leading to dramatically improved performance
+  in many cases. **(21574425)**
+
+* All `CollectionType` objects are now sliceable. `SequenceType` now has a notion
+  of `SubSequence`, which is a type that represents only some of the values but
+  in the same order. For example, the `ArraySubSequence` type is `ArraySlice`,
+  which is an efficient view on the `Array` type's buffer that avoids copying as
+  long as it uniquely references the `Array` from which it came.
+
+  The following free Swift functions for splitting/slicing sequences have been
+  removed and replaced by method requirements on the `SequenceType` protocol
+  with default implementations in protocol extensions. `CollectionType` has
+  specialized implementations, where possible, to take advantage of efficient
+  access of its elements.
+
+  ```swift
+  /// Returns the first `maxLength` elements of `self`,
+  /// or all the elements if `self` has fewer than `maxLength` elements.
+  prefix(maxLength: Int) -> SubSequence
+
+  /// Returns the last `maxLength` elements of `self`,
+  /// or all the elements if `self` has fewer than `maxLength` elements.
+  suffix(maxLength: Int) -> SubSequence
+
+  /// Returns all but the first `n` elements of `self`.
+  dropFirst(n: Int) -> SubSequence
+
+  /// Returns all but the last `n` elements of `self`.
+  dropLast(n: Int) -> SubSequence
+
+  /// Returns the maximal `SubSequence`s of `self`, in order, that
+  /// don't contain elements satisfying the predicate `isSeparator`.
+  split(maxSplits maxSplits: Int, allowEmptySlices: Bool, @noescape isSeparator: (Generator.Element) -> Bool) -> [SubSequence]
+  ```
+
+  The following convenience extension is provided for `split`:
+
+  ```swift
+  split(separator: Generator.Element, maxSplit: Int, allowEmptySlices: Bool) -> [SubSequence]
+  ```
+
+  Also, new protocol requirements and default implementations on
+  `CollectionType` are now available:
+
+  ```swift
+  /// Returns `self[startIndex..<end]`
+  prefixUpTo(end: Index) -> SubSequence
+
+  /// Returns `self[start..<endIndex]`
+  suffixFrom(start: Index) -> SubSequence
+
+  /// Returns `prefixUpTo(position.successor())`
+  prefixThrough(position: Index) -> SubSequence
+  ```
+
+  **(21663830)**
+
+* The `print` and `debugPrint` functions are improved:
+  - Both functions have become variadic, and you can print any number of items
+    with a single call.
+  - `separator: String = " "` was added so you can control how the items are
+    separated.
+  - `terminator: String = "\n"` replaced `appendNewline: bool = true.`  With
+    this change, `print(x, appendNewline: false)` is expressed as
+    `print(x, terminator: "")`.
+
+  - For the variants that take an output stream, the argument label `toStream`
+    was added to the stream argument.
+
+  The `println` function from Swift 1.2 has been removed. **(21788540)**
+
+* For consistency and better composition of generic code, `ArraySlice` indices
+  are no longer always zero-based but map directly onto the indices of the
+  collection they are slicing and maintain that mapping even after mutations.
+
+  Before:
+
+  ```swift
+  var a = Array(0..<10)
+  var s = a[5..<10]
+  s.indices        // 0..<5
+  s[0] = 111
+  s                // [111, 6, 7, 8, 9]
+  s.removeFirst()
+  s.indices        // 1..<5
+  ```
+
+  After:
+
+  ```swift
+  var a = Array(0..<10)
+  var s = a[5..<10]
+  s.indices        // 5..<10
+  s[5] = 99
+  s                // [99, 6, 7, 8, 9]
+  s.removeFirst()
+  s.indices        // 6..<10
+  ```
+
+  Rather than define variants of collection algorithms that take explicit
+  subrange arguments, such as `a.sortSubrangeInPlace(3..<7)`, the Swift
+  standard library provides "slicing," which composes well with algorithms.
+  This enables you to write `a[3..<7].sortInPlace()`, for example. With most
+  collections, these algorithms compose naturally.
+
+  For example, before this change was incorporated:
+
+  ```swift
+  extension MyIntCollection {
+    func prefixThroughFirstNegativeSubrange() -> SubSequence {
+      // Find the first negative element
+      let firstNegative = self.indexOf { $0 < 0 } ?? endIndex
+
+      // Slice off non-negative prefix
+      let startsWithNegative = self.suffixFrom(firstNegative)
+
+      // Find the first non-negative position in the slice
+      let end = startsWithNegative.indexOf { $0 >= 0 } ?? endIndex
+      return self[startIndex..<end]
+    }
+  }
+  ```
+
+  The above code would work for any collection of `Int`s unless the collection
+  is an `Array<Int>`. Unfortunately, when array slice indices are zero-based,
+  the last two lines of the method need to change to:
+
+  ```swift
+  let end = startsWithNegative.indexOf { $0 >= 0 }
+    ?? startsWithNegative.endIndex
+  return self[startIndex..<end + firstNegative]
+  ```
+
+  These differences made working with slices awkward, error-prone, and
+  nongeneric.
+
+  After this change, Swift collections start to provide a guarantee that, at
+  least until there is a mutation, slice indices are valid in the collection
+  from which they were sliced, and refer to the same elements. **(21866825)**
+
+* The method `RangeReplaceableCollectionType.extend()` was renamed to
+  `appendContentsOf()`, and the `splice()` method was renamed to
+  `insertContentsOf()`. **(21972324)**
+
+* `find` has been renamed to `indexOf()`, sort has been renamed to
+  `sortInPlace()`, and `sorted()` becomes `sort()`.
+
+* `String.toInt()` has been renamed to a failable `Int(String)` initializer,
+  since initialization syntax is the preferred style for type conversions.
+
+* `String` no longer conforms to `SequenceType` in order to prevent non-Unicode
+  correct sequence algorithms from being prominently available on String. To
+  perform grapheme-cluster-based, UTF-8-based, or UTF-16-based algorithms, use
+  the `.characters`, `.utf8`, and `.utf16` projections respectively.
+
+* Generic functions that declare type parameters not used within the generic
+  function's type produce a compiler error. For example:
+
+  ```swift
+  func foo<T>() { } // error: generic parameter 'T' is not used in function signature
+  ```
+
+* The `Dictionary.removeAtIndex(_:)` method now returns the key-value pair
+  being removed as a two-element tuple (rather than returning `Void`).
+  Similarly, the `Set.removeAtIndex(_:)` method returns the element being
+  removed. **(20299881)**
+
+* Generic parameters on types in the Swift standard library have been renamed
+  to reflect the role of the types in the API. For example, `Array<T>` became
+  `Array<Element>`, `UnsafePointer<T>` became `UnsafePointer<Memory>`, and so
+  forth. **(21429126)**
+
+* The `SinkType` protocol and `SinkOf` struct have been removed from the standard
+  library in favor of `(T) -> ()` closures. **(21663799)**
+
+
+2015-04-08 [Xcode 6.3, Swift 1.2]
+----------
+
+## Swift Language Changes
+
+* The notions of guaranteed conversion and "forced failable" conversion are now
+  separated into two operators. Forced failable conversion now uses the `as!`
+  operator. The `!` makes it clear to readers of code that the cast may fail and
+  produce a runtime error. The `as` operator remains for upcasts
+  (e.g. `someDerivedValue as Base`) and type annotations (`0 as Int8`) which
+  are guaranteed to never fail. **(19031957)**
+
+* Immutable (`let`) properties in `struct` and `class` initializers have been
+  revised to standardize on a general "`let`s are singly initialized but never
+  reassigned or mutated" model. Previously, they were completely mutable
+  within the body of initializers. Now, they are only allowed to be assigned
+  to once to provide their value. If the property has an initial value in its
+  declaration, that counts as the initial value for all initializers.
+  **(19035287)**
+
+* The implicit conversions from bridged Objective-C classes
+  (`NSString`/`NSArray`/`NSDictionary`) to their corresponding Swift value types
+  (`String`/`Array`/`Dictionary`) have been removed, making the Swift type
+  system simpler and more predictable.
+
+  This means that the following code will no longer work:
+
+  ```swift
+  import Foundation
+  func log(s: String) { println(x) }
+  let ns: NSString = "some NSString" // okay: literals still work
+  log(ns)     // fails with the error
+              // "'NSString' is not convertible to 'String'"
+  ```
+
+  In order to perform such a bridging conversion, make the conversion explicit
+  with the as keyword:
+
+  ```swift
+  log(ns as String) // succeeds
+  ```
+
+  Implicit conversions from Swift value types to their bridged Objective-C
+  classes are still permitted. For example:
+
+  ```swift
+  func nsLog(ns: NSString) { println(ns) }
+  let s: String = "some String"
+  nsLog(s) // okay: implicit conversion from String to NSString is permitted
+  ```
+
+  Note that these Cocoa types in Objective-C headers are still automatically
+  bridged to their corresponding Swift type, which means that code is only
+  affected if it is explicitly referencing (for example) `NSString` in a Swift
+  source file. It is recommended you use the corresponding Swift types (for
+  example, `String`) directly unless you are doing something advanced, like
+  implementing a subclass in the class cluster. **(18311362)**
+
+* The `@autoclosure` attribute is now an attribute on a parameter, not an
+  attribute on the parameter's type.
+
+  Where before you might have used:
+
+  ```swift
+  func assert(predicate : @autoclosure () -> Bool) {...}
+  you now write this as:
+  func assert(@autoclosure predicate : () -> Bool) {...}
+  ```
+
+  **(15217242)**
+
+* The `@autoclosure` attribute on parameters now implies the new `@noescape`
+  attribute.
+
+* Curried function parameters can now specify argument labels.
+
+  For example:
+
+  ```swift
+  func curryUnnamed(a: Int)(_ b: Int) { return a + b }
+  curryUnnamed(1)(2)
+
+  func curryNamed(first a: Int)(second b: Int) -> Int { return a + b }
+  curryNamed(first: 1)(second: 2)
+  ```
+
+  **(17237268)**
+
+* Swift now detects discrepancies between overloading and overriding in the
+  Swift type system and the effective behavior seen via the Objective-C runtime.
+
+  For example, the following conflict between the Objective-C setter for
+  `property` in a class and the method `setProperty` in its extension is now
+  diagnosed:
+
+  ```swift
+  class A : NSObject {
+  var property: String = "Hello" // note: Objective-C method 'setProperty:'
+      // previously declared by setter for
+      // 'property' here
+  }
+
+  extension A {
+  func setProperty(str: String) { }     // error: method 'setProperty'
+      // redeclares Objective-C method
+      //'setProperty:'
+  }
+  Similar checking applies to accidental overrides in the Objective-C runtime:
+  class B : NSObject {
+  func method(arg: String) { }     // note: overridden declaration
+      // here has type '(String) -> ()'
+  }
+
+  class C : B {
+  func method(arg: [String]) { } // error: overriding method with
+      // selector 'method:' has incompatible
+      // type '([String]) -> ()'
+  }
+  as well as protocol conformances:
+  class MyDelegate : NSObject, NSURLSessionDelegate {
+  func URLSession(session: NSURLSession, didBecomeInvalidWithError:
+      Bool){ } // error: Objective-C method 'URLSession:didBecomeInvalidWithError:'
+      // provided by method 'URLSession(_:didBecomeInvalidWithError:)'
+      // conflicts with optional requirement method
+      // 'URLSession(_:didBecomeInvalidWithError:)' in protocol
+      // 'NSURLSessionDelegate'
+  }
+  ```
+
+  **(18391046, 18383574)**
+
+* The precedence of the Nil Coalescing Operator (`??`) has been raised to bind
+  tighter than short-circuiting logical and comparison operators, but looser
+  than as conversions and range operators. This provides more useful behavior
+  for expressions like:
+
+  ```swift
+  if allowEmpty || items?.count ?? 0 > 0 {...}
+  ```
+
+* The `&/` and `&%` operators were removed, to simplify the language and
+  improve consistency.
+
+  Unlike the `&+`, `&-`, and `&*` operators, these operators did not provide
+  two's-complement arithmetic behavior; they provided special case behavior
+  for division, remainder by zero, and `Int.min/-1`. These tests should be
+  written explicitly in the code as comparisons if needed. **(17926954)**
+
+* Constructing a `UInt8` from an ASCII value now requires the ascii keyword
+  parameter. Using non-ASCII unicode scalars will cause this initializer to
+  trap. **(18509195)**
+
+* The C `size_t` family of types are now imported into Swift as `Int`, since
+  Swift prefers sizes and counts to be represented as signed numbers, even if
+  they are non-negative.
+
+  This change decreases the amount of explicit type conversion between `Int`
+  and `UInt`, better aligns with `sizeof` returning `Int`, and provides safer
+  arithmetic properties. **(18949559)**
+
+* Classes that do not inherit from `NSObject` but do adopt an `@objc` protocol
+  will need to explicitly mark those methods, properties, and initializers
+  used to satisfy the protocol requirements as `@objc`.
+
+  For example:
+
+  ```swift
+  @objc protocol SomethingDelegate {
+      func didSomething()
+  }
+
+  class MySomethingDelegate : SomethingDelegate {
+      @objc func didSomething() { … }
+  }
+  ```
+
+## Swift Language Fixes
+
+* Dynamic casts (`as!`, `as?` and `is`) now work with Swift protocol types, so
+  long as they have no associated types. **(18869156)**
+
+* Adding conformances within a Playground now works as expected.
+
+  For example:
+
+  ```swift
+  struct Point {
+    var x, y: Double
+  }
+
+  extension Point : Printable {
+    var description: String {
+      return "(\(x), \(y))"
+    }
+  }
+
+  var p1 = Point(x: 1.5, y: 2.5)
+  println(p1) // prints "(1.5, 2.5)"
+  ```
+
+* Imported `NS_ENUM` types with undocumented values, such as
+  `UIViewAnimationCurve`, can now be converted from their raw integer values
+  using the `init(rawValue:)` initializer without being reset to `nil`. Code
+  that used `unsafeBitCast` as a workaround for this issue can be written to
+  use the raw value initializer.
+
+  For example:
+
+  ```swift
+  let animationCurve =
+    unsafeBitCast(userInfo[UIKeyboardAnimationCurveUserInfoKey].integerValue,
+    UIViewAnimationCurve.self)
+  can now be written instead as:
+  let animationCurve = UIViewAnimationCurve(rawValue:
+    userInfo[UIKeyboardAnimationCurveUserInfoKey].integerValue)!
+  ```
+
+  **(19005771)**
+
+* Negative floating-point literals are now accepted as raw values in enums.
+  **(16504472)**
+
+* Unowned references to Objective-C objects, or Swift objects inheriting from
+  Objective-C objects, no longer cause a crash if the object holding the
+  unowned reference is deallocated after the referenced object has been
+  released. **(18091547)**
+
+* Variables and properties with observing accessors no longer require an
+  explicit type if it can be inferred from the initial value expression.
+  **(18148072)**
+
+* Generic curried functions no longer produce random results when fully
+  applied. **(18988428)**
+
+* Comparing the result of a failed `NSClassFromString` lookup against `nil` now
+  behaves correctly. **(19318533)**
+
+* Subclasses that override base class methods with co- or contravariance in
+  Optional types no longer cause crashes at runtime.
+
+  For example:
+
+  ```swift
+  class Base {
+    func foo(x: String) -> String? { return x }
+  }
+  class Derived: Base {
+    override func foo(x: String?) -> String { return x! }
+  }
+  ```
+
+  **(19321484)**
+
+## Swift Language Enhancements
+
+* Swift now supports building targets incrementally, i.e. not rebuilding
+  every Swift source file in a target when a single file is changed.
+
+  The incremental build capability is based on a conservative dependency
+  analysis, so you may still see more files rebuilding than absolutely
+  necessary. If you find any cases where a file is not rebuilt when it should
+  be, please file a bug report. Running Clean on your target afterwards should
+  allow you to complete your build normally. **(18248514)**
+
+* A new `Set` data structure is included which provides a generic collection of
+  unique elements with full value semantics. It bridges with `NSSet`, providing
+  functionality analogous to `Array` and `Dictionary`. **(14661754)**
+
+* The `if–let` construct has been expanded to allow testing multiple optionals
+  and guarding conditions in a single `if` (or `while`) statement using syntax
+  similar to generic constraints:
+
+  ```swift
+  if let a = foo(), b = bar() where a < b,
+     let c = baz() {
+  }
+  ```
+
+  This allows you to test multiple optionals and include intervening boolean
+  conditions, without introducing undesirable nesting (for instance, to avoid
+  the optional unwrapping _"pyramid of doom"_).
+
+  Further, `if–let` now also supports a single leading boolean condition along
+  with optional binding `let` clauses. For example:
+
+  ```swift
+  if someValue > 42 && someOtherThing < 19, let a = getOptionalThing() where a > someValue {
+  }
+  ```
+
+  **(19797158, 19382942)**
+
+* The `if–let` syntax has been extended to support a single leading boolean
+  condition along with optional binding `let` clauses.
+
+  For example:
+
+  ```swift
+  if someValue > 42 && someOtherThing < 19, let a = getOptionalThing() where a > someValue {
+  }
+  ```
+
+  **(19797158)**
+
+* `let` constants have been generalized to no longer require immediate
+  initialization. The new rule is that a `let` constant must be initialized
+  before use (like a `var`), and that it may only be initialized: not
+  reassigned or mutated after initialization. This enables patterns such as:
+
+  ```swift
+  let x: SomeThing
+  if condition {
+    x = foo()
+  } else {
+    x = bar()
+  }
+  use(x)
+  ```
+
+  which formerly required the use of a `var`, even though there is no mutation
+  taking place. **(16181314)**
+
+* `static` methods and properties are now allowed in classes (as an alias for
+  `class final`). You are now allowed to declare static stored properties in
+  classes, which have global storage and are lazily initialized on first
+  access (like global variables). Protocols now declare type requirements as
+  static requirements instead of declaring them as class requirements.
+  **(17198298)**
+
+* Type inference for single-expression closures has been improved in several ways:
+  - Closures that are comprised of a single return statement are now type
+    checked as single-expression closures.
+  - Unannotated single-expression closures with non-`Void` return types can now
+    be used in `Void` contexts.
+  - Situations where a multi-statement closure's type could not be inferred
+    because of a missing return-type annotation are now properly diagnosed.
+
+* Swift enums can now be exported to Objective-C using the `@objc` attribute.
+  `@objc` enums must declare an integer raw type, and cannot be generic or use
+  associated values. Because Objective-C enums are not namespaced, enum cases
+  are imported into Objective-C as the concatenation of the enum name and
+  case name.
+
+  For example, this Swift declaration:
+
+  ```swift
+  // Swift
+  @objc
+  enum Bear: Int {
+     case Black, Grizzly, Polar
+  }
+  ```
+
+  imports into Objective-C as:
+
+  ```objc
+  // Objective-C
+  typedef NS_ENUM(NSInteger, Bear) {
+     BearBlack, BearGrizzly, BearPolar
+  };
+  ```
+
+  **(16967385)**
+
+* Objective-C language extensions are now available to indicate the nullability
+  of pointers and blocks in Objective-C APIs, allowing your Objective-C APIs
+  to be imported without `ImplicitlyUnwrappedOptional`. (See items below for
+  more details.) **(18868820)**
+
+* Swift can now partially import C aggregates containing unions, bitfields,
+  SIMD vector types, and other C language features that are not natively
+  supported in Swift. The unsupported fields will not be accessible from
+  Swift, but C and Objective-C APIs that have arguments and return values of
+  these types can be used in Swift. This includes the Foundation `NSDecimal`
+  type and the `GLKit` `GLKVector` and `GLKMatrix` types, among others.
+  **(15951448)**
+
+* Imported C structs now have a default initializer in Swift that initializes
+  all of the struct's fields to zero.
+
+  For example:
+
+  ```swift
+  import Darwin
+  var devNullStat = stat()
+  stat("/dev/null", &devNullStat)
+  ```
+
+  If a structure contains fields that cannot be correctly zero initialized
+  (i.e. pointer fields marked with the new `__nonnull` modifier), this default
+  initializer will be suppressed. **(18338802)**
+
+* New APIs for converting among the `Index` types for `String`,
+  `String.UnicodeScalarView`, `String.UTF16View`, and `String.UTF8View` are
+  available, as well as APIs for converting each of the `String` views into
+  `String`s. **(18018911)**
+
+* Type values now print as the full demangled type name when used with
+  `println` or string interpolation.
+
+  ```swift
+  toString(Int.self)          // prints "Swift.Int"
+  println([Float].self)       // prints "Swift.Array&lt;Swift.Float&gt;"
+  println((Int, String).self) // prints "(Swift.Int, Swift.String)"
+  ```
+
+  **(18947381)**
+
+* A new `@noescape` attribute may be used on closure parameters to functions.
+  This indicates that the parameter is only ever called (or passed as an
+  `@noescape` parameter in a call), which means that it cannot outlive the
+  lifetime of the call. This enables some minor performance optimizations,
+  but more importantly disables the `self.` requirement in closure arguments.
+  This enables control-flow-like functions to be more transparent about their
+  behavior. In a future beta, the standard library will adopt this attribute
+  in functions like `autoreleasepool()`.
+
+  ```swift
+  func autoreleasepool(@noescape code: () -> ()) {
+     pushAutoreleasePool()
+     code()
+     popAutoreleasePool()
+  }
+  ```
+
+  **(16323038)**
+
+* Performance is substantially improved over Swift 1.1 in many cases. For
+  example, multidimensional arrays are algorithmically faster in some cases,
+  unoptimized code is much faster in many cases, and many other improvements
+  have been made.
+
+* The diagnostics emitted for expression type check errors are greatly
+  improved in many cases. **(18869019)**
+
+* Type checker performance for many common expression kinds has been greatly
+  improved. This can significantly improve build times and reduces the number
+  of "expression too complex" errors. **(18868985)**
+
+* The `@autoclosure` attribute has a second form, `@autoclosure(escaping)`, that
+  provides the same caller-side syntax as `@autoclosure` but allows the
+  resulting closure to escape in the implementation.
+
+  For example:
+
+  ```swift
+  func lazyAssertion(@autoclosure(escaping) condition: () -> Bool,
+                     message: String = "") {
+    lazyAssertions.append(condition) // escapes
+    }
+  lazyAssertion(1 == 2, message: "fail eventually")
+  ```
+
+  **(19499207)**
+
+## Swift Performance
+
+* A new compilation mode has been introduced for Swift called Whole Module
+  Optimization. This option optimizes all of the files in a target together
+  and enables better performance (at the cost of increased compile time). The
+  new flag can be enabled in Xcode using the `Whole Module Optimization` build
+  setting or by using the `swiftc` command line tool with the flag
+  `-whole-module-optimization`. **(18603795)**
+
+## Swift Standard Library Enhancements and Changes
+
+* `flatMap` was added to the standard library. `flatMap` is the function that
+  maps a function over something and returns the result flattened one level.
+  `flatMap` has many uses, such as to flatten an array:
+
+  ```swift
+  [[1,2],[3,4]].flatMap { $0 }
+  ```
+
+  or to chain optionals with functions:
+
+  ```swift
+  [[1,2], [3,4]].first.flatMap { find($0, 1) }
+  ```
+
+  **(19881534)**
+
+* The function `zip` was added. It joins two sequences together into one
+  sequence of tuples. **(17292393)**
+
+* `utf16Count` is removed from `String`. Instead use count on the `UTF16` view
+  of the `String`.
+
+  For example:
+
+  ```swift
+  count(string.utf16)
+  ```
+
+  **(17627758)**
+
+
+2014-12-02 [Xcode 6.1.1]
+----------
+
+* Class methods and initializers that satisfy protocol requirements now properly
+  invoke subclass overrides when called in generic contexts. For example:
+
+    ```swift
+    protocol P {
+      class func foo()
+    }
+
+    class C: P {
+      class func foo() { println("C!") }
+    }
+
+    class D: C {
+      override class func foo() { println("D!") }
+    }
+
+    func foo<T: P>(x: T) {
+      x.dynamicType.foo()
+    }
+
+    foo(C()) // Prints "C!"
+    foo(D()) // Used to incorrectly print "C!", now prints "D!"
+    ```
+
+  **(18828217)**
+
+2014-10-09 [Xcode 6.1 Release Notes, Swift 1.1]
+----------
+
+* Values of type `Any` can now contain values of function type. **(16406907)**
+
+* Documentation for the standard library (displayed in quick help and in the
+  synthesized header for the Swift module) is improved. **(16462500)**
+
+* Class properties don't need to be marked final to avoid `O(n)` mutations on
+  value semantic types. **(17416120)**
+
+* Casts can now be performed between `CF` types (such as `CFString`, `CGImage`,
+  and `SecIdentity`) and AnyObject. Such casts will always succeed at run-time.
+  For example:
+
+  ```swift
+  var cfStr: CFString = ...
+  var obj: AnyObject = cfStr as AnyObject
+  var cfStr = obj as CFString
+  ```
+
+  **(18088474)**
 
 
 2014-10-09 [Roughly Xcode 6.1, and Swift 1.1]
@@ -292,7 +1850,7 @@ Time warp
 
   Note that the meaning of `UnsafePointer` has changed from mutable to
   immutable. As a result, some of your code may fail to compile when
-  assigning to an `UnsafePointer`'s `.memory` property.  The fix is to
+  assigning to an `UnsafePointer.memory` property.  The fix is to
   change your `UnsafePointer<T>` into an `UnsafeMutablePointer<T>`.
 
 * The optional unwrapping operator `x!` can now be assigned through, and
@@ -369,7 +1927,7 @@ Time warp
   initializer requirement must provide a required initializer to
   satisfy that requirement. This ensures that subclasses will also
   conform to the protocol, and will be most visible with classes that
-  conform to NSCoding:
+  conform to `NSCoding`:
 
     ```swift
     class MyClass : NSObject, NSCoding {

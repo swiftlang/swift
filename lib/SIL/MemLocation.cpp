@@ -117,7 +117,7 @@ void MemLocation::getFirstLevelMemLocations(MemLocationList &Locs,
 
 void MemLocation::expand(MemLocation &Base, SILModule *Mod,
                          MemLocationList &Locs,
-                         TypeExpansionMap &TypeExpansionVault) {
+                         TypeExpansionMap &TECache) {
   // To expand a memory location to its indivisible parts, we first get the
   // address projection paths from the accessed type to each indivisible field,
   // i.e. leaf nodes, then we append these projection paths to the Base.
@@ -126,20 +126,20 @@ void MemLocation::expand(MemLocation &Base, SILModule *Mod,
   // initialized with address projection paths. By keeping it consistent makes
   // it easier to implement the getType function for MemLocation.
   //
-  SILType BaseType = Base.getType();
-  if (TypeExpansionVault.find(BaseType) == TypeExpansionVault.end()) {
+  SILType BaseTy = Base.getType();
+  if (TECache.find(BaseTy) == TECache.end()) {
     // There is no cached expansion for this type, build and cache it now.
     ProjectionPathList Paths;
-    ProjectionPath::expandTypeIntoLeafProjectionPaths(BaseType, Mod, Paths,
+    ProjectionPath::expandTypeIntoLeafProjectionPaths(BaseTy, Mod, Paths,
                                                       true);
-    for (auto &X : Paths) {
-      TypeExpansionVault[Base.getType()].push_back(std::move(X.getValue()));
+    for (auto &P : Paths) {
+      TECache[BaseTy].push_back(std::move(P.getValue()));
     }
   }
 
   // Construct the MemLocation by appending the projection path from the
   // accessed node to the leaf nodes.
-  for (auto &X : TypeExpansionVault[Base.getType()]) {
+  for (auto &X : TECache[BaseTy]) {
     Locs.push_back(MemLocation::createMemLocation(Base.getBase(), X.getValue(),
                                                   Base.getPath().getValue()));
   }

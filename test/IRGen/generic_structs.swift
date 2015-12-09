@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir
 
 struct A<T1, T2>
 {
@@ -19,8 +19,9 @@ struct D<T2>
 
 struct Foo<A1, A2>
 {
+  var a: A1
   var b: Bar<A1, A2>
 }
 
-struct Bar {
+struct Bar<A1, A2> {
 }

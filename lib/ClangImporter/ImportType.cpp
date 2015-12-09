@@ -653,7 +653,7 @@ namespace {
 
     ImportResult VisitEnumType(const clang::EnumType *type) {
       auto clangDecl = type->getDecl();
-      switch (Impl.classifyEnum(clangDecl)) {
+      switch (Impl.classifyEnum(Impl.getClangPreprocessor(), clangDecl)) {
       case ClangImporter::Implementation::EnumKind::Constants: {
         auto clangDef = clangDecl->getDefinition();
         // Map anonymous enums with no fixed underlying type to Int /if/
@@ -1819,7 +1819,8 @@ bool ClangImporter::Implementation::canInferDefaultArgument(
 
   // Option sets default to "[]" if they have "Options" in their name.
   if (const clang::EnumType *enumTy = type->getAs<clang::EnumType>())
-    if (classifyEnum(enumTy->getDecl()) == EnumKind::Options) {
+    if (classifyEnum(getClangPreprocessor(), enumTy->getDecl())
+          == EnumKind::Options) {
       auto enumName = enumTy->getDecl()->getName();
       for (auto word : reversed(camel_case::getWords(enumName))) {
         if (camel_case::sameWordIgnoreFirstCase(word, "options"))
