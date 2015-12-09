@@ -294,10 +294,6 @@ CallGraphEdge *CallGraph::makeCallGraphEdgeForCallee(FullApplySite Apply,
                                                     WMI->getMember());
 
     if (CalleeFn) {
-      if (CalleeFn->isExternalDeclaration())
-        M.linkFunction(CalleeFn, SILModule::LinkingMode::LinkAll,
-                       CallGraphLinkerEditor(this).getCallback());
-
       auto *CalleeNode = getOrAddCallGraphNode(CalleeFn);
       return new (Allocator) CallGraphEdge(Apply.getInstruction(), CalleeNode,
                                            EdgeOrdinal++);
