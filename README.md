@@ -156,7 +156,7 @@ to configure the Xcode projects.
 
 The `--reconfigure` flag tells `build-script-impl` to run the CMake configuration
 step even if there is a cached configuration. As you develop in Xcode, you may
-need to rerun this from time to time, to refresh your generated Xcode project,
+need to rerun this from time to time to refresh your generated Xcode project,
 picking up new targets, file removals, or file additions.
 
 ## Testing Swift
