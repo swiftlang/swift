@@ -429,13 +429,21 @@ public:
   subtractPaths(const ProjectionPath &LHS, const ProjectionPath &RHS);
 
   /// Given the SILType Base, expand every leaf nodes in the type tree.
-  /// Include the intermediate nodes if OnlyLeafNode is false.
+  ///
   /// NOTE: this function returns a single empty projection path if the BaseType
   /// is a leaf node in the type tree.
   static void expandTypeIntoLeafProjectionPaths(SILType BaseType,
                                                 SILModule *Mod,
-                                                ProjectionPathList &P,
-                                                bool OnlyLeafNode);
+                                                ProjectionPathList &P);
+
+  /// Given the SILType Base, expand every intermediate and leaf nodes in the
+  /// type tree.
+  ///
+  /// NOTE: this function returns a single empty projection path if the BaseType
+  /// is a leaf node in the type tree.
+  static void expandTypeIntoNodeProjectionPaths(SILType BaseType,
+                                                SILModule *Mod,
+                                                ProjectionPathList &P);
 
   /// Returns true if the two paths have a non-empty symmetric difference.
   ///

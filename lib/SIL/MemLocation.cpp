@@ -116,7 +116,7 @@ void MemLocation::expand(MemLocation &Base, SILModule *M, MemLocationList &Locs,
   if (TECache.find(BaseTy) == TECache.end()) {
     // There is no cached expansion for this type, build and cache it now.
     ProjectionPathList Paths;
-    ProjectionPath::expandTypeIntoLeafProjectionPaths(BaseTy, M, Paths, true);
+    ProjectionPath::expandTypeIntoNodeProjectionPaths(BaseTy, M, Paths);
     for (auto &P : Paths) {
       TECache[BaseTy].push_back(std::move(P.getValue()));
     }
@@ -135,8 +135,8 @@ void MemLocation::reduce(MemLocation &Base, SILModule *M, MemLocationSet &Locs) 
   // accessed node to the leaf nodes.
   MemLocationList Nodes;
   ProjectionPathList Paths;
-  ProjectionPath::expandTypeIntoLeafProjectionPaths(Base.getType(), M, Paths,
-                                                    false);
+  ProjectionPath::expandTypeIntoNodeProjectionPaths(Base.getType(), M,
+                                                    Paths);
   ProjectionPath &BasePath = Base.getPath().getValue();
   for (auto &X : Paths) {
     Nodes.push_back(MemLocation(Base.getBase(), X.getValue(), BasePath));
@@ -178,8 +178,8 @@ void MemLocation::expandWithValues(MemLocation &Base, SILValue &Val,
   // projection paths from the accessed type to each indivisible field, i.e.
   // leaf nodes, then we append these projection paths to the Base.
   ProjectionPathList Paths;
-  ProjectionPath::expandTypeIntoLeafProjectionPaths(Base.getType(), Mod, Paths,
-                                                    true);
+  ProjectionPath::expandTypeIntoNodeProjectionPaths(Base.getType(), Mod,
+                                                    Paths);
 
   // Construct the MemLocation and LoadStoreValues by appending the projection
   // path
@@ -202,8 +202,8 @@ SILValue MemLocation::reduceWithValues(MemLocation &Base, SILModule *Mod,
   // Base memory location.
   MemLocationList ALocs;
   ProjectionPathList Paths;
-  ProjectionPath::expandTypeIntoLeafProjectionPaths(Base.getType(), Mod, Paths,
-                                                    false);
+  ProjectionPath::expandTypeIntoNodeProjectionPaths(Base.getType(), Mod,
+                                                    Paths);
   ProjectionPath &BasePath = Base.getPath().getValue();
   for (auto &X : Paths) {
     ALocs.push_back(MemLocation(Base.getBase(), X.getValue(), BasePath));
