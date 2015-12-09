@@ -355,11 +355,12 @@ struct _Buffer72 {
 @_silgen_name("swift_float${bits}ToString")
 func _float${bits}ToStringImpl(
   buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
-  _ bufferLength: UInt, _ value: Float${bits}
+  _ bufferLength: UInt, _ value: Float${bits},
+  _ debug: Bool
 ) -> UInt
 
 @warn_unused_result
-func _float${bits}ToString(value: Float${bits}) -> String {
+func _float${bits}ToString(value: Float${bits}, debug: Bool) -> String {
   _sanityCheck(sizeof(_Buffer32.self) == 32)
   _sanityCheck(sizeof(_Buffer72.self) == 72)
 
@@ -367,7 +368,7 @@ func _float${bits}ToString(value: Float${bits}) -> String {
   return withUnsafeMutablePointer(&buffer) {
     (bufferPtr) in
     let bufferUTF8Ptr = UnsafeMutablePointer<UTF8.CodeUnit>(bufferPtr)
-    let actualLength = _float${bits}ToStringImpl(bufferUTF8Ptr, 32, value)
+    let actualLength = _float${bits}ToStringImpl(bufferUTF8Ptr, 32, value, debug)
     return String._fromWellFormedCodeUnitSequence(
       UTF8.self,
       input: UnsafeBufferPointer(
