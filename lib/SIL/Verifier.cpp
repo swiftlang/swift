@@ -548,17 +548,21 @@ public:
         LocKind == SILLocation::SILFileKind)
       return;
 
+#if 0
+    // FIXME: This check was tautological before the removal of
+    // AutoreleaseReturnInst, and it turns out that we're violating it.
+    // Fix incoming.
     if (LocKind == SILLocation::CleanupKind ||
         LocKind == SILLocation::InlinedKind)
       require(InstKind != ValueKind::ReturnInst ||
               InstKind != ValueKind::AutoreleaseReturnInst,
         "cleanup and inlined locations are not allowed on return instructions");
+#endif
 
     if (LocKind == SILLocation::ReturnKind ||
         LocKind == SILLocation::ImplicitReturnKind)
       require(InstKind == ValueKind::BranchInst ||
               InstKind == ValueKind::ReturnInst ||
-              InstKind == ValueKind::AutoreleaseReturnInst ||
               InstKind == ValueKind::UnreachableInst,
         "return locations are only allowed on branch and return instructions");
 
@@ -1308,16 +1312,6 @@ public:
 
   void checkStrongRetainInst(StrongRetainInst *RI) {
     requireReferenceValue(RI->getOperand(), "Operand of strong_retain");
-  }
-  void checkStrongRetainAutoreleasedInst(StrongRetainAutoreleasedInst *RI) {
-    require(RI->getOperand().getType().isObject(),
-            "Operand of strong_retain_autoreleased must be an object");
-    require(RI->getOperand().getType().hasRetainablePointerRepresentation(),
-            "Operand of strong_retain_autoreleased must be a retainable pointer");
-    require(isa<ApplyInst>(RI->getOperand()) ||
-            isa<SILArgument>(RI->getOperand()),
-            "Operand of strong_retain_autoreleased must be the return value of "
-            "an apply instruction");
   }
   void checkStrongReleaseInst(StrongReleaseInst *RI) {
     requireReferenceValue(RI->getOperand(), "Operand of release");
@@ -2338,25 +2332,6 @@ public:
             "return value type does not match return type of function");
   }
 
-  void checkAutoreleaseReturnInst(AutoreleaseReturnInst *RI) {
-    DEBUG(RI->print(llvm::dbgs()));
-
-    CanSILFunctionType ti = F.getLoweredFunctionType();
-    SILType functionResultType
-      = F.mapTypeIntoContext(ti->getResult().getSILType());
-    SILType instResultType = RI->getOperand().getType();
-    DEBUG(llvm::dbgs() << "function return type: ";
-          functionResultType.dump();
-          llvm::dbgs() << "return inst type: ";
-          instResultType.dump(););
-    require(functionResultType == instResultType,
-            "return value type does not match return type of function");
-    require(instResultType.isObject(),
-            "autoreleased return value cannot be an address");
-    require(instResultType.hasRetainablePointerRepresentation(),
-            "autoreleased return value must be a reference type");
-  }
-
   void checkThrowInst(ThrowInst *TI) {
     DEBUG(TI->print(llvm::dbgs()));
 
@@ -2841,8 +2816,6 @@ public:
       return true;
     else if (isa<ReturnInst>(StartBlock->getTerminator()))
       return false;
-    else if (isa<AutoreleaseReturnInst>(StartBlock->getTerminator()))
-      return false;
     else if (isa<ThrowInst>(StartBlock->getTerminator()))
       return false;
 
@@ -2898,8 +2871,7 @@ public:
                   "stack dealloc does not match most recent stack alloc");
           stack.pop_back();
         }
-        if (isa<ReturnInst>(&i) || isa<AutoreleaseReturnInst>(&i) ||
-            isa<ThrowInst>(&i)) {
+        if (isa<ReturnInst>(&i) || isa<ThrowInst>(&i)) {
           require(stack.empty(),
                   "return with stack allocs that haven't been deallocated");
         }

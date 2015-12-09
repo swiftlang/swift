@@ -297,7 +297,6 @@ void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
     return;
   }
 
-  case ValueKind::AutoreleaseReturnInst:
   case ValueKind::ReturnInst:
   case ValueKind::ThrowInst:
   case ValueKind::UnreachableInst:
@@ -439,7 +438,6 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
     return;
   }
 
-  case ValueKind::AutoreleaseReturnInst:
   case ValueKind::ReturnInst:
   case ValueKind::ThrowInst:
   case ValueKind::TryApplyInst:

@@ -898,9 +898,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::StrongPinInst:
   case ValueKind::StrongReleaseInst:
   case ValueKind::StrongRetainInst:
-  case ValueKind::StrongRetainAutoreleasedInst:
   case ValueKind::StrongUnpinInst:
-  case ValueKind::AutoreleaseReturnInst:
   case ValueKind::StrongRetainUnownedInst:
   case ValueKind::UnownedRetainInst:
   case ValueKind::UnownedReleaseInst:

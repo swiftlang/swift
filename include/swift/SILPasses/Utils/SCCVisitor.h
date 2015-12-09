@@ -131,7 +131,6 @@ private:
 
     case ValueKind::UnreachableInst:
     case ValueKind::ReturnInst:
-    case ValueKind::AutoreleaseReturnInst:
     case ValueKind::SwitchValueInst:
     case ValueKind::ThrowInst:
       llvm_unreachable("Did not expect terminator that does not have args!");

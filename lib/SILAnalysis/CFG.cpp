@@ -47,8 +47,6 @@ static bool isTrapNoReturnFunction(ApplyInst *AI) {
   return true;
 }
 
-/// TODO: Add support for autorelease_return. This is not implemented now to
-/// cause this to always fail in functions with objc calling convention.
 bool
 swift::
 findAllNonFailureExitBBs(SILFunction *F,

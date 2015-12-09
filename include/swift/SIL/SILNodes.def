@@ -113,8 +113,6 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   // Reference Counting
   ABSTRACT_VALUE(RefCountingInst, SILInstruction)
     INST(StrongRetainInst, RefCountingInst, MayHaveSideEffects, DoesNotRelease)
-    INST(StrongRetainAutoreleasedInst, RefCountingInst, MayHaveSideEffects,
-         DoesNotRelease)
     INST(StrongReleaseInst, RefCountingInst, MayHaveSideEffects, MayRelease)
     INST(StrongRetainUnownedInst, RefCountingInst, MayHaveSideEffects,
          DoesNotRelease)
@@ -245,7 +243,6 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   ABSTRACT_VALUE(TermInst, SILInstruction)
     TERMINATOR(UnreachableInst, TermInst, None, DoesNotRelease)
     TERMINATOR(ReturnInst, TermInst, None, DoesNotRelease)
-    TERMINATOR(AutoreleaseReturnInst, TermInst, None, DoesNotRelease)
     TERMINATOR(ThrowInst, TermInst, None, DoesNotRelease)
     TERMINATOR(TryApplyInst, TermInst, MayHaveSideEffects, MayRelease)
     TERMINATOR(BranchInst, TermInst, None, DoesNotRelease)
