@@ -1242,10 +1242,7 @@ static SILValue getThunkResult(SILGenFunction &gen,
   if (!fTy->hasIndirectResult()) {
     switch (fTy->getResult().getConvention()) {
     case ResultConvention::Owned:
-      break;
     case ResultConvention::Autoreleased:
-      innerResultValue =
-        gen.B.createStrongRetainAutoreleased(loc, innerResultValue);
       break;
     case ResultConvention::UnownedInnerPointer:
       // FIXME: We can't reasonably lifetime-extend an inner-pointer result

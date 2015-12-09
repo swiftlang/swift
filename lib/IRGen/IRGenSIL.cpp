@@ -2157,6 +2157,16 @@ static void emitReturnInst(IRGenSILFunction &IGF,
 
 void IRGenSILFunction::visitReturnInst(swift::ReturnInst *i) {
   Explosion result = getLoweredExplosion(i->getOperand());
+
+  // Implicitly autorelease the return value if the function's result
+  // convention is autoreleased.
+  if (CurSILFn->getLoweredFunctionType()->getResult().getConvention() ==
+        ResultConvention::Autoreleased) {
+    Explosion temp;
+    temp.add(emitObjCAutoreleaseReturnValue(*this, result.claimNext()));
+    result = std::move(temp);
+  }
+
   emitReturnInst(*this, i->getOperand().getType(), result);
 }
 
