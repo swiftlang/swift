@@ -2847,7 +2847,7 @@ static TypedPattern *
 parseOptionalAccessorArgument(SourceLoc SpecifierLoc, TypeLoc ElementTy,
                               Parser &P, AccessorKind Kind) {
   // 'set' and 'willSet' have a (value) parameter, 'didSet' takes an (oldValue)
-  // paramter and 'get' and always takes a () parameter.
+  // parameter and 'get' and always takes a () parameter.
   if (Kind != AccessorKind::IsSetter && Kind != AccessorKind::IsWillSet &&
       Kind != AccessorKind::IsDidSet)
     return nullptr;
