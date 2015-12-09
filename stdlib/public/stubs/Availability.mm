@@ -30,7 +30,8 @@ static NSDictionary *systemVersionDictionaryFromPlist() {
   // not pick up the host OS version.
   const char *simulatorRoot = getenv("IPHONE_SIMULATOR_ROOT");
   if (!simulatorRoot) {
-    fatalError("Unable to check API availability: "
+    fatalError(/* flags = */ 0,
+               "Unable to check API availability: "
                "IPHONE_SIMULATOR_ROOT not set when running under simulator");
   }
 
@@ -45,13 +46,15 @@ static NSDictionary *systemVersionDictionaryFromPlist() {
 static NSOperatingSystemVersion operatingSystemVersionFromPlist() {
   NSDictionary *plistDictionary = systemVersionDictionaryFromPlist();
   if (!plistDictionary) {
-    fatalError("Unable to check API availability: "
+    fatalError(/* flags = */ 0,
+               "Unable to check API availability: "
                "system version dictionary not found");
   }
 
   NSString *versionString = [plistDictionary objectForKey:@"ProductVersion"];
   if (!versionString) {
-    fatalError("Unable to check API availability: "
+    fatalError(/* flags = */ 0,
+               "Unable to check API availability: "
                "ProductVersion not present in system version dictionary");
   }
 

@@ -318,7 +318,8 @@ swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
 
   return entry->getData();
 #else
-  fatalError("swift_getObjCClassMetadata: no Objective-C interop");
+  fatalError(/* flags = */ 0,
+             "swift_getObjCClassMetadata: no Objective-C interop");
 #endif
 }
 

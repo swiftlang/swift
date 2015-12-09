@@ -36,7 +36,8 @@ public func assert(
   // Only assert in debug mode.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), true) {
-      _assertionFailed("assertion failed", message(), file, line)
+      _assertionFailed("assertion failed", message(), file, line,
+        flags: _fatalErrorFlags())
     }
   }
 }
@@ -66,7 +67,8 @@ public func precondition(
   // Only check in debug and release mode.  In release mode just trap.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), true) {
-      _assertionFailed("precondition failed", message(), file, line)
+      _assertionFailed("precondition failed", message(), file, line,
+        flags: _fatalErrorFlags())
     }
   } else if _isReleaseAssertConfiguration() {
     let error = !condition()
@@ -98,7 +100,8 @@ public func assertionFailure(
   file: StaticString = __FILE__, line: UInt = __LINE__
 ) {
   if _isDebugAssertConfiguration() {
-    _assertionFailed("fatal error", message(), file, line)
+    _assertionFailed("fatal error", message(), file, line,
+      flags: _fatalErrorFlags())
   }
   else if _isFastAssertConfiguration() {
     _conditionallyUnreachable()
@@ -127,7 +130,8 @@ public func preconditionFailure(
 ) {
   // Only check in debug and release mode.  In release mode just trap.
   if _isDebugAssertConfiguration() {
-    _assertionFailed("fatal error", message(), file, line)
+    _assertionFailed("fatal error", message(), file, line,
+      flags: _fatalErrorFlags())
   } else if _isReleaseAssertConfiguration() {
     Builtin.int_trap()
   }
@@ -140,7 +144,8 @@ public func fatalError(
   @autoclosure message: () -> String = String(),
   file: StaticString = __FILE__, line: UInt = __LINE__
 ) {
-  _assertionFailed("fatal error", message(), file, line)
+  _assertionFailed("fatal error", message(), file, line,
+    flags: _fatalErrorFlags())
 }
 
 /// Library precondition checks.
@@ -157,7 +162,8 @@ public func _precondition(
   // Only check in debug and release mode. In release mode just trap.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), true) {
-      _fatalErrorMessage("fatal error", message, file, line)
+      _fatalErrorMessage("fatal error", message, file, line,
+        flags: _fatalErrorFlags())
     }
   } else if _isReleaseAssertConfiguration() {
     let error = !condition()
@@ -186,7 +192,8 @@ public func _overflowChecked<T>(
   let (result, error) = args
   if _isDebugAssertConfiguration() {
     if _branchHint(error, false) {
-      _fatalErrorMessage("fatal error", "Overflow/underflow", file, line)
+      _fatalErrorMessage("fatal error", "Overflow/underflow", file, line,
+        flags: _fatalErrorFlags())
     }
   } else {
     Builtin.condfail(error._value)
@@ -210,7 +217,8 @@ public func _debugPrecondition(
   // Only check in debug mode.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), true) {
-      _fatalErrorMessage("fatal error", message, file, line)
+      _fatalErrorMessage("fatal error", message, file, line,
+        flags: _fatalErrorFlags())
     }
   }
 }
@@ -238,7 +246,8 @@ public func _sanityCheck(
 ) {
 #if INTERNAL_CHECKS_ENABLED
   if !_branchHint(condition(), true) {
-    _fatalErrorMessage("fatal error", message, file, line)
+    _fatalErrorMessage("fatal error", message, file, line,
+      flags: _fatalErrorFlags())
   }
 #endif
 }
