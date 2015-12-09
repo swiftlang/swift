@@ -153,7 +153,10 @@ namespace swift {
     
     /// Don't mangle the Self type as part of declaration manglings.
     bool DisableSelfTypeMangling = true;
-    
+
+    /// Don't implicitly up/down cast between values and optionals.
+    bool DisableImplicitOptionalConversions = false;
+
     /// Sets the target we are building for and updates configuration options
     /// to match.
     ///

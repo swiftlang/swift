@@ -1922,7 +1922,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // A value of type T? can be converted to type U? if T is convertible to U.
   // The above conversions also apply to implicitly unwrapped optional types,
   // except that there is no implicit conversion from T? to T!.
-  {
+  if (!TC.getLangOpts().DisableImplicitOptionalConversions) {
     BoundGenericType *boundGenericType2;
     
     if (concrete && kind >= TypeMatchKind::Subtype &&
@@ -1964,7 +1964,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
   // A value of type T! can be (unsafely) forced to U if T
   // is convertible to U.
-  {
+  if (!TC.getLangOpts().DisableImplicitOptionalConversions) {
     Type objectType1;
     if (concrete && kind >= TypeMatchKind::Conversion &&
         (objectType1 = lookThroughImplicitlyUnwrappedOptionalType(type1))) {
