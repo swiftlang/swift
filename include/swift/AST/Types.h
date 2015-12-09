@@ -47,6 +47,7 @@ namespace swift {
   class GenericParamList;
   class GenericSignature;
   class Identifier;
+  enum class ResilienceExpansion : unsigned;
   class SILModule;
   class SILType;
   class TypeAliasDecl;
@@ -631,6 +632,10 @@ public:
   /// possibly nil pointer that can be unknown-retained and
   /// unknown-released.
   bool hasRetainablePointerRepresentation();
+
+  /// \brief Given that this type is a reference type, is it known to use
+  /// Swift-native reference counting?
+  bool usesNativeReferenceCounting(ResilienceExpansion resilience);
 
   /// Determines whether this type has a bridgable object
   /// representation, i.e., whether it is always represented as a single
@@ -4003,7 +4008,7 @@ BEGIN_CAN_TYPE_WRAPPER(ReferenceStorageType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getReferentType)
 END_CAN_TYPE_WRAPPER(ReferenceStorageType, Type)
 
-/// \brief The storage type of a variable with [unowned] ownership semantics.
+/// \brief The storage type of a variable with @unowned ownership semantics.
 class UnownedStorageType : public ReferenceStorageType {
   friend class ReferenceStorageType;
   UnownedStorageType(Type referent, const ASTContext *C,
@@ -4015,6 +4020,10 @@ public:
     return static_cast<UnownedStorageType*>(
                  ReferenceStorageType::get(referent, Ownership::Unowned, C));
   }
+
+  /// Is this unowned storage type known to be loadable within the given
+  /// resilience scope?
+  bool isLoadable(ResilienceExpansion resilience) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {

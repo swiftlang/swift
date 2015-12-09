@@ -692,6 +692,27 @@ SILCloner<ImplClass>::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitLoadUnownedInst(LoadUnownedInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+    getBuilder().createLoadUnowned(getOpLocation(Inst->getLoc()),
+                                   getOpValue(Inst->getOperand()),
+                                   Inst->isTake()));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitStoreUnownedInst(StoreUnownedInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+    getBuilder().createStoreUnowned(getOpLocation(Inst->getLoc()),
+                                    getOpValue(Inst->getSrc()),
+                                    getOpValue(Inst->getDest()),
+                                    Inst->isInitializationOfDest()));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitLoadWeakInst(LoadWeakInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,

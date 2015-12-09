@@ -2073,6 +2073,9 @@ SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
   // For @unowned(safe) types, we need to generate a strong retain and
   // strip the unowned box.
   if (auto unownedType = src.getType().getAs<UnownedStorageType>()) {
+    assert(unownedType->isLoadable(ResilienceExpansion::Maximal));
+    (void) unownedType;
+
     B.createStrongRetainUnowned(loc, src);
     return B.createUnownedToRef(loc, src,
                 SILType::getPrimitiveObjectType(unownedType.getReferentType()));
@@ -2107,6 +2110,10 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &gen,
 
   // For @unowned(safe) types, we need to strip the unowned box.
   if (auto unownedType = storageType.getAs<UnownedStorageType>()) {
+    if (!unownedType->isLoadable(ResilienceExpansion::Maximal)) {
+      return gen.B.createLoadUnowned(loc, src, isTake);
+    }
+
     auto unownedValue = gen.B.createLoad(loc, src);
     gen.B.createStrongRetainUnowned(loc, unownedValue);
     if (isTake) gen.B.createUnownedRelease(loc, unownedValue);
@@ -2159,7 +2166,16 @@ static void emitStoreOfSemanticRValue(SILGenFunction &gen,
 
   // For @unowned(safe) types, we need to enter the unowned box by
   // turning the strong retain into an unowned retain.
-  if (storageType.is<UnownedStorageType>()) {
+  if (auto unownedType = storageType.getAs<UnownedStorageType>()) {
+    // FIXME: resilience
+    if (!unownedType->isLoadable(ResilienceExpansion::Maximal)) {
+      gen.B.createStoreUnowned(loc, value, dest, isInit);
+
+      // store_unowned doesn't take ownership of the input, so cancel it out.
+      gen.B.emitStrongReleaseAndFold(loc, value);
+      return;
+    }
+
     auto unownedValue =
       gen.B.createRefToUnowned(loc, value, storageType.getObjectType());
     gen.B.createUnownedRetain(loc, unownedValue);
@@ -2258,7 +2274,10 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
   // @weak types are never loadable, so we don't need to handle them here.
   
   // For @unowned types, place into an unowned box.
-  if (storageType.is<UnownedStorageType>()) {
+  if (auto unownedType = storageType.getAs<UnownedStorageType>()) {
+    assert(unownedType->isLoadable(ResilienceExpansion::Maximal));
+    (void) unownedType;
+
     SILValue unowned = B.createRefToUnowned(loc, semanticValue, storageType);
     B.createUnownedRetain(loc, unowned);
     B.emitStrongReleaseAndFold(loc, semanticValue);

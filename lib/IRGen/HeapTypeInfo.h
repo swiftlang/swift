@@ -86,6 +86,8 @@ public:
 
   static const bool IsScalarPOD = false;
 
+  // Emit the copy/destroy operations required by SingleScalarTypeInfo
+  // using strong reference counting.
   void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {
     IGF.emitStrongRelease(value, asDerived().getReferenceCounting());
   }
@@ -98,86 +100,82 @@ public:
     IGF.emitStrongRetain(value, asDerived().getReferenceCounting());
   }
 
-  void emitScalarRetainUnowned(IRGenFunction &IGF, llvm::Value *value) const {
-    IGF.emitStrongRetainUnowned(value, asDerived().getReferenceCounting());
-  }
-
-  void emitScalarUnownedRelease(IRGenFunction &IGF, llvm::Value *value) const {
-    IGF.emitUnownedRelease(value, asDerived().getReferenceCounting());
-  }
-
-  void emitScalarUnownedRetain(IRGenFunction &IGF, llvm::Value *value) const {
-    IGF.emitUnownedRetain(value, asDerived().getReferenceCounting());
-  }
-
-  void retain(IRGenFunction &IGF, Explosion &e) const override {
+  // Implement the primary retain/release operations of ReferenceTypeInfo
+  // using basic reference counting.
+  void strongRetain(IRGenFunction &IGF, Explosion &e) const override {
     llvm::Value *value = e.claimNext();
     asDerived().emitScalarRetain(IGF, value);
   }
 
-  void release(IRGenFunction &IGF, Explosion &e) const override {
+  void strongRelease(IRGenFunction &IGF, Explosion &e) const override {
     llvm::Value *value = e.claimNext();
     asDerived().emitScalarRelease(IGF, value);
   }
 
-  void retainUnowned(IRGenFunction &IGF, Explosion &e) const override {
+  void strongRetainUnowned(IRGenFunction &IGF, Explosion &e) const override {
     llvm::Value *value = e.claimNext();
-    asDerived().emitScalarRetainUnowned(IGF, value);
+    IGF.emitStrongRetainUnowned(value, asDerived().getReferenceCounting());
+  }
+
+  void strongRetainUnownedRelease(IRGenFunction &IGF,
+                                  Explosion &e) const override {
+    llvm::Value *value = e.claimNext();
+    IGF.emitStrongRetainAndUnownedRelease(value,
+                                          asDerived().getReferenceCounting());
   }
 
   void unownedRetain(IRGenFunction &IGF, Explosion &e) const override {
     llvm::Value *value = e.claimNext();
-    asDerived().emitScalarUnownedRetain(IGF, value);
+    IGF.emitUnownedRetain(value, asDerived().getReferenceCounting());
   }
 
   void unownedRelease(IRGenFunction &IGF, Explosion &e) const override {
     llvm::Value *value = e.claimNext();
-    asDerived().emitScalarUnownedRelease(IGF, value);
+    IGF.emitUnownedRelease(value, asDerived().getReferenceCounting());
+  }
+
+  void unownedLoadStrong(IRGenFunction &IGF, Address src,
+                         Explosion &out) const override {
+    llvm::Value *value = IGF.emitUnownedLoadStrong(src, this->getStorageType(),
+                                           asDerived().getReferenceCounting());
+    out.add(value);
+  }
+
+  void unownedTakeStrong(IRGenFunction &IGF, Address src,
+                         Explosion &out) const override {
+    llvm::Value *value = IGF.emitUnownedTakeStrong(src, this->getStorageType(),
+                                           asDerived().getReferenceCounting());
+    out.add(value);
+  }
+
+  void unownedInit(IRGenFunction &IGF, Explosion &in,
+                   Address dest) const override {
+    IGF.emitUnownedInit(in.claimNext(), dest,
+                        asDerived().getReferenceCounting());
+  }
+
+  void unownedAssign(IRGenFunction &IGF, Explosion &in,
+                     Address dest) const override {
+    IGF.emitUnownedAssign(in.claimNext(), dest,
+                          asDerived().getReferenceCounting());
   }
 
   LoadedRef loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc,
                               Address addr) const override {
-    switch (asDerived().getReferenceCounting()) {
-    case ReferenceCounting::Native:
-      return LoadedRef(IGF.emitLoadNativeRefcountedPtr(addr), true);
-    case ReferenceCounting::ObjC:
-    case ReferenceCounting::Block:
-    case ReferenceCounting::Unknown:
-      return LoadedRef(IGF.emitLoadUnknownRefcountedPtr(addr), true);
-    case ReferenceCounting::Bridge:
-      return LoadedRef(IGF.emitLoadBridgeRefcountedPtr(addr), true);
-    case ReferenceCounting::Error:
-      llvm_unreachable("not supported!");
-    }
+    llvm::Value *ptr =
+      IGF.emitLoadRefcountedPtr(addr, asDerived().getReferenceCounting());
+    return LoadedRef(ptr, true);
   }
 
   const WeakTypeInfo *createWeakStorageType(TypeConverter &TC) const override {
-    switch (asDerived().getReferenceCounting()) {
-    case ReferenceCounting::Native:
-      return TC.createSwiftWeakStorageType(this->getStorageType());
-    case ReferenceCounting::ObjC:
-    case ReferenceCounting::Block:
-    case ReferenceCounting::Unknown:
-      return TC.createUnknownWeakStorageType(this->getStorageType());
-    case ReferenceCounting::Bridge:
-    case ReferenceCounting::Error:
-      llvm_unreachable("not supported!");
-    }
+    return TC.createWeakStorageType(this->getStorageType(),
+                                    asDerived().getReferenceCounting());
   }
 
-  const UnownedTypeInfo *
+  const TypeInfo *
   createUnownedStorageType(TypeConverter &TC) const override {
-    switch (asDerived().getReferenceCounting()) {
-    case ReferenceCounting::Native:
-      return TC.createSwiftUnownedStorageType(this->getStorageType());
-    case ReferenceCounting::ObjC:
-    case ReferenceCounting::Block:
-    case ReferenceCounting::Unknown:
-      return TC.createUnknownUnownedStorageType(this->getStorageType());
-    case ReferenceCounting::Bridge:
-    case ReferenceCounting::Error:
-      llvm_unreachable("not supported!");
-    }
+    return TC.createUnownedStorageType(this->getStorageType(),
+                                       asDerived().getReferenceCounting());
   }
 
   const TypeInfo *createUnmanagedStorageType(TypeConverter &TC) const override {

@@ -428,11 +428,6 @@ static SILType getPinResultType(SILType operandType) {
 StrongPinInst::StrongPinInst(SILDebugLocation *Loc, SILValue operand)
     : UnaryInstructionBase(Loc, operand, getPinResultType(operand.getType())) {}
 
-StoreWeakInst::StoreWeakInst(SILDebugLocation *Loc, SILValue value,
-                             SILValue dest, IsInitialization_t isInit)
-    : SILInstruction(ValueKind::StoreWeakInst, Loc),
-      Operands(this, value, dest), IsInitializationOfDest(isInit) {}
-
 CopyAddrInst::CopyAddrInst(SILDebugLocation *Loc, SILValue SrcLValue,
                            SILValue DestLValue, IsTake_t isTakeOfSrc,
                            IsInitialization_t isInitializationOfDest)

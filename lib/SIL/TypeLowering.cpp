@@ -230,7 +230,20 @@ namespace {
     }
 
     RetTy visitUnownedStorageType(CanUnownedStorageType type) {
+      // FIXME: resilience
+      if (type->isLoadable(ResilienceExpansion::Maximal)) {
+        return asImpl().visitLoadableUnownedStorageType(type);
+      } else {
+        return asImpl().visitAddressOnlyUnownedStorageType(type);
+      }
+    }
+
+    RetTy visitLoadableUnownedStorageType(CanUnownedStorageType type) {
       return asImpl().handleReference(type);
+    }
+
+    RetTy visitAddressOnlyUnownedStorageType(CanUnownedStorageType type) {
+      return asImpl().handleAddressOnly(type);
     }
 
     RetTy visitWeakStorageType(CanWeakStorageType type) {
@@ -846,10 +859,10 @@ namespace {
     }
   };
 
-  /// A type lowering for @unowned types.
-  class UnownedTypeLowering final : public LeafLoadableTypeLowering {
+  /// A type lowering for loadable @unowned types.
+  class LoadableUnownedTypeLowering final : public LeafLoadableTypeLowering {
   public:
-    UnownedTypeLowering(SILType type)
+    LoadableUnownedTypeLowering(SILType type)
       : LeafLoadableTypeLowering(type, IsReferenceCounted) {}
 
     void emitRetainValue(SILBuilder &B, SILLocation loc,
@@ -995,8 +1008,13 @@ namespace {
           .visit(unownedBaseType);
       }
 
-      return new (TC, Dependent) UnownedTypeLowering(
-                                      SILType::getPrimitiveObjectType(OrigType));
+      return this->TypeClassifierBase::visitUnownedStorageType(type);
+    }
+
+    const TypeLowering *
+    visitLoadableUnownedStorageType(CanUnownedStorageType type) {
+      return new (TC, Dependent) LoadableUnownedTypeLowering(
+                                     SILType::getPrimitiveObjectType(OrigType));      
     }
 
     const TypeLowering *visitUnmanagedStorageType(
