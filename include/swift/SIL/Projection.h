@@ -430,6 +430,8 @@ public:
 
   /// Given the SILType Base, expand every leaf nodes in the type tree.
   /// Include the intermediate nodes if OnlyLeafNode is false.
+  /// NOTE: this function returns a single empty projection path if the BaseType
+  /// is a leaf node in the type tree.
   static void expandTypeIntoLeafProjectionPaths(SILType BaseType,
                                                 SILModule *Mod,
                                                 ProjectionPathList &P,

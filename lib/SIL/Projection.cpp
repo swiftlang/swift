@@ -665,7 +665,7 @@ ProjectionPath::expandTypeIntoLeafProjectionPaths(SILType B, SILModule *Mod,
       continue;
     }
 
-    // This is NOT a leaf node, keep the intermediate nodes as well.
+    // If OnlyLeafNode is false, keep the intermediate nodes as well.
     if (!OnlyLeafNode)
       Paths.push_back(std::move(PP.getValue()));
 
