@@ -2005,7 +2005,8 @@ namespace {
       // stand in for that parameter or return type, allowing it to be inferred
       // from context.
       Type funcTy;
-      if (expr->hasExplicitResultType()) {
+      if (expr->hasExplicitResultType() &&
+          expr->getExplicitResultTypeLoc().getType()) {
         funcTy = expr->getExplicitResultTypeLoc().getType();
       } else if (!crt.isNull()) {
         funcTy = crt;

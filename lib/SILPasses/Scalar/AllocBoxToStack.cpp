@@ -36,7 +36,7 @@ STATISTIC(NumStackPromoted, "Number of alloc_box's promoted to the stack");
 /// This is a list we use to store a set of indices. We create the set by
 /// sorting, uniqueing at the appropriate time. The reason why it makes sense to
 /// just use a sorted vector with std::count is because generally functions do
-/// not have that many arguments and even less dead arguments.
+/// not have that many arguments and even fewer promoted arguments.
 using ParamIndexList = llvm::SmallVector<unsigned, 8>;
 
 static SILInstruction* findUnexpectedBoxUse(SILValue Box,
@@ -315,11 +315,11 @@ static bool checkPartialApplyBody(Operand *O) {
 
   // We don't actually use these because we're not recursively
   // rewriting the partial applies we find.
-  llvm::SmallVector<Operand *, 1> ElidedOperands;
+  llvm::SmallVector<Operand *, 1> PromotedOperands;
   auto Param = SILValue(getParameterForOperand(F, O));
   return !findUnexpectedBoxUse(Param, /* examinePartialApply = */ false,
                                /* inAppliedFunction = */ true,
-                               ElidedOperands);
+                               PromotedOperands);
 }
 
 
@@ -331,13 +331,13 @@ static bool checkPartialApplyBody(Operand *O) {
 static SILInstruction* findUnexpectedBoxUse(SILValue Box,
                                             bool examinePartialApply,
                                             bool inAppliedFunction,
-                             llvm::SmallVectorImpl<Operand *> &ElidedOperands) {
+                            llvm::SmallVectorImpl<Operand *> &PromotedOperands) {
   assert((Box.getType().is<SILBoxType>()
           || Box.getType()
                  == SILType::getNativeObjectType(Box.getType().getASTContext()))
          && "Expected an object pointer!");
 
-  llvm::SmallVector<Operand *, 4> LocalElidedOperands;
+  llvm::SmallVector<Operand *, 4> LocalPromotedOperands;
 
   // Scan all of the uses of the retain count value, collecting all
   // the releases and validating that we don't have an unexpected
@@ -347,7 +347,9 @@ static SILInstruction* findUnexpectedBoxUse(SILValue Box,
 
     // Retains and releases are fine. Deallocs are fine if we're not
     // examining a function that the alloc_box was passed into.
+    // Projections are fine as well.
     if (isa<StrongRetainInst>(User) || isa<StrongReleaseInst>(User) ||
+        isa<ProjectBoxInst>(User) ||
         (!inAppliedFunction && isa<DeallocBoxInst>(User)))
       continue;
 
@@ -357,26 +359,27 @@ static SILInstruction* findUnexpectedBoxUse(SILValue Box,
     if (auto *PAI = dyn_cast<PartialApplyInst>(User))
       if (examinePartialApply && checkPartialApplyBody(UI) &&
           !partialApplyEscapes(PAI, /* examineApply = */ true)) {
-        LocalElidedOperands.push_back(UI);
+        LocalPromotedOperands.push_back(UI);
         continue;
       }
 
     return User;
   }
 
-  ElidedOperands.append(LocalElidedOperands.begin(), LocalElidedOperands.end());
+  PromotedOperands.append(LocalPromotedOperands.begin(),
+                         LocalPromotedOperands.end());
   return nullptr;
 }
 
 /// canPromoteAllocBox - Can we promote this alloc_box to an alloc_stack?
 static bool canPromoteAllocBox(AllocBoxInst *ABI,
-                             llvm::SmallVectorImpl<Operand *> &ElidedOperands) {
+                             llvm::SmallVectorImpl<Operand *> &PromotedOperands){
   // Scan all of the uses of the address of the box to see if any
   // disqualifies the box from being promoted to the stack.
   if (auto *User = findUnexpectedBoxUse(ABI->getContainerResult(),
                                         /* examinePartialApply = */ true,
                                         /* inAppliedFunction = */ false,
-                                        ElidedOperands)) {
+                                        PromotedOperands)) {
     (void)User;
     // Otherwise, we have an unexpected use.
     DEBUG(llvm::dbgs() << "*** Failed to promote alloc_box in @"
@@ -461,14 +464,13 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
 namespace {
 
 /// \brief A SILCloner subclass which clones a closure function while
-/// removing some of the parameters, which are either completely dead
-/// or only used in retains and releases (which will not be cloned).
-class DeadParamCloner : public SILClonerWithScopes<DeadParamCloner> {
+/// promoting some of its box parameters to stack addresses.
+class PromotedParamCloner : public SILClonerWithScopes<PromotedParamCloner> {
   public:
-  friend class SILVisitor<DeadParamCloner>;
-  friend class SILCloner<DeadParamCloner>;
+  friend class SILVisitor<PromotedParamCloner>;
+  friend class SILCloner<PromotedParamCloner>;
 
-  DeadParamCloner(SILFunction *Orig, ParamIndexList &DeadParamIndices,
+  PromotedParamCloner(SILFunction *Orig, ParamIndexList &PromotedParamIndices,
                   llvm::StringRef ClonedName);
 
   void populateCloned();
@@ -477,48 +479,50 @@ class DeadParamCloner : public SILClonerWithScopes<DeadParamCloner> {
 
   private:
   static SILFunction *initCloned(SILFunction *Orig,
-                                 ParamIndexList &DeadParamIndices,
+                                 ParamIndexList &PromotedParamIndices,
                                  llvm::StringRef ClonedName);
 
   void visitStrongReleaseInst(StrongReleaseInst *Inst);
   void visitStrongRetainInst(StrongRetainInst *Inst);
+  void visitProjectBoxInst(ProjectBoxInst *Inst);
 
   SILFunction *Orig;
-  ParamIndexList &DeadParamIndices;
+  ParamIndexList &PromotedParamIndices;
 
-  // The values in the original function that are either dead or only
-  // used in retains and releases.
-  llvm::SmallSet<SILValue, 4> DeadParameters;
+  // The values in the original function that are promoted to stack
+  // references.
+  llvm::SmallSet<SILValue, 4> PromotedParameters;
 };
 } // end anonymous namespace.
 
-DeadParamCloner::DeadParamCloner(SILFunction *Orig,
-                                 ParamIndexList &DeadParamIndices,
+PromotedParamCloner::PromotedParamCloner(SILFunction *Orig,
+                                 ParamIndexList &PromotedParamIndices,
                                  llvm::StringRef ClonedName)
-  : SILClonerWithScopes<DeadParamCloner>(*initCloned(Orig, DeadParamIndices,
+  : SILClonerWithScopes<PromotedParamCloner>(*initCloned(Orig,
+                                                     PromotedParamIndices,
                                                      ClonedName)),
-    Orig(Orig), DeadParamIndices(DeadParamIndices) {
+    Orig(Orig), PromotedParamIndices(PromotedParamIndices) {
   assert(Orig->getDebugScope()->SILFn != getCloned()->getDebugScope()->SILFn);
 }
 
 static void getClonedName(SILFunction *F,
-                          ParamIndexList &DeadParamIndices,
+                          ParamIndexList &PromotedParamIndices,
                           llvm::SmallString<64> &Name) {
   llvm::raw_svector_ostream buffer(Name);
   Mangle::Mangler M(buffer);
   auto P = Mangle::SpecializationPass::AllocBoxToStack;
   Mangle::FunctionSignatureSpecializationMangler FSSM(P, M, F);
-  for (unsigned i : DeadParamIndices)
-    FSSM.setArgumentDead(i);
+  for (unsigned i : PromotedParamIndices)
+    FSSM.setArgumentBoxToStack(i);
   FSSM.mangle();
 }
 
 /// \brief Create the function corresponding to the clone of the
-/// original closure with the signature modified to reflect removed
-/// parameters (which are specified by DeadParamIndices).
+/// original closure with the signature modified to reflect promoted
+/// parameters (which are specified by PromotedParamIndices).
 SILFunction*
-DeadParamCloner::initCloned(SILFunction *Orig,
-                            ParamIndexList &DeadParamIndices,
+PromotedParamCloner::initCloned(SILFunction *Orig,
+                            ParamIndexList &PromotedParamIndices,
                             llvm::StringRef ClonedName) {
   SILModule &M = Orig->getModule();
 
@@ -528,13 +532,21 @@ DeadParamCloner::initCloned(SILFunction *Orig,
   SILFunctionType *OrigFTI = Orig->getLoweredFunctionType();
   unsigned Index = 0;
   for (auto &param : OrigFTI->getParameters()) {
-    if (!std::count(DeadParamIndices.begin(), DeadParamIndices.end(), Index))
+    if (std::count(PromotedParamIndices.begin(), PromotedParamIndices.end(),
+                   Index)) {
+      auto paramTy = param.getType()->castTo<SILBoxType>()
+        ->getBoxedAddressType();
+      auto promotedParam = SILParameterInfo(paramTy.getSwiftRValueType(),
+                                  ParameterConvention::Indirect_InoutAliasable);
+      ClonedInterfaceArgTys.push_back(promotedParam);
+    } else {
       ClonedInterfaceArgTys.push_back(param);
+    }
     ++Index;
   }
 
   // Create the new function type for the cloned function with some of
-  // the parameters removed.
+  // the parameters promoted.
   auto ClonedTy =
     SILFunctionType::get(OrigFTI->getGenericSignature(),
                          OrigFTI->getExtInfo(),
@@ -562,7 +574,7 @@ DeadParamCloner::initCloned(SILFunction *Orig,
 /// \brief Populate the body of the cloned closure, modifying instructions as
 /// necessary to take into consideration the removed parameters.
 void
-DeadParamCloner::populateCloned() {
+PromotedParamCloner::populateCloned() {
   SILFunction *Cloned = getCloned();
   SILModule &M = Cloned->getModule();
 
@@ -572,13 +584,27 @@ DeadParamCloner::populateCloned() {
   unsigned ArgNo = 0;
   auto I = OrigEntryBB->bbarg_begin(), E = OrigEntryBB->bbarg_end();
   while (I != E) {
-    if (!std::count(DeadParamIndices.begin(), DeadParamIndices.end(), ArgNo)) {
+    if (std::count(PromotedParamIndices.begin(),
+                   PromotedParamIndices.end(), ArgNo)) {
+      // Create a new argument with the promoted type.
+      auto promotedTy = (*I)->getType().castTo<SILBoxType>()
+        ->getBoxedAddressType();
+      auto promotedArg = new (M)
+        SILArgument(ClonedEntryBB, promotedTy, (*I)->getDecl());
+      PromotedParameters.insert(*I);
+      
+      // Map any projections of the box to the promoted argument.
+      for (auto use : (*I)->getUses()) {
+        if (auto project = dyn_cast<ProjectBoxInst>(use->getUser())) {
+          ValueMap.insert(std::make_pair(project, promotedArg));
+        }
+      }
+      
+    } else {
       // Create a new argument which copies the original argument.
       SILValue MappedValue =
         new (M) SILArgument(ClonedEntryBB, (*I)->getType(), (*I)->getDecl());
       ValueMap.insert(std::make_pair(*I, MappedValue));
-    } else {
-      DeadParameters.insert(SILValue(*I));
     }
     ++ArgNo;
     ++I;
@@ -602,21 +628,32 @@ DeadParamCloner::populateCloned() {
 /// a ReleaseValue of the new object type argument, otherwise it is handled
 /// normally.
 void
-DeadParamCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
-  // If it's a release of a dead parameter, just drop the instruction.
-  if (DeadParameters.count(Inst->getOperand()))
+PromotedParamCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
+  // If it's a release of a promoted parameter, just drop the instruction.
+  if (PromotedParameters.count(Inst->getOperand()))
     return;
 
-  SILCloner<DeadParamCloner>::visitStrongReleaseInst(Inst);
+  SILCloner<PromotedParamCloner>::visitStrongReleaseInst(Inst);
 }
 
 void
-DeadParamCloner::visitStrongRetainInst(StrongRetainInst *Inst) {
-  // If it's a retain of a dead parameter, just drop the instruction.
-  if (DeadParameters.count(Inst->getOperand()))
+PromotedParamCloner::visitStrongRetainInst(StrongRetainInst *Inst) {
+  // If it's a retain of a promoted parameter, just drop the instruction.
+  if (PromotedParameters.count(Inst->getOperand()))
     return;
 
-  SILCloner<DeadParamCloner>::visitStrongRetainInst(Inst);
+  SILCloner<PromotedParamCloner>::visitStrongRetainInst(Inst);
+}
+
+void
+PromotedParamCloner::visitProjectBoxInst(ProjectBoxInst *Inst) {
+  // If it's a projection of a promoted parameter, drop the instruction.
+  // Its uses will be replaced by the promoted address.
+  // and replace its uses with
+  if (PromotedParameters.count(Inst->getOperand()))
+    return;
+  
+  SILCloner<PromotedParamCloner>::visitProjectBoxInst(Inst);
 }
 
 static void emitStrongReleaseAfter(SILValue V, SILInstruction *I) {
@@ -655,19 +692,19 @@ LifetimeTracker::EndpointRange LifetimeTracker::getEndpoints() {
   return EndpointRange(Lifetime->LastUsers.begin(), Lifetime->LastUsers.end());
 }
 
-/// Specialize a partial_apply by removing the parameters indicated by
-/// indices. We expect these parameters to be either dead, or used
-/// only by retains and releases.
+/// Specialize a partial_apply by promoting the parameters indicated by
+/// indices. We expect these parameters to be replaced by stack address
+/// references.
 static PartialApplyInst *
 specializePartialApply(PartialApplyInst *PartialApply,
-                       ParamIndexList &DeadParamIndices) {
+                       ParamIndexList &PromotedParamIndices) {
   auto *FRI = cast<FunctionRefInst>(PartialApply->getCallee());
   assert(FRI && "Expected a direct partial_apply!");
   auto *F = FRI->getReferencedFunction();
   assert(F && "Expected a referenced function!");
 
   llvm::SmallString<64> ClonedName;
-  getClonedName(F, DeadParamIndices, ClonedName);
+  getClonedName(F, PromotedParamIndices, ClonedName);
 
   auto &M = PartialApply->getModule();
 
@@ -676,7 +713,7 @@ specializePartialApply(PartialApplyInst *PartialApply,
     ClonedFn = PrevFn;
   } else {
     // Clone the function the existing partial_apply references.
-    DeadParamCloner Cloner(F, DeadParamIndices, ClonedName);
+    PromotedParamCloner Cloner(F, PromotedParamIndices, ClonedName);
     Cloner.populateCloned();
     ClonedFn = Cloner.getCloned();
   }
@@ -686,10 +723,10 @@ specializePartialApply(PartialApplyInst *PartialApply,
 
   LifetimeTracker Lifetime(PartialApply);
 
-  // Only use the arguments that are not dead.
+  // Promote the arguments that need promotion.
   for (auto &O : PartialApply->getArgumentOperands()) {
     auto ParamIndex = getParameterIndexForOperand(&O);
-    if (!std::count(DeadParamIndices.begin(), DeadParamIndices.end(),
+    if (!std::count(PromotedParamIndices.begin(), PromotedParamIndices.end(),
                     ParamIndex)) {
       Args.push_back(O.get());
       continue;
@@ -697,13 +734,27 @@ specializePartialApply(PartialApplyInst *PartialApply,
 
     auto Endpoints = Lifetime.getEndpoints();
 
-    // If this argument is marked dead, it is a box that we're
-    // removing from the partial_apply because we've proven we can
-    // keep this value on the stack. The partial_apply has ownership
+    // If this argument is promoted, it is a box that we're
+    // turning into an address because we've proven we can
+    // keep this value on the stack. The partial_apply had ownership
     // of this box so we must now release it explicitly when the
     // partial_apply is released.
-    assert(cast<AllocBoxInst>(O.get())->getContainerResult() == O.get() &&
-           "Expected dead param to be an alloc_box container!");
+    auto box = cast<AllocBoxInst>(O.get());
+    assert(box->getContainerResult() == O.get() &&
+           "Expected promoted param to be an alloc_box container!");
+
+    // If the box address has a MUI, route accesses through it so DI still
+    // works.
+    auto promoted = box->getAddressResult();
+    for (auto use : promoted->getUses()) {
+      if (auto MUI = dyn_cast<MarkUninitializedInst>(use->getUser())) {
+        assert(promoted.hasOneUse() && "box value used by mark_uninitialized"
+               " but not exclusively!");
+        promoted = MUI;
+        break;
+      }
+    }
+    Args.push_back(promoted);
 
     // If the partial_apply is dead, insert a release after it.
     if (Endpoints.begin() == Endpoints.end()) {
@@ -737,13 +788,13 @@ specializePartialApply(PartialApplyInst *PartialApply,
 }
 
 static void
-rewritePartialApplies(llvm::SmallVectorImpl<Operand *> &ElidedOperands) {
+rewritePartialApplies(llvm::SmallVectorImpl<Operand *> &PromotedOperands) {
   llvm::DenseMap<PartialApplyInst *, ParamIndexList> IndexMap;
   ParamIndexList Indices;
 
   // Build a map from partial_apply to the indices of the operands
-  // that will not be in our rewritten version.
-  for (auto *O : ElidedOperands) {
+  // that will be promoted in our rewritten version.
+  for (auto *O : PromotedOperands) {
     auto ParamIndexNumber = getParameterIndexForOperand(O);
 
     Indices.clear();
@@ -783,11 +834,11 @@ rewritePartialApplies(llvm::SmallVectorImpl<Operand *> &ElidedOperands) {
 
 static unsigned
 rewritePromotedBoxes(llvm::SmallVectorImpl<AllocBoxInst *> &Promoted,
-                     llvm::SmallVectorImpl<Operand *> &ElidedOperands,
+                     llvm::SmallVectorImpl<Operand *> &PromotedOperands,
                      llvm::SmallVectorImpl<TermInst *> &Returns) {
   // First we'll rewrite any partial applies that we can to remove the
   // box container pointer from the operands.
-  rewritePartialApplies(ElidedOperands);
+  rewritePartialApplies(PromotedOperands);
 
   unsigned Count = 0;
   auto rend = Promoted.rend();
@@ -806,7 +857,7 @@ class AllocBoxToStack : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     llvm::SmallVector<AllocBoxInst *, 8> Promotable;
-    llvm::SmallVector<Operand *, 8> ElidedOperands;
+    llvm::SmallVector<Operand *, 8> PromotedOperands;
     llvm::SmallVector<TermInst *, 8> Returns;
 
     for (auto &BB : *getFunction()) {
@@ -818,12 +869,12 @@ class AllocBoxToStack : public SILFunctionTransform {
 
       for (auto &I : BB)
         if (auto *ABI = dyn_cast<AllocBoxInst>(&I))
-          if (canPromoteAllocBox(ABI, ElidedOperands))
+          if (canPromoteAllocBox(ABI, PromotedOperands))
             Promotable.push_back(ABI);
     }
 
     if (!Promotable.empty()) {
-      auto Count = rewritePromotedBoxes(Promotable, ElidedOperands, Returns);
+      auto Count = rewritePromotedBoxes(Promotable, PromotedOperands, Returns);
       NumStackPromoted += Count;
       
       // TODO: Update the call graph instead of invalidating it.

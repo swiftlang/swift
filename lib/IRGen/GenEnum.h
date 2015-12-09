@@ -28,6 +28,7 @@ namespace swift {
   
 namespace irgen {
   class EnumPayload;
+  class EnumPayloadSchema;
   class IRGenFunction;
   class TypeConverter;
 
@@ -83,6 +84,12 @@ void emitStoreEnumTagToAddress(IRGenFunction &IGF,
 APInt
 interleaveSpareBits(IRGenModule &IGM, const SpareBitVector &spareBits,
                     unsigned bits, unsigned spareValue, unsigned occupiedValue);
+
+/// A version of the above where the tag value is dynamic.
+EnumPayload interleaveSpareBits(IRGenFunction &IGF,
+                                const EnumPayloadSchema &schema,
+                                const SpareBitVector &spareBitVector,
+                                llvm::Value *value);
 
 /// Gather spare bits into the low bits of a smaller integer value.
 llvm::Value *emitGatherSpareBits(IRGenFunction &IGF,
@@ -223,7 +230,7 @@ public:
   /// \group Indirect enum operations
   
   /// Return the enum case tag for the given value. Payload cases come first,
-  /// followed by non-payload cases.
+  /// followed by non-payload cases. Used for the getEnumTag value witness.
   virtual llvm::Value *emitGetEnumTag(IRGenFunction &IGF,
                                       SILType T,
                                       Address enumAddr) const = 0;
@@ -242,11 +249,20 @@ public:
                         Address enumAddr,
                         EnumElementDecl *elt) const = 0;
   
+  /// Overlay a dynamic case tag onto a data value in memory. Used when
+  /// generating the destructiveInjectEnumTag value witness.
+  virtual void emitStoreTag(IRGenFunction &IGF,
+                            SILType T,
+                            Address enumAddr,
+                            llvm::Value *tag) const = 0;
+  
   /// Clears tag bits from within the payload of an enum in memory and
   /// projects the address of the data for a case. Does not check
   /// the referenced enum value.
   /// Performs the block argument binding for a SIL
   /// 'switch_enum_addr' instruction.
+  /// Also used when generating the destructiveProjectEnumData value
+  /// witness.
   Address destructiveProjectDataForLoad(IRGenFunction &IGF,
                                         SILType T,
                                         Address enumAddr,

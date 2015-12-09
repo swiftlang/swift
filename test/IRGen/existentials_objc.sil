@@ -66,17 +66,25 @@ protocol CP: class {}
 // CHECK-DAG: define { %objc_object*, i8** } @class_existential_unowned(%objc_object*, i8**) {{.*}} {
 sil @class_existential_unowned : $@convention(thin) (@owned CP) -> @owned CP {
 entry(%s : $CP):
-  %u = ref_to_unowned %s : $CP to $@sil_unowned CP
-  // CHECK: call void @swift_unknownUnownedRetain(%objc_object* %0)
-  unowned_retain %u : $@sil_unowned CP
-  // CHECK: call void @swift_unknownUnownedRelease(%objc_object* %0)
-  unowned_release %u : $@sil_unowned CP
+  %u1 = alloc_stack $@sil_unowned CP
+  %u2 = alloc_stack $@sil_unowned CP
+  // CHECK: [[U1:%.*]] = alloca [[UREF:{ %swift.unowned, i8.. }]], align 8
+  // CHECK: [[U2:%.*]] = alloca [[UREF]], align 8
 
-  // CHECK: call void @swift_unknownUnownedRetainStrong(%objc_object* %0)
-  strong_retain_unowned %u : $@sil_unowned CP
-  %t = unowned_to_ref %u : $@sil_unowned CP to $CP
-  // CHECK: call void @swift_unknownRelease(%objc_object* %0)
+  store_unowned %s to [initialization] %u1#1 : $*@sil_unowned CP
+  // CHECK: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[U1]], i32 0, i32 1
+  // CHECK: store i8** %1, i8*** [[T0]], align 8
+  // CHECK: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[U1]], i32 0, i32 0
+  // CHECK: call void @swift_unknownUnownedInit(%swift.unowned* [[T0]], %objc_object* %0)
+
+  // CHECK: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[U1]], i32 0, i32 0
+  // CHECK: [[T1:%.*]] = call %objc_object* @swift_unknownUnownedLoadStrong(%swift.unowned* [[T0]])
+  %t = load_unowned %u1#1 : $*@sil_unowned CP
+  // CHECK: call void @swift_unknownRelease(%objc_object* [[T1]])
   strong_release %t : $CP
+
+  dealloc_stack %u2#0 : $*@local_storage @sil_unowned CP
+  dealloc_stack %u1#0 : $*@local_storage @sil_unowned CP
 
   %v = ref_to_unmanaged %s : $CP to $@sil_unmanaged CP
   %z = unmanaged_to_ref %v : $@sil_unmanaged CP to $CP

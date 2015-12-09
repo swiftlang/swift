@@ -28,7 +28,7 @@ class A {
 // CHECK-NEXT: br
 //   Continuation.
 // CHECK:      bb3([[T0:%.*]] : $Optional<NSString>):
-// CHECK-NEXT: autorelease_return [[T0]]
+// CHECK-NEXT: return [[T0]]
 
   @objc func bar(x x : String?) {}
 // CHECK-LABEL:    sil hidden [thunk] @_TToFC8optional1A3barfT1xGSqSS__T_ : $@convention(objc_method) (Optional<NSString>, A) -> ()

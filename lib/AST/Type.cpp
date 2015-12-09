@@ -3137,3 +3137,99 @@ bool Type::isPrivateStdlibType(bool whitelistProtocols) const {
 
   return false;
 }
+
+bool UnownedStorageType::isLoadable(ResilienceExpansion resilience) const {
+  return getReferentType()->usesNativeReferenceCounting(resilience);
+}
+
+static bool doesOpaqueClassUseNativeReferenceCounting(const ASTContext &ctx) {
+  return !ctx.LangOpts.EnableObjCInterop;
+}
+
+static bool usesNativeReferenceCounting(ClassDecl *theClass,
+                                        ResilienceExpansion resilience) {
+  // NOTE: if you change this, change irgen::getReferenceCountingForClass.
+  // TODO: Resilience? there might be some legal avenue of changing this.
+  while (Type supertype = theClass->getSuperclass()) {
+    theClass = supertype->getClassOrBoundGenericClass();
+    assert(theClass);
+  }
+  return !theClass->hasClangNode();
+}
+
+bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
+  assert(allowsOwnership());
+
+  CanType type = getCanonicalType();
+  switch (type->getKind()) {
+#define SUGARED_TYPE(id, parent) case TypeKind::id:
+#define TYPE(id, parent)
+#include "swift/AST/TypeNodes.def"
+    llvm_unreachable("sugared canonical type?");
+
+  case TypeKind::BuiltinNativeObject:
+  case TypeKind::SILBox:
+    return true;
+
+  case TypeKind::BuiltinUnknownObject:
+  case TypeKind::BuiltinBridgeObject:
+    return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
+
+  case TypeKind::Class:
+    return ::usesNativeReferenceCounting(cast<ClassType>(type)->getDecl(),
+                                         resilience);
+  case TypeKind::BoundGenericClass:
+    return ::usesNativeReferenceCounting(
+                                  cast<BoundGenericClassType>(type)->getDecl(),
+                                         resilience);
+
+  case TypeKind::DynamicSelf:
+    return cast<DynamicSelfType>(type).getSelfType()
+             ->usesNativeReferenceCounting(resilience);
+
+  case TypeKind::Archetype: {
+    auto archetype = cast<ArchetypeType>(type);
+    assert(archetype->requiresClass());
+    if (auto supertype = archetype->getSuperclass())
+      return supertype->usesNativeReferenceCounting(resilience);
+    return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
+  }
+
+  case TypeKind::Protocol:
+  case TypeKind::ProtocolComposition:
+    return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
+
+  case TypeKind::UnboundGeneric:
+  case TypeKind::Function:
+  case TypeKind::PolymorphicFunction:
+  case TypeKind::GenericFunction:
+  case TypeKind::SILFunction:
+  case TypeKind::SILBlockStorage:
+  case TypeKind::Error:
+  case TypeKind::Unresolved:
+  case TypeKind::BuiltinInteger:
+  case TypeKind::BuiltinFloat:
+  case TypeKind::BuiltinRawPointer:
+  case TypeKind::BuiltinUnsafeValueBuffer:
+  case TypeKind::BuiltinVector:
+  case TypeKind::Tuple:
+  case TypeKind::Enum:
+  case TypeKind::Struct:
+  case TypeKind::Metatype:
+  case TypeKind::ExistentialMetatype:
+  case TypeKind::Module:
+  case TypeKind::LValue:
+  case TypeKind::InOut:
+  case TypeKind::TypeVariable:
+  case TypeKind::BoundGenericEnum:
+  case TypeKind::BoundGenericStruct:
+  case TypeKind::UnownedStorage:
+  case TypeKind::UnmanagedStorage:
+  case TypeKind::WeakStorage:
+  case TypeKind::GenericTypeParam:
+  case TypeKind::DependentMember:
+    llvm_unreachable("type is not a class reference");
+  }
+
+  llvm_unreachable("Unhandled type kind!");
+}

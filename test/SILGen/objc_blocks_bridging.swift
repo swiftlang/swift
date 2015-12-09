@@ -115,14 +115,14 @@ func clearDraggingItemImageComponentsProvider(x: NSDraggingItem) {
 // CHECK:         [[CONVERT:%.*]] = function_ref @_TF10Foundation22_convertArrayToNSArray
 // CHECK:         [[CONVERTED:%.*]] = apply [[CONVERT]]
 // CHECK:         [[OPTIONAL:%.*]] = enum $Optional<NSArray>, #Optional.Some!enumelt.1, [[CONVERTED]]
-// CHECK:         autorelease_return [[OPTIONAL]]
+// CHECK:         return [[OPTIONAL]]
 
 // CHECK-LABEL: sil hidden @{{.*}}bridgeNonnullBlockResult{{.*}}
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__oSS_XFdCb__aGSqCSo8NSString__
 // CHECK:         [[CONVERT:%.*]] = function_ref @swift_StringToNSString
 // CHECK:         [[BRIDGED:%.*]] = apply [[CONVERT]]
 // CHECK:         [[OPTIONAL_BRIDGED:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[BRIDGED]]
-// CHECK:         autorelease_return [[OPTIONAL_BRIDGED]]
+// CHECK:         return [[OPTIONAL_BRIDGED]]
 func bridgeNonnullBlockResult() {
   nonnullStringBlockResult { return "test" }
 }
