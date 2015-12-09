@@ -116,7 +116,7 @@ void MemLocation::expand(MemLocation &Base, SILModule *M, MemLocationList &Locs,
   if (TECache.find(BaseTy) == TECache.end()) {
     // There is no cached expansion for this type, build and cache it now.
     ProjectionPathList Paths;
-    ProjectionPath::expandTypeIntoNodeProjectionPaths(BaseTy, M, Paths);
+    ProjectionPath::expandTypeIntoLeafProjectionPaths(BaseTy, M, Paths);
     for (auto &P : Paths) {
       TECache[BaseTy].push_back(std::move(P.getValue()));
     }
@@ -178,7 +178,7 @@ void MemLocation::expandWithValues(MemLocation &Base, SILValue &Val,
   // projection paths from the accessed type to each indivisible field, i.e.
   // leaf nodes, then we append these projection paths to the Base.
   ProjectionPathList Paths;
-  ProjectionPath::expandTypeIntoNodeProjectionPaths(Base.getType(), Mod,
+  ProjectionPath::expandTypeIntoLeafProjectionPaths(Base.getType(), Mod,
                                                     Paths);
 
   // Construct the MemLocation and LoadStoreValues by appending the projection
