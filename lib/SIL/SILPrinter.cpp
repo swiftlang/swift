@@ -872,7 +872,20 @@ public:
   void visitDebugValueAddrInst(DebugValueAddrInst *DVAI) {
     *this << "debug_value_addr " << getIDAndType(DVAI->getOperand());
     printVarDeclComment(DVAI);
-}
+  }
+
+  void visitLoadUnownedInst(LoadUnownedInst *LI) {
+    *this << "load_unowned ";
+    if (LI->isTake())
+      *this << "[take] ";
+    *this << getIDAndType(LI->getOperand());
+  }
+  void visitStoreUnownedInst(StoreUnownedInst *SI) {
+    *this << "store_unowned " << getID(SI->getSrc()) << " to ";
+    if (SI->isInitializationOfDest())
+      *this << "[initialization] ";
+    *this << getIDAndType(SI->getDest());
+  }
 
   void visitLoadWeakInst(LoadWeakInst *LI) {
     *this << "load_weak ";
@@ -886,6 +899,7 @@ public:
       *this << "[initialization] ";
     *this << getIDAndType(SI->getDest());
   }
+
   void visitCopyAddrInst(CopyAddrInst *CI) {
     *this << "copy_addr ";
     if (CI->isTakeOfSrc())

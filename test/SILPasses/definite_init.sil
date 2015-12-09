@@ -143,7 +143,7 @@ bb0(%0 : $*T, %1 : $*T):
 
 
 sil @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
-sil @closure0 : $@convention(thin) (@owned @box Int, @inout Int) -> ()
+sil @closure0 : $@convention(thin) (@owned @box Int) -> ()
 
 // CHECK-LABEL: sil @closure_test
 sil @closure_test : $@convention(thin) () -> () {
@@ -152,9 +152,10 @@ bb0:
   %0 = mark_uninitialized [var] %1#1 : $*Int // expected-note {{variable defined here}}
 
   %5 = function_ref @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
-  %6 = function_ref @closure0 : $@convention(thin) (@owned @box Int, @inout Int) -> ()
+  %6 = function_ref @closure0 : $@convention(thin) (@owned @box Int) -> ()
   strong_retain %1#0 : $@box Int
-  %8 = partial_apply %6(%1#0, %0) : $@convention(thin) (@owned @box Int, @inout Int) -> ()  // expected-error {{variable '<unknown>' captured by a closure before being initialized}}
+  mark_function_escape %0 : $*Int // expected-error {{variable '<unknown>' used by function definition before being initialized}}
+  %8 = partial_apply %6(%1#0) : $@convention(thin) (@owned @box Int) -> ()  
   %9 = apply %5(%8) : $@convention(thin) (@callee_owned () -> ()) -> ()
   strong_release %1#0 : $@box Int
 

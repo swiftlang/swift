@@ -5,3 +5,5 @@
 // REQUIRES: objc_interop
 
 // CHECK-NOT: Unknown
+
+// REQUIRES: rdar://23805004

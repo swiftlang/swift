@@ -674,7 +674,7 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW
 //===----------------------------------------------------------------------===//
 
 func isNativeArray<Element>(a: Array<Element>) -> Bool {
-  return a._getArrayPropertyIsNative()
+  return a._hoistableIsNativeTypeChecked()
 }
 
 func isCocoaArray<Element>(a: Array<Element>) -> Bool {

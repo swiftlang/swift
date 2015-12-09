@@ -99,6 +99,7 @@ public:
       return std::move(gen.emitManagedRetain(loc, arg));
 
     case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_InoutAliasable:
       // An inout parameter is +0 and guaranteed, but represents an lvalue.
       return ManagedValue::forLValue(arg);
 
@@ -470,13 +471,13 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
   }
 
   case CaptureKind::Box: {
-    // LValues are captured as two arguments: a retained NativeObject that owns
-    // the captured value, and the address of the value itself.
+    // LValues are captured as a retained @box that owns
+    // the captured value.
     SILType ty = gen.getLoweredType(type).getAddressType();
     SILType boxTy = SILType::getPrimitiveObjectType(
       SILBoxType::get(ty.getSwiftRValueType()));
     SILValue box = new (gen.SGM.M) SILArgument(gen.F.begin(), boxTy, VD);
-    SILValue addr = new (gen.SGM.M) SILArgument(gen.F.begin(), ty, VD);
+    SILValue addr = gen.B.createProjectBox(VD, box);
     gen.VarLocs[VD] = SILGenFunction::VarLoc::get(addr, box);
     gen.B.createDebugValueAddr(Loc, addr, ArgNo);
     gen.Cleanups.pushCleanup<StrongReleaseCleanup>(box);

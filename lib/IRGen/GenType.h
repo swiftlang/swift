@@ -158,10 +158,10 @@ public:
                                                    Alignment storageAlign);
   const LoadableTypeInfo &getMetatypeTypeInfo(MetatypeRepresentation representation);
 
-  const WeakTypeInfo *createSwiftWeakStorageType(llvm::Type *valueType);
-  const UnownedTypeInfo *createSwiftUnownedStorageType(llvm::Type *valueType);
-  const WeakTypeInfo *createUnknownWeakStorageType(llvm::Type *valueType);
-  const UnownedTypeInfo *createUnknownUnownedStorageType(llvm::Type *valueType);
+  const WeakTypeInfo *createWeakStorageType(llvm::Type *valueType,
+                                            ReferenceCounting style);
+  const TypeInfo *createUnownedStorageType(llvm::Type *valueType,
+                                           ReferenceCounting style);
   const LoadableTypeInfo *createUnmanagedStorageType(llvm::Type *valueType);
 
   /// Enter a generic context for lowering the parameters of a generic function

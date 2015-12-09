@@ -108,19 +108,27 @@ valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
 ///
 /// TODO: This really needs a better name.
 class ConsumedArgToEpilogueReleaseMatcher {
+public:
+  enum class ExitKind { Return, Throw };
+
+private:
+  SILFunction *F;
+  RCIdentityFunctionInfo *RCFI;
+  ExitKind Kind;
   llvm::SmallMapVector<SILArgument *, SILInstruction *, 8> ArgInstMap;
+  bool HasBlock = false;
 
 public:
-  /// Default constructor: does not find matching releases, so
-  /// findMatchingReleases should be called explicitly.
-  ConsumedArgToEpilogueReleaseMatcher() { }
 
   /// Finds matching releases in the return block of the function \p F.
-  ConsumedArgToEpilogueReleaseMatcher(RCIdentityFunctionInfo *RCIA,
-                                      SILFunction *F);
+  ConsumedArgToEpilogueReleaseMatcher(RCIdentityFunctionInfo *RCFI,
+                                      SILFunction *F,
+                                      ExitKind Kind = ExitKind::Return);
 
   /// Finds matching releases in the provided block \p BB.
-  void findMatchingReleases(RCIdentityFunctionInfo *RCIA, SILBasicBlock *BB);
+  void findMatchingReleases(SILBasicBlock *BB);
+
+  bool hasBlock() const { return HasBlock; }
 
   bool argumentHasRelease(SILArgument *Arg) const {
     return ArgInstMap.find(Arg) != ArgInstMap.end();
@@ -139,6 +147,16 @@ public:
       return nullptr;
     return I->second;
   }
+
+  SILInstruction *releaseForArgument(SILValue V) const {
+    auto *Arg = dyn_cast<SILArgument>(V);
+    if (!Arg)
+      return nullptr;
+    return releaseForArgument(Arg);
+  }
+
+  /// Recompute the mapping from argument to consumed arg.
+  void recompute();
 
   bool isReleaseMatchedToArgument(SILInstruction *Inst) const {
     auto Pred = [&Inst](const std::pair<SILArgument *,
@@ -198,6 +216,9 @@ public:
 /// false otherwise. The FinalRelease set is placed in the out parameter
 /// FinalRelease.
 bool getFinalReleasesForValue(SILValue Value, ReleaseTracker &Tracker);
+
+/// Match a call to a trap BB with no ARC relevant side effects.
+bool isARCInertTrapBB(const SILBasicBlock *BB);
 
 } // end namespace swift
 

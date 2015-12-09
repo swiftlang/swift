@@ -73,11 +73,13 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::FunctionRefInst:
   case ValueKind::IntegerLiteralInst:
   case ValueKind::LoadInst:
+  case ValueKind::LoadUnownedInst:
   case ValueKind::LoadWeakInst:
   case ValueKind::MetatypeInst:
   case ValueKind::ObjCProtocolInst:
   case ValueKind::GlobalAddrInst:
   case ValueKind::StoreInst:
+  case ValueKind::StoreUnownedInst:
   case ValueKind::StoreWeakInst:
   case ValueKind::StringLiteralInst:
   case ValueKind::CopyBlockInst:

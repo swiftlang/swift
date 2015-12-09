@@ -88,10 +88,6 @@ extension _ArrayBuffer {
     _storage = _ArrayBridgeStorage(native: source._storage)
   }
 
-  var arrayPropertyIsNative : Bool {
-    return _isNative
-  }
-
   /// `true`, if the array is native and does not need a deferred type check.
   var arrayPropertyIsNativeTypeChecked : Bool {
     return _isNativeTypeChecked

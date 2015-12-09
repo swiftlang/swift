@@ -46,14 +46,6 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
         << " and " << getSecondType().getString();
     break;
 
-  case MissingArgument:
-    out << "missing argument for parameter " << getValue();
-    break;
-
-  case ExtraArgument:
-    out << "extra argument " << getValue();
-    break;
-
   case NoPublicInitializers:
     out << getFirstType().getString()
         << " does not have any public initializers";
@@ -642,46 +634,7 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
     }
     // FIXME: diagnose other cases
     return false;
-
-  case Failure::MissingArgument: {
-    Identifier name;
-    unsigned idx = failure.getValue();
-    if (auto tupleTy = failure.getFirstType()->getAs<TupleType>()) {
-      name = tupleTy->getElement(idx).getName();
-    } else {
-      // Scalar.
-      assert(idx == 0);
-    }
-
-    if (name.empty())
-      tc.diagnose(loc, diag::missing_argument_positional, idx+1);
-    else
-      tc.diagnose(loc, diag::missing_argument_named, name);
-    return true;
-  }
     
-  case Failure::ExtraArgument: {
-    if (auto tuple = dyn_cast_or_null<TupleExpr>(anchor)) {
-      unsigned firstIdx = failure.getValue();
-      auto name = tuple->getElementName(firstIdx);
-      Expr *arg = tuple->getElement(firstIdx);
-      
-      if (firstIdx == tuple->getNumElements()-1 &&
-          tuple->hasTrailingClosure())
-        tc.diagnose(arg->getLoc(), diag::extra_trailing_closure_in_call)
-          .highlight(arg->getSourceRange());
-      else if (name.empty())
-        tc.diagnose(loc, diag::extra_argument_positional)
-          .highlight(arg->getSourceRange());
-      else
-        tc.diagnose(loc, diag::extra_argument_named, name)
-          .highlight(arg->getSourceRange());
-      return true;
-    }
-
-    return false;
-  }
-      
   case Failure::NoPublicInitializers: {
     tc.diagnose(loc, diag::no_accessible_initializers, failure.getFirstType())
       .highlight(range);
@@ -1237,6 +1190,11 @@ namespace {
     /// overloads.
     void suggestPotentialOverloads(SourceLoc loc, bool isResult = false);
 
+    /// If the candidate set has been narrowed down to a specific structural
+    /// problem, e.g. that there are too few parameters specified or that
+    /// argument labels don't match up, diagnose that error and return true.
+    bool diagnoseAnyStructuralArgumentError(Expr *argExpr);
+    
     void dump() const LLVM_ATTRIBUTE_USED;
     
   private:
@@ -1731,6 +1689,140 @@ suggestPotentialOverloads(SourceLoc loc, bool isResult) {
                     suggestionText);
   }
 }
+
+
+/// If the candidate set has been narrowed down to a specific structural
+/// problem, e.g. that there are too few parameters specified or that argument
+/// labels don't match up, diagnose that error and return true.
+bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *argExpr) {
+  // TODO: We only handle the situation where there is exactly one candidate
+  // here.
+  if (size() != 1) return false;
+  
+  // We only handle structural errors here.
+  if (closeness != CC_ArgumentLabelMismatch &&
+      closeness != CC_ArgumentCountMismatch)
+    return false;
+    
+  auto args = decomposeArgParamType(argExpr->getType());
+  SmallVector<Identifier, 4> correctNames;
+  unsigned OOOArgIdx = ~0U, OOOPrevArgIdx = ~0U;
+  unsigned extraArgIdx = ~0U, missingParamIdx = ~0U;
+  
+  // If we have a single candidate that failed to match the argument list,
+  // attempt to use matchCallArguments to diagnose the problem.
+  struct OurListener : public MatchCallArgumentListener {
+    SmallVectorImpl<Identifier> &correctNames;
+    unsigned &OOOArgIdx, &OOOPrevArgIdx;
+    unsigned &extraArgIdx, &missingParamIdx;
+    
+  public:
+    OurListener(SmallVectorImpl<Identifier> &correctNames,
+                unsigned &OOOArgIdx, unsigned &OOOPrevArgIdx,
+                unsigned &extraArgIdx, unsigned &missingParamIdx)
+    : correctNames(correctNames),
+    OOOArgIdx(OOOArgIdx), OOOPrevArgIdx(OOOPrevArgIdx),
+    extraArgIdx(extraArgIdx), missingParamIdx(missingParamIdx) {}
+    void extraArgument(unsigned argIdx) override {
+      extraArgIdx = argIdx;
+    }
+    void missingArgument(unsigned paramIdx) override {
+      missingParamIdx = paramIdx;
+    }
+    void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override{
+      OOOArgIdx = argIdx;
+      OOOPrevArgIdx = prevArgIdx;
+    }
+    bool relabelArguments(ArrayRef<Identifier> newNames) override {
+      correctNames.append(newNames.begin(), newNames.end());
+      return true;
+    }
+  } listener(correctNames, OOOArgIdx, OOOPrevArgIdx,
+             extraArgIdx, missingParamIdx);
+  
+  // Use matchCallArguments to determine how close the argument list is (in
+  // shape) to the specified candidates parameters.  This ignores the
+  // concrete types of the arguments, looking only at the argument labels.
+  SmallVector<ParamBinding, 4> paramBindings;
+  auto params = decomposeArgParamType(candidates[0].getArgumentType());
+  if (!matchCallArguments(args, params, hasTrailingClosure,
+                          /*allowFixes:*/true, listener, paramBindings))
+    return false;
+  
+  
+  // If we are missing an parameter, diagnose that.
+  if (missingParamIdx != ~0U) {
+    Identifier name = params[missingParamIdx].Label;
+    auto loc = argExpr->getStartLoc();
+    if (name.empty())
+      CS->TC.diagnose(loc, diag::missing_argument_positional,
+                      missingParamIdx+1);
+    else
+      CS->TC.diagnose(loc, diag::missing_argument_named, name);
+    return true;
+  }
+  
+  if (extraArgIdx != ~0U) {
+    auto name = args[extraArgIdx].Label;
+    Expr *arg = argExpr;
+    auto tuple = dyn_cast<TupleExpr>(argExpr);
+    if (tuple)
+      arg = tuple->getElement(extraArgIdx);
+    auto loc = arg->getLoc();
+    if (tuple && extraArgIdx == tuple->getNumElements()-1 &&
+        tuple->hasTrailingClosure())
+      CS->TC.diagnose(loc, diag::extra_trailing_closure_in_call)
+        .highlight(arg->getSourceRange());
+    else if (params.empty())
+      CS->TC.diagnose(loc, diag::extra_argument_to_nullary_call)
+        .highlight(argExpr->getSourceRange());
+    else if (name.empty())
+      CS->TC.diagnose(loc, diag::extra_argument_positional)
+        .highlight(arg->getSourceRange());
+    else
+      CS->TC.diagnose(loc, diag::extra_argument_named, name)
+        .highlight(arg->getSourceRange());
+    return true;
+  }
+  
+  // If this is an argument label mismatch, then diagnose that error now.
+  if (!correctNames.empty() &&
+      CS->diagnoseArgumentLabelError(argExpr, correctNames,
+                                     /*isSubscript=*/false))
+    return true;
+  
+  // If we have an out-of-order argument, diagnose it as such.
+  if (OOOArgIdx != ~0U && isa<TupleExpr>(argExpr)) {
+    auto tuple = cast<TupleExpr>(argExpr);
+    Identifier first = tuple->getElementName(OOOArgIdx);
+    Identifier second = tuple->getElementName(OOOPrevArgIdx);
+    
+    SourceLoc diagLoc;
+    if (!first.empty())
+      diagLoc = tuple->getElementNameLoc(OOOArgIdx);
+    else
+      diagLoc = tuple->getElement(OOOArgIdx)->getStartLoc();
+    
+    if (!second.empty()) {
+      CS->TC.diagnose(diagLoc, diag::argument_out_of_order, first, second)
+        .highlight(tuple->getElement(OOOArgIdx)->getSourceRange())
+        .highlight(SourceRange(tuple->getElementNameLoc(OOOPrevArgIdx),
+                               tuple->getElement(OOOPrevArgIdx)->getEndLoc()));
+      return true;
+    }
+    
+    CS->TC.diagnose(diagLoc, diag::argument_out_of_order_named_unnamed, first,
+                    OOOPrevArgIdx)
+      .highlight(tuple->getElement(OOOArgIdx)->getSourceRange())
+      .highlight(tuple->getElement(OOOPrevArgIdx)->getSourceRange());
+    return true;
+  }
+  return false;
+}
+
+
+
+
 
 /// Flags that can be used to control name lookup.
 enum TCCFlags {
@@ -3552,7 +3644,9 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   
   // Filter the candidate list based on the argument we may or may not have.
   calleeInfo.filterContextualMemberList(callExpr->getArg());
-  
+
+  if (calleeInfo.diagnoseAnyStructuralArgumentError(callExpr->getArg()))
+    return true;
   
   Type argType;  // Type of the argument list, if knowable.
   if (auto FTy = fnType->getAs<AnyFunctionType>())
@@ -3576,82 +3670,8 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
 
   calleeInfo.filterList(argExpr->getType());
 
-
-  // If we filtered this down to exactly one candidate, see if we can produce
-  // an extremely specific error about it.
-  if (calleeInfo.size() == 1) {
-    if (calleeInfo.closeness == CC_ArgumentLabelMismatch) {
-      auto args = decomposeArgParamType(argExpr->getType());
-      SmallVector<Identifier, 4> correctNames;
-      unsigned OOOArgIdx = ~0U, OOOPrevArgIdx = ~0U;
-      
-      // If we have a single candidate that failed to match the argument list,
-      // attempt to use matchCallArguments to diagnose the problem.
-      struct OurListener : public MatchCallArgumentListener {
-        SmallVectorImpl<Identifier> &correctNames;
-        unsigned &OOOArgIdx, &OOOPrevArgIdx;
-
-      public:
-        OurListener(SmallVectorImpl<Identifier> &correctNames,
-                    unsigned &OOOArgIdx, unsigned &OOOPrevArgIdx)
-           : correctNames(correctNames),
-             OOOArgIdx(OOOArgIdx), OOOPrevArgIdx(OOOPrevArgIdx) {}
-        void extraArgument(unsigned argIdx) override {}
-        void missingArgument(unsigned paramIdx) override {}
-        void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override{
-          OOOArgIdx = argIdx;
-          OOOPrevArgIdx = prevArgIdx;
-        }
-        bool relabelArguments(ArrayRef<Identifier> newNames) override {
-          correctNames.append(newNames.begin(), newNames.end());
-          return true;
-        }
-      } listener(correctNames, OOOArgIdx, OOOPrevArgIdx);
-
-      // Use matchCallArguments to determine how close the argument list is (in
-      // shape) to the specified candidates parameters.  This ignores the
-      // concrete types of the arguments, looking only at the argument labels.
-      SmallVector<ParamBinding, 4> paramBindings;
-      auto params = decomposeArgParamType(calleeInfo[0].getArgumentType());
-      if (matchCallArguments(args, params, hasTrailingClosure,
-                             /*allowFixes:*/true, listener, paramBindings)) {
-       
-        // If this is a argument label mismatch, then diagnose that error now.
-        if (!correctNames.empty() &&
-            CS->diagnoseArgumentLabelError(argExpr, correctNames,
-                                           /*isSubscript=*/false))
-          return true;
-        
-        // If we have an out-of-order argument, diagnose it as such.
-        if (OOOArgIdx != ~0U && isa<TupleExpr>(callExpr->getArg())) {
-          auto tuple = cast<TupleExpr>(callExpr->getArg());
-          Identifier first = tuple->getElementName(OOOArgIdx);
-          Identifier second = tuple->getElementName(OOOPrevArgIdx);
-
-          SourceLoc diagLoc;
-          if (!first.empty())
-            diagLoc = tuple->getElementNameLoc(OOOArgIdx);
-          else
-            diagLoc = tuple->getElement(OOOArgIdx)->getStartLoc();
-          
-          if (!second.empty()) {
-            diagnose(diagLoc,
-                     diag::argument_out_of_order, first, second)
-            .highlight(tuple->getElement(OOOArgIdx)->getSourceRange())
-            .highlight(SourceRange(tuple->getElementNameLoc(OOOPrevArgIdx),
-                               tuple->getElement(OOOPrevArgIdx)->getEndLoc()));
-            return true;
-          }
-          
-          diagnose(diagLoc, diag::argument_out_of_order_named_unnamed, first,
-                   OOOPrevArgIdx)
-            .highlight(tuple->getElement(OOOArgIdx)->getSourceRange())
-            .highlight(tuple->getElement(OOOPrevArgIdx)->getSourceRange());
-          return true;
-        }
-      }
-    }
-  }
+  if (calleeInfo.diagnoseAnyStructuralArgumentError(argExpr))
+    return true;
 
   // If we have a failure where the candidate set differs on exactly one
   // argument, and where we have a consistent mismatch across the candidate set

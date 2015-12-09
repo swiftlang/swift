@@ -635,6 +635,39 @@ EnumPayload::emitApplyOrMask(IRGenFunction &IGF, APInt mask) {
   }
 }
 
+void
+EnumPayload::emitApplyOrMask(IRGenFunction &IGF,
+                             EnumPayload mask) {
+  unsigned count = PayloadValues.size();
+  assert(count == mask.PayloadValues.size());
+
+  auto &DL = IGF.IGM.DataLayout;
+  for (unsigned i = 0; i < count; i++ ) {
+    auto payloadTy = getPayloadType(PayloadValues[i]);
+    unsigned size = DL.getTypeSizeInBits(payloadTy);
+
+    auto payloadIntTy = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), size);
+
+    if (mask.PayloadValues[i].is<llvm::Type *>()) {
+      // We're ORing with zero, do nothing
+    } else if (PayloadValues[i].is<llvm::Type *>()) {
+      PayloadValues[i] = mask.PayloadValues[i];
+    } else {
+      auto v1 = IGF.Builder.CreateBitOrPointerCast(
+          PayloadValues[i].get<llvm::Value *>(),
+          payloadIntTy);
+
+      auto v2 = IGF.Builder.CreateBitOrPointerCast(
+          mask.PayloadValues[i].get<llvm::Value *>(),
+          payloadIntTy);
+
+      PayloadValues[i] = IGF.Builder.CreateBitOrPointerCast(
+          IGF.Builder.CreateOr(v1, v2),
+          payloadTy);
+    }
+  }
+}
+
 llvm::Value *
 EnumPayload::emitGatherSpareBits(IRGenFunction &IGF,
                                  const SpareBitVector &spareBits,

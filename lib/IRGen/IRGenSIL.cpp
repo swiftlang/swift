@@ -671,6 +671,8 @@ public:
   void visitStrongRetainUnownedInst(StrongRetainUnownedInst *i);
   void visitUnownedRetainInst(UnownedRetainInst *i);
   void visitUnownedReleaseInst(UnownedReleaseInst *i);
+  void visitLoadUnownedInst(LoadUnownedInst *i);
+  void visitStoreUnownedInst(StoreUnownedInst *i);
   void visitIsUniqueInst(IsUniqueInst *i);
   void visitIsUniqueOrPinnedInst(IsUniqueOrPinnedInst *i);
   void visitDeallocStackInst(DeallocStackInst *i);
@@ -3057,13 +3059,13 @@ void IRGenSILFunction::visitStrongUnpinInst(swift::StrongUnpinInst *i) {
 void IRGenSILFunction::visitStrongRetainInst(swift::StrongRetainInst *i) {
   Explosion lowered = getLoweredExplosion(i->getOperand());
   auto &ti = cast<ReferenceTypeInfo>(getTypeInfo(i->getOperand().getType()));
-  ti.retain(*this, lowered);
+  ti.strongRetain(*this, lowered);
 }
 
 void IRGenSILFunction::visitStrongReleaseInst(swift::StrongReleaseInst *i) {
   Explosion lowered = getLoweredExplosion(i->getOperand());
   auto &ti = cast<ReferenceTypeInfo>(getTypeInfo(i->getOperand().getType()));
-  ti.release(*this, lowered);
+  ti.strongRelease(*this, lowered);
 }
 
 void IRGenSILFunction::
@@ -3093,7 +3095,6 @@ visitStrongRetainAutoreleasedInst(swift::StrongRetainAutoreleasedInst *i) {
 /// info for the underlying reference type.
 static const ReferenceTypeInfo &getReferentTypeInfo(IRGenFunction &IGF,
                                                     SILType silType) {
-  assert(silType.isObject());
   auto type = silType.castTo<ReferenceStorageType>().getReferentType();
   return cast<ReferenceTypeInfo>(IGF.getTypeInfoForLowered(type));
 }
@@ -3102,7 +3103,7 @@ void IRGenSILFunction::
 visitStrongRetainUnownedInst(swift::StrongRetainUnownedInst *i) {
   Explosion lowered = getLoweredExplosion(i->getOperand());
   auto &ti = getReferentTypeInfo(*this, i->getOperand().getType());
-  ti.retainUnowned(*this, lowered);
+  ti.strongRetainUnowned(*this, lowered);
 }
 
 void IRGenSILFunction::visitUnownedRetainInst(swift::UnownedRetainInst *i) {
@@ -3111,11 +3112,36 @@ void IRGenSILFunction::visitUnownedRetainInst(swift::UnownedRetainInst *i) {
   ti.unownedRetain(*this, lowered);
 }
 
-
 void IRGenSILFunction::visitUnownedReleaseInst(swift::UnownedReleaseInst *i) {
   Explosion lowered = getLoweredExplosion(i->getOperand());
   auto &ti = getReferentTypeInfo(*this, i->getOperand().getType());
   ti.unownedRelease(*this, lowered);
+}
+
+void IRGenSILFunction::visitLoadUnownedInst(swift::LoadUnownedInst *i) {
+  Address source = getLoweredAddress(i->getOperand());
+  auto &ti = getReferentTypeInfo(*this, i->getOperand().getType());
+
+  Explosion result;
+  if (i->isTake()) {
+    ti.unownedTakeStrong(*this, source, result);
+  } else {
+    ti.unownedLoadStrong(*this, source, result);
+  }
+
+  setLoweredExplosion(SILValue(i, 0), result);
+}
+
+void IRGenSILFunction::visitStoreUnownedInst(swift::StoreUnownedInst *i) {
+  Explosion source = getLoweredExplosion(i->getSrc());
+  Address dest = getLoweredAddress(i->getDest());
+
+  auto &ti = getReferentTypeInfo(*this, i->getDest().getType());
+  if (i->isInitializationOfDest()) {
+    ti.unownedInit(*this, source, dest);
+  } else {
+    ti.unownedAssign(*this, source, dest);
+  }
 }
 
 static void requireRefCountedType(IRGenSILFunction &IGF,
@@ -3640,19 +3666,24 @@ static void trivialRefConversion(IRGenSILFunction &IGF,
     IGF.setLoweredExplosion(result, temp);
     return;
   }
-  
-  // Otherwise, do the conversion.
-  llvm::Value *value = temp.claimNext();
+
   auto schema = resultTI.getSchema();
-  assert(schema.size() == 1 && "not a single scalar type");
-  auto resultTy = schema.begin()->getScalarType();
-  if (resultTy->isPointerTy())
-    value = IGF.Builder.CreateIntToPtr(value, resultTy);
-  else
-    value = IGF.Builder.CreatePtrToInt(value, resultTy);
-  
   Explosion out;
-  out.add(value);
+
+  for (auto schemaElt : schema) {
+    auto resultTy = schemaElt.getScalarType();
+
+    llvm::Value *value = temp.claimNext();
+    if (value->getType() == resultTy) {
+      // Nothing to do.  This happens with the unowned conversions.
+    } else if (resultTy->isPointerTy()) {
+      value = IGF.Builder.CreateIntToPtr(value, resultTy);
+    } else {
+      value = IGF.Builder.CreatePtrToInt(value, resultTy);
+    }
+    out.add(value);
+  }
+  
   IGF.setLoweredExplosion(result, out);
 }
 

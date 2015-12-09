@@ -1677,6 +1677,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                             -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
                             -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
                             -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
+                            -DLLDB_ALLOW_STATIC_BINDINGS=1
                             "${LLDB_SOURCE_DIR}"
                         )
                         ;;
@@ -1694,6 +1695,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                             -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
                             -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
                             -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
+                            -DLLDB_ALLOW_STATIC_BINDINGS=1
                             "${LLDB_SOURCE_DIR}"
                         )
                         ;;

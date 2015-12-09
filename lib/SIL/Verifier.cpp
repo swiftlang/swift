@@ -975,6 +975,32 @@ public:
     require(Dest.getType().getObjectType() == Src.getType(),
             "Store operand type and dest type mismatch");
   }
+
+  void checkLoadUnownedInst(LoadUnownedInst *LUI) {
+    require(LUI->getType().isObject(), "Result of load must be an object");
+    auto PointerType = LUI->getOperand().getType();
+    auto PointerRVType = PointerType.getSwiftRValueType();
+    require(PointerType.isAddress() &&
+            PointerRVType->is<UnownedStorageType>(),
+            "load_unowned operand must be an unowned address");
+    require(PointerRVType->getReferenceStorageReferent()->getCanonicalType() ==
+            LUI->getType().getSwiftType(),
+            "Load operand type and result type mismatch");
+  }
+
+  void checkStoreUnownedInst(StoreUnownedInst *SUI) {
+    require(SUI->getSrc().getType().isObject(),
+            "Can't store from an address source");
+    auto PointerType = SUI->getDest().getType();
+    auto PointerRVType = PointerType.getSwiftRValueType();
+    require(PointerType.isAddress() &&
+            PointerRVType->is<UnownedStorageType>(),
+            "store_unowned address operand must be an unowned address");
+    require(PointerRVType->getReferenceStorageReferent()->getCanonicalType() ==
+            SUI->getSrc().getType().getSwiftType(),
+            "Store operand type and dest type mismatch");
+  }
+
   void checkLoadWeakInst(LoadWeakInst *LWI) {
     require(LWI->getType().isObject(), "Result of load must be an object");
     require(LWI->getType().getSwiftType()->getAnyOptionalObjectType(),
@@ -1297,16 +1323,22 @@ public:
     requireReferenceValue(RI->getOperand(), "Operand of release");
   }
   void checkStrongRetainUnownedInst(StrongRetainUnownedInst *RI) {
-    requireObjectType(UnownedStorageType, RI->getOperand(),
-                      "Operand of retain_unowned");
+    auto unownedType = requireObjectType(UnownedStorageType, RI->getOperand(),
+                                         "Operand of strong_retain_unowned");
+    require(unownedType->isLoadable(ResilienceExpansion::Maximal),
+            "strong_retain_unowned requires unowned type to be loadable");
   }
   void checkUnownedRetainInst(UnownedRetainInst *RI) {
-    requireObjectType(UnownedStorageType, RI->getOperand(),
-                      "Operand of unowned_retain");
+    auto unownedType = requireObjectType(UnownedStorageType, RI->getOperand(),
+                                          "Operand of unowned_retain");
+    require(unownedType->isLoadable(ResilienceExpansion::Maximal),
+            "unowned_retain requires unowned type to be loadable");
   }
   void checkUnownedReleaseInst(UnownedReleaseInst *RI) {
-    requireObjectType(UnownedStorageType, RI->getOperand(),
-                      "Operand of unowned_release");
+    auto unownedType = requireObjectType(UnownedStorageType, RI->getOperand(),
+                                         "Operand of unowned_release");
+    require(unownedType->isLoadable(ResilienceExpansion::Maximal),
+            "unowned_release requires unowned type to be loadable");
   }
   void checkDeallocStackInst(DeallocStackInst *DI) {
     require(DI->getOperand().getType().isLocalStorage(),
@@ -2055,6 +2087,8 @@ public:
     auto operandType = I->getOperand().getType().getSwiftRValueType();
     auto resultType = requireObjectType(UnownedStorageType, I,
                                         "Result of ref_to_unowned");
+    require(resultType->isLoadable(ResilienceExpansion::Maximal),
+            "ref_to_unowned requires unowned type to be loadable");
     require(resultType.getReferentType() == operandType,
             "Result of ref_to_unowned does not have the "
             "operand's type as its referent type");
@@ -2064,6 +2098,8 @@ public:
     auto operandType = requireObjectType(UnownedStorageType,
                                          I->getOperand(),
                                          "Operand of unowned_to_ref");
+    require(operandType->isLoadable(ResilienceExpansion::Maximal),
+            "unowned_to_ref requires unowned type to be loadable");
     requireReferenceStorageCapableValue(I, "Result of unowned_to_ref");
     auto resultType = I->getType().getSwiftRValueType();
     require(operandType.getReferentType() == resultType,
@@ -2662,8 +2698,10 @@ public:
     require(invokeTy->getParameters().size() >= 1,
             "invoke function must take at least one parameter");
     auto storageParam = invokeTy->getParameters()[0];
-    require(storageParam.getConvention() == ParameterConvention::Indirect_Inout,
-            "invoke function must take block storage as @inout parameter");
+    require(storageParam.getConvention() ==
+              ParameterConvention::Indirect_InoutAliasable,
+            "invoke function must take block storage as @inout_aliasable "
+            "parameter");
     require(storageParam.getType() == storageTy,
             "invoke function must take block storage type as first parameter");
     
@@ -2769,12 +2807,13 @@ public:
                            return false;
                          case ParameterConvention::Indirect_In:
                          case ParameterConvention::Indirect_Inout:
+                         case ParameterConvention::Indirect_InoutAliasable:
                          case ParameterConvention::Indirect_Out:
                          case ParameterConvention::Indirect_In_Guaranteed:
                            return true;
                          }
                        }),
-            "entry point address argument must have a nonaliasing calling "
+            "entry point address argument must have an indirect calling "
             "convention");
   }
 
