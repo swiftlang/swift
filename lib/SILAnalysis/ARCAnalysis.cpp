@@ -515,6 +515,8 @@ ConsumedArgToEpilogueReleaseMatcher::ConsumedArgToEpilogueReleaseMatcher(
 }
 
 void ConsumedArgToEpilogueReleaseMatcher::recompute() {
+  ArgInstMap.clear();
+
   // Find the return BB of F. If we fail, then bail.
   SILFunction::iterator BB;
   switch (Kind) {

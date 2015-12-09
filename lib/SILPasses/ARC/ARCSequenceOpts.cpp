@@ -192,9 +192,9 @@ processFunctionWithoutLoopSupport(SILFunction &F, bool FreezePostDomReleases,
 //===----------------------------------------------------------------------===//
 
 static bool processFunctionWithLoopSupport(
-    SILFunction &F, bool FreezePostDomReleases, AliasAnalysis *AA,
-    PostOrderAnalysis *POTA, LoopRegionFunctionInfo *LRFI, SILLoopInfo *LI,
-    RCIdentityFunctionInfo *RCFI, ProgramTerminationFunctionInfo *PTFI) {
+    SILFunction &F, AliasAnalysis *AA, PostOrderAnalysis *POTA,
+    LoopRegionFunctionInfo *LRFI, SILLoopInfo *LI, RCIdentityFunctionInfo *RCFI,
+    ProgramTerminationFunctionInfo *PTFI) {
   // GlobalARCOpts seems to be taking up a lot of compile time when running on
   // globalinit_func. Since that is not *that* interesting from an ARC
   // perspective (i.e. no ref count operations in a loop), disable it on such
@@ -205,7 +205,7 @@ static bool processFunctionWithLoopSupport(
   DEBUG(llvm::dbgs() << "***** Processing " << F.getName() << " *****\n");
 
   LoopARCPairingContext Context(F, AA, LRFI, LI, RCFI, PTFI);
-  return Context.process(FreezePostDomReleases);
+  return Context.process();
 }
 
 //===----------------------------------------------------------------------===//
@@ -256,9 +256,7 @@ class ARCSequenceOpts : public SILFunctionTransform {
     auto *LRFI = getAnalysis<LoopRegionAnalysis>()->get(F);
     auto *PTFI = getAnalysis<ProgramTerminationAnalysis>()->get(F);
 
-    if (processFunctionWithLoopSupport(*F, false, AA, POTA, LRFI, LI, RCFI,
-                                       PTFI)) {
-      processFunctionWithLoopSupport(*F, true, AA, POTA, LRFI, LI, RCFI, PTFI);
+    if (processFunctionWithLoopSupport(*F, AA, POTA, LRFI, LI, RCFI, PTFI)) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
     }
   }
