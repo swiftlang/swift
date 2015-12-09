@@ -62,6 +62,9 @@ public:
   }
 
   bool isIncomplete() const { return IsIncomplete; }
+
+  /// Returns true if all callees are known and not external.
+  bool allCalleesVisible();
 };
 
 /// CalleeCache is a helper class that builds lists of potential

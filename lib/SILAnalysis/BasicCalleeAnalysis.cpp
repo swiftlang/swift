@@ -21,6 +21,17 @@
 
 using namespace swift;
 
+bool CalleeList::allCalleesVisible() {
+  if (isIncomplete())
+    return false;
+
+  for (SILFunction *Callee : *this) {
+    if (Callee->isExternalDeclaration())
+      return false;
+  }
+  return true;
+}
+
 void CalleeCache::sortAndUniqueCallees() {
   // Sort the callees for each decl and remove duplicates.
   for (auto &Pair : TheCache) {
