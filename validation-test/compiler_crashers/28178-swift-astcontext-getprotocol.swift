@@ -4,6 +4,6 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-println{enum b{class B<d where I:A{
+print{enum b{class B<d where I:A{
 class B<D
 var _=B

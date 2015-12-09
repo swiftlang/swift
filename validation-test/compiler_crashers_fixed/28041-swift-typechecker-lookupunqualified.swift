@@ -1,3 +1,6 @@
+// XFAIL: *
+// XFailing it due to unavailability of free `map` function
+
 // RUN: not --crash %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
