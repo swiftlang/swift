@@ -92,9 +92,16 @@ static llvm::cl::opt<bool> EnableLocalStoreDSE("enable-local-store-dse",
 STATISTIC(NumDeadStores, "Number of dead stores removed");
 STATISTIC(NumPartialDeadStores, "Number of partial dead stores removed");
 
+/// Are we building the gen/kill sets or actually performing the DSE.
+enum class DSEComputeKind {BuildGenKillSet, PerformDSE};
+
 //===----------------------------------------------------------------------===//
 //                             Utility Functions
 //===----------------------------------------------------------------------===//
+
+static inline bool isBuildingGenKillSet(DSEComputeKind Kind) {
+  return Kind == DSEComputeKind::BuildGenKillSet;
+}
 
 /// Returns true if this is an instruction that may have side effects in a
 /// general sense but are inert from a load store perspective.
@@ -323,18 +330,18 @@ class DSEContext {
   /// There is a read to a location, expand the location into individual fields
   /// before processing them.
   void processRead(SILInstruction *Inst, BlockState *State, SILValue Mem,
-                   bool BuildGenKillSet);
+                   DSEComputeKind Kind);
 
   /// There is a write to a location, expand the location into individual fields
   /// before processing them.
   void processWrite(SILInstruction *Inst, BlockState *State, SILValue Val,
-                    SILValue Mem, bool BuildGenKillSet);
+                    SILValue Mem, DSEComputeKind Kind);
 
   /// Process Instructions. Extract MemLocations from SIL LoadInst.
-  void processLoadInst(SILInstruction *Inst, bool BuildGenKillSet);
+  void processLoadInst(SILInstruction *Inst, DSEComputeKind Kind);
 
   /// Process Instructions. Extract MemLocations from SIL StoreInst.
-  void processStoreInst(SILInstruction *Inst, bool BuildGenKillSet);
+  void processStoreInst(SILInstruction *Inst, DSEComputeKind Kind);
 
   /// Process Instructions. Extract MemLocations from SIL DebugValueAddrInst.
   /// DebugValueAddrInst operand maybe promoted to DebugValue, when this is
@@ -342,7 +349,7 @@ class DSEContext {
   void processDebugValueAddrInst(SILInstruction *I);
 
   /// Process Instructions. Extract MemLocations from SIL Unknown Memory Inst.
-  void processUnknownReadMemInst(SILInstruction *Inst, bool BuildGenKillSet);
+  void processUnknownReadMemInst(SILInstruction *Inst, DSEComputeKind Kind);
 
   /// Check whether the instruction invalidate any MemLocations due to change in
   /// its MemLocation Base.
@@ -367,7 +374,7 @@ class DSEContext {
   /// the loop basic block will have store to x.a and therefore x.a = 13 can now
   /// be considered dead.
   ///
-  void invalidateMemLocationBase(SILInstruction *Inst, bool BuildGenKillSet);
+  void invalidateMemLocationBase(SILInstruction *Inst, DSEComputeKind Kind);
 
   /// Get the bit representing the location in the MemLocationVault.
   ///
@@ -400,7 +407,7 @@ public:
   void mergeSuccessorStates(SILBasicBlock *BB);
 
   /// Update the BlockState based on the given instruction.
-  void processInstruction(SILInstruction *I, bool BuildGenKillSet);
+  void processInstruction(SILInstruction *I, DSEComputeKind Kind);
 
   /// Entry point for global dead store elimination.
   void run();
@@ -423,7 +430,7 @@ unsigned DSEContext::getMemLocationBit(const MemLocation &Loc) {
 
 void DSEContext::processBasicBlockForGenKillSet(SILBasicBlock *BB) {
   for (auto I = BB->rbegin(), E = BB->rend(); I != E; ++I) {
-    processInstruction(&(*I), true);
+    processInstruction(&(*I), DSEComputeKind::BuildGenKillSet);
   }
 }
 
@@ -449,7 +456,7 @@ bool DSEContext::processBasicBlock(SILBasicBlock *BB) {
 
   // Process instructions in post-order fashion.
   for (auto I = BB->rbegin(), E = BB->rend(); I != E; ++I) {
-    processInstruction(&(*I), false);
+    processInstruction(&(*I), DSEComputeKind::PerformDSE);
   }
 
   // If WriteSetIn changes, then keep iterating until reached a fixed
@@ -487,11 +494,11 @@ void DSEContext::mergeSuccessorStates(SILBasicBlock *BB) {
 }
 
 void DSEContext::invalidateMemLocationBase(SILInstruction *I,
-                                           bool BuildGenKillSet) {
+                                           DSEComputeKind Kind) {
   // If this instruction defines the base of a location, then we need to
   // invalidate any locations with the same base.
   BlockState *S = getBlockState(I);
-  if (BuildGenKillSet) {
+  if (isBuildingGenKillSet(Kind)) {
     for (unsigned i = 0; i < S->MemLocationNum; ++i) {
       if (MemLocationVault[i].getBase().getDef() != I)
         continue;
@@ -574,7 +581,7 @@ void DSEContext::updateGenKillSetForWrite(BlockState *S, unsigned bit) {
 }
 
 void DSEContext::processRead(SILInstruction *I, BlockState *S, SILValue Mem,
-                             bool BuildGenKillSet) {
+                             DSEComputeKind Kind) {
   // Construct a MemLocation to represent the memory read by this instruction.
   // NOTE: The base will point to the actual object this inst is accessing,
   // not this particular field.
@@ -593,7 +600,7 @@ void DSEContext::processRead(SILInstruction *I, BlockState *S, SILValue Mem,
   // If we cant figure out the Base or Projection Path for the read instruction,
   // process it as an unknown memory instruction for now.
   if (!L.isValid()) {
-    processUnknownReadMemInst(I, BuildGenKillSet);
+    processUnknownReadMemInst(I, Kind);
     return;
   }
 
@@ -610,7 +617,7 @@ void DSEContext::processRead(SILInstruction *I, BlockState *S, SILValue Mem,
   // separate reads.
   MemLocationList Locs;
   MemLocation::expand(L, &I->getModule(), Locs, TypeExpansionVault);
-  if (BuildGenKillSet) {
+  if (isBuildingGenKillSet(Kind)) {
     for (auto &E : Locs) {
       // Only building the gen and kill sets for now.
       updateGenKillSetForRead(S, getMemLocationBit(E));
@@ -625,7 +632,7 @@ void DSEContext::processRead(SILInstruction *I, BlockState *S, SILValue Mem,
 }
 
 void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
-                              SILValue Mem, bool BuildGenKillSet) {
+                              SILValue Mem, DSEComputeKind Kind) {
   // Construct a MemLocation to represent the memory read by this instruction.
   // NOTE: The base will point to the actual object this inst is accessing,
   // not this particular field.
@@ -662,7 +669,7 @@ void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
   MemLocationList Locs;
   MemLocation::expand(L, Mod, Locs, TypeExpansionVault);
   llvm::BitVector V(Locs.size());
-  if (BuildGenKillSet) {
+  if (isBuildingGenKillSet(Kind)) {
     for (auto &E : Locs) {
       // Only building the gen and kill sets here.
       updateGenKillSetForWrite(S, getMemLocationBit(E));
@@ -680,7 +687,7 @@ void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
   }
 
   // Data flow has not stablized, do not perform the DSE just yet.
-  if (BuildGenKillSet)
+  if (isBuildingGenKillSet(Kind))
     return;
 
   // Fully dead store - stores to all the components are dead, therefore this
@@ -739,15 +746,15 @@ void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
   }
 }
 
-void DSEContext::processLoadInst(SILInstruction *I, bool BuildGenKillSet) {
+void DSEContext::processLoadInst(SILInstruction *I, DSEComputeKind Kind) {
   SILValue Mem = cast<LoadInst>(I)->getOperand();
-  processRead(I, getBlockState(I), Mem, BuildGenKillSet);
+  processRead(I, getBlockState(I), Mem, Kind);
 }
 
-void DSEContext::processStoreInst(SILInstruction *I, bool BuildGenKillSet) {
+void DSEContext::processStoreInst(SILInstruction *I, DSEComputeKind Kind) {
   SILValue Val = cast<StoreInst>(I)->getSrc();
   SILValue Mem = cast<StoreInst>(I)->getDest();
-  processWrite(I, getBlockState(I), Val, Mem, BuildGenKillSet);
+  processWrite(I, getBlockState(I), Val, Mem, Kind);
 }
 
 void DSEContext::processDebugValueAddrInst(SILInstruction *I) {
@@ -763,10 +770,10 @@ void DSEContext::processDebugValueAddrInst(SILInstruction *I) {
 }
 
 void DSEContext::processUnknownReadMemInst(SILInstruction *I,
-                                           bool BuildGenKillSet) {
+                                           DSEComputeKind Kind) {
   BlockState *S = getBlockState(I);
   // Update the gen kill set.
-  if (BuildGenKillSet) {
+  if (isBuildingGenKillSet(Kind)) {
     for (unsigned i = 0; i < S->MemLocationNum; ++i) {
       if (!AA->mayReadFromMemory(I, MemLocationVault[i].getBase()))
         continue;
@@ -788,7 +795,7 @@ void DSEContext::processUnknownReadMemInst(SILInstruction *I,
   }
 }
 
-void DSEContext::processInstruction(SILInstruction *I, bool BuildGenKillSet) {
+void DSEContext::processInstruction(SILInstruction *I, DSEComputeKind Kind) {
   // If this instruction has side effects, but is inert from a store
   // perspective, skip it.
   if (isDeadStoreInertInstruction(I))
@@ -799,17 +806,17 @@ void DSEContext::processInstruction(SILInstruction *I, bool BuildGenKillSet) {
   // TODO: process more instructions.
   //
   if (isa<LoadInst>(I)) {
-    processLoadInst(I, BuildGenKillSet);
+    processLoadInst(I, Kind);
   } else if (isa<StoreInst>(I)) {
-    processStoreInst(I, BuildGenKillSet);
+    processStoreInst(I, Kind);
   } else if (isa<DebugValueAddrInst>(I)) {
     processDebugValueAddrInst(I);
   } else if (I->mayReadFromMemory()) {
-    processUnknownReadMemInst(I, BuildGenKillSet);
+    processUnknownReadMemInst(I, Kind);
   }
 
   // Check whether this instruction will invalidate any other MemLocations.
-  invalidateMemLocationBase(I, BuildGenKillSet);
+  invalidateMemLocationBase(I, Kind);
 }
 
 SILValue DSEContext::createExtract(SILValue Base,
