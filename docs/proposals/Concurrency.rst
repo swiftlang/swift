@@ -202,7 +202,7 @@ variables and unsafe code. Objective-C methods are automatically marked as
 that do not explicitly mark the APIs as reentrant or non-reentrant.
 
 In the example program below the method `fly` may access the global variable
-because it is marked with the attribute `unsafe`. The compile won't allow this
+because it is marked with the attribute `unsafe`. The compiler won't allow this
 method to be executed from a worker-thread.
 
 .. code-block:: swift
