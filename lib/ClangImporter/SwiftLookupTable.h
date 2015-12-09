@@ -19,11 +19,17 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Identifier.h"
+#include "clang/Serialization/ModuleFileExtension.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include <functional>
 #include <utility>
+
+namespace llvm {
+class BitstreamWriter;
+}
 
 namespace clang {
 class NamedDecl;
@@ -31,6 +37,18 @@ class DeclContext;
 }
 
 namespace swift {
+
+class SwiftLookupTableReader;
+class SwiftLookupTableWriter;
+
+/// Lookup table major version number.
+///
+const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MAJOR = 1;
+
+/// Lookup table major version number.
+///
+/// When the format changes IN ANY WAY, this number should be incremented.
+const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 0;
 
 /// A lookup table that maps Swift names to the set of Clang
 /// declarations with that particular name.
@@ -55,6 +73,9 @@ public:
     ObjCProtocol,
   };
 
+  /// Determine whether the given context requires a name to disambiguate.
+  static bool contextRequiresName(ContextKind kind);
+
   /// An entry in the table of C entities indexed by full Swift name.
   struct FullTableEntry {
     /// The context in which the entities with the given name occur, e.g.,
@@ -64,7 +85,11 @@ public:
 
     /// The set of Clang declarations with this name and in this
     /// context.
-    llvm::TinyPtrVector<clang::NamedDecl *> Decls;
+    ///
+    /// The low bit indicates whether we have a clang::serialization::DeclID or
+    /// not. If set, the upper 64 bits are the DeclID; if unset, the whole
+    /// value can be cast to a Decl*.
+    llvm::SmallVector<uint64_t, 2> Decls;
   };
 
 private:
@@ -72,7 +97,18 @@ private:
   /// the C entities that have that name, in all contexts.
   llvm::DenseMap<StringRef, SmallVector<FullTableEntry, 2>> LookupTable;
 
+  /// The reader responsible for lazily loading the contents of this table.
+  SwiftLookupTableReader *Reader;
+
+  friend class SwiftLookupTableReader;
+  friend class SwiftLookupTableWriter;
+
 public:
+  explicit SwiftLookupTable(SwiftLookupTableReader *reader) : Reader(reader) { }
+
+  /// Maps a stored declaration entry to an actual Clang declaration.
+  clang::NamedDecl *mapStoredDecl(uint64_t &entry);
+
   /// Translate a Clang DeclContext into a context kind and name.
   llvm::Optional<std::pair<ContextKind, StringRef>>
   translateContext(clang::DeclContext *context);
@@ -90,29 +126,78 @@ public:
   /// \param baseName The base name to search for. All results will
   /// have this base name.
   ///
-  /// \param context The context in which the resulting set of
+  /// \param searchContext The context in which the resulting set of
   /// declarations should reside. This may be null to indicate that
   /// all results from all contexts should be produced.
-  ArrayRef<clang::NamedDecl *>
-  lookup(Identifier baseName,
-         clang::DeclContext *context,
-         SmallVectorImpl<clang::NamedDecl *> &scratch);
+  SmallVector<clang::NamedDecl *, 4>
+  lookup(StringRef baseName, clang::DeclContext *searchContext);
 
-  /// Lookup the set of declarations with the given full name.
-  ///
-  /// \param name The full name to search for. All results will have
-  /// this full name.
-  ///
-  /// \param context The context in which the resulting set of
-  /// declarations should reside. This may be null to indicate that
-  /// all results from all contexts should be produced.
-  ArrayRef<clang::NamedDecl *>
-  lookup(DeclName name,
-         clang::DeclContext *context,
-         SmallVectorImpl<clang::NamedDecl *> &scratch);
+  /// Deserialize all entries.
+  void deserializeAll();
 
   /// Dump the internal representation of this lookup table.
   void dump() const;
+};
+
+/// Module file extension writer for the Swift lookup tables.
+class SwiftLookupTableWriter : public clang::ModuleFileExtensionWriter {
+  clang::ASTWriter &Writer;
+  std::function<void(clang::Sema &, SwiftLookupTable &)> PopulateTable;
+
+public:
+  SwiftLookupTableWriter(
+    clang::ModuleFileExtension *extension,
+    std::function<void(clang::Sema &, SwiftLookupTable &)> populateTable,
+    clang::ASTWriter &writer)
+      : ModuleFileExtensionWriter(extension), Writer(writer),
+        PopulateTable(std::move(populateTable)) { }
+
+  void writeExtensionContents(clang::Sema &sema,
+                              llvm::BitstreamWriter &stream) override;
+};
+
+/// Module file extension reader for the Swift lookup tables.
+class SwiftLookupTableReader : public clang::ModuleFileExtensionReader {
+  clang::ASTReader &Reader;
+  clang::serialization::ModuleFile &ModuleFile;
+  std::function<void()> OnRemove;
+
+  void *SerializedTable;
+
+  SwiftLookupTableReader(clang::ModuleFileExtension *extension,
+                         clang::ASTReader &reader,
+                         clang::serialization::ModuleFile &moduleFile,
+                         std::function<void()> onRemove,
+                         void *serializedTable)
+    : ModuleFileExtensionReader(extension), Reader(reader),
+      ModuleFile(moduleFile), OnRemove(onRemove),
+      SerializedTable(serializedTable) { }
+
+public:
+  /// Create a new lookup table reader for the given AST reader and stream
+  /// position.
+  static std::unique_ptr<SwiftLookupTableReader>
+  create(clang::ModuleFileExtension *extension, clang::ASTReader &reader,
+         clang::serialization::ModuleFile &moduleFile,
+         std::function<void()> onRemove,
+         const llvm::BitstreamCursor &stream);
+
+  ~SwiftLookupTableReader();
+
+  /// Retrieve the AST reader associated with this lookup table reader.
+  clang::ASTReader &getASTReader() const { return Reader; }
+
+  /// Retrieve the module file associated with this lookup table reader.
+  clang::serialization::ModuleFile &getModuleFile() { return ModuleFile; }
+
+  /// Retrieve the set of base names that are stored in the on-disk hash table.
+  SmallVector<StringRef, 4> getBaseNames();
+
+  /// Retrieve the set of entries associated with the given base name.
+  ///
+  /// \returns true if we found anything, false otherwise.
+  bool lookup(StringRef baseName,
+              SmallVectorImpl<SwiftLookupTable::FullTableEntry> &entries);
 };
 
 }

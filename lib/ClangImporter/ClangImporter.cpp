@@ -45,6 +45,7 @@
 #include "clang/Frontend/FrontendActions.h"
 #include "clang/Frontend/Utils.h"
 #include "clang/Serialization/ASTReader.h"
+#include "clang/Serialization/ASTWriter.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Parse/Parser.h"
 #include "clang/Rewrite/Frontend/FrontendActions.h"
@@ -237,10 +238,11 @@ ClangImporter::ClangImporter(ASTContext &ctx,
   : ClangModuleLoader(tracker),
     Impl(*new Implementation(ctx, clangImporterOpts))
 {
+  Impl.Retain();
 }
 
 ClangImporter::~ClangImporter() {
-  delete &Impl;
+  Impl.Release();
 }
 
 void ClangImporter::setTypeResolver(LazyResolver &resolver) {
@@ -543,6 +545,13 @@ ClangImporter::create(ASTContext &ctx,
   clang::PreprocessorOptions &ppOpts = invocation->getPreprocessorOpts();
   ppOpts.addRemappedFile(Implementation::moduleImportBufferName,
                          sourceBuffer.release());
+
+  // Build Swift lookup tables, if requested.
+  if (importer->Impl.UseSwiftLookupTables) {
+    invocation->getFrontendOpts().ModuleFileExtensions.push_back(
+
+      &importer->Impl);
+  }
 
   // Create a compiler instance.
   auto PCHContainerOperations =
@@ -1061,7 +1070,8 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
     ImportForwardDeclarations(opts.ImportForwardDeclarations),
     OmitNeedlessWords(opts.OmitNeedlessWords),
     InferDefaultArguments(opts.InferDefaultArguments),
-    UseSwiftLookupTables(opts.UseSwiftLookupTables)
+    UseSwiftLookupTables(opts.UseSwiftLookupTables),
+    BridgingHeaderLookupTable(nullptr)
 {
   // Add filters to determine if a Clang availability attribute
   // applies in Swift, and if so, what is the cutoff for deprecated
@@ -4306,10 +4316,105 @@ void ClangImporter::getMangledName(raw_ostream &os,
   Impl.Mangler->mangleName(clangDecl, os);
 }
 
+// ---------------------------------------------------------------------------
+// Swift lookup tables
+// ---------------------------------------------------------------------------
+
+clang::ModuleFileExtensionMetadata
+ClangImporter::Implementation::getExtensionMetadata() const {
+  clang::ModuleFileExtensionMetadata metadata;
+  metadata.BlockName = "swift.lookup";
+  metadata.MajorVersion = SWIFT_LOOKUP_TABLE_VERSION_MAJOR;
+  metadata.MinorVersion = SWIFT_LOOKUP_TABLE_VERSION_MINOR;
+  metadata.UserInfo = version::getSwiftFullVersion();
+  return metadata;
+}
+
+llvm::hash_code ClangImporter::Implementation::hashExtension(
+                  llvm::hash_code code) const {
+  return llvm::hash_combine(code, "swift.lookup",
+                            SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
+                            SWIFT_LOOKUP_TABLE_VERSION_MINOR);
+}
+
+std::unique_ptr<clang::ModuleFileExtensionWriter>
+ClangImporter::Implementation::createExtensionWriter(clang::ASTWriter &writer) {
+  // Local function to populate the lookup table.
+  auto populateTable = [this](clang::Sema &sema, SwiftLookupTable &table) {
+    for (auto decl
+           : sema.Context.getTranslationUnitDecl()->noload_decls()) {
+      // Skip anything from an AST file.
+      if (decl->isFromASTFile()) continue;
+
+      // Skip non-named declarations.
+      auto named = dyn_cast<clang::NamedDecl>(decl);
+      if (!named) continue;
+
+      // Add this entry to the lookup tabke.
+      addEntryToLookupTable(sema, table, named);
+    }
+  };
+
+  return std::unique_ptr<clang::ModuleFileExtensionWriter>(
+           new SwiftLookupTableWriter(this, populateTable, writer));
+}
+
+std::unique_ptr<clang::ModuleFileExtensionReader>
+ClangImporter::Implementation::createExtensionReader(
+  const clang::ModuleFileExtensionMetadata &metadata,
+  clang::ASTReader &reader,
+  clang::serialization::ModuleFile &mod,
+  const llvm::BitstreamCursor &stream)
+{
+  // Make sure we have a compatible block.
+  assert(metadata.BlockName == "swift.lookup");
+  if (metadata.MajorVersion != SWIFT_LOOKUP_TABLE_VERSION_MAJOR ||
+      metadata.MinorVersion != SWIFT_LOOKUP_TABLE_VERSION_MINOR ||
+      metadata.UserInfo != version::getSwiftFullVersion())
+    return nullptr;
+
+  // Check whether we already have an entry in the set of lookup tables.
+  auto &entry = LookupTables[mod.ModuleName];
+  if (entry) return nullptr;
+
+  // Local function used to remove this entry when the reader goes away.
+  std::string moduleName = mod.ModuleName;
+  auto onRemove = [this, moduleName]() {
+    LookupTables.erase(moduleName);
+  };
+
+  // Create the reader.
+  auto tableReader = SwiftLookupTableReader::create(this, reader, mod, onRemove,
+                                                    stream);
+  if (!tableReader) return nullptr;
+
+  // Create the lookup table.
+  entry.reset(new SwiftLookupTable(tableReader.get()));
+
+  // Return the new reader.
+  return std::move(tableReader);
+}
+
 void ClangImporter::dumpSwiftLookupTables() {
   Impl.dumpSwiftLookupTables();
 }
 
 void ClangImporter::Implementation::dumpSwiftLookupTables() {
+  // Sort the module names so we can print in a deterministic order.
+  SmallVector<StringRef, 4> moduleNames;
+  for (const auto &lookupTable : LookupTables) {
+    moduleNames.push_back(lookupTable.first());
+  }
+  array_pod_sort(moduleNames.begin(), moduleNames.end());
+
+  // Print out the lookup tables for the various modules.
+  for (auto moduleName : moduleNames) {
+    llvm::errs() << "<<" << moduleName << " lookup table>>\n";
+    LookupTables[moduleName]->deserializeAll();
+    LookupTables[moduleName]->dump();
+  }
+
+
+  llvm::errs() << "<<Bridging header lookup table>>\n";
   BridgingHeaderLookupTable.dump();
 }
