@@ -60,7 +60,7 @@ multi-threaded program below.
 
 This program crashes very quickly when it tries to deallocate an already
 deallocated class instance.  To understand the bug try to imagine two threads
-executing the SIL code below in lockstep.  After, they both load the same value
+executing the SIL code below in lockstep.  After they both load the same value
 they both try to release the object.  One thread succeeds and deallocates the
 object while another thread attempts to read the memory of a deallocated
 object::
