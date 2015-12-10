@@ -370,7 +370,6 @@ UNARY_OP_MATCH_WITH_ARG_MATCHER(DeinitExistentialAddrInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ProjectBlockStorageInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongRetainInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongReleaseInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongRetainAutoreleasedInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongRetainUnownedInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(UnownedRetainInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(UnownedReleaseInst)
@@ -383,7 +382,6 @@ UNARY_OP_MATCH_WITH_ARG_MATCHER(DeallocBoxInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(DestroyAddrInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(CondFailInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ReturnInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(AutoreleaseReturnInst)
 #undef UNARY_OP_MATCH_WITH_ARG_MATCHER
 
 //===----------------------------------------------------------------------===//

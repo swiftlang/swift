@@ -144,7 +144,6 @@ public:
     return I->getMemoryBehavior();                                             \
   }
   REFCOUNTINC_MEMBEHAVIOR_INST(StrongRetainInst)
-  REFCOUNTINC_MEMBEHAVIOR_INST(StrongRetainAutoreleasedInst)
   REFCOUNTINC_MEMBEHAVIOR_INST(StrongRetainUnownedInst)
   REFCOUNTINC_MEMBEHAVIOR_INST(UnownedRetainInst)
   REFCOUNTINC_MEMBEHAVIOR_INST(RetainValueInst)

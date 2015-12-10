@@ -10,7 +10,6 @@ func testInstanceTypeFactoryMethod(queen: Bee) {
   // CHECK-NEXT:   [[HIVE_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[HIVE_META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
   // CHECK-NEXT:   [[FACTORY:%[0-9]+]] = class_method [volatile] [[HIVE_META_OBJC]] : $@objc_metatype Hive.Type, #Hive.init!allocator.1.foreign : Hive.Type -> (queen: Bee!) -> Hive! , $@convention(objc_method) (ImplicitlyUnwrappedOptional<Bee>, @objc_metatype Hive.Type) -> @autoreleased ImplicitlyUnwrappedOptional<Hive>
   // CHECK-NEXT:   [[HIVE:%[0-9]+]] = apply [[FACTORY]]([[QUEEN]], [[HIVE_META_OBJC]]) : $@convention(objc_method) (ImplicitlyUnwrappedOptional<Bee>, @objc_metatype Hive.Type) -> @autoreleased ImplicitlyUnwrappedOptional<Hive>
-  // CHECK-NEXT:   strong_retain_autoreleased [[HIVE]] : $ImplicitlyUnwrappedOptional<Hive>
   // CHECK-NEXT:   release_value [[QUEEN]]
   // CHECK-NEXT:   return [[HIVE]] : $ImplicitlyUnwrappedOptional<Hive>
   var hive1 = Hive(queen: queen)

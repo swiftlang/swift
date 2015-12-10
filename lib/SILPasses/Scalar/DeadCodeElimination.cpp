@@ -43,8 +43,7 @@ static bool seemsUseful(SILInstruction *I) {
   if (I->mayHaveSideEffects())
     return true;
 
-  if (isa<ReturnInst>(I) || isa<AutoreleaseReturnInst>(I) ||
-      isa<UnreachableInst>(I) || isa<ThrowInst>(I))
+  if (isa<ReturnInst>(I) || isa<UnreachableInst>(I) || isa<ThrowInst>(I))
     return true;
 
   return false;
@@ -378,7 +377,6 @@ void DCE::propagateLiveness(SILInstruction *I) {
     return;
 
   case ValueKind::ReturnInst:
-  case ValueKind::AutoreleaseReturnInst:
   case ValueKind::ThrowInst:
   case ValueKind::CondBranchInst:
   case ValueKind::SwitchEnumInst:

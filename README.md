@@ -10,29 +10,27 @@ and frameworks, and is memory safe (by default).
 Although inspired by Objective-C and many other languages, Swift is not itself a
 C-derived language. As a complete and independent language, Swift packages core
 features like flow control, data structures, and functions, with high-level
-constructs like objects, protocols, closures, and generics.  Swift embraces
+constructs like objects, protocols, closures, and generics. Swift embraces
 modules, eliminating the need for headers and the code duplication they entail.
 
 
 ## Documentation
 
-To read the documentation, start by installing the 
-[Sphinx](http://sphinx-doc.org) documentation generator tool (just run 
+To read the documentation, start by installing the
+[Sphinx](http://sphinx-doc.org) documentation generator tool (just run
 `easy_install -U Sphinx` from the command line and you're good to go). Once you
- have that, you can build the Swift documentation by going into `docs` and 
-typing `make`.  This compiles the `.rst` files in the `docs` directory into 
+ have that, you can build the Swift documentation by going into `docs` and
+typing `make`. This compiles the `.rst` files in the `docs` directory into
 HTML in the `docs/_build/html` directory.
 
-Once built, the best place to start is with the Swift white paper, which gives a
-tour of the language (in `docs/_build/html/whitepaper/index.html`).
-Another potentially useful document is `docs/LangRef`, which gives a low level
+A potentially useful document to start is `docs/LangRef`, which gives a low level
 tour of how the language works from the implementation perspective.
 
 Many of the docs are out of date, but you can see some historical design
 documents in the `docs` directory.
 
 Another source of documentation is the standard library itself, located in
-`stdlib`.  Much of the language is actually implemented in the library
+`stdlib`. Much of the language is actually implemented in the library
 (including `Int`), and the standard library gives some examples of what can be
 expressed today.
 
@@ -40,7 +38,7 @@ expressed today.
 ## Getting Started
 
 These instructions give the most direct path to a working Swift
-development environment.  Options for doing things differently are
+development environment. Options for doing things differently are
 discussed below.
 
 
@@ -80,7 +78,7 @@ For those checking out sources as read-only:
      git clone https://github.com/apple/swift-corelibs-foundation.git
 
 For those who plan on regularly making direct commits, cloning over
-SSH may provide a better experience (which requires uploading 
+SSH may provide a better experience (which requires uploading
 SSH keys to GitHub):
 
      git clone git@github.com:apple/swift.git swift

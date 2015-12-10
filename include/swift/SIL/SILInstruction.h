@@ -3185,18 +3185,6 @@ class StrongRetainInst
       : UnaryInstructionBase(DebugLoc, Operand) {}
 };
 
-/// StrongRetainAutoreleasedInst - Take ownership of the autoreleased return
-/// value of an ObjC method.
-class StrongRetainAutoreleasedInst
-  : public UnaryInstructionBase<ValueKind::StrongRetainAutoreleasedInst,
-                                RefCountingInst, /*HAS_RESULT*/ false>
-{
-  friend class SILBuilder;
-
-  StrongRetainAutoreleasedInst(SILDebugLocation *DebugLoc, SILValue Operand)
-      : UnaryInstructionBase(DebugLoc, Operand) {}
-};
-
 /// StrongReleaseInst - Decrease the strong reference count of an object.
 ///
 /// An object can be destroyed when its strong reference count is
@@ -3656,31 +3644,6 @@ class ReturnInst
   /// \param ReturnValue The value to be returned.
   ///
   ReturnInst(SILDebugLocation *DebugLoc, SILValue ReturnValue)
-      : UnaryInstructionBase(DebugLoc, ReturnValue) {}
-
-public:
-  SuccessorListTy getSuccessors() {
-    // No Successors.
-    return SuccessorListTy();
-  }
-};
-
-/// AutoreleaseReturnInst - Transfer ownership of a value to an ObjC
-/// autorelease pool, and then return the value.
-class AutoreleaseReturnInst
-  : public UnaryInstructionBase<ValueKind::AutoreleaseReturnInst, TermInst,
-                                /*HAS_RESULT*/ false>
-{
-  friend class SILBuilder;
-
-  /// Constructs an AutoreleaseReturnInst representing an autorelease-return
-  /// sequence.
-  ///
-  /// \param DebugLoc The backing AST location.
-  ///
-  /// \param ReturnValue The value to be returned.
-  ///
-  AutoreleaseReturnInst(SILDebugLocation *DebugLoc, SILValue ReturnValue)
       : UnaryInstructionBase(DebugLoc, ReturnValue) {}
 
 public:
