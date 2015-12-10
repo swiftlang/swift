@@ -216,7 +216,7 @@ Non-NSObjects are messageable but not ``id``-compatible:
 - Cannot assign Swift objects to ``id`` variables.
 - Cannot put arbitrary Swift objects in NSArrays.
 - Potentially confusing: "I can message it but I can't put it in an ``id``??"
-- Clang must be taught how to message Swift objects and manage their retain 
+- Clang must be taught how to message Swift objects and manage their retain
   counts.
 - On the plus side, then non-NSObjects can use Swift calling conventions.
 - Requires framework authors to make an arbitrary decision that may not be
@@ -315,18 +315,18 @@ Method Overriding Model
 
 *Requirement: Swift classes can override any Objective-C methods.*
 
-Methods marked as "overrideable API" only have Objective-C entry points:
+Methods marked as "overridable API" only have Objective-C entry points:
 
 - Less to think about, maximum compatibility.
 - Penalizes future Swift clients (and potentially Objective-C clients?).
 
-Methods marked as "overridable API" have both Objective-C and Swift entry 
+Methods marked as "overridable API" have both Objective-C and Swift entry
 points:
 
 - Requires teaching Clang to emit Swift vtables.
 - Increases binary size and link time.
 
-Methods marked as "overrideable API" have only Swift entry points:
+Methods marked as "overridable API" have only Swift entry points:
 
 - Requires teaching Clang to emit Swift vtables.
 - Later exposing this method to Objective-C in a subclass may be awkward?

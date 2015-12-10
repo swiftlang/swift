@@ -430,7 +430,7 @@ Here's another example of an out-parameter:
 
 .. code-block:: objc
 
-  - (instancetype)initWithContentsOfURL:(NSURL *)url encoding:(NSStringEncoding)enc error:(NSError **)error;  
+  - (instancetype)initWithContentsOfURL:(NSURL *)url encoding:(NSStringEncoding)enc error:(NSError **)error;
 
 Out-parameters have some nice advantages.  First, they're a reliable
 source of marking; even if the actual propagation gets separated from
@@ -1687,7 +1687,7 @@ might want to investigate closer, and you can easily imagine codebases
 that expect uses of it to always be explained in comments.  But more
 importantly, just like ``!`` it's only *statically* unsafe, and it
 will reliably fail when the programmer is wrong.  Therefore, while you
-can easily imagine (and demonstrate) uncautious programmers flailing
+can easily imagine (and demonstrate) incautious programmers flailing
 around with it to appease the type-checker, that's not actually a
 tenable position for the overall program: eventually the programmer
 will have to learn how to use the feature, or else their program
