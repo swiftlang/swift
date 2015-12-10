@@ -81,7 +81,6 @@ if optional_return() == nil {
 }
 // CHECK: optional return OK
 
-var empty: Bool = true
 switch x {
 case .Some(let y):
   print("destructuring bind: \(y).")
