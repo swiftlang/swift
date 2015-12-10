@@ -3099,7 +3099,7 @@ bool VarDecl::isSettable(const DeclContext *UseDC,
   // initialized.
   if (hasNonPatternBindingInit())
     return false;
-  
+
   // 'let' parameters are never settable.
   if (isa<ParamDecl>(this))
     return false;

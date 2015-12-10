@@ -351,12 +351,12 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// \brief Whether this is a 'let' property, which can only be initialized
     /// once (either in its declaration, or once later), making it immutable.
     unsigned IsLet : 1;
-      
+
     /// \brief Whether this vardecl has an initial value bound to it in a way
     /// that isn't represented in the AST with an initializer in the pattern
     /// binding.  This happens in cases like "for i in ...", switch cases, etc.
     unsigned HasNonPatternBindingInit : 1;
-      
+    
     /// \brief Whether this is a property used in expressions in the debugger.
     /// It is up to the debugger to instruct SIL how to access this variable.
     unsigned IsDebuggerVar : 1;
@@ -364,7 +364,7 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// Whether the decl can be accessed by swift users; for instance,
     /// a.storage for lazy var a is a decl that cannot be accessed.
     unsigned IsUserAccessible : 1;
-      
+    
     /// \brief Whether this property is assignable by swift users; for instance,
     /// a weak closure capture is mutable by the runtime, but not user assignable.
     /// Note that a 'let' property is user assignable (once).
