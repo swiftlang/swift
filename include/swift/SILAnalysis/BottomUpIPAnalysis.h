@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILANALYSIS_UTILS_H
-#define SWIFT_SILANALYSIS_UTILS_H
+#ifndef SWIFT_SILANALYSIS_BOTTOMUPIPANALYSIS_H
+#define SWIFT_SILANALYSIS_BOTTOMUPIPANALYSIS_H
 
 #include "swift/SILAnalysis/Analysis.h"
 #include "swift/SIL/SILInstruction.h"
@@ -310,4 +310,4 @@ protected:
 
 } // end namespace swift
 
-#endif // SWIFT_SILANALYSIS_UTILS_H
+#endif // SWIFT_SILANALYSIS_BOTTOMUPIPANALYSIS_H
