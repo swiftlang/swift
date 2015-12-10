@@ -4526,7 +4526,8 @@ public:
     : super(IGM, theEnum) {}
   
   void addMetadataFlags() {
-    addWord(getMetadataKind(IGM, MetadataKind::Enum));
+    addWord(getMetadataKind(IGM, Target->classifyAsOptionalType()
+                            ? MetadataKind::Optional : MetadataKind::Enum));
   }
   
   void addNominalTypeDescriptor() {

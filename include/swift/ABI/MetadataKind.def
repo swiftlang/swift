@@ -47,6 +47,9 @@ NOMINALTYPEMETADATAKIND(Struct, 1)
 /// If we add reference enums, that needs to go here.
 NOMINALTYPEMETADATAKIND(Enum, 2)
 
+/// An optional type.
+NOMINALTYPEMETADATAKIND(Optional, 3)
+
 /// A type whose value is not exposed in the metadata system.
 METADATAKIND(Opaque, 8)
 

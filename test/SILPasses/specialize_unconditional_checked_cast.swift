@@ -357,6 +357,21 @@ ExistentialToArchetype(o: o, t: c)
 ExistentialToArchetype(o: o, t: b)
 ExistentialToArchetype(o: o, t: o)
 
+// Ensure that a downcast from an Optional source is not promoted to a
+// value cast. We could do the promotion, but the optimizer would need
+// to insert the Optional unwrapping logic before the cast.
+//
+// CHECK-LABEL: sil shared [noinline] @_TTSg5GSqC37specialize_unconditional_checked_cast1C__CS_1D___TF37specialize_unconditional_checked_cast15genericDownCastu0_rFTxMq__q_ : $@convention(thin) (@out D, @in Optional<C>, @thick D.Type) -> () {
+// CHECK: unconditional_checked_cast_addr take_always Optional<C> in %1 : $*Optional<C> to D in %0 : $*D
+@inline(never)
+public func genericDownCast<T, U>(a: T, _ : U.Type) -> U {
+  return a as! U
+}
+
+public func callGenericDownCast(c: C?) -> D {
+  return genericDownCast(c, D.self)
+}
+
 //order: -5
 // x -> y where y is a class but x is not.
 // CHECK-LABEL: sil shared [noinline] @_TTSf4d___TTSg5C37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast31ArchetypeToConcreteConvertUInt8
