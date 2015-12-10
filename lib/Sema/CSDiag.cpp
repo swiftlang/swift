@@ -914,7 +914,7 @@ static void diagnoseSubElementFailure(Expr *destExpr,
     message += VD->getName().str().str();
     message += "'";
  
-    if (VD->isImplicit())
+    if (VD->isImplicit() || !VD->isUserAssignable())
       message += " is immutable";
     else if (VD->isLet())
       message += " is a 'let' constant";

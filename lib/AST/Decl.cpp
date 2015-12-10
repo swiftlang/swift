@@ -3085,6 +3085,10 @@ static bool isSettable(const AbstractStorageDecl *decl) {
 /// is a let member in an initializer.
 bool VarDecl::isSettable(const DeclContext *UseDC,
                          const DeclRefExpr *base) const {
+
+  if (!isUserAssignable())
+      return false;
+    
   // If this is a 'var' decl, then we're settable if we have storage or a
   // setter.
   if (!isLet())
@@ -3308,6 +3312,9 @@ ObjCSelector VarDecl::getDefaultObjCSetterSelector(ASTContext &ctx,
 void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
   // If it isn't a 'let', don't touch it.
   if (!isLet()) return;
+
+  // Don't suggest mutability if the var isn't user assignable at all.
+  if (!isUserAssignable()) return;
 
   // If this is the 'self' argument of a non-mutating method in a value type,
   // suggest adding 'mutating' to the method.
