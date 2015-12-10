@@ -13,20 +13,28 @@
 #define SWIFT_SILANALYSIS_TYPEEXPANSIONANALYSIS_H
 
 #include "swift/SIL/Projection.h"
+#include "swift/SIL/SILType.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SILAnalysis/Analysis.h"
 #include "llvm/ADT/DenseMap.h"
 
 namespace swift {
 
+/// Type expansion kind.
+enum class TEKind { 
+  TELeaf, // Leaf nodes expansion.
+  TENode  // Intermediate and leaf nodes expansion.
+}; 
+
+using TypeExpansionMap = llvm::DenseMap<SILType, ProjectionPathList>;
+
 /// This analysis determines memory effects during destruction.
 class TypeExpansionAnalysis : public SILAnalysis {
-  using TypeExpansionMap = llvm::DenseMap<SILType, ProjectionPathList>;
   /// Caches the type to leaf node expansion.
-  TypeExpansionMap LeafTECache;
+  TypeExpansionMap TELeafCache;
   /// Caches the type to each node expansion, including intermediate nodes as
   /// well as leaf nodes in the type tree.
-  TypeExpansionMap NodeTECache;
+  TypeExpansionMap TENodeCache;
 
 public:
   TypeExpansionAnalysis(SILModule *M)
@@ -36,11 +44,10 @@ public:
     return S->getKind() == AnalysisKind::TypeExpansion;
   }
 
-  /// Return ProjectionPath to every leaf node of the given type.
-  const ProjectionPathList &getTypeLeafExpansion(SILType B, SILModule *Mod);
-  /// Returns the ProjectionPath to every leaf and intermediate node of the
-  /// given type.
-  const ProjectionPathList &getTypeNodeExpansion(SILType B, SILModule *Mod);
+  /// Return ProjectionPath to every leaf or intermediate node of the given type.
+  const ProjectionPathList &getTypeExpansionProjectionPaths(SILType B,
+                                                            SILModule *Mod,
+                                                            TEKind K);
 };
 }
 #endif
