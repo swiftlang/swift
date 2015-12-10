@@ -912,9 +912,11 @@ if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
 fi
 
 SWIFT_STDLIB_TARGETS=()
+SWIFT_PERFTEST_TARGETS=()
 SWIFT_TEST_TARGETS=()
 for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
     build_for_this_target=1
+    perftest_this_target=
     test_this_target=1
     case $deployment_target in
         linux-*)
@@ -927,10 +929,12 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
             ;;
         macosx-*)
             build_for_this_target=$(not $SKIP_BUILD_OSX)
+            perftest_this_target=$(not $SKIP_BUILD_OSX)
             test_this_target=$(not $SKIP_TEST_OSX)
             ;;
         iphoneos-*)
             build_for_this_target=$(not $SKIP_BUILD_IOS_DEVICE)
+            perftest_this_target=$(not $SKIP_BUILD_IOS_DEVICE)
             test_this_target=
             ;;
         iphonesimulator-*)
@@ -939,6 +943,7 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
             ;;
         appletvos-*)
             build_for_this_target=$(not $SKIP_BUILD_TVOS_DEVICE)
+            perftest_this_target=$(not $SKIP_BUILD_TVOS_DEVICE)
             test_this_target=
             ;;
         appletvsimulator-*)
@@ -947,6 +952,7 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
             ;;
         watchos-*)
             build_for_this_target=$(not $SKIP_BUILD_WATCHOS_DEVICE)
+            perftest_this_target=$(not $SKIP_BUILD_WATCHOS_DEVICE)
             test_this_target=
             ;;
         watchsimulator-*)
@@ -961,6 +967,10 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
     if [[ "$build_for_this_target" ]] ; then
         SWIFT_STDLIB_TARGETS=(
             "${SWIFT_STDLIB_TARGETS[@]}" "swift-stdlib-${deployment_target}")
+    fi
+    if [[ "$perftest_this_target" ]] ; then
+        SWIFT_PERFTEST_TARGETS=(
+            "${SWIFT_PERFTEST_TARGETS[@]}" "swift-perftest-${deployment_target}")
     fi
     if [[ "$test_this_target" ]] ; then
         if [[ "$SKIP_TEST_VALIDATION" ]] ; then
@@ -1625,7 +1635,13 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
 
                 build_targets=(all "${SWIFT_STDLIB_TARGETS[@]}")
                 if [[ $(should_build_perftestsuite) == "TRUE" ]]; then
-                    build_targets=("${build_targets[@]}" benchmark-swift)
+                    native_swift_tools_path=$(build_directory macosx-x86_64 swift)/bin
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_EXEC:STRING="${native_swift_tools_path}/swiftc"
+                    )
+                    build_targets=("${build_targets[@]}"
+                                   "${SWIFT_PERFTEST_TARGETS[@]}")
                 fi
                 skip_build=$SKIP_BUILD_SWIFT
                 ;;
