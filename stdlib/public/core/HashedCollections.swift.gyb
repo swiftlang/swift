@@ -678,8 +678,10 @@ public func == <Element : Hashable>(lhs: Set<Element>, rhs: Set<Element>) -> Boo
   case (.Native(let lhsNativeOwner), .Native(let rhsNativeOwner)):
     let lhsNative = lhsNativeOwner.nativeStorage
     let rhsNative = rhsNativeOwner.nativeStorage
-    // FIXME(performance): early exit if lhs and rhs reference the same
-    // storage?
+
+    if lhsNativeOwner === rhsNativeOwner {
+        return true
+    }
 
     if lhsNative.count != rhsNative.count {
       return false
@@ -1184,8 +1186,10 @@ public func == <Key : Equatable, Value : Equatable>(
   case (.Native(let lhsNativeOwner), .Native(let rhsNativeOwner)):
     let lhsNative = lhsNativeOwner.nativeStorage
     let rhsNative = rhsNativeOwner.nativeStorage
-    // FIXME(performance): early exit if lhs and rhs reference the same
-    // storage?
+
+    if lhsNativeOwner === rhsNativeOwner {
+        return true
+    }
 
     if lhsNative.count != rhsNative.count {
       return false
