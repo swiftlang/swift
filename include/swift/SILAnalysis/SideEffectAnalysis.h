@@ -364,7 +364,7 @@ public:
     return S->getKind() == AnalysisKind::SideEffect;
   }
   
-  virtual void initialize(SILPassManager *PM);
+  virtual void initialize(SILPassManager *PM) override;
   
   /// Get the side-effects of a function.
   const FunctionEffects &getEffects(SILFunction *F) {
@@ -378,10 +378,10 @@ public:
   void getEffects(FunctionEffects &ApplyEffects, FullApplySite FAS);
   
   /// No invalidation is needed. See comment for SideEffectAnalysis.
-  virtual void invalidate(InvalidationKind K);
+  virtual void invalidate(InvalidationKind K) override;
   
   /// No invalidation is needed. See comment for SideEffectAnalysis.
-  virtual void invalidate(SILFunction *F, InvalidationKind K);
+  virtual void invalidate(SILFunction *F, InvalidationKind K)  override;
 };
 
 } // end namespace swift

@@ -694,7 +694,7 @@ public:
     return S->getKind() == AnalysisKind::Escape;
   }
 
-  virtual void initialize(SILPassManager *PM);
+  virtual void initialize(SILPassManager *PM) override;
 
   /// Gets the connection graph for \a F.
   ConnectionGraph *getConnectionGraph(SILFunction *F) {
@@ -720,15 +720,15 @@ public:
 
   bool canPointToSameMemory(SILValue V1, SILValue V2, ConnectionGraph *ConGraph);
 
-  virtual void invalidate(InvalidationKind K);
+  virtual void invalidate(InvalidationKind K) override;
 
-  virtual void invalidate(SILFunction *F, InvalidationKind K);
+  virtual void invalidate(SILFunction *F, InvalidationKind K) override;
 
   virtual void handleDeleteNotification(ValueBase *I) override;
 
   virtual bool needsNotifications() override { return true; }
 
-  virtual void verify() const {
+  virtual void verify() const override {
 #ifndef NDEBUG
     for (auto Iter : Function2Info) {
       FunctionInfo *FInfo = Iter.second;
@@ -738,7 +738,7 @@ public:
 #endif
   }
 
-  virtual void verify(SILFunction *F) const {
+  virtual void verify(SILFunction *F) const override {
 #ifndef NDEBUG
     if (FunctionInfo *FInfo = Function2Info.lookup(F)) {
       FInfo->Graph.verify();
