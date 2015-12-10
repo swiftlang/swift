@@ -14,7 +14,6 @@
 #include "swift/SILAnalysis/SideEffectAnalysis.h"
 #include "swift/SILAnalysis/BasicCalleeAnalysis.h"
 #include "swift/SILAnalysis/FunctionOrder.h"
-#include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILPasses/PassManager.h"
 #include "swift/SIL/SILArgument.h"
 

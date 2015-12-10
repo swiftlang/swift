@@ -13,7 +13,6 @@
 #define DEBUG_TYPE "sil-escape"
 #include "swift/SILAnalysis/EscapeAnalysis.h"
 #include "swift/SILAnalysis/BasicCalleeAnalysis.h"
-#include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILAnalysis/ArraySemantic.h"
 #include "swift/SILAnalysis/ValueTracking.h"
 #include "swift/SILPasses/PassManager.h"
