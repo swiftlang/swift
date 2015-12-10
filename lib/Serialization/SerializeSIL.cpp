@@ -167,9 +167,6 @@ namespace {
                          << " for layout " << Layout::Code << "\n");
     }
 
-    // TODO: this is not required anymore. Remove it.
-    bool ShouldSerializeAll;
-
     /// Helper function to update ListOfValues for MethodInst. Format:
     /// Attr, SILDeclRef (DeclID, Kind, uncurryLevel, IsObjC), and an operand.
     void handleMethodInst(const MethodInst *MI, SILValue operand,
@@ -205,8 +202,8 @@ namespace {
 
   public:
     SILSerializer(Serializer &S, ASTContext &Ctx,
-                  llvm::BitstreamWriter &Out, bool serializeAll)
-      : S(S), Ctx(Ctx), Out(Out), ShouldSerializeAll(serializeAll) {}
+                  llvm::BitstreamWriter &Out)
+      : S(S), Ctx(Ctx), Out(Out) {}
 
     void writeSILModule(const SILModule *SILMod);
   };
@@ -1697,27 +1694,22 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // FIXME: Resilience: could write out vtable for fragile classes.
   const DeclContext *assocDC = SILMod->getAssociatedContext();
   for (const SILVTable &vt : SILMod->getVTables()) {
-    if (ShouldSerializeAll &&
-        vt.getClass()->isChildContextOf(assocDC))
+    if (vt.getClass()->isChildContextOf(assocDC))
       writeSILVTable(vt);
   }
 
-  // Write out WitnessTables. For now, write out only if EnableSerializeAll.
+  // Write out WitnessTables.
   for (const SILWitnessTable &wt : SILMod->getWitnessTables()) {
-    if (ShouldSerializeAll &&
-        wt.getConformance()->getDeclContext()->isChildContextOf(assocDC))
+    if (wt.getConformance()->getDeclContext()->isChildContextOf(assocDC))
       writeSILWitnessTable(wt);
   }
 
   // Go through all the SILFunctions in SILMod and write out any
   // mandatory function bodies.
   for (const SILFunction &F : *SILMod) {
-    if (shouldEmitFunctionBody(F) || ShouldSerializeAll)
+    if (shouldEmitFunctionBody(F))
       writeSILFunction(F);
   }
-
-  if (ShouldSerializeAll)
-    return;
 
   // Now write function declarations for every function we've
   // emitted a reference to without emitting a function body for.
@@ -1732,10 +1724,10 @@ void SILSerializer::writeSILModule(const SILModule *SILMod) {
   writeIndexTables();
 }
 
-void Serializer::writeSIL(const SILModule *SILMod, bool serializeAllSIL) {
+void Serializer::writeSIL(const SILModule *SILMod) {
   if (!SILMod)
     return;
 
-  SILSerializer SILSer(*this, M->getASTContext(), Out, serializeAllSIL);
+  SILSerializer SILSer(*this, M->getASTContext(), Out);
   SILSer.writeSILModule(SILMod);
 }
