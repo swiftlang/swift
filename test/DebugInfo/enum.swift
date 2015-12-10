@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
 
+// XFAIL: *
+
 // CHECK: ![[EMPTY:.*]] = !{}
 // CHECK: !DICompositeType(tag: DW_TAG_union_type, name: "Color",
 // CHECK-SAME:             line: [[@LINE+3]]

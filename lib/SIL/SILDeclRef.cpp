@@ -248,6 +248,11 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   if (isThunk())
     return SILLinkage::Shared;
   
+  // Enum constructors are essentially the same as thunks, they are
+  // emitted by need and have shared linkage.
+  if (kind == Kind::EnumElement)
+    return SILLinkage::Shared;
+
   // Declarations imported from Clang modules have shared linkage.
   // FIXME: They shouldn't.
   const SILLinkage ClangLinkage = SILLinkage::Shared;

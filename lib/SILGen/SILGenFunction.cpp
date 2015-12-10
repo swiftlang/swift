@@ -169,6 +169,8 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
       SGM.emitForeignToNativeThunk(constant);
     } else if (constant.isNativeToForeignThunk()) {
       SGM.emitNativeToForeignThunk(constant);
+    } else if (constant.kind == SILDeclRef::Kind::EnumElement) {
+      SGM.emitEnumConstructor(cast<EnumElementDecl>(constant.getDecl()));
     }
   }
 
@@ -204,11 +206,6 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
 
   return std::make_tuple(ManagedValue::forUnmanaged(methodValue),
                          methodTy, subs);
-}
-
-ManagedValue SILGenFunction::emitFunctionRef(SILLocation loc,
-                                             SILDeclRef constant) {
-  return emitFunctionRef(loc, constant, getConstantInfo(constant));
 }
 
 ManagedValue SILGenFunction::emitFunctionRef(SILLocation loc,
@@ -614,22 +611,15 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
                                        bool direct,
                                        ArrayRef<SILValue> curriedArgs,
                                        ArrayRef<Substitution> curriedSubs) {
-  // For a foreign function, reference the native thunk.
-  if (next.isForeign)
+  if (next.isForeign || next.isCurried || !next.hasDecl() || direct)
     return gen.emitGlobalFunctionRef(loc, next.asForeign(false));
-
-  // If the fully-uncurried reference is to a native dynamic class method, emit
-  // the dynamic dispatch.
-  auto fullyAppliedMethod = !next.isCurried && !next.isForeign && !direct &&
-    next.hasDecl();
 
   auto constantInfo = gen.SGM.Types.getConstantInfo(next);
   SILValue thisArg;
   if (!curriedArgs.empty())
       thisArg = curriedArgs.back();
 
-  if (fullyAppliedMethod &&
-      isa<AbstractFunctionDecl>(next.getDecl()) &&
+  if (isa<AbstractFunctionDecl>(next.getDecl()) &&
       gen.getMethodDispatch(cast<AbstractFunctionDecl>(next.getDecl()))
         == MethodDispatch::Class) {
     SILValue thisArg = curriedArgs.back();
@@ -645,8 +635,7 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
 
   // If the fully-uncurried reference is to a generic method, look up the
   // witness.
-  if (fullyAppliedMethod &&
-      constantInfo.SILFnType->getRepresentation()
+  if (constantInfo.SILFnType->getRepresentation()
         == SILFunctionTypeRepresentation::WitnessMethod) {
     auto thisType = curriedSubs[0].getReplacement()->getCanonicalType();
     assert(isa<ArchetypeType>(thisType) && "no archetype for witness?!");

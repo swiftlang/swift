@@ -1009,7 +1009,6 @@ public:
   /// Returns a reference to a constant in local context. This will return a
   /// retained closure object reference if the constant refers to a local func
   /// decl.
-  ManagedValue emitFunctionRef(SILLocation loc, SILDeclRef constant);
   ManagedValue emitFunctionRef(SILLocation loc, SILDeclRef constant,
                                SILConstantInfo constantInfo);
   
