@@ -3099,11 +3099,11 @@ bool VarDecl::isSettable(const DeclContext *UseDC,
   // initialized.
   if (hasNonPatternBindingInit())
     return false;
-
+  
   // 'let' parameters are never settable.
   if (isa<ParamDecl>(this))
     return false;
-    
+
   // Properties in structs/classes are only ever mutable in their designated
   // initializer(s).
   if (isInstanceMember()) {
