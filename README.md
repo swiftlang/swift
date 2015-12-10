@@ -1,6 +1,8 @@
 <img src="https://swift.org/assets/images/swift.svg" alt="Swift logo" height="70" >
 # Swift Programming Language
 
+[![License: Apache 2.0 with runtime exception](https://img.shields.io/badge/License-Apache%202.0%20with%20runtime%20exception-lightgrey.svg?style=flat)](https://github.com/apple/swift/blob/master/LICENSE.txt)
+
 **Welcome to Swift!**
 
 Swift is a high-performance system programming language.  It has a clean
