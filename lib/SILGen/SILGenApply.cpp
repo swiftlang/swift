@@ -593,7 +593,7 @@ public:
       constant = Constant.atUncurryLevel(level);
       constantInfo = gen.getConstantInfo(*constant);
 
-      if (SILDeclRef baseConstant = Constant.getOverriddenVTableEntry())
+      if (SILDeclRef baseConstant = Constant.getBaseOverriddenVTableEntry())
         constantInfo = gen.SGM.Types.getConstantOverrideInfo(Constant,
                                                              baseConstant);
       auto methodVal = gen.B.createSuperMethod(Loc,

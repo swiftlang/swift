@@ -512,7 +512,7 @@ StringRef SILDeclRef::mangle(SmallVectorImpl<char> &buffer,
   return stream.str();
 }
 
-SILDeclRef SILDeclRef::getOverriddenVTableEntry() const {
+SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
   if (auto overridden = getOverridden()) {
     // If we overrode a foreign decl, a dynamic method, this is an
     // accessor for a property that overrides an ObjC decl, or if it is an
@@ -542,6 +542,19 @@ SILDeclRef SILDeclRef::getOverriddenVTableEntry() const {
     return overridden;
   }
   return SILDeclRef();
+}
+
+SILDeclRef SILDeclRef::getBaseOverriddenVTableEntry() const {
+  // 'method' is the most final method in the hierarchy which we
+  // haven't yet found a compatible override for.  'cur' is the method
+  // we're currently looking at.  Compatibility is transitive,
+  // so we can forget our original method and just keep going up.
+  SILDeclRef method = *this;
+  SILDeclRef cur = method;
+  while ((cur = cur.getNextOverriddenVTableEntry())) {
+    method = cur;
+  }
+  return method;
 }
 
 SILLocation SILDeclRef::getAsRegularLocation() const {

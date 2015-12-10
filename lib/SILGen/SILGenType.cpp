@@ -232,7 +232,7 @@ public:
     // Try to find an overridden entry.
     // NB: Mutates vtableEntries in-place
     // FIXME: O(n^2)
-    if (auto overridden = member.getOverriddenVTableEntry()) {
+    if (auto overridden = member.getNextOverriddenVTableEntry()) {
       for (SILVTable::Pair &entry : vtableEntries) {
         SILDeclRef ref = overridden;
 

@@ -1736,7 +1736,7 @@ SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
   if (found != ConstantOverrideTypes.end())
     return found->second;
 
-  assert(base.getOverriddenVTableEntry().isNull()
+  assert(base.getNextOverriddenVTableEntry().isNull()
          && "base must not be an override");
 
   auto baseInfo = getConstantInfo(base);

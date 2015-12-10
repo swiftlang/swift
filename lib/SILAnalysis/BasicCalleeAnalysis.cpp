@@ -94,7 +94,7 @@ void CalleeCache::computeClassMethodCalleesForClass(ClassDecl *CD) {
       if (canCallUnknown)
         TheCallees.setInt(true);
 
-      Method = Method.getOverriddenVTableEntry();
+      Method = Method.getNextOverriddenVTableEntry();
     } while (Method);
   }
 }

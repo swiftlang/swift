@@ -212,7 +212,7 @@ private:
                       unsigned uncurryLevel) {
     SILDeclRef declRef(fn, kind, explosionLevel, uncurryLevel);
     // If the method overrides something, we don't need a new entry.
-    if (declRef.getOverriddenVTableEntry())
+    if (declRef.getNextOverriddenVTableEntry())
       return;
 
     // Both static and non-static functions go in the metadata.
