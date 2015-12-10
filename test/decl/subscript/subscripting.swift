@@ -259,3 +259,18 @@ func testSubscript1(s2 : SubscriptTest2) {
   let b = s2[1, "foo"] // expected-error {{cannot subscript a value of type 'SubscriptTest2' with an index of type '(Int, String)'}}
   // expected-note @-1 {{expected an argument list of type '(String, String)'}}
 }
+
+// sr-114 & rdar://22007370
+
+class Foo {
+    subscript(key: String) -> String { // expected-note {{'subscript' previously declared here}}
+        get { a } // expected-error {{use of unresolved identifier 'a'}}
+        set { b } // expected-error {{use of unresolved identifier 'b'}}
+    }
+    
+    subscript(key: String) -> String { // expected-error {{invalid redeclaration of 'subscript'}}
+        get { a } // expected-error {{use of unresolved identifier 'a'}}
+        set { b } // expected-error {{use of unresolved identifier 'b'}}
+    }
+}
+
