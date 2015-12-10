@@ -602,6 +602,40 @@ public:
   void emitValueDestroy(IRGenFunction &IGF, Address addr) const {
     IGF.emitUnownedDestroy(addr, Refcounting);
   }
+
+  bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
+    return true;
+  }
+
+  unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
+    return IGM.getUnownedExtraInhabitantCount(Refcounting);
+  }
+
+  APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                     unsigned bits,
+                                     unsigned index) const override {
+    return IGM.getUnownedExtraInhabitantValue(bits, index, Refcounting);
+  }
+
+  llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
+                                       SILType T) const override {
+    Address valueSrc = projectValue(IGF, src);
+    return IGF.getUnownedExtraInhabitantIndex(valueSrc, Refcounting);
+  }
+
+  void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
+                            Address dest, SILType T) const override {
+    Address valueDest = projectValue(IGF, dest);
+    return IGF.storeUnownedExtraInhabitant(index, valueDest, Refcounting);
+  }
+
+  APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
+    APInt bits = IGM.getUnownedExtraInhabitantMask(Refcounting);
+
+    // Zext out to the size of the existential.
+    bits = bits.zextOrTrunc(getFixedSize().getValueInBits());
+    return bits;
+  }
 };
 
 /// A helper class for working with existential types that can be
@@ -885,14 +919,6 @@ public:
            refcounting == ReferenceCounting::Unknown);
   }
 
-  const LoadableTypeInfo &
-  getValueTypeInfoForExtraInhabitants(IRGenModule &IGM) const {
-    if (Refcounting == ReferenceCounting::Native)
-      return IGM.getNativeObjectTypeInfo();
-    else
-      return IGM.getUnknownObjectTypeInfo();
-  }
-
   llvm::Type *getValueType() const {
     return ValueType;
   }
@@ -912,6 +938,45 @@ public:
 
   void emitValueFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
     IGF.emitFixLifetime(value);
+  }
+
+  const LoadableTypeInfo &
+  getValueTypeInfoForExtraInhabitants(IRGenModule &IGM) const {
+    llvm_unreachable("should have overridden all actual uses of this");
+  }
+
+  bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
+    return true;
+  }
+
+  unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
+    return IGM.getUnownedExtraInhabitantCount(Refcounting);
+  }
+
+  APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                     unsigned bits,
+                                     unsigned index) const override {
+    return IGM.getUnownedExtraInhabitantValue(bits, index, Refcounting);
+  }
+
+  llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
+                                       SILType T) const override {
+    Address valueSrc = projectValue(IGF, src);
+    return IGF.getUnownedExtraInhabitantIndex(valueSrc, Refcounting);
+  }
+
+  void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
+                            Address dest, SILType T) const override {
+    Address valueDest = projectValue(IGF, dest);
+    return IGF.storeUnownedExtraInhabitant(index, valueDest, Refcounting);
+  }
+
+  APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
+    APInt bits = IGM.getUnownedExtraInhabitantMask(Refcounting);
+
+    // Zext out to the size of the existential.
+    bits = bits.zextOrTrunc(asDerived().getFixedSize().getValueInBits());
+    return bits;
   }
 };
 
