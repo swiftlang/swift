@@ -389,24 +389,21 @@ public:
   ///
   /// \return false if the linking failed.
   bool linkFunction(SILFunction *Fun,
-                    LinkingMode LinkAll=LinkingMode::LinkNormal,
-                    std::function<void(SILFunction *)> Callback =nullptr);
+                    LinkingMode LinkAll = LinkingMode::LinkNormal);
 
   /// Attempt to link a function by declaration. Returns true if linking
   /// succeeded, false otherwise.
   ///
   /// \return false if the linking failed.
   bool linkFunction(SILDeclRef Decl,
-                    LinkingMode LinkAll=LinkingMode::LinkNormal,
-                    std::function<void(SILFunction *)> Callback =nullptr);
+                    LinkingMode LinkAll = LinkingMode::LinkNormal);
 
   /// Attempt to link a function by mangled name. Returns true if linking
   /// succeeded, false otherwise.
   ///
   /// \return false if the linking failed.
   bool linkFunction(StringRef Name,
-                    LinkingMode LinkAll=LinkingMode::LinkNormal,
-                    std::function<void(SILFunction *)> Callback =nullptr);
+                    LinkingMode LinkAll = LinkingMode::LinkNormal);
 
   /// Link in all Witness Tables in the module.
   void linkAllWitnessTables();
@@ -476,8 +473,7 @@ public:
   lookUpFunctionInWitnessTable(const ProtocolConformance *C, SILDeclRef Member);
 
   /// Look up the VTable mapped to the given ClassDecl. Returns null on failure.
-  SILVTable *lookUpVTable(const ClassDecl *C,
-                          std::function<void(SILFunction *)> Callback = nullptr);
+  SILVTable *lookUpVTable(const ClassDecl *C);
 
   /// Attempt to lookup the function corresponding to \p Member in the class
   /// hierarchy of \p Class.
