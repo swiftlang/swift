@@ -842,7 +842,7 @@ Inferring Function Purity
 
 The optimizer can infer function purity by knowing that (1) the
 function does not access unspecified state, (2) all arguments are pure
-values, and (3) no calls are made into nonpure code.
+values, and (3) no calls are made into non-pure code.
 
 (1) The effects system described above already tells the optimizer via
     analysis or annotation that the function does not access
