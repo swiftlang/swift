@@ -26,8 +26,6 @@ struct CGForDotView;
 namespace swift {
 
 class BasicCalleeAnalysis;
-class CallGraphAnalysis;
-class CallGraph;
 
 /// The EscapeAnalysis provides information if the lifetime of an object exceeds
 /// the scope of a function.

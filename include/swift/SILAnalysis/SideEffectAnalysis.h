@@ -24,8 +24,6 @@
 namespace swift {
 
 class BasicCalleeAnalysis;
-class CallGraphAnalysis;
-class CallGraph;
 
 
 /// An enum to represent the kind of scan we perform when we calculate
