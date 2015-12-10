@@ -2,7 +2,7 @@
 
 .. OptimizerEffects:
 
-Optimizer Effects: Summarizing and specifing function side effects
+Optimizer Effects: Summarizing and specifying function side effects
 ==================================================================
 
 .. contents::
@@ -738,7 +738,7 @@ effects. This is the crux of the difficulty in defining the CoW
 effects. Consequently, communicating purity to the compiler will
 require some function annotations and/or type constraints.
 
-A CoW type consits of a top-level value type, most likely a struct, and a
+A CoW type consists of a top-level value type, most likely a struct, and a
 referenced storage, which may be shared between multiple instances of the CoW
 type.
 
@@ -842,7 +842,7 @@ Inferring Function Purity
 
 The optimizer can infer function purity by knowing that (1) the
 function does not access unspecified state, (2) all arguments are pure
-values, and (3) no calls are made into nonpure code.
+values, and (3) no calls are made into non-pure code.
 
 (1) The effects system described above already tells the optimizer via
     analysis or annotation that the function does not access
