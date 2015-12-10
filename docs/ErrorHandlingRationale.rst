@@ -1421,7 +1421,7 @@ can throw.
 Typed propagation checking can generally be performed in a secondary
 pass over a type-checked function body: if a function is not permitted
 to throw, walk its body and verify that there are no ``throw``
-expressions or calls to function that can ``throw``.  If all throwing
+expressions or calls to functions that can ``throw``.  If all throwing
 calls must be marked, this can be done prior to type-checking to
 decide syntactically whether a function can apparently throw; of
 course, the later pass is still necessary, but the ability to do this
