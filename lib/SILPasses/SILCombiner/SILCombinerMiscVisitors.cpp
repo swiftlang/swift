@@ -761,6 +761,8 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   SILBasicBlock::iterator II = IEAI->getIterator();
   StoreInst *SI = nullptr;
   InitEnumDataAddrInst *DataAddrInst = nullptr;
+  ApplyInst *AI = nullptr;
+  Operand *EnumInitOperand = nullptr;
   for (;;) {
     if (II == IEAI->getParent()->begin())
       return nullptr;
@@ -772,20 +774,76 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
       DataAddrInst = dyn_cast<InitEnumDataAddrInst>(SI->getDest().getDef());
       if (DataAddrInst && DataAddrInst->getOperand() == IEAI->getOperand())
         break;
+      SI = nullptr;
+    }
+    // Check whether we have an apply initializing the enum.
+    //  %iedai = init_enum_data_addr %enum_addr
+    //         = apply(%iedai,...)
+    //  inject_enum_addr %enum_addr
+    //
+    // We can localize the store to an alloc_stack.
+    // Allowing us to perform the same optimization as for the store.
+    //
+    //  %alloca = alloc_stack
+    //            apply(%alloca#1,...)
+    //  %load = load %alloca#1
+    //  %1 = enum $EnumType, $EnumType.case, %load
+    //  store %1 to %nopayload_addr
+    //
+    if ((AI = dyn_cast<ApplyInst>(&*II))) {
+      auto Params = AI->getSubstCalleeType()->getParameters();
+      unsigned ArgIdx = 0;
+      for (auto &Opd : AI->getArgumentOperands()) {
+        // Found an apply that initializes the enum. We can optimize this by
+        // localizing the initialization to an alloc_stack and loading from it.
+        DataAddrInst = dyn_cast<InitEnumDataAddrInst>(Opd.get().getDef());
+        if (DataAddrInst && DataAddrInst->getOperand() == IEAI->getOperand() &&
+            Params[ArgIdx].getConvention() ==
+                ParameterConvention::Indirect_Out) {
+          EnumInitOperand = &Opd;
+          break;
+        }
+        ++ArgIdx;
+      }
+      // We found an enum initialization.
+      if (EnumInitOperand)
+        break;
+      AI = nullptr;
     }
   }
   // Found the store to this enum payload. Check if the store is the only use.
   if (!DataAddrInst->hasOneUse())
     return nullptr;
 
-  // In that case, create the payload enum/store.
-  EnumInst *E =
+  if (SI) {
+    // In that case, create the payload enum/store.
+    EnumInst *E =
       Builder.createEnum(DataAddrInst->getLoc(), SI->getSrc(),
-                          DataAddrInst->getElement(),
-                          DataAddrInst->getOperand().getType().getObjectType());
+                         DataAddrInst->getElement(),
+                         DataAddrInst->getOperand().getType().getObjectType());
+    Builder.createStore(DataAddrInst->getLoc(), E, DataAddrInst->getOperand());
+    // Cleanup.
+    eraseInstFromFunction(*SI);
+    eraseInstFromFunction(*DataAddrInst);
+    return eraseInstFromFunction(*IEAI);
+  }
+
+  assert(AI && "Must have an apply");
+  // Localize the address access.
+  Builder.setInsertionPoint(AI);
+  auto *AllocStack = Builder.createAllocStack(DataAddrInst->getLoc(),
+                                              EnumInitOperand->get().getType());
+  EnumInitOperand->set(AllocStack->getAddressResult());
+  Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(AI)));
+  SILValue Load(Builder.createLoad(DataAddrInst->getLoc(),
+                                   AllocStack->getAddressResult()),
+                0);
+  EnumInst *E = Builder.createEnum(
+      DataAddrInst->getLoc(), Load, DataAddrInst->getElement(),
+      DataAddrInst->getOperand().getType().getObjectType());
   Builder.createStore(DataAddrInst->getLoc(), E, DataAddrInst->getOperand());
-  // Cleanup.
-  eraseInstFromFunction(*SI);
+  Builder.createDeallocStack(DataAddrInst->getLoc(),
+                             AllocStack->getContainerResult());
   eraseInstFromFunction(*DataAddrInst);
   return eraseInstFromFunction(*IEAI);
 }
