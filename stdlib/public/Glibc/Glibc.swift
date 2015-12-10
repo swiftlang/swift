@@ -69,7 +69,7 @@ internal func _swift_Glibc_fcntl(
   fd: CInt,
   _ cmd: CInt,
   _ value: CInt
-  ) ->CInt
+  ) -> CInt
 
 @warn_unused_result
 @_silgen_name("_swift_Glibc_fcntlPtr")
@@ -77,13 +77,13 @@ internal func _swift_Glibc_fcntlPtr(
   fd: CInt,
   _ cmd: CInt,
   _ ptr: UnsafeMutablePointer<Void>
-  ) ->CInt
+  ) -> CInt
 
 @warn_unused_result
 public func fcntl(
   fd: CInt,
   _ cmd: CInt
-  ) ->CInt {
+  ) -> CInt {
   return _swift_Glibc_fcntl(fd, cmd, 0)
 }
 
@@ -92,7 +92,7 @@ public func fcntl(
   fd: CInt,
   _ cmd: CInt,
   _ value: CInt
-  ) ->CInt {
+  ) -> CInt {
   return _swift_Glibc_fcntl(fd, cmd, value)
 }
 
@@ -101,7 +101,7 @@ public func fcntl(
   fd: CInt,
   _ cmd: CInt,
   _ ptr: UnsafeMutablePointer<Void>
-  ) ->CInt {
+  ) -> CInt {
   return _swift_Glibc_fcntlPtr(fd, cmd, ptr)
 }
 

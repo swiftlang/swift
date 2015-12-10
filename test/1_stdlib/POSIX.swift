@@ -15,7 +15,7 @@ let fn = "test.txt"
 
 POSIXTests.setUp {
   sem_unlink(semaphoreName)
-  unlink(strdup(fn))
+  unlink(fn)
 }
 
 // Failed semaphore creation.
@@ -83,8 +83,8 @@ POSIXTests.test("sem_open existing O_EXCL fail") {
 }
 	
 // Fail because file doesn't exist.
-POSIXTests.test("fcntl fail") {
-  let fd = open(strdup(fn), 0)
+POSIXTests.test("fcntl(CInt, CInt): fail") {
+  let fd = open(fn, 0)
   expectEqual(-1, fd)
   expectEqual(ENOENT, errno)
 	
@@ -93,10 +93,9 @@ POSIXTests.test("fcntl fail") {
 }
 
 // Change modes on existing file.
-POSIXTests.test("fcntl F_GETFL/F_SETFL success with file") {
+POSIXTests.test("fcntl(CInt, CInt): F_GETFL/F_SETFL success with file") {
   // Create and open file.
-  system("touch \(fn)")
-  let fd = open(strdup(fn), 0)
+  let fd = open(fn, O_CREAT, 0o666)
   expectGT(Int(fd), 0)
 	
   var flags = fcntl(fd, F_GETFL)
@@ -120,11 +119,11 @@ POSIXTests.test("fcntl F_GETFL/F_SETFL success with file") {
   rc = close(fd)
   expectEqual(0, rc)
 	
-  rc = unlink(strdup(fn))
+  rc = unlink(fn)
   expectEqual(0, rc)
 }
 
-POSIXTests.test("fcntl block and unblocking sockets success") {
+POSIXTests.test("fcntl(CInt, CInt, CInt): block and unblocking sockets success") {
   // Create socket, note: socket created by default in blocking mode...
   let sock = socket(PF_INET, 1, 0)
   expectGT(Int(sock), 0)
@@ -151,26 +150,26 @@ POSIXTests.test("fcntl block and unblocking sockets success") {
   expectEqual(0, rc)
 }
 
-POSIXTests.test("fcntl locking and unlocking success") {
+POSIXTests.test("fcntl(CInt, CInt, UnsafeMutablePointer<Void>): locking and unlocking success") {
   // Create the file and add data to it...
-  var fd = open(strdup(fn), O_CREAT | O_WRONLY, 0o666)
+  var fd = open(fn, O_CREAT | O_WRONLY, 0o666)
   expectGT(Int(fd), 0)
 	
   let data = "Testing 1 2 3"
-  let bytesWritten = write(fd, data, data.characters.count)
-  expectEqual(data.characters.count, bytesWritten)
+  let bytesWritten = write(fd, data, data.utf8.count)
+  expectEqual(data.utf8.count, bytesWritten)
 	
   var rc = close(fd)
   expectEqual(0, rc)
 	
   // Re-open the file...
-  fd = open(strdup(fn), 0)
+  fd = open(fn, 0)
   expectGT(Int(fd), 0)
 	
   // Lock for reading...
   var flck = flock()
   flck.l_type = Int16(F_RDLCK)
-  flck.l_len = off_t(data.characters.count)
+  flck.l_len = off_t(data.utf8.count)
   rc = fcntl(fd, F_SETLK, &flck)
   expectEqual(0, rc)
 	
@@ -184,7 +183,7 @@ POSIXTests.test("fcntl locking and unlocking success") {
   rc = close(fd)
   expectEqual(0, rc)
 	
-  rc = unlink(strdup(fn))
+  rc = unlink(fn)
   expectEqual(0, rc)
 }
 
