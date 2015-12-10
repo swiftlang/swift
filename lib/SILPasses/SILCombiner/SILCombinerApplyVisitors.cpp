@@ -1392,9 +1392,9 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
       SILBasicBlock *NormalBB = AI->getNormalBB();
       SILBasicBlock *ErrorBB = AI->getErrorBB();
       SILLocation Loc = AI->getLoc();
-      eraseApply(AI, Users);
       Builder.setInsertionPoint(BB);
       Builder.setCurrentDebugScope(AI->getDebugScope());
+      eraseApply(AI, Users);
 
       // Replace the try_apply with a cond_br false, which will be removed by
       // SimplifyCFG. We don't want to modify the CFG in SILCombine.
