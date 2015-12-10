@@ -332,6 +332,27 @@ ArrayTestSuite.test("${Kind}/popLast") {
 }
 % end
 
+% for array_type in ['Array']:
+ArrayTestSuite.test("${array_type}/rotate") {
+  if true {
+    var arr: ${array_type}<Double> = []
+    arr.rotate(0, middleIndex: 0, lastIndex: 0)
+    expectEqual([], arr)
+  }
+  if true {
+    var arr: ${array_type}<Int> = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    arr.rotate(0, middleIndex: 2, lastIndex: 9)
+    expectEqual([2, 3, 4, 5, 6, 7, 8, 9, 0, 1], arr)
+  }
+  if true {
+    var arr: ${array_type}<Int> = [10, 12, 13, 11, 14, 15]
+    arr.rotate(1, middleIndex: 3, lastIndex: 4)
+    expectEqual([10, 11, 12, 13, 14, 15], arr)
+  }
+}
+%end
+
+
 // Check how removeFirst() affects indices.
 % for Kind in ['Array', 'ContiguousArray']:
 ArrayTestSuite.test("${Kind}/removeFirst") {
