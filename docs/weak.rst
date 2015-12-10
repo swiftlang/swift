@@ -1141,7 +1141,7 @@ The library should definitely provide the following types:
   will preserve the weakness of the reference.
 
   In keeping with our design for :code:`unowned`, I think this type
-  should should actually be an alias to either
+  should actually be an alias to either
   :code:`SafeUnownedReference<T>` or :code:`UnsafeUnownedReference<T>`
   depending on the current component's build settings.  The choice
   would be exported in binary modules, but for cleanliness we would
