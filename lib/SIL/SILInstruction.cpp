@@ -176,10 +176,19 @@ void SILInstruction::replaceAllUsesWithUndef() {
   }
 }
 
+namespace swift {
+  void deallocate(void *Ptr) {
+    AlignedFree(Ptr);
+  }
+}
+
 namespace {
   class InstructionDestroyer : public SILVisitor<InstructionDestroyer> {
   public:
-#define VALUE(CLASS, PARENT) void visit##CLASS(CLASS *I) { I->~CLASS(); }
+#define VALUE(CLASS, PARENT) void visit##CLASS(CLASS *I) { \
+  I->~CLASS();\
+  deallocate(I);\
+  }
 #include "swift/SIL/SILNodes.def"
   };
 } // end anonymous namespace
