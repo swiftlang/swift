@@ -30,6 +30,7 @@ class SILArgument;
 class SILBasicBlock :
 public llvm::ilist_node<SILBasicBlock>, public SILAllocated<SILBasicBlock> {
   friend class SILSuccessor;
+  friend class SILFunction;
 public:
   using InstListType = llvm::iplist<SILInstruction>;
 private:
