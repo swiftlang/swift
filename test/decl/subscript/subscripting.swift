@@ -228,16 +228,14 @@ struct tuple_index {
 
 
 struct SubscriptTest1 {
-  subscript(keyword:String) -> Bool { return true }  // expected-note 3 {{found this candidate}}
-  subscript(keyword:String) -> String? {return nil }  // expected-note 3 {{found this candidate}}
+  subscript(keyword:String) -> Bool { return true }  // expected-note 2 {{found this candidate}}
+  subscript(keyword:String) -> String? {return nil }  // expected-note 2 {{found this candidate}}
 }
 
 func testSubscript1(s1 : SubscriptTest1) {
   let _ : Int = s1["hello"]  // expected-error {{ambiguous subscript with base type 'SubscriptTest1' and index type 'String'}}
   
-  // FIXME: This is a sema bug, it should not be ambiguous due to its contextual boolean type. 
-  // rdar://18741539
-  if s1["hello"] {}  // expected-error {{ambiguous subscript with base type 'SubscriptTest1' and index type 'String'}}
+  if s1["hello"] {}
   
   
   let _ = s1["hello"]  // expected-error {{ambiguous use of 'subscript'}}

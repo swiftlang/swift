@@ -1454,6 +1454,9 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       TypeResolutionOptions options;
       options |= TR_OverrideType;
       options |= TR_InExpression;
+      if (isa<EditorPlaceholderExpr>(expr->getSemanticsProvidingExpr())) {
+        options |= TR_EditorPlaceholder;
+      }
       if (tc.coercePatternToType(pattern, DC, patternType, options)) {
         return nullptr;
       }
@@ -1566,6 +1569,9 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
     /// The type of the initializer.
     Type InitType;
 
+    /// The type of the sequence.
+    Type SequenceType;
+
   public:
     explicit BindingListener(ForEachStmt *stmt) : Stmt(stmt) { }
 
@@ -1581,12 +1587,23 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         return true;
       }
 
+      SequenceType =
+        cs.createTypeVariable(Locator, /*options=*/TVO_MustBeMaterializable);
       cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
+                       SequenceType, Locator);
+      cs.addConstraint(ConstraintKind::ConformsTo, SequenceType,
                        sequenceProto->getDeclaredType(), Locator);
+
+      auto generatorLocator =
+        cs.getConstraintLocator(Locator,
+                                ConstraintLocator::SequenceGeneratorType);
+      auto elementLocator =
+        cs.getConstraintLocator(generatorLocator,
+                                ConstraintLocator::GeneratorElementType);
 
       // Collect constraints from the element pattern.
       auto pattern = Stmt->getPattern();
-      InitType = cs.generateConstraints(pattern, Locator);
+      InitType = cs.generateConstraints(pattern, elementLocator);
       if (!InitType)
         return true;
       
@@ -1619,13 +1636,10 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       
         // Determine the generator type of the sequence.
         generatorType = cs.createTypeVariable(Locator, /*options=*/0);
-        cs.addConstraint(
-          Constraint::create(cs, ConstraintKind::TypeMember,
-                             expr->getType(), generatorType,
-                             tc.Context.Id_Generator,
-                             cs.getConstraintLocator(
-                               Locator,
-                               ConstraintLocator::SequenceGeneratorType)));
+        cs.addConstraint(Constraint::create(
+                           cs, ConstraintKind::TypeMember,
+                           SequenceType, generatorType,
+                           tc.Context.Id_Generator, generatorLocator));
 
         // Determine the element type of the generator.
         // FIXME: Should look up the type witness.
@@ -1633,31 +1647,30 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         cs.addConstraint(Constraint::create(
                            cs, ConstraintKind::TypeMember,
                            generatorType, elementType,
-                           tc.Context.Id_Element,
-                           cs.getConstraintLocator(
-                             Locator,
-                             ConstraintLocator::GeneratorElementType)));
+                           tc.Context.Id_Element, elementLocator));
       }
       
 
       // Add a conversion constraint between the element type of the sequence
       // and the type of the element pattern.
       cs.addConstraint(ConstraintKind::Conversion, elementType, InitType,
-                       Locator);
+                       elementLocator);
       
       Stmt->setSequence(expr);
       return false;
     }
 
     virtual Expr *appliedSolution(Solution &solution, Expr *expr) {
-      // Figure out what type the constraints decided on.
+      // Figure out what types the constraints decided on.
       auto &cs = solution.getConstraintSystem();
       auto &tc = cs.getTypeChecker();
       InitType = solution.simplifyType(tc, InitType);
+      SequenceType = solution.simplifyType(tc, SequenceType);
 
-      // Force the sequence to be materializable.
-      // FIXME: work this into the constraint system
-      expr = tc.coerceToMaterializable(expr);
+      // Perform any necessary conversions of the sequence (e.g. [T]! -> [T]).
+      if (tc.convertToType(expr, SequenceType, cs.DC)) {
+        return nullptr;
+      }
 
       // Apply the solution to the iteration pattern as well.
       Pattern *pattern = Stmt->getPattern();

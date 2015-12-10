@@ -365,6 +365,9 @@ enum TypeResolutionFlags : unsigned {
   /// Whether we should resolve only the structure of the resulting
   /// type rather than its complete semantic properties.
   TR_ResolveStructure = 0x100000,
+
+  /// Whether this is the type of an editor placeholder.
+  TR_EditorPlaceholder = 0x200000,
 };
 
 /// Option set describing how type resolution should work.

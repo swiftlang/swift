@@ -2471,9 +2471,20 @@ namespace {
     }
 
     Type visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
+      if (E->getTypeLoc().isNull()) {
+        auto locator = CS.getConstraintLocator(E);
+        auto placeholderTy = CS.createTypeVariable(locator, /*options*/0);
+        // A placeholder may have any type, but default to Void type if
+        // otherwise unconstrained.
+        CS.addConstraint(ConstraintKind::Defaultable,
+                         placeholderTy, TupleType::getEmpty(CS.getASTContext()),
+                         locator);
+        E->setType(placeholderTy);
+      }
+      // NOTE: The type loc may be there but have failed to validate, in which
+      // case we return the null type.
       return E->getType();
     }
-
   };
 
   /// \brief AST walker that "sanitizes" an expression for the

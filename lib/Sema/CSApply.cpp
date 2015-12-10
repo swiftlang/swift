@@ -3247,6 +3247,29 @@ namespace {
     }
     
     Expr *visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
+      Type valueType = simplifyType(E->getType());
+      E->setType(valueType);
+
+      auto &tc = cs.getTypeChecker();
+      auto &ctx = tc.Context;
+      // Synthesize a call to _undefined() of appropriate type.
+      FuncDecl *undefinedDecl = ctx.getUndefinedDecl(&tc);
+      if (!undefinedDecl) {
+        tc.diagnose(E->getLoc(), diag::missing_undefined_runtime);
+        return nullptr;
+      }
+      DeclRefExpr *fnRef = new (ctx) DeclRefExpr(undefinedDecl, SourceLoc(),
+                                                 /*Implicit=*/true);
+      StringRef msg = "attempt to evaluate editor placeholder";
+      Expr *argExpr = new (ctx) StringLiteralExpr(msg, E->getLoc(),
+                                                  /*implicit*/true);
+      argExpr = new (ctx) ParenExpr(E->getLoc(), argExpr, E->getLoc(),
+                                    /*hasTrailingClosure*/false);
+      Expr *callExpr = new (ctx) CallExpr(fnRef, argExpr, /*implicit*/true);
+      bool invalid = tc.typeCheckExpression(callExpr, cs.DC, valueType,
+                                            CTP_CannotFail);
+      assert(!invalid && "conversion cannot fail");
+      E->setSemanticExpr(callExpr);
       return E;
     }
 

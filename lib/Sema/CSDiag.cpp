@@ -2014,14 +2014,16 @@ static bool isConversionConstraint(const Constraint *C) {
 /// low that we would only like to issue an error message about it if there is
 /// nothing else interesting we can scrape out of the constraint system.
 static bool isLowPriorityConstraint(Constraint *C) {
-  // If the member constraint is a ".Element" lookup to find the element type of
-  // a generator in a foreach loop, then it is very low priority: We will get a
-  // better and more useful diagnostic from the failed conversion to
-  // SequenceType that will fail as well.
+  // If the member constraint is a ".Generator" lookup to find the generator
+  // type in a foreach loop, or a ".Element" lookup to find its element type,
+  // then it is very low priority: We will get a better and more useful
+  // diagnostic from the failed conversion to SequenceType that will fail as
+  // well.
   if (C->getKind() == ConstraintKind::TypeMember) {
     if (auto *loc = C->getLocator())
       for (auto Elt : loc->getPath())
-        if (Elt.getKind() ==  ConstraintLocator::GeneratorElementType)
+        if (Elt.getKind() == ConstraintLocator::GeneratorElementType ||
+            Elt.getKind() == ConstraintLocator::SequenceGeneratorType)
           return true;
   }
 
@@ -2457,7 +2459,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
 
   Type fromType = CS->simplifyType(constraint->getFirstType());
   
-  if (fromType->is<TypeVariableType>() && resolvedAnchorToExpr) {
+  if (fromType->hasTypeVariable() && resolvedAnchorToExpr) {
     TCCOptions options;
     
     // If we know we're removing a contextual constraint, then we can force a
@@ -2548,12 +2550,16 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
       return true;
     }
 
-    // Emit a conformance error through conformsToProtocol.  If this succeeds,
-    // then keep searching.
+    // Emit a conformance error through conformsToProtocol.  If this succeeds
+    // and yields a valid protocol conformance, then keep searching.
+    ProtocolConformance *Conformance = nullptr;
     if (CS->TC.conformsToProtocol(fromType, PT->getDecl(), CS->DC,
                                   ConformanceCheckFlags::InExpression,
-                                  nullptr, expr->getLoc()))
-      return false;
+                                  &Conformance, expr->getLoc())) {
+      if (!Conformance || !Conformance->isInvalid()) {
+        return false;
+      }
+    }
     return true;
   }
 
