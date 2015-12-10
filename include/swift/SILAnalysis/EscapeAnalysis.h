@@ -499,6 +499,11 @@ public:
     /// Propagates the escape states through the graph.
     void propagateEscapeStates();
 
+    /// Removes a value from the graph.
+    /// It does not delete its node but makes sure that the value cannot be
+    /// lookup-up with getNode() anymore.
+    void removeFromGraph(ValueBase *V) { Values2Nodes.erase(V); }
+
   public:
 
     /// Gets or creates a node for a value \p V.
@@ -718,6 +723,10 @@ public:
   virtual void invalidate(InvalidationKind K);
 
   virtual void invalidate(SILFunction *F, InvalidationKind K);
+
+  virtual void handleDeleteNotification(ValueBase *I) override;
+
+  virtual bool needsNotifications() override { return true; }
 
   virtual void verify() const {
 #ifndef NDEBUG

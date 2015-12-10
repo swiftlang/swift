@@ -1523,6 +1523,18 @@ void EscapeAnalysis::invalidate(SILFunction *F, InvalidationKind K) {
   }
 }
 
+void EscapeAnalysis::handleDeleteNotification(ValueBase *I) {
+  if (SILBasicBlock *Parent = I->getParentBB()) {
+    SILFunction *F = Parent->getParent();
+    if (FunctionInfo *FInfo = Function2Info.lookup(F)) {
+      if (FInfo->isValid()) {
+        FInfo->Graph.removeFromGraph(I);
+        FInfo->SummaryGraph.removeFromGraph(I);
+      }
+    }
+  }
+}
+
 SILAnalysis *swift::createEscapeAnalysis(SILModule *M) {
   return new EscapeAnalysis(M);
 }
