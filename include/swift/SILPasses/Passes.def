@@ -79,6 +79,8 @@ PASS(EarlyInliner, "early-inline",
      "Inline functions that are not marked as having special semantics")
 PASS(EmitDFDiagnostics, "dataflow-diagnostics",
      "Emit SIL Diagnostics")
+PASS(EscapeAnalysisDumper, "escapes-dump",
+     "Dumps the results of escape analysis for all functions")
 PASS(ExternalDefsToDecls, "external-defs-to-decls",
      "Convert external definitions to decls")
 PASS(ExternalFunctionDefinitionsElimination, "external-func-definition-elim",
@@ -185,8 +187,6 @@ PASS(StripDebugInfo, "strip-debug-info",
      "Strip debug info")
 PASS(SwiftArrayOpts, "array-specialize",
      "Specialize arrays")
-PASS(UpdateEscapeAnalysis, "update-escapes",
-     "Update the escape analysis for all functions")
 PASS(UsePrespecialized, "use-prespecialized",
      "Use pre-specialized functions")
 PASS_RANGE(AllPasses, AADumper, UsePrespecialized)

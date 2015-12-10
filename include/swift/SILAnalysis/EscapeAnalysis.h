@@ -15,7 +15,7 @@
 
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/SILAnalysis/Analysis.h"
+#include "swift/SILAnalysis/BottomUpIPAnalysis.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
@@ -31,10 +31,6 @@ class CallGraph;
 
 /// The EscapeAnalysis provides information if the lifetime of an object exceeds
 /// the scope of a function.
-/// The analysis is done intra- and interprocedural. The intraprocedural
-/// analysis is updated on the fly based on the usual invalidation mechanism.
-/// The interprocedural analysis is explicitly updated at some points in the
-/// pass pipeline by the UpdateSideEffects pass.
 ///
 /// We compute the escape analysis by building a connection graph for each
 /// function. For the interprocedural analysis the connection graphs are merged
@@ -42,7 +38,7 @@ class CallGraph;
 /// The idea is based on "Escape analysis for Java." by J.-D. Choi, M. Gupta, M.
 /// Serrano, V. C. Sreedhar, and S. Midkiff
 /// http://dx.doi.org/10.1145/320384.320386
-class EscapeAnalysis : public SILAnalysis {
+class EscapeAnalysis : public BottomUpIPAnalysis {
 
   /// The types of edges in the connection graph.
   /// Escape information is propagated along edges in the connection graph:
@@ -366,14 +362,16 @@ public:
     /// Mapping of use points to bit indices in CGNode::UsePoints.
     llvm::DenseMap<ValueBase *, int> UsePoints;
 
-    /// True if the CGNode::UsePoints are computed.
-    bool UsePointsComputed = false;
-
     /// The allocator for nodes.
     llvm::SpecificBumpPtrAllocator<CGNode> NodeAllocator;
 
     /// Constructs a connection graph for a function.
     ConnectionGraph(SILFunction *F) : F(F) {
+    }
+
+    /// Returns true if the connection graph is empty.
+    bool isEmpty() {
+      return Values2Nodes.empty() && Nodes.empty() && UsePoints.empty();
     }
 
     /// Removes all nodes from the graph.
@@ -491,7 +489,6 @@ public:
     bool defer(CGNode *From, CGNode *To) {
       bool EdgeAdded = addDeferEdge(From, To);
       mergeAllScheduledNodes();
-      verify();
       return EdgeAdded;
     }
 
@@ -520,7 +517,6 @@ public:
     int getNumUsePoints(CGNode *Node) {
       assert(!Node->escapes() &&
              "Use points are only valid for non-escaping nodes");
-      computeUsePoints();
       return Node->UsePoints.count();
     }
 
@@ -565,13 +561,8 @@ public:
 
 private:
 
-  enum {
-    /// A limit for the interprocedural algorithm.
-    MaxGraphMerges = 4
-  };
-
   /// All the information we keep for a function.
-  struct FunctionInfo {
+  struct FunctionInfo : public FunctionInfoBase<FunctionInfo> {
     FunctionInfo(SILFunction *F) : Graph(F), SummaryGraph(F) { }
 
     /// The connection graph for the function. This is what clients of the
@@ -585,15 +576,29 @@ private:
     /// when explicitly calling recompute().
     ConnectionGraph SummaryGraph;
 
-    /// The callsites from which we have to merge the callee graphs.
-    llvm::SmallVector<FullApplySite, 8> KnownCallees;
-
     /// If true, at least one of the callee graphs has changed. We have to merge
     /// them again.
-    bool NeedMergeCallees = false;
+    bool NeedUpdateSummaryGraph = true;
 
-    /// True if the Graph is valid.
-    bool Valid = false;
+    /// Clears the analysis data on invalidation.
+    void clear() {
+      Graph.clear();
+      SummaryGraph.clear();
+    }
+  };
+
+  typedef BottomUpFunctionOrder<FunctionInfo> FunctionOrder;
+
+  enum {
+    /// The maximum call-graph recursion depth for recomputing the analysis.
+    /// This is a relatively small number to reduce compile time in case of
+    /// large cycles in the call-graph.
+    /// In case of no cycles, we should not hit this limit at all because the
+    /// pass manager processes functions in bottom-up order.
+    MaxRecursionDepth = 3,
+
+    /// A limit for the number of call-graph iterations in recompute().
+    MaxGraphMerges = 4
   };
 
   /// The connection graphs for all functions (does not include external
@@ -614,12 +619,6 @@ private:
   /// Callee analysis, used for determining the callees at call sites.
   BasicCalleeAnalysis *BCA;
   
-  /// This analysis depends on the call graph.
-  CallGraphAnalysis *CGA;
-  
-  /// If false, nothing has changed between two recompute() calls.
-  bool shouldRecompute;
-
   /// Returns true if \p V is a "pointer" value.
   /// See EscapeAnalysis::NodeType::Value.
   bool isPointer(ValueBase *V);
@@ -630,17 +629,26 @@ private:
       ConGraph->setEscapesGlobal(Node);
   }
 
-  /// Builds the connection graph and the summary graph for a function, but
-  /// does not handle applys of known callees. This is done afterwards in
-  /// mergeAllCallees.
-  void buildConnectionGraphs(FunctionInfo *FInfo);
+  /// Gets or creates FunctionEffects for \p F.
+  FunctionInfo *getFunctionInfo(SILFunction *F) {
+    FunctionInfo *&FInfo = Function2Info[F];
+    if (!FInfo)
+      FInfo = new (Allocator.Allocate()) FunctionInfo(F);
+    return FInfo;
+  }
 
-  /// Returns true if all called functions from an apply site are known and not
-  /// external.
-  bool allCalleeFunctionsVisible(FullApplySite FAS);
+  /// Builds the connection graph for a function, including called functions.
+  /// Visited callees are added to \p BottomUpOrder until \p RecursionDepth
+  /// reaches MaxRecursionDepth.
+  void buildConnectionGraph(FunctionInfo *FInfo, FunctionOrder &BottomUpOrder,
+                            int RecursionDepth);
 
   /// Updates the graph by analysing instruction \p I.
-  void analyzeInstruction(SILInstruction *I, FunctionInfo *FInfo);
+  /// Visited callees are added to \p BottomUpOrder until \p RecursionDepth
+  /// reaches MaxRecursionDepth.
+  void analyzeInstruction(SILInstruction *I, FunctionInfo *FInfo,
+                          FunctionOrder &BottomUpOrder,
+                          int RecursionDepth);
 
   /// Updates the graph by analysing instruction \p SI, which may be a
   /// select_enum, select_enum_addr or select_value.
@@ -653,8 +661,9 @@ private:
   /// Sets all operands and results of \p I as global escaping.
   void setAllEscaping(SILInstruction *I, ConnectionGraph *ConGraph);
 
-  /// Merge the graphs of all known callees into this graph.
-  bool mergeAllCallees(FunctionInfo *FInfo, CallGraph &CG);
+  /// Recomputes the connection grpah for the function \p Initial and
+  /// all called functions, up to a recursion depth of MaxRecursionDepth.
+  void recompute(FunctionInfo *Initial);
 
   /// Merges the graph of a callee function into the graph of
   /// a caller function, whereas \p FAS is the call-site.
@@ -665,9 +674,6 @@ private:
   /// Merge the \p Graph into \p SummaryGraph.
   bool mergeSummaryGraph(ConnectionGraph *SummaryGraph,
                          ConnectionGraph *Graph);
-
-  /// Set all arguments and return values of all callees to global escaping.
-  void finalizeGraphsConservatively(FunctionInfo *FInfo);
 
   /// Returns true if the value \p V can escape to the \p UsePoint, where
   /// \p UsePoint is either a release-instruction or a function call.
@@ -685,15 +691,11 @@ public:
 
   virtual void initialize(SILPassManager *PM);
 
-  /// Gets or creates a connection graph for \a F.
+  /// Gets the connection graph for \a F.
   ConnectionGraph *getConnectionGraph(SILFunction *F) {
-    FunctionInfo *&FInfo = Function2Info[F];
-    if (!FInfo)
-      FInfo = new (Allocator.Allocate()) FunctionInfo(F);
-
-    if (!FInfo->Valid)
-      buildConnectionGraphs(FInfo);
-
+    FunctionInfo *FInfo = getFunctionInfo(F);
+    if (!FInfo->isValid())
+      recompute(FInfo);
     return &FInfo->Graph;
   }
 
@@ -713,23 +715,9 @@ public:
 
   bool canPointToSameMemory(SILValue V1, SILValue V2, ConnectionGraph *ConGraph);
 
-  /// Recomputes the connection graphs for all functions the module.
-  void recompute();
+  virtual void invalidate(InvalidationKind K);
 
-  virtual void invalidate(InvalidationKind K) {
-    Function2Info.clear();
-    Allocator.DestroyAll();
-    shouldRecompute = true;
-  }
-  
-  virtual void invalidate(SILFunction *F, InvalidationKind K) {
-    if (FunctionInfo *FInfo = Function2Info.lookup(F)) {
-      FInfo->Graph.clear();
-      FInfo->KnownCallees.clear();
-      FInfo->Valid = false;
-      shouldRecompute = true;
-    }
-  }
+  virtual void invalidate(SILFunction *F, InvalidationKind K);
 
   virtual void verify() const {
 #ifndef NDEBUG

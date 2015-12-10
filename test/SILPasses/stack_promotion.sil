@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -update-escapes -stack-promotion -enable-sil-verify-all %s | FileCheck %s
+// RUN: %target-sil-opt -stack-promotion -enable-sil-verify-all %s | FileCheck %s
 
 sil_stage canonical
 
