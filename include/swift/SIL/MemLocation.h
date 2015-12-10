@@ -20,6 +20,7 @@
 #define SWIFT_SIL_MEMLOCATION_H
 
 #include "swift/SILAnalysis/AliasAnalysis.h"
+#include "swift/SILAnalysis/TypeExpansionAnalysis.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILAnalysis/ValueTracking.h"
@@ -68,8 +69,12 @@ public:
   SILValueProjection() : Base(), Kind(NormalKey) {}
   SILValueProjection(KeyKind Kind) : Base(), Kind(Kind) {}
   SILValueProjection(SILValue B) : Base(B), Kind(NormalKey) {}
-  SILValueProjection(SILValue B, ProjectionPath &P, KeyKind Kind = NormalKey)
-      : Base(B), Kind(Kind), Path(std::move(P)) {}
+  SILValueProjection(SILValue B, const ProjectionPath &P, KeyKind Kind = NormalKey)
+      : Base(B), Kind(Kind) {
+    ProjectionPath T;
+    T.append(P);
+    Path = std::move(T);
+  }
 
   /// Destructors.
   virtual ~SILValueProjection() {}
@@ -273,7 +278,7 @@ public:
   /// Constructors.
   LoadStoreValue() : SILValueProjection(), IsCoveringValue(false) {}
   LoadStoreValue(SILValue B) : SILValueProjection(B), IsCoveringValue(false) {}
-  LoadStoreValue(SILValue B, ProjectionPath &P)
+  LoadStoreValue(SILValue B, const ProjectionPath &P)
       : SILValueProjection(B, P), IsCoveringValue(false) {}
 
   /// Copy constructor.
@@ -385,7 +390,7 @@ public:
       : SILValueProjection(B, P, Kind) {}
   MemLocation(KeyKind Kind) : SILValueProjection(Kind) {} 
   /// Use the concatenation of the 2 ProjectionPaths as the Path.
-  MemLocation(SILValue B, ProjectionPath &P1, ProjectionPath &P2) 
+  MemLocation(SILValue B, const ProjectionPath &P1, const ProjectionPath &P2) 
       : SILValueProjection(B) {
     ProjectionPath T;
     T.append(P1);
@@ -447,16 +452,18 @@ public:
   /// fields. Therefore, we expand all the operations on aggregates onto
   /// individual fields and process them separately.
   static void expand(MemLocation &Base, SILModule *Mod, MemLocationList &Locs,
-                     TypeExpansionMap &TypeExpansionVault);
+                     TypeExpansionAnalysis *TE);
 
   /// Given a set of locations derived from the same base, try to merge/reduce
   /// them into smallest number of MemLocations possible.
-  static void reduce(MemLocation &Base, SILModule *Mod, MemLocationSet &Locs);
+  static void reduce(MemLocation &Base, SILModule *Mod, MemLocationSet &Locs,
+                     TypeExpansionAnalysis *TE);
 
   /// Given a memory location and a SILValue, expand the location into its
   /// individual fields and the values that is in each individual field.
   static void expandWithValues(MemLocation &Base, SILValue &Val, SILModule *Mod,
-                               MemLocationList &Locs, LoadStoreValueList &Vals);
+                               MemLocationList &Locs, LoadStoreValueList &Vals,
+                               TypeExpansionAnalysis *TE);
 
   /// Given a memory location and a map between the expansions of the location
   /// and their corresponding values, try to come up with a single SILValue this
@@ -467,19 +474,20 @@ public:
   /// concrete (i.e. not coverings set) available value in LocAndVal.
   static SILValue reduceWithValues(MemLocation &Base, SILModule *Mod,
                                    MemLocationValueMap &LocAndVal,
-                                   SILInstruction *InsertPt);
+                                   SILInstruction *InsertPt,
+                                   TypeExpansionAnalysis *TE);
 
   /// Enumerate the given Mem MemLocation.
   static void enumerateMemLocation(SILModule *M, SILValue Mem,
                                    std::vector<MemLocation> &MemLocationVault,
                                    MemLocationIndexMap &LocToBit,
-                                   TypeExpansionMap &TypeExpansionVault);
+                                   TypeExpansionAnalysis *TE);
 
   /// Enumerate all the locations in the function.
   static void enumerateMemLocations(SILFunction &F,
                                     std::vector<MemLocation> &MemLocationVault,
                                     MemLocationIndexMap &LocToBit,
-                                    TypeExpansionMap &TypeExpansionVault);
+                                    TypeExpansionAnalysis *TE);
 };
 
 static inline llvm::hash_code hash_value(const MemLocation &L) {

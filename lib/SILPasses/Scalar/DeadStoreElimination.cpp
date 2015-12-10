@@ -284,6 +284,9 @@ class DSEContext {
   /// Alias Analysis.
   AliasAnalysis *AA;
 
+  /// Type Expansion Analysis.
+  TypeExpansionAnalysis *TE;
+
   /// Allocator.
   llvm::BumpPtrAllocator BPA;
 
@@ -297,9 +300,6 @@ class DSEContext {
   /// BlockState is then laid on top of it to keep track of which MemLocation
   /// has an upward visible store.
   std::vector<MemLocation> MemLocationVault;
-
-  /// Caches a list of projection paths to leaf nodes in the given type.
-  TypeExpansionMap TypeExpansionVault;
 
   /// Contains a map between location to their index in the MemLocationVault.
   MemLocationIndexMap LocToBitIndex;
@@ -392,8 +392,8 @@ class DSEContext {
 public:
   /// Constructor.
   DSEContext(SILFunction *F, SILModule *M, SILPassManager *PM,
-             AliasAnalysis *AA)
-      : Mod(M), F(F), PM(PM), AA(AA) {}
+             AliasAnalysis *AA, TypeExpansionAnalysis *TE)
+      : Mod(M), F(F), PM(PM), AA(AA), TE(TE) {}
 
   /// Compute the kill set for the basic block. return true if the store set
   /// changes.
@@ -619,7 +619,7 @@ void DSEContext::processRead(SILInstruction *I, BlockState *S, SILValue Mem,
   // Expand the given Mem into individual fields and process them as
   // separate reads.
   MemLocationList Locs;
-  MemLocation::expand(L, &I->getModule(), Locs, TypeExpansionVault);
+  MemLocation::expand(L, &I->getModule(), Locs, TE);
   if (isBuildingGenKillSet(Kind)) {
     for (auto &E : Locs) {
       // Only building the gen and kill sets for now.
@@ -670,7 +670,7 @@ void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
   // writes.
   bool Dead = true;
   MemLocationList Locs;
-  MemLocation::expand(L, Mod, Locs, TypeExpansionVault);
+  MemLocation::expand(L, Mod, Locs, TE);
   llvm::BitVector V(Locs.size());
   if (isBuildingGenKillSet(Kind)) {
     for (auto &E : Locs) {
@@ -716,7 +716,7 @@ void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
     }
 
     // Try to create as few aggregated stores as possible out of the locations.
-    MemLocation::reduce(L, Mod, Alives);
+    MemLocation::reduce(L, Mod, Alives, TE);
 
     // Oops, we have too many smaller stores generated, bail out.
     if (Alives.size() > MaxPartialDeadStoreCountLimit)
@@ -853,8 +853,7 @@ SILValue DSEContext::createExtract(SILValue Base,
 void DSEContext::run() {
   // Walk over the function and find all the locations accessed by
   // this function.
-  MemLocation::enumerateMemLocations(*F, MemLocationVault, LocToBitIndex,
-                                     TypeExpansionVault);
+  MemLocation::enumerateMemLocations(*F, MemLocationVault, LocToBitIndex, TE);
 
   // For all basic blocks in the function, initialize a BB state. Since we
   // know all the locations accessed in this function, we can resize the bit
@@ -931,10 +930,11 @@ public:
   /// The entry point to the transformation.
   void run() override {
     auto *AA = PM->getAnalysis<AliasAnalysis>();
+    auto *TE = PM->getAnalysis<TypeExpansionAnalysis>();
     SILFunction *F = getFunction();
     DEBUG(llvm::dbgs() << "*** DSE on function: " << F->getName() << " ***\n");
 
-    DSEContext DSE(F, &F->getModule(), PM, AA);
+    DSEContext DSE(F, &F->getModule(), PM, AA, TE);
     DSE.run();
   }
 };

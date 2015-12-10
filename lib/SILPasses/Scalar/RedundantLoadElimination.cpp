@@ -302,6 +302,9 @@ class RLEContext {
   /// The alias analysis that we will use during all computations.
   AliasAnalysis *AA;
 
+  /// The type expansion analysis we will use during all computations.
+  TypeExpansionAnalysis *TE;
+
   /// The range that we use to iterate over the reverse post order of the given
   /// function.
   PostOrderFunctionInfo::reverse_range ReversePostOrder;
@@ -310,9 +313,6 @@ class RLEContext {
   /// BlockState is then laid on top of it to keep track of which MemLocation
   /// has a downward available value.
   std::vector<MemLocation> MemLocationVault;
-
-  /// Caches a list of projection paths to leaf nodes in the given type.
-  TypeExpansionMap TypeExpansionCache;
 
   /// Contains a map between MemLocation to their index in the MemLocationVault.
   /// Use for fast lookup.
@@ -326,7 +326,7 @@ class RLEContext {
   llvm::DenseMap<SILBasicBlock *, bool> ForwardableEdge;
 
 public:
-  RLEContext(SILFunction *F, AliasAnalysis *AA,
+  RLEContext(SILFunction *F, AliasAnalysis *AA, TypeExpansionAnalysis *TE,
              PostOrderFunctionInfo::reverse_range RPOT);
 
   RLEContext(const RLEContext &) = delete;
@@ -338,8 +338,8 @@ public:
   /// Returns the alias analysis we will use during all computations.
   AliasAnalysis *getAA() const { return AA; }
 
-  /// Returns the TypeExpansionCache we will use during expanding MemLocations.
-  TypeExpansionMap &getTypeExpansionCache() { return TypeExpansionCache; }
+  /// Returns the current type expansion analysis we are .
+  TypeExpansionAnalysis *getTE() const { return TE; }
 
   /// Return the BlockState for the basic block this basic block belongs to.
   BlockState &getBlockState(SILBasicBlock *B) { return BBToLocState[B]; }
@@ -421,7 +421,8 @@ SILValue BlockState::computeForwardingValues(RLEContext &Ctx, MemLocation &L,
   // forward.
   SILValue TheForwardingValue;
   TheForwardingValue = MemLocation::reduceWithValues(L, &ParentBB->getModule(),
-                                                     Values, InsertPt);
+                                                     Values, InsertPt,
+                                                     Ctx.getTE());
   /// Return the forwarding value.
   return TheForwardingValue;
 }
@@ -438,7 +439,8 @@ bool BlockState::setupRLE(RLEContext &Ctx, SILInstruction *I, SILValue Mem) {
   // Reduce the available values into a single SILValue we can use to forward.
   SILModule *Mod = &I->getModule();
   SILValue TheForwardingValue;
-  TheForwardingValue = MemLocation::reduceWithValues(L, Mod, Values, I);
+  TheForwardingValue = MemLocation::reduceWithValues(L, Mod, Values, I,
+                                                     Ctx.getTE());
   if (!TheForwardingValue)
     return false;
 
@@ -514,7 +516,8 @@ void BlockState::processWrite(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
   // them as separate writes.
   MemLocationList Locs;
   LoadStoreValueList Vals;
-  MemLocation::expandWithValues(L, Val, &I->getModule(), Locs, Vals);
+  MemLocation::expandWithValues(L, Val, &I->getModule(), Locs, Vals,
+                                Ctx.getTE());
   for (unsigned i = 0; i < Locs.size(); ++i) {
     updateForwardSetForWrite(Ctx, Ctx.getMemLocationBit(Locs[i]), Vals[i]);
   }
@@ -534,7 +537,8 @@ void BlockState::processRead(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
   // them as separate reads.
   MemLocationList Locs;
   LoadStoreValueList Vals;
-  MemLocation::expandWithValues(L, Val, &I->getModule(), Locs, Vals);
+  MemLocation::expandWithValues(L, Val, &I->getModule(), Locs, Vals,
+                                Ctx.getTE());
 
   bool CanForward = true;
   for (auto &X : Locs) {
@@ -688,12 +692,12 @@ void BlockState::mergePredecessorStates(RLEContext &Ctx) {
 //===----------------------------------------------------------------------===//
 
 RLEContext::RLEContext(SILFunction *F, AliasAnalysis *AA,
+                       TypeExpansionAnalysis *TE,
                        PostOrderFunctionInfo::reverse_range RPOT)
-    : AA(AA), ReversePostOrder(RPOT) {
+    : AA(AA), TE(TE), ReversePostOrder(RPOT) {
   // Walk over the function and find all the locations accessed by
   // this function.
-  MemLocation::enumerateMemLocations(*F, MemLocationVault, LocToBitIndex,
-                                     TypeExpansionCache);
+  MemLocation::enumerateMemLocations(*F, MemLocationVault, LocToBitIndex, TE);
 
   // For all basic blocks in the function, initialize a BB state. Since we
   // know all the locations accessed in this function, we can resize the bit
@@ -790,10 +794,10 @@ SILValue RLEContext::computePredecessorCoveringValue(SILBasicBlock *BB,
   // the backedge will carry a covering value as well in this case.
   //
   MemLocationList Locs;
-  MemLocation::expand(L, &BB->getModule(), Locs, getTypeExpansionCache());
+  MemLocation::expand(L, &BB->getModule(), Locs, TE);
   LoadStoreValueList Vals;
   MemLocation::expandWithValues(L, TheForwardingValue, &BB->getModule(), Locs,
-                                Vals);
+                                Vals, TE);
   ValueTableMap &VTM = Forwarder.getForwardValOut();
   for (unsigned i = 0; i < Locs.size(); ++i) {
     unsigned bit = getMemLocationBit(Locs[i]);
@@ -850,7 +854,7 @@ bool RLEContext::gatherValues(SILBasicBlock *BB, MemLocation &L,
                               bool UseForwardValOut) {
   MemLocationSet CSLocs;
   MemLocationList Locs;
-  MemLocation::expand(L, &BB->getModule(), Locs, getTypeExpansionCache());
+  MemLocation::expand(L, &BB->getModule(), Locs, TE);
   // Are we using the ForwardVal at the end of the basic block or not.
   // If we are collecting values at the end of the basic block, we can
   // use its ForwardValOut.
@@ -867,7 +871,7 @@ bool RLEContext::gatherValues(SILBasicBlock *BB, MemLocation &L,
 
   // Try to reduce it to the minimum # of locations possible, this will help
   // us to generate as few extractions as possible.
-  MemLocation::reduce(L, &BB->getModule(), CSLocs);
+  MemLocation::reduce(L, &BB->getModule(), CSLocs, TE);
 
   // To handle covering value, we need to go to the predecessors and
   // materialize them there.
@@ -879,7 +883,7 @@ bool RLEContext::gatherValues(SILBasicBlock *BB, MemLocation &L,
     // collect the newly created forwardable values.
     MemLocationList Locs;
     LoadStoreValueList Vals;
-    MemLocation::expandWithValues(X, V, &BB->getModule(), Locs, Vals);
+    MemLocation::expandWithValues(X, V, &BB->getModule(), Locs, Vals, TE);
     for (unsigned i = 0; i < Locs.size(); ++i) {
       Values[Locs[i]] = Vals[i];
       assert(Values[Locs[i]].isValid() && "Invalid load store value");
@@ -980,9 +984,10 @@ class RedundantLoadElimination : public SILFunctionTransform {
                        << F->getName() << " *****\n");
 
     auto *AA = PM->getAnalysis<AliasAnalysis>();
+    auto *TE = PM->getAnalysis<TypeExpansionAnalysis>();
     auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
 
-    RLEContext RLE(F, AA, PO->getReversePostOrder());
+    RLEContext RLE(F, AA, TE, PO->getReversePostOrder());
     if (RLE.run()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }

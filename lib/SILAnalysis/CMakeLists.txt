@@ -18,5 +18,6 @@ add_swift_library(swiftSILAnalysis
   RCIdentityAnalysis.cpp
   SideEffectAnalysis.cpp
   SimplifyInstruction.cpp
+  TypeExpansionAnalysis.cpp
   ValueTracking.cpp
   LINK_LIBRARIES swiftSILPassesUtils)
