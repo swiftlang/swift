@@ -153,7 +153,7 @@ the cache for the function that was modified.
     }
 ```
 
-The invalidation traits that passes can invalidate are are:
+The invalidation traits that passes can invalidate are:
 1. Instructions - some instructions were added, deleted or moved.
 2. Calls - some call sites were added or deleted.
 3. Branches - branches in the code were added, deleted or modified.
