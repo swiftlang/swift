@@ -15,7 +15,6 @@
 #include "swift/SILAnalysis/BasicCalleeAnalysis.h"
 #include "swift/SILAnalysis/FunctionOrder.h"
 #include "swift/SILAnalysis/CallGraphAnalysis.h"
-#include "swift/SILAnalysis/ArraySemantic.h"
 #include "swift/SILPasses/PassManager.h"
 #include "swift/SIL/SILArgument.h"
 
@@ -71,18 +70,21 @@ bool FunctionEffects::mergeFromApply(
                   const FunctionEffects &ApplyEffects, FullApplySite FAS) {
   bool Changed = mergeFlags(ApplyEffects);
   Changed |= GlobalEffects.mergeFrom(ApplyEffects.GlobalEffects);
-  auto Args = FAS.getArguments();
-  unsigned NumCalleeArgs = ApplyEffects.ParamEffects.size();
-  assert(NumCalleeArgs == Args.size());
-  for (unsigned Idx = 0; Idx < NumCalleeArgs; Idx++) {
+  unsigned numCallerArgs = FAS.getNumArguments();
+  unsigned numCalleeArgs = ApplyEffects.ParamEffects.size();
+  assert(numCalleeArgs >= numCallerArgs);
+  for (unsigned Idx = 0; Idx < numCalleeArgs; Idx++) {
     // Map the callee argument effects to parameters of this function.
-    Effects *E = getEffectsOn(Args[Idx]);
+    // If there are more callee parameters than arguments it means that the
+    // callee is the result of a partial_apply.
+    Effects *E = (Idx < numCallerArgs ? getEffectsOn(FAS.getArgument(Idx)) :
+                  &GlobalEffects);
     Changed |= E->mergeFrom(ApplyEffects.ParamEffects[Idx]);
   }
   return Changed;
 }
 
-void FunctionEffects::dump() {
+void FunctionEffects::dump() const {
   llvm::errs() << *this << '\n';
 }
 
@@ -171,12 +173,9 @@ bool SideEffectAnalysis::getDefinedEffects(FunctionEffects &Effects,
 }
 
 bool SideEffectAnalysis::getSemanticEffects(FunctionEffects &FE,
-                                            FullApplySite FAS) {
-  ArraySemanticsCall ASC(FAS.getInstruction());
-  if (!ASC || !ASC.hasSelf())
-    return false;
-  
-  auto &SelfEffects = FE.ParamEffects[FAS.getNumArguments() - 1];
+                                            ArraySemanticsCall ASC) {
+  assert(ASC.hasSelf());
+  auto &SelfEffects = FE.ParamEffects[FE.ParamEffects.size() - 1];
 
   // Currently we only handle array semantics.
   // TODO: also handle other semantic functions.
@@ -205,7 +204,7 @@ bool SideEffectAnalysis::getSemanticEffects(FunctionEffects &FE,
       if (!ASC.mayHaveBridgedObjectElementType()) {
         SelfEffects.Reads = true;
         SelfEffects.Releases |= !ASC.hasGuaranteedSelf();
-        if (FAS.getOrigCalleeType()->hasIndirectResult())
+        if (((ApplyInst *)ASC)->getOrigCalleeType()->hasIndirectResult())
           FE.ParamEffects[0].Writes = true;
         return true;
       }
@@ -239,50 +238,78 @@ bool SideEffectAnalysis::getSemanticEffects(FunctionEffects &FE,
   }
 }
 
-void SideEffectAnalysis::analyzeFunction(SILFunction *F,
-                                         WorkListType &WorkList,
-                                         CallGraph &CG) {
-  DEBUG(llvm::dbgs() << "analyze " << F->getName() << "\n");
-  auto *FE = getFunctionEffects(F, true);
-  
+void SideEffectAnalysis::analyzeFunction(FunctionInfo *FInfo,
+                                         FunctionOrder &BottomUpOrder,
+                                         int RecursionDepth) {
+  FInfo->NeedUpdateCallers = true;
+
+  if (BottomUpOrder.prepareForVisiting(FInfo))
+    return;
+
   // Handle @effects attributes
-  if (getDefinedEffects(*FE, F))
+  if (getDefinedEffects(FInfo->FE, FInfo->F)) {
+    DEBUG(llvm::dbgs() << "  -- has defined effects " <<
+          FInfo->F->getName() << '\n');
     return;
+  }
   
-  if (!F->isDefinition()) {
+  if (!FInfo->F->isDefinition()) {
     // We can't assume anything about external functions.
-    FE->setWorstEffects();
+    DEBUG(llvm::dbgs() << "  -- is external " << FInfo->F->getName() << '\n');
+    FInfo->FE.setWorstEffects();
     return;
   }
   
-  FunctionEffects NewEffects(F->getArguments().size());
-#ifndef NDEBUG
-  FunctionEffects RefEffects = *FE;
-#endif
+  DEBUG(llvm::dbgs() << "  >> analyze " << FInfo->F->getName() << '\n');
+
   // Check all instructions of the function
-  for (auto &BB : *F) {
+  for (auto &BB : *FInfo->F) {
     for (auto &I : BB) {
-      analyzeInstruction(NewEffects, &I);
-      DEBUG(if (RefEffects.mergeFrom(NewEffects))
-              llvm::dbgs() << "  " << NewEffects << "\t changed in " << I);
+      analyzeInstruction(FInfo, &I, BottomUpOrder, RecursionDepth);
     }
   }
-  if (FE->mergeFrom(NewEffects)) {
-    // The effects have changed. We also have to recompute the effects of all
-    // callers.
-    for (auto *CallerEdge : CG.getCallerEdges(F)) {
-      SILFunction *Caller = CallerEdge->getInstruction()->getFunction();
-      WorkList.insert(Caller);
-    }
-  }
+  DEBUG(llvm::dbgs() << "  << finished " << FInfo->F->getName() << '\n');
 }
 
-void SideEffectAnalysis::analyzeInstruction(FunctionEffects &FE,
-                                            SILInstruction *I) {
+void SideEffectAnalysis::analyzeInstruction(FunctionInfo *FInfo,
+                                            SILInstruction *I,
+                                            FunctionOrder &BottomUpOrder,
+                                            int RecursionDepth) {
   if (FullApplySite FAS = FullApplySite::isa(I)) {
-    FunctionEffects ApplyEffects;
-    getEffectsOfApply(ApplyEffects, FAS, true);
-    FE.mergeFromApply(ApplyEffects, FAS);
+    // Is this a call to a semantics function?
+    ArraySemanticsCall ASC(I);
+    if (ASC && ASC.hasSelf()) {
+      FunctionEffects ApplyEffects(FAS.getNumArguments());
+      if (getSemanticEffects(ApplyEffects, ASC)) {
+        FInfo->FE.mergeFromApply(ApplyEffects, FAS);
+        return;
+      }
+    }
+
+    if (SILFunction *SingleCallee = FAS.getCalleeFunction()) {
+      // Does the function have any @effects?
+      if (getDefinedEffects(FInfo->FE, SingleCallee))
+        return;
+    }
+
+    if (RecursionDepth < MaxRecursionDepth) {
+      CalleeList Callees = BCA->getCalleeList(FAS);
+      if (Callees.allCalleesVisible()) {
+        // Derive the effects of the apply from the known callees.
+        for (SILFunction *Callee : Callees) {
+          FunctionInfo *CalleeInfo = getFunctionInfo(Callee);
+          CalleeInfo->addCaller(FInfo, FAS);
+          if (!CalleeInfo->isVisited()) {
+            // Recursively visit the called function.
+            analyzeFunction(CalleeInfo, BottomUpOrder, RecursionDepth + 1);
+            BottomUpOrder.tryToSchedule(CalleeInfo);
+          }
+        }
+        return;
+      }
+    }
+    // Be conservative for everything else.
+    FInfo->FE.setWorstEffects();
     return;
   }
   // Handle some kind of instructions specially.
@@ -294,28 +321,28 @@ void SideEffectAnalysis::analyzeInstruction(FunctionEffects &FE,
     case ValueKind::StrongRetainUnownedInst:
     case ValueKind::RetainValueInst:
     case ValueKind::UnownedRetainInst:
-      FE.getEffectsOn(I->getOperand(0))->Retains = true;
+      FInfo->FE.getEffectsOn(I->getOperand(0))->Retains = true;
       return;
     case ValueKind::StrongReleaseInst:
     case ValueKind::ReleaseValueInst:
     case ValueKind::UnownedReleaseInst:
-      FE.getEffectsOn(I->getOperand(0))->Releases = true;
+      FInfo->FE.getEffectsOn(I->getOperand(0))->Releases = true;
       
       // TODO: Check the call graph to be less conservative about what
       // destructors might be called.
-      FE.setWorstEffects();
+      FInfo->FE.setWorstEffects();
       return;
     case ValueKind::LoadInst:
-      FE.getEffectsOn(cast<LoadInst>(I)->getOperand())->Reads = true;
+      FInfo->FE.getEffectsOn(cast<LoadInst>(I)->getOperand())->Reads = true;
       return;
     case ValueKind::StoreInst:
-      FE.getEffectsOn(cast<StoreInst>(I)->getDest())->Writes = true;
+      FInfo->FE.getEffectsOn(cast<StoreInst>(I)->getDest())->Writes = true;
       return;
     case ValueKind::CondFailInst:
-      FE.Traps = true;
+      FInfo->FE.Traps = true;
       return;
     case ValueKind::PartialApplyInst:
-      FE.AllocsObjects = true;
+      FInfo->FE.AllocsObjects = true;
       return;
     case ValueKind::BuiltinInst: {
       auto &BI = cast<BuiltinInst>(I)->getBuiltinInfo();
@@ -323,7 +350,7 @@ void SideEffectAnalysis::analyzeInstruction(FunctionEffects &FE,
         case BuiltinValueKind::IsUnique:
           // TODO: derive this information in a more general way, e.g. add it
           // to Builtins.def
-          FE.ReadsRC = true;
+          FInfo->FE.ReadsRC = true;
           break;
         default:
           break;
@@ -338,7 +365,7 @@ void SideEffectAnalysis::analyzeInstruction(FunctionEffects &FE,
 
   if (isa<AllocationInst>(I)) {
     // Excluding AllocStackInst (which is handled above).
-    FE.AllocsObjects = true;
+    FInfo->FE.AllocsObjects = true;
   }
   
   // Check the general memory behavior for instructions we didn't handle above.
@@ -346,87 +373,122 @@ void SideEffectAnalysis::analyzeInstruction(FunctionEffects &FE,
     case MemoryBehavior::None:
       break;
     case MemoryBehavior::MayRead:
-      FE.GlobalEffects.Reads = true;
+      FInfo->FE.GlobalEffects.Reads = true;
       break;
     case MemoryBehavior::MayWrite:
-      FE.GlobalEffects.Writes = true;
+      FInfo->FE.GlobalEffects.Writes = true;
       break;
     case MemoryBehavior::MayReadWrite:
-      FE.GlobalEffects.Reads = true;
-      FE.GlobalEffects.Writes = true;
+      FInfo->FE.GlobalEffects.Reads = true;
+      FInfo->FE.GlobalEffects.Writes = true;
       break;
     case MemoryBehavior::MayHaveSideEffects:
-      FE.setWorstEffects();
+      FInfo->FE.setWorstEffects();
       break;
   }
   if (I->mayTrap())
-    FE.Traps = true;
+    FInfo->FE.Traps = true;
 }
 
-void SideEffectAnalysis::getEffectsOfApply(FunctionEffects &ApplyEffects,
-                                           FullApplySite FAS,
-                                           bool isRecomputing) {
-  
+void SideEffectAnalysis::initialize(SILPassManager *PM) {
+  BCA = PM->getAnalysis<BasicCalleeAnalysis>();
+}
+
+void SideEffectAnalysis::recompute(FunctionInfo *Initial) {
+  allocNewUpdateID();
+
+  DEBUG(llvm::dbgs() << "recompute side-effect analysis with UpdateID " <<
+        getCurrentUpdateID() << '\n');
+
+  // Collect and analyze all functions to recompute, starting at Initial.
+  FunctionOrder BottomUpOrder(getCurrentUpdateID());
+  analyzeFunction(Initial, BottomUpOrder, 0);
+
+  // Build the bottom-up order.
+  BottomUpOrder.tryToSchedule(Initial);
+  BottomUpOrder.finishScheduling();
+
+  // Second step: propagate the side-effect information up the call-graph until
+  // it stabilizes.
+  bool NeedAnotherIteration;
+  do {
+    DEBUG(llvm::dbgs() << "new iteration\n");
+    NeedAnotherIteration = false;
+
+    for (FunctionInfo *FInfo : BottomUpOrder) {
+      if (FInfo->NeedUpdateCallers) {
+        DEBUG(llvm::dbgs() << "  update callers of " << FInfo->F->getName() <<
+              '\n');
+        FInfo->NeedUpdateCallers = false;
+
+        // Propagate the side-effects to all callers.
+        for (const auto &E : FInfo->getCallers()) {
+          assert(E.isValid());
+
+          // Only include callers which we are actually recomputing.
+          if (BottomUpOrder.wasRecomputedWithCurrentUpdateID(E.Caller)) {
+            DEBUG(llvm::dbgs() << "    merge into caller " <<
+                  E.Caller->F->getName() << '\n');
+
+            if (E.Caller->FE.mergeFromApply(FInfo->FE, E.FAS)) {
+              E.Caller->NeedUpdateCallers = true;
+              if (!E.Caller->isScheduledAfter(FInfo)) {
+                // This happens if we have a cycle in the call-graph.
+                NeedAnotherIteration = true;
+              }
+            }
+          }
+        }
+      }
+    }
+  } while (NeedAnotherIteration);
+}
+
+void SideEffectAnalysis::getEffects(FunctionEffects &ApplyEffects, FullApplySite FAS) {
   assert(ApplyEffects.ParamEffects.size() == 0 &&
          "Not using a new ApplyEffects?");
   ApplyEffects.ParamEffects.resize(FAS.getNumArguments());
 
   // Is this a call to a semantics function?
-  if (getSemanticEffects(ApplyEffects, FAS))
-    return;
+  ArraySemanticsCall ASC(FAS.getInstruction());
+  if (ASC && ASC.hasSelf()) {
+    if (getSemanticEffects(ApplyEffects, ASC))
+      return;
+  }
+
+  if (SILFunction *SingleCallee = FAS.getCalleeFunction()) {
+    // Does the function have any @effects?
+    if (getDefinedEffects(ApplyEffects, SingleCallee))
+      return;
+  }
 
   auto Callees = BCA->getCalleeList(FAS);
-  if (Callees.isIncomplete()) {
+  if (!Callees.allCalleesVisible()) {
     ApplyEffects.setWorstEffects();
     return;
   }
 
   // We can see all the callees. So we just merge the effects from all of
   // them.
-  for (auto *F : Callees) {
-    auto *E = getFunctionEffects(F, isRecomputing);
-    ApplyEffects.mergeFrom(*E);
+  for (auto *Callee : Callees) {
+    const FunctionEffects &CalleeFE = getEffects(Callee);
+    ApplyEffects.mergeFrom(CalleeFE);
   }
 }
 
-void SideEffectAnalysis::initialize(SILPassManager *PM) {
-  BCA = PM->getAnalysis<BasicCalleeAnalysis>();
-  CGA = PM->getAnalysis<CallGraphAnalysis>();
-}
-
-void SideEffectAnalysis::recompute() {
-
-  // Did anything change since the last recompuation? (Probably yes)
-  if (!shouldRecompute)
-    return;
-
-  Function2Effects.clear();
+void SideEffectAnalysis::invalidate(InvalidationKind K) {
+  Function2Info.clear();
   Allocator.DestroyAll();
-  shouldRecompute = false;
-
-  WorkListType WorkList;
-
-  BottomUpFunctionOrder BottomUpOrder(M, BCA);
-  auto BottomUpFunctions = BottomUpOrder.getFunctions();
-
-  // Copy the bottom-up function list into the worklist.
-  for (auto I = BottomUpFunctions.rbegin(), E = BottomUpFunctions.rend();
-       I != E; ++I)
-    WorkList.insert(*I);
-
-  CallGraph &CG = CGA->getOrBuildCallGraph();
-
-  // Iterate until the side-effect information stabilizes.
-  while (!WorkList.empty()) {
-    auto *F = WorkList.pop_back_val();
-    analyzeFunction(F, WorkList, CG);
-  }
+  DEBUG(llvm::dbgs() << "invalidate all\n");
 }
 
-void SideEffectAnalysis::getEffects(FunctionEffects &FE, FullApplySite FAS) {
-  getEffectsOfApply(FE, FAS, false);
+void SideEffectAnalysis::invalidate(SILFunction *F, InvalidationKind K) {
+  if (FunctionInfo *FInfo = Function2Info.lookup(F)) {
+    DEBUG(llvm::dbgs() << "  invalidate " << FInfo->F->getName() << '\n');
+    invalidateIncludingAllCallers(FInfo);
+  }
 }
 
 SILAnalysis *swift::createSideEffectAnalysis(SILModule *M) {
-  return new SideEffectAnalysis(M);
+  return new SideEffectAnalysis();
 }

@@ -15,7 +15,8 @@
 
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/SILAnalysis/Analysis.h"
+#include "swift/SILAnalysis/BottomUpIPAnalysis.h"
+#include "swift/SILAnalysis/ArraySemantic.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
@@ -41,16 +42,7 @@ enum class RetainObserveKind {
 /// objects? etc.
 /// For details see SideEffectAnalysis::FunctionEffects and
 /// SideEffectAnalysis::Effects.
-///
-/// The update and invalidation policy of this analysis is a little bit
-/// different than for other analysis. When an optimization pass changes the
-/// SIL, there should not be more side-effects on a function than before the
-/// transformation. Therefore optimization passes do not _invalidate_ the
-/// side-effect information, they may only make it more conservative.
-/// For this reason, the invalidate function are no-ops. Instead the
-/// UpdateSideEffects pass does recompute the analysis no certain points in the
-/// optimization pipeline. This avoids updating the analysis too often.
-class SideEffectAnalysis : public SILAnalysis {
+class SideEffectAnalysis : public BottomUpIPAnalysis {
 public:
 
   using MemoryBehavior = SILInstruction::MemoryBehavior;
@@ -79,7 +71,15 @@ public:
       Retains = true;
       Releases = true;
     }
-    
+
+    /// Clears all effects.
+    void clear() {
+      Reads = false;
+      Writes = false;
+      Retains = false;
+      Releases = false;
+    }
+
     friend class SideEffectAnalysis;
     
   public:
@@ -198,6 +198,16 @@ public:
       Traps = true;
       ReadsRC = true;
     }
+    
+    /// Clears all effects.
+    void clear() {
+      GlobalEffects.clear();
+      for (Effects &PE : ParamEffects)
+        PE.clear();
+      AllocsObjects = false;
+      Traps = false;
+      ReadsRC = false;
+    }
   
     /// Merge the flags from \p RHS.
     bool mergeFlags(const FunctionEffects &RHS) {
@@ -249,7 +259,7 @@ public:
                         FullApplySite FAS);
     
     /// Print the function effects.
-    void dump();
+    void dump() const;
   };
 
   friend raw_ostream &operator<<(raw_ostream &os,
@@ -269,64 +279,86 @@ public:
   }
 
 private:
-  /// The module being processed.
-  SILModule &M;
+
+  /// Stores the analysis data, i.e. the side-effects, for a function.
+  struct FunctionInfo : public FunctionInfoBase<FunctionInfo> {
+
+    /// The side-effects of the function.
+    FunctionEffects FE;
+
+    /// Back-link to the function.
+    SILFunction *F;
+
+    /// Used during recomputation to indicate if the side-effects of a caller
+    /// must be updated.
+    bool NeedUpdateCallers = false;
+
+    FunctionInfo(SILFunction *F) :
+      FE(F->empty() ? 0 : F->getArguments().size()), F(F) { }
+
+    /// Clears the analysis data on invalidation.
+    void clear() { FE.clear(); }
+  };
+  
+  typedef BottomUpFunctionOrder<FunctionInfo> FunctionOrder;
+
+  enum {
+    /// The maximum call-graph recursion depth for recomputing the analysis.
+    /// This is a relatively small number to reduce compile time in case of
+    /// large cycles in the call-graph.
+    /// In case of no cycles, we should not hit this limit at all because the
+    /// pass manager processes functions in bottom-up order.
+    MaxRecursionDepth = 5
+  };
 
   /// All the side-effect information for the whole module.
-  llvm::DenseMap<SILFunction *, FunctionEffects *> Function2Effects;
+  llvm::DenseMap<SILFunction *, FunctionInfo *> Function2Info;
   
-  /// The allocator for the map values in Function2Effects.
-  llvm::SpecificBumpPtrAllocator<FunctionEffects> Allocator;
+  /// The allocator for the map values in Function2Info.
+  llvm::SpecificBumpPtrAllocator<FunctionInfo> Allocator;
   
   /// Callee analysis, used for determining the callees at call sites.
   BasicCalleeAnalysis *BCA;
 
-  /// This analysis depends on the call graph.
-  CallGraphAnalysis *CGA;
-  
-  /// If false, nothing has changed between two recompute() calls.
-  bool shouldRecompute;
-  
-  typedef llvm::SetVector<SILFunction *> WorkListType;
-  
   /// Get the side-effects of a function, which has an @effects attribute.
   /// Returns true if \a F has an @effects attribute which could be handled.
   static bool getDefinedEffects(FunctionEffects &Effects, SILFunction *F);
   
   /// Get the side-effects of a semantic call.
-  /// Return true if \a FAS is a semantic call which could be handled.
-  bool getSemanticEffects(FunctionEffects &Effects, FullApplySite FAS);
+  /// Return true if \p ASC could be handled.
+  bool getSemanticEffects(FunctionEffects &Effects, ArraySemanticsCall ASC);
   
-  /// Analyise the side-effects of a function.
-  /// If the side-effects changed, the callers are pushed onto the \a WorkList.
-  void analyzeFunction(SILFunction *F, WorkListType &WorkList, CallGraph &CG);
-  
-  /// Analyise the side-effects of a single SIL instruction.
-  void analyzeInstruction(FunctionEffects &Effects, SILInstruction *I);
+  /// Analyze the side-effects of a function, including called functions.
+  /// Visited callees are added to \p BottomUpOrder until \p RecursionDepth
+  /// reaches MaxRecursionDepth.
+  void analyzeFunction(FunctionInfo *FInfo,
+                       FunctionOrder &BottomUpOrder,
+                       int RecursionDepth);
 
-  /// Get the side-effects of a call site.
-  void getEffectsOfApply(FunctionEffects &FE, FullApplySite FAS,
-                         bool isRecomputing);
-  
-  /// Gets or creates FunctionEffects for \p F. If \a isRecomputing is true,
-  /// the effects are initialized with empty effects, otherwise with most
-  /// conservative effects.
-  FunctionEffects *getFunctionEffects(SILFunction *F, bool isRecomputing) {
-    auto *FE = Function2Effects[F];
-    if (!FE) {
-      unsigned argSize = F->empty() ? 0 : F->getArguments().size();
-      FE = new (Allocator.Allocate()) FunctionEffects(argSize);
-      Function2Effects[F] = FE;
-      if (!isRecomputing)
-        FE->setWorstEffects();
+  /// Analyze the side-effects of a single SIL instruction \p I.
+  /// Visited callees are added to \p BottomUpOrder until \p RecursionDepth
+  /// reaches MaxRecursionDepth.
+  void analyzeInstruction(FunctionInfo *FInfo,
+                          SILInstruction *I,
+                          FunctionOrder &BottomUpOrder,
+                          int RecursionDepth);
+
+  /// Gets or creates FunctionEffects for \p F.
+  FunctionInfo *getFunctionInfo(SILFunction *F) {
+    FunctionInfo *&FInfo = Function2Info[F];
+    if (!FInfo) {
+      FInfo = new (Allocator.Allocate()) FunctionInfo(F);
     }
-    return FE;
+    return FInfo;
   }
-  
+
+  /// Recomputes the side-effect information for the function \p Initial and
+  /// all called functions, up to a recursion depth of MaxRecursionDepth.
+  void recompute(FunctionInfo *Initial);
+
 public:
-  SideEffectAnalysis(SILModule *M)
-      : SILAnalysis(AnalysisKind::SideEffect), M(*M), CGA(nullptr),
-        shouldRecompute(true) {}
+  SideEffectAnalysis()
+      : BottomUpIPAnalysis(AnalysisKind::SideEffect) {}
 
   static bool classof(const SILAnalysis *S) {
     return S->getKind() == AnalysisKind::SideEffect;
@@ -334,27 +366,22 @@ public:
   
   virtual void initialize(SILPassManager *PM);
   
-  /// Recomputes the side-effect information for all functions the module.
-  void recompute();
-
   /// Get the side-effects of a function.
   const FunctionEffects &getEffects(SILFunction *F) {
-    auto *FE = getFunctionEffects(F, false);
-    return *FE;
+    FunctionInfo *FInfo = getFunctionInfo(F);
+    if (!FInfo->isValid())
+      recompute(FInfo);
+    return FInfo->FE;
   }
 
   /// Get the side-effects of a call site.
-  void getEffects(FunctionEffects &FE, FullApplySite FAS);
+  void getEffects(FunctionEffects &ApplyEffects, FullApplySite FAS);
   
   /// No invalidation is needed. See comment for SideEffectAnalysis.
-  virtual void invalidate(InvalidationKind K) {
-    shouldRecompute = true;
-  }
+  virtual void invalidate(InvalidationKind K);
   
   /// No invalidation is needed. See comment for SideEffectAnalysis.
-  virtual void invalidate(SILFunction *F, InvalidationKind K) {
-    invalidate(K);
-  }
+  virtual void invalidate(SILFunction *F, InvalidationKind K);
 };
 
 } // end namespace swift

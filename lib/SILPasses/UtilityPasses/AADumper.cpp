@@ -121,8 +121,6 @@ class MemBehaviorDumper : public SILModuleTransform {
         continue;
 
       AliasAnalysis *AA = PM->getAnalysis<AliasAnalysis>();
-      SideEffectAnalysis *SEA = PM->getAnalysis<SideEffectAnalysis>();
-      SEA->recompute();
 
       unsigned PairCount = 0;
       for (auto &BB : Fn) {

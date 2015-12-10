@@ -14,10 +14,13 @@ public extension Foo {
   }
 }
 
+var gg = 1111
+
 public class C : Foo {
   @inline(never)
   public func foo(x:Int) -> Int {
-    return 1111 + x
+    gg++
+    return gg + x
   }
 }
 

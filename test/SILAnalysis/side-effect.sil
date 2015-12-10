@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -side-effects -sil-print-side-effects -o /dev/null | FileCheck %s
+// RUN: %target-sil-opt %s -side-effects-dump -o /dev/null | FileCheck %s
 
 // REQUIRES: asserts
 
@@ -380,8 +380,14 @@ sil [_semantics "array.get_count"] @get_count_X : $@convention(method) (@guarant
 // CHECK: <func=;trap>
 sil @call_noreturn : $@convention(thin) () -> () {
 bb0:
+  cond_br undef, bb1, bb2
+
+bb1:
   %u = function_ref @exitfunc : $@convention(thin) @noreturn () -> ()
   %a = apply %u() : $@convention(thin) @noreturn () -> ()
+  unreachable
+
+bb2:
   %r = tuple ()
   return %r : $()
 }

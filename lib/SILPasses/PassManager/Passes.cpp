@@ -218,7 +218,6 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
     PM.addEarlyCodeMotion();
   PM.addARCSequenceOpts();
   PM.addRemovePins();
-  PM.addUpdateSideEffects();
 }
 
 

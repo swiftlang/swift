@@ -156,6 +156,8 @@ PASS(ReleaseDevirtualizer, "release-devirtualizer",
      "Devirtualize release-instructions")
 PASS(RemovePins, "remove-pins",
      "Remove pin/unpin pairs")
+PASS(SideEffectsDumper, "side-effects-dump",
+     "Dumps the results of side-effect analysis for all functions")
 PASS(SILCleanup, "cleanup",
      "Cleanup SIL in preparation for IRGen")
 PASS(SILCombine, "sil-combine",
@@ -185,8 +187,6 @@ PASS(SwiftArrayOpts, "array-specialize",
      "Specialize arrays")
 PASS(UpdateEscapeAnalysis, "update-escapes",
      "Update the escape analysis for all functions")
-PASS(UpdateSideEffects, "side-effects",
-     "Update the side effect analysis for all functions")
 PASS(UsePrespecialized, "use-prespecialized",
      "Use pre-specialized functions")
 PASS_RANGE(AllPasses, AADumper, UsePrespecialized)
