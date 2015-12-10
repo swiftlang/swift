@@ -206,3 +206,4 @@ func testImmutableUnsafePointer(p: UnsafePointer<Int>) {
 // <https://bugs.swift.org/browse/SR-7> Inferring closure param type to
 // inout crashes compiler
 let g = { x in f0(x) } // expected-error{{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{19-19=&}}
+
