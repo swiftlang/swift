@@ -4,8 +4,7 @@
 var x : Int! = .None
 if x != nil {
   print("x is non-empty!")
-}
-else {
+} else {
   print("an empty optional is logically false")
 }
 // CHECK: an empty optional is logically false
@@ -14,8 +13,7 @@ x = .Some(0)
 
 if x != nil {
   print("a non-empty optional is logically true")
-}
-else {
+} else {
   print("x is empty!")
 }
 // CHECK: a non-empty optional is logically true
