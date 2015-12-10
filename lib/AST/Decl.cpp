@@ -3086,6 +3086,10 @@ static bool isSettable(const AbstractStorageDecl *decl) {
 /// is a let member in an initializer.
 bool VarDecl::isSettable(const DeclContext *UseDC,
                          const DeclRefExpr *base) const {
+
+  if (!isUserAssignable())
+      return false;
+    
   // If this is a 'var' decl, then we're settable if we have storage or a
   // setter.
   if (!isLet())
@@ -3099,7 +3103,7 @@ bool VarDecl::isSettable(const DeclContext *UseDC,
   // 'let' parameters are never settable.
   if (isa<ParamDecl>(this))
     return false;
-  
+
   // Properties in structs/classes are only ever mutable in their designated
   // initializer(s).
   if (isInstanceMember()) {
@@ -3308,6 +3312,9 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
 
   // Don't suggest mutability for explicit function parameters
   if (isa<ParamDecl>(this) && !isImplicitSelf()) return;
+ 
+  // Don't suggest mutability if the var isn't user assignable at all.
+  if (!isUserAssignable()) return;
 
   // If this is the 'self' argument of a non-mutating method in a value type,
   // suggest adding 'mutating' to the method.
