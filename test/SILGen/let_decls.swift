@@ -152,7 +152,7 @@ func testGetOnlySubscript(x : GetOnlySubscriptStruct, idx : Int) -> Int {
 extension Optional {
   func getLV() -> Int { }
 }
-struct CloseOverAddressOnlyConstant<T>  {
+struct CloseOverAddressOnlyConstant<T> {
   func isError() {
     let AOV = Optional<T>()
     takeClosure({ AOV.getLV() })

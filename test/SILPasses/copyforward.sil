@@ -11,7 +11,7 @@ sil @f_in_guaranteed : $@convention(thin) <T> (@in_guaranteed T) -> ()
 sil @f_out : $@convention(thin) <T> (@out T) -> ()
 sil @f_owned : $@convention(thin) <T> (@owned T) -> ()
 
-protocol P  {
+protocol P {
   init(_ i : Int32)
 };
 

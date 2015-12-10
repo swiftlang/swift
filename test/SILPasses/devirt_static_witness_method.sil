@@ -5,7 +5,7 @@ import Builtin
 import Swift
 import SwiftShims
 
-protocol CanAdd  {
+protocol CanAdd {
   func +(lhs: Self, rhs: Self) -> Self
 }
 

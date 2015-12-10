@@ -75,7 +75,7 @@ namespace llvm {
 }
 
 template <typename Fn>
-void swift::driver::types::forAllTypes(const Fn &fn)  {
+void swift::driver::types::forAllTypes(const Fn &fn) {
   static_assert(std::is_constructible<std::function<void(types::ID)>,Fn>::value,
                 "must have the signature 'void(types::ID)'");
   for (uint8_t i = 0; i < static_cast<uint8_t>(TY_INVALID); ++i)

@@ -119,7 +119,7 @@ class SourceFile::LookupCache {
       Members.shrink_and_clear();
     }
 
-    decltype(Members)::const_iterator begin() const  { return Members.begin(); }
+    decltype(Members)::const_iterator begin() const { return Members.begin(); }
     decltype(Members)::const_iterator end() const { return Members.end(); }
     decltype(Members)::const_iterator find(DeclName Name) const {
       return Members.find(Name);
@@ -1530,7 +1530,7 @@ bool SourceFile::walk(ASTWalker &walker) {
   return false;
 }
 
-StringRef SourceFile::getFilename() const  {
+StringRef SourceFile::getFilename() const {
   if (BufferID == -1)
     return "";
   SourceManager &SM = getASTContext().SourceMgr;
