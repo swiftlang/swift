@@ -148,7 +148,7 @@ protected:
   };
 
   /// Computes and stores a bottom-up function order.
-  template<typename FunctionInfo> class BottomUpFunctionOrder  {
+  template<typename FunctionInfo> class BottomUpFunctionOrder {
 
     typedef llvm::SmallVector<FunctionInfo *, 8> FunctionInfoList;
 

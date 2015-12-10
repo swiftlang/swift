@@ -95,7 +95,7 @@ public:
   void visitTransparentAttr(TransparentAttr *attr);
   void visitMutationAttr(DeclAttribute *attr);
   void visitMutatingAttr(MutatingAttr *attr) { visitMutationAttr(attr); }
-  void visitNonMutatingAttr(NonMutatingAttr *attr)  { visitMutationAttr(attr); }
+  void visitNonMutatingAttr(NonMutatingAttr *attr) { visitMutationAttr(attr); }
   void visitDynamicAttr(DynamicAttr *attr);
 
   void visitOwnershipAttr(OwnershipAttr *attr) {

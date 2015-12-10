@@ -721,7 +721,7 @@ class ClassWhoseInitDoesntReturn : BaseWithConvenienceInits {
 }
 
 // <rdar://problem/17233681> DI: Incorrectly diagnostic in delegating init with generic enum
-enum r17233681Lazy<T>  {
+enum r17233681Lazy<T> {
   case Thunk(() -> T)
   case Value(T)
   

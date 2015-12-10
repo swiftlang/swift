@@ -168,7 +168,7 @@ public typealias UWord = UInt${word_bits}
 
 public protocol IntegerType
   : Comparable, ArithmeticType, 
-    IntegerLiteralConvertible, CustomStringConvertible  {
+    IntegerLiteralConvertible, CustomStringConvertible {
 
   // Dispatching through these puts less stress on the user reading
   // the interface and error messages (and on the type checker) than
