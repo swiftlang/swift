@@ -183,7 +183,6 @@ func testCaptureBehavior(ptr : SomeClass) {
   let v2 : SomeClass = ptr
 
   doStuff { [weak v1] in v1!.foo() }
-  // expected-warning @+2 {{variable 'v1' was written to, but never read}}
   doStuff { [weak v1,                 // expected-note {{previous}}
              weak v1] in v1!.foo() }  // expected-error {{definition conflicts with previous value}}
   doStuff { [unowned v2] in v2.foo() }
@@ -191,8 +190,12 @@ func testCaptureBehavior(ptr : SomeClass) {
   doStuff { [unowned(safe) v2] in v2.foo() }
   doStuff { [weak v1, weak v2] in v1!.foo() + v2!.foo() }
 
+  // Test constness of captures.  
+  doVoidStuff { [weak v2] in v2 = SomeClass() } // expected-error {{cannot assign to value: 'v2' is immutable}}
+  doVoidStuff { [unowned v2] in v2 = SomeClass() } // expected-error {{cannot assign to value: 'v2' is immutable}}
+  doVoidStuff { [v2] in v2 = SomeClass() } // expected-error {{cannot assign to value: 'v2' is immutable}}
+
   let i = 42
-  // expected-warning @+1 {{variable 'i' was never mutated}} {{19-20=let}}
   doStuff { [weak i] in i! }   // expected-error {{'weak' may only be applied to class and class-bound protocol types, not 'Int'}}
 }
 

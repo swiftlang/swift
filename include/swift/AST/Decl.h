@@ -351,15 +351,12 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// \brief Whether this is a 'let' property, which can only be initialized
     /// once (either in its declaration, or once later), making it immutable.
     unsigned IsLet : 1;
-
+      
     /// \brief Whether this vardecl has an initial value bound to it in a way
     /// that isn't represented in the AST with an initializer in the pattern
     /// binding.  This happens in cases like "for i in ...", switch cases, etc.
     unsigned HasNonPatternBindingInit : 1;
-    
-    /// \brief Whether this vardecl comes via a closure capture list.
-    unsigned InClosureCaptureList : 1;
-    
+      
     /// \brief Whether this is a property used in expressions in the debugger.
     /// It is up to the debugger to instruct SIL how to access this variable.
     unsigned IsDebuggerVar : 1;
@@ -367,6 +364,11 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// Whether the decl can be accessed by swift users; for instance,
     /// a.storage for lazy var a is a decl that cannot be accessed.
     unsigned IsUserAccessible : 1;
+      
+    /// \brief Whether this property is assignable by swift users; for instance,
+    /// a weak closure capture is mutable by the runtime, but not user assignable.
+    /// Note that a 'let' property is user assignable (once).
+    unsigned IsUserAssignable : 1;
   };
   enum { NumVarDeclBits = NumAbstractStorageDeclBits + 6 };
   static_assert(NumVarDeclBits <= 32, "fits in an unsigned");
@@ -4043,9 +4045,9 @@ protected:
     : AbstractStorageDecl(Kind, DC, Name, NameLoc) 
   {
     VarDeclBits.IsUserAccessible = true;
+    VarDeclBits.IsUserAssignable = true;
     VarDeclBits.IsStatic = IsStatic;
     VarDeclBits.IsLet = IsLet;
-    VarDeclBits.InClosureCaptureList = false;
     VarDeclBits.IsDebuggerVar = false;
     VarDeclBits.HasNonPatternBindingInit = false;
     setType(Ty);
@@ -4143,9 +4145,9 @@ public:
   bool isLet() const { return VarDeclBits.IsLet; }
   void setLet(bool IsLet) { VarDeclBits.IsLet = IsLet; }
 
-  /// Is this captured in a closure via a capture list?
-  bool inClosureCaptureList() const { return VarDeclBits.InClosureCaptureList; }
-  void setInClosureCaptureList(bool InClosureCaptureList) { VarDeclBits.InClosureCaptureList = InClosureCaptureList; }
+  /// Is this assignable by the user?
+  bool isUserAssignable() const { return VarDeclBits.IsUserAssignable; }
+  void setIsUserAssignable(bool IsUserAssignable) { VarDeclBits.IsUserAssignable = IsUserAssignable; }
 
   /// Return true if this vardecl has an initial value bound to it in a way
   /// that isn't represented in the AST with an initializer in the pattern
