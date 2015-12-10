@@ -242,9 +242,9 @@ public:
   ///  We assume a declaration without an annotation is always available.
   static VersionRange availableRange(const Decl *D, ASTContext &C);
 
-  /// \brief Returns the version range on which the declaration for which
-  /// declaration is annotated as available, or None if the declaration
-  /// has not availability annotation.
+  /// \brief Returns the version range for which the declaration
+  /// is annotated as available, or None if the declaration
+  /// has no availability annotation.
   static Optional<VersionRange> annotatedAvailableRange(const Decl *D,
                                                         ASTContext &C);
 
