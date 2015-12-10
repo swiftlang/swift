@@ -3,7 +3,7 @@
 .. OptimizerEffects:
 
 Optimizer Effects: Summarizing and specifying function side effects
-==================================================================
+===================================================================
 
 .. contents::
 
