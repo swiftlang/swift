@@ -1164,11 +1164,31 @@ void Lexer::lexStringLiteral() {
       if (*TokStart == '\'') {
         // Complain about single-quote string and suggest replacement with
         // double-quoted equivalent.
-        // FIXME: Fixit should replace ['"'] with ["\""] (radar 22709931)
         StringRef orig(TokStart, CurPtr - TokStart);
         llvm::SmallString<32> replacement;
         replacement += '"';
-        replacement += orig.slice(1, orig.size() - 1);
+        std::string str = orig.slice(1, orig.size() - 1).str();
+        std::string quot = "\"";
+        size_t pos = 0;
+        while (pos != str.length()) {
+          if (str.at(pos) == '\\') {
+            if (str.at(pos + 1) == '\'') {
+                // Un-escape escaped single quotes.
+                str.replace(pos, 2, "'");
+                ++pos;
+            } else {
+                // Skip over escaped characters.
+                pos += 2;
+            }
+          } else if (str.at(pos) == '"') {
+            str.replace(pos, 1, "\\\"");
+            // Advance past the newly added ["\""].
+            pos += 2;
+          } else {
+            ++pos;
+          }
+        }
+        replacement += StringRef(str);
         replacement += '"';
         diagnose(TokStart, diag::lex_single_quote_string)
           .fixItReplaceChars(getSourceLoc(TokStart), getSourceLoc(CurPtr),
