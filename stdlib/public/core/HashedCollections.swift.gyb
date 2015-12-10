@@ -680,7 +680,7 @@ public func == <Element : Hashable>(lhs: Set<Element>, rhs: Set<Element>) -> Boo
     let rhsNative = rhsNativeOwner.nativeStorage
 
     if lhsNativeOwner === rhsNativeOwner {
-        return true
+      return true
     }
 
     if lhsNative.count != rhsNative.count {
@@ -1188,7 +1188,7 @@ public func == <Key : Equatable, Value : Equatable>(
     let rhsNative = rhsNativeOwner.nativeStorage
 
     if lhsNativeOwner === rhsNativeOwner {
-        return true
+      return true
     }
 
     if lhsNative.count != rhsNative.count {
