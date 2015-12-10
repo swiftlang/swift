@@ -449,8 +449,9 @@ bb3(%16 : $Bool):
   return %16 : $Bool
 }
 
-sil private [transparent] @closure0 : $@convention(thin) (@owned @box Bool, @inout Bool) -> Bool {
-bb0(%0 : $@box Bool, %1 : $*Bool):
+sil private [transparent] @closure0 : $@convention(thin) (@owned @box Bool) -> Bool {
+bb0(%0 : $@box Bool):
+  %1 = project_box %0 : $@box Bool
   %2 = tuple ()
   %3 = load %1 : $*Bool
   strong_release %0 : $@box Bool
@@ -471,8 +472,9 @@ sil @test_short_circuit : $@convention(thin) (Bool, Bool) -> Bool {
 
 // CHECK: [[BB3]]:
   // CHECK: strong_retain [[VAL3:.*]]#0
+  // CHECK: [[ADDR3:%.*]] = project_box [[VAL3]]#0
   // CHECK: {{%.*}} = tuple ()
-  // CHECK: {{%.*}} = load [[VAL3]]#1
+  // CHECK: {{%.*}} = load [[ADDR3]]
   // CHECK: strong_release [[VAL3]]#0
   // CHECK: br [[BB2]](
 
@@ -487,9 +489,9 @@ bb0(%0 : $Bool, %1 : $Bool):
   store %1 to %3#1 : $*Bool
   %6 = function_ref @short_circuit_or : $@convention(thin) (Bool, @callee_owned () -> Bool) -> Bool
   %7 = load %2#1 : $*Bool
-  %8 = function_ref @closure0 : $@convention(thin) (@owned @box Bool, @inout Bool) -> Bool
+  %8 = function_ref @closure0 : $@convention(thin) (@owned @box Bool) -> Bool
   strong_retain %3#0 : $@box Bool
-  %10 = partial_apply %8(%3#0, %3#1) : $@convention(thin) (@owned @box Bool, @inout Bool) -> Bool
+  %10 = partial_apply %8(%3#0) : $@convention(thin) (@owned @box Bool) -> Bool
   %11 = apply %6(%7, %10) : $@convention(thin) (Bool, @callee_owned () -> Bool) -> Bool
   strong_release %3#0 : $@box Bool
   strong_release %2#0 : $@box Bool
@@ -510,8 +512,9 @@ sil @test_short_circuit2 : $@convention(thin) (Bool, Bool) -> Bool {
 
 // CHECK: [[BB3]]:
   // CHECK: strong_retain [[VAL3:.*]]#0
+  // CHECK: [[ADDR3:%.*]] = project_box [[VAL3]]#0
   // CHECK: {{%.*}} = tuple ()
-  // CHECK: {{%.*}} = load [[VAL3]]#1
+  // CHECK: {{%.*}} = load [[ADDR3]]
   // CHECK: strong_release [[VAL3]]#0
   // CHECK: br [[BB2]](
 
@@ -526,9 +529,9 @@ bb0(%0 : $Bool, %1 : $Bool):
   store %1 to %3#1 : $*Bool
   %6 = function_ref @short_circuit_or : $@convention(thin) (Bool, @callee_owned () -> Bool) -> Bool
   %7 = load %2#1 : $*Bool
-  %8 = function_ref @closure0 : $@convention(thin) (@owned @box Bool, @inout Bool) -> Bool
+  %8 = function_ref @closure0 : $@convention(thin) (@owned @box Bool) -> Bool
   strong_retain %3#0 : $@box Bool
-  %10 = partial_apply %8(%3#0, %3#1) : $@convention(thin) (@owned @box Bool, @inout Bool) -> Bool
+  %10 = partial_apply %8(%3#0) : $@convention(thin) (@owned @box Bool) -> Bool
   strong_retain %10 : $@callee_owned () -> Bool
   %12 = tuple ()
 

@@ -183,6 +183,7 @@ public:
       return true;
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_InoutAliasable:
       return false;
     case ParameterConvention::Indirect_Out:
       llvm_unreachable("copy_addr not released before reinitialization");
@@ -278,6 +279,7 @@ public:
     case ParameterConvention::Indirect_Out:
       return true;
     case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_InoutAliasable:
     case ParameterConvention::Indirect_In_Guaranteed:
       return false;
     case ParameterConvention::Indirect_In:

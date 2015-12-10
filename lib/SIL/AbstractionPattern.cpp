@@ -463,10 +463,10 @@ AbstractionPattern AbstractionPattern::getLValueObjectType() const {
     return *this;
   case Kind::Type:
     return AbstractionPattern(getGenericSignature(),
-                              cast<InOutType>(getType()).getObjectType());
+                              getType().getLValueOrInOutObjectType());
   case Kind::ClangType:
     return AbstractionPattern(getGenericSignature(),
-                              cast<InOutType>(getType()).getObjectType(),
+                              getType().getLValueOrInOutObjectType(),
                               getClangType());
   }
   llvm_unreachable("bad kind");

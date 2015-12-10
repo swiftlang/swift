@@ -28,7 +28,7 @@ import gizmo
 
     // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation32_convertDictionaryToNSDictionary{{.*}} : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
     // CHECK-NEXT:   [[NSDICT:%[0-9]+]] = apply [[CONVERTER]]<Foo, Foo>([[DICT]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
-    // CHECK-NEXT:   autorelease_return [[NSDICT]] : $NSDictionary
+    // CHECK-NEXT:   return [[NSDICT]] : $NSDictionary
   }
 
   var property: Dictionary<Foo, Foo> = [:]
@@ -41,7 +41,7 @@ import gizmo
   
   // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation32_convertDictionaryToNSDictionary{{.*}} : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
   // CHECK:   [[NSDICT:%[0-9]+]] = apply [[CONVERTER]]<Foo, Foo>([[DICT]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
-  // CHECK:   autorelease_return [[NSDICT]] : $NSDictionary
+  // CHECK:   return [[NSDICT]] : $NSDictionary
 
   // Property setter
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC24objc_dictionary_bridging3Foos8propertyGVs10DictionaryS0_S0__ : $@convention(objc_method) (NSDictionary, Foo) -> ()

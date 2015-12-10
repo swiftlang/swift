@@ -457,6 +457,20 @@ public:
                                                     value, dest, isInit));
   }
 
+  LoadUnownedInst *createLoadUnowned(SILLocation loc, SILValue src,
+                                     IsTake_t isTake) {
+    return insert(new (F.getModule())
+                    LoadUnownedInst(createSILDebugLocation(loc), src, isTake));
+  }
+
+  StoreUnownedInst *createStoreUnowned(SILLocation loc, SILValue value,
+                                       SILValue dest,
+                                       IsInitialization_t isInit) {
+    return insert(new (F.getModule())
+                    StoreUnownedInst(createSILDebugLocation(loc),
+                                     value, dest, isInit));
+  }
+
   CopyAddrInst *createCopyAddr(SILLocation Loc, SILValue srcAddr,
                                SILValue destAddr, IsTake_t isTake,
                                IsInitialization_t isInitialize) {
@@ -996,11 +1010,6 @@ public:
     return insert(new (F.getModule())
                       StrongReleaseInst(createSILDebugLocation(Loc), Operand));
   }
-  StrongRetainAutoreleasedInst *
-  createStrongRetainAutoreleased(SILLocation Loc, SILValue Operand) {
-    return insert(new (F.getModule()) StrongRetainAutoreleasedInst(
-        createSILDebugLocation(Loc), Operand));
-  }
   StrongPinInst *createStrongPin(SILLocation Loc, SILValue Operand) {
     return insert(new (F.getModule())
                       StrongPinInst(createSILDebugLocation(Loc), Operand));
@@ -1167,12 +1176,6 @@ public:
 
   ReturnInst *createReturn(SILLocation Loc, SILValue ReturnValue) {
     return insertTerminator(new (F.getModule()) ReturnInst(
-        createSILDebugLocation(Loc), ReturnValue));
-  }
-
-  AutoreleaseReturnInst *createAutoreleaseReturn(SILLocation Loc,
-                                                 SILValue ReturnValue) {
-    return insertTerminator(new (F.getModule()) AutoreleaseReturnInst(
         createSILDebugLocation(Loc), ReturnValue));
   }
 

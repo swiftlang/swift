@@ -57,52 +57,6 @@ enum class FixedPacking {
   /// It needs to be checked dynamically.
   Dynamic
 };
-
-/// The kind of reference counting implementation a heap object uses.
-enum class ReferenceCounting : unsigned char {
-  /// The object uses native Swift reference counting.
-  Native,
-  
-  /// The object uses ObjC reference counting.
-  ///
-  /// When ObjC interop is enabled, native Swift class objects are also ObjC
-  /// reference counting compatible. Swift non-class heap objects are never
-  /// ObjC reference counting compatible.
-  ///
-  /// Blocks are always ObjC reference counting compatible.
-  ObjC,
-  
-  /// The object uses _Block_copy/_Block_release reference counting.
-  ///
-  /// This is a strict subset of ObjC; all blocks are also ObjC reference
-  /// counting compatible. The block is assumed to have already been moved to
-  /// the heap so that _Block_copy returns the same object back.
-  Block,
-  
-  /// The object has an unknown reference counting implementation.
-  ///
-  /// This uses maximally-compatible reference counting entry points in the
-  /// runtime.
-  ///
-  /// FIXME: Those entry points are currently objc_retain/objc_release, which
-  /// are not compatible with non-class heap objects.
-  Unknown,
-  
-  /// Cases prior to this one are binary-compatible with Unknown reference
-  /// counting.
-  LastUnknownCompatible = Unknown,
-
-  /// The object has an unknown reference counting implementation and
-  /// the reference value may contain extra bits that need to be masked.
-  ///
-  /// This uses maximally-compatible reference counting entry points in the
-  /// runtime, with a masking layer on top. A bit inside the pointer is used
-  /// to signal native Swift refcounting.
-  Bridge,
-  
-  /// The object uses ErrorType's reference counting entry points.
-  Error,
-};
   
 /// Information about the IR representation and generation of the
 /// given type.
@@ -126,7 +80,6 @@ protected:
     /// Everything after this is loadable.
     STIK_Loadable,
     STIK_Reference,
-    STIK_Unowned,
   };
 
   TypeInfo(llvm::Type *Type, Alignment A, IsPOD_t pod,

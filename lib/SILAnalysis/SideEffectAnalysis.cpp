@@ -211,7 +211,6 @@ bool SideEffectAnalysis::getSemanticEffects(FunctionEffects &FE,
       }
       return false;
 
-    case ArrayCallKind::kArrayPropsIsNative:
     case ArrayCallKind::kArrayPropsIsNativeTypeChecked:
       SelfEffects.Releases |= !ASC.hasGuaranteedSelf();
       // The isNative checks evaluate to a constant (no read!) if the array

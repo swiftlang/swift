@@ -1291,10 +1291,7 @@ bool ModelASTWalker::processComment(CharSourceRange Range) {
 bool ModelASTWalker::findUrlStartingLoc(StringRef Text,
                                         unsigned &Start,
                                         std::regex &Regex) {
-#ifndef SWIFT_HAVE_WORKING_STD_REGEX
-  return false;
-#endif
-
+#ifdef SWIFT_HAVE_WORKING_STD_REGEX
   static const auto MailToPosition = std::find(URLProtocols.begin(),
                                                URLProtocols.end(),
                                                "mailto");
@@ -1318,6 +1315,7 @@ bool ModelASTWalker::findUrlStartingLoc(StringRef Text,
       return true;
     }
   }
+#endif
   return false;
 }
 
@@ -1354,10 +1352,8 @@ bool ModelASTWalker::searchForURL(CharSourceRange Range) {
 Optional<SyntaxNode> ModelASTWalker::parseFieldNode(StringRef Text,
                                                     StringRef OrigText,
                                                     SourceLoc OrigLoc) {
-#ifndef SWIFT_HAVE_WORKING_STD_REGEX
-  return None;
-#endif
-
+  Optional<SyntaxNode> Node;
+#ifdef SWIFT_HAVE_WORKING_STD_REGEX
   std::match_results<StringRef::iterator> Matches;
   for (unsigned i = 0; i != 3; ++i) {
     auto &Rx = getDocCommentRegex(i);
@@ -1372,7 +1368,9 @@ Optional<SyntaxNode> ModelASTWalker::parseFieldNode(StringRef Text,
   StringRef MatchStr(Match.first, Match.second - Match.first);
   auto Loc = OrigLoc.getAdvancedLoc(MatchStr.data() - OrigText.data());
   CharSourceRange Range(Loc, MatchStr.size());
-  return Optional<SyntaxNode>({ SyntaxNodeKind::DocCommentField, Range });
+  Node = Optional<SyntaxNode>({ SyntaxNodeKind::DocCommentField, Range });
+#endif
+  return Node;
 }
 
 bool ModelASTWalker::findFieldsInDocCommentLine(SyntaxNode Node) {

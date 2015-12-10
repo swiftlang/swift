@@ -1108,6 +1108,7 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     // <impl-convention> ::= 'e'                      // direct, deallocating
     // <impl-convention> ::= 'i'                      // indirect, ownership transfer
     // <impl-convention> ::= 'l'                      // indirect, inout
+    // <impl-convention> ::= 'L'                      // indirect, inout, aliasable
     // <impl-convention> ::= 'g'                      // direct, guaranteed
     // <impl-convention> ::= 'G'                      // indirect, guaranteed
     // <impl-convention> ::= 'z' <impl-convention>    // error result
@@ -1129,6 +1130,7 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
       case ParameterConvention::Indirect_In: return 'i';
       case ParameterConvention::Indirect_Out: return 'i';
       case ParameterConvention::Indirect_Inout: return 'l';
+      case ParameterConvention::Indirect_InoutAliasable: return 'L';
       case ParameterConvention::Indirect_In_Guaranteed: return 'G';
       case ParameterConvention::Direct_Owned: return 'o';
       case ParameterConvention::Direct_Unowned: return 'd';

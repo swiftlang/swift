@@ -96,7 +96,7 @@ bool BottomUpRefCountState::initWithMutatorInst(SILInstruction *I) {
   // since we will not move non-arc instructions.
   KnownSafe |= FoundNonARCUser;
 
-  // Set our lattice state to be incremented.
+  // Set our lattice state to be decremented.
   LatState = LatticeState::Decremented;
 
   return NestingDetected;

@@ -364,6 +364,8 @@ static void sanitizeCompilerArgs(ArrayRef<const char *> Args,
       continue;
     if (Arg == "-Xfrontend")
       continue;
+    if (Arg == "-embed-bitcode")
+      continue;
     NewArgs.push_back(CArg);
   }
 }

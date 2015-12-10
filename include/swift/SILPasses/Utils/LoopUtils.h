@@ -18,6 +18,8 @@
 #ifndef SWIFT_SILPASSES_UTILS_LOOPUTILS_H
 #define SWIFT_SILPASSES_UTILS_LOOPUTILS_H
 
+#include "llvm/ADT/SmallVector.h"
+
 namespace swift {
 
 class SILFunction;
@@ -51,6 +53,36 @@ public:
 
   virtual void runOnLoop(SILLoop *L) = 0;
   virtual void runOnFunction(SILFunction *F) = 0;
+};
+
+/// A group of sil loop visitors, run in sequence on a function.
+class SILLoopVisitorGroup : public SILLoopVisitor {
+  /// The list of visitors to run.
+  ///
+  /// This is set to 3, since currently the only place this is used will have at
+  /// most 3 such visitors.
+  llvm::SmallVector<SILLoopVisitor *, 3> Visitors;
+
+public:
+  SILLoopVisitorGroup(SILFunction *Func, SILLoopInfo *LInfo)
+      : SILLoopVisitor(Func, LInfo) {}
+  virtual ~SILLoopVisitorGroup() {}
+
+  void addVisitor(SILLoopVisitor *V) {
+    Visitors.push_back(V);
+  }
+
+  void runOnLoop(SILLoop *L) override {
+    for (auto *V : Visitors) {
+      V->runOnLoop(L);
+    }
+  }
+
+  void runOnFunction(SILFunction *F) override {
+    for (auto *V : Visitors) {
+      V->runOnFunction(F);
+    }
+  }
 };
 
 } // end swift namespace

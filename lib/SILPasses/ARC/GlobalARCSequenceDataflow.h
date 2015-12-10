@@ -15,7 +15,7 @@
 
 #include "RefCountState.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
-#include "swift/SILAnalysis/ProgramTerminationAnalysis.h"
+#include "ProgramTerminationAnalysis.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/NullablePtr.h"
 #include "llvm/ADT/MapVector.h"

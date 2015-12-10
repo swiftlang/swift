@@ -45,6 +45,7 @@ TYPE_ATTR(error)
 TYPE_ATTR(out)
 TYPE_ATTR(in)
 TYPE_ATTR(inout)
+TYPE_ATTR(inout_aliasable)
 TYPE_ATTR(in_guaranteed)
 TYPE_ATTR(noescape)  // Only valid in sil mode.
 TYPE_ATTR(owned)

@@ -168,7 +168,7 @@ class RDar16666631 {
       self.init(i: i, d: 0.1, s: s)
    }
 }
-let rdar16666631 = RDar16666631(i: 5, d: 6) // expected-error {{missing argument for parameter 's' in call}}
+let rdar16666631 = RDar16666631(i: 5, d: 6) // expected-error {{incorrect argument label in call (have 'i:d:', expected 'i:s:')}}
 
 
 struct S {

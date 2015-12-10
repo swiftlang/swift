@@ -55,7 +55,10 @@ static llvm::cl::opt<MLKind> MemLocationKinds(
 namespace {
 
 class MemLocationPrinter : public SILModuleTransform {
+  /// Type expansion analysis.
+  TypeExpansionAnalysis *TE;
 
+public:
   /// Dumps the expansions of SILType accessed in the function.
   /// This tests the expandTypeIntoLeafProjectionPaths function, which is
   /// a function used extensively in expand and reduce functions.
@@ -72,14 +75,12 @@ class MemLocationPrinter : public SILModuleTransform {
           SILValue V = LI->getOperand();
           // This is an address type, take it object type.
           SILType Ty = V.getType().getObjectType();
-          ProjectionPath::expandTypeIntoLeafProjectionPaths(Ty, M, PPList,
-                                                            true);
+          ProjectionPath::expandTypeIntoLeafProjectionPaths(Ty, M, PPList);
         } else if (auto *SI = dyn_cast<StoreInst>(&II)) {
           SILValue V = SI->getDest();
           // This is an address type, take it object type.
           SILType Ty = V.getType().getObjectType();
-          ProjectionPath::expandTypeIntoLeafProjectionPaths(Ty, M, PPList,
-                                                            true);
+          ProjectionPath::expandTypeIntoLeafProjectionPaths(Ty, M, PPList);
         } else {
           // Not interested in these instructions yet.
           continue;
@@ -103,7 +104,6 @@ class MemLocationPrinter : public SILModuleTransform {
   /// properly.
   void printMemExpansion(SILFunction &Fn) {
     MemLocation L;
-    TypeExpansionMap Types;
     MemLocationList Locs;
     unsigned Counter = 0;
     for (auto &BB : Fn) {
@@ -112,12 +112,12 @@ class MemLocationPrinter : public SILModuleTransform {
           L.initialize(LI->getOperand());
           if (!L.isValid())
             continue;
-          MemLocation::expand(L, &Fn.getModule(), Locs, Types);
+          MemLocation::expand(L, &Fn.getModule(), Locs, TE);
         } else if (auto *SI = dyn_cast<StoreInst>(&II)) {
           L.initialize(SI->getDest());
           if (!L.isValid())
             continue;
-          MemLocation::expand(L, &Fn.getModule(), Locs, Types);
+          MemLocation::expand(L, &Fn.getModule(), Locs, TE);
         } else {
           // Not interested in these instructions yet.
           continue;
@@ -142,7 +142,6 @@ class MemLocationPrinter : public SILModuleTransform {
   void printMemReduction(SILFunction &Fn) {
     MemLocation L;
     MemLocationList Locs;
-    TypeExpansionMap Types;
     llvm::DenseSet<MemLocation> SLocs;
     unsigned Counter = 0;
     for (auto &BB : Fn) {
@@ -154,12 +153,12 @@ class MemLocationPrinter : public SILModuleTransform {
           L.initialize(LI->getOperand());
           if (!L.isValid())
             continue;
-          MemLocation::expand(L, &Fn.getModule(), Locs, Types);
+          MemLocation::expand(L, &Fn.getModule(), Locs, TE);
         } else if (auto *SI = dyn_cast<StoreInst>(&II)) {
           L.initialize(SI->getDest());
           if (!L.isValid())
             continue;
-          MemLocation::expand(L, &Fn.getModule(), Locs, Types);
+          MemLocation::expand(L, &Fn.getModule(), Locs, TE);
         } else {
           // Not interested in these instructions yet.
           continue;
@@ -173,7 +172,7 @@ class MemLocationPrinter : public SILModuleTransform {
           SLocs.insert(*I);
         }
         // This should get the original (unexpanded) location back.
-        MemLocation::reduce(L, &Fn.getModule(), SLocs);
+        MemLocation::reduce(L, &Fn.getModule(), SLocs, TE);
         llvm::outs() << "#" << Counter++ << II;
         for (auto &Loc : SLocs) {
           Loc.print();
@@ -189,6 +188,9 @@ class MemLocationPrinter : public SILModuleTransform {
   void run() override {
     for (auto &Fn : *getModule()) {
       if (Fn.isExternalDeclaration()) continue;
+
+      // Initialize the type expansion analysis.
+      TE = PM->getAnalysis<TypeExpansionAnalysis>();
 
       llvm::outs() << "@" << Fn.getName() << "\n";
       switch (MemLocationKinds) {

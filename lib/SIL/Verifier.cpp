@@ -548,17 +548,21 @@ public:
         LocKind == SILLocation::SILFileKind)
       return;
 
+#if 0
+    // FIXME: This check was tautological before the removal of
+    // AutoreleaseReturnInst, and it turns out that we're violating it.
+    // Fix incoming.
     if (LocKind == SILLocation::CleanupKind ||
         LocKind == SILLocation::InlinedKind)
       require(InstKind != ValueKind::ReturnInst ||
               InstKind != ValueKind::AutoreleaseReturnInst,
         "cleanup and inlined locations are not allowed on return instructions");
+#endif
 
     if (LocKind == SILLocation::ReturnKind ||
         LocKind == SILLocation::ImplicitReturnKind)
       require(InstKind == ValueKind::BranchInst ||
               InstKind == ValueKind::ReturnInst ||
-              InstKind == ValueKind::AutoreleaseReturnInst ||
               InstKind == ValueKind::UnreachableInst,
         "return locations are only allowed on branch and return instructions");
 
@@ -975,6 +979,32 @@ public:
     require(Dest.getType().getObjectType() == Src.getType(),
             "Store operand type and dest type mismatch");
   }
+
+  void checkLoadUnownedInst(LoadUnownedInst *LUI) {
+    require(LUI->getType().isObject(), "Result of load must be an object");
+    auto PointerType = LUI->getOperand().getType();
+    auto PointerRVType = PointerType.getSwiftRValueType();
+    require(PointerType.isAddress() &&
+            PointerRVType->is<UnownedStorageType>(),
+            "load_unowned operand must be an unowned address");
+    require(PointerRVType->getReferenceStorageReferent()->getCanonicalType() ==
+            LUI->getType().getSwiftType(),
+            "Load operand type and result type mismatch");
+  }
+
+  void checkStoreUnownedInst(StoreUnownedInst *SUI) {
+    require(SUI->getSrc().getType().isObject(),
+            "Can't store from an address source");
+    auto PointerType = SUI->getDest().getType();
+    auto PointerRVType = PointerType.getSwiftRValueType();
+    require(PointerType.isAddress() &&
+            PointerRVType->is<UnownedStorageType>(),
+            "store_unowned address operand must be an unowned address");
+    require(PointerRVType->getReferenceStorageReferent()->getCanonicalType() ==
+            SUI->getSrc().getType().getSwiftType(),
+            "Store operand type and dest type mismatch");
+  }
+
   void checkLoadWeakInst(LoadWeakInst *LWI) {
     require(LWI->getType().isObject(), "Result of load must be an object");
     require(LWI->getType().getSwiftType()->getAnyOptionalObjectType(),
@@ -1283,30 +1313,26 @@ public:
   void checkStrongRetainInst(StrongRetainInst *RI) {
     requireReferenceValue(RI->getOperand(), "Operand of strong_retain");
   }
-  void checkStrongRetainAutoreleasedInst(StrongRetainAutoreleasedInst *RI) {
-    require(RI->getOperand().getType().isObject(),
-            "Operand of strong_retain_autoreleased must be an object");
-    require(RI->getOperand().getType().hasRetainablePointerRepresentation(),
-            "Operand of strong_retain_autoreleased must be a retainable pointer");
-    require(isa<ApplyInst>(RI->getOperand()) ||
-            isa<SILArgument>(RI->getOperand()),
-            "Operand of strong_retain_autoreleased must be the return value of "
-            "an apply instruction");
-  }
   void checkStrongReleaseInst(StrongReleaseInst *RI) {
     requireReferenceValue(RI->getOperand(), "Operand of release");
   }
   void checkStrongRetainUnownedInst(StrongRetainUnownedInst *RI) {
-    requireObjectType(UnownedStorageType, RI->getOperand(),
-                      "Operand of retain_unowned");
+    auto unownedType = requireObjectType(UnownedStorageType, RI->getOperand(),
+                                         "Operand of strong_retain_unowned");
+    require(unownedType->isLoadable(ResilienceExpansion::Maximal),
+            "strong_retain_unowned requires unowned type to be loadable");
   }
   void checkUnownedRetainInst(UnownedRetainInst *RI) {
-    requireObjectType(UnownedStorageType, RI->getOperand(),
-                      "Operand of unowned_retain");
+    auto unownedType = requireObjectType(UnownedStorageType, RI->getOperand(),
+                                          "Operand of unowned_retain");
+    require(unownedType->isLoadable(ResilienceExpansion::Maximal),
+            "unowned_retain requires unowned type to be loadable");
   }
   void checkUnownedReleaseInst(UnownedReleaseInst *RI) {
-    requireObjectType(UnownedStorageType, RI->getOperand(),
-                      "Operand of unowned_release");
+    auto unownedType = requireObjectType(UnownedStorageType, RI->getOperand(),
+                                         "Operand of unowned_release");
+    require(unownedType->isLoadable(ResilienceExpansion::Maximal),
+            "unowned_release requires unowned type to be loadable");
   }
   void checkDeallocStackInst(DeallocStackInst *DI) {
     require(DI->getOperand().getType().isLocalStorage(),
@@ -2055,6 +2081,8 @@ public:
     auto operandType = I->getOperand().getType().getSwiftRValueType();
     auto resultType = requireObjectType(UnownedStorageType, I,
                                         "Result of ref_to_unowned");
+    require(resultType->isLoadable(ResilienceExpansion::Maximal),
+            "ref_to_unowned requires unowned type to be loadable");
     require(resultType.getReferentType() == operandType,
             "Result of ref_to_unowned does not have the "
             "operand's type as its referent type");
@@ -2064,6 +2092,8 @@ public:
     auto operandType = requireObjectType(UnownedStorageType,
                                          I->getOperand(),
                                          "Operand of unowned_to_ref");
+    require(operandType->isLoadable(ResilienceExpansion::Maximal),
+            "unowned_to_ref requires unowned type to be loadable");
     requireReferenceStorageCapableValue(I, "Result of unowned_to_ref");
     auto resultType = I->getType().getSwiftRValueType();
     require(operandType.getReferentType() == resultType,
@@ -2300,25 +2330,6 @@ public:
           instResultType.dump(););
     require(functionResultType == instResultType,
             "return value type does not match return type of function");
-  }
-
-  void checkAutoreleaseReturnInst(AutoreleaseReturnInst *RI) {
-    DEBUG(RI->print(llvm::dbgs()));
-
-    CanSILFunctionType ti = F.getLoweredFunctionType();
-    SILType functionResultType
-      = F.mapTypeIntoContext(ti->getResult().getSILType());
-    SILType instResultType = RI->getOperand().getType();
-    DEBUG(llvm::dbgs() << "function return type: ";
-          functionResultType.dump();
-          llvm::dbgs() << "return inst type: ";
-          instResultType.dump(););
-    require(functionResultType == instResultType,
-            "return value type does not match return type of function");
-    require(instResultType.isObject(),
-            "autoreleased return value cannot be an address");
-    require(instResultType.hasRetainablePointerRepresentation(),
-            "autoreleased return value must be a reference type");
   }
 
   void checkThrowInst(ThrowInst *TI) {
@@ -2662,8 +2673,10 @@ public:
     require(invokeTy->getParameters().size() >= 1,
             "invoke function must take at least one parameter");
     auto storageParam = invokeTy->getParameters()[0];
-    require(storageParam.getConvention() == ParameterConvention::Indirect_Inout,
-            "invoke function must take block storage as @inout parameter");
+    require(storageParam.getConvention() ==
+              ParameterConvention::Indirect_InoutAliasable,
+            "invoke function must take block storage as @inout_aliasable "
+            "parameter");
     require(storageParam.getType() == storageTy,
             "invoke function must take block storage type as first parameter");
     
@@ -2769,12 +2782,13 @@ public:
                            return false;
                          case ParameterConvention::Indirect_In:
                          case ParameterConvention::Indirect_Inout:
+                         case ParameterConvention::Indirect_InoutAliasable:
                          case ParameterConvention::Indirect_Out:
                          case ParameterConvention::Indirect_In_Guaranteed:
                            return true;
                          }
                        }),
-            "entry point address argument must have a nonaliasing calling "
+            "entry point address argument must have an indirect calling "
             "convention");
   }
 
@@ -2801,8 +2815,6 @@ public:
     if (isa<UnreachableInst>(StartBlock->getTerminator()))
       return true;
     else if (isa<ReturnInst>(StartBlock->getTerminator()))
-      return false;
-    else if (isa<AutoreleaseReturnInst>(StartBlock->getTerminator()))
       return false;
     else if (isa<ThrowInst>(StartBlock->getTerminator()))
       return false;
@@ -2859,8 +2871,7 @@ public:
                   "stack dealloc does not match most recent stack alloc");
           stack.pop_back();
         }
-        if (isa<ReturnInst>(&i) || isa<AutoreleaseReturnInst>(&i) ||
-            isa<ThrowInst>(&i)) {
+        if (isa<ReturnInst>(&i) || isa<ThrowInst>(&i)) {
           require(stack.empty(),
                   "return with stack allocs that haven't been deallocated");
         }

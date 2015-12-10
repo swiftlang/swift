@@ -43,21 +43,21 @@ bb1:
 
 bb2:
   %14 = alloc_box $@callee_owned () -> Builtin.Int64
-  // CHECK: [[CLOSURE0_PROMOTE0:%.*]] = function_ref @_TTSf2d_i__closure0 :
-  %15 = function_ref @closure0 : $@convention(thin) (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64
+  // CHECK: [[CLOSURE0_PROMOTE0:%.*]] = function_ref @_TTSf2i__closure0 :
+  %15 = function_ref @closure0 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
   strong_retain %4#0 : $@box Builtin.Int64
   // CHECK: partial_apply [[CLOSURE0_PROMOTE0]]({{%.*}})
-  %17 = partial_apply %15(%4#0, %4#1) : $@convention(thin) (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64
+  %17 = partial_apply %15(%4#0) : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
   store %17 to %14#1 : $*@callee_owned () -> Builtin.Int64
   %19 = load %3#1 : $*Builtin.Int1
   cond_br %19, bb3, bb4
 
 bb3:
-  // CHECK: [[CLOSURE1_PROMOTE0:%.*]] = function_ref @_TTSf2d_i__closure1 :
-  %21 = function_ref @closure1 : $@convention(thin) (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64
+  // CHECK: [[CLOSURE1_PROMOTE0:%.*]] = function_ref @_TTSf2i__closure1 :
+  %21 = function_ref @closure1 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
   strong_retain %4#0 : $@box Builtin.Int64
   // CHECK: partial_apply [[CLOSURE1_PROMOTE0]]({{%.*}})
-  %23 = partial_apply %21(%4#0, %4#1) : $@convention(thin) (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64
+  %23 = partial_apply %21(%4#0) : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
   assign %23 to %14#1 : $*@callee_owned () -> Builtin.Int64
   br bb4
 
@@ -71,8 +71,9 @@ bb4:
 }
 
 // closure0
-sil private @closure0 : $@convention(thin) (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64 {
-bb0(%0 : $@box Builtin.Int64, %1 : $*Builtin.Int64):
+sil private @closure0 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $@box Builtin.Int64):
+  %1 = project_box %0 : $@box Builtin.Int64
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
   strong_release %0 : $@box Builtin.Int64
@@ -80,8 +81,9 @@ bb0(%0 : $@box Builtin.Int64, %1 : $*Builtin.Int64):
 }
 
 // closure1
-sil private @closure1 : $@convention(thin) (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64 {
-bb0(%0 : $@box Builtin.Int64, %1 : $*Builtin.Int64):
+sil private @closure1 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $@box Builtin.Int64):
+  %1 = project_box %0 : $@box Builtin.Int64
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
   strong_release %0 : $@box Builtin.Int64
@@ -111,10 +113,10 @@ bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
   store %2 to %5#1 : $*Builtin.Int64
   %9 = alloc_box $@callee_owned () -> Builtin.Int64
   // CHECK: [[CLOSURE2:%.*]] = function_ref @closure2 :
-  %10 = function_ref @closure2 : $@convention(thin) (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64
+  %10 = function_ref @closure2 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
   strong_retain %4#0 : $@box Builtin.Int64
-  // CHECK: partial_apply [[CLOSURE2]]({{%.*}}, {{%.*}})
-  %12 = partial_apply %10(%4#0, %4#1) : $@convention(thin) (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64
+  // CHECK: partial_apply [[CLOSURE2]]({{%.*}})
+  %12 = partial_apply %10(%4#0) : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
   store %12 to %9#1 : $*@callee_owned () -> Builtin.Int64
   %14 = load %3#1 : $*Builtin.Int1
   cond_br %14, bb1, bb2
@@ -129,11 +131,11 @@ bb2:
   cond_br %19, bb3, bb4
 
 bb3:
-  // CHECK: [[CLOSURE3_PROMOTE0:%.*]] = function_ref @_TTSf2d_i__closure3 :
-  %21 = function_ref @closure3 : $@convention(thin) (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64
+  // CHECK: [[CLOSURE3_PROMOTE0:%.*]] = function_ref @_TTSf2i__closure3 :
+  %21 = function_ref @closure3 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
   strong_retain %4#0 : $@box Builtin.Int64
   // CHECK: partial_apply [[CLOSURE3_PROMOTE0]]({{%.*}})
-  %23 = partial_apply %21(%4#0, %4#1) : $@convention(thin) (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64
+  %23 = partial_apply %21(%4#0) : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
   assign %23 to %9#1 : $*@callee_owned () -> Builtin.Int64
   br bb4
 
@@ -147,8 +149,9 @@ bb4:
 }
 
 // closure2
-sil private @closure2 : $@convention(thin) (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64 {
-bb0(%0 : $@box Builtin.Int64, %1 : $*Builtin.Int64):
+sil private @closure2 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $@box Builtin.Int64):
+  %1 = project_box %0 : $@box Builtin.Int64
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
   strong_release %0 : $@box Builtin.Int64
@@ -156,8 +159,9 @@ bb0(%0 : $@box Builtin.Int64, %1 : $*Builtin.Int64):
 }
 
 // closure3
-sil private @closure3 : $@convention(thin) (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64 {
-bb0(%0 : $@box Builtin.Int64, %1 : $*Builtin.Int64):
+sil private @closure3 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $@box Builtin.Int64):
+  %1 = project_box %0 : $@box Builtin.Int64
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
   strong_release %0 : $@box Builtin.Int64
@@ -187,20 +191,20 @@ bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
   store %2 to %5#1 : $*Builtin.Int64
   %9 = alloc_box $@callee_owned () -> Builtin.Int64
   // CHECK: [[CLOSURE4:%.*]] = function_ref @closure4 :
-  %10 = function_ref @closure4 : $@convention(thin) (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64
+  %10 = function_ref @closure4 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
   strong_retain %4#0 : $@box Builtin.Int64
-  // CHECK: partial_apply [[CLOSURE4]]({{%.*}}, {{%.*}})
-  %12 = partial_apply %10(%4#0, %4#1) : $@convention(thin) (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64
+  // CHECK: partial_apply [[CLOSURE4]]({{%.*}})
+  %12 = partial_apply %10(%4#0) : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
   store %12 to %9#1 : $*@callee_owned () -> Builtin.Int64
   %14 = load %3#1 : $*Builtin.Int1
   cond_br %14, bb1, bb2
 
 bb1:
   // CHECK: [[CLOSURE5:%.*]] = function_ref @closure5 :
-  %16 = function_ref @closure5 : $@convention(thin) (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64
+  %16 = function_ref @closure5 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
   strong_retain %4#0 : $@box Builtin.Int64
-  // CHECK: partial_apply [[CLOSURE5]]({{%.*}}, {{%.*}})
-  %18 = partial_apply %16(%4#0, %4#1) : $@convention(thin) (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64
+  // CHECK: partial_apply [[CLOSURE5]]({{%.*}})
+  %18 = partial_apply %16(%4#0) : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
   assign %18 to %9#1 : $*@callee_owned () -> Builtin.Int64
   br bb2
 
@@ -223,8 +227,9 @@ bb4:
 }
 
 // closure4
-sil private @closure4 : $@convention(thin) (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64 {
-bb0(%0 : $@box Builtin.Int64, %1 : $*Builtin.Int64):
+sil private @closure4 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $@box Builtin.Int64):
+  %1 = project_box %0 : $@box Builtin.Int64
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
   strong_release %0 : $@box Builtin.Int64
@@ -232,8 +237,9 @@ bb0(%0 : $@box Builtin.Int64, %1 : $*Builtin.Int64):
 }
 
 // closure5
-sil private @closure5 : $@convention(thin) (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64 {
-bb0(%0 : $@box Builtin.Int64, %1 : $*Builtin.Int64):
+sil private @closure5 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $@box Builtin.Int64):
+  %1 = project_box %0 : $@box Builtin.Int64
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
   strong_release %0 : $@box Builtin.Int64
@@ -261,10 +267,10 @@ bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
   store %2 to %5#1 : $*Builtin.Int64
   %9 = alloc_box $@callee_owned () -> Builtin.Int64
   // CHECK: [[CLOSURE6:%.*]] = function_ref @closure6 :
-  %10 = function_ref @closure6 : $@convention(thin) (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64
+  %10 = function_ref @closure6 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
   strong_retain %4#0 : $@box Builtin.Int64
-  // CHECK: partial_apply [[CLOSURE6]]({{%.*}}, {{%.*}})
-  %12 = partial_apply %10(%4#0, %4#1) : $@convention(thin) (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64
+  // CHECK: partial_apply [[CLOSURE6]]({{%.*}})
+  %12 = partial_apply %10(%4#0) : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
   store %12 to %9#1 : $*@callee_owned () -> Builtin.Int64
   br bb1
 
@@ -276,10 +282,10 @@ bb2:
   %17 = load %5#1 : $*Builtin.Int64
   assign %17 to %4#1 : $*Builtin.Int64
   // CHECK: [[CLOSURE7:%.*]] = function_ref @closure7 :
-  %19 = function_ref @closure7 : $@convention(thin) (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64
+  %19 = function_ref @closure7 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
   strong_retain %4#0 : $@box Builtin.Int64
-  // CHECK: partial_apply [[CLOSURE7]]({{%.*}}, {{%.*}})
-  %21 = partial_apply %19(%4#0, %4#1) : $@convention(thin) (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64
+  // CHECK: partial_apply [[CLOSURE7]]({{%.*}})
+  %21 = partial_apply %19(%4#0) : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
   assign %21 to %9#1 : $*@callee_owned () -> Builtin.Int64
   br bb1
 
@@ -293,8 +299,9 @@ bb3:
 }
 
 // closure6
-sil private @closure6 : $@convention(thin) (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64 {
-bb0(%0 : $@box Builtin.Int64, %1 : $*Builtin.Int64):
+sil private @closure6 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $@box Builtin.Int64):
+  %1 = project_box %0 : $@box Builtin.Int64
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
   strong_release %0 : $@box Builtin.Int64
@@ -302,8 +309,9 @@ bb0(%0 : $@box Builtin.Int64, %1 : $*Builtin.Int64):
 }
 
 // closure7
-sil private @closure7 : $@convention(thin) (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64 {
-bb0(%0 : $@box Builtin.Int64, %1 : $*Builtin.Int64):
+sil private @closure7 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $@box Builtin.Int64):
+  %1 = project_box %0 : $@box Builtin.Int64
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
   strong_release %0 : $@box Builtin.Int64

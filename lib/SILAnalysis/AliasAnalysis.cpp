@@ -368,8 +368,8 @@ static bool isTypedAccessOracle(SILInstruction *I) {
 /// address is with pointer_to_address (via UnsafePointer) or
 /// unchecked_addr_cast (via Builtin.reinterpretCast). Consequently, if the
 /// given value is directly derived from a memory location, it cannot
-/// alias. Call arguments also cannot alias because they must follow @in, @out,
-/// @inout, or @in_guaranteed conventions.
+/// alias. Call arguments also cannot alias because they must follow \@in, @out,
+/// @inout, or \@in_guaranteed conventions.
 ///
 /// FIXME: pointer_to_address should contain a flag that indicates whether the
 /// address is aliasing. Currently, we aggressively assume that

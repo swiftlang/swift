@@ -20,6 +20,11 @@
 
 using namespace swift;
 
+// The MemoryBehavior Cache must not grow beyond this size.
+// We limit the size of the MB cache to 2**14 because we want to limit the
+// memory usage of this cache.
+static const int MemoryBehaviorAnalysisMaxCacheSize = 16384;
+
 //===----------------------------------------------------------------------===//
 //                       Memory Behavior Implementation
 //===----------------------------------------------------------------------===//
@@ -139,7 +144,6 @@ public:
     return I->getMemoryBehavior();                                             \
   }
   REFCOUNTINC_MEMBEHAVIOR_INST(StrongRetainInst)
-  REFCOUNTINC_MEMBEHAVIOR_INST(StrongRetainAutoreleasedInst)
   REFCOUNTINC_MEMBEHAVIOR_INST(StrongRetainUnownedInst)
   REFCOUNTINC_MEMBEHAVIOR_INST(UnownedRetainInst)
   REFCOUNTINC_MEMBEHAVIOR_INST(RetainValueInst)
@@ -308,9 +312,40 @@ MemBehavior MemoryBehaviorVisitor::visitReleaseValueInst(ReleaseValueInst *SI) {
 
 MemBehavior
 AliasAnalysis::computeMemoryBehavior(SILInstruction *Inst, SILValue V,
-                                 RetainObserveKind InspectionMode) {
+                                     RetainObserveKind InspectionMode) {
+  MemBehaviorKeyTy Key = toMemoryBehaviorKey(SILValue(Inst), V,
+                                             InspectionMode);
+  // Check if we've already computed this result.
+  auto It = MemoryBehaviorCache.find(Key);
+  if (It != MemoryBehaviorCache.end()) {
+    return It->second;
+  }
+
+  // Flush the cache if the size of the cache is too large.
+  if (MemoryBehaviorCache.size() > MemoryBehaviorAnalysisMaxCacheSize) {
+    MemoryBehaviorCache.clear();
+    ValueBaseToIndex.clear();
+  }
+
+  // Calculate the aliasing result and store it in the cache.
+  auto Result = computeMemoryBehaviorInner(Inst, V, InspectionMode);
+  MemoryBehaviorCache[Key] = Result;
+  return Result;
+}
+
+MemBehavior
+AliasAnalysis::computeMemoryBehaviorInner(SILInstruction *Inst, SILValue V,
+                                          RetainObserveKind InspectionMode) {
   DEBUG(llvm::dbgs() << "GET MEMORY BEHAVIOR FOR:\n    " << *Inst << "    "
                      << *V.getDef());
   assert(SEA && "SideEffectsAnalysis must be initialized!");
   return MemoryBehaviorVisitor(this, SEA, V, InspectionMode).visit(Inst);
+}
+
+MemBehaviorKeyTy AliasAnalysis::toMemoryBehaviorKey(SILValue V1, SILValue V2,
+                                                    RetainObserveKind M) {
+  size_t idx1 = ValueBaseToIndex.getIndex(V1.getDef());
+  size_t idx2 = ValueBaseToIndex.getIndex(V2.getDef());
+  unsigned R2 = V2.getResultNumber();
+  return {idx1, idx2, R2, M};
 }

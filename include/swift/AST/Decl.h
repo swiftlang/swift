@@ -4086,9 +4086,9 @@ public:
     ParentPattern = PBD;
   }
   
-  /// Return the Pattern involved in initializing this VarDecl.  Recall that the
-  /// Pattern may be involved in initializing more than just this one vardecl
-  /// though.  For example, if this is a VarDecl for "x", the pattern may be
+  /// Return the Pattern involved in initializing this VarDecl.  However, recall that 
+  /// the Pattern may be involved in initializing more than just this one vardecl.
+  /// For example, if this is a VarDecl for "x", the pattern may be
   /// "(x, y)" and the initializer on the PatternBindingDecl may be "(1,2)" or
   /// "foo()".
   ///
@@ -4106,7 +4106,7 @@ public:
     ParentPattern = S;
   }
 
-  /// Return the initializer involved in this VarDecl.  However, Recall that the
+  /// Return the initializer involved in this VarDecl.  Recall that the
   /// initializer may be involved in initializing more than just this one
   /// vardecl though.  For example, if this is a VarDecl for "x", the pattern
   /// may be "(x, y)" and the initializer on the PatternBindingDecl may be
@@ -4191,7 +4191,7 @@ public:
   ParamDecl(bool isLet, SourceLoc argumentNameLoc, 
             Identifier argumentName, SourceLoc parameterNameLoc,
             Identifier parameterName, Type ty, DeclContext *dc)
-    : VarDecl(DeclKind::Param, /*IsState=*/false, isLet, parameterNameLoc, 
+    : VarDecl(DeclKind::Param, /*IsStatic=*/false, isLet, parameterNameLoc, 
               parameterName, ty, dc),
       ArgumentName(argumentName), ArgumentNameLoc(argumentNameLoc) { }
 

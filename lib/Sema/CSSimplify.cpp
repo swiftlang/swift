@@ -444,7 +444,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
       if (param.Variadic)
         continue;
 
-      // Parameters with defaults can be unfilfilled.
+      // Parameters with defaults can be unfulfilled.
       if (param.HasDefaultArgument)
         continue;
 
@@ -518,29 +518,7 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
              ConstraintLocatorBuilder &locator)
       : CS(cs), ArgType(argType), ParamType(paramType), Locator(locator) { }
 
-    virtual void extraArgument(unsigned argIdx) {
-      if (!CS.shouldRecordFailures())
-        return;
-
-      CS.recordFailure(CS.getConstraintLocator(Locator),
-                       Failure::ExtraArgument,
-                       argIdx);
-    }
-
-    virtual void missingArgument(unsigned paramIdx) {
-      if (!CS.shouldRecordFailures())
-        return;
-
-      CS.recordFailure(CS.getConstraintLocator(Locator),
-                       Failure::MissingArgument,
-                       ParamType, paramIdx);
-    }
-
-    virtual void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) {
-      return;
-    }
-
-    virtual bool relabelArguments(ArrayRef<Identifier> newNames) {
+    bool relabelArguments(ArrayRef<Identifier> newNames) override {
       if (!CS.shouldAttemptFixes()) {
         // FIXME: record why this failed. We have renaming.
         return true;

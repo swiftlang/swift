@@ -183,6 +183,19 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
       ->getPointerTo();
   }
 
+  /// void (*destructiveInjectEnumTag)(T *obj, unsigned tag, M *self);
+  case ValueWitness::DestructiveInjectEnumTag: {
+    llvm::Type *voidTy = IGM.VoidTy;
+    llvm::Type *ptrTy = IGM.OpaquePtrTy;
+    llvm::Type *indexTy = IGM.Int32Ty;
+    llvm::Type *metaTy = IGM.TypeMetadataPtrTy;
+
+    llvm::Type *args[] = {ptrTy, indexTy, metaTy};
+
+    return llvm::FunctionType::get(voidTy, args, /*isVarArg*/ false)
+      ->getPointerTo();
+  }
+
   case ValueWitness::Size:
   case ValueWitness::Flags:
   case ValueWitness::Stride:
@@ -256,6 +269,8 @@ static StringRef getValueWitnessLabel(ValueWitness index) {
     return "getEnumTag";
   case ValueWitness::DestructiveProjectEnumData:
     return "destructiveProjectEnumData";
+  case ValueWitness::DestructiveInjectEnumTag:
+    return "destructiveInjectEnumTag";
   }
   llvm_unreachable("bad value witness index");
 }

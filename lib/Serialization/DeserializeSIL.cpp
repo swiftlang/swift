@@ -1192,8 +1192,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(StrongUnpin)
   UNARY_INSTRUCTION(StrongRetain)
   UNARY_INSTRUCTION(StrongRelease)
-  UNARY_INSTRUCTION(StrongRetainAutoreleased)
-  UNARY_INSTRUCTION(AutoreleaseReturn)
   UNARY_INSTRUCTION(StrongRetainUnowned)
   UNARY_INSTRUCTION(UnownedRetain)
   UNARY_INSTRUCTION(UnownedRelease)
@@ -1203,6 +1201,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(DebugValueAddr)
 #undef UNARY_INSTRUCTION
 
+  case ValueKind::LoadUnownedInst: {
+    auto Ty = MF->getType(TyID);
+    bool isTake = (Attr > 0);
+    ResultVal = Builder.createLoadUnowned(Loc,
+        getLocalValue(ValID, ValResNum,
+                      getSILType(Ty, (SILValueCategory)TyCategory)),
+        IsTake_t(isTake));
+    break;
+  }
   case ValueKind::LoadWeakInst: {
     auto Ty = MF->getType(TyID);
     bool isTake = (Attr > 0);
@@ -1226,6 +1233,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createStore(Loc,
                     getLocalValue(ValID, ValResNum, ValType),
                     getLocalValue(ValID2, ValResNum2, addrType));
+    break;
+  }
+  case ValueKind::StoreUnownedInst: {
+    auto Ty = MF->getType(TyID);
+    SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);
+    auto refType = addrType.getAs<WeakStorageType>();
+    auto ValType = SILType::getPrimitiveObjectType(refType.getReferentType());
+    bool isInit = (Attr > 0);
+    ResultVal = Builder.createStoreUnowned(Loc,
+                    getLocalValue(ValID, ValResNum, ValType),
+                    getLocalValue(ValID2, ValResNum2, addrType),
+                    IsInitialization_t(isInit));
     break;
   }
   case ValueKind::StoreWeakInst: {

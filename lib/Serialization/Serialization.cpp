@@ -2572,6 +2572,7 @@ static uint8_t getRawStableParameterConvention(swift::ParameterConvention pc) {
   SIMPLE_CASE(ParameterConvention, Indirect_In_Guaranteed)
   SIMPLE_CASE(ParameterConvention, Indirect_Out)
   SIMPLE_CASE(ParameterConvention, Indirect_Inout)
+  SIMPLE_CASE(ParameterConvention, Indirect_InoutAliasable)
   SIMPLE_CASE(ParameterConvention, Direct_Owned)
   SIMPLE_CASE(ParameterConvention, Direct_Unowned)
   SIMPLE_CASE(ParameterConvention, Direct_Guaranteed)

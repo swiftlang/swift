@@ -35,8 +35,8 @@ ANALYSIS(Loop)
 ANALYSIS(LoopRegion)
 ANALYSIS(PostDominance)
 ANALYSIS(PostOrder)
-ANALYSIS(ProgramTermination)
 ANALYSIS(RCIdentity)
 ANALYSIS(SideEffect)
+ANALYSIS(TypeExpansion)
 
 #undef ANALYSIS

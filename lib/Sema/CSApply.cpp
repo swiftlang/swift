@@ -404,6 +404,16 @@ namespace {
       }
 
       auto type = simplifyType(openedType);
+        
+      // If we've ended up trying to assign an inout type here, it means we're
+      // missing an ampersand in front of the ref.
+      if (auto inoutType = type->getAs<InOutType>()) {
+        auto &tc = cs.getTypeChecker();
+        tc.diagnose(loc, diag::missing_address_of, inoutType->getInOutObjectType())
+          .fixItInsert(loc, "&");
+        return nullptr;
+      }
+        
       return new (ctx) DeclRefExpr(decl, loc, implicit, semantics, type);
     }
 
@@ -5650,6 +5660,8 @@ namespace {
           // Enter the context of the closure when type-checking the body.
           llvm::SaveAndRestore<DeclContext *> savedDC(Rewriter.dc, closure);
           Expr *body = closure->getSingleExpressionBody()->walk(*this);
+          if (!body)
+            return { false, nullptr };
           
           if (body != closure->getSingleExpressionBody())
             closure->setSingleExpressionBody(body);
@@ -5666,7 +5678,7 @@ namespace {
                                              closure,
                                              ConstraintLocator::ClosureResult));
               if (!body)
-                return { false, nullptr } ;
+                return { false, nullptr };
 
               closure->setSingleExpressionBody(body);
             }

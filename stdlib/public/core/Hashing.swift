@@ -68,7 +68,7 @@ struct _HashingDetail {
 
 //
 // _mix*() functions all have type (T) -> T.  These functions don't compress
-// their inputs and just exhibit avalance effect.
+// their inputs and just exhibit avalanche effect.
 //
 
 @_transparent

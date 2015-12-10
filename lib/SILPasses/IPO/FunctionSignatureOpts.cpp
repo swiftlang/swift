@@ -502,10 +502,8 @@ bool FunctionAnalyzer::analyze() {
   // A map from consumed SILArguments to the release associated with an
   // argument.
   ConsumedArgToEpilogueReleaseMatcher ArgToReturnReleaseMap(RCIA, F);
-  ConsumedArgToEpilogueReleaseMatcher ArgToThrowReleaseMap;
-  auto ThrowBBIter = F->findThrowBB();
-  if (ThrowBBIter != F->end())
-    ArgToThrowReleaseMap.findMatchingReleases(RCIA, &*ThrowBBIter);
+  ConsumedArgToEpilogueReleaseMatcher ArgToThrowReleaseMap(
+      RCIA, F, ConsumedArgToEpilogueReleaseMatcher::ExitKind::Throw);
 
   for (unsigned i = 0, e = Args.size(); i != e; ++i) {
     ArgumentDescriptor A(Allocator, Args[i]);
@@ -530,7 +528,7 @@ bool FunctionAnalyzer::analyze() {
 
         // If the function has a throw block we must also find a matching
         // release in the throw block.
-        if (ThrowBBIter == F->end() ||
+        if (!ArgToThrowReleaseMap.hasBlock() ||
             (ReleaseInThrow = ArgToThrowReleaseMap.releaseForArgument(A.Arg))) {
 
           // TODO: accept a second release in the throw block to let the

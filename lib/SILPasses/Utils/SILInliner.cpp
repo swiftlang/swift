@@ -173,9 +173,6 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
       continue;
     }
 
-    assert(!isa<AutoreleaseReturnInst>(BI->first->getTerminator()) &&
-           "Unexpected autorelease return while inlining non-Objective-C "
-           "function?");
     // Otherwise use normal visitor, which clones the existing instruction
     // but remaps basic blocks and values.
     visit(BI->first->getTerminator());
@@ -316,7 +313,6 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::ValueMetatypeInst:
     case ValueKind::WitnessMethodInst:
     case ValueKind::AssignInst:
-    case ValueKind::AutoreleaseReturnInst:
     case ValueKind::BranchInst:
     case ValueKind::CheckedCastBranchInst:
     case ValueKind::CheckedCastAddrBranchInst:
@@ -350,6 +346,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::InjectEnumAddrInst:
     case ValueKind::IsNonnullInst:
     case ValueKind::LoadInst:
+    case ValueKind::LoadUnownedInst:
     case ValueKind::LoadWeakInst:
     case ValueKind::OpenExistentialAddrInst:
     case ValueKind::OpenExistentialBoxInst:
@@ -361,10 +358,10 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::RefToUnmanagedInst:
     case ValueKind::RefToUnownedInst:
     case ValueKind::StoreInst:
+    case ValueKind::StoreUnownedInst:
     case ValueKind::StoreWeakInst:
     case ValueKind::StrongPinInst:
     case ValueKind::StrongReleaseInst:
-    case ValueKind::StrongRetainAutoreleasedInst:
     case ValueKind::StrongRetainInst:
     case ValueKind::StrongRetainUnownedInst:
     case ValueKind::StrongUnpinInst:

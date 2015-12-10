@@ -3234,7 +3234,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
     // element after the hole may belong where the new hole is.
     var hole = offset
 
-    // Find the first bucket in the contigous chain
+    // Find the first bucket in the contiguous chain
     var start = idealBucket
     while nativeStorage.isInitializedEntry(nativeStorage._prev(start)) {
       start = nativeStorage._prev(start)

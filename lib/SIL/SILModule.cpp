@@ -306,7 +306,7 @@ static bool verifySILSelfParameterType(SILDeclRef DeclRef,
   // Otherwise, if this function type has a guaranteed self parameter type,
   // make sure that we have a +0 self param.
   return !FTy->getExtInfo().hasGuaranteedSelfParam() ||
-          PInfo.isGuaranteed() || PInfo.isIndirectInOut();
+          PInfo.isGuaranteed() || PInfo.isIndirectMutating();
 }
 
 SILFunction *SILModule::getOrCreateFunction(SILLocation loc,

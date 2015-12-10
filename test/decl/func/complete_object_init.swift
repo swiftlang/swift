@@ -94,7 +94,7 @@ class B2 : A {
 
 func testConstructB2(i: Int) {
   var b2a = B2()
-  var b2b = B2(int: i) // expected-error{{extra argument 'int' in call}}
+  var b2b = B2(int: i) // expected-error{{argument passed to call that takes no arguments}}
 
   var b2: B2 = b2a
 }

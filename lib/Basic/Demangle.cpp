@@ -784,7 +784,12 @@ private:
         if (!demangleFuncSigSpecializationClosureProp(param))
           return nullptr;
       } else if (Mangled.nextIf("i_")) {
-        auto result = FUNCSIGSPEC_CREATE_PARAM_KIND(InOutToValue);
+        auto result = FUNCSIGSPEC_CREATE_PARAM_KIND(BoxToValue);
+        if (!result)
+          return nullptr;
+        param->addChild(result);
+      } else if (Mangled.nextIf("k_")) {
+        auto result = FUNCSIGSPEC_CREATE_PARAM_KIND(BoxToStack);
         if (!result)
           return nullptr;
         param->addChild(result);
@@ -2634,7 +2639,8 @@ unsigned NodePrinter::printFunctionSigSpecializationParam(NodePointer pointer,
   unsigned V = firstChild->getIndex();
   auto K = FunctionSigSpecializationParamKind(V);
   switch (K) {
-  case FunctionSigSpecializationParamKind::InOutToValue:
+  case FunctionSigSpecializationParamKind::BoxToValue:
+  case FunctionSigSpecializationParamKind::BoxToStack:
     print(pointer->getChild(Idx++));
     return Idx;
   case FunctionSigSpecializationParamKind::ConstantPropFunction:
@@ -3099,8 +3105,11 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
       return;
 
     switch (FunctionSigSpecializationParamKind(raw)) {
-    case FunctionSigSpecializationParamKind::InOutToValue:
-      Printer << "Value Promoted from InOut";
+    case FunctionSigSpecializationParamKind::BoxToValue:
+      Printer << "Value Promoted from Box";
+      break;
+    case FunctionSigSpecializationParamKind::BoxToStack:
+      Printer << "Stack Promoted from Box";
       break;
     case FunctionSigSpecializationParamKind::ConstantPropFunction:
       Printer << "Constant Propagated Function";

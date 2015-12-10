@@ -899,7 +899,7 @@ void swift::releasePartialApplyCapturedArg(SILBuilder &Builder, SILLocation Loc,
   // not need to destroy it here. This is something that is implicit in the
   // partial_apply design that will be revisited when partial_apply is
   // redesigned.
-  if (PInfo.isIndirectInOut())
+  if (PInfo.isIndirectMutating())
     return;
 
   if (isa<AllocStackInst>(Arg)) {

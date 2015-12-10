@@ -325,24 +325,6 @@ FUNCTION(UnknownWeakTakeAssign, swift_unknownWeakTakeAssign,RuntimeCC,
          ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
          ATTRS(NoUnwind))
 
-// void swift_unknownUnownedRetainStrong(void *object);
-FUNCTION(UnknownStrongRetainUnowned, swift_unknownUnownedRetainStrong,RuntimeCC,
-         RETURNS(VoidTy),
-         ARGS(UnknownRefCountedPtrTy),
-         ATTRS(NoUnwind))
-
-// void swift_unknownUnownedRetain(void *object);
-FUNCTION(UnknownUnownedRetain,     swift_unknownUnownedRetain,    RuntimeCC,
-         RETURNS(VoidTy),
-         ARGS(UnknownRefCountedPtrTy),
-         ATTRS(NoUnwind))
-
-// void swift_unknownUnownedRelease(void *object);
-FUNCTION(UnknownUnownedRelease,    swift_unknownUnownedRelease,   RuntimeCC,
-         RETURNS(VoidTy),
-         ARGS(UnknownRefCountedPtrTy),
-         ATTRS(NoUnwind))
-
 // void swift_unknownUnownedDestroy(UnownedReference *object);
 FUNCTION(UnknownUnownedDestroy,    swift_unknownUnownedDestroy,   RuntimeCC,
          RETURNS(VoidTy),
@@ -867,6 +849,13 @@ FUNCTION(ConformsToProtocol,
 // bool swift_isClassType(type*);
 FUNCTION(IsClassType,
          swift_isClassType, RuntimeCC,
+         RETURNS(Int1Ty),
+         ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// bool swift_isOptionalType(type*);
+FUNCTION(IsOptionalType,
+         swift_isOptionalType, RuntimeCC,
          RETURNS(Int1Ty),
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone))

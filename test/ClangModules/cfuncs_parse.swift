@@ -12,8 +12,8 @@ func test_cfunc1(i: Int) {
 func test_cfunc2(i: Int) {
   let f = cfunc2(i, 17)
   _ = f as Float
-  // FIXME: Should report this error: {{cannot convert the expression's type '$T3' to type 'CLong'}}
-  cfunc2(b:17, a:i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'Int32'}}
+  cfunc2(b:17, a:i) // expected-error{{extraneous argument labels 'b:a:' in call}}
+  cfunc2(17, i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'Int32'}}
 }
 
 func test_cfunc3_a() {

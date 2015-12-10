@@ -453,6 +453,9 @@ ERROR(sil_invalid_instr_operands,decl_parsing,none,
       "invalid instruction operands", ())
 ERROR(sil_operand_not_address,decl_parsing,none,
       "%0 operand of '%1' must have address type", (StringRef, StringRef))
+ERROR(sil_operand_not_unowned_address,decl_parsing,none,
+      "%0 operand of '%1' must have address of [unowned] type",
+      (StringRef, StringRef))
 ERROR(sil_operand_not_weak_address,decl_parsing,none,
       "%0 operand of '%1' must have address of [weak] type",
       (StringRef, StringRef))

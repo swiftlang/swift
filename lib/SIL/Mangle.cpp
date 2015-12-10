@@ -123,8 +123,14 @@ setArgumentSROA(unsigned ArgNo) {
 
 void
 FunctionSignatureSpecializationMangler::
-setArgumentInOutToValue(unsigned ArgNo) {
-  Args[ArgNo].first = ArgumentModifierIntBase(ArgumentModifier::InOutToValue);
+setArgumentBoxToValue(unsigned ArgNo) {
+  Args[ArgNo].first = ArgumentModifierIntBase(ArgumentModifier::BoxToValue);
+}
+
+void
+FunctionSignatureSpecializationMangler::
+setArgumentBoxToStack(unsigned ArgNo) {
+  Args[ArgNo].first = ArgumentModifierIntBase(ArgumentModifier::BoxToStack);
 }
 
 void
@@ -240,8 +246,13 @@ void FunctionSignatureSpecializationMangler::mangleArgument(
     return;
   }
 
-  if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::InOutToValue)) {
+  if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::BoxToValue)) {
     os << "i";
+    return;
+  }
+
+  if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::BoxToStack)) {
+    os << "k";
     return;
   }
 

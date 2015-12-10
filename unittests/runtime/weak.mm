@@ -289,23 +289,6 @@ TEST(WeakTest, simple_objc_and_swift) {
   swift_unknownWeakDestroy(&ref1);
 }
 
-TEST(WeakTest, objc_weak_release_after_strong_release) {
-  DestroyedObjCCount = 0;
-
-  void *o = make_objc_object();
-  // strong 1, unowned 0
-
-  swift_unknownUnownedRetain(o);
-  // strong 1, unowned 1
-
-  swift_unknownRelease(o);
-  // strong 0, unowned 1 -- object gets greedily deallocated by ObjC runtime
-  ASSERT_EQ(1U, DestroyedObjCCount);
-  
-  swift_unknownUnownedRelease(o);
-  // strong 0, unowned 0
-}
-
 TEST(WeakTest, objc_unowned_basic) {
   UnownedReference ref;
   void *objc1 = make_objc_object();

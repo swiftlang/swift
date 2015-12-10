@@ -97,7 +97,6 @@ func test9(g: Gizmo) -> Gizmo {
   // CHECK: alloc_stack
   // CHECK-NEXT: [[METHOD:%.*]] = class_method [volatile] [[G]] : {{.*}}, #Gizmo.duplicate!1.foreign
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[G]])
-  // CHECK-NEXT: retain_autoreleased [[RESULT]]
   // CHECK-NEXT: store [[RESULT]]
   // CHECK-NEXT: function_ref
   // CHECK-NEXT: function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
@@ -159,7 +158,6 @@ func applyBlock(f: @convention(block) Gizmo -> Gizmo, x: Gizmo) -> Gizmo {
   // CHECK:       [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
   // CHECK:       strong_retain [[BLOCK_COPY]]
   // CHECK:       [[RESULT:%.*]] = apply [[BLOCK_COPY]]([[ARG]])
-  // CHECK:       strong_retain_autoreleased [[RESULT]]
   // CHECK:       strong_release [[BLOCK_COPY]]
   // CHECK:       strong_release [[ARG]]
   // CHECK:       strong_release [[BLOCK_COPY]]

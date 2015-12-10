@@ -165,6 +165,16 @@ internal func _adHocPrint<T, TargetStream : OutputStreamType>(
 internal func _print_unlocked<T, TargetStream : OutputStreamType>(
   value: T, inout _ target: TargetStream
 ) {
+  // Optional has no representation suitable for display; therefore,
+  // values of optional type should be printed as a debug
+  // string. Check for Optional first, before checking protocol
+  // conformance below, because an Optional value is convertible to a
+  // protocol if its wrapped type conforms to that protocol.
+  if _isOptional(value.dynamicType) {
+    let debugPrintable = value as! CustomDebugStringConvertible
+    debugPrintable.debugDescription.writeTo(&target)
+    return
+  }
   if case let streamableObject as Streamable = value {
     streamableObject.writeTo(&target)
     return

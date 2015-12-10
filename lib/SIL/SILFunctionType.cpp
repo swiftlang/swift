@@ -359,6 +359,9 @@ enum class ConventionsKind : uint8_t {
       if (isa<InOutType>(substType)) {
         assert(origType.isOpaque() || origType.getAs<InOutType>());
         convention = ParameterConvention::Indirect_Inout;
+      } else if (isa<LValueType>(substType)) {
+        assert(origType.isOpaque() || origType.getAs<LValueType>());
+        convention = ParameterConvention::Indirect_InoutAliasable;
       } else if (isPassedIndirectly(origType, substType, substTL)) {
         convention = Convs.getIndirectParameter(origParamIndex, origType);
         assert(isIndirectParameter(convention));
@@ -1625,6 +1628,7 @@ namespace {
       case ParameterConvention::Direct_Deallocating:
       case ParameterConvention::Direct_Unowned:
       case ParameterConvention::Indirect_Inout:
+      case ParameterConvention::Indirect_InoutAliasable:
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_Guaranteed:
         return orig;

@@ -692,6 +692,27 @@ SILCloner<ImplClass>::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitLoadUnownedInst(LoadUnownedInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+    getBuilder().createLoadUnowned(getOpLocation(Inst->getLoc()),
+                                   getOpValue(Inst->getOperand()),
+                                   Inst->isTake()));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitStoreUnownedInst(StoreUnownedInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+    getBuilder().createStoreUnowned(getOpLocation(Inst->getLoc()),
+                                    getOpValue(Inst->getSrc()),
+                                    getOpValue(Inst->getDest()),
+                                    Inst->isInitializationOfDest()));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitLoadWeakInst(LoadWeakInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
@@ -1413,17 +1434,6 @@ SILCloner<ImplClass>::visitStrongRetainInst(StrongRetainInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::
-visitStrongRetainAutoreleasedInst(StrongRetainAutoreleasedInst *Inst) {
-  SILValue OpValue = getOpValue(Inst->getOperand());
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createStrongRetainAutoreleased(getOpLocation(Inst->getLoc()),
-                                                OpValue));
-}
-
-template<typename ImplClass>
-void
 SILCloner<ImplClass>::visitFixLifetimeInst(FixLifetimeInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
@@ -1644,15 +1654,6 @@ SILCloner<ImplClass>::visitReturnInst(ReturnInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createReturn(getOpLocation(Inst->getLoc()),
                               getOpValue(Inst->getOperand())));
-}
-
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::visitAutoreleaseReturnInst(AutoreleaseReturnInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createAutoreleaseReturn(getOpLocation(Inst->getLoc()),
-                                         getOpValue(Inst->getOperand())));
 }
 
 template<typename ImplClass>

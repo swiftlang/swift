@@ -743,50 +743,6 @@ static inline void swift_unknownWeakTakeAssign(WeakReference *dest, WeakReferenc
 /************************ UNKNOWN UNOWNED REFERENCES *************************/
 /*****************************************************************************/
 
-// TODO: these first three functions cannot be correctly supported.
-
-#if SWIFT_OBJC_INTEROP
-  
-/// Increment the strong retain count of an object which may have been
-/// deallocated and which might not be a native Swift object.
-extern "C" void swift_unknownUnownedRetainStrong(void *value);
-
-#else
-
-static inline void swift_unknownUnownedRetainStrong(void *value) {
-  swift_unownedRetain(static_cast<HeapObject *>(value));
-}
-
-#endif /* SWIFT_OBJC_INTEROP */
-
-#if SWIFT_OBJC_INTEROP
-
-/// Increment the weak/unowned reference count of an object that might
-/// not be a native Swift object.
-extern "C" void swift_unknownUnownedRetain(void *value);
-
-#else
-
-static inline void swift_unknownUnownedRetain(void *value) {
-  swift_unownedRetain(static_cast<HeapObject *>(value));
-}
-
-#endif /* SWIFT_OBJC_INTEROP */
-
-#if SWIFT_OBJC_INTEROP
-
-/// Decrement the weak/unowned reference count of an object that might not be
-/// a native Swift object.
-extern "C" void swift_unknownUnownedRelease(void *value);
-
-#else
-
-static inline void swift_unknownUnownedRelease(void *value) {
-  swift_unownedRelease(static_cast<HeapObject *>(value));
-}
-
-#endif /* SWIFT_OBJC_INTEROP */
-
 #if SWIFT_OBJC_INTEROP
 
 /// Initialize an unowned reference to an object with unknown reference

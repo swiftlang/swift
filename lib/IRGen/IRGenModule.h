@@ -408,7 +408,23 @@ public:
     return getPointerAlignment();
   }
 
-  llvm::Type *getReferenceType(ReferenceCounting refcounting);
+  llvm::Type *getReferenceType(ReferenceCounting style);
+
+  static bool isUnownedReferenceAddressOnly(ReferenceCounting style) {
+    switch (style) {
+    case ReferenceCounting::Native:
+      return false;
+
+    case ReferenceCounting::Unknown:
+    case ReferenceCounting::ObjC:
+    case ReferenceCounting::Block:
+      return true;
+
+    case ReferenceCounting::Bridge:
+    case ReferenceCounting::Error:
+      llvm_unreachable("unowned references to this type are not supported");
+    }
+  }
   
   /// Return the spare bit mask to use for types that comprise heap object
   /// pointers.
@@ -416,6 +432,7 @@ public:
 
   const SpareBitVector &getFunctionPointerSpareBits() const;
   SpareBitVector getWeakReferenceSpareBits() const;
+  SpareBitVector getUnownedReferenceSpareBits(ReferenceCounting style) const;
   const SpareBitVector &getWitnessTablePtrSpareBits() const;
 
   Size getWeakReferenceSize() const { return PtrSize; }

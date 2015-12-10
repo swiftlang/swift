@@ -571,7 +571,7 @@ public:
 
   Operand *operator*() const { return *CurrentIter; }
   Operand *operator->() const { return *CurrentIter; }
-  SILInstruction *getUser() const { return this->getUser(); }
+  SILInstruction *getUser() const { return CurrentIter->getUser(); }
 
   IgnoreExpectUseIterator &operator++() {
     assert(**this && "increment past end()!");

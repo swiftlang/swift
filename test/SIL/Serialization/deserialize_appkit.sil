@@ -6,3 +6,5 @@
 // REQUIRES: OS=macosx
 
 // CHECK-NOT: Unknown
+
+// REQUIRES: rdar://23805004

@@ -219,7 +219,6 @@ public:
       // NSArray may do arbitrary things including releasing the array.
       return !Call.mayHaveBridgedObjectElementType();
 
-    case ArrayCallKind::kArrayPropsIsNative:
     case ArrayCallKind::kArrayPropsIsNativeTypeChecked:
     case ArrayCallKind::kGetElementAddress:
     case ArrayCallKind::kMakeMutable:

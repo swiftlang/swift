@@ -872,7 +872,20 @@ public:
   void visitDebugValueAddrInst(DebugValueAddrInst *DVAI) {
     *this << "debug_value_addr " << getIDAndType(DVAI->getOperand());
     printVarDeclComment(DVAI);
-}
+  }
+
+  void visitLoadUnownedInst(LoadUnownedInst *LI) {
+    *this << "load_unowned ";
+    if (LI->isTake())
+      *this << "[take] ";
+    *this << getIDAndType(LI->getOperand());
+  }
+  void visitStoreUnownedInst(StoreUnownedInst *SI) {
+    *this << "store_unowned " << getID(SI->getSrc()) << " to ";
+    if (SI->isInitializationOfDest())
+      *this << "[initialization] ";
+    *this << getIDAndType(SI->getDest());
+  }
 
   void visitLoadWeakInst(LoadWeakInst *LI) {
     *this << "load_weak ";
@@ -886,6 +899,7 @@ public:
       *this << "[initialization] ";
     *this << getIDAndType(SI->getDest());
   }
+
   void visitCopyAddrInst(CopyAddrInst *CI) {
     *this << "copy_addr ";
     if (CI->isTakeOfSrc())
@@ -1241,9 +1255,6 @@ public:
   void visitStrongRetainInst(StrongRetainInst *RI) {
     *this << "strong_retain " << getIDAndType(RI->getOperand());
   }
-  void visitStrongRetainAutoreleasedInst(StrongRetainAutoreleasedInst *RI) {
-    *this << "strong_retain_autoreleased " << getIDAndType(RI->getOperand());
-  }
   void visitStrongReleaseInst(StrongReleaseInst *RI) {
     *this << "strong_release " << getIDAndType(RI->getOperand());
   }
@@ -1321,10 +1332,6 @@ public:
 
   void visitReturnInst(ReturnInst *RI) {
     *this << "return " << getIDAndType(RI->getOperand());
-  }
-  
-  void visitAutoreleaseReturnInst(AutoreleaseReturnInst *RI) {
-    *this << "autorelease_return " << getIDAndType(RI->getOperand());
   }
   
   void visitThrowInst(ThrowInst *TI) {

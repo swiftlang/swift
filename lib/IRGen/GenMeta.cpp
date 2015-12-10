@@ -2039,8 +2039,9 @@ namespace {
 #define BEGIN_METADATA_SEARCHER_0(SEARCHER, DECLKIND)                   \
   struct SEARCHER                                                       \
     : MetadataSearcher<DECLKIND##MetadataScanner<SEARCHER>> {           \
+    using super = MetadataSearcher;                                     \
     SEARCHER(IRGenModule &IGM, DECLKIND##Decl *target)                  \
-      : MetadataSearcher(IGM, target) {}
+      : super(IGM, target) {}
 #define BEGIN_METADATA_SEARCHER_1(SEARCHER, DECLKIND, TYPE_1, NAME_1)   \
   struct SEARCHER                                                       \
       : MetadataSearcher<DECLKIND##MetadataScanner<SEARCHER>> {         \
@@ -3790,7 +3791,7 @@ namespace {
   BEGIN_METADATA_SEARCHER_0(FindClassParentIndex, Class)
     void addParentMetadataRef(ClassDecl *forClass) {
       if (forClass == Target) setTargetOffset();
-      addParentMetadataRef(forClass);
+      super::addParentMetadataRef(forClass);
     }
   END_METADATA_SEARCHER()
 }
@@ -4525,7 +4526,8 @@ public:
     : super(IGM, theEnum) {}
   
   void addMetadataFlags() {
-    addWord(getMetadataKind(IGM, MetadataKind::Enum));
+    addWord(getMetadataKind(IGM, Target->classifyAsOptionalType()
+                            ? MetadataKind::Optional : MetadataKind::Enum));
   }
   
   void addNominalTypeDescriptor() {

@@ -24,6 +24,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// This type is used as a result of the _checkSubscript call to associate the
+/// call with the array access call it guards.
+public struct _DependenceToken {}
 
 %{
   arrayTypes = [
@@ -213,9 +216,12 @@ public struct ${Self}<Element>
       
       // Make sure the index is in range and wasNativeTypeChecked is
       // still valid.
-      _checkSubscript(index, wasNativeTypeChecked: wasNativeTypeChecked)
+      let token = _checkSubscript(
+        index, wasNativeTypeChecked: wasNativeTypeChecked)
 
-      return _getElement(index, wasNativeTypeChecked: wasNativeTypeChecked)
+      return _getElement(
+        index, wasNativeTypeChecked: wasNativeTypeChecked,
+        matchingSubscriptCheck: token)
     }
 %elif Self == 'ContiguousArray':
     addressWithNativeOwner {
@@ -280,13 +286,6 @@ public struct ${Self}<Element>
 
   //===--- private --------------------------------------------------------===//
 
-  @warn_unused_result
-  @_semantics("array.props.isNative")
-  public // @testable
-  func _getArrayPropertyIsNative() -> Bool {
-   return _buffer.arrayPropertyIsNative
-  }
-
   /// Returns true if the array is native and does not need a deferred
   /// type check.  May be hoisted by the optimizer, which means its
   /// results may be stale by the time they are used if there is an
@@ -335,7 +334,7 @@ public struct ${Self}<Element>
   }
   
   // Don't inline copyBuffer - this would inline the copy loop into the current
-  // path preventing retains/releases to be matched accross that region.
+  // path preventing retains/releases to be matched across that region.
   @inline(never)
   static internal func _copyBuffer(inout buffer: _Buffer) {
     let newBuffer = _ContiguousArrayBuffer<Element>(
@@ -376,13 +375,16 @@ public struct ${Self}<Element>
   /// ≤ index < count`.
   @_semantics("array.check_subscript")
   public // @testable
-  func _checkSubscript(index: Int, wasNativeTypeChecked: Bool) {
+  func _checkSubscript(
+    index: Int, wasNativeTypeChecked: Bool
+  ) -> _DependenceToken {
 #if _runtime(_ObjC)
     _buffer._checkInoutAndNativeTypeCheckedBounds(
       index, wasNativeTypeChecked: wasNativeTypeChecked)
 #else
     _buffer._checkValidSubscript(index)
 #endif
+    return _DependenceToken()
   }
 % end
 
@@ -397,7 +399,11 @@ public struct ${Self}<Element>
   @_semantics("array.get_element")
   @inline(__always)
   public // @testable
-  func _getElement(index: Int, wasNativeTypeChecked : Bool) -> Element {
+  func _getElement(
+    index: Int,
+    wasNativeTypeChecked : Bool,
+    matchingSubscriptCheck: _DependenceToken
+  ) -> Element {
 #if ${'_runtime(_ObjC)' if Self == 'Array' else 'false'}
     return _buffer.getElement(index, wasNativeTypeChecked: wasNativeTypeChecked)
 #else
@@ -1022,7 +1028,7 @@ public func += <
 /// Create a unique mutable buffer that has enough capacity to hold 'newCount'
 /// elements and at least 'requiredCapacity' elements. Set the count of the new
 /// buffer to 'newCount'. The content of the buffer is uninitialized.
-/// The forumula used to compute the new buffers capacity is:
+/// The formula used to compute the new buffers capacity is:
 ///   max(requiredCapacity, source.capacity)  if newCount <= source.capacity
 ///   max(requiredCapacity, _growArrayCapacity(source.capacity)) otherwise
 @inline(never)
@@ -1037,7 +1043,7 @@ internal func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferType>(
 /// Create a unique mutable buffer that has enough capacity to hold
 /// 'minNewCapacity' elements and set the count of the new buffer to
 /// 'countForNewBuffer'. The content of the buffer uninitialized.
-/// The forumula used to compute the new buffers capacity is:
+/// The formula used to compute the new buffers capacity is:
 ///   max(minNewCapacity, source.capacity) if minNewCapacity <= source.capacity
 ///   max(minNewCapacity, _growArrayCapacity(source.capacity)) otherwise
 @inline(never)

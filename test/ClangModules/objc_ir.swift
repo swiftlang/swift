@@ -28,11 +28,11 @@ func instanceMethods(b: B) {
 
 // CHECK: define hidden void @_TF7objc_ir16extensionMethodsFT1bCSo1B_T_
 func extensionMethods(b b: B) {
-  // CHECK: load i8*, i8** @"\01L_selector(method:separateExtMethod:)", align 8
-  // CHECK: [[T0:%.*]] = call i8* bitcast (void ()* @objc_msgSend to i8*
-  // CHECK: [[T1:%.*]] = ptrtoint i8* [[T0]] to i64
-  // CHECK: [[T2:%.*]] = inttoptr i64 [[T1]] to i8*
-  // CHECK: call i8* @objc_retainAutoreleasedReturnValue(i8* [[T2]])
+  // CHECK:      load i8*, i8** @"\01L_selector(method:separateExtMethod:)", align 8
+  // CHECK:      [[T0:%.*]] = call i8* bitcast (void ()* @objc_msgSend to i8*
+  // CHECK-NEXT: [[T1:%.*]] = call i8* @objc_retainAutoreleasedReturnValue(i8* [[T0]])
+  // CHECK-NOT:  [[T0]]
+  // CHECK:      [[T1]]
   b.method(1, separateExtMethod:1.5)
 }
 

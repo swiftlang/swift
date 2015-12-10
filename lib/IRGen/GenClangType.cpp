@@ -547,6 +547,7 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
       llvm_unreachable("block takes owned parameter");
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_InoutAliasable:
     case ParameterConvention::Indirect_Out:
     case ParameterConvention::Indirect_In_Guaranteed:
       llvm_unreachable("block takes indirect parameter");
@@ -720,9 +721,9 @@ clang::CanQualType IRGenModule::getClangType(SILType type) {
 
 clang::CanQualType IRGenModule::getClangType(SILParameterInfo params) {
   auto clangType = getClangType(params.getSILType());
-  // @block_storage types must be wrapped in an @inout and have special
-  // lowering
-  if (params.isIndirectInOut() &&
+  // @block_storage types must be @inout_aliasable and have
+  // special lowering
+  if (params.isIndirectMutating() &&
       !params.getSILType().is<SILBlockStorageType>()) {
     return getClangASTContext().getPointerType(clangType);
   }

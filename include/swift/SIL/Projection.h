@@ -35,6 +35,27 @@ class SILBuilder;
 class ProjectionPath;
 using ProjectionPathList = llvm::SmallVector<Optional<ProjectionPath>, 8>;
 
+enum class SubSeqRelation_t : uint8_t {
+  Unknown,
+  LHSStrictSubSeqOfRHS,
+  RHSStrictSubSeqOfLHS,
+  Equal,
+};
+
+/// Returns true if Seq is either LHSStrictSubSeqOfRHS or
+/// RHSStrictSubSeqOfLHS. Returns false if Seq is one of either Equal or
+/// Unrelated.
+inline bool isStrictSubSeqRelation(SubSeqRelation_t Seq) {
+  switch (Seq) {
+  case SubSeqRelation_t::Unknown:
+  case SubSeqRelation_t::Equal:
+    return false;
+  case SubSeqRelation_t::LHSStrictSubSeqOfRHS:
+  case SubSeqRelation_t::RHSStrictSubSeqOfLHS:
+    return true;
+  }
+}
+
 /// Extract an integer index from a SILValue.
 ///
 /// Return true if IndexVal is a constant index representable as unsigned
@@ -343,27 +364,6 @@ private:
   explicit Projection(UncheckedEnumDataInst *UEDAI);
 };
 
-enum class SubSeqRelation_t : uint8_t {
-  Unrelated = 0,
-  LHSStrictSubSeqOfRHS = 1,
-  RHSStrictSubSeqOfLHS = 2,
-  Equal = 3
-};
-
-/// Returns true if Seq is either LHSStrictSubSeqOfRHS or
-/// RHSStrictSubSeqOfLHS. Returns false if Seq is one of either Equal or
-/// Unrelated.
-inline bool isStrictSubSeqRelation(SubSeqRelation_t Seq) {
-  switch (Seq) {
-  case SubSeqRelation_t::Unrelated:
-  case SubSeqRelation_t::Equal:
-    return false;
-  case SubSeqRelation_t::LHSStrictSubSeqOfRHS:
-  case SubSeqRelation_t::RHSStrictSubSeqOfLHS:
-    return true;
-  }
-}
-
 /// A "path" of projections abstracting either value or aggregate projections
 /// upon a value.
 ///
@@ -429,11 +429,21 @@ public:
   subtractPaths(const ProjectionPath &LHS, const ProjectionPath &RHS);
 
   /// Given the SILType Base, expand every leaf nodes in the type tree.
-  /// Include the intermediate nodes if OnlyLeafNode is false.
+  ///
+  /// NOTE: this function returns a single empty projection path if the BaseType
+  /// is a leaf node in the type tree.
   static void expandTypeIntoLeafProjectionPaths(SILType BaseType,
                                                 SILModule *Mod,
-                                                ProjectionPathList &P,
-                                                bool OnlyLeafNode);
+                                                ProjectionPathList &P);
+
+  /// Given the SILType Base, expand every intermediate and leaf nodes in the
+  /// type tree.
+  ///
+  /// NOTE: this function returns a single empty projection path if the BaseType
+  /// is a leaf node in the type tree.
+  static void expandTypeIntoNodeProjectionPaths(SILType BaseType,
+                                                SILModule *Mod,
+                                                ProjectionPathList &P);
 
   /// Returns true if the two paths have a non-empty symmetric difference.
   ///

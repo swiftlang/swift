@@ -377,17 +377,39 @@ struct ObjCRetainableBox : RetainableBoxBase<ObjCRetainableBox, void*> {
 
 /// A box implementation class for unowned Objective-C object pointers.
 struct ObjCUnownedRetainableBox
-    : RetainableBoxBase<ObjCUnownedRetainableBox, void*> {
+    : WeakRetainableBoxBase<ObjCUnownedRetainableBox, UnownedReference> {
+
   static constexpr unsigned numExtraInhabitants =
     swift_getHeapObjectExtraInhabitantCount();
-
-  static void *retain(void *obj) {
-    swift_unknownUnownedRetain(obj);
-    return obj;
+  static void storeExtraInhabitant(UnownedReference *dest, int index) {
+    swift_storeHeapObjectExtraInhabitant(&dest->Value, index);
+  }
+  static int getExtraInhabitantIndex(const UnownedReference *src) {
+    return swift_getHeapObjectExtraInhabitantIndex(&src->Value);
   }
 
-  static void release(void *obj) {
-    swift_unknownUnownedRelease(obj);
+  static void destroy(UnownedReference *ref) {
+    swift_unknownUnownedDestroy(ref);
+  }
+  static UnownedReference *initializeWithCopy(UnownedReference *dest,
+                                              UnownedReference *src) {
+    swift_unknownUnownedCopyInit(dest, src);
+    return dest;
+  }
+  static UnownedReference *initializeWithTake(UnownedReference *dest,
+                                              UnownedReference *src) {
+    swift_unknownUnownedTakeInit(dest, src);
+    return dest;
+  }
+  static UnownedReference *assignWithCopy(UnownedReference *dest,
+                                          UnownedReference *src) {
+    swift_unknownUnownedCopyAssign(dest, src);
+    return dest;
+  }
+  static UnownedReference *assignWithTake(UnownedReference *dest,
+                                          UnownedReference *src) {
+    swift_unknownUnownedTakeAssign(dest, src);
+    return dest;
   }
 };
 

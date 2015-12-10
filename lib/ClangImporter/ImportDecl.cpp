@@ -1962,7 +1962,7 @@ namespace {
       
       // Create the enum declaration and record it.
       NominalTypeDecl *result;
-      auto enumKind = Impl.classifyEnum(decl);
+      auto enumKind = Impl.classifyEnum(Impl.getClangPreprocessor(), decl);
       switch (enumKind) {
       case EnumKind::Constants: {
         // There is no declaration. Rather, the type is mapped to the
@@ -2403,7 +2403,7 @@ namespace {
       if (name.empty())
         return nullptr;
 
-      switch (Impl.classifyEnum(clangEnum)) {
+      switch (Impl.classifyEnum(Impl.getClangPreprocessor(), clangEnum)) {
       case EnumKind::Constants: {
         // The enumeration was simply mapped to an integral type. Create a
         // constant with that integral type.
@@ -5184,7 +5184,7 @@ namespace {
 
 /// \brief Classify the given Clang enumeration to describe how to import it.
 EnumKind ClangImporter::Implementation::
-classifyEnum(const clang::EnumDecl *decl) {
+classifyEnum(clang::Preprocessor &pp, const clang::EnumDecl *decl) {
   // Anonymous enumerations simply get mapped to constants of the
   // underlying type of the enum, because there is no way to conjure up a
   // name for the Swift type.
@@ -5195,7 +5195,7 @@ classifyEnum(const clang::EnumDecl *decl) {
   // FIXME: Use Clang attributes instead of grovelling the macro expansion loc.
   auto loc = decl->getLocStart();
   if (loc.isMacroID()) {
-    StringRef MacroName = getClangPreprocessor().getImmediateMacroName(loc);
+    StringRef MacroName = pp.getImmediateMacroName(loc);
     if (MacroName == "CF_ENUM" || MacroName == "OBJC_ENUM" ||
         MacroName == "SWIFT_ENUM" || MacroName == "__CF_NAMED_ENUM")
       return EnumKind::Enum;

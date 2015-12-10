@@ -97,11 +97,20 @@ public protocol MyIndexableType {
   @warn_unused_result
   func next(i: Index) -> Index
 
+  func _nextInPlace(inout i: Index)
+
   func _failEarlyRangeCheck(index: Index, bounds: MyRange<Index>)
 
   func _failEarlyRangeCheck2(
     rangeStart: Index, rangeEnd: Index, boundsStart: Index, boundsEnd: Index)
 }
+extension MyIndexableType {
+  @inline(__always)
+  public func _nextInPlace(inout i: Index) {
+    i = next(i)
+  }
+}
+
 public protocol MyForwardCollectionType : MySequenceType, MyIndexableType {
   typealias Generator = DefaultGenerator<Self>
   typealias Index : MyIndexType
@@ -172,7 +181,7 @@ extension MyForwardCollectionType {
 
     var i = i
     for var offset: Index.Distance = 0; offset != n; ++offset {
-      i = next(i)
+      _nextInPlace(&i)
     }
     return i
   }
@@ -188,7 +197,7 @@ extension MyForwardCollectionType {
 
     var i = i
     for var offset: Index.Distance = 0; offset != n && i != limit; ++offset {
-      i = next(i)
+      _nextInPlace(&i)
     }
     return i
   }
@@ -209,7 +218,7 @@ extension MyForwardCollectionType {
     var count: Index.Distance = 0
     while start != end {
       ++count
-      start = next(start)
+      _nextInPlace(&start)
     }
     return count
   }
@@ -289,13 +298,19 @@ extension MyForwardCollectionType
 
   @warn_unused_result
   public func advance(i: Index, by n: Index.Distance) -> Index {
+    _precondition(n >= 0,
+      "Can't advance an Index of MyForwardCollectionType by a negative amount")
     return i.advancedBy(n)
   }
 
   @warn_unused_result
   public func advance(i: Index, by n: Index.Distance, limit: Index) -> Index {
+    _precondition(n >= 0,
+      "Can't advance an Index of MyForwardCollectionType by a negative amount")
     let d = i.distanceTo(limit)
-    if d == 0 || (d > 0 ? d <= n : d >= n) {
+    _precondition(d >= 0,
+      "The specified limit is behind the index")
+    if d <= n {
       return limit
     }
     return i.advancedBy(n)
@@ -327,7 +342,7 @@ extension MyForwardCollectionType
       if self[i] == element {
         return i
       }
-      i = next(i)
+      _nextInPlace(&i)
     }
     return nil
   }
@@ -345,9 +360,69 @@ extension MyForwardCollectionType
 }
 
 public protocol MyBidirectionalCollectionType : MyForwardCollectionType {
+  @warn_unused_result
+  func previous(i: Index) -> Index
+
+  func _previousInPlace(inout i: Index)
 }
+
+extension MyBidirectionalCollectionType {
+  @inline(__always)
+  public func _previousInPlace(inout i: Index) {
+    i = previous(i)
+  }
+
+  @warn_unused_result
+  public func advance(i: Index, by n: Index.Distance) -> Index {
+    if n >= 0 {
+      return _advanceForward(i, by: n)
+    }
+    var i = i
+    for var offset: Index.Distance = n; offset != 0; ++offset {
+      _previousInPlace(&i)
+    }
+    return i
+  }
+
+  @warn_unused_result
+  public func advance(i: Index, by n: Index.Distance, limit: Index) -> Index {
+    if n >= 0 {
+      return _advanceForward(i, by: n, limit: limit)
+    }
+    var i = i
+    for var offset: Index.Distance = n; offset != 0 && i != limit; ++offset {
+      _previousInPlace(&i)
+    }
+    return i
+  }
+}
+extension MyBidirectionalCollectionType
+  where Index : MyRandomAccessIndex {
+
+  @warn_unused_result
+  public func previous(i: Index) -> Index {
+    return advance(i, by: -1)
+  }
+
+  @warn_unused_result
+  public func advance(i: Index, by n: Index.Distance) -> Index {
+    return i.advancedBy(n)
+  }
+
+  @warn_unused_result
+  public func advance(i: Index, by n: Index.Distance, limit: Index) -> Index {
+    let d = i.distanceTo(limit)
+    if d == 0 || (d > 0 ? d <= n : d >= n) {
+      return limit
+    }
+    return i.advancedBy(n)
+  }
+}
+
 public protocol MyRandomAccessCollectionType : MyBidirectionalCollectionType {
+  typealias Index : MyRandomAccessIndex
 }
+
 public struct DefaultUnownedForwardCollection<Collection : MyForwardCollectionType> {
   internal let _collection: Collection
 
@@ -647,43 +722,6 @@ public func == <IR : MyIndexRangeType> (lhs: IR, rhs: IR) -> Bool {
 }
 
 /*
-public protocol MyBidirectionalIndexType : MyForwardIndexType {
-  @warn_unused_result
-  func predecessor() -> Self
-
-  mutating func _predecessorInPlace()
-}
-extension MyBidirectionalIndexType {
-  @inline(__always)
-  public mutating func _predecessorInPlace() {
-    self = self.predecessor()
-  }
-
-  @warn_unused_result
-  public func advancedBy(n: Distance) -> Self {
-    if n >= 0 {
-      return _advanceForward(n)
-    }
-    var p = self
-    for var i: Distance = n; i != 0; ++i {
-      --p
-    }
-    return p
-  }
-
-  @warn_unused_result
-  public func advancedBy(n: Distance, limit: Self) -> Self {
-    if n >= 0 {
-      return _advanceForward(n, limit)
-    }
-    var p = self
-    for var i: Distance = n; i != 0 && p != limit; ++i {
-      --p
-    }
-    return p
-  }
-}
-
 public protocol MyRandomAccessIndexType : MyBidirectionalIndexType, MyStrideable,
   _RandomAccessAmbiguity {
 
@@ -756,6 +794,9 @@ extension Int : MyIndexType {}
 extension Int : MyStrideable {}
 extension Int : MyRandomAccessIndex {}
 
+//------------------------------------------------------------------------
+// Array
+
 public struct MyArray<Element> : MyForwardCollectionType {
   internal var _elements: [Element] = []
 
@@ -774,6 +815,154 @@ public struct MyArray<Element> : MyForwardCollectionType {
     return _elements[i]
   }
 }
+
+//------------------------------------------------------------------------
+// Simplest Forward Collection
+
+public struct MySimplestForwardCollection<Element> : MyForwardCollectionType {
+  internal let _elements: [Element]
+
+  public init(_ elements: [Element]) {
+    self._elements = elements
+  }
+
+  public var startIndex: MySimplestForwardCollectionIndex {
+    return MySimplestForwardCollectionIndex(_elements.startIndex)
+  }
+
+  public var endIndex: MySimplestForwardCollectionIndex {
+    return MySimplestForwardCollectionIndex(_elements.endIndex)
+  }
+
+  @warn_unused_result
+  public func next(i: MySimplestForwardCollectionIndex) -> MySimplestForwardCollectionIndex {
+    return MySimplestForwardCollectionIndex(i._index + 1)
+  }
+
+  public subscript(i: MySimplestForwardCollectionIndex) -> Element {
+    return _elements[i._index]
+  }
+}
+
+public struct MySimplestForwardCollectionIndex : MyIndexType {
+  internal let _index: Int
+  internal init(_ index: Int) {
+    self._index = index
+  }
+}
+
+public func == (
+  lhs: MySimplestForwardCollectionIndex,
+  rhs: MySimplestForwardCollectionIndex
+) -> Bool {
+  return lhs._index == rhs._index
+}
+
+//------------------------------------------------------------------------
+// Simplest Bidirectional Collection
+
+public struct MySimplestBidirectionalCollection<Element> : MyBidirectionalCollectionType {
+  internal let _elements: [Element]
+
+  public init(_ elements: [Element]) {
+    self._elements = elements
+  }
+
+  public var startIndex: MySimplestBidirectionalCollectionIndex {
+    return MySimplestBidirectionalCollectionIndex(_elements.startIndex)
+  }
+
+  public var endIndex: MySimplestBidirectionalCollectionIndex {
+    return MySimplestBidirectionalCollectionIndex(_elements.endIndex)
+  }
+
+  @warn_unused_result
+  public func next(i: MySimplestBidirectionalCollectionIndex) -> MySimplestBidirectionalCollectionIndex {
+    return MySimplestBidirectionalCollectionIndex(i._index + 1)
+  }
+
+  @warn_unused_result
+  public func previous(i: MySimplestBidirectionalCollectionIndex) -> MySimplestBidirectionalCollectionIndex {
+    return MySimplestBidirectionalCollectionIndex(i._index - 1)
+  }
+
+  public subscript(i: MySimplestBidirectionalCollectionIndex) -> Element {
+    return _elements[i._index]
+  }
+}
+
+public struct MySimplestBidirectionalCollectionIndex : MyIndexType {
+  internal let _index: Int
+  internal init(_ index: Int) {
+    self._index = index
+  }
+}
+
+public func == (
+  lhs: MySimplestBidirectionalCollectionIndex,
+  rhs: MySimplestBidirectionalCollectionIndex
+) -> Bool {
+  return lhs._index == rhs._index
+}
+
+//------------------------------------------------------------------------
+// Simplest Bidirectional Collection
+
+public struct MySimplestRandomAccessCollection<Element> : MyRandomAccessCollectionType {
+  internal let _elements: [Element]
+
+  public init(_ elements: [Element]) {
+    self._elements = elements
+  }
+
+  // FIXME: 'typealias Index' should be inferred.
+  public typealias Index = MySimplestRandomAccessCollectionIndex
+
+  public var startIndex: MySimplestRandomAccessCollectionIndex {
+    return MySimplestRandomAccessCollectionIndex(_elements.startIndex)
+  }
+
+  public var endIndex: MySimplestRandomAccessCollectionIndex {
+    return MySimplestRandomAccessCollectionIndex(_elements.endIndex)
+  }
+
+  public subscript(i: MySimplestRandomAccessCollectionIndex) -> Element {
+    return _elements[i._index]
+  }
+}
+
+public struct MySimplestRandomAccessCollectionIndex : MyRandomAccessIndex {
+  internal let _index: Int
+  internal init(_ index: Int) {
+    self._index = index
+  }
+
+  @warn_unused_result
+  public func distanceTo(other: MySimplestRandomAccessCollectionIndex) -> Int {
+    return other._index - _index
+  }
+
+  @warn_unused_result
+  public func advancedBy(n: Int) -> MySimplestRandomAccessCollectionIndex {
+    return MySimplestRandomAccessCollectionIndex(_index + n)
+  }
+}
+
+public func == (
+  lhs: MySimplestRandomAccessCollectionIndex,
+  rhs: MySimplestRandomAccessCollectionIndex
+) -> Bool {
+  return lhs._index == rhs._index
+}
+
+public func < (
+  lhs: MySimplestRandomAccessCollectionIndex,
+  rhs: MySimplestRandomAccessCollectionIndex
+) -> Bool {
+  return lhs._index < rhs._index
+}
+
+//------------------------------------------------------------------------
 
 // FIXME: how does AnyCollection look like in the new scheme?
 

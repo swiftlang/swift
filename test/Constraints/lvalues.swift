@@ -203,3 +203,34 @@ func testImmutableUnsafePointer(p: UnsafePointer<Int>) {
   p[0] = 1 // expected-error {{cannot assign through subscript: subscript is get-only}}
 }
 
+// <https://bugs.swift.org/browse/SR-7> Inferring closure param type to 
+// inout crashes compiler
+let g = { x in f0(x) } // expected-error{{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{19-19=&}}
+
+// <rdar://problem/17245353> Crash with optional closure taking inout
+func rdar17245353() {
+  typealias Fn = (inout Int) -> ()
+  func getFn() -> Fn? { return nil }
+
+  let _: (inout UInt, UInt) -> Void = { $0 += $1 }
+}
+
+// <rdar://problem/23131768> Bugs related to closures with inout parameters
+func rdar23131768() {
+  func f(g: (inout Int) -> Void) { var a = 1; g(&a); print(a) }
+  f { $0 += 1 } // Crashes compiler
+
+  func f2(g: (inout Int) -> Void) { var a = 1; g(&a); print(a) }
+  f2 { $0 = $0 + 1 } // previously error: Cannot convert value of type '_ -> ()' to expected type '(inout Int) -> Void'
+
+  func f3(g: (inout Int) -> Void) { var a = 1; g(&a); print(a) }
+  f3 { (inout v: Int) -> Void in v += 1 }
+}
+
+// <rdar://problem/23331567> Swift: Compiler crash related to closures with inout parameter.
+func r23331567(fn: (inout x: Int) -> Void) {
+  var a = 0
+  fn(x: &a)
+}
+r23331567 { $0 += 1 }
+

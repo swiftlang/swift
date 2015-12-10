@@ -166,6 +166,9 @@ public:
   /// Apply an OR mask to the payload.
   void emitApplyOrMask(IRGenFunction &IGF, APInt mask);
   
+  /// Apply an OR mask to the payload.
+  void emitApplyOrMask(IRGenFunction &IGF, EnumPayload mask);
+  
   /// Gather bits from an enum payload based on a spare bit mask.
   llvm::Value *emitGatherSpareBits(IRGenFunction &IGF,
                                    const SpareBitVector &spareBits,

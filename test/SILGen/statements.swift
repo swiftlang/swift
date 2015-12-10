@@ -515,7 +515,7 @@ func defer_mutable(x: Int) {
   var x = x
   // CHECK: [[BOX:%.*]] = alloc_box $Int
   // CHECK-NOT: [[BOX]]#0
-  // CHECK: function_ref @_TFF10statements13defer_mutableFSiT_L_6$deferfT_T_ : $@convention(thin) (@inout Int) -> ()
+  // CHECK: function_ref @_TFF10statements13defer_mutableFSiT_L_6$deferfT_T_ : $@convention(thin) (@inout_aliasable Int) -> ()
   // CHECK-NOT: [[BOX]]#0
   // CHECK: strong_release [[BOX]]#0
   defer { _ = x }

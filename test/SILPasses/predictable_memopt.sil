@@ -94,7 +94,7 @@ sil @returns_generic_struct : $@convention(thin) (@out AddressOnlyStruct) -> ()
 
 
 sil @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
-sil @closure0 : $@convention(thin) (@owned @box Int, @inout Int) -> ()
+sil @closure0 : $@convention(thin) (@owned @box Int) -> ()
 
 
 // CHECK-LABEL: sil @closure_test2
@@ -104,9 +104,9 @@ bb0(%1 : $Int):
   store %1 to %0#1 : $*Int  // CHECK: store
 
   %5 = function_ref @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
-  %6 = function_ref @closure0 : $@convention(thin) (@owned @box Int, @inout Int) -> ()
+  %6 = function_ref @closure0 : $@convention(thin) (@owned @box Int) -> ()
   strong_retain %0#0 : $@box Int
-  %8 = partial_apply %6(%0#0, %0#1) : $@convention(thin) (@owned @box Int, @inout Int) -> ()
+  %8 = partial_apply %6(%0#0) : $@convention(thin) (@owned @box Int) -> ()
   %9 = apply %5(%8) : $@convention(thin) (@callee_owned () -> ()) -> ()
   strong_release %0#0 : $@box Int
 

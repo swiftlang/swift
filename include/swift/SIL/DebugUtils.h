@@ -158,6 +158,15 @@ inline bool hasOneNonDebugUse(const V &value) {
   return ++I == E;
 }
 
+// Returns the use if the value has only one non debug user.
+template <typename V>
+inline SILInstruction *getSingleNonDebugUser(const V &value) {
+  auto Range = getNonDebugUses(value);
+  auto I = Range.begin(), E = Range.end();
+  if (I == E) return nullptr;
+  return I->getUser();
+}
+
 /// Erases the instruction \p I from it's parent block and deletes it, including
 /// all debug instructions which use \p I.
 /// Precondition: The instruction may only have debug instructions as uses.

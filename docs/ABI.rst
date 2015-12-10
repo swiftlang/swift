@@ -770,6 +770,7 @@ Globals
   funcsigspecializationarginfo ::= 'd'                                           // Dead argument
   funcsigspecializationarginfo ::= 'g' 's'?                                      // Owned => Guaranteed and Exploded if 's' present.
   funcsigspecializationarginfo ::= 's'                                           // Exploded
+  funcsigspecializationarginfo ::= 'k'                                           // Exploded
   funcsigspecializationconstantpropinfo ::= 'fr' mangled-name
   funcsigspecializationconstantpropinfo ::= 'g' mangled-name
   funcsigspecializationconstantpropinfo ::= 'i' 64-bit-integer
@@ -1088,6 +1089,7 @@ TODO: document these
   value-witness-kind ::= 'tT'           // initializeArrayWithTakeBackToFront
   value-witness-kind ::= 'ug'           // getEnumTag
   value-witness-kind ::= 'up'           // destructiveProjectEnumData
+  value-witness-kind ::= 'ui'           // destructiveInjectEnumTag
 
 ``<value-witness-kind>`` differentiates the kinds of value
 witness functions for a type.

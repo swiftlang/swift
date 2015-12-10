@@ -823,6 +823,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_Out:
   case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
     llvm_unreachable("self passed indirectly?!");
   }
   

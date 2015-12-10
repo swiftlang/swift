@@ -365,10 +365,6 @@ public:
     IsNotBridgedToObjectiveC,
     /// \brief The type is not allowed to be an l-value.
     IsForbiddenLValue,
-    /// Missing argument in a call.
-    MissingArgument,
-    /// Extra argument in a call.
-    ExtraArgument,
     /// Type has no public initializers.
     NoPublicInitializers,
     /// The type is not materializable.
@@ -437,12 +433,9 @@ public:
                      getSecondType());
 
     case IsNotBridgedToObjectiveC:
-    case MissingArgument:
     case NoPublicInitializers:
       return Profile(id, locator, kind, resolvedOverloadSets, getFirstType(),
                     value);
-    case ExtraArgument:
-      return Profile(id, locator, kind, resolvedOverloadSets, value, value2);
     }
   }
 
@@ -1059,7 +1052,7 @@ struct MemberLookupResult {
     Unsolved,
     
     /// This result indicates that the member reference is erroneous, but was
-    /// already dianosed.  Don't emit another error.
+    /// already diagnosed.  Don't emit another error.
     ErrorAlreadyDiagnosed,
     
     /// This result indicates that the lookup produced candidate lists,

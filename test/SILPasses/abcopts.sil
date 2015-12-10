@@ -6,6 +6,7 @@ sil_stage canonical
 import Builtin
 import Swift
 
+struct _DependenceToken {}
 struct ArrayIntBuffer {
   var storage : Builtin.NativeObject
 }
@@ -31,14 +32,14 @@ bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
 
   // Don't assert on functions that are marked with array semantics but are not
   // methods.
-  %302 = function_ref @checkbounds_no_meth : $@convention(thin) (Int32, Bool, @owned ArrayInt) -> ()
+  %302 = function_ref @checkbounds_no_meth : $@convention(thin) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %303 = load %0 : $*ArrayInt
   %304 = struct_extract %303 : $ArrayInt, #ArrayInt.buffer
   %305 = struct_extract %304 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %305 : $Builtin.NativeObject
   %306 = integer_literal $Builtin.Int32, 0
   %307 = struct $Int32(%306 : $Builtin.Int32)
-  %308 = apply %302(%307, %102, %303) : $@convention(thin) (Int32, Bool, @owned ArrayInt) -> ()
+  %308 = apply %302(%307, %102, %303) : $@convention(thin) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   // CHECK: [[CHECKBOUNDSNO:%[0-9]+]] = function_ref @checkbounds_no_meth
 
   %200 = function_ref @arrayinit: $@convention(thin) () -> @owned ArrayInt
@@ -47,7 +48,7 @@ bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
   // CHECK: [[CHECKBOUNDS:%[0-9]+]] = function_ref @checkbounds
   // CHECK: [[LD1:%[0-9]+]] = load %0
 
-  %2 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %2 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken 
   %3 = load %0 : $*ArrayInt
   %4 = struct_extract %3 : $ArrayInt, #ArrayInt.buffer
   %5 = struct_extract %4 : $ArrayIntBuffer, #ArrayIntBuffer.storage
@@ -56,32 +57,32 @@ bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
   // First check.
   %x1 = integer_literal $Builtin.Int32, 1
   %i1 = struct $Int32(%x1 : $Builtin.Int32)
-  %8 = apply %2(%i1, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %8 = apply %2(%i1, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   // CHECK: [[IDX1:%[0-9]+]] = struct $Int32
   // CHECK: apply [[CHECKBOUNDS]]([[IDX1]]
 
   // Redundant same index and array.
   retain_value %5 : $Builtin.NativeObject
-  %9 = apply %2(%i1, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %9 = apply %2(%i1, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   // CHECK-NOT: apply [[CHECKBOUNDS]]([[IDX1]]
 
   // Redundant same index and array and retain the array directly instead of
   // through the array buffer storage.
   retain_value %3 : $ArrayInt
-  %r9 = apply %2(%i1, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %r9 = apply %2(%i1, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   // CHECK-NOT: apply [[CHECKBOUNDS]]([[IDX1]]
 
   // Redundant same index and array, but loaded again.
   %l0 = load %0 : $*ArrayInt
   retain_value %5 : $Builtin.NativeObject
-  %10 = apply %2(%i1, %102, %l0) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %10 = apply %2(%i1, %102, %l0) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   // CHECK-NOT: apply [[CHECKBOUNDS]]([[IDX1]]
 
   // Not redundant - different index.
   %x2 = integer_literal $Builtin.Int32, 2
   %i2 = struct $Int32(%x2 : $Builtin.Int32)
   retain_value %5 : $Builtin.NativeObject
-  %12 = apply %2(%i2, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %12 = apply %2(%i2, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   // CHECK: [[IDX2:%[0-9]+]] = struct $Int32
   // CHECK: apply [[CHECKBOUNDS]]([[IDX2]]
 
@@ -90,7 +91,7 @@ bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
   %14 = struct_extract %13 : $ArrayInt, #ArrayInt.buffer
   %15 = struct_extract %14 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %15 : $Builtin.NativeObject
-  %16 = apply %2(%i1, %102, %13) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %16 = apply %2(%i1, %102, %13) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   // CHECK: [[LD2:%[0-9]+]] = load %1
   // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], {{.*}}[[LD2]]
 
@@ -100,7 +101,7 @@ bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
   %19 = apply %17(%18#1, %0) : $@convention(method) (@in Int32, @inout ArrayInt) -> ()
   retain_value %5 : $Builtin.NativeObject
   %l2 = load %0 : $*ArrayInt
-  %20 = apply %2(%i1, %102, %l2) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %20 = apply %2(%i1, %102, %l2) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   // CHECK: [[LD2:%[0-9]+]] = load %0
   // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], {{.*}}[[LD2]]
 
@@ -109,7 +110,7 @@ bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
   %x3 = integer_literal $Builtin.Int32, 3
   %i3 = struct $Int32(%x3 : $Builtin.Int32)
   retain_value %5 : $Builtin.NativeObject
-  %21 = apply %2(%i3, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %21 = apply %2(%i3, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   // CHECK: [[IDX3:%[0-9]+]] = struct $Int32
   // CHECK: apply [[CHECKBOUNDS]]([[IDX3]], {{.*}}[[LD1]]
   %22 = function_ref @unknown_func : $@convention(thin) () -> ()
@@ -119,14 +120,14 @@ bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
   %l3 = load %0 : $*ArrayInt
   // CHECK: [[LD3:%[0-9]+]] = load %0
   retain_value %5 : $Builtin.NativeObject
-  %24 = apply %2(%i3, %102, %l3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %24 = apply %2(%i3, %102, %l3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   // CHECK: apply [[CHECKBOUNDS]]([[IDX3]], {{.*}}[[LD3]]
 
   // Not redundant same index and array but odd store in between.
   %x4 = integer_literal $Builtin.Int32, 4
   %i4 = struct $Int32(%x4 : $Builtin.Int32)
   retain_value %5 : $Builtin.NativeObject
-  %25 = apply %2(%i4, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %25 = apply %2(%i4, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   // CHECK: [[IDX4:%[0-9]+]] = struct $Int32
   // CHECK: apply [[CHECKBOUNDS]]([[IDX4]], {{.*}}[[LD1]]
   %26 = ref_to_raw_pointer %5 : $Builtin.NativeObject to $Builtin.RawPointer
@@ -134,7 +135,7 @@ bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
   %29 = store %x1 to %27 : $*Builtin.Int32
   %l4 = load %0 : $*ArrayInt
   retain_value %5 : $Builtin.NativeObject
-  %30 = apply %2(%i4, %102, %l4) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %30 = apply %2(%i4, %102, %l4) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   // CHECK: store
   // CHECK: [[LD4:%[0-9]+]] = load %0
   // CHECK: apply [[CHECKBOUNDS]]([[IDX4]], {{.*}}[[LD4]]
@@ -167,12 +168,12 @@ bb4:
   // CHECK: [[IDX1:%[0-9]+]] = struct $Int32
 
 bb5:
-  %32 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %32 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %33 = load %24 : $*ArrayInt
   %34 = struct_extract %33 : $ArrayInt, #ArrayInt.buffer
   %35 = struct_extract %34 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %35 : $Builtin.NativeObject
-  %38 = apply %32(%37, %101, %33) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %38 = apply %32(%37, %101, %33) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
  br bb2
   // CHECK: [[CHECKBOUNDS:%[0-9]+]] = function_ref @checkbounds
   // CHECK: [[LD1:%[0-9]+]] = load {{.*}} : $*ArrayInt
@@ -181,12 +182,12 @@ bb5:
 bb6:
   // CHECK: [[CHECKBOUNDS2:%[0-9]+]] = function_ref @checkbounds
   // CHECK: [[LD2:%[0-9]+]] = load {{.*}} : $*ArrayInt
-  %42 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %42 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %43 = load %24 : $*ArrayInt
   %44 = struct_extract %43 : $ArrayInt, #ArrayInt.buffer
   %45 = struct_extract %44 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %45 : $Builtin.NativeObject
-  %48 = apply %42(%37, %101, %43) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %48 = apply %42(%37, %101, %43) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   // CHECK: apply [[CHECKBOUNDS2]]([[IDX1]]
  br bb2
 
@@ -230,24 +231,24 @@ bb4:
   // CHECK: [[IDX1:%[0-9]+]] = struct $Int32
   // CHECK: [[CHECKBOUNDS3:%[0-9]+]] = function_ref @checkbounds
   // CHECK: [[LD3:%[0-9]+]] = load {{.*}} : $*ArrayInt
-  %52 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %52 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %53 = load %24 : $*ArrayInt
   %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
   %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %55 : $Builtin.NativeObject
-  %58 = apply %52(%37, %101, %53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %58 = apply %52(%37, %101, %53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   // CHECK: apply [[CHECKBOUNDS3]]([[IDX1]], {{.*}}[[LD3]]
   cond_br %8, bb5, bb6
 
 bb5:
   // CHECK: [[CHECKBOUNDS:%[0-9]+]] = function_ref @checkbounds
   // CHECK: [[LD1:%[0-9]+]] = load {{.*}} : $*ArrayInt
-  %32 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %32 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %33 = load %24 : $*ArrayInt
   %34 = struct_extract %33 : $ArrayInt, #ArrayInt.buffer
   %35 = struct_extract %34 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %35 : $Builtin.NativeObject
-  %38 = apply %32(%37, %101, %33) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %38 = apply %32(%37, %101, %33) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   // CHECK-NOT: apply [[CHECKBOUNDS]]([[IDX1]], {{.*}}[[LD1]]
 
  br bb2
@@ -255,12 +256,12 @@ bb5:
 bb6:
   // CHECK: [[CHECKBOUNDS2:%[0-9]+]] = function_ref @checkbounds
   // CHECK: [[LD2:%[0-9]+]] = load {{.*}} : $*ArrayInt
-  %42 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %42 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %43 = load %24 : $*ArrayInt
   %44 = struct_extract %43 : $ArrayInt, #ArrayInt.buffer
   %45 = struct_extract %44 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %45 : $Builtin.NativeObject
-  %48 = apply %42(%37, %101, %43) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %48 = apply %42(%37, %101, %43) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   // CHECK-NOT: apply [[CHECKBOUNDS2]]([[IDX1]], {{.*}}[[LD2]]
  br bb2
 
@@ -304,36 +305,36 @@ bb4:
   // CHECK: [[IDX1:%[0-9]+]] = struct $Int32
   // CHECK: [[CHECKBOUNDS3:%[0-9]+]] = function_ref @checkbounds
   // CHECK: [[LD3:%[0-9]+]] = load {{.*}} : $*ArrayInt
-  %52 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %52 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %53 = load %24 : $*ArrayInt
   %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
   %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %55 : $Builtin.NativeObject
-  %58 = apply %52(%37, %101, %53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %58 = apply %52(%37, %101, %53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   // CHECK: apply [[CHECKBOUNDS3]]([[IDX1]], {{.*}}[[LD3]]
   cond_br %8, bb5, bb6
 
 bb5:
   // CHECK: [[CHECKBOUNDS:%[0-9]+]] = function_ref @checkbounds
   // CHECK: [[LD1:%[0-9]+]] = load {{.*}} : $*ArrayInt
-  %32 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %32 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %33 = load %24 : $*ArrayInt
   %34 = struct_extract %33 : $ArrayInt, #ArrayInt.buffer
   %35 = struct_extract %34 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %35 : $Builtin.NativeObject
-  %38 = apply %32(%37, %101, %33) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %38 = apply %32(%37, %101, %33) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], {{.*}}[[LD1]]
  br bb2
 
 bb6:
   // CHECK: [[CHECKBOUNDS2:%[0-9]+]] = function_ref @checkbounds
   // CHECK: [[LD2:%[0-9]+]] = load {{.*}} : $*ArrayInt
-  %42 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %42 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %43 = load %24 : $*ArrayInt
   %44 = struct_extract %43 : $ArrayInt, #ArrayInt.buffer
   %45 = struct_extract %44 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %45 : $Builtin.NativeObject
-  %48 = apply %42(%37, %101, %43) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %48 = apply %42(%37, %101, %43) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   // CHECK: apply [[CHECKBOUNDS2]]([[IDX1]], {{.*}}[[LD2]]
  br bb2
 
@@ -352,7 +353,7 @@ bb2:
   %118 = alloc_stack $Int32
   %119 = apply %117(%118#1, %24) : $@convention(method) (@in Int32, @inout ArrayInt) -> ()
   retain_value %55 : $Builtin.NativeObject
-  %120 = apply %52(%37, %101, %53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %120 = apply %52(%37, %101, %53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   dealloc_stack %118#0 : $*@local_storage Int32
   // CHECK: [[APPEND:%[0-9]+]] = function_ref @append
   // CHECK: apply [[APPEND]]
@@ -420,12 +421,12 @@ bb1(%4 : $Builtin.Int32):
 
 bb4:
   %37 = struct $Int32(%4 : $Builtin.Int32)
-  %52 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %52 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %53 = load %24 : $*ArrayInt
   %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
   %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %55 : $Builtin.NativeObject
-  %58 = apply %52(%37, %101, %53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %58 = apply %52(%37, %101, %53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %10 = integer_literal $Builtin.Int32, 1
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %10 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
@@ -480,12 +481,12 @@ bb1(%4 : $Builtin.Int32):
   cond_br %8, bb3, bb4
 
 bb4:
-  %52 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %52 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %53 = load %24 : $*ArrayInt
   %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
   %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %55 : $Builtin.NativeObject
-  %58 = apply %52(%37, %101, %53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %58 = apply %52(%37, %101, %53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %10 = integer_literal $Builtin.Int32, 1
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %10 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
@@ -524,8 +525,8 @@ bb0(%0 : $Int32):
   br bb1(%2 : $Builtin.Int32)
 
 bb1(%4 : $Builtin.Int32):
-  %52 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
-  %58 = apply %52(%37, %101, %x53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %52 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
+  %58 = apply %52(%37, %101, %x53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %10 = integer_literal $Builtin.Int32, 1
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %10 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
@@ -578,12 +579,12 @@ bb1(%4 : $Builtin.Int32):
 
 bb4:
   %37 = struct $Int32(%4 : $Builtin.Int32)
-  %52 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %52 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %53 = load %24 : $*ArrayInt
   %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
   %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %55 : $Builtin.NativeObject
-  %58 = apply %52(%37, %101, %53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %58 = apply %52(%37, %101, %53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %10 = integer_literal $Builtin.Int32, 1
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %10 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
@@ -625,14 +626,14 @@ bb2(%i0 : $Builtin.Int32):
   cond_br undef, bb3, bb4
 
 bb3:
-  %f2 = function_ref @checkbounds2 : $@convention(method) (Int32, Bool, @owned Array<Int>) -> ()
+  %f2 = function_ref @checkbounds2 : $@convention(method) (Int32, Bool, @owned Array<Int>) -> _DependenceToken
   retain_value %0 : $Array<Int>
   %t3 = struct $Int32(%i0 : $Builtin.Int32)
 
   // This subscript check can be completely eliminated because the loop goes
   // from 0 to array.count.
   // It's even not required that this loop block dominates the exit block.
-  %t4 = apply %f2(%t3, %101, %0) : $@convention(method) (Int32, Bool, @owned Array<Int>) -> ()
+  %t4 = apply %f2(%t3, %101, %0) : $@convention(method) (Int32, Bool, @owned Array<Int>) -> _DependenceToken
   br bb4
 
 bb4:
@@ -667,13 +668,13 @@ bb0(%0 : $ArraySlice<Int>):
   cond_br %t2, bb2, bb1(%z0 : $Builtin.Int32)
 
 bb1(%i0 : $Builtin.Int32):
-  %f2 = function_ref @checkbounds3 : $@convention(method) (Int32, Bool, @owned ArraySlice<Int>) -> ()
+  %f2 = function_ref @checkbounds3 : $@convention(method) (Int32, Bool, @owned ArraySlice<Int>) -> _DependenceToken
   retain_value %0 : $ArraySlice<Int>
   %t3 = struct $Int32(%i0 : $Builtin.Int32)
 
   // Slices don't necessarily have a zero lower bound. So we can't elminate the
   // subscript check for 0..<count loops.
-  %t4 = apply %f2(%t3, %101, %0) : $@convention(method) (Int32, Bool, @owned ArraySlice<Int>) -> ()
+  %t4 = apply %f2(%t3, %101, %0) : $@convention(method) (Int32, Bool, @owned ArraySlice<Int>) -> _DependenceToken
 
   %t5 = integer_literal $Builtin.Int1, 0
   %i2 = integer_literal $Builtin.Int32, 1
@@ -725,12 +726,12 @@ bb1(%4 : $Builtin.Int32):
 
 bb4:
   %37 = struct $Int32(%4 : $Builtin.Int32)
-  %52 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %52 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %53 = load %24 : $*ArrayInt
   %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
   %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %55 : $Builtin.NativeObject
-  %58 = apply %52(%37, %101, %53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %58 = apply %52(%37, %101, %53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %10 = integer_literal $Builtin.Int32, 1
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %10 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
@@ -795,12 +796,12 @@ bb1(%4 : $Builtin.Int32):
 
 bb4:
   %37 = struct $Int32(%4 : $Builtin.Int32)
-  %52 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %52 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %53 = load %24 : $*ArrayInt
   %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
   %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %55 : $Builtin.NativeObject
-  %58 = apply %52(%37, %101, %53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %58 = apply %52(%37, %101, %53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %10 = integer_literal $Builtin.Int32, 1
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %10 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
@@ -851,12 +852,12 @@ bb1(%4 : $Builtin.Int32):
 bb4:
   %36 = alloc_stack $ArrayInt
   %37 = struct $Int32(%4 : $Builtin.Int32)
-  %52 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %52 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %53 = load %36#1 : $*ArrayInt
   %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
   %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %55 : $Builtin.NativeObject
-  %58 = apply %52(%37, %101, %53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %58 = apply %52(%37, %101, %53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %10 = integer_literal $Builtin.Int32, 1
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %10 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
@@ -890,12 +891,12 @@ bb1(%4 : $Builtin.Int32):
 
 bb4:
   %37 = struct $Int32(%4 : $Builtin.Int32)
-  %52 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %52 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %53 = load %24 : $*ArrayInt
   %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
   %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %55 : $Builtin.NativeObject
-  %58 = apply %52(%37, %106, %53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %58 = apply %52(%37, %106, %53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %10 = integer_literal $Builtin.Int32, 1
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %10 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
@@ -937,12 +938,12 @@ bb1:
 
 bb2(%10 : $Builtin.Int32):
   %11 = struct $Int32 (%10 : $Builtin.Int32)
-  %12 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %12 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %13 = load %1 : $*ArrayInt
   %14 = struct_extract %13 : $ArrayInt, #ArrayInt.buffer
   %15 = struct_extract %14 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %15 : $Builtin.NativeObject
-  %17 = apply %12(%11, %3, %13) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %17 = apply %12(%11, %3, %13) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %18 = integer_literal $Builtin.Int32, 1
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Int32"(%10 : $Builtin.Int32, %18 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
@@ -956,7 +957,7 @@ bb3(%28 : $Builtin.Int32):
   %t1 = function_ref @take_array : $@convention(thin) (@inout ArrayInt) -> ()
   %t2 = apply %t1(%1) : $@convention(thin) (@inout ArrayInt) -> ()
   %29 = load %1 : $*ArrayInt
-  %30 = apply %12(%11, %3, %29) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %30 = apply %12(%11, %3, %29) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   br bb4(%28 : $Builtin.Int32)
 
 bb4(%31 : $Builtin.Int32):
@@ -964,17 +965,17 @@ bb4(%31 : $Builtin.Int32):
   return %32 : $Int32
 }
 
-sil public_external [_semantics "array.check_subscript"] @checkbounds_no_meth : $@convention(thin) (Int32, Bool, @owned ArrayInt) -> () {
+sil public_external [_semantics "array.check_subscript"] @checkbounds_no_meth : $@convention(thin) (Int32, Bool, @owned ArrayInt) -> _DependenceToken {
   bb0(%0: $Int32, %1: $Bool, %2: $ArrayInt):
     unreachable
 }
 
-sil public_external [_semantics "array.props.isNative"] @arrayPropertyIsNative : $@convention(method) (@owned ArrayInt) -> Bool {
+sil public_external [_semantics "array.props.isNativeTypeChecked"] @arrayPropertyIsNative : $@convention(method) (@owned ArrayInt) -> Bool {
   bb0(%0: $ArrayInt):
     unreachable
 }
 
-sil public_external [_semantics "array.check_subscript"] @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> () {
+sil public_external [_semantics "array.check_subscript"] @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken {
   bb0(%0: $Int32, %1: $Bool, %2: $ArrayInt):
     unreachable
 }
@@ -1012,8 +1013,8 @@ bb0(%0 : $*ArrayInt):
 sil @getArray : $@convention(thin) () -> ArrayInt
 
 sil [_semantics "array.get_count"] @getCount2 : $@convention(method) (@owned Array<Int>) -> Int32
-sil [_semantics "array.check_subscript"] @checkbounds2 : $@convention(method) (Int32, Bool, @owned Array<Int>) -> ()
+sil [_semantics "array.check_subscript"] @checkbounds2 : $@convention(method) (Int32, Bool, @owned Array<Int>) -> _DependenceToken
 
 sil [_semantics "array.get_count"] @getCount3 : $@convention(method) (@owned ArraySlice<Int>) -> Int32
-sil [_semantics "array.check_subscript"] @checkbounds3 : $@convention(method) (Int32, Bool, @owned ArraySlice<Int>) -> ()
+sil [_semantics "array.check_subscript"] @checkbounds3 : $@convention(method) (Int32, Bool, @owned ArraySlice<Int>) -> _DependenceToken
 
