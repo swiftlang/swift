@@ -593,13 +593,15 @@ public:
       constant = Constant.atUncurryLevel(level);
       constantInfo = gen.getConstantInfo(*constant);
 
-      SILValue methodVal = gen.B.createSuperMethod(Loc,
-                                                   SelfValue,
-                                                   *constant,
-                                                   constantInfo.getSILType(),
-                                                   /*volatile*/
-                                                     constant->isForeign);
-
+      if (SILDeclRef baseConstant = Constant.getOverriddenVTableEntry())
+        constantInfo = gen.SGM.Types.getConstantOverrideInfo(Constant,
+                                                             baseConstant);
+      auto methodVal = gen.B.createSuperMethod(Loc,
+                                               SelfValue,
+                                               *constant,
+                                               constantInfo.getSILType(),
+                                               /*volatile*/
+                                                 constant->isForeign);
       mv = ManagedValue::forUnmanaged(methodVal);
       break;
     }
