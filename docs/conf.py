@@ -250,7 +250,7 @@ texinfo_documents = [
 #texinfo_show_urls = 'footnote'
 
 
-# FIXME: Define intersphinx configration.
+# FIXME: Define intersphinx configuration.
 intersphinx_mapping = {}
 
 

@@ -856,7 +856,7 @@ depend on how the l-value is used:
   that ``left`` contains a value::
 
     // begin FA for ? operand left (DSN={})
-    // instataneous FA reading right (DSN={})
+    // instantaneous FA reading right (DSN={})
     // begin FA for inout argument left?.member (DSN={lhs})
     // evaluation of +=
     // end FA for inout argument left?.member

@@ -40,7 +40,7 @@ Basic Goals
 In no particular order, and not explained well:
 
 * Support building great frameworks and applications, with a specific focus on
-  permiting rich and powerful APIs.
+  permitting rich and powerful APIs.
 * Get the defaults right: this reduces the barrier to entry and increases the
   odds that the right thing happens.
 * Through our support for building great APIs, we aim to provide an expressive
@@ -752,7 +752,7 @@ protocols.
     }
 
   We disambiguate towards ``get-set`` or ``willset-didset`` production if the
-  first token after ``{`` is the corresponding keyword, possibly preceeded by
+  first token after ``{`` is the corresponding keyword, possibly preceded by
   attributes.  Thus, the following code is rejected because we are expecting
   ``{`` after ``set``:
 
@@ -782,7 +782,7 @@ protocols.
     }
 
   We disambiguate towards ``willget-didset`` production if the first token
-  after ``{`` is the keyword ``willSet`` or ``didSet``, possibly preceeded by
+  after ``{`` is the keyword ``willSet`` or ``didSet``, possibly preceded by
   attributes.
 
 .. admonition:: Rationale
