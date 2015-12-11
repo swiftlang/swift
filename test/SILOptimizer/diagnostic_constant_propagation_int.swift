@@ -6,7 +6,7 @@
 //
 // For the same reason, this test is using FileCheck instead of -verify.
 
-// FIXME: <rdar://problem/19508336> Extend test/SILPasses/diagnostic_constant_propagation.swift to 32-bit platforms
+// FIXME: <rdar://problem/19508336> Extend test/SILOptimizer/diagnostic_constant_propagation.swift to 32-bit platforms
 
 #if arch(i386) || arch(arm)
 func testArithmeticOverflow_Int_32bit() {
