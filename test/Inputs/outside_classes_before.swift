@@ -3,6 +3,12 @@ public func doFoo(f: () -> ()) {
 }
 
 public class OutsideParent {
+  public var property: String = "OutsideParent.property"
+
+  public class var classProperty: String {
+    return "OutsideParent.classProperty"
+  }
+
   public init() {
     print("OutsideParent.init()")
   }
@@ -29,9 +35,9 @@ public class OutsideChild : OutsideParent {
 }
 
 public class GenericOutsideParent<A> {
-  let a: A
-  public init(a: A) {
-    self.a = a
+  public var property: A
+  public init(property: A) {
+    self.property = property
     print("OutsideParent.init()")
   }
 
@@ -45,9 +51,9 @@ public class GenericOutsideParent<A> {
 }
 
 public class GenericOutsideChild<A> : GenericOutsideParent<A> {
-  public override init(a: A) {
+  public override init(property: A) {
     print("OutsideGenericChild.init(a: A)")
-    super.init(a: a)
+    super.init(property: property)
   }
 
   public override func method() {
@@ -62,9 +68,9 @@ public class GenericOutsideChild<A> : GenericOutsideParent<A> {
 }
 
 public class ConcreteOutsideChild : GenericOutsideParent<String> {
-  public override init(a: String) {
-    print("ConcreteOutsideChild.init(s: String)")
-    super.init(a: a)
+  public override init(property: String) {
+    print("ConcreteOutsideChild.init(property: String)")
+    super.init(property: property)
   }
 
   public override func method() {
