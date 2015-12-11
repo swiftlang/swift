@@ -89,14 +89,18 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         action="store_true")
     args = parser.parse_args()
 
+    if args.clone:
+        obtain_additional_swift_sources()
+        return 0
+
+    if args.clone_with_ssh:
+        obtain_additional_swift_sources({'with_ssh': True})
+        return 0
+
     if args.all:
         update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "llbuild"))
         update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "llvm"))
         update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "clang"))
-    if args.clone:
-        obtain_additional_swift_sources()
-    if args.clone_with_ssh:
-        obtain_additional_swift_sources({'with_ssh': True})
 
     update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "swift"))
     update_working_copy(
