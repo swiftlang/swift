@@ -1700,11 +1700,7 @@ bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *fnExpr,
   // here.
   if (size() != 1) return false;
   
-  // We only handle structural errors here.
-  if (closeness != CC_ArgumentLabelMismatch &&
-      closeness != CC_ArgumentCountMismatch)
-    return false;
-    
+  
   auto args = decomposeArgParamType(argExpr->getType());
   auto params = decomposeArgParamType(candidates[0].getArgumentType());
 
@@ -1730,6 +1726,11 @@ bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *fnExpr,
         return true;
       }
   }
+  
+  // We only handle structural errors here.
+  if (closeness != CC_ArgumentLabelMismatch &&
+      closeness != CC_ArgumentCountMismatch)
+    return false;
   
   SmallVector<Identifier, 4> correctNames;
   unsigned OOOArgIdx = ~0U, OOOPrevArgIdx = ~0U;
@@ -3266,6 +3267,15 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     if (candidates.size() == 1 && !argType)
       argType = candidates[0].getArgumentType();
   }
+  
+  // If our candidates are instance members at curry level #0, then the argument
+  // being provided is the receiver type for the instance.  We produce better
+  // diagnostics when we don't force the self type down.
+  if (argType && !candidates.empty() &&
+      candidates[0].decl->isInstanceMember() && candidates[0].level == 0 &&
+      !isa<SubscriptDecl>(candidates[0].decl))
+    argType = Type();
+  
 
   // FIXME: This should all just be a matter of getting type type of the
   // sub-expression, but this doesn't work well when typeCheckChildIndependently

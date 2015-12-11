@@ -339,7 +339,7 @@ c.method2(1.0)(b: 2.0) // expected-error {{cannot convert value of type 'Double'
 CurriedClass.method1(c)()
 _ = CurriedClass.method1(c)
 CurriedClass.method1(c)(1)         // expected-error {{argument passed to call that takes no arguments}}
-CurriedClass.method1(2.0)(1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'CurriedClass'}}
+CurriedClass.method1(2.0)(1)       // expected-error {{use of instance member 'method1' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
 
 CurriedClass.method2(c)(32)(b: 1)
 _ = CurriedClass.method2(c)
@@ -380,7 +380,7 @@ CurriedClass.m1(2, b: 42)   // expected-error {{use of instance member 'm1' on t
 
 
 // <rdar://problem/22108559> QoI: Confusing error message when calling an instance method as a class method
-CurriedClass.m2(12)  // expected-error {{cannot convert value of type 'Int' to expected argument type 'CurriedClass'}}
+CurriedClass.m2(12)  // expected-error {{use of instance member 'm2' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
 
 
 
