@@ -145,13 +145,7 @@ bool swift::immediate::tryLoadLibraries(ArrayRef<LinkLibrary> LinkLibraries,
                      [](bool Value) { return Value; });
 }
 
-static void linkerDiagnosticHandler(const llvm::DiagnosticInfo &DI,
-                                    void *Context) {
-  // This assert self documents our precondition that Context is always
-  // nullptr. It seems that parts of LLVM are using the flexibility of having a
-  // context. We don't really care about this.
-  assert(Context == nullptr && "We assume Context is always a nullptr");
-
+static void linkerDiagnosticHandlerNoCtx(const llvm::DiagnosticInfo &DI) {
   if (DI.getSeverity() != llvm::DS_Error)
     return;
 
@@ -163,6 +157,18 @@ static void linkerDiagnosticHandler(const llvm::DiagnosticInfo &DI,
   }
   llvm::errs() << "Error linking swift modules\n";
   llvm::errs() << MsgStorage << "\n";
+}
+
+
+
+static void linkerDiagnosticHandler(const llvm::DiagnosticInfo &DI,
+                                    void *Context) {
+  // This assert self documents our precondition that Context is always
+  // nullptr. It seems that parts of LLVM are using the flexibility of having a
+  // context. We don't really care about this.
+  assert(Context == nullptr && "We assume Context is always a nullptr");
+
+  return linkerDiagnosticHandlerNoCtx(DI);
 }
 
 bool swift::immediate::linkLLVMModules(llvm::Module *Module,
@@ -179,7 +185,9 @@ bool swift::immediate::linkLLVMModules(llvm::Module *Module,
                               // TODO: reactivate the linker mode if it is
                               // supported in llvm again. Otherwise remove the
                               // commented code completely.
-  bool Failed = llvm::Linker::LinkModules(Module, SubModule /*, LinkerMode*/);
+  bool Failed = llvm::Linker::linkModules(*Module, *SubModule,
+                                          linkerDiagnosticHandlerNoCtx
+                                          /*, LinkerMode*/);
   Ctx.setDiagnosticHandler(OldHandler, OldDiagnosticContext);
 
   return !Failed;
