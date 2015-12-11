@@ -118,109 +118,90 @@ testRelation(!=)
 testRelation(<)
 // CHECK-NEXT: false, true, false, false, true, false.
 
+import StdlibUnittest
+import Swift
+
+let OptionalTests = TestSuite("Optional")
+
 struct X {}
 class C {}
 
 class E : Equatable {}
 func == (_: E, _: E) -> Bool { return true }
 
-func nilComparison() {
-  let _: X? = nil
-  let _: X? = X()
-
-  /*
-  // FIXME: <rdar://problem/17489239> Optional<T>() == nil where T: !Equatable
-  print(x1 == nil) // DISABLED-CHECK-NEXT: false
-  print(x1 != nil) // DISABLED-CHECK-NEXT: true
-  print(x0 == nil) // DISABLED-CHECK-NEXT: true
-  print(x0 != nil) // DISABLED-CHECK-NEXT: false
-
-  print(nil == x1) // DISABLED-CHECK-NEXT: false
-  print(nil != x1) // DISABLED-CHECK-NEXT: true
-  print(nil == x0) // DISABLED-CHECK-NEXT: true
-  print(nil != x0) // DISABLED-CHECK-NEXT: false
-  */
-  
+OptionalTests.test("nil comparison") {
   let v0: Int? = nil
   let v1: Int? = 1
-  
-  print(v1 == nil) // CHECK-NEXT: false
-  print(v1 != nil) // CHECK-NEXT: true
-  print(v0 == nil) // CHECK-NEXT: true
-  print(v0 != nil) // CHECK-NEXT: false
 
-  print(nil == v1) // CHECK-NEXT: false
-  print(nil != v1) // CHECK-NEXT: true
-  print(nil == v0) // CHECK-NEXT: true
-  print(nil != v0) // CHECK-NEXT: false
+  expectFalse(v1 == nil)
+  expectTrue(v1 != nil)
+  expectTrue(v0 == nil)
+  expectFalse(v0 != nil)
 
-  let _: C? = nil
-  let _: C? = C()
-  
-  /*
-  // FIXME: <rdar://problem/17489239> Optional<T>() == nil where T: !Equatable
-  print(c1 == nil) // DISABLED-CHECK-NEXT: false
-  print(c1 != nil) // DISABLED-CHECK-NEXT: true
-  print(c0 == nil) // DISABLED-CHECK-NEXT: true
-  print(c0 != nil) // DISABLED-CHECK-NEXT: false
+  expectFalse(nil == v1)
+  expectTrue(nil != v1)
+  expectTrue(nil == v0)
+  expectFalse(nil != v0)
 
-  print(nil == c1) // DISABLED-CHECK-NEXT: false
-  print(nil != c1) // DISABLED-CHECK-NEXT: true
-  print(nil == c0) // DISABLED-CHECK-NEXT: true
-  print(nil != c0) // DISABLED-CHECK-NEXT: false
-  */
   
   let e0: E? = nil
   let e1: E? = E()
   
-  print(e1 == nil) // CHECK-NEXT: false
-  print(e1 != nil) // CHECK-NEXT: true
-  print(e0 == nil) // CHECK-NEXT: true
-  print(e0 != nil) // CHECK-NEXT: false
+  expectFalse(e1 == nil)
+  expectTrue(e1 != nil)
+  expectTrue(e0 == nil)
+  expectFalse(e0 != nil)
 
-  print(nil == e1) // CHECK-NEXT: false
-  print(nil != e1) // CHECK-NEXT: true
-  print(nil == e0) // CHECK-NEXT: true
-  print(nil != e0) // CHECK-NEXT: false
-}
-nilComparison()
+  expectFalse(nil == e1)
+  expectTrue(nil != e1)
+  expectTrue(nil == e0)
+  expectFalse(nil != e0)
 
-var counter = 0
-func nextCounter() -> Int {
-  return counter++
-}
+  /*
+  // FIXME: <rdar://problem/17489239> Optional<T>() == nil where T: !Equatable
+  let _: X? = nil
+  let _: X? = X()
 
-let a: Int? = 123
-let b: Int? = nil
-let c: Int? = nil
-let d: Int? = 456
-let e: Int? = nil
-let f: Int? = nil
+  expectFalse(x1 == nil)
+  expectTrue(x1 != nil)
+  expectTrue(x0 == nil)
+  expectFalse(x0 != nil)
 
-debugPrint(a ?? nextCounter())      // CHECK-NEXT: 123
-debugPrint(b ?? nextCounter())      // CHECK-NEXT: 0
-debugPrint(c ?? nextCounter())      // CHECK-NEXT: 1
-debugPrint(d ?? nextCounter())      // CHECK-NEXT: 456
-debugPrint(e ?? d ?? nextCounter()) // CHECK-NEXT: 456
-debugPrint(f ?? nextCounter())      // CHECK-NEXT: 2
-
-func nextCounter2() -> Int? {
-  return nextCounter()
+  expectFalse(nil == x1)
+  expectTrue(nil != x1)
+  expectTrue(nil == x0)
+  expectFalse(nil != x0)
+  */
 }
 
-debugPrint(c ?? d)                   // CHECK-NEXT: Optional(456)
-debugPrint(c ?? e)                   // CHECK-NEXT: nil
-debugPrint(a ?? nextCounter2())      // CHECK-NEXT: Optional(123)
-debugPrint(b ?? nextCounter2())      // CHECK-NEXT: Optional(3)
-debugPrint(c ?? nextCounter2())      // CHECK-NEXT: Optional(4)
-debugPrint(d ?? nextCounter2())      // CHECK-NEXT: Optional(456)
-debugPrint(e ?? d ?? nextCounter2()) // CHECK-NEXT: Optional(456)
-debugPrint(f ?? nextCounter2())      // CHECK-NEXT: Optional(5)
+OptionalTests.test("??") {
+  var counter = 0
+  func nextCounter() -> Int { return counter++ }
+  func nextCounter2() -> Int? { return nextCounter() }
 
-import StdlibUnittest
-import Swift
+  let a: Int? = 123
+  let b: Int? = nil
+  let c: Int? = nil
+  let d: Int? = 456
+  let e: Int? = nil
+  let f: Int? = nil
 
-var OptionalTests = TestSuite("Optional")
+  expectEqual(a ?? nextCounter(), 123)
+  expectEqual(b ?? nextCounter(), 0)
+  expectEqual(c ?? nextCounter(), 1)
+  expectEqual(d ?? nextCounter(), 456)
+  expectEqual(e ?? d ?? nextCounter(), 456)
+  expectEqual(f ?? nextCounter(), 2)
+
+  expectEqual(c ?? d, Optional(456))
+  expectEqual(c ?? e, nil)
+  expectEqual(a ?? nextCounter2(), Optional(123))
+  expectEqual(b ?? nextCounter2(), Optional(3))
+  expectEqual(c ?? nextCounter2(), Optional(4))
+  expectEqual(d ?? nextCounter2(), Optional(456))
+  expectEqual(e ?? d ?? nextCounter2(), Optional(456))
+  expectEqual(f ?? nextCounter2(), Optional(5))
+}
 
 OptionalTests.test("flatMap") {
   let half: Int32 -> Int16? =
