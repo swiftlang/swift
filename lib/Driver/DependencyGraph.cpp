@@ -83,7 +83,7 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
     if (!key)
       return LoadResult::HadError;
     StringRef keyString = key->getValue(scratch);
-    LoadResult resultUpdate;
+    LoadResult resultUpdate = LoadResult::UpToDate;
 
     if (keyString == "interface-hash") {
       auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
