@@ -26,7 +26,7 @@ namespace swift {
 /// A relative reference to an object stored in memory. The reference may be
 /// direct or indirect, and uses the low bit of the (assumed at least
 /// 2-byte-aligned) pointer to differentiate.
-template<typename ValueTy, bool Nullable = false>
+template<typename ValueTy>
 class RelativeIndirectablePointer {
 private:
   /// The relative offset of the pointer's memory from the `this` pointer.
@@ -44,12 +44,7 @@ private:
   RelativeIndirectablePointer &operator=(const RelativeIndirectablePointer &)
     = delete;
 
-public:
   const ValueTy *get() const & {
-    // Check for null.
-    if (Nullable && RelativeOffset == 0)
-      return nullptr;
-    
     // The pointer is offset relative to `this`.
     auto base = reinterpret_cast<intptr_t>(this);
     intptr_t address = base + (RelativeOffset & ~1);
@@ -62,7 +57,8 @@ public:
       return reinterpret_cast<const ValueTy *>(address);
     }
   }
-  
+
+public:
   operator const ValueTy* () const & {
     return get();
   }
@@ -79,7 +75,7 @@ public:
 /// A relative reference to a function, intended to reference private metadata
 /// functions for the current executable or dynamic library image from
 /// position-independent constant data.
-template<typename T, bool Nullable>
+template<typename T>
 class RelativeDirectPointerImpl {
 private:
   /// The relative offset of the function's entry point from *this.
@@ -100,11 +96,7 @@ public:
   using PointerTy = T*;
 
   PointerTy get() const & {
-    // Check for null.
-    if (Nullable && RelativeOffset == 0)
-      return nullptr;
-    
-    // The value is addressed relative to `this`.
+    // The function entry point is addressed relative to `this`.
     auto base = reinterpret_cast<intptr_t>(this);
     intptr_t absolute = base + RelativeOffset;
     return reinterpret_cast<PointerTy>(absolute);
@@ -113,14 +105,12 @@ public:
 };
 
 /// A direct relative reference to an object.
-template<typename T, bool Nullable = true>
+template<typename T>
 class RelativeDirectPointer :
-  private RelativeDirectPointerImpl<T, Nullable>
+  private RelativeDirectPointerImpl<T>
 {
-  using super = RelativeDirectPointerImpl<T, Nullable>;
+  using super = RelativeDirectPointerImpl<T>;
 public:
-  using super::get;
-
   operator typename super::PointerTy() const & {
     return this->get();
   }
@@ -136,59 +126,18 @@ public:
 
 /// A specialization of RelativeDirectPointer for function pointers,
 /// allowing for calls.
-template<typename RetTy, typename...ArgTy, bool Nullable>
-class RelativeDirectPointer<RetTy (ArgTy...), Nullable> :
-  private RelativeDirectPointerImpl<RetTy (ArgTy...), Nullable>
+template<typename RetTy, typename...ArgTy>
+class RelativeDirectPointer<RetTy (ArgTy...)> :
+  private RelativeDirectPointerImpl<RetTy (ArgTy...)>
 {
-  using super = RelativeDirectPointerImpl<RetTy (ArgTy...), Nullable>;
+  using super = RelativeDirectPointerImpl<RetTy (ArgTy...)>;
 public:
-  using super::get;
-
   operator typename super::PointerTy() const & {
     return this->get();
   }
 
   RetTy operator()(ArgTy...arg) {
     return this->get()(std::forward<ArgTy>(arg)...);
-  }
-};
-
-/// A direct relative reference to an aligned object, with an additional
-/// tiny integer value crammed into its low bits.
-template<typename PointeeTy, typename IntTy>
-class RelativeDirectPointerIntPair {
-  int32_t RelativeOffsetPlusInt;
-
-  /// RelativePointers should appear in statically-generated metadata. They
-  /// shouldn't be constructed or copied.
-  RelativeDirectPointerIntPair() = delete;
-  RelativeDirectPointerIntPair(RelativeDirectPointerIntPair &&) = delete;
-  RelativeDirectPointerIntPair(const RelativeDirectPointerIntPair &) = delete;
-  RelativeDirectPointerIntPair &operator=(RelativeDirectPointerIntPair &&)
-    = delete;
-  RelativeDirectPointerIntPair &operator=(const RelativeDirectPointerIntPair&)
-    = delete;
-
-  static int32_t getMask() {
-    static_assert(alignof(PointeeTy) >= alignof(int32_t),
-                  "pointee alignment must be at least 32 bit");
-
-    return alignof(int32_t) - 1;
-  }
-
-public:
-  using ValueTy = PointeeTy;
-  using PointerTy = PointeeTy*;
-
-  PointerTy getPointer() const & {
-    // The value is addressed relative to `this`.
-    auto base = reinterpret_cast<intptr_t>(this);
-    intptr_t absolute = base + (RelativeOffsetPlusInt & ~getMask());
-    return reinterpret_cast<PointerTy>(absolute);
-  }
-
-  IntTy getInt() const & {
-    return IntTy(RelativeOffsetPlusInt & getMask());
   }
 };
 
