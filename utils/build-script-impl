@@ -1229,7 +1229,7 @@ function llvm_c_flags() {
 
 function cmark_c_flags() {
     echo -n " $(common_cross_c_flags $1)"
-    if [[ $(is_cmake_release_build_type "${LLVM_BUILD_TYPE}") ]] ; then
+    if [[ $(is_cmake_release_build_type "${CMARK_BUILD_TYPE}") ]] ; then
         echo -n " -fno-stack-protector"
     fi
 }
