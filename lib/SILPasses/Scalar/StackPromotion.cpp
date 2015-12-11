@@ -251,7 +251,8 @@ SILFunction *StackPromoter::getBufferAllocFunc(SILFunction *OrigFunc,
                           "swift_bufferAllocateOnStack",
                           OrigFunc->getLinkage(),
                           OrigFunc->getLoweredFunctionType(),
-                          OrigFunc->isBare(), IsNotTransparent, IsNotFragile);
+                          OrigFunc->isBare(), IsNotTransparent,
+                          OrigFunc->isFragile());
   }
   return BufferAllocFunc;
 }
@@ -279,7 +280,7 @@ SILFunction *StackPromoter::getBufferDeallocFunc(SILFunction *OrigFunc,
       "swift_bufferDeallocateFromStack",
       OrigFunc->getLinkage(),
       FunTy,
-      OrigFunc->isBare(), IsNotTransparent, IsNotFragile);
+      OrigFunc->isBare(), IsNotTransparent, OrigFunc->isFragile());
   }
   return BufferDeallocFunc;
 }
