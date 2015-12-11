@@ -233,7 +233,7 @@ swift::_matchMetadataByMangledTypeName(const llvm::StringRef typeName,
   else if (pattern != nullptr)
     ntd = pattern->getTemplateDescription();
 
-  if (ntd == nullptr || ntd->Name != typeName)
+  if (ntd == nullptr || ntd->Name.get() != typeName)
     return nullptr;
 
   if (pattern != nullptr) {

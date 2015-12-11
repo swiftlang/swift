@@ -5,13 +5,13 @@
 import Swift
 
 // CHECK-LABEL: @_TMnV18field_type_vectors3Foo = constant 
-// CHECK:         %swift.type** (%swift.type*)* [[FOO_TYPES_ACCESSOR:@[^,]*]],
+// CHECK:         %swift.type** (%swift.type*)* [[FOO_TYPES_ACCESSOR:@[A-Za-z0-9_]*]]
 struct Foo {
   var x: Int
 }
 
 // CHECK-LABEL: @_TMnV18field_type_vectors3Bar = constant
-// CHECK:         %swift.type** (%swift.type*)* [[BAR_TYPES_ACCESSOR:@[^,]*]],
+// CHECK:         %swift.type** (%swift.type*)* [[BAR_TYPES_ACCESSOR:@[A-Za-z0-9_]*]]
 // CHECK-LABEL: @_TMPV18field_type_vectors3Bar = global
 // -- There should be 5 words between the address point and the field type
 //    vector slot, with type %swift.type**
@@ -21,7 +21,7 @@ struct Bar<T> {
 }
 
 // CHECK-LABEL: @_TMnV18field_type_vectors3Bas = constant
-// CHECK:         %swift.type** (%swift.type*)* [[BAS_TYPES_ACCESSOR:@[^,]*]],
+// CHECK:         %swift.type** (%swift.type*)* [[BAS_TYPES_ACCESSOR:@[A-Za-z0-9_]*]]
 // CHECK-LABEL: @_TMPV18field_type_vectors3Bas = global
 // -- There should be 7 words between the address point and the field type
 //    vector slot, with type %swift.type**
@@ -32,7 +32,7 @@ struct Bas<T, U> {
 }
 
 // CHECK-LABEL: @_TMnC18field_type_vectors3Zim = constant
-// CHECK:         %swift.type** (%swift.type*)* [[ZIM_TYPES_ACCESSOR:@[^,]*]],
+// CHECK:         %swift.type** (%swift.type*)* [[ZIM_TYPES_ACCESSOR:@[A-Za-z0-9_]*]]
 // CHECK-LABEL: @_TMPC18field_type_vectors3Zim = global
 // -- There should be 14 words between the address point and the field type
 //    vector slot, with type %swift.type**
@@ -47,7 +47,7 @@ sil_vtable Zim {}
 sil @_TFC18field_type_vectors3ZimcU___fMGS0_Q_Q0__FT_GS0_Q_Q0__ : $@convention(method) <T, U> (@owned Zim<T, U>) -> @owned Zim<T, U>
 
 // CHECK-LABEL: @_TMnC18field_type_vectors4Zang = constant
-// CHECK:         %swift.type** (%swift.type*)* [[ZANG_TYPES_ACCESSOR:@[^,]*]],
+// CHECK:         %swift.type** (%swift.type*)* [[ZANG_TYPES_ACCESSOR:@[A-Za-z0-9_]*]]
 // CHECK-LABEL: @_TMPC18field_type_vectors4Zang = global
 // -- There should be 16 words between the address point and the field type
 //    vector slot, with type %swift.type**

@@ -61,7 +61,7 @@ void ProtocolConformanceRecord::dump() const {
              kind == TypeMetadataRecordKind::UniqueDirectType
              ? "unique" : "nonunique");
       if (auto ntd = getDirectType()->getNominalTypeDescriptor()) {
-        printf("%s", ntd->Name);
+        printf("%s", ntd->Name.get());
       } else {
         printf("<structural type>");
       }

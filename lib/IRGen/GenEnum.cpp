@@ -158,7 +158,8 @@ llvm::Constant *EnumImplStrategy::emitCaseNames() const {
     fieldNames.push_back('\0');
   }
   // The final null terminator is provided by getAddrOfGlobalString.
-  return IGM.getAddrOfGlobalString(fieldNames);
+  return IGM.getAddrOfGlobalString(fieldNames,
+                                   /*willBeRelativelyAddressed*/ true);
 }
 
 unsigned EnumImplStrategy::getPayloadSizeForMetadata() const {
@@ -1048,7 +1049,7 @@ namespace {
       // C enums have arbitrary values and we don't preserve the mapping
       // between the case and raw value at runtime, so don't emit any
       // case names at all so that reflection can give up in this case.
-      return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+      return nullptr;
     }
   };
 

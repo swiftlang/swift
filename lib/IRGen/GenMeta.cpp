@@ -85,11 +85,15 @@ static Address createPointerSizedGEP(IRGenFunction &IGF,
                                          offset);
 }
 
-static llvm::Constant *getMangledTypeName(IRGenModule &IGM, CanType type) {
+// FIXME: willBeRelativelyAddressed is only needed to work around an ld64 bug
+// resolving relative references to coalesceable symbols.
+// It should be removed when fixed. rdar://problem/22674524
+static llvm::Constant *getMangledTypeName(IRGenModule &IGM, CanType type,
+                                      bool willBeRelativelyAddressed = false) {
   auto name = LinkEntity::forTypeMangling(type);
   llvm::SmallString<32> mangling;
   name.mangle(mangling);
-  return IGM.getAddrOfGlobalString(mangling);
+  return IGM.getAddrOfGlobalString(mangling, willBeRelativelyAddressed);
 }
 
 llvm::Value *irgen::emitObjCMetadataRefForMetadata(IRGenFunction &IGF,
@@ -1654,6 +1658,17 @@ llvm::Value *IRGenFunction::emitTypeLayoutRef(SILType type) {
   return EmitTypeLayoutRef(*this).visit(type.getSwiftRValueType());
 }
 
+void IRGenModule::setTrueConstGlobal(llvm::GlobalVariable *var) {
+  switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::MachO:
+    var->setSection("__TEXT, __const");
+    break;
+  // TODO: ELF?
+  default:
+    break;
+  }
+}
+
 /// Produce the heap metadata pointer for the given class type.  For
 /// Swift-defined types, this is equivalent to the metatype for the
 /// class, but for Objective-C-defined types, this is the class
@@ -1769,6 +1784,7 @@ namespace {
     IRGenModule &IGM = Base::IGM;
 
   private:
+    llvm::GlobalVariable *relativeAddressBase = nullptr;
     llvm::SmallVector<llvm::Constant*, 16> Fields;
     Size NextOffset = Size(0);
 
@@ -1795,7 +1811,58 @@ namespace {
       NextOffset += IGM.getPointerSize();
     }
 
-    /// Add a uint32_t value that represents the given offset, but
+    void setRelativeAddressBase(llvm::GlobalVariable *base) {
+      relativeAddressBase = base;
+    }
+
+    llvm::Constant *getRelativeAddressFromNextField(llvm::Constant *referent) {
+      assert(relativeAddressBase && "no relative address base set");
+      // Determine the address of the next field in the initializer.
+      llvm::Constant *fieldAddr =
+        llvm::ConstantExpr::getPtrToInt(relativeAddressBase, IGM.SizeTy);
+      fieldAddr = llvm::ConstantExpr::getAdd(fieldAddr,
+                            llvm::ConstantInt::get(IGM.SizeTy,
+                                                   getNextOffset().getValue()));
+      referent = llvm::ConstantExpr::getPtrToInt(referent, IGM.SizeTy);
+
+      llvm::Constant *relative
+        = llvm::ConstantExpr::getSub(referent, fieldAddr);
+      
+      if (relative->getType() != IGM.RelativeAddressTy)
+        relative = llvm::ConstantExpr::getTrunc(relative,
+                                                IGM.RelativeAddressTy);
+      return relative;
+    }
+
+    /// Add a 32-bit relative address from the current location in the local
+    /// being built to another global variable.
+    void addRelativeAddress(llvm::Constant *referent) {
+      addInt32(getRelativeAddressFromNextField(referent));
+    }
+
+    /// Add a 32-bit relative address from the current location in the local
+    /// being built to another global variable, or null if a null referent
+    /// is passed.
+    void addRelativeAddressOrNull(llvm::Constant *referent) {
+      if (referent)
+        addRelativeAddress(referent);
+      else
+        addConstantInt32(0);
+    }
+
+    /// Add a 32-bit relative address from the current location in the local
+    /// being built to another global variable. Pack a constant integer into
+    /// the alignment bits of the pointer.
+    void addRelativeAddressWithTag(llvm::Constant *referent,
+                                   unsigned tag) {
+      assert(tag < 4 && "tag too big to pack in relative address");
+      llvm::Constant *relativeAddr = getRelativeAddressFromNextField(referent);
+      relativeAddr = llvm::ConstantExpr::getAdd(relativeAddr,
+                            llvm::ConstantInt::get(IGM.RelativeAddressTy, tag));
+      addInt32(relativeAddr);
+    }
+
+    /// Add a uint32_t value that represents the given offset
     /// scaled to a number of words.
     void addConstantInt32InWords(Size value) {
       addConstantInt32(getOffsetInWords(IGM, value));
@@ -1879,34 +1946,32 @@ namespace {
     NominalTypeDescriptorBuilderBase(IRGenModule &IGM) : ConstantBuilder(IGM) {}
     
     void layout() {
-      asImpl().addKind();
       asImpl().addName();
       asImpl().addKindDependentFields();
-      asImpl().addGenericMetadataPattern();
+      asImpl().addGenericMetadataPatternAndKind();
       asImpl().addGenericParams();
     }
 
-    void addKind() {
-      addConstantWord(asImpl().getKind());
-    }
-    
     void addName() {
       NominalTypeDecl *ntd = asImpl().getTarget();
-      addWord(getMangledTypeName(IGM,
-                                 ntd->getDeclaredType()->getCanonicalType()));
+      addRelativeAddress(getMangledTypeName(IGM,
+                                 ntd->getDeclaredType()->getCanonicalType(),
+                                 /*willBeRelativelyAddressed*/ true));
     }
     
-    void addGenericMetadataPattern() {
+    void addGenericMetadataPatternAndKind() {
       NominalTypeDecl *ntd = asImpl().getTarget();
+      auto kind = asImpl().getKind();
       if (!IGM.hasMetadataPattern(ntd)) {
-        // If there are no generic parameters, there's no pattern to link.
-        addWord(llvm::ConstantPointerNull::get(IGM.TypeMetadataPatternPtrTy));
+        // There's no pattern to link.
+        addConstantInt32(kind);
         return;
       }
-      
-      addWord(IGM.getAddrOfTypeMetadata(ntd->getDeclaredType()
-                                          ->getCanonicalType(),
-                                        /*pattern*/ true));
+
+      addRelativeAddressWithTag(
+        IGM.getAddrOfTypeMetadata(ntd->getDeclaredType()->getCanonicalType(),
+                                  /*pattern*/ true),
+        kind);
     }
     
     void addGenericParams() {
@@ -1955,6 +2020,11 @@ namespace {
     }
     
     llvm::Constant *emit() {
+      // Set up a dummy global to stand in for the constant.
+      std::unique_ptr<llvm::GlobalVariable> tempBase(
+                   new llvm::GlobalVariable(IGM.Int8Ty, true,
+                                            llvm::GlobalValue::PrivateLinkage));
+      setRelativeAddressBase(tempBase.get());
       asImpl().layout();
       auto init = getInit();
       
@@ -1963,6 +2033,11 @@ namespace {
                                                          init->getType()));
       var->setConstant(true);
       var->setInitializer(init);
+      IGM.setTrueConstGlobal(var);
+
+      auto replacer = llvm::ConstantExpr::getBitCast(var, IGM.Int8PtrTy);
+      tempBase->replaceAllUsesWith(replacer);
+
       return var;
     }
     
@@ -2284,14 +2359,15 @@ namespace {
       
       addConstantInt32(numFields);
       addConstantInt32InWords(FieldVectorOffset);
-      addWord(IGM.getAddrOfGlobalString(fieldNames));
+      addRelativeAddress(IGM.getAddrOfGlobalString(fieldNames,
+                                           /*willBeRelativelyAddressed*/ true));
       
       // Build the field type accessor function.
       llvm::Function *fieldTypeVectorAccessor
         = getFieldTypeAccessorFn(IGM, Target,
                                    Target->getStoredProperties());
       
-      addWord(fieldTypeVectorAccessor);
+      addRelativeAddress(fieldTypeVectorAccessor);
     }
   };
   
@@ -2368,14 +2444,15 @@ namespace {
       
       addConstantInt32(numFields);
       addConstantInt32InWords(FieldVectorOffset);
-      addWord(IGM.getAddrOfGlobalString(fieldNames));
+      addRelativeAddress(IGM.getAddrOfGlobalString(fieldNames,
+                                           /*willBeRelativelyAddressed*/ true));
       
       // Build the field type accessor function.
       llvm::Function *fieldTypeVectorAccessor
         = getFieldTypeAccessorFn(IGM, Target,
                                    Target->getStoredProperties());
       
-      addWord(fieldTypeVectorAccessor);
+      addRelativeAddress(fieldTypeVectorAccessor);
     }
   };
   
@@ -2458,14 +2535,14 @@ namespace {
       // # empty cases
       addConstantInt32(strategy.getElementsWithNoPayload().size());
 
-      addWord(strategy.emitCaseNames());
+      addRelativeAddressOrNull(strategy.emitCaseNames());
 
       // Build the case type accessor.
       llvm::Function *caseTypeVectorAccessor
         = getFieldTypeAccessorFn(IGM, Target,
                                  strategy.getElementsWithPayload());
       
-      addWord(caseTypeVectorAccessor);
+      addRelativeAddress(caseTypeVectorAccessor);
     }
   };
 }

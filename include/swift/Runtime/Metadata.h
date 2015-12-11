@@ -1213,10 +1213,8 @@ struct EnumTypeDescriptor;
 /// Common information about all nominal types. For generic types, this
 /// descriptor is shared for all instantiations of the generic type.
 struct NominalTypeDescriptor {
-  /// The kind of nominal type descriptor.
-  NominalTypeKind Kind;
   /// The mangled name of the nominal type, with no generic parameters.
-  const char *Name;
+  RelativeDirectPointer<char> Name;
   
   /// The following fields are kind-dependent.
   union {
@@ -1236,12 +1234,12 @@ struct NominalTypeDescriptor {
       
       /// The field names. A doubly-null-terminated list of strings, whose
       /// length and order is consistent with that of the field offset vector.
-      const char *FieldNames;
+      RelativeDirectPointer<char, /*nullable*/ true> FieldNames;
       
       /// The field type vector accessor. Returns a pointer to an array of
       /// type metadata references whose order is consistent with that of the
       /// field offset vector.
-      const FieldType *(*GetFieldTypes)(const Metadata *Self);
+      RelativeDirectPointer<const FieldType * (const Metadata *)> GetFieldTypes;
 
       /// True if metadata records for this type have a field offset vector for
       /// its stored properties.
@@ -1260,12 +1258,12 @@ struct NominalTypeDescriptor {
       
       /// The field names. A doubly-null-terminated list of strings, whose
       /// length and order is consistent with that of the field offset vector.
-      const char *FieldNames;
+      RelativeDirectPointer<char, /*nullable*/ true> FieldNames;
       
       /// The field type vector accessor. Returns a pointer to an array of
       /// type metadata references whose order is consistent with that of the
       /// field offset vector.
-      const FieldType *(*GetFieldTypes)(const Metadata *Self);
+      RelativeDirectPointer<const FieldType * (const Metadata *)> GetFieldTypes;
 
       /// True if metadata records for this type have a field offset vector for
       /// its stored properties.
@@ -1283,11 +1281,11 @@ struct NominalTypeDescriptor {
       /// The names of the cases. A doubly-null-terminated list of strings,
       /// whose length is NumNonEmptyCases + NumEmptyCases. Cases are named in
       /// tag order, non-empty cases first, followed by empty cases.
-      const char *CaseNames;
+      RelativeDirectPointer<char, /*nullable*/ true> CaseNames;
       /// The field type vector accessor. Returns a pointer to an array of
       /// type metadata references whose order is consistent with that of the
       /// CaseNames. Only types for payload cases are provided.
-      const FieldType *(*GetCaseTypes)(const Metadata *Self);
+      RelativeDirectPointer<const FieldType * (const Metadata *)> GetCaseTypes;
 
       uint32_t getNumPayloadCases() const {
         return NumPayloadCasesAndPayloadSizeOffset & 0x00FFFFFFU;
@@ -1308,10 +1306,20 @@ struct NominalTypeDescriptor {
     } Enum;
   };
   
+  RelativeDirectPointerIntPair<GenericMetadata, NominalTypeKind>
+    GenericMetadataPatternAndKind;
+
   /// A pointer to the generic metadata pattern that is used to instantiate
-  /// instances of this type. Null if the type is not generic.
-  GenericMetadata *GenericMetadataPattern;
-  
+  /// instances of this type. Zero if the type is not generic.
+  GenericMetadata *getGenericMetadataPattern() const {
+    return const_cast<GenericMetadata*>(
+                                    GenericMetadataPatternAndKind.getPointer());
+  }
+
+  NominalTypeKind getKind() const {
+    return GenericMetadataPatternAndKind.getInt();
+  }
+
   /// The generic parameter descriptor header. This describes how to find and
   /// parse the generic parameter vector in metadata records for this nominal
   /// type.
@@ -1515,7 +1523,7 @@ public:
   /// Get a pointer to the field type vector, if present, or null.
   const FieldType *getFieldTypes() const {
     assert(isTypeMetadata());
-    auto *getter = Description->Class.GetFieldTypes;
+    auto *getter = Description->Class.GetFieldTypes.get();
     if (!getter)
       return nullptr;
     
@@ -1693,7 +1701,7 @@ struct StructMetadata : public Metadata {
   
   /// Get a pointer to the field type vector, if present, or null.
   const FieldType *getFieldTypes() const {
-    auto *getter = Description->Struct.GetFieldTypes;
+    auto *getter = Description->Struct.GetFieldTypes.get();
     if (!getter)
       return nullptr;
     

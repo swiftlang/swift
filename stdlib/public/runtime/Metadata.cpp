@@ -1633,7 +1633,7 @@ void swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
   rodata->InstanceStart = size;
 
   auto &allocator = unsafeGetInitializedCache(
-                                 self->getDescription()->GenericMetadataPattern)
+                           self->getDescription()->getGenericMetadataPattern())
     .getAllocator();
 
   // Always clone the ivar descriptors.
@@ -2426,7 +2426,7 @@ Metadata::getGenericPattern() const {
   auto ntd = getNominalTypeDescriptor();
   if (!ntd)
     return nullptr;
-  return ntd->GenericMetadataPattern;
+  return ntd->getGenericMetadataPattern();
 }
 
 const ClassMetadata *

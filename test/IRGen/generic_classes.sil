@@ -8,19 +8,18 @@ import Swift
 // CHECK: [[ROOTGENERIC:%C15generic_classes11RootGeneric]] = type <{ %swift.refcounted, %Vs5UInt8 }>
 
 // -- offset of RootGeneric<T>.x
-// CHECK: [[ROOTGENERIC_NAME:@.*]] = private unnamed_addr constant [32 x i8] c"C15generic_classes11RootGeneric\00"
-// CHECK: [[ROOTGENERIC_FIELDS:@.*]] = private unnamed_addr constant [7 x i8] c"x\00y\00z\00\00"
+//    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
+// CHECK: [[ROOTGENERIC_NAME:@.*]] = private constant [32 x i8] c"C15generic_classes11RootGeneric\00"
+// CHECK: [[ROOTGENERIC_FIELDS:@.*]] = private constant [7 x i8] c"x\00y\00z\00\00"
 // CHECK: @_TMnC15generic_classes11RootGeneric = constant { {{.*}} i32 } {
-// --       0 = class
-// CHECK:   i64 0,
 // --       name
-// CHECK:   i8* getelementptr inbounds ([32 x i8], [32 x i8]* [[ROOTGENERIC_NAME]], i64 0, i64 0),
+// CHECK:   [32 x i8]* [[ROOTGENERIC_NAME]]
 // --       num fields
 // CHECK:   i32 3,
 // --       field offset vector offset
 // CHECK:   i32 15,
 // --       field names
-// CHECK:   i8* getelementptr inbounds ([7 x i8], [7 x i8]* [[ROOTGENERIC_FIELDS]], i64 0, i64 0),
+// CHECK:   [7 x i8]* [[ROOTGENERIC_FIELDS]]
 // --       generic metadata pattern
 // CHECK:   @_TMPC15generic_classes11RootGeneric
 // --       generic parameter vector offset
@@ -48,20 +47,19 @@ import Swift
 // CHECK: @_TWvdvC15generic_classes22RootGenericFixedLayout1zVs5UInt8 = constant i64 32, align 8
 
 // -- fixed-layout nongeneric descriptor
-// CHECK: [[ROOTNONGENERIC_NAME:@.*]] = private unnamed_addr constant [35 x i8] c"C15generic_classes14RootNonGeneric\00"
+//    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
+// CHECK: [[ROOTNONGENERIC_NAME:@.*]] = private constant [35 x i8] c"C15generic_classes14RootNonGeneric\00"
 // CHECK: @_TMnC15generic_classes14RootNonGeneric = constant { {{.*}} i32 } {
-// --       0 = class
-// CHECK:   i64 0,
 // --       name
-// CHECK:   i8* getelementptr inbounds ([35 x i8], [35 x i8]* [[ROOTNONGENERIC_NAME]], i64 0, i64 0),
+// CHECK:   [35 x i8]* [[ROOTNONGENERIC_NAME]]
 // --       num fields
 // CHECK:   i32 3,
 // --       -- field offset vector offset
 // CHECK:   i32 11,
 // --       field names
-// CHECK:   i8* getelementptr inbounds ([7 x i8], [7 x i8]* [[ROOTGENERIC_FIELDS]], i64 0, i64 0),
-// --       no generic metadata pattern
-// CHECK:   %swift.type_pattern* null,
+// CHECK:   [7 x i8]* [[ROOTGENERIC_FIELDS]]
+// --       no generic metadata pattern, kind 0
+// CHECK:   i32 0,
 // --       0 = no generic parameter vector
 // CHECK:   i32 0,
 // --       number of generic params, primary params
