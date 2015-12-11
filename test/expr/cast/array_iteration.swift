@@ -18,7 +18,7 @@ for view in rootView.subviews as! [View] {
 
 // FIXME: Diagnostic below should be "'AnyObject' is not convertible to
 // 'View'", but IUO type gets in the way of proper diagnosis.
-for view:View in rootView.subviews { // expected-error{{type 'Array<AnyObject>!' does not conform to protocol 'SequenceType'}}
+for view:View in rootView.subviews { // expected-error{{type 'Array<AnyObject>!' does not conform to protocol 'Sequence'}}
   doFoo()
 }
 

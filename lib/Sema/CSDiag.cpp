@@ -2027,7 +2027,7 @@ static bool isLowPriorityConstraint(Constraint *C) {
     if (auto *loc = C->getLocator())
       for (auto Elt : loc->getPath())
         if (Elt.getKind() == ConstraintLocator::GeneratorElementType ||
-            Elt.getKind() == ConstraintLocator::SequenceGeneratorType)
+            Elt.getKind() == ConstraintLocator::SequenceIteratorProtocol)
           return true;
   }
 

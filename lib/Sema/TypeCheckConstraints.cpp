@@ -1597,7 +1597,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 
       auto generatorLocator =
         cs.getConstraintLocator(Locator,
-                                ConstraintLocator::SequenceGeneratorType);
+                                ConstraintLocator::SequenceIteratorProtocol);
       auto elementLocator =
         cs.getConstraintLocator(generatorLocator,
                                 ConstraintLocator::GeneratorElementType);
