@@ -1094,6 +1094,8 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
       DiagMessage = diag::variable_closure_use_uninit;
     else
       DiagMessage = diag::variable_function_use_uninit;
+  } else if (isa<UncheckedTakeEnumDataAddrInst>(Inst)) {
+    DiagMessage = diag::variable_used_before_initialized;
   } else {
     DiagMessage = diag::variable_closure_use_uninit;
   }
