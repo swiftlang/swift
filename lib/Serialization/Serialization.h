@@ -314,7 +314,7 @@ private:
                     const std::vector<BitOffset> &values);
 
   /// Serializes all transparent SIL functions in the SILModule.
-  void writeSIL(const SILModule *M);
+  void writeSIL(const SILModule *M, bool serializeAllSIL);
 
   /// Top-level entry point for serializing a module.
   void writeAST(ModuleOrSourceFile DC);
