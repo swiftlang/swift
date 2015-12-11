@@ -241,11 +241,11 @@ function set_deployment_target_based_options() {
                     cmark_cmake_options=(
                         -DCMAKE_C_FLAGS="$(cmark_c_flags $deployment_target)"
                         -DCMAKE_CXX_FLAGS="$(cmark_c_flags $deployment_target)"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk $xcrun_sdk_name --show-sdk-path)"
+                        -DCMAKE_OSX_SYSROOT:PATH=$(printf %q "$(xcrun --sdk $xcrun_sdk_name --show-sdk-path)")
                         -DCMAKE_OSX_DEPLOYMENT_TARGET="${cmake_osx_deployment_target}"
                     )
                     swiftpm_bootstrap_options=(
-                        --sysroot="$(xcrun --sdk $xcrun_sdk_name --show-sdk-path)"
+                        --sysroot=$(printf %q "$(xcrun --sdk $xcrun_sdk_name --show-sdk-path)")
                     )
                     ;;
                 iphonesimulator-i386)
@@ -256,7 +256,7 @@ function set_deployment_target_based_options() {
                     cmark_cmake_options=(
                         -DCMAKE_C_FLAGS="$(cmark_c_flags $deployment_target)"
                         -DCMAKE_CXX_FLAGS="$(cmark_c_flags $deployment_target)"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk $xcrun_sdk_name --show-sdk-path)"
+                        -DCMAKE_OSX_SYSROOT:PATH=$(printf %q "$(xcrun --sdk $xcrun_sdk_name --show-sdk-path)")
                     )
                     swift_cmake_options=(
                         -DSWIFT_HOST_VARIANT="iphonesimulator"
@@ -272,7 +272,7 @@ function set_deployment_target_based_options() {
                     cmark_cmake_options=(
                         -DCMAKE_C_FLAGS="$(cmark_c_flags $deployment_target)"
                         -DCMAKE_CXX_FLAGS="$(cmark_c_flags $deployment_target)"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk $xcrun_sdk_name --show-sdk-path)"
+                        -DCMAKE_OSX_SYSROOT:PATH=$(printf %q "$(xcrun --sdk $xcrun_sdk_name --show-sdk-path)")
                     )
                     swift_cmake_options=(
                         -DSWIFT_HOST_VARIANT="iphonesimulator"
@@ -288,7 +288,7 @@ function set_deployment_target_based_options() {
                     cmark_cmake_options=(
                         -DCMAKE_C_FLAGS="$(cmark_c_flags $deployment_target)"
                         -DCMAKE_CXX_FLAGS="$(cmark_c_flags $deployment_target)"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk $xcrun_sdk_name --show-sdk-path)"
+                        -DCMAKE_OSX_SYSROOT:PATH=$(printf %q "$(xcrun --sdk $xcrun_sdk_name --show-sdk-path)")
                     )
                     swift_cmake_options=(
                         -DSWIFT_HOST_VARIANT="iphoneos"
@@ -304,7 +304,7 @@ function set_deployment_target_based_options() {
                     cmark_cmake_options=(
                         -DCMAKE_C_FLAGS="$(cmark_c_flags $deployment_target)"
                         -DCMAKE_CXX_FLAGS="$(cmark_c_flags $deployment_target)"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk $xcrun_sdk_name --show-sdk-path)"
+                        -DCMAKE_OSX_SYSROOT:PATH=$(printf %q "$(xcrun --sdk $xcrun_sdk_name --show-sdk-path)")
                     )
                     swift_cmake_options=(
                         -DSWIFT_HOST_VARIANT="iphoneos"
@@ -320,7 +320,7 @@ function set_deployment_target_based_options() {
                     cmark_cmake_options=(
                         -DCMAKE_C_FLAGS="$(cmark_c_flags $deployment_target)"
                         -DCMAKE_CXX_FLAGS="$(cmark_c_flags $deployment_target)"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk $xcrun_sdk_name --show-sdk-path)"
+                        -DCMAKE_OSX_SYSROOT:PATH=$(printf %q "$(xcrun --sdk $xcrun_sdk_name --show-sdk-path)")
                     )
                     swift_cmake_options=(
                         -DSWIFT_HOST_VARIANT="appletvsimulator"
@@ -336,7 +336,7 @@ function set_deployment_target_based_options() {
                     cmark_cmake_options=(
                         -DCMAKE_C_FLAGS="$(cmark_c_flags $deployment_target)"
                         -DCMAKE_CXX_FLAGS="$(cmark_c_flags $deployment_target)"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk $xcrun_sdk_name --show-sdk-path)"
+                        -DCMAKE_OSX_SYSROOT:PATH=$(printf %q "$(xcrun --sdk $xcrun_sdk_name --show-sdk-path)")
                     )
                     swift_cmake_options=(
                         -DSWIFT_HOST_VARIANT="appletvos"
@@ -352,7 +352,7 @@ function set_deployment_target_based_options() {
                     cmark_cmake_options=(
                         -DCMAKE_C_FLAGS="$(cmark_c_flags $deployment_target)"
                         -DCMAKE_CXX_FLAGS="$(cmark_c_flags $deployment_target)"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk $xcrun_sdk_name --show-sdk-path)"
+                        -DCMAKE_OSX_SYSROOT:PATH=$(printf %q "$(xcrun --sdk $xcrun_sdk_name --show-sdk-path)")
                     )
                     swift_cmake_options=(
                         -DSWIFT_HOST_VARIANT="watchsimulator"
@@ -368,7 +368,7 @@ function set_deployment_target_based_options() {
                     cmark_cmake_options=(
                         -DCMAKE_C_FLAGS="$(cmark_c_flags $deployment_target)"
                         -DCMAKE_CXX_FLAGS="$(cmark_c_flags $deployment_target)"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk $xcrun_sdk_name --show-sdk-path)"
+                        -DCMAKE_OSX_SYSROOT:PATH=$(printf %q "$(xcrun --sdk $xcrun_sdk_name --show-sdk-path)")
                     )
                     swift_cmake_options=(
                         -DSWIFT_HOST_VARIANT="watchos"
@@ -385,7 +385,7 @@ function set_deployment_target_based_options() {
             native_llvm_build=$(build_directory macosx-x86_64 llvm)
             llvm_cmake_options=(
                 -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING="${cmake_osx_deployment_target}"
-                -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk $xcrun_sdk_name --show-sdk-path)"
+                -DCMAKE_OSX_SYSROOT:PATH=$(printf %q "$(xcrun --sdk $xcrun_sdk_name --show-sdk-path)")
                 -DLLVM_HOST_TRIPLE:STRING="${llvm_host_triple}"
             )
             swift_cmake_options=(
@@ -681,7 +681,7 @@ if [ ! -e "$WORKSPACE" ] ; then
 fi
 
 function xcrun_find_tool() {
-  xcrun --sdk macosx --toolchain "${DARWIN_XCRUN_TOOLCHAIN}" --find "$@"
+    printf %q "$(xcrun --sdk macosx --toolchain "${DARWIN_XCRUN_TOOLCHAIN}" --find "$@")"
 }
 
 function not() {
@@ -1319,9 +1319,11 @@ if [[ "${BUILD_NINJA}" ]] ; then
         rm -rf "${build_dir}"
         cp -r "${NINJA_SOURCE_DIR}" "${build_dir}"
         if [[ $(uname -s) == "Darwin" ]]; then
+          CXX_PATH=$(printf %q "$(xcrun --sdk macosx -find clang++)")
+          SDK_PATH=$(printf %q "$(xcrun --sdk macosx --show-sdk-path)")
           (cd "${build_dir}" && \
-            env CXX=$(xcrun --sdk macosx -find clang++) \
-                CFLAGS="-isysroot $(xcrun --sdk macosx --show-sdk-path) -mmacosx-version-min=${DARWIN_DEPLOYMENT_VERSION_OSX}" \
+            env CXX="$CXX_PATH" \
+                CFLAGS="-isysroot $SDK_PATH -mmacosx-version-min=${DARWIN_DEPLOYMENT_VERSION_OSX}" \
                 LDFLAGS="-mmacosx-version-min=${DARWIN_DEPLOYMENT_VERSION_OSX}" \
                 python ./configure.py --bootstrap)
           { set +x; } 2>/dev/null
@@ -2175,7 +2177,7 @@ if [[ "${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS}" ]] && [[ ! "${SKIP_MERGE_LIPO_
             "${BUILD_DIR}"/intermediate-install/"${deployment_target}"
         )
     done
-    "${SWIFT_SOURCE_DIR}"/utils/recursive-lipo --lipo=$(xcrun_find_tool lipo) --copy-subdirs="${INSTALL_PREFIX}/lib/swift ${INSTALL_PREFIX}/lib/swift_static" --destination="${INSTALL_DESTDIR}" ${lipo_src_dirs[@]}
+    "${SWIFT_SOURCE_DIR}"/utils/recursive-lipo --lipo="$(xcrun_find_tool lipo)" --copy-subdirs="${INSTALL_PREFIX}/lib/swift ${INSTALL_PREFIX}/lib/swift_static" --destination="${INSTALL_DESTDIR}" ${lipo_src_dirs[@]}
 fi
 
 if [[ "${DARWIN_INSTALL_EXTRACT_SYMBOLS}" ]] ; then
