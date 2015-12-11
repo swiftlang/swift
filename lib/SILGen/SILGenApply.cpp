@@ -29,40 +29,6 @@
 using namespace swift;
 using namespace Lowering;
 
-/// Get the method dispatch mechanism for a method.
-MethodDispatch
-SILGenFunction::getMethodDispatch(AbstractFunctionDecl *method) {
-  // Final methods can be statically referenced.
-  if (method->isFinal())
-    return MethodDispatch::Static;
-  // Some methods are forced to be statically dispatched.
-  if (method->hasForcedStaticDispatch())
-    return MethodDispatch::Static;
-
-  // If this declaration is in a class but not marked final, then it is
-  // always dynamically dispatched.
-  auto dc = method->getDeclContext();
-  if (isa<ClassDecl>(dc))
-    return MethodDispatch::Class;
-
-  // Class extension methods are only dynamically dispatched if they're
-  // dispatched by objc_msgSend, which happens if they're foreign or dynamic.
-  if (auto declaredType = dc->getDeclaredTypeInContext())
-    if (declaredType->getClassOrBoundGenericClass()) {
-      if (method->hasClangNode())
-        return MethodDispatch::Class;
-      if (auto fd = dyn_cast<FuncDecl>(method)) {
-        if (fd->isAccessor() && fd->getAccessorStorageDecl()->hasClangNode())
-          return MethodDispatch::Class;
-      }
-      if (method->getAttrs().hasAttribute<DynamicAttr>())
-        return MethodDispatch::Class;
-    }
-
-  // Otherwise, it can be referenced statically.
-  return MethodDispatch::Static;
-}
-
 static SILDeclRef::Loc getLocForFunctionRef(AnyFunctionRef fn) {
   if (auto afd = fn.getAbstractFunctionDecl()) {
     return afd;
@@ -539,7 +505,7 @@ public:
       // make sure we emit the right set of thunks.
       if (constant->isCurried && Constant.hasDecl())
         if (auto func = Constant.getAbstractFunctionDecl())
-          if (gen.getMethodDispatch(func) == MethodDispatch::Class)
+          if (getMethodDispatch(func) == MethodDispatch::Class)
             constant = constant->asDirectReference(true);
       
       constantInfo = gen.getConstantInfo(*constant);
@@ -1102,7 +1068,7 @@ public:
       if (e->getAccessSemantics() != AccessSemantics::Ordinary) {
         isDynamicallyDispatched = false;
       } else {
-        switch (SGF.getMethodDispatch(afd)) {
+        switch (getMethodDispatch(afd)) {
         case MethodDispatch::Class:
           isDynamicallyDispatched = true;
           break;
@@ -1121,7 +1087,7 @@ public:
         if (ctor->isRequired() &&
             thisCallSite->getArg()->getType()->is<AnyMetatypeType>() &&
             !thisCallSite->getArg()->isStaticallyDerivedMetatype()) {
-          if (SGF.SGM.requiresObjCDispatch(afd)) {
+          if (requiresObjCDispatch(afd)) {
             // When we're performing Objective-C dispatch, we don't have an
             // allocating constructor to call. So, perform an alloc_ref_dynamic
             // and pass that along to the initializer.
@@ -1171,7 +1137,7 @@ public:
         SILDeclRef constant(afd, kind.getValue(),
                             SILDeclRef::ConstructAtBestResilienceExpansion,
                             SILDeclRef::ConstructAtNaturalUncurryLevel,
-                            SGF.SGM.requiresObjCDispatch(afd));
+                            requiresObjCDispatch(afd));
 
         setCallee(Callee::forClassMethod(SGF, selfValue,
                                          constant, getSubstFnType(), e));
@@ -1203,7 +1169,7 @@ public:
     SILDeclRef constant(e->getDecl(),
                         SILDeclRef::ConstructAtBestResilienceExpansion,
                         SILDeclRef::ConstructAtNaturalUncurryLevel,
-                        SGF.SGM.requiresObjCDispatch(e->getDecl()));
+                        requiresObjCDispatch(e->getDecl()));
 
     // Otherwise, we have a statically-dispatched call.
     CanFunctionType substFnType = getSubstFnType();
@@ -1345,7 +1311,7 @@ public:
       constant = SILDeclRef(ctorRef->getDecl(), SILDeclRef::Kind::Initializer,
                          SILDeclRef::ConstructAtBestResilienceExpansion,
                          SILDeclRef::ConstructAtNaturalUncurryLevel,
-                         SGF.SGM.requiresObjCSuperDispatch(ctorRef->getDecl()));
+                         requiresObjCDispatch(ctorRef->getDecl()));
 
       if (ctorRef->getDeclRef().isSpecialized())
         substitutions = ctorRef->getDeclRef().getSubstitutions();
@@ -1354,7 +1320,7 @@ public:
       constant = SILDeclRef(declRef->getDecl(),
                          SILDeclRef::ConstructAtBestResilienceExpansion,
                          SILDeclRef::ConstructAtNaturalUncurryLevel,
-                         SGF.SGM.requiresObjCSuperDispatch(declRef->getDecl()));
+                         requiresObjCDispatch(declRef->getDecl()));
 
       if (declRef->getDeclRef().isSpecialized())
         substitutions = declRef->getDeclRef().getSubstitutions();
@@ -1536,12 +1502,12 @@ public:
                                : SILDeclRef::Kind::Initializer,
                              SILDeclRef::ConstructAtBestResilienceExpansion,
                              SILDeclRef::ConstructAtNaturalUncurryLevel,
-                             SGF.SGM.requiresObjCDispatch(ctorRef->getDecl()));
+                             requiresObjCDispatch(ctorRef->getDecl()));
       setCallee(Callee::forArchetype(SGF, SILValue(),
                      self.getType().getSwiftRValueType(), constant,
                      cast<AnyFunctionType>(expr->getType()->getCanonicalType()),
                      expr));
-    } else if (SGF.getMethodDispatch(ctorRef->getDecl())
+    } else if (getMethodDispatch(ctorRef->getDecl())
                  == MethodDispatch::Class) {
       // Dynamic dispatch to the initializer.
       setCallee(Callee::forClassMethod(
@@ -1553,7 +1519,7 @@ public:
                                : SILDeclRef::Kind::Initializer,
                              SILDeclRef::ConstructAtBestResilienceExpansion,
                              SILDeclRef::ConstructAtNaturalUncurryLevel,
-                             SGF.SGM.requiresObjCDispatch(ctorRef->getDecl())),
+                             requiresObjCDispatch(ctorRef->getDecl())),
                   getSubstFnType(), fn));
     } else {
       // Directly call the peer constructor.
@@ -3799,7 +3765,7 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
 
   bool isClassDispatch = false;
   if (!isDirectUse) {
-    switch (gen.getMethodDispatch(decl)) {
+    switch (getMethodDispatch(decl)) {
     case MethodDispatch::Class:
       isClassDispatch = true;
       break;

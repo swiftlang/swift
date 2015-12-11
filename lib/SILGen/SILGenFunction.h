@@ -31,14 +31,6 @@ class LValue;
 class ManagedValue;
 class RValue;
 class TemporaryInitialization;
-
-/// How a method is dispatched.
-enum class MethodDispatch {
-  // The method implementation can be referenced statically.
-  Static,
-  // The method implementation uses class_method dispatch.
-  Class,
-};
   
 /// Internal context information for the SILGenFunction visitor.
 ///
@@ -1540,9 +1532,6 @@ public:
   /// intrinsic.
   Substitution getPointerSubstitution(Type pointerType,
                                       ArchetypeType *archetype);
-  
-  /// Get the method dispatch mechanism for a method.
-  MethodDispatch getMethodDispatch(AbstractFunctionDecl *method);
 };
 
 

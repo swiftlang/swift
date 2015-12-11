@@ -25,6 +25,85 @@
 #include "clang/AST/DeclObjC.h"
 using namespace swift;
 
+/// Get the method dispatch mechanism for a method.
+MethodDispatch
+swift::getMethodDispatch(AbstractFunctionDecl *method) {
+  // Final methods can be statically referenced.
+  if (method->isFinal())
+    return MethodDispatch::Static;
+  // Some methods are forced to be statically dispatched.
+  if (method->hasForcedStaticDispatch())
+    return MethodDispatch::Static;
+
+  // If this declaration is in a class but not marked final, then it is
+  // always dynamically dispatched.
+  auto dc = method->getDeclContext();
+  if (isa<ClassDecl>(dc))
+    return MethodDispatch::Class;
+
+  // Class extension methods are only dynamically dispatched if they're
+  // dispatched by objc_msgSend, which happens if they're foreign or dynamic.
+  if (dc->isClassOrClassExtensionContext()) {
+    if (method->hasClangNode())
+      return MethodDispatch::Class;
+    if (auto fd = dyn_cast<FuncDecl>(method)) {
+      if (fd->isAccessor() && fd->getAccessorStorageDecl()->hasClangNode())
+        return MethodDispatch::Class;
+    }
+    if (method->getAttrs().hasAttribute<DynamicAttr>())
+      return MethodDispatch::Class;
+  }
+
+  // Otherwise, it can be referenced statically.
+  return MethodDispatch::Static;
+}
+
+bool swift::requiresForeignToNativeThunk(ValueDecl *vd) {
+  // Functions imported from C, Objective-C methods imported from Objective-C,
+  // as well as methods in @objc protocols (even protocols defined in Swift)
+  // require a foreign to native thunk.
+  auto dc = vd->getDeclContext();
+  if (auto proto = dyn_cast<ProtocolDecl>(dc))
+    if (proto->isObjC())
+      return true;
+
+  if (auto fd = dyn_cast<FuncDecl>(vd))
+    return fd->hasClangNode();
+
+  return false;
+}
+
+/// FIXME: merge requiresObjCDispatch() into getMethodDispatch() and add
+/// an ObjectiveC case to the MethodDispatch enum.
+bool swift::requiresObjCDispatch(ValueDecl *vd) {
+  // Final functions never require ObjC dispatch.
+  if (vd->isFinal())
+    return false;
+
+  if (requiresForeignToNativeThunk(vd))
+    return true;
+
+  if (auto *fd = dyn_cast<FuncDecl>(vd)) {
+    // Property accessors should be generated alongside the property.
+    if (fd->isGetterOrSetter())
+      return requiresObjCDispatch(fd->getAccessorStorageDecl());
+
+    return fd->getAttrs().hasAttribute<DynamicAttr>();
+  }
+
+  if (auto *cd = dyn_cast<ConstructorDecl>(vd)) {
+    if (cd->hasClangNode())
+      return true;
+
+    return cd->getAttrs().hasAttribute<DynamicAttr>();
+  }
+
+  if (auto *asd = dyn_cast<AbstractStorageDecl>(vd))
+    return asd->requiresObjCGetterAndSetter();
+
+  return vd->getAttrs().hasAttribute<DynamicAttr>();
+}
+
 static unsigned getFuncNaturalUncurryLevel(AnyFunctionRef AFR) {
   assert(AFR.getBodyParamPatterns().size() >= 1 && "no arguments for func?!");
   unsigned Level = AFR.getBodyParamPatterns().size() - 1;
@@ -338,14 +417,8 @@ bool SILDeclRef::isForeignToNativeThunk() const {
   // have a foreign-to-native thunk.
   if (!hasDecl())
     return false;
-  // Otherwise, match whether we have a clang node with whether we're foreign.
-  if (isa<FuncDecl>(getDecl()) && getDecl()->hasClangNode())
+  if (requiresForeignToNativeThunk(getDecl()))
     return !isForeign;
-  // Objective-C protocol methods also require a foreign to native thunk.
-  auto dc = getDecl()->getDeclContext();
-  if (auto proto = dyn_cast<ProtocolDecl>(dc))
-    if (proto->isObjC())
-      return !isForeign;
   // ObjC initializing constructors and factories are foreign.
   // We emit a special native allocating constructor though.
   if (isa<ConstructorDecl>(getDecl())

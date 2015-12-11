@@ -136,47 +136,6 @@ bool SILGenModule::requiresObjCMethodEntryPoint(ConstructorDecl *constructor) {
   return constructor->isObjC();
 }
 
-bool SILGenModule::requiresObjCDispatch(ValueDecl *vd) {
-  // Final functions never require ObjC dispatch.
-  if (vd->isFinal())
-    return false;
-
-  // If the decl is an @objc protocol requirement, then the only witness is
-  // objc.
-  if (auto *proto = dyn_cast<ProtocolDecl>(vd->getDeclContext()))
-    if (proto->isObjC())
-      return true;
-
-  if (auto *fd = dyn_cast<FuncDecl>(vd)) {
-    // If a function has an associated Clang node, it's foreign and only has
-    // an ObjC entry point.
-    if (vd->hasClangNode())
-      return true;
-
-    // Property accessors should be generated alongside the property.
-    if (fd->isGetterOrSetter())
-      return requiresObjCDispatch(fd->getAccessorStorageDecl());
-
-    return fd->getAttrs().hasAttribute<DynamicAttr>();
-  }
-  if (auto *cd = dyn_cast<ConstructorDecl>(vd)) {
-    // If a function has an associated Clang node, it's foreign and only has
-    // an ObjC entry point.
-    if (vd->hasClangNode())
-      return true;
-    
-    return cd->getAttrs().hasAttribute<DynamicAttr>();
-  }
-  if (auto *asd = dyn_cast<AbstractStorageDecl>(vd))
-    return asd->requiresObjCGetterAndSetter();
-
-  return vd->getAttrs().hasAttribute<DynamicAttr>();
-}
-
-bool SILGenModule::requiresObjCSuperDispatch(ValueDecl *vd) {
-  return requiresObjCDispatch(vd);
-}
-
 namespace {
 
 /// An ASTVisitor for populating SILVTable entries from ClassDecl members.

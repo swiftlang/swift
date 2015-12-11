@@ -45,6 +45,23 @@ namespace swift {
   class SILLocation;
   class AnyFunctionRef;
 
+/// How a method is dispatched.
+enum class MethodDispatch {
+  // The method implementation can be referenced statically.
+  Static,
+  // The method implementation uses class_method dispatch.
+  Class,
+};
+
+/// Get the method dispatch mechanism for a method.
+MethodDispatch getMethodDispatch(AbstractFunctionDecl *method);
+
+/// True if calling the given method or property should use ObjC dispatch.
+bool requiresObjCDispatch(ValueDecl *vd);
+
+/// True if the entry point is natively foreign.
+bool requiresForeignToNativeThunk(ValueDecl *vd);
+
 enum ForDefinition_t : bool {
   NotForDefinition = false,
   ForDefinition = true

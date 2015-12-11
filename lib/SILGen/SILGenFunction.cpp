@@ -147,14 +147,8 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
       // If the function is fully uncurried and natively foreign, reference its
       // foreign entry point.
       if (!next.isCurried) {
-        if (vd->hasClangNode())
+        if (requiresForeignToNativeThunk(vd))
           next = next.asForeign();
-
-        // Objective-C protocol methods also require a foreign to native thunk.
-        auto dc = vd->getDeclContext();
-        if (auto proto = dyn_cast<ProtocolDecl>(dc))
-          if (proto->isObjC())
-            next = next.asForeign();
       }
       
       // Preserve whether the curry thunks lead to a direct reference to the
@@ -620,7 +614,7 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
       thisArg = curriedArgs.back();
 
   if (isa<AbstractFunctionDecl>(next.getDecl()) &&
-      gen.getMethodDispatch(cast<AbstractFunctionDecl>(next.getDecl()))
+      getMethodDispatch(cast<AbstractFunctionDecl>(next.getDecl()))
         == MethodDispatch::Class) {
     SILValue thisArg = curriedArgs.back();
 
