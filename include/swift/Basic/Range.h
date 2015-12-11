@@ -268,22 +268,6 @@ template <class T> EnumeratorRange<T> enumerate(T Begin, T End) {
   return EnumeratorRange<T>(Begin, End);
 }
 
-/// An adaptor of std::any_of for ranges.
-template <class Range, class Predicate>
-inline
-bool
-any_of(Range R, Predicate P) {
-  return std::any_of(R.begin(), R.end(), P);
-}
-
-/// An adaptor of std::all_of for ranges.
-template <class Range, class Predicate>
-inline
-bool
-all_of(Range R, Predicate P) {
-  return std::all_of(R.begin(), R.end(), P);
-}
-
 /// An adaptor of std::none_of for ranges.
 template <class Range, class Predicate>
 inline
