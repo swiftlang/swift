@@ -1517,8 +1517,11 @@ namespace {
 
     Type visitSubscriptExpr(SubscriptExpr *expr) {
       ValueDecl *decl = nullptr;
-      if (expr->hasDecl())
+      if (expr->hasDecl()) {
         decl = expr->getDecl().getDecl();
+        if (decl->isInvalid())
+          return Type();
+      }
       return addSubscriptConstraints(expr, expr->getBase(), expr->getIndex(),
                                      decl);
     }
