@@ -200,7 +200,7 @@ extension SetAlgebraType {
     return self.intersect(other).isEmpty
   }
 
-  /// Returns true iff `self.intersect(other).isEmpty`.
+  /// Returns the set of elements contained in `self` but not in `other`.
   @warn_unused_result
   public func subtract(other: Self) -> Self {
     return self.intersect(self.exclusiveOr(other))
