@@ -520,7 +520,8 @@ private:
   
 //--- Globals ---------------------------------------------------------------
 public:
-  llvm::Constant *getAddrOfGlobalString(StringRef utf8);
+  llvm::Constant *getAddrOfGlobalString(StringRef utf8,
+                                        bool willBeRelativelyAddressed = false);
   llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
   llvm::Constant *getAddrOfObjCSelectorRef(StringRef selector);
   llvm::Constant *getAddrOfObjCMethodName(StringRef methodName);
@@ -547,7 +548,8 @@ private:
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
   llvm::DenseSet<const clang::Decl *> GlobalClangDecls;
-  llvm::StringMap<llvm::Constant*> GlobalStrings;
+  llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
+    GlobalStrings;
   llvm::StringMap<llvm::Constant*> GlobalUTF16Strings;
   llvm::StringMap<llvm::Constant*> ObjCSelectorRefs;
   llvm::StringMap<llvm::Constant*> ObjCMethodNames;
@@ -759,6 +761,10 @@ public:
   enum class DirectOrGOT {
     Direct, GOT,
   };
+
+  /// Mark a global variable as true-const by putting it in the text section of
+  /// the binary.
+  void setTrueConstGlobal(llvm::GlobalVariable *var);
 
 private:
   llvm::Constant *getAddrOfLLVMVariable(LinkEntity entity,

@@ -140,7 +140,7 @@ static void dumpSwiftHeapObjects() {
                       "\"name\": \"%s\", "
                       "\"kind\": \"%s\""
                       "}",
-              NTD->Name, kindDescriptor);
+              NTD->Name.get(), kindDescriptor);
       continue;
     }
 
