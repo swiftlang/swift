@@ -3208,7 +3208,7 @@ namespace {
       // Reassign ArgValue.
       RValue NewRValue = RValue(gen, ArgLoc, ArgTy.getSwiftRValueType(),
                                  ArgManagedValue);
-      ArgValue = std::move(ArgumentSource(ArgLoc, std::move(NewRValue)));
+      ArgValue = ArgumentSource(ArgLoc, std::move(NewRValue));
     }
   };
 
