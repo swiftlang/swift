@@ -26,7 +26,7 @@
 #   o When all files are compiled, the harness begins to run the tests. The
 #     harness chooses a number of iterations for each tests to achieve the best
 #     accuracy in the given time limit (in order to do that, it performs several
-#     auxiliary test runs). When the iteration number is chosen, the measurent
+#     auxiliary test runs). When the iteration number is chosen, the measurement
 #     of execution time is actually performed.
 #   o At this point everything is ready, and the harness simply reports the
 #     results.
