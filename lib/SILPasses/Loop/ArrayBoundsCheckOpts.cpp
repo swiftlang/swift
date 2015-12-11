@@ -919,7 +919,7 @@ public:
   }
 
   /// Hoists the necessary check for beginning and end of the induction
-  /// encapsulated by this acess function to the header.
+  /// encapsulated by this access function to the header.
   void hoistCheckToPreheader(ArraySemanticsCall CheckToHoist,
                              SILBasicBlock *Preheader,
                              DominanceInfo *DT) {
