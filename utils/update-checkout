@@ -64,12 +64,13 @@ def obtain_additional_swift_sources(opts = {'with_ssh': False}):
         'swift-corelibs-foundation': 'apple/swift-corelibs-foundation'
     }
     for dir_name, repo in additional_repos.iteritems():
-        print("--- Cloning '" + dir_name + "' ---")
-        if opts['with_ssh'] == True:
-            remote = "git@github.com:" + repo + '.git'
-        else:
-            remote = "https://github.com/" + repo + '.git'
-        check_call(['git', 'clone', remote, dir_name])
+        with WorkingDirectory(SWIFT_SOURCE_ROOT):
+            print("--- Cloning '" + dir_name + "' ---")
+            if opts['with_ssh'] == True:
+                remote = "git@github.com:" + repo + '.git'
+            else:
+                remote = "https://github.com/" + repo + '.git'
+            check_call(['git', 'clone', remote, dir_name])
 
 def main():
     parser = argparse.ArgumentParser(
