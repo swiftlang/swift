@@ -11,30 +11,25 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-analysis"
-#include "swift/SILAnalysis/Analysis.h"
-#include "swift/SILAnalysis/BasicCalleeAnalysis.h"
-#include "swift/SILAnalysis/DominanceAnalysis.h"
-#include "swift/SILAnalysis/IVAnalysis.h"
-#include "swift/SILAnalysis/PostOrderAnalysis.h"
-#include "swift/SILAnalysis/CallGraphAnalysis.h"
-#include "swift/SILAnalysis/ClassHierarchyAnalysis.h"
+#include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Analysis/IVAnalysis.h"
+#include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILFunction.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
-#include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 
 using namespace swift;
 
 void SILAnalysis::verifyFunction(SILFunction *F) {
   // Only functions with bodies can be analyzed by the analysis.
   assert(F->isDefinition() && "Can't analyze external functions");
-}
-
-SILAnalysis *swift::createCallGraphAnalysis(SILModule *M) {
-  return new CallGraphAnalysis(M);
 }
 
 SILAnalysis *swift::createDominanceAnalysis(SILModule *) {

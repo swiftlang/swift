@@ -2517,7 +2517,13 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(DeclContext *dc) {
     }
 
     // Continue looking into the parent.
-    baseTy = baseTy->castTo<NominalType>()->getParent();
+    if (auto nominalTy = baseTy->getAs<NominalType>()) {
+      baseTy = nominalTy->getParent();
+      continue;
+    }
+
+    // We're done.
+    break;
   }
 
   return substitutions;

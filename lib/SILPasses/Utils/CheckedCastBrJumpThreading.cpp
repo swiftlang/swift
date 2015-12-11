@@ -2,10 +2,10 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SILAnalysis/DominanceAnalysis.h"
-#include "swift/SILPasses/Utils/CFG.h"
-#include "swift/SILPasses/Utils/Local.h"
-#include "swift/SILPasses/Utils/SILInliner.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/SILInliner.h"
 
 using namespace swift;
 

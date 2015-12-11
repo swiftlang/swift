@@ -2,7 +2,7 @@ set(UTILITYPASSES_SOURCES
   UtilityPasses/AADumper.cpp
   UtilityPasses/BasicCalleePrinter.cpp
   UtilityPasses/CFGPrinter.cpp
-  UtilityPasses/CallGraphPrinter.cpp
+  UtilityPasses/EscapeAnalysisDumper.cpp
   UtilityPasses/FunctionOrderPrinter.cpp
   UtilityPasses/IVInfoPrinter.cpp
   UtilityPasses/InstCount.cpp
@@ -11,7 +11,6 @@ set(UTILITYPASSES_SOURCES
   UtilityPasses/LoopCanonicalizer.cpp
   UtilityPasses/LoopRegionPrinter.cpp
   UtilityPasses/MemLocationPrinter.cpp
+  UtilityPasses/SideEffectsDumper.cpp
   UtilityPasses/StripDebugInfo.cpp
-  UtilityPasses/UpdateEscapeAnalysis.cpp
-  UtilityPasses/UpdateSideEffects.cpp
   PARENT_SCOPE)

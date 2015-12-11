@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SILPasses/Passes.h"
-#include "swift/SILPasses/Transforms.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILFunction.h"

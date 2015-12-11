@@ -88,6 +88,13 @@ protected:
       : ValueBase(Kind, TypeList), ParentBB(0), Location(*DebugLoc) {}
 
 public:
+  /// Instructions should be allocated using a dedicated instruction allocation
+  /// function from the ContextTy.
+  template <typename ContextTy>
+  void *operator new(size_t Bytes, const ContextTy &C,
+                     size_t Alignment = alignof(ValueBase)) {
+    return C.allocateInst(Bytes, Alignment);
+  }
 
   enum class MemoryBehavior {
     None,
@@ -864,7 +871,7 @@ public:
     return V->getKind() == ValueKind::ApplyInst;
   }
   
-  /// Returns true if the called function has an error result but is not actully
+  /// Returns true if the called function has an error result but is not actually
   /// throwing an error.
   bool isNonThrowing() const {
     return isNonThrowingApply();

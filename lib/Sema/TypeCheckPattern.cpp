@@ -1025,7 +1025,8 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     
     if (shouldRequireType && 
         !(options & TR_FromNonInferredPattern) &&
-        !(options & TR_EnumerationVariable)) {
+        !(options & TR_EnumerationVariable) &&
+        !(options & TR_EditorPlaceholder)) {
       diagnose(NP->getLoc(), diag::type_inferred_to_undesirable_type,
                NP->getDecl()->getName(), type, NP->getDecl()->isLet());
       diagnose(NP->getLoc(), diag::add_explicit_type_annotation_to_silence);
@@ -1279,17 +1280,17 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     // type as `.Foo`), resolve it now that we have a type.
     Optional<CheckedCastKind> castKind;
     
+    EnumElementDecl *elt = EEP->getElementDecl();
+    
     Type enumTy;
-    if (!EEP->getElementDecl()) {
-      EnumElementDecl *element = nullptr;
+    if (!elt) {
       if (type->getAnyNominal())
-        element = lookupEnumMemberElement(*this, dc, type, EEP->getName());
-      if (!element) {
+        elt = lookupEnumMemberElement(*this, dc, type, EEP->getName());
+      if (!elt) {
         diagnose(EEP->getLoc(), diag::enum_element_pattern_member_not_found,
                  EEP->getName().str(), type);
         return true;
       }
-      EEP->setElementDecl(element);
       enumTy = type;
     } else {
       // Check if the explicitly-written enum type matches the type we're
@@ -1336,8 +1337,6 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       }
     }
 
-    EnumElementDecl *elt = EEP->getElementDecl();
-    
     // If there is a subpattern, push the enum element type down onto it.
     if (EEP->hasSubPattern()) {
       Type elementType;
@@ -1354,6 +1353,8 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
         return true;
       EEP->setSubPattern(sub);
     }
+
+    EEP->setElementDecl(elt);
     EEP->setType(enumTy);
     
     // Ensure that the type of our TypeLoc is fully resolved. If an unbound

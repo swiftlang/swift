@@ -730,7 +730,7 @@ public:
     sma::TypeName ResultTN;
     llvm::raw_string_ostream OS(ResultTN.Name);
     T.print(OS, Options);
-    return std::move(ResultTN);
+    return ResultTN;
   }
 
   llvm::Optional<sma::TypeName> convertToOptionalTypeName(Type T) const {

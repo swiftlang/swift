@@ -11,14 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-arc-analysis"
-#include "swift/SILAnalysis/ARCAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SILAnalysis/AliasAnalysis.h"
-#include "swift/SILAnalysis/RCIdentityAnalysis.h"
-#include "swift/SILAnalysis/ValueTracking.h"
-#include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ValueTracking.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Debug.h"
 

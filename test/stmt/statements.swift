@@ -403,7 +403,7 @@ func test_is_as_patterns() {
 func matching_pattern_recursion() {
   switch 42 {
   case {  // expected-error {{expression pattern of type '() -> ()' cannot match values of type 'Int'}}
-      for i in zs {  // expected-error {{use of unresolved identifier 'zs'}}
+      for i in zs {
       }
   }: break
   }

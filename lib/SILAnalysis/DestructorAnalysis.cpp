@@ -1,4 +1,4 @@
-#include "swift/SILAnalysis/DestructorAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DestructorAnalysis.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"

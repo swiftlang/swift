@@ -14,9 +14,9 @@
 #include "ARCRegionState.h"
 #include "RCStateTransitionVisitors.h"
 #include "swift/Basic/Range.h"
-#include "swift/SILAnalysis/LoopRegionAnalysis.h"
-#include "swift/SILAnalysis/AliasAnalysis.h"
-#include "swift/SILAnalysis/RCIdentityAnalysis.h"
+#include "swift/SILOptimizer/Analysis/LoopRegionAnalysis.h"
+#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;

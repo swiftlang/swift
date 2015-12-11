@@ -228,16 +228,14 @@ struct tuple_index {
 
 
 struct SubscriptTest1 {
-  subscript(keyword:String) -> Bool { return true }  // expected-note 3 {{found this candidate}}
-  subscript(keyword:String) -> String? {return nil }  // expected-note 3 {{found this candidate}}
+  subscript(keyword:String) -> Bool { return true }  // expected-note 2 {{found this candidate}}
+  subscript(keyword:String) -> String? {return nil }  // expected-note 2 {{found this candidate}}
 }
 
 func testSubscript1(s1 : SubscriptTest1) {
   let _ : Int = s1["hello"]  // expected-error {{ambiguous subscript with base type 'SubscriptTest1' and index type 'String'}}
   
-  // FIXME: This is a sema bug, it should not be ambiguous due to its contextual boolean type. 
-  // rdar://18741539
-  if s1["hello"] {}  // expected-error {{ambiguous subscript with base type 'SubscriptTest1' and index type 'String'}}
+  if s1["hello"] {}
   
   
   let _ = s1["hello"]  // expected-error {{ambiguous use of 'subscript'}}
@@ -259,3 +257,18 @@ func testSubscript1(s2 : SubscriptTest2) {
   let b = s2[1, "foo"] // expected-error {{cannot subscript a value of type 'SubscriptTest2' with an index of type '(Int, String)'}}
   // expected-note @-1 {{expected an argument list of type '(String, String)'}}
 }
+
+// sr-114 & rdar://22007370
+
+class Foo {
+    subscript(key: String) -> String { // expected-note {{'subscript' previously declared here}}
+        get { a } // expected-error {{use of unresolved identifier 'a'}}
+        set { b } // expected-error {{use of unresolved identifier 'b'}}
+    }
+    
+    subscript(key: String) -> String { // expected-error {{invalid redeclaration of 'subscript'}}
+        get { a } // expected-error {{use of unresolved identifier 'a'}}
+        set { b } // expected-error {{use of unresolved identifier 'b'}}
+    }
+}
+

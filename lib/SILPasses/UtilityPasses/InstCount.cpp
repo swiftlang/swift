@@ -15,9 +15,9 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-instcount"
-#include "swift/SILPasses/Passes.h"
-#include "swift/SILPasses/PassManager.h"
-#include "swift/SILPasses/Transforms.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/PassManager/PassManager.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
 #include "llvm/ADT/Statistic.h"

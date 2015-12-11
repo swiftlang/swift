@@ -177,6 +177,9 @@ struct ASTContext::Implementation {
   /// func _unimplemented_initializer(className: StaticString).
   FuncDecl *UnimplementedInitializerDecl = nullptr;
 
+  /// func _undefined<T>(msg: StaticString, file: StaticString, line: UInt) -> T
+  FuncDecl *UndefinedDecl = nullptr;
+
   /// func _stdlib_isOSVersionAtLeast(Builtin.Word,Builtin.Word, Builtin.word)
   //    -> Builtin.Int1
   FuncDecl *IsOSVersionAtLeastDecl = nullptr;
@@ -982,6 +985,21 @@ ASTContext::getUnimplementedInitializerDecl(LazyResolver *resolver) const {
   // FIXME: Check inputs and outputs.
 
   Impl.UnimplementedInitializerDecl = decl;
+  return decl;
+}
+
+FuncDecl *
+ASTContext::getUndefinedDecl(LazyResolver *resolver) const {
+  if (Impl.UndefinedDecl)
+    return Impl.UndefinedDecl;
+
+  // Look for the function.
+  CanType input, output;
+  auto decl = findLibraryIntrinsic(*this, "_undefined", resolver);
+  if (!decl)
+    return nullptr;
+
+  Impl.UndefinedDecl = decl;
   return decl;
 }
 

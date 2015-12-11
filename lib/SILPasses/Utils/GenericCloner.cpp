@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SILPasses/Utils/GenericCloner.h"
+#include "swift/SILOptimizer/Utils/GenericCloner.h"
 
 #include "swift/AST/Type.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -18,7 +18,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 

@@ -10,13 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILPASSES_GLOBALARCPAIRINGANALYSIS_H
-#define SWIFT_SILPASSES_GLOBALARCPAIRINGANALYSIS_H
+#ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_GLOBALARCPAIRINGANALYSIS_H
+#define SWIFT_SILOPTIMIZER_PASSMANAGER_GLOBALARCPAIRINGANALYSIS_H
 
 #include "GlobalARCSequenceDataflow.h"
 #include "GlobalLoopARCSequenceDataflow.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SILPasses/Utils/LoopUtils.h"
+#include "swift/SILOptimizer/Utils/LoopUtils.h"
 #include "llvm/ADT/SetVector.h"
 
 namespace swift {

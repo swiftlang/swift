@@ -24,7 +24,7 @@
 #include "swift/IDE/Utils.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SILPasses/Passes.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Transforms/Utils/Cloning.h"

@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SILAnalysis/IVAnalysis.h"
+#include "swift/SILOptimizer/Analysis/IVAnalysis.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"

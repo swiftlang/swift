@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SILPasses/PrettyStackTrace.h"
+#include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/SILPasses/Transforms.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;

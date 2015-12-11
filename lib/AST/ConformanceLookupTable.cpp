@@ -543,7 +543,7 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
                                    bool &diagnoseSuperseded) {
   // If one entry is fixed and the other is not, we have our answer.
   if (lhs->isFixed() != rhs->isFixed()) {
-    // If the non-fixed conformance is not replacable, we have a failure to
+    // If the non-fixed conformance is not replaceable, we have a failure to
     // diagnose.
     diagnoseSuperseded = (lhs->isFixed() &&
                           !isReplaceable(rhs->getRankingKind())) ||

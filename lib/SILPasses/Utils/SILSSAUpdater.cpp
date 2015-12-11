@@ -20,8 +20,8 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
-#include "swift/SILPasses/Utils/CFG.h"
-#include "swift/SILPasses/Utils/SILSSAUpdater.h"
+#include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 
 
 using namespace swift;

@@ -770,7 +770,7 @@ extension BinaryFloatingPoint {
   }
   
   public static func sqrt<X: BinaryFloatingPoint>(x: X) -> Self {
-    if X._fractionalBitCount <= Self._fractionalBitCount  { return sqrt(Self(x)) }
+    if X._fractionalBitCount <= Self._fractionalBitCount { return sqrt(Self(x)) }
     return Self(X._sqrtStickyRounding(x))
   }
   

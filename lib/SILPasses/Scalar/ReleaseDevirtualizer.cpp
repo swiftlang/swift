@@ -11,9 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "release-devirtualizer"
-#include "swift/SILPasses/Passes.h"
-#include "swift/SILPasses/Transforms.h"
-#include "swift/SILAnalysis/RCIdentityAnalysis.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SIL/SILBuilder.h"
 #include "llvm/ADT/Statistic.h"
 

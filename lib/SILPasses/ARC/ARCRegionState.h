@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILPASSES_ARC_ARCREGIONSTATE_H
-#define SWIFT_SILPASSES_ARC_ARCREGIONSTATE_H
+#ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_ARC_ARCREGIONSTATE_H
+#define SWIFT_SILOPTIMIZER_PASSMANAGER_ARC_ARCREGIONSTATE_H
 
 #include "GlobalLoopARCSequenceDataflow.h"
 #include "swift/Basic/NullablePtr.h"

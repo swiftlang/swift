@@ -10,6 +10,8 @@ import objc_protocols_Bas
   func copyRuncing() -> NSObject
 
   func foo()
+
+  static func mince() -> NSObject
 }
 
 @objc protocol NSFunging {
@@ -37,6 +39,47 @@ func objc_generic<T : NSRuncing>(x: T) -> (NSObject, NSObject) {
   // CHECK: release [[THIS2]]
 }
 
+func objc_generic_partial_apply<T : NSRuncing>(x: T) {
+  // CHECK:      [[FN:%.*]] = function_ref @_TTOFP14objc_protocols9NSRuncing5runceFT_CSo8NSObject
+  // CHECK-NEXT: strong_retain %0
+  // CHECK-NEXT: [[METHOD:%.*]] = apply [[FN]]<T>(%0)
+  // CHECK-NEXT: strong_release [[METHOD]]
+  _ = x.runce
+
+  // CHECK:      [[FN:%.*]] = function_ref @_TTOFP14objc_protocols9NSRuncing5runceFT_CSo8NSObject
+  // CHECK-NEXT: [[METHOD:%.*]] = partial_apply [[FN]]<T>()
+  // CHECK-NEXT: strong_release [[METHOD]]
+  _ = T.runce
+
+  // CHECK:      [[FN:%.*]] = function_ref @_TTOZFP14objc_protocols9NSRuncing5minceFT_CSo8NSObject
+  // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thick T.Type
+  // CHECK-NEXT: [[METHOD:%.*]] = apply [[FN]]<T>([[METATYPE]])
+  // CHECK-NEXT: strong_release [[METHOD:%.*]]
+  _ = T.mince
+}
+
+// CHECK-LABEL: sil shared @_TTOFP14objc_protocols9NSRuncing5runceFT_CSo8NSObject
+// CHECK:      [[FN:%.*]] = function_ref @_TTOFP14objc_protocols9NSRuncing5runcefT_CSo8NSObject
+// CHECK-NEXT: [[METHOD:%.*]] = partial_apply [[FN]]<Self>(%0)
+// CHECK-NEXT: return [[METHOD]]
+
+// CHECK-LABEL: sil shared @_TTOFP14objc_protocols9NSRuncing5runcefT_CSo8NSObject
+// CHECK:      strong_retain %0
+// CHECK-NEXT: [[FN:%.*]] = witness_method $Self, #NSRuncing.runce!1.foreign
+// CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<Self>(%0)
+// CHECK-NEXT: strong_release %0
+// CHECK-NEXT: return [[RESULT]]
+
+// CHECK-LABEL: sil shared @_TTOZFP14objc_protocols9NSRuncing5minceFT_CSo8NSObject
+// CHECK:      [[FN:%.*]] = function_ref @_TTOZFP14objc_protocols9NSRuncing5mincefT_CSo8NSObject
+// CHECK-NEXT: [[METHOD:%.*]] = partial_apply [[FN]]<Self>(%0)
+// CHECK-NEXT: return [[METHOD]]
+
+// CHECK-LABEL: sil shared @_TTOZFP14objc_protocols9NSRuncing5mincefT_CSo8NSObject
+// CHECK:      [[FN:%.*]] = witness_method $Self, #NSRuncing.mince!1.foreign
+// CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<Self>(%0)
+// CHECK-NEXT: return [[RESULT]]
+
 // CHECK-LABEL: sil hidden  @_TF14objc_protocols13objc_protocol
 func objc_protocol(x: NSRuncing) -> (NSObject, NSObject) {
   return (x.runce(), x.copyRuncing())
@@ -52,6 +95,19 @@ func objc_protocol(x: NSRuncing) -> (NSObject, NSObject) {
 
   // -- Arguments are not consumed by objc calls
   // CHECK: release [[THIS2_ORIG]]
+}
+
+func objc_protocol_partial_apply(x: NSRuncing) {
+  // CHECK: [[THIS1:%.*]] = open_existential_ref %0 : $NSRuncing to $[[OPENED:@opened(.*) NSRuncing]]
+  // CHECK: [[FN:%.*]] = function_ref @_TTOFP14objc_protocols9NSRuncing5runceFT_CSo8NSObject
+  // CHECK: strong_retain [[THIS1]]
+  // CHECK: [[RESULT:%.*]] = apply [[FN]]<[[OPENED]]>([[THIS1]])
+  // CHECK: strong_release [[RESULT]]
+  // CHECK: strong_release %0
+  _ = x.runce
+
+  // FIXME: rdar://21289579
+  // _ = NSRuncing.runce
 }
 
 // CHECK-LABEL: sil hidden  @_TF14objc_protocols25objc_protocol_composition
@@ -72,6 +128,8 @@ class Foo : NSRuncing, NSFunging, Ansible {
   // -- NSRuncing
   @objc func runce() -> NSObject { return NSObject() }
   @objc func copyRuncing() -> NSObject { return NSObject() }
+
+  @objc static func mince() -> NSObject { return NSObject() }
 
   // -- NSFunging
   @objc func funge() {}
@@ -95,6 +153,7 @@ extension Bar : NSRuncing {
   @objc func runce() -> NSObject { return NSObject() }
   @objc func copyRuncing() -> NSObject { return NSObject() }
   @objc func foo() {}
+  @objc static func mince() -> NSObject { return NSObject() }
 }
 
 // CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Bar5runce
@@ -106,6 +165,7 @@ extension Bas : NSRuncing {
   // runce() implementation from the original definition of Bas
   @objc func copyRuncing() -> NSObject { return NSObject() }
   @objc func foo() {}
+  @objc static func mince() -> NSObject { return NSObject() }
 }
 
 // CHECK-LABEL: sil hidden [thunk] @_TToFE14objc_protocolsC18objc_protocols_Bas3Bas11copyRuncing

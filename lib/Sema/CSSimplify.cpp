@@ -2290,12 +2290,30 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     llvm_unreachable("bad constraint kind");
   }
   
-  if (!type->getAnyOptionalObjectType().isNull() &&
-      protocol->isSpecificProtocol(KnownProtocolKind::Boolean)) {
-    Fixes.push_back({FixKind::OptionalToBoolean,
-      getConstraintLocator(locator)});
-    
-    return SolutionKind::Solved;
+  if (!shouldAttemptFixes())
+    return SolutionKind::Error;
+
+  // See if there's anything we can do to fix the conformance:
+  OptionalTypeKind optionalKind;
+  if (auto optionalObjectType = type->getAnyOptionalObjectType(optionalKind)) {
+    if (protocol->isSpecificProtocol(KnownProtocolKind::Boolean)) {
+      // Optionals don't conform to Boolean; suggest '!= nil'.
+      if (recordFix(FixKind::OptionalToBoolean, getConstraintLocator(locator)))
+        return SolutionKind::Error;
+      return SolutionKind::Solved;
+    } else if (optionalKind == OTK_Optional) {
+      // The underlying type of an optional may conform to the protocol if the
+      // optional doesn't; suggest forcing if that's the case.
+      auto result = simplifyConformsToConstraint(
+        optionalObjectType, protocol, kind,
+        locator.withPathElement(LocatorPathElt::getGenericArgument(0)), flags);
+      if (result == SolutionKind::Solved) {
+        if (recordFix(FixKind::ForceOptional, getConstraintLocator(locator))) {
+          return SolutionKind::Error;
+        }
+      }
+      return result;
+    }
   }
   
   // There's nothing more we can do; fail.

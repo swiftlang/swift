@@ -78,6 +78,12 @@ func test2() {
   takes_closure {     // ok.
     markUsed(b3)
   }
+    
+  var b4 : Int?
+  takes_closure {     // ok.
+    markUsed(b4!)
+  }
+  b4 = 7
 
   // Structs
   var s1 : SomeStruct
@@ -721,7 +727,7 @@ class ClassWhoseInitDoesntReturn : BaseWithConvenienceInits {
 }
 
 // <rdar://problem/17233681> DI: Incorrectly diagnostic in delegating init with generic enum
-enum r17233681Lazy<T>  {
+enum r17233681Lazy<T> {
   case Thunk(() -> T)
   case Value(T)
   
@@ -1184,3 +1190,9 @@ func test22436880() {
   x = 1
   bug22436880(&x) // expected-error {{immutable value 'x' may not be passed inout}}
 }
+
+// sr-184
+let x: String? // expected-note 2 {{constant defined here}}
+print(x?.characters.count) // expected-error {{constant 'x' used before being initialized}}
+print(x!) // expected-error {{constant 'x' used before being initialized}}
+

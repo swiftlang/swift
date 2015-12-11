@@ -12,9 +12,9 @@
 
 #define DEBUG_TYPE "sil-membehavior"
 
-#include "swift/SILAnalysis/AliasAnalysis.h"
-#include "swift/SILAnalysis/SideEffectAnalysis.h"
-#include "swift/SILAnalysis/ValueTracking.h"
+#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SIL/SILVisitor.h"
 #include "llvm/Support/Debug.h"
 

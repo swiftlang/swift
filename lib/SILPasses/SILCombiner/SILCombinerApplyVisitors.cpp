@@ -18,11 +18,11 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/DebugUtils.h"
-#include "swift/SILAnalysis/AliasAnalysis.h"
-#include "swift/SILAnalysis/ARCAnalysis.h"
-#include "swift/SILAnalysis/CFG.h"
-#include "swift/SILAnalysis/ValueTracking.h"
-#include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
+#include "swift/SILOptimizer/Analysis/CFG.h"
+#include "swift/SILOptimizer/Analysis/ValueTracking.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/DenseMap.h"
@@ -1392,9 +1392,9 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
       SILBasicBlock *NormalBB = AI->getNormalBB();
       SILBasicBlock *ErrorBB = AI->getErrorBB();
       SILLocation Loc = AI->getLoc();
-      eraseApply(AI, Users);
       Builder.setInsertionPoint(BB);
       Builder.setCurrentDebugScope(AI->getDebugScope());
+      eraseApply(AI, Users);
 
       // Replace the try_apply with a cond_br false, which will be removed by
       // SimplifyCFG. We don't want to modify the CFG in SILCombine.

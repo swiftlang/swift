@@ -116,7 +116,8 @@ void MemLocation::expand(MemLocation &Base, SILModule *M, MemLocationList &Locs,
   // Construct the MemLocation by appending the projection path from the
   // accessed node to the leaf nodes.
   ProjectionPath &BasePath = Base.getPath().getValue();
-  for (const auto &P : TE->getTypeLeafExpansion(Base.getType(), M)) {
+  for (const auto &P : TE->getTypeExpansionProjectionPaths(Base.getType(), M,
+                                                           TEKind::TELeaf)) {
     Locs.push_back(MemLocation(Base.getBase(), P.getValue(), BasePath));
   }
 }
@@ -127,7 +128,8 @@ void MemLocation::reduce(MemLocation &Base, SILModule *M, MemLocationSet &Locs,
   // accessed node to the leaf nodes.
   MemLocationList Nodes;
   ProjectionPath &BasePath = Base.getPath().getValue();
-  for (const auto &P : TE->getTypeNodeExpansion(Base.getType(), M)) {
+  for (const auto &P : TE->getTypeExpansionProjectionPaths(Base.getType(), M,
+                                                           TEKind::TENode)) {
     Nodes.push_back(MemLocation(Base.getBase(), P.getValue(), BasePath));
   }
 
@@ -172,7 +174,8 @@ void MemLocation::expandWithValues(MemLocation &Base, SILValue &Val,
   // path
   // from the accessed node to the leaf nodes.
   ProjectionPath &BasePath = Base.getPath().getValue();
-  for (const auto &P : TE->getTypeLeafExpansion(Base.getType(), M)) {
+  for (const auto &P : TE->getTypeExpansionProjectionPaths(Base.getType(), M,
+                                                           TEKind::TELeaf)) {
     Locs.push_back(MemLocation(Base.getBase(), P.getValue(), BasePath));
     Vals.push_back(LoadStoreValue(Val, P.getValue()));
   }
@@ -190,7 +193,8 @@ SILValue MemLocation::reduceWithValues(MemLocation &Base, SILModule *M,
   // Base memory location.
   MemLocationList ALocs;
   ProjectionPath &BasePath = Base.getPath().getValue();
-  for (const auto &P : TE->getTypeNodeExpansion(Base.getType(), M)) {
+  for (const auto &P : TE->getTypeExpansionProjectionPaths(Base.getType(), M,
+                                                           TEKind::TENode)) {
     ALocs.push_back(MemLocation(Base.getBase(), P.getValue(), BasePath));
   }
 

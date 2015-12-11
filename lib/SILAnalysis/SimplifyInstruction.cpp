@@ -11,9 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-simplify"
-#include "swift/SILAnalysis/SimplifyInstruction.h"
-#include "swift/SILAnalysis/ValueTracking.h"
-#include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
+#include "swift/SILOptimizer/Analysis/ValueTracking.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILVisitor.h"
 

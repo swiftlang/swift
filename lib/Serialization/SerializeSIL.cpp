@@ -167,7 +167,6 @@ namespace {
                          << " for layout " << Layout::Code << "\n");
     }
 
-    // TODO: this is not required anymore. Remove it.
     bool ShouldSerializeAll;
 
     /// Helper function to update ListOfValues for MethodInst. Format:

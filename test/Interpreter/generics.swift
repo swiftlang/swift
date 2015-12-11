@@ -93,7 +93,7 @@ func checkOverloadResolution() {
 }
 checkOverloadResolution()
 
-class Base  {
+class Base {
     var v = 0
     required init() {}
     func map() {

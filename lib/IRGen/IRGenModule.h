@@ -431,12 +431,17 @@ public:
   const SpareBitVector &getHeapObjectSpareBits() const;
 
   const SpareBitVector &getFunctionPointerSpareBits() const;
-  SpareBitVector getWeakReferenceSpareBits() const;
-  SpareBitVector getUnownedReferenceSpareBits(ReferenceCounting style) const;
   const SpareBitVector &getWitnessTablePtrSpareBits() const;
 
+  SpareBitVector getWeakReferenceSpareBits() const;
   Size getWeakReferenceSize() const { return PtrSize; }
   Alignment getWeakReferenceAlignment() const { return getPointerAlignment(); }
+
+  SpareBitVector getUnownedReferenceSpareBits(ReferenceCounting style) const;
+  unsigned getUnownedExtraInhabitantCount(ReferenceCounting style);
+  APInt getUnownedExtraInhabitantValue(unsigned bits, unsigned index,
+                                       ReferenceCounting syle);
+  APInt getUnownedExtraInhabitantMask(ReferenceCounting style);
 
   llvm::Type *getFixedBufferTy();
   llvm::Type *getValueWitnessTy(ValueWitness index);

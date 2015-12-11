@@ -11,13 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "diagnose-unreachable"
-#include "swift/SILPasses/Passes.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILUndef.h"
-#include "swift/SILPasses/Utils/Local.h"
-#include "swift/SILPasses/Transforms.h"
+#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"

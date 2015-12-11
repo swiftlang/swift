@@ -11,13 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "constant-propagation"
-#include "swift/SILPasses/Passes.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SILPasses/Utils/Local.h"
-#include "swift/SILPasses/Utils/ConstantFolding.h"
-#include "swift/SILPasses/Transforms.h"
+#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/ConstantFolding.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Debug.h"

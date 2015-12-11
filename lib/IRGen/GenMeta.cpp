@@ -4279,21 +4279,6 @@ AbstractCallee irgen::getAbstractVirtualCallee(IRGenFunction &IGF,
                         naturalUncurry, naturalUncurry, ExtraData::None);
 }
 
-/// Find the function which will actually appear in the virtual table.
-static SILDeclRef findOverriddenFunction(IRGenModule &IGM,
-                                         SILDeclRef method) {
-  // 'method' is the most final method in the hierarchy which we
-  // haven't yet found a compatible override for.  'cur' is the method
-  // we're currently looking at.  Compatibility is transitive,
-  // so we can forget our original method and just keep going up.
-
-  SILDeclRef cur = method;
-  while ((cur = cur.getOverriddenVTableEntry())) {
-    method = cur;
-  }
-  return method;
-}
-
 /// Load the correct virtual function for the given class method.
 llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                                            llvm::Value *base,
@@ -4305,8 +4290,7 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     = cast<AbstractFunctionDecl>(method.getDecl());
 
   // Find the function that's actually got an entry in the metadata.
-  SILDeclRef overridden =
-    findOverriddenFunction(IGF.IGM, method);
+  SILDeclRef overridden = method.getBaseOverriddenVTableEntry();
 
   // Find the metadata.
   llvm::Value *metadata;

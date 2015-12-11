@@ -46,7 +46,6 @@
 ///   - `x.isStrictSupersetOf(y)` iff `x.isSupersetOf(y) && x != y`
 ///   - `x.isStrictSubsetOf(y)` iff `x.isSubsetOf(y) && x != y`
 public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
-
   /// A type for which `Self` provides a containment test.
   typealias Element
   
@@ -148,7 +147,6 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   /// - SeeAlso: `Self.element(_, subsumes:_)`
   @warn_unused_result
   static func element(a: Element, isDisjointWith b: Element) -> Bool
-  
 }
 
 /// `SetAlgebra` requirements for which default implementations
@@ -200,7 +198,7 @@ extension SetAlgebra {
     return self.intersect(other).isEmpty
   }
 
-  /// Returns true iff `self.intersect(other).isEmpty`.
+  /// Returns the set of elements contained in `self` but not in `other`.
   @warn_unused_result
   public func subtract(other: Self) -> Self {
     return self.intersect(self.exclusiveOr(other))

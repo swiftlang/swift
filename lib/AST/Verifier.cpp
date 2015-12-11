@@ -436,7 +436,7 @@ struct ASTNodeBase {};
             return false;
 
           // We should know about archetypes corresponding to opened
-          // existerntial archetypes.
+          // existential archetypes.
           if (archetype->getOpenedExistentialType()) {
             if (OpenedExistentialArchetypes.count(archetype) == 0) {
               Out << "Found opened existential archetype "
@@ -462,8 +462,8 @@ struct ASTNodeBase {};
               } while (!activeScope->isModuleScopeContext());
             }
 
-            Out << "AST verification error: archetype " << archetype
-                << " not allowed in this context\n";
+            Out << "AST verification error: archetype "
+                << archetype->getString() << " not allowed in this context\n";
 
             auto knownDC = Ctx.ArchetypeContexts.find(archetype);
             if (knownDC != Ctx.ArchetypeContexts.end()) {

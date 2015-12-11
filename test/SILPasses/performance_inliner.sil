@@ -6,11 +6,11 @@ import Builtin
 import Swift
 
 /////////////////////
-// CallGraph Tests //
+// Inlining Tests //
 /////////////////////
 
-// *NOTE* These tests currently validate whether or not the callgraph
-// visits nodes in the correct order since we do not explore inlined
+// *NOTE* These tests currently validate whether or not we
+// visit nodes in the correct order since we do not explore inlined
 // code for more apply inst to inline. After that point, we will
 // probably need to do one of the following:
 //

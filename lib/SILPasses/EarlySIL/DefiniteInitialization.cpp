@@ -11,15 +11,15 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "definite-init"
-#include "swift/SILPasses/Passes.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "DIMemoryUseCollector.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SILPasses/Utils/CFG.h"
-#include "swift/SILPasses/Utils/Local.h"
-#include "swift/SILPasses/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
@@ -1094,6 +1094,8 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
       DiagMessage = diag::variable_closure_use_uninit;
     else
       DiagMessage = diag::variable_function_use_uninit;
+  } else if (isa<UncheckedTakeEnumDataAddrInst>(Inst)) {
+    DiagMessage = diag::variable_used_before_initialized;
   } else {
     DiagMessage = diag::variable_closure_use_uninit;
   }

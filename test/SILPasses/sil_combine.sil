@@ -3033,3 +3033,29 @@ entry:
   %r = load %p : $*Builtin.Int32
   return %r : $Builtin.Int32
 }
+
+sil @init_enum : $@convention(thin) (@out B) -> ()
+
+
+// Localize the initialization of the enum payload to enable mem2reg for the enum.
+
+// CHECK-LABEL: sil @enum_promotion_case4
+// CHECK:  [[V1:%.*]] = alloc_stack $FakeOptional
+// CHECK:  [[V2:%.*]] = function_ref @init_enum
+// CHECK:  [[V3:%.*]] = alloc_stack $B
+// CHECK:               apply [[V2]]([[V3]]#1)
+// CHECK:  [[V4:%.*]] = load [[V3]]#1
+// CHECK:  [[V5:%.*]] = enum $FakeOptional<B>, #FakeOptional.Some!enumelt.1, [[V4]]
+// CHECK:  store [[V5]] to [[V1]]#1
+
+sil @enum_promotion_case4 : $@convention(thin) () -> @owned FakeOptional<B> {
+bb0:
+  %2 = alloc_stack $FakeOptional<B>
+  %3 = init_enum_data_addr %2#1 : $*FakeOptional<B>, #FakeOptional.Some!enumelt.1
+  %4 = function_ref @init_enum : $@convention(thin) (@out B) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@out B) -> ()
+  inject_enum_addr %2#1 : $*FakeOptional<B>, #FakeOptional.Some!enumelt.1
+  %7 = load %2#1 : $*FakeOptional<B>
+  dealloc_stack %2#0 : $*@local_storage FakeOptional<B>
+  return %7 : $FakeOptional<B>
+}

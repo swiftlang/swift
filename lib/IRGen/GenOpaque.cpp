@@ -694,6 +694,23 @@ void irgen::emitDestructiveProjectEnumDataCall(IRGenFunction &IGF,
   setHelperAttributes(call);
 }
 
+/// Emit a call to the 'destructiveInjectEnumTag' operation.
+/// The type must be dynamically known to have enum witnesses.
+void irgen::emitDestructiveInjectEnumTagCall(IRGenFunction &IGF,
+                                             SILType T,
+                                             unsigned tag,
+                                             llvm::Value *srcObject) {
+  auto metadata = IGF.emitTypeMetadataRefForLayout(T);
+  llvm::Value *fn = IGF.emitValueWitnessForLayout(T,
+                                      ValueWitness::DestructiveInjectEnumTag);
+  llvm::Value *tagValue =
+    llvm::ConstantInt::get(IGF.IGM.Int32Ty, tag);
+  llvm::CallInst *call =
+    IGF.Builder.CreateCall(fn, {srcObject, tagValue, metadata});
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  setHelperAttributes(call);
+}
+
 /// Load the 'size' value witness from the given table as a size_t.
 llvm::Value *irgen::emitLoadOfSize(IRGenFunction &IGF, SILType T) {
   return IGF.emitValueWitnessForLayout(T, ValueWitness::Size);

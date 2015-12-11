@@ -323,13 +323,6 @@ public:
   /// True if the given constructor requires an entry point for ObjC method
   /// dispatch.
   bool requiresObjCMethodEntryPoint(ConstructorDecl *constructor);
-  
-  /// True if calling the given method or property should use ObjC dispatch.
-  bool requiresObjCDispatch(ValueDecl *vd);
-  
-  /// True if super-calling the given method from a subclass should use ObjC
-  /// dispatch.
-  bool requiresObjCSuperDispatch(ValueDecl *vd);
 
   /// Emit a global initialization.
   void emitGlobalInitialization(PatternBindingDecl *initializer, unsigned elt);

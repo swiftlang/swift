@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-devirtualize-utility"
-#include "swift/SILPasses/Utils/Devirtualize.h"
+#include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -20,7 +20,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Casting.h"

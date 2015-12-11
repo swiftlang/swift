@@ -17,14 +17,14 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-aa-evaluator"
-#include "swift/SILPasses/Passes.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SILAnalysis/AliasAnalysis.h"
-#include "swift/SILAnalysis/SideEffectAnalysis.h"
-#include "swift/SILAnalysis/Analysis.h"
-#include "swift/SILPasses/Transforms.h"
+#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
+#include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -121,8 +121,6 @@ class MemBehaviorDumper : public SILModuleTransform {
         continue;
 
       AliasAnalysis *AA = PM->getAnalysis<AliasAnalysis>();
-      SideEffectAnalysis *SEA = PM->getAnalysis<SideEffectAnalysis>();
-      SEA->recompute();
 
       unsigned PairCount = 0;
       for (auto &BB : Fn) {

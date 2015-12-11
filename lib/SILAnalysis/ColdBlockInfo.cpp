@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SILAnalysis/ColdBlockInfo.h"
-#include "swift/SILAnalysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ColdBlockInfo.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 
 using namespace swift;
 

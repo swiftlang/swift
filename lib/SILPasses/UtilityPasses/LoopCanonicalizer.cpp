@@ -17,12 +17,12 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-loop-canonicalizer"
-#include "swift/SILPasses/Passes.h"
-#include "swift/SILAnalysis/Analysis.h"
-#include "swift/SILAnalysis/DominanceAnalysis.h"
-#include "swift/SILAnalysis/LoopAnalysis.h"
-#include "swift/SILPasses/Transforms.h"
-#include "swift/SILPasses/Utils/LoopUtils.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/LoopUtils.h"
 
 using namespace swift;
 

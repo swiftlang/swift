@@ -21,11 +21,11 @@
 
 #define DEBUG_TYPE "sil-optimizer"
 
-#include "swift/SILPasses/Passes.h"
-#include "swift/SILPasses/PassManager.h"
-#include "swift/SILPasses/Transforms.h"
-#include "swift/SILPasses/Utils/Local.h"
-#include "swift/SILAnalysis/Analysis.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/PassManager/PassManager.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
 #include "swift/SIL/SILModule.h"
@@ -218,7 +218,6 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
     PM.addEarlyCodeMotion();
   PM.addARCSequenceOpts();
   PM.addRemovePins();
-  PM.addUpdateSideEffects();
 }
 
 
@@ -254,7 +253,6 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.addDeadFunctionElimination();
   PM.addDeadObjectElimination();
   PM.addGlobalPropertyOpt();
-  PM.addUpdateEscapeAnalysis();
 
   // Do the first stack promotion on high-level SIL.
   PM.addStackPromotion();
@@ -289,8 +287,6 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   // Specialize closure.
   PM.addClosureSpecializer();
-
-  PM.addUpdateEscapeAnalysis();
 
   // Do the second stack promotion on low-level SIL.
   PM.addStackPromotion();

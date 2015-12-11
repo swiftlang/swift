@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SILAnalysis/LoopAnalysis.h"
-#include "swift/SILPasses/Passes.h"
-#include "swift/SILPasses/Transforms.h"
+#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
 #include "llvm/ADT/Statistic.h"

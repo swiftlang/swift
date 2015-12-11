@@ -11,12 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-escape"
-#include "swift/SILAnalysis/EscapeAnalysis.h"
-#include "swift/SILAnalysis/BasicCalleeAnalysis.h"
-#include "swift/SILAnalysis/CallGraphAnalysis.h"
-#include "swift/SILAnalysis/ArraySemantic.h"
-#include "swift/SILAnalysis/ValueTracking.h"
-#include "swift/SILPasses/PassManager.h"
+#include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ArraySemantic.h"
+#include "swift/SILOptimizer/Analysis/ValueTracking.h"
+#include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SIL/SILArgument.h"
 #include "llvm/Support/GraphWriter.h"
 #include "llvm/Support/raw_ostream.h"
@@ -76,7 +75,6 @@ void EscapeAnalysis::ConnectionGraph::clear() {
   Nodes.clear();
   ReturnNode = nullptr;
   UsePoints.clear();
-  UsePointsComputed = false;
   NodeAllocator.DestroyAll();
   assert(ToMerge.empty());
 }
@@ -292,9 +290,6 @@ void EscapeAnalysis::ConnectionGraph::propagateEscapeStates() {
 }
 
 void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
-  if (UsePointsComputed)
-    return;
-
   // First scan the whole function and add relevant instructions as use-points.
   for (auto &BB : *F) {
     for (SILArgument *BBArg : BB.getBBArgs()) {
@@ -350,8 +345,6 @@ void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
       }
     }
   } while (Changed);
-
-  UsePointsComputed = true;
 }
 
 bool EscapeAnalysis::ConnectionGraph::mergeFrom(ConnectionGraph *SourceGraph,
@@ -468,7 +461,6 @@ getNode(ValueBase *V, EscapeAnalysis *EA) {
 bool EscapeAnalysis::ConnectionGraph::isUsePoint(ValueBase *V, CGNode *Node) {
   assert(Node->getEscapeState() < EscapeState::Global &&
          "Use points are only valid for non-escaping nodes");
-  computeUsePoints();
   auto Iter = UsePoints.find(V);
   if (Iter == UsePoints.end())
     return false;
@@ -896,15 +888,13 @@ void EscapeAnalysis::ConnectionGraph::verifyStructure() const {
 //===----------------------------------------------------------------------===//
 
 EscapeAnalysis::EscapeAnalysis(SILModule *M) :
-  SILAnalysis(AnalysisKind::Escape), M(M),
-  ArrayType(M->getASTContext().getArrayDecl()),
-  CGA(nullptr), shouldRecompute(true) {
+  BottomUpIPAnalysis(AnalysisKind::Escape), M(M),
+  ArrayType(M->getASTContext().getArrayDecl()), BCA(nullptr) {
 }
 
 
 void EscapeAnalysis::initialize(SILPassManager *PM) {
   BCA = PM->getAnalysis<BasicCalleeAnalysis>();
-  CGA = PM->getAnalysis<CallGraphAnalysis>();
 }
 
 /// Returns true if we need to add defer edges for the arguments of a block.
@@ -969,8 +959,20 @@ bool EscapeAnalysis::isPointer(ValueBase *V) {
   return IP;
 }
 
-void EscapeAnalysis::buildConnectionGraphs(FunctionInfo *FInfo) {
+void EscapeAnalysis::buildConnectionGraph(FunctionInfo *FInfo,
+                                          FunctionOrder &BottomUpOrder,
+                                          int RecursionDepth) {
+  if (BottomUpOrder.prepareForVisiting(FInfo))
+    return;
+
+  DEBUG(llvm::dbgs() << "  >> build graph for " <<
+        FInfo->Graph.F->getName() << '\n');
+
+  FInfo->NeedUpdateSummaryGraph = true;
+
   ConnectionGraph *ConGraph = &FInfo->Graph;
+  assert(ConGraph->isEmpty());
+
   // We use a worklist for iteration to visit the blocks in dominance order.
   llvm::SmallPtrSet<SILBasicBlock*, 32> VisitedBlocks;
   llvm::SmallVector<SILBasicBlock *, 16> WorkList;
@@ -982,7 +984,7 @@ void EscapeAnalysis::buildConnectionGraphs(FunctionInfo *FInfo) {
 
     // Create edges for the instructions.
     for (auto &I : *BB) {
-      analyzeInstruction(&I, FInfo);
+      analyzeInstruction(&I, FInfo, BottomUpOrder, RecursionDepth);
     }
     for (auto &Succ : BB->getSuccessors()) {
       if (VisitedBlocks.insert(Succ.getBB()).second)
@@ -1021,26 +1023,14 @@ void EscapeAnalysis::buildConnectionGraphs(FunctionInfo *FInfo) {
       }
     }
   }
-
-  ConGraph->propagateEscapeStates();
-  mergeSummaryGraph(&FInfo->SummaryGraph, ConGraph);
-  FInfo->Valid = true;
-}
-
-bool EscapeAnalysis::allCalleeFunctionsVisible(FullApplySite FAS) {
-  auto Callees = BCA->getCalleeList(FAS);
-  if (Callees.isIncomplete())
-    return false;
-
-  for (SILFunction *Callee : Callees) {
-    if (Callee->isExternalDeclaration())
-      return false;
-  }
-  return true;
+  DEBUG(llvm::dbgs() << "  << finished graph for " <<
+        FInfo->Graph.F->getName() << '\n');
 }
 
 void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
-                                        FunctionInfo *FInfo) {
+                                        FunctionInfo *FInfo,
+                                        FunctionOrder &BottomUpOrder,
+                                        int RecursionDepth) {
   ConnectionGraph *ConGraph = &FInfo->Graph;
   FullApplySite FAS = FullApplySite::isa(I);
   if (FAS) {
@@ -1096,11 +1086,21 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         break;
     }
 
-    if (allCalleeFunctionsVisible(FAS)) {
-      // We handle this apply site afterwards by merging the callee graph(s)
-      // into the caller graph.
-      FInfo->KnownCallees.push_back(FAS);
-      return;
+    if (RecursionDepth < MaxRecursionDepth) {
+      CalleeList Callees = BCA->getCalleeList(FAS);
+      if (Callees.allCalleesVisible()) {
+        // Derive the connection graph of the apply from the known callees.
+        for (SILFunction *Callee : Callees) {
+          FunctionInfo *CalleeInfo = getFunctionInfo(Callee);
+          CalleeInfo->addCaller(FInfo, FAS);
+          if (!CalleeInfo->isVisited()) {
+            // Recursively visit the called function.
+            buildConnectionGraph(CalleeInfo, BottomUpOrder, RecursionDepth + 1);
+            BottomUpOrder.tryToSchedule(CalleeInfo);
+          }
+        }
+        return;
+      }
     }
 
     if (auto *Fn = FAS.getCalleeFunction()) {
@@ -1178,8 +1178,10 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       return;
     case ValueKind::StoreInst:
     case ValueKind::StoreWeakInst:
-      if (CGNode *ValueNode = ConGraph->getNode(I->getOperand(StoreInst::Src), this)) {
-        CGNode *AddrNode = ConGraph->getNode(I->getOperand(StoreInst::Dest), this);
+      if (CGNode *ValueNode = ConGraph->getNode(I->getOperand(StoreInst::Src),
+                                                this)) {
+        CGNode *AddrNode = ConGraph->getNode(I->getOperand(StoreInst::Dest),
+                                             this);
         if (AddrNode) {
           // Create a defer-edge from the content to the stored value.
           CGNode *PointsTo = ConGraph->getContentNode(AddrNode);
@@ -1258,7 +1260,8 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       return;
     }
     case ValueKind::ReturnInst:
-      if (CGNode *ValueNd = ConGraph->getNode(cast<ReturnInst>(I)->getOperand(), this)) {
+      if (CGNode *ValueNd = ConGraph->getNode(cast<ReturnInst>(I)->getOperand(),
+                                              this)) {
         ConGraph->defer(ConGraph->getReturnNode(),
                                  ValueNd);
       }
@@ -1322,112 +1325,94 @@ void EscapeAnalysis::setAllEscaping(SILInstruction *I,
   setEscapesGlobal(ConGraph, I);
 }
 
-void EscapeAnalysis::recompute() {
+void EscapeAnalysis::recompute(FunctionInfo *Initial) {
+  allocNewUpdateID();
 
-  // Did anything change since the last recompuation? (Probably yes)
-  if (!shouldRecompute)
-    return;
+  DEBUG(llvm::dbgs() << "recompute escape analysis with UpdateID " <<
+        getCurrentUpdateID() << '\n');
 
-  DEBUG(llvm::dbgs() << "recompute escape analysis\n");
+  // Collect and analyze all functions to recompute, starting at Initial.
+  FunctionOrder BottomUpOrder(getCurrentUpdateID());
+  buildConnectionGraph(Initial, BottomUpOrder, 0);
 
-  Function2Info.clear();
-  Allocator.DestroyAll();
-  shouldRecompute = false;
+  // Build the bottom-up order.
+  BottomUpOrder.tryToSchedule(Initial);
+  BottomUpOrder.finishScheduling();
 
-  CallGraph &CG = CGA->getOrBuildCallGraph();
-
-  // TODO: Remove this workaround when the bottom-up function order is
-  // updated automatically.
-  CG.invalidateBottomUpFunctionOrder();
-
-  auto BottomUpFunctions = CG.getBottomUpFunctionOrder();
-  std::vector<FunctionInfo *> FInfos;
-  FInfos.reserve(BottomUpFunctions.size());
-
-  // First step: create the initial connection graphs for all functions.
-  for (SILFunction *F : BottomUpFunctions) {
-    if (F->isExternalDeclaration())
-      continue;
-
-    DEBUG(llvm::dbgs() << "  build initial graph for " << F->getName() << '\n');
-
-    auto *FInfo = new (Allocator.Allocate()) FunctionInfo(F);
-    Function2Info[F] = FInfo;
-    buildConnectionGraphs(FInfo);
-
-    FInfos.push_back(FInfo);
-    FInfo->NeedMergeCallees = true;
-  }
-
-  // Second step: propagate the connection graphs up the call tree until it
-  // stabalizes.
+  // Second step: propagate the connection graphs up the call-graph until it
+  // stabilizes.
   int Iteration = 0;
-  bool Changed;
+  bool NeedAnotherIteration;
   do {
     DEBUG(llvm::dbgs() << "iteration " << Iteration << '\n');
-    Changed = false;
-    for (FunctionInfo *FInfo : FInfos) {
-      if (!FInfo->NeedMergeCallees)
-        continue;
-      FInfo->NeedMergeCallees = false;
+    NeedAnotherIteration = false;
 
-      // Limit the total number of iterations. First to limit compile time,
-      // second to make sure that the loop terminates. Theoretically this
-      // should always be the case, but who knows?
-      if (Iteration >= MaxGraphMerges) {
-        DEBUG(llvm::dbgs() << "  finalize " <<
+    for (FunctionInfo *FInfo : BottomUpOrder) {
+      bool SummaryGraphChanged = false;
+      if (FInfo->NeedUpdateSummaryGraph) {
+        DEBUG(llvm::dbgs() << "  create summary graph for " <<
               FInfo->Graph.F->getName() << '\n');
-        finalizeGraphsConservatively(FInfo);
-        continue;
+
+        FInfo->Graph.propagateEscapeStates();
+
+        // Derive the summary graph of the current function. Even if the
+        // complete graph of the function did change, it does not mean that the
+        // summary graph will change.
+        SummaryGraphChanged = mergeSummaryGraph(&FInfo->SummaryGraph,
+                                                &FInfo->Graph);
+        FInfo->NeedUpdateSummaryGraph = false;
       }
 
-      DEBUG(llvm::dbgs() << "  merge into " <<
-            FInfo->Graph.F->getName() << '\n');
+      if (Iteration < MaxGraphMerges) {
+        // In the first iteration we have to merge the summary graphs, even if
+        // they didn't change (in not recomputed leaf functions).
+        if (Iteration == 0 || SummaryGraphChanged) {
+          // Merge the summary graph into all callers.
+          for (const auto &E : FInfo->getCallers()) {
+            assert(E.isValid());
 
-      // Merge the callee-graphs into the graph of the current function.
-      if (!mergeAllCallees(FInfo, CG))
-        continue;
+            // Only include callers which we are actually recomputing.
+            if (BottomUpOrder.wasRecomputedWithCurrentUpdateID(E.Caller)) {
+              DEBUG(llvm::dbgs() << "  merge  " << FInfo->Graph.F->getName() <<
+                    " into " << E.Caller->Graph.F->getName() << '\n');
 
-      FInfo->Graph.propagateEscapeStates();
-
-      // Derive the summary graph of the current function. Even if the
-      // complete graph of the function did change, it does not mean that the
-      // summary graph will change.
-      if (!mergeSummaryGraph(&FInfo->SummaryGraph, &FInfo->Graph))
-        continue;
-
-      // Trigger another graph merging action in all caller functions.
-      auto &CallerSet = CG.getCallerEdges(FInfo->Graph.F);
-      for (CallGraphEdge *CallerEdge : CallerSet) {
-        if (!CallerEdge->canCallUnknownFunction()) {
-          SILFunction *Caller = CallerEdge->getInstruction()->getFunction();
-          FunctionInfo *CallerInfo = Function2Info.lookup(Caller);
-          assert(CallerInfo && "We should have an info for all functions");
-          CallerInfo->NeedMergeCallees = true;
+              if (mergeCalleeGraph(E.FAS, &E.Caller->Graph,
+                                   &FInfo->SummaryGraph)) {
+                E.Caller->NeedUpdateSummaryGraph = true;
+                if (!E.Caller->isScheduledAfter(FInfo)) {
+                  // This happens if we have a cycle in the call-graph.
+                  NeedAnotherIteration = true;
+                }
+              }
+            }
+          }
+        }
+      } else if (Iteration == MaxGraphMerges) {
+        // Limit the total number of iterations. First to limit compile time,
+        // second to make sure that the loop terminates. Theoretically this
+        // should always be the case, but who knows?
+        DEBUG(llvm::dbgs() << "  finalize conservatively " <<
+              FInfo->Graph.F->getName() << '\n');
+        for (const auto &E : FInfo->getCallers()) {
+          assert(E.isValid());
+          if (BottomUpOrder.wasRecomputedWithCurrentUpdateID(E.Caller)) {
+            setAllEscaping(E.FAS.getInstruction(), &E.Caller->Graph);
+            E.Caller->NeedUpdateSummaryGraph = true;
+            NeedAnotherIteration = true;
+          }
         }
       }
-      Changed = true;
     }
     Iteration++;
-  } while (Changed);
+  } while (NeedAnotherIteration);
 
-  verify();
-}
-
-bool EscapeAnalysis::mergeAllCallees(FunctionInfo *FInfo, CallGraph &CG) {
-  bool Changed = false;
-  for (FullApplySite FAS : FInfo->KnownCallees) {
-    auto Callees = CG.getCallees(FAS.getInstruction());
-    assert(!Callees.canCallUnknownFunction() &&
-           "knownCallees should not contain an unknown function");
-    for (SILFunction *Callee : Callees) {
-      DEBUG(llvm::dbgs() << "    callee " << Callee->getName() << '\n');
-      FunctionInfo *CalleeInfo = Function2Info.lookup(Callee);
-      assert(CalleeInfo && "We should have an info for all functions");
-      Changed |= mergeCalleeGraph(FAS, &FInfo->Graph, &CalleeInfo->SummaryGraph);
+  for (FunctionInfo *FInfo : BottomUpOrder) {
+    if (BottomUpOrder.wasRecomputedWithCurrentUpdateID(FInfo)) {
+      FInfo->Graph.computeUsePoints();
+      FInfo->Graph.verify();
+      FInfo->SummaryGraph.verify();
     }
   }
-  return Changed;
 }
 
 bool EscapeAnalysis::mergeCalleeGraph(FullApplySite FAS,
@@ -1485,14 +1470,6 @@ bool EscapeAnalysis::mergeSummaryGraph(ConnectionGraph *SummaryGraph,
 }
 
 
-void EscapeAnalysis::finalizeGraphsConservatively(FunctionInfo *FInfo) {
-  for (FullApplySite FAS : FInfo->KnownCallees) {
-    setAllEscaping(FAS.getInstruction(), &FInfo->Graph);
-  }
-  FInfo->Graph.propagateEscapeStates();
-  mergeSummaryGraph(&FInfo->SummaryGraph, &FInfo->Graph);
-}
-
 bool EscapeAnalysis::canEscapeToUsePoint(SILValue V, ValueBase *UsePoint,
                                          ConnectionGraph *ConGraph) {
   CGNode *Node = ConGraph->getNode(V, this);
@@ -1531,6 +1508,31 @@ bool EscapeAnalysis::canPointToSameMemory(SILValue V1, SILValue V2,
   CGNode *Content1 = ConGraph->getContentNode(Node1);
   CGNode *Content2 = ConGraph->getContentNode(Node2);
   return Content1 == Content2;
+}
+
+void EscapeAnalysis::invalidate(InvalidationKind K) {
+  Function2Info.clear();
+  Allocator.DestroyAll();
+  DEBUG(llvm::dbgs() << "invalidate all\n");
+}
+
+void EscapeAnalysis::invalidate(SILFunction *F, InvalidationKind K) {
+  if (FunctionInfo *FInfo = Function2Info.lookup(F)) {
+    DEBUG(llvm::dbgs() << "  invalidate " << FInfo->Graph.F->getName() << '\n');
+    invalidateIncludingAllCallers(FInfo);
+  }
+}
+
+void EscapeAnalysis::handleDeleteNotification(ValueBase *I) {
+  if (SILBasicBlock *Parent = I->getParentBB()) {
+    SILFunction *F = Parent->getParent();
+    if (FunctionInfo *FInfo = Function2Info.lookup(F)) {
+      if (FInfo->isValid()) {
+        FInfo->Graph.removeFromGraph(I);
+        FInfo->SummaryGraph.removeFromGraph(I);
+      }
+    }
+  }
 }
 
 SILAnalysis *swift::createEscapeAnalysis(SILModule *M) {

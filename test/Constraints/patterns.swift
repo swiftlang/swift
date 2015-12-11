@@ -176,5 +176,54 @@ var (let y) = 42  // expected-error {{'let' cannot appear nested inside another 
 let (var z) = 42  // expected-error {{'var' cannot appear nested inside another 'var' or 'let' pattern}}
 
 
+// Crash when re-typechecking EnumElementPattern.
+// FIXME: This should actually type-check -- the diagnostics are bogus. But
+// at least we don't crash anymore.
 
+protocol PP {
+  typealias E
+}
 
+struct A<T> : PP {
+  typealias E = T
+}
+
+extension PP {
+  func map<T>(f: Self.E -> T) -> T {}
+}
+
+enum EE {
+  case A
+  case B
+}
+
+func good(a: A<EE>) -> Int {
+  return a.map {
+    switch $0 {
+    case .A:
+      return 1
+    default:
+      return 2
+    }
+  }
+}
+
+func bad(a: A<EE>) {
+  a.map { // expected-error {{cannot invoke 'map' with an argument list of type '((EE) -> _)'}}
+  // expected-note@-1 {{expected an argument list of type '(EE -> T)'}}
+    let _: EE = $0
+    return 1
+  }
+}
+
+func ugly(a: A<EE>) {
+  a.map { // expected-error {{cannot invoke 'map' with an argument list of type '((EE) -> _)'}}
+  // expected-note@-1 {{expected an argument list of type '(EE -> T)'}}
+    switch $0 {
+    case .A:
+      return 1
+    default:
+      return 2
+    }
+  }
+}

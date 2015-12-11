@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-loop-region-analysis"
-#include "swift/SILAnalysis/LoopRegionAnalysis.h"
+#include "swift/SILOptimizer/Analysis/LoopRegionAnalysis.h"
 #include "swift/Basic/Range.h"
 #include "llvm/Support/DOTGraphTraits.h"
 #include "llvm/Support/CommandLine.h"

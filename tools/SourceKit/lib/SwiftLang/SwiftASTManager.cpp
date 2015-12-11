@@ -25,7 +25,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
-#include "swift/SILPasses/Passes.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 // This is included only for createLazyResolver(). Move to different header ?
 #include "swift/Sema/CodeCompletionTypeChecking.h"
 

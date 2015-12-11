@@ -211,7 +211,7 @@ extension String : _BuiltinUTF16StringLiteralConvertible {
   public init(
     _builtinUTF16StringLiteral start: Builtin.RawPointer,
     numberOfCodeUnits: Builtin.Word
-  )  {
+  ) {
     self = String(
       _StringCore(
         baseAddress: OpaquePointer(start),

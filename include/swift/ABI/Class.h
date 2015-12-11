@@ -22,7 +22,7 @@
 
 namespace swift {
 
-/// Objetive-C class flags, stored in the ro-data.
+/// Objective-C class flags, stored in the ro-data.
 enum class ObjCClassFlags : uint32_t {
   /// This class is a metaclass.
   Meta                 = 0x00001,
