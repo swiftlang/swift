@@ -77,7 +77,7 @@ uploading SSH keys to GitHub):
 
     git clone git@github.com:apple/swift.git
     cd swift
-    ./utils/update-checkout --clone-via-ssh
+    ./utils/update-checkout --clone-with-ssh
 
 [CMake](http://cmake.org) is the core infrastructure used to configure builds of
 Swift and its companion projects; at least version 2.8.12.2 is required. Your
