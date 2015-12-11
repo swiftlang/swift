@@ -100,18 +100,14 @@ extension String {
 extension String {
   /// Returns `true` iff `self` begins with `prefix`.
   public func hasPrefix(prefix: String) -> Bool {
-    if prefix.isEmpty {
-      return false
-    }
-    return prefix == String(self.characters.prefix(prefix.characters.count))
+    return prefix.isEmpty ? false :
+      prefix == String(self.characters.prefix(prefix.characters.count))
   }
 
   /// Returns `true` iff `self` ends with `suffix`.
   public func hasSuffix(suffix: String) -> Bool {
-    if suffix.isEmpty {
-      return false
-    }
-    return suffix == String(self.characters.suffix(suffix.characters.count))
+    return suffix.isEmpty ? false :
+      suffix == String(self.characters.suffix(suffix.characters.count))
   }
 }
 #endif
