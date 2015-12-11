@@ -584,8 +584,7 @@ extension SequenceType
   // A fast implementation for when you are backed by a contiguous array.
   public func _initializeTo(ptr: UnsafeMutablePointer<Generator.Element>)
     -> UnsafeMutablePointer<Generator.Element> {
-    let s = self._baseAddressIfContiguous
-    if s != nil {
+    if let s = self._baseAddressIfContiguous {
       let count = self.count
       ptr.initializeFrom(s, count: count)
       _fixLifetime(self._owner)
