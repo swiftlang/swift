@@ -2891,7 +2891,7 @@ Latest
     @_silgen_name("foo") @objc
     ```
 
-  The `,` was vestigial when the attribute syntax consisted of bracked lists.
+  The `,` was vestigial when the attribute syntax consisted of bracket lists.
 
 * `switch` now always requires a statement after a `case` or `default`.
 
@@ -3190,7 +3190,7 @@ Latest
     ```
 
 * The compiler now warns about cases where a variable is inferred to have
-  `AnyObject`, `AnyClass`, or `()` type, since type inferrence can turn a simple
+  `AnyObject`, `AnyClass`, or `()` type, since type inference can turn a simple
   mistake (e.g. failing to cast an `AnyObject` when you meant to) into something
   with ripple effects.  Here is a simple example:
 
@@ -3386,7 +3386,7 @@ Latest
   `#if` block.
 
   Target configurations are tested against their values via a pseudo-function
-  invocation expression, taking a single argument expressed as an identitifer.
+  invocation expression, taking a single argument expressed as an identifier.
   The argument represents certain static build-time information.
 
   There are currently two supported target configurations:
@@ -4830,7 +4830,7 @@ Latest
     ```
 
   checks whether `object` has a value and, if so, asks for the length of
-  its title.  `titleLength` wil have type `Int?`, and if `object` was
+  its title.  `titleLength` will have type `Int?`, and if `object` was
   missing, the variable will be initialized to None.
 
 * Objects with type `id` can now be used as the receiver of property
