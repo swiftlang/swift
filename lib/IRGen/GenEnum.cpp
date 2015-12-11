@@ -4281,7 +4281,9 @@ namespace {
                   SILType T,
                   Address enumAddr,
                   EnumElementDecl *Case) const override {
-      llvm_unreachable("resilient enums cannot be constructed directly");
+      emitDestructiveInjectEnumTagCall(IGF, T,
+                                       getTagIndex(Case),
+                                       enumAddr.getAddress());
     }
 
     llvm::Value *
