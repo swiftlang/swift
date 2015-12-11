@@ -1558,10 +1558,9 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 if [[ $(is_cross_tools_deployment_target $deployment_target) ]] ; then
                     build_tests_this_time=false
 
-                    # FIXME: don't hardcode macosx-x86_64.
-                    native_llvm_tools_path="$(build_directory macosx-x86_64 llvm)/bin"
-                    native_clang_tools_path="$(build_directory macosx-x86_64 llvm)/bin"
-                    native_swift_tools_path="$(build_directory macosx-x86_64 swift)/bin"
+                    native_llvm_tools_path="$(build_directory $deployment_target llvm)/bin"
+                    native_clang_tools_path="$(build_directory $deployment_target llvm)/bin"
+                    native_swift_tools_path="$(build_directory $deployment_target swift)/bin"
 
                     cmake_options=(
                         "${cmake_options[@]}"
