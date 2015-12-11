@@ -3106,7 +3106,7 @@ Latest
   inference (e.g. when passing a function argument).
 
 * Properties defined in classes are now dynamically dispatched and can be
-  overriden with `@override`.  Currently `@override` only works with computed properties
+  overridden with `@override`.  Currently `@override` only works with computed properties
   overriding other computed properties, but this will be enhanced in coming weeks.
 
 
@@ -4708,7 +4708,7 @@ Latest
     ```
 
 * Attribute syntax has been redesigned (see **(rdar://10700853)** and
-  **(rdar://14462729)**) so that attributes now preceed the declaration and use
+  **(rdar://14462729)**) so that attributes now precede the declaration and use
   the `@` character to signify them.  Where before you might have written:
 
     ```swift
@@ -5293,5 +5293,5 @@ Latest
 
 * `POSIX.EnvironmentVariables` and `swift.CommandLineArguments` global variables
   were merged into a `swift.Process` variable.  Now you can access command line
-  arguments with `Process.arguments`.  In order to acces environment variables
+  arguments with `Process.arguments`.  In order to access environment variables
   add `import POSIX` and use `Process.environmentVariables`.
