@@ -14,7 +14,7 @@
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SILPasses/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/CFG.h"
 
 using namespace swift;
 

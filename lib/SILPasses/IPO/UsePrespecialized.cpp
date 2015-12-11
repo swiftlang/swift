@@ -12,16 +12,16 @@
 
 #define DEBUG_TYPE "use-prespecialized"
 #include "swift/Basic/Demangle.h"
-#include "swift/SILPasses/Passes.h"
-#include "swift/SILPasses/Transforms.h"
-#include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SIL/Mangle.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/Support/Debug.h"
-#include "swift/SILPasses/Utils/Generics.h"
+#include "swift/SILOptimizer/Utils/Generics.h"
 
 using namespace swift;
 

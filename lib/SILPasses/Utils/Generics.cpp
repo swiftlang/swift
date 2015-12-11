@@ -13,8 +13,8 @@
 #define DEBUG_TYPE "generic-specializer"
 
 #include "swift/Strings.h"
-#include "swift/SILPasses/Utils/Generics.h"
-#include "swift/SILPasses/Utils/GenericCloner.h"
+#include "swift/SILOptimizer/Utils/Generics.h"
+#include "swift/SILOptimizer/Utils/GenericCloner.h"
 
 using namespace swift;
 

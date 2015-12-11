@@ -13,15 +13,15 @@
 #define DEBUG_TYPE "sil-passmanager"
 
 #include "swift/Basic/DemangleWrappers.h"
-#include "swift/SILPasses/PassManager.h"
+#include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SILPasses/PrettyStackTrace.h"
-#include "swift/SILPasses/Transforms.h"
+#include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "swift/SILAnalysis/FunctionOrder.h"
-#include "swift/SILAnalysis/BasicCalleeAnalysis.h"
+#include "swift/SILOptimizer/Analysis/FunctionOrder.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/TimeValue.h"
@@ -153,7 +153,7 @@ SILPassManager::SILPassManager(SILModule *M, llvm::StringRef Stage) :
   
 #define ANALYSIS(NAME) \
   Analysis.push_back(create##NAME##Analysis(Mod));
-#include "swift/SILAnalysis/Analysis.def"
+#include "swift/SILOptimizer/Analysis/Analysis.def"
 
   for (SILAnalysis *A : Analysis) {
     A->initialize(this);
@@ -424,7 +424,7 @@ void SILPassManager::add##ID() {           \
   T->setPassKind(PassKind::ID);            \
   Transformations.push_back(T);            \
 }
-#include "swift/SILPasses/Passes.def"
+#include "swift/SILOptimizer/PassManager/Passes.def"
 
 void SILPassManager::addPass(PassKind Kind) {
   assert(unsigned(PassKind::AllPasses_Last) >= unsigned(Kind) &&
@@ -434,7 +434,7 @@ void SILPassManager::addPass(PassKind Kind) {
   case PassKind::ID:                       \
     add##ID();                             \
     break;
-#include "swift/SILPasses/Passes.def"
+#include "swift/SILOptimizer/PassManager/Passes.def"
   case PassKind::invalidPassKind:
     llvm_unreachable("invalid pass kind");
   }
@@ -443,7 +443,7 @@ void SILPassManager::addPass(PassKind Kind) {
 void SILPassManager::addPassForName(StringRef Name) {
   auto P = llvm::StringSwitch<PassKind>(Name)
 #define PASS(ID, NAME, DESCRIPTION) .Case(#ID, PassKind::ID)
-#include "swift/SILPasses/Passes.def"
+#include "swift/SILOptimizer/PassManager/Passes.def"
   ;
   addPass(P);
 }

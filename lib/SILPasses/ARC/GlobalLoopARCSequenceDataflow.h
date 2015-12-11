@@ -10,12 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILPASSES_ARC_GLOBALLOOPARCSEQUENCEDATAFLOW_H
-#define SWIFT_SILPASSES_ARC_GLOBALLOOPARCSEQUENCEDATAFLOW_H
+#ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_ARC_GLOBALLOOPARCSEQUENCEDATAFLOW_H
+#define SWIFT_SILOPTIMIZER_PASSMANAGER_ARC_GLOBALLOOPARCSEQUENCEDATAFLOW_H
 
 #include "RefCountState.h"
 #include "ProgramTerminationAnalysis.h"
-#include "swift/SILAnalysis/LoopRegionAnalysis.h"
+#include "swift/SILOptimizer/Analysis/LoopRegionAnalysis.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/NullablePtr.h"
 #include "llvm/ADT/MapVector.h"

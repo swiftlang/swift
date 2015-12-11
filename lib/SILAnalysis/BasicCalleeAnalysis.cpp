@@ -10,12 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SILAnalysis/BasicCalleeAnalysis.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 
 #include "swift/AST/Decl.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 
 #include <algorithm>
 

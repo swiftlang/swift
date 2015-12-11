@@ -15,9 +15,9 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-lower-aggregate-instrs"
-#include "swift/SILPasses/Passes.h"
-#include "swift/SILPasses/Transforms.h"
-#include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/SILBuilder.h"

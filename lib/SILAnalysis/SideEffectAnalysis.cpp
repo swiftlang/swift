@@ -11,10 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-sea"
-#include "swift/SILAnalysis/SideEffectAnalysis.h"
-#include "swift/SILAnalysis/BasicCalleeAnalysis.h"
-#include "swift/SILAnalysis/FunctionOrder.h"
-#include "swift/SILPasses/PassManager.h"
+#include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
+#include "swift/SILOptimizer/Analysis/FunctionOrder.h"
+#include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SIL/SILArgument.h"
 
 using namespace swift;

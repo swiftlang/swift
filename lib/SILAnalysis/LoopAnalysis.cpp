@@ -11,9 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/Dominance.h"
-#include "swift/SILAnalysis/DominanceAnalysis.h"
-#include "swift/SILAnalysis/LoopAnalysis.h"
-#include "swift/SILPasses/PassManager.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
+#include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;

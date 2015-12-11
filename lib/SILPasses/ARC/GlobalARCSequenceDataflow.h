@@ -10,11 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILPASSES_ARC_GLOBALARCSEQUENCEDATAFLOW_H
-#define SWIFT_SILPASSES_ARC_GLOBALARCSEQUENCEDATAFLOW_H
+#ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_ARC_GLOBALARCSEQUENCEDATAFLOW_H
+#define SWIFT_SILOPTIMIZER_PASSMANAGER_ARC_GLOBALARCSEQUENCEDATAFLOW_H
 
 #include "RefCountState.h"
-#include "swift/SILAnalysis/PostOrderAnalysis.h"
+#include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "ProgramTerminationAnalysis.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/NullablePtr.h"

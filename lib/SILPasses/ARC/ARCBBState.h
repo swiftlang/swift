@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILPASSES_ARC_ARCBBSTATE_H
-#define SWIFT_SILPASSES_ARC_ARCBBSTATE_H
+#ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_ARC_ARCBBSTATE_H
+#define SWIFT_SILOPTIMIZER_PASSMANAGER_ARC_ARCBBSTATE_H
 
 #include "GlobalARCSequenceDataflow.h"
 

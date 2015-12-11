@@ -20,7 +20,7 @@
 
 
 #define DEBUG_TYPE "sil-mem2reg"
-#include "swift/SILPasses/Passes.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILBuilder.h"
@@ -29,10 +29,10 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/SILPasses/Transforms.h"
-#include "swift/SILPasses/Utils/CFG.h"
-#include "swift/SILPasses/Utils/Local.h"
-#include "swift/SILAnalysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"

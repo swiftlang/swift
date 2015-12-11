@@ -11,14 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-loop-utils"
-#include "swift/SILPasses/Utils/LoopUtils.h"
+#include "swift/SILOptimizer/Utils/LoopUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SILPasses/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/CFG.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;

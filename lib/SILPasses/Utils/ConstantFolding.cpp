@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SILPasses/Utils/ConstantFolding.h"
+#include "swift/SILOptimizer/Utils/ConstantFolding.h"
 
 using namespace swift;
 

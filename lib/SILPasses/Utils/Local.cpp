@@ -9,10 +9,10 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===---------------------------------------------------------------------===//
-#include "swift/SILPasses/Utils/Local.h"
-#include "swift/SILAnalysis/Analysis.h"
-#include "swift/SILAnalysis/ARCAnalysis.h"
-#include "swift/SILAnalysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"

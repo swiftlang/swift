@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SILAnalysis/RCIdentityAnalysis.h"
-#include "swift/SILAnalysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SIL/SILInstruction.h"
 #include "llvm/Support/CommandLine.h"
 

@@ -13,8 +13,8 @@
 #define DEBUG_TYPE "sil-global-arc-opts"
 #include "RCStateTransitionVisitors.h"
 #include "ARCBBState.h"
-#include "swift/SILAnalysis/ARCAnalysis.h"
-#include "swift/SILAnalysis/RCIdentityAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
+#include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;

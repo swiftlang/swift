@@ -25,10 +25,10 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILANALYSIS_PROGRAMTERMINATIONANALYSIS_H
-#define SWIFT_SILANALYSIS_PROGRAMTERMINATIONANALYSIS_H
+#ifndef SWIFT_SILOPTIMIZER_ANALYSIS_PROGRAMTERMINATIONANALYSIS_H
+#define SWIFT_SILOPTIMIZER_ANALYSIS_PROGRAMTERMINATIONANALYSIS_H
 
-#include "swift/SILAnalysis/ARCAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
 namespace swift {

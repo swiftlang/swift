@@ -18,14 +18,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILPASSES_SILCOMBINER_H
-#define SWIFT_SILPASSES_SILCOMBINER_H
+#ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_SILCOMBINER_H
+#define SWIFT_SILOPTIMIZER_PASSMANAGER_SILCOMBINER_H
 
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/DenseMap.h"
 

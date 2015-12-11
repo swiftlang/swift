@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "typeexpansion-analysis"
-#include "swift/SILAnalysis/TypeExpansionAnalysis.h"
+#include "swift/SILOptimizer/Analysis/TypeExpansionAnalysis.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/Support/Debug.h"

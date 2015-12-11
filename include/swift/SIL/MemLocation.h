@@ -19,11 +19,11 @@
 #ifndef SWIFT_SIL_MEMLOCATION_H
 #define SWIFT_SIL_MEMLOCATION_H
 
-#include "swift/SILAnalysis/AliasAnalysis.h"
-#include "swift/SILAnalysis/TypeExpansionAnalysis.h"
+#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/TypeExpansionAnalysis.h"
 #include "swift/SIL/Projection.h"
-#include "swift/SILPasses/Utils/Local.h"
-#include "swift/SILAnalysis/ValueTracking.h"
+#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"

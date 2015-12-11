@@ -11,9 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "dump-ea"
-#include "swift/SILPasses/Passes.h"
-#include "swift/SILAnalysis/EscapeAnalysis.h"
-#include "swift/SILPasses/Transforms.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
 
 using namespace swift;
 

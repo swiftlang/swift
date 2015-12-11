@@ -10,15 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILPASSES_ARC_REFCOUNTSTATE_H
-#define SWIFT_SILPASSES_ARC_REFCOUNTSTATE_H
+#ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_ARC_REFCOUNTSTATE_H
+#define SWIFT_SILOPTIMIZER_PASSMANAGER_ARC_REFCOUNTSTATE_H
 
 #include "RCStateTransition.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
-#include "swift/SILAnalysis/ARCAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include <algorithm>
 
 namespace swift {

@@ -11,11 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-aa"
-#include "swift/SILAnalysis/AliasAnalysis.h"
-#include "swift/SILAnalysis/ValueTracking.h"
-#include "swift/SILAnalysis/SideEffectAnalysis.h"
-#include "swift/SILPasses/Utils/Local.h"
-#include "swift/SILPasses/PassManager.h"
+#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ValueTracking.h"
+#include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
+#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILInstruction.h"

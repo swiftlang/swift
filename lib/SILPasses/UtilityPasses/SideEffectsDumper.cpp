@@ -11,9 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "dump-sea"
-#include "swift/SILPasses/Passes.h"
-#include "swift/SILAnalysis/SideEffectAnalysis.h"
-#include "swift/SILPasses/Transforms.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
 
 using namespace swift;
 

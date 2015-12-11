@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-inliner"
-#include "swift/SILPasses/Utils/SILInliner.h"
+#include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
