@@ -1016,6 +1016,19 @@ if [ -z "${HOST_CC}" ] ; then
     if [ "$(uname -s)" == "Darwin" ] ; then
         HOST_CC="$(xcrun_find_tool clang)"
         HOST_CXX="$(xcrun_find_tool clang++)"
+    elif [ "$(uname -s)" == "FreeBSD" ]; then
+        if [ $(sysctl -n kern.osreldate) -ge 1100000 ]; then
+            HOST_CC="clang"
+            HOST_CXX="clang++"
+        else
+            for clang_candidate_suffix in "38" "37" "36" "35" ; do
+                if which "clang${clang_candidate_suffix}" > /dev/null ; then
+                    HOST_CC="clang${clang_candidate_suffix}"
+                    HOST_CXX="clang++${clang_candidate_suffix}"
+                    break
+                fi
+            done
+        fi
     else
         for clang_candidate_suffix in "" "-3.8" "-3.7" "-3.6" "-3.5" ; do
             if which "clang${clang_candidate_suffix}" > /dev/null ; then
