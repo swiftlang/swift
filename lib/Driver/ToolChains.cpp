@@ -1115,8 +1115,10 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   // Add the linker script that coalesces protocol conformance sections.
   Arguments.push_back("-Xlinker");
   Arguments.push_back("-T");
-  Arguments.push_back(
-      context.Args.MakeArgString(Twine(RuntimeLibPath) + "/x86_64/swift.ld"));
+    
+  // FIXME: This should also query the abi type (i.e. gnueabihf)
+  Arguments.push_back(context.Args.MakeArgString(
+    Twine(RuntimeLibPath) + "/" + getTriple().getArchName() + "/swift.ld"));
 
   // This should be the last option, for convenience in checking output.
   Arguments.push_back("-o");
