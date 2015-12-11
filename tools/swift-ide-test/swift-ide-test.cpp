@@ -2474,11 +2474,6 @@ int main(int argc, char *argv[]) {
         options::InputFilenames);
   }
 
-  if (options::Action == ActionType::GenerateModuleAPIDescription) {
-    llvm::errs() << "unimplemented\n";
-    return 1;
-  }
-
   if (options::Action == ActionType::DumpCompletionCache) {
     if (options::InputFilenames.empty()) {
       llvm::errs() << "-dump-completin-cache requires an input file\n";

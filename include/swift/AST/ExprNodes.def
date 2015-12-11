@@ -156,7 +156,7 @@ EXPR(Assign, Expr)
 EXPR(DefaultValue, Expr)
 EXPR(CodeCompletion, Expr)
 UNCHECKED_EXPR(UnresolvedPattern, Expr)
-UNCHECKED_EXPR(EditorPlaceholder, Expr)
+EXPR(EditorPlaceholder, Expr)
 
 #undef EXPR_RANGE
 #undef UNCHECKED_EXPR

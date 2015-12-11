@@ -247,6 +247,7 @@ static void _buildNameForMetadata(const Metadata *type,
                                     result);
   }
   case MetadataKind::Enum:
+  case MetadataKind::Optional:
   case MetadataKind::Struct: {
     auto structType = static_cast<const StructMetadata *>(type);
     return _buildNominalTypeName(structType->Description,
@@ -574,6 +575,7 @@ static bool _conformsToProtocol(const OpaqueValue *value,
     case MetadataKind::HeapGenericLocalVariable:
     case MetadataKind::ErrorObject:
     case MetadataKind::Enum:
+    case MetadataKind::Optional:
     case MetadataKind::Opaque:
     case MetadataKind::Struct:
     case MetadataKind::Tuple:
@@ -634,6 +636,7 @@ static bool _conformsToProtocol(const OpaqueValue *value,
   case MetadataKind::ErrorObject:
   case MetadataKind::Metatype:
   case MetadataKind::Enum:
+  case MetadataKind::Optional:
   case MetadataKind::Opaque:
   case MetadataKind::Struct:
   case MetadataKind::Tuple:
@@ -736,6 +739,7 @@ static void findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
   case MetadataKind::HeapGenericLocalVariable:
   case MetadataKind::ErrorObject:
   case MetadataKind::Enum:
+  case MetadataKind::Optional:
   case MetadataKind::Opaque:
   case MetadataKind::Struct:
   case MetadataKind::Tuple:
@@ -797,6 +801,7 @@ static void deallocateDynamicValue(OpaqueValue *value, const Metadata *type) {
   case MetadataKind::HeapGenericLocalVariable:
   case MetadataKind::ErrorObject:
   case MetadataKind::Enum:
+  case MetadataKind::Optional:
   case MetadataKind::Opaque:
   case MetadataKind::Struct:
   case MetadataKind::Tuple:
@@ -822,6 +827,7 @@ swift_dynamicCastMetatypeToObjectConditional(const Metadata *metatype) {
   // Other kinds of metadata don't cast to AnyObject.
   case MetadataKind::Struct:
   case MetadataKind::Enum:
+  case MetadataKind::Optional:
   case MetadataKind::Opaque:
   case MetadataKind::Tuple:
   case MetadataKind::Function:
@@ -852,6 +858,7 @@ swift_dynamicCastMetatypeToObjectUnconditional(const Metadata *metatype) {
   // Other kinds of metadata don't cast to AnyObject.
   case MetadataKind::Struct:
   case MetadataKind::Enum:
+  case MetadataKind::Optional:
   case MetadataKind::Opaque:
   case MetadataKind::Tuple:
   case MetadataKind::Function:
@@ -939,6 +946,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
 
     case MetadataKind::Struct:
     case MetadataKind::Enum:
+    case MetadataKind::Optional:
 #if SWIFT_OBJC_INTEROP
       // If the source type is bridged to Objective-C, try to bridge.
       if (auto srcBridgeWitness = findBridgeWitness(srcDynamicType)) {
@@ -1111,6 +1119,7 @@ swift::swift_dynamicCastUnknownClass(const void *object,
   case MetadataKind::ErrorObject:
   case MetadataKind::Metatype:
   case MetadataKind::Enum:
+  case MetadataKind::Optional:
   case MetadataKind::Opaque:
   case MetadataKind::Struct:
   case MetadataKind::Tuple:
@@ -1166,6 +1175,7 @@ swift::swift_dynamicCastUnknownClassUnconditional(const void *object,
   case MetadataKind::ErrorObject:
   case MetadataKind::Metatype:
   case MetadataKind::Enum:
+  case MetadataKind::Optional:
   case MetadataKind::Opaque:
   case MetadataKind::Struct:
   case MetadataKind::Tuple:
@@ -1225,6 +1235,7 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
     case MetadataKind::ErrorObject:
     case MetadataKind::Metatype:
     case MetadataKind::Enum:
+    case MetadataKind::Optional:
     case MetadataKind::Opaque:
     case MetadataKind::Struct:
     case MetadataKind::Tuple:
@@ -1255,6 +1266,7 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
     case MetadataKind::ErrorObject:
     case MetadataKind::Metatype:
     case MetadataKind::Enum:
+    case MetadataKind::Optional:
     case MetadataKind::Opaque:
     case MetadataKind::Struct:
     case MetadataKind::Tuple:
@@ -1270,6 +1282,7 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
   case MetadataKind::ErrorObject:
   case MetadataKind::Metatype:
   case MetadataKind::Enum:
+  case MetadataKind::Optional:
   case MetadataKind::Opaque:
   case MetadataKind::Struct:
   case MetadataKind::Tuple:
@@ -1332,6 +1345,7 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
     case MetadataKind::ErrorObject:
     case MetadataKind::Metatype:
     case MetadataKind::Enum:
+    case MetadataKind::Optional:
     case MetadataKind::Opaque:
     case MetadataKind::Struct:
     case MetadataKind::Tuple:
@@ -1363,6 +1377,7 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
     case MetadataKind::ErrorObject:
     case MetadataKind::Metatype:
     case MetadataKind::Enum:
+    case MetadataKind::Optional:
     case MetadataKind::Opaque:
     case MetadataKind::Struct:
     case MetadataKind::Tuple:
@@ -1377,6 +1392,7 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
   case MetadataKind::ErrorObject:
   case MetadataKind::Metatype:
   case MetadataKind::Enum:
+  case MetadataKind::Optional:
   case MetadataKind::Opaque:
   case MetadataKind::Struct:
   case MetadataKind::Tuple:
@@ -1715,6 +1731,7 @@ static bool _dynamicCastToMetatype(OpaqueValue *dest,
   case MetadataKind::HeapGenericLocalVariable:
   case MetadataKind::ErrorObject:
   case MetadataKind::Enum:
+  case MetadataKind::Optional:
   case MetadataKind::Opaque:
   case MetadataKind::Struct:
   case MetadataKind::Tuple:
@@ -1885,6 +1902,7 @@ static bool _dynamicCastToExistentialMetatype(OpaqueValue *dest,
   case MetadataKind::HeapGenericLocalVariable:
   case MetadataKind::ErrorObject:
   case MetadataKind::Enum:
+  case MetadataKind::Optional:
   case MetadataKind::Opaque:
   case MetadataKind::Struct:
   case MetadataKind::Tuple:
@@ -1947,6 +1965,7 @@ static bool _dynamicCastToFunction(OpaqueValue *dest,
   case MetadataKind::Class:
   case MetadataKind::Struct:
   case MetadataKind::Enum:
+  case MetadataKind::Optional:
   case MetadataKind::ObjCClassWrapper:
   case MetadataKind::ForeignClass:
   case MetadataKind::ExistentialMetatype:
@@ -1971,13 +1990,59 @@ static id dynamicCastValueToNSError(OpaqueValue *src,
 }
 #endif
 
+static bool canCastToExistential(OpaqueValue *dest, OpaqueValue *src,
+                                 const Metadata *srcType,
+                                 const Metadata *targetType) {
+  if (targetType->getKind() != MetadataKind::Existential)
+    return false;
+
+  return _dynamicCastToExistential(dest, src, srcType,
+                                   cast<ExistentialTypeMetadata>(targetType),
+                                   DynamicCastFlags::Default);
+}
+
 /// Perform a dynamic cast to an arbitrary type.
 bool swift::swift_dynamicCast(OpaqueValue *dest,
                               OpaqueValue *src,
                               const Metadata *srcType,
                               const Metadata *targetType,
                               DynamicCastFlags flags) {
+  // Check if the cast source is Optional and the target is not an existential
+  // that Optional conforms to. Unwrap one level of Optional and continue.
+  if (srcType->getKind() == MetadataKind::Optional
+      && !canCastToExistential(dest, src, srcType, targetType)) {
+    const Metadata *payloadType =
+      cast<EnumMetadata>(srcType)->getGenericArgs()[0];
+    int enumCase =
+      swift_getEnumCaseSinglePayload(src, payloadType, 1 /*emptyCases=*/);
+    if (enumCase != -1) {
+      // Allow Optional<T>.None -> Optional<U>.None
+      if (targetType->getKind() != MetadataKind::Optional)
+        return _fail(src, srcType, targetType, flags);
+      // Inject the .None tag
+      swift_storeEnumTagSinglePayload(dest, payloadType, enumCase,
+                                      1 /*emptyCases=*/);
+      return _succeed(dest, src, srcType, flags);        
+    }
+    // .Some
+    // Single payload enums are guaranteed layout compatible with their
+    // payload. Only the source's payload needs to be taken or destroyed.
+    srcType = payloadType;
+  }
+
   switch (targetType->getKind()) {
+  // Handle wrapping an Optional target.
+  case MetadataKind::Optional: {
+    // Recursively cast into the layout compatible payload area.
+    const Metadata *payloadType =
+      cast<EnumMetadata>(targetType)->getGenericArgs()[0];
+    if (swift_dynamicCast(dest, src, srcType, payloadType, flags)) {
+      swift_storeEnumTagSinglePayload(dest, payloadType, -1 /*case*/,
+                                      1 /*emptyCases*/);
+      return true;
+    }
+    return false;
+  }
 
   // Casts to class type.
   case MetadataKind::Class:
@@ -2020,6 +2085,7 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
     }
 
     case MetadataKind::Enum:
+    case MetadataKind::Optional:
     case MetadataKind::Struct: {
 #if SWIFT_OBJC_INTEROP
       // If the source type is bridged to Objective-C, try to bridge.
@@ -2092,6 +2158,7 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
     }
 
     case MetadataKind::Enum:
+    case MetadataKind::Optional:
     case MetadataKind::Existential:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
@@ -2970,6 +3037,7 @@ findBridgeWitness(const Metadata *T) {
   case MetadataKind::Class:
   case MetadataKind::Struct:
   case MetadataKind::Enum:
+  case MetadataKind::Optional:
   case MetadataKind::Opaque:
   case MetadataKind::Tuple:
   case MetadataKind::Function:
@@ -3148,4 +3216,8 @@ extern "C" const Metadata *_swift_getSuperclass_nonNull(
 
 extern "C" bool swift_isClassType(const Metadata *type) {
   return Metadata::isAnyKindOfClass(type->getKind());
+}
+
+extern "C" bool swift_isOptionalType(const Metadata *type) {
+  return type->getKind() == MetadataKind::Optional;
 }

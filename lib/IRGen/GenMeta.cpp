@@ -2039,8 +2039,9 @@ namespace {
 #define BEGIN_METADATA_SEARCHER_0(SEARCHER, DECLKIND)                   \
   struct SEARCHER                                                       \
     : MetadataSearcher<DECLKIND##MetadataScanner<SEARCHER>> {           \
+    using super = MetadataSearcher;                                     \
     SEARCHER(IRGenModule &IGM, DECLKIND##Decl *target)                  \
-      : MetadataSearcher(IGM, target) {}
+      : super(IGM, target) {}
 #define BEGIN_METADATA_SEARCHER_1(SEARCHER, DECLKIND, TYPE_1, NAME_1)   \
   struct SEARCHER                                                       \
       : MetadataSearcher<DECLKIND##MetadataScanner<SEARCHER>> {         \
@@ -3790,7 +3791,7 @@ namespace {
   BEGIN_METADATA_SEARCHER_0(FindClassParentIndex, Class)
     void addParentMetadataRef(ClassDecl *forClass) {
       if (forClass == Target) setTargetOffset();
-      addParentMetadataRef(forClass);
+      super::addParentMetadataRef(forClass);
     }
   END_METADATA_SEARCHER()
 }
@@ -4278,21 +4279,6 @@ AbstractCallee irgen::getAbstractVirtualCallee(IRGenFunction &IGF,
                         naturalUncurry, naturalUncurry, ExtraData::None);
 }
 
-/// Find the function which will actually appear in the virtual table.
-static SILDeclRef findOverriddenFunction(IRGenModule &IGM,
-                                         SILDeclRef method) {
-  // 'method' is the most final method in the hierarchy which we
-  // haven't yet found a compatible override for.  'cur' is the method
-  // we're currently looking at.  Compatibility is transitive,
-  // so we can forget our original method and just keep going up.
-
-  SILDeclRef cur = method;
-  while ((cur = cur.getOverriddenVTableEntry())) {
-    method = cur;
-  }
-  return method;
-}
-
 /// Load the correct virtual function for the given class method.
 llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                                            llvm::Value *base,
@@ -4304,8 +4290,7 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     = cast<AbstractFunctionDecl>(method.getDecl());
 
   // Find the function that's actually got an entry in the metadata.
-  SILDeclRef overridden =
-    findOverriddenFunction(IGF.IGM, method);
+  SILDeclRef overridden = method.getBaseOverriddenVTableEntry();
 
   // Find the metadata.
   llvm::Value *metadata;
@@ -4525,7 +4510,8 @@ public:
     : super(IGM, theEnum) {}
   
   void addMetadataFlags() {
-    addWord(getMetadataKind(IGM, MetadataKind::Enum));
+    addWord(getMetadataKind(IGM, Target->classifyAsOptionalType()
+                            ? MetadataKind::Optional : MetadataKind::Enum));
   }
   
   void addNominalTypeDescriptor() {

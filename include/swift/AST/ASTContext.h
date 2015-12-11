@@ -481,6 +481,9 @@ public:
   /// Retrieve the declaration of Swift._unimplemented_initializer.
   FuncDecl *getUnimplementedInitializerDecl(LazyResolver *resolver) const;
 
+  /// Retrieve the declaration of Swift._undefined.
+  FuncDecl *getUndefinedDecl(LazyResolver *resolver) const;
+
   // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastDecl(LazyResolver *resolver) const;
   

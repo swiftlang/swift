@@ -8,9 +8,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     else()
       message(FATAL_ERROR "Can't find the Swift performance suite at ${PERF_TESTSUITE_DIR}/.")
     endif()
-    add_custom_target(benchmark-swift
-        DEPENDS benchmark-swift PerfTests_Onone PerfTests_O
-        PerfTests_Ounchecked)
   endif()
 endif()
 

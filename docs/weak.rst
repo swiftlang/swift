@@ -716,7 +716,7 @@ One complication with extending :code:`weak` to value types is that
 generally the implementing type will need to be different from the
 underlying value type.  Probably the best solution would be to hide
 the use of the implementing type from the type system outside of the
-well-formedness checks for the variable; SIL-gen would lower the field
+wellformedness checks for the variable; SIL-gen would lower the field
 to its implementing type using the appropriate protocol conformances.
 
 As long as we have convenient optional back-references, though, we
@@ -1141,7 +1141,7 @@ The library should definitely provide the following types:
   will preserve the weakness of the reference.
 
   In keeping with our design for :code:`unowned`, I think this type
-  should should actually be an alias to either
+  should actually be an alias to either
   :code:`SafeUnownedReference<T>` or :code:`UnsafeUnownedReference<T>`
   depending on the current component's build settings.  The choice
   would be exported in binary modules, but for cleanliness we would

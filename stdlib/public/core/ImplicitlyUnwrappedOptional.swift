@@ -95,6 +95,17 @@ extension ImplicitlyUnwrappedOptional : CustomStringConvertible {
   }
 }
 
+/// Directly conform to CustomDebugStringConvertible to support
+/// optional printing. Implementation of that feature relies on
+/// _isOptional thus cannot distinguish ImplicitlyUnwrappedOptional
+/// from Optional. When conditional conformance is available, this
+/// outright conformance can be removed.
+extension ImplicitlyUnwrappedOptional : CustomDebugStringConvertible {
+  public var debugDescription: String {
+    return description
+  }
+}
+
 @_transparent
 @warn_unused_result
 public // COMPILER_INTRINSIC

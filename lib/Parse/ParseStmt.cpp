@@ -1822,8 +1822,9 @@ ParserResult<Stmt> Parser::parseStmtRepeat(LabeledStmtInfo labelInfo) {
   } else {
     condition = parseExpr(diag::expected_expr_repeat_while);
     status |= condition;
-    if (condition.isNull() || condition.hasCodeCompletion())
+    if (condition.isNull()) {
       return makeParserResult<Stmt>(status, nullptr); // FIXME: better recovery
+    }
   }
 
   return makeParserResult(

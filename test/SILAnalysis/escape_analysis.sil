@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -update-escapes -sil-print-escapes -o /dev/null | FileCheck %s
+// RUN: %target-sil-opt %s -escapes-dump -o /dev/null | FileCheck %s
 
 // REQUIRES: asserts
 
@@ -467,7 +467,7 @@ sil_global @global_ln : $LinkedNode
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
 // CHECK-NEXT:    Con %0.1 Esc: A, Succ: (%0.2)
 // CHECK-NEXT:    Con %0.2 Esc: G, Succ: (%4.1)
-// CHECK-NEXT:    Val %4 Esc: R, Succ: (%4.1), %0.2
+// CHECK-NEXT:    Val %4 Esc: R, Succ: %0.2
 // CHECK-NEXT:    Con %4.1 Esc: G, Succ:
 // CHECK-NEXT:    Ret Esc: R, Succ: %4
 // CHECK-NEXT:  End
@@ -482,11 +482,10 @@ bb0(%0 : $LinkedNode):
 
 // CHECK-LABEL: CG of let_escape
 // CHECK-NEXT:    Arg %0 Esc: G, Succ: (%0.1)
-// CHECK-NEXT:    Con %0.1 Esc: G, Succ: (%0.2)
-// CHECK-NEXT:    Con %0.2 Esc: G, Succ: 
+// CHECK-NEXT:    Con %0.1 Esc: G, Succ: 
 // CHECK-NEXT:    Val %1 Esc: G, Succ: (%1.1)
 // CHECK-NEXT:    Con %1.1 Esc: G, Succ: %0
-// CHECK-NEXT:    Val %4 Esc: R, Succ: (%0.1), %0
+// CHECK-NEXT:    Val %4 Esc: R, Succ: %0
 // CHECK-NEXT:    Ret Esc: R, Succ: %4
 // CHECK-NEXT:  End
 sil @let_escape : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode {

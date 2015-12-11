@@ -283,7 +283,7 @@ attribute, are guaranteed to be available in every subclass of
   }
 
   func f(meta: D.Type) {
-    meta() // okay: every sublass of D guaranteed to have an init()
+    meta() // okay: every subclass of D guaranteed to have an init()
   }
 
 Note that ``@virtual`` places a requirement on all subclasses to

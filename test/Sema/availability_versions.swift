@@ -757,7 +757,7 @@ class ClassWithDeclarationsOfUnavailableClasses {
   func unavailableMethodWithUnavailableParameterType(o : ClassAvailableOn10_10) {
   }
   
-  func methodWithUnavailableReturnType() -> ClassAvailableOn10_10  { // expected-error {{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
+  func methodWithUnavailableReturnType() -> ClassAvailableOn10_10 { // expected-error {{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
       // expected-note@-1 {{add @available attribute to enclosing class}}
       // expected-note@-2 {{add @available attribute to enclosing instance method}}
 
@@ -768,7 +768,7 @@ class ClassWithDeclarationsOfUnavailableClasses {
   }
   
   @available(OSX, introduced=10.10)
-  func unavailableMethodWithUnavailableReturnType() -> ClassAvailableOn10_10  {
+  func unavailableMethodWithUnavailableReturnType() -> ClassAvailableOn10_10 {
     return ClassAvailableOn10_10()
   }
 

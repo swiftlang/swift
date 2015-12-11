@@ -856,7 +856,7 @@ depend on how the l-value is used:
   that ``left`` contains a value::
 
     // begin FA for ? operand left (DSN={})
-    // instataneous FA reading right (DSN={})
+    // instantaneous FA reading right (DSN={})
     // begin FA for inout argument left?.member (DSN={lhs})
     // evaluation of +=
     // end FA for inout argument left?.member
@@ -1027,7 +1027,7 @@ summary of the rule being proposed.
 
 If storage is passed to an ``inout`` argument, then any other
 simultaneous attempt to read or write to that storage, including to
-the storage containing it, will have have unspecified behavior.  Reads
+the storage containing it, will have unspecified behavior.  Reads
 from it may see partially-updated values, or even values which will
 change as modifications are made to the original storage; and writes
 may be clobbered or simply disappear.

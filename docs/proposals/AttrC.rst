@@ -66,7 +66,7 @@ On Darwin, we can allow passing reference counted pointers directly
 as function parameters. They are still not allowed as fields in ``@c``
 structs, though.
 
-The convention for arguments and results an be the same as CoreFoundation
+The convention for arguments and results can be the same as CoreFoundation
 functions imported from C. The code in ``CFunctionConventions`` in
 SILFunctionType.cpp looks relevant.
 

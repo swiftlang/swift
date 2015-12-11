@@ -695,7 +695,7 @@ public:
   /// not override.
   CanSILFunctionType getConstantOverrideType(SILDeclRef constant) {
     // Fast path if the constant isn't overridden.
-    if (constant.getOverriddenVTableEntry().isNull())
+    if (constant.getNextOverriddenVTableEntry().isNull())
       return getConstantFunctionType(constant);
     SILDeclRef base = constant;
     while (SILDeclRef overridden = base.getOverridden())

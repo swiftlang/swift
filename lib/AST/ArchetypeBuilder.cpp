@@ -854,7 +854,7 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   T1 = T1->getRepresentative();
   T2 = T2->getRepresentative();
 
-  // If the representives are already the same, we're done.
+  // If the representatives are already the same, we're done.
   if (T1 == T2)
     return false;
 

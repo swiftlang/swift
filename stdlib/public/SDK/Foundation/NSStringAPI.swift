@@ -1369,7 +1369,7 @@ extension String {
   @available(*, unavailable, message="Use URLByAppendingPathExtension on NSURL instead.")
   public func stringByAppendingPathExtension(ext: String) -> String? {
     // FIXME: This method can return nil in practice, for example when self is
-    // an empty string.  OTOH, this is not documented, documentatios says that
+    // an empty string.  OTOH, this is not documented, documentation says that
     // it always returns a string.
     //
     // <rdar://problem/17902469> -[NSString stringByAppendingPathExtension] can

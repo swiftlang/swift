@@ -2,8 +2,8 @@
 
 .. OptimizerEffects:
 
-Optimizer Effects: Summarizing and specifing function side effects
-==================================================================
+Optimizer Effects: Summarizing and specifying function side effects
+===================================================================
 
 .. contents::
 
@@ -23,7 +23,7 @@ modeling more precise function effects, the optimizer can make more
 assumptions leading to more aggressive transformation of the program.
 
 Function effects may be deduced by the compiler during program
-analyis. However, in certain situations it is helpful to directly
+analysis. However, in certain situations it is helpful to directly
 communicate function effects to the compiler via function attributes
 or types. These source level annotations may or may not be statically
 enforceable.
@@ -207,7 +207,7 @@ state.
 
 ``@get_subobject``
 
-  A method marked ``@get_subobject`` must fullfill all of ``@preserve_unique``'s
+  A method marked ``@get_subobject`` must fulfill all of ``@preserve_unique``'s
   guarantees. Furthermore, it must return a 'subobject' that is stored by the
   set of storage objects or a value stored in the CoW struct itself. It must be
   guaranteed that the 'subobject' returned is kept alive as long the current
@@ -280,7 +280,7 @@ state.
 
 ``@get_subobject_addr``
 
-  A method marked ``@get_subobject_addr`` must fullfill all of
+  A method marked ``@get_subobject_addr`` must fulfill all of
   ``@preserve_unique``'s guarantees. Furthermore, it must return the address of
   a 'subobject' that is stored by the set of storage objects. It is guaranteed
   that the 'subobject' at the address returned is kept alive as long the current
@@ -304,7 +304,7 @@ state.
 
 ``@initialize_subobject``
 
-  A method marked ``@initialize_subobject`` must fullfill all of
+  A method marked ``@initialize_subobject`` must fulfill all of
   ``@preserve_unique``'s guarantees. The method must only store its arguments
   into *uninitialized* storage. The only effect to non-self state is the capture
   of the method's arguments.::
@@ -332,7 +332,7 @@ state.
 
 ``@set_subobject``
 
-  A method marked ``@set_subobject`` must fullfill all of
+  A method marked ``@set_subobject`` must fulfill all of
   ``@preserve_unique``'s guarantees. The method must only store its arguments
   into *initialized* storage. The only effect to non-self state is the capture
   of the method's arguments and the release of objects of the method arguments'
@@ -427,7 +427,7 @@ the object named by 'A' and therefore cannot modify it.
 Why do we need ``@get_subobject``, ``@initialize_subobject``, and
 ``@set_subobject``?
 
-We want to be able to hoist ``makeunique`` calls when the array is not identfied
+We want to be able to hoist ``makeunique`` calls when the array is not identified
 by a unique name.::
 
   class AClass {
@@ -452,7 +452,7 @@ Further we would like to reason that:::
 
   a.array.append
 
-cannot change the uniqueness state of the instance of array 'a.array' accross
+cannot change the uniqueness state of the instance of array 'a.array' across
 iterations. We can conclude so because ``appendAssumingUnique``'s side-effects
 guarantee that no destructor can run - it's only side-effect is that ``tmp``
 is captured and initializes storage in the array - these are the only
@@ -535,7 +535,7 @@ User-Specified Effects, Syntax and Defaults
 Mostly TBD.
 
 The optimizer can only take advantage of user-specified effects before
-they have been inlined. Consequently, the optimizer initialy preserves
+they have been inlined. Consequently, the optimizer initially preserves
 calls to annotated @effects() functions. After optimizing for effects
 these functions can be inlined, dropping the effects information.
 
@@ -562,7 +562,7 @@ generic arguments::
     func setElt(elt: T) { t = elt }
   }
 
-With no knowledge of T.deinit() we must assume worst case. SIL effects
+With no knowledge of T.deinit() we must assume the worst case. SIL effects
 analysis following specialization can easily handle such a trivial
 example. But there are two situations to be concerned about:
 
@@ -644,12 +644,12 @@ defined types composed from Arrays, Sets, and Strings.
 Conceptually, a pure value does not share state with another
 value. Any trivial struct is automatically pure. Other structs can be
 declared pure by the author. It then becomes the author's
-resonsibility to guarantee value semantics. For instance, any stored
+responsibility to guarantee value semantics. For instance, any stored
 reference into the heap must either be to immutable data or protected
 by CoW.
 
 Since a pure value type can in practice share implementation state, we
-need an enforcable definition of such types. More formally:
+need an enforceable definition of such types. More formally:
 
 - Copying or destroying a pure value cannot affect other program
   state.
@@ -738,7 +738,7 @@ effects. This is the crux of the difficulty in defining the CoW
 effects. Consequently, communicating purity to the compiler will
 require some function annotations and/or type constraints.
 
-A CoW type consits of a top-level value type, most likely a struct, and a
+A CoW type consists of a top-level value type, most likely a struct, and a
 referenced storage, which may be shared between multiple instances of the CoW
 type.
 
@@ -842,7 +842,7 @@ Inferring Function Purity
 
 The optimizer can infer function purity by knowing that (1) the
 function does not access unspecified state, (2) all arguments are pure
-values, and (3) no calls are made into nonpure code.
+values, and (3) no calls are made into non-pure code.
 
 (1) The effects system described above already tells the optimizer via
     analysis or annotation that the function does not access
@@ -853,7 +853,7 @@ values, and (3) no calls are made into nonpure code.
     type definition, or it may rely on a type constraint.
 
 (3) Naturally, any calls within the function body must be transitively
-    pure. There is no need to check a calls to the storage
+    pure. There is no need to check calls to the storage
     deinitializer, which should already be guaranteed pure by virtue
     of (2).
 

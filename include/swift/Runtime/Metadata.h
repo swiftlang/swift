@@ -1003,6 +1003,7 @@ public:
     case MetadataKind::Function:
     case MetadataKind::Struct:
     case MetadataKind::Enum:
+    case MetadataKind::Optional:
     case MetadataKind::Opaque:
     case MetadataKind::Tuple:
     case MetadataKind::Existential:
@@ -1029,6 +1030,7 @@ public:
     case MetadataKind::ForeignClass:
     case MetadataKind::Struct:
     case MetadataKind::Enum:
+    case MetadataKind::Optional:
     case MetadataKind::Opaque:
     case MetadataKind::Tuple:
     case MetadataKind::Function:
@@ -1746,7 +1748,8 @@ struct EnumMetadata : public Metadata {
   }
 
   static bool classof(const Metadata *metadata) {
-    return metadata->getKind() == MetadataKind::Enum;
+    return metadata->getKind() == MetadataKind::Enum
+      || metadata->getKind() == MetadataKind::Optional;
   }
 };
 

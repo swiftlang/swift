@@ -2323,6 +2323,7 @@ Metadata::getNominalTypeDescriptor() const {
   }
   case MetadataKind::Struct:
   case MetadataKind::Enum:
+  case MetadataKind::Optional:
     return static_cast<const StructMetadata *>(this)->Description;
   case MetadataKind::ForeignClass:
   case MetadataKind::Opaque:
@@ -2362,6 +2363,7 @@ Metadata::getClassObject() const {
   // Other kinds of types don't have class objects.
   case MetadataKind::Struct:
   case MetadataKind::Enum:
+  case MetadataKind::Optional:
   case MetadataKind::ForeignClass:
   case MetadataKind::Opaque:
   case MetadataKind::Tuple:

@@ -400,7 +400,7 @@ SILCloner<ImplClass>::cleanUp(SILFunction *F) {
   // NOTE: It is unfortunate that it essentially duplicates
   // the code from sil-combine, but doing so allows for
   // avoiding any cross-layer invocations between SIL and
-  // SILPasses layers.
+  // SILOptimizer layers.
 
   for (auto *BB : BlocksWithUnreachables) {
     for (auto &I : *BB) {

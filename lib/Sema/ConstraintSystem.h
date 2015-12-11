@@ -2368,9 +2368,14 @@ public:
   ///
   /// \param convertType the contextual type to which the
   /// expression should be converted, if any.
+  /// \param discardedExpr if true, the result of the expression
+  /// is contextually ignored.
+  /// \param skipClosures if true, don't descend into bodies of
+  /// non-single expression closures.
   Expr *applySolution(Solution &solution, Expr *expr,
                       Type convertType, bool discardedExpr,
-                      bool suppressDiagnostics);
+                      bool suppressDiagnostics,
+                      bool skipClosures);
 
   /// \brief Apply a given solution to the expression to the top-level
   /// expression, producing a fully type-checked expression.

@@ -666,7 +666,7 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
         TokLen = 7; // '#elseif'
       if (!passNonTokenNode({SyntaxNodeKind::BuildConfigKeyword,
         CharSourceRange(Clause.Loc, TokLen) }))
-        return  { false, nullptr };
+        return { false, nullptr };
 
       if (Clause.Cond && !annotateIfConfigConditionIdentifiers(Clause.Cond))
         return { false, nullptr };

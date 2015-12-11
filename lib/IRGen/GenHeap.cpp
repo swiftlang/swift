@@ -417,31 +417,32 @@ namespace {
       IGF.emitFixLifetime(value);
     }
     
-    // Unowned types have the same spare bits as strong heap object refs.
-    
-    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
-      return true;
-    }
-
     unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
-      return getHeapObjectExtraInhabitantCount(IGM);
+      return IGM.getUnownedExtraInhabitantCount(ReferenceCounting::Native);
     }
 
     APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
                                        unsigned bits,
                                        unsigned index) const override {
-      return getHeapObjectFixedExtraInhabitantValue(IGM, bits, index, 0);
+      return IGM.getUnownedExtraInhabitantValue(bits, index,
+                                                ReferenceCounting::Native);
     }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
-                                         SILType T)
-    const override {
-      return getHeapObjectExtraInhabitantIndex(IGF, src);
+                                         SILType T) const override {    
+      return IGF.getUnownedExtraInhabitantIndex(src,
+                                                ReferenceCounting::Native);
     }
 
     void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
                               Address dest, SILType T) const override {
-      return storeHeapObjectExtraInhabitant(IGF, index, dest);
+      return IGF.storeUnownedExtraInhabitant(index, dest,
+                                             ReferenceCounting::Native);
+    }
+
+    APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
+      return IGM.getUnownedExtraInhabitantMask(ReferenceCounting::Native);
+
     }
   };
 
@@ -535,6 +536,7 @@ IRGenModule::getUnownedReferenceSpareBits(ReferenceCounting style) const {
   // If unknown references don't exist, we can just use the same rules as
   // regular pointers.
   if (!ObjCInterop) {
+    assert(style == ReferenceCounting::Native);
     return getHeapObjectSpareBits();
   }
 
@@ -542,6 +544,63 @@ IRGenModule::getUnownedReferenceSpareBits(ReferenceCounting style) const {
   // reference-counting) in order to interoperate with code that might
   // be working more generically with the memory/type.
   return SpareBitVector::getConstant(getPointerSize().getValueInBits(), false);
+}
+
+unsigned IRGenModule::getUnownedExtraInhabitantCount(ReferenceCounting style) {
+  if (!ObjCInterop) {
+    assert(style == ReferenceCounting::Native);
+    return getHeapObjectExtraInhabitantCount(*this);
+  }
+
+  return 1;
+}
+
+APInt IRGenModule::getUnownedExtraInhabitantValue(unsigned bits, unsigned index,
+                                                  ReferenceCounting style) {
+  if (!ObjCInterop) {
+    assert(style == ReferenceCounting::Native);
+    return getHeapObjectFixedExtraInhabitantValue(*this, bits, index, 0);
+  }
+
+  assert(index == 0);
+  return APInt(bits, 0);
+}
+
+APInt IRGenModule::getUnownedExtraInhabitantMask(ReferenceCounting style) {
+  return APInt::getAllOnesValue(getPointerSize().getValueInBits());
+}
+
+llvm::Value *IRGenFunction::getUnownedExtraInhabitantIndex(Address src,
+                                                ReferenceCounting style) {
+  if (!IGM.ObjCInterop) {
+    assert(style == ReferenceCounting::Native);
+    return getHeapObjectExtraInhabitantIndex(*this, src);
+  }
+
+  assert(src.getAddress()->getType() == IGM.UnownedReferencePtrTy);
+  src = Builder.CreateStructGEP(src, 0, Size(0));
+  llvm::Value *ptr = Builder.CreateLoad(src);
+  llvm::Value *isNull = Builder.CreateIsNull(ptr);
+  llvm::Value *result =
+    Builder.CreateSelect(isNull, Builder.getInt32(0),
+                         llvm::ConstantInt::getSigned(IGM.Int32Ty, -1));
+  return result;
+}
+
+void IRGenFunction::storeUnownedExtraInhabitant(llvm::Value *index,
+                                                Address dest,
+                                                ReferenceCounting style) {
+  if (!IGM.ObjCInterop) {
+    assert(style == ReferenceCounting::Native);
+    return storeHeapObjectExtraInhabitant(*this, index, dest);
+  }
+
+  // Since there's only one legal extra inhabitant, it has to have
+  // the null pattern.
+  assert(dest.getAddress()->getType() == IGM.UnownedReferencePtrTy);
+  dest = Builder.CreateStructGEP(dest, 0, Size(0));
+  llvm::Value *null = llvm::ConstantPointerNull::get(IGM.RefCountedPtrTy);
+  Builder.CreateStore(null, dest);
 }
 
 namespace {
@@ -585,29 +644,31 @@ namespace {
     // Unowned types have the same extra inhabitants as normal pointers.
     // They do not, however, necessarily have any spare bits.
     
-    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
-      return true;
-    }
-
     unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
-      return getHeapObjectExtraInhabitantCount(IGM);
+      return IGM.getUnownedExtraInhabitantCount(ReferenceCounting::Unknown);
     }
 
     APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
                                        unsigned bits,
                                        unsigned index) const override {
-      return getHeapObjectFixedExtraInhabitantValue(IGM, bits, index, 0);
+      return IGM.getUnownedExtraInhabitantValue(bits, index,
+                                                ReferenceCounting::Unknown);
     }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
-                                         SILType T)
-    const override {
-      return getHeapObjectExtraInhabitantIndex(IGF, src);
+                                         SILType T) const override {
+      return IGF.getUnownedExtraInhabitantIndex(src,
+                                                ReferenceCounting::Unknown);
     }
 
     void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
                               Address dest, SILType T) const override {
-      return storeHeapObjectExtraInhabitant(IGF, index, dest);
+      return IGF.storeUnownedExtraInhabitant(index, dest,
+                                             ReferenceCounting::Unknown);
+    }
+
+    APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
+      return IGM.getUnownedExtraInhabitantMask(ReferenceCounting::Unknown);
     }
   };
 

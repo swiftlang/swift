@@ -5,7 +5,7 @@ add_swift_library(swiftImmediate
     swiftIDE
     swiftFrontend
     swiftSILGen
-    swiftSILPasses
+    swiftSILOptimizer
     swiftIRGen
   COMPONENT_DEPENDS
     linker mcjit)

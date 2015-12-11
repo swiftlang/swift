@@ -194,6 +194,10 @@ enum class TypeCheckExprFlags {
   /// statement. This should only be used for syntactic restrictions, and should
   /// not affect type checking itself.
   IsExprStmt = 0x20,
+  
+  /// If set, this expression is being re-type checked as part of diagnostics,
+  /// and so we should not visit bodies of non-single expression closures.
+  SkipMultiStmtClosures = 0x40,
 };
   
 typedef OptionSet<TypeCheckExprFlags> TypeCheckExprOptions;
@@ -365,6 +369,9 @@ enum TypeResolutionFlags : unsigned {
   /// Whether we should resolve only the structure of the resulting
   /// type rather than its complete semantic properties.
   TR_ResolveStructure = 0x100000,
+
+  /// Whether this is the type of an editor placeholder.
+  TR_EditorPlaceholder = 0x200000,
 };
 
 /// Option set describing how type resolution should work.

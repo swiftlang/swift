@@ -7,7 +7,7 @@
 .. warning:: This proposal was rejected, though it helped in the design of the
   final Swift 1 initialization model.
 
-Objective-C's “designated inititalizers” pattern seems at first to
+Objective-C's “designated initializers pattern seems at first to
 create a great deal of complication.  However, designated initializers
 are simply the only sane response to Objective-C's initialization rules,
 which are the root cause of the complication.

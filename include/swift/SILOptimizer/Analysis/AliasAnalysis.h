@@ -1,0 +1,326 @@
+//===-------------- AliasAnalysis.h - SIL Alias Analysis -*- C++ -*--------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef SWIFT_SILOPTIMIZER_ANALYSIS_ALIASANALYSIS_H
+#define SWIFT_SILOPTIMIZER_ANALYSIS_ALIASANALYSIS_H
+
+#include "swift/Basic/ValueEnumerator.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
+#include "llvm/ADT/DenseMap.h"
+
+using swift::RetainObserveKind;
+
+namespace {
+  /// A cache for AliasAnalysis.
+  /// This struct represents the argument list to the method 'alias'.
+  /// The two SILValue pointers are mapped to size_t indices because we need
+  /// an efficient way to invalidate them (the mechanism is described below).
+  /// The Type arguments are translated to void* because their
+  /// underlying storage is opaque pointers that never goes away.
+  struct AliasKeyTy {
+    // The SILValue pair:
+    size_t V1, V2;
+    unsigned ResultNo1, ResultNo2;
+    // The TBAAType pair:
+    void *T1, *T2;
+  };
+
+  /// A cache for MemoryBehavior Analysis.
+  /// The two SILValue pointers are mapped to size_t indices because we need
+  /// an efficient way to invalidate them (the mechanism is described below).
+  /// The RetainObserveKind represents the inspection mode for the memory
+  /// behavior analysis.
+  struct MemBehaviorKeyTy {
+    // The SILValue pair:
+    size_t V1, V2;
+    // V1 is a SILInstruction and therefore ResultNo is always 0.
+    unsigned ResultNo2;
+    RetainObserveKind InspectionMode; 
+  };
+}
+
+namespace swift {
+
+class SILValue;
+class SILInstruction;
+class ValueBase;
+class SideEffectAnalysis;
+
+/// This class is a simple wrapper around an alias analysis cache. This is
+/// needed since we do not have an "analysis" infrastructure.
+class AliasAnalysis : public SILAnalysis {
+public:
+
+  /// This enum describes the different kinds of aliasing relations between
+  /// pointers.
+  ///
+  /// NoAlias: There is never dependence between memory referenced by the two
+  ///          pointers. Example: Two pointers pointing to non-overlapping
+  ///          memory ranges.
+  ///
+  /// MayAlias: Two pointers might refer to the same memory location.
+  ///
+  ///
+  /// PartialAlias: The two memory locations are known to be overlapping
+  ///               but do not start at the same address.
+  ///
+  ///
+  /// MustAlias: The two memory locations always start at exactly the same
+  ///            location. The pointers are equal.
+  ///
+  enum class AliasResult : unsigned {
+    NoAlias=0,      ///< The two values have no dependencies on each
+                    ///  other.
+    MayAlias,       ///< The two values can not be proven to alias or
+                    ///  not alias. Anything could happen.
+    PartialAlias,   ///< The two values overlap in a partial manner.
+    MustAlias,      ///< The two values are equal.
+  };
+
+private:
+  SILModule *Mod;
+  SideEffectAnalysis *SEA;
+
+  using TBAACacheKey = std::pair<SILType, SILType>;
+
+  /// A cache for the computation of TBAA. True means that the types may
+  /// alias. False means that the types must not alias.
+  ///
+  /// We don't need to invalidate this cache because type aliasing relations
+  /// never change.
+  llvm::DenseMap<TBAACacheKey, bool> TypesMayAliasCache;
+
+  /// AliasAnalysis value cache.
+  /// The alias() method uses this map to cache queries.
+  llvm::DenseMap<AliasKeyTy, AliasResult> AliasCache;
+
+  using MemoryBehavior = SILInstruction::MemoryBehavior;
+  /// MemoryBehavior value cache.
+  /// The computeMemoryBehavior() method uses this map to cache queries.
+  llvm::DenseMap<MemBehaviorKeyTy, MemoryBehavior> MemoryBehaviorCache;
+
+  /// The AliasAnalysis/MemoryBehavior cache can't directly map a pair of
+  /// ValueBase pointers to alias/memorybehavior results because we'd like to
+  /// be able to remove deleted pointers without having to scan the whole map.
+  /// So, instead of storing pointers we map pointers to indices and store the
+  /// indices.
+  ValueEnumerator<ValueBase*> ValueBaseToIndex;
+
+  AliasResult aliasAddressProjection(SILValue V1, SILValue V2,
+                                     SILValue O1, SILValue O2);
+
+  /// Perform an alias query to see if V1, V2 refer to the same values.
+  AliasResult aliasInner(SILValue V1, SILValue V2,
+                         SILType TBAAType1 = SILType(),
+                         SILType TBAAType2 = SILType());  
+
+  /// Returns True if memory of type \p T1 and \p T2 may alias.
+  bool typesMayAlias(SILType T1, SILType T2);
+
+  virtual void handleDeleteNotification(ValueBase *I) override {
+    // The pointer I is going away.  We can't scan the whole cache and remove
+    // all of the occurrences of the pointer. Instead we remove the pointer
+    // from the cache the translates pointers to indices.
+    ValueBaseToIndex.invalidateValue(I);
+  }
+
+  virtual bool needsNotifications() override { return true; }
+
+
+public:
+  AliasAnalysis(SILModule *M) :
+    SILAnalysis(AnalysisKind::Alias), Mod(M), SEA(nullptr) {}
+
+  static bool classof(const SILAnalysis *S) {
+    return S->getKind() == AnalysisKind::Alias;
+  }
+  
+  virtual void initialize(SILPassManager *PM) override;
+  
+  /// Perform an alias query to see if V1, V2 refer to the same values.
+  AliasResult alias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
+                    SILType TBAAType2 = SILType());
+
+  /// Convenience method that returns true if V1 and V2 must alias.
+  bool isMustAlias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
+                   SILType TBAAType2 = SILType()) {
+    return alias(V1, V2, TBAAType1, TBAAType2) == AliasResult::MustAlias;
+  }
+
+  /// Convenience method that returns true if V1 and V2 partially alias.
+  bool isPartialAlias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
+                      SILType TBAAType2 = SILType()) {
+    return alias(V1, V2, TBAAType1, TBAAType2) == AliasResult::PartialAlias;
+  }
+
+  /// Convenience method that returns true if V1, V2 can not alias.
+  bool isNoAlias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
+                 SILType TBAAType2 = SILType()) {
+    return alias(V1, V2, TBAAType1, TBAAType2) == AliasResult::NoAlias;
+  }
+
+  /// Convenience method that returns true if V1, V2 may alias.
+  bool isMayAlias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
+                  SILType TBAAType2 = SILType()) {
+    return alias(V1, V2, TBAAType1, TBAAType2) == AliasResult::MayAlias;
+  }
+
+  /// Use the alias analysis to determine the memory behavior of Inst with
+  /// respect to V.
+  ///
+  /// TODO: When ref count behavior is separated from generic memory behavior,
+  /// the InspectionMode flag will be unnecessary.
+  MemoryBehavior computeMemoryBehavior(SILInstruction *Inst, SILValue V,
+                                       RetainObserveKind);
+
+  /// Use the alias analysis to determine the memory behavior of Inst with
+  /// respect to V.
+  ///
+  /// TODO: When ref count behavior is separated from generic memory behavior,
+  /// the InspectionMode flag will be unnecessary.
+  MemoryBehavior computeMemoryBehaviorInner(SILInstruction *Inst, SILValue V,
+                                            RetainObserveKind);
+
+  /// Returns true if \p Inst may read from memory in a manner that
+  /// affects V.
+  bool mayReadFromMemory(SILInstruction *Inst, SILValue V) {
+    auto B = computeMemoryBehavior(Inst, V, RetainObserveKind::IgnoreRetains);
+    return B == MemoryBehavior::MayRead ||
+           B == MemoryBehavior::MayReadWrite ||
+           B == MemoryBehavior::MayHaveSideEffects;
+  }
+
+  /// Returns true if \p Inst may write to memory in a manner that
+  /// affects V.
+  bool mayWriteToMemory(SILInstruction *Inst, SILValue V) {
+    auto B = computeMemoryBehavior(Inst, V, RetainObserveKind::IgnoreRetains);
+    return B == MemoryBehavior::MayWrite ||
+           B == MemoryBehavior::MayReadWrite ||
+           B == MemoryBehavior::MayHaveSideEffects;
+  }
+
+  /// Returns true if \p Inst may read or write to memory in a manner that
+  /// affects V.
+  bool mayReadOrWriteMemory(SILInstruction *Inst, SILValue V) {
+    auto B = computeMemoryBehavior(Inst, V, RetainObserveKind::IgnoreRetains);
+    return MemoryBehavior::None != B;
+  }
+
+  /// Returns true if Inst may have side effects in a manner that affects V.
+  bool mayHaveSideEffects(SILInstruction *Inst, SILValue V) {
+    auto B = computeMemoryBehavior(Inst, V, RetainObserveKind::ObserveRetains);
+    return B == MemoryBehavior::MayWrite ||
+           B == MemoryBehavior::MayReadWrite ||
+           B == MemoryBehavior::MayHaveSideEffects;
+  }
+
+  /// Returns true if Inst may have side effects in a manner that affects
+  /// V. This is independent of whether or not Inst may write to V and is meant
+  /// to encode notions such as ref count modifications.
+  bool mayHavePureSideEffects(SILInstruction *Inst, SILValue V) {
+    auto B = computeMemoryBehavior(Inst, V, RetainObserveKind::ObserveRetains);
+    return MemoryBehavior::MayHaveSideEffects == B;
+  }
+
+  /// Encodes the alias query as a AliasKeyTy.
+  /// The parameters to this function are identical to the parameters of alias()
+  /// and this method serializes them into a key for the alias analysis cache.
+  AliasKeyTy toAliasKey(SILValue V1, SILValue V2, SILType Type1, SILType Type2);
+
+  /// Encodes the memory behavior query as a MemBehaviorKeyTy.
+  MemBehaviorKeyTy toMemoryBehaviorKey(SILValue V1, SILValue V2, RetainObserveKind K);
+
+  virtual void invalidate(SILAnalysis::InvalidationKind K) override {
+    AliasCache.clear();
+    MemoryBehaviorCache.clear();
+  }
+
+  virtual void invalidate(SILFunction *,
+                          SILAnalysis::InvalidationKind K) override {
+    invalidate(K);
+  }
+};
+
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                              AliasAnalysis::AliasResult R);
+
+/// If this value is an address that obeys strict TBAA, return the address type.
+/// Otherwise, return an empty type.
+SILType computeTBAAType(SILValue V);
+
+/// Check if \p V points to a let-member.
+/// Nobody can write into let members.
+bool isLetPointer(SILValue V);
+
+} // end namespace swift
+
+namespace llvm {
+  template <> struct llvm::DenseMapInfo<AliasKeyTy> {
+    static inline AliasKeyTy getEmptyKey() {
+      auto Allone = std::numeric_limits<size_t>::max();
+      return {Allone, Allone, 0xffff, 0xffff, nullptr, nullptr};
+    }
+    static inline AliasKeyTy getTombstoneKey() {
+      auto Allone = std::numeric_limits<size_t>::max();
+      return {Allone, Allone, 0xff, 0xff, nullptr, nullptr};
+    }
+    static unsigned getHashValue(const AliasKeyTy Val) {
+      unsigned H = 0;
+      H ^= DenseMapInfo<size_t>::getHashValue(Val.V1);
+      H ^= DenseMapInfo<size_t>::getHashValue(Val.V2);
+      H ^= DenseMapInfo<unsigned>::getHashValue(Val.ResultNo1);
+      H ^= DenseMapInfo<unsigned>::getHashValue(Val.ResultNo2);
+      H ^= DenseMapInfo<void *>::getHashValue(Val.T1);
+      H ^= DenseMapInfo<void *>::getHashValue(Val.T2);
+      return H;
+    }
+    static bool isEqual(const AliasKeyTy LHS, const AliasKeyTy RHS) {
+      return LHS.V1 == RHS.V1 &&
+             LHS.V2 == RHS.V2 &&
+             LHS.ResultNo1 == RHS.ResultNo1 &&
+             LHS.ResultNo2 == RHS.ResultNo2 &&
+             LHS.T1 == RHS.T1 &&
+             LHS.T2 == RHS.T2;
+    }
+  };
+
+  template <> struct llvm::DenseMapInfo<MemBehaviorKeyTy> {
+    static inline MemBehaviorKeyTy getEmptyKey() {
+      auto Allone = std::numeric_limits<size_t>::max();
+      return {Allone, Allone, 0xffff, RetainObserveKind::RetainObserveKindEnd};
+    }
+    static inline MemBehaviorKeyTy getTombstoneKey() {
+      auto Allone = std::numeric_limits<size_t>::max();
+      return {Allone, Allone, 0xff, RetainObserveKind::RetainObserveKindEnd};
+    }
+    static unsigned getHashValue(const MemBehaviorKeyTy V) {
+      unsigned H = 0;
+      H ^= DenseMapInfo<size_t>::getHashValue(V.V1);
+      H ^= DenseMapInfo<size_t>::getHashValue(V.V2);
+      H ^= DenseMapInfo<unsigned>::getHashValue(V.ResultNo2);
+      H ^= DenseMapInfo<int>::getHashValue(static_cast<int>(V.InspectionMode));
+      return H;
+    }
+    static bool isEqual(const MemBehaviorKeyTy LHS,
+                        const MemBehaviorKeyTy RHS) {
+      return LHS.V1 == RHS.V1 &&
+             LHS.V2 == RHS.V2 &&
+             LHS.ResultNo2 == RHS.ResultNo2 &&
+             LHS.InspectionMode == RHS.InspectionMode; 
+    }
+  };
+}
+
+#endif

@@ -30,7 +30,11 @@ Type DependentGenericTypeResolver::resolveDependentMemberType(
                                      DeclContext *DC,
                                      SourceRange baseRange,
                                      ComponentIdentTypeRepr *ref) {
-  return Builder.resolveArchetype(baseTy)->getRepresentative()
+  auto archetype = Builder.resolveArchetype(baseTy);
+  if (!archetype)
+    return ErrorType::get(DC->getASTContext());
+  
+  return archetype->getRepresentative()
            ->getNestedType(ref->getIdentifier(), Builder)
            ->getDependentType(Builder, true);
 }

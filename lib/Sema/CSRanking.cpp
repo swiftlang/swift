@@ -1252,7 +1252,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
   return None;
 }
 
-SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions)  {
+SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions) {
   if (solutions.size() <= 1)
     return;
 
