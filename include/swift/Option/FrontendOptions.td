@@ -208,6 +208,10 @@ def enable_infer_default_arguments :
   Flag<["-"], "enable-infer-default-arguments">,
   HelpText<"Infer default arguments for imported parameters">;
 
+def enable_swift_name_lookup_tables :
+  Flag<["-"], "enable-swift-name-lookup-tables">,
+  HelpText<"Enable Swift name lookup tables in the Clang importer">;
+
 def warn_omit_needless_words :
   Flag<["-"], "Womit-needless-words">,
   HelpText<"Warn about needless words in names">;
