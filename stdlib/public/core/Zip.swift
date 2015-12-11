@@ -42,7 +42,7 @@ public struct Zip2Generator<
     // didn't, and the first sequence is longer than the second, then when we
     // have already exhausted the second sequence, on every subsequent call to
     // next() we would consume and discard one additional element from the
-    // first sequence, even though next() is already returning nil.
+    // first sequence, even though next() had already returned nil.
 
     if _reachedEnd {
       return nil
