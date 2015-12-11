@@ -1214,7 +1214,7 @@ public:
     SmallVector<ProtocolConformance *, 4> result
       = std::move(conformances->second);
     DelayedConformances.erase(conformances);
-    return std::move(result);
+    return result;
   }
 
   /// Record the set of imported protocols for the given declaration,

@@ -96,7 +96,7 @@ public:
       // An unowned parameter is passed at +0, like guaranteed, but it isn't
       // kept alive by the caller, so we need to retain and manage it
       // regardless.
-      return std::move(gen.emitManagedRetain(loc, arg));
+      return gen.emitManagedRetain(loc, arg);
 
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
