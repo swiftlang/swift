@@ -789,7 +789,7 @@ static void tryFixPrintWithAppendNewline(const ValueDecl *D,
   auto ArgNames = Name.getArgumentNames();
   if (ArgNames.size() != 2)
     return;
-  if (ArgNames[1].str() != "appendNewline")
+  if (ArgNames[1].empty() || ArgNames[1].str() != "appendNewline")
     return;
 
   // Go through the expr to determine if second parameter is boolean literal.

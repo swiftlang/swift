@@ -193,3 +193,10 @@ func shortFormMissingWildcard() {}
 
 @availability(OSX, introduced=10.10) // expected-error {{@availability has been renamed to @available}} {{2-14=available}}
 func someFuncUsingOldAttribute() { }
+
+
+// <rdar://problem/23853709> Compiler crash on call to unavailable "print"
+func OutputStreamTest(message: String, inout to: OutputStreamType) {
+  print(message, &to)  // expected-error {{'print' is unavailable: Please use the 'toStream' label for the target stream: 'print((...), toStream: &...)'}}
+}
+
