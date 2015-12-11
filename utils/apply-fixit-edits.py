@@ -51,7 +51,7 @@ def apply_edits(path):
         if not edits_per_file.has_key(fname):
             edits_per_file[fname] = []
         edits_per_file[fname].append((ed[1], ed[2], ed[3]))
-    
+
     for fname, edits in edits_per_file.iteritems():
         print 'Updating', fname
         edits.sort(reverse=True)

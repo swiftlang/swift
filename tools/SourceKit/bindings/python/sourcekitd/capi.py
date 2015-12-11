@@ -283,107 +283,107 @@ callbacks['dictionary_applier'] = CFUNCTYPE(c_int, c_object_p, Variant, py_objec
 # Functions strictly alphabetical order.
 functionList = [
   ("sourcekitd_cancel_request",
-  	[c_void_p]),
+    [c_void_p]),
 
   ("sourcekitd_initialize",
-  	None),
+    None),
 
   ("sourcekitd_request_array_create",
-  	[POINTER(c_object_p), c_size_t],
-  	c_object_p),
+    [POINTER(c_object_p), c_size_t],
+    c_object_p),
 
   ("sourcekitd_request_array_set_int64",
-  	[Object, c_size_t, c_int64]),
+    [Object, c_size_t, c_int64]),
 
   ("sourcekitd_request_array_set_string",
-  	[Object, c_size_t, c_char_p]),
+    [Object, c_size_t, c_char_p]),
 
   ("sourcekitd_request_array_set_stringbuf",
-  	[Object, c_size_t, c_char_p, c_size_t]),
+    [Object, c_size_t, c_char_p, c_size_t]),
 
   ("sourcekitd_request_array_set_uid",
-  	[Object, c_size_t, UIdent]),
+    [Object, c_size_t, UIdent]),
 
   ("sourcekitd_request_array_set_value",
-  	[Object, c_size_t, Object]),
+    [Object, c_size_t, Object]),
 
   ("sourcekitd_request_create_from_yaml",
-  	[c_char_p, POINTER(c_char_p)],
-  	c_object_p),
+    [c_char_p, POINTER(c_char_p)],
+    c_object_p),
 
   ("sourcekitd_request_description_copy",
-  	[Object],
-  	c_void_p),
+    [Object],
+    c_void_p),
 
   ("sourcekitd_request_description_dump",
-  	[Object]),
+    [Object]),
 
   ("sourcekitd_request_dictionary_create",
-  	[POINTER(c_object_p), POINTER(c_object_p), c_size_t],
-  	c_object_p),
+    [POINTER(c_object_p), POINTER(c_object_p), c_size_t],
+    c_object_p),
 
   ("sourcekitd_request_dictionary_set_int64",
-  	[Object, UIdent, c_int64]),
+    [Object, UIdent, c_int64]),
 
   ("sourcekitd_request_dictionary_set_string",
-  	[Object, UIdent, c_char_p]),
+    [Object, UIdent, c_char_p]),
 
   ("sourcekitd_request_dictionary_set_stringbuf",
-  	[Object, UIdent, c_char_p, c_size_t]),
+    [Object, UIdent, c_char_p, c_size_t]),
 
   ("sourcekitd_request_dictionary_set_uid",
-  	[Object, UIdent, UIdent]),
+    [Object, UIdent, UIdent]),
 
   ("sourcekitd_request_dictionary_set_value",
-  	[Object, UIdent, Object]),
+    [Object, UIdent, Object]),
 
   ("sourcekitd_request_int64_create",
-  	[c_int64],
-  	c_object_p),
+    [c_int64],
+    c_object_p),
 
   ("sourcekitd_request_retain",
-  	[Object],
-  	c_object_p),
+    [Object],
+    c_object_p),
 
   ("sourcekitd_request_release",
-  	[Object]),
+    [Object]),
 
   ("sourcekitd_request_string_create",
-  	[c_char_p],
-  	c_object_p),
+    [c_char_p],
+    c_object_p),
 
   ("sourcekitd_request_uid_create",
-  	[UIdent],
-  	c_object_p),
+    [UIdent],
+    c_object_p),
 
   ("sourcekitd_response_description_copy",
-  	[Response],
-  	c_char_p),
+    [Response],
+    c_char_p),
 
   ("sourcekitd_response_description_dump",
-  	[Response]),
+    [Response]),
 
   ("sourcekitd_response_description_dump_filedesc",
-  	[Response, c_int]),
+    [Response, c_int]),
 
   ("sourcekitd_response_dispose",
-  	[Response]),
+    [Response]),
 
   ("sourcekitd_response_error_get_description",
-  	[Response],
-  	c_char_p),
+    [Response],
+    c_char_p),
 
   ("sourcekitd_response_error_get_kind",
-  	[Response],
-  	ErrorKind.from_id),
+    [Response],
+    ErrorKind.from_id),
 
   ("sourcekitd_response_get_value",
-  	[Response],
-  	Variant),
+    [Response],
+    Variant),
 
   ("sourcekitd_response_is_error",
-  	[Response],
-  	c_bool),
+    [Response],
+    c_bool),
 
 #  ("sourcekitd_send_request",
 
@@ -394,100 +394,99 @@ functionList = [
   # ("sourcekitd_set_interrupted_connection_handler",
 
   ("sourcekitd_shutdown",
-  	None),
+    None),
 
   ("sourcekitd_uid_get_from_buf",
-  	[c_char_p, c_size_t],
-  	c_object_p),
+    [c_char_p, c_size_t],
+    c_object_p),
 
   ("sourcekitd_uid_get_from_cstr",
-  	[c_char_p],
-  	c_object_p),
+    [c_char_p],
+    c_object_p),
 
   ("sourcekitd_uid_get_length",
-  	[UIdent],
-  	c_size_t),
+    [UIdent],
+    c_size_t),
 
   ("sourcekitd_uid_get_string_ptr",
-  	[UIdent],
-  	c_char_p),
+    [UIdent],
+    c_char_p),
 
   ("sourcekitd_variant_array_apply_f",
     [Variant, callbacks['array_applier'], py_object],
     c_bool),
 
-
   ("sourcekitd_variant_array_get_bool",
-  	[Variant, c_size_t],
-  	c_bool),
+    [Variant, c_size_t],
+    c_bool),
 
   ("sourcekitd_variant_array_get_count",
-  	[Variant],
-  	c_size_t),
+    [Variant],
+    c_size_t),
 
   ("sourcekitd_variant_array_get_int64",
-  	[Variant, c_size_t],
-  	c_int64),
+    [Variant, c_size_t],
+    c_int64),
 
   ("sourcekitd_variant_array_get_string",
-  	[Variant, c_size_t],
-  	c_char_p),
+    [Variant, c_size_t],
+    c_char_p),
 
   ("sourcekitd_variant_array_get_uid",
-  	[Variant, c_size_t],
-  	c_object_p),
+    [Variant, c_size_t],
+    c_object_p),
 
   ("sourcekitd_variant_array_get_value",
-  	[Variant, c_size_t],
-  	Variant),
+    [Variant, c_size_t],
+    Variant),
 
   ("sourcekitd_variant_bool_get_value",
-  	[Variant],
-  	c_bool),
+    [Variant],
+    c_bool),
 
   ("sourcekitd_variant_dictionary_apply_f",
     [Variant, callbacks['dictionary_applier'], py_object],
     c_bool),
 
   ("sourcekitd_variant_dictionary_get_bool",
-  	[Variant, UIdent],
-  	c_bool),
+    [Variant, UIdent],
+    c_bool),
 
   ("sourcekitd_variant_dictionary_get_int64",
-  	[Variant, UIdent],
-  	c_int64),
-  
+    [Variant, UIdent],
+    c_int64),
+
   ("sourcekitd_variant_dictionary_get_string",
-  	[Variant, UIdent],
-  	c_char_p),
-  
+    [Variant, UIdent],
+    c_char_p),
+
   ("sourcekitd_variant_dictionary_get_value",
-  	[Variant, UIdent],
-  	Variant),
-  
+    [Variant, UIdent],
+    Variant),
+
   ("sourcekitd_variant_dictionary_get_uid",
-  	[Variant, UIdent],
-  	c_object_p),
-  
+    [Variant, UIdent],
+    c_object_p),
+
   ("sourcekitd_variant_get_type",
-  	[Variant],
-  	VariantType.from_id),
+    [Variant],
+    VariantType.from_id),
 
   ("sourcekitd_variant_string_get_length",
-  	[Variant],
-  	c_size_t),
+    [Variant],
+    c_size_t),
 
   ("sourcekitd_variant_string_get_ptr",
-  	[Variant],
-  	c_char_p),
+    [Variant],
+    c_char_p),
 
   ("sourcekitd_variant_int64_get_value",
-  	[Variant],
-  	c_int64),
+    [Variant],
+    c_int64),
 
   ("sourcekitd_variant_uid_get_value",
-  	[Variant],
-  	c_object_p),
+    [Variant],
+    c_object_p),
   ]
 
 

@@ -1,4 +1,3 @@
-
 from pass_pipeline import Pass
 
 # TODO: This should not be hard coded. Create a tool in the compiler that knows
