@@ -95,8 +95,29 @@ extension String {
   }
 }
 #else
-// FIXME: Implement hasPrefix and hasSuffix without objc
-// rdar://problem/18878343
+extension String {
+  /// Returns `true` iff `self` begins with `prefix`.
+  public func hasPrefix(prefix: String) -> Bool {
+    if prefix.isEmpty { return false }
+
+    let distance = prefix.startIndex.distanceTo(prefix.endIndex)
+
+    let lastIndex = startIndex.advancedBy(distance, limit: endIndex)
+    let prefixSlice = self[startIndex..<lastIndex]
+    return prefixSlice._compareDeterministicUnicodeCollation(prefix) == 0
+  }
+
+  /// Returns `true` iff `self` ends with `suffix`.
+  public func hasSuffix(suffix: String) -> Bool {
+    if suffix.isEmpty { return false }
+
+    let distance = suffix.startIndex.distanceTo(suffix.endIndex)
+
+    let firstIndex = endIndex.advancedBy(-distance, limit: startIndex)
+    let suffixSlice = self[firstIndex..<endIndex]
+    return suffixSlice._compareDeterministicUnicodeCollation(suffix) == 0
+  }
+}
 #endif
 
 // Conversions to string from other types.
