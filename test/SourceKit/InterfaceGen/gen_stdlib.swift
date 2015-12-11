@@ -8,7 +8,7 @@ var x: Int
 
 // Just check a small part, mainly to make sure we can print the interface of the stdlib.
 // CHECK-STDLIB-NOT: extension _SwiftNSOperatingSystemVersion
-// CHECK-STDLIB: struct Int : SignedIntegerType, Comparable, Equatable {
+// CHECK-STDLIB: struct Int : SignedInteger, Comparable, Equatable {
 // CHECK-STDLIB:   static var max: Int { get }
 // CHECK-STDLIB:   static var min: Int { get }
 // CHECK-STDLIB: }
@@ -36,4 +36,4 @@ var x: Int
 // CHECK1-NEXT: Swift{{$}}
 // CHECK1-NEXT: /<interface-gen>{{$}}
 // CHECK1-NEXT: SYSTEM
-// CHECK1-NEXT: <Declaration>struct Int : <Type usr="s:Ps17SignedIntegerType">SignedIntegerType</Type>{{.*}}{{.*}}<Type usr="s:Ps10Comparable">Comparable</Type>{{.*}}<Type usr="s:Ps9Equatable">Equatable</Type>{{.*}}</Declaration>
+// CHECK1-NEXT: <Declaration>struct Int : <Type usr="s:Ps13SignedInteger">SignedInteger</Type>{{.*}}{{.*}}<Type usr="s:Ps10Comparable">Comparable</Type>{{.*}}<Type usr="s:Ps9Equatable">Equatable</Type>{{.*}}</Declaration>
