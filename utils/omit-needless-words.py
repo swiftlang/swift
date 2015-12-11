@@ -112,7 +112,7 @@ for opt, arg in opts:
     if opt == '-q':
         verbose = 0
         continue
-    
+
     help()
     sys.exit(2)
 

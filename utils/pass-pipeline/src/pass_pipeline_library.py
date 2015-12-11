@@ -1,4 +1,3 @@
-
 import pass_pipeline as ppipe
 import passes as p
 
@@ -98,7 +97,7 @@ def lower_passlist():
         p.SpeculativeDevirtualizer,
         p.FunctionSignatureOpts,
     ])
-        
+
 def normal_passpipelines():
     result = []
 

@@ -23,26 +23,35 @@ def getDisposition(disp=None):
 def _getGenericArgStrings(genericArgs=None,genericConstraints=None):
   if genericArgs == None:
     return ('','')
+
   genericArgString = ''
   first = True
+
   for arg in genericArgs:
     if not first:
       genericArgString  = genericArgString + ','
+
     first = False
     genericArgString = genericArgString + arg
+
   if genericConstraints == None:
     genericConstraintString = genericArgString
+
   else:
     genericConstraintString = ''
     first = True
+
     for arg in genericArgs:
       if not first:
         genericConstraintString = genericConstraintString + ','
+
       first = False
       genericConstraintString = genericConstraintString + arg
+
       if arg in genericConstraints:
         cons = genericConstraints[arg]
         genericConstraintString = genericConstraintString + ' : ' + cons
+
   genericArgString = '<' + genericArgString + '>'
   genericConstraintString = '<' + genericConstraintString + '>'
   return (genericArgString,genericConstraintString)

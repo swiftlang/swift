@@ -30,12 +30,12 @@ def stripTrailingNL(s):
 
 def splitLines(s):
     """Split s into a list of lines, each of which has a trailing newline
-    
+
     If the lines are later concatenated, the result is s, possibly
     with a single appended newline.
     """
     return [ l + '\n' for l in s.split('\n') ]
-    
+
 # text on a line up to the first '$$', '${', or '%%'
 literalText = r'(?: [^$\n%] | \$(?![${]) | %(?!%) )*'
 
@@ -137,7 +137,7 @@ def tokenizePythonToUnmatchedCloseCurly(sourceText, start, lineStarts):
         return tokenPosToIndex(errorPos, start, lineStarts)
 
     return len(sourceText)
-    
+
 def tokenizeTemplate(templateText):
     r"""Given the text of a template, returns an iterator over
 (tokenType,token,match) tuples.  
@@ -217,12 +217,12 @@ def tokenizeTemplate(templateText):
 
     while pos < end:
         m = tokenizeRE.match(templateText, pos, end)
-        
+
         # pull out the one matched key (ignoring internal patterns starting with _)
         ((kind, text), ) = (
             (kind,text) for (kind,text) in m.groupdict().items() 
             if text is not None and kind[0] != '_')
-                
+ 
         if kind in ('literal', 'symbol'):
             if len(savedLiteral) == 0:
                 literalFirstMatch = m
@@ -237,7 +237,7 @@ def tokenizeTemplate(templateText):
             # Then yield the thing we found.  If we get a reply, it's
             # the place to resume tokenizing
             pos = yield kind, text, m
-        
+
         # If we were not sent a new position by our client, resume
         # tokenizing at the end of this match.
         if pos is None:
@@ -309,7 +309,7 @@ def splitGybLines(sourceLines):
 
             if tokenText == '\n' and lastTokenText == ':':
                 unmatchedIndents.append(tokenEndLine)
-                
+
             # The tokenizer appends dedents at EOF; don't consider
             # those as matching indentations.  Instead just save them
             # up...
@@ -319,7 +319,7 @@ def splitGybLines(sourceLines):
             if tokenKind != tokenize.DEDENT and dedents > 0:
                 unmatchedIndents = unmatchedIndents[:-dedents]
                 dedents = 0
-                
+
             lastTokenText,lastTokenKind = tokenText,tokenKind
 
     except tokenize.TokenError, (message, errorPos):
@@ -371,7 +371,7 @@ class ParseContext:
 
     def posToLine(self, pos):
         return bisect(self.lineStarts, pos) - 1
-            
+
     def tokenGenerator(self, baseTokens):
         r""" Given an iterator over (kind, text, match) triples (see
         tokenizeTemplate above), return a refined iterator over
@@ -446,7 +446,7 @@ class ParseContext:
         for self.tokenKind, self.tokenText, self.tokenMatch in baseTokens:
             kind = self.tokenKind
             self.codeText = None
-            
+
             # Do we need to close the current lines?
             self.closeLines = kind == 'gybLinesClose'
 
@@ -474,7 +474,7 @@ class ParseContext:
                 baseTokens.send(nextPos)
 
             elif kind == 'gybLines':
-                
+
                 self.codeStartLine = self.posToLine(self.tokenMatch.start('gybLines'))
                 codeStartPos = self.tokenMatch.end('_indent')
                 indentation = self.tokenMatch.group('_indent')
@@ -484,7 +484,7 @@ class ParseContext:
                     '^' + re.escape(indentation), 
                     self.tokenMatch.group('gybLines')+'\n', 
                     flags=re.MULTILINE)[1:]
-                
+
                 if codeStartsWithDedentKeyword(sourceLines):
                     self.closeLines = True
 
@@ -537,10 +537,10 @@ class ExecutionContext:
                     # and try again
                     self.appendText(text[i + 1:], file, line)
                     return
-                    
+
         self.resultText.append(text)
         self.lastFileLine = (file, line + text.count('\n'))
-        
+
 class ASTNode(object):
     """Abstract base class for template AST nodes"""
     def __init__(self):
@@ -633,10 +633,10 @@ class Code(ASTNode):
 
             if context.tokenKind == 'gybLinesClose':
                 context.nextToken()
-        
+
         if context.tokenKind == 'gybLines':
             source, sourceLineCount = accumulateCode()
-            
+
             # Only handle a substitution as part of this code block if
             # we don't already have some %-lines.
         elif context.tokenKind == 'gybBlockOpen':
@@ -676,7 +676,7 @@ class Code(ASTNode):
 
 def parseTemplate(filename, text = None):
     r"""Return an AST corresponding to the given template file.
-    
+
     If text is supplied, it is assumed to be the contents of the file,
     as a string.
 
@@ -971,7 +971,7 @@ def main():
     A GYB template consists of the following elements:
 
       - Literal text which is inserted directly into the output
-    
+
       - %% or $$ in literal text, which insert literal '%' and '$'
         symbols respectively.
 
@@ -1039,7 +1039,7 @@ def main():
     parser.add_argument('--verbose-test', action='store_true', default=False, help='Run a verbose self-test')
     parser.add_argument('--dump', action='store_true', default=False, help='Dump the parsed template to stdout')
     parser.add_argument('--line-directive', default='// ###line', help='Line directive prefix; empty => no line markers')
-    
+
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -1047,17 +1047,16 @@ def main():
         import doctest
         if doctest.testmod(verbose=args.verbose_test).failed:
             exit(1)
-        
+
     bindings = dict( x.split('=', 1) for x in args.defines )
     ast = parseTemplate(args.file.name, args.file.read())
     if args.dump:
         print ast
-        
+
     # Allow the template to import .py files from its own directory
     sys.path = [os.path.split(args.file.name)[0] or '.'] + sys.path
-    
+
     args.target.write(executeTemplate(ast, args.line_directive, **bindings))
 
 if __name__ == '__main__':
     main()
-    
