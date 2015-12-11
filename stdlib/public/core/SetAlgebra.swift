@@ -46,7 +46,6 @@
 ///   - `x.isStrictSupersetOf(y)` iff `x.isSupersetOf(y) && x != y`
 ///   - `x.isStrictSubsetOf(y)` iff `x.isSubsetOf(y) && x != y`
 public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
-
   /// A type for which `Self` provides a containment test.
   typealias Element
   
@@ -148,7 +147,6 @@ public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
   /// - SeeAlso: `Self.element(_, subsumes:_)`
   @warn_unused_result
   static func element(a: Element, isDisjointWith b: Element) -> Bool
-  
 }
 
 /// `SetAlgebraType` requirements for which default implementations
