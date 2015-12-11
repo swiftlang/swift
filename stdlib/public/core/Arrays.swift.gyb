@@ -251,14 +251,22 @@ public struct ${Self}<Element>
   /// Access the `index`th element. Reading is O(1).  Writing is
   /// ${O1}.
   public subscript(index: Int) -> Element {
-    
-    addressWithNativeOwner {
-      _checkSubscript_native(index)
-      return (
-        UnsafePointer(_buffer.subscriptBaseAddress + index),
-        Builtin.castToNativeObject(_buffer.owner))
+    get {
+      // This call may be hoisted or eliminated by the optimizer.  If
+      // there is an inout violation, this value may be stale so needs to be
+      // checked again below.
+      let wasNativeTypeChecked = _hoistableIsNativeTypeChecked()
+
+      // Make sure the index is in range and wasNativeTypeChecked is
+      // still valid.
+      let token = _checkSubscript(
+        index, wasNativeTypeChecked: wasNativeTypeChecked)
+
+      return _getElement(
+        index, wasNativeTypeChecked: wasNativeTypeChecked,
+        matchingSubscriptCheck: token)
     }
-    
+
     mutableAddressWithPinnedNativeOwner {
       _makeMutableAndUniqueOrPinned()
       _checkSubscript_native(index)
@@ -373,7 +381,6 @@ public struct ${Self}<Element>
 % end
   }
 
-% if Self == 'Array':
   /// Check that the given `index` is valid for subscripting, i.e. `0
   /// ≤ index < count`.
   @_semantics("array.check_subscript")
@@ -382,14 +389,17 @@ public struct ${Self}<Element>
     index: Int, wasNativeTypeChecked: Bool
   ) -> _DependenceToken {
 #if _runtime(_ObjC)
+% if Self == 'Array':
     _buffer._checkInoutAndNativeTypeCheckedBounds(
       index, wasNativeTypeChecked: wasNativeTypeChecked)
+% else:
+    _buffer._checkValidSubscript(index)
+% end
 #else
     _buffer._checkValidSubscript(index)
 #endif
     return _DependenceToken()
   }
-% end
 
   /// Check that the given `index` is valid, i.e. `0 ≤ index ≤ count`.
   @_semantics("array.check_index")
