@@ -3715,7 +3715,7 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
     BCBlockRAII moduleBlock(S.Out, MODULE_BLOCK_ID, 2);
     S.writeHeader(options);
     S.writeInputBlock(options);
-    S.writeSIL(SILMod, options.SerializeAllSIL);
+    S.writeSIL(SILMod);
     S.writeAST(DC);
   }
 
