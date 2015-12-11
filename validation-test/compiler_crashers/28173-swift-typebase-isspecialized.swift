@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-{struct A:OptionSetType
+{struct A:OptionSet
 struct A{
 func b<T:d{
 }

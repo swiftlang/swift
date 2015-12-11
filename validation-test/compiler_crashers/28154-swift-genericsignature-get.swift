@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-{struct A:OptionSetType
+{struct A:OptionSet
 B{struct A
 c{_{
 enum S{class a{
@@ -14,4 +14,4 @@ class d{
 }enum B{struct e{
 {
 }enum b{class c<T where a:a{
-class a{struct A:OptionSetType
+class a{struct A:OptionSet

@@ -4,4 +4,4 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-func b{class B<T where g:S{class A:OptionSetType{let rawValue=0
+func b{class B<T where g:S{class A:OptionSet{let rawValue=0

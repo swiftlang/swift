@@ -6,4 +6,4 @@
 
 import a
 enum S<f{class B<I{
-let i{struct A:OptionSetType{struct B<a where I.e:a
+let i{struct A:OptionSet{struct B<a where I.e:a

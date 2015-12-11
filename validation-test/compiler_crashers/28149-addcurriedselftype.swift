@@ -4,6 +4,6 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-struct B<I{let a=Void{struct A:OptionSetType{
+struct B<I{let a=Void{struct A:OptionSet{
 let rawValue=0
 let rawValue=0
