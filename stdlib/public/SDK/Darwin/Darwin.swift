@@ -177,6 +177,48 @@ public func openat(fd: CInt, _ path: UnsafePointer<CChar>,
   return _swift_Darwin_openat(fd, path, oflag, mode)
 }
 
+@warn_unused_result
+@_silgen_name("_swift_Darwin_fcntl")
+internal func _swift_Darwin_fcntl(
+  fd: CInt,
+  _ cmd: CInt,
+  _ value: CInt
+  ) -> CInt
+
+@warn_unused_result
+@_silgen_name("_swift_Darwin_fcntlPtr")
+internal func _swift_Darwin_fcntlPtr(
+  fd: CInt,
+  _ cmd: CInt,
+  _ ptr: UnsafeMutablePointer<Void>
+  ) -> CInt
+
+@warn_unused_result
+public func fcntl(
+  fd: CInt,
+  _ cmd: CInt
+  ) -> CInt {
+  return _swift_Darwin_fcntl(fd, cmd, 0)
+}
+
+@warn_unused_result
+public func fcntl(
+  fd: CInt,
+  _ cmd: CInt,
+  _ value: CInt
+  ) -> CInt {
+  return _swift_Darwin_fcntl(fd, cmd, value)
+}
+
+@warn_unused_result
+public func fcntl(
+  fd: CInt,
+  _ cmd: CInt,
+  _ ptr: UnsafeMutablePointer<Void>
+  ) -> CInt {
+  return _swift_Darwin_fcntlPtr(fd, cmd, ptr)
+}
+
 public var S_IFMT: mode_t   { return mode_t(0o170000) }
 public var S_IFIFO: mode_t  { return mode_t(0o010000) }
 public var S_IFCHR: mode_t  { return mode_t(0o020000) }

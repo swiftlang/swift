@@ -1,5 +1,6 @@
 set(sources
-    Glibc.swift
+	Glibc.swift
+	Misc.c
 )
 
 set(output_dir "${SWIFTLIB_DIR}/glibc")
