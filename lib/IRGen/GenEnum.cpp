@@ -4068,29 +4068,30 @@ namespace {
         return storeDynamicTag(IGF, enumAddr, tag, T);
       }
 
-      auto &C = IGF.IGM.getLLVMContext();
-      auto payloadBB = llvm::BasicBlock::Create(C);
-      auto noPayloadBB = llvm::BasicBlock::Create(C);
-      auto endBB = llvm::BasicBlock::Create(C);
-
+      // If there are no empty cases, don't need a conditional.
       if (ElementsWithNoPayload.empty()) {
         storePayloadTag(IGF, enumAddr, tag, T);
         return;
       }
 
+      auto &C = IGF.IGM.getLLVMContext();
+      auto noPayloadBB = llvm::BasicBlock::Create(C);
+      auto payloadBB = llvm::BasicBlock::Create(C);
+      auto endBB = llvm::BasicBlock::Create(C);
+
       llvm::Value *numPayloadCases =
           llvm::ConstantInt::get(IGF.IGM.Int32Ty,
                                  ElementsWithPayload.size());
-      llvm::Value *cond = IGF.Builder.CreateICmpULE(tag, numPayloadCases);
-      IGF.Builder.CreateCondBr(cond, payloadBB, noPayloadBB);
+      llvm::Value *cond = IGF.Builder.CreateICmpUGE(tag, numPayloadCases);
+      IGF.Builder.CreateCondBr(cond, noPayloadBB, payloadBB);
 
-      IGF.Builder.emitBlock(payloadBB);
-      storePayloadTag(IGF, enumAddr, tag, T);
+      IGF.Builder.emitBlock(noPayloadBB);
+      llvm::Value *noPayloadTag = IGF.Builder.CreateSub(tag, numPayloadCases);
+      storeNoPayloadTag(IGF, enumAddr, noPayloadTag, T);
       IGF.Builder.CreateBr(endBB);
       
-      IGF.Builder.emitBlock(noPayloadBB);
-      tag = IGF.Builder.CreateSub(tag, numPayloadCases);
-      storeNoPayloadTag(IGF, enumAddr, tag, T);
+      IGF.Builder.emitBlock(payloadBB);
+      storePayloadTag(IGF, enumAddr, tag, T);
       IGF.Builder.CreateBr(endBB);
       
       IGF.Builder.emitBlock(endBB);
