@@ -1,133 +1,90 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
-
-protocol TestProtocol1 {}
-
-// Check that the generic parameter is called 'Memory'.
-extension Optional where Wrapped: TestProtocol1 {
-  var _wrappedIsTestProtocol1: Bool {
-    fatalError("not implemented")
-  }
-}
-
-extension ImplicitlyUnwrappedOptional where Wrapped: TestProtocol1 {
-  var _wrappedIsTestProtocol1: Bool {
-    fatalError("not implemented")
-  }
-}
-
-var x: Optional<Int> = nil
-if x != nil { 
-  print("x is non-empty!")
-} else { 
-  print("an empty optional is logically false")
-}
-// CHECK: an empty optional is logically false
-
-switch x {
-case .Some(let y):
-  assert(false, "Something's wrong here!")
-case .None:
-  ()
-}
-
-x = .Some(0)
-
-x = .Some(1)
-
-if x != nil {
-  print("a non-empty optional is logically true") 
-} else { 
-  assert(false, "x is empty!")
-}
-// CHECK: a non-empty optional is logically true
-
-if x == nil { 
-  print("logical negation fails 0")
-} else { 
-  print("logical negation works 0") 
-}
-// CHECK: logical negation works 0
-
-if true {
-  var y1: Optional<Int> = .None
-  if y1 == nil {
-    print("y1 is .None")
-  }
-  // CHECK: y1 is .None
-
-  var y2: Optional<Int> = .None
-  if y2 == nil {
-    print("y2 is .None")
-  }
-  // CHECK: y2 is .None
-}
-
-func optional_param(x: Optional<Int>) {
-  if x == nil {
-    print("optional param OK")
-  }
-}
-optional_param(.None)
-// CHECK: optional param OK
-
-func optional_return() -> Optional<Int> {
-  return .None
-}
-if optional_return() == nil {
-  print("optional return OK")
-}
-// CHECK: optional return OK
-
-switch x {
-case .Some(let y):
-  print("destructuring bind: \(y).")
-case .None:
-  ()
-}
-// CHECK: destructuring bind: 1.
-
-
-print("forced extraction: \(x!).")
-// CHECK: forced extraction: 1.
-
-print("forced extraction use: \(x!.successor()).")
-// CHECK-NEXT: forced extraction use: 2.
-
-func testRelation(p: (Int?, Int?) -> Bool) {
-  typealias optPair = (Int?, Int?)
-  
-  let relationships: [optPair] = [
-    (1, 1), (1, 2), (2, 1), (1, .None), (.None, 1), (.None, .None)
-  ]
-
-  var prefix = ""
-  for (l,r) in relationships {
-    print("\(prefix)\(p(l, r))", terminator: "")
-    prefix=", "
-  }
-  print(".")
-}
-
-testRelation(==)
-// CHECK-NEXT: true, false, false, false, false, true.
-
-testRelation(!=)
-// CHECK-NEXT: false, true, true, true, true, false
-
-testRelation(<)
-// CHECK-NEXT: false, true, false, false, true, false.
 
 import StdlibUnittest
 import Swift
 
 let OptionalTests = TestSuite("Optional")
 
+protocol TestProtocol1 {}
+
+// Check that the generic parameter is called 'Memory'.
+extension Optional where Wrapped : TestProtocol1 {
+  var _wrappedIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension ImplicitlyUnwrappedOptional where Wrapped : TestProtocol1 {
+  var _wrappedIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+OptionalTests.test("nil comparison") {
+  var x: Int? = nil
+  expectFalse(x != nil)
+
+  switch x {
+  case .Some(let y): expectUnreachable()
+  case .None: break
+  }
+
+  x = .Some(1)
+  expectTrue(x != nil)
+
+  if true {
+    var y1: Int? = .None
+    expectTrue(y1 == nil)
+
+    var y2: Int? = .None
+    expectTrue(y2 == nil)
+  }
+
+  let x1: Int? = nil
+  let x2: Int? = .None
+
+  expectTrue(x1 == nil)
+  expectTrue(x2 == nil)
+
+  switch x {
+    case .Some(let y): expectEqual("1", "\(y)")
+    case .None: assert(false)
+  }
+
+  expectEqual("forced extraction: 1.", "forced extraction: \(x!).")
+  expectEqual("forced extraction use: 2.", "forced extraction use: \(x!.successor()).")
+}
+
+func testRelation(p: (Int?, Int?) -> Bool) -> [Bool] {
+  typealias optPair = (Int?, Int?)
+  
+  let relationships: [optPair] = [
+    (1, 1), (1, 2), (2, 1), (1, .None), (.None, 1), (.None, .None)
+  ]
+
+  return relationships.map { p($0, $1) }
+}
+
+OptionalTests.test("Equatable") {
+  expectEqual([true, false, false, false, false, true], testRelation(==))
+  expectEqual([false, true, true, true, true, false], testRelation(!=))
+  expectEqual([false, true, false, false, true, false], testRelation(<))
+}
+
 struct X {}
 class C {}
 
-class E: Equatable {}
+class E : Equatable {}
 func == (_: E, _: E) -> Bool { return true }
+
+OptionalTests.test("initializers") {
+  let _: X? = nil
+  let _: X? = X()
+
+  let _: C? = nil
+  let _: C? = C()
+}
 
 OptionalTests.test("nil comparison") {
   let v0: Int? = nil
@@ -143,7 +100,6 @@ OptionalTests.test("nil comparison") {
   expectTrue(nil == v0)
   expectFalse(nil != v0)
 
-  
   let e0: E? = nil
   let e1: E? = E()
   
@@ -186,21 +142,21 @@ OptionalTests.test("??") {
   let e: Int? = nil
   let f: Int? = nil
 
-  expectEqual(a ?? nextCounter(), 123)
-  expectEqual(b ?? nextCounter(), 0)
-  expectEqual(c ?? nextCounter(), 1)
-  expectEqual(d ?? nextCounter(), 456)
-  expectEqual(e ?? d ?? nextCounter(), 456)
-  expectEqual(f ?? nextCounter(), 2)
+  expectEqual(123, a ?? nextCounter())
+  expectEqual(0, b ?? nextCounter())
+  expectEqual(1, c ?? nextCounter())
+  expectEqual(456, d ?? nextCounter())
+  expectEqual(456, e ?? d ?? nextCounter())
+  expectEqual(2, f ?? nextCounter())
 
-  expectEqual(c ?? d, Optional(456))
-  expectEqual(c ?? e, nil)
-  expectEqual(a ?? nextCounter2(), Optional(123))
-  expectEqual(b ?? nextCounter2(), Optional(3))
-  expectEqual(c ?? nextCounter2(), Optional(4))
-  expectEqual(d ?? nextCounter2(), Optional(456))
-  expectEqual(e ?? d ?? nextCounter2(), Optional(456))
-  expectEqual(f ?? nextCounter2(), Optional(5))
+  expectEqual(Optional(456), c ?? d)
+  expectEqual(nil, c ?? e)
+  expectEqual(Optional(123), a ?? nextCounter2())
+  expectEqual(Optional(3), b ?? nextCounter2())
+  expectEqual(Optional(4), c ?? nextCounter2())
+  expectEqual(Optional(456), d ?? nextCounter2())
+  expectEqual(Optional(456), e ?? d ?? nextCounter2())
+  expectEqual(Optional(5), f ?? nextCounter2())
 }
 
 OptionalTests.test("flatMap") {
@@ -216,14 +172,14 @@ OptionalTests.test("flatMap") {
 }
 
 @inline(never)
-func anyToAny<T, U>(a: T, _: U.Type) -> U {
+func anyToAny<T, U>(a: T, _ : U.Type) -> U {
   return a as! U
 }
 @inline(never)
-func anyToAnyOrNil<T, U>(a: T, _: U.Type) -> U? {
+func anyToAnyOrNil<T, U>(a: T, _ : U.Type) -> U? {
   return a as? U
 }
-func canGenericCast<T, U>(a: T, _ ty: U.Type) -> Bool {
+func canGenericCast<T, U>(a: T, _ ty : U.Type) -> Bool {
   return anyToAnyOrNil(a, ty) != nil
 }
 
@@ -261,7 +217,7 @@ OptionalTests.test("Casting Optional Traps") {
 }
 
 class TestNoString {}
-class TestString: CustomStringConvertible, CustomDebugStringConvertible {
+class TestString : CustomStringConvertible, CustomDebugStringConvertible {
   var description: String {
     return "AString"
   }
@@ -269,8 +225,8 @@ class TestString: CustomStringConvertible, CustomDebugStringConvertible {
     return "XString"
   }
 }
-class TestStream: Streamable {
-  func writeTo<Target: OutputStreamType>(inout target: Target) {
+class TestStream : Streamable {
+  func writeTo<Target : OutputStreamType>(inout target: Target) {
     target.write("AStream")
   }
 }
