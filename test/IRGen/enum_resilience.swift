@@ -136,7 +136,7 @@ public func constructResilientEnumPayload(s: Size) -> Medium {
   return Medium.Postcard(s)
 }
 
-// CHECK-LABEL: define {{i32|i64}} @_TF15enum_resilience18indirectSwitchTestFO14resilient_enum6MediumSi(%swift.opaque* noalias nocapture)
+// CHECK-LABEL: define {{i32|i64}} @_TF15enum_resilience19resilientSwitchTestFO14resilient_enum6MediumSi(%swift.opaque* noalias nocapture)
 // CHECK: [[BUFFER:%.*]] = alloca [[BUFFER_TYPE:\[(12|24) x i8\]]]
 
 // CHECK: [[METADATA:%.*]] = call %swift.type* @_TMaO14resilient_enum6Medium()
@@ -175,15 +175,29 @@ public func constructResilientEnumPayload(s: Size) -> Medium {
 // CHECK: ; <label>:[[END]]
 // CHECK: ret
 
-public func indirectSwitchTest(m: Medium) -> Int {
+public func resilientSwitchTest(m: Medium) -> Int {
   switch m {
   case .Paper:
     return 1
   case .Canvas:
     return 2
   case .Pamphlet(let m):
-    return indirectSwitchTest(m)
+    return resilientSwitchTest(m)
   default:
     return 3
   }
 }
+
+public func reabstraction<T>(f: Medium -> T) {}
+
+// CHECK-LABEL: define void @_TF15enum_resilience25resilientEnumPartialApplyFFO14resilient_enum6MediumSiT_(i8*, %swift.refcounted*)
+public func resilientEnumPartialApply(f: Medium -> Int) {
+
+// CHECK:     [[CONTEXT:%.*]] = call noalias %swift.refcounted* @swift_allocObject
+// CHECK:     call void @_TF15enum_resilience13reabstractionurFFO14resilient_enum6MediumxT_(i8* bitcast (void (%Si*, %swift.opaque*, %swift.refcounted*)* @_TPA__TTRXFo_iO14resilient_enum6Medium_dSi_XFo_iS0__iSi_ to i8*), %swift.refcounted* [[CONTEXT:%.*]], %swift.type* @_TMSi)
+  reabstraction(f)
+
+// CHECK:     ret void
+}
+
+// CHECK-LABEL: define internal void @_TPA__TTRXFo_iO14resilient_enum6Medium_dSi_XFo_iS0__iSi_(%Si* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.refcounted*)

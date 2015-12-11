@@ -4386,6 +4386,11 @@ namespace {
     const override {
       emitDestroyCall(IGF, T, addr.getAddress());
     }
+    
+    void getSchema(ExplosionSchema &schema) const override {
+      schema.add(ExplosionSchema::Element::forAggregate(getStorageType(),
+                                                  TI->getBestKnownAlignment()));
+    }
 
     // \group Operations for loadable enums
 
@@ -4435,10 +4440,6 @@ namespace {
                           Explosion &inValue,
                           EnumElementDecl *theCase,
                           Explosion &out) const override {
-      llvm_unreachable("resilient enums are always indirect");
-    }
-
-    void getSchema(ExplosionSchema &schema) const override {
       llvm_unreachable("resilient enums are always indirect");
     }
 
