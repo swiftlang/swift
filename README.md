@@ -65,24 +65,19 @@ compiler for C++14 support and create a symlink:
 
 ### Getting Sources for Swift and Related Projects
 
-#### Swift Sources
+**Via HTTPS**  For those checking out sources as read-only, HTTPS works best:
 
-**Via HTTPS**
     git clone https://github.com/apple/swift.git
-
-**Via SSH**
-    git clone git@github.com:apple/swift.git
-
-#### Related Project Sources
-
-**Via HTTPS**
-    cd <local_path_to_swift_repo>
+    cd swift
     ./utils/update-checkout --clone
 
-**Via SSH**
-    cd <local_path_to_swift_repo>
-    ./utils/update-checkout --clone-via-ssh
+**Via SSH**  For those who plan on regularly making direct commits,
+cloning over SSH may provide a better experience (which requires
+uploading SSH keys to GitHub):
 
+    git clone git@github.com:apple/swift.git
+    cd swift
+    ./utils/update-checkout --clone-via-ssh
 
 [CMake](http://cmake.org) is the core infrastructure used to configure builds of
 Swift and its companion projects; at least version 2.8.12.2 is required. Your
