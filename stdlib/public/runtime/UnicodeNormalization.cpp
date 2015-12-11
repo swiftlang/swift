@@ -72,7 +72,7 @@ class ASCIICollation {
 public:
 
   static const ASCIICollation *getTable() {
-    // We are reallying on C++11's guarantueed of thread safe static variable
+    // We are reallying on C++11's guaranteed of thread safe static variable
     // initialization.
     static ASCIICollation collation;
     return &collation;
