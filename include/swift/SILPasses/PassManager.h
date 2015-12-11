@@ -160,6 +160,11 @@ private:
   /// if the pass manager requested to stop the execution
   /// of the optimization cycle (this is a debug feature).
   bool runFunctionPasses(PassList FuncTransforms);
+
+  /// Displays the call graph in an external dot-viewer.
+  /// This function is meant for use from the debugger.
+  /// When asserts are disabled, this is a NoOp.
+  void viewCallGraph();
 };
 
 } // end namespace swift

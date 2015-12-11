@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-passmanager"
 
+#include "swift/Basic/DemangleWrappers.h"
 #include "swift/SILPasses/PassManager.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
@@ -20,9 +21,11 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "swift/SILAnalysis/FunctionOrder.h"
+#include "swift/SILAnalysis/BasicCalleeAnalysis.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/TimeValue.h"
+#include "llvm/Support/GraphWriter.h"
 
 using namespace swift;
 
@@ -445,4 +448,193 @@ void SILPassManager::addPassForName(StringRef Name) {
   addPass(P);
 }
 
+//===----------------------------------------------------------------------===//
+//                          View Call-Graph Implementation
+//===----------------------------------------------------------------------===//
 
+#ifndef NDEBUG
+
+namespace {
+
+  /// An explicit graph data structure for the call graph.
+  /// Used for viewing the callgraph as dot file with llvm::ViewGraph.
+  struct CallGraph {
+
+    struct Node;
+
+    struct Edge {
+      FullApplySite FAS;
+      Node *Child;
+      bool Incomplete;
+    };
+
+    struct Node {
+      SILFunction *F;
+      CallGraph *CG;
+      int NumCallSites = 0;
+      SmallVector<Edge, 8> Children;
+    };
+
+    struct child_iterator : public std::iterator<std::random_access_iterator_tag,
+    Node *, ptrdiff_t> {
+      SmallVectorImpl<Edge>::iterator baseIter;
+
+      child_iterator(SmallVectorImpl<Edge>::iterator baseIter) :
+      baseIter(baseIter)
+      { }
+
+      child_iterator &operator++() { baseIter++; return *this; }
+      child_iterator operator++(int) { auto tmp = *this; baseIter++; return tmp; }
+      Node *operator*() const { return baseIter->Child; }
+      bool operator==(const child_iterator &RHS) const {
+        return baseIter == RHS.baseIter;
+      }
+      bool operator!=(const child_iterator &RHS) const {
+        return baseIter != RHS.baseIter;
+      }
+      difference_type operator-(const child_iterator &RHS) const {
+        return baseIter - RHS.baseIter;
+      }
+    };
+
+    CallGraph(SILModule *M, BasicCalleeAnalysis *BCA);
+
+    std::vector<Node> Nodes;
+
+    /// The SILValue IDs which are printed as edge source labels.
+    llvm::DenseMap<const ValueBase *, unsigned> InstToIDMap;
+
+    typedef std::vector<Node>::iterator iterator;
+  };
+
+  CallGraph::CallGraph(SILModule *M, BasicCalleeAnalysis *BCA) {
+    Nodes.resize(M->getFunctionList().size());
+    llvm::DenseMap<SILFunction *, Node *> NodeMap;
+    int idx = 0;
+    for (SILFunction &F : *M) {
+      Node &Nd = Nodes[idx++];
+      Nd.F = &F;
+      Nd.CG = this;
+      NodeMap[&F] = &Nd;
+
+      F.numberValues(InstToIDMap);
+    }
+
+    for (Node &Nd : Nodes) {
+      for (SILBasicBlock &BB : *Nd.F) {
+        for (SILInstruction &I : BB) {
+          if (FullApplySite FAS = FullApplySite::isa(&I)) {
+            auto CList = BCA->getCalleeList(FAS);
+            for (SILFunction *Callee : CList) {
+              Node *CalleeNode = NodeMap[Callee];
+              Nd.Children.push_back({FAS, CalleeNode,CList.isIncomplete()});
+            }
+          }
+        }
+      }
+    }
+  }
+
+} // end swift namespace
+
+namespace llvm {
+
+  /// Wraps a dot node label string to multiple lines. The \p NumEdgeLabels
+  /// gives an estimate on the minimum width of the node shape.
+  static void wrap(std::string &Str, int NumEdgeLabels) {
+    unsigned ColNum = 0;
+    unsigned LastSpace = 0;
+    unsigned MaxColumns = std::max(60, NumEdgeLabels * 8);
+    for (unsigned i = 0; i != Str.length(); ++i) {
+      if (ColNum == MaxColumns) {
+        if (!LastSpace)
+          LastSpace = i;
+        Str.insert(LastSpace + 1, "\\l");
+        ColNum = i - LastSpace - 1;
+        LastSpace = 0;
+      } else
+        ++ColNum;
+      if (Str[i] == ' ' || Str[i] == '.')
+        LastSpace = i;
+    }
+  }
+
+  /// CallGraph GraphTraits specialization so the CallGraph can be
+  /// iterable by generic graph iterators.
+  template <> struct GraphTraits<CallGraph::Node *> {
+    typedef CallGraph::Node NodeType;
+    typedef CallGraph::child_iterator ChildIteratorType;
+
+    static NodeType *getEntryNode(NodeType *N) { return N; }
+    static inline ChildIteratorType child_begin(NodeType *N) {
+      return N->Children.begin();
+    }
+    static inline ChildIteratorType child_end(NodeType *N) {
+      return N->Children.end();
+    }
+  };
+
+  template <> struct GraphTraits<CallGraph *>
+  : public GraphTraits<CallGraph::Node *> {
+    typedef CallGraph *GraphType;
+
+    static NodeType *getEntryNode(GraphType F) { return nullptr; }
+
+    typedef CallGraph::iterator nodes_iterator;
+    static nodes_iterator nodes_begin(GraphType CG) {
+      return CG->Nodes.begin();
+    }
+    static nodes_iterator nodes_end(GraphType CG) { return CG->Nodes.end(); }
+    static unsigned size(GraphType CG) { return CG->Nodes.size(); }
+  };
+
+  /// This is everything the llvm::GraphWriter needs to write the call graph in
+  /// a dot file.
+  template <>
+  struct DOTGraphTraits<CallGraph *> : public DefaultDOTGraphTraits {
+
+    DOTGraphTraits(bool isSimple = false) : DefaultDOTGraphTraits(isSimple) {}
+
+    std::string getNodeLabel(const CallGraph::Node *Node,
+                             const CallGraph *Graph) {
+      std::string Label = Node->F->getName();
+      wrap(Label, Node->NumCallSites);
+      return Label;
+    }
+
+    std::string getNodeDescription(const CallGraph::Node *Node,
+                                   const CallGraph *Graph) {
+      std::string Label = demangle_wrappers::
+      demangleSymbolAsString(Node->F->getName());
+      wrap(Label, Node->NumCallSites);
+      return Label;
+    }
+
+    static std::string getEdgeSourceLabel(const CallGraph::Node *Node,
+                                          CallGraph::child_iterator I) {
+      std::string Label;
+      raw_string_ostream O(Label);
+      SILInstruction *Inst = I.baseIter->FAS.getInstruction();
+      O << '%' << Node->CG->InstToIDMap[Inst];
+      return Label;
+    }
+
+    static std::string getEdgeAttributes(const CallGraph::Node *Node,
+                                         CallGraph::child_iterator I,
+                                         const CallGraph *Graph) {
+      CallGraph::Edge *Edge = I.baseIter;
+      if (Edge->Incomplete)
+        return "color=\"red\"";
+      return "";
+    }
+  };
+} // end llvm namespace
+#endif
+
+void SILPassManager::viewCallGraph() {
+  /// When asserts are disabled, this should be a NoOp.
+#ifndef NDEBUG
+  CallGraph OCG(getModule(), getAnalysis<BasicCalleeAnalysis>());
+  llvm::ViewGraph(&OCG, "callgraph");
+#endif
+}
