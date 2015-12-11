@@ -1,9 +1,7 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-class B<T where g:e{
-let a{let b:T.E
-T{var f=b
+{l{}{let a=((t> {}class a{func fQ{enum A{var f=a{struct c<U:U.R

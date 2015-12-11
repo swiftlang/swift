@@ -1,7 +1,7 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-{var _=Int}}{{struct B<U:U.j}{}{
+{r S}{func c{protocol A{func a:d struct d<f:f.a

@@ -1188,8 +1188,9 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   // Apply the solution to the expression.
   auto &solution = viable[0];
   bool isDiscarded = options.contains(TypeCheckExprFlags::IsDiscarded);
+  bool skipClosures = options.contains(TypeCheckExprFlags::SkipMultiStmtClosures);
   auto result = cs.applySolution(solution, expr, convertType, isDiscarded,
-                                 suppressDiagnostics);
+                                 suppressDiagnostics, skipClosures);
   if (!result) {
     // Failure already diagnosed, above, as part of applying the solution.
     return true;

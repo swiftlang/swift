@@ -295,6 +295,7 @@ namespace {
     DeclContext *dc;
     const Solution &solution;
     bool SuppressDiagnostics;
+    bool SkipClosures;
 
   private:
     /// \brief Coerce the given tuple to another tuple type.
@@ -1468,9 +1469,10 @@ namespace {
     
   public:
     ExprRewriter(ConstraintSystem &cs, const Solution &solution,
-                 bool suppressDiagnostics)
+                 bool suppressDiagnostics, bool skipClosures)
       : cs(cs), dc(cs.DC), solution(solution), 
-        SuppressDiagnostics(suppressDiagnostics) { }
+        SuppressDiagnostics(suppressDiagnostics),
+        SkipClosures(skipClosures) { }
 
     ConstraintSystem &getConstraintSystem() const { return cs; }
 
@@ -5646,6 +5648,11 @@ namespace {
     ExprWalker(ExprRewriter &Rewriter) : Rewriter(Rewriter) { }
 
     ~ExprWalker() {
+      // If we're re-typechecking an expression for diagnostics, don't
+      // visit closures that have non-single expression bodies.
+      if (Rewriter.SkipClosures)
+        return;
+
       auto &cs = Rewriter.getConstraintSystem();
       auto &tc = cs.getTypeChecker();
       for (auto *closure : closuresToTypeCheck)
@@ -6126,7 +6133,8 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
 Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
                                       Type convertType,
                                       bool discardedExpr,
-                                      bool suppressDiagnostics) {
+                                      bool suppressDiagnostics,
+                                      bool skipClosures) {
   // If any fixes needed to be applied to arrive at this solution, resolve
   // them to specific expressions.
   if (!solution.Fixes.empty()) {
@@ -6141,7 +6149,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
     return nullptr;
   }
 
-  ExprRewriter rewriter(*this, solution, suppressDiagnostics);
+  ExprRewriter rewriter(*this, solution, suppressDiagnostics, skipClosures);
   ExprWalker walker(rewriter);
 
   // Apply the solution to the expression.
@@ -6171,7 +6179,8 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
 Expr *ConstraintSystem::applySolutionShallow(const Solution &solution,
                                              Expr *expr,
                                              bool suppressDiagnostics) {
-  ExprRewriter rewriter(*this, solution, suppressDiagnostics);
+  ExprRewriter rewriter(*this, solution, suppressDiagnostics,
+                        /*skipClosures=*/false);
   rewriter.walkToExprPre(expr);
   Expr *result = rewriter.walkToExprPost(expr);
   if (result)
@@ -6183,7 +6192,9 @@ Expr *Solution::coerceToType(Expr *expr, Type toType,
                              ConstraintLocator *locator,
                              bool ignoreTopLevelInjection) const {
   auto &cs = getConstraintSystem();
-  ExprRewriter rewriter(cs, *this, /*suppressDiagnostics=*/false);
+  ExprRewriter rewriter(cs, *this,
+                        /*suppressDiagnostics=*/false,
+                        /*skipClosures=*/false);
   Expr *result = rewriter.coerceToType(expr, toType, locator);
   if (!result)
     return nullptr;
@@ -6309,7 +6320,9 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   }
 
   Solution &solution = solutions.front();
-  ExprRewriter rewriter(cs, solution, /*suppressDiagnostics=*/false);
+  ExprRewriter rewriter(cs, solution,
+                        /*suppressDiagnostics=*/false,
+                        /*skipClosures=*/false);
 
   auto memberRef = rewriter.buildMemberRef(base, openedFullType,
                                            base->getStartLoc(),

@@ -212,7 +212,7 @@ func bad(a: A<EE>) {
   a.map { // expected-error {{cannot invoke 'map' with an argument list of type '((EE) -> _)'}}
   // expected-note@-1 {{expected an argument list of type '(EE -> T)'}}
     let _: EE = $0
-    return 1 // expected-error {{cannot convert return expression of type 'Int' to return type 'T'}}
+    return 1
   }
 }
 
@@ -221,9 +221,9 @@ func ugly(a: A<EE>) {
   // expected-note@-1 {{expected an argument list of type '(EE -> T)'}}
     switch $0 {
     case .A:
-      return 1 // expected-error {{cannot convert return expression of type 'Int' to return type 'T'}}
+      return 1
     default:
-      return 2 // expected-error {{cannot convert return expression of type 'Int' to return type 'T'}}
+      return 2
     }
   }
 }

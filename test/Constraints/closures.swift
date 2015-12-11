@@ -162,3 +162,14 @@ func r15998821() {
 var _: (Int,Int)-> Int = {$0+$1+$2}  // expected-error {{contextual closure type '(Int, Int) -> Int' expects 2 arguments, but 3 were used in closure body}}
 
 
+// Crash when re-typechecking bodies of non-single expression closures
+
+struct CC {}
+func callCC<U>(f: CC -> U) -> () {}
+
+func typeCheckMultiStmtClosureCrash() {
+  callCC { // expected-error {{cannot invoke 'callCC' with an argument list of type '((CC) -> _)'}}
+    _ = $0 // expected-note@-1 {{expected an argument list of type '(CC -> U)'}}
+    return 1
+  }
+}

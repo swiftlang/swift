@@ -2897,6 +2897,10 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
   // the context is missing).
   TypeCheckExprOptions TCEOptions = TypeCheckExprFlags::DisableStructuralChecks;
 
+  // Don't walk into non-single expression closure bodies, because
+  // ExprTypeSaver and TypeNullifier skip them too.
+  TCEOptions |= TypeCheckExprFlags::SkipMultiStmtClosures;
+
   // Claim that the result is discarded to preserve the lvalue type of
   // the expression.
   if (options.contains(TCC_AllowLValue))
