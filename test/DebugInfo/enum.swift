@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
 
-// XFAIL: *
-
 // CHECK: ![[EMPTY:.*]] = !{}
 // CHECK: !DICompositeType(tag: DW_TAG_union_type, name: "Color",
 // CHECK-SAME:             line: [[@LINE+3]]
@@ -48,12 +46,14 @@ public func foo(empty : Nothing) { }
 
 // CHECK: !DICompositeType({{.*}}name: "Rose", {{.*}}elements: ![[ELTS:[0-9]+]],
 // CHECK-SAME:             {{.*}}identifier: "_TtGO4enum4Rosex_")
-public enum Rose<A> {
+enum Rose<A> {
 	case MkRose(() -> A, () -> [Rose<A>])
   // CHECK: !DICompositeType({{.*}}name: "Rose", {{.*}}elements: ![[ELTS]],
   // CHECK-SAME:             {{.*}}identifier: "_TtGO4enum4RoseQq_S0__")
 	case IORose(() -> Rose<A>)
 }
+
+func foo<T>(x : Rose<T>) -> Rose<T> { return x }
 
 // CHECK: !DICompositeType({{.*}}name: "Tuple", {{.*}}elements: ![[ELTS:[0-9]+]],
 // CHECK-SAME:             {{.*}}identifier: "_TtGO4enum5Tuplex_")
@@ -62,6 +62,8 @@ public enum Tuple<P> {
   // CHECK-SAME:             {{.*}}identifier: "_TtGO4enum5TupleQq_S0__")
 	case C(P, () -> Tuple)
 }
+
+func bar<T>(x : Tuple<T>) -> Tuple<T> { return x }
 
 public enum List<T> {
        indirect case Tail(List, T)
