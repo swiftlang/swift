@@ -70,6 +70,7 @@ private:
   /// The payload of the request, which differs based on the request kind.
   union PayloadType {
     PayloadType() { }
+    PayloadType(const PayloadType &) {}
 
 #define TYPE_CHECK_REQUEST_PAYLOAD(PayloadName,...) \
     __VA_ARGS__ PayloadName;
