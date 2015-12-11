@@ -1,0 +1,23 @@
+set(TRANSFORMS_SOURCES
+  Transforms/AllocBoxToStack.cpp
+  Transforms/ArrayCountPropagation.cpp
+  Transforms/MergeCondFail.cpp
+  Transforms/SILSROA.cpp
+  Transforms/CSE.cpp
+  Transforms/RedundantOverflowCheckRemoval.cpp
+  Transforms/SimplifyCFG.cpp
+  Transforms/CopyForwarding.cpp
+  Transforms/RemovePin.cpp
+  Transforms/Sink.cpp
+  Transforms/DeadCodeElimination.cpp
+  Transforms/SILCleanup.cpp
+  Transforms/SpeculativeDevirtualizer.cpp
+  Transforms/ReleaseDevirtualizer.cpp
+  Transforms/DeadObjectElimination.cpp
+  Transforms/SILCodeMotion.cpp
+  Transforms/StackPromotion.cpp
+  Transforms/DeadStoreElimination.cpp
+  Transforms/SILLowerAggregateInstrs.cpp
+  Transforms/RedundantLoadElimination.cpp
+  Transforms/SILMem2Reg.cpp
+  PARENT_SCOPE)

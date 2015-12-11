@@ -5,7 +5,7 @@ add_swift_executable(swift
   modulewrap_main.cpp
   LINK_LIBRARIES
     swiftIDE
-    swiftDriver swiftIRGen swiftSIL swiftSILGen swiftSILPasses
+    swiftDriver swiftIRGen swiftSIL swiftSILGen swiftSILOptimizer
     swiftImmediate
     swiftSerialization
     swiftPrintAsObjC
