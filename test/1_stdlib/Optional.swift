@@ -4,19 +4,19 @@
 protocol TestProtocol1 {}
 
 // Check that the generic parameter is called 'Memory'.
-extension Optional where Wrapped : TestProtocol1 {
+extension Optional where Wrapped: TestProtocol1 {
   var _wrappedIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
 }
 
-extension ImplicitlyUnwrappedOptional where Wrapped : TestProtocol1 {
+extension ImplicitlyUnwrappedOptional where Wrapped: TestProtocol1 {
   var _wrappedIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
 }
 
-var x : Optional<Int> = nil
+var x: Optional<Int> = nil
 if x != nil { 
   print("x is non-empty!")
 } else { 
@@ -50,13 +50,13 @@ if x == nil {
 // CHECK: logical negation works 0
 
 if true {
-  var y1 : Optional<Int> = .None
+  var y1: Optional<Int> = .None
   if y1 == nil {
     print("y1 is .None")
   }
   // CHECK: y1 is .None
 
-  var y2 : Optional<Int> = .None
+  var y2: Optional<Int> = .None
   if y2 == nil {
     print("y2 is .None")
   }
@@ -126,7 +126,7 @@ let OptionalTests = TestSuite("Optional")
 struct X {}
 class C {}
 
-class E : Equatable {}
+class E: Equatable {}
 func == (_: E, _: E) -> Bool { return true }
 
 OptionalTests.test("nil comparison") {
@@ -216,21 +216,21 @@ OptionalTests.test("flatMap") {
 }
 
 @inline(never)
-func anyToAny<T, U>(a: T, _ : U.Type) -> U {
+func anyToAny<T, U>(a: T, _: U.Type) -> U {
   return a as! U
 }
 @inline(never)
-func anyToAnyOrNil<T, U>(a: T, _ : U.Type) -> U? {
+func anyToAnyOrNil<T, U>(a: T, _: U.Type) -> U? {
   return a as? U
 }
-func canGenericCast<T, U>(a: T, _ ty : U.Type) -> Bool {
+func canGenericCast<T, U>(a: T, _ ty: U.Type) -> Bool {
   return anyToAnyOrNil(a, ty) != nil
 }
 
 OptionalTests.test("Casting Optional") {
   let x = C()
-  let sx : C? = x
-  let nx : C? = nil
+  let sx: C? = x
+  let nx: C? = nil
   expectTrue(anyToAny(x, Optional<C>.self)! === x)
   expectTrue(anyToAny(sx, C.self) === x)
   expectTrue(anyToAny(sx, Optional<C>.self)! === x)
@@ -239,8 +239,8 @@ OptionalTests.test("Casting Optional") {
   expectTrue(anyToAnyOrNil(nx, C.self) == nil)
 
   let i = Int.max
-  let si : Int? = Int.max
-  let ni : Int? = nil
+  let si: Int? = Int.max
+  let ni: Int? = nil
   expectEqual(anyToAny(i, Optional<Int>.self)!, Int.max)
   expectEqual(anyToAny(si, Int.self), Int.max)
   expectEqual(anyToAny(si, Optional<Int>.self)!, Int.max)
@@ -248,20 +248,20 @@ OptionalTests.test("Casting Optional") {
   expectTrue(anyToAny(ni, Optional<Int>.self) == nil)
   expectTrue(anyToAnyOrNil(ni, Int.self) == nil)
 
-  let ssx : C?? = sx
+  let ssx: C?? = sx
   expectTrue(anyToAny(ssx, Optional<C>.self)! === x)
   expectTrue(anyToAny(x, Optional<Optional<C>>.self)!! === x)
   expectTrue(anyToAnyOrNil(ni, Int.self) == nil)
 }
 
 OptionalTests.test("Casting Optional Traps") {
-  let nx : C? = nil
+  let nx: C? = nil
   expectCrashLater()
   anyToAny(nx, Int.self)
 }
 
 class TestNoString {}
-class TestString : CustomStringConvertible, CustomDebugStringConvertible {
+class TestString: CustomStringConvertible, CustomDebugStringConvertible {
   var description: String {
     return "AString"
   }
@@ -269,8 +269,8 @@ class TestString : CustomStringConvertible, CustomDebugStringConvertible {
     return "XString"
   }
 }
-class TestStream : Streamable {
-  func writeTo<Target : OutputStreamType>(inout target: Target) {
+class TestStream: Streamable {
+  func writeTo<Target: OutputStreamType>(inout target: Target) {
     target.write("AStream")
   }
 }
@@ -286,7 +286,7 @@ func debugPrintStr<T>(a: T) -> String {
 // description regardless of whether the wrapper type conforms to an
 // output stream protocol.
 OptionalTests.test("Optional OutputStream") {
-  let optNoString : TestNoString? = TestNoString()
+  let optNoString: TestNoString? = TestNoString()
   expectFalse(optNoString is CustomStringConvertible)
   expectFalse(canGenericCast(optNoString, CustomStringConvertible.self))
   expectFalse(optNoString is Streamable)
@@ -296,7 +296,7 @@ OptionalTests.test("Optional OutputStream") {
   expectEqual(String(optNoString), "Optional(main.TestNoString)")
   expectEqual(debugPrintStr(optNoString), "Optional(main.TestNoString)")
 
-  let iouNoString : TestNoString! = TestNoString()
+  let iouNoString: TestNoString! = TestNoString()
   // IOU directly conforms to CustomStringConvertible.
   // Disabled pending SR-164
   //   expectTrue(iouNoString is CustomStringConvertible)
@@ -310,7 +310,7 @@ OptionalTests.test("Optional OutputStream") {
   expectEqual(String(iouNoString), "main.TestNoString")
   expectEqual(debugPrintStr(iouNoString), "main.TestNoString")
 
-  let optString : TestString? = TestString()
+  let optString: TestString? = TestString()
   expectTrue(optString is CustomStringConvertible)
   expectTrue(canGenericCast(optString, CustomStringConvertible.self))
   expectTrue(optString is CustomDebugStringConvertible)
@@ -319,7 +319,7 @@ OptionalTests.test("Optional OutputStream") {
   expectEqual(String(optString), "Optional(XString)")
   expectEqual(debugPrintStr(optString), "Optional(XString)")
 
-  let iouString : TestString! = TestString()
+  let iouString: TestString! = TestString()
   expectTrue(iouString is CustomStringConvertible)
   expectTrue(canGenericCast(iouString, CustomStringConvertible.self))
   // CustomDebugStringConvertible conformance is a temporary hack.
@@ -331,7 +331,7 @@ OptionalTests.test("Optional OutputStream") {
   // (directly invoking debugPrint(Any) already works correctly).
   expectEqual(debugPrintStr(iouString), "AString")
 
-  let optStream : TestStream? = TestStream()
+  let optStream: TestStream? = TestStream()
   expectTrue(optStream is Streamable)
   expectTrue(canGenericCast(optStream, Streamable.self))
   expectTrue(optStream is CustomDebugStringConvertible)
