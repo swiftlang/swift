@@ -1702,7 +1702,11 @@ bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *fnExpr,
   
   
   auto args = decomposeArgParamType(argExpr->getType());
-  auto params = decomposeArgParamType(candidates[0].getArgumentType());
+
+  auto argTy = candidates[0].getArgumentType();
+  if (!argTy) return false;
+
+  auto params = decomposeArgParamType(argTy);
 
   // It is a somewhat common error to try to access an instance method as a
   // curried member on the type, instead of using an instance, e.g. the user
