@@ -651,7 +651,7 @@ static ProtocolDecl *getNSCopyingProtocol(TypeChecker &TC,
 
 /// Synthesize the code to store 'Val' to 'VD', given that VD has an @NSCopying
 /// attribute on it.  We know that VD is a stored property in a class, so we
-/// just need to generate something like "self.property = val.copyWithZone(nil)"
+/// just need to generate something like "self.property = val.copy(zone: nil)"
 /// here.  This does some type checking to validate that the call will succeed.
 static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
                                         TypeChecker &TC) {
@@ -684,15 +684,16 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   // Generate:
   // (force_value_expr type='<null>'
   //   (call_expr type='<null>'
-  //     (unresolved_dot_expr type='<null>' field 'copyWithZone'
+  //     (unresolved_dot_expr type='<null>' field 'copy'
   //       "Val")
   //     (paren_expr type='<null>'
   //       (nil_literal_expr type='<null>'))))
   auto UDE = new (Ctx) UnresolvedDotExpr(Val, SourceLoc(),
-                                         Ctx.getIdentifier("copyWithZone"),
+                                         Ctx.getIdentifier("copy"),
                                          SourceLoc(), /*implicit*/true);
   Expr *Nil = new (Ctx) NilLiteralExpr(SourceLoc(), /*implicit*/true);
-  Nil = new (Ctx) ParenExpr(SourceLoc(), Nil, SourceLoc(), false);
+  Nil = TupleExpr::create(Ctx, SourceLoc(), { Nil }, { Ctx.Id_zone },
+                          { SourceLoc() }, SourceLoc(), false, true);
 
   //- (id)copyWithZone:(NSZone *)zone;
   Expr *Call = new (Ctx) CallExpr(UDE, Nil, /*implicit*/true);

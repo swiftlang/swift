@@ -32,7 +32,7 @@ func findSubstring(string: String, _ substring: String) -> String.Index? {
     return string.startIndex
   }
 #if _runtime(_ObjC)
-  return string.rangeOfString(substring)?.startIndex
+  return string.rangeOf(substring)?.startIndex
 #else
   // FIXME(performance): This is a very non-optimal algorithm, with a worst
   // case of O((n-m)*m). When non-objc String has a match function that's better,
@@ -74,7 +74,7 @@ public func createTemporaryFile(
 ) -> String {
 #if _runtime(_ObjC)
   let tempDir: NSString = NSTemporaryDirectory()
-  var fileName = tempDir.stringByAppendingPathComponent(
+  var fileName = tempDir.appendingPathComponent(
     fileNamePrefix + "XXXXXX" + fileNameSuffix)
 #else
   var fileName = fileNamePrefix + "XXXXXX" + fileNameSuffix

@@ -24,14 +24,14 @@ func getDescription(o: NSObject) -> String {
 // CHECK:}
 
 func getUppercaseString(s: NSString) -> String {
-  return s.uppercaseString()
+  return s.uppercase()
 }
 // CHECK-LABEL: sil hidden @_TF13objc_bridging18getUppercaseString
 // CHECK: bb0({{%.*}} : $NSString):
 // -- The 'self' argument of NSString methods doesn't bridge.
 // CHECK-NOT: function_ref @swift_NSStringToString
 // CHECK-NOT: function_ref @swift_StringToNSString
-// CHECK:   [[UPPERCASE_STRING:%.*]] = class_method [volatile] {{%.*}} : {{.*}}, #NSString.uppercaseString!1.foreign
+// CHECK:   [[UPPERCASE_STRING:%.*]] = class_method [volatile] {{%.*}} : {{.*}}, #NSString.uppercase!1.foreign
 // CHECK:   [[OPT_BRIDGED:%.*]] = apply [[UPPERCASE_STRING]]({{%.*}})
 // CHECK:   select_enum [[OPT_BRIDGED]]
 // CHECK:   [[BRIDGED:%.*]] = unchecked_enum_data [[OPT_BRIDGED]]

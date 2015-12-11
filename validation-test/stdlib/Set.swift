@@ -112,13 +112,13 @@ func isNativeSet<T : Hashable>(s: Set<T>) -> Bool {
 
 func isNativeNSSet(s: NSSet) -> Bool {
   let className: NSString = NSStringFromClass(s.dynamicType)
-  return className.rangeOfString("NativeSetStorage").length > 0
+  return className.rangeOf("NativeSetStorage").length > 0
 }
 
 func isCocoaNSSet(s: NSSet) -> Bool {
   let className: NSString = NSStringFromClass(s.dynamicType)
-  return className.rangeOfString("NSSet").length > 0 ||
-    className.rangeOfString("NSCFSet").length > 0
+  return className.rangeOf("NSSet").length > 0 ||
+    className.rangeOf("NSCFSet").length > 0
 }
 
 func getBridgedEmptyNSSet() -> NSSet {
@@ -145,7 +145,7 @@ func equalsUnordered(lhs: Set<Int>, _ rhs: Set<Int>) -> Bool {
 func getAsNSSet(members: [Int] = [1010, 2020, 3030]) -> NSSet {
   let nsArray = NSMutableArray()
   for member in members {
-    nsArray.addObject(TestObjCKeyTy(member))
+    nsArray.add(TestObjCKeyTy(member))
   }
   return NSMutableSet(array: nsArray as [AnyObject])
 }
@@ -154,7 +154,7 @@ func getAsNSSet(members: [Int] = [1010, 2020, 3030]) -> NSSet {
 func getAsNSMutableSet(members: [Int] = [1010, 2020, 3030]) -> NSMutableSet {
   let nsArray = NSMutableArray()
   for member in members {
-    nsArray.addObject(TestObjCKeyTy(member))
+    nsArray.add(TestObjCKeyTy(member))
   }
   return NSMutableSet(array: nsArray as [AnyObject])
 }
@@ -250,9 +250,9 @@ func getBridgedNSSet_ValueTypesCustomBridged(
 
 func getRoundtripBridgedNSSet() -> NSSet {
   let items = NSMutableArray()
-  items.addObject(TestObjCKeyTy(1010))
-  items.addObject(TestObjCKeyTy(2020))
-  items.addObject(TestObjCKeyTy(3030))
+  items.add(TestObjCKeyTy(1010))
+  items.add(TestObjCKeyTy(2020))
+  items.add(TestObjCKeyTy(3030))
 
   let nss = NSSet(array: items as [AnyObject])
 
@@ -1160,7 +1160,7 @@ class CustomImmutableNSSet : NSSet {
     fatalError("init(coder:) not implemented by CustomImmutableNSSet")
   }
 
-  @objc override func copyWithZone(zone: NSZone) -> AnyObject {
+  @objc override func copy(zone zone: NSZone) -> AnyObject {
     ++CustomImmutableNSSet.timesCopyWithZoneWasCalled
     return self
   }
@@ -1195,7 +1195,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.SetIsCopied") {
   expectTrue(s.contains(TestObjCKeyTy(1010)))
   expectNotEmpty(nss.member(TestObjCKeyTy(1010)))
 
-  nss.removeObject(TestObjCKeyTy(1010))
+  nss.remove(TestObjCKeyTy(1010))
   expectEmpty(nss.member(TestObjCKeyTy(1010)))
 
   expectTrue(s.contains(TestObjCKeyTy(1010)))
@@ -1209,7 +1209,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.SetIsCopied") {
   expectTrue(s.contains(TestBridgedKeyTy(1010)))
   expectNotEmpty(nss.member(TestBridgedKeyTy(1010)))
 
-  nss.removeObject(TestBridgedKeyTy(1010))
+  nss.remove(TestBridgedKeyTy(1010))
   expectEmpty(nss.member(TestBridgedKeyTy(1010)))
 
   expectTrue(s.contains(TestBridgedKeyTy(1010)))
@@ -2074,7 +2074,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Small") {
 SetTestSuite.test("BridgedFromObjC.Verbatim.ArrayOfSets") {
   var nsa = NSMutableArray()
   for i in 0..<3 {
-    nsa.addObject(
+    nsa.add(
         getAsNSSet([ 1 + i,  2 + i, 3 + i ]))
   }
 
@@ -2095,7 +2095,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.ArrayOfSets") {
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfSets") {
   var nsa = NSMutableArray()
   for i in 0..<3 {
-    nsa.addObject(
+    nsa.add(
         getAsNSSet([ 1 + i, 2 + i, 3 + i ]))
   }
 
@@ -2335,7 +2335,7 @@ SetTestSuite.test("BridgingRoundTrip") {
 SetTestSuite.test("NSSetToSetConversion") {
   let nsArray = NSMutableArray()
   for i in [1010, 2020, 3030] {
-    nsArray.addObject(TestObjCKeyTy(i))
+    nsArray.add(TestObjCKeyTy(i))
   }
 
   let nss = NSSet(array: nsArray as [AnyObject])
@@ -3406,7 +3406,7 @@ class MockSetWithCustomCount : NSSet {
     fatalError("init(coder:) not implemented by MockSetWithCustomCount")
   }
 
-  @objc override func copyWithZone(zone: NSZone) -> AnyObject {
+  @objc override func copy(zone zone: NSZone) -> AnyObject {
     // Ensure that copying this set produces an object of the same
     // dynamic type.
     return self

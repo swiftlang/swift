@@ -6,7 +6,7 @@
 @interface NSString : NSObject<NSCopying>
 
 - (__null_unspecified NSString*)uppercaseString;
-- (id) copyWithZone: (void*)zone;
+- (id) copyWithZone: (nullable NSZone*)zone;
 
 @end
 

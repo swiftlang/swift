@@ -15,16 +15,16 @@ class C : NSObject {
 }
 
 // CHECK: true
-print(C.self.respondsToSelector("i"))
+print(C.self.respondsTo("i"))
 
 // CHECK: 2
 print(C.i)
 
 // CHECK: false
-print(C.self.respondsToSelector("setI:"))
+print(C.self.respondsTo("setI:"))
 
 // CHECK: true
-print(C.self.respondsToSelector("j"))
+print(C.self.respondsTo("j"))
 
 // CHECK: Hello
 print(C.j)
@@ -35,7 +35,7 @@ C.j = "World"
 print(C.j)
 
 // CHECK: true
-print(C.self.respondsToSelector("setJ:"))
+print(C.self.respondsTo("setJ:"))
 
 // CHECK: Test
 C.performSelectorOnMainThread("setJ:", withObject: "Test", waitUntilDone: true)
@@ -46,10 +46,10 @@ C.j = "OK"
 print(C.j)
 
 // CHECK: true
-print(C.self.respondsToSelector("k"))
+print(C.self.respondsTo("k"))
 
 // CHECK: 3.14
 print(C.k)
 
 // CHECK: false
-print(C.self.respondsToSelector("setK:"))
+print(C.self.respondsTo("setK:"))

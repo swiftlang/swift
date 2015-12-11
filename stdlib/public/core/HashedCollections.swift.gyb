@@ -2388,8 +2388,8 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
     return bridgedKey
   }
 
-  @objc
-  internal func countByEnumeratingWithState(
+  @objc(countByEnumeratingWithState:objects:count:)
+  internal func countByEnumeratingWith(
     state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>,
     count: Int
@@ -2492,7 +2492,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 
   @objc
   @warn_unused_result
-  internal func copyWithZone(zone: _SwiftNSZone) -> AnyObject {
+  internal func copy(zone zone: _SwiftNSZone) -> AnyObject {
     // Instances of this class should be visible outside of standard library as
     // having `NSSet` type, which is immutable.
     return self
@@ -2515,8 +2515,8 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
     _sanityCheckFailure("don't call this designated initializer")
   }
 
-  @objc
-  internal func objectForKey(aKey: AnyObject) -> AnyObject? {
+  @objc(objectForKey:)
+  internal func objectFor(aKey: AnyObject) -> AnyObject? {
     return bridgingObjectForKey(aKey)
   }
 
@@ -2526,7 +2526,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   }
 
   @objc
-  internal func copyWithZone(zone: _SwiftNSZone) -> AnyObject {
+  internal func copy(zone zone: _SwiftNSZone) -> AnyObject {
     // Instances of this class should be visible outside of standard library as
     // having `NSDictionary` type, which is immutable.
     return self
@@ -2735,8 +2735,8 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
     return _Native${Self}StorageKeyNSEnumerator<${TypeParameters}>(self)
   }
 
-  @objc
-  internal func countByEnumeratingWithState(
+  @objc(countByEnumeratingWithState:objects:count:)
+  internal func countByEnumeratingWith(
     state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>,
     count: Int
@@ -2823,7 +2823,7 @@ internal struct _Cocoa${Self}Storage : _HashStorageType {
     return value!
 %elif Self == 'Dictionary':
     let key: Key = i.allKeys[i.currentKeyIndex]
-    let value: Value = i.cocoaDictionary.objectForKey(key)!
+    let value: Value = i.cocoaDictionary.objectFor(key)!
     return (key, value)
 %end
 
@@ -2836,7 +2836,7 @@ internal struct _Cocoa${Self}Storage : _HashStorageType {
     _precondition(value != nil, "member not found in underlying NS${Self}")
     return value!
 %elif Self == 'Dictionary':
-    let value: Value? = cocoa${Self}.objectForKey(key)
+    let value: Value? = cocoa${Self}.objectFor(key)
     _precondition(value != nil, "key not found in underlying NS${Self}")
     return value!
 %end
@@ -2848,7 +2848,7 @@ internal struct _Cocoa${Self}Storage : _HashStorageType {
 %if Self == 'Set':
   return cocoaSet.member(key)
 %elif Self == 'Dictionary':
-  return cocoaDictionary.objectForKey(key)
+  return cocoaDictionary.objectFor(key)
 %end
 
   }
@@ -3809,7 +3809,7 @@ final internal class _Cocoa${Self}Iterator : IteratorProtocol {
       // properties, because doing so might introduce a writeback buffer, but
       // fast enumeration relies on the pointer identity of the enumeration
       // state struct.
-      itemCount = cocoa${Self}.countByEnumeratingWithState(
+      itemCount = cocoa${Self}.countByEnumeratingWith(
         _fastEnumerationStatePtr,
         objects: UnsafeMutablePointer(_fastEnumerationStackBufPtr),
         count: stackBufLength)
@@ -3827,7 +3827,7 @@ final internal class _Cocoa${Self}Iterator : IteratorProtocol {
 %if Self == 'Set':
     return key
 %elif Self == 'Dictionary':
-    let value: AnyObject = cocoa${Self}.objectForKey(key)!
+    let value: AnyObject = cocoa${Self}.objectFor(key)!
     return (key, value)
 %end
   }

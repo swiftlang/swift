@@ -37,8 +37,8 @@ func instanceMethods(b: B) {
   b.setEnabled(true)
 
   // SEL
-  b.performSelector("isEqual:", withObject:b)
-  if let result = b.performSelector("getAsProto", withObject:nil) {
+  b.perform("isEqual:", withObject:b)
+  if let result = b.perform("getAsProto", withObject:nil) {
     _ = result.takeUnretainedValue()
   }
 
@@ -142,10 +142,10 @@ func newConstruction(a: A, aproxy: AProxy) {
   b = B(int: 17)
   b = B(int:17)
   b = B(double:17.5, 3.14159)
-  b = B(BBB:b)
+  b = B(bbb:b)
   b = B(forWorldDomination:())
   b = B(int: 17, andDouble : 3.14159)
-  b = B.newWithA(a)
+  b = B.newWith(a)
   B.alloc()._initFoo()
   b.notAnInit()
 
@@ -209,7 +209,7 @@ func testProtocolMethods(b: B, p2m: P2.Type) {
 }
 
 func testId(x: AnyObject) {
-  x.performSelector!("foo:", withObject: x)
+  x.perform!("foo:", withObject: x)
 
   x.performAdd(1, withValue: 2, withValue: 3, withValue2: 4)
   x.performAdd!(1, withValue: 2, withValue: 3, withValue2: 4)
@@ -296,15 +296,15 @@ func ivars(hive: Hive) {
 
 class NSObjectable : NSObjectProtocol {
   @objc var description : String { return "" }
-  @objc func conformsToProtocol(_: Protocol) -> Bool { return false }
-  @objc func isKindOfClass(aClass: AnyClass) -> Bool { return false }
+  @objc(conformsToProtocol:) func conformsTo(_: Protocol) -> Bool { return false }
+  @objc(isKindOfClass:) func isKindOf(aClass: AnyClass) -> Bool { return false }
 }
 
 
 // Properties with custom accessors
 func customAccessors(hive: Hive, bee: Bee) {
-  markUsed(hive.makingHoney)
-  markUsed(hive.isMakingHoney()) // expected-error{{value of type 'Hive' has no member 'isMakingHoney'}}
+  markUsed(hive.isMakingHoney)
+  markUsed(hive.makingHoney()) // expected-error{{value of type 'Hive' has no member 'makingHoney'}}
   hive.setMakingHoney(true) // expected-error{{value of type 'Hive' has no member 'setMakingHoney'}}
 
   hive.`guard`.description // okay

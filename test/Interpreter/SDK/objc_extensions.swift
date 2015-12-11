@@ -30,15 +30,15 @@ var o = NSObject()
 func drop(x: NSObject?) {}
 
 // CHECK: true
-print(o.respondsToSelector("frob"))
+print(o.respondsTo("frob"))
 // CHECK: true
-print(o.respondsToSelector("asHerself"))
+print(o.respondsTo("asHerself"))
 // CHECK: false
-print(o.respondsToSelector("setAsHerself:"))
+print(o.respondsTo("setAsHerself:"))
 // CHECK: true
-print(o.respondsToSelector("blackHoleWithHawkingRadiation"))
+print(o.respondsTo("blackHoleWithHawkingRadiation"))
 // CHECK: true
-print(o.respondsToSelector("setBlackHoleWithHawkingRadiation:"))
+print(o.respondsTo("setBlackHoleWithHawkingRadiation:"))
 
 // CHECK: I've been frobbed!
 o.frob()

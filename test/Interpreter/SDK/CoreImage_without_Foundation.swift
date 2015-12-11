@@ -9,4 +9,4 @@ import CoreImage
 
 var v = CIVector(x:7);
 // CHECK: x = 7
-print("x = \(v.X)")
+print("x = \(v.x)")

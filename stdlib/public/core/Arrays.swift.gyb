@@ -158,7 +158,7 @@ if True:
 /// -------------------------
 ///
 /// An `NSArray` can be implicitly or explicitly converted to any
-/// bridged `Array<Element>`.  This conversion calls `copyWithZone`
+/// bridged `Array<Element>`.  This conversion calls `copy(withZone:)`
 /// on the `NSArray`, to ensure it won't be modified, and stores the
 /// result in the `Array`.  Type-checking, to ensure the `NSArray`'s
 /// elements match or can be bridged to `Element`, is deferred until the

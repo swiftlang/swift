@@ -15,7 +15,7 @@ var r = CGFloat(0)
 var g = CGFloat(0)
 var b = CGFloat(0)
 var a = CGFloat(0)
-var color = SKColor.redColor()
+var color = SKColor.red()
 color.getRed(&r, green:&g, blue:&b, alpha:&a)
 print("color \(r) \(g) \(b) \(a)")
 // CHECK: color 1.0 0.0 0.0 1.0

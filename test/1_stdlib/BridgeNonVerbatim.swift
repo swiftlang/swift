@@ -111,12 +111,12 @@ func testScope() {
 
   // We can get a single element out
   // CHECK-NEXT: nsx[0]: 1 .
-  var one = nsx.objectAtIndex(0) as! Tracked
+  var one = nsx.objectAt(0) as! Tracked
   print("nsx[0]: \(one.value) .")
 
   // We can get the element again, but it may not have the same identity
   // CHECK-NEXT: object identity matches?
-  var anotherOne = nsx.objectAtIndex(0) as! Tracked
+  var anotherOne = nsx.objectAt(0) as! Tracked
   print("object identity matches? \(one === anotherOne)")
 
   // Because the elements come back at +0, we really don't want to

@@ -118,8 +118,8 @@ func testNonnullSubscript(obj: Test) -> [AnyObject] {
 
 // CHECK-LABEL: sil hidden @_TF20objc_bridged_results19testPerformSelectorFCSo8NSObjectT_
 func testPerformSelector(obj: NSObject) {
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $NSObject, #NSObject.performSelector!1.foreign
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $NSObject, #NSObject.perform!1.foreign
   // CHECK: [[RESULT:%[0-9]+]] = apply [[METHOD]]({{%[0-9]+}}, {{%[0-9]+}}, %0)
-  _ = obj.performSelector("foo", withObject: nil)
+  _ = obj.perform("foo", withObject: nil)
   // CHECK-NOT: {{(retain|release).+}}[[RESULT]]
 } // CHECK: {{^}$}}

@@ -79,7 +79,7 @@ ${getMirrorDecl("NSDate")} {
     let df = NSDateFormatter()
     df.dateStyle = .MediumStyle
     df.timeStyle = .ShortStyle
-    return df.stringFromDate(_value)
+    return df.stringFrom(_value)
   }
   
   var quickLookObject: PlaygroundQuickLook? { return .Some(.Text(summary)) }
