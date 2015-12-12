@@ -352,21 +352,6 @@ bool SILLinkerVisitor::process() {
             if (!shouldImportFunction(F))
               continue;
 
-            // The ExternalSource may wish to rewrite non-empty bodies.
-            if (!F->isExternalDeclaration() && ExternalSource) {
-              if (auto *NewFn = ExternalSource->lookupSILFunction(F)) {
-                if (NewFn->isExternalDeclaration())
-                  continue;
-
-                NewFn->verify();
-                Worklist.push_back(NewFn);
-
-                ++NumFuncLinked;
-                Result = true;
-                continue;
-              }
-            }
-
             DEBUG(llvm::dbgs() << "Imported function: "
                                << F->getName() << "\n");
             F->setBare(IsBare);
