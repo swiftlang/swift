@@ -312,7 +312,7 @@ namespace {
 /// Optimize Copy-On-Write array checks based on high-level semantics.
 ///
 /// Performs an analysis on all Array users to ensure they do not interfere
-/// with make_mutable hoisting. Ultimately, the only thing that can interefere
+/// with make_mutable hoisting. Ultimately, the only thing that can interfere
 /// with make_mutable is a retain of the array. To ensure no retains occur
 /// within the loop, it is necessary to check that the array does not escape on
 /// any path reaching the loop, and that it is not directly retained within the
@@ -910,7 +910,7 @@ stripValueProjections(SILValue V,
   return V;
 }
 
-/// Finds the preceeding check_subscript, make_mutable call or returns nil.
+/// Finds the preceding check_subscript, make_mutable call or returns nil.
 ///
 /// If we found a make_mutable call this means that check_subscript was removed
 /// by the array bounds check elimination pass.
@@ -963,9 +963,9 @@ matchSelfParameterSetup(ApplyInst *Call, LoadInst *Self,
 ///
 /// Precondition: The client must make sure that it is valid to actually hoist
 /// the call. It must make sure that no write and no increment to the array
-/// reference has happend such that hoisting is not valid.
+/// reference has happened such that hoisting is not valid.
 ///
-/// This helper only checks that the operands computing the array refererence
+/// This helper only checks that the operands computing the array reference
 /// are also hoistable.
 struct HoistableMakeMutable {
   SILLoop *Loop;
@@ -1610,7 +1610,7 @@ static llvm::cl::opt<bool> ShouldSpecializeArrayProps("sil-array-props",
                                                       llvm::cl::init(true));
 
 /// Analysis whether it is safe to specialize this loop nest based on the
-/// array.props function calls it constains. It is safe to hoist array.props
+/// array.props function calls it contains. It is safe to hoist array.props
 /// calls if the array does not escape such that the array container could be
 /// overwritten in the hoisted region.
 /// This analysis also checks if we can clone the instructions in the loop nest.
