@@ -120,7 +120,7 @@ public func -= <T : UnsignedIntegerType> (
 
 //===----------------------------------------------------------------------===//
 
-/// A GeneratorType for `StrideTo<Element>`.
+/// A `GeneratorType` for `StrideTo<Element>`.
 public struct StrideToGenerator<Element : Strideable> : GeneratorType {
   @available(*, unavailable, renamed="Element")
   public typealias T = Element
@@ -186,7 +186,7 @@ public func stride<
   fatalError("unavailable function can't be called")
 }
 
-/// A GeneratorType for `StrideThrough<Element>`.
+/// A `GeneratorType` for `StrideThrough<Element>`.
 public struct StrideThroughGenerator<Element : Strideable> : GeneratorType {
   @available(*, unavailable, renamed="Element")
   public typealias T = Element
