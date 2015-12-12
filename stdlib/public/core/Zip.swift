@@ -48,12 +48,12 @@ public struct Zip2Generator<
       return nil
     }
 
-    guard let e0 = _baseStreams.0.next(), e1 = _baseStreams.1.next() else {
+    guard let element0 = _baseStreams.0.next(), element1 = _baseStreams.1.next() else {
       _reachedEnd = true
       return nil
     }
 
-    return .Some((e0, e1))
+    return .Some((element0, element1))
   }
 
   internal var _baseStreams: (Generator1, Generator2)
