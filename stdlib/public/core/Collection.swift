@@ -101,7 +101,7 @@ public struct IndexingGenerator<Elements : Indexable>
   ///
   /// - Requires: No preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> Elements._Element? {
-    guard _position != _elements.endIndex else { return nil }
+    if _position == _elements.endIndex { return nil }
     let element = _elements[_position]
     _position._successorInPlace()
     return element
