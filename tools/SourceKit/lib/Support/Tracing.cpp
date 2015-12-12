@@ -30,7 +30,7 @@ static std::atomic<bool> tracing_enabled(false);
 static std::atomic<uint64_t> operation_id(0);
 
 //----------------------------------------------------------------------------//
-// Copnsumers
+// Consumers
 //----------------------------------------------------------------------------//
 struct TraceConsumerListNode {
   trace::TraceConsumer *const Consumer;
