@@ -243,7 +243,7 @@ public struct StrideThrough<Element : Strideable> : SequenceType {
 }
 
 extension Strideable {
-  /// Return the sequence of values (`start`, `start + stride`, `start +
+  /// Return the sequence of values (`self`, `self + stride`, `self +
   /// stride + stride`, ... *last*) where *last* is the last value in
   /// the progression less than or equal to `end`.
   ///
