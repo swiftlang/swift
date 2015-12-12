@@ -103,7 +103,7 @@ public struct IndexingGenerator<Elements : Indexable>
   public mutating func next() -> Elements._Element? {
     guard _position != _elements.endIndex else { return nil }
     let element = _elements[_position]
-    _position = _position.successor()
+    _position._successorInPlace()
     return element
   }
 
