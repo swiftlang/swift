@@ -135,9 +135,9 @@ public struct StrideToGenerator<Element : Strideable> : GeneratorType {
     if stride > 0 ? current >= end : current <= end {
       return nil
     }
-    let ret = current
+    let element = current
     current += stride
-    return ret
+    return element
   }
 }
 
@@ -209,9 +209,9 @@ public struct StrideThroughGenerator<Element : Strideable> : GeneratorType {
       }
       return nil
     }
-    let ret = current
+    let element = current
     current += stride
-    return ret
+    return element
   }
 }
 
