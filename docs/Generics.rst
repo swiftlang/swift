@@ -814,7 +814,7 @@ because code like this::
 
 will essentially parse the type as::
 
-  identifier operator Int operator
+  identifier operator identifier operator
 
 and verify that the operators are '<' and '>', respectively. Cases
 involving <> are more interesting, because the type of::
