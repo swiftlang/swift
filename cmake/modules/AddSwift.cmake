@@ -1612,14 +1612,12 @@ function(_add_swift_executable_single name)
       "${SWIFTEXE_SINGLE_ARCHITECTURE}"
       "${CMAKE_BUILD_TYPE}"
       "${LLVM_ENABLE_ASSERTIONS}"
-      FALSE
       c_compile_flags)
   _add_variant_link_flags(
       "${SWIFTEXE_SINGLE_SDK}"
       "${SWIFTEXE_SINGLE_ARCHITECTURE}"
       "${CMAKE_BUILD_TYPE}"
       "${LLVM_ENABLE_ASSERTIONS}"
-      FALSE
       link_flags)
 
   list(APPEND link_flags
