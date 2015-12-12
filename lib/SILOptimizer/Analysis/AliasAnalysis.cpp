@@ -176,7 +176,7 @@ static bool isIdentifiedFunctionLocal(SILValue V) {
 }
 
 /// Returns true if V is a function argument that is not an address implying
-/// that we do not have the gaurantee that it will not alias anything inside the
+/// that we do not have the guarantee that it will not alias anything inside the
 /// function.
 static bool isAliasingFunctionArgument(SILValue V) {
   return isFunctionArgument(V) && !V.getType().isAddress();
