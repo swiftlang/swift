@@ -876,7 +876,7 @@ private:
   }
 };
 
-/// A block in the loop is guarantueed to be excuted if it dominates the exiting
+/// A block in the loop is guaranteed to be excuted if it dominates the exiting
 /// block.
 static bool isGuaranteedToBeExecuted(DominanceInfo *DT, SILBasicBlock *Block,
                                      SILBasicBlock *ExitingBlk) {
