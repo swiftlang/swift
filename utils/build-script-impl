@@ -993,7 +993,7 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
 done
 
 echo "Building the standard library for: ${SWIFT_STDLIB_TARGETS[@]}"
-if [[ "${SWIFT_TEST_TARGETS[@]}" ]] ; then
+if [[ "${SWIFT_TEST_TARGETS[@]}" ]] && ! [[ "${SKIP_TEST_SWIFT}" ]]; then
     echo "Running Swift tests for: ${SWIFT_TEST_TARGETS[@]}"
 fi
 echo
