@@ -31,7 +31,9 @@ public struct RangeGenerator<
     if startIndex == endIndex {
       return .None
     }
-    return startIndex++
+    let element = startIndex
+    startIndex._successorInPlace()
+    return element
   }
 
   /// The lower bound of the remaining range.
