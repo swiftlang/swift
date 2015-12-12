@@ -3164,11 +3164,11 @@ SetTestSuite.test("∩") {
   expectEqual(Set<Int>(), Set<Int>() ∩ s1)
 }
 
-SetTestSuite.test("intersectInPlace") {
-  var s1 = Set([1010, 2020, 3030])
-  let s2 = Set([4040, 5050, 6060])
-  var s3 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  var s4 = Set([1010, 2020, 3030])
+SetTestSuite.test("intersectInPlace.Native.Native") {
+  var s1 = getCOWFastSet([1010, 2020, 3030])
+  let s2 = getCOWFastSet([4040, 5050, 6060])
+  var s3 = getCOWFastSet([1010, 2020, 3030, 4040, 5050, 6060])
+  var s4 = getCOWFastSet([1010, 2020, 3030])
 
   let identity1 = unsafeBitCast(s1, Int.self)
   s1.intersectInPlace(s4)
@@ -3176,7 +3176,7 @@ SetTestSuite.test("intersectInPlace") {
   expectEqual(identity1, unsafeBitCast(s1, Int.self))
 
   s4.intersectInPlace(s2)
-  expectEqual(Set<Int>(), s4)
+  expectEqual(getCOWFastSet([]), s4)
 
   let identity2 = unsafeBitCast(s3, Int.self)
   s3.intersectInPlace(s2)
@@ -3184,11 +3184,89 @@ SetTestSuite.test("intersectInPlace") {
   expectTrue(s1.isDisjointWith(s3))
   expectNotEqual(identity1, unsafeBitCast(s3, Int.self))
 
-  var s5 = Set<Int>()
+  var s5 = getCOWFastSet([])
   s5.intersectInPlace(s5)
-  expectEqual(s5, Set<Int>())
+  expectEqual(s5, getCOWFastSet([]))
   s5.intersectInPlace(s1)
-  expectEqual(s5, Set<Int>())
+  expectEqual(s5, getCOWFastSet([]))
+}
+
+SetTestSuite.test("intersectInPlace.Native.BridgedVerbatim") {
+  var s1 = getNativeBridgedVerbatimSet([1010, 2020, 3030])
+  var s3 = getNativeBridgedVerbatimSet([1010, 2020, 3030, 4040, 5050, 6060])
+  var s4 = getNativeBridgedVerbatimSet([1010, 2020, 3030])
+
+  let bvs2 = getBridgedVerbatimSet([4040, 5050, 6060])
+  var bvs4 = getBridgedVerbatimSet([1010, 2020, 3030])
+
+  let identity1 = unsafeBitCast(s1, Int.self)
+  s1.intersectInPlace(bvs4)
+  expectEqual(s1, bvs4)
+  expectEqual(identity1, unsafeBitCast(s1, Int.self))
+
+  s4.intersectInPlace(bvs2)
+  expectEqual(Set<Int>(), s4)
+
+  let identity2 = unsafeBitCast(s3, Int.self)
+  s3.intersectInPlace(bvs2)
+  expectEqual(s3, bvs2)
+  expectTrue(s1.isDisjointWith(s3))
+  expectNotEqual(identity1, unsafeBitCast(s3, Int.self))
+}
+
+
+SetTestSuite.test("intersectInPlace.BridgedVerbatim.BridgedVerbatim") {
+  var bvs1 = getBridgedVerbatimSet([1010, 2020, 3030])
+  let bvs2 = getBridgedVerbatimSet([4040, 5050, 6060])
+  var bvs3 = getBridgedVerbatimSet([1010, 2020, 3030, 4040, 5050, 6060])
+  var bvs4 = getBridgedVerbatimSet([1010, 2020, 3030])
+
+  let identity1 = unsafeBitCast(bvs1, Int.self)
+  bvs1.intersectInPlace(bvs4)
+  expectEqual(bvs1, bvs4)
+  expectEqual(identity1, unsafeBitCast(bvs1, Int.self))
+
+  bvs4.intersectInPlace(bvs2)
+  expectEqual(getBridgedVerbatimSet([]), bvs4)
+
+  let identity2 = unsafeBitCast(bvs3, Int.self)
+  bvs3.intersectInPlace(bvs2)
+  expectEqual(bvs3, bvs2)
+  expectTrue(bvs1.isDisjointWith(bvs3))
+  expectNotEqual(identity1, unsafeBitCast(bvs3, Int.self))
+
+  var bvs5 = getBridgedVerbatimSet([])
+  bvs5.intersectInPlace(bvs5)
+  expectEqual(bvs5,  getBridgedVerbatimSet([]))
+  bvs5.intersectInPlace(bvs1)
+  expectEqual(bvs5, getBridgedVerbatimSet([]))
+}
+
+SetTestSuite.test("intersectInPlace.BridgedNonverbatim.BridgedNonverbatim") {
+  var bnvs1 = getBridgedNonverbatimSet([1010, 2020, 3030])
+  let bnvs2 = getBridgedNonverbatimSet([4040, 5050, 6060])
+  var bnvs3 = getBridgedNonverbatimSet([1010, 2020, 3030, 4040, 5050, 6060])
+  var bnvs4 = getBridgedNonverbatimSet([1010, 2020, 3030])
+
+  let identity1 = unsafeBitCast(bnvs1, Int.self)
+  bnvs1.intersectInPlace(bnvs4)
+  expectEqual(bnvs1, bnvs4)
+  expectEqual(identity1, unsafeBitCast(bnvs1, Int.self))
+
+  bnvs4.intersectInPlace(bnvs2)
+  expectEqual(getBridgedNonverbatimSet([]), bnvs4)
+
+  let identity2 = unsafeBitCast(bnvs3, Int.self)
+  bnvs3.intersectInPlace(bnvs2)
+  expectEqual(bnvs3, bnvs2)
+  expectTrue(bnvs1.isDisjointWith(bnvs3))
+  expectNotEqual(identity1, unsafeBitCast(bnvs3, Int.self))
+
+  var bnvs5 = getBridgedNonverbatimSet([])
+  bnvs5.intersectInPlace(bnvs5)
+  expectEqual(bnvs5, getBridgedNonverbatimSet([]))
+  bnvs5.intersectInPlace(bnvs1)
+  expectEqual(bnvs5, getBridgedNonverbatimSet([]))
 }
 
 SetTestSuite.test("∩=") {
