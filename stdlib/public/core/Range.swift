@@ -28,9 +28,7 @@ public struct RangeGenerator<
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   public mutating func next() -> Element? {
-    if startIndex == endIndex {
-      return .None
-    }
+    if startIndex == endIndex { return nil }
     let element = startIndex
     startIndex._successorInPlace()
     return element
