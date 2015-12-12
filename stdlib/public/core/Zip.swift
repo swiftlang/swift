@@ -48,12 +48,7 @@ public struct Zip2Generator<
       return nil
     }
 
-    guard let e0 = _baseStreams.0.next() else {
-      _reachedEnd = true
-      return nil
-    }
-
-    guard let e1 = _baseStreams.1.next() else {
+    guard let e0 = _baseStreams.0.next(), e1 = _baseStreams.1.next() else {
       _reachedEnd = true
       return nil
     }
