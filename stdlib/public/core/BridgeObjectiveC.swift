@@ -131,7 +131,7 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
 
 /// Attempt to convert `x` to its Objective-C representation.
 ///
-/// - If `T` is a class type, it is alaways bridged verbatim, the function
+/// - If `T` is a class type, it is always bridged verbatim, the function
 ///   returns `x`;
 ///
 /// - otherwise, `T` conforms to `_ObjectiveCBridgeable`:
@@ -257,7 +257,7 @@ func _bridgeNonVerbatimFromObjectiveC<T>(
   inout _ result: T?
 )
 
-/// Runtime optional to conditionall perform a bridge from an object to a value
+/// Runtime optional to conditionally perform a bridge from an object to a value
 /// type.
 ///
 /// - parameter result: Will be set to the resulting value if bridging succeeds, and
