@@ -20,7 +20,7 @@
 /// In a model of `SetAlgebraType`, some elements may subsume other
 /// elements, where
 ///
-/// > `a` **subsumes** `b` iff `([a] as Self).isSupersetOf([b])`
+/// > `a` **subsumes** `b` if `([a] as Self).isSupersetOf([b])`
 ///
 /// In many models of `SetAlgebraType` such as `Set<T>`, `a`
 /// *subsumes* `b` if and only if `a == b`, but that is not always the
