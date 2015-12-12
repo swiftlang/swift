@@ -210,7 +210,6 @@ public struct ${Self}<Element>
   /// Access the `index`th element. Reading is O(1).  Writing is
   /// ${O1}.
   public subscript(index: Int) -> Element {
-%if Self == 'Array':
     get {
       // This call may be hoisted or eliminated by the optimizer.  If
       // there is an inout violation, this value may be stale so needs to be 
@@ -226,21 +225,6 @@ public struct ${Self}<Element>
         index, wasNativeTypeChecked: wasNativeTypeChecked,
         matchingSubscriptCheck: token)
     }
-%elif Self == 'ContiguousArray':
-    addressWithNativeOwner {
-      _checkSubscript_native(index)
-      return (
-        UnsafePointer(_buffer.subscriptBaseAddress + index),
-        Builtin.castToNativeObject(_buffer.owner))
-    }
-%else:
-    addressWithOwner {
-      _checkSubscript_native(index)
-      return (
-        UnsafePointer(_buffer.subscriptBaseAddress + index),
-        Builtin.castToUnknownObject(_buffer.owner))
-    }
-%end
     mutableAddressWithPinnedNativeOwner {
       _makeMutableAndUniqueOrPinned() // makes the array native, too
       _checkSubscript_native(index)   
