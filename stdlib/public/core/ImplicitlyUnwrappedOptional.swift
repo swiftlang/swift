@@ -59,7 +59,7 @@ public enum ImplicitlyUnwrappedOptional<Wrapped>
     }
   }
 
-  /// Returns `nil` if `self` is nil, `f(self!)` otherwise.
+  /// Returns `nil` if `self` is `nil`, `f(self!)` otherwise.
   @warn_unused_result
   public func flatMap<U>(
     @noescape f: (Wrapped) throws -> ImplicitlyUnwrappedOptional<U>

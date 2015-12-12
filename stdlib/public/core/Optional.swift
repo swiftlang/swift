@@ -38,7 +38,7 @@ public enum Optional<Wrapped> : _Reflectable, NilLiteralConvertible {
     }
   }
 
-  /// Returns `nil` if `self` is nil, `f(self!)` otherwise.
+  /// Returns `nil` if `self` is `nil`, `f(self!)` otherwise.
   @warn_unused_result
   public func flatMap<U>(@noescape f: (Wrapped) throws -> U?) rethrows -> U? {
     switch self {
@@ -91,7 +91,7 @@ public func map<T, U>(x: T?, @noescape _ f: (T)->U) -> U? {
 }
 
 
-/// Returns `f(self)!` iff `self` and `f(self)` are not nil.
+/// Returns `f(self)!` iff `self` and `f(self)` are not `nil`.
 @available(*, unavailable, message="call the 'flatMap()' method on the optional value")
 public func flatMap<T, U>(x: T?, @noescape _ f: (T)->U?) -> U? {
   fatalError("unavailable function can't be called")
