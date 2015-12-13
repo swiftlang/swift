@@ -2517,7 +2517,7 @@ public:
   /// \param prevArgIdx The argument that the \c argIdx should have preceded.
   virtual void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx);
 
-  /// Indicates that the arguments need to be relabed to match the parameters.
+  /// Indicates that the arguments need to be labelled to match the parameters.
   ///
   /// \returns true to indicate that this should cause a failure, false
   /// otherwise.
