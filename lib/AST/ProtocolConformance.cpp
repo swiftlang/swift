@@ -642,7 +642,7 @@ DeclContext::getLocalProtocols(
     nullptr,
     diagnostics);
 
-  // Sort if requred.
+  // Sort if required.
   if (sorted) {
     llvm::array_pod_sort(result.begin(), result.end(),
                          &ProtocolType::compareProtocols);
