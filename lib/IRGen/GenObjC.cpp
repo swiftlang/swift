@@ -1098,7 +1098,7 @@ static llvm::Constant *getObjCEncodingForTypes(IRGenModule &IGM,
   }
 
   // Parameter types.
-  // TODO. Encode type qualifer, 'in', 'inout', etc. for the parameter.
+  // TODO. Encode type qualifier, 'in', 'inout', etc. for the parameter.
   std::string paramsString;
   for (auto param : params) {
     auto clangType = IGM.getClangType(param.getType());
@@ -1106,7 +1106,7 @@ static llvm::Constant *getObjCEncodingForTypes(IRGenModule &IGM,
       return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     
     // TODO. Some stuff related to Array and Function type is missing.
-    // TODO. Encode type qualifer, 'in', 'inout', etc. for the parameter.
+    // TODO. Encode type qualifier, 'in', 'inout', etc. for the parameter.
     HelperGetObjCEncodingForType(clangASTContext, clangType, paramsString,
                                  useExtendedEncoding);
     paramsString += llvm::itostr(parmOffset);
