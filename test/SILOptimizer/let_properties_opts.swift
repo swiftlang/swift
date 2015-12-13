@@ -10,7 +10,7 @@
 // FIXME: This test is written in Swift instead of SIL, because there are some problems
 // with SIL deserialization (rdar://22636911)
 
-// Check that intializers do not contain a code to intialize private or
+// Check that initializers do not contain a code to initialize private or
 // internal (if used with WMO) properties, because their values are propagated into
 // their uses and they cannot be accessed from other modules. Therefore the
 // initialization code could be removed.
@@ -36,7 +36,7 @@
 // CHECK-WMO: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop3
 // CHECK-WMO: return
 
-// Check that intializers do not contain a code to intialize private properties, 
+// Check that initializers do not contain a code to initialize private properties, 
 // because their values are propagated into their uses and they cannot be accessed
 // from other modules. Therefore the initialization code could be removed.
 // Specifically, the initialization code for Prop2 can be removed.
