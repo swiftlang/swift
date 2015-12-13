@@ -16,7 +16,7 @@ var SliceTests = TestSuite("CollectionType")
 
 SliceTests.test("Slice/AssociatedTypes") {
 %for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
-  if true {
+  do {
     typealias Base = Minimal${traversal}Collection<OpaqueValue<Int>>
     typealias ${traversal}Slice = Slice<Base>
     expectSliceType(${traversal}Slice.self)
@@ -129,7 +129,7 @@ SliceTests.test("Slice.subscript(_: Range<Index>)") {
 
 SliceTests.test("MutableSlice/AssociatedTypes") {
 %for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
-  if true {
+  do {
     typealias Base =
       Minimal${traversal}MutableCollection<OpaqueValue<Int>>
     typealias ${traversal}MutableSlice = MutableSlice<Base>

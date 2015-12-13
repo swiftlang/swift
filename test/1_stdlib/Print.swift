@@ -159,19 +159,19 @@ func test_StdlibTypesPrinted() {
   assertEquals("\"あ\"", us.description)
   debugPrintedIs(us, "\"\\u{3042}\"")
 
-  if true {
+  do {
     var implicitlyUnwrappedString: String! = nil
     printedIs(implicitlyUnwrappedString, "nil")
     implicitlyUnwrappedString = "meow"
     printedIs(implicitlyUnwrappedString, "meow")
   }
-  if true {
+  do {
     var optionalString: String? = nil
     printedIs(optionalString, "nil")
     optionalString = "meow"
     printedIs(optionalString, "Optional(\"meow\")")
   }
-  if true {
+  do {
     struct Wrapper : CustomStringConvertible {
       var x: CustomStringConvertible? = nil
 
@@ -603,95 +603,95 @@ class ClassVeryPrintable : CustomStringConvertible, CustomDebugStringConvertible
 }
 
 func test_ObjectPrinting() {
-  if true {
+  do {
     let s = StructPrintable(1)
     printedIs(s, "►1◀︎")
   }
-  if true {
+  do {
     let s: ProtocolUnrelatedToPrinting = StructPrintable(1)
     printedIs(s, "►1◀︎")
   }
-  if true {
+  do {
     let s: CustomStringConvertible = StructPrintable(1)
     printedIs(s, "►1◀︎")
   }
-  if true {
+  do {
     let s: Any = StructPrintable(1)
     printedIs(s, "►1◀︎")
   }
 
-  if true {
+  do {
     let s = LargeStructPrintable(10, 20, 30, 40)
     printedIs(s, "<10 20 30 40>")
   }
-  if true {
+  do {
     let s: ProtocolUnrelatedToPrinting = LargeStructPrintable(10, 20, 30, 40)
     printedIs(s, "<10 20 30 40>")
   }
-  if true {
+  do {
     let s: CustomStringConvertible = LargeStructPrintable(10, 20, 30, 40)
     printedIs(s, "<10 20 30 40>")
   }
-  if true {
+  do {
     let s: Any = LargeStructPrintable(10, 20, 30, 40)
     printedIs(s, "<10 20 30 40>")
   }
 
-  if true {
+  do {
     let s = StructVeryPrintable(1)
     printedIs(s, "<description: 1>")
   }
-  if true {
+  do {
     let s: ProtocolUnrelatedToPrinting = StructVeryPrintable(1)
     printedIs(s, "<description: 1>")
   }
-  if true {
+  do {
     let s: CustomStringConvertible = StructVeryPrintable(1)
     printedIs(s, "<description: 1>")
   }
-  if true {
+  do {
     let s: CustomDebugStringConvertible = StructVeryPrintable(1)
     printedIs(s, "<description: 1>")
   }
-  if true {
+  do {
     let s: Any = StructVeryPrintable(1)
     printedIs(s, "<description: 1>")
   }
 
-  if true {
+  do {
     let c = ClassPrintable(1)
     printedIs(c, "►1◀︎")
   }
-  if true {
+  do {
     let c: ProtocolUnrelatedToPrinting = ClassPrintable(1)
     printedIs(c, "►1◀︎")
   }
-  if true {
+  do {
     let c: CustomStringConvertible = ClassPrintable(1)
     printedIs(c, "►1◀︎")
   }
-  if true {
+  do {
     let c: Any = ClassPrintable(1)
     printedIs(c, "►1◀︎")
   }
 
-  if true {
+  do {
     let c = ClassVeryPrintable(1)
     printedIs(c, "<description: 1>")
   }
-  if true {
+  do {
     let c: ProtocolUnrelatedToPrinting = ClassVeryPrintable(1)
     printedIs(c, "<description: 1>")
   }
-  if true {
+  do {
     let c: CustomStringConvertible = ClassVeryPrintable(1)
     printedIs(c, "<description: 1>")
   }
-  if true {
+  do {
     let c: CustomDebugStringConvertible = ClassVeryPrintable(1)
     printedIs(c, "<description: 1>")
   }
-  if true {
+  do {
     let c: Any = ClassVeryPrintable(1)
     printedIs(c, "<description: 1>")
   }
