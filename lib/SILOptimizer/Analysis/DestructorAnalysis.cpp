@@ -40,7 +40,7 @@ bool DestructorAnalysis::isSafeType(Type Ty) {
   }
 
   // Before we recurse mark the type as safe i.e if we see it in a recursive
-  // possition it is safe in the absence of another fact that proves otherwise.
+  // position it is safe in the absence of another fact that proves otherwise.
   // We will reset this value to the correct value once we return from the
   // recursion below.
   cacheResult(Canonical, true);
