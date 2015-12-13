@@ -71,7 +71,7 @@ protected:
   private:
 
     /// The list of callers which must be invalidated if this function gets
-    /// invalidated. Note that the list may contain invlid entries for already
+    /// invalidated. Note that the list may contain invalid entries for already
     /// invalidated callers. Those entries are removed lazily in
     /// removeInvalidCallers().
     /// The lazy removal of invalid entries avoids that we additionally need to
