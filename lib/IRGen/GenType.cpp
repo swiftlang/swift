@@ -661,7 +661,7 @@ namespace {
   };
   
   /// A TypeInfo implementation for opaque storage. Swift will preserve any
-  /// data stored into this arbitarily sized and aligned field, but doesn't
+  /// data stored into this arbitrarily sized and aligned field, but doesn't
   /// know anything about the data.
   class OpaqueStorageTypeInfo final :
     public ScalarTypeInfo<OpaqueStorageTypeInfo, LoadableTypeInfo>
