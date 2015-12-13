@@ -3,7 +3,7 @@
 
 // Test propagation of non-static let properties with compile-time constant values.
 
-// TODO: Once this optimization can remove the propagated private/internal let propeties or
+// TODO: Once this optimization can remove the propagated private/internal let properties or
 // mark them as ones without a storage, new tests should be added here to check for this
 // functionality.
 
