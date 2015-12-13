@@ -311,7 +311,7 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
     //               apply %specialized_callee(..., %arg)
     //
     // However, if they are not in the same basic block the callee might be
-    // executed more frequenly than the closure (for example, if the closure is
+    // executed more frequently than the closure (for example, if the closure is
     // created in a loop preheader and the callee taking the closure is executed
     // in the loop). In such a case we must keep the argument live accross the
     // call site of the callee and emit a matching retain for every innvocation
