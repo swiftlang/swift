@@ -637,7 +637,7 @@ public:
   /// Swift-native reference counting?
   bool usesNativeReferenceCounting(ResilienceExpansion resilience);
 
-  /// Determines whether this type has a bridgable object
+  /// Determines whether this type has a bridgeable object
   /// representation, i.e., whether it is always represented as a single
   /// (non-nil) pointer that can be unknown-retained and
   /// unknown-released.
