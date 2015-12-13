@@ -214,7 +214,7 @@ bb22:
 // Check that a checked_cast_addr_br converting a known type into a protocol type
 // is performed at the compile-time if protocol conformances are statically known.
 // In a negative case, take care that cast for private types are not folded if one
-// of its superclasses could have a conformance extension defined elsewere.
+// of its superclasses could have a conformance extension defined elsewhere.
 //
 // CHECK-LABEL: sil @convert_checked_cast_addr_br_with_non_private_superclass : $@convention(thin) (@in D, @inout _Stdout) -> ()
 // CHECK: checked_cast_addr_br
