@@ -27,11 +27,11 @@
 #ifndef SWIFT_SIL_VALUEPROJECTION_H
 #define SWIFT_SIL_VALUEPROJECTION_H
 
+#include "swift/SIL/Projection.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/TypeExpansionAnalysis.h"
-#include "swift/SIL/Projection.h"
-#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
@@ -529,8 +529,9 @@ static inline llvm::hash_code hash_value(const LSLocation &L) {
 /// LSLocation is used in DenseMap, define functions required by DenseMap.
 namespace llvm {
 using swift::SILValueProjection;
-
 using swift::LSLocation;
+using swift::LSValue;
+
 template <> struct DenseMapInfo<LSLocation> {
   static inline LSLocation getEmptyKey() {
     return LSLocation(SILValueProjection::EmptyKey);
@@ -538,7 +539,7 @@ template <> struct DenseMapInfo<LSLocation> {
   static inline LSLocation getTombstoneKey() {
     return LSLocation(SILValueProjection::TombstoneKey);
   }
-  static unsigned getHashValue(const LSLocation &Loc) {
+  static inline unsigned getHashValue(const LSLocation &Loc) {
     return hash_value(Loc);
   }
   static bool isEqual(const LSLocation &LHS, const LSLocation &RHS) {
@@ -546,7 +547,6 @@ template <> struct DenseMapInfo<LSLocation> {
   }
 };
 
-using swift::LSValue;
 template <> struct DenseMapInfo<LSValue> {
   static inline LSValue getEmptyKey() {
     return LSValue(SILValueProjection::EmptyKey);
@@ -554,7 +554,9 @@ template <> struct DenseMapInfo<LSValue> {
   static inline LSValue getTombstoneKey() {
     return LSValue(SILValueProjection::TombstoneKey);
   }
-  static unsigned getHashValue(const LSValue &Val) { return hash_value(Val); }
+  static inline unsigned getHashValue(const LSValue &Val) {
+    return hash_value(Val);
+  }
   static bool isEqual(const LSValue &LHS, const LSValue &RHS) {
     return LHS == RHS;
   }
