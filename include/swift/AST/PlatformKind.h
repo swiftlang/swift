@@ -40,7 +40,7 @@ StringRef platformString(PlatformKind platform);
 /// or None if such a platform kind does not exist.
 Optional<PlatformKind> platformFromString(StringRef Name);
 
-/// Returns a human-readiable version of the platform name as a string, suitable
+/// Returns a human-readable version of the platform name as a string, suitable
 /// for emission in diagnostics (e.g., "OS X").
 StringRef prettyPlatformString(PlatformKind platform);
 
