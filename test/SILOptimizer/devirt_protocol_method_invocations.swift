@@ -39,7 +39,7 @@ func callGetSelf(f: Foo)->Foo {
   return f.getSelf()
 }
 
-// Check that calls to f.foo() get devirtalized and are not invoked
+// Check that calls to f.foo() get devirtualized and are not invoked
 // via the expensive witness_method instruciton.
 // To achieve that the information about a concrete type C should
 // be propagated from init_existential_addr into witness_method and 
@@ -69,7 +69,7 @@ public func test_devirt_protocol_method_invocation(c: C)->Int {
 }
 
 // Check that calls of a method boo() from the protocol extension
-// get devirtalized and are not invoked via the expensive witness_method instruciton
+// get devirtualized and are not invoked via the expensive witness_method instruciton
 // or by passing an existential as a parameter.
 // To achieve that the information about a concrete type C should
 // be propagated from init_existential_addr into apply instructions.
