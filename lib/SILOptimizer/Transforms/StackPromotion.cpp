@@ -37,7 +37,7 @@ using namespace swift;
 ///    size and alignment for the final stack promotion decision. The arguments
 ///    to swift_bufferAllocate in SIL are not constant because they depend on
 ///    the not-yet-evaluatable sizeof and alignof builtins. Therefore we need
-///    LLVM's contant propagation prior to deciding on stack promotion.
+///    LLVM's constant propagation prior to deciding on stack promotion.
 ///    The solution to this problem is that we need native support for tail-
 ///    allocated arrays in SIL so that we can do the array buffer allocations
 ///    with alloc_ref instructions.
