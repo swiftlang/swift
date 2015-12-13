@@ -33,7 +33,7 @@
 /// 3. Performing a RPO walk over the control flow graph, tracking any
 /// LSLocations that are read from or stored into in each basic block. The
 /// read or stored value, kept in a map (gen-set) between LSLocation and
-/// LSValue, becomes the avalable value for the LSLocation.
+/// LSValue, becomes the available value for the LSLocation.
 ///
 /// 4. An optimistic iterative intersection-based dataflow is performed on the
 /// gen sets until convergence.
