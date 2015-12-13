@@ -166,7 +166,7 @@ private:
   /// This is lazily initialized the first time we attempt to
   /// deserialize. Previously this was created when the SILModule was
   /// constructed. In certain cases this was before all Modules had been loaded
-  /// causeing us to not
+  /// causing us to not
   std::unique_ptr<SerializedSILLoader> SILLoader;
   
   /// True if this SILModule really contains the whole module, i.e.
