@@ -436,7 +436,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
 
   case tok::oper_postfix:
     // Postfix operators cannot start a subexpression, but can happen
-    // syntactically because the operator may just follow whatever preceeds this
+    // syntactically because the operator may just follow whatever precedes this
     // expression (and that may not always be an expression).
     diagnose(Tok, diag::invalid_postfix_operator);
     Tok.setKind(tok::oper_prefix);
