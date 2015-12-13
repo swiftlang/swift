@@ -505,7 +505,7 @@ void BlockState::updateForwardSetForWrite(RLEContext &Ctx, unsigned LBit,
     LSLocation &L = Ctx.getLSLocation(i);
     if (!L.isMayAliasLSLocation(R, Ctx.getAA()))
       continue;
-    // MayAlias, invaliate the LSLocation.
+    // MayAlias, invalidate the LSLocation.
     stopTrackingLSLocation(i);
   }
 
