@@ -10,7 +10,7 @@ import Swift
 import Darwin
 
 // Interpret the command line arguments.
-var arg = Process.arguments[1]
+let arg = Process.arguments[1]
 
 if arg == "env" {
   setlocale(LC_ALL, "")
@@ -18,8 +18,13 @@ if arg == "env" {
   setlocale(LC_ALL, arg)
 }
 
-func stdlibTypesHaveDescription() {
-  func hasDescription(_: CustomStringConvertible) {}
+import StdlibUnittest
+let PrintTests = TestSuite("Print")
+
+PrintTests.test("stdlib types have description") {
+  func hasDescription(any: Any) {
+    expectTrue(any is CustomStringConvertible)
+  }
 
   hasDescription(Int(42))
   hasDescription(UInt(42))
@@ -109,165 +114,159 @@ func assertEquals(
   }
 }
 
-func test_StdlibTypesPrinted() {
-  printedIs(Float(1.0), "1.0")
-  printedIs(Float(-1.0), "-1.0")
-  printedIs(Double(1.0), "1.0")
-  printedIs(Double(-1.0), "-1.0")
+PrintTests.test("test stdlib types printed") {
+  expectPrinted("1.0", Float(1.0))
+  expectPrinted("-1.0", Float(-1.0))
+  expectPrinted("1.0", Double(1.0))
+  expectPrinted("-1.0", Double(-1.0))
 
-  printedIs(CChar(42), "42")
-  printedIs(CUnsignedChar(42), "42")
-  printedIs(CUnsignedShort(42), "42")
-  printedIs(CUnsignedInt(42), "42")
-  printedIs(CUnsignedLong(42), "42")
-  printedIs(CUnsignedLongLong(42), "42")
-  printedIs(CSignedChar(42), "42")
-  printedIs(CShort(42), "42")
-  printedIs(CInt(42), "42")
-  printedIs(CLong(42), "42")
-  printedIs(CLongLong(42), "42")
-  printedIs(CFloat(1.0), "1.0")
-  printedIs(CFloat(-1.0), "-1.0")
-  printedIs(CDouble(1.0), "1.0")
-  printedIs(CDouble(-1.0), "-1.0")
+  expectPrinted("42", CChar(42))
+  expectPrinted("42", CUnsignedChar(42))
+  expectPrinted("42", CUnsignedShort(42))
+  expectPrinted("42", CUnsignedInt(42))
+  expectPrinted("42", CUnsignedLong(42))
+  expectPrinted("42", CUnsignedLongLong(42))
+  expectPrinted("42", CSignedChar(42))
+  expectPrinted("42", CShort(42))
+  expectPrinted("42", CInt(42))
+  expectPrinted("42", CLong(42))
+  expectPrinted("42", CLongLong(42))
+  expectPrinted("1.0", CFloat(1.0))
+  expectPrinted("-1.0", CFloat(-1.0))
+  expectPrinted("1.0", CDouble(1.0))
+  expectPrinted("-1.0", CDouble(-1.0))
 
-  printedIs(CWideChar(42), "*")
-  printedIs(CChar16(42), "42")
-  printedIs(CChar32(42), "*")
-  printedIs(CBool(true), "true")
-  printedIs(CBool(false), "false")
+  expectPrinted("*", CWideChar(42))
+  expectPrinted("42", CChar16(42))
+  expectPrinted("*", CChar32(42))
+  expectPrinted("true", CBool(true))
+  expectPrinted("false", CBool(false))
 
-  var s: String = "abc"
-  printedIs(s, "abc")
-  debugPrintedIs(s, "\"abc\"")
-  s = "\\ \' \" \0 \n \r \t \u{05}"
-  debugPrintedIs(s, "\"\\\\ \\\' \\\" \\0 \\n \\r \\t \\u{05}\"")
+
+  let s0: String = "abc"
+  expectPrinted("abc", s0)
+  expectDebugPrinted("\"abc\"", s0)
+
+  let s1: String =  "\\ \' \" \0 \n \r \t \u{05}"
+  expectDebugPrinted("\"\\\\ \\\' \\\" \\0 \\n \\r \\t \\u{05}\"", s1)
 
   let ch: Character = "a"
-  printedIs(ch, "a")
-  debugPrintedIs(ch, "\"a\"")
+  expectPrinted("a", ch)
+  expectDebugPrinted("\"a\"", ch)
 
-  var us: UnicodeScalar = "a"
-  printedIs(us, "a")
-  debugPrintedIs(us, "\"a\"")
-  us = "\\"
-  printedIs(us, "\\")
-  assertEquals("\"\\\\\"", us.description)
-  debugPrintedIs(us, "\"\\\\\"")
-  us = "あ"
-  printedIs(us, "あ")
-  assertEquals("\"あ\"", us.description)
-  debugPrintedIs(us, "\"\\u{3042}\"")
+  let us0: UnicodeScalar = "a"
+  expectPrinted("a", us0)
+  expectDebugPrinted("\"a\"", us0)
 
-  do {
-    var implicitlyUnwrappedString: String! = nil
-    printedIs(implicitlyUnwrappedString, "nil")
-    implicitlyUnwrappedString = "meow"
-    printedIs(implicitlyUnwrappedString, "meow")
-  }
-  do {
-    var optionalString: String? = nil
-    printedIs(optionalString, "nil")
-    optionalString = "meow"
-    printedIs(optionalString, "Optional(\"meow\")")
-  }
-  do {
-    struct Wrapper : CustomStringConvertible {
-      var x: CustomStringConvertible? = nil
+  let us1: UnicodeScalar = "\\"
+  expectPrinted("\\", us1)
+  expectEqual("\"\\\\\"", us1.description)
+  expectDebugPrinted("\"\\\\\"", us1)
 
-      var description: String {
-        return "Wrapper(" + x.debugDescription + ")"
-      }
+  let us2: UnicodeScalar = "あ"
+  expectPrinted("あ", us2)
+  expectEqual("\"あ\"", us2.description)
+  expectDebugPrinted("\"\\u{3042}\"", us2)
+}
+
+PrintTests.test("optional strings") {
+  expectEqual("nil", String!())
+  expectEqual("meow", String!("meow"))
+  expectEqual("nil", String?())
+  expectEqual("Optional(\"meow\")", String?("meow"))
+}
+
+PrintTests.test("custom string convertible structs") {
+  struct Wrapper : CustomStringConvertible {
+    var x: CustomStringConvertible? = nil
+    
+    var description: String {
+      return "Wrapper(\(x.debugDescription))"
     }
-    printedIs(Wrapper(), "Wrapper(nil)")
-    printedIs(Wrapper(x: Wrapper()), "Wrapper(Optional(Wrapper(nil)))")
-    printedIs(Wrapper(x: Wrapper(x: Wrapper())),
-        "Wrapper(Optional(Wrapper(Optional(Wrapper(nil)))))")
   }
-
-  print("test_StdlibTypesPrinted done")
+  expectPrinted("Wrapper(nil)", Wrapper())
+  expectPrinted("Wrapper(Optional(Wrapper(nil)))",
+    Wrapper(x: Wrapper()))
+  expectPrinted("Wrapper(Optional(Wrapper(Optional(Wrapper(nil)))))",
+    Wrapper(x: Wrapper(x: Wrapper())))
 }
-test_StdlibTypesPrinted()
-// CHECK: test_StdlibTypesPrinted done
 
-func test_IntegerPrinting() {
+PrintTests.test("integer printing") {
   if (UInt64(Int.max) > 0x1_0000_0000 as UInt64) {
-    printedIs(Int.min, "-9223372036854775808")
-    printedIs(Int.max, "9223372036854775807")
+    expectPrinted("-9223372036854775808", Int.min)
+    expectPrinted("9223372036854775807", Int.max)
   } else {
-    printedIs(Int.min, "-2147483648")
-    printedIs(Int.max, "2147483647")
+    expectPrinted("-2147483648", Int.min)
+    expectPrinted("2147483647", Int.max)
   }
-  printedIs(Int(0), "0")
-  printedIs(Int(42), "42")
-  printedIs(Int(-42), "-42")
-
+  
+  expectPrinted("0", Int(0))
+  expectPrinted("42", Int(42))
+  expectPrinted("-42", Int(-42))
+  
   if (UInt64(UInt.max) > 0x1_0000_0000 as UInt64) {
-    printedIs(UInt.max, "18446744073709551615")
+    expectPrinted("18446744073709551615", UInt.max)
   } else {
-    printedIs(UInt.max, "4294967295")
+    expectPrinted("4294967295", UInt.max)
   }
-  printedIs(UInt.min, "0")
-  printedIs(UInt(0), "0")
-  printedIs(UInt(42), "42")
-
-  printedIs(Int8.min, "-128")
-  printedIs(Int8.max, "127")
-  printedIs(Int8(0), "0")
-  printedIs(Int8(42), "42")
-  printedIs(Int8(-42), "-42")
-
-  printedIs(UInt8.min, "0")
-  printedIs(UInt8.max, "255")
-  printedIs(UInt8(0), "0")
-  printedIs(UInt8(42), "42")
-
-  printedIs(Int16.min, "-32768")
-  printedIs(Int16.max, "32767")
-  printedIs(Int16(0), "0")
-  printedIs(Int16(42), "42")
-  printedIs(Int16(-42), "-42")
-
-  printedIs(UInt16.min, "0")
-  printedIs(UInt16.max, "65535")
-  printedIs(UInt16(0), "0")
-  printedIs(UInt16(42), "42")
-
-  printedIs(Int32.min, "-2147483648")
-  printedIs(Int32.max, "2147483647")
-  printedIs(Int32(0), "0")
-  printedIs(Int32(42), "42")
-  printedIs(Int32(-42), "-42")
-
-  printedIs(UInt32.min, "0")
-  printedIs(UInt32.max, "4294967295")
-  printedIs(UInt32(0), "0")
-  printedIs(UInt32(42), "42")
-
-  printedIs(Int64.min, "-9223372036854775808")
-  printedIs(Int64.max, "9223372036854775807")
-  printedIs(Int64(0), "0")
-  printedIs(Int64(42), "42")
-  printedIs(Int64(-42), "-42")
-
-  printedIs(UInt64.min, "0")
-  printedIs(UInt64.max, "18446744073709551615")
-  printedIs(UInt64(0), "0")
-  printedIs(UInt64(42), "42")
-
-  printedIs(Int8(-42), "-42")
-  printedIs(Int16(-42), "-42")
-  printedIs(Int32(-42), "-42")
-  printedIs(Int64(-42), "-42")
-  printedIs(UInt8(42), "42")
-  printedIs(UInt16(42), "42")
-  printedIs(UInt32(42), "42")
-  printedIs(UInt64(42), "42")
-
-  print("test_IntegerPrinting done")
+  
+  expectPrinted("0", UInt.min)
+  expectPrinted("0", UInt(0))
+  expectPrinted("42", UInt(42))
+  
+  expectPrinted("-128", Int8.min)
+  expectPrinted("127", Int8.max)
+  expectPrinted("0", Int8(0))
+  expectPrinted("42", Int8(42))
+  expectPrinted("-42", Int8(-42))
+  
+  expectPrinted("0", UInt8.min)
+  expectPrinted("255", UInt8.max)
+  expectPrinted("0", UInt8(0))
+  expectPrinted("42", UInt8(42))
+  
+  expectPrinted("-32768", Int16.min)
+  expectPrinted("32767", Int16.max)
+  expectPrinted("0", Int16(0))
+  expectPrinted("42", Int16(42))
+  expectPrinted("-42", Int16(-42))
+  
+  expectPrinted("0", UInt16.min)
+  expectPrinted("65535", UInt16.max)
+  expectPrinted("0", UInt16(0))
+  expectPrinted("42", UInt16(42))
+  
+  expectPrinted("-2147483648", Int32.min)
+  expectPrinted("2147483647", Int32.max)
+  expectPrinted("0", Int32(0))
+  expectPrinted("42", Int32(42))
+  expectPrinted("-42", Int32(-42))
+  
+  expectPrinted("0", UInt32.min)
+  expectPrinted("4294967295", UInt32.max)
+  expectPrinted("0", UInt32(0))
+  expectPrinted("42", UInt32(42))
+  
+  expectPrinted("-9223372036854775808", Int64.min)
+  expectPrinted("9223372036854775807", Int64.max)
+  expectPrinted("0", Int64(0))
+  expectPrinted("42", Int64(42))
+  expectPrinted("-42", Int64(-42))
+  
+  expectPrinted("0", UInt64.min)
+  expectPrinted("18446744073709551615", UInt64.max)
+  expectPrinted("0", UInt64(0))
+  expectPrinted("42", UInt64(42))
+  
+  expectPrinted("-42", Int8(-42))
+  expectPrinted("-42", Int16(-42))
+  expectPrinted("-42", Int32(-42))
+  expectPrinted("-42", Int64(-42))
+  expectPrinted("42", UInt8(42))
+  expectPrinted("42", UInt16(42))
+  expectPrinted("42", UInt32(42))
+  expectPrinted("42", UInt64(42))
 }
-test_IntegerPrinting()
-// CHECK: test_IntegerPrinting done
 
 func test_FloatingPointPrinting() {
   func asFloat32(f: Float32) -> Float32 { return f }
