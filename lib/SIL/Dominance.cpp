@@ -22,7 +22,7 @@ template class llvm::DominatorTreeBase<SILBasicBlock>;
 template class llvm::DominatorBase<SILBasicBlock>;
 template class llvm::DomTreeNodeBase<SILBasicBlock>;
 
-/// Compute the immmediate-dominators map.
+/// Compute the immediate-dominators map.
 DominanceInfo::DominanceInfo(SILFunction *F)
     : DominatorTreeBase(/*isPostDom*/ false) {
       assert(!F->isExternalDeclaration() &&
@@ -64,7 +64,7 @@ void DominanceInfo::verify() const {
   }
 }
 
-/// Compute the immmediate-post-dominators map.
+/// Compute the immediate-post-dominators map.
 PostDominanceInfo::PostDominanceInfo(SILFunction *F)
   : DominatorTreeBase(/*isPostDom*/ true) {
   assert(!F->isExternalDeclaration() &&
