@@ -1168,7 +1168,7 @@ bool SILCombiner::optimizeIdentityCastComposition(ApplyInst *FInverse,
   if (!knowHowToEmitReferenceCountInsts(FInverse))
     return false;
 
-  // We need to know that the cast will succeeed.
+  // We need to know that the cast will succeed.
   if (!isCastTypeKnownToSucceed(FInverse->getArgument(0).getType(),
                                 FInverse->getModule()) ||
       !isCastTypeKnownToSucceed(FInverse->getType(), FInverse->getModule()))
