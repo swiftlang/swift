@@ -186,7 +186,7 @@ public struct LazyFilterCollection<
       if _predicate(_base[first]) {
         break
       }
-      ++first
+      first._successorInPlace()
     }
     return LazyFilterIndex(
       _baseElements: _base, base: first, _include: _predicate)
