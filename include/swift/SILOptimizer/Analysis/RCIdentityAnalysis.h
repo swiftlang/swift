@@ -12,7 +12,7 @@
 //
 //  This is an analysis that determines the ref count identity (i.e. gc root) of
 //  a pointer. Any values with the same ref count identity are able to be
-//  retained and released interchangably.
+//  retained and released interchangeably.
 //
 //===----------------------------------------------------------------------===//
 
