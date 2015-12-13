@@ -133,7 +133,7 @@ void AddSimplifyCFGSILCombine(SILPassManager &PM) {
 
 /// Perform semantic annotation/loop base optimizations.
 void AddHighLevelLoopOptPasses(SILPassManager &PM) {
-  // Perform classsic SSA optimizations for cleanup.
+  // Perform classic SSA optimizations for cleanup.
   PM.addLowerAggregateInstrs();
   PM.addSILCombine();
   PM.addSROA();
@@ -172,7 +172,7 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   PM.addSROA();
   PM.addMem2Reg();
 
-  // Perform classsic SSA optimizations.
+  // Perform classic SSA optimizations.
   PM.addGlobalOpt();
   PM.addLetPropertiesOpt();
   PM.addPerformanceConstantPropagation();
