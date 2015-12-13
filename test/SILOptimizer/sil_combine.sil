@@ -2841,7 +2841,7 @@ sil @closure_with_in_guaranteed_owened_in_args : $@convention(method) (@in CC2, 
 //  should be copied into temporaries. This should happen just before that partial_apply instruction.
 // - The temporaries are allocated at the beginning of the function and deallocated at the end.
 // - Before each apply of the partial_apply, we retain values of any arguments which are of non-address type.
-//   This is required because they could be consumed (i.e. relased by the callee).
+//   This is required because they could be consumed (i.e. released by the callee).
 // - After each apply of the partial_apply, we release values of any arguments which are non-consumed by the callee (e.g. @guaranteed ones)
 
 // CHECK-LABEL: sil @test_apply_of_partial_apply
