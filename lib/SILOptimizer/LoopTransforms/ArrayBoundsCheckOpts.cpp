@@ -707,7 +707,7 @@ static SILValue getSub(SILLocation Loc, SILValue Val, unsigned SubVal,
   return B.createTupleExtract(Loc, AI, 0);
 }
 
-/// A cannonical induction variable incremented by one from Start to End-1.
+/// A canonical induction variable incremented by one from Start to End-1.
 struct InductionInfo {
   SILArgument *HeaderVal;
   BuiltinInst *Inc;
@@ -883,7 +883,7 @@ static bool isGuaranteedToBeExecuted(DominanceInfo *DT, SILBasicBlock *Block,
   return DT->dominates(Block, ExitingBlk);
 }
 
-/// Describes the access function "a[f(i)]" that is based on a cannonical
+/// Describes the access function "a[f(i)]" that is based on a canonical
 /// induction variable.
 class AccessFunction {
   InductionInfo *Ind;
@@ -1112,7 +1112,7 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
 
   DEBUG(Preheader->getParent()->dump());
 
-  // Find cannonical induction variables.
+  // Find canonical induction variables.
   InductionAnalysis IndVars(DT, IVs, Preheader, Header, ExitingBlk, ExitBlk);
   bool IVarsFound = IndVars.analyse();
   if (!IVarsFound){
