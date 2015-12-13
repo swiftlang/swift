@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This containts the definition of a cloner class for creating specialized
+// This contains the definition of a cloner class for creating specialized
 // versions of generic functions by substituting concrete types.
 //
 //===----------------------------------------------------------------------===//
