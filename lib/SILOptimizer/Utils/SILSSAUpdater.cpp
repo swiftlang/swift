@@ -140,7 +140,7 @@ static OperandValueArrayRef getEdgeValuesForTerminator(TermInst *TI,
     return IsTrueEdge ? CondBrInst->getTrueArgs() : CondBrInst->getFalseArgs();
   }
 
-  // We need a predecessor who is capabable of holding outgoing branch
+  // We need a predecessor who is capable of holding outgoing branch
   // arguments.
   llvm_unreachable("Unrecognized terminator leading to phi block");
 }
