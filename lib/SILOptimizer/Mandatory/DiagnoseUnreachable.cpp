@@ -146,7 +146,7 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
 
   // If we've reached this point, the optimization is valid, so optimize.
   // We know that the incoming arguments from all predecessors are the same,
-  // so just use them directly and remove the basic block paramters.
+  // so just use them directly and remove the basic block parameters.
 
   // Drop the arguments from the branch instructions by creating a new branch
   // instruction and deleting the old one.
