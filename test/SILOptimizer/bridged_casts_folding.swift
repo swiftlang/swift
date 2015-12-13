@@ -761,7 +761,7 @@ print(testCondCastSwiftToNSDictDouble())
 print(testForcedCastSwiftToNSDictString())
 print(testCondCastSwiftToNSDictString())
 
-print("Swift to NS dictionariess: End")
+print("Swift to NS dictionaries: End")
 
 // Sets
 print("Swift to NS sets: Start")
