@@ -642,7 +642,7 @@ enum class MinVersionComparison {
   Unavailable,
 
   /// The entity might be unavailable, because it was introduced after
-  /// the minimimum version.
+  /// the minimum version.
   PotentiallyUnavailable,
 
   /// The entity has been obsoleted.
