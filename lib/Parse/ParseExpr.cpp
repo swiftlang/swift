@@ -37,7 +37,7 @@ static Expr *createArgWithTrailingClosure(ASTContext &context,
                                           SourceLoc rightParen,
                                           Expr *closure) {
   // If there are no elements, just build a parenthesized expression around
-  // the cosure.
+  // the closure.
   if (elementsIn.empty()) {
     return new (context) ParenExpr(leftParen, closure, rightParen,
                                    /*hasTrailingClosure=*/true);
