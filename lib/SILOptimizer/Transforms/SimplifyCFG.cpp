@@ -1175,7 +1175,7 @@ static SILValue skipInvert(SILValue Cond, bool &Inverted,
     OperandValueArrayRef Args = BI->getArguments();
     
     if (BI->getBuiltinInfo().ID == BuiltinValueKind::Xor) {
-      // Check if it's a boolean invertion of the condition.
+      // Check if it's a boolean inversion of the condition.
       if (auto *IL = dyn_cast<IntegerLiteralInst>(Args[1])) {
         if (IL->getValue().isAllOnesValue()) {
           Cond = Args[0];
@@ -1302,7 +1302,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   if (auto *Xor =
           dyn_cast<BuiltinInst>(BI->getCondition().stripExpectIntrinsic())) {
     if (Xor->getBuiltinInfo().ID == BuiltinValueKind::Xor) {
-      // Check if it's a boolean invertion of the condition.
+      // Check if it's a boolean inversion of the condition.
       OperandValueArrayRef Args = Xor->getArguments();
       if (auto *IL = dyn_cast<IntegerLiteralInst>(Args[1])) {
         if (IL->getValue().isAllOnesValue()) {
