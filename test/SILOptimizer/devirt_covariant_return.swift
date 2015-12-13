@@ -13,7 +13,7 @@
 // CHECK: alloc_ref [stack]
 // CHECK: function_ref @unknown1a : $@convention(thin) () -> ()
 // CHECK: apply
-// CHECK: function_ref @defrenestrate : $@convention(thin) () -> ()
+// CHECK: function_ref @defenestrate : $@convention(thin) () -> ()
 // CHECK: apply
 // CHECK: function_ref @unknown2a : $@convention(thin) () -> ()
 // CHECK: apply
@@ -39,8 +39,8 @@ func unknown2b() -> ()
 func unknown3a() -> ()
 @_silgen_name("unknown3b")
 func unknown3b() -> ()
-@_silgen_name("defrenestrate")
-func defrenestrate() -> ()
+@_silgen_name("defenestrate")
+func defenestrate() -> ()
 
 class B<T> {
   // We do not specialize typealias's correctly now.
@@ -56,7 +56,7 @@ class B<T> {
   //}
 
   func doSomethingElse() {
-    defrenestrate()
+    defenestrate()
   }
 }
 
