@@ -42,7 +42,7 @@ STATISTIC(NumFunctionSignaturesOptimized, "Total func sig optimized");
 STATISTIC(NumDeadArgsEliminated, "Total dead args eliminated");
 STATISTIC(NumOwnedConvertedToGuaranteed, "Total owned args -> guaranteed args");
 STATISTIC(NumCallSitesOptimized, "Total call sites optimized");
-STATISTIC(NumSROAArguments, "Total SROA argumments optimized");
+STATISTIC(NumSROAArguments, "Total SROA arguments optimized");
 
 //===----------------------------------------------------------------------===//
 //                                  Utility
