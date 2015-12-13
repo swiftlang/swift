@@ -1013,7 +1013,7 @@ public:
                                    = AccessSemantics::Ordinary);
   
   /// Produce a singular RValue for a reference to the specified declaration,
-  /// with the given type and in response to the specified epxression.  Try to
+  /// with the given type and in response to the specified expression.  Try to
   /// emit into the specified SGFContext to avoid copies (when provided).
   ManagedValue emitRValueForDecl(SILLocation loc, ConcreteDeclRef decl, Type ty,
                                  AccessSemantics semantics,
