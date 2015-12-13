@@ -39,7 +39,7 @@ using namespace swift;
 
 enum BlockIDs {
   /// \brief A top-level block which represents any meta data associated
-  /// with the diagostics, including versioning of the format.
+  /// with the diagnostics, including versioning of the format.
   BLOCK_META = llvm::bitc::FIRST_APPLICATION_BLOCKID,
 
   /// \brief The this block acts as a container for all the information
