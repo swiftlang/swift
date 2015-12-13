@@ -194,7 +194,7 @@ public struct StrideThroughGenerator<Element : Strideable> : GeneratorType {
   var current: Element
   let end: Element
   let stride: Element.Stride
-  var done: Bool = false
+  var done = false
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.

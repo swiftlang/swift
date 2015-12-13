@@ -57,7 +57,7 @@ public struct Zip2Generator<
   }
 
   internal var _baseStreams: (Generator1, Generator2)
-  internal var _reachedEnd: Bool = false
+  internal var _reachedEnd = false
 }
 
 /// A sequence of pairs built out of two underlying sequences, where
