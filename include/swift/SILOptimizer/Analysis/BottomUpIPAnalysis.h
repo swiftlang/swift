@@ -232,7 +232,7 @@ protected:
     /// Should be called after visiting \p FInfo during recomputation.
     void tryToSchedule(FunctionInfo *FInfo) {
       assert(FInfo->isVisited() &&
-             "tryied to schedule function which was not visited");
+             "tried to schedule function which was not visited");
       assert(!FInfo->isScheduled() &&
              "function scheduled multiple times");
       if (FInfo->numUnscheduledCallees == 0) {
