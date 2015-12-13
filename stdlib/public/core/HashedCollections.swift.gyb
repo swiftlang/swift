@@ -863,7 +863,7 @@ public func _setDownCast<BaseValue, DerivedValue>(source: Set<BaseValue>)
 
 /// Implements a conditional downcast.
 ///
-/// If the cast fails, the function returns `.None`.  All checks should be
+/// If the cast fails, the function returns `nil`.  All checks should be
 /// performed eagerly.
 ///
 /// - Precondition: `DerivedValue` is a subtype of `BaseValue` and both
@@ -901,7 +901,7 @@ public func _setBridgeFromObjectiveC<ObjCValue, SwiftValue>(
 
 /// Implements a conditional downcast that involves bridging.
 ///
-/// If the cast fails, the function returns `.None`.  All checks should be
+/// If the cast fails, the function returns `nil`.  All checks should be
 /// performed eagerly.
 ///
 /// - Precondition: At least one of `SwiftValue` is a bridged value
@@ -1442,7 +1442,7 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
 
 /// Implements a conditional downcast.
 ///
-/// If the cast fails, the function returns `.None`.  All checks should be
+/// If the cast fails, the function returns `nil`.  All checks should be
 /// performed eagerly.
 ///
 /// - Precondition: `DerivedKey` is a subtype of `BaseKey`, `DerivedValue` is
@@ -1492,7 +1492,7 @@ public func _dictionaryBridgeFromObjectiveC<
 
 /// Implements a conditional downcast that involves bridging.
 ///
-/// If the cast fails, the function returns `.None`.  All checks should be
+/// If the cast fails, the function returns `nil`.  All checks should be
 /// performed eagerly.
 ///
 /// - Precondition: At least one of `SwiftKey` or `SwiftValue` is a bridged value
