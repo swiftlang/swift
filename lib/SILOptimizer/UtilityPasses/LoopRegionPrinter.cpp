@@ -49,6 +49,8 @@ class LoopRegionViewCFG : public SILModuleTransform {
 
     auto *M = getModule();
     for (auto &Fn : M->getFunctions()) {
+      if (Fn.isExternalDeclaration())
+        continue;
       LRA->get(&Fn)->viewLoopRegions();
     }
   }
