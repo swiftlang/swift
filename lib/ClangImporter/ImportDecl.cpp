@@ -2437,7 +2437,7 @@ namespace {
       }
 
       case EnumKind::Unknown: {
-        // The enumeration was mapped to a struct containining the integral
+        // The enumeration was mapped to a struct containing the integral
         // type. Create a constant with that struct type.
 
         auto dc = Impl.importDeclContextOf(clangEnum);
