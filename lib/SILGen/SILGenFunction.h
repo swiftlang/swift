@@ -687,7 +687,7 @@ public:
   ///                    argument of this type to receive the return value for
   ///                    the function.
   /// \param isThrowing  If true, create an error epilog block.
-  /// \param L           The SILLocation which should be accosocated with
+  /// \param L           The SILLocation which should be associated with
   ///                    cleanup instructions.
   void prepareEpilog(Type returnType, bool isThrowing, CleanupLocation L);
   void prepareRethrowEpilog(CleanupLocation l);
