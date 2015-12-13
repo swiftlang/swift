@@ -214,7 +214,7 @@ void Operand::hoistAddressProjections(SILInstruction *InsertBefore,
     if (V != Incoming) {
       if (V == get()) {
         // If we are the operand itself set the operand to the incoming
-        // arugment.
+        // argument.
         set(Incoming);
         V = Incoming;
       } else {
