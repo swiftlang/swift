@@ -58,7 +58,7 @@ extractEnumElement(const VarDecl *constant) {
 
 /// Find the first enum element in \p foundElements.
 ///
-/// If there are no enum elements but there are properties, attepmts to map
+/// If there are no enum elements but there are properties, attempts to map
 /// an arbitrary property to an enum element using extractEnumElement.
 static EnumElementDecl *
 filterForEnumElement(LookupResult foundElements) {
