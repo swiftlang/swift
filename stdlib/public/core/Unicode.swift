@@ -749,7 +749,7 @@ internal func _transcodeSomeUTF16AsUTF8<
 
     if _fastPath(u <= 0x7f) {
       result |= UTF8Chunk(u) << shift
-      ++utf8Count
+      utf8Count += 1
     } else {
       var scalarUtf8Length: Int
       var r: UInt
