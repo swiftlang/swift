@@ -191,7 +191,7 @@ static SILValue simplifyEnumFromUncheckedEnumData(EnumInst *EI) {
   
   SILValue EnumOp = UEDI->getOperand();
   
-  // Same enum elements don't necesserily imply same enum types.
+  // Same enum elements don't necessarily imply same enum types.
   // Enum types may be different if the enum is generic, e.g.
   // E<Int>.Case and E<Double>.Case.
   SILType OriginalEnum = EnumOp.getType();
