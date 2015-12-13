@@ -14,7 +14,7 @@
 // These definitions automatically generate the classes and XML printing
 // facilities.
 //
-// There must be a correspnding definition of these nodes
+// There must be a corresponding definition of these nodes
 // in include/swift/Markup/ASTNodes.def.
 //
 //===----------------------------------------------------------------------===//

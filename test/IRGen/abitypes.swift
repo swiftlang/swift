@@ -61,7 +61,7 @@ class Foo {
   }
 
   // Call from Swift entrypoint with exploded Rect to @objc entrypoint
-  // with unexploaded ABI-coerced type.
+  // with unexploded ABI-coerced type.
   // x86_64-macosx: define hidden float @_TFC8abitypes3Foo17getXFromRectSwift{{.*}}(%VSC6MyRect* noalias nocapture dereferenceable({{.*}}), [[SELF:%.*]]*) {{.*}} {
   // x86_64-macosx: [[COERCED:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 4
   // x86_64-macosx: [[SEL:%.*]] = load i8*, i8** @"\01L_selector(getXFromRect:)", align 8

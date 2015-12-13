@@ -71,7 +71,7 @@ protected:
   private:
 
     /// The list of callers which must be invalidated if this function gets
-    /// invalidated. Note that the list may contain invlid entries for already
+    /// invalidated. Note that the list may contain invalid entries for already
     /// invalidated callers. Those entries are removed lazily in
     /// removeInvalidCallers().
     /// The lazy removal of invalid entries avoids that we additionally need to
@@ -232,7 +232,7 @@ protected:
     /// Should be called after visiting \p FInfo during recomputation.
     void tryToSchedule(FunctionInfo *FInfo) {
       assert(FInfo->isVisited() &&
-             "tryied to schedule function which was not visited");
+             "tried to schedule function which was not visited");
       assert(!FInfo->isScheduled() &&
              "function scheduled multiple times");
       if (FInfo->numUnscheduledCallees == 0) {

@@ -785,9 +785,9 @@ public:
   /// \brief Determine whether a constraint of the given kind can be satisfied
   /// by the two types.
   ///
-  /// \param t1 The first type of the constrant.
+  /// \param t1 The first type of the constraint.
   ///
-  /// \param t2 The second type of the constrant.
+  /// \param t2 The second type of the constraint.
   ///
   /// \param dc The context of the conversion.
   ///
@@ -1147,7 +1147,7 @@ public:
   ///                       of printing diagnostics.
   ///
   /// \returns a CheckedCastKind indicating the semantics of the cast. If the
-  /// cast is invald, Unresolved is returned. If the cast represents an implicit
+  /// cast is invalid, Unresolved is returned. If the cast represents an implicit
   /// conversion, Coercion is returned.
   CheckedCastKind typeCheckCheckedCast(Type fromType,
                                        Type toType,
@@ -1590,7 +1590,7 @@ public:
   /// @{
 
   /// \brief Returns true if the availability of the overriding declaration
-  /// makes it a safe override, given the availability of the base declation.
+  /// makes it a safe override, given the availability of the base declaration.
   bool isAvailabilitySafeForOverride(ValueDecl *override, ValueDecl *base);
 
   /// \brief Returns true if the availability of the witness

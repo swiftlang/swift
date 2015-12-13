@@ -33,7 +33,7 @@
 /// 3. Performing a RPO walk over the control flow graph, tracking any
 /// LSLocations that are read from or stored into in each basic block. The
 /// read or stored value, kept in a map (gen-set) between LSLocation and
-/// LSValue, becomes the avalable value for the LSLocation.
+/// LSValue, becomes the available value for the LSLocation.
 ///
 /// 4. An optimistic iterative intersection-based dataflow is performed on the
 /// gen sets until convergence.
@@ -242,7 +242,7 @@ public:
     //   use(a);
     //
     // However, by doing so, we can only do the data forwarding after the
-    // data flow stablizes.
+    // data flow stabilizes.
     //
     ForwardSetIn.resize(bitcnt, false);
     ForwardSetOut.resize(bitcnt, reachable);
@@ -293,7 +293,7 @@ public:
 
 namespace {
 
-/// This class stores global state that we use when computing redudant load and
+/// This class stores global state that we use when computing redundant load and
 /// their replacement in each basic block.
 class RLEContext {
   /// Function currently processing.
@@ -505,7 +505,7 @@ void BlockState::updateForwardSetForWrite(RLEContext &Ctx, unsigned LBit,
     LSLocation &L = Ctx.getLSLocation(i);
     if (!L.isMayAliasLSLocation(R, Ctx.getAA()))
       continue;
-    // MayAlias, invaliate the LSLocation.
+    // MayAlias, invalidate the LSLocation.
     stopTrackingLSLocation(i);
   }
 
@@ -779,7 +779,7 @@ SILValue RLEContext::computePredecessorCoveringValue(SILBasicBlock *BB,
     return SILValue();
 
   // At this point, we know this LSLocation has available value and we also
-  // know we can forward a SILValue from every predecesor. It is safe to
+  // know we can forward a SILValue from every predecessor. It is safe to
   // insert the basic block argument.
   BlockState &Forwarder = getBlockState(BB);
   SILValue TheForwardingValue = BB->createBBArg(L.getType());

@@ -30,7 +30,7 @@ bb0:
   return %7 : $Builtin.RawPointer
 }
 
-// This references a public global so we *SHOULD* derserialize this.
+// This references a public global so we *SHOULD* deserialize this.
 // CHECK-LABEL: sil public_external [fragile] @_TFV18lazy_global_access4Type10staticPropSia_public : $@convention(thin) () -> Builtin.RawPointer {
 sil [fragile] @_TFV18lazy_global_access4Type10staticPropSia_public : $@convention(thin) () -> Builtin.RawPointer {
 bb0:

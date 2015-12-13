@@ -1124,7 +1124,7 @@ void PatternMatchEmission::bindIrrefutablePatterns(const ClauseRow &row,
 void PatternMatchEmission::bindIrrefutablePattern(Pattern *pattern,
                                                   ConsumableManagedValue value,
                                                   bool forIrrefutableRow) {
-  // We use null patterns to mean artifical AnyPatterns.
+  // We use null patterns to mean artificial AnyPatterns.
   if (!pattern) return;
 
   pattern = pattern->getSemanticsProvidingPattern();
@@ -1466,7 +1466,7 @@ emitNominalTypeDispatch(ArrayRef<RowToSpecialize> rows,
     CanType baseFormalType = aggMV.getType().getSwiftRValueType();
     auto val = SGF.emitRValueForPropertyLoad(loc, aggMV, baseFormalType, false,
                                              property,
-                                             // FIXME: No generic substitions.
+                                             // FIXME: No generic substitutions.
                                              {}, AccessSemantics::Ordinary,
                                              firstMatcher->getType(),
                                              // TODO: Avoid copies on
@@ -2049,7 +2049,7 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
     // blocks might fallthrough into this one.
     if (!hasFallthroughTo && caseBlock->getCaseLabelItems().size() == 1) {
       SILBasicBlock *predBB = caseBB->getSinglePredecessor();
-      assert(predBB && "Should only have 1 predecesor because it isn't shared");
+      assert(predBB && "Should only have 1 predecessor because it isn't shared");
       assert(isa<BranchInst>(predBB->getTerminator()) &&
              "Should have uncond branch to shared block");
       predBB->getTerminator()->eraseFromParent();

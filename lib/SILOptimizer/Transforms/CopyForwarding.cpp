@@ -684,7 +684,7 @@ bool CopyForwarding::forwardPropagateCopy(
 
     AnalyzeForwardUse AnalyzeUse(CopyDest);
     bool seenDeinit = AnalyzeUse.visit(UserInst);
-    // If this use cannot be anlayzed, then abort.
+    // If this use cannot be analyzed, then abort.
     if (!AnalyzeUse.Oper)
       return false;
     // Otherwise record the operand.
@@ -699,7 +699,7 @@ bool CopyForwarding::forwardPropagateCopy(
   // Convert a reinitialization of this address into a destroy, followed by an
   // initialization. Replacing a copy with a destroy+init is not by itself
   // profitable. However, it does allow eliminating the earlier copy, and we may
-  // later be able to elimimate this initialization copy.
+  // later be able to eliminate this initialization copy.
   if (auto Copy = dyn_cast<CopyAddrInst>(&*SI)) {
     if (Copy->getDest() == CopyDest) {
       assert(!Copy->isInitializationOfDest() && "expected a deinit");
@@ -760,7 +760,7 @@ bool CopyForwarding::backwardPropagateCopy(
 
     AnalyzeBackwardUse AnalyzeUse(CopySrc);
     seenInit = AnalyzeUse.visit(UserInst);
-    // If this use cannot be anlayzed, then abort.
+    // If this use cannot be analyzed, then abort.
     if (!AnalyzeUse.Oper)
       return false;
     // Otherwise record the operand.
@@ -778,7 +778,7 @@ bool CopyForwarding::backwardPropagateCopy(
   // Convert a reinitialization of this address into a destroy, followed by an
   // initialization. Replacing a copy with a destroy+init is not by itself
   // profitable. However, it does allow us to eliminate the later copy, and the
-  // init copy may be eliminater later.
+  // init copy may be eliminator later.
   if (auto Copy = dyn_cast<CopyAddrInst>(&*SI)) {
     if (Copy->getDest() == CopySrc && !Copy->isInitializationOfDest()) {
       SILBuilderWithScope(Copy).createDestroyAddr(Copy->getLoc(), CopySrc);

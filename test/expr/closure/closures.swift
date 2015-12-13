@@ -255,7 +255,7 @@ func returnsInt() -> Int { return 0 }
 takesVoidFunc(returnsInt) // expected-error {{cannot convert value of type '() -> Int' to expected argument type '() -> ()'}}
 takesVoidFunc({()->Int in 0}) // expected-error {{declared closure result 'Int' is incompatible with contextual type '()'}} {{20-23=()}}
   
-// These used to crash the compiler, but were fixed to support the implemenation of rdar://problem/17228969
+// These used to crash the compiler, but were fixed to support the implementation of rdar://problem/17228969
 Void(0) // expected-error{{argument passed to call that takes no arguments}}
 _ = {0}
 

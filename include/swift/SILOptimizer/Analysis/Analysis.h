@@ -35,7 +35,7 @@ namespace swift {
     /// may refer to a specific function or to the whole module depending on
     /// the context in which it is used.
     enum InvalidationKind : unsigned {
-      /// The pass does not change anithing.
+      /// The pass does not change anything.
       Nothing = 0x0,
 
       /// The pass created, deleted or rearranged some instructions in a
@@ -132,7 +132,7 @@ namespace swift {
     static void verifyFunction(SILFunction *F);
   };
 
-  /// An abstract base class that implements the boiler plate of cacheing and
+  /// An abstract base class that implements the boiler plate of caching and
   /// invalidating analysis for specific functions.
   template<typename AnalysisTy>
   class FunctionAnalysisBase : public SILAnalysis {

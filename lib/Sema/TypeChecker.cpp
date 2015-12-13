@@ -838,7 +838,7 @@ class TypeRefinementContextBuilder : private ASTWalker {
 
   /// A mapping from abstract storage declarations with accessors to
   /// to the type refinement contexts for those declarations. We refer to
-  /// this map to determine the appopriate parent TRC to use when
+  /// this map to determine the appropriate parent TRC to use when
   /// walking the accessor function.
   llvm::DenseMap<AbstractStorageDecl *, TypeRefinementContext *>
       StorageContexts;
@@ -1794,7 +1794,7 @@ static const Decl *ancestorTypeLevelDeclForAvailabilityFixit(const Decl *D) {
 /// if #available(...) { ... } version check to fix the unavailable reference,
 /// or None if such such a node cannot be found.
 ///
-/// \param FoundMemberLevelDecl Returns memember-level declaration (i.e., the
+/// \param FoundMemberLevelDecl Returns member-level declaration (i.e., the
 ///  child of a type DeclContext) for which an @available attribute would
 /// fix the unavailable reference.
 ///

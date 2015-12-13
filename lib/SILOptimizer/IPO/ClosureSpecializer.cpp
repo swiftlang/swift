@@ -311,9 +311,9 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
     //               apply %specialized_callee(..., %arg)
     //
     // However, if they are not in the same basic block the callee might be
-    // executed more frequenly than the closure (for example, if the closure is
+    // executed more frequently than the closure (for example, if the closure is
     // created in a loop preheader and the callee taking the closure is executed
-    // in the loop). In such a case we must keep the argument live accross the
+    // in the loop). In such a case we must keep the argument live across the
     // call site of the callee and emit a matching retain for every innvocation
     // of the callee.
     //
@@ -589,7 +589,7 @@ void ClosureSpecCloner::populateCloned() {
   // Next we need to add in any arguments that are not captured as arguments to
   // the cloned function.
   //
-  // We do not insert the new mapped arugments into the value map since there by
+  // We do not insert the new mapped arguments into the value map since there by
   // definition is nothing in the partial apply user function that references
   // such arguments. After this pass is done the only thing that will reference
   // the arguments is the partial apply that we will create.

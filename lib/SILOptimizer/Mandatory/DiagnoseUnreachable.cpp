@@ -60,7 +60,7 @@ struct UnreachableInfo {
 /// removal stage of the path.
 ///
 /// To report unreachable user code, we detect the blocks that contain user
-/// code and are not reachable (along any of the preceeding paths). Note that we
+/// code and are not reachable (along any of the preceding paths). Note that we
 /// only want to report the first statement on the unreachable path. Keeping
 /// the info about which branch folding had produced the unreachable block makes
 /// it possible.
@@ -78,7 +78,7 @@ public:
   ///
   /// Note, this set is different from the PossiblyUnreachableBlocks as these
   /// are the blocks that do contain user code and they might not be immediate
-  /// sucessors of a folded branch.
+  /// successors of a folded branch.
   llvm::SmallPtrSet<const SILBasicBlock*, 2> BlocksWithErrors;
 
   /// A map from the PossiblyUnreachableBlocks to the folded conditional
@@ -145,8 +145,8 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
   }
 
   // If we've reached this point, the optimization is valid, so optimize.
-  // We know that the incomming arguments from all predecessors are the same,
-  // so just use them directly and remove the basic block paramters.
+  // We know that the incoming arguments from all predecessors are the same,
+  // so just use them directly and remove the basic block parameters.
 
   // Drop the arguments from the branch instructions by creating a new branch
   // instruction and deleting the old one.
@@ -219,7 +219,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
       // Produce an unreachable code warning for this basic block if it
       // contains user code (only if we are not within an inlined function or a
       // template instantiation).
-      // FIXME: Do not report if we are within a template instatiation.
+      // FIXME: Do not report if we are within a template instantiation.
       if (Loc.is<RegularLocation>() && State &&
           !State->PossiblyUnreachableBlocks.count(UnreachableBlock)) {
         // If this is the first time we see this unreachable block, store it
@@ -285,7 +285,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
 
       // Produce diagnostic info if we are not within an inlined function or
       // template instantiation.
-      // FIXME: Do not report if we are within a template instatiation.
+      // FIXME: Do not report if we are within a template instantiation.
       assert(ReachableBlockIdx >= 0);
       if (Loc.is<RegularLocation>() && State) {
         // Find the first unreachable block in the switch so that we could use
@@ -557,7 +557,7 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
 /// \brief Issue an "unreachable code" diagnostic if the blocks contains or
 /// leads to another block that contains user code.
 ///
-/// Note, we rely on SILLocation inforamtion to determine if SILInstructions
+/// Note, we rely on SILLocation information to determine if SILInstructions
 /// correspond to user code.
 static bool diagnoseUnreachableBlock(const SILBasicBlock &B,
                                      SILModule &M,
@@ -636,7 +636,7 @@ static bool diagnoseUnreachableBlock(const SILBasicBlock &B,
     return false;
 
   // If we have not found user code in this block, inspect it's successors.
-  // Check if at least one of the sucessors contains user code.
+  // Check if at least one of the successors contains user code.
   for (auto I = B.succ_begin(), E = B.succ_end(); I != E; ++I) {
     SILBasicBlock *SB = *I;
     bool HasReachablePred = false;

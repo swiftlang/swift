@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-silgen -emit-verbose-sil %s | FileCheck %s
 
-// Test if 'transparent' atribute gets propagated correctly to apply instructions.
+// Test if 'transparent' attribute gets propagated correctly to apply instructions.
 
 // Test that the attribute gets set on default argument generators.
 @_transparent func transparentFuncWithDefaultArgument (x: Int = 1) -> Int {

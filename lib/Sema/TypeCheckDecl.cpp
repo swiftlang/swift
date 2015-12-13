@@ -3365,7 +3365,7 @@ public:
     TC.checkDeclAttributes(SD);
   }
 
-  /// Check whether the given propertes can be @NSManaged in this class.
+  /// Check whether the given properties can be @NSManaged in this class.
   static bool propertiesCanBeNSManaged(ClassDecl *classDecl,
                                        ArrayRef<VarDecl *> vars) {
     // Check whether we have an Objective-C-defined class in our
@@ -5195,7 +5195,7 @@ public:
     EED->setIsBeingTypeChecked();
 
     // Only attempt to validate the argument type or raw value if the element
-    // is not currenly being validated.
+    // is not currently being validated.
     if (EED->getRecursiveness() == ElementRecursiveness::NotRecursive) {
       EED->setRecursiveness(ElementRecursiveness::PotentiallyRecursive);
       

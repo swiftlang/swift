@@ -278,7 +278,7 @@ protected:
   TypeSubstitutionMap &SubsMap;
   /// The original function to specialize.
   SILFunction &Original;
-  /// The substiutions used at the call site.
+  /// The substitutions used at the call site.
   ArrayRef<Substitution> ApplySubs;
   /// True, if used for inlining.
   bool Inlining;

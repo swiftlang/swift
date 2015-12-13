@@ -654,7 +654,7 @@ bool CheckedCastBrJumpThreading::trySimplify(TermInst *Term) {
     if (!areEquivalentConditionsAlongPaths())
       continue;
 
-    // Check if any jump-threding is required and possible.
+    // Check if any jump-threading is required and possible.
     if (SuccessPreds.empty() && FailurePreds.empty())
       return false;
 

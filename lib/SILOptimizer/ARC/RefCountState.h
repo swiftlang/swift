@@ -237,7 +237,7 @@ private:
   /// perform the dataflow it may change value.
   bool mightRemoveMutators();
 
-  /// Can we gaurantee that the given reference counted value has been modified?
+  /// Can we guarantee that the given reference counted value has been modified?
   bool isRefCountStateModified() const;
 
   /// Returns true if given the current lattice state, do we care if the value
@@ -366,7 +366,7 @@ public:
   bool merge(const TopDownRefCountState &Other);
 
 private:
-  /// Can we gaurantee that the given reference counted value has been modified?
+  /// Can we guarantee that the given reference counted value has been modified?
   bool isRefCountStateModified() const;
 
   /// Returns true if given the current lattice state, do we care if the value

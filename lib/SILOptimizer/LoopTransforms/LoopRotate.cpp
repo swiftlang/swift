@@ -181,7 +181,7 @@ rewriteNewLoopEntryCheckBlock(SILBasicBlock *Header,
   SmallVector<SILArgument*, 4> InsertedPHIs;
   SILSSAUpdater Updater(&InsertedPHIs);
 
-  // Fix PHIs (incomming arguments).
+  // Fix PHIs (incoming arguments).
   for (auto *Inst: Header->getBBArgs())
     updateSSAForUseOfInst(Updater, InsertedPHIs, ValueMap, Header,
                           EntryCheckBlock, Inst);
@@ -277,7 +277,7 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
   if (!Header)
     return false;
 
-  // We need a preheader - this is also a cannonicalization for follow-up
+  // We need a preheader - this is also a canonicalization for follow-up
   // passes.
   auto *Preheader = L->getLoopPreheader();
   if (!Preheader) {

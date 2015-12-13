@@ -3,14 +3,14 @@
 
 // Test propagation of non-static let properties with compile-time constant values.
 
-// TODO: Once this optimization can remove the propagated private/internal let propeties or
+// TODO: Once this optimization can remove the propagated private/internal let properties or
 // mark them as ones without a storage, new tests should be added here to check for this
 // functionality.
 
 // FIXME: This test is written in Swift instead of SIL, because there are some problems
 // with SIL deserialization (rdar://22636911)
 
-// Check that intializers do not contain a code to intialize private or
+// Check that initializers do not contain a code to initialize private or
 // internal (if used with WMO) properties, because their values are propagated into
 // their uses and they cannot be accessed from other modules. Therefore the
 // initialization code could be removed.
@@ -36,7 +36,7 @@
 // CHECK-WMO: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop3
 // CHECK-WMO: return
 
-// Check that intializers do not contain a code to intialize private properties, 
+// Check that initializers do not contain a code to initialize private properties, 
 // because their values are propagated into their uses and they cannot be accessed
 // from other modules. Therefore the initialization code could be removed.
 // Specifically, the initialization code for Prop2 can be removed.
@@ -86,7 +86,7 @@ public struct Boo {
   public init(i:Int64) {}
 }
 
-// Check that Foo1.Prop1 is not constant-folded, because its value is unkown, since it is initialized differently
+// Check that Foo1.Prop1 is not constant-folded, because its value is unknown, since it is initialized differently
 // by Foo1 initializers.
 
 // CHECK-LABEL: sil @_TF19let_properties_opts13testClassLet1FCS_4Foo1Vs5Int32 : $@convention(thin) (@owned Foo1) -> Int32
@@ -99,7 +99,7 @@ public func testClassLet1(f: Foo1) -> Int32 {
   return f.Prop1 + f.Prop2 + f.Prop3
 }
 
-// Check that Foo1.Prop1 is not constant-folded, because its value is unkown, since it is initialized differently
+// Check that Foo1.Prop1 is not constant-folded, because its value is unknown, since it is initialized differently
 // by Foo1 initializers.
 
 // CHECK-LABEL: sil @_TF19let_properties_opts13testClassLet1FRCS_4Foo1Vs5Int32 : $@convention(thin) (@inout Foo1) -> Int32 

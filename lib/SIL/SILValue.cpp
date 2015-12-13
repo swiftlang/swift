@@ -210,11 +210,11 @@ void Operand::hoistAddressProjections(SILInstruction *InsertBefore,
   while (true) {
     SILValue Incoming = stripSinglePredecessorArgs(V);
 
-    // Forward the incoming arg from a single predeccessor.
+    // Forward the incoming arg from a single predecessor.
     if (V != Incoming) {
       if (V == get()) {
         // If we are the operand itself set the operand to the incoming
-        // arugment.
+        // argument.
         set(Incoming);
         V = Incoming;
       } else {

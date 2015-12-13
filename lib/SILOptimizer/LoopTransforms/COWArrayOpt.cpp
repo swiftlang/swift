@@ -1156,7 +1156,7 @@ bool COWArrayOpt::hoistInLoopWithOnlyNonArrayValueMutatingOperations() {
 
 
   /// Make sure that no writes to an array value happens in the loop and that
-  /// no array values are retained without beeing released before hitting a
+  /// no array values are retained without being released before hitting a
   /// make_unique:
   ///
   /// * array semantic functions that don't change the uniqueness state to
@@ -1330,7 +1330,7 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
         if (Kind == ArrayCallKind::kArrayInit ||
             Kind == ArrayCallKind::kArrayUninitialized)
           continue;
-        // All array types must be the same. This is a stronger guarantueed than
+        // All array types must be the same. This is a stronger guaranteed than
         // we actually need. The requirement is that we can't create another
         // reference to the array by performing an array operation: for example,
         // storing or appending one array into an two-dimensional array.
@@ -1806,7 +1806,7 @@ private:
   // We have a safe container if the array container is passed as a function
   // argument by-value or by inout reference. In either case there can't be an
   // alias of the container. Alternatively, we can have a local variable. We
-  // will check in checkSafeArrayAddressUses that all intialization stores to
+  // will check in checkSafeArrayAddressUses that all initialization stores to
   // this variable are safe (i.e the store dominates the loop etc).
   bool isSafeArrayContainer(SILValue V) {
     if (auto *Arg = dyn_cast<SILArgument>(V.getDef())) {
@@ -2236,7 +2236,7 @@ void ArrayPropertiesSpecializer::specializeLoopNest() {
   auto *Header = CheckBlock->getSingleSuccessor();
   assert(Header);
 
-  // Our loop info is not really completedly valid anymore since the cloner does
+  // Our loop info is not really completely valid anymore since the cloner does
   // not update it. However, exit blocks of the original loop are still valid.
   SmallVector<SILBasicBlock *, 16> ExitBlocks;
   Lp->getExitBlocks(ExitBlocks);

@@ -433,7 +433,7 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
   return nullptr;
 }
 
-/// Helper function for simplifying convertions between
+/// Helper function for simplifying conversions between
 /// thick and objc metatypes.
 static SILInstruction *
 visitMetatypeConversionInst(SILBuilder &Builder, ConversionInst *MCI,

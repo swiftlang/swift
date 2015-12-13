@@ -701,7 +701,7 @@ public:
   /// \brief Return current code completion results.
   MutableArrayRef<CodeCompletionResult *> takeResults();
 
-  /// \brief Sort code completion results in an implementetion-defined order
+  /// \brief Sort code completion results in an implementation-defined order
   /// in place.
   static void sortCompletionResults(
       MutableArrayRef<CodeCompletionResult *> Results);
@@ -732,7 +732,7 @@ struct SimpleCachingCodeCompletionConsumer : public CodeCompletionConsumer {
                                ArrayRef<RequestedCachedModule> requestedModules,
                                DeclContext *DCForModules) override;
 
-  /// Clients should overrride this method to receive \p Results.
+  /// Clients should override this method to receive \p Results.
   virtual void handleResults(
       MutableArrayRef<CodeCompletionResult *> Results) = 0;
 };

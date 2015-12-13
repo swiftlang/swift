@@ -1559,7 +1559,7 @@ public:
 
   /// Returns the most appropriate import kind for the given list of decls.
   ///
-  /// If the list is non-homogenous, or if there is more than one decl that
+  /// If the list is non-homogeneous, or if there is more than one decl that
   /// cannot be overloaded, returns None.
   static Optional<ImportKind> findBestImportKind(ArrayRef<ValueDecl *> Decls);
 
@@ -3958,7 +3958,7 @@ public:
     return getAddressorInfo().MutableAddress;
   }
 
-  /// \brief Return the approproiate addressor for the given access kind.
+  /// \brief Return the appropriate addressor for the given access kind.
   FuncDecl *getAddressorForAccess(AccessKind accessKind) const {
     if (accessKind == AccessKind::Read)
       return getAddressor();

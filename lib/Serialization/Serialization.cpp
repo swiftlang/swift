@@ -3064,7 +3064,7 @@ void Serializer::writeType(Type ty) {
     auto generic = cast<BoundGenericType>(ty.getPointer());
 
     // We don't want two copies of Archetype being serialized, one by
-    // serializing genericArgs, the other by serializaing the Decl. The reason
+    // serializing genericArgs, the other by serializing the Decl. The reason
     // is that it is likely the Decl's Archetype can be serialized in
     // a different module, causing two copies being constructed at
     // deserialization, one in the other module, one in this module as
@@ -3084,7 +3084,7 @@ void Serializer::writeType(Type ty) {
       if (auto arche = dyn_cast<ArchetypeType>(next.getPointer())) {
         auto genericParams = generic->getDecl()->getGenericParams();
         unsigned idx = 0;
-        // Check if next exisits in the Decl.
+        // Check if next exists in the Decl.
         for (auto archetype : genericParams->getAllArchetypes()) {
           if (archetype == arche) {
             found = true;

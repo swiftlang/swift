@@ -707,7 +707,7 @@ static SILValue getSub(SILLocation Loc, SILValue Val, unsigned SubVal,
   return B.createTupleExtract(Loc, AI, 0);
 }
 
-/// A cannonical induction variable incremented by one from Start to End-1.
+/// A canonical induction variable incremented by one from Start to End-1.
 struct InductionInfo {
   SILArgument *HeaderVal;
   BuiltinInst *Inc;
@@ -753,7 +753,7 @@ struct InductionInfo {
     IsOverflowCheckInserted = true;
 
     // We can now remove the cond fail on the increment the above comparison
-    // guarantuees that the addition won't overflow.
+    // guarantees that the addition won't overflow.
     auto *CondFail = isOverflowChecked(cast<BuiltinInst>(Inc));
     if (CondFail)
       CondFail->eraseFromParent();
@@ -883,7 +883,7 @@ static bool isGuaranteedToBeExecuted(DominanceInfo *DT, SILBasicBlock *Block,
   return DT->dominates(Block, ExitingBlk);
 }
 
-/// Describes the access function "a[f(i)]" that is based on a cannonical
+/// Describes the access function "a[f(i)]" that is based on a canonical
 /// induction variable.
 class AccessFunction {
   InductionInfo *Ind;
@@ -895,7 +895,7 @@ public:
 
   static AccessFunction getLinearFunction(SILValue Idx,
                                           InductionAnalysis &IndVars) {
-    // Match the actual induction variable burried in the integer struct.
+    // Match the actual induction variable buried in the integer struct.
     // %2 = struct $Int(%1 : $Builtin.Word)
     //    = apply %check_bounds(%array, %2) : $@convention(thin) (Int, ArrayInt) -> ()
     auto ArrayIndexStruct = dyn_cast<StructInst>(Idx);
@@ -935,7 +935,7 @@ public:
     // Set the new start index to the first value of the induction.
     Start->setOperand(0, FirstVal);
 
-      // Clone and fixup the load, retain sequenence to the header.
+      // Clone and fixup the load, retain sequence to the header.
     auto NewCheck = CheckToHoist.copyTo(Preheader->getTerminator(), DT);
     NewCheck->setOperand(1, Start);
 
@@ -1112,7 +1112,7 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
 
   DEBUG(Preheader->getParent()->dump());
 
-  // Find cannonical induction variables.
+  // Find canonical induction variables.
   InductionAnalysis IndVars(DT, IVs, Preheader, Header, ExitingBlk, ExitBlk);
   bool IVarsFound = IndVars.analyse();
   if (!IVarsFound){

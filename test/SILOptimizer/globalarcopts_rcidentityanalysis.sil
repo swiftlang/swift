@@ -314,10 +314,10 @@ bb4:
 // Make sure we are properly iterating up the domtree by checking if we properly
 // look past the loop in bb4 and match up %0 and %2.
 //
-// CHECK-LABEL: sil @silargument_do_strip_over_irrelevent_loop : $@convention(thin) (FakeOptional<Builtin.NativeObject>) -> () {
+// CHECK-LABEL: sil @silargument_do_strip_over_irrelevant_loop : $@convention(thin) (FakeOptional<Builtin.NativeObject>) -> () {
 // CHECK-NOT: retain_value
 // CHECK-NOT: release_value
-sil @silargument_do_strip_over_irrelevent_loop : $@convention(thin) (FakeOptional<Builtin.NativeObject>) -> () {
+sil @silargument_do_strip_over_irrelevant_loop : $@convention(thin) (FakeOptional<Builtin.NativeObject>) -> () {
 bb0(%0 : $FakeOptional<Builtin.NativeObject>):
   switch_enum %0 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
 

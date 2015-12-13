@@ -339,7 +339,7 @@ public:
               isKnownAbsLess(B, R))
             return true;
 
-          // And commutitively, swapping A and B.
+          // And commutatively, swapping A and B.
           if (isKnownAbsLess(B, L) &&
               knownRelation(A, R, ValueRelation::EQ))
             return true;

@@ -42,7 +42,7 @@ STATISTIC(NumFunctionSignaturesOptimized, "Total func sig optimized");
 STATISTIC(NumDeadArgsEliminated, "Total dead args eliminated");
 STATISTIC(NumOwnedConvertedToGuaranteed, "Total owned args -> guaranteed args");
 STATISTIC(NumCallSitesOptimized, "Total call sites optimized");
-STATISTIC(NumSROAArguments, "Total SROA argumments optimized");
+STATISTIC(NumSROAArguments, "Total SROA arguments optimized");
 
 //===----------------------------------------------------------------------===//
 //                                  Utility
@@ -459,7 +459,7 @@ public:
   /// Analyze the given function.
   bool analyze();
 
-  /// Returns the managled name of the function that should be generated from
+  /// Returns the mangled name of the function that should be generated from
   /// this function analyzer.
   llvm::SmallString<64> getOptimizedName();
 

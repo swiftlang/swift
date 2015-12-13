@@ -66,7 +66,7 @@ class EscapeAnalysis : public BottomUpIPAnalysis {
     
     /// Represents the "memory content" to which a pointer points to.
     /// The "content" represents all stored properties of the referenced object.
-    /// We also treat the elements of a referece-counted object as a "content"
+    /// We also treat the elements of a reference-counted object as a "content"
     /// of that object. Although ref_element_addr is just a pointer addition, we
     /// treat it as a "pointer" pointing to the elements. Having this additional
     /// indirection in the graph, we avoid letting a reference escape just
@@ -158,7 +158,7 @@ private:
     bool isInWorkList = false;
     
     /// True if the merge is finished (see mergeTo). In this state this node
-    /// is completly unlinked from the graph,
+    /// is completely unlinked from the graph,
     bool isMerged = false;
     
     /// The type of the node (mainly distinguishes between content and value
@@ -291,7 +291,7 @@ private:
     }
   };
 
-  /// Mapping from nodes in a calleee-graph to nodes in a caller-graph.
+  /// Mapping from nodes in a callee-graph to nodes in a caller-graph.
   class CGNodeMap {
     /// The map itself.
     llvm::DenseMap<CGNode *, CGNode *> Map;

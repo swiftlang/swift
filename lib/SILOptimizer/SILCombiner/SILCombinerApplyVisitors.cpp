@@ -250,7 +250,7 @@ void PartialApplyCombiner::deallocateTemporaries() {
   }
 }
 
-/// Emit code to release/destory temporaries.
+/// Emit code to release/destroy temporaries.
 void PartialApplyCombiner::releaseTemporaries() {
   // Insert releases and destroy_addrs as early as possible,
   // because we don't want to keep objects alive longer than
@@ -1168,7 +1168,7 @@ bool SILCombiner::optimizeIdentityCastComposition(ApplyInst *FInverse,
   if (!knowHowToEmitReferenceCountInsts(FInverse))
     return false;
 
-  // We need to know that the cast will succeeed.
+  // We need to know that the cast will succeed.
   if (!isCastTypeKnownToSucceed(FInverse->getArgument(0).getType(),
                                 FInverse->getModule()) ||
       !isCastTypeKnownToSucceed(FInverse->getType(), FInverse->getModule()))
@@ -1287,7 +1287,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
     for (auto &Op : AI->getArgumentOperands()) {
       Arguments.push_back(Op.get());
     }
-    // The type of the substition is the source type of the thin to thick
+    // The type of the substitution is the source type of the thin to thick
     // instruction.
     SILType substTy = TTTFI->getOperand().getType();
     auto *NewAI = Builder.createApply(AI->getLoc(), TTTFI->getOperand(),

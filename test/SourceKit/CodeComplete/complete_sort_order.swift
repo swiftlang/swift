@@ -26,7 +26,7 @@ func test() {
 // RUN: %sourcekitd-test -req=complete.open -pos=7:1 -req-opts=sort.byname=1,hidelowpriority=0,hideunderscores=0 %s -- %s > %t.off
 // RUN: FileCheck -check-prefix=CONTEXT %s < %t.default
 // RUN: FileCheck -check-prefix=NAME %s < %t.off
-// FIXME: rdar://problem/20109989 non-determinisitic sort order
+// FIXME: rdar://problem/20109989 non-deterministic sort order
 // RUN-disabled: diff %t.on %t.default
 // RUN: FileCheck -check-prefix=CONTEXT %s < %t.on
 

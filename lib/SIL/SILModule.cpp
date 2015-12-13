@@ -262,7 +262,7 @@ static SILFunction::ClassVisibility_t getClassVisibility(SILDeclRef constant) {
   if (!constant.hasDecl())
     return SILFunction::NotRelevant;
 
-  // If this decleration is a function which goes into a vtable, then it's
+  // If this declaration is a function which goes into a vtable, then it's
   // symbol must be as visible as its class. Derived classes even have to put
   // all less visible methods of the base class into their vtables.
 

@@ -819,7 +819,7 @@ void AllocOptimize::explodeCopyAddr(CopyAddrInst *CAI) {
       
     case ValueKind::LoadInst:
       // If it is a load from the memory object (as oppose to a load from
-      // something else), track it as an access.  We need to explictly check to
+      // something else), track it as an access.  We need to explicitly check to
       // see if the load accesses "TheMemory" because it could either be a load
       // for the copy_addr source, or it could be a load corresponding to the
       // "assign" operation on the destination of the copyaddr.

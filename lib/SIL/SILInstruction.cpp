@@ -88,7 +88,7 @@ void llvm::ilist_traits<SILInstruction>::
 transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
                       llvm::ilist_iterator<SILInstruction> first,
                       llvm::ilist_iterator<SILInstruction> last) {
-  // If transfering instructions within the same basic block, no reason to
+  // If transferring instructions within the same basic block, no reason to
   // update their parent pointers.
   SILBasicBlock *ThisParent = getContainingBlock();
   if (ThisParent == L2.getContainingBlock()) return;
@@ -160,7 +160,7 @@ void SILInstruction::dropAllReferences() {
   }
 
   // If we have a function ref inst, we need to especially drop its function
-  // argument so that it gets a proper ref decement.
+  // argument so that it gets a proper ref decrement.
   auto *FRI = dyn_cast<FunctionRefInst>(this);
   if (!FRI || !FRI->getReferencedFunction())
     return;

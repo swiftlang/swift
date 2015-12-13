@@ -112,7 +112,7 @@ recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
       }
 
       // If we have a function ref inst, we need to especially drop its function
-      // argument so that it gets a proper ref decement.
+      // argument so that it gets a proper ref decrement.
       auto *FRI = dyn_cast<FunctionRefInst>(I);
       if (FRI && FRI->getReferencedFunction())
         FRI->dropReferencedFunction();
@@ -1244,7 +1244,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
 
   // Now emit the a cast from the casted ObjC object into a target type.
   // This is done by means of calling _forceBridgeFromObjectiveC or
-  // _conditionallyBridgeFromObjectiveC_birdgeable from the Target type.
+  // _conditionallyBridgeFromObjectiveC_bridgeable from the Target type.
   // Lookup the required function in the Target type.
 
   // Lookup the _ObjectiveCBridgeable protocol.
@@ -1924,7 +1924,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       // Check if this alloc_stac is is only initialized once by means of
       // single init_existential_addr.
       bool isLegal = true;
-      // init_existental instruction used to initialize this alloc_stack.
+      // init_existential instruction used to initialize this alloc_stack.
       InitExistentialAddrInst *FoundIEI = nullptr;
       for (auto Use: getNonDebugUses(*ASI)) {
         auto *User = Use->getUser();

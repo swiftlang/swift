@@ -727,7 +727,7 @@ public:
   ClangModuleUnit *getClangModuleForMacro(const clang::MacroInfo *MI);
 
   /// Retrieve the type of an instance of the given Clang declaration context,
-  /// or a null type if the DeclContext does not have a correspinding type.
+  /// or a null type if the DeclContext does not have a corresponding type.
   clang::QualType getClangDeclContextType(const clang::DeclContext *dc);
 
   /// Determine whether this typedef is a CF type.
