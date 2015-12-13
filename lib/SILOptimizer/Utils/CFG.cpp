@@ -664,7 +664,7 @@ SILBasicBlock *swift::splitEdge(TermInst *T, unsigned EdgeIdx,
   }
 
   // Neither loop contains the other. The destination must be the header of its
-  // loop. Otherwise, we would be creating irreducable control flow.
+  // loop. Otherwise, we would be creating irreducible control flow.
   assert(DstBBLoop->getHeader() == DestBB &&
          "Creating irreducible control flow?");
 
