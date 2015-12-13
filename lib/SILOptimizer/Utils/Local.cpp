@@ -1924,7 +1924,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       // Check if this alloc_stac is is only initialized once by means of
       // single init_existential_addr.
       bool isLegal = true;
-      // init_existental instruction used to initialize this alloc_stack.
+      // init_existential instruction used to initialize this alloc_stack.
       InitExistentialAddrInst *FoundIEI = nullptr;
       for (auto Use: getNonDebugUses(*ASI)) {
         auto *User = Use->getUser();
