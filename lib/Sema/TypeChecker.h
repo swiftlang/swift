@@ -1590,7 +1590,7 @@ public:
   /// @{
 
   /// \brief Returns true if the availability of the overriding declaration
-  /// makes it a safe override, given the availability of the base declation.
+  /// makes it a safe override, given the availability of the base declaration.
   bool isAvailabilitySafeForOverride(ValueDecl *override, ValueDecl *base);
 
   /// \brief Returns true if the availability of the witness
