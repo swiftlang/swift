@@ -112,7 +112,7 @@ recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
       }
 
       // If we have a function ref inst, we need to especially drop its function
-      // argument so that it gets a proper ref decement.
+      // argument so that it gets a proper ref decrement.
       auto *FRI = dyn_cast<FunctionRefInst>(I);
       if (FRI && FRI->getReferencedFunction())
         FRI->dropReferencedFunction();
