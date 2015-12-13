@@ -543,7 +543,7 @@ void TopDownRefCountState::clear() {
   SuperTy::clear();
 }
 
-/// Can we gaurantee that the given reference counted value has been modified?
+/// Can we guarantee that the given reference counted value has been modified?
 bool TopDownRefCountState::isRefCountStateModified() const {
   switch (LatState) {
   case LatticeState::Incremented:
