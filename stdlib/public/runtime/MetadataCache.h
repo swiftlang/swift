@@ -201,7 +201,7 @@ public:
     // Build the new cache entry.
     // For some cache types this call may re-entrantly perform additional
     // cache lookups.
-    // Notice that the entry is completly constructed before it is inserted
+    // Notice that the entry is completely constructed before it is inserted
     // into the map, and that only one entry can be constructed at once
     // because of the lock above.
     Entry *entry = entryBuilder();
