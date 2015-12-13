@@ -32,7 +32,7 @@ enum class PlatformKind {
 #include "swift/AST/PlatformKinds.def"
 };
 
-/// Returns the short string representating the platform, suitable for
+/// Returns the short string representing the platform, suitable for
 /// use in availability specifications (e.g., "OSX").
 StringRef platformString(PlatformKind platform);
   
