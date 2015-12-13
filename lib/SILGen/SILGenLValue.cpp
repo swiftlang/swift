@@ -1415,7 +1415,7 @@ void LValue::addOrigToSubstComponent(SILType loweredSubstType) {
   assert(getTypeOfRValue() != loweredSubstType &&
          "reabstraction component is unnecessary!");
 
-  // Peephole away complementary reabstractons.
+  // Peephole away complementary reabstractions.
   assert(!Path.empty() && "adding translation component to empty l-value");
   if (Path.back()->getKind() == PathComponent::SubstToOrigKind) {
     // But only if the lowered type matches exactly.
@@ -1437,7 +1437,7 @@ void LValue::addSubstToOrigComponent(AbstractionPattern origType,
   assert(getTypeOfRValue() != loweredSubstType &&
          "reabstraction component is unnecessary!");
 
-  // Peephole away complementary reabstractons.
+  // Peephole away complementary reabstractions.
   assert(!Path.empty() && "adding translation component to empty l-value");
   if (Path.back()->getKind() == PathComponent::OrigToSubstKind) {
     // But only if the lowered type matches exactly.
