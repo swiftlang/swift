@@ -935,7 +935,7 @@ public:
     // Set the new start index to the first value of the induction.
     Start->setOperand(0, FirstVal);
 
-      // Clone and fixup the load, retain sequenence to the header.
+      // Clone and fixup the load, retain sequence to the header.
     auto NewCheck = CheckToHoist.copyTo(Preheader->getTerminator(), DT);
     NewCheck->setOperand(1, Start);
 
