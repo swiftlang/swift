@@ -435,8 +435,8 @@ SILValue BlockState::computeForwardingValues(RLEContext &Ctx, LSLocation &L,
   // Second, reduce the available values into a single SILValue we can use to
   // forward.
   SILValue TheForwardingValue;
-  TheForwardingValue = LSLocation::reduceWithValues(
-      L, &ParentBB->getModule(), Values, InsertPt, Ctx.getTE());
+  TheForwardingValue = LSValue::reduce(L, &ParentBB->getModule(), Values,
+                                       InsertPt, Ctx.getTE());
   /// Return the forwarding value.
   return TheForwardingValue;
 }
@@ -453,8 +453,7 @@ bool BlockState::setupRLE(RLEContext &Ctx, SILInstruction *I, SILValue Mem) {
   // Reduce the available values into a single SILValue we can use to forward.
   SILModule *Mod = &I->getModule();
   SILValue TheForwardingValue;
-  TheForwardingValue =
-      LSLocation::reduceWithValues(L, Mod, Values, I, Ctx.getTE());
+  TheForwardingValue = LSValue::reduce(L, Mod, Values, I, Ctx.getTE());
   if (!TheForwardingValue)
     return false;
 

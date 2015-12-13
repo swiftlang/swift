@@ -256,7 +256,7 @@ using ValueTableMap = llvm::SmallMapVector<unsigned, unsigned, 8>;
 /// SILValue through a SILArgument.
 ///
 /// Given a set of LSLocations and their available LSValues,
-/// reduceWithValues will create the forwarding SILValue by merging them while
+/// reduce will create the forwarding SILValue by merging them while
 /// creating as few value extraction and aggregation as possible.
 ///
 /// NOTE: ProjectionPath in LSValue could be replaced by the
@@ -357,6 +357,24 @@ public:
   /// Expand this SILValue to all individual fields it contains.
   static void expand(SILValue Base, SILModule *Mod, LSValueList &Vals,
                      TypeExpansionAnalysis *TE);
+
+  /// Given a memory location and a map between the expansions of the location
+  /// and their corresponding values, try to come up with a single SILValue this
+  /// location holds. This may involve extracting and aggregating available
+  /// values.
+  ///
+  /// NOTE: reduce assumes that every component of the location has an concrete
+  /// (i.e. not coverings set) available value in LocAndVal.
+  ///
+  /// TODO: we do not really need the llvm::DenseMap<LSLocation, LSValue> here
+  /// we only need a map between the projection tree of a SILType and the value
+  /// each leaf node takes. This will be implemented once ProjectionPath memory
+  /// cost is reduced and made copyable (its copy constructor is deleted at the
+  /// momemt). 
+  static SILValue reduce(LSLocation &Base, SILModule *Mod,
+                         LSLocationValueMap &LocAndVal,
+                         SILInstruction *InsertPt,
+                         TypeExpansionAnalysis *TE);
 
   /// Enumerate the given LSValue.
   static void enumerateLSValue(SILModule *M, SILValue Val,
@@ -493,18 +511,6 @@ public:
   /// them into smallest number of LSLocations possible.
   static void reduce(LSLocation &Base, SILModule *Mod, LSLocationSet &Locs,
                      TypeExpansionAnalysis *TE);
-
-  /// Given a memory location and a map between the expansions of the location
-  /// and their corresponding values, try to come up with a single SILValue this
-  /// location holds. This may involve extracting and aggregating available
-  /// values.
-  ///
-  /// NOTE: reduceValues assumes that every component of the location has an
-  /// concrete (i.e. not coverings set) available value in LocAndVal.
-  static SILValue reduceWithValues(LSLocation &Base, SILModule *Mod,
-                                   LSLocationValueMap &LocAndVal,
-                                   SILInstruction *InsertPt,
-                                   TypeExpansionAnalysis *TE);
 
   /// Enumerate the given Mem LSLocation.
   static void enumerateLSLocation(SILModule *M, SILValue Mem,

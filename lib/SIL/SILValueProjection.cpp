@@ -79,6 +79,99 @@ void LSValue::expand(SILValue Base, SILModule *M, LSValueList &Vals,
   }
 }
 
+SILValue LSValue::reduce(LSLocation &Base, SILModule *M,
+                         LSLocationValueMap &Values,
+                         SILInstruction *InsertPt,
+                         TypeExpansionAnalysis *TE) {
+  // Walk bottom up the projection tree, try to reason about how to construct
+  // a single SILValue out of all the available values for all the memory
+  // locations.
+  //
+  // First, get a list of all the leaf nodes and intermediate nodes for the
+  // Base memory location.
+  LSLocationList ALocs;
+  ProjectionPath &BasePath = Base.getPath().getValue();
+  for (const auto &P :
+       TE->getTypeExpansionProjectionPaths(Base.getType(), M, TEKind::TENode)) {
+    ALocs.push_back(LSLocation(Base.getBase(), P.getValue(), BasePath));
+  }
+
+  // Second, go from leaf nodes to their parents. This guarantees that at the
+  // point the parent is processed, its children have been processed already.
+  for (auto I = ALocs.rbegin(), E = ALocs.rend(); I != E; ++I) {
+    // This is a leaf node, we have a value for it.
+    //
+    // Reached the end of the projection tree, this is a leaf node.
+    LSLocationList FirstLevel;
+    I->getFirstLevelLSLocations(FirstLevel, M);
+    if (FirstLevel.empty())
+      continue;
+
+    // If this is a class reference type, we have reached end of the type tree.
+    if (I->getType().getClassOrBoundGenericClass())
+      continue;
+
+    // This is NOT a leaf node, we need to construct a value for it.
+    //
+    // If there are more than 1 children and all the children nodes have
+    // LSValues with the same base. we can get away by not extracting
+    // value
+    // for every single field.
+    //
+    // Simply create a new node with all the aggregated base value, i.e.
+    // stripping off the last level projection.
+    //
+    bool HasIdenticalValueBase = true;
+    auto Iter = FirstLevel.begin();
+    LSValue &FirstVal = Values[*Iter];
+    SILValue FirstBase = FirstVal.getBase();
+    Iter = std::next(Iter);
+    for (auto EndIter = FirstLevel.end(); Iter != EndIter; ++Iter) {
+      LSValue &V = Values[*Iter];
+      HasIdenticalValueBase &= (FirstBase == V.getBase());
+    }
+
+    if (HasIdenticalValueBase &&
+        (FirstLevel.size() > 1 || !FirstVal.hasEmptyProjectionPath())) {
+      Values[*I] = FirstVal.stripLastLevelProjection();
+      // We have a value for the parent, remove all the values for children.
+      removeLSLocations(Values, FirstLevel);
+      continue;
+    }
+
+    // In 2 cases do we need aggregation.
+    //
+    // 1. If there is only 1 child and we can not strip off any projections,
+    // that means we need to create an aggregation.
+    //
+    // 2. Children have values from different bases, We need to create
+    // extractions and aggregation in this case.
+    //
+    llvm::SmallVector<SILValue, 8> Vals;
+    for (auto &X : FirstLevel) {
+      Vals.push_back(Values[X].materialize(InsertPt));
+    }
+    SILBuilder Builder(InsertPt);
+    NullablePtr<swift::SILInstruction> AI =
+        Projection::createAggFromFirstLevelProjections(
+            Builder, InsertPt->getLoc(), I->getType(), Vals);
+    // This is the Value for the current node.
+    ProjectionPath P;
+    Values[*I] = LSValue(SILValue(AI.get()), P);
+    removeLSLocations(Values, FirstLevel);
+
+    // Keep iterating until we have reach the top-most level of the projection
+    // tree.
+    // i.e. the memory location represented by the Base.
+  }
+
+  assert(Values.size() == 1 && "Should have a single location this point");
+
+  // Finally materialize and return the forwarding SILValue.
+  return Values.begin()->second.materialize(InsertPt);
+}
+
+
 void LSValue::enumerateLSValue(SILModule *M, SILValue Val,
                                std::vector<LSValue> &Vault,
                                LSValueIndexMap &ValToBit,
@@ -217,97 +310,6 @@ void LSLocation::reduce(LSLocation &Base, SILModule *M, LSLocationSet &Locs,
   }
 }
 
-SILValue LSLocation::reduceWithValues(LSLocation &Base, SILModule *M,
-                                      LSLocationValueMap &Values,
-                                      SILInstruction *InsertPt,
-                                      TypeExpansionAnalysis *TE) {
-  // Walk bottom up the projection tree, try to reason about how to construct
-  // a single SILValue out of all the available values for all the memory
-  // locations.
-  //
-  // First, get a list of all the leaf nodes and intermediate nodes for the
-  // Base memory location.
-  LSLocationList ALocs;
-  ProjectionPath &BasePath = Base.getPath().getValue();
-  for (const auto &P :
-       TE->getTypeExpansionProjectionPaths(Base.getType(), M, TEKind::TENode)) {
-    ALocs.push_back(LSLocation(Base.getBase(), P.getValue(), BasePath));
-  }
-
-  // Second, go from leaf nodes to their parents. This guarantees that at the
-  // point the parent is processed, its children have been processed already.
-  for (auto I = ALocs.rbegin(), E = ALocs.rend(); I != E; ++I) {
-    // This is a leaf node, we have a value for it.
-    //
-    // Reached the end of the projection tree, this is a leaf node.
-    LSLocationList FirstLevel;
-    I->getFirstLevelLSLocations(FirstLevel, M);
-    if (FirstLevel.empty())
-      continue;
-
-    // If this is a class reference type, we have reached end of the type tree.
-    if (I->getType().getClassOrBoundGenericClass())
-      continue;
-
-    // This is NOT a leaf node, we need to construct a value for it.
-    //
-    // If there are more than 1 children and all the children nodes have
-    // LSValues with the same base. we can get away by not extracting
-    // value
-    // for every single field.
-    //
-    // Simply create a new node with all the aggregated base value, i.e.
-    // stripping off the last level projection.
-    //
-    bool HasIdenticalValueBase = true;
-    auto Iter = FirstLevel.begin();
-    LSValue &FirstVal = Values[*Iter];
-    SILValue FirstBase = FirstVal.getBase();
-    Iter = std::next(Iter);
-    for (auto EndIter = FirstLevel.end(); Iter != EndIter; ++Iter) {
-      LSValue &V = Values[*Iter];
-      HasIdenticalValueBase &= (FirstBase == V.getBase());
-    }
-
-    if (HasIdenticalValueBase &&
-        (FirstLevel.size() > 1 || !FirstVal.hasEmptyProjectionPath())) {
-      Values[*I] = FirstVal.stripLastLevelProjection();
-      // We have a value for the parent, remove all the values for children.
-      removeLSLocations(Values, FirstLevel);
-      continue;
-    }
-
-    // In 2 cases do we need aggregation.
-    //
-    // 1. If there is only 1 child and we can not strip off any projections,
-    // that means we need to create an aggregation.
-    //
-    // 2. Children have values from different bases, We need to create
-    // extractions and aggregation in this case.
-    //
-    llvm::SmallVector<SILValue, 8> Vals;
-    for (auto &X : FirstLevel) {
-      Vals.push_back(Values[X].materialize(InsertPt));
-    }
-    SILBuilder Builder(InsertPt);
-    NullablePtr<swift::SILInstruction> AI =
-        Projection::createAggFromFirstLevelProjections(
-            Builder, InsertPt->getLoc(), I->getType(), Vals);
-    // This is the Value for the current node.
-    ProjectionPath P;
-    Values[*I] = LSValue(SILValue(AI.get()), P);
-    removeLSLocations(Values, FirstLevel);
-
-    // Keep iterating until we have reach the top-most level of the projection
-    // tree.
-    // i.e. the memory location represented by the Base.
-  }
-
-  assert(Values.size() == 1 && "Should have a single location this point");
-
-  // Finally materialize and return the forwarding SILValue.
-  return Values.begin()->second.materialize(InsertPt);
-}
 
 void LSLocation::enumerateLSLocation(SILModule *M, SILValue Mem,
                                      std::vector<LSLocation> &LV,
