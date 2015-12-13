@@ -1094,7 +1094,7 @@ function(_add_swift_library_single target name)
   # conformance sections. This wouldn't be necessary if the link was done by
   # the swift binary: rdar://problem/19007002
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux" OR
-    "${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
+     "${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
     list(APPEND link_flags
         "-Xlinker" "-T"
         "-Xlinker" "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}/swift.ld")
