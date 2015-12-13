@@ -32,7 +32,7 @@ public protocol SplittableCollectionType : CollectionType {
   // FIXME: all collections with random access should conform to this protocol
   // automatically.
 
-  /// Splits a given range of indicies into a set of disjoint ranges covering
+  /// Splits a given range of indices into a set of disjoint ranges covering
   /// the same elements.
   ///
   /// Complexity: amortized O(1).
