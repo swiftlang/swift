@@ -582,6 +582,17 @@ class ClassVeryPrintable : CustomStringConvertible, CustomDebugStringConvertible
   }
 }
 
+func test_ThickMetatypePrintingImpl<T>(
+  thickMetatype: T.Type,
+  _ expectedPrint: String,
+  _ expectedDebug: String
+  ) {
+    expectPrinted(expectedPrint, thickMetatype)
+    expectPrinted("[\(expectedDebug)]", [ thickMetatype ])
+    expectDebugPrinted(expectedDebug, thickMetatype)
+    expectDebugPrinted("[\(expectedDebug)]", [ thickMetatype ])
+}
+
 PrintTests.test("StructPrintable") {
   let s0 = StructPrintable(1)
   let s1: ProtocolUnrelatedToPrinting = StructPrintable(1)
@@ -592,6 +603,14 @@ PrintTests.test("StructPrintable") {
   expectPrinted("►1◀︎", s1)
   expectPrinted("►1◀︎", s2)
   expectPrinted("►1◀︎", s3)
+  
+  let structMetatype = StructPrintable.self
+  expectPrinted("StructPrintable", structMetatype)
+  expectDebugPrinted("a.StructPrintable", structMetatype)
+  expectPrinted("[a.StructPrintable]", [ structMetatype ])
+  expectDebugPrinted("[a.StructPrintable]", [ structMetatype ])
+  test_ThickMetatypePrintingImpl(structMetatype, "StructPrintable",
+    "a.StructPrintable")
 }
 
 PrintTests.test("LargeStructPrintable") {
@@ -632,6 +651,14 @@ PrintTests.test("ClassPrintable") {
   expectPrinted("►1◀︎", c1)
   expectPrinted("►1◀︎", c2)
   expectPrinted("►1◀︎", c3)
+  
+  let classMetatype = ClassPrintable.self
+  expectPrinted("ClassPrintable", classMetatype)
+  expectDebugPrinted("a.ClassPrintable", classMetatype)
+  expectPrinted("[a.ClassPrintable]", [ classMetatype ])
+  expectDebugPrinted("[a.ClassPrintable]", [ classMetatype ])
+  test_ThickMetatypePrintingImpl(classMetatype, "ClassPrintable",
+    "a.ClassPrintable")
 }
 
 PrintTests.test("ClassVeryPrintable") {
@@ -647,39 +674,6 @@ PrintTests.test("ClassVeryPrintable") {
   expectPrinted("<description: 1>", c3)
   expectPrinted("<description: 1>", c4)
 }
-
-func test_ThickMetatypePrintingImpl<T>(
-    thickMetatype: T.Type,
-    _ expectedPrint: String,
-    _ expectedDebug: String
-) {
-  printedIs(thickMetatype, expectedPrint)
-  printedIs([ thickMetatype ], "[" + expectedDebug + "]")
-  debugPrintedIs(thickMetatype, expectedDebug)
-  debugPrintedIs([ thickMetatype ], "[" + expectedDebug + "]")
-}
-
-func test_gcMetatypePrinting() {
-  let structMetatype = StructPrintable.self
-  printedIs(structMetatype, "StructPrintable")
-  debugPrintedIs(structMetatype, "a.StructPrintable")
-  printedIs([ structMetatype ], "[a.StructPrintable]")
-  debugPrintedIs([ structMetatype ], "[a.StructPrintable]")
-  test_ThickMetatypePrintingImpl(structMetatype, "StructPrintable",
-    "a.StructPrintable")
-
-  let classMetatype = ClassPrintable.self
-  printedIs(classMetatype, "ClassPrintable")
-  debugPrintedIs(classMetatype, "a.ClassPrintable")
-  printedIs([ classMetatype ], "[a.ClassPrintable]")
-  debugPrintedIs([ classMetatype ], "[a.ClassPrintable]")
-  test_ThickMetatypePrintingImpl(classMetatype, "ClassPrintable",
-    "a.ClassPrintable")
-
-  print("test_gcMetatypePrinting done")
-}
-test_gcMetatypePrinting()
-// CHECK: test_gcMetatypePrinting done
 
 func test_ArrayPrinting() {
   let arrayOfInts: [Int] = []
