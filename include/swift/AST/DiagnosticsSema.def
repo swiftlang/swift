@@ -1500,7 +1500,7 @@ ERROR(noescape_conflicts_escaping_autoclosure,attribute_parsing,none,
 ERROR(attr_NSManaged_not_instance_member,sema_tcd,none,
       "@NSManaged only allowed on an instance property or method", ())
 ERROR(attr_NSManaged_not_stored,sema_tcd,none,
-      "@NSManaged not allowed on %select{computed|observing|adressed}0 "
+      "@NSManaged not allowed on %select{computed|observing|addressed}0 "
       "properties", (unsigned))
 ERROR(attr_NSManaged_let_property,sema_tcd,none,
       "@NSManaged not allowed on a 'let' property", ())
