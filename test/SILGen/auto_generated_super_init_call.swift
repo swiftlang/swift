@@ -51,7 +51,7 @@ class SomeDerivedClass : Parent {
 // CHECK-NEXT: return
   }
 
-  // One init has a call to super init. Make sure we don't instert more than one.
+  // One init has a call to super init. Make sure we don't insert more than one.
   init(b: Bool, i: Int) {
     if (b) {
       y = i
