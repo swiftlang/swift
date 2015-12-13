@@ -133,7 +133,7 @@ enum OperandRelation {
   /// The original operand values are equal.
   AlwaysEqual,
   
-  /// The operand values are euqal after replacing with the successor block
+  /// The operand values are equal after replacing with the successor block
   /// arguments.
   EqualAfterMove
 };
