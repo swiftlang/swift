@@ -1429,7 +1429,7 @@ bool EscapeAnalysis::mergeCalleeGraph(FullApplySite FAS,
     // If there are more callee parameters than arguments it means that the
     // callee is the result of a partial_apply - a thick function. A thick
     // function also references the boxed partially applied arguments.
-    // Therefore we map all the extra callee paramters to the callee operand
+    // Therefore we map all the extra callee parameters to the callee operand
     // of the apply site.
     SILValue CallerArg = (Idx < numCallerArgs ? FAS.getArgument(Idx) :
                           FAS.getCallee());
