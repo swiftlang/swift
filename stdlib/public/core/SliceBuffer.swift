@@ -156,7 +156,7 @@ struct _SliceBuffer<Element> : _ArrayBufferType {
         return native
       }
     }
-    return nil
+    return .None
   }
 
   @warn_unused_result
@@ -178,7 +178,7 @@ struct _SliceBuffer<Element> : _ArrayBufferType {
     if _fastPath(_hasNativeBuffer && nativeBuffer.count == count) {
       return nativeBuffer
     }
-    return nil
+    return .None
   }
 
   public

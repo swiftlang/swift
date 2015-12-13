@@ -39,7 +39,7 @@ public struct _FDInputStream {
       _bufferUsed = 0
       return result
     }
-    return nil
+    return .None
   }
 
   public mutating func read() {

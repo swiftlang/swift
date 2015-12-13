@@ -238,7 +238,7 @@ internal class _DropFirstSequence<Base : GeneratorType>
     while dropped < limit {
       if generator.next() == nil {
         dropped = limit
-        return nil
+        return .None
       }
       ++dropped
     }
@@ -269,7 +269,7 @@ internal class _PrefixSequence<Base : GeneratorType> : SequenceType, GeneratorTy
   }
 
   internal func next() -> Base.Element? {
-    if taken >= maxLength { return nil }
+    if taken >= maxLength { return .None }
     ++taken
 
     if let next = generator.next() {
@@ -277,7 +277,7 @@ internal class _PrefixSequence<Base : GeneratorType> : SequenceType, GeneratorTy
     }
 
     taken = maxLength
-    return nil
+    return .None
   }
 }
 
@@ -517,14 +517,14 @@ extension SequenceType {
   }
 
   public func _preprocessingPass<R>(preprocess: (Self)->R) -> R? {
-    return nil
+    return .None
   }
 
   @warn_unused_result
   public func _customContainsEquatableElement(
     element: Generator.Element
   ) -> Bool? {
-    return nil
+    return .None
   }
 }
 

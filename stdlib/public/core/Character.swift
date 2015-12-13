@@ -179,7 +179,7 @@ public struct Character :
       internal mutating func next() -> UInt8? {
         let result = UInt8(truncatingBitPattern: _data)
         if result == 0xFF {
-          return nil
+          return .None
         }
         _data = (_data >> 8) | 0xFF00_0000_0000_0000
         return result

@@ -279,7 +279,7 @@ extension RangeReplaceableCollectionType where SubSequence == Self {
 extension RangeReplaceableCollectionType {
   @warn_unused_result
   public mutating func _customRemoveLast() -> Generator.Element? {
-    return nil
+    return .None
   }
 
   @warn_unused_result

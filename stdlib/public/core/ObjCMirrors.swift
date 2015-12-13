@@ -56,7 +56,7 @@ struct _ObjCSuperMirror : _MirrorType {
 
   // Suppress the value identifier for super mirrors.
   public var objectIdentifier: ObjectIdentifier? {
-    return nil
+    return .None
   }
   public var count: Int {
     return _getObjCCount(data)

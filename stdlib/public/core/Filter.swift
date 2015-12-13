@@ -30,7 +30,7 @@ public struct LazyFilterGenerator<
         return n
       }
     }
-    return nil
+    return .None
   }
 
   /// Creates an instance that produces the elements `x` of `base`

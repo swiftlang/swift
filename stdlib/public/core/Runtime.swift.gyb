@@ -252,7 +252,7 @@ func _stdlib_atomicLoadARCRef(
   if result != nil {
     return Unmanaged<AnyObject>.fromOpaque(result).takeUnretainedValue()
   }
-  return nil
+  return .None
 }
 
 % for operation in [ 'Add', 'And', 'Or', 'Xor' ]:

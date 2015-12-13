@@ -139,7 +139,7 @@ extension _ArrayBuffer {
         return b
       }
     }
-    return nil
+    return .None
   }
 
   @warn_unused_result

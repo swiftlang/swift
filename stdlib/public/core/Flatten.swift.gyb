@@ -42,7 +42,7 @@ public struct FlattenGenerator<
       }
       let s = _base.next()
       if _slowPath(s == nil) {
-        return nil
+        return .None
       }
       _inner = s!.generate()
     }

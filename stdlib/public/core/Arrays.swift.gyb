@@ -1340,7 +1340,7 @@ extension Array {
         return Array(_ContiguousArrayBuffer(nativeStorage))
       }
     }
-    return nil
+    return .None
   }
 
   /// Private initializer used for bridging.
@@ -1363,7 +1363,7 @@ extension Array {
   /// - Complexity: O(`self.count`) if the array is bridged,
   ///   otherwise O(1).
   public mutating func popLast() -> Element? {
-    guard !isEmpty else { return nil }
+    guard !isEmpty else { return .None }
     return removeLast()
   }
 }
@@ -1374,7 +1374,7 @@ extension ContiguousArray {
   ///
   /// - Complexity: O(1)
   public mutating func popLast() -> Element? {
-    guard !isEmpty else { return nil }
+    guard !isEmpty else { return .None }
     return removeLast()
   }
 }

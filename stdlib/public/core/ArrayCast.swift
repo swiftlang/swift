@@ -119,7 +119,7 @@ internal func _arrayConditionalDownCastElements<SourceElement, TargetElement>(
       if native!.storesOnlyElementsOfType(TargetElement.self) {
         return Array(a._buffer.castToBufferOf(TargetElement.self))
       }
-      return nil
+      return .None
     }
     
     // slow path: we store an NSArray
@@ -128,7 +128,7 @@ internal func _arrayConditionalDownCastElements<SourceElement, TargetElement>(
     if !(AnyObject.self is TargetElement.Type) {
       for element in a {
         if !(element is TargetElement) {
-          return nil
+          return .None
         }
       }
     }

@@ -142,7 +142,7 @@ public struct Mirror {
   }
 
   @warn_unused_result
-  static func _noSuperclassMirror() -> Mirror? { return nil }
+  static func _noSuperclassMirror() -> Mirror? { return .None }
 
   /// Return the legacy mirror representing the part of `subject`
   /// corresponding to the superclass of `staticSubclass`.
@@ -163,7 +163,7 @@ public struct Mirror {
       clsMirror = superclassMirror
       cls = superclass
     }
-    return nil
+    return .None
   }
   
   @warn_unused_result
@@ -432,7 +432,7 @@ extension Mirror {
         _preconditionFailure(
           "Someone added a conformance to MirrorPathType; that privilege is reserved to the standard library")
       }
-      if position == children.endIndex { return nil }
+      if position == children.endIndex { return .None }
       result = children[position].value
     }
     return result
@@ -477,7 +477,7 @@ extension _MirrorType {
         return childMirror
       }
     }
-    return nil
+    return .None
   }
 }
 

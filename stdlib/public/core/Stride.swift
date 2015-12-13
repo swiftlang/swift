@@ -133,7 +133,7 @@ public struct StrideToGenerator<Element : Strideable> : GeneratorType {
   /// element exists.
   public mutating func next() -> Element? {
     if stride > 0 ? current >= end : current <= end {
-      return nil
+      return .None
     }
     let ret = current
     current += stride
@@ -200,14 +200,14 @@ public struct StrideThroughGenerator<Element : Strideable> : GeneratorType {
   /// element exists.
   public mutating func next() -> Element? {
     if done {
-      return nil
+      return .None
     }
     if stride > 0 ? current >= end : current <= end {
       if current == end {
         done = true
         return current
       }
-      return nil
+      return .None
     }
     let ret = current
     current += stride

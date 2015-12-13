@@ -47,7 +47,7 @@ ${MirrorDecl} {
 
   var summary: String { return "${SummaryString}" }
 
-  var quickLookObject: PlaygroundQuickLook? { return nil }
+  var quickLookObject: PlaygroundQuickLook? { return .None }
 }
 
 ${MirrorConformance}

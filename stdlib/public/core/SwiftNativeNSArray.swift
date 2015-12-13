@@ -143,7 +143,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
       _stdlib_atomicLoadARCRef(object: _heapBufferBridgedPtr) {
       return unsafeBitCast(ref, HeapBufferStorage.self)
     }
-    return nil
+    return .None
   }
 
   internal init(_nativeStorage: _ContiguousArrayStorageBase) {

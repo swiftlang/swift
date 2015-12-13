@@ -243,7 +243,7 @@ internal struct _LeafMirror<T>: _MirrorType {
 
   var value: Any { return _value }
   var valueType: Any.Type { return value.dynamicType }
-  var objectIdentifier: ObjectIdentifier? { return nil }
+  var objectIdentifier: ObjectIdentifier? { return .None }
   var count: Int { return 0 }
   subscript(i: Int) -> (String, _MirrorType) {
     _preconditionFailure("no children")
@@ -296,13 +296,13 @@ struct _OpaqueMirror : _MirrorType {
 
   var value: Any { return data.value }
   var valueType: Any.Type { return data.valueType }
-  var objectIdentifier: ObjectIdentifier? { return nil }
+  var objectIdentifier: ObjectIdentifier? { return .None }
   var count: Int { return 0 }
   subscript(i: Int) -> (String, _MirrorType) {
     _preconditionFailure("no children")
   }
   var summary: String { return data.summary }
-  var quickLookObject: PlaygroundQuickLook? { return nil }
+  var quickLookObject: PlaygroundQuickLook? { return .None }
   var disposition: _MirrorDisposition { return .Aggregate }
 }
 
@@ -311,7 +311,7 @@ internal struct _TupleMirror : _MirrorType {
 
   var value: Any { return data.value }
   var valueType: Any.Type { return data.valueType }
-  var objectIdentifier: ObjectIdentifier? { return nil }
+  var objectIdentifier: ObjectIdentifier? { return .None }
   var count: Int {
     @_silgen_name("swift_TupleMirror_count")get
   }
@@ -319,7 +319,7 @@ internal struct _TupleMirror : _MirrorType {
     @_silgen_name("swift_TupleMirror_subscript")get
   }
   var summary: String { return "(\(count) elements)" }
-  var quickLookObject: PlaygroundQuickLook? { return nil }
+  var quickLookObject: PlaygroundQuickLook? { return .None }
   var disposition: _MirrorDisposition { return .Tuple }
 }
 
@@ -328,7 +328,7 @@ struct _StructMirror : _MirrorType {
 
   var value: Any { return data.value }
   var valueType: Any.Type { return data.valueType }
-  var objectIdentifier: ObjectIdentifier? { return nil }
+  var objectIdentifier: ObjectIdentifier? { return .None }
   var count: Int {
     @_silgen_name("swift_StructMirror_count")get
   }
@@ -339,7 +339,7 @@ struct _StructMirror : _MirrorType {
   var summary: String {
     return _typeName(valueType)
   }
-  var quickLookObject: PlaygroundQuickLook? { return nil }
+  var quickLookObject: PlaygroundQuickLook? { return .None }
   var disposition: _MirrorDisposition { return .Struct }
 }
 
@@ -348,7 +348,7 @@ struct _EnumMirror : _MirrorType {
 
   var value: Any { return data.value }
   var valueType: Any.Type { return data.valueType }
-  var objectIdentifier: ObjectIdentifier? { return nil }
+  var objectIdentifier: ObjectIdentifier? { return .None }
   var count: Int {
     @_silgen_name("swift_EnumMirror_count")get
   }
@@ -366,7 +366,7 @@ struct _EnumMirror : _MirrorType {
     }
     return typeName
   }
-  var quickLookObject: PlaygroundQuickLook? { return nil }
+  var quickLookObject: PlaygroundQuickLook? { return .None }
   var disposition: _MirrorDisposition { return .Enum }
 }
 
@@ -407,7 +407,7 @@ struct _ClassMirror : _MirrorType {
 #if _runtime(_ObjC)
     return _getClassPlaygroundQuickLook(data)
 #else
-    return nil
+    return .None
 #endif
   }
   var disposition: _MirrorDisposition { return .Class }
@@ -421,7 +421,7 @@ struct _ClassSuperMirror : _MirrorType {
 
   // Suppress the value identifier for super mirrors.
   var objectIdentifier: ObjectIdentifier? {
-    return nil
+    return .None
   }
   var count: Int {
     return _getClassCount(data)
@@ -432,7 +432,7 @@ struct _ClassSuperMirror : _MirrorType {
   var summary: String {
     return _typeName(data.metadata)
   }
-  var quickLookObject: PlaygroundQuickLook? { return nil }
+  var quickLookObject: PlaygroundQuickLook? { return .None }
   var disposition: _MirrorDisposition { return .Class }
 }
 
@@ -455,7 +455,7 @@ struct _MetatypeMirror : _MirrorType {
   var summary: String {
     return _typeName(data._loadValue() as Any.Type)
   }
-  var quickLookObject: PlaygroundQuickLook? { return nil }
+  var quickLookObject: PlaygroundQuickLook? { return .None }
 
   // Special disposition for types?
   var disposition: _MirrorDisposition { return .Aggregate }

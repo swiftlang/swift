@@ -23,7 +23,7 @@ extension String {
   @warn_unused_result
   public static func fromCString(cs: UnsafePointer<CChar>) -> String? {
     if cs._isNull {
-      return nil
+      return .None
     }
     let len = Int(_swift_stdlib_strlen(cs))
     return String._fromCodeUnitSequence(UTF8.self,
@@ -56,7 +56,7 @@ extension String {
 @warn_unused_result
 public func _persistCString(s: UnsafePointer<CChar>) -> [CChar]? {
   if s == nil {
-    return nil
+    return .None
   }
   let length = Int(_swift_stdlib_strlen(s))
   var result = [CChar](count: length + 1, repeatedValue: 0)

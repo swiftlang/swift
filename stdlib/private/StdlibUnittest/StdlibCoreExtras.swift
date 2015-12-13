@@ -53,7 +53,7 @@ func findSubstring(string: String, _ substring: String) -> String.Index? {
       if matchIndex == haystack.endIndex {
         // if we hit the end of the string before finding the end of the needle,
         // we aren't going to find the needle after that.
-        return nil
+        return .None
       }
       if needle[needleIndex] == haystack[matchIndex] {
         // keep advancing through both the string and search string on match
@@ -65,7 +65,7 @@ func findSubstring(string: String, _ substring: String) -> String.Index? {
       }
     }
   }
-  return nil
+  return .None
 #endif
 }
 
