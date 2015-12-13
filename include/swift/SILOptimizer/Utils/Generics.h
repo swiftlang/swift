@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This containts utilities for transforming generics.
+// This contains utilities for transforming generics.
 //
 //===----------------------------------------------------------------------===//
 
