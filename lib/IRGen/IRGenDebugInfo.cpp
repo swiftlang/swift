@@ -1059,7 +1059,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
       if (!Dim.SizeInBits || (StorageSize && Dim.SizeInBits > StorageSize))
         Dim.SizeInBits = StorageSize;
 
-      // FIXME: Occasionally we miss out that the Storage is acually a
+      // FIXME: Occasionally we miss out that the Storage is actually a
       // refcount wrapper. Silently skip these for now.
       if (OffsetInBits+Dim.SizeInBits > VarSizeInBits)
         break;

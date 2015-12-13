@@ -1229,7 +1229,7 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
                              nullptr, Decls);
           Optional<ImportKind> FoundKind = ImportDecl::findBestImportKind(Decls);
           assert(FoundKind.hasValue() &&
-                 "deserialized imports should not be ambigous");
+                 "deserialized imports should not be ambiguous");
           Kind = *FoundKind;
         }
 

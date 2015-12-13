@@ -838,7 +838,7 @@ class TypeRefinementContextBuilder : private ASTWalker {
 
   /// A mapping from abstract storage declarations with accessors to
   /// to the type refinement contexts for those declarations. We refer to
-  /// this map to determine the appopriate parent TRC to use when
+  /// this map to determine the appropriate parent TRC to use when
   /// walking the accessor function.
   llvm::DenseMap<AbstractStorageDecl *, TypeRefinementContext *>
       StorageContexts;
