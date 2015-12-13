@@ -517,7 +517,7 @@ extension FloatingPointType {
 
 public protocol BinaryFloatingPointType: FloatingPointType {
   
-  /// Values that parametrize the type:
+  /// Values that parameterize the type:
   static var _exponentBitCount: UInt { get }
   static var _fractionalBitCount: UInt { get }
   
