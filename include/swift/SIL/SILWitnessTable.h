@@ -181,7 +181,7 @@ private:
   NormalProtocolConformance *Conformance;
 
   /// The various witnesses containing in this witness table. Is empty if the
-  /// table has no witness entires or if it is a declaration.
+  /// table has no witness entries or if it is a declaration.
   MutableArrayRef<Entry> Entries;
 
   /// Whether or not this witness table is a declaration. This is separate from
