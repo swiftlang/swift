@@ -79,9 +79,9 @@ bb0(%0 : $*Y, %1 : $X):
   return %7 : $()
 }
 
-// Test if a defering edge is created for a block argument.
+// Test if a deferring edge is created for a block argument.
 
-// CHECK-LABEL: CG of deferingEdge
+// CHECK-LABEL: CG of deferringEdge
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: (%3.1)
 // CHECK-NEXT:    Arg %1 Esc: A, Succ: 
 // CHECK-NEXT:    Val %3 Esc: %3, Succ: (%3.1), %0
@@ -89,7 +89,7 @@ bb0(%0 : $*Y, %1 : $X):
 // CHECK-NEXT:    Con %3.2 Esc: A, Succ: %1
 // CHECK-NEXT:    Ret Esc: R, Succ: %0
 // CHECK-NEXT:  End
-sil @deferingEdge : $@convention(thin) (@owned LinkedNode, @owned LinkedNode) -> @owned LinkedNode {
+sil @deferringEdge : $@convention(thin) (@owned LinkedNode, @owned LinkedNode) -> @owned LinkedNode {
 bb0(%0 : $LinkedNode, %1 : $LinkedNode):
   br bb1(%0 : $LinkedNode)
 
