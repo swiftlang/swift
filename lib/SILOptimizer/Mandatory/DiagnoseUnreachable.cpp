@@ -557,7 +557,7 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
 /// \brief Issue an "unreachable code" diagnostic if the blocks contains or
 /// leads to another block that contains user code.
 ///
-/// Note, we rely on SILLocation inforamtion to determine if SILInstructions
+/// Note, we rely on SILLocation information to determine if SILInstructions
 /// correspond to user code.
 static bool diagnoseUnreachableBlock(const SILBasicBlock &B,
                                      SILModule &M,
