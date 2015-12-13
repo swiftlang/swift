@@ -2324,7 +2324,7 @@ namespace {
           std::tie(getter, setter) = makeUnionFieldAccessors(Impl, result, VD);
           members.push_back(VD);
 
-          // Create labeled inititializers for unions that take one of the
+          // Create labeled initializers for unions that take one of the
           // fields, which only initializes the data for that field.
           auto valueCtor =
               createValueConstructor(result, VD,
