@@ -1398,7 +1398,7 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
                       IGM.getPointerAlignment(),
                       nullptr);
     StringRef Name("$error");
-    // We just need any number that is guranteed to be larger than every
+    // We just need any number that is guaranteed to be larger than every
     // other argument. It is only used for sorting.
     unsigned ArgNo =
         countArgs(CurSILFn->getDeclContext()) + 1 + BB->getBBArgs().size();
