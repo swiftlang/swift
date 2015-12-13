@@ -223,7 +223,7 @@ bb0(%0 : $Int64):
   %24 = integer_literal $Builtin.Int64, 10        // user: %25
   %25 = builtin "ssub_with_overflow_Int64"(%2 : $Builtin.Int64, %24 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %26
   %26 = tuple_extract %25 : $(Builtin.Int64, Builtin.Int1), 1 // user: %27
-// Keep this condfail because it is not in the guraded range.
+// Keep this condfail because it is not in the guarded range.
 // CHECK: cond_fail
   cond_fail %26 : $Builtin.Int1                   // id: %27
   %28 = apply %7() : $@convention(thin) () -> ()
