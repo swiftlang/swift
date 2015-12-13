@@ -53,7 +53,7 @@ public struct Zip2Generator<
       return nil
     }
 
-    return .Some((element0, element1))
+    return (element0, element1)
   }
 
   internal var _baseStreams: (Generator1, Generator2)

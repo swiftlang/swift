@@ -407,7 +407,7 @@ struct _ClassMirror : _MirrorType {
 #if _runtime(_ObjC)
     return _getClassPlaygroundQuickLook(data)
 #else
-    return .None
+    return nil
 #endif
   }
   var disposition: _MirrorDisposition { return .Class }
