@@ -206,7 +206,7 @@ public:
     //   a = 10
     //
     // However, by doing so, we can only eliminate the dead stores after the
-    // data flow stablizes.
+    // data flow stabilizes.
     //
     WriteSetIn.resize(LSLocationNum, true);
     WriteSetOut.resize(LSLocationNum, false);
