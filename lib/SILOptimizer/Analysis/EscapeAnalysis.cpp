@@ -99,7 +99,7 @@ getOrCreateNode(ValueBase *V) {
 
 EscapeAnalysis::CGNode *EscapeAnalysis::ConnectionGraph::getContentNode(
                                                           CGNode *AddrNode) {
-  // Do we already have a content node (which is not necessarliy an immediate
+  // Do we already have a content node (which is not necessarily an immediate
   // successor of AddrNode)?
   if (AddrNode->pointsTo)
     return AddrNode->pointsTo;
