@@ -375,3 +375,10 @@ public func swap<T>(inout a : T, inout _ b : T) {
   // Initialize P2.
   Builtin.initialize(tmp, p2)
 }
+
+/// Replace the value of `a` with `b` and return the old value.
+public func replace<T>(inout a: T, with b: T) -> T {
+    var value = b
+    swap(&a, &value)
+    return value
+}
