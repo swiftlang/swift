@@ -785,9 +785,9 @@ public:
   /// \brief Determine whether a constraint of the given kind can be satisfied
   /// by the two types.
   ///
-  /// \param t1 The first type of the constrant.
+  /// \param t1 The first type of the constraint.
   ///
-  /// \param t2 The second type of the constrant.
+  /// \param t2 The second type of the constraint.
   ///
   /// \param dc The context of the conversion.
   ///
