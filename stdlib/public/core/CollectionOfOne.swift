@@ -29,7 +29,7 @@ public struct GeneratorOfOne<Element> : GeneratorType, SequenceType {
   ///   has returned `nil`.
   public mutating func next() -> Element? {
     let result = elements
-    elements = .None
+    elements = nil
     return result
   }
   var elements: Element?

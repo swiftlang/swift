@@ -145,7 +145,7 @@ extension String {
     if let stringBuffer = stringBufferOptional {
       return String(_storage: stringBuffer)
     } else {
-      return .None
+      return nil
     }
   }
 

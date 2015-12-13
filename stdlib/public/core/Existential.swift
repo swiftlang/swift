@@ -47,7 +47,7 @@ internal struct _CollectionOf<
         ++index
         return self._subscriptImpl(index)
       }
-      return .None
+      return nil
     }
   }
 

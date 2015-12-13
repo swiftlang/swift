@@ -129,7 +129,7 @@ struct _HeapBuffer<Value, Element> : Equatable {
   }
 
   init() {
-    self._storage = .None
+    self._storage = nil
   }
 
   public // @testable

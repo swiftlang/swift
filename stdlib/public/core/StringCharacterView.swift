@@ -242,7 +242,7 @@ extension String.CharacterView : CollectionType {
 
     var valueType: Any.Type { return (_value as Any).dynamicType }
 
-    var objectIdentifier: ObjectIdentifier? { return .None }
+    var objectIdentifier: ObjectIdentifier? { return nil }
 
     var disposition: _MirrorDisposition { return .Aggregate }
 
@@ -255,7 +255,7 @@ extension String.CharacterView : CollectionType {
     var summary: String { return "\(_value._utf16Index)" }
 
     var quickLookObject: PlaygroundQuickLook? {
-      return .Some(.Int(Int64(_value._utf16Index)))
+      return .Int(Int64(_value._utf16Index))
     }
   }
 }

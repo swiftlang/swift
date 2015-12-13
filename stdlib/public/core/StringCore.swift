@@ -174,7 +174,7 @@ public struct _StringCore {
   public init() {
     self._baseAddress = _emptyStringBase
     self._countAndFlags = 0
-    self._owner = .None
+    self._owner = nil
     _invariantCheck()
   }
 
