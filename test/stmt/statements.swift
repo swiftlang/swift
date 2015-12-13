@@ -438,4 +438,8 @@ func for_loop_multi_iter() {
   }
 }
 
-
+// Errors in case syntax
+class
+case, // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{expected pattern}}
+case  // expected-error {{expected identifier after comma in enum 'case' declaration}} expected-error {{expected identifier in enum 'case' declaration}} expected-error {{enum 'case' is not allowed outside of an enum}} expected-error {{expected pattern}}
+// NOTE: EOF is important here to properly test a code path that used to crash the parser
