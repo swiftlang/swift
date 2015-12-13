@@ -122,7 +122,7 @@ if True:
 /// property, these array types have a `capacity` that reflects their
 /// potential to store elements without reallocation, and when you
 /// know how many elements you'll store, you can call
-/// `reserveCapacity` to pre-emptively reallocate and prevent
+/// `reserveCapacity` to preemptively reallocate and prevent
 /// intermediate reallocations.
 ///
 /// Objective-C Bridge
