@@ -108,7 +108,7 @@ private:
   /// functions into the thunk.
   unsigned Thunk : 2;
 
-  /// The visiblity of the parent class, if this is a method which is contained
+  /// The visibility of the parent class, if this is a method which is contained
   /// in the vtable of that class.
   unsigned ClassVisibility : 2;
     
@@ -300,7 +300,7 @@ public:
 
   /// Get's the effective linkage which is used to derive the llvm linkage.
   /// Usually this is the same as getLinkage(), except in one case: if this
-  /// function is a method in a class which has higher visiblity than the
+  /// function is a method in a class which has higher visibility than the
   /// method itself, the function can be referenced from vtables of derived
   /// classes in other compilation units.
   SILLinkage getEffectiveSymbolLinkage() const {
