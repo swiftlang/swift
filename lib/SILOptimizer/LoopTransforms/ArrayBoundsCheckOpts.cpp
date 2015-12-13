@@ -753,7 +753,7 @@ struct InductionInfo {
     IsOverflowCheckInserted = true;
 
     // We can now remove the cond fail on the increment the above comparison
-    // guarantuees that the addition won't overflow.
+    // guarantees that the addition won't overflow.
     auto *CondFail = isOverflowChecked(cast<BuiltinInst>(Inc));
     if (CondFail)
       CondFail->eraseFromParent();
