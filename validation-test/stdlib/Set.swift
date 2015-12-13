@@ -391,7 +391,7 @@ SetTestSuite.test("COW.Fast.ContainsDoesNotReallocate") {
   expectTrue(s.contains(1010))
   expectEqual(identity1, unsafeBitCast(s, Int.self))
 
-  if true {
+  do {
     var s2: Set<MinimalHashableValue> = []
     MinimalHashableValue.timesEqualEqualWasCalled = 0
     MinimalHashableValue.timesHashValueWasCalled = 0
@@ -436,7 +436,7 @@ SetTestSuite.test("COW.Slow.ContainsDoesNotReallocate") {
   expectTrue(s.contains(TestKeyTy(3030)))
   expectTrue(s.contains(TestKeyTy(4040)))
 
-  if true {
+  do {
     var s2: Set<MinimalHashableClass> = []
     MinimalHashableClass.timesEqualEqualWasCalled = 0
     MinimalHashableClass.timesHashValueWasCalled = 0
@@ -468,7 +468,7 @@ SetTestSuite.test("COW.Fast.InsertDoesNotReallocate") {
 }
 
 SetTestSuite.test("COW.Slow.InsertDoesNotReallocate") {
-  if true {
+  do {
     var s1 = getCOWSlowSet()
 
     let identity1 = unsafeBitCast(s1, Int.self)
@@ -486,7 +486,7 @@ SetTestSuite.test("COW.Slow.InsertDoesNotReallocate") {
     expectEqual(identity1, unsafeBitCast(s1, Int.self))
   }
 
-  if true {
+  do {
     var s1 = getCOWSlowSet()
     var identity1 = unsafeBitCast(s1, Int.self)
 
@@ -515,7 +515,7 @@ SetTestSuite.test("COW.Slow.InsertDoesNotReallocate") {
     _fixLifetime(s2)
   }
 
-  if true {
+  do {
     var s1 = getCOWSlowSet()
     var identity1 = unsafeBitCast(s1, Int.self)
 
@@ -549,7 +549,7 @@ SetTestSuite.test("COW.Fast.IndexForMemberDoesNotReallocate") {
   var identity1 = unsafeBitCast(s, Int.self)
 
   // Find an existing key.
-  if true {
+  do {
     var foundIndex1 = s.indexOf(1010)!
     expectEqual(identity1, unsafeBitCast(s, Int.self))
 
@@ -561,13 +561,13 @@ SetTestSuite.test("COW.Fast.IndexForMemberDoesNotReallocate") {
   }
 
   // Try to find a key that is not present.
-  if true {
+  do {
     var foundIndex1 = s.indexOf(1111)
     expectEmpty(foundIndex1)
     expectEqual(identity1, unsafeBitCast(s, Int.self))
   }
 
-  if true {
+  do {
     var s2: Set<MinimalHashableValue> = []
     MinimalHashableValue.timesEqualEqualWasCalled = 0
     MinimalHashableValue.timesHashValueWasCalled = 0
@@ -585,7 +585,7 @@ SetTestSuite.test("COW.Slow.IndexForMemberDoesNotReallocate") {
   var identity1 = unsafeBitCast(s, Int.self)
 
   // Find an existing key.
-  if true {
+  do {
     var foundIndex1 = s.indexOf(TestKeyTy(1010))!
     expectEqual(identity1, unsafeBitCast(s, Int.self))
 
@@ -597,13 +597,13 @@ SetTestSuite.test("COW.Slow.IndexForMemberDoesNotReallocate") {
   }
 
   // Try to find a key that is not present.
-  if true {
+  do {
     var foundIndex1 = s.indexOf(TestKeyTy(1111))
     expectEmpty(foundIndex1)
     expectEqual(identity1, unsafeBitCast(s, Int.self))
   }
 
-  if true {
+  do {
     var s2: Set<MinimalHashableClass> = []
     MinimalHashableClass.timesEqualEqualWasCalled = 0
     MinimalHashableClass.timesHashValueWasCalled = 0
@@ -617,7 +617,7 @@ SetTestSuite.test("COW.Slow.IndexForMemberDoesNotReallocate") {
 }
 
 SetTestSuite.test("COW.Fast.RemoveAtIndexDoesNotReallocate") {
-  if true {
+  do {
     var s = getCOWFastSet()
     var identity1 = unsafeBitCast(s, Int.self)
 
@@ -633,7 +633,7 @@ SetTestSuite.test("COW.Fast.RemoveAtIndexDoesNotReallocate") {
     expectEmpty(s.indexOf(1010))
   }
 
-  if true {
+  do {
     var s1 = getCOWFastSet()
     var identity1 = unsafeBitCast(s1, Int.self)
 
@@ -656,7 +656,7 @@ SetTestSuite.test("COW.Fast.RemoveAtIndexDoesNotReallocate") {
 }
 
 SetTestSuite.test("COW.Slow.RemoveAtIndexDoesNotReallocate") {
-  if true {
+  do {
     var s = getCOWSlowSet()
     var identity1 = unsafeBitCast(s, Int.self)
 
@@ -672,7 +672,7 @@ SetTestSuite.test("COW.Slow.RemoveAtIndexDoesNotReallocate") {
     expectEmpty(s.indexOf(TestKeyTy(1010)))
   }
 
-  if true {
+  do {
     var s1 = getCOWSlowSet()
     var identity1 = unsafeBitCast(s1, Int.self)
 
@@ -695,7 +695,7 @@ SetTestSuite.test("COW.Slow.RemoveAtIndexDoesNotReallocate") {
 }
 
 SetTestSuite.test("COW.Fast.RemoveDoesNotReallocate") {
-  if true {
+  do {
     var s1 = getCOWFastSet()
     var identity1 = unsafeBitCast(s1, Int.self)
 
@@ -711,7 +711,7 @@ SetTestSuite.test("COW.Fast.RemoveDoesNotReallocate") {
     _fixLifetime(s1)
   }
 
-  if true {
+  do {
     var s1 = getCOWFastSet()
     var identity1 = unsafeBitCast(s1, Int.self)
 
@@ -733,7 +733,7 @@ SetTestSuite.test("COW.Fast.RemoveDoesNotReallocate") {
 }
 
 SetTestSuite.test("COW.Slow.RemoveDoesNotReallocate") {
-  if true {
+  do {
     var s1 = getCOWSlowSet()
     var identity1 = unsafeBitCast(s1, Int.self)
 
@@ -749,7 +749,7 @@ SetTestSuite.test("COW.Slow.RemoveDoesNotReallocate") {
     _fixLifetime(s1)
   }
 
-  if true {
+  do {
     var s1 = getCOWSlowSet()
     var identity1 = unsafeBitCast(s1, Int.self)
 
@@ -788,7 +788,7 @@ SetTestSuite.test("COW.Fast.UnionInPlaceSmallSetDoesNotReallocate") {
 }
 
 SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
-  if true {
+  do {
     var s = getCOWFastSet()
     let originalCapacity = s._variantStorage.native.capacity
     expectEqual(3, s.count)
@@ -808,7 +808,7 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     expectFalse(s.contains(1010))
   }
 
-  if true {
+  do {
     var s = getCOWFastSet()
     var identity1 = unsafeBitCast(s, Int.self)
     let originalCapacity = s._variantStorage.native.capacity
@@ -828,7 +828,7 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     expectFalse(s.contains(1010))
   }
 
-  if true {
+  do {
     var s1 = getCOWFastSet()
     var identity1 = unsafeBitCast(s1, Int.self)
     expectEqual(3, s1.count)
@@ -849,7 +849,7 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     _fixLifetime(s2)
   }
 
-  if true {
+  do {
     var s1 = getCOWFastSet()
     var identity1 = unsafeBitCast(s1, Int.self)
     let originalCapacity = s1._variantStorage.native.capacity
@@ -874,7 +874,7 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
 }
 
 SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
-  if true {
+  do {
     var s = getCOWSlowSet()
     let originalCapacity = s._variantStorage.native.capacity
     expectEqual(3, s.count)
@@ -894,7 +894,7 @@ SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     expectFalse(s.contains(TestKeyTy(1010)))
   }
 
-  if true {
+  do {
     var s = getCOWSlowSet()
     var identity1 = unsafeBitCast(s, Int.self)
     let originalCapacity = s._variantStorage.native.capacity
@@ -914,7 +914,7 @@ SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     expectFalse(s.contains(TestKeyTy(1010)))
   }
 
-  if true {
+  do {
     var s1 = getCOWSlowSet()
     var identity1 = unsafeBitCast(s1, Int.self)
     expectEqual(3, s1.count)
@@ -935,7 +935,7 @@ SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     _fixLifetime(s2)
   }
 
-  if true {
+  do {
     var s1 = getCOWSlowSet()
     var identity1 = unsafeBitCast(s1, Int.self)
     let originalCapacity = s1._variantStorage.native.capacity
@@ -1320,7 +1320,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.IndexForMember") {
   var s = getBridgedNonverbatimSet()
   var identity1 = unsafeBitCast(s, Int.self)
 
-  if true {
+  do {
     var member = s[s.indexOf(TestBridgedKeyTy(1010))!]
     expectEqual(TestBridgedKeyTy(1010), member)
 
@@ -1336,7 +1336,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.IndexForMember") {
 }
 
 SetTestSuite.test("BridgedFromObjC.Verbatim.Insert") {
-  if true {
+  do {
     var s = getBridgedVerbatimSet()
     var identity1 = unsafeBitCast(s, Int.self)
     expectTrue(isCocoaSet(s))
@@ -1357,7 +1357,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Insert") {
 }
 
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.Insert") {
-  if true {
+  do {
     var s = getBridgedNonverbatimSet()
     var identity1 = unsafeBitCast(s, Int.self)
     expectTrue(isNativeSet(s))
@@ -1621,7 +1621,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAtIndex") {
 }
 
 SetTestSuite.test("BridgedFromObjC.Verbatim.Remove") {
-  if true {
+  do {
     var s = getBridgedVerbatimSet()
     var identity1 = unsafeBitCast(s, Int.self)
     expectTrue(isCocoaSet(s))
@@ -1644,7 +1644,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Remove") {
     expectEqual(identity2, unsafeBitCast(s, Int.self))
   }
 
-  if true {
+  do {
     var s1 = getBridgedVerbatimSet()
     var identity1 = unsafeBitCast(s1, Int.self)
 
@@ -1681,7 +1681,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Remove") {
 }
 
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.Remove") {
-  if true {
+  do {
     var s = getBridgedNonverbatimSet()
     var identity1 = unsafeBitCast(s, Int.self)
     expectTrue(isNativeSet(s))
@@ -1713,7 +1713,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Remove") {
     expectEqual(identity2, unsafeBitCast(s, Int.self))
   }
 
-  if true {
+  do {
     var s1 = getBridgedNonverbatimSet()
     let identity1 = unsafeBitCast(s1, Int.self)
 
@@ -1749,7 +1749,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Remove") {
 }
 
 SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
-  if true {
+  do {
     var s = getBridgedVerbatimSet([])
     var identity1 = unsafeBitCast(s, Int.self)
     expectTrue(isCocoaSet(s))
@@ -1760,7 +1760,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     expectEqual(0, s.count)
   }
 
-  if true {
+  do {
     var s = getBridgedVerbatimSet()
     var identity1 = unsafeBitCast(s, Int.self)
     expectTrue(isCocoaSet(s))
@@ -1772,7 +1772,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     expectFalse(s.contains(TestBridgedKeyTy(1010)))
   }
 
-  if true {
+  do {
     var s1 = getBridgedVerbatimSet()
     var identity1 = unsafeBitCast(s1, Int.self)
     expectTrue(isCocoaSet(s1))
@@ -1790,7 +1790,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     expectFalse(s2.contains(TestBridgedKeyTy(1010)))
   }
 
-  if true {
+  do {
     var s1 = getBridgedVerbatimSet()
     var identity1 = unsafeBitCast(s1, Int.self)
     expectTrue(isCocoaSet(s1))
@@ -1810,7 +1810,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 }
 
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
-  if true {
+  do {
     var s = getBridgedNonverbatimSet([])
     var identity1 = unsafeBitCast(s, Int.self)
     expectTrue(isNativeSet(s))
@@ -1821,7 +1821,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     expectEqual(0, s.count)
   }
 
-  if true {
+  do {
     var s = getBridgedNonverbatimSet()
     var identity1 = unsafeBitCast(s, Int.self)
     expectTrue(isNativeSet(s))
@@ -1833,7 +1833,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     expectFalse(s.contains(TestBridgedKeyTy(1010)))
   }
 
-  if true {
+  do {
     var s1 = getBridgedNonverbatimSet()
     var identity1 = unsafeBitCast(s1, Int.self)
     expectTrue(isNativeSet(s1))
@@ -1851,7 +1851,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     expectFalse(s2.contains(TestBridgedKeyTy(1010)))
   }
 
-  if true {
+  do {
     var s1 = getBridgedNonverbatimSet()
     var identity1 = unsafeBitCast(s1, Int.self)
     expectTrue(isNativeSet(s1))
@@ -2397,7 +2397,7 @@ SetTestSuite.test("SetUpcastBridgedEntryPoint") {
       s.insert(TestBridgedKeyTy(i))
   }
 
-  if true {
+  do {
     var s: Set<NSObject> = _setBridgeToObjectiveC(s)
 
     expectTrue(s.contains(TestBridgedKeyTy(1010)))
@@ -2405,7 +2405,7 @@ SetTestSuite.test("SetUpcastBridgedEntryPoint") {
     expectTrue(s.contains(TestBridgedKeyTy(3030)))
   }
 
-  if true {
+  do {
     var s: Set<TestObjCKeyTy> = _setBridgeToObjectiveC(s)
 
     expectEqual(3, s.count)
@@ -2421,7 +2421,7 @@ SetTestSuite.test("SetUpcastBridged") {
       s.insert(TestBridgedKeyTy(i))
   }
 
-  if true {
+  do {
     var s: Set<NSObject> = s
 
     expectEqual(3, s.count)
@@ -2430,7 +2430,7 @@ SetTestSuite.test("SetUpcastBridged") {
     expectTrue(s.contains(TestBridgedKeyTy(3030)))
   }
 
-  if true {
+  do {
     var s: Set<TestObjCKeyTy> = s
 
     expectEqual(3, s.count)
@@ -2530,7 +2530,7 @@ SetTestSuite.test("SetBridgeFromObjectiveCEntryPoint") {
 
   // Successful downcast.
   let sCV: Set<TestBridgedKeyTy> = _setBridgeFromObjectiveC(s)
-  if true {
+  do {
     expectEqual(3, sCV.count)
     expectTrue(sCV.contains(TestBridgedKeyTy(1010)))
     expectTrue(sCV.contains(TestBridgedKeyTy(2020)))
@@ -2546,7 +2546,7 @@ SetTestSuite.test("SetBridgeFromObjectiveC") {
 
   // Successful downcast.
   let sCV = s as! Set<TestObjCKeyTy>
-  if true {
+  do {
     expectEqual(3, sCV.count)
     expectTrue(sCV.contains(TestObjCKeyTy(1010)))
     expectTrue(sCV.contains(TestObjCKeyTy(2020)))
@@ -2555,7 +2555,7 @@ SetTestSuite.test("SetBridgeFromObjectiveC") {
 
   // Successful downcast.
   let sVC = s as! Set<TestBridgedKeyTy>
-  if true {
+  do {
     expectEqual(3, sVC.count)
     expectTrue(sVC.contains(TestBridgedKeyTy(1010)))
     expectTrue(sVC.contains(TestBridgedKeyTy(2020)))
@@ -3451,26 +3451,26 @@ SetTestSuite.test("isEmpty") {
 }
 
 SetTestSuite.test("isEmpty/ImplementationIsCustomized") {
-  if true {
+  do {
     var d = getMockSetWithCustomCount(count: 0)
     MockSetWithCustomCount.timesCountWasCalled = 0
     expectTrue(d.isEmpty)
     expectEqual(1, MockSetWithCustomCount.timesCountWasCalled)
   }
-  if true {
+  do {
     var d = getMockSetWithCustomCount(count: 0)
     MockSetWithCustomCount.timesCountWasCalled = 0
     expectTrue(callGenericIsEmpty(d))
     expectEqual(1, MockSetWithCustomCount.timesCountWasCalled)
   }
 
-  if true {
+  do {
     var d = getMockSetWithCustomCount(count: 4)
     MockSetWithCustomCount.timesCountWasCalled = 0
     expectFalse(d.isEmpty)
     expectEqual(1, MockSetWithCustomCount.timesCountWasCalled)
   }
-  if true {
+  do {
     var d = getMockSetWithCustomCount(count: 4)
     MockSetWithCustomCount.timesCountWasCalled = 0
     expectFalse(callGenericIsEmpty(d))
@@ -3509,14 +3509,14 @@ SetTestSuite.test("indexOf") {
 
 SetTestSuite.test("popFirst") {
   // Empty
-  if true {
+  do {
     var s = Set<Int>()
     let popped = s.popFirst()
     expectEmpty(popped)
     expectTrue(s.isEmpty)
   }
 
-  if true {
+  do {
     var popped = [Int]()
     var s = Set([1010, 2020, 3030])
     let expected = Array(s)
@@ -3596,7 +3596,7 @@ SetTestSuite.test("absorption") {
 
 SetTestSuite.test("misc") {
   // Set with other types
-  if true {
+  do {
     var s = Set([1.1, 2.2, 3.3])
     s.insert(4.4)
     expectTrue(s.contains(1.1))
@@ -3604,7 +3604,7 @@ SetTestSuite.test("misc") {
     expectTrue(s.contains(3.3))
   }
 
-  if true {
+  do {
     var s = Set(["Hello", "world"])
     expectTrue(s.contains("Hello"))
     expectTrue(s.contains("world"))

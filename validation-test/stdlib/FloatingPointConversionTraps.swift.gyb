@@ -76,11 +76,11 @@ var FloatingPointConversion = TestSuite("FloatingPointConversion")
 FloatingPointConversion.test("${FloatSelf}/${IntSelf}/+inf")
   .xfail(.Custom({ "${FloatSelf}" == "Float80" }, reason: "<rdar://problem/17958458> Int(Float80.quietNaN) is garbage"))
   .crashOutputMatches(getInfiniteOrNaNMessage("${FloatSelf}")).code {
-  if true {
+  do {
     var a = get${IntSelf}(${IntSelf}(get${FloatSelf}(0.0)))
     expectEqual(0, a)
   }
-  if true {
+  do {
     var a = get${IntSelf}(${IntSelf}(get${FloatSelf}(123.0)))
     expectEqual(123, a)
   }
@@ -94,11 +94,11 @@ FloatingPointConversion.test("${FloatSelf}/${IntSelf}/+inf")
 FloatingPointConversion.test("${FloatSelf}/${IntSelf}/-inf")
   .xfail(.Custom({ "${FloatSelf}" == "Float80" }, reason: "<rdar://problem/17958458> Int(Float80.quietNaN) is garbage"))
   .crashOutputMatches(getInfiniteOrNaNMessage("${FloatSelf}")).code {
-  if true {
+  do {
     var a = get${IntSelf}(${IntSelf}(get${FloatSelf}(-0.0)))
     expectEqual(0, a)
   }
-  if true {
+  do {
     var a = get${IntSelf}(${IntSelf}(get${FloatSelf}(-123.0)))
     expectEqual(-123, a)
   }

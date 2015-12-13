@@ -10,7 +10,7 @@
 
 #if arch(i386) || arch(arm)
 func testArithmeticOverflow_Int_32bit() {
-  if true {
+  do {
     // Literals.
     var t1: Int = 0x7fff_ffff // OK
     var t2: Int = 0x8000_0000
@@ -21,7 +21,7 @@ func testArithmeticOverflow_Int_32bit() {
     // CHECK-32-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: integer literal {{.*}}overflows when stored into 'Int'{{$}}
   }
 
-  if true {
+  do {
     // Negation.
     var t1: Int = -(-0x7fff_ffff) // OK
     var t2: Int = -(-0x8000_0000)
@@ -29,7 +29,7 @@ func testArithmeticOverflow_Int_32bit() {
     // <rdar://problem/19623142> Overflow in arithmetic negation is not detected at compile time
   }
 
-  if true {
+  do {
     // Addition.
     var t1: Int = 0x7fff_fffe + 1 // OK
     var t2: Int = 0x7fff_fffe + 2
@@ -40,7 +40,7 @@ func testArithmeticOverflow_Int_32bit() {
     // CHECK-32-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: arithmetic operation '-2147483647 + -2' (on type 'Int') results in an overflow{{$}}
   }
 
-  if true {
+  do {
     // Subtraction.
     var t1: Int = 0x7fff_fffe - (-1) // OK
     var t2: Int = 0x7fff_fffe - (-2)
@@ -51,7 +51,7 @@ func testArithmeticOverflow_Int_32bit() {
     // CHECK-32-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: arithmetic operation '-2147483647 - 2' (on type 'Int') results in an overflow{{$}}
   }
 
-  if true {
+  do {
     // Multiplication.
     var t1: Int = 0x7fff_fffe * 1 // OK
     var t2: Int = 0x7fff_fffe * 2
@@ -62,7 +62,7 @@ func testArithmeticOverflow_Int_32bit() {
     // CHECK-32-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: arithmetic operation '-2147483647 * 2' (on type 'Int') results in an overflow{{$}}
   }
 
-  if true {
+  do {
     // Division.
     var t1: Int = 0x7fff_fffe / 2 // OK
     var t2: Int = 0x7fff_fffe / 0
@@ -76,7 +76,7 @@ func testArithmeticOverflow_Int_32bit() {
     // CHECK-32-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: division '-2147483648 / -1' results in an overflow{{$}}
   }
 
-  if true {
+  do {
     // Remainder.
     var t1: Int = 0x7fff_fffe % 2 // OK
     var t2: Int = 0x7fff_fffe % 0
@@ -90,7 +90,7 @@ func testArithmeticOverflow_Int_32bit() {
     // CHECK-32-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: division '-2147483648 % -1' results in an overflow{{$}}
   }
 
-  if true {
+  do {
     // Right shift.
     var t1: Int = 0 >> 0
     var t2: Int = 0 >> 1
@@ -116,7 +116,7 @@ func testArithmeticOverflow_Int_32bit() {
     // CHECK-32-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
   }
 
-  if true {
+  do {
     // Left shift.
     var t1: Int = 0 << 0
     var t2: Int = 0 << 1
@@ -144,7 +144,7 @@ func testArithmeticOverflow_Int_32bit() {
 }
 
 func testArithmeticOverflow_UInt_32bit() {
-  if true {
+  do {
     // Literals.
     var t1: UInt = 0x7fff_ffff // OK
     var t2: UInt = 0x8000_0000
@@ -161,11 +161,11 @@ func testArithmeticOverflow_UInt_32bit() {
     // <rdar://problem/19623566> Obscure diagnostic for assigning negative numbers to unsigned
   }
 
-  if true {
+  do {
     // There is no negation for unsigned integers.
   }
 
-  if true {
+  do {
     // Addition.
     var t1: UInt = 0 + 0 // OK
     var t2: UInt = 0xffff_ffff + 0 // OK
@@ -177,7 +177,7 @@ func testArithmeticOverflow_UInt_32bit() {
     // CHECK-32-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: arithmetic operation '4294967294 + 2' (on type 'UInt') results in an overflow{{$}}
   }
 
-  if true {
+  do {
     // Subtraction.
     var t1: UInt = 0xffff_fffe - 1 // OK
     var t2: UInt = 0xffff_fffe - 0xffff_ffff
@@ -188,7 +188,7 @@ func testArithmeticOverflow_UInt_32bit() {
     // CHECK-32-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: arithmetic operation '0 - 1' (on type 'UInt') results in an overflow{{$}}
   }
 
-  if true {
+  do {
     // Multiplication.
     var t1: UInt = 0xffff_ffff * 0 // OK
     var t2: UInt = 0xffff_ffff * 1 // OK
@@ -205,7 +205,7 @@ func testArithmeticOverflow_UInt_32bit() {
     // CHECK-32-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: arithmetic operation '2147483646 * 3' (on type 'UInt') results in an overflow{{$}}
   }
 
-  if true {
+  do {
     // Division.
     var t1: UInt = 0x7fff_fffe / 2 // OK
     var t2: UInt = 0x7fff_fffe / 0
@@ -217,7 +217,7 @@ func testArithmeticOverflow_UInt_32bit() {
 
   }
 
-  if true {
+  do {
     // Remainder.
     var t1: UInt = 0x7fff_fffe % 2 // OK
     var t2: UInt = 0x7fff_fffe % 0
@@ -228,7 +228,7 @@ func testArithmeticOverflow_UInt_32bit() {
     // CHECK-32-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: division by zero{{$}}
   }
 
-  if true {
+  do {
     // Right shift.
     var t1: UInt = 0 >> 0
     var t2: UInt = 0 >> 1
@@ -246,7 +246,7 @@ func testArithmeticOverflow_UInt_32bit() {
     // CHECK-32-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
   }
 
-  if true {
+  do {
     // Left shift.
     var t1: UInt = 0 << 0
     var t2: UInt = 0 << 1
@@ -268,7 +268,7 @@ func testArithmeticOverflow_UInt_32bit() {
 #elseif arch(x86_64) || arch(arm64)
 
 func testArithmeticOverflow_Int_64bit() {
-  if true {
+  do {
     // Literals.
     var t1: Int = 0x7fff_ffff_ffff_ffff // OK
     var t2: Int = 0x8000_0000_0000_0000
@@ -279,7 +279,7 @@ func testArithmeticOverflow_Int_64bit() {
     // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: integer literal {{.*}} overflows when stored into 'Int'{{$}}
   }
 
-  if true {
+  do {
     // Negation.
     var t1: Int = -(-0x7fff_ffff_ffff_ffff) // OK
     var t2: Int = -(-0x8000_0000_0000_0000)
@@ -287,7 +287,7 @@ func testArithmeticOverflow_Int_64bit() {
     // <rdar://problem/19623142> Overflow in arithmetic negation is not detected at compile time
   }
 
-  if true {
+  do {
     // Addition.
     var t1: Int = 0x7fff_ffff_ffff_fffe + 1 // OK
     var t2: Int = 0x7fff_ffff_ffff_fffe + 2
@@ -298,7 +298,7 @@ func testArithmeticOverflow_Int_64bit() {
     // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: arithmetic operation '-9223372036854775807 + -2' (on type 'Int') results in an overflow{{$}}
   }
 
-  if true {
+  do {
     // Subtraction.
     var t1: Int = 0x7fff_ffff_ffff_fffe - (-1) // OK
     var t2: Int = 0x7fff_ffff_ffff_fffe - (-2)
@@ -309,7 +309,7 @@ func testArithmeticOverflow_Int_64bit() {
     // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: arithmetic operation '-9223372036854775807 - 2' (on type 'Int') results in an overflow{{$}}
   }
 
-  if true {
+  do {
     // Multiplication.
     var t1: Int = 0x7fff_ffff_ffff_fffe * 1 // OK
     var t2: Int = 0x7fff_ffff_ffff_fffe * 2
@@ -320,7 +320,7 @@ func testArithmeticOverflow_Int_64bit() {
     // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: arithmetic operation '-9223372036854775807 * 2' (on type 'Int') results in an overflow{{$}}
   }
 
-  if true {
+  do {
     // Division.
     var t1: Int = 0x7fff_ffff_ffff_fffe / 2 // OK
     var t2: Int = 0x7fff_ffff_ffff_fffe / 0
@@ -334,7 +334,7 @@ func testArithmeticOverflow_Int_64bit() {
     // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: division '-9223372036854775808 / -1' results in an overflow{{$}}
   }
 
-  if true {
+  do {
     // Remainder.
     var t1: Int = 0x7fff_ffff_ffff_fffe % 2 // OK
     var t2: Int = 0x7fff_ffff_ffff_fffe % 0
@@ -348,7 +348,7 @@ func testArithmeticOverflow_Int_64bit() {
     // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: division '-9223372036854775808 % -1' results in an overflow{{$}}
   }
 
-  if true {
+  do {
     // Right shift.
     var t1: Int = 0 >> 0
     var t2: Int = 0 >> 1
@@ -374,7 +374,7 @@ func testArithmeticOverflow_Int_64bit() {
     // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
   }
 
-  if true {
+  do {
     // Left shift.
     var t1: Int = 0 << 0
     var t2: Int = 0 << 1
@@ -402,7 +402,7 @@ func testArithmeticOverflow_Int_64bit() {
 }
 
 func testArithmeticOverflow_UInt_64bit() {
-  if true {
+  do {
     // Literals.
     var t1: UInt = 0x7fff_ffff_ffff_ffff // OK
     var t2: UInt = 0x8000_0000_0000_0000
@@ -415,11 +415,11 @@ func testArithmeticOverflow_UInt_64bit() {
     // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: negative integer {{.*}} overflows when stored into unsigned type 'UInt'{{$}}
   }
 
-  if true {
+  do {
     // There is no negation for unsigned integers.
   }
 
-  if true {
+  do {
     // Addition.
     var t1: UInt = 0 + 0 // OK
     var t2: UInt = 0xffff_ffff_ffff_ffff + 0 // OK
@@ -431,7 +431,7 @@ func testArithmeticOverflow_UInt_64bit() {
     // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: arithmetic operation '18446744073709551614 + 2' (on type 'UInt') results in an overflow{{$}}
   }
 
-  if true {
+  do {
     // Subtraction.
     var t1: UInt = 0xffff_ffff_ffff_fffe - 1 // OK
     var t2: UInt = 0xffff_ffff_ffff_fffe - 0xffff_ffff_ffff_ffff
@@ -442,7 +442,7 @@ func testArithmeticOverflow_UInt_64bit() {
     // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: arithmetic operation '0 - 1' (on type 'UInt') results in an overflow{{$}}
   }
 
-  if true {
+  do {
     // Multiplication.
     var t1: UInt = 0xffff_ffff_ffff_ffff * 0 // OK
     var t2: UInt = 0xffff_ffff_ffff_ffff * 1 // OK
@@ -459,7 +459,7 @@ func testArithmeticOverflow_UInt_64bit() {
     // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: arithmetic operation '9223372036854775806 * 3' (on type 'UInt') results in an overflow{{$}}
   }
 
-  if true {
+  do {
     // Division.
     var t1: UInt = 0x7fff_ffff_ffff_fffe / 2 // OK
     var t2: UInt = 0x7fff_ffff_ffff_fffe / 0
@@ -471,7 +471,7 @@ func testArithmeticOverflow_UInt_64bit() {
 
   }
 
-  if true {
+  do {
     // Remainder.
     var t1: UInt = 0x7fff_ffff_ffff_fffe % 2 // OK
     var t2: UInt = 0x7fff_ffff_ffff_fffe % 0
@@ -482,7 +482,7 @@ func testArithmeticOverflow_UInt_64bit() {
     // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: division by zero{{$}}
   }
 
-  if true {
+  do {
     // Right shift.
     var t1: UInt = 0 >> 0
     var t2: UInt = 0 >> 1
@@ -500,7 +500,7 @@ func testArithmeticOverflow_UInt_64bit() {
     // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
   }
 
-  if true {
+  do {
     // Left shift.
     var t1: UInt = 0 << 0
     var t2: UInt = 0 << 1

@@ -301,7 +301,7 @@ if #available(iOS 8.0, *) {
       allowLossyConversion: true)!
     let sceneSource = SCNSceneSource(data: sceneData, options: nil)!
 
-    if true {
+    do {
       var unarchivedPlaneGeometry =
         sceneSource.entryWithIdentifier("plane", withClass: SCNGeometry.self)
       var unarchivedPlaneNode_nil =
@@ -313,7 +313,7 @@ if #available(iOS 8.0, *) {
       expectEmpty(unarchivedPlaneNode_nil)
     }
 
-    if true {
+    do {
       var unarchivedBoxGeometry =
         sceneSource.entryWithIdentifier("box", withClass: SCNGeometry.self)
       var unarchivedBoxGeometry_nil =
@@ -325,7 +325,7 @@ if #available(iOS 8.0, *) {
       expectEmpty(unarchivedBoxGeometry_nil)
     }
 
-    if true {
+    do {
       var unarchivedBoxNode =
         sceneSource.entryWithIdentifier("box-node", withClass: SCNNode.self)
       var unarchivedBoxNode_nil =

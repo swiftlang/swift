@@ -17,37 +17,37 @@ UTF16APIs.test("width") {
 }
 
 UTF16APIs.test("leadSurrogate,trailSurrogate") {
-  if true {
+  do {
     let us: UnicodeScalar = "𝄞"
     expectEqual(0xD834, UTF16.leadSurrogate(us))
     expectEqual(0xDD1E, UTF16.trailSurrogate(us))
   }
-  if true {
+  do {
     let us: UnicodeScalar = "\u{10000}"
     expectEqual(0xD800, UTF16.leadSurrogate(us))
     expectEqual(0xDC00, UTF16.trailSurrogate(us))
   }
-  if true {
+  do {
     let us: UnicodeScalar = "\u{20000}"
     expectEqual(0xD840, UTF16.leadSurrogate(us))
     expectEqual(0xDC00, UTF16.trailSurrogate(us))
   }
-  if true {
+  do {
     let us: UnicodeScalar = "\u{80000}"
     expectEqual(0xD9C0, UTF16.leadSurrogate(us))
     expectEqual(0xDC00, UTF16.trailSurrogate(us))
   }
-  if true {
+  do {
     let us: UnicodeScalar = "\u{F0000}"
     expectEqual(0xDB80, UTF16.leadSurrogate(us))
     expectEqual(0xDC00, UTF16.trailSurrogate(us))
   }
-  if true {
+  do {
     let us: UnicodeScalar = "\u{100000}"
     expectEqual(0xDBC0, UTF16.leadSurrogate(us))
     expectEqual(0xDC00, UTF16.trailSurrogate(us))
   }
-  if true {
+  do {
     let us: UnicodeScalar = "\u{10FFFF}"
     expectEqual(0xDBFF, UTF16.leadSurrogate(us))
     expectEqual(0xDFFF, UTF16.trailSurrogate(us))
@@ -112,7 +112,7 @@ func checkDecodeUTF<Codec : UnicodeCodecType>(
     codec: Codec.Type, _ expectedHead: [UInt32],
     _ expectedRepairedTail: [UInt32], _ utfStr: [Codec.CodeUnit]
 ) -> AssertionResult {
-  if true {
+  do {
     var decoded = [UInt32]()
     let output: (UInt32) -> Void = { decoded.append($0) }
     let g = EOFCountingGenerator(utfStr)
@@ -126,7 +126,7 @@ func checkDecodeUTF<Codec : UnicodeCodecType>(
     }
   }
 
-  if true {
+  do {
     var expected = expectedHead
     expected += expectedRepairedTail
 
@@ -749,19 +749,19 @@ let UTF16Tests = [
 var UnicodeScalarTests = TestSuite("UnicodeScalarTests")
 
 UnicodeScalarTests.test("literal") {
-  if true {
+  do {
     // U+0041 LATIN CAPITAL LETTER A
     let us: UnicodeScalar = "A"
     expectEqual(0x0041, us.value)
   }
 
-  if true {
+  do {
     // U+3042 HIRAGANA LETTER A
     let us: UnicodeScalar = "あ"
     expectEqual(0x3042, us.value)
   }
 
-  if true {
+  do {
     // U+4F8B CJK UNIFIED IDEOGRAPH-4F8B
     let us: UnicodeScalar = "例"
     expectEqual(0x4F8B, us.value)
@@ -1895,7 +1895,7 @@ UTF8Decoder.test("Noncharacters") {
 var UTF16Decoder = TestSuite("UTF16Decoder")
 
 UTF16Decoder.test("measure") {
-  if true {
+  do {
     var u8: [UTF8.CodeUnit] = [ 0, 1, 2, 3, 4, 5 ]
     let (count, isASCII) = UTF16.measure(
       UTF8.self, input: u8.generate(), repairIllFormedSequences: false)!
@@ -1903,7 +1903,7 @@ UTF16Decoder.test("measure") {
     expectTrue(isASCII)
   }
 
-  if true {
+  do {
     // "€" == U+20AC.
     var u8: [UTF8.CodeUnit] = [ 0xF0, 0xA4, 0xAD, 0xA2 ]
     let (count, isASCII) = UTF16.measure(
@@ -1912,7 +1912,7 @@ UTF16Decoder.test("measure") {
     expectFalse(isASCII)
   }
 
-  if true {
+  do {
     let u16: [UTF16.CodeUnit] = [ 6, 7, 8, 9, 10, 11 ]
     let (count, isASCII) = UTF16.measure(
       UTF16.self, input: u16.generate(), repairIllFormedSequences: false)!
@@ -2263,7 +2263,7 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16") {
 StringCookedViews.test("UTF8ForNonContiguousUTF16Extra") {
   // These tests don't add much additional value as long as tests above
   // actually test the code path we care about.
-  if true {
+  do {
     var bytes: [UInt8] = [ 97, 98, 99 ]
     var cfstring: CFString = CFStringCreateWithBytesNoCopy(
       kCFAllocatorDefault, bytes, bytes.count,
@@ -2287,7 +2287,7 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16Extra") {
     _fixLifetime(bytes)
   }
 
-  if true {
+  do {
     var bytes: [UInt8] = [ 97, 98, 99 ]
     var cfstring: CFString = CFStringCreateWithBytes(kCFAllocatorDefault,
         bytes, bytes.count, CFStringBuiltInEncodings.MacRoman.rawValue, false)
