@@ -2792,7 +2792,7 @@ bb0:
   return %2 : $Builtin.Int1
 }
 
-// Check that it does not creash the compiler.
+// Check that it does not crash the compiler.
 // Int is ObjC-bridgeable in this case, but its conformance is not know, 
 // because Foundation is not imported yet.
 // Therefore the cast may sucseed from the compiler point of view.
