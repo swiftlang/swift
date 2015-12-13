@@ -409,81 +409,67 @@ PrintTests.test("floating point printing") {
   #endif
 }
 
-func test_BoolPrinting() {
-  printedIs(Bool(true), "true")
-  printedIs(Bool(false), "false")
-
-  printedIs(true, "true")
-  printedIs(false, "false")
-
-  print("test_BoolPrinting done")
+PrintTests.test("bool printing") {
+  expectPrinted("true", Bool(true))
+  expectPrinted("false", Bool(false))
+  
+  expectPrinted("true", true)
+  expectPrinted("false", false)
 }
-test_BoolPrinting()
-// CHECK: test_BoolPrinting done
 
-func test_CTypesPrinting() {
-  printedIs(CChar(42), "42")
-  printedIs(CUnsignedChar(42), "42")
-  printedIs(CUnsignedShort(42), "42")
-  printedIs(CUnsignedInt(42), "42")
-  printedIs(CUnsignedLong(42), "42")
-  printedIs(CUnsignedLongLong(42), "42")
-  printedIs(CSignedChar(42), "42")
-  printedIs(CShort(42), "42")
-  printedIs(CInt(42), "42")
-  printedIs(CLong(42), "42")
-  printedIs(CLongLong(42), "42")
-  printedIs(CFloat(1.0), "1.0")
-  printedIs(CFloat(-1.0), "-1.0")
-  printedIs(CDouble(1.0), "1.0")
-  printedIs(CDouble(-1.0), "-1.0")
-
-  printedIs(CWideChar(42), "*")
-  printedIs(CChar16(42), "42")
-  printedIs(CChar32(42), "*")
-  printedIs(CBool(true), "true")
-  printedIs(CBool(false), "false")
-
-  print("test_CTypesPrinting done")
+PrintTests.test("ctypes printing") {
+  expectPrinted("42", CChar(42))
+  expectPrinted("42", CUnsignedChar(42))
+  expectPrinted("42", CUnsignedShort(42))
+  expectPrinted("42", CUnsignedInt(42))
+  expectPrinted("42", CUnsignedLong(42))
+  expectPrinted("42", CUnsignedLongLong(42))
+  expectPrinted("42", CSignedChar(42))
+  expectPrinted("42", CShort(42))
+  expectPrinted("42", CInt(42))
+  expectPrinted("42", CLong(42))
+  expectPrinted("42", CLongLong(42))
+  expectPrinted("1.0", CFloat(1.0))
+  expectPrinted("-1.0", CFloat(-1.0))
+  expectPrinted("1.0", CDouble(1.0))
+  expectPrinted("-1.0", CDouble(-1.0))
+  
+  expectPrinted("*", CWideChar(42))
+  expectPrinted("42", CChar16(42))
+  expectPrinted("*", CChar32(42))
+  expectPrinted("true", CBool(true))
+  expectPrinted("false", CBool(false))
 }
-test_CTypesPrinting()
-// CHECK: test_CTypesPrinting done
 
-
-func test_PointerPrinting() {
+PrintTests.test("pointer printing") {
   let nullUP = UnsafeMutablePointer<Float>()
   let fourByteUP = UnsafeMutablePointer<Float>(bitPattern: 0xabcd1234 as UInt)
-
-#if !(arch(i386) || arch(arm))
-  let eightByteAddr: UInt = 0xabcddcba12344321
-  let eightByteUP = UnsafeMutablePointer<Float>(bitPattern: eightByteAddr)
-#endif
-
-#if arch(i386) || arch(arm)
-  let expectedNull = "0x00000000"
-  printedIs(fourByteUP, "0xabcd1234")
-#else
-  let expectedNull = "0x0000000000000000"
-  printedIs(fourByteUP, "0x00000000abcd1234")
-  printedIs(eightByteUP, "0xabcddcba12344321")
-#endif
-
-  printedIs(nullUP, expectedNull)
-
-  printedIs(UnsafeBufferPointer(start: nullUP, count: 0),
-      "UnsafeBufferPointer(start: \(expectedNull), length: 0)")
-  printedIs(UnsafeMutableBufferPointer(start: nullUP, count: 0),
-      "UnsafeMutableBufferPointer(start: \(expectedNull), length: 0)")
-
-  printedIs(COpaquePointer(), expectedNull)
-  printedIs(CVaListPointer(_fromUnsafeMutablePointer: nullUP), expectedNull)
-  printedIs(AutoreleasingUnsafeMutablePointer<Int>(), expectedNull)
-
-  print("test_PointerPrinting done")
+  
+  #if !(arch(i386) || arch(arm))
+    let eightByteAddr: UInt = 0xabcddcba12344321
+    let eightByteUP = UnsafeMutablePointer<Float>(bitPattern: eightByteAddr)
+  #endif
+  
+  #if arch(i386) || arch(arm)
+    let expectedNull = "0x00000000"
+    expectPrinted("0xabcd1234", fourByteUP)
+  #else
+    let expectedNull = "0x0000000000000000"
+    expectPrinted("0x00000000abcd1234", fourByteUP)
+    expectPrinted("0xabcddcba12344321", eightByteUP)
+  #endif
+  
+  expectPrinted(expectedNull, nullUP)
+  
+  expectPrinted("UnsafeBufferPointer(start: \(expectedNull), length: 0)",
+    UnsafeBufferPointer(start: nullUP, count: 0))
+  expectPrinted("UnsafeMutableBufferPointer(start: \(expectedNull), length: 0)",
+    UnsafeMutableBufferPointer(start: nullUP, count: 0))
+  
+  expectPrinted(expectedNull, COpaquePointer())
+  expectPrinted(expectedNull, CVaListPointer(_fromUnsafeMutablePointer: nullUP))
+  expectPrinted(expectedNull, AutoreleasingUnsafeMutablePointer<Int>())
 }
-test_PointerPrinting()
-// CHECK: test_PointerPrinting done
-
 
 protocol ProtocolUnrelatedToPrinting {}
 
@@ -596,104 +582,71 @@ class ClassVeryPrintable : CustomStringConvertible, CustomDebugStringConvertible
   }
 }
 
-func test_ObjectPrinting() {
-  do {
-    let s = StructPrintable(1)
-    printedIs(s, "►1◀︎")
-  }
-  do {
-    let s: ProtocolUnrelatedToPrinting = StructPrintable(1)
-    printedIs(s, "►1◀︎")
-  }
-  do {
-    let s: CustomStringConvertible = StructPrintable(1)
-    printedIs(s, "►1◀︎")
-  }
-  do {
-    let s: Any = StructPrintable(1)
-    printedIs(s, "►1◀︎")
-  }
-
-  do {
-    let s = LargeStructPrintable(10, 20, 30, 40)
-    printedIs(s, "<10 20 30 40>")
-  }
-  do {
-    let s: ProtocolUnrelatedToPrinting = LargeStructPrintable(10, 20, 30, 40)
-    printedIs(s, "<10 20 30 40>")
-  }
-  do {
-    let s: CustomStringConvertible = LargeStructPrintable(10, 20, 30, 40)
-    printedIs(s, "<10 20 30 40>")
-  }
-  do {
-    let s: Any = LargeStructPrintable(10, 20, 30, 40)
-    printedIs(s, "<10 20 30 40>")
-  }
-
-  do {
-    let s = StructVeryPrintable(1)
-    printedIs(s, "<description: 1>")
-  }
-  do {
-    let s: ProtocolUnrelatedToPrinting = StructVeryPrintable(1)
-    printedIs(s, "<description: 1>")
-  }
-  do {
-    let s: CustomStringConvertible = StructVeryPrintable(1)
-    printedIs(s, "<description: 1>")
-  }
-  do {
-    let s: CustomDebugStringConvertible = StructVeryPrintable(1)
-    printedIs(s, "<description: 1>")
-  }
-  do {
-    let s: Any = StructVeryPrintable(1)
-    printedIs(s, "<description: 1>")
-  }
-
-  do {
-    let c = ClassPrintable(1)
-    printedIs(c, "►1◀︎")
-  }
-  do {
-    let c: ProtocolUnrelatedToPrinting = ClassPrintable(1)
-    printedIs(c, "►1◀︎")
-  }
-  do {
-    let c: CustomStringConvertible = ClassPrintable(1)
-    printedIs(c, "►1◀︎")
-  }
-  do {
-    let c: Any = ClassPrintable(1)
-    printedIs(c, "►1◀︎")
-  }
-
-  do {
-    let c = ClassVeryPrintable(1)
-    printedIs(c, "<description: 1>")
-  }
-  do {
-    let c: ProtocolUnrelatedToPrinting = ClassVeryPrintable(1)
-    printedIs(c, "<description: 1>")
-  }
-  do {
-    let c: CustomStringConvertible = ClassVeryPrintable(1)
-    printedIs(c, "<description: 1>")
-  }
-  do {
-    let c: CustomDebugStringConvertible = ClassVeryPrintable(1)
-    printedIs(c, "<description: 1>")
-  }
-  do {
-    let c: Any = ClassVeryPrintable(1)
-    printedIs(c, "<description: 1>")
-  }
-
-  print("test_ObjectPrinting done")
+PrintTests.test("StructPrintable") {
+  let s0 = StructPrintable(1)
+  let s1: ProtocolUnrelatedToPrinting = StructPrintable(1)
+  let s2: CustomStringConvertible = StructPrintable(1)
+  let s3: Any = StructPrintable(1)
+  
+  expectPrinted("►1◀︎", s0)
+  expectPrinted("►1◀︎", s1)
+  expectPrinted("►1◀︎", s2)
+  expectPrinted("►1◀︎", s3)
 }
-test_ObjectPrinting()
-// CHECK: test_ObjectPrinting done
+
+PrintTests.test("LargeStructPrintable") {
+  let s0 = LargeStructPrintable(10, 20, 30, 40)
+  let s1: ProtocolUnrelatedToPrinting = LargeStructPrintable(10, 20, 30, 40)
+  let s2: CustomStringConvertible = LargeStructPrintable(10, 20, 30, 40)
+  let s3: Any = LargeStructPrintable(10, 20, 30, 40)
+
+  expectPrinted("<10 20 30 40>", s0)
+  expectPrinted("<10 20 30 40>", s1)
+  expectPrinted("<10 20 30 40>", s2)
+  expectPrinted("<10 20 30 40>", s0)
+  expectPrinted("<10 20 30 40>", s3)
+
+}
+
+PrintTests.test("StructVeryPrintable") {
+  let s0 = StructVeryPrintable(1)
+  let s1: ProtocolUnrelatedToPrinting = StructVeryPrintable(1)
+  let s2: CustomStringConvertible = StructVeryPrintable(1)
+  let s3: CustomDebugStringConvertible = StructVeryPrintable(1)
+  let s4: Any = StructVeryPrintable(1)
+  
+  expectPrinted("<description: 1>", s0)
+  expectPrinted("<description: 1>", s1)
+  expectPrinted("<description: 1>", s2)
+  expectPrinted("<description: 1>", s3)
+  expectPrinted("<description: 1>", s4)
+}
+
+PrintTests.test("ClassPrintable") {
+  let c0 = ClassPrintable(1)
+  let c1: ProtocolUnrelatedToPrinting = ClassPrintable(1)
+  let c2: CustomStringConvertible = ClassPrintable(1)
+  let c3: Any = ClassPrintable(1)
+  
+  expectPrinted("►1◀︎", c0)
+  expectPrinted("►1◀︎", c1)
+  expectPrinted("►1◀︎", c2)
+  expectPrinted("►1◀︎", c3)
+}
+
+PrintTests.test("ClassVeryPrintable") {
+  let c0 = ClassVeryPrintable(1)
+  let c1: ProtocolUnrelatedToPrinting = ClassVeryPrintable(1)
+  let c2: CustomStringConvertible = ClassVeryPrintable(1)
+  let c3: CustomDebugStringConvertible = ClassVeryPrintable(1)
+  let c4: Any = ClassVeryPrintable(1)
+  
+  expectPrinted("<description: 1>", c0)
+  expectPrinted("<description: 1>", c1)
+  expectPrinted("<description: 1>", c2)
+  expectPrinted("<description: 1>", c3)
+  expectPrinted("<description: 1>", c4)
+}
 
 func test_ThickMetatypePrintingImpl<T>(
     thickMetatype: T.Type,
