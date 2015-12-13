@@ -113,7 +113,7 @@ static SILValue stripRCIdentityPreservingInsts(SILValue V) {
 
 /// V is the incoming value for the SILArgument A on at least one path.  Find a
 /// value that is trivially RC-identical to V and dominates the argument's
-/// block. If such a value exists, it is a candidate for RC-indentity with the
+/// block. If such a value exists, it is a candidate for RC-identity with the
 /// argument itself--the caller must verify this after evaluating all paths.
 SILValue RCIdentityFunctionInfo::stripOneRCIdentityIncomingValue(SILArgument *A,
                                                              SILValue V) {
