@@ -1392,12 +1392,12 @@ bb0:
   return %3 : $()
 }
 
-// CHECK-LABEL: sil @eliminiate_thin_to_thick_apply : $@convention(thin) () -> () {
+// CHECK-LABEL: sil @eliminate_thin_to_thick_apply : $@convention(thin) () -> () {
 // CHECK: bb0
 // CHECK: function_ref @eliminate_dead_thin_to_thick_function_fun
 // CHECK-NEXT: apply
 // CHECK-NEXT: return
-sil @eliminiate_thin_to_thick_apply : $@convention(thin) () -> () {
+sil @eliminate_thin_to_thick_apply : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @eliminate_dead_thin_to_thick_function_fun : $@convention(thin) () -> ()
   %1 = thin_to_thick_function %0 : $@convention(thin) () -> () to $@callee_owned () -> ()
