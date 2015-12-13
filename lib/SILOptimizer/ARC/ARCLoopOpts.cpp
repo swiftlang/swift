@@ -73,14 +73,13 @@ class ARCLoopOpts : public SILFunctionTransform {
 
     // Create all of our visitors, register them with the visitor group, and
     // run.
-    LoopARCPairingContext LoopARCContext(*F, AA, LRFI, LI, RCFI, &PTFI);
+    LoopARCPairingContext ARCSequenceOptsCtx(*F, AA, LRFI, LI, RCFI, &PTFI);
     SILLoopVisitorGroup VisitorGroup(F, LI);
-    VisitorGroup.addVisitor(&LoopARCContext);
+    VisitorGroup.addVisitor(&ARCSequenceOptsCtx);
     VisitorGroup.run();
 
-    if (LoopARCContext.madeChange()) {
+    if (ARCSequenceOptsCtx.madeChange())
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
-    }
   }
 
   StringRef getName() override { return "ARC Loop Opts"; }

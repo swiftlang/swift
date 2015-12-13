@@ -1,0 +1,1174 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -arc-loop-hoisting | FileCheck %s
+
+import Builtin
+
+//////////////////
+// Declarations //
+//////////////////
+
+sil @user : $@convention(thin) (Builtin.NativeObject) -> ()
+sil [_semantics "arc.programtermination_point"] @fatal_error : $@convention(thin) (Builtin.NativeObject) -> ()
+sil [readnone] @creator : $@convention(thin) () -> Builtin.NativeObject
+
+enum FakeOptional<T> {
+case None
+case Some(T)
+}
+
+///////////
+// Tests //
+///////////
+
+// Make sure we can hoist out of simple one bb loops.
+//
+// CHECK-LABEL: sil @single_bb_loop_1 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK: strong_retain
+// CHECK: bb1:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb2:
+// CHECK: strong_release
+sil @single_bb_loop_1 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb2:
+  return undef : $()
+}
+
+// Make sure that we do not care about multiple applies in between retains/releases
+//
+// CHECK-LABEL: sil @single_bb_loop_2 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK: strong_retain
+// CHECK: bb1:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb2:
+// CHECK: strong_release
+sil @single_bb_loop_2 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  br bb1
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb2:
+  return undef : $()
+}
+
+// Make sure that we properly block hoisting when a potential uniqueness check blocks the retain.
+//
+// CHECK-LABEL: sil @single_bb_loop_3 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK: strong_retain
+// CHECK: bb1:
+// CHECK: apply
+// CHECK: strong_retain
+// CHECK: apply
+// CHECK: apply
+// CHECK: strong_release
+// CHECK: bb2:
+// CHECK: strong_release
+sil @single_bb_loop_3 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  br bb1
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb2:
+  return undef : $()
+}
+
+// Make sure that we properly block hoisting when a potential uniqueness check blocks the release.
+//
+// CHECK-LABEL: sil @single_bb_loop_4 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK: strong_retain
+// CHECK: bb1:
+// CHECK: strong_retain
+// CHECK: apply
+// CHECK: apply
+// CHECK: strong_release
+// CHECK: apply
+// CHECK: bb2:
+// CHECK: strong_release
+sil @single_bb_loop_4 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  br bb1
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  strong_retain %0 : $Builtin.NativeObject
+  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb2:
+  return undef : $()
+}
+
+// Make sure that we can handle iterated retains, releases.
+//
+// CHECK-LABEL: sil @single_bb_loop_5 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK: strong_retain
+// CHECK: strong_retain
+// CHECK: bb1:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb2:
+// CHECK: strong_release
+// CHECK: strong_release
+sil @single_bb_loop_5 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  br bb1
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  strong_retain %0 : $Builtin.NativeObject
+  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb2:
+  return undef : $()
+}
+
+// Make sure that we can handle cases where the retain/release are inverted in order.
+//
+// CHECK-LABEL: sil @single_bb_loop_6 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK-NOT: strong_retain
+// CHECK: bb1:
+// CHECK: strong_release
+// CHECK: strong_retain
+// CHECK: bb2:
+// CHECK-NOT: strong_release
+sil @single_bb_loop_6 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  br bb1
+
+bb1:
+  strong_release %0 : $Builtin.NativeObject
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb2:
+  return undef : $()
+}
+
+// Make sure we can hoist retain/releases which involve phi nodes.
+//
+// CHECK-LABEL: sil @single_bb_loop_7 : $@convention(thin) (Builtin.NativeObject) -> () {
+sil @single_bb_loop_7 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  br bb1(%0 : $Builtin.NativeObject)
+
+bb1(%1 : $Builtin.NativeObject):
+  strong_retain %1 : $Builtin.NativeObject
+  strong_release %1 : $Builtin.NativeObject
+  cond_br undef, bb1(%1 : $Builtin.NativeObject), bb2
+
+bb2:
+  return undef : $()
+}
+
+// Make sure we do not hoist retains/releases on a value that originates in a
+// loop.
+//
+// This will fail once we use effects information. For now it will never fail.
+//
+// The verifier will catch this error.
+//
+// CHECK-LABEL: sil @single_bb_loop_8 : $@convention(thin) () -> () {
+sil @single_bb_loop_8 : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  %0 = function_ref @creator : $@convention(thin) () -> Builtin.NativeObject
+  %1 = apply %0() : $@convention(thin) () -> Builtin.NativeObject
+  strong_retain %1 : $Builtin.NativeObject
+  strong_release %1 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb2:
+  return undef : $()
+}
+
+// Make sure we do not hoist retains/releases on a value that originates in a
+// loop.
+//
+// I am using an enum here so I can be sure that I will not be blocked by issues
+// relating to effects.
+//
+// The verifier will catch this error.
+//
+// CHECK-LABEL: sil @single_bb_loop_9 : $@convention(thin) () -> () {
+sil @single_bb_loop_9 : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  %0 = enum $FakeOptional<Builtin.Int32>, #FakeOptional.None!enumelt
+  retain_value %0 : $FakeOptional<Builtin.Int32>
+  release_value %0 : $FakeOptional<Builtin.Int32>
+  cond_br undef, bb1, bb2
+
+bb2:
+  return undef : $()
+}
+
+// Make sure that we can handle cases where the retain/release are inverted in order.
+//
+// CHECK-LABEL: sil @multiple_bb_loop_1 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK-NOT: strong_retain
+// CHECK: bb1:
+// CHECK: strong_release
+// CHECK: bb2:
+// CHECK: strong_retain
+// CHECK: bb3:
+// CHECK-NOT: strong_release
+sil @multiple_bb_loop_1 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  br bb1
+
+bb1:
+  strong_release %0 : $Builtin.NativeObject
+  br bb2
+
+bb2:
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb3
+
+bb3:
+  return undef : $()
+}
+
+// Make sure we can handle a retain in the loop header, and a release in a
+// single loop exiting node even when we have a diamond.
+//
+// CHECK-LABEL: sil @diamond_test_1 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK: strong_retain
+// CHECK: bb1:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb2:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb3:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb4:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb5:
+// CHECK: strong_release
+sil @diamond_test_1 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  strong_release %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb5
+
+bb5:
+  return undef : $()
+}
+
+// Make sure that we can handle a strong_retain in a header, and strong_releases
+// that post dominate.
+//
+// CHECK-LABEL: sil @diamond_test_2 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK: strong_retain
+// CHECK: bb1:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb2:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb3:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb4:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb5:
+// CHECK: strong_release
+sil @diamond_test_2 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb2, bb3
+
+bb2:
+  strong_release %0 : $Builtin.NativeObject
+  br bb4
+
+bb3:
+  strong_release %0 : $Builtin.NativeObject
+  br bb4
+
+bb4:
+  cond_br undef, bb1, bb5
+
+bb5:
+  return undef : $()
+}
+
+// Make sure that we can handle dominating strong_retains and a strong_release
+//
+// CHECK-LABEL: sil @diamond_test_3 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK: strong_retain
+// CHECK: bb1:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb2:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb3:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb4:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb5:
+// CHECK: strong_release
+sil @diamond_test_3 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  strong_retain %0 : $Builtin.NativeObject
+  br bb4
+
+bb3:
+  strong_retain %0 : $Builtin.NativeObject
+  br bb4
+
+bb4:
+  strong_release %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb5
+
+bb5:
+  return undef : $()
+}
+
+// Make sure that we ignore the non-dominating retain.
+//
+// CHECK-LABEL: sil @diamond_test_4 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK: strong_retain
+// CHECK: bb1:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb2:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb3:
+// CHECK: strong_retain
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb4:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb5:
+// CHECK: strong_release
+sil @diamond_test_4 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb4
+
+bb3:
+  strong_retain %0 : $Builtin.NativeObject
+  br bb4
+
+bb4:
+  strong_release %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb5
+
+bb5:
+  return undef : $()
+}
+
+// Make sure that we ignore the non-dominating release
+//
+// CHECK-LABEL: sil @diamond_test_5 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK: strong_retain
+// CHECK: bb1:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb2:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb3:
+// CHECK-NEXT: strong_release
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb4:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb5:
+// CHECK: strong_release
+sil @diamond_test_5 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb4
+
+bb3:
+  strong_release %0 : $Builtin.NativeObject
+  br bb4
+
+bb4:
+  strong_release %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb5
+
+bb5:
+  return undef : $()
+}
+
+// Make sure that we properly handle concatenated diamonds.
+// CHECK-LABEL: sil @diamond_test_6 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK: strong_retain
+// CHECK: strong_retain
+// CHECK: strong_retain
+// CHECK: bb1:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb8:
+// CHECK: strong_release
+// CHECK: strong_release
+// CHECK: strong_release
+sil @diamond_test_6 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb2, bb3
+
+bb2:
+  strong_retain %0 : $Builtin.NativeObject
+  br bb4
+
+bb3:
+  strong_retain %0 : $Builtin.NativeObject
+  br bb4
+
+bb4:
+  strong_retain %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  cond_br undef, bb5, bb6
+
+bb5:
+  strong_release %0 : $Builtin.NativeObject
+  br bb7
+
+bb6:
+  strong_release %0 : $Builtin.NativeObject
+  br bb7
+
+bb7:
+  strong_release %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb8
+
+bb8:
+  return undef : $()
+}
+
+// Make sure that we do not hoist the retains/releases here since we have seen
+// one strong_release in the hoistin release set along a path twice.
+//
+// CHECK-LABEL: sil @diamond_test_7 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK-NOT: retain
+// CHECK: bb1:
+// CHECK: strong_retain
+// CHECK: bb2:
+// CHECK: strong_release
+// CHECK: bb3:
+// CHECK: strong_release
+// CHECK: bb6:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @diamond_test_7 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  br bb2
+
+bb2:
+  strong_release %0 : $Builtin.NativeObject
+  cond_br undef, bb3, bb4
+
+bb3:
+  strong_release %0 : $Builtin.NativeObject
+  br bb5
+
+bb4:
+  br bb5
+
+bb5:
+  cond_br undef, bb1, bb6
+
+bb6:
+  return undef : $()
+}
+
+// Make sure that we do not hoist the retains/releases since along one of the
+// hoisting paths, we saw a retain twice.
+//
+// CHECK-LABEL: sil @diamond_test_8 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK-NOT: strong_retain
+// CHECK: bb2:
+// CHECK: strong_retain
+// CHECK: bb4:
+// CHECK: strong_retain
+// CHECK: strong_release
+// CHECK: bb5:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @diamond_test_8 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  strong_retain %0 : $Builtin.NativeObject
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  strong_retain %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb5
+
+bb5:
+  return undef : $()
+}
+
+// Make sure we can handle diamonds where the retain, release ordering is
+// swapped.
+//
+// CHECK-LABEL: sil @diamond_test_9 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK-NOT: strong_retain
+// CHECK: bb1:
+// CHECK: strong_release
+// CHECK: bb4:
+// CHECK: strong_retain
+// CHECK: bb5:
+// CHECK-NOT: strong_release
+sil @diamond_test_9 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  strong_release %0 : $Builtin.NativeObject
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb5
+
+bb5:
+  return undef : $()
+}
+
+// In this situation, we have an early exit, but the release is later than the
+// early exit. This means that since we are pairing the release with the retain
+// from the next iteration, we are not stymied.
+//
+// CHECK-LABEL: sil @early_exit_1 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK: strong_retain
+// CHECK: bb1:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb2:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb3:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// ==> *NOTE* This is the early exit "exit block". There should not be any
+// ==> retains/releases here.
+// CHECK: bb4:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb5:
+// CHECK: strong_release
+// CHECK-NOT: strong_release
+// CHECK-NOT: strong_retain
+// CHECK: bb6:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @early_exit_1 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb2, bb3
+
+bb2:
+  cond_br undef, bb3, bb4
+
+bb3:
+  strong_release %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb5
+
+bb4:
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  return undef: $()
+}
+
+// In this case, we can hoist the retain in BB1 into BB0 and the release in BB3
+// into BB5. The release in BB2 must remain though. Since we are not moving BB2,
+// we need to make sure no release is placed in BB4.
+//
+// CHECK-LABEL: sil @early_exit_2 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK: strong_retain
+// CHECK: bb1:
+// CHECK-NOT: strong_retain
+// CHECK: bb2:
+// CHECK: strong_release
+// CHECK: bb3:
+// CHECK-NOT: strong_release
+// CHECK: bb4:
+// CHECK-NOT: strong_release
+// CHECK: bb5:
+// CHECK: strong_release
+sil @early_exit_2 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb2, bb3
+
+bb2:
+  strong_release %0 : $Builtin.NativeObject
+  cond_br undef, bb3, bb4
+
+bb3:
+  strong_release %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb5
+
+bb4:
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  return undef : $()
+}
+
+// We can hoist in this case, but only into bb5.
+//
+// CHECK-LABEL: sil @early_exit_3 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK: strong_retain
+// CHECK: bb1:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb2:
+// CHECK: bb3:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb4:
+// CHECK: strong_release
+// CHECK-NOT: strong_release
+// CHECK: bb5:
+// CHECK: strong_releas
+// CHECK-NOT: strong_release
+// CHECK: bb6:
+sil @early_exit_3 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb2, bb3
+
+bb2:
+  cond_br undef, bb3, bb4
+
+bb3:
+  strong_release %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb5
+
+bb4:
+  strong_release %0 : $Builtin.NativeObject
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  return undef: $()
+}
+
+// Make sure that if we have a release that dominates the early exit that we can hoist.
+//
+// CHECK-LABEL: sil @early_exit_4 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK: strong_retain
+// CHECK: bb1:
+// CHECK-NOT: strong_retain
+// CHECK: bb2:
+// CHECK-NOT: strong_release
+// CHECK: bb3:
+// CHECK-NOT: strong_release
+// CHECK: bb4:
+// CHECK: strong_release
+// CHECK: bb5:
+// CHECK: strong_release
+// CHECK: bb6:
+// CHECK-NOT: strong_release
+sil @early_exit_4 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  br bb2
+
+bb2:
+  strong_release %0 : $Builtin.NativeObject
+  cond_br undef, bb3, bb4
+
+bb3:
+  cond_br undef, bb1, bb5
+
+bb4:
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  return undef: $()
+}
+
+// Make sure that if we have a retain after
+// CHECK-LABEL: sil @early_exit_5 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb1:
+// CHECK-NOT: strong_retain
+// CHECK: bb2:
+// CHECK: strong_release
+// CHECK: bb3:
+// CHECK: strong_retain
+// CHECK: bb4:
+// CHECK-NOT: strong_release
+// CHECK: bb5:
+// CHECK-NOT: strong_release
+sil @early_exit_5 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  br bb2
+
+bb2:
+  strong_release %0 : $Builtin.NativeObject
+  cond_br undef, bb3, bb4
+
+bb3:
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb5
+
+bb4:
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  return undef: $()
+}
+
+// Make sure that we can hoist out of multiple level loops
+//
+// CHECK-LABEL: sil @multiple_level_loop_1 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK: strong_retain
+// CHECK: bb1:
+// CHECK-NOT: strong_retain
+// CHECK: bb2:
+// CHECK-NOT: strong_retain
+// CHECK: bb3:
+// CHECK-NOT: strong_release
+// CHECK: bb4:
+// CHECK-NOT: strong_release
+// CHECK: bb5:
+// CHECK: strong_release
+sil @multiple_level_loop_1 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  br bb2
+
+bb2:
+  strong_retain %0 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  strong_release %0 : $Builtin.NativeObject
+  cond_br undef, bb2, bb4
+
+bb4:
+  cond_br undef, bb1, bb5
+
+bb5:
+  return undef : $()
+}
+
+// Make sure we can handle multiple level loops involving phi nodes.
+//
+// CHECK-LABEL: sil @multiple_level_loop_2 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0([[INPUT:%[0-9]+]]
+// CHECK: strong_retain [[INPUT]]
+// CHECK: bb1(
+// CHECK-NOT: strong_retain
+// CHECK: bb2(
+// CHECK-NOT: strong_retain
+// CHECK: bb3:
+// CHECK-NOT: strong_release
+// CHECK: bb4:
+// CHECK-NOT: strong_release
+// CHECK: bb5:
+// CHECK: strong_release [[INPUT]]
+sil @multiple_level_loop_2 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  br bb1(%0 : $Builtin.NativeObject)
+
+bb1(%1 : $Builtin.NativeObject):
+  br bb2(%1 : $Builtin.NativeObject)
+
+bb2(%2 : $Builtin.NativeObject):
+  strong_retain %2 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  strong_release %2 : $Builtin.NativeObject
+  cond_br undef, bb2(%2 : $Builtin.NativeObject), bb4
+
+bb4:
+  cond_br undef, bb1(%1 : $Builtin.NativeObject), bb5
+
+bb5:
+  return undef : $()
+}
+
+// Make sure that we can handle multiple loops with an unreachable in the
+// innermost loop. Ensure that we do not put any release in the unreachable part
+// since we are leaking there.
+//
+// CHECK-LABEL: sil @multiple_level_loop_3 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK: strong_retain
+// CHECK: bb1(
+// CHECK-NOT: strong_retain
+// CHECK: bb2(
+// CHECK-NOT: strong_retain
+// CHECK: bb3:
+// CHECK-NOT: strong_release
+// CHECK: bb4:
+// CHECK-NOT: strong_release
+// CHECK: bb6:
+// CHECK: strong_release
+// CHECK: bb7:
+// CHECK-NOT: strong_release
+sil @multiple_level_loop_3 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  br bb1(%0 : $Builtin.NativeObject)
+
+bb1(%1 : $Builtin.NativeObject):
+  br bb2(%1 : $Builtin.NativeObject)
+
+bb2(%2 : $Builtin.NativeObject):
+  strong_retain %2 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  cond_br undef, bb4, bb7
+
+bb4:
+  strong_release %2 : $Builtin.NativeObject
+  cond_br undef, bb2(%2 : $Builtin.NativeObject), bb5
+
+bb5:
+  cond_br undef, bb1(%1 : $Builtin.NativeObject), bb6
+
+bb6:
+  return undef : $()
+
+bb7:
+  unreachable
+}
+
+// Make sure that we can hoist through multiple levels of a loop when in an
+// intermediate level loop has an unreachable that will be dominated by the
+// hoisted release. This should get through all levels of the loop and we should
+// have no release in the unreachable block.
+//
+// CHECK-LABEL: sil @multiple_level_loop_4 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK: strong_retain
+// CHECK: bb1(
+// CHECK-NOT: strong_retain
+// CHECK: bb2(
+// CHECK-NOT: strong_retain
+// CHECK: bb3:
+// CHECK-NOT: strong_release
+// CHECK: bb4:
+// CHECK-NOT: strong_release
+// CHECK: bb6:
+// CHECK: strong_release
+// CHECK: bb7:
+// CHECK-NOT: strong_release
+// CHECK: unreachable
+sil @multiple_level_loop_4 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  br bb1(%0 : $Builtin.NativeObject)
+
+bb1(%1 : $Builtin.NativeObject):
+  br bb2(%1 : $Builtin.NativeObject)
+
+bb2(%2 : $Builtin.NativeObject):
+  strong_retain %2 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  strong_release %2 : $Builtin.NativeObject
+  cond_br undef, bb2(%2 : $Builtin.NativeObject), bb4
+
+bb4:
+  cond_br undef, bb5, bb7
+
+bb5:
+  cond_br undef, bb1(%1 : $Builtin.NativeObject), bb6
+
+bb6:
+  return undef : $()
+
+bb7:
+  unreachable
+}
+
+// Make sure that we can hoist through multiple levels of a loop when in an
+// intermediate level loop has an unreachable that will be dominated by the
+// hoisted release. This should get through all levels of the loop and we should
+// have a release in the unreachable block since we can not ignore the
+// unreachable block.
+//
+// CHECK-LABEL: sil @multiple_level_loop_5 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK: strong_retain
+// CHECK: bb1(
+// CHECK-NOT: strong_retain
+// CHECK: bb2(
+// CHECK-NOT: strong_retain
+// CHECK: bb3:
+// CHECK-NOT: strong_release
+// CHECK: bb4:
+// CHECK-NOT: strong_release
+// CHECK: bb5:
+// CHECK-NOT: strong_release
+// CHECK: bb6:
+// CHECK: strong_release
+// CHECK: bb7:
+// CHECK: strong_release
+sil @multiple_level_loop_5 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  br bb1(%0 : $Builtin.NativeObject)
+
+bb1(%1 : $Builtin.NativeObject):
+  br bb2(%1 : $Builtin.NativeObject)
+
+bb2(%2 : $Builtin.NativeObject):
+  strong_retain %2 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  strong_release %2 : $Builtin.NativeObject
+  cond_br undef, bb2(%2 : $Builtin.NativeObject), bb4
+
+bb4:
+  cond_br undef, bb5, bb7
+
+bb5:
+  cond_br undef, bb1(%1 : $Builtin.NativeObject), bb6
+
+bb6:
+  return undef : $()
+
+bb7:
+  %3 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %3(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  unreachable
+}
+
+// Make sure that we can hoist through multiple levels of a loop when in an
+// intermediate level loop has an unreachable that will be dominated by the
+// hoisted release. This should get through all levels of the loop and we should
+// not have a release in the unreachable block since we can ignore the
+// unreachable block.
+//
+// CHECK-LABEL: sil @multiple_level_loop_6 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK: strong_retain
+// CHECK: bb1(
+// CHECK-NOT: strong_retain
+// CHECK: bb2(
+// CHECK-NOT: strong_retain
+// CHECK: bb3:
+// CHECK-NOT: strong_release
+// CHECK: bb4:
+// CHECK-NOT: strong_release
+// CHECK: bb5:
+// CHECK-NOT: strong_release
+// CHECK: bb6:
+// CHECK: strong_release
+// CHECK: bb7:
+// CHECK-NOT: strong_release
+sil @multiple_level_loop_6 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  br bb1(%0 : $Builtin.NativeObject)
+
+bb1(%1 : $Builtin.NativeObject):
+  br bb2(%1 : $Builtin.NativeObject)
+
+bb2(%2 : $Builtin.NativeObject):
+  strong_retain %2 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  strong_release %2 : $Builtin.NativeObject
+  cond_br undef, bb2(%2 : $Builtin.NativeObject), bb4
+
+bb4:
+  cond_br undef, bb5, bb7
+
+bb5:
+  cond_br undef, bb1(%1 : $Builtin.NativeObject), bb6
+
+bb6:
+  return undef : $()
+
+bb7:
+  %3 = function_ref @fatal_error : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %3(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  unreachable
+}
+
+// CHECK-LABEL: sil @linked_list_example : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK-NEXT: strong_retain
+// CHECK: bb1:
+// CHECK-NOT: strong_retain
+// CHECK: bb2:
+// CHECK-NOT: strong_release
+// CHECK: bb3:
+// CHECK: strong_release
+// CHECK-NOT: return undef
+sil @linked_list_example : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb2, bb3
+
+bb2:
+  strong_release %0 : $Builtin.NativeObject
+  br bb1
+
+bb3:
+  return undef : $()
+}

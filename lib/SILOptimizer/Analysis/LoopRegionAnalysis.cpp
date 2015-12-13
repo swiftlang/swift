@@ -403,7 +403,7 @@ void LoopRegionFunctionInfo::initializeBlockRegions(PostOrderFunctionInfo *PI,
     //
     // We rely on Loop canonicalization to separate such loops into separate
     // nested loops.
-    ParentRegion->getSubregionData().RPONumOfHeaderBlock = RPOIndex;
+    ParentRegion->getSubregionData().HeaderBlockRPONumber = RPOIndex;
 
     // If we have one loop latch, continue.
     if (Loop->getLoopLatch()) {
@@ -578,13 +578,12 @@ rewriteLoopExitingBlockSuccessors(LoopTy *Loop, RegionTy *LRegion) {
 
       // If S is not contained in L, then:
       //
-      // 1. The successor/predecessor edge in between S and ER with a new
-      // successor/predecessor edge in between S and L.
-      // 2. ER is given a non-local successor edge that points at the successor
-      // index in L that points at S. This will enable us to recover the
-      // original edge if we need to.
+      // 1. Replace the edge from ER -> S with an edge from L -> S in both the
+      //    successor lists of ER/L and the predecessor list of S.
       //
-      // Then we continue.
+      // 2. ER is given a non-local successor edge that points at the successor
+      //    index in L that points at S. This will enable us to recover the
+      //    original edge if we need to.
       auto *SuccRegion = getRegion(SuccID.ID);
       if (!LRegion->containsSubregion(SuccRegion)) {
         DEBUG(llvm::dbgs() << "            Is not a subregion, replacing.\n");
