@@ -219,7 +219,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
       // Produce an unreachable code warning for this basic block if it
       // contains user code (only if we are not within an inlined function or a
       // template instantiation).
-      // FIXME: Do not report if we are within a template instatiation.
+      // FIXME: Do not report if we are within a template instantiation.
       if (Loc.is<RegularLocation>() && State &&
           !State->PossiblyUnreachableBlocks.count(UnreachableBlock)) {
         // If this is the first time we see this unreachable block, store it
@@ -285,7 +285,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
 
       // Produce diagnostic info if we are not within an inlined function or
       // template instantiation.
-      // FIXME: Do not report if we are within a template instatiation.
+      // FIXME: Do not report if we are within a template instantiation.
       assert(ReachableBlockIdx >= 0);
       if (Loc.is<RegularLocation>() && State) {
         // Find the first unreachable block in the switch so that we could use
