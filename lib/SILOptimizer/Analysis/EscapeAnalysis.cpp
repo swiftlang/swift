@@ -310,7 +310,7 @@ void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
         case ValueKind::TryApplyInst: {
           /// Actually we only add instructions which may release a reference.
           /// We need the use points only for getting the end of a reference's
-          /// liferange. And that must be a releaseing instruction.
+          /// liferange. And that must be a releasing instruction.
           int ValueIdx = -1;
           for (const Operand &Op : I.getAllOperands()) {
             ValueBase *OpV = Op.get().getDef();
