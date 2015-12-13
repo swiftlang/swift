@@ -293,7 +293,7 @@ public:
 
 namespace {
 
-/// This class stores global state that we use when computing redudant load and
+/// This class stores global state that we use when computing redundant load and
 /// their replacement in each basic block.
 class RLEContext {
   /// Function currently processing.
