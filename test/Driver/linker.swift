@@ -12,16 +12,18 @@
 // RUN: FileCheck -check-prefix watchOS_SIMPLE %s < %t.simple.txt
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-linux-gnu -Ffoo -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
-// RUN: FileCheck -check-prefix LINUX %s < %t.linux.txt
+// RUN: FileCheck -check-prefix LINUX-x86_64 %s < %t.linux.txt
+
+// RUN: %swiftc_driver -driver-print-jobs -target armv7-unknown-linux-gnueabihf -Ffoo -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
+// RUN: FileCheck -check-prefix LINUX-armv7 %s < %t.linux.txt
 
 // RUN: %swiftc_driver -driver-print-jobs -emit-library -target x86_64-apple-macosx10.9.1 %s -sdk %S/../Inputs/clang-importer-sdk -lfoo -framework bar -Lbaz -Fgarply -Xlinker -undefined -Xlinker dynamic_lookup -o sdk.out 2>&1 > %t.complex.txt
 // RUN: FileCheck %s < %t.complex.txt
 // RUN: FileCheck -check-prefix COMPLEX %s < %t.complex.txt
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -g %s | FileCheck -check-prefix DEBUG %s
-
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.10 %s | FileCheck -check-prefix NO_ARCLITE %s
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios8.0 %s | FileCheck -check-prefix NO_ARCLITE %s
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.10   %s | FileCheck -check-prefix NO_ARCLITE %s
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios8.0        %s | FileCheck -check-prefix NO_ARCLITE %s
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -module-name LINKER | FileCheck -check-prefix INFERRED_NAME %s
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -o libLINKER.dylib | FileCheck -check-prefix INFERRED_NAME %s
@@ -90,21 +92,37 @@
 // watchOS_SIMPLE: -o linker
 
 
-// LINUX: swift
-// LINUX: -o [[OBJECTFILE:.*]]
+// LINUX-x86_64: swift
+// LINUX-x86_64: -o [[OBJECTFILE:.*]]
 
-// LINUX: clang++{{"? }}
-// LINUX-DAG: [[OBJECTFILE]]
-// LINUX-DAG: -lswiftCore
-// LINUX-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
-// LINUX-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
-// LINUX-DAG: -Xlinker -T /{{[^ ]+}}/linux/x86_64/swift.ld
-// LINUX-DAG: -F foo
-// LINUX-DAG: -framework bar
-// LINUX-DAG: -L baz
-// LINUX-DAG: -lboo
-// LINUX-DAG: -Xlinker -undefined
-// LINUX: -o linker
+// LINUX-x86_64: clang++{{"? }}
+// LINUX-x86_64-DAG: [[OBJECTFILE]]
+// LINUX-x86_64-DAG: -lswiftCore
+// LINUX-x86_64-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
+// LINUX-x86_64-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
+// LINUX-x86_64-DAG: -Xlinker -T /{{[^ ]+}}/linux/x86_64/swift.ld
+// LINUX-x86_64-DAG: -F foo
+// LINUX-x86_64-DAG: -framework bar
+// LINUX-x86_64-DAG: -L baz
+// LINUX-x86_64-DAG: -lboo
+// LINUX-x86_64-DAG: -Xlinker -undefined
+// LINUX-x86_64: -o linker
+
+// LINUX-armv7: swift
+// LINUX-armv7: -o [[OBJECTFILE:.*]]
+
+// LINUX-armv7: clang++{{"? }}
+// LINUX-armv7-DAG: [[OBJECTFILE]]
+// LINUX-armv7-DAG: -lswiftCore
+// LINUX-armv7-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
+// LINUX-armv7-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
+// LINUX-armv7-DAG: -Xlinker -T /{{[^ ]+}}/linux/armv7/swift.ld
+// LINUX-armv7-DAG: -F foo
+// LINUX-armv7-DAG: -framework bar
+// LINUX-armv7-DAG: -L baz
+// LINUX-armv7-DAG: -lboo
+// LINUX-armv7-DAG: -Xlinker -undefined
+// LINUX-armv7: -o linker
 
 // COMPLEX: bin/ld{{"? }}
 // COMPLEX-DAG: -dylib

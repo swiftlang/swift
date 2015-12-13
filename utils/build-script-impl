@@ -227,6 +227,9 @@ function set_deployment_target_based_options() {
         linux-x86_64)
             SWIFT_HOST_VARIANT_ARCH="x86_64"
             ;;
+        linux-armv7)
+            SWIFT_HOST_VARIANT_ARCH="armv7"
+            ;;
         freebsd-x86_64)
             SWIFT_HOST_VARIANT_ARCH="x86_64"
             ;;
@@ -730,8 +733,8 @@ if [[ "$(uname -s)" == "Darwin" ]] ; then
     TOOLCHAIN_PREFIX=$(echo ${INSTALL_PREFIX} | sed -E 's/\/usr$//')
 fi
 
-# A list of deployment targets to compile the Swift host tools for, in case when
-# we can run the resulting binaries natively on the build machine.
+# A list of deployment targets to compile the Swift host tools for, in cases
+# where we can run the resulting binaries natively on the build machine.
 NATIVE_TOOLS_DEPLOYMENT_TARGETS=()
 
 # A list of deployment targets to cross-compile the Swift host tools for.
@@ -740,20 +743,24 @@ CROSS_TOOLS_DEPLOYMENT_TARGETS=()
 
 # Determine the native deployment target for the build machine, that will be
 # used to jumpstart the standard library build when cross-compiling.
-case "$(uname -s)" in
-    Linux)
+case "$(uname -s -m)" in
+    Linux\ x86_64)
         NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
             "linux-x86_64"
         )
         ;;
-
-    Darwin)
+    Linux\ armv7*)
+        NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
+            "linux-armv7"
+        )
+        ;;
+    Darwin\ x86_64)
         NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
             "macosx-x86_64"
         )
         ;;
 
-    FreeBSD)
+    FreeBSD\ x86_64)
         NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
             "freebsd-x86_64"
         )
@@ -805,15 +812,18 @@ function is_cross_tools_deployment_target() {
 # A list of deployment targets that we compile or cross-compile the
 # Swift standard library for.
 STDLIB_DEPLOYMENT_TARGETS=()
-
-case "$(uname -s)" in
-    Linux)
+case "$(uname -s -m)" in
+    Linux\ x86_64)
         STDLIB_DEPLOYMENT_TARGETS=(
             "linux-x86_64"
         )
         ;;
-
-    Darwin)
+    Linux\ armv7*)
+        STDLIB_DEPLOYMENT_TARGETS=(
+            "linux-armv7"
+        )
+        ;;
+    Darwin\ x86_64)
         STDLIB_DEPLOYMENT_TARGETS=(
             "macosx-x86_64"
             "iphonesimulator-i386"
@@ -830,7 +840,7 @@ case "$(uname -s)" in
         )
         ;;
 
-    FreeBSD)
+    FreeBSD\ x86_64)
         STDLIB_DEPLOYMENT_TARGETS=(
             "freebsd-x86_64"
         )
