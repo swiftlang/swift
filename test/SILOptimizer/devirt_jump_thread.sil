@@ -355,7 +355,7 @@ class C {
 }
 
 // Check that checked_cast_br jump-threading works properly when both
-// condititions are arguments of the function's entry block.
+// conditions are arguments of the function's entry block.
 // CHECK: sil @test_checked_cast_br_jump_threading_with_entry_bb_arguments
 // CHECK: checked_cast_br %0
 // CHECK: checked_cast_br %1
