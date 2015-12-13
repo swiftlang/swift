@@ -158,7 +158,7 @@ private:
     bool isInWorkList = false;
     
     /// True if the merge is finished (see mergeTo). In this state this node
-    /// is completly unlinked from the graph,
+    /// is completely unlinked from the graph,
     bool isMerged = false;
     
     /// The type of the node (mainly distinguishes between content and value
