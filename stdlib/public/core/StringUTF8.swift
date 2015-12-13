@@ -36,7 +36,7 @@ extension _StringCore {
       // our UTF8Chunk with UTF-8 code units?
       let utf16Count = min(sizeof(UTF8Chunk.self), count - i)
 
-      var result: UTF8Chunk = ~0 // start with all bits set
+      var result: UTF8Chunk = ~0 // Start with all bits set
 
       _memcpy(
         dest: UnsafeMutablePointer(Builtin.addressof(&result)),
