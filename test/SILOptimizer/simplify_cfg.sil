@@ -2258,15 +2258,15 @@ sil [noinline] @initCC : $@convention(thin) (@thick CC.Type) -> @owned @callee_o
 sil [noinline] @takeBB : $@convention(thin) (@owned BB) -> @owned BB
 
 // Check that we don't crash on this.
-// The compiler should be able to cast between the labled and unlabled return tuple types.
-// CHECK-LABEL: @try_apply_with_convert_function_returning_casted_unlabled_tuple
+// The compiler should be able to cast between the labled and unlabeled return tuple types.
+// CHECK-LABEL: @try_apply_with_convert_function_returning_casted_unlabeled_tuple
 // CHECK: apply {{%[0-9]+}}
 // Proper tuple is created by deconstructing the old one and creating a new one using its elements.
 // CHECK: tuple_extract
 // CHECK: tuple_extract
 // CHECK: tuple
 // CHECK: return
-sil @try_apply_with_convert_function_returning_casted_unlabled_tuple: $@convention(thin) () -> (Int32, Int32) {
+sil @try_apply_with_convert_function_returning_casted_unlabeled_tuple: $@convention(thin) () -> (Int32, Int32) {
 bb0:
   %3 = function_ref @returnLabledTuple : $@convention(thin) () -> (first: Int32, second: Int32)
   %6 = convert_function %3 : $@convention(thin) () -> (first: Int32, second: Int32) to $@convention(thin) () -> ((Int32, Int32), @error ErrorType)
@@ -2283,7 +2283,7 @@ bb2(%10 : $ErrorType):
 }
 
 // Check that we don't crash on this.
-// The compiler should be able to cast between the labled and unlabled return tuple types.
+// The compiler should be able to cast between the labled and unlabeled return tuple types.
 // CHECK-LABEL: @try_apply_with_convert_function_returning_casted_labled_tuple
 // CHECK: apply {{%[0-9]+}}
 // Proper tuple is created by deconstructing the old one and creating a new one using its elements.
