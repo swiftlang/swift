@@ -1156,7 +1156,7 @@ bool COWArrayOpt::hoistInLoopWithOnlyNonArrayValueMutatingOperations() {
 
 
   /// Make sure that no writes to an array value happens in the loop and that
-  /// no array values are retained without beeing released before hitting a
+  /// no array values are retained without being released before hitting a
   /// make_unique:
   ///
   /// * array semantic functions that don't change the uniqueness state to
