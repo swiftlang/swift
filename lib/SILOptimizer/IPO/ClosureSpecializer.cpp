@@ -589,7 +589,7 @@ void ClosureSpecCloner::populateCloned() {
   // Next we need to add in any arguments that are not captured as arguments to
   // the cloned function.
   //
-  // We do not insert the new mapped arugments into the value map since there by
+  // We do not insert the new mapped arguments into the value map since there by
   // definition is nothing in the partial apply user function that references
   // such arguments. After this pass is done the only thing that will reference
   // the arguments is the partial apply that we will create.
