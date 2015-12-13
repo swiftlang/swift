@@ -2207,7 +2207,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return out.add(OverflowFlag);
   }
 
-  // We are currently emiting code for '_convertFromBuiltinIntegerLiteral',
+  // We are currently emitting code for '_convertFromBuiltinIntegerLiteral',
   // which will call the builtin and pass it a non-compile-time-const parameter.
   if (Builtin.ID == BuiltinValueKind::IntToFPWithOverflow) {
     auto ToTy =
