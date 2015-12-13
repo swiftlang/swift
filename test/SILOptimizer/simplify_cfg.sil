@@ -369,7 +369,7 @@ bb4(%6 : $Int64):
 }
 
 // Make sure the cond_br is not simplified as it would create
-// a crticial edge.
+// a critical edge.
 // CHECK-LABEL: @elim_trampoline4
 // CHECK: cond_br %0, bb1, bb2
 // CHECK: bb1:
