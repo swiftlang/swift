@@ -242,7 +242,7 @@ public:
     //   use(a);
     //
     // However, by doing so, we can only do the data forwarding after the
-    // data flow stablizes.
+    // data flow stabilizes.
     //
     ForwardSetIn.resize(bitcnt, false);
     ForwardSetOut.resize(bitcnt, reachable);
