@@ -1443,7 +1443,7 @@ bb9:
   return %9999 : $()
 }
 
-// CHECK-LABEL: @multiple_level_natural_loop_with_irreducible_loop_sandwhich@
+// CHECK-LABEL: @multiple_level_natural_loop_with_irreducible_loop_sandwich@
 // CHECK: (region id:12 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -1577,7 +1577,7 @@ bb9:
 // CHECK-NEXT:         (region id:13))
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs))
-sil @multiple_level_natural_loop_with_irreducible_loop_sandwhich : $@convention(thin) () -> () {
+sil @multiple_level_natural_loop_with_irreducible_loop_sandwich : $@convention(thin) () -> () {
 bb0:
   br bb6
 
