@@ -194,7 +194,7 @@ FloatLiteralConvertible {
   /// edge cases to be aware of:
   ///
   /// - `greatestFiniteMagnitude.ulp` is a finite number, even though
-  ///   the next greater respresentable value is `infinity`.
+  ///   the next greater representable value is `infinity`.
   /// - `x.ulp` is `NaN` if `x` is not a finite number.
   /// - If `x` is very small in magnitude, then `x.ulp` may be a subnormal
   ///   number.  On targets that do not support subnormals, `x.ulp` may be
