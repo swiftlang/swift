@@ -291,7 +291,7 @@ private:
     }
   };
 
-  /// Mapping from nodes in a calleee-graph to nodes in a caller-graph.
+  /// Mapping from nodes in a callee-graph to nodes in a caller-graph.
   class CGNodeMap {
     /// The map itself.
     llvm::DenseMap<CGNode *, CGNode *> Map;
