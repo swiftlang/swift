@@ -675,39 +675,29 @@ PrintTests.test("ClassVeryPrintable") {
   expectPrinted("<description: 1>", c4)
 }
 
-func test_ArrayPrinting() {
-  let arrayOfInts: [Int] = []
-  printedIs(arrayOfInts, "[]")
-
-  printedIs([ 1 ], "[1]")
-  printedIs([ 1, 2 ], "[1, 2]")
-  printedIs([ 1, 2, 3 ], "[1, 2, 3]")
-
-  printedIs([ "foo", "bar", "bas" ], "[\"foo\", \"bar\", \"bas\"]")
-  debugPrintedIs([ "foo", "bar", "bas" ], "[\"foo\", \"bar\", \"bas\"]")
-
-  printedIs([ StructPrintable(1), StructPrintable(2),
-              StructPrintable(3) ],
-            "[►1◀︎, ►2◀︎, ►3◀︎]")
-
-  printedIs([ LargeStructPrintable(10, 20, 30, 40),
-              LargeStructPrintable(50, 60, 70, 80) ],
-            "[<10 20 30 40>, <50 60 70 80>]")
-
-  printedIs([ StructDebugPrintable(1) ], "[►1◀︎]")
-
-  printedIs([ ClassPrintable(1), ClassPrintable(2),
-              ClassPrintable(3) ],
-            "[►1◀︎, ►2◀︎, ►3◀︎]")
-
-  printedIs([ ClassPrintable(1), ClassPrintable(2),
-              ClassPrintable(3) ] as Array<AnyObject>,
-            "[►1◀︎, ►2◀︎, ►3◀︎]")
-
-  print("test_ArrayPrinting done")
+PrintTests.test("Array") {
+  expectPrinted("[]", [Int]())
+  expectPrinted("[1]", [ 1 ])
+  expectPrinted("[1, 2]", [ 1, 2 ])
+  expectPrinted("[1, 2, 3]", [ 1, 2, 3 ])
+  
+  expectPrinted("[\"foo\", \"bar\", \"bas\"]", [ "foo", "bar", "bas" ])
+  expectDebugPrinted("[\"foo\", \"bar\", \"bas\"]", [ "foo", "bar", "bas" ])
+  
+  expectPrinted("[►1◀︎, ►2◀︎, ►3◀︎]", [ StructPrintable(1),
+    StructPrintable(2), StructPrintable(3) ])
+  
+  expectPrinted("[<10 20 30 40>, <50 60 70 80>]",
+    [ LargeStructPrintable(10, 20, 30, 40), LargeStructPrintable(50, 60, 70, 80) ])
+  
+  expectPrinted("[►1◀︎]", [ StructDebugPrintable(1) ])
+  
+  expectPrinted("[►1◀︎, ►2◀︎, ►3◀︎]", [ ClassPrintable(1),
+    ClassPrintable(2), ClassPrintable(3) ])
+  
+  expectPrinted("[►1◀︎, ►2◀︎, ►3◀︎]", [ ClassPrintable(1),
+    ClassPrintable(2), ClassPrintable(3) ] as Array<AnyObject>)
 }
-test_ArrayPrinting()
-// CHECK: test_ArrayPrinting done
 
 func test_DictionaryPrinting() {
   var dictSI: Dictionary<String, Int> = [:]
