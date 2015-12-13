@@ -250,7 +250,7 @@ void PartialApplyCombiner::deallocateTemporaries() {
   }
 }
 
-/// Emit code to release/destory temporaries.
+/// Emit code to release/destroy temporaries.
 void PartialApplyCombiner::releaseTemporaries() {
   // Insert releases and destroy_addrs as early as possible,
   // because we don't want to keep objects alive longer than
