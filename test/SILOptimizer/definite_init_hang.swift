@@ -7,7 +7,7 @@ func f1() { }
 func f2() { }
 
 // The old implementation of the LifetimeChecker in DefiniteInitialization had
-// an exponential compuation complexity in some cases.
+// an exponential computation complexity in some cases.
 // This test should finish in almost no time. With the old implementation it
 // took about 8 minutes.
 
