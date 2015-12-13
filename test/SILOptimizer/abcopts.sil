@@ -672,7 +672,7 @@ bb1(%i0 : $Builtin.Int32):
   retain_value %0 : $ArraySlice<Int>
   %t3 = struct $Int32(%i0 : $Builtin.Int32)
 
-  // Slices don't necessarily have a zero lower bound. So we can't elminate the
+  // Slices don't necessarily have a zero lower bound. So we can't eliminate the
   // subscript check for 0..<count loops.
   %t4 = apply %f2(%t3, %101, %0) : $@convention(method) (Int32, Bool, @owned ArraySlice<Int>) -> _DependenceToken
 
