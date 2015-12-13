@@ -520,7 +520,7 @@ void DSEContext::invalidateLSLocationBase(SILInstruction *I,
 
 void DSEContext::updateWriteSetForRead(BlockState *S, unsigned bit) {
   // Remove any may/must-aliasing stores to the LSLocation, as they cant be
-  // used to kill any upward visible stores due to the intefering load.
+  // used to kill any upward visible stores due to the interfering load.
   LSLocation &R = LSLocationVault[bit];
   for (unsigned i = 0; i < S->LSLocationNum; ++i) {
     if (!S->isTrackingLSLocation(i))
