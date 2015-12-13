@@ -267,7 +267,7 @@ public:
   void addSimpleNamedParameter(StringRef name) {
     CurrentNestingLevel++;
     addSimpleChunk(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin);
-    // Use internal, since we don't want the name to be outisde the placeholder.
+    // Use internal, since we don't want the name to be outside the placeholder.
     addChunkWithText(
         CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName,
         name);
