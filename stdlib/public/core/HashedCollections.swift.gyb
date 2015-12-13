@@ -881,7 +881,7 @@ public func _setDownCastConditional<BaseValue, DerivedValue>(
       result.insert(derivedMember)
       continue
     }
-    return nil
+    return .None
   }
   return result
 }
@@ -927,14 +927,14 @@ public func _setBridgeFromObjectiveCConditional<
       if let bridgedValue = value as? SwiftValue {
         resultValue = bridgedValue
       } else {
-        return nil
+        return .None
       }
     } else {
       if let bridgedValue = _conditionallyBridgeFromObjectiveC(
           _reinterpretCastToAnyObject(value), SwiftValue.self) {
         resultValue = bridgedValue
       } else {
-        return nil
+        return .None
       }
     }
     result.insert(resultValue)
@@ -1469,7 +1469,7 @@ public func _dictionaryDownCastConditional<
 
     // Either the key or the value wasn't of the appropriate derived
     // type. Fail.
-    return nil
+    return .None
   }
   return result
 }
@@ -1525,14 +1525,14 @@ public func _dictionaryBridgeFromObjectiveCConditional<
       if let bridgedKey = key as? SwiftKey {
         resultKey = bridgedKey
       } else {
-        return nil
+        return .None
       }
     } else {
       if let bridgedKey = _conditionallyBridgeFromObjectiveC(
         _reinterpretCastToAnyObject(key), SwiftKey.self) {
           resultKey = bridgedKey
       } else {
-        return nil
+        return .None
       }
     }
 
@@ -1542,14 +1542,14 @@ public func _dictionaryBridgeFromObjectiveCConditional<
       if let bridgedValue = value as? SwiftValue {
         resultValue = bridgedValue
       } else {
-        return nil
+        return .None
       }
     } else {
       if let bridgedValue = _conditionallyBridgeFromObjectiveC(
         _reinterpretCastToAnyObject(value), SwiftValue.self) {
           resultValue = bridgedValue
       } else {
-        return nil
+        return .None
       }
     }
 
@@ -2142,10 +2142,10 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   internal func indexForKey(key: Key) -> Index? {
     if count == 0 {
       // Fast path that avoids computing the hash of the key.
-      return nil
+      return .None
     }
     let (i, found) = _find(key, _bucket(key))
-    return found ? i : nil
+    return found ? i : .None
   }
 
   @warn_unused_result
@@ -2177,7 +2177,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   internal func maybeGet(key: Key) -> Value? {
     if count == 0 {
       // Fast path that avoids computing the hash of the key.
-      return nil
+      return .None
     }
 
     let (i, found) = _find(key, _bucket(key))
@@ -2188,7 +2188,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
       return valueAt(i.offset)
 %end
     }
-    return nil
+    return .None
   }
 
   internal mutating func updateValue(value: Value, forKey: Key) -> Value? {
@@ -2386,7 +2386,7 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
   @warn_unused_result
   internal func nextObject() -> AnyObject? {
     if nextIndex == endIndex {
-      return nil
+      return .None
     }
     let bridgedKey: AnyObject = nativeStorageOwner._getBridgedKey(nextIndex)
     nextIndex = nextIndex.successor()
@@ -2560,7 +2560,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
       if let ref = _stdlib_atomicLoadARCRef(object: _heapBufferBridgedPtr) {
         return unsafeDowncast(ref) as BridgedNativeStorage.StorageImpl
       }
-      return nil
+      return .None
     }
   }
 
@@ -2732,7 +2732,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
     if found {
       return _getBridgedValue(i)
     }
-    return nil
+    return .None
   }
 
   @warn_unused_result
@@ -2800,7 +2800,7 @@ internal struct _Cocoa${Self}Storage : _HashStorageType {
     // potential savings are significant: we could skip a memory allocation and
     // a linear search.
     if maybeGet(key) == nil {
-      return nil
+      return .None
     }
 
 %if Self == 'Set':
@@ -3082,14 +3082,14 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
       if let nativeIndex = native.indexForKey(key) {
         return ._Native(nativeIndex)
       }
-      return nil
+      return .None
     case .Cocoa(let cocoaStorage):
 #if _runtime(_ObjC)
       let anyObjectKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
       if let cocoaIndex = cocoaStorage.indexForKey(anyObjectKey) {
         return ._Cocoa(cocoaIndex)
       }
-      return nil
+      return .None
 #else
       _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
@@ -3146,7 +3146,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
     if let anyObjectValue = cocoaStorage.maybeGet(anyObjectKey) {
       return _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
     }
-    return nil
+    return .None
   }
 #endif
 
@@ -3290,7 +3290,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
     // Fast path: if the key is not present, we will not mutate the set,
     // so don't force unique storage.
     if !found {
-      return nil
+      return .None
     }
 
     let (reallocated, capacityChanged) =
@@ -3383,7 +3383,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
 #if _runtime(_ObjC)
       let anyObjectKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
       if cocoaStorage.maybeGet(anyObjectKey) == nil {
-        return nil
+        return .None
       }
       migrateDataToNativeStorage(cocoaStorage)
       return nativeRemoveObjectForKey(key)
@@ -3808,7 +3808,7 @@ final internal class _Cocoa${Self}Generator : GeneratorType {
 
   internal func next() -> Element? {
     if itemIndex < 0 {
-      return nil
+      return .None
     }
     let cocoa${Self} = self.cocoa${Self}
     if itemIndex == itemCount {
@@ -3823,7 +3823,7 @@ final internal class _Cocoa${Self}Generator : GeneratorType {
         count: stackBufLength)
       if itemCount == 0 {
         itemIndex = -1
-        return nil
+        return .None
       }
       itemIndex = 0
     }
@@ -3912,7 +3912,7 @@ public struct ${Self}Generator<${TypeParametersDecl}> : GeneratorType {
     switch _state {
     case ._Native(let startIndex, let endIndex, let owner):
       if startIndex == endIndex {
-        return nil
+        return .None
       }
       let result = startIndex.nativeStorage.assertingGet(startIndex)
       _state =
@@ -3948,7 +3948,7 @@ public struct ${Self}Generator<${TypeParametersDecl}> : GeneratorType {
         return (nativeKey, nativeValue)
       }
 %end
-      return nil
+      return .None
 #else
       _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
@@ -4009,7 +4009,7 @@ internal class ${Self}Mirror<${TypeParametersDecl}> : _MirrorType {
 
   internal var valueType: Any.Type { return (_mirror as Any).dynamicType }
 
-  internal var objectIdentifier: ObjectIdentifier? { return nil }
+  internal var objectIdentifier: ObjectIdentifier? { return .None }
 
   internal var count: Int { return _mirror.count }
 
@@ -4044,7 +4044,7 @@ internal class ${Self}Mirror<${TypeParametersDecl}> : _MirrorType {
 %end
   }
 
-  internal var quickLookObject: PlaygroundQuickLook? { return nil }
+  internal var quickLookObject: PlaygroundQuickLook? { return .None }
 
 %if Self == 'Set':
   internal var disposition: _MirrorDisposition { return .MembershipContainer }
@@ -4118,7 +4118,7 @@ extension ${Self} {
   ///
   /// - Complexity: Amortized O(1)
   public mutating func popFirst() -> Element? {
-    guard !isEmpty else { return nil }
+    guard !isEmpty else { return .None }
     return removeAtIndex(startIndex)
   }
 }
@@ -4157,7 +4157,7 @@ extension ${Self} {
       return ${Self}<${TypeParameters}>(_nativeStorageOwner: nativeOwner)
     }
     // FIXME: what if `s` is native storage, but for different key/value type?
-    return nil
+    return .None
   }
 }
 #endif

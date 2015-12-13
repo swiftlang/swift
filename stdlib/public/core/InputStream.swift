@@ -26,7 +26,7 @@ public func readLine(stripNewline stripNewline: Bool = true) -> String? {
   var linePtr: UnsafeMutablePointer<CChar> = nil
   var readBytes = swift_stdlib_readLine_stdin(&linePtr)
   if readBytes == -1 {
-    return nil
+    return .None
   }
   _sanityCheck(readBytes >= 0,
     "unexpected return value from swift_stdlib_readLine_stdin")

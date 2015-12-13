@@ -341,7 +341,7 @@ internal class _ForwardIndexBox<
       // the same type.
       return unsafeBitCast(base, T.self)
     }
-    return nil
+    return .None
   }
 
   var typeID: ObjectIdentifier { return _typeID(self) }

@@ -47,7 +47,7 @@ public struct JoinGenerator<
           _state = .GeneratingElements
         } else {
           _state = .End
-          return nil
+          return .None
         }
 
       case .GeneratingElements:
@@ -59,13 +59,13 @@ public struct JoinGenerator<
           _inner = _base.next()?.generate()
           if _inner == nil {
             _state = .End
-            return nil
+            return .None
           }
         } else {
           _inner = _base.next()?.generate()
           if _inner == nil {
             _state = .End
-            return nil
+            return .None
           }
           _separator = _separatorData.generate()
           _state = .GeneratingSeparator
@@ -79,7 +79,7 @@ public struct JoinGenerator<
         _state = .GeneratingElements
 
       case .End:
-        return nil
+        return .None
 
       }
     }

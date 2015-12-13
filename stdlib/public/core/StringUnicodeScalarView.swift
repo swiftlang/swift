@@ -44,7 +44,7 @@ extension String {
       }
       mutating func next() -> UTF16.CodeUnit? {
         if idx == core.endIndex {
-          return nil
+          return .None
         }
         return self.core[idx++]
       }
@@ -188,7 +188,7 @@ extension String {
         case .Result(let us):
           return us
         case .EmptyInput:
-          return nil
+          return .None
         case .Error:
           return UnicodeScalar(0xfffd)
         }

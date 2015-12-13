@@ -947,7 +947,7 @@ extension UTF16 {
         break loop
       case .Error:
         if !repairIllFormedSequences {
-          return nil
+          return .None
         }
         isAscii = false
         count += width(UnicodeScalar(0xfffd))

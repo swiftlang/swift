@@ -192,7 +192,7 @@ struct _UIViewMirror : _MirrorType {
   var quickLookObject: PlaygroundQuickLook? {
       // iOS 7 or greater only
       
-      var result: PlaygroundQuickLook? = nil
+      var result: PlaygroundQuickLook? = .None
       
       switch _UIViewMirror._views.member(_v) {
         case nil:
@@ -201,7 +201,7 @@ struct _UIViewMirror : _MirrorType {
           let bounds = _v.bounds
           // in case of an empty rectangle abort the logging
           if (bounds.size.width == 0) || (bounds.size.height == 0) {
-            return nil
+            return .None
           }
       
           UIGraphicsBeginImageContextWithOptions(bounds.size, false, 0.0)

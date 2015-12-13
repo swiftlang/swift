@@ -91,7 +91,7 @@ internal struct _ArrayTypeMirror<
 
   var valueType: Any.Type { return (_value as Any).dynamicType }
 
-  var objectIdentifier: ObjectIdentifier? { return nil }
+  var objectIdentifier: ObjectIdentifier? { return .None }
 
   var count: Int { return _value.count }
 
@@ -105,7 +105,7 @@ internal struct _ArrayTypeMirror<
     return "\(count) elements"
   }
 
-  var quickLookObject: PlaygroundQuickLook? { return nil }
+  var quickLookObject: PlaygroundQuickLook? { return .None }
 
   var disposition: _MirrorDisposition { return .IndexContainer }
 }

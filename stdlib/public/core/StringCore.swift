@@ -244,7 +244,7 @@ public struct _StringCore {
         unsafeBitCast($0, _StringBuffer.self)
       }
     }
-    return nil
+    return .None
   }
 
 #if _runtime(_ObjC)
@@ -255,7 +255,7 @@ public struct _StringCore {
         unsafeBitCast($0, _CocoaStringType.self)
       }
     }
-    return nil
+    return .None
   }
 #endif
 

@@ -63,7 +63,7 @@ internal struct _BitMirror : _MirrorType {
 
   var valueType: Any.Type { return (_value as Any).dynamicType }
 
-  var objectIdentifier: ObjectIdentifier? { return nil }
+  var objectIdentifier: ObjectIdentifier? { return .None }
 
   var count: Int { return 0 }
 
@@ -78,7 +78,7 @@ internal struct _BitMirror : _MirrorType {
     }
   }
 
-  var quickLookObject: PlaygroundQuickLook? { return nil }
+  var quickLookObject: PlaygroundQuickLook? { return .None }
 
   var disposition: _MirrorDisposition { return .Enum }
 }

@@ -294,7 +294,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
     if _fastPath(isUniquelyReferenced() && capacity >= minimumCapacity) {
       return self
     }
-    return nil
+    return .None
   }
 
   @warn_unused_result

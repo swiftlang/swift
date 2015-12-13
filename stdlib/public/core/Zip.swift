@@ -45,12 +45,12 @@ public struct Zip2Generator<
     // first sequence, even though next() had already returned nil.
 
     if _reachedEnd {
-      return nil
+      return .None
     }
 
     guard let element0 = _baseStreams.0.next(), element1 = _baseStreams.1.next() else {
       _reachedEnd = true
-      return nil
+      return .None
     }
 
     return (element0, element1)

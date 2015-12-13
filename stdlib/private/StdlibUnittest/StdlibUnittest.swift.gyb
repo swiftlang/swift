@@ -422,7 +422,7 @@ func _stdlib_getline() -> String? {
     let c = getchar()
     if c == EOF {
       if result.isEmpty {
-        return nil
+        return .None
       }
       return String._fromWellFormedCodeUnitSequence(UTF8.self, input: result)
     }
@@ -2506,7 +2506,7 @@ public struct MinimalGenerator<T> : GeneratorType {
         expectUnreachable("next() was called on a consumed generator")
       }
       ++_privateState.returnedNilCounter
-      return nil
+      return .None
     }
     return _sharedState.data[_sharedState.i++]
   }
@@ -2853,7 +2853,7 @@ internal func _expectCompatibleIndices<Index : _MinimalIndexType>(
   // to elements that persisted from the same state.
 
   func getLastMutatedStateId(i: Index) -> Int? {
-    guard let state = i._collectionState else { return nil }
+    guard let state = i._collectionState else { return .None }
     let offset = i._offset
     if offset == state._elementsLastMutatedStateIds.endIndex {
       return state._id

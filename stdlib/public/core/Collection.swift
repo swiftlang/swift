@@ -101,7 +101,7 @@ public struct IndexingGenerator<Elements : Indexable>
   ///
   /// - Requires: No preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> Elements._Element? {
-    if _position == _elements.endIndex { return nil }
+    if _position == _elements.endIndex { return .None }
     let element = _elements[_position]
     _position._successorInPlace()
     return element
@@ -229,7 +229,7 @@ extension CollectionType where SubSequence == Self {
   /// - Complexity: O(`self.count`)
   @warn_unused_result
   public mutating func popFirst() -> Generator.Element? {
-    guard !isEmpty else { return nil }
+    guard !isEmpty else { return .None }
     let element = first!
     self = self[startIndex.successor()..<endIndex]
     return element
@@ -241,7 +241,7 @@ extension CollectionType where SubSequence == Self {
   /// - Complexity: O(`self.count`)
   @warn_unused_result
   public mutating func popLast() -> Generator.Element? {
-    guard !isEmpty else { return nil }
+    guard !isEmpty else { return .None }
     let lastElementIndex = startIndex.advancedBy(numericCast(count) - 1)
     let element = self[lastElementIndex]
     self = self[startIndex..<lastElementIndex]
@@ -294,7 +294,7 @@ extension CollectionType {
   @warn_unused_result
   public // dispatching
   func _customIndexOfEquatableElement(_: Generator.Element) -> Index?? {
-    return nil
+    return .None
   }
 }
 
@@ -687,7 +687,7 @@ extension MutableCollectionType {
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     @noescape body: (UnsafeMutablePointer<Generator.Element>, Int) throws -> R
   ) rethrows -> R? {
-    return nil
+    return .None
   }
 
   public subscript(bounds: Range<Index>) -> MutableSlice<Self> {

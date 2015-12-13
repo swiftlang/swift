@@ -315,7 +315,7 @@ func _getBridgedNonVerbatimObjectiveCType<T>(_: T.Type) -> Any.Type?
 
 @_transparent
 internal var _nilNativeObject: AnyObject? {
-  return nil
+  return .None
 }
 
 /// A mutable pointer-to-ObjC-pointer argument.

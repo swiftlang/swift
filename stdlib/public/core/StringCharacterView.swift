@@ -242,7 +242,7 @@ extension String.CharacterView : CollectionType {
 
     var valueType: Any.Type { return (_value as Any).dynamicType }
 
-    var objectIdentifier: ObjectIdentifier? { return nil }
+    var objectIdentifier: ObjectIdentifier? { return .None }
 
     var disposition: _MirrorDisposition { return .Aggregate }
 
