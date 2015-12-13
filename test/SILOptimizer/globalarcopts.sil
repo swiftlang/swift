@@ -677,7 +677,7 @@ bb2:
 // Double Hammock //
 ////////////////////
 
-// Make sure we do not do anything in the presense of double partial
+// Make sure we do not do anything in the presence of double partial
 // applies. This is due to issues related to the two branches of the two
 // diamonds not being control dependent.
 // CHECK-LABEL: sil @double_hammock1 : $@convention(thin) (@box Builtin.Int32) -> () {
