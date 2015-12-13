@@ -261,7 +261,7 @@ static llvm::Optional<unsigned>
 cheaperToPassOperandsAsArguments(SILInstruction *First,
                                  SILInstruction *Second) {
   // This will further enable to sink strong_retain_unowned instructions,
-  // which provides more opportinities for the unowned-optimization in
+  // which provides more opportunities for the unowned-optimization in
   // LLVMARCOpts.
   UnownedToRefInst *UTORI1 = dyn_cast<UnownedToRefInst>(First);
   UnownedToRefInst *UTORI2 = dyn_cast<UnownedToRefInst>(Second);
