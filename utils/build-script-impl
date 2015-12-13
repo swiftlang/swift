@@ -1000,13 +1000,14 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
               SWIFT_TEST_TARGETS=(
                  "${SWIFT_TEST_TARGETS[@]}" "check-swift-all-optimize-${deployment_target}")
             fi
-
         fi
     fi
 done
 
 echo "Building the standard library for: ${SWIFT_STDLIB_TARGETS[@]}"
-echo "Running Swift tests for: ${SWIFT_TEST_TARGETS[@]}"
+if [[ "${SWIFT_TEST_TARGETS[@]}" ]] && ! [[ "${SKIP_TEST_SWIFT}" ]]; then
+    echo "Running Swift tests for: ${SWIFT_TEST_TARGETS[@]}"
+fi
 echo
 
 # CMake options used for all targets, including LLVM/Clang
