@@ -67,7 +67,7 @@ Reflection.test("Dictionary") {
   expected += "    - .0: Four\n"
   expected += "    - .1: 4\n"
 #else
-  fatalError("unipmelemented")
+  fatalError("unimplemented")
 #endif
 
   expectEqual(expected, output)
