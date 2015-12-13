@@ -2,7 +2,7 @@
 
 // We used to crash on this when trying to devirtualize a.doSomething(),
 // because a is A<Int> and B is a subclass of A<String>, but not a 
-// subclass A<Int>. And we were not filtring the results of the
+// subclass A<Int>. And we were not filtering the results of the
 // ClassHierarchyAnalysis to handle such cases properly and
 // as a result, we were trying to cast A<Int> into B, which is
 // impossible.
