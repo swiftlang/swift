@@ -3084,7 +3084,7 @@ void Serializer::writeType(Type ty) {
       if (auto arche = dyn_cast<ArchetypeType>(next.getPointer())) {
         auto genericParams = generic->getDecl()->getGenericParams();
         unsigned idx = 0;
-        // Check if next exisits in the Decl.
+        // Check if next exists in the Decl.
         for (auto archetype : genericParams->getAllArchetypes()) {
           if (archetype == arche) {
             found = true;
