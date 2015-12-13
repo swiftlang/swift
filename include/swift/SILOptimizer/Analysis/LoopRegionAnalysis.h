@@ -717,7 +717,7 @@ class LoopRegionFunctionInfo {
 
   /// A map from an unsigned integer ID to a region.
   ///
-  /// *WARNING* Before modifying the initializiation of this field of the data
+  /// *WARNING* Before modifying the initialization of this field of the data
   /// structure please read the comment below:
   ///
   /// We assign IDs to BBs, Loops, and the top level Function, so that we can
