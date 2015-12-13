@@ -70,7 +70,7 @@ to all three of the components.
 
   .. image:: ArrayImplementation.png
 
-* ``Slice<T>`` is a subrange of some ``Array<T>`` or
+* ``Slice<T>`` is a sub-range of some ``Array<T>`` or
   ``ContiguousArray<T>``; it's the result of using slice notation,
   e.g. ``a[7...21]`` on any Swift array ``a``.  A slice always has
   contiguous storage and "C array" performance.  Slicing an
