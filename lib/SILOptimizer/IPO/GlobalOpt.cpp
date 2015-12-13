@@ -429,7 +429,7 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
       while (Node) {
         SILBasicBlock *DomParentBB = Node->getBlock();
         if (isAvailabilityCheck(DomParentBB)) {
-          DEBUG(llvm::dbgs() << "  don't hoist above availibility check at bb" <<
+          DEBUG(llvm::dbgs() << "  don't hoist above availability check at bb" <<
                 DomParentBB->getDebugID() << "\n");
           break;
         }

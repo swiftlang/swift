@@ -297,7 +297,7 @@ bb0(%0 : $*T, %1 : $C):
 
 
 // Everything in this function should get devirtualized, inlined and folded together,
-// because neither this function nor any of its callees are anootated to be
+// because neither this function nor any of its callees are annotated to be
 // excuded from the optimization.
 // CHECK-LABEL: sil @_TF14optimize_never4boo3FCS_1CVs5Int32
 // CHECK: bb0
@@ -347,7 +347,7 @@ bb0(%0 : $Int32, %1 : $C):
 
 
 // Everything in this function should get devirtualized and inlined,
-// because neither this function nor any of its callees are anootated to be
+// because neither this function nor any of its callees are annotated to be
 // excuded from the optimization.
 // CHECK-LABEL: sil @_TF14optimize_never4boo4FCS_1CVs5Int32
 // CHECK: bb0

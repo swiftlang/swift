@@ -684,7 +684,7 @@ bool CopyForwarding::forwardPropagateCopy(
 
     AnalyzeForwardUse AnalyzeUse(CopyDest);
     bool seenDeinit = AnalyzeUse.visit(UserInst);
-    // If this use cannot be anlayzed, then abort.
+    // If this use cannot be analyzed, then abort.
     if (!AnalyzeUse.Oper)
       return false;
     // Otherwise record the operand.
@@ -760,7 +760,7 @@ bool CopyForwarding::backwardPropagateCopy(
 
     AnalyzeBackwardUse AnalyzeUse(CopySrc);
     seenInit = AnalyzeUse.visit(UserInst);
-    // If this use cannot be anlayzed, then abort.
+    // If this use cannot be analyzed, then abort.
     if (!AnalyzeUse.Oper)
       return false;
     // Otherwise record the operand.
