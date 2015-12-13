@@ -210,7 +210,7 @@ func testTuples() {
   // CHECK: tuple_element_addr                                       {{.*}} line:[[@LINE-9]]:16  
 }
 
-// Test tuple emploding/exploding.
+// Test tuple imploding/exploding.
 protocol Ordinable {
   func ord() -> Int
 }
