@@ -366,7 +366,7 @@ bb4(%20 : $Builtin.Int1):                         // Preds: bb1 bb2 bb3
 sil @external_f :  $@convention(thin) () -> ()
 
 // Check that switch_enum to select_enum conversion does not
-// take place in a peresence of side-effects.
+// take place in a presence of side-effects.
 // CHECK-LABEL: simplify_switch_to_select_enum_with_side_effects
 sil @simplify_switch_to_select_enum_with_side_effects : $@convention(thin) (X) -> Int32 {
 bb0(%0 : $X):
