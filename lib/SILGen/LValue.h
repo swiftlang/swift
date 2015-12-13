@@ -53,7 +53,7 @@ struct LValueTypeData {
   /// On physical path components, projection yields an address of
   /// this type.  On logical path components, materialize yields an
   /// address of this type, set expects a value of this type, and
-  /// get yields a vlaue of this type.
+  /// get yields a value of this type.
   SILType TypeOfRValue;
 
   LValueTypeData() = default;
