@@ -44,7 +44,7 @@ STATISTIC(NumSROAArguments, "Number of aggregate argument levels split by "
 //                             CFG Simplification
 //===----------------------------------------------------------------------===//
 
-/// dominatorBasedSimplify iterates between dominator based simplifation of
+/// dominatorBasedSimplify iterates between dominator based simplification of
 /// terminator branch condition values and cfg simplification. This is the
 /// maximum number of iterations we run. The number is the maximum number of
 /// iterations encountered when compiling the stdlib on April 2 2015.
