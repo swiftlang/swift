@@ -779,7 +779,7 @@ SILValue RLEContext::computePredecessorCoveringValue(SILBasicBlock *BB,
     return SILValue();
 
   // At this point, we know this LSLocation has available value and we also
-  // know we can forward a SILValue from every predecesor. It is safe to
+  // know we can forward a SILValue from every predecessor. It is safe to
   // insert the basic block argument.
   BlockState &Forwarder = getBlockState(BB);
   SILValue TheForwardingValue = BB->createBBArg(L.getType());
