@@ -1566,7 +1566,7 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
   // are mutating the base expression.  We also need to visit the index
   // expressions as loads though.
   if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
-    // The index of the subscript is evaluted as an rvalue.
+    // The index of the subscript is evaluated as an rvalue.
     SE->getIndex()->walk(*this);
     if (SE->hasDecl())
       markBaseOfAbstractStorageDeclStore(SE->getBase(), SE->getDecl());
