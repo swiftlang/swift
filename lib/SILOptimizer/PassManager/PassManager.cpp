@@ -389,7 +389,7 @@ SILPassManager::~SILPassManager() {
   for (auto T : Transformations)
     delete T;
 
-  // delete the analyis.
+  // delete the analysis.
   for (auto A : Analysis) {
     Mod->removeDeleteNotificationHandler(A);
     assert(!A->isLocked() &&

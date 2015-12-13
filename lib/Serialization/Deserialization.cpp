@@ -1486,7 +1486,7 @@ Module *ModuleFile::getModule(ArrayRef<Identifier> name) {
 }
 
 
-/// Translate from the Serialization assocativity enum values to the AST
+/// Translate from the Serialization associativity enum values to the AST
 /// strongly-typed enum.
 ///
 /// The former is guaranteed to be stable, but may not reflect this version of
