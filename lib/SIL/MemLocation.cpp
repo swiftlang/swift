@@ -35,13 +35,9 @@ void SILValueProjection::print() const {
   llvm::outs() << Path.getValue();
 }
 
-//===----------------------------------------------------------------------===//
-//                              Load Store Value
-//===----------------------------------------------------------------------===//
-
-SILValue LoadStoreValue::createExtract(SILValue Base,
-                                       Optional<ProjectionPath> &Path,
-                                       SILInstruction *Inst) {
+SILValue SILValueProjection::createExtract(SILValue Base,
+                                           Optional<ProjectionPath> &Path,
+                                           SILInstruction *Inst, bool IsValExt) {
   // If we found a projection path, but there are no projections, then the two
   // loads must be the same, return PrevLI.
   if (!Path || Path->empty())
@@ -54,13 +50,24 @@ SILValue LoadStoreValue::createExtract(SILValue Base,
 
   // Construct the path!
   for (auto PI = Path->rbegin(), PE = Path->rend(); PI != PE; ++PI) {
+    if (IsValExt) {
+      LastExtract =
+          PI->createValueProjection(Builder, Inst->getLoc(), LastExtract).get();
+      continue;
+    }
     LastExtract =
-        PI->createValueProjection(Builder, Inst->getLoc(), LastExtract).get();
-    continue;
+        PI->createAddrProjection(Builder, Inst->getLoc(), LastExtract).get();
   }
+
   // Return the last extract we created.
   return LastExtract;
 }
+
+
+
+//===----------------------------------------------------------------------===//
+//                              Load Store Value
+//===----------------------------------------------------------------------===//
 
 void LoadStoreValue::expand(SILValue Base, SILModule *M,
                             LoadStoreValueList &Vals,

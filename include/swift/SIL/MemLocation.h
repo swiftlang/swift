@@ -190,6 +190,10 @@ public:
   }
 
   virtual void print() const;
+
+  /// Create a path of ValueProjection with the given VA and Path.
+  static SILValue createExtract(SILValue VA, Optional<ProjectionPath> &Path,
+                                SILInstruction *Inst, bool IsValExt);
 };
 
 //===----------------------------------------------------------------------===//
@@ -271,10 +275,6 @@ class LoadStoreValue : public SILValueProjection {
   /// materialize the value.
   bool IsCoveringValue;
 
-  /// Create a path of ValueProjection with the given VA and Path.
-  SILValue createExtract(SILValue VA, Optional<ProjectionPath> &Path,
-                         SILInstruction *Inst);
-
 public:
   /// Constructors.
   LoadStoreValue() : SILValueProjection(), IsCoveringValue(false) {}
@@ -343,7 +343,7 @@ public:
   SILValue materialize(SILInstruction *Inst) {
     if (IsCoveringValue)
       return SILValue();
-    return createExtract(Base, Path, Inst);
+    return SILValueProjection::createExtract(Base, Path, Inst, true);
   }
 
   void print() const {

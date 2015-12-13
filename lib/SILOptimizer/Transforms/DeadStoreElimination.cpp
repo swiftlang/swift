@@ -384,11 +384,6 @@ class DSEContext {
   /// NOTE: Adds the location to the location vault if necessary.
   unsigned getMemLocationBit(const MemLocation &L);
 
-  /// Create the value or address extraction based on the give Base and
-  /// projection path.
-  SILValue createExtract(SILValue Base, Optional<ProjectionPath> &Path,
-                         SILInstruction *Inst, bool IsValExtract);
-
 public:
   /// Constructor.
   DSEContext(SILFunction *F, SILModule *M, SILPassManager *PM,
@@ -737,8 +732,8 @@ void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
     // We merely setup the remain live stores, but do not materialize in IR yet,
     // These stores will be materialized when before the algorithm exits.
     for (auto &X : Alives) {
-      SILValue Value = createExtract(Val, X.getPath(), I, true);
-      SILValue Addr = createExtract(Mem, X.getPath(), I, false);
+      SILValue Value = SILValueProjection::createExtract(Val, X.getPath(), I, true);
+      SILValue Addr = SILValueProjection::createExtract(Mem, X.getPath(), I, false);
       S->LiveStores[Addr] = Value;
     }
 
@@ -822,33 +817,6 @@ void DSEContext::processInstruction(SILInstruction *I, DSEComputeKind Kind) {
   invalidateMemLocationBase(I, Kind);
 }
 
-SILValue DSEContext::createExtract(SILValue Base,
-                                   Optional<ProjectionPath> &Path,
-                                   SILInstruction *Inst, bool IsValExt) {
-  // If we found a projection path, but there are no projections, then the two
-  // loads must be the same, return PrevLI.
-  if (!Path || Path->empty())
-    return Base;
-
-  // Ok, at this point we know that we can construct our aggregate projections
-  // from our list of address projections.
-  SILValue LastExtract = Base;
-  SILBuilder Builder(Inst);
-
-  // Construct the path!
-  for (auto PI = Path->rbegin(), PE = Path->rend(); PI != PE; ++PI) {
-    if (IsValExt) {
-      LastExtract =
-          PI->createValueProjection(Builder, Inst->getLoc(), LastExtract).get();
-      continue;
-    }
-    LastExtract =
-        PI->createAddrProjection(Builder, Inst->getLoc(), LastExtract).get();
-  }
-
-  // Return the last extract we created.
-  return LastExtract;
-}
 
 void DSEContext::run() {
   // Walk over the function and find all the locations accessed by
