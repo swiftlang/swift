@@ -20,7 +20,7 @@
 self_path=$0
 
 tool="$DEVELOPER_DIR/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-stdlib-tool"
-if [[ ! -fx "$tool" ]]; then
+if [ ! -f "$tool" -o ! -x "$tool" ]; then
     echo "$self_path: error: couldn't find swift-stdlib-tool at $tool"
     exit 1
 fi
@@ -66,7 +66,7 @@ else
     bindir=`dirname "$self_path"`
     usrdir=`dirname "$bindir"`
     source_libraries="$usrdir/lib/swift/$platform"
-    if [[ ! -dx "$source_libraries" ]]; then
+    if [ ! -d "$source_libraries" -o ! -x "$source_libraries" ]; then
         echo "$self_path: error: platform path inaccessible: $source_libraries"
         exit 1
     fi
