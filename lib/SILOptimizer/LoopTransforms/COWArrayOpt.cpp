@@ -1806,7 +1806,7 @@ private:
   // We have a safe container if the array container is passed as a function
   // argument by-value or by inout reference. In either case there can't be an
   // alias of the container. Alternatively, we can have a local variable. We
-  // will check in checkSafeArrayAddressUses that all intialization stores to
+  // will check in checkSafeArrayAddressUses that all initialization stores to
   // this variable are safe (i.e the store dominates the loop etc).
   bool isSafeArrayContainer(SILValue V) {
     if (auto *Arg = dyn_cast<SILArgument>(V.getDef())) {
