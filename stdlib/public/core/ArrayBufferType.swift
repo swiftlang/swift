@@ -35,7 +35,7 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// If this buffer is backed by a uniquely-referenced mutable
   /// `_ContiguousArrayBuffer` that can be grown in-place to allow the `self`
   /// buffer store `minimumCapacity` elements, returns that buffer.
-  /// Otherwise, returns nil.
+  /// Otherwise, returns `nil`.
   ///
   /// - Note: The result's firstElementAddress may not match ours, if we are a
   ///   _SliceBuffer.
