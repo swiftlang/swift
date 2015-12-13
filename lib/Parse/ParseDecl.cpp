@@ -4249,6 +4249,7 @@ ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       // Handle the likely case someone typed 'case X, case Y'.
       if (Tok.is(tok::kw_case) && CommaLoc.isValid()) {
         diagnose(Tok, diag::expected_identifier_after_case_comma);
+        Status.setIsParseError();
         return Status;
       }
       
