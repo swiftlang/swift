@@ -56,7 +56,8 @@ public struct Zip2Generator<
     return (element1, element2)
   }
 
-  internal var _baseStream1: Generator1, _baseStream2: Generator2
+  internal var _baseStream1: Generator1
+  internal var _baseStream2: Generator2
   internal var _reachedEnd: Bool = false
 }
 
@@ -88,7 +89,8 @@ public struct Zip2Sequence<Sequence1 : SequenceType, Sequence2 : SequenceType>
       _sequence2.generate())
   }
 
-  internal let _sequence1: Sequence1, _sequence2: Sequence2
+  internal let _sequence1: Sequence1
+  internal let _sequence2: Sequence2
 }
 
 @available(*, unavailable, renamed="Zip2Generator")
