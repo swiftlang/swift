@@ -3450,7 +3450,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
                                 NormalProtocolConformance *conformance) {
           auto proto = conformance->getProtocol();
           tc.diagnose(failedDefaultedAssocType,
-                      diag::default_assocated_type_req_fail,
+                      diag::default_associated_type_req_fail,
                       failedDefaultedWitness,
                       failedDefaultedAssocType->getFullName(),
                       proto->getDeclaredType(),
