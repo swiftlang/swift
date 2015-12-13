@@ -132,7 +132,7 @@ namespace swift {
     static void verifyFunction(SILFunction *F);
   };
 
-  /// An abstract base class that implements the boiler plate of cacheing and
+  /// An abstract base class that implements the boiler plate of caching and
   /// invalidating analysis for specific functions.
   template<typename AnalysisTy>
   class FunctionAnalysisBase : public SILAnalysis {
