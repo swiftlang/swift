@@ -62,6 +62,60 @@ SILValue LoadStoreValue::createExtract(SILValue Base,
   return LastExtract;
 }
 
+void LoadStoreValue::expand(SILValue Base, SILModule *M,
+                            LoadStoreValueList &Vals,
+                            TypeExpansionAnalysis *TE) {
+  // To expand a LoadStoreValue to its indivisible parts, we first get the
+  // address projection paths from the accessed type to each indivisible field,
+  // i.e. leaf nodes, then we append these projection paths to the Base.
+  for (const auto &P : TE->getTypeExpansionProjectionPaths(Base.getType(), M,
+                                                           TEKind::TELeaf)) {
+    Vals.push_back(LoadStoreValue(Base, P.getValue()));
+  }
+}
+
+void
+LoadStoreValue::enumerateLoadStoreValue(SILModule *M, SILValue Val,
+                                        std::vector<LoadStoreValue> &Vault,
+                                        LoadStoreValueIndexMap &ValToBit,
+                                        TypeExpansionAnalysis *TE) {
+  // Expand the given Mem into individual fields and add them to the
+  // locationvault.
+  LoadStoreValueList Vals;
+  LoadStoreValue::expand(Val, M, Vals, TE);
+  for (auto &Val : Vals) {
+    ValToBit[Val] = Vault.size();
+    Vault.push_back(Val);
+  }
+}
+
+void LoadStoreValue::enumerateLoadStoreValues(SILFunction &F, 
+                                              std::vector<LoadStoreValue> &Vault,
+                                              LoadStoreValueIndexMap &ValToBit,
+                                              TypeExpansionAnalysis *TE) {
+  // Enumerate all LoadStoreValues created or used by the loads or stores.
+  //
+  // TODO: process more instructions as we process more instructions in
+  // processInstruction.
+  //
+  SILValue Op;
+  for (auto &B : F) {
+    for (auto &I : B) {
+      if (auto *LI = dyn_cast<LoadInst>(&I)) {
+        enumerateLoadStoreValue(&I.getModule(), SILValue(LI), Vault, ValToBit,
+                                TE);
+      } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
+        enumerateLoadStoreValue(&I.getModule(), SI->getSrc(), Vault, ValToBit,
+                                TE);
+      }
+    }
+  }
+
+  // Lastly, push in the covering value LoadStoreValue.
+  ValToBit[LoadStoreValue(true)] = Vault.size();
+  Vault.push_back(LoadStoreValue(true));
+}
+
 //===----------------------------------------------------------------------===//
 //                                  Memory Location
 //===----------------------------------------------------------------------===//
@@ -159,25 +213,6 @@ void MemLocation::reduce(MemLocation &Base, SILModule *M, MemLocationSet &Locs,
         Locs.erase(X);
       Locs.insert(*I);
     }
-  }
-}
-
-void MemLocation::expandWithValues(MemLocation &Base, SILValue &Val,
-                                   SILModule *M, MemLocationList &Locs,
-                                   LoadStoreValueList &Vals,
-                                   TypeExpansionAnalysis *TE) {
-  // To expand a memory location to its indivisible parts, we first get the
-  // projection paths from the accessed type to each indivisible field, i.e.
-  // leaf nodes, then we append these projection paths to the Base.
-  //
-  // Construct the MemLocation and LoadStoreValues by appending the projection
-  // path
-  // from the accessed node to the leaf nodes.
-  ProjectionPath &BasePath = Base.getPath().getValue();
-  for (const auto &P : TE->getTypeExpansionProjectionPaths(Base.getType(), M,
-                                                           TEKind::TELeaf)) {
-    Locs.push_back(MemLocation(Base.getBase(), P.getValue(), BasePath));
-    Vals.push_back(LoadStoreValue(Val, P.getValue()));
   }
 }
 

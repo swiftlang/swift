@@ -199,17 +199,15 @@ class BlockState {
   }
 
   /// Merge in the state of an individual predecessor.
-  void mergePredecessorState(BlockState &OtherState);
+  void mergePredecessorState(RLEContext &Ctx, BlockState &OtherState);
 
   /// MemLocation read has been extracted, expanded and mapped to the bit
   /// position in the bitvector. process it using the bit position.
-  void updateForwardSetForRead(RLEContext &Ctx, unsigned Bit,
-                               LoadStoreValue Val);
+  void updateForwardSetForRead(RLEContext &Ctx, unsigned LBit, unsigned VBit);
 
   /// MemLocation written has been extracted, expanded and mapped to the bit
   /// position in the bitvector. process it using the bit position.
-  void updateForwardSetForWrite(RLEContext &Ctx, unsigned Bit,
-                                LoadStoreValue Val);
+  void updateForwardSetForWrite(RLEContext &Ctx, unsigned LBit, unsigned VBit);
 
   /// There is a read to a MemLocation, expand the MemLocation into individual
   /// fields before processing them.
@@ -223,9 +221,9 @@ class BlockState {
 
   /// BitVector manipulation functions.
   void clearMemLocations();
-  void startTrackingMemLocation(unsigned bit, LoadStoreValue Val);
+  void startTrackingMemLocation(unsigned bit, unsigned VBit);
   void stopTrackingMemLocation(unsigned bit);
-  void updateTrackedMemLocation(unsigned bit, LoadStoreValue Val);
+  void updateTrackedMemLocation(unsigned bit, unsigned VBit);
   bool isTrackingMemLocation(unsigned bit);
 
 public:
@@ -299,6 +297,9 @@ namespace {
 /// This class stores global state that we use when computing redudant load and
 /// their replacement in each basic block.
 class RLEContext {
+  /// Function currently processing.
+  SILFunction *Fn;
+
   /// The alias analysis that we will use during all computations.
   AliasAnalysis *AA;
 
@@ -317,6 +318,15 @@ class RLEContext {
   /// Contains a map between MemLocation to their index in the MemLocationVault.
   /// Use for fast lookup.
   llvm::DenseMap<MemLocation, unsigned> LocToBitIndex;
+
+  /// Keeps all the loadstorevalues for the current function. The BitVector in
+  /// each BBState is then laid on top of it to keep track of which MemLocation
+  /// has a downward available value.
+  std::vector<LoadStoreValue> LoadStoreValueVault;
+
+  /// Contains a map between MemLocation to their index in the MemLocationVault.
+  /// Use for fast lookup.
+  llvm::DenseMap<LoadStoreValue, unsigned> ValToBitIndex;
 
   /// A map from each BasicBlock to its BlockState.
   llvm::SmallDenseMap<SILBasicBlock *, BlockState, 4> BBToLocState;
@@ -349,6 +359,12 @@ public:
 
   /// Given the bit, get the MemLocation from the MemLocationVault.
   MemLocation &getMemLocation(const unsigned index);
+
+  /// Get the bit representing the LoadStoreValue in the LoadStoreValueVault.
+  unsigned getLoadStoreValueBit(const LoadStoreValue &L);
+
+  /// Given the bit, get the LoadStoreValue from the LoadStoreValueVault.
+  LoadStoreValue &getLoadStoreValue(const unsigned index);
 
   /// Go to the predecessors of the given basic block, compute the value
   /// for the given MemLocation.
@@ -387,13 +403,13 @@ void BlockState::clearMemLocations() {
   ForwardValIn.clear();
 }
 
-void BlockState::startTrackingMemLocation(unsigned bit, LoadStoreValue Val) {
+void BlockState::startTrackingMemLocation(unsigned bit, unsigned VBit) {
   ForwardSetIn.set(bit);
-  ForwardValIn[bit] = Val;
+  ForwardValIn[bit] = VBit;
 }
 
-void BlockState::updateTrackedMemLocation(unsigned bit, LoadStoreValue Val) {
-  ForwardValIn[bit] = Val;
+void BlockState::updateTrackedMemLocation(unsigned bit, unsigned VBit) {
+  ForwardValIn[bit] = VBit;
 }
 
 SILValue BlockState::computeForwardingValues(RLEContext &Ctx, MemLocation &L,
@@ -470,22 +486,22 @@ bool BlockState::setupRLE(RLEContext &Ctx, SILInstruction *I, SILValue Mem) {
   return true;
 }
 
-void BlockState::updateForwardSetForRead(RLEContext &Ctx, unsigned bit,
-                                      LoadStoreValue Val) {
+void BlockState::updateForwardSetForRead(RLEContext &Ctx, unsigned LBit,
+                                         unsigned VBit) {
   // If there is already an available value for this location, use
   // the existing value.
-  if (isTrackingMemLocation(bit))
+  if (isTrackingMemLocation(LBit))
     return;
 
   // Track the new location and value.
-  startTrackingMemLocation(bit, Val);
+  startTrackingMemLocation(LBit, VBit);
 }
 
-void BlockState::updateForwardSetForWrite(RLEContext &Ctx, unsigned bit,
-                                       LoadStoreValue Val) {
+void BlockState::updateForwardSetForWrite(RLEContext &Ctx, unsigned LBit,
+                                          unsigned VBit) {
   // This is a store. Invalidate any Memlocation that this location may
   // alias, as their value can no longer be forwarded.
-  MemLocation &R = Ctx.getMemLocation(bit);
+  MemLocation &R = Ctx.getMemLocation(LBit);
   for (unsigned i = 0; i < ForwardSetIn.size(); ++i) {
     if (!isTrackingMemLocation(i))
       continue;
@@ -497,7 +513,7 @@ void BlockState::updateForwardSetForWrite(RLEContext &Ctx, unsigned bit,
   }
 
   // Start tracking this MemLocation.
-  startTrackingMemLocation(bit, Val);
+  startTrackingMemLocation(LBit, VBit);
 }
 
 void BlockState::processWrite(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
@@ -516,15 +532,16 @@ void BlockState::processWrite(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
   // them as separate writes.
   MemLocationList Locs;
   LoadStoreValueList Vals;
-  MemLocation::expandWithValues(L, Val, &I->getModule(), Locs, Vals,
-                                Ctx.getTE());
+  MemLocation::expand(L, &I->getModule(), Locs, Ctx.getTE());
+  LoadStoreValue::expand(Val, &I->getModule(), Vals, Ctx.getTE());
   for (unsigned i = 0; i < Locs.size(); ++i) {
-    updateForwardSetForWrite(Ctx, Ctx.getMemLocationBit(Locs[i]), Vals[i]);
+    updateForwardSetForWrite(Ctx, Ctx.getMemLocationBit(Locs[i]),
+                             Ctx.getLoadStoreValueBit(Vals[i]));
   }
 }
 
 void BlockState::processRead(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
-                          SILValue Val, bool PF) {
+                             SILValue Val, bool PF) {
   // Initialize the MemLocation.
   MemLocation L(Mem);
 
@@ -537,8 +554,8 @@ void BlockState::processRead(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
   // them as separate reads.
   MemLocationList Locs;
   LoadStoreValueList Vals;
-  MemLocation::expandWithValues(L, Val, &I->getModule(), Locs, Vals,
-                                Ctx.getTE());
+  MemLocation::expand(L, &I->getModule(), Locs, Ctx.getTE());
+  LoadStoreValue::expand(Val, &I->getModule(), Vals, Ctx.getTE());
 
   bool CanForward = true;
   for (auto &X : Locs) {
@@ -549,7 +566,8 @@ void BlockState::processRead(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
   // their values from this instruction, and return.
   if (!CanForward) {
     for (unsigned i = 0; i < Locs.size(); ++i) {
-      updateForwardSetForRead(Ctx, Ctx.getMemLocationBit(Locs[i]), Vals[i]);
+      updateForwardSetForRead(Ctx, Ctx.getMemLocationBit(Locs[i]),
+                              Ctx.getLoadStoreValueBit(Vals[i]));
     }
     return;
   }
@@ -637,7 +655,7 @@ bool BlockState::optimize(RLEContext &Ctx, bool PF) {
   return updateForwardSetOut();
 }
 
-void BlockState::mergePredecessorState(BlockState &OtherState) {
+void BlockState::mergePredecessorState(RLEContext &Ctx, BlockState &OtherState) {
   // Merge in the predecessor state.
   llvm::SmallVector<unsigned, 8> LocDeleteList;
   for (unsigned i = 0; i < ForwardSetIn.size(); ++i) {
@@ -645,7 +663,7 @@ void BlockState::mergePredecessorState(BlockState &OtherState) {
       // There are multiple values from multiple predecessors, set this as
       // a covering value. We do not need to track the value itself, as we
       // can always go to the predecessors BlockState to find it.
-      ForwardValIn[i].setCoveringValue();
+      ForwardValIn[i] = Ctx.getLoadStoreValueBit(LoadStoreValue(true));
       continue;
     }
     // If this location does have an available value, then clear it.
@@ -674,17 +692,10 @@ void BlockState::mergePredecessorStates(RLEContext &Ctx) {
       ForwardSetIn = Other.ForwardSetOut;
       ForwardValIn = Other.ForwardValOut;
     } else {
-      mergePredecessorState(Other);
+      mergePredecessorState(Ctx, Other);
     }
     HasAtLeastOnePred = true;
   }
-
-#ifndef NDEBUG
-  for (auto &X : ForwardValIn) {
-    (void)X;
-    assert(X.second.isValid() && "Invalid load store value");
-  }
-#endif
 }
 
 //===----------------------------------------------------------------------===//
@@ -694,10 +705,14 @@ void BlockState::mergePredecessorStates(RLEContext &Ctx) {
 RLEContext::RLEContext(SILFunction *F, AliasAnalysis *AA,
                        TypeExpansionAnalysis *TE,
                        PostOrderFunctionInfo::reverse_range RPOT)
-    : AA(AA), TE(TE), ReversePostOrder(RPOT) {
+    : Fn(F), AA(AA), TE(TE), ReversePostOrder(RPOT) {
   // Walk over the function and find all the locations accessed by
   // this function.
-  MemLocation::enumerateMemLocations(*F, MemLocationVault, LocToBitIndex, TE);
+  MemLocation::enumerateMemLocations(*Fn, MemLocationVault, LocToBitIndex, TE);
+
+  // Walk over the function and find all the values used in this function.
+  LoadStoreValue::enumerateLoadStoreValues(*Fn, LoadStoreValueVault, ValToBitIndex,
+                                           TE);
 
   // For all basic blocks in the function, initialize a BB state. Since we
   // know all the locations accessed in this function, we can resize the bit
@@ -794,16 +809,15 @@ SILValue RLEContext::computePredecessorCoveringValue(SILBasicBlock *BB,
   // the backedge will carry a covering value as well in this case.
   //
   MemLocationList Locs;
-  MemLocation::expand(L, &BB->getModule(), Locs, TE);
   LoadStoreValueList Vals;
-  MemLocation::expandWithValues(L, TheForwardingValue, &BB->getModule(), Locs,
-                                Vals, TE);
+  MemLocation::expand(L, &BB->getModule(), Locs, TE);
+  LoadStoreValue::expand(TheForwardingValue, &BB->getModule(), Vals, TE);
   ValueTableMap &VTM = Forwarder.getForwardValOut();
   for (unsigned i = 0; i < Locs.size(); ++i) {
     unsigned bit = getMemLocationBit(Locs[i]);
-    if (!VTM[bit].isCoveringValue())
+    if (!getLoadStoreValue(VTM[bit]).isCoveringValue())
       continue;
-    VTM[bit] = Vals[i];
+    VTM[bit] = getLoadStoreValueBit(Vals[i]);
   }
 
   // Compute the SILArgument for the covering value.
@@ -849,6 +863,22 @@ unsigned RLEContext::getMemLocationBit(const MemLocation &Loc) {
   return Iter->second;
 }
 
+LoadStoreValue &RLEContext::getLoadStoreValue(const unsigned index) {
+  return LoadStoreValueVault[index];
+}
+
+unsigned RLEContext::getLoadStoreValueBit(const LoadStoreValue &Val) {
+  // Return the bit position of the given Val in the LoadStoreValueVault. The bit
+  // position is then used to set/reset the bitvector kept by each BBState.
+  auto Iter = ValToBitIndex.find(Val);
+  if (Iter == ValToBitIndex.end()) {
+    ValToBitIndex[Val] = LoadStoreValueVault.size();
+    LoadStoreValueVault.push_back(Val);
+    return ValToBitIndex[Val]; 
+  }
+  return Iter->second;
+}
+
 bool RLEContext::gatherValues(SILBasicBlock *BB, MemLocation &L,
                               MemLocationValueMap &Values,
                               bool UseForwardValOut) {
@@ -863,7 +893,7 @@ bool RLEContext::gatherValues(SILBasicBlock *BB, MemLocation &L,
   ValueTableMap &OTM = UseForwardValOut ? Forwarder.getForwardValOut()
                                         : Forwarder.getForwardValIn();
   for (auto &X : Locs) {
-    Values[X] = OTM[getMemLocationBit(X)];
+    Values[X] = getLoadStoreValue(OTM[getMemLocationBit(X)]);
     if (!Values[X].isCoveringValue())
       continue;
     CSLocs.insert(X);
@@ -883,7 +913,9 @@ bool RLEContext::gatherValues(SILBasicBlock *BB, MemLocation &L,
     // collect the newly created forwardable values.
     MemLocationList Locs;
     LoadStoreValueList Vals;
-    MemLocation::expandWithValues(X, V, &BB->getModule(), Locs, Vals, TE);
+    MemLocation::expand(X, &BB->getModule(), Locs, TE);
+    LoadStoreValue::expand(V, &BB->getModule(), Vals, TE);
+
     for (unsigned i = 0; i < Locs.size(); ++i) {
       Values[Locs[i]] = Vals[i];
       assert(Values[Locs[i]].isValid() && "Invalid load store value");

@@ -196,9 +196,10 @@ public:
 //                            Load Store Value
 //===----------------------------------------------------------------------===//
 
-using LoadStoreValueList = llvm::SmallVector<LoadStoreValue, 8>;
 using MemLocationValueMap = llvm::DenseMap<MemLocation, LoadStoreValue>;
-using ValueTableMap = llvm::SmallMapVector<unsigned, LoadStoreValue, 8>;
+using LoadStoreValueList = llvm::SmallVector<LoadStoreValue, 8>;
+using LoadStoreValueIndexMap = llvm::DenseMap<LoadStoreValue, unsigned>;
+using ValueTableMap = llvm::SmallMapVector<unsigned, unsigned, 8>;
 
 /// This class represents either a single SILValue or a covering of values that
 /// we can forward from via the introdution of a SILArgument. This enables us
@@ -280,6 +281,9 @@ public:
   LoadStoreValue(SILValue B) : SILValueProjection(B), IsCoveringValue(false) {}
   LoadStoreValue(SILValue B, const ProjectionPath &P)
       : SILValueProjection(B, P), IsCoveringValue(false) {}
+  LoadStoreValue(KeyKind Kind) : SILValueProjection(Kind), IsCoveringValue(false) {} 
+  LoadStoreValue(bool CSVal)
+      : SILValueProjection(NormalKey), IsCoveringValue(CSVal) {} 
 
   /// Copy constructor.
   LoadStoreValue(const LoadStoreValue &RHS) : SILValueProjection(RHS) {
@@ -291,6 +295,19 @@ public:
     SILValueProjection::operator=(RHS);
     IsCoveringValue = RHS.IsCoveringValue;
     return *this;
+  }
+
+  /// Comparisons.
+  bool operator!=(const LoadStoreValue &RHS) const {
+    return !(*this == RHS);
+  }
+  bool operator==(const LoadStoreValue &RHS) const {
+    if (IsCoveringValue && RHS.isCoveringValue())
+      return true;
+    if (IsCoveringValue != RHS.isCoveringValue())
+      return false;
+
+    return SILValueProjection::operator==(RHS);
   }
 
   /// Returns whether the LoadStoreValue has been initialized properly.
@@ -324,9 +341,6 @@ public:
   /// and when we insert the PHI node, this is set to the SILArgument which
   /// represents the PHI node.
   SILValue materialize(SILInstruction *Inst) {
-    //
-    // TODO: handle covering value.
-    //
     if (IsCoveringValue)
       return SILValue();
     return createExtract(Base, Path, Inst);
@@ -339,7 +353,34 @@ public:
     }
     SILValueProjection::print();
   }
+
+  //============================//
+  //       static functions.    //
+  //============================//
+
+  /// Expand this SILValue to all individual fields it contains.
+  static void expand(SILValue Base, SILModule *Mod, LoadStoreValueList &Vals,
+                     TypeExpansionAnalysis *TE);
+
+  /// Enumerate the given LoadStoreValue.
+  static void enumerateLoadStoreValue(SILModule *M, SILValue Val,
+                                      std::vector<LoadStoreValue> &Vault,
+                                      LoadStoreValueIndexMap &ValToBit,
+                                      TypeExpansionAnalysis *TE);
+
+  /// Enumerate all the LoadStoreValues in the function.
+  static void enumerateLoadStoreValues(SILFunction &F,
+                                       std::vector<LoadStoreValue> &Vault,
+                                       LoadStoreValueIndexMap &ValToBit,
+                                       TypeExpansionAnalysis *TE);
 };
+
+static inline llvm::hash_code hash_value(const LoadStoreValue &V) {
+  if (V.isCoveringValue())
+     return llvm::hash_combine(V.isCoveringValue());
+  return llvm::hash_combine(V.getBase().getDef(), V.getBase().getResultNumber(),
+                            V.getBase().getType());
+}
 
 //===----------------------------------------------------------------------===//
 //                              Memory Location
@@ -348,7 +389,6 @@ public:
 using MemLocationSet = llvm::DenseSet<MemLocation>;
 using MemLocationList = llvm::SmallVector<MemLocation, 8>;
 using MemLocationIndexMap = llvm::DenseMap<MemLocation, unsigned>;
-using TypeExpansionMap = llvm::DenseMap<SILType, ProjectionPathList>;
 
 /// This class represents a field in an allocated object. It consists of a
 /// base that is the tracked SILValue, and a projection path to the
@@ -459,12 +499,6 @@ public:
   static void reduce(MemLocation &Base, SILModule *Mod, MemLocationSet &Locs,
                      TypeExpansionAnalysis *TE);
 
-  /// Given a memory location and a SILValue, expand the location into its
-  /// individual fields and the values that is in each individual field.
-  static void expandWithValues(MemLocation &Base, SILValue &Val, SILModule *Mod,
-                               MemLocationList &Locs, LoadStoreValueList &Vals,
-                               TypeExpansionAnalysis *TE);
-
   /// Given a memory location and a map between the expansions of the location
   /// and their corresponding values, try to come up with a single SILValue this
   /// location holds. This may involve extracting and aggregating available
@@ -499,19 +533,36 @@ static inline llvm::hash_code hash_value(const MemLocation &L) {
 
 /// MemLocation is used in DenseMap, define functions required by DenseMap.
 namespace llvm {
+using swift::SILValueProjection;
 
 using swift::MemLocation;
 template <> struct DenseMapInfo<MemLocation> {
   static inline MemLocation getEmptyKey() {
-    return MemLocation(MemLocation::EmptyKey);
+    return MemLocation(SILValueProjection::EmptyKey);
   }
   static inline MemLocation getTombstoneKey() {
-    return MemLocation(MemLocation::TombstoneKey);
+    return MemLocation(SILValueProjection::TombstoneKey);
   }
   static unsigned getHashValue(const MemLocation &Loc) {
     return hash_value(Loc);
   }
   static bool isEqual(const MemLocation &LHS, const MemLocation &RHS) {
+    return LHS == RHS;
+  }
+};
+
+using swift::LoadStoreValue;
+template <> struct DenseMapInfo<LoadStoreValue> {
+  static inline LoadStoreValue getEmptyKey() {
+    return LoadStoreValue(SILValueProjection::EmptyKey);
+  }
+  static inline LoadStoreValue getTombstoneKey() {
+    return LoadStoreValue(SILValueProjection::TombstoneKey);
+  }
+  static unsigned getHashValue(const LoadStoreValue &Val) {
+    return hash_value(Val);
+  }
+  static bool isEqual(const LoadStoreValue &LHS, const LoadStoreValue &RHS) {
     return LHS == RHS;
   }
 };
