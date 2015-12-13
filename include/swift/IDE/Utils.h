@@ -54,7 +54,7 @@ struct SourceCompleteResult {
   // The text to use as the indent string when auto indenting the next line.
   // This will contain the exactly what the client typed (any whitespaces and
   // tabs) and can be used to indent subsequent lines. It does not include
-  // the current indent level, IDE clients should insert the currect indentation
+  // the current indent level, IDE clients should insert the correct indentation
   // with spaces or tabs to account for the current indent level. The indent
   // prefix will contain the leading space characters of the line that
   // contained the '{', '(' or '[' character that was unbalanced.
