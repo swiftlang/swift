@@ -1,4 +1,4 @@
-//===------------------------ MemLocation.h ----------------------------- -===//
+//===------------------------ SILValueProjection.h ---------------------- -===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,15 +9,24 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// This file defines the class Location. A MemLocation is an abstraction of an
-// object field in program. It consists of a base that is the tracked SILValue
-// and a projection path to the represented field.
-//
+///
+/// This file defines SILValueProjection, a class containing a SILValue base
+/// and a ProjectionPath. It is used as the base class for MemLocation and
+/// LoadStoreValue.
+///
+/// In the case of MemLocation, the base represents the base of the allocated
+/// objects and the ProjectionPath tells which field in the object the
+/// MemLocation represents.
+///
+/// In the case of LoadStoreValue, the base represents the root of loaded or
+/// stored value it represents. And the ProjectionPath represents the field in
+/// the loaded/store value the LoadStoreValue represents.
+///
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SIL_MEMLOCATION_H
-#define SWIFT_SIL_MEMLOCATION_H
+
+#ifndef SWIFT_SIL_VALUEPROJECTION_H
+#define SWIFT_SIL_VALUEPROJECTION_H
 
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/TypeExpansionAnalysis.h"
@@ -41,17 +50,6 @@ class LoadStoreValue;
 //                           SILValue Projection 
 //===----------------------------------------------------------------------===//
 
-/// This class contains a SILValue base and a ProjectionPath. It is used as
-/// the base class for MemLocation and LoadStoreValue.
-///
-/// In the case of MemLocation, the base represents the base of the allocated
-/// objects and the ProjectionPath tells which field in the object the
-/// MemLocation represents.
-///
-/// In the case of LoadStoreValue, the base represents the root of loaded or
-/// stored value it represents. And the ProjectionPath represents the field in
-/// the loaded/store value the LoadStoreValue represents.
-///
 class SILValueProjection {
 public:
   enum KeyKind : uint8_t { EmptyKey = 0, TombstoneKey, NormalKey };

@@ -1,4 +1,4 @@
-//===------------------------- MemLocation.cpp ----------------------------===//
+//===------------------------- SILValueProjection.cpp ---------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "sil-memlocation"
-#include "swift/SIL/MemLocation.h"
+#define DEBUG_TYPE "sil-value-projection"
+#include "swift/SIL/SILValueProjection.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
