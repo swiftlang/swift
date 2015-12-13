@@ -699,7 +699,7 @@ bool CopyForwarding::forwardPropagateCopy(
   // Convert a reinitialization of this address into a destroy, followed by an
   // initialization. Replacing a copy with a destroy+init is not by itself
   // profitable. However, it does allow eliminating the earlier copy, and we may
-  // later be able to elimimate this initialization copy.
+  // later be able to eliminate this initialization copy.
   if (auto Copy = dyn_cast<CopyAddrInst>(&*SI)) {
     if (Copy->getDest() == CopyDest) {
       assert(!Copy->isInitializationOfDest() && "expected a deinit");
