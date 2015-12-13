@@ -181,7 +181,7 @@ rewriteNewLoopEntryCheckBlock(SILBasicBlock *Header,
   SmallVector<SILArgument*, 4> InsertedPHIs;
   SILSSAUpdater Updater(&InsertedPHIs);
 
-  // Fix PHIs (incomming arguments).
+  // Fix PHIs (incoming arguments).
   for (auto *Inst: Header->getBBArgs())
     updateSSAForUseOfInst(Updater, InsertedPHIs, ValueMap, Header,
                           EntryCheckBlock, Inst);
