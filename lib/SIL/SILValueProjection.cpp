@@ -20,8 +20,8 @@ using namespace swift;
 //                              Utility Functions
 //===----------------------------------------------------------------------===//
 
-static inline void removeMemLocations(MemLocationValueMap &Values,
-                                      MemLocationList &FirstLevel) {
+static inline void removeLSLocations(LSLocationValueMap &Values,
+                                     LSLocationList &FirstLevel) {
   for (auto &X : FirstLevel)
     Values.erase(X);
 }
@@ -37,7 +37,8 @@ void SILValueProjection::print() const {
 
 SILValue SILValueProjection::createExtract(SILValue Base,
                                            Optional<ProjectionPath> &Path,
-                                           SILInstruction *Inst, bool IsValExt) {
+                                           SILInstruction *Inst,
+                                           bool IsValExt) {
   // If we found a projection path, but there are no projections, then the two
   // loads must be the same, return PrevLI.
   if (!Path || Path->empty())
@@ -63,44 +64,39 @@ SILValue SILValueProjection::createExtract(SILValue Base,
   return LastExtract;
 }
 
-
-
 //===----------------------------------------------------------------------===//
 //                              Load Store Value
 //===----------------------------------------------------------------------===//
 
-void LoadStoreValue::expand(SILValue Base, SILModule *M,
-                            LoadStoreValueList &Vals,
-                            TypeExpansionAnalysis *TE) {
-  // To expand a LoadStoreValue to its indivisible parts, we first get the
+void LSValue::expand(SILValue Base, SILModule *M, LSValueList &Vals,
+                     TypeExpansionAnalysis *TE) {
+  // To expand a LSValue to its indivisible parts, we first get the
   // address projection paths from the accessed type to each indivisible field,
   // i.e. leaf nodes, then we append these projection paths to the Base.
-  for (const auto &P : TE->getTypeExpansionProjectionPaths(Base.getType(), M,
-                                                           TEKind::TELeaf)) {
-    Vals.push_back(LoadStoreValue(Base, P.getValue()));
+  for (const auto &P :
+       TE->getTypeExpansionProjectionPaths(Base.getType(), M, TEKind::TELeaf)) {
+    Vals.push_back(LSValue(Base, P.getValue()));
   }
 }
 
-void
-LoadStoreValue::enumerateLoadStoreValue(SILModule *M, SILValue Val,
-                                        std::vector<LoadStoreValue> &Vault,
-                                        LoadStoreValueIndexMap &ValToBit,
-                                        TypeExpansionAnalysis *TE) {
+void LSValue::enumerateLSValue(SILModule *M, SILValue Val,
+                               std::vector<LSValue> &Vault,
+                               LSValueIndexMap &ValToBit,
+                               TypeExpansionAnalysis *TE) {
   // Expand the given Mem into individual fields and add them to the
   // locationvault.
-  LoadStoreValueList Vals;
-  LoadStoreValue::expand(Val, M, Vals, TE);
+  LSValueList Vals;
+  LSValue::expand(Val, M, Vals, TE);
   for (auto &Val : Vals) {
     ValToBit[Val] = Vault.size();
     Vault.push_back(Val);
   }
 }
 
-void LoadStoreValue::enumerateLoadStoreValues(SILFunction &F, 
-                                              std::vector<LoadStoreValue> &Vault,
-                                              LoadStoreValueIndexMap &ValToBit,
-                                              TypeExpansionAnalysis *TE) {
-  // Enumerate all LoadStoreValues created or used by the loads or stores.
+void LSValue::enumerateLSValues(SILFunction &F, std::vector<LSValue> &Vault,
+                                LSValueIndexMap &ValToBit,
+                                TypeExpansionAnalysis *TE) {
+  // Enumerate all LSValues created or used by the loads or stores.
   //
   // TODO: process more instructions as we process more instructions in
   // processInstruction.
@@ -109,31 +105,29 @@ void LoadStoreValue::enumerateLoadStoreValues(SILFunction &F,
   for (auto &B : F) {
     for (auto &I : B) {
       if (auto *LI = dyn_cast<LoadInst>(&I)) {
-        enumerateLoadStoreValue(&I.getModule(), SILValue(LI), Vault, ValToBit,
-                                TE);
+        enumerateLSValue(&I.getModule(), SILValue(LI), Vault, ValToBit, TE);
       } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
-        enumerateLoadStoreValue(&I.getModule(), SI->getSrc(), Vault, ValToBit,
-                                TE);
+        enumerateLSValue(&I.getModule(), SI->getSrc(), Vault, ValToBit, TE);
       }
     }
   }
 
-  // Lastly, push in the covering value LoadStoreValue.
-  ValToBit[LoadStoreValue(true)] = Vault.size();
-  Vault.push_back(LoadStoreValue(true));
+  // Lastly, push in the covering value LSValue.
+  ValToBit[LSValue(true)] = Vault.size();
+  Vault.push_back(LSValue(true));
 }
 
 //===----------------------------------------------------------------------===//
 //                                  Memory Location
 //===----------------------------------------------------------------------===//
 
-void MemLocation::initialize(SILValue Dest) {
+void LSLocation::initialize(SILValue Dest) {
   Base = getUnderlyingObject(Dest);
   Path = ProjectionPath::getAddrProjectionPath(Base, Dest);
 }
 
-bool MemLocation::isMustAliasMemLocation(const MemLocation &RHS,
-                                         AliasAnalysis *AA) {
+bool LSLocation::isMustAliasLSLocation(const LSLocation &RHS,
+                                       AliasAnalysis *AA) {
   // If the bases are not must-alias, the locations may not alias.
   if (!AA->isMustAlias(Base, RHS.getBase()))
     return false;
@@ -143,8 +137,8 @@ bool MemLocation::isMustAliasMemLocation(const MemLocation &RHS,
   return true;
 }
 
-bool MemLocation::isMayAliasMemLocation(const MemLocation &RHS,
-                                        AliasAnalysis *AA) {
+bool LSLocation::isMayAliasLSLocation(const LSLocation &RHS,
+                                      AliasAnalysis *AA) {
   // If the bases do not alias, then the locations can not alias.
   if (AA->isNoAlias(Base, RHS.getBase()))
     return false;
@@ -155,8 +149,8 @@ bool MemLocation::isMayAliasMemLocation(const MemLocation &RHS,
   return true;
 }
 
-void MemLocation::getFirstLevelMemLocations(MemLocationList &Locs,
-                                            SILModule *Mod) {
+void LSLocation::getFirstLevelLSLocations(LSLocationList &Locs,
+                                          SILModule *Mod) {
   SILType Ty = getType();
   llvm::SmallVector<Projection, 8> Out;
   Projection::getFirstLevelAddrProjections(Ty, *Mod, Out);
@@ -164,41 +158,41 @@ void MemLocation::getFirstLevelMemLocations(MemLocationList &Locs,
     ProjectionPath P;
     P.append(X);
     P.append(Path.getValue());
-    Locs.push_back(MemLocation(Base, P));
+    Locs.push_back(LSLocation(Base, P));
   }
 }
 
-void MemLocation::expand(MemLocation &Base, SILModule *M, MemLocationList &Locs,
-                         TypeExpansionAnalysis *TE) {
+void LSLocation::expand(LSLocation &Base, SILModule *M, LSLocationList &Locs,
+                        TypeExpansionAnalysis *TE) {
   // To expand a memory location to its indivisible parts, we first get the
   // address projection paths from the accessed type to each indivisible field,
   // i.e. leaf nodes, then we append these projection paths to the Base.
   //
-  // Construct the MemLocation by appending the projection path from the
+  // Construct the LSLocation by appending the projection path from the
   // accessed node to the leaf nodes.
   ProjectionPath &BasePath = Base.getPath().getValue();
-  for (const auto &P : TE->getTypeExpansionProjectionPaths(Base.getType(), M,
-                                                           TEKind::TELeaf)) {
-    Locs.push_back(MemLocation(Base.getBase(), P.getValue(), BasePath));
+  for (const auto &P :
+       TE->getTypeExpansionProjectionPaths(Base.getType(), M, TEKind::TELeaf)) {
+    Locs.push_back(LSLocation(Base.getBase(), P.getValue(), BasePath));
   }
 }
 
-void MemLocation::reduce(MemLocation &Base, SILModule *M, MemLocationSet &Locs,
-                         TypeExpansionAnalysis *TE) {
-  // First, construct the MemLocation by appending the projection path from the
+void LSLocation::reduce(LSLocation &Base, SILModule *M, LSLocationSet &Locs,
+                        TypeExpansionAnalysis *TE) {
+  // First, construct the LSLocation by appending the projection path from the
   // accessed node to the leaf nodes.
-  MemLocationList Nodes;
+  LSLocationList Nodes;
   ProjectionPath &BasePath = Base.getPath().getValue();
-  for (const auto &P : TE->getTypeExpansionProjectionPaths(Base.getType(), M,
-                                                           TEKind::TENode)) {
-    Nodes.push_back(MemLocation(Base.getBase(), P.getValue(), BasePath));
+  for (const auto &P :
+       TE->getTypeExpansionProjectionPaths(Base.getType(), M, TEKind::TENode)) {
+    Nodes.push_back(LSLocation(Base.getBase(), P.getValue(), BasePath));
   }
 
   // Second, go from leaf nodes to their parents. This guarantees that at the
   // point the parent is processed, its children have been processed already.
   for (auto I = Nodes.rbegin(), E = Nodes.rend(); I != E; ++I) {
-    MemLocationList FirstLevel;
-    I->getFirstLevelMemLocations(FirstLevel, M);
+    LSLocationList FirstLevel;
+    I->getFirstLevelLSLocations(FirstLevel, M);
     // Reached the end of the projection tree, this is a leaf node.
     if (FirstLevel.empty())
       continue;
@@ -223,21 +217,21 @@ void MemLocation::reduce(MemLocation &Base, SILModule *M, MemLocationSet &Locs,
   }
 }
 
-SILValue MemLocation::reduceWithValues(MemLocation &Base, SILModule *M,
-                                       MemLocationValueMap &Values,
-                                       SILInstruction *InsertPt,
-                                       TypeExpansionAnalysis *TE) {
+SILValue LSLocation::reduceWithValues(LSLocation &Base, SILModule *M,
+                                      LSLocationValueMap &Values,
+                                      SILInstruction *InsertPt,
+                                      TypeExpansionAnalysis *TE) {
   // Walk bottom up the projection tree, try to reason about how to construct
   // a single SILValue out of all the available values for all the memory
   // locations.
   //
   // First, get a list of all the leaf nodes and intermediate nodes for the
   // Base memory location.
-  MemLocationList ALocs;
+  LSLocationList ALocs;
   ProjectionPath &BasePath = Base.getPath().getValue();
-  for (const auto &P : TE->getTypeExpansionProjectionPaths(Base.getType(), M,
-                                                           TEKind::TENode)) {
-    ALocs.push_back(MemLocation(Base.getBase(), P.getValue(), BasePath));
+  for (const auto &P :
+       TE->getTypeExpansionProjectionPaths(Base.getType(), M, TEKind::TENode)) {
+    ALocs.push_back(LSLocation(Base.getBase(), P.getValue(), BasePath));
   }
 
   // Second, go from leaf nodes to their parents. This guarantees that at the
@@ -246,8 +240,8 @@ SILValue MemLocation::reduceWithValues(MemLocation &Base, SILModule *M,
     // This is a leaf node, we have a value for it.
     //
     // Reached the end of the projection tree, this is a leaf node.
-    MemLocationList FirstLevel;
-    I->getFirstLevelMemLocations(FirstLevel, M);
+    LSLocationList FirstLevel;
+    I->getFirstLevelLSLocations(FirstLevel, M);
     if (FirstLevel.empty())
       continue;
 
@@ -258,7 +252,7 @@ SILValue MemLocation::reduceWithValues(MemLocation &Base, SILModule *M,
     // This is NOT a leaf node, we need to construct a value for it.
     //
     // If there are more than 1 children and all the children nodes have
-    // LoadStoreValues with the same base. we can get away by not extracting
+    // LSValues with the same base. we can get away by not extracting
     // value
     // for every single field.
     //
@@ -267,11 +261,11 @@ SILValue MemLocation::reduceWithValues(MemLocation &Base, SILModule *M,
     //
     bool HasIdenticalValueBase = true;
     auto Iter = FirstLevel.begin();
-    LoadStoreValue &FirstVal = Values[*Iter];
+    LSValue &FirstVal = Values[*Iter];
     SILValue FirstBase = FirstVal.getBase();
     Iter = std::next(Iter);
     for (auto EndIter = FirstLevel.end(); Iter != EndIter; ++Iter) {
-      LoadStoreValue &V = Values[*Iter];
+      LSValue &V = Values[*Iter];
       HasIdenticalValueBase &= (FirstBase == V.getBase());
     }
 
@@ -279,7 +273,7 @@ SILValue MemLocation::reduceWithValues(MemLocation &Base, SILModule *M,
         (FirstLevel.size() > 1 || !FirstVal.hasEmptyProjectionPath())) {
       Values[*I] = FirstVal.stripLastLevelProjection();
       // We have a value for the parent, remove all the values for children.
-      removeMemLocations(Values, FirstLevel);
+      removeLSLocations(Values, FirstLevel);
       continue;
     }
 
@@ -301,8 +295,8 @@ SILValue MemLocation::reduceWithValues(MemLocation &Base, SILModule *M,
             Builder, InsertPt->getLoc(), I->getType(), Vals);
     // This is the Value for the current node.
     ProjectionPath P;
-    Values[*I] = LoadStoreValue(SILValue(AI.get()), P);
-    removeMemLocations(Values, FirstLevel);
+    Values[*I] = LSValue(SILValue(AI.get()), P);
+    removeLSLocations(Values, FirstLevel);
 
     // Keep iterating until we have reach the top-most level of the projection
     // tree.
@@ -315,12 +309,12 @@ SILValue MemLocation::reduceWithValues(MemLocation &Base, SILModule *M,
   return Values.begin()->second.materialize(InsertPt);
 }
 
-void MemLocation::enumerateMemLocation(SILModule *M, SILValue Mem,
-                                       std::vector<MemLocation> &LV,
-                                       MemLocationIndexMap &BM,
-                                       TypeExpansionAnalysis *TE) {
+void LSLocation::enumerateLSLocation(SILModule *M, SILValue Mem,
+                                     std::vector<LSLocation> &LV,
+                                     LSLocationIndexMap &BM,
+                                     TypeExpansionAnalysis *TE) {
   // Construct a Location to represent the memory written by this instruction.
-  MemLocation L(Mem);
+  LSLocation L(Mem);
 
   // If we cant figure out the Base or Projection Path for the memory location,
   // simply ignore it for now.
@@ -329,18 +323,18 @@ void MemLocation::enumerateMemLocation(SILModule *M, SILValue Mem,
 
   // Expand the given Mem into individual fields and add them to the
   // locationvault.
-  MemLocationList Locs;
-  MemLocation::expand(L, M, Locs, TE);
+  LSLocationList Locs;
+  LSLocation::expand(L, M, Locs, TE);
   for (auto &Loc : Locs) {
     BM[Loc] = LV.size();
     LV.push_back(Loc);
   }
 }
 
-void MemLocation::enumerateMemLocations(SILFunction &F,
-                                        std::vector<MemLocation> &LV,
-                                        MemLocationIndexMap &BM,
-                                        TypeExpansionAnalysis *TE) {
+void LSLocation::enumerateLSLocations(SILFunction &F,
+                                      std::vector<LSLocation> &LV,
+                                      LSLocationIndexMap &BM,
+                                      TypeExpansionAnalysis *TE) {
   // Enumerate all locations accessed by the loads or stores.
   //
   // TODO: process more instructions as we process more instructions in
@@ -350,9 +344,9 @@ void MemLocation::enumerateMemLocations(SILFunction &F,
   for (auto &B : F) {
     for (auto &I : B) {
       if (auto *LI = dyn_cast<LoadInst>(&I)) {
-        enumerateMemLocation(&I.getModule(), LI->getOperand(), LV, BM, TE);
+        enumerateLSLocation(&I.getModule(), LI->getOperand(), LV, BM, TE);
       } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
-        enumerateMemLocation(&I.getModule(), SI->getDest(), LV, BM, TE);
+        enumerateLSLocation(&I.getModule(), SI->getDest(), LV, BM, TE);
       }
     }
   }

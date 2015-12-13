@@ -1,4 +1,4 @@
-///===--- MemLocationPrinter.cpp - Dump all memory locations in program ---===//
+///===--- LSLocationPrinter.cpp - Dump all memory locations in program ---===//
 ///
 /// This source file is part of the Swift.org open source project
 ///
@@ -43,8 +43,8 @@ enum class MLKind : unsigned {
 
 } // end anonymous namespace
 
-static llvm::cl::opt<MLKind> MemLocationKinds(
-    "ml", llvm::cl::desc("MemLocation Kinds:"), llvm::cl::init(MLKind::All),
+static llvm::cl::opt<MLKind> LSLocationKinds(
+    "ml", llvm::cl::desc("LSLocation Kinds:"), llvm::cl::init(MLKind::All),
     llvm::cl::values(
         clEnumValN(MLKind::OnlyExpansion, "only-expansion", "only-expansion"),
         clEnumValN(MLKind::OnlyReduction, "only-reduction", "only-reduction"),
@@ -54,7 +54,7 @@ static llvm::cl::opt<MLKind> MemLocationKinds(
 
 namespace {
 
-class MemLocationPrinter : public SILModuleTransform {
+class LSLocationPrinter : public SILModuleTransform {
   /// Type expansion analysis.
   TypeExpansionAnalysis *TE;
 
@@ -97,14 +97,14 @@ public:
   }
 
   /// Dumps the expansions of memory locations accessed in the function.
-  /// This tests the expand function in MemLocation class.
+  /// This tests the expand function in LSLocation class.
   ///
   /// We test it to catch any suspicious things when memory location is
   /// expanded, i.e. base is traced back and aggregate is expanded
   /// properly.
   void printMemExpansion(SILFunction &Fn) {
-    MemLocation L;
-    MemLocationList Locs;
+    LSLocation L;
+    LSLocationList Locs;
     unsigned Counter = 0;
     for (auto &BB : Fn) {
       for (auto &II : BB) {
@@ -112,12 +112,12 @@ public:
           L.initialize(LI->getOperand());
           if (!L.isValid())
             continue;
-          MemLocation::expand(L, &Fn.getModule(), Locs, TE);
+          LSLocation::expand(L, &Fn.getModule(), Locs, TE);
         } else if (auto *SI = dyn_cast<StoreInst>(&II)) {
           L.initialize(SI->getDest());
           if (!L.isValid())
             continue;
-          MemLocation::expand(L, &Fn.getModule(), Locs, TE);
+          LSLocation::expand(L, &Fn.getModule(), Locs, TE);
         } else {
           // Not interested in these instructions yet.
           continue;
@@ -140,9 +140,9 @@ public:
   /// reduce, in hope to get the original memory location back.
   ///
   void printMemReduction(SILFunction &Fn) {
-    MemLocation L;
-    MemLocationList Locs;
-    llvm::DenseSet<MemLocation> SLocs;
+    LSLocation L;
+    LSLocationList Locs;
+    llvm::DenseSet<LSLocation> SLocs;
     unsigned Counter = 0;
     for (auto &BB : Fn) {
       for (auto &II : BB) {
@@ -153,12 +153,12 @@ public:
           L.initialize(LI->getOperand());
           if (!L.isValid())
             continue;
-          MemLocation::expand(L, &Fn.getModule(), Locs, TE);
+          LSLocation::expand(L, &Fn.getModule(), Locs, TE);
         } else if (auto *SI = dyn_cast<StoreInst>(&II)) {
           L.initialize(SI->getDest());
           if (!L.isValid())
             continue;
-          MemLocation::expand(L, &Fn.getModule(), Locs, TE);
+          LSLocation::expand(L, &Fn.getModule(), Locs, TE);
         } else {
           // Not interested in these instructions yet.
           continue;
@@ -172,7 +172,7 @@ public:
           SLocs.insert(*I);
         }
         // This should get the original (unexpanded) location back.
-        MemLocation::reduce(L, &Fn.getModule(), SLocs, TE);
+        LSLocation::reduce(L, &Fn.getModule(), SLocs, TE);
         llvm::outs() << "#" << Counter++ << II;
         for (auto &Loc : SLocs) {
           Loc.print();
@@ -193,7 +193,7 @@ public:
       TE = PM->getAnalysis<TypeExpansionAnalysis>();
 
       llvm::outs() << "@" << Fn.getName() << "\n";
-      switch (MemLocationKinds) {
+      switch (LSLocationKinds) {
         case MLKind::OnlyTypeExpansion:
           printTypeExpansion(Fn);
           break;
@@ -214,6 +214,6 @@ public:
 
 } // end anonymous namespace
 
-SILTransform *swift::createMemLocationPrinter() {
-  return new MemLocationPrinter();
+SILTransform *swift::createLSLocationPrinter() {
+  return new LSLocationPrinter();
 }
