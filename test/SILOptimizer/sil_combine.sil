@@ -2211,7 +2211,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*GenContai
 // CHECK: apply [[FUN]]<ConcreteIndexable, ConcreteForwardIndexType>(
 // CHECK: return
 
-sil @combine_cast_of_materializeForSet_function_nested_subsitutions : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer2<ConcreteIndexable>) -> () {
+sil @combine_cast_of_materializeForSet_function_nested_substitutions : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer2<ConcreteIndexable>) -> () {
 bbO(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2: $*GenContainer2<ConcreteIndexable>):
   %3 = metatype $@thick GenContainer2<ConcreteIndexable>.Type
   %4 = function_ref @materializeForSetClosure2 : $@convention(thin) <τ_0_0 : AnIndexable> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer2<τ_0_0>, @thick GenContainer2<τ_0_0>.Type) -> ()
