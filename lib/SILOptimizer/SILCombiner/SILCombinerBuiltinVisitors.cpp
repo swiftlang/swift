@@ -32,7 +32,7 @@ using namespace swift::PatternMatch;
 
 SILInstruction *SILCombiner::optimizeBuiltinCompareEq(BuiltinInst *BI,
                                                       bool NegateResult) {
-  // Canonicalize boolean comparisions.
+  // Canonicalize boolean comparisons.
   if (auto OpTy = BI->getArguments()[0].getType().getAs<BuiltinIntegerType>())
     if (OpTy->isFixedWidth(1))
       // cmp_eq %X, -1 -> xor (cmp_eq %X, 0), -1

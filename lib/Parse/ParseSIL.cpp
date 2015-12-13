@@ -1481,7 +1481,7 @@ bool getApplySubstitutionsFromParsed(
   return false;
 }
 
-// FIXME: we work around canoicalization of PolymorphicFunctionType
+// FIXME: we work around canonicalization of PolymorphicFunctionType
 // by generating GenericSignature and transforming the input, output
 // types.
 static GenericSignature *canonicalPolymorphicFunctionType(

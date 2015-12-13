@@ -1124,7 +1124,7 @@ void PatternMatchEmission::bindIrrefutablePatterns(const ClauseRow &row,
 void PatternMatchEmission::bindIrrefutablePattern(Pattern *pattern,
                                                   ConsumableManagedValue value,
                                                   bool forIrrefutableRow) {
-  // We use null patterns to mean artifical AnyPatterns.
+  // We use null patterns to mean artificial AnyPatterns.
   if (!pattern) return;
 
   pattern = pattern->getSemanticsProvidingPattern();
