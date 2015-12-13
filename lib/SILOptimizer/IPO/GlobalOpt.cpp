@@ -304,7 +304,7 @@ void SILGlobalOpt::collectOnceCall(BuiltinInst *BI) {
   if (!Callee->getName().startswith("globalinit_"))
     return;
 
-  // We currently disable optimizing the intializer if a globalinit_func
+  // We currently disable optimizing the initializer if a globalinit_func
   // is called by "once" from multiple locations.
   if (!BI->getFunction()->isGlobalInit())
     // If a globalinit_func is called by "once" from a function that is not
@@ -454,7 +454,7 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
   }
 }
 
-/// Create a getter function from the intializer function.
+/// Create a getter function from the initializer function.
 static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
   // Generate a getter from the global init function without side-effects.
   llvm::SmallString<20> getterBuffer;
