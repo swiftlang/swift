@@ -1099,10 +1099,11 @@ function(_add_swift_library_single target name)
     set(PLIST_INFO_BUILD_VERSION)
   endif()
 
-  # On Linux add the linker script that coalesces protocol conformance
-  # sections. This wouldn't be necessary if the link was done by the swift
-  # binary: rdar://problem/19007002
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+  # On Linux and FreeBSD add the linker script that coalesces protocol
+  # conformance sections. This wouldn't be necessary if the link was done by
+  # the swift binary: rdar://problem/19007002
+  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux" OR
+     "${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
     list(APPEND link_flags
         "-Xlinker" "-T"
         "-Xlinker" "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}/swift.ld")
