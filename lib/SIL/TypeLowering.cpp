@@ -323,7 +323,7 @@ namespace {
     RetTy visitTupleType(CanTupleType type) {
       bool hasReference = false;
       // TODO: We ought to be able to early-exit as soon as we've established
-      // that a type is address-only. However, we also currenty rely on
+      // that a type is address-only. However, we also currently rely on
       // SIL lowering to catch unsupported recursive value types.
       bool isAddressOnly = false;
       for (auto eltType : type.getElementTypes()) {
@@ -1056,7 +1056,7 @@ namespace {
       typedef LoadableTupleTypeLowering::Child Child;
       SmallVector<Child, 8> childElts;
       // TODO: We ought to be able to early-exit as soon as we've established
-      // that a type is address-only. However, we also currenty rely on
+      // that a type is address-only. However, we also currently rely on
       // SIL lowering to catch unsupported recursive value types.
       bool isAddressOnly = false;
       bool hasOnlyTrivialChildren = true;
@@ -1080,7 +1080,7 @@ namespace {
 
     const TypeLowering *visitAnyStructType(CanType structType, StructDecl *D) {
       // TODO: We ought to be able to early-exit as soon as we've established
-      // that a type is address-only. However, we also currenty rely on
+      // that a type is address-only. However, we also currently rely on
       // SIL lowering to catch unsupported recursive value types.
       bool isAddressOnly = false;
       
@@ -1116,7 +1116,7 @@ namespace {
         
     const TypeLowering *visitAnyEnumType(CanType enumType, EnumDecl *D) {
       // TODO: We ought to be able to early-exit as soon as we've established
-      // that a type is address-only. However, we also currenty rely on
+      // that a type is address-only. However, we also currently rely on
       // SIL lowering to catch unsupported recursive value types.
       bool isAddressOnly = false;
 
