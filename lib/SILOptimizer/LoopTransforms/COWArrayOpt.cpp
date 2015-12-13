@@ -1330,7 +1330,7 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
         if (Kind == ArrayCallKind::kArrayInit ||
             Kind == ArrayCallKind::kArrayUninitialized)
           continue;
-        // All array types must be the same. This is a stronger guarantueed than
+        // All array types must be the same. This is a stronger guaranteed than
         // we actually need. The requirement is that we can't create another
         // reference to the array by performing an array operation: for example,
         // storing or appending one array into an two-dimensional array.
