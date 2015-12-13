@@ -359,6 +359,8 @@ public func sorted<
 // for p in preds
 
 /// Exchange the values of `a` and `b`.
+///
+/// - Requires: `a` and `b` do not alias each other.
 public func swap<T>(inout a : T, inout _ b : T) {
   // Semantically equivalent to (a, b) = (b, a).
   // Microoptimized to avoid retain/release traffic.
