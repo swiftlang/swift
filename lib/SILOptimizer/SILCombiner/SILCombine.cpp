@@ -263,7 +263,7 @@ SILInstruction *SILCombiner::insertNewInstBefore(SILInstruction *New,
 }
 
 // This method is to be used when an instruction is found to be dead,
-// replacable with another preexisting expression. Here we add all uses of I
+// replaceable with another preexisting expression. Here we add all uses of I
 // to the worklist, replace all uses of I with the new value, then return I,
 // so that the combiner will know that I was modified.
 SILInstruction *SILCombiner::replaceInstUsesWith(SILInstruction &I,
