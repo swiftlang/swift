@@ -28,7 +28,7 @@ public struct Zip2Generator<
 
   /// Construct around a pair of underlying generators.
   public init(_ generator1: Generator1, _ generator2: Generator2) {
-    _baseStreams = (generator1, generator2)
+    (_baseStream1, _baseStream2) = (generator1, generator2)
   }
 
   /// Advance to the next element and return it, or `nil` if no next
@@ -48,15 +48,16 @@ public struct Zip2Generator<
       return nil
     }
 
-    guard let element0 = _baseStreams.0.next(), element1 = _baseStreams.1.next() else {
+    guard let element1 = _baseStream1.next(), element2 = _baseStream2.next() else {
       _reachedEnd = true
       return nil
     }
 
-    return (element0, element1)
+    return (element1, element2)
   }
 
-  internal var _baseStreams: (Generator1, Generator2)
+  internal var _baseStream1: Generator1
+  internal var _baseStream2: Generator2
   internal var _reachedEnd: Bool = false
 }
 
@@ -76,7 +77,7 @@ public struct Zip2Sequence<Sequence1 : SequenceType, Sequence2 : SequenceType>
   /// Construct an instance that makes pairs of elements from `sequence1` and
   /// `sequence2`.
   public init(_ sequence1: Sequence1, _ sequence2: Sequence2) {
-    _sequences = (sequence1, sequence2)
+    (_sequence1, _sequence2) = (sequence1, sequence2)
   }
 
   /// Return a *generator* over the elements of this *sequence*.
@@ -84,11 +85,12 @@ public struct Zip2Sequence<Sequence1 : SequenceType, Sequence2 : SequenceType>
   /// - Complexity: O(1).
   public func generate() -> Generator {
     return Generator(
-      _sequences.0.generate(),
-      _sequences.1.generate())
+      _sequence1.generate(),
+      _sequence2.generate())
   }
 
-  internal let _sequences: (Sequence1, Sequence2)
+  internal let _sequence1: Sequence1
+  internal let _sequence2: Sequence2
 }
 
 @available(*, unavailable, renamed="Zip2Generator")
