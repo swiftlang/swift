@@ -1846,17 +1846,15 @@ public:
   ///
   /// \param dc The declaration context in which the type occurs.
   ///
-  /// \param skipProtocolSelfConstraint Whether to skip the constraint on a
-  /// protocol's 'Self' type.
-  ///
   /// \returns The opened type.
   Type openType(Type type, ConstraintLocatorBuilder locator,
                 DeclContext *dc = nullptr,
-                bool skipProtocolSelfConstraint = false,
                 DependentTypeOpener *opener = nullptr) {
     llvm::DenseMap<CanType, TypeVariableType *> replacements;
-    return openType(type, locator, replacements, dc, skipProtocolSelfConstraint,
-                    opener);
+    return openType(type, locator, replacements, dc,
+                    /*skipProtocolSelfConstraint=*/false,
+                    /*minOpeningDepth=*/0,
+                    /*opener=*/opener);
   }
 
   /// \brief "Open" the given type by replacing any occurrences of generic
@@ -1872,6 +1870,10 @@ public:
   /// \param skipProtocolSelfConstraint Whether to skip the constraint on a
   /// protocol's 'Self' type.
   ///
+  /// \param minOpeningDepth Whether to skip generic parameters from generic
+  /// contexts that we're inheriting context archetypes from. See the comment
+  /// on openGeneric().
+  ///
   /// \param opener Abstract class that assists in opening dependent
   /// types.
   ///
@@ -1881,6 +1883,7 @@ public:
                 llvm::DenseMap<CanType, TypeVariableType *> &replacements,
                 DeclContext *dc = nullptr,
                 bool skipProtocolSelfConstraint = false,
+                unsigned minOpeningDepth = 0,
                 DependentTypeOpener *opener = nullptr);
 
   /// \brief "Open" the given binding type by replacing any occurrences of
@@ -1897,10 +1900,30 @@ public:
 
   /// Open the generic parameter list and its requirements, creating
   /// type variables for each of the type parameters.
+  ///
+  /// Note: when a generic declaration is nested inside a generic function, the
+  /// generic parameters of the outer function do not appear in the inner type's
+  /// generic signature.
+  ///
+  /// Eg,
+  ///
+  /// func foo<T>() {
+  ///   func g() -> T {} // type is () -> T
+  /// }
+  ///
+  /// class Foo<T> {
+  ///   func g() -> T {} // type is <T> Foo<T> -> () -> T
+  /// }
+  ///
+  /// Instead, the outer parameters can appear as free variables in the nested
+  /// declaration's signature, but they do not have to, so they might not be
+  /// substituted at all. Since the inner declaration inherits the context
+  /// archetypes of the outer function we do not need to open them here.
   void openGeneric(DeclContext *dc,
                    ArrayRef<GenericTypeParamType *> params,
                    ArrayRef<Requirement> requirements,
                    bool skipProtocolSelfConstraint,
+                   unsigned minOpeningDepth,
                    DependentTypeOpener *opener,
                    ConstraintLocatorBuilder locator,
                    llvm::DenseMap<CanType, TypeVariableType *> &replacements);

@@ -484,7 +484,8 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
   ConstraintSystem cs(tc, dc1, None);
   llvm::DenseMap<CanType, TypeVariableType *> replacements;
   cs.openGeneric(dc2, sig2->getGenericParams(), sig2->getRequirements(),
-                 false, nullptr, ConstraintLocatorBuilder(nullptr),
+                 false, dc2->getGenericTypeContextDepth(),
+                 nullptr, ConstraintLocatorBuilder(nullptr),
                  replacements);
 
   // Bind the 'Self' type from the first extension to the type parameter from
@@ -615,7 +616,6 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
   ArchetypeOpener opener(decl1->getPotentialGenericDeclContext());
   Type openedType1 = cs.openType(type1, locator,
                                  decl1->getPotentialGenericDeclContext(),
-                                 /*skipProtocolSelfConstraint=*/false,
                                  &opener);
 
   // Extract the self types from the declarations, if they have them.

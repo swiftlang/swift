@@ -448,6 +448,29 @@ bool DeclContext::isGenericTypeContext() const {
   return false;
 }
 
+/// Determine the maximum depth of the current generic type context's generic
+/// parameters. If the current context is not a generic type context, returns
+/// the maximum depth of any generic parameter in this context.
+unsigned DeclContext::getGenericTypeContextDepth() const {
+  unsigned depth = 0;
+  bool inTypeContext = true;
+  for (const auto *dc = this; dc; dc = dc->getParent()) {
+    // Starting from the innermost context that is not a type context, count
+    // all parent contexts that have generic parameters.
+    if (!dc->isTypeContext())
+      inTypeContext = false;
+
+    if (!inTypeContext && dc->isInnermostContextGeneric())
+      depth++;
+  }
+
+  // Until nominal type generic signatures are parented onto outer generic
+  // function signatures, we can just punt here -- the outermost nominal
+  // type context's generic parameters all have a depth of 0.
+  return 0;
+  // return depth;
+}
+
 /// Determine whether the innermost context is generic.
 bool DeclContext::isInnermostContextGeneric() const {
   switch (getContextKind()) {

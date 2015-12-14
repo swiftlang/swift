@@ -1024,13 +1024,25 @@ bool TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
                                         ArrayRef<Type> genericArgs) {
   // Form the set of generic substitutions required
   TypeSubstitutionMap substitutions;
+
   auto genericParams = genericSig->getGenericParams();
-  assert(genericParams.size() == genericArgs.size());
-  for (unsigned i = 0, n = genericParams.size(); i != n; ++i) {
-    auto gp
-      = genericParams[i]->getCanonicalType()->castTo<GenericTypeParamType>();
-    substitutions[gp] = genericArgs[i];
+
+  unsigned genericTypeDepth =
+      owner->getAnyNominal()->getGenericTypeContextDepth();
+  unsigned count = 0;
+
+  for (auto gp : genericParams) {
+    // Skip parameters that were introduced by outer generic
+    // function signatures.
+    if (gp->getDecl()->getDepth() < genericTypeDepth)
+      continue;
+    auto gpTy = gp->getCanonicalType()->castTo<GenericTypeParamType>();
+    substitutions[gpTy] = genericArgs[count++];
   }
+
+  // The number of generic type arguments being bound must be equal to the
+  // total number of generic parameters in the current generic type context.
+  assert(count == genericArgs.size());
 
   // Check each of the requirements.
   Module *module = dc->getParentModule();

@@ -4210,8 +4210,10 @@ bool TypeChecker::isProtocolExtensionUsable(DeclContext *dc, Type type,
   auto genericSig = protocolExtension->getGenericSignature();
   
   cs.openGeneric(protocolExtension, genericSig->getGenericParams(),
-                 genericSig->getRequirements(), false, nullptr,
-                 ConstraintLocatorBuilder(nullptr), replacements);
+                 genericSig->getRequirements(), false,
+                 protocolExtension->getGenericTypeContextDepth(),
+                 nullptr, ConstraintLocatorBuilder(nullptr),
+                 replacements);
 
   // Bind the 'Self' type variable to the provided type.
   CanType selfType = genericSig->getGenericParams().back()->getCanonicalType();
