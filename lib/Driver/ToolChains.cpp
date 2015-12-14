@@ -1,4 +1,4 @@
-//===--- ToolChains.cpp - Job invocations (general and per-plaftorm) ------===//
+//===--- ToolChains.cpp - Job invocations (general and per-platform) ------===//
 //
 // This source file is part of the Swift.org open source project
 //

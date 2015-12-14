@@ -60,7 +60,7 @@ struct UnreachableInfo {
 /// removal stage of the path.
 ///
 /// To report unreachable user code, we detect the blocks that contain user
-/// code and are not reachable (along any of the preceeding paths). Note that we
+/// code and are not reachable (along any of the preceding paths). Note that we
 /// only want to report the first statement on the unreachable path. Keeping
 /// the info about which branch folding had produced the unreachable block makes
 /// it possible.
@@ -146,7 +146,7 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
 
   // If we've reached this point, the optimization is valid, so optimize.
   // We know that the incomming arguments from all predecessors are the same,
-  // so just use them directly and remove the basic block paramters.
+  // so just use them directly and remove the basic block parameters.
 
   // Drop the arguments from the branch instructions by creating a new branch
   // instruction and deleting the old one.
