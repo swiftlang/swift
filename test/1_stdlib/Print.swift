@@ -83,7 +83,7 @@ func debugPrintedIs<T>(
 ) {
   var actual = ""
   debugPrint(object, terminator: "", toStream: &actual)
-  if expected1 != actual && (expected2 != nil && expected2! != actual) {
+  if expected1 != actual && (expected2 == nil || expected2! != actual) {
     print(
       "check failed at \(file), line \(line)",
       "expected: \"\(expected1)\" or \"\(expected2)\"",
