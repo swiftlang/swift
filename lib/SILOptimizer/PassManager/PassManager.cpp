@@ -277,16 +277,12 @@ void SILPassManager::runFunctionPasses(PassList FuncTransforms) {
     runPassesOnFunction(FuncTransforms, F);
 
     ++CountOptimized[F];
-    // We currently have no function passes that generate new
-    // functions, so confirm that we only optimize a given function
-    // once.
-    assert(CountOptimized[F] == 1 && "Expected function to be optimized once!");
 
     // If running the function transforms did not result in new
     // functions being added to the top of the worklist, then we're
-    // done with this function and can pop it off and
-    // continue. Otherwise, we'll return to this function and
-    // reoptimize after processing the new function that were added.
+    // done with this function and can pop it off and continue.
+    // Otherwise, we'll return to this function and reoptimize after
+    // processing the new functions that were added.
     if (F == FunctionWorklist.back())
       FunctionWorklist.pop_back();
   }

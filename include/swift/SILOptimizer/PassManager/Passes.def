@@ -104,6 +104,8 @@ PASS(RedundantLoadElimination, "redundant-load-elim",
      "Multiple basic block redundant load elimination")
 PASS(DeadStoreElimination, "dead-store-elim",
      "Multiple basic block dead store elimination")
+PASS(GenericSpecializer, "generic-specializer",
+     "Specialization of generic functions by static types")
 PASS(GlobalOpt, "global-opt",
      "Global variable optimizations")
 PASS(GlobalPropertyOpt, "global-property-opt",
