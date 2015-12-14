@@ -2352,6 +2352,9 @@ bool swift::calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl) {
   if (AFD->isDynamic())
     return false;
 
+  if (!AFD->hasAccessibility())
+    return false;
+
   // Only consider 'private' members, unless we are in whole-module compilation.
   switch (AFD->getEffectiveAccess()) {
   case Accessibility::Public:
