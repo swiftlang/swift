@@ -1893,8 +1893,7 @@ public:
   ///
   /// \param type The type to open.
   /// \returns The opened type, or \c type if there are no archetypes in it.
-  Type openBindingType(Type type, ConstraintLocatorBuilder locator,
-                       DeclContext *dc = nullptr);
+  Type openBindingType(Type type, ConstraintLocatorBuilder locator);
 
   /// Open the generic parameter list and its requirements, creating
   /// type variables for each of the type parameters.

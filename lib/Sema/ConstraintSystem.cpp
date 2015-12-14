@@ -721,9 +721,8 @@ bool ConstraintSystem::isSetType(Type type) {
 }
 
 Type ConstraintSystem::openBindingType(Type type, 
-                                       ConstraintLocatorBuilder locator,
-                                       DeclContext *dc) {
-  Type result = openType(type, locator, dc);
+                                       ConstraintLocatorBuilder locator) {
+  Type result = openType(type, locator);
   
   if (isArrayType(type)) {
     auto boundStruct = cast<BoundGenericStructType>(type.getPointer());
