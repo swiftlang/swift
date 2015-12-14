@@ -34,13 +34,78 @@ STATISTIC(NumWitnessDevirt, "Number of witness_method applies devirtualized");
 //                         Class Method Optimization
 //===----------------------------------------------------------------------===//
 
+/// Check if a given class is final in terms of a current
+/// compilation, i.e.:
+/// - it is really final
+/// - or it is private and has not sub-classes
+/// - or it is an internal class without sub-classes and
+///   it is a whole-module compilation.
+static bool isKnownFinalClass(ClassDecl *CD, SILModule &M,
+                              ClassHierarchyAnalysis *CHA) {
+  const DeclContext *DC = M.getAssociatedContext();
+
+  if (CD->isFinal())
+    return true;
+
+  // Without an associated context we cannot perform any
+  // access-based optimizations.
+  if (!DC)
+    return false;
+
+  // Only handle classes defined within the SILModule's associated context.
+  if (!CD->isChildContextOf(DC))
+    return false;
+
+  if (!CD->hasAccessibility())
+    return false;
+
+  // Only consider 'private' members, unless we are in whole-module compilation.
+  switch (CD->getEffectiveAccess()) {
+  case Accessibility::Public:
+    return false;
+  case Accessibility::Internal:
+    if (!M.isWholeModule())
+      return false;
+    break;
+  case Accessibility::Private:
+    break;
+  }
+
+  // Take the ClassHieararchyAnalysis into account.
+  // If a given class has no subclasses and
+  // - private
+  // - or internal and it is a WMO compilation
+  // then this class can be considered final for the purpose
+  // of devirtualization.
+  if (CHA) {
+    if (!CHA->hasKnownDirectSubclasses(CD)) {
+      switch (CD->getEffectiveAccess()) {
+      case Accessibility::Public:
+        return false;
+      case Accessibility::Internal:
+        if (!M.isWholeModule())
+          return false;
+        break;
+      case Accessibility::Private:
+        break;
+      }
+
+      return true;
+    }
+  }
+
+  return false;
+}
+
+
 // Attempt to get the instance for S, whose static type is the same as
 // its exact dynamic type, returning a null SILValue() if we cannot find it.
 // The information that a static type is the same as the exact dynamic,
 // can be derived e.g.:
 // - from a constructor or
 // - from a successful outcome of a checked_cast_br [exact] instruction.
-static SILValue getInstanceWithExactDynamicType(SILValue S) {
+static SILValue getInstanceWithExactDynamicType(SILValue S, SILModule &M,
+                                                ClassHierarchyAnalysis *CHA) {
 
   while (S) {
     S = S.stripCasts();
@@ -52,8 +117,15 @@ static SILValue getInstanceWithExactDynamicType(SILValue S) {
       break;
 
     auto *SinglePred = Arg->getParent()->getSinglePredecessor();
-    if (!SinglePred)
-      break;
+    if (!SinglePred) {
+      if (!Arg->isFunctionArg())
+        break;
+      auto *CD = Arg->getType().getClassOrBoundGenericClass();
+      // Check if this class is effectively final.
+      if (!CD || !isKnownFinalClass(CD, M, CHA))
+        break;
+      return Arg;
+    }
 
     // Traverse the chain of predecessors.
     if (isa<BranchInst>(SinglePred->getTerminator()) ||
@@ -652,7 +724,9 @@ swift::tryDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA) {
 
     // Try to check if the exact dynamic type of the instance is statically
     // known.
-    if (auto Instance = getInstanceWithExactDynamicType(CMI->getOperand()))
+    if (auto Instance = getInstanceWithExactDynamicType(CMI->getOperand(),
+                                                        CMI->getModule(),
+                                                        CHA))
       return tryDevirtualizeClassMethod(AI, Instance);
   }
 
