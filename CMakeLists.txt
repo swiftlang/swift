@@ -412,7 +412,10 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
   endif()
 
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
-  configure_sdk_unix(FREEBSD "FreeBSD" "freebsd" "freebsd" "x86_64" "x86_64-freebsd10")
+  string(REPLACE "[-].*" "" FREEBSD_SYSTEM_VERSION ${CMAKE_SYSTEM_VERSION})
+  message(STATUS "FreeBSD Version: ${FREEBSD_SYSTEM_VERSION}")
+  configure_sdk_unix(FREEBSD "FreeBSD" "freebsd" "freebsd" "x86_64"
+    "x86_64-unknown-freebsd${FREEBSD_SYSTEM_VERSION}")
 
   set(CMAKE_EXECUTABLE_FORMAT "ELF")
 
