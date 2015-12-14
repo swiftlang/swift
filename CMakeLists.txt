@@ -412,6 +412,8 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
   endif()
 
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
+  # FIXME: Using the host OS version won't produce correct results for
+  # cross-compilation.
   string(REPLACE "[-].*" "" FREEBSD_SYSTEM_VERSION ${CMAKE_SYSTEM_VERSION})
   message(STATUS "FreeBSD Version: ${FREEBSD_SYSTEM_VERSION}")
   configure_sdk_unix(FREEBSD "FreeBSD" "freebsd" "freebsd" "x86_64"
