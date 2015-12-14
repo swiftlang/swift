@@ -768,7 +768,7 @@ case "$(uname -s -m)" in
         )
         ;;
 
-    FreeBSD\ x86_64)
+    FreeBSD\ amd64)
         NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
             "freebsd-x86_64"
         )
@@ -853,7 +853,7 @@ case "$(uname -s -m)" in
         )
         ;;
 
-    FreeBSD\ x86_64)
+    FreeBSD\ amd64)
         STDLIB_DEPLOYMENT_TARGETS=(
             "freebsd-x86_64"
         )
