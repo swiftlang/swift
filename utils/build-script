@@ -295,9 +295,12 @@ details of the setups of other systems or automated environments.""")
         dest="build_foundation")
 
     extra_actions_group = parser.add_argument_group(
-        title="Extra actions to perform before building")
+        title="Extra actions to perform before or in addition to building")
     extra_actions_group.add_argument("-c", "--clean",
         help="do a clean build",
+        action="store_true")
+    extra_actions_group.add_argument("--export-compile-commands",
+        help="generate compilation databases in addition to building",
         action="store_true")
 
     build_variant_group = parser.add_mutually_exclusive_group(required=False)
@@ -558,6 +561,11 @@ the number of parallel build jobs to use""",
         args.test = True
 
     build_script_impl_inferred_args = []
+
+    if args.export_compile_commands:
+        build_script_impl_inferred_args += [
+            "--export-compile-commands"
+        ]
 
     if args.cmake_generator == "XcodeIDEOnly":
         args.cmake_generator = "Xcode"
