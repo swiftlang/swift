@@ -51,7 +51,7 @@ extension String {
 }
 
 /// From a non-`nil` `UnsafePointer` to a null-terminated string
-/// with possibly-transient lifetime, create a nul-terminated array of 'C' char.
+/// with possibly-transient lifetime, create a null-terminated array of 'C' char.
 /// Returns `nil` if passed a null pointer.
 @warn_unused_result
 public func _persistCString(s: UnsafePointer<CChar>) -> [CChar]? {
