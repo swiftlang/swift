@@ -80,6 +80,76 @@ static void getAllSubclasses(ClassHierarchyAnalysis *CHA,
   }
 }
 
+/// \brief Returns true, if a method implementation corresponding to
+/// the class_method applied to an instance of the class CD is
+/// effectively final, i.e. it is statically known to be not overridden
+/// by any subclasses of the class CD.
+///
+/// \p AI  invocation instruction
+/// \p ClassType type of the instance
+/// \p CD  static class of the instance whose method is being invoked
+/// \p CHA class hierarchy analysis
+bool isEffectivelyFinalMethod(FullApplySite AI,
+                              SILType ClassType,
+                              ClassDecl *CD,
+                              ClassHierarchyAnalysis *CHA) {
+  if (CD && CD->isFinal())
+    return true;
+
+  const DeclContext *DC = AI.getModule().getAssociatedContext();
+
+  // Without an associated context we cannot perform any
+  // access-based optimizations.
+  if (!DC)
+    return false;
+
+  auto *CMI = cast<MethodInst>(AI.getCallee());
+
+  if (!calleesAreStaticallyKnowable(AI.getModule(), CMI->getMember()))
+    return false;
+
+  auto *Method = CMI->getMember().getAbstractFunctionDecl();
+  assert(Method && "Expected abstract function decl!");
+  assert(!Method->isFinal() && "Unexpected indirect call to final method!");
+
+  // If this method is not overridden in the module,
+  // there is no other implementation.
+  if (!Method->isOverridden())
+    return true;
+
+  // Class declaration may be nullptr, e.g. for cases like:
+  // func foo<C:Base>(c: C) {}, where C is a class, but
+  // it does not have a class decl.
+  if (!CD)
+    return false;
+
+  if (!CHA)
+    return false;
+
+  // This is a private or a module internal class.
+  //
+  // We can analyze the class hierarchy rooted at it and
+  // eventually devirtualize a method call more efficiently.
+
+  ClassHierarchyAnalysis::ClassList Subs;
+  getAllSubclasses(CHA, CD, ClassType, AI.getModule(), Subs);
+
+  // This is the implementation of the method to be used
+  // if the exact class of the instance would be CD.
+  auto *ImplMethod = CD->findImplementingMethod(Method);
+
+  // First, analyze all direct subclasses.
+  for (auto S : Subs) {
+    // Check if the subclass overrides a method and provides
+    // a different implementation.
+    auto *ImplFD = S->findImplementingMethod(Method);
+    if (ImplFD != ImplMethod)
+      return false;
+  }
+
+  return true;
+}
+
 /// Check if a given class is final in terms of a current
 /// compilation, i.e.:
 /// - it is really final
@@ -711,22 +781,6 @@ DevirtualizationResult swift::tryDevirtualizeWitnessMethod(ApplySite AI) {
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
-/// Return the final class decl based on access control information.
-static bool isKnownFinal(SILModule &M, SILDeclRef Member) {
-  if (!calleesAreStaticallyKnowable(M, Member))
-    return false;
-
-  auto *FD = Member.getAbstractFunctionDecl();
-  assert(FD && "Expected abstract function decl!");
-
-  assert(!FD->isFinal() && "Unexpected indirect call to final method!");
-
-  if (FD->isOverridden())
-    return false;
-
-  return true;
-}
-
 /// Attempt to devirtualize the given apply if possible, and return a
 /// new instruction in that case, or nullptr otherwise.
 DevirtualizationResult
@@ -758,9 +812,16 @@ swift::tryDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA) {
   ///
   /// %YY = function_ref @...
   if (auto *CMI = dyn_cast<ClassMethodInst>(AI.getCallee())) {
-    // Check if the class member is known to be final.
-    if (isKnownFinal(CMI->getModule(), CMI->getMember()))
-      return tryDevirtualizeClassMethod(AI, CMI->getOperand());
+    auto &M = AI.getModule();
+    auto Instance = CMI->getOperand().stripUpCasts();
+    auto ClassType = Instance.getType();
+    if (ClassType.is<MetatypeType>())
+      ClassType = ClassType.getMetatypeInstanceType(M);
+
+    auto *CD = ClassType.getClassOrBoundGenericClass();
+
+    if (isEffectivelyFinalMethod(AI, ClassType, CD, CHA))
+      return tryDevirtualizeClassMethod(AI, Instance);
 
     // Try to check if the exact dynamic type of the instance is statically
     // known.

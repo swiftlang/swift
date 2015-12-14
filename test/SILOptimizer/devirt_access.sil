@@ -102,7 +102,11 @@ bb0(%0 : $X):
 
 //CHECK-LABEL: sil @Case2
 //CHECK: function_ref @_TFC14devirt_access21X4pingfS0_FT_Si
-//CHECK-NEXT: apply
+// Y is an internal class, it has no subclasses and it is a wmo compilation,
+// therefore ping method invocation can be devirtualized.
+//CHECK-NOT: class_method
+//CHECK: apply
+//CHECK-NOT: class_method
 //CHECK: return
 sil @Case2 : $@convention(thin) (@owned Y) -> Int {
 bb0(%0 : $Y):

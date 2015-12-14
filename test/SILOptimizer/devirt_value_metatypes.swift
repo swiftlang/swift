@@ -33,10 +33,13 @@ public class D : C {
 }
 
 // CHECK-LABEL: sil @_TF22devirt_value_metatypes5testDFCS_1DSi
-// CHECK: value_metatype $@thick D.Type
-// CHECK: checked_cast_br
-// CHECK: function_ref
-// CHECK: class_method
+// CHECK-NOT: value_metatype %
+// D.foo is an internal method, D has no subclasses and it is a wmo compilation,
+// therefore D.foo method invocation can be devirtualized.
+// CHECK: function_ref @_TTSf4d___TZFC22devirt_value_metatypes1D3foofT_Si 
+// CHECK-NOT: value_metatype %
+// CHECK-NOT: checked_cast_br
+// CHECK-NOT: class_method
 // CHECK: }
 public func testD(x: D) -> Int {
   return (x.dynamicType as C.Type).foo()
