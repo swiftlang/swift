@@ -1,4 +1,4 @@
-//===--- DiverseStack.cpp - Out-of-line code for the heterogenous stack ---===//
+//===--- DiverseStack.cpp - Out-of-line code for the heterogeneous stack ---===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file implements the small amount of code for the heterogenous
+//  This file implements the small amount of code for the heterogeneous
 //  stack and list classes.
 //
 //===----------------------------------------------------------------------===//

@@ -29,7 +29,7 @@ namespace swift {
 
 template <class T> class DiverseListImpl;
 
-/// DiverseList - A list of heterogenously-typed objects.
+/// DiverseList - A list of heterogeneously-typed objects.
 ///
 /// \tparam T - A common base class of the objects in the list; must
 ///   provide an allocated_size() const method.
