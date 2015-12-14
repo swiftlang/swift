@@ -1282,7 +1282,7 @@ void
 BBEnumTagDataflowState::
 mergePredecessorStates(BBToDataflowStateMap &BBToStateMap) {
 
-  // If we have no processors, there is nothing to do so return early...
+  // If we have no predecessors, there is nothing to do so return early...
   if (getBB()->pred_empty()) {
     DEBUG(llvm::dbgs() << "            No Preds.\n");
     return;
