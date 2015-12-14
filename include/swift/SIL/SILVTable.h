@@ -55,7 +55,7 @@ private:
   /// The number of SILVTables entries.
   unsigned NumEntries;
 
-  /// Tail-allocated SILVTable entires.
+  /// Tail-allocated SILVTable entries.
   Pair Entries[1];
 
   /// Private constructor. Create SILVTables by calling SILVTable::create.

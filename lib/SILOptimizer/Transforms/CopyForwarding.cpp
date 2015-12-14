@@ -778,7 +778,7 @@ bool CopyForwarding::backwardPropagateCopy(
   // Convert a reinitialization of this address into a destroy, followed by an
   // initialization. Replacing a copy with a destroy+init is not by itself
   // profitable. However, it does allow us to eliminate the later copy, and the
-  // init copy may be eliminater later.
+  // init copy may be eliminated later.
   if (auto Copy = dyn_cast<CopyAddrInst>(&*SI)) {
     if (Copy->getDest() == CopySrc && !Copy->isInitializationOfDest()) {
       SILBuilderWithScope(Copy).createDestroyAddr(Copy->getLoc(), CopySrc);

@@ -2539,7 +2539,7 @@ enum Target {
 
 // Ensure that we generate IR that does not run into verification
 // issues for the case where there is a single tag bit and extra
-// enhabitants.
+// inhabitants.
 // CHECK-LABEL: define void @generate_conditional_branch
 sil @generate_conditional_branch : $@convention(thin) (@owned Target) -> () {
 bb0(%0 : $Target):
