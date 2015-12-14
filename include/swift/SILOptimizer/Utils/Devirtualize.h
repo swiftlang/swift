@@ -43,7 +43,7 @@ namespace swift {
 typedef std::pair<ValueBase *, ApplySite> DevirtualizationResult;
 
 DevirtualizationResult tryDevirtualizeApply(FullApplySite AI);
-bool isClassWithUnboundGenericParameters(SILType C, SILModule &M);
+bool isNominalTypeWithUnboundGenericParameters(SILType Ty, SILModule &M);
 bool canDevirtualizeClassMethod(FullApplySite AI, SILType ClassInstanceType);
 DevirtualizationResult devirtualizeClassMethod(FullApplySite AI,
                                                SILValue ClassInstance);

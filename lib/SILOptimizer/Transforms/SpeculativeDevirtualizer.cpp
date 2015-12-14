@@ -312,7 +312,7 @@ static bool tryToSpeculateTarget(FullApplySite AI,
   // Bail if any generic types parameters of the class instance type are
   // unbound.
   // We cannot devirtualize unbound generic calls yet.
-  if (isClassWithUnboundGenericParameters(SubType, AI.getModule()))
+  if (isNominalTypeWithUnboundGenericParameters(SubType, AI.getModule()))
     return false;
 
   auto &M = CMI->getModule();

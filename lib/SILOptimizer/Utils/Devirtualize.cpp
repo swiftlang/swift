@@ -102,11 +102,11 @@ static CanType bindSuperclass(CanType Superclass,
 
 // Returns true if any generic types parameters of the class are
 // unbound.
-bool swift::isClassWithUnboundGenericParameters(SILType C, SILModule &M) {
-  auto *CD = C.getClassOrBoundGenericClass();
-  if (CD && CD->getGenericSignature()) {
+bool swift::isNominalTypeWithUnboundGenericParameters(SILType Ty, SILModule &M) {
+  auto *ND = Ty.getNominalOrBoundGenericNominal();
+  if (ND && ND->getGenericSignature()) {
     auto InstanceTypeSubsts =
-        C.gatherAllSubstitutions(M);
+        Ty.gatherAllSubstitutions(M);
 
     if (!InstanceTypeSubsts.empty()) {
       if (hasUnboundGenericTypes(InstanceTypeSubsts))
@@ -114,7 +114,7 @@ bool swift::isClassWithUnboundGenericParameters(SILType C, SILModule &M) {
     }
   }
 
-  if (C.hasArchetype())
+  if (Ty.hasArchetype())
     return true;
 
   return false;
