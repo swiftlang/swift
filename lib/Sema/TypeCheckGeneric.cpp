@@ -257,20 +257,25 @@ bool TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
     options = TR_GenericSignature;
   }    
 
-  // Visit each of the generic parameters.
+  // First, set the depth of each generic parameter, and add them to the
+  // archetype builder. Do this before checking the inheritance clause,
+  // since it may itself be dependent on one of these parameters.
   unsigned depth = genericParams->getDepth();
   for (auto param : *genericParams) {
-    // Check the generic type parameter.
-    // Set the depth of this type parameter.
     param->setDepth(depth);
 
-    // Check the inheritance clause of this type parameter.
+    if (builder) {
+      if (builder->addGenericParameter(param))
+        invalid = true;
+    }
+  }
+
+  // Now, check the inheritance clauses of each parameter.
+  for (auto param : *genericParams) {
     checkInheritanceClause(param, resolver);
 
     if (builder) {
-      // Add the generic parameter to the builder.
-      if (builder->addGenericParameter(param))
-        invalid = true;
+      builder->addGenericParameterRequirements(param);
 
       // Infer requirements from the inherited types.
       for (const auto &inherited : param->getInherited()) {
