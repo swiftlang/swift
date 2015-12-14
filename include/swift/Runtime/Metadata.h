@@ -192,7 +192,7 @@ public:
   /// available in this type's value witness table.
   bool hasExtraInhabitants() const { return Data & HasExtraInhabitants; }
   /// True if this type's binary representation is that of an enum, and the
-  /// enum value witness table entries are avaialble in this type's value
+  /// enum value witness table entries are available in this type's value
   /// witness table.
   bool hasEnumWitnesses() const { return Data & HasEnumWitnesses; }
   constexpr ValueWitnessFlags
