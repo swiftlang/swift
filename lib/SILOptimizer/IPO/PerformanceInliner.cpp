@@ -249,11 +249,13 @@ namespace {
     /// \p Caller and the inliner needs to reject this inlining request.
     bool hasInliningCycle(SILFunction *Caller, SILFunction *Callee);
 
-    FullApplySite devirtualize(FullApplySite Apply);
+    FullApplySite devirtualize(FullApplySite Apply,
+							   ClassHierarchyAnalysis *CHA);
 
     bool devirtualizeAndSpecializeApplies(
       llvm::SmallVectorImpl<ApplySite> &Applies,
         SILModuleTransform *MT,
+		ClassHierarchyAnalysis *CHA,
         llvm::SmallVectorImpl<SILFunction *> &WorkList);
 
     ApplySite specializeGeneric(ApplySite Apply,
@@ -273,7 +275,8 @@ namespace {
     void inlineDevirtualizeAndSpecialize(SILFunction *WorkItem,
                                          SILModuleTransform *MT,
                                          DominanceAnalysis *DA,
-                                         SILLoopAnalysis *LA);
+                                         SILLoopAnalysis *LA,
+										 ClassHierarchyAnalysis *CHA);
   };
 }
 
@@ -853,9 +856,10 @@ static void tryLinkCallee(FullApplySite Apply) {
 // Attempt to devirtualize. When successful, replaces the old apply
 // with the new one and returns the new one. When unsuccessful returns
 // an empty apply site.
-FullApplySite SILPerformanceInliner::devirtualize(FullApplySite Apply) {
+FullApplySite SILPerformanceInliner::devirtualize(FullApplySite Apply,
+												  ClassHierarchyAnalysis *CHA) {
 
-  auto NewInstPair = tryDevirtualizeApply(Apply);
+  auto NewInstPair = tryDevirtualizeApply(Apply, CHA);
   if (!NewInstPair.second)
     return FullApplySite();
 
@@ -940,6 +944,7 @@ static void collectAllAppliesInFunction(SILFunction *F,
 bool SILPerformanceInliner::devirtualizeAndSpecializeApplies(
                                   llvm::SmallVectorImpl<ApplySite> &Applies,
                                   SILModuleTransform *MT,
+								  ClassHierarchyAnalysis *CHA,
                                llvm::SmallVectorImpl<SILFunction *> &WorkList) {
   assert(WorkList.empty() && "Expected empty worklist for return results!");
 
@@ -957,7 +962,7 @@ bool SILPerformanceInliner::devirtualizeAndSpecializeApplies(
 
     bool ChangedApply = false;
     if (auto FullApply = FullApplySite::isa(Apply.getInstruction())) {
-      if (auto NewApply = devirtualize(FullApply)) {
+      if (auto NewApply = devirtualize(FullApply, CHA)) {
         ChangedApply = true;
 
         Apply = ApplySite(NewApply.getInstruction());
@@ -1151,9 +1156,10 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
 
 void SILPerformanceInliner::inlineDevirtualizeAndSpecialize(
                                                           SILFunction *Caller,
-                                                        SILModuleTransform *MT,
-                                                          DominanceAnalysis *DA,
-                                                          SILLoopAnalysis *LA) {
+                                                       SILModuleTransform *MT,
+                                                        DominanceAnalysis *DA,
+                                                          SILLoopAnalysis *LA,
+												  ClassHierarchyAnalysis *CHA) {
   assert(Caller->isDefinition() && "Expected only functions with bodies!");
 
   llvm::SmallVector<SILFunction *, 4> WorkList;
@@ -1169,7 +1175,7 @@ void SILPerformanceInliner::inlineDevirtualizeAndSpecialize(
     // and collect new functions we should inline into as we do
     // so.
     llvm::SmallVector<SILFunction *, 4> NewFuncs;
-    if (devirtualizeAndSpecializeApplies(WorkItemApplies, MT, NewFuncs)) {
+    if (devirtualizeAndSpecializeApplies(WorkItemApplies, MT, CHA, NewFuncs)) {
       WorkList.insert(WorkList.end(), NewFuncs.begin(), NewFuncs.end());
       NewFuncs.clear();
     }
@@ -1214,7 +1220,8 @@ void SILPerformanceInliner::inlineDevirtualizeAndSpecialize(
         collectAllAppliesInFunction(WorkItem, WorkItemApplies);
 
         bool Modified =
-            devirtualizeAndSpecializeApplies(WorkItemApplies, MT, NewFuncs);
+            devirtualizeAndSpecializeApplies(WorkItemApplies, MT,
+											 CHA, NewFuncs);
         if (Modified) {
           WorkList.insert(WorkList.end(), NewFuncs.begin(), NewFuncs.end());
           NewFuncs.clear();
@@ -1298,6 +1305,7 @@ public:
     BasicCalleeAnalysis *BCA = PM->getAnalysis<BasicCalleeAnalysis>();
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
+    ClassHierarchyAnalysis *CHA = PM->getAnalysis<ClassHierarchyAnalysis>();
 
     if (getOptions().InlineThreshold == 0) {
       DEBUG(llvm::dbgs() << "*** The Performance Inliner is disabled ***\n");
@@ -1320,7 +1328,7 @@ public:
 
     // Inline functions bottom up from the leafs.
     while (!WorkList.empty()) {
-      Inliner.inlineDevirtualizeAndSpecialize(WorkList.back(), this, DA, LA);
+      Inliner.inlineDevirtualizeAndSpecialize(WorkList.back(), this, DA, LA, CHA);
       WorkList.pop_back();
     }
   }

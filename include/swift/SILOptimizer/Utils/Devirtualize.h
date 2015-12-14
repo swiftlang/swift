@@ -26,6 +26,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/ArrayRef.h"
 
@@ -43,6 +44,8 @@ namespace swift {
 typedef std::pair<ValueBase *, ApplySite> DevirtualizationResult;
 
 DevirtualizationResult tryDevirtualizeApply(FullApplySite AI);
+DevirtualizationResult tryDevirtualizeApply(FullApplySite AI,
+                                            ClassHierarchyAnalysis *CHA);
 bool isNominalTypeWithUnboundGenericParameters(SILType Ty, SILModule &M);
 bool canDevirtualizeClassMethod(FullApplySite AI, SILType ClassInstanceType);
 DevirtualizationResult devirtualizeClassMethod(FullApplySite AI,

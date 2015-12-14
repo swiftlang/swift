@@ -282,7 +282,8 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
                          SILModule::LinkingMode Mode,
                          DenseFunctionSet &FullyInlinedSet,
                          ImmutableFunctionSet::Factory &SetFactory,
-                         ImmutableFunctionSet CurrentInliningSet) {
+                         ImmutableFunctionSet CurrentInliningSet,
+						 ClassHierarchyAnalysis *CHA) {
   // Avoid reprocessing functions needlessly.
   if (FullyInlinedSet.count(F))
     return true;
@@ -313,7 +314,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
 
       auto *ApplyBlock = InnerAI.getParent();
 
-      auto NewInstPair = tryDevirtualizeApply(InnerAI);
+      auto NewInstPair = tryDevirtualizeApply(InnerAI, CHA);
       if (auto *NewInst = NewInstPair.first) {
         replaceDeadApply(InnerAI, NewInst);
         if (auto *II = dyn_cast<SILInstruction>(NewInst))
@@ -342,7 +343,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       // Then recursively process it first before trying to inline it.
       if (!runOnFunctionRecursively(CalleeFunction, InnerAI, Mode,
                                     FullyInlinedSet, SetFactory,
-                                    CurrentInliningSet)) {
+                                    CurrentInliningSet, CHA)) {
         // If we failed due to circular inlining, then emit some notes to
         // trace back the failure if we have more information.
         // FIXME: possibly it could be worth recovering and attempting other
@@ -433,6 +434,7 @@ namespace {
 class MandatoryInlining : public SILModuleTransform {
   /// The entry point to the transformation.
   void run() override {
+	ClassHierarchyAnalysis *CHA = getAnalysis<ClassHierarchyAnalysis>();
     SILModule *M = getModule();
     SILModule::LinkingMode Mode = getOptions().LinkMode;
     bool ShouldCleanup = !getOptions().DebugSerialization;
@@ -448,7 +450,7 @@ class MandatoryInlining : public SILModuleTransform {
       runOnFunctionRecursively(&F,
                                FullApplySite(static_cast<ApplyInst*>(nullptr)),
                                Mode, FullyInlinedSet,
-                               SetFactory, SetFactory.getEmptySet());
+                               SetFactory, SetFactory.getEmptySet(), CHA);
     }
 
     if (!ShouldCleanup)

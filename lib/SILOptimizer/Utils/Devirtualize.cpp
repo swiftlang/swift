@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-devirtualize-utility"
+#include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
@@ -159,7 +160,7 @@ getSubstitutionsForCallee(SILModule &M, CanSILFunctionType GenCalleeType,
   CanType FSelfClass = GenCalleeType->getSelfParameter().getType();
 
   SILType FSelfSubstType;
-  Module *Module = M.getSwiftModule();
+  auto *Module = M.getSwiftModule();
 
   ArrayRef<Substitution> ClassSubs;
 
@@ -616,7 +617,8 @@ static bool isKnownFinal(SILModule &M, SILDeclRef Member) {
 
 /// Attempt to devirtualize the given apply if possible, and return a
 /// new instruction in that case, or nullptr otherwise.
-DevirtualizationResult swift::tryDevirtualizeApply(FullApplySite AI) {
+DevirtualizationResult
+swift::tryDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize: " << *AI.getInstruction());
 
   // Devirtualize apply instructions that call witness_method instructions:
