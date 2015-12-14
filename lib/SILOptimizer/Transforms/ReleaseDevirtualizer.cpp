@@ -87,10 +87,12 @@ void ReleaseDevirtualizer::run() {
       if (LastRelease) {
         if (auto *DRI = dyn_cast<DeallocRefInst>(&I)) {
           Changed |= devirtualizeReleaseOfObject(LastRelease, DRI);
+          LastRelease = nullptr;
           continue;
         }
         if (auto *AI = dyn_cast<ApplyInst>(&I)) {
           Changed |= devirtualizeReleaseOfBuffer(LastRelease, AI);
+          LastRelease = nullptr;
           continue;
         }
       }
@@ -111,6 +113,8 @@ void ReleaseDevirtualizer::run() {
 bool ReleaseDevirtualizer::
 devirtualizeReleaseOfObject(SILInstruction *ReleaseInst,
                             DeallocRefInst *DeallocInst) {
+
+  DEBUG(llvm::dbgs() << "  try to devirtualize " << *ReleaseInst);
 
   // We only do the optimization for stack promoted object, because for these
   // we know that they don't have associated objects, which are _not_ released
@@ -137,6 +141,8 @@ devirtualizeReleaseOfObject(SILInstruction *ReleaseInst,
 bool ReleaseDevirtualizer::
 devirtualizeReleaseOfBuffer(SILInstruction *ReleaseInst,
                             ApplyInst *DeallocCall) {
+
+  DEBUG(llvm::dbgs() << "  try to devirtualize " << *ReleaseInst);
 
   // Is this a deallocation of a buffer?
   SILFunction *DeallocFn = DeallocCall->getCalleeFunction();
@@ -180,6 +186,8 @@ devirtualizeReleaseOfBuffer(SILInstruction *ReleaseInst,
 bool ReleaseDevirtualizer::createDeinitCall(SILType AllocType,
                                             SILInstruction *ReleaseInst,
                                             SILValue object) {
+  DEBUG(llvm::dbgs() << "  create deinit call\n");
+
   ClassDecl *Cl = AllocType.getClassOrBoundGenericClass();
   assert(Cl && "no class type allocated with alloc_ref");
 
