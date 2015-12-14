@@ -2871,9 +2871,6 @@ public:
     return GenericSig;
   }
 
-  /// Mark generic type signature as invalid.
-  void markInvalidGenericSignature();
-
   /// getDeclaredType - Retrieve the type declared by this entity.
   Type getDeclaredType() const { return DeclaredTy; }
 

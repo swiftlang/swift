@@ -1922,13 +1922,6 @@ void NominalTypeDecl::setGenericSignature(GenericSignature *sig) {
   GenericSig = sig;
 }
 
-void NominalTypeDecl::markInvalidGenericSignature() {
-  ASTContext &ctx = getASTContext();
-  overwriteType(ErrorType::get(ctx));
-  if (!getDeclaredType())
-    setDeclaredType(ErrorType::get(ctx));
-}
-
 void NominalTypeDecl::computeType() {
   assert(!hasType() && "Nominal type declaration already has a type");
 

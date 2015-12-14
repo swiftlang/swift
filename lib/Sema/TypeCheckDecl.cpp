@@ -795,22 +795,24 @@ void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
   }
 }
 
-static void markInvalidGenericSignature(AbstractFunctionDecl *AFD,
+static void markInvalidGenericSignature(ValueDecl *VD,
                                         TypeChecker &TC) {
-  ArchetypeBuilder builder = TC.createArchetypeBuilder(AFD->getParentModule());
-  auto genericParams = AFD->getGenericParams();
-  
-  // If there is a parent context, add the generic parameters and requirements
-  // from that context.
-  auto dc = AFD->getDeclContext();
-
-  if (dc->isTypeContext())
-    if (auto sig = dc->getGenericSignatureOfContext())
-      builder.addGenericSignature(sig, true);
+  GenericParamList *genericParams;
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
+    genericParams = AFD->getGenericParams();
+  else
+    genericParams = cast<NominalTypeDecl>(VD)->getGenericParams();
   
   // If there aren't any generic parameters at this level, we're done.
-  if (!genericParams)
+  if (genericParams == nullptr)
     return;
+
+  DeclContext *DC = VD->getDeclContext();
+  ArchetypeBuilder builder = TC.createArchetypeBuilder(DC->getParentModule());
+
+  if (DC->isTypeContext())
+    if (auto sig = DC->getGenericSignatureOfContext())
+      builder.addGenericSignature(sig, true);
   
   // Visit each of the generic parameters.
   for (auto param : *genericParams)
@@ -5824,7 +5826,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
       // Validate the generic type parameters.
       if (validateGenericTypeSignature(nominal)) {
-        nominal->markInvalidGenericSignature();
+        markInvalidGenericSignature(nominal, *this);
         return;
       }
 
