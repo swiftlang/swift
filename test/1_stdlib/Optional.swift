@@ -253,7 +253,7 @@ OptionalTests.test("Optional OutputStream") {
   expectEqual(debugPrintStr(optNoString), "Optional(main.TestNoString)")
 
   let iouNoString: TestNoString! = TestNoString()
-  // IOU directly conforms to CustomStringConvertible.
+  // IUO directly conforms to CustomStringConvertible.
   // Disabled pending SR-164
   //   expectTrue(iouNoString is CustomStringConvertible)
   expectTrue(canGenericCast(iouNoString, CustomStringConvertible.self))
