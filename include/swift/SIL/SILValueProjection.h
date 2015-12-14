@@ -205,7 +205,7 @@ using LSValueIndexMap = llvm::DenseMap<LSValue, unsigned>;
 using ValueTableMap = llvm::SmallMapVector<unsigned, unsigned, 8>;
 
 /// This class represents either a single SILValue or a covering of values that
-/// we can forward from via the introdution of a SILArgument. This enables us
+/// we can forward from via the introduction of a SILArgument. This enables us
 /// to treat the case of having one value or multiple values and load and store
 /// cases all at once abstractly and cleanly.
 ///

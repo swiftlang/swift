@@ -246,7 +246,7 @@ simdTestSuite.test("matrix init") {
 %       mat = 'm_' + mattype
 %       diagsize = rows if rows < cols else cols
 
-  //  Check empty intializer.
+  //  Check empty initializer.
   var ${mat} = ${mattype}()
   expectEqual(${mat}, ${mattype}(${[[0]*rows]*cols}), sameValue: same)
 
