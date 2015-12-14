@@ -153,6 +153,15 @@ public func == <Element>(lhs: Range<Element>, rhs: Range<Element>) -> Bool {
       lhs.endIndex == rhs.endIndex
 }
 
+/// Forms a half-open range that contains `maximum`, but not
+/// `minimum`.
+@_transparent
+@warn_unused_result
+public func <.. <Pos : ForwardIndexType> (minimum: Pos, maximum: Pos)
+-> Range<Pos> {
+    return Range(start: minimum.successor(), end: maximum.successor())
+}
+
 /// Forms a half-open range that contains `minimum`, but not
 /// `maximum`.
 @_transparent
@@ -172,6 +181,19 @@ public func ... <Pos : ForwardIndexType> (
 }
 
 //===--- Prefer Ranges to Intervals, and add checking ---------------------===//
+
+
+/// Forms a half-open range that contains `end`, but not `start`.
+///
+/// - Requires: `start <= end`.
+@_transparent
+@warn_unused_result
+public func <.. <Pos : ForwardIndexType where Pos : Comparable> (
+start: Pos, end: Pos
+) -> Range<Pos> {
+    _precondition(start <= end, "Can't form Range with end < start")
+    return Range(start: start.successor(), end: end.successor())
+}
 
 /// Forms a half-open range that contains `start`, but not `end`.
 ///
