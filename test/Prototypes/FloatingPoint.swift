@@ -329,7 +329,7 @@ FloatLiteralConvertible {
   
   //  TODO: do we actually want to provide remainder as an operator?  It's
   //  definitely not obvious to me that we should, but we have until now.
-  //  See further discustion with func remainder(x,y) above.
+  //  See further discussion with func remainder(x,y) above.
   func %(x: Self, y: Self) -> Self
   
   //  Conversions from all integer types.

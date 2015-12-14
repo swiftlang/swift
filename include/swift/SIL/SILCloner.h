@@ -348,7 +348,7 @@ void
 SILCloner<ImplClass>::postProcess(SILInstruction *Orig,
                                   SILInstruction *Cloned) {
   assert((Orig->getDebugScope() ? Cloned->getDebugScope()!=nullptr : true) &&
-         "cloned function droped debug scope");
+         "cloned function dropped debug scope");
   InstructionMap.insert(std::make_pair(Orig, Cloned));
 }
 
