@@ -653,16 +653,16 @@ static Type getResultType(TypeChecker &TC, FuncDecl *fn, Type resultType) {
 }
 
 bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
+  bool invalid = false;
+
   // Create the archetype builder.
   ArchetypeBuilder builder = createArchetypeBuilder(func->getParentModule());
 
   // Type check the function declaration, treating all generic type
   // parameters as dependent, unresolved.
   DependentGenericTypeResolver dependentResolver(builder);
-  if (checkGenericFuncSignature(*this, &builder, func, dependentResolver)) {
-    func->overwriteType(ErrorType::get(Context));
-    return true;
-  }
+  if (checkGenericFuncSignature(*this, &builder, func, dependentResolver))
+    invalid = true;
 
   // If this triggered a recursive validation, back out: we're done.
   // FIXME: This is an awful hack.
@@ -677,10 +677,8 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   // function signature and type-check it again, completely.
   revertGenericFuncSignature(func);
   CompleteGenericTypeResolver completeResolver(*this, builder);
-  if (checkGenericFuncSignature(*this, nullptr, func, completeResolver)) {
-    func->overwriteType(ErrorType::get(Context));
-    return true;
-  }
+  if (checkGenericFuncSignature(*this, nullptr, func, completeResolver))
+    invalid = true;
 
   // The generic function signature is complete and well-formed. Determine
   // the type of the generic function.
@@ -694,6 +692,32 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   // Collect the requirements placed on the generic parameter types.
   SmallVector<Requirement, 4> requirements;
   collectRequirements(builder, allGenericParams, requirements);
+  
+  auto sig = GenericSignature::get(allGenericParams, requirements);
+  
+  // Debugging of the archetype builder and generic signature generation.
+  if (sig && Context.LangOpts.DebugGenericSignatures) {
+    func->dumpRef(llvm::errs());
+    llvm::errs() << "\n";
+    builder.dump(llvm::errs());
+    llvm::errs() << "Generic signature: ";
+    sig->print(llvm::errs());
+    llvm::errs() << "\n";
+    llvm::errs() << "Canonical generic signature: ";
+    sig->getCanonicalSignature()->print(llvm::errs());
+    llvm::errs() << "\n";
+    llvm::errs() << "Canonical generic signature for mangling: ";
+    sig->getCanonicalManglingSignature(*func->getParentModule())
+    ->print(llvm::errs());
+    llvm::errs() << "\n";
+  }
+
+  func->setGenericSignature(sig);
+
+  if (invalid) {
+    func->overwriteType(ErrorType::get(Context));
+    return true;
+  }
 
   // Compute the function type.
   Type funcTy;
@@ -740,25 +764,6 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     pattern->setType(TupleType::getEmpty(Context));
     storedPatterns.push_back(pattern);
     patterns = storedPatterns;
-  }
-
-  auto sig = GenericSignature::get(allGenericParams, requirements);
-
-  // Debugging of the archetype builder and generic signature generation.
-  if (Context.LangOpts.DebugGenericSignatures) {
-    func->dumpRef(llvm::errs());
-    llvm::errs() << "\n";
-    builder.dump(llvm::errs());
-    llvm::errs() << "Generic signature: ";
-    sig->print(llvm::errs());
-    llvm::errs() << "\n";
-    llvm::errs() << "Canonical generic signature: ";
-    sig->getCanonicalSignature()->print(llvm::errs());
-    llvm::errs() << "\n";
-    llvm::errs() << "Canonical generic signature for mangling: ";
-    sig->getCanonicalManglingSignature(*func->getParentModule())
-      ->print(llvm::errs());
-    llvm::errs() << "\n";    
   }
 
   bool hasSelf = func->getDeclContext()->isTypeContext();

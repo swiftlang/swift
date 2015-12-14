@@ -250,8 +250,8 @@ GenericSignature *DeclContext::getGenericSignatureOfContext() const {
 
   case DeclContextKind::AbstractFunctionDecl: {
     auto *AFD = cast<AbstractFunctionDecl>(this);
-    if (auto GFT = AFD->getInterfaceType()->getAs<GenericFunctionType>())
-      return GFT->getGenericSignature();
+    if (auto genericSig = AFD->getGenericSignature())
+      return genericSig;
       
     // If we're within a type context, pick up the generic signature
     // of that context.
