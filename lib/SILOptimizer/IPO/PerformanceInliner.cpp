@@ -286,7 +286,7 @@ namespace {
 
 
 void ConstantTracker::trackInst(SILInstruction *inst) {
-  if (LoadInst *LI = dyn_cast<LoadInst>(inst)) {
+  if (auto *LI = dyn_cast<swift::LoadInst>(inst)) {
     SILValue baseAddr = scanProjections(LI->getOperand());
     if (SILInstruction *loadLink = getMemoryContent(baseAddr))
        links[LI] = loadLink;
