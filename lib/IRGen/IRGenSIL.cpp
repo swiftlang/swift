@@ -2955,7 +2955,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   llvm::SmallVector<llvm::Value *, 8> Copy;
   emitShadowCopy(e.claimAll(), Name, Copy);
   emitDebugVariableDeclaration(Copy, DbgTy, i->getDebugScope(), Name,
-                               i->getVarInfo().getArgNo());
+                               i->getVarInfo().ArgNo);
 }
 
 void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
@@ -2975,7 +2975,7 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   // Put the value into a stack slot at -Onone and emit a debug intrinsic.
   emitDebugVariableDeclaration(emitShadowCopy(Addr, Name), DbgTy,
                                i->getDebugScope(), Name,
-                               i->getVarInfo().getArgNo(), IndirectValue);
+                               i->getVarInfo().ArgNo, IndirectValue);
 }
 
 void IRGenSILFunction::visitLoadWeakInst(swift::LoadWeakInst *i) {
@@ -3235,7 +3235,7 @@ static void emitDebugDeclarationForAllocStack(IRGenSILFunction &IGF,
       if (DS) {
         assert(DS->SILFn == IGF.CurSILFn || DS->InlinedCallSite);
         IGF.emitDebugVariableDeclaration(addr, DbgTy, DS, Name,
-                                         i->getVarInfo().getArgNo());
+                                         i->getVarInfo().ArgNo);
       }
     }
   }

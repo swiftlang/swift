@@ -31,7 +31,7 @@ struct BuiltinUWord {
 // test.test_trunc_u_to_s_zext_lshr_1 (BuiltinUWord) -> Swift.BuiltinWord
 sil @_TF4test29test_trunc_u_to_s_zext_lshr_1FSuSi : $@convention(thin) (BuiltinUWord) -> BuiltinWord {
 bb0(%0 : $BuiltinUWord):
-  debug_value %0 : $BuiltinUWord  // let x        // id: %1
+  debug_value %0 : $BuiltinUWord, let, name "x" // id: %1
   %2 = integer_literal $Builtin.Word, 1           // user: %7
   br bb1                                          // id: %3
 
@@ -55,7 +55,7 @@ bb3:                                              // Preds: bb2
   %19 = struct_extract %18 : $Int64, #Int64._value // user: %21
   %21 = builtin "truncOrBitCast_Int64_Word"(%19 : $Builtin.Int64) : $Builtin.Word // user: %22
   %22 = struct $BuiltinWord (%21 : $Builtin.Word) // users: %23, %24
-  debug_value %22 : $BuiltinWord  // let v1       // id: %23
+  debug_value %22 : $BuiltinWord, let, name "v1" // id: %23
   return %22 : $BuiltinWord                       // id: %24
 }
 
@@ -70,7 +70,7 @@ bb3:                                              // Preds: bb2
 // test.test_trunc_u_to_s_zext_lshr_10 (Swift.BuiltinUWord) -> Swift.BuiltinWord
 sil @_TF4test30test_trunc_u_to_s_zext_lshr_10FSuSi : $@convention(thin) (BuiltinUWord) -> BuiltinWord {
 bb0(%0 : $BuiltinUWord):
-  debug_value %0 : $BuiltinUWord  // let x                // id: %1
+  debug_value %0 : $BuiltinUWord, let, name "x" // id: %1
   %2 = integer_literal $Builtin.Word, 10          // user: %7
   br bb1                                          // id: %3
 
@@ -94,7 +94,7 @@ bb3:                                              // Preds: bb2
   %19 = struct_extract %18 : $Int64, #Int64._value // user: %21
   %21 = builtin "truncOrBitCast_Int64_Word"(%19 : $Builtin.Int64) : $Builtin.Word // user: %22
   %22 = struct $BuiltinWord (%21 : $Builtin.Word)         // users: %23, %24
-  debug_value %22 : $BuiltinWord  // let v1               // id: %23
+  debug_value %22 : $BuiltinWord, let, name "v1" // id: %23
   return %22 : $BuiltinWord                               // id: %24
 }
 
@@ -107,8 +107,8 @@ bb3:                                              // Preds: bb2
 // test.test_trunc_u_to_s_zext_lshr_var (Swift.BuiltinUWord, Swift.BuiltinUWord) -> Swift.BuiltinWord
 sil @_TF4test31test_trunc_u_to_s_zext_lshr_varFTSuSu_Si : $@convention(thin) (BuiltinUWord, BuiltinUWord) -> BuiltinWord {
 bb0(%0 : $BuiltinUWord, %1 : $BuiltinUWord):
-  debug_value %0 : $BuiltinUWord  // let x                // id: %2
-  debug_value %1 : $BuiltinUWord  // let c                // id: %3
+  debug_value %0 : $BuiltinUWord, let, name "x" // id: %2
+  debug_value %1 : $BuiltinUWord, let, name "c" // id: %3
   %4 = tuple ()
   %5 = tuple ()
   %6 = tuple ()
@@ -154,7 +154,7 @@ bb4:                                              // Preds: bb2
   %43 = struct_extract %42 : $Int64, #Int64._value // user: %45
   %45 = builtin "truncOrBitCast_Int64_Word"(%43 : $Builtin.Int64) : $Builtin.Word // user: %46
   %46 = struct $BuiltinWord (%45 : $Builtin.Word)         // users: %47, %48
-  debug_value %46 : $BuiltinWord  // let v1               // id: %47
+  debug_value %46 : $BuiltinWord, let, name "v1" // id: %47
   return %46 : $BuiltinWord                               // id: %48
 }
 
@@ -168,7 +168,7 @@ bb4:                                              // Preds: bb2
 // test.test_uint16_trunc_u_to_s_zext_lshr_1 (Swift.UInt16) -> Swift.UInt16
 sil @_TF4test36test_uint16_trunc_u_to_s_zext_lshr_1FVs6UInt16S0_ : $@convention(thin) (UInt16) -> UInt16 {
 bb0(%0 : $UInt16):
-  debug_value %0 : $UInt16  // let x              // id: %1
+  debug_value %0 : $UInt16, let, name "x" // id: %1
   %2 = integer_literal $Builtin.Int16, 1          // user: %7
   br bb1                                          // id: %3
 
@@ -191,7 +191,7 @@ bb3:                                              // Preds: bb2
   %18 = tuple_extract %16 : $(Builtin.Int16, Builtin.Int1), 1 // user: %19
   cond_fail %18 : $Builtin.Int1                   // id: %19
   %20 = struct $UInt16 (%17 : $Builtin.Int16)     // users: %21, %22
-  debug_value %20 : $UInt16  // let v1            // id: %21
+  debug_value %20 : $UInt16, let, name "v1" // id: %21
   return %20 : $UInt16                            // id: %22
 }
 
@@ -206,7 +206,7 @@ bb3:                                              // Preds: bb2
 // test.test_int16_trunc_u_to_s_zext_lshr_1 (Swift.UInt16) -> Swift.Int16
 sil @_TF4test35test_int16_trunc_u_to_s_zext_lshr_1FVs6UInt16Vs5Int16 : $@convention(thin) (UInt16) -> Int16 {
 bb0(%0 : $UInt16):
-  debug_value %0 : $UInt16  // let x              // id: %1
+  debug_value %0 : $UInt16, let, name "x" // id: %1
   %2 = integer_literal $Builtin.Int16, 1          // user: %7
   br bb1                                          // id: %3
 
@@ -229,7 +229,7 @@ bb3:                                              // Preds: bb2
   %18 = tuple_extract %16 : $(Builtin.Int16, Builtin.Int1), 1 // user: %19
   cond_fail %18 : $Builtin.Int1                   // id: %19
   %20 = struct $Int16 (%17 : $Builtin.Int16)      // users: %21, %22
-  debug_value %20 : $Int16  // let v1             // id: %21
+  debug_value %20 : $Int16, let, name "v1" // id: %21
   return %20 : $Int16                             // id: %22
 }
 
@@ -243,7 +243,7 @@ bb3:                                              // Preds: bb2
 // test.test_trunc_s_to_u_zext_var (Swift.BuiltinWord) -> Swift.BuiltinUWord
 sil @_TF4test26test_trunc_s_to_u_zext_varFSiSu : $@convention(thin) (BuiltinWord) -> BuiltinUWord {
 bb0(%0 : $BuiltinWord):
-  debug_value %0 : $BuiltinWord  // let x                   // id: %1
+  debug_value %0 : $BuiltinWord, let, name "x" // id: %1
   %3 = struct_extract %0 : $BuiltinWord, #BuiltinWord.value // user: %4
   %4 = builtin "zextOrBitCast_Word_Int64"(%3 : $Builtin.Word) : $Builtin.Int64 // user: %6
   %6 = builtin "s_to_u_checked_conversion_Int64"(%4 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1) // users: %7, %8
@@ -331,7 +331,7 @@ bb0:
 // test.test_int16_trunc_s_to_u_zext_int16 (Swift.UInt16) -> Swift.UInt16
 sil @_TF4test34test_int16_trunc_s_to_u_zext_int16FVs6UInt16S0_ : $@convention(thin) (UInt16) -> UInt16 {
 bb0(%0 : $UInt16):
-  debug_value %0 : $UInt16  // let x              // id: %1
+  debug_value %0 : $UInt16, let, name "x" // id: %1
   %2 = integer_literal $Builtin.Int16, 1          // user: %7
   br bb1                                          // id: %3
 
@@ -376,7 +376,7 @@ bb3:                                              // Preds: bb2
 // peephole_trunc_and_ext.test_s_to_s_checked_trunc_of_and (Swift.Int32) -> Swift.Int8
 sil @_TF22peephole_trunc_and_ext32test_s_to_s_checked_trunc_of_andFVs5Int32Vs4Int8 : $@convention(thin) (Int32) -> Int8 {
 bb0(%0 : $Int32):
-  debug_value %0 : $Int32  // let x               // id: %1
+  debug_value %0 : $Int32, let, name "x" // id: %1
   %2 = integer_literal $Builtin.Int32, 127        // user: %5
   %4 = struct_extract %0 : $Int32, #Int32._value   // user: %5
   %5 = builtin "and_Int32"(%4 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32 // user: %6
@@ -399,7 +399,7 @@ bb0(%0 : $Int32):
 // peephole_trunc_and_ext.test_s_to_u_checked_trunc_of_and (Swift.Int32) -> Swift.UInt8
 sil @_TF22peephole_trunc_and_ext32test_s_to_u_checked_trunc_of_andFVs5Int32Vs5UInt8 : $@convention(thin) (Int32) -> UInt8 {
 bb0(%0 : $Int32):
-  debug_value %0 : $Int32  // let x               // id: %1
+  debug_value %0 : $Int32, let, name "x" // id: %1
   %2 = integer_literal $Builtin.Int32, 255        // user: %5
   %4 = struct_extract %0 : $Int32, #Int32._value   // user: %5
   %5 = builtin "and_Int32"(%4 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32 // user: %6
@@ -422,7 +422,7 @@ bb0(%0 : $Int32):
 // peephole_trunc_and_ext.test_u_to_u_checked_trunc_of_and (Swift.UInt32) -> Swift.UInt8
 sil @_TF22peephole_trunc_and_ext32test_u_to_u_checked_trunc_of_andFVs6UInt32Vs5UInt8 : $@convention(thin) (UInt32) -> UInt8 {
 bb0(%0 : $UInt32):
-  debug_value %0 : $UInt32  // let x              // id: %1
+  debug_value %0 : $UInt32, let, name "x" // id: %1
   %2 = integer_literal $Builtin.Int32, 255        // user: %5
   %4 = struct_extract %0 : $UInt32, #UInt32._value // user: %5
   %5 = builtin "and_Int32"(%4 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32 // user: %6
@@ -445,7 +445,7 @@ bb0(%0 : $UInt32):
 // peephole_trunc_and_ext.test_u_to_s_checked_trunc_of_and (Swift.UInt32) -> Swift.Int8
 sil @_TF22peephole_trunc_and_ext32test_u_to_s_checked_trunc_of_andFVs6UInt32Vs4Int8 : $@convention(thin) (UInt32) -> Int8 {
 bb0(%0 : $UInt32):
-  debug_value %0 : $UInt32  // let x              // id: %1
+  debug_value %0 : $UInt32, let, name "x" // id: %1
   %2 = integer_literal $Builtin.Int32, 127        // user: %5
   %4 = struct_extract %0 : $UInt32, #UInt32._value // user: %5
   %5 = builtin "and_Int32"(%4 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32 // user: %6

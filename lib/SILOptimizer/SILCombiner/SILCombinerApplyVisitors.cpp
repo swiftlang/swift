@@ -212,7 +212,8 @@ void PartialApplyCombiner::allocateTemporaries() {
         (Param.isConsumed() && Param.isIndirect())) {
       Builder.setInsertionPoint(PAI->getFunction()->begin()->begin());
       // Create a new temporary at the beginning of a function.
-      auto *Tmp = Builder.createAllocStack(PAI->getLoc(), Arg.getType(), AI);
+      auto *Tmp = Builder.createAllocStack(PAI->getLoc(), Arg.getType(),
+                                           {/*Constant*/ true, AI});
       Builder.setInsertionPoint(PAI);
       // Copy argument into this temporary.
       Builder.createCopyAddr(PAI->getLoc(), Arg, SILValue(Tmp, 1),

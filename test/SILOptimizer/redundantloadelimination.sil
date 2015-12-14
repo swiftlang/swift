@@ -736,7 +736,7 @@ bb3:                                              // Preds: bb1 bb2
 // CHECK: return
 sil hidden @agg_and_field_store_branches_diamond : $@convention(thin) (Bool) -> () {
 bb0(%0 : $Bool):
-  %1 = alloc_stack $TwoField  // var x            // users: %6, %11, %16, %21, %24
+  %1 = alloc_stack $TwoField, var, name "x"            // users: %6, %11, %16, %21, %24
   %7 = struct_extract %0 : $Bool, #Bool.value     // user: %8
   cond_br %7, bb1, bb2                            // id: %8
 

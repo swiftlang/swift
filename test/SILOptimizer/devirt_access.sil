@@ -92,7 +92,7 @@ sil @_TFC14devirt_access21BCfMS0_FT_S0_ : $@convention(thin) (@thick B.Type) -> 
 //CHECK: return
 sil @Case1 : $@convention(thin) (@owned X) -> Int {
 bb0(%0 : $X):
-  debug_value %0 : $X  // let a                   // id: %1
+  debug_value %0 : $X, let, name "a" // id: %1
   strong_retain %0 : $X                           // id: %2
   %3 = class_method %0 : $X, #X.ping!1 : X -> () -> Int , $@convention(method) (@guaranteed X) -> Int // user: %4
   %4 = apply %3(%0) : $@convention(method) (@guaranteed X) -> Int // user: %6
@@ -110,7 +110,7 @@ bb0(%0 : $X):
 //CHECK: return
 sil @Case2 : $@convention(thin) (@owned Y) -> Int {
 bb0(%0 : $Y):
-  debug_value %0 : $Y  // let a                   // id: %1
+  debug_value %0 : $Y, let, name "a" // id: %1
   strong_retain %0 : $Y                           // id: %2
   %3 = upcast %0 : $Y to $X                       // users: %4, %5
   %4 = class_method %3 : $X, #X.ping!1 : X -> () -> Int , $@convention(method) (@guaranteed X) -> Int // user: %5
@@ -124,7 +124,7 @@ bb0(%0 : $Y):
 //CHECK: return
 sil @Case3 : $@convention(thin) (@owned A) -> Int {
 bb0(%0 : $A):
-  debug_value %0 : $A  // let a                   // id: %1
+  debug_value %0 : $A, let, name "a" // id: %1
   strong_retain %0 : $A                           // id: %2
   %3 = class_method %0 : $A, #A.ping!1 : A -> () -> Int , $@convention(method) (@guaranteed A) -> Int // user: %4
   %4 = apply %3(%0) : $@convention(method) (@guaranteed A) -> Int // user: %6
@@ -137,7 +137,7 @@ bb0(%0 : $A):
 //CHECK: return
 sil @Case4 : $@convention(thin) (@owned B) -> Int {
 bb0(%0 : $B):
-  debug_value %0 : $B  // let a                   // id: %1
+  debug_value %0 : $B, let, name "a" // id: %1
   strong_retain %0 : $B                           // id: %2
   %3 = class_method %0 : $B, #B.ping!1 : B -> () -> Int , $@convention(method) (@guaranteed B) -> Int // user: %4
   %4 = apply %3(%0) : $@convention(method) (@guaranteed B) -> Int // user: %6

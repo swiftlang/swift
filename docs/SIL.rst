@@ -1630,7 +1630,7 @@ alloc_stack
 ```````````
 ::
 
-  sil-instruction ::= 'alloc_stack' sil-type
+  sil-instruction ::= 'alloc_stack' sil-type (',' debug-var-attr)*
 
   %1 = alloc_stack $T
   // %1#0 has type $*@local_storage T
@@ -1697,7 +1697,7 @@ alloc_box
 `````````
 ::
   
-  sil-instruction ::= 'alloc_box' sil-type
+  sil-instruction ::= 'alloc_box' sil-type (',' debug-var-attr)*
 
   %1 = alloc_box $T
   // %1 has two values:
@@ -1886,7 +1886,7 @@ debug_value
 
 ::
 
-  sil-instruction ::= debug_value sil-operand
+  sil-instruction ::= debug_value sil-operand (',' debug-var-attr)*
   
   debug_value %1 : $Int
   
@@ -1896,12 +1896,24 @@ the SILLocation attached to the debug_value instruction.
 
 The operand must have loadable type.
 
+::
+
+   debug-var-attr ::= 'var'
+   debug-var-attr ::= 'let'
+   debug-var-attr ::= 'name' string-literal
+   debug-var-attr ::= 'argno' integer-literal
+
+There are a number of attributes that provide details about the source
+variable that is being described, including the name of the
+variable. For function and closure arguments ``argno`` is the number
+of the function argument starting with 1.
+
 debug_value_addr
 ````````````````
 
 ::
 
-  sil-instruction ::= debug_value_addr sil-operand
+  sil-instruction ::= debug_value_addr sil-operand (',' debug-var-attr)*
   
   debug_value_addr %7 : $*SomeProtocol
   

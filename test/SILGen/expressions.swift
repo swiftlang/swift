@@ -542,8 +542,8 @@ func implodeRecursiveTuple(expr: ((Int, Int), Int)?) {
   // CHECK-NEXT: [[WHOLE1:%[0-9]+]] = tuple_extract [[WHOLE]] : $((Int, Int), Int), 1
 
   // CHECK-NEXT: [[X:%[0-9]+]] = tuple ([[WHOLE00]] : $Int, [[WHOLE01]] : $Int)
-  // CHECK-NEXT: debug_value [[X]] : $(Int, Int)  // let x
-  // CHECK-NEXT: debug_value [[WHOLE1]] : $Int  // let y
+  // CHECK-NEXT: debug_value [[X]] : $(Int, Int), let, name "x"
+  // CHECK-NEXT: debug_value [[WHOLE1]] : $Int, let, name "y"
 
   let (x, y) = expr!
 }

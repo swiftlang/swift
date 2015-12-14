@@ -42,11 +42,11 @@ bb0:
 // peephole_thick_to_objc_metatype.test_thick_to_objc_metatype_existential_metatype (peephole_thick_to_objc_metatype.X) -> Swift.AnyObject
 sil @_TF31peephole_thick_to_objc_metatype48test_thick_to_objc_metatype_existential_metatypeFPS_1X_Ps9AnyObject_ : $@convention(thin) (@owned X) -> @owned AnyObject {
 bb0(%0 : $X):
-  debug_value %0 : $X  // let o                   // id: %1
+  debug_value %0 : $X, let, name "o" // id: %1
   %2 = existential_metatype $@thick X.Type, %0 : $X // user: %3
   %3 = thick_to_objc_metatype %2 : $@thick X.Type to $@objc_metatype X.Type // user: %4
   %4 = objc_existential_metatype_to_object %3 : $@objc_metatype X.Type to $AnyObject // users: %5, %7
-  debug_value %4 : $AnyObject  // let Ty          // id: %5
+  debug_value %4 : $AnyObject, let, name "Ty" // id: %5
   strong_release %0 : $X                          // id: %6
   return %4 : $AnyObject                          // id: %7
 }
@@ -61,11 +61,11 @@ bb0(%0 : $X):
 // peephole_thick_to_objc_metatype.test_thick_to_objc_metatype_value_metatype <A : Swift.AnyObject>(A) -> Swift.AnyObject
 sil @_TF31peephole_thick_to_objc_metatype42test_thick_to_objc_metatype_value_metatypeUs9AnyObject__FQ_PS0__ : $@convention(thin) <T where T : AnyObject> (@owned T) -> @owned AnyObject {
 bb0(%0 : $T):
-  debug_value %0 : $T  // let o                   // id: %1
+  debug_value %0 : $T, let, name "o" // id: %1
   %2 = value_metatype $@thick T.Type, %0 : $T     // user: %3
   %3 = thick_to_objc_metatype %2 : $@thick T.Type to $@objc_metatype T.Type // user: %4
   %4 = objc_metatype_to_object %3 : $@objc_metatype T.Type to $AnyObject // users: %5, %7
-  debug_value %4 : $AnyObject  // let Ty          // id: %5
+  debug_value %4 : $AnyObject, let, name "Ty" // id: %5
   strong_release %0 : $T                          // id: %6
   return %4 : $AnyObject                          // id: %7
 }
@@ -93,7 +93,7 @@ bb0:
 // CHECK: return
 sil @_TF31peephole_thick_to_objc_metatype48test_objc_to_thick_metatype_existential_metatypeFPS_1X_Ps9AnyObject_ : $@convention(thin) (@owned X) -> @thick X.Type {
 bb0(%0 : $X):
-  debug_value %0 : $X  // let o                   // id: %1
+  debug_value %0 : $X, let, name "o" // id: %1
   %2 = existential_metatype $@objc_metatype X.Type, %0 : $X // user: %3
   %3 = objc_to_thick_metatype %2 : $@objc_metatype X.Type to $@thick X.Type // user: %4
   strong_release %0 : $X
@@ -109,7 +109,7 @@ bb0(%0 : $X):
 // CHECK: return
 sil @_TF31peephole_thick_to_objc_metatype42test_objc_to_thick_metatype_value_metatypeUs9AnyObject__FQ_PS0__ : $@convention(thin) <T where T : AnyObject> (@owned T) -> @thick T.Type {
 bb0(%0 : $T):
-  debug_value %0 : $T  // let o                   // id: %1
+  debug_value %0 : $T, let, name "o" // id: %1
   %2 = value_metatype $@objc_metatype T.Type, %0 : $T     // user: %3
   %3 = objc_to_thick_metatype %2 : $@objc_metatype T.Type to $@thick T.Type // user: %4
   strong_release %0 : $T

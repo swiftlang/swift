@@ -547,7 +547,7 @@ func pinUnpin(object : Builtin.NativeObject) {
 
 // CHECK-LABEL: sil hidden @_TF8builtins19allocateValueBuffer
 // CHECK:       bb0([[BUFFER:%.*]] : $*Builtin.UnsafeValueBuffer):
-// CHECK-NEXT:     debug_value_addr %0 : $*Builtin.UnsafeValueBuffer // var buffer, argno: 1
+// CHECK-NEXT:     debug_value_addr %0 : $*Builtin.UnsafeValueBuffer, var, name "buffer", argno 1
 // CHECK-NEXT:    metatype $@thin Int.Type
 // CHECK-NEXT:    [[T0:%.*]] = alloc_value_buffer $Int in [[BUFFER]] : $*Builtin.UnsafeValueBuffer
 // CHECK-NEXT:    [[T1:%.*]] = address_to_pointer [[T0]] : $*Int to $Builtin.RawPointer
@@ -558,7 +558,7 @@ func allocateValueBuffer(inout buffer: Builtin.UnsafeValueBuffer) -> Builtin.Raw
 
 // CHECK-LABEL: sil hidden @_TF8builtins18projectValueBuffer
 // CHECK:       bb0([[BUFFER:%.*]] : $*Builtin.UnsafeValueBuffer):
-// CHECK-NEXT:    debug_value_addr %0 : $*Builtin.UnsafeValueBuffer // var buffer, argno: 1
+// CHECK-NEXT:    debug_value_addr %0 : $*Builtin.UnsafeValueBuffer, var, name "buffer", argno 1
 // CHECK-NEXT:    metatype $@thin Int.Type
 // CHECK-NEXT:    [[T0:%.*]] = project_value_buffer $Int in [[BUFFER]] : $*Builtin.UnsafeValueBuffer
 // CHECK-NEXT:    [[T1:%.*]] = address_to_pointer [[T0]] : $*Int to $Builtin.RawPointer
@@ -569,7 +569,7 @@ func projectValueBuffer(inout buffer: Builtin.UnsafeValueBuffer) -> Builtin.RawP
 
 // CHECK-LABEL: sil hidden @_TF8builtins18deallocValueBuffer
 // CHECK:       bb0([[BUFFER:%.*]] : $*Builtin.UnsafeValueBuffer):
-//CHECK-NEXT:     debug_value_addr %0 : $*Builtin.UnsafeValueBuffer // var buffer, argno: 1
+//CHECK-NEXT:     debug_value_addr %0 : $*Builtin.UnsafeValueBuffer, var, name "buffer", argno 1
 // CHECK-NEXT:    metatype $@thin Int.Type
 // CHECK-NEXT:    dealloc_value_buffer $Int in [[BUFFER]] : $*Builtin.UnsafeValueBuffer
 // CHECK-NEXT:    tuple ()

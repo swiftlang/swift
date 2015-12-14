@@ -66,7 +66,7 @@ class C {}
 sil @test_uniq_alias : $@convention(method) (@owned C) -> Builtin.Int1 {
 // CHECK: bb0
 bb0(%0 : $C):
-  %1 = alloc_stack $C  // var x
+  %1 = alloc_stack $C, var, name "x"
   store %0 to %1#1 : $*C
 // CHECK: strong_retain %0 : $C
   strong_retain %0 : $C

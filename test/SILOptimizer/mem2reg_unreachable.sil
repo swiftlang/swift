@@ -9,9 +9,9 @@ import Swift
 
 sil @_TF4main3fooFT1xSi1ySi_Si : $@convention(thin) (Int32, Int32) -> Int32 {
 bb0(%0 : $Int32, %1 : $Int32):
-  debug_value %0 : $Int32  // let x               // id: %2
-  debug_value %1 : $Int32  // let y               // id: %3
-  %4 = alloc_stack $Int32  // var g               // users: %14, %18, %20, %21
+  debug_value %0 : $Int32, let, name "x" // id: %2
+  debug_value %1 : $Int32, let, name "y" // id: %3
+  %4 = alloc_stack $Int32, var, name "g"               // users: %14, %18, %20, %21
   %6 = struct_extract %1 : $Int32, #Int32._value   // user: %8
   %7 = struct_extract %0 : $Int32, #Int32._value   // user: %8
   %8 = builtin "cmp_sgt_Word"(%6 : $Builtin.Int32, %7 : $Builtin.Int32) : $Builtin.Int1 // user: %9

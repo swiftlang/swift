@@ -45,10 +45,36 @@ static SILTypeList *getAllocStackType(SILType eltTy, SILFunction &F) {
   return F.getModule().getSILTypeList(resTys);
 }
 
+template <typename INST>
+static void *allocateDebugVarCarryingInst(SILModule &M, SILDebugVariable Var) {
+  return M.allocateInst(sizeof(INST) + Var.Name.size(), alignof(INST));
+}
+
+TailAllocatedDebugVariable::TailAllocatedDebugVariable(SILDebugVariable Var,
+                                                       char *buf)
+    : ArgNo(Var.ArgNo), NameLength(Var.Name.size()) {
+  assert((Var.ArgNo < (2<<16)) && "too many arguments");
+  assert((NameLength < (2<<15)) && "variable name too long");
+  memcpy(buf, Var.Name.data(), NameLength);
+}
+
+StringRef TailAllocatedDebugVariable::getName(const char *buf) const {
+  return NameLength ? StringRef(buf, NameLength) : StringRef();
+}
+
 AllocStackInst::AllocStackInst(SILDebugLocation *Loc, SILType elementType,
-                               SILFunction &F, unsigned ArgNo)
+                               SILFunction &F, SILDebugVariable Var)
     : AllocationInst(ValueKind::AllocStackInst, Loc,
-                     getAllocStackType(elementType, F)), VarInfo(ArgNo) {}
+                     getAllocStackType(elementType, F)),
+      VarInfo(Var, reinterpret_cast<char *>(this + 1)) {}
+
+AllocStackInst *AllocStackInst::create(SILDebugLocation *Loc,
+                                       SILType elementType, SILFunction &F,
+                                       SILDebugVariable Var) {
+  void *buf = allocateDebugVarCarryingInst<AllocStackInst>(F.getModule(), Var);
+  return ::new (buf)
+      AllocStackInst(Loc, elementType, F, Var);
+}
 
 /// getDecl - Return the underlying variable declaration associated with this
 /// allocation, or null if this is a temporary allocation.
@@ -75,15 +101,45 @@ static SILTypeList *getAllocBoxType(SILType EltTy, SILFunction &F) {
 }
 
 AllocBoxInst::AllocBoxInst(SILDebugLocation *Loc, SILType ElementType,
-                           SILFunction &F, unsigned ArgNo)
+                           SILFunction &F, SILDebugVariable Var)
     : AllocationInst(ValueKind::AllocBoxInst, Loc,
                      getAllocBoxType(ElementType, F)),
-      VarInfo(ArgNo) {}
+      VarInfo(Var, reinterpret_cast<char *>(this + 1)) {}
+
+AllocBoxInst *AllocBoxInst::create(SILDebugLocation *Loc, SILType ElementType,
+                                   SILFunction &F, SILDebugVariable Var) {
+  void *buf = allocateDebugVarCarryingInst<AllocStackInst>(F.getModule(), Var);
+  return ::new (buf) AllocBoxInst(Loc, ElementType, F, Var);
+}
 
 /// getDecl - Return the underlying variable declaration associated with this
 /// allocation, or null if this is a temporary allocation.
 VarDecl *AllocBoxInst::getDecl() const {
   return getLoc().getAsASTNode<VarDecl>();
+}
+
+DebugValueInst::DebugValueInst(SILDebugLocation *DebugLoc, SILValue Operand,
+                               SILDebugVariable Var)
+    : UnaryInstructionBase(DebugLoc, Operand),
+      VarInfo(Var, reinterpret_cast<char *>(this + 1)) {}
+
+DebugValueInst *DebugValueInst::create(SILDebugLocation *DebugLoc,
+                                       SILValue Operand, SILModule &M,
+                                       SILDebugVariable Var) {
+  void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var);
+  return ::new (buf) DebugValueInst(DebugLoc, Operand, Var);
+}
+
+DebugValueAddrInst::DebugValueAddrInst(SILDebugLocation *DebugLoc,
+                                       SILValue Operand, SILDebugVariable Var)
+    : UnaryInstructionBase(DebugLoc, Operand),
+      VarInfo(Var, reinterpret_cast<char *>(this + 1)) {}
+
+DebugValueAddrInst *DebugValueAddrInst::create(SILDebugLocation *DebugLoc,
+                                               SILValue Operand, SILModule &M,
+                                               SILDebugVariable Var) {
+  void *buf = allocateDebugVarCarryingInst<DebugValueAddrInst>(M, Var);
+  return ::new (buf) DebugValueAddrInst(DebugLoc, Operand, Var);
 }
 
 VarDecl *DebugValueInst::getDecl() const {

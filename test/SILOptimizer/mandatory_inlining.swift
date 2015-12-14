@@ -10,7 +10,7 @@ func foo(x: Float) -> Float {
 
 // CHECK-LABEL: sil hidden @_TF18mandatory_inlining3foo
 // CHECK: bb0(%0 : $Float):
-// CHECK-NEXT: debug_value %0 : $Float  // let x
+// CHECK-NEXT: debug_value %0 : $Float, let, name "x"
 // CHECK-NEXT: return %0
 
 @_transparent func bar(x: Float) -> Float {

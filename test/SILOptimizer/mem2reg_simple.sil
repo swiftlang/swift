@@ -20,9 +20,9 @@ import Swift
 
 sil @place_phi : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
-  %1 = alloc_stack $Int64  // var v               // users: %45, %2
+  %1 = alloc_stack $Int64, var, name "v"               // users: %45, %2
   store %0 to %1#1 : $*Int64                      // id: %2
-  %3 = alloc_stack $Int64  // var x               // users: %19, %13, %44, %6, %42
+  %3 = alloc_stack $Int64, var, name "x"               // users: %19, %13, %44, %6, %42
   %4 = integer_literal $Builtin.Int64, 0          // user: %5
   %5 = struct $Int64 (%4 : $Builtin.Int64)        // users: %23, %6
   store %5 to %3#1 : $*Int64                      // id: %6
@@ -52,7 +52,7 @@ bb4:                                              // Preds: bb3 bb2
 //CHECK: bb5([[PHI:%[0-9]+]] : $Int64):
 //CHECK-NOT: alloc_stack
 bb5:                                              // Preds: bb4 bb1
-  %22 = alloc_stack $Int64  // var i              // users: %31, %25, %40, %43, %23
+  %22 = alloc_stack $Int64, var, name "i"              // users: %31, %25, %40, %43, %23
   store %5 to %22#1 : $*Int64                     // id: %23
   br bb6                                          // id: %24
 
@@ -97,9 +97,9 @@ bb8:                                              // Preds: bb6
 //CHECK-NOT: alloc_stack
 sil @func_loop: $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
-  %1 = alloc_stack $Int64  // var c               // users: %28, %2
+  %1 = alloc_stack $Int64, var, name "c"               // users: %28, %2
   store %0 to %1#1 : $*Int64                      // id: %2
-  %3 = alloc_stack $Int64  // var x               // users: %24, %27, %6, %8, %14, %26
+  %3 = alloc_stack $Int64, var, name "x"               // users: %24, %27, %6, %8, %14, %26
   %4 = integer_literal $Builtin.Int64, 0          // user: %5
   %5 = struct $Int64 (%4 : $Builtin.Int64)        // user: %6
   store %5 to %3#1 : $*Int64                      // id: %6
@@ -153,9 +153,9 @@ bb3:                                              // Preds: bb1
 //CHECK: return
 sil @high_nest : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64): 
-  %1 = alloc_stack $Int64  // var c               // users: %114, %2
+  %1 = alloc_stack $Int64, var, name "c"               // users: %114, %2
   store %0 to %1#1 : $*Int64                      // id: %2
-  %3 = alloc_stack $Int64  // var x               // users: %94, %113, %6, %112
+  %3 = alloc_stack $Int64, var, name "x"               // users: %94, %113, %6, %112
   %4 = integer_literal $Builtin.Int64, 0          // user: %5
   %5 = struct $Int64 (%4 : $Builtin.Int64)        // user: %6
   store %5 to %3#1 : $*Int64                      // id: %6
@@ -326,9 +326,9 @@ bb34:                                             // Preds: bb33 bb0
 //CHECK-NOT: alloc_stack
 sil @simple_if : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
-  %1 = alloc_stack $Int64  // var c               // users: %17, %2
+  %1 = alloc_stack $Int64, var, name "c"               // users: %17, %2
   store %0 to %1#1 : $*Int64                      // id: %2
-  %3 = alloc_stack $Int64  // var x               // users: %13, %16, %6, %15
+  %3 = alloc_stack $Int64, var, name "x"               // users: %13, %16, %6, %15
   %4 = integer_literal $Builtin.Int64, 0          // users: %9, %5
 //CHECK: [[INIT:%[0-9]+]] = struct $Int64
   %5 = struct $Int64 (%4 : $Builtin.Int64)        // user: %6
@@ -366,11 +366,11 @@ enum X {
 //CHECK-NOT: dealloc_stack
 sil @test_switch: $@convention(thin) (Int64, X) -> Int64 {
 bb0(%0 : $Int64, %1 : $X):
-  %2 = alloc_stack $Int64  // var xi              // users: %28, %4
-  %3 = alloc_stack $X  // var c                   // users: %27, %5
+  %2 = alloc_stack $Int64, var, name "xi"              // users: %28, %4
+  %3 = alloc_stack $X, var, name "c"                   // users: %27, %5
   store %0 to %2#1 : $*Int64                      // id: %4
   store %1 to %3#1 : $*X                          // id: %5
-  %6 = alloc_stack $Int64  // var x               // users: %7, %23, %18, %13, %26, %25
+  %6 = alloc_stack $Int64, var, name "x"               // users: %7, %23, %18, %13, %26, %25
   store %0 to %6#1 : $*Int64                      // id: %7
   %8 = tuple ()
   switch_enum %1 : $X, case #X.One!enumelt: bb1, case #X.Two!enumelt: bb3, case #X.Three!enumelt: bb5 // id: %9

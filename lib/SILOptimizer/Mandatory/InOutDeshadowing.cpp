@@ -72,8 +72,7 @@ static void promoteShadow(AllocStackInst *Alloc, SILArgument *InOutArg) {
   }
   // Make the debug information stored in the AllocBox explicit.
   SILBuilder B(Alloc);
-  B.createDebugValueAddr(Alloc->getLoc(), InOutArg,
-                         Alloc->getVarInfo().getArgNo());
+  B.createDebugValueAddr(Alloc->getLoc(), InOutArg, Alloc->getVarInfo());
   Alloc->eraseFromParent();
 }
 

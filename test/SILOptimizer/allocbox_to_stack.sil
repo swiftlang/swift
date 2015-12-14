@@ -314,7 +314,7 @@ bb3:
 // struct.apply (f : () -> Swift.Int) -> Swift.Int
 sil @_TF6struct5applyFT1fFT_Si_Si : $@convention(thin) (@owned @callee_owned () -> Int) -> Int {
 bb0(%0 : $@callee_owned () -> Int):
-  debug_value %0 : $@callee_owned () -> Int  // let f // id: %1
+  debug_value %0 : $@callee_owned () -> Int, let, name "f" // id: %1
   strong_retain %0 : $@callee_owned () -> Int     // id: %2
   %3 = apply %0() : $@callee_owned () -> Int      // user: %5
   strong_release %0 : $@callee_owned () -> Int    // id: %4
@@ -325,7 +325,7 @@ bb0(%0 : $@callee_owned () -> Int):
 // struct.escape (f : () -> Swift.Int) -> () -> Swift.Int
 sil @_TF6struct6escapeFT1fFT_Si_FT_Si : $@convention(thin) (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int {
 bb0(%0 : $@callee_owned () -> Int):
-  debug_value %0 : $@callee_owned () -> Int  // let f // id: %1
+  debug_value %0 : $@callee_owned () -> Int, let, name "f" // id: %1
   return %0 : $@callee_owned () -> Int            // id: %2
 }
 
@@ -333,9 +333,9 @@ bb0(%0 : $@callee_owned () -> Int):
 // struct.useStack (t : Swift.Int) -> ()
 sil @_TF6struct8useStackFT1tSi_T_ : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
-  debug_value %0 : $Int  // let t                 // id: %1
+  debug_value %0 : $Int, let, name "t" // id: %1
   // CHECK: alloc_stack
-  %2 = alloc_box $Int  // var s                   // users: %3, %6, %7, %7, %9
+  %2 = alloc_box $Int, var, name "s"                   // users: %3, %6, %7, %7, %9
   store %0 to %2#1 : $*Int                        // id: %3
   // function_ref struct.apply (f : () -> Swift.Int) -> Swift.Int
   %4 = function_ref @_TF6struct5applyFT1fFT_Si_Si : $@convention(thin) (@owned @callee_owned () -> Int) -> Int // user: %8
@@ -374,9 +374,9 @@ sil [transparent] @_TFsoP2ppUs14_Incrementable__FT1xRQ__Q_ : $@convention(thin) 
 // struct.useBox (t : Swift.Int) -> ()
 sil @_TF6struct6useBoxFT1tSi_T_ : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
-  debug_value %0 : $Int  // let t                 // id: %1
+  debug_value %0 : $Int, let, name "t" // id: %1
   // CHECK: alloc_box
-  %2 = alloc_box $Int  // var s                   // users: %3, %6, %7, %7, %10
+  %2 = alloc_box $Int, var, name "s"                   // users: %3, %6, %7, %7, %10
   store %0 to %2#1 : $*Int                        // id: %3
   // function_ref struct.escape (f : () -> Swift.Int) -> () -> Swift.Int
   %4 = function_ref @_TF6struct6escapeFT1fFT_Si_FT_Si : $@convention(thin) (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int // user: %8

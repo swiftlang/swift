@@ -33,8 +33,8 @@ bb0(%c : $Builtin.Int32, %v : $Builtin.RawPointer):
 // single.REC.recursive (single.REC)(Swift.Int) -> ()
 sil @_TFC6single3REC9recursivefS0_FSiT_ : $@convention(method) (Int, @guaranteed REC) -> () {
 bb0(%0 : $Int, %1 : $REC):
-  debug_value %0 : $Int  // let a                 // id: %2
-  debug_value %1 : $REC  // let self              // id: %3
+  debug_value %0 : $Int, let, name "a" // id: %2
+  debug_value %1 : $REC, let, name "self" // id: %3
   // function_ref Swift.Bool._getBuiltinLogicValue (Swift.Bool)() -> Builtin.Int1
   %4 = function_ref @_TFSb21_getBuiltinLogicValuefSbFT_Bi1_ : $@convention(method) (Bool) -> Builtin.Int1 // user: %11
   // function_ref Swift.>= @infix (Swift.Int, Swift.Int) -> Swift.Bool
@@ -83,7 +83,7 @@ sil [transparent] @_TFsoi1sFTSiSi_Si : $@convention(thin) (Int, Int) -> Int
 // single.REC.deinit
 sil @_TFC6single3RECd : $@convention(method) (@owned REC) -> @owned Builtin.NativeObject {
 bb0(%0 : $REC):
-  debug_value %0 : $REC  // let self              // id: %1
+  debug_value %0 : $REC, let, name "self" // id: %1
   %2 = unchecked_ref_cast %0 : $REC to $Builtin.NativeObject // user: %3
   return %2 : $Builtin.NativeObject               // id: %3
 }
@@ -91,7 +91,7 @@ bb0(%0 : $REC):
 // single.REC.__deallocating_deinit
 sil @_TFC6single3RECD : $@convention(method) (@owned REC) -> () {
 bb0(%0 : $REC):
-  debug_value %0 : $REC  // let self              // id: %1
+  debug_value %0 : $REC, let, name "self" // id: %1
   // function_ref single.REC.deinit
   %2 = function_ref @_TFC6single3RECd : $@convention(method) (@owned REC) -> @owned Builtin.NativeObject // user: %3
   %3 = apply %2(%0) : $@convention(method) (@owned REC) -> @owned Builtin.NativeObject // user: %4
@@ -104,7 +104,7 @@ bb0(%0 : $REC):
 // single.REC.init (single.REC.Type)() -> single.REC
 sil @_TFC6single3RECcfMS0_FT_S0_ : $@convention(method) (@owned REC) -> @owned REC {
 bb0(%0 : $REC):
-  debug_value %0 : $REC  // let self              // id: %1
+  debug_value %0 : $REC, let, name "self" // id: %1
   %2 = mark_uninitialized [rootself] %0 : $REC    // user: %3
   return %2 : $REC                                // id: %3
 }
@@ -122,12 +122,12 @@ bb0(%0 : $@thick REC.Type):
 // single.test (Swift.Int) -> ()
 sil @_TF6single4testFSiT_ : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
-  debug_value %0 : $Int  // let N                 // id: %1
+  debug_value %0 : $Int, let, name "N" // id: %1
   // function_ref single.REC.__allocating_init (single.REC.Type)() -> single.REC
   %2 = function_ref @_TFC6single3RECCfMS0_FT_S0_ : $@convention(thin) (@thick REC.Type) -> @owned REC // user: %4
   %3 = metatype $@thick REC.Type                  // user: %4
   %4 = apply %2(%3) : $@convention(thin) (@thick REC.Type) -> @owned REC // users: %5, %6, %7, %8, %9
-  debug_value %4 : $REC  // let rec               // id: %5
+  debug_value %4 : $REC, let, name "rec" // id: %5
   strong_retain %4 : $REC                         // id: %6
   %7 = class_method %4 : $REC, #REC.recursive!1 : REC -> (Int) -> () , $@convention(method) (Int, @guaranteed REC) -> () // user: %8
   %8 = apply %7(%0, %4) : $@convention(method) (Int, @guaranteed REC) -> ()

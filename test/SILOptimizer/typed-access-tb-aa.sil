@@ -39,8 +39,8 @@ sil @goo_init : $@convention(thin) (@thick goo.Type) -> @owned goo
 // CHECK: NoAlias
 sil hidden @no_parent_child_relation_reftype_tests : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_stack $boo  // var a                 // users: %5, %14 
-  %1 = alloc_stack $baz  // var b                 // users: %9, %13 
+  %0 = alloc_stack $boo, var, name "a"                 // users: %5, %14 
+  %1 = alloc_stack $baz, var, name "b"                 // users: %9, %13 
   %2 = function_ref @boo_init : $@convention(thin) (@thick boo.Type) -> @owned boo // user: %4
   %3 = metatype $@thick boo.Type                  // user: %4
   %4 = apply %2(%3) : $@convention(thin) (@thick boo.Type) -> @owned boo // users: %5, %11 
@@ -65,8 +65,8 @@ bb0:
 // CHECK: MayAlias
 sil hidden @with_parent_child_relation_reftype_tests : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_stack $boo  // var a                 // users: %5, %14 
-  %1 = alloc_stack $goo  // var b                 // users: %9, %13 
+  %0 = alloc_stack $boo, var, name "a"                 // users: %5, %14 
+  %1 = alloc_stack $goo, var, name "b"                 // users: %9, %13 
   %2 = function_ref @boo_init : $@convention(thin) (@thick boo.Type) -> @owned boo // user: %4
   %3 = metatype $@thick boo.Type                  // user: %4
   %4 = apply %2(%3) : $@convention(thin) (@thick boo.Type) -> @owned boo // users: %5, %11 

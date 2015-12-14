@@ -140,7 +140,7 @@ sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
 // DISABLECHECK: return
 sil hidden @DeadLocalStoreSimpleStruct : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_stack $Int  // var a                 // users: %3, %5
+  %0 = alloc_stack $Int, var, name "a"                 // users: %3, %5
   %1 = integer_literal $Builtin.Int64, 1          // user: %2
   %2 = struct $Int (%1 : $Builtin.Int64)          // user: %3
   store %2 to %0#1 : $*Int                        // id: %3
@@ -161,7 +161,7 @@ bb0:
 // DISABLECHECK: return
 sil hidden @NoDeadLocalStoreSimpleStruct : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_stack $Int  // var a                 // users: %3, %5
+  %0 = alloc_stack $Int, var, name "a"                 // users: %3, %5
   %1 = integer_literal $Builtin.Int64, 1          // user: %2
   %2 = struct $Int (%1 : $Builtin.Int64)          // user: %3
   store %2 to %0#1 : $*Int                        // id: %3
@@ -185,7 +185,7 @@ bb0:
 // DISABLECHECK: debug_value_addr
 sil hidden @NoDeadStoreDebugValueAddr : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_stack $Int  // var a                 // users: %3, %5
+  %0 = alloc_stack $Int, var, name "a"                 // users: %3, %5
   %1 = integer_literal $Builtin.Int64, 1          // user: %2
   %2 = struct $Int (%1 : $Builtin.Int64)          // user: %3
   store %2 to %0#1 : $*Int                        // id: %3
@@ -762,7 +762,7 @@ bb4:                                              // Preds: bb2 bb3
 // CHECK: br
 sil hidden @DeadStoreSingleLoopBlockSimpleStruct : $@convention(thin) (Bool, Int) -> () {
 bb0(%0 : $Bool, %1 : $Int):
-  %2 = alloc_stack $S1  // var x                  // users: %8, %13, %18, %23, %26
+  %2 = alloc_stack $S1, var, name "x"                  // users: %8, %13, %18, %23, %26
   %5 = function_ref @S1_init : $@convention(thin) (@thin S1.Type) -> S1 // user: %7
   %6 = metatype $@thin S1.Type                    // user: %7
   %7 = apply %5(%6) : $@convention(thin) (@thin S1.Type) -> S1 // user: %8
@@ -805,7 +805,7 @@ bb3:                                              // Preds: bb1 bb2
 // CHECK: br
 sil hidden @DeadStoreInMultiLoopBlocksSimpleStruct : $@convention(thin) (Bool, Int) -> () {
 bb0(%0 : $Bool, %1 : $Int):
-  %2 = alloc_stack $S1  // var x                  // users: %8, %13, %18, %23, %26
+  %2 = alloc_stack $S1, var, name "x"                  // users: %8, %13, %18, %23, %26
   %5 = function_ref @S1_init : $@convention(thin) (@thin S1.Type) -> S1 // user: %7
   %6 = metatype $@thin S1.Type                    // user: %7
   %7 = apply %5(%6) : $@convention(thin) (@thin S1.Type) -> S1 // user: %8
@@ -852,7 +852,7 @@ bb3:                                              // Preds: bb1 bb2
 // CHECK-NEXT: store
 sil hidden @DeadStoreInSimpleTuple : $@convention(thin) () -> Int {
 bb0:
-  %0 = alloc_stack $(a: Int, b: Int)  // var x    // users: %1, %2, %11, %15, %20
+  %0 = alloc_stack $(a: Int, b: Int), var, name "x"    // users: %1, %2, %11, %15, %20
   %1 = tuple_element_addr %0#1 : $*(a: Int, b: Int), 0 // user: %5
   %2 = tuple_element_addr %0#1 : $*(a: Int, b: Int), 1 // user: %8
   %3 = integer_literal $Builtin.Int64, 2          // user: %4
@@ -1123,7 +1123,7 @@ bb0(%0 : $*A):
 // CHECK: return
 sil hidden @DeadStoreEnumSameCase : $@convention(thin) () -> Int64 {
 bb0:
-  %0 = alloc_stack $Example  // var x             // users: %7, %14, %19
+  %0 = alloc_stack $Example, var, name "x"             // users: %7, %14, %19
   %1 = integer_literal $Builtin.Int64, 64         // user: %2
   %2 = struct $Int64 (%1 : $Builtin.Int64)        // user: %5
   %3 = integer_literal $Builtin.Int64, 64         // user: %4
@@ -1195,7 +1195,7 @@ bb3:                                              // Preds: bb1 bb2
 /// CHECK: store [[RET0:%.+]] to [[RET1:%.+]] : $*S4
 sil hidden @PartialDeadStoreStructInStruct : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_stack $S5  // var i                  // users: %4, %7, %10
+  %0 = alloc_stack $S5, var, name "i"                  // users: %4, %7, %10
   %1 = function_ref @S5_init : $@convention(thin) (@thin S5.Type) -> S5 // user: %3
   %2 = metatype $@thin S5.Type                    // user: %3
   %3 = apply %1(%2) : $@convention(thin) (@thin S5.Type) -> S5 // user: %4
@@ -1217,7 +1217,7 @@ bb0:
 /// CHECK: store
 sil hidden @DiscontiguosPartialDeadStoreInSimpleStruct : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_stack $S6  // var a                  // users: %4, %7, %10
+  %0 = alloc_stack $S6, var, name "a"                  // users: %4, %7, %10
   %1 = function_ref @S6_init : $@convention(thin) (@thin S6.Type) -> S6 // user: %3
   %2 = metatype $@thin S6.Type                    // user: %3
   %3 = apply %1(%2) : $@convention(thin) (@thin S6.Type) -> S6 // user: %4
@@ -1240,7 +1240,7 @@ bb0:
 /// CHECK: store
 sil hidden @DiscontiguosPartialDeadStoreInSimpleLargeStruct : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_stack $S7  // var a                  // users: %4, %7, %10
+  %0 = alloc_stack $S7, var, name "a"                  // users: %4, %7, %10
   %1 = function_ref @S7_init : $@convention(thin) (@thin S7.Type) -> S7 // user: %3
   %2 = metatype $@thin S7.Type                    // user: %3
   %3 = apply %1(%2) : $@convention(thin) (@thin S7.Type) -> S7 // user: %4
@@ -1264,7 +1264,7 @@ bb0:
 /// CHECK: function_ref
 sil hidden @PartialDeadStoreBailOutProperPropagation : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_stack $S7  // var a                  // users: %4, %7, %10
+  %0 = alloc_stack $S7, var, name "a"                  // users: %4, %7, %10
   %55 = integer_literal $Builtin.Int64, 10         // user: %6
   %56 = struct $Int (%55 : $Builtin.Int64)          // user: %8
   %57 = struct_element_addr %0#1 : $*S7, #S7.a     // user: %8
@@ -1293,7 +1293,7 @@ bb0:
 /// CHECK-NEXT: struct_extract
 sil hidden @PartialDeadStoreInSimpleSmallStruct : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_stack $S3  // var a                  // users: %4, %7, %10
+  %0 = alloc_stack $S3, var, name "a"                  // users: %4, %7, %10
   %1 = function_ref @S3_init : $@convention(thin) (@thin S3.Type) -> S3 // user: %3
   %2 = metatype $@thin S3.Type                    // user: %3
   %3 = apply %1(%2) : $@convention(thin) (@thin S3.Type) -> S3 // user: %4
@@ -1317,7 +1317,7 @@ bb0:
 /// CHECK-NEXT: store [[RET0:%.+]] to [[RET1:%.+]] : $*SelfLoop  
 sil hidden @SelfLoopClassTestTypeExpansion : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_stack $S8  // var h                  // users: %4, %7, %13
+  %0 = alloc_stack $S8, var, name "h"                  // users: %4, %7, %13
   %1 = function_ref @S8_init : $@convention(thin) (@thin S8.Type) -> @owned S8 // user: %3
   %2 = metatype $@thin S8.Type                    // user: %3
   %3 = apply %1(%2) : $@convention(thin) (@thin S8.Type) -> @owned S8 // users: %4, %9
@@ -1343,8 +1343,8 @@ bb0:
 /// CHECK: store
 sil hidden @NoDeadStoreWithInterferingLoad : $@convention(thin) (@owned foo, @owned foo) -> () {
 bb0(%0 : $foo, %1 : $foo):
-  debug_value %0 : $foo  // let x                   // id: %2
-  debug_value %1 : $foo  // let a                   // id: %3
+  debug_value %0 : $foo, let, name "x" // id: %2
+  debug_value %1 : $foo, let, name "a" // id: %3
   %4 = integer_literal $Builtin.Int64, 10         // user: %5
   %5 = struct $Int (%4 : $Builtin.Int64)          // user: %7
   %6 = ref_element_addr %0 : $foo, #foo.a             // user: %7

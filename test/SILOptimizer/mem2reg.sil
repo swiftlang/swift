@@ -9,7 +9,7 @@ import Swift
 // simple.foo0 (c : Swift.Int64) -> ()
 sil @store_only_allocas : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
-  %1 = alloc_stack $Int64  // var c               // users: %5, %2
+  %1 = alloc_stack $Int64, var, name "c"               // users: %5, %2
   store %0 to %1#1 : $*Int64                      // id: %2
   // function_ref Swift.print (val : Swift.Int64) -> ()
   %3 = function_ref @_Ts5printFT3valSi_T_ : $@convention(thin) (Int64) -> () // user: %4
@@ -28,9 +28,9 @@ sil @_Ts5printFT3valSi_T_ : $@convention(thin) (Int64) -> ()
 // simple.foo1 (c : Swift.Int64) -> Swift.Int64
 sil @multiple_store_vals : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
-  %1 = alloc_stack $Int64  // var c               // users: %14, %2
+  %1 = alloc_stack $Int64, var, name "c"               // users: %14, %2
   store %0 to %1#1 : $*Int64                      // id: %2
-  %3 = alloc_stack $Int64  // var x               // users: %12, %11, %13, %6
+  %3 = alloc_stack $Int64, var, name "x"               // users: %12, %11, %13, %6
   %4 = integer_literal $Builtin.Int64, 2          // user: %5
   %5 = struct $Int64 (%4 : $Builtin.Int64)        // user: %6
   store %5 to %3#1 : $*Int64                      // id: %6
@@ -51,9 +51,9 @@ bb0(%0 : $Int64):
 // simple.foo2 (c : Swift.Int64) -> Swift.Int64
 sil @multiple_store_vals2 : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
-  %1 = alloc_stack $Int64  // var c               // users: %19, %2
+  %1 = alloc_stack $Int64, var, name "c"               // users: %19, %2
   store %0 to %1#1 : $*Int64                      // id: %2
-  %3 = alloc_box $Int64  // var x                 // users: %16, %11, %6
+  %3 = alloc_box $Int64, var, name "x"                 // users: %16, %11, %6
   %4 = integer_literal $Builtin.Int64, 2          // users: %9, %5
   %5 = struct $Int64 (%4 : $Builtin.Int64)        // users: %12, %6
   store %5 to %3#1 : $*Int64                      // id: %6
@@ -81,9 +81,9 @@ bb3(%18 : $Int64):                                // Preds: bb2 bb1
 // simple.foo2 (c : Swift.Int64) -> Swift.Int64
 sil @with_loads : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
-  %1 = alloc_stack $Int64  // var c               // users: %19, %2, (%20)
+  %1 = alloc_stack $Int64, var, name "c"               // users: %19, %2, (%20)
   store %0 to %1#1 : $*Int64                      // id: %2
-  %3 = alloc_box $Int64  // var x                 // users: %16, %11, %6
+  %3 = alloc_box $Int64, var, name "x"                 // users: %16, %11, %6
   %4 = integer_literal $Builtin.Int64, 2          // users: %9, %5
   %5 = struct $Int64 (%4 : $Builtin.Int64)        // users: %12, %6
   store %5 to %3#1 : $*Int64                      // id: %6
@@ -116,9 +116,9 @@ bb3(%18 : $Int64):                                // Preds: bb2 bb1
 // test.foo3 (c : Swift.Int64) -> ()
 sil @basic_block_with_loads_and_stores : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
-  %1 = alloc_stack $Int64  // var c               // users: %20, %2
+  %1 = alloc_stack $Int64, var, name "c"               // users: %20, %2
   store %0 to %1#1 : $*Int64                      // id: %2
-  %3 = alloc_stack $Int64  // var x               // users: %14, %19, %6, %17
+  %3 = alloc_stack $Int64, var, name "x"               // users: %14, %19, %6, %17
   %4 = integer_literal $Builtin.Int64, 3          // user: %5
   %5 = struct $Int64 (%4 : $Builtin.Int64)        // user: %6
   store %5 to %3#1 : $*Int64                      // id: %6

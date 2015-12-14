@@ -1096,7 +1096,7 @@ func foo<T : Reachable>(x: T, a: Int)
 // p.T.reach (p.T)() -> ()
 sil hidden @_TFC1p1T5reachfS0_FT_T_ : $@convention(method) (@guaranteed T) -> () {
 bb0(%0 : $T):
-  debug_value %0 : $T  // let self                // id: %1
+  debug_value %0 : $T, let, name "self" // id: %1
   %2 = tuple ()                                   // user: %3
   return %2 : $()                                 // id: %3
 }
@@ -1104,7 +1104,7 @@ bb0(%0 : $T):
 // p.T.__deallocating_deinit
 sil hidden @_TFC1p1TD : $@convention(method) (@owned T) -> () {
 bb0(%0 : $T):
-  debug_value %0 : $T  // let self                // id: %1
+  debug_value %0 : $T, let, name "self" // id: %1
   %6 = tuple ()                                   // user: %7
   return %6 : $()                                 // id: %7
 }
@@ -1112,7 +1112,7 @@ bb0(%0 : $T):
 // p.T.deinit
 sil hidden @_TFC1p1Td : $@convention(method) (@guaranteed T) -> @owned Builtin.NativeObject {
 bb0(%0 : $T):
-  debug_value %0 : $T  // let self                // id: %1
+  debug_value %0 : $T, let, name "self" // id: %1
   %2 = unchecked_ref_cast %0 : $T to $Builtin.NativeObject // user: %3
   return %2 : $Builtin.NativeObject               // id: %3
 }
@@ -1120,7 +1120,7 @@ bb0(%0 : $T):
 // p.T.init (p.T.Type)() -> p.T
 sil hidden @_TFC1p1TcfMS0_FT_S0_ : $@convention(method) (@owned T) -> @owned T {
 bb0(%0 : $T):
-  debug_value %0 : $T  // let self                // id: %1
+  debug_value %0 : $T, let, name "self" // id: %1
   return %0 : $T                                  // id: %2
 }
 
@@ -1191,7 +1191,7 @@ func trytofly(a: Flyable)
 // p2.Airplane.fly (p2.Airplane)() -> ()
 sil hidden @_TFV2p28Airplane3flyfS0_FT_T_ : $@convention(method) (Airplane) -> () {
 bb0(%0 : $Airplane):
-  debug_value %0 : $Airplane  // let self         // id: %1
+  debug_value %0 : $Airplane, let, name "self" // id: %1
   %2 = tuple ()                                   // user: %3
   return %2 : $()                                 // id: %3
 }
@@ -1262,7 +1262,7 @@ func trytowalk(f: Walkable)
 // test.Bar.init (test.Bar.Type)() -> test.Bar
 sil hidden @_TFC4test3BarcfMS0_FT_S0_ : $@convention(method) (@owned Bar) -> @owned Bar {
 bb0(%0 : $Bar):
-  %1 = alloc_stack $Bar  // let self              // users: %2, %6, %9, %10
+  %1 = alloc_stack $Bar, let, name "sf"              // users: %2, %6, %9, %10
   store %0 to %1#1 : $*Bar                        // id: %2
   %3 = upcast %0 : $Bar to $NSObject              // user: %7
   %4 = super_method [volatile] %0 : $Bar, #NSObject.init!initializer.1.foreign : NSObject.Type -> () -> NSObject , $@convention(objc_method) (@owned NSObject) -> @owned NSObject // user: %7
@@ -1295,7 +1295,7 @@ bb0(%0 : $Bar):
 // test.Bar.walk (test.Bar)() -> ()
 sil hidden @_TFC4test3Bar4walkfS0_FT_T_ : $@convention(method) (@guaranteed Bar) -> () {
 bb0(%0 : $Bar):
-  debug_value %0 : $Bar  // let self              // id: %1
+  debug_value %0 : $Bar, let, name "self" // id: %1
   %2 = tuple ()                                   // user: %3
   return %2 : $()                                 // id: %3
 }
@@ -1314,7 +1314,7 @@ bb0(%0 : $Bar):
 // test.Bar.__deallocating_deinit
 sil hidden @_TFC4test3BarD : $@convention(method) (@owned Bar) -> () {
 bb0(%0 : $Bar):
-  debug_value %0 : $Bar  // let self              // id: %1
+  debug_value %0 : $Bar, let, name "self" // id: %1
   %2 = super_method %0 : $Bar, #NSObject.deinit!deallocator.foreign : NSObject -> () , $@convention(objc_method) (NSObject) -> () // user: %4
   %3 = upcast %0 : $Bar to $NSObject              // user: %4
   %4 = apply %2(%3) : $@convention(objc_method) (NSObject) -> ()

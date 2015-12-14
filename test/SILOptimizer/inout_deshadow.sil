@@ -13,7 +13,7 @@ sil @takeInt : $@convention(method) (@inout Int64) -> ()
 
 sil @TrivialTest : $@convention(thin) (@inout Int64) -> () {
 bb0(%0 : $*Int64):
-  %1 = alloc_stack $Int64  // var a               // users: %6, %2, %4, %5
+  %1 = alloc_stack $Int64, var, name "a"               // users: %6, %2, %4, %5
   copy_addr %0 to [initialization] %1#1 : $*Int64
   %3 = function_ref @takeInt : $@convention(method) (@inout Int64) -> () // user: %4
   %4 = apply %3(%1#1) : $@convention(method) (@inout Int64) -> ()

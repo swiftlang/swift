@@ -223,7 +223,7 @@ sil @unknown_func : $@convention(thin) () -> ()
 sil hidden @_TFC4test1BD : $@convention(method) (@owned B) -> () {
 // %0                                             // users: %1, %3
 bb0(%0 : $B):
-  debug_value %0 : $B  // let self                // id: %1
+  debug_value %0 : $B, let, name "self" // id: %1
   // function_ref test.B.deinit
   %2 = function_ref @_TFC4test1Bd : $@convention(method) (@guaranteed B) -> @owned Builtin.NativeObject // user: %3
   %3 = apply %2(%0) : $@convention(method) (@guaranteed B) -> @owned Builtin.NativeObject // user: %4
@@ -237,7 +237,7 @@ bb0(%0 : $B):
 sil hidden @_TFC4test1Bd : $@convention(method) (@guaranteed B) -> @owned Builtin.NativeObject {
 // %0                                             // users: %1, %2
 bb0(%0 : $B):
-  debug_value %0 : $B  // let self                // id: %1
+  debug_value %0 : $B, let, name "self" // id: %1
   %2 = unchecked_ref_cast %0 : $B to $Builtin.NativeObject // user: %3
   return %2 : $Builtin.NativeObject               // id: %3
 }
@@ -246,7 +246,7 @@ bb0(%0 : $B):
 sil hidden @_TFC4test1BcfT_S0_ : $@convention(method) (@owned B) -> @owned B {
 // %0                                             // users: %1, %2
 bb0(%0 : $B):
-  debug_value %0 : $B  // let self                // id: %1
+  debug_value %0 : $B, let, name "self" // id: %1
   return %0 : $B                                  // id: %2
 }
 
@@ -259,7 +259,7 @@ sil_vtable B {
 sil hidden @_TFC4test14MyArrayStorageD : $@convention(method) <Element> (@owned MyArrayStorage<Element>) -> () {
 // %0                                             // users: %1, %3
 bb0(%0 : $MyArrayStorage<Element>):
-  debug_value %0 : $MyArrayStorage<Element>  // let self // id: %1
+  debug_value %0 : $MyArrayStorage<Element>, let, name "self" // id: %1
   // function_ref test.MyArrayStorage.deinit
   %2 = function_ref @_TFC4test14MyArrayStoraged : $@convention(method) <τ_0_0> (@guaranteed MyArrayStorage<τ_0_0>) -> @owned Builtin.NativeObject // user: %3
   %3 = apply %2<Element>(%0) : $@convention(method) <τ_0_0> (@guaranteed MyArrayStorage<τ_0_0>) -> @owned Builtin.NativeObject // user: %4
@@ -273,7 +273,7 @@ bb0(%0 : $MyArrayStorage<Element>):
 sil hidden @_TFC4test14MyArrayStoraged : $@convention(method) <Element> (@guaranteed MyArrayStorage<Element>) -> @owned Builtin.NativeObject {
 // %0                                             // users: %1, %2
 bb0(%0 : $MyArrayStorage<Element>):
-  debug_value %0 : $MyArrayStorage<Element>  // let self // id: %1
+  debug_value %0 : $MyArrayStorage<Element>, let, name "self" // id: %1
   %2 = unchecked_ref_cast %0 : $MyArrayStorage<Element> to $Builtin.NativeObject // user: %3
   return %2 : $Builtin.NativeObject               // id: %3
 }
@@ -282,7 +282,7 @@ bb0(%0 : $MyArrayStorage<Element>):
 sil hidden @_TFC4test14MyArrayStoragecfT_GS0_x_ : $@convention(method) <Element> (@owned MyArrayStorage<Element>) -> @owned MyArrayStorage<Element> {
 // %0                                             // users: %1, %2
 bb0(%0 : $MyArrayStorage<Element>):
-  debug_value %0 : $MyArrayStorage<Element>  // let self // id: %1
+  debug_value %0 : $MyArrayStorage<Element>, let, name "self" // id: %1
   return %0 : $MyArrayStorage<Element>            // id: %2
 }
 

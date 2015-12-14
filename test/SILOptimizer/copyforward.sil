@@ -20,7 +20,7 @@ protocol P {
 // CHECK: return
 sil hidden @nrvo : $@convention(thin) <T where T : P> (@out T, Bool) -> () {
 bb0(%0 : $*T, %1 : $Bool):
-  %2 = alloc_stack $T  // var rvo                 // users: %9, %15, %17, %19
+  %2 = alloc_stack $T, var, name "ro"                 // users: %9, %15, %17, %19
   debug_value_addr %0 : $*T
   debug_value_addr %2#1 : $*T
   %3 = struct_extract %1 : $Bool, #Bool._value     // user: %4
@@ -236,7 +236,7 @@ sil [transparent] @_TFO8enuminit1A3ValU__fMGS0_Q__FQ_GS0_Q__ : $@convention(thin
 //CHECK: return
 sil @enuminit : $@convention(thin) <T> (@out A<T>, @in T, @thin A<T>.Type) -> () {
 bb0(%0 : $*A<T>, %1 : $*T, %2 : $@thin A<T>.Type):
-  %3 = alloc_stack $A<T>  // var self             // users: %10, %14, %16
+  %3 = alloc_stack $A<T>, var, name "sf"             // users: %10, %14, %16
   // function_ref enuminit.A.Val <A>(enuminit.A<A>.Type)(A) -> enuminit.A<A>
   %4 = function_ref @_TFO8enuminit1A3ValU__fMGS0_Q__FQ_GS0_Q__ : $@convention(thin) <τ_0_0> (@out A<τ_0_0>, @in τ_0_0, @thin A<τ_0_0>.Type) -> () // user: %9
   %5 = metatype $@thin A<T>.Type                  // user: %9
@@ -259,7 +259,7 @@ bb0(%0 : $*A<T>, %1 : $*T, %2 : $@thin A<T>.Type):
 //CHECK: return
 sil hidden @make_addronly : $@convention(thin) <T> (@out T) -> () {
 bb0(%0 : $*T):
-  %1 = alloc_stack $T  // let t                   // users: %3, %4, %5
+  %1 = alloc_stack $T, let, name "t"                   // users: %3, %4, %5
   %2 = function_ref @f_out : $@convention(thin) <τ_0_0> (@out τ_0_0) -> () // user: %3
   %3 = apply %2<T>(%1#1) : $@convention(thin) <τ_0_0> (@out τ_0_0) -> ()
   copy_addr [take] %1#1 to [initialization] %0 : $*T // id: %4

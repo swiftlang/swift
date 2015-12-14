@@ -250,7 +250,8 @@ public:
 
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
-    AllocBoxInst *allocBox = SGF.B.createAllocBox(decl, lType, ArgNo);
+    AllocBoxInst *allocBox =
+        SGF.B.createAllocBox(decl, lType, {decl->isLet(), ArgNo});
     auto box = SILValue(allocBox, 0);
     auto addr = SILValue(allocBox, 1);
 

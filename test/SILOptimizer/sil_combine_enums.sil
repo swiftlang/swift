@@ -17,7 +17,7 @@ sil @external_func: $@convention(thin) () -> ()
 //CHECK: return
 sil @eliminate_sw_enum_addr : $@convention(thin) () -> Int {
 bb0:
-  %0 = alloc_stack $Optional<SomeClass>  // var x // users: %2, %4, %5, %17, %19
+  %0 = alloc_stack $Optional<SomeClass>, var, name "x" // users: %2, %4, %5, %17, %19
   %1 = alloc_ref $SomeClass                       // user: %3
   %2 = init_enum_data_addr %0#1 : $*Optional<SomeClass>, #Optional.Some!enumelt.1 // user: %3
   store %1 to %2 : $*SomeClass                    // id: %3

@@ -1938,7 +1938,7 @@ bb0(%0 : $XX):
   %2 = existential_metatype $@thick XX.Type, %0 : $XX // user: %3
   %3 = thick_to_objc_metatype %2 : $@thick XX.Type to $@objc_metatype XX.Type // user: %4
   %4 = objc_existential_metatype_to_object %3 : $@objc_metatype XX.Type to $AnyObject // users: %5, %6
-  debug_value %4 : $AnyObject  // let obj1        // id: %5
+  debug_value %4 : $AnyObject, let, name "obj1" // id: %5
   strong_release %4 : $AnyObject                  // id: %6
   strong_release %0 : $XX                         // id: %7
   %8 = tuple ()                                   // user: %9
@@ -2670,10 +2670,10 @@ final class NClass {
 // CHECK: return [[R]]
 sil @narrow_load_with_debug_value : $@convention(thin) (@owned NClass) -> Int {
 bb0(%0 : $NClass):
-  debug_value %0 : $NClass  // let c             // id: %1
+  debug_value %0 : $NClass, let, name "c" // id: %1
   %2 = ref_element_addr %0 : $NClass, #NClass.s // user: %3
   %3 = load %2 : $*NStruct                       // users: %4, %5
-  debug_value %3 : $NStruct  // let xx           // id: %4
+  debug_value %3 : $NStruct, let, name "xx" // id: %4
   %5 = struct_extract %3 : $NStruct, #NStruct.a // user: %7
   strong_release %0 : $NClass                    // id: %6
   return %5 : $Int                                // id: %7
@@ -2706,7 +2706,7 @@ enum VendingMachineError: ErrorType {
 // CHECK: return
 sil hidden @RemoveUnusedException : $@convention(thin) (Int32) -> (Double, @error ErrorType) {
 bb0(%0 : $Int32):
-  debug_value %0 : $Int32  // let x               // id: %1
+  debug_value %0 : $Int32, let, name "x" // id: %1
   %2 = integer_literal $Builtin.Int32, 10         // user: %4
   %3 = struct_extract %0 : $Int32, #Int32._value   // user: %4
   %4 = builtin "cmp_sgt_Int32"(%3 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int1 // user: %5
@@ -2716,7 +2716,7 @@ bb1:                                              // Preds: bb0
   %6 = alloc_existential_box $ErrorType, $VendingMachineError // users: %8, %9, %13
   %7 = enum $VendingMachineError, #VendingMachineError.OutOfStock!enumelt // user: %8
   store %7 to %6#1 : $*VendingMachineError        // id: %8
-  debug_value %6#0 : $ErrorType  // let error     // id: %9
+  debug_value %6#0 : $ErrorType, let, name "error" // id: %9
   %10 = float_literal $Builtin.FPIEEE80, 0x3FFF8000000000000000 // 1 // user: %11
   %11 = builtin "fptrunc_FPIEEE80_FPIEEE64"(%10 : $Builtin.FPIEEE80) : $Builtin.FPIEEE64 // user: %12
   %12 = struct $Double (%11 : $Builtin.FPIEEE64)  // user: %14

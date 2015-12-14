@@ -9,7 +9,7 @@ sil @_Ts5printFT3valSi_T_ : $@convention(thin) (Int64) -> ()
 // CHECK-NOT: alloc_stack
 sil @liveness0 : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
-  %1 = alloc_stack $Int64  // var x               // users: %39, %2
+  %1 = alloc_stack $Int64, var, name "x"               // users: %39, %2
   store %0 to %1#1 : $*Int64                      // id: %2
   %3 = integer_literal $Builtin.Int64, 10         // user: %6
   %5 = struct_extract %0 : $Int64, #Int64._value   // user: %6
@@ -17,7 +17,7 @@ bb0(%0 : $Int64):
   cond_br %6, bb1, bb5                            // id: %7
 
 bb1:                                              // Preds: bb0
-  %8 = alloc_stack $Int64  // var y               // users: %23, %19, %37, %11, %26
+  %8 = alloc_stack $Int64, var, name "y"               // users: %23, %19, %37, %11, %26
   %9 = integer_literal $Builtin.Int64, 20         // user: %10
   %10 = struct $Int64 (%9 : $Builtin.Int64)       // user: %11
   store %10 to %8#1 : $*Int64                     // id: %11

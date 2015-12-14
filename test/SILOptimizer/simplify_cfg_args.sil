@@ -465,7 +465,7 @@ public enum Numbers {
 // CHECK_WITH_CODEMOTION: return
 sil @FormSelectEnumFromTwoSelectSwitches : $@convention(thin) (Numbers) -> Int32 {
 bb0(%0 : $Numbers):
-  debug_value %0 : $Numbers  // let e             // id: %1
+  debug_value %0 : $Numbers, let, name "e" // id: %1
   switch_enum %0 : $Numbers, case #Numbers.First!enumelt: bb1, case #Numbers.Second!enumelt: bb3, case #Numbers.Third!enumelt: bb4, default bb6 // id: %2
 
 bb1:                                              // Preds: bb0
@@ -542,7 +542,7 @@ bb20(%34 : $Builtin.Int32):                       // Preds: bb2 bb5 bb11 bb14 bb
 // CHECK_WITH_CODEMOTION: return
 sil @FormSelectEnumIntResult : $@convention(thin) (Numbers) -> Int32 {
 bb0(%0 : $Numbers):
-  debug_value %0 : $Numbers  // let e             // id: %1
+  debug_value %0 : $Numbers, let, name "e" // id: %1
   switch_enum %0 : $Numbers, case #Numbers.First!enumelt: bb1, case #Numbers.Second!enumelt: bb3, case #Numbers.Third!enumelt: bb4, case #Numbers.Fourth!enumelt: bb6, default bb8 // id: %2
 
 bb1:                                              // Preds: bb0
@@ -590,7 +590,7 @@ bb11(%21 : $Builtin.Int32):                       // Preds: bb2 bb5 bb7 bb10
 // CHECK_WITH_CODEMOTION: return
 sil @FormSelectEnumBoolResult : $@convention(thin) (Numbers) -> Bool {
 bb0(%0 : $Numbers):
-  debug_value %0 : $Numbers  // let e             // id: %1
+  debug_value %0 : $Numbers, let, name "e" // id: %1
   switch_enum %0 : $Numbers, case #Numbers.First!enumelt: bb1, case #Numbers.Second!enumelt: bb3, case #Numbers.Third!enumelt: bb4, default bb6 // id: %2
 
 bb1:                                              // Preds: bb0
@@ -631,7 +631,7 @@ bb9(%17 : $Builtin.Int1):                         // Preds: bb2 bb5 bb8
 // CHECK_WITH_CODEMOTION: return
 sil @DontFormSelectEnumBoolResult : $@convention(thin) (Numbers, Bool) -> Bool {
 bb0(%0 : $Numbers, %1 : $Bool):
-  debug_value %0 : $Numbers  // let e             // id: %2
+  debug_value %0 : $Numbers, let, name "e" // id: %2
   %2 = struct_extract %1 : $Bool, #Bool._value
   switch_enum %0 : $Numbers, case #Numbers.First!enumelt: bb1, case #Numbers.Second!enumelt: bb3, case #Numbers.Third!enumelt: bb4, default bb6 // id: %4
 

@@ -501,7 +501,7 @@ void ClosureCloner::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
     if (I != ProjectBoxArgumentMap.end()) {
       getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
       getBuilder().createDebugValue(Inst->getLoc(), I->second,
-                                    Inst->getVarInfo().getArgNo());
+                                    Inst->getVarInfo());
       return;
     }
   }
