@@ -100,7 +100,7 @@
 // LINUX-x86_64-DAG: -lswiftCore
 // LINUX-x86_64-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
 // LINUX-x86_64-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
-// LINUX-x86_64-DAG: -Xlinker -T /{{[^ ]+}}/linux/x86_64/swift.ld
+// LINUX-x86_64-DAG: -Xlinker -T /{{[^ ]+}}/linux/x86_64-gnu/swift.ld
 // LINUX-x86_64-DAG: -F foo
 // LINUX-x86_64-DAG: -framework bar
 // LINUX-x86_64-DAG: -L baz
