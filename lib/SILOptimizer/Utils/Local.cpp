@@ -1244,7 +1244,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
 
   // Now emit the a cast from the casted ObjC object into a target type.
   // This is done by means of calling _forceBridgeFromObjectiveC or
-  // _conditionallyBridgeFromObjectiveC_birdgeable from the Target type.
+  // _conditionallyBridgeFromObjectiveC_bridgeable from the Target type.
   // Lookup the required function in the Target type.
 
   // Lookup the _ObjectiveCBridgeable protocol.
