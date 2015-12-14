@@ -31,8 +31,7 @@ Type DependentGenericTypeResolver::resolveDependentMemberType(
                                      SourceRange baseRange,
                                      ComponentIdentTypeRepr *ref) {
   auto archetype = Builder.resolveArchetype(baseTy);
-  if (!archetype)
-    return ErrorType::get(DC->getASTContext());
+  assert(archetype && "Bad generic context nesting?");
   
   return archetype->getRepresentative()
            ->getNestedType(ref->getIdentifier(), Builder)
@@ -44,8 +43,7 @@ Type DependentGenericTypeResolver::resolveSelfAssociatedType(
        DeclContext *DC,
        AssociatedTypeDecl *assocType) {
   auto archetype = Builder.resolveArchetype(selfTy);
-  if (!archetype)
-    return ErrorType::get(DC->getASTContext());
+  assert(archetype && "Bad generic context nesting?");
   
   return archetype->getRepresentative()
            ->getNestedType(assocType->getName(), Builder)
