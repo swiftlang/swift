@@ -337,12 +337,6 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
 
   SILModule &Mod = AI.getModule();
 
-  // Bail if any generic types parameters of the class instance type are
-  // unbound.
-  // We cannot devirtualize unbound generic calls yet.
-  if (isClassWithUnboundGenericParameters(ClassOrMetatypeType, Mod))
-    return false;
-
   // First attempt to lookup the origin for our class method. The origin should
   // either be a metatype or an alloc_ref.
   DEBUG(llvm::dbgs() << "        Origin Type: " << ClassOrMetatypeType);

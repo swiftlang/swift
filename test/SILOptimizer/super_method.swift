@@ -52,14 +52,20 @@ class GenericChild<A> : GenericParent<A> {}
 class GenericGrandchild<A> : GenericChild<A> {
   // CHECK-LABEL: sil hidden @_TFC12super_method17GenericGrandchild16onlyInGrandchildfT_T_ : $@convention(method) <A> (@guaranteed GenericGrandchild<A>) -> ()
   func onlyInGrandchild() {
-    // CHECK: super_method {{%[0-9+]}} : $GenericGrandchild<A>, #GenericParent.onlyInParent!1 : <A> GenericParent<A> -> () -> () , $@convention(method) <τ_0_0> (@guaranteed GenericParent<τ_0_0>) -> ()
+	// CHECK-NOT: super_method %
+	// CHECK: function_ref @_TFC12super_method13GenericParent12onlyInParentfT_T_
+	// CHECK-NOT: super_method %
     super.onlyInParent()
+	// CHECK-NOT: super_method %
     // CHECK: function_ref @_TFC12super_method13GenericParent17finalOnlyInParentfT_T_ : $@convention(method) <τ_0_0> (@guaranteed GenericParent<τ_0_0>) -> ()
+	// CHECK-NOT: super_method %
     super.finalOnlyInParent()
   }
   // CHECK-LABEL: sil hidden @_TFC12super_method17GenericGrandchild6methodfT_T_ : $@convention(method) <A> (@guaranteed GenericGrandchild<A>) -> ()
   override func method() {
-    // CHECK: super_method {{%[0-9]+}} : $GenericGrandchild<A>, #GenericParent.method!1 : <A> GenericParent<A> -> () -> () , $@convention(method) <τ_0_0> (@guaranteed GenericParent<τ_0_0>) -> ()
+	// CHECK-NOT: super_method %
+    // CHECK: function_ref @_TFC12super_method13GenericParent6methodfT_T_
+	// CHECK-NOT: super_method %
     super.method()
   }
 }
