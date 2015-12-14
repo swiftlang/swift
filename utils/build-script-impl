@@ -230,6 +230,9 @@ function set_deployment_target_based_options() {
         linux-armv7)
             SWIFT_HOST_VARIANT_ARCH="armv7"
             ;;
+        linux-aarch64)
+            SWIFT_HOST_VARIANT_ARCH="aarch64"
+            ;;
         freebsd-x86_64)
             SWIFT_HOST_VARIANT_ARCH="x86_64"
             ;;
@@ -754,6 +757,11 @@ case "$(uname -s -m)" in
             "linux-armv7"
         )
         ;;
+    Linux\ aarch64)
+        NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
+            "linux-aarch64"
+        )
+        ;;
     Darwin\ x86_64)
         NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
             "macosx-x86_64"
@@ -821,6 +829,11 @@ case "$(uname -s -m)" in
     Linux\ armv7*)
         STDLIB_DEPLOYMENT_TARGETS=(
             "linux-armv7"
+        )
+        ;;
+    Linux\ aarch64)
+        STDLIB_DEPLOYMENT_TARGETS=(
+            "linux-aarch64"
         )
         ;;
     Darwin\ x86_64)
