@@ -182,7 +182,7 @@ KNOWN_SETTINGS=(
     darwin-toolchain-installer-package ""        "The path to installer pkg"
     build-jobs ""                                "The number of parallel build jobs to use"
     darwin-toolchain-alias             "swift"   "Swift alias for toolchain"
-
+    export-compile-commands            ""        "set to generate JSON compilation databases for each build product"
 )
 
 function toupper() {
@@ -1045,6 +1045,13 @@ if [[ "${ENABLE_ASAN}" ]] ; then
     COMMON_CMAKE_OPTIONS=(
         "${COMMON_CMAKE_OPTIONS[@]}"
         -DLLVM_USE_SANITIZER="Address"
+    )
+fi
+
+if [[ "${EXPORT_COMPILE_COMMANDS}" ]] ; then
+    COMMON_CMAKE_OPTIONS=(
+        "${COMMON_CMAKE_OPTIONS[@]}"
+        -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
     )
 fi
 
