@@ -60,7 +60,8 @@ void ConstraintSystem::addTypeVariable(TypeVariableType *typeVar) {
 }
 
 void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
-                                               TypeVariableType *typeVar2) {
+                                               TypeVariableType *typeVar2,
+                                               bool updateWorkList) {
   assert(typeVar1 == getRepresentative(typeVar1) &&
          "typeVar1 is not the representative");
   assert(typeVar2 == getRepresentative(typeVar2) &&
@@ -70,7 +71,10 @@ void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
 
   // Merge nodes in the constraint graph.
   CG.mergeNodes(typeVar1, typeVar2);
-  addTypeVariableConstraintsToWorkList(typeVar1);
+
+  if (updateWorkList) {
+    addTypeVariableConstraintsToWorkList(typeVar1);
+  }
 }
 
 void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,

@@ -1418,7 +1418,8 @@ public:
   /// representatives of their equivalence classes, and must be
   /// distinct.
   void mergeEquivalenceClasses(TypeVariableType *typeVar1,
-                               TypeVariableType *typeVar2);
+                               TypeVariableType *typeVar2,
+                               bool upateWorkList = true);
 
   /// \brief Retrieve the fixed type corresponding to the given type variable,
   /// or a null type if there is no fixed type.

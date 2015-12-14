@@ -692,7 +692,7 @@ unsigned ConstraintGraph::computeConnectedComponents(
 /// edge in the graph.
 static bool shouldContractEdge(ConstraintKind kind) {
   switch (kind) {
-    case ConstraintKind::Conversion:
+//    case ConstraintKind::Conversion:
     case ConstraintKind::Bind:
     case ConstraintKind::BindParam:
     case ConstraintKind::Equal:
@@ -726,7 +726,11 @@ bool ConstraintGraph::contractEdges() {
             auto rep1 = CS.getRepresentative(tyvar1);
             auto rep2 = CS.getRepresentative(tyvar2);
 
-            if (rep1 != rep2) {
+            if (rep1 != rep2 &&
+                ((rep1->getImpl().canBindToLValue() ==
+                  rep2->getImpl().canBindToLValue()) ||
+                  // Allow l-value contractions when binding parameter types.
+                  constraint->getKind() == ConstraintKind::BindParam)) {
               if (CS.TC.getLangOpts().DebugConstraintSolver) {
                 auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
                 if (CS.solverState)
@@ -738,9 +742,9 @@ bool ConstraintGraph::contractEdges() {
               }
 
               // Merge the edges and remove the constraint.
-              CS.mergeEquivalenceClasses(rep1, rep2);
-              didContractEdges = true;
               removeEdge(constraint);
+              CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
+              didContractEdges = true;
             }
           }
         }
