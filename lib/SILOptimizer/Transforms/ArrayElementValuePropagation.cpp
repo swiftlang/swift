@@ -283,7 +283,10 @@ public:
               ArrayAllocation::findValueReplacements(Apply, ValueReplacements);
       }
     }
-
+    DEBUG(if (Changed) {
+      llvm::dbgs() << "Array elements replaced in " << Fn.getName() << " ("
+                   << ValueReplacements.size() << ")\n";
+    });
     // Perform the actual replacement of the get_element call by its value.
     for (auto &Repl : ValueReplacements) {
       ArraySemanticsCall GetElement(Repl.first);
