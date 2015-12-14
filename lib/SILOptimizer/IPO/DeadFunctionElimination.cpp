@@ -148,9 +148,9 @@ protected:
     
     // Check if the method implementation is the same in a super class, i.e.
     // it is not overridden in the derived class.
-    FuncDecl *Impl1 = MethodCl->findImplementingMethod(FD);
+    auto *Impl1 = MethodCl->findImplementingMethod(FD);
     assert(Impl1);
-    FuncDecl *Impl2 = ImplCl->findImplementingMethod(FD);
+    auto *Impl2 = ImplCl->findImplementingMethod(FD);
     assert(Impl2);
     
     return Impl1 == Impl2;

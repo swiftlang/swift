@@ -3279,12 +3279,14 @@ public:
 
   /// Find a method of a class that overrides a given method.
   /// Return nullptr, if no such method exists.
-  FuncDecl *findOverridingDecl(const FuncDecl *method) const;
+  AbstractFunctionDecl *findOverridingDecl(
+      const AbstractFunctionDecl *method) const;
 
   /// Find a method implementation which will be used when a given method
   /// is invoked on an instance of this class. This implementation may stem
   /// either from a class itself or its direct or indirect superclasses.
-  FuncDecl *findImplementingMethod(const FuncDecl *method) const;
+  AbstractFunctionDecl *findImplementingMethod(
+      const AbstractFunctionDecl *method) const;
 
   /// True if the class has a destructor.
   ///
@@ -4590,6 +4592,10 @@ public:
   /// Retrieve the declaration that this method overrides, if any.
   AbstractFunctionDecl *getOverriddenDecl() const;
 
+  /// Returns true if a function declaration overrides a given
+  /// method from its direct or indirect superclass.
+  bool isOverridingDecl(const AbstractFunctionDecl *method) const;
+
   /// Whether the declaration is later overridden in the module
   ///
   /// Overriddes are resolved during type checking; only query this field after
@@ -4929,10 +4935,6 @@ public:
     FuncDeclBits.ForcedStaticDispatch = flag;
   }
 
-  /// Returns true if a function declaration overrides a given
-  /// method from its direct or indirect superclass.
-  bool isOverridingDecl(const FuncDecl *method) const;
-  
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }
   static bool classof(const AbstractFunctionDecl *D) {
     return classof(static_cast<const Decl*>(D));
