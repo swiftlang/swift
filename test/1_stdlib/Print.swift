@@ -1,25 +1,24 @@
 // RUN: mkdir -p %t
 // RUN: %target-build-swift %s -parse-stdlib -Xfrontend -disable-access-control -o %t/a.out -Xlinker -dead_strip
-// RUN: %target-run %t/a.out env | FileCheck %s
-// RUN: %target-run %t/a.out ru_RU.UTF-8 | FileCheck %s
+// RUN: %target-run %t/a.out env %s
+// RUN: %target-run %t/a.out ru_RU.UTF-8 %s
 // REQUIRES: executable_test
 
 // XFAIL: linux
 
 import Swift
 import Darwin
+import StdlibUnittest
 
-// Interpret the command line arguments.
+let PrintTests = TestSuite("Print")
+
 let arg = Process.arguments[1]
-
 if arg == "env" {
   setlocale(LC_ALL, "")
 } else {
+  expectEqual("ru_RU.UTF-8", arg)
   setlocale(LC_ALL, arg)
 }
-
-import StdlibUnittest
-let PrintTests = TestSuite("Print")
 
 PrintTests.test("stdlib types have description") {
   func hasDescription(any: Any) {
@@ -170,10 +169,10 @@ PrintTests.test("test stdlib types printed") {
 }
 
 PrintTests.test("optional strings") {
-  expectEqual("nil", String!())
-  expectEqual("meow", String!("meow"))
-  expectEqual("nil", String?())
-  expectEqual("Optional(\"meow\")", String?("meow"))
+  expectPrinted("nil", String!())
+  expectPrinted("meow", String!("meow"))
+  expectPrinted("nil", String?())
+  expectPrinted("Optional(\"meow\")", String?("meow"))
 }
 
 PrintTests.test("custom string convertible structs") {
@@ -699,139 +698,103 @@ PrintTests.test("Array") {
     ClassPrintable(2), ClassPrintable(3) ] as Array<AnyObject>)
 }
 
-func test_DictionaryPrinting() {
-  var dictSI: Dictionary<String, Int> = [:]
-  printedIs(dictSI, "[:]")
-  debugPrintedIs(dictSI, "[:]")
-
-  dictSI = [ "aaa": 1 ]
-  printedIs(dictSI, "[\"aaa\": 1]")
-  debugPrintedIs(dictSI, "[\"aaa\": 1]")
-
-  dictSI = [ "aaa": 1, "bbb": 2 ]
-  printedIs(dictSI, "[\"aaa\": 1, \"bbb\": 2]", expected2: "[\"bbb\": 2, \"aaa\": 1]")
-  debugPrintedIs(dictSI, "[\"aaa\": 1, \"bbb\": 2]", expected2: "[\"bbb\": 2, \"aaa\": 1]")
-
-  let dictSS = [ "aaa": "bbb" ]
-  printedIs(dictSS, "[\"aaa\": \"bbb\"]")
-  debugPrintedIs(dictSS, "[\"aaa\": \"bbb\"]")
-
-  print("test_DictionaryPrinting done")
+PrintTests.test("Dictionary") {
+  expectPrinted("[:]", [String: Int]())
+  expectDebugPrinted("[:]", [String: Int]())
+  
+  expectPrinted("[\"aaa\": 1]", [ "aaa": 1 ])
+  expectDebugPrinted("[\"aaa\": 1]", [ "aaa": 1 ])
+  
+  let d0 = [ "aaa": 1, "bbb": 2 ]
+  expectPrinted(expectedOneOf: [ "[\"aaa\": 1, \"bbb\": 2]",
+    "[\"bbb\": 2, \"aaa\": 1]" ], d0)
+  expectDebugPrinted(expectedOneOf: [ "[\"aaa\": 1, \"bbb\": 2]",
+    "[\"bbb\": 2, \"aaa\": 1]" ], d0)
+  
+  let d1 = [ "aaa": "bbb" ]
+  expectPrinted("[\"aaa\": \"bbb\"]", d1)
+  expectDebugPrinted("[\"aaa\": \"bbb\"]", d1)
 }
-test_DictionaryPrinting()
-// CHECK: test_DictionaryPrinting done
 
-func test_SetPrinting() {
-  var sI = Set<Int>()
-  printedIs(sI, "[]")
-  debugPrintedIs(sI, "Set([])")
-
-  sI = Set<Int>([11, 22])
-  printedIs(sI, "[11, 22]", expected2: "[22, 11]")
-  debugPrintedIs(sI, "Set([11, 22])", expected2: "Set([22, 11])")
-
-  let sS = Set<String>(["Hello", "world"])
-  printedIs(sS, "[\"Hello\", \"world\"]", expected2: "[\"world\", \"Hello\"]")
-  debugPrintedIs(sS, "Set([\"Hello\", \"world\"])", expected2: "Set([\"world\", \"Hello\"])")
-
-  print("test_SetPrinting done")
+PrintTests.test("Set") {
+  expectPrinted("[]", Set<Int>())
+  expectDebugPrinted("Set([])", Set<Int>())
+  
+  let s0 = Set<Int>([11, 22])
+  expectPrinted(expectedOneOf: [ "[11, 22]", "[22, 11]" ], s0)
+  expectDebugPrinted(expectedOneOf: [ "Set([11, 22])",
+    "Set([22, 11])" ], s0)
+  
+  let s1 = Set<String>(["Hello", "world"])
+  expectPrinted(expectedOneOf: [ "[\"Hello\", \"world\"]",
+    "[\"world\", \"Hello\"]" ], s1)
+  expectDebugPrinted(expectedOneOf: [ "Set([\"Hello\", \"world\"])",
+    "Set([\"world\", \"Hello\"])" ], s1)
 }
-test_SetPrinting()
-// CHECK: test_SetPrinting done
 
-func test_TuplePrinting() {
-  let tuple1 = (42, ())
-  printedIs(tuple1, "(42, ())")
-
-  let tuple2 = ((), 42)
-  printedIs(tuple2, "((), 42)")
-
-  let tuple3 = (42, StructPrintable(3))
-  printedIs(tuple3, "(42, ►3◀︎)")
-
-  let tuple4 = (42, LargeStructPrintable(10, 20, 30, 40))
-  printedIs(tuple4, "(42, <10 20 30 40>)")
-
-  let tuple5 = (42, ClassPrintable(3))
-  printedIs(tuple5, "(42, ►3◀︎)")
-
-  let tuple6 = ([123: 123], (1, 2, "3"))
-  printedIs(tuple6, "([123: 123], (1, 2, \"3\"))")
-
-  let arrayOfTuples1 =
-      [ (1, "two", StructPrintable(3), StructDebugPrintable(4),
-         WithoutDescription(5)) ]
-  printedIs(arrayOfTuples1, "[(1, \"two\", ►3◀︎, ►4◀︎, a.WithoutDescription(x: 5))]")
-
-  let arrayOfTuples2 =
-      [ (1, "two", WithoutDescription(3)),
-        (11, "twenty-two", WithoutDescription(33)),
-        (111, "two hundred twenty-two", WithoutDescription(333)) ]
-  printedIs(arrayOfTuples2, "[(1, \"two\", a.WithoutDescription(x: 3)), (11, \"twenty-two\", a.WithoutDescription(x: 33)), (111, \"two hundred twenty-two\", a.WithoutDescription(x: 333))]")
-
-  print("test_TuplePrinting done")
+PrintTests.test("Tuple") {
+  expectPrinted("(42, ())", (42, ()))
+  expectPrinted("((), 42)", ((), 42))
+  expectPrinted("(42, ►3◀︎)", (42, StructPrintable(3)))
+  expectPrinted("(42, <10 20 30 40>)",
+    (42, LargeStructPrintable(10, 20, 30, 40)))
+  expectPrinted("(42, ►3◀︎)", (42, ClassPrintable(3)))
+  expectPrinted("([123: 123], (1, 2, \"3\"))",
+    ([123: 123], (1, 2, "3")))
+  
+  let t0 = [ (1, "two", StructPrintable(3), StructDebugPrintable(4),
+    WithoutDescription(5)) ]
+  expectPrinted("[(1, \"two\", ►3◀︎, ►4◀︎, a.WithoutDescription(x: 5))]",
+    t0)
+  
+  let t1 = [ (1, "two", WithoutDescription(3)),
+    (11, "twenty-two", WithoutDescription(33)),
+    (111, "two hundred twenty-two", WithoutDescription(333)) ]
+  expectPrinted("[(1, \"two\", a.WithoutDescription(x: 3)), (11, \"twenty-two\", a.WithoutDescription(x: 33)), (111, \"two hundred twenty-two\", a.WithoutDescription(x: 333))]", t1)
 }
-test_TuplePrinting()
-// CHECK: test_TuplePrinting done
 
-func test_ArbitraryStructPrinting() {
-  let arrayOfArbitraryStructs =
-    [ WithoutDescription(1), WithoutDescription(2), WithoutDescription(3) ]
-  printedIs(
-    arrayOfArbitraryStructs,
-    "[a.WithoutDescription(x: 1), a.WithoutDescription(x: 2), a.WithoutDescription(x: 3)]")
-  debugPrintedIs(
-    arrayOfArbitraryStructs,
-    "[a.WithoutDescription(x: 1), a.WithoutDescription(x: 2), a.WithoutDescription(x: 3)]")
-
-  printedIs(
-    EmptyStructWithoutDescription(),
-    "EmptyStructWithoutDescription()")
-  debugPrintedIs(
-    EmptyStructWithoutDescription(),
-    "a.EmptyStructWithoutDescription()")
-
-  printedIs(
-    ValuesWithoutDescription(1.25, "abc", [ 1, 2, 3 ]),
-    "ValuesWithoutDescription<Double, String, Array<Int>>(t: 1.25, u: \"abc\", v: [1, 2, 3])")
-  debugPrintedIs(
-    ValuesWithoutDescription(1.25, "abc", [ 1, 2, 3 ]),
-    "a.ValuesWithoutDescription<Swift.Double, Swift.String, Swift.Array<Swift.Int>>(t: 1.25, u: \"abc\", v: [1, 2, 3])")
-
-  print("test_ArbitraryStructPrinting done")
+PrintTests.test("ArbitraryStruct") {
+  let s0 = [ WithoutDescription(1), WithoutDescription(2), WithoutDescription(3) ]
+  expectPrinted(
+  "[a.WithoutDescription(x: 1), a.WithoutDescription(x: 2), a.WithoutDescription(x: 3)]",
+  s0)
+  expectDebugPrinted(
+  "[a.WithoutDescription(x: 1), a.WithoutDescription(x: 2), a.WithoutDescription(x: 3)]",
+  s0)
+  
+  expectPrinted("EmptyStructWithoutDescription()",
+    EmptyStructWithoutDescription())
+  expectDebugPrinted("a.EmptyStructWithoutDescription()",
+    EmptyStructWithoutDescription())
+  
+  expectPrinted(
+    "ValuesWithoutDescription<Double, String, Array<Int>>(t: 1.25, u: \"abc\", v: [1, 2, 3])",
+    ValuesWithoutDescription(1.25, "abc", [ 1, 2, 3 ]))
+  expectDebugPrinted(
+    "a.ValuesWithoutDescription<Swift.Double, Swift.String, Swift.Array<Swift.Int>>(t: 1.25, u: \"abc\", v: [1, 2, 3])", ValuesWithoutDescription(1.25, "abc", [ 1, 2, 3 ]))
 }
-test_ArbitraryStructPrinting()
-// CHECK: test_ArbitraryStructPrinting done
 
-func test_MetatypePrinting() {
-  printedIs(Int.self, "Int")
-  debugPrintedIs(Int.self, "Swift.Int")
-
-  print("test_MetatypePrinting done")
+PrintTests.test("Metatype") {
+  expectPrinted("Int", Int.self)
+  expectDebugPrinted("Swift.Int", Int.self)
 }
-test_MetatypePrinting()
-// CHECK: test_MetatypePrinting done
 
-func test_StringInterpolation() {
-  assertEquals("1", "\(1)")
-  assertEquals("2", "\(1 + 1)")
-  assertEquals("aaa1bbb2ccc", "aaa\(1)bbb\(2)ccc")
-
-  assertEquals("1.0", "\(1.0)")
-  assertEquals("1.5", "\(1.5)")
-  assertEquals("1e-12", "\(1.0 / (1000000000000))")
-
-  assertEquals("inf", "\(1 / 0.0)")
-  assertEquals("-inf", "\(-1 / 0.0)")
-  assertEquals("nan", "\(0 / 0.0)")
-
-  assertEquals("<[►1◀︎, ►2◀︎, ►3◀︎]>", "<\([ StructPrintable(1), StructPrintable(2), StructPrintable(3) ])>")
-  assertEquals("WithoutDescription(x: 1)", "\(WithoutDescription(1))")
-
-  print("test_StringInterpolation done")
+PrintTests.test("StringInterpolation") {
+  expectEqual("1", "\(1)")
+  expectEqual("2", "\(1 + 1)")
+  expectEqual("aaa1bbb2ccc", "aaa\(1)bbb\(2)ccc")
+  
+  expectEqual("1.0", "\(1.0)")
+  expectEqual("1.5", "\(1.5)")
+  expectEqual("1e-12", "\(1.0 / (1000000000000))")
+  
+  expectEqual("inf", "\(1 / 0.0)")
+  expectEqual("-inf", "\(-1 / 0.0)")
+  expectEqual("nan", "\(0 / 0.0)")
+  
+  expectEqual("<[►1◀︎, ►2◀︎, ►3◀︎]>", "<\([ StructPrintable(1), StructPrintable(2), StructPrintable(3) ])>")
+  expectEqual("WithoutDescription(x: 1)", "\(WithoutDescription(1))")
 }
-test_StringInterpolation()
-// CHECK: test_StringInterpolation done
 
 struct MyString : StringLiteralConvertible, StringInterpolationConvertible {
   init(str: String) {
@@ -865,95 +828,49 @@ struct MyString : StringLiteralConvertible, StringInterpolationConvertible {
   }
 }
 
-func test_CustomStringInterpolation() {
-  assertEquals("<segment aaa><segment 1><segment bbb>",
-               ("aaa\(1)bbb" as MyString).value)
-
-  print("test_CustomStringInterpolation done")
+PrintTests.test("CustomStringInterpolation") {
+  expectEqual("<segment aaa><segment 1><segment bbb>",
+    ("aaa\(1)bbb" as MyString).value)
 }
-test_CustomStringInterpolation()
-// CHECK: test_CustomStringInterpolation done
 
-func test_StdoutUTF8Printing() {
-  print("\u{00B5}")
-// CHECK: {{^}}µ{{$}}
-
-  print("test_StdoutUTF8Printing done")
+PrintTests.test("StdoutUTF8") {
+  expectPrinted("µ", "\u{00B5}")
 }
-test_StdoutUTF8Printing()
-// CHECK: test_StdoutUTF8Printing done
 
-func test_varargs() {
-  print("", 1, 2, 3, 4, "", separator: "|") // CHECK: |1|2|3|4|
-  print(1, 2, 3, separator: "\n", terminator: "===")
-  print(4, 5, 6, separator: "\n")
-  // CHECK-NEXT: 1
-  // CHECK-NEXT: 2
-  // CHECK-NEXT: 3===4
-  // CHECK-NEXT: 5
-  // CHECK-NEXT: 6
-
-  debugPrint("", 1, 2, 3, 4, "", separator: "|")
-   // CHECK-NEXT: ""|1|2|3|4|""
-  debugPrint(1, 2, 3, separator: "\n", terminator: "===")
-  debugPrint(4, 5, 6, separator: "\n")
-  // CHECK-NEXT: 1
-  // CHECK-NEXT: 2
-  // CHECK-NEXT: 3===4
-  // CHECK-NEXT: 5
-  // CHECK-NEXT: 6
-
-  var output = ""
-  print(
-    "", 1, 2, 3, 4, "", separator: "|", toStream: &output)
-  print(output == "|1|2|3|4|\n") // CHECK-NEXT: true
-  output = ""
-  debugPrint(
-    "", 1, 2, 3, 4, "", separator: "|", terminator: "", toStream: &output)
-  print(output == "\"\"|1|2|3|4|\"\"") // CHECK-NEXT: true
-  print("test_varargs done")
-}
-test_varargs()
-// CHECK: test_varargs done
-
-func test_playgroundPrintHook() {
+PrintTests.test("Varargs") {
+  var s0 = ""
+  print("", 1, 2, 3, 4, "", separator: "|", toStream: &s0)
+  expectEqual("|1|2|3|4|\n", s0)
   
-  var printed: String? = nil
+  var s1 = ""
+  print(1, 2, 3, separator: "\n", terminator: "===", toStream: &s1)
+  expectEqual("1\n2\n3===", s1)
+  
+  var s2 = ""
+  print(4, 5, 6, separator: "\n", toStream: &s2)
+  expectEqual("4\n5\n6\n", s2)
+  
+  var s3 = ""
+  print("", 1, 2, 3, 4, "", separator: "|", toStream: &s3)
+  expectEqual("|1|2|3|4|\n", s3)
+}
+
+PrintTests.test("PlaygroundPrintHook") {
+  var printed = ""
   _playgroundPrintHook = { printed = $0 }
   
-  print("", 1, 2, 3, 4, "", separator: "|") // CHECK: |1|2|3|4|
-  print("%\(printed!)%") // CHECK-NEXT: %|1|2|3|4|
-  // CHECK-NEXT: %
+  var s0 = ""
+  print("", 1, 2, 3, 4, "", separator: "|", toStream: &s0)
+  expectEqual("|1|2|3|4|\n", s0)
+  print("%\(s0)%")
+  expectEqual("%|1|2|3|4|\n%\n", printed)
   
-  printed = nil
-  debugPrint("", 1, 2, 3, 4, "", separator: "|")
-  // CHECK-NEXT: ""|1|2|3|4|""
-  print("%\(printed!)%") // CHECK-NEXT: %""|1|2|3|4|""
-  // CHECK-NEXT: %
-  
-  var explicitStream = ""
-  printed = nil
-  print("", 1, 2, 3, 4, "", separator: "!", toStream: &explicitStream)
-  print(printed)               // CHECK-NEXT: nil
-  print("%\(explicitStream)%") // CHECK-NEXT: %!1!2!3!4!
-  // CHECK-NEXT: %
-  
-  explicitStream = ""
-  printed = nil
-  debugPrint(
-    "", 1, 2, 3, 4, "", separator: "!", toStream: &explicitStream)
-  print(printed) // CHECK-NEXT: nil
-  print("%\(explicitStream)%") // CHECK-NEXT: %""!1!2!3!4!""
-  // CHECK-NEXT: %
-  
-  _playgroundPrintHook = nil
-  print("test_playgroundPrintHook done")
-  // CHECK-NEXT: test_playgroundPrintHook done
+  printed = ""
+  var s1 = ""
+  print("", 1, 2, 3, 4, "", separator: "!", toStream: &s1)
+  expectEqual("", printed)
+  print("%\(s1)%")
+  expectEqual("%!1!2!3!4!\n%\n", printed)
 }
-test_playgroundPrintHook()
 
-if !failed {
-  print("OK")
-}
-// CHECK: OK
-
+runAllTests()
