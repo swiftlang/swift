@@ -204,7 +204,7 @@ public:
   /// Emit the protocol conformance records needed by each IR module.
   void emitProtocolConformances();
 
-  /// Emit everthing which is reachable from already emitted IR.
+  /// Emit everything which is reachable from already emitted IR.
   void emitLazyDefinitions();
   
   void addLazyFunction(SILFunction *f) {
