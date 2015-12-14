@@ -8,7 +8,7 @@
 // These tests emulate deploying back to an older OS where newer APIs are not
 // available by linking to an Objective-C framework where APIs have been
 // annotated to only be available in the far future (version 1066.0 of all
-// platforms) and then moving the famework aside so that it can't be found
+// platforms) and then moving the framework aside so that it can't be found
 // at run time.
 // RUN: mv %t/FakeUnavailableObjCFramework.framework %t/FakeUnavailableObjCFramework-MovedAside.framework
 
