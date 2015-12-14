@@ -283,7 +283,7 @@ OptionalTests.test("Optional OutputStream") {
   expectTrue(canGenericCast(iouString, CustomDebugStringConvertible.self))
   expectEqual(String(iouString), "AString")
   // FIXME: Ideally the debug output would be "XString", but a reasonable
-  // implemention of that behavior requires conditional conformance.
+  // implementation of that behavior requires conditional conformance.
   // (directly invoking debugPrint(Any) already works correctly).
   expectEqual(debugPrintStr(iouString), "AString")
 
