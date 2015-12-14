@@ -743,6 +743,7 @@ public:
 
   /// Omit needless words in a function name.
   bool omitNeedlessWordsInFunctionName(
+         clang::Preprocessor &pp,
          StringRef &baseName,
          SmallVectorImpl<StringRef> &argumentNames,
          ArrayRef<const clang::ParmVarDecl *> params,
@@ -1125,7 +1126,8 @@ public:
 
   /// Determine whether we can infer a default argument for a parameter with
   /// the given \c type and (Clang) optionality.
-  bool canInferDefaultArgument(clang::QualType type,
+  bool canInferDefaultArgument(clang::Preprocessor &pp,
+                               clang::QualType type,
                                OptionalTypeKind clangOptionality,
                                Identifier baseName,
                                unsigned numParams,

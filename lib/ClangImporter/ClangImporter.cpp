@@ -2492,6 +2492,7 @@ auto ClangImporter::Implementation::importFullName(
     // Objective-C methods.
     if (auto method = dyn_cast<clang::ObjCMethodDecl>(D)) {
       (void)omitNeedlessWordsInFunctionName(
+        clangSema.getPreprocessor(),
         baseName,
         argumentNames,
         params,
