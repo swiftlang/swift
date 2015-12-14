@@ -68,7 +68,7 @@ extension TestSuite {
       for test in removeFirstTests.filter({ $0.numberToRemove == 1 }) {
         var c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
         let survivingIndices =
-          Array(c.startIndex.successor()..<c.endIndex)
+          Array(c.startIndex<..c.endIndex)
         let removedElement = c.removeFirst()
         expectEqual(test.collection.first, extractValue(removedElement).value)
         expectEqualSequence(
