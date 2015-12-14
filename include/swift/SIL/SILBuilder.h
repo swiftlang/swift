@@ -221,10 +221,10 @@ public:
   //===--------------------------------------------------------------------===//
 
   AllocStackInst *createAllocStack(SILLocation Loc, SILType elementType,
-                                   unsigned ArgNo = 0) {
+                                   SILDebugVariable Var = SILDebugVariable()) {
     Loc.markAsPrologue();
-    return insert(new (F.getModule()) AllocStackInst(
-        createSILDebugLocation(Loc), elementType, F, ArgNo));
+    return insert(AllocStackInst::create(createSILDebugLocation(Loc),
+                                         elementType, F, Var));
   }
 
   AllocRefInst *createAllocRef(SILLocation Loc, SILType elementType, bool objc,
@@ -252,10 +252,10 @@ public:
   }
 
   AllocBoxInst *createAllocBox(SILLocation Loc, SILType ElementType,
-                               unsigned ArgNo = 0) {
+                               SILDebugVariable Var = SILDebugVariable()) {
     Loc.markAsPrologue();
-    return insert(new (F.getModule()) AllocBoxInst(createSILDebugLocation(Loc),
-                                                   ElementType, F, ArgNo));
+    return insert(
+        AllocBoxInst::create(createSILDebugLocation(Loc), ElementType, F, Var));
   }
 
   AllocExistentialBoxInst *
@@ -436,14 +436,15 @@ public:
   }
 
   DebugValueInst *createDebugValue(SILLocation Loc, SILValue src,
-                                   unsigned ArgNo = 0) {
-    return insert(new (F.getModule())
-                      DebugValueInst(createSILDebugLocation(Loc), src, ArgNo));
+                                   SILDebugVariable Var = SILDebugVariable()) {
+    return insert(DebugValueInst::create(createSILDebugLocation(Loc), src,
+                                         F.getModule(), Var));
   }
-  DebugValueAddrInst *createDebugValueAddr(SILLocation Loc, SILValue src,
-                                           unsigned ArgNo = 0) {
-    return insert(new (F.getModule()) DebugValueAddrInst(
-        createSILDebugLocation(Loc), src, ArgNo));
+  DebugValueAddrInst *
+  createDebugValueAddr(SILLocation Loc, SILValue src,
+                       SILDebugVariable Var = SILDebugVariable()) {
+    return insert(DebugValueAddrInst::create(createSILDebugLocation(Loc), src,
+                                             F.getModule(), Var));
   }
 
   LoadWeakInst *createLoadWeak(SILLocation Loc, SILValue src, IsTake_t isTake) {

@@ -5549,7 +5549,7 @@ static std::pair<Expr *, unsigned> getPrecedenceParentAndIndex(Expr *expr,
 // Return infix data representing the precedence of E.
 // FIXME: unify this with getInfixData() in lib/Sema/TypeCheckExpr.cpp; the
 // function there is meant to return infix data for expressions that have not
-// yet been folded, so currently the correct behavor for this infixData() and
+// yet been folded, so currently the correct behavior for this infixData() and
 // that one are mutually exclusive.
 static InfixData getInfixDataForFixIt(DeclContext *DC, Expr *E) {
   assert(E);

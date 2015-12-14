@@ -1559,7 +1559,7 @@ public:
 
   /// Returns the most appropriate import kind for the given list of decls.
   ///
-  /// If the list is non-homogenous, or if there is more than one decl that
+  /// If the list is non-homogeneous, or if there is more than one decl that
   /// cannot be overloaded, returns None.
   static Optional<ImportKind> findBestImportKind(ArrayRef<ValueDecl *> Decls);
 
@@ -3279,12 +3279,14 @@ public:
 
   /// Find a method of a class that overrides a given method.
   /// Return nullptr, if no such method exists.
-  FuncDecl *findOverridingDecl(const FuncDecl *method) const;
+  AbstractFunctionDecl *findOverridingDecl(
+      const AbstractFunctionDecl *method) const;
 
   /// Find a method implementation which will be used when a given method
   /// is invoked on an instance of this class. This implementation may stem
   /// either from a class itself or its direct or indirect superclasses.
-  FuncDecl *findImplementingMethod(const FuncDecl *method) const;
+  AbstractFunctionDecl *findImplementingMethod(
+      const AbstractFunctionDecl *method) const;
 
   /// True if the class has a destructor.
   ///
@@ -3958,7 +3960,7 @@ public:
     return getAddressorInfo().MutableAddress;
   }
 
-  /// \brief Return the approproiate addressor for the given access kind.
+  /// \brief Return the appropriate addressor for the given access kind.
   FuncDecl *getAddressorForAccess(AccessKind accessKind) const {
     if (accessKind == AccessKind::Read)
       return getAddressor();
@@ -4590,6 +4592,10 @@ public:
   /// Retrieve the declaration that this method overrides, if any.
   AbstractFunctionDecl *getOverriddenDecl() const;
 
+  /// Returns true if a function declaration overrides a given
+  /// method from its direct or indirect superclass.
+  bool isOverridingDecl(const AbstractFunctionDecl *method) const;
+
   /// Whether the declaration is later overridden in the module
   ///
   /// Overriddes are resolved during type checking; only query this field after
@@ -4929,10 +4935,6 @@ public:
     FuncDeclBits.ForcedStaticDispatch = flag;
   }
 
-  /// Returns true if a function declaration overrides a given
-  /// method from its direct or indirect superclass.
-  bool isOverridingDecl(const FuncDecl *method) const;
-  
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }
   static bool classof(const AbstractFunctionDecl *D) {
     return classof(static_cast<const Decl*>(D));

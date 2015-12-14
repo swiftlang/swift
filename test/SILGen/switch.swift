@@ -1236,14 +1236,14 @@ func testOptionalPattern(value : Int?) {
 // switch on the enum kind.  There should be no unreachable generated.
 // CHECK-LABEL: sil hidden @_TF6switch19testOptionalEnumMixFGSqSi_Si
 func testOptionalEnumMix(a : Int?) -> Int {
-  // CHECK: debug_value %0 : $Optional<Int>  // let a
+  // CHECK: debug_value %0 : $Optional<Int>, let, name "a"
   // CHECK-NEXT: switch_enum %0 : $Optional<Int>, case #Optional.Some!enumelt.1: [[SOMEBB:bb[0-9]+]], case #Optional.None!enumelt: [[NILBB:bb[0-9]+]]
   switch a {
   case let x?:
     return 0
 
   // CHECK: [[SOMEBB]](%3 : $Int):
-  // CHECK-NEXT: debug_value %3 : $Int  // let x
+  // CHECK-NEXT: debug_value %3 : $Int, let, name "x"
   // CHECK: integer_literal $Builtin.Int2048, 0
 
   case .None:
@@ -1258,14 +1258,14 @@ func testOptionalEnumMix(a : Int?) -> Int {
 // switch on the enum kind.  There should be no unreachable generated.
 // CHECK-LABEL: sil hidden @_TF6switch26testOptionalEnumMixWithNilFGSqSi_Si
 func testOptionalEnumMixWithNil(a : Int?) -> Int {
-  // CHECK: debug_value %0 : $Optional<Int>  // let a
+  // CHECK: debug_value %0 : $Optional<Int>, let, name "a"
   // CHECK-NEXT: switch_enum %0 : $Optional<Int>, case #Optional.Some!enumelt.1: [[SOMEBB:bb[0-9]+]], case #Optional.None!enumelt: [[NILBB:bb[0-9]+]]
   switch a {
   case let x?:
     return 0
 
   // CHECK: [[SOMEBB]](%3 : $Int):
-  // CHECK-NEXT: debug_value %3 : $Int  // let x
+  // CHECK-NEXT: debug_value %3 : $Int, let, name "x"
   // CHECK: integer_literal $Builtin.Int2048, 0
 
   case nil:

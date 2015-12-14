@@ -281,7 +281,7 @@ public:
   /// Return the mangled name of this SILFunction.
   StringRef getName() const { return Name; }
 
-  /// A convencience function which checks if the function has a specific
+  /// A convenience function which checks if the function has a specific
   /// \p name. It is equivalent to getName() == Name, but as it is not
   /// inlined it can be called from the debugger.
   bool hasName(const char *Name) const;

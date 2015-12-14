@@ -123,7 +123,7 @@ struct X : D {
 // Here's a generic function that uses our dispatching distance
 func sort<T: F>(x: T) {
   // In here, we don't know whether T is an R or just a plain F, or
-  // whether it has its own specialized impelementation of
+  // whether it has its own specialized implementation of
   distance(x, x)
 }
 // CHECK-NEXT: F

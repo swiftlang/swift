@@ -26,7 +26,7 @@ public struct IteratorOfOne<Element> : IteratorProtocol, Sequence {
   ///   has returned `nil`.
   public mutating func next() -> Element? {
     let result = elements
-    elements = .None
+    elements = nil
     return result
   }
   var elements: Element?

@@ -24,7 +24,7 @@ Algorithm.test("min,max") {
   expectEqual(7, max(3, 7, 5))
 
   // FIXME: add tests that check that min/max return the
-  // first element of the sequence (by reference equailty) that satisfy the
+  // first element of the sequence (by reference equality) that satisfy the
   // condition.
 }
 

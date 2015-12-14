@@ -14,6 +14,15 @@ function(_list_add_string_suffix input_list suffix result_var_name)
   set("${result_var_name}" "${result}" PARENT_SCOPE)
 endfunction()
 
+function(_list_escape_for_shell input_list result_var_name)
+  set(result "")
+  foreach(element ${input_list})
+    string(REPLACE " " "\\ " element "${element}")
+    set(result "${result}${element} ")
+  endforeach()
+  set("${result_var_name}" "${result}" PARENT_SCOPE)
+endfunction()
+
 function(add_dependencies_multiple_targets)
   cmake_parse_arguments(
       ADMT # prefix
@@ -1090,18 +1099,19 @@ function(_add_swift_library_single target name)
     set(PLIST_INFO_BUILD_VERSION)
   endif()
 
-  # On Linux add the linker script that coalesces protocol conformance
-  # sections. This wouldn't be necessary if the link was done by the swift
-  # binary: rdar://problem/19007002
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+  # On Linux and FreeBSD add the linker script that coalesces protocol
+  # conformance sections. This wouldn't be necessary if the link was done by
+  # the swift binary: rdar://problem/19007002
+  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux" OR
+     "${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
     list(APPEND link_flags
         "-Xlinker" "-T"
         "-Xlinker" "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}/swift.ld")
   endif()
 
   # Convert variables to space-separated strings.
-  string(REPLACE ";" " " c_compile_flags "${c_compile_flags}")
-  string(REPLACE ";" " " link_flags "${link_flags}")
+  _list_escape_for_shell("${c_compile_flags}" c_compile_flags)
+  _list_escape_for_shell("${link_flags}" link_flags)
 
   # Set compilation and link flags.
   set_property(TARGET "${target}" APPEND_STRING PROPERTY
@@ -1669,8 +1679,8 @@ function(_add_swift_executable_single name)
   llvm_update_compile_flags("${name}")
 
   # Convert variables to space-separated strings.
-  string(REPLACE ";" " " c_compile_flags "${c_compile_flags}")
-  string(REPLACE ";" " " link_flags "${link_flags}")
+  _list_escape_for_shell("${c_compile_flags}" c_compile_flags)
+  _list_escape_for_shell("${link_flags}" link_flags)
 
   set_property(TARGET ${name} APPEND_STRING PROPERTY
       COMPILE_FLAGS " ${c_compile_flags}")
@@ -1863,8 +1873,8 @@ function(add_swift_llvm_loadable_module name)
       link_flags)
 
   # Convert variables to space-separated strings.
-  string(REPLACE ";" " " c_compile_flags "${c_compile_flags}")
-  string(REPLACE ";" " " link_flags "${link_flags}")
+  _list_escape_for_shell("${c_compile_flags}" c_compile_flags)
+  _list_escape_for_shell("${link_flags}" link_flags)
 
   set_property(TARGET ${name} APPEND_STRING PROPERTY
       COMPILE_FLAGS " ${c_compile_flags}")

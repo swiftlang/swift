@@ -3176,11 +3176,8 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     // If the base type was an optional, try to look through it.
     if (shouldAttemptFixes() && baseObjTy->getOptionalObjectType()) {
       // Note the fix.
-      increaseScore(SK_Fix);
-      if (worseThanBestSolution())
+      if (recordFix(FixKind::ForceOptional, constraint.getLocator()))
         return SolutionKind::Error;
-      
-      Fixes.push_back({FixKind::ForceOptional, constraint.getLocator()});
       
       // Look through one level of optional.
       addConstraint(Constraint::create(*this, ConstraintKind::TypeMember,
@@ -3206,19 +3203,16 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     // FIXME: This is temporary.
     
     // Record this fix.
-    increaseScore(SK_Fix);
-    if (worseThanBestSolution())
+    if (recordFix(FixKind::FromRawToInit, constraint.getLocator()))
       return SolutionKind::Error;
-    
-    auto locator = constraint.getLocator();
-    Fixes.push_back({FixKind::FromRawToInit,getConstraintLocator(locator)});
-    
+      
     // Form the type that "fromRaw" would have had and bind the
     // member type to it.
     Type fromRawType = FunctionType::get(ParenType::get(TC.Context,
                                                         rawValueType),
                                          OptionalType::get(instanceTy));
-    addConstraint(ConstraintKind::Bind, memberTy, fromRawType, locator);
+    addConstraint(ConstraintKind::Bind, memberTy, fromRawType,
+                  constraint.getLocator());
     
     return SolutionKind::Solved;
   }
@@ -3229,18 +3223,15 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     // FIXME: This is temporary.
     
     // Record this fix.
-    increaseScore(SK_Fix);
-    if (worseThanBestSolution())
+    if (recordFix(FixKind::ToRawToRawValue, constraint.getLocator()))
       return SolutionKind::Error;
-    
-    auto locator = constraint.getLocator();
-    Fixes.push_back({FixKind::ToRawToRawValue,getConstraintLocator(locator)});
     
     // Form the type that "toRaw" would have had and bind the member
     // type to it.
     Type toRawType = FunctionType::get(TupleType::getEmpty(TC.Context),
                                        rawValueType);
-    addConstraint(ConstraintKind::Bind, memberTy, toRawType, locator);
+    addConstraint(ConstraintKind::Bind, memberTy, toRawType,
+                  constraint.getLocator());
     
     return SolutionKind::Solved;
   }
@@ -3251,16 +3242,13 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     // FIXME: This is temporary.
     
     // Record this fix.
-    increaseScore(SK_Fix);
-    if (worseThanBestSolution())
+    if (recordFix(FixKind::AllZerosToInit, constraint.getLocator()))
       return SolutionKind::Error;
-    
-    auto locator = constraint.getLocator();
-    Fixes.push_back({FixKind::AllZerosToInit,getConstraintLocator(locator)});
     
     // Form the type that "allZeros" would have had and bind the
     // member type to it.
-    addConstraint(ConstraintKind::Bind, memberTy, rawValueType, locator);
+    addConstraint(ConstraintKind::Bind, memberTy, rawValueType,
+                  constraint.getLocator());
     return SolutionKind::Solved;
   }
   
@@ -3268,11 +3256,8 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     // If the base type was an optional, look through it.
     
     // Note the fix.
-    increaseScore(SK_Fix);
-    if (worseThanBestSolution())
+    if (recordFix(FixKind::ForceOptional, constraint.getLocator()))
       return SolutionKind::Error;
-    
-    Fixes.push_back({FixKind::ForceOptional, constraint.getLocator()});
     
     // Look through one level of optional.
     addValueMemberConstraint(baseObjTy->getOptionalObjectType(),
@@ -3514,14 +3499,13 @@ retry:
                                           getConstraintLocator(outerLocator));
   }
 
+  if (!shouldAttemptFixes())
+    return SolutionKind::Error;
+
   // If we're coming from an optional type, unwrap the optional and try again.
   if (auto objectType2 = desugar2->getOptionalObjectType()) {
-    // Increase the score before we attempt a fix.
-    increaseScore(SK_Fix);
-    if (worseThanBestSolution())
+    if (recordFix(FixKind::ForceOptional, getConstraintLocator(locator)))
       return SolutionKind::Error;
-
-    Fixes.push_back({FixKind::ForceOptional,getConstraintLocator(locator)});
 
     type2 = objectType2;
     desugar2 = type2->getDesugaredType();
@@ -3529,17 +3513,11 @@ retry:
   }
 
   // If this is a '()' call, drop the call.
-  if (shouldAttemptFixes() &&
-      func1->getInput()->isEqual(TupleType::getEmpty(getASTContext()))) {
-    // Increase the score before we attempt a fix.
-    increaseScore(SK_Fix);
-    if (worseThanBestSolution())
-      return SolutionKind::Error;
-
+  if (func1->getInput()->isEqual(TupleType::getEmpty(getASTContext()))) {
     // We don't bother with a 'None' case, because at this point we won't get
     // a better diagnostic from that case.
-    Fixes.push_back({FixKind::RemoveNullaryCall,
-                     getConstraintLocator(locator)});
+    if (recordFix(FixKind::RemoveNullaryCall, getConstraintLocator(locator)))
+      return SolutionKind::Error;
 
     return matchTypes(func1->getResult(), type2,
                       TypeMatchKind::BindType,
@@ -3763,7 +3741,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
   // We don't want to allow this after user-defined conversions:
   //   - it gets really complex for users to understand why there's
   //     a dereference in their code
-  //   - it would allow nil to be coerceable to a non-optional type
+  //   - it would allow nil to be coercible to a non-optional type
   // Fortunately, user-defined conversions only allow subtype
   // conversions on their results.
   case ConversionRestrictionKind::ForceUnchecked: {
@@ -4269,13 +4247,13 @@ bool ConstraintSystem::recordFix(Fix fix, ConstraintLocatorBuilder locator) {
 
   // Record the fix.
   if (fix.getKind() != FixKind::None) {
-    Fixes.push_back({fix, getConstraintLocator(locator)});
-
     // Increase the score. If this would make the current solution worse than
     // the best solution we've seen already, stop now.
     increaseScore(SK_Fix);
     if (worseThanBestSolution())
       return true;
+
+    Fixes.push_back({fix, getConstraintLocator(locator)});
   }
   return false;
 }

@@ -29,7 +29,7 @@ UIntMax = 'UInt%s' % int_max_bits
 /// return `nil`.
 ///
 /// - Note: If `text` begins with `"+"` or `"-"`, even if the rest of
-///   the characters are `"0"`, the result is nil.
+///   the characters are `"0"`, the result is `nil`.
 internal func _parseUnsignedAsciiAsUIntMax(
   u16: String.UTF16View, _ radix: Int, _ maximum: UIntMax
 ) -> UIntMax? {
@@ -68,7 +68,7 @@ internal func _parseUnsignedAsciiAsUIntMax(
 /// return `nil`.
 ///
 /// - Note: If `text` begins with `"+"` or `"-"`, even if the rest of
-///   the characters are `"0"`, the result is nil.
+///   the characters are `"0"`, the result is `nil`.
 internal func _parseAsciiAsUIntMax(
   u16: String.UTF16View, _ radix: Int, _ maximum: UIntMax
 ) -> UIntMax? {

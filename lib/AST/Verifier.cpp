@@ -246,7 +246,7 @@ struct ASTNodeBase {};
 #undef DISPATCH
       }
 
-      llvm_unreachable("Unhandled declaratiom kind");
+      llvm_unreachable("Unhandled declaration kind");
     }
 
   private:

@@ -31,7 +31,7 @@ struct X0c : P0 { // okay: Assoc1 == Int
 
 struct X0d : P0 { // okay: Assoc1 == Int
   func f0(_: Int) { }
-  func g0(_: Double) { } // viable, but no correspinding f0
+  func g0(_: Double) { } // viable, but no corresponding f0
   func g0(_: Int) { }
 }
 

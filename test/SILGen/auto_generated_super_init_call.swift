@@ -36,7 +36,7 @@ class SomeDerivedClass : Parent {
       y = 10
     }
     return
-// Check that we are emittng the super.init expr into the epilog block.
+// Check that we are emitting the super.init expr into the epilog block.
     
 // CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call16SomeDerivedClassc{{.*}} : $@convention(method) (Bool, @owned SomeDerivedClass) -> @owned SomeDerivedClass    
 // CHECK: bb4:
@@ -51,7 +51,7 @@ class SomeDerivedClass : Parent {
 // CHECK-NEXT: return
   }
 
-  // One init has a call to super init. Make sure we don't instert more than one.
+  // One init has a call to super init. Make sure we don't insert more than one.
   init(b: Bool, i: Int) {
     if (b) {
       y = i

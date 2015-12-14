@@ -750,7 +750,7 @@ internal func _transcodeSomeUTF16AsUTF8<
 
     if _fastPath(u <= 0x7f) {
       result |= _UTF8Chunk(u) << shift
-      ++utf8Count
+      utf8Count += 1
     } else {
       var scalarUtf8Length: Int
       var r: UInt
@@ -948,7 +948,7 @@ extension UTF16 {
         break loop
       case .Error:
         if !repairIllFormedSequences {
-          return .None
+          return nil
         }
         isAscii = false
         count += width(UnicodeScalar(0xfffd))

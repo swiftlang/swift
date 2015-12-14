@@ -3590,7 +3590,7 @@ namespace {
       // If we have no contextual type, there is nothing to do.
       if (!contextualType) return false;
 
-      // If the expresion is obviously something that produces a metatype,
+      // If the expression is obviously something that produces a metatype,
       // then don't put a constraint on it.
       auto semExpr = expr->getValueProvidingExpr();
       if (isa<TypeExpr>(semExpr) ||isa<UnresolvedConstructorExpr>(semExpr))
@@ -4010,7 +4010,7 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
       auto pointerEltType = pointerType->getGenericArgs()[0];
       
       // If the element type is Void, then we allow any input type, since
-      // everything is convertable to UnsafePointer<Void>
+      // everything is convertible to UnsafePointer<Void>
       if (pointerEltType->isVoid())
         contextualType = Type();
       else

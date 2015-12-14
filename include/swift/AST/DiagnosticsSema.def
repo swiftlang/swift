@@ -1058,7 +1058,7 @@ NOTE(ambiguous_witnesses_wrong_name,sema_tcd,none,
      "subscript operators}0 with type %2", (RequirementKind, DeclName, Type))
 NOTE(no_witnesses_type,sema_tcd,none,
      "protocol requires nested type %0", (Identifier))
-NOTE(default_assocated_type_req_fail,sema_tcd,none,
+NOTE(default_associated_type_req_fail,sema_tcd,none,
      "default type %0 for associated type %1 (from protocol %2) "
      "does not conform to %3",
      (Type, DeclName, Type, Type))
@@ -1500,7 +1500,7 @@ ERROR(noescape_conflicts_escaping_autoclosure,attribute_parsing,none,
 ERROR(attr_NSManaged_not_instance_member,sema_tcd,none,
       "@NSManaged only allowed on an instance property or method", ())
 ERROR(attr_NSManaged_not_stored,sema_tcd,none,
-      "@NSManaged not allowed on %select{computed|observing|adressed}0 "
+      "@NSManaged not allowed on %select{computed|observing|addressed}0 "
       "properties", (unsigned))
 ERROR(attr_NSManaged_let_property,sema_tcd,none,
       "@NSManaged not allowed on a 'let' property", ())

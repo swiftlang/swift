@@ -111,10 +111,10 @@ KNOWN_SETTINGS=(
     skip-build-watchos-device   ""               "set to skip building Swift stdlibs for Apple watchOS devices (i.e. build simulators only)"
     skip-build-watchos-simulator ""              "set to skip building Swift stdlibs for Apple watchOS simulators (i.e. build devices only)"
     skip-build-lldb             ""               "set to skip building LLDB"
-    skip-build-llbuild          ""               "set to skip buildling llbuild"
-    skip-build-swiftpm          ""               "set to skip buildling swiftpm"
-    skip-build-xctest           ""               "set to skip buildling xctest"
-    skip-build-foundation       ""               "set to skip buildling foundation"
+    skip-build-llbuild          ""               "set to skip building llbuild"
+    skip-build-swiftpm          ""               "set to skip building swiftpm"
+    skip-build-xctest           ""               "set to skip building xctest"
+    skip-build-foundation       ""               "set to skip building foundation"
     skip-test-cmark             ""               "set to skip testing CommonMark"
     skip-test-lldb              ""               "set to skip testing lldb"
     skip-test-swift             ""               "set to skip testing Swift"
@@ -182,7 +182,7 @@ KNOWN_SETTINGS=(
     darwin-toolchain-installer-package ""        "The path to installer pkg"
     build-jobs ""                                "The number of parallel build jobs to use"
     darwin-toolchain-alias             "swift"   "Swift alias for toolchain"
-
+    export-compile-commands            ""        "set to generate JSON compilation databases for each build product"
 )
 
 function toupper() {
@@ -226,6 +226,12 @@ function set_deployment_target_based_options() {
     case $deployment_target in
         linux-x86_64)
             SWIFT_HOST_VARIANT_ARCH="x86_64"
+            ;;
+        linux-armv7)
+            SWIFT_HOST_VARIANT_ARCH="armv7"
+            ;;
+        linux-aarch64)
+            SWIFT_HOST_VARIANT_ARCH="aarch64"
             ;;
         freebsd-x86_64)
             SWIFT_HOST_VARIANT_ARCH="x86_64"
@@ -730,8 +736,8 @@ if [[ "$(uname -s)" == "Darwin" ]] ; then
     TOOLCHAIN_PREFIX=$(echo ${INSTALL_PREFIX} | sed -E 's/\/usr$//')
 fi
 
-# A list of deployment targets to compile the Swift host tools for, in case when
-# we can run the resulting binaries natively on the build machine.
+# A list of deployment targets to compile the Swift host tools for, in cases
+# where we can run the resulting binaries natively on the build machine.
 NATIVE_TOOLS_DEPLOYMENT_TARGETS=()
 
 # A list of deployment targets to cross-compile the Swift host tools for.
@@ -740,20 +746,29 @@ CROSS_TOOLS_DEPLOYMENT_TARGETS=()
 
 # Determine the native deployment target for the build machine, that will be
 # used to jumpstart the standard library build when cross-compiling.
-case "$(uname -s)" in
-    Linux)
+case "$(uname -s -m)" in
+    Linux\ x86_64)
         NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
             "linux-x86_64"
         )
         ;;
-
-    Darwin)
+    Linux\ armv7*)
+        NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
+            "linux-armv7"
+        )
+        ;;
+    Linux\ aarch64)
+        NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
+            "linux-aarch64"
+        )
+        ;;
+    Darwin\ x86_64)
         NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
             "macosx-x86_64"
         )
         ;;
 
-    FreeBSD)
+    FreeBSD\ x86_64)
         NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
             "freebsd-x86_64"
         )
@@ -805,15 +820,23 @@ function is_cross_tools_deployment_target() {
 # A list of deployment targets that we compile or cross-compile the
 # Swift standard library for.
 STDLIB_DEPLOYMENT_TARGETS=()
-
-case "$(uname -s)" in
-    Linux)
+case "$(uname -s -m)" in
+    Linux\ x86_64)
         STDLIB_DEPLOYMENT_TARGETS=(
             "linux-x86_64"
         )
         ;;
-
-    Darwin)
+    Linux\ armv7*)
+        STDLIB_DEPLOYMENT_TARGETS=(
+            "linux-armv7"
+        )
+        ;;
+    Linux\ aarch64)
+        STDLIB_DEPLOYMENT_TARGETS=(
+            "linux-aarch64"
+        )
+        ;;
+    Darwin\ x86_64)
         STDLIB_DEPLOYMENT_TARGETS=(
             "macosx-x86_64"
             "iphonesimulator-i386"
@@ -830,7 +853,7 @@ case "$(uname -s)" in
         )
         ;;
 
-    FreeBSD)
+    FreeBSD\ x86_64)
         STDLIB_DEPLOYMENT_TARGETS=(
             "freebsd-x86_64"
         )
@@ -856,11 +879,23 @@ XCTEST_SOURCE_DIR="$WORKSPACE/swift-corelibs-xctest"
 FOUNDATION_SOURCE_DIR="$WORKSPACE/swift-corelibs-foundation"
 
 if [[ ! -d $CMARK_SOURCE_DIR ]]; then
-  echo "$CMARK_SOURCE_DIR not found. Attempting to clone ..."
-  git clone https://github.com/apple/swift-cmark.git "$CMARK_SOURCE_DIR" || \
-    (echo "Couldn't clone cmark. Please check README.md and visit https://github.com/apple/swift-cmark for details." && \
-    exit 1)
+    echo "Couldn't find cmark source directory."
+    exit 1
 fi
+
+# Migration code for the cmark repository.  Can be removed in February 2016.
+pushd ${CMARK_SOURCE_DIR} > /dev/null
+if git show 077611288ad990bf5962b3e1d844172392d3e8d8 > /dev/null 2>&1 ; then
+    echo ""
+    echo "You have an old copy of the cmark repository."
+    echo "You need to remove it and clone again:"
+    echo ""
+    echo " $ rm -rf ${CMARK_SOURCE_DIR}"
+    echo " $ ${SWIFT_SOURCE_DIR}/utils/update-checkout --clone"
+    echo ""
+    exit 1
+fi
+popd > /dev/null
 
 if [[ ! "$SKIP_BUILD_LLBUILD" && ! -d $LLBUILD_SOURCE_DIR ]]; then
     echo "Couldn't find llbuild source directory."
@@ -988,13 +1023,14 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
               SWIFT_TEST_TARGETS=(
                  "${SWIFT_TEST_TARGETS[@]}" "check-swift-all-optimize-${deployment_target}")
             fi
-
         fi
     fi
 done
 
 echo "Building the standard library for: ${SWIFT_STDLIB_TARGETS[@]}"
-echo "Running Swift tests for: ${SWIFT_TEST_TARGETS[@]}"
+if [[ "${SWIFT_TEST_TARGETS[@]}" ]] && ! [[ "${SKIP_TEST_SWIFT}" ]]; then
+    echo "Running Swift tests for: ${SWIFT_TEST_TARGETS[@]}"
+fi
 echo
 
 # CMake options used for all targets, including LLVM/Clang
@@ -1009,6 +1045,13 @@ if [[ "${ENABLE_ASAN}" ]] ; then
     COMMON_CMAKE_OPTIONS=(
         "${COMMON_CMAKE_OPTIONS[@]}"
         -DLLVM_USE_SANITIZER="Address"
+    )
+fi
+
+if [[ "${EXPORT_COMPILE_COMMANDS}" ]] ; then
+    COMMON_CMAKE_OPTIONS=(
+        "${COMMON_CMAKE_OPTIONS[@]}"
+        -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
     )
 fi
 

@@ -462,7 +462,7 @@ public:
   static bool canAttributeAppearOnDecl(DeclAttrKind DK, const Decl *D);
 
   /// Returns true if multiple instances of an attribute kind
-  /// can appear on a delcaration.
+  /// can appear on a declaration.
   static bool allowMultipleAttributes(DeclAttrKind DK) {
     return getOptions(DK) & AllowMultipleAttributes;
   }

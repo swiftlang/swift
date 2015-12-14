@@ -2378,10 +2378,11 @@ ArtificialMainKind ClassDecl::getArtificialMainKind() const {
   llvm_unreachable("class has no @ApplicationMain attr?!");
 }
 
-FuncDecl *ClassDecl::findOverridingDecl(const FuncDecl *Method) const {
+AbstractFunctionDecl *
+ClassDecl::findOverridingDecl(const AbstractFunctionDecl *Method) const {
   auto Members = getMembers();
   for (auto M : Members) {
-    FuncDecl *CurMethod = dyn_cast<FuncDecl>(M);
+    AbstractFunctionDecl *CurMethod = dyn_cast<AbstractFunctionDecl>(M);
     if (!CurMethod)
       continue;
     if (CurMethod->isOverridingDecl(Method)) {
@@ -2391,12 +2392,24 @@ FuncDecl *ClassDecl::findOverridingDecl(const FuncDecl *Method) const {
   return nullptr;
 }
 
-FuncDecl * ClassDecl::findImplementingMethod(const FuncDecl *Method) const {
+bool AbstractFunctionDecl::isOverridingDecl(
+    const AbstractFunctionDecl *Method) const {
+  const AbstractFunctionDecl *CurMethod = this;
+  while (CurMethod) {
+    if (CurMethod == Method)
+      return true;
+    CurMethod = CurMethod->getOverriddenDecl();
+  }
+  return false;
+}
+
+AbstractFunctionDecl *
+ClassDecl::findImplementingMethod(const AbstractFunctionDecl *Method) const {
   const ClassDecl *C = this;
   while (C) {
     auto Members = C->getMembers();
     for (auto M : Members) {
-      FuncDecl *CurMethod = dyn_cast<FuncDecl>(M);
+      AbstractFunctionDecl *CurMethod = dyn_cast<AbstractFunctionDecl>(M);
       if (!CurMethod)
         continue;
       if (Method == CurMethod)
@@ -3987,16 +4000,6 @@ bool FuncDecl::isBinaryOperator() const {
   return argTuple->getNumElements() == 2
     || (argTuple->getNumElements() == 1 &&
         argTuple->getElement(0).hasEllipsis());
-}
-
-bool FuncDecl::isOverridingDecl(const FuncDecl *Method) const {
-  const FuncDecl *CurMethod = this;
-  while (CurMethod) {
-    if (CurMethod == Method)
-      return true;
-    CurMethod = CurMethod->getOverriddenDecl();
-  }
-  return false;
 }
 
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,

@@ -1014,7 +1014,7 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
   // TODO: Since we expect a pattern in this position, we should optimistically
   // parse pattern nodes for productions shared by pattern and expression
   // grammar. For short-term ease of initial implementation, we always go
-  // through the expr parser for ambiguious productions.
+  // through the expr parser for ambiguous productions.
 
   // Parse productions that can only be patterns.
   if (Tok.isAny(tok::kw_var, tok::kw_let)) {

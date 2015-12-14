@@ -222,7 +222,7 @@ func _unimplemented_initializer(className: StaticString,
   Builtin.int_trap()
 }
 
-@_transparent @noreturn
+@noreturn
 public // COMPILER_INTRINSIC
 func _undefined<T>(
   @autoclosure message: () -> String = String(),

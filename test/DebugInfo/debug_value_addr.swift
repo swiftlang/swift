@@ -5,7 +5,7 @@
 // instructions.
 
 // CHECK-SIL: sil hidden @_TF16debug_value_addr4testurFxT_
-// CHECK-SIL: debug_value_addr %0 : $*T  // let t
+// CHECK-SIL: debug_value_addr %0 : $*T, let, name "t"
 
 // CHECK: define {{.*}}_TF16debug_value_addr4testurFxT_
 // CHECK: entry:

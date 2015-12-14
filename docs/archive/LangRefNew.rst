@@ -54,7 +54,7 @@ In no particular order, and not explained well:
   ideas already out there.
 * Memory safe by default: array overrun errors, uninitialized values, and other
   problems endemic to C should not occur in Swift, even if it means some amount
-  of runtime overhead.  Eventually these checks will be disablable for people
+  of runtime overhead.  Eventually these checks will be disableable for people
   who want ultimate performance in production builds.
 * Efficiently implementable with a static compiler: runtime compilation is
   great technology and Swift may eventually get a runtime optimizer, but it is
@@ -1551,5 +1551,3 @@ lowest:
   "comparative:" ==, !=, <, <=, >=, >
   "conjunctive:" &&
   "disjunctive:" ||
-
-

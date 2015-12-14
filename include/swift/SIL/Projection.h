@@ -63,7 +63,7 @@ inline bool isStrictSubSeqRelation(SubSeqRelation_t Seq) {
 bool getIntegerIndex(SILValue IndexVal, unsigned &IndexConst);
 
 /// Given a SIL value, capture its element index and the value of the aggregate
-/// that immeditely contains it.
+/// that immediately contains it.
 ///
 /// This lightweight utility maps a SIL address projection to an index.
 struct ProjectionIndex {

@@ -485,6 +485,8 @@ ERROR(sil_missing_substitutions,decl_parsing,none,
       "missing substitutions", ())
 ERROR(sil_too_many_substitutions,decl_parsing,none,
       "too many substitutions", ())
+ERROR(sil_dbg_unknown_key,decl_parsing,none,
+      "unknown key '%0' in debug variable declaration", (StringRef))
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name, decl_parsing,none,

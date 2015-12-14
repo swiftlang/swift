@@ -390,7 +390,7 @@ private:
     ///
     /// This contains IDs that represent both basic blocks and loops that are
     /// subregions of this region. What is key to notice is that a loop is
-    /// represented by the RPO number of its header. We use an auxillary map to
+    /// represented by the RPO number of its header. We use an auxiliary map to
     /// map the preheader's RPO number to the loop's ID.
     llvm::SmallVector<SubregionID, 16> Subregions;
 
@@ -717,7 +717,7 @@ class LoopRegionFunctionInfo {
 
   /// A map from an unsigned integer ID to a region.
   ///
-  /// *WARNING* Before modifying the initializiation of this field of the data
+  /// *WARNING* Before modifying the initialization of this field of the data
   /// structure please read the comment below:
   ///
   /// We assign IDs to BBs, Loops, and the top level Function, so that we can

@@ -247,6 +247,7 @@ namespace {
     }
     bool parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
                         StringRef &OpcodeName);
+    bool parseSILDebugVar(SILDebugVariable &Var);
 
     /// \brief Parses the basic block arguments as part of branch instruction.
     bool parseSILBBArgsAtBranch(SmallVector<SILValue, 6> &Args, SILBuilder &B);
@@ -1322,6 +1323,40 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
   return true;
 }
 
+bool SILParser::parseSILDebugVar(SILDebugVariable &Var) {
+  while (P.Tok.is(tok::comma)) {
+    P.consumeToken();
+    StringRef Key = P.Tok.getText();
+    if (Key == "name") {
+      P.consumeToken();
+      if (P.Tok.getKind() != tok::string_literal) {
+        P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "string");
+        return true;
+      }
+      // Drop the double quotes.
+      StringRef Val = P.Tok.getText().drop_front().drop_back();
+      Var.Name = Val;
+    } else if (Key == "argno") {
+      P.consumeToken();
+      if (P.Tok.getKind() != tok::integer_literal) {
+        P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "integer");
+        return true;
+      }
+      if (P.Tok.getText().getAsInteger(0, Var.ArgNo))
+        return true;
+    } else if (Key == "let") {
+      Var.Constant = true;
+    } else if (Key == "var") {
+      Var.Constant = false;
+    } else {
+      P.diagnose(P.Tok, diag::sil_dbg_unknown_key, Key);
+      return true;
+    }
+    P.consumeToken();
+  }
+  return false;
+}
+
 bool SILParser::parseSILBBArgsAtBranch(SmallVector<SILValue, 6> &Args,
                                        SILBuilder &B) {
   if (P.Tok.is(tok::l_paren)) {
@@ -1481,7 +1516,7 @@ bool getApplySubstitutionsFromParsed(
   return false;
 }
 
-// FIXME: we work around canoicalization of PolymorphicFunctionType
+// FIXME: we work around canonicalization of PolymorphicFunctionType
 // by generating GenericSignature and transforming the input, output
 // types.
 static GenericSignature *canonicalPolymorphicFunctionType(
@@ -1659,7 +1694,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::AllocBoxInst: {
     SILType Ty;
     if (parseSILType(Ty)) return true;
-    ResultVal = B.createAllocBox(InstLoc, Ty);
+    SILDebugVariable VarInfo;
+    if (parseSILDebugVar(VarInfo))
+      return true;
+    ResultVal = B.createAllocBox(InstLoc, Ty, VarInfo);
     break;
   }
   case ValueKind::ApplyInst:
@@ -1944,34 +1982,47 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   UNARY_INSTRUCTION(RetainValue)
   UNARY_INSTRUCTION(Load)
   UNARY_INSTRUCTION(CondFail)
-  UNARY_INSTRUCTION(DebugValue)
-  UNARY_INSTRUCTION(DebugValueAddr)
 #undef UNARY_INSTRUCTION
 
-  case ValueKind::LoadUnownedInst:
-  case ValueKind::LoadWeakInst: {
-    bool isTake = false;
-    SourceLoc addrLoc;
-    if (parseSILOptional(isTake, *this, "take") ||
-        parseTypedValueRef(Val, addrLoc, B))
-      return true;
+ case ValueKind::DebugValueInst:
+ case ValueKind::DebugValueAddrInst: {
+   if (parseTypedValueRef(Val, B))
+     return true;
 
-    if (Opcode == ValueKind::LoadUnownedInst) {
-      if (!Val.getType().is<UnownedStorageType>()) {
-        P.diagnose(addrLoc, diag::sil_operand_not_unowned_address,
-                   "source", OpcodeName);
-      }
-      ResultVal = B.createLoadUnowned(InstLoc, Val, IsTake_t(isTake));
+   SILDebugVariable VarInfo;
+   if (parseSILDebugVar(VarInfo))
+     return true;
+   if (Opcode == ValueKind::DebugValueInst)
+     ResultVal = B.createDebugValue(InstLoc, Val, VarInfo);
+   else
+     ResultVal = B.createDebugValueAddr(InstLoc, Val, VarInfo);
+   break;
+ }
 
-    } else {
-      if (!Val.getType().is<WeakStorageType>()) {
-        P.diagnose(addrLoc, diag::sil_operand_not_weak_address,
-                   "source", OpcodeName);
-      }      
-      ResultVal = B.createLoadWeak(InstLoc, Val, IsTake_t(isTake));
-    }
+ case ValueKind::LoadUnownedInst:
+ case ValueKind::LoadWeakInst: {
+   bool isTake = false;
+   SourceLoc addrLoc;
+   if (parseSILOptional(isTake, *this, "take") ||
+       parseTypedValueRef(Val, addrLoc, B))
+     return true;
 
-    break;
+   if (Opcode == ValueKind::LoadUnownedInst) {
+     if (!Val.getType().is<UnownedStorageType>()) {
+       P.diagnose(addrLoc, diag::sil_operand_not_unowned_address, "source",
+                  OpcodeName);
+     }
+     ResultVal = B.createLoadUnowned(InstLoc, Val, IsTake_t(isTake));
+
+   } else {
+     if (!Val.getType().is<WeakStorageType>()) {
+       P.diagnose(addrLoc, diag::sil_operand_not_weak_address, "source",
+                  OpcodeName);
+     }
+     ResultVal = B.createLoadWeak(InstLoc, Val, IsTake_t(isTake));
+   }
+
+   break;
   }
 
   case ValueKind::MarkDependenceInst: {
@@ -2353,10 +2404,13 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SILType Ty;
     if (parseSILType(Ty))
       return true;
-    
-    if (Opcode == ValueKind::AllocStackInst)
-      ResultVal = B.createAllocStack(InstLoc, Ty);
-    else if (Opcode == ValueKind::AllocRefInst)
+
+    if (Opcode == ValueKind::AllocStackInst) {
+      SILDebugVariable VarInfo;
+      if (parseSILDebugVar(VarInfo))
+        return true;
+      ResultVal = B.createAllocStack(InstLoc, Ty, VarInfo);
+    } else if (Opcode == ValueKind::AllocRefInst)
       ResultVal = B.createAllocRef(InstLoc, Ty, IsObjC, OnStack);
     else {
       assert(Opcode == ValueKind::MetatypeInst);

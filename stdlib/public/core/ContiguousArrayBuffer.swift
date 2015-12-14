@@ -250,7 +250,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
   }
 
   /// If the elements are stored contiguously, a pointer to the first
-  /// element. Otherwise, nil.
+  /// element. Otherwise, `nil`.
   public var firstElementAddress: UnsafeMutablePointer<Element> {
     return __bufferPointer._elementPointer
   }

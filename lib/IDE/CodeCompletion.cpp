@@ -65,7 +65,7 @@ CodeCompletionCommandKind getCommandKind(StringRef Command) {
   return CodeCompletionCommandKind::none;
 }
 
-StringRef getCommnadName(CodeCompletionCommandKind Kind) {
+StringRef getCommandName(CodeCompletionCommandKind Kind) {
 #define CHECK_CASE(KIND)                                                    \
   if (CodeCompletionCommandKind::KIND == Kind) {                            \
     static std::string Name(#KIND);                                         \
@@ -179,7 +179,7 @@ public:
         auto Text = TC->getText();
         std::vector<StringRef> Subs;
         splitTextByComma(Text, Subs);
-        auto Kind = getCommnadName(CommandKind);
+        auto Kind = getCommandName(CommandKind);
         for (auto S : Subs)
           Words.push_back(std::make_pair(Kind, S));
       } else
@@ -223,7 +223,7 @@ public:
   void visitText(const Text *Text) override {
     if (Kind == CodeCompletionCommandKind::none)
       return;
-    StringRef CommandName = getCommnadName(Kind);
+    StringRef CommandName = getCommandName(Kind);
     std::vector<StringRef> Subs;
     splitTextByComma(Text->str(), Subs);
     for (auto S : Subs)
@@ -2798,7 +2798,7 @@ public:
     CodeCompletionResultBuilder builder(
         Sink, CodeCompletionResult::ResultKind::Pattern,
         SemanticContextKind::None, {});
-    // FIXME: we can't use the exclaimation mark chunk kind, or it isn't
+    // FIXME: we can't use the exclamation mark chunk kind, or it isn't
     // included in the completion name.
     builder.addTextChunk("!");
     assert(resultType);
@@ -4443,7 +4443,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
         Lookup.setHaveRParen(HasRParen);
         Lookup.getValueExprCompletions(*ExprType);
       } else {
-        // Add argument labels, then fallthough to get values.
+        // Add argument labels, then fallthrough to get values.
         Lookup.addArgNameCompletionResults(PossibleNames);
       }
     }

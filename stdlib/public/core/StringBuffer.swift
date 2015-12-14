@@ -94,7 +94,7 @@ public struct _StringBuffer {
     let inputStream = input.iterator()
     guard let (utf16Count, isAscii) = UTF16.measure(encoding, input: inputStream,
         repairIllFormedSequences: repairIllFormedSequences) else {
-      return (.None, true)
+      return (nil, true)
     }
 
     // Allocate storage
@@ -232,7 +232,7 @@ public struct _StringBuffer {
   }
 
   var _anyObject: AnyObject? {
-    return _storage.storage != nil ? .Some(_storage.storage!) : .None
+    return _storage.storage != nil ? _storage.storage! : nil
   }
 
   var _storage: _Storage

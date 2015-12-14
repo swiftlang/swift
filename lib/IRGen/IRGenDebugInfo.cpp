@@ -1059,7 +1059,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
       if (!Dim.SizeInBits || (StorageSize && Dim.SizeInBits > StorageSize))
         Dim.SizeInBits = StorageSize;
 
-      // FIXME: Occasionally we miss out that the Storage is acually a
+      // FIXME: Occasionally we miss out that the Storage is actually a
       // refcount wrapper. Silently skip these for now.
       if (OffsetInBits+Dim.SizeInBits > VarSizeInBits)
         break;
@@ -1112,7 +1112,7 @@ void IRGenDebugInfo::emitDbgIntrinsic(llvm::BasicBlock *BB,
 
   // A dbg.declare is only meaningful if there is a single alloca for
   // the variable that is live throughout the function. With SIL
-  // optimizations this is not guranteed and a variable can end up in
+  // optimizations this is not guaranteed and a variable can end up in
   // two allocas (for example, one function inlined twice).
   if (!Opts.Optimize &&
       (isa<llvm::AllocaInst>(Storage) ||

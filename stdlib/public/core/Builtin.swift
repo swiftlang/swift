@@ -474,7 +474,7 @@ internal func _makeBridgeObject(
   )
 }
 
-/// Return the superclass of `t`, if any.  The result is nil if `t` is
+/// Return the superclass of `t`, if any.  The result is `nil` if `t` is
 /// a root class or class protocol.
 @inline(__always)
 @warn_unused_result
@@ -485,7 +485,7 @@ func _getSuperclass(t: AnyClass) -> AnyClass? {
     AnyClass.self)
 }
 
-/// Return the superclass of `t`, if any.  The result is nil if `t` is
+/// Return the superclass of `t`, if any.  The result is `nil` if `t` is
 /// not a class, is a root class, or is a class protocol.
 @inline(__always)
 @warn_unused_result

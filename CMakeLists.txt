@@ -385,18 +385,32 @@ endfunction()
 # FIXME: separate the notions of SDKs used for compiler tools and target
 # binaries.
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
-  configure_sdk_unix(LINUX "Linux" "linux" "linux" "x86_64" "x86_64-unknown-linux-gnu")
-
   set(CMAKE_EXECUTABLE_FORMAT "ELF")
 
   set(SWIFT_HOST_VARIANT "linux" CACHE STRING
       "Deployment OS for Swift host tools (the compiler) [linux].")
 
   set(SWIFT_HOST_VARIANT_SDK "LINUX")
-  set(SWIFT_HOST_VARIANT_ARCH "x86_64")
-
   set(SWIFT_PRIMARY_VARIANT_SDK_default "LINUX")
-  set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
+
+  # FIXME: This will not work while trying to cross-compile.
+  if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
+    configure_sdk_unix(LINUX "Linux" "linux" "linux" "x86_64" "x86_64-unknown-linux-gnu")
+    set(SWIFT_HOST_VARIANT_ARCH "x86_64")
+    set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
+  # FIXME: This only matches ARMv7l (by far the most common variant).
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "armv7l")
+    configure_sdk_unix(LINUX "Linux" "linux" "linux" "armv7" "armv7-unknown-linux-gnueabihf")
+    set(SWIFT_HOST_VARIANT_ARCH "armv7")
+    set(SWIFT_PRIMARY_VARIANT_ARCH_default "armv7")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64")
+    configure_sdk_unix(LINUX "Linux" "linux" "linux" "aarch64" "aarch64-unknown-linux-gnu")
+    set(SWIFT_HOST_VARIANT_ARCH "aarch64")
+    set(SWIFT_PRIMARY_VARIANT_ARCH_default "aarch64")
+  else()
+    message(FATAL_ERROR "Unknown or unsupported architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+  endif()
+
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
   configure_sdk_unix(FREEBSD "FreeBSD" "freebsd" "freebsd" "x86_64" "x86_64-freebsd10")
 

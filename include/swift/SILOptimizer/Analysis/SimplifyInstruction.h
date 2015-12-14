@@ -12,7 +12,7 @@
 //
 // An analysis that provides utilities for folding instructions. Since it is an
 // analysis it does not modify the IR in anyway. This is left to actual
-// SILPasses.
+// SIL Transforms.
 //
 //===----------------------------------------------------------------------===//
 

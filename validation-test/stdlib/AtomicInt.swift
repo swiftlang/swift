@@ -730,7 +730,7 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
   ) -> Observation {
     var observation = Observation4UInt(0, 0, 0, 0)
     var initializerDestroyed = HeapBool(false)
-    if true {
+    do {
       let initializer = DummyObject(
         destroyedFlag: initializerDestroyed,
         randomInt: threadLocalData.randomInt())

@@ -85,8 +85,10 @@ public struct CollectionDefaultIterator<Elements : Indexable>
   ///
   /// - Requires: No preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> Elements._Element? {
-    return _position == _elements.endIndex
-    ? .None : .Some(_elements[_position++])
+    if _position == _elements.endIndex { return nil }
+    let element = _elements[_position]
+    _position._successorInPlace()
+    return element
   }
 
   internal let _elements: Elements

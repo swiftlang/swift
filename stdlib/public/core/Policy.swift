@@ -86,7 +86,7 @@ public typealias Any = protocol<>
 ///     }
 ///
 ///     // If x has a method @objc getValue()->Int, call it and
-///     // return the result.  Otherwise, return nil.
+///     // return the result.  Otherwise, return `nil`.
 ///     func getCValue1(x: AnyObject) -> Int? {
 ///       if let f: ()->Int = x.getCValue { // <===
 ///         return f()
@@ -134,7 +134,7 @@ public protocol AnyObject : class {}
 ///     }
 ///
 ///     // If x has an @objc cValue: Int, return its value.
-///     // Otherwise, return nil.
+///     // Otherwise, return `nil`.
 ///     func getCValue(x: AnyClass) -> Int? {
 ///       return x.cValue // <===
 ///     }
