@@ -43,7 +43,11 @@ Type DependentGenericTypeResolver::resolveSelfAssociatedType(
        Type selfTy,
        DeclContext *DC,
        AssociatedTypeDecl *assocType) {
-  return Builder.resolveArchetype(selfTy)->getRepresentative()
+  auto archetype = Builder.resolveArchetype(selfTy);
+  if (!archetype)
+    return ErrorType::get(DC->getASTContext());
+  
+  return archetype->getRepresentative()
            ->getNestedType(assocType->getName(), Builder)
            ->getDependentType(Builder, true);
 }

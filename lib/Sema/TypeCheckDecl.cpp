@@ -1374,14 +1374,10 @@ void swift::makeDynamic(ASTContext &ctx, ValueDecl *D) {
 /// pattern, etc.
 ///
 /// \param func The function whose 'self' is being configured.
-/// \param outerGenericParams The generic parameters from the outer scope.
 ///
 /// \returns the type of 'self'.
 Type swift::configureImplicitSelf(TypeChecker &tc,
-                                  AbstractFunctionDecl *func,
-                                  GenericParamList *&outerGenericParams) {
-  outerGenericParams = nullptr;
-
+                                  AbstractFunctionDecl *func) {
   auto selfDecl = func->getImplicitSelfDecl();
 
   // Validate the context.
@@ -1392,7 +1388,7 @@ Type swift::configureImplicitSelf(TypeChecker &tc,
   }
 
   // Compute the type of self.
-  Type selfTy = func->computeSelfType(&outerGenericParams);
+  Type selfTy = func->computeSelfType();
   assert(selfDecl && selfTy && "Not a method");
 
   if (selfDecl->hasType())
@@ -1413,7 +1409,6 @@ Type swift::configureImplicitSelf(TypeChecker &tc,
 /// Compute the allocating and initializing constructor types for
 /// the given constructor.
 void swift::configureConstructorType(ConstructorDecl *ctor,
-                                     GenericParamList *outerGenericParams,
                                      Type selfType,
                                      Type argType,
                                      bool throws) {
@@ -1430,6 +1425,9 @@ void swift::configureConstructorType(ConstructorDecl *ctor,
                                       ctor->getFullName().getArgumentNames());
 
   auto extInfo = AnyFunctionType::ExtInfo().withThrows(throws);
+
+  GenericParamList *outerGenericParams =
+      ctor->getDeclContext()->getGenericParamsOfContext();
 
   if (GenericParamList *innerGenericParams = ctor->getGenericParams()) {
     innerGenericParams->setOuterParameters(outerGenericParams);
@@ -4009,13 +4007,12 @@ public:
     }
 
     // Before anything else, set up the 'self' argument correctly if present.
-    GenericParamList *outerGenericParams = nullptr;
     if (FD->getDeclContext()->isTypeContext())
-      configureImplicitSelf(TC, FD, outerGenericParams);
+      configureImplicitSelf(TC, FD);
 
     // If we have generic parameters, check the generic signature now.
     if (auto gp = FD->getGenericParams()) {
-      gp->setOuterParameters(outerGenericParams);
+      gp->setOuterParameters(FD->getDeclContext()->getGenericParamsOfContext());
 
       if (TC.validateGenericFuncSignature(FD)) {
         markInvalidGenericSignature(FD, TC);
@@ -5394,13 +5391,12 @@ public:
       }
     }
 
-    GenericParamList *outerGenericParams;
-    Type SelfTy = configureImplicitSelf(TC, CD, outerGenericParams);
+    Type SelfTy = configureImplicitSelf(TC, CD);
 
     Optional<ArchetypeBuilder> builder;
     if (auto gp = CD->getGenericParams()) {
       // Write up generic parameters and check the generic parameter list.
-      gp->setOuterParameters(outerGenericParams);
+      gp->setOuterParameters(CD->getDeclContext()->getGenericParamsOfContext());
 
       if (TC.validateGenericFuncSignature(CD)) {
         markInvalidGenericSignature(CD, TC);
@@ -5433,7 +5429,7 @@ public:
       CD->overwriteType(ErrorType::get(TC.Context));
       CD->setInvalid();
     } else {
-      configureConstructorType(CD, outerGenericParams, SelfTy, 
+      configureConstructorType(CD, SelfTy,
                                CD->getBodyParamPatterns()[1]->getType(),
                                CD->getThrowsLoc().isValid());
     }
@@ -5562,8 +5558,7 @@ public:
       DD->setAccessibility(enclosingClass->getFormalAccess());
     }
 
-    GenericParamList *outerGenericParams;
-    Type SelfTy = configureImplicitSelf(TC, DD, outerGenericParams);
+    Type SelfTy = configureImplicitSelf(TC, DD);
 
     if (DD->getDeclContext()->isGenericTypeContext())
       TC.validateGenericFuncSignature(DD);
@@ -5577,7 +5572,7 @@ public:
     if (DD->getDeclContext()->isGenericTypeContext())
       FnTy = PolymorphicFunctionType::get(SelfTy,
                                           TupleType::getEmpty(TC.Context),
-                                          outerGenericParams);
+                             DD->getDeclContext()->getGenericParamsOfContext());
     else
       FnTy = FunctionType::get(SelfTy, TupleType::getEmpty(TC.Context));
 
@@ -5891,9 +5886,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     // Validate the generic type signature, which is just <Self : P>.
     validateGenericTypeSignature(proto);
 
-    GenericParamList *outerGenericParams =
-        proto->getDeclContext()->getGenericParamsOfContext();
-    gp->setOuterParameters(outerGenericParams);
+    assert(gp->getOuterParameters() ==
+           proto->getDeclContext()->getGenericParamsOfContext());
 
     revertGenericParamList(gp);
 
@@ -5985,8 +5979,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         if (isa<NominalTypeDecl>(VD->getDeclContext()->getParent())) {
           if (auto funcDeclContext =
                   dyn_cast<AbstractFunctionDecl>(VD->getDeclContext())) {
-            GenericParamList *outerGenericParams = nullptr;
-            configureImplicitSelf(*this, funcDeclContext, outerGenericParams);
+            configureImplicitSelf(*this, funcDeclContext);
           }
         } else {
           D->setType(ErrorType::get(Context));

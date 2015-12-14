@@ -3429,8 +3429,7 @@ SourceRange SubscriptDecl::getSourceRange() const {
 
 static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
                                     bool isInitializingCtor,
-                                    bool wantInterfaceType,
-                                    GenericParamList **outerGenericParams) {
+                                    bool wantInterfaceType) {
   auto *dc = theMethod->getDeclContext();
   
   // Determine the type of the container.
@@ -3480,10 +3479,6 @@ static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
         selfTy = self->getArchetype();
     }
   }
-
-  // Capture the generic parameters, if requested.
-  if (outerGenericParams)
-    *outerGenericParams = dc->getGenericParamsOfContext();
 
   // If the self type couldn't be computed, or is the result of an
   // upstream error, return an error type.
@@ -3560,13 +3555,12 @@ void AbstractFunctionDecl::setGenericParams(GenericParamList *GP) {
 }
 
 
-Type AbstractFunctionDecl::
-computeSelfType(GenericParamList **outerGenericParams) {
-  return getSelfTypeForContainer(this, true, false, outerGenericParams);
+Type AbstractFunctionDecl::computeSelfType() {
+  return getSelfTypeForContainer(this, true, false);
 }
 
 Type AbstractFunctionDecl::computeInterfaceSelfType(bool isInitializingCtor) {
-  return getSelfTypeForContainer(this, isInitializingCtor, true, nullptr);
+  return getSelfTypeForContainer(this, isInitializingCtor, true);
 }
 
 /// \brief This method returns the implicit 'self' decl.

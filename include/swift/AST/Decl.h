@@ -4568,11 +4568,7 @@ public:
   /// and return the type to be used for the 'self' argument of the type, or an
   /// empty Type() if no 'self' argument should exist.  This can
   /// only be used after name binding has resolved types.
-  ///
-  /// \param outerGenericParams If non-NULL, and this function is an instance
-  /// of a generic type, will be set to the generic parameter list of that
-  /// generic type.
-  Type computeSelfType(GenericParamList **outerGenericParams = nullptr);
+  Type computeSelfType();
 
   /// \brief If this is a method in a type or extension thereof, compute
   /// and return the type to be used for the 'self' argument of the interface
