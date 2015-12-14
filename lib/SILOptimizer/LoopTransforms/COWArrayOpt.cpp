@@ -2236,7 +2236,7 @@ void ArrayPropertiesSpecializer::specializeLoopNest() {
   auto *Header = CheckBlock->getSingleSuccessor();
   assert(Header);
 
-  // Our loop info is not really completedly valid anymore since the cloner does
+  // Our loop info is not really completely valid anymore since the cloner does
   // not update it. However, exit blocks of the original loop are still valid.
   SmallVector<SILBasicBlock *, 16> ExitBlocks;
   Lp->getExitBlocks(ExitBlocks);

@@ -2275,7 +2275,7 @@ public:
   /// \returns true if an error occurred, false otherwise.
   bool simplify(bool ContinueAfterFailures = false);
 
-  /// \brief Simplify the given constaint.
+  /// \brief Simplify the given constraint.
   SolutionKind simplifyConstraint(const Constraint &constraint);
 
 private:

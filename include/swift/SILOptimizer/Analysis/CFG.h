@@ -24,7 +24,7 @@ namespace swift {
 class SILFunction;
 class SILBasicBlock;
 
-/// Return true if we conservativly find all BB's that are non-failure exit
+/// Return true if we conservatively find all BB's that are non-failure exit
 /// basic blocks and place them in \p BBs. If we find something we don't
 /// understand, bail.
 ///
