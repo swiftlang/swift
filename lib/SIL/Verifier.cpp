@@ -779,7 +779,7 @@ public:
   }
 
   void verifyLLVMIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID) {
-    // Certain llvm instrinsic require constant values as their operands.
+    // Certain llvm intrinsic require constant values as their operands.
     // Consequently, these must not be phi nodes (aka. basic block arguments).
     switch (ID) {
     default:

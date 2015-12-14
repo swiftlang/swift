@@ -192,7 +192,7 @@ public:
   void emitArtificialFunction(SILModule &SILMod, IRBuilder &Builder,
                               llvm::Function *Fn, SILType SILTy = SILType());
 
-  /// Emit a dbg.declare instrinsic at the current insertion point and
+  /// Emit a dbg.declare intrinsic at the current insertion point and
   /// the Builder's current debug location.
   void emitVariableDeclaration(IRBuilder &Builder,
                                ArrayRef<llvm::Value *> Storage,
