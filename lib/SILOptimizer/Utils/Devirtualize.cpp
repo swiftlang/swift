@@ -34,6 +34,52 @@ STATISTIC(NumWitnessDevirt, "Number of witness_method applies devirtualized");
 //                         Class Method Optimization
 //===----------------------------------------------------------------------===//
 
+/// Compute all subclasses of a given class.
+///
+/// \p CHA class hierarchy analysis
+/// \p CD class declaration
+/// \p ClassType type of the instance
+/// \p M SILModule
+/// \p Subs a container to be used for storing the set of subclasses
+static void getAllSubclasses(ClassHierarchyAnalysis *CHA,
+                             ClassDecl *CD,
+                             SILType ClassType,
+                             SILModule &M,
+                             ClassHierarchyAnalysis::ClassList &Subs) {
+  // Collect the direct and indirect subclasses for the class.
+  // Sort these subclasses in the order they should be tested by the
+  // speculative devirtualization. Different strategies could be used,
+  // E.g. breadth-first, depth-first, etc.
+  // Currently, let's use the breadth-first strategy.
+  // The exact static type of the instance should be tested first.
+  auto &DirectSubs = CHA->getDirectSubClasses(CD);
+  auto &IndirectSubs = CHA->getIndirectSubClasses(CD);
+
+  Subs.append(DirectSubs.begin(), DirectSubs.end());
+  //SmallVector<ClassDecl *, 8> Subs(DirectSubs);
+  Subs.append(IndirectSubs.begin(), IndirectSubs.end());
+
+  if (isa<BoundGenericClassType>(ClassType.getSwiftRValueType())) {
+    // Filter out any subclassses that do not inherit from this
+    // specific bound class.
+    auto RemovedIt = std::remove_if(Subs.begin(), Subs.end(),
+        [&ClassType, &M](ClassDecl *Sub){
+          auto SubCanTy = Sub->getDeclaredType()->getCanonicalType();
+          // Unbound generic type can override a method from
+          // a bound generic class, but this unbound generic
+          // class is not considered to be a subclass of a
+          // bound generic class in a general case.
+          if (isa<UnboundGenericType>(SubCanTy))
+            return false;
+          // Handle the ususal case here: the class in question
+          // should be a real subclass of a bound generic class.
+          return !ClassType.isSuperclassOf(
+              SILType::getPrimitiveObjectType(SubCanTy));
+        });
+    Subs.erase(RemovedIt, Subs.end());
+  }
+}
+
 /// Check if a given class is final in terms of a current
 /// compilation, i.e.:
 /// - it is really final
