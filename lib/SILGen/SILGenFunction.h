@@ -702,7 +702,7 @@ public:
   /// \returns None if the epilog block is unreachable. Otherwise, returns
   ///          the epilog block's return value argument, or a null SILValue if
   ///          the epilog doesn't take a return value. Also returns the location
-  ///          of the return instrcution if the epilog block is supposed to host
+  ///          of the return instruction if the epilog block is supposed to host
   ///          the ReturnLocation (This happens in case the predecessor block is
   ///          merged with the epilog block.)
   std::pair<Optional<SILValue>, SILLocation>
@@ -1013,7 +1013,7 @@ public:
                                    = AccessSemantics::Ordinary);
   
   /// Produce a singular RValue for a reference to the specified declaration,
-  /// with the given type and in response to the specified epxression.  Try to
+  /// with the given type and in response to the specified expression.  Try to
   /// emit into the specified SGFContext to avoid copies (when provided).
   ManagedValue emitRValueForDecl(SILLocation loc, ConcreteDeclRef decl, Type ty,
                                  AccessSemantics semantics,
