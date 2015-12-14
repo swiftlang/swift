@@ -5195,7 +5195,7 @@ public:
     EED->setIsBeingTypeChecked();
 
     // Only attempt to validate the argument type or raw value if the element
-    // is not currenly being validated.
+    // is not currently being validated.
     if (EED->getRecursiveness() == ElementRecursiveness::NotRecursive) {
       EED->setRecursiveness(ElementRecursiveness::PotentiallyRecursive);
       
