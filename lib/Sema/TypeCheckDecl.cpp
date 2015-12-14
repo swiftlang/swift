@@ -1440,7 +1440,7 @@ void swift::configureConstructorType(ConstructorDecl *ctor,
     fnType = FunctionType::get(argType, resultType, extInfo);
   }
   Type selfMetaType = MetatypeType::get(selfType->getInOutObjectType());
-  if (outerGenericParams) {
+  if (ctor->getDeclContext()->isGenericTypeContext()) {
     allocFnType = PolymorphicFunctionType::get(selfMetaType, fnType,
                                                outerGenericParams);
     initFnType = PolymorphicFunctionType::get(selfType, fnType,
@@ -3671,7 +3671,7 @@ public:
     GenericParamList *outerGenericParams = nullptr;
     auto patterns = FD->getBodyParamPatterns();
     bool hasSelf = FD->getDeclContext()->isTypeContext();
-    if (hasSelf)
+    if (FD->getDeclContext()->isGenericTypeContext())
       outerGenericParams = FD->getDeclContext()->getGenericParamsOfContext();
 
     for (unsigned i = 0, e = patterns.size(); i != e; ++i) {
@@ -4042,7 +4042,7 @@ public:
         // Assign archetypes.
         finalizeGenericParamList(builder, gp, FD, TC);
       }
-    } else if (outerGenericParams) {
+    } else if (FD->getDeclContext()->isGenericTypeContext()) {
       if (TC.validateGenericFuncSignature(FD)) {
         markInvalidGenericSignature(FD, TC);
       } else if (!FD->hasType()) {
@@ -5168,7 +5168,7 @@ public:
     auto resultTy = TC.getInterfaceTypeFromInternalType(enumDecl,
                                                         funcTy->getResult());
     auto interfaceTy
-      = GenericFunctionType::get(enumDecl->getGenericSignature(),
+      = GenericFunctionType::get(enumDecl->getGenericSignatureOfContext(),
                                  inputTy, resultTy, funcTy->getExtInfo());
 
     // Record the interface type.
@@ -5247,7 +5247,7 @@ public:
     // case the enclosing enum type was illegally declared inside of a generic
     // context. (In that case, we'll post a diagnostic while visiting the
     // parent enum.)
-    if (ED->getGenericParams())
+    if (EED->getDeclContext()->isGenericTypeContext())
       computeEnumElementInterfaceType(EED);
 
     // Require the carried type to be materializable.
@@ -5419,7 +5419,7 @@ public:
         // Assign archetypes.
         finalizeGenericParamList(builder, gp, CD, TC);
       }
-    } else if (outerGenericParams) {
+    } else if (CD->getDeclContext()->isGenericTypeContext()) {
       if (TC.validateGenericFuncSignature(CD)) {
         CD->setInvalid();
       } else {
@@ -5565,7 +5565,7 @@ public:
     GenericParamList *outerGenericParams;
     Type SelfTy = configureImplicitSelf(TC, DD, outerGenericParams);
 
-    if (outerGenericParams)
+    if (DD->getDeclContext()->isGenericTypeContext())
       TC.validateGenericFuncSignature(DD);
 
     if (semaFuncParamPatterns(DD)) {
@@ -5574,7 +5574,7 @@ public:
     }
 
     Type FnTy;
-    if (outerGenericParams)
+    if (DD->getDeclContext()->isGenericTypeContext())
       FnTy = PolymorphicFunctionType::get(SelfTy,
                                           TupleType::getEmpty(TC.Context),
                                           outerGenericParams);

@@ -4138,8 +4138,9 @@ void EnumElementDecl::computeType() {
   if (getArgumentType())
     resultTy = FunctionType::get(getArgumentType(), resultTy);
 
-  if (auto gp = ED->getGenericParamsOfContext())
-    resultTy = PolymorphicFunctionType::get(argTy, resultTy, gp);
+  if (ED->isGenericTypeContext())
+    resultTy = PolymorphicFunctionType::get(argTy, resultTy,
+                                            ED->getGenericParamsOfContext());
   else
     resultTy = FunctionType::get(argTy, resultTy);
 
