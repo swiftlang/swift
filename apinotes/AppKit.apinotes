@@ -140,3 +140,4 @@ Classes:
   - Selector: 'initWithWindow:'
     MethodKind: Instance
     DesignatedInit: true
+ 
