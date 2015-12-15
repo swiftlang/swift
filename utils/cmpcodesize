@@ -341,25 +341,16 @@ How to specify files:
     listFunctions = parsed_arguments.list_functions
     sumSizes = parsed_arguments.sum_sizes
 
-    separatorFound = False
-    oldFileArgs = []
-    newFileArgs = []
-    curFiles = oldFileArgs
-    for arg in parsed_arguments.files:
-        if arg == separator_token:
-            curFiles = newFileArgs
-            separatorFound = True
-        else:
-            curFiles.append(arg)
-
     oldBuildDir = os.environ.get("SWIFT_OLD_BUILDDIR")
     newBuildDir = os.environ.get("SWIFT_NEW_BUILDDIR")
 
-    if separatorFound:
-        oldFiles = oldFileArgs
-        newFiles = newFileArgs
+    if separator_token in parsed_arguments.files:
+        separator_index = parsed_arguments.files.index(separator_token)
+        oldFiles = parsed_arguments.files[:separator_index]
+        newFiles = parsed_arguments.files[separator_index + 1:]
     else:
-        if not oldFileArgs:
+        oldFileArgs = parsed_arguments.files
+        if not parsed_arguments.files:
             if listFunctions:
                 sys.exit("Must specify file for the -l option")
             if not oldBuildDir:
