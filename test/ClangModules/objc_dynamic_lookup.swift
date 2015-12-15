@@ -1,0 +1,6 @@
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -enable-swift-name-lookup-tables %s -verify
+import Foundation
+
+func useAnyObject(obj: AnyObject) {
+  _ = obj.makingHoney
+}
