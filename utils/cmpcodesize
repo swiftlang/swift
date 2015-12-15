@@ -338,17 +338,13 @@ How to specify files:
     parsed_arguments = parser.parse_args(
         [separator_token if arg == '--' else arg for arg in sys.argv[1:]])
 
-    allSections = parsed_arguments.all_sections
-    listCategories = parsed_arguments.list_categories
-    listFunctions = parsed_arguments.list_functions
-    sumSizes = parsed_arguments.sum_sizes
-
     # --list is mutually exclusive with both --additional-sections
     # and --category. argparse is only capable of expressing mutual
     # exclusivity among options, not among groups of options, so
     # we detect this case manually.
-    if listFunctions:
-        assert not allSections and not listCategories, \
+    if parsed_arguments.list_functions:
+        assert (not parsed_arguments.all_sections and
+                not parsed_arguments.list_categories), \
             'Incorrect usage: --list cannot be specified in conjunction ' + \
             'with --additional-sections or --category.'
 
@@ -362,7 +358,7 @@ How to specify files:
     else:
         oldFileArgs = parsed_arguments.files
         if not parsed_arguments.files:
-            if listFunctions:
+            if parsed_arguments.list_functions:
                 sys.exit("Must specify file for the -l option")
             if not oldBuildDir:
                 sys.exit("$SWIFT_OLD_BUILDDIR not specified")
@@ -402,7 +398,7 @@ How to specify files:
         if not os.path.isfile(file):
             sys.exit("file " + file + " not found")
 
-    if listFunctions:
+    if parsed_arguments.list_functions:
         if not newFiles:
             sizes = collections.defaultdict(int)
             for file in oldFiles:
@@ -412,8 +408,10 @@ How to specify files:
             compareFunctionSizes(oldFiles, newFiles)
     else:
         print "%-26s%16s  %8s  %8s  %s" % ("", "Section", "Old", "New", "Percent")
-        if sumSizes:
-            compareSizesOfFile(oldFiles, newFiles, allSections, listCategories)
+        if parsed_arguments.sum_sizes:
+            compareSizesOfFile(oldFiles, newFiles,
+                               parsed_arguments.all_sections,
+                               parsed_arguments.list_categories)
         else:
             if len(oldFiles) != len(newFiles):
                 sys.exit("number of new files must be the same of old files")
@@ -423,7 +421,9 @@ How to specify files:
 
             for idx, oldFile in enumerate(oldFiles):
                 newFile = newFiles[idx]
-                compareSizesOfFile([oldFile], [newFile], allSections, listCategories)
+                compareSizesOfFile([oldFile], [newFile],
+                                   parsed_arguments.all_sections,
+                                   parsed_arguments.list_categories)
 
 if __name__ == '__main__':
     main()
