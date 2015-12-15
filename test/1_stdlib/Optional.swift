@@ -4,6 +4,14 @@
 import StdlibUnittest
 import Swift
 
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 let OptionalTests = TestSuite("Optional")
 
 protocol TestProtocol1 {}
