@@ -55,12 +55,12 @@ function(_add_variant_c_compile_link_flags
     "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}")
 
   list(APPEND result
-    "-isysroot" "${SWIFT_SDK_${sdk}_PATH}")
+    "-isysroot" "\"${SWIFT_SDK_${sdk}_PATH}\"")
 
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     list(APPEND result
         "-arch" "${arch}"
-        "-F" "${SWIFT_SDK_${sdk}_PATH}/../../../Developer/Library/Frameworks"
+        "-F" "\"${SWIFT_SDK_${sdk}_PATH}/../../../Developer/Library/Frameworks\""
         "-m${SWIFT_SDK_${sdk}_VERSION_MIN_NAME}-version-min=${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION}")
   endif()
 
