@@ -446,7 +446,7 @@ extension ${Self} {
 extension ${Self} : SignedNumberType {}
 % end
 
-// construction from other integer types
+// Construction from other integer types
 @_transparent
 extension ${Self} {
 % for src_ty in all_integer_types(word_bits):
@@ -586,7 +586,7 @@ public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 }
 % end
 
-// bitwise operations
+// Bitwise operations
 @_transparent
 extension ${Self} : BitwiseOperationsType {
   /// The empty bitset of type ${Self}.

@@ -547,7 +547,12 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
   // We make this function bare so we don't have to worry about decls in the
   // SILArgument.
   auto *Fn = M.getOrCreateFunction(
-      ClosureUser->getLinkage(), ClonedName, ClonedTy,
+      // It's important to use a shared linkage for the specialized function
+      // and not the original linkage.
+      // Otherwise the new function could have an external linkage (in case the
+      // original function was de-serialized) and would not be code-gen'd.
+      getSpecializedLinkage(ClosureUser, ClosureUser->getLinkage()),
+      ClonedName, ClonedTy,
       ClosureUser->getContextGenericParams(), ClosureUser->getLocation(),
       IsBare, ClosureUser->isTransparent(), ClosureUser->isFragile(),
       ClosureUser->isThunk(), ClosureUser->getClassVisibility(),

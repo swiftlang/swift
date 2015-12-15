@@ -355,7 +355,7 @@ extension String {
       compare = self._core.count - rhs._core.count
     }
     // This efficiently normalizes the result to -1, 0, or 1 to match the
-    // behaviour of NSString's compare function.
+    // behavior of NSString's compare function.
     return (compare > 0 ? 1 : 0) - (compare < 0 ? 1 : 0)
   }
 #endif

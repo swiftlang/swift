@@ -635,7 +635,7 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
   }
 
   /// Uniquely identifies the stored underlying collection.
-  public // due to language limitations only
+  public // Due to language limitations only
   var _underlyingCollectionID: ObjectIdentifier {
     return ObjectIdentifier(_box)
   }

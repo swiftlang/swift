@@ -451,14 +451,14 @@ extension CollectionType {
     while subSequenceEnd != cachedEndIndex {
       if try isSeparator(self[subSequenceEnd]) {
         let didAppend = appendSubsequence(end: subSequenceEnd)
-        ++subSequenceEnd
+        subSequenceEnd._successorInPlace()
         subSequenceStart = subSequenceEnd
         if didAppend && result.count == maxSplit {
           break
         }
         continue
       }
-      ++subSequenceEnd
+      subSequenceEnd._successorInPlace()
     }
 
     if subSequenceStart != cachedEndIndex || allowEmptySlices {

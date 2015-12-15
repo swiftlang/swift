@@ -15,7 +15,7 @@ import SwiftShims
 /// Returns 1 if the running OS version is greater than or equal to
 /// major.minor.patchVersion and 0 otherwise.
 ///
-/// This is a magic entrypoint known to the compiler. It is called in
+/// This is a magic entry point known to the compiler. It is called in
 /// generated code for API availability checking.
 @warn_unused_result
 @_semantics("availability.osversion")

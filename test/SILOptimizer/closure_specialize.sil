@@ -3,12 +3,12 @@
 import Builtin
 import Swift
 
-// CHECK-LABEL: sil [noinline] @_TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil shared [noinline] @_TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ : $@convention(thin) (Int) -> () {
 // CHECK: bb0(%0 : $Int)
 // CHECK: function_ref @_TFF7specgen6callerFSiT_U_FTSiSi_T_
 // CHECK: partial_apply
 
-// CHECK-LABEL: sil [noinline] @_TTSf1cl27_TF7specgen6calleeFTSiSi_T____TF7specgen12take_closureFFTSiSi_T_T_ : $@convention(thin) () -> () {
+// CHECK-LABEL: sil shared [noinline] @_TTSf1cl27_TF7specgen6calleeFTSiSi_T____TF7specgen12take_closureFFTSiSi_T_T_ : $@convention(thin) () -> () {
 // CHECK-NEXT: bb0:
 // CHECK: [[FUN:%.*]] = function_ref @_TF7specgen6calleeFTSiSi_T_ : $@convention(thin) (Int, Int) -> ()
 // CHECK: thin_to_thick_function [[FUN]] : $@convention(thin) (Int, Int) -> () to $@callee_owned (Int, Int) -> ()
@@ -24,12 +24,12 @@ bb0(%0 : $@callee_owned (Int, Int) -> ()):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [noinline] @_TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen13take_closure2FFTSiSi_T_T_ : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil shared [noinline] @_TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen13take_closure2FFTSiSi_T_T_ : $@convention(thin) (Int) -> () {
 // CHECK: bb0(%0 : $Int)
 // CHECK: [[FUN:%.*]] = function_ref @_TFF7specgen6callerFSiT_U_FTSiSi_T_
 // CHECK: partial_apply [[FUN]](
 
-// CHECK-LABEL: sil [noinline] @_TTSf1cl27_TF7specgen6calleeFTSiSi_T____TF7specgen13take_closure2FFTSiSi_T_T_ : $@convention(thin) () -> () {
+// CHECK-LABEL: sil shared [noinline] @_TTSf1cl27_TF7specgen6calleeFTSiSi_T____TF7specgen13take_closure2FFTSiSi_T_T_ : $@convention(thin) () -> () {
 // CHECK-NEXT: bb0:
 // CHECK: [[FUN:%.*]] = function_ref @_TF7specgen6calleeFTSiSi_T_ : $@convention(thin) (Int, Int) -> ()
 // CHECK: thin_to_thick_function [[FUN]] : $@convention(thin) (Int, Int) -> () to $@callee_owned (Int, Int) -> ()
@@ -163,6 +163,7 @@ bb0(%0 : $A, %1 : $A):
   return %4 : $()
 }
 
+// CHECK-LABEL: sil shared {{.*}} @_TTS{{.*}}use_closure : $@convention(thin) (@owned A) -> () {
 sil hidden [noinline] @use_closure : $@convention(thin) (@owned @callee_owned (@owned A) -> ()) -> () {
 bb0(%0 : $@callee_owned (@owned A) -> ()):
   %1 = alloc_ref $A

@@ -1155,6 +1155,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     }
   }
 
+  Opts.ForceResilientSuperDispatch |=
+    Args.hasArg(OPT_force_resilient_super_dispatch);
+
   return false;
 }
 
