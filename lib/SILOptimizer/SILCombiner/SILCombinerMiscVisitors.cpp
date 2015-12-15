@@ -492,7 +492,7 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
     return Builder.createStrongRetain(RVI->getLoc(), Operand);
   }
 
-  // RetainValueInst of a trivial type is a no-op + use propogation.
+  // RetainValueInst of a trivial type is a no-op + use propagation.
   if (OperandTy.isTrivial(RVI->getModule())) {
     return eraseInstFromFunction(*RVI);
   }
