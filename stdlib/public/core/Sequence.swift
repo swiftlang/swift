@@ -240,7 +240,7 @@ internal class _DropFirstSequence<Base : GeneratorType>
         dropped = limit
         return nil
       }
-      ++dropped
+      dropped += 1
     }
     return generator.next()
   }
