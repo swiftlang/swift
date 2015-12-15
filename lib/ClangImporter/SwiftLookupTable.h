@@ -207,6 +207,9 @@ public:
   SmallVector<SingleEntry, 4>
   lookup(StringRef baseName, clang::DeclContext *searchContext);
 
+  /// Retrieve the set of base names that are stored in the lookup table.
+  SmallVector<StringRef, 4> allBaseNames();
+
   /// Lookup Objective-C members with the given base name, regardless
   /// of context.
   SmallVector<clang::NamedDecl *, 4> lookupObjCMembers(StringRef baseName);

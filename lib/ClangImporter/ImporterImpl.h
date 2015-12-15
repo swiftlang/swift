@@ -1297,9 +1297,14 @@ public:
   /// about the directly-parsed headers.
   SwiftLookupTable *findLookupTable(const clang::Module *clangModule);
 
-  /// Look for Objective-C members in the given Swift lookup table.
+  /// Look for Objective-C members with the given name in the given
+  /// Swift lookup table.
   void lookupObjCMembers(SwiftLookupTable &table, DeclName name,
                          VisibleDeclConsumer &consumer);
+
+  /// Look for all Objective-C members in the given Swift lookup table.
+  void lookupAllObjCMembers(SwiftLookupTable &table,
+                            VisibleDeclConsumer &consumer);
 
   /// Dump the Swift-specific name lookup tables we generate.
   void dumpSwiftLookupTables();
