@@ -122,7 +122,7 @@ if True:
 /// property, these array types have a `capacity` that reflects their
 /// potential to store elements without reallocation, and when you
 /// know how many elements you'll store, you can call
-/// `reserveCapacity` to pre-emptively reallocate and prevent
+/// `reserveCapacity` to preemptively reallocate and prevent
 /// intermediate reallocations.
 ///
 /// Objective-C Bridge
@@ -465,7 +465,7 @@ public func _allocateUninitializedArray<Element>(_count: Builtin.Word)
     -> (Array<Element>, Builtin.RawPointer) {
   let count = Int(_count)
   if count > 0 {
-    // Doing the actual buffer alloction outside of the array.uninitialized
+    // Doing the actual buffer allocation outside of the array.uninitialized
     // semantics function enables stack propagation of the buffer.
     let bufferObject = ManagedBufferPointer<_ArrayBody, Element>(
       _uncheckedBufferClass: _ContiguousArrayStorage<Element>.self,
@@ -532,7 +532,7 @@ extension ${Self} : _ArrayType {
     _buffer = _Buffer()
     if count > 0 {
       // Creating a buffer instead of calling reserveCapacity saves doing an
-      // unneccessary uniqueness check. We disable inlining here to curb code
+      // unnecessary uniqueness check. We disable inlining here to curb code
       // growth.
       _buffer = ${Self}._allocateBufferUninitialized(count)
     }
