@@ -283,7 +283,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
                          DenseFunctionSet &FullyInlinedSet,
                          ImmutableFunctionSet::Factory &SetFactory,
                          ImmutableFunctionSet CurrentInliningSet,
-						 ClassHierarchyAnalysis *CHA) {
+                         ClassHierarchyAnalysis *CHA) {
   // Avoid reprocessing functions needlessly.
   if (FullyInlinedSet.count(F))
     return true;
@@ -434,7 +434,7 @@ namespace {
 class MandatoryInlining : public SILModuleTransform {
   /// The entry point to the transformation.
   void run() override {
-	ClassHierarchyAnalysis *CHA = getAnalysis<ClassHierarchyAnalysis>();
+    ClassHierarchyAnalysis *CHA = getAnalysis<ClassHierarchyAnalysis>();
     SILModule *M = getModule();
     SILModule::LinkingMode Mode = getOptions().LinkMode;
     bool ShouldCleanup = !getOptions().DebugSerialization;

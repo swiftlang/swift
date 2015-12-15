@@ -808,12 +808,9 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     });
   }
 
-  Opts.InferImplicitProperties |=
-    Args.hasArg(OPT_enable_objc_implicit_properties);
-
   Opts.OmitNeedlessWords |= Args.hasArg(OPT_enable_omit_needless_words);
   Opts.InferDefaultArguments |= Args.hasArg(OPT_enable_infer_default_arguments);
-
+  Opts.UseSwiftLookupTables |= Args.hasArg(OPT_enable_swift_name_lookup_tables);
   Opts.DumpClangDiagnostics |= Args.hasArg(OPT_dump_clang_diagnostics);
 
   if (Args.hasArg(OPT_embed_bitcode))
@@ -1157,6 +1154,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       }
     }
   }
+
+  Opts.ForceResilientSuperDispatch |=
+    Args.hasArg(OPT_force_resilient_super_dispatch);
 
   return false;
 }

@@ -240,7 +240,7 @@ internal class _DropFirstSequence<Base : IteratorProtocol>
         _dropped = _limit
         return nil
       }
-      ++_dropped
+      _dropped += 1
     }
     return _iterator.next()
   }
@@ -272,7 +272,7 @@ internal class _PrefixSequence<Base : IteratorProtocol>
 
   internal func next() -> Base.Element? {
     if _taken >= _maxLength { return nil }
-    ++_taken
+    _taken += 1
 
     if let next = _iterator.next() {
       return next

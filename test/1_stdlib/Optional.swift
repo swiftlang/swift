@@ -4,6 +4,14 @@
 import StdlibUnittest
 import Swift
 
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 let OptionalTests = TestSuite("Optional")
 
 protocol TestProtocol1 {}
@@ -253,7 +261,7 @@ OptionalTests.test("Optional OutputStream") {
   expectEqual(debugPrintStr(optNoString), "Optional(main.TestNoString)")
 
   let iouNoString: TestNoString! = TestNoString()
-  // IOU directly conforms to CustomStringConvertible.
+  // IUO directly conforms to CustomStringConvertible.
   // Disabled pending SR-164
   //   expectTrue(iouNoString is CustomStringConvertible)
   expectTrue(canGenericCast(iouNoString, CustomStringConvertible.self))

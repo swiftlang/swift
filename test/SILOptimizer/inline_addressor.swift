@@ -18,8 +18,8 @@ var totalsum = nonTrivialInit(true)
 //CHECK-NOT: totalsum
 //CHECK-NOT: inputval
 //CHECK: {{^}$}}
-func testit() {
-	for i in 0...10 {
+func testit(x: Int) {
+	for _ in 0...10000000 {
 		totalsum += inputval
 	}
 }

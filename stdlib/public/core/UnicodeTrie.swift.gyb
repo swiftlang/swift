@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// A custom trie implementation to quickly retrive Unicode property values.
+// A custom trie implementation to quickly retrieve Unicode property values.
 //
 //===----------------------------------------------------------------------===//
 

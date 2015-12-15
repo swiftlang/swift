@@ -736,9 +736,13 @@ bool ArchetypeBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam) {
         GenericParam->getDeclaredType()->castTo<GenericTypeParamType>(),
         RootProtocol,
         GenericParam->getName());
-  
-  if (!PA)
-    return true;
+
+  return (!PA);
+}
+
+bool ArchetypeBuilder::addGenericParameterRequirements(GenericTypeParamDecl *GenericParam) {
+  GenericTypeParamKey Key{GenericParam->getDepth(), GenericParam->getIndex()};
+  auto PA = Impl->PotentialArchetypes[Key];
   
   // Add the requirements from the declaration.
   llvm::SmallPtrSet<ProtocolDecl *, 8> visited;

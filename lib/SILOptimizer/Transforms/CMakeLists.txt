@@ -1,23 +1,24 @@
 set(TRANSFORMS_SOURCES
   Transforms/AllocBoxToStack.cpp
   Transforms/ArrayCountPropagation.cpp
-  Transforms/MergeCondFail.cpp
-  Transforms/SILSROA.cpp
+  Transforms/ArrayElementValuePropagation.cpp
   Transforms/CSE.cpp
-  Transforms/RedundantOverflowCheckRemoval.cpp
-  Transforms/SimplifyCFG.cpp
   Transforms/CopyForwarding.cpp
-  Transforms/RemovePin.cpp
-  Transforms/Sink.cpp
   Transforms/DeadCodeElimination.cpp
-  Transforms/SILCleanup.cpp
-  Transforms/SpeculativeDevirtualizer.cpp
-  Transforms/ReleaseDevirtualizer.cpp
   Transforms/DeadObjectElimination.cpp
-  Transforms/SILCodeMotion.cpp
-  Transforms/StackPromotion.cpp
   Transforms/DeadStoreElimination.cpp
-  Transforms/SILLowerAggregateInstrs.cpp
+  Transforms/MergeCondFail.cpp
   Transforms/RedundantLoadElimination.cpp
+  Transforms/RedundantOverflowCheckRemoval.cpp
+  Transforms/ReleaseDevirtualizer.cpp
+  Transforms/RemovePin.cpp
+  Transforms/SILCleanup.cpp
+  Transforms/SILCodeMotion.cpp
+  Transforms/SILLowerAggregateInstrs.cpp
   Transforms/SILMem2Reg.cpp
+  Transforms/SILSROA.cpp
+  Transforms/SimplifyCFG.cpp
+  Transforms/Sink.cpp
+  Transforms/SpeculativeDevirtualizer.cpp
+  Transforms/StackPromotion.cpp
   PARENT_SCOPE)

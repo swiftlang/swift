@@ -190,6 +190,9 @@ def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
 def use_native_super_method : Flag<["-"], "use-native-super-method">,
   HelpText<"Use super_method for super calls in native classes">;
 
+def force_resilient_super_dispatch: Flag<["-"], "force-resilient-super-dispatch">,
+  HelpText<"Assume all super member accesses are resilient">;
+
 def disable_self_type_mangling : Flag<["-"], "disable-self-type-mangling">,
   HelpText<"Disable including Self type in method type manglings">;
 
@@ -200,10 +203,6 @@ def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
 
-def enable_objc_implicit_properties :
-  Flag<["-"], "enable-objc-implicit-properties">,
-  HelpText<"Import Objective-C \"implicit properties\" as properties">;
-
 def enable_omit_needless_words :
   Flag<["-"], "enable-omit-needless-words">,
   HelpText<"Omit needless words when importing Objective-C names">;
@@ -211,6 +210,10 @@ def enable_omit_needless_words :
 def enable_infer_default_arguments :
   Flag<["-"], "enable-infer-default-arguments">,
   HelpText<"Infer default arguments for imported parameters">;
+
+def enable_swift_name_lookup_tables :
+  Flag<["-"], "enable-swift-name-lookup-tables">,
+  HelpText<"Enable Swift name lookup tables in the Clang importer">;
 
 def warn_omit_needless_words :
   Flag<["-"], "Womit-needless-words">,

@@ -842,13 +842,6 @@ StringLiteralExpr::StringLiteralExpr(StringRef Val, SourceRange Range,
       unicode::isSingleExtendedGraphemeCluster(Val);
 }
 
-void DeclRefExpr::setDeclRef(ConcreteDeclRef ref) {
-  if (auto spec = getSpecInfo())
-    spec->D = ref;
-  else
-    DOrSpecialized = ref;
-}
-
 void DeclRefExpr::setSpecialized() {
   if (isSpecialized())
     return;

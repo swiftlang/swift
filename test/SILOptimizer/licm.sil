@@ -180,3 +180,27 @@ bb2:
   %r1 = tuple ()
   return %r1 : $()
 }
+
+// CHECK-LABEL:   sil @dont_hoist_aliased_stack_location
+// CHECK:         {{^}}bb0
+// CHECK-NOT:       load
+// CHECK:         {{^}}bb1:
+// CHECK:           store
+// CHECK:           load
+// CHECK:         {{^}}bb2:
+// CHECK:           return
+sil @dont_hoist_aliased_stack_location : $@convention(thin) (Int32) -> () {
+bb0(%0 : $Int32):
+  %313 = alloc_stack $Int32
+  br bb1
+
+bb1:
+  store %0 to %313#1 : $*Int32
+  %l1 = load %313#1 : $*Int32
+  cond_br undef, bb1, bb2
+
+bb2:
+  dealloc_stack %313#0 : $*@local_storage Int32
+  %52 = tuple ()
+  return %52 : $()
+}

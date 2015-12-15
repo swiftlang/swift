@@ -89,11 +89,6 @@ module ObjCParseExtrasSystem [system] {
   export *
 }
 
-module ObjCImplicitProperties {
-  header "ObjCImplicitProperties.h"
-  export *
-}
-
 module ObjCSubscripts {
   header "ObjCSubscripts.h"
   export *

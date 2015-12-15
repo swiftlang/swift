@@ -14,7 +14,7 @@ public struct S<A: P where A.T == S<A>> {}
 
 // rdar://problem/19840527
 class X<T where T == X> { // expected-error{{same-type requirement makes generic parameter 'T' non-generic}}
-    var type: T { return self.dynamicType } // expected-error{{use of undeclared type 'T'}}
+    var type: T { return self.dynamicType } // expected-error{{cannot convert return expression of type 'X<T>.Type' to return type 'T'}}
 }
 
 protocol Y {

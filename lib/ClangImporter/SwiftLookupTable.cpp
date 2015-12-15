@@ -123,25 +123,38 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
   entries.push_back(entry);
 }
 
+
+auto SwiftLookupTable::findOrCreate(StringRef baseName) 
+  -> llvm::DenseMap<StringRef, SmallVector<FullTableEntry, 2>>::iterator {
+  // If there is no base name, there is nothing to find.
+  if (baseName.empty()) return LookupTable.end();
+
+  // Find entries for this base name.
+  auto known = LookupTable.find(baseName);
+
+  // If we found somthing, we're done.
+  if (known != LookupTable.end()) return known;
+  
+  // If there's no reader, we've found all there is to find.
+  if (!Reader) return known;
+
+  // Add an entry to the table so we don't look again.
+  known = LookupTable.insert({ baseName, { } }).first;
+
+  // Lookup this base name in the module file.
+  (void)Reader->lookup(baseName, known->second);
+
+  return known;
+}
+
 SmallVector<SwiftLookupTable::SingleEntry, 4>
 SwiftLookupTable::lookup(StringRef baseName,
                          clang::DeclContext *searchContext) {
   SmallVector<SwiftLookupTable::SingleEntry, 4> result;
 
-  if (baseName.empty()) return result;
-
-  // Find entries for this base name.
-  auto known = LookupTable.find(baseName);
-
-  // If we didn't find anything...
-  if (known == LookupTable.end()) {
-    // If there's no reader, we'll never find anything.
-    if (!Reader) return result;
-
-    // Add an entry to the table so we don't look again.
-    known = LookupTable.insert({ baseName, { } }).first;
-    if (!Reader->lookup(baseName, known->second)) return result;
-  }
+  // Find the lookup table entry for this base name.
+  auto known = findOrCreate(baseName);
+  if (known == LookupTable.end()) return result;
 
   // Translate context.
   Optional<std::pair<SwiftLookupTable::ContextKind, StringRef>> context;
@@ -157,11 +170,39 @@ SwiftLookupTable::lookup(StringRef baseName,
     if (context && *context != entry.Context) continue;
 
     // Map each of the declarations.
+    for (auto &stored : entry.DeclsOrMacros)
+      result.push_back(mapStored(stored));
+  }
+
+  return result;
+}
+
+SmallVector<clang::NamedDecl *, 4>
+SwiftLookupTable::lookupObjCMembers(StringRef baseName) {
+  SmallVector<clang::NamedDecl *, 4> result;
+
+  // Find the lookup table entry for this base name.
+  auto known = findOrCreate(baseName);
+  if (known == LookupTable.end()) return result;
+
+  // Walk each of the entries.
+  for (auto &entry : known->second) {
+    // If we're looking in a particular context and it doesn't match the
+    // entry context, we're done.
+    switch (entry.Context.first) {
+    case ContextKind::TranslationUnit:
+    case ContextKind::Tag:
+      continue;
+
+    case ContextKind::ObjCClass:
+    case ContextKind::ObjCProtocol:
+      break;
+    }
+
+    // Map each of the declarations.
     for (auto &stored : entry.DeclsOrMacros) {
-      if (isDeclEntry(stored))
-        result.push_back(mapStoredDecl(stored));
-      else
-        result.push_back(mapStoredMacro(stored));
+      assert(isDeclEntry(stored) && "Not a declaration?");
+      result.push_back(mapStoredDecl(stored));
     }
   }
 
@@ -547,6 +588,13 @@ clang::MacroInfo *SwiftLookupTable::mapStoredMacro(uintptr_t &entry) {
   // Update the entry now that we've resolved the macro.
   entry = encodeEntry(macro);
   return macro;
+}
+
+SwiftLookupTable::SingleEntry SwiftLookupTable::mapStored(uintptr_t &entry) {
+  if (isDeclEntry(entry))
+    return mapStoredDecl(entry);
+
+  return mapStoredMacro(entry);
 }
 
 SwiftLookupTableReader::~SwiftLookupTableReader() {

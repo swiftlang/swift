@@ -1064,30 +1064,16 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
     }
   }
 
-  // We don't distinguish inner from outer generic parameters yet, but also
-  // nested generics are not really supported by the rest of the compiler.
-  // There are three cases where getGenericSignatureOfContext() returns a
-  // non-null value:
+  // Since nested generic functions are not supported yet, the only case where
+  // generic parameters can be captured is by closures and non-generic local
+  // functions.
   //
-  // 1) Top-level generic functions
-  // 2) Methods with a generic signature either on the type or the method
-  // 3) Local generic functions
-  //
-  // But *not*
-  //
-  // 4) Closure or non-generic local function inside a generic context
-  //
-  // In case 1) and 2), usages of generic type parameters are never formally
-  // "captures". In case 3), the only way a generic type parameter can be
-  // captured is if the local generic function is itself nested inside a generic
-  // context. However, SILGen does not currently support this anyway.
-  //
-  // So we only set GenericParamCaptures in case 4), to avoid confusing SILGen.
-  // Eventually, the computation in checkType() will be more exact and this
-  // conditional should be removed.
-  if (!(AFR.getAbstractFunctionDecl() &&
-        AFR.getAbstractFunctionDecl()->hasType() &&
-        AFR.getAbstractFunctionDecl()->getGenericSignatureOfContext())) {
+  // So we only set GenericParamCaptures if we have a closure, or a
+  // non-generic function defined inside a local context.
+  auto *AFD = AFR.getAbstractFunctionDecl();
+  if (!AFD ||
+      (!AFD->getGenericParams() &&
+       AFD->getDeclContext()->isLocalContext())) {
     AFR.getCaptureInfo().setGenericParamCaptures(GenericParamCaptures);
   }
 

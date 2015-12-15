@@ -21,8 +21,6 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Debug.h"
 
-using namespace llvm;
-
 namespace swift {
 
 class SILModule;
@@ -32,7 +30,8 @@ public:
   typedef SmallVector<ClassDecl *, 8> ClassList;
   typedef SmallPtrSet<ClassDecl *, 32> ClassSet;
   typedef SmallVector<NominalTypeDecl *, 8> NominalTypeList;
-  typedef DenseMap<ProtocolDecl *, NominalTypeList> ProtocolImplementations;
+  typedef llvm::DenseMap<ProtocolDecl *, NominalTypeList>
+      ProtocolImplementations;
 
   ClassHierarchyAnalysis(SILModule *Mod)
       : SILAnalysis(AnalysisKind::ClassHierarchy), M(Mod) {
@@ -101,10 +100,10 @@ private:
   SILModule *M;
 
   /// A cache that maps a class to all of its known direct subclasses.
-  DenseMap<ClassDecl*, ClassList> DirectSubclassesCache;
+  llvm::DenseMap<ClassDecl*, ClassList> DirectSubclassesCache;
 
   /// A cache that maps a class to all of its known indirect subclasses.
-  DenseMap<ClassDecl*, ClassList> IndirectSubclassesCache;
+  llvm::DenseMap<ClassDecl*, ClassList> IndirectSubclassesCache;
 
   /// A cache that maps a protocol to all of its known implementations.
   ProtocolImplementations ProtocolImplementationsCache;

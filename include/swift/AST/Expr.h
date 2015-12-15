@@ -931,9 +931,6 @@ public:
     return DOrSpecialized.get<ConcreteDeclRef>();
   }
 
-  /// Set the declaration.
-  void setDeclRef(ConcreteDeclRef ref);
-
   void setSpecialized();
 
   /// \brief Determine whether this declaration reference was immediately

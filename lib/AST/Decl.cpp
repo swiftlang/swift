@@ -1922,13 +1922,6 @@ void NominalTypeDecl::setGenericSignature(GenericSignature *sig) {
   GenericSig = sig;
 }
 
-void NominalTypeDecl::markInvalidGenericSignature() {
-  ASTContext &ctx = getASTContext();
-  overwriteType(ErrorType::get(ctx));
-  if (!getDeclaredType())
-    setDeclaredType(ErrorType::get(ctx));
-}
-
 void NominalTypeDecl::computeType() {
   assert(!hasType() && "Nominal type declaration already has a type");
 
@@ -4145,8 +4138,9 @@ void EnumElementDecl::computeType() {
   if (getArgumentType())
     resultTy = FunctionType::get(getArgumentType(), resultTy);
 
-  if (auto gp = ED->getGenericParamsOfContext())
-    resultTy = PolymorphicFunctionType::get(argTy, resultTy, gp);
+  if (ED->isGenericTypeContext())
+    resultTy = PolymorphicFunctionType::get(argTy, resultTy,
+                                            ED->getGenericParamsOfContext());
   else
     resultTy = FunctionType::get(argTy, resultTy);
 

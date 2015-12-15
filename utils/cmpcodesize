@@ -350,7 +350,7 @@ def main():
             if not oldBuildDir:
                 sys.exit("$SWIFT_OLD_BUILDDIR not specified")
             if not newBuildDir:
-                die("$SWIFT_NEW_BUILDDIR not specified")
+                sys.exit("$SWIFT_NEW_BUILDDIR not specified")
             oldFileArgs = [ "O", "Ounchecked", "Onone", "dylib" ]
         oldFiles = []
         newFiles = []

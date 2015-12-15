@@ -151,8 +151,17 @@ void AddHighLevelLoopOptPasses(SILPassManager &PM) {
   PM.addHighLevelCSE();
   PM.addSILCombine();
   PM.addSimplifyCFG();
-  PM.addArrayCountPropagation();
   PM.addHighLevelLICM();
+  // Start of loop unrolling passes.
+  PM.addArrayCountPropagation();
+  // To simplify induction variable.
+  PM.addSILCombine();
+  PM.addLoopUnroll();
+  PM.addSimplifyCFG();
+  PM.addPerformanceConstantPropagation();
+  PM.addSimplifyCFG();
+  PM.addArrayElementPropagation();
+  // End of unrolling passes.
   PM.addRemovePins();
   PM.addABCOpt();
   // Cleanup.

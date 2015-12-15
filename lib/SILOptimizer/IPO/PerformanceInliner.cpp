@@ -250,12 +250,12 @@ namespace {
     bool hasInliningCycle(SILFunction *Caller, SILFunction *Callee);
 
     FullApplySite devirtualize(FullApplySite Apply,
-							   ClassHierarchyAnalysis *CHA);
+                               ClassHierarchyAnalysis *CHA);
 
     bool devirtualizeAndSpecializeApplies(
-      llvm::SmallVectorImpl<ApplySite> &Applies,
+        llvm::SmallVectorImpl<ApplySite> &Applies,
         SILModuleTransform *MT,
-		ClassHierarchyAnalysis *CHA,
+        ClassHierarchyAnalysis *CHA,
         llvm::SmallVectorImpl<SILFunction *> &WorkList);
 
     ApplySite specializeGeneric(ApplySite Apply,
@@ -276,7 +276,7 @@ namespace {
                                          SILModuleTransform *MT,
                                          DominanceAnalysis *DA,
                                          SILLoopAnalysis *LA,
-										 ClassHierarchyAnalysis *CHA);
+                                         ClassHierarchyAnalysis *CHA);
   };
 }
 
@@ -286,7 +286,7 @@ namespace {
 
 
 void ConstantTracker::trackInst(SILInstruction *inst) {
-  if (LoadInst *LI = dyn_cast<LoadInst>(inst)) {
+  if (auto *LI = dyn_cast<LoadInst>(inst)) {
     SILValue baseAddr = scanProjections(LI->getOperand());
     if (SILInstruction *loadLink = getMemoryContent(baseAddr))
        links[LI] = loadLink;
@@ -857,7 +857,7 @@ static void tryLinkCallee(FullApplySite Apply) {
 // with the new one and returns the new one. When unsuccessful returns
 // an empty apply site.
 FullApplySite SILPerformanceInliner::devirtualize(FullApplySite Apply,
-												  ClassHierarchyAnalysis *CHA) {
+                                                  ClassHierarchyAnalysis *CHA) {
 
   auto NewInstPair = tryDevirtualizeApply(Apply, CHA);
   if (!NewInstPair.second)
@@ -944,7 +944,7 @@ static void collectAllAppliesInFunction(SILFunction *F,
 bool SILPerformanceInliner::devirtualizeAndSpecializeApplies(
                                   llvm::SmallVectorImpl<ApplySite> &Applies,
                                   SILModuleTransform *MT,
-								  ClassHierarchyAnalysis *CHA,
+                                  ClassHierarchyAnalysis *CHA,
                                llvm::SmallVectorImpl<SILFunction *> &WorkList) {
   assert(WorkList.empty() && "Expected empty worklist for return results!");
 
@@ -1159,7 +1159,7 @@ void SILPerformanceInliner::inlineDevirtualizeAndSpecialize(
                                                        SILModuleTransform *MT,
                                                         DominanceAnalysis *DA,
                                                           SILLoopAnalysis *LA,
-												  ClassHierarchyAnalysis *CHA) {
+                                                  ClassHierarchyAnalysis *CHA) {
   assert(Caller->isDefinition() && "Expected only functions with bodies!");
 
   llvm::SmallVector<SILFunction *, 4> WorkList;
@@ -1221,7 +1221,7 @@ void SILPerformanceInliner::inlineDevirtualizeAndSpecialize(
 
         bool Modified =
             devirtualizeAndSpecializeApplies(WorkItemApplies, MT,
-											 CHA, NewFuncs);
+                                             CHA, NewFuncs);
         if (Modified) {
           WorkList.insert(WorkList.end(), NewFuncs.begin(), NewFuncs.end());
           NewFuncs.clear();

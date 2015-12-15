@@ -2685,9 +2685,9 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
     _ keys: UnsafeMutablePointer<AnyObject>
   ) {
     bridgeEverything()
-    // the user is expected to provide a buffer of the correct size
-    var i = 0 // position in the input buffer
-    var position = 0 // position in the dictionary storage
+    // The user is expected to provide a buffer of the correct size
+    var i = 0 // Position in the input buffer
+    var position = 0 // Position in the dictionary storage
     let count = bridgedNativeStorage.capacity
     let unmanagedKeys = _UnmanagedAnyObjectArray(keys)
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects)
@@ -3287,7 +3287,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
         let c0 = idealBucket >= start
         let c1 = idealBucket <= hole
         if start <= hole ? (c0 && c1) : (c0 || c1) {
-          break // found it
+          break // Found it
         }
       }
 

@@ -126,6 +126,9 @@ public:
   /// Whether we should embed the bitcode file.
   IRGenEmbedMode EmbedMode : 2;
 
+  /// For resilient access to super's members for testing.
+  unsigned ForceResilientSuperDispatch: 1;
+
   /// List of backend command-line options for -embed-bitcode.
   std::vector<uint8_t> CmdArgs;
 
@@ -135,7 +138,9 @@ public:
                    DisableLLVMARCOpts(false), DisableLLVMSLPVectorizer(false),
                    DisableFPElim(true), Playground(false),
                    EmitStackPromotionChecks(false), GenerateProfile(false),
-                   EmbedMode(IRGenEmbedMode::None) {}
+                   EmbedMode(IRGenEmbedMode::None),
+                   ForceResilientSuperDispatch(false)
+                   {}
   
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.

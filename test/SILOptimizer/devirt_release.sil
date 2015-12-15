@@ -73,6 +73,25 @@ bb0(%0 : $B):
   return %r : $()
 }
 
+// CHECK-LABEL: sil @dont_crash_with_missing_release
+// CHECK: [[A:%[0-9]+]] = alloc_ref
+// CHECK-NOT: strong_release
+// CHECK: [[D:%[0-9]+]] = function_ref @_TFC4test1Bd
+// CHECK: apply [[D]]([[A]])
+// CHECK-NEXT: dealloc_ref [stack] [[A]]
+// CHECK: return
+sil @dont_crash_with_missing_release : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_ref [stack] $B
+  strong_release %1 : $B
+  dealloc_ref [stack] %1 : $B
+  %2 = alloc_ref [stack] $B
+  dealloc_ref [stack] %2 : $B
+  %r = tuple ()
+  return %r : $()
+}
+
+
 class MyArrayStorage<Element> {
 }
 

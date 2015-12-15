@@ -426,16 +426,18 @@ if let strArr = objImplicitOpt as? [String] {
 }
 
 // Casting an array of numbers to different numbers.
-// CHECK: Numbers-as-doubles cast produces [3.14159, 2.71828, 0.0]
-obj = ([3.14159, 2.71828, 0] as [Double]) as AnyObject
+// CHECK: Numbers-as-doubles cast produces [3.9375, 2.71828, 0.0]
+obj = ([3.9375, 2.71828, 0] as [Double]) as AnyObject
 if let doubleArr = obj as? [Double] {
+  print(sizeof(Double.self))
   print("Numbers-as-doubles cast produces \(doubleArr)")
 } else {
   print("Numbers-as-doubles failed")
 }
 
-// CHECK: Numbers-as-floats cast produces [3.14159{{.*}}, 2.71828{{.*}}, 0.0]
+// CHECK: Numbers-as-floats cast produces [3.9375, 2.71828{{.*}}, 0.0]
 if let floatArr = obj as? [Float] {
+  print(sizeof(Float.self))
   print("Numbers-as-floats cast produces \(floatArr)")
 } else {
   print("Numbers-as-floats failed")

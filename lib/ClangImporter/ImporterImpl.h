@@ -250,7 +250,6 @@ public:
   /// \brief Swift AST context.
   ASTContext &SwiftContext;
 
-  const bool InferImplicitProperties;
   const bool ImportForwardDeclarations;
   const bool OmitNeedlessWords;
   const bool InferDefaultArguments;
@@ -744,6 +743,7 @@ public:
 
   /// Omit needless words in a function name.
   bool omitNeedlessWordsInFunctionName(
+         clang::Preprocessor &pp,
          StringRef &baseName,
          SmallVectorImpl<StringRef> &argumentNames,
          ArrayRef<const clang::ParmVarDecl *> params,
@@ -917,6 +917,14 @@ public:
     return importDeclAndCacheImpl(ClangDecl,
                                   /*SuperfluousTypedefsAreTransparent=*/false);
   }
+
+  /// Import the subscript declaration corresponding to the given
+  /// declaration, if there is one.
+  SubscriptDecl *importSubscriptOf(Decl *decl);
+
+  /// Import the class-method version of the given Objective-C
+  /// instance method of a root class.
+  Decl *importClassMethodVersionOf(FuncDecl *method);
 
   /// \brief Import a cloned version of the given declaration, which is part of
   /// an Objective-C protocol and currently must be a method or property, into
@@ -1126,7 +1134,8 @@ public:
 
   /// Determine whether we can infer a default argument for a parameter with
   /// the given \c type and (Clang) optionality.
-  bool canInferDefaultArgument(clang::QualType type,
+  bool canInferDefaultArgument(clang::Preprocessor &pp,
+                               clang::QualType type,
                                OptionalTypeKind clangOptionality,
                                Identifier baseName,
                                unsigned numParams,
@@ -1281,6 +1290,16 @@ public:
                         clang::ASTReader &reader,
                         clang::serialization::ModuleFile &mod,
                         const llvm::BitstreamCursor &stream) override;
+
+  /// Find the lookup table that corresponds to the given Clang module.
+  ///
+  /// \param clangModule The module, or null to indicate that we're talking
+  /// about the directly-parsed headers.
+  SwiftLookupTable *findLookupTable(const clang::Module *clangModule);
+
+  /// Look for Objective-C members in the given Swift lookup table.
+  void lookupObjCMembers(SwiftLookupTable &table, DeclName name,
+                         VisibleDeclConsumer &consumer);
 
   /// Dump the Swift-specific name lookup tables we generate.
   void dumpSwiftLookupTables();

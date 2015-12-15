@@ -141,12 +141,16 @@ static int swift_snprintf_l(char *Str, size_t StrSize, locale_t Locale,
 
 template <typename T>
 static uint64_t swift_floatingPointToString(char *Buffer, size_t BufferLength,
-                                            T Value, const char *Format) {
+                                            T Value, const char *Format, 
+                                            bool Debug) {
   if (BufferLength < 32)
     swift::crash("swift_floatingPointToString: insufficient buffer size");
 
-  const int Precision = std::numeric_limits<T>::digits10;
-
+  int Precision = std::numeric_limits<T>::digits10;
+  if (Debug) {
+    Precision = std::numeric_limits<T>::max_digits10;
+  }
+  
   // Pass a null locale to use the C locale.
   int i = swift_snprintf_l(Buffer, BufferLength, /*locale=*/nullptr, Format,
                            Precision, Value);
@@ -170,21 +174,21 @@ static uint64_t swift_floatingPointToString(char *Buffer, size_t BufferLength,
 }
 
 extern "C" uint64_t swift_float32ToString(char *Buffer, size_t BufferLength,
-                                          float Value) {
+                                          float Value, bool Debug) {
   return swift_floatingPointToString<float>(Buffer, BufferLength, Value,
-                                            "%0.*g");
+                                            "%0.*g", Debug);
 }
 
 extern "C" uint64_t swift_float64ToString(char *Buffer, size_t BufferLength,
-                                          double Value) {
+                                          double Value, bool Debug) {
   return swift_floatingPointToString<double>(Buffer, BufferLength, Value,
-                                             "%0.*g");
+                                             "%0.*g", Debug);
 }
 
 extern "C" uint64_t swift_float80ToString(char *Buffer, size_t BufferLength,
-                                          long double Value) {
+                                          long double Value, bool Debug) {
   return swift_floatingPointToString<long double>(Buffer, BufferLength, Value,
-                                                  "%0.*Lg");
+                                                  "%0.*Lg", Debug);
 }
 
 /// \param[out] LinePtr Replaced with the pointer to the malloc()-allocated

@@ -4,6 +4,10 @@
 // RUN: FileCheck %s < %t.swiftdeps
 // RUN: FileCheck -check-prefix=NEGATIVE %s < %t.swiftdeps
 
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -primary-file %t/main.swift -emit-reference-dependencies-path - -enable-swift-name-lookup-tables > %t.swiftdeps
+// RUN: FileCheck %s < %t.swiftdeps
+// RUN: FileCheck -check-prefix=NEGATIVE %s < %t.swiftdeps
+
 // REQUIRES: objc_interop
 
 import Foundation
@@ -53,7 +57,8 @@ func testDynamicLookup(obj: AnyObject) {
   _ = obj.method(5, withDouble: 5.0)
   
   // CHECK-DAG: - !private "subscript"
-  _ = obj[2]
+  _ = obj[2] as AnyObject
+  _ = obj[2] as AnyObject!
 }
 
 // CHECK-DAG: - "counter"

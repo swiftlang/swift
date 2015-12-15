@@ -2871,9 +2871,6 @@ public:
     return GenericSig;
   }
 
-  /// Mark generic type signature as invalid.
-  void markInvalidGenericSignature();
-
   /// getDeclaredType - Retrieve the type declared by this entity.
   Type getDeclaredType() const { return DeclaredTy; }
 
@@ -4371,6 +4368,7 @@ protected:
   };
 
   GenericParamList *GenericParams;
+  GenericSignature *GenericSig;
 
   CaptureInfo Captures;
 
@@ -4379,7 +4377,7 @@ protected:
                        GenericParamList *GenericParams)
       : ValueDecl(Kind, Parent, Name, NameLoc),
         DeclContext(DeclContextKind::AbstractFunctionDecl, Parent),
-        Body(nullptr), GenericParams(nullptr) {
+        Body(nullptr), GenericParams(nullptr), GenericSig(nullptr) {
     setBodyKind(BodyKind::None);
     setGenericParams(GenericParams);
     AbstractFunctionDeclBits.NumParamPatterns = NumParamPatterns;
@@ -4396,6 +4394,17 @@ protected:
   }
 
   void setGenericParams(GenericParamList *GenericParams);
+  
+public:
+  void setGenericSignature(GenericSignature *GenericSig) {
+    assert(!this->GenericSig && "already have signature?");
+    this->GenericSig = GenericSig;
+  }
+  
+  GenericSignature *getGenericSignature() const {
+    return GenericSig;
+  }
+
 public:
   // FIXME: Hack that provides names with keyword arguments for accessors.
   DeclName getEffectiveFullName() const;
