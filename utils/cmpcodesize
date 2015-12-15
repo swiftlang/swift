@@ -39,6 +39,13 @@ Infixes = {
   "q_" : "Generic Function"
 }
 
+SHORTCUTS = {
+    "O": "bin/PerfTests_O",
+    "Ounchecked": "bin/PerfTests_Ounchecked",
+    "Onone": "bin/PerfTests_Onone",
+    "dylib": "lib/swift/macosx/x86_64/libswiftCore.dylib",
+}
+
 GenericFunctionPrefix = "__TTSg"
 
 SortedPrefixes = sorted(Prefixes)
@@ -371,19 +378,14 @@ How to specify files:
                 '$SWIFT_NEW_BUILDDIR environment variables set.\n' + \
                 '$SWIFT_OLD_BUILDDIR = {0}\n$SWIFT_NEW_BUILDDIR = {1}'.format(
                     oldBuildDir, newBuildDir)
-            oldFileArgs = [ "O", "Ounchecked", "Onone", "dylib" ]
+            oldFileArgs = SHORTCUTS.keys()
+
         oldFiles = []
         newFiles = []
         numExpanded = 0
         for file in oldFileArgs:
-            shortcuts = {
-                "O"          : "bin/PerfTests_O",
-                "Ounchecked" : "bin/PerfTests_Ounchecked",
-                "Onone"      : "bin/PerfTests_Onone",
-                "dylib"      : "lib/swift/macosx/x86_64/libswiftCore.dylib"
-            }
-            if file in shortcuts:
-                file = shortcuts[file]
+            if file in SHORTCUTS:
+                file = SHORTCUTS[file]
 
             if not file.startswith("./") and oldBuildDir and newBuildDir:
                 oldExpanded = glob.glob(oldBuildDir + "/" + file)
