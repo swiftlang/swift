@@ -513,7 +513,7 @@ void swift::swift_unknownRelease(void *object) {
   return objc_release(static_cast<id>(object));
 }
 
-/// Return true iff the given BridgeObject is not known to use native
+/// Return true if the given BridgeObject is not known to use native
 /// reference-counting.
 ///
 /// Requires: object does not encode a tagged pointer
