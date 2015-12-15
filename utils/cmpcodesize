@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import argparse
 import re
 import sys
 import os
@@ -8,57 +9,6 @@ import glob
 import subprocess
 import collections
 from operator import itemgetter
-
-def help():
-  print """\
-cmpcodesize [options] <old-files> [--] <new-files>
-
-Compares code sizes of "new" files, taking "old" files as a reference.
-
-Options:
-    -a           Show sizes of additional sections
-    -c           Show functions by category
-    -l           List all functions (can be a very long list)
-    -s           Summarize the sizes of multiple files instead of listing each file separately
-
-Environment variables:
-    SWIFT_NEW_BUILDDIR   The old build-dir
-E.g. $HOME/swift-work/build/Ninja-ReleaseAssert+stdlib-Release/swift-macosx-x86_64
-    SWIFT_OLD_BUILDDIR   The new build-dir
-E.g. $HOME/swift-reference/build/Ninja-ReleaseAssert+stdlib-Release/swift-macosx-x86_64
-
-How to specify files:
-1) No files:
-    Compares codesize of the PerfTests_* executables and the swiftCore dylib in the new and old build-dirs.
-    Example:
-        cmpcodesize
-
-2) One or more paths relative to the build-dirs (can be a pattern):
-    Compares the files in the new and old build-dirs.
-    Aliases:
-        O          => bin/PerfTests_O
-        Ounchecked => bin/PerfTests_Ounchecked
-        Onone      => bin/PerfTests_Onone
-        dylib      => lib/swift/macosx/x86_64/libswiftCore.dylib
-    Examples:
-        cmpcodesize Onone
-        cmpcodesize benchmark/PerfTestSuite/O/*.o
-
-3) Two files:
-    Compares these two files (the first is the old file).
-    Example:
-        cmpcodesize test.o newversion.o
-
-4) Two lists of files, separated by '--':
-    Compares a set a files.
-    Example:
-        cmpcodesize olddir/*.o -- newdir/*.o
-
-5) One file (only available with the -l option):
-    Lists function sizes for that file
-    Example:
-        cmpcodesize -l test.o
-"""
 
 Prefixes = {
     # Cpp
@@ -308,34 +258,99 @@ def compareFunctionSizes(oldFiles, newFiles):
         print "Total size change of functions present in both files: {}".format(sizeIncrease - sizeDecrease)
 
 def main():
-    allSections = False
-    listCategories = False
-    listFunctions = False
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="""
+Compares code sizes of "new" files, taking "old" files as a reference.
+
+Environment variables:
+    SWIFT_NEW_BUILDDIR   The old build-dir
+E.g. $HOME/swift-work/build/Ninja-ReleaseAssert+stdlib-Release/swift-macosx-x86_64
+    SWIFT_OLD_BUILDDIR   The new build-dir
+E.g. $HOME/swift-reference/build/Ninja-ReleaseAssert+stdlib-Release/swift-macosx-x86_64
+
+How to specify files:
+1) No files:
+    Compares codesize of the PerfTests_* executables and the swiftCore dylib in the new and old build-dirs.
+    Example:
+        cmpcodesize
+
+2) One or more paths relative to the build-dirs (can be a pattern):
+    Compares the files in the new and old build-dirs.
+    Aliases:
+        O          => bin/PerfTests_O
+        Ounchecked => bin/PerfTests_Ounchecked
+        Onone      => bin/PerfTests_Onone
+        dylib      => lib/swift/macosx/x86_64/libswiftCore.dylib
+    Examples:
+        cmpcodesize Onone
+        cmpcodesize benchmark/PerfTestSuite/O/*.o
+
+3) Two files:
+    Compares these two files (the first is the old file).
+    Example:
+        cmpcodesize test.o newversion.o
+
+4) Two lists of files, separated by '--':
+    Compares a set a files.
+    Example:
+        cmpcodesize olddir/*.o -- newdir/*.o
+
+5) One file (only available with the -l option):
+    Lists function sizes for that file
+    Example:
+        cmpcodesize -l test.o""")
+
+    # Optional arguments.
+    parser.add_argument('-a', '--additional-sections',
+                        help='Show sizes of additional sections.',
+                        action='store_true',
+                        dest='all_sections',
+                        default=False)
+    parser.add_argument('-c', '--category',
+                        help='Show functions by category.',
+                        action='store_true',
+                        dest='list_categories',
+                        default=False)
+    parser.add_argument('-l', '--list',
+                        help='List all functions (can be a very long list).',
+                        action='store_true',
+                        dest='list_functions',
+                        default=False)
+    parser.add_argument('-s', '--summarize',
+                        help='Summarize the sizes of multiple files instead ' +
+                             'of listing each file separately.',
+                        action='store_true',
+                        dest='sum_sizes',
+                        default=False)
+
+    # Positional arguments.
+    # These can be specififed in means beyond what argparse supports,
+    # so we gather them in a list and parse them manually.
+    parser.add_argument('files', nargs='*',
+                        help='A list of old and new files.')
+
+    # argparse can't handle an '--' argument, so we replace it with
+    # a custom identifier.
+    separator_token = '*-*-*'
+    parsed_arguments = parser.parse_args(
+        [separator_token if arg == '--' else arg for arg in sys.argv[1:]])
+
+    allSections = parsed_arguments.all_sections
+    listCategories = parsed_arguments.list_categories
+    listFunctions = parsed_arguments.list_functions
+    sumSizes = parsed_arguments.sum_sizes
+
     separatorFound = False
-    sumSizes = False
     oldFileArgs = []
     newFileArgs = []
     curFiles = oldFileArgs
-    for arg in sys.argv[1:]:
-        if arg == "-a":
-            allSections = True
-        elif arg == "-c":
-            listCategories = True
-        elif arg == "-s":
-            sumSizes = True
-        elif arg == "-l":
-            listFunctions = True
-        elif arg == "--":
+    for arg in parsed_arguments.files:
+        if arg == separator_token:
             curFiles = newFileArgs
             separatorFound = True
-        elif arg == "-h":
-            help()
-            return
-        elif arg.startswith("-"):
-            sys.exit("Unknown option. Use -h to display usage.")
         else:
             curFiles.append(arg)
-    
 
     oldBuildDir = os.environ.get("SWIFT_OLD_BUILDDIR")
     newBuildDir = os.environ.get("SWIFT_NEW_BUILDDIR")
