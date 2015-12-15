@@ -192,7 +192,7 @@ def listFunctionSizes(sizeArray):
     for pair in sorted(sizeArray, key=itemgetter(1)):
         name = pair[0]
         size = pair[1]
-        print "%8d %s" % (size, name)
+        return "%8d %s" % (size, name)
 
 
 def compareFunctionSizes(oldFiles, newFiles):
@@ -227,13 +227,13 @@ def compareFunctionSizes(oldFiles, newFiles):
 
     if onlyInFile1:
         print "Only in old file(s)"
-        listFunctionSizes(onlyInFile1)
+        print listFunctionSizes(onlyInFile1)
         print "Total size of functions only in old file: {}".format(onlyInFile1Size)
         print
 
     if onlyInFile2:
         print "Only in new files(s)"
-        listFunctionSizes(onlyInFile2)
+        print listFunctionSizes(onlyInFile2)
         print "Total size of functions only in new file: {}".format(onlyInFile2Size) 
         print
 

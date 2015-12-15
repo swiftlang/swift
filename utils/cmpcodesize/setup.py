@@ -20,6 +20,8 @@ setuptools.setup(
     description="A tool to compare the size of Swift compiler build products.",
     keywords='compare size swift',
 
+    test_suite='tests',
+
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Environment :: Console',
