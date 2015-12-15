@@ -354,20 +354,23 @@ How to specify files:
             'Incorrect usage: Must specify between one and two files when ' + \
             'using --list, but you specified no files.'
 
-    oldBuildDir = os.environ.get("SWIFT_OLD_BUILDDIR")
-    newBuildDir = os.environ.get("SWIFT_NEW_BUILDDIR")
-
     if separator_token in parsed_arguments.files:
         separator_index = parsed_arguments.files.index(separator_token)
         oldFiles = parsed_arguments.files[:separator_index]
         newFiles = parsed_arguments.files[separator_index + 1:]
     else:
         oldFileArgs = parsed_arguments.files
+
+        oldBuildDir = os.environ.get("SWIFT_OLD_BUILDDIR")
+        newBuildDir = os.environ.get("SWIFT_NEW_BUILDDIR")
+
         if not parsed_arguments.files:
-            if not oldBuildDir:
-                sys.exit("$SWIFT_OLD_BUILDDIR not specified")
-            if not newBuildDir:
-                sys.exit("$SWIFT_NEW_BUILDDIR not specified")
+            assert oldBuildDir and newBuildDir, \
+                'Incorrect usage: You must specify either a list of ' + \
+                'files, or have both $SWIFT_OLD_BUILDDIR and ' + \
+                '$SWIFT_NEW_BUILDDIR environment variables set.\n' + \
+                '$SWIFT_OLD_BUILDDIR = {0}\n$SWIFT_NEW_BUILDDIR = {1}'.format(
+                    oldBuildDir, newBuildDir)
             oldFileArgs = [ "O", "Ounchecked", "Onone", "dylib" ]
         oldFiles = []
         newFiles = []
