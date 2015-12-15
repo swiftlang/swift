@@ -341,7 +341,7 @@ if let strArr = obj as? [NSString] {
 
 // CHECK-NEXT: Object-to-bridged-array cast failed due to bridge mismatch
 if let strArr = obj as? [Int] {
-  print("Object-to-bridged-array cast should not have succedded")
+  print("Object-to-bridged-array cast should not have succeeded")
 } else {
   print("Object-to-bridged-array cast failed due to bridge mismatch")
 }
@@ -376,7 +376,7 @@ if let strArr = objOpt as? [NSString] {
 
 // CHECK: Object-to-bridged-array cast failed due to bridge mismatch
 if let intArr = objOpt as? [Int] {
-  print("Object-to-bridged-array cast should not have succedded")
+  print("Object-to-bridged-array cast should not have succeeded")
 } else {
   print("Object-to-bridged-array cast failed due to bridge mismatch")
 }
@@ -412,7 +412,7 @@ if let strArr = objImplicitOpt as? [NSString] {
 
 // CHECK: Object-to-bridged-array cast failed due to bridge mismatch
 if let intArr = objImplicitOpt as? [Int] {
-  print("Object-to-bridged-array cast should not have succedded")
+  print("Object-to-bridged-array cast should not have succeeded")
 } else {
   print("Object-to-bridged-array cast failed due to bridge mismatch")
 }

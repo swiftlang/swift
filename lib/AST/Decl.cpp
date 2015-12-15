@@ -2285,7 +2285,7 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
   }
 
   // All of the direct superclass's designated initializers have been overridden
-  // by the sublcass. Initializers can be inherited.
+  // by the subclass. Initializers can be inherited.
   ClassDeclBits.InheritsSuperclassInits
     = static_cast<unsigned>(StoredInheritsSuperclassInits::Inherited);
   return true;

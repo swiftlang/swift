@@ -1466,7 +1466,7 @@ emitNominalTypeDispatch(ArrayRef<RowToSpecialize> rows,
     CanType baseFormalType = aggMV.getType().getSwiftRValueType();
     auto val = SGF.emitRValueForPropertyLoad(loc, aggMV, baseFormalType, false,
                                              property,
-                                             // FIXME: No generic substitions.
+                                             // FIXME: No generic substitutions.
                                              {}, AccessSemantics::Ordinary,
                                              firstMatcher->getType(),
                                              // TODO: Avoid copies on

@@ -1288,7 +1288,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
     for (auto &Op : AI->getArgumentOperands()) {
       Arguments.push_back(Op.get());
     }
-    // The type of the substition is the source type of the thin to thick
+    // The type of the substitution is the source type of the thin to thick
     // instruction.
     SILType substTy = TTTFI->getOperand().getType();
     auto *NewAI = Builder.createApply(AI->getLoc(), TTTFI->getOperand(),
