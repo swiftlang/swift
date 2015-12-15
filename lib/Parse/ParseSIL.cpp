@@ -337,7 +337,7 @@ bool SILParser::parseVerbatim(StringRef name) {
 bool SILParser::diagnoseProblems() {
   // Check for any uses of basic blocks that were not defined.
   if (!UndefinedBlocks.empty()) {
-    // FIXME: These are going to come out in nondeterminstic order.
+    // FIXME: These are going to come out in nondeterministic order.
     for (auto Entry : UndefinedBlocks)
       P.diagnose(Entry.second.first, diag::sil_undefined_basicblock_use,
                  Entry.second.second);
@@ -346,7 +346,7 @@ bool SILParser::diagnoseProblems() {
   }
   
   if (!ForwardRefLocalValues.empty()) {
-    // FIXME: These are going to come out in nondeterminstic order.
+    // FIXME: These are going to come out in nondeterministic order.
     for (auto &Entry : ForwardRefLocalValues)
       P.diagnose(Entry.second, diag::sil_use_of_undefined_value,
                  Entry.first());
