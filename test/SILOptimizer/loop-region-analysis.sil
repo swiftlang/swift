@@ -1724,7 +1724,7 @@ bb4:
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
-// CHECK-NEXT:         (parentindex:1)))
+// CHECK-NEXT:         (parentindex:0)))
 // CHECK: (region id:9 kind:loop ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1))
@@ -1734,7 +1734,7 @@ bb4:
 // CHECK-NEXT:         (region id:2)
 // CHECK-NEXT:         (region id:3))
 // CHECK-NEXT:     (non-local-succs
-// CHECK-NEXT:         (parentindex:0)))
+// CHECK-NEXT:         (parentindex:1)))
 // CHECK: (region id:3 kind:bb   ucfh:false ucft:false parent:9
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:2))
@@ -1823,7 +1823,7 @@ bb6:
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
-// CHECK-NEXT:         (parentindex:1)))
+// CHECK-NEXT:         (parentindex:0)))
 // CHECK: (region id:9 kind:loop ucfh:false ucft:false parent:8
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1))
@@ -1833,7 +1833,7 @@ bb6:
 // CHECK-NEXT:         (region id:2)
 // CHECK-NEXT:         (region id:3))
 // CHECK-NEXT:     (non-local-succs
-// CHECK-NEXT:         (parentindex:0)))
+// CHECK-NEXT:         (parentindex:1)))
 // CHECK: (region id:3 kind:bb   ucfh:false ucft:false parent:9
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:2))
@@ -2026,7 +2026,7 @@ bb4:
 // CHECK-NEXT:     (succs)
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs
-// CHECK-NEXT:         (parentindex:2)))
+// CHECK-NEXT:         (parentindex:1)))
 // CHECK: (region id:12 kind:loop ucfh:false ucft:false parent:11
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:1))
@@ -2036,7 +2036,7 @@ bb4:
 // CHECK-NEXT:         (region id:2)
 // CHECK-NEXT:         (region id:3))
 // CHECK-NEXT:     (non-local-succs
-// CHECK-NEXT:         (parentindex:1)))
+// CHECK-NEXT:         (parentindex:2)))
 // CHECK: (region id:3 kind:bb   ucfh:false ucft:false parent:12
 // CHECK-NEXT:     (preds
 // CHECK-NEXT:         (region id:2))

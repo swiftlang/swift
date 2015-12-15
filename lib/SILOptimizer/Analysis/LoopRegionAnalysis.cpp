@@ -526,7 +526,13 @@ getExitingRegions(LoopRegionFunctionInfo *LRFI,
   // We can have a loop subregion that has multiple exiting edges from the
   // current loop. We do not want to visit that loop subregion multiple
   // times. So we unique the exiting region list.
-  sortUnique(ExitingRegions);
+  //
+  // In order to make sure we have a deterministic ordering when we visiting
+  // exiting subregions, we need to sort our exiting regions by ID, not pointer
+  // value.
+  sortUnique(ExitingRegions, [](LoopRegion *R1, LoopRegion *R2) -> bool {
+    return R1->getID() < R2->getID();
+  });
 }
 
 /// For each exiting block:
