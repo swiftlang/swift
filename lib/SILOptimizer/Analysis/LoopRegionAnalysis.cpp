@@ -285,13 +285,13 @@ LoopRegionFunctionInfo::createRegion(BlockTy *BB, unsigned RPONum) {
 
 void LoopRegionFunctionInfo::initializeBlockRegionSuccessors(
     BlockTy *BB, RegionTy *BBRegion, PostOrderFunctionInfo *PI) {
-  for (auto &SuccIter : BB->getSuccessors()) {
-    unsigned SuccRPOIndex = *PI->getRPONumber(SuccIter.getBB());
-    auto *SuccRegion = createRegion(SuccIter.getBB(), SuccRPOIndex);
+  for (auto *SuccBB : BB->getSuccessorBlocks()) {
+    unsigned SuccRPOIndex = *PI->getRPONumber(SuccBB);
+    auto *SuccRegion = createRegion(SuccBB, SuccRPOIndex);
     BBRegion->addSucc(SuccRegion);
     SuccRegion->addPred(BBRegion);
     DEBUG(llvm::dbgs() << "    Succ: ";
-          SuccIter.getBB()->printAsOperand(llvm::dbgs());
+          SuccBB->printAsOperand(llvm::dbgs());
           llvm::dbgs() << " RPONum: " << SuccRPOIndex << "\n");
   }
 }

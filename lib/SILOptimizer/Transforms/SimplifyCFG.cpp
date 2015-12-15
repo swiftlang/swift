@@ -1931,8 +1931,7 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
 // and the destination blocks may have no arguments.
 bool SimplifyCFG::simplifyTermWithIdenticalDestBlocks(SILBasicBlock *BB) {
   SILBasicBlock *commonDest = nullptr;
-  for (const SILSuccessor &Succ : BB->getSuccessors()) {
-    SILBasicBlock *SuccBlock = Succ.getBB();
+  for (auto *SuccBlock : BB->getSuccessorBlocks()) {
     if (SuccBlock->getNumBBArg() != 0)
       return false;
     SILBasicBlock *DestBlock = getTrampolineDest(SuccBlock);

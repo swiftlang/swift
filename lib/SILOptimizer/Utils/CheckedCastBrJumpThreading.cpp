@@ -706,8 +706,8 @@ bool CheckedCastBrJumpThreading::trySimplify(TermInst *Term) {
       addBlockToSimplifyCFGWorklist(B);
     }
 
-    for (auto &B : BB->getSuccessors()) {
-      addBlockToSimplifyCFGWorklist(B.getBB());
+    for (auto *B : BB->getSuccessorBlocks()) {
+      addBlockToSimplifyCFGWorklist(B);
     }
 
     // Create a copy of the BB as a landing BB

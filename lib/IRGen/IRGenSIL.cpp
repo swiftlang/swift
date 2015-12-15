@@ -1335,8 +1335,7 @@ void IRGenSILFunction::emitSILFunction() {
     //
     // Therefore the invariant holds of all the successors, and we can
     // queue them up if we haven't already visited them.
-    for (auto &succ : bb->getSuccessors()) {
-      auto succBB = succ.getBB();
+    for (auto *succBB : bb->getSuccessorBlocks()) {
       if (visitedBlocks.insert(succBB).second)
         workQueue.push_back(succBB);
     }
