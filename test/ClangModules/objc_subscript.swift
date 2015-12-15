@@ -6,6 +6,7 @@
 // FIXME: END -enable-source-import hackaround
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-sil -I %S/Inputs/custom-modules %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-sil -enable-swift-name-lookup-tables -I %S/Inputs/custom-modules %s -verify
 
 // REQUIRES: objc_interop
 

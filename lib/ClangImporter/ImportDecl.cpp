@@ -5927,6 +5927,21 @@ ClangImporter::Implementation::getSpecialTypedefKind(clang::TypedefNameDecl *dec
   return iter->second;
 }
 
+SubscriptDecl *ClangImporter::Implementation::importSubscriptOf(Decl *decl) {
+  SwiftDeclConverter converter(*this);
+  if (auto special = converter.importSpecialMethod(decl, decl->getDeclContext()))
+    return dyn_cast<SubscriptDecl>(special);
+  return nullptr;
+}
+
+Decl *ClangImporter::Implementation::importClassMethodVersionOf(
+        FuncDecl *method) {
+  SwiftDeclConverter converter(*this);
+  auto objcMethod = cast<clang::ObjCMethodDecl>(method->getClangDecl());
+  return converter.VisitObjCMethodDecl(objcMethod, method->getDeclContext(),
+                                       true);
+}
+
 Identifier
 ClangImporter::getEnumConstantName(const clang::EnumConstantDecl *enumConstant){
   return Impl.importFullName(enumConstant).Imported.getBaseName();

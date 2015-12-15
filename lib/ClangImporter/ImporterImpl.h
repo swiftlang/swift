@@ -918,6 +918,14 @@ public:
                                   /*SuperfluousTypedefsAreTransparent=*/false);
   }
 
+  /// Import the subscript declaration corresponding to the given
+  /// declaration, if there is one.
+  SubscriptDecl *importSubscriptOf(Decl *decl);
+
+  /// Import the class-method version of the given Objective-C
+  /// instance method of a root class.
+  Decl *importClassMethodVersionOf(FuncDecl *method);
+
   /// \brief Import a cloned version of the given declaration, which is part of
   /// an Objective-C protocol and currently must be a method or property, into
   /// the given declaration context.
@@ -1282,6 +1290,16 @@ public:
                         clang::ASTReader &reader,
                         clang::serialization::ModuleFile &mod,
                         const llvm::BitstreamCursor &stream) override;
+
+  /// Find the lookup table that corresponds to the given Clang module.
+  ///
+  /// \param clangModule The module, or null to indicate that we're talking
+  /// about the directly-parsed headers.
+  SwiftLookupTable *findLookupTable(const clang::Module *clangModule);
+
+  /// Look for Objective-C members in the given Swift lookup table.
+  void lookupObjCMembers(SwiftLookupTable &table, DeclName name,
+                         VisibleDeclConsumer &consumer);
 
   /// Dump the Swift-specific name lookup tables we generate.
   void dumpSwiftLookupTables();
