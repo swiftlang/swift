@@ -4295,13 +4295,29 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   // Find the metadata.
   llvm::Value *metadata;
   if (useSuperVTable) {
+    auto instanceTy = baseType;
     if (auto metaTy = dyn_cast<MetatypeType>(baseType.getSwiftRValueType()))
-      baseType = SILType::getPrimitiveObjectType(metaTy.getInstanceType());
+      instanceTy = SILType::getPrimitiveObjectType(metaTy.getInstanceType());
 
-    metadata = emitClassHeapMetadataRef(IGF, baseType.getSwiftRValueType(),
-                                        MetadataValueType::TypeMetadata);
-    auto superField = emitAddressOfSuperclassRefInClassMetadata(IGF, metadata);
-    metadata = IGF.Builder.CreateLoad(superField);
+    if (IGF.IGM.isResilient(instanceTy.getClassOrBoundGenericClass(),
+                            ResilienceScope::Component) ||
+        IGF.IGM.Opts.ForceResilientSuperDispatch) {
+      // The derived type that is making the super call is resilient,
+      // for example we may be in an extension of a class outside of our
+      // resilience domain. So, we need to load the superclass metadata
+      // dynamically.
+
+      metadata = emitClassHeapMetadataRef(IGF, instanceTy.getSwiftRValueType(),
+                                          MetadataValueType::TypeMetadata);
+      auto superField = emitAddressOfSuperclassRefInClassMetadata(IGF, metadata);
+      metadata = IGF.Builder.CreateLoad(superField);
+    } else {
+      // Otherwise, we can directly load the statically known superclass's
+      // metadata.
+      auto superTy = instanceTy.getSuperclass(/*resolver=*/nullptr);
+      metadata = emitClassHeapMetadataRef(IGF, superTy.getSwiftRValueType(),
+                                          MetadataValueType::TypeMetadata);
+    }
   } else {
     if ((isa<FuncDecl>(methodDecl) && cast<FuncDecl>(methodDecl)->isStatic()) ||
         (isa<ConstructorDecl>(methodDecl) &&
