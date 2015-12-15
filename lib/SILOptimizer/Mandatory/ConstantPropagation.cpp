@@ -1001,7 +1001,7 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
       if (ResultsInError.hasValue() && ResultsInError.getValue())
         ErrorSet.insert(User);
 
-      // We failed to constant propogate... continue...
+      // We failed to constant propagate... continue...
       if (!C)
         continue;
 

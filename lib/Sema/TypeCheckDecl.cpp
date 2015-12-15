@@ -3367,7 +3367,7 @@ public:
     TC.checkDeclAttributes(SD);
   }
 
-  /// Check whether the given propertes can be @NSManaged in this class.
+  /// Check whether the given properties can be @NSManaged in this class.
   static bool propertiesCanBeNSManaged(ClassDecl *classDecl,
                                        ArrayRef<VarDecl *> vars) {
     // Check whether we have an Objective-C-defined class in our
