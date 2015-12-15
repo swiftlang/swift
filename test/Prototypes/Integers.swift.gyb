@@ -290,6 +290,12 @@ public func > <T : IntegerType, U : IntegerType>(lhs: T, rhs: U) -> Bool {
 //
 //     <T : IntegerType>(T,T) -> Bool
 
+@_transparent
+@warn_unused_result
+public func != <T : IntegerType>(lhs:T, rhs: T) -> Bool {
+  return !(lhs == rhs)
+}
+
 @inline(__always)
 @warn_unused_result
 public func <= <T : IntegerType>(lhs: T, rhs: T) -> Bool {
