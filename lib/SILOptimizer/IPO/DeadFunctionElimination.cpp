@@ -197,7 +197,7 @@ protected:
     }
   }
 
-  /// Retrieve the visiblity information from the AST.
+  /// Retrieve the visibility information from the AST.
   bool isVisibleExternally(ValueDecl *decl) {
     Accessibility accessibility = decl->getEffectiveAccess();
     SILLinkage linkage;

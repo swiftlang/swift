@@ -4098,7 +4098,7 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
   };
 
   // Local function to extract the ith argument label, which papers over some
-  // of the weirdndess with tuples vs. parentheses.
+  // of the weirdness with tuples vs. parentheses.
   auto getArgLabel = [&](unsigned i) -> Identifier {
     if (argTuple)
       return argTuple->getElementName(i);
