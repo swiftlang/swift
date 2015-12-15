@@ -411,7 +411,7 @@ public:
   void processInstruction(SILInstruction *I, DSEComputeKind Kind);
 
   /// Entry point for global dead store elimination.
-  void run();
+  bool run();
 };
 
 } // end anonymous namespace
@@ -822,7 +822,7 @@ void DSEContext::processInstruction(SILInstruction *I, DSEComputeKind Kind) {
   invalidateLSLocationBase(I, Kind);
 }
 
-void DSEContext::run() {
+bool DSEContext::run() {
   // Walk over the function and find all the locations accessed by
   // this function.
   LSLocation::enumerateLSLocations(*F, LSLocationVault, LocToBitIndex, TE);
@@ -874,6 +874,7 @@ void DSEContext::run() {
   }
 
   // Finally, delete the dead stores and create the live stores.
+  bool Changed = false;
   for (SILBasicBlock &BB : *F) {
     // Create the stores that are alive due to partial dead stores.
     for (auto &I : getBlockState(&BB)->LiveStores) {
@@ -883,11 +884,13 @@ void DSEContext::run() {
     }
     // Delete the dead stores.
     for (auto &I : getBlockState(&BB)->DeadStores) {
+      Changed = true;
       DEBUG(llvm::dbgs() << "*** Removing: " << *I << " ***\n");
       // This way, we get rid of pass dependence on DCE.
       recursivelyDeleteTriviallyDeadInstructions(I, true);
     }
   }
+  return Changed;
 }
 
 //===----------------------------------------------------------------------===//
@@ -908,7 +911,9 @@ public:
     DEBUG(llvm::dbgs() << "*** DSE on function: " << F->getName() << " ***\n");
 
     DSEContext DSE(F, &F->getModule(), PM, AA, TE);
-    DSE.run();
+    if (DSE.run()) {
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    }
   }
 };
 
