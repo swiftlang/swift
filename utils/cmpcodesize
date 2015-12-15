@@ -315,7 +315,9 @@ How to specify files:
     parser.add_argument('-l', '--list',
                         help='List all functions (can be a very long list). ' +
                              'Cannot be used in conjunction with ' +
-                             '--additional-sections or --category.',
+                             '--additional-sections or --category. ' +
+                             'You must specify between one and two files ' +
+                             'when using this option.',
                         action='store_true',
                         dest='list_functions',
                         default=False)
@@ -338,15 +340,19 @@ How to specify files:
     parsed_arguments = parser.parse_args(
         [separator_token if arg == '--' else arg for arg in sys.argv[1:]])
 
-    # --list is mutually exclusive with both --additional-sections
-    # and --category. argparse is only capable of expressing mutual
-    # exclusivity among options, not among groups of options, so
-    # we detect this case manually.
     if parsed_arguments.list_functions:
+        # --list is mutually exclusive with both --additional-sections
+        # and --category. argparse is only capable of expressing mutual
+        # exclusivity among options, not among groups of options, so
+        # we detect this case manually.
         assert (not parsed_arguments.all_sections and
                 not parsed_arguments.list_categories), \
             'Incorrect usage: --list cannot be specified in conjunction ' + \
             'with --additional-sections or --category.'
+        # A file must be specified when using --list.
+        assert parsed_arguments.files, \
+            'Incorrect usage: Must specify between one and two files when ' + \
+            'using --list, but you specified no files.'
 
     oldBuildDir = os.environ.get("SWIFT_OLD_BUILDDIR")
     newBuildDir = os.environ.get("SWIFT_NEW_BUILDDIR")
@@ -358,8 +364,6 @@ How to specify files:
     else:
         oldFileArgs = parsed_arguments.files
         if not parsed_arguments.files:
-            if parsed_arguments.list_functions:
-                sys.exit("Must specify file for the -l option")
             if not oldBuildDir:
                 sys.exit("$SWIFT_OLD_BUILDDIR not specified")
             if not newBuildDir:
