@@ -6,7 +6,7 @@ func singleBlock() -> Int {
 
 func singleBlock2() -> Int {
   var y = 0 
-  y++
+  y += 1
 } // expected-error {{missing return in a function expected to return 'Int'}}
 
 class MyClassWithClosure {
@@ -18,7 +18,7 @@ func multipleBlocksSingleMissing(b: Bool) -> (String, Int) {
   if b {
     return ("a", 1)
   } else if (y == 0) {
-    y++
+    y += 1
   }
 } // expected-error {{missing return in a function expected to return '(String, Int)'}}
 
@@ -29,7 +29,7 @@ func multipleBlocksAllMissing(x: Int) -> Int {
     break;
   }
   var x = 0
-  x++
+  x += 1
 } // expected-error {{missing return in a function expected to return 'Int'}}
 
 @noreturn func MYsubscriptNonASCII(idx: Int) -> UnicodeScalar {

@@ -17,10 +17,10 @@ import MirrorObjC
 var nsObjectCanaryCount = 0
 @objc class NSObjectCanary : NSObject {
   override init() {
-    ++nsObjectCanaryCount
+    nsObjectCanaryCount += 1
   }
   deinit {
-    --nsObjectCanaryCount
+    nsObjectCanaryCount -= 1
   }
 }
 
@@ -31,10 +31,10 @@ struct NSObjectCanaryStruct {
 var swiftObjectCanaryCount = 0
 class SwiftObjectCanary {
   init() {
-    ++swiftObjectCanaryCount
+    swiftObjectCanaryCount += 1
   }
   deinit {
-    --swiftObjectCanaryCount
+    swiftObjectCanaryCount -= 1
   }
 }
 
@@ -909,14 +909,14 @@ RuntimeFoundationWrappers.test("_stdlib_NSObject_isEqual/NoLeak") {
 var nsStringCanaryCount = 0
 @objc class NSStringCanary : NSString {
   override init() {
-    ++nsStringCanaryCount
+    nsStringCanaryCount += 1
     super.init()
   }
   required init(coder: NSCoder) {
     fatalError("don't call this initializer")
   }
   deinit {
-    --nsStringCanaryCount
+    nsStringCanaryCount -= 1
   }
   @objc override var length: Int {
     return 0
@@ -2266,7 +2266,7 @@ func computeCountLeadingZeroes(x: Int64) -> Int64 {
   var r: Int64 = 64
   while x != 0 {
     x >>= 1
-    r--
+    r -= 1
   }
   return r
 }

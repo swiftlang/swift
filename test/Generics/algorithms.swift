@@ -41,7 +41,7 @@ func count<R : GeneratorType where R.Element : Eq>
   var result = 0
   for x in GeneratorSequence(range) {
     if x == value {
-      ++result
+      result += 1
     }
   }
   return result
@@ -53,7 +53,7 @@ func countIf<
   var result = 0
   for x in GeneratorSequence(range) {
     if predicate(x) {
-      ++result
+      result += 1
     }
   }
   return result

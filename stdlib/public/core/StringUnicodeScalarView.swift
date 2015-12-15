@@ -77,7 +77,7 @@ extension String {
         let codeUnit = _core[--i]
         if _slowPath((codeUnit >> 10) == 0b1101_11) {
           if i != 0 && (_core[i - 1] >> 10) == 0b1101_10 {
-            --i
+            i -= 1
           }
         }
         return Index(i, _core)

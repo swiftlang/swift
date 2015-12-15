@@ -200,7 +200,7 @@ struct DictionaryIndex<Element> : BidirectionalIndexType {
         break
       }
       // end workaround
-      ++i
+      i += 1
     }
     return Index(buffer: buffer, offset: i)
   }

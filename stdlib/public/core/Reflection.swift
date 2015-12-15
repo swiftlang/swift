@@ -175,7 +175,7 @@ func _dumpWithMirror<TargetStream : OutputStreamType>(
     inout _ targetStream: TargetStream
 ) {
   if maxItemCounter <= 0 { return }
-  --maxItemCounter
+  maxItemCounter -= 1
 
   for _ in 0..<indent { print(" ", terminator: "", toStream: &targetStream) }
 

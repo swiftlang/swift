@@ -54,7 +54,7 @@ func _countFormatSpecifiers(a: String) -> Int {
         lastChar = notPercentUTF16
       }
       else {
-        ++count
+        count += 1
         lastChar = c
       }
     } else {
@@ -141,7 +141,7 @@ extension String {
     var p = NSString.availableStringEncodings()
     while p.memory != 0 {
       result.append(p.memory)
-      ++p
+      p += 1
     }
     return result
   }

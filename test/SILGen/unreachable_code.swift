@@ -3,7 +3,7 @@
 func testUnreachableAfterReturn() -> Int {
   var x: Int = 3;
   return x;
-  x++ //expected-warning {{code after 'return' will never be executed}}
+  x += 1 //expected-warning {{code after 'return' will never be executed}}
 }
 
 func testUnreachableAfterIfReturn(a: Bool) -> Int {
@@ -46,13 +46,13 @@ func testBreakAndContinue() {
   var i = 0;
   var m = 0;
   for (i = 0; i < 10; ++i) {
-    m++
+    m += 1
     if m == 15 {
       break
     } else {
       continue
     }
-    m++ // expected-warning {{will never be executed}}
+    m += 1 // expected-warning {{will never be executed}}
   }
 }
 

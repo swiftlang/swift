@@ -772,10 +772,10 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
       switch (observation.data1, observation.data4) {
       case (1, 0):
         // Won race, value not destroyed.
-        ++wonRace
+        wonRace += 1
       case (0, 1):
         // Lost race, value destroyed.
-        ++lostRace
+        lostRace += 1
       default:
         sink(.FailureInteresting(String(observation)))
       }

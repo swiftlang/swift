@@ -102,7 +102,7 @@ func find<T : Eq>(array: [T], value: T) -> Int {
   var idx = 0
   for elt in array {
      if (elt == value) { return idx }
-     ++idx
+     idx += 1
   }
   return -1
 }
@@ -111,7 +111,7 @@ func findIf<T>(array: [T], fn: (T) -> Bool) -> Int {
   var idx = 0
   for elt in array {
      if (fn(elt)) { return idx }
-     ++idx
+     idx += 1
   }
   return -1
 }

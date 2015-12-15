@@ -663,7 +663,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   mutating func addWithExistingCapacity(element: Element) {
     _sanityCheck(remainingCapacity > 0,
       "_UnsafePartiallyInitializedContiguousArrayBuffer has no more capacity")
-    remainingCapacity--
+    remainingCapacity -= 1
 
     (p++).initialize(element)
   }

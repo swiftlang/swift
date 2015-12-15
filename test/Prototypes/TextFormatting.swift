@@ -217,19 +217,19 @@ func _writeSigned<T:XPrintableInteger, S: XOutputStream>(
 
   if value == 0 {
     result = "0"
-    ++width
+    width += 1
   }
   else {
     var absVal = abs(value)
     if (value < 0) {
       target.append("-")
-      ++width
+      width += 1
     }
     width += _writePositive(absVal, &result, args)
   }
 
   while width < args.width {
-    ++width
+    width += 1
     target.append(args.fill)
   }
   target.append(result)
