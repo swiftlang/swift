@@ -198,7 +198,14 @@ public struct ${Self} {
 extension ${Self} : CustomStringConvertible {
   /// A textual representation of `self`.
   public var description: String {
-    return _float${bits}ToString(self)
+    return _float${bits}ToString(self, debug: false)
+  }
+}
+
+extension ${Self} : CustomDebugStringConvertible {
+  /// A textual representation of `self`.
+  public var debugDescription: String {
+    return _float${bits}ToString(self, debug: true)
   }
 }
 

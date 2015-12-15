@@ -83,7 +83,7 @@ func debugPrintedIs<T>(
 ) {
   var actual = ""
   debugPrint(object, terminator: "", toStream: &actual)
-  if expected1 != actual && (expected2 != nil && expected2! != actual) {
+  if expected1 != actual && (expected2 == nil || expected2! != actual) {
     print(
       "check failed at \(file), line \(line)",
       "expected: \"\(expected1)\" or \"\(expected2)\"",
@@ -407,6 +407,23 @@ func test_FloatingPointPrinting() {
   printedIs(asFloat80(0.00000000000000125),   "1.25e-15")
   printedIs(asFloat80(0.000000000000000125),  "1.25e-16")
   printedIs(asFloat80(0.0000000000000000125), "1.25e-17")
+#endif
+
+  debugPrintedIs(asFloat32(1.1), "1.10000002")
+  debugPrintedIs(asFloat32(125000000000000000.0), "1.24999998e+17")
+  debugPrintedIs(asFloat32(1.25),  "1.25")
+  debugPrintedIs(asFloat32(0.0000125), "1.24999997e-05")
+
+  debugPrintedIs(asFloat64(1.1), "1.1000000000000001")
+  debugPrintedIs(asFloat64(125000000000000000.0), "1.25e+17")
+  debugPrintedIs(asFloat64(1.25),  "1.25")
+  debugPrintedIs(asFloat64(0.0000125), "1.2500000000000001e-05")
+
+#if arch(i386) || arch(x86_64)
+  debugPrintedIs(asFloat80(1.1), "1.10000000000000000002")
+  debugPrintedIs(asFloat80(125000000000000000.0), "125000000000000000.0")
+  debugPrintedIs(asFloat80(1.25),  "1.25")
+  debugPrintedIs(asFloat80(0.0000125), "1.25000000000000000001e-05")
 #endif
 
   print("test_FloatingPointPrinting done")

@@ -169,11 +169,11 @@ IntervalTestSuite.test("CustomStringConvertible/CustomDebugStringConvertible") {
   expectEqual("0.0...0.1", String(X(0.0)...X(0.1)))
   
   expectEqual(
-    "HalfOpenInterval(X(0.0)..<X(0.1))",
-    String(reflecting: HalfOpenInterval(X(0.0)..<X(0.1))))
+    "HalfOpenInterval(X(0.0)..<X(0.5))",
+    String(reflecting: HalfOpenInterval(X(0.0)..<X(0.5))))
   expectEqual(
-    "ClosedInterval(X(0.0)...X(0.1))",
-    String(reflecting: ClosedInterval(X(0.0)...X(0.1))))
+    "ClosedInterval(X(0.0)...X(0.5))",
+    String(reflecting: ClosedInterval(X(0.0)...X(0.5))))
 }
 
 IntervalTestSuite.test("rdar12016900") {
