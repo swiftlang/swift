@@ -554,18 +554,37 @@ getExitingRegions(LoopRegionFunctionInfo *LRFI,
 void
 LoopRegionFunctionInfo::
 rewriteLoopExitingBlockSuccessors(LoopTy *Loop, RegionTy *LRegion) {
+  // Begin by using loop info and loop region info to find all of the exiting
+  // regions.
+  //
+  // We do this by looking up the exiting blocks and finding the outermost
+  // region which the block is a subregion of. Since we initialize our data
+  // structure by processing the loop nest bottom up, this should always give us
+  // the correct region for the level of the loop we are processing.
   llvm::SmallVector<RegionTy *, 8> ExitingRegions;
   getExitingRegions(this, Loop, LRegion, ExitingRegions);
 
+  // Then for each exiting region ER of the Loop L...
   DEBUG(llvm::dbgs() << "    Visiting Exit Blocks...\n");
   for (auto *ExitingRegion : ExitingRegions) {
     DEBUG(llvm::dbgs() << "        Exiting Region: "
           << ExitingRegion->getID() << "\n");
+
+    // For each successor region S of ER...
     for (auto SuccID : ExitingRegion->getSuccs()) {
       DEBUG(llvm::dbgs() << "            Succ: " << SuccID.ID
                          << ". IsNonLocal: "
                          << (SuccID.IsNonLocal ? "true" : "false") << "\n");
 
+      // If S is not contained in L, then:
+      //
+      // 1. The successor/predecessor edge in between S and ER with a new
+      // successor/predecessor edge in between S and L.
+      // 2. ER is given a non-local successor edge that points at the successor
+      // index in L that points at S. This will enable us to recover the
+      // original edge if we need to.
+      //
+      // Then we continue.
       auto *SuccRegion = getRegion(SuccID.ID);
       if (!LRegion->containsSubregion(SuccRegion)) {
         DEBUG(llvm::dbgs() << "            Is not a subregion, replacing.\n");
@@ -581,13 +600,16 @@ rewriteLoopExitingBlockSuccessors(LoopTy *Loop, RegionTy *LRegion) {
         continue;
       }
 
-      // If the rpo number of the successor is less than the RPO number of the
-      // BB, then we know that it is not a backedge.
+      // Otherwise, we know S is in L. If the RPO number of S is less than the
+      // RPO number of ER, then we know that the edge in between them is not a
+      // backedge and thus we do not want to clip the edge.
       if (SuccRegion->getRPONumber() > ExitingRegion->getRPONumber()) {
         DEBUG(llvm::dbgs() << "            Is a subregion, but not a "
               "backedge, not removing.\n");
         continue;
       }
+
+      // If the edge from ER to S is a back edge, we want to clip it.
       DEBUG(llvm::dbgs() << "            Is a subregion and a backedge, "
             "removing.\n");
       auto Iter =
@@ -679,8 +701,8 @@ propagateLivenessDownNonLocalSuccessorEdges(LoopRegion *Parent) {
         if (!SuccID->IsNonLocal)
           continue;
 
-        // Finally if the non-local successor edge points to a parent successor
-        // that is not dead continue.
+        // If the non-local successor edge points to a parent successor that is
+        // not dead continue.
         if (R->Succs[SuccID->ID].hasValue())
           continue;
 
