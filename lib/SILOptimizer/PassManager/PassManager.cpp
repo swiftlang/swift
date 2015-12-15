@@ -330,45 +330,40 @@ void SILPassManager::runOneIteration() {
   NumOptimizationIterations++;
   SmallVector<SILFunctionTransform*, 16> PendingFuncTransforms;
 
-  // For each transformation:
-  for (SILTransform *ST : Transformations) {
-    // Bail out if we've hit the optimization pass limit.
-    if (Mod->getStage() == SILStage::Canonical
-        && NumPassesRun >= SILNumOptPassesToRun)
-      return;
+  auto KeepTransforming = [&]() {
+    return Mod->getStage() == SILStage::Raw ||
+           NumPassesRun < SILNumOptPassesToRun;
+  };
 
-    // Run module transformations on the module.
-    if (SILModuleTransform *SMT = llvm::dyn_cast<SILModuleTransform>(ST)) {
-      // Run all function passes that we've seen since the last module pass.
-      // Stop stop this optimization phase if one of the passes requested to
-      // stop.
-      bool NeedToStop = runFunctionPasses(PendingFuncTransforms);
-      if (NeedToStop)
-        return;
+  // Run the transforms by alternating between function transforms and
+  // module transforms. We'll queue up all the function transforms
+  // that we see in a row and then run the entire group of transforms
+  // on each function in turn. Then we move on to running the next set
+  // of consequtive module transforms.
+  auto It = Transformations.begin();
+  auto End = Transformations.end();
 
-      PendingFuncTransforms.clear();
+  while (It != End && KeepTransforming()) {
+    assert((isa<SILFunctionTransform>(*It) || isa<SILModuleTransform>(*It)) &&
+           "Unexpected pass kind!");
 
-      runModulePass(SMT);
+    while (It != End && isa<SILFunctionTransform>(*It) && KeepTransforming()) {
+      PendingFuncTransforms.push_back(cast<SILFunctionTransform>(*It));
 
+      ++It;
       ++NumPassesRun;
-      if (Mod->getStage() == SILStage::Canonical
-          && NumPassesRun >= SILNumOptPassesToRun) {
-        return;
-      }
-      
-      continue;
     }
 
-    // Run function transformation on all functions.
-    if (SILFunctionTransform *SFT = llvm::dyn_cast<SILFunctionTransform>(ST)) {
-      PendingFuncTransforms.push_back(SFT);      
-      continue;
-    }
+    runFunctionPasses(PendingFuncTransforms);
+    PendingFuncTransforms.clear();
 
-    llvm_unreachable("Unknown pass kind.");
+    while (It != End && isa<SILModuleTransform>(*It) && KeepTransforming()) {
+      runModulePass(cast<SILModuleTransform>(*It));
+
+      ++It;
+      ++NumPassesRun;
+    }
   }
-
-  runFunctionPasses(PendingFuncTransforms);
 }
 
 void SILPassManager::run() {
