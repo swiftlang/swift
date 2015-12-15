@@ -313,7 +313,9 @@ How to specify files:
                         dest='list_categories',
                         default=False)
     parser.add_argument('-l', '--list',
-                        help='List all functions (can be a very long list).',
+                        help='List all functions (can be a very long list). ' +
+                             'Cannot be used in conjunction with ' +
+                             '--additional-sections or --category.',
                         action='store_true',
                         dest='list_functions',
                         default=False)
@@ -340,6 +342,15 @@ How to specify files:
     listCategories = parsed_arguments.list_categories
     listFunctions = parsed_arguments.list_functions
     sumSizes = parsed_arguments.sum_sizes
+
+    # --list is mutually exclusive with both --additional-sections
+    # and --category. argparse is only capable of expressing mutual
+    # exclusivity among options, not among groups of options, so
+    # we detect this case manually.
+    if listFunctions:
+        assert not allSections and not listCategories, \
+            'Incorrect usage: --list cannot be specified in conjunction ' + \
+            'with --additional-sections or --category.'
 
     oldBuildDir = os.environ.get("SWIFT_OLD_BUILDDIR")
     newBuildDir = os.environ.get("SWIFT_NEW_BUILDDIR")
@@ -392,8 +403,6 @@ How to specify files:
             sys.exit("file " + file + " not found")
 
     if listFunctions:
-        if allSections or listCategories:
-            print >> sys.stderr, "Warning: options -a and -c ignored when using -l"
         if not newFiles:
             sizes = collections.defaultdict(int)
             for file in oldFiles:
