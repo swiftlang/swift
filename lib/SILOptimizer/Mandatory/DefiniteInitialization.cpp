@@ -2289,7 +2289,7 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
     return Result;
   }
 
-  // Check locally to see if any elements are satified within the block, and
+  // Check locally to see if any elements are satisfied within the block, and
   // keep track of which ones are still needed in the NeededElements set.
   llvm::SmallBitVector NeededElements(TheMemory.NumElements);
   NeededElements.set(FirstElt, FirstElt+NumElts);
