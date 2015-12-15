@@ -5,7 +5,7 @@ import Swift
 
 sil @simple_partial_apply_fun : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
 
-// CHECK-LABEL: sil @_TTSf1cl24simple_partial_apply_funBi1___simple_partial_apply_caller : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
+// CHECK-LABEL: sil shared @_TTSf1cl24simple_partial_apply_funBi1___simple_partial_apply_caller : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
 // CHECK: bb0([[CAPTURED_ARG:%.*]] : $Builtin.Int1):
 // CHECK: [[CLOSED_OVER_FUN:%.*]] = function_ref @simple_partial_apply_fun :
 // CHECK: [[NEW_PAI:%.*]] = partial_apply [[CLOSED_OVER_FUN]]
