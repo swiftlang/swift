@@ -78,7 +78,7 @@ public:
   ///
   /// Note, this set is different from the PossiblyUnreachableBlocks as these
   /// are the blocks that do contain user code and they might not be immediate
-  /// sucessors of a folded branch.
+  /// successors of a folded branch.
   llvm::SmallPtrSet<const SILBasicBlock*, 2> BlocksWithErrors;
 
   /// A map from the PossiblyUnreachableBlocks to the folded conditional
@@ -636,7 +636,7 @@ static bool diagnoseUnreachableBlock(const SILBasicBlock &B,
     return false;
 
   // If we have not found user code in this block, inspect it's successors.
-  // Check if at least one of the sucessors contains user code.
+  // Check if at least one of the successors contains user code.
   for (auto I = B.succ_begin(), E = B.succ_end(); I != E; ++I) {
     SILBasicBlock *SB = *I;
     bool HasReachablePred = false;

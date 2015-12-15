@@ -60,7 +60,7 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
     // Otherwise, we need to replace the assignment with the full
     // load/store/release dance.  Note that the new value is already
     // considered to be retained (by the semantics of the storage type),
-    // and we're transfering that ownership count into the destination.
+    // and we're transferring that ownership count into the destination.
 
     // This is basically TypeLowering::emitStoreOfCopy, except that if we have
     // a known incoming value, we can avoid the load.
