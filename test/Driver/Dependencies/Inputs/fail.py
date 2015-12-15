@@ -1,3 +1,4 @@
 #!/usr/bin/env python
 
-exit(1)
+import sys
+sys.exit(1)
