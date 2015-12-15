@@ -47,7 +47,7 @@ using WriteSet = SmallVector<SILInstruction *, 8>;
 /// alias with the memory addressed by \a LI.
 static bool mayWriteTo(AliasAnalysis *AA, WriteSet &MayWrites, LoadInst *LI) {
   for (auto *W : MayWrites)
-    if (AA->mayWriteToMemory(W, LI->getOperand().getDef())) {
+    if (AA->mayWriteToMemory(W, LI->getOperand())) {
       DEBUG(llvm::dbgs() << "  mayWriteTo\n" << *W << " to " << *LI << "\n");
       return true;
     }
