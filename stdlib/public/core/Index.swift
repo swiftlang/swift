@@ -215,7 +215,7 @@ extension ForwardIndexType {
         "Only BidirectionalIndexType can be advanced by a negative amount")
     var p = self
     var i: Distance = 0
-    do {
+    repeat {
       p._successorInPlace()
       i._successorInPlace()
     } while i != n
