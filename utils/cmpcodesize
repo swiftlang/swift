@@ -410,5 +410,5 @@ def main():
                 newFile = newFiles[idx]
                 compareSizesOfFile([oldFile], [newFile], allSections, listCategories)
 
-main()
-
+if __name__ == '__main__':
+    main()
