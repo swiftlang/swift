@@ -594,7 +594,7 @@ lets us describe an iteration of values of some given value type::
     func next() -> Element
   }
 
-Now, we want to express the notion of an enumerable collection, which provides a
+Now, we want to express the notion of an enumerable collection, which provides
 iteration, which we do by adding requirements into the protocol::
 
   protocol EnumerableCollection : Collection {

@@ -1063,7 +1063,7 @@ PERL_PATH              =
 #---------------------------------------------------------------------------
 
 # If the CLASS_DIAGRAMS tag is set to YES (the default) Doxygen will 
-# generate a inheritance diagram (in HTML, RTF and LaTeX) for classes with base 
+# generate an inheritance diagram (in HTML, RTF and LaTeX) for classes with base 
 # or super classes. Setting the tag to NO turns the diagrams off. Note that 
 # this option is superseded by the HAVE_DOT option below. This is only a 
 # fallback. It is recommended to install and use dot, since it yields more 

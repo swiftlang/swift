@@ -378,7 +378,7 @@ a trivial ``NSDocument``::
 
 In Swift, there would be no way to create an object of type
 ``MyDocument``. However, the frameworks will allocate an instance of
-``MyDocument`` and then send an message such as
+``MyDocument`` and then send a message such as
 ``initWithContentsOfURL:ofType:error:`` to the object. This will find
 ``-[NSDocument initWithContentsOfURL:ofType:error:]``, which delegates
 to ``-[NSDocument init]``, leaving ``MyDocument``'s stored properties
