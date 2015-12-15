@@ -9,7 +9,7 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// Pre-specializaiton of some popular generic classes and functions.
+// Pre-specialization of some popular generic classes and functions.
 //===----------------------------------------------------------------------===//
 
 struct _Prespecialize {

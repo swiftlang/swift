@@ -206,7 +206,7 @@ public:
     //   a = 10
     //
     // However, by doing so, we can only eliminate the dead stores after the
-    // data flow stablizes.
+    // data flow stabilizes.
     //
     WriteSetIn.resize(LSLocationNum, true);
     WriteSetOut.resize(LSLocationNum, false);
@@ -687,7 +687,7 @@ void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
     }
   }
 
-  // Data flow has not stablized, do not perform the DSE just yet.
+  // Data flow has not stabilized, do not perform the DSE just yet.
   if (isBuildingGenKillSet(Kind))
     return;
 
@@ -867,7 +867,7 @@ void DSEContext::run() {
     }
   }
 
-  // The data flow has stablized, run one last iteration over all the basic
+  // The data flow has stabilized, run one last iteration over all the basic
   // blocks and try to remove dead stores.
   for (SILBasicBlock &BB : *F) {
     processBasicBlock(&BB);

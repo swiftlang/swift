@@ -122,7 +122,7 @@ for example::
     def send(*args, **kwargs):
         return send_to_screen(opts.screen_name, *args, **kwargs)
     parser.add_option("-S", "--screen-name", dest="screen_name", metavar="NAME",
-                      help="name of the screen sesison to use [%default]",
+                      help="name of the screen session to use [%default]",
                       action="store", default="demo")
 
     opts, args = parser.parse_args()

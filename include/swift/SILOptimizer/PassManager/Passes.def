@@ -91,7 +91,7 @@ PASS(FunctionSignatureOpts, "function-signature-opts",
      "Optimize Function Signatures")
 PASS(ARCSequenceOpts, "arc-sequence-opts",
      "Optimize sequences of retain/release opts by removing redundant inner "
-     "retain/release sqeuences")
+     "retain/release sequences")
 PASS(ARCLoopOpts, "arc-loop-opts",
      "Run all arc loop passes")
 PASS(RedundantLoadElimination, "redundant-load-elim",
