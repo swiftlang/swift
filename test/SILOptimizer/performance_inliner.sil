@@ -598,7 +598,7 @@ entry:
   return %z : $()
 }
 
-// Visiblity Tests
+// Visibility Tests
 // These tests stem from a time where visibility had an influence
 // on the inlining. This is no longer the case so we just check
 // if everything can be inlined, regardless of visibility.

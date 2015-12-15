@@ -1821,10 +1821,10 @@ private:
 
   bool isClassElementTypeArray(SILValue Arr) {
     auto Ty = Arr.getType().getSwiftRValueType();
-    auto Cannonical = Ty.getCanonicalTypeOrNull();
-    if (Cannonical.isNull())
+    auto Canonical = Ty.getCanonicalTypeOrNull();
+    if (Canonical.isNull())
       return false;
-    auto *Struct = Cannonical->getStructOrBoundGenericStruct();
+    auto *Struct = Canonical->getStructOrBoundGenericStruct();
     assert(Struct && "Array must be a struct !?");
     if (Struct) {
       // No point in hoisting generic code.

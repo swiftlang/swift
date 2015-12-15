@@ -3,7 +3,7 @@
 
 // Test propagation of non-static let properties with compile-time constant values.
 
-// TODO: Once this optimization can remove the propagated private/internal let propeties or
+// TODO: Once this optimization can remove the propagated private/internal let properties or
 // mark them as ones without a storage, new tests should be added here to check for this
 // functionality.
 
@@ -86,7 +86,7 @@ public struct Boo {
   public init(i:Int64) {}
 }
 
-// Check that Foo1.Prop1 is not constant-folded, because its value is unkown, since it is initialized differently
+// Check that Foo1.Prop1 is not constant-folded, because its value is unknown, since it is initialized differently
 // by Foo1 initializers.
 
 // CHECK-LABEL: sil @_TF19let_properties_opts13testClassLet1FCS_4Foo1Vs5Int32 : $@convention(thin) (@owned Foo1) -> Int32
@@ -99,7 +99,7 @@ public func testClassLet1(f: Foo1) -> Int32 {
   return f.Prop1 + f.Prop2 + f.Prop3
 }
 
-// Check that Foo1.Prop1 is not constant-folded, because its value is unkown, since it is initialized differently
+// Check that Foo1.Prop1 is not constant-folded, because its value is unknown, since it is initialized differently
 // by Foo1 initializers.
 
 // CHECK-LABEL: sil @_TF19let_properties_opts13testClassLet1FRCS_4Foo1Vs5Int32 : $@convention(thin) (@inout Foo1) -> Int32 

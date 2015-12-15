@@ -53,6 +53,6 @@ public:
 };
 
 } // end namespace swift::constraints
-} // end namespacae swift
+} // end namespace swift
 
 #endif // LLVM_SWIFT_SEMA_CONSTRAINT_GRAPH_SCOPE_H

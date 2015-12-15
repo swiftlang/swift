@@ -3443,7 +3443,7 @@ namespace {
         // NOTE: Unlike other bits of the metadata that should later be removed,
         // this one is important because things check this value's flags to
         // determine what kind of object it is. That said, if those checks
-        // are determined to be removeable, we can remove this as well per
+        // are determined to be removable, we can remove this as well per
         // rdar://problem/18801263
         assert(!ClassRODataPtrOffset.isInvalid());
         Address rodataPtrSlot = createPointerSizedGEP(IGF, metadataPtr,

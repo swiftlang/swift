@@ -211,7 +211,7 @@ bool ARCSequenceDataflowEvaluator::processTopDown() {
 /// FreezeOwnedArgEpilogueReleases is set. This is useful since in certain cases
 /// due to dataflow issues, we can not properly propagate the last use
 /// information. Instead we run an extra iteration of the ARC optimizer with
-/// this enabled in a side table so the information gets propgated everywhere in
+/// this enabled in a side table so the information gets propagated everywhere in
 /// the CFG.
 bool ARCSequenceDataflowEvaluator::processBBBottomUp(
     ARCBBState &BBState, bool FreezeOwnedArgEpilogueReleases) {

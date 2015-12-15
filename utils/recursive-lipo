@@ -116,7 +116,7 @@ verbatim. This is useful if some subdirectories already contain fat binaries.
                         help="Files to ignore and skip merge/copy, default is \".DS_Store\"")
     parser.add_argument("--copy-subdirs", metavar="<subdirs-to-copy-verbatim>",
                         default="",
-                        help="Optional list of subdirecory paths that should be copied verbatim")
+                        help="Optional list of subdirectory paths that should be copied verbatim")
 
     required_group = parser.add_argument_group("required arguments")
     required_group.add_argument("--destination", metavar="<dest-path>",

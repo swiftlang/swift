@@ -127,7 +127,7 @@ public:
     return Path.getValue().hasNonEmptySymmetricDifference(P);
   }
 
-  /// Substract the given path from the ProjectionPath.
+  /// Subtract the given path from the ProjectionPath.
   void subtractPaths(Optional<ProjectionPath> &P) {
     if (!P.hasValue())
       return;

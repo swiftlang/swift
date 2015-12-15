@@ -506,11 +506,11 @@ bool swift::ArraySemanticsCall::mayHaveBridgedObjectElementType() const {
   assert(hasSelf() && "Need self parameter");
 
   auto Ty = getSelf().getType().getSwiftRValueType();
-  auto Cannonical = Ty.getCanonicalTypeOrNull();
-  if (Cannonical.isNull())
+  auto Canonical = Ty.getCanonicalTypeOrNull();
+  if (Canonical.isNull())
     return true;
 
-  auto *Struct = Cannonical->getStructOrBoundGenericStruct();
+  auto *Struct = Canonical->getStructOrBoundGenericStruct();
   assert(Struct && "Array must be a struct !?");
   if (Struct) {
     auto BGT = dyn_cast<BoundGenericType>(Ty);

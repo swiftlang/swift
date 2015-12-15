@@ -566,7 +566,7 @@ bb5:
 //         |      |        |      |
 //         --------        --------
 //
-// CHECK-LABEL: @two_separate_natural_loops_seperated_by_diamond@
+// CHECK-LABEL: @two_separate_natural_loops_separated_by_diamond@
 // CHECK: (region id:7 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -655,7 +655,7 @@ bb5:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs))
-sil @two_separate_natural_loops_seperated_by_diamond : $@convention(thin) () -> () {
+sil @two_separate_natural_loops_separated_by_diamond : $@convention(thin) () -> () {
 bb0:
   br bb1
 
@@ -693,7 +693,7 @@ bb6:
 //         |      |           |      |
 //         --------           --------
 //
-// CHECK-LABEL: @two_separate_natural_loops_seperated_by_diamond_with_loop@
+// CHECK-LABEL: @two_separate_natural_loops_separated_by_diamond_with_loop@
 // CHECK: (region id:8 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -803,7 +803,7 @@ bb6:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs))
-sil @two_separate_natural_loops_seperated_by_diamond_with_loop : $@convention(thin) () -> () {
+sil @two_separate_natural_loops_separated_by_diamond_with_loop : $@convention(thin) () -> () {
 bb0:
   br bb1
 
@@ -1600,7 +1600,7 @@ bb9:
   return %9999 : $()
 }
 
-// CHECK-LABEL: @multiple_level_natural_loop_with_irreducible_loop_sandwhich@
+// CHECK-LABEL: @multiple_level_natural_loop_with_irreducible_loop_sandwich@
 // CHECK: (region id:12 kind:func ucfh:false ucft:false
 // CHECK-NEXT:     (preds)
 // CHECK-NEXT:     (succs)
@@ -1755,7 +1755,7 @@ bb9:
 // CHECK-NEXT:     (subregs)
 // CHECK-NEXT:     (non-local-succs)
 // CHECK-NEXT:     (exiting-subregs))
-sil @multiple_level_natural_loop_with_irreducible_loop_sandwhich : $@convention(thin) () -> () {
+sil @multiple_level_natural_loop_with_irreducible_loop_sandwich : $@convention(thin) () -> () {
 bb0:
   br bb6
 

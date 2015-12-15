@@ -3467,7 +3467,7 @@ namespace {
         // Special case for superclass method calls.
         if (isPartiallyAppliedSuperMethod(uncurryLevel)) {
           assert(uncurriedArgs.size() == 1 &&
-                 "Can only partially apply the self parameater of a super method call");
+                 "Can only partially apply the self parameter of a super method call");
 
           auto constant = callee.getMethodName();
           auto loc = uncurriedLoc.getValue();

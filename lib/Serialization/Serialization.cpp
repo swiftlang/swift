@@ -3064,7 +3064,7 @@ void Serializer::writeType(Type ty) {
     auto generic = cast<BoundGenericType>(ty.getPointer());
 
     // We don't want two copies of Archetype being serialized, one by
-    // serializing genericArgs, the other by serializaing the Decl. The reason
+    // serializing genericArgs, the other by serializing the Decl. The reason
     // is that it is likely the Decl's Archetype can be serialized in
     // a different module, causing two copies being constructed at
     // deserialization, one in the other module, one in this module as

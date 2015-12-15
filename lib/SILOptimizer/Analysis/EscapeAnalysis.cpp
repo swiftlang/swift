@@ -99,7 +99,7 @@ getOrCreateNode(ValueBase *V) {
 
 EscapeAnalysis::CGNode *EscapeAnalysis::ConnectionGraph::getContentNode(
                                                           CGNode *AddrNode) {
-  // Do we already have a content node (which is not necessarliy an immediate
+  // Do we already have a content node (which is not necessarily an immediate
   // successor of AddrNode)?
   if (AddrNode->pointsTo)
     return AddrNode->pointsTo;
@@ -310,7 +310,7 @@ void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
         case ValueKind::TryApplyInst: {
           /// Actually we only add instructions which may release a reference.
           /// We need the use points only for getting the end of a reference's
-          /// liferange. And that must be a releaseing instruction.
+          /// liferange. And that must be a releasing instruction.
           int ValueIdx = -1;
           for (const Operand &Op : I.getAllOperands()) {
             ValueBase *OpV = Op.get().getDef();
@@ -1429,7 +1429,7 @@ bool EscapeAnalysis::mergeCalleeGraph(FullApplySite FAS,
     // If there are more callee parameters than arguments it means that the
     // callee is the result of a partial_apply - a thick function. A thick
     // function also references the boxed partially applied arguments.
-    // Therefore we map all the extra callee paramters to the callee operand
+    // Therefore we map all the extra callee parameters to the callee operand
     // of the apply site.
     SILValue CallerArg = (Idx < numCallerArgs ? FAS.getArgument(Idx) :
                           FAS.getCallee());

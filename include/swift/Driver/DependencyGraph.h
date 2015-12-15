@@ -94,7 +94,7 @@ private:
   static_assert(std::is_move_constructible<ProvidesEntryTy>::value, "");
 
   /// The "outgoing" edge map. This lists all outgoing (kind, string) edges
-  /// representing satisified dependencies from a particular node.
+  /// representing satisfied dependencies from a particular node.
   ///
   /// For multiple outgoing edges with the same string, the kinds are combined
   /// into one field.
