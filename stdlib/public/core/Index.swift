@@ -230,10 +230,10 @@ extension ForwardIndexType {
         "Only BidirectionalIndexType can be advanced by a negative amount")
     var p = self
     var i: Distance = 0
-    while i != n && p != limit {
+    repeat {
       p._successorInPlace()
       i._successorInPlace()
-    }
+    } while  i != n && p != limit
     return p
   }
 
