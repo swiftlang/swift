@@ -125,17 +125,13 @@ sil @S7_init : $@convention(thin) (@thin S7.Type) -> S7
 sil @S8_init : $@convention(thin) (@thin S8.Type) -> @owned S8
 sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
 
-//////////////////////////////////////////////////////////////
-// Tests for LoadStoreOpts.cpp from globalloadstoreopts.sil //
-//////////////////////////////////////////////////////////////
-
 // We should be able to remove the local store that is not read.
 //
-// CHECK-LABEL: DeadLocalStoreSimpleStruct
+// CHECK-LABEL: trivial_local_dead_store
 // CHECK: bb0
 // CHECK-NOT: store
 // CHECK: return
-sil hidden @DeadLocalStoreSimpleStruct : $@convention(thin) () -> () {
+sil hidden @trivial_local_dead_store : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $Int, var, name "a"                 // users: %3, %5
   %1 = integer_literal $Builtin.Int64, 1          // user: %2
@@ -148,11 +144,11 @@ bb0:
 
 // We can not remove the local store that is read.
 //
-// CHECK-LABEL: NoDeadLocalStoreSimpleStruct
+// CHECK-LABEL: blocking_read_on_local_store
 // CHECK: bb0
 // CHECK: store 
 // CHECK: return
-sil hidden @NoDeadLocalStoreSimpleStruct : $@convention(thin) () -> () {
+sil hidden @blocking_read_on_local_store : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $Int, var, name "a"                 // users: %3, %5
   %1 = integer_literal $Builtin.Int64, 1          // user: %2
@@ -164,34 +160,10 @@ bb0:
   return %4 : $()                                 // id: %6
 }
 
-// TEST CASE CURRENTLY DISABLED.
-// There is currently a outstand radar in the swift type/aa system, will
-// take this flag off once thats fixed.
-//
-// We can not remove the local store as the debug_value_addr could
-// be turned to a debug_value and thus act as a read on the memory
-// location..
-//
-// DISABLECHECK-LABEL: NoDeadStoreDebugValueAddr 
-// DISABLECHECK: bb0
-// DISABLECHECK: store
-// DISABLECHECK: debug_value_addr
-sil hidden @NoDeadStoreDebugValueAddr : $@convention(thin) () -> () {
-bb0:
-  %0 = alloc_stack $Int, var, name "a"                 // users: %3, %5
-  %1 = integer_literal $Builtin.Int64, 1          // user: %2
-  %2 = struct $Int (%1 : $Builtin.Int64)          // user: %3
-  store %2 to %0#1 : $*Int                        // id: %3
-  debug_value_addr %0#1 : $*Int  
-  %4 = tuple ()                                   // user: %6
-  dealloc_stack %0#0 : $*@local_storage Int       // id: %5
-  return %4 : $()                                 // id: %6
-}
-
 // CHECK-LABEL: sil @store_after_store
 // CHECK: alloc_box
-// CHECK-NEXT: store
-// CHECK-NEXT: tuple
+// CHECK: store
+// CHECK-NOT: store
 // CHECK: return
 sil @store_after_store : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
@@ -299,6 +271,26 @@ bb2:
   return %9999 : $()
 }
 
+// We can not remove the local store as the debug_value_addr could
+// be turned to a debug_value and thus act as a read on the memory
+// location..
+//
+// CHECK-LABEL: blocking_debug_value_addr_on_dead_store 
+// CHECK: bb0
+// CHECK: store
+// CHECK: debug_value_addr
+sil hidden @blocking_debug_value_addr_on_dead_store : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Int, var, name "a"                 // users: %3, %5
+  %1 = integer_literal $Builtin.Int64, 1          // user: %2
+  %2 = struct $Int (%1 : $Builtin.Int64)          // user: %3
+  store %2 to %0#1 : $*Int                        // id: %3
+  debug_value_addr %0#1 : $*Int  
+  %4 = tuple ()                                   // user: %6
+  dealloc_stack %0#0 : $*@local_storage Int       // id: %5
+  return %4 : $()                                 // id: %6
+}
+
 // CHECK-LABEL: sil @test_read_dependence_allows_forwarding : $@convention(thin) (@inout A, A) -> A {
 // CHECK: bb0
 // CHECK-NEXT: store
@@ -382,25 +374,14 @@ bb3:
   return %9999 : $()
 }
 
-//////////////////////////////////////////////
-// Tests for GlobalDeadStoreElimination.cpp //
-//////////////////////////////////////////////
-
 // We should be able to remove the store in bb0, but we currently
 // cant due to deficiency in alias analysis.
 //
 // CHECK-LABEL: DeadStoreWithAliasingBasesSimpleClass
 // CHECK: bb0([[RET0:%.+]] : $Bool):
-// CHECK-NEXT: [[RET1:%.+]] = alloc_ref
-// CHECK-NEXT: [[RET2:%.+]] = alloc_stack
-// CHECK-NEXT: store [[RET1:%.+]] to [[RET2:%.+]]
-// CHECK-NEXT: [[RET2:%.+]]  = load
-// CHECK-NEXT: [[RET3:%.+]]  = integer_literal
-// CHECK-NEXT: [[RET4:%.+]] = struct $Int
-// CHECK-NEXT: [[RET5:%.+]] = ref_element_addr
-// CHECK-NEXT: store [[RET4:%.+]] to [[RET5:%.+]]
-// CHECK-NEXT: [[RET6:%.+]] = ref_element_addr
-// CHECK-NEXT: store [[RET4:%.+]] to [[RET6:%.+]]
+// CHECK: store
+// CHECK: store
+// CHECK: store
 sil hidden @DeadStoreWithAliasingBasesSimpleClass : $@convention(thin) (Bool) -> () {
 bb0(%0 : $Bool):
   %1 = alloc_ref $foo                             // users: %3, %6
@@ -413,9 +394,6 @@ bb0(%0 : $Bool):
   store %5 to %6 : $*Int                          // id: %7
   %9 = ref_element_addr %8 : $foo, #foo.a        // user: %12
   store %5 to %9 : $*Int                        // id: %12
-  br bb1                                          // id: %13
-
-bb1:                                              // Preds: bb0
   %14 = tuple ()                                  // user: %16
   dealloc_stack %2#0 : $*@local_storage foo       // id: %15
   return %14 : $()                                // id: %16
@@ -424,14 +402,14 @@ bb1:                                              // Preds: bb0
 // Remove dead stores in if-else block on a simple struct as there are stores
 // in the joint block.
 //
-// CHECK-LABEL: DeadStoreInIfElseBlockSimpleStruct
+// CHECK-LABEL: diamond_control_flow_dead_store
 // CHECK: bb1:
 // CHECK-NOT: store
 // CHECK: br
 // CHECK: bb2:
 // CHECK-NOT: store
 // CHECK: br
-sil hidden @DeadStoreInIfElseBlockSimpleStruct : $@convention(thin) (Bool, Int) -> () {
+sil hidden @diamond_control_flow_dead_store : $@convention(thin) (Bool, Int) -> () {
 bb0(%0 : $Bool, %1 : $Int):
   %2 = alloc_stack $S1                            // users: %6, %11, %16, %21, %24
   // function_ref S1_init
@@ -965,13 +943,11 @@ bb4:                                              // Preds: bb2 bb3
 
 // Can not remove partially dead store in split block for simple class.
 //
-// CHECK-LABEL: PartialDeadStoreInSplitSimpleClass
+// CHECK-LABEL: partial_dead_store_simple_class
 // CHECK: bb1:
-// CHECK-NEXT: [[RET0:%.+]] = integer_literal $Builtin.Int64, 10
-// CHECK-NEXT: [[RET1:%.+]] = struct $Int ([[RET0:%.+]] : $Builtin.Int64)
-// CHECK-NEXT: [[RET2:%.+]] = ref_element_addr
-// CHECK-NEXT: store [[RET1:%.+]] to [[RET2:%.+]]
-sil hidden @PartialDeadStoreInSplitSimpleClass : $@convention(thin) (Bool) -> () {
+// CHECK: store
+// CHECK: cond_br
+sil hidden @partial_dead_store_simple_class : $@convention(thin) (Bool) -> () {
 bb0(%0 : $Bool):
   %1 = alloc_stack $foo                           // users: %3, %20
   %2 = alloc_ref $foo                             // users: %3, %7, %14, %18
@@ -1006,13 +982,11 @@ bb4:                                              // Preds: bb2 bb3
 
 // Can not remove partially dead store in split block for simple class.
 //
-// CHECK-LABEL: PartialDeadStoreInSplitWithFunctionCallSimpleClass
+// CHECK-LABEL: partial_dead_store_with_function_call
 // CHECK: bb1:
-// CHECK-NEXT: [[RET0:%.+]] = integer_literal $Builtin.Int64, 10
-// CHECK-NEXT: [[RET1:%.+]] = struct $Int ([[RET0:%.+]] : $Builtin.Int64)
-// CHECK-NEXT: [[RET2:%.+]] = ref_element_addr
-// CHECK-NEXT: store [[RET1:%.+]] to [[RET2:%.+]]
-sil hidden @PartialDeadStoreInSplitWithFunctionCallSimpleClass : $@convention(thin) (Bool) -> () {
+// CHECK: store
+// CHECK: cond_br
+sil hidden @partial_dead_store_with_function_call : $@convention(thin) (Bool) -> () {
 bb0(%0 : $Bool):
   %1 = alloc_stack $foo                           // users: %8, %36
   %3 = alloc_ref $foo                             // users: %6, %8, %11, %14, %17, %19, %22, %25, %27, %30, %33, %34
