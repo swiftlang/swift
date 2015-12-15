@@ -2,6 +2,7 @@
 
 sil_stage canonical
 
+import Swift
 import Builtin
 
 ///////////////////////
@@ -128,16 +129,12 @@ sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
 // Tests for LoadStoreOpts.cpp from globalloadstoreopts.sil //
 //////////////////////////////////////////////////////////////
 
-// TEST CASE CURRENTLY DISABLED.
-// There is currently a outstand radar in the swift type/aa system, will
-// take this flag off once thats fixed.
-//
 // We should be able to remove the local store that is not read.
 //
-// DISABLECHECK-LABEL: DeadLocalStoreSimpleStruct
-// DISABLECHECK: bb0
-// DISABLECHECK-NOT: store
-// DISABLECHECK: return
+// CHECK-LABEL: DeadLocalStoreSimpleStruct
+// CHECK: bb0
+// CHECK-NOT: store
+// CHECK: return
 sil hidden @DeadLocalStoreSimpleStruct : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $Int, var, name "a"                 // users: %3, %5
@@ -149,16 +146,12 @@ bb0:
   return %4 : $()                                 // id: %6
 }
 
-// TEST CASE CURRENTLY DISABLED.
-// There is currently a outstand radar in the swift type/aa system, will
-// take this flag off once thats fixed.
-//
 // We can not remove the local store that is read.
 //
-// DISABLECHECK-LABEL: NoDeadLocalStoreSimpleStruct
-// DISABLECHECK: bb0
-// DISABLECHECK: store 
-// DISABLECHECK: return
+// CHECK-LABEL: NoDeadLocalStoreSimpleStruct
+// CHECK: bb0
+// CHECK: store 
+// CHECK: return
 sil hidden @NoDeadLocalStoreSimpleStruct : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $Int, var, name "a"                 // users: %3, %5
@@ -841,15 +834,10 @@ bb3:                                              // Preds: bb1 bb2
 //
 // CHECK-LABEL: DeadStoreInSimpleTuple
 // CHECK: bb0:
-// CHECK-NEXT: alloc_stack
-// CHECK-NEXT: integer_literal
-// CHECK-NEXT: struct
-// CHECK-NEXT: tuple_element_addr
-// CHECK-NEXT: store
-// CHECK-NEXT: integer_literal
-// CHECK-NEXT: struct
-// CHECK-NEXT: tuple_element_addr
-// CHECK-NEXT: store
+// CHECK: store
+// CHECK: store
+// CHECK-NOT: store
+// CHECK: load 
 sil hidden @DeadStoreInSimpleTuple : $@convention(thin) () -> Int {
 bb0:
   %0 = alloc_stack $(a: Int, b: Int), var, name "x"    // users: %1, %2, %11, %15, %20
@@ -869,6 +857,10 @@ bb0:
   %14 = struct $Int (%13 : $Builtin.Int64)        // user: %16
   %15 = tuple_element_addr %0#1 : $*(a: Int, b: Int), 1 // user: %16
   store %14 to %15 : $*Int                        // id: %16
+  %22 = load %15 : $*Int
+  %23 = load %11 : $*Int
+  %24 = load %2 : $*Int
+  %25 = load %1 : $*Int
   %17 = integer_literal $Builtin.Int64, 22        // user: %19
   %18 = tuple ()
   %19 = struct $Int (%17 : $Builtin.Int64)        // user: %21
@@ -1121,28 +1113,26 @@ bb0(%0 : $*A):
 // CHECK: store
 // CHECK-NOT: store
 // CHECK: return
-sil hidden @DeadStoreEnumSameCase : $@convention(thin) () -> Int64 {
-bb0:
-  %0 = alloc_stack $Example, var, name "x"             // users: %7, %14, %19
+sil hidden @DeadStoreEnumSameCase : $@convention(thin) (@inout Example) -> Int64 {
+bb0(%0 : $*Example):
   %1 = integer_literal $Builtin.Int64, 64         // user: %2
   %2 = struct $Int64 (%1 : $Builtin.Int64)        // user: %5
   %3 = integer_literal $Builtin.Int64, 64         // user: %4
   %4 = struct $Int64 (%3 : $Builtin.Int64)        // user: %5
   %5 = tuple (%2 : $Int64, %4 : $Int64)           // user: %6
   %6 = enum $Example, #Example.A!enumelt.1, %5 : $(Int64, Int64) // users: %7, %15
-  store %6 to %0#1 : $*Example                    // id: %7
+  store %6 to %0 : $*Example                    // id: %7
   %8 = integer_literal $Builtin.Int64, 64         // user: %9
   %9 = struct $Int64 (%8 : $Builtin.Int64)        // user: %12
   %10 = integer_literal $Builtin.Int64, 64        // user: %11
   %11 = struct $Int64 (%10 : $Builtin.Int64)      // user: %12
   %12 = tuple (%9 : $Int64, %11 : $Int64)         // user: %13
   %13 = enum $Example, #Example.A!enumelt.1, %12 : $(Int64, Int64) // users: %14, %18
-  store %13 to %0#1 : $*Example                   // id: %14
+  store %13 to %0 : $*Example                   // id: %14
   release_value %6 : $Example                     // id: %15
   %16 = integer_literal $Builtin.Int64, 0         // user: %17
   %17 = struct $Int64 (%16 : $Builtin.Int64)      // user: %20
   release_value %13 : $Example                    // id: %18
-  dealloc_stack %0#0 : $*@local_storage Example   // id: %19
   return %17 : $Int64                             // id: %20
 }
 
@@ -1193,19 +1183,17 @@ bb3:                                              // Preds: bb1 bb2
 /// CHECK: [[RET0:%.+]] = struct_extract
 /// CHECK: [[RET1:%.+]] = struct_element_addr
 /// CHECK: store [[RET0:%.+]] to [[RET1:%.+]] : $*S4
-sil hidden @PartialDeadStoreStructInStruct : $@convention(thin) () -> () {
-bb0:
-  %0 = alloc_stack $S5, var, name "i"                  // users: %4, %7, %10
+sil hidden @PartialDeadStoreStructInStruct : $@convention(thin) (@inout S5) -> () {
+bb0(%0 : $*S5):
   %1 = function_ref @S5_init : $@convention(thin) (@thin S5.Type) -> S5 // user: %3
   %2 = metatype $@thin S5.Type                    // user: %3
   %3 = apply %1(%2) : $@convention(thin) (@thin S5.Type) -> S5 // user: %4
-  store %3 to %0#1 : $*S5                         // id: %4
+  store %3 to %0 : $*S5                         // id: %4
   %5 = integer_literal $Builtin.Int64, 11         // user: %6
   %6 = struct $Int (%5 : $Builtin.Int64)          // user: %8
-  %7 = struct_element_addr %0#1 : $*S5, #S5.y     // user: %8
+  %7 = struct_element_addr %0 : $*S5, #S5.y     // user: %8
   store %6 to %7 : $*Int                          // id: %8
   %9 = tuple ()                                   // user: %11
-  dealloc_stack %0#0 : $*@local_storage S5        // id: %10
   return %9 : $()                                 // id: %11
 }
 
@@ -1215,19 +1203,17 @@ bb0:
 /// CHECK: store
 /// CHECK: store
 /// CHECK: store
-sil hidden @DiscontiguosPartialDeadStoreInSimpleStruct : $@convention(thin) () -> () {
-bb0:
-  %0 = alloc_stack $S6, var, name "a"                  // users: %4, %7, %10
+sil hidden @DiscontiguosPartialDeadStoreInSimpleStruct : $@convention(thin) (@inout S6) -> () {
+bb0(%0 : $*S6):
   %1 = function_ref @S6_init : $@convention(thin) (@thin S6.Type) -> S6 // user: %3
   %2 = metatype $@thin S6.Type                    // user: %3
   %3 = apply %1(%2) : $@convention(thin) (@thin S6.Type) -> S6 // user: %4
-  store %3 to %0#1 : $*S6                         // id: %4
+  store %3 to %0 : $*S6                         // id: %4
   %5 = integer_literal $Builtin.Int64, 10         // user: %6
   %6 = struct $Int (%5 : $Builtin.Int64)          // user: %8
-  %7 = struct_element_addr %0#1 : $*S6, #S6.y     // user: %8
+  %7 = struct_element_addr %0 : $*S6, #S6.y     // user: %8
   store %6 to %7 : $*Int                          // id: %8
   %9 = tuple ()                                   // user: %11
-  dealloc_stack %0#0 : $*@local_storage S6        // id: %10
   return %9 : $()                                 // id: %11
 }
 
@@ -1238,19 +1224,17 @@ bb0:
 /// CHECK: store
 /// CHECK-NOT: store
 /// CHECK: store
-sil hidden @DiscontiguosPartialDeadStoreInSimpleLargeStruct : $@convention(thin) () -> () {
-bb0:
-  %0 = alloc_stack $S7, var, name "a"                  // users: %4, %7, %10
+sil hidden @DiscontiguosPartialDeadStoreInSimpleLargeStruct : $@convention(thin) (@inout S7) -> () {
+bb0(%0 : $*S7):
   %1 = function_ref @S7_init : $@convention(thin) (@thin S7.Type) -> S7 // user: %3
   %2 = metatype $@thin S7.Type                    // user: %3
   %3 = apply %1(%2) : $@convention(thin) (@thin S7.Type) -> S7 // user: %4
-  store %3 to %0#1 : $*S7                         // id: %4
+  store %3 to %0 : $*S7                         // id: %4
   %5 = integer_literal $Builtin.Int64, 10         // user: %6
   %6 = struct $Int (%5 : $Builtin.Int64)          // user: %8
-  %7 = struct_element_addr %0#1 : $*S7, #S7.y     // user: %8
+  %7 = struct_element_addr %0 : $*S7, #S7.y     // user: %8
   store %6 to %7 : $*Int                          // id: %8
   %9 = tuple ()                                   // user: %11
-  dealloc_stack %0#0 : $*@local_storage S7        // id: %10
   return %9 : $()                                 // id: %11
 }
 
@@ -1291,19 +1275,17 @@ bb0:
 /// CHECK-LABEL: PartialDeadStoreInSimpleSmallStruct
 /// CHECK: apply 
 /// CHECK-NEXT: struct_extract
-sil hidden @PartialDeadStoreInSimpleSmallStruct : $@convention(thin) () -> () {
-bb0:
-  %0 = alloc_stack $S3, var, name "a"                  // users: %4, %7, %10
+sil hidden @PartialDeadStoreInSimpleSmallStruct : $@convention(thin) (@inout S3) -> () {
+bb0(%0 : $*S3):
   %1 = function_ref @S3_init : $@convention(thin) (@thin S3.Type) -> S3 // user: %3
   %2 = metatype $@thin S3.Type                    // user: %3
   %3 = apply %1(%2) : $@convention(thin) (@thin S3.Type) -> S3 // user: %4
-  store %3 to %0#1 : $*S3                         // id: %4
+  store %3 to %0 : $*S3                         // id: %4
   %5 = integer_literal $Builtin.Int64, 10         // user: %6
   %6 = struct $Int (%5 : $Builtin.Int64)          // user: %8
-  %7 = struct_element_addr %0#1 : $*S3, #S3.a     // user: %8
+  %7 = struct_element_addr %0 : $*S3, #S3.a     // user: %8
   store %6 to %7 : $*Int                          // id: %8
   %9 = tuple ()                                   // user: %11
-  dealloc_stack %0#0 : $*@local_storage S3        // id: %10
   return %9 : $()                                 // id: %11
 }
 
@@ -1315,22 +1297,20 @@ bb0:
 /// CHECK: [[RET0:%.+]] = struct_extract
 /// CHECK: [[RET1:%.+]] = struct_element_addr
 /// CHECK-NEXT: store [[RET0:%.+]] to [[RET1:%.+]] : $*SelfLoop  
-sil hidden @SelfLoopClassTestTypeExpansion : $@convention(thin) () -> () {
-bb0:
-  %0 = alloc_stack $S8, var, name "h"                  // users: %4, %7, %13
+sil hidden @SelfLoopClassTestTypeExpansion : $@convention(thin) (@inout S8) -> () {
+bb0(%0 : $*S8):
   %1 = function_ref @S8_init : $@convention(thin) (@thin S8.Type) -> @owned S8 // user: %3
   %2 = metatype $@thin S8.Type                    // user: %3
   %3 = apply %1(%2) : $@convention(thin) (@thin S8.Type) -> @owned S8 // users: %4, %9
-  store %3 to %0#1 : $*S8                         // id: %4
+  store %3 to %0 : $*S8                         // id: %4
   %5 = integer_literal $Builtin.Int64, 12         // user: %6
   %6 = struct $Int (%5 : $Builtin.Int64)          // users: %8, %10
-  %7 = struct_element_addr %0#1 : $*S8, #S8.k     // user: %8
+  %7 = struct_element_addr %0 : $*S8, #S8.k     // user: %8
   store %6 to %7 : $*Int                          // id: %8
   %9 = struct_extract %3 : $S8, #S8.i             // user: %10
   %10 = struct $S8 (%9 : $SelfLoop, %6 : $Int)    // user: %11
   release_value %10 : $S8                         // id: %11
   %12 = tuple ()                                  // user: %14
-  dealloc_stack %0#0 : $*@local_storage S8        // id: %13
   return %12 : $()                                // id: %14
 }
 
@@ -1429,4 +1409,36 @@ bb2:
   store %5 to %6 : $*Int
   %18 = tuple ()                                  // user: %19
   return %18 : $()                                // id: %19
+}
+
+/// Make sure we DO NOT get rid of the first store as a dead store.
+///
+/// CHECK-LABEL: tbaa_no_alias_no_dead_store
+/// CHECK: store
+/// CHECK: load
+sil @tbaa_no_alias_no_dead_store : $@convention(thin) (Optional<protocol<>.Type>) -> Int {
+bb0(%0 : $Optional<protocol<>.Type>):
+  %2 = alloc_stack $Optional<protocol<>.Type>     // users: %3, %17, %19, %26
+  store %0 to %2#1 : $*Optional<protocol<>.Type>  // id: %3
+  %17 = unchecked_addr_cast %2#1 : $*Optional<protocol<>.Type> to $*Int // user: %18
+  %18 = load %17 : $*Int                          // user: %27
+  dealloc_stack %2#0 : $*@local_storage Optional<protocol<>.Type> // id: %26
+  return %18 : $Int                               // id: %27
+}
+
+/// Make sure we DO get rid of the store as a dead store, i.e. no read to a store
+/// to a local variable.
+/// 
+/// CHECK-LABEL: local_dead_store
+/// CHECK: load
+/// CHECK-NOT: store 
+/// CHECK: return 
+sil @local_dead_store : $@convention(thin) (Optional<protocol<>.Type>) -> Int {
+bb0(%0 : $Optional<protocol<>.Type>):
+  %2 = alloc_stack $Optional<protocol<>.Type>     // users: %3, %17, %19, %26
+  %17 = unchecked_addr_cast %2#1 : $*Optional<protocol<>.Type> to $*Int // user: %18
+  %18 = load %17 : $*Int                          // user: %27
+  store %0 to %2#1 : $*Optional<protocol<>.Type>  // id: %3
+  dealloc_stack %2#0 : $*@local_storage Optional<protocol<>.Type> // id: %26
+  return %18 : $Int                               // id: %27
 }
