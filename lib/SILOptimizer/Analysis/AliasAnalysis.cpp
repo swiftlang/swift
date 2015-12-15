@@ -230,7 +230,7 @@ static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
   }
 
   // Function arguments can't alias with things that are known to be
-  // unambigously identified at the function level.
+  // unambiguously identified at the function level.
   //
   // Note that both function arguments must be identified. For example, an @in
   // argument may be an interior pointer into a box that is passed separately as
