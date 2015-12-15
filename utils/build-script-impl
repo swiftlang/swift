@@ -2037,12 +2037,15 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                     continue
                 fi
                 echo "--- Running tests for ${product} ---"
+                set -x
                 build_dir=$(build_directory $deployment_target $product)
                 XCTEST_BUILD_DIR=$(build_directory $deployment_target xctest)
                 pushd "${FOUNDATION_SOURCE_DIR}"
                 $NINJA_BIN TestFoundation
                 LD_LIBRARY_PATH="${INSTALL_DESTDIR}"/"${INSTALL_PREFIX}"/lib/swift/:"${build_dir}/Foundation":"${XCTEST_BUILD_DIR}":$LD_LIBRARY_PATH "${build_dir}"/TestFoundation/TestFoundation
                 popd
+                { set +x; } 2>/dev/null
+                echo "--- Finished tests for ${product} ---"
                 continue
                 ;;
             *)
