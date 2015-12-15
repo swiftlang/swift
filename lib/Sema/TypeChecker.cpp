@@ -1794,7 +1794,7 @@ static const Decl *ancestorTypeLevelDeclForAvailabilityFixit(const Decl *D) {
 /// if #available(...) { ... } version check to fix the unavailable reference,
 /// or None if such such a node cannot be found.
 ///
-/// \param FoundMemberLevelDecl Returns memember-level declaration (i.e., the
+/// \param FoundMemberLevelDecl Returns member-level declaration (i.e., the
 ///  child of a type DeclContext) for which an @available attribute would
 /// fix the unavailable reference.
 ///
