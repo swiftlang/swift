@@ -166,21 +166,21 @@ PrintTests.test("Printable") {
   expectPrinted("1.25e-17", asFloat80(0.0000000000000000125))
 #endif
 
-  expectPrinted("1.10000002", asFloat32(1.1))
-  expectPrinted("1.24999998e+17", asFloat32(125000000000000000.0))
-  expectPrinted("1.25", asFloat32(1.25))
-  expectPrinted("1.24999997e-05", asFloat32(0.0000125))
+  expectDebugPrinted("1.10000002", asFloat32(1.1))
+  expectDebugPrinted("1.24999998e+17", asFloat32(125000000000000000.0))
+  expectDebugPrinted("1.25", asFloat32(1.25))
+  expectDebugPrinted("1.24999997e-05", asFloat32(0.0000125))
 
-  expectPrinted("1.1000000000000001", asFloat64(1.1))
-  expectPrinted("1.25e+17", asFloat64(125000000000000000.0))
-  expectPrinted("1.25", asFloat64(1.25))
-  expectPrinted("1.2500000000000001e-05", asFloat64(0.0000125))
+  expectDebugPrinted("1.1000000000000001", asFloat64(1.1))
+  expectDebugPrinted("1.25e+17", asFloat64(125000000000000000.0))
+  expectDebugPrinted("1.25", asFloat64(1.25))
+  expectDebugPrinted("1.2500000000000001e-05", asFloat64(0.0000125))
 
 #if arch(i386) || arch(x86_64)
-  expectPrinted("1.10000000000000000002", asFloat80(1.1))
-  expectPrinted("125000000000000000.0", asFloat80(125000000000000000.0))
-  expectPrinted("1.25", asFloat80(1.25))
-  expectPrinted("1.25000000000000000001e-05", asFloat80(0.0000125))
+  expectDebugPrinted("1.10000000000000000002", asFloat80(1.1))
+  expectDebugPrinted("125000000000000000.0", asFloat80(125000000000000000.0))
+  expectDebugPrinted("1.25", asFloat80(1.25))
+  expectDebugPrinted("1.25000000000000000001e-05", asFloat80(0.0000125))
 #endif
 }
 
