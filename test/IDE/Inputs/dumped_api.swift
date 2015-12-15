@@ -95,7 +95,6 @@ public func anyGenerator<T>(nextImplementation: ()->T?) -> AnyGenerator<T>
 
 
 // FIXME: can't make this a protocol due to <rdar://20209031>
-// FIXME: can't make this a protocol due to <rdar://20209031>
 
 /// A type-erased sequence.
 ///
