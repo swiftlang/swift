@@ -48,7 +48,7 @@ def update_working_copy(repo_path):
         if os.path.isdir(os.path.join(".git", "svn")):
             update_git_svn(repo_path)
         elif os.path.isdir(".git"):
-            check_call([ "git", "pull" ])
+            check_call([ "git", "pull", "--rebase" ])
         else:
             check_call([ "svn", "update" ])
 
