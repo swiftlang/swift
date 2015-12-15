@@ -26,6 +26,7 @@ namespace swift {
 class SILFunction;
 class SILFunctionTransform;
 class SILModule;
+class SILModuleTransform;
 class SILOptions;
 class SILTransform;
 
@@ -156,6 +157,10 @@ public:
 
   typedef llvm::ArrayRef<SILFunctionTransform *> PassList;
 private:
+  /// Run the SIL module transform \p SMT over all the functions in
+  /// the module.
+  void runModulePass(SILModuleTransform *SMT);
+
   /// Run the passes in \p FuncTransforms. Return true
   /// if the pass manager requested to stop the execution
   /// of the optimization cycle (this is a debug feature).

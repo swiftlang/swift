@@ -257,6 +257,57 @@ bool SILPassManager::runFunctionPasses(PassList FuncTransforms) {
   return false;
 }
 
+void SILPassManager::runModulePass(SILModuleTransform *SMT) {
+  if (isDisabled(SMT))
+    return;
+
+  const SILOptions &Options = getOptions();
+
+  PrettyStackTraceSILModuleTransform X(SMT);
+
+  SMT->injectPassManager(this);
+  SMT->injectModule(Mod);
+
+  currentPassHasInvalidated = false;
+
+  if (SILPrintPassName)
+    llvm::dbgs() << "#" << NumPassesRun << " Stage: " << StageName
+                 << " Pass: " << SMT->getName() << " (module pass)\n";
+
+  if (doPrintBefore(SMT, nullptr)) {
+    llvm::dbgs() << "*** SIL module before " << StageName << " "
+                 << SMT->getName() << " (" << NumOptimizationIterations
+                 << ") ***\n";
+    printModule(Mod, Options.EmitVerboseSIL);
+  }
+
+  llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
+  Mod->registerDeleteNotificationHandler(SMT);
+  SMT->run();
+  Mod->removeDeleteNotificationHandler(SMT);
+
+  if (SILPrintPassTime) {
+    auto Delta = llvm::sys::TimeValue::now().nanoseconds() -
+      StartTime.nanoseconds();
+    llvm::dbgs() << Delta << " (" << SMT->getName() << ",Module)\n";
+  }
+
+  // If this pass invalidated anything, print and verify.
+  if (doPrintAfter(SMT, nullptr,
+                   currentPassHasInvalidated && SILPrintAll)) {
+    llvm::dbgs() << "*** SIL module after " << StageName << " "
+                 << SMT->getName() << " (" << NumOptimizationIterations
+                 << ") ***\n";
+    printModule(Mod, Options.EmitVerboseSIL);
+  }
+
+  if (Options.VerifyAll &&
+      (currentPassHasInvalidated || !SILVerifyWithoutInvalidation)) {
+    Mod->verify();
+    verifyAnalyses();
+  }
+}
+
 void SILPassManager::runOneIteration() {
   // Verify that all analysis were properly unlocked.
   for (auto A : Analysis) {
@@ -297,52 +348,7 @@ void SILPassManager::runOneIteration() {
 
       PendingFuncTransforms.clear();
 
-      if (isDisabled(SMT))
-        continue;
-      
-      PrettyStackTraceSILModuleTransform X(SMT);
-
-      SMT->injectPassManager(this);
-      SMT->injectModule(Mod);
-
-      currentPassHasInvalidated = false;
-
-      if (SILPrintPassName)
-        llvm::dbgs() << "#" << NumPassesRun << " Stage: " << StageName
-                     << " Pass: " << SMT->getName() << " (module pass)\n";
-
-      if (doPrintBefore(SMT, nullptr)) {
-        llvm::dbgs() << "*** SIL module before " << StageName << " "
-                     << SMT->getName() << " (" << NumOptimizationIterations
-                     << ") ***\n";
-        printModule(Mod, Options.EmitVerboseSIL);
-      }
-
-      llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
-      Mod->registerDeleteNotificationHandler(SMT);
-      SMT->run();
-      Mod->removeDeleteNotificationHandler(SMT);
-
-      if (SILPrintPassTime) {
-        auto Delta = llvm::sys::TimeValue::now().nanoseconds() -
-          StartTime.nanoseconds();
-        llvm::dbgs() << Delta << " (" << SMT->getName() << ",Module)\n";
-      }
-
-      // If this pass invalidated anything, print and verify.
-      if (doPrintAfter(SMT, nullptr,
-                       currentPassHasInvalidated && SILPrintAll)) {
-        llvm::dbgs() << "*** SIL module after " << StageName << " "
-                     << SMT->getName() << " (" << NumOptimizationIterations
-                     << ") ***\n";
-        printModule(Mod, Options.EmitVerboseSIL);
-      }
-
-      if (Options.VerifyAll &&
-          (currentPassHasInvalidated || !SILVerifyWithoutInvalidation)) {
-        Mod->verify();
-        verifyAnalyses();
-      }
+      runModulePass(SMT);
 
       ++NumPassesRun;
       if (Mod->getStage() == SILStage::Canonical
