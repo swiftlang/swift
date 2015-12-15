@@ -388,8 +388,8 @@ How to specify files:
                 file = SHORTCUTS[file]
 
             if not file.startswith("./") and oldBuildDir and newBuildDir:
-                oldExpanded = glob.glob(oldBuildDir + "/" + file)
-                newExpanded = glob.glob(newBuildDir + "/" + file)
+                oldExpanded = glob.glob(os.path.join(oldBuildDir, file))
+                newExpanded = glob.glob(os.path.join(newBuildDir, file))
                 if oldExpanded and newExpanded:
                     oldFiles.extend(oldExpanded)
                     newFiles.extend(newExpanded)
