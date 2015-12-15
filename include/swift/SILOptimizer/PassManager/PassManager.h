@@ -164,7 +164,11 @@ private:
   /// Run the passes in \p FuncTransforms. Return true
   /// if the pass manager requested to stop the execution
   /// of the optimization cycle (this is a debug feature).
-  bool runFunctionPasses(PassList FuncTransforms);
+  void runFunctionPasses(PassList FuncTransforms);
+
+  /// A helper function that returns (based on SIL stage and debug
+  /// options) whether we should continue running passes.
+  bool continueTransforming();
 
   /// Displays the call graph in an external dot-viewer.
   /// This function is meant for use from the debugger.
