@@ -939,6 +939,7 @@ Types
   nominal-type-kind ::= 'C'                  // class
   nominal-type-kind ::= 'O'                  // enum
   nominal-type-kind ::= 'V'                  // struct
+  declaration-name ::= context decl-name
   archetype ::= 'Q' index                    // archetype with depth=0, idx=N
   archetype ::= 'Qd' index index             // archetype with depth=M+1, idx=N
   archetype ::= associated-type
