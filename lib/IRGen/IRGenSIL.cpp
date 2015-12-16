@@ -295,6 +295,8 @@ public:
   /// Keeps track of the mapping of source variables to -O0 shadow copy allocas.
   llvm::SmallDenseMap<std::pair<const SILDebugScope *, StringRef>, Address, 8>
       ShadowStackSlots;
+  llvm::SmallDenseMap<Decl *, SmallString<4>, 8> AnonymousVariables;
+  unsigned NumAnonVars = 0;
 
   /// Accumulative amount of allocated bytes on the stack. Used to limit the
   /// size for stack promoted objects.
@@ -481,6 +483,26 @@ public:
     return foundBB->second;
   }
 
+  StringRef getOrCreateAnonymousVarName(VarDecl *Decl) {
+    llvm::SmallString<4> &Name = AnonymousVariables[Decl];
+    if (Name.empty()) {
+      {
+        llvm::raw_svector_ostream S(Name);
+        S << '_' << NumAnonVars++;
+      }
+      AnonymousVariables.insert({Decl, Name});
+    }
+    return Name;
+  }
+
+  template <class DebugVarCarryingInst>
+  StringRef getVarName(DebugVarCarryingInst *i) {
+    StringRef Name = i->getVarInfo().Name;
+    if (Name.empty() && i->getDecl())
+      return getOrCreateAnonymousVarName(i->getDecl());
+    return Name;
+  }
+
   /// At -O0, emit a shadow copy of an Address in an alloca, so the
   /// register allocator doesn't elide the dbg.value intrinsic when
   /// register pressure is high.  There is a trade-off to this: With
@@ -587,6 +609,8 @@ public:
 
   void emitFunctionArgDebugInfo(SILBasicBlock *BB);
 
+  void emitDebugInfoForAllocStack(AllocStackInst *i, const TypeInfo &type,
+                                  llvm::Value *addr);
   void visitAllocStackInst(AllocStackInst *i);
   void visitAllocRefInst(AllocRefInst *i);
   void visitAllocRefDynamicInst(AllocRefDynamicInst *i);
@@ -2949,7 +2973,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   if (isa<SILUndef>(SILVal))
     return;
 
-  StringRef Name = i->getVarInfo().Name;
+  StringRef Name = getVarName(i);
   DebugTypeInfo DbgTy;
   SILType SILTy = SILVal.getType();
   if (VarDecl *Decl = i->getDecl())
@@ -2983,7 +3007,7 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   if (isa<SILUndef>(SILVal))
     return;
 
-  StringRef Name = i->getVarInfo().Name;
+  StringRef Name = getVarName(i);
   auto Addr = getLoweredAddress(SILVal).getAddress();
   DebugTypeInfo DbgTy(Decl, Decl->getType(), getTypeInfo(SILVal.getType()));
   // Put the value into a stack slot at -Onone and emit a debug intrinsic.
@@ -3231,12 +3255,11 @@ static bool tryDeferFixedSizeBufferInitialization(IRGenSILFunction &IGF,
   return false;
 }
 
-static void emitDebugDeclarationForAllocStack(IRGenSILFunction &IGF,
-                                              AllocStackInst *i,
-                                              const TypeInfo &type,
-                                              llvm::Value *addr) {
+void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
+                                                  const TypeInfo &type,
+                                                  llvm::Value *addr) {
   VarDecl *Decl = i->getDecl();
-  if (IGF.IGM.DebugInfo && Decl) {
+  if (IGM.DebugInfo && Decl) {
     auto *Pattern = Decl->getParentPattern();
     if (!Pattern || !Pattern->isImplicit()) {
       auto DbgTy = DebugTypeInfo(Decl, type);
@@ -3244,12 +3267,11 @@ static void emitDebugDeclarationForAllocStack(IRGenSILFunction &IGF,
       // is stored in the alloca, emitting it as a reference type would
       // be wrong.
       DbgTy.unwrapLValueOrInOutType();
-      auto Name = i->getVarInfo().Name.empty() ? "_" : i->getVarInfo().Name;
-      auto DS = i->getDebugScope();
-      if (DS) {
-        assert(DS->SILFn == IGF.CurSILFn || DS->InlinedCallSite);
-        IGF.emitDebugVariableDeclaration(addr, DbgTy, DS, Name,
-                                         i->getVarInfo().ArgNo);
+      StringRef Name = getVarName(i);
+      if (auto DS = i->getDebugScope()) {
+        assert(DS->SILFn == CurSILFn || DS->InlinedCallSite);
+        emitDebugVariableDeclaration(addr, DbgTy, DS, Name,
+                                     i->getVarInfo().ArgNo);
       }
     }
   }
@@ -3263,7 +3285,7 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   StringRef dbgname;
 # ifndef NDEBUG
   // If this is a DEBUG build, use pretty names for the LLVM IR.
-  dbgname = i->getVarInfo().Name;
+  dbgname = getVarName(i);
 # endif
 
   (void) Decl;
@@ -3280,10 +3302,8 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   auto addr = type.allocateStack(*this,
                                  i->getElementType(),
                                  dbgname);
-  
-  emitDebugDeclarationForAllocStack(*this, i, type,
-                                    addr.getAddress().getAddress());
-  
+
+  emitDebugInfoForAllocStack(i, type, addr.getAddress().getAddress());
   setLoweredAddress(i->getContainerResult(), addr.getContainer());
   setLoweredAddress(i->getAddressResult(), addr.getAddress());
 }
@@ -3377,7 +3397,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
 
   // Derive name from SIL location.
   VarDecl *Decl = i->getDecl();
-  StringRef Name = i->getVarInfo().Name;
+  StringRef Name = getVarName(i);
   StringRef DbgName =
 # ifndef NDEBUG
     // If this is a DEBUG build, use pretty names for the LLVM IR.
@@ -4332,15 +4352,15 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
 
 void IRGenSILFunction::setAllocatedAddressForBuffer(SILValue v,
                                                 const Address &allocedAddress) {
-  assert(getLoweredValue(v).kind == LoweredValue::Kind::UnallocatedAddressInBuffer
-         && "not an unallocated address");
-  
+  assert(getLoweredValue(v).kind ==
+             LoweredValue::Kind::UnallocatedAddressInBuffer &&
+         "not an unallocated address");
+
   overwriteLoweredAddress(v, allocedAddress);
   // Emit the debug info for the variable if any.
   if (auto allocStack = dyn_cast<AllocStackInst>(v)) {
-    emitDebugDeclarationForAllocStack(*this, allocStack,
-                                      getTypeInfo(v.getType()),
-                                      allocedAddress.getAddress());
+    emitDebugInfoForAllocStack(allocStack, getTypeInfo(v.getType()),
+                               allocedAddress.getAddress());
   }
 }
 
