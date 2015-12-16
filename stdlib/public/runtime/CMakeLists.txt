@@ -74,15 +74,30 @@ add_swift_library(swiftRuntime IS_STDLIB IS_STDLIB_CORE
 foreach(sdk ${SWIFT_CONFIGURED_SDKS})
   if("${sdk}" STREQUAL "LINUX" OR "${sdk}" STREQUAL "FREEBSD")
     foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
-      set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}")
+      if ("${sdk}" STREQUAL "LINUX" AND "${arch}" STREQUAL "armv7")
+        # Handle special case for ARM on Linux.
+        # FIXME: Find a more elegant way to handle this case.
+        foreach(subarch armv7;armv7l)
+          set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${subarch}")
 
-      # FIXME: We will need a different linker script for 32-bit builds.
-      configure_file(
-          "swift.ld" "${SWIFTLIB_DIR}/${arch_subdir}/swift.ld" COPYONLY)
+          configure_file(
+              "swift.ld" "${SWIFTLIB_DIR}/${arch_subdir}/swift.ld" COPYONLY)
 
-      swift_install_in_component(compiler
-          FILES "swift.ld"
-          DESTINATION "lib/swift/${arch_subdir}")
+          swift_install_in_component(compiler
+              FILES "swift.ld"
+              DESTINATION "lib/swift/${arch_subdir}")
+
+        endforeach()
+      else ()
+        set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}")
+
+        configure_file(
+            "swift.ld" "${SWIFTLIB_DIR}/${arch_subdir}/swift.ld" COPYONLY)
+
+        swift_install_in_component(compiler
+            FILES "swift.ld"
+            DESTINATION "lib/swift/${arch_subdir}")
+      endif ()
 
     endforeach()
   endif()
