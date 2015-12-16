@@ -19,7 +19,7 @@
 ///
 /// - Note: To print without a trailing newline, pass `terminator: ""`
 ///
-/// - SeeAlso: `debugPrint`, Streamable`, `CustomStringConvertible`,
+/// - SeeAlso: `debugPrint`, `Streamable`, `CustomStringConvertible`,
 ///   `CustomDebugStringConvertible`
 @inline(never)
 @_semantics("stdlib_binary_only")
@@ -50,7 +50,7 @@ public func print(
 ///
 /// - Note: To print without a trailing newline, pass `terminator: ""`
 ///
-/// - SeeAlso: `print`, Streamable`, `CustomStringConvertible`,
+/// - SeeAlso: `print`, `Streamable`, `CustomStringConvertible`,
 ///   `CustomDebugStringConvertible`
 @inline(never)
 @_semantics("stdlib_binary_only")
@@ -79,7 +79,7 @@ public func debugPrint(
 ///
 /// - Note: To print without a trailing newline, pass `terminator: ""`
 ///
-/// - SeeAlso: `debugPrint`, Streamable`, `CustomStringConvertible`,
+/// - SeeAlso: `debugPrint`, `Streamable`, `CustomStringConvertible`,
 ///   `CustomDebugStringConvertible`
 @inline(__always)
 public func print<Target: OutputStreamType>(
@@ -100,7 +100,7 @@ public func print<Target: OutputStreamType>(
 ///
 /// - Note: To print without a trailing newline, pass `terminator: ""`
 ///
-/// - SeeAlso: `print`, Streamable`, `CustomStringConvertible`,
+/// - SeeAlso: `print`, `Streamable`, `CustomStringConvertible`,
 ///   `CustomDebugStringConvertible`
 @inline(__always)
 public func debugPrint<Target: OutputStreamType>(
