@@ -446,7 +446,7 @@ argument drops from being O(n), depending on the size of the tree to O(1).
 
 ::
 
-  struct tree : P {
+  struct Tree : P {
     var node : [P?]
     init() {
       node = [ thing ]
