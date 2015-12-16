@@ -292,9 +292,6 @@ public:
 
   /// All alloc_ref instructions which allocate the object on the stack.
   llvm::SmallPtrSet<SILInstruction *, 8> StackAllocs;
-  /// Keeps track of the mapping of source variables to -O0 shadow copy allocas.
-  llvm::SmallDenseMap<std::pair<const SILDebugScope *, StringRef>, Address, 8>
-      ShadowStackSlots;
 
   /// Accumulative amount of allocated bytes on the stack. Used to limit the
   /// size for stack promoted objects.
@@ -486,7 +483,6 @@ public:
   /// register pressure is high.  There is a trade-off to this: With
   /// shadow copies, we lose the precise lifetime.
   llvm::Value *emitShadowCopy(llvm::Value *Storage,
-                              const SILDebugScope *Scope,
                               StringRef Name,
                               Alignment Align = Alignment(0)) {
     auto Ty = Storage->getType();
@@ -499,21 +495,16 @@ public:
     if (Align.isZero())
       Align = IGM.getPointerAlignment();
 
-    auto &Alloca = ShadowStackSlots[{Scope, Name}];
-    if (!Alloca.isValid())
-      Alloca = createAlloca(Ty, Align, Name+".addr");
+    auto Alloca = createAlloca(Ty, Align, Name+".addr");
     Builder.CreateStore(Storage, Alloca.getAddress(), Align);
     return Alloca.getAddress();
   }
 
-  llvm::Value *emitShadowCopy(Address Storage, const SILDebugScope *Scope,
-                              StringRef Name) {
-    return emitShadowCopy(Storage.getAddress(), Scope, Name,
-                          Storage.getAlignment());
+  llvm::Value *emitShadowCopy(Address storage, StringRef name) {
+    return emitShadowCopy(storage.getAddress(), name, storage.getAlignment());
   }
 
-  void emitShadowCopy(ArrayRef<llvm::Value *> vals, const SILDebugScope *scope,
-                      StringRef name,
+  void emitShadowCopy(ArrayRef<llvm::Value *> vals, StringRef name,
                       llvm::SmallVectorImpl<llvm::Value *> &copy) {
     // Only do this at -O0.
     if (IGM.Opts.Optimize) {
@@ -524,7 +515,7 @@ public:
     // Single or empty values.
     if (vals.size() <= 1) {
       for (auto val : vals)
-        copy.push_back(emitShadowCopy(val, scope, name));
+        copy.push_back(emitShadowCopy(val, name));
       return;
     }
 
@@ -1411,9 +1402,8 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
     unsigned ArgNo =
         countArgs(CurSILFn->getDeclContext()) + 1 + BB->getBBArgs().size();
     IGM.DebugInfo->emitVariableDeclaration(
-        Builder,
-        emitShadowCopy(ErrorResultSlot.getAddress(), getDebugScope(), Name),
-        DTI, getDebugScope(), Name, ArgNo, IndirectValue, ArtificialValue);
+        Builder, emitShadowCopy(ErrorResultSlot.getAddress(), Name), DTI,
+        getDebugScope(), Name, ArgNo, IndirectValue, ArtificialValue);
   }
 }
 
@@ -2945,29 +2935,24 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   if (!IGM.DebugInfo)
     return;
 
+  VarDecl *Decl = i->getDecl();
+  if (!Decl)
+    return;
+
   auto SILVal = i->getOperand();
   if (isa<SILUndef>(SILVal))
     return;
 
   StringRef Name = i->getVarInfo().Name;
-  DebugTypeInfo DbgTy;
-  SILType SILTy = SILVal.getType();
-  if (VarDecl *Decl = i->getDecl())
-    DbgTy = DebugTypeInfo(Decl, Decl->getType(), getTypeInfo(SILTy));
-  else if (i->getFunction()->isBare() &&
-           !SILTy.getSwiftType()->hasArchetype() && !Name.empty())
-    // Preliminary support for .sil debug information.
-    DbgTy = DebugTypeInfo(SILTy.getSwiftType(), getTypeInfo(SILTy), nullptr);
-  else
-    return;
+  Explosion e = getLoweredExplosion(SILVal);
+  DebugTypeInfo DbgTy(Decl, Decl->getType(), getTypeInfo(SILVal.getType()));
   // An inout/lvalue type that is described by a debug value has been
   // promoted by an optimization pass. Unwrap the type.
   DbgTy.unwrapLValueOrInOutType();
 
   // Put the value into a stack slot at -Onone.
-  llvm::SmallVector<llvm::Value *, 8> Copy; 
-  Explosion e = getLoweredExplosion(SILVal);
-  emitShadowCopy(e.claimAll(), i->getDebugScope(), Name, Copy);
+  llvm::SmallVector<llvm::Value *, 8> Copy;
+  emitShadowCopy(e.claimAll(), Name, Copy);
   emitDebugVariableDeclaration(Copy, DbgTy, i->getDebugScope(), Name,
                                i->getVarInfo().ArgNo);
 }
@@ -2987,9 +2972,9 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   auto Addr = getLoweredAddress(SILVal).getAddress();
   DebugTypeInfo DbgTy(Decl, Decl->getType(), getTypeInfo(SILVal.getType()));
   // Put the value into a stack slot at -Onone and emit a debug intrinsic.
-  emitDebugVariableDeclaration(
-      emitShadowCopy(Addr, i->getDebugScope(), Name), DbgTy,
-      i->getDebugScope(), Name, i->getVarInfo().ArgNo, IndirectValue);
+  emitDebugVariableDeclaration(emitShadowCopy(Addr, Name), DbgTy,
+                               i->getDebugScope(), Name,
+                               i->getVarInfo().ArgNo, IndirectValue);
 }
 
 void IRGenSILFunction::visitLoadWeakInst(swift::LoadWeakInst *i) {
@@ -3405,7 +3390,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
       return;
 
     IGM.DebugInfo->emitVariableDeclaration(
-        Builder, emitShadowCopy(addr.getAddress(), i->getDebugScope(), Name),
+        Builder, emitShadowCopy(addr.getAddress(), Name),
         DebugTypeInfo(Decl, i->getElementType().getSwiftType(), type),
         i->getDebugScope(), Name, 0, IndirectValue);
   }
