@@ -44,7 +44,7 @@ class TestClass {
 
   init() {
     lazy var localvar = 42  // expected-error {{lazy is only valid for members of a struct or class}} {{5-10=}}
-    localvar++
+    localvar += 1
     _ = localvar
   }
 }

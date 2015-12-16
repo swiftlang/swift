@@ -22,7 +22,7 @@ func userCode() {}
 func whileTrue() {
   var x = 0
   while true { // expected-note {{always evaluates to true}}
-    x++
+    x += 1
   }
   userCode() // expected-warning {{will never be executed}}
 }
@@ -38,7 +38,7 @@ func whileTrueReachable(v: Int) -> () {
     if v == 0 {
       break
     }
-    x++
+    x += 1
   }
   x--  
 }
@@ -49,7 +49,7 @@ func whileTrueTwoPredecessorsEliminated() -> () {
     if false {
       break
     }
-    x++
+    x += 1
   }
   userCode()  // expected-warning {{will never be executed}}
 }
@@ -126,29 +126,29 @@ func testSwitchEnum(xi: Int) -> Int {
 
   switch cond { // no warning
   default:
-    x++
+    x += 1
   }
 
   switch cond { // no warning
   case .Two: 
-    x++
+    x += 1
   }
 
   switch cond {
   case .One:
-    x++
+    x += 1
   } // expected-error{{switch must be exhaustive}}
 
   switch cond {
   case .One:
-    x++
+    x += 1
   case .Three:
-    x++
+    x += 1
   } // expected-error{{switch must be exhaustive}}
 
   switch cond { // expected-warning{{switch condition evaluates to a constant}}
   case .Two: 
-    x++
+    x += 1
   default: 
     userCode() // expected-note{{will never be executed}}
   }
@@ -157,7 +157,7 @@ func testSwitchEnum(xi: Int) -> Int {
   case .One: 
     userCode() // expected-note{{will never be executed}}
   default: 
-    x--
+    x -= 1
   }
   
   return x;
@@ -183,24 +183,24 @@ func testSwitchEnumBool(b: Bool, xi: Int) -> Int {
   
   switch Cond { // no warning
   default:
-    x++
+    x += 1
   }
 
   switch Cond {
   case true:
-    x++
+    x += 1
   } // expected-error{{switch must be exhaustive}}
 
   switch Cond {
   case false:
-    x++
+    x += 1
   } // expected-error{{switch must be exhaustive}}
 
   switch Cond { // no warning
   case true:
-    x++
+    x += 1
   case false:
-    x--
+    x -= 1
   }
 
   return x
@@ -210,16 +210,16 @@ func testSwitchOptionalBool (b:Bool?, xi: Int) -> Int {
   var x = xi
   switch b { // No warning
   case .Some(true):
-    x++
+    x += 1
   case .Some(false):
-    x++
+    x += 1
   case .None:
-    x--
+    x -= 1
   }
 
   switch b {
   case .Some(true):
-    x++
+    x += 1
   case .None:
     x-- 
   } // expected-error{{switch must be exhaustive}}
@@ -235,32 +235,32 @@ func testSwitchEnumBoolTuple(b1: Bool, b2: Bool, xi: Int) -> Int {
   
   switch Cond { // no warning
   default:
-    x++
+    x += 1
   }
 
   switch Cond {
   case (true, true):
-    x++
+    x += 1
     // FIXME: Two expect statements are written, because unreachable diagnostics produces N errors
     // for non-exhaustive switches on tuples of N elements
   } // expected-error{{switch must be exhaustive}} expected-error{{switch must be exhaustive}}
 
   switch Cond {
   case (false, true):
-    x++
+    x += 1
     // FIXME: Two expect statements are written, because unreachable diagnostics produces N errors
     // for non-exhaustive switches on tuples of N elements
   } // expected-error{{switch must be exhaustive}} expected-error{{switch must be exhaustive}}
 
   switch Cond { // no warning
   case (true, true):
-    x++
+    x += 1
   case (true, false):
-    x++
+    x += 1
   case (false, true):
-    x--
+    x -= 1
   case (false, false):
-    x--
+    x -= 1
   }
 
   return x

@@ -10,7 +10,7 @@ func partialInit() {
   func trivial(ni : Int) {
     var n = ni
     while (n > 0) {
-      --n
+      n -= 1
       var x : Int
       if (n > 2) { continue }
       x = 1

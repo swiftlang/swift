@@ -1368,11 +1368,11 @@ func testResolveGenericParamsError1() {
 class BuilderStyle<T> {
   var count = 0
   func addString(s: String) -> BuilderStyle<T> {
-    count++
+    count += 1
     return self
   }
   func add(t: T) -> BuilderStyle<T> {
-    count++
+    count += 1
     return self
   }
   func get() -> Int {

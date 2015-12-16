@@ -150,7 +150,7 @@ func testSwitch() {
     x = z
   // CHECK:  strong_release [[VAR_Z]]{{.*}}        // {{.*}} line:[[@LINE-1]]:9:cleanup
   case (3, let y):
-    x++
+    x += 1
   }
 }
 
@@ -326,7 +326,7 @@ func printSinglePayloadAddressOnly(v:SinglePayloadAddressOnly) {
 func testStringForEachStmt() {
   var i = 0;
   for index in 1..<20 {
-    i++
+    i += 1
     if i == 15 {
       break
     }
@@ -353,7 +353,7 @@ func testForStmt() {
   var i = 0;
   var m = 0;
   for (i = 0; i < 10; ++i) {
-    m++
+    m += 1
     if m == 15 {
       break
     } else {
@@ -382,7 +382,7 @@ func testForStmt() {
 func testRepeatWhile() {
   var m = 0;
   repeat {
-    m++
+    m += 1
   } while (m < 200)
   
   
@@ -398,11 +398,11 @@ func testRepeatWhile() {
 func testWhile() {
   var m = 0;
   while m < 100 {
-    m++
+    m += 1
     if m > 5 {
       break
     }
-    m++
+    m += 1
   }
   
   // CHECK-LABEL: sil hidden @_TF13sil_locations9testWhileFT_T_

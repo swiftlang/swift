@@ -135,7 +135,7 @@ ErrorHandlingTests.test("ErrorHandling/forEach") {
   var loopCount = 0
   do {
     try [1, 2, 3].forEach {
-      ++loopCount
+      loopCount += 1
       if $0 == 2 {
         throw SillyError.JazzHands
       }
@@ -151,7 +151,7 @@ ErrorHandlingTests.test("ErrorHandling/Optional flatMap") {
   var loopCount = 0
   do {
     let _: [Int] = try [1, 2, 3].flatMap {
-      ++loopCount
+      loopCount += 1
       if $0 == 2 {
         throw SillyError.JazzHands
       }
@@ -167,7 +167,7 @@ ErrorHandlingTests.test("ErrorHandling/Array flatMap") {
   var loopCount = 0
   do {
     let _: [Int] = try [1, 2, 3].flatMap {(x) -> [Int] in
-      ++loopCount
+      loopCount += 1
       if x == 2 {
         throw SillyError.JazzHands
       }
@@ -243,7 +243,7 @@ ErrorHandlingTests.test("ErrorHandling/reduce") {
     let x: Int = try [1, 2, 3, 4, 5].reduce(0, combine: {
       (x: Int, y: Int) -> Int
     in
-      ++loopCount
+      loopCount += 1
       var total = x + y
       if total > 5 {
         throw SillyError.JazzHands
@@ -295,7 +295,7 @@ ErrorHandlingTests.test("ErrorHandling/Sequence map") {
         if loopCount == throwAtCount {
           throw SillyError.JazzHands
         }
-        ++loopCount
+        loopCount += 1
         return Noisy()
       }
       expectEqual(NoisyCount, initialCount + 3)
@@ -316,7 +316,7 @@ ErrorHandlingTests.test("ErrorHandling/Sequence filter") {
           if loopCount == throwAtCount {
             throw SillyError.JazzHands
           }
-          ++loopCount
+          loopCount += 1
           return condition
         }
         expectEqual(NoisyCount, initialCount + sequence.count)
@@ -337,7 +337,7 @@ ErrorHandlingTests.test("ErrorHandling/Collection map") {
         if loopCount == throwAtCount {
           throw SillyError.JazzHands
         }
-        ++loopCount
+        loopCount += 1
         return Noisy()
       }
       expectEqual(NoisyCount, initialCount + 3)

@@ -13,11 +13,11 @@ class X {
   init(value: Int) { 
     self.value = value 
 
-    ++activeXObjects
+    activeXObjects += 1
   }
 
   deinit {
-    --activeXObjects
+    activeXObjects -= 1
   }
 }
 

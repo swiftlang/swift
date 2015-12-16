@@ -10,7 +10,7 @@ var i = 0
 var prefix = ""
 for p in zip(n, s) {
     print("\(prefix)\(p.0) => \(p.1)", terminator: "")
-    ++i
+    i += 1
     prefix = ", "
 }
 print(" (\(i) items)")
@@ -20,7 +20,7 @@ i = 0
 prefix = ""
 for p in zip(s, n) {
     print("\(prefix)\(p.0) => \(p.1)", terminator: "")
-    ++i
+    i += 1
     prefix = ", "
 }
 print(" (\(i) items)")
