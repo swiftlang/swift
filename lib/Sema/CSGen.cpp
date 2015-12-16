@@ -71,6 +71,16 @@ namespace {
     uint haveStringLiteral : 1;
     
     llvm::SmallSet<TypeBase*, 16> collectedTypes;
+
+    llvm::SmallVector<TypeVariableType *, 16> intLiteralTyvars;
+    llvm::SmallVector<TypeVariableType *, 16> floatLiteralTyvars;
+    llvm::SmallVector<TypeVariableType *, 16> stringLiteralTyvars;
+
+    llvm::SmallVector<ClosureExpr *, 4> closureExprs;
+
+    // TODO: manage as a set of lists, to speed up addition of binding
+    // constraints.
+    llvm::SmallVector<DeclRefExpr *, 16> anonClosureParams;
     
     LinkedTypeInfo() {
       haveIntLiteral = false;
@@ -96,7 +106,15 @@ namespace {
       if (isa<BinaryExpr>(expr) ||
           
           // Literal exprs are contextually typed, so store them off as well.
-          isa<LiteralExpr>(expr)) {
+          isa<LiteralExpr>(expr) ||
+
+          // We'd like to take a look at implicit closure params, so store
+          // them.
+          isa<ClosureExpr>(expr) ||
+
+          // We'd like to look at the elements of arrays and dictionaries.
+          isa<ArrayExpr>(expr) ||
+          isa<DictionaryExpr>(expr)) {
         LinkedExprs.push_back(expr);
         return {false, expr};
       }
@@ -134,17 +152,23 @@ namespace {
       
       if (isa<IntegerLiteralExpr>(expr)) {
         LTI.haveIntLiteral = true;
-        return {false, expr};
+        LTI.intLiteralTyvars.push_back(expr->getType()->
+                                              getAs<TypeVariableType>());
+        return { false, expr };
       }
       
       if (isa<FloatLiteralExpr>(expr)) {
         LTI.haveFloatLiteral = true;
-        return {false, expr};
+        LTI.floatLiteralTyvars.push_back(expr->getType()->
+                                                getAs<TypeVariableType>());
+        return { false, expr };
       }
       
       if (isa<StringLiteralExpr>(expr)) {
         LTI.haveStringLiteral = true;
-        return {false, expr};
+        LTI.stringLiteralTyvars.push_back(expr->getType()->
+                                                getAs<TypeVariableType>());
+        return { false, expr };
       }
       
       if (auto UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
@@ -154,14 +178,32 @@ namespace {
           LTI.collectedTypes.insert(UDE->getType().getPointer());
         
         // Don't recurse into the base expression.
-        return {false, expr};
+        return { false, expr };
       }
-      
-      if (auto favoredType = CS.getFavoredType(expr)) {
-        LTI.collectedTypes.insert(favoredType);
-        return {false, expr};
+
+
+      if (auto CE = dyn_cast<ClosureExpr>(expr)) {
+        if (!(LTI.closureExprs.size() || *LTI.closureExprs.end() == CE)) {
+          LTI.closureExprs.push_back(CE);
+          return { true, expr };
+        } else {
+          CS.optimizeConstraints(expr);
+          return { false, expr };
+        }
       }
-      
+
+      if (auto DRE = dyn_cast<DeclRefExpr>(expr)) {
+        if (auto varDecl = dyn_cast<VarDecl>(DRE->getDecl())) {
+          if (varDecl->isAnonClosureParam()) {
+            LTI.anonClosureParams.push_back(DRE);
+          } else if (DRE->getType() &&
+            !isa<TypeVariableType>(DRE->getType().getPointer())) {
+            LTI.collectedTypes.insert(DRE->getType().getPointer());
+          }
+          return { false, expr };
+        } 
+      }             
+
       // In the case of a function application, we would have already captured
       // the return type during constraint generation, so there's no use in
       // looking any further.
@@ -169,12 +211,27 @@ namespace {
           !(isa<BinaryExpr>(expr) || isa<PrefixUnaryExpr>(expr) ||
             isa<PostfixUnaryExpr>(expr))) {
         return { false, expr };
+      }    
+      
+      if (auto favoredType = CS.getFavoredType(expr)) {
+        LTI.collectedTypes.insert(favoredType);
+
+        // If we're analyzing a nested closure, continue to recurse, so we can
+        //make further connections amongst the arguments.
+        return { false, expr };
       }
       
       return { true, expr };
     }
     
     Expr *walkToExprPost(Expr *expr) override {
+
+      if (auto CE = dyn_cast<ClosureExpr>(expr)) {
+        if (LTI.closureExprs.size() && *LTI.closureExprs.end() == CE) {
+          LTI.closureExprs.pop_back();
+        }
+      }
+
       return expr;
     }
     
@@ -193,12 +250,62 @@ namespace {
     LinkedTypeInfo lti;
     
     expr->walk(LinkedExprAnalyzer(lti, CS));
-    
+
+    // Link anonymous closure params of the same index.
+    // TODO: As stated above, we should bucket these whilst collecting the
+    // exprs to avoid quadratic behavior.
+    for (auto acp1 : lti.anonClosureParams) {
+      for (auto acp2 : lti.anonClosureParams) {
+        if (acp1 == acp2)
+          continue;
+
+        if (acp1->getDecl()->getName().str() ==
+              acp2->getDecl()->getName().str()) {
+          CS.addConstraint(ConstraintKind::Equal, acp1->getType(),
+                       acp2->getType(),
+                       CS.getConstraintLocator(expr));
+        }
+      }
+    }    
+
+    // Link integer literal tyvars.
+    if (lti.intLiteralTyvars.size() > 1) {
+      auto first = lti.intLiteralTyvars[0];
+
+      for (size_t i = 1; i < lti.intLiteralTyvars.size(); i++) {
+        CS.addConstraint(ConstraintKind::Equal, first,
+                       lti.intLiteralTyvars[i],
+                       CS.getConstraintLocator(expr));
+      }
+    }
+
+    // Link float literal tyvars.
+    if (lti.floatLiteralTyvars.size() > 1) {
+      auto first = lti.floatLiteralTyvars[0];
+
+      for (size_t i = 1; i < lti.floatLiteralTyvars.size(); i++) {
+        CS.addConstraint(ConstraintKind::Equal, first,
+                       lti.floatLiteralTyvars[i],
+                       CS.getConstraintLocator(expr));
+      }
+    }
+
+    // Link string literal tyvars.
+    if (lti.stringLiteralTyvars.size() > 1) {
+      auto first = lti.stringLiteralTyvars[0];
+
+      for (size_t i = 1; i < lti.stringLiteralTyvars.size(); i++) {
+        CS.addConstraint(ConstraintKind::Equal, first,
+                       lti.stringLiteralTyvars[i],
+                       CS.getConstraintLocator(expr));
+      }
+    }
+
     if (!lti.collectedTypes.empty()) {
       // TODO: Compute the BCT.
       CS.setFavoredType(expr, *lti.collectedTypes.begin());
       return true;
-    }
+    }    
     
     if (lti.haveFloatLiteral) {
       if (auto floatProto =
