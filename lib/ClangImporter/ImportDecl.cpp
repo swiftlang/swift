@@ -3823,8 +3823,12 @@ namespace {
 
       // Check whether we've already created a subscript operation for
       // this getter/setter pair.
-      if (auto subscript = Impl.Subscripts[{getter, setter}])
-        return subscript->getDeclContext() == dc? subscript : nullptr;
+      if (auto subscript = Impl.Subscripts[{getter, setter}]) {
+        if (subscript->getDeclContext() != dc) return nullptr;
+
+        Impl.AlternateDecls[decl] = subscript;
+        return subscript;
+      }
 
       // Compute the element type, looking through the implicit 'self'
       // parameter and the normal function parameters.
@@ -3888,8 +3892,12 @@ namespace {
 
           // Check whether we've already created a subscript operation for
           // this getter.
-          if (auto subscript = Impl.Subscripts[{getter, nullptr}])
-            return subscript->getDeclContext() == dc? subscript : nullptr;
+          if (auto subscript = Impl.Subscripts[{getter, nullptr}]) {
+            if (subscript->getDeclContext() != dc) return nullptr;
+
+            Impl.AlternateDecls[decl] = subscript;
+            return subscript;
+          }
         }
       }
 
@@ -3910,7 +3918,7 @@ namespace {
                                       TypeLoc::withoutLoc(elementTy), dc);
 
       /// Record the subscript as an alternative declaration.
-      Impl.AlternateDecls[getter] = subscript;
+      Impl.AlternateDecls[decl] = subscript;
 
       subscript->makeComputed(SourceLoc(), getterThunk, setterThunk, nullptr,
                               SourceLoc());
