@@ -1160,6 +1160,11 @@ void Remangler::mangleErrorType(Node *node) {
   Out << "ERR";
 }
 
+void Remangler::mangleSILBoxType(Node *node) {
+  Out << 'H';
+  mangleSingleChildNode(node);
+}
+
 void Remangler::mangleMetatype(Node *node) {
   if (node->getNumChildren() == 1) {
     Out << 'M';

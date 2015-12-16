@@ -865,6 +865,7 @@ void Mangler::mangleAssociatedTypeName(DependentMemberType *dmt,
 /// <type> ::= 'a' <context> <identifier> # Type alias (DWARF only)
 /// <type> ::= F <type> <type>       # function type
 /// <type> ::= f <type> <type>       # uncurried function type
+/// <type> ::= H <type>              # SIL @box type
 /// <type> ::= G <type> <type>+ _    # bound generic type
 /// <type> ::= O <decl>              # enum (substitutable)
 /// <type> ::= M <type>              # metatype
@@ -1394,6 +1395,11 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
   }
 
   case TypeKind::SILBox:
+    Buffer << 'H';
+    mangleType(cast<SILBoxType>(tybase)->getBoxedType(), explosion,
+               uncurryLevel);
+    return;
+
   case TypeKind::SILBlockStorage:
     llvm_unreachable("should never be mangled");
   }
