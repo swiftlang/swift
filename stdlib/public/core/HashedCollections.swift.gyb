@@ -428,6 +428,39 @@ public struct Set<Element : Hashable> :
     self.init(_nativeStorage: _NativeSetStorage.fromArray(elements))
   }
 
+  /// Remove any members of this set that aren't also in a finite sequence.
+  public mutating func intersectInPlace<
+    S : SequenceType where S.Generator.Element == Element
+  >(sequence: S) {
+    if case .Native(let nativeOwner) = _variantStorage {
+      // perform this operation at a lower level
+      // to avoid invalidating the index and avoiding a copy.
+
+      let other = sequence as? Set<Element> ?? Set(sequence)
+      // FIXME(performance) take the oppurtunity to shrink the storage.
+      let native = nativeOwner.nativeStorage
+      for bucket in 0..<native.capacity {
+        if native.isInitializedEntry(bucket) &&
+          !other.contains(native.keyAt(bucket)) {
+          native.destroyEntryAt(bucket)
+          native.count -= 1
+        }
+      }
+    } else {
+      // Because `intersect` needs to both modify and iterate over
+      // the left-hand side, the index may become invalidated during
+      // traversal so an intermediate set must be created.
+      let result = intersect(sequence)
+
+      // The result can only have fewer or the same number of elements.
+      // If no elements were removed, don't perform a reassignment
+      // as this may cause an unnecessary uniquing COW.
+      if result.count != count {
+        self = result
+      }
+    }
+  }
+
   //
   // APIs below this comment should be implemented strictly in terms of
   // *public* APIs above.  `_variantStorage` should not be accessed directly.
@@ -571,25 +604,6 @@ public struct Set<Element : Hashable> :
     return newSet
   }
 
-  /// Remove any members of this set that aren't also in a finite sequence.
-  public mutating func intersectInPlace<
-    S : SequenceType where S.Generator.Element == Element
-  >(sequence: S) {
-    // Because `intersect` needs to both modify and iterate over
-    // the left-hand side, the index may become invalidated during
-    // traversal so an intermediate set must be created.
-    //
-    // FIXME(performance): perform this operation at a lower level
-    // to avoid invalidating the index and avoiding a copy.
-    let result = self.intersect(sequence)
-
-    // The result can only have fewer or the same number of elements.
-    // If no elements were removed, don't perform a reassignment
-    // as this may cause an unnecessary uniquing COW.
-    if result.count != count {
-      self = result
-    }
-  }
 
   /// Return a new set with elements that are either in the set or a finite
   /// sequence but do not occur in both.
