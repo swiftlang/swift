@@ -4300,8 +4300,7 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
       instanceTy = SILType::getPrimitiveObjectType(metaTy.getInstanceType());
 
     if (IGF.IGM.isResilient(instanceTy.getClassOrBoundGenericClass(),
-                            ResilienceScope::Component) ||
-        IGF.IGM.Opts.ForceResilientSuperDispatch) {
+                            ResilienceScope::Component)) {
       // The derived type that is making the super call is resilient,
       // for example we may be in an extension of a class outside of our
       // resilience domain. So, we need to load the superclass metadata
