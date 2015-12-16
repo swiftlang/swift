@@ -75,9 +75,9 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
   if("${sdk}" STREQUAL "LINUX" OR "${sdk}" STREQUAL "FREEBSD")
     foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
       if ("${sdk}" STREQUAL "LINUX" AND "${arch}" STREQUAL "armv7")
-        # Handle special case for ARM on Linux.
+        # Handle special case for ARM/Thumb on Linux.
         # FIXME: Find a more elegant way to handle this case.
-        foreach(subarch armv7;armv7l)
+        foreach(subarch armv7;armv7l;thumbv7;thumbv7l)
           set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${subarch}")
 
           configure_file(

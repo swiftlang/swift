@@ -400,7 +400,7 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
     set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
   # FIXME: This only matches ARMv7l (by far the most common variant).
   elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "armv7l")
-    configure_sdk_unix(LINUX "Linux" "linux" "linux" "armv7" "armv7-unknown-linux-gnueabihf")
+    configure_sdk_unix(LINUX "Linux" "linux" "linux" "armv7" "thumbv7-unknown-linux-gnueabihf")
     set(SWIFT_HOST_VARIANT_ARCH "armv7")
     set(SWIFT_PRIMARY_VARIANT_ARCH_default "armv7")
   elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64")
