@@ -609,13 +609,13 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
   // FIXME: Locator when anchored on a declaration.
   // Get the type of a reference to the second declaration.
   Type openedType2 = cs.openType(type2, locator,
-                                 decl2->getPotentialGenericDeclContext());
+                                 decl2->getInnermostDeclContext());
 
   // Get the type of a reference to the first declaration, swapping in
   // archetypes for the dependent types.
-  ArchetypeOpener opener(decl1->getPotentialGenericDeclContext());
+  ArchetypeOpener opener(decl1->getInnermostDeclContext());
   Type openedType1 = cs.openType(type1, locator,
-                                 decl1->getPotentialGenericDeclContext(),
+                                 decl1->getInnermostDeclContext(),
                                  &opener);
 
   // Extract the self types from the declarations, if they have them.

@@ -916,7 +916,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   // Adjust the type of the reference.
   valueType = openType(valueType, locator,
                        replacements,
-                       value->getPotentialGenericDeclContext(),
+                       value->getInnermostDeclContext(),
                        /*skipProtocolSelfConstraint=*/false,
                        value->getDeclContext()->getGenericTypeContextDepth(),
                        opener);
@@ -1138,26 +1138,24 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   }
 
   // Figure out the declaration context to use when opening this type.
-  DeclContext *dc = value->getPotentialGenericDeclContext();
+  DeclContext *dc = value->getInnermostDeclContext();
+  unsigned minOpeningDepth =
+      value->getDeclContext()->getGenericTypeContextDepth();
 
   // Open the type of the generic function or member of a generic type.
   Type openedType;
   auto isClassBoundExistential = false;
   llvm::DenseMap<CanType, TypeVariableType *> replacements;
   if (auto genericFn = value->getInterfaceType()->getAs<GenericFunctionType>()){
-    openedType = openType(genericFn, locator, replacements,
-                          dc,
+    openedType = openType(genericFn, locator, replacements, dc,
                           /*skipProtocolSelfConstraint=*/true,
-                          value->getDeclContext()->getGenericTypeContextDepth(),
-                          opener);
+                          minOpeningDepth, opener);
   } else {
     openedType = TC.getUnopenedTypeOfReference(value, baseTy, DC, base,
                                                /*wantInterfaceType=*/true);
 
     Type selfTy;
     if (auto sig = dc->getGenericSignatureOfContext()) {
-      unsigned minOpeningDepth =
-          value->getDeclContext()->getGenericTypeContextDepth();
 
       // Open up the generic parameter list for the container.
       openGeneric(dc, sig->getGenericParams(), sig->getRequirements(),
@@ -1165,9 +1163,9 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                   opener, locator, replacements);
 
       // Open up the type of the member.
-      openedType = openType(openedType, locator, replacements, nullptr, false,
-                            value->getDeclContext()->getGenericTypeContextDepth(),
-                            opener);
+      openedType = openType(openedType, locator, replacements, nullptr,
+                            /*skipProtocolSelfConstraint=*/false,
+                            minOpeningDepth, opener);
 
       // Determine the object type of 'self'.
       auto nominal = value->getDeclContext()->getDeclaredTypeOfContext()

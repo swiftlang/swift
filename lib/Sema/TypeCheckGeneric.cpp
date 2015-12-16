@@ -218,20 +218,6 @@ Type CompleteGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
   return ext->getExtendedType()->getAnyNominal()->getDeclaredInterfaceType();
 }
 
-/// Add the generic parameters and requirements from the parent context to the
-/// archetype builder.
-static void addContextParamsAndRequirements(ArchetypeBuilder &builder,
-                                            DeclContext *dc,
-                                            bool adoptArchetypes) {
-  if (!dc->isTypeContext())
-    return;
-
-  if (auto sig = dc->getGenericSignatureOfContext()) {
-    // Add generic signature from this context.
-    builder.addGenericSignature(sig, adoptArchetypes);
-  }
-}
-
 /// Check the generic parameters in the given generic parameter list (and its
 /// parent generic parameter lists) according to the given resolver.
 bool TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
@@ -244,7 +230,8 @@ bool TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
   // If there is a parent context, add the generic parameters and requirements
   // from that context.
   if (builder && parentDC)
-    addContextParamsAndRequirements(*builder, parentDC, adoptArchetypes);
+    if (auto sig = parentDC->getGenericSignatureOfContext())
+      builder->addGenericSignature(sig, adoptArchetypes);
 
   // If there aren't any generic parameters at this level, we're done.
   if (!genericParams)
@@ -363,15 +350,12 @@ static void collectGenericParamTypes(
               GenericParamList *genericParams,
               DeclContext *parentDC,
               SmallVectorImpl<GenericTypeParamType *> &allParams) {
-  // If the parent context is a generic type (or nested type thereof),
-  // add its generic parameters.
-  if (parentDC->isTypeContext()) {
-    if (auto parentSig = parentDC->getGenericSignatureOfContext()) {
-      allParams.append(parentSig->getGenericParams().begin(),
-                       parentSig->getGenericParams().end());
-    }
+  // If the parent context has a generic signature, add its generic parameters.
+  if (auto parentSig = parentDC->getGenericSignatureOfContext()) {
+    allParams.append(parentSig->getGenericParams().begin(),
+                     parentSig->getGenericParams().end());
   }
-    
+
   if (genericParams) {
     // Add our parameters.
     for (auto param : *genericParams) {

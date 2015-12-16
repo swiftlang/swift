@@ -2242,16 +2242,6 @@ public:
   /// If \p DC is null, returns true only if this declaration is public.
   bool isAccessibleFrom(const DeclContext *DC) const;
 
-  /// Get the innermost declaration context that can provide generic
-  /// parameters used within this declaration.
-  DeclContext *getPotentialGenericDeclContext();
-
-  /// Get the innermost declaration context that can provide generic
-  /// parameters used within this declaration.
-  const DeclContext *getPotentialGenericDeclContext() const {
-    return const_cast<ValueDecl *>(this)->getPotentialGenericDeclContext();
-  }
-
   /// Retrieve the "interface" type of this value, which is the type used when
   /// the declaration is viewed from the outside. For a generic function,
   /// this will have generic function type using generic parameters rather than

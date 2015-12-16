@@ -810,9 +810,8 @@ static void markInvalidGenericSignature(ValueDecl *VD,
   DeclContext *DC = VD->getDeclContext();
   ArchetypeBuilder builder = TC.createArchetypeBuilder(DC->getParentModule());
 
-  if (DC->isTypeContext())
-    if (auto sig = DC->getGenericSignatureOfContext())
-      builder.addGenericSignature(sig, true);
+  if (auto sig = DC->getGenericSignatureOfContext())
+    builder.addGenericSignature(sig, true);
   
   // Visit each of the generic parameters.
   for (auto param : *genericParams)

@@ -1249,7 +1249,7 @@ matchWitness(ConformanceChecker &cc, TypeChecker &tc,
     // Open up the type of the requirement. We only truly open 'Self' and
     // its associated types (recursively); inner generic type parameters get
     // mapped to their archetypes directly.
-    DeclContext *reqDC = req->getPotentialGenericDeclContext();
+    DeclContext *reqDC = req->getInnermostDeclContext();
     RequirementTypeOpener reqTypeOpener(*cs, conformance, reqDC);
     std::tie(openedFullReqType, reqType)
       = cs->getTypeOfMemberReference(model, req,
@@ -1292,7 +1292,7 @@ matchWitness(ConformanceChecker &cc, TypeChecker &tc,
 
     if (openedFullWitnessType->hasTypeVariable()) {
       // Figure out the context we're substituting into.
-      auto witnessDC = witness->getPotentialGenericDeclContext();
+      auto witnessDC = witness->getInnermostDeclContext();
       
       // Compute the set of substitutions we'll need for the witness.
       solution->computeSubstitutions(witness->getInterfaceType(),

@@ -41,6 +41,42 @@ class OuterNonGenericClass {
     case Baz
     case Zab
   } 
+
+  class InnerNonGenericBase {
+    init() {}
+  }
+
+  class InnerNonGenericClass1 : InnerNonGenericBase {
+    override init() {
+      super.init()
+    }
+  }
+
+  class InnerNonGenericClass2 : OuterNonGenericClass {
+    override init() {
+      super.init()
+    }
+  }
+
+  class InnerGenericClass<U> : OuterNonGenericClass { // expected-error {{generic type 'InnerGenericClass' nested in type 'OuterNonGenericClass'}}
+    override init() {
+      super.init()
+    }
+  }
+
+  func genericFunction<T>(t: T) {
+    class InnerNonGenericClass : OuterNonGenericClass { // expected-error {{type 'InnerNonGenericClass' nested in generic function}}
+      let t: T
+
+      init(t: T) { super.init(); self.t = t }
+    }
+
+    class InnerGenericClass<U where U : Racoon, U.Stripes == T> : OuterNonGenericClass { // expected-error {{type 'InnerGenericClass' nested in generic function}}
+      let t: T
+
+      init(t: T) { super.init(); self.t = t }
+    }
+  }
 }
 
 class OuterGenericClass<T> {
@@ -55,9 +91,65 @@ class OuterGenericClass<T> {
     func flop(t: T)
   }
 
-  class InnerNonGenericClass : InnerNonGenericBase {} // expected-error {{type 'InnerNonGenericClass' nested in generic type 'OuterGenericClass' is not allowed}}
+  class InnerNonGenericBase { // expected-error {{type 'InnerNonGenericBase' nested in generic type 'OuterGenericClass' is not allowed}}
+    init() {}
+  }
 
-  class InnerNonGenericBase {} // expected-error {{type 'InnerNonGenericBase' nested in generic type 'OuterGenericClass' is not allowed}}
+  class InnerNonGenericClass1 : InnerNonGenericBase { // expected-error {{type 'InnerNonGenericClass1' nested in generic type 'OuterGenericClass' is not allowed}}
+    override init() {
+      super.init()
+    }
+  }
+
+  class InnerNonGenericClass2 : OuterGenericClass { // expected-error {{type 'InnerNonGenericClass2' nested in generic type 'OuterGenericClass' is not allowed}}
+    override init() {
+      super.init()
+    }
+  }
+
+  class InnerNonGenericClass3 : OuterGenericClass<Int> { // expected-error {{type 'InnerNonGenericClass3' nested in generic type 'OuterGenericClass' is not allowed}}
+    override init() {
+      super.init()
+    }
+  }
+
+  class InnerNonGenericClass4 : OuterGenericClass<T> { // expected-error {{type 'InnerNonGenericClass4' nested in generic type 'OuterGenericClass' is not allowed}}
+    override init() {
+      super.init()
+    }
+  }
+
+  class InnerGenericClass<U> : OuterGenericClass<U> { // expected-error {{type 'InnerGenericClass' nested in type 'OuterGenericClass' is not allowed}}
+    override init() {
+      super.init()
+    }
+  }
+
+  func genericFunction<U>(t: U) {
+    class InnerNonGenericClass1 : OuterGenericClass { // expected-error {{type 'InnerNonGenericClass1' nested in generic function}}
+      let t: T
+
+      init(t: T) { super.init(); self.t = t }
+    }
+
+    class InnerNonGenericClass2 : OuterGenericClass<Int> { // expected-error {{type 'InnerNonGenericClass2' nested in generic function}}
+      let t: T
+
+      init(t: T) { super.init(); self.t = t }
+    }
+
+    class InnerNonGenericClass3 : OuterGenericClass<T> { // expected-error {{type 'InnerNonGenericClass3' nested in generic function}}
+      let t: T
+
+      init(t: T) { super.init(); self.t = t }
+    }
+
+    class InnerGenericClass<U where U : Racoon, U.Stripes == T> : OuterGenericClass<U> { // expected-error {{type 'InnerGenericClass' nested in generic function}}
+      let t: T
+
+      init(t: T) { super.init(); self.t = t }
+    }
+  }
 }
 
 protocol OuterProtocol {
@@ -82,4 +174,16 @@ protocol Racoon {
 enum OuterEnum {
   protocol C {} // expected-error{{declaration is only valid at file scope}}
   case C(C)
+}
+
+func outerGenericFunction<T>(t: T) {
+  struct InnerNonGeneric { // expected-error{{type 'InnerNonGeneric' nested in generic function 'outerGenericFunction' }}
+    func nonGenericMethod(t: T) {}
+    func genericMethod<V where V : Racoon, V.Stripes == T>(t: T) -> V {}
+  }
+
+  struct InnerGeneric<U> { // expected-error{{type 'InnerGeneric' nested in generic function 'outerGenericFunction' }}
+    func nonGenericMethod(t: T, u: U) {}
+    func genericMethod<V where V : Racoon, V.Stripes == T>(t: T, u: U) -> V {}
+  }
 }

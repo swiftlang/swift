@@ -195,89 +195,83 @@ Type DeclContext::getDeclaredInterfaceType() const {
 }
 
 GenericParamList *DeclContext::getGenericParamsOfContext() const {
-  switch (getContextKind()) {
-  case DeclContextKind::Module:
-  case DeclContextKind::FileUnit:
-  case DeclContextKind::TopLevelCodeDecl:
-    return nullptr;
+  for (const DeclContext *dc = this; ; dc = dc->getParent()) {
+    switch (dc->getContextKind()) {
+    case DeclContextKind::Module:
+    case DeclContextKind::FileUnit:
+    case DeclContextKind::TopLevelCodeDecl:
+      return nullptr;
 
-  case DeclContextKind::SerializedLocal:
-  case DeclContextKind::Initializer:
-  case DeclContextKind::AbstractClosureExpr:
-    // Closures and initializers can't themselves be generic, but they
-    // can occur in generic contexts.
-    return getParent()->getGenericParamsOfContext();
+    case DeclContextKind::SerializedLocal:
+    case DeclContextKind::Initializer:
+    case DeclContextKind::AbstractClosureExpr:
+      // Closures and initializers can't themselves be generic, but they
+      // can occur in generic contexts.
+      continue;
 
-  case DeclContextKind::AbstractFunctionDecl: {
-    auto *AFD = cast<AbstractFunctionDecl>(this);
-    if (auto GP = AFD->getGenericParams())
-      return GP;
+    case DeclContextKind::AbstractFunctionDecl: {
+      auto *AFD = cast<AbstractFunctionDecl>(dc);
+      if (auto GP = AFD->getGenericParams())
+        return GP;
+      continue;
+    }
 
-    // If we're within a type context, pick up the generic signature
-    // of that context.
-    if (AFD->getDeclContext()->isTypeContext())
-      return AFD->getDeclContext()->getGenericParamsOfContext();
+    case DeclContextKind::NominalTypeDecl: {
+      auto NTD = cast<NominalTypeDecl>(dc);
+      if (auto GP = NTD->getGenericParams())
+        return GP;
+      continue;
+    }
 
-    return nullptr;
+    case DeclContextKind::ExtensionDecl: {
+      auto ED = cast<ExtensionDecl>(dc);
+      if (auto GP = ED->getGenericParams())
+        return GP;
+      continue;
+    }
+    }
+    llvm_unreachable("bad DeclContextKind");
   }
-
-  case DeclContextKind::NominalTypeDecl: {
-    auto nominal = cast<NominalTypeDecl>(this);
-    if (auto gp = nominal->getGenericParams())
-      return gp;
-
-    if (nominal->getDeclContext()->isTypeContext())
-      return nominal->getDeclContext()->getGenericParamsOfContext();
-
-    return nullptr;
-  }
-
-  case DeclContextKind::ExtensionDecl:
-    return cast<ExtensionDecl>(this)->getGenericParams();
-  }
-  llvm_unreachable("bad DeclContextKind");
 }
 
 GenericSignature *DeclContext::getGenericSignatureOfContext() const {
-  switch (getContextKind()) {
-  case DeclContextKind::Module:
-  case DeclContextKind::FileUnit:
-  case DeclContextKind::TopLevelCodeDecl:
-  case DeclContextKind::AbstractClosureExpr:
-  case DeclContextKind::Initializer:
-  case DeclContextKind::SerializedLocal:
-    return nullptr;
+  for (const DeclContext *dc = this; ; dc = dc->getParent()) {
+    switch (dc->getContextKind()) {
+    case DeclContextKind::Module:
+    case DeclContextKind::FileUnit:
+    case DeclContextKind::TopLevelCodeDecl:
+      return nullptr;
 
-  case DeclContextKind::AbstractFunctionDecl: {
-    auto *AFD = cast<AbstractFunctionDecl>(this);
-    if (auto genericSig = AFD->getGenericSignature())
-      return genericSig;
-      
-    // If we're within a type context, pick up the generic signature
-    // of that context.
-    if (AFD->getDeclContext()->isTypeContext())
-      return AFD->getDeclContext()->getGenericSignatureOfContext();
-      
-    return nullptr;
-  }
+    case DeclContextKind::Initializer:
+    case DeclContextKind::SerializedLocal:
+    case DeclContextKind::AbstractClosureExpr:
+      // Closures and initializers can't themselves be generic, but they
+      // can occur in generic contexts.
+      continue;
 
-  case DeclContextKind::NominalTypeDecl: {
-    auto nominal = cast<NominalTypeDecl>(this);
-    if (auto genericSig = nominal->getGenericSignature())
-      return genericSig;
-      
-    // If we're within a type context, pick up the generic signature
-    // of that context.
-    if (nominal->getDeclContext()->isTypeContext())
-      return nominal->getDeclContext()->getGenericSignatureOfContext();
-      
-    return nullptr;
-  }
+    case DeclContextKind::AbstractFunctionDecl: {
+      auto *AFD = cast<AbstractFunctionDecl>(dc);
+      if (auto genericSig = AFD->getGenericSignature())
+        return genericSig;
+      continue;
+    }
 
-  case DeclContextKind::ExtensionDecl:
-    return cast<ExtensionDecl>(this)->getGenericSignature();
+    case DeclContextKind::NominalTypeDecl: {
+      auto NTD = cast<NominalTypeDecl>(dc);
+      if (auto genericSig = NTD->getGenericSignature())
+        return genericSig;
+      continue;
+    }
+
+    case DeclContextKind::ExtensionDecl: {
+      auto ED = cast<ExtensionDecl>(dc);
+      if (auto genericSig = ED->getGenericSignature())
+        return genericSig;
+      continue;
+    }
+    }
+    llvm_unreachable("bad DeclContextKind");
   }
-  llvm_unreachable("bad DeclContextKind");
 }
 
 DeclContext *DeclContext::getLocalContext() {
@@ -464,11 +458,7 @@ unsigned DeclContext::getGenericTypeContextDepth() const {
       depth++;
   }
 
-  // Until nominal type generic signatures are parented onto outer generic
-  // function signatures, we can just punt here -- the outermost nominal
-  // type context's generic parameters all have a depth of 0.
-  return 0;
-  // return depth;
+  return depth;
 }
 
 /// Determine whether the innermost context is generic.
