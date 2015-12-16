@@ -182,8 +182,12 @@ static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
                                                         E->getLoc()))
       return op->getInfixData();
   }
-  
-  TC.diagnose(E->getLoc(), diag::unknown_binop);
+
+  // If E is already an ErrorExpr, then we've diagnosed it as invalid already,
+  // otherwise emit an error.
+  if (!isa<ErrorExpr>(E))
+    TC.diagnose(E->getLoc(), diag::unknown_binop);
+
   // Recover with an infinite-precedence left-associative operator.
   return InfixData((unsigned char)~0U, Associativity::Left,
                    /*assignment*/ false);

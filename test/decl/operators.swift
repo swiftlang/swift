@@ -174,10 +174,8 @@ func ??= <T>(inout result : T?, rhs : Int) {  // ok
 
 
 _ = n*-4       // expected-error {{use of unresolved operator '*-'}}
-// expected-error @-1 2 {{operator is not a known binary operator}}
 
 if n==-1 {}    // expected-error {{use of unresolved operator '==-'}}
-// expected-error @-1 {{operator is not a known binary operator}}
 
 prefix operator ☃⃠ {}
 prefix func☃⃠(a : Int) -> Int { return a }
@@ -187,9 +185,7 @@ postfix func☃⃠(a : Int) -> Int { return a }
 _ = n☃⃠ ☃⃠ n   // Ok.
 _ = n ☃⃠ ☃⃠n   // Ok.
 _ = n☃⃠☃⃠n     // expected-error {{use of unresolved operator '☃⃠☃⃠'}}
-// expected-error @-1 2 {{operator is not a known binary operator}}
 _ = n ☃⃠☃⃠ n   // expected-error {{use of unresolved operator '☃⃠☃⃠'}}
-// expected-error @-1 2 {{operator is not a known binary operator}}
 
 
 
