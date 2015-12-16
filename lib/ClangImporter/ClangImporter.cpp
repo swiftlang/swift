@@ -631,6 +631,15 @@ ClangImporter::create(ASTContext &ctx,
   while (!importer->Impl.Parser->ParseTopLevelDecl(parsed)) {
     for (auto *D : parsed.get()) {
       importer->Impl.addBridgeHeaderTopLevelDecls(D);
+
+      if (importer->Impl.UseSwiftLookupTables) {
+        if (auto named = dyn_cast<clang::NamedDecl>(D)) {
+          importer->Impl.addEntryToLookupTable(
+            instance.getSema(),
+            importer->Impl.BridgingHeaderLookupTable,
+            named);
+        }
+      }
     }
   }
 
