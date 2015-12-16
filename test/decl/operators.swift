@@ -188,6 +188,9 @@ _ = n☃⃠☃⃠n     // expected-error {{ambiguous missing whitespace between 
 // expected-note @-1 {{could be binary '☃⃠' and prefix '☃⃠'}} {{12-12= }} {{18-18= }}
 // expected-note @-2 {{could be postfix '☃⃠' and binary '☃⃠'}} {{6-6= }} {{12-12= }}
 
-
+_ = n☃⃠☃⃠ // expected-error {{unary operators may not be juxtaposed; parenthesize inner expression}}
+_ = ~!n  // expected-error {{unary operators may not be juxtaposed; parenthesize inner expression}}
+_ = -+n  // expected-error {{unary operators may not be juxtaposed; parenthesize inner expression}}
+_ = -++n // expected-error {{unary operators may not be juxtaposed; parenthesize inner expression}}
 
 

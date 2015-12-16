@@ -295,10 +295,10 @@ static bool containsDeclRefKind(LookupResult &lookupResult,
 
 /// Emit a diagnostic with a fixit hint for an invalid binary operator, showing
 /// how to split it according to splitCandidate.
-static void diagnoseOperatorSplit(UnresolvedDeclRefExpr *UDRE,
-                                  std::pair<unsigned, bool> splitCandidate,
-                                  Diag<Identifier, Identifier, bool> diagID,
-                                  TypeChecker &TC) {
+static void diagnoseBinOpSplit(UnresolvedDeclRefExpr *UDRE,
+                               std::pair<unsigned, bool> splitCandidate,
+                               Diag<Identifier, Identifier, bool> diagID,
+                               TypeChecker &TC) {
 
   unsigned splitLoc = splitCandidate.first;
   bool isBinOpFirst = splitCandidate.second;
@@ -327,24 +327,29 @@ static void diagnoseOperatorSplit(UnresolvedDeclRefExpr *UDRE,
 /// it is a binary operator juxtaposed with a unary operator (x*-4) that
 /// needs whitespace.  If so, emit specific diagnostics for it and return true,
 /// otherwise return false.
-static bool diagnoseJuxtaposedBinOp(UnresolvedDeclRefExpr *UDRE,
+static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
                                     DeclContext *DC,
                                     TypeChecker &TC) {
   Identifier name = UDRE->getName();
   StringRef nameStr = name.str();
-  if (!name.isOperator() || nameStr.size() < 2 ||
-      UDRE->getRefKind() != DeclRefKind::BinaryOperator)
+  if (!name.isOperator() || nameStr.size() < 2)
     return false;
 
-  // Relex the token, to decide whether it has whitespace around it or not.  If
-  // it does, it isn't likely to be a case where a space was forgotten.
-  auto tok = Lexer::getTokenAtLocation(TC.Context.SourceMgr, UDRE->getLoc());
-  if (tok.getKind() != tok::oper_binary_unspaced)
-    return false;
+  bool isBinOp = UDRE->getRefKind() == DeclRefKind::BinaryOperator;
 
-  // Okay, we have a failed lookup of a multicharacter unspaced binary operator.
-  // Check to see if lookup succeeds if a prefix or postfix operator is split
-  // off, and record the matches found.  The bool indicated is false if the
+  // If this is a binary operator, relex the token, to decide whether it has
+  // whitespace around it or not.  If it does "x +++ y", then it isn't likely to
+  // be a case where a space was forgotten.
+  if (isBinOp) {
+    auto tok = Lexer::getTokenAtLocation(TC.Context.SourceMgr, UDRE->getLoc());
+    if (tok.getKind() != tok::oper_binary_unspaced)
+      return false;
+  }
+
+  // Okay, we have a failed lookup of a multicharacter operator. Check to see if
+  // lookup succeeds if part is split off, and record the matches found.
+  //
+  // In the case of a binary operator, the bool indicated is false if the
   // first half of the split is the unary operator (x!*4) or true if it is the
   // binary operator (x*+4).
   std::vector<std::pair<unsigned, bool>> WorkableSplits;
@@ -373,14 +378,23 @@ static bool diagnoseJuxtaposedBinOp(UnresolvedDeclRefExpr *UDRE,
                                           LookupOptions);
     if (!endLookup) continue;
 
-    // Look to see if the candidates found could possibly match.
-    if (containsDeclRefKind(startLookup, DeclRefKind::PostfixOperator) &&
-        containsDeclRefKind(endLookup, DeclRefKind::BinaryOperator))
-      WorkableSplits.push_back({ splitLoc, false });
+    // If the overall operator is a binary one, then we're looking at
+    // juxtaposed binary and unary operators.
+    if (isBinOp) {
+      // Look to see if the candidates found could possibly match.
+      if (containsDeclRefKind(startLookup, DeclRefKind::PostfixOperator) &&
+          containsDeclRefKind(endLookup, DeclRefKind::BinaryOperator))
+        WorkableSplits.push_back({ splitLoc, false });
 
-    if (containsDeclRefKind(startLookup, DeclRefKind::BinaryOperator) &&
-        containsDeclRefKind(endLookup, DeclRefKind::PrefixOperator))
-      WorkableSplits.push_back({ splitLoc, true });
+      if (containsDeclRefKind(startLookup, DeclRefKind::BinaryOperator) &&
+          containsDeclRefKind(endLookup, DeclRefKind::PrefixOperator))
+        WorkableSplits.push_back({ splitLoc, true });
+    } else {
+      // Otherwise, it is two of the same kind, e.g. "!!x" or "!~x".
+      if (containsDeclRefKind(startLookup, UDRE->getRefKind()) &&
+          containsDeclRefKind(endLookup, UDRE->getRefKind()))
+        WorkableSplits.push_back({ splitLoc, false });
+    }
   }
 
   switch (WorkableSplits.size()) {
@@ -389,19 +403,26 @@ static bool diagnoseJuxtaposedBinOp(UnresolvedDeclRefExpr *UDRE,
     return false;
   case 1:
     // One candidate: produce an error with a fixit on it.
-    diagnoseOperatorSplit(UDRE, WorkableSplits[0],
-                          diag::unspaced_operators_fixit, TC);
+    if (isBinOp)
+      diagnoseBinOpSplit(UDRE, WorkableSplits[0],
+                         diag::unspaced_binary_operator_fixit, TC);
+    else
+      TC.diagnose(UDRE->getLoc().getAdvancedLoc(WorkableSplits[0].first),
+                  diag::unspaced_unary_operator);
     return true;
 
   default:
     // Otherwise, we have to produce a series of notes listing the various
     // options.
-    TC.diagnose(UDRE->getLoc(), diag::unspaced_operators)
+    TC.diagnose(UDRE->getLoc(), isBinOp ? diag::unspaced_binary_operator :
+                diag::unspaced_unary_operator)
       .highlight(UDRE->getLoc());
 
-    for (auto candidateSplit : WorkableSplits)
-      diagnoseOperatorSplit(UDRE, candidateSplit,
-                            diag::unspaced_operators_candidate, TC);
+    if (isBinOp) {
+      for (auto candidateSplit : WorkableSplits)
+        diagnoseBinOpSplit(UDRE, candidateSplit,
+                           diag::unspaced_binary_operators_candidate, TC);
+    }
     return true;
   }
 }
@@ -423,10 +444,10 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   auto Lookup = lookupUnqualified(DC, Name, Loc, LookupOptions);
 
   if (!Lookup) {
-    // If we failed lookup of a binary operator, check to see it to see if
-    // it is a binary operator juxtaposed with a unary operator (x*-4) that
-    // needs whitespace.  If so, emit specific diagnostics for it.
-    if (!diagnoseJuxtaposedBinOp(UDRE, DC, *this)) {
+    // If we failed lookup of an operator, check to see it to see if it is
+    // because two operators are juxtaposed e.g. (x*-4) that needs whitespace.
+    // If so, emit specific diagnostics for it.
+    if (!diagnoseOperatorJuxtaposition(UDRE, DC, *this)) {
       diagnose(Loc, diag::use_unresolved_identifier, Name,
                UDRE->getName().isOperator())
         .highlight(Loc);

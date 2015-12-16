@@ -421,15 +421,17 @@ ERROR(use_nonmatching_operator,sema_nb,none,
       "%0 is not a %select{binary|prefix unary|postfix unary}1 operator",
       (Identifier, unsigned))
 
-ERROR(unspaced_operators_fixit,sema_nb,none,
+ERROR(unspaced_binary_operator_fixit,sema_nb,none,
       "missing whitespace between %0 and %1 operators",
       (Identifier, Identifier, bool))
-ERROR(unspaced_operators,sema_nb,none,
+ERROR(unspaced_binary_operator,sema_nb,none,
       "ambiguous missing whitespace between unary and binary operators", ())
-NOTE(unspaced_operators_candidate,sema_nb,none,
+NOTE(unspaced_binary_operators_candidate,sema_nb,none,
      "could be %select{binary|postfix}2 %0 and %select{prefix|binary}2 %1",
      (Identifier, Identifier, bool))
-
+ERROR(unspaced_unary_operator,sema_nb,none,
+      "unary operators may not be juxtaposed; parenthesize inner expression",
+      ())
 
 
 ERROR(use_unresolved_identifier,sema_nb,none,
