@@ -142,7 +142,9 @@ static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
                      Associativity::Right,
                      /*assignment*/ false);
 
-  } else if (auto *assign = dyn_cast<AssignExpr>(E)) {
+  }
+
+  if (auto *assign = dyn_cast<AssignExpr>(E)) {
     // Assignment has fixed precedence.
     assert(!assign->isFolded() && "already folded assign expr in sequence?!");
     (void)assign;
@@ -150,7 +152,9 @@ static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
                      Associativity::Right,
                      /*assignment*/ true);
 
-  } else if (auto *as = dyn_cast<ExplicitCastExpr>(E)) {
+  }
+
+  if (auto *as = dyn_cast<ExplicitCastExpr>(E)) {
     // 'as' and 'is' casts have fixed precedence.
     assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
     (void)as;
@@ -158,7 +162,9 @@ static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
                      Associativity::None,
                      /*assignment*/ false);
 
-  } else if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
+  }
+
+  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
     SourceFile *SF = DC->getParentSourceFile();
     Identifier name = DRE->getDecl()->getName();
     bool isCascading = DC->isCascadingContextForLookup(true);
@@ -166,7 +172,9 @@ static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
                                                         E->getLoc()))
       return op->getInfixData();
 
-  } else if (OverloadedDeclRefExpr *OO = dyn_cast<OverloadedDeclRefExpr>(E)) {
+  }
+
+  if (OverloadedDeclRefExpr *OO = dyn_cast<OverloadedDeclRefExpr>(E)) {
     SourceFile *SF = DC->getParentSourceFile();
     Identifier name = OO->getDecls()[0]->getName();
     bool isCascading = DC->isCascadingContextForLookup(true);
