@@ -2943,7 +2943,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   if (isa<SILUndef>(SILVal))
     return;
 
-  StringRef Name = Decl->getNameStr();
+  StringRef Name = i->getVarInfo().Name;
   Explosion e = getLoweredExplosion(SILVal);
   DebugTypeInfo DbgTy(Decl, Decl->getType(), getTypeInfo(SILVal.getType()));
   // An inout/lvalue type that is described by a debug value has been
@@ -2968,7 +2968,7 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   if (isa<SILUndef>(SILVal))
     return;
 
-  StringRef Name = Decl->getName().str();
+  StringRef Name = i->getVarInfo().Name;
   auto Addr = getLoweredAddress(SILVal).getAddress();
   DebugTypeInfo DbgTy(Decl, Decl->getType(), getTypeInfo(SILVal.getType()));
   // Put the value into a stack slot at -Onone and emit a debug intrinsic.
@@ -3229,7 +3229,7 @@ static void emitDebugDeclarationForAllocStack(IRGenSILFunction &IGF,
       // is stored in the alloca, emitting it as a reference type would
       // be wrong.
       DbgTy.unwrapLValueOrInOutType();
-      auto Name = Decl->getName().empty() ? "_" : Decl->getName().str();
+      auto Name = i->getVarInfo().Name.empty() ? "_" : i->getVarInfo().Name;
       auto DS = i->getDebugScope();
       if (DS) {
         assert(DS->SILFn == IGF.CurSILFn || DS->InlinedCallSite);
@@ -3245,12 +3245,11 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
 
   // Derive name from SIL location.
   VarDecl *Decl = i->getDecl();
-  StringRef dbgname =
+  StringRef dbgname;
 # ifndef NDEBUG
-    // If this is a DEBUG build, use pretty names for the LLVM IR.
-    Decl ? Decl->getNameStr() :
+  // If this is a DEBUG build, use pretty names for the LLVM IR.
+  dbgname = i->getVarInfo().Name;
 # endif
-    "";
 
   (void) Decl;
   // If a dynamic alloc_stack is immediately initialized by a copy_addr
@@ -3363,7 +3362,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
 
   // Derive name from SIL location.
   VarDecl *Decl = i->getDecl();
-  StringRef Name = Decl ? Decl->getName().str() : "";
+  StringRef Name = i->getVarInfo().Name;
   StringRef DbgName =
 # ifndef NDEBUG
     // If this is a DEBUG build, use pretty names for the LLVM IR.
