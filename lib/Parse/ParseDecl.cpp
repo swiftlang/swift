@@ -4951,7 +4951,23 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   bool AllowTopLevel = Flags.contains(PD_AllowTopLevel);
 
   if (!Tok.isAnyOperator() && !Tok.is(tok::exclaim_postfix)) {
-    diagnose(Tok, diag::expected_operator_name_after_operator);
+    // A common error is to try to define an operator with something in the
+    // unicode plane considered to be an operator, or to try to define an
+    // operator like "not".  Diagnose this specifically.
+    if (Tok.is(tok::identifier))
+      diagnose(Tok, diag::identifier_when_expecting_operator,
+               Context.getIdentifier(Tok.getText()));
+    else
+      diagnose(Tok, diag::expected_operator_name_after_operator);
+
+    // To improve recovery, check to see if we have a { right after this token.
+    // If so, swallow until the end } to avoid tripping over the body of the
+    // malformed operator decl.
+    if (peekToken().is(tok::l_brace)) {
+      consumeToken();
+      skipSingle();
+    }
+
     return nullptr;
   }
 

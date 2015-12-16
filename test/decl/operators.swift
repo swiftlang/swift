@@ -163,7 +163,7 @@ func operator_in_func_bad () {
                                                                     // expected-error {{use of unresolved identifier 'input'}}
 }
 
-infix operator ? {}  // expected-error {{expected operator name in operator declaration}} expected-error {{braced block of statements is an unused closure}} expected-error{{begin with a closure}} expected-note{{discard the result}} {{18-18=_ = }} expected-error{{expression resolves to an unused function}}
+infix operator ? {}  // expected-error {{expected operator name in operator declaration}} 
 
 infix operator ??= {}
 

@@ -364,6 +364,9 @@ ERROR(operator_decl_inner_scope,decl_parsing,none,
       "'operator' may only be declared at file scope", ())
 ERROR(expected_operator_name_after_operator,decl_parsing,PointsToFirstBadToken,
       "expected operator name in operator declaration", ())
+ERROR(identifier_when_expecting_operator,decl_parsing,PointsToFirstBadToken,
+      "%0 is considered to be an identifier, not an operator", (Identifier))
+
 ERROR(operator_decl_no_fixity,decl_parsing,none,
       "operator must be declared as 'prefix', 'postfix', or 'infix'", ())
 ERROR(expected_lbrace_after_operator,decl_parsing,PointsToFirstBadToken,

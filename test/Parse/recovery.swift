@@ -705,4 +705,9 @@ func test23719432() {
   &(Int:x)  // expected-error {{'&' can only appear immediately in a call argument list}}
 }
 
+// <rdar://problem/19911096> QoI: terrible recovery when using '·' for an operator
+infix operator · {  // expected-error {{'·' is considered to be an identifier, not an operator}}
+  associativity none precedence 150
+}
+
 
