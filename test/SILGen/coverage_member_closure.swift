@@ -10,6 +10,6 @@ class C {
 
   // Closures in members show up at the end of the constructor's map.
   // CHECK-NOT: sil_coverage_map
-  // CHECK: [[@LINE+1]]:55 -> [[@LINE+1]]:77 : 2
-  var completionHandler: (String, [String]) -> Void = {(foo, bar) in return}
+  // CHECK: [[@LINE+1]]:55 -> [[@LINE+1]]:79 : 2
+  var completionHandler: (String, [String]) -> Void = { (foo, bar) in return }
 }
