@@ -420,16 +420,28 @@ ERROR(ambiguous_module_type,sema_nb,none,
 ERROR(use_nonmatching_operator,sema_nb,none,
       "%0 is not a %select{binary|prefix unary|postfix unary}1 operator",
       (Identifier, unsigned))
+
+ERROR(unspaced_operators_fixit,sema_nb,none,
+      "missing whitespace between %0 and %1 operators",
+      (Identifier, Identifier, bool))
+ERROR(unspaced_operators,sema_nb,none,
+      "ambiguous missing whitespace between unary and binary operators", ())
+NOTE(unspaced_operators_candidate,sema_nb,none,
+     "could be %select{binary|postfix}2 %0 and %select{prefix|binary}2 %1",
+     (Identifier, Identifier, bool))
+
+
+
 ERROR(use_unresolved_identifier,sema_nb,none,
       "use of unresolved %select{identifier|operator}1 %0", (Identifier, bool))
 ERROR(use_undeclared_type,sema_nb,none,
       "use of undeclared type %0", (Identifier))
 ERROR(use_undeclared_type_did_you_mean,sema_nb,none,
-"use of undeclared type %0; did you mean to use '%1'?", (Identifier, StringRef))
+      "use of undeclared type %0; did you mean to use '%1'?", (Identifier, StringRef))
 NOTE(note_remapped_type,sema_nb,none,
-  "did you mean to use '%0'?", (StringRef))
+     "did you mean to use '%0'?", (StringRef))
 ERROR(identifier_init_failure,sema_nb,none,
-  "could not infer type for %0", (Identifier))
+      "could not infer type for %0", (Identifier))
 ERROR(pattern_used_in_type,sema_nb,none,
       "%0 used within its own type", (Identifier))
 NOTE(note_module_as_type,sema_nb,none,

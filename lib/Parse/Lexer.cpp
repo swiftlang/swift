@@ -523,6 +523,18 @@ bool Lexer::isIdentifier(StringRef string) {
   return p == end;
 }
 
+/// \brief Determines if the given string is a valid operator identifier,
+/// without escaping characters.
+bool Lexer::isOperator(StringRef string) {
+  if (string.empty()) return false;
+  char const *p = string.data(), *end = string.end();
+  if (!advanceIfValidStartOfOperator(p, end))
+    return false;
+  while (p < end && advanceIfValidContinuationOfOperator(p, end));
+  return p == end;
+}
+
+
 tok Lexer::kindOfIdentifier(StringRef Str, bool InSILMode) {
   tok Kind = llvm::StringSwitch<tok>(Str)
 #define KEYWORD(kw) \
@@ -1664,15 +1676,15 @@ Restart:
   }
 }
 
-SourceLoc Lexer::getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc) {
+Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
   // Don't try to do anything with an invalid location.
   if (!Loc.isValid())
-    return Loc;
+    return Token();
 
   // Figure out which buffer contains this location.
   int BufferID = SM.findBufferContainingLoc(Loc);
   if (BufferID < 0)
-    return SourceLoc();
+    return Token();
   
   // Use fake language options; language options only affect validity
   // and the exact token produced.
@@ -1685,9 +1697,13 @@ SourceLoc Lexer::getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc) {
   Lexer L(FakeLangOpts, SM, BufferID, nullptr, /*InSILMode=*/ false,
           CommentRetentionMode::ReturnAsTokens);
   L.restoreState(State(Loc));
-  unsigned Length = L.peekNextToken().getLength();
-  return Loc.getAdvancedLoc(Length);
+  return L.peekNextToken();
 }
+
+SourceLoc Lexer::getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc) {
+  return Loc.getAdvancedLoc(getTokenAtLocation(SM, Loc).getLength());
+}
+
 
 static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
                                             unsigned BufferID,

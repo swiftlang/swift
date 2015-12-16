@@ -281,6 +281,132 @@ static bool matchesDeclRefKind(ValueDecl *value, DeclRefKind refKind) {
   llvm_unreachable("bad declaration reference kind");
 }
 
+static bool containsDeclRefKind(LookupResult &lookupResult,
+                                DeclRefKind refKind) {
+  for (auto candidate : lookupResult) {
+    ValueDecl *D = candidate.Decl;
+    if (!D || !D->hasType())
+      continue;
+    if (matchesDeclRefKind(D, refKind))
+      return true;
+  }
+  return false;
+}
+
+/// Emit a diagnostic with a fixit hint for an invalid binary operator, showing
+/// how to split it according to splitCandidate.
+static void diagnoseOperatorSplit(UnresolvedDeclRefExpr *UDRE,
+                                  std::pair<unsigned, bool> splitCandidate,
+                                  Diag<Identifier, Identifier, bool> diagID,
+                                  TypeChecker &TC) {
+
+  unsigned splitLoc = splitCandidate.first;
+  bool isBinOpFirst = splitCandidate.second;
+  StringRef nameStr = UDRE->getName().str();
+  auto startStr = nameStr.substr(0, splitLoc);
+  auto endStr = nameStr.drop_front(splitLoc);
+
+  // One valid split found, it is almost certainly the right answer.
+  auto diag = TC.diagnose(UDRE->getLoc(), diagID,
+                          TC.Context.getIdentifier(startStr),
+                          TC.Context.getIdentifier(endStr), isBinOpFirst);
+  // Highlight the whole operator.
+  diag.highlight(UDRE->getLoc());
+  // Insert whitespace on the left if the binop is at the start, or to the
+  // right if it is end.
+  if (isBinOpFirst)
+    diag.fixItInsert(UDRE->getLoc(), " ");
+  else
+    diag.fixItInsertAfter(UDRE->getLoc(), " ");
+
+  // Insert a space between the operators.
+  diag.fixItInsert(UDRE->getLoc().getAdvancedLoc(splitLoc), " ");
+}
+
+/// If we failed lookup of a binary operator, check to see it to see if
+/// it is a binary operator juxtaposed with a unary operator (x*-4) that
+/// needs whitespace.  If so, emit specific diagnostics for it and return true,
+/// otherwise return false.
+static bool diagnoseJuxtaposedBinOp(UnresolvedDeclRefExpr *UDRE,
+                                    DeclContext *DC,
+                                    TypeChecker &TC) {
+  Identifier name = UDRE->getName();
+  StringRef nameStr = name.str();
+  if (!name.isOperator() || nameStr.size() < 2 ||
+      UDRE->getRefKind() != DeclRefKind::BinaryOperator)
+    return false;
+
+  // Relex the token, to decide whether it has whitespace around it or not.  If
+  // it does, it isn't likely to be a case where a space was forgotten.
+  auto tok = Lexer::getTokenAtLocation(TC.Context.SourceMgr, UDRE->getLoc());
+  if (tok.getKind() != tok::oper_binary_unspaced)
+    return false;
+
+  // Okay, we have a failed lookup of a multicharacter unspaced binary operator.
+  // Check to see if lookup succeeds if a prefix or postfix operator is split
+  // off, and record the matches found.  The bool indicated is false if the
+  // first half of the split is the unary operator (x!*4) or true if it is the
+  // binary operator (x*+4).
+  std::vector<std::pair<unsigned, bool>> WorkableSplits;
+
+  // Check all the potential splits.
+  for (unsigned splitLoc = 1, e = nameStr.size(); splitLoc != e; ++splitLoc) {
+    // For it to be a valid split, the start and end section must be valid
+    // operators, spliting a unicode code point isn't kosher.
+    auto startStr = nameStr.substr(0, splitLoc);
+    auto endStr = nameStr.drop_front(splitLoc);
+    if (!Lexer::isOperator(startStr) || !Lexer::isOperator(endStr))
+      continue;
+
+    auto startName = TC.Context.getIdentifier(startStr);
+    auto endName = TC.Context.getIdentifier(endStr);
+
+    // Perform name lookup for the first and second pieces.  If either fail to
+    // be found, then it isn't a valid split.
+    NameLookupOptions LookupOptions = defaultUnqualifiedLookupOptions;
+    if (isa<AbstractFunctionDecl>(DC))
+      LookupOptions |= NameLookupFlags::KnownPrivate;
+    auto startLookup = TC.lookupUnqualified(DC, startName, UDRE->getLoc(),
+                                       LookupOptions);
+    if (!startLookup) continue;
+    auto endLookup = TC.lookupUnqualified(DC, endName, UDRE->getLoc(),
+                                          LookupOptions);
+    if (!endLookup) continue;
+
+    // Look to see if the candidates found could possibly match.
+    if (containsDeclRefKind(startLookup, DeclRefKind::PostfixOperator) &&
+        containsDeclRefKind(endLookup, DeclRefKind::BinaryOperator))
+      WorkableSplits.push_back({ splitLoc, false });
+
+    if (containsDeclRefKind(startLookup, DeclRefKind::BinaryOperator) &&
+        containsDeclRefKind(endLookup, DeclRefKind::PrefixOperator))
+      WorkableSplits.push_back({ splitLoc, true });
+  }
+
+  switch (WorkableSplits.size()) {
+  case 0:
+    // No splits found, can't produce this diagnostic.
+    return false;
+  case 1:
+    // One candidate: produce an error with a fixit on it.
+    diagnoseOperatorSplit(UDRE, WorkableSplits[0],
+                          diag::unspaced_operators_fixit, TC);
+    return true;
+
+  default:
+    // Otherwise, we have to produce a series of notes listing the various
+    // options.
+    TC.diagnose(UDRE->getLoc(), diag::unspaced_operators)
+      .highlight(UDRE->getLoc());
+
+    for (auto candidateSplit : WorkableSplits)
+      diagnoseOperatorSplit(UDRE, candidateSplit,
+                            diag::unspaced_operators_candidate, TC);
+    return true;
+  }
+}
+
+
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression.  Context is the DeclContext used
 /// for the lookup.
@@ -297,9 +423,14 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   auto Lookup = lookupUnqualified(DC, Name, Loc, LookupOptions);
 
   if (!Lookup) {
-    diagnose(Loc, diag::use_unresolved_identifier, Name,
-             UDRE->getName().isOperator())
-      .highlight(Loc);
+    // If we failed lookup of a binary operator, check to see it to see if
+    // it is a binary operator juxtaposed with a unary operator (x*-4) that
+    // needs whitespace.  If so, emit specific diagnostics for it.
+    if (!diagnoseJuxtaposedBinOp(UDRE, DC, *this)) {
+      diagnose(Loc, diag::use_unresolved_identifier, Name,
+               UDRE->getName().isOperator())
+        .highlight(Loc);
+    }
     return new (Context) ErrorExpr(Loc);
   }
 
