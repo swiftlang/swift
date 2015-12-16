@@ -297,7 +297,8 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   auto Lookup = lookupUnqualified(DC, Name, Loc, LookupOptions);
 
   if (!Lookup) {
-    diagnose(Loc, diag::use_unresolved_identifier, Name)
+    diagnose(Loc, diag::use_unresolved_identifier, Name,
+             UDRE->getName().isOperator())
       .highlight(Loc);
     return new (Context) ErrorExpr(Loc);
   }

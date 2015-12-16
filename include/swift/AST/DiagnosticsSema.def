@@ -421,7 +421,7 @@ ERROR(use_nonmatching_operator,sema_nb,none,
       "%0 is not a %select{binary|prefix unary|postfix unary}1 operator",
       (Identifier, unsigned))
 ERROR(use_unresolved_identifier,sema_nb,none,
-      "use of unresolved identifier %0", (Identifier))
+      "use of unresolved %select{identifier|operator}1 %0", (Identifier, bool))
 ERROR(use_undeclared_type,sema_nb,none,
       "use of undeclared type %0", (Identifier))
 ERROR(use_undeclared_type_did_you_mean,sema_nb,none,
