@@ -92,7 +92,7 @@ public func max<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
     r = z
   }
   for t in rest {
-    if t >= r {
+    if r < t {
       r = t
     }
   }
