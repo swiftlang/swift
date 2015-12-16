@@ -1700,7 +1700,7 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
 }
 
 SourceLoc Lexer::getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc) {
-  return Loc.getAdvancedLoc(getTokenAtLocation(SM, Loc).getLength());
+  return Loc.getAdvancedLocOrInvalid(getTokenAtLocation(SM, Loc).getLength());
 }
 
 
