@@ -2311,7 +2311,7 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
         tar -c -z -f "${INSTALLABLE_PACKAGE}" --owner=0 --group=0 "${INSTALL_PREFIX/#\/}")
     fi
     if [[ "${TEST_INSTALLABLE_PACKAGE}" ]] ; then
-        PKG_TESTS_SOURCE_DIR="${WORKSPACE}/swift-package-tests"
+        PKG_TESTS_SOURCE_DIR="${WORKSPACE}/swift-integration-tests"
         PKG_TESTS_SANDBOX_PARENT="/tmp/swift_package_sandbox"
 
         if [[ "$(uname -s)" == "Darwin" ]] ; then
