@@ -1311,6 +1311,10 @@ public:
   void lookupValue(SwiftLookupTable &table, DeclName name,
                    VisibleDeclConsumer &consumer);
 
+  /// Look for namespace-scope values in the given Swift lookup table.
+  void lookupVisibleDecls(SwiftLookupTable &table,
+                          VisibleDeclConsumer &consumer);
+
   /// Look for Objective-C members with the given name in the given
   /// Swift lookup table.
   void lookupObjCMembers(SwiftLookupTable &table, DeclName name,

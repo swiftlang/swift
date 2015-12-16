@@ -3699,6 +3699,16 @@ void ClangModuleUnit::lookupVisibleDecls(Module::AccessPathTy accessPath,
     actualConsumer = &darwinBlacklistConsumer;
   }
 
+  if (owner.Impl.UseSwiftLookupTables) {
+    // Find the corresponding lookup table.
+    if (auto lookupTable = owner.Impl.findLookupTable(clangModule)) {
+      // Search it.
+      owner.Impl.lookupVisibleDecls(*lookupTable, *actualConsumer);
+    }
+
+    return;
+  }
+
   owner.lookupVisibleDecls(*actualConsumer);
 }
 
@@ -4520,6 +4530,19 @@ void ClangImporter::Implementation::lookupValue(
       if (alternate->getFullName().matchesRef(name))
         consumer.foundDecl(alternate, DeclVisibilityKind::VisibleAtTopLevel);
     }
+  }
+}
+
+void ClangImporter::Implementation::lookupVisibleDecls(
+       SwiftLookupTable &table,
+       VisibleDeclConsumer &consumer) {
+  // Retrieve and sort all of the base names in this particular table.
+  auto baseNames = table.allBaseNames();
+  llvm::array_pod_sort(baseNames.begin(), baseNames.end());
+
+  // Look for namespace-scope entities with each base name.
+  for (auto baseName : baseNames) {
+    lookupValue(table, SwiftContext.getIdentifier(baseName), consumer);
   }
 }
 
