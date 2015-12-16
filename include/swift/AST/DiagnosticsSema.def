@@ -451,6 +451,11 @@ NOTE(note_module_as_type,sema_nb,none,
 
 ERROR(use_unknown_object_literal,sema_nb,none,
      "use of unknown object literal name %0", (Identifier))
+ERROR(object_literal_default_type_missing,sema_nb,none,
+     "could not infer type of %0 literal", (StringRef))
+NOTE(object_literal_resolve_import,sema_nb,none,
+     "import %0 to use '%1' as the default %2 literal type",
+     (StringRef, StringRef, StringRef))
 
 ERROR(use_non_type_value,sema_nb,none,
       "%0 is not a type", (Identifier))
