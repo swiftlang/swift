@@ -324,17 +324,9 @@ struct ArgumentInitVisitor :
     ++ArgNo;
     auto PD = P->getDecl();
     if (!PD->hasName()) {
-      ManagedValue argrv = makeArgument(P->getType(), &*f.begin(), PD);
-      // Emit debug information for the argument.
-      SILLocation loc(PD);
-      loc.markAsPrologue();
-      if (argrv.getType().isAddress())
-        gen.B.createDebugValueAddr(loc, argrv.getValue(), {PD->isLet(), ArgNo});
-      else
-        gen.B.createDebugValue(loc, argrv.getValue(), {PD->isLet(), ArgNo});
-
       // A value bound to _ is unused and can be immediately released.
       Scope discardScope(gen.Cleanups, CleanupLocation(P));
+      makeArgument(P->getType(), &*f.begin(), PD);
       // Popping the scope destroys the value.
     } else {
       makeArgumentIntoBinding(P->getType(), &*f.begin(), PD);
