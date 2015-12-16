@@ -288,8 +288,10 @@ extension BidirectionalIndexType {
       return _advanceForward(n)
     }
     var p = self
-    for var i: Distance = n; i != 0; ++i {
-      --p
+    var i: Distance = n
+    while i != 0 {
+      p._predecessorInPlace()
+      i._successorInPlace()
     }
     return p
   }
