@@ -766,3 +766,33 @@ bb3:                                              // Preds: bb1 bb2
   dealloc_stack %1#0 : $*@local_storage TwoField  // id: %24
   return %23 : $()                                // id: %25
 }
+
+// CHECK-LABEL: agg_and_field_store_with_the_same_value
+// CHECK: bb2
+// CHECK-NOT: load
+// CHECK: return
+sil hidden @agg_and_field_store_with_the_same_value : $@convention(thin) (Bool) -> () {
+bb0(%0 : $Bool):
+  %1 = alloc_stack $TwoField, var, name "x"            // users: %6, %11, %16, %21, %24
+  %7 = struct_extract %0 : $Bool, #Bool.value     // user: %8
+  br bb1
+
+bb1:                                              // Preds: bb0
+  %9 = integer_literal $Builtin.Int64, 10         // user: %10
+  %10 = struct $Int (%9 : $Builtin.Int64)         // user: %12
+  %11 = struct_element_addr %1#1 : $*TwoField, #TwoField.a // user: %12
+  store %10 to %11 : $*Int                        // id: %12
+  %16 = struct_element_addr %1#1 : $*TwoField, #TwoField.b // user: %17
+  store %10 to %16 : $*Int                        // id: %17
+  br bb2                                          // id: %13
+
+bb2:                                              // Preds: bb1 bb2
+  %99 = load %1#1 : $*TwoField                   // id: %6
+  %991 = function_ref @use_twofield : $@convention(thin) (TwoField) -> () // user: %5
+  %55 = apply %991(%99) : $@convention(thin) (TwoField) -> () // user: %6
+  %23 = tuple ()                                  // user: %25
+  dealloc_stack %1#0 : $*@local_storage TwoField  // id: %24
+  return %23 : $()                                // id: %25
+}
+
+
