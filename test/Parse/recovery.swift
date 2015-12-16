@@ -680,8 +680,8 @@ class r22240342 {
 
 // <rdar://problem/22387625> QoI: Common errors: 'let x= 5' and 'let x =5' could use Fix-its
 func r22387625() {
-  let _= 5 // expected-error{{postfix '=' is reserved}} {{8-8= }}
-  let _ =5 // expected-error{{prefix '=' is reserved}} {{10-10= }}
+  let _= 5 // expected-error{{'=' must have consistent whitespace on both sides}} {{8-8= }}
+  let _ =5 // expected-error{{'=' must have consistent whitespace on both sides}} {{10-10= }}
 }
 
 

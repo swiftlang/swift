@@ -643,8 +643,7 @@ void Lexer::lexOperatorIdentifier() {
     switch (TokStart[0]) {
     case '=':
       if (leftBound != rightBound) {
-        auto d = diagnose(TokStart, diag::lex_unary_equal_is_reserved,
-                          leftBound);
+        auto d = diagnose(TokStart, diag::lex_unary_equal);
         if (leftBound)
           d.fixItInsert(getSourceLoc(TokStart), " ");
         else
