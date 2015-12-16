@@ -34,6 +34,13 @@ struct OuterGeneric<D> {
     func flip(r: Rooster)
     func flop(t: D)
   }
+
+  func nonGenericMethod(d: D) {
+    // FIXME: local generic functions can't capture generic parameters yet
+    func genericFunction<E>(d: D, e: E) {}
+
+    genericFunction(d, e: ())
+  }
 }
 
 class OuterNonGenericClass {
