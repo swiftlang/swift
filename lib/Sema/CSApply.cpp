@@ -3270,6 +3270,7 @@ namespace {
       Expr *callExpr = new (ctx) CallExpr(fnRef, argExpr, /*implicit*/true);
       bool invalid = tc.typeCheckExpression(callExpr, cs.DC, valueType,
                                             CTP_CannotFail);
+      (void) invalid;
       assert(!invalid && "conversion cannot fail");
       E->setSemanticExpr(callExpr);
       return E;
