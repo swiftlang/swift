@@ -143,9 +143,9 @@ extension String.CharacterView : CollectionType {
 
       var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
           unicodeScalars[start].value)
-      ++start
+      start = start.successor()
 
-      for ; start != end; ++start {
+      for ; start != end; start = start.successor() {
         // FIXME(performance): consider removing this "fast path".  A branch
         // that is hard to predict could be worse for performance than a few
         // loads from cache to fetch the property 'gcb1'.

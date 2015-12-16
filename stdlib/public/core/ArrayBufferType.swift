@@ -159,11 +159,13 @@ extension _ArrayBufferType {
       // Assign over the original subRange
       var i = newValues.startIndex
       for j in subRange {
-        elements[j] = newValues[i++]
+        elements[j] = newValues[i]
+        i = i.successor()
       }
       // Initialize the hole left by sliding the tail forward
       for j in oldTailIndex..<newTailIndex {
-        (elements + j).initialize(newValues[i++])
+        (elements + j).initialize(newValues[i])
+        i = i.successor()
       }
       _expectEnd(i, newValues)
     }
@@ -172,7 +174,9 @@ extension _ArrayBufferType {
       var i = subRange.startIndex
       var j = newValues.startIndex
       for _ in 0..<newCount {
-        elements[i++] = newValues[j++]
+        elements[i] = newValues[j]
+        i = i.successor()
+        j = j.successor()
       }
       _expectEnd(j, newValues)
 

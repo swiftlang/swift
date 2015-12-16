@@ -713,7 +713,7 @@ public func == <Element : Hashable>(lhs: Set<Element>, rhs: Set<Element>) -> Boo
     }
 
     let endIndex = lhsNative.endIndex
-    for var i = lhsNative.startIndex; i != endIndex; ++i {
+    for var i = lhsNative.startIndex; i != endIndex; i = i.successor() {
       let key = lhsNative.assertingGet(i)
       let bridgedKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
       let optRhsValue: AnyObject? = rhsCocoa.maybeGet(bridgedKey)
@@ -1230,7 +1230,8 @@ public func == <Key : Equatable, Value : Equatable>(
     }
 
     let endIndex = lhsNative.endIndex
-    for var index = lhsNative.startIndex; index != endIndex; ++index {
+    for var index = lhsNative.startIndex; index != endIndex;
+        index = index.successor() {
       let (key, value) = lhsNative.assertingGet(index)
       let optRhsValue: AnyObject? =
         rhsCocoa.maybeGet(_bridgeToObjectiveCUnconditional(key))

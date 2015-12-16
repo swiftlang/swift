@@ -613,7 +613,8 @@ extension SequenceType {
     -> UnsafeMutablePointer<Generator.Element> {
     var p = UnsafeMutablePointer<Generator.Element>(ptr)
     for x in GeneratorSequence(self.generate()) {
-      p++.initialize(x)
+      p.initialize(x)
+      p += 1
     }
     return p
   }

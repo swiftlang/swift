@@ -513,7 +513,8 @@ extension ${Self} : _ArrayType {
     var p: UnsafeMutablePointer<Element>
     (self, p) = ${Self}._allocateUninitialized(count)
     for _ in 0..<count {
-      p++.initialize(repeatedValue)
+      p.initialize(repeatedValue)
+      p += 1
     }
   }
 
@@ -908,7 +909,9 @@ internal struct _InitializeMemoryFromCollection<
     var p = rawMemory
     var q = newValues.startIndex
     for _ in 0..<count {
-      p++.initialize(newValues[q++])
+      p.initialize(newValues[q])
+      q = q.successor()
+      p += 1
     }
     _expectEnd(q, newValues)
   }
