@@ -252,8 +252,8 @@ extension ForwardIndexType {
     var p = self
     var count: Distance = 0
     while p != end {
-      ++count
-      ++p
+      count._successorInPlace()
+      p._successorInPlace()
     }
     return count
   }
