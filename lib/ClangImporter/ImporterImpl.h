@@ -1297,6 +1297,11 @@ public:
   /// about the directly-parsed headers.
   SwiftLookupTable *findLookupTable(const clang::Module *clangModule);
 
+  /// Look for namespace-scope values with the given name in the given
+  /// Swift lookup table.
+  void lookupValue(SwiftLookupTable &table, DeclName name,
+                   VisibleDeclConsumer &consumer);
+
   /// Look for Objective-C members with the given name in the given
   /// Swift lookup table.
   void lookupObjCMembers(SwiftLookupTable &table, DeclName name,

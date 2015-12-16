@@ -3788,10 +3788,6 @@ void ClangModuleUnit::lookupValue(Module::AccessPathTy accessPath,
   if (!Module::matchesAccessPath(accessPath, name))
     return;
 
-  // There should be no multi-part top-level decls in a Clang module.
-  if (!name.isSimpleName())
-    return;
-
   // FIXME: Ignore submodules, which are empty for now.
   if (clangModule && clangModule->isSubModule())
     return;
@@ -3807,6 +3803,20 @@ void ClangModuleUnit::lookupValue(Module::AccessPathTy accessPath,
       DarwinBlacklistDeclConsumer::needsBlacklist(clangModule)) {
     consumer = &darwinBlacklistConsumer;
   }
+
+  if (owner.Impl.UseSwiftLookupTables) {
+    // Find the corresponding lookup table.
+    if (auto lookupTable = owner.Impl.findLookupTable(clangModule)) {
+      // Search it.
+      owner.Impl.lookupValue(*lookupTable, name, *consumer);
+    }
+
+    return;
+  }
+
+  // There should be no multi-part top-level decls in a Clang module.
+  if (!name.isSimpleName())
+    return;
 
   owner.lookupValue(name.getBaseName(), *consumer);
 }
@@ -4479,6 +4489,32 @@ SwiftLookupTable *ClangImporter::Implementation::findLookupTable(
   if (known == LookupTables.end()) return nullptr;
 
   return known->second.get();
+}
+
+void ClangImporter::Implementation::lookupValue(
+       SwiftLookupTable &table, DeclName name,
+       VisibleDeclConsumer &consumer) {
+  auto clangTU = getClangASTContext().getTranslationUnitDecl();
+  for (auto entry : table.lookup(name.getBaseName().str(), clangTU)) {
+    ValueDecl *decl;
+
+    // If it's a Clang declaration, try to import it.
+    if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {
+      decl = cast_or_null<ValueDecl>(importDeclReal(clangDecl->getMostRecentDecl()));
+      if (!decl) continue;
+    } else {
+      // Try to import a macro.
+      auto clangMacro = entry.get<clang::MacroInfo *>();
+      decl = importMacro(name.getBaseName(), clangMacro);
+      if (!decl) continue;
+    }
+
+    // Did the name we found match?
+    if (!decl->getFullName().matchesRef(name)) continue;
+
+    // Report this declaration.
+    consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
+  }
 }
 
 void ClangImporter::Implementation::lookupObjCMembers(
