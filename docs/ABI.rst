@@ -1179,8 +1179,8 @@ using its substitution, ``CS1_``. The
 third argument type will mangle using the substitution for ``zim``,
 ``CS_7zippity``. (It also acquires substitution ``S2_`` which would be used
 if it mangled again.) The result type will mangle using the substitution for
-``zim.zang``, ``CS0_zoo`` (and acquire substitution ``S3_``). The full
-function type thus mangles as ``fTCC3zim4zang4zungCS1_CS_7zippity_CS0_zoo``.
+``zim.zang``, ``CS0_3zoo`` (and acquire substitution ``S3_``). The full
+function type thus mangles as ``fTCC3zim4zang4zungCS1_CS_7zippity_CS0_3zoo``.
 
 ::
 
