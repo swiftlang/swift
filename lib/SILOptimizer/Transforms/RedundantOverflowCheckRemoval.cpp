@@ -255,7 +255,7 @@ public:
     // L and R are the righthand and lefthand sides of the constraint.
     SILValue L = F.Left;
     SILValue R = F.Right;
-    assert(L.getType() &&R.getType() && "Invalid constraint type");
+    assert(L.getType() == R.getType() && "Invalid constraint type");
 
     // Make sure that the types of the constraints match the types of the
     // arithmetic operation.
