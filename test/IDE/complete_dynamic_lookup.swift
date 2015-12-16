@@ -13,6 +13,11 @@
 // RUN: FileCheck %s -check-prefix=DL_INSTANCE_DOT < %t.dl.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
+// FIXME: Redundant with above, except for -enable-swift-name-lookup-tables
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_FUNC_PARAM_DOT_1 -enable-swift-name-lookup-tables > %t.dl.txt
+// RUN: FileCheck %s -check-prefix=DL_INSTANCE_DOT < %t.dl.txt
+// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_VAR_NO_DOT_1 > %t.dl.txt
 // RUN: FileCheck %s -check-prefix=DL_INSTANCE_NO_DOT < %t.dl.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
@@ -139,6 +144,7 @@ protocol Bar { func bar() }
 // DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule[swift_ide_test]:      base1_Property2[#Base?#]{{; name=.+$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule[baz_clang_module]: baz_Class_InstanceFunc1!()[#Void#]{{; name=.+$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule[baz_clang_module]:    baz_Class_Property1[#Baz_Class!?#]{{; name=.+$}}
+// DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule[baz_clang_module]:    baz_Class_Property2[#Baz_Class!?#]{{; name=.+$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule[baz_clang_module]: baz_Protocol_InstanceFunc1!()[#Void#]{{; name=.+$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: foo_Nested1_ObjcInstanceFunc1!()[#Void#]{{; name=.+$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule[foo_swift_module]:    foo_Nested1_Property1[#Int?#]{{; name=.+$}}

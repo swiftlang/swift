@@ -86,6 +86,9 @@
 using namespace swift;
 using swift::LSLocation;
 
+static llvm::cl::opt<bool> DisableLocalStoreDSE("disable-local-store-dse",
+                                               llvm::cl::init(true));
+
 STATISTIC(NumDeadStores, "Number of dead stores removed");
 STATISTIC(NumPartialDeadStores, "Number of partial dead stores removed");
 
@@ -470,6 +473,8 @@ void DSEContext::mergeSuccessorStates(SILBasicBlock *BB) {
   // If basic block has no successor, then all local writes can be considered
   // dead for block with no successor.
   if (BB->succ_empty()) {
+    if (DisableLocalStoreDSE)
+      return;
     for (unsigned i = 0; i < LSLocationVault.size(); ++i) {
       if (!LSLocationVault[i].isNonEscapingLocalLSLocation())
         continue;

@@ -4064,6 +4064,16 @@ void ClangModuleUnit::lookupClassMembers(Module::AccessPathTy accessPath,
   if (clangModule && clangModule->isSubModule())
     return;
 
+  if (owner.Impl.UseSwiftLookupTables) {
+    // Find the corresponding lookup table.
+    if (auto lookupTable = owner.Impl.findLookupTable(clangModule)) {
+      // Search it.
+      owner.Impl.lookupAllObjCMembers(*lookupTable, consumer);
+    }
+
+    return;
+  }
+
   // FIXME: Not limited by module.
   lookupClassMembersImpl(owner.Impl, consumer, {});
 }
@@ -4388,7 +4398,7 @@ ClangImporter::Implementation::getExtensionMetadata() const {
 
 llvm::hash_code ClangImporter::Implementation::hashExtension(
                   llvm::hash_code code) const {
-  return llvm::hash_combine(code, "swift.lookup",
+  return llvm::hash_combine(code, StringRef("swift.lookup"),
                             SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
                             SWIFT_LOOKUP_TABLE_VERSION_MINOR);
 }
@@ -4515,6 +4525,19 @@ void ClangImporter::Implementation::lookupObjCMembers(
         }
       }
     }
+  }
+}
+
+void ClangImporter::Implementation::lookupAllObjCMembers(
+       SwiftLookupTable &table,
+       VisibleDeclConsumer &consumer) {
+  // Retrieve and sort all of the base names in this particular table.
+  auto baseNames = table.allBaseNames();
+  llvm::array_pod_sort(baseNames.begin(), baseNames.end());
+
+  // Look for Objective-C members with each base name.
+  for (auto baseName : baseNames) {
+    lookupObjCMembers(table, SwiftContext.getIdentifier(baseName), consumer);
   }
 }
 

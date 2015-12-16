@@ -177,6 +177,18 @@ SwiftLookupTable::lookup(StringRef baseName,
   return result;
 }
 
+SmallVector<StringRef, 4> SwiftLookupTable::allBaseNames() {
+  // If we have a reader, enumerate its base names.
+  if (Reader) return Reader->getBaseNames();
+
+  // Otherwise, walk the lookup table.
+  SmallVector<StringRef, 4> result;
+  for (const auto &entry : LookupTable) {
+    result.push_back(entry.first);
+  }
+  return result;
+}
+
 SmallVector<clang::NamedDecl *, 4>
 SwiftLookupTable::lookupObjCMembers(StringRef baseName) {
   SmallVector<clang::NamedDecl *, 4> result;

@@ -23,9 +23,6 @@ To read the documentation, start by installing the
 typing `make`. This compiles the `.rst` files in the `docs` directory into
 HTML in the `docs/_build/html` directory.
 
-A potentially useful document to start is `docs/LangRef`, which gives a low level
-tour of how the language works from the implementation perspective.
-
 Many of the docs are out of date, but you can see some historical design
 documents in the `docs` directory.
 

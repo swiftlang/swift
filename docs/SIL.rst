@@ -253,7 +253,7 @@ Consider a generic function like this:
 
 ::
 
-  func generateArray<T>(n : Int, generator : () -> T) -> T[]
+  func generateArray<T>(n : Int, generator : () -> T) -> [T]
 
 The function ``generator`` will be expected to store its result
 indirectly into an address passed in an implicit parameter.  There's
@@ -312,7 +312,7 @@ lowered using the pattern ``() -> T``, which eventually causes ``(Int,Int)
 lowering it with the pattern ``U -> V``; the result is that ``g.fn``
 has the following lowered type::
 
-  @callee_owned () -> @owned @callee_owned (@out Float, @in (Int,Int)) -> ()``.
+  @callee_owned () -> @owned @callee_owned (@out Float, @in (Int,Int)) -> ().
 
 As another example, suppose that ``h`` has type
 ``Generator<(Int, @inout Int) -> Float>``.  Neither ``(Int, @inout Int)``
@@ -799,7 +799,7 @@ are bound by the function's caller::
 
   sil @foo : $(Int) -> Int {
   bb0(%x : $Int):
-    %1 = return %x : $Int
+    return %x : $Int
   }
 
   sil @bar : $(Int, Int) -> () {
@@ -808,7 +808,7 @@ are bound by the function's caller::
     %1 = apply %foo(%x) : $(Int) -> Int
     %2 = apply %foo(%y) : $(Int) -> Int
     %3 = tuple ()
-    %4 = return %3 : $()
+    return %3 : $()
   }
 
 Declaration References

@@ -127,10 +127,10 @@ sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
 
 // We should be able to remove the local store that is not read.
 //
-// CHECK-LABEL: trivial_local_dead_store
-// CHECK: bb0
-// CHECK-NOT: store
-// CHECK: return
+// DISABLECHECK-LABEL: trivial_local_dead_store
+// DISABLECHECK: bb0
+// DISABLECHECK-NOT: store
+// DISABLECHECK: return
 sil hidden @trivial_local_dead_store : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $Int, var, name "a"                 // users: %3, %5
@@ -144,10 +144,10 @@ bb0:
 
 // We can not remove the local store that is read.
 //
-// CHECK-LABEL: blocking_read_on_local_store
-// CHECK: bb0
-// CHECK: store 
-// CHECK: return
+// DISABLECHECK-LABEL: blocking_read_on_local_store
+// DISABLECHECK: bb0
+// DISABLECHECK: store 
+// DISABLECHECK: return
 sil hidden @blocking_read_on_local_store : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $Int, var, name "a"                 // users: %3, %5
@@ -1403,10 +1403,10 @@ bb0(%0 : $Optional<protocol<>.Type>):
 /// Make sure we DO get rid of the store as a dead store, i.e. no read to a store
 /// to a local variable.
 /// 
-/// CHECK-LABEL: local_dead_store
-/// CHECK: load
-/// CHECK-NOT: store 
-/// CHECK: return 
+/// DISABLECHECK-LABEL: local_dead_store
+/// DISABLECHECK: load
+/// DISABLECHECK-NOT: store 
+/// DISABLECHECK: return 
 sil @local_dead_store : $@convention(thin) (Optional<protocol<>.Type>) -> Int {
 bb0(%0 : $Optional<protocol<>.Type>):
   %2 = alloc_stack $Optional<protocol<>.Type>     // users: %3, %17, %19, %26
