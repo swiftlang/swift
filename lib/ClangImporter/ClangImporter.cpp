@@ -4500,7 +4500,8 @@ void ClangImporter::Implementation::lookupValue(
 
     // If it's a Clang declaration, try to import it.
     if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {
-      decl = cast_or_null<ValueDecl>(importDeclReal(clangDecl->getMostRecentDecl()));
+      decl = cast_or_null<ValueDecl>(
+               importDeclReal(clangDecl->getMostRecentDecl()));
       if (!decl) continue;
     } else {
       // Try to import a macro.
@@ -4509,11 +4510,16 @@ void ClangImporter::Implementation::lookupValue(
       if (!decl) continue;
     }
 
-    // Did the name we found match?
-    if (!decl->getFullName().matchesRef(name)) continue;
+    // If the name matched, report this result.
+    if (decl->getFullName().matchesRef(name))
+      consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
 
-    // Report this declaration.
-    consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
+    // If there is an alternate declaration and the name matches,
+    // report this result.
+    if (auto alternate = getAlternateDecl(decl)) {
+      if (alternate->getFullName().matchesRef(name))
+        consumer.foundDecl(alternate, DeclVisibilityKind::VisibleAtTopLevel);
+    }
   }
 }
 
@@ -4521,30 +4527,27 @@ void ClangImporter::Implementation::lookupObjCMembers(
        SwiftLookupTable &table,
        DeclName name,
        VisibleDeclConsumer &consumer) {
-  bool isSubscript = name.getBaseName() == SwiftContext.Id_subscript;
-
   for (auto clangDecl : table.lookupObjCMembers(name.getBaseName().str())) {
     // Import the declaration.
     auto decl = cast_or_null<ValueDecl>(importDeclReal(clangDecl));
     if (!decl)
       continue;
 
-    // Handle subscripts.
-    if (isSubscript) {
-      if (auto subscript = importSubscriptOf(decl))
-        consumer.foundDecl(subscript, DeclVisibilityKind::DynamicLookup);
-      continue;
+    // If the name we found matches, report the declaration.
+    if (decl->getFullName().matchesRef(name))
+      consumer.foundDecl(decl, DeclVisibilityKind::DynamicLookup);
+
+    // Check for an alternate declaration; if it's name matches,
+    // report it.
+    if (auto alternate = getAlternateDecl(decl)) {
+      if (alternate->getFullName().matchesRef(name))
+        consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup);
     }
-
-    // Did the name we found match?
-    if (!decl->getFullName().matchesRef(name)) continue;
-
-    // Report this declaration.
-    consumer.foundDecl(decl, DeclVisibilityKind::DynamicLookup);
 
     // If we imported an Objective-C instance method from a root
     // class, and there is no corresponding class method, also import
     // it as a class method.
+    // FIXME: Handle this as an alternate?
     if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
       if (objcMethod->isInstanceMethod()) {
         if (auto method = dyn_cast<FuncDecl>(decl)) {

@@ -540,6 +540,19 @@ public:
                  ConstructorDecl *>
     Constructors;
 
+  /// A mapping from imported declarations to their "alternate" declarations,
+  /// for cases where a single Clang declaration is imported to two
+  /// different Swift declarations.
+  llvm::DenseMap<Decl *, ValueDecl *> AlternateDecls;
+
+  /// Retrieve the alternative declaration for the given imported
+  /// Swift declaration.
+  ValueDecl *getAlternateDecl(Decl *decl) {
+    auto known = AlternateDecls.find(decl);
+    if (known == AlternateDecls.end()) return nullptr;
+    return known->second;
+  }
+
 private:
   /// \brief NSObject, imported into Swift.
   Type NSObjectTy;
@@ -917,10 +930,6 @@ public:
     return importDeclAndCacheImpl(ClangDecl,
                                   /*SuperfluousTypedefsAreTransparent=*/false);
   }
-
-  /// Import the subscript declaration corresponding to the given
-  /// declaration, if there is one.
-  SubscriptDecl *importSubscriptOf(Decl *decl);
 
   /// Import the class-method version of the given Objective-C
   /// instance method of a root class.
