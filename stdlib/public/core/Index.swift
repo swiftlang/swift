@@ -214,9 +214,11 @@ extension ForwardIndexType {
     _precondition(n >= 0,
         "Only BidirectionalIndexType can be advanced by a negative amount")
     var p = self
-    for var i: Distance = 0; i != n; ++i {
-      ++p
-    }
+    var i: Distance = 0
+    repeat {
+      p._successorInPlace()
+      i._successorInPlace()
+    } while i != n
     return p
   }
 
@@ -227,9 +229,11 @@ extension ForwardIndexType {
     _precondition(n >= 0,
         "Only BidirectionalIndexType can be advanced by a negative amount")
     var p = self
-    for var i: Distance = 0; i != n && p != limit; ++i {
-      ++p
-    }
+    var i: Distance = 0
+    repeat {
+      p._successorInPlace()
+      i._successorInPlace()
+    } while  i != n && p != limit
     return p
   }
 
@@ -248,8 +252,8 @@ extension ForwardIndexType {
     var p = self
     var count: Distance = 0
     while p != end {
-      ++count
-      ++p
+      count._successorInPlace()
+      p._successorInPlace()
     }
     return count
   }
