@@ -258,6 +258,151 @@ StringTests.test("hasPrefix") {
   expectTrue("a\u{0301}bc".hasPrefix("\u{00e1}"))
 }
 
+struct ComparisonTest {
+  let expectedUnicodeCollation: ExpectedComparisonResult
+  let lhs: String
+  let rhs: String
+  let loc: SourceLoc
+
+  init(
+    _ expectedUnicodeCollation: ExpectedComparisonResult,
+    _ lhs: String, _ rhs: String,
+    file: String = __FILE__, line: UInt = __LINE__
+    ) {
+      self.expectedUnicodeCollation = expectedUnicodeCollation
+      self.lhs = lhs
+      self.rhs = rhs
+      self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
+let comparisonTests = [
+  ComparisonTest(.EQ, "", ""),
+  ComparisonTest(.LT, "", "a"),
+
+  // ASCII cases
+  ComparisonTest(.LT, "t", "tt"),
+  ComparisonTest(.GT, "t", "Tt"),
+  ComparisonTest(.GT, "\u{0}", ""),
+  ComparisonTest(.EQ, "\u{0}", "\u{0}"),
+  // Currently fails:
+  // ComparisonTest(.LT, "\r\n", "t"),
+  // ComparisonTest(.GT, "\r\n", "\n"),
+  // ComparisonTest(.LT, "\u{0}", "\u{0}\u{0}"),
+
+  // Whitespace
+  // U+000A LINE FEED (LF)
+  // U+000B LINE TABULATION
+  // U+000C FORM FEED (FF)
+  // U+0085 NEXT LINE (NEL)
+  // U+2028 LINE SEPARATOR
+  // U+2029 PARAGRAPH SEPARATOR
+  ComparisonTest(.GT, "\u{0085}", "\n"),
+  ComparisonTest(.GT, "\u{000b}", "\n"),
+  ComparisonTest(.GT, "\u{000c}", "\n"),
+  ComparisonTest(.GT, "\u{2028}", "\n"),
+  ComparisonTest(.GT, "\u{2029}", "\n"),
+  ComparisonTest(.GT, "\r\n\r\n", "\r\n"),
+
+  // U+0301 COMBINING ACUTE ACCENT
+  // U+00E1 LATIN SMALL LETTER A WITH ACUTE
+  ComparisonTest(.EQ, "a\u{301}", "\u{e1}"),
+  ComparisonTest(.LT, "a", "a\u{301}"),
+  ComparisonTest(.LT, "a", "\u{e1}"),
+
+  // U+304B HIRAGANA LETTER KA
+  // U+304C HIRAGANA LETTER GA
+  // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
+  ComparisonTest(.EQ, "\u{304b}", "\u{304b}"),
+  ComparisonTest(.EQ, "\u{304c}", "\u{304c}"),
+  ComparisonTest(.LT, "\u{304b}", "\u{304c}"),
+  ComparisonTest(.LT, "\u{304b}", "\u{304c}\u{3099}"),
+  ComparisonTest(.EQ, "\u{304c}", "\u{304b}\u{3099}"),
+  ComparisonTest(.LT, "\u{304c}", "\u{304c}\u{3099}"),
+
+  // U+212B ANGSTROM SIGN
+  // U+030A COMBINING RING ABOVE
+  // U+00C5 LATIN CAPITAL LETTER A WITH RING ABOVE
+  ComparisonTest(.EQ, "\u{212b}", "A\u{30a}"),
+  ComparisonTest(.EQ, "\u{212b}", "\u{c5}"),
+  ComparisonTest(.EQ, "A\u{30a}", "\u{c5}"),
+  ComparisonTest(.LT, "A\u{30a}", "a"),
+  ComparisonTest(.LT, "A", "A\u{30a}"),
+
+  // U+2126 OHM SIGN
+  // U+03A9 GREEK CAPITAL LETTER OMEGA
+  ComparisonTest(.EQ, "\u{2126}", "\u{03a9}"),
+
+  // U+0323 COMBINING DOT BELOW
+  // U+0307 COMBINING DOT ABOVE
+  // U+1E63 LATIN SMALL LETTER S WITH DOT BELOW
+  // U+1E69 LATIN SMALL LETTER S WITH DOT BELOW AND DOT ABOVE
+  ComparisonTest(.EQ, "\u{1e69}", "s\u{323}\u{307}"),
+  ComparisonTest(.EQ, "\u{1e69}", "s\u{307}\u{323}"),
+  ComparisonTest(.EQ, "\u{1e69}", "\u{1e63}\u{307}"),
+  ComparisonTest(.EQ, "\u{1e63}", "s\u{323}"),
+  ComparisonTest(.EQ, "\u{1e63}\u{307}", "s\u{323}\u{307}"),
+  ComparisonTest(.EQ, "\u{1e63}\u{307}", "s\u{307}\u{323}"),
+  ComparisonTest(.LT, "s\u{323}", "\u{1e69}"),
+
+  // U+FB01 LATIN SMALL LIGATURE FI
+  ComparisonTest(.EQ, "\u{fb01}", "\u{fb01}"),
+  ComparisonTest(.LT, "fi", "\u{fb01}"),
+
+  // Test that Unicode collation is performed in deterministic mode.
+  //
+  // U+0301 COMBINING ACUTE ACCENT
+  // U+0341 COMBINING ACUTE TONE MARK
+  // U+0954 DEVANAGARI ACUTE ACCENT
+  //
+  // Collation elements from DUCET:
+  // 0301  ; [.0000.0024.0002] # COMBINING ACUTE ACCENT
+  // 0341  ; [.0000.0024.0002] # COMBINING ACUTE TONE MARK
+  // 0954  ; [.0000.0024.0002] # DEVANAGARI ACUTE ACCENT
+  //
+  // U+0301 and U+0954 don't decompose in the canonical decomposition mapping.
+  // U+0341 has a canonical decomposition mapping of U+0301.
+  ComparisonTest(.EQ, "\u{0301}", "\u{0341}"),
+  ComparisonTest(.LT, "\u{0301}", "\u{0954}"),
+  ComparisonTest(.LT, "\u{0341}", "\u{0954}"),
+]
+
+func checkHasPrefixHasSuffix(
+  lhs: String, _ rhs: String, _ stackTrace: SourceLocStack
+  ) {
+    if lhs == "" {
+      return
+    }
+    if rhs == "" {
+      expectFalse(lhs.hasPrefix(rhs), stackTrace: stackTrace)
+      expectFalse(lhs.hasSuffix(rhs), stackTrace: stackTrace)
+      return
+    }
+
+  // To determine the expected results, compare grapheme clusters, one by one.
+  let expectHasPrefix = lhs.characters.startsWith(rhs.characters, isEquivalent: (==))
+  let expectHasSuffix = lhs.characters.lazy.reverse().startsWith(
+    rhs.characters.lazy.reverse(), isEquivalent: (==))
+
+  expectEqual(expectHasPrefix, lhs.hasPrefix(rhs), stackTrace: stackTrace)
+  expectEqual(expectHasSuffix, lhs.hasSuffix(rhs), stackTrace: stackTrace)
+}
+
+StringTests.test("hasPrefix,hasSuffix") {
+  for test in comparisonTests {
+    checkHasPrefixHasSuffix(test.lhs, test.rhs, test.loc.withCurrentLoc())
+    checkHasPrefixHasSuffix(test.rhs, test.lhs, test.loc.withCurrentLoc())
+
+    let fragment = "abc"
+    let combiner = "\u{0301}" // combining acute accent
+
+    checkHasPrefixHasSuffix(test.lhs + fragment, test.rhs, test.loc.withCurrentLoc())
+    checkHasPrefixHasSuffix(fragment + test.lhs, test.rhs, test.loc.withCurrentLoc())
+    checkHasPrefixHasSuffix(test.lhs + combiner, test.rhs, test.loc.withCurrentLoc())
+    checkHasPrefixHasSuffix(combiner + test.lhs, test.rhs, test.loc.withCurrentLoc())
+  }
+}
+
 StringTests.test("literalConcatenation") {
   do {
     // UnicodeScalarLiteral + UnicodeScalarLiteral
