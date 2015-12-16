@@ -72,47 +72,36 @@ for opt, arg in opts:
     if opt in ('-h', '--help'):
         help()
         sys.exit()
-
     if opt in ('-s', '--sdk'):
         sdk = arg
         continue
-
     if opt in ('-t', '--target'):
         target = arg
         continue
-
     if opt in ('-m', '--module'):
         module = arg
         continue
-
     if opt in ('-i', '--swift-ide-test'):
         swift_ide_test = arg
         continue
-
     if opt in ('-d', '--diff_tool'):
         diff_tool = arg
         continue
-
     if opt in ('-b', '--only-before'):
         only_before=1
         continue
-
     if opt in ('-a', '--only-after'):
         only_after=1
         continue
-
     if opt == '--before-file':
         before_filename = arg
         continue
-
     if opt == '--after-file':
         after_filename = arg
         continue
-
     if opt == '-q':
         verbose = 0
         continue
-    
     help()
     sys.exit(2)
 
@@ -123,17 +112,17 @@ if module == '':
 if target == '':
     if sdk == 'macosx':
         target = 'x86_64-apple-macosx10.11'
-    if sdk == 'iphoneos':
+    elif sdk == 'iphoneos':
         target = 'arm64-apple-ios9.0'
-    if sdk == 'iphonesimulator':
+    elif sdk == 'iphonesimulator':
         target = 'x86_64-apple-ios9.0'
-    if sdk == 'watchos':
+    elif sdk == 'watchos':
         target = 'armv7k-apple-watchos2.0'
-    if sdk == 'watchos.simulator':
+    elif sdk == 'watchos.simulator':
         target = 'i386-apple-watchos2.0'
-    if sdk == 'appletvos':
+    elif sdk == 'appletvos':
         target = 'arm64-apple-tvos9'
-    if sdk == 'appletvos.simulator':
+    elif sdk == 'appletvos.simulator':
         target = 'x86_64-apple-tvos9'
 
 # Figure out the SDK root for the requested SDK
