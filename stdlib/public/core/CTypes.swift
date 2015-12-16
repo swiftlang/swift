@@ -134,15 +134,6 @@ public struct OpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   public var hashValue: Int {
     return Int(Builtin.ptrtoint_Word(_rawValue))
   }
-<<<<<<< HEAD
-
-  /// Create an instance initialized with `nil`.
-  @_transparent public
-  init(nilLiteral: ()) {
-    _rawValue = _nilRawPointer
-  }
-=======
->>>>>>> a0a9a9b... Remove no-argument initializers from unsafe pointer types
 }
 
 extension OpaquePointer : CustomDebugStringConvertible {
