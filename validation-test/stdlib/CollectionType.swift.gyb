@@ -324,11 +324,11 @@ ${LazyFlatMapTest}
 //===----------------------------------------------------------------------===//
 
 CollectionTypeTests.test("underestimateCount/Collection/DefaultImplementation") {
-  if true {
+  do {
     let s = CollectionWithDefaultUnderestimateCount(count: 0)
     expectEqual(0, callGenericUnderestimatedCount(s))
   }
-  if true {
+  do {
     let s = CollectionWithDefaultUnderestimateCount(count: 5)
     expectEqual(5, callGenericUnderestimatedCount(s))
   }
@@ -368,11 +368,11 @@ struct CollectionWithCustomUnderestimateCount : Collection {
 }
 
 CollectionTypeTests.test("underestimateCount/Collection/CustomImplementation") {
-  if true {
+  do {
     let s = CollectionWithCustomUnderestimateCount(underestimatedCount: 0)
     expectEqual(0, callGenericUnderestimatedCount(s))
   }
-  if true {
+  do {
     let s = CollectionWithCustomUnderestimateCount(underestimatedCount: 5)
     expectEqual(5, callGenericUnderestimatedCount(s))
   }
@@ -411,7 +411,7 @@ CollectionTypeTests.test("Collection.iterator()/DefaultImplementation") {
   for count in [ 0, 5 ] {
     let collection = MinimalForwardCollectionWithDefaultIterator(count: count)
 
-    if true {
+    do {
       // Check the return type of the function when called statically.
       var iter = collection.iterator()
       expectType(
@@ -419,7 +419,7 @@ CollectionTypeTests.test("Collection.iterator()/DefaultImplementation") {
         &iter)
     }
 
-    if true {
+    do {
       // Check the return type of the function when called generically.
       var iter = callGenericIterator(collection)
       expectType(
@@ -439,10 +439,10 @@ struct MinimalForwardCollectionWithCustomIterator : Collection {
     self._count = count
   }
 
-  static var timesGenerateWasCalled: Int = 0
+  static var timesIteratorWasCalled: Int = 0
 
   func iterator() -> MinimalIterator<OpaqueValue<Int>> {
-    ++MinimalForwardCollectionWithCustomIterator.timesGenerateWasCalled
+    ++MinimalForwardCollectionWithCustomIterator.timesIteratorWasCalled
     return MinimalIterator<OpaqueValue<Int>>(
       Array(1..<_count+1).map(OpaqueValue.init) as [OpaqueValue<Int>]
     )
@@ -468,24 +468,24 @@ CollectionTypeTests.test("Collection.iterator()/CustomImplementation") {
   for count in [ 0, 5 ] {
     let collection = MinimalForwardCollectionWithCustomIterator(count: count)
 
-    if true {
+    do {
       // Check the return type of the function when called statically.
-      MinimalForwardCollectionWithCustomIterator.timesGenerateWasCalled = 0
+      MinimalForwardCollectionWithCustomIterator.timesIteratorWasCalled = 0
       var iter = collection.iterator()
       expectType(
         MinimalIterator<OpaqueValue<Int>>.self,
         &iter)
-      expectEqual(1, MinimalForwardCollectionWithCustomIterator.timesGenerateWasCalled)
+      expectEqual(1, MinimalForwardCollectionWithCustomIterator.timesIteratorWasCalled)
     }
 
-    if true {
-      MinimalForwardCollectionWithCustomIterator.timesGenerateWasCalled = 0
+    do {
+      MinimalForwardCollectionWithCustomIterator.timesIteratorWasCalled = 0
       // Check the return type of the function when called generically.
       var iter = callGenericIterator(collection)
       expectType(
         MinimalIterator<OpaqueValue<Int>>.self,
         &iter)
-      expectEqual(1, MinimalForwardCollectionWithCustomIterator.timesGenerateWasCalled)
+      expectEqual(1, MinimalForwardCollectionWithCustomIterator.timesIteratorWasCalled)
     }
 
     checkForwardCollection(
@@ -719,7 +719,7 @@ CollectionTypeTests.test("_withUnsafeMutableBufferPointerIfSupported/dispatch") 
 %       Base = "%s%s%sCollection" % (base_kind, traversal, 'Mutable' if mutable else '')
 
 // Test collections using value types as elements.
-if true {
+do {
   var checksAdded: Box<Set<String>> = Box([])
   var resiliencyChecks = CollectionMisuseResiliencyChecks.all
   resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .ExpectationFailure
@@ -762,7 +762,7 @@ if true {
 }
 
 // Test collections using a reference type as element.
-if true {
+do {
   var checksAdded: Box<Set<String>> = Box([])
   var resiliencyChecks = CollectionMisuseResiliencyChecks.all
   resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .ExpectationFailure

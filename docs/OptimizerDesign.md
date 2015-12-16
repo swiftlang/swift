@@ -9,19 +9,19 @@ knowledge of compiler optimizations is required.
 
 ### Optimization pipeline overview
 
-The Swift compiler translates textual swift programs into LLVM-IR and uses
+The Swift compiler translates textual Swift programs into LLVM-IR and uses
 multiple representations in between. The Swift frontend is responsible for
-translating textual swift program into well-formed and type-checked programs
+translating textual Swift programs into well-formed and type-checked programs
 that are encoded in the SIL intermediate representation. The frontend emits SIL
-in a phase that's called SILGen (stands for SIL-generation). Next, the swift
+in a phase that's called SILGen (stands for SIL-generation). Next, the Swift
 compiler performs a sequence of transformations, such as inlining and constant
-propagation that allow the swift compiler to emit diagnostic messages (such as
+propagation that allow the Swift compiler to emit diagnostic messages (such as
 warnings for uninitialized variables or arithmetic overflow). Next, the Swift
 optimizer transforms the code to make it faster. The optimizer removes redundant
 reference counting operations, devirtualizes function calls, and specializes
 generics and closures. This phase of the compiler is the focus of this
 document. Finally, the SIL intermediate representation is passed on to the IRGen
-phase (stands for intermediate representation generationphase) that lowers SIL
+phase (stands for intermediate representation generation phase) that lowers SIL
 into LLVM IR. The LLVM backend optimizes and emits binary code for the compiled
 program.
 
@@ -40,7 +40,7 @@ opaque calls, and the LLVM-optimizer can't do anything about it.
 The goal of the Swift optimizer is not to reimplement optimizations that
 already exist in the LLVM optimizer. The goal is to implement optimizations that
 can't be implemented in LLVM-IR because the high-level semantic information is
-lost. The swift optimizer does have some optimizations that are similar to LLVM
+lost. The Swift optimizer does have some optimizations that are similar to LLVM
 optimizations, like SSA-construction and function inlining. These optimizations
 are implemented at the SIL-level because they are required for exposing other
 higher-level optimizations. For example, the ARC optimizer and devirtualizer
@@ -50,7 +50,7 @@ prerequisite to the array optimizations.
 ### The Swift Pass Manager
 
 The Swift pass manager is the unit that executes optimization
-passes on the functions in the swift module. Unlike the LLVM optimizer, the
+passes on the functions in the Swift module. Unlike the LLVM optimizer, the
 Swift pass manager does not schedule analysis or optimization passes. The pass
 manager simply runs optimization passes on the functions in the module.
 The order of the optimizations is statically defined in the file "Passes.cpp".
@@ -60,7 +60,7 @@ development.
 
 The pass manager scans the module and creates a list of functions that are
 organized at a bottom-up order. This means that the optimizer first optimizes
-callees, and later optimizes the callers. This means that when optimizing a some
+callees, and later optimizes the callers. This means that when optimizing some
 caller function, the optimizer had already optimized all of its callees and the
 optimizer can inspect the callee for side effects and inline it into the caller.
 
@@ -153,7 +153,7 @@ the cache for the function that was modified.
     }
 ```
 
-The invalidation traits that passes can invalidate are are:
+The invalidation traits that passes can invalidate are:
 1. Instructions - some instructions were added, deleted or moved.
 2. Calls - some call sites were added or deleted.
 3. Branches - branches in the code were added, deleted or modified.
@@ -209,14 +209,14 @@ incorrect.
 
 LLVM handles this problem by keeping ValueHandles, which are a kind of smart
 pointers that handle instruction deletion and replaceAllUsesWith events.
-ValueHandles are special uses of llvm values. One problem with this approach is
+ValueHandles are special uses of LLVM values. One problem with this approach is
 that value handles require additional memory per-value and require doing extra
 work when working with values.
 
 The Swift optimizer approach is to let the Context (currently a part of the
 SILModule) handle the invalidation of instructions. When instructions are
 deleted the context notifies a list of listeners. The invalidation mechanism is
-relatively efficient and incur a cost only when instructions are deleted. Every
+relatively efficient and incurs a cost only when instructions are deleted. Every
 time an instruction is deleted the context notifies all of the listeners that
 requested to be notified. A typical notifications list is very short and is made
 of the registered Analysis and the currently executed Pass.

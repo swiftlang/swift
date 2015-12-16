@@ -387,19 +387,19 @@ Runtime.test("isBridgedVerbatimToObjectiveC") {
 
 // The protocol should be defined in the standard library, otherwise the cast
 // does not work.
-typealias P1 = BooleanType
+typealias P1 = Boolean
 typealias P2 = CustomStringConvertible
 protocol Q1 {}
 
 // A small struct that can be stored inline in an opaque buffer.
-struct StructConformsToP1 : BooleanType, Q1 {
+struct StructConformsToP1 : Boolean, Q1 {
   var boolValue: Bool {
     return true
   }
 }
 
 // A small struct that can be stored inline in an opaque buffer.
-struct Struct2ConformsToP1<T : BooleanType> : BooleanType, Q1 {
+struct Struct2ConformsToP1<T : Boolean> : Boolean, Q1 {
   init(_ value: T) {
     self.value = value
   }
@@ -454,13 +454,13 @@ struct Struct4ConformsToP2<T : CustomStringConvertible> : CustomStringConvertibl
 
 struct StructDoesNotConformToP1 : Q1 {}
 
-class ClassConformsToP1 : BooleanType, Q1 {
+class ClassConformsToP1 : Boolean, Q1 {
   var boolValue: Bool {
     return true
   }
 }
 
-class Class2ConformsToP1<T : BooleanType> : BooleanType, Q1 {
+class Class2ConformsToP1<T : Boolean> : Boolean, Q1 {
   init(_ value: T) {
     self.value = [ value ]
   }

@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Supplies convenient conformance to `SetAlgebraType` for any type
-/// whose `RawValue` is a `BitwiseOperationsType`.  For example:
+/// Supplies convenient conformance to `SetAlgebra` for any type
+/// whose `RawValue` is a `BitwiseOperations`.  For example:
 ///
-///     struct PackagingOptions : OptionSetType {
+///     struct PackagingOptions : OptionSet {
 ///       let rawValue: Int
 ///       init(rawValue: Int) { self.rawValue = rawValue }
 ///     
@@ -28,7 +28,7 @@
 /// In the example above, `PackagingOptions.Element` is the same type
 /// as `PackagingOptions`, and instance `a` subsumes instance `b` if
 /// and only if `a.rawValue & b.rawValue == b.rawValue`.
-public protocol OptionSetType : SetAlgebraType, RawRepresentable {
+public protocol OptionSet : SetAlgebra, RawRepresentable {
   // We can't constrain the associated Element type to be the same as
   // Self, but we can do almost as well with a default and a
   // constrained extension
@@ -40,21 +40,21 @@ public protocol OptionSetType : SetAlgebraType, RawRepresentable {
   // RawRepresentable. Unfortunately, current language limitations
   // that prevent non-failable initializers from forwarding to
   // failable ones would prevent us from generating the non-failing
-  // default (zero-argument) initializer.  Since OptionSetType's main
-  // purpose is to create convenient conformances to SetAlgebraType,
+  // default (zero-argument) initializer.  Since OptionSet's main
+  // purpose is to create convenient conformances to SetAlgebra,
   // we opt for a non-failable initializer.
   
   /// Convert from a value of `RawValue`, succeeding unconditionally.
   init(rawValue: RawValue)
 }
 
-/// `OptionSetType` requirements for which default implementations
+/// `OptionSet` requirements for which default implementations
 /// are supplied.
 ///
-/// - Note: A type conforming to `OptionSetType` can implement any of
+/// - Note: A type conforming to `OptionSet` can implement any of
 ///  these initializers or methods, and those implementations will be
 ///  used in lieu of these defaults.
-extension OptionSetType {
+extension OptionSet {
   /// Returns the set of elements contained in `self`, in `other`, or in
   /// both `self` and `other`.
   @warn_unused_result
@@ -82,13 +82,13 @@ extension OptionSetType {
   }
 }
 
-/// `OptionSetType` requirements for which default implementations are
+/// `OptionSet` requirements for which default implementations are
 /// supplied when `Element == Self`, which is the default.
 ///
-/// - Note: A type conforming to `OptionSetType` can implement any of
+/// - Note: A type conforming to `OptionSet` can implement any of
 ///   these initializers or methods, and those implementations will be
 ///   used in lieu of these defaults.
-extension OptionSetType where Element == Self {
+extension OptionSet where Element == Self {
   /// Returns `true` if `self` contains `member`.
   ///
   /// - Equivalent to `self.intersect([member]) == [member]`
@@ -116,8 +116,8 @@ extension OptionSetType where Element == Self {
   }
 }
 
-/// `OptionSetType` requirements for which default implementations are
-/// supplied when `RawValue` conforms to `BitwiseOperationsType`,
+/// `OptionSet` requirements for which default implementations are
+/// supplied when `RawValue` conforms to `BitwiseOperations`,
 /// which is the usual case.  Each distinct bit of an option set's
 /// `.rawValue` corresponds to a disjoint element of the option set.
 ///
@@ -125,10 +125,10 @@ extension OptionSetType where Element == Self {
 /// - `intersection` is implemented as a bitwise "and" (`|`) of `rawValue`s
 /// - `exclusiveOr` is implemented as a bitwise "exclusive or" (`^`) of `rawValue`s
 ///
-/// - Note: A type conforming to `OptionSetType` can implement any of
+/// - Note: A type conforming to `OptionSet` can implement any of
 ///   these initializers or methods, and those implementations will be
 ///   used in lieu of these defaults.
-extension OptionSetType where RawValue : BitwiseOperationsType {
+extension OptionSet where RawValue : BitwiseOperations {
   /// Create an empty instance.
   ///
   /// - Equivalent to `[] as Self`

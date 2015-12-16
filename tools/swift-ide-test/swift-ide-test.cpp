@@ -272,11 +272,6 @@ ObjCForwardDeclarations("enable-objc-forward-declarations",
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-ImplicitProperties("enable-objc-implicit-properties",
-                   llvm::cl::desc("Implicitly import Objective-C getter/setter pairs as properties"),
-                   llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
 InferDefaultArguments(
   "enable-infer-default-arguments",
   llvm::cl::desc("Infer default arguments for imported parameters"),
@@ -2474,11 +2469,6 @@ int main(int argc, char *argv[]) {
         options::InputFilenames);
   }
 
-  if (options::Action == ActionType::GenerateModuleAPIDescription) {
-    llvm::errs() << "unimplemented\n";
-    return 1;
-  }
-
   if (options::Action == ActionType::DumpCompletionCache) {
     if (options::InputFilenames.empty()) {
       llvm::errs() << "-dump-completin-cache requires an input file\n";
@@ -2547,8 +2537,6 @@ int main(int argc, char *argv[]) {
     !options::DisableAccessControl;
   InitInvok.getLangOptions().CodeCompleteInitsInPostfixExpr |=
       options::CodeCompleteInitsInPostfixExpr;
-  InitInvok.getClangImporterOptions().InferImplicitProperties |=
-    options::ImplicitProperties;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
     options::ObjCForwardDeclarations;
   InitInvok.getClangImporterOptions().OmitNeedlessWords |=

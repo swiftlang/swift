@@ -175,7 +175,7 @@ extension _ArrayBuffer {
         element is Element,
         "Down-casted Array element failed to match the target type")
     }
-    else  {
+    else {
       let ns = _nonNative
       _precondition(
         ns.objectAt(index) is Element,

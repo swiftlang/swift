@@ -53,10 +53,6 @@ public:
   /// generation.
   bool DetailedPreprocessingRecord = false;
 
-  /// If true, matched getter-like and setter-like methods will be imported as
-  /// properties.
-  bool InferImplicitProperties = false;
-
   /// If true, Clang diagnostics will be dumped to stderr using Clang's
   /// diagnostic printer as well as being passed to Swift's diagnostic engine.
   bool DumpClangDiagnostics = false;

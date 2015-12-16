@@ -45,18 +45,12 @@ class SILLinkerVisitor : public SILInstructionVisitor<SILLinkerVisitor, bool> {
   /// The current linking mode.
   LinkingMode Mode;
 
-  /// The callback which is called each time a new function body is
-  /// deserialized.
-  std::function<void(SILFunction *)> Callback;
-
 public:
   SILLinkerVisitor(SILModule &M, SerializedSILLoader *L,
                    SILModule::LinkingMode LinkingMode,
-                   SILExternalSource *E = nullptr,
-                   std::function<void(SILFunction *)> Callback =nullptr)
+                   SILExternalSource *E = nullptr)
       : Mod(M), Loader(L), ExternalSource(E), Worklist(),
-        FunctionDeserializationWorklist(), Mode(LinkingMode),
-        Callback(Callback) {}
+        FunctionDeserializationWorklist(), Mode(LinkingMode) {}
 
   /// Process F, recursively deserializing any thing F may reference.
   bool processFunction(SILFunction *F);

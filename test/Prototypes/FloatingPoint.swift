@@ -4,21 +4,21 @@
 // REQUIRES: executable_test
 import Swift
 
-//  TODO: These should probably subsumed into UnsignedIntegerType or
+//  TODO: These should probably subsumed into UnsignedInteger or
 //  another integer protocol.  Dave has already done some work here.
-public protocol FloatingPointRepresentationType : UnsignedIntegerType {
+public protocol FloatingPointRepresentation : UnsignedInteger {
   var leadingZeros: UInt { get }
   func <<(left: Self, right: Self) -> Self
   func >>(left: Self, right: Self) -> Self
   init(_ value: UInt)
 }
 
-extension UInt64 : FloatingPointRepresentationType {
+extension UInt64 : FloatingPointRepresentation {
   public var leadingZeros: UInt {
     return UInt(_countLeadingZeros(Int64(bitPattern: self)))
   }
 }
-extension UInt32 : FloatingPointRepresentationType {
+extension UInt32 : FloatingPointRepresentation {
   public var leadingZeros: UInt {
     return UInt64(self).leadingZeros - 32
   }
@@ -31,12 +31,12 @@ extension UInt32 : FloatingPointRepresentationType {
   import Glibc
 #endif
 
-public protocol FloatingPointType : Comparable, SignedNumberType,
+public protocol FloatingPoint : Comparable, SignedNumber,
   IntegerLiteralConvertible,
 FloatLiteralConvertible {
   
   /// An unsigned integer type large enough to hold the significand field.
-  typealias SignificandBits: FloatingPointRepresentationType
+  typealias SignificandBits: FloatingPointRepresentation
   
   /// Positive infinity.
   ///
@@ -329,7 +329,7 @@ FloatLiteralConvertible {
   
   //  TODO: do we actually want to provide remainder as an operator?  It's
   //  definitely not obvious to me that we should, but we have until now.
-  //  See further discustion with func remainder(x,y) above.
+  //  See further discussion with func remainder(x,y) above.
   func %(x: Self, y: Self) -> Self
   
   //  Conversions from all integer types.
@@ -359,11 +359,11 @@ FloatLiteralConvertible {
   /// Implements the IEEE-754 copy operation.
   prefix func +(value: Self) -> Self
   
-  //  IEEE-754 negate operation is prefix `-`, provided by SignedNumberType.
+  //  IEEE-754 negate operation is prefix `-`, provided by SignedNumber.
   //  TODO: ensure that the optimizer is able to produce a simple xor for -.
   
   //  IEEE-754 abs operation is the free function abs( ), provided by
-  //  SignedNumberType.  TODO: ensure that the optimizer is able to produce
+  //  SignedNumber.  TODO: ensure that the optimizer is able to produce
   //  a simple and or bic for abs( ).
   
   //  TODO: should this be the free function copysign(x, y) instead, a la C?
@@ -455,9 +455,9 @@ FloatLiteralConvertible {
   func equivalent(other: Self) -> Bool
 }
 
-//  Features of FloatingPointType that can be implemented without any
+//  Features of FloatingPoint that can be implemented without any
 //  dependence on the internals of the type.
-extension FloatingPointType {
+extension FloatingPoint {
   
   public static var NaN: Self { return NaN(payload: 0, signaling: false) }
   
@@ -515,7 +515,7 @@ extension FloatingPointType {
   }
 }
 
-public protocol BinaryFloatingPointType: FloatingPointType {
+public protocol BinaryFloatingPoint: FloatingPoint {
   
   /// Values that parametrize the type:
   static var _exponentBitCount: UInt { get }
@@ -542,7 +542,7 @@ public protocol BinaryFloatingPointType: FloatingPointType {
     exponentBitPattern: UInt,
     significandBitPattern: SignificandBits)
   
-  init<T: BinaryFloatingPointType>(_ other: T)
+  init<T: BinaryFloatingPoint>(_ other: T)
   
   //  TODO: IEEE-754 requires that the six basic operations (add, subtract,
   //  multiply, divide, square root, and FMA) be provided from all source
@@ -557,28 +557,28 @@ public protocol BinaryFloatingPointType: FloatingPointType {
   //
   //  While `sqrt` and `fma` have traditionally been part of the
   //  math library in C-derived languages, they rightfully belong as part
-  //  of the base FloatingPointType protocol in Swift, because they are
+  //  of the base FloatingPoint protocol in Swift, because they are
   //  IEEE-754 required operations, like + or *.
   /// The sum of `x` and `y`, correctly rounded to `Self`.
-  static func add<X: BinaryFloatingPointType, Y: BinaryFloatingPointType>(x: X, _ y: Y) -> Self
+  static func add<X: BinaryFloatingPoint, Y: BinaryFloatingPoint>(x: X, _ y: Y) -> Self
   
   /// The difference of `x` and `y`, correctly rounded to `Self`.
-  static func sub<X: BinaryFloatingPointType, Y: BinaryFloatingPointType>(x: X, _ y: Y) -> Self
+  static func sub<X: BinaryFloatingPoint, Y: BinaryFloatingPoint>(x: X, _ y: Y) -> Self
   
   /// The product of `x` and `y`, correctly rounded to `Self`.
-  static func mul<X: BinaryFloatingPointType, Y: BinaryFloatingPointType>(x: X, _ y: Y) -> Self
+  static func mul<X: BinaryFloatingPoint, Y: BinaryFloatingPoint>(x: X, _ y: Y) -> Self
   
   /// The quotient of `x` and `y`, correctly rounded to `Self`.
-  static func div<X: BinaryFloatingPointType, Y: BinaryFloatingPointType>(x: X, _ y: Y) -> Self
+  static func div<X: BinaryFloatingPoint, Y: BinaryFloatingPoint>(x: X, _ y: Y) -> Self
   
   /// The square root of `x`, correctly rounded to `Self`.
-  static func sqrt<X: BinaryFloatingPointType>(x: X) -> Self
+  static func sqrt<X: BinaryFloatingPoint>(x: X) -> Self
   
   /// (x*y) + z correctly rounded to `Self`.
-  static func mulAdd<X: BinaryFloatingPointType, Y: BinaryFloatingPointType, Z: BinaryFloatingPointType>(x: X, _ y: Y, _ z: Z) -> Self
+  static func mulAdd<X: BinaryFloatingPoint, Y: BinaryFloatingPoint, Z: BinaryFloatingPoint>(x: X, _ y: Y, _ z: Z) -> Self
 }
 
-extension BinaryFloatingPointType {
+extension BinaryFloatingPoint {
   
   static var _exponentBias: UInt {
     return Self._infinityExponent >> 1
@@ -746,35 +746,35 @@ extension BinaryFloatingPointType {
       significandBitPattern: significand)
   }
   
-  public static func add<X: BinaryFloatingPointType, Y: BinaryFloatingPointType>(x: X, _ y: Y) -> Self {
+  public static func add<X: BinaryFloatingPoint, Y: BinaryFloatingPoint>(x: X, _ y: Y) -> Self {
     if X._fractionalBitCount < Y._fractionalBitCount { return add(y, x) }
     if X._fractionalBitCount <= Self._fractionalBitCount { return Self(x) + Self(y) }
     return Self(X._addStickyRounding(x, X(y)))
   }
   
-  public static func sub<X: BinaryFloatingPointType, Y: BinaryFloatingPointType>(x: X, _ y: Y) -> Self {
+  public static func sub<X: BinaryFloatingPoint, Y: BinaryFloatingPoint>(x: X, _ y: Y) -> Self {
     return Self.add(x, -y)
   }
   
-  public static func mul<X: BinaryFloatingPointType, Y: BinaryFloatingPointType>(x: X, _ y: Y) -> Self {
+  public static func mul<X: BinaryFloatingPoint, Y: BinaryFloatingPoint>(x: X, _ y: Y) -> Self {
     if X._fractionalBitCount < Y._fractionalBitCount { return mul(y, x) }
     if X._fractionalBitCount <= Self._fractionalBitCount { return Self(x) * Self(y) }
     return Self(X._mulStickyRounding(x, X(y)))
   }
   
-  public static func div<X: BinaryFloatingPointType, Y: BinaryFloatingPointType>(x: X, _ y: Y) -> Self {
+  public static func div<X: BinaryFloatingPoint, Y: BinaryFloatingPoint>(x: X, _ y: Y) -> Self {
     if X._fractionalBitCount <= Self._fractionalBitCount &&
       Y._fractionalBitCount <= Self._fractionalBitCount { return Self(x) / Self(y) }
     if X._fractionalBitCount < Y._fractionalBitCount { return Self(Y._divStickyRounding(Y(x), y)) }
     return Self(X._divStickyRounding(x, X(y)))
   }
   
-  public static func sqrt<X: BinaryFloatingPointType>(x: X) -> Self {
-    if X._fractionalBitCount <= Self._fractionalBitCount  { return sqrt(Self(x)) }
+  public static func sqrt<X: BinaryFloatingPoint>(x: X) -> Self {
+    if X._fractionalBitCount <= Self._fractionalBitCount { return sqrt(Self(x)) }
     return Self(X._sqrtStickyRounding(x))
   }
   
-  public static func mulAdd<X: BinaryFloatingPointType, Y: BinaryFloatingPointType, Z: BinaryFloatingPointType>(x: X, _ y: Y, _ z: Z) -> Self {
+  public static func mulAdd<X: BinaryFloatingPoint, Y: BinaryFloatingPoint, Z: BinaryFloatingPoint>(x: X, _ y: Y, _ z: Z) -> Self {
     if X._fractionalBitCount < Y._fractionalBitCount { return mulAdd(y, x, z) }
     if X._fractionalBitCount <= Self._fractionalBitCount &&
       Z._fractionalBitCount <= Self._fractionalBitCount { return mulAdd(Self(x), Self(y), Self(z)) }
@@ -838,10 +838,10 @@ extension BinaryFloatingPointType {
   }
 }
 
-public protocol FloatingPointInterchangeType: FloatingPointType {
+public protocol FloatingPointInterchange: FloatingPoint {
   
   /// An unsigned integer type used to represent floating-point encodings.
-  typealias BitPattern: FloatingPointRepresentationType
+  typealias BitPattern: FloatingPointRepresentation
   
   /// Interpret `encoding` as a little-endian encoding of `Self`.
   init(littleEndian encoding: BitPattern)
@@ -856,7 +856,7 @@ public protocol FloatingPointInterchangeType: FloatingPointType {
   var bigEndian: BitPattern { get }
 }
 
-extension FloatingPointInterchangeType {
+extension FloatingPointInterchange {
   public init(littleEndian encoding: BitPattern) {
 #if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
     self = unsafeBitCast(encoding, Self.self)
@@ -879,7 +879,7 @@ extension FloatingPointInterchangeType {
   }
 }
 
-extension Float : BinaryFloatingPointType, FloatingPointInterchangeType {
+extension Float : BinaryFloatingPoint, FloatingPointInterchange {
   var _representation: UInt32 { return unsafeBitCast(self, UInt32.self) }
   public typealias SignificandBits = UInt32
   public typealias BitPattern = UInt32
@@ -894,7 +894,7 @@ extension Float : BinaryFloatingPointType, FloatingPointInterchangeType {
     let _representation = sign | exponent | significandBitPattern
     self = unsafeBitCast(_representation, Float.self)
   }
-  public init<T: BinaryFloatingPointType>(_ other: T) {
+  public init<T: BinaryFloatingPoint>(_ other: T) {
     // rdar://16980851 #if does not work with 'switch'
 #if arch(i386) || arch(x86_64)
     switch other {
@@ -928,7 +928,7 @@ extension Float : BinaryFloatingPointType, FloatingPointInterchangeType {
   public static func sqrt(x: Float) -> Float { return sqrtf(x) }
 }
 
-extension Double : BinaryFloatingPointType {
+extension Double : BinaryFloatingPoint {
   var _representation: UInt64 { return unsafeBitCast(self, UInt64.self) }
   public typealias SignificandBits = UInt64
   public static var _fractionalBitCount: UInt { return 52 }
@@ -942,7 +942,7 @@ extension Double : BinaryFloatingPointType {
     let _representation = sign | exponent | significandBitPattern
     self = unsafeBitCast(_representation, Double.self)
   }
-  public init<T: BinaryFloatingPointType>(_ other: T) {
+  public init<T: BinaryFloatingPoint>(_ other: T) {
     // rdar://16980851 #if does not work with 'switch' cases
 #if arch(i386) || arch(x86_64)
     switch other {
@@ -976,7 +976,7 @@ extension Double : BinaryFloatingPointType {
 }
 
 #if arch(i386) || arch(x86_64)
-extension Float80 : BinaryFloatingPointType {
+extension Float80 : BinaryFloatingPoint {
   
   // Internal implementation details
   struct _Float80Representation {
@@ -1049,7 +1049,7 @@ extension Float80 : BinaryFloatingPointType {
     self = unsafeBitCast(representation, Float80.self)
   }
   
-  public init<T: BinaryFloatingPointType>(_ other: T) {
+  public init<T: BinaryFloatingPoint>(_ other: T) {
     switch other {
     case let f as Float:
       self = Float80(f)
@@ -1117,6 +1117,15 @@ public func ==(lhs: FloatingPointClassification, rhs: FloatingPointClassificatio
 
 //===--- tests ------------------------------------------------------------===//
 import StdlibUnittest
+
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 var tests = TestSuite("Floating Point")
 
 tests.test("Parts") {

@@ -159,50 +159,24 @@ void ConstraintSystem::addTypeVariableConstraintsToWorkList(
   }
 }
 
-/// Retrieve a uniqued selector ID for the given declaration.
-static std::pair<unsigned, CanType>
-getDynamicResultSignature(ValueDecl *decl,
-                          llvm::StringMap<unsigned> &selectors) {
-  llvm::SmallString<32> buffer;
-
-  StringRef selector;
-  Type type;
-  if (auto func = dyn_cast<FuncDecl>(decl)) {
+/// Retrieve a dynamic result signature for the given declaration.
+static std::tuple<char, ObjCSelector, CanType>
+getDynamicResultSignature(ValueDecl *decl) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
     // Handle functions.
-    // FIXME: Use ObjCSelector here!
-    selector = func->getObjCSelector().getString(buffer);
-    type = decl->getType()->castTo<AnyFunctionType>()->getResult();
-
-    // Append a '+' for static methods, '-' for instance methods. This
-    // distinguishes methods with a given name from properties that
-    // might have the same name.
-    if (func->isStatic()) {
-      buffer += '+';
-    } else {
-      buffer += '-';
-    }
-    selector = buffer.str();
-  } else if (auto asd = dyn_cast<AbstractStorageDecl>(decl)) {
-    // Handle properties and subscripts. Only the getter matters.
-    selector = asd->getObjCGetterSelector().getString(buffer);
-    type = asd->getType();
-  } else if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
-    // Handle constructors.
-    selector = ctor->getObjCSelector().getString(buffer);
-    type = decl->getType()->castTo<AnyFunctionType>()->getResult();
-  } else {
-    llvm_unreachable("Dynamic lookup found a non-[objc] result");
+    auto type =
+      decl->getInterfaceType()->castTo<AnyFunctionType>()->getResult();
+    return std::make_tuple(func->isStatic(), func->getObjCSelector(),
+                           type->getCanonicalType());
   }
 
-  // Look for this selector in the table. If we find it, we're done.
-  auto known = selectors.find(selector);
-  if (known != selectors.end())
-    return { known->second, type->getCanonicalType() };
+  if (auto asd = dyn_cast<AbstractStorageDecl>(decl)) {
+    // Handle properties and subscripts, anchored by the getter's selector.
+    return std::make_tuple(asd->isStatic(), asd->getObjCGetterSelector(),
+                           asd->getInterfaceType()->getCanonicalType());
+  }
 
-  // Add this selector to the table.
-  unsigned result = selectors.size();
-  selectors[selector] = result;
-  return { result, type->getCanonicalType() };
+  llvm_unreachable("Not a valid @objc member");
 }
 
 LookupResult &ConstraintSystem::lookupMember(Type base, DeclName name) {
@@ -235,13 +209,12 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclName name) {
     return *result;
 
   // We are performing dynamic lookup. Filter out redundant results early.
-  llvm::DenseSet<std::pair<unsigned, CanType>> known;
-  llvm::StringMap<unsigned> selectors;
+  llvm::DenseSet<std::tuple<char, ObjCSelector, CanType>> known;
   result->filter([&](ValueDecl *decl) -> bool {
     if (decl->isInvalid())
       return false;
 
-    return known.insert(getDynamicResultSignature(decl, selectors)).second;
+    return known.insert(getDynamicResultSignature(decl)).second;
   });
 
   return *result;

@@ -1188,8 +1188,9 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   // Apply the solution to the expression.
   auto &solution = viable[0];
   bool isDiscarded = options.contains(TypeCheckExprFlags::IsDiscarded);
+  bool skipClosures = options.contains(TypeCheckExprFlags::SkipMultiStmtClosures);
   auto result = cs.applySolution(solution, expr, convertType, isDiscarded,
-                                 suppressDiagnostics);
+                                 suppressDiagnostics, skipClosures);
   if (!result) {
     // Failure already diagnosed, above, as part of applying the solution.
     return true;
@@ -1454,6 +1455,9 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       TypeResolutionOptions options;
       options |= TR_OverrideType;
       options |= TR_InExpression;
+      if (isa<EditorPlaceholderExpr>(expr->getSemanticsProvidingExpr())) {
+        options |= TR_EditorPlaceholder;
+      }
       if (tc.coercePatternToType(pattern, DC, patternType, options)) {
         return nullptr;
       }
@@ -1566,6 +1570,9 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
     /// The type of the initializer.
     Type InitType;
 
+    /// The type of the sequence.
+    Type SequenceType;
+
   public:
     explicit BindingListener(ForEachStmt *stmt) : Stmt(stmt) { }
 
@@ -1581,17 +1588,30 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         return true;
       }
 
+      SequenceType =
+        cs.createTypeVariable(Locator, /*options=*/TVO_MustBeMaterializable);
       cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
+                       SequenceType, Locator);
+      cs.addConstraint(ConstraintKind::ConformsTo, SequenceType,
                        sequenceProto->getDeclaredType(), Locator);
+
+      auto generatorLocator =
+        cs.getConstraintLocator(Locator,
+                                ConstraintLocator::SequenceIteratorProtocol);
+      auto elementLocator =
+        cs.getConstraintLocator(generatorLocator,
+                                ConstraintLocator::GeneratorElementType);
 
       // Collect constraints from the element pattern.
       auto pattern = Stmt->getPattern();
-      InitType = cs.generateConstraints(pattern, Locator);
+      InitType = cs.generateConstraints(pattern, elementLocator);
       if (!InitType)
         return true;
       
       // Manually search for the generator witness. If no generator/element pair
       // exists, solve for them.
+      // FIXME: rename generatorType to iteratorType due to the protocol
+      // renaming
       Type generatorType;
       Type elementType;
       
@@ -1619,13 +1639,10 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       
         // Determine the generator type of the sequence.
         generatorType = cs.createTypeVariable(Locator, /*options=*/0);
-        cs.addConstraint(
-          Constraint::create(cs, ConstraintKind::TypeMember,
-                             expr->getType(), generatorType,
-                             tc.Context.Id_Iterator,
-                             cs.getConstraintLocator(
-                               Locator,
-                               ConstraintLocator::SequenceIteratorProtocol)));
+        cs.addConstraint(Constraint::create(
+                           cs, ConstraintKind::TypeMember,
+                           SequenceType, generatorType,
+                           tc.Context.Id_Iterator, generatorLocator));
 
         // Determine the element type of the generator.
         // FIXME: Should look up the type witness.
@@ -1633,31 +1650,30 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         cs.addConstraint(Constraint::create(
                            cs, ConstraintKind::TypeMember,
                            generatorType, elementType,
-                           tc.Context.Id_Element,
-                           cs.getConstraintLocator(
-                             Locator,
-                             ConstraintLocator::GeneratorElementType)));
+                           tc.Context.Id_Element, elementLocator));
       }
       
 
       // Add a conversion constraint between the element type of the sequence
       // and the type of the element pattern.
       cs.addConstraint(ConstraintKind::Conversion, elementType, InitType,
-                       Locator);
+                       elementLocator);
       
       Stmt->setSequence(expr);
       return false;
     }
 
     virtual Expr *appliedSolution(Solution &solution, Expr *expr) {
-      // Figure out what type the constraints decided on.
+      // Figure out what types the constraints decided on.
       auto &cs = solution.getConstraintSystem();
       auto &tc = cs.getTypeChecker();
       InitType = solution.simplifyType(tc, InitType);
+      SequenceType = solution.simplifyType(tc, SequenceType);
 
-      // Force the sequence to be materializable.
-      // FIXME: work this into the constraint system
-      expr = tc.coerceToMaterializable(expr);
+      // Perform any necessary conversions of the sequence (e.g. [T]! -> [T]).
+      if (tc.convertToType(expr, SequenceType, cs.DC)) {
+        return nullptr;
+      }
 
       // Apply the solution to the iteration pattern as well.
       Pattern *pattern = Stmt->getPattern();
@@ -1737,7 +1753,7 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
   // If this expression is already typechecked and has an i1 type, then it has
-  // already got its conversion from BooleanType back to i1.  Just re-typecheck
+  // already got its conversion from Boolean back to i1.  Just re-typecheck
   // it.
   if (expr->getType() && expr->getType()->isBuiltinIntegerType(1))
     return typeCheckExpression(expr, dc);
@@ -1747,22 +1763,22 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
     Expr *OrigExpr = nullptr;
 
   public:
-    // Add the appropriate BooleanType constraint.
+    // Add the appropriate Boolean constraint.
     virtual bool builtConstraints(ConstraintSystem &cs, Expr *expr) {
       // Save the original expression.
       OrigExpr = expr;
       
-      // Otherwise, the result must be a BooleanType.
+      // Otherwise, the result must be a Boolean.
       auto &tc = cs.getTypeChecker();
       auto logicValueProto = tc.getProtocol(expr->getLoc(),
-                                            KnownProtocolKind::BooleanType);
+                                            KnownProtocolKind::Boolean);
       if (!logicValueProto)
         return true;
 
       auto logicValueType = logicValueProto->getDeclaredType();
 
-      // We use SelfObjectOfProtocol because an existential BooleanType is
-      // allowed as a condition, but BooleanType is not self-conforming.
+      // We use SelfObjectOfProtocol because an existential Boolean is
+      // allowed as a condition, but Boolean is not self-conforming.
       cs.addConstraint(ConstraintKind::SelfObjectOfProtocol,
                        expr->getType(), logicValueType,
                        cs.getConstraintLocator(OrigExpr), /*isFavored*/true);

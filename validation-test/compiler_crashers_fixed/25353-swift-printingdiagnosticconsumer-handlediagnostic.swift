@@ -4,6 +4,6 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-protocol A:A{typealias e:BooleanType,var a
+protocol A:A{typealias e:Boolean,var a
 class B{
 deinit{

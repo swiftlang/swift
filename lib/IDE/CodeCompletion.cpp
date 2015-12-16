@@ -65,7 +65,7 @@ CodeCompletionCommandKind getCommandKind(StringRef Command) {
   return CodeCompletionCommandKind::none;
 }
 
-StringRef getCommnadName(CodeCompletionCommandKind Kind) {
+StringRef getCommandName(CodeCompletionCommandKind Kind) {
 #define CHECK_CASE(KIND)                                                    \
   if (CodeCompletionCommandKind::KIND == Kind) {                            \
     static std::string Name(#KIND);                                         \
@@ -179,7 +179,7 @@ public:
         auto Text = TC->getText();
         std::vector<StringRef> Subs;
         splitTextByComma(Text, Subs);
-        auto Kind = getCommnadName(CommandKind);
+        auto Kind = getCommandName(CommandKind);
         for (auto S : Subs)
           Words.push_back(std::make_pair(Kind, S));
       } else
@@ -223,7 +223,7 @@ public:
   void visitText(const Text *Text) override {
     if (Kind == CodeCompletionCommandKind::none)
       return;
-    StringRef CommandName = getCommnadName(Kind);
+    StringRef CommandName = getCommandName(Kind);
     std::vector<StringRef> Subs;
     splitTextByComma(Text->str(), Subs);
     for (auto S : Subs)
@@ -2611,12 +2611,12 @@ public:
     return false;
   }
 
-  void handleOptionSetType(Decl *D, DeclVisibilityKind Reason) {
+  void handleOptionSet(Decl *D, DeclVisibilityKind Reason) {
     if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-      if (isOptionSetTypeDecl(NTD)) {
+      if (isOptionSetDecl(NTD)) {
         for (auto M : NTD->getMembers()) {
           if (auto *VD = dyn_cast<VarDecl>(M)) {
-            if (isOptionSetType(VD->getType()) && VD->isStatic()) {
+            if (isOptionSet(VD->getType()) && VD->isStatic()) {
               addVarDeclRef(VD, Reason);
             }
           }
@@ -2625,8 +2625,8 @@ public:
     }
   }
 
-  bool isOptionSetTypeDecl(NominalTypeDecl *D) {
-    auto optionSetType = dyn_cast<ProtocolDecl>(Ctx.getOptionSetTypeDecl());
+  bool isOptionSetDecl(NominalTypeDecl *D) {
+    auto optionSetType = dyn_cast<ProtocolDecl>(Ctx.getOptionSetDecl());
     if (!optionSetType)
       return false;
 
@@ -2635,10 +2635,10 @@ public:
                                 optionSetType, conformances);
   }
 
-  bool isOptionSetType(Type Ty) {
+  bool isOptionSet(Type Ty) {
     return Ty &&
            Ty->getNominalOrBoundGenericNominal() &&
-           isOptionSetTypeDecl(Ty->getNominalOrBoundGenericNominal());
+           isOptionSetDecl(Ty->getNominalOrBoundGenericNominal());
   }
 
   void getTupleExprCompletions(TupleType *ExprType) {
@@ -2798,7 +2798,7 @@ public:
     CodeCompletionResultBuilder builder(
         Sink, CodeCompletionResult::ResultKind::Pattern,
         SemanticContextKind::None, {});
-    // FIXME: we can't use the exclaimation mark chunk kind, or it isn't
+    // FIXME: we can't use the exclamation mark chunk kind, or it isn't
     // included in the completion name.
     builder.addTextChunk("!");
     assert(resultType);
@@ -3177,7 +3177,7 @@ public:
         if (HandledDecls.count(NTD) == 0) {
           auto Reason = DeclVisibilityKind::MemberOfCurrentNominal;
           if (!Lookup.handleEnumElement(NTD, Reason)) {
-            Lookup.handleOptionSetType(NTD, Reason);
+            Lookup.handleOptionSet(NTD, Reason);
           }
           HandledDecls.insert(NTD);
         }
@@ -3220,7 +3220,7 @@ public:
       if (T && T->getNominalOrBoundGenericNominal()) {
         auto Reason = DeclVisibilityKind::MemberOfCurrentNominal;
         if (!handleEnumElement(T->getNominalOrBoundGenericNominal(), Reason)) {
-          handleOptionSetType(T->getNominalOrBoundGenericNominal(), Reason);
+          handleOptionSet(T->getNominalOrBoundGenericNominal(), Reason);
         }
       }
     }
@@ -4186,6 +4186,7 @@ public:
         switch (S->getKind()) {
         case StmtKind::Return:
         case StmtKind::ForEach:
+        case StmtKind::RepeatWhile:
           return true;
         default:
           return false;
@@ -4246,6 +4247,15 @@ public:
                                 ParsedExpr->getSourceRange())) {
              Callback(Context.getSequenceDecl()->getDeclaredInterfaceType());
            }
+         }
+         break;
+       }
+       case StmtKind::RepeatWhile: {
+         auto Cond = cast<RepeatWhileStmt>(Parent)->getCond();
+         if (Cond &&
+             SM.rangeContains(Cond->getSourceRange(),
+                              ParsedExpr->getSourceRange())) {
+           Callback(Context.getBoolDecl()->getDeclaredType());
          }
          break;
        }
@@ -4433,7 +4443,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
         Lookup.setHaveRParen(HasRParen);
         Lookup.getValueExprCompletions(*ExprType);
       } else {
-        // Add argument labels, then fallthough to get values.
+        // Add argument labels, then fallthrough to get values.
         Lookup.addArgNameCompletionResults(PossibleNames);
       }
     }

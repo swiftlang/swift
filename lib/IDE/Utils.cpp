@@ -174,7 +174,7 @@ ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
       break;
   }
   if (!IndentInfos.empty()) {
-    SCR.IndentPrefix = std::move(IndentInfos.back().Prefix.str());
+    SCR.IndentPrefix = IndentInfos.back().Prefix.str();
     // Trim off anything that follows a non-space character
     const size_t pos = SCR.IndentPrefix.find_first_not_of(" \t");
     if (pos != std::string::npos)

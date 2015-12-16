@@ -448,13 +448,11 @@ func testSingleQuoteStringLiterals() {
   'abc" // expected-error{{unterminated string literal}}
   "a'c"
 
-  // FIXME: <rdar://problem/22709931> QoI: Single-quote => double-quote string literal fixit should escape quote chars
-  // FIXME: The suggested replacement should un-escape the single quote
-  // character.
-  'ab\'c' // expected-error{{single-quoted string literal found, use '"'}}{{3-10="ab\\'c"}}
+  'ab\'c' // expected-error{{single-quoted string literal found, use '"'}}{{3-10="ab'c"}}
 
-  // FIXME: The suggested replacement should escape the double-quote character.
-  'ab"c' // expected-error{{single-quoted string literal found, use '"'}}{{3-9="ab"c"}}
+  'ab"c' // expected-error{{single-quoted string literal found, use '"'}}{{3-9="ab\\"c"}}
+  'ab\"c' // expected-error{{single-quoted string literal found, use '"'}}{{3-10="ab\\"c"}}
+  'ab\\"c' // expected-error{{single-quoted string literal found, use '"'}}{{3-11="ab\\\\\\"c"}}
 }
 
 // <rdar://problem/17128913>
@@ -726,7 +724,7 @@ func testParenExprInTheWay() {
   if !(x & 4.0) {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
   
-  if x & x {} // expected-error {{type 'Int' does not conform to protocol 'BooleanType'}}
+  if x & x {} // expected-error {{type 'Int' does not conform to protocol 'Boolean'}}
 }
 
 // <rdar://problem/21352576> Mixed method/property overload groups can cause a crash during constraint optimization

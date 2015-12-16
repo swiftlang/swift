@@ -674,6 +674,7 @@ public:
   }
   SourceRange getSourceRange() const { return {getStartLoc(), getEndLoc()}; }
   
+  TypeLoc &getParentType() { return ParentType; }
   TypeLoc getParentType() const { return ParentType; }
   
   static bool classof(const Pattern *P) {

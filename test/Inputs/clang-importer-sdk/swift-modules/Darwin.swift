@@ -10,7 +10,7 @@ public let noErr: OSStatus = 0
 /// Foundation.
 ///
 /// The C type is a typedef for `unsigned char`.
-public struct DarwinBoolean : BooleanType, BooleanLiteralConvertible {
+public struct DarwinBoolean : Swift.Boolean, BooleanLiteralConvertible {
   var value: UInt8
 
   public init(_ value: Bool) {

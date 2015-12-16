@@ -25,10 +25,10 @@ public struct RangeIterator<
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   public mutating func next() -> Element? {
-    if startIndex == endIndex {
-      return .None
-    }
-    return startIndex++
+    if startIndex == endIndex { return nil }
+    let element = startIndex
+    startIndex._successorInPlace()
+    return element
   }
 
   /// The lower bound of the remaining range.
@@ -99,7 +99,7 @@ public struct Range<
 
   //===--------------------------------------------------------------------===//
   // Overloads for subscript that allow us to make subscripting fail
-  // at compile time, outside a generic context, when Element is an IntegerType
+  // at compile time, outside a generic context, when Element is an Integer
   // type. The current language design gives us no way to force r[0]
   // to work "as expected" (return the first element of the range) for
   // an arbitrary Range<Int>, so instead we make it ambiguous.  Same

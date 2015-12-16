@@ -141,12 +141,12 @@ internal class _AnySequenceBox {
 }
 
 internal class _AnyCollectionBoxBase : _AnySequenceBox {
-  init(startIndex: _ForwardIndexBoxType, endIndex: _ForwardIndexBoxType) {
+  init(startIndex: _ForwardIndexBoxProtocol, endIndex: _ForwardIndexBoxProtocol) {
     self.startIndex = startIndex
     self.endIndex = endIndex
   }
-  let startIndex: _ForwardIndexBoxType
-  let endIndex: _ForwardIndexBoxType
+  let startIndex: _ForwardIndexBoxProtocol
+  let endIndex: _ForwardIndexBoxProtocol
 }
 
 // FIXME: can't make this a protocol due to <rdar://20209031>
@@ -191,7 +191,7 @@ internal class _CollectionBox<S: Collection>
   override func _count() -> IntMax {
     return 0
   }
-  override subscript(position: _ForwardIndexBoxType) -> Element {
+  override subscript(position: _ForwardIndexBoxProtocol) -> Element {
     if let i = position._unbox() as S.Index? {
       return _base[i]
     }
@@ -199,8 +199,8 @@ internal class _CollectionBox<S: Collection>
   }
   init(
     _ base: S,
-    startIndex: _ForwardIndexBoxType,
-    endIndex: _ForwardIndexBoxType
+    startIndex: _ForwardIndexBoxProtocol,
+    endIndex: _ForwardIndexBoxProtocol
   ) {
     self._base = base
     super.init(startIndex: startIndex, endIndex: endIndex)
@@ -288,51 +288,51 @@ extension AnyRandomAccessCollection {
 //===--- ForwardIndex -----------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-internal protocol _ForwardIndexBoxType : class {
+internal protocol _ForwardIndexBoxProtocol : class {
   var typeID: ObjectIdentifier {get}
-  func successor() -> _ForwardIndexBoxType
-  func equals(other: _ForwardIndexBoxType) -> Bool
+  func successor() -> _ForwardIndexBoxProtocol
+  func equals(other: _ForwardIndexBoxProtocol) -> Bool
   func _unbox<T: ForwardIndex>() -> T?
-  func _distanceTo(other: _ForwardIndexBoxType) -> AnyForwardIndex.Distance
+  func _distanceTo(other: _ForwardIndexBoxProtocol) -> AnyForwardIndex.Distance
   // FIXME: Can't return Self from _advancedBy pending <rdar://20181253>
-  func _advancedBy(distance: AnyForwardIndex.Distance) -> _ForwardIndexBoxType
+  func _advancedBy(distance: AnyForwardIndex.Distance) -> _ForwardIndexBoxProtocol
   func _advancedBy(
     distance: AnyForwardIndex.Distance,
-    _ limit: _ForwardIndexBoxType
-  ) -> _ForwardIndexBoxType
+    _ limit: _ForwardIndexBoxProtocol
+  ) -> _ForwardIndexBoxProtocol
 }
 
 internal class _ForwardIndexBox<
   BaseIndex: ForwardIndex
-> : _ForwardIndexBoxType {
+> : _ForwardIndexBoxProtocol {
   required init(_ base: BaseIndex) {
     self.base = base
   }
 
-  func successor() -> _ForwardIndexBoxType {
+  func successor() -> _ForwardIndexBoxProtocol {
     return self.dynamicType(self.base.successor())
   }
 
-  func unsafeUnbox(other: _ForwardIndexBoxType) -> BaseIndex {
+  func unsafeUnbox(other: _ForwardIndexBoxProtocol) -> BaseIndex {
     return (unsafeDowncast(other) as _ForwardIndexBox).base
   }
 
-  func equals(other: _ForwardIndexBoxType) -> Bool {
+  func equals(other: _ForwardIndexBoxProtocol) -> Bool {
     return base == unsafeUnbox(other)
   }
 
-  func _distanceTo(other: _ForwardIndexBoxType) -> AnyForwardIndex.Distance {
+  func _distanceTo(other: _ForwardIndexBoxProtocol) -> AnyForwardIndex.Distance {
     return numericCast(distance(base, unsafeUnbox(other)))
   }
 
-  func _advancedBy(n: AnyForwardIndex.Distance) -> _ForwardIndexBoxType {
+  func _advancedBy(n: AnyForwardIndex.Distance) -> _ForwardIndexBoxProtocol {
     return self.dynamicType(advance(base, numericCast(n)))
   }
 
   func _advancedBy(
     n: AnyForwardIndex.Distance,
-    _ limit: _ForwardIndexBoxType
-  ) -> _ForwardIndexBoxType {
+    _ limit: _ForwardIndexBoxProtocol
+  ) -> _ForwardIndexBoxProtocol {
     return self.dynamicType(advance(base, numericCast(n), unsafeUnbox(limit)))
   }
 
@@ -355,22 +355,22 @@ internal class _ForwardIndexBox<
 //===--- BidirectionalIndex -----------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-internal protocol _BidirectionalIndexBoxType : _ForwardIndexBoxType {
-  func predecessor() -> _BidirectionalIndexBoxType
+internal protocol _BidirectionalIndexBoxProtocol : _ForwardIndexBoxProtocol {
+  func predecessor() -> _BidirectionalIndexBoxProtocol
 }
 
 internal class _BidirectionalIndexBox<
   BaseIndex: BidirectionalIndex
-> : _ForwardIndexBox<BaseIndex>, _BidirectionalIndexBoxType {
+> : _ForwardIndexBox<BaseIndex>, _BidirectionalIndexBoxProtocol {
   required init(_ base: BaseIndex) {
     super.init(base)
   }
 
-  override func successor() -> _ForwardIndexBoxType {
+  override func successor() -> _ForwardIndexBoxProtocol {
     return self.dynamicType(self.base.successor())
   }
 
-  func predecessor() -> _BidirectionalIndexBoxType {
+  func predecessor() -> _BidirectionalIndexBoxProtocol {
     return self.dynamicType(self.base.predecessor())
   }
 }
@@ -378,11 +378,11 @@ internal class _BidirectionalIndexBox<
 //===--- RandomAccessIndex -----------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-internal protocol _RandomAccessIndexBoxType : _BidirectionalIndexBoxType {}
+internal protocol _RandomAccessIndexBoxProtocol : _BidirectionalIndexBoxProtocol {}
 
 internal final class _RandomAccessIndexBox<
   BaseIndex: RandomAccessIndex
-> : _BidirectionalIndexBox<BaseIndex>, _RandomAccessIndexBoxType {
+> : _BidirectionalIndexBox<BaseIndex>, _RandomAccessIndexBoxProtocol {
   required init(_ base: BaseIndex) {
     super.init(base)
   }
@@ -420,11 +420,11 @@ public struct AnyForwardIndex : ForwardIndex {
     return _box.typeID
   }
 
-  internal init(_ box: _ForwardIndexBoxType) {
+  internal init(_ box: _ForwardIndexBoxProtocol) {
     self._box = box
   }
 
-  internal let _box: _ForwardIndexBoxType
+  internal let _box: _ForwardIndexBoxProtocol
 }
 
 public func ~> (
@@ -496,11 +496,11 @@ public struct AnyBidirectionalIndex : BidirectionalIndex {
     return _box.typeID
   }
 
-  internal init(_ box: _ForwardIndexBoxType) {
-    self._box = box as! _BidirectionalIndexBoxType
+  internal init(_ box: _ForwardIndexBoxProtocol) {
+    self._box = box as! _BidirectionalIndexBoxProtocol
   }
 
-  internal let _box: _BidirectionalIndexBoxType
+  internal let _box: _BidirectionalIndexBoxProtocol
 }
 
 public func ~> (
@@ -588,11 +588,11 @@ public struct AnyRandomAccessIndex : RandomAccessIndex {
     return _box.typeID
   }
 
-  internal init(_ box: _ForwardIndexBoxType) {
-    self._box = box as! _RandomAccessIndexBoxType
+  internal init(_ box: _ForwardIndexBoxProtocol) {
+    self._box = box as! _RandomAccessIndexBoxProtocol
   }
 
-  internal let _box: _RandomAccessIndexBoxType
+  internal let _box: _RandomAccessIndexBoxProtocol
 }
 
 public func ~> (
@@ -633,14 +633,14 @@ public func == (lhs: AnyRandomAccessIndex, rhs: AnyRandomAccessIndex) -> Bool {
 //===----------------------------------------------------------------------===//
 
 internal class _AnyCollectionBox<Element> : _AnyCollectionBoxBase {
-  subscript(_ForwardIndexBoxType) -> Element {_abstract()}
+  subscript(_ForwardIndexBoxProtocol) -> Element {_abstract()}
   func _count() -> IntMax {_abstract()}
 
   // FIXME: should be inherited, but a known bug prevents it since
   // this class is generic.
   override init(
-    startIndex: _ForwardIndexBoxType,
-    endIndex: _ForwardIndexBoxType
+    startIndex: _ForwardIndexBoxProtocol,
+    endIndex: _ForwardIndexBoxProtocol
   ) {
     super.init(startIndex: startIndex, endIndex: endIndex)
   }
@@ -857,10 +857,10 @@ public struct AnyBidirectionalCollection<Element> : AnyCollectionProtocol {
   ///
   /// Complexity: O(1)
   public init?(_ other: AnyForwardCollection<Element>) {
-    if !(other._box.startIndex is _BidirectionalIndexBoxType) {
+    if !(other._box.startIndex is _BidirectionalIndexBoxProtocol) {
       return nil
     }
-    _sanityCheck(other._box.endIndex is _BidirectionalIndexBoxType)
+    _sanityCheck(other._box.endIndex is _BidirectionalIndexBoxProtocol)
     self._box = other._box
   }
 
@@ -944,10 +944,10 @@ public struct AnyRandomAccessCollection<Element> : AnyCollectionProtocol {
   ///
   /// Complexity: O(1)
   public init?(_ other: AnyForwardCollection<Element>) {
-    if !(other._box.startIndex is _RandomAccessIndexBoxType) {
+    if !(other._box.startIndex is _RandomAccessIndexBoxProtocol) {
       return nil
     }
-    _sanityCheck(other._box.endIndex is _RandomAccessIndexBoxType)
+    _sanityCheck(other._box.endIndex is _RandomAccessIndexBoxProtocol)
     self._box = other._box
   }
   /// If the indices of the underlying collection stored by `other`
@@ -957,10 +957,10 @@ public struct AnyRandomAccessCollection<Element> : AnyCollectionProtocol {
   ///
   /// Complexity: O(1)
   public init?(_ other: AnyBidirectionalCollection<Element>) {
-    if !(other._box.startIndex is _RandomAccessIndexBoxType) {
+    if !(other._box.startIndex is _RandomAccessIndexBoxProtocol) {
       return nil
     }
-    _sanityCheck(other._box.endIndex is _RandomAccessIndexBoxType)
+    _sanityCheck(other._box.endIndex is _RandomAccessIndexBoxProtocol)
     self._box = other._box
   }
 

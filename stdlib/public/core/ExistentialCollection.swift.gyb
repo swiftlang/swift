@@ -130,13 +130,13 @@ internal class _AnySequenceBox<Element> {
 
 internal class _AnyCollectionBoxBase<Element> : _AnySequenceBox<Element> {
   internal init(
-    startIndex: _ForwardIndexBoxType, endIndex: _ForwardIndexBoxType
+    startIndex: _ForwardIndexBoxProtocol, endIndex: _ForwardIndexBoxProtocol
   ) {
     self.startIndex = startIndex
     self.endIndex = endIndex
   }
-  internal let startIndex: _ForwardIndexBoxType
-  internal let endIndex: _ForwardIndexBoxType
+  internal let startIndex: _ForwardIndexBoxProtocol
+  internal let endIndex: _ForwardIndexBoxProtocol
 }
 
 % for Kind in ['Sequence', 'Collection']:
@@ -162,7 +162,7 @@ internal class _${Kind}Box<S : ${Kind}>
   override func _count() -> IntMax {
     return numericCast(_base.count)
   }
-  override subscript(position: _ForwardIndexBoxType) -> Element {
+  override subscript(position: _ForwardIndexBoxProtocol) -> Element {
     if let i = position._unbox() as S.Index? {
       return _base[i]
     }
@@ -170,8 +170,8 @@ internal class _${Kind}Box<S : ${Kind}>
   }
   init(
     _ base: S,
-    startIndex: _ForwardIndexBoxType,
-    endIndex: _ForwardIndexBoxType
+    startIndex: _ForwardIndexBoxProtocol,
+    endIndex: _ForwardIndexBoxProtocol
   ) {
     self._base = base
     super.init(startIndex: startIndex, endIndex: endIndex)
@@ -251,42 +251,42 @@ extension Any${Kind} {
 //===--- ForwardIndex -----------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-internal protocol _ForwardIndexBoxType : class {
+internal protocol _ForwardIndexBoxProtocol : class {
   var typeID: ObjectIdentifier {get}
 
   @warn_unused_result
-  func successor() -> _ForwardIndexBoxType
+  func successor() -> _ForwardIndexBoxProtocol
 
   func _successorInPlace()
 
   @warn_unused_result
-  func equals(other: _ForwardIndexBoxType) -> Bool
+  func equals(other: _ForwardIndexBoxProtocol) -> Bool
 
   @warn_unused_result
   func _unbox<T : ForwardIndex>() -> T?
 
   @warn_unused_result
-  func _distanceTo(other: _ForwardIndexBoxType) -> AnyForwardIndex.Distance
+  func _distanceTo(other: _ForwardIndexBoxProtocol) -> AnyForwardIndex.Distance
 
   // FIXME: Can't return Self from _advancedBy pending <rdar://20181253>
   @warn_unused_result
-  func _advancedBy(distance: AnyForwardIndex.Distance) -> _ForwardIndexBoxType
+  func _advancedBy(distance: AnyForwardIndex.Distance) -> _ForwardIndexBoxProtocol
 
   @warn_unused_result
   func _advancedBy(
     distance: AnyForwardIndex.Distance,
-    _ limit: _ForwardIndexBoxType
-  ) -> _ForwardIndexBoxType
+    _ limit: _ForwardIndexBoxProtocol
+  ) -> _ForwardIndexBoxProtocol
 }
 
 internal class _ForwardIndexBox<
   BaseIndex: ForwardIndex
-> : _ForwardIndexBoxType {
+> : _ForwardIndexBoxProtocol {
   required init(_ base: BaseIndex) {
     self.base = base
   }
 
-  func successor() -> _ForwardIndexBoxType {
+  func successor() -> _ForwardIndexBoxProtocol {
     return self.dynamicType.init(self.base.successor())
   }
 
@@ -294,26 +294,26 @@ internal class _ForwardIndexBox<
     self.base._successorInPlace()
   }
 
-  func unsafeUnbox(other: _ForwardIndexBoxType) -> BaseIndex {
+  func unsafeUnbox(other: _ForwardIndexBoxProtocol) -> BaseIndex {
     return (unsafeDowncast(other) as _ForwardIndexBox).base
   }
 
-  func equals(other: _ForwardIndexBoxType) -> Bool {
+  func equals(other: _ForwardIndexBoxProtocol) -> Bool {
     return base == unsafeUnbox(other)
   }
 
-  func _distanceTo(other: _ForwardIndexBoxType) -> AnyForwardIndex.Distance {
+  func _distanceTo(other: _ForwardIndexBoxProtocol) -> AnyForwardIndex.Distance {
     return numericCast(base.distanceTo(unsafeUnbox(other)))
   }
 
-  func _advancedBy(n: AnyForwardIndex.Distance) -> _ForwardIndexBoxType {
+  func _advancedBy(n: AnyForwardIndex.Distance) -> _ForwardIndexBoxProtocol {
     return self.dynamicType.init(base.advancedBy(numericCast(n)))
   }
 
   func _advancedBy(
     n: AnyForwardIndex.Distance,
-    _ limit: _ForwardIndexBoxType
-  ) -> _ForwardIndexBoxType {
+    _ limit: _ForwardIndexBoxProtocol
+  ) -> _ForwardIndexBoxProtocol {
     return self.dynamicType.init(
       base.advancedBy(numericCast(n), limit: unsafeUnbox(limit)))
   }
@@ -337,23 +337,23 @@ internal class _ForwardIndexBox<
 //===--- BidirectionalIndex -----------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-internal protocol _BidirectionalIndexBoxType : _ForwardIndexBoxType {
-  func predecessor() -> _BidirectionalIndexBoxType
+internal protocol _BidirectionalIndexBoxProtocol : _ForwardIndexBoxProtocol {
+  func predecessor() -> _BidirectionalIndexBoxProtocol
   func _predecessorInPlace()
 }
 
 internal class _BidirectionalIndexBox<
   BaseIndex: BidirectionalIndex
-> : _ForwardIndexBox<BaseIndex>, _BidirectionalIndexBoxType {
+> : _ForwardIndexBox<BaseIndex>, _BidirectionalIndexBoxProtocol {
   required init(_ base: BaseIndex) {
     super.init(base)
   }
 
-  override func successor() -> _ForwardIndexBoxType {
+  override func successor() -> _ForwardIndexBoxProtocol {
     return self.dynamicType.init(self.base.successor())
   }
 
-  func predecessor() -> _BidirectionalIndexBoxType {
+  func predecessor() -> _BidirectionalIndexBoxProtocol {
     return self.dynamicType.init(self.base.predecessor())
   }
 
@@ -365,11 +365,11 @@ internal class _BidirectionalIndexBox<
 //===--- RandomAccessIndex ------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-internal protocol _RandomAccessIndexBoxType : _BidirectionalIndexBoxType {}
+internal protocol _RandomAccessIndexBoxProtocol : _BidirectionalIndexBoxProtocol {}
 
 internal final class _RandomAccessIndexBox<
   BaseIndex: RandomAccessIndex
-> : _BidirectionalIndexBox<BaseIndex>, _RandomAccessIndexBoxType {
+> : _BidirectionalIndexBox<BaseIndex>, _RandomAccessIndexBoxProtocol {
   required init(_ base: BaseIndex) {
     super.init(base)
   }
@@ -449,14 +449,14 @@ public struct ${Self} : ${Traversal}Index {
     return _box.typeID
   }
 
-  internal init(_ box: _ForwardIndexBoxType) {
+  internal init(_ box: _ForwardIndexBoxProtocol) {
     self._box = box${
-      '' if Traversal == 'Forward' else ' as! _%sIndexBoxType' % Traversal}
+      '' if Traversal == 'Forward' else ' as! _%sIndexBoxProtocol' % Traversal}
   }
 
   // _box is passed inout to _isUnique.  Although its value
   // is unchanged, it must appear mutable to the optimizer.
-  internal var _box: _${Traversal}IndexBoxType
+  internal var _box: _${Traversal}IndexBoxProtocol
 
   public func _distanceTo(other: ${Self}) -> ${Self}.Distance {
     precondition(
@@ -482,14 +482,14 @@ public func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
 //===----------------------------------------------------------------------===//
 
 internal class _AnyCollectionBox<Element> : _AnyCollectionBoxBase<Element> {
-  subscript(_: _ForwardIndexBoxType) -> Element {_abstract()}
+  subscript(_: _ForwardIndexBoxProtocol) -> Element {_abstract()}
   func _count() -> IntMax {_abstract()}
 
   // FIXME: should be inherited, but a known bug prevents it since
   // this class is generic.
   override init(
-    startIndex: _ForwardIndexBoxType,
-    endIndex: _ForwardIndexBoxType
+    startIndex: _ForwardIndexBoxProtocol,
+    endIndex: _ForwardIndexBoxProtocol
   ) {
     super.init(startIndex: startIndex, endIndex: endIndex)
   }
@@ -570,10 +570,10 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionProtocol {
   ///
   /// - Complexity: O(1).
   public init?(_ other: Any${SuperTraversal}Collection<Element>) {
-    if !(other._box.startIndex is _${Traversal}IndexBoxType) {
+    if !(other._box.startIndex is _${Traversal}IndexBoxProtocol) {
       return nil
     }
-    _sanityCheck(other._box.endIndex is _${Traversal}IndexBoxType)
+    _sanityCheck(other._box.endIndex is _${Traversal}IndexBoxProtocol)
     self._box = other._box
   }
 %   end
@@ -617,7 +617,7 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionProtocol {
   }
 
   /// Uniquely identifies the stored underlying collection.
-  public // due to language limitations only
+  public // Due to language limitations only
   var _underlyingCollectionID: ObjectIdentifier {
     return ObjectIdentifier(_box)
   }

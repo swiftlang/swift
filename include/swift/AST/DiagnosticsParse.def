@@ -132,6 +132,8 @@ ERROR(lex_unary_postfix_dot_is_reserved,lexing,none,
       "postfix '.' is reserved", ())
 ERROR(lex_editor_placeholder,lexing,none,
       "editor placeholder in source file", ())
+WARNING(lex_editor_placeholder_in_playground,lexing,none,
+        "editor placeholder in source file", ())
 
 //------------------------------------------------------------------------------
 // Declaration parsing diagnostics
@@ -483,6 +485,8 @@ ERROR(sil_missing_substitutions,decl_parsing,none,
       "missing substitutions", ())
 ERROR(sil_too_many_substitutions,decl_parsing,none,
       "too many substitutions", ())
+ERROR(sil_dbg_unknown_key,decl_parsing,none,
+      "unknown key '%0' in debug variable declaration", (StringRef))
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name, decl_parsing,none,

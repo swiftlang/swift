@@ -686,18 +686,21 @@ public:
     *this << "undef<" << A->getType() << ">";
   }
 
-  template <typename VarDeclaringInst>
-  void printVarDeclComment(VarDeclaringInst *VDI) {
-    if (VarDecl *VD = VDI->getDecl()) {
-      *this << "  // " << (VD->isLet() ? "let " : "var ") << VD->getName();
-      if (unsigned N = VDI->getVarInfo().getArgNo())
-        *this << ", argno: " << N;
-    }
-  }  
+  void printDebugVar(SILDebugVariable Var) {
+    if (Var.Name.empty())
+      return;
+    if (Var.Constant)
+      *this << ", let";
+    else
+      *this << ", var";
+    *this << ", name \"" << Var.Name << '"';
+    if (Var.ArgNo)
+      *this << ", argno " << Var.ArgNo;
+  }
 
   void visitAllocStackInst(AllocStackInst *AVI) {
     *this << "alloc_stack " << AVI->getElementType();
-    printVarDeclComment(AVI);
+    printDebugVar(AVI->getVarInfo());
   }
 
   void visitAllocRefInst(AllocRefInst *ARI) {
@@ -724,7 +727,7 @@ public:
 
   void visitAllocBoxInst(AllocBoxInst *ABI) {
     *this << "alloc_box " << ABI->getElementType();
-    printVarDeclComment(ABI);
+    printDebugVar(ABI->getVarInfo());
   }
 
   void printSubstitutions(ArrayRef<Substitution> Subs) {
@@ -866,12 +869,12 @@ public:
 
   void visitDebugValueInst(DebugValueInst *DVI) {
     *this << "debug_value " << getIDAndType(DVI->getOperand());
-    printVarDeclComment(DVI);
+    printDebugVar(DVI->getVarInfo());
   }
 
   void visitDebugValueAddrInst(DebugValueAddrInst *DVAI) {
     *this << "debug_value_addr " << getIDAndType(DVAI->getOperand());
-    printVarDeclComment(DVAI);
+    printDebugVar(DVAI->getVarInfo());
   }
 
   void visitLoadUnownedInst(LoadUnownedInst *LI) {

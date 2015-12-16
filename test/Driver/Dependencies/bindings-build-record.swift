@@ -1,8 +1,5 @@
-// rdar://problem/21515673
-// REQUIRES: OS=macosx
-
 // RUN: rm -rf %t && cp -r %S/Inputs/bindings-build-record/ %t
-// RUN: touch -t 201401240005 %t/*
+// RUN: %S/Inputs/touch.py 443865900 %t/*
 
 // RUN: cd %t && %swiftc_driver -driver-print-bindings ./main.swift ./other.swift ./yet-another.swift -incremental -output-file-map %t/output.json 2>&1 | FileCheck %s -check-prefix=MUST-EXEC
 
@@ -32,13 +29,13 @@
 
 // FILE-ADDED: inputs: ["./added.swift"], output: {{[{].*[}]}}, condition: newly-added{{$}}
 
-// RUN: touch -t 201401240006 %t/main.swift
+// RUN: %S/Inputs/touch.py 443865960 %t/main.swift
 // RUN: cd %t && %swiftc_driver -driver-print-bindings ./main.swift ./other.swift ./yet-another.swift -incremental -output-file-map %t/output.json 2>&1 | FileCheck %s -check-prefix=BUILD-RECORD-PLUS-CHANGE
 // BUILD-RECORD-PLUS-CHANGE: inputs: ["./main.swift"], output: {{[{].*[}]}}, condition: run-without-cascading
 // BUILD-RECORD-PLUS-CHANGE: inputs: ["./other.swift"], output: {{[{].*[}]}}, condition: run-without-cascading{{$}}
 // BUILD-RECORD-PLUS-CHANGE: inputs: ["./yet-another.swift"], output: {{[{].*[}]$}}
 
-// RUN: touch -t 201401240005 %t/main.swift
+// RUN: %S/Inputs/touch.py 443865900 %t/*
 // RUN: cd %t && %swiftc_driver -driver-print-bindings ./main.swift ./other.swift -incremental -output-file-map %t/output.json 2>&1 | FileCheck %s -check-prefix=FILE-REMOVED
 // FILE-REMOVED: inputs: ["./main.swift"], output: {{[{].*[}]}}, condition: run-without-cascading
 // FILE-REMOVED: inputs: ["./other.swift"], output: {{[{].*[}]}}, condition: run-without-cascading

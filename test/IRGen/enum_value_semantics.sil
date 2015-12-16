@@ -358,17 +358,8 @@ bb0(%0 : $SinglePayloadNontrivial):
 // -- MultiPayloadTrivial destructiveInjectEnumTag
 // CHECK-LABEL: define linkonce_odr hidden void @_TwuiO20enum_value_semantics19MultiPayloadTrivial
 // CHECK:      [[SELF:%.*]] = bitcast %swift.opaque* %value to %O20enum_value_semantics19MultiPayloadTrivial*
-// CHECK-NEXT: [[IS_PAYLOAD:%.*]] = icmp ule i32 %tag, 2
-// CHECK-NEXT: br i1 [[IS_PAYLOAD]], label %[[HAS_PAYLOAD:.*]], label %[[HAS_NO_PAYLOAD:.*]]
-
-// CHECK:      ; <label>:[[HAS_PAYLOAD]]
-
-//   -- Store the tag in the extra tag area
-// CHECK-NEXT: [[TAG:%.*]] = trunc i32 %tag to i2
-// CHECK-NEXT: [[EXTRA_TAG_ADDR_TMP:%.*]] = getelementptr inbounds %O20enum_value_semantics19MultiPayloadTrivial, %O20enum_value_semantics19MultiPayloadTrivial* [[SELF]], i32 0, i32 1
-// CHECK-NEXT: [[EXTRA_TAG_ADDR:%.*]] = bitcast [1 x i8]* [[EXTRA_TAG_ADDR_TMP]] to i2*
-// CHECK-NEXT: store i2 [[TAG]], i2* [[EXTRA_TAG_ADDR]], align 8
-// CHECK-NEXT: br label %[[DONE:.*]]
+// CHECK-NEXT: [[IS_PAYLOAD:%.*]] = icmp uge i32 %tag, 2
+// CHECK-NEXT: br i1 [[IS_PAYLOAD]], label %[[HAS_NO_PAYLOAD:.*]], label %[[HAS_PAYLOAD:.*]]
 
 // CHECK:      ; <label>:[[HAS_NO_PAYLOAD]]
 
@@ -384,6 +375,15 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-NEXT: [[EXTRA_TAG_ADDR_TMP:%.*]] = getelementptr inbounds %O20enum_value_semantics19MultiPayloadTrivial, %O20enum_value_semantics19MultiPayloadTrivial* [[SELF]], i32 0, i32 1
 // CHECK-NEXT: [[EXTRA_TAG_ADDR:%.*]] = bitcast [1 x i8]* [[EXTRA_TAG_ADDR_TMP]] to i2*
 // CHECK-NEXT: store i2 -2, i2* [[EXTRA_TAG_ADDR]], align 8
+// CHECK-NEXT: br label %[[DONE:.*]]
+
+// CHECK:      ; <label>:[[HAS_PAYLOAD]]
+
+//   -- Store the tag in the extra tag area
+// CHECK-NEXT: [[TAG:%.*]] = trunc i32 %tag to i2
+// CHECK-NEXT: [[EXTRA_TAG_ADDR_TMP:%.*]] = getelementptr inbounds %O20enum_value_semantics19MultiPayloadTrivial, %O20enum_value_semantics19MultiPayloadTrivial* [[SELF]], i32 0, i32 1
+// CHECK-NEXT: [[EXTRA_TAG_ADDR:%.*]] = bitcast [1 x i8]* [[EXTRA_TAG_ADDR_TMP]] to i2*
+// CHECK-NEXT: store i2 [[TAG]], i2* [[EXTRA_TAG_ADDR]], align 8
 // CHECK-NEXT: br label %[[DONE]]
 
 // CHECK:      ; <label>:[[DONE]]
@@ -592,8 +592,25 @@ bb0(%0 : $SinglePayloadNontrivial):
 
 // CHECK-LABEL: define linkonce_odr hidden void @_TwuiO20enum_value_semantics31MultiPayloadNontrivialSpareBits
 // CHECK:      [[SELF:%.*]] = bitcast %swift.opaque* %value to %O20enum_value_semantics31MultiPayloadNontrivialSpareBits*
-// CHECK-NEXT: [[IS_PAYLOAD:%.*]] = icmp ule i32 %tag, 3
-// CHECK-NEXT: br i1 [[IS_PAYLOAD]], label %[[HAS_PAYLOAD:.*]], label %[[HAS_NO_PAYLOAD:.*]]
+// CHECK-NEXT: [[IS_PAYLOAD:%.*]] = icmp uge i32 %tag, 3
+// CHECK-NEXT: br i1 [[IS_PAYLOAD]], label %[[HAS_NO_PAYLOAD:.*]], label %[[HAS_PAYLOAD:.*]]
+
+// CHECK:      ; <label>:[[HAS_NO_PAYLOAD]]
+
+//   -- Turn the case index into a no-payload case index
+// CHECK-NEXT: [[NO_PAYLOAD_TAG_TMP:%.*]] = sub i32 %tag, 3
+// CHECK-NEXT: [[NO_PAYLOAD_TAG:%.*]] = zext i32 [[NO_PAYLOAD_TAG_TMP]] to i64
+
+//   -- Store the low bits of the tag into the payload
+// CHECK-NEXT: [[PAYLOAD:%.*]] = bitcast %O20enum_value_semantics31MultiPayloadNontrivialSpareBits* [[SELF]] to { i64, i64 }*
+// CHECK-NEXT: [[FIRST_ADDR:%.*]] = getelementptr inbounds { i64, i64 }, { i64, i64 }* [[PAYLOAD]], i32 0, i32 0
+// CHECK-NEXT: store i64 [[NO_PAYLOAD_TAG]], i64* [[FIRST_ADDR]], align 8
+
+//   -- Store the high bits of the tag into the spare bits
+// CHECK-NEXT: [[SECOND_ADDR:%.*]] = getelementptr inbounds { i64, i64 }, { i64, i64 }* [[PAYLOAD]], i32 0, i32 1
+//   -- 0xc000000000000000
+// CHECK-NEXT: store i64 -4611686018427387904, i64* [[SECOND_ADDR]], align 8
+// CHECK-NEXT: br label %[[END:.*]]
 
 // CHECK:      ; <label>:[[HAS_PAYLOAD]]
 
@@ -626,23 +643,6 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-NEXT: store i64 [[FIRST]], i64* [[FIRST_ADDR]], align 8
 // CHECK-NEXT: [[SECOND_ADDR:%.*]] = getelementptr inbounds { i64, i64 }, { i64, i64 }* [[PAYLOAD]], i32 0, i32 1
 // CHECK-NEXT: store i64 [[SECOND_NEW]], i64* [[SECOND_ADDR]], align 8
-// CHECK-NEXT: br label %[[END:.*]]
-
-// CHECK:      ; <label>:[[HAS_NO_PAYLOAD]]
-
-//   -- Turn the case index into a no-payload case index
-// CHECK-NEXT: [[NO_PAYLOAD_TAG_TMP:%.*]] = sub i32 %tag, 3
-// CHECK-NEXT: [[NO_PAYLOAD_TAG:%.*]] = zext i32 [[NO_PAYLOAD_TAG_TMP]] to i64
-
-//   -- Store the low bits of the tag into the payload
-// CHECK-NEXT: [[PAYLOAD:%.*]] = bitcast %O20enum_value_semantics31MultiPayloadNontrivialSpareBits* [[SELF]] to { i64, i64 }*
-// CHECK-NEXT: [[FIRST_ADDR:%.*]] = getelementptr inbounds { i64, i64 }, { i64, i64 }* [[PAYLOAD]], i32 0, i32 0
-// CHECK-NEXT: store i64 [[NO_PAYLOAD_TAG]], i64* [[FIRST_ADDR]], align 8
-
-//   -- Store the high bits of the tag into the spare bits
-// CHECK-NEXT: [[SECOND_ADDR:%.*]] = getelementptr inbounds { i64, i64 }, { i64, i64 }* [[PAYLOAD]], i32 0, i32 1
-//   -- 0xc000000000000000
-// CHECK-NEXT: store i64 -4611686018427387904, i64* [[SECOND_ADDR]], align 8
 // CHECK-NEXT: br label %[[END]]
 
 // CHECK:      ; <label>:[[END]]

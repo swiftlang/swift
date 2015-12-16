@@ -8,4 +8,4 @@ func f
 {
 enum S<{
 enum S{protocol A:A{var b :e
-typealias e : BooleanType
+typealias e : Boolean

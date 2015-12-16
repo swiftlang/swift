@@ -2441,8 +2441,10 @@ struct ContainsUnownedObjC {
   unowned let x: C
 }
 // CHECK-LABEL: define {{.*}} @optional_unowned() {{.*}} {
-// CHECK-64:      ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 2 }
-// CHECK-32:      ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 1 }
+// CHECK-objc-64:     ret { [[WORD]], [[WORD]], i1 } { [[WORD]] 0, [[WORD]] 0, i1 true }
+// CHECK-native-64:   ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 2 }
+// CHECK-objc-32:     ret { [[WORD]], [[WORD]], i1 } { [[WORD]] 0, [[WORD]] 0, i1 true }
+// CHECK-native-32:   ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 1 }
 sil @optional_unowned : $@convention(thin) () -> (Optionable<ContainsUnowned>, Optionable<Optionable<ContainsUnowned>>) {
 entry:
   %a = enum $Optionable<ContainsUnowned>, #Optionable.None!enumelt
@@ -2451,8 +2453,10 @@ entry:
   return %t : $(Optionable<ContainsUnowned>, Optionable<Optionable<ContainsUnowned>>)
 }
 // CHECK-LABEL: define {{.*}} @optional_unowned_objc() {{.*}} {
-// CHECK-64:      ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 2 }
-// CHECK-32:      ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 1 }
+// CHECK-objc-64:      ret { [[WORD]], [[WORD]], i1 } { [[WORD]] 0, [[WORD]] 0, i1 true }
+// CHECK-native-64:    ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 2 }
+// CHECK-objc-32:      ret { [[WORD]], [[WORD]], i1 } { [[WORD]] 0, [[WORD]] 0, i1 true }
+// CHECK-native-32:    ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 1 }
 sil @optional_unowned_objc : $@convention(thin) () -> (Optionable<ContainsUnownedObjC>, Optionable<Optionable<ContainsUnownedObjC>>) {
 entry:
   %a = enum $Optionable<ContainsUnownedObjC>, #Optionable.None!enumelt
@@ -2535,7 +2539,7 @@ enum Target {
 
 // Ensure that we generate IR that does not run into verification
 // issues for the case where there is a single tag bit and extra
-// enhabitants.
+// inhabitants.
 // CHECK-LABEL: define void @generate_conditional_branch
 sil @generate_conditional_branch : $@convention(thin) (@owned Target) -> () {
 bb0(%0 : $Target):

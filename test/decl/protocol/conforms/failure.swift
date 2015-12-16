@@ -93,9 +93,9 @@ struct P6Conformer : P6 { // expected-error 2 {{does not conform}}
 }
 
 // rdar://problem/23033862
-// expected-error@+2{{type 'A' does not conform to protocol 'OptionSetType'}}
+// expected-error@+2{{type 'A' does not conform to protocol 'OptionSet'}}
 // expected-error@+1{{type 'A' does not conform to protocol 'RawRepresentable'}}
-struct A: OptionSetType {
+struct A: OptionSet {
     let rawValue = 0
     init() { } // expected-note 2{{candidate has non-matching type '()'}}
 }

@@ -276,6 +276,21 @@ struct SwiftUnownedRetainableBox :
   static void release(HeapObject *obj) {
     swift_unownedRelease(obj);
   }
+
+#if SWIFT_OBJC_INTEROP
+  // The implementation from RetainableBoxBase is valid when interop is
+  // disabled.
+  static constexpr unsigned numExtraInhabitants = 1;
+
+  static void storeExtraInhabitant(HeapObject **dest, int index) {
+    assert(index == 0);
+    *dest = nullptr;
+  }
+
+  static int getExtraInhabitantIndex(const HeapObject * const *src) {
+    return (*src == nullptr ? 0 : -1);
+  }
+#endif
 };
 
 /// CRTP base class for weak reference boxes.
@@ -379,13 +394,13 @@ struct ObjCRetainableBox : RetainableBoxBase<ObjCRetainableBox, void*> {
 struct ObjCUnownedRetainableBox
     : WeakRetainableBoxBase<ObjCUnownedRetainableBox, UnownedReference> {
 
-  static constexpr unsigned numExtraInhabitants =
-    swift_getHeapObjectExtraInhabitantCount();
+  static constexpr unsigned numExtraInhabitants = 1;
   static void storeExtraInhabitant(UnownedReference *dest, int index) {
-    swift_storeHeapObjectExtraInhabitant(&dest->Value, index);
+    assert(index == 0);
+    dest->Value = nullptr;
   }
   static int getExtraInhabitantIndex(const UnownedReference *src) {
-    return swift_getHeapObjectExtraInhabitantIndex(&src->Value);
+    return (src->Value == nullptr ? 0 : -1);
   }
 
   static void destroy(UnownedReference *ref) {

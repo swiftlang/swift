@@ -168,6 +168,10 @@ private:
   friend class SwiftLookupTableReader;
   friend class SwiftLookupTableWriter;
 
+  /// Find or create the table entry for the given base name. 
+  llvm::DenseMap<StringRef, SmallVector<FullTableEntry, 2>>::iterator
+  findOrCreate(StringRef baseName);
+
 public:
   explicit SwiftLookupTable(SwiftLookupTableReader *reader) : Reader(reader) { }
 
@@ -176,6 +180,9 @@ public:
 
   /// Maps a stored macro entry to an actual Clang macro.
   clang::MacroInfo *mapStoredMacro(uintptr_t &entry);
+
+  /// Maps a stored entry to an actual Clang AST node.
+  SingleEntry mapStored(uintptr_t &entry);
 
   /// Translate a Clang DeclContext into a context kind and name.
   llvm::Optional<std::pair<ContextKind, StringRef>>
@@ -199,6 +206,13 @@ public:
   /// all results from all contexts should be produced.
   SmallVector<SingleEntry, 4>
   lookup(StringRef baseName, clang::DeclContext *searchContext);
+
+  /// Retrieve the set of base names that are stored in the lookup table.
+  SmallVector<StringRef, 4> allBaseNames();
+
+  /// Lookup Objective-C members with the given base name, regardless
+  /// of context.
+  SmallVector<clang::NamedDecl *, 4> lookupObjCMembers(StringRef baseName);
 
   /// Deserialize all entries.
   void deserializeAll();

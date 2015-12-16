@@ -107,12 +107,12 @@ extension String {
   // need these single-arg overloads <rdar://problem/17775455>
   
   /// Create an instance representing `v` in base 10.
-  public init<T : _SignedIntegerType>(_ v: T) {
+  public init<T : _SignedInteger>(_ v: T) {
     self = _int64ToString(v.toIntMax())
   }
   
   /// Create an instance representing `v` in base 10.
-  public init<T : UnsignedIntegerType>(_ v: T) {
+  public init<T : UnsignedInteger>(_ v: T) {
     self = _uint64ToString(v.toUIntMax())
   }
 
@@ -120,7 +120,7 @@ extension String {
   ///
   /// Numerals greater than 9 are represented as roman letters,
   /// starting with `a` if `uppercase` is `false` or `A` otherwise.
-  public init<T : _SignedIntegerType>(
+  public init<T : _SignedInteger>(
     _ v: T, radix: Int, uppercase: Bool = false
   ) {
     _precondition(radix > 1, "Radix must be greater than 1")
@@ -132,7 +132,7 @@ extension String {
   ///
   /// Numerals greater than 9 are represented as roman letters,
   /// starting with `a` if `uppercase` is `false` or `A` otherwise.
-  public init<T : UnsignedIntegerType>(
+  public init<T : UnsignedInteger>(
     _ v: T, radix: Int, uppercase: Bool = false
   ) {
     _precondition(radix > 1, "Radix must be greater than 1")

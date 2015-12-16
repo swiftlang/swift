@@ -97,12 +97,14 @@ func uses_clang_struct(r r: NSRect) {}
 func uses_optionals(x x: Int?) -> UnicodeScalar? { return Optional() }
 
 enum GenericUnion<T> {
-  // CHECK-LABEL: sil hidden [transparent] @_TFO8mangling12GenericUnion3FoourfMGS0_x_FSiGS0_x_
+  // CHECK-LABEL: sil shared [transparent] @_TFO8mangling12GenericUnion3FoourfMGS0_x_FSiGS0_x_
   case Foo(Int)
-  // CHECK-LABEL: sil hidden [transparent] @_TFO8mangling12GenericUnion3BarurFMGS0_x_GS0_x_
-  case Bar
 }
- 
+
+func instantiateGenericUnionConstructor<T>(t: T) {
+  _ = GenericUnion<T>.Foo
+}
+
 struct HasVarInit {
   static var state = true && false
 }

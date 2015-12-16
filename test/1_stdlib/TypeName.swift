@@ -1,8 +1,6 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 // REQUIRES: executable_test
 
-// XFAIL: linux
-
 class C {}
 struct S {}
 enum E {}
@@ -56,13 +54,21 @@ printTypeName(F.self) // CHECK-NEXT: () -> ()
 printTypeName(F2.self) // CHECK-NEXT: () -> () -> ()
 printTypeName(F3.self) // CHECK-NEXT: (() -> ()) -> ()
 
+#if _runtime(_ObjC)
 typealias B = @convention(block) () -> ()
 typealias B2 = () -> @convention(block) () -> ()
 typealias B3 = (@convention(block) () -> ()) -> ()
-
-printTypeName(B.self) // CHECK-NEXT: @convention(block) () -> ()
-printTypeName(B2.self) // CHECK-NEXT: () -> @convention(block) () -> ()
-printTypeName(B3.self) // CHECK-NEXT: (@convention(block) () -> ()) -> ()
+printTypeName(B.self)
+printTypeName(B2.self)
+printTypeName(B3.self)
+#else
+print("@convention(block) () -> ()")
+print("() -> @convention(block) () -> ()")
+print("(@convention(block) () -> ()) -> ()")
+#endif
+// CHECK-NEXT: @convention(block) () -> ()
+// CHECK-NEXT: () -> @convention(block) () -> ()
+// CHECK-NEXT: (@convention(block) () -> ()) -> ()
 
 printTypeName(F.Type.self) // CHECK-NEXT: (() -> ()).Type
 printTypeName(C.Type.self) // CHECK-NEXT: [[THIS]].C.Type

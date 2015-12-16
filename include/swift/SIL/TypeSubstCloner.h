@@ -21,7 +21,7 @@
 #include "swift/AST/Type.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/DynamicCasts.h"
-#include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/Support/Debug.h"
 
 namespace swift {

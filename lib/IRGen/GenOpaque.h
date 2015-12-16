@@ -177,6 +177,13 @@ namespace irgen {
                                           SILType T,
                                           llvm::Value *srcObject);
 
+  /// Emit a call to the 'destructiveInjectEnumTag' operation.
+  /// The type must be dynamically known to have enum witnesses.
+  void emitDestructiveInjectEnumTagCall(IRGenFunction &IGF,
+                                        SILType T,
+                                        unsigned tag,
+                                        llvm::Value *srcObject);
+
   /// Emit a load of the 'size' value witness.
   llvm::Value *emitLoadOfSize(IRGenFunction &IGF, SILType T);
 

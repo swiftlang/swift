@@ -1700,13 +1700,13 @@ bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *fnExpr,
   // here.
   if (size() != 1) return false;
   
-  // We only handle structural errors here.
-  if (closeness != CC_ArgumentLabelMismatch &&
-      closeness != CC_ArgumentCountMismatch)
-    return false;
-    
+  
   auto args = decomposeArgParamType(argExpr->getType());
-  auto params = decomposeArgParamType(candidates[0].getArgumentType());
+
+  auto argTy = candidates[0].getArgumentType();
+  if (!argTy) return false;
+
+  auto params = decomposeArgParamType(argTy);
 
   // It is a somewhat common error to try to access an instance method as a
   // curried member on the type, instead of using an instance, e.g. the user
@@ -1730,6 +1730,11 @@ bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *fnExpr,
         return true;
       }
   }
+  
+  // We only handle structural errors here.
+  if (closeness != CC_ArgumentLabelMismatch &&
+      closeness != CC_ArgumentCountMismatch)
+    return false;
   
   SmallVector<Identifier, 4> correctNames;
   unsigned OOOArgIdx = ~0U, OOOPrevArgIdx = ~0U;
@@ -2014,14 +2019,15 @@ static bool isConversionConstraint(const Constraint *C) {
 /// low that we would only like to issue an error message about it if there is
 /// nothing else interesting we can scrape out of the constraint system.
 static bool isLowPriorityConstraint(Constraint *C) {
-  // If the member constraint is a ".Element" lookup to find the element type of
-  // an iterator in a foreach loop, then it is very low priority: We will get a
-  // better and more useful diagnostic from the failed conversion to
-  // Sequence that will fail as well.
+  // If the member constraint is a ".Iterator" lookup to find the iterator
+  // type in a foreach loop, or a ".Element" lookup to find its element type,
+  // then it is very low priority: We will get a better and more useful
+  // diagnostic from the failed conversion to Sequence that will fail as well.
   if (C->getKind() == ConstraintKind::TypeMember) {
     if (auto *loc = C->getLocator())
       for (auto Elt : loc->getPath())
-        if (Elt.getKind() ==  ConstraintLocator::GeneratorElementType)
+        if (Elt.getKind() == ConstraintLocator::GeneratorElementType ||
+            Elt.getKind() == ConstraintLocator::SequenceIteratorProtocol)
           return true;
   }
 
@@ -2457,7 +2463,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
 
   Type fromType = CS->simplifyType(constraint->getFirstType());
   
-  if (fromType->is<TypeVariableType>() && resolvedAnchorToExpr) {
+  if (fromType->hasTypeVariable() && resolvedAnchorToExpr) {
     TCCOptions options;
     
     // If we know we're removing a contextual constraint, then we can force a
@@ -2532,9 +2538,9 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   }
   
   if (auto PT = toType->getAs<ProtocolType>()) {
-    // Check for "=" converting to BooleanType.  The user probably meant ==.
+    // Check for "=" converting to Boolean.  The user probably meant ==.
     if (auto *AE = dyn_cast<AssignExpr>(expr->getValueProvidingExpr()))
-      if (PT->getDecl()->isSpecificProtocol(KnownProtocolKind::BooleanType)) {
+      if (PT->getDecl()->isSpecificProtocol(KnownProtocolKind::Boolean)) {
         diagnose(AE->getEqualLoc(), diag::use_of_equal_instead_of_equality)
         .fixItReplace(AE->getEqualLoc(), "==")
         .highlight(AE->getDest()->getLoc())
@@ -2548,12 +2554,16 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
       return true;
     }
 
-    // Emit a conformance error through conformsToProtocol.  If this succeeds,
-    // then keep searching.
+    // Emit a conformance error through conformsToProtocol.  If this succeeds
+    // and yields a valid protocol conformance, then keep searching.
+    ProtocolConformance *Conformance = nullptr;
     if (CS->TC.conformsToProtocol(fromType, PT->getDecl(), CS->DC,
                                   ConformanceCheckFlags::InExpression,
-                                  nullptr, expr->getLoc()))
-      return false;
+                                  &Conformance, expr->getLoc())) {
+      if (!Conformance || !Conformance->isInvalid()) {
+        return false;
+      }
+    }
     return true;
   }
 
@@ -2889,6 +2899,10 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
   // syntactic issues in a well-typed subexpression (which might be because
   // the context is missing).
   TypeCheckExprOptions TCEOptions = TypeCheckExprFlags::DisableStructuralChecks;
+
+  // Don't walk into non-single expression closure bodies, because
+  // ExprTypeSaver and TypeNullifier skip them too.
+  TCEOptions |= TypeCheckExprFlags::SkipMultiStmtClosures;
 
   // Claim that the result is discarded to preserve the lvalue type of
   // the expression.
@@ -3260,6 +3274,15 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     if (candidates.size() == 1 && !argType)
       argType = candidates[0].getArgumentType();
   }
+  
+  // If our candidates are instance members at curry level #0, then the argument
+  // being provided is the receiver type for the instance.  We produce better
+  // diagnostics when we don't force the self type down.
+  if (argType && !candidates.empty() &&
+      candidates[0].decl->isInstanceMember() && candidates[0].level == 0 &&
+      !isa<SubscriptDecl>(candidates[0].decl))
+    argType = Type();
+  
 
   // FIXME: This should all just be a matter of getting type type of the
   // sub-expression, but this doesn't work well when typeCheckChildIndependently
@@ -3567,7 +3590,7 @@ namespace {
       // If we have no contextual type, there is nothing to do.
       if (!contextualType) return false;
 
-      // If the expresion is obviously something that produces a metatype,
+      // If the expression is obviously something that produces a metatype,
       // then don't put a constraint on it.
       auto semExpr = expr->getValueProvidingExpr();
       if (isa<TypeExpr>(semExpr) ||isa<UnresolvedConstructorExpr>(semExpr))
@@ -3987,7 +4010,7 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
       auto pointerEltType = pointerType->getGenericArgs()[0];
       
       // If the element type is Void, then we allow any input type, since
-      // everything is convertable to UnsafePointer<Void>
+      // everything is convertible to UnsafePointer<Void>
       if (pointerEltType->isVoid())
         contextualType = Type();
       else
@@ -4102,7 +4125,7 @@ bool FailureDiagnosis::visitIfExpr(IfExpr *IE) {
   auto falseExpr = typeCheckChildIndependently(IE->getElseExpr());
   if (!falseExpr) return true;
 
-  // Check for "=" converting to BooleanType.  The user probably meant ==.
+  // Check for "=" converting to Boolean.  The user probably meant ==.
   if (auto *AE = dyn_cast<AssignExpr>(condExpr->getValueProvidingExpr())) {
     diagnose(AE->getEqualLoc(), diag::use_of_equal_instead_of_equality)
       .fixItReplace(AE->getEqualLoc(), "==")
@@ -4113,7 +4136,7 @@ bool FailureDiagnosis::visitIfExpr(IfExpr *IE) {
 
   // If the condition wasn't of boolean type, diagnose the problem.
   auto booleanType = CS->TC.getProtocol(IE->getQuestionLoc(),
-                                        KnownProtocolKind::BooleanType);
+                                        KnownProtocolKind::Boolean);
   if (!booleanType) return true;
 
   if (!CS->TC.conformsToProtocol(condExpr->getType(), booleanType, CS->DC,

@@ -178,7 +178,7 @@ void TypeChecker::contextualizeTopLevelCode(TopLevelContext &TLC,
 }
 
 /// Emits an error with a fixit for the case of unnecessary cast over a
-/// OptionSetType value. The primary motivation is to help with SDK changes.
+/// OptionSet value. The primary motivation is to help with SDK changes.
 /// Example:
 /// \code
 ///   func supported() -> MyMask {
@@ -192,7 +192,7 @@ static void tryDiagnoseUnnecessaryCastOverOptionSet(ASTContext &Ctx,
   auto *NTD = ResultType->getAnyNominal();
   if (!NTD)
     return;
-  auto optionSetType = dyn_cast<ProtocolDecl>(Ctx.getOptionSetTypeDecl());
+  auto optionSetType = dyn_cast<ProtocolDecl>(Ctx.getOptionSetDecl());
   SmallVector<ProtocolConformance *, 4> conformances;
   if (!(optionSetType &&
         NTD->lookupConformance(module, optionSetType, conformances)))

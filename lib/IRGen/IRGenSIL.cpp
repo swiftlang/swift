@@ -1335,8 +1335,7 @@ void IRGenSILFunction::emitSILFunction() {
     //
     // Therefore the invariant holds of all the successors, and we can
     // queue them up if we haven't already visited them.
-    for (auto &succ : bb->getSuccessors()) {
-      auto succBB = succ.getBB();
+    for (auto *succBB : bb->getSuccessorBlocks()) {
       if (visitedBlocks.insert(succBB).second)
         workQueue.push_back(succBB);
     }
@@ -1398,7 +1397,7 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
                       IGM.getPointerAlignment(),
                       nullptr);
     StringRef Name("$error");
-    // We just need any number that is guranteed to be larger than every
+    // We just need any number that is guaranteed to be larger than every
     // other argument. It is only used for sorting.
     unsigned ArgNo =
         countArgs(CurSILFn->getDeclContext()) + 1 + BB->getBBArgs().size();
@@ -2955,7 +2954,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   llvm::SmallVector<llvm::Value *, 8> Copy;
   emitShadowCopy(e.claimAll(), Name, Copy);
   emitDebugVariableDeclaration(Copy, DbgTy, i->getDebugScope(), Name,
-                               i->getVarInfo().getArgNo());
+                               i->getVarInfo().ArgNo);
 }
 
 void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
@@ -2975,7 +2974,7 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   // Put the value into a stack slot at -Onone and emit a debug intrinsic.
   emitDebugVariableDeclaration(emitShadowCopy(Addr, Name), DbgTy,
                                i->getDebugScope(), Name,
-                               i->getVarInfo().getArgNo(), IndirectValue);
+                               i->getVarInfo().ArgNo, IndirectValue);
 }
 
 void IRGenSILFunction::visitLoadWeakInst(swift::LoadWeakInst *i) {
@@ -3235,7 +3234,7 @@ static void emitDebugDeclarationForAllocStack(IRGenSILFunction &IGF,
       if (DS) {
         assert(DS->SILFn == IGF.CurSILFn || DS->InlinedCallSite);
         IGF.emitDebugVariableDeclaration(addr, DbgTy, DS, Name,
-                                         i->getVarInfo().getArgNo());
+                                         i->getVarInfo().ArgNo);
       }
     }
   }

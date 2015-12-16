@@ -14,14 +14,14 @@
 
 /// A type that represents a Boolean value.
 ///
-/// Types that conform to the `BooleanType` protocol can be used as
+/// Types that conform to the `Boolean` protocol can be used as
 /// the condition in control statements (`if`, `while`, C-style `for`)
 /// and other logical value contexts (e.g., `case` statement guards).
 ///
 /// Only three types provided by Swift, `Bool`, `DarwinBoolean`, and `ObjCBool`,
-/// conform to `BooleanType`. Expanding this set to include types that
+/// conform to `Boolean`. Expanding this set to include types that
 /// represent more than simple boolean values is discouraged.
-public protocol BooleanType {
+public protocol Boolean {
   /// The value of `self`, expressed as a `Bool`.
   var boolValue: Bool { get }
 }

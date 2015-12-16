@@ -27,7 +27,7 @@ set(SWIFTLIB_ESSENTIAL
   Assert.swift
   AssertCommon.swift
   Bool.swift
-  BooleanType.swift
+  Boolean.swift
   BridgeObjectiveC.swift
   BridgeStorage.swift
   Builtin.swift

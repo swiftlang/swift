@@ -44,7 +44,7 @@ var f2_x1_x1b = f2(x1, x1b)
 i = f2_x1_x1b
 
 // Overloading of struct methods
-struct StructOverload<U>  {
+struct StructOverload<U> {
   func f0<T : P1>(u: U, t: T) -> Int { return 0 }
   func f0<T : P2>(u: U, t: T) -> Double { return 0 }
 
@@ -65,7 +65,7 @@ var so_f1_x2 = SO.f1(5, t: x2)
 d = so_f1_x2
 
 // Overloading of class methods
-class ClassOverloadA<U>  {
+class ClassOverloadA<U> {
   func f0<T : P1>(u: U, t: T) -> Int { return 0 }
   func f1<T : P2>(u: U, t: T) -> Double { return 0 }
 }

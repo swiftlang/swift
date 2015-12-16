@@ -76,7 +76,7 @@ public protocol ForwardIndex : _Incrementable {
   ///
   /// Reachability is defined by the ability to produce one value from
   /// the other via zero or more applications of `successor`.
-  typealias Distance : _SignedIntegerType = Int
+  typealias Distance : _SignedInteger = Int
 
   // See the implementation of Range for an explanation of this
   // associated type
@@ -311,7 +311,7 @@ public postfix func -- <T : BidirectionalIndex> (inout i: T) -> T {
 /// Used to force conformers of RandomAccessIndex to implement
 /// `advancedBy` methods and `distanceTo`.
 public protocol _RandomAccessAmbiguity {
-  typealias Distance : _SignedIntegerType = Int
+  typealias Distance : _SignedInteger = Int
 }
 
 extension _RandomAccessAmbiguity {

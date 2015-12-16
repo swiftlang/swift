@@ -239,7 +239,7 @@ func generateWithConstant(x : SomeSpecificClass) {
 }
 // CHECK-LABEL: sil shared @_TFF8closures20generateWithConstant
 // CHECK:    bb0([[T0:%.*]] : $SomeSpecificClass):
-// CHECK-NEXT: debug_value %0 : $SomeSpecificClass // let x, argno: 1
+// CHECK-NEXT: debug_value %0 : $SomeSpecificClass, let, name "x", argno 1
 // CHECK-NEXT: [[T1:%.*]] = upcast [[T0]] : $SomeSpecificClass to $SomeClass
 // CHECK-NEXT: return [[T1]]
 
@@ -303,7 +303,7 @@ func closeOverLetLValue() {
 // is loadable even though we capture the value.
 // CHECK-LABEL: sil shared @_TFF8closures18closeOverLetLValueFT_T_U_FT_Si
 // CHECK: bb0(%0 : $ClassWithIntProperty):
-// CHECK-NEXT: [[TMP:%.*]] = alloc_stack $ClassWithIntProperty  // let a, argno: 1
+// CHECK-NEXT: [[TMP:%.*]] = alloc_stack $ClassWithIntProperty, let, name "a", argno 1
 // CHECK-NEXT: store %0 to [[TMP]]#1 : $*ClassWithIntProperty
 // CHECK-NEXT: {{.*}} = load [[TMP]]#1 : $*ClassWithIntProperty
 // CHECK-NEXT: {{.*}} = ref_element_addr {{.*}} : $ClassWithIntProperty, #ClassWithIntProperty.x
@@ -331,7 +331,7 @@ struct StructWithMutatingMethod {
 
 // CHECK-LABEL: sil hidden @_TFV8closures24StructWithMutatingMethod14mutatingMethod
 // CHECK: bb0(%0 : $*StructWithMutatingMethod):
-// CHECK-NEXT: %1 = alloc_box $StructWithMutatingMethod  // var self, argno: 1 // users: %2, %5, %7, %8
+// CHECK-NEXT: %1 = alloc_box $StructWithMutatingMethod, var, name "self", argno 1 // users: %2, %5, %7, %8
 // CHECK-NEXT: copy_addr %0 to [initialization] %1#1 : $*StructWithMutatingMethod // id: %2
 // CHECK: [[CLOSURE:%[0-9]+]] = function_ref @_TFFV8closures24StructWithMutatingMethod14mutatingMethod{{.*}} : $@convention(thin) (@inout_aliasable StructWithMutatingMethod) -> Int
 // CHECK: partial_apply [[CLOSURE]](%1#1) : $@convention(thin) (@inout_aliasable StructWithMutatingMethod) -> Int

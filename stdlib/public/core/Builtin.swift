@@ -289,7 +289,7 @@ public func _getUnsafePointerToStoredProperties(x: AnyObject)
 @_transparent
 @_semantics("branchhint")
 @warn_unused_result
-internal func _branchHint<C : BooleanType>(actual: C, _ expected: Bool)
+internal func _branchHint<C : Boolean>(actual: C, _ expected: Bool)
   -> Bool {
   return Bool(Builtin.int_expect_Int1(actual.boolValue._value, expected._value))
 }
@@ -298,7 +298,7 @@ internal func _branchHint<C : BooleanType>(actual: C, _ expected: Bool)
 @_transparent
 @_semantics("fastpath")
 @warn_unused_result
-public func _fastPath<C: BooleanType>(x: C) -> Bool {
+public func _fastPath<C: Boolean>(x: C) -> Bool {
   return _branchHint(x.boolValue, true)
 }
 
@@ -306,7 +306,7 @@ public func _fastPath<C: BooleanType>(x: C) -> Bool {
 @_transparent
 @_semantics("slowpath")
 @warn_unused_result
-public func _slowPath<C : BooleanType>(x: C) -> Bool {
+public func _slowPath<C : Boolean>(x: C) -> Bool {
   return _branchHint(x.boolValue, false)
 }
 
@@ -474,7 +474,7 @@ internal func _makeBridgeObject(
   )
 }
 
-/// Return the superclass of `t`, if any.  The result is nil if `t` is
+/// Return the superclass of `t`, if any.  The result is `nil` if `t` is
 /// a root class or class protocol.
 @inline(__always)
 @warn_unused_result
@@ -485,7 +485,7 @@ func _getSuperclass(t: AnyClass) -> AnyClass? {
     AnyClass.self)
 }
 
-/// Return the superclass of `t`, if any.  The result is nil if `t` is
+/// Return the superclass of `t`, if any.  The result is `nil` if `t` is
 /// not a class, is a root class, or is a class protocol.
 @inline(__always)
 @warn_unused_result

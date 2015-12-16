@@ -50,14 +50,14 @@
 
 PROTOCOL(Sequence)
 PROTOCOL(IteratorProtocol)
-PROTOCOL(BooleanType)
+PROTOCOL(Boolean)
 PROTOCOL(AnyObject)
 PROTOCOL(RawRepresentable)
 PROTOCOL(Equatable)
 PROTOCOL(Hashable)
 PROTOCOL(Comparable)
 PROTOCOL(ErrorProtocol)
-PROTOCOL(OptionSetType)
+PROTOCOL(OptionSet)
 PROTOCOL_(BridgedNSError)
 
 PROTOCOL_(ObjectiveCBridgeable)

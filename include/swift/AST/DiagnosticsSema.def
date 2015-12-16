@@ -832,6 +832,8 @@ NOTE(note_no_in_class_init_3plus,sema_tcd,none,
      (Identifier, Identifier, Identifier, bool))
 ERROR(missing_unimplemented_init_runtime,sema_tcd,none,
       "standard library error: missing _unimplemented_initializer", ())
+ERROR(missing_undefined_runtime,sema_tcd,none,
+      "standard library error: missing _undefined", ())
 WARNING(unsupported_synthesize_init_variadic,sema_tcd,none,
         "synthesizing a variadic inherited initializer for subclass %0 is "
         "unsupported",
@@ -1056,7 +1058,7 @@ NOTE(ambiguous_witnesses_wrong_name,sema_tcd,none,
      "subscript operators}0 with type %2", (RequirementKind, DeclName, Type))
 NOTE(no_witnesses_type,sema_tcd,none,
      "protocol requires nested type %0", (Identifier))
-NOTE(default_assocated_type_req_fail,sema_tcd,none,
+NOTE(default_associated_type_req_fail,sema_tcd,none,
      "default type %0 for associated type %1 (from protocol %2) "
      "does not conform to %3",
      (Type, DeclName, Type, Type))
@@ -1498,7 +1500,7 @@ ERROR(noescape_conflicts_escaping_autoclosure,attribute_parsing,none,
 ERROR(attr_NSManaged_not_instance_member,sema_tcd,none,
       "@NSManaged only allowed on an instance property or method", ())
 ERROR(attr_NSManaged_not_stored,sema_tcd,none,
-      "@NSManaged not allowed on %select{computed|observing|adressed}0 "
+      "@NSManaged not allowed on %select{computed|observing|addressed}0 "
       "properties", (unsigned))
 ERROR(attr_NSManaged_let_property,sema_tcd,none,
       "@NSManaged not allowed on a 'let' property", ())
@@ -1702,7 +1704,7 @@ ERROR(reference_non_inout,sema_tce,none,
 NOTE(subscript_decl_here,sema_tca,none,
      "subscript operator declared here", ())
 ERROR(condition_broken_proto,sema_tce,none,
-      "protocol 'BooleanType' is broken", ())
+      "protocol 'Boolean' is broken", ())
 ERROR(option_type_broken,sema_tce,none,
       "type 'Optional' is broken", ())
 
@@ -1849,7 +1851,6 @@ ERROR(partial_application_of_function_invalid,tce_sema,none,
       "partial application of %select{"
         "function with 'inout' parameters|"
         "'mutating' method|"
-        "method in @objc protocol|"
         "'super.init' initializer chain|"
         "'self.init' initializer delegation"
       "}0 is not allowed",

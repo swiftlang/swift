@@ -1111,7 +1111,6 @@ Module *ClangImporter::getImportedHeaderModule() const {
 ClangImporter::Implementation::Implementation(ASTContext &ctx,
                                               const ClangImporterOptions &opts)
   : SwiftContext(ctx),
-    InferImplicitProperties(opts.InferImplicitProperties),
     ImportForwardDeclarations(opts.ImportForwardDeclarations),
     OmitNeedlessWords(opts.OmitNeedlessWords),
     InferDefaultArguments(opts.InferDefaultArguments),
@@ -2493,6 +2492,7 @@ auto ClangImporter::Implementation::importFullName(
     // Objective-C methods.
     if (auto method = dyn_cast<clang::ObjCMethodDecl>(D)) {
       (void)omitNeedlessWordsInFunctionName(
+        clangSema.getPreprocessor(),
         baseName,
         argumentNames,
         params,
@@ -3922,7 +3922,6 @@ static int pointerPODSortComparator(T * const *lhs, T * const *rhs) {
   return 0;
 }
 
-
 static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
                                    VisibleDeclConsumer &consumer,
                                    DeclName name) {
@@ -4042,8 +4041,20 @@ ClangModuleUnit::lookupClassMember(Module::AccessPathTy accessPath,
   if (clangModule && clangModule->isSubModule())
     return;
 
-  // FIXME: Not limited by module.
   VectorDeclConsumer consumer(results);
+
+  // If we have lookup tables, use them.
+  if (owner.Impl.UseSwiftLookupTables) {
+    // Find the corresponding lookup table.
+    if (auto lookupTable = owner.Impl.findLookupTable(clangModule)) {
+      // Search it.
+      owner.Impl.lookupObjCMembers(*lookupTable, name, consumer);
+    }
+
+    return;
+  }
+
+  // FIXME: Not limited by module.
   lookupClassMembersImpl(owner.Impl, consumer, name);
 }
 
@@ -4052,6 +4063,16 @@ void ClangModuleUnit::lookupClassMembers(Module::AccessPathTy accessPath,
   // FIXME: Ignore submodules, which are empty for now.
   if (clangModule && clangModule->isSubModule())
     return;
+
+  if (owner.Impl.UseSwiftLookupTables) {
+    // Find the corresponding lookup table.
+    if (auto lookupTable = owner.Impl.findLookupTable(clangModule)) {
+      // Search it.
+      owner.Impl.lookupAllObjCMembers(*lookupTable, consumer);
+    }
+
+    return;
+  }
 
   // FIXME: Not limited by module.
   lookupClassMembersImpl(owner.Impl, consumer, {});
@@ -4377,7 +4398,7 @@ ClangImporter::Implementation::getExtensionMetadata() const {
 
 llvm::hash_code ClangImporter::Implementation::hashExtension(
                   llvm::hash_code code) const {
-  return llvm::hash_combine(code, "swift.lookup",
+  return llvm::hash_combine(code, StringRef("swift.lookup"),
                             SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
                             SWIFT_LOOKUP_TABLE_VERSION_MINOR);
 }
@@ -4441,6 +4462,83 @@ ClangImporter::Implementation::createExtensionReader(
 
   // Return the new reader.
   return std::move(tableReader);
+}
+
+SwiftLookupTable *ClangImporter::Implementation::findLookupTable(
+                    const clang::Module *clangModule) {
+  // If the Clang module is null, use the bridging header lookup table.
+  if (!clangModule)
+    return &BridgingHeaderLookupTable;
+
+  // Submodules share lookup tables with their parents.
+  if (clangModule->isSubModule())
+    return findLookupTable(clangModule->getTopLevelModule());
+
+  // Look for a Clang module with this name.
+  auto known = LookupTables.find(clangModule->Name);
+  if (known == LookupTables.end()) return nullptr;
+
+  return known->second.get();
+}
+
+void ClangImporter::Implementation::lookupObjCMembers(
+       SwiftLookupTable &table,
+       DeclName name,
+       VisibleDeclConsumer &consumer) {
+  bool isSubscript = name.getBaseName() == SwiftContext.Id_subscript;
+
+  for (auto clangDecl : table.lookupObjCMembers(name.getBaseName().str())) {
+    // Import the declaration.
+    auto decl = cast_or_null<ValueDecl>(importDeclReal(clangDecl));
+    if (!decl)
+      continue;
+
+    // Handle subscripts.
+    if (isSubscript) {
+      if (auto subscript = importSubscriptOf(decl))
+        consumer.foundDecl(subscript, DeclVisibilityKind::DynamicLookup);
+      continue;
+    }
+
+    // Did the name we found match?
+    if (!decl->getFullName().matchesRef(name)) continue;
+
+    // Report this declaration.
+    consumer.foundDecl(decl, DeclVisibilityKind::DynamicLookup);
+
+    // If we imported an Objective-C instance method from a root
+    // class, and there is no corresponding class method, also import
+    // it as a class method.
+    if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
+      if (objcMethod->isInstanceMethod()) {
+        if (auto method = dyn_cast<FuncDecl>(decl)) {
+          if (auto objcClass = objcMethod->getClassInterface()) {
+            if (!objcClass->getSuperClass() &&
+                !objcClass->getClassMethod(objcMethod->getSelector(),
+                                           /*AllowHidden=*/true)) {
+              if (auto classMethod = importClassMethodVersionOf(method)) {
+                consumer.foundDecl(cast<ValueDecl>(classMethod),
+                                   DeclVisibilityKind::DynamicLookup);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+void ClangImporter::Implementation::lookupAllObjCMembers(
+       SwiftLookupTable &table,
+       VisibleDeclConsumer &consumer) {
+  // Retrieve and sort all of the base names in this particular table.
+  auto baseNames = table.allBaseNames();
+  llvm::array_pod_sort(baseNames.begin(), baseNames.end());
+
+  // Look for Objective-C members with each base name.
+  for (auto baseName : baseNames) {
+    lookupObjCMembers(table, SwiftContext.getIdentifier(baseName), consumer);
+  }
 }
 
 void ClangImporter::dumpSwiftLookupTables() {

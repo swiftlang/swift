@@ -168,7 +168,7 @@ public typealias UWord = UInt${word_bits}
 
 public protocol IntegerType
   : Comparable, ArithmeticType, 
-    IntegerLiteralConvertible, CustomStringConvertible  {
+    IntegerLiteralConvertible, CustomStringConvertible {
 
   // Dispatching through these puts less stress on the user reading
   // the interface and error messages (and on the type checker) than
@@ -186,11 +186,26 @@ public protocol IntegerType
   var mostSignificantBit: Word { get }
   
   @warn_unused_result
-  func word(n: Word) -> Word
+  func uword(n: Word) -> UWord
 
+  mutating func replaceUWord(n: Word, with newBits: UWord)
+  
   init<T : IntegerType>(_ source: T)
   
   init<T : IntegerType>(extendingOrTruncating source: T)  
+}
+
+extension IntegerType {
+  /// The number of words required to represent our value.  If `self`
+  /// is negative, returns the index of the least significant words of
+  /// our representation such that all more-significant words are -1.
+  /// Has the value -1 if `self` is 0.
+  @_transparent
+  public // transparent
+  var _mostSignificantWord: Word {
+    let msb = mostSignificantBit
+    return msb < 0 ? msb : msb / ${word_bits}
+  }
 }
 
 //===--- Homogeneous comparison -------------------------------------------===//
@@ -329,9 +344,9 @@ ${comment}
   @warn_unused_result
   func countLeadingZeros() -> Word
 
-  init(_truncatingBits bits: Word)
+  init(_truncatingBits bits: UWord)
 
-  var _lowWord: Word { get }
+  var _lowUWord: UWord { get }
 }
 
 % for x in binaryBitwise:
@@ -477,7 +492,7 @@ extension FixedWidthIntegerType {
   @_transparent
   public init<T : IntegerType>(extendingOrTruncating source: T) {
     if Self.bitWidth <= ${word_bits} {
-      self = Self.init(_truncatingBits: source.word(0))
+      self = Self.init(_truncatingBits: source.uword(0))
     }
     else {
       var result: Self = source < 0 ? ~0 : 0
@@ -488,7 +503,7 @@ extension FixedWidthIntegerType {
         // that Self.bitWidth > ${word_bits}.  Not masking results in
         // infinite recursion.
         result &<<= ${word_bits}
-        result |= Self(_truncatingBits: source.word(n))
+        result |= Self(_truncatingBits: source.uword(n))
         n -= 1
       }
       
@@ -497,25 +512,33 @@ extension FixedWidthIntegerType {
   }
 
   @_transparent
-  public func word(n: Word) -> Word {
+  public func uword(n: Word) -> UWord {
     var n = n
     _precondition(n >= 0, "Negative word index")
     var x = self
     while n > 0 {
-      // Using a masking shift here allows us to make more things
-      // transparent, but this would have the wrong semantics if the
-      // masking ever had an effect.
-      _sanityCheck(Self.bitWidth > ${word_bits})
-      x &>>= ${word_bits}
+      x &>>= Swift.min(Self(_truncatingBits: Self._bitWidth) &- 1, ${word_bits})
       n -= 1
     }
-    return x._lowWord
+    return x._lowUWord
   }
 
   @_transparent
+  public mutating func replaceUWord(n: Word, with newBits: UWord) {
+    // Make sure the masking shift is going to be OK.
+    _sanityCheck(Self.bitWidth > ${word_bits} * n)
+    self ^= Self(_truncatingBits: newBits ^ uword(n)) &<< (${word_bits} * n)
+  }
+  
+  @_transparent
   public // transparent
   static var _highBitIndex: Self {
-    return Self.init(_truncatingBits: Self.bitWidth - 1)
+    return Self.init(_truncatingBits: Self._bitWidth &- 1)
+  }
+
+  @_transparent
+  public static var _bitWidth : UWord {
+    return UWord(bitWidth._storage)
   }
 }
 
@@ -650,6 +673,11 @@ public struct ${Self}
           _storage), x))
   }
 
+  @_transparent
+  public init(bitPattern x: ${'U' if signed else ''}Int${bits}) {
+    _storage = x._storage
+  }
+
   @warn_unused_result
   public func isEqualTo(rhs: ${Self}) -> Bool {
     return Bool(Builtin.cmp_eq_Int${bits}(_storage, rhs._storage))
@@ -727,31 +755,24 @@ public struct ${Self}
   @_transparent
   @warn_unused_result
   public func countLeadingZeros() -> Word {
-    return ${Self}(
-      Builtin.int_ctlz_Int${bits}(self._storage, false.__value))._lowWord
+    return Word(
+      ${Self}(
+        Builtin.int_ctlz_Int${bits}(self._storage, false.__value)
+      )._lowUWord._storage)
   }
   
   @_transparent
   public // transparent
-  var _lowWord: Word {
+  var _lowUWord: UWord {
     % truncOrExt = z + 'ext' if bits <= word_bits else 'trunc'
-    return Word(
+    return UWord(
       Builtin.${truncOrExt}OrBitCast_Int${bits}_Int${word_bits}(_storage)
     )
   }
   
   @_transparent
   public // transparent
-  var _lowUnsignedWord: Word {
-    % truncOrExt = z + 'ext' if bits <= word_bits else 'trunc'
-    return Word(
-      Builtin.${truncOrExt}OrBitCast_Int${bits}_Int${word_bits}(_storage)
-    )
-  }
-  
-  @_transparent
-  public // transparent
-  init(_truncatingBits bits: Word) {
+  init(_truncatingBits bits: UWord) {
     % truncOrExt = 'zext' if bits > word_bits else 'trunc'
     self.init(
       Builtin.${truncOrExt}OrBitCast_Int${word_bits}_Int${bits}(bits._storage))
@@ -777,6 +798,15 @@ typealias DWord = Int${word_bits*2}
 typealias UDWord = UInt${word_bits*2}
 
 import StdlibUnittest
+
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 var tests = TestSuite("Integers")
 
 tests.test("Literals") {
@@ -875,6 +905,7 @@ tests.test("mostSignificantBit") {
   expectEqual(7, UInt8.max.mostSignificantBit)
   expectEqual(-1, UInt8.min.mostSignificantBit)
   expectEqual(6, Int8.max.mostSignificantBit)
+  expectEqual(-1, (0 as Int8).mostSignificantBit)
   expectEqual(6, Int8.min.mostSignificantBit)
 }
 

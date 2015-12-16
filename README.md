@@ -23,9 +23,6 @@ To read the documentation, start by installing the
 typing `make`. This compiles the `.rst` files in the `docs` directory into
 HTML in the `docs/_build/html` directory.
 
-A potentially useful document to start is `docs/LangRef`, which gives a low level
-tour of how the language works from the implementation perspective.
-
 Many of the docs are out of date, but you can see some historical design
 documents in the `docs` directory.
 
@@ -51,7 +48,7 @@ For OS X, you need [the latest Xcode](https://developer.apple.com/xcode/download
 
 For Ubuntu, you'll need the following development dependencies:
 
-    sudo apt-get install git cmake ninja-build clang uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config
+    sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config
 
 Note: LLDB currently requires at least swig-1.3.40 but will successfully build
 with version 2 shipped with Ubuntu.
@@ -65,31 +62,19 @@ compiler for C++14 support and create a symlink:
 
 ### Getting Sources for Swift and Related Projects
 
-For those checking out sources as read-only:
+**Via HTTPS**  For those checking out sources as read-only, HTTPS works best:
 
-     git clone https://github.com/apple/swift.git swift
-     git clone https://github.com/apple/swift-llvm.git llvm
-     git clone https://github.com/apple/swift-clang.git clang
-     git clone https://github.com/apple/swift-lldb.git lldb
-     git clone https://github.com/apple/swift-cmark.git cmark
-     git clone https://github.com/apple/swift-llbuild.git llbuild
-     git clone https://github.com/apple/swift-package-manager.git swiftpm
-     git clone https://github.com/apple/swift-corelibs-xctest.git
-     git clone https://github.com/apple/swift-corelibs-foundation.git
+    git clone https://github.com/apple/swift.git
+    cd swift
+    ./utils/update-checkout --clone
 
-For those who plan on regularly making direct commits, cloning over
-SSH may provide a better experience (which requires uploading
-SSH keys to GitHub):
+**Via SSH**  For those who plan on regularly making direct commits,
+cloning over SSH may provide a better experience (which requires
+uploading SSH keys to GitHub):
 
-     git clone git@github.com:apple/swift.git swift
-     git clone git@github.com:apple/swift-llvm.git llvm
-     git clone git@github.com:apple/swift-clang.git clang
-     git clone git@github.com:apple/swift-lldb.git lldb
-     git clone git@github.com:apple/swift-cmark.git cmark
-     git clone git@github.com:apple/swift-llbuild.git llbuild
-     git clone git@github.com:apple/swift-package-manager.git swiftpm
-     git clone git@github.com:apple/swift-corelibs-xctest.git
-     git clone git@github.com:apple/swift-corelibs-foundation.git
+    git clone git@github.com:apple/swift.git
+    cd swift
+    ./utils/update-checkout --clone-with-ssh
 
 [CMake](http://cmake.org) is the core infrastructure used to configure builds of
 Swift and its companion projects; at least version 2.8.12.2 is required. Your

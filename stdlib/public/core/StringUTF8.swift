@@ -20,7 +20,7 @@
 extension _StringCore {
   /// An integral type that holds a sequence of UTF-8 code units, starting in
   /// its low byte.
-  public typealias UTF8Chunk = UInt64
+  internal typealias _UTF8Chunk = UInt64
 
   /// Encode text starting at `i` as UTF-8.  Returns a pair whose first
   /// element is the index of the text following whatever got encoded,
@@ -28,15 +28,15 @@ extension _StringCore {
   /// low byte.  Any unused high bytes in the result will be set to
   /// 0xFF.
   @warn_unused_result
-  func _encodeSomeUTF8(i: Int) -> (Int, UTF8Chunk) {
+  func _encodeSomeUTF8(i: Int) -> (Int, _UTF8Chunk) {
     _sanityCheck(i <= count)
 
     if _fastPath(elementWidth == 1) {
       // How many UTF-16 code units might we use before we've filled up
-      // our UTF8Chunk with UTF-8 code units?
-      let utf16Count = min(sizeof(UTF8Chunk.self), count - i)
+      // our _UTF8Chunk with UTF-8 code units?
+      let utf16Count = min(sizeof(_UTF8Chunk.self), count - i)
 
-      var result: UTF8Chunk = ~0 // start with all bits set
+      var result: _UTF8Chunk = ~0 // Start with all bits set
 
       _memcpy(
         dest: UnsafeMutablePointer(Builtin.addressof(&result)),
@@ -58,7 +58,7 @@ extension _StringCore {
   /// Helper for `_encodeSomeUTF8`, above.  Handles the case where the
   /// storage is contiguous UTF-16.
   @warn_unused_result
-  func _encodeSomeContiguousUTF16AsUTF8(i: Int) -> (Int, UTF8Chunk) {
+  func _encodeSomeContiguousUTF16AsUTF8(i: Int) -> (Int, _UTF8Chunk) {
     _sanityCheck(elementWidth == 2)
     _sanityCheck(!_baseAddress._isNull)
 
@@ -70,7 +70,7 @@ extension _StringCore {
   /// Helper for `_encodeSomeUTF8`, above.  Handles the case where the
   /// storage is non-contiguous UTF-16.
   @warn_unused_result
-  func _encodeSomeNonContiguousUTF16AsUTF8(i: Int) -> (Int, UTF8Chunk) {
+  func _encodeSomeNonContiguousUTF16AsUTF8(i: Int) -> (Int, _UTF8Chunk) {
     _sanityCheck(elementWidth == 2)
     _sanityCheck(_baseAddress._isNull)
 
@@ -111,7 +111,7 @@ extension String {
 
     /// A position in a `String.UTF8View`.
     public struct Index : ForwardIndex {
-      internal typealias Buffer = _StringCore.UTF8Chunk
+      internal typealias Buffer = _StringCore._UTF8Chunk
 
       init(_ _core: _StringCore, _ _coreIndex: Int,
            _ _buffer: Buffer) {
@@ -246,7 +246,12 @@ extension String {
 
   /// A UTF-8 encoding of `self`.
   public var utf8: UTF8View {
-    return UTF8View(self._core)
+    get {
+      return UTF8View(self._core)
+    }
+    set {
+      self = String(newValue)
+    }
   }
 
   public var _contiguousUTF8: UnsafeMutablePointer<UTF8.CodeUnit> {

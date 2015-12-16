@@ -45,7 +45,7 @@ DarwinBooleanAPI.test("boolValue/extra values") {
   expectTrue(otherValue.boolValue)
 }
 
-DarwinBooleanAPI.test("BooleanType") {
+DarwinBooleanAPI.test("Boolean") {
   var trueValue: DarwinBoolean = true
   expectIsBooleanType(&trueValue)
 

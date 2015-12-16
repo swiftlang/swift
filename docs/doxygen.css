@@ -313,8 +313,8 @@ HR { height: 1px;
 
 /* 
  * LLVM Modifications.
- * Note: Everything above here is generated with "doxygen -w htlm" command. See
- * "doxygen --help" for details. What follows are CSS overrides for LLVM 
+ * Note: Everything above here is generated with "doxygen -w html" command. See
+ * "doxygen --help" for details. What follows are CSS overrides for LLVM
  * specific formatting. We want to keep the above so it can be replaced with
  * subsequent doxygen upgrades.
  */

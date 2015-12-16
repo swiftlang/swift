@@ -40,7 +40,7 @@ Basic Goals
 In no particular order, and not explained well:
 
 * Support building great frameworks and applications, with a specific focus on
-  permiting rich and powerful APIs.
+  permitting rich and powerful APIs.
 * Get the defaults right: this reduces the barrier to entry and increases the
   odds that the right thing happens.
 * Through our support for building great APIs, we aim to provide an expressive
@@ -54,7 +54,7 @@ In no particular order, and not explained well:
   ideas already out there.
 * Memory safe by default: array overrun errors, uninitialized values, and other
   problems endemic to C should not occur in Swift, even if it means some amount
-  of runtime overhead.  Eventually these checks will be disablable for people
+  of runtime overhead.  Eventually these checks will be disableable for people
   who want ultimate performance in production builds.
 * Efficiently implementable with a static compiler: runtime compilation is
   great technology and Swift may eventually get a runtime optimizer, but it is
@@ -752,7 +752,7 @@ protocols.
     }
 
   We disambiguate towards ``get-set`` or ``willset-didset`` production if the
-  first token after ``{`` is the corresponding keyword, possibly preceeded by
+  first token after ``{`` is the corresponding keyword, possibly preceded by
   attributes.  Thus, the following code is rejected because we are expecting
   ``{`` after ``set``:
 
@@ -782,7 +782,7 @@ protocols.
     }
 
   We disambiguate towards ``willget-didset`` production if the first token
-  after ``{`` is the keyword ``willSet`` or ``didSet``, possibly preceeded by
+  after ``{`` is the keyword ``willSet`` or ``didSet``, possibly preceded by
   attributes.
 
 .. admonition:: Rationale
@@ -1551,5 +1551,3 @@ lowest:
   "comparative:" ==, !=, <, <=, >=, >
   "conjunctive:" &&
   "disjunctive:" ||
-
-

@@ -5,6 +5,13 @@
 import StdlibUnittest
 import SwiftPrivate
 
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 var Algorithm = TestSuite("Algorithm")
 
 // FIXME(prext): remove this conformance.
@@ -24,7 +31,7 @@ Algorithm.test("min,max") {
   expectEqual(7, max(3, 7, 5))
 
   // FIXME: add tests that check that min/max return the
-  // first element of the sequence (by reference equailty) that satisfy the
+  // first element of the sequence (by reference equality) that satisfy the
   // condition.
 }
 
@@ -43,7 +50,7 @@ Algorithm.test("sorted/strings")
 
 // A wrapper around Array<T> that disables any type-specific algorithm
 // optimizations and forces bounds checking on.
-struct A<T> : MutableSliceable {
+struct A<T> : MutableCollection {
   init(_ a: Array<T>) {
     impl = a
   }

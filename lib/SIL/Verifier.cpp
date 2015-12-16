@@ -779,7 +779,7 @@ public:
   }
 
   void verifyLLVMIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID) {
-    // Certain llvm instrinsic require constant values as their operands.
+    // Certain llvm intrinsic require constant values as their operands.
     // Consequently, these must not be phi nodes (aka. basic block arguments).
     switch (ID) {
     default:
@@ -1686,8 +1686,9 @@ public:
   }
 
   void checkSuperMethodInst(SuperMethodInst *CMI) {
-    require(CMI->getType() == TC.getConstantType(CMI->getMember()),
-            "result type of super_method must match type of method");
+    auto overrideTy = TC.getConstantOverrideType(CMI->getMember());
+    requireSameType(CMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
+                    "result type of super_method must match abstracted type of method");
     auto methodType = requireObjectType(SILFunctionType, CMI,
                                         "result of super_method");
     require(!methodType->getExtInfo().hasContext(),
@@ -2820,9 +2821,9 @@ public:
       return false;
 
     // Recursively check all successors.
-    for (const auto &SuccBB : StartBlock->getSuccessors())
-      if (!Visited.insert(SuccBB.getBB()).second)
-        if (!isUnreachableAlongAllPathsStartingAt(SuccBB.getBB(), Visited))
+    for (auto *SuccBB : StartBlock->getSuccessorBlocks())
+      if (!Visited.insert(SuccBB).second)
+        if (!isUnreachableAlongAllPathsStartingAt(SuccBB, Visited))
           return false;
 
     return true;
@@ -2938,25 +2939,20 @@ public:
   void visitSILBasicBlock(SILBasicBlock *BB) {
     // Make sure that each of the successors/predecessors of this basic block
     // have this basic block in its predecessor/successor list.
-    for (const SILSuccessor &S : BB->getSuccessors()) {
-      SILBasicBlock *SuccBB = S.getBB();
+    for (const auto *SuccBB : BB->getSuccessorBlocks()) {
       bool FoundSelfInSuccessor = false;
-      for (const SILBasicBlock *PredBB : SuccBB->getPreds()) {
-        if (PredBB == BB) {
-          FoundSelfInSuccessor = true;
-          break;
-        }
+      if (SuccBB->isPredecessor(BB)) {
+        FoundSelfInSuccessor = true;
+        break;
       }
       require(FoundSelfInSuccessor, "Must be a predecessor of each successor.");
     }
 
     for (const SILBasicBlock *PredBB : BB->getPreds()) {
       bool FoundSelfInPredecessor = false;
-      for (const SILSuccessor &S : PredBB->getSuccessors()) {
-        if (S.getBB() == BB) {
-          FoundSelfInPredecessor = true;
-          break;
-        }
+      if (PredBB->isSuccessor(BB)) {
+        FoundSelfInPredecessor = true;
+        break;
       }
       require(FoundSelfInPredecessor, "Must be a successor of each predecessor.");
     }

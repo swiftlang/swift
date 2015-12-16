@@ -28,7 +28,7 @@ SILValue SILGenFunction::emitSelfDecl(VarDecl *selfDecl) {
   SILLocation PrologueLoc(selfDecl);
   PrologueLoc.markAsPrologue();
   unsigned ArgNo = 1; // Hardcoded for destructors.
-  B.createDebugValue(PrologueLoc, selfValue, ArgNo);
+  B.createDebugValue(PrologueLoc, selfValue, {selfDecl->isLet(), ArgNo});
   return selfValue;
 }
 
@@ -96,7 +96,7 @@ public:
       // An unowned parameter is passed at +0, like guaranteed, but it isn't
       // kept alive by the caller, so we need to retain and manage it
       // regardless.
-      return std::move(gen.emitManagedRetain(loc, arg));
+      return gen.emitManagedRetain(loc, arg);
 
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
@@ -256,7 +256,7 @@ struct ArgumentInitVisitor :
       if (isa<BuiltinUnsafeValueBufferType>(objectType)) {
         // FIXME: mark a debug location?
         gen.VarLocs[vd] = SILGenFunction::VarLoc::get(address);
-        gen.B.createDebugValueAddr(loc, address, ArgNo);
+        gen.B.createDebugValueAddr(loc, address, {vd->isLet(), ArgNo});
         return;
       }
 
@@ -278,9 +278,9 @@ struct ArgumentInitVisitor :
       // argument if we're responsible for it.
       gen.VarLocs[vd] = SILGenFunction::VarLoc::get(argrv.getValue());
       if (argrv.getType().isAddress())
-        gen.B.createDebugValueAddr(loc, argrv.getValue(), ArgNo);
+        gen.B.createDebugValueAddr(loc, argrv.getValue(), {vd->isLet(), ArgNo});
       else
-        gen.B.createDebugValue(loc, argrv.getValue(), ArgNo);
+        gen.B.createDebugValue(loc, argrv.getValue(), {vd->isLet(), ArgNo});
     } else {
       // If the variable is mutable, we need to copy or move the argument
       // value to local mutable memory.
@@ -464,7 +464,7 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
     if (auto *AllocStack = dyn_cast<AllocStackInst>(val))
       AllocStack->setArgNo(ArgNo);
     else 
-      gen.B.createDebugValue(Loc, val, ArgNo);
+      gen.B.createDebugValue(Loc, val, {/*Constant*/true, ArgNo});
     if (!lowering.isTrivial())
       gen.enterDestroyCleanup(val);
     break;
@@ -479,7 +479,7 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
     SILValue box = new (gen.SGM.M) SILArgument(gen.F.begin(), boxTy, VD);
     SILValue addr = gen.B.createProjectBox(VD, box);
     gen.VarLocs[VD] = SILGenFunction::VarLoc::get(addr, box);
-    gen.B.createDebugValueAddr(Loc, addr, ArgNo);
+    gen.B.createDebugValueAddr(Loc, addr, {/*Constant*/false, ArgNo});
     gen.Cleanups.pushCleanup<StrongReleaseCleanup>(box);
     break;
   }
@@ -488,7 +488,7 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
     SILType ty = gen.getLoweredType(type).getAddressType();
     SILValue addr = new (gen.SGM.M) SILArgument(gen.F.begin(), ty, VD);
     gen.VarLocs[VD] = SILGenFunction::VarLoc::get(addr);
-    gen.B.createDebugValueAddr(Loc, addr, ArgNo);
+    gen.B.createDebugValueAddr(Loc, addr, {/*Constant*/true, ArgNo});
     break;
   }
   }

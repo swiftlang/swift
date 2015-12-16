@@ -47,7 +47,7 @@ enum FooComparisonResult : Int {
 }
 
 /// Aaa.  FooRuncingOptions.  Bbb.
-struct FooRuncingOptions : OptionSetType {
+struct FooRuncingOptions : OptionSet {
   init(rawValue: Int)
   let rawValue: Int
   

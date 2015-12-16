@@ -40,7 +40,7 @@ extension Bool : _BuiltinBooleanLiteralConvertible, BooleanLiteralConvertible {
   }
 }
 
-extension Bool : BooleanType {
+extension Bool : Boolean {
   @_transparent
   @warn_unused_result
   public func _getBuiltinLogicValue() -> Builtin.Int1 {
@@ -52,7 +52,7 @@ extension Bool : BooleanType {
 
   /// Construct an instance representing the same logical value as
   /// `value`.
-  public init<T : BooleanType>(_ value: T) {
+  public init<T : Boolean>(_ value: T) {
     self = value.boolValue
   }
 }
@@ -64,7 +64,7 @@ extension Bool : CustomStringConvertible {
   }
 }
 
-// This is a magic entrypoint known to the compiler.
+// This is a magic entry point known to the compiler.
 @_transparent
 public // COMPILER_INTRINSIC
 func _getBool(v: Builtin.Int1) -> Bool { return Bool(v) }

@@ -1,11 +1,11 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
 
-protocol IntegerArithmeticType {
+protocol IntegerArithmetic {
   static func uncheckedSubtract(lhs: Self, rhs: Self) -> (Self, Bool)
 }
 
-protocol RandomAccessIndex : IntegerArithmeticType {
-  typealias Distance : IntegerArithmeticType
+protocol RandomAccessIndex : IntegerArithmetic {
+  typealias Distance : IntegerArithmetic
   static func uncheckedSubtract(lhs: Self, rhs: Self) -> (Distance, Bool)
 }
 

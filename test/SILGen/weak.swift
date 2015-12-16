@@ -21,7 +21,7 @@ func test0(c c: C) {
 // CHECK:      [[A:%.*]] = mark_uninitialized [var] [[A1]]#1
 
   weak var x = c
-// CHECK:      [[X:%.*]] = alloc_box $@sil_weak Optional<C>  // var x
+// CHECK:      [[X:%.*]] = alloc_box $@sil_weak Optional<C>, var, name "x"
 //   Implicit conversion
 // CHECK-NEXT: [[TMP:%.*]] = load [[C]]#1 : $*C
 // CHECK-NEXT: strong_retain [[TMP]] : $C
@@ -48,7 +48,7 @@ func test0(c c: C) {
 // CHECK-LABEL: sil shared @_TFF4weak19testClosureOverWeakFT_T_U_FT_Si : $@convention(thin) (@owned @box @sil_weak Optional<C>) -> Int {
 // CHECK: bb0(%0 : $@box @sil_weak Optional<C>):
 // CHECK-NEXT:  %1 = project_box %0
-// CHECK-NEXT:  debug_value_addr %1 : $*@sil_weak Optional<C> // var bC, argno: 1
+// CHECK-NEXT:  debug_value_addr %1 : $*@sil_weak Optional<C>, var, name "bC", argno 1
 // CHECK-NEXT:  %3 = alloc_stack $Optional<C>
 // CHECK-NEXT:  %4 = load_weak %1 : $*@sil_weak Optional<C>
 // CHECK-NEXT:  store %4 to %3#1 : $*Optional<C>

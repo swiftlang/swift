@@ -317,9 +317,9 @@ public func expectCollectionAssociatedTypes<
 ) {}
 
 public func expectForwardIndexType<X : ForwardIndex>(x: X) -> X { return x }
-public func expectIsBooleanType<X : BooleanType>(inout x: X) -> X { return x }
+public func expectIsBooleanType<X : Boolean>(inout x: X) -> X { return x }
 
-public struct AssertionResult : CustomStringConvertible, BooleanType {
+public struct AssertionResult : CustomStringConvertible, Boolean {
   init(isPass: Bool) {
     self._isPass = isPass
   }

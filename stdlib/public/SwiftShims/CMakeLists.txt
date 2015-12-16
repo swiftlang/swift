@@ -55,7 +55,6 @@ if(SWIFT_BUILT_STANDALONE)
 
   set(clang_headers_location)
   foreach(loc ${clang_headers_locations})
-  message(WARNING "go: ${loc}")
     if(EXISTS "${loc}")
       set(clang_headers_location "${loc}")
       break()

@@ -85,8 +85,10 @@ public struct CollectionDefaultIterator<Elements : Indexable>
   ///
   /// - Requires: No preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> Elements._Element? {
-    return _position == _elements.endIndex
-    ? .None : .Some(_elements[_position++])
+    if _position == _elements.endIndex { return nil }
+    let element = _elements[_position]
+    _position._successorInPlace()
+    return element
   }
 
   internal let _elements: Elements
@@ -433,14 +435,14 @@ extension Collection {
     while subSequenceEnd != cachedEndIndex {
       if try isSeparator(self[subSequenceEnd]) {
         let didAppend = appendSubsequence(end: subSequenceEnd)
-        ++subSequenceEnd
+        subSequenceEnd._successorInPlace()
         subSequenceStart = subSequenceEnd
         if didAppend && result.count == maxSplit {
           break
         }
         continue
       }
-      ++subSequenceEnd
+      subSequenceEnd._successorInPlace()
     }
 
     if subSequenceStart != cachedEndIndex || allowEmptySlices {
@@ -698,15 +700,5 @@ internal func _writeBackMutableSlice<
   _precondition(
     newElementIndex == newElementsEndIndex,
     "Can not replace a slice of a MutableCollection with a slice of a smaller size")
-}
-
-/// A *collection* with mutable slices.
-///
-/// For example,
-///
-///      x[i..<j] = someExpression
-///      x[i..<j].mutatingMethod()
-public protocol MutableSliceable : Collection, MutableCollection {
-  subscript(_: Range<Index>) -> SubSequence { get set }
 }
 

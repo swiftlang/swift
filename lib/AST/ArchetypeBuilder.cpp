@@ -736,9 +736,13 @@ bool ArchetypeBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam) {
         GenericParam->getDeclaredType()->castTo<GenericTypeParamType>(),
         RootProtocol,
         GenericParam->getName());
-  
-  if (!PA)
-    return true;
+
+  return (!PA);
+}
+
+bool ArchetypeBuilder::addGenericParameterRequirements(GenericTypeParamDecl *GenericParam) {
+  GenericTypeParamKey Key{GenericParam->getDepth(), GenericParam->getIndex()};
+  auto PA = Impl->PotentialArchetypes[Key];
   
   // Add the requirements from the declaration.
   llvm::SmallPtrSet<ProtocolDecl *, 8> visited;
@@ -854,7 +858,7 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   T1 = T1->getRepresentative();
   T2 = T2->getRepresentative();
 
-  // If the representives are already the same, we're done.
+  // If the representatives are already the same, we're done.
   if (T1 == T2)
     return false;
 

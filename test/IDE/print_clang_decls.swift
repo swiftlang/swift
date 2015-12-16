@@ -92,7 +92,7 @@
 // FOUNDATION-NEXT: {{^}}}{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSRuncingOptions.  Bbb.{{$}}
-// FOUNDATION-NEXT: {{^}}struct NSRuncingOptions : OptionSetType {{{$}}
+// FOUNDATION-NEXT: {{^}}struct NSRuncingOptions : OptionSet {{{$}}
 // FOUNDATION-NEXT: {{^}}  init(rawValue: UInt){{$}}
 // FOUNDATION-NEXT: {{^}}  let rawValue: UInt{{$}}
 // FOUNDATION-NEXT: {{^}}  static var EnableMince: NSRuncingOptions { get }{{$}}

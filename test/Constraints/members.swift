@@ -146,7 +146,7 @@ func goo() {
 
 func id<T>(t: T) -> T { return t }
 
-func doGetLogicValue<T : BooleanType>(t: T) {
+func doGetLogicValue<T : Boolean>(t: T) {
   t.boolValue
 }
 

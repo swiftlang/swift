@@ -31,7 +31,7 @@
 ///
 /// To add new lazy sequence operations, extend this protocol with
 /// methods that return lazy wrappers that are themselves
-/// `LazySequenceType`s.  For example, given an eager `scan`
+/// `LazySequenceProtocol`s.  For example, given an eager `scan`
 /// method defined as follows
 ///
 ///     extension Sequence {
@@ -74,7 +74,7 @@
 ///     }
 ///     
 ///     struct LazyScanSequence<Base: Sequence, ResultElement>
-///       : LazySequenceType // Chained operations on self are lazy, too
+///       : LazySequenceProtocol // Chained operations on self are lazy, too
 ///     {
 ///       func iterator() -> LazyScanIterator<Base.Iterator, ResultElement> {
 ///         return LazyScanIterator(
@@ -88,7 +88,7 @@
 ///
 /// and finally, we can give all lazy sequences a lazy `scan` method:
 ///     
-///     extension LazySequenceType {
+///     extension LazySequenceProtocol {
 ///       /// Returns a sequence containing the results of
 ///       ///
 ///       ///   p.reduce(initial, combine: combine)
@@ -112,7 +112,7 @@
 ///
 /// - Note: The explicit permission to implement further operations
 ///   lazily applies only in contexts where the sequence is statically
-///   known to conform to `LazySequenceType`.  Thus, side-effects such
+///   known to conform to `LazySequenceProtocol`.  Thus, side-effects such
 ///   as the accumulation of `result` below are never unexpectedly
 ///   dropped or deferred:
 ///
@@ -127,7 +127,7 @@
 ///   [We don't recommend that you use `map` this way, because it
 ///   creates and discards an array. `sum` would be better implemented
 ///   using `reduce`].
-public protocol LazySequenceType : Sequence {
+public protocol LazySequenceProtocol : Sequence {
   /// A `Sequence` that can contain the same elements as this one,
   /// possibly with a simpler type.
   ///
@@ -151,7 +151,7 @@ public protocol LazySequenceType : Sequence {
 
 /// When there's no special associated `Elements` type, the `elements`
 /// property is provided.
-extension LazySequenceType where Elements == Self {
+extension LazySequenceProtocol where Elements == Self {
   /// Identical to `self`.
   public var elements: Self { return self }
 }
@@ -160,9 +160,9 @@ extension LazySequenceType where Elements == Self {
 /// on which some operations such as `map` and `filter` are
 /// implemented lazily.
 ///
-/// - See also: `LazySequenceType`
+/// - See also: `LazySequenceProtocol`
 public struct LazySequence<Base : Sequence>
-  : LazySequenceType, _SequenceWrapperType {
+  : LazySequenceProtocol, _SequenceWrapperType {
 
   /// Creates a sequence that has the same elements as `base`, but on
   /// which some operations such as `map` and `filter` are implemented
@@ -182,15 +182,15 @@ extension Sequence {
   /// but on which some operations such as `map` and `filter` are
   /// implemented lazily.
   ///
-  /// - See also: `LazySequenceType`, `LazySequence`
+  /// - See also: `LazySequenceProtocol`, `LazySequence`
   public var lazy: LazySequence<Self> {
     return LazySequence(self)
   }
 }
 
 /// Avoid creating multiple layers of `LazySequence` wrapper.
-/// Anything conforming to `LazySequenceType` is already lazy.
-extension LazySequenceType {
+/// Anything conforming to `LazySequenceProtocol` is already lazy.
+extension LazySequenceProtocol {
   /// Identical to `self`.
   public var lazy: Self {
     return self

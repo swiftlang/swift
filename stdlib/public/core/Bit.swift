@@ -63,7 +63,7 @@ internal struct _BitMirror : _MirrorType {
 
   var valueType: Any.Type { return (_value as Any).dynamicType }
 
-  var objectIdentifier: ObjectIdentifier? { return .None }
+  var objectIdentifier: ObjectIdentifier? { return nil }
 
   var count: Int { return 0 }
 
@@ -78,7 +78,7 @@ internal struct _BitMirror : _MirrorType {
     }
   }
 
-  var quickLookObject: PlaygroundQuickLook? { return .None }
+  var quickLookObject: PlaygroundQuickLook? { return nil }
 
   var disposition: _MirrorDisposition { return .Enum }
 }
@@ -93,7 +93,7 @@ public func < (lhs: Bit, rhs: Bit) -> Bool {
   return lhs.rawValue < rhs.rawValue
 }
 
-extension Bit : IntegerArithmeticType {
+extension Bit : IntegerArithmetic {
   static func _withOverflow(v: (Int, overflow: Bool)) -> (Bit, overflow: Bool) {
     if let b = Bit(rawValue: v.0) {
       return (b, v.overflow)

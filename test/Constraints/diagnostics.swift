@@ -129,7 +129,7 @@ func rdar20142523() {
   myMap(0..<10, { x in // expected-error{{cannot invoke 'myMap' with an argument list of type '(Range<Int>, (_) -> _)'}}
     // expected-note @-1 {{overloads for 'myMap' exist with these partially matching parameter lists: (C, (C.Iterator.Element) -> T), (T?, @noescape (T) -> U)}}
     ()
-    return x  // expected-error {{type of expression is ambiguous without more context}}
+    return x
   })
 }
 
@@ -164,10 +164,10 @@ func r17224804(monthNumber : Int) {
 
 // <rdar://problem/17020197> QoI: Operand of postfix '!' should have optional type; type is 'Int?'
 func r17020197(x : Int?, y : Int) {
-  if x! {  }  // expected-error {{type 'Int' does not conform to protocol 'BooleanType'}}
+  if x! {  }  // expected-error {{type 'Int' does not conform to protocol 'Boolean'}}
 
   // <rdar://problem/12939553> QoI: diagnostic for using an integer in a condition is utterly terrible
-  if y {}    // expected-error {{type 'Int' does not conform to protocol 'BooleanType'}}
+  if y {}    // expected-error {{type 'Int' does not conform to protocol 'Boolean'}}
 }
 
 // <rdar://problem/20714480> QoI: Boolean expr not treated as Bool type when function return type is different
@@ -351,7 +351,7 @@ c.method2(1.0)(b: 2.0) // expected-error {{cannot convert value of type 'Double'
 CurriedClass.method1(c)()
 _ = CurriedClass.method1(c)
 CurriedClass.method1(c)(1)         // expected-error {{argument passed to call that takes no arguments}}
-CurriedClass.method1(2.0)(1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'CurriedClass'}}
+CurriedClass.method1(2.0)(1)       // expected-error {{use of instance member 'method1' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
 
 CurriedClass.method2(c)(32)(b: 1)
 _ = CurriedClass.method2(c)
@@ -392,7 +392,7 @@ CurriedClass.m1(2, b: 42)   // expected-error {{use of instance member 'm1' on t
 
 
 // <rdar://problem/22108559> QoI: Confusing error message when calling an instance method as a class method
-CurriedClass.m2(12)  // expected-error {{cannot convert value of type 'Int' to expected argument type 'CurriedClass'}}
+CurriedClass.m2(12)  // expected-error {{use of instance member 'm2' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
 
 
 
@@ -437,8 +437,7 @@ func f20371273() {
 // FIXME: Should complain about not having a return type annotation in the closure.
 [0].map { _ in let r =  (1,2).0;  return r }
 // expected-error @-1 {{cannot invoke 'map' with an argument list of type '(@noescape (Int) throws -> _)'}}
-// expected-error @-2 {{cannot convert return expression of type 'Int' to return type 'T'}}
-// expected-note @-3 {{expected an argument list of type '(@noescape Int throws -> T)'}}
+// expected-note @-2 {{expected an argument list of type '(@noescape Int throws -> T)'}}
 
 // <rdar://problem/21078316> Less than useful error message when using map on optional dictionary type
 func rdar21078316() {
@@ -531,7 +530,7 @@ func f(arguments: [String]) -> [ArraySlice<String>] {
 
 
 
-struct AOpts : OptionSetType {
+struct AOpts : OptionSet {
   let rawValue : Int
 }
 

@@ -39,11 +39,11 @@ void *_swift_objCMirrorSummary(const void * nsObject);
 /// types so we can operate on Float80.  Return NULL on overflow.
 const char *_swift_stdlib_strtold_clocale(const char *nptr, void *outResult);
 /// Call strtod_l with the C locale, swapping argument and return
-/// types so we can operate constistently on Float80.  Return NULL on
+/// types so we can operate consistently on Float80.  Return NULL on
 /// overflow.
 const char *_swift_stdlib_strtod_clocale(const char *nptr, double *outResult);
 /// Call strtof_l with the C locale, swapping argument and return
-/// types so we can operate constistently on Float80.  Return NULL on
+/// types so we can operate consistently on Float80.  Return NULL on
 /// overflow.
 const char *_swift_stdlib_strtof_clocale(const char *nptr, float *outResult);
 

@@ -13,7 +13,6 @@
 public // @testable
 protocol _ArrayType
   : RangeReplaceableCollection,
-    MutableSliceable,
     ArrayLiteralConvertible
 {
   //===--- public interface -----------------------------------------------===//

@@ -115,7 +115,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       enum : unsigned {
         Function,
         MutatingMethod,
-        ObjCProtocolMethod,
         SuperInit,
         SelfInit,
       };
@@ -138,32 +137,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
     /// If this is an application of a function that cannot be partially
     /// applied, arrange for us to check that it gets fully applied.
-    void recordUnsupportedPartialApply(DeclRefExpr *expr) {
-      bool requiresFullApply = false;
-      unsigned kind;
-
-      auto fn = dyn_cast<FuncDecl>(expr->getDecl());
-      if (!fn)
-        return;
-
-      // @objc protocol methods cannot be partially applied.
-      if (auto proto = fn->getDeclContext()->isProtocolOrProtocolExtensionContext()) {
-        if (proto->isObjC()) {
-          requiresFullApply = true;
-          kind = PartialApplication::ObjCProtocolMethod;
-        }
-      }
-
-      if (requiresFullApply) {
-        // We need to apply all argument clauses.
-        InvalidPartialApplications.insert({
-          expr, {fn->getNaturalArgumentCount(), kind}
-        });
-      }
-    }
-
-    /// If this is an application of a function that cannot be partially
-    /// applied, arrange for us to check that it gets fully applied.
     void recordUnsupportedPartialApply(ApplyExpr *expr, Expr *fnExpr) {
 
       if (isa<OtherConstructorDeclRefExpr>(fnExpr)) {
@@ -180,8 +153,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       auto fnDeclRef = dyn_cast<DeclRefExpr>(fnExpr);
       if (!fnDeclRef)
         return;
-
-      recordUnsupportedPartialApply(fnDeclRef);
 
       auto fn = dyn_cast<FuncDecl>(fnDeclRef->getDecl());
       if (!fn)
@@ -203,11 +174,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     /// This method is called in post-order over the AST to validate that
     /// methods are fully applied when they can't support partial application.
     void checkInvalidPartialApplication(Expr *E) {
-      if (auto DRE = dyn_cast<DeclRefExpr>(E)) {
-        recordUnsupportedPartialApply(DRE);
-        return;
-      }
-
       if (auto AE = dyn_cast<ApplyExpr>(E)) {
         Expr *fnExpr = AE->getFn()->getSemanticsProvidingExpr();
         if (auto forceExpr = dyn_cast<ForceValueExpr>(fnExpr))
@@ -823,7 +789,7 @@ static void tryFixPrintWithAppendNewline(const ValueDecl *D,
   auto ArgNames = Name.getArgumentNames();
   if (ArgNames.size() != 2)
     return;
-  if (ArgNames[1].str() != "appendNewline")
+  if (ArgNames[1].empty() || ArgNames[1].str() != "appendNewline")
     return;
 
   // Go through the expr to determine if second parameter is boolean literal.
@@ -1600,7 +1566,7 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
   // are mutating the base expression.  We also need to visit the index
   // expressions as loads though.
   if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
-    // The index of the subscript is evaluted as an rvalue.
+    // The index of the subscript is evaluated as an rvalue.
     SE->getIndex()->walk(*this);
     if (SE->hasDecl())
       markBaseOfAbstractStorageDeclStore(SE->getBase(), SE->getDecl());

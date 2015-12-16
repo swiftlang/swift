@@ -558,6 +558,21 @@ void sortUnique(
   C.erase(std::unique(C.begin(), C.end()), C.end());
 }
 
+/// Sorts and then uniques a container with random access iterators and an erase
+/// method that removes a range specified by random access iterators.
+template <typename Container, typename Comparator>
+void sortUnique(
+    Container &C,
+    Comparator Cmp,
+    typename std::enable_if<
+        std::is_same<typename std::iterator_traits<
+                         typename Container::iterator>::iterator_category,
+                     std::random_access_iterator_tag>::value,
+        void>::type * = nullptr) {
+  std::sort(C.begin(), C.end(), Cmp);
+  C.erase(std::unique(C.begin(), C.end()), C.end());
+}
+
 } // end namespace swift
 
 #endif

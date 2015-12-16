@@ -1,58 +1,188 @@
-// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
+// RUN: rm -rf %t
+// RUN: mkdir %t
+// RUN: %target-swift-frontend -emit-module -module-name OutsideClasses -o %t %S/../Inputs/outside_classes_before.swift
+// RUN: %target-swift-frontend -use-native-super-method -parse-sil -parse-as-library -emit-ir -I %t %s | FileCheck %s --check-prefix=IRGEN
+// RUN: %target-swift-frontend -use-native-super-method -force-resilient-super-dispatch -parse-sil -parse-as-library -emit-ir -I %t %s | FileCheck %s --check-prefix=IRGEN-RESILIENT
 
 sil_stage canonical
 
 import Builtin
 import Swift
 import SwiftShims
+import OutsideClasses
 
-public class Parent {
-  public class func foo() {}
+class GrandchildToOutside : OutsideChild {
+  override class func classMethod()
+   deinit 
+  override init()
 }
 
-public class Child : Parent {}
-
-public class Grandchild : Child {
-  override public class func foo() {
-    super.foo()
-  }
+class GenericGrandchildToOutside<A> : GenericOutsideChild<A> {
+  override class func classMethod()
+   deinit 
 }
 
-sil @Parent_foo : $@convention(thin) (@thick Parent.Type) -> () {
+class ConcreteGrandchildToOutside : ConcreteOutsideChild {
+  override class func classMethod()
+   deinit 
+  override init(property: String)
+}
+
+class Parent {
+  class func classMethod()
+   deinit 
+  init()
+}
+
+class Child : Parent {
+  override class func classMethod()
+   deinit 
+  override init()
+}
+
+// static OutsideClasses.OutsideParent.classMethod () -> ()
+sil @_TZFC14OutsideClasses13OutsideParent11classMethodfT_T_ : $@convention(thin) (@thick OutsideParent.Type) -> ()
+
+// static OutsideClasses.OutsideChild.classMethod () -> ()
+sil @_TZFC14OutsideClasses12OutsideChild11classMethodfT_T_ : $@convention(thin) (@thick OutsideChild.Type) -> ()
+
+sil hidden @GrandchildToOutside_classMethod : $@convention(thin) (@thick GrandchildToOutside.Type) -> () {
+bb0(%0 : $@thick GrandchildToOutside.Type):
+  debug_value %0 : $@thick GrandchildToOutside.Type
+  %2 = upcast %0 : $@thick GrandchildToOutside.Type to $@thick OutsideChild.Type
+  %3 = super_method %0 : $@thick GrandchildToOutside.Type, #OutsideChild.classMethod!1 : OutsideChild.Type -> () -> () , $@convention(thin) (@thick OutsideChild.Type) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@thick OutsideChild.Type) -> ()
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// IRGEN-LABEL: define hidden void @GrandchildToOutside_classMethod
+// IRGEN: [[SUPER_METADATA:%[0-9]+]] = call %swift.type* @_TMaC14OutsideClasses12OutsideChild()
+// IRGEN: [[OPAQUE_SUPER_METADATA:%[0-9]+]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%swift.type*)**
+// IRGEN: [[VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%swift.type*)*, void (%swift.type*)** [[OPAQUE_SUPER_METADATA]]
+// IRGEN: [[FN_PTR:%[0-9]+]] = load void (%swift.type*)*, void (%swift.type*)** [[VTABLE_SLOT]]
+// IRGEN: call void {{%[0-9]+}}(%swift.type* %0)
+
+// IRGEN-RESILIENT-LABEL: define hidden void @GrandchildToOutside_classMethod
+// IRGEN-RESILIENT: [[METADATA:%[0-9]+]] = call %swift.type* @_TMaC18super_class_method19GrandchildToOutside()
+// IRGEN-RESILIENT: [[OPAQUE_METADATA:%[0-9]+]] = bitcast %swift.type* [[METADATA]] to %swift.type**
+// IRGEN-RESILIENT: [[SUPER_METADATA_PTR:%[0-9]+]] = getelementptr inbounds %swift.type*, %swift.type** [[OPAQUE_METADATA]], i32 1
+// IRGEN-RESILIENT: [[SUPER_METADATA:%[0-9]+]] = load %swift.type*, %swift.type** [[SUPER_METADATA_PTR]]
+// IRGEN-RESILIENT: [[OPAQUE_SUPER_METADATA:%[0-9]+]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%swift.type*)**
+// IRGEN-RESILIENT: [[VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%swift.type*)*, void (%swift.type*)** [[OPAQUE_SUPER_METADATA]]
+// IRGEN-RESILIENT: [[FN_PTR:%[0-9]+]] = load void (%swift.type*)*, void (%swift.type*)** [[VTABLE_SLOT]]
+// IRGEN-RESILIENT: call void {{%[0-9]+}}(%swift.type* %0)
+
+// static OutsideClasses.GenericOutsideParent.classMethod () -> ()
+sil @_TZFC14OutsideClasses20GenericOutsideParent11classMethodfT_T_ : $@convention(thin) <τ_0_0> (@thick GenericOutsideParent<τ_0_0>.Type) -> ()
+
+// static OutsideClasses.GenericOutsideChild.classMethod () -> ()
+sil @_TZFC14OutsideClasses19GenericOutsideChild11classMethodfT_T_ : $@convention(thin) <τ_0_0> (@thick GenericOutsideChild<τ_0_0>.Type) -> ()
+
+sil hidden @GenericGrandchildToOutside_classMethod : $@convention(thin) <A> (@thick GenericGrandchildToOutside<A>.Type) -> () {
+bb0(%0 : $@thick GenericGrandchildToOutside<A>.Type):
+  debug_value %0 : $@thick GenericGrandchildToOutside<A>.Type
+  %2 = upcast %0 : $@thick GenericGrandchildToOutside<A>.Type to $@thick GenericOutsideChild<A>.Type
+  %3 = super_method %0 : $@thick GenericGrandchildToOutside<A>.Type, #GenericOutsideChild.classMethod!1 : <A> GenericOutsideChild<A>.Type -> () -> () , $@convention(thin) <τ_0_0> (@thick GenericOutsideChild<τ_0_0>.Type) -> ()
+  %4 = apply %3<A>(%2) : $@convention(thin) <τ_0_0> (@thick GenericOutsideChild<τ_0_0>.Type) -> ()
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// IRGEN-LABEL: define hidden void @GenericGrandchildToOutside_classMethod
+// IRGEN: [[SUPER_METADATA:%[0-9]+]] = call %swift.type* @swift_getGenericMetadata1(%swift.type_pattern* @_TMPC14OutsideClasses19GenericOutsideChild, i8* %3) #4
+// IRGEN: [[OPAQUE_SUPER_METADATA:%[0-9]+]] = bitcast %swift.type* %4 to void (%swift.type*)**
+// IRGEN: [[VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%swift.type*)*, void (%swift.type*)** [[OPAQUE_SUPER_METADATA]]
+// IRGEN: [[FN_PTR:%[0-9]+]] = load void (%swift.type*)*, void (%swift.type*)** [[VTABLE_SLOT]]
+// Some bitcasts
+// IRGEN: call void
+
+// IRGEN-RESILIENT-LABEL: define hidden void @GenericGrandchildToOutside_classMethod
+// IRGEN-RESILIENT: [[METADATA:%[0-9]+]] = call %swift.type* @swift_getGenericMetadata1
+// IRGEN-RESILIENT: [[OPAQUE_METADATA:%[0-9]+]] = bitcast %swift.type* [[METADATA]] to %swift.type**
+// IRGEN-RESILIENT: [[SUPER_METADATA_PTR:%[0-9]+]] = getelementptr inbounds %swift.type*, %swift.type** [[OPAQUE_METADATA]], i32 1
+// IRGEN-RESILIENT: [[SUPER_METADATA:%[0-9]+]] = load %swift.type*, %swift.type** [[SUPER_METADATA_PTR]]
+// IRGEN-RESILIENT: [[OPAQUE_SUPER_METADATA:%[0-9]+]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%swift.type*)**
+// IRGEN-RESILIENT: [[VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%swift.type*)*, void (%swift.type*)** [[OPAQUE_SUPER_METADATA]]
+// IRGEN-RESILIENT: [[FN_PTR:%[0-9]+]] = load void (%swift.type*)*, void (%swift.type*)** [[VTABLE_SLOT]]
+// Some bitcasts
+// IRGEN-RESILIENT: call void
+
+// static OutsideClasses.ConcreteOutsideChild.classMethod () -> ()
+sil @_TZFC14OutsideClasses20ConcreteOutsideChild11classMethodfT_T_ : $@convention(thin) (@thick ConcreteOutsideChild.Type) -> ()
+
+sil hidden @ConcreteGrandchildToOutside_classMethod : $@convention(thin) (@thick ConcreteGrandchildToOutside.Type) -> () {
+bb0(%0 : $@thick ConcreteGrandchildToOutside.Type):
+  debug_value %0 : $@thick ConcreteGrandchildToOutside.Type
+  %2 = upcast %0 : $@thick ConcreteGrandchildToOutside.Type to $@thick ConcreteOutsideChild.Type
+  %3 = super_method %0 : $@thick ConcreteGrandchildToOutside.Type, #ConcreteOutsideChild.classMethod!1 : ConcreteOutsideChild.Type -> () -> () , $@convention(thin) (@thick ConcreteOutsideChild.Type) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@thick ConcreteOutsideChild.Type) -> ()
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// IRGEN-LABEL: define hidden void @ConcreteGrandchildToOutside_classMethod
+// IRGEN: [[SUPER_METADATA:%[0-9]+]] = call %swift.type* @_TMaC14OutsideClasses20ConcreteOutsideChild()
+// IRGEN: [[OPAQUE_SUPER_METADATA:%[0-9]+]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%swift.type*)**
+// IRGEN: [[VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%swift.type*)*, void (%swift.type*)** [[OPAQUE_SUPER_METADATA]]
+// IRGEN: [[FN_PTR:%[0-9]+]] = load void (%swift.type*)*, void (%swift.type*)** [[VTABLE_SLOT]]
+// Some bitcasts
+// IRGEN: call void
+
+// IRGEN-RESILIENT-LABEL: define hidden void @ConcreteGrandchildToOutside_classMethod
+// IRGEN-RESILIENT: [[METADATA:%[0-9]+]] = call %swift.type* @_TMaC18super_class_method27ConcreteGrandchildToOutside()
+// IRGEN-RESILIENT: [[OPAQUE_METADATA:%[0-9]+]] = bitcast %swift.type* [[METADATA]] to %swift.type**
+// IRGEN-RESILIENT: [[SUPER_METADATA_PTR:%[0-9]+]] = getelementptr inbounds %swift.type*, %swift.type** [[OPAQUE_METADATA]], i32 1
+// IRGEN-RESILIENT: [[SUPER_METADATA:%[0-9]+]] = load %swift.type*, %swift.type** [[SUPER_METADATA_PTR]]
+// IRGEN-RESILIENT: [[OPAQUE_SUPER_METADATA:%[0-9]+]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%swift.type*)**
+// IRGEN-RESILIENT: [[VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%swift.type*)*, void (%swift.type*)** [[OPAQUE_SUPER_METADATA]]
+// IRGEN-RESILIENT: [[FN_PTR:%[0-9]+]] = load void (%swift.type*)*, void (%swift.type*)** [[VTABLE_SLOT]]
+// Some bitcasts
+// IRGEN-RESILIENT: call void
+
+sil hidden @Parent_classMethod : $@convention(thin) (@thick Parent.Type) -> () {
 bb0(%0 : $@thick Parent.Type):
   debug_value %0 : $@thick Parent.Type
   %2 = tuple ()
   return %2 : $()
 }
 
-sil @Grandchild_foo : $@convention(thin) (@thick Grandchild.Type) -> () {
-bb0(%0 : $@thick Grandchild.Type):
-  debug_value %0 : $@thick Grandchild.Type
-  %2 = upcast %0 : $@thick Grandchild.Type to $@thick Child.Type
-  %3 = upcast %2 : $@thick Child.Type to $@thick Parent.Type
-  %4 = super_method %0 : $@thick Grandchild.Type, #Parent.foo!1 : (Parent.Type) -> () -> (), $@convention(thin) (@thick Parent.Type) -> ()
-  %5 = apply %4(%3) : $@convention(thin) (@thick Parent.Type) -> ()
-  %6 = tuple ()
-  return %6 : $()
+sil hidden @Child_classMethod : $@convention(thin) (@thick Child.Type) -> () {
+bb0(%0 : $@thick Child.Type):
+  debug_value %0 : $@thick Child.Type
+  %2 = upcast %0 : $@thick Child.Type to $@thick Parent.Type
+
+  %3 = function_ref @Parent_classMethod : $@convention(thin) (@thick Parent.Type) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@thick Parent.Type) -> ()
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// IRGEN-LABEL: define hidden void @Child_classMethod(%swift.type*)
+// This call is devirtualized to a direct call to Parent.classMethod.
+// IRGEN: call void @Parent_classMethod(%swift.type* %0)
+
+// IRGEN-RESILIENT-LABEL: define hidden void @Child_classMethod(%swift.type*)
+// This call is devirtualized to a direct call to Parent.classMethod.
+// IRGEN-RESILIENT: call void @Parent_classMethod(%swift.type* %0)
+
+sil_vtable GrandchildToOutside {
+  #OutsideParent.classMethod!1: GrandchildToOutside_classMethod
+}
+
+sil_vtable GenericGrandchildToOutside {
+  #GenericOutsideParent.classMethod!1: GenericGrandchildToOutside_classMethod
+}
+
+sil_vtable ConcreteGrandchildToOutside {
+  #GenericOutsideParent.classMethod!1: ConcreteGrandchildToOutside_classMethod
 }
 
 sil_vtable Parent {
-  #Parent.foo!1: Parent_foo
+  #Parent.classMethod!1: Parent_classMethod
 }
 
 sil_vtable Child {
-  #Parent.foo!1: Parent_foo
+  #Parent.classMethod!1: Child_classMethod
 }
 
-sil_vtable Grandchild {
-  #Parent.foo!1: Grandchild_foo
-}
-// CHECK-LABEL: define void @Grandchild_foo(%swift.type*) #0
-// CHECK: [[CHILD_METADATA_PTR:%[0-9]+]] = call %swift.type* @_TMaC18super_class_method10Grandchild()
-// CHECK: [[OPAQUE_CHILD_METADATA_PTR:%[0-9]+]] = bitcast %swift.type* [[CHILD_METADATA_PTR]] to %swift.type**
-// CHECK: [[SUPER_METADATA_PTR:%[0-9]+]] = getelementptr inbounds %swift.type*, %swift.type** [[OPAQUE_CHILD_METADATA_PTR]], i32 1
-// CHECK: [[SUPER_METADATA:%[0-9]+]] = load %swift.type*, %swift.type** [[SUPER_METADATA_PTR]]
-// CHECK: [[OPAQUE_SUPER_METADATA_PTR:%[0-9]+]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%swift.type*)**
-// CHECK: [[FOO_VTABLE_SLOT:%[0-9]+]] = getelementptr inbounds void (%swift.type*)*, void (%swift.type*)** [[OPAQUE_SUPER_METADATA_PTR]]
-// CHECK: [[FOO_FN_PTR:%[0-9]+]] = load void (%swift.type*)*, void (%swift.type*)** [[FOO_VTABLE_SLOT]]
-// CHECK: call void

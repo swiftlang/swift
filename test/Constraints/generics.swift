@@ -173,7 +173,7 @@ class MyArrayBuffer<Element>: r22409190ManagedBuffer<UInt, Element> {
 
 // <rdar://problem/22459135> error: 'print' is unavailable: Please wrap your tuple argument in parentheses: 'print((...))'
 func r22459135() {
-  func h<S : Sequence where S.Iterator.Element : IntegerType>
+  func h<S : Sequence where S.Iterator.Element : Integer>
     (sequence: S) -> S.Iterator.Element {
     return 0
   }

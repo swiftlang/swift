@@ -5,18 +5,18 @@ import Swift
 @objc
 protocol P2 {
   func bar(x: Int)
+  static func pub(x: Int)
 }
 
 func existential(p2 : P2) {
-  _ = p2.bar // expected-error{{partial application of method in @objc protocol is not allowed}}
+  _ = p2.bar
+  _ = P2.bar
 }
 
 func archetype<T: P2>(p2 : T) {
-  _ = p2.bar // expected-error{{partial application of method in @objc protocol is not allowed}}
-}
-
-func archetypeMeta<T: P2>(p2 : T) {
-  _ = T.bar // expected-error {{partial application of method in @objc protocol is not allowed}}
+  _ = p2.bar
+  _ = T.bar
+  _ = T.pub
 }
 
 // rdar://problem/22012606 - test applications of subscript members of class-constrained protocols

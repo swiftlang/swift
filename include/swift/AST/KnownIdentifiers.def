@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file defines macros used for macro-metaprogramming with compiler-known
-// identifers.
+// identifiers.
 //
 //===----------------------------------------------------------------------===//
 

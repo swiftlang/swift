@@ -17,12 +17,13 @@ import ObjectiveC
 // Objective-C Primitive Types
 //===----------------------------------------------------------------------===//
 
+public typealias BooleanType = Swift.Boolean
 /// The Objective-C BOOL type.
 ///
 /// On 64-bit iOS, the Objective-C BOOL type is a typedef of C/C++
 /// bool. Elsewhere, it is "signed char". The Clang importer imports it as
 /// ObjCBool.
-public struct ObjCBool : BooleanType, BooleanLiteralConvertible {
+public struct ObjCBool : Boolean, BooleanLiteralConvertible {
 #if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
   // On OS X and 32-bit iOS, Objective-C's BOOL type is a "signed char".
   var _value: Int8
@@ -225,7 +226,7 @@ public var NO: ObjCBool {
 // for ObjCBool
 @_transparent
 @warn_unused_result
-public func && <T : BooleanType>(
+public func && <T : Boolean>(
   lhs: T, @autoclosure rhs: () -> ObjCBool
 ) -> Bool {
   return lhs.boolValue ? rhs().boolValue : false
@@ -233,7 +234,7 @@ public func && <T : BooleanType>(
 
 @_transparent
 @warn_unused_result
-public func || <T : BooleanType>(
+public func || <T : Boolean>(
   lhs: T, @autoclosure rhs: () -> ObjCBool
 ) -> Bool {
   return lhs.boolValue ? true : rhs().boolValue

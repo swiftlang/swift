@@ -160,7 +160,7 @@ void SILInstruction::dropAllReferences() {
   }
 
   // If we have a function ref inst, we need to especially drop its function
-  // argument so that it gets a proper ref decement.
+  // argument so that it gets a proper ref decrement.
   auto *FRI = dyn_cast<FunctionRefInst>(this);
   if (!FRI || !FRI->getReferencedFunction())
     return;

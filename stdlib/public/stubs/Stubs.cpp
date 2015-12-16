@@ -141,12 +141,16 @@ static int swift_snprintf_l(char *Str, size_t StrSize, locale_t Locale,
 
 template <typename T>
 static uint64_t swift_floatingPointToString(char *Buffer, size_t BufferLength,
-                                            T Value, const char *Format) {
+                                            T Value, const char *Format, 
+                                            bool Debug) {
   if (BufferLength < 32)
     swift::crash("swift_floatingPointToString: insufficient buffer size");
 
-  const int Precision = std::numeric_limits<T>::digits10;
-
+  int Precision = std::numeric_limits<T>::digits10;
+  if (Debug) {
+    Precision = std::numeric_limits<T>::max_digits10;
+  }
+  
   // Pass a null locale to use the C locale.
   int i = swift_snprintf_l(Buffer, BufferLength, /*locale=*/nullptr, Format,
                            Precision, Value);
@@ -170,21 +174,21 @@ static uint64_t swift_floatingPointToString(char *Buffer, size_t BufferLength,
 }
 
 extern "C" uint64_t swift_float32ToString(char *Buffer, size_t BufferLength,
-                                          float Value) {
+                                          float Value, bool Debug) {
   return swift_floatingPointToString<float>(Buffer, BufferLength, Value,
-                                            "%0.*g");
+                                            "%0.*g", Debug);
 }
 
 extern "C" uint64_t swift_float64ToString(char *Buffer, size_t BufferLength,
-                                          double Value) {
+                                          double Value, bool Debug) {
   return swift_floatingPointToString<double>(Buffer, BufferLength, Value,
-                                             "%0.*g");
+                                             "%0.*g", Debug);
 }
 
 extern "C" uint64_t swift_float80ToString(char *Buffer, size_t BufferLength,
-                                          long double Value) {
+                                          long double Value, bool Debug) {
   return swift_floatingPointToString<long double>(Buffer, BufferLength, Value,
-                                                  "%0.*Lg");
+                                                  "%0.*Lg", Debug);
 }
 
 /// \param[out] LinePtr Replaced with the pointer to the malloc()-allocated
@@ -216,7 +220,9 @@ extern "C" long double _swift_fmodl(long double lhs, long double rhs) {
 // This implementation is copied here to avoid a new dependency
 // on compiler-rt on Linux.
 // FIXME: rdar://14883575 Libcompiler_rt omits muloti4
-#if __arm64__ || !defined(__APPLE__)
+#if (defined(__APPLE__) && defined(__arm64__)) || \
+    (defined(__linux__) && defined(__x86_64__)) || \
+    (defined(__linux__) && defined(__aarch64__))
 
 typedef int      ti_int __attribute__ ((mode (TI)));
 extern "C"
@@ -259,6 +265,54 @@ __muloti4(ti_int a, ti_int b, int* overflow)
     return result;
 }
 
+#endif
+
+#if defined(__linux__) && defined(__arm__)
+// Similar to above, but with mulodi4.  Perhaps this is
+// something that shouldn't be done, and is a bandaid over
+// some other lower-level architecture issue that I'm
+// missing.  Perhaps relevant bug report:
+// FIXME: https://llvm.org/bugs/show_bug.cgi?id=14469
+typedef int      di_int __attribute__ ((mode (DI)));
+extern "C"
+di_int
+__mulodi4(di_int a, di_int b, int* overflow)
+{
+    const int N = (int)(sizeof(di_int) * CHAR_BIT);
+    const di_int MIN = (di_int)1 << (N-1);
+    const di_int MAX = ~MIN;
+    *overflow = 0;
+    di_int result = a * b;
+    if (a == MIN)
+    {
+        if (b != 0 && b != 1)
+            *overflow = 1;
+        return result;
+    }
+    if (b == MIN)
+    {
+        if (a != 0 && a != 1)
+            *overflow = 1;
+        return result;
+    }
+    di_int sa = a >> (N - 1);
+    di_int abs_a = (a ^ sa) - sa;
+    di_int sb = b >> (N - 1);
+    di_int abs_b = (b ^ sb) - sb;
+    if (abs_a < 2 || abs_b < 2)
+        return result;
+    if (sa == sb)
+    {
+        if (abs_a > MAX / abs_b)
+            *overflow = 1;
+    }
+    else
+    {
+        if (abs_a > MIN / -abs_b)
+            *overflow = 1;
+    }
+    return result;
+}
 #endif
 
 // We can't return Float80, but we can receive a pointer to one, so

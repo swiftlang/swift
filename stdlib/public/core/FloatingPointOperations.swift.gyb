@@ -56,7 +56,7 @@ func ==(lhs: FloatingPointClassification, rhs: FloatingPointClassification) -> B
 }
 
 /// A set of common requirements for Swift's floating point types.
-public protocol FloatingPointType : Strideable {
+public protocol FloatingPoint : Strideable {
   typealias _BitsType
 
   @warn_unused_result

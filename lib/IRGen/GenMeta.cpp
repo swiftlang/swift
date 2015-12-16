@@ -4279,21 +4279,6 @@ AbstractCallee irgen::getAbstractVirtualCallee(IRGenFunction &IGF,
                         naturalUncurry, naturalUncurry, ExtraData::None);
 }
 
-/// Find the function which will actually appear in the virtual table.
-static SILDeclRef findOverriddenFunction(IRGenModule &IGM,
-                                         SILDeclRef method) {
-  // 'method' is the most final method in the hierarchy which we
-  // haven't yet found a compatible override for.  'cur' is the method
-  // we're currently looking at.  Compatibility is transitive,
-  // so we can forget our original method and just keep going up.
-
-  SILDeclRef cur = method;
-  while ((cur = cur.getOverriddenVTableEntry())) {
-    method = cur;
-  }
-  return method;
-}
-
 /// Load the correct virtual function for the given class method.
 llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                                            llvm::Value *base,
@@ -4305,19 +4290,34 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     = cast<AbstractFunctionDecl>(method.getDecl());
 
   // Find the function that's actually got an entry in the metadata.
-  SILDeclRef overridden =
-    findOverriddenFunction(IGF.IGM, method);
+  SILDeclRef overridden = method.getBaseOverriddenVTableEntry();
 
   // Find the metadata.
   llvm::Value *metadata;
   if (useSuperVTable) {
+    auto instanceTy = baseType;
     if (auto metaTy = dyn_cast<MetatypeType>(baseType.getSwiftRValueType()))
-      baseType = SILType::getPrimitiveObjectType(metaTy.getInstanceType());
+      instanceTy = SILType::getPrimitiveObjectType(metaTy.getInstanceType());
 
-    metadata = emitClassHeapMetadataRef(IGF, baseType.getSwiftRValueType(),
-                                        MetadataValueType::TypeMetadata);
-    auto superField = emitAddressOfSuperclassRefInClassMetadata(IGF, metadata);
-    metadata = IGF.Builder.CreateLoad(superField);
+    if (IGF.IGM.isResilient(instanceTy.getClassOrBoundGenericClass(),
+                            ResilienceScope::Component) ||
+        IGF.IGM.Opts.ForceResilientSuperDispatch) {
+      // The derived type that is making the super call is resilient,
+      // for example we may be in an extension of a class outside of our
+      // resilience domain. So, we need to load the superclass metadata
+      // dynamically.
+
+      metadata = emitClassHeapMetadataRef(IGF, instanceTy.getSwiftRValueType(),
+                                          MetadataValueType::TypeMetadata);
+      auto superField = emitAddressOfSuperclassRefInClassMetadata(IGF, metadata);
+      metadata = IGF.Builder.CreateLoad(superField);
+    } else {
+      // Otherwise, we can directly load the statically known superclass's
+      // metadata.
+      auto superTy = instanceTy.getSuperclass(/*resolver=*/nullptr);
+      metadata = emitClassHeapMetadataRef(IGF, superTy.getSwiftRValueType(),
+                                          MetadataValueType::TypeMetadata);
+    }
   } else {
     if ((isa<FuncDecl>(methodDecl) && cast<FuncDecl>(methodDecl)->isStatic()) ||
         (isa<ConstructorDecl>(methodDecl) &&
@@ -4877,7 +4877,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   // The other known protocols aren't special at runtime.
   case KnownProtocolKind::Sequence:
   case KnownProtocolKind::IteratorProtocol:
-  case KnownProtocolKind::BooleanType:
+  case KnownProtocolKind::Boolean:
   case KnownProtocolKind::RawRepresentable:
   case KnownProtocolKind::Equatable:
   case KnownProtocolKind::Hashable:
@@ -4904,7 +4904,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::BuiltinStringLiteralConvertible:
   case KnownProtocolKind::BuiltinUTF16StringLiteralConvertible:
   case KnownProtocolKind::BuiltinUnicodeScalarLiteralConvertible:
-  case KnownProtocolKind::OptionSetType:
+  case KnownProtocolKind::OptionSet:
   case KnownProtocolKind::BridgedNSError:
     return SpecialProtocol::None;
   }

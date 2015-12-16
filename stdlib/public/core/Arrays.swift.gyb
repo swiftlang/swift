@@ -122,7 +122,7 @@ if True:
 /// property, these array types have a `capacity` that reflects their
 /// potential to store elements without reallocation, and when you
 /// know how many elements you'll store, you can call
-/// `reserveCapacity` to pre-emptively reallocate and prevent
+/// `reserveCapacity` to preemptively reallocate and prevent
 /// intermediate reallocations.
 ///
 /// Objective-C Bridge
@@ -207,7 +207,6 @@ public struct ${Self}<Element>
   /// Access the `index`th element. Reading is O(1).  Writing is
   /// ${O1}.
   public subscript(index: Int) -> Element {
-%if Self == 'Array':
     get {
       // This call may be hoisted or eliminated by the optimizer.  If
       // there is an inout violation, this value may be stale so needs to be 
@@ -223,21 +222,6 @@ public struct ${Self}<Element>
         index, wasNativeTypeChecked: wasNativeTypeChecked,
         matchingSubscriptCheck: token)
     }
-%elif Self == 'ContiguousArray':
-    addressWithNativeOwner {
-      _checkSubscript_native(index)
-      return (
-        UnsafePointer(_buffer.subscriptBaseAddress + index),
-        Builtin.castToNativeObject(_buffer.owner))
-    }
-%else:
-    addressWithOwner {
-      _checkSubscript_native(index)
-      return (
-        UnsafePointer(_buffer.subscriptBaseAddress + index),
-        Builtin.castToUnknownObject(_buffer.owner))
-    }
-%end
     mutableAddressWithPinnedNativeOwner {
       _makeMutableAndUniqueOrPinned() // makes the array native, too
       _checkSubscript_native(index)   
@@ -248,14 +232,22 @@ public struct ${Self}<Element>
   /// Access the `index`th element. Reading is O(1).  Writing is
   /// ${O1}.
   public subscript(index: Int) -> Element {
-    
-    addressWithNativeOwner {
-      _checkSubscript_native(index)
-      return (
-        UnsafePointer(_buffer.subscriptBaseAddress + index),
-        Builtin.castToNativeObject(_buffer.owner))
+    get {
+      // This call may be hoisted or eliminated by the optimizer.  If
+      // there is an inout violation, this value may be stale so needs to be
+      // checked again below.
+      let wasNativeTypeChecked = _hoistableIsNativeTypeChecked()
+
+      // Make sure the index is in range and wasNativeTypeChecked is
+      // still valid.
+      let token = _checkSubscript(
+        index, wasNativeTypeChecked: wasNativeTypeChecked)
+
+      return _getElement(
+        index, wasNativeTypeChecked: wasNativeTypeChecked,
+        matchingSubscriptCheck: token)
     }
-    
+
     mutableAddressWithPinnedNativeOwner {
       _makeMutableAndUniqueOrPinned()
       _checkSubscript_native(index)
@@ -370,7 +362,6 @@ public struct ${Self}<Element>
 % end
   }
 
-% if Self == 'Array':
   /// Check that the given `index` is valid for subscripting, i.e. `0
   /// ≤ index < count`.
   @_semantics("array.check_subscript")
@@ -379,14 +370,17 @@ public struct ${Self}<Element>
     index: Int, wasNativeTypeChecked: Bool
   ) -> _DependenceToken {
 #if _runtime(_ObjC)
+% if Self == 'Array':
     _buffer._checkInoutAndNativeTypeCheckedBounds(
       index, wasNativeTypeChecked: wasNativeTypeChecked)
+% else:
+    _buffer._checkValidSubscript(index)
+% end
 #else
     _buffer._checkValidSubscript(index)
 #endif
     return _DependenceToken()
   }
-% end
 
   /// Check that the given `index` is valid, i.e. `0 ≤ index ≤ count`.
   @_semantics("array.check_index")
@@ -468,7 +462,7 @@ public func _allocateUninitializedArray<Element>(_count: Builtin.Word)
     -> (Array<Element>, Builtin.RawPointer) {
   let count = Int(_count)
   if count > 0 {
-    // Doing the actual buffer alloction outside of the array.uninitialized
+    // Doing the actual buffer allocation outside of the array.uninitialized
     // semantics function enables stack propagation of the buffer.
     let bufferObject = ManagedBufferPointer<_ArrayBody, Element>(
       _uncheckedBufferClass: _ContiguousArrayStorage<Element>.self,
@@ -501,7 +495,7 @@ extension ${Self} : _ArrayType {
     _buffer = _Buffer()
   }
 
-  /// Construct from an arbitrary sequence with elements of type `Element`.
+  /// Construct from an arbitrary sequence of `Element`s.
   public init<
     S: Sequence where S.Iterator.Element == _Buffer.Element
   >(_ s: S) {
@@ -535,7 +529,7 @@ extension ${Self} : _ArrayType {
     _buffer = _Buffer()
     if count > 0 {
       // Creating a buffer instead of calling reserveCapacity saves doing an
-      // unneccessary uniqueness check. We disable inlining here to curb code
+      // unnecessary uniqueness check. We disable inlining here to curb code
       // growth.
       _buffer = ${Self}._allocateBufferUninitialized(count)
     }
@@ -619,7 +613,7 @@ extension ${Self} : _ArrayType {
   /// Reserve enough space to store `minimumCapacity` elements.
   ///
   /// - Postcondition: `capacity >= minimumCapacity` and the array has
-  ///   mutable contiguous storage.
+  ///   contiguous storage whose elements can be replaced in O(1).
   ///
   /// - Complexity: O(`self.count`).
   @_semantics("array.mutate_unknown")
@@ -711,7 +705,7 @@ extension ${Self} : _ArrayType {
     self += newElements
   }
 
-  /// Remove an element from the end of the ${Self} in O(1).
+  /// Remove and return the last element in O(1).
   ///
   /// - Requires: `count > 0`.
   public mutating func removeLast() -> Element {
@@ -982,7 +976,7 @@ extension ${Self} {
   }
 }
 
-/// Extend `lhs` with the elements of `rhs`.
+/// Append the contents of `rhs` to `lhs`.
 public func += <
   Element, S : Sequence
   where
@@ -999,7 +993,7 @@ public func += <
   _arrayAppendSequence(&lhs._buffer, rhs)
 }
 
-/// Extend `lhs` with the elements of `rhs`.
+/// Append the contents of `rhs` to `lhs`.
 public func += <
   Element, C : Collection
   where
@@ -1253,7 +1247,8 @@ internal func _arrayAppendSequence<
 // that are the same, e.g. Array<Int> and Array<Int>, not
 // ArraySlice<Int> and Array<Int>.
 
-/// Returns true if these arrays contain the same elements.
+/// Returns true iff `lhs` and `rhs` contain equal elements in the same
+/// order.
 @warn_unused_result
 public func == <Element : Equatable>(
   lhs: ${Self}<Element>, rhs: ${Self}<Element>
@@ -1283,7 +1278,8 @@ public func == <Element : Equatable>(
   return true
 }
 
-/// Returns true if the arrays do not contain the same elements.
+/// Returns true iff `lhs` and `rhs` do not contain equal elements in
+/// the same order.
 @warn_unused_result
 public func != <Element : Equatable>(
   lhs: ${Self}<Element>, rhs: ${Self}<Element>

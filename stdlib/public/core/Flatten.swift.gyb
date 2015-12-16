@@ -98,7 +98,7 @@ extension Sequence where Iterator.Element : Sequence {
   }
 }
 
-extension LazySequenceType
+extension LazySequenceProtocol
   where
   Elements.Iterator.Element == Iterator.Element,
   Iterator.Element : Sequence {

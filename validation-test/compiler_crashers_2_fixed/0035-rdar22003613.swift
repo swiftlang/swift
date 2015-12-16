@@ -7,7 +7,7 @@ func yyy<T, Result>(inout arg: T, @noescape _ body: U<T> -> Result) -> Result {
   return body(U<T>())
 }
 
-enum YYY: Int, OptionSetType {
+enum YYY: Int, OptionSet {
   case A = 1
   
   init(rawValue: Int) {

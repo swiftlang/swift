@@ -111,10 +111,10 @@ KNOWN_SETTINGS=(
     skip-build-watchos-device   ""               "set to skip building Swift stdlibs for Apple watchOS devices (i.e. build simulators only)"
     skip-build-watchos-simulator ""              "set to skip building Swift stdlibs for Apple watchOS simulators (i.e. build devices only)"
     skip-build-lldb             ""               "set to skip building LLDB"
-    skip-build-llbuild          ""               "set to skip buildling llbuild"
-    skip-build-swiftpm          ""               "set to skip buildling swiftpm"
-    skip-build-xctest           ""               "set to skip buildling xctest"
-    skip-build-foundation       ""               "set to skip buildling foundation"
+    skip-build-llbuild          ""               "set to skip building llbuild"
+    skip-build-swiftpm          ""               "set to skip building swiftpm"
+    skip-build-xctest           ""               "set to skip building xctest"
+    skip-build-foundation       ""               "set to skip building foundation"
     skip-test-cmark             ""               "set to skip testing CommonMark"
     skip-test-lldb              ""               "set to skip testing lldb"
     skip-test-swift             ""               "set to skip testing Swift"
@@ -181,7 +181,8 @@ KNOWN_SETTINGS=(
     darwin-toolchain-installer-cert    ""        "Installer Cert name to create installer pkg"
     darwin-toolchain-installer-package ""        "The path to installer pkg"
     build-jobs ""                                "The number of parallel build jobs to use"
-
+    darwin-toolchain-alias             "swift"   "Swift alias for toolchain"
+    export-compile-commands            ""        "set to generate JSON compilation databases for each build product"
 )
 
 function toupper() {
@@ -225,6 +226,12 @@ function set_deployment_target_based_options() {
     case $deployment_target in
         linux-x86_64)
             SWIFT_HOST_VARIANT_ARCH="x86_64"
+            ;;
+        linux-armv7)
+            SWIFT_HOST_VARIANT_ARCH="armv7"
+            ;;
+        linux-aarch64)
+            SWIFT_HOST_VARIANT_ARCH="aarch64"
             ;;
         freebsd-x86_64)
             SWIFT_HOST_VARIANT_ARCH="x86_64"
@@ -729,8 +736,8 @@ if [[ "$(uname -s)" == "Darwin" ]] ; then
     TOOLCHAIN_PREFIX=$(echo ${INSTALL_PREFIX} | sed -E 's/\/usr$//')
 fi
 
-# A list of deployment targets to compile the Swift host tools for, in case when
-# we can run the resulting binaries natively on the build machine.
+# A list of deployment targets to compile the Swift host tools for, in cases
+# where we can run the resulting binaries natively on the build machine.
 NATIVE_TOOLS_DEPLOYMENT_TARGETS=()
 
 # A list of deployment targets to cross-compile the Swift host tools for.
@@ -739,20 +746,29 @@ CROSS_TOOLS_DEPLOYMENT_TARGETS=()
 
 # Determine the native deployment target for the build machine, that will be
 # used to jumpstart the standard library build when cross-compiling.
-case "$(uname -s)" in
-    Linux)
+case "$(uname -s -m)" in
+    Linux\ x86_64)
         NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
             "linux-x86_64"
         )
         ;;
-
-    Darwin)
+    Linux\ armv7*)
+        NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
+            "linux-armv7"
+        )
+        ;;
+    Linux\ aarch64)
+        NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
+            "linux-aarch64"
+        )
+        ;;
+    Darwin\ x86_64)
         NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
             "macosx-x86_64"
         )
         ;;
 
-    FreeBSD)
+    FreeBSD\ amd64)
         NATIVE_TOOLS_DEPLOYMENT_TARGETS=(
             "freebsd-x86_64"
         )
@@ -804,15 +820,23 @@ function is_cross_tools_deployment_target() {
 # A list of deployment targets that we compile or cross-compile the
 # Swift standard library for.
 STDLIB_DEPLOYMENT_TARGETS=()
-
-case "$(uname -s)" in
-    Linux)
+case "$(uname -s -m)" in
+    Linux\ x86_64)
         STDLIB_DEPLOYMENT_TARGETS=(
             "linux-x86_64"
         )
         ;;
-
-    Darwin)
+    Linux\ armv7*)
+        STDLIB_DEPLOYMENT_TARGETS=(
+            "linux-armv7"
+        )
+        ;;
+    Linux\ aarch64)
+        STDLIB_DEPLOYMENT_TARGETS=(
+            "linux-aarch64"
+        )
+        ;;
+    Darwin\ x86_64)
         STDLIB_DEPLOYMENT_TARGETS=(
             "macosx-x86_64"
             "iphonesimulator-i386"
@@ -829,7 +853,7 @@ case "$(uname -s)" in
         )
         ;;
 
-    FreeBSD)
+    FreeBSD\ amd64)
         STDLIB_DEPLOYMENT_TARGETS=(
             "freebsd-x86_64"
         )
@@ -855,11 +879,23 @@ XCTEST_SOURCE_DIR="$WORKSPACE/swift-corelibs-xctest"
 FOUNDATION_SOURCE_DIR="$WORKSPACE/swift-corelibs-foundation"
 
 if [[ ! -d $CMARK_SOURCE_DIR ]]; then
-  echo "$CMARK_SOURCE_DIR not found. Attempting to clone ..."
-  git clone https://github.com/apple/swift-cmark.git "$CMARK_SOURCE_DIR" || \
-    (echo "Couldn't clone cmark. Please check README.md and visit https://github.com/apple/swift-cmark for details." && \
-    exit 1)
+    echo "Couldn't find cmark source directory."
+    exit 1
 fi
+
+# Migration code for the cmark repository.  Can be removed in February 2016.
+pushd ${CMARK_SOURCE_DIR} > /dev/null
+if git show 077611288ad990bf5962b3e1d844172392d3e8d8 > /dev/null 2>&1 ; then
+    echo ""
+    echo "You have an old copy of the cmark repository."
+    echo "You need to remove it and clone again:"
+    echo ""
+    echo " $ rm -rf ${CMARK_SOURCE_DIR}"
+    echo " $ ${SWIFT_SOURCE_DIR}/utils/update-checkout --clone"
+    echo ""
+    exit 1
+fi
+popd > /dev/null
 
 if [[ ! "$SKIP_BUILD_LLBUILD" && ! -d $LLBUILD_SOURCE_DIR ]]; then
     echo "Couldn't find llbuild source directory."
@@ -912,9 +948,11 @@ if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
 fi
 
 SWIFT_STDLIB_TARGETS=()
+SWIFT_PERFTEST_TARGETS=()
 SWIFT_TEST_TARGETS=()
 for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
     build_for_this_target=1
+    perftest_this_target=
     test_this_target=1
     case $deployment_target in
         linux-*)
@@ -927,10 +965,12 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
             ;;
         macosx-*)
             build_for_this_target=$(not $SKIP_BUILD_OSX)
+            perftest_this_target=$(not $SKIP_BUILD_OSX)
             test_this_target=$(not $SKIP_TEST_OSX)
             ;;
         iphoneos-*)
             build_for_this_target=$(not $SKIP_BUILD_IOS_DEVICE)
+            perftest_this_target=$(not $SKIP_BUILD_IOS_DEVICE)
             test_this_target=
             ;;
         iphonesimulator-*)
@@ -939,6 +979,7 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
             ;;
         appletvos-*)
             build_for_this_target=$(not $SKIP_BUILD_TVOS_DEVICE)
+            perftest_this_target=$(not $SKIP_BUILD_TVOS_DEVICE)
             test_this_target=
             ;;
         appletvsimulator-*)
@@ -947,6 +988,7 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
             ;;
         watchos-*)
             build_for_this_target=$(not $SKIP_BUILD_WATCHOS_DEVICE)
+            perftest_this_target=$(not $SKIP_BUILD_WATCHOS_DEVICE)
             test_this_target=
             ;;
         watchsimulator-*)
@@ -961,6 +1003,10 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
     if [[ "$build_for_this_target" ]] ; then
         SWIFT_STDLIB_TARGETS=(
             "${SWIFT_STDLIB_TARGETS[@]}" "swift-stdlib-${deployment_target}")
+    fi
+    if [[ "$perftest_this_target" ]] ; then
+        SWIFT_PERFTEST_TARGETS=(
+            "${SWIFT_PERFTEST_TARGETS[@]}" "swift-perftest-${deployment_target}")
     fi
     if [[ "$test_this_target" ]] ; then
         if [[ "$SKIP_TEST_VALIDATION" ]] ; then
@@ -977,13 +1023,14 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
               SWIFT_TEST_TARGETS=(
                  "${SWIFT_TEST_TARGETS[@]}" "check-swift-all-optimize-${deployment_target}")
             fi
-
         fi
     fi
 done
 
 echo "Building the standard library for: ${SWIFT_STDLIB_TARGETS[@]}"
-echo "Running Swift tests for: ${SWIFT_TEST_TARGETS[@]}"
+if [[ "${SWIFT_TEST_TARGETS[@]}" ]] && ! [[ "${SKIP_TEST_SWIFT}" ]]; then
+    echo "Running Swift tests for: ${SWIFT_TEST_TARGETS[@]}"
+fi
 echo
 
 # CMake options used for all targets, including LLVM/Clang
@@ -1001,10 +1048,30 @@ if [[ "${ENABLE_ASAN}" ]] ; then
     )
 fi
 
+if [[ "${EXPORT_COMPILE_COMMANDS}" ]] ; then
+    COMMON_CMAKE_OPTIONS=(
+        "${COMMON_CMAKE_OPTIONS[@]}"
+        -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+    )
+fi
+
 if [ -z "${HOST_CC}" ] ; then
     if [ "$(uname -s)" == "Darwin" ] ; then
         HOST_CC="$(xcrun_find_tool clang)"
         HOST_CXX="$(xcrun_find_tool clang++)"
+    elif [ "$(uname -s)" == "FreeBSD" ]; then
+        if [ $(sysctl -n kern.osreldate) -ge 1100000 ]; then
+            HOST_CC="clang"
+            HOST_CXX="clang++"
+        else
+            for clang_candidate_suffix in "38" "37" "36" "35" ; do
+                if which "clang${clang_candidate_suffix}" > /dev/null ; then
+                    HOST_CC="clang${clang_candidate_suffix}"
+                    HOST_CXX="clang++${clang_candidate_suffix}"
+                    break
+                fi
+            done
+        fi
     else
         for clang_candidate_suffix in "" "-3.8" "-3.7" "-3.6" "-3.5" ; do
             if which "clang${clang_candidate_suffix}" > /dev/null ; then
@@ -1205,7 +1272,7 @@ function llvm_c_flags() {
 
 function cmark_c_flags() {
     echo -n " $(common_cross_c_flags $1)"
-    if [[ $(is_cmake_release_build_type "${LLVM_BUILD_TYPE}") ]] ; then
+    if [[ $(is_cmake_release_build_type "${CMARK_BUILD_TYPE}") ]] ; then
         echo -n " -fno-stack-protector"
     fi
 }
@@ -1625,7 +1692,13 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
 
                 build_targets=(all "${SWIFT_STDLIB_TARGETS[@]}")
                 if [[ $(should_build_perftestsuite) == "TRUE" ]]; then
-                    build_targets=("${build_targets[@]}" benchmark-swift)
+                    native_swift_tools_path=$(build_directory macosx-x86_64 swift)/bin
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_EXEC:STRING="${native_swift_tools_path}/swiftc"
+                    )
+                    build_targets=("${build_targets[@]}"
+                                   "${SWIFT_PERFTEST_TARGETS[@]}")
                 fi
                 skip_build=$SKIP_BUILD_SWIFT
                 ;;
@@ -1964,12 +2037,15 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                     continue
                 fi
                 echo "--- Running tests for ${product} ---"
+                set -x
                 build_dir=$(build_directory $deployment_target $product)
                 XCTEST_BUILD_DIR=$(build_directory $deployment_target xctest)
                 pushd "${FOUNDATION_SOURCE_DIR}"
                 $NINJA_BIN TestFoundation
                 LD_LIBRARY_PATH="${INSTALL_DESTDIR}"/"${INSTALL_PREFIX}"/lib/swift/:"${build_dir}/Foundation":"${XCTEST_BUILD_DIR}":$LD_LIBRARY_PATH "${build_dir}"/TestFoundation/TestFoundation
                 popd
+                { set +x; } 2>/dev/null
+                echo "--- Finished tests for ${product} ---"
                 continue
                 ;;
             *)
@@ -2213,6 +2289,8 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
       ${PLISTBUDDY_BIN} -c "Add CFBundleIdentifier string '${DARWIN_TOOLCHAIN_BUNDLE_IDENTIFIER}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
       ${PLISTBUDDY_BIN} -c "Add ReportProblemURL string '${DARWIN_TOOLCHAIN_REPORT_URL}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
       ${PLISTBUDDY_BIN} -c "Add OverrideEnvironment::DYLD_LIBRARY_PATH string '${DARWIN_TOOLCHAIN_INSTALL_LOCATION}/usr/lib'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+      ${PLISTBUDDY_BIN} -c "Add Aliases array" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+      ${PLISTBUDDY_BIN} -c "Add Aliases:0 string '${DARWIN_TOOLCHAIN_ALIAS}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
       chmod a+r "${DARWIN_TOOLCHAIN_INFO_PLIST}"
 
       if [[ "${DARWIN_TOOLCHAIN_APPLICATION_CERT}" ]] ; then

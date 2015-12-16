@@ -59,7 +59,7 @@ public struct LazyFilterIterator<
 /// - Note: `s.lazy.filter { ... }`, for an arbitrary sequence `s`,
 ///   is a `LazyFilterSequence`.
 public struct LazyFilterSequence<Base : Sequence>
-  : LazySequenceType {
+  : LazySequenceProtocol {
   
   /// Return an *iterator* over the elements of this *sequence*.
   ///
@@ -183,7 +183,7 @@ public struct LazyFilterCollection<
       if _predicate(_base[first]) {
         break
       }
-      ++first
+      first._successorInPlace()
     }
     return LazyFilterIndex(
       _baseElements: _base, base: first, _include: _predicate)
@@ -221,7 +221,7 @@ public struct LazyFilterCollection<
   var _predicate: (Base.Iterator.Element)->Bool
 }
 
-extension LazySequenceType {
+extension LazySequenceProtocol {
   /// Return the elements of `self` that satisfy `predicate`.
   ///
   /// - Note: The elements of the result are computed on-demand, as

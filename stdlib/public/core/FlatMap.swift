@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-extension LazySequenceType {
+extension LazySequenceProtocol {
   /// Returns the concatenated results of mapping `transform` over
   /// `self`.  Equivalent to 
   ///

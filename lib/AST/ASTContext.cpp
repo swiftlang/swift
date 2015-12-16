@@ -122,8 +122,8 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.Optional<T>.None.
   EnumElementDecl *OptionalNoneDecl = nullptr;
 
-  /// The declaration of Swift.OptionSetType.
-  NominalTypeDecl *OptionSetTypeDecl = nullptr;
+  /// The declaration of Swift.OptionSet.
+  NominalTypeDecl *OptionSetDecl = nullptr;
 
   /// The declaration of Swift.ImplicitlyUnwrappedOptional<T>.Some.
   EnumElementDecl *ImplicitlyUnwrappedOptionalSomeDecl = nullptr;
@@ -176,6 +176,9 @@ struct ASTContext::Implementation {
 
   /// func _unimplemented_initializer(className: StaticString).
   FuncDecl *UnimplementedInitializerDecl = nullptr;
+
+  /// func _undefined<T>(msg: StaticString, file: StaticString, line: UInt) -> T
+  FuncDecl *UndefinedDecl = nullptr;
 
   /// func _stdlib_isOSVersionAtLeast(Builtin.Word,Builtin.Word, Builtin.word)
   //    -> Builtin.Int1
@@ -675,10 +678,10 @@ EnumElementDecl *ASTContext::getImplicitlyUnwrappedOptionalNoneDecl() const {
   return Impl.ImplicitlyUnwrappedOptionalNoneDecl;
 }
 
-NominalTypeDecl *ASTContext::getOptionSetTypeDecl() const {
-  if (!Impl.OptionSetTypeDecl)
-    Impl.OptionSetTypeDecl = findStdlibType(*this, "OptionSetType", 1);
-  return Impl.OptionSetTypeDecl;
+NominalTypeDecl *ASTContext::getOptionSetDecl() const {
+  if (!Impl.OptionSetDecl)
+    Impl.OptionSetDecl = findStdlibType(*this, "OptionSet", 1);
+  return Impl.OptionSetDecl;
 }
 
 NominalTypeDecl *ASTContext::getUnsafeMutablePointerDecl() const {
@@ -982,6 +985,21 @@ ASTContext::getUnimplementedInitializerDecl(LazyResolver *resolver) const {
   // FIXME: Check inputs and outputs.
 
   Impl.UnimplementedInitializerDecl = decl;
+  return decl;
+}
+
+FuncDecl *
+ASTContext::getUndefinedDecl(LazyResolver *resolver) const {
+  if (Impl.UndefinedDecl)
+    return Impl.UndefinedDecl;
+
+  // Look for the function.
+  CanType input, output;
+  auto decl = findLibraryIntrinsic(*this, "_undefined", resolver);
+  if (!decl)
+    return nullptr;
+
+  Impl.UndefinedDecl = decl;
   return decl;
 }
 

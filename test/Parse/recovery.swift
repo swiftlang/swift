@@ -175,7 +175,7 @@ func missingControllingExprInFor() {
   }
 
   // A trailing closure is not accepted for the condition.
-  for ; acceptsClosure { 42 }; { // expected-error{{does not conform to protocol 'BooleanType'}} expected-error{{expression resolves to an unused function}}
+  for ; acceptsClosure { 42 }; { // expected-error{{does not conform to protocol 'Boolean'}} expected-error{{expression resolves to an unused function}}
 // expected-error@-1{{expected ';' in 'for' statement}}
 // expected-error@-2{{braced block}}
   }

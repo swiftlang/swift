@@ -253,7 +253,7 @@ Consider a generic function like this:
 
 ::
 
-  func generateArray<T>(n : Int, generator : () -> T) -> T[]
+  func generateArray<T>(n : Int, generator : () -> T) -> [T]
 
 The function ``generator`` will be expected to store its result
 indirectly into an address passed in an implicit parameter.  There's
@@ -312,7 +312,7 @@ lowered using the pattern ``() -> T``, which eventually causes ``(Int,Int)
 lowering it with the pattern ``U -> V``; the result is that ``g.fn``
 has the following lowered type::
 
-  @callee_owned () -> @owned @callee_owned (@out Float, @in (Int,Int)) -> ()``.
+  @callee_owned () -> @owned @callee_owned (@out Float, @in (Int,Int)) -> ().
 
 As another example, suppose that ``h`` has type
 ``Generator<(Int, @inout Int) -> Float>``.  Neither ``(Int, @inout Int)``
@@ -799,7 +799,7 @@ are bound by the function's caller::
 
   sil @foo : $(Int) -> Int {
   bb0(%x : $Int):
-    %1 = return %x : $Int
+    return %x : $Int
   }
 
   sil @bar : $(Int, Int) -> () {
@@ -808,7 +808,7 @@ are bound by the function's caller::
     %1 = apply %foo(%x) : $(Int) -> Int
     %2 = apply %foo(%y) : $(Int) -> Int
     %3 = tuple ()
-    %4 = return %3 : $()
+    return %3 : $()
   }
 
 Declaration References
@@ -1630,7 +1630,7 @@ alloc_stack
 ```````````
 ::
 
-  sil-instruction ::= 'alloc_stack' sil-type
+  sil-instruction ::= 'alloc_stack' sil-type (',' debug-var-attr)*
 
   %1 = alloc_stack $T
   // %1#0 has type $*@local_storage T
@@ -1697,7 +1697,7 @@ alloc_box
 `````````
 ::
   
-  sil-instruction ::= 'alloc_box' sil-type
+  sil-instruction ::= 'alloc_box' sil-type (',' debug-var-attr)*
 
   %1 = alloc_box $T
   // %1 has two values:
@@ -1886,7 +1886,7 @@ debug_value
 
 ::
 
-  sil-instruction ::= debug_value sil-operand
+  sil-instruction ::= debug_value sil-operand (',' debug-var-attr)*
   
   debug_value %1 : $Int
   
@@ -1896,12 +1896,24 @@ the SILLocation attached to the debug_value instruction.
 
 The operand must have loadable type.
 
+::
+
+   debug-var-attr ::= 'var'
+   debug-var-attr ::= 'let'
+   debug-var-attr ::= 'name' string-literal
+   debug-var-attr ::= 'argno' integer-literal
+
+There are a number of attributes that provide details about the source
+variable that is being described, including the name of the
+variable. For function and closure arguments ``argno`` is the number
+of the function argument starting with 1.
+
 debug_value_addr
 ````````````````
 
 ::
 
-  sil-instruction ::= debug_value_addr sil-operand
+  sil-instruction ::= debug_value_addr sil-operand (',' debug-var-attr)*
   
   debug_value_addr %7 : $*SomeProtocol
   

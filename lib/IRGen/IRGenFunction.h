@@ -285,6 +285,10 @@ public:
   llvm::Value *emitUnownedTakeStrong(Address src, llvm::Type *resultType,
                                      ReferenceCounting style);
   void emitUnownedDestroy(Address addr, ReferenceCounting style);
+  llvm::Value *getUnownedExtraInhabitantIndex(Address src,
+                                              ReferenceCounting style);
+  void storeUnownedExtraInhabitant(llvm::Value *index, Address dest,
+                                   ReferenceCounting style);
 
   //   - weak references
   void emitWeakInit(llvm::Value *ref, Address dest, ReferenceCounting style);

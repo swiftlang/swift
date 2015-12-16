@@ -250,7 +250,8 @@ public:
 
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
-    AllocBoxInst *allocBox = SGF.B.createAllocBox(decl, lType, ArgNo);
+    AllocBoxInst *allocBox =
+        SGF.B.createAllocBox(decl, lType, {decl->isLet(), ArgNo});
     auto box = SILValue(allocBox, 0);
     auto addr = SILValue(allocBox, 1);
 
@@ -1155,12 +1156,9 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   }
   case DeclKind::Enum: {
     auto ed = cast<EnumDecl>(d);
-    // Emit the enum cases and derived conformance methods for the type.
+    // Emit derived conformance methods for the type.
     for (auto member : ed->getMembers()) {
-      if (auto elt = dyn_cast<EnumElementDecl>(member)) {
-        if (elt->hasArgumentType())
-          emitEnumConstructor(elt);
-      } else if (auto func = dyn_cast<FuncDecl>(member))
+      if (auto func = dyn_cast<FuncDecl>(member))
         emitFunction(func);
       else if (auto ctor = dyn_cast<ConstructorDecl>(member))
         emitConstructor(ctor);

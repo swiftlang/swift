@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name foo -emit-ir %s | FileCheck %s
+// RUN: %target-swift-frontend -use-native-super-method -module-name foo -emit-ir %s | FileCheck %s
 
 // -- Classes with generic bases can't go in the @objc_classes list, since
 //    they need runtime initialization before they're valid.

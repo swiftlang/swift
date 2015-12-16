@@ -164,6 +164,8 @@ inline SILInstruction *getSingleNonDebugUser(const V &value) {
   auto Range = getNonDebugUses(value);
   auto I = Range.begin(), E = Range.end();
   if (I == E) return nullptr;
+  if (std::next(I) != E)
+    return nullptr;
   return I->getUser();
 }
 

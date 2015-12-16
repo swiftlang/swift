@@ -221,3 +221,12 @@ func _unimplemented_initializer(className: StaticString,
 
   Builtin.int_trap()
 }
+
+@noreturn
+public // COMPILER_INTRINSIC
+func _undefined<T>(
+  @autoclosure message: () -> String = String(),
+  file: StaticString = __FILE__, line: UInt = __LINE__
+) -> T {
+  _assertionFailed("fatal error", message(), file, line)
+}

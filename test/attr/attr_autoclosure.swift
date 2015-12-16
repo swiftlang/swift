@@ -29,7 +29,7 @@ struct MethodHolder {
   func migrate2(a : Int, _ fp : @autoclosure () -> Int) {}    // expected-error {{@autoclosure is now an attribute of the parameter declaration, not its type}} {{26-26=@autoclosure }} {{33-46=}}
 }
 func migrate3(fp fp : @autoclosure () -> Int) {}    // expected-error {{@autoclosure is now an attribute of the parameter declaration, not its type}} {{15-15=@autoclosure }} {{23-36=}}
-public func || <T: BooleanType>(
+public func || <T: Boolean>(
   lhs: T, rhs: @autoclosure () -> Bool    // expected-error {{@autoclosure is now an attribute of the parameter declaration, not its type}} {{11-11=@autoclosure }} {{16-29=}}
   ) -> Bool {
     return lhs.boolValue ? true : rhs().boolValue

@@ -552,13 +552,14 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
 }
 
 void SILGenModule::emitEnumConstructor(EnumElementDecl *decl) {
+  // Enum element constructors are always emitted by need, so don't need
+  // delayed emission.
   SILDeclRef constant(decl);
-  emitOrDelayFunction(*this, constant, [this,constant,decl](SILFunction *f) {
-    preEmitFunction(constant, decl, f, decl);
-    PrettyStackTraceSILFunction X("silgen enum constructor", f);
-    SILGenFunction(*this, *f).emitEnumConstructor(decl);
-    postEmitFunction(constant, f);
-  });
+  SILFunction *f = getFunction(constant, ForDefinition);
+  preEmitFunction(constant, decl, f, decl);
+  PrettyStackTraceSILFunction X("silgen enum constructor", f);
+  SILGenFunction(*this, *f).emitEnumConstructor(decl);
+  postEmitFunction(constant, f);
 }
 
 SILFunction *SILGenModule::emitClosure(AbstractClosureExpr *ce) {

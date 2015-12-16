@@ -218,6 +218,12 @@ public:
   /// \returns true if an error occurred, false otherwise.
   bool addGenericParameter(GenericTypeParamDecl *GenericParam);
 
+  /// Add the requirements placed on the given abstract type parameter
+  /// to the given potential archetype.
+  ///
+  /// \returns true if an error occurred, false otherwise.
+  bool addGenericParameterRequirements(GenericTypeParamDecl *GenericParam);
+
   /// \brief Add a new generic parameter for which there may be requirements.
   ///
   /// \returns true if an error occurred, false otherwise.

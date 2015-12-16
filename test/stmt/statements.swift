@@ -54,7 +54,7 @@ func funcdecl5(a: Int, y: Int) {
   }
 
   // FIXME: This diagnostic is terrible - rdar://12939553
-  if x {}   // expected-error {{type 'Int' does not conform to protocol 'BooleanType'}}
+  if x {}   // expected-error {{type 'Int' does not conform to protocol 'Boolean'}}
 
   if true {
     if (B) {
@@ -94,7 +94,7 @@ struct infloopbool {
 }
 
 func infloopbooltest() {
-  if (infloopbool()) {} // expected-error {{type 'infloopbool' does not conform to protocol 'BooleanType'}}
+  if (infloopbool()) {} // expected-error {{type 'infloopbool' does not conform to protocol 'Boolean'}}
 }
 
 // test "builder" API style
@@ -403,7 +403,7 @@ func test_is_as_patterns() {
 func matching_pattern_recursion() {
   switch 42 {
   case {  // expected-error {{expression pattern of type '() -> ()' cannot match values of type 'Int'}}
-      for i in zs {  // expected-error {{use of unresolved identifier 'zs'}}
+      for i in zs {
       }
   }: break
   }
@@ -438,4 +438,8 @@ func for_loop_multi_iter() {
   }
 }
 
-
+// Errors in case syntax
+class
+case, // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{expected pattern}}
+case  // expected-error {{expected identifier after comma in enum 'case' declaration}} expected-error {{expected identifier in enum 'case' declaration}} expected-error {{enum 'case' is not allowed outside of an enum}} expected-error {{expected pattern}}
+// NOTE: EOF is important here to properly test a code path that used to crash the parser

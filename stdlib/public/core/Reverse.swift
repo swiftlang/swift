@@ -15,7 +15,7 @@ public protocol ReverseIndexType : BidirectionalIndex {
   
   /// A type that can represent the number of steps between pairs of
   /// `ReverseIndex` values where one value is reachable from the other.
-  typealias Distance: _SignedIntegerType = Base.Distance
+  typealias Distance: _SignedInteger = Base.Distance
 
   /// The successor position in the underlying (un-reversed)
   /// collection.

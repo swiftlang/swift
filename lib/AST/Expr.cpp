@@ -286,6 +286,7 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     LEAF_LVALUE_EXPR(DiscardAssignment)
     LEAF_LVALUE_EXPR(DynamicLookup)
     LEAF_LVALUE_EXPR(OpaqueValue)
+    LEAF_LVALUE_EXPR(EditorPlaceholder)
 
     COMPLETE_PHYSICAL_LVALUE_EXPR(AnyTry, getSubExpr())
     PARTIAL_PHYSICAL_LVALUE_EXPR(BindOptional, getSubExpr())
@@ -839,13 +840,6 @@ StringLiteralExpr::StringLiteralExpr(StringRef Val, SourceRange Range,
       unicode::isSingleUnicodeScalar(Val);
   StringLiteralExprBits.IsSingleExtendedGraphemeCluster =
       unicode::isSingleExtendedGraphemeCluster(Val);
-}
-
-void DeclRefExpr::setDeclRef(ConcreteDeclRef ref) {
-  if (auto spec = getSpecInfo())
-    spec->D = ref;
-  else
-    DOrSpecialized = ref;
 }
 
 void DeclRefExpr::setSpecialized() {

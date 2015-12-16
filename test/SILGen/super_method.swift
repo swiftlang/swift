@@ -9,7 +9,7 @@ class Parent {
 class Child : Parent {}
 
 class Grandchild : Child {
-  // CHECK: sil hidden @_TFC12super_method10Grandchild16onlyInGrandchildfT_T_
+  // CHECK-LABEL: sil hidden @_TFC12super_method10Grandchild16onlyInGrandchildfT_T_
   func onlyInGrandchild() {
     // CHECK: super_method %0 : $Grandchild, #Parent.onlyInParent!1 : Parent -> () -> ()
     super.onlyInParent()
@@ -17,9 +17,17 @@ class Grandchild : Child {
     super.finalOnlyInParent()
   }
 
-  // CHECK: sil hidden @_TFC12super_method10Grandchild3foofT_T_
+  // CHECK-LABEL: sil hidden @_TFC12super_method10Grandchild3foofT_T_
   override func foo() {
     // CHECK: super_method %0 : $Grandchild, #Parent.foo!1 : Parent -> () -> ()
+    super.foo()
+  }
+}
+
+class GreatGrandchild : Grandchild {
+  // CHECK-LABEL: sil hidden @_TFC12super_method15GreatGrandchild3foofT_T_ : $@convention(method) (@guaranteed GreatGrandchild) -> ()
+  override func foo() {
+    // CHECK: super_method {{%[0-9]+}} : $GreatGrandchild, #Grandchild.foo!1 : Grandchild -> () -> () , $@convention(method) (@guaranteed Grandchild) -> ()
     super.foo()
   }
 }

@@ -1164,11 +1164,31 @@ void Lexer::lexStringLiteral() {
       if (*TokStart == '\'') {
         // Complain about single-quote string and suggest replacement with
         // double-quoted equivalent.
-        // FIXME: Fixit should replace ['"'] with ["\""] (radar 22709931)
         StringRef orig(TokStart, CurPtr - TokStart);
         llvm::SmallString<32> replacement;
         replacement += '"';
-        replacement += orig.slice(1, orig.size() - 1);
+        std::string str = orig.slice(1, orig.size() - 1).str();
+        std::string quot = "\"";
+        size_t pos = 0;
+        while (pos != str.length()) {
+          if (str.at(pos) == '\\') {
+            if (str.at(pos + 1) == '\'') {
+                // Un-escape escaped single quotes.
+                str.replace(pos, 2, "'");
+                ++pos;
+            } else {
+                // Skip over escaped characters.
+                pos += 2;
+            }
+          } else if (str.at(pos) == '"') {
+            str.replace(pos, 1, "\\\"");
+            // Advance past the newly added ["\""].
+            pos += 2;
+          } else {
+            ++pos;
+          }
+        }
+        replacement += StringRef(str);
         replacement += '"';
         diagnose(TokStart, diag::lex_single_quote_string)
           .fixItReplaceChars(getSourceLoc(TokStart), getSourceLoc(CurPtr),
@@ -1259,9 +1279,13 @@ void Lexer::tryLexEditorPlaceholder() {
     if (Ptr[0] == '<' && Ptr[1] == '#')
       break;
     if (Ptr[0] == '#' && Ptr[1] == '>') {
-      // Found it. Flag it as error for the rest of the compiler pipeline and
-      // lex it as an identifier.
-      diagnose(TokStart, diag::lex_editor_placeholder);
+      // Found it. Flag it as error (or warning, if in playground mode) for the
+      // rest of the compiler pipeline and lex it as an identifier.
+      if (LangOpts.Playground) {
+        diagnose(TokStart, diag::lex_editor_placeholder_in_playground);
+      } else {
+        diagnose(TokStart, diag::lex_editor_placeholder);
+      }
       CurPtr = Ptr+2;
       formToken(tok::identifier, TokStart);
       return;

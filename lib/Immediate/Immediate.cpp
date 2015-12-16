@@ -25,7 +25,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Module.h"
 #include "swift/Frontend/Frontend.h"
-#include "swift/SILPasses/Passes.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Config/config.h"

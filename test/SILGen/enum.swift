@@ -23,12 +23,6 @@ enum Optionable {
   case mere(Int)
 }
 
-// CHECK-LABEL: sil hidden [transparent] @_TFO4enum10Optionable4merefMS0_FVS_3IntS0_
-// CHECK: bb0([[ARG:%.*]] : $Int, {{%.*}} : $@thin Optionable.Type):
-// CHECK-NEXT:   [[RES:%.*]] = enum $Optionable, #Optionable.mere!enumelt.1, [[ARG]] : $Int
-// CHECK-NEXT:   return [[RES]] : $Optionable
-// CHECK-NEXT: }
-
 // CHECK-LABEL: sil hidden @_TF4enum16Optionable_casesFVS_3IntT_
 func Optionable_cases(x: Int) {
 
@@ -43,6 +37,17 @@ func Optionable_cases(x: Int) {
   _ = Optionable.mere(x)
 }
 
+// CHECK-LABEL: sil shared [transparent] @_TFO4enum10Optionable4mereFMS0_FVS_3IntS0_
+// CHECK:        [[FN:%.*]] = function_ref @_TFO4enum10Optionable4merefMS0_FVS_3IntS0_
+// CHECK-NEXT:   [[METHOD:%.*]] = partial_apply [[FN]](%0)
+// CHECK-NEXT:   return [[METHOD]]
+// CHECK-NEXT: }
+
+// CHECK-LABEL: sil shared [transparent] @_TFO4enum10Optionable4merefMS0_FVS_3IntS0_
+// CHECK:        [[RES:%.*]] = enum $Optionable, #Optionable.mere!enumelt.1, %0 : $Int
+// CHECK-NEXT:   return [[RES]] : $Optionable
+// CHECK-NEXT: }
+
 protocol P {}
 struct S : P {}
 
@@ -52,15 +57,7 @@ enum AddressOnly {
   case phantom(S)
 }
 
-// CHECK-LABEL: sil hidden [transparent] @_TFO4enum11AddressOnly4merefMS0_FPS_1P_S0_ : $@convention(thin) (@out AddressOnly, @in P, @thin AddressOnly.Type) -> () {
-// CHECK: bb0([[RET:%.*]] : $*AddressOnly, [[DATA:%.*]] : $*P, {{%.*}} : $@thin AddressOnly.Type):
-// CHECK-NEXT:   [[RET_DATA:%.*]] = init_enum_data_addr [[RET]] : $*AddressOnly, #AddressOnly.mere!enumelt.1 // user: %4
-// CHECK-NEXT:   copy_addr [take] [[DATA]] to [initialization] [[RET_DATA]] : $*P
-// CHECK-NEXT:   inject_enum_addr [[RET]] : $*AddressOnly, #AddressOnly.mere!enumelt.1
-// CHECK:   return
-// CHECK-NEXT: }
-
-// CHECK-LABEL: sil hidden @_TF4enum17AddressOnly_casesFVS_1ST_ : $@convention(thin) (S) -> ()
+// CHECK-LABEL: sil hidden @_TF4enum17AddressOnly_casesFVS_1ST_
 func AddressOnly_cases(s: S) {
 
   // CHECK:       [[FN:%.*]] = function_ref @_TFO4enum11AddressOnly4mereFMS0_FPS_1P_S0_
@@ -90,7 +87,7 @@ func AddressOnly_cases(s: S) {
 
   // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin AddressOnly.Type
   // CHECK-NEXT:  [[PHANTOM:%.*]] = alloc_stack $AddressOnly
-  // CHECK-NEXT:  [[PAYLOAD:%.*]] = init_enum_data_addr %20#1 : $*AddressOnly, #AddressOnly.phantom!enumelt.1
+  // CHECK-NEXT:  [[PAYLOAD:%.*]] = init_enum_data_addr [[PHANTOM]]#1 : $*AddressOnly, #AddressOnly.phantom!enumelt.1
   // CHECK-NEXT:  store %0 to [[PAYLOAD]]
   // CHECK-NEXT:  inject_enum_addr [[PHANTOM]]#1 : $*AddressOnly, #AddressOnly.phantom!enumelt.1
   // CHECK-NEXT:  destroy_addr [[PHANTOM]]#1
@@ -99,6 +96,19 @@ func AddressOnly_cases(s: S) {
   _ = AddressOnly.phantom(s)
   // CHECK:       return
 }
+
+// CHECK-LABEL: sil shared [transparent] @_TFO4enum11AddressOnly4mereFMS0_FPS_1P_S0_
+// CHECK:       [[FN:%.*]] = function_ref @_TFO4enum11AddressOnly4merefMS0_FPS_1P_S0_
+// CHECK-NEXT:  [[METHOD:%.*]] = partial_apply [[FN]](%0)
+// CHECK-NEXT:  return [[METHOD]] : $@callee_owned (@out AddressOnly, @in P) -> ()
+// CHECK-NEXT: }
+
+// CHECK-LABEL: sil shared [transparent] @_TFO4enum11AddressOnly4merefMS0_FPS_1P_S0_
+// CHECK:        [[RET_DATA:%.*]] = init_enum_data_addr %0 : $*AddressOnly, #AddressOnly.mere!enumelt.1
+// CHECK-NEXT:   copy_addr [take] %1 to [initialization] [[RET_DATA]] : $*P
+// CHECK-NEXT:   inject_enum_addr %0 : $*AddressOnly, #AddressOnly.mere!enumelt.1
+// CHECK:        return
+// CHECK-NEXT: }
 
 enum PolyOptionable<T> {
   case nought
@@ -154,7 +164,13 @@ struct String { var ptr: Builtin.NativeObject }
 
 enum Foo { case A(P, String) }
 
-// CHECK-LABEL: sil hidden [transparent] @_TFO4enum3Foo1AfMS0_FTPS_1P_VS_6String_S0_ : $@convention(thin) (@out Foo, @in P, @owned String, @thin Foo.Type) -> () {
+// CHECK-LABEL: sil shared [transparent] @_TFO4enum3Foo1AFMS0_FTPS_1P_VS_6String_S0_
+// CHECK:         [[FN:%.*]] = function_ref @_TFO4enum3Foo1AfMS0_FTPS_1P_VS_6String_S0_
+// CHECK-NEXT:    [[METHOD:%.*]] = partial_apply [[FN]](%0)
+// CHECK-NEXT:    return [[METHOD]]
+// CHECK-NEXT:  }
+
+// CHECK-LABEL: sil shared [transparent] @_TFO4enum3Foo1AfMS0_FTPS_1P_VS_6String_S0_
 // CHECK:         [[PAYLOAD:%.*]] = init_enum_data_addr %0 : $*Foo, #Foo.A!enumelt.1
 // CHECK-NEXT:    [[LEFT:%.*]] = tuple_element_addr [[PAYLOAD]] : $*(P, String), 0
 // CHECK-NEXT:    [[RIGHT:%.*]] = tuple_element_addr [[PAYLOAD]] : $*(P, String), 1
@@ -163,3 +179,7 @@ enum Foo { case A(P, String) }
 // CHECK-NEXT:    inject_enum_addr %0 : $*Foo, #Foo.A!enumelt.1
 // CHECK:         return
 // CHECK-NEXT:  }
+
+func Foo_cases() {
+  _ = Foo.A
+}

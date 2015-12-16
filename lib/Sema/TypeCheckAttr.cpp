@@ -95,7 +95,7 @@ public:
   void visitTransparentAttr(TransparentAttr *attr);
   void visitMutationAttr(DeclAttribute *attr);
   void visitMutatingAttr(MutatingAttr *attr) { visitMutationAttr(attr); }
-  void visitNonMutatingAttr(NonMutatingAttr *attr)  { visitMutationAttr(attr); }
+  void visitNonMutatingAttr(NonMutatingAttr *attr) { visitMutationAttr(attr); }
   void visitDynamicAttr(DynamicAttr *attr);
 
   void visitOwnershipAttr(OwnershipAttr *attr) {
@@ -426,7 +426,7 @@ void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
   if (!VD->hasStorage())
     return diagnoseAndRemoveAttr(attr, diag::lazy_not_on_computed);
 
-  // lazy is not allowed on a lazily initiailized global variable or on a
+  // lazy is not allowed on a lazily initialized global variable or on a
   // static property (which is already lazily initialized).
   if (VD->isStatic() ||
       (varDC->isModuleScopeContext() &&

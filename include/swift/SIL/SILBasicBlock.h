@@ -17,6 +17,7 @@
 #ifndef SWIFT_SIL_BASICBLOCK_H
 #define SWIFT_SIL_BASICBLOCK_H
 
+#include "swift/Basic/Range.h"
 #include "swift/SIL/SILInstruction.h"
 
 namespace llvm {
@@ -30,6 +31,7 @@ class SILArgument;
 class SILBasicBlock :
 public llvm::ilist_node<SILBasicBlock>, public SILAllocated<SILBasicBlock> {
   friend class SILSuccessor;
+  friend class SILFunction;
 public:
   using InstListType = llvm::iplist<SILInstruction>;
 private:
@@ -233,10 +235,31 @@ public:
 
   /// \brief Returns true if \p BB is a successor of this block.
   bool isSuccessor(SILBasicBlock *BB) const {
-    for (auto &Succ : getSuccessors())
-      if (Succ.getBB() == BB)
-        return true;
-    return false;
+    auto Range = getSuccessorBlocks();
+    return any_of(Range, [&BB](const SILBasicBlock *SuccBB) -> bool {
+      return BB == SuccBB;
+    });
+  }
+
+  using SuccessorBlockListTy =
+    TransformRange<SuccessorListTy,
+                   std::function<SILBasicBlock *(const SILSuccessor &)>>;
+  using ConstSuccessorBlockListTy =
+    TransformRange<ConstSuccessorListTy,
+                   std::function<const SILBasicBlock *(const SILSuccessor &)>>;
+
+  /// Return the range of SILBasicBlocks that are successors of this block.
+  SuccessorBlockListTy getSuccessorBlocks() {
+    using FuncTy = std::function<SILBasicBlock *(const SILSuccessor &)>;
+    FuncTy F(&SILSuccessor::getBB);
+    return makeTransformRange(getSuccessors(), F);
+  }
+
+  /// Return the range of SILBasicBlocks that are successors of this block.
+  ConstSuccessorBlockListTy getSuccessorBlocks() const {
+    using FuncTy = std::function<const SILBasicBlock *(const SILSuccessor &)>;
+    FuncTy F(&SILSuccessor::getBB);
+    return makeTransformRange(getSuccessors(), F);
   }
 
   using pred_iterator = SILSuccessorIterator;
@@ -247,6 +270,12 @@ public:
 
   iterator_range<pred_iterator> getPreds() const {
     return {pred_begin(), pred_end() };
+  }
+
+  bool isPredecessor(SILBasicBlock *BB) const {
+    return any_of(getPreds(), [&BB](const SILBasicBlock *PredBB) -> bool {
+      return BB == PredBB;
+    });
   }
 
   SILBasicBlock *getSinglePredecessor() {

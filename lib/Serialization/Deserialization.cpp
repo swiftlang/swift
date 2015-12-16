@@ -1486,7 +1486,7 @@ Module *ModuleFile::getModule(ArrayRef<Identifier> name) {
 }
 
 
-/// Translate from the Serialization assocativity enum values to the AST
+/// Translate from the Serialization associativity enum values to the AST
 /// strongly-typed enum.
 ///
 /// The former is guaranteed to be stable, but may not reflect this version of
@@ -2238,8 +2238,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     // A polymorphic constructor type needs to refer to the constructor to get
     // its generic parameters.
     ctor->setType(getType(signatureID));
-    if (auto interfaceType = getType(interfaceID))
+    if (auto interfaceType = getType(interfaceID)) {
+      if (auto genericFnType = interfaceType->getAs<GenericFunctionType>())
+        ctor->setGenericSignature(genericFnType->getGenericSignature());
       ctor->setInterfaceType(interfaceType);
+    }
 
     // Set the initializer type of the constructor.
     auto allocType = ctor->getType();
@@ -2480,8 +2483,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     fn->setType(signature);
 
     // Set the interface type.
-    if (auto interfaceType = getType(interfaceTypeID))
+    if (auto interfaceType = getType(interfaceTypeID)) {
+      if (auto genericFnType = interfaceType->getAs<GenericFunctionType>())
+        fn->setGenericSignature(genericFnType->getGenericSignature());
       fn->setInterfaceType(interfaceType);
+    }
 
     SmallVector<Pattern *, 16> patternBuf;
     while (Pattern *pattern = maybeReadPattern())

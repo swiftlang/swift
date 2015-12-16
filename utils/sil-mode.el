@@ -162,7 +162,7 @@
 (unless sil-mode-syntax-table
     (progn
       (setq sil-mode-syntax-table (make-syntax-table))
-      (mapcar (function (lambda (n)
+      (mapc (function (lambda (n)
                           (modify-syntax-entry (aref n 0)
                                                (aref n 1)
                                                sil-mode-syntax-table)))

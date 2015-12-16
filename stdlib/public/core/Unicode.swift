@@ -735,22 +735,22 @@ internal func _transcodeSomeUTF16AsUTF8<
   where
   Input.Iterator.Element == UInt16>(
   input: Input, _ startIndex: Input.Index
-) -> (Input.Index, _StringCore.UTF8Chunk) {
-  typealias UTF8Chunk = _StringCore.UTF8Chunk
+) -> (Input.Index, _StringCore._UTF8Chunk) {
+  typealias _UTF8Chunk = _StringCore._UTF8Chunk
 
   let endIndex = input.endIndex
-  let utf8Max = sizeof(UTF8Chunk.self)
-  var result: UTF8Chunk = 0
+  let utf8Max = sizeof(_UTF8Chunk.self)
+  var result: _UTF8Chunk = 0
   var utf8Count = 0
   var nextIndex = startIndex
   while nextIndex != input.endIndex && utf8Count != utf8Max {
     let u = UInt(input[nextIndex])
-    let shift = UTF8Chunk(utf8Count * 8)
+    let shift = _UTF8Chunk(utf8Count * 8)
     var utf16Length: Input.Index.Distance = 1
 
     if _fastPath(u <= 0x7f) {
-      result |= UTF8Chunk(u) << shift
-      ++utf8Count
+      result |= _UTF8Chunk(u) << shift
+      utf8Count += 1
     } else {
       var scalarUtf8Length: Int
       var r: UInt
@@ -948,7 +948,7 @@ extension UTF16 {
         break loop
       case .Error:
         if !repairIllFormedSequences {
-          return .None
+          return nil
         }
         isAscii = false
         count += width(UnicodeScalar(0xfffd))

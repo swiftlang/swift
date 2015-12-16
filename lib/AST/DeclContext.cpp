@@ -250,8 +250,8 @@ GenericSignature *DeclContext::getGenericSignatureOfContext() const {
 
   case DeclContextKind::AbstractFunctionDecl: {
     auto *AFD = cast<AbstractFunctionDecl>(this);
-    if (auto GFT = AFD->getInterfaceType()->getAs<GenericFunctionType>())
-      return GFT->getGenericSignature();
+    if (auto genericSig = AFD->getGenericSignature())
+      return genericSig;
       
     // If we're within a type context, pick up the generic signature
     // of that context.
@@ -404,10 +404,11 @@ DeclContext *DeclContext::getModuleScopeContext() const {
 
 /// Determine whether the given context is generic at any level.
 bool DeclContext::isGenericContext() const {
-  for (const DeclContext *dc = this; ; dc = dc->getParent() ) {
+  for (const DeclContext *dc = this; ; dc = dc->getParent()) {
     switch (dc->getContextKind()) {
     case DeclContextKind::Module:
     case DeclContextKind::FileUnit:
+    case DeclContextKind::TopLevelCodeDecl:
       return false;
 
     case DeclContextKind::Initializer:
@@ -419,10 +420,6 @@ bool DeclContext::isGenericContext() const {
     case DeclContextKind::AbstractFunctionDecl:
       if (cast<AbstractFunctionDecl>(dc)->getGenericParams())
         return true;
-      continue;
-
-    case DeclContextKind::TopLevelCodeDecl:
-      // Check parent context.
       continue;
 
     case DeclContextKind::NominalTypeDecl:
@@ -438,6 +435,17 @@ bool DeclContext::isGenericContext() const {
     llvm_unreachable("bad decl context kind");
   }
   llvm_unreachable("illegal declcontext hierarchy");
+}
+
+/// Determine whether the given context nested inside a generic type context
+/// with no local contexts in between.
+bool DeclContext::isGenericTypeContext() const {
+  for (const auto *dc = this; dc->isTypeContext(); dc = dc->getParent()) {
+    if (dc->isInnermostContextGeneric())
+      return true;
+  }
+  
+  return false;
 }
 
 /// Determine whether the innermost context is generic.

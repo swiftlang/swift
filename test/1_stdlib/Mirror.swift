@@ -21,6 +21,14 @@
 
 import StdlibUnittest
 
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 var mirrors = TestSuite("Mirrors")
 
 extension Mirror {
@@ -55,7 +63,7 @@ func find(substring: String, within domain: String) -> String.Index? {
   if (domainCount < substringCount) { return nil }
   var sliceStart = domain.startIndex
   var sliceEnd = domain.startIndex.advancedBy(substringCount)
-  for var i = 0;; ++i  {
+  for var i = 0;; ++i {
     if domain[sliceStart..<sliceEnd] == substring {
       return sliceStart
     }

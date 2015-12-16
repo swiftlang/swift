@@ -48,10 +48,30 @@ def update_working_copy(repo_path):
         if os.path.isdir(os.path.join(".git", "svn")):
             update_git_svn(repo_path)
         elif os.path.isdir(".git"):
-            check_call([ "git", "pull" ])
+            check_call([ "git", "pull", "--rebase" ])
         else:
             check_call([ "svn", "update" ])
 
+def obtain_additional_swift_sources(opts = {'with_ssh': False}):
+    additional_repos = {
+        'llvm': 'apple/swift-llvm',
+        'clang': 'apple/swift-clang',
+        'lldb': 'apple/swift-lldb',
+        'cmark': 'apple/swift-cmark',
+        'llbuild': 'apple/swift-llbuild',
+        'swiftpm': 'apple/swift-package-manager',
+        'swift-corelibs-xctest': 'apple/swift-corelibs-xctest',
+        'swift-corelibs-foundation': 'apple/swift-corelibs-foundation'
+    }
+    for dir_name, repo in additional_repos.iteritems():
+        with WorkingDirectory(SWIFT_SOURCE_ROOT):
+            if not os.path.isdir(os.path.join(dir_name, ".git")):
+                print("--- Cloning '" + dir_name + "' ---")
+                if opts['with_ssh'] == True:
+                    remote = "git@github.com:" + repo + '.git'
+                else:
+                    remote = "https://github.com/" + repo + '.git'
+                check_call(['git', 'clone', remote, dir_name])
 
 def main():
     parser = argparse.ArgumentParser(
@@ -63,7 +83,21 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     parser.add_argument("-a", "--all",
         help="also update checkouts of llbuild, LLVM, and Clang",
         action="store_true")
+    parser.add_argument("--clone",
+        help="Obtain Sources for Swift and Related Projects",
+        action="store_true")
+    parser.add_argument("--clone-with-ssh",
+        help="Obtain Sources for Swift and Related Projects via SSH",
+        action="store_true")
     args = parser.parse_args()
+
+    if args.clone:
+        obtain_additional_swift_sources()
+        return 0
+
+    if args.clone_with_ssh:
+        obtain_additional_swift_sources({'with_ssh': True})
+        return 0
 
     if args.all:
         update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "llbuild"))
