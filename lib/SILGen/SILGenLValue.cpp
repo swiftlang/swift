@@ -1529,8 +1529,7 @@ static ArrayRef<Substitution>
 getNonMemberVarDeclSubstitutions(SILGenFunction &gen, VarDecl *var) {
   ArrayRef<Substitution> substitutions;
   if (auto genericParams
-      = gen.SGM.Types.getEffectiveGenericParamsForContext(
-                                                      var->getDeclContext()))
+      = var->getDeclContext()->getGenericParamsOfContext())
     substitutions =
         genericParams->getForwardingSubstitutions(gen.getASTContext());
   return substitutions;
