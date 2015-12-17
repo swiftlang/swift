@@ -711,50 +711,11 @@ Objective-C ``Protocol`` objects. The layout is as follows:
 Heap Objects
 ------------
 
-Swift heap objects share a common header for reference counting by the
-runtime and are used for the following:
-
-- Swift class instances
-- Boxes, e.g. for closure captures or indirect enum cases
-- Thick function contexts
-- Blocks
-- Metatype instances
-- Opaque value buffers, e.g. for values that are too large to fit into
-  existential containers
+Heap Metadata
+~~~~~~~~~~~~~
 
 Heap Object Header
 ~~~~~~~~~~~~~~~~~~
-
-**Objective-C Heap Objects**
-
-Objective-C objects start with just the following:
-
-* The so-called "isa", for use in finding the Class object.
-  This may not necesarily be a pointer.
-
-**Swift Heap Objects**
-
-Swift Heap Objects start with the following items:
-
-* The pointer to the metadata for this object.
-* The 32-bit *strong reference count* for this object.
-
-  The strong reference count uses the two least significant bits as
-  flags:
-
-  Bit 0: The *pinned* marker. This is used by the Swift runtime to
-  prevent changes in the reference count.
-
-  Bit 1: The *deallocating* marker. This is used by the Swift runtime to
-  indicate that the object is being deallocated.
-
-* The 32-bit *weak reference count* for this object.
-
-As you can see, a Swift heap object is offset-compatible with an
-Objective-C object, although the reference counts for Swift objects are
-stored inline as fields instead of packed into the isa or in a side
-table.
-
 
 Mangling
 --------
