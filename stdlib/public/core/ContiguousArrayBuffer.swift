@@ -609,7 +609,9 @@ internal func _copyCollectionToNativeArrayBuffer<
   var i = source.startIndex
   for _ in 0..<count {
     // FIXME(performance): use _initializeTo().
-    (p++).initializeMemory(source[i++])
+    p.initializeMemory(source[i])
+    i._successorInPlace()
+    p._successorInPlace()
   }
   _expectEnd(i, source)
   return result
@@ -664,9 +666,10 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   mutating func addWithExistingCapacity(element: Element) {
     _sanityCheck(remainingCapacity > 0,
       "_UnsafePartiallyInitializedContiguousArrayBuffer has no more capacity")
-    remainingCapacity--
+    remainingCapacity -= 1
 
-    (p++).initializeMemory(element)
+    p.initializeMemory(element)
+    p += 1
   }
 
   /// Finish initializing the buffer, adjusting its count to the final

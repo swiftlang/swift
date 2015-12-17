@@ -206,7 +206,7 @@ static bool hasMetadataPattern(IRGenModule &IGM, NominalTypeDecl *theDecl) {
 
 /// Attempts to return a constant heap metadata reference for a
 /// nominal type.
-llvm::Constant *irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
+llvm::Constant *irgen::tryEmitConstantTypeMetadataRef(IRGenModule &IGM,
                                                       CanType type) {
   auto theDecl = type->getAnyNominal();
   assert(theDecl && "emitting constant metadata ref for non-nominal type?");
@@ -3029,7 +3029,7 @@ namespace {
     
     bool addReferenceToType(CanType type) {
       if (llvm::Constant *metadata
-            = tryEmitConstantHeapMetadataRef(IGM, type)) {
+            = tryEmitConstantTypeMetadataRef(IGM, type)) {
         addWord(metadata);
         return true;
       } else {
@@ -4300,8 +4300,7 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
       instanceTy = SILType::getPrimitiveObjectType(metaTy.getInstanceType());
 
     if (IGF.IGM.isResilient(instanceTy.getClassOrBoundGenericClass(),
-                            ResilienceScope::Component) ||
-        IGF.IGM.Opts.ForceResilientSuperDispatch) {
+                            ResilienceScope::Component)) {
       // The derived type that is making the super call is resilient,
       // for example we may be in an extension of a class outside of our
       // resilience domain. So, we need to load the superclass metadata

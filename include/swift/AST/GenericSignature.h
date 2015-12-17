@@ -202,9 +202,10 @@ public:
   /// Determine the superclass bound on the given dependent type.
   Type getSuperclassBound(Type type, ModuleDecl &mod);
 
+  using ConformsToArray = SmallVector<ProtocolDecl *, 2>;
   /// Determine the set of protocols to which the given dependent type
   /// must conform.
-  SmallVector<ProtocolDecl *, 2> getConformsTo(Type type, ModuleDecl &mod);
+  ConformsToArray getConformsTo(Type type, ModuleDecl &mod);
 
   /// Determine whether the given dependent type is equal to a concrete type.
   bool isConcreteType(Type type, ModuleDecl &mod);

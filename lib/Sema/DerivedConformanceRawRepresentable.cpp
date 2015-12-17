@@ -318,7 +318,7 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   initDecl->setBodySynthesizer(&deriveBodyRawRepresentable_init);
 
   // Compute the type of the initializer.
-  GenericParamList *genericParams = nullptr;
+  GenericParamList *genericParams = initDecl->getGenericParamsOfContext();
   
   TupleTypeElt element(rawType, C.Id_rawValue);
   auto argType = TupleType::get(element, C);
@@ -326,7 +326,8 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   auto interfaceArgType = TupleType::get(interfaceElement, C);
   
   Type type = FunctionType::get(argType, retTy);
-  Type selfType = initDecl->computeSelfType(&genericParams);
+
+  Type selfType = initDecl->computeSelfType();
   Type selfMetatype = MetatypeType::get(selfType->getInOutObjectType());
   
   Type allocType;
@@ -359,8 +360,8 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
                                              interfaceType,
                                              FunctionType::ExtInfo());
   } else {
-    allocIfaceType = allocType;
-    initIfaceType = initType;
+    allocIfaceType = FunctionType::get(selfMetatype, type);
+    initIfaceType = FunctionType::get(selfType, type);
   }
   initDecl->setInterfaceType(allocIfaceType);
   initDecl->setInitializerInterfaceType(initIfaceType);

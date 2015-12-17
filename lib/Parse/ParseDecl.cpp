@@ -1159,6 +1159,115 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                                       rParenLoc, false));
     break;
     }
+
+  case DAK_MigrationId: {
+    if (Tok.isNot(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    StringRef ident;
+    StringRef patternId;
+    SourceLoc lParenLoc = consumeToken();
+
+    // If we don't have a string, complain.
+    if (Tok.isNot(tok::string_literal)) {
+      diagnose(Tok, diag::attr_expected_string_literal, AttrName);
+      if (Tok.isNot(tok::r_paren))
+        skipUntil(tok::r_paren);
+      consumeIf(tok::r_paren);
+      return false;
+    }
+
+    // Dig out the string.
+    auto string = getStringLiteralIfNotInterpolated(*this, Loc, Tok,
+                                                    AttrName);
+    consumeToken(tok::string_literal);
+    if (!string)
+      return false;
+    ident = string.getValue();
+    consumeIf(tok::comma);
+
+    bool invalid = false;
+    do {
+      // If we see a closing parenthesis,
+      if (Tok.is(tok::r_paren))
+        break;
+
+      if (Tok.isNot(tok::identifier)) {
+        diagnose(Tok, diag::attr_migration_id_expected_name);
+        if (Tok.isNot(tok::r_paren))
+          skipUntil(tok::r_paren);
+        consumeIf(tok::r_paren);
+        invalid = true;
+        break;
+      }
+
+      // Consume the identifier.
+      StringRef name = Tok.getText();
+      SourceLoc nameLoc = consumeToken();
+      bool known = (name == "pattern");
+
+      // If we don't have the '=', complain.
+      SourceLoc equalLoc;
+      if (!consumeIf(tok::equal, equalLoc)) {
+        if (known)
+          diagnose(Tok, diag::attr_migration_id_expected_eq, name);
+        else
+          diagnose(Tok, diag::attr_migration_id_unknown_parameter, name);
+        continue;
+      }
+
+
+      // If we don't have a string, complain.
+      if (Tok.isNot(tok::string_literal)) {
+        diagnose(Tok, diag::attr_migration_id_expected_string, name);
+        if (Tok.isNot(tok::r_paren))
+          skipUntil(tok::r_paren);
+        consumeIf(tok::r_paren);
+        invalid = true;
+        break;
+      }
+
+      // Dig out the string.
+      auto param_string = getStringLiteralIfNotInterpolated(*this, nameLoc, Tok,
+                                                            name.str());
+      consumeToken(tok::string_literal);
+      if (!param_string) {
+        continue;
+      }
+
+      if (!known) {
+        diagnose(nameLoc, diag::attr_migration_id_unknown_parameter,
+                 name);
+        continue;
+      }
+
+      if (!patternId.empty()) {
+        diagnose(nameLoc, diag::attr_migration_id_duplicate_parameter,
+                 name);
+      }
+
+      patternId = param_string.getValue();
+    } while (consumeIf(tok::comma));
+
+    // Parse the closing ')'.
+    SourceLoc rParenLoc;
+    if (Tok.isNot(tok::r_paren)) {
+      parseMatchingToken(tok::r_paren, rParenLoc,
+                         diag::attr_migration_id_expected_rparen,
+                         lParenLoc);
+    }
+    if (Tok.is(tok::r_paren)) {
+      rParenLoc = consumeToken();
+    }
+
+    Attributes.add(new (Context) MigrationIdAttr(AtLoc, Loc, lParenLoc,
+                                                 ident, patternId,
+                                                 rParenLoc, false));
+    break;
+    }
   }
 
   if (DuplicateAttribute) {
@@ -4951,7 +5060,23 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   bool AllowTopLevel = Flags.contains(PD_AllowTopLevel);
 
   if (!Tok.isAnyOperator() && !Tok.is(tok::exclaim_postfix)) {
-    diagnose(Tok, diag::expected_operator_name_after_operator);
+    // A common error is to try to define an operator with something in the
+    // unicode plane considered to be an operator, or to try to define an
+    // operator like "not".  Diagnose this specifically.
+    if (Tok.is(tok::identifier))
+      diagnose(Tok, diag::identifier_when_expecting_operator,
+               Context.getIdentifier(Tok.getText()));
+    else
+      diagnose(Tok, diag::expected_operator_name_after_operator);
+
+    // To improve recovery, check to see if we have a { right after this token.
+    // If so, swallow until the end } to avoid tripping over the body of the
+    // malformed operator decl.
+    if (peekToken().is(tok::l_brace)) {
+      consumeToken();
+      skipSingle();
+    }
+
     return nullptr;
   }
 

@@ -712,3 +712,34 @@ bb3:                                              // Preds: bb1 bb2
   return %3 : $()                                // id: %17
 }
 
+// Check that we are not crashing on arithmetic of different kinds
+// that makes formulas of different types.
+sil hidden @mixed_types : $@convention(thin) (Int8) -> () {
+bb0(%0 : $Int8):
+  %1 = integer_literal $Builtin.Int8, -128
+  %2 = struct_extract %0 : $Int8, #Int8._value
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = builtin "smul_with_overflow_Int8"(%2 : $Builtin.Int8, %1 : $Builtin.Int8, %3 : $Builtin.Int1) : $(Builtin.Int8, Builtin.Int1)
+  %5 = tuple_extract %4 : $(Builtin.Int8, Builtin.Int1), 1
+  cond_fail %5 : $Builtin.Int1
+
+  %v0 = integer_literal $Builtin.Int32, 128
+  %v1 = integer_literal $Builtin.Int32, 128
+  %v4 = builtin "smul_with_overflow_Int32"(%v1 : $Builtin.Int32, %v0 : $Builtin.Int32, %3 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %v5 = tuple_extract %v4 : $(Builtin.Int32, Builtin.Int1), 1
+  cond_fail %v5 : $Builtin.Int1
+
+
+  %g0 = integer_literal $Builtin.Int64, 2
+  %g1 = integer_literal $Builtin.Int64, 1
+  %g3 = builtin "cmp_slt_Int64"(%g0 : $Builtin.Int64, %g1 : $Builtin.Int64) : $Builtin.Int1
+  cond_fail %g3 : $Builtin.Int1
+
+  %t0 = integer_literal $Builtin.Int32, 2
+  %t1 = integer_literal $Builtin.Int32, 1
+  %t3 = builtin "cmp_slt_Int32"(%t0 : $Builtin.Int32, %t1 : $Builtin.Int32) : $Builtin.Int1
+  cond_fail %t3 : $Builtin.Int1
+
+  %ret = tuple ()
+  return %ret : $()
+}

@@ -26,7 +26,7 @@ func getMandelbrotIterations(c: Complex, _ maxIterations: Int) -> Int {
   var z = Complex() 
   while (n < maxIterations && z.magnitude() < 4.0) {
     z = z*z + c
-    ++n
+    n += 1
   }
   return n
 }

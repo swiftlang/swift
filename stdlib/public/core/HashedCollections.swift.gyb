@@ -723,7 +723,7 @@ public func == <Element : Hashable>(lhs: Set<Element>, rhs: Set<Element>) -> Boo
     }
 
     let endIndex = lhsNative.endIndex
-    for var i = lhsNative.startIndex; i != endIndex; ++i {
+    for var i = lhsNative.startIndex; i != endIndex; i = i.successor() {
       let key = lhsNative.assertingGet(i)
       let bridgedKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
       let optRhsValue: AnyObject? = rhsCocoa.maybeGet(bridgedKey)
@@ -1242,7 +1242,8 @@ public func == <Key : Equatable, Value : Equatable>(
     }
 
     let endIndex = lhsNative.endIndex
-    for var index = lhsNative.startIndex; index != endIndex; ++index {
+    for var index = lhsNative.startIndex; index != endIndex;
+        index._successorInPlace() {
       let (key, value) = lhsNative.assertingGet(index)
       let optRhsValue: AnyObject? =
         rhsCocoa.maybeGet(_bridgeToObjectiveCUnconditional(key))
@@ -2406,7 +2407,7 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
       return nil
     }
     let bridgedKey: AnyObject = nativeStorageOwner._getBridgedKey(nextIndex)
-    nextIndex = nextIndex.successor()
+    nextIndex._successorInPlace()
     return bridgedKey
   }
 
@@ -2431,7 +2432,7 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
     // Return only a single element so that code can start iterating via fast
     // enumeration, terminate it, and continue via NSEnumerator.
     let bridgedKey: AnyObject = nativeStorageOwner._getBridgedKey(nextIndex)
-    nextIndex = nextIndex.successor()
+    nextIndex._successorInPlace()
 
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects)
     unmanagedObjects[0] = bridgedKey
@@ -2783,7 +2784,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
       let bridgedKey: AnyObject = _getBridgedKey(currIndex)
       unmanagedObjects[i] = bridgedKey
       ++stored
-      currIndex = currIndex.successor()
+      currIndex._successorInPlace()
     }
     theState.extra.0 = CUnsignedLong(currIndex.offset)
     state.pointee = theState
@@ -3980,7 +3981,7 @@ internal struct ${Self}MirrorPosition<${TypeParametersDecl}> {
 
   internal mutating func successor() {
     _intPos = _intPos + 1
-    ${Self}Pos = ${Self}Pos.successor()
+    ${Self}Pos._successorInPlace()
   }
 
 }

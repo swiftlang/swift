@@ -393,7 +393,7 @@ namespace {
       // specialized reference to it.
       if (auto genericFn
             = decl->getInterfaceType()->getAs<GenericFunctionType>()) {
-        auto dc = decl->getPotentialGenericDeclContext();
+        auto dc = decl->getInnermostDeclContext();
 
         SmallVector<Substitution, 4> substitutions;
         auto type = solution.computeSubstitutions(
@@ -739,7 +739,7 @@ namespace {
 
         // Figure out the declaration context where we'll get the generic
         // parameters.
-        auto dc = member->getPotentialGenericDeclContext();
+        auto dc = member->getInnermostDeclContext();
 
         // Build a reference to the generic member.
         SmallVector<Substitution, 4> substitutions;
@@ -3270,6 +3270,7 @@ namespace {
       Expr *callExpr = new (ctx) CallExpr(fnRef, argExpr, /*implicit*/true);
       bool invalid = tc.typeCheckExpression(callExpr, cs.DC, valueType,
                                             CTP_CannotFail);
+      (void) invalid;
       assert(!invalid && "conversion cannot fail");
       E->setSemanticExpr(callExpr);
       return E;
@@ -3400,11 +3401,11 @@ findDefaultArgsOwner(ConstraintSystem &cs, const Solution &solution,
             },
             [&](ValueDecl *decl,
                 Type openedType) -> ConcreteDeclRef {
-              if (decl->getPotentialGenericDeclContext()->isGenericContext()) {
+              if (decl->getInnermostDeclContext()->isGenericContext()) {
                 SmallVector<Substitution, 4> subs;
                 solution.computeSubstitutions(
                   decl->getType(),
-                  decl->getPotentialGenericDeclContext(),
+                  decl->getInnermostDeclContext(),
                   openedType, locator, subs);
                 return ConcreteDeclRef(cs.getASTContext(), decl, subs);
               }

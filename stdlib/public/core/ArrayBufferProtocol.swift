@@ -158,11 +158,13 @@ extension _ArrayBufferProtocol {
       // Assign over the original subRange
       var i = newValues.startIndex
       for j in subRange {
-        elements[j] = newValues[i++]
+        elements[j] = newValues[i]
+        i._successorInPlace()
       }
       // Initialize the hole left by sliding the tail forward
       for j in oldTailIndex..<newTailIndex {
-        (elements + j).initializeMemory(newValues[i++])
+        (elements + j).initializeMemory(newValues[i])
+        i._successorInPlace()
       }
       _expectEnd(i, newValues)
     }
@@ -171,7 +173,9 @@ extension _ArrayBufferProtocol {
       var i = subRange.startIndex
       var j = newValues.startIndex
       for _ in 0..<newCount {
-        elements[i++] = newValues[j++]
+        elements[i] = newValues[j]
+        i._successorInPlace()
+        j._successorInPlace()
       }
       _expectEnd(j, newValues)
 

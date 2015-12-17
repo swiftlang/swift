@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "sil-global-arc-opts"
+#define DEBUG_TYPE "arc-sequence-opts"
 #include "GlobalARCPairingAnalysis.h"
 #include "RefCountState.h"
 #include "GlobalARCSequenceDataflow.h"

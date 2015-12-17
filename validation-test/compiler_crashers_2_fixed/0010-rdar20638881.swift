@@ -37,7 +37,7 @@ extension Q_SequenceDefaults {
     var iter = self.iterator()
     while let element? = iter.next() {
       p.initializeMemory(element)
-      ++p
+      p += 1
     }
   }
 
@@ -131,7 +131,7 @@ public struct Q_IndexingIterator<C: Q_Indexable> : Q_ConcreteIteratorProtocol {
       return nil
     }
     let ret = elements[pos]
-    ++pos
+    pos += 1
     return ret
   }
 }

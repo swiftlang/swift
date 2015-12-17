@@ -225,7 +225,7 @@ extension _ArrayBuffer {
     var result = target
     for _ in bounds {
       result.initializeMemory(result.pointee)
-      ++result
+      result += 1
     }
     return result
   }

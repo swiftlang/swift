@@ -190,9 +190,6 @@ def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
 def use_native_super_method : Flag<["-"], "use-native-super-method">,
   HelpText<"Use super_method for super calls in native classes">;
 
-def force_resilient_super_dispatch: Flag<["-"], "force-resilient-super-dispatch">,
-  HelpText<"Assume all super member accesses are resilient">;
-
 def disable_self_type_mangling : Flag<["-"], "disable-self-type-mangling">,
   HelpText<"Disable including Self type in method type manglings">;
 

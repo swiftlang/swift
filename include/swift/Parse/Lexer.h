@@ -240,6 +240,15 @@ public:
     restoreState(S);
   }
 
+  /// \brief Retrieve the Token referred to by \c Loc.
+  ///
+  /// \param SM The source manager in which the given source location
+  /// resides.
+  ///
+  /// \param Loc The source location of the beginning of a token.
+  static Token getTokenAtLocation(const SourceManager &SM, SourceLoc Loc);
+
+
   /// \brief Retrieve the source location that points just past the
   /// end of the token referred to by \c Loc.
   ///
@@ -298,6 +307,10 @@ public:
   /// non-operator identifier. Return tok::identifier if the string is not a
   /// reserved word.
   static tok kindOfIdentifier(StringRef Str, bool InSILMode);
+
+  /// \brief Determines if the given string is a valid operator identifier,
+  /// without escaping characters.
+  static bool isOperator(StringRef string);
 
   SourceLoc getLocForStartOfBuffer() const {
     return SourceLoc(llvm::SMLoc::getFromPointer(BufferStart));

@@ -8,7 +8,7 @@ enum SWIFT_NAME(ColorKind) ColorType {
   CT_blue,
 };
 
-typedef struct {
+typedef struct SWIFT_NAME(Point) {
   int X SWIFT_NAME(x);
   int Y SWIFT_NAME(y);
 } PointType;

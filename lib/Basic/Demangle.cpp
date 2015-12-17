@@ -1883,6 +1883,16 @@ private:
       type_application->addChild(type_list);
       return type_application;
     }
+    if (c == 'X') {
+      if (Mangled.nextIf('b')) {
+        NodePointer type = demangleType();
+        if (!type)
+          return nullptr;
+        NodePointer boxType = NodeFactory::create(Node::Kind::SILBoxType);
+        boxType->addChild(type);
+        return boxType;
+      }
+    }
     if (c == 'K') {
       return demangleFunctionType(Node::Kind::AutoClosureType);
     }
@@ -2331,6 +2341,7 @@ private:
     case Node::Kind::QualifiedArchetype:
     case Node::Kind::ReturnType:
     case Node::Kind::SelfTypeRef:
+    case Node::Kind::SILBoxType:
     case Node::Kind::Structure:
     case Node::Kind::TupleElementName:
     case Node::Kind::Type:
@@ -3302,6 +3313,12 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::ObjCBlock: {
     Printer << "@convention(block) ";
     printFunctionType(pointer);
+    return;
+  }
+  case Node::Kind::SILBoxType: {
+    Printer << "@box ";
+    NodePointer type = pointer->getChild(0);
+    print(type);
     return;
   }
   case Node::Kind::Metatype: {

@@ -49,7 +49,7 @@ public struct _FDInputStream {
       _buffer.reserveCapacity(minFree - bufferFree)
       while bufferFree < minFree {
         _buffer.append(0)
-        ++bufferFree
+        bufferFree += 1
       }
     }
     let readResult: __swift_ssize_t = _buffer.withUnsafeMutableBufferPointer {

@@ -15,7 +15,7 @@ func testReallocation() {
       story += " "
       story += s
       if lastBase != story._core._baseAddress {
-        ++reallocations
+        reallocations += 1
         
         // To avoid dumping a vast string here, just write the first
         // part of the story out each time there's a reallocation.

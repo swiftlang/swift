@@ -9,6 +9,15 @@
 // RUN: FileCheck %s -check-prefix=CLANG_BAR < %t.compl.txt
 // RUN: FileCheck %s -check-prefix=CLANG_BOTH_FOO_BAR < %t.compl.txt
 
+// FIXME: Same as above, but with Swift name lookup tables enabled.
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=FW_UNQUAL_1 -enable-swift-name-lookup-tables > %t.compl.txt
+// RUN: FileCheck %s -check-prefix=CLANG_FOO < %t.compl.txt
+// RUN: FileCheck %s -check-prefix=CLANG_FOO_SUB < %t.compl.txt
+// RUN: FileCheck %s -check-prefix=CLANG_FOO_HELPER < %t.compl.txt
+// RUN: FileCheck %s -check-prefix=CLANG_FOO_HELPER_SUB < %t.compl.txt
+// RUN: FileCheck %s -check-prefix=CLANG_BAR < %t.compl.txt
+// RUN: FileCheck %s -check-prefix=CLANG_BOTH_FOO_BAR < %t.compl.txt
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_QUAL_FOO_1 > %t.compl.txt
 // RUN: FileCheck %s -check-prefix=CLANG_FOO < %t.compl.txt
 // RUN: FileCheck %s -check-prefix=CLANG_FOO_SUB < %t.compl.txt

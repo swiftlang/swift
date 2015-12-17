@@ -986,7 +986,7 @@ namespace {
         fields.push_back(IGM.getAddrOfObjCClass(getClass(), NotForDefinition));
       else {
         auto type = getSelfType(getClass()).getSwiftRValueType();
-        llvm::Constant *metadata = tryEmitConstantHeapMetadataRef(IGM, type);
+        llvm::Constant *metadata = tryEmitConstantTypeMetadataRef(IGM, type);
         assert(metadata &&
                "extended objc class doesn't have constant metadata?");
         fields.push_back(metadata);

@@ -1737,19 +1737,6 @@ void ValueDecl::overwriteType(Type T) {
     setInvalid();
 }
 
-DeclContext *ValueDecl::getPotentialGenericDeclContext() {
-  if (auto func = dyn_cast<AbstractFunctionDecl>(this))
-    return func;
-  if (auto NTD = dyn_cast<NominalTypeDecl>(this))
-    return NTD;
-
-  auto parentDC = getDeclContext();
-  if (parentDC->isTypeContext())
-    return parentDC;
-
-  return nullptr;
-}
-
 Type ValueDecl::getInterfaceType() const {
   if (InterfaceTy)
     return InterfaceTy;
@@ -3429,8 +3416,7 @@ SourceRange SubscriptDecl::getSourceRange() const {
 
 static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
                                     bool isInitializingCtor,
-                                    bool wantInterfaceType,
-                                    GenericParamList **outerGenericParams) {
+                                    bool wantInterfaceType) {
   auto *dc = theMethod->getDeclContext();
   
   // Determine the type of the container.
@@ -3480,10 +3466,6 @@ static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
         selfTy = self->getArchetype();
     }
   }
-
-  // Capture the generic parameters, if requested.
-  if (outerGenericParams)
-    *outerGenericParams = dc->getGenericParamsOfContext();
 
   // If the self type couldn't be computed, or is the result of an
   // upstream error, return an error type.
@@ -3560,13 +3542,12 @@ void AbstractFunctionDecl::setGenericParams(GenericParamList *GP) {
 }
 
 
-Type AbstractFunctionDecl::
-computeSelfType(GenericParamList **outerGenericParams) {
-  return getSelfTypeForContainer(this, true, false, outerGenericParams);
+Type AbstractFunctionDecl::computeSelfType() {
+  return getSelfTypeForContainer(this, true, false);
 }
 
 Type AbstractFunctionDecl::computeInterfaceSelfType(bool isInitializingCtor) {
-  return getSelfTypeForContainer(this, isInitializingCtor, true, nullptr);
+  return getSelfTypeForContainer(this, isInitializingCtor, true);
 }
 
 /// \brief This method returns the implicit 'self' decl.

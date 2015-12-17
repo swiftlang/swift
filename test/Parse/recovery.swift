@@ -680,8 +680,8 @@ class r22240342 {
 
 // <rdar://problem/22387625> QoI: Common errors: 'let x= 5' and 'let x =5' could use Fix-its
 func r22387625() {
-  let _= 5 // expected-error{{postfix '=' is reserved}} {{8-8= }}
-  let _ =5 // expected-error{{prefix '=' is reserved}} {{10-10= }}
+  let _= 5 // expected-error{{'=' must have consistent whitespace on both sides}} {{8-8= }}
+  let _ =5 // expected-error{{'=' must have consistent whitespace on both sides}} {{10-10= }}
 }
 
 
@@ -703,6 +703,11 @@ func test23086402(a: A23086402) {
 func test23719432() {
   var x = 42
   &(Int:x)  // expected-error {{'&' can only appear immediately in a call argument list}}
+}
+
+// <rdar://problem/19911096> QoI: terrible recovery when using '·' for an operator
+infix operator · {  // expected-error {{'·' is considered to be an identifier, not an operator}}
+  associativity none precedence 150
 }
 
 

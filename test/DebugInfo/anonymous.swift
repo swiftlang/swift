@@ -1,22 +1,10 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
 
-// Don't crash when emitting debug info for anonymous variables.
-// CHECK: !DILocalVariable(name: "_"
+// CHECK: !DILocalVariable(name: "_0", arg: 1
+// CHECK: !DILocalVariable(name: "_1", arg: 2
+// CHECK: !DILocalVariable(name: "_2", arg: 3
+// CHECK: !DILocalVariable(name: "x4", arg: 4
 
-func markUsed<T>(t: T) {}
-
-protocol F_ {
-  func successor() -> Self
-}
-
-protocol F : F_ {
-  func ~> (_: Self, _: (_Distance, (Self))) -> Int64
-}
-
-struct _Distance {}
-
-func ~> <I: F_>(self_:I, _: (_Distance, (I))) -> Int64 {
-  self_.successor()
-  markUsed("F")
-  return 0
+public func fourth<T>(_: T, _: T, _: T, x4 : T) -> T {
+  return x4
 }

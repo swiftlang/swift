@@ -607,7 +607,8 @@ extension Sequence {
     -> UnsafeMutablePointer<Iterator.Element> {
     var p = UnsafeMutablePointer<Iterator.Element>(ptr)
     for x in IteratorSequence(self.iterator()) {
-      p++.initializeMemory(x)
+      p.initializeMemory(x)
+      p += 1
     }
     return p
   }

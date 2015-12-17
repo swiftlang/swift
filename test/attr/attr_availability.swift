@@ -79,19 +79,19 @@ let _: Int
 @available(OSX, message) // expected-error{{expected '=' after 'message' in 'available' attribute}}
 let _: Int
 
-@available(OSX, message=) // expected-error{{expected string literal in 'available' attribute}} expected-error{{postfix '=' is reserved}}
+@available(OSX, message=) // expected-error{{expected string literal in 'available' attribute}} expected-error{{'=' must have consistent whitespace on both sides}}
 let _: Int
 
 @available(OSX, message=x) // expected-error{{expected string literal in 'available' attribute}}
 let _: Int
 
-@available(OSX, unavailable=) // expected-error{{expected ')' in 'available' attribute}} expected-error{{postfix '=' is reserved}} expected-error{{expected declaration}}
+@available(OSX, unavailable=) // expected-error{{expected ')' in 'available' attribute}} expected-error{{'=' must have consistent whitespace on both sides}} expected-error{{expected declaration}}
 let _: Int
 
 @available(OSX, introduced) // expected-error{{expected '=' after 'introduced' in 'available' attribute}}
 let _: Int
 
-@available(OSX, introduced=) // expected-error{{expected version number in 'available' attribute}} expected-error{{postfix '=' is reserved}}
+@available(OSX, introduced=) // expected-error{{expected version number in 'available' attribute}} expected-error{{'=' must have consistent whitespace on both sides}}
 let _: Int
 
 @available(OSX, introduced=x) // expected-error{{expected version number in 'available' attribute}}

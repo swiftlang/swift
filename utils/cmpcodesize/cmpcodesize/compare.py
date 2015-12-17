@@ -1,64 +1,8 @@
-#!/usr/bin/env python
-
 import re
-import sys
 import os
-import os.path
-import glob
 import subprocess
 import collections
 from operator import itemgetter
-
-def help():
-  print """\
-cmpcodesize [options] <old-files> [--] <new-files>
-
-Compares code sizes of "new" files, taking "old" files as a reference.
-
-Options:
-    -a           Show sizes of additional sections
-    -c           Show functions by category
-    -l           List all functions (can be a very long list)
-    -s           Summarize the sizes of multiple files instead of listing each file separately
-
-Environment variables:
-    SWIFT_NEW_BUILDDIR   The old build-dir
-E.g. $HOME/swift-work/build/Ninja-ReleaseAssert+stdlib-Release/swift-macosx-x86_64
-    SWIFT_OLD_BUILDDIR   The new build-dir
-E.g. $HOME/swift-reference/build/Ninja-ReleaseAssert+stdlib-Release/swift-macosx-x86_64
-
-How to specify files:
-1) No files:
-    Compares codesize of the PerfTests_* executables and the swiftCore dylib in the new and old build-dirs.
-    Example:
-        cmpcodesize
-
-2) One or more paths relative to the build-dirs (can be a pattern):
-    Compares the files in the new and old build-dirs.
-    Aliases:
-        O          => bin/PerfTests_O
-        Ounchecked => bin/PerfTests_Ounchecked
-        Onone      => bin/PerfTests_Onone
-        dylib      => lib/swift/macosx/x86_64/libswiftCore.dylib
-    Examples:
-        cmpcodesize Onone
-        cmpcodesize benchmark/PerfTestSuite/O/*.o
-
-3) Two files:
-    Compares these two files (the first is the old file).
-    Example:
-        cmpcodesize test.o newversion.o
-
-4) Two lists of files, separated by '--':
-    Compares a set a files.
-    Example:
-        cmpcodesize olddir/*.o -- newdir/*.o
-
-5) One file (only available with the -l option):
-    Lists function sizes for that file
-    Example:
-        cmpcodesize -l test.o
-"""
 
 Prefixes = {
     # Cpp
@@ -94,6 +38,7 @@ GenericFunctionPrefix = "__TTSg"
 SortedPrefixes = sorted(Prefixes)
 SortedInfixes = sorted(Infixes)
 
+
 def addFunction(sizes, function, startAddr, endAddr, groupByPrefix):
     if not function or startAddr == None or endAddr == None:
         return
@@ -118,6 +63,7 @@ def addFunction(sizes, function, startAddr, endAddr, groupByPrefix):
     else:
         sizes[function] += size
 
+
 def flatten(*args):
     for x in args:
         if hasattr(x, '__iter__'):
@@ -125,6 +71,7 @@ def flatten(*args):
                 yield y
         else:
             yield x
+
 
 def readSizes(sizes, fileName, functionDetails, groupByPrefix):
     # Check if multiple architectures are supported by the object file.
@@ -189,6 +136,7 @@ def readSizes(sizes, fileName, functionDetails, groupByPrefix):
 
     addFunction(sizes, currFunc, startAddr, endAddr, groupByPrefix)
 
+
 def compareSizes(oldSizes, newSizes, nameKey, title):
     oldSize = oldSizes[nameKey]
     newSize = newSizes[nameKey]
@@ -198,6 +146,7 @@ def compareSizes(oldSizes, newSizes, nameKey, title):
         else:
             perc = "- "
         print "%-26s%16s: %8d  %8d  %6s" % (title, nameKey, oldSize, newSize, perc)
+
 
 def compareSizesOfFile(oldFiles, newFiles, allSections, listCategories):
     oldSizes = collections.defaultdict(int)
@@ -238,11 +187,13 @@ def compareSizesOfFile(oldFiles, newFiles, allSections, listCategories):
         compareSizes(oldSizes, newSizes, "__common", sectionTitle)
         compareSizes(oldSizes, newSizes, "__bss", sectionTitle)
 
+
 def listFunctionSizes(sizeArray):
     for pair in sorted(sizeArray, key=itemgetter(1)):
         name = pair[0]
         size = pair[1]
-        print "%8d %s" % (size, name)
+        return "%8d %s" % (size, name)
+
 
 def compareFunctionSizes(oldFiles, newFiles):
     oldSizes = collections.defaultdict(int)
@@ -276,13 +227,13 @@ def compareFunctionSizes(oldFiles, newFiles):
 
     if onlyInFile1:
         print "Only in old file(s)"
-        listFunctionSizes(onlyInFile1)
+        print listFunctionSizes(onlyInFile1)
         print "Total size of functions only in old file: {}".format(onlyInFile1Size)
         print
 
     if onlyInFile2:
         print "Only in new files(s)"
-        listFunctionSizes(onlyInFile2)
+        print listFunctionSizes(onlyInFile2)
         print "Total size of functions only in new file: {}".format(onlyInFile2Size) 
         print
 
@@ -306,109 +257,3 @@ def compareFunctionSizes(oldFiles, newFiles):
         print "Total size of functions that got smaller: {}".format(sizeDecrease)
         print "Total size of functions that got bigger: {}".format(sizeIncrease)
         print "Total size change of functions present in both files: {}".format(sizeIncrease - sizeDecrease)
-
-def main():
-    allSections = False
-    listCategories = False
-    listFunctions = False
-    separatorFound = False
-    sumSizes = False
-    oldFileArgs = []
-    newFileArgs = []
-    curFiles = oldFileArgs
-    for arg in sys.argv[1:]:
-        if arg == "-a":
-            allSections = True
-        elif arg == "-c":
-            listCategories = True
-        elif arg == "-s":
-            sumSizes = True
-        elif arg == "-l":
-            listFunctions = True
-        elif arg == "--":
-            curFiles = newFileArgs
-            separatorFound = True
-        elif arg == "-h":
-            help()
-            return
-        elif arg.startswith("-"):
-            sys.exit("Unknown option. Use -h to display usage.")
-        else:
-            curFiles.append(arg)
-    
-
-    oldBuildDir = os.environ.get("SWIFT_OLD_BUILDDIR")
-    newBuildDir = os.environ.get("SWIFT_NEW_BUILDDIR")
-
-    if separatorFound:
-        oldFiles = oldFileArgs
-        newFiles = newFileArgs
-    else:
-        if not oldFileArgs:
-            if listFunctions:
-                sys.exit("Must specify file for the -l option")
-            if not oldBuildDir:
-                sys.exit("$SWIFT_OLD_BUILDDIR not specified")
-            if not newBuildDir:
-                sys.exit("$SWIFT_NEW_BUILDDIR not specified")
-            oldFileArgs = [ "O", "Ounchecked", "Onone", "dylib" ]
-        oldFiles = []
-        newFiles = []
-        numExpanded = 0
-        for file in oldFileArgs:
-            shortcuts = {
-                "O"          : "bin/PerfTests_O",
-                "Ounchecked" : "bin/PerfTests_Ounchecked",
-                "Onone"      : "bin/PerfTests_Onone",
-                "dylib"      : "lib/swift/macosx/x86_64/libswiftCore.dylib"
-            }
-            if file in shortcuts:
-                file = shortcuts[file]
-
-            if not file.startswith("./") and oldBuildDir and newBuildDir:
-                oldExpanded = glob.glob(oldBuildDir + "/" + file)
-                newExpanded = glob.glob(newBuildDir + "/" + file)
-                if oldExpanded and newExpanded:
-                    oldFiles.extend(oldExpanded)
-                    newFiles.extend(newExpanded)
-                    numExpanded += 1
-
-        if numExpanded != 0 and numExpanded != len(oldFileArgs):
-            sys.exit("mix of expanded/not-expanded arguments") 
-        if numExpanded == 0:
-            if len(oldFileArgs) > 2:
-                sys.exit("too many arguments")
-            oldFiles = oldFileArgs[0:1]
-            newFiles = oldFileArgs[1:2]
-
-    for file in (oldFiles + newFiles):
-        if not os.path.isfile(file):
-            sys.exit("file " + file + " not found")
-
-    if listFunctions:
-        if allSections or listCategories:
-            print >> sys.stderr, "Warning: options -a and -c ignored when using -l"
-        if not newFiles:
-            sizes = collections.defaultdict(int)
-            for file in oldFiles:
-                readSizes(sizes, file, True, False)
-            listFunctionSizes(sizes.items())
-        else:
-            compareFunctionSizes(oldFiles, newFiles)
-    else:
-        print "%-26s%16s  %8s  %8s  %s" % ("", "Section", "Old", "New", "Percent")
-        if sumSizes:
-            compareSizesOfFile(oldFiles, newFiles, allSections, listCategories)
-        else:
-            if len(oldFiles) != len(newFiles):
-                sys.exit("number of new files must be the same of old files")
-
-            oldFiles.sort
-            newFiles.sort
-
-            for idx, oldFile in enumerate(oldFiles):
-                newFile = newFiles[idx]
-                compareSizesOfFile([oldFile], [newFile], allSections, listCategories)
-
-main()
-

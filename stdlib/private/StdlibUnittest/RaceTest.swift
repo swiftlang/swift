@@ -342,7 +342,7 @@ struct _RaceTestAggregatedEvaluations : CustomStringConvertible {
   mutating func addEvaluation(evaluation: RaceTestObservationEvaluation) {
     switch evaluation {
     case .Pass:
-      ++passCount
+      passCount += 1
 
     case .PassInteresting(let s):
       if passInterestingCount[s] == nil {
@@ -351,7 +351,7 @@ struct _RaceTestAggregatedEvaluations : CustomStringConvertible {
       passInterestingCount[s] = passInterestingCount[s]! + 1
 
     case .Failure:
-      ++failureCount
+      failureCount += 1
 
     case .FailureInteresting(let s):
       if failureInterestingCount[s] == nil {

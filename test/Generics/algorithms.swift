@@ -42,7 +42,7 @@ func count<R : IteratorProtocol where R.Element : Eq>
   var result = 0
   for x in IteratorSequence(range) {
     if x == value {
-      ++result
+      result += 1
     }
   }
   return result
@@ -54,7 +54,7 @@ func countIf<
   var result = 0
   for x in IteratorSequence(range) {
     if predicate(x) {
-      ++result
+      result += 1
     }
   }
   return result

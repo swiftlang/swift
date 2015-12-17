@@ -28,9 +28,9 @@ class SideEffectsDumper : public SILModuleTransform {
 
     DEBUG(llvm::dbgs() << "** SideEffectsDumper **\n");
 
+#ifndef NDEBUG
     auto *SEA = PM->getAnalysis<SideEffectAnalysis>();
 
-#ifndef NDEBUG
     llvm::outs() << "Side effects of module\n";
     for (auto &F : *getModule()) {
       llvm::outs() << "  sil @" << F.getName() << '\n';

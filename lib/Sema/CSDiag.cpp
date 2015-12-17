@@ -1977,6 +1977,7 @@ private:
   bool visitUnresolvedMemberExpr(UnresolvedMemberExpr *E);
   bool visitArrayExpr(ArrayExpr *E);
   bool visitDictionaryExpr(DictionaryExpr *E);
+  bool visitObjectLiteralExpr(ObjectLiteralExpr *E);
 
   bool visitForceValueExpr(ForceValueExpr *FVE);
   bool visitBindOptionalExpr(BindOptionalExpr *BOE);
@@ -4465,6 +4466,77 @@ bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
   // where the element types mismatch.  There is no Any equivalent since they
   // keys need to be hashable.
   return false;
+}
+
+/// When an object literal fails to typecheck because its protocol's
+/// corresponding default type has not been set in the global namespace (e.g.
+/// _ColorLiteralType), suggest that the user import the appropriate module for
+/// the target.
+bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
+  auto &TC = CS->getTypeChecker();
+
+  // Type check the argument first.
+  auto protocol = TC.getLiteralProtocol(E);
+  if (!protocol)
+    return false;
+  DeclName constrName = TC.getObjectLiteralConstructorName(E);
+  assert(constrName);
+  ArrayRef<ValueDecl *> constrs = protocol->lookupDirect(constrName);
+  if (constrs.size() != 1 || !isa<ConstructorDecl>(constrs.front()))
+    return false;
+  auto *constr = cast<ConstructorDecl>(constrs.front());
+  if (!typeCheckChildIndependently(
+        E->getArg(), constr->getArgumentType(), CTP_CallArgument))
+    return true;
+
+  // Conditions for showing this diagnostic:
+  // * The object literal protocol's default type is unimplemented
+  if (TC.getDefaultType(protocol, CS->DC))
+    return false;
+  // * The object literal has no contextual type
+  if (CS->getContextualType())
+    return false;
+
+  // Figure out what import to suggest.
+  auto &Ctx = CS->getASTContext();
+  const auto &target = Ctx.LangOpts.Target;
+  StringRef plainName = E->getName().str();
+  StringRef importModule;
+  StringRef importDefaultTypeName;
+  if (protocol == Ctx.getProtocol(KnownProtocolKind::ColorLiteralConvertible)) {
+    plainName = "color";
+    if (target.isMacOSX()) {
+      importModule = "AppKit";
+      importDefaultTypeName = "NSColor";
+    } else if (target.isiOS() || target.isTvOS()) {
+      importModule = "UIKit";
+      importDefaultTypeName = "UIColor";
+    }
+  } else if (protocol == Ctx.getProtocol(
+               KnownProtocolKind::ImageLiteralConvertible)) {
+    plainName = "image";
+    if (target.isMacOSX()) {
+      importModule = "AppKit";
+      importDefaultTypeName = "NSImage";
+    } else if (target.isiOS() || target.isTvOS()) {
+      importModule = "UIKit";
+      importDefaultTypeName = "UIImage";
+    }
+  } else if (protocol == Ctx.getProtocol( 
+               KnownProtocolKind::FileReferenceLiteralConvertible)) {
+    plainName = "file reference";
+    importModule = "Foundation";
+    importDefaultTypeName = "NSURL";
+  }
+
+  // Emit the diagnostic.
+  TC.diagnose(E->getLoc(), diag::object_literal_default_type_missing,
+              plainName);
+  if (!importModule.empty()) {
+    TC.diagnose(E->getLoc(), diag::object_literal_resolve_import,
+                importModule, importDefaultTypeName, plainName);
+  }
+  return true;
 }
 
 bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {

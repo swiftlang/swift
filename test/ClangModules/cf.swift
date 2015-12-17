@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -parse -verify -import-cf-types -I %S/Inputs/custom-modules %s
+// RUN: %target-swift-frontend -parse -verify -import-cf-types -enable-swift-name-lookup-tables -I %S/Inputs/custom-modules %s
 
 // REQUIRES: objc_interop
 

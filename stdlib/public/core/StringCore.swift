@@ -121,7 +121,9 @@ public struct _StringCore {
       var src = UnsafeMutablePointer<UTF8.CodeUnit>(srcStart)
       let srcEnd = src + count
       while (src != srcEnd) {
-        dest++.pointee = UTF16.CodeUnit(src++.pointee)
+        dest.pointee = UTF16.CodeUnit(src.pointee)
+        dest += 1
+        src += 1
       }
     }
     else {
@@ -130,7 +132,9 @@ public struct _StringCore {
       var src = UnsafeMutablePointer<UTF16.CodeUnit>(srcStart)
       let srcEnd = src + count
       while (src != srcEnd) {
-        dest++.pointee = UTF8.CodeUnit(src++.pointee)
+        dest.pointee = UTF8.CodeUnit(src.pointee)
+        dest += 1
+        src += 1
       }
     }
   }
@@ -618,13 +622,15 @@ extension _StringCore : RangeReplaceableCollection {
       if _fastPath(elementWidth == 1) {
         var dst = rangeStart
         for u in newElements {
-          dst++.pointee = UInt8(u & 0xFF)
+          dst.pointee = UInt8(u & 0xFF)
+          dst += 1
         }
       }
       else {
         var dst = UnsafeMutablePointer<UTF16.CodeUnit>(rangeStart)
         for u in newElements {
-          dst++.pointee = u
+          dst.pointee = u
+          dst += 1
         }
       }
 

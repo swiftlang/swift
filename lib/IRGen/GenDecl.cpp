@@ -106,7 +106,7 @@ public:
     class_addProtocol = IGM.getClassAddProtocolFn();
 
     CanType origTy = ext->getDeclaredTypeOfContext()->getCanonicalType();
-    classMetadata = tryEmitConstantHeapMetadataRef(IGM, origTy);
+    classMetadata = tryEmitConstantTypeMetadataRef(IGM, origTy);
     assert(classMetadata &&
            "extended objc class doesn't have constant metadata?!");
     classMetadata = llvm::ConstantExpr::getBitCast(classMetadata,

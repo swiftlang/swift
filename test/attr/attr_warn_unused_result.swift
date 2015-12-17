@@ -86,7 +86,7 @@ struct BadAttributes1 {
   @warn_unused_result(blarg) func f1() { } // expected-warning{{unknown parameter 'blarg' in 'warn_unused_result' attribute}}
   @warn_unused_result(wibble="foo") func f2() { } // expected-warning{{unknown parameter 'wibble' in 'warn_unused_result' attribute}}
   @warn_unused_result(message) func f3() { } // expected-error{{expected '=' following 'message' parameter}}
-  @warn_unused_result(message=) func f4() { } // expected-error{{postfix '=' is reserved}}
+  @warn_unused_result(message=) func f4() { } // expected-error{{'=' must have consistent whitespace on both sides}}
   // expected-error@-1{{expected a string following '=' for 'message' parameter}}
   @warn_unused_result(message=blah) func f5() { } // expected-error{{expected a string following '=' for 'message' parameter}}
 

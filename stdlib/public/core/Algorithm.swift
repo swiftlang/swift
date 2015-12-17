@@ -41,27 +41,15 @@ public func min<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
 /// Returns the greater of `x` and `y`.
 @warn_unused_result
 public func max<T : Comparable>(x: T, _ y: T) -> T {
-  var r = y
-  if y < x {
-    r = x
-  }
-  return r
+  return y >= x ? y : x
 }
 
 /// Returns the greatest argument passed.
 @warn_unused_result
 public func max<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
-  var r = y
-  if y < x {
-    r = x
-  }
-  if r < z {
-    r = z
-  }
-  for t in rest {
-    if t >= r {
-      r = t
-    }
+  var r = max(max(x, y), z)
+  for t in rest where t >= r {
+    r = t
   }
   return r
 }
@@ -75,10 +63,12 @@ public func max<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
 ///     iterator.next() // (0, "foo")
 ///     iterator.next() // (1, "bar")
 ///     iterator.next() // nil
+///
+/// - Note: Idiomatic usage is to call `enumerate` instead of
+///   constructing an `EnumerateGenerator` directly.
 public struct EnumeratedIterator<
   Base : IteratorProtocol
 > : IteratorProtocol, Sequence {
-
   internal var _base: Base
   internal var _count: Int
 

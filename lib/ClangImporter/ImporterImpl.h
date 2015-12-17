@@ -540,6 +540,19 @@ public:
                  ConstructorDecl *>
     Constructors;
 
+  /// A mapping from imported declarations to their "alternate" declarations,
+  /// for cases where a single Clang declaration is imported to two
+  /// different Swift declarations.
+  llvm::DenseMap<Decl *, ValueDecl *> AlternateDecls;
+
+  /// Retrieve the alternative declaration for the given imported
+  /// Swift declaration.
+  ValueDecl *getAlternateDecl(Decl *decl) {
+    auto known = AlternateDecls.find(decl);
+    if (known == AlternateDecls.end()) return nullptr;
+    return known->second;
+  }
+
 private:
   /// \brief NSObject, imported into Swift.
   Type NSObjectTy;
@@ -918,10 +931,6 @@ public:
                                   /*SuperfluousTypedefsAreTransparent=*/false);
   }
 
-  /// Import the subscript declaration corresponding to the given
-  /// declaration, if there is one.
-  SubscriptDecl *importSubscriptOf(Decl *decl);
-
   /// Import the class-method version of the given Objective-C
   /// instance method of a root class.
   Decl *importClassMethodVersionOf(FuncDecl *method);
@@ -1296,6 +1305,15 @@ public:
   /// \param clangModule The module, or null to indicate that we're talking
   /// about the directly-parsed headers.
   SwiftLookupTable *findLookupTable(const clang::Module *clangModule);
+
+  /// Look for namespace-scope values with the given name in the given
+  /// Swift lookup table.
+  void lookupValue(SwiftLookupTable &table, DeclName name,
+                   VisibleDeclConsumer &consumer);
+
+  /// Look for namespace-scope values in the given Swift lookup table.
+  void lookupVisibleDecls(SwiftLookupTable &table,
+                          VisibleDeclConsumer &consumer);
 
   /// Look for Objective-C members with the given name in the given
   /// Swift lookup table.

@@ -399,9 +399,9 @@ final public class VaListBuilder {
            + (sseRegistersUsed * _x86_64SSERegisterWords)
       for w in encoded {
         storage[startIndex] = w
-        ++startIndex
+        startIndex += 1
       }
-      ++sseRegistersUsed
+      sseRegistersUsed += 1
     }
     else if encoded.count == 1 && gpRegistersUsed < _x86_64CountGPRegisters {
       storage[gpRegistersUsed++] = encoded[0]

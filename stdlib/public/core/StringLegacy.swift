@@ -148,7 +148,7 @@ extension String {
     let rng = unicodeScalars
     var startIndex = rng.startIndex
     for _ in 0..<start {
-      ++startIndex
+      startIndex._successorInPlace()
     }
     return String(rng[startIndex..<rng.endIndex])
   }

@@ -697,7 +697,7 @@ final public class NSFastEnumerationIterator : IteratorProtocol {
       if count == 0 { return .None }
     }
     let next : AnyObject = state[0].itemsPtr[n]!
-    ++n
+    n += 1
     return next
   }
 
