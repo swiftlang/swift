@@ -751,6 +751,30 @@ bool CopyForwarding::forwardPropagateCopy(
   return true;
 }
 
+/// Given an address defined by 'Def', find the object root and all direct uses,
+/// not including:
+/// - 'Def' itself
+/// - Transitive uses of 'Def' (listed elsewhere in DestUserInsts)
+/// 
+/// If the returned root is not 'Def' itself, then 'Def' must be an address
+/// projection that can be trivially rematerialized with the root as its
+/// operand.
+static ValueBase *
+findAddressRootAndUsers(ValueBase *Def,
+                        SmallPtrSetImpl<SILInstruction*> &RootUserInsts) {
+  if (auto EDAI = dyn_cast<InitEnumDataAddrInst>(Def)) {
+    auto EnumRoot = EDAI->getOperand();
+    for (auto *Use : EnumRoot.getUses()) {
+      auto *UserInst = Use->getUser();
+      if (UserInst == Def)
+        continue;
+      RootUserInsts.insert(UserInst);
+    }
+    return EnumRoot.getDef();
+  }
+  return Def;
+}
+
 /// Perform backward copy-propagation. Find the initialization point of the
 /// copy's source and replace the initializer's address with the copy's dest.
 bool CopyForwarding::backwardPropagateCopy(
@@ -759,25 +783,33 @@ bool CopyForwarding::backwardPropagateCopy(
 
   SILValue CopySrc = CopyInst->getSrc();
   ValueBase *CopyDestDef = CopyInst->getDest().getDef();
+  SmallPtrSet<SILInstruction*, 8> RootUserInsts;
+  ValueBase *CopyDestRoot = findAddressRootAndUsers(CopyDestDef, RootUserInsts);
+
   // Require the copy dest value to be identified by this address. This ensures
   // that all instructions that may write to destination address depend on
-  // CopyDestDef.
-  if (!isIdentifiedDestValue(CopyDestDef))
+  // CopyDestRoot.
+  if (!isIdentifiedDestValue(CopyDestRoot))
     return false;
 
   // Scan backward recording all operands that use CopySrc until we see the
   // most recent init of CopySrc.
   bool seenInit = false;
+  bool seenCopyDestDef = false;
+  // ValueUses records the uses of CopySrc in reverse order.
   SmallVector<Operand*, 16> ValueUses;
   SmallVector<DebugValueAddrInst*, 4> DebugValueInstsToDelete;
   auto SI = CopyInst->getIterator(), SE = CopyInst->getParent()->begin();
   while (SI != SE) {
     --SI;
     SILInstruction *UserInst = &*SI;
+    if (UserInst == CopyDestDef)
+      seenCopyDestDef = true;
 
     // If we see another use of Dest, then Dest is live after the Src location
     // is initialized, so we really need the copy.
-    if (DestUserInsts.count(UserInst) || UserInst == CopyDestDef) {
+    if (UserInst == CopyDestRoot || DestUserInsts.count(UserInst)
+        || RootUserInsts.count(UserInst)) {
       if (auto *DVAI = dyn_cast<DebugValueAddrInst>(UserInst)) {
         DebugValueInstsToDelete.push_back(DVAI);
         continue;
@@ -797,7 +829,7 @@ bool CopyForwarding::backwardPropagateCopy(
     // If this use cannot be analyzed, then abort.
     if (!AnalyzeUse.Oper)
       return false;
-    // Otherwise record the operand.
+    // Otherwise record the operand with the earliest use last in the list.
     ValueUses.push_back(AnalyzeUse.Oper);
     // If this is an init, we're done searching.
     if (seenInit)
@@ -818,6 +850,10 @@ bool CopyForwarding::backwardPropagateCopy(
       SILBuilderWithScope(Copy).createDestroyAddr(Copy->getLoc(), CopySrc);
       Copy->setIsInitializationOfDest(IsInitialization);
     }
+  }
+  // Rematerialize the projection if needed by simply moving it.
+  if (seenCopyDestDef) {
+    cast<SILInstruction>(CopyDestDef)->moveBefore(&*SI);
   }
   // Now that an init was found, it is safe to substitute all recorded uses
   // with the copy's dest.

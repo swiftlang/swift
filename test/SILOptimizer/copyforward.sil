@@ -492,3 +492,24 @@ bb0(%0 : $*AClass, %1 : $*AnyObject):
   %11 = tuple ()                                  // user: %12
   return %11 : $()                                // id: %12
 }
+
+sil @element_use : $@convention(thin)  (@inout P) -> ()
+
+// CHECK-LABEL: backward_propagate_enum_init
+// CHECK: %[[TMP:.*]] = init_enum_data_addr %0 : $*Optional<P>
+// CHECK: copy_addr %1 to [initialization] %[[TMP]]
+// CHECK-NOT: copy_addr
+sil @backward_propagate_enum_init : $@convention(thin) (@out Optional<P>, @inout P) -> () {
+bb0(%0 : $*Optional<P>, %1 : $*P):
+  %2 = alloc_stack $P
+  copy_addr %1 to [initialization] %2#1 : $*P
+  %3 = function_ref @element_use : $@convention(thin)  (@inout P) -> ()
+  %4 = apply %3(%1) : $@convention(thin)  (@inout P) -> ()
+  %5 = init_enum_data_addr %0 : $*Optional<P>, #Optional.Some!enumelt.1
+  copy_addr %2#1 to [initialization] %5 : $*P
+  inject_enum_addr %0 : $*Optional<P>, #Optional.Some!enumelt.1
+  destroy_addr %2#1 : $*P
+  dealloc_stack %2#0 : $*@local_storage P
+  %27 = tuple ()
+  return %27 : $()
+}
