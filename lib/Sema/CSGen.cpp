@@ -61,6 +61,14 @@ static bool isDelayedOperatorDecl(ValueDecl *vd) {
   return vd && (vd->getName().str() == "==");
 }
 
+static bool isArithmeticOperatorDecl(ValueDecl *vd) {
+  return vd && 
+  ( vd->getName().str() == "+" ||
+    vd->getName().str() == "-" ||
+    vd->getName().str() == "*" ||
+    vd->getName().str() == "/");
+}
+
 namespace {
   
   /// Internal struct for tracking information about types within a series
@@ -869,31 +877,6 @@ namespace {
     Type secondArgTy =
     getInnerParenType(argTupleTy->getElement(1).getType());
     
-    auto firstFavoredTy = CS.getFavoredType(argTupleExpr->getElement(0));
-    auto secondFavoredTy = CS.getFavoredType(argTupleExpr->getElement(1));
-    
-    auto favoredExprTy = CS.getFavoredType(expr);
-    
-    // If the parent has been favored on the way down, propagate that
-    // information to its children.
-    if (!firstFavoredTy) {
-      CS.setFavoredType(argTupleExpr->getElement(0), favoredExprTy);
-      firstFavoredTy = favoredExprTy;
-    }
-    
-    if (!secondFavoredTy) {
-      CS.setFavoredType(argTupleExpr->getElement(1), favoredExprTy);
-      secondFavoredTy = favoredExprTy;
-    }
-    
-    if (firstFavoredTy && firstArgTy->getAs<TypeVariableType>()) {
-      firstArgTy = firstFavoredTy;
-    }
-    
-    if (secondFavoredTy && secondArgTy->getAs<TypeVariableType>()) {
-      secondArgTy = secondFavoredTy;
-    }
-    
     // Determine whether the given declaration is favored.
     auto isFavoredDecl = [&](ValueDecl *value) -> bool {
       auto valueTy = value->getType();
@@ -901,6 +884,34 @@ namespace {
       auto fnTy = valueTy->getAs<AnyFunctionType>();
       if (!fnTy)
         return false;
+
+      auto firstFavoredTy = CS.getFavoredType(argTupleExpr->getElement(0));
+      auto secondFavoredTy = CS.getFavoredType(argTupleExpr->getElement(1));
+      
+      auto favoredExprTy = CS.getFavoredType(expr);
+      
+      if (isArithmeticOperatorDecl(value)) {
+        // If the parent has been favored on the way down, propagate that
+        // information to its children.
+        // TODO: This is only valid for arithmetic expressions.
+        if (!firstFavoredTy) {
+          CS.setFavoredType(argTupleExpr->getElement(0), favoredExprTy);
+          firstFavoredTy = favoredExprTy;
+        }
+        
+        if (!secondFavoredTy) {
+          CS.setFavoredType(argTupleExpr->getElement(1), favoredExprTy);
+          secondFavoredTy = favoredExprTy;
+        }
+        
+        if (firstFavoredTy && firstArgTy->getAs<TypeVariableType>()) {
+          firstArgTy = firstFavoredTy;
+        }
+        
+        if (secondFavoredTy && secondArgTy->getAs<TypeVariableType>()) {
+          secondArgTy = secondFavoredTy;
+        }
+      }
       
       // Figure out the parameter type.
       if (value->getDeclContext()->isTypeContext()) {
@@ -921,7 +932,7 @@ namespace {
       return
         (isFavoredParamAndArg(CS, firstParamTy, firstArgTy, secondArgTy) ||
          isFavoredParamAndArg(CS, secondParamTy, secondArgTy, firstArgTy)) &&
-        firstParamTy->isEqual(secondParamTy) &&
+         firstParamTy->isEqual(secondParamTy) &&
         (!contextualTy || contextualTy->isEqual(resultTy));
     };
     
