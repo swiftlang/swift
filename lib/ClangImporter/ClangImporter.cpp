@@ -4559,6 +4559,13 @@ void ClangImporter::Implementation::lookupValue(
       if (!decl) continue;
     }
 
+    // If we found a declaration from the standard library, make sure
+    // it does not show up in the lookup results for the imported
+    // module.
+    if (decl->getDeclContext()->isModuleScopeContext() &&
+        decl->getModuleContext() == getStdlibModule())
+      continue;
+
     // If the name matched, report this result.
     if (decl->getFullName().matchesRef(name))
       consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
