@@ -54,7 +54,7 @@ func _countFormatSpecifiers(a: String) -> Int {
         lastChar = notPercentUTF16
       }
       else {
-        ++count
+        count += 1
         lastChar = c
       }
     } else {
@@ -139,9 +139,9 @@ extension String {
   public static func availableStringEncodings() -> [NSStringEncoding] {
     var result = [NSStringEncoding]()
     var p = NSString.availableStringEncodings()
-    while p.memory != 0 {
-      result.append(p.memory)
-      ++p
+    while p.pointee != 0 {
+      result.append(p.pointee)
+      p += 1
     }
     return result
   }
@@ -172,7 +172,7 @@ extension String {
   /// according to the user's default locale.
   @warn_unused_result
   public static func localizedStringWithFormat(
-    format: String, _ arguments: CVarArgType...
+    format: String, _ arguments: CVarArg...
   ) -> String {
     return String(format: format, locale: NSLocale.current(),
       arguments: arguments)
@@ -486,7 +486,7 @@ extension String {
       var stop_ = false
       body(line: line, stop: &stop_)
       if stop_ {
-        UnsafeMutablePointer<ObjCBool>(stop).memory = true
+        UnsafeMutablePointer<ObjCBool>(stop).pointee = true
       }
     }
   }
@@ -522,7 +522,7 @@ extension String {
       var stop_ = false
       body($0, self._range($1), self._range($2), &stop_)
       if stop_ {
-        UnsafeMutablePointer($3).memory = true
+        UnsafeMutablePointer($3).pointee = true
       }
     }
   }
@@ -557,7 +557,7 @@ extension String {
         &stop_)
 
       if stop_ {
-        UnsafeMutablePointer($3).memory = true
+        UnsafeMutablePointer($3).pointee = true
       }
     }
   }
@@ -913,7 +913,7 @@ extension String {
   /// Returns a `String` object initialized by using a given
   /// format string as a template into which the remaining argument
   /// values are substituted.
-  public init(format: String, _ arguments: CVarArgType...) {
+  public init(format: String, _ arguments: CVarArg...) {
     self = String(format: format, arguments: arguments)
   }
 
@@ -924,7 +924,7 @@ extension String {
   /// Returns a `String` object initialized by using a given
   /// format string as a template into which the remaining argument
   /// values are substituted according to the user’s default locale.
-  public init(format: String, arguments: [CVarArgType]) {
+  public init(format: String, arguments: [CVarArg]) {
     self = String(format: format, locale: nil, arguments: arguments)
   }
 
@@ -933,7 +933,7 @@ extension String {
   /// Returns a `String` object initialized by using a given
   /// format string as a template into which the remaining argument
   /// values are substituted according to given locale information.
-  public init(format: String, locale: NSLocale?, _ args: CVarArgType...) {
+  public init(format: String, locale: NSLocale?, _ args: CVarArg...) {
     self = String(format: format, locale: locale, arguments: args)
   }
 
@@ -945,8 +945,8 @@ extension String {
   /// Returns a `String` object initialized by using a given
   /// format string as a template into which the remaining argument
   /// values are substituted according to given locale information.
-  public init(format: String, locale: NSLocale?, arguments: [CVarArgType]) {
-    _precondition(
+  public init(format: String, locale: NSLocale?, arguments: [CVarArg]) {
+    _require(
       _countFormatSpecifiers(format) <= arguments.count,
       "Too many format specifiers (%<letter>) provided for the argument list"
     )
@@ -1348,7 +1348,7 @@ extension String {
   /// arguments.
   @warn_unused_result
   public func appendingFormat(
-    format: String, _ arguments: CVarArgType...
+    format: String, _ arguments: CVarArg...
   ) -> String {
     return _ns.appending(
       String(format: format, arguments: arguments))

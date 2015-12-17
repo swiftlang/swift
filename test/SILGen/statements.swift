@@ -163,7 +163,7 @@ func for_loops1(x: Int, c: Bool) {
   
   for ; x < 40;  {
    markUsed(x)
-   ++x
+   x += 1
   }
   
   for var i = 0; i < 100; ++i {

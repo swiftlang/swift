@@ -18,10 +18,10 @@
 
 public var errno: Int32 {
   get {
-    return __errno_location().memory
+    return __errno_location().pointee
   }
   set(val) {
-    return __errno_location().memory = val
+    __errno_location().pointee = val
   }
 }
 

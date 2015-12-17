@@ -19,7 +19,7 @@ public enum ApproximateCount {
   case Overestimate(IntMax)
 }
 
-public protocol ApproximateCountableSequenceType : Sequence {
+public protocol ApproximateCountableSequence : Sequence {
   /// Complexity: amortized O(1).
   var approximateCount: ApproximateCount { get }
 }
@@ -69,7 +69,7 @@ internal func _splitRandomAccessIndexRange<Index : RandomAccessIndex>(
 ///
 /// Using a builder can be more efficient than creating an empty collection
 /// instance and adding elements one by one.
-public protocol CollectionBuilderType {
+public protocol CollectionBuilder {
   typealias Destination : Collection
   typealias Element = Destination.Iterator.Element
 
@@ -120,8 +120,8 @@ public protocol CollectionBuilderType {
   mutating func takeResult() -> Destination
 }
 
-public protocol BuildableCollectionType : Collection {
-  typealias Builder : CollectionBuilderType
+public protocol BuildableCollectionProtocol : Collection {
+  typealias Builder : CollectionBuilder
 }
 
 extension Array : SplittableCollection {
@@ -130,7 +130,7 @@ extension Array : SplittableCollection {
   }
 }
 
-public struct ArrayBuilder<T> : CollectionBuilderType {
+public struct ArrayBuilder<T> : CollectionBuilder {
   // FIXME: the compiler didn't complain when I remove public on 'Collection'.
   // File a bug.
   public typealias Destination = Array<T>
@@ -176,7 +176,7 @@ public struct ArrayBuilder<T> : CollectionBuilderType {
   }
 }
 
-extension Array : BuildableCollectionType {
+extension Array : BuildableCollectionProtocol {
   public typealias Builder = ArrayBuilder<Element>
 }
 
@@ -218,7 +218,7 @@ struct _ForkJoinMutex {
   var _mutex: UnsafeMutablePointer<pthread_mutex_t>
 
   init() {
-    _mutex = UnsafeMutablePointer.alloc(1)
+    _mutex = UnsafeMutablePointer(allocatingCapacity: 1)
     if pthread_mutex_init(_mutex, nil) != 0 {
       fatalError("pthread_mutex_init")
     }
@@ -228,8 +228,8 @@ struct _ForkJoinMutex {
     if pthread_mutex_destroy(_mutex) != 0 {
       fatalError("pthread_mutex_init")
     }
-    _mutex.destroy()
-    _mutex.dealloc(1)
+    _mutex.deinitializePointee()
+    _mutex.deallocateCapacity(1)
   }
 
   func withLock<Result>(@noescape body: () -> Result) -> Result {
@@ -248,7 +248,7 @@ struct _ForkJoinCond {
   var _cond: UnsafeMutablePointer<pthread_cond_t> = nil
 
   init() {
-    _cond = UnsafeMutablePointer.alloc(1)
+    _cond = UnsafeMutablePointer(allocatingCapacity: 1)
     if pthread_cond_init(_cond, nil) != 0 {
       fatalError("pthread_cond_init")
     }
@@ -258,8 +258,8 @@ struct _ForkJoinCond {
     if pthread_cond_destroy(_cond) != 0 {
       fatalError("pthread_cond_destroy")
     }
-    _cond.destroy()
-    _cond.dealloc(1)
+    _cond.deinitializePointee()
+    _cond.deallocateCapacity(1)
   }
 
   func signal() {
@@ -322,7 +322,7 @@ final class _ForkJoinWorkDeque<T> {
   init() {}
 
   deinit {
-    precondition(_deque.isEmpty)
+    require(_deque.isEmpty)
 
     _dequeMutex.`deinit`()
   }
@@ -520,7 +520,7 @@ final class _ForkJoinWorkerThread {
   }
 }
 
-internal protocol _FutureType {
+internal protocol _Future {
   typealias Result
 
   /// Establishes a happens-before relation between completing the future and
@@ -557,12 +557,12 @@ public class ForkJoinTaskBase {
   }
 
   final public func fork() {
-    precondition(_pool == nil)
+    require(_pool == nil)
     if let thread = ForkJoinPool._getCurrentThread() {
       thread._forkTask(self)
     } else {
       // FIXME: decide if we want to allow this.
-      precondition(false)
+      require(false)
       ForkJoinPool.commonPool.forkTask(self)
     }
   }
@@ -576,7 +576,7 @@ public class ForkJoinTaskBase {
   }
 }
 
-final public class ForkJoinTask<Result> : ForkJoinTaskBase, _FutureType {
+final public class ForkJoinTask<Result> : ForkJoinTaskBase, _Future {
   internal let _task: () -> Result
   internal var _result: Result? = nil
 
@@ -591,7 +591,7 @@ final public class ForkJoinTask<Result> : ForkJoinTaskBase, _FutureType {
   /// It is not allowed to call _complete() in a racy way.  Only one thread
   /// should ever call _complete().
   internal func _complete(result: Result) {
-    precondition(!_completedEvent.isSet())
+    require(!_completedEvent.isSet())
     _result = result
     _completedEvent.set()
   }
@@ -763,7 +763,7 @@ final public class ForkJoinPool {
       return
     }
     _submissionQueuesMutex.withLock {
-      precondition(!_submissionQueues.isEmpty)
+      require(!_submissionQueues.isEmpty)
       for task in tasks {
         pickRandom(_submissionQueues).append(task)
       }
@@ -820,7 +820,7 @@ final public class ForkJoinPool {
       first!._run()
     } else {
       // FIXME: decide if we want to allow this.
-      precondition(false)
+      require(false)
     }
   }
 }
@@ -829,13 +829,13 @@ final public class ForkJoinPool {
 // Collection transformation DSL: implementation
 //===----------------------------------------------------------------------===//
 
-internal protocol _CollectionTransformerStepType /*: class*/ {
+internal protocol _CollectionTransformerStepProtocol /*: class*/ {
   typealias PipelineInputElement
   typealias OutputElement
 
   func transform<
     InputCollection : Collection,
-    Collector : _ElementCollectorType
+    Collector : _ElementCollector
     where
     InputCollection.Iterator.Element == PipelineInputElement,
     Collector.Element == OutputElement
@@ -847,7 +847,7 @@ internal protocol _CollectionTransformerStepType /*: class*/ {
 }
 
 internal class _CollectionTransformerStep<PipelineInputElement_, OutputElement_>
-  : _CollectionTransformerStepType {
+  : _CollectionTransformerStepProtocol {
 
   typealias PipelineInputElement = PipelineInputElement_
   typealias OutputElement = OutputElement_
@@ -871,7 +871,7 @@ internal class _CollectionTransformerStep<PipelineInputElement_, OutputElement_>
   }
 
   func collectTo<
-    C : BuildableCollectionType
+    C : BuildableCollectionProtocol
     where
     C.Builder.Destination == C,
     C.Builder.Element == C.Iterator.Element,
@@ -883,7 +883,7 @@ internal class _CollectionTransformerStep<PipelineInputElement_, OutputElement_>
 
   func transform<
     InputCollection : Collection,
-    Collector : _ElementCollectorType
+    Collector : _ElementCollector
     where
     InputCollection.Iterator.Element == PipelineInputElement,
     Collector.Element == OutputElement
@@ -925,7 +925,7 @@ final internal class _CollectionTransformerStepCollectionSource<
   }
 
   override func collectTo<
-    C : BuildableCollectionType
+    C : BuildableCollectionProtocol
     where
     C.Builder.Destination == C,
     C.Builder.Element == C.Iterator.Element,
@@ -937,7 +937,7 @@ final internal class _CollectionTransformerStepCollectionSource<
 
   override func transform<
     InputCollection : Collection,
-    Collector : _ElementCollectorType
+    Collector : _ElementCollector
     where
     InputCollection.Iterator.Element == PipelineInputElement,
     Collector.Element == OutputElement
@@ -956,7 +956,7 @@ final internal class _CollectionTransformerStepCollectionSource<
 final internal class _CollectionTransformerStepOneToMaybeOne<
   PipelineInputElement,
   OutputElement,
-  InputStep : _CollectionTransformerStepType
+  InputStep : _CollectionTransformerStepProtocol
   where
   InputStep.PipelineInputElement == PipelineInputElement
 > : _CollectionTransformerStep<PipelineInputElement, OutputElement> {
@@ -1008,7 +1008,7 @@ final internal class _CollectionTransformerStepOneToMaybeOne<
   }
 
   override func collectTo<
-    C : BuildableCollectionType
+    C : BuildableCollectionProtocol
     where
     C.Builder.Destination == C,
     C.Builder.Element == C.Iterator.Element,
@@ -1020,7 +1020,7 @@ final internal class _CollectionTransformerStepOneToMaybeOne<
 
   override func transform<
     InputCollection : Collection,
-    Collector : _ElementCollectorType
+    Collector : _ElementCollector
     where
     InputCollection.Iterator.Element == PipelineInputElement,
     Collector.Element == OutputElement
@@ -1037,9 +1037,9 @@ final internal class _CollectionTransformerStepOneToMaybeOne<
 }
 
 struct _ElementCollectorOneToMaybeOne<
-  BaseCollector : _ElementCollectorType,
+  BaseCollector : _ElementCollector,
   Element_
-> : _ElementCollectorType {
+> : _ElementCollector {
   typealias Element = Element_
 
   var _baseCollector: BaseCollector
@@ -1072,7 +1072,7 @@ struct _ElementCollectorOneToMaybeOne<
   }
 }
 
-protocol _ElementCollectorType {
+protocol _ElementCollector {
   typealias Element
 
   mutating func sizeHint(approximateSize: Int)
@@ -1100,7 +1100,7 @@ final class _CollectionTransformerFinalizerReduce<
   PipelineInputElement,
   U,
   InputElementTy,
-  InputStep : _CollectionTransformerStepType
+  InputStep : _CollectionTransformerStepProtocol
   where
   InputStep.OutputElement == InputElementTy,
   InputStep.PipelineInputElement == PipelineInputElement
@@ -1127,7 +1127,7 @@ final class _CollectionTransformerFinalizerReduce<
   }
 }
 
-struct _ElementCollectorReduce<Element_, Result> : _ElementCollectorType {
+struct _ElementCollectorReduce<Element_, Result> : _ElementCollector {
   typealias Element = Element_
 
   var _current: Result
@@ -1161,9 +1161,9 @@ struct _ElementCollectorReduce<Element_, Result> : _ElementCollectorType {
 
 final class _CollectionTransformerFinalizerCollectTo<
   PipelineInputElement,
-  U : BuildableCollectionType,
+  U : BuildableCollectionProtocol,
   InputElementTy,
-  InputStep : _CollectionTransformerStepType
+  InputStep : _CollectionTransformerStepProtocol
   where
   InputStep.OutputElement == InputElementTy,
   InputStep.PipelineInputElement == PipelineInputElement,
@@ -1190,11 +1190,11 @@ final class _CollectionTransformerFinalizerCollectTo<
 }
 
 struct _ElementCollectorCollectTo<
-  BuildableCollection : BuildableCollectionType
+  BuildableCollection : BuildableCollectionProtocol
   where
   BuildableCollection.Builder.Destination == BuildableCollection,
   BuildableCollection.Builder.Element == BuildableCollection.Iterator.Element
-> : _ElementCollectorType {
+> : _ElementCollector {
 
   typealias Element = BuildableCollection.Iterator.Element
 
@@ -1276,7 +1276,7 @@ public struct CollectionTransformerPipeline<
   }
 
   public func collectTo<
-    C : BuildableCollectionType
+    C : BuildableCollectionProtocol
     where
     C.Builder.Destination == C,
     C.Iterator.Element == T,

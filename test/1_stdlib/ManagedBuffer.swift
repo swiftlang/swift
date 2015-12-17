@@ -97,18 +97,18 @@ final class TestManagedBuffer<T> : ManagedBuffer<CountAndCapacity,T> {
     withUnsafeMutablePointerToElements {
       (x: UnsafeMutablePointer<T>)->() in
       for i in 0.stride(to: count, by: 2) {
-        (x + i).destroy()
+        (x + i).deinitializePointee()
       }
     }
   }
   
   func append(x: T) {
     let count = self.count
-    precondition(count + 2 <= capacity)
+    require(count + 2 <= capacity)
     
     withUnsafeMutablePointerToElements {
       (p: UnsafeMutablePointer<T>)->() in
-      (p + count).initialize(x)
+      (p + count).initializeMemory(x)
     }
     self.count = count + 2
   }
@@ -119,8 +119,8 @@ class MyBuffer<T> {
   deinit {
     Manager(unsafeBufferObject: self).withUnsafeMutablePointers {
       (pointerToValue, pointerToElements)->Void in
-      pointerToElements.destroy(self.count)
-      pointerToValue.destroy()
+      pointerToElements.deinitializePointee(count: self.count)
+      pointerToValue.deinitializePointee()
     }
   }
 
@@ -154,11 +154,11 @@ tests.test("basic") {
       expectEqual(i * 2, s.count)
       expectEqual(
         s.count,
-        s.withUnsafeMutablePointerToValue { $0.memory.count.value }
+        s.withUnsafeMutablePointerToValue { $0.pointee.count.value }
       )
       expectEqual(
         s.capacity,
-        s.withUnsafeMutablePointerToValue { $0.memory.capacity }
+        s.withUnsafeMutablePointerToValue { $0.pointee.capacity }
       )
       expectEqual(
         LifetimeTracked(i),
@@ -238,7 +238,7 @@ tests.test("ManagedBufferPointer") {
     let s2 = mgr.buffer as! MyBuffer<LifetimeTracked>
     expectFalse(mgr.holdsUniqueReference())
     
-    let val = mgr.withUnsafeMutablePointerToValue { $0 }.memory
+    let val = mgr.withUnsafeMutablePointerToValue { $0 }.pointee
     expectEqual(val.count.value, 0)
     expectEqual(val.capacity, 99)
   }

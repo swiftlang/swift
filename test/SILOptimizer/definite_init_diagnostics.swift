@@ -722,7 +722,7 @@ class DerivedUsingConvenienceInits : BaseWithConvenienceInits {
 // <rdar://problem/16660680> QoI: _preconditionFailure() in init method complains about super.init being called multiple times
 class ClassWhoseInitDoesntReturn : BaseWithConvenienceInits {
   init() {  
-    _preconditionFailure("leave me alone dude");
+    _requirementFailure("leave me alone dude");
   }
 }
 

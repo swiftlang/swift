@@ -43,11 +43,11 @@ ${MirrorDecl} {
 
   var count: Int { return 2 }
 
-  subscript(i: Int) -> (String, _MirrorType) {
+  subscript(i: Int) -> (String, _Mirror) {
     switch i {
     case 0: return ("${Children[0]}", _reflect(_value.${Children[0]}))
     case 1: return ("${Children[1]}", _reflect(_value.${Children[1]}))
-    default: _preconditionFailure("cannot extract this child index")
+    default: _requirementFailure("cannot extract this child index")
     }
   }
 

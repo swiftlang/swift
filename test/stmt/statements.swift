@@ -434,7 +434,7 @@ func for_ignored_lvalue_init() {
 func for_loop_multi_iter() {
   for (var i = 0, x = 0; i < 10; i++,
        x) { // expected-error {{expression resolves to an unused l-value}}
-    --x
+    x -= 1
   }
 }
 

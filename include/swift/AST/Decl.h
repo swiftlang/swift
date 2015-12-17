@@ -2242,16 +2242,6 @@ public:
   /// If \p DC is null, returns true only if this declaration is public.
   bool isAccessibleFrom(const DeclContext *DC) const;
 
-  /// Get the innermost declaration context that can provide generic
-  /// parameters used within this declaration.
-  DeclContext *getPotentialGenericDeclContext();
-
-  /// Get the innermost declaration context that can provide generic
-  /// parameters used within this declaration.
-  const DeclContext *getPotentialGenericDeclContext() const {
-    return const_cast<ValueDecl *>(this)->getPotentialGenericDeclContext();
-  }
-
   /// Retrieve the "interface" type of this value, which is the type used when
   /// the declaration is viewed from the outside. For a generic function,
   /// this will have generic function type using generic parameters rather than
@@ -4568,11 +4558,7 @@ public:
   /// and return the type to be used for the 'self' argument of the type, or an
   /// empty Type() if no 'self' argument should exist.  This can
   /// only be used after name binding has resolved types.
-  ///
-  /// \param outerGenericParams If non-NULL, and this function is an instance
-  /// of a generic type, will be set to the generic parameter list of that
-  /// generic type.
-  Type computeSelfType(GenericParamList **outerGenericParams = nullptr);
+  Type computeSelfType();
 
   /// \brief If this is a method in a type or extension thereof, compute
   /// and return the type to be used for the 'self' argument of the interface

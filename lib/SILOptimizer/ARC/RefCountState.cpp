@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "sil-global-arc-opts"
+#define DEBUG_TYPE "arc-sequence-opts"
 #include "RefCountState.h"
 #include "RCStateTransition.h"
 #include "llvm/Support/Debug.h"

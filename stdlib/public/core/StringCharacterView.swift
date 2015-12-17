@@ -93,7 +93,7 @@ extension String.CharacterView : Collection {
     ///
     /// - Requires: The next value is representable.
     public func successor() -> Index {
-      _precondition(_base != _base._viewEndIndex, "can not increment endIndex")
+      _require(_base != _base._viewEndIndex, "can not increment endIndex")
       return Index(_base: _endBase)
     }
 
@@ -101,7 +101,7 @@ extension String.CharacterView : Collection {
     ///
     /// - Requires: The previous value is representable.
     public func predecessor() -> Index {
-      _precondition(_base != _base._viewStartIndex,
+      _require(_base != _base._viewStartIndex,
           "can not decrement startIndex")
       let predecessorLengthUTF16 =
           Index._measureExtendedGraphemeClusterBackward(_base)
@@ -148,9 +148,9 @@ extension String.CharacterView : Collection {
 
       var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
           unicodeScalars[start].value)
-      ++start
+      start._successorInPlace()
 
-      for ; start != end; ++start {
+      for ; start != end; start._successorInPlace() {
         // FIXME(performance): consider removing this "fast path".  A branch
         // that is hard to predict could be worse for performance than a few
         // loads from cache to fetch the property 'gcb1'.
@@ -208,7 +208,7 @@ extension String.CharacterView : Collection {
     }
 
     /// Returns a mirror that reflects `self`.
-    public func _getMirror() -> _MirrorType {
+    public func _getMirror() -> _Mirror {
       return _IndexMirror(self)
     }
   }
@@ -236,7 +236,7 @@ extension String.CharacterView : Collection {
     return Character(String(unicodeScalars[i._base..<i._endBase]))
   }
 
-  internal struct _IndexMirror : _MirrorType {
+  internal struct _IndexMirror : _Mirror {
     var _value: Index
 
     init(_ x: Index) {
@@ -253,8 +253,8 @@ extension String.CharacterView : Collection {
 
     var count: Int { return 0 }
 
-    subscript(i: Int) -> (String, _MirrorType) {
-      _preconditionFailure("_MirrorType access out of bounds")
+    subscript(i: Int) -> (String, _Mirror) {
+      _requirementFailure("_Mirror access out of bounds")
     }
 
     var summary: String { return "\(_value._utf16Index)" }

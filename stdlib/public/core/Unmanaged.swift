@@ -31,7 +31,7 @@ public struct Unmanaged<Instance : AnyObject> {
   public static func fromOpaque(value: OpaquePointer) -> Unmanaged {
     // Null pointer check is a debug check, because it guards only against one
     // specific bad pointer value.
-    _debugPrecondition(
+    _debugRequire(
       value != nil,
       "attempt to create an Unmanaged instance from a null pointer")
 

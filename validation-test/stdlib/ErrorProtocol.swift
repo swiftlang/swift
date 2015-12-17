@@ -19,7 +19,7 @@ enum SomeError : ErrorProtocol {
   case GoneToFail
 }
 
-struct ErrorProtocolAsNSErrorRaceTest : RaceTestWithPerTrialDataType {
+struct ErrorProtocolAsNSErrorRaceTest : RaceTestWithPerTrialData {
   class RaceData {
     let error: ErrorProtocol
 

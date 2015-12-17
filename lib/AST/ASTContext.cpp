@@ -715,7 +715,7 @@ NominalTypeDecl *ASTContext::getUnmanagedDecl() const {
   return Impl.UnmanagedDecl;
 }
 
-static VarDecl *getMemoryProperty(VarDecl *&cache,
+static VarDecl *getPointeeProperty(VarDecl *&cache,
                            NominalTypeDecl *(ASTContext::*getNominal)() const,
                                   const ASTContext &ctx) {
   if (cache) return cache;
@@ -727,8 +727,8 @@ static VarDecl *getMemoryProperty(VarDecl *&cache,
   if (!generics) return nullptr;
   if (generics->size() != 1) return nullptr;
 
-  // There must be a property named "memory".
-  auto identifier = ctx.getIdentifier("memory");
+  // There must be a property named "pointee".
+  auto identifier = ctx.getIdentifier("pointee");
   auto results = nominal->lookupDirect(identifier);
   if (results.size() != 1) return nullptr;
 
@@ -743,18 +743,18 @@ static VarDecl *getMemoryProperty(VarDecl *&cache,
 }
 
 VarDecl *
-ASTContext::getPointerMemoryPropertyDecl(PointerTypeKind ptrKind) const {
+ASTContext::getPointerPointeePropertyDecl(PointerTypeKind ptrKind) const {
   switch (ptrKind) {
   case PTK_UnsafeMutablePointer:
-    return getMemoryProperty(Impl.UnsafeMutablePointerMemoryDecl,
+    return getPointeeProperty(Impl.UnsafeMutablePointerMemoryDecl,
                              &ASTContext::getUnsafeMutablePointerDecl,
                              *this);
   case PTK_UnsafePointer:
-    return getMemoryProperty(Impl.UnsafePointerMemoryDecl,
+    return getPointeeProperty(Impl.UnsafePointerMemoryDecl,
                              &ASTContext::getUnsafePointerDecl,
                              *this);
   case PTK_AutoreleasingUnsafeMutablePointer:
-    return getMemoryProperty(Impl.AutoreleasingUnsafeMutablePointerMemoryDecl,
+    return getPointeeProperty(Impl.AutoreleasingUnsafeMutablePointerMemoryDecl,
                          &ASTContext::getAutoreleasingUnsafeMutablePointerDecl,
                              *this);
   }

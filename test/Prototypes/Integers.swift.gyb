@@ -109,7 +109,7 @@ public func _assertCond(
   file: StaticString = __FILE__, line: UInt = __LINE__) {
   let ok = condition()
   if _isDebugAssertConfiguration() {
-    precondition(ok, message, file: file, line: line)
+    require(ok, message, file: file, line: line)
   }
   Builtin.condfail((!ok).__value)
 }
@@ -474,7 +474,7 @@ extension FixedWidthIntegerType {
     
     if (overflow != .None) {
       if (_isDebugAssertConfiguration()) {
-        _preconditionFailure("overflow in unsafe${capitalize(x.name)}")
+        _requirementFailure("overflow in unsafe${capitalize(x.name)}")
       }
       else {
         Builtin.conditionallyUnreachable()
@@ -514,7 +514,7 @@ extension FixedWidthIntegerType {
   @_transparent
   public func uword(n: Word) -> UWord {
     var n = n
-    _precondition(n >= 0, "Negative word index")
+    _require(n >= 0, "Negative word index")
     var x = self
     while n > 0 {
       x &>>= Swift.min(Self(_truncatingBits: Self._bitWidth) &- 1, ${word_bits})

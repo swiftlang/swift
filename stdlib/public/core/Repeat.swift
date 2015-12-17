@@ -42,7 +42,7 @@ public struct Repeat<Element> : Collection {
   /// - Requires: `position` is a valid position in `self` and
   ///   `position != endIndex`.
   public subscript(position: Int) -> Element {
-    _precondition(position >= 0 && position < count, "Index out of range")
+    _require(position >= 0 && position < count, "Index out of range")
     return repeatedValue
   }
 

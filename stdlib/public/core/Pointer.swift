@@ -13,7 +13,7 @@
 /// A stdlib-internal protocol modeled by the intrinsic pointer types,
 /// UnsafeMutablePointer, UnsafePointer, and
 /// AutoreleasingUnsafeMutablePointer.
-public protocol _PointerType {
+public protocol _Pointer {
   /// The underlying raw pointer value.
   var _rawValue: Builtin.RawPointer { get }
 
@@ -26,8 +26,8 @@ public protocol _PointerType {
 @warn_unused_result
 public // COMPILER_INTRINSIC
 func _convertPointerToPointerArgument<
-  FromPointer: _PointerType,
-  ToPointer: _PointerType
+  FromPointer : _Pointer,
+  ToPointer : _Pointer
 >(from: FromPointer) -> ToPointer {
   return ToPointer(from._rawValue)
 }
@@ -37,7 +37,7 @@ func _convertPointerToPointerArgument<
 @warn_unused_result
 public // COMPILER_INTRINSIC
 func _convertInOutToPointerArgument<
-  ToPointer: _PointerType
+  ToPointer : _Pointer
 >(from: Builtin.RawPointer) -> ToPointer {
   return ToPointer(from)
 }
@@ -48,14 +48,14 @@ func _convertInOutToPointerArgument<
 public // COMPILER_INTRINSIC
 func _convertMutableArrayToPointerArgument<
   FromElement,
-  ToPointer: _PointerType
+  ToPointer : _Pointer
 >(inout a: [FromElement]) -> (AnyObject?, ToPointer) {
   // TODO: Putting a canary at the end of the array in checked builds might
   // be a good idea
 
   // Call reserve to force contiguous storage.
   a.reserveCapacity(0)
-  _debugPrecondition(a._baseAddressIfContiguous != nil || a.isEmpty)
+  _debugRequire(a._baseAddressIfContiguous != nil || a.isEmpty)
 
   return (a._owner, ToPointer(a._baseAddressIfContiguous._rawValue))
 }
@@ -66,7 +66,7 @@ func _convertMutableArrayToPointerArgument<
 public // COMPILER_INTRINSIC
 func _convertConstArrayToPointerArgument<
   FromElement,
-  ToPointer: _PointerType
+  ToPointer : _Pointer
 >(arr: [FromElement]) -> (AnyObject?, ToPointer) {
   let (owner, raw) = arr._cPointerArgs()
   return (owner, ToPointer(raw))
@@ -77,7 +77,7 @@ func _convertConstArrayToPointerArgument<
 @warn_unused_result
 public // COMPILER_INTRINSIC
 func _convertConstStringToUTF8PointerArgument<
-  ToPointer: _PointerType
+  ToPointer : _Pointer
 >(str: String) -> (AnyObject?, ToPointer) {
   // Convert the UTF-8 representation to a null-terminated array.
   var utf8 = Array(str.utf8)

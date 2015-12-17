@@ -631,6 +631,15 @@ ClangImporter::create(ASTContext &ctx,
   while (!importer->Impl.Parser->ParseTopLevelDecl(parsed)) {
     for (auto *D : parsed.get()) {
       importer->Impl.addBridgeHeaderTopLevelDecls(D);
+
+      if (importer->Impl.UseSwiftLookupTables) {
+        if (auto named = dyn_cast<clang::NamedDecl>(D)) {
+          importer->Impl.addEntryToLookupTable(
+            instance.getSema(),
+            importer->Impl.BridgingHeaderLookupTable,
+            named);
+        }
+      }
     }
   }
 
@@ -3699,6 +3708,16 @@ void ClangModuleUnit::lookupVisibleDecls(Module::AccessPathTy accessPath,
     actualConsumer = &darwinBlacklistConsumer;
   }
 
+  if (owner.Impl.UseSwiftLookupTables) {
+    // Find the corresponding lookup table.
+    if (auto lookupTable = owner.Impl.findLookupTable(clangModule)) {
+      // Search it.
+      owner.Impl.lookupVisibleDecls(*lookupTable, *actualConsumer);
+    }
+
+    return;
+  }
+
   owner.lookupVisibleDecls(*actualConsumer);
 }
 
@@ -3788,10 +3807,6 @@ void ClangModuleUnit::lookupValue(Module::AccessPathTy accessPath,
   if (!Module::matchesAccessPath(accessPath, name))
     return;
 
-  // There should be no multi-part top-level decls in a Clang module.
-  if (!name.isSimpleName())
-    return;
-
   // FIXME: Ignore submodules, which are empty for now.
   if (clangModule && clangModule->isSubModule())
     return;
@@ -3807,6 +3822,20 @@ void ClangModuleUnit::lookupValue(Module::AccessPathTy accessPath,
       DarwinBlacklistDeclConsumer::needsBlacklist(clangModule)) {
     consumer = &darwinBlacklistConsumer;
   }
+
+  if (owner.Impl.UseSwiftLookupTables) {
+    // Find the corresponding lookup table.
+    if (auto lookupTable = owner.Impl.findLookupTable(clangModule)) {
+      // Search it.
+      owner.Impl.lookupValue(*lookupTable, name, *consumer);
+    }
+
+    return;
+  }
+
+  // There should be no multi-part top-level decls in a Clang module.
+  if (!name.isSimpleName())
+    return;
 
   owner.lookupValue(name.getBaseName(), *consumer);
 }
@@ -4481,34 +4510,119 @@ SwiftLookupTable *ClangImporter::Implementation::findLookupTable(
   return known->second.get();
 }
 
+/// Determine whether the given Clang entry is visible.
+///
+/// FIXME: this is an elaborate hack to badly reflect Clang's
+/// submodule visibility into Swift.
+static bool isVisibleClangEntry(clang::Preprocessor &pp,
+                                StringRef name,
+                                SwiftLookupTable::SingleEntry entry) {
+  if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {
+    // For a declaration, check whether the declaration is hidden.
+    if (!clangDecl->isHidden()) return true;
+
+    // Is any redeclaration visible?
+    for (auto redecl : clangDecl->redecls()) {
+      if (!cast<clang::NamedDecl>(redecl)->isHidden()) return true;
+    }
+
+    return false;
+  }
+
+  // Check whether the macro is defined.
+  // FIXME: We could get the wrong macro definition here.
+  return pp.isMacroDefined(name);
+}
+
+void ClangImporter::Implementation::lookupValue(
+       SwiftLookupTable &table, DeclName name,
+       VisibleDeclConsumer &consumer) {
+  auto clangTU = getClangASTContext().getTranslationUnitDecl();
+  auto &clangPP = getClangPreprocessor();
+  auto baseName = name.getBaseName().str();
+
+  for (auto entry : table.lookup(name.getBaseName().str(), clangTU)) {
+    // If the entry is not visible, skip it.
+    if (!isVisibleClangEntry(clangPP, baseName, entry)) continue;
+
+    ValueDecl *decl;
+
+    // If it's a Clang declaration, try to import it.
+    if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {
+      decl = cast_or_null<ValueDecl>(
+               importDeclReal(clangDecl->getMostRecentDecl()));
+      if (!decl) continue;
+    } else {
+      // Try to import a macro.
+      auto clangMacro = entry.get<clang::MacroInfo *>();
+      decl = importMacro(name.getBaseName(), clangMacro);
+      if (!decl) continue;
+    }
+
+    // If we found a declaration from the standard library, make sure
+    // it does not show up in the lookup results for the imported
+    // module.
+    if (decl->getDeclContext()->isModuleScopeContext() &&
+        decl->getModuleContext() == getStdlibModule())
+      continue;
+
+    // If the name matched, report this result.
+    if (decl->getFullName().matchesRef(name))
+      consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
+
+    // If there is an alternate declaration and the name matches,
+    // report this result.
+    if (auto alternate = getAlternateDecl(decl)) {
+      if (alternate->getFullName().matchesRef(name))
+        consumer.foundDecl(alternate, DeclVisibilityKind::VisibleAtTopLevel);
+    }
+  }
+}
+
+void ClangImporter::Implementation::lookupVisibleDecls(
+       SwiftLookupTable &table,
+       VisibleDeclConsumer &consumer) {
+  // Retrieve and sort all of the base names in this particular table.
+  auto baseNames = table.allBaseNames();
+  llvm::array_pod_sort(baseNames.begin(), baseNames.end());
+
+  // Look for namespace-scope entities with each base name.
+  for (auto baseName : baseNames) {
+    lookupValue(table, SwiftContext.getIdentifier(baseName), consumer);
+  }
+}
+
 void ClangImporter::Implementation::lookupObjCMembers(
        SwiftLookupTable &table,
        DeclName name,
        VisibleDeclConsumer &consumer) {
-  bool isSubscript = name.getBaseName() == SwiftContext.Id_subscript;
+  auto &clangPP = getClangPreprocessor();
+  auto baseName = name.getBaseName().str();
 
   for (auto clangDecl : table.lookupObjCMembers(name.getBaseName().str())) {
+    // If the entry is not visible, skip it.
+    if (!isVisibleClangEntry(clangPP, baseName, clangDecl)) continue;
+
     // Import the declaration.
     auto decl = cast_or_null<ValueDecl>(importDeclReal(clangDecl));
     if (!decl)
       continue;
 
-    // Handle subscripts.
-    if (isSubscript) {
-      if (auto subscript = importSubscriptOf(decl))
-        consumer.foundDecl(subscript, DeclVisibilityKind::DynamicLookup);
-      continue;
+    // If the name we found matches, report the declaration.
+    if (decl->getFullName().matchesRef(name))
+      consumer.foundDecl(decl, DeclVisibilityKind::DynamicLookup);
+
+    // Check for an alternate declaration; if it's name matches,
+    // report it.
+    if (auto alternate = getAlternateDecl(decl)) {
+      if (alternate->getFullName().matchesRef(name))
+        consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup);
     }
-
-    // Did the name we found match?
-    if (!decl->getFullName().matchesRef(name)) continue;
-
-    // Report this declaration.
-    consumer.foundDecl(decl, DeclVisibilityKind::DynamicLookup);
 
     // If we imported an Objective-C instance method from a root
     // class, and there is no corresponding class method, also import
     // it as a class method.
+    // FIXME: Handle this as an alternate?
     if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
       if (objcMethod->isInstanceMethod()) {
         if (auto method = dyn_cast<FuncDecl>(decl)) {

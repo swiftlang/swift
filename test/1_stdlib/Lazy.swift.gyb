@@ -72,24 +72,24 @@ LazyTestSuite.test("CollectionOfOne") {
 // FIXME: trap tests.
 
 //===----------------------------------------------------------------------===//
-// IteratorOfOne
+// IteratorOverOne
 //===----------------------------------------------------------------------===//
 
 // Check that the generic parameter is called 'Element'.
-extension IteratorOfOne where Element : TestProtocol1 {
+extension IteratorOverOne where Element : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
 }
 
-LazyTestSuite.test("IteratorOfOne") {
+LazyTestSuite.test("IteratorOverOne") {
   checkIterator(
     [] as Array<OpaqueValue<Int>>,
-    IteratorOfOne(nil as Optional<OpaqueValue<Int>>)) { $0.value == $1.value }
+    IteratorOverOne(nil as Optional<OpaqueValue<Int>>)) { $0.value == $1.value }
 
   checkIterator(
     [ OpaqueValue(42) ] as Array<OpaqueValue<Int>>,
-    IteratorOfOne(OpaqueValue(42))) { $0.value == $1.value }
+    IteratorOverOne(OpaqueValue(42))) { $0.value == $1.value }
 }
 
 //===----------------------------------------------------------------------===//
@@ -403,12 +403,12 @@ func expectSequencePassthrough<
   }
   
   SequenceLog._initializeTo.expectIncrement(baseType) { ()->Void in
-    let buf = UnsafeMutablePointer<S.Iterator.Element>.alloc(count)
+    let buf = UnsafeMutablePointer<S.Iterator.Element>(allocatingCapacity: count)
   
     let end = s._initializeTo(buf)
     expectTrue(end <= buf + count)
-    buf.destroy(end - buf)
-    buf.dealloc(count)
+    buf.deinitializePointee(count: end - buf)
+    buf.deallocateCapacity(count)
   }
 }
 

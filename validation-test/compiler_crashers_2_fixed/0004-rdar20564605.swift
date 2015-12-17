@@ -1,12 +1,12 @@
 // RUN: not %target-swift-frontend %s -parse
 
-public protocol Q_SequenceDefaultsType {
+public protocol Q_SequenceDefaults {
   typealias Element
   typealias Iterator : IteratorProtocol
   func iterator() -> Iterator
 }
 
-extension Q_SequenceDefaultsType {
+extension Q_SequenceDefaults {
   public final func underestimateCount() -> Int { return 0 }
   public final func preprocessingPass<R>(body: (Self)->R) -> R? {
     return nil
@@ -35,8 +35,8 @@ extension Q_SequenceDefaultsType {
     var p = baseAddress
     var iter = self.iterator()
     while let element = iter.next() {
-      p.initialize(element)
-      ++p
+      p.initializeMemory(element)
+      p += 1
     }
   }
 
@@ -49,7 +49,7 @@ extension Q_SequenceDefaultsType {
 /// whether they will be destructively "consumed" by iteration.  To
 /// ensure non-destructive iteration, constrain your *sequence* to
 /// `Collection`.
-public protocol Q_SequenceType : Q_SequenceDefaultsType {
+public protocol Q_Sequence : Q_SequenceDefaults {
   /// A type that provides the *sequence*\ 's iteration interface and
   /// encapsulates its iteration state.
   typealias Iterator : IteratorProtocol
@@ -87,7 +87,7 @@ public extension IteratorProtocol {
   }
 }
 
-public protocol Q_CollectionDefaultsType : Q_SequenceType {
+public protocol Q_CollectionDefaults : Q_Sequence {
   typealias Index : ForwardIndex
   
   var startIndex: Index {get}
@@ -110,7 +110,7 @@ extension Q_Indexable {
   }
 }
 
-extension Q_CollectionDefaultsType {
+extension Q_CollectionDefaults {
   public final func count() -> Index.Distance {
     return distance(startIndex, endIndex)
   }
@@ -135,23 +135,23 @@ public struct Q_IndexingIterator<C: Q_Indexable> : IteratorProtocol {
       return nil
     }
     let ret = elements[pos]
-    ++pos
+    pos += 1
     return ret
   }
 }
 
-public protocol Q_CollectionType : Q_Indexable, Q_CollectionDefaultsType {
+public protocol Q_Collection : Q_Indexable, Q_CollectionDefaults {
   func count() -> Index.Distance
   subscript(position: Index) -> Element {get}
 }
 
-extension Array : Q_CollectionType {
+extension Array : Q_Collection {
   public func copyToContiguousArray() -> ContiguousArray<Element> {
     return ContiguousArray(self~>_copyToNativeArrayBuffer())
   }
 }
 
-struct Boo : Q_CollectionType {
+struct Boo : Q_Collection {
   let startIndex: Int = 0
   let endIndex: Int = 10
 

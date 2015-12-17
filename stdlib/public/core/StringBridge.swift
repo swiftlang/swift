@@ -18,12 +18,12 @@ import SwiftShims
 // Foundation.
 
 /// Effectively an untyped NSString that doesn't require foundation.
-public typealias _CocoaStringType = AnyObject
+public typealias _CocoaString = AnyObject
 
 public // @testable
 func _stdlib_binary_CFStringCreateCopy(
-  source: _CocoaStringType
-) -> _CocoaStringType {
+  source: _CocoaString
+) -> _CocoaString {
   let result = _swift_stdlib_CFStringCreateCopy(nil, source)
   Builtin.release(result)
   return result
@@ -31,14 +31,14 @@ func _stdlib_binary_CFStringCreateCopy(
 
 public // @testable
 func _stdlib_binary_CFStringGetLength(
-  source: _CocoaStringType
+  source: _CocoaString
 ) -> Int {
   return _swift_stdlib_CFStringGetLength(source)
 }
 
 public // @testable
 func _stdlib_binary_CFStringGetCharactersPtr(
-  source: _CocoaStringType
+  source: _CocoaString
 ) -> UnsafeMutablePointer<UTF16.CodeUnit> {
   return UnsafeMutablePointer(_swift_stdlib_CFStringGetCharactersPtr(source))
 }
@@ -47,7 +47,7 @@ func _stdlib_binary_CFStringGetCharactersPtr(
 /// characters (does not apply ASCII optimizations).
 @inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
 func _cocoaStringToSwiftString_NonASCII(
-  source: _CocoaStringType
+  source: _CocoaString
 ) -> String {
   let cfImmutableValue = _stdlib_binary_CFStringCreateCopy(source)
   let length = _stdlib_binary_CFStringGetLength(cfImmutableValue)
@@ -65,10 +65,10 @@ func _cocoaStringToSwiftString_NonASCII(
 /// with useful values
 
 /// Produces a `_StringBuffer` from a given subrange of a source
-/// `_CocoaStringType`, having the given minimum capacity.
+/// `_CocoaString`, having the given minimum capacity.
 @inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
 internal func _cocoaStringToContiguous(
-  source: _CocoaStringType, _ range: Range<Int>, minimumCapacity: Int
+  source: _CocoaString, _ range: Range<Int>, minimumCapacity: Int
 ) -> _StringBuffer {
   _sanityCheck(_swift_stdlib_CFStringGetCharactersPtr(source) == nil,
     "Known contiguously-stored strings should already be converted to Swift")
@@ -86,11 +86,11 @@ internal func _cocoaStringToContiguous(
   return buffer
 }
 
-/// Reads the entire contents of a _CocoaStringType into contiguous
+/// Reads the entire contents of a _CocoaString into contiguous
 /// storage of sufficient capacity.
 @inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
 internal func _cocoaStringReadAll(
-  source: _CocoaStringType, _ destination: UnsafeMutablePointer<UTF16.CodeUnit>
+  source: _CocoaString, _ destination: UnsafeMutablePointer<UTF16.CodeUnit>
 ) {
   _swift_stdlib_CFStringGetCharacters(
     source, _swift_shims_CFRange(
@@ -103,7 +103,7 @@ internal func _cocoaStringSlice(
 ) -> _StringCore {
   _sanityCheck(target.hasCocoaBuffer)
   
-  let cfSelf: _swift_shims_CFStringRef = unsafeUnwrap(target.cocoaBuffer)
+  let cfSelf: _swift_shims_CFStringRef = target.cocoaBuffer.unsafeUnwrap()
   
   _sanityCheck(
     _swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
@@ -120,7 +120,7 @@ internal func _cocoaStringSlice(
 internal func _cocoaStringSubscript(
   target: _StringCore, _ position: Int
 ) -> UTF16.CodeUnit {
-  let cfSelf: _swift_shims_CFStringRef = unsafeUnwrap(target.cocoaBuffer)
+  let cfSelf: _swift_shims_CFStringRef = target.cocoaBuffer.unsafeUnwrap()
 
   _sanityCheck(_swift_stdlib_CFStringGetCharactersPtr(cfSelf)._isNull,
     "Known contiguously-stored strings should already be converted to Swift")
@@ -187,8 +187,8 @@ extension String {
 public class _SwiftNativeNSString {}
 
 @objc
-public protocol _NSStringCoreType :
-    _NSCopyingType, _NSFastEnumerationType {
+public protocol _NSStringCore :
+    _NSCopying, _NSFastEnumeration {
 
   // The following methods should be overridden when implementing an
   // NSString subclass.
@@ -226,7 +226,7 @@ public final class _NSContiguousString : _SwiftNativeNSString {
     buffer: UnsafeMutablePointer<UInt16>,
     range aRange: _SwiftNSRange) {
 
-    _precondition(aRange.location + aRange.length <= Int(_core.count))
+    _require(aRange.location + aRange.length <= Int(_core.count))
 
     if _core.elementWidth == 2 {
       UTF16._copy(

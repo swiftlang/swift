@@ -105,14 +105,6 @@ tests.test("_assumeNonNegative") {
   expectEqual(r, 27)
 }
 
-tests.test("unsafeUnwrap") {
-  let empty: Int? = nil
-  let nonEmpty: Int? = 3
-  expectEqual(3, unsafeUnwrap(nonEmpty))
-  expectCrashLater()
-  unsafeUnwrap(empty)
-}
-
 var NoisyLifeCount = 0
 var NoisyDeathCount = 0
 
@@ -137,17 +129,17 @@ struct Large : P {
 struct ContainsP { var p: P }
 
 func exerciseArrayValueWitnesses<T>(value: T) {
-  let buf = UnsafeMutablePointer<T>.alloc(5)
+  let buf = UnsafeMutablePointer<T>(allocatingCapacity: 5)
 
-  (buf + 0).initialize(value)
-  (buf + 1).initialize(value)
+  (buf + 0).initializeMemory(value)
+  (buf + 1).initializeMemory(value)
   
   Builtin.copyArray(T.self, (buf + 2)._rawValue, buf._rawValue, 2._builtinWordValue)
   Builtin.takeArrayBackToFront(T.self, (buf + 1)._rawValue, buf._rawValue, 4._builtinWordValue)
   Builtin.takeArrayFrontToBack(T.self, buf._rawValue, (buf + 1)._rawValue, 4._builtinWordValue)
   Builtin.destroyArray(T.self, buf._rawValue, 4._builtinWordValue)
 
-  buf.dealloc(5)
+  buf.deallocateCapacity(5)
 }
 
 tests.test("array value witnesses") {

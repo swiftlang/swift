@@ -19,7 +19,7 @@
 ///
 /// - Note: To print without a trailing newline, pass `terminator: ""`
 ///
-/// - SeeAlso: `debugPrint`, Streamable`, `CustomStringConvertible`,
+/// - SeeAlso: `debugPrint`, `Streamable`, `CustomStringConvertible`,
 ///   `CustomDebugStringConvertible`
 @inline(never)
 @_semantics("stdlib_binary_only")
@@ -50,7 +50,7 @@ public func print(
 ///
 /// - Note: To print without a trailing newline, pass `terminator: ""`
 ///
-/// - SeeAlso: `print`, Streamable`, `CustomStringConvertible`,
+/// - SeeAlso: `print`, `Streamable`, `CustomStringConvertible`,
 ///   `CustomDebugStringConvertible`
 @inline(never)
 @_semantics("stdlib_binary_only")
@@ -79,10 +79,10 @@ public func debugPrint(
 ///
 /// - Note: To print without a trailing newline, pass `terminator: ""`
 ///
-/// - SeeAlso: `debugPrint`, Streamable`, `CustomStringConvertible`,
+/// - SeeAlso: `debugPrint`, `Streamable`, `CustomStringConvertible`,
 ///   `CustomDebugStringConvertible`
 @inline(__always)
-public func print<Target: OutputStreamType>(
+public func print<Target: OutputStream>(
   items: Any...,
   separator: String = " ",
   terminator: String = "\n",
@@ -100,10 +100,10 @@ public func print<Target: OutputStreamType>(
 ///
 /// - Note: To print without a trailing newline, pass `terminator: ""`
 ///
-/// - SeeAlso: `print`, Streamable`, `CustomStringConvertible`,
+/// - SeeAlso: `print`, `Streamable`, `CustomStringConvertible`,
 ///   `CustomDebugStringConvertible`
 @inline(__always)
-public func debugPrint<Target: OutputStreamType>(
+public func debugPrint<Target: OutputStream>(
   items: Any...,
   separator: String = " ",
   terminator: String = "\n",
@@ -115,7 +115,7 @@ public func debugPrint<Target: OutputStreamType>(
 
 @inline(never)
 @_semantics("stdlib_binary_only")
-internal func _print<Target: OutputStreamType>(
+internal func _print<Target: OutputStream>(
   items: [Any],
   separator: String = " ",
   terminator: String = "\n",
@@ -134,7 +134,7 @@ internal func _print<Target: OutputStreamType>(
 
 @inline(never)
 @_semantics("stdlib_binary_only")
-internal func _debugPrint<Target: OutputStreamType>(
+internal func _debugPrint<Target: OutputStream>(
   items: [Any],
   separator: String = " ",
   terminator: String = "\n",
@@ -162,9 +162,9 @@ public func debugPrint<T>(_: T) {}
 
 //===--- FIXME: Not working due to <rdar://22101775> ----------------------===//
 @available(*, unavailable, message="Please use the 'toStream' label for the target stream: 'print((...), toStream: &...)'")
-public func print<T>(_: T, inout _: OutputStreamType) {}
+public func print<T>(_: T, inout _: OutputStream) {}
 @available(*, unavailable, message="Please use the 'toStream' label for the target stream: 'debugPrint((...), toStream: &...))'")
-public func debugPrint<T>(_: T, inout _: OutputStreamType) {}
+public func debugPrint<T>(_: T, inout _: OutputStream) {}
 
 //===----------------------------------------------------------------------===//
 //===----------------------------------------------------------------------===//

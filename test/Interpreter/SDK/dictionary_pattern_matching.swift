@@ -90,12 +90,12 @@ enum Statistic: _Reflectable {
   case ForState(State)
   case ForCountry(Country)
 
-  func _getMirror() -> _MirrorType {
+  func _getMirror() -> _Mirror {
     return StatMirror(_value: self)
   }
 }
 
-struct StatMirror: _MirrorType {
+struct StatMirror: _Mirror {
   let _value: Statistic
 
   var value: Any { return _value }
@@ -103,7 +103,7 @@ struct StatMirror: _MirrorType {
   var objectIdentifier: ObjectIdentifier? { return nil }
   var count: Int { return 1 }
 
-  subscript(i: Int) -> (String, _MirrorType) {
+  subscript(i: Int) -> (String, _Mirror) {
     assert(i == 0)
     switch _value {
     case .ForState(let state):

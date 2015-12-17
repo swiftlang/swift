@@ -17,7 +17,7 @@ import ObjectiveC
 // Objective-C Primitive Types
 //===----------------------------------------------------------------------===//
 
-public typealias BooleanType = Swift.Boolean
+public typealias Boolean = Swift.Boolean
 /// The Objective-C BOOL type.
 ///
 /// On 64-bit iOS, the Objective-C BOOL type is a typedef of C/C++
@@ -63,7 +63,7 @@ public struct ObjCBool : Boolean, BooleanLiteralConvertible {
 
 extension ObjCBool : _Reflectable {
   /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> _MirrorType {
+  public func _getMirror() -> _Mirror {
     return _reflect(boolValue)
   }
 }
@@ -121,13 +121,9 @@ public struct Selector : StringLiteralConvertible, NilLiteralConvertible {
     self = sel_registerName(value)
   }
 
-  public init() {
-    ptr = nil
-  }
-  
   /// Create an instance initialized with `nil`.
-  @_transparent public
-  init(nilLiteral: ()) {
+  @_transparent
+  public init(nilLiteral: ()) {
     ptr = nil
   }
 }
@@ -170,7 +166,7 @@ extension String {
 
 extension Selector : _Reflectable {
   /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> _MirrorType {
+  public func _getMirror() -> _Mirror {
     return _reflect(String(_sel: self))
   }
 }
@@ -185,8 +181,8 @@ public struct NSZone : NilLiteralConvertible {
   public init() { pointer = nil }
 
   /// Create an instance initialized with `nil`.
-  @_transparent public
-  init(nilLiteral: ()) {
+  @_transparent
+  public init(nilLiteral: ()) {
     pointer = nil
   }
 }
@@ -266,7 +262,7 @@ public func == (lhs: NSObject, rhs: NSObject) -> Bool {
   return lhs.isEqual(rhs)
 }
 
-extension NSObject : CVarArgType {
+extension NSObject : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
   public var _cVarArgEncoding: [Int] {

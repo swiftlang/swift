@@ -48,7 +48,7 @@ public enum Optional<Wrapped> : _Reflectable, NilLiteralConvertible {
 
   /// Returns a mirror that reflects `self`.
   @warn_unused_result
-  public func _getMirror() -> _MirrorType {
+  public func _getMirror() -> _Mirror {
     return _OptionalMirror(self)
   }
 
@@ -57,6 +57,40 @@ public enum Optional<Wrapped> : _Reflectable, NilLiteralConvertible {
   public init(nilLiteral: ()) {
     self = .None
   }
+
+  /// - Returns: `nonEmpty!`.
+  ///
+  /// - Requires: `nonEmpty != nil`.  In particular, in -O builds, no test
+  ///   is performed to ensure that `nonEmpty` actually is non-nil.
+  ///
+  /// - Warning: Trades safety for performance.  Use `unsafeUnwrap`
+  ///   only when `nonEmpty!` has proven to be a performance problem and
+  ///   you are confident that, always, `nonEmpty != nil`.  It is better
+  ///   than an `unsafeBitCast` because it's more restrictive, and
+  ///   because checking is still performed in debug builds.
+  @inline(__always)
+  @warn_unused_result
+  public func unsafeUnwrap() -> Wrapped {
+    if let x = self {
+      return x
+    }
+    _debugRequirementFailure("unsafeUnwrap of nil optional")
+  }
+
+  /// - Returns: `unsafeUnwrap(nonEmpty)`.
+  ///
+  /// This version is for internal stdlib use; it avoids any checking
+  /// overhead for users, even in Debug builds.
+  @inline(__always)
+  @warn_unused_result
+  public // SPI(SwiftExperimental)
+  func _unsafeUnwrap() -> Wrapped {
+    if let x = self {
+      return x
+    }
+    _sanityCheckFailure("_unsafeUnwrap of nil optional")
+  }
+
 }
 
 extension Optional : CustomDebugStringConvertible {
@@ -84,7 +118,7 @@ func _doesOptionalHaveValueAsBool<Wrapped>(v: Wrapped?) -> Bool {
 @_transparent
 public // COMPILER_INTRINSIC
 func _diagnoseUnexpectedNilOptional() {
-  _preconditionFailure(
+  _requirementFailure(
                 "unexpectedly found nil while unwrapping an Optional value")
 }
 
@@ -95,7 +129,7 @@ func _getOptionalValue<Wrapped>(v: Wrapped?) -> Wrapped {
   case let x?:
     return x
   case .None:
-    _preconditionFailure(
+    _requirementFailure(
       "unexpectedly found nil while unwrapping an Optional value")
   }
 }
@@ -191,7 +225,7 @@ public func != <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   }
 }
 
-internal struct _OptionalMirror<Wrapped> : _MirrorType {
+internal struct _OptionalMirror<Wrapped> : _Mirror {
   let _value : Optional<Wrapped>
 
   init(_ x : Optional<Wrapped>) {
@@ -206,10 +240,10 @@ internal struct _OptionalMirror<Wrapped> : _MirrorType {
 
   var count: Int { return (_value != nil) ? 1 : 0 }
 
-  subscript(i: Int) -> (String, _MirrorType) {
+  subscript(i: Int) -> (String, _Mirror) {
     switch (_value, i) {
     case (.Some(let contents), 0) : return ("Some", _reflect(contents))
-    default: _preconditionFailure("cannot extract this child index")
+    default: _requirementFailure("cannot extract this child index")
     }
   }
 

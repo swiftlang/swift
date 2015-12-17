@@ -22,7 +22,7 @@ import SwiftPrivatePthreadExtras
 import ObjectiveC
 #endif
 
-struct ArrayBridge_objectAtIndex_RaceTest : RaceTestWithPerTrialDataType {
+struct ArrayBridge_objectAtIndex_RaceTest : RaceTestWithPerTrialData {
   class RaceData {
     var nsa: NSArray
     init(nsa: NSArray) {
@@ -59,7 +59,7 @@ struct ArrayBridge_objectAtIndex_RaceTest : RaceTestWithPerTrialDataType {
 }
 
 struct ArrayBridge_FastEnumeration_ObjC_RaceTest :
-  RaceTestWithPerTrialDataType {
+  RaceTestWithPerTrialData {
   class RaceData {
     var nsa: NSArray
     init(nsa: NSArray) {

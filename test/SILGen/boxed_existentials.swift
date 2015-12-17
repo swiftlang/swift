@@ -34,13 +34,13 @@ func test_composition_erasure(x: protocol<HairType, ErrorProtocol>) -> ErrorProt
 // CHECK:         destroy_addr [[OLD_EXISTENTIAL]]
 // CHECK:         return [[NEW_EXISTENTIAL]]#0
 
-protocol HairClassType: class {}
+protocol HairClass: class {}
 
-func test_class_composition_erasure(x: protocol<HairClassType, ErrorProtocol>) -> ErrorProtocol {
+func test_class_composition_erasure(x: protocol<HairClass, ErrorProtocol>) -> ErrorProtocol {
   return x
 }
-// CHECK-LABEL: sil hidden @_TF18boxed_existentials30test_class_composition_erasureFPs13ErrorProtocolS_13HairClassType_PS0__
-// CHECK:         [[VALUE:%.*]] = open_existential_ref [[OLD_EXISTENTIAL:%.*]] : $protocol<ErrorProtocol, HairClassType> to $[[VALUE_TYPE:@opened\(.*\) protocol<ErrorProtocol, HairClassType>]]
+// CHECK-LABEL: sil hidden @_TF18boxed_existentials30test_class_composition_erasureFPs13ErrorProtocolS_9HairClass_PS0__
+// CHECK:         [[VALUE:%.*]] = open_existential_ref [[OLD_EXISTENTIAL:%.*]] : $protocol<ErrorProtocol, HairClass> to $[[VALUE_TYPE:@opened\(.*\) protocol<ErrorProtocol, HairClass>]]
 // CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $ErrorProtocol, $[[VALUE_TYPE]]
 // CHECK:         store [[VALUE]] to [[NEW_EXISTENTIAL]]#1
 // CHECK:         return [[NEW_EXISTENTIAL]]#0

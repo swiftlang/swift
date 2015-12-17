@@ -123,7 +123,7 @@ extension String {
   public init<T : _SignedInteger>(
     _ v: T, radix: Int, uppercase: Bool = false
   ) {
-    _precondition(radix > 1, "Radix must be greater than 1")
+    _require(radix > 1, "Radix must be greater than 1")
     self = _int64ToString(
       v.toIntMax(), radix: Int64(radix), uppercase: uppercase)
   }
@@ -135,7 +135,7 @@ extension String {
   public init<T : UnsignedInteger>(
     _ v: T, radix: Int, uppercase: Bool = false
   ) {
-    _precondition(radix > 1, "Radix must be greater than 1")
+    _require(radix > 1, "Radix must be greater than 1")
     self = _uint64ToString(
       v.toUIntMax(), radix: Int64(radix), uppercase: uppercase)
   }
@@ -148,7 +148,7 @@ extension String {
     let rng = unicodeScalars
     var startIndex = rng.startIndex
     for _ in 0..<start {
-      ++startIndex
+      startIndex._successorInPlace()
     }
     return String(rng[startIndex..<rng.endIndex])
   }

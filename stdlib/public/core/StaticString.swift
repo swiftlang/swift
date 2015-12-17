@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 // Implementation Note: Because StaticString is used in the
-// implementation of _precondition(), _fatalErrorMessage(), etc., we
+// implementation of _require(), _fatalErrorMessage(), etc., we
 // keep it extremely close to the bare metal.  In particular, because
 // we store only Builtin types, we are guaranteed that no assertions
 // are involved in its construction.  This feature is crucial for
@@ -61,7 +61,7 @@ public struct StaticString
   ///   units.
   @_transparent
   public var utf8Start: UnsafePointer<UInt8> {
-    _precondition(
+    _require(
       hasPointerRepresentation,
       "StaticString should have pointer representation")
     return UnsafePointer(_startPtrOrData)
@@ -72,7 +72,7 @@ public struct StaticString
   /// - Requires: `self` stores a single Unicode scalar value.
   @_transparent
   public var unicodeScalar: UnicodeScalar {
-    _precondition(
+    _require(
       !hasPointerRepresentation,
       "StaticString should have Unicode scalar representation")
     return UnicodeScalar(UInt32(unsafeBitCast(_startPtrOrData, UInt.self)))
@@ -85,7 +85,7 @@ public struct StaticString
   /// `byteSize` is unspecified.
   @_transparent
   public var byteSize: Int {
-    _precondition(
+    _require(
       hasPointerRepresentation,
       "StaticString should have pointer representation")
     return Int(_byteSize)
@@ -119,7 +119,7 @@ public struct StaticString
       var i = 0
       let sink: (UInt8) -> Void = {
         buffer = buffer | (UInt64($0) << (UInt64(i) * 8))
-        ++i
+        i += 1
       }
       UTF8.encode(unicodeScalar, output: sink)
       return body(UnsafeBufferPointer(
@@ -226,7 +226,7 @@ public struct StaticString
     return self.stringValue.debugDescription
   }
 
-  public func _getMirror() -> _MirrorType {
+  public func _getMirror() -> _Mirror {
     return _reflect(self.stringValue)
   }
 }

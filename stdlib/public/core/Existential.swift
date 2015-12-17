@@ -36,7 +36,7 @@ internal struct _CollectionOf<
     return AnyIterator {
       () -> T? in
       if _fastPath(index != self.endIndex) {
-        ++index
+        index._successorInPlace()
         return self._subscriptImpl(index)
       }
       return nil

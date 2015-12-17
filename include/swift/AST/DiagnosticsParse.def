@@ -126,8 +126,8 @@ ERROR(lex_expected_binary_exponent_in_hex_float_literal,lexing,none,
       "hexadecimal floating point literal must end with an exponent", ())
 ERROR(lex_unexpected_block_comment_end,lexing,none,
       "unexpected end of block comment", ())
-ERROR(lex_unary_equal_is_reserved,lexing,none,
-      "%select{prefix|postfix}0 '=' is reserved", (unsigned))
+ERROR(lex_unary_equal,lexing,none,
+      "'=' must have consistent whitespace on both sides", ())
 ERROR(lex_unary_postfix_dot_is_reserved,lexing,none,
       "postfix '.' is reserved", ())
 ERROR(lex_editor_placeholder,lexing,none,
@@ -364,6 +364,9 @@ ERROR(operator_decl_inner_scope,decl_parsing,none,
       "'operator' may only be declared at file scope", ())
 ERROR(expected_operator_name_after_operator,decl_parsing,PointsToFirstBadToken,
       "expected operator name in operator declaration", ())
+ERROR(identifier_when_expecting_operator,decl_parsing,PointsToFirstBadToken,
+      "%0 is considered to be an identifier, not an operator", (Identifier))
+
 ERROR(operator_decl_no_fixity,decl_parsing,none,
       "operator must be declared as 'prefix', 'postfix', or 'infix'", ())
 ERROR(expected_lbrace_after_operator,decl_parsing,PointsToFirstBadToken,
@@ -1173,6 +1176,20 @@ WARNING(attr_warn_unused_result_unknown_parameter,attribute_parsing,none,
         "unknown parameter '%0' in 'warn_unused_result' attribute", (StringRef))
 ERROR(attr_warn_unused_result_expected_rparen,attribute_parsing,none,
       "expected ')' after 'warn_unused_result' attribute", ())
+
+// _migration_id
+WARNING(attr_migration_id_expected_name,attribute_parsing,none,
+        "expected parameter 'pattern'", ())
+WARNING(attr_migration_id_unknown_parameter,attribute_parsing,none,
+        "unknown parameter '%0' in '_migration_id' attribute", (StringRef))
+ERROR(attr_migration_id_expected_eq,attribute_parsing,none,
+      "expected '=' following '%0' parameter", (StringRef))
+ERROR(attr_migration_id_expected_string,attribute_parsing,none,
+      "expected a string following '=' for '%0' parameter", (StringRef))
+WARNING(attr_migration_id_duplicate_parameter,attribute_parsing,none,
+      "duplicate '%0' parameter; previous value will be ignored", (StringRef))
+ERROR(attr_migration_id_expected_rparen,attribute_parsing,none,
+      "expected ')' after '_migration_id' attribute", ())
 
 //------------------------------------------------------------------------------
 // Generics parsing diagnostics

@@ -32,4 +32,4 @@
 %                          genericArgs if 'genericArgs' in locals() else None,\
 %                          genericConstraints if 'genericConstraints' in locals() else None)
 
-internal struct _${introspecteeType}Mirror${genericConstraintString} : _MirrorType
+internal struct _${introspecteeType}Mirror${genericConstraintString} : _Mirror

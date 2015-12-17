@@ -121,7 +121,9 @@ public struct _StringCore {
       var src = UnsafeMutablePointer<UTF8.CodeUnit>(srcStart)
       let srcEnd = src + count
       while (src != srcEnd) {
-        dest++.memory = UTF16.CodeUnit(src++.memory)
+        dest.pointee = UTF16.CodeUnit(src.pointee)
+        dest += 1
+        src += 1
       }
     }
     else {
@@ -130,7 +132,9 @@ public struct _StringCore {
       var src = UnsafeMutablePointer<UTF16.CodeUnit>(srcStart)
       let srcEnd = src + count
       while (src != srcEnd) {
-        dest++.memory = UTF8.CodeUnit(src++.memory)
+        dest.pointee = UTF8.CodeUnit(src.pointee)
+        dest += 1
+        src += 1
       }
     }
   }
@@ -249,10 +253,10 @@ public struct _StringCore {
 
 #if _runtime(_ObjC)
   /// the Cocoa String buffer, if any, or `nil`.
-  public var cocoaBuffer: _CocoaStringType? {
+  public var cocoaBuffer: _CocoaString? {
     if hasCocoaBuffer {
       return _owner.map {
-        unsafeBitCast($0, _CocoaStringType.self)
+        unsafeBitCast($0, _CocoaString.self)
       }
     }
     return nil
@@ -264,11 +268,11 @@ public struct _StringCore {
 
   /// Returns the given sub-`_StringCore`.
   public subscript(bounds: Range<Int>) -> _StringCore {
-    _precondition(
+    _require(
       bounds.startIndex >= 0,
       "subscript: subrange start precedes String start")
 
-    _precondition(
+    _require(
       bounds.endIndex <= count,
       "subscript: subrange extends past String end")
 
@@ -295,17 +299,17 @@ public struct _StringCore {
     // Always dereference two bytes, but when elements are 8 bits we
     // multiply the high byte by 0.
     // FIXME(performance): use masking instead of multiplication.
-    return UTF16.CodeUnit(p.memory)
-      + UTF16.CodeUnit((p + 1).memory) * _highByteMultiplier
+    return UTF16.CodeUnit(p.pointee)
+      + UTF16.CodeUnit((p + 1).pointee) * _highByteMultiplier
   }
 
   /// Get the Nth UTF-16 Code Unit stored.
   public subscript(position: Int) -> UTF16.CodeUnit {
-    _precondition(
+    _require(
       position >= 0,
       "subscript: index precedes String start")
 
-    _precondition(
+    _require(
       position <= count,
       "subscript: index points past String end")
 
@@ -321,7 +325,7 @@ public struct _StringCore {
 
   /// Write the string, in the given encoding, to output.
   func encode<
-    Encoding: UnicodeCodecType
+    Encoding: UnicodeCodec
   >(encoding: Encoding.Type, output: (Encoding.CodeUnit) -> Void)
   {
     if _fastPath(_baseAddress != nil) {
@@ -579,11 +583,11 @@ extension _StringCore : RangeReplaceableCollection {
   >(
     bounds: Range<Int>, with newElements: C
   ) {
-    _precondition(
+    _require(
       bounds.startIndex >= 0,
       "replaceSubrange: subrange start precedes String start")
 
-    _precondition(
+    _require(
       bounds.endIndex <= count,
       "replaceSubrange: subrange extends past String end")
 
@@ -618,13 +622,15 @@ extension _StringCore : RangeReplaceableCollection {
       if _fastPath(elementWidth == 1) {
         var dst = rangeStart
         for u in newElements {
-          dst++.memory = UInt8(u & 0xFF)
+          dst.pointee = UInt8(u & 0xFF)
+          dst += 1
         }
       }
       else {
         var dst = UnsafeMutablePointer<UTF16.CodeUnit>(rangeStart)
         for u in newElements {
-          dst++.memory = u
+          dst.pointee = u
+          dst += 1
         }
       }
 

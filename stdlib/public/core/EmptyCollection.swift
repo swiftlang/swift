@@ -17,7 +17,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A iterator that never produces an element.
+/// An iterator that never produces an element.
 ///
 /// - SeeAlso: `EmptyCollection<Element>`.
 public struct EmptyIterator<Element> : IteratorProtocol, Sequence {
@@ -62,7 +62,7 @@ public struct EmptyCollection<Element> : Collection {
   ///
   /// Should never be called, since this collection is always empty.
   public subscript(position: Index) -> Element {
-    _preconditionFailure("Index out of range")
+    _requirementFailure("Index out of range")
   }
 
   /// Return the number of elements (always zero).

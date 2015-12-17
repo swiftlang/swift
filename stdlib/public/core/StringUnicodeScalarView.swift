@@ -77,7 +77,7 @@ extension String {
         let codeUnit = _core[--i]
         if _slowPath((codeUnit >> 10) == 0b1101_11) {
           if i != 0 && (_core[i - 1] >> 10) == 0b1101_10 {
-            --i
+            i -= 1
           }
         }
         return Index(i, _core)
@@ -211,7 +211,7 @@ extension String {
 
     /// Returns a mirror that reflects `self`.
     @warn_unused_result
-    public func _getMirror() -> _MirrorType {
+    public func _getMirror() -> _Mirror {
       return _UnicodeScalarViewMirror(self)
     }
 
@@ -307,7 +307,7 @@ extension String.UnicodeScalarIndex {
 
     if utf16Index != utf16.startIndex
     && utf16Index != utf16.endIndex {
-      _precondition(
+      _require(
         utf16Index >= utf16.startIndex
         && utf16Index <= utf16.endIndex,
         "Invalid String.UTF16Index for this UnicodeScalar view")
@@ -335,7 +335,7 @@ extension String.UnicodeScalarIndex {
   ) {
     let core = unicodeScalars._core
 
-    _precondition(
+    _require(
       utf8Index._coreIndex >= 0 && utf8Index._coreIndex <= core.endIndex,
       "Invalid String.UTF8Index for this UnicodeScalar view")
 

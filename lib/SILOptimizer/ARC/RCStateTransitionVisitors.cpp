@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "sil-global-arc-opts"
+#define DEBUG_TYPE "arc-sequence-opts"
 #include "RCStateTransitionVisitors.h"
 #include "ARCBBState.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"

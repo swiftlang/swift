@@ -51,7 +51,7 @@ extension String {
     ///   `position != endIndex`.
     public subscript(i: Index) -> UTF16.CodeUnit {
       let position = i._offset
-      _precondition(position >= 0 && position < _length,
+      _require(position >= 0 && position < _length,
           "out-of-range access on a UTF16View")
 
       let index = _toInternalIndex(position)
@@ -124,7 +124,7 @@ extension String {
 
     /// Returns a mirror that reflects `self`.
     @warn_unused_result
-    public func _getMirror() -> _MirrorType {
+    public func _getMirror() -> _Mirror {
       return _UTF16ViewMirror(self)
     }
 
@@ -243,7 +243,7 @@ extension String.UTF16View.Index {
   ) {
     let core = utf16._core
 
-    _precondition(
+    _require(
       utf8Index._coreIndex >= 0 && utf8Index._coreIndex <= core.endIndex,
       "Invalid String.UTF8Index for this UTF-16 view")
 

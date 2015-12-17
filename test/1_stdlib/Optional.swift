@@ -16,7 +16,7 @@ let OptionalTests = TestSuite("Optional")
 
 protocol TestProtocol1 {}
 
-// Check that the generic parameter is called 'Memory'.
+// Check the generic parameter name.
 extension Optional where Wrapped : TestProtocol1 {
   var _wrappedIsTestProtocol1: Bool {
     fatalError("not implemented")
@@ -234,7 +234,7 @@ class TestString : CustomStringConvertible, CustomDebugStringConvertible {
   }
 }
 class TestStream : Streamable {
-  func writeTo<Target : OutputStreamType>(inout target: Target) {
+  func writeTo<Target : OutputStream>(inout target: Target) {
     target.write("AStream")
   }
 }
@@ -303,6 +303,14 @@ OptionalTests.test("Optional OutputStream") {
   expectEqual(String(TestStream()), "AStream")
   expectEqual(String(optStream), "Optional(AStream)")
   expectEqual(debugPrintStr(optStream), "Optional(AStream)")
+}
+
+OptionalTests.test("unsafeUnwrap") {
+  let empty: Int? = nil
+  let nonEmpty: Int? = 3
+  expectEqual(3, nonEmpty.unsafeUnwrap())
+  expectCrashLater()
+  empty.unsafeUnwrap()
 }
 
 runAllTests()

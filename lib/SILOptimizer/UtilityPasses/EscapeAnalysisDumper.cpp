@@ -25,12 +25,11 @@ namespace {
 class EscapeAnalysisDumper : public SILModuleTransform {
 
   void run() override {
-
     DEBUG(llvm::dbgs() << "** EscapeAnalysisDumper **\n");
 
+#ifndef NDEBUG
     auto *EA = PM->getAnalysis<EscapeAnalysis>();
 
-#ifndef NDEBUG
     llvm::outs() << "Escape information of module\n";
     for (auto &F : *getModule()) {
       if (!F.isExternalDeclaration()) {

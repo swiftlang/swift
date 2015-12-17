@@ -25,8 +25,8 @@ ${MirrorDecl} {
   
   var count: Int { return 0 }
   
-  subscript(_: Int) -> (String, _MirrorType) {
-    _preconditionFailure("_MirrorType access out of bounds")
+  subscript(_: Int) -> (String, _Mirror) {
+    _requirementFailure("_Mirror access out of bounds")
   }
 
   var summary: String { return _value.description }

@@ -21,5 +21,5 @@ bar(BarStruct())
 var cbas : Bassable = BasClass()
 var sbas : Bassable = BasStruct()
 
-func cyc<C: CyclicAssociatedType>(c: C) {}
+func cyc<C: CyclicAssociated>(c: C) {}
 cyc(CyclicImpl())

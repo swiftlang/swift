@@ -463,7 +463,7 @@ extension Array : _ObjectiveCBridgeable {
     // and watchOS.
     self = Array(
       _immutableCocoaArray:
-        unsafeBitCast(_cocoaArray.copy(), _NSArrayCoreType.self))
+        unsafeBitCast(_cocoaArray.copy(), _NSArrayCore.self))
   }
 
   public static func _isBridgedToObjectiveC() -> Bool {
@@ -483,7 +483,7 @@ extension Array : _ObjectiveCBridgeable {
     source: NSArray,
     inout result: Array?
   ) {
-    _precondition(
+    _require(
       Swift._isBridgedToObjectiveC(Element.self),
       "array element type is not bridged to Objective-C")
 
@@ -534,7 +534,7 @@ extension Dictionary {
   ///
   /// The provided `NSDictionary` will be copied to ensure that the copy can
   /// not be mutated by other code.
-  public init(_cocoaDictionary: _NSDictionaryType) {
+  public init(_cocoaDictionary: _NSDictionary) {
     _sanityCheck(
       _isBridgedVerbatimToObjectiveC(Key.self) &&
       _isBridgedVerbatimToObjectiveC(Value.self),
@@ -550,7 +550,7 @@ extension Dictionary {
     // and watchOS.
     self = Dictionary(
       _immutableCocoaDictionary:
-        unsafeBitCast(_cocoaDictionary.copy(zone: nil), _NSDictionaryType.self))
+        unsafeBitCast(_cocoaDictionary.copy(zone: nil), _NSDictionary.self))
   }
 }
 
@@ -626,7 +626,7 @@ extension Dictionary : _ObjectiveCBridgeable {
     if _isBridgedVerbatimToObjectiveC(Key.self) &&
        _isBridgedVerbatimToObjectiveC(Value.self) {
       result = [Key : Value](
-        _cocoaDictionary: unsafeBitCast(d, _NSDictionaryType.self))
+        _cocoaDictionary: unsafeBitCast(d, _NSDictionary.self))
       return
     }
 
@@ -681,10 +681,11 @@ final public class NSFastEnumerationIterator : IteratorProtocol {
   /// Size of ObjectsBuffer, in ids.
   var STACK_BUF_SIZE: Int { return 4 }
 
+  // FIXME: Replace with _CocoaFastEnumerationStackBuf.
   /// Must have enough space for STACK_BUF_SIZE object references.
   struct ObjectsBuffer {
-    var buf = (OpaquePointer(), OpaquePointer(),
-               OpaquePointer(), OpaquePointer())
+    var buf: (OpaquePointer, OpaquePointer, OpaquePointer, OpaquePointer) =
+      (nil, nil, nil, nil)
   }
   var objects: [ObjectsBuffer]
 
@@ -696,7 +697,7 @@ final public class NSFastEnumerationIterator : IteratorProtocol {
       if count == 0 { return .None }
     }
     let next : AnyObject = state[0].itemsPtr[n]!
-    ++n
+    n += 1
     return next
   }
 
@@ -747,7 +748,7 @@ extension Set {
   ///
   /// The provided `NSSet` will be copied to ensure that the copy can
   /// not be mutated by other code.
-  public init(_cocoaSet: _NSSetType) {
+  public init(_cocoaSet: _NSSet) {
     _sanityCheck(_isBridgedVerbatimToObjectiveC(Element.self),
       "Set can be backed by NSSet _variantStorage only when the member type can be bridged verbatim to Objective-C")
     // FIXME: We would like to call CFSetCreateCopy() to avoid doing an
@@ -761,7 +762,7 @@ extension Set {
     // and watchOS.
     self = Set(
       _immutableCocoaSet:
-        unsafeBitCast(_cocoaSet.copy(zone: nil), _NSSetType.self))
+        unsafeBitCast(_cocoaSet.copy(zone: nil), _NSSet.self))
   }
 }
 
@@ -880,7 +881,7 @@ extension Set : _ObjectiveCBridgeable {
     }
 
     if _isBridgedVerbatimToObjectiveC(Element.self) {
-      result = Set<Element>(_cocoaSet: unsafeBitCast(s, _NSSetType.self))
+      result = Set<Element>(_cocoaSet: unsafeBitCast(s, _NSSet.self))
       return
     }
 
@@ -992,7 +993,7 @@ func NSLocalizedString(key: String,
 // NSLog
 //===----------------------------------------------------------------------===//
 
-public func NSLog(format: String, _ args: CVarArgType...) {
+public func NSLog(format: String, _ args: CVarArg...) {
   withVaList(args) { NSLogv(format, $0) }
 }
 
@@ -1061,7 +1062,7 @@ func _convertErrorProtocolToNSError(error: ErrorProtocol) -> NSError
 extension NSPredicate {
   // + (NSPredicate *)predicateWithFormat:(NSString *)predicateFormat, ...;
   public
-  convenience init(format predicateFormat: String, _ args: CVarArgType...) {
+  convenience init(format predicateFormat: String, _ args: CVarArg...) {
     let va_args = getVaList(args)
     self.init(format: predicateFormat, arguments: va_args)
   }
@@ -1070,14 +1071,14 @@ extension NSPredicate {
 extension NSExpression {
   // + (NSExpression *) expressionWithFormat:(NSString *)expressionFormat, ...;
   public
-  convenience init(format expressionFormat: String, _ args: CVarArgType...) {
+  convenience init(format expressionFormat: String, _ args: CVarArg...) {
     let va_args = getVaList(args)
     self.init(format: expressionFormat, arguments: va_args)
   }
 }
 
 extension NSString {
-  public convenience init(format: NSString, _ args: CVarArgType...) {
+  public convenience init(format: NSString, _ args: CVarArg...) {
     // We can't use withVaList because 'self' cannot be captured by a closure
     // before it has been initialized.
     let va_args = getVaList(args)
@@ -1085,7 +1086,7 @@ extension NSString {
   }
 
   public convenience init(
-    format: NSString, locale: NSLocale?, _ args: CVarArgType...
+    format: NSString, locale: NSLocale?, _ args: CVarArg...
   ) {
     // We can't use withVaList because 'self' cannot be captured by a closure
     // before it has been initialized.
@@ -1095,7 +1096,7 @@ extension NSString {
 
   @warn_unused_result
   public class func localizedStringWithFormat(
-    format: NSString, _ args: CVarArgType...
+    format: NSString, _ args: CVarArg...
   ) -> Self {
     return withVaList(args) {
       self.init(format: format as String, locale: NSLocale.current(), arguments: $0)
@@ -1103,7 +1104,7 @@ extension NSString {
   }
 
   @warn_unused_result
-  public func appendingFormat(format: NSString, _ args: CVarArgType...)
+  public func appendingFormat(format: NSString, _ args: CVarArg...)
   -> NSString {
     return withVaList(args) {
       self.appending(NSString(format: format as String, arguments: $0) as String) as NSString
@@ -1112,7 +1113,7 @@ extension NSString {
 }
 
 extension NSMutableString {
-  public func appendFormat(format: NSString, _ args: CVarArgType...) {
+  public func appendFormat(format: NSString, _ args: CVarArg...) {
     return withVaList(args) {
       self.append(NSString(format: format as String, arguments: $0) as String)
     }

@@ -96,7 +96,7 @@ IntervalTestSuite.test("PatternMatching") {
 IntervalTestSuite.test("Overlaps") {
   
   func expectOverlaps<
-    I0: IntervalType, I1: IntervalType where I0.Bound == I1.Bound
+    I0: Interval, I1: Interval where I0.Bound == I1.Bound
   >(expectation: Bool, _ lhs: I0, _ rhs: I1) {
     if expectation {
       expectTrue(lhs.overlaps(rhs))

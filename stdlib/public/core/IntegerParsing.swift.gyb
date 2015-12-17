@@ -39,8 +39,8 @@ internal func _parseUnsignedAsciiAsUIntMax(
   let lower = _ascii16("a")..._ascii16("z")
   let upper = _ascii16("A")..._ascii16("Z")
 
-  _precondition(radix > 1, "Radix must be greater than 1")
-  _precondition(
+  _require(radix > 1, "Radix must be greater than 1")
+  _require(
     radix <= numericCast(10 + lower.count),
     "Radix exceeds what can be expressed using the English alphabet")
 

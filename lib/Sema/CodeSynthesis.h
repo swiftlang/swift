@@ -47,10 +47,8 @@ void markAsObjC(TypeChecker &TC, ValueDecl *D,
                 Optional<ObjCReason> isObjC,
                 Optional<ForeignErrorConvention> errorConvention = None);
 Type configureImplicitSelf(TypeChecker &tc,
-                           AbstractFunctionDecl *func,
-                           GenericParamList *&outerGenericParams);
+                           AbstractFunctionDecl *func);
 void configureConstructorType(ConstructorDecl *ctor,
-                              GenericParamList *outerGenericParams,
                               Type selfType,
                               Type argType,
                               bool throws);

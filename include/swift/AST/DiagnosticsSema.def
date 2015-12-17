@@ -420,16 +420,30 @@ ERROR(ambiguous_module_type,sema_nb,none,
 ERROR(use_nonmatching_operator,sema_nb,none,
       "%0 is not a %select{binary|prefix unary|postfix unary}1 operator",
       (Identifier, unsigned))
+
+ERROR(unspaced_binary_operator_fixit,sema_nb,none,
+      "missing whitespace between %0 and %1 operators",
+      (Identifier, Identifier, bool))
+ERROR(unspaced_binary_operator,sema_nb,none,
+      "ambiguous missing whitespace between unary and binary operators", ())
+NOTE(unspaced_binary_operators_candidate,sema_nb,none,
+     "could be %select{binary|postfix}2 %0 and %select{prefix|binary}2 %1",
+     (Identifier, Identifier, bool))
+ERROR(unspaced_unary_operator,sema_nb,none,
+      "unary operators may not be juxtaposed; parenthesize inner expression",
+      ())
+
+
 ERROR(use_unresolved_identifier,sema_nb,none,
-      "use of unresolved identifier %0", (Identifier))
+      "use of unresolved %select{identifier|operator}1 %0", (Identifier, bool))
 ERROR(use_undeclared_type,sema_nb,none,
       "use of undeclared type %0", (Identifier))
 ERROR(use_undeclared_type_did_you_mean,sema_nb,none,
-"use of undeclared type %0; did you mean to use '%1'?", (Identifier, StringRef))
+      "use of undeclared type %0; did you mean to use '%1'?", (Identifier, StringRef))
 NOTE(note_remapped_type,sema_nb,none,
-  "did you mean to use '%0'?", (StringRef))
+     "did you mean to use '%0'?", (StringRef))
 ERROR(identifier_init_failure,sema_nb,none,
-  "could not infer type for %0", (Identifier))
+      "could not infer type for %0", (Identifier))
 ERROR(pattern_used_in_type,sema_nb,none,
       "%0 used within its own type", (Identifier))
 NOTE(note_module_as_type,sema_nb,none,
@@ -437,6 +451,11 @@ NOTE(note_module_as_type,sema_nb,none,
 
 ERROR(use_unknown_object_literal,sema_nb,none,
      "use of unknown object literal name %0", (Identifier))
+ERROR(object_literal_default_type_missing,sema_nb,none,
+     "could not infer type of %0 literal", (StringRef))
+NOTE(object_literal_resolve_import,sema_nb,none,
+     "import %0 to use '%1' as the default %2 literal type",
+     (StringRef, StringRef, StringRef))
 
 ERROR(use_non_type_value,sema_nb,none,
       "%0 is not a type", (Identifier))

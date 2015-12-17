@@ -20,7 +20,7 @@ set(SWIFTLIB_ESSENTIAL
   Algorithm.swift
   ArrayBody.swift
   ArrayBuffer.swift
-  ArrayBufferType.swift
+  ArrayBufferProtocol.swift
   ArrayCast.swift
   ArrayType.swift
   Arrays.swift.gyb
@@ -120,7 +120,6 @@ set(SWIFTLIB_SOURCES
   ${SWIFTLIB_ESSENTIAL}
   ### PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
   Availability.swift
-  Bit.swift
   CollectionMirrors.swift.gyb
   CollectionOfOne.swift
   ExistentialCollection.swift.gyb

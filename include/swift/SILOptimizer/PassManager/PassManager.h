@@ -17,6 +17,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
+#include <vector>
 
 #ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_PASSMANAGER_H
 #define SWIFT_SILOPTIMIZER_PASSMANAGER_PASSMANAGER_H
@@ -40,6 +41,9 @@ class SILPassManager {
 
   /// A list of registered analysis.
   llvm::SmallVector<SILAnalysis *, 16> Analysis;
+
+  /// The worklist of functions to be processed by function passes.
+  std::vector<SILFunction *> FunctionWorklist;
 
   // Name of the current optimization stage for diagnostics.
   std::string StageName;
@@ -164,7 +168,11 @@ private:
   /// Run the passes in \p FuncTransforms. Return true
   /// if the pass manager requested to stop the execution
   /// of the optimization cycle (this is a debug feature).
-  bool runFunctionPasses(PassList FuncTransforms);
+  void runFunctionPasses(PassList FuncTransforms);
+
+  /// A helper function that returns (based on SIL stage and debug
+  /// options) whether we should continue running passes.
+  bool continueTransforming();
 
   /// Displays the call graph in an external dot-viewer.
   /// This function is meant for use from the debugger.

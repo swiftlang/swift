@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-sil -O %s | FileCheck %s
 
-protocol BarType {
+protocol Bar {
   typealias Element
 }
 
@@ -10,7 +10,7 @@ class FooImplBase<OutputElement> {
   }
 }
 
-final class FooImplDerived<Input : BarType> : FooImplBase<Input.Element> {
+final class FooImplDerived<Input : Bar> : FooImplBase<Input.Element> {
 
   init(_ input: Input) {}
 
@@ -19,7 +19,7 @@ final class FooImplDerived<Input : BarType> : FooImplBase<Input.Element> {
   }
 }
 
-struct BarImpl : BarType {
+struct BarImpl : Bar {
   typealias Element = Int
 }
 

@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 /// The underlying buffer for an ArrayType conforms to
-/// `_ArrayBufferType`.  This buffer does not provide value semantics.
-public protocol _ArrayBufferType : MutableCollection {
+/// `_ArrayBufferProtocol`.  This buffer does not provide value semantics.
+public protocol _ArrayBufferProtocol : MutableCollection {
   /// The type of elements stored in the buffer.
   typealias Element
 
@@ -120,7 +120,7 @@ public protocol _ArrayBufferType : MutableCollection {
   var startIndex: Int {get}
 }
 
-extension _ArrayBufferType {
+extension _ArrayBufferProtocol {
   public var subscriptBaseAddress: UnsafeMutablePointer<Element> {
     return firstElementAddress
   }
@@ -158,11 +158,13 @@ extension _ArrayBufferType {
       // Assign over the original subRange
       var i = newValues.startIndex
       for j in subRange {
-        elements[j] = newValues[i++]
+        elements[j] = newValues[i]
+        i._successorInPlace()
       }
       // Initialize the hole left by sliding the tail forward
       for j in oldTailIndex..<newTailIndex {
-        (elements + j).initialize(newValues[i++])
+        (elements + j).initializeMemory(newValues[i])
+        i._successorInPlace()
       }
       _expectEnd(i, newValues)
     }
@@ -171,7 +173,9 @@ extension _ArrayBufferType {
       var i = subRange.startIndex
       var j = newValues.startIndex
       for _ in 0..<newCount {
-        elements[i++] = newValues[j++]
+        elements[i] = newValues[j]
+        i._successorInPlace()
+        j._successorInPlace()
       }
       _expectEnd(j, newValues)
 
@@ -197,7 +201,8 @@ extension _ArrayBufferType {
         newTailStart.moveAssignFrom(oldTailStart, count: tailCount)
 
         // Destroy elements remaining after the tail in subRange
-        (newTailStart + tailCount).destroy(shrinkage - tailCount)
+        (newTailStart + tailCount).deinitializePointee(
+          count: shrinkage - tailCount)
       }
     }
   }

@@ -752,13 +752,13 @@ class CustomImmutableNSArray : NSArray {
     objects: AutoreleasingUnsafeMutablePointer<AnyObject?>,
     count: Int
   ) -> Int {
-    var theState = state.memory
+    var theState = state.pointee
     if theState.state == 0 {
       theState.state = 1
       theState.itemsPtr =
         AutoreleasingUnsafeMutablePointer(_data._baseAddressIfContiguous)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-      state.memory = theState
+      state.pointee = theState
       return _data.count
     }
     return 0
@@ -1003,7 +1003,7 @@ for indexRange in [
     .code {
     let a = getBridgedNSArrayOfRefTypeVerbatimBridged(
       numElements: 0, capacity: 16)
-    let buffer = UnsafeMutablePointer<AnyObject>.alloc(16)
+    let buffer = UnsafeMutablePointer<AnyObject>(allocatingCapacity: 16)
     a.getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<0))
     expectCrashLater()
@@ -1018,7 +1018,7 @@ for indexRange in [ 0..<4, -2..<(-1), -1..<2, 2..<4, 4..<5 ] as [Range<Int>] {
     .code {
     let a = getBridgedNSArrayOfRefTypeVerbatimBridged(
       numElements: 3, capacity: 16)
-    let buffer = UnsafeMutablePointer<AnyObject>.alloc(16)
+    let buffer = UnsafeMutablePointer<AnyObject>(allocatingCapacity: 16)
     a.getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<3))
     expectCrashLater()
@@ -1029,7 +1029,7 @@ for indexRange in [ 0..<4, -2..<(-1), -1..<2, 2..<4, 4..<5 ] as [Range<Int>] {
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/getObjects") {
   let a = getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 3)
-  let buffer = UnsafeMutablePointer<AnyObject>.alloc(16)
+  let buffer = UnsafeMutablePointer<AnyObject>(allocatingCapacity: 16)
   a.getObjects(
     AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<3))
 
@@ -1051,7 +1051,7 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/getObjects") {
     expectEqual(idValue2, unsafeBitCast(a.objectAt(2), UInt.self))
   }
 
-  buffer.dealloc(3)
+  buffer.deallocateCapacity(3)
   _fixLifetime(a)
 
   expectAutoreleasedKeysAndValues(unopt: (0, 3))
@@ -1275,7 +1275,7 @@ for indexRange in [
     .code {
     let a = getBridgedNSArrayOfValueTypeCustomBridged(
       numElements: 0, capacity: 16)
-    let buffer = UnsafeMutablePointer<AnyObject>.alloc(16)
+    let buffer = UnsafeMutablePointer<AnyObject>(allocatingCapacity: 16)
     a.getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<0))
     expectCrashLater()
@@ -1290,7 +1290,7 @@ for indexRange in [ 0..<4, -2..<(-1), -1..<2, 2..<4, 4..<5 ] as [Range<Int>] {
     .code {
     let a = getBridgedNSArrayOfValueTypeCustomBridged(
       numElements: 3, capacity: 16)
-    let buffer = UnsafeMutablePointer<AnyObject>.alloc(16)
+    let buffer = UnsafeMutablePointer<AnyObject>(allocatingCapacity: 16)
     a.getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<3))
     expectCrashLater()
@@ -1301,7 +1301,7 @@ for indexRange in [ 0..<4, -2..<(-1), -1..<2, 2..<4, 4..<5 ] as [Range<Int>] {
 
 ArrayTestSuite.test("BridgedToObjC/Custom/getObjects") {
   let a = getBridgedNSArrayOfValueTypeCustomBridged(numElements: 3)
-  let buffer = UnsafeMutablePointer<AnyObject>.alloc(16)
+  let buffer = UnsafeMutablePointer<AnyObject>(allocatingCapacity: 16)
   a.getObjects(
     AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<3))
 
@@ -1323,7 +1323,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/getObjects") {
     expectEqual(idValue2, unsafeBitCast(a.objectAt(2), UInt.self))
   }
 
-  buffer.dealloc(3)
+  buffer.deallocateCapacity(3)
   _fixLifetime(a)
 
   expectEqual(3, TestBridgedValueTy.bridgeOperations)
@@ -1597,7 +1597,7 @@ final class EvilCollection : Collection {
 
   subscript(i: Int) -> TestValueTy {
     if boundsChecked {
-      precondition(i >= 0 && i < _count, evilBoundsError)
+      require(i >= 0 && i < _count, evilBoundsError)
     }
     return TestValueTy(i)
   }

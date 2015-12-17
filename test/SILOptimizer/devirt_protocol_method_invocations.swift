@@ -19,7 +19,7 @@ var gg = 1111
 public class C : Foo {
   @inline(never)
   public func foo(x:Int) -> Int {
-    gg++
+    gg += 1
     return gg + x
   }
 }

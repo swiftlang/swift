@@ -16,16 +16,16 @@ func test_fatal(x: Int, y: Int) -> Int {
   if x > y {
     return x + y
   }
-  _preconditionFailure("Human nature ...")
+  _requirementFailure("Human nature ...")
 }
 
 func test_precondition_check(x: Int, y: Int) -> Int {
-  _precondition(x > y, "test precondition check")
+  _require(x > y, "test precondition check")
   return x + y
 }
 
 func test_partial_safety_check(x: Int, y: Int) -> Int {
-  _debugPrecondition(x > y, "test partial safety check")
+  _debugRequire(x > y, "test partial safety check")
   return x + y
 }
 

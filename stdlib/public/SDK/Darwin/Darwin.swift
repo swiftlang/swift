@@ -44,7 +44,7 @@ public struct DarwinBoolean : Boolean, BooleanLiteralConvertible {
 
 extension DarwinBoolean : _Reflectable {
   /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> _MirrorType {
+  public func _getMirror() -> _Mirror {
     return _reflect(boolValue)
   }
 }
@@ -101,10 +101,10 @@ public func || <T : Boolean>(
 
 public var errno : Int32 {
   get {
-    return __error().memory
+    return __error().pointee
   }
   set {
-    __error().memory = newValue
+    __error().pointee = newValue
   }
 }
 

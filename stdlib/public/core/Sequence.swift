@@ -33,7 +33,7 @@ public protocol IteratorProtocol {
   ///   since the copy was made, and no preceding call to `self.next()`
   ///   has returned `nil`.  Specific implementations of this protocol
   ///   are encouraged to respond to violations of this requirement by
-  ///   calling `preconditionFailure("...")`.
+  ///   calling `requirementFailure("...")`.
   @warn_unused_result
   mutating func next() -> Element?
 }
@@ -339,7 +339,7 @@ extension Sequence {
   /// - Complexity: O(`n`)
   @warn_unused_result
   public func dropFirst(n: Int) -> AnySequence<Iterator.Element> {
-    _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
+    _require(n >= 0, "Can't drop a negative number of elements from a sequence")
     if n == 0 { return AnySequence(self) }
     // If this is already a _DropFirstSequence, we need to fold in
     // the current drop count and drop limit so no data is lost.
@@ -366,7 +366,7 @@ extension Sequence {
   /// - Complexity: O(`self.count`)
   @warn_unused_result
   public func dropLast(n: Int) -> AnySequence<Iterator.Element> {
-    _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
+    _require(n >= 0, "Can't drop a negative number of elements from a sequence")
     if n == 0 { return AnySequence(self) }
     // FIXME: <rdar://problem/21885650> Create reusable RingBuffer<T>
     // Put incoming elements from this sequence in a holding tank, a ring buffer
@@ -392,7 +392,7 @@ extension Sequence {
 
   @warn_unused_result
   public func prefix(maxLength: Int) -> AnySequence<Iterator.Element> {
-    _precondition(maxLength >= 0, "Can't take a prefix of negative length from a sequence")
+    _require(maxLength >= 0, "Can't take a prefix of negative length from a sequence")
     if maxLength == 0 {
       return AnySequence(EmptyCollection<Iterator.Element>())
     }
@@ -412,7 +412,7 @@ extension Sequence {
 
   @warn_unused_result
   public func suffix(maxLength: Int) -> AnySequence<Iterator.Element> {
-    _precondition(maxLength >= 0, "Can't take a suffix of negative length from a sequence")
+    _require(maxLength >= 0, "Can't take a suffix of negative length from a sequence")
     if maxLength == 0 { return AnySequence([]) }
     // FIXME: <rdar://problem/21885650> Create reusable RingBuffer<T>
     // Put incoming elements into a ring buffer to save space. Once all
@@ -461,7 +461,7 @@ extension Sequence {
     allowEmptySlices: Bool = false,
     @noescape isSeparator: (Iterator.Element) throws -> Bool
   ) rethrows -> [AnySequence<Iterator.Element>] {
-    _precondition(maxSplit >= 0, "Must take zero or more splits")
+    _require(maxSplit >= 0, "Must take zero or more splits")
     var result: [AnySequence<Iterator.Element>] = []
     var subSequence: [Iterator.Element] = []
 
@@ -607,7 +607,8 @@ extension Sequence {
     -> UnsafeMutablePointer<Iterator.Element> {
     var p = UnsafeMutablePointer<Iterator.Element>(ptr)
     for x in IteratorSequence(self.iterator()) {
-      p++.initialize(x)
+      p.initializeMemory(x)
+      p += 1
     }
     return p
   }
@@ -615,7 +616,7 @@ extension Sequence {
 
 // Pending <rdar://problem/14011860> and <rdar://problem/14396120>,
 // pass a IteratorProtocol through IteratorSequence to give it "Sequence-ness"
-/// A sequence built around a iterator of type `Base`.
+/// A sequence built around an iterator of type `Base`.
 ///
 /// Useful mostly to recover the ability to use `for`...`in`,
 /// given just an iterator `i`:

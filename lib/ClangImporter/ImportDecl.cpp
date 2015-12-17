@@ -1382,10 +1382,10 @@ namespace {
       return Type();
     }
 
-    Type importCFClassType(const clang::TypedefNameDecl *decl,
-                           Identifier className, CFPointeeInfo info) {
+    ClassDecl *importCFClassType(const clang::TypedefNameDecl *decl,
+                                 Identifier className, CFPointeeInfo info) {
       auto dc = Impl.importDeclContextOf(decl);
-      if (!dc) return Type();
+      if (!dc) return nullptr;
 
       Type superclass = findCFSuperclass(decl, info);
 
@@ -1437,7 +1437,7 @@ namespace {
         }
       }
 
-      return theClass->getDeclaredType();
+      return theClass;
     }
 
     Decl *VisitTypedefNameDecl(const clang::TypedefNameDecl *Decl) {
@@ -1446,6 +1446,7 @@ namespace {
       if (Name.empty())
         return nullptr;
 
+      ValueDecl *alternateDecl = nullptr;
       Type SwiftType;
       if (Decl->getDeclContext()->getRedeclContext()->isTranslationUnit()) {
         bool IsError;
@@ -1464,14 +1465,19 @@ namespace {
           if (auto pointee = CFPointeeInfo::classifyTypedef(Decl)) {
             // If the pointee is a record, consider creating a class type.
             if (pointee.isRecord()) {
-              SwiftType = importCFClassType(Decl, Name, pointee);
-              if (!SwiftType) return nullptr;
+              auto SwiftClass = importCFClassType(Decl, Name, pointee);
+              if (!SwiftClass) return nullptr;
+
+              SwiftType = SwiftClass->getDeclaredInterfaceType();
               NameMapping = MappedTypeNameKind::DefineOnly;
 
               // If there is an alias (i.e., that doesn't have "Ref"),
               // use that as the name of the typedef later.
               if (importedName.Alias)
                 Name = importedName.Alias.getBaseName();
+
+              // Record the class as the alternate decl.
+              alternateDecl = SwiftClass;
 
             // If the pointee is another CF typedef, create an extra typealias
             // for the name without "Ref", but not a separate type.
@@ -1508,6 +1514,9 @@ namespace {
                 aliasWithoutRef->computeType();
                 SwiftType = aliasWithoutRef->getDeclaredType();
                 NameMapping = MappedTypeNameKind::DefineOnly;
+
+                // Store this alternative declaration.
+                alternateDecl = aliasWithoutRef;
               } else {
                 NameMapping = MappedTypeNameKind::DefineAndUse;
               }
@@ -1577,6 +1586,9 @@ namespace {
                                       TypeLoc::withoutLoc(SwiftType),
                                       DC);
       Result->computeType();
+
+      if (alternateDecl)
+        Impl.AlternateDecls[Result] = alternateDecl;
       return Result;
     }
 
@@ -2518,8 +2530,6 @@ namespace {
     }
 
     Decl *VisitFunctionDecl(const clang::FunctionDecl *decl) {
-      decl = decl->getMostRecentDecl();
-
       auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
         return nullptr;
@@ -2847,6 +2857,11 @@ namespace {
             Impl.SwiftContext.AllocateCopy(os.str())));
       }
 
+      /// Record the initializer as an alternative declaration for the
+      /// member.
+      if (result)
+        Impl.AlternateDecls[member] = result;
+
       return result;
     }
 
@@ -3030,7 +3045,7 @@ namespace {
             !Impl.ImportedDecls[decl->getCanonicalDecl()])
           Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
 
-        importSpecialMethod(result, dc);
+        (void)importSpecialMethod(result, dc);
       }
       return result;
     }
@@ -3808,8 +3823,12 @@ namespace {
 
       // Check whether we've already created a subscript operation for
       // this getter/setter pair.
-      if (auto subscript = Impl.Subscripts[{getter, setter}])
-        return subscript->getDeclContext() == dc? subscript : nullptr;
+      if (auto subscript = Impl.Subscripts[{getter, setter}]) {
+        if (subscript->getDeclContext() != dc) return nullptr;
+
+        Impl.AlternateDecls[decl] = subscript;
+        return subscript;
+      }
 
       // Compute the element type, looking through the implicit 'self'
       // parameter and the normal function parameters.
@@ -3873,8 +3892,12 @@ namespace {
 
           // Check whether we've already created a subscript operation for
           // this getter.
-          if (auto subscript = Impl.Subscripts[{getter, nullptr}])
-            return subscript->getDeclContext() == dc? subscript : nullptr;
+          if (auto subscript = Impl.Subscripts[{getter, nullptr}]) {
+            if (subscript->getDeclContext() != dc) return nullptr;
+
+            Impl.AlternateDecls[decl] = subscript;
+            return subscript;
+          }
         }
       }
 
@@ -3893,6 +3916,10 @@ namespace {
                                       name, decl->getLoc(), bodyPatterns,
                                       decl->getLoc(),
                                       TypeLoc::withoutLoc(elementTy), dc);
+
+      /// Record the subscript as an alternative declaration.
+      Impl.AlternateDecls[decl] = subscript;
+
       subscript->makeComputed(SourceLoc(), getterThunk, setterThunk, nullptr,
                               SourceLoc());
       auto indicesType = bodyPatterns->getType();
@@ -5925,13 +5952,6 @@ ClangImporter::Implementation::getSpecialTypedefKind(clang::TypedefNameDecl *dec
   if (iter == SpecialTypedefNames.end())
     return None;
   return iter->second;
-}
-
-SubscriptDecl *ClangImporter::Implementation::importSubscriptOf(Decl *decl) {
-  SwiftDeclConverter converter(*this);
-  if (auto special = converter.importSpecialMethod(decl, decl->getDeclContext()))
-    return dyn_cast<SubscriptDecl>(special);
-  return nullptr;
 }
 
 Decl *ClangImporter::Implementation::importClassMethodVersionOf(

@@ -101,8 +101,9 @@ class _ContiguousArrayStorage1 : _ContiguousArrayStorageBase {
 final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
 
   deinit {
-    __manager._elementPointer.destroy(__manager._valuePointer.memory.count)
-    __manager._valuePointer.destroy()
+    __manager._elementPointer.deinitializePointee(
+      count: __manager._valuePointer.pointee.count)
+    __manager._valuePointer.deinitializePointee()
     _fixLifetime(__manager)
   }
 
@@ -146,7 +147,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
     let resultPtr = result.baseAddress
     let p = __manager._elementPointer
     for i in 0..<count {
-      (resultPtr + i).initialize(_bridgeToObjectiveCUnconditional(p[i]))
+      (resultPtr + i).initializeMemory(_bridgeToObjectiveCUnconditional(p[i]))
     }
     _fixLifetime(__manager)
     return result
@@ -184,7 +185,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
   }
 }
 
-public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
+public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
 
   /// Make a buffer with uninitialized elements.  After using this
   /// method, you must either initialize the count elements at the
@@ -237,7 +238,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
     let verbatim = false
 #endif
 
-    __bufferPointer._valuePointer.initialize(
+    __bufferPointer._valuePointer.initializeMemory(
       _ArrayBody(
         count: count,
         capacity: capacity,
@@ -275,7 +276,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
       UnsafeMutableBufferPointer(start: firstElementAddress, count: count))
   }
 
-  //===--- _ArrayBufferType conformance -----------------------------------===//
+  //===--- _ArrayBufferProtocol conformance -----------------------------------===//
   /// Create an empty buffer.
   public init() {
     __bufferPointer = ManagedBufferPointer(
@@ -351,7 +352,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
         newValue <= capacity,
         "Can't grow an array buffer past its capacity")
 
-      __bufferPointer._valuePointer.memory.count = newValue
+      __bufferPointer._valuePointer.pointee.count = newValue
     }
   }
 
@@ -359,7 +360,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
   /// ≤ index < count`.
   @inline(__always)
   func _checkValidSubscript(index : Int) {
-    _precondition(
+    _require(
       (index >= 0) && (index < __bufferPointer.value.count),
       "Index out of range"
     )
@@ -426,7 +427,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
   ///
   /// - Complexity: O(1).
   @warn_unused_result
-  public func _asCocoaArray() -> _NSArrayCoreType {
+  public func _asCocoaArray() -> _NSArrayCore {
     _sanityCheck(
         _isBridgedToObjectiveC(Element.self),
         "Array element type is not bridged to Objective-C")
@@ -608,7 +609,9 @@ internal func _copyCollectionToNativeArrayBuffer<
   var i = source.startIndex
   for _ in 0..<count {
     // FIXME(performance): use _initializeTo().
-    (p++).initialize(source[i++])
+    p.initializeMemory(source[i])
+    i._successorInPlace()
+    p._successorInPlace()
   }
   _expectEnd(i, source)
   return result
@@ -663,9 +666,10 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   mutating func addWithExistingCapacity(element: Element) {
     _sanityCheck(remainingCapacity > 0,
       "_UnsafePartiallyInitializedContiguousArrayBuffer has no more capacity")
-    remainingCapacity--
+    remainingCapacity -= 1
 
-    (p++).initialize(element)
+    p.initializeMemory(element)
+    p += 1
   }
 
   /// Finish initializing the buffer, adjusting its count to the final

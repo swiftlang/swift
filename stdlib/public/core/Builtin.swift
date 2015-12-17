@@ -104,7 +104,7 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
 @_transparent
 @warn_unused_result
 public func unsafeBitCast<T, U>(x: T, _: U.Type) -> U {
-  _precondition(sizeof(T.self) == sizeof(U.self),
+  _require(sizeof(T.self) == sizeof(U.self),
     "can't unsafeBitCast between types of different sizes")
   return Builtin.reinterpretCast(x)
 }
@@ -231,41 +231,8 @@ public func _unsafeReferenceCast<T, U>(x: T, _: U.Type) -> U {
 @_transparent
 @warn_unused_result
 public func unsafeDowncast<T : AnyObject>(x: AnyObject) -> T {
-  _debugPrecondition(x is T, "invalid unsafeDowncast")
+  _debugRequire(x is T, "invalid unsafeDowncast")
   return Builtin.castReference(x)
-}
-
-/// - Returns: `nonEmpty!`.
-///
-/// - Requires: `nonEmpty != nil`.  In particular, in -O builds, no test
-///   is performed to ensure that `nonEmpty` actually is non-nil.
-///
-/// - Warning: Trades safety for performance.  Use `unsafeUnwrap`
-///   only when `nonEmpty!` has proven to be a performance problem and
-///   you are confident that, always, `nonEmpty != nil`.  It is better
-///   than an `unsafeBitCast` because it's more restrictive, and
-///   because checking is still performed in debug builds.
-@inline(__always)
-@warn_unused_result
-public func unsafeUnwrap<T>(nonEmpty: T?) -> T {
-  if let x = nonEmpty {
-    return x
-  }
-  _debugPreconditionFailure("unsafeUnwrap of nil optional")
-}
-
-/// - Returns: `unsafeUnwrap(nonEmpty)`.
-///
-/// This version is for internal stdlib use; it avoids any checking
-/// overhead for users, even in Debug builds.
-@inline(__always)
-@warn_unused_result
-public // SPI(SwiftExperimental)
-func _unsafeUnwrap<T>(nonEmpty: T?) -> T {
-  if let x = nonEmpty {
-    return x
-  }
-  _sanityCheckFailure("_unsafeUnwrap of nil optional")
 }
 
 @inline(__always)

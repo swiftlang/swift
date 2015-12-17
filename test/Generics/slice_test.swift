@@ -44,19 +44,19 @@ class Vector<T> {
       let size = Int(Builtin.sizeof(T.self))
       let newbase = UnsafeMutablePointer<T>(c_malloc(newcapacity * size))
       for i in 0..<length {
-        (newbase + i).initialize((base+i).move())
+        (newbase + i).initializeMemory((base+i).take())
       }
       c_free(base)
       base = newbase
       capacity = newcapacity
     }
-    (base+length).initialize(elem)
+    (base+length).initializeMemory(elem)
     length += 1
   }
 
   func pop_back() -> T {
     length -= 1
-    return (base + length).move()
+    return (base + length).take()
   }
 
   subscript (i : Int) -> T {
@@ -64,19 +64,19 @@ class Vector<T> {
       if i >= length {
         Builtin.int_trap()
       }
-      return (base + i).memory
+      return (base + i).pointee
     }
     set {
       if i >= length {
         Builtin.int_trap()
       }
-      (base + i).memory = newValue
+      (base + i).pointee = newValue
     }
   }
 
   deinit {
     for i in 0..<length {
-      (base + i).destroy()
+      (base + i).deinitializePointee()
     }
     c_free(base)
   }
@@ -102,7 +102,7 @@ func find<T : Eq>(array: [T], value: T) -> Int {
   var idx = 0
   for elt in array {
      if (elt == value) { return idx }
-     ++idx
+     idx += 1
   }
   return -1
 }
@@ -111,7 +111,7 @@ func findIf<T>(array: [T], fn: (T) -> Bool) -> Int {
   var idx = 0
   for elt in array {
      if (fn(elt)) { return idx }
-     ++idx
+     idx += 1
   }
   return -1
 }

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 public // @testable
-protocol _ArrayType
+protocol _ArrayProtocol
   : RangeReplaceableCollection,
     ArrayLiteralConvertible
 {
@@ -73,16 +73,16 @@ protocol _ArrayType
 
   //===--- implementation detail  -----------------------------------------===//
 
-  typealias _Buffer : _ArrayBufferType
+  typealias _Buffer : _ArrayBufferProtocol
   init(_ buffer: _Buffer)
 
   // For testing.
   var _buffer: _Buffer {get}
 }
 
-internal struct _ArrayTypeMirror<
-  T : _ArrayType where T.Index == Int
-> : _MirrorType {
+internal struct _ArrayProtocolMirror<
+  T : _ArrayProtocol where T.Index == Int
+> : _Mirror {
   let _value : T
 
   init(_ v : T) { _value = v }
@@ -95,8 +95,8 @@ internal struct _ArrayTypeMirror<
 
   var count: Int { return _value.count }
 
-  subscript(i: Int) -> (String, _MirrorType) {
-    _precondition(i >= 0 && i < count, "_MirrorType access out of bounds")
+  subscript(i: Int) -> (String, _Mirror) {
+    _require(i >= 0 && i < count, "_Mirror access out of bounds")
     return ("[\(i)]", _reflect(_value[_value.startIndex + i]))
   }
 

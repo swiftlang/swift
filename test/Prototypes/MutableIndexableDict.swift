@@ -107,7 +107,7 @@ class FixedSizedRefArrayOfOptionalStorage<T> : _HeapBufferStorage<Int, T?> {
   deinit {
     let buffer = Buffer(self)
     for i in 0..<buffer.value {
-      (buffer.baseAddress + i).destroy()
+      (buffer.baseAddress + i).deinitializePointee()
     }
   }
 }
@@ -121,7 +121,7 @@ struct FixedSizedRefArrayOfOptional<T>
   {
     buffer = Storage.Buffer(Storage.self, capacity, capacity)
     for var i = 0; i < capacity; ++i {
-      (buffer.baseAddress + i).initialize(.None)
+      (buffer.baseAddress + i).initializeMemory(.None)
     }
 
     buffer.value = capacity
@@ -130,12 +130,12 @@ struct FixedSizedRefArrayOfOptional<T>
   subscript(i: Int) -> T? {
     get {
       assert(i >= 0 && i < buffer.value)
-      return (buffer.baseAddress + i).memory
+      return (buffer.baseAddress + i).pointee
     }
     nonmutating
     set {
       assert(i >= 0 && i < buffer.value)
-      (buffer.baseAddress + i).memory = newValue
+      (buffer.baseAddress + i).pointee = newValue
     }
   }
 
@@ -200,7 +200,7 @@ struct DictionaryIndex<Element> : BidirectionalIndex {
         break
       }
       // end workaround
-      ++i
+      i += 1
     }
     return Index(buffer: buffer, offset: i)
   }

@@ -292,8 +292,8 @@ sil @_TFsoi2neU__FTGSqQ__Vs26_OptionalNilComparisonType_Sb : $@convention(thin) 
 //CHECK: return
 sil hidden @option_init : $@convention(thin) <T> (@in AnyObject) -> () {
 bb0(%0 : $*AnyObject):
-  %g0 = alloc_stack $IteratorOfOne<AnyObject> // 831
-  %s0 = struct_element_addr %g0#1 : $*IteratorOfOne<AnyObject>, #IteratorOfOne.elements
+  %g0 = alloc_stack $IteratorOverOne<AnyObject> // 831
+  %s0 = struct_element_addr %g0#1 : $*IteratorOverOne<AnyObject>, #IteratorOverOne.elements
 
   %l0 = alloc_stack $Optional<AnyObject>
   // function_ref Swift.Optional.Some <A>(Swift.Optional<A>.Type)(A) -> Swift.Optional<A>
@@ -301,12 +301,12 @@ bb0(%0 : $*AnyObject):
   %t0 = metatype $@thin Optional<AnyObject>.Type
   %i0 = apply %f0<AnyObject>(%l0#1, %0, %t0) : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>, @in τ_0_0, @thin Optional<τ_0_0>.Type) -> ()
 
-  %g1 = alloc_stack $IteratorOfOne<AnyObject> // 850
-  %s1 = struct_element_addr %g1#1 : $*IteratorOfOne<AnyObject>, #IteratorOfOne.elements
+  %g1 = alloc_stack $IteratorOverOne<AnyObject> // 850
+  %s1 = struct_element_addr %g1#1 : $*IteratorOverOne<AnyObject>, #IteratorOverOne.elements
   // We can't backward propagate this yet because we can't analyze struct_element_addr copy dest.
   copy_addr [take] %l0#1 to [initialization] %s1 : $*Optional<AnyObject>
   // We ignore this copy because its Def is used by struct_element_addr
-  copy_addr [take] %g1#1 to [initialization] %g0#1 : $*IteratorOfOne<AnyObject>
+  copy_addr [take] %g1#1 to [initialization] %g0#1 : $*IteratorOverOne<AnyObject>
 
   %l1 = alloc_stack $Optional<AnyObject> // 869
 
@@ -334,10 +334,10 @@ bb0(%0 : $*AnyObject):
   dealloc_stack %l4#0 : $*@local_storage Optional<AnyObject>
   destroy_addr %l1#1 : $*Optional<AnyObject>
   dealloc_stack %l1#0 : $*@local_storage Optional<AnyObject>
-  dealloc_stack %g1#0 : $*@local_storage IteratorOfOne<AnyObject>
+  dealloc_stack %g1#0 : $*@local_storage IteratorOverOne<AnyObject>
   dealloc_stack %l0#0 : $*@local_storage Optional<AnyObject>
-  destroy_addr %g0#1 : $*IteratorOfOne<AnyObject>
-  dealloc_stack %g0#0 : $*@local_storage IteratorOfOne<AnyObject>
+  destroy_addr %g0#1 : $*IteratorOverOne<AnyObject>
+  dealloc_stack %g0#0 : $*@local_storage IteratorOverOne<AnyObject>
   %p0 = tuple ()
   return %p0 : $()
 }

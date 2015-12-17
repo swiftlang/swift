@@ -77,33 +77,29 @@ public typealias CBool = Bool
 /// Opaque pointers are used to represent C pointers to types that
 /// cannot be represented in Swift, such as incomplete struct types.
 public struct OpaquePointer : Equatable, Hashable, NilLiteralConvertible {
-  var _rawValue: Builtin.RawPointer
+  internal var _rawValue: Builtin.RawPointer
 
-  /// Construct a `nil` instance.
+  /// Create an instance initialized with `nil`.
   @_transparent
-  public init() {
-    _rawValue = _nilRawPointer
+  public init(nilLiteral: ()) {
+    self._rawValue = _nilRawPointer
   }
 
   @_transparent
-  init(_ v: Builtin.RawPointer) {
-    _rawValue = v
+  internal init(_ v: Builtin.RawPointer) {
+    self._rawValue = v
   }
 
   /// Construct an `OpaquePointer` from a given address in memory.
-  ///
-  /// This is a fundamentally unsafe conversion.
   @_transparent
   public init(bitPattern: Int) {
-    _rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
+    self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
   /// Construct an `OpaquePointer` from a given address in memory.
-  ///
-  /// This is a fundamentally unsafe conversion.
   @_transparent
   public init(bitPattern: UInt) {
-    _rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
+    self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
   /// Convert a typed `UnsafePointer` to an opaque C pointer.
@@ -133,12 +129,6 @@ public struct OpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   ///   hash value across program runs.
   public var hashValue: Int {
     return Int(Builtin.ptrtoint_Word(_rawValue))
-  }
-
-  /// Create an instance initialized with `nil`.
-  @_transparent public
-  init(nilLiteral: ()) {
-    _rawValue = _nilRawPointer
   }
 }
 

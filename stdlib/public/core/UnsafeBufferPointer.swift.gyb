@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A iterator for the elements in the buffer referenced by
+/// An iterator for the elements in the buffer referenced by
 /// `UnsafeBufferPointer` or `UnsafeMutableBufferPointer`.
 public struct UnsafeBufferPointerIterator<Element>
   : IteratorProtocol, Sequence {
@@ -18,10 +18,14 @@ public struct UnsafeBufferPointerIterator<Element>
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   public mutating func next() -> Element? {
-    return position == end ? nil : (position++).memory
+    if _position == _end { return nil }
+
+    let result = _position.pointee
+    _position += 1
+    return result
   }
 
-  var position, end: UnsafePointer<Element>
+  internal var _position, _end: UnsafePointer<Element>
 }
 
 %for Mutable in ('Mutable', ''):
@@ -51,14 +55,14 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   /// Access the `i`th element in the buffer.
   public subscript(i: Int) -> Element {
     get {
-      _debugPrecondition(i >= 0)
-      _debugPrecondition(i < endIndex)
+      _debugRequire(i >= 0)
+      _debugRequire(i < endIndex)
       return _position[i]
     }
 %if Mutable:
     nonmutating set {
-      _debugPrecondition(i >= 0)
-      _debugPrecondition(i < endIndex)
+      _debugRequire(i >= 0)
+      _debugRequire(i < endIndex)
       _position[i] = newValue
     }
 %end
@@ -67,7 +71,7 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   /// Construct an Unsafe${Mutable}Pointer over the `count` contiguous
   /// `Element` instances beginning at `start`.
   public init(start: Unsafe${Mutable}Pointer<Element>, count: Int) {
-    _precondition(
+    _require(
       count >= 0, "Unsafe${Mutable}BufferPointer with negative count")
     _position = start
     _end = start + count
@@ -77,7 +81,7 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   ///
   /// - Complexity: O(1).
   public func iterator() -> UnsafeBufferPointerIterator<Element> {
-    return UnsafeBufferPointerIterator(position: _position, end: _end)
+    return UnsafeBufferPointerIterator(_position: _position, _end: _end)
   }
 
   /// A pointer to the first element of the buffer.
@@ -90,7 +94,7 @@ public struct Unsafe${Mutable}BufferPointer<Element>
     return _end - _position
   }
 
-  var _position, _end: Unsafe${Mutable}Pointer<Element>
+  let _position, _end: Unsafe${Mutable}Pointer<Element>
 }
 
 extension Unsafe${Mutable}BufferPointer : CustomDebugStringConvertible {

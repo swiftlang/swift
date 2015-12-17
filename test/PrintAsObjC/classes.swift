@@ -161,7 +161,7 @@ class NotObjC {}
   class func test2() {}
 
   func testPrimitives(b: Bool, i: Int, f: Float, d: Double, u: UInt)
-    -> OpaquePointer { return OpaquePointer() }
+    -> OpaquePointer { return nil }
   func testString(s: String) {}
   func testSelector(sel: Selector, boolean b: ObjCBool) {}
 
@@ -257,7 +257,7 @@ typealias AliasForNSRect = NSRect
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class MethodsWithPointers {
-  func test(a: UnsafeMutablePointer<Int>) -> UnsafeMutablePointer<AnyObject> { return UnsafeMutablePointer() }
+  func test(a: UnsafeMutablePointer<Int>) -> UnsafeMutablePointer<AnyObject> { return nil }
 
   func testNested(a: UnsafeMutablePointer<UnsafeMutablePointer<Int>>) {}
 

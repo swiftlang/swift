@@ -12,10 +12,10 @@ public class PureSwiftClass {
 }
 
 @objc(SwiftProtoWithCustomName)
-public protocol CustomNameType {}
+public protocol CustomName {}
 
 @objc(SwiftClassWithCustomName)
-public class CustomNameClass : CustomNameType {
+public class CustomNameClass : CustomName {
   public init() {}
   @nonobjc func pureSwiftMethod() {}
 }

@@ -18,13 +18,13 @@ struct Zzz<T> {
   }
 }
 
-protocol _CollectionType {
+protocol _Collection {
   typealias Index
   typealias _Element
   subscript(i: Index) -> _Element {get}
 }
 
-protocol Collection : _CollectionType, Sequence {
+protocol Collection : _Collection, Sequence {
   subscript(i: Index) -> Iterator.Element {get set }
 }
 func insertionSort<C: Mutable> (inout elements: C, i: C.Index) { // expected-error {{use of undeclared type 'Mutable'}} expected-error {{'Index' is not a member type of 'C'}}

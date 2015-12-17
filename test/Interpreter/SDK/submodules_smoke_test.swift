@@ -1,4 +1,5 @@
 // RUN: %target-build-swift -parse %s -Xfrontend -verify
+// RUN: %target-build-swift -parse %s -Xfrontend -verify -Xfrontend -enable-swift-name-lookup-tables
 // RUN: %target-build-swift -emit-ir -g %s -DNO_ERROR > /dev/null
 // REQUIRES: executable_test
 

@@ -523,6 +523,18 @@ bool Lexer::isIdentifier(StringRef string) {
   return p == end;
 }
 
+/// \brief Determines if the given string is a valid operator identifier,
+/// without escaping characters.
+bool Lexer::isOperator(StringRef string) {
+  if (string.empty()) return false;
+  char const *p = string.data(), *end = string.end();
+  if (!advanceIfValidStartOfOperator(p, end))
+    return false;
+  while (p < end && advanceIfValidContinuationOfOperator(p, end));
+  return p == end;
+}
+
+
 tok Lexer::kindOfIdentifier(StringRef Str, bool InSILMode) {
   tok Kind = llvm::StringSwitch<tok>(Str)
 #define KEYWORD(kw) \
@@ -595,30 +607,23 @@ static bool isRightBound(const char *tokEnd, bool isLeftBound) {
 /// lexOperatorIdentifier - Match identifiers formed out of punctuation.
 void Lexer::lexOperatorIdentifier() {
   const char *TokStart = CurPtr-1;
+  CurPtr = TokStart;
+  bool didStart = advanceIfValidStartOfOperator(CurPtr, BufferEnd);
+  assert(didStart && "unexpected operator start");
+  (void) didStart;
+  
+  do {
+    if (CurPtr != BufferEnd && InSILBody &&
+        (*CurPtr == '!' || *CurPtr == '?'))
+      // When parsing SIL body, '!' and '?' are special token and can't be
+      // in the middle of an operator.
+      break;
 
-  // We only allow '.' in a series.
-  if (*TokStart == '.') {
-    while (*CurPtr == '.')
-      ++CurPtr;
-    
-    // Lex ..< as an identifier.
-    if (*CurPtr == '<' && CurPtr-TokStart == 2)
-      ++CurPtr;
-    
-  } else {
-    CurPtr = TokStart;
-    bool didStart = advanceIfValidStartOfOperator(CurPtr, BufferEnd);
-    assert(didStart && "unexpected operator start");
-    (void) didStart;
-    
-    do {
-      if (CurPtr != BufferEnd && InSILBody &&
-          (*CurPtr == '!' || *CurPtr == '?'))
-        // When parsing SIL body, '!' and '?' are special token and can't be
-        // in the middle of an operator.
-        break;
-    } while (advanceIfValidContinuationOfOperator(CurPtr, BufferEnd));
-  }
+    // '.' cannot appear in the middle of an operator unless the operator
+    // started with a '.'.
+    if (*CurPtr == '.' && *TokStart != '.')
+      break;
+  } while (advanceIfValidContinuationOfOperator(CurPtr, BufferEnd));
 
   // Decide between the binary, prefix, and postfix cases.
   // It's binary if either both sides are bound or both sides are not bound.
@@ -631,8 +636,7 @@ void Lexer::lexOperatorIdentifier() {
     switch (TokStart[0]) {
     case '=':
       if (leftBound != rightBound) {
-        auto d = diagnose(TokStart, diag::lex_unary_equal_is_reserved,
-                          leftBound);
+        auto d = diagnose(TokStart, diag::lex_unary_equal);
         if (leftBound)
           d.fixItInsert(getSourceLoc(TokStart), " ");
         else
@@ -1664,15 +1668,15 @@ Restart:
   }
 }
 
-SourceLoc Lexer::getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc) {
+Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
   // Don't try to do anything with an invalid location.
   if (!Loc.isValid())
-    return Loc;
+    return Token();
 
   // Figure out which buffer contains this location.
   int BufferID = SM.findBufferContainingLoc(Loc);
   if (BufferID < 0)
-    return SourceLoc();
+    return Token();
   
   // Use fake language options; language options only affect validity
   // and the exact token produced.
@@ -1685,9 +1689,13 @@ SourceLoc Lexer::getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc) {
   Lexer L(FakeLangOpts, SM, BufferID, nullptr, /*InSILMode=*/ false,
           CommentRetentionMode::ReturnAsTokens);
   L.restoreState(State(Loc));
-  unsigned Length = L.peekNextToken().getLength();
-  return Loc.getAdvancedLoc(Length);
+  return L.peekNextToken();
 }
+
+SourceLoc Lexer::getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc) {
+  return Loc.getAdvancedLocOrInvalid(getTokenAtLocation(SM, Loc).getLength());
+}
+
 
 static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
                                             unsigned BufferID,

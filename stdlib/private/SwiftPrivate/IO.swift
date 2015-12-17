@@ -49,7 +49,7 @@ public struct _FDInputStream {
       _buffer.reserveCapacity(minFree - bufferFree)
       while bufferFree < minFree {
         _buffer.append(0)
-        ++bufferFree
+        bufferFree += 1
       }
     }
     let readResult: __swift_ssize_t = _buffer.withUnsafeMutableBufferPointer {
@@ -81,7 +81,7 @@ public struct _FDInputStream {
   }
 }
 
-public struct _Stderr : OutputStreamType {
+public struct _Stderr : OutputStream {
   public init() {}
 
   public mutating func write(string: String) {
@@ -91,7 +91,7 @@ public struct _Stderr : OutputStreamType {
   }
 }
 
-public struct _FDOutputStream : OutputStreamType {
+public struct _FDOutputStream : OutputStream {
   public let fd: CInt
   public var isClosed: Bool = false
 

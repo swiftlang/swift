@@ -163,11 +163,36 @@ func operator_in_func_bad () {
                                                                     // expected-error {{use of unresolved identifier 'input'}}
 }
 
-infix operator ? {}  // expected-error {{expected operator name in operator declaration}} expected-error {{braced block of statements is an unused closure}} expected-error{{begin with a closure}} expected-note{{discard the result}} {{18-18=_ = }} expected-error{{expression resolves to an unused function}}
+infix operator ? {}  // expected-error {{expected operator name in operator declaration}} 
 
 infix operator ??= {}
 
 func ??= <T>(inout result : T?, rhs : Int) {  // ok
 }
 
+
+
+// <rdar://problem/14296004> [QoI] Poor diagnostic/recovery when two operators (e.g., == and -) are adjacted without spaces.
+_ = n*-4       // expected-error {{missing whitespace between '*' and '-' operators}} {{6-6= }} {{7-7= }}
+if n==-1 {}    // expected-error {{missing whitespace between '==' and '-' operators}} {{5-5= }} {{7-7= }}
+
+prefix operator ☃⃠ {}
+prefix func☃⃠(a : Int) -> Int { return a }
+postfix operator ☃⃠ {}
+postfix func☃⃠(a : Int) -> Int { return a }
+
+_ = n☃⃠ ☃⃠ n   // Ok.
+_ = n ☃⃠ ☃⃠n   // Ok.
+_ = n ☃⃠☃⃠ n   // expected-error {{use of unresolved operator '☃⃠☃⃠'}}
+_ = n☃⃠☃⃠n     // expected-error {{ambiguous missing whitespace between unary and binary operators}}
+// expected-note @-1 {{could be binary '☃⃠' and prefix '☃⃠'}} {{12-12= }} {{18-18= }}
+// expected-note @-2 {{could be postfix '☃⃠' and binary '☃⃠'}} {{6-6= }} {{12-12= }}
+
+_ = n☃⃠☃⃠ // expected-error {{unary operators may not be juxtaposed; parenthesize inner expression}}
+_ = ~!n  // expected-error {{unary operators may not be juxtaposed; parenthesize inner expression}}
+_ = -+n  // expected-error {{unary operators may not be juxtaposed; parenthesize inner expression}}
+_ = -++n // expected-error {{unary operators may not be juxtaposed; parenthesize inner expression}}
+
+// <rdar://problem/16230507> Cannot use a negative constant as the second operator of ... operator
+_ = 3...-5  // expected-error {{missing whitespace between '...' and '-' operators}}
 

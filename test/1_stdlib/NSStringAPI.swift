@@ -198,15 +198,15 @@ NSStringAPIs.test("init(cString_:encoding:)") {
 
 NSStringAPIs.test("init(utF8String:)") {
   var s = "foo あいう"
-  var up = UnsafeMutablePointer<UInt8>.alloc(100)
+  var up = UnsafeMutablePointer<UInt8>(allocatingCapacity: 100)
   var i = 0
   for b in s.utf8 {
     up[i] = b
-    i++
+    i += 1
   }
   up[i] = 0
   expectOptionalEqual(s, String(utf8String: UnsafePointer(up)))
-  up.dealloc(100)
+  up.deallocateCapacity(100)
 }
 
 NSStringAPIs.test("canBeConvertedToEncoding(_:)") {
@@ -830,7 +830,7 @@ NSStringAPIs.test("init(format:arguments:)") {
     String(format: "abc абв \u{0001F60A}", arguments: []))
 
   let world: NSString = "world"
-  let args: [CVarArgType] = [ world, 42 ]
+  let args: [CVarArg] = [ world, 42 ]
   expectEqual("Hello, world!%42",
       String(format: "Hello, %@!%%%ld", arguments: args))
 }
@@ -845,7 +845,7 @@ NSStringAPIs.test("init(format:locale:_:...)") {
 
 NSStringAPIs.test("init(format:locale:arguments:)") {
   let world: NSString = "world"
-  let args: [CVarArgType] = [ world, 42 ]
+  let args: [CVarArg] = [ world, 42 ]
   expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
       locale: nil, arguments: args))
   expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
@@ -1339,7 +1339,7 @@ NSStringAPIs.test("smallestEncoding") {
 
 func getHomeDir() -> String {
 #if os(OSX)
-  return String.fromCString(getpwuid(getuid()).memory.pw_dir)!
+  return String.fromCString(getpwuid(getuid()).pointee.pw_dir)!
 #elseif os(iOS) || os(tvOS) || os(watchOS)
   // getpwuid() returns null in sandboxed apps under iOS simulator.
   return NSHomeDirectory()
@@ -2144,45 +2144,45 @@ func getNullCString() -> UnsafeMutablePointer<CChar> {
 }
 
 func getASCIICString() -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
-  let up = UnsafeMutablePointer<CChar>.alloc(100)
+  let up = UnsafeMutablePointer<CChar>(allocatingCapacity: 100)
   up[0] = 0x61
   up[1] = 0x62
   up[2] = 0
-  return (up, { up.dealloc(100) })
+  return (up, { up.deallocateCapacity(100) })
 }
 
 func getNonASCIICString() -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
-  let up = UnsafeMutablePointer<UInt8>.alloc(100)
+  let up = UnsafeMutablePointer<UInt8>(allocatingCapacity: 100)
   up[0] = 0xd0
   up[1] = 0xb0
   up[2] = 0xd0
   up[3] = 0xb1
   up[4] = 0
-  return (UnsafeMutablePointer(up), { up.dealloc(100) })
+  return (UnsafeMutablePointer(up), { up.deallocateCapacity(100) })
 }
 
 func getIllFormedUTF8String1(
 ) -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
-  let up = UnsafeMutablePointer<UInt8>.alloc(100)
+  let up = UnsafeMutablePointer<UInt8>(allocatingCapacity: 100)
   up[0] = 0x41
   up[1] = 0xed
   up[2] = 0xa0
   up[3] = 0x80
   up[4] = 0x41
   up[5] = 0
-  return (UnsafeMutablePointer(up), { up.dealloc(100) })
+  return (UnsafeMutablePointer(up), { up.deallocateCapacity(100) })
 }
 
 func getIllFormedUTF8String2(
 ) -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
-  let up = UnsafeMutablePointer<UInt8>.alloc(100)
+  let up = UnsafeMutablePointer<UInt8>(allocatingCapacity: 100)
   up[0] = 0x41
   up[1] = 0xed
   up[2] = 0xa0
   up[3] = 0x81
   up[4] = 0x41
   up[5] = 0
-  return (UnsafeMutablePointer(up), { up.dealloc(100) })
+  return (UnsafeMutablePointer(up), { up.deallocateCapacity(100) })
 }
 
 func asCCharArray(a: [UInt8]) -> [CChar] {

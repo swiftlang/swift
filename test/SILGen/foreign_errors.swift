@@ -64,7 +64,7 @@ extension NSObject {
 // CHECK:   [[T0:%.*]] = function_ref @swift_convertErrorProtocolToNSError : $@convention(thin) (@owned ErrorProtocol) -> @owned NSError
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[ERR]])
 // CHECK:   [[OBJCERR:%.*]] = enum $Optional<NSError>, #Optional.Some!enumelt.1, [[T1]] : $NSError
-// CHECK:   [[SETTER:%.*]] = function_ref @_TFVs33AutoreleasingUnsafeMutablePointers6memoryx :
+// CHECK:   [[SETTER:%.*]] = function_ref @_TFVs33AutoreleasingUnsafeMutablePointers7pointeex :
 // CHECK:   [[TEMP:%.*]] = alloc_stack $Optional<NSError>
 // CHECK:   store [[OBJCERR]] to [[TEMP]]#1
 // CHECK:   apply [[SETTER]]<Optional<NSError>>([[TEMP]]#1, %0)
@@ -90,7 +90,7 @@ extension NSObject {
 // CHECK:   [[T0:%.*]] = function_ref @swift_convertErrorProtocolToNSError : $@convention(thin) (@owned ErrorProtocol) -> @owned NSError
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[ERR]])
 // CHECK:   [[OBJCERR:%.*]] = enum $Optional<NSError>, #Optional.Some!enumelt.1, [[T1]] : $NSError
-// CHECK:   [[SETTER:%.*]] = function_ref @_TFVs33AutoreleasingUnsafeMutablePointers6memoryx :
+// CHECK:   [[SETTER:%.*]] = function_ref @_TFVs33AutoreleasingUnsafeMutablePointers7pointeex :
 // CHECK:   [[TEMP:%.*]] = alloc_stack $Optional<NSError>
 // CHECK:   store [[OBJCERR]] to [[TEMP]]#1
 // CHECK:   apply [[SETTER]]<Optional<NSError>>([[TEMP]]#1, %0)

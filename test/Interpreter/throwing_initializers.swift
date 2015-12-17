@@ -28,11 +28,11 @@ class Canary {
   static var count: Int = 0
 
   init() {
-    Canary.count++
+    Canary.count += 1
   }
 
   deinit {
-    Canary.count--
+    Canary.count -= 1
   }
 }
 
@@ -280,7 +280,7 @@ struct Chimera {
 func mustThrow<T>(f: () throws -> T) {
   do {
     try f()
-    preconditionFailure("Didn't throw")
+    requirementFailure("Didn't throw")
   } catch {}
 }
 

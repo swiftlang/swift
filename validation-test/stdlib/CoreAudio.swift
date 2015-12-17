@@ -191,27 +191,27 @@ CoreAudioTestSuite.test(
 CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.count") {
   let sizeInBytes = AudioBufferList.sizeInBytes(maximumBuffers: 16)
   let ablPtr = UnsafeMutablePointer<AudioBufferList>(
-    UnsafeMutablePointer<UInt8>.alloc(sizeInBytes))
+    UnsafeMutablePointer<UInt8>(allocatingCapacity: sizeInBytes))
 
   // It is important that 'ablPtrWrapper' is a 'let'.  We are verifying that
   // the 'count' property has a nonmutating setter.
   let ablPtrWrapper = UnsafeMutableAudioBufferListPointer(ablPtr)
 
   // Test getter.
-  UnsafeMutablePointer<UInt32>(ablPtr).memory = 0x1234_5678
+  UnsafeMutablePointer<UInt32>(ablPtr).pointee = 0x1234_5678
   expectEqual(0x1234_5678, ablPtrWrapper.count)
 
   // Test setter.
   ablPtrWrapper.count = 0x7765_4321
-  expectEqual(0x7765_4321, UnsafeMutablePointer<UInt32>(ablPtr).memory)
+  expectEqual(0x7765_4321, UnsafeMutablePointer<UInt32>(ablPtr).pointee)
 
-  ablPtr.dealloc(sizeInBytes)
+  ablPtr.deallocateCapacity(sizeInBytes)
 }
 
 CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.subscript(_: Int)") {
   let sizeInBytes = AudioBufferList.sizeInBytes(maximumBuffers: 16)
   let ablPtr = UnsafeMutablePointer<AudioBufferList>(
-    UnsafeMutablePointer<UInt8>.alloc(sizeInBytes))
+    UnsafeMutablePointer<UInt8>(allocatingCapacity: sizeInBytes))
 
   // It is important that 'ablPtrWrapper' is a 'let'.  We are verifying that
   // the subscript has a nonmutating setter.
@@ -224,7 +224,8 @@ CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.subscript(_: Int)")
       mData: UnsafeMutablePointer<Void>(bitPattern: 0x1234_5678))
 
     UnsafeMutablePointer<AudioBuffer>(
-      UnsafeMutablePointer<UInt8>(ablPtr) + ablHeaderSize).memory = audioBuffer
+        UnsafeMutablePointer<UInt8>(ablPtr) + ablHeaderSize
+      ).pointee = audioBuffer
     ablPtrWrapper.count = 1
 
     expectEqual(2, ablPtrWrapper[0].mNumberChannels)
@@ -243,12 +244,12 @@ CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.subscript(_: Int)")
 
     let audioBufferPtr = UnsafeMutablePointer<AudioBuffer>(
       UnsafeMutablePointer<UInt8>(ablPtr) + ablHeaderSize) + 1
-    expectEqual(5, audioBufferPtr.memory.mNumberChannels)
-    expectEqual(256, audioBufferPtr.memory.mDataByteSize)
-    expectEqual(audioBuffer.mData, audioBufferPtr.memory.mData)
+    expectEqual(5, audioBufferPtr.pointee.mNumberChannels)
+    expectEqual(256, audioBufferPtr.pointee.mDataByteSize)
+    expectEqual(audioBuffer.mData, audioBufferPtr.pointee.mData)
   }
 
-  ablPtr.dealloc(sizeInBytes)
+  ablPtr.deallocateCapacity(sizeInBytes)
 }
 
 CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.subscript(_: Int)/trap") {

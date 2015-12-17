@@ -40,7 +40,7 @@ let value = ObservedValue()
 value.amount = 42
 let observer = ValueObserver(value: value)
 // CHECK: updated to 43
-value.amount++
+value.amount += 1
 // CHECK: amount: 43
 dump(value)
 

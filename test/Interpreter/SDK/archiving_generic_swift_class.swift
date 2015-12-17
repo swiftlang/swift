@@ -39,7 +39,7 @@ func WEXITSTATUS(status: Int32) -> Int32 {
 func _NSGetEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>>>
 
 var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>> {
-  return _NSGetEnviron().memory
+  return _NSGetEnviron().pointee
 }
 
 func driver() {
@@ -55,7 +55,7 @@ func driver() {
 
   do {
     // Set up the archiver's stdout to feed into our pipe.
-    var archiverActions = posix_spawn_file_actions_t()
+    var archiverActions: posix_spawn_file_actions_t = nil
     guard posix_spawn_file_actions_init(&archiverActions) == 0 else {
       fatalError("posix_spawn_file_actions_init failed")
     }
@@ -84,7 +84,7 @@ func driver() {
 
   do {
     // Set up the unarchiver's stdin to read from our pipe.
-    var unarchiverActions = posix_spawn_file_actions_t()
+    var unarchiverActions: posix_spawn_file_actions_t = nil
     guard posix_spawn_file_actions_init(&unarchiverActions) == 0 else {
       fatalError("posix_spawn_file_actions_init failed")
     }

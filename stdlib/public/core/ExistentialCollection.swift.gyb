@@ -459,7 +459,7 @@ public struct ${Self} : ${Traversal}Index {
   internal var _box: _${Traversal}IndexBoxProtocol
 
   public func _distanceTo(other: ${Self}) -> ${Self}.Distance {
-    precondition(
+    require(
       self._typeID == other._typeID,
       "distance: base index types differ.")
     return self._box._distanceTo(other._box)
@@ -473,7 +473,7 @@ public struct ${Self} : ${Traversal}Index {
 ///   identical.
 @warn_unused_result
 public func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
-  precondition(lhs._typeID == rhs._typeID, "base index types differ.")
+  require(lhs._typeID == rhs._typeID, "base index types differ.")
   return lhs._box.equals(rhs._box)
 }
 % end

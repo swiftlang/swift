@@ -87,7 +87,7 @@ public protocol ForwardIndex : _Incrementable {
   ///
   /// The range check, if performed, is equivalent to:
   ///
-  ///     precondition(bounds.contains(index))
+  ///     require(bounds.contains(index))
   ///
   /// Use this function to perform a cheap range check for QoI purposes when
   /// memory safety is not a concern.  Do not rely on this range check for
@@ -105,10 +105,10 @@ public protocol ForwardIndex : _Incrementable {
   ///
   /// The range check, if performed, is equivalent to:
   ///
-  ///     precondition(
+  ///     require(
   ///       bounds.contains(range.startIndex) ||
   ///       range.startIndex == bounds.endIndex)
-  ///     precondition(
+  ///     require(
   ///       bounds.contains(range.endIndex) ||
   ///       range.endIndex == bounds.endIndex)
   ///
@@ -191,11 +191,13 @@ extension ForwardIndex {
   @_transparent
   @warn_unused_result
   internal func _advanceForward(n: Distance) -> Self {
-    _precondition(n >= 0,
+    _require(n >= 0,
         "Only BidirectionalIndex can be advanced by a negative amount")
     var p = self
-    for var i: Distance = 0; i != n; ++i {
-      ++p
+    var i : Distance = 0
+    while i != n {
+      p._successorInPlace()
+      i = i + 1
     }
     return p
   }
@@ -204,11 +206,14 @@ extension ForwardIndex {
   @_transparent
   @warn_unused_result
   internal func _advanceForward(n: Distance, _ limit: Self) -> Self {
-    _precondition(n >= 0,
+    _require(n >= 0,
         "Only BidirectionalIndex can be advanced by a negative amount")
     var p = self
-    for var i: Distance = 0; i != n && p != limit; ++i {
-      ++p
+    var i : Distance = 0
+    while i != n {
+      if p == limit { break }
+      p._successorInPlace()
+      i = i + 1
     }
     return p
   }
@@ -228,8 +233,8 @@ extension ForwardIndex {
     var p = self
     var count: Distance = 0
     while p != end {
-      ++count
-      ++p
+      count += 1
+      p._successorInPlace()
     }
     return count
   }
@@ -268,8 +273,10 @@ extension BidirectionalIndex {
       return _advanceForward(n)
     }
     var p = self
-    for var i: Distance = n; i != 0; ++i {
-      --p
+    var i: Distance = n
+    while i != 0 {
+      p._predecessorInPlace()
+      i._successorInPlace()
     }
     return p
   }
@@ -280,8 +287,10 @@ extension BidirectionalIndex {
       return _advanceForward(n, limit)
     }
     var p = self
-    for var i: Distance = n; i != 0 && p != limit; ++i {
-      --p
+    var i: Distance = n
+    while i != 0 && p != limit {
+      p._predecessorInPlace()
+      i._successorInPlace()
     }
     return p
   }
@@ -338,10 +347,10 @@ public protocol RandomAccessIndex : BidirectionalIndex, Strideable,
 
 extension RandomAccessIndex {
   public static func _failEarlyRangeCheck(index: Self, bounds: Range<Self>) {
-    _precondition(
+    _require(
       bounds.startIndex <= index,
       "index is out of bounds: index designates a position before bounds.startIndex")
-    _precondition(
+    _require(
       index < bounds.endIndex,
       "index is out of bounds: index designates the bounds.endIndex position or a position after it")
   }
@@ -351,17 +360,17 @@ extension RandomAccessIndex {
   ) {
     let range = rangeStart..<rangeEnd
     let bounds = boundsStart..<boundsEnd
-    _precondition(
+    _require(
       bounds.startIndex <= range.startIndex,
       "range.startIndex is out of bounds: index designates a position before bounds.startIndex")
-    _precondition(
+    _require(
       bounds.startIndex <= range.endIndex,
       "range.endIndex is out of bounds: index designates a position before bounds.startIndex")
 
-    _precondition(
+    _require(
       range.startIndex <= bounds.endIndex,
       "range.startIndex is out of bounds: index designates a position after bounds.endIndex")
-    _precondition(
+    _require(
       range.endIndex <= bounds.endIndex,
       "range.startIndex is out of bounds: index designates a position after bounds.endIndex")
   }

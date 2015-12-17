@@ -109,9 +109,6 @@ public:
   /// isOperatorContinuationCodePoint - Return true if the specified code point
   /// is a valid operator code point.
   static bool isOperatorContinuationCodePoint(uint32_t C) {
-    // '.' is a special case. It can only appear in '..'.
-    if (C == '.')
-      return false;
     if (isOperatorStartCodePoint(C))
       return true;
 

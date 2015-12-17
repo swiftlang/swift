@@ -1,68 +1,92 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %target-swift-frontend -emit-module -module-name OutsideClasses -o %t %S/../Inputs/outside_classes_before.swift
-// RUN: %target-swift-frontend -use-native-super-method -emit-silgen -I %t %S/../Inputs/partial_apply_super.swift | FileCheck %s --check-prefix=SILGEN
+// RUN: %target-swift-frontend -emit-module -emit-module-path=%t/resilient_class.swiftmodule -module-name resilient_class %S/../Inputs/resilient_class.swift
+// RUN: %target-swift-frontend -use-native-super-method -emit-silgen -parse-as-library -I %t %s | FileCheck %s
 
-// Child.method
-// SILGEN-LABEL: sil hidden @_TFC19partial_apply_super5Child6methodfT_T_
-// SILGEN: [[DOFOO:%[0-9]+]] = function_ref @_TF14OutsideClasses5doFooFFT_T_T_
-// SILGEN: [[CASTED_SELF:%[0-9]+]] = upcast {{%[0-9]+}} : $Child to $Parent
-// SILGEN: [[SUPER_METHOD:%[0-9]+]] = super_method %0 : $Child, #Parent.method!1
-// SILGEN: [[PARTIAL_APPLY:%[0-9]+]] = partial_apply [[SUPER_METHOD]]([[CASTED_SELF]])
-// SILGEN: apply [[DOFOO]]([[PARTIAL_APPLY]])
+import resilient_class
 
-// Child.classMethod
-// SILGEN-LABEL: sil hidden @_TZFC19partial_apply_super5Child11classMethodfT_T_ : $@convention(thin) (@thick Child.Type) -> () {
-// SILGEN: [[DOFOO:%[0-9]+]] = function_ref @_TF14OutsideClasses5doFooFFT_T_T_ : $@convention(thin) (@owned @callee_owned () -> ()) -> () // user: %6
-// SILGEN-NEXT: [[CASTED_SELF:%[0-9]+]] = upcast %0 : $@thick Child.Type to $@thick Parent.Type // user: %5
-// SILGEN-NEXT: [[SUPER_METHOD:%[0-9]+]] = super_method %0 : $@thick Child.Type, #Parent.classMethod!1 : Parent.Type -> () -> () , $@convention(thin) (@thick Parent.Type) -> ()
-// SILGEN-NEXT: [[PARTIAL_APPLY:%[0-9]+]] = partial_apply [[SUPER_METHOD]]([[CASTED_SELF]]) : $@convention(thin) (@thick Parent.Type) -> ()
-// SILGEN-NEXT:  apply [[DOFOO]]([[PARTIAL_APPLY]]) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+public class Parent {
+  public init() {}
+  public func method() {}
+  public final func finalMethod() {}
+  public class func classMethod() {}
+  public final class func finalClassMethod() {}
+}
 
-// GenericChild.method
-// SILGEN-LABEL: sil hidden @_TFC19partial_apply_super12GenericChild6methodfT_T_ : $@convention(method) <A> (@guaranteed GenericChild<A>) -> () 
-// SILGEN: [[DOFOO:%[0-9]+]] = function_ref @_TF14OutsideClasses5doFooFFT_T_T_ : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
-// SILGEN: [[CASTED_SELF:%[0-9]+]] = upcast {{%[0-9]+}} : $GenericChild<A> to $GenericParent<A>
-// SILGEN: [[SUPER_METHOD:%[0-9]+]] = super_method {{%[0-9]+}} : $GenericChild<A>, #GenericParent.method!1 : <A> GenericParent<A> -> () -> () , $@convention(method) <τ_0_0> (@guaranteed GenericParent<τ_0_0>) -> ()
-// SILGEN: [[PARTIAL_APPLY:%[0-9]+]] = partial_apply [[SUPER_METHOD]]<A>([[CASTED_SELF]]) : $@convention(method) <τ_0_0> (@guaranteed GenericParent<τ_0_0>) -> ()
-// SILGEN: apply [[DOFOO]]([[PARTIAL_APPLY]]) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+public class GenericParent<A> {
+  let a: A
+  public init(a: A) {
+    self.a = a
+  }
+  public func method() {}
+  public final func finalMethod() {}
+  public class func classMethod() {}
+  public final class func finalClassMethod() {}
+}
 
-// GenericChild.classMethod
-// SILGEN-LABEL: sil hidden @_TZFC19partial_apply_super12GenericChild11classMethodfT_T_ : $@convention(thin) <A> (@thick GenericChild<A>.Type) -> ()
-// SILGEN: [[DOFOO:%[0-9]+]] = function_ref @_TF14OutsideClasses5doFooFFT_T_T_ : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
-// SILGEN: [[CASTED_SELF:%[0-9]+]] = upcast {{%[0-9]+}} : $@thick GenericChild<A>.Type to $@thick GenericParent<A>.Type
-// SILGEN: [[SUPER_METHOD:%[0-9]+]] = super_method {{%[0-9]}} : $@thick GenericChild<A>.Type, #GenericParent.classMethod!1 : <A> GenericParent<A>.Type -> () -> () , $@convention(thin) <τ_0_0> (@thick GenericParent<τ_0_0>.Type) -> ()
-// SILGEN: [[PARTIAL_APPLY:%[0-9]+]] = partial_apply [[SUPER_METHOD]]<A>([[CASTED_SELF]]) : $@convention(thin) <τ_0_0> (@thick GenericParent<τ_0_0>.Type) -> ()
-// SILGEN: apply [[DOFOO]]([[PARTIAL_APPLY]]) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+class Child : Parent {
+  // CHECK-LABEL: sil hidden @_TFC19partial_apply_super5Child6methodfT_T_ : $@convention(method) (@guaranteed Child) -> ()
+  // CHECK: [[DOFOO:%[0-9]+]] = function_ref @_TF15resilient_class5doFooFFT_T_T_ : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  // CHECK: [[CASTED_SELF:%[0-9]+]] = upcast %0 : $Child to $Parent
+  // CHECK: [[SUPER_METHOD:%[0-9]+]] = super_method %0 : $Child, #Parent.method!1 : Parent -> () -> () , $@convention(method) (@guaranteed Parent) -> ()
+  // CHECK: [[PARTIAL_APPLY:%[0-9]+]] = partial_apply [[SUPER_METHOD]]([[CASTED_SELF]]) : $@convention(method) (@guaranteed Parent) -> ()
+  // CHECK: apply [[DOFOO]]([[PARTIAL_APPLY]]) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  override func method() {
+    doFoo(super.method)
+  }
 
-// closure.Child.method
-// SILGEN-LABEL: sil shared @_TFCF19partial_apply_superU_FT_T_L_5Child6methodfT_T_ : $@convention(method) (@guaranteed Child) -> ()
-// SILGEN: [[DOFOO:%[0-9]+]] = function_ref @_TF14OutsideClasses5doFooFFT_T_T_ : $@convention(thin) (@owned @callee_owned () -> ()) -> () // user: %7
-// SILGEN: [[CASTED_SELF:%[0-9]+]] = upcast {{%[0-9]+}} : $Child to $Parent
-// SILGEN: [[SUPER_METHOD:%[0-9]+]] = super_method {{%[0-9]+}} : $Child, #Parent.method!1 : Parent -> () -> () , $@convention(method) (@guaranteed Parent) -> ()
-// SILGEN: [[PARTIAL_APPLY:%[0-9]+]] = partial_apply [[SUPER_METHOD]]([[CASTED_SELF]]) : $@convention(method) (@guaranteed Parent) -> ()
-// SILGEN: apply [[DOFOO]]([[PARTIAL_APPLY]]) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  // CHECK-LABEL: sil hidden @_TZFC19partial_apply_super5Child11classMethodfT_T_ : $@convention(thin) (@thick Child.Type) -> () {
+  // CHECK: [[DOFOO:%[0-9]+]] = function_ref @_TF15resilient_class5doFooFFT_T_T_ : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  // CHECK: [[CASTED_SELF:%[0-9]+]] = upcast %0 : $@thick Child.Type to $@thick Parent.Type
+  // CHECK: [[SUPER_METHOD:%[0-9]+]] = super_method %0 : $@thick Child.Type, #Parent.classMethod!1 : Parent.Type -> () -> () , $@convention(thin) (@thick Parent.Type) -> ()
+  // CHECK: [[PARTIAL_APPLY:%[0-9]+]] = partial_apply [[SUPER_METHOD]]([[CASTED_SELF]]) : $@convention(thin) (@thick Parent.Type) -> ()
+  // CHECK: apply [[DOFOO]]([[PARTIAL_APPLY]]) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  override class func classMethod() {
+    doFoo(super.classMethod)
+  }
 
-// closure.Child.classMethod
-// SILGEN-LABEL: sil shared @_TZFCF19partial_apply_superU_FT_T_L_5Child11classMethodfT_T_ : $@convention(thin) (@thick Child.Type) -> () {
-// SILGEN: [[DOFOO:%[0-9]+]] = function_ref @_TF14OutsideClasses5doFooFFT_T_T_ : $@convention(thin) (@owned @callee_owned () -> ()) -> () // user: %6
-// SILGEN: [[CASTED_SELF:%[0-9]+]] = upcast {{%[0-9]+}} : $@thick Child.Type to $@thick Parent.Type // user: %5
-// SILGEN: [[SUPER_METHOD:%[0-9]+]] = super_method {{%[0-9]+}} : $@thick Child.Type, #Parent.classMethod!1 : Parent.Type -> () -> () , $@convention(thin) (@thick Parent.Type) -> () // user: %5
-// SILGEN: [[PARTIAL_APPLY:%[0-9]+]] = partial_apply [[SUPER_METHOD]]([[CASTED_SELF]]) : $@convention(thin) (@thick Parent.Type) -> () // user: %6
-// SILGEN: apply [[DOFOO]]([[PARTIAL_APPLY]]) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  // CHECK-LABEL: sil hidden @_TFC19partial_apply_super5Child20callFinalSuperMethodfT_T_ : $@convention(method) (@guaranteed Child) -> () 
+  // CHECK: [[DOFOO:%[0-9]+]] = function_ref @_TF15resilient_class5doFooFFT_T_T_ : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  // CHECK: [[CASTED_SELF:%[0-9]+]] = upcast %0 : $Child to $Parent
+  // CHECK: [[SUPER_METHOD:%[0-9]+]] = function_ref @_TFC19partial_apply_super6Parent11finalMethodFT_T_ : $@convention(thin) (@owned Parent) -> @owned @callee_owned () -> ()
+  // CHECK: [[APPLIED_SELF:%[0-9]+]] = apply [[SUPER_METHOD]]([[CASTED_SELF]]) : $@convention(thin) (@owned Parent) -> @owned @callee_owned () -> ()
+  // CHECK:  apply [[DOFOO]]([[APPLIED_SELF]]) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  func callFinalSuperMethod() {
+    doFoo(super.finalMethod)
+  }
 
-// closure.GenericChild.method
-// SILGEN-LABEL: sil shared @_TFCF19partial_apply_superU0_FT_T_L_12GenericChild6methodfT_T_ : $@convention(method) <A> (@guaranteed GenericChild<A>) -> ()
-// SILGEN: [[DOFOO:%[0-9]+]] = function_ref @_TF14OutsideClasses5doFooFFT_T_T_ : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
-// SILGEN: [[CASTED_SELF:%[0-9]+]] = upcast {{%[0-9]+}} : $GenericChild<A> to $GenericParent<A>
-// SILGEN: [[SUPER_METHOD:%[0-9]+]] = super_method {{%[0-9]+}} : $GenericChild<A>, #GenericParent.method!1 : <A> GenericParent<A> -> () -> () , $@convention(method) <τ_0_0> (@guaranteed GenericParent<τ_0_0>) -> ()
-// SILGEN: [[PARTIAL_APPLY:%[0-9]+]] = partial_apply [[SUPER_METHOD]]<A>([[CASTED_SELF]]) : $@convention(method) <τ_0_0> (@guaranteed GenericParent<τ_0_0>) -> ()
-// SILGEN: apply [[DOFOO]]([[PARTIAL_APPLY]]) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  // CHECK-LABEL: sil hidden @_TZFC19partial_apply_super5Child25callFinalSuperClassMethodfT_T_ : $@convention(thin) (@thick Child.Type) -> ()
+  // CHECK: [[DOFOO:%[0-9]+]] = function_ref @_TF15resilient_class5doFooFFT_T_T_ : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  // CHECK: [[CASTED_SELF:%[0-9]+]] = upcast %0 : $@thick Child.Type to $@thick Parent.Type
+  // CHECK: [[SUPER_METHOD:%[0-9]+]] = function_ref @_TZFC19partial_apply_super6Parent16finalClassMethodFT_T_ : $@convention(thin) (@thick Parent.Type) -> @owned @callee_owned () -> ()
+  // CHECK: [[APPLIED_SELF:%[0-9]+]] = apply [[SUPER_METHOD]]([[CASTED_SELF]]) : $@convention(thin) (@thick Parent.Type) -> @owned @callee_owned () -> ()
+  // CHECK: apply [[DOFOO]]([[APPLIED_SELF]]) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  class func callFinalSuperClassMethod() {
+    doFoo(super.finalClassMethod)
+  }
+}
 
-// closure.GenericChild.classMethod
-// SILGEN-LABEL: sil shared @_TZFCF19partial_apply_superU0_FT_T_L_12GenericChild11classMethodfT_T_ : $@convention(thin) <A> (@thick GenericChild<A>.Type) -> ()
-// SILGEN: [[DOFOO:%[0-9]+]] = function_ref @_TF14OutsideClasses5doFooFFT_T_T_ : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
-// SILGEN: [[CASTED_SELF:%[0-9]+]] = upcast {{%[0-9]+}} : $@thick GenericChild<A>.Type to $@thick GenericParent<A>.Type
-// SILGEN: [[SUPER_METHOD:%[0-9]+]] = super_method {{%[0-9]+}} : $@thick GenericChild<A>.Type, #GenericParent.classMethod!1 : <A> GenericParent<A>.Type -> () -> () , $@convention(thin) <τ_0_0> (@thick GenericParent<τ_0_0>.Type) -> ()
-// SILGEN: [[PARTIAL_APPLY:%[0-9]+]] = partial_apply [[SUPER_METHOD]]<A>([[CASTED_SELF]]) : $@convention(thin) <τ_0_0> (@thick GenericParent<τ_0_0>.Type) -> ()
-// SILGEN: apply [[DOFOO]]([[PARTIAL_APPLY]]) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+class GenericChild<A> : GenericParent<A> {
+  override init(a: A) {
+    super.init(a: a)
+  }
+  // CHECK-LABEL: sil hidden @_TFC19partial_apply_super12GenericChild6methodfT_T_ : $@convention(method) <A> (@guaranteed GenericChild<A>) -> ()
+  // CHECK: [[DOFOO:%[0-9]+]] = function_ref @_TF15resilient_class5doFooFFT_T_T_ : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  // CHECK: [[CASTED_SELF:%[0-9]+]] = upcast %0 : $GenericChild<A> to $GenericParent<A>
+  // CHECK: [[SUPER_METHOD:%[0-9]+]] = super_method %0 : $GenericChild<A>, #GenericParent.method!1 : <A> GenericParent<A> -> () -> () , $@convention(method) <τ_0_0> (@guaranteed GenericParent<τ_0_0>) -> ()
+  // CHECK: [[PARTIAL_APPLY:%[0-9]+]] = partial_apply [[SUPER_METHOD]]<A>([[CASTED_SELF]]) : $@convention(method) <τ_0_0> (@guaranteed GenericParent<τ_0_0>) -> ()
+  // CHECK: apply [[DOFOO]]([[PARTIAL_APPLY]]) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  override func method() {
+    doFoo(super.method)
+  }
+
+  // CHECK-LABEL: sil hidden @_TZFC19partial_apply_super12GenericChild11classMethodfT_T_ : $@convention(thin) <A> (@thick GenericChild<A>.Type) -> ()
+  // CHECK: [[DOFOO:%[0-9]+]] = function_ref @_TF15resilient_class5doFooFFT_T_T_ : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  // CHECK: [[CASTED_SELF:%[0-9]+]] = upcast %0 : $@thick GenericChild<A>.Type to $@thick GenericParent<A>.Type
+  // CHECK: [[SUPER_METHOD:%[0-9]+]] = super_method %0 : $@thick GenericChild<A>.Type, #GenericParent.classMethod!1 : <A> GenericParent<A>.Type -> () -> () , $@convention(thin) <τ_0_0> (@thick GenericParent<τ_0_0>.Type) -> ()
+  // CHECK: [[PARTIAL_APPLY:%[0-9]+]] = partial_apply %4<A>(%3) : $@convention(thin) <τ_0_0> (@thick GenericParent<τ_0_0>.Type) -> ()
+  // CHECK: apply %2(%5) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  override class func classMethod() {
+    doFoo(super.classMethod)
+  }
+}

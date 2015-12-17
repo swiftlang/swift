@@ -11,7 +11,7 @@ import Glibc
 typealias CGFloat = Double
 #endif
 
-func my_printf(format: String, _ arguments: CVarArgType...) {
+func my_printf(format: String, _ arguments: CVarArg...) {
   withVaList(arguments) {
     vprintf(format, $0)
   }
@@ -26,7 +26,7 @@ func test_varArgs0() {
 test_varArgs0()
 
 func test_varArgs1() {
-  var args = [CVarArgType]()
+  var args = [CVarArg]()
 
   var format = "dig it: "
   for i in 0..<12 {
@@ -43,7 +43,7 @@ func test_varArgs1() {
 test_varArgs1()
 
 func test_varArgs3() {
-  var args = [CVarArgType]()
+  var args = [CVarArg]()
 
   let format = "pointers: '%p' '%p' '%p' '%p' '%p'\n"
   args.append(OpaquePointer(bitPattern: 0x1234_5670))

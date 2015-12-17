@@ -31,8 +31,7 @@ Type DependentGenericTypeResolver::resolveDependentMemberType(
                                      SourceRange baseRange,
                                      ComponentIdentTypeRepr *ref) {
   auto archetype = Builder.resolveArchetype(baseTy);
-  if (!archetype)
-    return ErrorType::get(DC->getASTContext());
+  assert(archetype && "Bad generic context nesting?");
   
   return archetype->getRepresentative()
            ->getNestedType(ref->getIdentifier(), Builder)
@@ -43,7 +42,10 @@ Type DependentGenericTypeResolver::resolveSelfAssociatedType(
        Type selfTy,
        DeclContext *DC,
        AssociatedTypeDecl *assocType) {
-  return Builder.resolveArchetype(selfTy)->getRepresentative()
+  auto archetype = Builder.resolveArchetype(selfTy);
+  assert(archetype && "Bad generic context nesting?");
+  
+  return archetype->getRepresentative()
            ->getNestedType(assocType->getName(), Builder)
            ->getDependentType(Builder, true);
 }
@@ -214,20 +216,6 @@ Type CompleteGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
   return ext->getExtendedType()->getAnyNominal()->getDeclaredInterfaceType();
 }
 
-/// Add the generic parameters and requirements from the parent context to the
-/// archetype builder.
-static void addContextParamsAndRequirements(ArchetypeBuilder &builder,
-                                            DeclContext *dc,
-                                            bool adoptArchetypes) {
-  if (!dc->isTypeContext())
-    return;
-
-  if (auto sig = dc->getGenericSignatureOfContext()) {
-    // Add generic signature from this context.
-    builder.addGenericSignature(sig, adoptArchetypes);
-  }
-}
-
 /// Check the generic parameters in the given generic parameter list (and its
 /// parent generic parameter lists) according to the given resolver.
 bool TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
@@ -240,7 +228,8 @@ bool TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
   // If there is a parent context, add the generic parameters and requirements
   // from that context.
   if (builder && parentDC)
-    addContextParamsAndRequirements(*builder, parentDC, adoptArchetypes);
+    if (auto sig = parentDC->getGenericSignatureOfContext())
+      builder->addGenericSignature(sig, adoptArchetypes);
 
   // If there aren't any generic parameters at this level, we're done.
   if (!genericParams)
@@ -359,15 +348,12 @@ static void collectGenericParamTypes(
               GenericParamList *genericParams,
               DeclContext *parentDC,
               SmallVectorImpl<GenericTypeParamType *> &allParams) {
-  // If the parent context is a generic type (or nested type thereof),
-  // add its generic parameters.
-  if (parentDC->isTypeContext()) {
-    if (auto parentSig = parentDC->getGenericSignatureOfContext()) {
-      allParams.append(parentSig->getGenericParams().begin(),
-                       parentSig->getGenericParams().end());
-    }
+  // If the parent context has a generic signature, add its generic parameters.
+  if (auto parentSig = parentDC->getGenericSignatureOfContext()) {
+    allParams.append(parentSig->getGenericParams().begin(),
+                     parentSig->getGenericParams().end());
   }
-    
+
   if (genericParams) {
     // Add our parameters.
     for (auto param : *genericParams) {
@@ -1024,13 +1010,25 @@ bool TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
                                         ArrayRef<Type> genericArgs) {
   // Form the set of generic substitutions required
   TypeSubstitutionMap substitutions;
+
   auto genericParams = genericSig->getGenericParams();
-  assert(genericParams.size() == genericArgs.size());
-  for (unsigned i = 0, n = genericParams.size(); i != n; ++i) {
-    auto gp
-      = genericParams[i]->getCanonicalType()->castTo<GenericTypeParamType>();
-    substitutions[gp] = genericArgs[i];
+
+  unsigned genericTypeDepth =
+      owner->getAnyNominal()->getGenericTypeContextDepth();
+  unsigned count = 0;
+
+  for (auto gp : genericParams) {
+    // Skip parameters that were introduced by outer generic
+    // function signatures.
+    if (gp->getDecl()->getDepth() < genericTypeDepth)
+      continue;
+    auto gpTy = gp->getCanonicalType()->castTo<GenericTypeParamType>();
+    substitutions[gpTy] = genericArgs[count++];
   }
+
+  // The number of generic type arguments being bound must be equal to the
+  // total number of generic parameters in the current generic type context.
+  assert(count == genericArgs.size());
 
   // Check each of the requirements.
   Module *module = dc->getParentModule();

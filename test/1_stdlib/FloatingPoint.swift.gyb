@@ -321,7 +321,7 @@ FloatingPoint.test("${Self}/Strideable") {
 % end
 
 // FIXME: implement Float80 tests after Float80 is implemented.
-// <rdar://problem/20005438> Float80 does not conform to FloatingPointType
+// <rdar://problem/20005438> Float80 does not conform to FloatingPoint
 
 FloatingPoint.test("Float32/Literals") {
   do {

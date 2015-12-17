@@ -150,7 +150,7 @@ extension String {
         }
         else {
           // Produce the endIndex
-          _precondition(
+          _require(
             nextCoreIndex == _core.endIndex,
             "Can't increment past endIndex of String.UTF8View")
           return Index(_core, nextCoreIndex, nextBuffer)
@@ -217,7 +217,7 @@ extension String {
     ///   `position != endIndex`.
     public subscript(position: Index) -> UTF8.CodeUnit {
       let result: UTF8.CodeUnit = numericCast(position._buffer & 0xFF)
-      _precondition(result != 0xFF, "can not subscript using endIndex")
+      _require(result != 0xFF, "can not subscript using endIndex")
       return result
     }
 
@@ -231,7 +231,7 @@ extension String {
 
     /// Returns a mirror that reflects `self`.
     @warn_unused_result
-    public func _getMirror() -> _MirrorType {
+    public func _getMirror() -> _Mirror {
       return _UTF8ViewMirror(self)
     }
 
@@ -343,7 +343,7 @@ extension String.UTF8View.Index {
 
     if utf16Index != utf16.startIndex
     && utf16Index != utf16.endIndex {
-      _precondition(
+      _require(
         utf16Index >= utf16.startIndex
         && utf16Index <= utf16.endIndex,
         "Invalid String.UTF16Index for this UTF-8 view")

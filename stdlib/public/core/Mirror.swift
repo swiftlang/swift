@@ -148,7 +148,7 @@ public struct Mirror {
   /// corresponding to the superclass of `staticSubclass`.
   @warn_unused_result
   internal static func _legacyMirror(
-    subject: AnyObject, asClass targetSuperclass: AnyClass) -> _MirrorType? {
+    subject: AnyObject, asClass targetSuperclass: AnyClass) -> _Mirror? {
     
     // get a legacy mirror and the most-derived type
     var cls: AnyClass = subject.dynamicType
@@ -369,10 +369,10 @@ public protocol CustomLeafReflectable : CustomReflectable {}
 ///
 /// Do not declare new conformances to this protocol; they will not
 /// work as expected.
-public protocol MirrorPathType {}
-extension IntMax : MirrorPathType {}
-extension Int : MirrorPathType {}
-extension String : MirrorPathType {}
+public protocol MirrorPath {}
+extension IntMax : MirrorPath {}
+extension Int : MirrorPath {}
+extension String : MirrorPath {}
 
 extension Mirror {
   internal struct _Dummy : CustomReflectable {
@@ -415,7 +415,7 @@ extension Mirror {
   /// efficient.
   @warn_unused_result
   public func descendant(
-    first: MirrorPathType, _ rest: MirrorPathType...
+    first: MirrorPath, _ rest: MirrorPath...
   ) -> Any? {
     var result: Any = _Dummy(mirror: self)
     for e in [first] + rest {
@@ -429,8 +429,8 @@ extension Mirror {
           offset, limit: children.endIndex)
       }
       else {
-        _preconditionFailure(
-          "Someone added a conformance to MirrorPathType; that privilege is reserved to the standard library")
+        _requirementFailure(
+          "Someone added a conformance to MirrorPath; that privilege is reserved to the standard library")
       }
       if position == children.endIndex { return nil }
       result = children[position].value
@@ -439,7 +439,7 @@ extension Mirror {
   }
 }
 
-//===--- Legacy _MirrorType Support ---------------------------------------===//
+//===--- Legacy _Mirror Support ---------------------------------------===//
 extension Mirror.DisplayStyle {
   /// Construct from a legacy `_MirrorDisposition`
   internal init?(legacy: _MirrorDisposition) {
@@ -452,7 +452,7 @@ extension Mirror.DisplayStyle {
     case .IndexContainer: self = .Collection
     case .KeyContainer: self = .Dictionary
     case .MembershipContainer: self = .Set
-    case .Container: preconditionFailure("unused!")
+    case .Container: requirementFailure("unused!")
     case .Optional: self = .Optional
     case .ObjCObject: self = .Class
     }
@@ -468,9 +468,9 @@ internal func _isClassSuperMirror(t: Any.Type) -> Bool {
 #endif
 }
 
-extension _MirrorType {
+extension _Mirror {
   @warn_unused_result
-  internal func _superMirror() -> _MirrorType? {
+  internal func _superMirror() -> _Mirror? {
     if self.count > 0 {
       let childMirror = self[0].1
       if _isClassSuperMirror(childMirror.dynamicType) {
@@ -488,14 +488,14 @@ extension _MirrorType {
 /// mirrors to use the new style, which only present forward
 /// traversal in general.
 internal extension Mirror {
-  /// An adapter that represents a legacy `_MirrorType`'s children as
+  /// An adapter that represents a legacy `_Mirror`'s children as
   /// a `Collection` with integer `Index`.  Note that the performance
-  /// characteristics of the underlying `_MirrorType` may not be
+  /// characteristics of the underlying `_Mirror` may not be
   /// appropriate for random access!  To avoid this pitfall, convert
   /// mirrors to use the new style, which only present forward
   /// traversal in general.
   internal struct LegacyChildren : Collection {
-    init(_ oldMirror: _MirrorType) {
+    init(_ oldMirror: _Mirror) {
       self._oldMirror = oldMirror
     }
 
@@ -510,7 +510,7 @@ internal extension Mirror {
       return (label: label, value: childMirror.value)
     }
 
-    internal let _oldMirror: _MirrorType
+    internal let _oldMirror: _Mirror
   }
 
   /// Initialize for a view of `subject` as `subjectClass`.
@@ -524,7 +524,7 @@ internal extension Mirror {
     _ subject: AnyObject,
     subjectClass: AnyClass,
     ancestor: Mirror,
-    legacy legacyMirror: _MirrorType? = nil
+    legacy legacyMirror: _Mirror? = nil
   ) {
     if ancestor.subjectType == subjectClass
       || ancestor._defaultDescendantRepresentation == .Suppressed {
@@ -550,7 +550,7 @@ internal extension Mirror {
   }
 
   internal init(
-    legacy legacyMirror: _MirrorType,
+    legacy legacyMirror: _Mirror,
     subjectType: Any.Type,
     makeSuperclassMirror: (()->Mirror?)? = nil
   ) {

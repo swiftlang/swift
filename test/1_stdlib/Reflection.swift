@@ -188,9 +188,6 @@ dump(CollectionOfOne("Howdy Swift!"))
 var emptyCollectionOfInt: EmptyCollection<Int> = EmptyCollection()
 print(_reflect(emptyCollectionOfInt).summary)
 
-// CHECK-NEXT: .One
-print(_reflect(Bit.One).summary)
-
 // CHECK-NEXT: ▿
 // CHECK-NEXT: from: 1.0
 // CHECK-NEXT: through: 12.15
@@ -207,11 +204,11 @@ var randomUnsafeMutablePointerString = UnsafeMutablePointer<String>(
 print(_reflect(randomUnsafeMutablePointerString).summary)
 
 // CHECK-NEXT: Hello panda
-var sanePointerString = UnsafeMutablePointer<String>.alloc(1)
-sanePointerString.initialize("Hello panda")
-print(_reflect(sanePointerString.memory).summary)
-sanePointerString.destroy()
-sanePointerString.dealloc(1)
+var sanePointerString = UnsafeMutablePointer<String>(allocatingCapacity: 1)
+sanePointerString.initializeMemory("Hello panda")
+print(_reflect(sanePointerString.pointee).summary)
+sanePointerString.deinitializePointee()
+sanePointerString.deallocateCapacity(1)
 
 // Don't crash on types with opaque metadata. rdar://problem/19791252
 var rawPointer = unsafeBitCast(0 as Int, Builtin.RawPointer.self)

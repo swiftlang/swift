@@ -8,7 +8,7 @@ do {
   let suffix: [Int] = ${suffix}
 
   func makeCollection(elements: [OpaqueValue<Int>])
-    -> ${WrapperType}<${Base}<OpaqueValue<Int>>> {
+    -> ${Wrapper}<${Base}<OpaqueValue<Int>>> {
     var baseElements = prefix.map(OpaqueValue.init)
     baseElements.appendContentsOf(elements)
     baseElements.appendContentsOf(suffix.map(OpaqueValue.init))
@@ -16,13 +16,13 @@ do {
     let startIndex = base.startIndex.advancedBy(numericCast(prefix.count))
     let endIndex = base.startIndex.advancedBy(
       numericCast(prefix.count + elements.count))
-    return ${WrapperType}(
+    return ${Wrapper}(
       base: base,
       bounds: startIndex..<endIndex)
   }
 
   func makeCollectionOfEquatable(elements: [MinimalEquatableValue])
-    -> ${WrapperType}<${Base}<MinimalEquatableValue>> {
+    -> ${Wrapper}<${Base}<MinimalEquatableValue>> {
     var baseElements = prefix.map(MinimalEquatableValue.init)
     baseElements.appendContentsOf(elements)
     baseElements.appendContentsOf(suffix.map(MinimalEquatableValue.init))
@@ -30,13 +30,13 @@ do {
     let startIndex = base.startIndex.advancedBy(numericCast(prefix.count))
     let endIndex = base.startIndex.advancedBy(
       numericCast(prefix.count + elements.count))
-    return ${WrapperType}(
+    return ${Wrapper}(
       base: base,
       bounds: startIndex..<endIndex)
   }
 
   func makeCollectionOfComparable(elements: [MinimalComparableValue])
-    -> ${WrapperType}<${Base}<MinimalComparableValue>> {
+    -> ${Wrapper}<${Base}<MinimalComparableValue>> {
     var baseElements = prefix.map(MinimalComparableValue.init)
     baseElements.appendContentsOf(elements)
     baseElements.appendContentsOf(suffix.map(MinimalComparableValue.init))
@@ -44,7 +44,7 @@ do {
     let startIndex = base.startIndex.advancedBy(numericCast(prefix.count))
     let endIndex = base.startIndex.advancedBy(
       numericCast(prefix.count + elements.count))
-    return ${WrapperType}(
+    return ${Wrapper}(
       base: base,
       bounds: startIndex..<endIndex)
   }
@@ -55,7 +55,7 @@ do {
   resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior = .Trap
   resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior = .Trap
 
-  SliceTests.add${traversal}${'Mutable' if WrapperType == 'MutableSlice' else ''}CollectionTests(
+  SliceTests.add${traversal}${'Mutable' if Wrapper == 'MutableSlice' else ''}CollectionTests(
     "${name}.",
     makeCollection: makeCollection,
     wrapValue: identity,
@@ -63,7 +63,7 @@ do {
     makeCollectionOfEquatable: makeCollectionOfEquatable,
     wrapValueIntoEquatable: identityEq,
     extractValueFromEquatable: identityEq,
-% if WrapperType == 'MutableSlice':
+% if Wrapper == 'MutableSlice':
     makeCollectionOfComparable: makeCollectionOfComparable,
     wrapValueIntoComparable: identityComp,
     extractValueFromComparable: identityComp,
@@ -71,7 +71,7 @@ do {
     checksAdded: checksAdded,
     resiliencyChecks: resiliencyChecks,
     outOfBoundsIndexOffset: 6
-% if WrapperType == 'MutableSlice':
+% if Wrapper == 'MutableSlice':
     , withUnsafeMutableBufferPointerIsSupported: false
 % end
     )

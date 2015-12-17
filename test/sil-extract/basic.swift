@@ -69,17 +69,17 @@ struct X {
 }
 
 class Vehicle {
-    var num_of_wheels: Int
+    var numOfWheels: Int
 
     init(n: Int) {
-      num_of_wheels = n
+      numOfWheels = n
     }
 
     func now() -> Int {
-        return num_of_wheels;
+        return numOfWheels
     }
 }
 
 func foo() -> Int {
-  return 7;
+  return 7
 }

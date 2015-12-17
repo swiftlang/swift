@@ -12,7 +12,7 @@
 
 /// Buffer type for `ArraySlice<Element>`.
 public // @testable
-struct _SliceBuffer<Element> : _ArrayBufferType {
+struct _SliceBuffer<Element> : _ArrayBufferProtocol {
   internal typealias NativeStorage = _ContiguousArrayStorage<Element>
   public typealias NativeBuffer = _ContiguousArrayBuffer<Element>
 
@@ -216,7 +216,7 @@ struct _SliceBuffer<Element> : _ArrayBufferType {
   /// Traps unless the given `index` is valid for subscripting, i.e.
   /// `startIndex ≤ index < endIndex`
   internal func _checkValidSubscript(index : Int) {
-    _precondition(
+    _require(
       index >= startIndex && index < endIndex, "Index out of bounds")
   }
 

@@ -27,7 +27,7 @@ func _XCTRegisterFailure(expected: Bool, _ condition: String, _ message: String,
 }
 
 /// Produce a failure description for the given assertion type.
-func _XCTFailureDescription(assertionType: _XCTAssertionType, _ formatIndex: UInt, _ expressionStrings: CVarArgType...) -> String {
+func _XCTFailureDescription(assertionType: _XCTAssertionType, _ formatIndex: UInt, _ expressionStrings: CVarArg...) -> String {
   // In order to avoid revlock/submission issues between XCTest and the Swift XCTest overlay,
   // we are using the convention with _XCTFailureFormat that (formatIndex >= 100) should be
   // treated just like (formatIndex - 100), but WITHOUT the expression strings. (Swift can't
@@ -614,7 +614,7 @@ public func XCTAssertEqualWithAccuracy<T : FloatingPoint>(@autoclosure expressio
       
     default:
       // unknown type, fail with prejudice
-      _preconditionFailure("unsupported floating-point type passed to XCTAssertEqualWithAccuracy")
+      _requirementFailure("unsupported floating-point type passed to XCTAssertEqualWithAccuracy")
     }
     
     if !equalWithAccuracy {
@@ -682,7 +682,7 @@ public func XCTAssertNotEqualWithAccuracy<T : FloatingPoint>(@autoclosure expres
       
     default:
       // unknown type, fail with prejudice
-      _preconditionFailure("unsupported floating-point type passed to XCTAssertNotEqualWithAccuracy")
+      _requirementFailure("unsupported floating-point type passed to XCTAssertNotEqualWithAccuracy")
     }
     
     if !notEqualWithAccuracy {

@@ -77,7 +77,7 @@ final class AtomicInt4HeapInt2Int2RaceData {
   }
 }
 
-struct AtomicInt_fetchAndAdd_1_RaceTest : RaceTestWithPerTrialDataType {
+struct AtomicInt_fetchAndAdd_1_RaceTest : RaceTestWithPerTrialData {
   typealias RaceData = AtomicInt4RaceData
   typealias ThreadLocalData = Void
   typealias Observation = Observation5Int
@@ -158,7 +158,7 @@ struct AtomicInt_fetchAndAdd_1_RaceTest : RaceTestWithPerTrialDataType {
 }
 
 struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_1_RaceTest
-  : RaceTestWithPerTrialDataType {
+  : RaceTestWithPerTrialData {
 
   typealias RaceData = AtomicInt4RaceData
   typealias ThreadLocalData = Void
@@ -229,7 +229,7 @@ struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_1_RaceTest
 }
 
 struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_2_RaceTest
-  : RaceTestWithPerTrialDataType {
+  : RaceTestWithPerTrialData {
 
   typealias RaceData = AtomicInt4RaceData
   typealias ThreadLocalData = Void
@@ -316,7 +316,7 @@ struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_2_RaceTest
 }
 
 struct AtomicInt_fetchAndAdd_ReleaseNonAtomicStores_RaceTest
-  : RaceTestWithPerTrialDataType {
+  : RaceTestWithPerTrialData {
 
   typealias RaceData = AtomicInt4HeapInt2Int2RaceData
   typealias ThreadLocalData = Void
@@ -442,7 +442,7 @@ struct AtomicInt_fetchAndAdd_ReleaseNonAtomicStores_RaceTest
   }
 }
 
-struct AtomicInt_fetchAndAnd_1_RaceTest : RaceTestWithPerTrialDataType {
+struct AtomicInt_fetchAndAnd_1_RaceTest : RaceTestWithPerTrialData {
   typealias RaceData = AtomicInt4RaceData
   typealias ThreadLocalData = Void
   typealias Observation = Observation5Int
@@ -523,7 +523,7 @@ struct AtomicInt_fetchAndAnd_1_RaceTest : RaceTestWithPerTrialDataType {
   }
 }
 
-struct AtomicInt_fetchAndOr_1_RaceTest : RaceTestWithPerTrialDataType {
+struct AtomicInt_fetchAndOr_1_RaceTest : RaceTestWithPerTrialData {
   typealias RaceData = AtomicInt4RaceData
   typealias ThreadLocalData = Void
   typealias Observation = Observation5Int
@@ -604,7 +604,7 @@ struct AtomicInt_fetchAndOr_1_RaceTest : RaceTestWithPerTrialDataType {
   }
 }
 
-struct AtomicInt_fetchAndXor_1_RaceTest : RaceTestWithPerTrialDataType {
+struct AtomicInt_fetchAndXor_1_RaceTest : RaceTestWithPerTrialData {
   typealias RaceData = AtomicInt4RaceData
   typealias ThreadLocalData = Void
   typealias Observation = Observation5Int
@@ -688,7 +688,7 @@ struct AtomicInt_fetchAndXor_1_RaceTest : RaceTestWithPerTrialDataType {
 
 var dummyObjectCount = _stdlib_ShardedAtomicCounter()
 
-struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
+struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialData {
   class DummyObject {
     var payload: UInt = 0x12345678
     var randomInt: Int
@@ -772,10 +772,10 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
       switch (observation.data1, observation.data4) {
       case (1, 0):
         // Won race, value not destroyed.
-        ++wonRace
+        wonRace += 1
       case (0, 1):
         // Lost race, value destroyed.
-        ++lostRace
+        lostRace += 1
       default:
         sink(.FailureInteresting(String(observation)))
       }

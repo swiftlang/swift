@@ -474,7 +474,7 @@ test_CTypesPrinting()
 
 
 func test_PointerPrinting() {
-  let nullUP = UnsafeMutablePointer<Float>()
+  let nullUP: UnsafeMutablePointer<Float> = nil
   let fourByteUP = UnsafeMutablePointer<Float>(bitPattern: 0xabcd1234 as UInt)
 
 #if !(arch(i386) || arch(arm))
@@ -498,9 +498,9 @@ func test_PointerPrinting() {
   printedIs(UnsafeMutableBufferPointer(start: nullUP, count: 0),
       "UnsafeMutableBufferPointer(start: \(expectedNull), length: 0)")
 
-  printedIs(OpaquePointer(), expectedNull)
+  printedIs(nil as OpaquePointer, expectedNull)
   printedIs(CVaListPointer(_fromUnsafeMutablePointer: nullUP), expectedNull)
-  printedIs(AutoreleasingUnsafeMutablePointer<Int>(), expectedNull)
+  printedIs(nil as AutoreleasingUnsafeMutablePointer<Int>, expectedNull)
 
   print("test_PointerPrinting done")
 }

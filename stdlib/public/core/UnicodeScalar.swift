@@ -56,9 +56,9 @@ public struct UnicodeScalar :
     //     * As a result of this definition, the set of Unicode scalar values
     //     consists of the ranges 0 to D7FF and E000 to 10FFFF, inclusive.
 
-    _precondition(v < 0xD800 || v > 0xDFFF,
+    _require(v < 0xD800 || v > 0xDFFF,
         "high- and low-surrogate code points are not valid Unicode scalar values")
-    _precondition(v <= 0x10FFFF, "value is outside of Unicode codespace")
+    _require(v <= 0x10FFFF, "value is outside of Unicode codespace")
 
     self._value = v
   }
@@ -248,7 +248,7 @@ extension UInt8 {
   ///
   /// - Requires: `v.value` can be represented as ASCII (0..<128).
   public init(ascii v: UnicodeScalar) {
-    _precondition(v.value < 128,
+    _require(v.value < 128,
         "Code point value does not fit into ASCII")
     self = UInt8(v.value)
   }

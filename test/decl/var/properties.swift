@@ -226,11 +226,11 @@ class C {
   }
 }
 
-protocol TrivialInitType {
+protocol TrivialInit {
   init()
 }
 
-class CT<T : TrivialInitType> {
+class CT<T : TrivialInit> {
   var prop1 = 42 {
     didSet { }
   }

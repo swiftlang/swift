@@ -16,7 +16,7 @@
 extension String.UTF16View.Index : RandomAccessIndex {
   /// Construct from an integer offset.
   public init(_ offset: Int) {
-    _precondition(offset >= 0, "Negative UTF16 index offset not allowed")
+    _require(offset >= 0, "Negative UTF16 index offset not allowed")
     self.init(_offset: offset)
     // self._offset = offset
   }

@@ -408,7 +408,7 @@ func AO_curryThunk<T>(ao: AO<T>) -> (AO<T> -> Int -> ()/*, Int -> ()*/) {
 // CHECK: copy_addr [[ARG1_PTR]] to [initialization] [[GUARANTEED_COPY_STACK_SLOT]]#1
 // CHECK: [[ARG0:%.*]] = load [[ARG0_PTR]]
 // CHECK: [[GUARANTEED_COPY:%.*]] = load [[GUARANTEED_COPY_STACK_SLOT]]#1
-// CHECK: function_ref ext.guaranteed_self.guaranteed_self.SequenceDefaultsType._constrainElement
+// CHECK: function_ref ext.guaranteed_self.guaranteed_self.SequenceDefaults._constrainElement
 // CHECK: [[FUN:%.*]] = function_ref @_{{.*}}
 // CHECK: [[TRANSLATION_STACK_SLOT:%.*]] = alloc_stack $FakeArray
 // CHECK: store [[GUARANTEED_COPY]] to [[TRANSLATION_STACK_SLOT:%.*]]#1
@@ -423,24 +423,24 @@ public struct FakeArray {
 }
 public struct FakeElement {}
 
-public protocol FakeGeneratorType {
+public protocol FakeGeneratorProtocol {
   typealias Element
 }
 
-extension FakeGenerator : FakeGeneratorType {
+extension FakeGenerator : FakeGeneratorProtocol {
   public typealias Element = FakeElement
 }
 
-public protocol SequenceDefaultsType {
+public protocol SequenceDefaults {
   typealias Element
-  typealias Generator : FakeGeneratorType
+  typealias Generator : FakeGeneratorProtocol
 }
 
-extension SequenceDefaultsType {
+extension SequenceDefaults {
   public final func _constrainElement(_: FakeGenerator.Element) {}
 }
 
-public protocol Sequence : SequenceDefaultsType {
+public protocol Sequence : SequenceDefaults {
   func _constrainElement(_: Element)
 }
 

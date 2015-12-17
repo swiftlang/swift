@@ -1,8 +1,8 @@
 // -*- swift -*-
 // RUN: rm -rf %t ; mkdir -p %t
-// RUN: %S/../../utils/gyb %s -o %t/CollectionType.swift -D test_path="%S"
-// RUN: %S/../../utils/line-directive %t/CollectionType.swift -- %target-build-swift %t/CollectionType.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/CollectionType.swift -- %target-run %t/a.out
+// RUN: %S/../../utils/gyb %s -o %t/Collection.swift -D test_path="%S"
+// RUN: %S/../../utils/line-directive %t/Collection.swift -- %target-build-swift %t/Collection.swift -o %t/a.out
+// RUN: %S/../../utils/line-directive %t/Collection.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -617,7 +617,7 @@ extension Collection where
   Iterator.Element : Equatable,
 
   // FIXME: the following constraints should go away after
-  // <rdar://problem/20715697> CollectionType.SubSlice should constrain its
+  // <rdar://problem/20715697> Collection.SubSlice should constrain its
   // Element type
   SubSequence : Collection,
   SubSequence.SubSequence == SubSequence,

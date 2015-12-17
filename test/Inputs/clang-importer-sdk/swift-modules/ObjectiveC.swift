@@ -64,7 +64,7 @@ public struct NSZone: NilLiteralConvertible {
 
   @_transparent public
   init(nilLiteral: ()) {
-    pointer = OpaquePointer()
+    pointer = nil
   }
 }
 

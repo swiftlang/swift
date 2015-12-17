@@ -27,13 +27,13 @@ public class TypeIndexed<Value> : Resettable {
   internal var defaultValue: Value
 }
 
-public protocol WrapperType {
+public protocol Wrapper {
   typealias Base
   init(_: Base)
   var base: Base {get set}
 }
 
-public protocol LoggingType : WrapperType {
+public protocol LoggingType : Wrapper {
   typealias Log : AnyObject
 }
 

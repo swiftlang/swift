@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 //  _ContiguousArrayStorageBase supplies the implementation of the
-//  _NSArrayCoreType API (and thus, NSArray the API) for our
+//  _NSArrayCore API (and thus, NSArray the API) for our
 //  _ContiguousArrayStorage<T>.  We can't put this implementation
 //  directly on _ContiguousArrayStorage because generic classes can't
 //  override Objective-C selectors.
@@ -50,7 +50,7 @@ class _SwiftNativeNSArrayWithContiguousStorage
 }
 
 // Implement the APIs required by NSArray 
-extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
+extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
   @objc internal var count: Int {
     return withUnsafeBufferOfObjects { $0.count }
   }
@@ -58,7 +58,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
   @objc(objectAtIndex:) internal func objectAt(index: Int) -> AnyObject {
     return withUnsafeBufferOfObjects {
       objects in
-      _precondition(
+      _require(
         _isValidArraySubscript(index, objects.count),
         "Array index out of range")
       return objects[index]
@@ -70,11 +70,11 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
   ) {
     return withUnsafeBufferOfObjects {
       objects in
-      _precondition(
+      _require(
         _isValidArrayIndex(range.location, objects.count),
         "Array index out of range")
 
-      _precondition(
+      _require(
         _isValidArrayIndex(
           range.location + range.length, objects.count),
         "Array index out of range")
@@ -92,7 +92,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
     state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>, count: Int
   ) -> Int {
-    var enumerationState = state.memory
+    var enumerationState = state.pointee
 
     if enumerationState.state != 0 {
       return 0
@@ -105,7 +105,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
         objects.baseAddress,
         AutoreleasingUnsafeMutablePointer<AnyObject?>.self)
       enumerationState.state = 1
-      state.memory = enumerationState
+      state.pointee = enumerationState
       return objects.count
     }
   }
@@ -155,7 +155,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
     if let bridgedStorage = hb {
       let heapBuffer = _HeapBuffer(bridgedStorage)
       let count = heapBuffer.value
-      heapBuffer.baseAddress.destroy(count)
+      heapBuffer.baseAddress.deinitializePointee(count: count)
     }
   }
 

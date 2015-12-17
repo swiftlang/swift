@@ -385,8 +385,8 @@ public struct ${Self}<Element>
   /// Check that the given `index` is valid, i.e. `0 ≤ index ≤ count`.
   @_semantics("array.check_index")
   internal func _checkIndex(index: Int) {
-    _precondition(index <= endIndex, "${Self} index out of range")
-    _precondition(index >= startIndex, "Negative ${Self} index is out of range")
+    _require(index <= endIndex, "${Self} index out of range")
+    _require(index >= startIndex, "Negative ${Self} index is out of range")
   }
 
   @warn_unused_result
@@ -488,7 +488,7 @@ public func _deallocateUninitialized${Self}<Element>(
 }
 %end
 
-extension ${Self} : _ArrayType {
+extension ${Self} : _ArrayProtocol {
   /// Construct an empty ${Self}.
   @_semantics("array.init")
   public init() {
@@ -510,7 +510,8 @@ extension ${Self} : _ArrayType {
     var p: UnsafeMutablePointer<Element>
     (self, p) = ${Self}._allocateUninitialized(count)
     for _ in 0..<count {
-      p++.initialize(repeatedValue)
+      p.initializeMemory(repeatedValue)
+      p += 1
     }
   }
 
@@ -523,7 +524,7 @@ extension ${Self} : _ArrayType {
 
   /// Construct a ${Self} of `count` uninitialized elements.
   internal init(_uninitializedCount count: Int) {
-    _precondition(count >= 0, "Can't construct ${Self} with count < 0")
+    _require(count >= 0, "Can't construct ${Self} with count < 0")
     // Note: Sinking this constructor into an else branch below causes an extra
     // Retain/Release.
     _buffer = _Buffer()
@@ -668,7 +669,7 @@ extension ${Self} : _ArrayType {
     _sanityCheck(_buffer.capacity >= _buffer.count + 1)
 
     _buffer.count = oldCount + 1
-    (_buffer.firstElementAddress + oldCount).initialize(newElement)
+    (_buffer.firstElementAddress + oldCount).initializeMemory(newElement)
   }
 
   /// Append `newElement` to the ${Self}.
@@ -709,7 +710,7 @@ extension ${Self} : _ArrayType {
   ///
   /// - Requires: `count > 0`.
   public mutating func removeLast() -> Element {
-    _precondition(count > 0, "can't removeLast from an empty ${Self}")
+    _require(count > 0, "can't removeLast from an empty ${Self}")
     let c = endIndex
     // We don't check for "c - 1"  underflow because C is known to be positive.
     let result = self[c &- 1]
@@ -773,8 +774,8 @@ extension ${Self} : _ArrayType {
 extension ${Self} : _Reflectable {
   /// Returns a mirror that reflects `self`.
   @warn_unused_result
-  public func _getMirror() -> _MirrorType {
-    return _ArrayTypeMirror(self)
+  public func _getMirror() -> _Mirror {
+    return _ArrayProtocolMirror(self)
   }
 }
 
@@ -875,7 +876,7 @@ extension ${Self} {
 
     // Put the working array back before returning.
     defer {
-      _precondition(
+      _require(
         inoutBufferPointer.baseAddress == pointer &&
         inoutBufferPointer.count == count,
         "${Self} withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
@@ -891,12 +892,14 @@ extension ${Self} {
 
 internal struct _InitializeMemoryFromCollection<
   C: Collection
-> : _PointerFunctionType {
+> : _PointerFunction {
   func call(rawMemory: UnsafeMutablePointer<C.Iterator.Element>, count: Int) {
     var p = rawMemory
     var q = newValues.startIndex
     for _ in 0..<count {
-      p++.initialize(newValues[q++])
+      p.initializeMemory(newValues[q])
+      q = q.successor()
+      p += 1
     }
     _expectEnd(q, newValues)
   }
@@ -910,7 +913,7 @@ internal struct _InitializeMemoryFromCollection<
 
 @inline(never)
 internal func _arrayOutOfPlaceReplace<
-  B : _ArrayBufferType, C : Collection
+  B : _ArrayBufferProtocol, C : Collection
   where
   C.Iterator.Element == B.Element,
   B.Index == Int
@@ -930,11 +933,11 @@ internal func _arrayOutOfPlaceReplace<
   )
 }
 
-/// A _debugPrecondition check that `i` has exactly reached the end of
+/// A _debugRequire check that `i` has exactly reached the end of
 /// `s`.  This test is never used to ensure memory safety; that is
 /// always guaranteed by measuring `s` once and re-using that value.
 internal func _expectEnd<C : Collection>(i: C.Index, _ s: C) {
-  _debugPrecondition(
+  _debugRequire(
     i == s.endIndex,
       "invalid Collection: count differed in successive traversals"
     )
@@ -957,10 +960,10 @@ extension ${Self} {
   >(
     subRange: Range<Int>, with newElements: C
   ) {
-    _precondition(subRange.startIndex >= self._buffer.startIndex,
+    _require(subRange.startIndex >= self._buffer.startIndex,
       "${Self} replace: subRange start is negative")
 
-    _precondition(subRange.endIndex <= self._buffer.endIndex,
+    _require(subRange.endIndex <= self._buffer.endIndex,
       "${Self} replace: subRange extends past the end")
 
     let oldCount = self._buffer.count
@@ -1026,7 +1029,7 @@ public func += <
 ///   max(requiredCapacity, source.capacity)  if newCount <= source.capacity
 ///   max(requiredCapacity, _growArrayCapacity(source.capacity)) otherwise
 @inline(never)
-internal func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferType>(
+internal func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferProtocol>(
   inout source: _Buffer, newCount: Int, requiredCapacity: Int
 ) -> _ContiguousArrayBuffer<_Buffer.Element> {
   return _forceCreateUniqueMutableBufferImpl(
@@ -1042,7 +1045,7 @@ internal func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferType>(
 ///   max(minNewCapacity, _growArrayCapacity(source.capacity)) otherwise
 @inline(never)
 internal
-func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferType>(
+func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferProtocol>(
   inout source: _Buffer,  countForNewBuffer: Int,  minNewCapacity: Int
 ) -> _ContiguousArrayBuffer<_Buffer.Element> {
   return _forceCreateUniqueMutableBufferImpl(
@@ -1057,7 +1060,7 @@ func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferType>(
 /// The formula used to compute the new capacity is:
 ///  max(requiredCapacity, source.capacity) if minNewCapacity <= source.capacity
 ///  max(requiredCapacity, _growArrayCapacity(source.capacity))  otherwise
-internal func _forceCreateUniqueMutableBufferImpl<_Buffer : _ArrayBufferType>(
+internal func _forceCreateUniqueMutableBufferImpl<_Buffer : _ArrayBufferProtocol>(
   inout source: _Buffer,  countForBuffer: Int, minNewCapacity: Int,
   requiredCapacity: Int
 ) -> _ContiguousArrayBuffer<_Buffer.Element> {
@@ -1073,7 +1076,7 @@ internal func _forceCreateUniqueMutableBufferImpl<_Buffer : _ArrayBufferType>(
     count: countForBuffer, minimumCapacity: minimumCapacity)
 }
 
-internal protocol _PointerFunctionType {
+internal protocol _PointerFunction {
   typealias Element
   func call(_: UnsafeMutablePointer<Element>, count: Int)
 }
@@ -1087,7 +1090,7 @@ internal protocol _PointerFunctionType {
 /// copying when it isUniquelyReferenced.
 @inline(never)
 internal func _arrayOutOfPlaceUpdate<
-  _Buffer : _ArrayBufferType, Initializer : _PointerFunctionType
+  _Buffer : _ArrayBufferProtocol, Initializer : _PointerFunction
   where Initializer.Element == _Buffer.Element,
   _Buffer.Index == Int
 >(
@@ -1119,13 +1122,13 @@ internal func _arrayOutOfPlaceUpdate<
     // its real first element
     let backingStart = backing.firstElementAddress
     let sourceOffset = sourceStart - backingStart
-    backingStart.destroy(sourceOffset)
+    backingStart.deinitializePointee(count: sourceOffset)
 
     // Move the head items
     destStart.moveInitializeFrom(sourceStart, count: headCount)
 
     // Destroy unused source items
-    oldStart.destroy(oldCount)
+    oldStart.deinitializePointee(count: oldCount)
 
     initializeNewElements.call(newStart, count: newCount)
 
@@ -1136,7 +1139,7 @@ internal func _arrayOutOfPlaceUpdate<
     // its real last element
     let backingEnd = backingStart + backing.count
     let sourceEnd = sourceStart + sourceCount
-    sourceEnd.destroy(backingEnd - sourceEnd)
+    sourceEnd.deinitializePointee(count: backingEnd - sourceEnd)
     backing.count = 0
   }
   else {
@@ -1152,11 +1155,11 @@ internal func _arrayOutOfPlaceUpdate<
   source = _Buffer(dest!, shiftedToStartIndex: source.startIndex)
 }
 
-internal struct _InitializePointer<T> : _PointerFunctionType {
+internal struct _InitializePointer<T> : _PointerFunction {
   internal func call(rawMemory: UnsafeMutablePointer<T>, count: Int) {
     _sanityCheck(count == 1)
     // FIXME: it would be better if we could find a way to move, here
-    rawMemory.initialize(newValue)
+    rawMemory.initializeMemory(newValue)
   }
 
   @_transparent
@@ -1167,14 +1170,14 @@ internal struct _InitializePointer<T> : _PointerFunctionType {
   internal var newValue: T
 }
 
-internal struct _IgnorePointer<T> : _PointerFunctionType {
+internal struct _IgnorePointer<T> : _PointerFunction {
   internal func call(_: UnsafeMutablePointer<T>, count: Int) {
     _sanityCheck(count == 0)
   }
 }
 
 internal func _arrayReserve<
-  _Buffer : _ArrayBufferType where _Buffer.Index == Int
+  _Buffer : _ArrayBufferProtocol where _Buffer.Index == Int
 >(
   inout buffer: _Buffer, _ minimumCapacity: Int
 ) {
@@ -1194,7 +1197,7 @@ internal func _arrayReserve<
 
 public // SPI(Foundation)
 func _extractOrCopyToNativeArrayBuffer<
-  Buffer : _ArrayBufferType
+  Buffer : _ArrayBufferProtocol
   where
   Buffer.Iterator.Element == Buffer.Element
 >(source: Buffer)
@@ -1208,7 +1211,7 @@ func _extractOrCopyToNativeArrayBuffer<
 
 /// Append items from `newItems` to `buffer`.
 internal func _arrayAppendSequence<
-  Buffer : _ArrayBufferType,
+  Buffer : _ArrayBufferProtocol,
   S : Sequence
   where
   S.Iterator.Element == Buffer.Element,
@@ -1231,7 +1234,7 @@ internal func _arrayAppendSequence<
     let base = buffer.firstElementAddress
 
     while (nextItem != nil) && count < capacity {
-      (base + count++).initialize(nextItem!)
+      (base + count++).initializeMemory(nextItem!)
       nextItem = stream.next()
     }
     buffer.count = count
@@ -1329,7 +1332,7 @@ extension Array {
   /// * it is statically known that the given `NSArray` is immutable;
   /// * `Element` is bridged verbatim to Objective-C (i.e.,
   ///   is a reference type).
-  public init(_immutableCocoaArray: _NSArrayCoreType) {
+  public init(_immutableCocoaArray: _NSArrayCore) {
     self = Array(_ArrayBuffer(nsArray: _immutableCocoaArray))
   }
 }

@@ -1891,17 +1891,31 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
           TAI->getModule().getSwiftModule(), TAI->getSubstitutions());
     }
 
+    auto OrigParamTypes = OrigFnTy->getParameterSILTypes();
+    auto TargetParamTypes = TargetFnTy->getParameterSILTypes();
+    unsigned numArgs = TAI->getNumArguments();
+
+    // First check if it is possible to convert all arguments.
+    // Currently we believe that castValueToABICompatibleType can handle all
+    // cases, so this check should never fail. We just do it to be absolutely
+    // sure that we don't crash.
+    for (unsigned i = 0; i < numArgs; ++i) {
+      if (!canCastValueToABICompatibleType(TAI->getModule(),
+                                           OrigParamTypes[i],
+                                           TargetParamTypes[i])) {
+        return false;
+      }
+    }
+
     SmallVector<SILValue, 8> Args;
-    for (int i = 0, e = TAI->getNumArguments(); i < e; ++i) {
+    for (unsigned i = 0; i < numArgs; ++i) {
       auto Arg = TAI->getArgument(i);
       // Cast argument if required.
       Arg = castValueToABICompatibleType(&Builder, TAI->getLoc(), Arg,
-                                         OrigFnTy->getParameterSILTypes()[i],
-                                         TargetFnTy->getParameterSILTypes()[i]).
-                                         getValue();
+                                         OrigParamTypes[i],
+                                         TargetParamTypes[i]).getValue();
       Args.push_back(Arg);
     }
-
 
     assert (CalleeFnTy->getParameters().size() == Args.size() &&
             "The number of arguments should match");

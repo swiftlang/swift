@@ -820,7 +820,7 @@ public func runAllTests() {
 public class TestSuite {
   public init(_ name: String) {
     self.name = name
-    _precondition(
+    _require(
       _testNameToIndex[name] == nil,
       "test suite with the same name already exists")
     _allTestSuites.append(self)
@@ -843,12 +843,12 @@ public class TestSuite {
   }
 
   public func setUp(code: () -> Void) {
-    _precondition(_testSetUpCode == nil, "set-up code already set")
+    _require(_testSetUpCode == nil, "set-up code already set")
     _testSetUpCode = code
   }
 
   public func tearDown(code: () -> Void) {
-    _precondition(_testTearDownCode == nil, "tear-down code already set")
+    _require(_testTearDownCode == nil, "tear-down code already set")
     _testTearDownCode = code
   }
 
@@ -1930,15 +1930,15 @@ public func checkSequence<
   sequence._preprocessingPass { (sequence)->Void in 
     var count = 0
     for _ in sequence { ++count }
-    let buf = UnsafeMutablePointer<S.Iterator.Element>.alloc(count)
+    let buf = UnsafeMutablePointer<S.Iterator.Element>(allocatingCapacity: count)
     let end = sequence._initializeTo(buf)
     expectTrue(end == buf + count, "_initializeTo returned the wrong value")
     var j = expected.startIndex
     for i in 0..<(end - buf) {
       expectTrue(sameValue(expected[j++], buf[i]))
     }
-    buf.destroy(end - buf)
-    buf.dealloc(count)
+    buf.deinitializePointee(count: end - buf)
+    buf.deallocateCapacity(count)
   }
 }
 
@@ -2562,13 +2562,13 @@ public enum UnderestimateCountBehavior {
   case Value(Int)
 }
 
-public protocol StrictSequenceType : Sequence {
+public protocol StrictSequence : Sequence {
   typealias Element
   init(base: MinimalSequence<Element>)
   var base: MinimalSequence<Element> { get }
 }
 
-extension StrictSequenceType {
+extension StrictSequence {
   public init<S : Sequence where S.Iterator.Element == Element>(
     elements: S,
     underestimatedCount: UnderestimateCountBehavior = .Value(0)
@@ -2582,7 +2582,7 @@ extension StrictSequenceType {
   }
 }
 
-extension StrictSequenceType where Iterator : _MinimalIteratorProtocol {
+extension StrictSequence where Iterator : _MinimalIteratorProtocol {
   public func iterator() -> MinimalIterator<Element> {
     return base.iterator()
   }
@@ -2851,7 +2851,7 @@ internal struct _CollectionStateTransition {
 
 /// Asserts that the two indices are allowed to participate in a binary
 /// operation.
-internal func _expectCompatibleIndices<Index : _MinimalIndexType>(
+internal func _expectCompatibleIndices<Index : _MinimalIndex>(
   first: Index,
   _ second: Index,
   ${TRACE}
@@ -2895,7 +2895,7 @@ internal func _expectCompatibleIndices<Index : _MinimalIndexType>(
   }
 }
 
-public protocol _MinimalIndexType {
+public protocol _MinimalIndex {
   /// Distance from start index.
   var _offset: Int { get }
 
@@ -2986,7 +2986,7 @@ public func == (lhs: ${Index}, rhs: ${Index}) -> Bool {
   return lhs.position == rhs.position
 }
 
-extension ${Index} : _MinimalIndexType {
+extension ${Index} : _MinimalIndex {
   public var _offset: Int {
     return position - startIndex
   }
@@ -3088,7 +3088,7 @@ public func == (
   return lhs.position == rhs.position
 }
 
-extension MinimalBidirectionalIndex : _MinimalIndexType {
+extension MinimalBidirectionalIndex : _MinimalIndex {
   public var _offset: Int {
     return position - startIndex
   }
@@ -3290,7 +3290,7 @@ public func == (
   return lhs.position == rhs.position
 }
 
-extension MinimalRandomAccessIndex : _MinimalIndexType {
+extension MinimalRandomAccessIndex : _MinimalIndex {
   public var _offset: Int {
     return position - startIndex
   }
@@ -3337,7 +3337,7 @@ extension ${Protocol} where Iterator : _MinimalIteratorProtocol {
   }
 }
 
-extension ${Protocol} where Index : _MinimalIndexType {
+extension ${Protocol} where Index : _MinimalIndex {
   public var startIndex: ${Index} {
     return base.startIndex
   }
@@ -3466,7 +3466,7 @@ extension ${Protocol} where Iterator : _MinimalIteratorProtocol {
   }
 }
 
-extension ${Protocol} where Index : _MinimalIndexType {
+extension ${Protocol} where Index : _MinimalIndex {
   public var startIndex: ${Index} {
     return base.startIndex
   }
@@ -3793,7 +3793,7 @@ public func < (
 
 /// A Sequence that uses as many default implementations as
 /// `Sequence` can provide.
-public struct DefaultedSequence<Element> : StrictSequenceType {
+public struct DefaultedSequence<Element> : StrictSequence {
   public let base: MinimalSequence<Element>
 
   public init(base: MinimalSequence<Element>) {

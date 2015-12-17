@@ -25,13 +25,13 @@
 ///
 /// you can write:
 ///
-///     func swiftF(x: Int, arguments: CVarArgType...) -> Int {
+///     func swiftF(x: Int, arguments: CVarArg...) -> Int {
 ///       return withVaList(arguments) { f(x, $0) }
 ///     }
-public protocol CVarArgType {
+public protocol CVarArg {
   // Note: the protocol is public, but its requirement is stdlib-private.
-  // That's because there are APIs operating on CVarArgType instances, but
-  // defining conformances to CVarArgType outside of the standard library is
+  // That's because there are APIs operating on CVarArg instances, but
+  // defining conformances to CVarArg outside of the standard library is
   // not supported.
 
   /// Transform `self` into a series of machine words that can be
@@ -42,11 +42,11 @@ public protocol CVarArgType {
 /// Floating point types need to be passed differently on x86_64
 /// systems.  CoreGraphics uses this to make CGFloat work properly.
 public // SPI(CoreGraphics)
-protocol _CVarArgPassedAsDouble : CVarArgType {}
+protocol _CVarArgPassedAsDouble : CVarArg {}
 
 /// Some types require alignment greater than Int on some architectures.
 public // SPI(CoreGraphics)
-protocol _CVarArgAlignedType : CVarArgType {
+protocol _CVarArgAligned : CVarArg {
   /// Return the required alignment in bytes of 
   /// the value returned by `_cVarArgEncoding`.
   var _cVarArgAlignment: Int { get }
@@ -60,7 +60,7 @@ let _x86_64RegisterSaveWords = _x86_64CountGPRegisters + _x86_64CountSSERegister
 #endif
 
 /// Invoke `f` with a C `va_list` argument derived from `args`.
-public func withVaList<R>(args: [CVarArgType],
+public func withVaList<R>(args: [CVarArg],
   @noescape _ f: CVaListPointer -> R) -> R {
   let builder = VaListBuilder()
   for a in args {
@@ -90,7 +90,7 @@ public func withVaList<R>(builder: VaListBuilder,
 ///   may find that the language rules don't allow you to use
 /// `withVaList` as intended.
 @warn_unused_result
-public func getVaList(args: [CVarArgType]) -> CVaListPointer {
+public func getVaList(args: [CVarArg]) -> CVaListPointer {
   let builder = VaListBuilder()
   for a in args {
     builder.append(a)
@@ -103,7 +103,7 @@ public func getVaList(args: [CVarArgType]) -> CVaListPointer {
 #endif
 
 @warn_unused_result
-public func _encodeBitsAsWords<T : CVarArgType>(x: T) -> [Int] {
+public func _encodeBitsAsWords<T : CVarArg>(x: T) -> [Int] {
   let result = [Int](
     repeating: 0,
     count: (sizeof(T.self) + sizeof(Int.self) - 1) / sizeof(Int.self))
@@ -115,12 +115,12 @@ public func _encodeBitsAsWords<T : CVarArgType>(x: T) -> [Int] {
   return result
 }
 
-// CVarArgType conformances for the integer types.  Everything smaller
+// CVarArg conformances for the integer types.  Everything smaller
 // than a CInt must be promoted to CInt or CUnsignedInt before
 // encoding.
 
 // Signed types
-extension Int : CVarArgType {
+extension Int : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Int] {
@@ -128,7 +128,7 @@ extension Int : CVarArgType {
   }
 }
 
-extension Int64 : CVarArgType, _CVarArgAlignedType {
+extension Int64 : CVarArg, _CVarArgAligned {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Int] {
@@ -143,7 +143,7 @@ extension Int64 : CVarArgType, _CVarArgAlignedType {
   }
 }
 
-extension Int32 : CVarArgType {
+extension Int32 : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Int] {
@@ -151,7 +151,7 @@ extension Int32 : CVarArgType {
   }
 }
 
-extension Int16 : CVarArgType {
+extension Int16 : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Int] {
@@ -159,7 +159,7 @@ extension Int16 : CVarArgType {
   }
 }
 
-extension Int8 : CVarArgType {
+extension Int8 : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Int] {
@@ -168,7 +168,7 @@ extension Int8 : CVarArgType {
 }
 
 // Unsigned types
-extension UInt : CVarArgType {
+extension UInt : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Int] {
@@ -176,7 +176,7 @@ extension UInt : CVarArgType {
   }
 }
 
-extension UInt64 : CVarArgType, _CVarArgAlignedType {
+extension UInt64 : CVarArg, _CVarArgAligned {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Int] {
@@ -191,7 +191,7 @@ extension UInt64 : CVarArgType, _CVarArgAlignedType {
   }
 }
 
-extension UInt32 : CVarArgType {
+extension UInt32 : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Int] {
@@ -199,7 +199,7 @@ extension UInt32 : CVarArgType {
   }
 }
 
-extension UInt16 : CVarArgType {
+extension UInt16 : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Int] {
@@ -207,7 +207,7 @@ extension UInt16 : CVarArgType {
   }
 }
 
-extension UInt8 : CVarArgType {
+extension UInt8 : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Int] {
@@ -215,7 +215,7 @@ extension UInt8 : CVarArgType {
   }
 }
 
-extension OpaquePointer : CVarArgType {
+extension OpaquePointer : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Int] {
@@ -223,7 +223,7 @@ extension OpaquePointer : CVarArgType {
   }
 }
 
-extension UnsafePointer : CVarArgType {
+extension UnsafePointer : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Int] {
@@ -231,7 +231,7 @@ extension UnsafePointer : CVarArgType {
   }
 }
 
-extension UnsafeMutablePointer : CVarArgType {
+extension UnsafeMutablePointer : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Int] {
@@ -240,7 +240,7 @@ extension UnsafeMutablePointer : CVarArgType {
 }
 
 #if _runtime(_ObjC)
-extension AutoreleasingUnsafeMutablePointer : CVarArgType {
+extension AutoreleasingUnsafeMutablePointer : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Int] {
@@ -249,7 +249,7 @@ extension AutoreleasingUnsafeMutablePointer : CVarArgType {
 }
 #endif
 
-extension Float : _CVarArgPassedAsDouble, _CVarArgAlignedType {
+extension Float : _CVarArgPassedAsDouble, _CVarArgAligned {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Int] {
@@ -264,7 +264,7 @@ extension Float : _CVarArgPassedAsDouble, _CVarArgAlignedType {
   }
 }
 
-extension Double : _CVarArgPassedAsDouble, _CVarArgAlignedType {
+extension Double : _CVarArgPassedAsDouble, _CVarArgAligned {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Int] {
@@ -285,14 +285,14 @@ extension Double : _CVarArgPassedAsDouble, _CVarArgAlignedType {
 /// `CVaListPointer`.
 final public class VaListBuilder {
 
-  func append(arg: CVarArgType) {
+  func append(arg: CVarArg) {
     // Write alignment padding if necessary.
     // This is needed on architectures where the ABI alignment of some 
     // supported vararg type is greater than the alignment of Int.
     // FIXME: this implementation is not portable because
     // alignof differs from the ABI alignment on some architectures
 #if os(watchOS) && arch(arm)   // FIXME: rdar://21203036 should be arch(armv7k)
-    if let arg = arg as? _CVarArgAlignedType {
+    if let arg = arg as? _CVarArgAligned {
       let alignmentInWords = arg._cVarArgAlignment / sizeof(Int)
       let misalignmentInWords = count % alignmentInWords
       if misalignmentInWords != 0 {
@@ -390,7 +390,7 @@ final public class VaListBuilder {
     storage = Array(repeating: 0, count: _x86_64RegisterSaveWords)
   }
 
-  func append(arg: CVarArgType) {
+  func append(arg: CVarArg) {
     var encoded = arg._cVarArgEncoding
 
     if arg is _CVarArgPassedAsDouble
@@ -399,9 +399,9 @@ final public class VaListBuilder {
            + (sseRegistersUsed * _x86_64SSERegisterWords)
       for w in encoded {
         storage[startIndex] = w
-        ++startIndex
+        startIndex += 1
       }
-      ++sseRegistersUsed
+      sseRegistersUsed += 1
     }
     else if encoded.count == 1 && gpRegistersUsed < _x86_64CountGPRegisters {
       storage[gpRegistersUsed++] = encoded[0]

@@ -5,22 +5,22 @@ protocol MyIteratorProtocol {
   mutating func next() -> Element?
 }
 
-protocol MySequenceType {
+protocol MySequence {
   typealias Iterator : MyIteratorProtocol
   func iterator() -> Iterator
 }
 
-protocol MyCollectionDefaultsType : MySequenceType {}
-extension MyCollectionDefaultsType {
+protocol MyCollectionDefaults : MySequence {}
+extension MyCollectionDefaults {
   final func iterator() -> DefaultIterator<Self> {
     return DefaultIterator()
   }
 }
 
-protocol MyCollectionType
-  : MySequenceType, MyCollectionDefaultsType {}
+protocol MyCollection
+  : MySequence, MyCollectionDefaults {}
 
-struct DefaultIterator<C : MyCollectionDefaultsType> : MyIteratorProtocol {
+struct DefaultIterator<C : MyCollectionDefaults> : MyIteratorProtocol {
   mutating func next() -> C.Iterator.Element {
     fatalError("")
   }
@@ -30,6 +30,6 @@ struct FooIteratorWrapper<Base : MyIteratorProtocol> {
   init(_ base: Base) {}
 }
 
-func f<C : MyCollectionType>(c: C) {
+func f<C : MyCollection>(c: C) {
   FooIteratorWrapper(c.iterator())
 }

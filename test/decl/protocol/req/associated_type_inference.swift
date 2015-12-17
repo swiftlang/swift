@@ -231,7 +231,7 @@ struct Y7<T> : P7 {
   func f() -> Int { return 0 }
 }
 
-struct MyAnySequence<Element> : MySequenceType {
+struct MyAnySequence<Element> : MySequence {
   typealias SubSequence = MyAnySequence<Element>
   func iterator() -> MyAnyIterator<Element> {
     return MyAnyIterator<Element>()
@@ -246,7 +246,7 @@ protocol MyIteratorType {
   typealias Element
 }
 
-protocol MySequenceType {
+protocol MySequence {
   typealias Iterator : MyIteratorType
   typealias SubSequence
 
@@ -254,13 +254,13 @@ protocol MySequenceType {
   func iterator() -> Iterator
 }
 
-extension MySequenceType {
+extension MySequence {
   func foo() -> MyAnySequence<Iterator.Element> {
     return MyAnySequence()
   }
 }
 
-struct SomeStruct<Element> : MySequenceType {
+struct SomeStruct<Element> : MySequence {
   let element: Element
   init(_ element: Element) {
     self.element = element

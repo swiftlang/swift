@@ -1,4 +1,4 @@
-//===--- Mirrors.swift.gyb - Common _MirrorType implementations -*- swift -*-==//
+//===--- Mirrors.swift.gyb - Common _Mirror implementations -*- swift -*-==//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -42,7 +42,7 @@ internal func _toString<T>(x: T) -> String {
 % for Type in Types:
 extension ${Type[0]} : _Reflectable {
   /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> _MirrorType {
+  public func _getMirror() -> _Mirror {
     return _LeafMirror(self, _toString, { ${Type[1]}(${Type[2]}) })
   }
 }

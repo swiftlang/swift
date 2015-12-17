@@ -76,7 +76,7 @@ func test1() -> Int32 {
   return A()[0]
 }
 
-let uninitAddr = UnsafeMutablePointer<Int32>.alloc(1)
+let uninitAddr = UnsafeMutablePointer<Int32>(allocatingCapacity: 1)
 var global: Int32 {
   unsafeAddress {
     return UnsafePointer(uninitAddr)
@@ -251,7 +251,7 @@ func test_e(e: E) {
 }
 
 class F {
-  var data: UnsafeMutablePointer<Int32> = UnsafeMutablePointer.alloc(100)
+  var data: UnsafeMutablePointer<Int32> = UnsafeMutablePointer(allocatingCapacity: 100)
 
   final var value: Int32 {
     addressWithNativeOwner {
@@ -302,7 +302,7 @@ func test_f1(f: F) {
 // CHECK:   strong_release [[SELF]] : $F
 
 class G {
-  var data: UnsafeMutablePointer<Int32> = UnsafeMutablePointer.alloc(100)
+  var data: UnsafeMutablePointer<Int32> = UnsafeMutablePointer(allocatingCapacity: 100)
 
   var value: Int32 {
     addressWithNativeOwner {
@@ -375,7 +375,7 @@ class G {
 // CHECK:   dealloc_value_buffer $Builtin.NativeObject in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
 
 class H {
-  var data: UnsafeMutablePointer<Int32> = UnsafeMutablePointer.alloc(100)
+  var data: UnsafeMutablePointer<Int32> = UnsafeMutablePointer(allocatingCapacity: 100)
 
   final var value: Int32 {
     addressWithPinnedNativeOwner {
@@ -426,7 +426,7 @@ func test_h1(f: H) {
 // CHECK:   strong_release [[SELF]] : $H
 
 class I {
-  var data: UnsafeMutablePointer<Int32> = UnsafeMutablePointer.alloc(100)
+  var data: UnsafeMutablePointer<Int32> = UnsafeMutablePointer(allocatingCapacity: 100)
 
   var value: Int32 {
     addressWithPinnedNativeOwner {
@@ -505,7 +505,7 @@ struct RecMiddle {
   var inner: RecInner
 }
 class RecOuter {
-  var data: UnsafeMutablePointer<RecMiddle> = UnsafeMutablePointer.alloc(100)
+  var data: UnsafeMutablePointer<RecMiddle> = UnsafeMutablePointer(allocatingCapacity: 100)
   final var middle: RecMiddle {
     addressWithPinnedNativeOwner {
       return (UnsafePointer(data), Builtin.tryPin(Builtin.castToNativeObject(self)))

@@ -1,4 +1,4 @@
-// Failing the test as 'BooleanType' to 'Boolean' rename introduced problems
+// Failing the test as 'Boolean' to 'Boolean' rename introduced problems
 // with converting bool literals to DarwinBoolean
 
 // XFAIL: *

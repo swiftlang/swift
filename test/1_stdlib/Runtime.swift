@@ -17,10 +17,10 @@ import MirrorObjC
 var nsObjectCanaryCount = 0
 @objc class NSObjectCanary : NSObject {
   override init() {
-    ++nsObjectCanaryCount
+    nsObjectCanaryCount += 1
   }
   deinit {
-    --nsObjectCanaryCount
+    nsObjectCanaryCount -= 1
   }
 }
 
@@ -31,10 +31,10 @@ struct NSObjectCanaryStruct {
 var swiftObjectCanaryCount = 0
 class SwiftObjectCanary {
   init() {
-    ++swiftObjectCanaryCount
+    swiftObjectCanaryCount += 1
   }
   deinit {
-    --swiftObjectCanaryCount
+    swiftObjectCanaryCount -= 1
   }
 }
 
@@ -909,14 +909,14 @@ RuntimeFoundationWrappers.test("_stdlib_NSObject_isEqual/NoLeak") {
 var nsStringCanaryCount = 0
 @objc class NSStringCanary : NSString {
   override init() {
-    ++nsStringCanaryCount
+    nsStringCanaryCount += 1
     super.init()
   }
   required init(coder: NSCoder) {
     fatalError("don't call this initializer")
   }
   deinit {
-    --nsStringCanaryCount
+    nsStringCanaryCount -= 1
   }
   @objc override var length: Int {
     return 0
@@ -1080,7 +1080,7 @@ Reflection.test("Struct/NonGeneric/DefaultMirror") {
 
   do {
     // Build a String around an interpolation as a way of smoke-testing that
-    // the internal _MirrorType implementation gets memory management right.
+    // the internal _Mirror implementation gets memory management right.
     var output = ""
     dump(StructWithDefaultMirror("\(456)"), &output)
     expectEqual("▿ a.StructWithDefaultMirror\n  - s: 456\n", output)
@@ -1428,7 +1428,7 @@ Reflection.test("Enum/IndirectGeneric/DefaultMirror") {
 }
 
 /// A type that provides its own mirror.
-struct BrilliantMirror : _MirrorType {
+struct BrilliantMirror : _Mirror {
   let _value: Brilliant
 
   init (_ _value: Brilliant) {
@@ -1451,7 +1451,7 @@ struct BrilliantMirror : _MirrorType {
     return 3
   }
 
-  subscript(i: Int) -> (String, _MirrorType) {
+  subscript(i: Int) -> (String, _Mirror) {
     switch i {
     case 0:
       return ("first", _reflect(_value.first))
@@ -1460,7 +1460,7 @@ struct BrilliantMirror : _MirrorType {
     case 2:
       return ("self", self)
     case _:
-      _preconditionFailure("child index out of bounds")
+      _requirementFailure("child index out of bounds")
     }
   }
 
@@ -1486,7 +1486,7 @@ class Brilliant : _Reflectable {
     self.second = snd
   }
 
-  func _getMirror() -> _MirrorType {
+  func _getMirror() -> _Mirror {
     return BrilliantMirror(self)
   }
 }
@@ -1749,7 +1749,7 @@ Reflection.test("TupleMirror") {
 
 class DullClass {}
 Reflection.test("ObjectIdentity") {
-  // Check that the primitive _MirrorType implementation produces appropriately
+  // Check that the primitive _Mirror implementation produces appropriately
   // unique identifiers for class instances.
 
   let x = DullClass()
@@ -2190,7 +2190,7 @@ Reflection.test("MirrorMirror") {
 
 Reflection.test("OpaquePointer/null") {
   // Don't crash on null pointers. rdar://problem/19708338
-  var sequence = OpaquePointer()
+  var sequence: OpaquePointer = nil
   var mirror = _reflect(sequence)
   var child = mirror[0]
   expectEqual("(Opaque Value)", child.1.summary)
@@ -2266,7 +2266,7 @@ func computeCountLeadingZeroes(x: Int64) -> Int64 {
   var r: Int64 = 64
   while x != 0 {
     x >>= 1
-    r--
+    r -= 1
   }
   return r
 }

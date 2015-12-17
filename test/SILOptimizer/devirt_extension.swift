@@ -1,18 +1,18 @@
 // RUN: %target-swift-frontend -O -emit-sil %s | FileCheck %s
 
-protocol DrawingElementDispatchType {}
+protocol DrawingElementDispatch {}
 
-extension DrawingElementDispatchType {
+extension DrawingElementDispatch {
   final var boundingBox: Int32 {
     return 0
   }
 }
 
-protocol DrawingElementType : DrawingElementDispatchType {
+protocol DrawingElement : DrawingElementDispatch {
   var boundingBox: Int32 {get}
 }
 
-struct D : DrawingElementType {
+struct D : DrawingElement {
   var boundingBox: Int32 = 42
 }
 
@@ -27,5 +27,5 @@ struct D : DrawingElementType {
 // CHECK-NOT: bb1:
 // return
 public func test1111() -> Int32 {
-  return (D() as DrawingElementType).boundingBox
+  return (D() as DrawingElement).boundingBox
 }
