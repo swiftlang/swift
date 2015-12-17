@@ -84,22 +84,47 @@ static llvm::cl::opt<bool> EnableCopyForwarding("enable-copyforwarding",
 static llvm::cl::opt<bool> EnableDestroyHoisting("enable-destroyhoisting",
                                                 llvm::cl::init(true));
 
-/// \return true of the given object can only be accessed via the given def
-/// (this def uniquely identifies the object).
+/// \return true if the given copy source value can only be accessed via the
+/// given def (this def uniquely identifies the object).
 ///
 /// (1) An "in" argument.
 ///     (inouts are also nonaliased, but won't be destroyed in scope)
 ///
 /// (2) A local alloc_stack variable.
-static bool isIdentifiedObject(SILValue Def, SILFunction *F) {
+static bool isIdentifiedSourceValue(SILValue Def) {
   if (SILArgument *Arg = dyn_cast<SILArgument>(Def)) {
     // Check that the argument is passed as an in type. This means there are
-    // no aliases accessible within this function scope. We may be able to just
-    // assert this.
+    // no aliases accessible within this function scope.
     ParameterConvention Conv =  Arg->getParameterInfo().getConvention();
     switch (Conv) {
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_In_Guaranteed:
+      return true;
+    default:
+      DEBUG(llvm::dbgs() << "  Skipping Def: Not an @in argument!\n");
+      return false;
+    }
+  }
+  else if (isa<AllocStackInst>(Def))
+    return true;
+
+  return false;
+}
+
+/// \return true if the given copy dest value can only be accessed via the given
+/// def (this def uniquely identifies the object).
+///
+/// (1) An "out" or inout argument.
+///
+/// (2) A local alloc_stack variable.
+static bool isIdentifiedDestValue(SILValue Def) {
+  if (SILArgument *Arg = dyn_cast<SILArgument>(Def)) {
+    // Check that the argument is passed as an out type. This means there are
+    // no aliases accessible within this function scope.
+    ParameterConvention Conv =  Arg->getParameterInfo().getConvention();
+    switch (Conv) {
+    case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_Out:
       return true;
     default:
       DEBUG(llvm::dbgs() << "  Skipping Def: Not an @in argument!\n");
@@ -616,20 +641,25 @@ bool CopyForwarding::forwardPropagateCopy(
   CopyAddrInst *CopyInst,
   SmallPtrSetImpl<SILInstruction*> &DestUserInsts) {
 
+  SILValue CopyDest = CopyInst->getDest();
+  // Require the copy dest to be a simple alloc_stack. This ensures that all
+  // instructions that may read from the destination address depend on CopyDest.
+  if (!isa<AllocStackInst>(CopyDest))
+    return false;
+
   // Looking at
   //
   //    copy_addr %Src, [init] %Dst
   //
-  // We can reuse %Src if it is destroyed at %Src and not initialized again. To
+  // We can reuse %Src if it is dead after the copy and not reinitialized. To
   // know that we can safely replace all uses of %Dst with source we must know
   // that it is uniquely named and cannot be accessed outside of the function
   // (an alloc_stack instruction qualifies for this, an inout parameter does
   // not).  Additionally, we must know that all accesses to %Dst further on must
   // have had this copy on their path (there might be reinitialization of %Dst
-  // later, but there must no be a path around this copy that reads from %Dst).
+  // later, but there must not be a path around this copy that reads from %Dst).
   SmallVector<Operand *, 16> DestUses;
-  if (isa<AllocStackInst>(CopyInst->getDest()) && /* Uniquely identified name */
-      isSourceDeadAtCopy(CopyInst) &&
+  if (isSourceDeadAtCopy(CopyInst) &&
       areCopyDestUsersDominatedBy(CopyInst, DestUses)) {
 
     // Replace all uses of Dest with a use of Src.
@@ -648,7 +678,6 @@ bool CopyForwarding::forwardPropagateCopy(
     return true;
   }
 
-  SILValue CopyDest = CopyInst->getDest();
   SILInstruction *DefDealloc = nullptr;
   if (isa<AllocStackInst>(CurrentDef)) {
     SILValue StackAddr(CurrentDef.getDef(), 0);
@@ -730,6 +759,11 @@ bool CopyForwarding::backwardPropagateCopy(
 
   SILValue CopySrc = CopyInst->getSrc();
   ValueBase *CopyDestDef = CopyInst->getDest().getDef();
+  // Require the copy dest value to be identified by this address. This ensures
+  // that all instructions that may write to destination address depend on
+  // CopyDestDef.
+  if (!isIdentifiedDestValue(CopyDestDef))
+    return false;
 
   // Scan backward recording all operands that use CopySrc until we see the
   // most recent init of CopySrc.
@@ -1059,7 +1093,7 @@ class CopyForwardingPass : public SILFunctionTransform
             continue;
           }
           SILValue Def = CopyInst->getSrc();
-          if (isIdentifiedObject(Def, getFunction()))
+          if (isIdentifiedSourceValue(Def))
             CopiedDefs.insert(Def);
           else {
             DEBUG(llvm::dbgs() << "  Skipping Def: " << Def
