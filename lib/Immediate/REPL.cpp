@@ -950,8 +950,7 @@ public:
     }
     tryLoadLibraries(CI.getLinkLibraries(), Ctx.SearchPathOpts, CI.getDiags());
 
-    llvm::EngineBuilder builder(
-        std::move(std::unique_ptr<llvm::Module>(Module)));
+    llvm::EngineBuilder builder{std::unique_ptr<llvm::Module>{Module}};
     std::string ErrorMsg;
     llvm::TargetOptions TargetOpt;
     std::string CPU;
