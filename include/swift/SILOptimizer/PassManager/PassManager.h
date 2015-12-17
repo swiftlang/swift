@@ -92,6 +92,13 @@ public:
   /// \brief Run one iteration of the optimization pipeline.
   void runOneIteration();
 
+  /// \brief Add a function to the function pass worklist.
+  void addFunctionToWorklist(SILFunction *F) {
+    assert(F && F->isDefinition() && F->shouldOptimize() &&
+           "Expected optimizable function definition!");
+    FunctionWorklist.push_back(F);
+  }
+
   ///  \brief Broadcast the invalidation of the module to all analysis.
   void invalidateAnalysis(SILAnalysis::InvalidationKind K) {
     assert(K != SILAnalysis::InvalidationKind::Nothing &&

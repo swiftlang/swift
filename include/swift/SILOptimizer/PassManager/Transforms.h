@@ -96,6 +96,12 @@ namespace swift {
 
     void injectFunction(SILFunction *Func) { F = Func; }
 
+    /// \brief Notify the pass manager of a function that needs to be
+    /// processed by the function passes.
+    void notifyPassManagerOfFunction(SILFunction *F) {
+      PM->addFunctionToWorklist(F);
+    }
+
   protected:
     SILFunction *getFunction() { return F; }
 
@@ -139,4 +145,3 @@ namespace swift {
 } // end namespace swift
 
 #endif
-
