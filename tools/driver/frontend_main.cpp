@@ -28,6 +28,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Timer.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -52,6 +53,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/Timer.h"
 #include "llvm/Support/YAMLParser.h"
 
 #include <memory>
@@ -795,22 +797,32 @@ static bool performCompile(CompilerInstance &Instance,
   if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
     performSILLinking(SM.get(), true);
 
-  SM->verify();
+  {
+    SharedTimer timer("SIL verification (pre-optimization)");
+    SM->verify();
+  }
 
   // Perform SIL optimization passes if optimizations haven't been disabled.
   // These may change across compiler versions.
-  if (IRGenOpts.Optimize) {
-    StringRef CustomPipelinePath =
-      Invocation.getSILOptions().ExternalPassPipelineFilename;
-    if (!CustomPipelinePath.empty()) {
-      runSILOptimizationPassesWithFileSpecification(*SM, CustomPipelinePath);
+  {
+    SharedTimer timer("SIL optimization");
+    if (IRGenOpts.Optimize) {
+      StringRef CustomPipelinePath =
+        Invocation.getSILOptions().ExternalPassPipelineFilename;
+      if (!CustomPipelinePath.empty()) {
+        runSILOptimizationPassesWithFileSpecification(*SM, CustomPipelinePath);
+      } else {
+        runSILOptimizationPasses(*SM);
+      }
     } else {
-      runSILOptimizationPasses(*SM);
+      runSILPassesForOnone(*SM);
     }
-  } else {
-    runSILPassesForOnone(*SM);
   }
-  SM->verify();
+
+  {
+    SharedTimer timer("SIL verification (post-optimization)");
+    SM->verify();
+  }
 
   // Gather instruction counts if we are asked to do so.
   if (SM->getOptions().PrintInstCounts) {
@@ -1085,6 +1097,9 @@ int frontend_main(ArrayRef<const char *>Args,
 
   if (Invocation.getDiagnosticOptions().UseColor)
     PDC.forceColors();
+
+  if (Invocation.getFrontendOptions().DebugTimeCompilation)
+    SharedTimer::enableCompilationTimers();
 
   if (Invocation.getFrontendOptions().PrintStats) {
     llvm::EnableStatistics();

@@ -82,6 +82,7 @@ add_swift_library(swiftBasic
   StringExtras.cpp
   TaskQueue.cpp
   ThreadSafeRefCounted.cpp
+  Timer.cpp
   Unicode.cpp
   UUID.cpp
   Version.cpp

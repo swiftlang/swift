@@ -166,6 +166,12 @@ public:
   /// If set, dumps wall time taken to check each function body to llvm::errs().
   bool DebugTimeFunctionBodies = false;
 
+  /// If set, prints the time taken in each major compilation phase to 
+  /// llvm::errs().
+  ///
+  /// \sa swift::SharedTimer
+  bool DebugTimeCompilation = false;
+
   /// Indicates whether function body parsing should be delayed
   /// until the end of all files.
   bool DelayedFunctionBodyParsing = false;

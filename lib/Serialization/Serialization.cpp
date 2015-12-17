@@ -25,6 +25,7 @@
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Timer.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Serialization/SerializationOptions.h"
@@ -3814,6 +3815,7 @@ void swift::serialize(ModuleOrSourceFile DC,
 
   bool hadError = withOutputFile(getContext(DC), options.OutputPath,
                                  [&](raw_ostream &out) {
+    SharedTimer timer("Serialization (swiftmodule)");
     Serializer::writeToStream(out, DC, M, options);
   });
   if (hadError)
@@ -3822,6 +3824,7 @@ void swift::serialize(ModuleOrSourceFile DC,
   if (options.DocOutputPath && options.DocOutputPath[0] != '\0') {
     (void)withOutputFile(getContext(DC), options.DocOutputPath,
                          [&](raw_ostream &out) {
+      SharedTimer timer("Serialization (swiftdoc)");
       Serializer::writeDocToStream(out, DC);
     });
   }
