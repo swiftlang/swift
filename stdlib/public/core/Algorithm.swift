@@ -46,6 +46,10 @@ public func find<
 /// Returns the lesser of `x` and `y`.
 @warn_unused_result
 public func min<T : Comparable>(x: T, _ y: T) -> T {
+  // In case `x == y` we pick `x`.
+  // This preserves any pre-existing order in case `T` has identity,
+  // which is important for e.g. the stability of sorting algorithms.
+  // `(min(x, y), max(x, y))` should return `(x, y)` in case `x == y`.
   return y < x ? y : x
 }
 
@@ -53,6 +57,7 @@ public func min<T : Comparable>(x: T, _ y: T) -> T {
 @warn_unused_result
 public func min<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
   var minValue = min(min(x, y), z)
+  // In case `value == minValue`, we pick `minValue`. See min(_:_:).
   for value in rest where value < minValue {
     minValue = value
   }
@@ -62,6 +67,7 @@ public func min<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
 /// Returns the greater of `x` and `y`.
 @warn_unused_result
 public func max<T : Comparable>(x: T, _ y: T) -> T {
+  // In case `x == y`, we pick `y`. See min(_:_:).
   return y >= x ? y : x
 }
 
@@ -69,6 +75,7 @@ public func max<T : Comparable>(x: T, _ y: T) -> T {
 @warn_unused_result
 public func max<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
   var maxValue = max(max(x, y), z)
+  // In case `value == maxValue`, we pick `value`. See min(_:_:).
   for value in rest where value >= maxValue {
     maxValue = value
   }
