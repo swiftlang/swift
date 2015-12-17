@@ -203,6 +203,17 @@ var thinFunc : @thin () -> () // expected-error {{attribute is not supported}}
 @inline(__always) class FooClass2 { // expected-error {{@inline(__always) cannot be applied to this declaration}} {{1-19=}}
 }
 
+@_migration_id("blah1")
+func migrating1() {}
+@_migration_id("blah2", pattern="yoda")
+func migrating2() {}
+@_migration_id(pattern="yoda") // expected-error {{expected string literal in '_migration_id' attribute}}
+func migrating3() {}
+@_migration_id() // expected-error {{expected string literal in '_migration_id' attribute}}
+func migrating4() {}
+@_migration_id // expected-error {{expected '(' in '_migration_id' attribute}}
+func migrating5() {}
+
 class A {
   @inline(never) init(a : Int) {}
   var b : Int {

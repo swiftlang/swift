@@ -4842,6 +4842,7 @@ public:
 
     UNINTERESTING_ATTR(WarnUnusedResult)
     UNINTERESTING_ATTR(WarnUnqualifiedAccess)
+    UNINTERESTING_ATTR(MigrationId)
 
 #undef UNINTERESTING_ATTR
 
