@@ -43,7 +43,7 @@
    ;; Decl and type keywords
    `(,(regexp-opt '("class" "init" "deinit" "extension" "func"
                     "import" "let" "protocol" "static" "struct" "subscript"
-                    "typealias" "enum" "var" "where"
+                    "typealias" "enum" "var" "lazy" "where"
                     "private" "public" "internal" "override" "throws")
                   'words) . font-lock-keyword-face)
    ;; Statements
