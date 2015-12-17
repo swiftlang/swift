@@ -2596,6 +2596,12 @@ public:
   }
 
   void checkCondBranchInst(CondBranchInst *CBI) {
+    // It is important that cond_br keeps an i1 type. ARC Sequence Opts assumes
+    // that cond_br does not use reference counted values or decrement reference
+    // counted values under the assumption that the instruction that computes
+    // the i1 is the use/decrement that ARC cares about and that after that
+    // instruction is evaluated, the scalar i1 has a different identity and the
+    // object can be deallocated.
     require(CBI->getCondition().getType() ==
              SILType::getBuiltinIntegerType(1,
                                  CBI->getCondition().getType().getASTContext()),
