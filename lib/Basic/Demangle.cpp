@@ -1884,7 +1884,7 @@ private:
       return type_application;
     }
     if (c == 'X') {
-      if (Mangled.nextIf('H')) {
+      if (Mangled.nextIf('b')) {
         NodePointer type = demangleType();
         if (!type)
           return nullptr;

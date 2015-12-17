@@ -881,7 +881,7 @@ void Mangler::mangleAssociatedTypeName(DependentMemberType *dmt,
 /// <type> ::= Xo <type>             # unowned reference type
 /// <type> ::= Xw <type>             # weak reference type
 /// <type> ::= XF <impl-function-type> # SIL function type
-/// <type> ::= XH <type>             # SIL @box type
+/// <type> ::= Xb <type>             # SIL @box type
 ///
 /// <index> ::= _                    # 0
 /// <index> ::= <natural> _          # N+1
@@ -1395,7 +1395,7 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
   }
 
   case TypeKind::SILBox:
-    Buffer << 'X' << 'H';
+    Buffer << 'X' << 'b';
     mangleType(cast<SILBoxType>(tybase)->getBoxedType(), explosion,
                uncurryLevel);
     return;
