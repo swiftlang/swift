@@ -44,6 +44,8 @@ public func find<
 }
 
 /// Returns the lesser of `x` and `y`.
+///
+/// If `x == y`, returns `x`.
 @warn_unused_result
 public func min<T : Comparable>(x: T, _ y: T) -> T {
   // In case `x == y` we pick `x`.
@@ -54,6 +56,8 @@ public func min<T : Comparable>(x: T, _ y: T) -> T {
 }
 
 /// Returns the least argument passed.
+///
+/// If there are multiple equal least arguments, returns the first one.
 @warn_unused_result
 public func min<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
   var minValue = min(min(x, y), z)
@@ -65,6 +69,8 @@ public func min<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
 }
 
 /// Returns the greater of `x` and `y`.
+///
+/// If `x == y`, returns `y`.
 @warn_unused_result
 public func max<T : Comparable>(x: T, _ y: T) -> T {
   // In case `x == y`, we pick `y`. See min(_:_:).
@@ -72,6 +78,8 @@ public func max<T : Comparable>(x: T, _ y: T) -> T {
 }
 
 /// Returns the greatest argument passed.
+///
+/// If there are multiple equal greatest arguments, returns the last one.
 @warn_unused_result
 public func max<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
   var maxValue = max(max(x, y), z)
