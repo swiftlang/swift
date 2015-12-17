@@ -673,10 +673,10 @@ case BuiltinValueKind::id:
       return nullptr;
     APFloat TruncVal = V->getValue();
     Type DestTy = Builtin.Types[1];
-    bool loosesInfo;
+    bool losesInfo;
     APFloat::opStatus ConversionStatus = TruncVal.convert(
         DestTy->castTo<BuiltinFloatType>()->getAPFloatSemantics(),
-        APFloat::rmNearestTiesToEven, &loosesInfo);
+        APFloat::rmNearestTiesToEven, &losesInfo);
     SILLocation Loc = BI->getLoc();
 
     // Check if conversion was successful.
