@@ -261,43 +261,51 @@ namespace {
 
         if (acp1->getDecl()->getName().str() ==
               acp2->getDecl()->getName().str()) {
-          CS.addConstraint(ConstraintKind::Equal, acp1->getType(),
-                       acp2->getType(),
-                       CS.getConstraintLocator(expr));
+
+          auto rep1 = CS.getRepresentative(acp1->getType()->
+                        getAs<TypeVariableType>());
+          auto rep2 = CS.getRepresentative(acp2->getType()->
+                        getAs<TypeVariableType>());
+
+          if (rep1 != rep2)
+            CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
         }
       }
     }    
 
     // Link integer literal tyvars.
     if (lti.intLiteralTyvars.size() > 1) {
-      auto first = lti.intLiteralTyvars[0];
+      auto rep1 = CS.getRepresentative(lti.intLiteralTyvars[0]);
 
       for (size_t i = 1; i < lti.intLiteralTyvars.size(); i++) {
-        CS.addConstraint(ConstraintKind::Equal, first,
-                       lti.intLiteralTyvars[i],
-                       CS.getConstraintLocator(expr));
+        auto rep2 = CS.getRepresentative(lti.intLiteralTyvars[i]);
+
+        if (rep1 != rep2)
+          CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
       }
     }
 
     // Link float literal tyvars.
     if (lti.floatLiteralTyvars.size() > 1) {
-      auto first = lti.floatLiteralTyvars[0];
+      auto rep1 = CS.getRepresentative(lti.floatLiteralTyvars[0]);
 
       for (size_t i = 1; i < lti.floatLiteralTyvars.size(); i++) {
-        CS.addConstraint(ConstraintKind::Equal, first,
-                       lti.floatLiteralTyvars[i],
-                       CS.getConstraintLocator(expr));
+        auto rep2 = CS.getRepresentative(lti.floatLiteralTyvars[i]);
+        
+        if (rep1 != rep2)
+          CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
       }
     }
 
     // Link string literal tyvars.
     if (lti.stringLiteralTyvars.size() > 1) {
-      auto first = lti.stringLiteralTyvars[0];
+      auto rep1 = CS.getRepresentative(lti.stringLiteralTyvars[0]);
 
       for (size_t i = 1; i < lti.stringLiteralTyvars.size(); i++) {
-        CS.addConstraint(ConstraintKind::Equal, first,
-                       lti.stringLiteralTyvars[i],
-                       CS.getConstraintLocator(expr));
+        auto rep2 = CS.getRepresentative(lti.stringLiteralTyvars[i]);
+
+        if (rep1 != rep2)
+          CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
       }
     }
 
