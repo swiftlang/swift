@@ -10,7 +10,7 @@ for traversal, base_kind, mutable in itertools.product(
     # Test Slice<Base> and MutableSlice<Base> of various collections using value
     # types as elements.
     wrapper_types = [ 'Slice', 'MutableSlice' ] if mutable else [ 'Slice' ]
-    for WrapperType in wrapper_types:
+    for Wrapper in wrapper_types:
         for name, prefix, suffix in [
           ('FullWidth', '[]', '[]'),
           ('WithPrefix', '[ -9999, -9998, -9997 ]', '[]'),
@@ -18,7 +18,7 @@ for traversal, base_kind, mutable in itertools.product(
           ('WithPrefixAndSuffix', '[ -9999, -9998, -9997, -9996, -9995 ]', '[ -9994, -9993, -9992 ]')
         ]:
             Base = '%s%s%sCollection' % (base_kind, traversal, 'Mutable' if mutable else '')
-            testFilename = WrapperType + '_Of_' + Base + '_' + name + '.swift'
+            testFilename = Wrapper + '_Of_' + Base + '_' + name + '.swift'
             testFile = open(testFilename + '.gyb', 'w')
             testFile.write("""
 //// Automatically Generated From validation-test/stdlib/Inputs/GenerateSliceTests.py
@@ -64,7 +64,7 @@ runAllTests()
     traversal=traversal,
     base_kind=base_kind,
     mutable=mutable,
-    Wrapper=WrapperType,
+    Wrapper=Wrapper,
     name=name,
     prefix=prefix,
     suffix=suffix

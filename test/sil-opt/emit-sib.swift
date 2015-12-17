@@ -1,5 +1,3 @@
-// Started to fail after adding a `_debugRequire` in `UnsafeMutablePointer.initializeMemory`.
-// XFAIL: *
 // RUN: rm -rf %t && mkdir -p %t
 
 // RUN: %target-swiftc_driver -emit-sib %s -module-name test -assert-config Release -O -o %t/a-opt.sib

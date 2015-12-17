@@ -238,7 +238,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     let verbatim = false
 #endif
 
-    __bufferPointer._valuePointer.initialize(
+    __bufferPointer._valuePointer.initializeMemory(
       _ArrayBody(
         count: count,
         capacity: capacity,
