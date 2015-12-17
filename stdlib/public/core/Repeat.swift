@@ -31,9 +31,7 @@ public struct Repeat<Element> : CollectionType {
   
   /// Always zero, which is the index of the first element in a
   /// non-empty instance.
-  public var startIndex: Index {
-    return 0
-  }
+  public let startIndex: Index = 0
 
   /// Always equal to `count`, which is one greater than the index of
   /// the last element in a non-empty instance.
