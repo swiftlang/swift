@@ -27,6 +27,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/Timer.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/CodeCompletionTypeChecking.h"
@@ -511,13 +512,18 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
   // Make sure that name binding has been completed before doing any type
   // checking.
-  performNameBinding(SF, StartElem);
+  {
+    SharedTimer timer("Name binding");
+    performNameBinding(SF, StartElem);
+  }
 
   auto &Ctx = SF.getASTContext();
   {
     // NOTE: The type checker is scoped to be torn down before AST
     // verification.
     TypeChecker TC(Ctx);
+    SharedTimer timer("Type checking / Semantic analysis");
+
     auto &DefinedFunctions = TC.definedFunctions;
     if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
       TC.enableDebugTimeFunctionBodies();
@@ -609,16 +615,19 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   // Verify that we've checked types correctly.
   SF.ASTStage = SourceFile::TypeChecked;
 
-  // Verify the SourceFile.
-  verify(SF);
+  {
+    SharedTimer timer("AST verification");
+    // Verify the SourceFile.
+    verify(SF);
 
-  // Verify imported modules.
+    // Verify imported modules.
 #ifndef NDEBUG
-  if (SF.Kind != SourceFileKind::REPL &&
-      !Ctx.LangOpts.DebuggerSupport) {
-    Ctx.verifyAllLoadedModules();
-  }
+    if (SF.Kind != SourceFileKind::REPL &&
+        !Ctx.LangOpts.DebuggerSupport) {
+      Ctx.verifyAllLoadedModules();
+    }
 #endif
+  }
 }
 
 void swift::performWholeModuleTypeChecking(SourceFile &SF) {
