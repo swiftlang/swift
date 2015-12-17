@@ -95,8 +95,37 @@ extension String {
   }
 }
 #else
-// FIXME: Implement hasPrefix and hasSuffix without objc
-// rdar://problem/18878343
+
+extension String {
+  public func hasPrefix(prefix: String) -> Bool {
+    let count1 = characters.count
+    let count2 = prefix.characters.count
+
+    guard count1 + count2 > 0 else { return true }
+    guard count1 >= count2 else { return false }
+    guard count1 != count2 else { return self == prefix }
+
+    let range = Range<Index>(start: startIndex,
+      end: startIndex.advancedBy(count2))
+
+    return substringWithRange(range) == prefix
+  }
+
+  public func hasSuffix(suffix: String) -> Bool {
+    let count1 = characters.count
+    let count2 = suffix.characters.count
+
+    guard count1 + count2 > 0 else { return true }
+    guard count1 >= count2 else { return false }
+    guard count1 != count2 else { return self == suffix }
+
+    let range = Range<Index>(start: endIndex.advancedBy(-count2),
+      end: endIndex)
+
+      return substringWithRange(range) == suffix
+    }
+}
+
 #endif
 
 // Conversions to string from other types.
