@@ -1046,7 +1046,8 @@ def main():
     if args.test or args.verbose_test:
         import doctest
         if doctest.testmod(verbose=args.verbose_test).failed:
-            exit(1)
+            import sys
+            sys.exit(1)
         
     bindings = dict( x.split('=', 1) for x in args.defines )
     ast = parseTemplate(args.file.name, args.file.read())
