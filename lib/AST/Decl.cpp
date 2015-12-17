@@ -3371,7 +3371,10 @@ void SubscriptDecl::setIndices(Pattern *p) {
 }
 
 Type SubscriptDecl::getIndicesType() const {
-  return getType()->castTo<AnyFunctionType>()->getInput();
+  const auto type = getType();
+  if (type->is<ErrorType>())
+    return type;
+  return type->castTo<AnyFunctionType>()->getInput();
 }
 
 Type SubscriptDecl::getIndicesInterfaceType() const {

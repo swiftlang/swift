@@ -2987,6 +2987,9 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
     if (TupleTy->getNumElements() == 1 && !TupleTy->getElement(0).isVararg())
       IndicesType = TupleTy->getElementType(0);
   }
+  
+  if (IndicesType->is<ErrorType>())
+    return false;
 
   bool IndicesResult = isRepresentableInObjC(SD->getDeclContext(), IndicesType);
   bool ElementResult = isRepresentableInObjC(SD->getDeclContext(),
