@@ -46,11 +46,7 @@ public func find<
 /// Returns the lesser of `x` and `y`.
 @warn_unused_result
 public func min<T : Comparable>(x: T, _ y: T) -> T {
-  var r = x
-  if y < x {
-    r = y
-  }
-  return r
+  return y < x ? y : x
 }
 
 /// Returns the least argument passed.
