@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Emulates the frontend of an -embed-bitcode job. That means we have to handle
 # -emit-bc and -c actions.
