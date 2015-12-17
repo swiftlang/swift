@@ -336,7 +336,7 @@ void SILPassManager::runOneIteration() {
   // module transforms. We'll queue up all the function transforms
   // that we see in a row and then run the entire group of transforms
   // on each function in turn. Then we move on to running the next set
-  // of consequtive module transforms.
+  // of consecutive module transforms.
   auto It = Transformations.begin();
   auto End = Transformations.end();
 
