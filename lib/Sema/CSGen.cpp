@@ -152,22 +152,34 @@ namespace {
       
       if (isa<IntegerLiteralExpr>(expr)) {
         LTI.haveIntLiteral = true;
-        LTI.intLiteralTyvars.push_back(expr->getType()->
-                                              getAs<TypeVariableType>());
+        auto tyvar = expr->getType()->getAs<TypeVariableType>();
+
+        if (tyvar) {
+          LTI.intLiteralTyvars.push_back(tyvar);
+        }
+        
         return { false, expr };
       }
       
       if (isa<FloatLiteralExpr>(expr)) {
         LTI.haveFloatLiteral = true;
-        LTI.floatLiteralTyvars.push_back(expr->getType()->
-                                                getAs<TypeVariableType>());
+        auto tyvar = expr->getType()->getAs<TypeVariableType>();
+
+        if (tyvar) {
+          LTI.floatLiteralTyvars.push_back(tyvar);
+        }
+
         return { false, expr };
       }
       
       if (isa<StringLiteralExpr>(expr)) {
         LTI.haveStringLiteral = true;
-        LTI.stringLiteralTyvars.push_back(expr->getType()->
-                                                getAs<TypeVariableType>());
+        auto tyvar = expr->getType()->getAs<TypeVariableType>();
+
+        if (tyvar)  {
+          LTI.stringLiteralTyvars.push_back(tyvar);
+        }
+
         return { false, expr };
       }
       
@@ -220,6 +232,35 @@ namespace {
         //make further connections amongst the arguments.
         return { false, expr };
       }
+
+      // TODO: The systems that we need to solve for interpolated string expressions
+      // require bestoke logic that don't currently work with this approach.
+      if (isa<InterpolatedStringLiteralExpr>(expr)) {
+        return { false, expr };
+      }
+
+      // For exprs of a structural type that are not modeling argument lists,
+      // avoid merging the type variables. (We need to allow for cases like
+      // (Int, Int32).)
+      if (isa<TupleExpr>(expr) && !isa<ApplyExpr>(Parent.getAsExpr())) {
+        return { false, expr };
+      }
+
+      // Coercion exprs have a rigid type, so there's no use in gathering info
+      // about them.
+      if (isa<CoerceExpr>(expr)) {
+        LTI.collectedTypes.insert(expr->getType().getPointer());
+
+        return { false, expr };
+      }
+
+      // Don't walk into subscript expressions - to do so would risk factoring
+      // the index expression into edge contraction. (We don't want to do this
+      // if the index expression is a literal type that differs from the return
+      // type of the subscript operation.)
+      if (isa<SubscriptExpr>(expr) || isa<DynamicLookupExpr>(expr)) {
+        return { false, expr };
+      }
       
       return { true, expr };
     }
@@ -262,13 +303,17 @@ namespace {
         if (acp1->getDecl()->getName().str() ==
               acp2->getDecl()->getName().str()) {
 
-          auto rep1 = CS.getRepresentative(acp1->getType()->
-                        getAs<TypeVariableType>());
-          auto rep2 = CS.getRepresentative(acp2->getType()->
-                        getAs<TypeVariableType>());
+          auto tyvar1 = acp1->getType()->getAs<TypeVariableType>();
+          auto tyvar2 = acp2->getType()->getAs<TypeVariableType>();
 
-          if (rep1 != rep2)
-            CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
+          if (tyvar1 && tyvar2) {
+            auto rep1 = CS.getRepresentative(tyvar1);
+            auto rep2 = CS.getRepresentative(tyvar2);
+
+            if (rep1 != rep2) {
+              CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
+            }
+          }
         }
       }
     }    
