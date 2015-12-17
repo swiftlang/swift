@@ -420,6 +420,9 @@ public:
     Valid
   } CurrentCacheState = CacheState::Invalid;
 
+  /// Whether we should suppress the import of the given Clang declaration.
+  static bool shouldSuppressDeclImport(const clang::Decl *decl);
+
   /// \brief Check if the declaration is one of the specially handled
   /// accessibility APIs.
   ///
