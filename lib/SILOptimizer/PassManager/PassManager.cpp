@@ -53,7 +53,8 @@ llvm::cl::opt<std::string>
 
 llvm::cl::opt<std::string>
     SILPrintOnlyFuns("sil-print-only-functions", llvm::cl::init(""),
-                    llvm::cl::desc("Only print out the sil for the functions whose name contains this substring"));
+                     llvm::cl::desc("Only print out the sil for the functions "
+                                    "whose name contains this substring"));
 
 llvm::cl::list<std::string>
     SILPrintBefore("sil-print-before",
@@ -480,8 +481,9 @@ namespace {
       SmallVector<Edge, 8> Children;
     };
 
-    struct child_iterator : public std::iterator<std::random_access_iterator_tag,
-    Node *, ptrdiff_t> {
+    struct child_iterator
+        : public std::iterator<std::random_access_iterator_tag, Node *,
+                               ptrdiff_t> {
       SmallVectorImpl<Edge>::iterator baseIter;
 
       child_iterator(SmallVectorImpl<Edge>::iterator baseIter) :
@@ -489,7 +491,11 @@ namespace {
       { }
 
       child_iterator &operator++() { baseIter++; return *this; }
-      child_iterator operator++(int) { auto tmp = *this; baseIter++; return tmp; }
+      child_iterator operator++(int) {
+        auto tmp = *this;
+        baseIter++;
+        return tmp;
+      }
       Node *operator*() const { return baseIter->Child; }
       bool operator==(const child_iterator &RHS) const {
         return baseIter == RHS.baseIter;
