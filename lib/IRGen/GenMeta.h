@@ -76,7 +76,7 @@ namespace irgen {
   /// Emit a reference to a compile-time constant piece of type metadata, or
   /// return a null pointer if the type's metadata cannot be represented by a
   /// constant.
-  llvm::Constant *tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
+  llvm::Constant *tryEmitConstantTypeMetadataRef(IRGenModule &IGM,
                                                  CanType type);
 
   enum class MetadataValueType { ObjCClass, TypeMetadata };
