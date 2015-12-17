@@ -2454,15 +2454,17 @@ auto ClangImporter::Implementation::importFullName(
   };
 
   // Omit needless words.
+  clang::ASTContext &clangCtx = clangSema.Context;
   StringScratchSpace omitNeedlessWordsScratch;
   if (OmitNeedlessWords) {
     // Objective-C properties.
     if (auto objcProperty = dyn_cast<clang::ObjCPropertyDecl>(D)) {
       auto contextType = getClangDeclContextType(D->getDeclContext());
       if (!contextType.isNull()) {
-        auto contextTypeName = getClangTypeNameForOmission(contextType);
+        auto contextTypeName = getClangTypeNameForOmission(clangCtx,
+                                                           contextType);
         auto propertyTypeName = getClangTypeNameForOmission(
-                                  objcProperty->getType());
+                                  clangCtx, objcProperty->getType());
         // Find the property names.
         const InheritedNameSet *allPropertyNames = nullptr;
         if (!contextType.isNull()) {
@@ -2483,7 +2485,7 @@ auto ClangImporter::Implementation::importFullName(
     // Objective-C methods.
     if (auto method = dyn_cast<clang::ObjCMethodDecl>(D)) {
       (void)omitNeedlessWordsInFunctionName(
-        clangSema.getPreprocessor(),
+        clangSema,
         baseName,
         argumentNames,
         params,
@@ -4432,7 +4434,9 @@ llvm::hash_code ClangImporter::Implementation::hashExtension(
                   llvm::hash_code code) const {
   return llvm::hash_combine(code, StringRef("swift.lookup"),
                             SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
-                            SWIFT_LOOKUP_TABLE_VERSION_MINOR);
+                            SWIFT_LOOKUP_TABLE_VERSION_MINOR,
+                            OmitNeedlessWords,
+                            InferDefaultArguments);
 }
 
 std::unique_ptr<clang::ModuleFileExtensionWriter>
@@ -4601,7 +4605,7 @@ void ClangImporter::Implementation::lookupObjCMembers(
   auto &clangPP = getClangPreprocessor();
   auto baseName = name.getBaseName().str();
 
-  for (auto clangDecl : table.lookupObjCMembers(name.getBaseName().str())) {
+  for (auto clangDecl : table.lookupObjCMembers(baseName)) {
     // If the entry is not visible, skip it.
     if (!isVisibleClangEntry(clangPP, baseName, clangDecl)) continue;
 

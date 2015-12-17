@@ -75,6 +75,11 @@
 // CHECK-NEXT:   subscript:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass objectAtIndexedSubscript:]
 
+// CHECK-OMIT-NEEDLESS-WORDS: <<ObjectiveC lookup table>>
+// CHECK-OMIT-NEEDLESS-WORDS-NOT: lookup table
+// CHECK-OMIT-NEEDLESS-WORDS: respondsTo:
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT:     -[NSObject respondsToSelector:]
+
 // CHECK-OMIT-NEEDLESS-WORDS: Base name -> entry mappings:
 // CHECK-OMIT-NEEDLESS-WORDS:   methodWith:
 // CHECK-OMIT-NEEDLESS-WORDS:     NSErrorImports: -[NSErrorImports methodWithFloat:error:]

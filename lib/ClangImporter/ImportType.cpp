@@ -30,6 +30,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
+#include "clang/Lex/Preprocessor.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
@@ -1553,11 +1554,9 @@ static bool isObjCCollectionName(StringRef typeName) {
 /// Retrieve the name of the given Clang type for use when omitting
 /// needless words.
 OmissionTypeName ClangImporter::Implementation::getClangTypeNameForOmission(
-                   clang::QualType type) {
+                   clang::ASTContext &ctx, clang::QualType type) {
   if (type.isNull())
     return OmissionTypeName();
-
-  auto &ctx = getClangASTContext();
 
   // Dig through the type, looking for a typedef-name and stripping
   // references along the way.
@@ -1653,7 +1652,8 @@ OmissionTypeName ClangImporter::Implementation::getClangTypeNameForOmission(
         return OmissionTypeName(className, None, "Object");
 
       return OmissionTypeName(className, None,
-                              getClangTypeNameForOmission(typeArgs[0]).Name);
+                              getClangTypeNameForOmission(ctx,
+                                                          typeArgs[0]).Name);
     }
 
     // Objective-C "id" type.
@@ -1705,7 +1705,7 @@ OmissionTypeName ClangImporter::Implementation::getClangTypeNameForOmission(
 
 /// Attempt to omit needless words from the given function name.
 bool ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
-       clang::Preprocessor &pp,
+       clang::Sema &clangSema,
        StringRef &baseName,
        SmallVectorImpl<StringRef> &argumentNames,
        ArrayRef<const clang::ParmVarDecl *> params,
@@ -1717,6 +1717,8 @@ bool ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
        bool returnsSelf,
        bool isInstanceMethod,
        StringScratchSpace &scratch) {
+  clang::ASTContext &clangCtx = clangSema.Context;
+
   // Collect the parameter type names.
   StringRef firstParamName;
   SmallVector<OmissionTypeName, 4> paramTypes;
@@ -1740,7 +1742,7 @@ bool ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
     // parameter.
     bool hasDefaultArg
       = canInferDefaultArgument(
-          pp,
+          clangSema.PP,
           param->getType(),
           getParamOptionality(param,
                               !nonNullArgs.empty() && nonNullArgs[i],
@@ -1751,7 +1753,7 @@ bool ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
           SwiftContext.getIdentifier(baseName), numParams,
           isLastParameter);
 
-    paramTypes.push_back(getClangTypeNameForOmission(param->getType())
+    paramTypes.push_back(getClangTypeNameForOmission(clangCtx, param->getType())
                             .withDefaultArgument(hasDefaultArg));
   }
 
@@ -1767,8 +1769,8 @@ bool ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
 
   // Omit needless words.
   return omitNeedlessWords(baseName, argumentNames, firstParamName,
-                           getClangTypeNameForOmission(resultType),
-                           getClangTypeNameForOmission(contextType),
+                           getClangTypeNameForOmission(clangCtx, resultType),
+                           getClangTypeNameForOmission(clangCtx, contextType),
                            paramTypes, returnsSelf, /*isProperty=*/false,
                            allPropertyNames, scratch);
 }
