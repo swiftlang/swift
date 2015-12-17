@@ -609,8 +609,8 @@ internal func _copyCollectionToNativeArrayBuffer<
   for _ in 0..<count {
     // FIXME(performance): use _initializeTo().
     p.initialize(source[i])
-    i = i.successor()
-    p = p.successor()
+    i._successorInPlace()
+    p._successorInPlace()
   }
   _expectEnd(i, source)
   return result

@@ -216,7 +216,7 @@ extension ForwardIndexType {
     var p = self
     var i : Distance = 0
     while i != n {
-      p = p.successor()
+      p._successorInPlace()
       i = i + 1
     }
     return p
@@ -232,7 +232,7 @@ extension ForwardIndexType {
     var i : Distance = 0
     while i != n {
       if p == limit { break }
-      p = p.successor()
+      p._successorInPlace()
       i = i + 1
     }
     return p
@@ -254,7 +254,7 @@ extension ForwardIndexType {
     var count: Distance = 0
     while p != end {
       count += 1
-      p = p.successor()
+      p._successorInPlace()
     }
     return count
   }

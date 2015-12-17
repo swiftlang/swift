@@ -728,8 +728,8 @@ internal func _writeBackMutableSlice<
     newElementIndex != newElementsEndIndex {
 
     self_[selfElementIndex] = slice[newElementIndex]
-    selfElementIndex = selfElementIndex.successor()
-    newElementIndex = newElementIndex.successor()
+    selfElementIndex._successorInPlace()
+    newElementIndex._successorInPlace()
   }
 
   _precondition(
