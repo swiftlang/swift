@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Timer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
@@ -136,6 +137,7 @@ bool swift::parseIntoSourceFile(SourceFile &SF,
                                 SILParserState *SIL,
                                 PersistentParserState *PersistentState,
                                 DelayedParsingCallbacks *DelayedParseCB) {
+  SharedTimer timer("Parsing");
   Parser P(BufferID, SF, SIL, PersistentState);
   PrettyStackTraceParser StackTrace(P);
 
@@ -153,6 +155,7 @@ bool swift::parseIntoSourceFile(SourceFile &SF,
 void swift::performDelayedParsing(
     DeclContext *DC, PersistentParserState &PersistentState,
     CodeCompletionCallbacksFactory *CodeCompletionFactory) {
+  SharedTimer timer("Parsing");
   ParseDelayedFunctionBodies Walker(PersistentState,
                                     CodeCompletionFactory);
   DC->walkContext(Walker);

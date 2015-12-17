@@ -702,40 +702,22 @@ void ClangImporter::Implementation::addEntryToLookupTable(
        clang::NamedDecl *named)
 {
   // Determine whether this declaration is suppressed in Swift.
-  bool suppressDecl = false;
-  if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(named)) {
-    // If this member is a method that is a getter or setter for a
-    // property, don't add it into the table. property names and
-    // getter names (by choosing to only have a property).
-    //
-    // Note that this is suppressed for certain accessibility declarations,
-    // which are imported as getter/setter pairs and not properties.
-    if (objcMethod->isPropertyAccessor() && !isAccessibilityDecl(objcMethod)) {
-      suppressDecl = true;
-    }
-  } else if (auto objcProperty = dyn_cast<clang::ObjCPropertyDecl>(named)) {
-    // Suppress certain accessibility properties; they're imported as
-    // getter/setter pairs instead.
-    if (isAccessibilityDecl(objcProperty))
-      suppressDecl = true;
-  }
+  if (shouldSuppressDeclImport(named)) return;
 
-  if (!suppressDecl) {
-    // If we have a name to import as, add this entry to the table.
-    clang::DeclContext *effectiveContext;
-    if (auto importedName = importFullName(named, None, &effectiveContext,
-                                           &clangSema)) {
-      table.addEntry(importedName.Imported, named, effectiveContext);
+  // If we have a name to import as, add this entry to the table.
+  clang::DeclContext *effectiveContext;
+  if (auto importedName = importFullName(named, None, &effectiveContext,
+                                         &clangSema)) {
+    table.addEntry(importedName.Imported, named, effectiveContext);
 
-      // Also add the alias, if needed.
-      if (importedName.Alias)
-        table.addEntry(importedName.Alias, named, effectiveContext);
+    // Also add the alias, if needed.
+    if (importedName.Alias)
+      table.addEntry(importedName.Alias, named, effectiveContext);
 
-      // Also add the subscript entry, if needed.
-      if (importedName.IsSubscriptAccessor)
-        table.addEntry(DeclName(SwiftContext, SwiftContext.Id_subscript, { }),
-                       named, effectiveContext);
-    }
+    // Also add the subscript entry, if needed.
+    if (importedName.IsSubscriptAccessor)
+      table.addEntry(DeclName(SwiftContext, SwiftContext.Id_subscript, { }),
+                     named, effectiveContext);
   }
 
   // Walk the members of any context that can have nested members.
@@ -2472,15 +2454,17 @@ auto ClangImporter::Implementation::importFullName(
   };
 
   // Omit needless words.
+  clang::ASTContext &clangCtx = clangSema.Context;
   StringScratchSpace omitNeedlessWordsScratch;
   if (OmitNeedlessWords) {
     // Objective-C properties.
     if (auto objcProperty = dyn_cast<clang::ObjCPropertyDecl>(D)) {
       auto contextType = getClangDeclContextType(D->getDeclContext());
       if (!contextType.isNull()) {
-        auto contextTypeName = getClangTypeNameForOmission(contextType);
+        auto contextTypeName = getClangTypeNameForOmission(clangCtx,
+                                                           contextType);
         auto propertyTypeName = getClangTypeNameForOmission(
-                                  objcProperty->getType());
+                                  clangCtx, objcProperty->getType());
         // Find the property names.
         const InheritedNameSet *allPropertyNames = nullptr;
         if (!contextType.isNull()) {
@@ -2501,7 +2485,7 @@ auto ClangImporter::Implementation::importFullName(
     // Objective-C methods.
     if (auto method = dyn_cast<clang::ObjCMethodDecl>(D)) {
       (void)omitNeedlessWordsInFunctionName(
-        clangSema.getPreprocessor(),
+        clangSema,
         baseName,
         argumentNames,
         params,
@@ -3011,6 +2995,27 @@ isAccessibilityConformingContext(const clang::DeclContext *ctx) {
   }
   return false;
   
+}
+
+bool ClangImporter::Implementation::shouldSuppressDeclImport(
+       const clang::Decl *decl) {
+  if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(decl)) {
+    // If this member is a method that is a getter or setter for a
+    // property, don't add it into the table. property names and
+    // getter names (by choosing to only have a property).
+    //
+    // Note that this is suppressed for certain accessibility declarations,
+    // which are imported as getter/setter pairs and not properties.
+    return objcMethod->isPropertyAccessor() && !isAccessibilityDecl(objcMethod);
+  }
+
+  if (auto objcProperty = dyn_cast<clang::ObjCPropertyDecl>(decl)) {
+    // Suppress certain accessibility properties; they're imported as
+    // getter/setter pairs instead.
+    return isAccessibilityDecl(objcProperty);
+  }
+
+  return false;
 }
 
 bool
@@ -4429,7 +4434,9 @@ llvm::hash_code ClangImporter::Implementation::hashExtension(
                   llvm::hash_code code) const {
   return llvm::hash_combine(code, StringRef("swift.lookup"),
                             SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
-                            SWIFT_LOOKUP_TABLE_VERSION_MINOR);
+                            SWIFT_LOOKUP_TABLE_VERSION_MINOR,
+                            OmitNeedlessWords,
+                            InferDefaultArguments);
 }
 
 std::unique_ptr<clang::ModuleFileExtensionWriter>
@@ -4464,12 +4471,11 @@ ClangImporter::Implementation::createExtensionReader(
   clang::serialization::ModuleFile &mod,
   const llvm::BitstreamCursor &stream)
 {
-  // Make sure we have a compatible block.
+  // Make sure we have a compatible block. Since these values are part
+  // of the hash, it should never be wrong.
   assert(metadata.BlockName == "swift.lookup");
-  if (metadata.MajorVersion != SWIFT_LOOKUP_TABLE_VERSION_MAJOR ||
-      metadata.MinorVersion != SWIFT_LOOKUP_TABLE_VERSION_MINOR ||
-      metadata.UserInfo != version::getSwiftFullVersion())
-    return nullptr;
+  assert(metadata.MajorVersion == SWIFT_LOOKUP_TABLE_VERSION_MAJOR);
+  assert(metadata.MinorVersion == SWIFT_LOOKUP_TABLE_VERSION_MINOR);
 
   // Check whether we already have an entry in the set of lookup tables.
   auto &entry = LookupTables[mod.ModuleName];
@@ -4599,7 +4605,7 @@ void ClangImporter::Implementation::lookupObjCMembers(
   auto &clangPP = getClangPreprocessor();
   auto baseName = name.getBaseName().str();
 
-  for (auto clangDecl : table.lookupObjCMembers(name.getBaseName().str())) {
+  for (auto clangDecl : table.lookupObjCMembers(baseName)) {
     // If the entry is not visible, skip it.
     if (!isVisibleClangEntry(clangPP, baseName, clangDecl)) continue;
 
