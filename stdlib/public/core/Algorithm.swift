@@ -52,17 +52,9 @@ public func min<T : Comparable>(x: T, _ y: T) -> T {
 /// Returns the least argument passed.
 @warn_unused_result
 public func min<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
-  var r = x
-  if y < x {
-    r = y
-  }
-  if z < r {
-    r = z
-  }
-  for t in rest {
-    if t < r {
-      r = t
-    }
+  var r = min(min(x, y), z)
+  for t in rest where t < r {
+    r = t
   }
   return r
 }
