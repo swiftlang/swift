@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # A script for viewing the CFG of SIL and llvm IR.
 
