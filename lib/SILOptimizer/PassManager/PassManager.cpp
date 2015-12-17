@@ -167,9 +167,77 @@ bool SILPassManager::continueTransforming() {
          NumPassesRun < SILNumOptPassesToRun;
 }
 
-void SILPassManager::runFunctionPasses(PassList FuncTransforms) {
+void SILPassManager::runPassesOnFunction(PassList FuncTransforms,
+                                         SILFunction *F) {
+
   const SILOptions &Options = getOptions();
 
+  CompletedPasses &completedPasses = CompletedPassesMap[F];
+
+  for (auto SFT : FuncTransforms) {
+    PrettyStackTraceSILFunctionTransform X(SFT);
+    SFT->injectPassManager(this);
+    SFT->injectFunction(F);
+
+    // If nothing changed since the last run of this pass, we can skip this
+    // pass.
+    if (completedPasses.test((size_t)SFT->getPassKind()))
+      continue;
+
+    if (isDisabled(SFT))
+      continue;
+
+    currentPassHasInvalidated = false;
+
+    if (SILPrintPassName)
+      llvm::dbgs() << "#" << NumPassesRun << " Stage: " << StageName
+                   << " Pass: " << SFT->getName()
+                   << ", Function: " << F->getName() << "\n";
+
+    if (doPrintBefore(SFT, F)) {
+      llvm::dbgs() << "*** SIL function before " << StageName << " "
+                   << SFT->getName() << " (" << NumOptimizationIterations
+                   << ") ***\n";
+      F->dump(Options.EmitVerboseSIL);
+    }
+
+    llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
+    Mod->registerDeleteNotificationHandler(SFT);
+    SFT->run();
+    Mod->removeDeleteNotificationHandler(SFT);
+
+    if (SILPrintPassTime) {
+      auto Delta =
+          llvm::sys::TimeValue::now().nanoseconds() - StartTime.nanoseconds();
+      llvm::dbgs() << Delta << " (" << SFT->getName() << "," << F->getName()
+                   << ")\n";
+    }
+
+    // If this pass invalidated anything, print and verify.
+    if (doPrintAfter(SFT, F, currentPassHasInvalidated && SILPrintAll)) {
+      llvm::dbgs() << "*** SIL function after " << StageName << " "
+                   << SFT->getName() << " (" << NumOptimizationIterations
+                   << ") ***\n";
+      F->dump(Options.EmitVerboseSIL);
+    }
+
+    // Remember if this pass didn't change anything.
+    if (!currentPassHasInvalidated)
+      completedPasses.set((size_t)SFT->getPassKind());
+
+    if (Options.VerifyAll &&
+        (currentPassHasInvalidated || SILVerifyWithoutInvalidation)) {
+      F->verify();
+      verifyAnalyses(F);
+    }
+
+    ++NumPassesRun;
+    if (!continueTransforming())
+      return;
+  }
+}
+
+void SILPassManager::runFunctionPasses(PassList FuncTransforms) {
   BasicCalleeAnalysis *BCA = getAnalysis<BasicCalleeAnalysis>();
   BottomUpFunctionOrder BottomUpOrder(*Mod, BCA);
   auto BottomUpFunctions = BottomUpOrder.getFunctions();
@@ -187,75 +255,13 @@ void SILPassManager::runFunctionPasses(PassList FuncTransforms) {
       FunctionWorklist.push_back(*I);
   }
 
+  // Pop functions off the worklist, and run all function transforms
+  // on each of them.
   while (!FunctionWorklist.empty()) {
     auto *F = FunctionWorklist.back();
 
-    CompletedPasses &completedPasses = CompletedPassesMap[F];
+    runPassesOnFunction(FuncTransforms, F);
 
-    for (auto SFT : FuncTransforms) {
-      PrettyStackTraceSILFunctionTransform X(SFT);
-      SFT->injectPassManager(this);
-      SFT->injectFunction(F);
-
-      // If nothing changed since the last run of this pass, we can skip this
-      // pass.
-      if (completedPasses.test((size_t)SFT->getPassKind()))
-        continue;
-
-      if (isDisabled(SFT))
-        continue;
-
-      currentPassHasInvalidated = false;
-
-      if (SILPrintPassName)
-        llvm::dbgs() << "#" << NumPassesRun << " Stage: " << StageName
-                     << " Pass: " << SFT->getName()
-                     << ", Function: " << F->getName() << "\n";
-
-      if (doPrintBefore(SFT, F)) {
-        llvm::dbgs() << "*** SIL function before " << StageName << " "
-                     << SFT->getName() << " (" << NumOptimizationIterations
-                     << ") ***\n";
-        F->dump(Options.EmitVerboseSIL);
-      }
-
-      llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
-      Mod->registerDeleteNotificationHandler(SFT);
-      SFT->run();
-      Mod->removeDeleteNotificationHandler(SFT);
-
-      if (SILPrintPassTime) {
-        auto Delta = llvm::sys::TimeValue::now().nanoseconds() -
-          StartTime.nanoseconds();
-        llvm::dbgs() << Delta << " (" << SFT->getName() << "," << F->getName()
-                     << ")\n";
-      }
-
-      // If this pass invalidated anything, print and verify.
-      if (doPrintAfter(SFT, F,
-                       currentPassHasInvalidated && SILPrintAll)) {
-        llvm::dbgs() << "*** SIL function after " << StageName << " "
-                     << SFT->getName() << " (" << NumOptimizationIterations
-                     << ") ***\n";
-        F->dump(Options.EmitVerboseSIL);
-      }
-
-      // Remember if this pass didn't change anything.
-      if (!currentPassHasInvalidated)
-        completedPasses.set((size_t)SFT->getPassKind());
-
-      if (Options.VerifyAll &&
-          (currentPassHasInvalidated || SILVerifyWithoutInvalidation)) {
-        F->verify();
-        verifyAnalyses(F);
-      }
-
-      ++NumPassesRun;
-      if (!continueTransforming())
-        return;
-    }
-
-    // Pop the function we just processed off the work list.
     FunctionWorklist.pop_back();
   }
 }

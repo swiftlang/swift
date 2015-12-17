@@ -165,6 +165,9 @@ private:
   /// the module.
   void runModulePass(SILModuleTransform *SMT);
 
+  /// Run the passes in \p FuncTransforms on the function \p F.
+  void runPassesOnFunction(PassList FuncTransforms, SILFunction *F);
+
   /// Run the passes in \p FuncTransforms. Return true
   /// if the pass manager requested to stop the execution
   /// of the optimization cycle (this is a debug feature).
