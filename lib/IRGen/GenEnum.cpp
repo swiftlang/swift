@@ -1539,20 +1539,13 @@ namespace {
       std::tie(payloadTag, extraTag) = getNoPayloadCaseValue(Case);
 
       auto &ti = getFixedPayloadTypeInfo();
-      
+      bool hasExtraInhabitants = ti.getFixedExtraInhabitantCount(IGF.IGM) > 0;
+
       llvm::Value *payloadResult = nullptr;
-      // We can omit the payload check if this is the only case represented with
-      // the particular extra tag bit pattern set.
-      //
-      // TODO: This logic covers the most common case, when there's exactly one
-      // more no-payload case than extra inhabitants in the payload. This could
-      // be slightly generalized to cases where there's multiple tag bits and
-      // exactly one no-payload case in the highest used tag value.
-      if (!tagBits ||
-        ElementsWithNoPayload.size() != getFixedExtraInhabitantCount(IGF.IGM)+1)
-          payloadResult = payload.emitCompare(IGF,
+      if (hasExtraInhabitants)
+        payloadResult = payload.emitCompare(IGF,
                                         ti.getFixedExtraInhabitantMask(IGF.IGM),
-                                        payloadTag);
+                                            payloadTag);
 
       // If any tag bits are present, they must match.
       llvm::Value *tagResult = nullptr;
