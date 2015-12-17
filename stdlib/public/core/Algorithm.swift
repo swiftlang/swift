@@ -52,11 +52,11 @@ public func min<T : Comparable>(x: T, _ y: T) -> T {
 /// Returns the least argument passed.
 @warn_unused_result
 public func min<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
-  var r = min(min(x, y), z)
-  for t in rest where t < r {
-    r = t
+  var minValue = min(min(x, y), z)
+  for value in rest where value < minValue {
+    minValue = value
   }
-  return r
+  return minValue
 }
 
 /// Returns the greater of `x` and `y`.
@@ -68,11 +68,11 @@ public func max<T : Comparable>(x: T, _ y: T) -> T {
 /// Returns the greatest argument passed.
 @warn_unused_result
 public func max<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
-  var r = max(max(x, y), z)
-  for t in rest where t >= r {
-    r = t
+  var maxValue = max(max(x, y), z)
+  for value in rest where value >= maxValue {
+    maxValue = value
   }
-  return r
+  return maxValue
 }
 
 /// Returns the result of slicing `elements` into sub-sequences that
