@@ -607,30 +607,23 @@ static bool isRightBound(const char *tokEnd, bool isLeftBound) {
 /// lexOperatorIdentifier - Match identifiers formed out of punctuation.
 void Lexer::lexOperatorIdentifier() {
   const char *TokStart = CurPtr-1;
+  CurPtr = TokStart;
+  bool didStart = advanceIfValidStartOfOperator(CurPtr, BufferEnd);
+  assert(didStart && "unexpected operator start");
+  (void) didStart;
+  
+  do {
+    if (CurPtr != BufferEnd && InSILBody &&
+        (*CurPtr == '!' || *CurPtr == '?'))
+      // When parsing SIL body, '!' and '?' are special token and can't be
+      // in the middle of an operator.
+      break;
 
-  // We only allow '.' in a series.
-  if (*TokStart == '.') {
-    while (*CurPtr == '.')
-      ++CurPtr;
-    
-    // Lex ..< as an identifier.
-    if (*CurPtr == '<' && CurPtr-TokStart == 2)
-      ++CurPtr;
-    
-  } else {
-    CurPtr = TokStart;
-    bool didStart = advanceIfValidStartOfOperator(CurPtr, BufferEnd);
-    assert(didStart && "unexpected operator start");
-    (void) didStart;
-    
-    do {
-      if (CurPtr != BufferEnd && InSILBody &&
-          (*CurPtr == '!' || *CurPtr == '?'))
-        // When parsing SIL body, '!' and '?' are special token and can't be
-        // in the middle of an operator.
-        break;
-    } while (advanceIfValidContinuationOfOperator(CurPtr, BufferEnd));
-  }
+    // '.' cannot appear in the middle of an operator unless the operator
+    // started with a '.'.
+    if (*CurPtr == '.' && *TokStart != '.')
+      break;
+  } while (advanceIfValidContinuationOfOperator(CurPtr, BufferEnd));
 
   // Decide between the binary, prefix, and postfix cases.
   // It's binary if either both sides are bound or both sides are not bound.

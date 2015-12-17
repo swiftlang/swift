@@ -193,4 +193,6 @@ _ = ~!n  // expected-error {{unary operators may not be juxtaposed; parenthesize
 _ = -+n  // expected-error {{unary operators may not be juxtaposed; parenthesize inner expression}}
 _ = -++n // expected-error {{unary operators may not be juxtaposed; parenthesize inner expression}}
 
+// <rdar://problem/16230507> Cannot use a negative constant as the second operator of ... operator
+_ = 3...-5  // expected-error {{missing whitespace between '...' and '-' operators}}
 
