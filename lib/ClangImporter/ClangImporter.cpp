@@ -702,40 +702,22 @@ void ClangImporter::Implementation::addEntryToLookupTable(
        clang::NamedDecl *named)
 {
   // Determine whether this declaration is suppressed in Swift.
-  bool suppressDecl = false;
-  if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(named)) {
-    // If this member is a method that is a getter or setter for a
-    // property, don't add it into the table. property names and
-    // getter names (by choosing to only have a property).
-    //
-    // Note that this is suppressed for certain accessibility declarations,
-    // which are imported as getter/setter pairs and not properties.
-    if (objcMethod->isPropertyAccessor() && !isAccessibilityDecl(objcMethod)) {
-      suppressDecl = true;
-    }
-  } else if (auto objcProperty = dyn_cast<clang::ObjCPropertyDecl>(named)) {
-    // Suppress certain accessibility properties; they're imported as
-    // getter/setter pairs instead.
-    if (isAccessibilityDecl(objcProperty))
-      suppressDecl = true;
-  }
+  if (shouldSuppressDeclImport(named)) return;
 
-  if (!suppressDecl) {
-    // If we have a name to import as, add this entry to the table.
-    clang::DeclContext *effectiveContext;
-    if (auto importedName = importFullName(named, None, &effectiveContext,
-                                           &clangSema)) {
-      table.addEntry(importedName.Imported, named, effectiveContext);
+  // If we have a name to import as, add this entry to the table.
+  clang::DeclContext *effectiveContext;
+  if (auto importedName = importFullName(named, None, &effectiveContext,
+                                         &clangSema)) {
+    table.addEntry(importedName.Imported, named, effectiveContext);
 
-      // Also add the alias, if needed.
-      if (importedName.Alias)
-        table.addEntry(importedName.Alias, named, effectiveContext);
+    // Also add the alias, if needed.
+    if (importedName.Alias)
+      table.addEntry(importedName.Alias, named, effectiveContext);
 
-      // Also add the subscript entry, if needed.
-      if (importedName.IsSubscriptAccessor)
-        table.addEntry(DeclName(SwiftContext, SwiftContext.Id_subscript, { }),
-                       named, effectiveContext);
-    }
+    // Also add the subscript entry, if needed.
+    if (importedName.IsSubscriptAccessor)
+      table.addEntry(DeclName(SwiftContext, SwiftContext.Id_subscript, { }),
+                     named, effectiveContext);
   }
 
   // Walk the members of any context that can have nested members.
@@ -3011,6 +2993,27 @@ isAccessibilityConformingContext(const clang::DeclContext *ctx) {
   }
   return false;
   
+}
+
+bool ClangImporter::Implementation::shouldSuppressDeclImport(
+       const clang::Decl *decl) {
+  if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(decl)) {
+    // If this member is a method that is a getter or setter for a
+    // property, don't add it into the table. property names and
+    // getter names (by choosing to only have a property).
+    //
+    // Note that this is suppressed for certain accessibility declarations,
+    // which are imported as getter/setter pairs and not properties.
+    return objcMethod->isPropertyAccessor() && !isAccessibilityDecl(objcMethod);
+  }
+
+  if (auto objcProperty = dyn_cast<clang::ObjCPropertyDecl>(decl)) {
+    // Suppress certain accessibility properties; they're imported as
+    // getter/setter pairs instead.
+    return isAccessibilityDecl(objcProperty);
+  }
+
+  return false;
 }
 
 bool
