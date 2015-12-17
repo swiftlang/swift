@@ -225,7 +225,8 @@ bb3:
 
 // Ensure that we can specialize and properly mangle functions that take closures with @box arguments.
 
-// CHECK-LABEL: sil shared [noinline] @_TTSf1n_cl25closure_with_box_argumentHBi32____TF4main5innerFTRVs5Int32FS0_T__T_ : $@convention(thin) (@inout Builtin.Int32, @owned @box Builtin.Int32) -> ()
+
+// CHECK-LABEL: sil shared [noinline] @_TTSf1n_cl25closure_with_box_argumentXHBi32____TF4main5innerFTRVs5Int32FS0_T__T_ : $@convention(thin) (@inout Builtin.Int32, @owned @box Builtin.Int32) -> ()
 // CHECK: bb0
 // CHECK: [[FN:%.*]] = function_ref @closure_with_box_argument
 // CHECK: [[PARTIAL:%.*]] = partial_apply [[FN]](%1)

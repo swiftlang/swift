@@ -1883,13 +1883,15 @@ private:
       type_application->addChild(type_list);
       return type_application;
     }
-    if (c == 'H') {
-      NodePointer type = demangleType();
-      if (!type)
-        return nullptr;
-      NodePointer boxType = NodeFactory::create(Node::Kind::SILBoxType);
-      boxType->addChild(type);
-      return boxType;
+    if (c == 'X') {
+      if (Mangled.nextIf('H')) {
+        NodePointer type = demangleType();
+        if (!type)
+          return nullptr;
+        NodePointer boxType = NodeFactory::create(Node::Kind::SILBoxType);
+        boxType->addChild(type);
+        return boxType;
+      }
     }
     if (c == 'K') {
       return demangleFunctionType(Node::Kind::AutoClosureType);

@@ -1161,7 +1161,7 @@ void Remangler::mangleErrorType(Node *node) {
 }
 
 void Remangler::mangleSILBoxType(Node *node) {
-  Out << 'H';
+  Out << 'X' << 'H';
   mangleSingleChildNode(node);
 }
 
