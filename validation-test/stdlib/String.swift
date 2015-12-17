@@ -384,6 +384,27 @@ func checkHasPrefixHasSuffix(
   let expectHasSuffix = lhs.characters.lazy.reverse().startsWith(
     rhs.characters.lazy.reverse(), isEquivalent: (==))
 
+#if _runtime(_ObjC)
+  // To determine the expected results, compare grapheme clusters,
+  // scalar-to-scalar, of the NFD form of the strings.
+  let lhsNFDGraphemeClusters =
+    lhs.decomposedStringWithCanonicalMapping.characters.map {
+      Array(String($0).unicodeScalars)
+  }
+  let rhsNFDGraphemeClusters =
+    rhs.decomposedStringWithCanonicalMapping.characters.map {
+      Array(String($0).unicodeScalars)
+  }
+
+  let expectHasPrefixNFD = lhsNFDGraphemeClusters.startsWith(
+    rhsNFDGraphemeClusters, isEquivalent: (==))
+  let expectHasSuffixNFD = lhsNFDGraphemeClusters.lazy.reverse().startsWith(
+    rhsNFDGraphemeClusters.lazy.reverse(), isEquivalent: (==))
+
+  expectEqual(expectHasPrefixNFD, expectHasPrefix)
+  expectEqual(expectHasSuffixNFD, expectHasSuffix)
+#endif
+
   expectEqual(expectHasPrefix, lhs.hasPrefix(rhs), stackTrace: stackTrace)
   expectEqual(expectHasSuffix, lhs.hasSuffix(rhs), stackTrace: stackTrace)
 }
