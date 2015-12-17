@@ -755,11 +755,12 @@ public:
 
   /// Retrieve the type name of a Clang type for the purposes of
   /// omitting unneeded words.
-  OmissionTypeName getClangTypeNameForOmission(clang::QualType type);
+  OmissionTypeName getClangTypeNameForOmission(clang::ASTContext &ctx,
+                                               clang::QualType type);
 
   /// Omit needless words in a function name.
   bool omitNeedlessWordsInFunctionName(
-         clang::Preprocessor &pp,
+         clang::Sema &clangSema,
          StringRef &baseName,
          SmallVectorImpl<StringRef> &argumentNames,
          ArrayRef<const clang::ParmVarDecl *> params,
