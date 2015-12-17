@@ -23,6 +23,79 @@
 using namespace swift;
 using namespace irgen;
 
+/// Is metadata for the given type kind a "leaf", or does it possibly
+/// store any other type metadata that we can statically extract?
+///
+/// It's okay to conservatively answer "no".  It's more important for this
+/// to be quick than for it to be accurate; don't recurse.
+static bool isLeafTypeMetadata(CanType type) {
+  switch (type->getKind()) {
+#define SUGARED_TYPE(ID, SUPER) \
+  case TypeKind::ID:
+#define UNCHECKED_TYPE(ID, SUPER) \
+  case TypeKind::ID:
+#define TYPE(ID, SUPER)
+#include "swift/AST/TypeNodes.def"
+    llvm_unreachable("kind is invalid for a canonical type");
+
+#define ARTIFICIAL_TYPE(ID, SUPER) \
+  case TypeKind::ID:
+#define TYPE(ID, SUPER)
+#include "swift/AST/TypeNodes.def"
+  case TypeKind::LValue:
+  case TypeKind::InOut:
+  case TypeKind::DynamicSelf:
+    llvm_unreachable("these types do not have metadata");
+
+  // All the builtin types are leaves.
+#define BUILTIN_TYPE(ID, SUPER) \
+  case TypeKind::ID:
+#define TYPE(ID, SUPER)
+#include "swift/AST/TypeNodes.def"
+  case TypeKind::Module:
+    return true;
+
+  // Type parameters are statically opaque.
+  case TypeKind::Archetype:
+  case TypeKind::GenericTypeParam:
+  case TypeKind::DependentMember:
+    return true;
+
+  // Only the empty tuple is a leaf.
+  case TypeKind::Tuple:
+    return cast<TupleType>(type)->getNumElements() == 0;
+
+  // Nominal types might have parents.
+  case TypeKind::Class:
+  case TypeKind::Enum:
+  case TypeKind::Protocol:
+  case TypeKind::Struct:
+    return !cast<NominalType>(type)->getParent();
+
+  // Bound generic types have type arguments.
+  case TypeKind::BoundGenericClass:
+  case TypeKind::BoundGenericEnum:
+  case TypeKind::BoundGenericStruct:
+    return false;
+
+  // Functions have component types.
+  case TypeKind::Function:
+  case TypeKind::PolymorphicFunction:
+  case TypeKind::GenericFunction:  // included for future-proofing
+    return false;
+
+  // Protocol compositions have component types.
+  case TypeKind::ProtocolComposition:
+    return false;
+
+  // Metatypes have instance types.
+  case TypeKind::Metatype:
+  case TypeKind::ExistentialMetatype:
+    return false;
+  }
+  llvm_unreachable("bad type kind");
+}
+
 /// Given that we have a source for metadata of the given type, check
 /// to see if it fulfills anything.
 ///
@@ -31,11 +104,21 @@ using namespace irgen;
 bool FulfillmentMap::searchTypeMetadata(ModuleDecl &M, CanType type,
                                         IsExact_t isExact,
                                         unsigned source, MetadataPath &&path,
-                                        const InterestingKeysCallback *keys) {
+                                        const InterestingKeysCallback &keys) {
 
-  // Type parameters.  Inexact metadata are useless here.
-  if (isExact && type->isTypeParameter()) {
-    return addFulfillment({type, nullptr}, source, std::move(path));
+  // If this is an exact source, and it's an interesting type, add this
+  // as a fulfillment.
+  if (isExact && keys.isInterestingType(type)) {
+    // If the type isn't a leaf type, also check it as an inexact match.
+    bool hadFulfillment = false;
+    if (!isLeafTypeMetadata(type)) {
+      hadFulfillment |= searchTypeMetadata(M, type, IsInexact, source,
+                                           MetadataPath(path), keys);
+    }
+
+    // Add the fulfillment.
+    hadFulfillment |= addFulfillment({type, nullptr}, source, std::move(path));
+    return hadFulfillment;
   }
 
   // Inexact metadata will be a problem if we ever try to use this
@@ -58,7 +141,7 @@ bool FulfillmentMap::searchTypeMetadata(ModuleDecl &M, CanType type,
 bool FulfillmentMap::searchParentTypeMetadata(ModuleDecl &M, CanType parent,
                                               unsigned source,
                                               MetadataPath &&path,
-                                        const InterestingKeysCallback *keys) {
+                                        const InterestingKeysCallback &keys) {
   // We might not have a parent type.
   if (!parent) return false;
 
@@ -71,7 +154,7 @@ bool FulfillmentMap::searchNominalTypeMetadata(ModuleDecl &M,
                                                CanNominalType type,
                                                unsigned source,
                                                MetadataPath &&path,
-                                         const InterestingKeysCallback *keys) {
+                                         const InterestingKeysCallback &keys) {
   // Nominal types add no generic arguments themselves, but they
   // may have the arguments of their parents.
   return searchParentTypeMetadata(M, type.getParent(),
@@ -82,7 +165,7 @@ bool FulfillmentMap::searchBoundGenericTypeMetadata(ModuleDecl &M,
                                                     CanBoundGenericType type,
                                                     unsigned source,
                                                     MetadataPath &&path,
-                                         const InterestingKeysCallback *keys) {
+                                         const InterestingKeysCallback &keys) {
   auto params = type->getDecl()->getGenericParams()->getAllArchetypes();
   auto substitutions = type->getSubstitutions(&M, nullptr);
   assert(params.size() >= substitutions.size() &&
@@ -94,11 +177,12 @@ bool FulfillmentMap::searchBoundGenericTypeMetadata(ModuleDecl &M,
     auto sub = substitutions[i];
     CanType arg = sub.getReplacement()->getCanonicalType();
 
-    if (keys && !keys->isInterestingType(arg))
+    // Skip uninteresting type arguments.
+    if (!keys.hasInterestingType(arg))
       continue;
 
     // If the argument is a type parameter, fulfill conformances for it.
-    if (arg->isTypeParameter()) {
+    if (keys.isInterestingType(arg)) {
       hadFulfillment |=
         searchTypeArgConformances(M, arg, params[i], source, path, i, keys);
     }
@@ -122,7 +206,7 @@ bool FulfillmentMap::searchTypeArgConformances(ModuleDecl &M, CanType arg,
                                                unsigned source,
                                                const MetadataPath &path,
                                                unsigned argIndex,
-                                         const InterestingKeysCallback *keys) {
+                                         const InterestingKeysCallback &keys) {
   // Our sources are the protocol conformances that are recorded in
   // the generic metadata.
   auto storedConformances = param->getConformsTo();
@@ -130,10 +214,9 @@ bool FulfillmentMap::searchTypeArgConformances(ModuleDecl &M, CanType arg,
 
   bool hadFulfillment = false;
 
-  // If we don't have an interesting-keys callback, add fulfillments
+  // If we're not limiting the interesting conformances, just add fulfillments
   // for all of the stored conformances.
-  if (!keys) {
-    // Check each of the stored conformances.
+  if (!keys.hasLimitedInterestingConformances(arg)) {
     for (size_t confIndex : indices(storedConformances)) {
       MetadataPath confPath = path;
       confPath.addNominalTypeArgumentConformanceComponent(argIndex,
@@ -148,7 +231,7 @@ bool FulfillmentMap::searchTypeArgConformances(ModuleDecl &M, CanType arg,
 
   // Otherwise, our targets are the interesting conformances for the type
   // argument.
-  auto requiredConformances = keys->getInterestingConformances(arg);
+  auto requiredConformances = keys.getInterestingConformances(arg);
   if (requiredConformances.empty()) return false;
 
   for (auto target : requiredConformances) {

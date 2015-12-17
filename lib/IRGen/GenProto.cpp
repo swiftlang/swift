@@ -2288,16 +2288,21 @@ namespace {
         Callback(PolymorphicConvention &self) : Self(self) {}
 
         bool isInterestingType(CanType type) const override {
-          return FulfillmentMap::isInterestingTypeForFulfillments(type);
+          return type->isTypeParameter();
         }
-
+        bool hasInterestingType(CanType type) const override {
+          return type->hasTypeParameter();
+        }
+        bool hasLimitedInterestingConformances(CanType type) const override {
+          return true;
+        }
         GenericSignature::ConformsToArray
         getInterestingConformances(CanType type) const override {
           return Self.getConformsTo(type);
         }
       } callbacks(*this);
       return Fulfillments.searchTypeMetadata(M, type, isExact, sourceIndex,
-                                             std::move(path), &callbacks);
+                                             std::move(path), callbacks);
     }
 
     /// Testify to generic parameters in the Self type.

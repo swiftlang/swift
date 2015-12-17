@@ -51,9 +51,23 @@ public:
   enum IsExact_t : bool { IsInexact = false, IsExact = true };
 
   struct InterestingKeysCallback {
+    /// Is the given type something that we should add fulfillments for?
     virtual bool isInterestingType(CanType type) const = 0;
+
+    /// Is the given type expressed in terms of types that we should add
+    /// fulfillments for?
+    ///
+    /// It's okay to conservatively return true here.
+    virtual bool hasInterestingType(CanType type) const = 0;
+
+    /// Are we only interested in a subset of the conformances for a
+    /// given type?
+    virtual bool hasLimitedInterestingConformances(CanType type) const = 0;
+
+    /// Return the limited interesting conformances for an interesting type.
     virtual GenericSignature::ConformsToArray
       getInterestingConformances(CanType type) const = 0;
+
     virtual ~InterestingKeysCallback() = default;
   };
 
@@ -72,7 +86,7 @@ public:
   /// \return true if any fulfillments were added by this search.
   bool searchTypeMetadata(ModuleDecl &M, CanType type, IsExact_t isExact,
                           unsigned sourceIndex, MetadataPath &&path,
-                    const InterestingKeysCallback *interestingKeys = nullptr);
+                          const InterestingKeysCallback &interestingKeys);
 
   /// Register a fulfillment for the given key.
   ///
@@ -101,21 +115,21 @@ public:
 private:
   bool searchParentTypeMetadata(ModuleDecl &M, CanType parent,
                                 unsigned source, MetadataPath &&path,
-                          const InterestingKeysCallback *interestingKeys);
+                                const InterestingKeysCallback &keys);
 
   bool searchNominalTypeMetadata(ModuleDecl &M, CanNominalType type,
                                  unsigned source, MetadataPath &&path,
-                          const InterestingKeysCallback *interestingKeys);
+                                 const InterestingKeysCallback &keys);
 
   bool searchBoundGenericTypeMetadata(ModuleDecl &M, CanBoundGenericType type,
                                       unsigned source, MetadataPath &&path,
-                                const InterestingKeysCallback *interestingKeys);
+                                      const InterestingKeysCallback &keys);
 
   bool searchTypeArgConformances(ModuleDecl &M, CanType arg,
                                  ArchetypeType *param,
                                  unsigned source, const MetadataPath &path,
                                  unsigned argIndex,
-                           const InterestingKeysCallback *interestingKeys);
+                                 const InterestingKeysCallback &keys);
 };
 
 }
