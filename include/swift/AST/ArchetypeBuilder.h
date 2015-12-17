@@ -251,6 +251,14 @@ public:
   bool addGenericSignature(GenericSignature *sig, bool adoptArchetypes,
                            bool treatRequirementsAsExplicit = false);
 
+  /// \brief Get a generic signature based on the provided complete list
+  /// of generic parameter types.
+  ///
+  /// \returns a generic signature build based on the provided list of
+  ///          generic parameter types.
+  GenericSignature *
+  getGenericSignature(ArrayRef<GenericTypeParamType *> genericParamsTypes);
+
   /// Infer requirements from the given type, recursively.
   ///
   /// This routine infers requirements from a type that occurs within the
