@@ -4510,11 +4510,41 @@ SwiftLookupTable *ClangImporter::Implementation::findLookupTable(
   return known->second.get();
 }
 
+/// Determine whether the given Clang entry is visible.
+///
+/// FIXME: this is an elaborate hack to badly reflect Clang's
+/// submodule visibility into Swift.
+static bool isVisibleClangEntry(clang::Preprocessor &pp,
+                                StringRef name,
+                                SwiftLookupTable::SingleEntry entry) {
+  if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {
+    // For a declaration, check whether the declaration is hidden.
+    if (!clangDecl->isHidden()) return true;
+
+    // Is any redeclaration visible?
+    for (auto redecl : clangDecl->redecls()) {
+      if (!cast<clang::NamedDecl>(redecl)->isHidden()) return true;
+    }
+
+    return false;
+  }
+
+  // Check whether the macro is defined.
+  // FIXME: We could get the wrong macro definition here.
+  return pp.isMacroDefined(name);
+}
+
 void ClangImporter::Implementation::lookupValue(
        SwiftLookupTable &table, DeclName name,
        VisibleDeclConsumer &consumer) {
   auto clangTU = getClangASTContext().getTranslationUnitDecl();
+  auto &clangPP = getClangPreprocessor();
+  auto baseName = name.getBaseName().str();
+
   for (auto entry : table.lookup(name.getBaseName().str(), clangTU)) {
+    // If the entry is not visible, skip it.
+    if (!isVisibleClangEntry(clangPP, baseName, entry)) continue;
+
     ValueDecl *decl;
 
     // If it's a Clang declaration, try to import it.
@@ -4559,7 +4589,13 @@ void ClangImporter::Implementation::lookupObjCMembers(
        SwiftLookupTable &table,
        DeclName name,
        VisibleDeclConsumer &consumer) {
+  auto &clangPP = getClangPreprocessor();
+  auto baseName = name.getBaseName().str();
+
   for (auto clangDecl : table.lookupObjCMembers(name.getBaseName().str())) {
+    // If the entry is not visible, skip it.
+    if (!isVisibleClangEntry(clangPP, baseName, clangDecl)) continue;
+
     // Import the declaration.
     auto decl = cast_or_null<ValueDecl>(importDeclReal(clangDecl));
     if (!decl)
