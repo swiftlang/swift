@@ -284,7 +284,9 @@ std::string swift::ide::removeCodeCompletionTokens(
     if (C == '#' && Ptr <= End - 2 && Ptr[1] == '^') {
       do {
         Ptr++;
-      } while(*Ptr != '#');
+      } while (Ptr < End && *Ptr != '#');
+      if (Ptr == End)
+        break;
       continue;
     }
     CleanFile += C;
