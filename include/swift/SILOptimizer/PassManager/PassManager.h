@@ -17,6 +17,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
+#include <vector>
 
 #ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_PASSMANAGER_H
 #define SWIFT_SILOPTIMIZER_PASSMANAGER_PASSMANAGER_H
@@ -40,6 +41,9 @@ class SILPassManager {
 
   /// A list of registered analysis.
   llvm::SmallVector<SILAnalysis *, 16> Analysis;
+
+  /// The worklist of functions to be processed by function passes.
+  std::vector<SILFunction *> FunctionWorklist;
 
   // Name of the current optimization stage for diagnostics.
   std::string StageName;

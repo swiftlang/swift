@@ -173,8 +173,9 @@ void SILPassManager::runFunctionPasses(PassList FuncTransforms) {
   BottomUpFunctionOrder BottomUpOrder(*Mod, BCA);
   auto BottomUpFunctions = BottomUpOrder.getFunctions();
 
-  // Build an initial work list of functions to optimize.
-  llvm::SmallVector<SILFunction *, 32> WorkList;
+  assert(FunctionWorklist.empty() && "Expected empty function worklist!");
+
+  FunctionWorklist.reserve(BottomUpFunctions.size());
   for (auto I = BottomUpFunctions.rbegin(), E = BottomUpFunctions.rend();
        I != E; ++I) {
     auto &F = **I;
@@ -182,11 +183,11 @@ void SILPassManager::runFunctionPasses(PassList FuncTransforms) {
     // Only include functions that are definitions, and which have not
     // been intentionally excluded from optimization.
     if (F.isDefinition() && F.shouldOptimize())
-      WorkList.push_back(*I);
+      FunctionWorklist.push_back(*I);
   }
 
-  while (!WorkList.empty()) {
-    auto *F = WorkList.back();
+  while (!FunctionWorklist.empty()) {
+    auto *F = FunctionWorklist.back();
 
     CompletedPasses &completedPasses = CompletedPassesMap[F];
 
@@ -254,7 +255,7 @@ void SILPassManager::runFunctionPasses(PassList FuncTransforms) {
     }
 
     // Pop the function we just processed off the work list.
-    WorkList.pop_back();
+    FunctionWorklist.pop_back();
   }
 }
 
