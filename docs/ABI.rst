@@ -1176,12 +1176,12 @@ for the first time. The first argument type will mangle in long form,
 ``CC3zim4zang4zung``, and in doing so, ``zim`` will acquire substitution ``S_``,
 ``zim.zang`` will acquire substitution ``S0_``, and ``zim.zang.zung`` will
 acquire ``S1_``. The second argument is the same as the first and will mangle
-using its substitution, ``CS1_``. The
+using its substitution, ``S1_``. The
 third argument type will mangle using the substitution for ``zim``,
 ``CS_7zippity``. (It also acquires substitution ``S2_`` which would be used
 if it mangled again.) The result type will mangle using the substitution for
 ``zim.zang``, ``CS0_3zoo`` (and acquire substitution ``S3_``). The full
-function type thus mangles as ``fTCC3zim4zang4zungCS1_CS_7zippity_CS0_3zoo``.
+function type thus mangles as ``fTCC3zim4zang4zungS1_CS_7zippity_CS0_3zoo``.
 
 ::
 
