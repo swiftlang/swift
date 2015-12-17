@@ -4464,12 +4464,11 @@ ClangImporter::Implementation::createExtensionReader(
   clang::serialization::ModuleFile &mod,
   const llvm::BitstreamCursor &stream)
 {
-  // Make sure we have a compatible block.
+  // Make sure we have a compatible block. Since these values are part
+  // of the hash, it should never be wrong.
   assert(metadata.BlockName == "swift.lookup");
-  if (metadata.MajorVersion != SWIFT_LOOKUP_TABLE_VERSION_MAJOR ||
-      metadata.MinorVersion != SWIFT_LOOKUP_TABLE_VERSION_MINOR ||
-      metadata.UserInfo != version::getSwiftFullVersion())
-    return nullptr;
+  assert(metadata.MajorVersion == SWIFT_LOOKUP_TABLE_VERSION_MAJOR);
+  assert(metadata.MinorVersion == SWIFT_LOOKUP_TABLE_VERSION_MINOR);
 
   // Check whether we already have an entry in the set of lookup tables.
   auto &entry = LookupTables[mod.ModuleName];
