@@ -93,11 +93,19 @@ STATISTIC(NumDeadStores, "Number of dead stores removed");
 STATISTIC(NumPartialDeadStores, "Number of partial dead stores removed");
 
 /// Are we building the gen/kill sets or actually performing the DSE.
-enum class DSEComputeKind { BuildGenKillSet, PerformDSE };
+enum class DSEComputeKind : unsigned {
+  ComputeMaxStoreSet=0,
+  BuildGenKillSet=1,
+  PerformDSE=2, 
+};
 
 //===----------------------------------------------------------------------===//
 //                             Utility Functions
 //===----------------------------------------------------------------------===//
+
+static inline bool isComputeMaxStoreSet(DSEComputeKind Kind) {
+  return Kind == DSEComputeKind::ComputeMaxStoreSet;
+}
 
 static inline bool isBuildingGenKillSet(DSEComputeKind Kind) {
   return Kind == DSEComputeKind::BuildGenKillSet;
@@ -179,6 +187,12 @@ public:
   /// kills an upward visible store.
   llvm::BitVector BBKillSet;
 
+  /// A bit vector to keep the maximum number of stores that can reach the
+  /// beginning of the basic block. If a bit is set, that means there is 
+  /// potentially a upward visible store to the location at the beginning
+  /// of the basic block.
+  llvm::BitVector BBMaxStoreSet;
+
   /// The dead stores in the current basic block.
   llvm::DenseSet<SILInstruction *> DeadStores;
 
@@ -214,6 +228,9 @@ public:
     // GenSet and KillSet initially empty.
     BBGenSet.resize(LSLocationNum, false);
     BBKillSet.resize(LSLocationNum, false);
+
+    // MaxStoreSet is optimistically set to true initially.
+    BBMaxStoreSet.resize(LSLocationNum, true);
   }
 
   /// Check whether the WriteSetIn has changed. If it does, we need to rerun
@@ -315,6 +332,11 @@ class DSEContext {
     return getBlockState(I->getParent());
   }
 
+  /// LSLocation written has been extracted, expanded and mapped to the bit
+  /// position in the bitvector. update the gen kill set using the bit
+  /// position.
+  void updateMaxStoreSetForWrite(BlockState *S, unsigned bit);
+
   /// LSLocation read has been extracted, expanded and mapped to the bit
   /// position in the bitvector. update the gen kill set using the bit
   /// position.
@@ -400,6 +422,9 @@ public:
   /// Compute the genset and killset for the current basic block.
   void processBasicBlockForGenKillSet(SILBasicBlock *BB);
 
+  /// Compute the genset and killset for the current basic block.
+  void processBasicBlockForMaxStoreSet(SILBasicBlock *BB);
+
   /// Compute the WriteSetOut and WriteSetIn for the current basic
   /// block with the generated gen and kill set.
   bool processBasicBlockWithGenKillSet(SILBasicBlock *BB);
@@ -432,6 +457,29 @@ unsigned DSEContext::getLSLocationBit(const LSLocation &Loc) {
 void DSEContext::processBasicBlockForGenKillSet(SILBasicBlock *BB) {
   for (auto I = BB->rbegin(), E = BB->rend(); I != E; ++I) {
     processInstruction(&(*I), DSEComputeKind::BuildGenKillSet);
+  }
+}
+
+void DSEContext::processBasicBlockForMaxStoreSet(SILBasicBlock *BB) {
+  // Compute the MaxStoreSet at the end of the basic block.
+  auto *BBState = getBlockState(BB);
+  if (BB->succ_empty()) {
+    BBState->BBMaxStoreSet.reset();
+  } else {
+    auto Iter = BB->succ_begin();
+    BBState->BBMaxStoreSet = getBlockState(*Iter)->BBMaxStoreSet;
+    Iter = std::next(Iter);
+    for (auto EndIter = BB->succ_end(); Iter != EndIter; ++Iter) {
+      BBState->BBMaxStoreSet &= getBlockState(*Iter)->BBMaxStoreSet;
+    }
+  }
+
+  // Compute the MaxStoreSet at the beginning of the basic block.
+  for (auto I = BB->rbegin(), E = BB->rend(); I != E; ++I) {
+    // Only process store insts.
+    if (!isa<StoreInst>(*I))
+      continue;
+    processInstruction(&(*I), DSEComputeKind::ComputeMaxStoreSet);
   }
 }
 
@@ -526,8 +574,6 @@ void DSEContext::updateWriteSetForRead(BlockState *S, unsigned bit) {
     LSLocation &L = LSLocationVault[i];
     if (!L.isMayAliasLSLocation(R, AA))
       continue;
-    DEBUG(llvm::dbgs() << "Loc Removal: " << LSLocationVault[i].getBase()
-                       << "\n");
     S->stopTrackingLSLocation(i);
   }
 }
@@ -540,6 +586,11 @@ void DSEContext::updateGenKillSetForRead(BlockState *S, unsigned bit) {
   // alias analysis to determine whether 2 LSLocations are disjointed.
   LSLocation &R = LSLocationVault[bit];
   for (unsigned i = 0; i < S->LSLocationNum; ++i) {
+    // If BBMaxStoreSet is not turned on, then there is no reason to turn
+    // on the kill set nor the gen set for this store for this basic block.
+    // as there can NOT be a store that reaches the end of this basic block.
+    if (!S->BBMaxStoreSet.test(i))
+      continue;
     LSLocation &L = LSLocationVault[i];
     if (!L.isMayAliasLSLocation(R, AA))
       continue;
@@ -579,6 +630,10 @@ void DSEContext::updateGenKillSetForWrite(BlockState *S, unsigned bit) {
   S->BBGenSet.set(bit);
 }
 
+void DSEContext::updateMaxStoreSetForWrite(BlockState *S, unsigned bit) {
+  S->BBMaxStoreSet.set(bit);
+}
+
 void DSEContext::processRead(SILInstruction *I, BlockState *S, SILValue Mem,
                              DSEComputeKind Kind) {
   // Construct a LSLocation to represent the memory read by this instruction.
@@ -611,6 +666,9 @@ void DSEContext::processRead(SILInstruction *I, BlockState *S, SILValue Mem,
            "LSLocation returns different type");
   }
 #endif
+
+  if (isComputeMaxStoreSet(Kind))
+    return;
 
   // Expand the given Mem into individual fields and process them as
   // separate reads.
@@ -653,21 +711,21 @@ void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
   if (!L.isValid())
     return;
 
-#ifndef NDEBUG
-  // Make sure that the LSLocation getType() returns the same type as the
-  // stored type.
-  if (auto *SI = dyn_cast<StoreInst>(I)) {
-    assert(SI->getDest().getType().getObjectType() == L.getType() &&
-           "LSLocation returns different type");
-  }
-#endif
-
   // Expand the given Mem into individual fields and process them as separate
   // writes.
   bool Dead = true;
   LSLocationList Locs;
   LSLocation::expand(L, Mod, Locs, TE);
   llvm::BitVector V(Locs.size());
+
+  if (isComputeMaxStoreSet(Kind)) {
+    for (auto &E : Locs) {
+      // Only building the gen and kill sets here.
+      updateMaxStoreSetForWrite(S, getLSLocationBit(E));
+    }
+    return;
+  }
+
   if (isBuildingGenKillSet(Kind)) {
     for (auto &E : Locs) {
       // Only building the gen and kill sets here.
@@ -776,6 +834,11 @@ void DSEContext::processUnknownReadMemInst(SILInstruction *I,
   // Update the gen kill set.
   if (isBuildingGenKillSet(Kind)) {
     for (unsigned i = 0; i < S->LSLocationNum; ++i) {
+      // If BBMaxStoreSet is not turned on, then there is no reason to turn
+      // on the kill set nor the gen set for this store for this basic block.
+      // as there can NOT be a store that reaches the end of this basic block.
+      if (!S->BBMaxStoreSet.test(i))
+        continue;
       if (!AA->mayReadFromMemory(I, LSLocationVault[i].getBase()))
         continue;
       S->BBKillSet.set(i);
@@ -843,6 +906,19 @@ bool DSEContext::run() {
     BBToLocState[S.getBB()] = &S;
   }
 
+  // Compute the max store set at the beginning of the basic block.
+  //
+  // This helps generating the genset and killset. If there is no way a
+  // location can have an upward store at a particular point in the basic block,
+  // we do not need to turn on the genset and killset for the location.
+  //
+  // Turning on the genset and killset can be costly as it involves querying
+  // the AA interface.
+  auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
+  for (SILBasicBlock *B : PO->getPostOrder()) {
+    processBasicBlockForMaxStoreSet(B);
+  }
+
   // Generate the genset and killset for each basic block.
   for (auto &B : *F) {
     processBasicBlockForGenKillSet(&B);
@@ -851,7 +927,6 @@ bool DSEContext::run() {
   // Process each basic block with the gen and kill set. Every time the
   // WriteSetIn of a basic block changes, the optimization is rerun on its
   // predecessors.
-  auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
   llvm::SmallVector<SILBasicBlock *, 16> WorkList;
   for (SILBasicBlock *B : PO->getPostOrder()) {
     WorkList.push_back(B);
