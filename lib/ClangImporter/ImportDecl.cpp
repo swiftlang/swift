@@ -3118,15 +3118,25 @@ namespace {
           continue;
 
         // Set function override.
-        // FIXME: Proper type checking here!
         if (auto func = dyn_cast<FuncDecl>(decl)) {
-          func->setOverriddenDecl(cast<FuncDecl>(member));
+          auto foundFunc = cast<FuncDecl>(member);
+
+          // Require a selector match.
+          if (func->getObjCSelector() != foundFunc->getObjCSelector())
+            continue;
+
+          func->setOverriddenDecl(foundFunc);
           return;
         }
 
         // Set constructor override.
         auto ctor = cast<ConstructorDecl>(decl);
         auto memberCtor = cast<ConstructorDecl>(member);
+
+        // Require a selector match.
+        if (ctor->getObjCSelector() != memberCtor->getObjCSelector())
+          continue;
+
         ctor->setOverriddenDecl(memberCtor);
 
         // Propagate 'required' to subclass initializers.
@@ -4928,8 +4938,13 @@ namespace {
             result->getFullName().getArgumentNames().empty())
           return nullptr;
 
-        if (auto var = dyn_cast<VarDecl>(result))
-          overridden = var;
+        if (auto var = dyn_cast<VarDecl>(result)) {
+          // If the selectors of the getter match in Objective-C, we have an
+          // override.
+          if (var->getObjCGetterSelector() ==
+                Impl.importSelector(decl->getGetterName()))
+            overridden = var;
+        }
       }
 
       if (overridden) {
