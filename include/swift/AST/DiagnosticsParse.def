@@ -1188,33 +1188,38 @@ ERROR(unsupported_build_config_binary_expression,none,
 ERROR(unsupported_build_config_unary_expression,none,
       "expected unary '!' expression", ())
 ERROR(unsupported_target_config_expression,none,
-      "unexpected target configuration expression (expected 'os' or 'arch')",())
+      "unexpected target configuration expression (expected 'os', 'arch', or 'swift')",
+      ())
+ERROR(target_config_expected_one_argument,none,
+      "expected only one argument to target configuration expression",
+      ())
 ERROR(unsupported_target_config_runtime_argument,none,
       "unexpected argument for the '_runtime' target configuration, "
       "expected '_Native' or '_ObjC'", ())
 ERROR(unsupported_target_config_argument,none,
-      "unexpected target configuration expression argument: expected %0",
+      "unexpected target configuration argument: expected %0",
       (StringRef))
+ERROR(unexpected_version_comparison_operator,none,
+      "expected '>=' prefix operator on a version requirement",
+      ())
 ERROR(unsupported_config_conditional_expression_type,none,
       "unexpected configuration expression type", ())
 ERROR(unsupported_config_integer,none,
       "'%0' is not a valid configuration option, use '%1'",
       (StringRef, StringRef))
-ERROR(compiler_version_component_not_number,none,
-      "compiler version component is not a number", ())
+ERROR(version_component_not_number,none,
+      "version component contains non-numeric characters", ())
 ERROR(compiler_version_too_many_components,none,
 			"compiler version must not have more than five components", ())
 WARNING(unused_compiler_version_component,none,
 			"the second version component is not used for comparison", ())
-ERROR(empty_compiler_version_component,none,
-			"found empty compiler version component", ())
+ERROR(empty_version_component,none,
+			"found empty version component", ())
 ERROR(compiler_version_component_out_of_range,none,
       "compiler version component out of range: must be in [0, %0]",
       (unsigned))
-ERROR(empty_compiler_version_string,none,
-      "compiler version requirement is empty", ())
-ERROR(cannot_combine_compiler_version,none,
-      "cannot combine _compiler_version with binary operators", ())
+ERROR(empty_version_string,none,
+      "version requirement is empty", ())
 WARNING(unknown_build_config,none,
       "unknown %0 for build configuration '%1'",
       (StringRef, StringRef))
