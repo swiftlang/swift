@@ -80,7 +80,21 @@ void EscapeAnalysis::ConnectionGraph::clear() {
 }
 
 EscapeAnalysis::CGNode *EscapeAnalysis::ConnectionGraph::
-getOrCreateNode(ValueBase *V) {
+getNode(ValueBase *V, EscapeAnalysis *EA, bool createIfNeeded) {
+  if (isa<FunctionRefInst>(V))
+    return nullptr;
+  
+  if (!V->hasValue())
+    return nullptr;
+  
+  if (!EA->isPointer(V))
+    return nullptr;
+  
+  V = skipProjections(V);
+
+  if (!createIfNeeded)
+    return lookupNode(V);
+  
   CGNode * &Node = Values2Nodes[V];
   if (!Node) {
     if (SILArgument *Arg = dyn_cast<SILArgument>(V)) {
@@ -296,7 +310,7 @@ void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
       /// In addition to releasing instructions (see below) we also add block
       /// arguments as use points. In case of loops, block arguments can
       /// "extend" the liferange of a reference in upward direction.
-      if (CGNode *ArgNode = getNodeOrNull(BBArg)) {
+      if (CGNode *ArgNode = lookupNode(BBArg)) {
         addUsePoint(ArgNode, BBArg);
       }
     }
@@ -314,7 +328,7 @@ void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
           int ValueIdx = -1;
           for (const Operand &Op : I.getAllOperands()) {
             ValueBase *OpV = Op.get().getDef();
-            if (CGNode *OpNd = getNodeOrNull(skipProjections(OpV))) {
+            if (CGNode *OpNd = lookupNode(skipProjections(OpV))) {
               if (ValueIdx < 0) {
                 ValueIdx = addUsePoint(OpNd, &I);
               } else {
@@ -438,22 +452,6 @@ bool EscapeAnalysis::ConnectionGraph::mergeFrom(ConnectionGraph *SourceGraph,
   return Changed;
 }
 
-EscapeAnalysis::CGNode *EscapeAnalysis::ConnectionGraph::
-getNode(ValueBase *V, EscapeAnalysis *EA) {
-  if (isa<FunctionRefInst>(V))
-    return nullptr;
-
-  if (!V->hasValue())
-    return nullptr;
-
-  if (!EA->isPointer(V))
-    return nullptr;
-
-  V = skipProjections(V);
-
-  return getOrCreateNode(V);
-}
-
 /// Returns true if \p V is a use of \p Node, i.e. V may (indirectly)
 /// somehow refer to the Node's value.
 /// Use-points are only values which are relevant for lifeness computation,
@@ -470,7 +468,7 @@ bool EscapeAnalysis::ConnectionGraph::isUsePoint(ValueBase *V, CGNode *Node) {
   return Node->UsePoints.test(Idx);
 }
 
-bool EscapeAnalysis::ConnectionGraph::canEscapeTo(CGNode *From, CGNode *To) {
+bool EscapeAnalysis::ConnectionGraph::isReachable(CGNode *From, CGNode *To) {
   // See if we can reach the From-node by transitively visiting the
   // predecessor nodes of the To-node.
   // Usually nodes have few predecessor nodes and the graph depth is small.
@@ -1121,6 +1119,9 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case ValueKind::AllocStackInst:
     case ValueKind::AllocRefInst:
     case ValueKind::AllocBoxInst:
+      ConGraph->getNode(I, this);
+      return;
+
     case ValueKind::DeallocStackInst:
     case ValueKind::StrongRetainInst:
     case ValueKind::StrongRetainUnownedInst:
@@ -1318,7 +1319,7 @@ void EscapeAnalysis::setAllEscaping(SILInstruction *I,
   for (const Operand &Op : I->getAllOperands()) {
     SILValue OpVal = Op.get();
     if (!isNonWritableMemoryAddress(OpVal.getDef()))
-      setEscapesGlobal(ConGraph, OpVal);
+      setEscapesGlobal(ConGraph, OpVal.getDef());
   }
   // Even if the instruction does not write memory it could e.g. return the
   // address of global memory. Therefore we have to define it as escaping.
@@ -1469,42 +1470,134 @@ bool EscapeAnalysis::mergeSummaryGraph(ConnectionGraph *SummaryGraph,
   return SummaryGraph->mergeFrom(Graph, Mapping);
 }
 
-
 bool EscapeAnalysis::canEscapeToUsePoint(SILValue V, ValueBase *UsePoint,
                                          ConnectionGraph *ConGraph) {
-  CGNode *Node = ConGraph->getNode(V, this);
+
+  assert((FullApplySite::isa(UsePoint) || isa<RefCountingInst>(UsePoint)) &&
+         "use points are only created for calls and refcount instructions");
+
+  CGNode *Node = ConGraph->getNodeOrNull(V, this);
   if (!Node)
-    return false;
+    return true;
 
   // First check if there are escape pathes which we don't explicitly see
   // in the graph.
-  switch (Node->getEscapeState()) {
-    case EscapeState::None:
-    case EscapeState::Return:
-      break;
-    case EscapeState::Arguments:
-      if (!isNotAliasingArgument(V))
-        return true;
-      break;
-    case EscapeState::Global:
-      return true;
-  }
+  if (Node->escapesInsideFunction(isNotAliasingArgument(V)))
+    return true;
+
   // No hidden escapes: check if the Node is reachable from the UsePoint.
   return ConGraph->isUsePoint(UsePoint, Node);
 }
 
-bool EscapeAnalysis::canPointToSameMemory(SILValue V1, SILValue V2,
-                                          ConnectionGraph *ConGraph) {
-  CGNode *Node1 = ConGraph->getNode(V1, this);
-  assert(Node1 && "value is not a pointer");
-  CGNode *Node2 = ConGraph->getNode(V2, this);
-  assert(Node2 && "value is not a pointer");
+bool EscapeAnalysis::canEscapeTo(SILValue V, FullApplySite FAS) {
+  // If it's not a local object we don't know anything about the value.
+  if (!pointsToLocalObject(V))
+    return true;
+  auto *ConGraph = getConnectionGraph(FAS.getFunction());
+  return canEscapeToUsePoint(V, FAS.getInstruction(), ConGraph);
+}
 
-  // If both nodes escape, the relation of the nodes may not be explicitly
-  // represented in the graph.
-  if (Node1->escapesInsideFunction() && Node2->escapesInsideFunction())
+bool EscapeAnalysis::canObjectOrContentEscapeTo(SILValue V, FullApplySite FAS) {
+  // If it's not a local object we don't know anything about the value.
+  if (!pointsToLocalObject(V))
     return true;
 
+  auto *ConGraph = getConnectionGraph(FAS.getFunction());
+  CGNode *Node = ConGraph->getNodeOrNull(V, this);
+  if (!Node)
+    return true;
+
+  // First check if there are escape pathes which we don't explicitly see
+  // in the graph.
+  if (Node->escapesInsideFunction(isNotAliasingArgument(V)))
+    return true;
+
+  // Check if the object itself can escape to the called function.
+  SILInstruction *UsePoint = FAS.getInstruction();
+  if (ConGraph->isUsePoint(UsePoint, Node))
+    return true;
+
+  if (V.getType().hasReferenceSemantics()) {
+    // Check if the object "content", i.e. a pointer to one of its stored
+    // properties, can escape to the called function.
+    CGNode *ContentNode = ConGraph->getContentNode(Node);
+    if (ContentNode->escapesInsideFunction(false))
+      return true;
+
+    if (ConGraph->isUsePoint(UsePoint, ContentNode))
+      return true;
+  }
+  return false;
+}
+
+bool EscapeAnalysis::canEscapeTo(SILValue V, RefCountingInst *RI) {
+  // If it's not a local object we don't know anything about the value.
+  if (!pointsToLocalObject(V))
+    return true;
+  auto *ConGraph = getConnectionGraph(RI->getFunction());
+  return canEscapeToUsePoint(V, RI, ConGraph);
+}
+
+/// Utility to get the function which contains both values \p V1 and \p V2.
+static SILFunction *getCommonFunction(SILValue V1, SILValue V2) {
+  SILBasicBlock *BB1 = V1->getParentBB();
+  SILBasicBlock *BB2 = V2->getParentBB();
+  if (!BB1 || !BB2)
+    return nullptr;
+
+  SILFunction *F = BB1->getParent();
+  assert(BB2->getParent() == F && "values not in same function");
+  return F;
+}
+
+bool EscapeAnalysis::canEscapeToValue(SILValue V, SILValue To) {
+  if (!pointsToLocalObject(V))
+    return true;
+
+  SILFunction *F = getCommonFunction(V, To);
+  if (!F)
+    return true;
+  auto *ConGraph = getConnectionGraph(F);
+
+  CGNode *Node = ConGraph->getNodeOrNull(V, this);
+  if (!Node)
+    return true;
+  CGNode *ToNode = ConGraph->getNodeOrNull(To, this);
+  if (!ToNode)
+    return true;
+  return ConGraph->isReachable(Node, ToNode);
+}
+
+bool EscapeAnalysis::canPointToSameMemory(SILValue V1, SILValue V2) {
+  // At least one of the values must be a non-escaping local object.
+  bool isLocal1 = pointsToLocalObject(V1);
+  bool isLocal2 = pointsToLocalObject(V2);
+  if (!isLocal1 && !isLocal2)
+    return true;
+
+  SILFunction *F = getCommonFunction(V1, V2);
+  if (!F)
+    return true;
+  auto *ConGraph = getConnectionGraph(F);
+
+  CGNode *Node1 = ConGraph->getNodeOrNull(V1, this);
+  if (!Node1)
+    return true;
+  CGNode *Node2 = ConGraph->getNodeOrNull(V2, this);
+  if (!Node2)
+    return true;
+
+  // Finish the check for one value being a non-escaping local object.
+  if (isLocal1 && Node1->escapesInsideFunction(isNotAliasingArgument(V1)))
+    isLocal1 = false;
+
+  if (isLocal2 && Node2->escapesInsideFunction(isNotAliasingArgument(V2)))
+    isLocal2 = false;
+
+  if (!isLocal1 && !isLocal2)
+    return true;
+
+  // Check if both nodes may point to the same content.
   CGNode *Content1 = ConGraph->getContentNode(Node1);
   CGNode *Content2 = ConGraph->getContentNode(Node2);
   return Content1 == Content2;

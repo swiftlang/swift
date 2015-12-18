@@ -286,8 +286,16 @@ private:
     /// the node's value.
     /// Note that in the false-case the node's value can still escape via
     /// the return instruction.
-    bool escapesInsideFunction() const {
-      return getEscapeState() > EscapeState::Return;
+    bool escapesInsideFunction(bool isNotAliasingArgument) const {
+      switch (getEscapeState()) {
+        case EscapeState::None:
+        case EscapeState::Return:
+          return false;
+        case EscapeState::Arguments:
+          return !isNotAliasingArgument;
+        case EscapeState::Global:
+          return true;
+      }
     }
   };
 
@@ -423,7 +431,12 @@ public:
     /// taken. This means the node is always created for the "outermost" value
     /// where V is contained.
     /// Returns null, if V is not a "pointer".
-    CGNode *getOrCreateNode(ValueBase *V);
+    CGNode *getNode(ValueBase *V, EscapeAnalysis *EA, bool createIfNeeded = true);
+
+    /// Gets or creates a node for a SILValue (same as above).
+   CGNode *getNode(SILValue V, EscapeAnalysis *EA) {
+      return getNode(V.getDef(), EA, true);
+    }
 
     /// Gets or creates a content node to which \a AddrNode points to.
     CGNode *getContentNode(CGNode *AddrNode);
@@ -444,7 +457,7 @@ public:
 
     /// Returns the node of the "exact" value \p V (no projections are skipped)
     /// if one exists.
-    CGNode *getNodeOrNull(ValueBase *V) {
+    CGNode *lookupNode(ValueBase *V) {
       CGNode *Node = Values2Nodes.lookup(V);
       if (Node)
         return Node->getMergeTarget();
@@ -502,6 +515,9 @@ public:
     /// lookup-up with getNode() anymore.
     void removeFromGraph(ValueBase *V) { Values2Nodes.erase(V); }
 
+    /// Returns true if there is a path from \p From to \p To.
+    bool isReachable(CGNode *From, CGNode *To);
+
   public:
 
     /// Gets or creates a node for a value \p V.
@@ -509,11 +525,13 @@ public:
     /// taken. This means the node is always created for the "outermost" value
     /// where V is contained.
     /// Returns null, if V is not a "pointer".
-    CGNode *getNode(ValueBase *V, EscapeAnalysis *EA);
+    CGNode *getNodeOrNull(ValueBase *V, EscapeAnalysis *EA) {
+      return getNode(V, EA, false);
+    }
 
     /// Gets or creates a node for a SILValue (same as above).
-    CGNode *getNode(SILValue V, EscapeAnalysis *EA) {
-      return getNode(V.getDef(), EA);
+    CGNode *getNodeOrNull(SILValue V, EscapeAnalysis *EA) {
+      return getNode(V.getDef(), EA, false);
     }
 
     /// Returns the number of use-points of a node.
@@ -528,9 +546,6 @@ public:
     /// Use-points are only values which are relevant for lifeness computation,
     /// e.g. release or apply instructions.
     bool isUsePoint(ValueBase *V, CGNode *Node);
-
-    /// Returns true if there is a path from \p From to \p To.
-    bool canEscapeTo(CGNode *From, CGNode *To);
 
     /// Computes the use point information.
     void computeUsePoints();
@@ -627,7 +642,7 @@ private:
   bool isPointer(ValueBase *V);
 
   /// If V is a pointer, set it to global escaping.
-  void setEscapesGlobal(ConnectionGraph *ConGraph, SILValue V) {
+  void setEscapesGlobal(ConnectionGraph *ConGraph, ValueBase *V) {
     if (CGNode *Node = ConGraph->getNode(V, this))
       ConGraph->setEscapesGlobal(Node);
   }
@@ -704,19 +719,30 @@ public:
 
   /// Returns true if the value \p V can escape to the function call \p FAS.
   /// This means that the called function may access the value \p V.
-  bool canEscapeTo(SILValue V, FullApplySite FAS, ConnectionGraph *ConGraph) {
-    return canEscapeToUsePoint(V, FAS.getInstruction(), ConGraph);
-  }
+  /// If \p V has reference semantics, this function returns false if only the
+  /// address of a contained property escapes, but not the object itself.
+  bool canEscapeTo(SILValue V, FullApplySite FAS);
+
+  /// Returns true if the value \p V or its content can escape to the
+  /// function call \p FAS.
+  /// This is the same as above, execpt that it returns true if an address of
+  /// a contained property escapes.
+  bool canObjectOrContentEscapeTo(SILValue V, FullApplySite FAS);
 
   /// Returns true if the value \p V can escape to the release-instruction \p
   /// RI. This means that \p RI may release \p V or any called destructor may
   /// access (or release) \p V.
   /// Note that if \p RI is a retain-instruction always false is returned.
-  bool canEscapeTo(SILValue V, RefCountingInst *RI, ConnectionGraph *ConGraph) {
-    return canEscapeToUsePoint(V, RI, ConGraph);
-  }
+  bool canEscapeTo(SILValue V, RefCountingInst *RI);
 
-  bool canPointToSameMemory(SILValue V1, SILValue V2, ConnectionGraph *ConGraph);
+  /// Returns true if the value \p V can escape to any other pointer \p To.
+  /// This means that either \p To is the same as \p V or containes a reference
+  /// to \p V.
+  bool canEscapeToValue(SILValue V, SILValue To);
+
+  /// Returns true if the pointers \p V1 and \p V2 can possibly point to the
+  /// same memory.
+  bool canPointToSameMemory(SILValue V1, SILValue V2);
 
   virtual void invalidate(InvalidationKind K) override;
 
