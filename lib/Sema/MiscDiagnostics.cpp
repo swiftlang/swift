@@ -1140,25 +1140,6 @@ static void diagAvailability(TypeChecker &TC, const Expr *E,
 }
 
 //===--------------------------------------------------------------------===//
-// High-level entry points.
-//===--------------------------------------------------------------------===//
-
-/// \brief Emit diagnostics for syntactic restrictions on a given expression.
-void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
-                                            const DeclContext *DC,
-                                            bool isExprStmt) {
-  diagSelfAssignment(TC, E);
-  diagSyntacticUseRestrictions(TC, E, DC, isExprStmt);
-  diagRecursivePropertyAccess(TC, E, DC);
-  diagnoseImplicitSelfUseInClosure(TC, E, DC);
-  diagAvailability(TC, E, DC);
-}
-
-void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
-  TC.checkUnsupportedProtocolType(const_cast<Stmt *>(S));
-}
-
-//===--------------------------------------------------------------------===//
 // Per func/init diagnostics
 //===--------------------------------------------------------------------===//
 
@@ -1201,7 +1182,16 @@ public:
           VarDecls[VD] = 0;
       });
   }
-
+    
+  VarDeclUsageChecker(TypeChecker &TC, VarDecl *VD) : TC(TC) {
+    // Track a specific VarDecl
+    VarDecls[VD] = 0;
+  }
+    
+  void suppressDiagnostics() {
+    sawError = true; // set this flag so that no diagnostics will be emitted on delete.
+  }
+    
   // After we have scanned the entire region, diagnose variables that could be
   // declared with a narrower usage kind.
   ~VarDeclUsageChecker();
@@ -1223,6 +1213,10 @@ public:
       });
     }
     return sawMutation;
+  }
+    
+  bool isVarDeclEverWritten(VarDecl *VD) {
+    return (VarDecls[VD] & RK_Written) != 0;
   }
 
   bool shouldTrackVarDecl(VarDecl *VD) {
@@ -1689,8 +1683,128 @@ void swift::performAbstractFuncDeclDiagnostics(TypeChecker &TC,
   AFD->getBody()->walk(VarDeclUsageChecker(TC, AFD));
 }
 
+/// Diagnose C style for loops.
 
+static Expr *endConditionValueForConvertingCStyleForLoop(const ForStmt *FS, VarDecl *loopVar) {
+  auto *Cond = FS->getCond().getPtrOrNull();
+  if (!Cond)
+    return nullptr;
+  auto callExpr = dyn_cast<CallExpr>(Cond);
+  if (!callExpr)
+    return nullptr;
+  auto dotSyntaxExpr = dyn_cast<DotSyntaxCallExpr>(callExpr->getFn());
+  if (!dotSyntaxExpr)
+    return nullptr;
+  auto binaryExpr = dyn_cast<BinaryExpr>(dotSyntaxExpr->getBase());
+  if (!binaryExpr)
+    return nullptr;
+  auto binaryFuncExpr = dyn_cast<DeclRefExpr>(binaryExpr->getFn());
+  if (!binaryFuncExpr)
+    return nullptr;
 
+  // Verify that the condition is a simple != or < comparison to the loop variable.
+  auto comparisonOpName = binaryFuncExpr->getDecl()->getNameStr();
+  if (comparisonOpName != "!=" && comparisonOpName != "<")
+    return nullptr;
+  auto args = binaryExpr->getArg()->getElements();
+  auto loadExpr = dyn_cast<LoadExpr>(args[0]);
+  if (!loadExpr)
+    return nullptr;
+  auto declRefExpr = dyn_cast<DeclRefExpr>(loadExpr->getSubExpr());
+  if (!declRefExpr)
+    return nullptr;
+  if (declRefExpr->getDecl() != loopVar)
+    return nullptr;
+  return args[1];
+}
+
+static bool simpleIncrementForConvertingCStyleForLoop(const ForStmt *FS, VarDecl *loopVar) {
+  auto *Increment = FS->getIncrement().getPtrOrNull();
+  if (!Increment)
+    return false;
+  ApplyExpr *unaryExpr = dyn_cast<PrefixUnaryExpr>(Increment);
+  if (!unaryExpr)
+    unaryExpr = dyn_cast<PostfixUnaryExpr>(Increment);
+  if (!unaryExpr)
+    return false;
+  auto inoutExpr = dyn_cast<InOutExpr>(unaryExpr->getArg());
+  if (!inoutExpr)
+   return false;
+  auto incrementDeclRefExpr = dyn_cast<DeclRefExpr>(inoutExpr->getSubExpr());
+  if (!incrementDeclRefExpr)
+    return false;
+  auto unaryFuncExpr = dyn_cast<DeclRefExpr>(unaryExpr->getFn());
+  if (!unaryFuncExpr)
+    return false;
+  if (unaryFuncExpr->getDecl()->getNameStr() != "++")
+    return false;
+  return incrementDeclRefExpr->getDecl() == loopVar;    
+}
+
+static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
+  // If we're missing semi-colons we'll already be erroring out, and this may not even have been intended as C-style.
+  if (FS->getFirstSemicolonLoc().isInvalid() || FS->getSecondSemicolonLoc().isInvalid())
+    return;
+    
+  InFlightDiagnostic diagnostic = TC.diagnose(FS->getStartLoc(), diag::deprecated_c_style_for_stmt);
+    
+  // Try to construct a fix it using for-each:
+
+  // Verify that there is only one loop variable, and it is declared here.
+  auto initializers = FS->getInitializerVarDecls();
+  PatternBindingDecl *loopVarDecl = initializers.size() == 2 ? dyn_cast<PatternBindingDecl>(initializers[0]) : nullptr;
+  if (!loopVarDecl || loopVarDecl->getNumPatternEntries() != 1)
+    return;
+
+  VarDecl *loopVar = dyn_cast<VarDecl>(initializers[1]);
+  Expr *startValue = loopVarDecl->getInit(0);
+  Expr *endValue = endConditionValueForConvertingCStyleForLoop(FS, loopVar);
+  bool strideByOne = simpleIncrementForConvertingCStyleForLoop(FS, loopVar);
+
+  if (!loopVar || !startValue || !endValue || !strideByOne)
+    return;
+    
+  // Verify that the loop variable is invariant inside the body.
+  VarDeclUsageChecker checker(TC, loopVar);
+  checker.suppressDiagnostics();
+  FS->getBody()->walk(checker);
+    
+  if (checker.isVarDeclEverWritten(loopVar)) {
+    diagnostic.flush();
+    TC.diagnose(FS->getStartLoc(), diag::cant_fix_c_style_for_stmt);
+    return;
+  }
+    
+  SourceLoc loopPatternEnd = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, loopVarDecl->getPattern(0)->getEndLoc());
+  SourceLoc endOfIncrementLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, FS->getIncrement().getPtrOrNull()->getEndLoc());
+    
+  diagnostic
+   .fixItReplaceChars(loopPatternEnd, startValue->getStartLoc(), " in ")
+   .fixItReplaceChars(FS->getFirstSemicolonLoc(), endValue->getStartLoc(), " ..< ")
+   .fixItRemoveChars(FS->getSecondSemicolonLoc(), endOfIncrementLoc);
+}
+
+//===--------------------------------------------------------------------===//
+// High-level entry points.
+//===--------------------------------------------------------------------===//
+
+/// \brief Emit diagnostics for syntactic restrictions on a given expression.
+void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
+                                            const DeclContext *DC,
+                                            bool isExprStmt) {
+  diagSelfAssignment(TC, E);
+  diagSyntacticUseRestrictions(TC, E, DC, isExprStmt);
+  diagRecursivePropertyAccess(TC, E, DC);
+  diagnoseImplicitSelfUseInClosure(TC, E, DC);
+  diagAvailability(TC, E, DC);
+}
+
+void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
+  TC.checkUnsupportedProtocolType(const_cast<Stmt *>(S));
+    
+  if (auto forStmt = dyn_cast<ForStmt>(S))
+    checkCStyleForLoop(TC, forStmt);
+}
 
 //===--------------------------------------------------------------------===//
 // Utility functions

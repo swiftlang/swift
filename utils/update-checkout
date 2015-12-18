@@ -61,7 +61,8 @@ def obtain_additional_swift_sources(opts = {'with_ssh': False}):
         'llbuild': 'apple/swift-llbuild',
         'swiftpm': 'apple/swift-package-manager',
         'swift-corelibs-xctest': 'apple/swift-corelibs-xctest',
-        'swift-corelibs-foundation': 'apple/swift-corelibs-foundation'
+        'swift-corelibs-foundation': 'apple/swift-corelibs-foundation',
+        'swift-integration-tests': 'apple/swift-integration-tests',
     }
     for dir_name, repo in additional_repos.iteritems():
         with WorkingDirectory(SWIFT_SOURCE_ROOT):
@@ -113,6 +114,7 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "swiftpm"))
     update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "swift-corelibs-foundation"))
     update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "swift-corelibs-xctest"))
+    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "swift-integration-tests"))
 
     return 0
 

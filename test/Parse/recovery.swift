@@ -162,16 +162,16 @@ func missingControllingExprInFor() {
   }
 
   // Ensure that we don't do recovery in the following cases.
-  for ; ; {
+  for ; ; { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   }
 
-  for { true }(); ; {
+  for { true }(); ; { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   }
 
-  for ; { true }() ; {
+  for ; { true }() ; { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   }
 
-  for acceptsClosure { 42 }; ; {
+  for acceptsClosure { 42 }; ; { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   }
 
   // A trailing closure is not accepted for the condition.
