@@ -14,6 +14,7 @@ config.target_triple = "@TARGET_TRIPLE@"
 config.targets_to_build = "@TARGETS_TO_BUILD@"
 config.variant_triple = "@VARIANT_TRIPLE@"
 config.variant_sdk = "@VARIANT_SDK@"
+config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
 
 if "@SWIFT_ASAN_BUILD@" == "TRUE":
     config.available_features.add("asan")
