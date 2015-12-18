@@ -2020,6 +2020,12 @@ NOTE(change_to_mutating,sema_tcs,none,
      "mark %select{method|accessor}0 'mutating' to make 'self' mutable",
      (bool))
 
+// For Stmt
+WARNING(deprecated_c_style_for_stmt,sema_tcs,none,
+"C-style for statement is deprecated and will be removed in a future version of Swift", ())
+NOTE(cant_fix_c_style_for_stmt,sema_tcs,none,
+"C-style for statement can't be automatically fixed to for-in, because the loop variable is modified inside the loop", ())
+
 // ForEach Stmt
 ERROR(sequence_protocol_broken,sema_tcs,none,
       "SequenceType protocol definition is broken", ())

@@ -161,15 +161,15 @@ func for_loops1(x: Int, c: Bool) {
     markUsed(i)
   }
   
-  for ; x < 40;  {
+  for ; x < 40;  { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
    markUsed(x)
    x += 1
   }
   
-  for var i = 0; i < 100; ++i {
+  for var i = 0; i < 100; ++i { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   }
   
-  for let i = 0; i < 100; i {
+  for let i = 0; i < 100; i { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   }
 }
 
