@@ -367,8 +367,10 @@ Type TypeChecker::applyGenericArguments(Type type,
   if (!unbound) {
     // FIXME: Highlight generic arguments and introduce a Fix-It to remove
     // them.
-    diagnose(loc, diag::not_a_generic_type, type);
-
+    if (!type->is<ErrorType>()) {
+      diagnose(loc, diag::not_a_generic_type, type);
+    }
+    
     // Just return the type; this provides better recovery anyway.
     return type;
   }
