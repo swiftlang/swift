@@ -13,7 +13,7 @@ b as! Base
 var opti : Int?
 // Don't add bang.
 var i : Int = opti
-// But remove unecessary bang.
+// But remove unnecessary bang.
 var i2 : Int = i!
 
 struct MyMask : OptionSetType {

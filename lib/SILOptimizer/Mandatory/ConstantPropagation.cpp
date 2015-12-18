@@ -264,7 +264,7 @@ constantFoldAndCheckDivision(BuiltinInst *BI, BuiltinValueKind ID,
     return nullptr;
   }
 
-  // Add the literal instruction to represnet the result of the division.
+  // Add the literal instruction to represent the result of the division.
   SILBuilderWithScope B(BI);
   return B.createIntegerLiteral(BI->getLoc(), BI->getType(), ResVal);
 }
@@ -1001,7 +1001,7 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
       if (ResultsInError.hasValue() && ResultsInError.getValue())
         ErrorSet.insert(User);
 
-      // We failed to constant propogate... continue...
+      // We failed to constant propagate... continue...
       if (!C)
         continue;
 

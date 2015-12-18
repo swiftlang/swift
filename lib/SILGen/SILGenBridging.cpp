@@ -805,7 +805,7 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
 
     // If this parameter is deallocating, emit an unmanaged rvalue and
     // continue. The object has the deallocating bit set so retain, release is
-    // irrelevent.
+    // irrelevant.
     if (inputs[i].isDeallocating()) {
       bridgedArgs.push_back(ManagedValue::forUnmanaged(arg));
       continue;

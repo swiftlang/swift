@@ -377,7 +377,7 @@ public:
   /// Hoist the address projection rooted in this operand to \p InsertBefore.
   /// Requires the projected value to dominate the insertion point.
   ///
-  /// Will look through single basic block predeccessor arguments.
+  /// Will look through single basic block predecessor arguments.
   void hoistAddressProjections(SILInstruction *InsertBefore,
                                DominanceInfo *DomTree);
 

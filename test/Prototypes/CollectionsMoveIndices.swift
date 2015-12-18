@@ -524,7 +524,7 @@ public struct MyRange<Index : MyIndexType> : MyIndexRangeType {
   }
 }
 
-// FIXME: in order for all this to be useable, we need to unify MyRange and
+// FIXME: in order for all this to be usable, we need to unify MyRange and
 // MyHalfOpenInterval.  We can do that by constraining the Bound to comparable,
 // and providing a conditional conformance to collection when the Bound is
 // strideable.

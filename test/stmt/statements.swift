@@ -305,7 +305,7 @@ Loop:  // expected-note {{previously declared here}}
   }
 
 
-  // <rdar://problem/16798323> Following a 'break' statment by another statement on a new line result in an error/fit-it
+  // <rdar://problem/16798323> Following a 'break' statement by another statement on a new line result in an error/fit-it
   switch 5 {
   case 5:
     markUsed("before the break")

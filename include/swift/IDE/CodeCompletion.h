@@ -732,7 +732,7 @@ struct SimpleCachingCodeCompletionConsumer : public CodeCompletionConsumer {
                                ArrayRef<RequestedCachedModule> requestedModules,
                                DeclContext *DCForModules) override;
 
-  /// Clients should overrride this method to receive \p Results.
+  /// Clients should override this method to receive \p Results.
   virtual void handleResults(
       MutableArrayRef<CodeCompletionResult *> Results) = 0;
 };

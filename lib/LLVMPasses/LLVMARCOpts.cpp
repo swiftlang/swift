@@ -594,7 +594,7 @@ static DtorKind analyzeDestructor(Value *P) {
       case RT_BridgeRetain:          // x = swift_bridgeRetain(y)
       case RT_Retain: {      // swift_retain(obj)
 
-        // Ignore retains of the "self" object, no ressurection is possible.
+        // Ignore retains of the "self" object, no resurrection is possible.
         Value *ThisRetainedObject = cast<CallInst>(I).getArgOperand(0);
         if (ThisRetainedObject->stripPointerCasts() ==
             ThisObject->stripPointerCasts())

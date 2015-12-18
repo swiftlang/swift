@@ -2211,7 +2211,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*GenContai
 // CHECK: apply [[FUN]]<ConcreteIndexable, ConcreteForwardIndexType>(
 // CHECK: return
 
-sil @combine_cast_of_materializeForSet_function_nested_subsitutions : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer2<ConcreteIndexable>) -> () {
+sil @combine_cast_of_materializeForSet_function_nested_substitutions : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer2<ConcreteIndexable>) -> () {
 bbO(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2: $*GenContainer2<ConcreteIndexable>):
   %3 = metatype $@thick GenContainer2<ConcreteIndexable>.Type
   %4 = function_ref @materializeForSetClosure2 : $@convention(thin) <τ_0_0 : AnIndexable> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer2<τ_0_0>, @thick GenContainer2<τ_0_0>.Type) -> ()
@@ -2795,7 +2795,7 @@ bb0:
 // Check that it does not crash the compiler.
 // Int is ObjC-bridgeable in this case, but its conformance is not know, 
 // because Foundation is not imported yet.
-// Therefore the cast may sucseed from the compiler point of view.
+// Therefore the cast may succeed from the compiler point of view.
 // CHECK-LABEL: sil @cast_of_class_to_int
 // CHECK: unconditional_checked_cast_addr
 // CHECK: return
@@ -2833,7 +2833,7 @@ class CC4 {
 
 
 // Function that takes different kinds of arguments: @in, @guaranteed, @owned, 
-sil @closure_with_in_guaranteed_owened_in_args : $@convention(method) (@in CC2, @guaranteed CC1, @owned CC3, @in CC4) -> Optional<Int>
+sil @closure_with_in_guaranteed_owned_in_args : $@convention(method) (@in CC2, @guaranteed CC1, @owned CC3, @in CC4) -> Optional<Int>
 
 // Test the peephole performing apply{partial_apply(x,y,z)}(a) -> apply(a,x,y,z)
 // We need to check the following:
@@ -2841,7 +2841,7 @@ sil @closure_with_in_guaranteed_owened_in_args : $@convention(method) (@in CC2, 
 //  should be copied into temporaries. This should happen just before that partial_apply instruction.
 // - The temporaries are allocated at the beginning of the function and deallocated at the end.
 // - Before each apply of the partial_apply, we retain values of any arguments which are of non-address type.
-//   This is required because they could be consumed (i.e. relased by the callee).
+//   This is required because they could be consumed (i.e. released by the callee).
 // - After each apply of the partial_apply, we release values of any arguments which are non-consumed by the callee (e.g. @guaranteed ones)
 
 // CHECK-LABEL: sil @test_apply_of_partial_apply
@@ -2849,7 +2849,7 @@ sil @closure_with_in_guaranteed_owened_in_args : $@convention(method) (@in CC2, 
 // CHECK: bb0{{.*}}:
 // A new temporary should have been created for each alloc_stack argument passed to partial_apply
 // CHECK: [[TMP:%[0-9]+]] = alloc_stack $CC4
-// CHECK: [[CLOSURE:%[0-9]+]] = function_ref @closure_with_in_guaranteed_owened_in_args
+// CHECK: [[CLOSURE:%[0-9]+]] = function_ref @closure_with_in_guaranteed_owned_in_args
 // Copy the original value of the argument into a temporary
 // CHECK: copy_addr {{.*}} to [initialization] [[TMP]]#1 : $*CC4 
 // CHECK-NOT: partial_apply
@@ -2896,7 +2896,7 @@ sil @closure_with_in_guaranteed_owened_in_args : $@convention(method) (@in CC2, 
 sil @test_apply_of_partial_apply : $@convention(thin) (@in Optional<CC2>, @guaranteed CC1, @guaranteed CC3, @guaranteed CC4, @guaranteed CC2) -> Optional<Int> {
 bb0(%0 : $*Optional<CC2>, %1 : $CC1, %2 : $CC3, %3 : $CC4, %4 : $CC2):
   
-  %5 = function_ref @closure_with_in_guaranteed_owened_in_args : $@convention(method) (@in CC2, @guaranteed CC1, @owned CC3, @in CC4) -> Optional<Int>
+  %5 = function_ref @closure_with_in_guaranteed_owned_in_args : $@convention(method) (@in CC2, @guaranteed CC1, @owned CC3, @in CC4) -> Optional<Int>
   %6 = alloc_stack $CC3
   store %2 to %6#1 : $*CC3
   %8 = load %6#1 : $*CC3

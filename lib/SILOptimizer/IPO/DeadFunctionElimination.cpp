@@ -446,7 +446,7 @@ class ExternalFunctionDefinitionsElimination : FunctionLivenessComputation {
   bool findAliveFunctions() {
     /// TODO: Once there is a proper support for IPO,
     /// bodies of all external functions can be removed.
-    /// Therefore there is no need for a livesness computation.
+    /// Therefore there is no need for a liveness computation.
     /// The next line can be just replaced by:
     /// return false;
     return FunctionLivenessComputation::findAliveFunctions();
