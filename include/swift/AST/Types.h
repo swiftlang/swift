@@ -2575,6 +2575,32 @@ inline bool isConsumedParameter(ParameterConvention conv) {
   llvm_unreachable("bad convention kind");
 }
 
+/// Returns true if conv is a not-aliasing indirect parameter.
+/// The \p assumeInoutIsNotAliasing specifies in no-aliasing is assumed for
+/// the @inout convention.
+/// Using true for \p assumeInoutIsNotAliasing is only allowed if a violation
+/// of the inout-aliasing-rule will still preserve memory safety.
+inline bool isNotAliasedIndirectParameter(ParameterConvention conv,
+                                          bool assumeInoutIsNotAliasing) {
+  switch (conv) {
+    case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_Out:
+    case ParameterConvention::Indirect_In_Guaranteed:
+      return true;
+
+    case ParameterConvention::Indirect_Inout:
+      return assumeInoutIsNotAliasing;
+
+    case ParameterConvention::Indirect_InoutAliasable:
+    case ParameterConvention::Direct_Unowned:
+    case ParameterConvention::Direct_Guaranteed:
+    case ParameterConvention::Direct_Owned:
+    case ParameterConvention::Direct_Deallocating:
+      return false;
+  }
+  llvm_unreachable("covered switch isn't covered?!");
+}
+
 /// Returns true if conv is a guaranteed parameter. This may look unnecessary
 /// but this will allow code to generalize to handle Indirect_Guaranteed
 /// parameters when they are added.
