@@ -32,7 +32,7 @@ public func scan<
   S : Sequence, U
 >(seq: S, _ initial: U, _ combine: (U, S.Iterator.Element) -> U) -> [U] {
   var result: [U] = []
-  result.reserveCapacity(seq.underestimateCount())
+  result.reserveCapacity(seq.underestimateLength())
   var runningResult = initial
   for element in seq {
     runningResult = combine(runningResult, element)
@@ -43,7 +43,7 @@ public func scan<
 
 public func randomShuffle<T>(a: [T]) -> [T] {
   var result = a
-  for var i = a.count - 1; i != 0; --i {
+  for var i = a.length - 1; i != 0; --i {
     // FIXME: 32 bits are not enough in general case!
     let j = Int(rand32(exclusiveUpperBound: UInt32(i + 1)))
     if i != j {
@@ -66,7 +66,7 @@ public func gather<
 
 public func scatter<T>(a: [T], _ idx: [Int]) -> [T] {
   var result = a
-  for i in 0..<a.count {
+  for i in 0..<a.length {
     result[idx[i]] = a[i]
   }
   return result
@@ -76,7 +76,7 @@ public func withArrayOfCStrings<R>(
   args: [String], _ body: ([UnsafeMutablePointer<CChar>]) -> R
 ) -> R {
 
-  let argsLengths = Array(args.map { $0.utf8.count + 1 })
+  let argsLengths = Array(args.map { $0.utf8.length + 1 })
   let argsOffsets = [ 0 ] + scan(argsLengths, 0, +)
   let argsBufferSize = argsOffsets.last!
 
@@ -91,7 +91,7 @@ public func withArrayOfCStrings<R>(
     (argsBuffer) in
     let ptr = UnsafeMutablePointer<CChar>(argsBuffer.baseAddress)
     var cStrings = argsOffsets.map { ptr + $0 }
-    cStrings[cStrings.count - 1] = nil
+    cStrings[cStrings.length - 1] = nil
     return body(cStrings)
   }
 }

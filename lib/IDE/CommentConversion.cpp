@@ -100,7 +100,9 @@ struct CommentToXMLConverter {
   }
 
   void printCodeBlock(const CodeBlock *CB) {
-    OS << "<CodeListing>";
+    OS << "<CodeListing language=\"";
+    appendWithXMLEscaping(OS, CB->getLanguage());
+    OS << "\">";
     SmallVector<StringRef, 16> CodeLines;
     CB->getLiteralContent().split(CodeLines, "\n");
     for (auto Line : CodeLines) {

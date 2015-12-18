@@ -56,14 +56,15 @@ public struct Slice<Base : Indexable> : Collection {
     Index._failEarlyRangeCheck2(
       bounds.startIndex, rangeEnd: bounds.endIndex,
       boundsStart: startIndex, boundsEnd: endIndex)
-    return Slice(base: _base, bounds: bounds)
+    return Slice(_base: _base, bounds: bounds)
   }
 
   /// Create a view into collection `base` that allows access within `bounds`.
   ///
   /// - Complexity: O(1).
-  public init(base: Base, bounds: Range<Index>) {
-    self._base = base
+  public // @testable
+  init(_base: Base, bounds: Range<Index>) {
+    self._base = _base
     self.startIndex = bounds.startIndex
     self.endIndex = bounds.endIndex
   }
@@ -108,15 +109,16 @@ public struct MutableSlice<Base : MutableIndexable> : MutableCollection {
       Index._failEarlyRangeCheck2(
         bounds.startIndex, rangeEnd: bounds.endIndex,
         boundsStart: startIndex, boundsEnd: endIndex)
-      return MutableSlice(base: _base, bounds: bounds)
+      return MutableSlice(_base: _base, bounds: bounds)
     }
     set {
       _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
     }
   }
 
-  public init(base: Base, bounds: Range<Index>) {
-    self._base = base
+  public // @testable
+  init(_base: Base, bounds: Range<Index>) {
+    self._base = _base
     self._startIndex = bounds.startIndex
     self._endIndex = bounds.endIndex
   }

@@ -66,7 +66,7 @@ public struct EmptyCollection<Element> : Collection {
   }
 
   /// Return the number of elements (always zero).
-  public var count: Int {
+  public var length: Int {
     return 0
   }
 }

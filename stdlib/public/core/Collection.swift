@@ -75,7 +75,8 @@ public struct CollectionDefaultIterator<Elements : Indexable>
  : IteratorProtocol, Sequence {
 
   /// Create a *iterator* over the given collection.
-  public init(_ elements: Elements) {
+  public /// @testable
+  init(_ elements: Elements) {
     self._elements = elements
     self._position = elements.startIndex
   }
@@ -170,7 +171,7 @@ public protocol Collection : Indexable, Sequence {
   ///
   /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndex`;
   ///   O(N) otherwise.
-  var count: Index.Distance { get }
+  var length: Index.Distance { get }
   
   // The following requirement enables dispatching for indexOf when
   // the element type is Equatable.
@@ -202,7 +203,7 @@ extension Collection where SubSequence == Slice<Self> {
     Index._failEarlyRangeCheck2(
       bounds.startIndex, rangeEnd: bounds.endIndex,
       boundsStart: startIndex, boundsEnd: endIndex)
-    return Slice(base: self, bounds: bounds)
+    return Slice(_base: self, bounds: bounds)
   }
 }
 
@@ -210,7 +211,7 @@ extension Collection where SubSequence == Self {
   /// If `!self.isEmpty`, remove the first element and return it, otherwise
   /// return `nil`.
   ///
-  /// - Complexity: O(`self.count`)
+  /// - Complexity: O(`self.length`)
   @warn_unused_result
   public mutating func popFirst() -> Iterator.Element? {
     guard !isEmpty else { return nil }
@@ -222,11 +223,11 @@ extension Collection where SubSequence == Self {
   /// If `!self.isEmpty`, remove the last element and return it, otherwise
   /// return `nil`.
   ///
-  /// - Complexity: O(`self.count`)
+  /// - Complexity: O(`self.length`)
   @warn_unused_result
   public mutating func popLast() -> Iterator.Element? {
     guard !isEmpty else { return nil }
-    let lastElementIndex = startIndex.advancedBy(numericCast(count) - 1)
+    let lastElementIndex = startIndex.advancedBy(numericCast(length) - 1)
     let element = self[lastElementIndex]
     self = self[startIndex..<lastElementIndex]
     return element
@@ -252,16 +253,16 @@ extension Collection {
   /// Returns a value less than or equal to the number of elements in
   /// `self`, *nondestructively*.
   ///
-  /// - Complexity: O(N).
-  public func underestimateCount() -> Int {
-    return numericCast(count)
+  /// - Complexity: O(`length`).
+  public func underestimateLength() -> Int {
+    return numericCast(length)
   }
 
   /// Returns the number of elements.
   ///
   /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndex`;
   ///   O(N) otherwise.
-  public var count: Index.Distance {
+  public var length: Index.Distance {
     return startIndex.distanceTo(endIndex)
   }
 
@@ -274,7 +275,7 @@ extension Collection {
   ///   `Optional(nil)` if the element was not found, or
   ///   `Optional(Optional(index))` if an element was found.
   ///
-  /// - Complexity: O(N).
+  /// - Complexity: O(`length`).
   @warn_unused_result
   public // dispatching
   func _customIndexOfEquatableElement(_: Iterator.Element) -> Index?? {
@@ -295,17 +296,17 @@ extension Collection {
   public func map<T>(
     @noescape transform: (Iterator.Element) throws -> T
   ) rethrows -> [T] {
-    let count: Int = numericCast(self.count)
-    if count == 0 {
+    let length: Int = numericCast(self.length)
+    if length == 0 {
       return []
     }
 
     var result = ContiguousArray<T>()
-    result.reserveCapacity(count)
+    result.reserveCapacity(length)
 
     var i = self.startIndex
 
-    for _ in 0..<count {
+    for _ in 0..<length {
       result.append(try transform(self[i]))
       i = i.successor()
     }
@@ -328,11 +329,12 @@ extension Collection {
   /// Returns a subsequence containing all but the last `n` elements.
   ///
   /// - Requires: `n >= 0`
-  /// - Complexity: O(`self.count`)
+  /// - Complexity: O(`self.length`)
   @warn_unused_result
   public func dropLast(n: Int) -> SubSequence {
-    _require(n >= 0, "Can't drop a negative number of elements from a collection")
-    let amount = max(0, numericCast(count) - n)
+    _require(
+      n >= 0, "Can't drop a negative number of elements from a collection")
+    let amount = Swift.max(0, numericCast(length) - n)
     let end = startIndex.advancedBy(numericCast(amount), limit: endIndex)
     return self[startIndex..<end]
   }
@@ -340,30 +342,34 @@ extension Collection {
   /// Returns a subsequence, up to `maxLength` in length, containing the
   /// initial elements.
   ///
-  /// If `maxLength` exceeds `self.count`, the result contains all
+  /// If `maxLength` exceeds `self.length`, the result contains all
   /// the elements of `self`.
   ///
   /// - Requires: `maxLength >= 0`
   /// - Complexity: O(`maxLength`)
   @warn_unused_result
   public func prefix(maxLength: Int) -> SubSequence {
-    _require(maxLength >= 0, "Can't take a prefix of negative length from a collection")
+    _require(
+      maxLength >= 0,
+      "Can't take a prefix of negative length from a collection")
     let end = startIndex.advancedBy(numericCast(maxLength), limit: endIndex)
     return self[startIndex..<end]
   }
 
   /// Returns a slice, up to `maxLength` in length, containing the
-  /// final elements of `s`.
+  /// final elements of `self`.
   ///
-  /// If `maxLength` exceeds `s.count`, the result contains all
-  /// the elements of `s`.
+  /// If `maxLength` exceeds `s.length`, the result contains all
+  /// the elements of `self`.
   ///
   /// - Requires: `maxLength >= 0`
-  /// - Complexity: O(`self.count`)
+  /// - Complexity: O(`self.length`)
   @warn_unused_result
   public func suffix(maxLength: Int) -> SubSequence {
-    _require(maxLength >= 0, "Can't take a suffix of negative length from a collection")
-    let amount = max(0, numericCast(count) - maxLength)
+    _require(
+      maxLength >= 0,
+      "Can't take a suffix of negative length from a collection")
+    let amount = Swift.max(0, numericCast(length) - maxLength)
     let start = startIndex.advancedBy(numericCast(amount), limit: endIndex)
     return self[start..<endIndex]
   }
@@ -438,7 +444,7 @@ extension Collection {
         let didAppend = appendSubsequence(end: subSequenceEnd)
         subSequenceEnd._successorInPlace()
         subSequenceStart = subSequenceEnd
-        if didAppend && result.count == maxSplit {
+        if didAppend && result.length == maxSplit {
           break
         }
         continue
@@ -488,22 +494,25 @@ extension Collection where Index : BidirectionalIndex {
   /// - Complexity: O(`n`)
   @warn_unused_result
   public func dropLast(n: Int) -> SubSequence {
-    _require(n >= 0, "Can't drop a negative number of elements from a collection")
+    _require(
+      n >= 0, "Can't drop a negative number of elements from a collection")
     let end = endIndex.advancedBy(numericCast(-n), limit: startIndex)
     return self[startIndex..<end]
   }
 
   /// Returns a slice, up to `maxLength` in length, containing the
-  /// final elements of `s`.
+  /// final elements of `self`.
   ///
-  /// If `maxLength` exceeds `s.count`, the result contains all
-  /// the elements of `s`.
+  /// If `maxLength` exceeds `s.length`, the result contains all
+  /// the elements of `self`.
   ///
   /// - Requires: `maxLength >= 0`
   /// - Complexity: O(`maxLength`)
   @warn_unused_result
   public func suffix(maxLength: Int) -> SubSequence {
-    _require(maxLength >= 0, "Can't take a suffix of negative length from a collection")
+    _require(
+      maxLength >= 0,
+      "Can't take a suffix of negative length from a collection")
     let start = endIndex.advancedBy(numericCast(-maxLength), limit: startIndex)
     return self[start..<endIndex]
   }
@@ -526,11 +535,11 @@ extension Collection where SubSequence == Self {
   /// - Complexity:
   ///   - O(1) if `Index` conforms to `RandomAccessIndex`
   ///   - O(n) otherwise
-  /// - Requires: `n >= 0 && self.count >= n`.
+  /// - Requires: `n >= 0 && self.length >= n`.
   public mutating func removeFirst(n: Int) {
     if n == 0 { return }
     _require(n >= 0, "number of elements to remove should be non-negative")
-    _require(count >= numericCast(n),
+    _require(length >= numericCast(n),
       "can't remove more items from a collection than it contains")
     self = self[startIndex.advancedBy(numericCast(n))..<endIndex]
   }
@@ -556,11 +565,11 @@ extension Collection
   /// - Complexity:
   ///   - O(1) if `Index` conforms to `RandomAccessIndex`
   ///   - O(n) otherwise
-  /// - Requires: `n >= 0 && self.count >= n`.
+  /// - Requires: `n >= 0 && self.length >= n`.
   public mutating func removeLast(n: Int) {
     if n == 0 { return }
     _require(n >= 0, "number of elements to remove should be non-negative")
-    _require(count >= numericCast(n),
+    _require(length >= numericCast(n),
       "can't remove more items from a collection than it contains")
     self = self[startIndex..<endIndex.advancedBy(numericCast(-n))]
   }
@@ -573,10 +582,10 @@ extension Sequence
     -> UnsafeMutablePointer<Iterator.Element> {
     let s = self._baseAddressIfContiguous
     if s != nil {
-      let count = self.count
-      ptr.initializeFrom(s, count: count)
+      let length = self.length
+      ptr.initializeFrom(s, count: length)
       _fixLifetime(self._owner)
-      return ptr + count
+      return ptr + length
     } else {
       var p = ptr
       for x in self {
@@ -625,7 +634,7 @@ public protocol MutableCollection : MutableIndexable, Collection {
   /// Returns a collection representing a contiguous sub-range of
   /// `self`'s elements.
   ///
-  /// - Complexity: O(1) for the getter, O(`bounds.count`) for the setter.
+  /// - Complexity: O(1) for the getter, O(`bounds.length`) for the setter.
   subscript(bounds: Range<Index>) -> SubSequence {get set}
 
   /// Call `body(p)`, where `p` is a pointer to the collection's
@@ -661,7 +670,7 @@ extension MutableCollection {
       Index._failEarlyRangeCheck2(
         bounds.startIndex, rangeEnd: bounds.endIndex,
         boundsStart: startIndex, boundsEnd: endIndex)
-      return MutableSlice(base: self, bounds: bounds)
+      return MutableSlice(_base: self, bounds: bounds)
     }
     set {
       _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)

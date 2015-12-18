@@ -63,7 +63,8 @@ func forgotOptionalBang(a: A, obj: AnyObject) {
 class Dinner {}
 
 func microwave() -> Dinner {
-  return (n: Dinner?()) // expected-error{{value of optional type 'Dinner?' not unwrapped; did you mean to use '!' or '?'?}} {{24-24=!}}
+  let d: Dinner? = nil
+  return (n: d) // expected-error{{value of optional type 'Dinner?' not unwrapped; did you mean to use '!' or '?'?}} {{16-16=!}}
 }
 
 func forgotAnyObjectBang(obj: AnyObject) {

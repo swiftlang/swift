@@ -61,7 +61,7 @@ public func readLine(stripNewline stripNewline: Bool = true) -> String? {
   let result = String._fromCodeUnitSequenceWithRepair(UTF8.self,
     input: UnsafeMutableBufferPointer(
       start: UnsafeMutablePointer<UTF8.CodeUnit>(linePtr),
-      count: readBytes)).0
+      length: readBytes)).0
   _swift_stdlib_free(linePtr)
   return result
 }

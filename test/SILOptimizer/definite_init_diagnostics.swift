@@ -1193,6 +1193,6 @@ func test22436880() {
 
 // sr-184
 let x: String? // expected-note 2 {{constant defined here}}
-print(x?.characters.count) // expected-error {{constant 'x' used before being initialized}}
+print(x?.characters.length) // expected-error {{constant 'x' used before being initialized}}
 print(x!) // expected-error {{constant 'x' used before being initialized}}
 

@@ -35,7 +35,7 @@ public struct LazyFilterIterator<
 
   /// Creates an instance that produces the elements `x` of `base`
   /// for which `predicate(x) == true`.
-  public init(
+  internal init(
     _ base: Base,
     whereElementsSatisfy predicate: (Base.Element)->Bool
   ) {
@@ -71,8 +71,9 @@ public struct LazyFilterSequence<Base : Sequence>
 
   /// Creates an instance consisting of the elements `x` of `base` for
   /// which `predicate(x) == true`.
-  public init(
-    _ base: Base,
+  public // @testable
+  init(
+    _base base: Base,
     whereElementsSatisfy predicate: (Base.Iterator.Element)->Bool
   ) {
     self.base = base
@@ -163,7 +164,8 @@ public struct LazyFilterCollection<
 
   /// Construct an instance containing the elements of `base` that
   /// satisfy `predicate`.
-  public init(
+  public // @testable
+  init(
     _ base: Base,
     whereElementsSatisfy predicate: (Base.Iterator.Element)->Bool
   ) {
@@ -176,7 +178,7 @@ public struct LazyFilterCollection<
   /// In an empty collection, `startIndex == endIndex`.
   ///
   /// - Complexity: O(N), where N is the ratio between unfiltered and
-  ///   filtered collection counts.
+  ///   filtered collection lengths.
   public var startIndex: Index {
     var first = _base.startIndex
     while first != _base.endIndex {
@@ -233,7 +235,7 @@ extension LazySequenceProtocol {
     predicate: (Elements.Iterator.Element)->Bool
   ) -> LazyFilterSequence<Self.Elements> {
     return LazyFilterSequence(
-      self.elements, whereElementsSatisfy: predicate)
+      _base: self.elements, whereElementsSatisfy: predicate)
   }
 }
 

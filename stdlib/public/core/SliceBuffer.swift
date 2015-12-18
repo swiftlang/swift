@@ -42,7 +42,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
     self.init(
       owner: buffer.owner,
       subscriptBaseAddress: buffer.subscriptBaseAddress + shift,
-      indices: shiftedToStartIndex..<shiftedToStartIndex + buffer.count,
+      indices: shiftedToStartIndex..<shiftedToStartIndex + buffer.length,
       hasNativeBuffer: true)
   }
 
@@ -51,7 +51,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
     let isNativeStorage: Bool = (owner as? _ContiguousArrayStorageBase) != nil
     _sanityCheck(isNativeStorage == isNative)
     if isNative {
-      _sanityCheck(count <= nativeBuffer.count)
+      _sanityCheck(length <= nativeBuffer.length)
     }
   }
 
@@ -70,38 +70,38 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
     return owner
   }
 
-  /// Replace the given subRange with the first newCount elements of
+  /// Replace the given subRange with the first subRangeNewLength elements of
   /// the given collection.
   ///
   /// - Requires: This buffer is backed by a uniquely-referenced
   ///   `_ContiguousArrayBuffer` and
-  ///   `insertCount <= numericCast(newValues.count)`.
+  ///   `subRangeNewLength <= numericCast(newValues.length)`.
   public mutating func replace<
     C : Collection where C.Iterator.Element == Element
   >(
     subRange subRange: Range<Int>,
-    with insertCount: Int,
+    with subRangeNewLength: Int,
     elementsOf newValues: C
   ) {
     _invariantCheck()
-    _sanityCheck(insertCount <= numericCast(newValues.count))
+    _sanityCheck(subRangeNewLength <= numericCast(newValues.length))
 
     _sanityCheck(_hasNativeBuffer && isUniquelyReferenced())
 
-    let eraseCount = subRange.count
-    let growth = insertCount - eraseCount
-    let oldCount = count
+    let eraseCount = subRange.length
+    let growth = subRangeNewLength - eraseCount
+    let oldCount = length
 
     var native = nativeBuffer
     let hiddenElementCount = firstElementAddress - native.firstElementAddress
 
-    _sanityCheck(native.count + growth <= native.capacity)
+    _sanityCheck(native.length + growth <= native.capacity)
 
     let start = subRange.startIndex - startIndex + hiddenElementCount
     let end = subRange.endIndex - startIndex + hiddenElementCount
     native.replace(
       subRange: start..<end,
-      with: insertCount,
+      with: subRangeNewLength,
       elementsOf: newValues)
 
     self.endIndex = self.startIndex + oldCount + growth
@@ -111,7 +111,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
 
   /// A value that identifies the storage used by the buffer.  Two
   /// buffers address the same elements when they have the same
-  /// identity and count.
+  /// identity and length.
   public var identity: UnsafePointer<Void> {
     return UnsafePointer(firstElementAddress)
   }
@@ -143,12 +143,12 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
         // down that case.
         var native = nativeBuffer
         let offset = self.firstElementAddress - native.firstElementAddress
-        let backingCount = native.count
-        let myCount = count
+        let nativeLength = native.length
+        let myLength = length
 
-        if _slowPath(backingCount > myCount + offset) {
+        if _slowPath(nativeLength > myLength + offset) {
           native.replace(
-            subRange: (myCount+offset)..<backingCount,
+            subRange: (myLength+offset)..<nativeLength,
             with: 0,
             elementsOf: EmptyCollection())
         }
@@ -175,7 +175,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
   @warn_unused_result
   public func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>? {
     _invariantCheck()
-    if _fastPath(_hasNativeBuffer && nativeBuffer.count == count) {
+    if _fastPath(_hasNativeBuffer && nativeBuffer.length == length) {
       return nativeBuffer
     }
     return nil
@@ -188,9 +188,10 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
     _sanityCheck(bounds.startIndex >= startIndex)
     _sanityCheck(bounds.endIndex >= bounds.startIndex)
     _sanityCheck(bounds.endIndex <= endIndex)
-    let c = bounds.count
-    target.initializeFrom(subscriptBaseAddress + bounds.startIndex, count: c)
-    return target + c
+    let length = bounds.length
+    target.initializeFrom(
+      subscriptBaseAddress + bounds.startIndex, count: length)
+    return target + length
   }
 
   /// True, if the array is native and does not need a deferred type check.
@@ -198,15 +199,14 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
     return _hasNativeBuffer
   }
 
-  public
-  var count: Int {
+  public var length: Int {
     get {
       return endIndex - startIndex
     }
     set {
-      let growth = newValue - count
+      let growth = newValue - length
       if growth != 0 {
-        nativeBuffer.count += growth
+        nativeBuffer.length += growth
         self.endIndex += growth
       }
       _invariantCheck()
@@ -221,16 +221,16 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
   }
 
   public var capacity: Int {
-    let count = self.count
+    let length = self.length
     if _slowPath(!_hasNativeBuffer) {
-      return count
+      return length
     }
     let n = nativeBuffer
-    let nativeEnd = n.firstElementAddress + n.count
-    if (firstElementAddress + count) == nativeEnd {
-      return count + (n.capacity - n.count)
+    let nativeEnd = n.firstElementAddress + n.length
+    if (firstElementAddress + length) == nativeEnd {
+      return length + (n.capacity - n.length)
     }
-    return count
+    return length
   }
 
   @warn_unused_result
@@ -311,8 +311,8 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
     @noescape body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     defer { _fixLifetime(self) }
-    return try body(UnsafeBufferPointer(start: firstElementAddress,
-      count: count))
+    return try body(
+      UnsafeBufferPointer(start: firstElementAddress, length: length))
   }
 
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
@@ -323,7 +323,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
   ) rethrows -> R {
     defer { _fixLifetime(self) }
     return try body(
-      UnsafeMutableBufferPointer(start: firstElementAddress, count: count))
+      UnsafeMutableBufferPointer(start: firstElementAddress, length: length))
   }
 }
 
@@ -331,15 +331,16 @@ extension _SliceBuffer {
   public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
     if _hasNativeBuffer {
       let n = nativeBuffer
-      if count == n.count {
+      if length == n.length {
         return n
       }
     }
 
     let result = _ContiguousArrayBuffer<Element>(
-      count: count,
+      length: length,
       minimumCapacity: 0)
-    result.firstElementAddress.initializeFrom(firstElementAddress, count: count)
+    result.firstElementAddress.initializeFrom(
+      firstElementAddress, count: length)
     return result
   }
 }

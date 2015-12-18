@@ -42,7 +42,7 @@ ArrayOfClassObjectBridging.test("bridging NSArray of class objects to [AnyObject
   let classesBridged: NSArray = classes
   let classesUnbridgedAsAnyObject = classesBridged as [AnyObject]
 
-  expectTrue(classesUnbridgedAsAnyObject.count == 3)
+  expectTrue(classesUnbridgedAsAnyObject.length == 3)
   expectTrue(classesUnbridgedAsAnyObject[0] === NSObject.self)
   expectTrue(classesUnbridgedAsAnyObject[1] === NSString.self)
   expectTrue(classesUnbridgedAsAnyObject[2] === NSArray.self)
@@ -53,7 +53,7 @@ ArrayOfClassObjectBridging.test("bridging NSArray of class objects to [AnyClass]
   let classesBridged: NSArray = classes
 
   if let classesUnbridgedAsAnyClass = classesBridged as? [AnyClass] {
-    expectTrue(classesUnbridgedAsAnyClass.count == 3)
+    expectTrue(classesUnbridgedAsAnyClass.length == 3)
     expectTrue(classesUnbridgedAsAnyClass[0] == NSObject.self)
     expectTrue(classesUnbridgedAsAnyClass[1] == NSString.self)
     expectTrue(classesUnbridgedAsAnyClass[2] == NSArray.self)
@@ -67,7 +67,7 @@ ArrayOfClassObjectBridging.test("bridging NSArray of class objects to [NSObject.
   let classesBridged: NSArray = classes
 
   if let classesUnbridgedAsNSObjectType = classesBridged as? [NSObject.Type] {
-    expectTrue(classesUnbridgedAsNSObjectType.count == 3)
+    expectTrue(classesUnbridgedAsNSObjectType.length == 3)
     expectTrue(classesUnbridgedAsNSObjectType[0] == NSObject.self)
     expectTrue(classesUnbridgedAsNSObjectType[1] == NSString.self)
     expectTrue(classesUnbridgedAsNSObjectType[2] == NSArray.self)

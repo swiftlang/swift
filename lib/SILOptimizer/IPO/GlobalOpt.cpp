@@ -164,7 +164,7 @@ void SILGlobalOpt::collectGlobalLoad(LoadInst *LI, SILGlobalVariable *SILG) {
   //assert(SILG->isLet());
 
   // This is read from a let variable.
-  // Figure out if the value of this variable is statitcally known.
+  // Figure out if the value of this variable is statically known.
   GlobalLoadMap[SILG].push_back(LI);
 }
 

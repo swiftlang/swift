@@ -1370,7 +1370,7 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
     // ready for the next component.
     TypeVariables = std::move(allTypeVariables);
 
-    // For each of the partial solutions, substract off the current score.
+    // For each of the partial solutions, subtract off the current score.
     // It doesn't contribute.
     for (auto &solution : partialSolutions[component])
       solution.getFixedScore() -= CurrentScore;

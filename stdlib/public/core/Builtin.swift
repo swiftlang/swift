@@ -280,7 +280,7 @@ public func _slowPath<C : Boolean>(x: C) -> Bool {
 //===--- Runtime shim wrappers --------------------------------------------===//
 
 /// Returns `true` iff the class indicated by `theClass` uses native
-/// Swift reference-counting.
+/// Swift reference counting.
 @inline(__always)
 @warn_unused_result
 internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
@@ -379,7 +379,7 @@ internal func _isObjCTaggedPointer(x: AnyObject) -> Bool {
 /// Create a `BridgeObject` around the given `nativeObject` with the
 /// given spare bits.
 ///
-/// Reference-counting and other operations on this
+/// Reference counting and other operations on this
 /// object will have access to the knowledge that it is native.
 ///
 /// - Requires: `bits & _objectPointerIsObjCBit == 0`,

@@ -231,12 +231,12 @@ extension ForwardIndex {
   @warn_unused_result
   public func distanceTo(end: Self) -> Distance {
     var p = self
-    var count: Distance = 0
+    var length: Distance = 0
     while p != end {
-      count += 1
+      length += 1
       p._successorInPlace()
     }
-    return count
+    return length
   }
 }
 

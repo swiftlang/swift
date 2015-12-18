@@ -26,7 +26,7 @@ ${Test}.test("flatMap/${Kind}/Lazy") {
       resiliencyChecks: .none
     ) { $0.value == $1.value }
     expectEqual(
-      test.sequence.count, timesClosureWasCalled,
+      test.sequence.length, timesClosureWasCalled,
       "iterating forward the result of the lazy flatMap() should call "
       + "the closure only once for element")
 %   else:
@@ -38,7 +38,7 @@ ${Test}.test("flatMap/${Kind}/Lazy") {
     are compositions of offsets
 
     expectEqual(
-      test.sequence.count, timesClosureWasCalled,
+      test.sequence.length, timesClosureWasCalled,
       "iterating forward the result of the lazy flatMap() should call "
       + "the closure only once for element")
     */
@@ -54,7 +54,7 @@ ${Test}.test("flatMap/${Kind}/Lazy") {
     % if Kind == 'Sequence':
     expectTrue(Array(s).isEmpty, "sequence should be consumed")
     expectEqual(
-      test.sequence.count, timesClosureWasCalled,
+      test.sequence.length, timesClosureWasCalled,
       "iterating a lazy flatMap() should call the predicate"
       + "once per element")
     % end

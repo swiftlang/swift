@@ -20,31 +20,31 @@ import SwiftShims
 internal struct _ArrayBody {
   var _storage: _SwiftArrayBodyStorage
   
-  init(count: Int, capacity: Int, elementTypeIsBridgedVerbatim: Bool = false) {
-    _sanityCheck(count >= 0)
+  init(length: Int, capacity: Int, elementTypeIsBridgedVerbatim: Bool = false) {
+    _sanityCheck(length >= 0)
     _sanityCheck(capacity >= 0)
     
     _storage = _SwiftArrayBodyStorage(
-      count: count,
+      length: length,
       _capacityAndFlags:
         (UInt(capacity) << 1) | (elementTypeIsBridgedVerbatim ? 1 : 0))
   }
 
-  /// In principle CountAndCapacity shouldn't need to be default
+  /// In principle LengthAndCapacity shouldn't need to be default
   /// constructed, but since we want to claim all the allocated
   /// capacity after a new buffer is allocated, it's typical to want
   /// to update it immediately after construction.
   init() {
-    _storage = _SwiftArrayBodyStorage(count: 0, _capacityAndFlags: 0)
+    _storage = _SwiftArrayBodyStorage(length: 0, _capacityAndFlags: 0)
   }
   
   /// The number of elements stored in this Array.
-  var count: Int {
+  var length: Int {
     get {
-      return _assumeNonNegative(_storage.count)
+      return _assumeNonNegative(_storage.length)
     }
-    set(newCount) {
-      _storage.count = newCount
+    set(newLength) {
+      _storage.length = newLength
     }
   }
 

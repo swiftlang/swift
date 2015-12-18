@@ -23,15 +23,15 @@
 ${MirrorDecl} {
   ${MirrorBoilerplate}
 
-    var count: Int { return 3 }
+    var length: Int { return 3 }
 
     subscript(i: Int) -> (String, _Mirror) {
-      _require(i >= 0 && i < count, "_Mirror access out of bounds")
+      _require(i >= 0 && i < length, "_Mirror access out of bounds")
       switch i {
-      case 0: return ("${Self[1]}",_reflect(_value.start))
-      case 1: return ("${Self[2]}",_reflect(_value.end))
+      case 0: return ("${Self[1]}", _reflect(_value._start))
+      case 1: return ("${Self[2]}", _reflect(_value._end))
       case 2: fallthrough
-      default: return ("${Self[3]}",_reflect(_value.stride))
+      default: return ("${Self[3]}", _reflect(_value._stride))
       }
     }
 

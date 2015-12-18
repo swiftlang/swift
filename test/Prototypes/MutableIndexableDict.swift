@@ -267,7 +267,7 @@ struct Dictionary<Key: Hashable, Value> : Collection, Sequence {
       // count + 2 below ensures that we don't fill in the last hole
       var minCapacity = found
         ? capacity
-        : max(Int(Double(count + 1) * _maxLoadFactorInverse), count + 2)
+        : Swift.max(Int(Double(count + 1) * _maxLoadFactorInverse), count + 2)
 
       if (_ensureUniqueBuffer(minCapacity)) {
         i = find(key).0

@@ -68,14 +68,14 @@ ArrayTestSuite.test("valueDestruction") {
 // FIXME: incomplete.
 //===----------------------------------------------------------------------===//
 
-ArrayTestSuite.test("Native/count/empty") {
+ArrayTestSuite.test("Native/length/empty") {
   let a = [TestValueTy]()
-  expectEqual(0, a.count)
+  expectEqual(0, a.length)
 }
 
-ArrayTestSuite.test("Native/count") {
+ArrayTestSuite.test("Native/length") {
   let a = [ TestValueTy(10), TestValueTy(20), TestValueTy(30) ]
-  expectEqual(3, a.count)
+  expectEqual(3, a.length)
 }
 
 ArrayTestSuite.test("Native/isEmpty/empty") {
@@ -103,7 +103,7 @@ extension ${array_type} where Element : TestProtocol1 {
 func getFresh${array_type}<S : Sequence>(sequence: S)
   -> ${array_type}<S.Iterator.Element> {
   var result: ${array_type}<S.Iterator.Element> = []
-  result.reserveCapacity(sequence.underestimateCount())
+  result.reserveCapacity(sequence.underestimateLength())
   for element in sequence {
     result.append(element)
   }
@@ -126,7 +126,7 @@ func == (lhs: EnumWithoutPayloads, rhs: EnumWithoutPayloads) -> Bool {
   }
 }
 
-struct SequenceWithCustomUnderestimateCount : Sequence {
+struct SequenceWithCustomUnderestimateLength : Sequence {
   init(_ data: [Int]) {
     self._data = MinimalSequence(elements: data.map(OpaqueValue.init))
   }
@@ -135,12 +135,12 @@ struct SequenceWithCustomUnderestimateCount : Sequence {
     return _data.iterator()
   }
 
-  func underestimateCount() -> Int {
-    ++SequenceWithCustomUnderestimateCount.timesUnderestimateCountWasCalled
-    return _data.underestimateCount()
+  func underestimateLength() -> Int {
+    ++SequenceWithCustomUnderestimateLength.timesUnderestimateLengthWasCalled
+    return _data.underestimateLength()
   }
 
-  static var timesUnderestimateCountWasCalled: Int = 0
+  static var timesUnderestimateLengthWasCalled: Int = 0
 
   let _data: MinimalSequence<OpaqueValue<Int>>
 }
@@ -148,16 +148,16 @@ struct SequenceWithCustomUnderestimateCount : Sequence {
 % for array_type in all_array_types:
 
 ArrayTestSuite.test("${array_type}/init(Sequence)") {
-  let base = SequenceWithCustomUnderestimateCount(
+  let base = SequenceWithCustomUnderestimateLength(
     [ 0, 30, 10, 90 ])
 
-  SequenceWithCustomUnderestimateCount.timesUnderestimateCountWasCalled = 0
+  SequenceWithCustomUnderestimateLength.timesUnderestimateLengthWasCalled = 0
 
   let result = ${array_type}(base)
 
   expectEqual([ 0, 30, 10, 90 ], result.map { $0.value })
 
-  expectEqual(1, SequenceWithCustomUnderestimateCount.timesUnderestimateCountWasCalled)
+  expectEqual(1, SequenceWithCustomUnderestimateLength.timesUnderestimateLengthWasCalled)
 
   expectEqualSequence(
     [], Array(base).map { $0.value }, "sequence should be consumed")
@@ -198,7 +198,7 @@ ArrayTestSuite.test("${array_type}/appendNonUnique") {
 
 ArrayTestSuite.test("${array_type}/emptyAllocation") {
   let arr0 = ${array_type}<Int>()
-  let arr1 = ${array_type}<TestValueTy>(repeating: TestValueTy(0), count: 0)
+  let arr1 = ${array_type}<TestValueTy>(repeating: TestValueTy(0), length: 0)
   // Empty arrays all use the same buffer
   expectEqual(arr0._buffer.identity, arr1._buffer.identity)
 
@@ -226,19 +226,19 @@ ArrayTestSuite.test("${array_type}/filter") {
     let arr: ${array_type}<Int> = [ 0, 30, 10, 90 ]
     let result = arr.filter() { (x: Int) -> Bool in true }
     expectEqual([ 0, 30, 10, 90 ], result)
-    expectGE(2 * result.count, result.capacity)
+    expectGE(2 * result.length, result.capacity)
   }
   do {
     let arr: ${array_type}<Int> = [ 0, 30, 10, 90 ]
     let result = arr.filter() { (x: Int) -> Bool in false }
     expectEqual([], result)
-    expectGE(2 * result.count, result.capacity)
+    expectGE(2 * result.length, result.capacity)
   }
   do {
     let arr: ${array_type}<Int> = [ 0, 30, 10, 90 ]
     let result = arr.filter() { $0 % 3 == 0 }
     expectEqual([ 0, 30, 90 ], result)
-    expectGE(2 * result.count, result.capacity)
+    expectGE(2 * result.length, result.capacity)
   }
 }
 
@@ -258,7 +258,7 @@ ArrayTestSuite.test("${array_type}/map") {
     let arr: ${array_type}<Int> = [ 0, 30, 10, 90 ]
     let result = arr.map() { $0 + 1 }
     expectEqual([ 1, 31, 11, 91 ], result)
-    expectGE(2 * result.count, result.capacity)
+    expectGE(2 * result.length, result.capacity)
   }
 }
 
@@ -405,9 +405,9 @@ ArrayTestSuite.test("${array_type}/_withUnsafeMutableBufferPointerIfSupported") 
     do {
       // Read.
       var result = a._withUnsafeMutableBufferPointerIfSupported {
-        (baseAddress, count) -> OpaqueValue<[OpaqueValue<Int>]> in
+        (baseAddress, length) -> OpaqueValue<[OpaqueValue<Int>]> in
         let bufferPointer =
-          UnsafeMutableBufferPointer(start: baseAddress, count: count)
+          UnsafeMutableBufferPointer(start: baseAddress, length: length)
         return OpaqueValue(Array(bufferPointer))
       }
       expectType(Optional<OpaqueValue<Array<OpaqueValue<Int>>>>.self, &result)
@@ -417,9 +417,9 @@ ArrayTestSuite.test("${array_type}/_withUnsafeMutableBufferPointerIfSupported") 
     do {
       // Read and write.
       var result = a._withUnsafeMutableBufferPointerIfSupported {
-        (baseAddress, count) -> OpaqueValue<Array<OpaqueValue<Int>>> in
+        (baseAddress, length) -> OpaqueValue<Array<OpaqueValue<Int>>> in
         let bufferPointer =
-          UnsafeMutableBufferPointer(start: baseAddress, count: count)
+          UnsafeMutableBufferPointer(start: baseAddress, length: length)
         let result = OpaqueValue(Array(bufferPointer))
         for i in bufferPointer.indices {
           bufferPointer[i] = OpaqueValue(bufferPointer[i].value * 10)
@@ -439,8 +439,8 @@ ArrayTestSuite.test("${array_type}/_withUnsafeMutableBufferPointerIfSupported") 
 ArrayTestSuite.test("${array_type}/_withUnsafeMutableBufferPointerIfSupported/ReplacingTheBufferTraps/1") {
   var a = getFresh${array_type}([ OpaqueValue(10) ])
   var result = a._withUnsafeMutableBufferPointerIfSupported {
-    (baseAddress, count) -> OpaqueValue<Int> in
-    // buffer = UnsafeMutableBufferPointer(start: buffer.baseAddress, count: 0)
+    (baseAddress, length) -> OpaqueValue<Int> in
+    // buffer = UnsafeMutableBufferPointer(start: buffer.baseAddress, length: 0)
     // FIXME: does not trap since the buffer is not passed inout.
     // expectCrashLater()
     return OpaqueValue(42)
@@ -450,8 +450,8 @@ ArrayTestSuite.test("${array_type}/_withUnsafeMutableBufferPointerIfSupported/Re
 ArrayTestSuite.test("${array_type}/_withUnsafeMutableBufferPointerIfSupported/ReplacingTheBufferTraps/2") {
   var a = getFresh${array_type}([ OpaqueValue(10) ])
   var result = a._withUnsafeMutableBufferPointerIfSupported {
-    (baseAddress, count) -> OpaqueValue<Int> in
-    // buffer = UnsafeMutableBufferPointer(start: nil, count: 1)
+    (baseAddress, length) -> OpaqueValue<Int> in
+    // buffer = UnsafeMutableBufferPointer(start: nil, length: 1)
     // FIXME: does not trap since the buffer is not passed inout.
     // expectCrashLater()
     return OpaqueValue(42)
@@ -692,7 +692,7 @@ func isCocoaArray<Element>(a: Array<Element>) -> Bool {
 
 func getAsImmutableNSArray(a: Array<Int>) -> NSArray {
   var elements = a.map { TestObjCValueTy($0) as AnyObject? }
-  return NSArray(objects: &elements, count: elements.count)
+  return NSArray(objects: &elements, count: elements.length)
 }
 
 func getAsNSArray(a: Array<Int>) -> NSArray {
@@ -743,7 +743,7 @@ class CustomImmutableNSArray : NSArray {
   @objc
   override var count: Int {
     ++CustomImmutableNSArray.timesCountWasCalled
-    return _data.count
+    return _data.length
   }
 
   @objc
@@ -759,7 +759,7 @@ class CustomImmutableNSArray : NSArray {
         AutoreleasingUnsafeMutablePointer(_data._baseAddressIfContiguous)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
       state.pointee = theState
-      return _data.count
+      return _data.length
     }
     return 0
   }
@@ -939,12 +939,12 @@ ArrayTestSuite.test("BridgedToObjC.Verbatim.BridgeUsingAs") {
   }
 }
 
-ArrayTestSuite.test("BridgedToObjC/Verbatim/count/empty") {
+ArrayTestSuite.test("BridgedToObjC/Verbatim/length/empty") {
   let a = getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 0)
   expectEqual(0, a.count)
 }
 
-ArrayTestSuite.test("BridgedToObjC/Verbatim/count") {
+ArrayTestSuite.test("BridgedToObjC/Verbatim/length") {
   let a = getBridgedNSArrayOfRefTypeVerbatimBridged()
   expectEqual(3, a.count)
 }
@@ -1210,14 +1210,14 @@ ArrayTestSuite.test("BridgedToObjC.Nonverbatim.BridgeUsingAs") {
   }
 }
 
-ArrayTestSuite.test("BridgedToObjC/Custom/count/empty") {
+ArrayTestSuite.test("BridgedToObjC/Custom/length/empty") {
   let a = getBridgedNSArrayOfValueTypeCustomBridged(numElements: 0)
   expectEqual(0, a.count)
 
   expectEqual(0, TestBridgedValueTy.bridgeOperations)
 }
 
-ArrayTestSuite.test("BridgedToObjC/Custom/count") {
+ArrayTestSuite.test("BridgedToObjC/Custom/length") {
   let a = getBridgedNSArrayOfValueTypeCustomBridged()
   expectEqual(3, a.count)
 
@@ -1583,21 +1583,21 @@ final class EvilCollection : Collection {
   }
 
   var growth: Int
-  var _count: Int = 20
+  var _length: Int = 20
   var boundsChecked: Bool
 
   var startIndex : Int {
-    _count += growth
+    _length += growth
     return 0
   }
 
   var endIndex : Int {
-    return _count
+    return _length
   }
 
   subscript(i: Int) -> TestValueTy {
     if boundsChecked {
-      require(i >= 0 && i < _count, evilBoundsError)
+      require(i >= 0 && i < _length, evilBoundsError)
     }
     return TestValueTy(i)
   }
@@ -1611,7 +1611,7 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
 
   let message = step < 0 && evilBoundsCheck
     ? evilBoundsError
-    : "invalid Collection: count differed in successive traversals"
+    : "invalid Collection: length differed in successive traversals"
 
   let constructionMessage =
     /*_isStdlibInternalChecksEnabled() && !evilBoundsCheck && step <= 0
@@ -1632,14 +1632,14 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
     ? t.crashOutputMatches(evilBoundsError) : t)
   .code {
     let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
-    let count0 = evil.count
-    let count1 = evil.count
-    expectNotEqual(count0, count1)
+    let length0 = evil.length
+    let length1 = evil.length
+    expectNotEqual(length0, length1)
    if step > 0 {
-      expectLE(count0, count1)
+      expectLE(length0, length1)
     }
     else {
-      expectGE(count0, count1)
+      expectGE(length0, length1)
     }
     if evilBoundsCheck {
       expectCrashLater()
@@ -1743,7 +1743,7 @@ ArrayTestSuite.test("${array_type}<Void>/map") {
   do {
     let input: ${array_type}<Void> = [ (), (), () ]
     let result = input.map { (_) -> Void in return () }
-    expectEqual(3, result.count)
+    expectEqual(3, result.length)
   }
 
   do {
@@ -1751,7 +1751,7 @@ ArrayTestSuite.test("${array_type}<Void>/map") {
       OpaqueValue(10), OpaqueValue(20), OpaqueValue(30)
     ]
     let result = input.map { (_) -> Void in return () }
-    expectEqual(3, result.count)
+    expectEqual(3, result.length)
   }
 }
 

@@ -471,7 +471,7 @@ internal func _isClassSuperMirror(t: Any.Type) -> Bool {
 extension _Mirror {
   @warn_unused_result
   internal func _superMirror() -> _Mirror? {
-    if self.count > 0 {
+    if self.length > 0 {
       let childMirror = self[0].1
       if _isClassSuperMirror(childMirror.dynamicType) {
         return childMirror
@@ -503,7 +503,7 @@ internal extension Mirror {
       return _oldMirror._superMirror() == nil ? 0 : 1
     }
 
-    var endIndex: Int { return _oldMirror.count }
+    var endIndex: Int { return _oldMirror.length }
 
     subscript(position: Int) -> Child {
       let (label, childMirror) = _oldMirror[position]

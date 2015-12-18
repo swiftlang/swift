@@ -26,7 +26,7 @@ var readed = read(sourceFile, bytes, 11)
 close(sourceFile)
 assert(readed == 11)
 bytes[11] = CChar(0)
-print("the magic word is //\(String.fromCString(bytes)!)//")
+print("the magic word is //\(String(cString: bytes))//")
 
 // CHECK: O_CREAT|O_EXCL returned errno *17*
 let errFile = 

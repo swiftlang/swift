@@ -23,30 +23,30 @@ var LazyTestSuite = TestSuite("Lazy")
 protocol TestProtocol1 {}
 
 //===----------------------------------------------------------------------===//
-// Repeat
+// Repeated
 //===----------------------------------------------------------------------===//
 
 // Check that the generic parameter is called 'Element'.
-extension Repeat where Element : TestProtocol1 {
+extension Repeated where Element : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
 }
 
-LazyTestSuite.test("Repeat") {
+LazyTestSuite.test("Repeated") {
   checkRandomAccessCollection(
     [] as Array<OpaqueValue<Int>>,
-    Repeat(repeating: OpaqueValue(42), count: 0))
+    repeatElement(OpaqueValue(42), count: 0))
     { $0.value == $1.value }
 
   checkRandomAccessCollection(
     [ OpaqueValue(42) ] as Array<OpaqueValue<Int>>,
-    Repeat(repeating: OpaqueValue(42), count: 1))
+    repeatElement(OpaqueValue(42), count: 1))
     { $0.value == $1.value }
 
   checkRandomAccessCollection(
     [ OpaqueValue(42), OpaqueValue(42), OpaqueValue(42) ] as Array<OpaqueValue<Int>>,
-    Repeat(repeating: OpaqueValue(42), count: 3))
+    repeatElement(OpaqueValue(42), count: 3))
     { $0.value == $1.value }
 }
 
@@ -158,28 +158,28 @@ extension LazySequence where Base : TestProtocol1 {
   }
 }
 
-LazyTestSuite.test("LazySequence<Sequence>/underestimateCount") {
+LazyTestSuite.test("LazySequence<Sequence>/underestimateLength") {
   let s = MinimalSequence(
     elements: [ 0, 30, 10, 90 ].map(OpaqueValue.init),
-    underestimatedCount: .Value(42))
+    underestimatedLength: .Value(42))
   var lazySeq = s.lazy
   expectType(LazySequence<MinimalSequence<OpaqueValue<Int>>>.self, &lazySeq)
-  expectEqual(42, lazySeq.underestimateCount())
+  expectEqual(42, lazySeq.underestimateLength())
 }
 
 %for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
 
-LazyTestSuite.test("LazySequence<${traversal}Collection>/underestimateCount") {
+LazyTestSuite.test("LazySequence<${traversal}Collection>/underestimateLength") {
   let s = Minimal${traversal}Collection(
     elements: [ 0, 30, 10, 90 ].map(OpaqueValue.init),
-    underestimatedCount: .Value(42))
+    underestimatedLength: .Value(42))
   var lazySeq = s.lazy
   expectType(
     LazyCollection<
       Minimal${traversal}Collection<OpaqueValue<Int>>
     >.self,
     &lazySeq)
-  expectEqual(42, lazySeq.underestimateCount())
+  expectEqual(42, lazySeq.underestimateLength())
 }
 
 %end
@@ -188,18 +188,18 @@ LazyTestSuite.test("LazySequence<${traversal}Collection>/underestimateCount") {
 // MapSequence
 //===----------------------------------------------------------------------===//
 
-LazyTestSuite.test("MapSequence<Sequence>/underestimateCount") {
+LazyTestSuite.test("MapSequence<Sequence>/underestimateLength") {
   let s = MinimalSequence(
     elements: [ 0, 30, 10, 90 ].map(OpaqueValue.init),
-    underestimatedCount: .Value(42))
+    underestimatedLength: .Value(42))
   var lazyMap = s.lazy.map { OpaqueValue(Int32($0.value)) }
   expectType(
     LazyMapSequence<MinimalSequence<OpaqueValue<Int>>, OpaqueValue<Int32>>.self,
     &lazyMap)
-  expectEqual(42, lazyMap.underestimateCount())
+  expectEqual(42, lazyMap.underestimateLength())
 }
 
-struct SequenceWithCustomUnderestimateCount : Sequence {
+struct SequenceWithCustomUnderestimateLength : Sequence {
   init(_ data: [Int]) {
     self._data = MinimalSequence(elements: data.map(OpaqueValue.init))
   }
@@ -208,28 +208,28 @@ struct SequenceWithCustomUnderestimateCount : Sequence {
     return _data.iterator()
   }
 
-  func underestimateCount() -> Int {
-    ++SequenceWithCustomUnderestimateCount.timesUnderestimateCountWasCalled
-    return _data.underestimateCount()
+  func underestimateLength() -> Int {
+    ++SequenceWithCustomUnderestimateLength.timesUnderestimateLengthWasCalled
+    return _data.underestimateLength()
   }
 
-  static var timesUnderestimateCountWasCalled: Int = 0
+  static var timesUnderestimateLengthWasCalled: Int = 0
 
   let _data: MinimalSequence<OpaqueValue<Int>>
 }
 
 LazyTestSuite.test("LazySequence.array") {
-  SequenceWithCustomUnderestimateCount.timesUnderestimateCountWasCalled = 0
+  SequenceWithCustomUnderestimateLength.timesUnderestimateLengthWasCalled = 0
 
-  let base = SequenceWithCustomUnderestimateCount([ 0, 30, 10, 90 ])
-  let lazySequence = LazySequence(base)
+  let base = SequenceWithCustomUnderestimateLength([ 0, 30, 10, 90 ])
+  let lazySequence = base.lazy
   let arrayFromLazy = Array(lazySequence)
 
   expectEqual([ 0, 30, 10, 90 ], arrayFromLazy.map { $0.value })
 
-  // Lazy sequences should use underestimated count to preallocate array
+  // Lazy sequences should use underestimated length to preallocate array
   // storage.
-  expectEqual(1, SequenceWithCustomUnderestimateCount.timesUnderestimateCountWasCalled)
+  expectEqual(1, SequenceWithCustomUnderestimateLength.timesUnderestimateLengthWasCalled)
 
   expectEqualSequence(
     [], Array(base).map { $0.value }, "sequence should be consumed")
@@ -237,10 +237,10 @@ LazyTestSuite.test("LazySequence.array") {
 
 %for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
 
-LazyTestSuite.test("MapCollection<${traversal}Collection>/underestimateCount") {
+LazyTestSuite.test("MapCollection<${traversal}Collection>/underestimateLength") {
   let s = Minimal${traversal}Collection(
     elements: [ 0, 30, 10, 90 ].map(OpaqueValue.init),
-    underestimatedCount: .Value(42))
+    underestimatedLength: .Value(42))
   var lazyMap = s.lazy.map {
     (input: OpaqueValue<Int>) -> OpaqueValue<Int32> in
     OpaqueValue(Int32(input.value))
@@ -250,7 +250,7 @@ LazyTestSuite.test("MapCollection<${traversal}Collection>/underestimateCount") {
       Minimal${traversal}Collection<OpaqueValue<Int>>, OpaqueValue<Int32>
     >.self,
     &lazyMap)
-  expectEqual(42, lazyMap.underestimateCount())
+  expectEqual(42, lazyMap.underestimateLength())
 }
 
 %end
@@ -274,14 +274,14 @@ extension LazyCollection where Base : TestProtocol1 {
 
 LazyTestSuite.test("LazyCollection.array") {
   let base = Minimal${traversal}Collection(
-    elements: [ 0, 30, 10, 90 ], underestimatedCount: .Value(42))
-  let lazyCollection = LazyCollection(base)
+    elements: [ 0, 30, 10, 90 ], underestimatedLength: .Value(42))
+  let lazyCollection = base.lazy
   let arrayFromLazy = Array(lazyCollection)
 
   expectEqual([ 0, 30, 10, 90 ], arrayFromLazy)
 
-  // Lazy collections should not use underestimated count to preallocate array
-  // storage, since they have access to real count instead.
+  // Lazy collections should not use underestimated length to preallocate array
+  // storage, since they have access to real length instead.
   expectLE(4, arrayFromLazy.capacity)
   expectGE(40, arrayFromLazy.capacity)
 }
@@ -290,8 +290,8 @@ LazyTestSuite.test("LazyCollection.array") {
 LazyTestSuite.test("LazyCollection.reverse") {
   let base = Minimal${traversal}Collection(
     elements: [ 0, 30, 10, 90 ].map(OpaqueValue.init),
-    underestimatedCount: .Value(42))
-  let lazyCollection = LazyCollection(base)
+    underestimatedLength: .Value(42))
+  let lazyCollection = base.lazy
   var reversed = lazyCollection.reverse()
   expectType(
     LazyCollection<${ReversedType}<Minimal${traversal}Collection<OpaqueValue<Int>>>>.self,
@@ -388,12 +388,12 @@ func expectSequencePassthrough<
   where
   S : LazySequenceProtocol, Base : LoggingType,
   Base.Iterator.Element == S.Iterator.Element
->(s: S, base: Base, arbitraryElement: S.Iterator.Element, count: Int) {
+>(s: S, base: Base, arbitraryElement: S.Iterator.Element, length: Int) {
   let baseType = base.dynamicType
 
   SequenceLog.iterator.expectIncrement(baseType) { _ = s.iterator() }
-  SequenceLog.underestimateCount.expectIncrement(baseType) {
-    _ = s.underestimateCount()
+  SequenceLog.underestimateLength.expectIncrement(baseType) {
+    _ = s.underestimateLength()
   }
   SequenceLog._customContainsEquatableElement.expectIncrement(baseType) {
     _ = s._customContainsEquatableElement(arbitraryElement)
@@ -403,12 +403,12 @@ func expectSequencePassthrough<
   }
   
   SequenceLog._initializeTo.expectIncrement(baseType) { ()->Void in
-    let buf = UnsafeMutablePointer<S.Iterator.Element>(allocatingCapacity: count)
+    let buf = UnsafeMutablePointer<S.Iterator.Element>(allocatingCapacity: length)
   
     let end = s._initializeTo(buf)
-    expectTrue(end <= buf + count)
+    expectTrue(end <= buf + length)
     buf.deinitializePointee(count: end - buf)
-    buf.deallocateCapacity(count)
+    buf.deallocateCapacity(length)
   }
 }
 
@@ -420,7 +420,7 @@ tests.test("LazySequence/Passthrough") {
   
   expectSequencePassthrough(
     base.lazy,
-    base: base, arbitraryElement: OpaqueValue(0), count: a.count)
+    base: base, arbitraryElement: OpaqueValue(0), length: a.length)
 }
 
 % for traversal in 'Forward', 'Bidirectional', 'RandomAccess':
@@ -456,7 +456,7 @@ tests.test("LazyCollection/Passthrough") {
     base.lazy,
     base: base.lazy._base,
     arbitraryElement: OpaqueValue(0),
-    count: Int(expected.count))
+    length: Int(expected.length))
 
   let s = base.lazy
   let baseType = base.dynamicType
@@ -473,7 +473,7 @@ tests.test("LazyCollection/Passthrough") {
     _ = s[startIndex..<endIndex]
   }
   CollectionLog.isEmpty.expectIncrement(baseType) { _ = s.isEmpty }
-  CollectionLog.count.expectIncrement(baseType) { _ = s.count }
+  CollectionLog.length.expectIncrement(baseType) { _ = s.length }
   CollectionLog._customIndexOfEquatableElement.expectIncrement(baseType) {
     _ = s._customIndexOfEquatableElement(OpaqueValue(0))
   }
@@ -507,15 +507,15 @@ tests.test("LazyMapSequence") {
     $0.value == $1.value
   }
   
-  expectEqual(expected.count, calls)
+  expectEqual(expected.length, calls)
 }
 
 tests.test("MapSequence/Passthrough") {
   let expected = (0..<100).map(OpaqueValue.init)
   let base = LoggingSequence(expected)
   let mapped = base.lazy.map { OpaqueValue(Double($0.value) / 2.0) }
-  CollectionLog.underestimateCount.expectIncrement(base.dynamicType) {
-    _ = mapped.underestimateCount()
+  CollectionLog.underestimateLength.expectIncrement(base.dynamicType) {
+    _ = mapped.underestimateLength()
   }
   // Not exactly passthrough because we wrap the result
   CollectionLog.iterator.expectIncrement(base.dynamicType) {
@@ -550,7 +550,7 @@ tests.test("LazyMapCollection/${traversal}") {
 
   // check${traversal}Collection makes multiple passes over the input,
   // so we test that each element was transformed *at least* once.
-  expectLE(expected.count, calls)
+  expectLE(expected.length, calls)
 }
 %end
 
@@ -575,8 +575,8 @@ tests.test("LazyMapCollection/Passthrough") {
   CollectionLog.first.expectIncrement(base.dynamicType) {
     _ = mapped.first
   }
-  CollectionLog.underestimateCount.expectIncrement(base.dynamicType) {
-    _ = mapped.underestimateCount()
+  CollectionLog.underestimateLength.expectIncrement(base.dynamicType) {
+    _ = mapped.underestimateLength()
   }
   // Not exactly passthrough because we wrap the result
   CollectionLog.iterator.expectIncrement(base.dynamicType) {
@@ -598,7 +598,7 @@ tests.test("ReverseCollection") {
   do {
     var calls = 0
     _ = r.reverse().map { _ in ++calls }
-    expectEqual(r.count, calls)
+    expectEqual(r.length, calls)
   }
   
   checkBidirectionalCollection(
@@ -609,7 +609,7 @@ tests.test("ReverseCollection") {
   do {
     var calls = 0
     _ = "foobar".characters.reverse().map { _ in ++calls }
-    expectEqual("foobar".characters.count, calls)
+    expectEqual("foobar".characters.length, calls)
   }
 }
 
@@ -714,7 +714,7 @@ tests.test("LazyFilterSequence") {
   }
   expectEqual(100, calls)
 
-  // check that it works when the first element doesn't satify the predicate
+  // Check that it works when the first element doesn't satisfy the predicate
   let odds = 1.stride(to: 100, by: 2).map(OpaqueValue.init)
   filtered =
     MinimalSequence(elements: base).lazy.filter { $0.value % 2 != 0 }
@@ -724,7 +724,7 @@ tests.test("LazyFilterSequence") {
   
   // Try again using explicit construction
   filtered = LazyFilterSequence(
-    MinimalSequence(elements: base),
+    _base: MinimalSequence(elements: base),
     whereElementsSatisfy: { x in ++calls; return x.value % 2 == 0})
   
   expectEqual(100, calls)
@@ -827,7 +827,7 @@ do {
       var calls = 0
       _ = flattened.map { _ in ++calls }
       expectEqual(
-        expected.count, calls,
+        expected.length, calls,
         "unexpected laziness in \(flattened.dynamicType)")
     }
 
@@ -856,7 +856,7 @@ do {
       var calls = 0
       _ = flattened.map { _ in ++calls }
       expectLE(
-        expected.count, calls,
+        expected.length, calls,
         "unexpected laziness in \(flattened.dynamicType)")
     }
     

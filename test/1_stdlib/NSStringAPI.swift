@@ -38,7 +38,7 @@ class NonContiguousNSString : NSString {
   }
 
   @objc override var length: Int {
-    return _value.count
+    return _value.length
   }
 
   @objc override func characterAt(index: Int) -> unichar {
@@ -64,8 +64,9 @@ func createNSStringTemporaryFile()
 var NSStringAPIs = TestSuite("NSStringAPIs")
 
 NSStringAPIs.test("Encodings") {
-  let availableEncodings: [NSStringEncoding] = String.availableStringEncodings()
-  expectNotEqual(0, availableEncodings.count)
+  let availableEncodings: [NSStringEncoding] =
+    String.availableStringEncodings()
+  expectNotEqual(0, availableEncodings.length)
 
   let defaultCStringEncoding = String.defaultCStringEncoding()
   expectTrue(availableEncodings.contains(defaultCStringEncoding))
@@ -479,7 +480,7 @@ NSStringAPIs.test("dataUsingEncoding(_:allowLossyConversion:)") {
     let data = "あいう".dataUsingEncoding(NSUTF8StringEncoding)
     let bytes = Array(
       UnsafeBufferPointer(
-        start: UnsafePointer<UInt8>(data!.bytes), count: data!.length))
+        start: UnsafePointer<UInt8>(data!.bytes), length: data!.length))
     let expectedBytes: [UInt8] = [
       0xe3, 0x81, 0x82, 0xe3, 0x81, 0x84, 0xe3, 0x81, 0x86
     ]
@@ -489,7 +490,7 @@ NSStringAPIs.test("dataUsingEncoding(_:allowLossyConversion:)") {
 
 NSStringAPIs.test("initWithData(_:encoding:)") {
   let bytes: [UInt8] = [0xe3, 0x81, 0x82, 0xe3, 0x81, 0x84, 0xe3, 0x81, 0x86]
-  let data = NSData(bytes: bytes, length: bytes.count)
+  let data = NSData(bytes: bytes, length: bytes.length)
   
   expectEmpty(String(data: data, encoding: NSNonLossyASCIIStringEncoding))
   
@@ -515,7 +516,7 @@ NSStringAPIs.test("enumerateLines(_:)") {
     (line: String, inout stop: Bool)
   in
     lines.append(line)
-    if lines.count == 3 {
+    if lines.length == 3 {
       stop = true
     }
   }
@@ -538,7 +539,7 @@ NSStringAPIs.test("enumerateLinguisticTagsIn(_:scheme:options:orthography:_:") {
     tags.append(tag)
     tokens.append(s[tokenRange])
     sentences.append(s[sentenceRange])
-    if tags.count == 3 {
+    if tags.length == 3 {
       stop = true
     }
   }
@@ -597,10 +598,10 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     // 'maxLength' is limiting.
     let bufferLength = 100
     var expectedStr: [UInt8] = Array("def где ".utf8)
-    while (expectedStr.count != bufferLength) {
+    while (expectedStr.length != bufferLength) {
       expectedStr.append(0xff)
     }
-    var buffer = [UInt8](repeating: 0xff, count: bufferLength)
+    var buffer = [UInt8](repeating: 0xff, length: bufferLength)
     var usedLength = 0
     var remainingRange = startIndex..<endIndex
     var result = s.getBytes(&buffer, maxLength: 11, usedLength: &usedLength,
@@ -618,10 +619,10 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     // completely, since doing that would break a UTF sequence.
     let bufferLength = 5
     var expectedStr: [UInt8] = Array("def ".utf8)
-    while (expectedStr.count != bufferLength) {
+    while (expectedStr.length != bufferLength) {
       expectedStr.append(0xff)
     }
-    var buffer = [UInt8](repeating: 0xff, count: bufferLength)
+    var buffer = [UInt8](repeating: 0xff, length: bufferLength)
     var usedLength = 0
     var remainingRange = startIndex..<endIndex
     var result = s.getBytes(&buffer, maxLength: 11, usedLength: &usedLength,
@@ -638,10 +639,10 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     // 'range' is converted completely.
     let bufferLength = 100
     var expectedStr: [UInt8] = Array("def где gh жз ".utf8)
-    while (expectedStr.count != bufferLength) {
+    while (expectedStr.length != bufferLength) {
       expectedStr.append(0xff)
     }
-    var buffer = [UInt8](repeating: 0xff, count: bufferLength)
+    var buffer = [UInt8](repeating: 0xff, length: bufferLength)
     var usedLength = 0
     var remainingRange = startIndex..<endIndex
     var result = s.getBytes(&buffer, maxLength: bufferLength,
@@ -658,10 +659,10 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     // Inappropriate encoding.
     let bufferLength = 100
     var expectedStr: [UInt8] = Array("def ".utf8)
-    while (expectedStr.count != bufferLength) {
+    while (expectedStr.length != bufferLength) {
       expectedStr.append(0xff)
     }
-    var buffer = [UInt8](repeating: 0xff, count: bufferLength)
+    var buffer = [UInt8](repeating: 0xff, length: bufferLength)
     var usedLength = 0
     var remainingRange = startIndex..<endIndex
     var result = s.getBytes(&buffer, maxLength: bufferLength,
@@ -682,7 +683,7 @@ NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
     // The largest buffer that can not accommodate the string plus null terminator.
     let bufferLength = 16
     var buffer = Array(
-      repeating: CChar(bitPattern: 0xff), count: bufferLength)
+      repeating: CChar(bitPattern: 0xff), length: bufferLength)
     let result = s.getCString(&buffer, maxLength: 100,
       encoding: NSUTF8StringEncoding)
     expectFalse(result)
@@ -691,11 +692,11 @@ NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
     // The smallest buffer where the result can fit.
     let bufferLength = 17
     var expectedStr = "abc あかさた\0".utf8.map { CChar(bitPattern: $0) }
-    while (expectedStr.count != bufferLength) {
+    while (expectedStr.length != bufferLength) {
       expectedStr.append(CChar(bitPattern: 0xff))
     }
     var buffer = Array(
-      repeating: CChar(bitPattern: 0xff), count: bufferLength)
+      repeating: CChar(bitPattern: 0xff), length: bufferLength)
     let result = s.getCString(&buffer, maxLength: 100,
       encoding: NSUTF8StringEncoding)
     expectTrue(result)
@@ -705,7 +706,7 @@ NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
     // Limit buffer size with 'maxLength'.
     let bufferLength = 100
     var buffer = Array(
-      repeating: CChar(bitPattern: 0xff), count: bufferLength)
+      repeating: CChar(bitPattern: 0xff), length: bufferLength)
     let result = s.getCString(&buffer, maxLength: 8,
       encoding: NSUTF8StringEncoding)
     expectFalse(result)
@@ -715,7 +716,7 @@ NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
     let illFormedUTF16 = NonContiguousNSString([ 0xd800 ]) as String
     let bufferLength = 100
     var buffer = Array(
-      repeating: CChar(bitPattern: 0xff), count: bufferLength)
+      repeating: CChar(bitPattern: 0xff), length: bufferLength)
     let result = illFormedUTF16.getCString(&buffer, maxLength: 100,
       encoding: NSUTF8StringEncoding)
     expectFalse(result)
@@ -769,7 +770,7 @@ NSStringAPIs.test("init(bytes:encoding:)") {
   FIXME: Test disabled because the NSString documentation is unclear about
   what should actually happen in this case.
 
-  expectEmpty(String(bytes: bytes, length: bytes.count,
+  expectEmpty(String(bytes: bytes, length: bytes.length,
       encoding: NSASCIIStringEncoding))
   */
 
@@ -780,14 +781,14 @@ NSStringAPIs.test("init(bytesNoCopy:length:encoding:freeWhenDone:)") {
   var s: String = "abc あかさた"
   var bytes: [UInt8] = Array(s.utf8)
   expectOptionalEqual(s, String(bytesNoCopy: &bytes,
-      length: bytes.count, encoding: NSUTF8StringEncoding,
+      length: bytes.length, encoding: NSUTF8StringEncoding,
       freeWhenDone: false))
 
   /*
   FIXME: Test disabled because the NSString documentation is unclear about
   what should actually happen in this case.
 
-  expectEmpty(String(bytesNoCopy: &bytes, length: bytes.count,
+  expectEmpty(String(bytesNoCopy: &bytes, length: bytes.length,
       encoding: NSASCIIStringEncoding, freeWhenDone: false))
   */
 
@@ -798,7 +799,7 @@ NSStringAPIs.test("init(utf16CodeUnits:count:)") {
   let expected = "abc абв \u{0001F60A}"
   let chars: [unichar] = Array(expected.utf16)
 
-  expectEqual(expected, String(utf16CodeUnits: chars, count: chars.count))
+  expectEqual(expected, String(utf16CodeUnits: chars, count: chars.length))
 }
 
 NSStringAPIs.test("init(utf16CodeUnitsNoCopy:count:freeWhenDone:)") {
@@ -806,7 +807,7 @@ NSStringAPIs.test("init(utf16CodeUnitsNoCopy:count:freeWhenDone:)") {
   let chars: [unichar] = Array(expected.utf16)
 
   expectEqual(expected, String(utf16CodeUnitsNoCopy: chars,
-      count: chars.count, freeWhenDone: false))
+      count: chars.length, freeWhenDone: false))
 }
 
 NSStringAPIs.test("init(format:_:...)") {
@@ -858,8 +859,8 @@ NSStringAPIs.test("lastPathComponent") {
 }
 
 NSStringAPIs.test("utf16Count") {
-  expectEqual(1, "a".utf16.count)
-  expectEqual(2, "\u{0001F60A}".utf16.count)
+  expectEqual(1, "a".utf16.length)
+  expectEqual(2, "\u{0001F60A}".utf16.length)
 }
 
 NSStringAPIs.test("lengthOfBytesUsingEncoding(_:)") {
@@ -1018,17 +1019,17 @@ NSStringAPIs.test("lowercaseStringWith(_:)") {
 NSStringAPIs.test("maximumLengthOfBytesUsingEncoding(_:)") {
   do {
     let s = "abc"
-    expectLE(s.utf8.count,
+    expectLE(s.utf8.length,
         s.maximumLengthOfBytesUsingEncoding(NSUTF8StringEncoding))
   }
   do {
     let s = "abc абв"
-    expectLE(s.utf8.count,
+    expectLE(s.utf8.length,
         s.maximumLengthOfBytesUsingEncoding(NSUTF8StringEncoding))
   }
   do {
     let s = "\u{1F60A}"
-    expectLE(s.utf8.count,
+    expectLE(s.utf8.length,
         s.maximumLengthOfBytesUsingEncoding(NSUTF8StringEncoding))
   }
 }
@@ -1339,7 +1340,7 @@ NSStringAPIs.test("smallestEncoding") {
 
 func getHomeDir() -> String {
 #if os(OSX)
-  return String.fromCString(getpwuid(getuid()).pointee.pw_dir)!
+  return String(cString: getpwuid(getuid()).pointee.pw_dir)
 #elseif os(iOS) || os(tvOS) || os(watchOS)
   // getpwuid() returns null in sandboxed apps under iOS simulator.
   return NSHomeDirectory()
@@ -2012,7 +2013,7 @@ func checkCharacterComparison(
 
 NSStringAPIs.test("Character.{Equatable,Hashable,Comparable}") {
   for test in comparisonTests {
-    if test.lhs.characters.count == 1 && test.rhs.characters.count == 1 {
+    if test.lhs.characters.length == 1 && test.rhs.characters.length == 1 {
       let lhsCharacter = Character(test.lhs)
       let rhsCharacter = Character(test.rhs)
       checkCharacterComparison(
@@ -2189,54 +2190,67 @@ func asCCharArray(a: [UInt8]) -> [CChar] {
   return a.map { CChar(bitPattern: $0) }
 }
 
-CStringTests.test("String.fromCString") {
-  do {
-    let s = getNullCString()
-    expectEmpty(String.fromCString(s))
-  }
+CStringTests.test("String.init(validatingUTF8:)") {
   do {
     let (s, dealloc) = getASCIICString()
-    expectOptionalEqual("ab", String.fromCString(s))
+    expectOptionalEqual("ab", String(validatingUTF8: s))
     dealloc()
   }
   do {
     let (s, dealloc) = getNonASCIICString()
-    expectOptionalEqual("аб", String.fromCString(s))
+    expectOptionalEqual("аб", String(validatingUTF8: s))
     dealloc()
   }
   do {
     let (s, dealloc) = getIllFormedUTF8String1()
-    expectEmpty(String.fromCString(s))
+    expectEmpty(String(validatingUTF8: s))
     dealloc()
   }
 }
 
-CStringTests.test("String.fromCStringRepairingIllFormedUTF8") {
-  do {
-    let s = getNullCString()
-    let (result, hadError) = String.fromCStringRepairingIllFormedUTF8(s)
-    expectEmpty(result)
-    expectFalse(hadError)
-  }
+CStringTests.test("String(cString:)") {
   do {
     let (s, dealloc) = getASCIICString()
-    let (result, hadError) = String.fromCStringRepairingIllFormedUTF8(s)
-    expectOptionalEqual("ab", result)
-    expectFalse(hadError)
+    let result = String(cString: s)
+    expectEqual("ab", result)
     dealloc()
   }
   do {
     let (s, dealloc) = getNonASCIICString()
-    let (result, hadError) = String.fromCStringRepairingIllFormedUTF8(s)
-    expectOptionalEqual("аб", result)
-    expectFalse(hadError)
+    let result = String(cString: s)
+    expectEqual("аб", result)
     dealloc()
   }
   do {
     let (s, dealloc) = getIllFormedUTF8String1()
-    let (result, hadError) = String.fromCStringRepairingIllFormedUTF8(s)
-    expectOptionalEqual("\u{41}\u{fffd}\u{fffd}\u{fffd}\u{41}", result)
-    expectTrue(hadError)
+    let result = String(cString: s)
+    expectEqual("\u{41}\u{fffd}\u{fffd}\u{fffd}\u{41}", result)
+    dealloc()
+  }
+}
+
+CStringTests.test("String.decodeCString") {
+  do {
+    let s = getNullCString()
+    let result = String.decodeCString(UnsafePointer(s), `as`: UTF8.self)
+    expectEmpty(result)
+  }
+  do { // repairing
+    let (s, dealloc) = getIllFormedUTF8String1()
+    if let (result, repairsMade) = String.decodeCString(
+      UnsafePointer(s), `as`: UTF8.self, repairingInvalidCodeUnits: true) {
+      expectOptionalEqual("\u{41}\u{fffd}\u{fffd}\u{fffd}\u{41}", result)
+      expectTrue(repairsMade)
+    } else {
+      expectTrue(false, "Expected .Some()")
+    }
+    dealloc()
+  }
+  do { // non repairing
+    let (s, dealloc) = getIllFormedUTF8String1()
+    let result = String.decodeCString(
+      UnsafePointer(s), `as`: UTF8.self, repairingInvalidCodeUnits: false)
+    expectEmpty(result)
     dealloc()
   }
 }

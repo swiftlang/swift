@@ -22,20 +22,12 @@ public protocol _Reflectable {
   func _getMirror() -> _Mirror
 }
 
-/// A unique identifier for a class instance or metatype. This can be used by
-/// reflection clients to recognize cycles in the object graph.
+/// A unique identifier for a class instance or metatype.
 ///
 /// In Swift, only class instances and metatypes have unique identities. There
 /// is no notion of identity for structs, enums, functions, or tuples.
 public struct ObjectIdentifier : Hashable, Comparable {
-  let value: Builtin.RawPointer
-
-  /// Convert to a `UInt` that captures the full value of `self`.
-  ///
-  /// Axiom: `a.uintValue == b.uintValue` iff `a == b`.
-  public var uintValue: UInt {
-    return UInt(Builtin.ptrtoint_Word(value))
-  }
+  internal let _value: Builtin.RawPointer
 
   // FIXME: Better hashing algorithm
   /// The hash value.
@@ -46,30 +38,43 @@ public struct ObjectIdentifier : Hashable, Comparable {
   ///   different invocations of the same program.  Do not persist the
   ///   hash value across program runs.
   public var hashValue: Int {
-    return Int(Builtin.ptrtoint_Word(value))
+    return Int(Builtin.ptrtoint_Word(_value))
   }
 
   /// Construct an instance that uniquely identifies the class instance `x`.
   public init(_ x: AnyObject) {
-    self.value = Builtin.bridgeToRawPointer(x)
+    self._value = Builtin.bridgeToRawPointer(x)
   }
 
   /// Construct an instance that uniquely identifies the metatype `x`.
   public init(_ x: Any.Type) {
-    self.value = unsafeBitCast(x, Builtin.RawPointer.self)
+    self._value = unsafeBitCast(x, Builtin.RawPointer.self)
   }
 }
 
 @warn_unused_result
 public func <(lhs: ObjectIdentifier, rhs: ObjectIdentifier) -> Bool {
-  return lhs.uintValue < rhs.uintValue
+  return UInt(lhs) < UInt(rhs)
 }
 
 @warn_unused_result
 public func ==(x: ObjectIdentifier, y: ObjectIdentifier) -> Bool {
-  return Bool(Builtin.cmp_eq_RawPointer(x.value, y.value))
+  return Bool(Builtin.cmp_eq_RawPointer(x._value, y._value))
 }
 
+extension UInt {
+  /// Create a `UInt` that captures the full value of `objectID`.
+  public init(_ objectID: ObjectIdentifier) {
+    self.init(Builtin.ptrtoint_Word(objectID._value))
+  }
+}
+
+extension Int {
+  /// Create an `Int` that captures the full value of `objectID`.
+  public init(_ objectID: ObjectIdentifier) {
+    self.init(bitPattern: UInt(objectID))
+  }
+}
 
 /// How children of this value should be presented in the IDE.
 public enum _MirrorDisposition {
@@ -110,8 +115,8 @@ public protocol _Mirror {
   /// otherwise.
   var objectIdentifier: ObjectIdentifier? { get }
 
-  /// The count of `value`'s logical children.
-  var count: Int { get }
+  /// The length of `value`'s logical children.
+  var length: Int { get }
 
   /// Get a name and mirror for the `i`th logical child.
   subscript(i: Int) -> (String, _Mirror) { get }
@@ -179,8 +184,8 @@ func _dumpWithMirror<TargetStream : OutputStream>(
 
   for _ in 0..<indent { print(" ", terminator: "", toStream: &targetStream) }
 
-  let count = mirror.count
-  let bullet = count == 0    ? "-"
+  let length = mirror.length
+  let bullet = length == 0    ? "-"
              : maxDepth <= 0 ? "▹" : "▿"
   print("\(bullet) ", terminator: "", toStream: &targetStream)
 
@@ -194,7 +199,7 @@ func _dumpWithMirror<TargetStream : OutputStream>(
       print(" #\(previous)", toStream: &targetStream)
       return
     }
-    let identifier = visitedItems.count
+    let identifier = visitedItems.length
     visitedItems[id] = identifier
     print(" #\(identifier)", terminator: "", toStream: &targetStream)
   }
@@ -203,12 +208,12 @@ func _dumpWithMirror<TargetStream : OutputStream>(
 
   if maxDepth <= 0 { return }
 
-  for i in 0..<count {
+  for i in 0..<length {
     if maxItemCounter <= 0 {
       for _ in 0..<(indent+4) {
         print(" ", terminator: "", toStream: &targetStream)
       }
-      let remainder = count - i
+      let remainder = length - i
       print("(\(remainder)", terminator: "", toStream: &targetStream)
       if i > 0 { print(" more", terminator: "", toStream: &targetStream) }
       if remainder == 1 {
@@ -244,7 +249,7 @@ internal struct _LeafMirror<T>: _Mirror {
   var value: Any { return _value }
   var valueType: Any.Type { return value.dynamicType }
   var objectIdentifier: ObjectIdentifier? { return nil }
-  var count: Int { return 0 }
+  var length: Int { return 0 }
   subscript(i: Int) -> (String, _Mirror) {
     _requirementFailure("no children")
   }
@@ -297,7 +302,7 @@ struct _OpaqueMirror : _Mirror {
   var value: Any { return data.value }
   var valueType: Any.Type { return data.valueType }
   var objectIdentifier: ObjectIdentifier? { return nil }
-  var count: Int { return 0 }
+  var length: Int { return 0 }
   subscript(i: Int) -> (String, _Mirror) {
     _requirementFailure("no children")
   }
@@ -312,13 +317,13 @@ internal struct _TupleMirror : _Mirror {
   var value: Any { return data.value }
   var valueType: Any.Type { return data.valueType }
   var objectIdentifier: ObjectIdentifier? { return nil }
-  var count: Int {
-    @_silgen_name("swift_TupleMirror_count")get
+  var length: Int {
+    @_silgen_name("swift_TupleMirror_length")get
   }
   subscript(i: Int) -> (String, _Mirror) {
     @_silgen_name("swift_TupleMirror_subscript")get
   }
-  var summary: String { return "(\(count) elements)" }
+  var summary: String { return "(\(length) elements)" }
   var quickLookObject: PlaygroundQuickLook? { return nil }
   var disposition: _MirrorDisposition { return .Tuple }
 }
@@ -329,8 +334,8 @@ struct _StructMirror : _Mirror {
   var value: Any { return data.value }
   var valueType: Any.Type { return data.valueType }
   var objectIdentifier: ObjectIdentifier? { return nil }
-  var count: Int {
-    @_silgen_name("swift_StructMirror_count")get
+  var length: Int {
+    @_silgen_name("swift_StructMirror_length")get
   }
   subscript(i: Int) -> (String, _Mirror) {
     @_silgen_name("swift_StructMirror_subscript")get
@@ -349,8 +354,8 @@ struct _EnumMirror : _Mirror {
   var value: Any { return data.value }
   var valueType: Any.Type { return data.valueType }
   var objectIdentifier: ObjectIdentifier? { return nil }
-  var count: Int {
-    @_silgen_name("swift_EnumMirror_count")get
+  var length: Int {
+    @_silgen_name("swift_EnumMirror_length")get
   }
   var caseName: UnsafePointer<CChar> {
     @_silgen_name("swift_EnumMirror_caseName")get
@@ -359,7 +364,7 @@ struct _EnumMirror : _Mirror {
     @_silgen_name("swift_EnumMirror_subscript")get
   }
   var summary: String {
-    let maybeCaseName = String.fromCString(self.caseName)
+    let maybeCaseName = String(validatingUTF8: self.caseName)
     let typeName = _typeName(valueType)
     if let caseName = maybeCaseName {
       return typeName + "." + caseName
@@ -371,8 +376,8 @@ struct _EnumMirror : _Mirror {
 }
 
 @warn_unused_result
-@_silgen_name("swift_ClassMirror_count")
-func _getClassCount(_: _MagicMirrorData) -> Int
+@_silgen_name("swift_ClassMirror_length")
+func _getClassLength(_: _MagicMirrorData) -> Int
 
 @warn_unused_result
 @_silgen_name("swift_ClassMirror_subscript")
@@ -394,8 +399,8 @@ struct _ClassMirror : _Mirror {
   var objectIdentifier: ObjectIdentifier? {
     return data._loadValue() as ObjectIdentifier
   }
-  var count: Int {
-    return _getClassCount(data)
+  var length: Int {
+    return _getClassLength(data)
   }
   subscript(i: Int) -> (String, _Mirror) {
     return _getClassChild(i, data)
@@ -423,8 +428,8 @@ struct _ClassSuperMirror : _Mirror {
   var objectIdentifier: ObjectIdentifier? {
     return nil
   }
-  var count: Int {
-    return _getClassCount(data)
+  var length: Int {
+    return _getClassLength(data)
   }
   subscript(i: Int) -> (String, _Mirror) {
     return _getClassChild(i, data)
@@ -446,7 +451,7 @@ struct _MetatypeMirror : _Mirror {
     return data._loadValue() as ObjectIdentifier
   }
 
-  var count: Int {
+  var length: Int {
     return 0
   }
   subscript(i: Int) -> (String, _Mirror) {

@@ -145,7 +145,7 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() const {
           .Case("array.uninitialized", ArrayCallKind::kArrayUninitialized)
           .Case("array.check_subscript", ArrayCallKind::kCheckSubscript)
           .Case("array.check_index", ArrayCallKind::kCheckIndex)
-          .Case("array.get_count", ArrayCallKind::kGetCount)
+          .Case("array.get_length", ArrayCallKind::kGetCount)
           .Case("array.get_capacity", ArrayCallKind::kGetCapacity)
           .Case("array.get_element", ArrayCallKind::kGetElement)
           .Case("array.owner", ArrayCallKind::kGetArrayOwner)
@@ -506,11 +506,11 @@ bool swift::ArraySemanticsCall::mayHaveBridgedObjectElementType() const {
   assert(hasSelf() && "Need self parameter");
 
   auto Ty = getSelf().getType().getSwiftRValueType();
-  auto Cannonical = Ty.getCanonicalTypeOrNull();
-  if (Cannonical.isNull())
+  auto Canonical = Ty.getCanonicalTypeOrNull();
+  if (Canonical.isNull())
     return true;
 
-  auto *Struct = Cannonical->getStructOrBoundGenericStruct();
+  auto *Struct = Canonical->getStructOrBoundGenericStruct();
   assert(Struct && "Array must be a struct !?");
   if (Struct) {
     auto BGT = dyn_cast<BoundGenericType>(Ty);

@@ -149,10 +149,11 @@ extension Selector : Equatable, Hashable {
 extension Selector : CustomStringConvertible {
   /// A textual representation of `self`.
   public var description: String {
-    if let s = String.fromCStringRepairingIllFormedUTF8(sel_getName(self)).0 {
-      return s
+    let name = sel_getName(self)
+    if name == nil {
+      return "<NULL>"
     }
-    return "<NULL>"
+    return String(cString: name)
   }
 }
 
@@ -160,7 +161,7 @@ extension String {
   /// Construct the C string representation of an Objective-C selector.
   public init(_sel: Selector) {
     // FIXME: This misses the ASCII optimization.
-    self = String.fromCString(sel_getName(_sel))!
+    self = String(cString: sel_getName(_sel))
   }
 }
 

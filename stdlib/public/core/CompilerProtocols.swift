@@ -129,7 +129,7 @@ public protocol _BuiltinExtendedGraphemeClusterLiteralConvertible
 
   init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
-    byteSize: Builtin.Word,
+    lengthInBytes: Builtin.Word,
     isASCII: Builtin.Int1)
 }
 
@@ -149,7 +149,7 @@ public protocol _BuiltinStringLiteralConvertible
 
   init(
     _builtinStringLiteral start: Builtin.RawPointer,
-    byteSize: Builtin.Word,
+    lengthInBytes: Builtin.Word,
     isASCII: Builtin.Int1)
 }
 

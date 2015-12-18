@@ -24,7 +24,7 @@ struct _NSCursorMirror : _Mirror {
 
   var objectIdentifier: ObjectIdentifier? { return .None }
 
-  var count: Int { return 0 }
+  var length: Int { return 0 }
 
   subscript(_: Int) -> (String, _Mirror) {
     _requirementFailure("_Mirror access out of bounds")
@@ -58,7 +58,7 @@ struct _NSViewMirror : _Mirror {
   
   var objectIdentifier: ObjectIdentifier? { get { return .None } }
   
-  var count: Int { get { return 0 } }
+  var length: Int { get { return 0 } }
   
   subscript(_: Int) -> (String, _Mirror) {
     _requirementFailure("_Mirror access out of bounds")

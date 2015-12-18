@@ -88,7 +88,7 @@ void llvm::ilist_traits<SILInstruction>::
 transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
                       llvm::ilist_iterator<SILInstruction> first,
                       llvm::ilist_iterator<SILInstruction> last) {
-  // If transfering instructions within the same basic block, no reason to
+  // If transferring instructions within the same basic block, no reason to
   // update their parent pointers.
   SILBasicBlock *ThisParent = getContainingBlock();
   if (ThisParent == L2.getContainingBlock()) return;

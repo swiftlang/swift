@@ -21,52 +21,13 @@ public enum ImplicitlyUnwrappedOptional<Wrapped>
   case None
   case Some(Wrapped)
 
-  /// Construct a `nil` instance.
-  public init() { self = .None }
-
   /// Construct a non-`nil` instance that stores `some`.
   public init(_ some: Wrapped) { self = .Some(some) }
-
-  /// Construct an instance from an explicitly unwrapped optional
-  /// (`Wrapped?`).
-  public init(_ v: Wrapped?) {
-    switch v {
-    case .Some(let some):
-      self = .Some(some)
-    case .None:
-      self = .None
-    }
-  }
 
   /// Create an instance initialized with `nil`.
   @_transparent public
   init(nilLiteral: ()) {
     self = .None
-  }
-
-  /// If `self == nil`, returns `nil`.  Otherwise, returns `f(self!)`.
-  @warn_unused_result
-  public func map<U>(@noescape f: (Wrapped) throws -> U)
-      rethrows -> ImplicitlyUnwrappedOptional<U> {
-    switch self {
-    case .Some(let y):
-      return .Some(try f(y))
-    case .None:
-      return .None
-    }
-  }
-
-  /// Returns `nil` if `self` is `nil`, `f(self!)` otherwise.
-  @warn_unused_result
-  public func flatMap<U>(
-    @noescape f: (Wrapped) throws -> ImplicitlyUnwrappedOptional<U>
-  ) rethrows -> ImplicitlyUnwrappedOptional<U> {
-    switch self {
-    case .Some(let y):
-      return try f(y)
-    case .None:
-      return .None
-    }
   }
 
   /// Returns a mirror that reflects `self`.

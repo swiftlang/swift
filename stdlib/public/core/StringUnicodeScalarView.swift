@@ -31,11 +31,11 @@ extension String {
   /// encode a `String` .
   public struct UnicodeScalarView : Collection, _Reflectable,
     CustomStringConvertible, CustomDebugStringConvertible {
-    init(_ _core: _StringCore) {
+    internal init(_ _core: _StringCore) {
       self._core = _core
     }
 
-    struct _ScratchIterator : IteratorProtocol {
+    internal struct _ScratchIterator : IteratorProtocol {
       var core: _StringCore
       var idx: Int
       init(_ core: _StringCore, _ pos: Int) {
@@ -120,7 +120,7 @@ extension String {
       var scratch = _ScratchIterator(_core, position._position)
       var decoder = UTF16()
       switch decoder.decode(&scratch) {
-      case .Result(let us):
+      case .ScalarValue(let us):
         return us
       case .EmptyInput:
         _sanityCheckFailure("can not subscript using an endIndex")
@@ -148,12 +148,12 @@ extension String {
             self._ascii = true
             self._asciiBase = UnsafeBufferPointer<UInt8>(
               start: UnsafePointer(_base._baseAddress),
-              count: _base.count).iterator()
+              length: _base.length).iterator()
           } else {
             self._ascii = false
             self._base = UnsafeBufferPointer<UInt16>(
               start: UnsafePointer(_base._baseAddress),
-              count: _base.count).iterator()
+              length: _base.length).iterator()
           }
         } else {
           self._ascii = false
@@ -173,7 +173,7 @@ extension String {
           if _ascii {
             switch self._asciiBase.next() {
             case let x?:
-              result = .Result(UnicodeScalar(x))
+              result = .ScalarValue(UnicodeScalar(x))
             case nil:
               result = .EmptyInput
             }
@@ -184,7 +184,7 @@ extension String {
           result = _decoder.decode(&(self._iterator!))
         }
         switch result {
-        case .Result(let us):
+        case .ScalarValue(let us):
           return us
         case .EmptyInput:
           return nil
@@ -278,7 +278,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`bounds.count`) if `bounds.endIndex
+  /// - Complexity: O(`bounds.length`) if `bounds.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceSubrange<
     C: Collection where C.Iterator.Element == UnicodeScalar

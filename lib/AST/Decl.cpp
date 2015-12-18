@@ -2272,7 +2272,7 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
   }
 
   // All of the direct superclass's designated initializers have been overridden
-  // by the sublcass. Initializers can be inherited.
+  // by the subclass. Initializers can be inherited.
   ClassDeclBits.InheritsSuperclassInits
     = static_cast<unsigned>(StoredInheritsSuperclassInits::Inherited);
   return true;
@@ -3371,7 +3371,10 @@ void SubscriptDecl::setIndices(Pattern *p) {
 }
 
 Type SubscriptDecl::getIndicesType() const {
-  return getType()->castTo<AnyFunctionType>()->getInput();
+  const auto type = getType();
+  if (type->is<ErrorType>())
+    return type;
+  return type->castTo<AnyFunctionType>()->getInput();
 }
 
 Type SubscriptDecl::getIndicesInterfaceType() const {

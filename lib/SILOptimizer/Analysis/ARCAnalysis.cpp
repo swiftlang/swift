@@ -28,65 +28,6 @@ using namespace swift;
 //                             Decrement Analysis
 //===----------------------------------------------------------------------===//
 
-static bool isKnownToNotDecrementRefCount(FunctionRefInst *FRI) {
-   return llvm::StringSwitch<bool>(FRI->getReferencedFunction()->getName())
-     .Case("swift_keepAlive", true)
-     .Default(false);
-}
-
-static bool canApplyDecrementRefCount(OperandValueArrayRef Ops, SILValue Ptr,
-                                      AliasAnalysis *AA) {
-  // Ok, this apply *MAY* decrement ref counts. Now our strategy is to attempt
-  // to use properties of the pointer, the function's arguments, and the
-  // function itself to prove that the pointer cannot have its ref count
-  // affected by the applied function.
-
-  // TODO: Put in function property check section here when we get access to
-  // such information.
-
-  // First make sure that the underlying object of ptr is a local object which
-  // does not escape. This prevents the apply from indirectly via the global
-  // affecting the reference count of the pointer.
-  if (!isNonEscapingLocalObject(getUnderlyingObject(Ptr)))
-    return true;
-
-  // Now that we know that the function can not affect the pointer indirectly,
-  // make sure that the apply can not affect the pointer directly via the
-  // applies arguments by proving that the pointer can not alias any of the
-  // functions arguments.
-  for (auto Op : Ops) {
-    for (int i = 0, e = Ptr->getNumTypes(); i < e; i++) {
-      if (!AA->isNoAlias(Op, SILValue(Ptr.getDef(), i)))
-        return true;
-    }
-  }
-
-  // Success! The apply inst can not affect the reference count of ptr!
-  return false;
-}
-
-static bool canApplyDecrementRefCount(ApplyInst *AI, SILValue Ptr,
-                                      AliasAnalysis *AA) {
-  // Ignore any thick functions for now due to us not handling the ref-counted
-  // nature of its context.
-  if (auto FTy = AI->getCallee().getType().getAs<SILFunctionType>())
-    if (FTy->getExtInfo().hasContext())
-      return true;
-
-  // Treat applications of @noreturn functions as decrementing ref counts. This
-  // causes the apply to become a sink barrier for ref count increments.
-  if (AI->getCallee().getType().getAs<SILFunctionType>()->isNoReturn())
-    return true;
-
-  // swift_keepAlive can not retain values. Remove this when we get rid of that.
-  if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
-    if (isKnownToNotDecrementRefCount(FRI))
-      return false;
-
-  return canApplyDecrementRefCount(AI->getArgumentsWithoutIndirectResult(),
-                                   Ptr, AA);
-}
-
 bool swift::mayDecrementRefCount(SILInstruction *User,
                                  SILValue Ptr, AliasAnalysis *AA) {
   // First do a basic check, mainly based on the type of instruction.
@@ -97,9 +38,11 @@ bool swift::mayDecrementRefCount(SILInstruction *User,
   // Ok, this instruction may have ref counts. If it is an apply, attempt to
   // prove that the callee is unable to affect Ptr.
   if (auto *AI = dyn_cast<ApplyInst>(User))
-    return canApplyDecrementRefCount(AI, Ptr, AA);
+    return AA->canApplyDecrementRefCount(AI, Ptr);
+  if (auto *TAI = dyn_cast<TryApplyInst>(User))
+    return AA->canApplyDecrementRefCount(TAI, Ptr);
   if (auto *BI = dyn_cast<BuiltinInst>(User))
-    return canApplyDecrementRefCount(BI->getArguments(), Ptr, AA);
+    return AA->canBuiltinDecrementRefCount(BI, Ptr);
 
   // We can not conservatively prove that this instruction can not decrement the
   // ref count of Ptr. So assume that it does.

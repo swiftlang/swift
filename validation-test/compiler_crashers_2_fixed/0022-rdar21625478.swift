@@ -94,7 +94,7 @@ public class SequenceLog {
     return LoggingSequence(LoggingSequence(s))
   }
   public static var iterator = TypeIndexed(0)
-  public static var underestimateCount = TypeIndexed(0)
+  public static var underestimateLength = TypeIndexed(0)
   public static var map = TypeIndexed(0)
   public static var filter = TypeIndexed(0)
   public static var _customContainsEquatableElement = TypeIndexed(0)
@@ -116,9 +116,9 @@ extension LoggingSequenceType
     return LoggingIterator(base.iterator())
   }
 
-  public func underestimateCount() -> Int {
-    ++Log.underestimateCount[selfType]
-    return base.underestimateCount()
+  public func underestimateLength() -> Int {
+    ++Log.underestimateLength[selfType]
+    return base.underestimateLength()
   }
 
   public func map<T>(
@@ -192,7 +192,7 @@ public class CollectionLog : SequenceLog {
   static var subscriptIndex = TypeIndexed(0)
   static var subscriptRange = TypeIndexed(0)
   static var isEmpty = TypeIndexed(0)
-  static var count = TypeIndexed(0)
+  static var length = TypeIndexed(0)
   static var _customIndexOfEquatableElement = TypeIndexed(0)
   static var first = TypeIndexed(0)
 }
@@ -228,9 +228,9 @@ where Index == Base.Index {
     return base.isEmpty
   }
 
-  public var count: Base.Index.Distance {
-    ++CollectionLog.count[selfType]
-    return base.count
+  public var length: Base.Index.Distance {
+    ++CollectionLog.length[selfType]
+    return base.length
   }
   
   public func _customIndexOfEquatableElement(element: Base.Iterator.Element) -> Base.Index?? {

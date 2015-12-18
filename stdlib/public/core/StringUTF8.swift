@@ -29,21 +29,21 @@ extension _StringCore {
   /// 0xFF.
   @warn_unused_result
   func _encodeSomeUTF8(i: Int) -> (Int, _UTF8Chunk) {
-    _sanityCheck(i <= count)
+    _sanityCheck(i <= length)
 
     if _fastPath(elementWidth == 1) {
       // How many UTF-16 code units might we use before we've filled up
       // our _UTF8Chunk with UTF-8 code units?
-      let utf16Count = min(sizeof(_UTF8Chunk.self), count - i)
+      let utf16Length = Swift.min(sizeof(_UTF8Chunk.self), length - i)
 
       var result: _UTF8Chunk = ~0 // Start with all bits set
 
       _memcpy(
         dest: UnsafeMutablePointer(Builtin.addressof(&result)),
         src: UnsafeMutablePointer(startASCII + i),
-        size: numericCast(utf16Count))
+        size: numericCast(utf16Length))
 
-      return (i + utf16Count, result)
+      return (i + utf16Length, result)
     } else if _fastPath(!_baseAddress._isNull) {
       return _encodeSomeContiguousUTF16AsUTF8(i)
     } else {
@@ -62,7 +62,7 @@ extension _StringCore {
     _sanityCheck(elementWidth == 2)
     _sanityCheck(!_baseAddress._isNull)
 
-    let storage = UnsafeBufferPointer(start: startUTF16, count: self.count)
+    let storage = UnsafeBufferPointer(start: startUTF16, length: self.length)
     return _transcodeSomeUTF16AsUTF8(storage, i)
   }
 
@@ -75,7 +75,7 @@ extension _StringCore {
     _sanityCheck(_baseAddress._isNull)
 
     let storage = _CollectionOf<Int, UInt16>(
-      startIndex: 0, endIndex: self.count) {
+      startIndex: 0, endIndex: self.length) {
       (i: Int) -> UInt16 in
       return _cocoaStringSubscript(self, i)
     }
@@ -95,7 +95,7 @@ extension String {
     init(_ _core: _StringCore) {
       self._core = _core
       self._endIndex = Index(_core, _core.endIndex, Index._emptyBuffer)
-      if _fastPath(_core.count != 0) {
+      if _fastPath(_core.length != 0) {
         let (_, buffer) = _core._encodeSomeUTF8(0)
         self._startIndex = Index(_core, 0, buffer)
       } else {
@@ -119,7 +119,7 @@ extension String {
         self._coreIndex = _coreIndex
         self._buffer = _buffer
         _sanityCheck(_coreIndex >= 0)
-        _sanityCheck(_coreIndex <= _core.count)
+        _sanityCheck(_coreIndex <= _core.length)
       }
 
       /// Returns the next consecutive value after `self`.
@@ -265,7 +265,7 @@ extension String {
   /// `withUnsafeBufferPointer` on the `ContiguousArray`.
   public var nulTerminatedUTF8: ContiguousArray<UTF8.CodeUnit> {
     var result = ContiguousArray<UTF8.CodeUnit>()
-    result.reserveCapacity(utf8.count + 1)
+    result.reserveCapacity(utf8.length + 1)
     result += utf8
     result.append(0)
     return result

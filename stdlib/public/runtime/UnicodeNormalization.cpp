@@ -78,7 +78,7 @@ public:
     return &collation;
   }
 
-  /// Maps an ASCII character to an collation element priority as would be
+  /// Maps an ASCII character to a collation element priority as would be
   /// returned by a call to ucol_next().
   int32_t map(unsigned char c) const {
     return CollationTable[c];
@@ -287,7 +287,7 @@ int32_t _swift_stdlib_unicode_strToUpper(uint16_t *Destination,
 /// Convert the unicode string to lowercase. This function will return the
 /// required buffer length as a result. If this length does not match the
 /// 'DestinationCapacity' this function must be called again with a buffer of
-/// the required length to get an lowercase version of the string.
+/// the required length to get a lowercase version of the string.
 extern "C"
 int32_t _swift_stdlib_unicode_strToLower(uint16_t *Destination,
                                          int32_t DestinationCapacity,

@@ -19,7 +19,7 @@
 /// A unicode scalar value, an indication that no more unicode scalars
 /// are available, or an indication of a decoding error.
 public enum UnicodeDecodingResult {
-  case Result(UnicodeScalar)
+  case ScalarValue(UnicodeScalar)
   case EmptyInput
   case Error
 
@@ -413,7 +413,7 @@ public struct UTF8 : UnicodeCodec {
 
     if cu0 < 0x80 {
       // 1-byte sequences.
-      return .Result(UnicodeScalar(UInt32(cu0)))
+      return .ScalarValue(UnicodeScalar(UInt32(cu0)))
     }
 
     // Start with octet 1 (we'll mask off high bits later).
@@ -425,7 +425,7 @@ public struct UTF8 : UnicodeCodec {
     result = (result << 6) | UInt32(cu1 & 0x3f)
     if cu0 < 0xe0 {
       // 2-byte sequences.
-      return .Result(UnicodeScalar(result & 0x000007ff)) // 11 bits
+      return .ScalarValue(UnicodeScalar(result & 0x000007ff)) // 11 bits
     }
 
     let cu2 = UInt8(buffer & 0xff)
@@ -434,14 +434,14 @@ public struct UTF8 : UnicodeCodec {
     result = (result << 6) | UInt32(cu2 & 0x3f)
     if cu0 < 0xf0 {
       // 3-byte sequences.
-      return .Result(UnicodeScalar(result & 0x0000ffff)) // 16 bits
+      return .ScalarValue(UnicodeScalar(result & 0x0000ffff)) // 16 bits
     }
 
     // 4-byte sequences.
     let cu3 = UInt8(buffer & 0xff)
     _lookaheadFlags >>= 1
     result = (result << 6) | UInt32(cu3 & 0x3f)
-    return .Result(UnicodeScalar(result & 0x001fffff)) // 21 bits
+    return .ScalarValue(UnicodeScalar(result & 0x001fffff)) // 21 bits
   }
 
   /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
@@ -551,7 +551,7 @@ public struct UTF16 : UnicodeCodec {
     if _fastPath((unit0 >> 11) != 0b1101_1) {
       // Neither high-surrogate, nor low-surrogate -- sequence of 1 code unit,
       // decoding is trivial.
-      return .Result(UnicodeScalar(unit0))
+      return .ScalarValue(UnicodeScalar(unit0))
     }
 
     if _slowPath((unit0 >> 10) == 0b1101_11) {
@@ -577,7 +577,7 @@ public struct UTF16 : UnicodeCodec {
       // `unit1` is a low-surrogate.  We have a well-formed surrogate pair.
 
       let result = 0x10000 + (((unit0 & 0x03ff) << 10) | (unit1 & 0x03ff))
-      return .Result(UnicodeScalar(result))
+      return .ScalarValue(UnicodeScalar(result))
     }
 
     // Otherwise, we have an ill-formed sequence.  These are the possible
@@ -602,7 +602,7 @@ public struct UTF16 : UnicodeCodec {
   >(inout input: I) -> (UnicodeDecodingResult, Int) {
     let result = decode(&input)
     switch result {
-    case .Result(let us):
+    case .ScalarValue(let us):
       return (result, UTF16.width(us))
 
     case .EmptyInput:
@@ -665,7 +665,7 @@ public struct UTF32 : UnicodeCodec {
   >(inout input: I) -> UnicodeDecodingResult {
     guard let x = input.next() else { return .EmptyInput }
     if _fastPath((x >> 11) != 0b1101_1 && x <= 0x10ffff) {
-      return .Result(UnicodeScalar(x))
+      return .ScalarValue(UnicodeScalar(x))
     } else {
       return .Error
     }
@@ -709,7 +709,7 @@ public func transcode<
           !scalar.isEmptyInput();
           scalar = inputDecoder.decode(&input) {
     switch scalar {
-    case .Result(let us):
+    case .ScalarValue(let us):
       OutputEncoding.encode(us, output: output)
     case .EmptyInput:
       _sanityCheckFailure("should not enter the loop when input becomes empty")
@@ -752,7 +752,7 @@ internal func _transcodeSomeUTF16AsUTF8<
       result |= _UTF8Chunk(u) << shift
       utf8Count += 1
     } else {
-      var scalarUtf8Length: Int
+      var scalarUTF8Length: Int
       var r: UInt
       if _fastPath((u >> 11) != 0b1101_1) {
         // Neither high-surrogate, nor low-surrogate -- well-formed sequence
@@ -761,14 +761,14 @@ internal func _transcodeSomeUTF16AsUTF8<
           r = 0b10__00_0000__110__0_0000
           r |= u >> 6
           r |= (u & 0b11_1111) << 8
-          scalarUtf8Length = 2
+          scalarUTF8Length = 2
         }
         else {
           r = 0b10__00_0000__10__00_0000__1110__0000
           r |= u >> 12
           r |= ((u >> 6) & 0b11_1111) << 8
           r |= (u        & 0b11_1111) << 16
-          scalarUtf8Length = 3
+          scalarUTF8Length = 3
         }
       } else {
         let unit0 = u
@@ -776,12 +776,12 @@ internal func _transcodeSomeUTF16AsUTF8<
           // `unit0` is a low-surrogate.  We have an ill-formed sequence.
           // Replace it with U+FFFD.
           r = 0xbdbfef
-          scalarUtf8Length = 3
+          scalarUTF8Length = 3
         } else if _slowPath(nextIndex.advancedBy(1) == endIndex) {
           // We have seen a high-surrogate and EOF, so we have an ill-formed
           // sequence.  Replace it with U+FFFD.
           r = 0xbdbfef
-          scalarUtf8Length = 3
+          scalarUTF8Length = 3
         } else {
           let unit1 = UInt(input[nextIndex.advancedBy(1)])
           if _fastPath((unit1 >> 10) == 0b1101_11) {
@@ -794,22 +794,22 @@ internal func _transcodeSomeUTF16AsUTF8<
             r |= ((v >> 12) & 0b11_1111) << 8
             r |= ((v >> 6) & 0b11_1111) << 16
             r |= (v        & 0b11_1111) << 24
-            scalarUtf8Length = 4
+            scalarUTF8Length = 4
             utf16Length = 2
           } else {
             // Otherwise, we have an ill-formed sequence.  Replace it with
             // U+FFFD.
             r = 0xbdbfef
-            scalarUtf8Length = 3
+            scalarUTF8Length = 3
           }
         }
       }
       // Don't overrun the buffer
-      if utf8Count + scalarUtf8Length > utf8Max {
+      if utf8Count + scalarUTF8Length > utf8Max {
         break
       }
       result |= numericCast(r) << shift
-      utf8Count += scalarUtf8Length
+      utf8Count += scalarUTF8Length
     }
     nextIndex = nextIndex.advancedBy(utf16Length)
   }
@@ -901,16 +901,16 @@ extension UTF16 {
   public // @testable
   static func _copy<T : _StringElement, U : _StringElement>(
     source: UnsafeMutablePointer<T>,
-    destination: UnsafeMutablePointer<U>, count: Int
+    destination: UnsafeMutablePointer<U>, length: Int
   ) {
     if strideof(T.self) == strideof(U.self) {
       _memcpy(
         dest: UnsafeMutablePointer(destination),
         src: UnsafeMutablePointer(source),
-        size: UInt(count) * UInt(strideof(U.self)))
+        size: UInt(length) * UInt(strideof(U.self)))
     }
     else {
-      for i in 0..<count {
+      for i in 0..<length {
         let u16 = T._toUTF16CodeUnit((source + i).pointee)
         (destination + i).pointee = U._fromUTF16CodeUnit(u16)
       }
@@ -939,7 +939,7 @@ extension UTF16 {
     loop:
     while true {
       switch inputDecoder.decode(&input) {
-      case .Result(let us):
+      case .ScalarValue(let us):
         if us.value > 0x7f {
           isAscii = false
         }

@@ -290,7 +290,7 @@ bool StackPromoter::canPromoteAlloc(SILInstruction *AI,
                                     SILInstruction *&DeallocInsertionPoint) {
   AllocInsertionPoint = nullptr;
   DeallocInsertionPoint = nullptr;
-  auto *Node = ConGraph->getNode(AI, EA);
+  auto *Node = ConGraph->getNodeOrNull(AI, EA);
   if (!Node)
     return false;
 

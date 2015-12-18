@@ -5,17 +5,17 @@ sil_stage canonical
 import Builtin
 import Swift
 
-sil [_semantics "array.get_count"] @getCount : $@convention(method) (@guaranteed Array<Int>) -> Int
+sil [_semantics "array.get_length"] @getCount : $@convention(method) (@guaranteed Array<Int>) -> Int
 sil [_semantics "array.get_capacity"] @getCapacity : $@convention(method) (@guaranteed Array<Int>) -> Int
 sil [_semantics "array.check_subscript"] @checkSubscript : $@convention(method) (Int, Bool, @guaranteed Array<Int>) -> ()
 sil [_semantics "array.check_index"] @checkIndex : $@convention(method) (Int, @guaranteed Array<Int>) -> ()
 
-// CHECK-LABEL:   sil @cse_get_count
+// CHECK-LABEL:   sil @cse_get_length
 // CHECK:           [[R:%[0-9]+]] = apply
 // CHECK-NOT:       apply
 // CHECK:           tuple ([[R]] : $Int, [[R]] : $Int)
 // CHECK-NEXT:      return
-sil @cse_get_count : $@convention(thin) (@guaranteed Array<Int>) -> (Int, Int) {
+sil @cse_get_length : $@convention(thin) (@guaranteed Array<Int>) -> (Int, Int) {
 bb0(%0 : $Array<Int>):
   %f1 = function_ref @getCount : $@convention(method) (@guaranteed Array<Int>) -> Int
   %c1 = apply %f1(%0) : $@convention(method) (@guaranteed Array<Int>) -> Int

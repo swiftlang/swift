@@ -85,7 +85,7 @@ public protocol Sequence {
   ///
   /// - Complexity: O(N).
   @warn_unused_result
-  func underestimateCount() -> Int
+  func underestimateLength() -> Int
 
   /// Return an `Array` containing the results of mapping `transform`
   /// over `self`.
@@ -122,7 +122,7 @@ public protocol Sequence {
   ///   exit from the current call to `body`, not any outer scope, and won't
   ///   skip subsequent calls.
   ///
-  /// - Complexity: O(`self.count`)
+  /// - Complexity: O(`self.length`)
   func forEach(@noescape body: (Iterator.Element) throws -> Void) rethrows
 
   /// Returns a subsequence containing all but the first `n` elements.
@@ -136,14 +136,14 @@ public protocol Sequence {
   ///
   /// - Requires: `self` is a finite sequence.
   /// - Requires: `n >= 0`
-  /// - Complexity: O(`self.count`)
+  /// - Complexity: O(`self.length`)
   @warn_unused_result
   func dropLast(n: Int) -> SubSequence
 
   /// Returns a subsequence, up to `maxLength` in length, containing the
   /// initial elements.
   ///
-  /// If `maxLength` exceeds `self.count`, the result contains all
+  /// If `maxLength` exceeds `self.length`, the result contains all
   /// the elements of `self`.
   ///
   /// - Requires: `maxLength >= 0`
@@ -153,7 +153,7 @@ public protocol Sequence {
   /// Returns a slice, up to `maxLength` in length, containing the
   /// final elements of `s`.
   ///
-  /// If `maxLength` exceeds `s.count`, the result contains all
+  /// If `maxLength` exceeds `s.length`, the result contains all
   /// the elements of `s`.
   ///
   /// - Requires: `self` is a finite sequence.
@@ -296,7 +296,7 @@ extension Sequence {
   public func map<T>(
     @noescape transform: (Iterator.Element) throws -> T
   ) rethrows -> [T] {
-    let initialCapacity = underestimateCount()
+    let initialCapacity = underestimateLength()
     var result = ContiguousArray<T>()
     result.reserveCapacity(initialCapacity)
 
@@ -363,7 +363,7 @@ extension Sequence {
   ///
   /// - Requires: `self` is a finite collection.
   /// - Requires: `n >= 0`
-  /// - Complexity: O(`self.count`)
+  /// - Complexity: O(`self.length`)
   @warn_unused_result
   public func dropLast(n: Int) -> AnySequence<Iterator.Element> {
     _require(n >= 0, "Can't drop a negative number of elements from a sequence")
@@ -379,7 +379,7 @@ extension Sequence {
     var i = ringBuffer.startIndex
 
     for element in self {
-      if ringBuffer.count < n {
+      if ringBuffer.length < n {
         ringBuffer.append(element)
       } else {
         result.append(ringBuffer[i])
@@ -403,7 +403,7 @@ extension Sequence {
       let base = box._base
       let folded = _PrefixSequence(
         base._iterator,
-        maxLength: min(base._maxLength, maxLength),
+        maxLength: Swift.min(base._maxLength, maxLength),
         taken: base._taken)
       return AnySequence(folded)
     }
@@ -420,12 +420,12 @@ extension Sequence {
     // and return it. This saves memory for sequences particularly longer
     // than `maxLength`.
     var ringBuffer: [Iterator.Element] = []
-    ringBuffer.reserveCapacity(min(maxLength, underestimateCount()))
+    ringBuffer.reserveCapacity(Swift.min(maxLength, underestimateLength()))
 
     var i = ringBuffer.startIndex
 
     for element in self {
-      if ringBuffer.count < maxLength {
+      if ringBuffer.length < maxLength {
         ringBuffer.append(element)
       } else {
         ringBuffer[i] = element
@@ -493,7 +493,7 @@ extension Sequence {
         if !appendSubsequence() {
           continue
         }
-        if result.count == maxSplit {
+        if result.length == maxSplit {
           break
         }
       } else {
@@ -514,7 +514,7 @@ extension Sequence {
   ///
   /// - Complexity: O(N).
   @warn_unused_result
-  public func underestimateCount() -> Int {
+  public func underestimateLength() -> Int {
     return 0
   }
 
@@ -550,7 +550,7 @@ extension Sequence {
   ///   exit from the current call to `body`, not any outer scope, and won't
   ///   skip subsequent calls.
   ///
-  /// - Complexity: O(`self.count`)
+  /// - Complexity: O(`self.length`)
   public func forEach(
     @noescape body: (Iterator.Element) throws -> Void
   ) rethrows {
@@ -597,7 +597,8 @@ extension Sequence {
   /// Returns a subsequence containing all but the last element.
   ///
   /// - Requires: `self` is a finite sequence.
-  /// - Complexity: O(`self.count`)
+  /// - Requires: `n >= 0`
+  /// - Complexity: O(`self.length`)
   @warn_unused_result
   public func dropLast() -> SubSequence  { return dropLast(1) }
 }

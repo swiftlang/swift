@@ -34,9 +34,9 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   /// This value may be nontrivial to compute; it is usually a good
   /// idea to store this information in the "value" area when
   /// an instance is created.
-  public final var allocatedElementCount: Int {
+  public final var capacity: Int {
     let p = ManagedBufferPointer<Value,Element>(self)
-    return p.allocatedElementCount
+    return p.capacity
   }
 
   /// Call `body` with an `UnsafeMutablePointer` to the stored
@@ -87,7 +87,7 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
 /// Note that the `Element` array is suitably-aligned **raw memory**.
 /// You are expected to construct and---if necessary---destroy objects
 /// there yourself, using the APIs on `UnsafeMutablePointer<Element>`.
-/// Typical usage stores a count and capacity in `Value` and destroys
+/// Typical usage stores a length and capacity in `Value` and destroys
 /// any live elements in the `deinit` of a subclass.
 /// - Note: Subclasses must not have any stored properties; any storage
 ///   needed should be included in `Value`.
@@ -147,13 +147,13 @@ public class ManagedBuffer<Value, Element>
 ///        deinit {
 ///          Manager(unsafeBufferObject: self).withUnsafeMutablePointers {
 ///            (pointerToValue, pointerToElements)->Void in
-///            pointerToElements.deinitializePointee(count: self.count)
+///            pointerToElements.deinitializePointee(count: self.length)
 ///            pointerToValue.deinitializePointee()
 ///          }
 ///        }
 ///
 ///        // All properties are *computed* based on members of the Value
-///        var count: Int {
+///        var length: Int {
 ///          return Manager(unsafeBufferObject: self).value.0
 ///        }
 ///        var name: String {
@@ -181,7 +181,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   public init(
     bufferClass: AnyClass,
     minimumCapacity: Int,
-    initialValue: (buffer: AnyObject, allocatedCount: (AnyObject)->Int)->Value
+    initialValue: (buffer: AnyObject, capacity: (AnyObject)->Int)->Value
   ) {
     self = ManagedBufferPointer(bufferClass: bufferClass, minimumCapacity: minimumCapacity)
 
@@ -190,8 +190,8 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
       $0.initializeMemory(
         initialValue(
           buffer: self.buffer,
-          allocatedCount: {
-            ManagedBufferPointer(unsafeBufferObject: $0).allocatedElementCount
+          capacity: {
+            ManagedBufferPointer(unsafeBufferObject: $0).capacity
           }))
     }
     // FIXME: workaround for <rdar://problem/18619176>.  If we don't
@@ -243,8 +243,8 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// This value may be nontrivial to compute; it is usually a good
   /// idea to store this information in the "value" area when
   /// an instance is created.
-  public var allocatedElementCount: Int {
-    return (_allocatedByteCount &- _My._elementOffset) / strideof(Element)
+  public var capacity: Int {
+    return (_capacityInBytes &- _My._elementOffset) / strideof(Element)
   }
 
   /// Call `body` with an `UnsafeMutablePointer` to the stored
@@ -395,7 +395,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   }
 
   /// The actual number of bytes allocated for this object.
-  internal var _allocatedByteCount: Int {
+  internal var _capacityInBytes: Int {
     return _swift_stdlib_malloc_size(_address)
   }
 

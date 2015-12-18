@@ -80,7 +80,7 @@ public func createTemporaryFile(
   var fileName = fileNamePrefix + "XXXXXX" + fileNameSuffix
 #endif
   let fd = _stdlib_mkstemps(
-    &fileName, CInt(fileNameSuffix.utf8.count))
+    &fileName, CInt(fileNameSuffix.utf8.length))
   if fd < 0 {
     fatalError("mkstemps() returned an error")
   }
@@ -161,8 +161,8 @@ public func forAllPermutations(size: Int, body: ([Int]) -> Void) {
     return
   }
 
-  var permutation = [Int](repeating: 0, count: size)
-  var visited = [Bool](repeating: false, count: size)
+  var permutation = [Int](repeating: 0, length: size)
+  var visited = [Bool](repeating: false, length: size)
   _forAllPermutationsImpl(0, size, &permutation, &visited, body)
 }
 
@@ -171,7 +171,7 @@ public func forAllPermutations<S : Sequence>(
   sequence: S, body: ([S.Iterator.Element]) -> Void
 ) {
   let data = Array(sequence)
-  forAllPermutations(data.count) {
+  forAllPermutations(data.length) {
     (indices: [Int]) in
     body(indices.map { data[$0] })
     return ()

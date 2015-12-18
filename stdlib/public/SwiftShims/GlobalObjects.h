@@ -26,7 +26,7 @@ namespace swift { extern "C" {
 #endif
 
 struct _SwiftArrayBodyStorage {
-  __swift_intptr_t count;
+  __swift_intptr_t length;
   __swift_uintptr_t _capacityAndFlags;
 };
 

@@ -150,7 +150,7 @@ func _introSort<
 %   if p:
   var comp = isOrderedBefore
 %   end
-  let len = range.count.toIntMax()
+  let len = range.length.toIntMax()
   if len < 2 {
     return
   }
@@ -171,7 +171,7 @@ func _introSortImpl<
 ) {
 
   // Insertion sort is better at handling smaller regions.
-  if range.count < 20 {
+  if range.length < 20 {
     _insertionSort(&elements, range ${", &isOrderedBefore" if p else ""})
     return
   }
@@ -200,20 +200,20 @@ func _siftDown<
   _ range: Range<C.Index> ${"," if p else ""}
   ${"inout _ isOrderedBefore: (C.Iterator.Element, C.Iterator.Element)->Bool" if p else ""}
 ) {
-  let countToIndex = (range.startIndex..<index).count
-  let countFromIndex = (index..<range.endIndex).count
+  let lengthToIndex = (range.startIndex..<index).length
+  let lengthFromIndex = (index..<range.endIndex).length
   // Check if left child is within bounds. If not, return, because there are
   // no children of the given node in the heap.
-  if countToIndex + 1 >= countFromIndex {
+  if lengthToIndex + 1 >= lengthFromIndex {
     return
   }
-  let left = index.advancedBy(countToIndex + 1)
+  let left = index.advancedBy(lengthToIndex + 1)
   var largest = index
   if ${cmp("elements[largest]", "elements[left]", p)} {
     largest = left
   }
   // Check if right child is also within bounds before trying to examine it.
-  if countToIndex + 2 < countFromIndex {
+  if lengthToIndex + 2 < lengthFromIndex {
     let right = left + 1
     if ${cmp("elements[largest]", "elements[right]", p)} {
       largest = right
@@ -241,7 +241,7 @@ func _heapify<
   // We skip the rightmost half of the array, because these nodes don't have
   // any children.
   let root = range.startIndex
-  var node = root.advancedBy(C.Index.Distance(range.count.toIntMax()/2))
+  var node = root.advancedBy(C.Index.Distance(range.length.toIntMax()/2))
   while node-- != root {
     _siftDown(&elements, node, range ${", &isOrderedBefore" if p else ""})
   }

@@ -22,7 +22,7 @@ public protocol ReverseIndexProtocol : BidirectionalIndex {
   ///
   /// If `self` is `advance(c.reverse.startIndex, n)`, then:
   /// - `self.base` is `advance(c.endIndex, -n)`.
-  /// - if `n` != `c.count`, then `c.reverse[self]` is 
+  /// - if `n` != `c.length`, then `c.reverse[self]` is
   ///   equivalent to `[self.base.predecessor()]`.
   var base: Base { get }
 
@@ -58,7 +58,7 @@ public struct ReverseIndex<Base: BidirectionalIndex>
   ///
   /// If `self` is `advance(c.reverse.startIndex, n)`, then:
   /// - `self.base` is `advance(c.endIndex, -n)`.
-  /// - if `n` != `c.count`, then `c.reverse[self]` is 
+  /// - if `n` != `c.length`, then `c.reverse[self]` is
   ///   equivalent to `[self.base.predecessor()]`.
   public let base: Base
 }
@@ -84,7 +84,7 @@ public struct ReverseRandomAccessIndex<Base: RandomAccessIndex>
   ///
   /// If `self` is `advance(c.reverse.startIndex, n)`, then:
   /// - `self.base` is `advance(c.endIndex, -n)`.
-  /// - if `n` != `c.count`, then `c.reverse[self]` is 
+  /// - if `n` != `c.length`, then `c.reverse[self]` is
   ///   equivalent to `[self.base.predecessor()]`.
   public let base: Base
 
@@ -143,7 +143,7 @@ public struct ReverseCollection<
   /// reverse order.
   ///
   /// - Complexity: O(1)
-  public init(_ base: Base) {
+  internal init(_ base: Base) {
     self._base = base
   }
 
@@ -173,7 +173,7 @@ public struct ReverseRandomAccessCollection<
   /// reverse order.
   ///
   /// - Complexity: O(1)
-  public init(_ base: Base) {
+  internal init(_ base: Base) {
     self._base = base
   }
 

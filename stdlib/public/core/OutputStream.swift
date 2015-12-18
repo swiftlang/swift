@@ -98,7 +98,7 @@ internal func _adHocPrint<T, TargetStream : OutputStream>(
   case is _TupleMirror:
     target.write("(")
     var first = true
-    for i in 0..<mirror.count {
+    for i in 0..<mirror.length {
       if first {
         first = false
       } else {
@@ -114,7 +114,7 @@ internal func _adHocPrint<T, TargetStream : OutputStream>(
     printTypeName(mirror.valueType)
     target.write("(")
     var first = true
-    for i in 0..<mirror.count {
+    for i in 0..<mirror.length {
       if first {
         first = false
       } else {
@@ -128,7 +128,8 @@ internal func _adHocPrint<T, TargetStream : OutputStream>(
     target.write(")")
 
   case let enumMirror as _EnumMirror:
-    if let caseName = String.fromCString(enumMirror.caseName) {
+    if enumMirror.caseName != nil {
+      let caseName = String(cString: enumMirror.caseName)
       // Write the qualified type name in debugPrint.
       if isDebugPrint {
         target.write(_typeName(mirror.valueType))
@@ -140,7 +141,7 @@ internal func _adHocPrint<T, TargetStream : OutputStream>(
       printTypeName(mirror.valueType)
     }
 
-    if mirror.count == 0 {
+    if mirror.length == 0 {
       return
     }
     let (_, payload) = mirror[0]

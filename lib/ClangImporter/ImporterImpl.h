@@ -750,13 +750,13 @@ public:
 
   /// Determine the imported CF type for the given typedef-name, or the empty
   /// string if this is not an imported CF type name.
-  StringRef getCFTypeName(const clang::TypedefNameDecl *decl,
-                          StringRef *secondaryName = nullptr);
+  static StringRef getCFTypeName(const clang::TypedefNameDecl *decl,
+                                 StringRef *secondaryName = nullptr);
 
   /// Retrieve the type name of a Clang type for the purposes of
   /// omitting unneeded words.
-  OmissionTypeName getClangTypeNameForOmission(clang::ASTContext &ctx,
-                                               clang::QualType type);
+  static OmissionTypeName getClangTypeNameForOmission(clang::ASTContext &ctx,
+                                                      clang::QualType type);
 
   /// Omit needless words in a function name.
   bool omitNeedlessWordsInFunctionName(

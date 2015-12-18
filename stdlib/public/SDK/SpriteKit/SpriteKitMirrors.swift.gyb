@@ -23,7 +23,7 @@
 ${MirrorDecl} {
   ${MirrorBoilerplate}
   
-  var count: Int { return 0 }
+  var length: Int { return 0 }
   
   subscript(_: Int) -> (String, _Mirror) {
     _requirementFailure("_Mirror access out of bounds")

@@ -171,7 +171,7 @@ ErrorHandlingTests.test("ErrorHandling/Array flatMap") {
       if x == 2 {
         throw SillyError.JazzHands
       }
-      return Array(repeating: x, count: x)
+      return Array(repeating: x, length: x)
     }
     expectUnreachable()
   } catch {}
@@ -179,9 +179,9 @@ ErrorHandlingTests.test("ErrorHandling/Array flatMap") {
   expectEqual(loopCount, 2)
 }
 
-ErrorHandlingTests.test("ErrorHandling/minElement") {
+ErrorHandlingTests.test("ErrorHandling/min") {
   do {
-    let _: Int? = try [1, 2, 3].minElement { _, _ in
+    let _: Int? = try [1, 2, 3].min { _, _ in
       throw SillyError.JazzHands
       return false
     }
@@ -189,7 +189,7 @@ ErrorHandlingTests.test("ErrorHandling/minElement") {
   } catch {}
 
   do {
-    let _: Int? = try [1, 2, 3].maxElement { _, _ in
+    let _: Int? = try [1, 2, 3].max { _, _ in
       throw SillyError.JazzHands
       return false
     }
@@ -299,7 +299,7 @@ ErrorHandlingTests.test("ErrorHandling/Sequence map") {
         return Noisy()
       }
       expectEqual(NoisyCount, initialCount + 3)
-      expectEqual(result.count, 3)
+      expectEqual(result.length, 3)
     } catch {}
     expectEqual(NoisyCount, initialCount)
   }
@@ -319,8 +319,8 @@ ErrorHandlingTests.test("ErrorHandling/Sequence filter") {
           loopCount += 1
           return condition
         }
-        expectEqual(NoisyCount, initialCount + sequence.count)
-        expectEqual(result.count, condition ? 3 : 0)
+        expectEqual(NoisyCount, initialCount + sequence.length)
+        expectEqual(result.length, condition ? 3 : 0)
       } catch {}
     }
     expectEqual(NoisyCount, initialCount)
@@ -341,7 +341,7 @@ ErrorHandlingTests.test("ErrorHandling/Collection map") {
         return Noisy()
       }
       expectEqual(NoisyCount, initialCount + 3)
-      expectEqual(result.count, 3)
+      expectEqual(result.length, 3)
     } catch {}
     expectEqual(NoisyCount, initialCount)
   }

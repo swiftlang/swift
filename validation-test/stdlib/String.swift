@@ -325,7 +325,7 @@ StringTests.test("appendToSubstring") {
           sliceEnd < sliceStart {
           continue
         }
-        var s0 = String(repeating: UnicodeScalar("x"), count: initialSize)
+        var s0 = String(repeating: UnicodeScalar("x"), length: initialSize)
         let originalIdentity = s0.bufferID
         s0 = s0[
           s0.startIndex.advancedBy(sliceStart)..<s0.startIndex.advancedBy(sliceEnd)]
@@ -340,7 +340,7 @@ StringTests.test("appendToSubstring") {
         expectEqual(
           String(
             repeating: UnicodeScalar("x"),
-            count: sliceEnd - sliceStart + 1),
+            length: sliceEnd - sliceStart + 1),
           s0)
       }
     }
@@ -368,8 +368,8 @@ StringTests.test("appendToSubstringBug") {
   let prefixSize = size - suffixSize
   for i in 1..<10 {
     // We will be overflowing s0 with s1.
-    var s0 = String(repeating: UnicodeScalar("x"), count: size)
-    let s1 = String(repeating: UnicodeScalar("x"), count: prefixSize)
+    var s0 = String(repeating: UnicodeScalar("x"), length: size)
+    let s1 = String(repeating: UnicodeScalar("x"), length: prefixSize)
     let originalIdentity = s0.bufferID
 
     // Turn s0 into a slice that points to the end.
@@ -388,7 +388,7 @@ StringTests.test("appendToSubstringBug") {
     expectEqual(
       String(
         repeating: UnicodeScalar("x"),
-        count: suffixSize + prefixSize),
+        length: suffixSize + prefixSize),
       s0)
   }
 }
@@ -628,16 +628,16 @@ StringTests.test("stringCoreExtensibility") {
         
         for i in 0..<length {
           x.appendContentsOf(
-            Repeat(repeating: i < boundary ? ascii : nonAscii, count: 3))
+            repeatElement(i < boundary ? ascii : nonAscii, count: 3))
         }
         // Make sure we can append pure ASCII to wide storage
-        x.appendContentsOf(Repeat(repeating: ascii, count: 2))
+        x.appendContentsOf(repeatElement(ascii, count: 2))
         
         expectEqualSequence(
           [UTF16.CodeUnit(UnicodeScalar("b").value)]
-          + Array(Repeat(repeating: ascii, count: 3*boundary))
-          + Repeat(repeating: nonAscii, count: 3*(length - boundary))
-          + Repeat(repeating: ascii, count: 2),
+          + Array(repeatElement(ascii, count: 3*boundary))
+          + repeatElement(nonAscii, count: 3*(length - boundary))
+          + repeatElement(ascii, count: 2),
           x
         )
       }
@@ -705,10 +705,10 @@ StringTests.test("stringCoreReserve") {
 func makeStringCore(base: String) -> _StringCore {
   var x = _StringCore()
   // make sure some - but not all - replacements will have to grow the buffer
-  x.reserveCapacity(base._core.count * 3 / 2)
+  x.reserveCapacity(base._core.length * 3 / 2)
   x.appendContentsOf(base._core)
   // In case the core was widened and lost its capacity
-  x.reserveCapacity(base._core.count * 3 / 2)
+  x.reserveCapacity(base._core.length * 3 / 2)
   return x
 }
 
@@ -769,17 +769,17 @@ StringTests.test("reserveCapacity") {
   let id0 = s.bufferID
   let oldCap = s.capacity
   let x: Character = "x" // Help the typechecker - <rdar://problem/17128913>
-  s.insertContentsOf(Repeat(repeating: x, count: s.capacity + 1), at: s.endIndex)
+  s.insertContentsOf(repeatElement(x, count: s.capacity + 1), at: s.endIndex)
   expectNotEqual(id0, s.bufferID)
   s = ""
   print("empty capacity \(s.capacity)")
   s.reserveCapacity(oldCap + 2)
   print("reserving \(oldCap + 2) -> \(s.capacity), width = \(s._core.elementWidth)")
   let id1 = s.bufferID
-  s.insertContentsOf(Repeat(repeating: x, count: oldCap + 2), at: s.endIndex)
+  s.insertContentsOf(repeatElement(x, count: oldCap + 2), at: s.endIndex)
   print("extending by \(oldCap + 2) -> \(s.capacity), width = \(s._core.elementWidth)")
   expectEqual(id1, s.bufferID)
-  s.insertContentsOf(Repeat(repeating: x, count: s.capacity + 100), at: s.endIndex)
+  s.insertContentsOf(repeatElement(x, count: s.capacity + 100), at: s.endIndex)
   expectNotEqual(id1, s.bufferID)
 }
 
@@ -903,7 +903,7 @@ StringTests.test(
     String._compareDeterministicUnicodeCollation, String._compareASCII)
 }
 
-StringTests.test("lowercaseString") {
+StringTests.test("lowercased") {
   // Use setlocale so tolower() is correct on ASCII.
   setlocale(LC_ALL, "C")
 
@@ -912,12 +912,12 @@ StringTests.test("lowercaseString") {
   expectEqualFunctionsForDomain(
     asciiDomain,
     { String(UnicodeScalar(Int(tolower($0)))) },
-    { String(UnicodeScalar(Int($0))).lowercaseString })
+    { String(UnicodeScalar(Int($0))).lowercased })
 
-  expectEqual("", "".lowercaseString)
-  expectEqual("abcd", "abCD".lowercaseString)
-  expectEqual("абвг", "абВГ".lowercaseString)
-  expectEqual("たちつてと", "たちつてと".lowercaseString)
+  expectEqual("", "".lowercased)
+  expectEqual("abcd", "abCD".lowercased)
+  expectEqual("абвг", "абВГ".lowercased)
+  expectEqual("たちつてと", "たちつてと".lowercased)
 
   //
   // Special casing.
@@ -927,17 +927,17 @@ StringTests.test("lowercaseString") {
   // to lower case:
   // U+0069 LATIN SMALL LETTER I
   // U+0307 COMBINING DOT ABOVE
-  expectEqual("\u{0069}\u{0307}", "\u{0130}".lowercaseString)
+  expectEqual("\u{0069}\u{0307}", "\u{0130}".lowercased)
 
   // U+0049 LATIN CAPITAL LETTER I
   // U+0307 COMBINING DOT ABOVE
   // to lower case:
   // U+0069 LATIN SMALL LETTER I
   // U+0307 COMBINING DOT ABOVE
-  expectEqual("\u{0069}\u{0307}", "\u{0049}\u{0307}".lowercaseString)
+  expectEqual("\u{0069}\u{0307}", "\u{0049}\u{0307}".lowercased)
 }
 
-StringTests.test("uppercaseString") {
+StringTests.test("uppercased") {
   // Use setlocale so toupper() is correct on ASCII.
   setlocale(LC_ALL, "C")
 
@@ -946,12 +946,12 @@ StringTests.test("uppercaseString") {
   expectEqualFunctionsForDomain(
     asciiDomain,
     { String(UnicodeScalar(Int(toupper($0)))) },
-    { String(UnicodeScalar(Int($0))).uppercaseString })
+    { String(UnicodeScalar(Int($0))).uppercased })
 
-  expectEqual("", "".uppercaseString)
-  expectEqual("ABCD", "abCD".uppercaseString)
-  expectEqual("АБВГ", "абВГ".uppercaseString)
-  expectEqual("たちつてと", "たちつてと".uppercaseString)
+  expectEqual("", "".uppercased)
+  expectEqual("ABCD", "abCD".uppercased)
+  expectEqual("АБВГ", "абВГ".uppercased)
+  expectEqual("たちつてと", "たちつてと".uppercased)
 
   //
   // Special casing.
@@ -960,7 +960,7 @@ StringTests.test("uppercaseString") {
   // U+0069 LATIN SMALL LETTER I
   // to upper case:
   // U+0049 LATIN CAPITAL LETTER I
-  expectEqual("\u{0049}", "\u{0069}".uppercaseString)
+  expectEqual("\u{0049}", "\u{0069}".uppercased)
 
   // U+00DF LATIN SMALL LETTER SHARP S
   // to upper case:
@@ -968,7 +968,7 @@ StringTests.test("uppercaseString") {
   // U+0073 LATIN SMALL LETTER S
   // But because the whole string is converted to uppercase, we just get two
   // U+0053.
-  expectEqual("\u{0053}\u{0053}", "\u{00df}".uppercaseString)
+  expectEqual("\u{0053}\u{0053}", "\u{00df}".uppercased)
 
   // U+FB01 LATIN SMALL LIGATURE FI
   // to upper case:
@@ -976,7 +976,7 @@ StringTests.test("uppercaseString") {
   // U+0069 LATIN SMALL LETTER I
   // But because the whole string is converted to uppercase, we get U+0049
   // LATIN CAPITAL LETTER I.
-  expectEqual("\u{0046}\u{0049}", "\u{fb01}".uppercaseString)
+  expectEqual("\u{0046}\u{0049}", "\u{fb01}".uppercased)
 }
 
 StringTests.test("unicodeViews") {
@@ -1051,7 +1051,7 @@ StringTests.test("indexConversion") {
   var matches: [String] = []
   
   re.enumerateMatchesIn(
-    s, options: NSMatchingOptions(), range: NSRange(0..<s.utf16.count)
+    s, options: NSMatchingOptions(), range: NSRange(0..<s.utf16.length)
   ) {
     result, flags, stop
   in

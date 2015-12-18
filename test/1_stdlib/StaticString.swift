@@ -15,14 +15,14 @@ var StaticStringTestSuite = TestSuite("StaticString")
 
 StaticStringTestSuite.test("PointerRepresentation/ASCII/Empty") {
   let str = StaticString()
-  expectEqual(0, str.byteSize)
+  expectEqual(0, str.lengthInBytes)
   expectTrue(str.hasPointerRepresentation)
   expectTrue(str.isASCII)
   str.withUTF8Buffer {
     utf8 in
-    expectEqual(0, utf8.count)
+    expectEqual(0, utf8.length)
   }
-  expectEqual("", str.stringValue)
+  expectEqual("", String(str))
 
   expectPrinted("", str)
   expectDebugPrinted("\"\"", str)
@@ -33,17 +33,17 @@ StaticStringTestSuite.test("PointerRepresentation/ASCII") {
   expectEqual(0x61, str.utf8Start[0])
   expectEqual(0x62, str.utf8Start[1])
   expectEqual(0x63, str.utf8Start[2])
-  expectEqual(3, str.byteSize)
+  expectEqual(3, str.lengthInBytes)
   expectTrue(str.hasPointerRepresentation)
   expectTrue(str.isASCII)
   str.withUTF8Buffer {
     (utf8) -> Void in
-    expectEqual(3, utf8.count)
+    expectEqual(3, utf8.length)
     expectEqual(0x61, utf8[0])
     expectEqual(0x62, utf8[1])
     expectEqual(0x63, utf8[2])
   }
-  expectEqual("abc", str.stringValue)
+  expectEqual("abc", String(str))
 
   expectPrinted("abc", str)
   expectDebugPrinted("\"abc\"", str)
@@ -57,12 +57,12 @@ StaticStringTestSuite.test("PointerRepresentation/NonASCII") {
   expectEqual(0xb1, str.utf8Start[3])
   expectEqual(0xd0, str.utf8Start[4])
   expectEqual(0xb2, str.utf8Start[5])
-  expectEqual(6, str.byteSize)
+  expectEqual(6, str.lengthInBytes)
   expectTrue(str.hasPointerRepresentation)
   expectFalse(str.isASCII)
   str.withUTF8Buffer {
     (utf8) -> Void in
-    expectEqual(6, utf8.count)
+    expectEqual(6, utf8.length)
     expectEqual(0xd0, utf8[0])
     expectEqual(0xb0, utf8[1])
     expectEqual(0xd0, utf8[2])
@@ -70,7 +70,7 @@ StaticStringTestSuite.test("PointerRepresentation/NonASCII") {
     expectEqual(0xd0, utf8[4])
     expectEqual(0xb2, utf8[5])
   }
-  expectEqual("абв", str.stringValue)
+  expectEqual("абв", String(str))
 
   expectPrinted("абв", str)
   expectDebugPrinted("\"абв\"", str)
@@ -100,10 +100,10 @@ StaticStringTestSuite.test("UnicodeScalarRepresentation/ASCII") {
   expectTrue(str.isASCII)
   str.withUTF8Buffer {
     (utf8) -> Void in
-    expectEqual(1, utf8.count)
+    expectEqual(1, utf8.length)
     expectEqual(0x5a, utf8[0])
   }
-  expectEqual("Z", str.stringValue)
+  expectEqual("Z", String(str))
 
   expectPrinted("Z", str)
   expectDebugPrinted("\"Z\"", str)
@@ -120,7 +120,7 @@ StaticStringTestSuite.test("UnicodeScalarRepresentation/NonASCII") {
     expectEqual(0xd0, utf8[0])
     expectEqual(0xab, utf8[1])
   }
-  expectEqual("Ы", str.stringValue)
+  expectEqual("Ы", String(str))
 
   expectPrinted("Ы", str)
   expectDebugPrinted("\"Ы\"", str)
@@ -139,7 +139,7 @@ StaticStringTestSuite.test("UnicodeScalarRepresentation/utf8Start")
   strOpaque.utf8Start
 }
 
-StaticStringTestSuite.test("UnicodeScalarRepresentation/byteSize")
+StaticStringTestSuite.test("UnicodeScalarRepresentation/lengthInBytes")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
@@ -149,7 +149,7 @@ StaticStringTestSuite.test("UnicodeScalarRepresentation/byteSize")
   let str = StaticString(_builtinUnicodeScalarLiteral: UInt32(0x5a)._value)
   let strOpaque = _opaqueIdentity(str)
   expectCrashLater()
-  strOpaque.byteSize
+  strOpaque.lengthInBytes
 }
 
 runAllTests()

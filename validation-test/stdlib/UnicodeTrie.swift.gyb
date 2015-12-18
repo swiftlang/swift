@@ -50,7 +50,7 @@ UnicodeTrie.test("_UnicodeGraphemeClusterBreakPropertyTrie") {
 
   var expected = [_GraphemeClusterBreakPropertyValue](
     repeating: _GraphemeClusterBreakPropertyValue.Other,
-    count: 0x110000)
+    length: 0x110000)
   for (startCodePoint, endCodePoint, value) in graphemeBreakPropertyTable {
     for cp in startCodePoint...endCodePoint {
       expected[cp] = value
@@ -108,7 +108,7 @@ class NonContiguousNSString : NSString {
   }
 
   @objc override var length: Int {
-    return _value.count
+    return _value.length
   }
 
   @objc override func characterAt(index: Int) -> unichar {
@@ -126,7 +126,7 @@ func checkGraphemeClusterSegmentation(
   var actualBoundaries: [Int] = [ 0 ]
   var unicodeScalarCount = 0
   for c in subject.characters {
-    let currentClusterSize = String(c).unicodeScalars.count
+    let currentClusterSize = String(c).unicodeScalars.length
     unicodeScalarCount += currentClusterSize
     actualBoundaries += [ unicodeScalarCount ]
   }

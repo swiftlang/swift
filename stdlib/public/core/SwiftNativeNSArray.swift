@@ -22,17 +22,17 @@
 import SwiftShims
 
 /// Returns `true` iff the given `index` is valid as a position, i.e. `0
-/// ≤ index ≤ count`.
+/// ≤ index ≤ length`.
 @_transparent
-internal func _isValidArrayIndex(index: Int, _ count: Int) -> Bool {
-  return (index >= 0) && (index <= count)
+internal func _isValidArrayIndex(index: Int, _ length: Int) -> Bool {
+  return (index >= 0) && (index <= length)
 }
 
 /// Returns `true` iff the given `index` is valid for subscripting, i.e.
-/// `0 ≤ index < count`.
+/// `0 ≤ index < length`.
 @_transparent
-internal func _isValidArraySubscript(index: Int, _ count: Int) -> Bool {
-  return (index >= 0) && (index < count)
+internal func _isValidArraySubscript(index: Int, _ length: Int) -> Bool {
+  return (index >= 0) && (index < length)
 }
 
 /// An `NSArray` with Swift-native reference counting and contiguous
@@ -52,14 +52,14 @@ class _SwiftNativeNSArrayWithContiguousStorage
 // Implement the APIs required by NSArray 
 extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
   @objc internal var count: Int {
-    return withUnsafeBufferOfObjects { $0.count }
+    return withUnsafeBufferOfObjects { $0.length }
   }
 
   @objc(objectAtIndex:) internal func objectAt(index: Int) -> AnyObject {
     return withUnsafeBufferOfObjects {
       objects in
       _require(
-        _isValidArraySubscript(index, objects.count),
+        _isValidArraySubscript(index, objects.length),
         "Array index out of range")
       return objects[index]
     }
@@ -71,12 +71,12 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
     return withUnsafeBufferOfObjects {
       objects in
       _require(
-        _isValidArrayIndex(range.location, objects.count),
+        _isValidArrayIndex(range.location, objects.length),
         "Array index out of range")
 
       _require(
         _isValidArrayIndex(
-          range.location + range.length, objects.count),
+          range.location + range.length, objects.length),
         "Array index out of range")
 
       // These objects are "returned" at +0, so treat them as values to
@@ -106,7 +106,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
         AutoreleasingUnsafeMutablePointer<AnyObject?>.self)
       enumerationState.state = 1
       state.pointee = enumerationState
-      return objects.count
+      return objects.length
     }
   }
 
@@ -154,8 +154,8 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
   internal func _destroyBridgedStorage(hb: HeapBufferStorage?) {
     if let bridgedStorage = hb {
       let heapBuffer = _HeapBuffer(bridgedStorage)
-      let count = heapBuffer.value
-      heapBuffer.baseAddress.deinitializePointee(count: count)
+      let length = heapBuffer.value
+      heapBuffer.baseAddress.deinitializePointee(count: length)
     }
   }
 
@@ -173,7 +173,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
       if let bridgedStorage = _heapBufferBridged {
         let heapBuffer = _HeapBuffer(bridgedStorage)
         buffer = UnsafeBufferPointer(
-            start: heapBuffer.baseAddress, count: heapBuffer.value)
+            start: heapBuffer.baseAddress, length: heapBuffer.value)
       }
 
       // If elements are bridged verbatim, the native buffer is all we
@@ -206,7 +206,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
 
   /// Returns the number of elements in the array.
   ///
-  /// This override allows the count to be read without triggering
+  /// This override allows the length to be read without triggering
   /// bridging of array elements.
   @objc
   internal override var count: Int {
@@ -215,8 +215,8 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
     }
 
     // Check if elements are bridged verbatim.
-    return _nativeStorage._withVerbatimBridgedUnsafeBuffer { $0.count }
-      ?? _nativeStorage._getNonVerbatimBridgedCount()
+    return _nativeStorage._withVerbatimBridgedUnsafeBuffer { $0.length }
+      ?? _nativeStorage._getNonVerbatimBridgedLength()
   }
 }
 #else
@@ -249,9 +249,9 @@ internal class _ContiguousArrayStorageBase
       "Concrete subclasses must implement _withVerbatimBridgedUnsafeBuffer")
   }
 
-  internal func _getNonVerbatimBridgedCount(dummy: Void) -> Int {
+  internal func _getNonVerbatimBridgedLength(dummy: Void) -> Int {
     _sanityCheckFailure(
-      "Concrete subclasses must implement _getNonVerbatimBridgedCount")
+      "Concrete subclasses must implement _getNonVerbatimBridgedLength")
   }
 
   internal func _getNonVerbatimBridgedHeapBuffer(dummy: Void) ->

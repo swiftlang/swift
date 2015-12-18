@@ -36,7 +36,7 @@ public struct AnyIterator<Element> : IteratorProtocol {
   ///
   /// Example:
   ///
-  ///     func countStrings() -> AnyIterator<String> {
+  ///     func digits() -> AnyIterator<String> {
   ///       let lazyStrings = (0..<10).lazy.map { String($0) }
   ///
   ///       // This is a really complicated type of no interest to our
@@ -45,7 +45,8 @@ public struct AnyIterator<Element> : IteratorProtocol {
   ///         = lazyStrings.iterator()
   ///       return AnyIterator(iterator)
   ///     }
-  public init<I : IteratorProtocol where I.Element == Element>(_ base: I) {
+  public // @testable
+  init<I : IteratorProtocol where I.Element == Element>(_ base: I) {
     self._box = _IteratorBox(base)
   }
 
@@ -117,7 +118,7 @@ internal func _typeID(instance: AnyObject) -> ObjectIdentifier {
 internal class _AnySequenceBox<Element> {
   internal func iterator() -> AnyIterator<Element> { _abstract() }
 
-  internal func _underestimateCount() -> Int { _abstract() }
+  internal func _underestimateLength() -> Int { _abstract() }
 
   internal func _initializeTo(ptr: UnsafeMutablePointer<Element>)
     -> UnsafeMutablePointer<Element> {
@@ -148,8 +149,8 @@ internal class _${Kind}Box<S : ${Kind}>
   override func iterator() -> AnyIterator<Element> {
     return AnyIterator(_base.iterator())
   }
-  override func _underestimateCount() -> Int {
-    return _base.underestimateCount()
+  override func _underestimateLength() -> Int {
+    return _base.underestimateLength()
   }
   override func _initializeTo(ptr: UnsafeMutablePointer<Element>)
     -> UnsafeMutablePointer<Element> {
@@ -159,8 +160,8 @@ internal class _${Kind}Box<S : ${Kind}>
     return _base._copyToNativeArrayBuffer()._storage
   }
 %   if Kind == 'Collection':
-  override func _count() -> IntMax {
-    return numericCast(_base.count)
+  override func _length() -> IntMax {
+    return numericCast(_base.length)
   }
   override subscript(position: _ForwardIndexBoxProtocol) -> Element {
     if let i = position._unbox() as S.Index? {
@@ -232,8 +233,8 @@ public struct AnySequence<Element> : Sequence {
 
 % for Kind in ['Sequence'] + [t + 'Collection' for t in traversals]:
 extension Any${Kind} {
-  public func underestimateCount() -> Int {
-    return _box._underestimateCount()
+  public func underestimateLength() -> Int {
+    return _box._underestimateLength()
   }
 
   public func _initializeTo(ptr: UnsafeMutablePointer<Element>)
@@ -483,7 +484,7 @@ public func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
 
 internal class _AnyCollectionBox<Element> : _AnyCollectionBoxBase<Element> {
   subscript(_: _ForwardIndexBoxProtocol) -> Element {_abstract()}
-  func _count() -> IntMax {_abstract()}
+  func _length() -> IntMax {_abstract()}
 
   // FIXME: should be inherited, but a known bug prevents it since
   // this class is generic.
@@ -612,8 +613,8 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionProtocol {
   /// Return the number of elements.
   ///
   /// - Complexity: ${'O(1)' if Traversal == 'RandomAccess' else 'O(N)'}.
-  public var count: IntMax {
-    return _box._count()
+  public var length: IntMax {
+    return _box._length()
   }
 
   /// Uniquely identifies the stored underlying collection.

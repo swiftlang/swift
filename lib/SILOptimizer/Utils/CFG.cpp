@@ -98,7 +98,7 @@ TermInst *swift::changeEdgeValue(TermInst *Branch, SILBasicBlock *Dest,
     bool BranchOnTrue = CBI->getTrueBB() == Dest;
     assert((!BranchOnTrue || Idx < OldTrueArgs.size()) && "Not enough edges");
 
-    // Copy the edge values overwritting the edge at Idx.
+    // Copy the edge values overwriting the edge at Idx.
     for (unsigned i = 0, e = OldTrueArgs.size(); i != e; ++i) {
       if (BranchOnTrue && Idx == i)
         TrueArgs.push_back(Val);
@@ -112,7 +112,7 @@ TermInst *swift::changeEdgeValue(TermInst *Branch, SILBasicBlock *Dest,
     bool BranchOnFalse = CBI->getFalseBB() == Dest;
     assert((!BranchOnFalse || Idx < OldFalseArgs.size()) && "Not enough edges");
 
-    // Copy the edge values overwritting the edge at Idx.
+    // Copy the edge values overwriting the edge at Idx.
     for (unsigned i = 0, e = OldFalseArgs.size(); i != e; ++i) {
       if (BranchOnFalse && Idx == i)
         FalseArgs.push_back(Val);
@@ -136,7 +136,7 @@ TermInst *swift::changeEdgeValue(TermInst *Branch, SILBasicBlock *Dest,
     assert(Idx < BI->getNumArgs() && "Not enough edges");
     OperandValueArrayRef OldArgs = BI->getArgs();
 
-    // Copy the edge values overwritting the edge at Idx.
+    // Copy the edge values overwriting the edge at Idx.
     for (unsigned i = 0, e = OldArgs.size(); i != e; ++i) {
       if (Idx == i)
         Args.push_back(Val);
@@ -664,7 +664,7 @@ SILBasicBlock *swift::splitEdge(TermInst *T, unsigned EdgeIdx,
   }
 
   // Neither loop contains the other. The destination must be the header of its
-  // loop. Otherwise, we would be creating irreducable control flow.
+  // loop. Otherwise, we would be creating irreducible control flow.
   assert(DstBBLoop->getHeader() == DestBB &&
          "Creating irreducible control flow?");
 

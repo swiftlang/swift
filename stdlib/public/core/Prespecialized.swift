@@ -9,7 +9,7 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// Pre-specializaiton of some popular generic classes and functions.
+// Pre-specialization of some popular generic classes and functions.
 //===----------------------------------------------------------------------===//
 
 struct _Prespecialize {
@@ -19,18 +19,18 @@ struct _Prespecialize {
     func _createArrayUser<Element : Comparable>(sampleValue: Element) {
       // Initializers.
       let _: [Element] = [ sampleValue ]
-      var a = [Element](repeating: sampleValue, count: 1)
+      var a = [Element](repeating: sampleValue, length: 1)
 
       // Read array element
       let _ =  a[0]
 
       // Set array elements
-      for j in 0..<a.count {
+      for j in 0..<a.length {
         a[0] = a[j]
       }
 
-      for var i1 = 0; i1 < a.count; ++i1 {
-        for var i2 = 0; i2 < a.count; ++i2 {
+      for var i1 = 0; i1 < a.length; ++i1 {
+        for var i2 = 0; i2 < a.length; ++i2 {
           a[i1] = a[i2]
         }
       }
@@ -38,7 +38,7 @@ struct _Prespecialize {
       a[0] = sampleValue
 
       // Get length and capacity
-      let _ = a.count + a.capacity
+      let _ = a.length + a.capacity
 
       // Iterate over array
       for e in a {
@@ -79,12 +79,12 @@ struct _Prespecialize {
 
   // Force pre-specialization of Range<Int>
   static internal func _specializeRanges() -> Int {
-    let a = [Int](repeating: 1, count: 10)
-    var count = 0
+    let a = [Int](repeating: 1, length: 10)
+    var length = 0
     // Specialize Range for integers
-    for i in 0..<a.count {
-      count += a[i]
+    for i in 0..<a.length {
+      length += a[i]
     }
-    return count
+    return length
   }
 }

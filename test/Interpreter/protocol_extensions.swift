@@ -18,7 +18,7 @@ print(["a", "b", "c", "d"].myCount)
 // Extend a protocol with a function.
 extension Collection {
   final var myIndices: Range<Index> {
-    return Range(start: startIndex, end: endIndex)
+    return startIndex..<endIndex
   }
 
   func clone() -> Self {
@@ -87,7 +87,7 @@ print([1, 2, 3, 4, 5].myReduce(0, combine: +))
 
 extension Sequence {
   final public func myZip<S : Sequence>(s: S) -> Zip2Sequence<Self, S> {
-    return Zip2Sequence(self, s)
+    return Zip2Sequence(_sequence1: self, _sequence2: s)
   }
 }
 

@@ -208,7 +208,7 @@ func subscript_rvalue_materialize(inout i: Int) {
 
 func subscript_coerce(fn: ([UnicodeScalar], [UnicodeScalar]) -> Bool) {}
 func test_subscript_coerce() {
-  subscript_coerce({ $0[$0.count-1] < $1[$1.count-1] })
+  subscript_coerce({ $0[$0.length-1] < $1[$1.length-1] })
 }
 
 struct no_index {

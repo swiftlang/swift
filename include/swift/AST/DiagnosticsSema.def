@@ -661,6 +661,12 @@ ERROR(unbound_generic_parameter,sema_tcc,none,
 ERROR(cannot_bind_generic_parameter_to_type,sema_tcc,none,
       "cannot bind generic parameter to type %0",
       (Type))
+ERROR(string_index_not_integer,sema_tcc,none,
+      "String may not be indexed with %0, it has variable size elements",
+      (Type))
+NOTE(string_index_not_integer_note,sema_tcc,none,
+     "consider using an existing high level algorithm, "
+     "str.startIndex.advancedBy(n), or a projection like str.utf8", ())
 
 ERROR(invalid_c_function_pointer_conversion_expr,sema_tcc,none,
       "a C function pointer can only be formed from a reference to a 'func' or "

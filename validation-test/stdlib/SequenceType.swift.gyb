@@ -53,19 +53,19 @@ var SequenceTypeTests = TestSuite("Sequence")
 // [1.0, Double.NaN].startsWith([1.0, 2.0]) should be false.
 
 //===----------------------------------------------------------------------===//
-// minElement(), maxElement()
+// min(), max()
 //===----------------------------------------------------------------------===//
 
 % for algorithmKind in [ 'min', 'max' ]:
 %   AlgorithmKind = algorithmKind.capitalize()
 
-SequenceTypeTests.test("${algorithmKind}Element/WhereElementIsComparable") {
-  for test in minMaxElementTests {
+SequenceTypeTests.test("${algorithmKind}/WhereElementIsComparable") {
+  for test in minMaxTests {
     let s = MinimalSequence<MinimalComparableValue>(
       elements: test.sequence.enumerated.map {
         MinimalComparableValue($1, identity: $0)
       })
-    var maybeResult = s.${algorithmKind}Element()
+    var maybeResult = s.${algorithmKind}()
     expectType(Optional<MinimalComparableValue>.self, &maybeResult)
     if let result = maybeResult {
       expectEqual(
@@ -86,14 +86,14 @@ SequenceTypeTests.test("${algorithmKind}Element/WhereElementIsComparable") {
   }
 }
 
-SequenceTypeTests.test("${algorithmKind}Element/Predicate") {
-  for test in minMaxElementTests {
+SequenceTypeTests.test("${algorithmKind}/Predicate") {
+  for test in minMaxTests {
     let s = MinimalSequence<OpaqueValue<Int>>(
       elements: test.sequence.enumerated.map {
         OpaqueValue($1, identity: $0)
       })
     var timesClosureWasCalled = 0
-    var maybeResult = s.${algorithmKind}Element {
+    var maybeResult = s.${algorithmKind} {
       (lhs, rhs) -> Bool in
       ++timesClosureWasCalled
       return lhs.value < rhs.value
@@ -116,8 +116,8 @@ SequenceTypeTests.test("${algorithmKind}Element/Predicate") {
     }
     expectEqual([], s.map { $0.value }, "sequence should be consumed")
     expectEqual(
-      max(0, test.sequence.count - 1), timesClosureWasCalled,
-      "maxElement() should be eager and should only call its predicate"
+      max(0, test.sequence.length - 1), timesClosureWasCalled,
+      "max() should be eager and should only call its predicate"
       + " once per element")
   }
 }
@@ -632,7 +632,7 @@ SequenceTypeTests.test("reduce") {
     expectEqual(test.sequence, result.value)
     expectEqual([], s.map { $0.value }, "sequence should be consumed")
     expectEqual(
-      test.sequence.count, timesClosureWasCalled,
+      test.sequence.length, timesClosureWasCalled,
       "reduce() should be eager and should only call its predicate"
       + "once per element")
   }
@@ -706,15 +706,15 @@ SequenceTypeTests.test("filter/Sequence/Dispatch") {
 
 SequenceTypeTests.test("filter/Sequence/Semantics") {
   for test in filterTests {
-    for underestimateCountBehavior in [
-      UnderestimateCountBehavior.Precise,
-      UnderestimateCountBehavior.Half,
-      UnderestimateCountBehavior.Value(0)
+    for underestimateLengthBehavior in [
+      UnderestimateLengthBehavior.Precise,
+      UnderestimateLengthBehavior.Half,
+      UnderestimateLengthBehavior.Value(0)
     ] {
       
       let s = DefaultedSequence<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init),
-        underestimatedCount: underestimateCountBehavior)
+        underestimatedLength: underestimateLengthBehavior)
       
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
@@ -729,11 +729,11 @@ SequenceTypeTests.test("filter/Sequence/Semantics") {
       expectEqual(test.expected, result.map { $0.value })
       expectEqual([], s.map { $0.value }, "sequence should be consumed")
       expectEqual(
-        test.sequence.count, timesClosureWasCalled,
+        test.sequence.length, timesClosureWasCalled,
         "filter() should be eager and should only call its predicate"
         + "once per element")
       expectGE(
-        2 * result.count, result.capacity,
+        2 * result.length, result.capacity,
         "filter() should not reserve capacity (it does not know how much the"
         + "predicate will filter out)")
     }
@@ -749,9 +749,9 @@ var MinimalSequenceWithCustomMap_timesMapWasCalled: Int = 0
 % for Implementation in [ 'Default', 'Custom' ]:
 
 struct MinimalSequenceWith${Implementation}Map<Element> : Sequence {
-  init(_ data: [Element], underestimatedCount: UnderestimateCountBehavior) {
+  init(_ data: [Element], underestimatedLength: UnderestimateLengthBehavior) {
     self._data = MinimalSequence(
-      elements: data, underestimatedCount: underestimatedCount)
+      elements: data, underestimatedLength: underestimatedLength)
   }
 
   func iterator() -> MinimalIterator<Element> {
@@ -819,14 +819,14 @@ SequenceTypeTests.test(
   "map/Sequence/${Implementation}Implementation/${dispatch}"
 ) {
   for test in mapTests {
-    for underestimateCountBehavior in [
-      UnderestimateCountBehavior.Precise,
-      UnderestimateCountBehavior.Half,
-      UnderestimateCountBehavior.Value(0)
+    for underestimateLengthBehavior in [
+      UnderestimateLengthBehavior.Precise,
+      UnderestimateLengthBehavior.Half,
+      UnderestimateLengthBehavior.Value(0)
     ] {
       let s = MinimalSequenceWith${Implementation}Map<OpaqueValue<Int>>(
         test.sequence.map(OpaqueValue.init),
-        underestimatedCount: underestimateCountBehavior)
+        underestimatedLength: underestimateLengthBehavior)
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
@@ -847,7 +847,7 @@ SequenceTypeTests.test(
 %     end
       expectEqual([], s.map { $0.value }, "sequence should be consumed")
       expectEqual(
-        test.sequence.count, timesClosureWasCalled,
+        test.sequence.length, timesClosureWasCalled,
         "map() should be eager and should only call its predicate"
         + "once per element")
     }
@@ -864,13 +864,13 @@ SequenceTypeTests.test(
 
 SequenceTypeTests.test("flatMap/Sequence") {
   for test in flatMapTests {
-    for underestimateCountBehavior in [
-      UnderestimateCountBehavior.Precise,
-      UnderestimateCountBehavior.Value(0)
+    for underestimateLengthBehavior in [
+      UnderestimateLengthBehavior.Precise,
+      UnderestimateLengthBehavior.Value(0)
     ] {
       let s = MinimalSequence<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init),
-        underestimatedCount: underestimateCountBehavior)
+        underestimatedLength: underestimateLengthBehavior)
       let closureLifetimeTracker = LifetimeTracked(0)
       var timesClosureWasCalled = 0
       var result = s.flatMap {
@@ -886,11 +886,11 @@ SequenceTypeTests.test("flatMap/Sequence") {
         stackTrace: SourceLocStack().with(test.loc))
       expectTrue(Array(s).isEmpty, "sequence should be consumed")
       expectEqual(
-        test.sequence.count, timesClosureWasCalled,
+        test.sequence.length, timesClosureWasCalled,
         "flatMap() should be eager and should only call its predicate"
         + "once per element")
       expectGE(
-        2 * result.count, result.capacity,
+        2 * result.length, result.capacity,
         "flatMap() should not reserve capacity")
     }
   }
@@ -902,13 +902,13 @@ ${LazyFlatMapTest}
 
 SequenceTypeTests.test("flatMap/Sequence/TransformProducesOptional") {
   for test in flatMapToOptionalTests {
-    for underestimateCountBehavior in [
-      UnderestimateCountBehavior.Precise,
-      UnderestimateCountBehavior.Value(0)
+    for underestimateLengthBehavior in [
+      UnderestimateLengthBehavior.Precise,
+      UnderestimateLengthBehavior.Value(0)
     ] {
       let s = MinimalSequence<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init),
-        underestimatedCount: underestimateCountBehavior)
+        underestimatedLength: underestimateLengthBehavior)
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
@@ -924,11 +924,11 @@ SequenceTypeTests.test("flatMap/Sequence/TransformProducesOptional") {
         stackTrace: SourceLocStack().with(test.loc))
       expectTrue(Array(s).isEmpty, "sequence should be consumed")
       expectEqual(
-        test.sequence.count, timesClosureWasCalled,
+        test.sequence.length, timesClosureWasCalled,
         "flatMap() should be eager and should only call its predicate"
         + "once per element")
       expectGE(
-        2 * result.count, result.capacity,
+        2 * result.length, result.capacity,
         "flatMap() should not reserve capacity")
     }
   }
@@ -1051,10 +1051,10 @@ SequenceTypeTests.test("zip") {
 }
 
 //===----------------------------------------------------------------------===//
-// underestimateCount()
+// underestimateLength()
 //===----------------------------------------------------------------------===//
 
-struct SequenceWithDefaultUnderestimateCount : Sequence {
+struct SequenceWithDefaultUnderestimateLength : Sequence {
   init() {}
 
   func iterator() -> MinimalSequence<OpaqueValue<Int>>.Iterator {
@@ -1065,14 +1065,14 @@ struct SequenceWithDefaultUnderestimateCount : Sequence {
   }
 }
 
-SequenceTypeTests.test("underestimateCount/Sequence/DefaultImplementation") {
-  let s = SequenceWithDefaultUnderestimateCount()
-  expectEqual(0, callGenericUnderestimatedCount(s))
+SequenceTypeTests.test("underestimateLength/Sequence/DefaultImplementation") {
+  let s = SequenceWithDefaultUnderestimateLength()
+  expectEqual(0, callGenericUnderestimatedLength(s))
 }
 
-struct SequenceWithCustomUnderestimateCount : Sequence {
-  init(underestimatedCount: Int) {
-    self._underestimatedCount = underestimatedCount
+struct SequenceWithCustomUnderestimateLength : Sequence {
+  init(underestimatedLength: Int) {
+    self._underestimatedLength = underestimatedLength
   }
 
   func iterator() -> MinimalSequence<OpaqueValue<Int>>.Iterator {
@@ -1082,21 +1082,21 @@ struct SequenceWithCustomUnderestimateCount : Sequence {
     ).iterator()
   }
 
-  func underestimateCount() -> Int {
-    return _underestimatedCount
+  func underestimateLength() -> Int {
+    return _underestimatedLength
   }
 
-  let _underestimatedCount: Int
+  let _underestimatedLength: Int
 }
 
-SequenceTypeTests.test("underestimateCount/Sequence/CustomImplementation") {
+SequenceTypeTests.test("underestimateLength/Sequence/CustomImplementation") {
   do {
-    let s = SequenceWithCustomUnderestimateCount(underestimatedCount: 5)
-    expectEqual(5, callGenericUnderestimatedCount(s))
+    let s = SequenceWithCustomUnderestimateLength(underestimatedLength: 5)
+    expectEqual(5, callGenericUnderestimatedLength(s))
   }
   do {
-    let s = SequenceWithCustomUnderestimateCount(underestimatedCount: 42)
-    expectEqual(42, callGenericUnderestimatedCount(s))
+    let s = SequenceWithCustomUnderestimateLength(underestimatedLength: 42)
+    expectEqual(42, callGenericUnderestimatedLength(s))
   }
 }
 
@@ -1110,7 +1110,7 @@ SequenceTypeTests.test("_copyToNativeArrayBuffer/OverestimatedCount")
   .code {
   let s = MinimalSequence<OpaqueValue<Int>>(
     elements: [ 1, 2, 3 ].map(OpaqueValue.init),
-    underestimatedCount: .Value(4))
+    underestimatedLength: .Value(4))
   expectCrashLater()
   let array = s._copyToNativeArrayBuffer()
   _blackHole(array)

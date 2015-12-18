@@ -188,13 +188,13 @@ extension String : _BuiltinExtendedGraphemeClusterLiteralConvertible {
   @_semantics("string.makeUTF8")
   public init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
-    byteSize: Builtin.Word,
+    lengthInBytes: Builtin.Word,
     isASCII: Builtin.Int1) {
     self = String._fromWellFormedCodeUnitSequence(
-        UTF8.self,
-        input: UnsafeBufferPointer(
-            start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
-            count: Int(byteSize)))
+      UTF8.self,
+      input: UnsafeBufferPointer(
+        start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
+        length: Int(lengthInBytes)))
   }
 }
 
@@ -215,7 +215,7 @@ extension String : _BuiltinUTF16StringLiteralConvertible {
     self = String(
       _StringCore(
         baseAddress: OpaquePointer(start),
-        count: Int(numberOfCodeUnits),
+        length: Int(numberOfCodeUnits),
         elementShift: 1,
         hasCocoaBuffer: false,
         owner: nil))
@@ -227,23 +227,23 @@ extension String : _BuiltinStringLiteralConvertible {
   @_semantics("string.makeUTF8")
   public init(
     _builtinStringLiteral start: Builtin.RawPointer,
-    byteSize: Builtin.Word,
+    lengthInBytes: Builtin.Word,
     isASCII: Builtin.Int1) {
     if Bool(isASCII) {
       self = String(
         _StringCore(
           baseAddress: OpaquePointer(start),
-          count: Int(byteSize),
+          length: Int(lengthInBytes),
           elementShift: 0,
           hasCocoaBuffer: false,
           owner: nil))
     }
     else {
       self = String._fromWellFormedCodeUnitSequence(
-          UTF8.self,
-          input: UnsafeBufferPointer(
-              start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
-              count: Int(byteSize)))
+        UTF8.self,
+        input: UnsafeBufferPointer(
+          start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
+          length: Int(lengthInBytes)))
     }
   }
 }
@@ -322,12 +322,12 @@ extension String : Equatable {
 @warn_unused_result
 public func ==(lhs: String, rhs: String) -> Bool {
   if lhs._core.isASCII && rhs._core.isASCII {
-    if lhs._core.count != rhs._core.count {
+    if lhs._core.length != rhs._core.length {
       return false
     }
     return _swift_stdlib_memcmp(
       lhs._core.startASCII, rhs._core.startASCII,
-      rhs._core.count) == 0
+      rhs._core.length) == 0
   }
   return lhs._compareString(rhs) == 0
 }
@@ -353,9 +353,9 @@ extension String {
   func _compareASCII(rhs: String) -> Int {
     var compare = Int(_swift_stdlib_memcmp(
       self._core.startASCII, rhs._core.startASCII,
-      min(self._core.count, rhs._core.count)))
+      min(self._core.length, rhs._core.length)))
     if compare == 0 {
-      compare = self._core.count - rhs._core.count
+      compare = self._core.length - rhs._core.length
     }
     // This efficiently normalizes the result to -1, 0, or 1 to match the
     // behavior of NSString's compare function.
@@ -381,7 +381,7 @@ extension String {
       let rhsPtr = UnsafePointer<UTF16.CodeUnit>(rhs._core.startUTF16)
 
       return Int(_swift_stdlib_unicode_compare_utf8_utf16(
-        lhsPtr, Int32(_core.count), rhsPtr, Int32(rhs._core.count)))
+        lhsPtr, Int32(_core.length), rhsPtr, Int32(rhs._core.length)))
     case (false, true):
       // Just invert it and recurse for this case.
       return -rhs._compareDeterministicUnicodeCollation(self)
@@ -390,15 +390,15 @@ extension String {
       let rhsPtr = UnsafePointer<UTF16.CodeUnit>(rhs._core.startUTF16)
 
       return Int(_swift_stdlib_unicode_compare_utf16_utf16(
-        lhsPtr, Int32(_core.count),
-        rhsPtr, Int32(rhs._core.count)))
+        lhsPtr, Int32(_core.length),
+        rhsPtr, Int32(rhs._core.length)))
     case (true, true):
       let lhsPtr = UnsafePointer<Int8>(_core.startASCII)
       let rhsPtr = UnsafePointer<Int8>(rhs._core.startASCII)
 
       return Int(_swift_stdlib_unicode_compare_utf8_utf8(
-        lhsPtr, Int32(_core.count),
-        rhsPtr, Int32(rhs._core.count)))
+        lhsPtr, Int32(_core.length),
+        rhsPtr, Int32(rhs._core.length)))
     }
 #endif
   }
@@ -435,10 +435,6 @@ extension String {
   /// - Complexity: Amortized O(1).
   public mutating func append(x: UnicodeScalar) {
     _core.append(x)
-  }
-
-  var _utf16Count: Int {
-    return _core.count
   }
 
   public // SPI(Foundation)
@@ -489,11 +485,11 @@ extension String : Hashable {
     if self._core.isASCII {
       return _swift_stdlib_unicode_hash_ascii(
         UnsafeMutablePointer<Int8>(_core.startASCII),
-        Int32(_core.count))
+        Int32(_core.length))
     } else {
       return _swift_stdlib_unicode_hash(
         UnsafeMutablePointer<UInt16>(_core.startUTF16),
-        Int32(_core.count))
+        Int32(_core.length))
     }
 #endif
   }
@@ -530,11 +526,12 @@ extension String {
   public // COMPILER_INTRINSIC
   static func _fromUTF8InRawMemory(
     resultStorage: UnsafeMutablePointer<String>,
-    start: UnsafeMutablePointer<UTF8.CodeUnit>, utf8Count: Int
+    start: UnsafeMutablePointer<UTF8.CodeUnit>,
+    utf8Length: Int
   ) {
     resultStorage.initializeMemory(
         String._fromWellFormedCodeUnitSequence(UTF8.self,
-            input: UnsafeBufferPointer(start: start, count: utf8Count)))
+            input: UnsafeBufferPointer(start: start, length: utf8Length)))
   }
 }
 
@@ -619,7 +616,7 @@ extension Sequence where Iterator.Element == String {
 
     // FIXME(performance): this code assumes UTF-16 in-memory representation.
     // It should be switched to low-level APIs.
-    let separatorSize = separator.utf16.count
+    let separatorSize = separator.utf16.length
 
     let reservation = self._preprocessingPass {
       (s: Self) -> Int in
@@ -627,7 +624,7 @@ extension Sequence where Iterator.Element == String {
       for chunk in s {
         // FIXME(performance): this code assumes UTF-16 in-memory representation.
         // It should be switched to low-level APIs.
-        r += separatorSize + chunk.utf16.count
+        r += separatorSize + chunk.utf16.length
       }
       return r - separatorSize
     }
@@ -662,7 +659,7 @@ extension String {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`bounds.count`) if `bounds.endIndex
+  /// - Complexity: O(`bounds.length`) if `bounds.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceSubrange<
     C: Collection where C.Iterator.Element == Character
@@ -678,7 +675,7 @@ extension String {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`bounds.count`) if `bounds.endIndex
+  /// - Complexity: O(`bounds.length`) if `bounds.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceSubrange(
     bounds: Range<Index>, with newElements: String
@@ -690,7 +687,7 @@ extension String {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`self.count`).
+  /// - Complexity: O(`self.length`).
   public mutating func insert(newElement: Character, at i: Index) {
     withMutableCharacters {
       (inout v: CharacterView) in v.insert(newElement, at: i)
@@ -701,7 +698,7 @@ extension String {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`self.count + newElements.count`).
+  /// - Complexity: O(`self.length + newElements.length`).
   public mutating func insertContentsOf<
     S : Collection where S.Iterator.Element == Character
   >(newElements: S, at i: Index) {
@@ -714,7 +711,7 @@ extension String {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`self.count`).
+  /// - Complexity: O(`self.length`).
   public mutating func removeAt(i: Index) -> Character {
     return withMutableCharacters {
       (inout v: CharacterView) in v.removeAt(i)
@@ -725,7 +722,7 @@ extension String {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`self.count`).
+  /// - Complexity: O(`self.length`).
   public mutating func removeSubrange(bounds: Range<Index>) {
     withMutableCharacters {
       (inout v: CharacterView) in v.removeSubrange(bounds)
@@ -757,22 +754,22 @@ func _stdlib_NSStringUppercaseString(str: AnyObject) -> _CocoaString
 @warn_unused_result
 internal func _nativeUnicodeLowercaseString(str: String) -> String {
   var buffer = _StringBuffer(
-    capacity: str._core.count, initialSize: str._core.count, elementWidth: 2)
+    capacity: str._core.length, initialSize: str._core.length, elementWidth: 2)
 
   // Try to write it out to the same length.
   let dest = UnsafeMutablePointer<UTF16.CodeUnit>(buffer.start)
   let z = _swift_stdlib_unicode_strToLower(
-    dest, Int32(str._core.count),
-    str._core.startUTF16, Int32(str._core.count))
+    dest, Int32(str._core.length),
+    str._core.startUTF16, Int32(str._core.length))
   let correctSize = Int(z)
 
   // If more space is needed, do it again with the correct buffer size.
-  if correctSize != str._core.count {
+  if correctSize != str._core.length {
     buffer = _StringBuffer(
       capacity: correctSize, initialSize: correctSize, elementWidth: 2)
     let dest = UnsafeMutablePointer<UTF16.CodeUnit>(buffer.start)
     _swift_stdlib_unicode_strToLower(
-      dest, Int32(correctSize), str._core.startUTF16, Int32(str._core.count))
+      dest, Int32(correctSize), str._core.startUTF16, Int32(str._core.length))
   }
 
   return String(_storage: buffer)
@@ -781,22 +778,22 @@ internal func _nativeUnicodeLowercaseString(str: String) -> String {
 @warn_unused_result
 internal func _nativeUnicodeUppercaseString(str: String) -> String {
   var buffer = _StringBuffer(
-    capacity: str._core.count, initialSize: str._core.count, elementWidth: 2)
+    capacity: str._core.length, initialSize: str._core.length, elementWidth: 2)
 
   // Try to write it out to the same length.
   let dest = UnsafeMutablePointer<UTF16.CodeUnit>(buffer.start)
   let z = _swift_stdlib_unicode_strToUpper(
-    dest, Int32(str._core.count),
-    str._core.startUTF16, Int32(str._core.count))
+    dest, Int32(str._core.length),
+    str._core.startUTF16, Int32(str._core.length))
   let correctSize = Int(z)
 
   // If more space is needed, do it again with the correct buffer size.
-  if correctSize != str._core.count {
+  if correctSize != str._core.length {
     buffer = _StringBuffer(
       capacity: correctSize, initialSize: correctSize, elementWidth: 2)
     let dest = UnsafeMutablePointer<UTF16.CodeUnit>(buffer.start)
     _swift_stdlib_unicode_strToUpper(
-      dest, Int32(correctSize), str._core.startUTF16, Int32(str._core.count))
+      dest, Int32(correctSize), str._core.startUTF16, Int32(str._core.length))
   }
 
   return String(_storage: buffer)
@@ -830,9 +827,9 @@ extension String {
   /// Return `self` converted to lower case.
   ///
   /// - Complexity: O(n)
-  public var lowercaseString: String {
+  public var lowercased: String {
     if self._core.isASCII {
-      let length = self._core.count
+      let length = self._core.length
       let source = self._core.startASCII
       let buffer = _StringBuffer(
         capacity: length, initialSize: length, elementWidth: 1)
@@ -871,9 +868,9 @@ extension String {
   /// Return `self` converted to upper case.
   ///
   /// - Complexity: O(n)
-  public var uppercaseString: String {
+  public var uppercased: String {
     if self._core.isASCII {
-      let length = self._core.count
+      let length = self._core.length
       let source = self._core.startASCII
       let buffer = _StringBuffer(
         capacity: length, initialSize: length, elementWidth: 1)

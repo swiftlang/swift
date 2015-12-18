@@ -22,7 +22,7 @@
 
 @warn_unused_result
 func _toNSArray<T, U : AnyObject>(a: [T], @noescape f: (T) -> U) -> NSArray {
-  let result = NSMutableArray(capacity: a.count)
+  let result = NSMutableArray(capacity: a.length)
   for s in a {
     result.add(f(s))
   }
@@ -631,7 +631,7 @@ extension String {
     return _withOptionalOutParameter(leftover) {
       self._ns.getBytes(
         &buffer,
-        maxLength: min(buffer.count, maxBufferCount),
+        maxLength: min(buffer.length, maxBufferCount),
         usedLength: usedBufferCount,
         encoding: encoding,
         options: options,
@@ -647,12 +647,12 @@ extension String {
 
   /// Converts the `String`’s content to a given encoding and
   /// stores them in a buffer.
-  /// - Note: will store a maximum of `min(buffer.count, maxLength)` bytes.
+  /// - Note: will store a maximum of `min(buffer.length, maxLength)` bytes.
   public func getCString(
     inout buffer: [CChar], maxLength: Int, encoding: NSStringEncoding
   ) -> Bool {
-    return _ns.getCString(&buffer, maxLength: min(buffer.count, maxLength),
-                          encoding: encoding)
+    return _ns.getCString(
+      &buffer, maxLength: min(buffer.length, maxLength), encoding: encoding)
   }
 
   // - (BOOL)
@@ -662,12 +662,12 @@ extension String {
   /// Interprets the `String` as a system-independent path and
   /// fills a buffer with a C-string in a format and encoding suitable
   /// for use with file-system calls.
-  /// - Note: will store a maximum of `min(buffer.count, maxLength)` bytes.
+  /// - Note: will store a maximum of `min(buffer.length, maxLength)` bytes.
   @available(*, unavailable, message="Use getFileSystemRepresentation on NSURL instead.")
   public func getFileSystemRepresentation(
     inout buffer: [CChar], maxLength: Int) -> Bool {
     return _ns.getFileSystemRepresentation(
-      &buffer, maxLength: min(buffer.count, maxLength))
+      &buffer, maxLength: min(buffer.length, maxLength))
   }
 
   // - (void)
@@ -747,7 +747,7 @@ extension String {
   ) {
     let byteArray = Array(bytes)
     if let ns = NSString(
-      bytes: byteArray, length: byteArray.count, encoding: encoding) {
+      bytes: byteArray, length: byteArray.length, encoding: encoding) {
 
       self = ns as String
     } else {
@@ -947,7 +947,7 @@ extension String {
   /// values are substituted according to given locale information.
   public init(format: String, locale: NSLocale?, arguments: [CVarArg]) {
     _require(
-      _countFormatSpecifiers(format) <= arguments.count,
+      _countFormatSpecifiers(format) <= arguments.length,
       "Too many format specifiers (%<letter>) provided for the argument list"
     )
     self = withVaList(arguments) {
@@ -984,7 +984,7 @@ extension String {
 
   /// Returns the number of Unicode characters in the `String`.
   @available(*, unavailable,
-    message="Take the count of a UTF-16 view instead, i.e. str.utf16.count")
+    message="Take the length of a UTF-16 view instead, i.e. str.utf16.length")
   public var utf16Count: Int {
     return _ns.length
   }

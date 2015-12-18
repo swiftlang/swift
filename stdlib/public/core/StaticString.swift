@@ -17,15 +17,15 @@
 // are involved in its construction.  This feature is crucial for
 // preventing infinite recursion even in non-asserting cases.
 
-/// An simple string designed to represent text that is "knowable at
+/// A simple string designed to represent text that is "knowable at
 /// compile-time".
 ///
 /// Logically speaking, each instance looks something like this:
 ///
 ///      enum StaticString {
-///         case ASCII(start: UnsafePointer<UInt8>, length: Int)
-///         case UTF8(start: UnsafePointer<UInt8>, length: Int)
-///         case Scalar(UnicodeScalar)
+///        case ASCII(start: UnsafePointer<UInt8>, length: Int)
+///        case UTF8(start: UnsafePointer<UInt8>, length: Int)
+///        case Scalar(UnicodeScalar)
 ///      }
 public struct StaticString
   : _BuiltinUnicodeScalarLiteralConvertible,
@@ -44,7 +44,7 @@ public struct StaticString
 
   /// If `_startPtrOrData` is a pointer, contains the length of the UTF-8 data
   /// in bytes.
-  var _byteSize: Builtin.Word
+  var _lengthInBytes: Builtin.Word
 
   /// Extra flags:
   ///
@@ -82,13 +82,13 @@ public struct StaticString
   /// length in bytes of that data.
   ///
   /// If `self` stores a single Unicode scalar value, the value of
-  /// `byteSize` is unspecified.
+  /// `lengthInBytes` is unspecified.
   @_transparent
-  public var byteSize: Int {
+  public var lengthInBytes: Int {
     _require(
       hasPointerRepresentation,
       "StaticString should have pointer representation")
-    return Int(_byteSize)
+    return Int(_lengthInBytes)
   }
 
   /// `true` iff `self` stores a pointer to ASCII or UTF-8 code units.
@@ -113,7 +113,7 @@ public struct StaticString
   public func withUTF8Buffer<R>(
     @noescape body: (UnsafeBufferPointer<UInt8>) -> R) -> R {
     if hasPointerRepresentation {
-      return body(UnsafeBufferPointer(start: utf8Start, count: Int(byteSize)))
+      return body(UnsafeBufferPointer(start: utf8Start, length: Int(lengthInBytes)))
     } else {
       var buffer: UInt64 = 0
       var i = 0
@@ -124,17 +124,7 @@ public struct StaticString
       UTF8.encode(unicodeScalar, output: sink)
       return body(UnsafeBufferPointer(
         start: UnsafePointer(Builtin.addressof(&buffer)),
-        count: i))
-    }
-  }
-
-  /// Return a `String` representing the same sequence of Unicode
-  /// scalar values as `self` does.
-  @_transparent
-  public var stringValue: String {
-    return withUTF8Buffer {
-      (buffer) in
-      return String._fromWellFormedCodeUnitSequence(UTF8.self, input: buffer)
+        length: i))
     }
   }
 
@@ -146,10 +136,10 @@ public struct StaticString
 
   @_transparent
   internal init(
-    start: Builtin.RawPointer, byteSize: Builtin.Word, isASCII: Builtin.Int1
+    start: Builtin.RawPointer, lengthInBytes: Builtin.Word, isASCII: Builtin.Int1
   ) {
     self._startPtrOrData = start
-    self._byteSize = byteSize
+    self._lengthInBytes = lengthInBytes
     self._flags = Bool(isASCII) ? (0x2 as UInt8)._value : (0x0 as UInt8)._value
   }
 
@@ -159,7 +149,7 @@ public struct StaticString
   ) {
     self._startPtrOrData =
       unsafeBitCast(UInt(UInt32(unicodeScalar)), OpaquePointer.self)._rawValue
-    self._byteSize = 0._builtinWordValue
+    self._lengthInBytes = 0._builtinWordValue
     self._flags = UnicodeScalar(_builtinUnicodeScalarLiteral: unicodeScalar).isASCII()
       ? (0x3 as UInt8)._value
       : (0x1 as UInt8)._value
@@ -182,12 +172,12 @@ public struct StaticString
   @_transparent
   public init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
-    byteSize: Builtin.Word,
+    lengthInBytes: Builtin.Word,
     isASCII: Builtin.Int1
   ) {
     self = StaticString(
       _builtinStringLiteral: start,
-      byteSize: byteSize,
+      lengthInBytes: lengthInBytes,
       isASCII: isASCII
     )
   }
@@ -203,10 +193,13 @@ public struct StaticString
   @_transparent
   public init(
     _builtinStringLiteral start: Builtin.RawPointer,
-    byteSize: Builtin.Word,
+    lengthInBytes: Builtin.Word,
     isASCII: Builtin.Int1
   ) {
-    self = StaticString(start: start, byteSize: byteSize, isASCII: isASCII)
+    self = StaticString(
+      start: start,
+      lengthInBytes: lengthInBytes,
+      isASCII: isASCII)
   }
 
   /// Create an instance initialized to `value`.
@@ -218,15 +211,18 @@ public struct StaticString
 
   /// A textual representation of `self`.
   public var description: String {
-    return self.stringValue
+    return withUTF8Buffer {
+      (buffer) in
+      return String._fromWellFormedCodeUnitSequence(UTF8.self, input: buffer)
+    }
   }
 
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
-    return self.stringValue.debugDescription
+    return self.description.debugDescription
   }
 
   public func _getMirror() -> _Mirror {
-    return _reflect(self.stringValue)
+    return _reflect(self.description)
   }
 }

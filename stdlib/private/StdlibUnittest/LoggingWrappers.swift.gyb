@@ -113,8 +113,8 @@ public struct LoggingRangeReplaceableCollection<
     self.base = base
   }
 
-  public var count: Base.Index.Distance {
-    return base.count
+  public var length: Base.Index.Distance {
+    return base.length
   }
 
   public var first: Base.Iterator.Element? {
@@ -270,7 +270,7 @@ public class SequenceLog {
   }
   public static var forEach = TypeIndexed(0)
   public static var iterator = TypeIndexed(0)
-  public static var underestimateCount = TypeIndexed(0)
+  public static var underestimateLength = TypeIndexed(0)
   public static var map = TypeIndexed(0)
   public static var filter = TypeIndexed(0)
   public static var dropFirst = TypeIndexed(0)
@@ -298,7 +298,7 @@ public class CollectionLog : SequenceLog {
   public static var subscriptRange = TypeIndexed(0)
   public static var suffixFrom = TypeIndexed(0)
   public static var isEmpty = TypeIndexed(0)
-  public static var count = TypeIndexed(0)
+  public static var length = TypeIndexed(0)
   public static var _customIndexOfEquatableElement = TypeIndexed(0)
   public static var first = TypeIndexed(0)
 }
@@ -416,9 +416,9 @@ public struct Logging${Kind}<Base: ${Kind}> : ${Kind}, LoggingType {
     return base.isEmpty
   }
 
-  public var count: Base.Index.Distance {
-    ++Log.count[selfType]
-    return base.count
+  public var length: Base.Index.Distance {
+    ++Log.length[selfType]
+    return base.length
   }
 
   public func _customIndexOfEquatableElement(
@@ -452,9 +452,9 @@ public struct Logging${Kind}<Base: ${Kind}> : ${Kind}, LoggingType {
     return LoggingIterator(base.iterator())
   }
 
-  public func underestimateCount() -> Int {
-    ++Log.underestimateCount[selfType]
-    return base.underestimateCount()
+  public func underestimateLength() -> Int {
+    ++Log.underestimateLength[selfType]
+    return base.underestimateLength()
   }
 
   public func forEach(

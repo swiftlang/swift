@@ -16,10 +16,6 @@ public enum Optional<Wrapped> : _Reflectable, NilLiteralConvertible {
   case None
   case Some(Wrapped)
 
-  /// Construct a `nil` instance.
-  @_transparent
-  public init() { self = .None }
-
   /// Construct a non-`nil` instance that stores `some`.
   @_transparent
   public init(_ some: Wrapped) { self = .Some(some) }
@@ -238,7 +234,7 @@ internal struct _OptionalMirror<Wrapped> : _Mirror {
 
   var objectIdentifier: ObjectIdentifier? { return .None }
 
-  var count: Int { return (_value != nil) ? 1 : 0 }
+  var length: Int { return (_value != nil) ? 1 : 0 }
 
   subscript(i: Int) -> (String, _Mirror) {
     switch (_value, i) {

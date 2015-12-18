@@ -116,7 +116,7 @@ public:
     Load,
     /// The candidate witness during protocol conformance checking.
     Witness,
-    /// This is refering to a type produced by opening a generic type at the
+    /// This is referring to a type produced by opening a generic type at the
     /// base of the locator.
     OpenedGeneric,
   };

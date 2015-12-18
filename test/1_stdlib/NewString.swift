@@ -40,13 +40,13 @@ func repr(x: _StringCore) -> String {
       ? UnsafeMutablePointer(b.start) - x.startUTF16
       : UnsafeMutablePointer(b.start) - x.startASCII
       return "Contiguous(owner: "
-      + "\(hexAddr(x._owner))[\(offset)...\(x.count + offset)]"
+      + "\(hexAddr(x._owner))[\(offset)...\(x.length + offset)]"
       + ", capacity = \(b.capacity))"
     }
-    return "Contiguous(owner: \(hexAddr(x._owner)), count: \(x.count))"
+    return "Contiguous(owner: \(hexAddr(x._owner)), length: \(x.length))"
   }
   else if let b2 = x.cocoaBuffer {
-    return "Opaque(buffer: \(hexAddr(b2))[0...\(x.count)])"
+    return "Opaque(buffer: \(hexAddr(b2))[0...\(x.length)])"
   }
   return "?????"
 }
@@ -64,13 +64,13 @@ print("Testing...")
 var nsb = "🏂☃❅❆❄︎⛄️❄️"
 // CHECK-NEXT: Hello, snowy world: 🏂☃❅❆❄︎⛄️❄️
 print("Hello, snowy world: \(nsb)")
-// CHECK-NEXT: String(Contiguous(owner: null, count: 11))
+// CHECK-NEXT: String(Contiguous(owner: null, length: 11))
 print("  \(repr(nsb))")
 
 var empty = String()
 // CHECK-NEXT: These are empty: <>
 print("These are empty: <\(empty)>")
-// CHECK-NEXT: String(Contiguous(owner: null, count: 0))
+// CHECK-NEXT: String(Contiguous(owner: null, length: 0))
 print("  \(repr(empty))")
 
 
@@ -91,7 +91,7 @@ func nonASCII() {
   // CHECK-NEXT: __NSCFString@[[utf16address:[x0-9a-f]+]] = "🏂☃❅❆❄︎⛄️❄️"
   print("  \(repr(nsUTF16))")
 
-  // CHECK-NEXT: String(Contiguous(owner: .Cocoa@[[utf16address]], count: 11))
+  // CHECK-NEXT: String(Contiguous(owner: .Cocoa@[[utf16address]], length: 11))
   var newNSUTF16 = nsUTF16 as String
   print("  \(repr(newNSUTF16))")
 
@@ -103,7 +103,7 @@ func nonASCII() {
   print("--- UTF-16 slicing ---")
 
   // Slicing the String does not allocate
-  // CHECK-NEXT: String(Contiguous(owner: .Cocoa@[[utf16address]], count: 6))
+  // CHECK-NEXT: String(Contiguous(owner: .Cocoa@[[utf16address]], length: 6))
   let i2 = newNSUTF16.startIndex.advancedBy(2)
   let i8 = newNSUTF16.startIndex.advancedBy(6)
   print("  \(repr(newNSUTF16[i2..<i8]))")
@@ -115,7 +115,7 @@ func nonASCII() {
   print("  \(repr(nsSliceUTF16))")
 
   // Check that we can recover the original buffer
-  // CHECK-NEXT: String(Contiguous(owner: .Cocoa@[[utf16address]], count: 6))
+  // CHECK-NEXT: String(Contiguous(owner: .Cocoa@[[utf16address]], length: 6))
   print("  \(repr(nsSliceUTF16 as String))")
 }
 nonASCII()
@@ -169,13 +169,13 @@ ascii()
 // CHECK: --- Literals ---
 print("--- Literals ---")
 
-// CHECK-NEXT: String(Contiguous(owner: null, count: 6)) = "foobar"
+// CHECK-NEXT: String(Contiguous(owner: null, length: 6)) = "foobar"
 // CHECK-NEXT: true
 var asciiLiteral: String = "foobar"
 print("  \(repr(asciiLiteral))")
 print("  \(asciiLiteral._core.isASCII)")
 
-// CHECK-NEXT: String(Contiguous(owner: null, count: 11)) = "🏂☃❅❆❄︎⛄️❄️"
+// CHECK-NEXT: String(Contiguous(owner: null, length: 11)) = "🏂☃❅❆❄︎⛄️❄️"
 // CHECK-NEXT: false
 var nonASCIILiteral: String = "🏂☃❅❆❄︎⛄️❄️"
 print("  \(repr(nonASCIILiteral))")

@@ -43,7 +43,7 @@ public struct Unsafe${Mutable}BufferPointer<Element>
     return 0
   }
 
-  /// The "past the end" position; always identical to `count`.
+  /// The "past the end" position; always identical to `length`.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
@@ -68,13 +68,13 @@ public struct Unsafe${Mutable}BufferPointer<Element>
 %end
   }
 
-  /// Construct an Unsafe${Mutable}Pointer over the `count` contiguous
+  /// Construct an Unsafe${Mutable}Pointer over the `length` contiguous
   /// `Element` instances beginning at `start`.
-  public init(start: Unsafe${Mutable}Pointer<Element>, count: Int) {
+  public init(start: Unsafe${Mutable}Pointer<Element>, length: Int) {
     _require(
-      count >= 0, "Unsafe${Mutable}BufferPointer with negative count")
+      length >= 0, "Unsafe${Mutable}BufferPointer with negative length")
     _position = start
-    _end = start + count
+    _end = start + length
   }
 
   /// Return a *iterator* over the elements of this *sequence*.
@@ -90,7 +90,7 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   }
 
   /// The number of elements in the buffer.
-  public var count: Int {
+  public var length: Int {
     return _end - _position
   }
 

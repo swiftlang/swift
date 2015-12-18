@@ -304,12 +304,20 @@ static bool valueMayBeCaptured(SILValue V, CaptureException Exception) {
   return false;
 }
 
-bool swift::isNotAliasingArgument(SILValue V) {
+bool swift::isNotAliasingArgument(SILValue V,
+                                  bool assumeInoutIsNotAliasing) {
   auto *Arg = dyn_cast<SILArgument>(V);
-  if (!Arg)
+  if (!Arg || !Arg->isFunctionArg())
     return false;
 
-  return Arg->isFunctionArg() && V.getType().isAddress();
+  return isNotAliasedIndirectParameter(Arg->getParameterInfo().getConvention(),
+                                       assumeInoutIsNotAliasing);
+}
+
+bool swift::pointsToLocalObject(SILValue V, bool assumeInoutIsNotAliasing) {
+  V = getUnderlyingObject(V);
+  return isa<AllocationInst>(V) ||
+        isNotAliasingArgument(V, assumeInoutIsNotAliasing);
 }
 
 /// Return true if the pointer is to a function-local object that never escapes

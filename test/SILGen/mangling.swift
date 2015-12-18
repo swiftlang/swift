@@ -94,7 +94,7 @@ func uses_objc_class_and_protocol(o o: NSObject, p: NSAnsing) {}
 func uses_clang_struct(r r: NSRect) {}
 
 // CHECK-LABEL: sil hidden @_TF8mangling14uses_optionalsFT1xGSqSi__GSqSc_
-func uses_optionals(x x: Int?) -> UnicodeScalar? { return Optional() }
+func uses_optionals(x x: Int?) -> UnicodeScalar? { return nil }
 
 enum GenericUnion<T> {
   // CHECK-LABEL: sil shared [transparent] @_TFO8mangling12GenericUnion3FoourfMGS0_x_FSiGS0_x_
