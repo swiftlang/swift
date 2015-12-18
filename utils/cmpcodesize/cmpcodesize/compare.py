@@ -3,7 +3,7 @@ import os
 import collections
 from operator import itemgetter
 
-from cmpcodesize import otool
+from cmpcodesize import otool, regex
 
 Prefixes = {
     # Cpp
@@ -68,30 +68,24 @@ def addFunction(sizes, function, startAddr, endAddr, groupByPrefix):
 def readSizes(sizes, fileName, functionDetails, groupByPrefix):
     # Check if multiple architectures are supported by the object file.
     # Prefer arm64 if available.
-    architectures = otool.fat_headers(fileName).split('\n')
-    arch = None
-    archPattern = re.compile('architecture ([\S]+)')
-    for architecture in architectures:
-        archMatch = archPattern.match(architecture)
-        if archMatch:
-            if arch is None:
-                arch = archMatch.group(1)
-            if "arm64" in arch:
-                arch = "arm64"
-
+    fat_headers = otool.fat_headers(fileName)
+    architecture = regex.architecture(fat_headers)
     if functionDetails:
         content = otool.load_commands(fileName,
-                                      architecture=arch,
+                                      architecture=architecture,
                                       include_text_sections=True).split('\n')
-        content += otool.text_sections(fileName, architecture=arch).split('\n')
+        content += otool.text_sections(fileName,
+                                       architecture=architecture).split('\n')
     else:
-        content = otool.load_commands(fileName, architecture=arch).split('\n')
+        content = otool.load_commands(fileName,
+                                      architecture=architecture).split('\n')
 
     sectName = None
     currFunc = None
     startAddr = None
     endAddr = None
 
+    # FIXME: Move re calls into cmpcodesize.regex module.
     sectionPattern = re.compile(' +sectname ([\S]+)')
     sizePattern = re.compile(' +size ([\da-fx]+)')
     asmlinePattern = re.compile('^([0-9a-fA-F]+)\s')
