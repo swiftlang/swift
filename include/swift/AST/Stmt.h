@@ -800,6 +800,9 @@ public:
   
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(ForLoc); }
   SourceLoc getEndLoc() const { return Body->getEndLoc(); }
+
+  SourceLoc getFirstSemicolonLoc() const { return Semi1Loc; }
+  SourceLoc getSecondSemicolonLoc() const { return Semi2Loc; }
   
   NullablePtr<Expr> getInitializer() const { return Initializer; }
   void setInitializer(Expr *V) { Initializer = V; }

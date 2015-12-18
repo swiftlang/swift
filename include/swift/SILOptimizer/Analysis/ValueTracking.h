@@ -31,14 +31,16 @@ SILValue getUnderlyingObject(SILValue V);
 /// any other pointer in the function.
 /// The \p assumeInoutIsNotAliasing specifies in no-aliasing is assumed for
 /// the @inout convention. See swift::isNotAliasedIndirectParameter().
-bool isNotAliasingArgument(SILValue V, bool assumeInoutIsNotAliasing = false);
+bool isNotAliasingArgument(SILValue V, InoutAliasingAssumption isInoutAliasing =
+                                         InoutAliasingAssumption::Aliasing);
 
 /// Returns true if \p V is local inside its function. This means its underlying
 /// object either is a non-aliasing function argument or a locally allocated
 /// object.
 /// The \p assumeInoutIsNotAliasing specifies in no-aliasing is assumed for
 /// the @inout convention. See swift::isNotAliasedIndirectParameter().
-bool pointsToLocalObject(SILValue V, bool assumeInoutIsNotAliasing = false);
+  bool pointsToLocalObject(SILValue V, InoutAliasingAssumption isInoutAliasing =
+                                         InoutAliasingAssumption::Aliasing);
 
 /// Return true if the pointer is to a function-local object that never escapes
 /// from the function.

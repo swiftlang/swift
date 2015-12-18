@@ -22,6 +22,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/TimeValue.h"
@@ -206,6 +207,10 @@ void SILPassManager::runPassesOnFunction(PassList FuncTransforms,
     SFT->run();
     Mod->removeDeleteNotificationHandler(SFT);
 
+    // Did running the transform result in new functions being added
+    // to the top of our worklist?
+    bool newFunctionsAdded = (F != FunctionWorklist.back());
+
     if (SILPrintPassTime) {
       auto Delta =
           llvm::sys::TimeValue::now().nanoseconds() - StartTime.nanoseconds();
@@ -232,7 +237,11 @@ void SILPassManager::runPassesOnFunction(PassList FuncTransforms,
     }
 
     ++NumPassesRun;
-    if (!continueTransforming())
+
+    // If running the transform resulted in new functions on the top
+    // of the worklist, we'll return so that we can begin processing
+    // those new functions.
+    if (newFunctionsAdded || !continueTransforming())
       return;
   }
 }
@@ -255,6 +264,11 @@ void SILPassManager::runFunctionPasses(PassList FuncTransforms) {
       FunctionWorklist.push_back(*I);
   }
 
+  // Used to track how many times a given function has been
+  // (partially) optimized by the function pass pipeline in this
+  // invocation.
+  llvm::DenseMap<SILFunction *, unsigned int> CountOptimized;
+
   // Pop functions off the worklist, and run all function transforms
   // on each of them.
   while (!FunctionWorklist.empty()) {
@@ -262,7 +276,15 @@ void SILPassManager::runFunctionPasses(PassList FuncTransforms) {
 
     runPassesOnFunction(FuncTransforms, F);
 
-    FunctionWorklist.pop_back();
+    ++CountOptimized[F];
+
+    // If running the function transforms did not result in new
+    // functions being added to the top of the worklist, then we're
+    // done with this function and can pop it off and continue.
+    // Otherwise, we'll return to this function and reoptimize after
+    // processing the new functions that were added.
+    if (F == FunctionWorklist.back())
+      FunctionWorklist.pop_back();
   }
 }
 

@@ -1,6 +1,2 @@
 // RUN: not --crash %target-swift-ide-test -code-completion -code-completion-token=A -source-filename=%s
-protocol A{
-typealias e
-class A{let A{
-protocol A{typealias f=e
-#^A^#
+struct a<T{var d{enum b{func c{func b{#^A^#class A
