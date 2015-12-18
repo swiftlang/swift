@@ -3,6 +3,8 @@
 # Emulates the frontend of an -embed-bitcode job. That means we have to handle
 # -emit-bc and -c actions.
 
+from __future__ import print_function
+
 import os
 import shutil
 import sys
@@ -18,8 +20,8 @@ with open(outputFile, 'a'):
     os.utime(outputFile, None)
 
 if '-emit-bc' in sys.argv:
-  print "Handled", os.path.basename(primaryFile)
+  print("Handled", os.path.basename(primaryFile))
 elif '-c' in sys.argv:
-  print "Produced", os.path.basename(outputFile)
+  print("Produced", os.path.basename(outputFile))
 else:
   assert False, "unknown action"

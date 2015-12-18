@@ -2,6 +2,8 @@
 
 # Emulates the frontend of a -whole-module-optimization compilation.
 
+from __future__ import print_function
+
 import os
 import shutil
 import sys
@@ -16,4 +18,4 @@ outputFile = sys.argv[sys.argv.index('-o') + 1]
 with open(outputFile, 'a'):
     os.utime(outputFile, None)
 
-print "Produced", os.path.basename(outputFile)
+print("Produced", os.path.basename(outputFile))

@@ -15,6 +15,8 @@
 # Note: viewcfg should be in the $PATH and .dot files should be associated
 # with the Graphviz app.
 
+from __future__ import print_function
+
 import re
 import sys
 import tempfile
@@ -22,14 +24,14 @@ import subprocess
 import os
 
 def help():
-  print """\
+  print("""\
 Usage:
 
 viewcfg [output-suffix] < file
 
 By default all CFGs are opened in the same window.
 Use the a unique output-suffix to open a CFG in a new window.
-"""
+""")
 
 class Block:
 

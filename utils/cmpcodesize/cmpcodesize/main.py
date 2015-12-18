@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 import argparse
 import sys
 import os
@@ -132,7 +134,7 @@ How to specify files:
                 '$SWIFT_NEW_BUILDDIR environment variables set.\n' + \
                 '$SWIFT_OLD_BUILDDIR = {0}\n$SWIFT_NEW_BUILDDIR = {1}'.format(
                     oldBuildDir, newBuildDir)
-            oldFileArgs = SHORTCUTS.keys()
+            oldFileArgs = list(SHORTCUTS.keys())
 
         oldFiles = []
         newFiles = []
@@ -150,7 +152,7 @@ How to specify files:
                     numExpanded += 1
 
         if numExpanded != 0 and numExpanded != len(oldFileArgs):
-            sys.exit("mix of expanded/not-expanded arguments") 
+            sys.exit("mix of expanded/not-expanded arguments")
         if numExpanded == 0:
             if len(oldFileArgs) > 2:
                 sys.exit("too many arguments")
@@ -166,11 +168,11 @@ How to specify files:
             sizes = collections.defaultdict(int)
             for file in oldFiles:
                 readSizes(sizes, file, True, False)
-            print listFunctionSizes(sizes.items())
+            print(listFunctionSizes(sizes.items()))
         else:
             compareFunctionSizes(oldFiles, newFiles)
     else:
-        print "%-26s%16s  %8s  %8s  %s" % ("", "Section", "Old", "New", "Percent")
+        print("%-26s%16s  %8s  %8s  %s" % ("", "Section", "Old", "New", "Percent"))
         if parsed_arguments.sum_sizes:
             compareSizesOfFile(oldFiles, newFiles,
                                parsed_arguments.all_sections,

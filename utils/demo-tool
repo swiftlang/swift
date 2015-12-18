@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 import json
 import optparse
 import subprocess
@@ -115,10 +117,10 @@ for example::
     def prompterPrint(string):
         if hasColor:
             attr = [ '32', '1' ]
-            print '\x1b[%sm%s\x1b[0m' % (';'.join(attr), string)
+            print('\x1b[%sm%s\x1b[0m' % (';'.join(attr), string))
         else:
-            print string
     
+            print(string)
     def send(*args, **kwargs):
         return send_to_screen(opts.screen_name, *args, **kwargs)
     parser.add_option("-S", "--screen-name", dest="screen_name", metavar="NAME",
@@ -162,7 +164,7 @@ for example::
 
         if command:
             # Send the command slowly, as if it was typed.
-            print "sending command: %r" % (command.replace('\n', '<cr>'),)
+            print("sending command: %r" % (command.replace('\n', '<cr>'),))
             for c in command:
                 send(c)
                 if c == "\n":
@@ -179,7 +181,7 @@ for example::
             raw_input('press enter to continue to next command...')
             # Send the command slowly, as if it was typed.
             if shouldClear:
-                print "clearing screen"
+                print("clearing screen")
                 send(command="clear")
                 send('\n')
 

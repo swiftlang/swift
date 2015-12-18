@@ -2,6 +2,8 @@
 # GYB: Generate Your Boilerplate (improved names welcome; at least
 # this one's short).  See -h output for instructions
 
+from __future__ import print_function
+
 import re
 from cStringIO import StringIO
 import tokenize
@@ -1051,8 +1053,8 @@ def main():
     bindings = dict( x.split('=', 1) for x in args.defines )
     ast = parseTemplate(args.file.name, args.file.read())
     if args.dump:
-        print ast
         
+        print(ast)
     # Allow the template to import .py files from its own directory
     sys.path = [os.path.split(args.file.name)[0] or '.'] + sys.path
     

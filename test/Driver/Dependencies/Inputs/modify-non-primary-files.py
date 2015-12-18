@@ -3,6 +3,8 @@
 # modify-non-primary-files.py simulates a build where the user is modifying the
 # source files during compilation.
 
+from __future__ import print_function
+
 import os
 import shutil
 import sys
@@ -32,6 +34,6 @@ with open(outputFile, 'a'):
     os.utime(outputFile, None)
 
 if primaryFile:
-  print "Handled", os.path.basename(primaryFile)
+  print("Handled", os.path.basename(primaryFile))
 else:
-  print "Produced", os.path.basename(outputFile)
+  print("Produced", os.path.basename(outputFile))
