@@ -438,6 +438,13 @@ func for_loop_multi_iter() {
   }
 }
 
+// rdar://problem/23684220
+// Even if the condition fails to typecheck, save it in the AST anyway; the old
+// condition may have contained a SequenceExpr.
+func r23684220(b: Any) {
+  if let _ = b ?? b {} // expected-error {{initializer for conditional binding must have Optional type, not 'Any' (aka 'protocol<>')}}
+}
+
 // Errors in case syntax
 class
 case, // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{expected pattern}}

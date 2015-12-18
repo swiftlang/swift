@@ -2006,10 +2006,7 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
     // If the pattern didn't get a type, it's because we ran into some
     // unknown types along the way. We'll need to check the initializer.
     auto init = elt.getInitializer();
-    if (typeCheckBinding(pattern, init, dc)) {
-      hadError = true;
-      continue;
-    }
+    hadError |= typeCheckBinding(pattern, init, dc);
     elt.setPattern(pattern);
     elt.setInitializer(init);
     hadAnyFalsable |= pattern->isRefutablePattern();
