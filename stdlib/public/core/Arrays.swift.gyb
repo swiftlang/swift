@@ -19,7 +19,7 @@
 //    contiguous sequence of `Element`s.
 //
 //  - `Array<Element>` is like `ContiguousArray<Element>` when `Element` is not
-//    an reference type or an Objective-C existential.  Otherwise, it may use
+//    a reference type or an Objective-C existential.  Otherwise, it may use
 //    an `NSArray` bridged from Cocoa for storage.
 //
 //===----------------------------------------------------------------------===//

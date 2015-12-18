@@ -4058,7 +4058,7 @@ select_value
   // %r1, %r2, %r3, etc. must have type $T
   // %n has type $T
 
-Selects one of the "case" or "default" operands based on the case of an
+Selects one of the "case" or "default" operands based on the case of a
 value. This is equivalent to a trivial `switch_value`_ branch sequence::
 
   entry:

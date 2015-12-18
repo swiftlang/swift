@@ -355,7 +355,7 @@ CPU=i386_or_x86_64`` to ``REQUIRES: CPU=x86_64``.
 ``swift_test_mode_optimize[_unchecked|none]_<CPUNAME>`` to specify a test mode
 plus cpu configuration.
 
-``optimized_stdlib_<CPUNAME>``` to specify a optimized stdlib plus cpu
+``optimized_stdlib_<CPUNAME>``` to specify an optimized stdlib plus cpu
 configuration.
 
 Feature ``REQUIRES: executable_test``

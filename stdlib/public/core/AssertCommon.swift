@@ -179,7 +179,7 @@ func _fatalErrorMessage(prefix: StaticString, _ message: StaticString,
   Builtin.int_trap()
 }
 
-/// Prints a fatal error message when a unimplemented initializer gets
+/// Prints a fatal error message when an unimplemented initializer gets
 /// called by the Objective-C runtime.
 @_transparent @noreturn
 public // COMPILER_INTRINSIC
