@@ -44,7 +44,7 @@ var s2 = s2s as NSString
 printDescription(s2) // CHECK: kappa-chow
 printDescription(p.sinePittyOnRunnyKine(s2 as String) as NSString) // CHECK: kappa-chow. sa-da-tay
 
-var s3:String = s2.stringByAppendingPathComponent(s1).reallyAString()
+var s3:String = s2.appendingPathComponent(s1).reallyAString()
 printDescription(s3 as NSString) // CHECK: kappa-chow/wa-da-ta
 
 // Unicode conversion

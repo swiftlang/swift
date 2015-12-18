@@ -1,3 +1,4 @@
 // REQUIRES: disabled
 // RUN: not --crash %target-swift-ide-test -code-completion -code-completion-token=A -source-filename=%s
+// REQUIRES: asserts
 {var f={{#^A^#}r

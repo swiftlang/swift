@@ -2134,7 +2134,7 @@ class NonContiguousNSString : NSString {
     self.init(encoded)
   }
 
-  @objc override func copyWithZone(zone: NSZone) -> AnyObject {
+  @objc override func copy(zone zone: NSZone) -> AnyObject {
     // Ensure that copying this string produces a class that CoreFoundation
     // does not know about.
     return self
@@ -2144,7 +2144,7 @@ class NonContiguousNSString : NSString {
     return _value.length
   }
 
-  @objc override func characterAtIndex(index: Int) -> unichar {
+  @objc override func characterAt(index: Int) -> unichar {
     return _value[index]
   }
 

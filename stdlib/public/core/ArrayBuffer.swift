@@ -178,7 +178,7 @@ extension _ArrayBuffer {
     else {
       let ns = _nonNative
       _require(
-        ns.objectAtIndex(index) is Element,
+        ns.objectAt(index) is Element,
         "NSArray element failed to match the Swift Array Element type")
     }
   }
@@ -367,7 +367,7 @@ extension _ArrayBuffer {
         "Down-casted Array element failed to match the target type")
     } else {
       // ObjC arrays do their own subscript checking.
-      element = _nonNative.objectAtIndex(i)
+      element = _nonNative.objectAt(i)
       _require(
         element is Element,
         "NSArray element failed to match the Swift Array Element type")

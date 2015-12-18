@@ -31,18 +31,18 @@ ur = testFunctionWithPointerParam(pui)
 // The types are treated as system types when working with objects having
 // protocol type.
 var a: [NSFastEnumeration] = [NSUIntTest(), NSUIntTest()]
-var r: Int = a[0].countByEnumeratingWithState(p, objects: pp, count: i)
+var r: Int = a[0].countByEnumeratingWith(p, objects: pp, count: i)
 
 // When working with instances typed as user-defined, NSUInteger comes
 // across as UInt.
-var rr: UInt = userTypedObj.countByEnumeratingWithState(p, objects: pp, count: ui)
+var rr: UInt = userTypedObj.countByEnumeratingWith(p, objects: pp, count: ui)
 
 // Check exercising protocol conformance.
 func gen<T:NSFastEnumeration>(t:T) {
   let i: Int = 56
   let p: UnsafeMutablePointer<NSFastEnumerationState> = nil
   let pp: AutoreleasingUnsafeMutablePointer<AnyObject?> = nil
-  t.countByEnumeratingWithState(p, objects: pp, count: i)
+  t.countByEnumeratingWith(p, objects: pp, count: i)
 }
 
 gen(userTypedObj)

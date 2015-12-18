@@ -14,9 +14,9 @@ func test0() {
 func testAndReturnError() throws {
   try ErrorProne.fail()
   try ErrorProne.go()
-  try ErrorProne.tryAndReturnError() // collides with 'try' keyword
+  try ErrorProne.tryAndReturn() // collides with 'try' keyword
 
-  ErrorProne.messUpSignatureAndReturnError(nil) // wrong signature
+  ErrorProne.messUpSignatureAndReturn(nil) // wrong signature
 }
 
 func testInheritedInit() throws {
@@ -72,7 +72,7 @@ func testBlockFinal() throws {
 }
 
 func testNonBlockFinal() throws {
-  ErrorProne.runWithError(count: 0) // expected-error {{missing argument for parameter #1 in call}}
+  ErrorProne.runWith(count: 0) // expected-error {{missing argument for parameter #1 in call}}
   ErrorProne.runWithAnError(count: 0) // expected-error {{missing argument for parameter #1 in call}}
 }
 

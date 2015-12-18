@@ -20,7 +20,7 @@
 // APPKIT-LABEL: {{^}}class NSView : NSObject, NSCoding, NSAccessibility {{{$}}
 // APPKIT-NEXT: init?(coder aDecoder: NSCoder)
 // APPKIT-NEXT: func isDescendantOf(aView: NSView) -> Bool
-// APPKIT-NEXT: func ancestorSharedWithView(aView: NSView) -> NSView?
+// APPKIT-NEXT: func ancestorSharedWith(aView: NSView) -> NSView?
 // APPKIT-NEXT: func addSubview(aView: NSView)
 // APPKIT-NEXT: func addSubview(aView: NSView, positioned place: UInt32, relativeTo otherView: NSView?)
 // APPKIT-NEXT: unowned(unsafe) var superview: @sil_unmanaged NSView? { get }
@@ -28,7 +28,7 @@
 // APPKIT-NEXT: var trackingAreas: [AnyObject] { get }
 // APPKIT-NEXT: var subviews: [AnyObject]
 // APPKIT-LABEL:      extension NSView {
-// APPKIT-NEXT:   unowned(unsafe) var nextKeyView: @sil_unmanaged NSView?
+// APPKIT-NEXT:   unowned(unsafe) var nextKey: @sil_unmanaged NSView?
 
 // APPKIT-LABEL: {{^}}class NSMenuItem : NSObject, NSCopying, NSCoding {
 // APPKIT-NEXT: unowned(unsafe) var menu: @sil_unmanaged NSMenu?

@@ -36,7 +36,7 @@ GamePlayKitTests.test("GKEntity.componentForClass()") {
     expectEmpty(componentForOtherTestComponent_nil)
   }
 
-  entity.removeComponentForClass(TestComponent.self)
+  entity.removeComponentFor(TestComponent.self)
   entity.addComponent(OtherTestComponent())
 
   do {

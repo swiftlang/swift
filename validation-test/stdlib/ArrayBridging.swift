@@ -46,7 +46,7 @@ struct ArrayBridge_objectAtIndex_RaceTest : RaceTestWithPerTrialData {
     raceData: RaceData, inout _ threadLocalData: ThreadLocalData
   ) -> Observation {
     let nsa = raceData.nsa
-    let v: AnyObject = nsa.objectAtIndex(0)
+    let v: AnyObject = nsa.objectAt(0)
     return Observation(unsafeBitCast(v, UInt.self))
   }
 

@@ -205,7 +205,7 @@ func testBridgedVerbatim() {
 
   // CHECK-NEXT: Base#1(100)
   let basesConvertedToNSArray = bases as NSArray
-  print(basesConvertedToNSArray.objectAtIndex(0) as! Base)
+  print(basesConvertedToNSArray.objectAt(0) as! Base)
 
   // Create an ordinary NSArray, not a native one
   let nsArrayOfBase: NSArray = NSArray(object: Base(42))
@@ -215,7 +215,7 @@ func testBridgedVerbatim() {
 
   // Capture the representation of the first element
   // CHECK-NEXT: [[base42:Base.*42]]
-  print(nsArrayOfBase.objectAtIndex(0) as! Base)
+  print(nsArrayOfBase.objectAt(0) as! Base)
 
   // ...with the same elements
   // CHECK-NEXT: [[base42]]
@@ -551,14 +551,14 @@ struct X {}
 /*
 let x: NSArray = arrayAsID(bases)!
 
-print(x.objectAtIndex(0) as Base)
+print(x.objectAt(0) as Base)
 */
 
 func testMutableArray() {
   var m = NSMutableArray(array: ["fu", "bar", "buzz"])
   let a = m as NSArray as! [NSString]
   print(a) // CHECK-NEXT: [fu, bar, buzz]
-  m.addObject("goop")
+  m.add("goop")
   print(a) // CHECK-NEXT: [fu, bar, buzz]
 }
 testMutableArray()

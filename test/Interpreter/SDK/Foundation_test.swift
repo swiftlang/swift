@@ -264,12 +264,12 @@ if #available(OSX 10.11, iOS 9.0, *) {
 private let KEY = "some-key"
 private func createTestArchive() -> NSData {
   let mutableData = NSMutableData()
-  let KA = NSKeyedArchiver(forWritingWithMutableData: mutableData)
+  let KA = NSKeyedArchiver(forWritingWith: mutableData)
 
   // Set up some fake data.
   let obj =  NSPredicate(value: true)
-  KA.encodeObject(obj, forKey: KEY)
-  KA.encodeObject(obj, forKey: NSKeyedArchiveRootObjectKey)
+  KA.encode(obj, forKey: KEY)
+  KA.encode(obj, forKey: NSKeyedArchiveRootObjectKey)
   KA.finishEncoding()
 
   return mutableData
@@ -279,7 +279,7 @@ FoundationTestSuite.test("NSKeyedUnarchiver/decodeObjectOfClass(_:forKey:)") {
   let obj = NSPredicate(value: true)
   let data = createTestArchive()
 
-  var KU = NSKeyedUnarchiver(forReadingWithData: data)
+  var KU = NSKeyedUnarchiver(forReadingWith: data)
 
   var missing = KU.decodeObjectOfClass(NSPredicate.self, forKey: "Not there")
   expectEmpty(missing)
@@ -304,12 +304,12 @@ if #available(OSX 10.11, iOS 9.0, *) {
     let data = createTestArchive()
 
     // first confirm .decodeObjectWithClasses overlay requires NSSet
-    var KU = NSKeyedUnarchiver(forReadingWithData: data)
+    var KU = NSKeyedUnarchiver(forReadingWith: data)
     var nonTopLevelResult = KU.decodeObjectOfClasses(NSSet(array: [NSPredicate.self]), forKey: KEY)
     expectTrue(nonTopLevelResult != nil)
     KU.finishDecoding()
 
-    KU = NSKeyedUnarchiver(forReadingWithData: data)
+    KU = NSKeyedUnarchiver(forReadingWith: data)
     do {
       // decodeObjectForKey(_:) throws
       let decoded1 = try KU.decodeTopLevelObjectForKey(KEY) as? NSPredicate
@@ -320,7 +320,7 @@ if #available(OSX 10.11, iOS 9.0, *) {
       KU.finishDecoding()
 
       // recreate so we can do the rest securely
-      KU = NSKeyedUnarchiver(forReadingWithData: data)
+      KU = NSKeyedUnarchiver(forReadingWith: data)
       KU.requiresSecureCoding = true
 
       // decodeObjectOfClass(_:,forKey:) throws
@@ -343,7 +343,7 @@ if #available(OSX 10.11, iOS 9.0, *) {
     }
     KU.finishDecoding()
 
-    KU = NSKeyedUnarchiver(forReadingWithData: data)
+    KU = NSKeyedUnarchiver(forReadingWith: data)
     KU.requiresSecureCoding = true
     do {
       // recreate so we avoid caches from above
@@ -355,7 +355,7 @@ if #available(OSX 10.11, iOS 9.0, *) {
     }
     KU.finishDecoding()
 
-    KU = NSKeyedUnarchiver(forReadingWithData: data)
+    KU = NSKeyedUnarchiver(forReadingWith: data)
     KU.requiresSecureCoding = true
     do {
       let wrongClasses = NSSet(array: [NSDateFormatter.self])
@@ -381,7 +381,7 @@ if #available(OSX 10.11, iOS 9.0, *) {
     let obj = NSPredicate(value: true)
     let data = createTestArchive()
 
-    var KU = NSKeyedUnarchiver(forReadingWithData: data)
+    var KU = NSKeyedUnarchiver(forReadingWith: data)
 
     expectCrashLater()
     // Even though we're doing non-secure coding, this should still be checked

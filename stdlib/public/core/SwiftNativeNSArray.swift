@@ -55,7 +55,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
     return withUnsafeBufferOfObjects { $0.length }
   }
 
-  @objc internal func objectAtIndex(index: Int) -> AnyObject {
+  @objc(objectAtIndex:) internal func objectAt(index: Int) -> AnyObject {
     return withUnsafeBufferOfObjects {
       objects in
       _require(
@@ -87,7 +87,8 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
     }
   }
 
-  @objc internal func countByEnumeratingWithState(
+  @objc(countByEnumeratingWithState:objects:count:)
+  internal func countByEnumeratingWith(
     state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>, count: Int
   ) -> Int {
@@ -109,7 +110,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
     }
   }
 
-  @objc internal func copyWithZone(_: _SwiftNSZone) -> AnyObject {
+  @objc internal func copy(zone _: _SwiftNSZone) -> AnyObject {
     return self
   }
 }

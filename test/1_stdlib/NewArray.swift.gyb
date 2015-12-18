@@ -500,7 +500,7 @@ class Rdar16914909 : NSObject {
   var basicColorSet = [OSColor]()
   
   func doColorStuff() {
-    basicColorSet.append(OSColor.lightGrayColor())
+    basicColorSet.append(OSColor.lightGray())
     print("appended")
   }
 }

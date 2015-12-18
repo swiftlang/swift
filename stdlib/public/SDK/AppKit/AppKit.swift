@@ -80,15 +80,15 @@ struct _NSViewMirror : _Mirror {
       // FIXME: is there a way to say "cacheDisplayInRect butDoNotRedrawEvenIfISaidSo"?
       switch _NSViewMirror._views.member(_v) {
         case nil:
-          _NSViewMirror._views.addObject(_v)
+          _NSViewMirror._views.add(_v)
 
           let bounds = _v.bounds
-          if let b = _v.bitmapImageRepForCachingDisplayInRect(bounds) {
-              _v.cacheDisplayInRect(bounds, toBitmapImageRep: b)
+          if let b = _v.bitmapImageRepForCachingDisplayIn(bounds) {
+              _v.cacheDisplayIn(bounds, to: b)
               result = .Some(.View(b))
           }
           
-          _NSViewMirror._views.removeObject(_v)
+          _NSViewMirror._views.remove(_v)
         default: ()
       }
       
@@ -113,7 +113,7 @@ public extension NSGradient {
     self.init(
       colors: objects.map { $0.0 },
       atLocations: objects.map { $0.1 },
-      colorSpace: NSColorSpace.genericRGBColorSpace())
+      colorSpace: NSColorSpace.genericRGB())
   }
 }
 
@@ -127,7 +127,7 @@ public func NSApplicationMain(
 extension NSColor : _ColorLiteralConvertible {
   public required convenience init(colorLiteralRed red: Float, green: Float,
                                    blue: Float, alpha: Float) {
-    self.init(SRGBRed: CGFloat(red), green: CGFloat(green),
+    self.init(srgbRed: CGFloat(red), green: CGFloat(green),
               blue: CGFloat(blue), alpha: CGFloat(alpha))
   }
 }

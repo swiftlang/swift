@@ -35,7 +35,7 @@ internal struct _CocoaArrayWrapper : Collection {
   }
 
   subscript(i: Int) -> AnyObject {
-    return buffer.objectAtIndex(i)
+    return buffer.objectAt(i)
   }
 
   /// Returns a pointer to the first element in the given subRange if
@@ -44,7 +44,7 @@ internal struct _CocoaArrayWrapper : Collection {
   /// - Note: This method should only be used as an optimization; it
   ///   is sometimes conservative and may return `nil` even when
   ///   contiguous storage exists, e.g., if array doesn't have a smart
-  /// implementation of countByEnumeratingWithState.
+  /// implementation of countByEnumeratingWith.
   func contiguousStorage(
     subRange: Range<Int>
   ) -> UnsafeMutablePointer<AnyObject>
@@ -56,7 +56,7 @@ internal struct _CocoaArrayWrapper : Collection {
     // acceptable conservative behavior, but could potentially be
     // optimized for other cases.
     let contiguousCount = withUnsafeMutablePointer(&enumerationState) {
-      self.buffer.countByEnumeratingWithState($0, objects: nil, count: 0)
+      self.buffer.countByEnumeratingWith($0, objects: nil, count: 0)
     }
     
     return contiguousCount >= subRange.endIndex

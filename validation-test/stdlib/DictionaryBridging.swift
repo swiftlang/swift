@@ -49,7 +49,7 @@ struct DictionaryBridge_objectForKey_RaceTest : RaceTestWithPerTrialData {
     raceData: RaceData, inout _ threadLocalData: ThreadLocalData
   ) -> Observation {
     let nsd = raceData.nsd
-    let v: AnyObject? = nsd.objectForKey(key)
+    let v: AnyObject? = nsd.objectFor(key)
     return Observation(unsafeBitCast(v, UInt.self))
   }
 

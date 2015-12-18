@@ -1050,12 +1050,12 @@ StringTests.test("indexConversion") {
 
   var matches: [String] = []
   
-  re.enumerateMatchesInString(
+  re.enumerateMatchesIn(
     s, options: NSMatchingOptions(), range: NSRange(0..<s.utf16.length)
   ) {
     result, flags, stop
   in
-    let r = result!.rangeAtIndex(1)
+    let r = result!.rangeAt(1)
     let start = String.UTF16Index(_offset: r.location)
     let end = String.UTF16Index(_offset: r.location + r.length)
     matches.append(String(s.utf16[start..<end])!)

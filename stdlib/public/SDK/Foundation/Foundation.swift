@@ -313,7 +313,7 @@ extension Bool: _ObjectiveCBridgeable {
   }
 
   public init(_ number: NSNumber) {
-    if number.boolValue { self = true }
+    if number.isBoolValue { self = true }
     else { self = false }
   }
 
@@ -330,7 +330,7 @@ extension Bool: _ObjectiveCBridgeable {
     x: NSNumber,
     inout result: Bool?
   ) {
-    result = x.boolValue
+    result = x.isBoolValue
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
@@ -463,7 +463,7 @@ extension Array : _ObjectiveCBridgeable {
     // and watchOS.
     self = Array(
       _immutableCocoaArray:
-        unsafeBitCast(_cocoaArray.copyWithZone(nil), _NSArrayCore.self))
+        unsafeBitCast(_cocoaArray.copy(), _NSArrayCore.self))
   }
 
   public static func _isBridgedToObjectiveC() -> Bool {
@@ -550,7 +550,7 @@ extension Dictionary {
     // and watchOS.
     self = Dictionary(
       _immutableCocoaDictionary:
-        unsafeBitCast(_cocoaDictionary.copyWithZone(nil), _NSDictionary.self))
+        unsafeBitCast(_cocoaDictionary.copy(zone: nil), _NSDictionary.self))
   }
 }
 
@@ -633,7 +633,7 @@ extension Dictionary : _ObjectiveCBridgeable {
     // `Dictionary<Key, Value>` where either `Key` or `Value` is a value type
     // may not be backed by an NSDictionary.
     var builder = _DictionaryBuilder<Key, Value>(length: d.count)
-    d.enumerateKeysAndObjectsUsingBlock {
+    d.enumerateKeysAndObjectsUsing {
       (anyObjectKey: AnyObject, anyObjectValue: AnyObject,
        stop: UnsafeMutablePointer<ObjCBool>) in
       builder.add(
@@ -703,7 +703,7 @@ final public class NSFastEnumerationIterator : IteratorProtocol {
 
   func refresh() {
     n = 0
-    count = enumerable.countByEnumeratingWithState(
+    count = enumerable.countByEnumeratingWith(
       state._baseAddressIfContiguous,
       objects: AutoreleasingUnsafeMutablePointer(
         objects._baseAddressIfContiguous),
@@ -762,7 +762,7 @@ extension Set {
     // and watchOS.
     self = Set(
       _immutableCocoaSet:
-        unsafeBitCast(_cocoaSet.copyWithZone(nil), _NSSet.self))
+        unsafeBitCast(_cocoaSet.copy(zone: nil), _NSSet.self))
   }
 }
 
@@ -888,7 +888,7 @@ extension Set : _ObjectiveCBridgeable {
     // `Set<Element>` where `Element` is a value type may not be backed by
     // an NSSet.
     var builder = _SetBuilder<Element>(length: s.count)
-    s.enumerateObjectsUsingBlock {
+    s.enumerateObjectsUsing {
       (anyObjectMember: AnyObject, stop: UnsafeMutablePointer<ObjCBool>) in
       builder.add(member: Swift._forceBridgeFromObjectiveC(
         anyObjectMember, Element.self))
@@ -931,7 +931,7 @@ extension NSDictionary : Sequence {
         // Deliberately avoid the subscript operator in case the dictionary
         // contains non-copyable keys. This is rare since NSMutableDictionary
         // requires them, but we don't want to paint ourselves into a corner.
-        return (key: key, value: _dictionary.objectForKey(key)!)
+        return (key: key, value: _dictionary.objectFor(key)!)
       }
     }
 
@@ -983,7 +983,7 @@ extension NSRange {
 public
 func NSLocalizedString(key: String,
                        tableName: String? = nil,
-                       bundle: NSBundle = NSBundle.mainBundle(),
+                       bundle: NSBundle = NSBundle.main(),
                        value: String = "",
                        comment: String) -> String {
   return bundle.localizedStringForKey(key, value:value, table:tableName)
@@ -1099,15 +1099,15 @@ extension NSString {
     format: NSString, _ args: CVarArg...
   ) -> Self {
     return withVaList(args) {
-      self.init(format: format as String, locale: NSLocale.currentLocale(), arguments: $0)
+      self.init(format: format as String, locale: NSLocale.current(), arguments: $0)
     }
   }
 
   @warn_unused_result
-  public func stringByAppendingFormat(format: NSString, _ args: CVarArg...)
+  public func appendingFormat(format: NSString, _ args: CVarArg...)
   -> NSString {
     return withVaList(args) {
-      self.stringByAppendingString(NSString(format: format as String, arguments: $0) as String) as NSString
+      self.appending(NSString(format: format as String, arguments: $0) as String) as NSString
     }
   }
 }
@@ -1115,7 +1115,7 @@ extension NSString {
 extension NSMutableString {
   public func appendFormat(format: NSString, _ args: CVarArg...) {
     return withVaList(args) {
-      self.appendString(NSString(format: format as String, arguments: $0) as String)
+      self.append(NSString(format: format as String, arguments: $0) as String)
     }
   }
 }
@@ -1367,7 +1367,7 @@ extension NSKeyedUnarchiver {
 
 extension NSURL : _FileReferenceLiteralConvertible {
   private convenience init(failableFileReferenceLiteral path: String) {
-    let fullPath = NSBundle.mainBundle().pathForResource(path, ofType: nil)!
+    let fullPath = NSBundle.main().pathForResource(path, ofType: nil)!
     self.init(fileURLWithPath: fullPath)
   }
 

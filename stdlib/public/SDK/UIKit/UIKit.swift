@@ -196,7 +196,7 @@ struct _UIViewMirror : _Mirror {
       
       switch _UIViewMirror._views.member(_v) {
         case nil:
-          _UIViewMirror._views.addObject(_v)
+          _UIViewMirror._views.add(_v)
           
           let bounds = _v.bounds
           // in case of an empty rectangle abort the logging
@@ -212,7 +212,7 @@ struct _UIViewMirror : _Mirror {
           let ctx: CGContext! = UIGraphicsGetCurrentContext()
           UIColor(white:1.0, alpha:0.0).set()
           CGContextFillRect(ctx, bounds)
-          _v.layer.renderInContext(ctx)
+          _v.layer.renderIn(ctx)
 
           let image: UIImage! = UIGraphicsGetImageFromCurrentImageContext()
       
@@ -220,7 +220,7 @@ struct _UIViewMirror : _Mirror {
       
           result = .Some(.View(image))
 
-          _UIViewMirror._views.removeObject(_v)
+          _UIViewMirror._views.remove(_v)
           
         default: ()
       }

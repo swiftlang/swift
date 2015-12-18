@@ -142,8 +142,8 @@ class SubclassWithItsOwnAvailableWitnessOfNSClassWithMethodFromNSProtocolWithOpt
 class UserClass : UnannotatedFrameworkProtocol {
 
   @available(OSX 10.10, *)
-  @objc
-  func doSomethingWithClass(k: AnnotatedFrameworkClass?) { }
+  @objc(doSomethingWithClass:)
+  func doSomethingWith(k: AnnotatedFrameworkClass?) { }
 
   @available(OSX 10.10, *)
   @objc
@@ -162,8 +162,8 @@ class UserClass : UnannotatedFrameworkProtocol {
   @objc
   func noUnavailableTypesInSignature() { }
 
-  @objc @available(OSX 10.11, *)
-  func doSomethingWithClass(k: AnnotatedFrameworkClass, andLaterClass lk: AnnotatedLaterFrameworkClass) { }
+  @objc(doSomethingWithClass:andLaterClass:) @available(OSX 10.11, *)
+  func doSomethingWith(k: AnnotatedFrameworkClass, andLaterClass lk: AnnotatedLaterFrameworkClass) { }
 
   @objc
   @available(OSX 10.12, *)

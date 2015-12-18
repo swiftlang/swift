@@ -31,7 +31,7 @@ class NonContiguousNSString : NSString {
     super.init()
   }
 
-  @objc override func copyWithZone(zone: NSZone) -> AnyObject {
+  @objc override func copy(zone zone: NSZone) -> AnyObject {
     // Ensure that copying this string produces a class that CoreFoundation
     // does not know about.
     return self
@@ -41,7 +41,7 @@ class NonContiguousNSString : NSString {
     return _value.length
   }
 
-  @objc override func characterAtIndex(index: Int) -> unichar {
+  @objc override func characterAt(index: Int) -> unichar {
     return _value[index]
   }
 
@@ -144,13 +144,13 @@ NSStringAPIs.test("init(contentsOfFile:usedEncoding:error:)") {
 }
 
 
-NSStringAPIs.test("init(contentsOfURL:encoding:error:)") {
+NSStringAPIs.test("init(contentsOf:encoding:error:)") {
   let (existingPath, nonExistentPath) = createNSStringTemporaryFile()
   let existingURL = NSURL(string: "file://" + existingPath)!
   let nonExistentURL = NSURL(string: "file://" + nonExistentPath)!
   do {
     let content = try String(
-      contentsOfURL: existingURL, encoding: NSASCIIStringEncoding)
+      contentsOf: existingURL, encoding: NSASCIIStringEncoding)
     expectEqual(
       "Lorem ipsum dolor sit amet, consectetur adipisicing elit,",
       content._lines[0])
@@ -159,20 +159,20 @@ NSStringAPIs.test("init(contentsOfURL:encoding:error:)") {
   }
 
   do {
-    _ = try String(contentsOfURL: nonExistentURL, encoding: NSASCIIStringEncoding)
+    _ = try String(contentsOf: nonExistentURL, encoding: NSASCIIStringEncoding)
     expectUnreachable()
   } catch {
   }
 }
 
-NSStringAPIs.test("init(contentsOfURL:usedEncoding:error:)") {
+NSStringAPIs.test("init(contentsOf:usedEncoding:error:)") {
   let (existingPath, nonExistentPath) = createNSStringTemporaryFile()
   let existingURL = NSURL(string: "file://" + existingPath)!
   let nonExistentURL = NSURL(string: "file://" + nonExistentPath)!
   do {
     var usedEncoding: NSStringEncoding = 0
     let content = try String(
-      contentsOfURL: existingURL, usedEncoding: &usedEncoding)
+      contentsOf: existingURL, usedEncoding: &usedEncoding)
 
     expectNotEqual(0, usedEncoding)
     expectEqual(
@@ -184,20 +184,20 @@ NSStringAPIs.test("init(contentsOfURL:usedEncoding:error:)") {
 
   var usedEncoding: NSStringEncoding = 0
   do {
-    _ = try String(contentsOfURL: nonExistentURL, usedEncoding: &usedEncoding)
+    _ = try String(contentsOf: nonExistentURL, usedEncoding: &usedEncoding)
     expectUnreachable()
   } catch {
     expectEqual(0, usedEncoding)
   }
 }
 
-NSStringAPIs.test("init(withCString_:encoding:)") {
+NSStringAPIs.test("init(cString_:encoding:)") {
   expectOptionalEqual("foo, a basmati bar!",
-      String(CString: 
+      String(cString: 
           "foo, a basmati bar!", encoding: String.defaultCStringEncoding()))
 }
 
-NSStringAPIs.test("init(UTF8String:)") {
+NSStringAPIs.test("init(utF8String:)") {
   var s = "foo あいう"
   var up = UnsafeMutablePointer<UInt8>(allocatingCapacity: 100)
   var i = 0
@@ -206,7 +206,7 @@ NSStringAPIs.test("init(UTF8String:)") {
     i += 1
   }
   up[i] = 0
-  expectOptionalEqual(s, String(UTF8String: UnsafePointer(up)))
+  expectOptionalEqual(s, String(utf8String: UnsafePointer(up)))
   up.deallocateCapacity(100)
 }
 
@@ -215,18 +215,18 @@ NSStringAPIs.test("canBeConvertedToEncoding(_:)") {
   expectFalse("あいう".canBeConvertedToEncoding(NSASCIIStringEncoding))
 }
 
-NSStringAPIs.test("capitalizedString") {
-  expectEqual("Foo Foo Foo Foo", "foo Foo fOO FOO".capitalizedString)
-  expectEqual("Жжж", "жжж".capitalizedString)
+NSStringAPIs.test("capitalized") {
+  expectEqual("Foo Foo Foo Foo", "foo Foo fOO FOO".capitalized)
+  expectEqual("Жжж", "жжж".capitalized)
 }
 
-NSStringAPIs.test("localizedCapitalizedString") {
+NSStringAPIs.test("localizedCapitalized") {
   if #available(OSX 10.11, iOS 9.0, *) {
     withOverriddenNSLocaleCurrentLocale("en") { () -> Void in
       expectEqual(
         "Foo Foo Foo Foo",
-        "foo Foo fOO FOO".localizedCapitalizedString)
-      expectEqual("Жжж", "жжж".localizedCapitalizedString)
+        "foo Foo fOO FOO".localizedCapitalized)
+      expectEqual("Жжж", "жжж".localizedCapitalized)
       return ()
     }
 
@@ -238,14 +238,14 @@ NSStringAPIs.test("localizedCapitalizedString") {
     // to upper case:
     // U+0049 LATIN CAPITAL LETTER I
     withOverriddenNSLocaleCurrentLocale("en") {
-      expectEqual("Iii Iii", "iii III".localizedCapitalizedString)
+      expectEqual("Iii Iii", "iii III".localizedCapitalized)
     }
 
     // U+0069 LATIN SMALL LETTER I
     // to upper case in Turkish locale:
     // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
     withOverriddenNSLocaleCurrentLocale("tr") {
-      expectEqual("\u{0130}ii Iıı", "iii III".localizedCapitalizedString)
+      expectEqual("\u{0130}ii Iıı", "iii III".localizedCapitalized)
     }
   }
 }
@@ -271,28 +271,28 @@ func expectLocalizedEquality(
 
   let locale = localeID.map {
     NSLocale(localeIdentifier: $0)
-  } ?? NSLocale.currentLocale()
+  } ?? NSLocale.current()
   
   expectEqual(
     expected, op(locale),
     message(), stackTrace: trace)
   
   expectEqual(
-    op(NSLocale.systemLocale()), op(nil),
+    op(NSLocale.system()), op(nil),
     message(), stackTrace: trace)
 }
 
-NSStringAPIs.test("capitalizedStringWithLocale(_:)") {
+NSStringAPIs.test("capitalizedStringWith(_:)") {
   expectLocalizedEquality(
     "Foo Foo Foo Foo",
-    "foo Foo fOO FOO".capitalizedStringWithLocale)
+    "foo Foo fOO FOO".capitalizedStringWith)
   
-  expectLocalizedEquality("Жжж","жжж".capitalizedStringWithLocale)
+  expectLocalizedEquality("Жжж","жжж".capitalizedStringWith)
 
   expectEqual(
     "Foo Foo Foo Foo",
-    "foo Foo fOO FOO".capitalizedStringWithLocale(nil))
-  expectEqual("Жжж", "жжж".capitalizedStringWithLocale(nil))
+    "foo Foo fOO FOO".capitalizedStringWith(nil))
+  expectEqual("Жжж", "жжж".capitalizedStringWith(nil))
 
   //
   // Special casing.
@@ -303,14 +303,14 @@ NSStringAPIs.test("capitalizedStringWithLocale(_:)") {
   // U+0049 LATIN CAPITAL LETTER I
   expectLocalizedEquality(
     "Iii Iii",
-    "iii III".capitalizedStringWithLocale, "en")
+    "iii III".capitalizedStringWith, "en")
 
   // U+0069 LATIN SMALL LETTER I
   // to upper case in Turkish locale:
   // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
   expectLocalizedEquality(
     "İii Iıı",
-    "iii III".capitalizedStringWithLocale, "tr")
+    "iii III".capitalizedStringWith, "tr")
 }
 
 NSStringAPIs.test("caseInsensitiveCompare(_:)") {
@@ -325,16 +325,16 @@ NSStringAPIs.test("caseInsensitiveCompare(_:)") {
       "абВГ".caseInsensitiveCompare("АбВгД"))
 }
 
-NSStringAPIs.test("commonPrefixWithString(_:options:)") {
+NSStringAPIs.test("commonPrefixWith(_:options:)") {
   expectEqual("ab",
-      "abcd".commonPrefixWithString("abdc", options: []))
+      "abcd".commonPrefixWith("abdc", options: []))
   expectEqual("abC",
-      "abCd".commonPrefixWithString("abce", options: .CaseInsensitiveSearch))
+      "abCd".commonPrefixWith("abce", options: .CaseInsensitiveSearch))
 
   expectEqual("аб",
-      "абвг".commonPrefixWithString("абгв", options: []))
+      "абвг".commonPrefixWith("абгв", options: []))
   expectEqual("абВ",
-      "абВг".commonPrefixWithString("абвд", options: .CaseInsensitiveSearch))
+      "абВг".commonPrefixWith("абвд", options: .CaseInsensitiveSearch))
 }
 
 NSStringAPIs.test("compare(_:options:range:locale:)") {
@@ -362,21 +362,21 @@ NSStringAPIs.test("compare(_:options:range:locale:)") {
   }
 
   expectEqual(NSComparisonResult.OrderedSame,
-      "abc".compare("abc", locale: NSLocale.currentLocale()))
+      "abc".compare("abc", locale: NSLocale.current()))
   expectEqual(NSComparisonResult.OrderedSame,
-      "абв".compare("абв", locale: NSLocale.currentLocale()))
+      "абв".compare("абв", locale: NSLocale.current()))
 }
 
-NSStringAPIs.test("completePathIntoString(_:caseSensitive:matchesIntoArray:filterTypes)") {
+NSStringAPIs.test("completePathInto(_:caseSensitive:matchesInto:filterTypes)") {
   let (existingPath, nonExistentPath) = createNSStringTemporaryFile()
   do {
-    var count = nonExistentPath.completePathIntoString(caseSensitive: false)
+    var count = nonExistentPath.completePathInto(caseSensitive: false)
     expectEqual(0, count)
   }
 
   do {
     var outputName = "None Found"
-    var count = nonExistentPath.completePathIntoString(
+    var count = nonExistentPath.completePathInto(
         &outputName, caseSensitive: false)
 
     expectEqual(0, count)
@@ -386,8 +386,8 @@ NSStringAPIs.test("completePathIntoString(_:caseSensitive:matchesIntoArray:filte
   do {
     var outputName = "None Found"
     var outputArray: [String] = [ "foo", "bar" ]
-    var count = nonExistentPath.completePathIntoString(
-        &outputName, caseSensitive: false, matchesIntoArray: &outputArray)
+    var count = nonExistentPath.completePathInto(
+        &outputName, caseSensitive: false, matchesInto: &outputArray)
 
     expectEqual(0, count)
     expectEqual("None Found", outputName)
@@ -395,13 +395,13 @@ NSStringAPIs.test("completePathIntoString(_:caseSensitive:matchesIntoArray:filte
   }
 
   do {
-    var count = existingPath.completePathIntoString(caseSensitive: false)
+    var count = existingPath.completePathInto(caseSensitive: false)
     expectEqual(1, count)
   }
 
   do {
     var outputName = "None Found"
-    var count = existingPath.completePathIntoString(
+    var count = existingPath.completePathInto(
         &outputName, caseSensitive: false)
 
     expectEqual(1, count)
@@ -411,8 +411,8 @@ NSStringAPIs.test("completePathIntoString(_:caseSensitive:matchesIntoArray:filte
   do {
     var outputName = "None Found"
     var outputArray: [String] = [ "foo", "bar" ]
-    var count = existingPath.completePathIntoString(
-        &outputName, caseSensitive: false, matchesIntoArray: &outputArray)
+    var count = existingPath.completePathInto(
+        &outputName, caseSensitive: false, matchesInto: &outputArray)
 
     expectEqual(1, count)
     expectEqual(existingPath, outputName)
@@ -421,7 +421,7 @@ NSStringAPIs.test("completePathIntoString(_:caseSensitive:matchesIntoArray:filte
 
   do {
     var outputName = "None Found"
-    var count = existingPath.completePathIntoString(
+    var count = existingPath.completePathInto(
         &outputName, caseSensitive: false, filterTypes: [ "txt" ])
 
     expectEqual(1, count)
@@ -429,39 +429,39 @@ NSStringAPIs.test("completePathIntoString(_:caseSensitive:matchesIntoArray:filte
   }
 }
 
-NSStringAPIs.test("componentsSeparatedByCharactersInSet(_:)") {
-  expectEqual([ "" ], "".componentsSeparatedByCharactersInSet(
-    NSCharacterSet.decimalDigitCharacterSet()))
+NSStringAPIs.test("componentsSeparatedByCharactersIn(_:)") {
+  expectEqual([ "" ], "".componentsSeparatedByCharactersIn(
+    NSCharacterSet.decimalDigit()))
 
   expectEqual(
     [ "абв", "", "あいう", "abc" ],
-    "абв12あいう3abc".componentsSeparatedByCharactersInSet(
-        NSCharacterSet.decimalDigitCharacterSet()))
+    "абв12あいう3abc".componentsSeparatedByCharactersIn(
+        NSCharacterSet.decimalDigit()))
 
   expectEqual(
     [ "абв", "", "あいう", "abc" ],
     "абв\u{1F601}\u{1F602}あいう\u{1F603}abc"
-      .componentsSeparatedByCharactersInSet(
-        NSCharacterSet(charactersInString: "\u{1F601}\u{1F602}\u{1F603}")))
+      .componentsSeparatedByCharactersIn(
+        NSCharacterSet(charactersIn: "\u{1F601}\u{1F602}\u{1F603}")))
 
   // Performs Unicode scalar comparison.
   expectEqual(
     [ "abcし\u{3099}def" ],
-    "abcし\u{3099}def".componentsSeparatedByCharactersInSet(
-      NSCharacterSet(charactersInString: "\u{3058}")))
+    "abcし\u{3099}def".componentsSeparatedByCharactersIn(
+      NSCharacterSet(charactersIn: "\u{3058}")))
 }
 
-NSStringAPIs.test("componentsSeparatedByString(_:)") {
-  expectEqual([ "" ], "".componentsSeparatedByString("//"))
+NSStringAPIs.test("componentsSeparatedBy(_:)") {
+  expectEqual([ "" ], "".componentsSeparatedBy("//"))
 
   expectEqual(
     [ "абв", "あいう", "abc" ],
-    "абв//あいう//abc".componentsSeparatedByString("//"))
+    "абв//あいう//abc".componentsSeparatedBy("//"))
 
   // Performs normalization.
   expectEqual(
     [ "abc", "def" ],
-    "abcし\u{3099}def".componentsSeparatedByString("\u{3058}"))
+    "abcし\u{3099}def".componentsSeparatedBy("\u{3058}"))
 }
 
 NSStringAPIs.test("cStringUsingEncoding(_:)") {
@@ -523,14 +523,14 @@ NSStringAPIs.test("enumerateLines(_:)") {
   expectEqual([ "abc", "", "defghi" ], lines)
 }
 
-NSStringAPIs.test("enumerateLinguisticTagsInRange(_:scheme:options:orthography:_:") {
+NSStringAPIs.test("enumerateLinguisticTagsIn(_:scheme:options:orthography:_:") {
   let s = "Абв. Глокая куздра штеко будланула бокра и кудрячит бокрёнка. Абв."
   let startIndex = s.startIndex.advancedBy(5)
   let endIndex = s.startIndex.advancedBy(62)
   var tags: [String] = []
   var tokens: [String] = []
   var sentences: [String] = []
-  s.enumerateLinguisticTagsInRange(startIndex..<endIndex,
+  s.enumerateLinguisticTagsIn(startIndex..<endIndex,
       scheme: NSLinguisticTagSchemeTokenType,
       options: [],
       orthography: nil) {
@@ -552,13 +552,13 @@ NSStringAPIs.test("enumerateLinguisticTagsInRange(_:scheme:options:orthography:_
   expectEqual([ sentence, sentence, sentence ], sentences)
 }
 
-NSStringAPIs.test("enumerateSubstringsInRange(_:options:_:)") {
+NSStringAPIs.test("enumerateSubstringsIn(_:options:_:)") {
   let s = "え\u{304b}\u{3099}お\u{263a}\u{fe0f}😀😊"
   let startIndex = s.startIndex.advancedBy(1)
   let endIndex = s.startIndex.advancedBy(5)
   do {
     var substrings: [String] = []
-    s.enumerateSubstringsInRange(startIndex..<endIndex,
+    s.enumerateSubstringsIn(startIndex..<endIndex,
       options: NSStringEnumerationOptions.ByComposedCharacterSequences) {
       (substring: String?, substringRange: Range<String.Index>,
        enclosingRange: Range<String.Index>, inout stop: Bool)
@@ -571,7 +571,7 @@ NSStringAPIs.test("enumerateSubstringsInRange(_:options:_:)") {
   }
   do {
     var substrings: [String] = []
-    s.enumerateSubstringsInRange(startIndex..<endIndex,
+    s.enumerateSubstringsIn(startIndex..<endIndex,
       options: [.ByComposedCharacterSequences, .SubstringNotRequired]) {
       (substring_: String?, substringRange: Range<String.Index>,
        enclosingRange: Range<String.Index>, inout stop: Bool)
@@ -841,7 +841,7 @@ NSStringAPIs.test("init(format:locale:_:...)") {
   expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
       locale: nil, world, 42))
   expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
-      locale: NSLocale.systemLocale(), world, 42))
+      locale: NSLocale.system(), world, 42))
 }
 
 NSStringAPIs.test("init(format:locale:arguments:)") {
@@ -850,7 +850,7 @@ NSStringAPIs.test("init(format:locale:arguments:)") {
   expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
       locale: nil, arguments: args))
   expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
-      locale: NSLocale.systemLocale(), arguments: args))
+      locale: NSLocale.system(), arguments: args))
 }
 
 NSStringAPIs.test("lastPathComponent") {
@@ -868,21 +868,21 @@ NSStringAPIs.test("lengthOfBytesUsingEncoding(_:)") {
   expectEqual(2, "あ".lengthOfBytesUsingEncoding(NSShiftJISStringEncoding))
 }
 
-NSStringAPIs.test("lineRangeForRange(_:)") {
+NSStringAPIs.test("lineRangeFor(_:)") {
   let s = "Глокая куздра\nштеко будланула\nбокра и кудрячит\nбокрёнка."
   let r = s.startIndex.advancedBy(16)..<s.startIndex.advancedBy(35)
   do {
-    let result = s.lineRangeForRange(r)
+    let result = s.lineRangeFor(r)
     expectEqual("штеко будланула\nбокра и кудрячит\n", s[result])
   }
 }
 
-NSStringAPIs.test("linguisticTagsInRange(_:scheme:options:orthography:tokenRanges:)") {
+NSStringAPIs.test("linguisticTagsIn(_:scheme:options:orthography:tokenRanges:)") {
   let s = "Абв. Глокая куздра штеко будланула бокра и кудрячит бокрёнка. Абв."
   let startIndex = s.startIndex.advancedBy(5)
   let endIndex = s.startIndex.advancedBy(17)
   var tokenRanges: [Range<String.Index>] = []
-  var tags = s.linguisticTagsInRange(startIndex..<endIndex,
+  var tags = s.linguisticTagsIn(startIndex..<endIndex,
       scheme: NSLinguisticTagSchemeTokenType,
       options: [],
       orthography: nil, tokenRanges: &tokenRanges)
@@ -922,21 +922,21 @@ NSStringAPIs.test("localizedStandardCompare(_:)") {
       "абвг".localizedStandardCompare("АбВг"))
 }
 
-NSStringAPIs.test("localizedLowercaseString") {
+NSStringAPIs.test("localizedLowercase") {
   if #available(OSX 10.11, iOS 9.0, *) {
     withOverriddenNSLocaleCurrentLocale("en") {
-      expectEqual("abcd", "abCD".localizedLowercaseString)
+      expectEqual("abcd", "abCD".localizedLowercase)
     }
 
     withOverriddenNSLocaleCurrentLocale("en") {
-      expectEqual("абвг", "абВГ".localizedLowercaseString)
+      expectEqual("абвг", "абВГ".localizedLowercase)
     }
     withOverriddenNSLocaleCurrentLocale("ru") {
-      expectEqual("абвг", "абВГ".localizedLowercaseString)
+      expectEqual("абвг", "абВГ".localizedLowercase)
     }
 
     withOverriddenNSLocaleCurrentLocale("ru") {
-      expectEqual("たちつてと", "たちつてと".localizedLowercaseString)
+      expectEqual("たちつてと", "たちつてと".localizedLowercase)
     }
 
     //
@@ -948,14 +948,14 @@ NSStringAPIs.test("localizedLowercaseString") {
     // U+0069 LATIN SMALL LETTER I
     // U+0307 COMBINING DOT ABOVE
     withOverriddenNSLocaleCurrentLocale("en") {
-      expectEqual("\u{0069}\u{0307}", "\u{0130}".localizedLowercaseString)
+      expectEqual("\u{0069}\u{0307}", "\u{0130}".localizedLowercase)
     }
 
     // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
     // to lower case in Turkish locale:
     // U+0069 LATIN SMALL LETTER I
     withOverriddenNSLocaleCurrentLocale("tr") {
-      expectEqual("\u{0069}", "\u{0130}".localizedLowercaseString)
+      expectEqual("\u{0069}", "\u{0130}".localizedLowercase)
     }
 
     // U+0049 LATIN CAPITAL LETTER I
@@ -966,7 +966,7 @@ NSStringAPIs.test("localizedLowercaseString") {
     withOverriddenNSLocaleCurrentLocale("en") {
       expectEqual(
         "\u{0069}\u{0307}",
-        "\u{0049}\u{0307}".localizedLowercaseString)
+        "\u{0049}\u{0307}".localizedLowercase)
     }
 
     // U+0049 LATIN CAPITAL LETTER I
@@ -974,18 +974,18 @@ NSStringAPIs.test("localizedLowercaseString") {
     // to lower case in Turkish locale:
     // U+0069 LATIN SMALL LETTER I
     withOverriddenNSLocaleCurrentLocale("tr") {
-      expectEqual("\u{0069}", "\u{0049}\u{0307}".localizedLowercaseString)
+      expectEqual("\u{0069}", "\u{0049}\u{0307}".localizedLowercase)
     }
   }
 }
 
-NSStringAPIs.test("lowercaseStringWithLocale(_:)") {
-  expectLocalizedEquality("abcd", "abCD".lowercaseStringWithLocale, "en")
+NSStringAPIs.test("lowercaseStringWith(_:)") {
+  expectLocalizedEquality("abcd", "abCD".lowercaseStringWith, "en")
 
-  expectLocalizedEquality("абвг", "абВГ".lowercaseStringWithLocale, "en")
-  expectLocalizedEquality("абвг", "абВГ".lowercaseStringWithLocale, "ru")
+  expectLocalizedEquality("абвг", "абВГ".lowercaseStringWith, "en")
+  expectLocalizedEquality("абвг", "абВГ".lowercaseStringWith, "ru")
 
-  expectLocalizedEquality("たちつてと", "たちつてと".lowercaseStringWithLocale, "ru")
+  expectLocalizedEquality("たちつてと", "たちつてと".lowercaseStringWith, "ru")
 
   //
   // Special casing.
@@ -995,25 +995,25 @@ NSStringAPIs.test("lowercaseStringWithLocale(_:)") {
   // to lower case:
   // U+0069 LATIN SMALL LETTER I
   // U+0307 COMBINING DOT ABOVE
-  expectLocalizedEquality("\u{0069}\u{0307}", "\u{0130}".lowercaseStringWithLocale, "en")
+  expectLocalizedEquality("\u{0069}\u{0307}", "\u{0130}".lowercaseStringWith, "en")
 
   // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
   // to lower case in Turkish locale:
   // U+0069 LATIN SMALL LETTER I
-  expectLocalizedEquality("\u{0069}", "\u{0130}".lowercaseStringWithLocale, "tr")
+  expectLocalizedEquality("\u{0069}", "\u{0130}".lowercaseStringWith, "tr")
 
   // U+0049 LATIN CAPITAL LETTER I
   // U+0307 COMBINING DOT ABOVE
   // to lower case:
   // U+0069 LATIN SMALL LETTER I
   // U+0307 COMBINING DOT ABOVE
-  expectLocalizedEquality("\u{0069}\u{0307}", "\u{0049}\u{0307}".lowercaseStringWithLocale, "en")
+  expectLocalizedEquality("\u{0069}\u{0307}", "\u{0049}\u{0307}".lowercaseStringWith, "en")
 
   // U+0049 LATIN CAPITAL LETTER I
   // U+0307 COMBINING DOT ABOVE
   // to lower case in Turkish locale:
   // U+0069 LATIN SMALL LETTER I
-  expectLocalizedEquality("\u{0069}", "\u{0049}\u{0307}".lowercaseStringWithLocale, "tr")
+  expectLocalizedEquality("\u{0069}", "\u{0049}\u{0307}".lowercaseStringWith, "tr")
 }
 
 NSStringAPIs.test("maximumLengthOfBytesUsingEncoding(_:)") {
@@ -1034,11 +1034,11 @@ NSStringAPIs.test("maximumLengthOfBytesUsingEncoding(_:)") {
   }
 }
 
-NSStringAPIs.test("paragraphRangeForRange(_:)") {
+NSStringAPIs.test("paragraphRangeFor(_:)") {
   let s = "Глокая куздра\nштеко будланула\u{2028}бокра и кудрячит\u{2028}бокрёнка.\n Абв."
   let r = s.startIndex.advancedBy(16)..<s.startIndex.advancedBy(35)
   do {
-    let result = s.paragraphRangeForRange(r)
+    let result = s.paragraphRangeFor(r)
     expectEqual("штеко будланула\u{2028}бокра и кудрячит\u{2028}бокрёнка.\n", s[result])
   }
 }
@@ -1086,28 +1086,28 @@ NSStringAPIs.test("propertyListFromStringsFileFormat()") {
           .propertyListFromStringsFileFormat() as Dictionary<String, String>)
 }
 
-NSStringAPIs.test("rangeOfCharacterFromSet(_:options:range:)") {
+NSStringAPIs.test("rangeOfCharacterFrom(_:options:range:)") {
   do {
-    let charset = NSCharacterSet(charactersInString: "абв")
+    let charset = NSCharacterSet(charactersIn: "абв")
     do {
       let s = "Глокая куздра"
-      let r = s.rangeOfCharacterFromSet(charset)!
+      let r = s.rangeOfCharacterFrom(charset)!
       expectEqual(s.startIndex.advancedBy(4), r.startIndex)
       expectEqual(s.startIndex.advancedBy(5), r.endIndex)
     }
     do {
-      expectEmpty("клмн".rangeOfCharacterFromSet(charset))
+      expectEmpty("клмн".rangeOfCharacterFrom(charset))
     }
     do {
       let s = "абвклмнабвклмн"
-      let r = s.rangeOfCharacterFromSet(charset,
+      let r = s.rangeOfCharacterFrom(charset,
           options: .BackwardsSearch)!
       expectEqual(s.startIndex.advancedBy(9), r.startIndex)
       expectEqual(s.startIndex.advancedBy(10), r.endIndex)
     }
     do {
       let s = "абвклмнабв"
-      let r = s.rangeOfCharacterFromSet(charset,
+      let r = s.rangeOfCharacterFrom(charset,
           range: s.startIndex.advancedBy(3)..<s.endIndex)!
       expectEqual(s.startIndex.advancedBy(7), r.startIndex)
       expectEqual(s.startIndex.advancedBy(8), r.endIndex)
@@ -1115,45 +1115,45 @@ NSStringAPIs.test("rangeOfCharacterFromSet(_:options:range:)") {
   }
 
   do {
-    let charset = NSCharacterSet(charactersInString: "\u{305f}\u{3099}")
-    expectEmpty("\u{3060}".rangeOfCharacterFromSet(charset))
+    let charset = NSCharacterSet(charactersIn: "\u{305f}\u{3099}")
+    expectEmpty("\u{3060}".rangeOfCharacterFrom(charset))
   }
   do {
-    let charset = NSCharacterSet(charactersInString: "\u{3060}")
-    expectEmpty("\u{305f}\u{3099}".rangeOfCharacterFromSet(charset))
+    let charset = NSCharacterSet(charactersIn: "\u{3060}")
+    expectEmpty("\u{305f}\u{3099}".rangeOfCharacterFrom(charset))
   }
 
   do {
-    let charset = NSCharacterSet(charactersInString: "\u{1F600}")
+    let charset = NSCharacterSet(charactersIn: "\u{1F600}")
     do {
       let s = "abc\u{1F600}"
       expectEqual("\u{1F600}",
-          s[s.rangeOfCharacterFromSet(charset)!])
+          s[s.rangeOfCharacterFrom(charset)!])
     }
     do {
-      expectEmpty("abc\u{1F601}".rangeOfCharacterFromSet(charset))
+      expectEmpty("abc\u{1F601}".rangeOfCharacterFrom(charset))
     }
   }
 }
 
-NSStringAPIs.test("rangeOfComposedCharacterSequenceAtIndex(_:)") {
+NSStringAPIs.test("rangeOfComposedCharacterSequenceAt(_:)") {
   let s = "\u{1F601}abc \u{305f}\u{3099} def"
-  expectEqual("\u{1F601}", s[s.rangeOfComposedCharacterSequenceAtIndex(
+  expectEqual("\u{1F601}", s[s.rangeOfComposedCharacterSequenceAt(
       s.startIndex)])
-  expectEqual("a", s[s.rangeOfComposedCharacterSequenceAtIndex(
+  expectEqual("a", s[s.rangeOfComposedCharacterSequenceAt(
       s.startIndex.advancedBy(1))])
-  expectEqual("\u{305f}\u{3099}", s[s.rangeOfComposedCharacterSequenceAtIndex(
+  expectEqual("\u{305f}\u{3099}", s[s.rangeOfComposedCharacterSequenceAt(
       s.startIndex.advancedBy(5))])
-  expectEqual(" ", s[s.rangeOfComposedCharacterSequenceAtIndex(
+  expectEqual(" ", s[s.rangeOfComposedCharacterSequenceAt(
       s.startIndex.advancedBy(6))])
 }
 
-NSStringAPIs.test("rangeOfComposedCharacterSequencesForRange(_:)") {
+NSStringAPIs.test("rangeOfComposedCharacterSequencesFor(_:)") {
   let s = "\u{1F601}abc さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}"
 
-  expectEqual("\u{1F601}a", s[s.rangeOfComposedCharacterSequencesForRange(
+  expectEqual("\u{1F601}a", s[s.rangeOfComposedCharacterSequencesFor(
       s.startIndex..<s.startIndex.advancedBy(2))])
-  expectEqual("せ\u{3099}そ\u{3099}", s[s.rangeOfComposedCharacterSequencesForRange(
+  expectEqual("せ\u{3099}そ\u{3099}", s[s.rangeOfComposedCharacterSequencesFor(
       s.startIndex.advancedBy(8)..<s.startIndex.advancedBy(10))])
 }
 
@@ -1167,168 +1167,168 @@ func toIntRange(
     string.startIndex.distanceTo(range.endIndex)
 }
 
-NSStringAPIs.test("rangeOfString(_:options:range:locale:)") {
+NSStringAPIs.test("rangeOf(_:options:range:locale:)") {
   do {
     let s = ""
-    expectEmpty(s.rangeOfString(""))
-    expectEmpty(s.rangeOfString("abc"))
+    expectEmpty(s.rangeOf(""))
+    expectEmpty(s.rangeOf("abc"))
   }
   do {
     let s = "abc"
-    expectEmpty(s.rangeOfString(""))
-    expectEmpty(s.rangeOfString("def"))
-    expectOptionalEqual(0..<3, toIntRange(s, s.rangeOfString("abc")))
+    expectEmpty(s.rangeOf(""))
+    expectEmpty(s.rangeOf("def"))
+    expectOptionalEqual(0..<3, toIntRange(s, s.rangeOf("abc")))
   }
   do {
     let s = "さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}"
-    expectOptionalEqual(2..<3, toIntRange(s, s.rangeOfString("す\u{3099}")))
-    expectOptionalEqual(2..<3, toIntRange(s, s.rangeOfString("\u{305a}")))
+    expectOptionalEqual(2..<3, toIntRange(s, s.rangeOf("す\u{3099}")))
+    expectOptionalEqual(2..<3, toIntRange(s, s.rangeOf("\u{305a}")))
 
-    expectEmpty(s.rangeOfString("\u{3099}す"))
-    expectEmpty(s.rangeOfString("す"))
+    expectEmpty(s.rangeOf("\u{3099}す"))
+    expectEmpty(s.rangeOf("す"))
 
-    // Note: here `rangeOfString` API produces indexes that don't point between
+    // Note: here `rangeOf` API produces indexes that don't point between
     // grapheme cluster boundaries -- these can not be created with public
     // String interface.
     //
     // FIXME: why does this search succeed and the above queries fail?  There is
     // no apparent pattern.
-    expectEqual("\u{3099}", s[s.rangeOfString("\u{3099}")!])
+    expectEqual("\u{3099}", s[s.rangeOf("\u{3099}")!])
   }
   do {
     let s = "а\u{0301}б\u{0301}в\u{0301}г\u{0301}"
-    expectOptionalEqual(0..<1, toIntRange(s, s.rangeOfString("а\u{0301}")))
-    expectOptionalEqual(1..<2, toIntRange(s, s.rangeOfString("б\u{0301}")))
+    expectOptionalEqual(0..<1, toIntRange(s, s.rangeOf("а\u{0301}")))
+    expectOptionalEqual(1..<2, toIntRange(s, s.rangeOf("б\u{0301}")))
 
-    expectEmpty(s.rangeOfString("б"))
-    expectEmpty(s.rangeOfString("\u{0301}б"))
+    expectEmpty(s.rangeOf("б"))
+    expectEmpty(s.rangeOf("\u{0301}б"))
 
     // FIXME: Again, indexes that don't correspond to grapheme
     // cluster boundaries.
-    expectEqual("\u{0301}", s[s.rangeOfString("\u{0301}")!])
+    expectEqual("\u{0301}", s[s.rangeOf("\u{0301}")!])
   }
 }
 
-NSStringAPIs.test("containsString(_:)") {
+NSStringAPIs.test("contains(_:)") {
   withOverriddenNSLocaleCurrentLocale("en") { () -> Void in
-    expectFalse("".containsString(""))
-    expectFalse("".containsString("a"))
-    expectFalse("a".containsString(""))
-    expectFalse("a".containsString("b"))
-    expectTrue("a".containsString("a"))
-    expectFalse("a".containsString("A"))
-    expectFalse("A".containsString("a"))
-    expectFalse("a".containsString("a\u{0301}"))
-    expectTrue("a\u{0301}".containsString("a\u{0301}"))
-    expectFalse("a\u{0301}".containsString("a"))
-    expectTrue("a\u{0301}".containsString("\u{0301}"))
-    expectFalse("a".containsString("\u{0301}"))
+    expectFalse("".contains(""))
+    expectFalse("".contains("a"))
+    expectFalse("a".contains(""))
+    expectFalse("a".contains("b"))
+    expectTrue("a".contains("a"))
+    expectFalse("a".contains("A"))
+    expectFalse("A".contains("a"))
+    expectFalse("a".contains("a\u{0301}"))
+    expectTrue("a\u{0301}".contains("a\u{0301}"))
+    expectFalse("a\u{0301}".contains("a"))
+    expectTrue("a\u{0301}".contains("\u{0301}"))
+    expectFalse("a".contains("\u{0301}"))
 
-    expectFalse("i".containsString("I"))
-    expectFalse("I".containsString("i"))
-    expectFalse("\u{0130}".containsString("i"))
-    expectFalse("i".containsString("\u{0130}"))
+    expectFalse("i".contains("I"))
+    expectFalse("I".contains("i"))
+    expectFalse("\u{0130}".contains("i"))
+    expectFalse("i".contains("\u{0130}"))
 
     return ()
   }
 
   withOverriddenNSLocaleCurrentLocale("tr") {
-    expectFalse("\u{0130}".containsString("ı"))
+    expectFalse("\u{0130}".contains("ı"))
   }
 }
 
-NSStringAPIs.test("localizedCaseInsensitiveContainsString(_:)") {
+NSStringAPIs.test("localizedCaseInsensitiveContains(_:)") {
   withOverriddenNSLocaleCurrentLocale("en") { () -> Void in
-    expectFalse("".localizedCaseInsensitiveContainsString(""))
-    expectFalse("".localizedCaseInsensitiveContainsString("a"))
-    expectFalse("a".localizedCaseInsensitiveContainsString(""))
-    expectFalse("a".localizedCaseInsensitiveContainsString("b"))
-    expectTrue("a".localizedCaseInsensitiveContainsString("a"))
-    expectTrue("a".localizedCaseInsensitiveContainsString("A"))
-    expectTrue("A".localizedCaseInsensitiveContainsString("a"))
-    expectFalse("a".localizedCaseInsensitiveContainsString("a\u{0301}"))
-    expectTrue("a\u{0301}".localizedCaseInsensitiveContainsString("a\u{0301}"))
-    expectFalse("a\u{0301}".localizedCaseInsensitiveContainsString("a"))
-    expectTrue("a\u{0301}".localizedCaseInsensitiveContainsString("\u{0301}"))
-    expectFalse("a".localizedCaseInsensitiveContainsString("\u{0301}"))
+    expectFalse("".localizedCaseInsensitiveContains(""))
+    expectFalse("".localizedCaseInsensitiveContains("a"))
+    expectFalse("a".localizedCaseInsensitiveContains(""))
+    expectFalse("a".localizedCaseInsensitiveContains("b"))
+    expectTrue("a".localizedCaseInsensitiveContains("a"))
+    expectTrue("a".localizedCaseInsensitiveContains("A"))
+    expectTrue("A".localizedCaseInsensitiveContains("a"))
+    expectFalse("a".localizedCaseInsensitiveContains("a\u{0301}"))
+    expectTrue("a\u{0301}".localizedCaseInsensitiveContains("a\u{0301}"))
+    expectFalse("a\u{0301}".localizedCaseInsensitiveContains("a"))
+    expectTrue("a\u{0301}".localizedCaseInsensitiveContains("\u{0301}"))
+    expectFalse("a".localizedCaseInsensitiveContains("\u{0301}"))
 
-    expectTrue("i".localizedCaseInsensitiveContainsString("I"))
-    expectTrue("I".localizedCaseInsensitiveContainsString("i"))
-    expectFalse("\u{0130}".localizedCaseInsensitiveContainsString("i"))
-    expectFalse("i".localizedCaseInsensitiveContainsString("\u{0130}"))
+    expectTrue("i".localizedCaseInsensitiveContains("I"))
+    expectTrue("I".localizedCaseInsensitiveContains("i"))
+    expectFalse("\u{0130}".localizedCaseInsensitiveContains("i"))
+    expectFalse("i".localizedCaseInsensitiveContains("\u{0130}"))
 
     return ()
   }
 
   withOverriddenNSLocaleCurrentLocale("tr") {
-    expectFalse("\u{0130}".localizedCaseInsensitiveContainsString("ı"))
+    expectFalse("\u{0130}".localizedCaseInsensitiveContains("ı"))
   }
 }
 
-NSStringAPIs.test("localizedStandardContainsString(_:)") {
+NSStringAPIs.test("localizedStandardContains(_:)") {
   if #available(OSX 10.11, iOS 9.0, *) {
     withOverriddenNSLocaleCurrentLocale("en") { () -> Void in
-      expectFalse("".localizedStandardContainsString(""))
-      expectFalse("".localizedStandardContainsString("a"))
-      expectFalse("a".localizedStandardContainsString(""))
-      expectFalse("a".localizedStandardContainsString("b"))
-      expectTrue("a".localizedStandardContainsString("a"))
-      expectTrue("a".localizedStandardContainsString("A"))
-      expectTrue("A".localizedStandardContainsString("a"))
-      expectTrue("a".localizedStandardContainsString("a\u{0301}"))
-      expectTrue("a\u{0301}".localizedStandardContainsString("a\u{0301}"))
-      expectTrue("a\u{0301}".localizedStandardContainsString("a"))
-      expectTrue("a\u{0301}".localizedStandardContainsString("\u{0301}"))
-      expectFalse("a".localizedStandardContainsString("\u{0301}"))
+      expectFalse("".localizedStandardContains(""))
+      expectFalse("".localizedStandardContains("a"))
+      expectFalse("a".localizedStandardContains(""))
+      expectFalse("a".localizedStandardContains("b"))
+      expectTrue("a".localizedStandardContains("a"))
+      expectTrue("a".localizedStandardContains("A"))
+      expectTrue("A".localizedStandardContains("a"))
+      expectTrue("a".localizedStandardContains("a\u{0301}"))
+      expectTrue("a\u{0301}".localizedStandardContains("a\u{0301}"))
+      expectTrue("a\u{0301}".localizedStandardContains("a"))
+      expectTrue("a\u{0301}".localizedStandardContains("\u{0301}"))
+      expectFalse("a".localizedStandardContains("\u{0301}"))
 
-      expectTrue("i".localizedStandardContainsString("I"))
-      expectTrue("I".localizedStandardContainsString("i"))
-      expectTrue("\u{0130}".localizedStandardContainsString("i"))
-      expectTrue("i".localizedStandardContainsString("\u{0130}"))
+      expectTrue("i".localizedStandardContains("I"))
+      expectTrue("I".localizedStandardContains("i"))
+      expectTrue("\u{0130}".localizedStandardContains("i"))
+      expectTrue("i".localizedStandardContains("\u{0130}"))
 
       return ()
     }
 
     withOverriddenNSLocaleCurrentLocale("tr") {
-      expectTrue("\u{0130}".localizedStandardContainsString("ı"))
+      expectTrue("\u{0130}".localizedStandardContains("ı"))
     }
   }
 }
 
-NSStringAPIs.test("localizedStandardRangeOfString(_:)") {
+NSStringAPIs.test("localizedStandardRangeOf(_:)") {
   if #available(OSX 10.11, iOS 9.0, *) {
-    func rangeOfString(string: String, _ substring: String) -> Range<Int>? {
+    func rangeOf(string: String, _ substring: String) -> Range<Int>? {
       return toIntRange(
-        string, string.localizedStandardRangeOfString(substring))
+        string, string.localizedStandardRangeOf(substring))
     }
     withOverriddenNSLocaleCurrentLocale("en") { () -> Void in
-      expectEmpty(rangeOfString("", ""))
-      expectEmpty(rangeOfString("", "a"))
-      expectEmpty(rangeOfString("a", ""))
-      expectEmpty(rangeOfString("a", "b"))
-      expectEqual(0..<1, rangeOfString("a", "a"))
-      expectEqual(0..<1, rangeOfString("a", "A"))
-      expectEqual(0..<1, rangeOfString("A", "a"))
-      expectEqual(0..<1, rangeOfString("a", "a\u{0301}"))
-      expectEqual(0..<1, rangeOfString("a\u{0301}", "a\u{0301}"))
-      expectEqual(0..<1, rangeOfString("a\u{0301}", "a"))
+      expectEmpty(rangeOf("", ""))
+      expectEmpty(rangeOf("", "a"))
+      expectEmpty(rangeOf("a", ""))
+      expectEmpty(rangeOf("a", "b"))
+      expectEqual(0..<1, rangeOf("a", "a"))
+      expectEqual(0..<1, rangeOf("a", "A"))
+      expectEqual(0..<1, rangeOf("A", "a"))
+      expectEqual(0..<1, rangeOf("a", "a\u{0301}"))
+      expectEqual(0..<1, rangeOf("a\u{0301}", "a\u{0301}"))
+      expectEqual(0..<1, rangeOf("a\u{0301}", "a"))
       do {
         // FIXME: Indices that don't correspond to grapheme cluster boundaries.
         let s = "a\u{0301}"
         expectEqual(
-          "\u{0301}", s[s.localizedStandardRangeOfString("\u{0301}")!])
+          "\u{0301}", s[s.localizedStandardRangeOf("\u{0301}")!])
       }
-      expectEmpty(rangeOfString("a", "\u{0301}"))
+      expectEmpty(rangeOf("a", "\u{0301}"))
 
-      expectEqual(0..<1, rangeOfString("i", "I"))
-      expectEqual(0..<1, rangeOfString("I", "i"))
-      expectEqual(0..<1, rangeOfString("\u{0130}", "i"))
-      expectEqual(0..<1, rangeOfString("i", "\u{0130}"))
+      expectEqual(0..<1, rangeOf("i", "I"))
+      expectEqual(0..<1, rangeOf("I", "i"))
+      expectEqual(0..<1, rangeOf("\u{0130}", "i"))
+      expectEqual(0..<1, rangeOf("i", "\u{0130}"))
       return ()
     }
 
     withOverriddenNSLocaleCurrentLocale("tr") {
-      expectEqual(0..<1, rangeOfString("\u{0130}", "ı"))
+      expectEqual(0..<1, rangeOf("\u{0130}", "ı"))
     }
   }
 }
@@ -1349,55 +1349,55 @@ func getHomeDir() -> String {
 #endif
 }
 
-NSStringAPIs.test("stringByAddingPercentEscapesUsingEncoding(_:)") {
+NSStringAPIs.test("addingPercentEscapesUsingEncoding(_:)") {
   expectEmpty(
-    "abcd абвг".stringByAddingPercentEscapesUsingEncoding(
+    "abcd абвг".addingPercentEscapesUsingEncoding(
       NSASCIIStringEncoding))
   expectOptionalEqual("abcd%20%D0%B0%D0%B1%D0%B2%D0%B3",
-    "abcd абвг".stringByAddingPercentEscapesUsingEncoding(
+    "abcd абвг".addingPercentEscapesUsingEncoding(
       NSUTF8StringEncoding))
 }
 
-NSStringAPIs.test("stringByAppendingFormat(_:_:...)") {
-  expectEqual("", "".stringByAppendingFormat(""))
-  expectEqual("a", "a".stringByAppendingFormat(""))
+NSStringAPIs.test("appendingFormat(_:_:...)") {
+  expectEqual("", "".appendingFormat(""))
+  expectEqual("a", "a".appendingFormat(""))
   expectEqual(
     "abc абв \u{0001F60A}",
-    "abc абв \u{0001F60A}".stringByAppendingFormat(""))
+    "abc абв \u{0001F60A}".appendingFormat(""))
 
   let formatArg: NSString = "привет мир \u{0001F60A}"
   expectEqual(
     "abc абв \u{0001F60A}def привет мир \u{0001F60A} 42",
     "abc абв \u{0001F60A}"
-      .stringByAppendingFormat("def %@ %ld", formatArg, 42))
+      .appendingFormat("def %@ %ld", formatArg, 42))
 }
 
-NSStringAPIs.test("stringByAppendingPathComponent(_:)") {
-  expectEqual("", "".stringByAppendingPathComponent(""))
-  expectEqual("a.txt", "".stringByAppendingPathComponent("a.txt"))
-  expectEqual("/tmp/a.txt", "/tmp".stringByAppendingPathComponent("a.txt"))
+NSStringAPIs.test("appendingPathComponent(_:)") {
+  expectEqual("", "".appendingPathComponent(""))
+  expectEqual("a.txt", "".appendingPathComponent("a.txt"))
+  expectEqual("/tmp/a.txt", "/tmp".appendingPathComponent("a.txt"))
 }
 
-NSStringAPIs.test("stringByAppendingString(_:)") {
-  expectEqual("", "".stringByAppendingString(""))
-  expectEqual("a", "a".stringByAppendingString(""))
-  expectEqual("a", "".stringByAppendingString("a"))
-  expectEqual("さ\u{3099}", "さ".stringByAppendingString("\u{3099}"))
+NSStringAPIs.test("appending(_:)") {
+  expectEqual("", "".appending(""))
+  expectEqual("a", "a".appending(""))
+  expectEqual("a", "".appending("a"))
+  expectEqual("さ\u{3099}", "さ".appending("\u{3099}"))
 }
 
-NSStringAPIs.test("stringByDeletingLastPathComponent") {
-  expectEqual("", "".stringByDeletingLastPathComponent)
-  expectEqual("/", "/".stringByDeletingLastPathComponent)
-  expectEqual("/", "/tmp".stringByDeletingLastPathComponent)
-  expectEqual("/tmp", "/tmp/a.txt".stringByDeletingLastPathComponent)
+NSStringAPIs.test("deletingLastPathComponent") {
+  expectEqual("", "".deletingLastPathComponent)
+  expectEqual("/", "/".deletingLastPathComponent)
+  expectEqual("/", "/tmp".deletingLastPathComponent)
+  expectEqual("/tmp", "/tmp/a.txt".deletingLastPathComponent)
 }
 
-NSStringAPIs.test("stringByFoldingWithOptions(_:locale:)") {
+NSStringAPIs.test("folding(options:locale:)") {
 
   func fwo(
     s: String, _ options: NSStringCompareOptions
   )(loc: NSLocale?) -> String {
-    return s.stringByFoldingWithOptions(options, locale: loc)
+    return s.folding(options: options, locale: loc)
   }
   
   expectLocalizedEquality("abcd", fwo("abCD", .CaseInsensitiveSearch), "en")
@@ -1419,129 +1419,129 @@ NSStringAPIs.test("stringByFoldingWithOptions(_:locale:)") {
     "example123", fwo("ｅｘａｍｐｌｅ１２３", .WidthInsensitiveSearch), "en")
 }
 
-NSStringAPIs.test("stringByPaddingToLength(_:withString:startingAtIndex:)") {
+NSStringAPIs.test("byPaddingToLength(_:withString:startingAtIndex:)") {
   expectEqual(
     "abc абв \u{0001F60A}",
-    "abc абв \u{0001F60A}".stringByPaddingToLength(
-      10, withString: "XYZ", startingAtIndex: 0))
+    "abc абв \u{0001F60A}".byPaddingToLength(
+      10, withString: "XYZ", startingAt: 0))
   expectEqual(
     "abc абв \u{0001F60A}XYZXY",
-    "abc абв \u{0001F60A}".stringByPaddingToLength(
-      15, withString: "XYZ", startingAtIndex: 0))
+    "abc абв \u{0001F60A}".byPaddingToLength(
+      15, withString: "XYZ", startingAt: 0))
   expectEqual(
     "abc абв \u{0001F60A}YZXYZ",
-    "abc абв \u{0001F60A}".stringByPaddingToLength(
-      15, withString: "XYZ", startingAtIndex: 1))
+    "abc абв \u{0001F60A}".byPaddingToLength(
+      15, withString: "XYZ", startingAt: 1))
 }
 
-NSStringAPIs.test("stringByRemovingPercentEncoding/OSX 10.9")
+NSStringAPIs.test("removingPercentEncoding/OSX 10.9")
   .xfail(.OSXMinor(10, 9, reason: "looks like a bug in Foundation in OS X 10.9"))
   .xfail(.iOSMajor(7, reason: "same bug in Foundation in iOS 7.*"))
   .skip(.iOSSimulatorAny("same bug in Foundation in iOS Simulator 7.*"))
   .code {
-  expectOptionalEqual("", "".stringByRemovingPercentEncoding)
+  expectOptionalEqual("", "".removingPercentEncoding)
 }
 
-NSStringAPIs.test("stringByRemovingPercentEncoding") {
-  expectEmpty("%".stringByRemovingPercentEncoding)
+NSStringAPIs.test("removingPercentEncoding") {
+  expectEmpty("%".removingPercentEncoding)
   expectOptionalEqual(
     "abcd абвг",
-    "ab%63d %D0%B0%D0%B1%D0%B2%D0%B3".stringByRemovingPercentEncoding)
+    "ab%63d %D0%B0%D0%B1%D0%B2%D0%B3".removingPercentEncoding)
 }
 
-NSStringAPIs.test("stringByReplacingCharactersInRange(_:withString:)") {
+NSStringAPIs.test("replacingCharactersIn(_:withString:)") {
   do {
     let empty = ""
-    expectEqual("", empty.stringByReplacingCharactersInRange(
+    expectEqual("", empty.replacingCharactersIn(
       empty.startIndex..<empty.startIndex, withString: ""))
   }
 
   let s = "\u{1F601}abc さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}"
 
-  expectEqual(s, s.stringByReplacingCharactersInRange(
+  expectEqual(s, s.replacingCharactersIn(
     s.startIndex..<s.startIndex, withString: ""))
-  expectEqual(s, s.stringByReplacingCharactersInRange(
+  expectEqual(s, s.replacingCharactersIn(
     s.endIndex..<s.endIndex, withString: ""))
-  expectEqual("zzz" + s, s.stringByReplacingCharactersInRange(
+  expectEqual("zzz" + s, s.replacingCharactersIn(
     s.startIndex..<s.startIndex, withString: "zzz"))
-  expectEqual(s + "zzz", s.stringByReplacingCharactersInRange(
+  expectEqual(s + "zzz", s.replacingCharactersIn(
     s.endIndex..<s.endIndex, withString: "zzz"))
 
   expectEqual(
     "す\u{3099}せ\u{3099}そ\u{3099}",
-    s.stringByReplacingCharactersInRange(
+    s.replacingCharactersIn(
       s.startIndex..<s.startIndex.advancedBy(7), withString: ""))
   expectEqual(
     "zzzす\u{3099}せ\u{3099}そ\u{3099}",
-    s.stringByReplacingCharactersInRange(
+    s.replacingCharactersIn(
       s.startIndex..<s.startIndex.advancedBy(7), withString: "zzz"))
   expectEqual(
     "\u{1F602}す\u{3099}せ\u{3099}そ\u{3099}",
-    s.stringByReplacingCharactersInRange(
+    s.replacingCharactersIn(
       s.startIndex..<s.startIndex.advancedBy(7), withString: "\u{1F602}"))
 
-  expectEqual("\u{1F601}", s.stringByReplacingCharactersInRange(
+  expectEqual("\u{1F601}", s.replacingCharactersIn(
     s.startIndex.successor()..<s.endIndex, withString: ""))
-  expectEqual("\u{1F601}zzz", s.stringByReplacingCharactersInRange(
+  expectEqual("\u{1F601}zzz", s.replacingCharactersIn(
     s.startIndex.successor()..<s.endIndex, withString: "zzz"))
-  expectEqual("\u{1F601}\u{1F602}", s.stringByReplacingCharactersInRange(
+  expectEqual("\u{1F601}\u{1F602}", s.replacingCharactersIn(
     s.startIndex.successor()..<s.endIndex, withString: "\u{1F602}"))
 
   expectEqual(
     "\u{1F601}aす\u{3099}せ\u{3099}そ\u{3099}",
-    s.stringByReplacingCharactersInRange(
+    s.replacingCharactersIn(
       s.startIndex.advancedBy(2)..<s.startIndex.advancedBy(7), withString: ""))
   expectEqual(
     "\u{1F601}azzzす\u{3099}せ\u{3099}そ\u{3099}",
-    s.stringByReplacingCharactersInRange(
+    s.replacingCharactersIn(
       s.startIndex.advancedBy(2)..<s.startIndex.advancedBy(7), withString: "zzz"))
   expectEqual(
     "\u{1F601}a\u{1F602}す\u{3099}せ\u{3099}そ\u{3099}",
-    s.stringByReplacingCharactersInRange(
+    s.replacingCharactersIn(
       s.startIndex.advancedBy(2)..<s.startIndex.advancedBy(7),
       withString: "\u{1F602}"))
 }
 
-NSStringAPIs.test("stringByReplacingOccurrencesOfString(_:withString:options:range:)") {
+NSStringAPIs.test("replacingOccurrencesOf(_:withString:options:range:)") {
   do {
     let empty = ""
-    expectEqual("", empty.stringByReplacingOccurrencesOfString(
+    expectEqual("", empty.replacingOccurrencesOf(
       "", withString: ""))
-    expectEqual("", empty.stringByReplacingOccurrencesOfString(
+    expectEqual("", empty.replacingOccurrencesOf(
       "", withString: "xyz"))
-    expectEqual("", empty.stringByReplacingOccurrencesOfString(
+    expectEqual("", empty.replacingOccurrencesOf(
       "abc", withString: "xyz"))
   }
 
   let s = "\u{1F601}abc さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}"
 
-  expectEqual(s, s.stringByReplacingOccurrencesOfString("", withString: "xyz"))
-  expectEqual(s, s.stringByReplacingOccurrencesOfString("xyz", withString: ""))
+  expectEqual(s, s.replacingOccurrencesOf("", withString: "xyz"))
+  expectEqual(s, s.replacingOccurrencesOf("xyz", withString: ""))
 
-  expectEqual("", s.stringByReplacingOccurrencesOfString(s, withString: ""))
+  expectEqual("", s.replacingOccurrencesOf(s, withString: ""))
 
   expectEqual(
     "\u{1F601}xyzbc さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}",
-    s.stringByReplacingOccurrencesOfString("a", withString: "xyz"))
+    s.replacingOccurrencesOf("a", withString: "xyz"))
 
   expectEqual(
     "\u{1F602}\u{1F603}abc さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}",
-    s.stringByReplacingOccurrencesOfString(
+    s.replacingOccurrencesOf(
       "\u{1F601}", withString: "\u{1F602}\u{1F603}"))
 
   expectEqual(
     "\u{1F601}abc さ\u{3099}xyzす\u{3099}せ\u{3099}そ\u{3099}",
-    s.stringByReplacingOccurrencesOfString(
+    s.replacingOccurrencesOf(
       "し\u{3099}", withString: "xyz"))
 
   expectEqual(
     "\u{1F601}abc さ\u{3099}xyzす\u{3099}せ\u{3099}そ\u{3099}",
-    s.stringByReplacingOccurrencesOfString(
+    s.replacingOccurrencesOf(
       "し\u{3099}", withString: "xyz"))
 
   expectEqual(
     "\u{1F601}abc さ\u{3099}xyzす\u{3099}せ\u{3099}そ\u{3099}",
-    s.stringByReplacingOccurrencesOfString(
+    s.replacingOccurrencesOf(
       "\u{3058}", withString: "xyz"))
 
   //
@@ -1550,11 +1550,11 @@ NSStringAPIs.test("stringByReplacingOccurrencesOfString(_:withString:options:ran
 
   expectEqual(
     "\u{1F602}\u{1F603}abc さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}",
-    s.stringByReplacingOccurrencesOfString(
+    s.replacingOccurrencesOf(
       "\u{1F601}", withString: "\u{1F602}\u{1F603}",
       options: NSStringCompareOptions.LiteralSearch))
 
-  expectEqual(s, s.stringByReplacingOccurrencesOfString(
+  expectEqual(s, s.replacingOccurrencesOf(
     "\u{3058}", withString: "xyz",
     options: NSStringCompareOptions.LiteralSearch))
 
@@ -1564,86 +1564,86 @@ NSStringAPIs.test("stringByReplacingOccurrencesOfString(_:withString:options:ran
 
   expectEqual(
     "\u{1F602}\u{1F603}abc さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}",
-    s.stringByReplacingOccurrencesOfString(
+    s.replacingOccurrencesOf(
       "\u{1F601}", withString: "\u{1F602}\u{1F603}",
       options: NSStringCompareOptions.LiteralSearch,
       range: s.startIndex..<s.startIndex.advancedBy(1)))
 
-  expectEqual(s, s.stringByReplacingOccurrencesOfString(
+  expectEqual(s, s.replacingOccurrencesOf(
       "\u{1F601}", withString: "\u{1F602}\u{1F603}",
       options: NSStringCompareOptions.LiteralSearch,
       range: s.startIndex.advancedBy(1)..<s.startIndex.advancedBy(3)))
 }
 
-NSStringAPIs.test("stringByReplacingPercentEscapesUsingEncoding(_:)") {
+NSStringAPIs.test("replacingPercentEscapesUsingEncoding(_:)") {
   expectOptionalEqual(
     "abcd абвг",
-    "abcd абвг".stringByReplacingPercentEscapesUsingEncoding(
+    "abcd абвг".replacingPercentEscapesUsingEncoding(
       NSASCIIStringEncoding))
 
   expectOptionalEqual(
     "abcd абвг\u{0000}\u{0001}",
-    "abcd абвг%00%01".stringByReplacingPercentEscapesUsingEncoding(
+    "abcd абвг%00%01".replacingPercentEscapesUsingEncoding(
       NSASCIIStringEncoding))
 
   expectOptionalEqual(
     "abcd абвг",
     "%61%62%63%64%20%D0%B0%D0%B1%D0%B2%D0%B3"
-      .stringByReplacingPercentEscapesUsingEncoding(NSUTF8StringEncoding))
+      .replacingPercentEscapesUsingEncoding(NSUTF8StringEncoding))
 
-  expectEmpty("%ED%B0".stringByReplacingPercentEscapesUsingEncoding(
+  expectEmpty("%ED%B0".replacingPercentEscapesUsingEncoding(
     NSUTF8StringEncoding))
 
-  expectEmpty("%zz".stringByReplacingPercentEscapesUsingEncoding(
+  expectEmpty("%zz".replacingPercentEscapesUsingEncoding(
     NSUTF8StringEncoding))
 }
 
-NSStringAPIs.test("stringByReplacingPercentEscapesUsingEncoding(_:)/rdar18029471")
+NSStringAPIs.test("replacingPercentEscapesUsingEncoding(_:)/rdar18029471")
   .xfail(
     .Custom({ true },
     reason: "<rdar://problem/18029471> NSString " +
-      "stringByReplacingPercentEscapesUsingEncoding: does not return nil " +
+      "replacingPercentEscapesUsingEncoding: does not return nil " +
       "when a byte sequence is not legal in ASCII"))
   .code {
   expectEmpty(
-    "abcd%FF".stringByReplacingPercentEscapesUsingEncoding(
+    "abcd%FF".replacingPercentEscapesUsingEncoding(
       NSASCIIStringEncoding))
 }
 
-NSStringAPIs.test("stringByResolvingSymlinksInPath") {
+NSStringAPIs.test("resolvingSymlinksInPath") {
   // <rdar://problem/18030188> Difference between
-  // stringByResolvingSymlinksInPath and stringByStandardizingPath is unclear
-  expectEqual("", "".stringByResolvingSymlinksInPath)
+  // resolvingSymlinksInPath and stringByStandardizingPath is unclear
+  expectEqual("", "".resolvingSymlinksInPath)
   expectEqual(
-    "/var", "/private/var/tmp////..//".stringByResolvingSymlinksInPath)
+    "/var", "/private/var/tmp////..//".resolvingSymlinksInPath)
 }
 
-NSStringAPIs.test("stringByStandardizingPath") {
+NSStringAPIs.test("standardizingPath") {
   // <rdar://problem/18030188> Difference between
-  // stringByResolvingSymlinksInPath and stringByStandardizingPath is unclear
-  expectEqual("", "".stringByStandardizingPath)
+  // resolvingSymlinksInPath and standardizingPath is unclear
+  expectEqual("", "".standardizingPath)
   expectEqual(
-    "/var", "/private/var/tmp////..//".stringByStandardizingPath)
+    "/var", "/private/var/tmp////..//".standardizingPath)
 }
 
-NSStringAPIs.test("stringByTrimmingCharactersInSet(_:)") {
-  expectEqual("", "".stringByTrimmingCharactersInSet(
-    NSCharacterSet.decimalDigitCharacterSet()))
+NSStringAPIs.test("byTrimmingCharactersIn(_:)") {
+  expectEqual("", "".byTrimmingCharactersIn(
+    NSCharacterSet.decimalDigit()))
 
-  expectEqual("abc", "abc".stringByTrimmingCharactersInSet(
-    NSCharacterSet.decimalDigitCharacterSet()))
+  expectEqual("abc", "abc".byTrimmingCharactersIn(
+    NSCharacterSet.decimalDigit()))
 
-  expectEqual("", "123".stringByTrimmingCharactersInSet(
-    NSCharacterSet.decimalDigitCharacterSet()))
+  expectEqual("", "123".byTrimmingCharactersIn(
+    NSCharacterSet.decimalDigit()))
 
-  expectEqual("abc", "123abc789".stringByTrimmingCharactersInSet(
-    NSCharacterSet.decimalDigitCharacterSet()))
+  expectEqual("abc", "123abc789".byTrimmingCharactersIn(
+    NSCharacterSet.decimalDigit()))
 
   // Performs Unicode scalar comparison.
   expectEqual(
     "し\u{3099}abc",
-    "し\u{3099}abc".stringByTrimmingCharactersInSet(
-      NSCharacterSet(charactersInString: "\u{3058}")))
+    "し\u{3099}abc".byTrimmingCharactersIn(
+      NSCharacterSet(charactersIn: "\u{3058}")))
 }
 
 NSStringAPIs.test("stringsByAppendingPaths(_:)") {
@@ -1653,54 +1653,54 @@ NSStringAPIs.test("stringsByAppendingPaths(_:)") {
     "/tmp".stringsByAppendingPaths([ "foo", "bar" ]))
 }
 
-NSStringAPIs.test("substringFromIndex(_:)") {
+NSStringAPIs.test("substringFrom(_:)") {
   let s = "\u{1F601}abc さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}"
 
-  expectEqual(s, s.substringFromIndex(s.startIndex))
+  expectEqual(s, s.substringFrom(s.startIndex))
   expectEqual("せ\u{3099}そ\u{3099}",
-      s.substringFromIndex(s.startIndex.advancedBy(8)))
-  expectEqual("", s.substringFromIndex(s.startIndex.advancedBy(10)))
+      s.substringFrom(s.startIndex.advancedBy(8)))
+  expectEqual("", s.substringFrom(s.startIndex.advancedBy(10)))
 }
 
-NSStringAPIs.test("substringToIndex(_:)") {
+NSStringAPIs.test("substringTo(_:)") {
   let s = "\u{1F601}abc さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}"
 
-  expectEqual("", s.substringToIndex(s.startIndex))
+  expectEqual("", s.substringTo(s.startIndex))
   expectEqual("\u{1F601}abc さ\u{3099}し\u{3099}す\u{3099}",
-      s.substringToIndex(s.startIndex.advancedBy(8)))
-  expectEqual(s, s.substringToIndex(s.startIndex.advancedBy(10)))
+      s.substringTo(s.startIndex.advancedBy(8)))
+  expectEqual(s, s.substringTo(s.startIndex.advancedBy(10)))
 }
 
-NSStringAPIs.test("substringWithRange(_:)") {
+NSStringAPIs.test("substringWith(_:)") {
   let s = "\u{1F601}abc さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}"
 
-  expectEqual("", s.substringWithRange(s.startIndex..<s.startIndex))
+  expectEqual("", s.substringWith(s.startIndex..<s.startIndex))
   expectEqual(
     "",
-    s.substringWithRange(s.startIndex.advancedBy(1)..<s.startIndex.advancedBy(1)))
-  expectEqual("", s.substringWithRange(s.endIndex..<s.endIndex))
-  expectEqual(s, s.substringWithRange(s.startIndex..<s.endIndex))
+    s.substringWith(s.startIndex.advancedBy(1)..<s.startIndex.advancedBy(1)))
+  expectEqual("", s.substringWith(s.endIndex..<s.endIndex))
+  expectEqual(s, s.substringWith(s.startIndex..<s.endIndex))
   expectEqual(
     "さ\u{3099}し\u{3099}す\u{3099}",
-    s.substringWithRange(s.startIndex.advancedBy(5)..<s.startIndex.advancedBy(8)))
+    s.substringWith(s.startIndex.advancedBy(5)..<s.startIndex.advancedBy(8)))
 }
 
-NSStringAPIs.test("localizedUppercaseString") {
+NSStringAPIs.test("localizedUppercase") {
   if #available(OSX 10.11, iOS 9.0, *) {
     withOverriddenNSLocaleCurrentLocale("en") {
-      expectEqual("ABCD", "abCD".localizedUppercaseString)
+      expectEqual("ABCD", "abCD".localizedUppercase)
     }
 
     withOverriddenNSLocaleCurrentLocale("en") {
-      expectEqual("АБВГ", "абВГ".localizedUppercaseString)
+      expectEqual("АБВГ", "абВГ".localizedUppercase)
     }
 
     withOverriddenNSLocaleCurrentLocale("ru") {
-      expectEqual("АБВГ", "абВГ".localizedUppercaseString)
+      expectEqual("АБВГ", "абВГ".localizedUppercase)
     }
 
     withOverriddenNSLocaleCurrentLocale("ru") {
-      expectEqual("たちつてと", "たちつてと".localizedUppercaseString)
+      expectEqual("たちつてと", "たちつてと".localizedUppercase)
     }
 
     //
@@ -1711,14 +1711,14 @@ NSStringAPIs.test("localizedUppercaseString") {
     // to upper case:
     // U+0049 LATIN CAPITAL LETTER I
     withOverriddenNSLocaleCurrentLocale("en") {
-      expectEqual("\u{0049}", "\u{0069}".localizedUppercaseString)
+      expectEqual("\u{0049}", "\u{0069}".localizedUppercase)
     }
 
     // U+0069 LATIN SMALL LETTER I
     // to upper case in Turkish locale:
     // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
     withOverriddenNSLocaleCurrentLocale("tr") {
-      expectEqual("\u{0130}", "\u{0069}".localizedUppercaseString)
+      expectEqual("\u{0130}", "\u{0069}".localizedUppercase)
     }
 
     // U+00DF LATIN SMALL LETTER SHARP S
@@ -1728,7 +1728,7 @@ NSStringAPIs.test("localizedUppercaseString") {
     // But because the whole string is converted to uppercase, we just get two
     // U+0053.
     withOverriddenNSLocaleCurrentLocale("en") {
-      expectEqual("\u{0053}\u{0053}", "\u{00df}".localizedUppercaseString)
+      expectEqual("\u{0053}\u{0053}", "\u{00df}".localizedUppercase)
     }
 
     // U+FB01 LATIN SMALL LIGATURE FI
@@ -1738,18 +1738,18 @@ NSStringAPIs.test("localizedUppercaseString") {
     // But because the whole string is converted to uppercase, we get U+0049
     // LATIN CAPITAL LETTER I.
     withOverriddenNSLocaleCurrentLocale("ru") {
-      expectEqual("\u{0046}\u{0049}", "\u{fb01}".localizedUppercaseString)
+      expectEqual("\u{0046}\u{0049}", "\u{fb01}".localizedUppercase)
     }
   }
 }
 
-NSStringAPIs.test("uppercaseStringWithLocale(_:)") {
-  expectLocalizedEquality("ABCD", "abCD".uppercaseStringWithLocale, "en")
+NSStringAPIs.test("uppercaseStringWith(_:)") {
+  expectLocalizedEquality("ABCD", "abCD".uppercaseStringWith, "en")
 
-  expectLocalizedEquality("АБВГ", "абВГ".uppercaseStringWithLocale, "en")
-  expectLocalizedEquality("АБВГ", "абВГ".uppercaseStringWithLocale, "ru")
+  expectLocalizedEquality("АБВГ", "абВГ".uppercaseStringWith, "en")
+  expectLocalizedEquality("АБВГ", "абВГ".uppercaseStringWith, "ru")
 
-  expectLocalizedEquality("たちつてと", "たちつてと".uppercaseStringWithLocale, "ru")
+  expectLocalizedEquality("たちつてと", "たちつてと".uppercaseStringWith, "ru")
 
   //
   // Special casing.
@@ -1758,12 +1758,12 @@ NSStringAPIs.test("uppercaseStringWithLocale(_:)") {
   // U+0069 LATIN SMALL LETTER I
   // to upper case:
   // U+0049 LATIN CAPITAL LETTER I
-  expectLocalizedEquality("\u{0049}", "\u{0069}".uppercaseStringWithLocale, "en")
+  expectLocalizedEquality("\u{0049}", "\u{0069}".uppercaseStringWith, "en")
 
   // U+0069 LATIN SMALL LETTER I
   // to upper case in Turkish locale:
   // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
-  expectLocalizedEquality("\u{0130}", "\u{0069}".uppercaseStringWithLocale, "tr")
+  expectLocalizedEquality("\u{0130}", "\u{0069}".uppercaseStringWith, "tr")
 
   // U+00DF LATIN SMALL LETTER SHARP S
   // to upper case:
@@ -1771,7 +1771,7 @@ NSStringAPIs.test("uppercaseStringWithLocale(_:)") {
   // U+0073 LATIN SMALL LETTER S
   // But because the whole string is converted to uppercase, we just get two
   // U+0053.
-  expectLocalizedEquality("\u{0053}\u{0053}", "\u{00df}".uppercaseStringWithLocale, "en")
+  expectLocalizedEquality("\u{0053}\u{0053}", "\u{00df}".uppercaseStringWith, "en")
 
   // U+FB01 LATIN SMALL LIGATURE FI
   // to upper case:
@@ -1779,7 +1779,7 @@ NSStringAPIs.test("uppercaseStringWithLocale(_:)") {
   // U+0069 LATIN SMALL LETTER I
   // But because the whole string is converted to uppercase, we get U+0049
   // LATIN CAPITAL LETTER I.
-  expectLocalizedEquality("\u{0046}\u{0049}", "\u{fb01}".uppercaseStringWithLocale, "ru")
+  expectLocalizedEquality("\u{0046}\u{0049}", "\u{fb01}".uppercaseStringWith, "ru")
 }
 
 NSStringAPIs.test("writeToFile(_:atomically:encoding:error:)") {
@@ -1815,27 +1815,27 @@ NSStringAPIs.test("writeToURL(_:atomically:encoding:error:)") {
   }
 }
 
-NSStringAPIs.test("stringByApplyingTransform(_:reverse:)") {
+NSStringAPIs.test("applyingTransform(_:reverse:)") {
   if #available(OSX 10.11, iOS 9.0, *) {
     do {
       let source = "tre\u{300}s k\u{fc}hl"
       expectEqual(
         "tres kuhl",
-        source.stringByApplyingTransform(
+        source.applyingTransform(
           NSStringTransformStripDiacritics, reverse: false))
     }
     do {
       let source = "hiragana"
       expectEqual(
         "ひらがな",
-        source.stringByApplyingTransform(
+        source.applyingTransform(
           NSStringTransformLatinToHiragana, reverse: false))
     }
     do {
       let source = "ひらがな"
       expectEqual(
         "hiragana",
-        source.stringByApplyingTransform(
+        source.applyingTransform(
           NSStringTransformLatinToHiragana, reverse: true))
     }
   }

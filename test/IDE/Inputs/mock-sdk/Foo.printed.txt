@@ -277,7 +277,7 @@ class FooClassPropertyOwnership : FooClassBase {
 class FooUnavailableMembers : FooClassBase {
   convenience init!(int i: Int32)
   @available(*, unavailable, message="use object construction 'FooUnavailableMembers(int:)'")
-  class func unavailableMembersWithInt(i: Int32) -> Self!
+  class func withInt(i: Int32) -> Self!
   
   @available(*, unavailable, message="x")
   func unavailable() // This comment should not show without decl. rdar://20092567

@@ -88,7 +88,7 @@ func nsEncode<CodeUnit>(
     encoding: encoding,
     options: [],
     range: NSRange(location: 0, length: s.length),
-    remainingRange: nil)
+    remaining: nil)
 }
 
 class CodecTest<Codec : TestableUnicodeCodec> {

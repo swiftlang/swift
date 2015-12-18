@@ -25,7 +25,7 @@ typealias XXColor = UIColor
 let rgb = CGColorSpaceCreateDeviceRGB()
 let cgRed = CGColorCreate(rgb, [1.0, 0.0, 0.0, 1.0])!
 
-let nsRed = XXColor(CGColor: cgRed)
+let nsRed = XXColor(cgColor: cgRed)
 
 var r: CGFloat = 0.5, g: CGFloat = 0.5, b: CGFloat = 0.5, a: CGFloat = 0.5
 #if os(OSX)
@@ -95,7 +95,7 @@ autoreleasepool {
 // The result error should have died with the autorelease pool
 // CHECK-NEXT: died
 class DumbString: NSString {
-  override func characterAtIndex(x: Int) -> unichar { _requirementFailure("nope") }
+  override func characterAt(x: Int) -> unichar { _requirementFailure("nope") }
   override var length: Int { return 0 }
 
   convenience init(contentsOfFile s: String, encoding: NSStringEncoding) throws {

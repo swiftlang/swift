@@ -55,8 +55,8 @@ var globalObjCBoolBlock: @convention(block) (ObjCBool) -> ObjCBool
 var globalDarwinBooleanBlock: @convention(block) (DarwinBoolean) -> DarwinBoolean
 
 class Test : NSObject {
-  var propCBool: Bool
-  var propObjCBool: Bool
+  var isPropCBool: Bool
+  var isPropObjCBool: Bool
   var propDarwinBoolean: Bool
   
   func testCBool(b: Bool) -> Bool

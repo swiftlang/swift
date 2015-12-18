@@ -41,12 +41,6 @@ void setBar(NSString *s);
 @interface NSManagedObject: NSObject
 @end
 
-typedef struct NSZone NSZone;
-
-@protocol NSCopying
-- copyWithZone:(NSZone*)z;
-@end
-
 @interface NSData: NSObject <NSCopying>
 @end
 

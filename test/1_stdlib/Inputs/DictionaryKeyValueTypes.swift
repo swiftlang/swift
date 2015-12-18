@@ -26,18 +26,18 @@ func isCocoaDictionary<KeyTy : Hashable, ValueTy>(
 
 func isNativeNSDictionary(d: NSDictionary) -> Bool {
   let className: NSString = NSStringFromClass(d.dynamicType)
-  return className.rangeOfString("_NativeDictionaryStorageOwner").length > 0
+  return className.rangeOf("_NativeDictionaryStorageOwner").length > 0
 }
 
 func isCocoaNSDictionary(d: NSDictionary) -> Bool {
   let className: NSString = NSStringFromClass(d.dynamicType)
-  return className.rangeOfString("NSDictionary").length > 0 ||
-    className.rangeOfString("NSCFDictionary").length > 0
+  return className.rangeOf("NSDictionary").length > 0 ||
+    className.rangeOf("NSCFDictionary").length > 0
 }
 
 func isNativeNSArray(d: NSArray) -> Bool {
   let className: NSString = NSStringFromClass(d.dynamicType)
-  return className.rangeOfString("_SwiftDeferredNSArray").length > 0
+  return className.rangeOf("_SwiftDeferredNSArray").length > 0
 }
 
 // Compare two arrays as sets.
@@ -213,7 +213,7 @@ class TestObjCKeyTy : NSObject, NSCopying {
   }
 
   @objc
-  func copyWithZone(zone: NSZone) -> AnyObject {
+  func copy(zone zone: NSZone) -> AnyObject {
     return TestObjCKeyTy(value)
   }
 
@@ -626,7 +626,7 @@ func slurpFastEnumerationFromSwift(
 
   var itemsReturned = 0
   while true {
-    let returnedCount = fe.countByEnumeratingWithState(
+    let returnedCount = fe.countByEnumeratingWith(
       &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
@@ -645,7 +645,7 @@ func slurpFastEnumerationFromSwift(
   }
 
   for _ in 0..<3 {
-    let returnedCount = fe.countByEnumeratingWithState(
+    let returnedCount = fe.countByEnumeratingWith(
       &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
@@ -668,7 +668,7 @@ func slurpFastEnumerationFromSwift(
 
   var itemsReturned = 0
   while true {
-    let returnedCount = fe.countByEnumeratingWithState(
+    let returnedCount = fe.countByEnumeratingWith(
       &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
@@ -678,7 +678,7 @@ func slurpFastEnumerationFromSwift(
     }
     for i in 0..<returnedCount {
       let key: AnyObject = state.itemsPtr[i]!
-      let value: AnyObject = d.objectForKey(key)!
+      let value: AnyObject = d.objectFor(key)!
       let kv = (key, value)
       sink(kv)
       itemsReturned += 1
@@ -689,7 +689,7 @@ func slurpFastEnumerationFromSwift(
   }
 
   for _ in 0..<3 {
-    let returnedCount = fe.countByEnumeratingWithState(
+    let returnedCount = fe.countByEnumeratingWith(
       &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectEqual(0, returnedCount)
@@ -715,7 +715,7 @@ func slurpFastEnumerationOfNSEnumeratorFromSwift(
   slurpFastEnumerationFromSwift(
     d, enumerator, sink, maxItems: maxFastEnumerationItems)
   while let key = enumerator.nextObject() {
-    let value: AnyObject = d.objectForKey(key)!
+    let value: AnyObject = d.objectFor(key)!
     let kv = (key, value)
     sink(kv)
   }
@@ -988,7 +988,7 @@ func slurpFastEnumerationFromSwift(
 
   var itemsReturned = 0
   while true {
-    let returnedCount = fe.countByEnumeratingWithState(
+    let returnedCount = fe.countByEnumeratingWith(
       &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
@@ -1007,7 +1007,7 @@ func slurpFastEnumerationFromSwift(
   }
 
   for _ in 0..<3 {
-    let returnedCount = fe.countByEnumeratingWithState(
+    let returnedCount = fe.countByEnumeratingWith(
       &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)

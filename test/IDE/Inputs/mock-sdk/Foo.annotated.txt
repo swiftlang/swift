@@ -227,7 +227,7 @@ class <loc>FooClassDerived</loc> : <ref:Class>FooClassBase</ref>, <ref:Protocol>
 <decl:Class>class <loc>FooUnavailableMembers</loc> : <ref:Class>FooClassBase</ref> {
   <decl:Constructor>convenience <loc>init!(int i: <ref:Struct>Int32</ref>)</loc></decl>
   <decl:Func>@available(*, unavailable, message="use object construction 'FooUnavailableMembers(int:)'")
-  class func <loc>unavailableMembersWithInt(i: <ref:Struct>Int32</ref>)</loc> -> Self!</decl>
+  class func <loc>withInt(i: <ref:Struct>Int32</ref>)</loc> -> Self!</decl>
   <decl:Func>@available(*, unavailable, message="x")
   func <loc>unavailable()</loc></decl>
   <decl:Func>@available(*, unavailable, message="Not available in Swift")

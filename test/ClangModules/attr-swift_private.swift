@@ -70,7 +70,7 @@ public func testTopLevel() {
   _ = foo as __PrivProto
 
   // CHECK: @"\01l_OBJC_PROTOCOL_REFERENCE_$_PrivProto"
-  foo.conformsToProtocol(__PrivProto.self)
+  foo.conformsTo(__PrivProto.self)
 
   // CHECK: call void @privTest()
   __privTest()

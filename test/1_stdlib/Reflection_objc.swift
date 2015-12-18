@@ -145,7 +145,7 @@ case _:
   print("got something else")
 }
 
-let color = OSColor.blackColor()
+let color = OSColor.black()
 switch _reflect(color).quickLookObject {
 case .Some(.Color(let color2 as OSColor)) where color === color2:
   print("got the expected quick look color")

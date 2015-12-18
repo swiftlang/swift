@@ -921,7 +921,7 @@ var nsStringCanaryCount = 0
   @objc override var length: Int {
     return 0
   }
-  @objc override func characterAtIndex(index: Int) -> unichar {
+  @objc override func characterAt(index: Int) -> unichar {
     fatalError("out-of-bounds access")
   }
 }

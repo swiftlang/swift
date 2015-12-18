@@ -20,9 +20,9 @@ final class Foo<T: NSCoding>: NSObject, NSCoding {
     self.init(one: one, two: two)
   }
 
-  @objc func encodeWithCoder(encoder: NSCoder) {
-    encoder.encodeObject(one, forKey: "one")
-    encoder.encodeObject(two, forKey: "two")
+  @objc(encodeWithCoder:) func encodeWith(encoder: NSCoder) {
+    encoder.encode(one, forKey: "one")
+    encoder.encode(two, forKey: "two")
   }
 }
 
@@ -138,11 +138,9 @@ func driver() {
 
 func archive() {
   let data = NSMutableData()
-  let archiver = NSKeyedArchiver(forWritingWithMutableData: data)
-  archiver.encodeObject(Foo<NSString>(one: "one", two: "two"),
-                        forKey: "strings")
-  archiver.encodeObject(Foo<NSNumber>(one: 1, two: 2),
-                        forKey: "numbers")
+  let archiver = NSKeyedArchiver(forWritingWith: data)
+  archiver.encode(Foo<NSString>(one: "one", two: "two"), forKey: "strings")
+  archiver.encode(Foo<NSNumber>(one: 1, two: 2), forKey: "numbers")
   archiver.finishEncoding()
 
   // Output the archived data over stdout, which should be piped to stdin
@@ -179,7 +177,7 @@ func unarchive() {
 
   // Feed it into an unarchiver.
   let data = NSData(bytes: rawData, length: rawData.length)
-  let unarchiver = NSKeyedUnarchiver(forReadingWithData: data)
+  let unarchiver = NSKeyedUnarchiver(forReadingWith: data)
 
   guard let strings
       = unarchiver.decodeObjectForKey("strings") as? Foo<NSString> else {

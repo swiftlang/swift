@@ -113,8 +113,8 @@ testConvertArrayOfImplicitUnwrappedArray()
 func testConvertToArrayOfImplicitUnwrappedClass() {
   print("Converting an NSArray to an array of X!")
   var nsarr = NSMutableArray()
-  nsarr.addObject(X(value: 1))
-  nsarr.addObject(X(value: 2))
+  nsarr.add(X(value: 1))
+  nsarr.add(X(value: 2))
 
   var arr: [X!] = _convertNSArrayToArray(nsarr)
   
@@ -137,8 +137,8 @@ testConvertToArrayOfImplicitUnwrappedClass()
 func testConvertToArrayOfImplicitUnwrappedString() {
   print("Converting an NSArray to an array of String!")
   var nsarr = NSMutableArray()
-  nsarr.addObject(NSString(string: "Hello"))
-  nsarr.addObject(NSString(string: "World"))
+  nsarr.add(NSString(string: "Hello"))
+  nsarr.add(NSString(string: "World"))
 
   var arr: [String!] = _convertNSArrayToArray(nsarr)
   
