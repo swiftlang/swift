@@ -1195,7 +1195,7 @@ Predefined Substitutions
 
 ::
 
-  known-module ::= 's'                       // Swift
+  known-module ::= 'Ss'                       // Swift
   known-module ::= 'SC'                      // C
   known-module ::= 'So'                      // Objective-C
   known-nominal-type ::= 'Sa'                // Swift.Array
