@@ -261,7 +261,7 @@ static llvm::Optional<unsigned>
 cheaperToPassOperandsAsArguments(SILInstruction *First,
                                  SILInstruction *Second) {
   // This will further enable to sink strong_retain_unowned instructions,
-  // which provides more opportinities for the unowned-optimization in
+  // which provides more opportunities for the unowned-optimization in
   // LLVMARCOpts.
   UnownedToRefInst *UTORI1 = dyn_cast<UnownedToRefInst>(First);
   UnownedToRefInst *UTORI2 = dyn_cast<UnownedToRefInst>(Second);
@@ -486,7 +486,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
 /// Try to sink literals that are passed to arguments that are coming from
 /// multiple predecessors.
 /// Notice that unline other sinking methods in this file we do allow sinking
-/// of literals from blocks with multiple sucessors.
+/// of literals from blocks with multiple successors.
 static bool sinkLiteralsFromPredecessors(SILBasicBlock *BB) {
   if (BB->pred_empty() || BB->getSinglePredecessor())
     return false;
@@ -1282,7 +1282,7 @@ void
 BBEnumTagDataflowState::
 mergePredecessorStates(BBToDataflowStateMap &BBToStateMap) {
 
-  // If we have no precessors, there is nothing to do so return early...
+  // If we have no predecessors, there is nothing to do so return early...
   if (getBB()->pred_empty()) {
     DEBUG(llvm::dbgs() << "            No Preds.\n");
     return;

@@ -936,24 +936,33 @@ findPreceedingCheckSubscriptOrMakeMutable(ApplyInst *GetElementAddr) {
 /// Matches the self parameter arguments, verifies that \p Self is called and
 /// stores the instructions in \p DepInsts in order.
 static bool
-matchSelfParameterSetup(ApplyInst *Call, LoadInst *Self,
+matchSelfParameterSetup(ArraySemanticsCall Call, LoadInst *Self,
                         SmallVectorImpl<SILInstruction *> &DepInsts) {
+  bool MayHaveBridgedObjectElementType = Call.mayHaveBridgedObjectElementType();
+  // We only need the retain/release for the guaranteed parameter if the call
+  // could release self. This can only happen if the array is backed by an
+  // Objective-C array. If this is not the case we can safely hoist the call
+  // without the retain/releases.
   auto *RetainArray = dyn_cast_or_null<StrongRetainInst>(getInstBefore(Call));
-  if (!RetainArray)
+  if (!RetainArray && MayHaveBridgedObjectElementType)
     return false;
   auto *ReleaseArray = dyn_cast_or_null<StrongReleaseInst>(getInstAfter(Call));
-  if (!ReleaseArray)
+  if (!ReleaseArray && MayHaveBridgedObjectElementType)
     return false;
-  if (ReleaseArray->getOperand() != RetainArray->getOperand())
+  if (ReleaseArray && ReleaseArray->getOperand() != RetainArray->getOperand())
     return false;
 
-  DepInsts.push_back(ReleaseArray);
+  if (ReleaseArray)
+    DepInsts.push_back(ReleaseArray);
   DepInsts.push_back(Call);
-  DepInsts.push_back(RetainArray);
+  if (RetainArray)
+    DepInsts.push_back(RetainArray);
 
-  auto ArrayLoad = stripValueProjections(RetainArray->getOperand(), DepInsts);
-  if (ArrayLoad != Self)
-    return false;
+  if (RetainArray) {
+    auto ArrayLoad = stripValueProjections(RetainArray->getOperand(), DepInsts);
+    if (ArrayLoad != Self)
+      return false;
+  }
 
   DepInsts.push_back(Self);
   return true;
@@ -1002,8 +1011,10 @@ struct HoistableMakeMutable {
   /// Hoist this make_mutable call and depend instructions to the preheader.
   void hoist() {
     auto *Term = Loop->getLoopPreheader()->getTerminator();
-    for (auto *It : swift::reversed(DepInsts))
-      It->moveBefore(Term);
+    for (auto *It : swift::reversed(DepInsts)) {
+      if (It->getParent() != Term->getParent())
+        It->moveBefore(Term);
+    }
     MakeMutable->moveBefore(Term);
   }
 
@@ -1056,7 +1067,9 @@ private:
     if (!UncheckedRefCast)
       return false;
     DepInsts.push_back(UncheckedRefCast);
-    auto *BaseLoad = dyn_cast<LoadInst>(UncheckedRefCast->getOperand());
+
+    SILValue ArrayBuffer = stripValueProjections(UncheckedRefCast->getOperand(), DepInsts);
+    auto *BaseLoad = dyn_cast<LoadInst>(ArrayBuffer);
     if (!BaseLoad ||  Loop->contains(BaseLoad->getOperand()->getParentBB()))
       return false;
     DepInsts.push_back(BaseLoad);
@@ -1821,10 +1834,10 @@ private:
 
   bool isClassElementTypeArray(SILValue Arr) {
     auto Ty = Arr.getType().getSwiftRValueType();
-    auto Cannonical = Ty.getCanonicalTypeOrNull();
-    if (Cannonical.isNull())
+    auto Canonical = Ty.getCanonicalTypeOrNull();
+    if (Canonical.isNull())
       return false;
-    auto *Struct = Cannonical->getStructOrBoundGenericStruct();
+    auto *Struct = Canonical->getStructOrBoundGenericStruct();
     assert(Struct && "Array must be a struct !?");
     if (Struct) {
       // No point in hoisting generic code.

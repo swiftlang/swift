@@ -159,7 +159,7 @@ public struct UnicodeScalar :
     return (self >= "A" && self <= "Z") || (self >= "a" && self <= "z")
   }
 
-  // FIXME: Is there an similar term of art in Unicode?
+  // FIXME: Is there a similar term of art in Unicode?
   @warn_unused_result
   public func _isASCIIDigit() -> Bool {
     return self >= "0" && self <= "9"

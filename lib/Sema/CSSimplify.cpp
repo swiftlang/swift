@@ -1145,17 +1145,22 @@ static bool isArrayDictionarySetOrString(const ASTContext &ctx, Type type) {
   return false;
 }
 
-/// Return the number of elements of parameter tuple type 'tupleTy' that must
-/// be matched to arguments, as opposed to being varargs or having default
-/// values.
-static unsigned tupleTypeRequiredArgCount(TupleType *tupleTy) {
-  auto argIsRequired = [&](const TupleTypeElt &elt) {
-    return !elt.isVararg() &&
-           elt.getDefaultArgKind() == DefaultArgumentKind::None;
-  };
-  return std::count_if(
-    tupleTy->getElements().begin(), tupleTy->getElements().end(),
-    argIsRequired);
+/// Given that 'tupleTy' is the argument type of a function that's being
+/// invoked with a single unlabeled argument, return the type of the parameter
+/// that matches that argument, or the null type if such a match is impossible.
+static Type getTupleElementTypeForSingleArgument(TupleType *tupleTy) {
+  Type result;
+  for (auto &param : tupleTy->getElements()) {
+    bool mustClaimArg = !param.isVararg() &&
+                        param.getDefaultArgKind() == DefaultArgumentKind::None;
+    bool canClaimArg = !param.hasName();
+    if (!result && canClaimArg) {
+      result = param.isVararg() ? param.getVarargBaseTy() : param.getType();
+    } else if (mustClaimArg) {
+      return Type();
+    }
+  }
+  return result;
 }
 
 ConstraintSystem::SolutionKind
@@ -1332,30 +1337,19 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     case TypeMatchKind::ArgumentTupleConversion:
       if (typeVar1 &&
           !typeVar1->getImpl().literalConformanceProto &&
-          kind == TypeMatchKind::ArgumentTupleConversion &&
           (flags & TMF_GenerateConstraints) &&
           dyn_cast<ParenType>(type1.getPointer())) {
         
-        auto tupleTy = type2->getAs<TupleType>();
-        
-        if (tupleTy &&
-            !tupleTy->getElements().empty() &&
-            (tupleTy->hasAnyDefaultValues() ||
-             tupleTy->getElement(0).isVararg()) &&
-            !tupleTy->getElement(0).hasName() &&
-            tupleTypeRequiredArgCount(tupleTy) <= 1) {
-              
-          // Look through vararg types, if necessary.
-          auto tupleElt = tupleTy->getElement(0);
-          auto tupleEltTy = tupleElt.isVararg() ?
-                              tupleElt.getVarargBaseTy() : tupleElt.getType();
-          
-          addConstraint(getConstraintKind(kind),
-                        typeVar1,
-                        tupleEltTy,
-                        getConstraintLocator(locator));
-          return SolutionKind::Solved;
+        if (auto tupleTy = type2->getAs<TupleType>()) {
+          if (auto tupleEltTy = getTupleElementTypeForSingleArgument(tupleTy)) {
+            addConstraint(getConstraintKind(kind),
+                          typeVar1,
+                          tupleEltTy,
+                          getConstraintLocator(locator));
+            return SolutionKind::Solved;
+          }
         }
+
       }
       SWIFT_FALLTHROUGH;
 

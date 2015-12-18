@@ -459,7 +459,7 @@ public:
   /// Analyze the given function.
   bool analyze();
 
-  /// Returns the managled name of the function that should be generated from
+  /// Returns the mangled name of the function that should be generated from
   /// this function analyzer.
   llvm::SmallString<64> getOptimizedName();
 

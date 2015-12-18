@@ -131,7 +131,7 @@ public:
                                     const llvm::opt::ArgList &args,
                                     const OutputInfo &OI) const;
 
-  /// Return the default langauge type to use for the given extension.
+  /// Return the default language type to use for the given extension.
   virtual types::ID lookupTypeForExtension(StringRef Ext) const;
 };
 } // end namespace driver

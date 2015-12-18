@@ -329,7 +329,7 @@ final internal class _VaListBuilder {
       // length is updated below
 
       if oldStorage != nil {
-        storage.moveInitializeFrom(oldStorage, length: oldLength)
+        storage.moveInitializeFrom(oldStorage, count: oldLength)
         deallocStorage(wordLength: oldAllocated,
           storage: oldStorage)
       }

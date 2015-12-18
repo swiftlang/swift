@@ -21,7 +21,7 @@
 /// In this case, one can replace the load instruction with the previous
 /// results.
 ///
-/// Redudant Load Elimination (RLE) eliminates such loads by:
+/// Redundant Load Elimination (RLE) eliminates such loads by:
 ///
 /// 1. Introducing a notion of a LSLocation that is used to model object
 /// fields. (See below for more details).
@@ -242,7 +242,7 @@ public:
     //   use(a);
     //
     // However, by doing so, we can only do the data forwarding after the
-    // data flow stablizes.
+    // data flow stabilizes.
     //
     ForwardSetIn.resize(bitcnt, false);
     ForwardSetOut.resize(bitcnt, reachable);
@@ -293,7 +293,7 @@ public:
 
 namespace {
 
-/// This class stores global state that we use when computing redudant load and
+/// This class stores global state that we use when computing redundant load and
 /// their replacement in each basic block.
 class RLEContext {
   /// Function currently processing.
@@ -779,7 +779,7 @@ SILValue RLEContext::computePredecessorCoveringValue(SILBasicBlock *BB,
     return SILValue();
 
   // At this point, we know this LSLocation has available value and we also
-  // know we can forward a SILValue from every predecesor. It is safe to
+  // know we can forward a SILValue from every predecessor. It is safe to
   // insert the basic block argument.
   BlockState &Forwarder = getBlockState(BB);
   SILValue TheForwardingValue = BB->createBBArg(L.getType());

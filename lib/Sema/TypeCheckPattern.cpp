@@ -1229,7 +1229,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                              IP->getLoc(),
                              IP->getLoc(),IP->getCastTypeLoc().getSourceRange(),
                              [](Type) { return false; },
-                             /*suppressDiagnostics=*/ false);
+                             /*suppressDiagnostics=*/ type->is<ErrorType>());
     switch (castKind) {
     case CheckedCastKind::Unresolved:
       return false;
@@ -1288,8 +1288,9 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       if (type->getAnyNominal())
         elt = lookupEnumMemberElement(*this, dc, type, EEP->getName());
       if (!elt) {
-        diagnose(EEP->getLoc(), diag::enum_element_pattern_member_not_found,
-                 EEP->getName().str(), type);
+        if (!type->is<ErrorType>())
+          diagnose(EEP->getLoc(), diag::enum_element_pattern_member_not_found,
+                   EEP->getName().str(), type);
         return true;
       }
       enumTy = type;

@@ -690,4 +690,13 @@ func r23272739(contentType: String) {
   return actualAcceptableContentTypes.contains(contentType)  // expected-error {{unexpected non-void return value in void function}}
 }
 
+// <rdar://problem/23641896> QoI: Strings in Swift cannot be indexed directly with integer offsets
+func r23641896() {
+  var g = "Hello World"
+  g.replaceSubrange(0...2, with: "ce")  // expected-error {{String may not be indexed with 'Int', it has variable size elements}}
+  // expected-note @-1 {{consider using an existing high level algorithm, str.startIndex.advancedBy(n), or a projection like str.utf8}}
+
+  _ = g[12]  // expected-error {{'subscript' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}}
+
+}
 

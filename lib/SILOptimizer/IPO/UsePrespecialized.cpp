@@ -123,7 +123,7 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     if (!NewF)
       continue;
 
-    // An existing specializaiton was found.
+    // An existing specialization was found.
     DEBUG(
         llvm::dbgs() << "Found a specialization of " << ReferencedF->getName()
         << " : " << NewF->getName() << "\n");

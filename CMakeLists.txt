@@ -69,7 +69,7 @@ set(SWIFT_ENABLE_GOLD_LINKER FALSE CACHE BOOL
     "Enable using the gold linker when available")
 
 set(_SWIFT_KNOWN_INSTALL_COMPONENTS
-    "compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;editor-integration;tools;testsuite-tools;dev;sourcekit-xpc-service;sourcekit-inproc")
+    "compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;editor-integration;tools;testsuite-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc")
 
 # Set the SWIFT_INSTALL_COMPONENTS variable to the default value if it is not passed in via -D
 set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_KNOWN_INSTALL_COMPONENTS}" CACHE STRING
@@ -124,6 +124,9 @@ option(SWIFT_EMBED_BITCODE_SECTION
 option(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT
     "Whether to enable CrashReporter integration"
     FALSE)
+
+set(SWIFT_DARWIN_XCRUN_TOOLCHAIN "XcodeDefault" CACHE STRING
+    "The name of the toolchain to pass to 'xcrun'")
 
 set(SWIFT_DARWIN_ICU_INCLUDE_PATH "" CACHE STRING
     "Path to the directory where the ICU headers are located")
@@ -643,6 +646,10 @@ endif()
 if(SWIFT_INCLUDE_DOCS)
   add_subdirectory(docs)
 endif()
+
+swift_install_in_component(license
+  FILES "LICENSE.txt"
+  DESTINATION "share/swift")
 
 # Add a documentation target so that documentation shows up in the
 # Xcode project.

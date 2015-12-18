@@ -286,7 +286,7 @@ public:
   /// Finalize the set of requirements, performing any remaining checking
   /// required before generating archetypes.
   ///
-  /// \returns true if an error occurs, false otherwse.
+  /// \returns true if an error occurs, false otherwise.
   bool finalize(SourceLoc loc);
 
   /// \brief Resolve the given type to the potential archetype it names.

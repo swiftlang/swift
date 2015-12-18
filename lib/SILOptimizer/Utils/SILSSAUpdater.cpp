@@ -173,7 +173,15 @@ SILValue SILSSAUpdater::GetValueInMiddleOfBlock(SILBasicBlock *BB) {
   SILValue SingularValue;
   SmallVector<std::pair<SILBasicBlock*, SILValue>, 4> PredVals;
   bool FirstPred = true;
+
+  // SSAupdater can modify TerminatorInst and therefore invalidate the
+  // predecessor iterator. Find all the predecesors before the SSA update.
+  SmallVector<SILBasicBlock *, 4> Preds;
   for (auto *PredBB: BB->getPreds()) {
+    Preds.push_back(PredBB);
+  }
+
+  for (auto *PredBB : Preds) {
     SILValue PredVal = GetValueAtEndOfBlock(PredBB);
     PredVals.push_back(std::make_pair(PredBB, PredVal));
     if (FirstPred) {

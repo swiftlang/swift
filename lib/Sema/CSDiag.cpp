@@ -3037,6 +3037,28 @@ bool FailureDiagnosis::diagnoseCalleeResultContextualConversionError() {
   }
 }
 
+
+/// Return true if the conversion from fromType to toType is an invalid string
+/// index operation.
+static bool isIntegerToStringIndexConversion(Type fromType, Type toType,
+                                             ConstraintSystem *CS) {
+  auto integerType =
+    CS->TC.getProtocol(SourceLoc(),
+                       KnownProtocolKind::IntegerLiteralConvertible);
+  if (!integerType) return false;
+
+  // If the from type is an integer type, and the to type is
+  // String.CharacterView.Index, then we found one.
+  if (CS->TC.conformsToProtocol(fromType, integerType, CS->DC,
+                                ConformanceCheckFlags::InExpression)) {
+    if (toType->getCanonicalType().getString() == "String.CharacterView.Index")
+      return true;
+  }
+
+  return false;
+}
+
+
 bool FailureDiagnosis::diagnoseContextualConversionError() {
   // If the constraint system has a contextual type, then we can test to see if
   // this is the problem that prevents us from solving the system.
@@ -3192,6 +3214,18 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
     return true;
   }
 
+  exprType = exprType->getRValueType();
+
+  // Special case a some common common conversions involving Swift.String
+  // indexes, catching cases where people attempt to index them with an integer.
+  if (isIntegerToStringIndexConversion(exprType, contextualType, CS)) {
+    diagnose(expr->getLoc(), diag::string_index_not_integer,
+             exprType->getRValueType())
+      .highlight(expr->getSourceRange());
+    diagnose(expr->getLoc(), diag::string_index_not_integer_note);
+    return true;
+  }
+
   // When complaining about conversion to a protocol type, complain about
   // conformance instead of "conversion".
   if (contextualType->is<ProtocolType>() ||
@@ -3220,7 +3254,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
         diagID = diag::noescape_functiontype_mismatch;
     }
 
-  diagnose(expr->getLoc(), diagID, exprType->getRValueType(), contextualType)
+  diagnose(expr->getLoc(), diagID, exprType, contextualType)
     .highlight(expr->getSourceRange());
   return true;
 }

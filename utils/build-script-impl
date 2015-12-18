@@ -1463,6 +1463,11 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
         )
     fi
 
+    swift_cmake_options=(
+        "${swift_cmake_options[@]}"
+        -DSWIFT_DARWIN_XCRUN_TOOLCHAIN:STRING="${DARWIN_XCRUN_TOOLCHAIN}"
+    )
+
     if [[ "${DARWIN_STDLIB_INSTALL_NAME_DIR}" ]] ; then
         swift_cmake_options=(
             "${swift_cmake_options[@]}"

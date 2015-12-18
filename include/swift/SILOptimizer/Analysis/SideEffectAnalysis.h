@@ -177,7 +177,7 @@ public:
     /// Can this function trap or exit the program in any way?
     bool Traps = false;
     
-    /// Does this function read a refernce count other than with retain or
+    /// Does this function read a reference count other than with retain or
     /// release instructions, e.g. isUnique?
     bool ReadsRC = false;
     
@@ -230,7 +230,7 @@ public:
     /// Can this function trap or exit the program in any way?
     bool mayTrap() const { return Traps; }
 
-    /// Does this function read a refernce count other than with retain or
+    /// Does this function read a reference count other than with retain or
     /// release instructions, e.g. isUnique?
     bool mayReadRC() const { return ReadsRC; }
 

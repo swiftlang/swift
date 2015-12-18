@@ -704,7 +704,7 @@ that was technically copied beforehand.  For example::
   var oldArray : [Int] = []
 
   // This function copies array before modifying it, but because that
-  // copy is of an value undergoing modification, the copy will use
+  // copy is of a value undergoing modification, the copy will use
   // the same buffer and therefore observe updates to the element.
   func foo(inout element: Int) {
     oldArray = array

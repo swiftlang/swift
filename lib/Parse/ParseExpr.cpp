@@ -436,7 +436,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
 
   case tok::oper_postfix:
     // Postfix operators cannot start a subexpression, but can happen
-    // syntactically because the operator may just follow whatever preceeds this
+    // syntactically because the operator may just follow whatever precedes this
     // expression (and that may not always be an expression).
     diagnose(Tok, diag::invalid_postfix_operator);
     Tok.setKind(tok::oper_prefix);
@@ -630,14 +630,14 @@ static StringRef copyAndStripUnderscores(ASTContext &C, StringRef orig) {
 /// the start of a trailing closure, or start the variable accessor block.
 ///
 /// Check to see if the '{' is followed by a 'didSet' or a 'willSet' label,
-/// possibly preceeded by attributes.  If so, we disambiguate the parse as the
+/// possibly preceded by attributes.  If so, we disambiguate the parse as the
 /// start of a get-set block in a variable definition (not as a trailing
 /// closure).
 static bool isStartOfGetSetAccessor(Parser &P) {
   assert(P.Tok.is(tok::l_brace) && "not checking a brace?");
   
   // The only case this can happen is if the accessor label is immediately after
-  // a brace (possibly preceeded by attributes).  "get" is implicit, so it can't
+  // a brace (possibly preceded by attributes).  "get" is implicit, so it can't
   // be checked for.  Conveniently however, get/set properties are not allowed
   // to have initializers, so we don't have an ambiguity, we just have to check
   // for observing accessors.

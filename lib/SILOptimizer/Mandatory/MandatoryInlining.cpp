@@ -348,7 +348,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
         // trace back the failure if we have more information.
         // FIXME: possibly it could be worth recovering and attempting other
         // inlines within this same recursive call rather than simply
-        // propogating the failure.
+        // propagating the failure.
         if (AI) {
           SILLocation L = AI.getLoc();
           assert(L && "Must have location for transparent inline apply");

@@ -323,7 +323,7 @@ struct StructWithStoredProperty : PropertyWithGetter {
 //
 // *NOTE* Even though at first glance the copy_addr looks like a leak
 // here, StructWithStoredProperty is a trivial struct implying that no
-// leak is occuring. See the test with StructWithStoredClassProperty
+// leak is occurring. See the test with StructWithStoredClassProperty
 // that makes sure in such a case we don't leak. This is due to the
 // thunking code being too dumb but it is harmless to program
 // correctness.

@@ -57,6 +57,12 @@ PASS(ClosureSpecializer, "closure-specialize",
      "Specialize functions passed a closure to call the closure directly")
 PASS(CodeSinking, "code-sinking",
      "Sinks code closer to users")
+PASS(ComputeDominanceInfo, "compute-dominance-info",
+     "Utility pass that computes dominance info for all functions in order to "
+     "help test dominanceinfo updating")
+PASS(ComputeLoopInfo, "compute-loop-info",
+     "Utility pass that computes loop info for all functions in order to help "
+     "test loop info updating")
 PASS(CopyForwarding, "copy-forwarding",
      "Eliminate redundant copies")
 PASS(RedundantOverflowCheckRemoval, "remove-redundant-overflow-checks",
@@ -91,7 +97,7 @@ PASS(FunctionSignatureOpts, "function-signature-opts",
      "Optimize Function Signatures")
 PASS(ARCSequenceOpts, "arc-sequence-opts",
      "Optimize sequences of retain/release opts by removing redundant inner "
-     "retain/release sqeuences")
+     "retain/release sequences")
 PASS(ARCLoopOpts, "arc-loop-opts",
      "Run all arc loop passes")
 PASS(RedundantLoadElimination, "redundant-load-elim",

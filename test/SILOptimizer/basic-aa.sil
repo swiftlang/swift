@@ -238,10 +238,6 @@ sil @use_native_object : $@convention(thin) (Builtin.NativeObject) -> ()
 // CHECK: (0):   %0 = argument of bb0 : $*Builtin.NativeObject
 // CHECK: (0):   %8 = load %3#1 : $*Builtin.NativeObject
 // CHECK: NoAlias
-// CHECK: PAIR #11.
-// CHECK: (0):   %0 = argument of bb0 : $*Builtin.NativeObject
-// CHECK: (0):   %9 = apply %7(%8) : $@convention(thin) (Builtin.NativeObject) -> ()
-// CHECK: NoAlias
 
 // Test %1 (the aliasing argument)
 
@@ -318,10 +314,6 @@ sil @use_native_object : $@convention(thin) (Builtin.NativeObject) -> ()
 // CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.NativeObject
 // CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.NativeObject
 // CHECK-NEXT: NoAlias
-// CHECK: PAIR #53.
-// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.NativeObject
-// CHECK-NEXT: (0):   %9 = apply %7(%8) : $@convention(thin) (Builtin.NativeObject) -> ()
-// CHECK-NEXT: NoAlias
 // CHECK: PAIR #57.
 // CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.NativeObject
 // CHECK-NEXT: (0):   %5 = apply %4() : $@convention(thin) () -> Builtin.NativeObject
@@ -333,10 +325,6 @@ sil @use_native_object : $@convention(thin) (Builtin.NativeObject) -> ()
 // CHECK: PAIR #60.
 // CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.NativeObject
 // CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.NativeObject
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #61.
-// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.NativeObject
-// CHECK-NEXT: (0):   %9 = apply %7(%8) : $@convention(thin) (Builtin.NativeObject) -> ()
 // CHECK-NEXT: NoAlias
 
 // Test %5 (the read write apply inst).
@@ -373,7 +361,7 @@ sil @use_native_object : $@convention(thin) (Builtin.NativeObject) -> ()
 // CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.NativeObject
 // CHECK-NEXT: (0):   %9 = apply %7(%8) : $@convention(thin) (Builtin.NativeObject) -> ()
 // CHECK-NEXT: MayAlias
-sil @escapesource_functionlocal_test_escapesource_nonescapinglocal : $@convention(thin) (@inout Builtin.NativeObject, Builtin.NativeObject) -> () {
+sil @escapesource_functionlocal_test_escapesource_nonescapinglocal : $@convention(thin) (@in Builtin.NativeObject, Builtin.NativeObject) -> () {
 bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.NativeObject):
   %2 = alloc_stack $Builtin.NativeObject
   %3 = alloc_stack $Builtin.NativeObject
@@ -513,5 +501,27 @@ bb0(%0 : $C, %1 : $C, %2 : $Int):
   %6 = ref_element_addr %0 : $C, #C.a
   %8 = ref_element_addr %1 : $C, #C.b
   return %2 : $Int
+}
+
+// CHECK-LABEL: @non_escaping_local_object_does_not_alias_with_unknown
+// CHECK: PAIR #7.
+// CHECK-NEXT: (0):   %1 = alloc_ref $X                               // user: %3
+// CHECK-NEXT: (0):   %3 = apply %2(%1) : $@convention(thin) (X) -> X
+// CHECK-NEXT: NoAlias
+sil @non_escaping_local_object_does_not_alias_with_unknown : $@convention(thin) (X) -> () {
+bb0(%0 : $X):
+  %1 = alloc_ref $X
+
+  %f = function_ref @not_escaping : $@convention(thin) (X) -> X
+  %2 = apply %f(%1) : $@convention(thin) (X) -> X
+
+  %12 = tuple()
+  return %12 : $()
+}
+
+sil @not_escaping: $@convention(thin) (X) -> X {
+bb0(%0 : $X):
+  %1 = alloc_ref $X
+  return %1 : $X
 }
 

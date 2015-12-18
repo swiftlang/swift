@@ -216,7 +216,7 @@ namespace {
   };
 
   class SILPerformanceInliner {
-    /// The inline threashold.
+    /// The inline threshold.
     const int InlineCostThreshold;
     /// Specifies which functions not to inline, based on @_semantics and
     /// global_init attributes.

@@ -563,7 +563,7 @@ bb0(%0 : $*S1):
 // (including each subtype's field in that count). This fixes a bug where we
 // were not handling the possibility of an std::vector resize invalidated
 // references. This cause the this pointer to become invalidated and other
-// schinanigans. So just make sure we don't crash
+// shenanigans. So just make sure we don't crash
 // CHECK-LABEL: sil [fragile] @more_than_32_type_sized_caller : $@convention(thin) (ThirtySixFieldStruct) -> () {
 sil [fragile] @more_than_32_type_sized_caller : $@convention(thin) (ThirtySixFieldStruct) -> () {
 bb0(%0 : $ThirtySixFieldStruct):

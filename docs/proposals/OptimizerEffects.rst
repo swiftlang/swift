@@ -795,7 +795,7 @@ Store (1) and load (2) do not alias and (3) is defined as ``readnone``. So (1)
 could be moved over (3).
 
 Currently inlining is prevented in high-level SIL for all functions which
-have an semantics or effect attribute. Therefore we could say that the
+have a semantics or effect attribute. Therefore we could say that the
 implementor of a pure value type has to define effects on all member functions
 which eventually can access or modify the storage.
 

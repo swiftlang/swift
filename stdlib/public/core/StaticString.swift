@@ -17,7 +17,7 @@
 // are involved in its construction.  This feature is crucial for
 // preventing infinite recursion even in non-asserting cases.
 
-/// An simple string designed to represent text that is "knowable at
+/// A simple string designed to represent text that is "knowable at
 /// compile-time".
 ///
 /// Logically speaking, each instance looks something like this:

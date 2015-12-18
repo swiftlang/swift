@@ -807,7 +807,7 @@ public:
   /// The hope is that this will prevent any future bugs from coming up related
   /// to this.
   ///
-  /// Self is always the last parameter, but self subtitutions are always
+  /// Self is always the last parameter, but self substitutions are always
   /// first. The reason to add this method is to wrap that dichotomy to reduce
   /// errors.
   ///

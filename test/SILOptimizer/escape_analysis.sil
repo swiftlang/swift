@@ -593,7 +593,7 @@ bb2(%5 : $LinkedNode):
   return %5 : $LinkedNode
 }
 
-// Test if a try_apply is repressented correctly in the connection graph.
+// Test if a try_apply is represented correctly in the connection graph.
 
 // CHECK-LABEL: CG of call_throwing_func
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: 

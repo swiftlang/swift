@@ -2258,15 +2258,15 @@ sil [noinline] @initCC : $@convention(thin) (@thick CC.Type) -> @owned @callee_o
 sil [noinline] @takeBB : $@convention(thin) (@owned BB) -> @owned BB
 
 // Check that we don't crash on this.
-// The compiler should be able to cast between the labled and unlabled return tuple types.
-// CHECK-LABEL: @try_apply_with_convert_function_returning_casted_unlabled_tuple
+// The compiler should be able to cast between the labeled and unlabeled return tuple types.
+// CHECK-LABEL: @try_apply_with_convert_function_returning_casted_unlabeled_tuple
 // CHECK: apply {{%[0-9]+}}
 // Proper tuple is created by deconstructing the old one and creating a new one using its elements.
 // CHECK: tuple_extract
 // CHECK: tuple_extract
 // CHECK: tuple
 // CHECK: return
-sil @try_apply_with_convert_function_returning_casted_unlabled_tuple: $@convention(thin) () -> (Int32, Int32) {
+sil @try_apply_with_convert_function_returning_casted_unlabeled_tuple: $@convention(thin) () -> (Int32, Int32) {
 bb0:
   %3 = function_ref @returnLabledTuple : $@convention(thin) () -> (first: Int32, second: Int32)
   %6 = convert_function %3 : $@convention(thin) () -> (first: Int32, second: Int32) to $@convention(thin) () -> ((Int32, Int32), @error ErrorProtocol)
@@ -2283,17 +2283,17 @@ bb2(%10 : $ErrorProtocol):
 }
 
 // Check that we don't crash on this.
-// The compiler should be able to cast between the labled and unlabled return tuple types.
-// CHECK-LABEL: @try_apply_with_convert_function_returning_casted_labled_tuple
+// The compiler should be able to cast between the labeled and unlabeled return tuple types.
+// CHECK-LABEL: @try_apply_with_convert_function_returning_casted_labeled_tuple
 // CHECK: apply {{%[0-9]+}}
 // Proper tuple is created by deconstructing the old one and creating a new one using its elements.
 // CHECK: tuple_extract
 // CHECK: tuple_extract
 // CHECK: tuple
 // CHECK: return
-sil @try_apply_with_convert_function_returning_casted_labled_tuple: $@convention(thin) () -> (first: Int32, second: Int32) {
+sil @try_apply_with_convert_function_returning_casted_labeled_tuple: $@convention(thin) () -> (first: Int32, second: Int32) {
 bb0:
-  %3 = function_ref @returnUnlabledTuple : $@convention(thin) () -> (Int32, Int32)
+  %3 = function_ref @returnUnlabeledTuple : $@convention(thin) () -> (Int32, Int32)
   %6 = convert_function %3 : $@convention(thin) () -> (Int32, Int32) to $@convention(thin) () -> ((first: Int32, second: Int32), @error ErrorProtocol)
   try_apply %6() : $@convention(thin) () -> ((first: Int32, second: Int32), @error ErrorProtocol), normal bb1, error bb2
  
@@ -2308,7 +2308,7 @@ bb2(%10 : $ErrorProtocol):
 }
 
 sil [noinline] @returnLabledTuple: $@convention(thin) () -> (first: Int32, second: Int32)
-sil [noinline] @returnUnlabledTuple : $@convention(thin) () -> (Int32, Int32)
+sil [noinline] @returnUnlabeledTuple : $@convention(thin) () -> (Int32, Int32)
 
 public class AAA {
 }
@@ -2316,13 +2316,13 @@ public class AAA {
 public class BBB : AAA {
 }
 
-@inline(never) func returnUnlabledTuple(b: BBB) -> (BBB, BBB)
+@inline(never) func returnUnlabeledTuple(b: BBB) -> (BBB, BBB)
 
 func testit(f: (BBB) throws -> (AAA, AAA), _ b: BBB) throws -> (AAA, AAA)
 
 func callit(b: BBB) throws -> (AAA, AAA)
 
-sil [noinline] @returnUnlabledTupleOfClasses : $@convention(thin) (@owned BBB) -> @owned (BBB, BBB) {
+sil [noinline] @returnUnlabeledTupleOfClasses : $@convention(thin) (@owned BBB) -> @owned (BBB, BBB) {
 bb0(%0 : $BBB):
   debug_value %0 : $BBB
   strong_retain %0 : $BBB
@@ -2365,7 +2365,7 @@ bb0(%0 : $BBB):
 
   %2 = function_ref @testFunctorReturningUnlabeledTuple : $@convention(thin) (@owned @callee_owned (@owned BBB) -> (@owned (AAA, AAA), @error ErrorProtocol), @owned BBB) -> (@owned (AAA, AAA), @error ErrorProtocol)
 
-  %3 = function_ref @returnUnlabledTupleOfClasses : $@convention(thin) (@owned BBB) -> @owned (BBB, BBB)
+  %3 = function_ref @returnUnlabeledTupleOfClasses : $@convention(thin) (@owned BBB) -> @owned (BBB, BBB)
   %4 = thin_to_thick_function %3 : $@convention(thin) (@owned BBB) -> @owned (BBB, BBB) to $@callee_owned (@owned BBB) -> @owned (BBB, BBB)
   %5 = convert_function %4 : $@callee_owned (@owned BBB) -> @owned (BBB, BBB) to $@callee_owned (@owned BBB) -> (@owned (AAA, AAA), @error ErrorProtocol)
   strong_retain %0 : $BBB
