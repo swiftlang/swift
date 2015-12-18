@@ -767,6 +767,9 @@
 
   <define name="CodeListing">
     <element name="CodeListing">
+      <attribute name="language">
+        <data type="string" />
+      </attribute>
       <zeroOrMore>
         <ref name="zCodeLineNumbered"/>
       </zeroOrMore>
