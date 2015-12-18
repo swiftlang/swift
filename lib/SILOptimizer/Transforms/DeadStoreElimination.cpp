@@ -422,7 +422,7 @@ public:
   /// Compute the genset and killset for the current basic block.
   void processBasicBlockForGenKillSet(SILBasicBlock *BB);
 
-  /// Compute the genset and killset for the current basic block.
+  /// Compute the max store set for the current basic block.
   void processBasicBlockForMaxStoreSet(SILBasicBlock *BB);
 
   /// Compute the WriteSetOut and WriteSetIn for the current basic
@@ -626,7 +626,6 @@ bool DSEContext::updateWriteSetForWrite(BlockState *S, unsigned bit) {
 }
 
 void DSEContext::updateGenKillSetForWrite(BlockState *S, unsigned bit) {
-  // Start tracking the store to this MemLoation.
   S->BBGenSet.set(bit);
 }
 
@@ -666,9 +665,6 @@ void DSEContext::processRead(SILInstruction *I, BlockState *S, SILValue Mem,
            "LSLocation returns different type");
   }
 #endif
-
-  if (isComputeMaxStoreSet(Kind))
-    return;
 
   // Expand the given Mem into individual fields and process them as
   // separate reads.
@@ -720,7 +716,7 @@ void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
 
   if (isComputeMaxStoreSet(Kind)) {
     for (auto &E : Locs) {
-      // Only building the gen and kill sets here.
+      // Update the max store set for the basic block.
       updateMaxStoreSetForWrite(S, getLSLocationBit(E));
     }
     return;
@@ -835,7 +831,7 @@ void DSEContext::processUnknownReadMemInst(SILInstruction *I,
   if (isBuildingGenKillSet(Kind)) {
     for (unsigned i = 0; i < S->LSLocationNum; ++i) {
       // If BBMaxStoreSet is not turned on, then there is no reason to turn
-      // on the kill set nor the gen set for this store for this basic block.
+      // on the kill set nor the gen set for this location in this basic block.
       // as there can NOT be a store that reaches the end of this basic block.
       if (!S->BBMaxStoreSet.test(i))
         continue;
@@ -909,8 +905,9 @@ bool DSEContext::run() {
   // Compute the max store set at the beginning of the basic block.
   //
   // This helps generating the genset and killset. If there is no way a
-  // location can have an upward store at a particular point in the basic block,
-  // we do not need to turn on the genset and killset for the location.
+  // location can have an upward visible store at a particular point in the
+  // basic block, we do not need to turn on the genset and killset for the
+  // location.
   //
   // Turning on the genset and killset can be costly as it involves querying
   // the AA interface.
