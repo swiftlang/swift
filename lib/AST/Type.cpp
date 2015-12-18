@@ -2313,9 +2313,12 @@ static Type getMemberForBaseType(Module *module,
   // If the parent is an archetype, extract the child archetype with the
   // given name.
   if (auto archetypeParent = substBase->getAs<ArchetypeType>()) {
-    if (!archetypeParent->hasNestedType(name) &&
-        archetypeParent->getParent()->isSelfDerived()) {
-      return archetypeParent->getParent()->getNestedTypeValue(name);
+    if (!archetypeParent->hasNestedType(name)) {
+      const auto parent = archetypeParent->getParent();
+      if (!parent)
+        return ErrorType::get(module->getASTContext());
+      if (parent->isSelfDerived())
+        return parent->getNestedTypeValue(name);
     }
     
     return archetypeParent->getNestedTypeValue(name);
