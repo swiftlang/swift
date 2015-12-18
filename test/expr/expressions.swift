@@ -796,3 +796,9 @@ protocol P { var y: String? { get } }
 func r23185177(x: P?) -> [String] {
   return x?.y // expected-error{{cannot convert return expression of type 'String?' to return type '[String]'}}
 }
+
+// <rdar://problem/22913570> Miscompile: wrong argument parsing when calling a function in swift2.0
+func r22913570() {
+  func f(from: Int = 0, to: Int) {}
+  f(1 + 1) // expected-error{{missing argument for parameter 'to' in call}}
+}
