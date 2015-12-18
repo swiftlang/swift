@@ -626,6 +626,47 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   return AliasResult::MayAlias;
 }
 
+bool AliasAnalysis::canApplyDecrementRefCount(FullApplySite FAS, SILValue Ptr) {
+  // Treat applications of @noreturn functions as decrementing ref counts. This
+  // causes the apply to become a sink barrier for ref count increments.
+  if (FAS.getCallee().getType().getAs<SILFunctionType>()->isNoReturn())
+    return true;
+
+  /// If the pointer cannot escape to the function we are done.
+  if (!EA->canEscapeTo(Ptr, FAS))
+    return false;
+
+  SideEffectAnalysis::FunctionEffects ApplyEffects;
+  SEA->getEffects(ApplyEffects, FAS);
+
+  auto &GlobalEffects = ApplyEffects.getGlobalEffects();
+  if (ApplyEffects.mayReadRC() || GlobalEffects.mayRelease())
+    return true;
+
+  /// The function has no unidentified releases, so let's look at the arguments
+  // in detail.
+  for (unsigned Idx = 0, End = FAS.getNumArguments(); Idx < End; ++Idx) {
+    auto &ArgEffect = ApplyEffects.getParameterEffects()[Idx];
+    if (ArgEffect.mayRelease()) {
+      // The function may release this argument, so check if the pointer can
+      // escape to it.
+      if (EA->canEscapeToValue(Ptr, FAS.getArgument(Idx)))
+        return true;
+    }
+  }
+  return false;
+}
+
+bool AliasAnalysis::canBuiltinDecrementRefCount(BuiltinInst *BI, SILValue Ptr) {
+  for (SILValue Arg : BI->getArguments()) {
+    // A builtin can only release an object if it can escape to one of the
+    // builtin's arguments.
+    if (EA->canEscapeToValue(Ptr, Arg))
+      return true;
+  }
+  return false;
+}
+
 bool swift::isLetPointer(SILValue V) {
   // Traverse the "access" path for V and check that it starts with "let"
   // and everything along this path is a value-type (i.e. struct or tuple).

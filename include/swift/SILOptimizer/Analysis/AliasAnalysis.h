@@ -235,6 +235,12 @@ public:
     return MemoryBehavior::MayHaveSideEffects == B;
   }
 
+  /// Returns true if \p Ptr may be released in the function call \p FAS.
+  bool canApplyDecrementRefCount(FullApplySite FAS, SILValue Ptr);
+
+  /// Returns true if \p Ptr may be released by the builtin \p BI.
+  bool canBuiltinDecrementRefCount(BuiltinInst *BI, SILValue Ptr);
+
   /// Encodes the alias query as a AliasKeyTy.
   /// The parameters to this function are identical to the parameters of alias()
   /// and this method serializes them into a key for the alias analysis cache.

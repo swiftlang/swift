@@ -202,8 +202,6 @@ ConcreteToArchetypeConvertC(t: c, t2: e)
 // x -> y where x and y are unrelated classes.
 // CHECK-LABEL: sil shared [noinline] @_TTSg5C37specialize_unconditional_checked_cast1E___TF37specialize_unconditional_checked_cast27ConcreteToArchetypeConvertC{{.*}} : $@convention(thin) (@out E, @owned C, @in E) -> () {
 // CHECK: bb0
-// CHECK-NEXT: debug_value
-// CHECK-NEXT: strong_retain
 // CHECK-NEXT: builtin "int_trap"
 // CHECK: unreachable
 // CHECK-NEXT: }
