@@ -1669,18 +1669,113 @@ OmissionTypeName ClangImporter::Implementation::getClangTypeNameForOmission(
 
   // Handle builtin types by importing them and getting the Swift name.
   if (auto builtinTy = type->getAs<clang::BuiltinType>()) {
-    if (Type type = importType(clang::QualType(builtinTy, 0),
-                               ImportTypeKind::Abstract,
-                               /*allowNSUIntegerAsInt=*/true,
-                               /*canFullyBridgeTypes=*/true,
-                               OTK_None)) {
-      if (auto nominal = type->getAnyNominal()) {
-        OmissionTypeOptions options;
-        if (nominal->getName().str() == "Bool")
-          options |= OmissionTypeFlags::Boolean;
+    // Names of integer types.
+    static const char *intTypeNames[] = {
+      "UInt8",
+      "UInt16",
+      "UInt32",
+      "UInt64",
+      "UInt128"
+    };
 
-        return OmissionTypeName(nominal->getName().str(), options);
+    /// Retrieve the name for an integer type based on its size.
+    auto getIntTypeName = [&](bool isSigned) -> StringRef {
+      switch (ctx.getTypeSize(builtinTy)) {
+      case 8: return StringRef(intTypeNames[0]).substr(isSigned ? 1 : 0);
+      case 16: return StringRef(intTypeNames[1]).substr(isSigned ? 1 : 0);
+      case 32: return StringRef(intTypeNames[2]).substr(isSigned ? 1 : 0);
+      case 64: return StringRef(intTypeNames[3]).substr(isSigned ? 1 : 0);
+      case 128: return StringRef(intTypeNames[4]).substr(isSigned ? 1 : 0);
+      default: llvm_unreachable("bad integer type size");
       }
+    };
+
+    switch (builtinTy->getKind()) {
+    case clang::BuiltinType::Void:
+      return "Void";
+
+    case clang::BuiltinType::Bool:
+      return OmissionTypeName("Bool", OmissionTypeFlags::Boolean);
+
+    case clang::BuiltinType::Float:
+      return "Float";
+
+    case clang::BuiltinType::Double:
+      return "Double";
+
+    case clang::BuiltinType::Char16:
+      return "UInt16";
+
+    case clang::BuiltinType::Char32:
+      return "UnicodeScalar";
+
+    case clang::BuiltinType::Char_U:
+    case clang::BuiltinType::UChar:
+    case clang::BuiltinType::UShort:
+    case clang::BuiltinType::UInt:
+    case clang::BuiltinType::ULong:
+    case clang::BuiltinType::ULongLong:
+    case clang::BuiltinType::UInt128:
+    case clang::BuiltinType::WChar_U:
+      return getIntTypeName(false);
+
+    case clang::BuiltinType::Char_S:
+    case clang::BuiltinType::SChar:
+    case clang::BuiltinType::Short:
+    case clang::BuiltinType::Int:
+    case clang::BuiltinType::Long:
+    case clang::BuiltinType::LongLong:
+    case clang::BuiltinType::Int128:
+    case clang::BuiltinType::WChar_S:
+      return getIntTypeName(true);
+
+    // Types that cannot be mapped into Swift, and probably won't ever be.
+    case clang::BuiltinType::Dependent:
+    case clang::BuiltinType::ARCUnbridgedCast:
+    case clang::BuiltinType::BoundMember:
+    case clang::BuiltinType::BuiltinFn:
+    case clang::BuiltinType::Overload:
+    case clang::BuiltinType::PseudoObject:
+    case clang::BuiltinType::UnknownAny:
+      return OmissionTypeName();
+
+    // FIXME: Types that can be mapped, but aren't yet.
+    case clang::BuiltinType::Half:
+    case clang::BuiltinType::LongDouble:
+    case clang::BuiltinType::NullPtr:
+      return OmissionTypeName();
+
+    // Objective-C types that aren't mapped directly; rather, pointers to
+    // these types will be mapped.
+    case clang::BuiltinType::ObjCClass:
+    case clang::BuiltinType::ObjCId:
+    case clang::BuiltinType::ObjCSel:
+      return OmissionTypeName();
+
+    // OpenCL types that don't have Swift equivalents.
+    case clang::BuiltinType::OCLImage1d:
+    case clang::BuiltinType::OCLImage1dArray:
+    case clang::BuiltinType::OCLImage1dBuffer:
+    case clang::BuiltinType::OCLImage2d:
+    case clang::BuiltinType::OCLImage2dArray:
+    case clang::BuiltinType::OCLImage2dDepth:
+    case clang::BuiltinType::OCLImage2dArrayDepth:
+    case clang::BuiltinType::OCLImage2dMSAA:
+    case clang::BuiltinType::OCLImage2dArrayMSAA:
+    case clang::BuiltinType::OCLImage2dMSAADepth:
+    case clang::BuiltinType::OCLImage2dArrayMSAADepth:
+    case clang::BuiltinType::OCLImage3d:
+    case clang::BuiltinType::OCLSampler:
+    case clang::BuiltinType::OCLEvent:
+    case clang::BuiltinType::OCLClkEvent:
+    case clang::BuiltinType::OCLQueue:
+    case clang::BuiltinType::OCLNDRange:
+    case clang::BuiltinType::OCLReserveID:
+      return OmissionTypeName();
+
+    // OpenMP types that don't have Swift equivalents.
+    case clang::BuiltinType::OMPArraySection:
+      return OmissionTypeName();
     }
   }
 
