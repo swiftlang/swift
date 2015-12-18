@@ -56,6 +56,7 @@ class SILValue;
 class SILInstruction;
 class ValueBase;
 class SideEffectAnalysis;
+class EscapeAnalysis;
 
 /// This class is a simple wrapper around an alias analysis cache. This is
 /// needed since we do not have an "analysis" infrastructure.
@@ -91,6 +92,7 @@ public:
 private:
   SILModule *Mod;
   SideEffectAnalysis *SEA;
+  EscapeAnalysis *EA;
 
   using TBAACacheKey = std::pair<SILType, SILType>;
 
@@ -140,7 +142,7 @@ private:
 
 public:
   AliasAnalysis(SILModule *M) :
-    SILAnalysis(AnalysisKind::Alias), Mod(M), SEA(nullptr) {}
+    SILAnalysis(AnalysisKind::Alias), Mod(M), SEA(nullptr), EA(nullptr) {}
 
   static bool classof(const SILAnalysis *S) {
     return S->getKind() == AnalysisKind::Alias;
