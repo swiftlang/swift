@@ -1,0 +1,20 @@
+// RUN: %target-sil-opt %s | %target-sil-opt | FileCheck %s
+sil_stage raw
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: sil @undef_in_switch_value_case : $@convention(thin) () -> ()
+sil @undef_in_switch_value_case : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int1, 0
+  // CHECK: case undef: bb1
+  switch_value %0 : $Builtin.Int1, case undef: bb1
+bb1:
+  %1 = function_ref @undef_in_switch_value_case : $@convention(thin) () -> ()
+  // CHECK: case undef: bb2
+  switch_value %1 : $@convention(thin) () -> (), case undef: bb2
+bb2:
+  %2 = tuple ()
+  return %2 : $()
+}
