@@ -2,7 +2,7 @@
 
 import re
 
-from pygments.lexer import Lexer, RegexLexer, include, bygroups, using, this, do_insertions
+from pygments.lexer import RegexLexer, include, bygroups
 from pygments.token import *
 
 __all__ = ['SwiftLexer', 'SwiftConsoleLexer']

@@ -3,7 +3,6 @@
 import os
 import sys
 import argparse
-import itertools
 import json
 import textwrap
 

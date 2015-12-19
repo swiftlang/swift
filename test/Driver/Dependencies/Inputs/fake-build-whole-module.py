@@ -5,7 +5,6 @@
 from __future__ import print_function
 
 import os
-import shutil
 import sys
 
 assert sys.argv[1] == '-frontend'

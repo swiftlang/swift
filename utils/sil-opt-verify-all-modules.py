@@ -17,7 +17,6 @@ import argparse
 import glob
 import multiprocessing
 import os
-import shutil
 import subprocess
 import sys
 import tempfile

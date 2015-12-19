@@ -38,7 +38,6 @@ from __future__ import print_function
 
 import subprocess
 import numpy
-import time
 import re
 import os
 import sys

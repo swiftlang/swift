@@ -14,7 +14,6 @@
 
 from __future__ import print_function
 
-import subprocess
 import json
 import argparse
 import sys
