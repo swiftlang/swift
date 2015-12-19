@@ -131,6 +131,7 @@ KNOWN_SETTINGS=(
     skip-test-watchos-simulator  ""              "set to skip testing Swift stdlibs for Apple watchOS simulators (i.e. test devices only)"
     skip-test-validation        ""               "set to skip validation test suite"
     skip-test-optimized         ""               "set to skip testing the test suite in optimized mode"
+    skip-test-sourcekit         ""               "set to skip testing SourceKit"
     stress-test-sourcekit       ""               "set to run the stress-SourceKit target"
     xcode-ide-only              ""               "set to configure Xcode project for IDE use only, not building"
     workspace                   "${HOME}/src"    "source directory containing llvm, clang, swift"
@@ -1496,6 +1497,13 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
         -DSWIFT_RUNTIME_ENABLE_DTRACE:BOOL=$(true_false "${SWIFT_RUNTIME_ENABLE_DTRACE}")
         -DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER:BOOL=$(true_false "${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
     )
+
+    if [[ "${SKIP_TEST_SOURCEKIT}" ]] ; then
+        swift_cmake_options=(
+            "${swift_cmake_options[@]}"
+            -DSWIFT_ENABLE_SOURCEKIT_TESTS:BOOL=FALSE
+        )
+    fi
 
     for product in "${PRODUCTS[@]}"; do
         unset skip_build
