@@ -11,7 +11,7 @@ fi
 MODE="$1"
 PACKAGE="$2"
 
-if [ \! "$PACKAGE" ]; then
+if [ ! "$PACKAGE" ]; then
   echo "No package name! Usage: $0 [install|uninstall] package.tar.gz"
   exit 1
 fi
