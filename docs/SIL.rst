@@ -424,7 +424,7 @@ number of ways:
 - A SIL function type declares its conventional treatment of its
   context value:
 
-  - If it is ``@thin``, the function requires no context value.
+  - If it is ``@convention(thin)``, the function requires no context value.
 
   - If it is ``@callee_owned``, the context value is treated as an
     owned direct parameter.
@@ -864,16 +864,17 @@ partial application level. For a curried function declaration::
 The declaration references and types for the different uncurry levels are as
 follows::
 
-  #example.foo!0 : $@thin (x:A) -> (y:B) -> (z:C) -> D
-  #example.foo!1 : $@thin ((y:B), (x:A)) -> (z:C) -> D
-  #example.foo!2 : $@thin ((z:C), (y:B), (x:A)) -> D
+  #example.foo!0 : $@convention(thin) (x:A) -> (y:B) -> (z:C) -> D
+  #example.foo!1 : $@convention(thin) ((y:B), (x:A)) -> (z:C) -> D
+  #example.foo!2 : $@convention(thin) ((z:C), (y:B), (x:A)) -> D
 
 The deepest uncurry level is referred to as the **natural uncurry level**. In
 this specific example, the reference at the natural uncurry level is
 ``#example.foo!2``.  Note that the uncurried argument clauses are composed
 right-to-left, as specified in the `calling convention`_. For uncurry levels
-less than the uncurry level, the entry point itself is ``@thin`` but returns a
-thick function value carrying the partially applied arguments for its context.
+less than the uncurry level, the entry point itself is ``@convention(thin)`` but
+returns a thick function value carrying the partially applied arguments for its
+context.
 
 `Dynamic dispatch`_ instructions such as ``class method`` require their method
 declaration reference to be uncurried to at least uncurry level 1 (which applies
@@ -1007,9 +1008,9 @@ implements the method for that class::
     func bas()
   }
 
-  sil @A_foo : $@thin (@owned A) -> ()
-  sil @A_bar : $@thin (@owned A) -> ()
-  sil @A_bas : $@thin (@owned A) -> ()
+  sil @A_foo : $@convention(thin) (@owned A) -> ()
+  sil @A_bar : $@convention(thin) (@owned A) -> ()
+  sil @A_bas : $@convention(thin) (@owned A) -> ()
 
   sil_vtable A {
     #A.foo!1: @A_foo
@@ -1021,7 +1022,7 @@ implements the method for that class::
     func bar()
   }
 
-  sil @B_bar : $@thin (@owned B) -> ()
+  sil @B_bar : $@convention(thin) (@owned B) -> ()
 
   sil_vtable B {
     #A.foo!1: @A_foo
@@ -1033,7 +1034,7 @@ implements the method for that class::
     func bas()
   }
 
-  sil @C_bas : $@thin (@owned C) -> ()
+  sil @C_bas : $@convention(thin) (@owned C) -> ()
 
   sil_vtable C {
     #A.foo!1: @A_foo
@@ -1192,7 +1193,7 @@ Calling Convention
 
 This section describes how Swift functions are emitted in SIL.
 
-Swift Calling Convention @cc(swift)
+Swift Calling Convention @convention(swift)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Swift calling convention is the one used by default for native Swift
@@ -1393,7 +1394,7 @@ gets lowered to SIL as::
     return
   }
 
-Swift Method Calling Convention @cc(method)
+Swift Method Calling Convention @convention(method)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The method calling convention is currently identical to the freestanding
@@ -1408,7 +1409,7 @@ passed last::
 
   sil @Foo_method_1 : $((x : Int), @inout Foo) -> Int { ... }
 
-Witness Method Calling Convention @cc(witness_method)
+Witness Method Calling Convention @convention(witness_method)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The witness method calling convention is used by protocol witness methods in
@@ -1420,7 +1421,7 @@ witnesses must be polymorphically dispatchable on their ``Self`` type,
 the ``Self``-related metadata for a witness must be passed in a maximally
 abstracted manner.
 
-C Calling Convention @cc(cdecl)
+C Calling Convention @convention(c)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In Swift's C module importer, C types are always mapped to Swift types
@@ -1431,7 +1432,7 @@ platform calling convention.
 
 SIL (and therefore Swift) cannot currently invoke variadic C functions.
 
-Objective-C Calling Convention @cc(objc_method)
+Objective-C Calling Convention @convention(objc_method)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Reference Counts
@@ -1523,7 +1524,7 @@ return a class reference::
 
   bb0(%0 : $MyClass):
     %1 = class_method %0 : $MyClass, #MyClass.foo!1
-    %2 = apply %1(%0) : $@cc(method) @thin (@guaranteed MyClass) -> @owned MyOtherClass
+    %2 = apply %1(%0) : $@convention(method) (@guaranteed MyClass) -> @owned MyOtherClass
     // use of %2 goes here; no use of %1
     strong_release %2 : $MyOtherClass
     strong_release %1 : $MyClass
@@ -2392,8 +2393,8 @@ function_ref
 
   sil-instruction ::= 'function_ref' sil-function-name ':' sil-type
 
-  %1 = function_ref @function : $@thin T -> U
-  // $@thin T -> U must be a thin function type
+  %1 = function_ref @function : $@convention(thin) T -> U
+  // $@convention(thin) T -> U must be a thin function type
   // %1 has type $T -> U
 
 Creates a reference to a SIL function.
@@ -2483,7 +2484,7 @@ class_method
   sil-instruction ::= 'class_method' sil-method-attributes?
                         sil-operand ',' sil-decl-ref ':' sil-type
 
-  %1 = class_method %0 : $T, #T.method!1 : $@thin U -> V
+  %1 = class_method %0 : $T, #T.method!1 : $@convention(thin) U -> V
   // %0 must be of a class type or class metatype $T
   // #T.method!1 must be a reference to a dynamically-dispatched method of T or
   // of one of its superclasses, at uncurry level >= 1
@@ -2512,11 +2513,11 @@ super_method
   sil-instruction ::= 'super_method' sil-method-attributes?
                         sil-operand ',' sil-decl-ref ':' sil-type
   
-  %1 = super_method %0 : $T, #Super.method!1.foreign : $@thin U -> V
+  %1 = super_method %0 : $T, #Super.method!1.foreign : $@convention(thin) U -> V
   // %0 must be of a non-root class type or class metatype $T
   // #Super.method!1.foreign must be a reference to an ObjC method of T's
   // superclass or of one of its ancestor classes, at uncurry level >= 1
-  // %1 will be of type $@thin U -> V
+  // %1 will be of type $@convention(thin) U -> V
 
 Looks up a method in the superclass of a class or class metatype instance.
 Note that for native Swift methods, ``super.method`` calls are statically
@@ -2532,13 +2533,13 @@ witness_method
                         sil-type ',' sil-decl-ref ':' sil-type
 
   %1 = witness_method $T, #Proto.method!1 \
-    : $@thin @cc(witness_method) <Self: Proto> U -> V
+    : $@convention(witness_method) <Self: Proto> U -> V
   // $T must be an archetype
   // #Proto.method!1 must be a reference to a method of one of the protocol
   //   constraints on T
   // <Self: Proto> U -> V must be the type of the referenced method,
   //   generic on Self
-  // %1 will be of type $@thin <Self: Proto> U -> V
+  // %1 will be of type $@convention(thin) <Self: Proto> U -> V
 
 Looks up the implementation of a protocol method for a generic type variable
 constrained by that protocol. The result will be generic on the ``Self``
@@ -2553,13 +2554,13 @@ dynamic_method
   sil-instruction ::= 'dynamic_method' sil-method-attributes?
                       sil-operand ',' sil-decl-ref ':' sil-type
 
-  %1 = dynamic_method %0 : $P, #X.method!1 : $@thin U -> V
+  %1 = dynamic_method %0 : $P, #X.method!1 : $@convention(thin) U -> V
   // %0 must be of a protocol or protocol composition type $P,
   // where $P contains the Swift.DynamicLookup protocol
   // #X.method!1 must be a reference to an @objc method of any class
   // or protocol type
   //
-  // The "self" argument of the method type $@thin U -> V must be 
+  // The "self" argument of the method type $@convention(thin) U -> V must be 
   //   Builtin.ObjCPointer
 
 Looks up the implementation of an Objective-C method with the same
@@ -2685,28 +2686,30 @@ curried function in Swift::
 emits curry thunks in SIL as follows (retains and releases omitted for
 clarity)::
 
-  func @foo : $@thin A -> B -> C -> D -> E {
+  func @foo : $@convention(thin) A -> B -> C -> D -> E {
   entry(%a : $A):
-    %foo_1 = function_ref @foo_1 : $@thin (B, A) -> C -> D -> E
-    %thunk = partial_apply %foo_1(%a) : $@thin (B, A) -> C -> D -> E
+    %foo_1 = function_ref @foo_1 : $@convention(thin) (B, A) -> C -> D -> E
+    %thunk = partial_apply %foo_1(%a) : $@convention(thin) (B, A) -> C -> D -> E
     return %thunk : $B -> C -> D -> E
   }
 
-  func @foo_1 : $@thin (B, A) -> C -> D -> E {
+  func @foo_1 : $@convention(thin) (B, A) -> C -> D -> E {
   entry(%b : $B, %a : $A):
-    %foo_2 = function_ref @foo_2 : $@thin (C, B, A) -> D -> E
-    %thunk = partial_apply %foo_2(%b, %a) : $@thin (C, B, A) -> D -> E
+    %foo_2 = function_ref @foo_2 : $@convention(thin) (C, B, A) -> D -> E
+    %thunk = partial_apply %foo_2(%b, %a) \
+      : $@convention(thin) (C, B, A) -> D -> E
     return %thunk : $(B, A) -> C -> D -> E
   }
 
-  func @foo_2 : $@thin (C, B, A) -> D -> E {
+  func @foo_2 : $@convention(thin) (C, B, A) -> D -> E {
   entry(%c : $C, %b : $B, %a : $A):
-    %foo_3 = function_ref @foo_3 : $@thin (D, C, B, A) -> E
-    %thunk = partial_apply %foo_3(%c, %b, %a) : $@thin (D, C, B, A) -> E
+    %foo_3 = function_ref @foo_3 : $@convention(thin) (D, C, B, A) -> E
+    %thunk = partial_apply %foo_3(%c, %b, %a) \
+      : $@convention(thin) (D, C, B, A) -> E
     return %thunk : $(C, B, A) -> D -> E
   }
 
-  func @foo_3 : $@thin (D, C, B, A) -> E {
+  func @foo_3 : $@convention(thin) (D, C, B, A) -> E {
   entry(%d : $D, %c : $C, %b : $B, %a : $A):
     // ... body of foo ...
   }
@@ -2723,12 +2726,12 @@ following example::
 
 lowers to an uncurried entry point and is curried in the enclosing function::
   
-  func @bar : $@thin (Int, @box Int, *Int) -> Int {
+  func @bar : $@convention(thin) (Int, @box Int, *Int) -> Int {
   entry(%y : $Int, %x_box : $@box Int, %x_address : $*Int):
     // ... body of bar ...
   }
 
-  func @foo : $@thin Int -> Int {
+  func @foo : $@convention(thin) Int -> Int {
   entry(%x : $Int):
     // Create a box for the 'x' variable
     %x_box = alloc_box $Int
