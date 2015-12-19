@@ -190,9 +190,23 @@ namespace {
     SmallVector<VarDecl*, 8> AllStoredProperties;
     SmallVector<FieldAccess, 8> AllFieldAccesses;
     unsigned NumInherited = 0;
-    bool IsMetadataResilient = false;
-    bool IsObjectResilient = false;
-    bool IsObjectGenericallyArranged = false;
+
+    // Does the superclass have a fixed number of stored properties?
+    // If not, and the class has generally-dependent layout, we have to
+    // access stored properties through an indirect offset into the field
+    // offset vector.
+    bool ClassHasFixedFieldCount = true;
+
+    // Does the class have a fixed size up until the current point?
+    // If not, we have to access stored properties either ivar offset globals,
+    // or through the field offset vector, based on whether the layout has
+    // dependent layout.
+    bool ClassHasFixedSize = true;
+
+    // Does the class have identical layout under all generic substitutions?
+    // If not, we can have to access stored properties through the field
+    // offset vector in the instantiated type metadata.
+    bool ClassHasConcreteLayout = true;
 
   public:
     ClassLayoutBuilder(IRGenModule &IGM, ClassDecl *theClass)
@@ -236,16 +250,33 @@ namespace {
         auto superclass = superclassType.getClassOrBoundGenericClass();
         assert(superclass);
 
-        // Recur.
-        addFieldsForClass(superclass, superclassType);
-        // Count the fields we got from the superclass.
-        NumInherited = Elements.size();
+        if (superclass->hasClangNode()) {
+          // As a special case, assume NSObject has a fixed layout.
+          if (superclass->getName() != IGM.Context.Id_NSObject) {
+            // If the superclass was imported from Objective-C, its size is
+            // not known at compile time. However, since the field offset
+            // vector only stores offsets of stored properties defined in
+            // Swift, we don't have to worry about indirect indexing of
+            // the field offset vector.
+            ClassHasFixedSize = false;
+          }
+        } else if (IGM.isResilient(superclass, ResilienceScope::Component)) {
+          // If the superclass is resilient, the number of stored properties
+          // is not known at compile time.
+          ClassHasFixedFieldCount = false;
+          ClassHasFixedSize = false;
 
-        // If the superclass is resilient, the count of stored properties
-        // and their offsets are not known at compile time.
-        if (IGM.isResilient(superclass, ResilienceScope::Component)) {
-          IsObjectResilient = true;
-          IsMetadataResilient = true;
+          // If the superclass is in a generic context, conservatively
+          // assume the layout depends on generic parameters, since we
+          // can't look at stored properties.
+          if (superclass->isGenericContext())
+            ClassHasConcreteLayout = false;
+        } else {
+          // Otherwise, we have total knowledge of the class and its
+          // fields, so walk them to compute the layout.
+          addFieldsForClass(superclass, superclassType);
+          // Count the fields we got from the superclass.
+          NumInherited = Elements.size();
         }
       }
 
@@ -260,13 +291,10 @@ namespace {
         auto &eltType = IGM.getTypeInfo(type);
 
         if (!eltType.isFixedSize()) {
-          // If the field type is not fixed-size, the size either depends
-          // on generic parameters, or resilient types. In the former case,
-          // we store field offsets in type metadata.
           if (type.hasArchetype())
-            IsObjectGenericallyArranged = true;
+            ClassHasConcreteLayout = false;
           
-          IsObjectResilient = true;
+          ClassHasFixedSize = false;
         }
 
         Elements.push_back(ElementLayout::getIncomplete(eltType));
@@ -276,17 +304,30 @@ namespace {
     }
 
     FieldAccess getCurFieldAccess() const {
-      if (IsObjectGenericallyArranged) {
-        if (IsMetadataResilient) {
-          return FieldAccess::NonConstantIndirect;
+      if (ClassHasConcreteLayout) {
+        if (ClassHasFixedSize) {
+          // No generic parameter dependencies, fixed size. The field offset
+          // is known at compile time.
+          return FieldAccess::ConstantDirect;
         } else {
-          return FieldAccess::ConstantIndirect;
+          // No generic parameter dependencies, but some stored properties
+          // have unknown size. The field offset is stored in a global constant
+          // and set up by the Objective-C or Swift runtime, depending on the
+          // class's heritage.
+          return FieldAccess::NonConstantDirect;
         }
       } else {
-        if (IsObjectResilient) {
-          return FieldAccess::NonConstantDirect;
+        if (ClassHasFixedFieldCount) {
+          // Layout depends on generic parameters, but the number of fields
+          // is known. The field offset is loaded from a fixed offset in the
+          // field offset vector in type metadata.
+          return FieldAccess::ConstantIndirect;
         } else {
-          return FieldAccess::ConstantDirect;
+          // Layout depends on generic parameters, and the number of fields
+          // is not known at compile time either. The field index is loaded
+          // from a global variable set up by the runtime, and then this
+          // index is used to load the offset from the field offset vector.
+          return FieldAccess::NonConstantIndirect;
         }
       }
     }
