@@ -192,11 +192,14 @@ public:
       llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo);
 
 private:
+  void processBlockBottomUpPredTerminators(const LoopRegion *R,
+                                           AliasAnalysis *AA,
+                                           LoopRegionFunctionInfo *LRFI);
   bool processBlockBottomUp(
-    SILBasicBlock &BB, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
-    bool FreezeOwnedArgEpilogueReleases,
-    ConsumedArgToEpilogueReleaseMatcher &ConsumedArgToReleaseMap,
-    BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap);
+      const LoopRegion *R, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
+      LoopRegionFunctionInfo *LRFI, bool FreezeOwnedArgEpilogueReleases,
+      ConsumedArgToEpilogueReleaseMatcher &ConsumedArgToReleaseMap,
+      BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap);
   bool processLoopBottomUp(
       const LoopRegion *R, AliasAnalysis *AA, LoopRegionFunctionInfo *LRFI,
       llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo);

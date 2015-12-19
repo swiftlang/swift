@@ -11,6 +11,8 @@ import Builtin
 
 sil @user : $@convention(thin) (@box Builtin.Int32) -> ()
 
+sil @owned_user : $@convention(thin) (@owned @box Builtin.Int32) -> ()
+
 struct S {
   var x : Builtin.NativeObject
 }
@@ -1704,12 +1706,11 @@ bb3:
   return %9999 : $()
 }
 
-// We can not ignore this branch since bb3 uses %0.
+// We can ignore this branch since bb3's use of %0 is dead.
 //
 // CHECK-LABEL: sil @branch_use3 : $@convention(thin) (@box Builtin.Int32) -> () {
-// CHECK: strong_retain
-// CHECK: strong_retain
-// CHECK: strong_release
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
 sil @branch_use3 : $@convention(thin) (@box Builtin.Int32) -> () {
 bb0(%0 : $@box Builtin.Int32):
   cond_br undef, bb1, bb2
@@ -1756,12 +1757,13 @@ bb3:
   return %9999 : $()
 }
 
-// Make sure that we do not ignore the cond_br and do not try to compare the
-// pointer with the Builtin.Int1 arg.
+// In this case, we can eliminate the retain, release pair since a cond_br does
+// not have any side-effects and is effectively a dead PHI. LLVM will clean up
+// the use if we do not.
 //
 // CHECK-LABEL: sil @cond_branch_use2 : $@convention(thin) (@box Builtin.Int32) -> () {
-// CHECK: strong_retain
-// CHECK: strong_release
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
 sil @cond_branch_use2 : $@convention(thin) (@box Builtin.Int32) -> () {
 bb0(%0 : $@box Builtin.Int32):
   strong_retain %0 : $@box Builtin.Int32
@@ -1783,8 +1785,8 @@ bb3:
 }
 
 // CHECK-LABEL: sil @cond_branch_use3 : $@convention(thin) (@box Builtin.Int32) -> () {
-// CHECK: strong_retain
-// CHECK: strong_release
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
 sil @cond_branch_use3 : $@convention(thin) (@box Builtin.Int32) -> () {
 bb0(%0 : $@box Builtin.Int32):
   strong_retain %0 : $@box Builtin.Int32
@@ -2002,14 +2004,14 @@ bb0:
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [fragile] @try_apply_test : $@convention(thin) (Builtin.NativeObject) -> @error ErrorType {
+// CHECK-LABEL: sil [fragile] @try_apply_test_1 : $@convention(thin) (Builtin.NativeObject) -> @error ErrorType {
 // CHECK: bb0
 // CHECK: strong_retain
 // CHECK: bb1
 // CHECK: strong_release
 // CHECK: bb2
 // CHECK: strong_release
-sil [fragile] @try_apply_test : $@convention(thin) (Builtin.NativeObject) -> @error ErrorType {
+sil [fragile] @try_apply_test_1 : $@convention(thin) (Builtin.NativeObject) -> @error ErrorType {
 bb0(%0 : $Builtin.NativeObject):
   strong_retain %0 : $Builtin.NativeObject
   %1 = function_ref @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorType
@@ -2024,3 +2026,27 @@ bb2(%3 : $ErrorType):
   throw %3 : $ErrorType
 }
 
+// CHECK-LABEL: sil [fragile] @try_apply_test_2 : $@convention(thin) (Builtin.NativeObject) -> @error ErrorType {
+// CHECK: bb0(
+// CHECK: strong_retain
+// CHECK: try_apply
+// CHECK: bb1(
+// CHECK: strong_release
+// CHECK: bb2(
+// CHECK: strong_release
+sil [fragile] @try_apply_test_2 : $@convention(thin) (Builtin.NativeObject) -> @error ErrorType {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  %1 = function_ref @guaranteed_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %2 = function_ref @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorType
+  try_apply %2(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorType, normal bb1, error bb2
+
+bb1(%3 : $()):
+  strong_release %0 : $Builtin.NativeObject
+  return undef : $()
+
+bb2(%4 : $ErrorType):
+  strong_release %0 : $Builtin.NativeObject
+  throw %4 : $ErrorType
+}

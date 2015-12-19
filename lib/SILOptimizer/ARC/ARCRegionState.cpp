@@ -158,13 +158,82 @@ void ARCRegionState::mergePredTopDown(ARCRegionState &PredRegionState) {
 // Bottom Up Dataflow
 //
 
+static bool isARCSignificantTerminator(TermInst *TI) {
+  switch (TI->getTermKind()) {
+  case TermKind::Invalid:
+    llvm_unreachable("Expected a TermInst");
+  case TermKind::UnreachableInst:
+  // br is a forwarding use for its arguments. It can not in of itself extend
+  // the lifetime of an object (just like a phi-node) can not.
+  case TermKind::BranchInst:
+  // A cond_br is a forwarding use for its non-operand arguments in a similar
+  // way to br. Its operand must be an i1 that has a different lifetime from any
+  // ref counted object.
+  case TermKind::CondBranchInst:
+    return false;
+  // Be conservative for now. These actually perform some sort of operation
+  // against the operand or can use the value in some way.
+  case TermKind::ThrowInst:
+  case TermKind::ReturnInst:
+  case TermKind::TryApplyInst:
+  case TermKind::SwitchValueInst:
+  case TermKind::SwitchEnumInst:
+  case TermKind::SwitchEnumAddrInst:
+  case TermKind::DynamicMethodBranchInst:
+  case TermKind::CheckedCastBranchInst:
+  case TermKind::CheckedCastAddrBranchInst:
+    return true;
+  }
+}
+
+// Visit each one of our predecessor regions and see if any are blocks that can
+// use reference counted values. If any of them do, we advance the sequence for
+// the pointer and create an insertion point here. This state will be propagated
+// into all of our predecessors, allowing us to be conservatively correct in all
+// cases.
+//
+// The key thing to notice is that in general this can not happen due to
+// critical edge splitting. To trigger this, one would need a terminator that
+// uses a reference counted value and only has one successor due to critical
+// edge splitting. This is just to be conservative when faced with the unknown
+// of future changes.
+//
+// We do not need to worry about loops here, since a loop exit block can only
+// have predecessors in the loop itself implying that loop exit blocks at the
+// loop region level always have only one predecessor, the loop itself.
+void ARCRegionState::processBlockBottomUpPredTerminators(
+    const LoopRegion *R, AliasAnalysis *AA, LoopRegionFunctionInfo *LRFI) {
+  auto &BB = *R->getBlock();
+  llvm::TinyPtrVector<SILInstruction *> PredTerminators;
+  for (unsigned PredID : R->getPreds()) {
+    auto *PredRegion = LRFI->getRegion(PredID);
+    if (!PredRegion->isBlock())
+      continue;
+
+    auto *TermInst = PredRegion->getBlock()->getTerminator();
+    if (!isARCSignificantTerminator(TermInst))
+      continue;
+    PredTerminators.push_back(TermInst);
+  }
+
+  auto *InsertPt = &*BB.begin();
+  for (auto &OtherState : getBottomupStates()) {
+    // If the other state's value is blotted, skip it.
+    if (!OtherState.hasValue())
+      continue;
+
+    OtherState->second.updateForPredTerminators(PredTerminators, InsertPt, AA);
+  }
+}
+
 bool ARCRegionState::processBlockBottomUp(
-    SILBasicBlock &BB, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
-    bool FreezeOwnedArgEpilogueReleases,
+    const LoopRegion *R, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
+    LoopRegionFunctionInfo *LRFI, bool FreezeOwnedArgEpilogueReleases,
     ConsumedArgToEpilogueReleaseMatcher &ConsumedArgToReleaseMap,
     BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap) {
   DEBUG(llvm::dbgs() << ">>>> Bottom Up!\n");
 
+  SILBasicBlock &BB = *R->getBlock();
   bool NestingDetected = false;
 
   BottomUpDataflowRCStateVisitor<ARCRegionState> DataflowVisitor(
@@ -210,6 +279,13 @@ bool ARCRegionState::processBlockBottomUp(
       OtherState->second.updateForSameLoopInst(&I, InsertPt, AA);
     }
   }
+
+  // Now visit each one of our predecessor regions and see if any are blocks
+  // that can use reference counted values. If any of them do, we advance the
+  // sequence for the pointer and create an insertion point here. This state
+  // will be propagated into all of our predecessors, allowing us to be
+  // conservatively correct in all cases.
+  processBlockBottomUpPredTerminators(R, AA, LRFI);
 
   return NestingDetected;
 }
@@ -285,10 +361,8 @@ bool ARCRegionState::processBottomUp(
   if (!R->isBlock())
     return processLoopBottomUp(R, AA, LRFI, RegionStateInfo);
 
-  return processBlockBottomUp(*R->getBlock(), AA, RCIA,
-                              FreezeOwnedArgEpilogueReleases,
-                              ConsumedArgToReleaseMap,
-                              IncToDecStateMap);
+  return processBlockBottomUp(R, AA, RCIA, LRFI, FreezeOwnedArgEpilogueReleases,
+                              ConsumedArgToReleaseMap, IncToDecStateMap);
 }
 
 //===---

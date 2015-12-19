@@ -198,6 +198,36 @@ bool ARCSequenceDataflowEvaluator::processTopDown() {
 //                             Bottom Up Dataflow
 //===----------------------------------------------------------------------===//
 
+// This is temporary code duplication. This will be removed when Loop ARC is
+// finished and Block ARC is removed.
+static bool isARCSignificantTerminator(TermInst *TI) {
+  switch (TI->getTermKind()) {
+  case TermKind::Invalid:
+    llvm_unreachable("Expected a TermInst");
+  case TermKind::UnreachableInst:
+  // br is a forwarding use for its arguments. It can not in of itself extend
+  // the lifetime of an object (just like a phi-node) can not.
+  case TermKind::BranchInst:
+  // A cond_br is a forwarding use for its non-operand arguments in a similar
+  // way to br. Its operand must be an i1 that has a different lifetime from any
+  // ref counted object.
+  case TermKind::CondBranchInst:
+    return false;
+  // Be conservative for now. These actually perform some sort of operation
+  // against the operand or can use the value in some way.
+  case TermKind::ThrowInst:
+  case TermKind::ReturnInst:
+  case TermKind::TryApplyInst:
+  case TermKind::SwitchValueInst:
+  case TermKind::SwitchEnumInst:
+  case TermKind::SwitchEnumAddrInst:
+  case TermKind::DynamicMethodBranchInst:
+  case TermKind::CheckedCastBranchInst:
+  case TermKind::CheckedCastAddrBranchInst:
+    return true;
+  }
+}
+
 /// Analyze a single BB for refcount inc/dec instructions.
 ///
 /// If anything was found it will be added to DecToIncStateMap.
@@ -264,6 +294,31 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
 
       OtherState->second.updateForSameLoopInst(&I, InsertPt, AA);
     }
+  }
+
+  // This is ignoring the possibility that we may have a loop with an
+  // interesting terminator but for which, we are going to clear all state
+  // (since it is a loop boundary). We may in such a case, be too conservative
+  // with our other predecessors. Luckily this can not happen since cond_br is
+  // the only terminator that allows for critical edges and all other
+  // "interesting terminators" always having multiple successors. This means
+  // that this block could not have multiple predecessors since otherwise, the
+  // edge would be broken.
+  llvm::TinyPtrVector<SILInstruction *> PredTerminators;
+  for (SILBasicBlock *PredBB : BB.getPreds()) {
+    auto *TermInst = PredBB->getTerminator();
+    if (!isARCSignificantTerminator(TermInst))
+      continue;
+    PredTerminators.push_back(TermInst);
+  }
+
+  auto *InsertPt = &*BB.begin();
+  for (auto &OtherState : BBState.getBottomupStates()) {
+    // If the other state's value is blotted, skip it.
+    if (!OtherState.hasValue())
+      continue;
+
+    OtherState->second.updateForPredTerminators(PredTerminators, InsertPt, AA);
   }
 
   return NestingDetected;
