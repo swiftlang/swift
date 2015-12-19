@@ -3138,32 +3138,36 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 
         if (intTy) {
           // If it is a switch on an integer type, check that all case values
-          // are integer literals.
-          auto *IL = dyn_cast<IntegerLiteralInst>(CaseVal);
-          if (!IL) {
-            P.diagnose(P.Tok, diag::sil_integer_literal_not_integer_type);
-            return true;
-          }
-          APInt CaseValue = IL->getValue();
+          // are integer literals or undef.
+          if (!isa<SILUndef>(CaseVal))  {
+            auto *IL = dyn_cast<IntegerLiteralInst>(CaseVal);
+            if (!IL) {
+              P.diagnose(P.Tok, diag::sil_integer_literal_not_integer_type);
+              return true;
+            }
+            APInt CaseValue = IL->getValue();
 
-          if (CaseValue.getBitWidth() != intTy->getGreatestWidth())
-            CaseVal = B.createIntegerLiteral(
-                IL->getLoc(), Val.getType(),
-                CaseValue.zextOrTrunc(intTy->getGreatestWidth()));
+            if (CaseValue.getBitWidth() != intTy->getGreatestWidth())
+              CaseVal = B.createIntegerLiteral(
+                  IL->getLoc(), Val.getType(),
+                  CaseValue.zextOrTrunc(intTy->getGreatestWidth()));
+          }
         }
 
         if (functionTy) {
           // If it is a switch on a function type, check that all case values
-          // are function references.
-          auto *FR = dyn_cast<FunctionRefInst>(CaseVal);
-          if (!FR) {
-            if (auto *CF = dyn_cast<ConvertFunctionInst>(CaseVal)) {
-              FR = dyn_cast<FunctionRefInst>(CF->getOperand());
+          // are function references or undef.
+          if (!isa<SILUndef>(CaseVal)) {
+            auto *FR = dyn_cast<FunctionRefInst>(CaseVal);
+            if (!FR) {
+              if (auto *CF = dyn_cast<ConvertFunctionInst>(CaseVal)) {
+                FR = dyn_cast<FunctionRefInst>(CF->getOperand());
+              }
             }
-          }
-          if (!FR) {
-            P.diagnose(P.Tok, diag::sil_integer_literal_not_integer_type);
-            return true;
+            if (!FR) {
+              P.diagnose(P.Tok, diag::sil_integer_literal_not_integer_type);
+              return true;
+            }
           }
         }
 
