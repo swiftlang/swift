@@ -35,17 +35,17 @@ argv=("$@")
 have_source_libraries=NO
 platform=""
 set -- "$@"
-while [[ $# > 0 ]]; do
+while [[ $# -gt 0 ]]; do
     case "$1" in
         --source-libraries)
             shift
-            if [[ $# > 0 ]]; then
+            if [[ $# -gt 0 ]]; then
                 have_source_libraries=YES
             fi
             ;;
         --platform)
             shift
-            if [[ $# > 0 ]]; then
+            if [[ $# -gt 0 ]]; then
                 platform="$1"
             fi
             ;;
