@@ -1194,7 +1194,7 @@ Calling Convention
 This section describes how Swift functions are emitted in SIL.
 
 Swift Calling Convention @convention(swift)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Swift calling convention is the one used by default for native Swift
 functions.
@@ -1395,7 +1395,7 @@ gets lowered to SIL as::
   }
 
 Swift Method Calling Convention @convention(method)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The method calling convention is currently identical to the freestanding
 function convention. Methods are considered to be curried functions, taking
@@ -1410,7 +1410,7 @@ passed last::
   sil @Foo_method_1 : $((x : Int), @inout Foo) -> Int { ... }
 
 Witness Method Calling Convention @convention(witness_method)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The witness method calling convention is used by protocol witness methods in
 `witness tables`_. It is identical to the ``method`` calling convention
@@ -1422,7 +1422,7 @@ the ``Self``-related metadata for a witness must be passed in a maximally
 abstracted manner.
 
 C Calling Convention @convention(c)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In Swift's C module importer, C types are always mapped to Swift types
 considered trivial by SIL. SIL does not concern itself with platform
@@ -1433,7 +1433,7 @@ platform calling convention.
 SIL (and therefore Swift) cannot currently invoke variadic C functions.
 
 Objective-C Calling Convention @convention(objc_method)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Reference Counts
 ````````````````
