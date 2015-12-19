@@ -25,6 +25,7 @@ public class OutsideParent {
 
 public class ResilientOutsideParent {
   public var property: String = "ResilientOutsideParent.property"
+  public final var finalProperty: String = "ResilientOutsideParent.finalProperty"
 
   public class var classProperty: String {
     return "ResilientOutsideParent.classProperty"
