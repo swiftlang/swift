@@ -155,8 +155,8 @@ def _get_preset_options_impl(config, substitutions, preset_name):
             # Split on newlines and filter out empty lines.
             mixins = filter(None, [m.strip() for m in a.splitlines()])
             for mixin in mixins:
-                (base_build_script_opts, \
-                    base_build_script_impl_opts, \
+                (base_build_script_opts,
+                    base_build_script_impl_opts,
                     base_missing_opts) = \
                     _get_preset_options_impl(config, substitutions, mixin)
                 build_script_opts += base_build_script_opts
@@ -187,7 +187,7 @@ def get_preset_options(substitutions, preset_file_names, preset_name):
         print_with_argv0("preset '" + preset_name + "' not found")
         sys.exit(1)
     if missing_opts:
-        print_with_argv0("missing option(s) for preset '" + preset_name + \
+        print_with_argv0("missing option(s) for preset '" + preset_name +
         "': " + ", ".join(missing_opts))
         sys.exit(1)
 

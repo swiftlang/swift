@@ -143,16 +143,16 @@ def main():
     outFile.write('digraph "CFG" {\n')
     for name, block in blocks.iteritems():
         if block.content is not None:
-            outFile.write("\tNode" + str(block.index) + \
+            outFile.write("\tNode" + str(block.index) +
                 " [shape=record,label=\"{" + block.content + "}\"];\n")
         else:
-            outFile.write("\tNode" + str(block.index) + \
-                " [shape=record,color=gray,fontcolor=gray,label=\"{" + \
+            outFile.write("\tNode" + str(block.index) +
+                " [shape=record,color=gray,fontcolor=gray,label=\"{" +
                 block.name + "}\"];\n")
 
         for succName in block.getSuccs():
             succBlock = blocks[succName]
-            outFile.write("\tNode" + str(block.index) + " -> Node" + \
+            outFile.write("\tNode" + str(block.index) + " -> Node" +
                 str(succBlock.index) + ";\n")
 
     outFile.write("}\n")
