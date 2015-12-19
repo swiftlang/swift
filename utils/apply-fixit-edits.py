@@ -48,7 +48,7 @@ def apply_edits(path):
     edits_per_file = {}
     for ed in edits_set:
         fname = ed[0]
-        if not fname in edits_per_file:
+        if fname not in edits_per_file:
             edits_per_file[fname] = []
         edits_per_file[fname].append((ed[1], ed[2], ed[3]))
     

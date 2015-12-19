@@ -121,7 +121,7 @@ def main():
     newBlocks = { }
     for name, block in blocks.iteritems():
         for adjName in (block.preds + block.getSuccs()):
-            if not adjName in blocks:
+            if adjName not in blocks:
                 newBlocks[adjName] = Block(adjName, None)
 
     blocks = dict(blocks.items() + newBlocks.items())
@@ -132,7 +132,7 @@ def main():
     for name, block in blocks.iteritems():
         for predName in block.preds:
             predBlock = blocks[predName]
-            if not name in predBlock.getSuccs():
+            if name not in predBlock.getSuccs():
                 predBlock.getSuccs().append(name)
 
     # Write the output dot file.
