@@ -235,6 +235,22 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       if (Tok.is(tok::colon)) {
         param.ColonLoc = consumeToken();
 
+        // Check if token is @ sign ergo an attribute
+        if (Tok.is(tok::at_sign)) {
+          Token nextToken = peekToken();
+          // Fix for SR215
+          // Check if attribute is invalid type attribute 
+          // and actually a declaration attribute
+          if (TypeAttributes::getAttrKindFromString(nextToken.getText()) == TAK_Count 
+              && DeclAttribute::getAttrKindFromString(nextToken.getText()) != TAK_Count) { 
+            SourceLoc AtLoc = consumeToken(tok::at_sign);
+            SourceLoc AttrLoc = consumeToken(tok::identifier);
+            diagnose(AtLoc, diag::decl_attribute_applied_to_type)
+              .fixItRemove(SourceRange(AtLoc, AttrLoc))
+              .fixItInsert(StartLoc, "@" + nextToken.getText().str()+" ");              
+          }
+        }
+
         auto type = parseType(diag::expected_parameter_type);
         status |= type;
         param.Type = type.getPtrOrNull();
