@@ -68,7 +68,7 @@ def obtain_additional_swift_sources(opts = {'with_ssh': False}):
         with WorkingDirectory(SWIFT_SOURCE_ROOT):
             if not os.path.isdir(os.path.join(dir_name, ".git")):
                 print("--- Cloning '" + dir_name + "' ---")
-                if opts['with_ssh'] == True:
+                if opts['with_ssh'] is True:
                     remote = "git@github.com:" + repo + '.git'
                 else:
                     remote = "https://github.com/" + repo + '.git'
