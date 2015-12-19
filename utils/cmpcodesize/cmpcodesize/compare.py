@@ -194,7 +194,7 @@ def listFunctionSizes(sizeArray):
     for pair in sorted(sizeArray, key=itemgetter(1)):
         name = pair[0]
         size = pair[1]
-        return "%8d %s" % (size, name)
+        yield "%8d %s" % (size, name)
 
 
 def compareFunctionSizes(oldFiles, newFiles):
