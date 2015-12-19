@@ -30,7 +30,7 @@ def apply_edits(path):
     remap_files = find_remap_files(path)
     if not remap_files:
         print("No remap files found")
-        return 1;
+        return 1
 
     edits_set = set()
     for remap_file in remap_files:
