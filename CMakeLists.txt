@@ -225,9 +225,6 @@ endif()
 option(SWIFT_BUILD_SOURCEKIT
     "Build SourceKit"
     ${SWIFT_BUILD_SOURCEKIT_default})
-# Force updating the cache, remove the following after a couple of weeks or so.
-set(SWIFT_BUILD_SOURCEKIT ${SWIFT_BUILD_SOURCEKIT_default}
-    CACHE BOOL "Build SourceKit" FORCE)
 
 #
 # Include CMake modules
