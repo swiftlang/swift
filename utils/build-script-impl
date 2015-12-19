@@ -1329,7 +1329,7 @@ function should_build_perftestsuite() {
         return
     fi
 
-    echo $(true_false "${BUILD_SWIFT_PERF_TESTSUITE}")
+    true_false "${BUILD_SWIFT_PERF_TESTSUITE}"
 }
 
 function set_swiftpm_bootstrap_command() {
