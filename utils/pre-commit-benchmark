@@ -289,7 +289,7 @@ if __name__ == '__main__':
                         action='append', help='Optimization levels to test')
     parser.add_argument(dest='baseline', nargs='?', metavar='tree-ish', default='origin/master',
                         help='the baseline Git commit to compare with.')
-    parser.add_argument(dest='build_script_args', nargs=argparse.REMAINDER, metavar='build-script-args', default=[]
+    parser.add_argument(dest='build_script_args', nargs=argparse.REMAINDER, metavar='build-script-args', default=[],
                         help='additional arguments to build script, e.g. -- --distcc --build-args=-j30')
     args = parser.parse_args()
 
