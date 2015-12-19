@@ -1744,7 +1744,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 fi
 
                 # Get the build date
-                LLDB_BUILD_DATE=`date +%Y-%m-%d`
+                LLDB_BUILD_DATE=$(date +%Y-%m-%d)
 
                 case "$(uname -s)" in
                     Linux)
@@ -2172,10 +2172,10 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                     continue
                 fi
                 LIB_TARGET="linux"
-                if [[ `uname -s` == "FreeBSD" ]]; then
+                if [[ $(uname -s) == "FreeBSD" ]]; then
                     LIB_TARGET="freebsd"
                 fi
-                if [[ `uname -s` == "Darwin" ]]; then
+                if [[ $(uname -s) == "Darwin" ]]; then
                     LIB_TARGET="macosx"
                 fi
                 XCTEST_INSTALL_PREFIX="${INSTALL_DESTDIR}"/"${INSTALL_PREFIX}"/lib/swift/"${LIB_TARGET}"
