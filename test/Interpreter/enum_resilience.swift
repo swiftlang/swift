@@ -292,4 +292,91 @@ ResilientEnumTestSuite.test("ResilientMultiPayloadGenericEnum") {
   expectEqual(b, [0, 1, 2, 3, 4])
 }
 
+public func getMetadata() -> Any.Type {
+  return Shape.self
+}
+
+ResilientEnumTestSuite.test("DynamicLayoutMetatype") {
+  do {
+    var output = ""
+    let expected = "- resilient_enum.Shape #0\n"
+    dump(getMetadata(), &output)
+    expectEqual(output, expected)
+  }
+  do {
+    expectEqual(true, getMetadata() == getMetadata())
+  }
+}
+
+ResilientEnumTestSuite.test("DynamicLayoutSinglePayload") {
+  let s = Size(w: 10, h: 20)
+  let a: [SimpleShape] = [.KleinBottle, .Triangle(s)]
+
+  let b: [Int] = a.map {
+    switch $0 {
+    case .KleinBottle:
+      return 0
+    case .Triangle(let s):
+      expectEqual(s.w, 10)
+      expectEqual(s.h, 20)
+      return 1
+    }
+  }
+
+  expectEqual(b, [0, 1])
+}
+
+ResilientEnumTestSuite.test("DynamicLayoutMultiPayload") {
+  let s = Size(w: 10, h: 20)
+  let a: [Shape] = [.Point, .Rect(s), .RoundedRect(s, s)]
+
+  let b: [Int] = a.map {
+    switch $0 {
+    case .Point:
+      return 0
+    case .Rect(let s):
+      expectEqual(s.w, 10)
+      expectEqual(s.h, 20)
+      return 1
+    case .RoundedRect(let s, let ss):
+      expectEqual(s.w, 10)
+      expectEqual(s.h, 20)
+      expectEqual(ss.w, 10)
+      expectEqual(ss.h, 20)
+      return 2
+    }
+  }
+
+  expectEqual(b, [0, 1, 2])
+}
+
+ResilientEnumTestSuite.test("DynamicLayoutMultiPayload2") {
+  let c = Color(r: 1, g: 2, b: 3)
+  let a: [CustomColor] = [.Black, .White, .Custom(c), .Bespoke(c, c)]
+
+  let b: [Int] = a.map {
+    switch $0 {
+    case .Black:
+      return 0
+    case .White:
+      return 1
+    case .Custom(let c):
+      expectEqual(c.r, 1)
+      expectEqual(c.g, 2)
+      expectEqual(c.b, 3)
+      return 2
+    case .Bespoke(let c, let cc):
+      expectEqual(c.r, 1)
+      expectEqual(c.g, 2)
+      expectEqual(c.b, 3)
+      expectEqual(cc.r, 1)
+      expectEqual(cc.g, 2)
+      expectEqual(cc.b, 3)
+      return 3
+    }
+  }
+
+  expectEqual(b, [0, 1, 2, 3])
+}
+
 runAllTests()

@@ -201,3 +201,43 @@ public func resilientEnumPartialApply(f: Medium -> Int) {
 }
 
 // CHECK-LABEL: define internal void @_TPA__TTRXFo_iO14resilient_enum6Medium_dSi_XFo_iS0__iSi_(%Si* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.refcounted*)
+
+
+// Enums with resilient payloads from a different resilience domain
+// require runtime metadata instantiation, just like generics.
+
+public enum EnumWithResilientPayload {
+  case OneSize(Size)
+  case TwoSizes(Size, Size)
+}
+
+// Make sure we call a function to access metadata of enums with
+// resilient layout.
+
+// CHECK-LABEL: define %swift.type* @_TF15enum_resilience20getResilientEnumTypeFT_PMP_()
+// CHECK:      [[METADATA:%.*]] = call %swift.type* @_TMaO15enum_resilience24EnumWithResilientPayload()
+// CHECK-NEXT: ret %swift.type* [[METADATA]]
+
+public func getResilientEnumType() -> Any.Type {
+  return EnumWithResilientPayload.self
+}
+
+// Public metadata accessor for our resilient enum
+// CHECK-LABEL: define %swift.type* @_TMaO15enum_resilience24EnumWithResilientPayload()
+// CHECK: [[METADATA:%.*]] = load %swift.type*, %swift.type** @_TMLO15enum_resilience24EnumWithResilientPayload
+// CHECK-NEXT: [[COND:%.*]] = icmp eq %swift.type* [[METADATA]], null
+// CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
+
+// CHECK: cacheIsNull:
+// CHECK-NEXT: [[METADATA2:%.*]] = call %swift.type* @swift_getResilientMetadata
+// CHECK-NEXT: store %swift.type* [[METADATA2]], %swift.type** @_TMLO15enum_resilience24EnumWithResilientPayload
+// CHECK-NEXT: br label %cont
+
+// CHECK: cont:
+// CHECK-NEXT: [[RESULT:%.*]] = phi %swift.type* [ [[METADATA]], %entry ], [ [[METADATA2]], %cacheIsNull ]
+// CHECK-NEXT: ret %swift.type* [[RESULT]]
+
+
+// FIXME: this is bogus
+
+// CHECK-LABEL: define private %swift.type* @create_generic_metadata_EnumWithResilientPayload(%swift.type_pattern*, i8**)
