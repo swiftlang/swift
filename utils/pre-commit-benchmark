@@ -166,7 +166,7 @@ def parseFloat(word):
     try:
         return float(word)
     except:
-        raise ScoreParserException("Expected float val, not "+word)
+        raise Exception("Expected float val, not {}".format(word))
 
 def getScores(fname):
     scores = {}
