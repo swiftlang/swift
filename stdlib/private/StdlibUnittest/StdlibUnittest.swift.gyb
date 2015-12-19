@@ -782,7 +782,8 @@ public func runAllTests() {
   } else {
     var runTestsInProcess: Bool = false
     var filter: String? = nil
-    for var i = 0; i < Process.arguments.count; {
+    var i = 0
+    while i < Process.arguments.count {
       let arg = Process.arguments[i]
       if arg == "--stdlib-unittest-in-process" {
         runTestsInProcess = true
