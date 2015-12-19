@@ -478,7 +478,6 @@ class ParseContext:
             elif kind == 'gybLines':
                 
                 self.codeStartLine = self.posToLine(self.tokenMatch.start('gybLines'))
-                codeStartPos = self.tokenMatch.end('_indent')
                 indentation = self.tokenMatch.group('_indent')
 
                 # Strip off the leading indentation and %-sign
