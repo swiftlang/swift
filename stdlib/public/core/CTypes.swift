@@ -122,7 +122,7 @@ public struct OpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   ///     let str0: CFString = "boxcar"
   ///     let bits = OpaquePointer(bitPattern: UnsafeReference(withoutRetaining: str0))
   ///     let str1 = UnsafeReference<CFString>(bitPattern: bits).object
-  @transparent
+  @_transparent
   public init<T>(bitPattern bits: UnsafeReference<T>) {
     self = unsafeBitCast(bits._storage, OpaquePointer.self)
   }

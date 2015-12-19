@@ -574,7 +574,7 @@ extension UnsignedIntegerType {
           ascii0 + Swift.Int(Word(extendingOrTruncating: r)._storage)))
     }
     while x != 0
-    return String(buf.reverse().lazy.map { Character($0) })
+    return String(buf.reversed().lazy.map { Character($0) })
   }
 }
 

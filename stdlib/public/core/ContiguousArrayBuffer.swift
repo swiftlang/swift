@@ -239,7 +239,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     let verbatim = false
 #endif
 
-    __bufferPointer._valuePointer.initializeMemory(
+    __bufferPointer._valuePointer.initializePointee(
       _ArrayBody(
         length: length,
         capacity: capacity,

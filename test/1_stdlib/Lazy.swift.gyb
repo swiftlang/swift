@@ -717,7 +717,7 @@ tests.test("LazyFilterSequence") {
   expectEqual(100, calls)
 
   // Check that it works when the first element doesn't satisfy the predicate
-  let odds = 1.strideTO(100, by: 2).map(OpaqueValue.init)
+  let odds = 1.strideTo(100, by: 2).map(OpaqueValue.init)
   filtered =
     MinimalSequence(elements: base).lazy.filter { $0.value % 2 != 0 }
   checkSequence(odds, filtered, resiliencyChecks: .none) {

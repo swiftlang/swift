@@ -293,7 +293,7 @@ sil @_TFsoi2neU__FTGSqQ__Vs26_OptionalNilComparisonType_Sb : $@convention(thin) 
 sil hidden @option_init : $@convention(thin) <T> (@in AnyObject) -> () {
 bb0(%0 : $*AnyObject):
   %g0 = alloc_stack $IteratorOverOne<AnyObject> // 831
-  %s0 = struct_element_addr %g0#1 : $*IteratorOverOne<AnyObject>, #IteratorOverOne.elements
+  %s0 = struct_element_addr %g0#1 : $*IteratorOverOne<AnyObject>, #IteratorOverOne._elements
 
   %l0 = alloc_stack $Optional<AnyObject>
   // function_ref Swift.Optional.Some <A>(Swift.Optional<A>.Type)(A) -> Swift.Optional<A>
@@ -302,7 +302,7 @@ bb0(%0 : $*AnyObject):
   %i0 = apply %f0<AnyObject>(%l0#1, %0, %t0) : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>, @in τ_0_0, @thin Optional<τ_0_0>.Type) -> ()
 
   %g1 = alloc_stack $IteratorOverOne<AnyObject> // 850
-  %s1 = struct_element_addr %g1#1 : $*IteratorOverOne<AnyObject>, #IteratorOverOne.elements
+  %s1 = struct_element_addr %g1#1 : $*IteratorOverOne<AnyObject>, #IteratorOverOne._elements
   // We can't backward propagate this yet because we can't analyze struct_element_addr copy dest.
   copy_addr [take] %l0#1 to [initialization] %s1 : $*Optional<AnyObject>
   // We ignore this copy because its Def is used by struct_element_addr
