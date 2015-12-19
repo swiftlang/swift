@@ -373,7 +373,9 @@ namespace {
             CS.TC.Context.getProtocol(
                                   KnownProtocolKind::FloatLiteralConvertible)) {
         if (auto defaultType = CS.TC.getDefaultType(floatProto, CS.DC)) {
-          CS.setFavoredType(expr, defaultType.getPointer());
+          if (!CS.getFavoredType(expr)) {
+            CS.setFavoredType(expr, defaultType.getPointer());
+          }
           return true;
         }
       }
@@ -384,7 +386,9 @@ namespace {
             CS.TC.Context.getProtocol(
                                 KnownProtocolKind::IntegerLiteralConvertible)) {
         if (auto defaultType = CS.TC.getDefaultType(intProto, CS.DC)) {
-          CS.setFavoredType(expr, defaultType.getPointer());
+          if (!CS.getFavoredType(expr)) {
+            CS.setFavoredType(expr, defaultType.getPointer());
+          }
           return true;
         }
       }
@@ -395,7 +399,9 @@ namespace {
           CS.TC.Context.getProtocol(
                                 KnownProtocolKind::StringLiteralConvertible)) {
         if (auto defaultType = CS.TC.getDefaultType(stringProto, CS.DC)) {
-          CS.setFavoredType(expr, defaultType.getPointer());
+          if (!CS.getFavoredType(expr)) {
+            CS.setFavoredType(expr, defaultType.getPointer());
+          }
           return true;
         }
       }
@@ -874,8 +880,7 @@ namespace {
     auto argTupleTy = argTy->castTo<TupleType>();
     auto argTupleExpr = dyn_cast<TupleExpr>(expr->getArg());
     Type firstArgTy = getInnerParenType(argTupleTy->getElement(0).getType());
-    Type secondArgTy =
-    getInnerParenType(argTupleTy->getElement(1).getType());
+    Type secondArgTy = getInnerParenType(argTupleTy->getElement(1).getType());
     
     // Determine whether the given declaration is favored.
     auto isFavoredDecl = [&](ValueDecl *value) -> bool {
@@ -2175,6 +2180,7 @@ namespace {
       if (expr->hasExplicitResultType() &&
           expr->getExplicitResultTypeLoc().getType()) {
         funcTy = expr->getExplicitResultTypeLoc().getType();
+        CS.setFavoredType(expr, funcTy.getPointer());
       } else if (!crt.isNull()) {
         funcTy = crt;
       } else{
@@ -2748,6 +2754,7 @@ namespace {
           // return type.
           auto resultTy = closure->getResultType();
           auto bodyTy = closure->getSingleExpressionBody()->getType();
+          CG.getConstraintSystem().setFavoredType(expr, bodyTy.getPointer());
           CG.getConstraintSystem()
             .addConstraint(ConstraintKind::Conversion, bodyTy,
                            resultTy,
