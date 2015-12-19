@@ -139,7 +139,8 @@ function(_add_variant_swift_compile_flags
 endfunction()
 
 function(_add_variant_link_flags
-    sdk arch build_type enable_assertions result_var_name)
+    sdk arch build_type enable_assertions
+    link_libs_var_name link_flags_var_name)
 
   if("${sdk}" STREQUAL "")
     message(FATAL_ERROR "Should specify an SDK")
@@ -149,24 +150,26 @@ function(_add_variant_link_flags
     message(FATAL_ERROR "Should specify an architecture")
   endif()
 
-  set(result ${${result_var_name}})
+  set(link_libs ${${link_libs_var_name}})
+  set(link_flags ${${link_flags_var_name}})
 
   _add_variant_c_compile_link_flags(
       "${sdk}"
       "${arch}"
       "${build_type}"
       "${enable_assertions}"
-      result)
+      link_flags)
 
   if("${sdk}" STREQUAL "LINUX")
-    list(APPEND result "-lpthread" "-ldl")
+    list(APPEND link_libs "-lpthread" "-ldl")
   elseif("${sdk}" STREQUAL "FREEBSD")
     # No extra libraries required.
   else()
-    list(APPEND result "-lobjc")
+    list(APPEND link_libs "-lobjc")
   endif()
 
-  set("${result_var_name}" "${result}" PARENT_SCOPE)
+  set("${link_libs_var_name}" "${link_libs}" PARENT_SCOPE)
+  set("${link_flags_var_name}" "${link_flags}" PARENT_SCOPE)
 endfunction()
 
 # Look up extra flags for a module that matches a regexp.
@@ -1033,6 +1036,7 @@ function(_add_swift_library_single target name)
   # Don't set PROPERTY COMPILE_FLAGS or LINK_FLAGS directly.
   set(c_compile_flags ${SWIFTLIB_SINGLE_C_COMPILE_FLAGS})
   set(link_flags ${SWIFTLIB_SINGLE_LINK_FLAGS})
+  set(link_libs)
 
   # Add variant-specific flags.
   if(SWIFTLIB_SINGLE_IS_STDLIB)
@@ -1053,7 +1057,7 @@ function(_add_swift_library_single target name)
       "${SWIFTLIB_SINGLE_ARCHITECTURE}"
       "${build_type}"
       "${enable_assertions}"
-      link_flags)
+      link_libs link_flags)
 
   # Handle gold linker flags for shared libraries.
   if(SWIFT_ENABLE_GOLD_LINKER AND SWIFTLIB_SINGLE_SHARED)
@@ -1119,7 +1123,8 @@ function(_add_swift_library_single target name)
   set_property(TARGET "${target}" APPEND_STRING PROPERTY
     LINK_FLAGS " ${link_flags} -L${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR} -L${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR} -L${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
   target_link_libraries("${target}" PRIVATE
-      ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
+      ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES}
+      ${link_libs})
   if(${SWIFTLIB_SINGLE_INTERFACE_LINK_LIBRARIES})
     message(FATAL_ERROR "${SWIFTLIB_SINGLE_INTERFACE_LINK_LIBRARIES}")
   endif()
@@ -1605,6 +1610,7 @@ function(_add_swift_executable_single name)
   # Determine compiler flags.
   set(c_compile_flags)
   set(link_flags)
+  set(link_libs)
 
   # Add variant-specific flags.
   _add_variant_c_compile_flags(
@@ -1620,7 +1626,7 @@ function(_add_swift_executable_single name)
       "${CMAKE_BUILD_TYPE}"
       "${LLVM_ENABLE_ASSERTIONS}"
       FALSE
-      link_flags)
+      link_libs link_flags)
 
   list(APPEND link_flags
       "-L${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
@@ -1699,7 +1705,9 @@ function(_add_swift_executable_single name)
       PROPERTIES
       HEADER_FILE_ONLY true)
 
-  target_link_libraries("${name}" ${SWIFTEXE_SINGLE_LINK_LIBRARIES})
+  target_link_libraries("${name}"
+    ${SWIFTEXE_SINGLE_LINK_LIBRARIES}
+    ${link_libs})
   swift_common_llvm_config("${name}" ${SWIFTEXE_SINGLE_COMPONENT_DEPENDS})
 
   set_target_properties(${name}
