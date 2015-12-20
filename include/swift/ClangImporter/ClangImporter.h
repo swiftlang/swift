@@ -1,4 +1,4 @@
-//===--- ClangImporter.cpp - Import Clang Modules --------------*- C++ -*--===//
+//===--- ClangImporter.h - Import Clang Modules --------------*- C++ -*--===//
 //
 // This source file is part of the Swift.org open source project
 //

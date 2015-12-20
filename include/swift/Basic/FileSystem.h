@@ -1,4 +1,4 @@
-//===--- FileSystem.cpp - Extra helpers for manipulating files --*- C++ -*-===//
+//===--- FileSystem.h - Extra helpers for manipulating files --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

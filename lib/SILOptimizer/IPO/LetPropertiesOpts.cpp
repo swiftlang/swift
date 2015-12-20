@@ -1,4 +1,4 @@
-//===---------- LetPropertiesOpt.cpp - Optimize let properties ------------===//
+//===---------- LetPropertiesOpts.cpp - Optimize let properties ------------===//
 //
 // This source file is part of the Swift.org open source project
 //

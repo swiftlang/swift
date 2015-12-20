@@ -1,4 +1,4 @@
-//===--------- LoopSimplify.cpp - Loop structure simplify -*- C++ -*-------===//
+//===--------- LoopRotate.cpp - Loop structure simplify -*- C++ -*-------===//
 //
 // This source file is part of the Swift.org open source project
 //

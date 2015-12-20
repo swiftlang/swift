@@ -1,4 +1,4 @@
-//===--- Alloc.h - Swift Language Allocation ABI ---------------*- C++ -*--===//
+//===--- HeapObject.h - Swift Language Allocation ABI ---------------*- C++ -*--===//
 //
 // This source file is part of the Swift.org open source project
 //

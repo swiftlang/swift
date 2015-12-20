@@ -1,4 +1,4 @@
-//===--- DebugTypeInfo.h - Type Info for Debugging --------------*- C++ -*-===//
+//===--- DebugTypeInfo.cpp - Type Info for Debugging --------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

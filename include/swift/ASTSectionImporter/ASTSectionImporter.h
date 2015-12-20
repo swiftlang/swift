@@ -1,4 +1,4 @@
-//===--- ASTSectionImporter.cpp - Import AST Section Modules ---*- C++ -*--===//
+//===--- ASTSectionImporter.h - Import AST Section Modules ---*- C++ -*--===//
 //
 // This source file is part of the Swift.org open source project
 //

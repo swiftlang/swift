@@ -1,4 +1,4 @@
-//===--- Passes.cpp - LLVM Reference Counting Optimizations ---------------===//
+//===--- LLVMARCOpts.cpp - LLVM Reference Counting Optimizations ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //
