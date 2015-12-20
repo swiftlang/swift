@@ -4598,6 +4598,18 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
   std::vector<Element> elementsWithPayload;
   std::vector<Element> elementsWithNoPayload;
 
+  // The most general resilience scope that can have knowledge of this
+  // enum's layout. If all payload types have a fixed size in this
+  // resilience scope, we can make further assumptions to optimize
+  // layout.
+  ResilienceScope scope = ResilienceScope::Universal;
+
+  // TODO: Replace this with 'public or internal with @availability' check
+  // once that is in place
+  if (theEnum->getFormalAccess() != Accessibility::Public ||
+      TC.IGM.isResilient(theEnum, ResilienceScope::Universal))
+    scope = ResilienceScope::Component;
+
   for (auto elt : theEnum->getAllElements()) {
     numElements++;
 
@@ -4629,7 +4641,7 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
     // If the unsubstituted argument contains a generic parameter type, or if
     // the substituted argument is not universally fixed-size, we need to
     // constrain our layout optimizations to what the runtime can reproduce.
-    if (!origArgTI->isFixedSize(ResilienceScope::Universal))
+    if (!origArgTI->isFixedSize(scope))
       alwaysFixedSize = IsNotFixedSize;
 
     auto loadableOrigArgTI = dyn_cast<LoadableTypeInfo>(origArgTI);
@@ -4651,7 +4663,7 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
       // If the substituted argument contains a type that is not universally
       // fixed-size, we need to constrain our layout optimizations to what
       // the runtime can reproduce.
-      if (!substArgTI->isFixedSize(ResilienceScope::Universal))
+      if (!substArgTI->isFixedSize(scope))
         alwaysFixedSize = IsNotFixedSize;
     }
   }

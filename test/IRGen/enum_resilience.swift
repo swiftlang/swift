@@ -13,14 +13,14 @@ import resilient_struct
 // CHECK: %O15enum_resilience6Either = type <{ [[REFERENCE_TYPE:\[(4|8) x i8\]]], [1 x i8] }>
 
 // Public resilient struct contains a public resilient struct,
-// can use spare bits (FIXME)
+// can use spare bits
 
-// CHECK: %O15enum_resilience15ResilientEither = type <{ [[REFERENCE_TYPE]], [1 x i8] }>
+// CHECK: %O15enum_resilience15ResilientEither = type <{ [[REFERENCE_TYPE]] }>
 
 // Internal fixed layout struct contains a public resilient struct,
-// can use spare bits (FIXME)
+// can use spare bits
 
-// CHECK: %O15enum_resilience14InternalEither = type <{ [[REFERENCE_TYPE]], [1 x i8] }>
+// CHECK: %O15enum_resilience14InternalEither = type <{ [[REFERENCE_TYPE]] }>
 
 // Public fixed layout struct contains a fixed layout struct,
 // can use spare bits
