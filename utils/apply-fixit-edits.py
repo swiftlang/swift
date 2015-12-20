@@ -12,6 +12,7 @@
 #
 #===------------------------------------------------------------------------===#
 
+from __future__ import print_function
 
 import subprocess
 import json
@@ -29,7 +30,7 @@ def find_remap_files(path):
 def apply_edits(path):
     remap_files = find_remap_files(path)
     if not remap_files:
-        print "No remap files found"
+        print("No remap files found")
         return 1;
 
     edits_set = set()
@@ -53,7 +54,7 @@ def apply_edits(path):
         edits_per_file[fname].append((ed[1], ed[2], ed[3]))
     
     for fname, edits in edits_per_file.iteritems():
-        print 'Updating', fname
+        print('Updating', fname)
         edits.sort(reverse=True)
         file_data = open(fname).read()
         for ed in edits:
