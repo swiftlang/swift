@@ -561,13 +561,30 @@ public struct Set<Element : Hashable> :
   public func intersect<
     S : SequenceType where S.Generator.Element == Element
   >(sequence: S) -> Set<Element> {
-    let other = sequence as? Set<Element> ?? Set(sequence)
+
+    // Attempt to iterate the smaller between `self` and `sequence`.
+    // If sequence is not a set, iterate over it because it may be single-pass.
     var newSet = Set<Element>()
-    for member in self {
-      if other.contains(member) {
-        newSet.insert(member)
+
+    if let other = sequence as? Set<Element> {
+      let smaller: Set<Element>
+      let bigger: Set<Element>
+      if other.count > count {
+        smaller = self
+        bigger = other
+      } else {
+        smaller = other
+        bigger = self
+      }
+      for element in smaller where bigger.contains(element) {
+        newSet.insert(element)
+      }
+    } else {
+      for element in sequence where contains(element) {
+        newSet.insert(element)
       }
     }
+
     return newSet
   }
 
