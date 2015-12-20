@@ -3,7 +3,7 @@
 }
 
 @_transparent public func testBuiltin() -> Int32 {
-  var y: Int32 = 300;
+  var y: Int32 = 300
   var z = "foo"
   return y
 }

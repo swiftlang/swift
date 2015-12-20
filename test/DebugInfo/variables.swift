@@ -11,17 +11,17 @@
 // CHECK-DAG: ![[TLC:.*]] = !DIModule({{.*}}, name: "variables"
 
 // Global variables.
-var glob_i8:   Int8 = 8;
+var glob_i8:   Int8 = 8
 // CHECK-DAG: !DIGlobalVariable(name: "glob_i8",{{.*}} scope: ![[TLC]],{{.*}} line: [[@LINE-1]],{{.*}} type: ![[I8:[^,]+]]
-var glob_i16:  Int16 = 16;
+var glob_i16:  Int16 = 16
 // CHECK-DAG: !DIGlobalVariable(name: "glob_i16",{{.*}} scope: ![[TLC]],{{.*}} line: [[@LINE-1]],{{.*}} type: ![[I16:[^,]+]]
-var glob_i32:  Int32 = 32;
+var glob_i32:  Int32 = 32
 // CHECK-DAG: !DIGlobalVariable(name: "glob_i32",{{.*}} scope: ![[TLC]],{{.*}} line: [[@LINE-1]],{{.*}} type: ![[I32:[^,]+]]
-var glob_i64:  Int64 = 64;
+var glob_i64:  Int64 = 64
 // CHECK-DAG: !DIGlobalVariable(name: "glob_i64",{{.*}} scope: ![[TLC]],{{.*}} line: [[@LINE-1]],{{.*}} type: ![[I64:[^,]+]]
-var glob_f:    Float = 2.89;
+var glob_f:    Float = 2.89
 // CHECK-DAG: !DIGlobalVariable(name: "glob_f",{{.*}} scope: ![[TLC]],{{.*}} line: [[@LINE-1]],{{.*}} type: ![[F:[^,]+]]
-var glob_d:    Double = 3.14;
+var glob_d:    Double = 3.14
 // CHECK-DAG: !DIGlobalVariable(name: "glob_d",{{.*}} scope: ![[TLC]],{{.*}} line: [[@LINE-1]],{{.*}} type: ![[D:[^,]+]]
 var glob_b:    Bool = true
 // CHECK-DAG: !DIGlobalVariable(name: "glob_b",{{.*}} scope: ![[TLC]],{{.*}} line: [[@LINE-1]],{{.*}} type: ![[B:[^,]+]]
@@ -47,10 +47,10 @@ var unused: Int32 = -1
 func foo(dt: Float) -> Float {
   // CHECK-DAG: call void @llvm.dbg.declare
   // CHECK-DAG: !DILocalVariable(name: "f"
-  var f: Float = 9.78;
+  var f: Float = 9.78
   // CHECK-DAG: !DILocalVariable(name: "r"
-  var r: Float = f*dt;
-  return r;
+  var r: Float = f*dt
+  return r
 }
 
 var g = foo(1.0);

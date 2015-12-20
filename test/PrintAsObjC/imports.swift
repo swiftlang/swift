@@ -25,12 +25,12 @@ import ctypes.bits
 import Foundation
 
 import Base
-import Base.ImplicitSub;
-import Base.ImplicitSub.ImSub;
-import Base.ImplicitSub.ExSub;
-import Base.ExplicitSub;
-import Base.ExplicitSub.ImSub;
-import Base.ExplicitSub.ExSub;
+import Base.ImplicitSub
+import Base.ImplicitSub.ImSub
+import Base.ImplicitSub.ExSub
+import Base.ExplicitSub
+import Base.ExplicitSub.ImSub
+import Base.ExplicitSub.ExSub
 
 @objc class Test {
   let word: DWORD = 0

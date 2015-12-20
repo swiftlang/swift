@@ -267,11 +267,11 @@ func testDirection() {
   switch dir {
   case .North(let x):
     i = x
-    break;
+    break
 
   case .NorthEast(let x):
     i = x.distanceEast
-    break;
+    break
   }
   _ = i
 }
