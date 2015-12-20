@@ -47,12 +47,12 @@ extension _SwiftNSOperatingSystemVersion : Comparable { }
 
 @warn_unused_result
 public func == (
-  left: _SwiftNSOperatingSystemVersion,
-  right: _SwiftNSOperatingSystemVersion
+  lhs: _SwiftNSOperatingSystemVersion,
+  rhs: _SwiftNSOperatingSystemVersion
 ) -> Bool {
-  return left.majorVersion == right.majorVersion &&
-         left.minorVersion == right.minorVersion &&
-         left.patchVersion == right.patchVersion
+  return lhs.majorVersion == rhs.majorVersion &&
+         lhs.minorVersion == rhs.minorVersion &&
+         lhs.patchVersion == rhs.patchVersion
 }
 
 /// Lexicographic comparison of version components.
