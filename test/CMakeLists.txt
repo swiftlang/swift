@@ -131,7 +131,6 @@ if(PYTHONINTERP_FOUND)
         normalize_boolean_spelling(SWIFT_STDLIB_ASSERTIONS)
         normalize_boolean_spelling(SWIFT_AST_VERIFIER)
         normalize_boolean_spelling(SWIFT_ASAN_BUILD)
-        normalize_boolean_spelling(SWIFT_ENABLE_SOURCEKIT_TESTS)
 
         # A directory where to put the xUnit-style XML test results.
         set(swift_test_results_dir
