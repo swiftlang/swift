@@ -1120,7 +1120,8 @@ public struct Dictionary<Key : Hashable, Value> :
   ///   storage capacity that the collection has, otherwise the underlying
   ///   storage is released.  The default is `false`.
   ///
-  /// Complexity: O(`self.count`).
+  /// - Complexity: O(`self.count`) if `keepCapacity` is `true`, O(1)
+  ///   otherwise.
   public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
     // The 'will not decrease' part in the documentation comment is worded very
     // carefully.  The capacity can increase if we replace Cocoa storage with
