@@ -61,29 +61,14 @@ public func < (
   lhs: _SwiftNSOperatingSystemVersion,
   rhs: _SwiftNSOperatingSystemVersion
 ) -> Bool {
-  if lhs.majorVersion > rhs.majorVersion {
-    return false
+  // Compare by major version
+  if lhs.majorVersion != rhs.majorVersion {
+    return lhs.majorVersion < rhs.majorVersion
   }
-
-  if lhs.majorVersion < rhs.majorVersion {
-    return true
+  // Compare by minor version
+  if lhs.minorVersion != rhs.minorVersion {
+    return lhs.minorVersion < rhs.minorVersion
   }
-
-  if lhs.minorVersion > rhs.minorVersion {
-    return false
-  }
-
-  if lhs.minorVersion < rhs.minorVersion {
-    return true
-  }
-
-  if lhs.patchVersion > rhs.patchVersion {
-    return false
-  }
-
-  if lhs.patchVersion < rhs.patchVersion {
-    return true
-  }
-
-  return false
+  // Compare by patch version
+  return lhs.patchVersion < rhs.patchVersion
 }
