@@ -1,7 +1,7 @@
 Latest
 ------
 
-* The "C style for loop", which is spelled for (init; comparison; increment){}"
+* The "C style for loop", which is spelled `for init; comparison; increment {}`
   has been deprecated and is slated for removal in Swift 3.0.  See
   [SE-0007](https://github.com/apple/swift-evolution/blob/master/proposals/0007-remove-c-style-for-loops.md)
   for more information.
