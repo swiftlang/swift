@@ -27,6 +27,8 @@ print(one.predecessor().rawValue)
 
 // CHECK-NEXT: 0
 print((one &+ one).rawValue)
+// CHECK-NEXT: 1
+print((zero &- one).rawValue)
 
 // CHECK: done.
 print("done.")
