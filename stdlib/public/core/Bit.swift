@@ -98,7 +98,8 @@ extension Bit : IntegerArithmeticType {
     if let b = Bit(rawValue: v.0) {
       return (b, v.overflow)
     } else {
-      return (Bit(rawValue: v.0 % 2)!, true)
+      let bitRaw = v.0 > 0 ? v.0 % 2 : v.0 % 2 + 2
+      return (Bit(rawValue: bitRaw)!, true)
     }
   }
 
