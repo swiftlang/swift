@@ -64,7 +64,7 @@ class GraphemeClusterBreakPropertyTable(UnicodeProperty):
         # values to symbolic values.
         self.symbolic_values = \
             [ None ] * (max(self.numeric_value_table.values()) + 1)
-        for k,v in self.numeric_value_table.iteritems():
+        for k,v in self.numeric_value_table.items():
             self.symbolic_values[v] = k
 
         # Load the data file.
@@ -329,7 +329,7 @@ class UnicodeTrieGenerator(object):
                 else:
                     return idx
 
-            return map(map_index, indexes)
+            return list(map(map_index, indexes))
 
         # If self.BMP_data contains identical data blocks, keep the first one,
         # remove duplicates and change the indexes in self.BMP_lookup to point to

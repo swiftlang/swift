@@ -41,7 +41,7 @@ def run_build_script_with_data_file(build_script, data_file, verbose=False):
             sys.stdout.write(" Failure:\n")
 
 def build_disable_slice_pipelines(**kwargs):
-    pipeline_range = range(len(PIPELINES))
+    pipeline_range = list(range(len(PIPELINES)))
 
     def get_pipeline_args(script, iter):
         result = [script]
