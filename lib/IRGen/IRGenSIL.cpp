@@ -1233,7 +1233,7 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
   // all the value parameters.
   if (hasPolymorphicParameters(funcTy)) {
     emitPolymorphicParameters(IGF, *IGF.CurSILFn, params,
-                              NULL,
+                              nullptr,
       [&](unsigned paramIndex) -> llvm::Value* {
         SILValue parameter = entry->getBBArgs()[paramIndex];
         return IGF.getLoweredSingletonExplosion(parameter);

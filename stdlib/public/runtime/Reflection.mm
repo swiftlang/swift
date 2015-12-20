@@ -598,7 +598,7 @@ const char *swift_EnumMirror_caseName(HeapObject *owner,
                                       const OpaqueValue *value,
                                       const Metadata *type) {
   if (!isEnumReflectable(type))
-    return NULL;
+    return nullptr;
 
   const auto Enum = static_cast<const EnumMetadata *>(type);
   const auto &Description = Enum->Description->Enum;
