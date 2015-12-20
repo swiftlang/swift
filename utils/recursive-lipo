@@ -22,10 +22,10 @@ def merge_file_lists(src_root_dirs, skip_files, skip_subpaths):
             rel_dir = os.path.relpath(src_dir, src_root_dir)
             rel_files = [os.path.join(rel_dir, file) for file in files+dirs
                         if file not in skip_files]
-            file_list.extend(filter(lambda file:
-                                    file not in file_list, rel_files))
-            dirs[:] = filter(lambda dir:
-                             os.path.join(rel_dir, dir) not in skip_subpaths, dirs)
+            file_list.extend([file for file in rel_files
+                                   if file not in file_list])
+            dirs[:] = [dir for dir in dirs
+                       if os.path.join(rel_dir, dir) not in skip_subpaths]
     return file_list
 
 

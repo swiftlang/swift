@@ -5,11 +5,15 @@
 from __future__ import print_function
 
 import re
-from cStringIO import StringIO
 import tokenize
 import textwrap
 from bisect import bisect
 import os
+
+try:
+    from cStringIO import StringIO
+except ImportError
+    from io import StringIO
 
 def getLineStarts(s):
     """Return a list containing the start index of each line in s.
@@ -135,7 +139,7 @@ def tokenizePythonToUnmatchedCloseCurly(sourceText, start, lineStarts):
                 if nesting < 0:
                     return tokenPosToIndex(tokenStart, start, lineStarts)
 
-    except tokenize.TokenError, (message, errorPos):
+    except tokenize.TokenError as (message, errorPos):
         return tokenPosToIndex(errorPos, start, lineStarts)
 
     return len(sourceText)
@@ -324,7 +328,7 @@ def splitGybLines(sourceLines):
                 
             lastTokenText,lastTokenKind = tokenText,tokenKind
 
-    except tokenize.TokenError, (message, errorPos):
+    except tokenize.TokenError as (message, errorPos):
         return [] # Let the later compile() call report the error
 
     if lastTokenText == ':':

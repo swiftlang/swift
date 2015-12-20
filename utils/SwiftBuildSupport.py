@@ -12,7 +12,11 @@
 
 from __future__ import print_function
 
-import ConfigParser
+try:
+    import ConfigParser
+except ImportError:  # Python 3
+    import configparser as ConfigParser
+
 import os
 import pipes
 import subprocess
@@ -139,7 +143,7 @@ def _get_preset_options_impl(config, substitutions, preset_name):
     for o in config.options(section_name):
         try:
             a = config.get(section_name, o)
-        except ConfigParser.InterpolationMissingOptionError, e:
+        except configparser.InterpolationMissingOptionError as e:
             # e.reference contains the correctly formatted option
             missing_opts.append(e.reference)
             continue

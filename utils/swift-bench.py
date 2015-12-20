@@ -270,7 +270,7 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
         spent = int(execTime) / 1000000 # Convert ns to ms
         if spent <= self.minIterTime:
           scale *= 2
-        if scale > sys.maxint:
+        if scale > sys.maxsize:
           return (0, 0)
       except subprocess.CalledProcessError as e:
         r = e.output

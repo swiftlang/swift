@@ -49,11 +49,11 @@ def apply_edits(path):
     edits_per_file = {}
     for ed in edits_set:
         fname = ed[0]
-        if not edits_per_file.has_key(fname):
+        if fname not in edits_per_file:
             edits_per_file[fname] = []
         edits_per_file[fname].append((ed[1], ed[2], ed[3]))
     
-    for fname, edits in edits_per_file.iteritems():
+    for fname, edits in edits_per_file.items():
         print('Updating', fname)
         edits.sort(reverse=True)
         file_data = open(fname).read()

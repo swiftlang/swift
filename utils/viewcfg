@@ -119,17 +119,17 @@ def main():
     # Add empty blocks which we didn't see, but which are referenced.
 
     newBlocks = { }
-    for name, block in blocks.iteritems():
+    for name, block in blocks.items():
         for adjName in (block.preds + block.getSuccs()):
             if not adjName in blocks:
                 newBlocks[adjName] = Block(adjName, None)
 
-    blocks = dict(blocks.items() + newBlocks.items())
+    blocks = dict(list(blocks.items()) + list(newBlocks.items()))
 
     # Add missing edges if we didn't see a successor in the terminator
     # but the block is mentioned in the pred list of the successor.
 
-    for name, block in blocks.iteritems():
+    for name, block in blocks.items():
         for predName in block.preds:
             predBlock = blocks[predName]
             if not name in predBlock.getSuccs():
@@ -141,7 +141,7 @@ def main():
     outFile = open(fileName, "w")
 
     outFile.write('digraph "CFG" {\n')
-    for name, block in blocks.iteritems():
+    for name, block in blocks.items():
         if block.content is not None:
             outFile.write("\tNode" + str(block.index) + \
                 " [shape=record,label=\"{" + block.content + "}\"];\n")

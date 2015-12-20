@@ -12,6 +12,14 @@
 
 from ctypes import *
 
+# Python 3 has just one integer type, which mostly behaves like the `long`
+# type from Python 2.  There's an `isinstance(obj, (int,long,bool))` in this
+# file; this fudge is to make that work on Python 3.  See PEP 237.
+try:
+    long
+except NameError:
+    long = int
+
 # ctypes doesn't implicitly convert c_void_p to the appropriate wrapper
 # object. This is a problem, because it means that from_parameter will see an
 # integer and pass the wrong value on platforms where int != void*. Work around
@@ -156,7 +164,7 @@ class ErrorKind(object):
         if value >= len(ErrorKind._kinds):
             ErrorKind._kinds += [None] * (value - len(ErrorKind._kinds) + 1)
         if ErrorKind._kinds[value] is not None:
-            raise ValueError,'ErrorKind already loaded'
+            raise ValueError('ErrorKind already loaded')
         self.value = value
         ErrorKind._kinds[value] = self
         ErrorKind._name_map = None
@@ -177,7 +185,7 @@ class ErrorKind(object):
     @staticmethod
     def from_id(id):
         if id >= len(ErrorKind._kinds) or ErrorKind._kinds[id] is None:
-            raise ValueError,'Unknown type kind %d' % id
+            raise ValueError('Unknown type kind %d' % id)
         return ErrorKind._kinds[id]
 
     def __repr__(self):
@@ -239,7 +247,7 @@ class VariantType(object):
         if value >= len(VariantType._kinds):
             VariantType._kinds += [None] * (value - len(VariantType._kinds) + 1)
         if VariantType._kinds[value] is not None:
-            raise ValueError,'VariantType already loaded'
+            raise ValueError('VariantType already loaded')
         self.value = value
         VariantType._kinds[value] = self
         VariantType._name_map = None
@@ -260,7 +268,7 @@ class VariantType(object):
     @staticmethod
     def from_id(id):
         if id >= len(VariantType._kinds) or VariantType._kinds[id] is None:
-            raise ValueError,'Unknown type kind %d' % id
+            raise ValueError('Unknown type kind %d' % id)
         return VariantType._kinds[id]
 
     def __repr__(self):
@@ -529,7 +537,7 @@ def register_functions(lib, ignore_errors):
     def register(item):
         return register_function(lib, item, ignore_errors)
 
-    map(register, functionList)
+    list(map(register, functionList))
 
 class Config:
     library_path = None
