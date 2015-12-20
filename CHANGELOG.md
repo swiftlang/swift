@@ -73,7 +73,7 @@ Latest
   allows you to use C enum pattern matching in switch statements with no
   additional code. **(17287720)**
 
-* The `NSNumberunsignedIntegerValue` property now has the type `UInt` instead
+* The `NSNumber.unsignedIntegerValue` property now has the type `UInt` instead
   of `Int`, as do other methods and properties that use the `NSUInteger` type
   in Objective-C and whose names contain `unsigned..`. Most other uses of
   `NSUInteger` in system frameworks are imported as `Int` as they were in
