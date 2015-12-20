@@ -519,6 +519,36 @@ public:
   //===--------------------------------------------------------------------===//
   // SILInstruction Printing Logic
 
+  /// Print out the users of the SILValue \p V. Return true if we printed out
+  /// either an id or a use list. Return false otherwise.
+  bool printUsersOfSILValue(SILValue V) {
+    if (!V->hasValue()) {
+      PrintState.OS.PadToColumn(50);
+      *this << "// id: " << getID(V);
+      return true;
+    }
+
+    if (V->use_empty())
+      return false;
+
+    PrintState.OS.PadToColumn(50);
+    *this << "// user";
+    if (std::next(V->use_begin()) != V->use_end())
+      *this << 's';
+    *this << ": ";
+
+    // Display the user ids sorted to give a stable use order in the printer's
+    // output. This makes diffing large sections of SIL significantly easier.
+    llvm::SmallVector<ID, 32> UserIDs;
+    for (auto *Op : V->getUses())
+      UserIDs.push_back(getID(Op->getUser()));
+    std::sort(UserIDs.begin(), UserIDs.end());
+
+    interleave(UserIDs.begin(), UserIDs.end(), [&](ID id) { *this << id; },
+               [&] { *this << ", "; });
+    return true;
+  }
+
   void print(SILValue V) {
     if (auto *FRI = dyn_cast<FunctionRefInst>(V))
       *this << "  // function_ref "
@@ -537,32 +567,9 @@ public:
     // Print the value.
     visit(V);
 
-    // Print users, or id for valueless instructions.
-    bool printedSlashes = false;
-
-    if (!V->hasValue()) {
-      PrintState.OS.PadToColumn(50);
-      *this << "// id: " << getID(V);
-      printedSlashes = true;
-    } else if (!V->use_empty()) {
-      PrintState.OS.PadToColumn(50);
-      *this << "// user";
-      if (std::next(V->use_begin()) != V->use_end())
-        *this << 's';
-      *this << ": ";
-
-      // Display the user ids sorted to give a stable use order in the printer's
-      // output. This makes diffing large sections of SIL significantly easier.
-      llvm::SmallVector<ID, 32> UserIDs;
-      for (auto *Op : V->getUses())
-        UserIDs.push_back(getID(Op->getUser()));
-      std::sort(UserIDs.begin(), UserIDs.end());
-
-      interleave(UserIDs.begin(), UserIDs.end(),
-                 [&] (ID id) { *this << id; },
-                 [&] { *this << ", "; });
-      printedSlashes = true;
-    }
+    // Print users, or id for valueless instructions. Return true if we emitted
+    // any output.
+    bool printedSlashes = printUsersOfSILValue(V);
 
     // Print SIL location.
     if (Verbose) {
