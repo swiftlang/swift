@@ -87,35 +87,3 @@ public func < (
 
   return false
 }
-
-@warn_unused_result
-public func >= (
-  _lhs: _SwiftNSOperatingSystemVersion,
-  _rhs: _SwiftNSOperatingSystemVersion
-) -> Bool {
-  if _lhs.majorVersion < _rhs.majorVersion {
-    return false
-  }
-
-  if _lhs.majorVersion > _rhs.majorVersion {
-    return true
-  }
-
-  if _lhs.minorVersion < _rhs.minorVersion {
-    return false
-  }
-
-  if _lhs.minorVersion > _rhs.minorVersion {
-    return true
-  }
-
-  if _lhs.patchVersion < _rhs.patchVersion {
-    return false
-  }
-
-  if _lhs.patchVersion > _rhs.patchVersion {
-    return true
-  }
-
-  return true
-}
