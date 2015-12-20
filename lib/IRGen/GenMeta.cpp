@@ -1020,26 +1020,39 @@ static void emitDirectTypeMetadataInitialization(IRGenFunction &IGF,
   
   // If any ancestors are generic, we need to trigger the superclass's
   // initialization.
+  bool initializeSuper = false;
+
+  // If an ancestor was imported from Objective-C, we have to copy
+  // field offset vectors from our superclass, since the Objective-C
+  // runtime only slides the ivars of the immediate class being
+  // registered.
+  bool copyFieldOffsetVectors = false;
+
   auto ancestor = superclass;
   while (ancestor) {
-    if (ancestor->getClassOrBoundGenericClass()->isGenericContext())
-      goto initialize_super;
+    auto classDecl = ancestor->getClassOrBoundGenericClass();
+    if (classDecl->isGenericContext())
+      initializeSuper = true;
+    else if (classDecl->hasClangNode())
+      copyFieldOffsetVectors = true;
     
     ancestor = ancestor->getSuperclass(nullptr);
   }
-  // No generic ancestors.
-  return;
 
-initialize_super:
-  auto classMetadata = IGF.IGM.getAddrOfTypeMetadata(type, /*pattern*/ false);
-  // Get the superclass metadata.
-  auto superMetadata = IGF.emitTypeMetadataRef(superclass->getCanonicalType());
-  
-  // Ask the runtime to initialize the superclass of the metaclass.
-  // This function will ensure the initialization is dependency-ordered-before
-  // any loads from the base class metadata.
-  auto initFn = IGF.IGM.getInitializeSuperclassFn();
-  IGF.Builder.CreateCall(initFn, {classMetadata, superMetadata});
+  if (initializeSuper) {
+    auto classMetadata = IGF.IGM.getAddrOfTypeMetadata(type, /*pattern*/ false);
+    // Get the superclass metadata.
+    auto superMetadata = IGF.emitTypeMetadataRef(superclass->getCanonicalType());
+
+    // Ask the runtime to initialize the superclass of the metaclass.
+    // This function will ensure the initialization is dependency-ordered-before
+    // any loads from the base class metadata.
+    auto initFn = IGF.IGM.getInitializeSuperclassFn();
+    IGF.Builder.CreateCall(initFn,
+                           {classMetadata, superMetadata,
+                            llvm::ConstantInt::get(IGF.IGM.Int1Ty,
+                                                   copyFieldOffsetVectors)});
+  }
 }
 
 /// Emit the body of a lazy cache accessor.

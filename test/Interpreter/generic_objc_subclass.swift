@@ -4,11 +4,9 @@
 // RUN: %target-clang -fobjc-arc %S/Inputs/ObjCClasses/ObjCClasses.m -c -o %t/ObjCClasses.o
 // RUN: %target-build-swift -I %S/Inputs/ObjCClasses/ -Xlinker %t/ObjCClasses.o %s -o %t/a.out
 // RUN: %target-run %t/a.out | FileCheck %s
+
 // REQUIRES: executable_test
-
-// XFAIL: linux
-
-// rdar://19583881
+// REQUIRES: objc_interop
 
 import Foundation
 import ObjCClasses
@@ -18,9 +16,9 @@ import ObjCClasses
 }
 
 class A<T> : HasHiddenIvars, P {
-  var x: Int = 16
-  var t: T? = nil
-  var y: Int = 61
+  var first: Int = 16
+  var second: T? = nil
+  var third: Int = 61
 
   override var description: String {
     return "Grilled artichokes"
@@ -38,68 +36,38 @@ let a = A<Int>()
 print(a.description)
 print((a as NSObject).description)
 
-// CHECK: 0
-// CHECK: 16
-// CHECK: nil
-// CHECK: 61
-print(a.count)
-print(a.x)
-print(a.t)
-print(a.y)
+let f = { (a.x, a.y, a.z, a.t, a.first, a.second, a.third) }
 
-// CHECK: 25
-// CHECK: 16
-// CHECK: nil
-// CHECK: 61
-a.count = 25
-print(a.count)
-print(a.x)
-print(a.t)
-print(a.y)
+// CHECK: (0, 0, 0, 0, 16, nil, 61)
+print(f())
 
-// CHECK: 25
-// CHECK: 36
-// CHECK: nil
-// CHECK: 61
+// CHECK: (25, 225, 255, 2255, 16, nil, 61)
+a.x = 25
+a.y = 225
+a.z = 255
+a.t = 2255
+print(f())
+
+// CHECK: (36, 225, 255, 2255, 16, nil, 61)
 a.x = 36
-print(a.count)
-print(a.x)
-print(a.t)
-print(a.y)
+print(f())
 
-// CHECK: 25
-// CHECK: 36
-// CHECK: 121
-// CHECK: 61
-a.t = 121
-print(a.count)
-print(a.x)
-print(a.t)
-print(a.y)
+// CHECK: (36, 225, 255, 2255, 16, Optional(121), 61)
+a.second = 121
+print(f())
 
 let aa = A<(Int, Int)>()
+let ff = { (aa.x, aa.y, aa.z, aa.t, aa.first, aa.second, aa.third) }
 
-// CHECK: 0
-// CHECK: 16
-// CHECK: nil
-// CHECK: 61
-print(aa.count)
-print(aa.x)
-print(aa.t)
-print(aa.y)
+// CHECK: (0, 0, 0, 0, 16, nil, 61)
+print(ff())
 
-aa.count = 101
-aa.t = (19, 84)
-aa.y = 17
+aa.x = 101
+aa.second = (19, 84)
+aa.third = 17
 
-// CHECK: 101
-// CHECK: 16
-// CHECK: (19, 84)
-// CHECK: 17
-print(aa.count)
-print(aa.x)
-print(aa.t)
-print(aa.y)
+// CHECK: (101, 0, 0, 0, 16, Optional((19, 84)), 17)
+print(ff())
 
 class B : A<(Int, Int)> {
   override var description: String {
@@ -130,3 +98,16 @@ print((C() as P).calculatePrice())
 // CHECK: Grilled artichokes
 print((B() as NSObject).description)
 print((C() as NSObject).description)
+
+let b = B()
+let g = { (b.x, b.y, b.z, b.t, b.first, b.second, b.third) }
+
+// CHECK: (0, 0, 0, 0, 16, nil, 61)
+print(g())
+
+b.x = 101
+b.second = (19, 84)
+b.third = 17
+
+// CHECK: (101, 0, 0, 0, 16, Optional((19, 84)), 17)
+print(g())
