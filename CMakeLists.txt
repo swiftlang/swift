@@ -44,9 +44,9 @@ option(SWIFT_BUILD_STATIC_STDLIB
     "Build static variants of the Swift standard library and SDK overlay"
     FALSE)
 
-option(SWIFT_INCLUDE_BENCHMARKS
-    "Create targets for running swift benchmarks"
-    TRUE)
+option(SWIFT_BUILD_PERF_TESTSUITE
+    "Create targets for swift performance benchmarks."
+    FALSE)
 
 option(SWIFT_INCLUDE_TESTS "Create targets for building/running tests." TRUE)
 
@@ -633,7 +633,7 @@ if(SWIFT_BUILD_TOOLS)
 endif()
 add_subdirectory(utils)
 add_subdirectory(stdlib)
-if(SWIFT_INCLUDE_BENCHMARKS)
+if(SWIFT_BUILD_PERF_TESTSUITE)
   add_subdirectory(benchmark)
 endif()
 if(SWIFT_INCLUDE_TESTS)
