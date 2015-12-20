@@ -328,7 +328,7 @@ static const char *_swift_stdlib_strtoX_clocale_impl(
   *outResult = result;
   if (result == huge || result == -huge || result == 0.0 || result == -0.0) {
       if (errno == ERANGE)
-          EndPtr = NULL;
+          EndPtr = nullptr;
   }
   return EndPtr;
 }
