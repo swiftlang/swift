@@ -238,8 +238,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         // Check if token is @ sign ergo an attribute
         if (Tok.is(tok::at_sign)) {
           Token nextToken = peekToken();
-          // Fix for SR215
-          // Check if attribute is invalid type attribute 
+          // Check if attribute is invalid type attribute
           // and actually a declaration attribute
           if (TypeAttributes::getAttrKindFromString(nextToken.getText()) == TAK_Count 
               && DeclAttribute::getAttrKindFromString(nextToken.getText()) != TAK_Count) { 
@@ -247,7 +246,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
             SourceLoc AttrLoc = consumeToken(tok::identifier);
             diagnose(AtLoc, diag::decl_attribute_applied_to_type)
               .fixItRemove(SourceRange(AtLoc, AttrLoc))
-              .fixItInsert(StartLoc, "@" + nextToken.getText().str()+" ");              
+              .fixItInsert(StartLoc, "@" + nextToken.getText().str()+" ");
           }
         }
 
