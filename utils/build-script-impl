@@ -219,6 +219,9 @@ function set_deployment_target_based_options() {
         linux-x86_64)
             SWIFT_HOST_VARIANT_ARCH="x86_64"
             ;;
+        linux-armv6)
+            SWIFT_HOST_VARIANT_ARCH="armv6"
+            ;;
         linux-armv7)
             SWIFT_HOST_VARIANT_ARCH="armv7"
             ;;
@@ -781,6 +784,11 @@ case "$(uname -s -m)" in
     Linux\ x86_64)
         STDLIB_DEPLOYMENT_TARGETS=(
             "linux-x86_64"
+        )
+        ;;
+    Linux\ armv6*)
+        STDLIB_DEPLOYMENT_TARGETS=(
+            "linux-armv6"
         )
         ;;
     Linux\ armv7*)
