@@ -12,8 +12,13 @@ import json
 import optparse
 import subprocess
 import sys
-import urllib
-import urllib2
+
+try:
+    from urllib import urlencode
+    from urllib2 import urlopen, Request
+except ImportError:  # Python 3
+    from urllib.parse import urlencode
+    from urllib.request import urlopen, Request
 
 # Test status codes.
 PASS = 0
@@ -52,9 +57,9 @@ def timestamp():
 
 def submit_results_to_server(results_data, submit_url):
     # Submit the URL encoded data.
-    data = urllib.urlencode({ 'input_data' : results_data,
-                              'commit' : '1' })
-    response = urllib2.urlopen(urllib2.Request(submit_url, data))
+    data = urlencode({'input_data': results_data,
+                      'commit': '1'})
+    response = urlopen(Request(submit_url, data))
     result_data = response.read()
 
     # The result is expected to be a JSON object.
@@ -113,7 +118,7 @@ def main():
    utcnow = datetime.datetime.utcnow()
    start_time = utcnow - datetime.timedelta(seconds=data['elapsed'])
    end_time = utcnow
-   
+
    # Create the LNT report format.
    lnt_results = {}
    lnt_results['Machine'] = {
@@ -186,6 +191,6 @@ def main():
    # Submit the results to an LNT server, if requested.
    if opts.submit_url:
       submit_results_to_server(lnt_result_data, opts.submit_url)
-      
+
 if __name__ == '__main__':
    main()

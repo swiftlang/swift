@@ -12,6 +12,14 @@
 
 from ctypes import *
 
+# Python 3 has just one integer type, which mostly behaves like the `long`
+# type from Python 2.  There's an `isinstance(obj, (int,long,bool))` in this
+# file; this fudge is to make that work on Python 3.  See PEP 237.
+try:
+    long
+except NameError:
+    long = int
+
 # ctypes doesn't implicitly convert c_void_p to the appropriate wrapper
 # object. This is a problem, because it means that from_parameter will see an
 # integer and pass the wrong value on platforms where int != void*. Work around

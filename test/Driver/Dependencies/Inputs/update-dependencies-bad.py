@@ -17,4 +17,4 @@ if os.path.basename(primaryFile) == 'bad.swift':
     exit(1)
 
 dir = os.path.dirname(os.path.abspath(__file__))
-execfile(os.path.join(dir, "update-dependencies.py"))
+exec(compile(open(os.path.join(dir, "update-dependencies.py")).read(), os.path.join(dir, "update-dependencies.py"), 'exec'))

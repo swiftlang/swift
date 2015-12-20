@@ -5,11 +5,15 @@
 from __future__ import print_function
 
 import re
-from cStringIO import StringIO
 import tokenize
 import textwrap
 from bisect import bisect
 import os
+
+try:
+    from cStringIO import StringIO
+except ImportError
+    from io import StringIO
 
 def getLineStarts(s):
     """Return a list containing the start index of each line in s.

@@ -9,6 +9,13 @@ import time
 import random
 import sys
 
+# In Python 3, raw_input() was renamed to input() and the original
+# input() was removed.
+try:
+    raw_input
+except NameError:
+    raw_input = input
+
 def send_to_screen(screen_name, arg0=None, command='stuff'):
     args = ['screen', '-S', screen_name, '-p', '0',
             '-X', command]
