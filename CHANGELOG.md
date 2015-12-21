@@ -6,8 +6,10 @@ Latest
   that starts with a dot may contain other dots in it, but operators that start
   with some other character may not contain dots.  For example:
  
+    ```
     x....foo   --> "x" "...." "foo"
     x&%^.foo   --> "x" "&%^"  ".foo"
+    ```
 
   This eliminates a special case for the ..< operator, folding it into a simple
   and consistent rule.
