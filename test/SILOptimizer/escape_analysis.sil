@@ -526,7 +526,7 @@ bb2(%5 : $LinkedNode):
 // CHECK-NEXT:    Con %0.2 Esc: A, Succ: (%0.3)
 // CHECK-NEXT:    Con %0.3 Esc: A, Succ: (%0.4)
 // CHECK-NEXT:    Con %0.4 Esc: A, Succ: (%4.1)
-// CHECK-NEXT:    Val %4 Esc: R, Succ: %0.4, %4.2
+// CHECK-NEXT:    Val %4 Esc: R, Succ: %0.4
 // CHECK-NEXT:    Con %4.1 Esc: A, Succ: (%4.2)
 // CHECK-NEXT:    Con %4.2 Esc: A, Succ: (%4.1)
 // CHECK-NEXT:    Ret Esc: R, Succ: %4
@@ -705,6 +705,26 @@ bb1(%7 : $(Pointer, Pointer)):
   %8 = tuple_extract %7 : $(Pointer, Pointer), 1
   %9 = struct_extract %8 : $Pointer, #Pointer.y
   return %9 : $Y
+}
+
+// CHECK-LABEL: CG of defer_edge_cycle
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ: %1.1
+// CHECK-NEXT:    Con %0.2 Esc: A, Succ: (%0.3)
+// CHECK-NEXT:    Con %0.3 Esc: A, Succ: 
+// CHECK-NEXT:    Arg %1 Esc: A, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: A, Succ: (%0.2), %0.1
+// CHECK-NEXT:  End
+sil @defer_edge_cycle : $@convention(thin) (@inout Y, @inout Y) -> () {
+entry(%0 : $*Y, %1 : $*Y):
+  %l1 = load %0 : $*Y
+  store %l1 to %1 : $*Y
+  %l2 = load %1 : $*Y
+  store %l2 to %0 : $*Y
+  %x = ref_element_addr %l1 : $Y, #Y.x
+  %l3 = load %x : $*X
+  %r = tuple ()
+  return %r : $()
 }
 
 // CHECK-LABEL: CG of test_select_enum

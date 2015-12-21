@@ -149,8 +149,8 @@ bool EscapeAnalysis::ConnectionGraph::addDeferEdge(CGNode *From, CGNode *To) {
 void EscapeAnalysis::ConnectionGraph::mergeAllScheduledNodes() {
   while (!ToMerge.empty()) {
     CGNode *From = ToMerge.pop_back_val();
-    CGNode *To = From->mergeTo;
-    assert(To && "Node scheduled to merge but no merge target set");
+    CGNode *To = From->getMergeTarget();
+    assert(To != From && "Node scheduled to merge but no merge target set");
     assert(!From->isMerged && "Merge source is already merged");
     assert(From->Type == NodeType::Content && "Can only merge content nodes");
     assert(To->Type == NodeType::Content && "Can only merge content nodes");
@@ -216,6 +216,9 @@ void EscapeAnalysis::ConnectionGraph::mergeAllScheduledNodes() {
           if (PredOfPred.getInt() == EdgeType::Defer)
             updatePointsTo(PredOfPred.getPointer(), To);
         }
+        for (CGNode *Def : PredNode->defersTo) {
+          updatePointsTo(Def, To);
+        }
       }
     }
     if (CGNode *ToPT = To->getPointsToEdge()) {
@@ -243,6 +246,7 @@ updatePointsTo(CGNode *InitialNode, CGNode *pointsTo) {
   llvm::SmallVector<CGNode *, 8> WorkList;
   WorkList.push_back(InitialNode);
   InitialNode->isInWorkList = true;
+  bool isInitialSet = (InitialNode->pointsTo == nullptr);
   for (unsigned Idx = 0; Idx < WorkList.size(); ++Idx) {
     auto *Node = WorkList[Idx];
     if (Node->pointsTo == pointsTo)
@@ -261,6 +265,8 @@ updatePointsTo(CGNode *InitialNode, CGNode *pointsTo) {
         // We create an edge to pointsTo (agreed, this changes the structure of
         // the graph but adding this edge is harmless).
         Node->setPointsTo(pointsTo);
+        assert(isInitialSet &&
+               "when replacing the points-to, there should already be an edge");
       } else {
         Node->pointsTo = pointsTo;
       }
@@ -279,6 +285,60 @@ updatePointsTo(CGNode *InitialNode, CGNode *pointsTo) {
         if (!PredNode->isInWorkList) {
           WorkList.push_back(PredNode);
           PredNode->isInWorkList = true;
+        }
+      }
+    }
+  }
+  if (isInitialSet) {
+    // Here we handle a special case: all defer-edge pathes must eventually end
+    // in a points-to edge to pointsTo. We ensure this by setting the edge on
+    // nodes which have no defer-successors (see above). But this does not cover
+    // the case where there is a terminating cyle in the defer-edge path,
+    // e.g.  A -> B -> C -> B
+    // We find all nodes which don't reach a points-to edge and add additional
+    // points-to edges to fix that.
+    llvm::SmallVector<CGNode *, 8> PotentiallyInCycles;
+
+    // Keep all nodes with a points-to edge in the WorkList and remove all other
+    // nodes.
+    unsigned InsertionPoint = 0;
+    for (CGNode *Node : WorkList) {
+      if (Node->pointsToIsEdge) {
+        WorkList[InsertionPoint++] = Node;
+      } else {
+        Node->isInWorkList = false;
+        PotentiallyInCycles.push_back(Node);
+      }
+    }
+    WorkList.set_size(InsertionPoint);
+    unsigned Idx = 0;
+    while (!PotentiallyInCycles.empty()) {
+
+      // Propagate the "reaches-a-points-to-edge" backwards in the defer-edge
+      // sub-graph by adding those nodes to the WorkList.
+      while (Idx < WorkList.size()) {
+        auto *Node = WorkList[Idx++];
+        for (Predecessor Pred : Node->Preds) {
+          if (Pred.getInt() == EdgeType::Defer) {
+            CGNode *PredNode = Pred.getPointer();
+            if (!PredNode->isInWorkList) {
+              WorkList.push_back(PredNode);
+              PredNode->isInWorkList = true;
+            }
+          }
+        }
+      }
+      // Check if we still have some nodes which don't reach a points-to edge,
+      // i.e. points not yet in the WorkList.
+      while (!PotentiallyInCycles.empty()) {
+        auto *Node = PotentiallyInCycles.pop_back_val();
+        if (!Node->isInWorkList) {
+          // We create a points-to edge for the first node which doesn't reach
+          // a points-to edge yet.
+          Node->setPointsTo(pointsTo);
+          WorkList.push_back(Node);
+          Node->isInWorkList = true;
+          break;
         }
       }
     }
