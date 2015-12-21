@@ -111,6 +111,11 @@ public:
                         ArrayRef<std::pair<Identifier, SourceLoc>> path)
                       override;
 
+  /// \brief Look for declarations associated with the given name.
+  ///
+  /// \param name The name we're searching for.
+  void lookupValue(DeclName name, VisibleDeclConsumer &consumer);
+
   /// \brief Look for visible declarations in the Clang translation unit and
   /// import them as Swift decls.
   ///

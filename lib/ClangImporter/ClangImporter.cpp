@@ -3476,6 +3476,23 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
   return true; // no info found about that header.
 }
 
+void ClangImporter::lookupValue(DeclName name, VisibleDeclConsumer &consumer){
+  // Look for values in the bridging header's lookup table.
+  Impl.lookupValue(Impl.BridgingHeaderLookupTable, name, consumer);
+
+  // Collect and sort the set of module names.
+  SmallVector<StringRef, 4> moduleNames;
+  for (const auto &entry : Impl.LookupTables) {
+    moduleNames.push_back(entry.first());
+  }
+  llvm::array_pod_sort(moduleNames.begin(), moduleNames.end());
+
+  // Look for values in the module lookup tables.
+  for (auto moduleName : moduleNames) {
+    Impl.lookupValue(*Impl.LookupTables[moduleName].get(), name, consumer);
+  }
+}
+
 void ClangImporter::lookupVisibleDecls(VisibleDeclConsumer &Consumer) const {
   if (Impl.CurrentCacheState != Implementation::CacheState::Valid) {
     do {
