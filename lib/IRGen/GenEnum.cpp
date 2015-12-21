@@ -161,6 +161,10 @@ llvm::Constant *EnumImplStrategy::emitCaseNames() const {
   return IGM.getAddrOfGlobalString(fieldNames);
 }
 
+unsigned EnumImplStrategy::getPayloadSizeForMetadata() const {
+  llvm_unreachable("don't need payload size for this enum kind");
+}
+
 llvm::Value *irgen::EnumImplStrategy::
 loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc, Address addr) const {
   IGF.IGM.error(loc, "Can only load from an address of an optional "
@@ -2679,6 +2683,10 @@ namespace {
     // The number of tag values used for no-payload cases.
     unsigned NumEmptyElementTags = ~0u;
 
+    // The payload size in bytes. This might need to be written to metadata
+    // if it depends on resilient types.
+    unsigned PayloadSize;
+
     /// More efficient value semantics implementations for certain enum layouts.
     enum CopyDestroyStrategy {
       /// No special behavior.
@@ -2781,7 +2789,17 @@ namespace {
       // the payload area size from all of the cases, so cache it in the
       // metadata. For fixed-layout cases this isn't necessary (except for
       // reflection, but it's OK if reflection is a little slow).
-      return TIK < Fixed;
+      //
+      // Note that even if from within our module the enum has a fixed layout,
+      // we might need the payload size if from another module the enum has
+      // a dynamic size, which can happen if the enum contains a resilient
+      // payload.
+      return !AlwaysFixedSize;
+    }
+
+    unsigned getPayloadSizeForMetadata() const override {
+      assert(TIK >= Fixed);
+      return PayloadSize;
     }
 
     TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
@@ -4580,6 +4598,18 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
   std::vector<Element> elementsWithPayload;
   std::vector<Element> elementsWithNoPayload;
 
+  // The most general resilience scope that can have knowledge of this
+  // enum's layout. If all payload types have a fixed size in this
+  // resilience scope, we can make further assumptions to optimize
+  // layout.
+  ResilienceScope scope = ResilienceScope::Universal;
+
+  // TODO: Replace this with 'public or internal with @availability' check
+  // once that is in place
+  if (theEnum->getFormalAccess() != Accessibility::Public ||
+      TC.IGM.isResilient(theEnum, ResilienceScope::Universal))
+    scope = ResilienceScope::Component;
+
   for (auto elt : theEnum->getAllElements()) {
     numElements++;
 
@@ -4611,7 +4641,7 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
     // If the unsubstituted argument contains a generic parameter type, or if
     // the substituted argument is not universally fixed-size, we need to
     // constrain our layout optimizations to what the runtime can reproduce.
-    if (!origArgTI->isFixedSize(ResilienceScope::Universal))
+    if (!origArgTI->isFixedSize(scope))
       alwaysFixedSize = IsNotFixedSize;
 
     auto loadableOrigArgTI = dyn_cast<LoadableTypeInfo>(origArgTI);
@@ -4633,7 +4663,7 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
       // If the substituted argument contains a type that is not universally
       // fixed-size, we need to constrain our layout optimizations to what
       // the runtime can reproduce.
-      if (!substArgTI->isFixedSize(ResilienceScope::Universal))
+      if (!substArgTI->isFixedSize(scope))
         alwaysFixedSize = IsNotFixedSize;
     }
   }
@@ -5165,6 +5195,7 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
   Alignment worstAlignment(1);
   IsPOD_t isPOD = IsPOD;
   IsBitwiseTakable_t isBT = IsBitwiseTakable;
+  PayloadSize = 0;
   for (auto &elt : ElementsWithPayload) {
     auto &fixedPayloadTI = cast<FixedTypeInfo>(*elt.ti);
     if (fixedPayloadTI.getFixedAlignment() > worstAlignment)
@@ -5174,8 +5205,12 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
     if (!fixedPayloadTI.isBitwiseTakable(ResilienceScope::Component))
       isBT = IsNotBitwiseTakable;
 
+    unsigned payloadBytes = fixedPayloadTI.getFixedSize().getValue();
     unsigned payloadBits = fixedPayloadTI.getFixedSize().getValueInBits();
-    
+
+    if (payloadBytes > PayloadSize)
+      PayloadSize = payloadBytes;
+
     // See what spare bits from the payload we can use for layout optimization.
 
     // The runtime currently does not track spare bits, so we can't use them

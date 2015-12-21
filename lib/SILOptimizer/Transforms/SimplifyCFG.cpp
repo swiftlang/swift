@@ -966,7 +966,7 @@ bool SimplifyCFG::simplifyBranchOperands(OperandValueArrayRef Operands) {
   for (auto O = Operands.begin(), E = Operands.end(); O != E; ++O)
     if (auto *I = dyn_cast<SILInstruction>(*O))
       if (SILValue Result = simplifyInstruction(I)) {
-        SILValue(I, 0).replaceAllUsesWith(Result.getDef());
+        SILValue(I, 0).replaceAllUsesWith(Result);
         if (isInstructionTriviallyDead(I)) {
           eraseFromParentWithDebugInsts(I);
           Simplified = true;

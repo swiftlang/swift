@@ -176,6 +176,47 @@ static bool isIdentifiedFunctionLocal(SILValue V) {
   return isa<AllocationInst>(*V) || isNoAliasArgument(V) || isLocalLiteral(V);
 }
 
+/// Returns true if V is a function argument that is not an address implying
+/// that we do not have the guarantee that it will not alias anything inside the
+/// function.
+static bool isAliasingFunctionArgument(SILValue V) {
+  return isFunctionArgument(V) && !V.getType().isAddress();
+}
+
+/// Returns true if V is an apply inst that may read or write to memory.
+static bool isReadWriteApplyInst(SILValue V) {
+  // See if this is a normal function application.
+  if (auto *AI = dyn_cast<ApplyInst>(V)) {
+    return AI->mayReadOrWriteMemory();
+  }
+  
+  // Next, see if this is a builtin.
+  if (auto *BI = dyn_cast<BuiltinInst>(V)) {
+    return BI->mayReadOrWriteMemory();
+  }
+
+  // If we fail, bail...
+  return false;
+}
+
+/// Return true if the pointer is one which would have been considered an escape
+/// by isNonEscapingLocalObject.
+static bool isEscapeSource(SILValue V) {
+  if (isReadWriteApplyInst(V))
+    return true;
+
+  if (isAliasingFunctionArgument(V))
+    return true;
+
+  // The LoadInst case works since valueMayBeCaptured always assumes stores are
+  // escapes.
+  if (isa<LoadInst>(*V))
+    return true;
+
+  // We could not prove anything, be conservative and return false.
+  return false;
+}
+
 /// Returns true if we can prove that the two input SILValues which do not equal
 /// can not alias.
 static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
@@ -200,6 +241,16 @@ static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
       (isFunctionArgument(O2) && isIdentifiedFunctionLocal(O1))) {
     DEBUG(llvm::dbgs() << "            Found unequal function arg and "
           "identified function local!\n");
+    return true;
+  }
+
+  // If one pointer is the result of an apply or load and the other is a
+  // non-escaping local object within the same function, then we know the object
+  // couldn't escape to a point where the call could return it.
+  if ((isEscapeSource(O1) && isNonEscapingLocalObject(O2)) ||
+      (isEscapeSource(O2) && isNonEscapingLocalObject(O1))) {
+    DEBUG(llvm::dbgs() << "            Found unequal escape source and non "
+          "escaping local object!\n");
     return true;
   }
 
@@ -593,14 +644,6 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   // same object. If we can, return No Alias.
   if (O1 != O2 && aliasUnequalObjects(O1, O2))
     return AliasResult::NoAlias;
-
-  // Ask escape analysis. This catches cases where we compare e.g. a
-  // non-escaping pointer with another pointer.
-  if (!EA->canPointToSameMemory(V1, V2)) {
-    DEBUG(llvm::dbgs() << "            Found not-aliased objects based on"
-                                      "escape analysis\n");
-    return AliasResult::NoAlias;
-  }
 
   // Ok, either O1, O2 are the same or we could not prove anything based off of
   // their inequality. Now we climb up use-def chains and attempt to do tricks

@@ -114,7 +114,42 @@ public:
   }
 
 #include "swift/Sema/TypeCheckRequestPayloads.def"
-  
+
+  TypeCheckRequest(const TypeCheckRequest &T) { *this = T; }
+
+  TypeCheckRequest& operator=(const TypeCheckRequest &T) {
+    TheKind = T.getKind();
+    switch (getPayloadKind(TheKind)) {
+    case PayloadKind::Class:
+      Payload.Class = T.Payload.Class;
+      break;
+    case PayloadKind::Enum:
+      Payload.Enum = T.Payload.Enum;
+      break;
+    case PayloadKind::InheritedClauseEntry:
+      new (&Payload.InheritedClauseEntry)
+        std::pair<llvm::PointerUnion<TypeDecl *, ExtensionDecl *>, unsigned>();
+      Payload.InheritedClauseEntry = T.Payload.InheritedClauseEntry;
+      break;
+    case PayloadKind::Protocol:
+      Payload.Protocol = T.Payload.Protocol;
+      break;
+    case PayloadKind::DeclContextLookup:
+      new (&Payload.DeclContextLookup) DeclContextLookupInfo();
+      Payload.DeclContextLookup = T.Payload.DeclContextLookup;
+      break;
+    case PayloadKind::TypeResolution:
+      new (&Payload.InheritedClauseEntry)
+        std::tuple<TypeRepr *, DeclContext *, unsigned>();
+      Payload.TypeResolution = T.Payload.TypeResolution;
+      break;
+    case PayloadKind::TypeDeclResolution:
+      Payload.TypeDeclResolution = T.Payload.TypeDeclResolution;
+      break;
+    }
+    return *this;
+  }
+
   /// Determine the kind of type check request.
   Kind getKind() const { return TheKind; }
 

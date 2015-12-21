@@ -14,7 +14,6 @@
 #include "swift/SIL/SILModule.h"
 #include "Linker.h"
 #include "swift/SIL/SILDebugScope.h"
-#include "swift/SIL/SILExternalSource.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/SIL/SILValue.h"
@@ -43,9 +42,6 @@ namespace swift {
     }
   };
 } // end namespace swift.
-
-void SILExternalSource::anchor() {
-}
 
 /// SILTypeListUniquingType - This is the type of the folding set maintained by
 /// SILModule that these things are uniqued into.
@@ -527,18 +523,15 @@ SILFunction *SILModule::lookUpFunction(SILDeclRef fnRef) {
 }
 
 bool SILModule::linkFunction(SILFunction *Fun, SILModule::LinkingMode Mode) {
-  return SILLinkerVisitor(*this, getSILLoader(), Mode, ExternalSource)
-      .processFunction(Fun);
+  return SILLinkerVisitor(*this, getSILLoader(), Mode).processFunction(Fun);
 }
 
 bool SILModule::linkFunction(SILDeclRef Decl, SILModule::LinkingMode Mode) {
-  return SILLinkerVisitor(*this, getSILLoader(), Mode, ExternalSource)
-      .processDeclRef(Decl);
+  return SILLinkerVisitor(*this, getSILLoader(), Mode).processDeclRef(Decl);
 }
 
 bool SILModule::linkFunction(StringRef Name, SILModule::LinkingMode Mode) {
-  return SILLinkerVisitor(*this, getSILLoader(), Mode, ExternalSource)
-      .processFunction(Name);
+  return SILLinkerVisitor(*this, getSILLoader(), Mode).processFunction(Name);
 }
 
 void SILModule::linkAllWitnessTables() {
@@ -598,8 +591,7 @@ SILVTable *SILModule::lookUpVTable(const ClassDecl *C) {
 
   // If that fails, try to deserialize it. If that fails, return nullptr.
   SILVTable *Vtbl =
-      SILLinkerVisitor(*this, getSILLoader(), SILModule::LinkingMode::LinkAll,
-                       ExternalSource)
+      SILLinkerVisitor(*this, getSILLoader(), SILModule::LinkingMode::LinkAll)
           .processClassDecl(C);
   if (!Vtbl)
     return nullptr;

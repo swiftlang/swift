@@ -1,13 +1,15 @@
 #!/usr/bin/env python
+from __future__ import print_function
+
 import sys, re, subprocess
 
 def run():
     if len(sys.argv) > 1:
-        print """
+        print("""
 ns-html2rst - Convert Cocoa HTML documentation into ReST
 
 usage: nshtml2rst < NSString.html > NSString.rst
-        """
+        """)
         exit(0)
 
     html = sys.stdin.read()

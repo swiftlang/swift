@@ -1,4 +1,4 @@
-//===--- ClangImporter.cpp - Import Clang Modules --------------*- C++ -*--===//
+//===--- ClangImporter.h - Import Clang Modules ----------------*- C++ -*--===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -114,7 +114,7 @@ public:
   /// \brief Look for declarations associated with the given name.
   ///
   /// \param name The name we're searching for.
-  void lookupValue(Identifier name, VisibleDeclConsumer &consumer);
+  void lookupValue(DeclName name, VisibleDeclConsumer &consumer);
 
   /// \brief Look for visible declarations in the Clang translation unit and
   /// import them as Swift decls.

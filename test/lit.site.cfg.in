@@ -42,9 +42,6 @@ if "@SWIFT_OPTIMIZED@" == "TRUE":
 if "@SWIFT_HAVE_WORKING_STD_REGEX@" == "FALSE":
     config.available_features.add('broken_std_regex')
 
-if "@SWIFT_BUILD_SOURCEKIT@" == "TRUE" or "@SWIFT_BUILD_SOURCEKIT@" == "ON":
-    config.available_features.add('sourcekit')
-
 # Let the main config do the real work.
 if config.test_exec_root is None:
     config.test_exec_root = os.path.dirname(os.path.realpath(__file__))

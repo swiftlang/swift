@@ -1,4 +1,4 @@
-//===- DiagnosticsSILAnalysis.def - Diagnostics Text ------------*- C++ -*-===//
+//===- DiagnosticsSIL.def - Diagnostics Text --------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -1,0 +1,7 @@
+// RUN: not --crash %target-sil-opt %s
+// REQUIRES: asserts
+
+// This test fails in the AST verifier, which can be turned off.
+// REQUIRES: swift_ast_verifier
+
+l<@convention()>(

@@ -119,7 +119,7 @@ ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
   const char *SourceStart = Buffer.data();
   const char *SourceEnd = Buffer.data() + Buffer.size();
   const char *LineStart = SourceStart;
-  const char *LineSourceStart = NULL;
+  const char *LineSourceStart = nullptr;
   uint32_t LineIndent = 0;
   struct IndentInfo {
     StringRef Prefix;
@@ -134,7 +134,7 @@ ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
     case '\r':
     case '\n':
       LineIndent = 0;
-      LineSourceStart = NULL;
+      LineSourceStart = nullptr;
       LineStart = p + 1;
       break;
 
@@ -146,7 +146,7 @@ ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
     case '(':
     case '[':
       ++LineIndent;
-      if (LineSourceStart == NULL)
+      if (LineSourceStart == nullptr)
         IndentInfos.push_back(IndentInfo(LineStart,
                                          p - LineStart,
                                          LineIndent));
@@ -166,7 +166,7 @@ ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
       break;
   
     default:
-      if (LineSourceStart == NULL && !isspace(*p))
+      if (LineSourceStart == nullptr && !isspace(*p))
         LineSourceStart = p;
       break;
     }

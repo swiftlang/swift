@@ -407,6 +407,7 @@ public:
                                      unsigned offset) const = 0;
   
   virtual bool needsPayloadSizeInMetadata() const = 0;
+  virtual unsigned getPayloadSizeForMetadata() const;
   
   virtual llvm::Value *loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc,
                                          Address addr) const;

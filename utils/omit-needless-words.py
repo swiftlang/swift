@@ -4,6 +4,8 @@
 # heuristics that omit 'needless' words from APIs imported from Clang
 # into Swift.
 
+from __future__ import print_function
+
 import argparse
 import subprocess
 
@@ -52,32 +54,32 @@ def main():
 
     swift_ide_test_cmd = [args.swift_ide_test, '-print-module', '-source-filename', source_filename, '-sdk', sdkroot, '-target', args.target, '-module-print-skip-overlay', '-skip-unavailable', '-module-print-submodules', '-skip-imports', '-module-to-print=%s' % (args.module)]
     omit_needless_words_args = ['-enable-omit-needless-words', '-enable-infer-default-arguments']
-    
+
     # Determine the output files.
     # No good way with argparse to set default value based on depenency of other arg.
     if not args.before_file:
         args.before_file = '%s.before.txt' % (args.module)
     if not args.after_file:
         args.after_file = '%s.after.txt' % (args.module)
-    
+
     # Create a .swift file we can feed into swift-ide-test
     subprocess.call(['touch', source_filename])
-    
+
     if not args.only_after:
       # Print the interface without omitting needless words
       if not args.quiet:
           print('Writing %s...' % args.before_file)
       output_command_result_to_file(swift_ide_test_cmd, args.before_file)
-    
+
     if not args.only_before:
       # Print the interface omitting needless words
       if not args.quiet:
           print('Writing %s...' % args.after_file)
       output_command_result_to_file(swift_ide_test_cmd + omit_needless_words_args, args.after_file)
-    
+
     # Remove the .swift file we fed into swift-ide-test
     subprocess.call(['rm', '-f', source_filename])
-    
+
     # Diff them
     subprocess.call([args.diff_tool, args.before_file, args.after_file])
 

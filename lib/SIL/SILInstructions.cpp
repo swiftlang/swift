@@ -1,4 +1,4 @@
-//===--- SILInstruction.cpp - Instructions for SIL code -------------------===//
+//===--- SILInstructions.cpp - Instructions for SIL code ------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -862,6 +862,12 @@ SwitchValueInst::SwitchValueInst(SILDebugLocation *Loc, SILValue Operand,
   }
 
   for (unsigned i = 0, size = Cases.size(); i < size; ++i) {
+    // If we have undef, just add the case and continue.
+    if (isa<SILUndef>(Cases[i])) {
+      ::new (succs + i) SILSuccessor(this, BBs[i]);
+      continue;
+    }
+
     if (OperandBitWidth) {
       auto *IL = dyn_cast<IntegerLiteralInst>(Cases[i]);
       assert(IL && "switch_value case value should be of an integer type");

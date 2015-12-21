@@ -3,7 +3,7 @@
 func markUsed<T>(t: T) {}
 
 protocol AProtocol {
-  func f() -> String;
+  func f() -> String
 }
 class AClass : AProtocol {
   func f() -> String { return "A" }

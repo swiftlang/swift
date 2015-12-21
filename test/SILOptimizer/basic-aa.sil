@@ -503,25 +503,3 @@ bb0(%0 : $C, %1 : $C, %2 : $Int):
   return %2 : $Int
 }
 
-// CHECK-LABEL: @non_escaping_local_object_does_not_alias_with_unknown
-// CHECK: PAIR #7.
-// CHECK-NEXT: (0):   %1 = alloc_ref $X                               // user: %3
-// CHECK-NEXT: (0):   %3 = apply %2(%1) : $@convention(thin) (X) -> X
-// CHECK-NEXT: NoAlias
-sil @non_escaping_local_object_does_not_alias_with_unknown : $@convention(thin) (X) -> () {
-bb0(%0 : $X):
-  %1 = alloc_ref $X
-
-  %f = function_ref @not_escaping : $@convention(thin) (X) -> X
-  %2 = apply %f(%1) : $@convention(thin) (X) -> X
-
-  %12 = tuple()
-  return %12 : $()
-}
-
-sil @not_escaping: $@convention(thin) (X) -> X {
-bb0(%0 : $X):
-  %1 = alloc_ref $X
-  return %1 : $X
-}
-

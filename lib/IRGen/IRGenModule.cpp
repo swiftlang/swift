@@ -625,19 +625,6 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
   }
 }
 
-// FIXME: This should just be the implementation of
-// llvm::array_pod_sort_comparator. The only difference is that it uses
-// std::less instead of operator<.
-template <typename T>
-static int pointerPODSortComparator(T * const *lhs, T * const *rhs) {
-  std::less<T *> lt;
-  if (lt(*lhs, *rhs))
-    return -1;
-  if (lt(*rhs, *lhs))
-    return -1;
-  return 0;
-}
-
 static bool replaceModuleFlagsEntry(llvm::LLVMContext &Ctx,
                                     llvm::Module &Module, StringRef EntryName,
                                     llvm::Module::ModFlagBehavior Behavior,

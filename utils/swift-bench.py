@@ -34,9 +34,10 @@
 # Ideas for the harness improvement and development are welcomed here:
 # rdar://problem/18072938
 
+from __future__ import print_function
+
 import subprocess
 import numpy
-import time
 import re
 import os
 import sys
@@ -297,7 +298,6 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
       return
     samples = []
     self.log("Running bench: %s, numsamples: %d" % (name, numSamples), 2)
-    output = ""
     for i in range(0,numSamples):
       try:
         r = self.runCommand([self.tests[name].binary, str(iterScale),

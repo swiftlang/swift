@@ -51,7 +51,7 @@ func testGenericArithmeticOverflowMessage() {
   myaddUnsigned(250, 250, 250) // expected-error{{arithmetic operation '250 + 250' (on unsigned 8-bit integer type) results in an overflow}}
 }
 
-typealias MyInt = UInt8;
+typealias MyInt = UInt8
 
 func testConvertOverflow() {
   var _ /*int8_minus_two*/  : Int8 = (-2)
@@ -106,7 +106,7 @@ func testConvertOverflow() {
   
   var _ /*int8_max_pa*/      : Int8   = -13333; //expected-error{{integer literal '-13333' overflows when stored into 'Int8}}
   var _ /*int32_max_p_hex*/  : Int32  = 0xFFFF_FFFF; //expected-error{{integer literal '4294967295' overflows when stored into 'Int32'}}
-  var _ /*uint32_max_hex*/   : UInt32 = 0xFFFF_FFFF;
+  var _ /*uint32_max_hex*/   : UInt32 = 0xFFFF_FFFF
   var _ /*uint32_max_p_hex*/ : UInt32 = 0xFFFF_FFFF_F; //expected-error{{integer literal '68719476735' overflows when stored into 'UInt32'}}
   var _ /*uint0_typealias*/  : MyInt = 256; //expected-error{{integer literal '256' overflows when stored into 'MyInt'}}
 

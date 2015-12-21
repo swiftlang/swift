@@ -49,7 +49,7 @@ enum SomeEnum3 {
 }
 
 struct NotOptions1 {
-  static let NotSet = 1;
+  static let NotSet = 1
 }
 
 struct SomeOptions1 : OptionSet {

@@ -1,5 +1,11 @@
 Latest
 ------
+
+* The "C-style for loop", which is spelled `for init; comparison; increment {}`
+  has been deprecated and is slated for removal in Swift 3.0.  See
+  [SE-0007](https://github.com/apple/swift-evolution/blob/master/proposals/0007-remove-c-style-for-loops.md)
+  for more information.
+
 * Three new doc comment fields, namely `- keyword:`, `- recommended:`
   and `- recommendedover:`, allow Swift users to cooperate with code
   completion engine to deliver more effective code completion results.
@@ -67,7 +73,7 @@ Latest
   allows you to use C enum pattern matching in switch statements with no
   additional code. **(17287720)**
 
-* The `NSNumberunsignedIntegerValue` property now has the type `UInt` instead
+* The `NSNumber.unsignedIntegerValue` property now has the type `UInt` instead
   of `Int`, as do other methods and properties that use the `NSUInteger` type
   in Objective-C and whose names contain `unsigned..`. Most other uses of
   `NSUInteger` in system frameworks are imported as `Int` as they were in

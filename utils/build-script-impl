@@ -389,7 +389,6 @@ function set_deployment_target_based_options() {
                     ;;
             esac
 
-            native_llvm_build=$(build_directory macosx-x86_64 llvm)
             llvm_cmake_options=(
                 -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING="${cmake_osx_deployment_target}"
                 -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk $xcrun_sdk_name --show-sdk-path)"
@@ -699,10 +698,10 @@ function not() {
 
 function true_false() {
     case "$1" in
-        false | 0)
+        false | FALSE | 0)
             echo "FALSE"
             ;;
-        true | 1)
+        true | TRUE | 1)
             echo "TRUE"
             ;;
         *)
@@ -1039,7 +1038,6 @@ COMMON_CMAKE_OPTIONS=(
 )
 
 COMMON_C_FLAGS=""
-COMMON_CXX_FLAGS=""
 
 if [[ "${ENABLE_ASAN}" ]] ; then
     COMMON_CMAKE_OPTIONS=(
@@ -1324,15 +1322,6 @@ function cmake_config_opt() {
     fi
 }
 
-function should_build_perftestsuite() {
-    if [ "$(uname -s)" != Darwin ]; then
-        echo "FALSE"
-        return
-    fi
-
-    echo $(true_false "${BUILD_SWIFT_PERF_TESTSUITE}")
-}
-
 function set_swiftpm_bootstrap_command() {
     swiftpm_bootstrap_command=()
     
@@ -1479,13 +1468,6 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
         swift_cmake_options=(
             "${swift_cmake_options[@]}"
             -DSWIFT_EXPERIMENTAL_EXTRA_REGEXP_FLAGS="${EXTRA_SWIFT_ARGS}"
-        )
-    fi
-
-    if [[ $(should_build_perftestsuite) == "TRUE" ]]; then
-        swift_cmake_options=(
-            "${swift_cmake_options[@]}"
-            -DSWIFT_INCLUDE_PERF_TESTSUITE=YES
         )
     fi
 
@@ -1696,7 +1678,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 fi
 
                 build_targets=(all "${SWIFT_STDLIB_TARGETS[@]}")
-                if [[ $(should_build_perftestsuite) == "TRUE" ]]; then
+                if [[ $(true_false "${build_perf_testsuite_this_time}") == "TRUE" ]]; then
                     native_swift_tools_path=$(build_directory macosx-x86_64 swift)/bin
                     cmake_options=(
                         "${cmake_options[@]}"
@@ -1738,7 +1720,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 fi
 
                 # Get the build date
-                LLDB_BUILD_DATE=`date +%Y-%m-%d`
+                LLDB_BUILD_DATE=$(date +%Y-%m-%d)
 
                 case "$(uname -s)" in
                     Linux)
@@ -2166,10 +2148,10 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                     continue
                 fi
                 LIB_TARGET="linux"
-                if [[ `uname -s` == "FreeBSD" ]]; then
+                if [[ $(uname -s) == "FreeBSD" ]]; then
                     LIB_TARGET="freebsd"
                 fi
-                if [[ `uname -s` == "Darwin" ]]; then
+                if [[ $(uname -s) == "Darwin" ]]; then
                     LIB_TARGET="macosx"
                 fi
                 XCTEST_INSTALL_PREFIX="${INSTALL_DESTDIR}"/"${INSTALL_PREFIX}"/lib/swift/"${LIB_TARGET}"
@@ -2319,7 +2301,7 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
     fi
     if [[ "${TEST_INSTALLABLE_PACKAGE}" ]] ; then
         PKG_TESTS_SOURCE_DIR="${WORKSPACE}/swift-integration-tests"
-        PKG_TESTS_SANDBOX_PARENT="/tmp/swift_package_sandbox"
+        PKG_TESTS_SANDBOX_PARENT="$(build_directory swift_package_sandbox none)"
 
         if [[ "$(uname -s)" == "Darwin" ]] ; then
             PKG_TESTS_SANDBOX="${PKG_TESTS_SANDBOX_PARENT}"/"${TOOLCHAIN_PREFIX}"

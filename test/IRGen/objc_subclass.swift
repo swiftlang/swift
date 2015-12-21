@@ -280,7 +280,7 @@ class SwiftGizmo : Gizmo {
   var x = Int()
 
   func getX() -> Int {
-    return x;
+    return x
   }
 
   override func duplicate() -> Gizmo {

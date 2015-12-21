@@ -769,9 +769,6 @@ public:
   SILType getSubstitutedStorageType(AbstractStorageDecl *value,
                                     Type lvalueType);
 
-  /// Retrieve the set of archetypes open in the given context.
-  GenericParamList *getEffectiveGenericParamsForContext(DeclContext *dc);
-
   /// Retrieve the set of archetypes closed over by the given function.
   GenericParamList *getEffectiveGenericParams(AnyFunctionRef fn,
                                               CaptureInfo captureInfo);

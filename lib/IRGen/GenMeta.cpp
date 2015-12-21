@@ -4561,7 +4561,16 @@ public:
   }
   
   void addPayloadSize() {
-    llvm_unreachable("nongeneric enums shouldn't need payload size in metadata");
+    auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
+    auto &enumTI = IGM.getTypeInfoForLowered(enumTy);
+    
+    assert(enumTI.isFixedSize(ResilienceScope::Component) &&
+           "emitting constant enum metadata for resilient-sized type?");
+    assert(!enumTI.isFixedSize(ResilienceScope::Universal) &&
+           "non-generic, non-resilient enums don't need payload size in metadata");
+
+    auto &strategy = getEnumImplStrategy(IGM, enumTy);
+    addConstantWord(strategy.getPayloadSizeForMetadata());
   }
 };
   
@@ -4597,6 +4606,10 @@ public:
   void addPayloadSize() {
     // In all cases where a payload size is demanded in the metadata, it's
     // runtime-dependent, so fill in a zero here.
+    auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
+    auto &enumTI = IGM.getTypeInfoForLowered(enumTy);
+    assert(!enumTI.isFixedSize(ResilienceScope::Universal) &&
+           "non-generic, non-resilient enums don't need payload size in metadata");
     addConstantWord(0);
   }
   
@@ -4605,7 +4618,7 @@ public:
                               llvm::Value *vwtable) {
     // Nominal types are always preserved through SIL lowering.
     auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
-    IGM.getTypeInfoForLowered(CanType(Target->getDeclaredTypeInContext()))
+    IGM.getTypeInfoForLowered(enumTy)
       .initializeMetadata(IGF, metadata, vwtable,
                           SILType::getPrimitiveAddressType(enumTy));
   }

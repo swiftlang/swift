@@ -3261,7 +3261,7 @@ public:
     return ClassDeclBits.Foreign;
   }
   void setForeign(bool isForeign = true) {
-    ClassDeclBits.Foreign = true;
+    ClassDeclBits.Foreign = isForeign;
   }
 
   /// Find a method of a class that overrides a given method.

@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import re
 import os
 import subprocess
@@ -40,7 +42,7 @@ SortedInfixes = sorted(Infixes)
 
 
 def addFunction(sizes, function, startAddr, endAddr, groupByPrefix):
-    if not function or startAddr == None or endAddr == None:
+    if not function or startAddr is None or endAddr is None:
         return
 
     size = endAddr - startAddr
@@ -111,7 +113,7 @@ def readSizes(sizes, fileName, functionDetails, groupByPrefix):
         asmlineMatch = asmlinePattern.match(line)
         if asmlineMatch:
             addr = int(asmlineMatch.group(1), 16)
-            if startAddr == None:
+            if startAddr is None:
                 startAddr = addr
             endAddr = addr
         elif line == "Section":
@@ -140,12 +142,12 @@ def readSizes(sizes, fileName, functionDetails, groupByPrefix):
 def compareSizes(oldSizes, newSizes, nameKey, title):
     oldSize = oldSizes[nameKey]
     newSize = newSizes[nameKey]
-    if oldSize != None and newSize != None:
+    if oldSize is not None and newSize is not None:
         if oldSize != 0:
             perc = "%.1f%%" % ((1.0 - float(newSize) / float(oldSize)) * 100.0)
         else:
             perc = "- "
-        print "%-26s%16s: %8d  %8d  %6s" % (title, nameKey, oldSize, newSize, perc)
+        print("%-26s%16s: %8d  %8d  %6s" % (title, nameKey, oldSize, newSize, perc))
 
 
 def compareSizesOfFile(oldFiles, newFiles, allSections, listCategories):
@@ -226,21 +228,21 @@ def compareFunctionSizes(oldFiles, newFiles):
             onlyInFile2Size += newSize
 
     if onlyInFile1:
-        print "Only in old file(s)"
-        print listFunctionSizes(onlyInFile1)
-        print "Total size of functions only in old file: {}".format(onlyInFile1Size)
-        print
+        print("Only in old file(s)")
+        print(listFunctionSizes(onlyInFile1))
+        print("Total size of functions only in old file: {}".format(onlyInFile1Size))
+        print()
 
     if onlyInFile2:
-        print "Only in new files(s)"
-        print listFunctionSizes(onlyInFile2)
-        print "Total size of functions only in new file: {}".format(onlyInFile2Size) 
-        print
+        print("Only in new files(s)")
+        print(listFunctionSizes(onlyInFile2))
+        print("Total size of functions only in new file: {}".format(onlyInFile2Size))
+        print()
 
     if inBoth:
         sizeIncrease = 0
         sizeDecrease = 0
-        print "%8s %8s %8s" % ("old", "new", "diff")
+        print("%8s %8s %8s" % ("old", "new", "diff"))
         for triple in sorted(inBoth, key=lambda tup: (tup[2] - tup[1], tup[1])):
             func = triple[0]
             oldSize = triple[1]
@@ -252,8 +254,8 @@ def compareFunctionSizes(oldFiles, newFiles):
                 sizeDecrease -= diff
             if diff == 0:
                 inBothSize += newSize
-            print "%8d %8d %8d %s" %(oldSize, newSize, newSize - oldSize, func)
-        print "Total size of functions with the same size in both files: {}".format(inBothSize)
-        print "Total size of functions that got smaller: {}".format(sizeDecrease)
-        print "Total size of functions that got bigger: {}".format(sizeIncrease)
-        print "Total size change of functions present in both files: {}".format(sizeIncrease - sizeDecrease)
+            print("%8d %8d %8d %s" %(oldSize, newSize, newSize - oldSize, func))
+        print("Total size of functions with the same size in both files: {}".format(inBothSize))
+        print("Total size of functions that got smaller: {}".format(sizeDecrease))
+        print("Total size of functions that got bigger: {}".format(sizeIncrease))
+        print("Total size change of functions present in both files: {}".format(sizeIncrease - sizeDecrease))

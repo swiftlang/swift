@@ -15,6 +15,8 @@
 # Note: viewcfg should be in the $PATH and .dot files should be associated
 # with the Graphviz app.
 
+from __future__ import print_function
+
 import re
 import sys
 import tempfile
@@ -22,14 +24,14 @@ import subprocess
 import os
 
 def help():
-  print """\
+  print("""\
 Usage:
 
 viewcfg [output-suffix] < file
 
 By default all CFGs are opened in the same window.
 Use the a unique output-suffix to open a CFG in a new window.
-"""
+""")
 
 class Block:
 
@@ -119,7 +121,7 @@ def main():
     newBlocks = { }
     for name, block in blocks.iteritems():
         for adjName in (block.preds + block.getSuccs()):
-            if not adjName in blocks:
+            if adjName not in blocks:
                 newBlocks[adjName] = Block(adjName, None)
 
     blocks = dict(blocks.items() + newBlocks.items())
@@ -130,7 +132,7 @@ def main():
     for name, block in blocks.iteritems():
         for predName in block.preds:
             predBlock = blocks[predName]
-            if not name in predBlock.getSuccs():
+            if name not in predBlock.getSuccs():
                 predBlock.getSuccs().append(name)
 
     # Write the output dot file.
@@ -141,16 +143,16 @@ def main():
     outFile.write('digraph "CFG" {\n')
     for name, block in blocks.iteritems():
         if block.content is not None:
-            outFile.write("\tNode" + str(block.index) + \
+            outFile.write("\tNode" + str(block.index) +
                 " [shape=record,label=\"{" + block.content + "}\"];\n")
         else:
-            outFile.write("\tNode" + str(block.index) + \
-                " [shape=record,color=gray,fontcolor=gray,label=\"{" + \
+            outFile.write("\tNode" + str(block.index) +
+                " [shape=record,color=gray,fontcolor=gray,label=\"{" +
                 block.name + "}\"];\n")
 
         for succName in block.getSuccs():
             succBlock = blocks[succName]
-            outFile.write("\tNode" + str(block.index) + " -> Node" + \
+            outFile.write("\tNode" + str(block.index) + " -> Node" +
                 str(succBlock.index) + ";\n")
 
     outFile.write("}\n")

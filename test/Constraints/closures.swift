@@ -19,7 +19,7 @@ mySort(strings, { x, y in x < y })
 
 // Closures with inout arguments.
 func f0<T, U>(t: T, _ f: (inout T) -> U) -> U {
-  var t2 = t;
+  var t2 = t
   return f(&t2)
 }
 

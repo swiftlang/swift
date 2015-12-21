@@ -43,7 +43,7 @@ public func scan<
 
 public func randomShuffle<T>(a: [T]) -> [T] {
   var result = a
-  for var i = a.length - 1; i != 0; --i {
+  for i in (1..<a.length).reverse() {
     // FIXME: 32 bits are not enough in general case!
     let j = Int(rand32(exclusiveUpperBound: UInt32(i + 1)))
     if i != j {

@@ -185,7 +185,7 @@ func missingControllingExprInFor() {
 #if true  // <rdar://problem/21679557> compiler crashes on "for{{"
   // expected-error @+2 {{missing initialization in a 'for' statement}}
   // expected-note @+1 2 {{to match this opening '{'}}
-for{{
+for{{ // expected-error {{expression resolves to an unused function}}
 #endif  // expected-error 2 {{expected '}' at end of closure}}
   
 #if true

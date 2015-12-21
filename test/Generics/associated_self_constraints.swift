@@ -50,7 +50,7 @@ class Subject<T>: Observer, Observable {
             observer.onError(error)
         }
         
-        return self;
+        return self
     }
 }
 

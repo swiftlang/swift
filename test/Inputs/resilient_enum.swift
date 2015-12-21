@@ -1,9 +1,16 @@
 import resilient_struct
 
 // Fixed-layout enum with resilient members
+@_fixed_layout public enum SimpleShape {
+  case KleinBottle
+  case Triangle(Size)
+}
+
+// Fixed-layout enum with resilient members
 @_fixed_layout public enum Shape {
+  case Point
   case Rect(Size)
-  case RoundedRect(Size)
+  case RoundedRect(Size, Size)
 }
 
 // Fixed-layout enum with indirect resilient members
@@ -11,6 +18,29 @@ import resilient_struct
   indirect case Parallelogram(Size)
   indirect case Trapezoid(Size)
 }
+
+// The enum payload has fixed layout inside this module, but
+// resilient layout outside. Make sure we emit the payload
+// size in the metadata.
+
+public struct Color {
+  public let r: Int, g: Int, b: Int
+
+  public init(r: Int, g: Int, b: Int) {
+    self.r = r
+    self.g = g
+    self.b = b
+  }
+}
+
+@_fixed_layout public enum CustomColor {
+  case Black
+  case White
+  case Custom(Color)
+  case Bespoke(Color, Color)
+}
+
+// Fixed-layout enum with resilient members
 
 // Resilient enum
 public enum Medium {

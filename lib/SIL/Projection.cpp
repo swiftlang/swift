@@ -729,8 +729,16 @@ ProjectionPath::expandTypeIntoNodeProjectionPaths(SILType B, SILModule *Mod,
       continue;
     }
 
-    // Keep the intermediate nodes as well.
-    Paths.push_back(std::move(PP.getValue()));
+    // Keep the intermediate nodes as well. 
+    //
+    // std::move clears the passed ProjectionPath. Give it a temporarily
+    // created ProjectionPath for now.
+    //
+    // TODO: this can be simplified once we reduce the size of the projection
+    // path and make them copyable.
+    ProjectionPath T;
+    T.append(PP.getValue());
+    Paths.push_back(std::move(T));
 
     // Keep expanding the location.
     for (auto &P : Projections) {

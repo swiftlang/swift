@@ -92,6 +92,10 @@ tests.test("${Self}/success") {
   expectEqual(nil, ${Self}("${minValue - 1}"))
   expectEqual(nil, ${Self}("\u{1D7FF}"))  // MATHEMATICAL MONOSPACE DIGIT NINE
 
+  // Cases that should fail to parse
+  expectEqual(nil, ${Self}("--0")) // Zero w/ repeated plus
+  expectEqual(nil, ${Self}("-+5")) // Non-zero with -+
+
   // Do more exhaustive testing
   % for radix in radices_to_test:
   %   for n in required_values + range(

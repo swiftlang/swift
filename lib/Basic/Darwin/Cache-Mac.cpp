@@ -1,4 +1,4 @@
-//===--- Cache.h - Caching mechanism implementation -----------------------===//
+//===--- Cache-Mac.cpp - Caching mechanism implementation ----------------===//
 //
 // This source file is part of the Swift.org open source project
 //

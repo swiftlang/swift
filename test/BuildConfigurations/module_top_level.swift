@@ -4,6 +4,6 @@
 class C {}
 
 func > (lhs: C, rhs: C) -> Bool {
-  return false;
+  return false
 }
 #endif

@@ -84,7 +84,13 @@ private:
     // consistent metadata layout between generic superclasses and concrete
     // subclasses.
     if (Type superclass = theClass->getSuperclass()) {
-      addClassMembers(superclass->getClassOrBoundGenericClass());
+      // Skip superclass fields if superclass is resilient.
+      // FIXME: Needs runtime support to ensure the field offset vector is
+      // populated correctly.
+      if (!IGM.isResilient(superclass->getClassOrBoundGenericClass(),
+                           ResilienceScope::Component)) {
+        addClassMembers(superclass->getClassOrBoundGenericClass());
+      }
     }
 
     // Add a reference to the parent class, if applicable.

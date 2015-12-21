@@ -8,11 +8,12 @@
 # this script somewhere outside the source tree and then move it back
 # when your changes are finished.
 
+from __future__ import print_function
+
 import subprocess
 import sys
 import os
 import re
-import shutil
 import argparse
 from pipes import quote as shell_quote
 
@@ -33,8 +34,8 @@ def print_call(*args, **kw):
     if isinstance(args[0], (str, unicode)):
         args = [args]
         
-    print '$ ' + ' '.join(shell_quote(x) for x in args[0]) + '   # %r, %r' % (args[1:], kw)
     
+    print('$ ' + ' '.join(shell_quote(x) for x in args[0]) + '   # %r, %r' % (args[1:], kw))
 def check_call(*args, **kw):
     print_call(*args, **kw)
     try:
@@ -165,7 +166,7 @@ def parseFloat(word):
     try:
         return float(word)
     except:
-        raise ScoreParserException("Expected float val, not "+word)
+        raise Exception("Expected float val, not {}".format(word))
 
 def getScores(fname):
     scores = {}
@@ -173,7 +174,8 @@ def getScores(fname):
     f = open(fname)
     try:
         for line in f:
-            if VERBOSE: print "Parsing", line,
+            if VERBOSE:
+                print("Parsing", line)
             m = SCORERE.match(line)
             if not m:
                 continue
@@ -214,12 +216,14 @@ def compareTimingsFiles(file1, file2):
     scores1, runs1 = getScores(file1)
     scores2, runs2 = getScores(file2)
     runs = min(runs1, runs2)
-    if VERBOSE: print scores1; print scores2
     keys = [f for f in set(scores1.keys() + scores2.keys())]
+    if VERBOSE:
+        print(scores1)
+        print(scores2)
     keys.sort()
     if VERBOSE:
-        print "comparing ", file1, "vs", file2, "=",
-        print file1, "/", file2
+        print("comparing ", file1, "vs", file2, "=", end='')
+        print(file1, "/", file2)
 
     rows =  [["benchmark"]]
     for i in range(0,runs):
@@ -229,11 +233,11 @@ def compareTimingsFiles(file1, file2):
     rows[0] += ["delta", "speedup"]
 
     for key in keys:
-        if not key in scores1:
-            print key, "not in", file1
+        if key not in scores1:
+            print(key, "not in", file1)
             continue
-        if not key in scores2:
-            print key, "not in", file2
+        if key not in scores2:
+            print(key, "not in", file2)
             continue
         rows.append(compareScores(key, scores1[key], scores2[key], runs))
         
@@ -247,9 +251,9 @@ def compareTimingsFiles(file1, file2):
     for row in rows:
         for n, x in enumerate(row):
             if n != 0:
-                print ',',
-            print ((widths[n] - len(x)) * ' ') + x,
-        print ''
+                print(',', end='')
+            print(((widths[n] - len(x)) * ' ') + x, end='')
+        print()
 
 def checkAndUpdatePerfTestSuite(sourceDir):
     """Check that the performance testsuite directory is in its appropriate
@@ -284,7 +288,7 @@ if __name__ == '__main__':
                         action='append', help='Optimization levels to test')
     parser.add_argument(dest='baseline', nargs='?', metavar='tree-ish', default='origin/master',
                         help='the baseline Git commit to compare with.')
-    parser.add_argument(dest='build_script_args', nargs=argparse.REMAINDER, metavar='build-script-args', default=[]
+    parser.add_argument(dest='build_script_args', nargs=argparse.REMAINDER, metavar='build-script-args', default=[],
                         help='additional arguments to build script, e.g. -- --distcc --build-args=-j30')
     args = parser.parse_args()
 
@@ -303,7 +307,7 @@ if __name__ == '__main__':
         print('No changes between work tree and %s; nothing to compare.' % args.baseline)
     else:
         for exe in exeNames:
-            print '=' * 20, exe, '=' * 20
+            print('=' * 20, exe, '=' * 20)
             timingsFileName = exe + '.out'
             compareTimingsFiles(
                 os.path.join(baselineCacheDir, timingsFileName),

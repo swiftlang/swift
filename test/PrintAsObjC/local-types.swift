@@ -81,7 +81,7 @@ class ANonObjCClass {}
   func b(b: ZForwardProtocol1) {}
 }
 
-typealias ZForwardAlias = ZForwardAliasClass;
+typealias ZForwardAlias = ZForwardAliasClass
 @objc class ZForwardAliasClass {}
 
 // CHECK-NOT: @class UseForward;

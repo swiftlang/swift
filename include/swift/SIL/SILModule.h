@@ -45,7 +45,6 @@ namespace swift {
   class AnyFunctionType;
   class ASTContext;
   class FuncDecl;
-  class SILExternalSource;
   class SILTypeList;
   class SILUndef;
   class SourceFile;
@@ -172,9 +171,6 @@ private:
   /// True if this SILModule really contains the whole module, i.e.
   /// optimizations can assume that they see the whole module.
   bool wholeModule;
-
-  /// The external SIL source to use when linking this module.
-  SILExternalSource *ExternalSource = nullptr;
 
   /// The options passed into this SILModule.
   SILOptions &Options;
@@ -491,12 +487,6 @@ public:
   void setStage(SILStage s) {
     assert(s >= Stage && "regressing stage?!");
     Stage = s;
-  }
-
-  SILExternalSource *getExternalSource() const { return ExternalSource; }
-  void setExternalSource(SILExternalSource *S) {
-    assert(!ExternalSource && "External source already set");
-    ExternalSource = S;
   }
 
   /// \brief Run the SIL verifier to make sure that all Functions follow
