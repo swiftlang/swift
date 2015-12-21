@@ -76,7 +76,8 @@ internal func _parseAsciiAsUIntMax(
   // Parse (optional) sign
   let (digitsUTF16, hasMinus) = _parseOptionalAsciiSign(utf16)
   // Parse digits
-  guard let result = _parseUnsignedAsciiAsUIntMax(digitsUTF16, radix, maximum) else { return nil }
+  guard let result = _parseUnsignedAsciiAsUIntMax(digitsUTF16, radix, maximum)
+    else { return nil }
   // Disallow < 0
   if hasMinus && result != 0 { return nil }
   // Return
@@ -96,9 +97,11 @@ internal func _parseAsciiAsIntMax(
   if utf16.isEmpty { return nil }
   // Parse (optional) sign
   let (digitsUTF16, hasMinus) = _parseOptionalAsciiSign(utf16)
-  // Parse digits
-  let absValueMax = UIntMax(bitPattern: maximum) + (hasMinus ? 1 : 0) // E.g. Int8's range is -128...127
-  guard let absValue = _parseUnsignedAsciiAsUIntMax(digitsUTF16, radix, absValueMax) else { return nil }
+  // Parse digits. +1 for negatives because e.g. Int8's range is -128...127.
+  let absValueMax = UIntMax(bitPattern: maximum) + (hasMinus ? 1 : 0)
+  guard let absValue =
+    _parseUnsignedAsciiAsUIntMax(digitsUTF16, radix, absValueMax)
+    else { return nil }
   // Return signed result
   return IntMax(bitPattern: hasMinus ? 0 &- absValue : absValue)
 }
