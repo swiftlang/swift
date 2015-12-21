@@ -14,23 +14,23 @@
 # If you edit this, make sure to also accordingly tweak the actual template files.
 
 def getDisposition(disp=None):
-  if disp == None:
+  if disp is None:
     return '.Aggregate'
   if len(disp) == 0 or disp[0] != '.':
     disp = '.' + disp
   return disp
 
-def _getGenericArgStrings(genericArgs=None,genericConstraints=None):
-  if genericArgs == None:
+def _getGenericArgStrings(genericArgs=None, genericConstraints=None):
+  if genericArgs is None:
     return ('','')
   genericArgString = ''
   first = True
   for arg in genericArgs:
     if not first:
-      genericArgString  = genericArgString + ','
+      genericArgString = genericArgString + ','
     first = False
     genericArgString = genericArgString + arg
-  if genericConstraints == None:
+  if genericConstraints is None:
     genericConstraintString = genericArgString
   else:
     genericConstraintString = ''
@@ -45,11 +45,11 @@ def _getGenericArgStrings(genericArgs=None,genericConstraints=None):
         genericConstraintString = genericConstraintString + ' : ' + cons
   genericArgString = '<' + genericArgString + '>'
   genericConstraintString = '<' + genericConstraintString + '>'
-  return (genericArgString,genericConstraintString)
+  return (genericArgString, genericConstraintString)
 
-def getGenericArgString(genericArgs=None,genericConstraints=None):
-  return _getGenericArgStrings(genericArgs,genericConstraints)[0]
+def getGenericArgString(genericArgs=None, genericConstraints=None):
+  return _getGenericArgStrings(genericArgs, genericConstraints)[0]
 
-def getGenericConstraintString(genericArgs=None,genericConstraints=None):
-  return _getGenericArgStrings(genericArgs,genericConstraints)[1]
+def getGenericConstraintString(genericArgs=None, genericConstraints=None):
+  return _getGenericArgStrings(genericArgs, genericConstraints)[1]
 
