@@ -517,7 +517,7 @@ extension FixedWidthIntegerType {
     _precondition(n >= 0, "Negative word index")
     var x = self
     while n > 0 {
-      x &>>= Swift.min(Self(_truncatingBits: Self._bitWidth) &- 1, ${word_bits})
+      x &>>= Swift.min(Self(_truncatingBits: UWord(Self.bitWidth._storage)) &- 1, ${word_bits})
       n -= 1
     }
     return x._lowUWord
@@ -533,12 +533,7 @@ extension FixedWidthIntegerType {
   @_transparent
   public // transparent
   static var _highBitIndex: Self {
-    return Self.init(_truncatingBits: Self._bitWidth &- 1)
-  }
-
-  @_transparent
-  public static var _bitWidth : UWord {
-    return UWord(bitWidth._storage)
+    return Self.init(_truncatingBits: UWord(Self.bitWidth._storage) &- 1)
   }
 }
 
