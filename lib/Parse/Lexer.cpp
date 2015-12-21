@@ -622,6 +622,13 @@ static bool isLeftBound(const char *tokBegin, const char *bufferBegin) {
   // The first character in the file is not left-bound.
   if (tokBegin == bufferBegin) return false;
 
+  if (tokBegin - 1 != bufferBegin) {
+    if (tokBegin[-2] == '*' && tokBegin[-1] == '/') {
+      // End of a slash-star comment, which we treat as whitespace.
+      return false;
+    }
+  }
+
   switch (tokBegin[-1]) {
   case ' ': case '\r': case '\n': case '\t': // whitespace
   case '(': case '[': case '{':              // opening delimiters
@@ -655,6 +662,13 @@ static bool isRightBound(const char *tokEnd, bool isLeftBound,
     // Prefer the '^' in "x^.y" to be a postfix op, not binary, but the '^' in
     // "^.y" to be a prefix op, not binary.
     return !isLeftBound;
+
+  case '/':
+    // The start of a comment counts as whitespace, so it's not right bound.
+    if (tokEnd[1] == '/' || tokEnd[1] == '*')
+      return false;
+    else
+      return true;
 
   default:
     return true;
@@ -760,14 +774,20 @@ void Lexer::lexOperatorIdentifier() {
     // If there is a "//" in the middle of an identifier token, it starts
     // a single-line comment.
     auto Pos = StringRef(TokStart, CurPtr-TokStart).find("//");
-    if (Pos != StringRef::npos)
+    if (Pos != StringRef::npos) {
       CurPtr = TokStart+Pos;
+      // Next token is a comment, which counts as whitespace.
+      rightBound = false;
+    }
 
     // If there is a "/*" in the middle of an identifier token, it starts
     // a multi-line comment.
     Pos = StringRef(TokStart, CurPtr-TokStart).find("/*");
-    if (Pos != StringRef::npos)
+    if (Pos != StringRef::npos) {
       CurPtr = TokStart+Pos;
+      // Next token is a comment, which counts as whitespace.
+      rightBound = false;
+    }
 
     // Verify there is no "*/" in the middle of the identifier token, we reject
     // it as potentially ending a block comment.
@@ -1887,6 +1907,3 @@ StringRef Lexer::getIndentationForLine(SourceManager &SM, SourceLoc Loc) {
 
   return StringRef(StartOfLine, EndOfIndentation - StartOfLine);
 }
-
-
-
