@@ -50,7 +50,7 @@ def addFunction(sizes, function, startAddr, endAddr, groupByPrefix):
     if groupByPrefix:
         for infix in SortedInfixes:
 	    if infix in function:
-               if GenericFunctionPrefix not in function:
+               if not GenericFunctionPrefix in function:
 	           sizes[Infixes[infix]] += size
                    return
         for prefix in SortedPrefixes:
