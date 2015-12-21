@@ -29,7 +29,7 @@ namespace swift {
 /// operations requiring cloning (while possibly modifying, at the same time)
 /// instruction sequences.
 ///
-/// By default, this visitor will not do anything useful when when called on a
+/// By default, this visitor will not do anything useful when called on a
 /// basic block, or function; subclasses that want to handle those should
 /// implement the appropriate visit functions and/or provide other entry points.
 template<typename ImplClass>

@@ -149,7 +149,7 @@ void ARCSequenceDataflowEvaluator::mergePredecessors(
     ARCBBState &PredBBState = PredDataHandle->getState();
 
     // If we found the state but the state is for a trap BB, skip it. Trap BBs
-    // leak all reference counts and do not reference reference semantic objects
+    // leak all reference counts and do not reference semantic objects
     // in any manner.
     //
     // TODO: I think this is a copy paste error, since we a trap BB should have

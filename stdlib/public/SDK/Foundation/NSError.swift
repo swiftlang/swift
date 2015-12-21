@@ -61,7 +61,7 @@ public func _stdlib_bridgeNSErrorToErrorType<
   }
 }
 
-/// Helper protocol for _BridgedNSError, which used used to provide
+/// Helper protocol for _BridgedNSError, which used to provide
 /// default implementations.
 public protocol __BridgedNSError : RawRepresentable, ErrorType {
   static var _NSErrorDomain: String { get }

@@ -2798,7 +2798,7 @@ public:
     return ValidatingGenericSignature;
   }
   
-  /// \brief Returns true if this this decl contains delayed value or protocol
+  /// \brief Returns true if this decl contains delayed value or protocol
   /// declarations.
   bool hasDelayedMembers() const {
     return NominalTypeDeclBits.HasDelayedMembers;

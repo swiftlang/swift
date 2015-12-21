@@ -102,7 +102,7 @@ bb0:
 // CHECK-NEXT: release_value {{.*}} : $Baz
 
 // The release of %0 is replaced by a strong_release of the Foo argument, since
-// is is a reference type
+// it is a reference type
 // CHECK-NEXT: strong_release {{.*}} : $Foo
 
 // CHECK-NEXT: return [[RETVAL]] : $Int

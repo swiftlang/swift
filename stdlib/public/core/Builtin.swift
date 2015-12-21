@@ -534,7 +534,7 @@ internal func _isUniqueOrPinned<T>(inout object: T) -> Bool {
 public // @testable
 func _isUnique_native<T>(inout object: T) -> Bool {
   // This could be a bridge object, single payload enum, or plain old
-  // reference. Any any case it's non pointer bits must be zero, so
+  // reference. Any case it's non pointer bits must be zero, so
   // force cast it to BridgeObject and check the spare bits.
   _sanityCheck(
     (_bitPattern(Builtin.reinterpretCast(object)) & _objectPointerSpareBits)
@@ -551,7 +551,7 @@ func _isUnique_native<T>(inout object: T) -> Bool {
 public // @testable
 func _isUniqueOrPinned_native<T>(inout object: T) -> Bool {
   // This could be a bridge object, single payload enum, or plain old
-  // reference. Any any case it's non pointer bits must be zero.
+  // reference. Any case it's non pointer bits must be zero.
   _sanityCheck(
     (_bitPattern(Builtin.reinterpretCast(object)) & _objectPointerSpareBits)
     == 0)

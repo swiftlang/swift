@@ -4469,7 +4469,7 @@ namespace {
       auto superclass
         = cast<ClassDecl>(classDecl->getSuperclass()->getAnyNominal());
 
-      // If we we have a superclass, import from it.
+      // If we have a superclass, import from it.
       if (auto superclassClangDecl = superclass->getClangDecl()) {
         if (isa<clang::ObjCInterfaceDecl>(superclassClangDecl)) {
           inheritConstructors(superclass->getMembers(), kind);

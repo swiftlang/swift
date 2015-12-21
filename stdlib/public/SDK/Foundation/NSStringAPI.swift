@@ -1537,7 +1537,7 @@ extension String {
   // - (NSArray *)stringsByAppendingPaths:(NSArray *)paths
 
   /// Returns an array of strings made by separately appending
-  /// to the `String` each string in in a given array.
+  /// to the `String` each string in a given array.
   @available(*, unavailable, message="map over paths with URLByAppendingPathComponent instead.")
   public func stringsByAppendingPaths(paths: [String]) -> [String] {
     return _ns.stringsByAppendingPaths(paths)

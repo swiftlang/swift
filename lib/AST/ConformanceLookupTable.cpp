@@ -487,7 +487,7 @@ void ConformanceLookupTable::addProtocols(NominalTypeDecl *nominal,
 void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
                                                        DeclContext *dc, 
                                                        LazyResolver *resolver) {
-  // Note: recursive type-checking implies that that AllConformances
+  // Note: recursive type-checking implies that AllConformances
   // may be reallocated during this traversal, so pay the lookup cost
   // during each iteration.
   for (unsigned i = 0; i != AllConformances[dc].size(); ++i) {

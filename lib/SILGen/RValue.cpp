@@ -279,7 +279,7 @@ public:
 /// RValue) into an initialization. The RValue will have one scalar ManagedValue
 /// for each exploded tuple element in the RValue, so this needs to make the
 /// shape of the initialization match the available elements.  This can be done
-/// one one of two ways:
+/// one of two ways:
 ///
 ///  1) recursively scalarize down the initialization on demand if the type of
 ///     the RValue is tuple type and the initialization supports it.

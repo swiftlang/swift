@@ -1399,7 +1399,7 @@ static Type getRequirementTypeForDisplay(TypeChecker &tc, Module *module,
       }
     }
 
-    // Replace 'Self' with the conforming type type.
+    // Replace 'Self' with the conforming type.
     if (type->isEqual(selfTy))
       return conformance->getType();
 
@@ -3732,7 +3732,7 @@ void ConformanceChecker::checkConformance() {
   }
 
   // Ensure that all of the requirements of the protocol have been satisfied.
-  // Note: the odd check for one generic parameter parameter copes with
+  // Note: the odd check for one generic parameter copes with
   // protocols nested within other generic contexts, which is ill-formed.
   SourceLoc noteLoc = Proto->getLoc();
   if (noteLoc.isInvalid())
