@@ -379,25 +379,4 @@ ResilientEnumTestSuite.test("DynamicLayoutMultiPayload2") {
   expectEqual(b, [0, 1, 2, 3])
 }
 
-// Make sure case numbers round-trip if payload has zero size
-
-ResilientEnumTestSuite.test("ResilientEnumWithEmptyCase") {
-  let a: [ResilientEnumWithEmptyCase] = getResilientEnumWithEmptyCase()
-
-  let b: [Int] = a.map {
-    switch $0 {
-    case .A:
-      return 0
-    case .B:
-      return 1
-    case .Empty:
-      return 2
-    default:
-      return -1
-    }
-  }
-
-  expectEqual(b, [0, 1, 2])
-}
-
 runAllTests()

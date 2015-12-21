@@ -4598,22 +4598,17 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
   std::vector<Element> elementsWithPayload;
   std::vector<Element> elementsWithNoPayload;
 
-  // Resilient enums are manipulated as opaque values, except we still
-  // make the following assumptions:
-  // 1) Physical case indices won't change
-  // 2) The indirect-ness of cases won't change
-  // 3) Payload types won't change in a non-resilient way
-  bool isResilient = TC.IGM.isResilient(theEnum, ResilienceScope::Component);
-  
-  // The most general resilience scope where the enum type is visible.
-  // Case numbering must not depend on any information that is not static
-  // in this resilience scope.
-  ResilienceScope accessScope = TC.IGM.getResilienceScopeForAccess(theEnum);
+  // The most general resilience scope that can have knowledge of this
+  // enum's layout. If all payload types have a fixed size in this
+  // resilience scope, we can make further assumptions to optimize
+  // layout.
+  ResilienceScope scope = ResilienceScope::Universal;
 
-  // The most general resilience scope where the enum's layout is known.
-  // Fixed-size optimizations can be applied if all payload types are
-  // fixed-size from this resilience scope.
-  ResilienceScope layoutScope = TC.IGM.getResilienceScopeForLayout(theEnum);
+  // TODO: Replace this with 'public or internal with @availability' check
+  // once that is in place
+  if (theEnum->getFormalAccess() != Accessibility::Public ||
+      TC.IGM.isResilient(theEnum, ResilienceScope::Universal))
+    scope = ResilienceScope::Component;
 
   for (auto elt : theEnum->getAllElements()) {
     numElements++;
@@ -4643,20 +4638,14 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
       = TC.tryGetCompleteTypeInfo(origArgLoweredTy.getSwiftRValueType());
     assert(origArgTI && "didn't complete type info?!");
 
-    // If the unsubstituted argument contains a generic parameter type, or
-    // is not fixed-size in all resilience domains that have knowledge of
-    // this enum's layout, we need to constrain our layout optimizations to
-    // what the runtime can reproduce.
-    if (!isResilient &&
-        !origArgTI->isFixedSize(layoutScope))
+    // If the unsubstituted argument contains a generic parameter type, or if
+    // the substituted argument is not universally fixed-size, we need to
+    // constrain our layout optimizations to what the runtime can reproduce.
+    if (!origArgTI->isFixedSize(scope))
       alwaysFixedSize = IsNotFixedSize;
 
-    // If the payload is empty, turn the case into a no-payload case, but
-    // only if case numbering remains unchanged from all resilience domains
-    // that can see the enum.
-    if (origArgTI->isFixedSize(accessScope) &&
-        isa<LoadableTypeInfo>(origArgTI) &&
-        cast<LoadableTypeInfo>(origArgTI)->isKnownEmpty()) {
+    auto loadableOrigArgTI = dyn_cast<LoadableTypeInfo>(origArgTI);
+    if (loadableOrigArgTI && loadableOrigArgTI->isKnownEmpty()) {
       elementsWithNoPayload.push_back({elt, nullptr, nullptr});
     } else {
       // *Now* apply the substitutions and get the type info for the instance's
@@ -4666,20 +4655,16 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
       auto *substArgTI = &TC.IGM.getTypeInfo(fieldTy);
 
       elementsWithPayload.push_back({elt, substArgTI, origArgTI});
+      if (!substArgTI->isFixedSize())
+        tik = Opaque;
+      else if (!substArgTI->isLoadable() && tik > Fixed)
+        tik = Fixed;
 
-      if (!isResilient) {
-        if (!substArgTI->isFixedSize(ResilienceScope::Component))
-          tik = Opaque;
-        else if (!substArgTI->isLoadable() && tik > Fixed)
-          tik = Fixed;
-
-        // If the substituted argument contains a type that is not fixed-size
-        // in all resilience domains that have knowledge of this enum's layout,
-        // we need to constrain our layout optimizations to what the runtime
-        // can reproduce.
-        if (!substArgTI->isFixedSize(layoutScope))
-          alwaysFixedSize = IsNotFixedSize;
-      }
+      // If the substituted argument contains a type that is not universally
+      // fixed-size, we need to constrain our layout optimizations to what
+      // the runtime can reproduce.
+      if (!substArgTI->isFixedSize(scope))
+        alwaysFixedSize = IsNotFixedSize;
     }
   }
 
@@ -4688,7 +4673,12 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
            + elementsWithNoPayload.size()
          && "not all elements accounted for");
 
-  if (isResilient) {
+  // Resilient enums are manipulated as opaque values, except we still
+  // make the following assumptions:
+  // 1) Physical case indices won't change
+  // 2) The indirect-ness of cases won't change
+  // 3) Payload types won't change in a non-resilient way
+  if (TC.IGM.isResilient(theEnum, ResilienceScope::Component)) {
     return new ResilientEnumImplStrategy(TC.IGM,
                                          numElements,
                                          std::move(elementsWithPayload),
