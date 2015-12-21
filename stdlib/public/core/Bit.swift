@@ -94,7 +94,9 @@ public func < (lhs: Bit, rhs: Bit) -> Bool {
 }
 
 extension Bit : IntegerArithmeticType {
-  static func _withOverflow(intResult: Int, overflow: Bool) -> (Bit, overflow: Bool) {
+  static func _withOverflow(
+    intResult: Int, overflow: Bool
+  ) -> (Bit, overflow: Bool) {
     if let bit = Bit(rawValue: intResult) {
       return (bit, overflow: overflow)
     } else {
