@@ -175,15 +175,8 @@ ERROR(decl_inner_scope,decl_parsing,none,
 ERROR(decl_not_static,decl_parsing,none,
       "declaration cannot be marked %0", (StaticSpellingKind))
 
-ERROR(ownership_not_attribute,decl_parsing,none,
-      "'@%0' is not an attribute, use the '%0' keyword instead",
-      (StringRef))
- 
 ERROR(cskeyword_not_attribute,decl_parsing,none,
       "'%0' is a declaration modifier, not an attribute", (StringRef))
-
-ERROR(convenience_invalid,sema_tcd,none,
-      "'convenience' is not valid on this declaration", ())
 
 ERROR(decl_already_static,decl_parsing,none,
       "%0 specified twice", (StaticSpellingKind))
@@ -288,11 +281,6 @@ ERROR(static_func_decl_global_scope,decl_parsing,none,
       (StaticSpellingKind))
 ERROR(func_decl_expected_arrow,decl_parsing,none,
       "expected '->' after function parameter tuple", ())
-ERROR(func_static_not_allowed,decl_parsing,none,
-      "static functions are not allowed in this context, "
-      "use 'class' to declare a class method", ())
-ERROR(func_conversion,decl_parsing,none,
-      "'__conversion' functions are no longer allowed", ())
 
 // Enum
 ERROR(expected_lbrace_enum,decl_parsing,PointsToFirstBadToken,
@@ -468,8 +456,6 @@ ERROR(sil_integer_literal_not_integer_type,decl_parsing,none,
       "integer_literal instruction requires a 'Builtin.Int<n>' type", ())
 ERROR(sil_float_literal_not_float_type,decl_parsing,none,
       "float_literal instruction requires a 'Builtin.FP<n>' type", ())
-ERROR(sil_apply_archetype_not_found,decl_parsing,none,
-      "archetype name not found in polymorphic function type of apply instruction", ())
 ERROR(sil_substitutions_on_non_polymorphic_type,decl_parsing,none,
       "apply of non-polymorphic function cannot have substitutions", ())
 ERROR(sil_witness_method_not_protocol,decl_parsing,none,
@@ -504,8 +490,6 @@ ERROR(sil_basicblock_arg_rparen, decl_parsing,none,
       "expected ')' in basic block argument list", ())
 
 // SIL Functions
-ERROR(expected_sil_linkage_or_function, decl_parsing,none,
-      "expected SIL linkage type or function name", ())
 ERROR(expected_sil_function_name, decl_parsing,none,
       "expected SIL function name", ())
 ERROR(expected_sil_rbrace, decl_parsing,none,
@@ -590,8 +574,6 @@ ERROR(expected_type_function_result,type_parsing,PointsToFirstBadToken,
       "expected type for function result", ())
 ERROR(generic_non_function,type_parsing,PointsToFirstBadToken,
       "only syntactic function types can be generic", ())
-ERROR(throwing_non_function,type_parsing,PointsToFirstBadToken,
-      "only function types may throw", ())
 ERROR(rethrowing_function_type,type_parsing,PointsToFirstBadToken,
       "only function declarations may be marked 'rethrows'", ())
 ERROR(throws_after_function_result,type_parsing,none,
@@ -762,8 +744,6 @@ ERROR(expected_expr_conditional_letbinding,stmt_parsing,none,
 ERROR(expected_expr_conditional_letbinding_bool_conditions,stmt_parsing,none,
       "expected 'let' or 'var' in conditional; "
       "use '&&' to join boolean conditions", ())
-ERROR(expected_simple_identifier_pattern,stmt_parsing,none,
-      "expected simple identifier pattern in optional binding condition", ())
 ERROR(expected_expr_conditional_var,stmt_parsing,PointsToFirstBadToken,
       "expected expression after '=' in conditional binding", ())
 ERROR(expected_expr_conditional_where,stmt_parsing,PointsToFirstBadToken,
@@ -817,8 +797,6 @@ ERROR(expected_while_after_repeat_body,stmt_parsing,PointsToFirstBadToken,
       "expected 'while' after body of 'repeat' statement", ())
 ERROR(expected_expr_repeat_while,stmt_parsing,PointsToFirstBadToken,
       "expected expression in 'repeat-while' condition", ())
-ERROR(missing_condition_after_repeat_while,stmt_parsing,none,
-      "missing condition in a 'repeat-while' statement", ())
 
 ERROR(do_while_now_repeat_while,stmt_parsing,none,
       "'do-while' statement is not allowed; use 'repeat-while' instead", ())
@@ -1113,14 +1091,6 @@ ERROR(attr_availability_renamed, attribute_parsing, none,
 ERROR(attr_autoclosure_expected_r_paren,attribute_parsing,PointsToFirstBadToken,
       "expected ')' in @autoclosure", ())
 
-// cc
-ERROR(cc_attribute_expected_lparen,attribute_parsing,none,
-      "expected '(' after 'cc' attribute", ())
-ERROR(cc_attribute_expected_name,attribute_parsing,none,
-      "expected calling convention name identifier in 'cc' attribute", ())
-ERROR(cc_attribute_expected_rparen,attribute_parsing,none,
-      "expected ')' after calling convention name for 'cc' attribute", ())
-
 // convention
 ERROR(convention_attribute_expected_lparen,attribute_parsing,none,
       "expected '(' after 'convention' attribute", ())
@@ -1255,9 +1225,6 @@ WARNING(unknown_build_config,parsing,none,
 //------------------------------------------------------------------------------
 // Availability query parsing diagnostics
 //------------------------------------------------------------------------------
-ERROR(avail_query_not_enabled,parsing,Fatal,
-      "experimental availability checking not enabled", ())
-
 ERROR(avail_query_expected_condition,parsing,PointsToFirstBadToken,
       "expected availability condition", ())
 ERROR(avail_query_expected_platform_name,parsing,PointsToFirstBadToken,

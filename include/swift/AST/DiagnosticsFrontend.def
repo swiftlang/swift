@@ -58,8 +58,6 @@ ERROR(cannot_open_serialized_file,frontend,none,
   "cannot open file '%0' for diagnostics emission (%1)", (StringRef, StringRef))
 ERROR(error_open_input_file,frontend,none,
   "error opening input file '%0' (%1)", (StringRef, StringRef))
-ERROR(error_clang_importer_not_linked_in,frontend,none,
-  "clang importer not available", ())
 ERROR(error_clang_importer_create_fail,frontend,none,
   "clang importer creation failed", ())
 ERROR(error_missing_arg_value,frontend,none,
