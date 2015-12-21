@@ -3641,6 +3641,32 @@ public:
 // Instructions representing terminators
 //===----------------------------------------------------------------------===//
 
+enum class TermKind {
+  Invalid = 0,
+#define TERMINATOR(Id, Parent, MemBehavior, MayRelease) Id,
+#include "SILNodes.def"
+};
+
+struct ValueKindAsTermKind {
+  TermKind K;
+
+  ValueKindAsTermKind(ValueKind V) {
+    switch (V) {
+#define TERMINATOR(Id, Parent, MemBehavior, MayRelease)                        \
+  case ValueKind::Id:                                                          \
+    K = TermKind::Id;                                                          \
+    break;
+#define VALUE(Id, Parent)                                                      \
+  case ValueKind::Id:                                                          \
+    K = TermKind::Invalid;                                                     \
+    break;
+#include "SILNodes.def"
+    }
+  }
+
+  operator TermKind() const { return K; }
+};
+
 /// This class defines a "terminating instruction" for a SILBasicBlock.
 class TermInst : public SILInstruction {
 protected:
@@ -3664,6 +3690,8 @@ public:
   }
 
   bool isBranch() const { return !getSuccessors().empty(); }
+
+  TermKind getTermKind() const { return ValueKindAsTermKind(getKind()); }
 };
 
 /// UnreachableInst - Position in the code which would be undefined to reach.
