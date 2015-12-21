@@ -42,7 +42,7 @@ SortedInfixes = sorted(Infixes)
 
 
 def addFunction(sizes, function, startAddr, endAddr, groupByPrefix):
-    if not function or startAddr == None or endAddr == None:
+    if not function or startAddr is None or endAddr is None:
         return
 
     size = endAddr - startAddr
@@ -113,7 +113,7 @@ def readSizes(sizes, fileName, functionDetails, groupByPrefix):
         asmlineMatch = asmlinePattern.match(line)
         if asmlineMatch:
             addr = int(asmlineMatch.group(1), 16)
-            if startAddr == None:
+            if startAddr is None:
                 startAddr = addr
             endAddr = addr
         elif line == "Section":
@@ -142,7 +142,7 @@ def readSizes(sizes, fileName, functionDetails, groupByPrefix):
 def compareSizes(oldSizes, newSizes, nameKey, title):
     oldSize = oldSizes[nameKey]
     newSize = newSizes[nameKey]
-    if oldSize != None and newSize != None:
+    if oldSize is not None and newSize is not None:
         if oldSize != 0:
             perc = "%.1f%%" % ((1.0 - float(newSize) / float(oldSize)) * 100.0)
         else:
