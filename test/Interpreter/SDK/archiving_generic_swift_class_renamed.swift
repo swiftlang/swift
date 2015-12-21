@@ -1,4 +1,4 @@
-// RUN: %target-build-swift -Xfrontend -enable-swift-name-lookup-tables -parse %s -F %S/Inputs -Xfrontend -enable-omit-needless-words -Xfrontend -verify
+// RUN: %target-build-swift -parse %s -F %S/Inputs -Xfrontend -enable-omit-needless-words -Xfrontend -verify
 
 // REQUIRES: objc_interop
 // UNSUPPORTED: OS=tvos

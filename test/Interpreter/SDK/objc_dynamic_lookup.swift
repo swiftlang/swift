@@ -1,5 +1,4 @@
 // RUN: %target-run-simple-swift | FileCheck %s
-// RUN: %target-run-simple-swift -enable-swift-name-lookup-tables | FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
