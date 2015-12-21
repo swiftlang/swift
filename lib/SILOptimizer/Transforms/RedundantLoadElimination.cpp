@@ -158,6 +158,9 @@ static bool isForwardableEdge(SILBasicBlock *BB) {
 //===----------------------------------------------------------------------===//
 namespace {
 
+// If there are too many locations in the function, we give up.
+constexpr unsigned MaxLSLocationLimit = 2048;
+
 /// forward declaration.
 class RLEContext;
 /// State of the load store in one basic block which allows for forwarding from
@@ -931,6 +934,10 @@ bool RLEContext::gatherValues(SILBasicBlock *BB, LSLocation &L,
 }
 
 bool RLEContext::run() {
+  // Data flow may take too long to converge.
+  if (LSLocationVault.size() > MaxLSLocationLimit)
+    return false;
+
   // Process basic blocks in RPO. After the data flow converges, run last
   // iteration and perform load forwarding.
   bool LastIteration = false;
