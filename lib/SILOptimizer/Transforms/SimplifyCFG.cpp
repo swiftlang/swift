@@ -2095,38 +2095,38 @@ bool SimplifyCFG::simplifyBlocks() {
     // Otherwise, try to simplify the terminator.
     TermInst *TI = BB->getTerminator();
 
-    switch (TI->getKind()) {
-    case ValueKind::BranchInst:
+    switch (TI->getTermKind()) {
+    case TermKind::BranchInst:
       Changed |= simplifyBranchBlock(cast<BranchInst>(TI));
       break;
-    case ValueKind::CondBranchInst:
+    case TermKind::CondBranchInst:
       Changed |= simplifyCondBrBlock(cast<CondBranchInst>(TI));
       break;
-    case ValueKind::SwitchValueInst:
+    case TermKind::SwitchValueInst:
       // FIXME: Optimize for known switch values.
       Changed |= simplifySwitchValueBlock(cast<SwitchValueInst>(TI));
       break;
-    case ValueKind::SwitchEnumInst:
+    case TermKind::SwitchEnumInst:
       Changed |= simplifySwitchEnumBlock(cast<SwitchEnumInst>(TI));
       Changed |= simplifyTermWithIdenticalDestBlocks(BB);
       break;
-    case ValueKind::UnreachableInst:
+    case TermKind::UnreachableInst:
       Changed |= simplifyUnreachableBlock(cast<UnreachableInst>(TI));
       break;
-    case ValueKind::CheckedCastBranchInst:
+    case TermKind::CheckedCastBranchInst:
       Changed |= simplifyCheckedCastBranchBlock(cast<CheckedCastBranchInst>(TI));
       break;
-    case ValueKind::CheckedCastAddrBranchInst:
+    case TermKind::CheckedCastAddrBranchInst:
       Changed |= simplifyCheckedCastAddrBranchBlock(cast<CheckedCastAddrBranchInst>(TI));
       break;
-    case ValueKind::TryApplyInst:
+    case TermKind::TryApplyInst:
       Changed |= simplifyTryApplyBlock(cast<TryApplyInst>(TI));
       break;
-    case ValueKind::SwitchEnumAddrInst:
+    case TermKind::SwitchEnumAddrInst:
       Changed |= simplifyTermWithIdenticalDestBlocks(BB);
       break;
-    default:
-      break;
+    case TermKind::Invalid:
+      llvm_unreachable("Invalid Term Inst?!");
     }
     // If the block has a cond_fail, try to move it to the predecessors.
     Changed |= tryMoveCondFailToPreds(BB);

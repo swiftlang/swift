@@ -107,11 +107,11 @@ private:
 
   void getArgsForTerminator(TermInst *Term, SILBasicBlock *SuccBB, int Index,
                             llvm::SmallVectorImpl<ValueBase *> &Operands) {
-    switch (Term->getKind()) {
-    case ValueKind::BranchInst:
+    switch (Term->getTermKind()) {
+    case TermKind::BranchInst:
       return Operands.push_back(cast<BranchInst>(Term)->getArg(Index).getDef());
 
-    case ValueKind::CondBranchInst: {
+    case TermKind::CondBranchInst: {
       auto *CBI = cast<CondBranchInst>(Term);
       if (SuccBB == CBI->getTrueBB())
         return Operands.push_back(CBI->getTrueArgs()[Index].getDef());
@@ -121,26 +121,26 @@ private:
       return;
     }
 
-    case ValueKind::SwitchEnumInst:
-    case ValueKind::SwitchEnumAddrInst:
-    case ValueKind::CheckedCastBranchInst:
-    case ValueKind::CheckedCastAddrBranchInst:
-    case ValueKind::DynamicMethodBranchInst:
+    case TermKind::SwitchEnumInst:
+    case TermKind::SwitchEnumAddrInst:
+    case TermKind::CheckedCastBranchInst:
+    case TermKind::CheckedCastAddrBranchInst:
+    case TermKind::DynamicMethodBranchInst:
       assert(Index == 0 && "Expected argument index to always be zero!");
       return Operands.push_back(Term->getOperand(0).getDef());
 
-    case ValueKind::UnreachableInst:
-    case ValueKind::ReturnInst:
-    case ValueKind::SwitchValueInst:
-    case ValueKind::ThrowInst:
+    case TermKind::UnreachableInst:
+    case TermKind::ReturnInst:
+    case TermKind::SwitchValueInst:
+    case TermKind::ThrowInst:
       llvm_unreachable("Did not expect terminator that does not have args!");
 
-    case ValueKind::TryApplyInst:
+    case TermKind::TryApplyInst:
       for (auto &O : cast<TryApplyInst>(Term)->getAllOperands())
         Operands.push_back(O.get().getDef());
       return;
 
-    default:
+    case TermKind::Invalid:
       llvm_unreachable("Unhandled terminator kind!");
     }
   }

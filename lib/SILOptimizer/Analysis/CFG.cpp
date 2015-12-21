@@ -19,18 +19,23 @@
 using namespace swift;
 
 static bool isSafeNonExitTerminator(TermInst *TI) {
-  switch (TI->getKind()) {
-  case ValueKind::BranchInst:
-  case ValueKind::CondBranchInst:
-  case ValueKind::SwitchValueInst:
-  case ValueKind::SwitchEnumInst:
-  case ValueKind::SwitchEnumAddrInst:
-  case ValueKind::DynamicMethodBranchInst:
-  case ValueKind::CheckedCastBranchInst:
-  case ValueKind::CheckedCastAddrBranchInst:
+  switch (TI->getTermKind()) {
+  case TermKind::BranchInst:
+  case TermKind::CondBranchInst:
+  case TermKind::SwitchValueInst:
+  case TermKind::SwitchEnumInst:
+  case TermKind::SwitchEnumAddrInst:
+  case TermKind::DynamicMethodBranchInst:
+  case TermKind::CheckedCastBranchInst:
+  case TermKind::CheckedCastAddrBranchInst:
     return true;
-  default:
+  case TermKind::UnreachableInst:
+  case TermKind::ReturnInst:
+  case TermKind::ThrowInst:
+  case TermKind::TryApplyInst:
     return false;
+  case TermKind::Invalid:
+    llvm_unreachable("Invalid Term Inst?!");
   }
 }
 
