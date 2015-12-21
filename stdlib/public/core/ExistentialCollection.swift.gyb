@@ -81,14 +81,14 @@ public struct AnyGenerator<Element> : GeneratorType {
 /// traversing the sequence consumes the generator.
 extension AnyGenerator : SequenceType {}
 
-@available(*, unavailable, renamed="AnyGenerator")
+@available(*, deprecated, renamed="AnyGenerator")
 public func anyGenerator<G: GeneratorType>(base: G) -> AnyGenerator<G.Element> {
-  fatalError("unavailable function can't be called")
+  return AnyGenerator(base)
 }
 
-@available(*, unavailable, renamed="AnyGenerator")
+@available(*, deprecated, renamed="AnyGenerator")
 public func anyGenerator<Element>(body: ()->Element?) -> AnyGenerator<Element> {
-  fatalError("unavailable function can't be called")
+  return AnyGenerator(body: body)
 }
 
 internal struct _ClosureBasedGenerator<Element> : GeneratorType {
