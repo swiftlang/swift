@@ -75,6 +75,7 @@ PASS(DeadObjectElimination, "deadobject-elim",
      "Eliminate unused objects that do not have destructors with side effects")
 PASS(DefiniteInitialization, "definite-init",
      "Definite Initialization")
+PASS(Devirtualizer, "devirtualizer", "Devirtualize indirect calls")
 PASS(DiagnoseUnreachable, "diagnose-unreachable",
      "Diagnose Unreachable Code")
 PASS(DiagnosticConstantPropagation, "diagnostic-constant-propagation",
