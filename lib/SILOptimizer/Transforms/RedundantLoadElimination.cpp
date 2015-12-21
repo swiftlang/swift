@@ -98,9 +98,25 @@ using namespace swift;
 
 STATISTIC(NumForwardedLoads, "Number of loads forwarded");
 
+enum class RLEKind : unsigned {
+  ComputeAvailSet = 0,
+  ComputeAvailValue = 1,
+  PerformRLE = 2,
+};
+
 //===----------------------------------------------------------------------===//
 //                             Utility Functions
 //===----------------------------------------------------------------------===//
+
+bool inline isComputeAvailSet(RLEKind Kind) {
+  return Kind == RLEKind::ComputeAvailSet;
+}
+
+bool inline isComputeAvailValue(RLEKind Kind) {
+  return Kind == RLEKind::ComputeAvailValue;
+}
+
+bool inline isPerformRLE(RLEKind Kind) { return Kind == RLEKind::PerformRLE; }
 
 /// Returns true if this is an instruction that may have side effects in a
 /// general sense but are inert from a load store perspective.
@@ -189,44 +205,57 @@ private:
   /// well as their SILValue replacement.
   llvm::DenseMap<SILInstruction *, SILValue> RedundantLoads;
 
+  void updateForwardValOut() { ForwardValOut = ForwardValIn; }
+
   /// Check whether the ForwardSetOut has changed. If it does, we need to
   /// rerun the data flow to reach fixed point.
   bool updateForwardSetOut() {
-    bool Changed = false;
     // Check the available value bit vector for changes.
+    bool Changed = false;
     Changed |= (ForwardSetIn != ForwardSetOut);
+    if (!Changed)
+      return Changed;
     ForwardSetOut = ForwardSetIn;
-    ForwardValOut = ForwardValIn;
     return Changed;
   }
 
   /// Merge in the state of an individual predecessor.
-  void mergePredecessorState(RLEContext &Ctx, BlockState &OtherState);
+  void mergePredecessorState(RLEContext &Ctx, BlockState &OtherState,
+                             RLEKind Kind);
 
   /// LSLocation read has been extracted, expanded and mapped to the bit
   /// position in the bitvector. process it using the bit position.
-  void updateForwardSetForRead(RLEContext &Ctx, unsigned LBit, unsigned VBit);
+  void updateForwardSetForRead(RLEContext &Ctx, unsigned bit);
+
+  /// LSLocation read has been extracted, expanded and mapped to the bit
+  /// position in the bitvector. process it using the bit position.
+  void updateForwardValForRead(RLEContext &Ctx, unsigned lbit, unsigned vbit);
 
   /// LSLocation written has been extracted, expanded and mapped to the bit
   /// position in the bitvector. process it using the bit position.
-  void updateForwardSetForWrite(RLEContext &Ctx, unsigned LBit, unsigned VBit);
+  void updateForwardSetForWrite(RLEContext &Ctx, unsigned bit);
+
+  /// LSLocation written has been extracted, expanded and mapped to the bit
+  /// position in the bitvector. process it using the bit position.
+  void updateForwardValForWrite(RLEContext &Ctx, unsigned lbit, unsigned vbit);
 
   /// There is a read to a LSLocation, expand the LSLocation into individual
   /// fields before processing them.
   void processRead(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
-                   SILValue Val, bool PF);
+                   SILValue Val, RLEKind Kind);
 
   /// There is a write to a LSLocation, expand the LSLocation into individual
   /// fields before processing them.
   void processWrite(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
-                    SILValue Val);
+                    SILValue Val, RLEKind Kind);
 
   /// BitVector manipulation functions.
   void clearLSLocations();
-  void startTrackingLSLocation(unsigned LBit, unsigned VBit);
-  void stopTrackingLSLocation(unsigned LBit);
-  void updateTrackedLSLocation(unsigned LBit, unsigned VBit);
-  bool isTrackingLSLocation(unsigned LBit);
+  void startTrackingLSLocation(unsigned bit);
+  void stopTrackingLSLocation(unsigned bit);
+  bool isTrackingLSLocation(unsigned bit);
+  void startTrackingLSValue(unsigned lbit, unsigned vbit);
+  void stopTrackingLSValue(unsigned bit);
 
 public:
   BlockState() = default;
@@ -275,22 +304,23 @@ public:
     return getValueStateAtEndOfBlock(Ctx, L) == ValueState::ConcreteValues;
   }
 
-  bool optimize(RLEContext &Ctx, bool PF);
+  bool optimize(RLEContext &Ctx, RLEKind Kind);
 
   /// Set up the value for redundant load elimination.
   bool setupRLE(RLEContext &Ctx, SILInstruction *I, SILValue Mem);
 
   /// Merge in the states of all predecessors.
-  void mergePredecessorStates(RLEContext &Ctx);
+  void mergePredecessorStates(RLEContext &Ctx, RLEKind Kind);
 
   /// Process Instruction which writes to memory in an unknown way.
-  void processUnknownWriteInst(RLEContext &Ctx, SILInstruction *I);
+  void processUnknownWriteInst(RLEContext &Ctx, SILInstruction *I,
+                               RLEKind Kind);
 
   /// Process LoadInst. Extract LSLocations from LoadInst.
-  void processLoadInst(RLEContext &Ctx, LoadInst *LI, bool PF);
+  void processLoadInst(RLEContext &Ctx, LoadInst *LI, RLEKind Kind);
 
   /// Process LoadInst. Extract LSLocations from StoreInst.
-  void processStoreInst(RLEContext &Ctx, StoreInst *SI);
+  void processStoreInst(RLEContext &Ctx, StoreInst *SI, RLEKind Kind);
 
   /// Returns a *single* forwardable SILValue for the given LSLocation right
   /// before the InsertPt instruction.
@@ -361,6 +391,8 @@ public:
 
   bool run();
 
+  bool processBasicBlocks(RLEKind Kind);
+
   /// Returns the alias analysis we will use during all computations.
   AliasAnalysis *getAA() const { return AA; }
 
@@ -390,7 +422,6 @@ public:
   /// in the given basic block.
   bool gatherLocationValues(SILBasicBlock *B, LSLocation &L,
                             LSLocationValueMap &Vs, ValueTableMap &VM);
-
 };
 
 } // end anonymous namespace
@@ -399,24 +430,21 @@ bool BlockState::isTrackingLSLocation(unsigned bit) {
   return ForwardSetIn.test(bit);
 }
 
+void BlockState::startTrackingLSLocation(unsigned bit) {
+  ForwardSetIn.set(bit);
+}
+
 void BlockState::stopTrackingLSLocation(unsigned bit) {
   ForwardSetIn.reset(bit);
-  ForwardValIn.erase(bit);
 }
 
-void BlockState::clearLSLocations() {
-  ForwardSetIn.reset();
-  ForwardValIn.clear();
+void BlockState::clearLSLocations() { ForwardSetIn.reset(); }
+
+void BlockState::startTrackingLSValue(unsigned lbit, unsigned vbit) {
+  ForwardValIn[lbit] = vbit;
 }
 
-void BlockState::startTrackingLSLocation(unsigned bit, unsigned VBit) {
-  ForwardSetIn.set(bit);
-  ForwardValIn[bit] = VBit;
-}
-
-void BlockState::updateTrackedLSLocation(unsigned bit, unsigned VBit) {
-  ForwardValIn[bit] = VBit;
-}
+void BlockState::stopTrackingLSValue(unsigned bit) { ForwardValIn.erase(bit); }
 
 SILValue BlockState::reduceValuesAtEndOfBlock(RLEContext &Ctx, LSLocation &L) {
   // First, collect current available locations and their corresponding values
@@ -485,22 +513,22 @@ bool BlockState::setupRLE(RLEContext &Ctx, SILInstruction *I, SILValue Mem) {
   return true;
 }
 
-void BlockState::updateForwardSetForRead(RLEContext &Ctx, unsigned LBit,
-                                         unsigned VBit) {
-  // If there is already an available value for this location, use
-  // the existing value.
-  if (isTrackingLSLocation(LBit))
-    return;
-
+void BlockState::updateForwardSetForRead(RLEContext &Ctx, unsigned bit) {
   // Track the new location and value.
-  startTrackingLSLocation(LBit, VBit);
+  startTrackingLSLocation(bit);
 }
 
-void BlockState::updateForwardSetForWrite(RLEContext &Ctx, unsigned LBit,
-                                          unsigned VBit) {
-  // This is a store. Invalidate any Memlocation that this location may
-  // alias, as their value can no longer be forwarded.
-  LSLocation &R = Ctx.getLSLocation(LBit);
+void BlockState::updateForwardValForRead(RLEContext &Ctx, unsigned lbit,
+                                         unsigned vbit) {
+  // Track the new location and value.
+  startTrackingLSValue(lbit, vbit);
+  startTrackingLSLocation(lbit);
+}
+
+void BlockState::updateForwardSetForWrite(RLEContext &Ctx, unsigned bit) {
+  // This is a store, invalidate any location that this location may alias, as
+  // their values can no longer be forwarded.
+  LSLocation &R = Ctx.getLSLocation(bit);
   for (unsigned i = 0; i < ForwardSetIn.size(); ++i) {
     if (!isTrackingLSLocation(i))
       continue;
@@ -512,35 +540,71 @@ void BlockState::updateForwardSetForWrite(RLEContext &Ctx, unsigned LBit,
   }
 
   // Start tracking this LSLocation.
-  startTrackingLSLocation(LBit, VBit);
+  startTrackingLSLocation(bit);
+}
+
+void BlockState::updateForwardValForWrite(RLEContext &Ctx, unsigned lbit,
+                                          unsigned vbit) {
+  // This is a store, invalidate any location that this location may alias, as
+  // their values can no longer be forwarded.
+  LSLocation &R = Ctx.getLSLocation(lbit);
+  for (unsigned i = 0; i < ForwardSetIn.size(); ++i) {
+    if (!isTrackingLSLocation(i))
+      continue;
+    LSLocation &L = Ctx.getLSLocation(i);
+    if (!L.isMayAliasLSLocation(R, Ctx.getAA()))
+      continue;
+    // MayAlias, invalidate the location and value.
+    stopTrackingLSValue(i);
+    stopTrackingLSLocation(i);
+  }
+
+  // Start tracking this location and value.
+  startTrackingLSLocation(lbit);
+  startTrackingLSValue(lbit, vbit);
 }
 
 void BlockState::processWrite(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
-                              SILValue Val) {
+                              SILValue Val, RLEKind Kind) {
   // Initialize the LSLocation.
   LSLocation L(Mem);
 
   // If we cant figure out the Base or Projection Path for the write,
   // process it as an unknown memory instruction.
   if (!L.isValid()) {
-    processUnknownWriteInst(Ctx, I);
+    processUnknownWriteInst(Ctx, I, Kind);
     return;
   }
 
-  // Expand the given LSLocation and Val into individual fields and process
+  // Expand the given location and val into individual fields and process
   // them as separate writes.
   LSLocationList Locs;
-  LSValueList Vals;
   LSLocation::expand(L, &I->getModule(), Locs, Ctx.getTE());
-  LSValue::expand(Val, &I->getModule(), Vals, Ctx.getTE());
-  for (unsigned i = 0; i < Locs.size(); ++i) {
-    updateForwardSetForWrite(Ctx, Ctx.getLSLocationBit(Locs[i]),
-                             Ctx.getLSValueBit(Vals[i]));
+
+  // Are we computing available set ?
+  if (isComputeAvailSet(Kind)) {
+    for (unsigned i = 0; i < Locs.size(); ++i) {
+      updateForwardSetForWrite(Ctx, Ctx.getLSLocationBit(Locs[i]));
+    }
+    return;
   }
+
+  // Are we computing available value ?
+  if (isComputeAvailValue(Kind) || isPerformRLE(Kind)) {
+    LSValueList Vals;
+    LSValue::expand(Val, &I->getModule(), Vals, Ctx.getTE());
+    for (unsigned i = 0; i < Locs.size(); ++i) {
+      updateForwardValForWrite(Ctx, Ctx.getLSLocationBit(Locs[i]),
+                               Ctx.getLSValueBit(Vals[i]));
+    }
+    return;
+  }
+
+  llvm_unreachable("Unknown RLE compute kind");
 }
 
 void BlockState::processRead(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
-                             SILValue Val, bool PF) {
+                             SILValue Val, RLEKind Kind) {
   // Initialize the LSLocation.
   LSLocation L(Mem);
 
@@ -552,44 +616,52 @@ void BlockState::processRead(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
   // Expand the given LSLocation and Val into individual fields and process
   // them as separate reads.
   LSLocationList Locs;
-  LSValueList Vals;
   LSLocation::expand(L, &I->getModule(), Locs, Ctx.getTE());
-  LSValue::expand(Val, &I->getModule(), Vals, Ctx.getTE());
 
-  bool CanForward = true;
-  for (auto &X : Locs) {
-    CanForward &= isTrackingLSLocation(Ctx.getLSLocationBit(X));
-  }
-
-  // We do not have every location available, track the LSLocations and
-  // their values from this instruction, and return.
-  if (!CanForward) {
-    for (unsigned i = 0; i < Locs.size(); ++i) {
-      updateForwardSetForRead(Ctx, Ctx.getLSLocationBit(Locs[i]),
-                              Ctx.getLSValueBit(Vals[i]));
+  // Are we computing available set ?.
+  if (isComputeAvailSet(Kind)) {
+    for (auto &X : Locs) {
+      if (isTrackingLSLocation(Ctx.getLSLocationBit(X)))
+        continue;
+      updateForwardSetForRead(Ctx, Ctx.getLSLocationBit(X));
     }
     return;
   }
 
-  // At this point, we have all the LSLocations and their values available.
-  //
-  // If we are not doing forwarding just yet, simply return.
-  if (!PF)
+  // Are we computing available values ?.
+  bool CanForward = true;
+  if (isComputeAvailValue(Kind) || isPerformRLE(Kind)) {
+    LSValueList Vals;
+    LSValue::expand(Val, &I->getModule(), Vals, Ctx.getTE());
+    for (unsigned i = 0; i < Locs.size(); ++i) {
+      if (isTrackingLSLocation(Ctx.getLSLocationBit(Locs[i])))
+        continue;
+      updateForwardValForRead(Ctx, Ctx.getLSLocationBit(Locs[i]),
+                              Ctx.getLSValueBit(Vals[i]));
+      CanForward = false;
+    }
+  }
+
+  // Simply return if we are not performing RLE or we do not have all the
+  // values available to perform RLE.
+  if (!isPerformRLE(Kind) || !CanForward)
     return;
 
   // Lastly, forward value to the load.
   setupRLE(Ctx, I, Mem);
 }
 
-void BlockState::processStoreInst(RLEContext &Ctx, StoreInst *SI) {
-  processWrite(Ctx, SI, SI->getDest(), SI->getSrc());
+void BlockState::processStoreInst(RLEContext &Ctx, StoreInst *SI,
+                                  RLEKind Kind) {
+  processWrite(Ctx, SI, SI->getDest(), SI->getSrc(), Kind);
 }
 
-void BlockState::processLoadInst(RLEContext &Ctx, LoadInst *LI, bool PF) {
-  processRead(Ctx, LI, LI->getOperand(), SILValue(LI), PF);
+void BlockState::processLoadInst(RLEContext &Ctx, LoadInst *LI, RLEKind Kind) {
+  processRead(Ctx, LI, LI->getOperand(), SILValue(LI), Kind);
 }
 
-void BlockState::processUnknownWriteInst(RLEContext &Ctx, SILInstruction *I) {
+void BlockState::processUnknownWriteInst(RLEContext &Ctx, SILInstruction *I,
+                                         RLEKind Kind) {
   auto *AA = Ctx.getAA();
   for (unsigned i = 0; i < ForwardSetIn.size(); ++i) {
     if (!isTrackingLSLocation(i))
@@ -603,75 +675,87 @@ void BlockState::processUnknownWriteInst(RLEContext &Ctx, SILInstruction *I) {
       continue;
     // MayAlias.
     stopTrackingLSLocation(i);
+    stopTrackingLSValue(i);
   }
 }
 
 /// Promote stored values to loads and merge duplicated loads.
-bool BlockState::optimize(RLEContext &Ctx, bool PF) {
+bool BlockState::optimize(RLEContext &Ctx, RLEKind Kind) {
   for (auto &II : *BB) {
     SILInstruction *Inst = &II;
     DEBUG(llvm::dbgs() << "    Visiting: " << *Inst);
 
-    // This is a StoreInst, try to see whether it clobbers any forwarding
-    // value.
+    // This is a StoreInst, try to see whether it clobbers any forwarding value
     if (auto *SI = dyn_cast<StoreInst>(Inst)) {
-      processStoreInst(Ctx, SI);
+      processStoreInst(Ctx, SI, Kind);
       continue;
     }
 
     // This is a LoadInst. Let's see if we can find a previous loaded, stored
     // value to use instead of this load.
     if (auto *LI = dyn_cast<LoadInst>(Inst)) {
-      processLoadInst(Ctx, LI, PF);
+      processLoadInst(Ctx, LI, Kind);
       continue;
     }
 
     // If this instruction has side effects, but is inert from a load store
     // perspective, skip it.
-    if (isRLEInertInstruction(Inst)) {
-      DEBUG(llvm::dbgs() << "        Found inert instruction: " << *Inst);
+    if (isRLEInertInstruction(Inst))
       continue;
-    }
 
     // If this instruction does not read or write memory, we can skip it.
-    if (!Inst->mayReadOrWriteMemory()) {
-      DEBUG(llvm::dbgs() << "        Found readnone instruction, does not "
-                            "affect loads and stores.\n");
+    if (!Inst->mayReadOrWriteMemory())
       continue;
-    }
 
     // If we have an instruction that may write to memory and we can not prove
     // that it and its operands can not alias a load we have visited, invalidate
     // that load.
     if (Inst->mayWriteToMemory()) {
-      processUnknownWriteInst(Ctx, Inst);
+      processUnknownWriteInst(Ctx, Inst, Kind);
       continue;
     }
   }
 
   // The basic block is finished, see whether there is a change in the
   // ForwardSetOut set.
-  return updateForwardSetOut();
+  if (isComputeAvailSet(Kind))
+    return updateForwardSetOut();
+
+  // Update the ForwardValOut if we are computing the available values.
+  if (isComputeAvailValue(Kind)) {
+    updateForwardValOut();
+    return false;
+  }
+  return false;
 }
 
-void BlockState::mergePredecessorState(RLEContext &Ctx,
-                                       BlockState &OtherState) {
-  // Merge in the predecessor state.
-  llvm::SmallVector<unsigned, 8> LocDeleteList;
-  for (unsigned i = 0; i < ForwardSetIn.size(); ++i) {
-    if (OtherState.ForwardSetOut[i]) {
-      // There are multiple values from multiple predecessors, set this as
-      // a covering value. We do not need to track the value itself, as we
-      // can always go to the predecessors BlockState to find it.
-      ForwardValIn[i] = Ctx.getLSValueBit(LSValue(true));
-      continue;
+void BlockState::mergePredecessorState(RLEContext &Ctx, BlockState &OtherState,
+                                       RLEKind Kind) {
+  // Are we computing the available set ?
+  if (isComputeAvailSet(Kind)) {
+    ForwardSetIn &= OtherState.ForwardSetOut;
+    return;
+  }
+
+  // Are we computing the available value ?
+  if (isComputeAvailValue(Kind) || isPerformRLE(Kind)) {
+    // Merge in the predecessor state.
+    llvm::SmallVector<unsigned, 8> LocDeleteList;
+    for (unsigned i = 0; i < ForwardSetIn.size(); ++i) {
+      if (OtherState.ForwardSetOut[i]) {
+        // There are multiple values from multiple predecessors, set this as
+        // a covering value. We do not need to track the value itself, as we
+        // can always go to the predecessors BlockState to find it.
+        ForwardValIn[i] = Ctx.getLSValueBit(LSValue(true));
+        continue;
+      }
+      // If this location does have an available value, then clear it.
+      stopTrackingLSLocation(i);
     }
-    // If this location does have an available value, then clear it.
-    stopTrackingLSLocation(i);
   }
 }
 
-void BlockState::mergePredecessorStates(RLEContext &Ctx) {
+void BlockState::mergePredecessorStates(RLEContext &Ctx, RLEKind Kind) {
   // Clear the state if the basic block has no predecessor.
   if (BB->getPreds().begin() == BB->getPreds().end()) {
     clearLSLocations();
@@ -689,10 +773,15 @@ void BlockState::mergePredecessorStates(RLEContext &Ctx) {
     // with the state of the initial predecessor.
     // If BB is also a predecessor of itself, we should not initialize.
     if (!HasAtLeastOnePred) {
-      ForwardSetIn = Other.ForwardSetOut;
-      ForwardValIn = Other.ForwardValOut;
+      if (isComputeAvailSet(Kind)) {
+        ForwardSetIn = Other.ForwardSetOut;
+      }
+      if (isComputeAvailValue(Kind) || isPerformRLE(Kind)) {
+        ForwardSetIn = Other.ForwardSetOut;
+        ForwardValIn = Other.ForwardValOut;
+      }
     } else {
-      mergePredecessorState(Ctx, Other);
+      mergePredecessorState(Ctx, Other, Kind);
     }
     HasAtLeastOnePred = true;
   }
@@ -773,7 +862,8 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
     // Mark this basic block as processed.
     HandledBBs.insert(CurBB);
 
-    // This BlockState contains concrete values for all the expanded locations,
+    // This BlockState contains concrete values for all the expanded
+    // locations,
     // collect and reduce them into a single value in the current block.
     if (Forwarder.isConcreteValues(*this, L)) {
       Values[CurBB] = Forwarder.reduceValuesAtEndOfBlock(*this, L);
@@ -792,13 +882,15 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
     }
 
     // This BlockState contains concrete values for some but not all the
-    // expanded locations, recursively call gatherLocationValues to materialize
+    // expanded locations, recursively call gatherLocationValues to
+    // materialize
     // the value that reaches this basic block.
     LSLocationValueMap LSValues;
     if (!gatherLocationValues(CurBB, L, LSValues, Forwarder.getForwardValOut()))
       return SILValue();
 
-    // Reduce the available values into a single SILValue we can use to forward.
+    // Reduce the available values into a single SILValue we can use to
+    // forward.
     SILInstruction *IPt = CurBB->getTerminator();
     Values[CurBB] = LSValue::reduce(L, &BB->getModule(), LSValues, IPt, TE);
   }
@@ -888,49 +980,55 @@ bool RLEContext::gatherLocationValues(SILBasicBlock *BB, LSLocation &L,
   return true;
 }
 
+bool RLEContext::processBasicBlocks(RLEKind Kind) {
+  bool Changed = false;
+  for (SILBasicBlock *BB : ReversePostOrder) {
+    BlockState &Forwarder = getBlockState(BB);
+
+    // Merge the predecessors. After merging, BlockState now contains
+    // lists of available LSLocations and their values that reach the
+    // beginning of the basic block along all paths.
+    Forwarder.mergePredecessorStates(*this, Kind);
+
+    // Merge duplicate loads, and forward stores to
+    // loads. We also update lists of stores|loads to reflect the end
+    // of the basic block.
+    Changed |= Forwarder.optimize(*this, Kind);
+  }
+  return Changed;
+}
+
 bool RLEContext::run() {
   // Data flow may take too long to converge.
   if (LSLocationVault.size() > MaxLSLocationLimit)
     return false;
 
+  // We perform redundant load elimination in the following phases.
+  //
+  // Phase 1. we use an iterative data flow to compute whether there is an
+  // available value at a given point, we do not yet care about what the value
+  // is.
+  //
+  // Phase 2. we compute the real forwardable value at a given point.
+  //
+  // Phase 3. we perform the redundant load elimination.
+
+  // Find whether there is an available value at a given point.
+  //
   // Process basic blocks in RPO. After the data flow converges, run last
   // iteration and perform load forwarding.
-  bool LastIteration = false;
   bool ForwardSetChanged = false;
   do {
-    ForwardSetChanged = false;
-    for (SILBasicBlock *BB : ReversePostOrder) {
-      BlockState &Forwarder = getBlockState(BB);
+    ForwardSetChanged = processBasicBlocks(RLEKind::ComputeAvailSet);
+  } while (ForwardSetChanged);
 
-      // Merge the predecessors. After merging, BlockState now contains
-      // lists of available LSLocations and their values that reach the
-      // beginning of the basic block along all paths.
-      Forwarder.mergePredecessorStates(*this);
+  // We have computed the available value bit, now go through every basic
+  // block and compute the forwarding value locally.
+  processBasicBlocks(RLEKind::ComputeAvailValue);
 
-      // Merge duplicate loads, and forward stores to
-      // loads. We also update lists of stores|loads to reflect the end
-      // of the basic block.
-      ForwardSetChanged |= Forwarder.optimize(*this, LastIteration);
-    }
-
-    // Last iteration completed, we are done here.
-    if (LastIteration)
-      break;
-
-    // ForwardSetOut have not changed in any basic block. Run one last
-    // the data flow has converged, run last iteration and try to perform
-    // load forwarding.
-    //
-    if (!ForwardSetChanged) {
-      LastIteration = true;
-    }
-
-    // ForwardSetOut in some basic blocks changed, rerun the data flow.
-    //
-    // TODO: We only need to rerun basic blocks with predecessors changed.
-    // use a worklist in the future.
-    //
-  } while (ForwardSetChanged || LastIteration);
+  // We have the available value bit computed and the local forwarding value.
+  // Set up the load forwarding.
+  processBasicBlocks(RLEKind::PerformRLE);
 
   // Finally, perform the redundant load replacements.
   llvm::DenseSet<SILInstruction *> InstsToRemove;
@@ -970,7 +1068,6 @@ class RedundantLoadElimination : public SILFunctionTransform {
 
   /// The entry point to the transformation.
   void run() override {
-
     SILFunction *F = getFunction();
     DEBUG(llvm::dbgs() << "***** Redundant Load Elimination on function: "
                        << F->getName() << " *****\n");
