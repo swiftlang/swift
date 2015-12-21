@@ -1,4 +1,4 @@
-//===--- TypeCheckRequest.h - Type Checking Request -----------------------===//
+//===--- TypeCheckRequest.cpp - Type Checking Request ---------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

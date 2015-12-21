@@ -1,4 +1,4 @@
-//===--- TypeCheckDecl.cpp - Type Checking for Declarations ---------------===//
+//===--- CodeSynthesis.cpp - Type Checking for Declarations ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //

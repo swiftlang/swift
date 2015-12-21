@@ -1,4 +1,4 @@
-//===--- SILInstruction.cpp - Instructions for SIL code -------------------===//
+//===--- SILInstructions.cpp - Instructions for SIL code ------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
