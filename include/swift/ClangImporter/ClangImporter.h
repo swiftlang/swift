@@ -116,13 +116,6 @@ public:
   /// \param name The name we're searching for.
   void lookupValue(DeclName name, VisibleDeclConsumer &consumer);
 
-  /// \brief Look for visible declarations in the Clang translation unit and
-  /// import them as Swift decls.
-  ///
-  /// \param Consumer The VisibleDeclConsumer that will be fed decls as they
-  /// are found and imported.
-  void lookupVisibleDecls(VisibleDeclConsumer &Consumer) const;
-
   /// Look for textually included declarations from the bridging header.
   ///
   /// \param filter returns true if the given clang decl/macro should be

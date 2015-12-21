@@ -253,6 +253,8 @@ class FooUnavailableMembers : FooClassBase {
   init!()
   convenience init!(float f: Float)
 }
+class FooCFType {
+}
 typealias FooCFTypeRef = FooCFType
 @available(*, unavailable, message="Core Foundation objects are automatically memory managed")
 func FooCFTypeRelease(_: FooCFType!)
@@ -265,10 +267,10 @@ class FooRepeatedMembers : FooClassBase {
 extension FooRepeatedMembers {
   var repeatedPropertyInCategory: Int32
   func repeatedMethodInCategory()
-  var repeatedPropertyFromCategory: Int32
-  func repeatedMethodFromCategory()
 }
 extension FooRepeatedMembers {
+  var repeatedPropertyFromCategory: Int32
+  func repeatedMethodFromCategory()
 }
 enum SCNFilterMode : Int {
   init?(rawValue: Int)

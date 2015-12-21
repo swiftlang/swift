@@ -3266,29 +3266,17 @@ public:
 
 class FilteringDeclaredDeclConsumer : public swift::VisibleDeclConsumer {
   swift::VisibleDeclConsumer &NextConsumer;
-  SmallVectorImpl<ExtensionDecl *> &ExtensionResults;
   const ClangModuleUnit *ModuleFilter = nullptr;
 
 public:
   FilteringDeclaredDeclConsumer(swift::VisibleDeclConsumer &consumer,
-                             SmallVectorImpl<ExtensionDecl *> &ExtensionResults,
                                 const ClangModuleUnit *CMU)
       : NextConsumer(consumer),
-        ExtensionResults(ExtensionResults),
         ModuleFilter(CMU) {}
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
     if (isDeclaredInModule(ModuleFilter, VD))
       NextConsumer.foundDecl(VD, Reason);
-
-    // Also report the extensions declared in this module (whether the extended
-    // type is from this module or not).
-    if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
-      for (auto Ext : NTD->getExtensions()) {
-        if (isDeclaredInModule(ModuleFilter, Ext))
-          ExtensionResults.push_back(Ext);
-      }
-    }
   }
 };
 
@@ -3495,62 +3483,6 @@ void ClangImporter::lookupValue(DeclName name, VisibleDeclConsumer &consumer){
   }
 }
 
-void ClangImporter::lookupVisibleDecls(VisibleDeclConsumer &Consumer) const {
-  if (Impl.CurrentCacheState != Implementation::CacheState::Valid) {
-    do {
-      Impl.CurrentCacheState = Implementation::CacheState::InProgress;
-      Impl.CachedVisibleDecls.clear();
-
-      ClangVectorDeclConsumer clangConsumer;
-      auto &sema = Impl.getClangSema();
-      sema.LookupVisibleDecls(sema.getASTContext().getTranslationUnitDecl(),
-                              clang::Sema::LookupNameKind::LookupAnyName,
-                              clangConsumer);
-
-      // Sort all the Clang decls we find, so that we process them
-      // deterministically. This *shouldn't* be necessary, but the importer
-      // definitely still has ordering dependencies.
-      auto results = clangConsumer.getResults();
-      llvm::array_pod_sort(results.begin(), results.end(),
-                           [](clang::NamedDecl * const *lhs,
-                              clang::NamedDecl * const *rhs) -> int {
-        return clang::DeclarationName::compare((*lhs)->getDeclName(),
-                                               (*rhs)->getDeclName());
-      });
-
-      for (const clang::NamedDecl *clangDecl : results) {
-        if (Impl.CurrentCacheState != Implementation::CacheState::InProgress)
-          break;
-        if (Decl *imported = Impl.importDeclReal(clangDecl))
-          Impl.CachedVisibleDecls.push_back(cast<ValueDecl>(imported));
-      }
-      
-      // If we changed things /while/ we were caching, we need to start over
-      // and try again. Fortunately we record a map of decls we've already
-      // imported, so most of the work is just the lookup and then going
-      // through the list.
-    } while (Impl.CurrentCacheState != Implementation::CacheState::InProgress);
-
-    auto &ClangPP = Impl.getClangPreprocessor();
-    for (auto I = ClangPP.macro_begin(), E = ClangPP.macro_end(); I != E; ++I) {
-      if (!I->first->hasMacroDefinition())
-        continue;
-      auto Name = Impl.importIdentifier(I->first);
-      if (Name.empty())
-        continue;
-      if (auto *Imported = Impl.importMacro(
-              Name, ClangPP.getMacroDefinition(I->first).getMacroInfo())) {
-        Impl.CachedVisibleDecls.push_back(Imported);
-      }
-    }
-
-    Impl.CurrentCacheState = Implementation::CacheState::Valid;
-  }
-
-  for (auto VD : Impl.CachedVisibleDecls)
-    Consumer.foundDecl(VD, DeclVisibilityKind::VisibleAtTopLevel);
-}
-
 void ClangModuleUnit::lookupVisibleDecls(Module::AccessPathTy accessPath,
                                          VisibleDeclConsumer &consumer,
                                          NLKind lookupKind) const {
@@ -3592,19 +3524,28 @@ public:
 
 void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
   VectorDeclPtrConsumer consumer(results);
-  SmallVector<ExtensionDecl *, 16> extensions;
-  FilteringDeclaredDeclConsumer filterConsumer(consumer, extensions, this);
+  FilteringDeclaredDeclConsumer filterConsumer(consumer, this);
   DarwinBlacklistDeclConsumer blacklistConsumer(filterConsumer,
                                                 getClangASTContext());
 
   const clang::Module *topLevelModule = clangModule->getTopLevelModule();
-  if (DarwinBlacklistDeclConsumer::needsBlacklist(topLevelModule)) {
-    owner.lookupVisibleDecls(blacklistConsumer);
-  } else {
-    owner.lookupVisibleDecls(filterConsumer);
-  }
 
-  results.append(extensions.begin(), extensions.end());
+  swift::VisibleDeclConsumer *actualConsumer = &filterConsumer;
+  if (DarwinBlacklistDeclConsumer::needsBlacklist(topLevelModule))
+    actualConsumer = &blacklistConsumer;
+
+  // Find the corresponding lookup table.
+  if (auto lookupTable = owner.Impl.findLookupTable(topLevelModule)) {
+    // Search it.
+    owner.Impl.lookupVisibleDecls(*lookupTable, *actualConsumer);
+
+    // Add the extensions produced by importing categories.
+    for (auto category : lookupTable->categories()) {
+      if (auto extension = cast_or_null<ExtensionDecl>(
+                            owner.Impl.importDecl(category)))
+        results.push_back(extension);
+    }
+  }
 }
 
 ImportDecl *swift::createImportDecl(ASTContext &Ctx,
