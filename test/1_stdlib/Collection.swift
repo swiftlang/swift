@@ -114,9 +114,10 @@ func isPalindrome2<
     if (b == --e) { 
       break
     }
-    if seq[b++] != seq[e] {
+    if seq[b] != seq[e] {
       return false
     }
+    b = b.successor()
   }
   return true
 }
