@@ -99,9 +99,16 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
 
       // Check whether this entry matches any existing entry.
       for (auto &existingEntry : entry.DeclsOrMacros) {
+        // If it matches an existing declaration, there's nothing to do.
         if (decl && isDeclEntry(existingEntry) && 
             matchesExistingDecl(decl, mapStoredDecl(existingEntry)))
           return;
+
+        // If it matches an existing macro, overwrite the existing entry.
+        if (macro && isMacroEntry(existingEntry)) {
+          existingEntry = encodeEntry(macro);
+          return;
+        }
       }
 
       // Add an entry to this context.
