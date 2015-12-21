@@ -188,7 +188,7 @@ def get_preset_options(substitutions, preset_file_names, preset_name):
         sys.exit(1)
     if missing_opts:
         print_with_argv0("missing option(s) for preset '" + preset_name +
-        "': " + ", ".join(missing_opts))
+                         "': " + ", ".join(missing_opts))
         sys.exit(1)
 
     return build_script_opts + [ "--" ] + build_script_impl_opts
