@@ -72,7 +72,7 @@ public:
 
   /// If true, we should use the Swift name lookup tables rather than
   /// Clang's name lookup facilities.
-  bool UseSwiftLookupTables = true;
+  bool UseSwiftLookupTables = false;
 };
 
 } // end namespace swift

@@ -546,12 +546,8 @@ ClangImporter::create(ASTContext &ctx,
   ppOpts.addRemappedFile(Implementation::moduleImportBufferName,
                          sourceBuffer.release());
 
-  // Build Swift lookup tables, if requested.
-  if (importer->Impl.UseSwiftLookupTables) {
-    invocation->getFrontendOpts().ModuleFileExtensions.push_back(
-
-      &importer->Impl);
-  }
+  // Install a Clang module file extension to build Swift name lookup tables.
+  invocation->getFrontendOpts().ModuleFileExtensions.push_back(&importer->Impl);
 
   // Create a compiler instance.
   auto PCHContainerOperations =
@@ -632,13 +628,11 @@ ClangImporter::create(ASTContext &ctx,
     for (auto *D : parsed.get()) {
       importer->Impl.addBridgeHeaderTopLevelDecls(D);
 
-      if (importer->Impl.UseSwiftLookupTables) {
-        if (auto named = dyn_cast<clang::NamedDecl>(D)) {
-          importer->Impl.addEntryToLookupTable(
-            instance.getSema(),
-            importer->Impl.BridgingHeaderLookupTable,
-            named);
-        }
+      if (auto named = dyn_cast<clang::NamedDecl>(D)) {
+        importer->Impl.addEntryToLookupTable(
+          instance.getSema(),
+          importer->Impl.BridgingHeaderLookupTable,
+          named);
       }
     }
   }
@@ -807,27 +801,24 @@ bool ClangImporter::Implementation::importHeader(
 
   clang::Parser::DeclGroupPtrTy parsed;
   while (!Parser->ParseTopLevelDecl(parsed)) {
-    if (parsed && (trackParsedSymbols || UseSwiftLookupTables)) {
-      for (auto *D : parsed.get()) {
-        if (trackParsedSymbols)
-          addBridgeHeaderTopLevelDecls(D);
+    if (!parsed) continue;
 
-        if (UseSwiftLookupTables) {
-          if (auto named = dyn_cast<clang::NamedDecl>(D)) {
-            addEntryToLookupTable(getClangSema(), BridgingHeaderLookupTable,
-                                  named);
-          }
-        }
+    for (auto *D : parsed.get()) {
+      if (trackParsedSymbols)
+        addBridgeHeaderTopLevelDecls(D);
+
+      if (auto named = dyn_cast<clang::NamedDecl>(D)) {
+        addEntryToLookupTable(getClangSema(), BridgingHeaderLookupTable,
+                              named);
       }
     }
   }
   pp.EndSourceFile();
   bumpGeneration();
 
-  if (UseSwiftLookupTables) {
-    addMacrosToLookupTable(getClangASTContext(), getClangPreprocessor(),
-                           BridgingHeaderLookupTable);
-  }
+  // Add any defined macros to the bridging header lookup table.
+  addMacrosToLookupTable(getClangASTContext(), getClangPreprocessor(),
+                         BridgingHeaderLookupTable);
 
   // Wrap all Clang imports under a Swift import decl.
   for (auto &Import : BridgeHeaderTopLevelImports) {
@@ -3132,159 +3123,6 @@ bool ClangImporter::Implementation::shouldImportAsInitializer(
 }
 
 #pragma mark Name lookup
-void ClangImporter::lookupValue(Identifier name, VisibleDeclConsumer &consumer){
-  auto &pp = Impl.Instance->getPreprocessor();
-  auto &sema = Impl.Instance->getSema();
-
-  // Map the name. If we can't represent the Swift name in Clang, bail out now.
-  auto clangName = Impl.exportName(name);
-  if (!clangName)
-    return;
-  
-  // See if there's a preprocessor macro we can import by this name.
-  clang::IdentifierInfo *clangID = clangName.getAsIdentifierInfo();
-  if (clangID && clangID->hasMacroDefinition()) {
-    if (auto clangMacro = pp.getMacroInfo(clangID)) {
-      if (auto valueDecl = Impl.importMacro(name, clangMacro)) {
-        consumer.foundDecl(valueDecl, DeclVisibilityKind::VisibleAtTopLevel);
-      }
-    }
-  }
-
-  bool FoundType = false;
-  bool FoundAny = false;
-  auto processResults = [&](clang::LookupResult &result) {
-    SmallVector<const clang::NamedDecl *, 16> sortedResults{result.begin(),
-                                                            result.end()};
-    const clang::SourceManager &srcMgr = pp.getSourceManager();
-    std::sort(sortedResults.begin(), sortedResults.end(),
-              [&](const clang::NamedDecl *lhs,
-                  const clang::NamedDecl *rhs) -> bool {
-      clang::SourceLocation lhsLoc = lhs->getLocStart();
-      clang::SourceLocation lhsExpLoc = srcMgr.getExpansionLoc(lhsLoc);
-      clang::SourceLocation rhsLoc = rhs->getLocStart();
-      clang::SourceLocation rhsExpLoc = srcMgr.getExpansionLoc(rhsLoc);
-      if (lhsExpLoc == rhsExpLoc)
-        return srcMgr.isBeforeInTranslationUnit(srcMgr.getSpellingLoc(lhsLoc),
-                                                srcMgr.getSpellingLoc(rhsLoc));
-      return srcMgr.isBeforeInTranslationUnit(lhsExpLoc, rhsExpLoc);
-    });
-
-    // FIXME: Filter based on access path? C++ access control?
-    for (auto decl : result) {
-      if (auto swiftDecl = Impl.importDeclReal(decl->getUnderlyingDecl())) {
-        if (auto valueDecl = dyn_cast<ValueDecl>(swiftDecl)) {
-          // If the importer gave us a declaration from the stdlib, make sure
-          // it does not show up in the lookup results for the imported module.
-          if (valueDecl->getDeclContext()->isModuleScopeContext() &&
-              valueDecl->getModuleContext() == Impl.getStdlibModule())
-            continue;
-          // Check that we didn't pick up something with a remapped name.
-          if (valueDecl->getName() != name)
-            continue;
-
-          consumer.foundDecl(valueDecl, DeclVisibilityKind::VisibleAtTopLevel);
-          FoundType = FoundType || isa<TypeDecl>(valueDecl);
-          FoundAny = true;
-        }
-      }
-    }
-  };
-
-
-  // Perform name lookup into the global scope.
-  // FIXME: Map source locations over.
-  clang::LookupResult lookupResult(sema, /*name=*/{}, clang::SourceLocation(),
-                                   clang::Sema::LookupOrdinaryName);
-
-  auto lookupNameForSwift = [&](clang::DeclarationName clangNameToLookup) {
-    lookupResult.setLookupName(clangNameToLookup);
-
-    lookupResult.clear(clang::Sema::LookupOrdinaryName);
-    if (sema.LookupName(lookupResult, /*Scope=*/nullptr))
-      processResults(lookupResult);
-
-    if (!FoundType) {
-      // Look up a tag name if we did not find a type with this name already.
-      // We don't want to introduce multiple types with same name.
-      lookupResult.clear(clang::Sema::LookupTagName);
-      if (sema.LookupName(lookupResult, /*Scope=*/nullptr))
-        processResults(lookupResult);
-    }
-
-    const auto *clangIDToLookup = clangNameToLookup.getAsIdentifierInfo();
-
-    // Look up protocol names as well.
-    lookupResult.clear(clang::Sema::LookupObjCProtocolName);
-    if (sema.LookupName(lookupResult, /*Scope=*/nullptr)) {
-      processResults(lookupResult);
-
-    } else if (!FoundAny &&
-               clangIDToLookup->getName().endswith(SWIFT_PROTOCOL_SUFFIX)) {
-      StringRef noProtoNameStr = clangIDToLookup->getName();
-      noProtoNameStr = noProtoNameStr.drop_back(strlen(SWIFT_PROTOCOL_SUFFIX));
-      auto protoIdent = &Impl.getClangASTContext().Idents.get(noProtoNameStr);
-      lookupResult.clear(clang::Sema::LookupObjCProtocolName);
-      lookupResult.setLookupName(protoIdent);
-
-      if (sema.LookupName(lookupResult, /*Scope=*/nullptr))
-        processResults(lookupResult);
-    }
-
-    // If we *still* haven't found anything, try looking for '<name>Ref'.
-    // Eventually, this should be optimized by recognizing this case when
-    // generating the Clang module.
-    if (!FoundAny && clangIDToLookup) {
-      llvm::SmallString<128> buffer;
-      buffer += clangIDToLookup->getName();
-      buffer += SWIFT_CFTYPE_SUFFIX;
-      auto refIdent = &Impl.Instance->getASTContext().Idents.get(buffer.str());
-
-      lookupResult.clear(clang::Sema::LookupOrdinaryName);
-      lookupResult.setLookupName(refIdent);
-      if (sema.LookupName(lookupResult, /*Scope=*/0)) {
-        // FIXME: Filter based on access path? C++ access control?
-        // FIXME: Sort this list, even though there's probably only one result.
-        for (auto decl : lookupResult) {
-          auto swiftDecl = Impl.importDeclReal(decl->getUnderlyingDecl());
-          auto alias = dyn_cast_or_null<TypeAliasDecl>(swiftDecl);
-          if (!alias)
-            continue;
-
-          Type underlyingTy = alias->getUnderlyingType();
-          TypeDecl *underlying = nullptr;
-          if (auto anotherAlias =
-              dyn_cast<NameAliasType>(underlyingTy.getPointer())) {
-            underlying = anotherAlias->getDecl();
-          } else if (auto aliasedClass = underlyingTy->getAs<ClassType>()) {
-            underlying = aliasedClass->getDecl();
-          }
-
-          if (!underlying)
-            continue;
-          if (underlying->getName() == name) {
-            consumer.foundDecl(underlying,
-                               DeclVisibilityKind::VisibleAtTopLevel);
-          }
-        }
-      }
-    }
-  };
-
-  // Actually do the lookup.
-  lookupNameForSwift(clangName);
-
-  // If we haven't found anything and the name starts with "__", maybe it's a
-  // decl marked with the swift_private attribute. Try chopping off the prefix.
-  if (!FoundAny && clangID && clangID->getName().startswith("__") &&
-      clangID->getName().size() > 2) {
-    StringRef unprefixedName = clangID->getName().drop_front(2);
-    auto unprefixedID =
-        &Impl.Instance->getASTContext().Idents.get(unprefixedName);
-    lookupNameForSwift(unprefixedID);
-  }
-}
-
 const clang::TypedefNameDecl *
 ClangImporter::Implementation::lookupTypedef(clang::DeclarationName name) {
   clang::Sema &sema = Instance->getSema();
@@ -3713,17 +3551,11 @@ void ClangModuleUnit::lookupVisibleDecls(Module::AccessPathTy accessPath,
     actualConsumer = &darwinBlacklistConsumer;
   }
 
-  if (owner.Impl.UseSwiftLookupTables) {
-    // Find the corresponding lookup table.
-    if (auto lookupTable = owner.Impl.findLookupTable(clangModule)) {
-      // Search it.
-      owner.Impl.lookupVisibleDecls(*lookupTable, *actualConsumer);
-    }
-
-    return;
+  // Find the corresponding lookup table.
+  if (auto lookupTable = owner.Impl.findLookupTable(clangModule)) {
+    // Search it.
+    owner.Impl.lookupVisibleDecls(*lookupTable, *actualConsumer);
   }
-
-  owner.lookupVisibleDecls(*actualConsumer);
 }
 
 namespace {
@@ -3828,21 +3660,11 @@ void ClangModuleUnit::lookupValue(Module::AccessPathTy accessPath,
     consumer = &darwinBlacklistConsumer;
   }
 
-  if (owner.Impl.UseSwiftLookupTables) {
-    // Find the corresponding lookup table.
-    if (auto lookupTable = owner.Impl.findLookupTable(clangModule)) {
-      // Search it.
-      owner.Impl.lookupValue(*lookupTable, name, *consumer);
-    }
-
-    return;
+  // Find the corresponding lookup table.
+  if (auto lookupTable = owner.Impl.findLookupTable(clangModule)) {
+    // Search it.
+    owner.Impl.lookupValue(*lookupTable, name, *consumer);
   }
-
-  // There should be no multi-part top-level decls in a Clang module.
-  if (!name.isSimpleName())
-    return;
-
-  owner.lookupValue(name.getBaseName(), *consumer);
 }
 
 void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
@@ -3942,131 +3764,6 @@ void ClangImporter::loadObjCMethods(
   }
 }
 
-// FIXME: This should just be the implementation of
-// llvm::array_pod_sort_comparator. The only difference is that it uses
-// std::less instead of operator<.
-// FIXME: Copied from IRGenModule.cpp.
-template <typename T>
-static int pointerPODSortComparator(T * const *lhs, T * const *rhs) {
-  std::less<T *> lt;
-  if (lt(*lhs, *rhs))
-    return -1;
-  if (lt(*rhs, *lhs))
-    return -1;
-  return 0;
-}
-
-static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
-                                   VisibleDeclConsumer &consumer,
-                                   DeclName name) {
-  // When looking for a subscript, we actually look for the getters
-  // and setters.
-  bool isSubscript = name.isSimpleName(Impl.SwiftContext.Id_subscript);
-
-  // FIXME: Does not include methods from protocols.
-  auto importMethodsImpl = [&](const clang::ObjCMethodList &start) {
-    for (auto *list = &start; list != nullptr; list = list->getNext()) {
-      if (list->getMethod()->isUnavailable())
-        continue;
-
-      // If the method is a property accessor, we want the property.
-      const clang::NamedDecl *searchForDecl = list->getMethod();
-      if (list->getMethod()->isPropertyAccessor() &&
-          !Impl.isAccessibilityDecl(list->getMethod())) {
-        if (auto property = list->getMethod()->findPropertyDecl()) {
-          // ... unless we are enumerating all decls.  In this case, if we see
-          // a getter, return a property.  If we see a setter, we know that
-          // there is a getter, and we will visit it and return a property at
-          // that time.
-          if (!name && list->getMethod()->param_size() != 0)
-            continue;
-          searchForDecl = property;
-        }
-      }
-
-      auto VD = cast_or_null<ValueDecl>(Impl.importDeclReal(searchForDecl));
-      if (!VD)
-        continue;
-
-      if (auto func = dyn_cast<FuncDecl>(VD)) {
-        if (auto storage = func->getAccessorStorageDecl()) {
-          consumer.foundDecl(storage, DeclVisibilityKind::DynamicLookup);
-          continue;
-        } else if (isSubscript || !name) {
-          auto known = Impl.Subscripts.find({func, nullptr});
-          if (known != Impl.Subscripts.end()) {
-            consumer.foundDecl(known->second,
-                               DeclVisibilityKind::DynamicLookup);
-          }
-
-          // If we were looking only for subscripts, don't report the getter.
-          if (isSubscript)
-            continue;
-        }
-      }
-
-      consumer.foundDecl(VD, DeclVisibilityKind::DynamicLookup);
-    }
-  };
-
-  auto importMethods = [=](const clang::Sema::GlobalMethods &methodListPair) {
-    if (methodListPair.first.getMethod())
-      importMethodsImpl(methodListPair.first);
-    if (methodListPair.second.getMethod())
-      importMethodsImpl(methodListPair.second);
-  };
-
-  clang::Sema &S = Impl.getClangSema();
-
-  if (isSubscript) {
-    clang::Selector sels[] = {
-      Impl.objectAtIndexedSubscript,
-      Impl.setObjectAtIndexedSubscript,
-      Impl.objectForKeyedSubscript,
-      Impl.setObjectForKeyedSubscript
-    };
-    for (auto sel : sels) {
-      S.ReadMethodPool(sel);
-      importMethods(S.MethodPool[sel]);
-    }
-
-  } else if (name) {
-    auto sel = Impl.exportSelector(name);
-    if (!sel.isNull()) {
-      S.ReadMethodPool(sel);
-      importMethods(S.MethodPool[sel]);
-
-      // If this is a simple name, we only checked nullary selectors. Check
-      // unary ones as well.
-      // Note: If this is ever used to look up init methods, we'd need to do
-      // the reverse as well.
-      if (name.isSimpleName()) {
-        auto *II = Impl.exportName(name.getBaseName()).getAsIdentifierInfo();
-        sel = Impl.getClangASTContext().Selectors.getUnarySelector(II);
-        assert(!sel.isNull());
-
-        S.ReadMethodPool(sel);
-        importMethods(S.MethodPool[sel]);
-      }
-    }
-
-  } else {
-    // Force load all external methods.
-    // FIXME: Copied from Clang's SemaCodeComplete.
-    clang::ExternalASTSource *source = S.getExternalSource();
-    for (uint32_t i = 0, n = source->GetNumExternalSelectors(); i != n; ++i) {
-      clang::Selector sel = source->GetExternalSelector(i);
-      if (sel.isNull() || S.MethodPool.count(sel))
-        continue;
-
-      S.ReadMethodPool(sel);
-    }
-
-    for (auto entry : S.MethodPool)
-      importMethods(entry.second);
-  }
-}
-
 void
 ClangModuleUnit::lookupClassMember(Module::AccessPathTy accessPath,
                                    DeclName name,
@@ -4077,19 +3774,11 @@ ClangModuleUnit::lookupClassMember(Module::AccessPathTy accessPath,
 
   VectorDeclConsumer consumer(results);
 
-  // If we have lookup tables, use them.
-  if (owner.Impl.UseSwiftLookupTables) {
-    // Find the corresponding lookup table.
-    if (auto lookupTable = owner.Impl.findLookupTable(clangModule)) {
-      // Search it.
-      owner.Impl.lookupObjCMembers(*lookupTable, name, consumer);
-    }
-
-    return;
+  // Find the corresponding lookup table.
+  if (auto lookupTable = owner.Impl.findLookupTable(clangModule)) {
+    // Search it.
+    owner.Impl.lookupObjCMembers(*lookupTable, name, consumer);
   }
-
-  // FIXME: Not limited by module.
-  lookupClassMembersImpl(owner.Impl, consumer, name);
 }
 
 void ClangModuleUnit::lookupClassMembers(Module::AccessPathTy accessPath,
@@ -4098,18 +3787,11 @@ void ClangModuleUnit::lookupClassMembers(Module::AccessPathTy accessPath,
   if (clangModule && clangModule->isSubModule())
     return;
 
-  if (owner.Impl.UseSwiftLookupTables) {
-    // Find the corresponding lookup table.
-    if (auto lookupTable = owner.Impl.findLookupTable(clangModule)) {
-      // Search it.
-      owner.Impl.lookupAllObjCMembers(*lookupTable, consumer);
-    }
-
-    return;
+  // Find the corresponding lookup table.
+  if (auto lookupTable = owner.Impl.findLookupTable(clangModule)) {
+    // Search it.
+    owner.Impl.lookupAllObjCMembers(*lookupTable, consumer);
   }
-
-  // FIXME: Not limited by module.
-  lookupClassMembersImpl(owner.Impl, consumer, {});
 }
 
 void ClangModuleUnit::collectLinkLibraries(
