@@ -2170,7 +2170,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                     continue
                 fi
                 echo "--- Installing ${product} ---"
-								build_dir=$(build_directory $deployment_target $product)
+                build_dir=$(build_directory $deployment_target $product)
                 set -x
                 pushd "${FOUNDATION_SOURCE_DIR}"
                 $NINJA_BIN install
