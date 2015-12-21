@@ -402,10 +402,16 @@ public:
   llvm::DenseMap<std::pair<ClangDeclAndFlag, DeclContext *>, Decl *>
     ImportedProtocolDecls;
 
-  /// \brief Mapping of already-imported macros.
-  llvm::DenseMap<clang::MacroInfo *, ValueDecl *> ImportedMacros;
+  /// Mapping from identifiers to the set of macros that have that name along
+  /// with their corresponding Swift declaration.
+  ///
+  /// Multiple macro definitions can map to the same declaration if the
+  /// macros are identically defined.
+  llvm::DenseMap<Identifier,
+                 SmallVector<std::pair<clang::MacroInfo *, ValueDecl *>, 2>>
+    ImportedMacros;
 
-  /// Keeps track of active selector-basde lookups, so that we don't infinitely
+  /// Keeps track of active selector-based lookups, so that we don't infinitely
   /// recurse when checking whether a method with a given selector has already
   /// been imported.
   llvm::DenseMap<std::pair<ObjCSelector, char>, unsigned>

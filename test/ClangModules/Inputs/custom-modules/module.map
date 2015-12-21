@@ -128,3 +128,11 @@ module Requires {
 module SwiftName {
   header "SwiftName.h"
 }
+
+module MacrosRedefA {
+  header "MacrosRedefA.h"
+}
+
+module MacrosRedefB {
+  header "MacrosRedefB.h"
+}
