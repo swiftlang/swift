@@ -14,7 +14,6 @@
 
 from __future__ import print_function
 
-import subprocess
 import json
 import argparse
 import sys
@@ -31,7 +30,7 @@ def apply_edits(path):
     remap_files = find_remap_files(path)
     if not remap_files:
         print("No remap files found")
-        return 1;
+        return 1
 
     edits_set = set()
     for remap_file in remap_files:
@@ -49,7 +48,7 @@ def apply_edits(path):
     edits_per_file = {}
     for ed in edits_set:
         fname = ed[0]
-        if not edits_per_file.has_key(fname):
+        if fname not in edits_per_file:
             edits_per_file[fname] = []
         edits_per_file[fname].append((ed[1], ed[2], ed[3]))
     

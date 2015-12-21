@@ -248,7 +248,7 @@ class UnicodeTrieGenerator(object):
         # maximum Unicode code point value is not 2^21-1 (0x1fffff), it is
         # 0x10ffff.
         self.supp_first_level_index_max = \
-            0x10ffff >> (self.supp_second_level_index_bits + \
+            0x10ffff >> (self.supp_second_level_index_bits +
                 self.supp_data_offset_bits)
 
         # A mapping from BMP first-level index to BMP data block index.
