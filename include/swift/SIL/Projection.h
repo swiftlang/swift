@@ -411,8 +411,10 @@ public:
   }
 
   ProjectionPath &operator=(ProjectionPath &&O) {
-    *this = std::move(O);
-    O.Path.clear();
+    if (this != &O) {
+      *this = std::move(O);
+      O.Path.clear();
+    }
     return *this;
   }
 
