@@ -394,7 +394,7 @@ public:
   /// We only allow for moves of ProjectionPath since we only want them to be
   /// able to be constructed by calling our factory method or by going through
   /// the append function.
-  ProjectionPath(ProjectionPath &&Other) : Path(std::move(Other.Path)) {}
+  ProjectionPath(ProjectionPath &&Other) : Path(Other.Path) {}
 
   /// Append the projection P onto this.
   ProjectionPath &append(const Projection &P) {
@@ -411,7 +411,8 @@ public:
   }
 
   ProjectionPath &operator=(ProjectionPath &&O) {
-    std::swap(Path, O.Path);
+    *this = std::move(O);
+    O.Path.clear();
     return *this;
   }
 
