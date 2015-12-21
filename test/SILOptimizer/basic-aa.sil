@@ -491,6 +491,23 @@ public final class C {
   init()
 }
 
+// CHECK-LABEL: @ref_element_addr_and_object_itself
+// CHECK: PAIR #0.
+// CHECK-NEXT: (0):   %0 = alloc_ref $C                               // user: %1
+// CHECK-NEXT: (0):   %0 = alloc_ref $C                               // user: %1
+// CHECK-NEXT: MustAlias
+// CHECK: PAIR #1.
+// CHECK-NEXT: (0):   %0 = alloc_ref $C                               // user: %1
+// CHECK-NEXT: (0):   %1 = ref_element_addr %0 : $C, #C.a
+// CHECK-NEXT: PartialAlias
+sil @ref_element_addr_and_object_itself : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $C
+  %1 = ref_element_addr %0 : $C, #C.a
+  %2 = tuple() 
+  return %2 : $() 
+}
+
 // CHECK-LABEL: @different_fields_of_different_refs
 // CHECK: PAIR #13.
 // CHECK-NEXT: (0):   %3 = ref_element_addr %0 : $C, #C.a

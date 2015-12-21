@@ -1660,6 +1660,18 @@ bool EscapeAnalysis::canPointToSameMemory(SILValue V1, SILValue V2) {
   // Check if both nodes may point to the same content.
   CGNode *Content1 = ConGraph->getContentNode(Node1);
   CGNode *Content2 = ConGraph->getContentNode(Node2);
+
+  // As we model the ref_element_addr instruction as a content-relationship, we
+  // have to go down one content level if just one of the values is a
+  // ref-counted object.
+  if (V1.getType().hasReferenceSemantics()) {
+    if (!V2.getType().hasReferenceSemantics())
+      Content1 = ConGraph->getContentNode(Content1);
+  } else {
+    if (V2.getType().hasReferenceSemantics())
+      Content2 = ConGraph->getContentNode(Content2);
+  }
+
   return Content1 == Content2;
 }
 
