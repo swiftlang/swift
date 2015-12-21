@@ -1,4 +1,4 @@
-//===--- USRGeneration.cpp - Routines for USR generation --------------------===//
+//===--- USRGeneration.cpp - Routines for USR generation ------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -1,4 +1,4 @@
-//===--- ExternalDefsToDecls.cpp - external defs to decls ---===//
+//===--- ExternalDefsToDecls.cpp - external defs to decls -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //

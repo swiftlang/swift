@@ -1,4 +1,4 @@
-//===--- SILGenForeignError.cpp - Error-handling code emission -------------------===//
+//===--- SILGenForeignError.cpp - Error-handling code emission ------------===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -1,4 +1,4 @@
-//===--- SILWitnessTable.cpp - Defines the SILWitnessTable class ------------===//
+//===--- SILWitnessTable.cpp - Defines the SILWitnessTable class ----------===//
 //
 // This source file is part of the Swift.org open source project
 //
