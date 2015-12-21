@@ -2606,7 +2606,7 @@ apply
   // %1, %2, etc. must be of the argument types $A, $B, etc.
   // %r will be of the return type $R
 
-  %r = apply %0<T = A, U = B>(%1, %2, ...) : $<T, U>(T, U, ...) -> R
+  %r = apply %0<A, B>(%1, %2, ...) : $<T, U>(T, U, ...) -> R
   // %0 must be of a polymorphic function type $<T, U>(T, U, ...) -> R
   // %1, %2, etc. must be of the argument types after substitution $A, $B, etc.
   // %r will be of the substituted return type $R'
@@ -2650,7 +2650,7 @@ partial_apply
   //   of the tail part of the argument tuple of %0
   // %c will be of the partially-applied thick function type (Z...) -> R
 
-  %c = partial_apply %0<T = A, U = B>(%1, %2, ...) : $(Z..., T, U, ...) -> R
+  %c = partial_apply %0<A, B>(%1, %2, ...) : $(Z..., T, U, ...) -> R
   // %0 must be of a polymorphic function type $<T, U>(T, U, ...) -> R
   // %1, %2, etc. must be of the argument types after substitution $A, $B, etc.
   //   of the tail part of the argument tuple of %0
