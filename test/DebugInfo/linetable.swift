@@ -12,7 +12,7 @@ class MyClass
     init(input: Int64) { x = input }
     func do_something(input: Int64) -> Int64
     {
-        return x * input;
+        return x * input
     }
 }
 

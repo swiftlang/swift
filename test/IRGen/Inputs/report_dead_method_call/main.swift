@@ -38,5 +38,5 @@ case 3:
 	callPublicClass()
 
 default:
-	break;
+	break
 }

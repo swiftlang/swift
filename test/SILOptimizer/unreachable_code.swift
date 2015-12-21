@@ -160,7 +160,7 @@ func testSwitchEnum(xi: Int) -> Int {
     x -= 1
   }
   
-  return x;
+  return x
 }
 
 

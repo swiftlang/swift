@@ -11,7 +11,7 @@ class Cat : Panda {
   required init() { }
 
   func getCutenessLevel() -> Int {
-    return 3;
+    return 3
   }
 }
 

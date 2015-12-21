@@ -3,6 +3,6 @@ func useEnum(x: TheEnum) {
   case A:
     print("a!")
   default:
-    break;
+    break
   }
 }

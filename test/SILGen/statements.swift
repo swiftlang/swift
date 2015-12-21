@@ -93,13 +93,13 @@ func nested_if_merge_ret(x: Int, y: Bool, z: Bool) -> Int {
     if (z) {
       bar(x);
     }
-    return 1;
+    return 1
   } else {
     if (z) {
       foo(x, y);
     }
   }
-  return 2;
+  return 2
 }
 
 // CHECK-LABEL: sil hidden  @_TF10statements19nested_if_merge_ret
@@ -119,7 +119,7 @@ func loop_with_break(x: Int, _ y: Bool, _ z: Bool) -> Int {
   while (x > 2) {
    if (y) {
      bar(x);
-     break;
+     break
    }
   }
 }
@@ -130,7 +130,7 @@ func loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
   while (x > 2) {
     if (y) {
      bar(x);
-     continue;
+     continue
     }
     loop_with_break(x, y, z);
   }
@@ -143,7 +143,7 @@ func do_loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
   repeat {
     if (x < 42) {
      bar(x);
-     continue;
+     continue
     }
     loop_with_break(x, y, z);
   }
