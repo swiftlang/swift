@@ -188,11 +188,19 @@ public protocol IntegerType
   @warn_unused_result
   func uword(n: Word) -> UWord
 
-  mutating func replaceUWord(n: Word, with newBits: UWord)
+  var countRepresentedWords: Word { get }
+
+  /// Replace the `n`th UWord of our representation with newBits.
+  mutating func replaceUWord(n: Word, with newBits: UWord) -> ArithmeticOverflow
   
   init<T : IntegerType>(_ source: T)
   
-  init<T : IntegerType>(extendingOrTruncating source: T)  
+  init<T : IntegerType>(extendingOrTruncating source: T)
+
+  mutating func addInPlace<RHS: IntegerType>(rhs: RHS) -> ArithmeticOverflow
+
+  func overflowInPlace(carry: Bool, overflow: Bool)
+    -> ArithmeticOverflow
 }
 
 extension IntegerType {
@@ -203,8 +211,7 @@ extension IntegerType {
   @_transparent
   public // transparent
   var _mostSignificantWord: Word {
-    let msb = mostSignificantBit
-    return msb < 0 ? msb : msb / ${word_bits}
+    return mostSignificantBit &>> ${int(log(word_bits,2))}
   }
 }
 
@@ -317,7 +324,11 @@ public func > <T : IntegerType>(lhs: T, rhs: T) -> Bool {
 //===----------------------------------------------------------------------===//
 //===--- FixedWidthIntegerType --------------------------------------------===//
 //===----------------------------------------------------------------------===//
-public enum ArithmeticOverflow { case None, Overflow }
+public enum ArithmeticOverflow {
+  @_transparent
+  public init(_ overflow: Bool) { self = overflow ? .Overflow : .None }
+  case None, Overflow 
+}
 
 public protocol FixedWidthIntegerType : IntegerType {
   static var bitWidth : Word { get }
@@ -503,7 +514,7 @@ extension FixedWidthIntegerType {
     else {
       var result: Self = source < 0 ? ~0 : 0
       // start with the most significant word
-      var n = source.mostSignificantBit / ${word_bits}
+      var n = source._mostSignificantWord
       while n >= 0 {
         // masking is OK here because this we have already ensured
         // that Self.bitWidth > ${word_bits}.  Not masking results in
@@ -529,11 +540,18 @@ extension FixedWidthIntegerType {
     return x._lowUWord
   }
 
-  @_transparent
-  public mutating func replaceUWord(n: Word, with newBits: UWord) {
-    // Make sure the masking shift is going to be OK.
-    _sanityCheck(Self.bitWidth > ${word_bits} * n)
-    self ^= Self(_truncatingBits: newBits ^ uword(n)) &<< (${word_bits} * n)
+  public var countRepresentedWords: Word {
+    return (Self.bitWidth + ${word_bits} - 1) / ${word_bits}
+  }
+  
+  // @_transparent
+  public mutating func replaceUWord(n: Word, with newBits: UWord) -> ArithmeticOverflow {
+    let flippedBits = uword(n) ^ newBits
+    self ^= Self(_truncatingBits: flippedBits) << (${word_bits} * n)
+    if uword(n) != newBits {
+      print("###### overflow replacing word \(n) with \(newBits.hex)")
+    }
+    return ArithmeticOverflow(uword(n) != newBits)
   }
   
   @_transparent
@@ -541,6 +559,33 @@ extension FixedWidthIntegerType {
   static var _highBitIndex: Self {
     return Self.init(_truncatingBits: UWord(Self.bitWidth._storage) &- 1)
   }
+}
+
+extension UWord {
+  % for name in 'add', 'subtract':
+  // @_transparent
+  public // transparent
+  func _${name}ing(
+    rhs: UWord, carryIn: UWord
+  ) -> (result: UWord, unsignedOverflow: Bool, signedOverflow: Bool) {
+    print("**** \(self.hex)._${name}ing(\(rhs.hex), carryIn: \(carryIn))")
+    let signedRHS = Word(bitPattern: rhs)
+    
+    let (uResult0, carry0) = self.${name}WithOverflow(rhs)
+    let (sResult0, overflow0) = Word(bitPattern: self).${name}WithOverflow(signedRHS)
+    
+    let (uResult1, carry1) = uResult0.${name}WithOverflow(carryIn)
+    let (_, overflow1) = sResult0.${name}WithOverflow(Word(_truncatingBits: carryIn))
+
+    let result = (
+      result: uResult1,
+      unsignedOverflow: carry0 != .None || carry1 != .None,
+      signedOverflow: overflow0 != .None || overflow1 != .None
+    )
+    print("**** -> sum: \(result.result.hex), unsignedOverflow: \(result.unsignedOverflow), signedOverflow: \(result.signedOverflow)")
+    return result
+  }
+  % end
 }
 
 % for x in binaryArithmetic:
@@ -606,6 +651,13 @@ extension UnsignedIntegerType where Self : FixedWidthIntegerType {
   public var mostSignificantBit: Word {
     return Self.bitWidth - 1 - self.countLeadingZeros()
   }
+  
+  @_transparent
+  public func overflowInPlace(
+    carry: Bool, overflow: Bool) -> ArithmeticOverflow {
+    print("\(Self.self).overflowInPlace(carry: \(carry), overflow: \(overflow))")
+    return ArithmeticOverflow(carry)
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -649,6 +701,13 @@ extension SignedIntegerType where Self : FixedWidthIntegerType {
   public var mostSignificantBit: Word {
     let x = self < 0 ? ~self : self
     return Self.bitWidth - 1 - x.countLeadingZeros()
+  }
+
+  @_transparent
+  public func overflowInPlace(
+    carry: Bool, overflow: Bool) -> ArithmeticOverflow {
+    print("\(Self.self).overflowInPlace(carry: \(carry), overflow: \(overflow))")
+    return ArithmeticOverflow(overflow)
   }
 }
 
@@ -722,7 +781,7 @@ public struct ${Self}
 
     return (
       partialValue: ${Self}(newStorage),
-      overflow: Bool(overflow) ? .Overflow : .None)
+      overflow: ArithmeticOverflow(Bool(overflow)))
   }
 %       end
 
@@ -793,8 +852,82 @@ public struct ${Self}
 %   end
 % end
 
+//===--- Multiprecision ---------------------------------------------------===//
+
+extension IntegerType {
+  public mutating func addInPlace<RHS: IntegerType>(
+    rhs: RHS
+  ) -> ArithmeticOverflow {
+    var sum: UWord, wordOverflow: Bool, wordCarry: Bool = false
+    
+    var i: Word = 0
+    repeat {
+      (sum, wordCarry, wordOverflow) = uword(i)._adding(
+        rhs.uword(i), carryIn: wordCarry ? 1 : 0)
+      
+      if self.replaceUWord(i, with: sum) == .Overflow {
+        return .Overflow
+      }
+      i += 1
+      
+      // If the carry cancels with the high bits of the rhs, further
+      // additions can't affect the result; we're done
+      if i > rhs._mostSignificantWord && (rhs < 0) == wordCarry {
+        break
+      }
+    }
+    while i < countRepresentedWords
+    return overflowInPlace(
+      (rhs < 0) != wordCarry,
+      overflow: wordOverflow && i == countRepresentedWords)
+  }
+}
+
+% for x in binaryArithmetic:
+@_transparent
+public func ${x.operator}= <T: IntegerType>(inout lhs: T, rhs: T) {
+  lhs.${x.name}InPlace(rhs)
+}
+% end
+
+@inline(__always)
+public func +=<T: IntegerType, U: IntegerType>(inout lhs: T, rhs: U) {
+  let overflow = lhs.addInPlace(rhs)
+  _assertCond(overflow == .None, "overflow in multiprecision add.")
+}
 
 //===--- Tests ------------------------------------------------------------===//
+
+extension IntegerType {
+  /// a hex representation of every bit in the number
+  func hexBits(bitWidth: Word) -> String {
+    let hexDigits: [UnicodeScalar] = [
+      "0", "1", "2", "3", "4", "5", "6", "7",
+      "8", "9", "A", "B", "C", "D", "E", "F"]
+
+    var result = "".unicodeScalars
+    var x = self
+    var nibbles: Word = 0
+    repeat {
+      if nibbles % 4 == 0 && nibbles != 0 {
+        result.insert("_", atIndex: result.startIndex)
+      }
+      let lowUWord = x.uword(0)
+      result.insert(
+        hexDigits[Swift.Int(lowUWord._storage) & 0xF],
+        atIndex: result.startIndex
+      )
+      x.replaceUWord(0, with: lowUWord & ~0xF)
+      x /= 16
+      nibbles += 1
+    }
+    while (nibbles << 2 < bitWidth || (x != 0 && x + 1 != 0))
+    return (self < 0 ? "[-]" : "[+]") + String(result)
+  }
+  
+  var hex: String { return hexBits(0) }
+}
+
 typealias DWord = Int${word_bits*2}
 typealias UDWord = UInt${word_bits*2}
 
@@ -1163,5 +1296,197 @@ tests.test("Basics") {
   expectEqual(16, Int16.bitWidth)
   expectEqual(32, Int32.bitWidth)
 }
+
+tests.test("Multiprecision/+/DWord") {
+  var x = DWord.max - 2
+  x += (1 as UInt8)
+  expectEqual(DWord.max - 1, x)
+  x += (-1 as Int8)
+  expectEqual(DWord.max - 2, x)
+
+  x = DWord.min
+  x += (1 as UInt8)
+  expectEqual(DWord.min + 1, x)
+
+  x += (-1 as Int8)
+  expectEqual(DWord.min, x)
+
+  x = DWord(UWord.max)
+  x += (1 as Int8)
+  expectEqual(DWord(UWord.max) + 1, x)
+  x += (-1 as Int8)
+  expectEqual(DWord(UWord.max), x)
+  x += (1 as UDWord)
+  expectEqual(DWord(UWord.max) + 1, x)
+  
+  x = DWord(Word.max)
+  var overflow: ArithmeticOverflow
+  overflow = x.addInPlace(Word.min)
+  expectEqual(.None, overflow)
+  expectEqual(-1, x)
+
+  overflow = x.addInPlace(DWord.min)
+  expectEqual(.Overflow, overflow)
+  expectEqual(DWord.max, x)
+
+  overflow = x.addInPlace(1 as Word)
+  expectEqual(.Overflow, overflow)
+  expectEqual(DWord.min, x)
+
+  x = 1
+  overflow = x.addInPlace(DWord.max)
+  expectEqual(.Overflow, overflow)
+  expectEqual(DWord.min, x)
+}
+
+tests.test("Multiprecision/+/UDWord") {
+  var x = UDWord.max - 2
+  x += (1 as UInt8)
+  expectEqual(UDWord.max - 1, x)
+  x += (-1 as Int8)
+  expectEqual(UDWord.max - 2, x)
+
+  x = UDWord.min
+  x += (1 as UInt8)
+  expectEqual(1, x)
+
+  x += (-1 as Int8)
+  expectEqual(UDWord.min, x)
+
+  x = UDWord(UWord.max)
+  x += (1 as Int8)
+  expectEqual(UDWord(UWord.max) + 1, x)
+  x += (-1 as Int8)
+  expectEqual(UDWord(UWord.max), x)
+  x += (1 as DWord)
+  expectEqual(UDWord(UWord.max) + 1, x)
+  x += (-1 as DWord)
+  expectEqual(UDWord(UWord.max), x)
+  
+  x = UDWord(Word.max)
+  var overflow: ArithmeticOverflow
+  overflow = x.addInPlace(Word.min)
+  expectEqual(.Overflow, overflow)
+  expectEqual(UDWord.max, x)
+
+  overflow = x.addInPlace(DWord.min)
+  expectEqual(.None, overflow)
+  overflow = x.addInPlace(DWord.min)
+  expectEqual(.Overflow, overflow)
+  expectEqual(UDWord.max, x)
+
+  overflow = x.addInPlace(1 as Int8)
+  expectEqual(.Overflow, overflow)
+  expectEqual(0, x)
+
+  x = 1
+  overflow = x.addInPlace(UDWord.max)
+  expectEqual(.Overflow, overflow)
+  expectEqual(0, x)
+}
+
+tests.test("Multiprecision/+/Int16") {
+  var x = Int16.max - 2
+  x += (1 as UDWord)
+  expectEqual(Int16.max - 1, x)
+  x += (-1 as DWord)
+  expectEqual(Int16.max - 2, x)
+
+  x = Int16.min
+  x += (1 as UDWord)
+  expectEqual(Int16.min + 1, x)
+  
+  x += (-1 as DWord)
+  expectEqual(Int16.min, x)
+}
+
+tests.test("Multiprecision/Overflow/+/Int16") {
+  var x = Int16.max - 1
+  x += 1 as UInt16
+  expectCrashLater()
+  x += 1 as UInt16
+}
+
+tests.test("Multiprecision/Underflow/+/Int16") {
+  var x = Int16.min + 1
+  x += -1 as Int32
+  expectCrashLater()
+  x += -1 as Int32
+}
+
+
+tests.test("Multiprecision/Overflow/+/UInt16") {
+  var x = UInt16.max - 1
+  x += 1 as Int16
+  expectCrashLater()
+  x += 1 as Int16
+}
+
+tests.test("Multiprecision/Underflow/+/UInt16") {
+  var x = UInt16.min + 1
+  x += -1 as DWord
+  expectCrashLater()
+  x += -1 as DWord
+}
+
+
+tests.test("Multiprecision/Overflow/+/Word") {
+  var x = Word.max - 1
+  x += 1 as UWord
+  expectCrashLater()
+  x += 1 as UWord
+}
+
+tests.test("Multiprecision/Underflow/+/Word") {
+  var x = Word.min + 1
+  x += -1 as Int32
+  expectCrashLater()
+  x += -1 as Int32
+}
+
+
+tests.test("Multiprecision/Overflow/+/UWord") {
+  var x = UWord.max - 1
+  x += 1 as Word
+  expectCrashLater()
+  x += 1 as Word
+}
+
+tests.test("Multiprecision/Underflow/+/UWord") {
+  var x = UWord.min + 1
+  x += -1 as DWord
+  expectCrashLater()
+  x += -1 as DWord
+}
+
+tests.test("Multiprecision/Overflow/+/DWord") {
+  var x = DWord.max - 1
+  x += 1 as UWord
+  expectCrashLater()
+  x += 1 as UWord
+}
+
+tests.test("Multiprecision/Underflow/+/DWord") {
+  var x = DWord.min + 1
+  x += -1 as Int32
+  expectCrashLater()
+  x += -1 as Int32
+}
+
+
+tests.test("Multiprecision/Overflow/+/UDWord") {
+  var x = UDWord.max - 1
+  x += 1 as Word
+  expectCrashLater()
+  x += 1 as Word
+}
+
+tests.test("Multiprecision/Underflow/+/UDWord") {
+  var x = UDWord.min + 1
+  x += -1 as DWord
+  expectCrashLater()
+  x += -1 as DWord
+}
+
 
 runAllTests()
