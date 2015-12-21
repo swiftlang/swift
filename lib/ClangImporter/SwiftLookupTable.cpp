@@ -80,6 +80,13 @@ SwiftLookupTable::translateContext(clang::DeclContext *context) {
   return None;
 }
 
+void SwiftLookupTable::addCategory(clang::ObjCCategoryDecl *category) {
+  assert(!Reader && "Cannot modify a lookup table stored on disk");
+
+  // Add the category.
+  Categories.push_back(category);
+}
+
 void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
                                 clang::DeclContext *effectiveContext) {
   assert(!Reader && "Cannot modify a lookup table stored on disk");
@@ -228,6 +235,22 @@ SwiftLookupTable::lookupObjCMembers(StringRef baseName) {
   return result;
 }
 
+ArrayRef<clang::ObjCCategoryDecl *> SwiftLookupTable::categories() {
+  if (!Categories.empty() || !Reader) return Categories;
+
+  // Map categories known to the reader.
+  for (auto declID : Reader->categories()) {
+    auto category =
+      cast_or_null<clang::ObjCCategoryDecl>(
+        Reader->getASTReader().GetLocalDecl(Reader->getModuleFile(), declID));
+    if (category)
+      Categories.push_back(category);
+
+  }
+
+  return Categories;
+}
+
 static void printName(clang::NamedDecl *named, llvm::raw_ostream &out) {
   // If there is a name, print it.
   if (!named->getDeclName().isEmpty()) {
@@ -285,6 +308,8 @@ void SwiftLookupTable::deserializeAll() {
   for (auto baseName : Reader->getBaseNames()) {
     (void)lookup(baseName, nullptr);
   }
+
+  (void)categories();
 }
 
 void SwiftLookupTable::dump() const {
@@ -331,6 +356,29 @@ void SwiftLookupTable::dump() const {
       llvm::errs() << "\n";
     }
   }
+
+  if (!Categories.empty()) {
+    llvm::errs() << "Categories: ";
+    interleave(Categories.begin(), Categories.end(),
+               [](clang::ObjCCategoryDecl *category) {
+                 llvm::errs() << category->getClassInterface()->getName()
+                              << "(" << category->getName() << ")";
+               },
+               [] {
+                 llvm::errs() << ", ";
+               });
+    llvm::errs() << "\n";
+  } else if (Reader && !Reader->categories().empty()) {
+    llvm::errs() << "Categories: ";
+    interleave(Reader->categories().begin(), Reader->categories().end(),
+               [](clang::serialization::DeclID declID) {
+                 llvm::errs() << "decl ID #" << declID;
+               },
+               [] {
+                 llvm::errs() << ", ";
+               });
+    llvm::errs() << "\n";
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -350,10 +398,16 @@ namespace {
     /// name.
     BASE_NAME_TO_ENTITIES_RECORD_ID
       = clang::serialization::FIRST_EXTENSION_RECORD_ID,
+
+    /// Record that contains the list of Objective-C category/extension IDs.
+    CATEGORIES_RECORD_ID
   };
 
   using BaseNameToEntitiesTableRecordLayout
     = BCRecordLayout<BASE_NAME_TO_ENTITIES_RECORD_ID, BCVBR<16>, BCBlob>;
+
+  using CategoriesRecordLayout
+    = llvm::BCRecordLayout<CATEGORIES_RECORD_ID, BCBlob>;
 
   /// Trait used to write the on-disk hash table for the base name -> entities
   /// mapping.
@@ -483,6 +537,19 @@ void SwiftLookupTableWriter::writeExtensionContents(
 
     BaseNameToEntitiesTableRecordLayout layout(stream);
     layout.emit(ScratchRecord, tableOffset, hashTableBlob);
+  }
+
+  // Write the categories, if there are any.
+  if (!table.Categories.empty()) {
+    SmallVector<clang::serialization::DeclID, 4> categoryIDs;
+    for (auto category : table.Categories) {
+      categoryIDs.push_back(Writer.getDeclID(category));
+    }
+
+    StringRef blob(reinterpret_cast<const char *>(categoryIDs.data()),
+                   categoryIDs.size() * sizeof(clang::serialization::DeclID));
+    CategoriesRecordLayout layout(stream);
+    layout.emit(ScratchRecord, blob);
   }
 }
 
@@ -633,6 +700,7 @@ SwiftLookupTableReader::create(clang::ModuleFileExtension *extension,
   auto cursor = stream;
   auto next = cursor.advance();
   std::unique_ptr<SerializedBaseNameToEntitiesTable> serializedTable;
+  ArrayRef<clang::serialization::DeclID> categories;
   while (next.Kind != llvm::BitstreamEntry::EndBlock) {
     if (next.Kind == llvm::BitstreamEntry::Error)
       return nullptr;
@@ -667,6 +735,18 @@ SwiftLookupTableReader::create(clang::ModuleFileExtension *extension,
       break;
     }
 
+    case CATEGORIES_RECORD_ID: {
+      // Already saw categories; input is malformed.
+      if (!categories.empty()) return nullptr;
+
+      auto start =
+        reinterpret_cast<const clang::serialization::DeclID *>(blobData.data());
+      unsigned numElements
+        = blobData.size() / sizeof(clang::serialization::DeclID);
+      categories = llvm::makeArrayRef(start, numElements);
+      break;
+    }
+
     default:
       // Unknown record, possibly for use by a future version of the
       // module format.
@@ -681,7 +761,7 @@ SwiftLookupTableReader::create(clang::ModuleFileExtension *extension,
   // Create the reader.
   return std::unique_ptr<SwiftLookupTableReader>(
            new SwiftLookupTableReader(extension, reader, moduleFile, onRemove,
-                                      serializedTable.release()));
+                                      serializedTable.release(), categories));
 
 }
 

@@ -6,6 +6,9 @@
 
 // REQUIRES: objc_interop
 
+// CHECK-LABEL: <<Foundation lookup table>>
+// CHECK: Categories:{{.*}}NSValue(NSValueCreation){{.*}}
+
 // CHECK-LABEL: <<ObjectiveC lookup table>>
 // CHECK-NEXT: Base name -> entry mappings:
 // CHECK-NOT: lookup table
@@ -74,6 +77,8 @@
 // CHECK-NEXT:     NSAccessibility: -[NSAccessibility setAccessibilityFloat:]
 // CHECK-NEXT:   subscript:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass objectAtIndexedSubscript:]
+
+// CHECK: Categories: SNSomeClass(), SNSomeClass(Category1)
 
 // CHECK-OMIT-NEEDLESS-WORDS: <<ObjectiveC lookup table>>
 // CHECK-OMIT-NEEDLESS-WORDS-NOT: lookup table

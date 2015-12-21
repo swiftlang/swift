@@ -1,4 +1,4 @@
-@import ObjectiveC;
+@import Foundation;
 
 #define SWIFT_NAME(X) __attribute__((swift_name(#X)))
 

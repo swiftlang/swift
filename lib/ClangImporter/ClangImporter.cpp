@@ -712,6 +712,8 @@ void ClangImporter::Implementation::addEntryToLookupTable(
     if (importedName.IsSubscriptAccessor)
       table.addEntry(DeclName(SwiftContext, SwiftContext.Id_subscript, { }),
                      named, effectiveContext);
+  } else if (auto category = dyn_cast<clang::ObjCCategoryDecl>(named)) {
+    table.addCategory(category);
   }
 
   // Walk the members of any context that can have nested members.
