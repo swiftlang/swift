@@ -123,26 +123,6 @@ inline TwoWordPair<A,B>::TwoWordPair(A first, B second)
   
 using BoxPair = TwoWordPair<HeapObject *, OpaqueValue *>;
 
-/// Allocates a heap object with POD value semantics. The returned memory is
-/// uninitialized outside of the heap object header. The object has an
-/// initial retain count of 1, and its metadata is set to a predefined
-/// POD heap metadata for which destruction is a no-op.
-///
-/// \param dataSize           The size of the data area for the allocation.
-///                           Excludes the heap metadata header.
-/// \param dataAlignmentMask  The alignment of the data area.
-///
-/// \returns a BoxPair in which the heapObject field points to the newly-created
-///          HeapObject and the value field points to the data area inside the
-///          allocation. The value pointer will have the alignment specified
-///          by the dataAlignmentMask and point to dataSize bytes of memory.
-extern "C" BoxPair::Return
-swift_allocPOD(size_t dataSize, size_t dataAlignmentMask);
-
-/// Deallocates a heap object known to have been allocated by swift_allocPOD and
-/// to have no remaining owners.
-extern "C" void swift_deallocPOD(HeapObject *obj);
-  
 /// Allocates a heap object that can contain a value of the given type.
 /// Returns a Box structure containing a HeapObject* pointer to the
 /// allocated object, and a pointer to the value inside the heap object.

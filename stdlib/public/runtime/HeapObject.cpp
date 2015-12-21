@@ -125,55 +125,6 @@ extern "C" void swift_bufferDeallocateFromStack(HeapObject *) {
 
 extern "C" intptr_t swift_bufferHeaderSize() { return sizeof(HeapObject); }
 
-/// A do-nothing destructor for POD metadata.
-static void destroyPOD(HeapObject *o);
-
-/// Heap metadata for POD allocations.
-static const FullMetadata<HeapMetadata> PODHeapMetadata{
-  HeapMetadataHeader{{destroyPOD}, {nullptr}},
-  HeapMetadata{Metadata{MetadataKind::HeapLocalVariable}}
-};
-
-namespace {
-  /// Header for a POD allocation created by swift_allocPOD.
-  struct PODBox : HeapObject {
-    /// The size of the complete allocation.
-    size_t allocatedSize;
-
-    /// The required alignment of the complete allocation.
-    size_t allocatedAlignMask;
-    
-    /// Returns the offset in bytes from the address of the header of a POD
-    /// allocation with the given size and alignment.
-    static size_t getValueOffset(size_t size, size_t alignMask) {
-      // llvm::RoundUpToAlignment(size, mask + 1) generates terrible code
-      return (sizeof(PODBox) + alignMask) & ~alignMask;
-    }
-  };
-}
-
-static void destroyPOD(HeapObject *o) {
-  auto box = static_cast<PODBox*>(o);
-  // Deallocate the buffer.
-  return swift_deallocObject(box, box->allocatedSize, box->allocatedAlignMask);
-}
-
-BoxPair::Return
-swift::swift_allocPOD(size_t dataSize, size_t dataAlignmentMask) {
-  assert(isAlignmentMask(dataAlignmentMask));
-  // Allocate the heap object.
-  size_t valueOffset = PODBox::getValueOffset(dataSize, dataAlignmentMask);
-  size_t size = valueOffset + dataSize;
-  size_t alignMask = std::max(dataAlignmentMask, alignof(HeapObject) - 1);
-  auto *obj = swift_allocObject(&PODHeapMetadata, size, alignMask);
-  // Initialize the header for the box.
-  static_cast<PODBox*>(obj)->allocatedSize = size;
-  static_cast<PODBox*>(obj)->allocatedAlignMask = alignMask;
-  // Get the address of the value inside.
-  auto *data = reinterpret_cast<char*>(obj) + valueOffset;
-  return BoxPair{obj, reinterpret_cast<OpaqueValue*>(data)};
-}
-
 namespace {
 /// Heap metadata for a box, which may have been generated statically by the
 /// compiler or by the runtime.
