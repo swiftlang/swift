@@ -1533,10 +1533,10 @@ static void _swift_initGenericClassObjCName(ClassMetadata *theClass) {
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
 void swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
-                                          const ClassMetadata *super,
                                           size_t numFields,
                                           const ClassFieldLayout *fieldLayouts,
                                           size_t *fieldOffsets) {
+  const ClassMetadata *super = self->SuperClass;
 
   if (super) {
     _swift_initializeSuperclass(self, super,
@@ -1554,7 +1554,7 @@ void swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
 #endif
 
   // If we have a superclass, start from its size and alignment instead.
-  if (super) {
+  if (classHasSuperclass(self)) {
     // This is straightforward if the superclass is Swift.
 #if SWIFT_OBJC_INTEROP
     if (super->isTypeMetadata()) {
@@ -2575,38 +2575,18 @@ void _swift_debug_verifyTypeLayoutAttribute(Metadata *type,
 
 extern "C"
 void swift_initializeSuperclass(ClassMetadata *theClass,
-                                const ClassMetadata *theSuperclass,
                                 bool copyFieldOffsetVectors) {
-  // We need a lock in order to ensure the class initialization and ObjC
-  // registration are atomic.
-  // TODO: A global lock for this is lame.
-  // TODO: A lock is also totally unnecessary for the non-objc runtime.
-  //       Without ObjC registration, a release store of the superclass
-  //       reference should be enough to dependency-order the other
-  //       initialization steps.
-  static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-  
-  pthread_mutex_lock(&mutex);
-  
-  // Bail out if this already happened while we were waiting.
-  if (theClass->SuperClass) {
-    pthread_mutex_unlock(&mutex);
-    return;
-  }
-  
-  // Put the superclass reference in the base class.
-  theClass->SuperClass = theSuperclass;
-
   // Copy generic parameters and field offset vectors from the superclass.
-  _swift_initializeSuperclass(theClass, theSuperclass,
-                              copyFieldOffsetVectors);
-  
+  const ClassMetadata *theSuperclass = theClass->SuperClass;
+  if (theSuperclass) {
+    _swift_initializeSuperclass(theClass, theSuperclass,
+                                copyFieldOffsetVectors);
+  }
+
 #if SWIFT_OBJC_INTEROP
   // Register the class pair with the ObjC runtime.
   swift_instantiateObjCClass(theClass);
 #endif
-  
-  pthread_mutex_unlock(&mutex);
 }
 
 namespace llvm { namespace hashing { namespace detail {

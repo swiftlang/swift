@@ -2491,7 +2491,6 @@ struct ClassFieldLayout {
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
 extern "C" void swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
-                                      const ClassMetadata *super,
                                       size_t numFields,
                                       const ClassFieldLayout *fieldLayouts,
                                       size_t *fieldOffsets);

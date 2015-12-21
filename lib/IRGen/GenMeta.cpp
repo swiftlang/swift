@@ -196,6 +196,22 @@ static bool hasMetadataPattern(IRGenModule &IGM, NominalTypeDecl *theDecl) {
   if (theDecl->isGenericContext())
     return true;
 
+  // A class with generic ancestry is always initialized at runtime.
+  // TODO: This should be cached in the ClassDecl since it is checked for in
+  // several places.
+  if (auto *theClass = dyn_cast<ClassDecl>(theDecl)) {
+    Type superclassTy = theClass->getSuperclass();
+    while (superclassTy) {
+      if (superclassTy->getClassOrBoundGenericClass()->isGenericContext())
+        return true;
+      superclassTy = superclassTy->getSuperclass(nullptr);
+    }
+
+    // TODO: check if class fields are resilient. Fixed-size check for value
+    // types isn't meaningful here.
+    return false;
+  }
+
   // If we have fields of resilient type, the metadata still has to be
   // initialized at runtime.
   if (!IGM.getTypeInfoForUnlowered(theDecl->getDeclaredType()).isFixedSize())
@@ -978,63 +994,6 @@ static Address emitAddressOfSuperclassRefInClassMetadata(IRGenFunction &IGF,
   return IGF.Builder.CreateConstArrayGEP(addr, index, IGF.IGM.getPointerSize());
 }
 
-static llvm::Value *emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF,
-                                                  CanType type,
-                                                  ForDefinition_t shouldDefine);
-
-/// Emit runtime initialization that must occur before a type metadata access.
-///
-/// This initialization must be dependency-ordered-before any loads from
-/// the initialized metadata pointer.
-static void emitDirectTypeMetadataInitialization(IRGenFunction &IGF,
-                                                 CanType type) {
-  // Currently only concrete subclasses of generic bases need this.
-  auto classDecl = type->getClassOrBoundGenericClass();
-  if (!classDecl)
-    return;
-  if (classDecl->isGenericContext())
-    return;
-  auto superclass = type->getSuperclass(nullptr);
-  if (!superclass)
-    return;
-  
-  // If any ancestors are generic, we need to trigger the superclass's
-  // initialization.
-  bool initializeSuper = false;
-
-  // If an ancestor was imported from Objective-C, we have to copy
-  // field offset vectors from our superclass, since the Objective-C
-  // runtime only slides the ivars of the immediate class being
-  // registered.
-  bool copyFieldOffsetVectors = false;
-
-  auto ancestor = superclass;
-  while (ancestor) {
-    auto classDecl = ancestor->getClassOrBoundGenericClass();
-    if (classDecl->isGenericContext())
-      initializeSuper = true;
-    else if (classDecl->hasClangNode())
-      copyFieldOffsetVectors = true;
-    
-    ancestor = ancestor->getSuperclass(nullptr);
-  }
-
-  if (initializeSuper) {
-    auto classMetadata = IGF.IGM.getAddrOfTypeMetadata(type, /*pattern*/ false);
-    // Get the superclass metadata.
-    auto superMetadata = IGF.emitTypeMetadataRef(superclass->getCanonicalType());
-
-    // Ask the runtime to initialize the superclass of the metaclass.
-    // This function will ensure the initialization is dependency-ordered-before
-    // any loads from the base class metadata.
-    auto initFn = IGF.IGM.getInitializeSuperclassFn();
-    IGF.Builder.CreateCall(initFn,
-                           {classMetadata, superMetadata,
-                            llvm::ConstantInt::get(IGF.IGM.Int1Ty,
-                                                   copyFieldOffsetVectors)});
-  }
-}
-
 /// Emit the body of a lazy cache accessor.
 ///
 /// If cacheVariable is null, we perform the direct access every time.
@@ -1147,7 +1106,6 @@ static llvm::Function *getTypeMetadataAccessFunction(IRGenModule &IGM,
 
   emitLazyCacheAccessFunction(IGM, accessor, cacheVariable,
                               [&](IRGenFunction &IGF) -> llvm::Value* {
-    emitDirectTypeMetadataInitialization(IGF, type);
     return emitDirectTypeMetadataRef(IGF, type);
   });
 
@@ -1912,7 +1870,7 @@ namespace {
     
     void addGenericMetadataPattern() {
       NominalTypeDecl *ntd = asImpl().getTarget();
-      if (!ntd->getGenericParams()) {
+      if (!hasMetadataPattern(IGM, ntd)) {
         // If there are no generic parameters, there's no pattern to link.
         addWord(llvm::ConstantPointerNull::get(IGM.TypeMetadataPatternPtrTy));
         return;
@@ -2903,7 +2861,6 @@ namespace {
       ClassObjectExtents = getSizeOfMetadata(IGM, Target);
     }
 
-    bool HasRuntimeBase = false;
     bool HasRuntimeParent = false;
   public:
     /// The 'metadata flags' field in a class is actually a pointer to
@@ -3003,21 +2960,9 @@ namespace {
       Type superclassTy
         = ArchetypeBuilder::mapTypeIntoContext(Target,
                                                Target->getSuperclass());
-      // If the class has any generic heritage, wait until runtime to set up
-      // the superclass reference.
-      auto ancestorTy = superclassTy;
-      while (ancestorTy) {
-        if (ancestorTy->getClassOrBoundGenericClass()->isGenericContext()) {
-          // Add a nil placeholder and continue.
-          addWord(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
-          HasRuntimeBase = true;
-          return;
-        }
-        ancestorTy = ancestorTy->getSuperclass(nullptr);
-      }
-      
-      if (!addReferenceToType(superclassTy->getCanonicalType()))
-        HasRuntimeBase = true;
+
+      // If the superclass has generic heritage, we will fill it in at runtime.
+      addReferenceToType(superclassTy->getCanonicalType());
     }
     
     bool addReferenceToType(CanType type) {
@@ -3155,10 +3100,6 @@ namespace {
     void addGenericWitnessTable(ArchetypeType *archetype,
                                 ProtocolDecl *protocol, ClassDecl *forClass) {
       addWord(llvm::Constant::getNullValue(IGM.WitnessTablePtrTy));
-    }
-    
-    bool hasRuntimeBase() const {
-      return HasRuntimeBase;
     }
   };
 
@@ -3312,7 +3253,7 @@ namespace {
     void addDependentValueWitnessTablePattern() {
       llvm_unreachable("classes should never have dependent vwtables");
     }
-                        
+
     void noteStartOfFieldOffsets(ClassDecl *whichClass) {
       HasDependentMetadata = true;
 
@@ -3455,23 +3396,16 @@ namespace {
                             metaclassRODataPtr.getAddress(), IGF.IGM.IntPtrTy);
         IGF.Builder.CreateStore(rodata, rodataPtrSlot);
       }
-
-      // Get the superclass metadata.
-      llvm::Value *superMetadata;
-      if (Target->hasSuperclass()) {
-        Address superField
-          = emitAddressOfSuperclassRefInClassMetadata(IGF, metadata);
-        superMetadata = IGF.Builder.CreateLoad(superField);
-      } else {
-        assert(!HasDependentSuperclass
-               && "dependent superclass without superclass?!");
-        superMetadata
-          = llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy);
-      }
       
       // If the field layout is dependent, ask the runtime to populate the
       // offset vector.
-      if (HasDependentFieldOffsetVector) {
+      //
+      // FIXME: the right check here is if the class layout is dependent or
+      // resilient. Also if only the superclass is resilient, we can get away
+      // with sliding field offsets instead of doing the entire layout all
+      // over again.
+      if (Target->isGenericContext() &&
+          HasDependentFieldOffsetVector) {
         llvm::Value *fieldVector
           = emitAddressOfFieldOffsetVectorInClassMetadata(IGF,
                                                           Target, metadata)
@@ -3519,7 +3453,7 @@ namespace {
         // Ask the runtime to lay out the class.
         auto numFields = IGF.IGM.getSize(Size(storedProperties.size()));
         IGF.Builder.CreateCall(IGF.IGM.getInitClassMetadataUniversalFn(),
-                               {metadata, superMetadata, numFields,
+                               {metadata, numFields,
                                 firstField.getAddress(), fieldVector});
 
       } else if (InheritFieldOffsetVectors || InheritGenericParameters) {
@@ -3527,8 +3461,9 @@ namespace {
         // copy them from the superclass metadata.
         auto initFn = IGF.IGM.getInitializeSuperclassFn();
         IGF.Builder.CreateCall(initFn,
-                               {metadata, superMetadata,
-                                llvm::ConstantInt::get(IGF.IGM.Int1Ty, 1)});
+                               {metadata,
+                                llvm::ConstantInt::get(IGF.IGM.Int1Ty,
+                                                       InheritFieldOffsetVectors)});
       } else if (IGF.IGM.ObjCInterop) {
         // Register the class with the ObjC runtime.
         llvm::Value *instantiateObjC = IGF.IGM.getInstantiateObjCClassFn();
@@ -3566,19 +3501,16 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
   // TODO: classes nested within generic types
   llvm::Constant *init;
   bool isPattern;
-  bool hasRuntimeBase;
-  if (classDecl->isGenericContext()) {
+  if (hasMetadataPattern(IGM, classDecl)) {
     GenericClassMetadataBuilder builder(IGM, classDecl, layout);
     builder.layout();
     init = builder.getInit();
     isPattern = true;
-    hasRuntimeBase = builder.hasRuntimeBase();
   } else {
     ClassMetadataBuilder builder(IGM, classDecl, layout);
     builder.layout();
     init = builder.getInit();
     isPattern = false;
-    hasRuntimeBase = builder.hasRuntimeBase();
   }
 
   maybeEmitTypeMetadataAccessFunction(IGM, classDecl);
@@ -3600,7 +3532,7 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
                /*isConstant*/ false, init, section);
 
   // Add non-generic classes to the ObjC class list.
-  if (IGM.ObjCInterop && !isPattern && !isIndirect && !hasRuntimeBase) {    
+  if (IGM.ObjCInterop && !isPattern && !isIndirect) {
     // Emit the ObjC class symbol to make the class visible to ObjC.
     if (classDecl->isObjC()) {
       emitObjCClassSymbol(IGM, classDecl, var);
