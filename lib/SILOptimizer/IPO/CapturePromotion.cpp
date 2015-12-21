@@ -783,7 +783,7 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       continue;
     }
 
-    // Verify that this this use does not otherwise allow the alloc_box to
+    // Verify that this use does not otherwise allow the alloc_box to
     // escape.
     if (!isNonescapingUse(O, Mutations))
       return false;

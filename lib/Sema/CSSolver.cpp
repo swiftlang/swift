@@ -1094,7 +1094,7 @@ static bool tryTypeVariableBindings(
     for (auto binding : bindings) {
       auto type = binding.BindingType;
 
-      // After our first pass, note that that we've explored these
+      // After our first pass, note that we've explored these
       // types.
       if (tryCount == 0)
         exploredTypes.insert(type->getCanonicalType());

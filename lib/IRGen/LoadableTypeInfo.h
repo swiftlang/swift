@@ -129,7 +129,7 @@ public:
                                      Explosion &targetExplosion,
                                      unsigned offset) const = 0;
 
-  /// Load a a reference counted pointer from an address.
+  /// Load a reference counted pointer from an address.
   /// Return the loaded pointer value.
   virtual LoadedRef loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc,
                                       Address addr) const;

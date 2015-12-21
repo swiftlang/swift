@@ -721,7 +721,7 @@ void ClosureSpecializer::gatherCallSites(
 
       // Go through all uses of our closure.
       for (auto *Use : II.getUses()) {
-        // If this use use is not an apply inst or an apply inst with
+        // If this use is not an apply inst or an apply inst with
         // substitutions, there is nothing interesting for us to do, so
         // continue...
         auto AI = FullApplySite::isa(Use->getUser());

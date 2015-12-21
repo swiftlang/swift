@@ -154,7 +154,7 @@ struct CandidateSpecificMatcher {
   /// Calculates the candidate's score, matching the candidate from
   /// \p firstPatternPos or later.
   ///
-  /// This drives drives scoreCandidateTrial by trying the possible matches.
+  /// This drives scoreCandidateTrial by trying the possible matches.
   double scoreCandidate(unsigned firstPatternPos);
 
   /// Calculates the candidate's score, matching the candidate from

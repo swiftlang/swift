@@ -2030,7 +2030,7 @@ static bool tryMoveCondFailToPreds(SILBasicBlock *BB) {
   
   // Find the underlying condition value of the cond_fail.
   // We only accept single uses. This is not a correctness check, but we only
-  // want to to the optimization if the condition gets dead after moving the
+  // want to the optimization if the condition gets dead after moving the
   // cond_fail.
   bool inverted = false;
   SILValue cond = skipInvert(CFI->getOperand(), inverted, true);

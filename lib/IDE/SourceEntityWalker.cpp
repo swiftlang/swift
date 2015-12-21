@@ -460,7 +460,7 @@ bool SourceEntityWalker::visitSubscriptReference(ValueDecl *D,
                                                  CharSourceRange Range,
                                                  bool IsOpenBracket) {
   // Most of the clients treat subscript reference the same way as a
-  // regular reference when called on the open open bracket and
+  // regular reference when called on the open bracket and
   // ignore the closing one.
   return IsOpenBracket ? visitDeclReference(D, Range, nullptr, Type()) : true;
 }

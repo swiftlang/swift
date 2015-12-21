@@ -764,7 +764,7 @@ static void maybeMarkTransparent(FuncDecl *accessor,
 }
 
 /// Synthesize the body of a trivial getter.  For a non-member vardecl or one
-/// which is not an override of a base class property, it performs a a direct
+/// which is not an override of a base class property, it performs a direct
 /// storage load.  For an override of a base member property, it chains up to
 /// super.
 static void synthesizeTrivialGetter(FuncDecl *getter,

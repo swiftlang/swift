@@ -212,7 +212,7 @@ static bool valueMayBeCaptured(SILValue V, CaptureException Exception) {
   DEBUG(llvm::dbgs() << "        Checking for capture.\n");
   
 
-  // All all uses of V to the worklist.
+  // All uses of V to the worklist.
   for (auto *UI : V.getUses()) {
     // If we have more uses than the threshold, be conservative and bail so we
     // don't use too much compile time.

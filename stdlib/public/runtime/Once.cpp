@@ -22,7 +22,7 @@ using namespace swift;
 
 #ifdef __APPLE__
 
-// On OS X and and iOS, swift_once is implemented using GCD.
+// On OS X and iOS, swift_once is implemented using GCD.
 
 #include <dispatch/dispatch.h>
 static_assert(std::is_same<swift_once_t, dispatch_once_t>::value,

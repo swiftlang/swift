@@ -824,7 +824,7 @@ processUsersOfValue(ProjectionTree &Tree,
 
     assert(User->getNumTypes() == 1 && "Projections should only have one use");
 
-    // Look up the Node for this projection add add {User, ChildNode} to the
+    // Look up the Node for this projection add {User, ChildNode} to the
     // worklist.
     //
     // *NOTE* This means that we will process ChildNode multiple times

@@ -165,7 +165,7 @@ bool ArrayAllocation::isInitializationWithKnownElements() {
 /// Propagate the elements of an array literal to get_element method calls on
 /// the same array.
 ///
-/// We have to prove that the the array value is not changed in between the
+/// We have to prove that the array value is not changed in between the
 /// creation and the method call to get_element.
 bool ArrayAllocation::findValueReplacements() {
   if (!isInitializationWithKnownElements())

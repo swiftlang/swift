@@ -353,7 +353,7 @@ extension ${Self} : CustomStringConvertible {
 // restrictive than the full range of ${Self}---against which we're
 // not able to check.  Overflows are not useful indicators of
 // precondition violations in this context.  Therefore, we use masked
-// arithmetic in this conformance, and we need to be be sure that
+// arithmetic in this conformance, and we need to be sure that
 // generic implementations of the arithmetic operators for
 // RandomAccessIndexType's are all shadowed by more-specific
 // implementations that *do* check for overflows.
