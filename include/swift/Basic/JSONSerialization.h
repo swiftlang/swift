@@ -425,8 +425,7 @@ private:
                             SaveInfo) ) {
       jsonize(*this, Val, Required);
       this->postflightKey(SaveInfo);
-    }
-    else {
+    } else {
       if ( UseDefault )
         Val = DefaultValue;
     }
