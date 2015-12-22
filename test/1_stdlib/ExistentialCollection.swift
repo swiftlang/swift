@@ -70,11 +70,7 @@ tests.test("AnyGenerator") {
   expectEqual(["0", "1", "2", "3", "4"], Array(countStrings()))
 
   var x = 7
-  let g = AnyGenerator<Int> {
-    if x >= 15 { return nil }
-    x += 1
-    return x-1
-  }
+  let g = AnyGenerator { x < 15 ? x++ : nil }
   expectEqual([ 7, 8, 9, 10, 11, 12, 13, 14 ], Array(g))
 }
 
@@ -100,32 +96,32 @@ struct InstrumentedIndex<I : RandomAccessIndexType> : RandomAccessIndexType {
   }
   
   func successor() -> InstrumentedIndex {
-    callCounts["successor"]! += 1
+    ++callCounts["successor"]!
     return InstrumentedIndex(base.successor())
   }
   
   mutating func _successorInPlace() {
-    callCounts["_successorInPlace"]! += 1
+    ++callCounts["_successorInPlace"]!
     base._successorInPlace()
   }
   
   func predecessor() -> InstrumentedIndex {
-    callCounts["predecessor"]! += 1
+    ++callCounts["predecessor"]!
     return InstrumentedIndex(base.predecessor())
   }
   
   mutating func _predecessorInPlace() {
-    callCounts["_predecessorInPlace"]! += 1
+    ++callCounts["_predecessorInPlace"]!
     base._predecessorInPlace()
   }
   
   func advancedBy(distance: Distance) -> InstrumentedIndex {
-    callCounts["advancedBy"]! += 1
+    ++callCounts["advancedBy"]!
     return InstrumentedIndex(base.advancedBy(distance))
   }
   
   func distanceTo(other: InstrumentedIndex) -> Distance {
-    callCounts["distanceTo"]! += 1
+    ++callCounts["distanceTo"]!
     return base.distanceTo(other.base)
   }
 }
@@ -171,11 +167,10 @@ tests.test("ForwardIndex") {
   i = i.successor()
   expectEqual(1, callCounts["successor"])
   expectEqual(0, callCounts["_successorInPlace"])
-  i._successorInPlace()
+  ++i
   expectEqual(1, callCounts["successor"])
   expectEqual(1, callCounts["_successorInPlace"])
-  var x = i
-  i = i.successor()
+  var x = i++
   expectEqual(2, callCounts["successor"])
   expectEqual(1, callCounts["_successorInPlace"])
   _blackHole(x)
@@ -189,11 +184,10 @@ tests.test("BidirectionalIndex") {
   i = i.predecessor()
   expectEqual(1, callCounts["predecessor"])
   expectEqual(0, callCounts["_predecessorInPlace"])
-  i._predecessorInPlace()
+  --i
   expectEqual(1, callCounts["predecessor"])
   expectEqual(1, callCounts["_predecessorInPlace"])
-  var x = i
-  i = i.predecessor()
+  var x = i--
   expectEqual(2, callCounts["predecessor"])
   expectEqual(1, callCounts["_predecessorInPlace"])
   _blackHole(x)

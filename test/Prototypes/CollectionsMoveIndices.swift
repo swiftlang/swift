@@ -178,7 +178,7 @@ extension MyForwardCollectionType {
       "Only BidirectionalIndexType can be advanced by a negative amount")
 
     var i = i
-    for var offset: Index.Distance = 0; offset != n; offset = offset + 1 {
+    for var offset: Index.Distance = 0; offset != n; ++offset {
       _nextInPlace(&i)
     }
     return i
@@ -194,7 +194,7 @@ extension MyForwardCollectionType {
       "Only BidirectionalIndexType can be advanced by a negative amount")
 
     var i = i
-    for var offset: Index.Distance = 0; offset != n && i != limit; offset = offset + 1 {
+    for var offset: Index.Distance = 0; offset != n && i != limit; ++offset {
       _nextInPlace(&i)
     }
     return i
@@ -215,7 +215,7 @@ extension MyForwardCollectionType {
     var start = start
     var count: Index.Distance = 0
     while start != end {
-      count = count + 1
+      ++count
       _nextInPlace(&start)
     }
     return count
@@ -376,7 +376,7 @@ extension MyBidirectionalCollectionType {
       return _advanceForward(i, by: n)
     }
     var i = i
-    for var offset: Index.Distance = n; offset != 0; offset = offset + 1 {
+    for var offset: Index.Distance = n; offset != 0; ++offset {
       _previousInPlace(&i)
     }
     return i
@@ -388,8 +388,7 @@ extension MyBidirectionalCollectionType {
       return _advanceForward(i, by: n, limit: limit)
     }
     var i = i
-    for var offset: Index.Distance = n; offset != 0 && i != limit;
-        offset = offset + 1 {
+    for var offset: Index.Distance = n; offset != 0 && i != limit; ++offset {
       _previousInPlace(&i)
     }
     return i

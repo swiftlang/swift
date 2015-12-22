@@ -361,7 +361,7 @@ struct MyIndexedGenerator<C : _MyCollection> : GeneratorType {
   mutating func next() -> C._Element? {
     if index == container.myEndIndex { return nil }
     let result = container[index]
-    index = index.successor()
+    ++index
     return result
   }
 }
@@ -373,7 +373,7 @@ struct OtherIndexedGenerator<C : _MyCollection> : GeneratorType {
   mutating func next() -> C._Element? {
     if index == container.myEndIndex { return nil }
     let result = container[index]
-    index = index.successor()
+    ++index
     return result
   }
 }
