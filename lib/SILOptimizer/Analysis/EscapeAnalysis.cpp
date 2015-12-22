@@ -194,9 +194,11 @@ void EscapeAnalysis::ConnectionGraph::mergeAllScheduledNodes() {
       Defers->removeFromPreds(Predecessor(From, EdgeType::Defer));
     }
     // Redirect the incoming defer edges. This may trigger other node merges.
-    for (Predecessor Pred : From->Preds) {
-      CGNode *PredNode = Pred.getPointer();
-      if (Pred.getInt() == EdgeType::Defer) {
+    // Note that the Pred iterator may be invalidated (because we may add
+    // edges in the loop). So we don't do: for (Pred : From->Preds) {...}
+    for (unsigned PredIdx = 0; PredIdx < From->Preds.size(); ++PredIdx) {
+      CGNode *PredNode = From->Preds[PredIdx].getPointer();
+      if (From->Preds[PredIdx].getInt() == EdgeType::Defer) {
         assert(PredNode != From && "defer edge may not form a self-cycle");
         addDeferEdge(PredNode, To);
       }
@@ -206,32 +208,36 @@ void EscapeAnalysis::ConnectionGraph::mergeAllScheduledNodes() {
     for (CGNode *Defers : From->defersTo) {
       addDeferEdge(To, Defers);
     }
-
-    // Ensure that graph invariance 4) is kept. At this point there may be still
-    // some violations because of the new adjacent edges of the To node.
-    for (Predecessor Pred : To->Preds) {
-      if (Pred.getInt() == EdgeType::PointsTo) {
-        CGNode *PredNode = Pred.getPointer();
-        for (Predecessor PredOfPred : PredNode->Preds) {
-          if (PredOfPred.getInt() == EdgeType::Defer)
-            updatePointsTo(PredOfPred.getPointer(), To);
+    // There is no point in updating the pointsTo if the To node will be
+    // merged to another node eventually.
+    if (!To->mergeTo) {
+      // Ensure that graph invariance 4) is kept. At this point there may be still
+      // some violations because of the new adjacent edges of the To node.
+      for (unsigned PredIdx = 0; PredIdx < To->Preds.size(); ++PredIdx) {
+        if (To->Preds[PredIdx].getInt() == EdgeType::PointsTo) {
+          CGNode *PredNode = To->Preds[PredIdx].getPointer();
+          for (unsigned PPIdx = 0; PPIdx < PredNode->Preds.size(); ++PPIdx) {
+            if (PredNode->Preds[PPIdx].getInt() == EdgeType::Defer)
+              updatePointsTo(PredNode->Preds[PPIdx].getPointer(), To);
+          }
+          for (CGNode *Def : PredNode->defersTo) {
+            updatePointsTo(Def, To);
+          }
         }
-        for (CGNode *Def : PredNode->defersTo) {
-          updatePointsTo(Def, To);
+      }
+      if (CGNode *ToPT = To->getPointsToEdge()) {
+        ToPT = ToPT->getMergeTarget();
+        for (CGNode *ToDef : To->defersTo) {
+          updatePointsTo(ToDef, ToPT);
+          assert(!ToPT->mergeTo);
+        }
+        for (unsigned PredIdx = 0; PredIdx < To->Preds.size(); ++PredIdx) {
+          if (To->Preds[PredIdx].getInt() == EdgeType::Defer)
+            updatePointsTo(To->Preds[PredIdx].getPointer(), ToPT);
         }
       }
+      To->mergeEscapeState(From->State);
     }
-    if (CGNode *ToPT = To->getPointsToEdge()) {
-      for (CGNode *ToDef : To->defersTo) {
-        updatePointsTo(ToDef, ToPT);
-      }
-      for (Predecessor Pred : To->Preds) {
-        if (Pred.getInt() == EdgeType::Defer)
-          updatePointsTo(Pred.getPointer(), ToPT);
-      }
-    }
-    To->mergeEscapeState(From->State);
-
     // Cleanup the merged node.
     From->isMerged = true;
     From->Preds.clear();
@@ -243,10 +249,11 @@ void EscapeAnalysis::ConnectionGraph::mergeAllScheduledNodes() {
 void EscapeAnalysis::ConnectionGraph::
 updatePointsTo(CGNode *InitialNode, CGNode *pointsTo) {
   // Visit all nodes in the defer web, which don't have the right pointsTo set.
+  assert(!pointsTo->mergeTo);
   llvm::SmallVector<CGNode *, 8> WorkList;
   WorkList.push_back(InitialNode);
   InitialNode->isInWorkList = true;
-  bool isInitialSet = (InitialNode->pointsTo == nullptr);
+  bool isInitialSet = false;
   for (unsigned Idx = 0; Idx < WorkList.size(); ++Idx) {
     auto *Node = WorkList[Idx];
     if (Node->pointsTo == pointsTo)
@@ -255,6 +262,8 @@ updatePointsTo(CGNode *InitialNode, CGNode *pointsTo) {
     if (Node->pointsTo) {
       // Mismatching: we need to merge!
       scheduleToMerge(Node->pointsTo, pointsTo);
+    } else {
+      isInitialSet = true;
     }
 
     // If the node already has a pointsTo _edge_ we don't change it (we don't
@@ -265,8 +274,6 @@ updatePointsTo(CGNode *InitialNode, CGNode *pointsTo) {
         // We create an edge to pointsTo (agreed, this changes the structure of
         // the graph but adding this edge is harmless).
         Node->setPointsTo(pointsTo);
-        assert(isInitialSet &&
-               "when replacing the points-to, there should already be an edge");
       } else {
         Node->pointsTo = pointsTo;
       }
