@@ -775,59 +775,11 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
 // Diagnose availability.
 //===--------------------------------------------------------------------===//
 
-static void tryFixPrintWithAppendNewline(const ValueDecl *D,
-                                         const Expr *ParentExpr,
-                                         InFlightDiagnostic &Diag) {
-  if (!D || !ParentExpr)
-    return;
-  if (!D->getModuleContext()->isStdlibModule())
-    return;
-
-  DeclName Name = D->getFullName();
-  if (Name.getBaseName().str() != "print")
-    return;
-  auto ArgNames = Name.getArgumentNames();
-  if (ArgNames.size() != 2)
-    return;
-  if (ArgNames[1].empty() || ArgNames[1].str() != "appendNewline")
-    return;
-
-  // Go through the expr to determine if second parameter is boolean literal.
-  auto *CE = dyn_cast_or_null<CallExpr>(ParentExpr);
-  if (!CE)
-    return;
-  auto *TE = dyn_cast<TupleExpr>(CE->getArg());
-  if (!TE)
-    return;
-  if (TE->getNumElements() != 2)
-    return;
-  auto *SCE = dyn_cast<CallExpr>(TE->getElement(1));
-  if (!SCE || !SCE->isImplicit())
-    return;
-  auto *STE = dyn_cast<TupleExpr>(SCE->getArg());
-  if (!STE || !STE->isImplicit())
-    return;
-  if (STE->getNumElements() != 1)
-    return;
-  auto *BE = dyn_cast<BooleanLiteralExpr>(STE->getElement(0));
-  if (!BE)
-    return;
-
-  SmallString<20> termStr = StringRef("terminator: \"");
-  if (BE->getValue())
-    termStr += "\\n";
-  termStr += "\"";
-
-  SourceRange RangeToFix(TE->getElementNameLoc(1), BE->getEndLoc());
-  Diag.fixItReplace(RangeToFix, termStr);
-}
-
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted=".
 bool TypeChecker::diagnoseExplicitUnavailability(const ValueDecl *D,
                                                  SourceRange R,
-                                                 const DeclContext *DC,
-                                                 const Expr *ParentExpr) {
+                                                 const DeclContext *DC) {
   auto *Attr = AvailableAttr::isUnavailable(D);
   if (!Attr)
     return false;
@@ -865,9 +817,9 @@ bool TypeChecker::diagnoseExplicitUnavailability(const ValueDecl *D,
       diagnose(Loc, diag::availability_decl_unavailable, Name).highlight(R);
     } else {
       EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-      tryFixPrintWithAppendNewline(D, ParentExpr,
-        diagnose(Loc, diag::availability_decl_unavailable_msg, Name,
-                    EncodedMessage.Message).highlight(R));
+      diagnose(Loc, diag::availability_decl_unavailable_msg, Name,
+               EncodedMessage.Message)
+        .highlight(R);
     }
     break;
 
@@ -945,8 +897,7 @@ public:
     };
 
     if (auto DR = dyn_cast<DeclRefExpr>(E))
-      diagAvailability(DR->getDecl(), DR->getSourceRange(),
-                       getParentForDeclRef());
+      diagAvailability(DR->getDecl(), DR->getSourceRange());
     if (auto MR = dyn_cast<MemberRefExpr>(E)) {
       walkMemberRef(MR);
       return skipChildren();
@@ -981,8 +932,7 @@ public:
   }
 
 private:
-  bool diagAvailability(const ValueDecl *D, SourceRange R,
-                        const Expr *ParentExpr = nullptr);
+  bool diagAvailability(const ValueDecl *D, SourceRange R);
 
   /// Walk an assignment expression, checking for availability.
   void walkAssignExpr(AssignExpr *E) const {
@@ -1085,44 +1035,25 @@ private:
                                                  ForInout);
     }
   }
-
-  const Expr *getParentForDeclRef() {
-    assert(isa<DeclRefExpr>(ExprStack.back()));
-    ArrayRef<const Expr *> Stack = ExprStack;
-
-    Stack = Stack.drop_back();
-    if (Stack.empty())
-      return nullptr;
-
-    if (isa<DotSyntaxBaseIgnoredExpr>(Stack.back()))
-      Stack = Stack.drop_back();
-    if (Stack.empty())
-      return nullptr;
-    
-    return Stack.back();
-  }
 };
 }
 
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
-bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
-                                          const Expr *ParentExpr) {
+bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R) {
   if (!D)
     return false;
 
-  if (TC.diagnoseExplicitUnavailability(D, R, DC, ParentExpr))
+  if (TC.diagnoseExplicitUnavailability(D, R, DC))
     return true;
 
   // Diagnose for deprecation
-  if (const AvailableAttr *Attr = TypeChecker::getDeprecated(D)) {
+  if (const AvailableAttr *Attr = TypeChecker::getDeprecated(D))
     TC.diagnoseDeprecated(R, DC, Attr, D->getFullName());
-  }
 
-  if (TC.getLangOpts().DisableAvailabilityChecking) {
+  if (TC.getLangOpts().DisableAvailabilityChecking)
     return false;
-  }
 
   // Diagnose for potential unavailability
   auto maybeUnavail = TC.checkDeclarationAvailability(D, R.Start, DC);

@@ -1488,8 +1488,7 @@ public:
   /// marked as unavailable, either through "unavailable" or "obsoleted=".
   bool diagnoseExplicitUnavailability(const ValueDecl *D,
                                       SourceRange R,
-                                      const DeclContext *DC,
-                                      const Expr *ParentExpr);
+                                      const DeclContext *DC);
   
   /// @}
 
