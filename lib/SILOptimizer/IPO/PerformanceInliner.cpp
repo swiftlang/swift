@@ -534,9 +534,11 @@ bool SILPerformanceInliner::hasInliningCycle(SILFunction *Caller,
   StringRef CallerName = Caller->getName();
   StringRef CalleeName = Callee->getName();
 
-  bool InlinedBefore = InlinedFunctions.count(std::make_pair(CallerName, CalleeName));
+  bool InlinedBefore =
+      InlinedFunctions.count(std::make_pair(CallerName, CalleeName));
 
-  // If the Callee was inlined into the Caller in previous inlining iterations then
+  // If the Callee was inlined into the Caller in previous inlining iterations
+  // then
   // we need to reject this inlining request to prevent a cycle.
   return InlinedBefore;
 }
@@ -776,7 +778,8 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
         SILInstruction *def = constTracker.getDefInCaller(AI->getCallee());
         if (def && (isa<FunctionRefInst>(def) || isa<PartialApplyInst>(def))) {
 
-          DEBUG(llvm::dbgs() << "        Boost: apply const function at" << *AI);
+          DEBUG(llvm::dbgs() << "        Boost: apply const function at"
+                             << *AI);
           Benefit += ConstCalleeBenefit + loopDepth * LoopBenefitFactor;
           testThreshold *= 2;
         }
