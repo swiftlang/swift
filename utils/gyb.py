@@ -466,7 +466,8 @@ class ParseContext:
                 if (kind == 'gybBlockOpen'):
                     # Absorb any '}% <optional-comment> \n'
                     m2 = gybBlockClose.match(self.template, closePos)
-                    assert m2, "Invalid block closure" # FIXME: need proper error handling here.
+                    if not m2:
+                        raise ValueError("Invalid block closure")
                     nextPos = m2.end(0)
                 else:
                     assert kind == 'substitutionOpen'
@@ -656,7 +657,9 @@ class Code(ASTNode):
         # Execute the code with our __children__ in scope 
         context.localBindings['__children__'] = self.children
         result = eval(self.code, context.localBindings)
-        assert context.localBindings['__children__'] is self.children
+
+        if context.localBindings['__children__'] is not self.children:
+            raise ValueError("The code is not allowed to mutate __children__")
         # Restore the bindings
         context.localBindings['__children__'] = saveChildren
 
