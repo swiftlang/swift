@@ -98,7 +98,7 @@ func testSwiftError() throws {
 }
 
 // rdar://21074857
-func needsNonThrowing(fn: () -> ()) {}
+func needsNonThrowing(fn: () -> Void) {}
 func testNSErrorExhaustive() {
   needsNonThrowing {
     do {
