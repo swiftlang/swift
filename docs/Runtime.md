@@ -1,62 +1,175 @@
 # The Swift Runtime
 
-This document describes the interface to the Swift runtime, which provides
+This document describes the ABI interface to the Swift runtime, which provides
 the following core functionality for Swift programs:
 
 - memory management, including allocation and reference counting;
 - the runtime type system, including dynamic casting, generic instantiation,
   and protocol conformance registration;
 
+It is intended to describe only the runtime interface that compiler-generated
+code should conform to, not details of how things are implemented.
+
 The final runtime interface is currently a work-in-progress; it is a goal of
 Swift 3 to stabilize it. This document attempts to describe both the current
 state of the runtime and the intended endpoint of the stable interface.
+Changes that are intended to be made before stabilization are marked with
+**ABI TODO**. Entry points that only exist on Darwin platforms with
+ObjC interop, and
+information that only pertains to ObjC interop, are marked **ObjC-only**.
 
-## Entry points
+## Deprecated entry points
 
-TODO
+Entry points in this section are intended to be removed or internalized before
+ABI stabilization.
+
+### Exported C++ symbols 
+
+**ABI TODO**: Any exported C++ symbols are implementation details that are not
+intended to be part of the stable runtime interface.
+
+### `_swift_ClassMirror_count`
+### `_swift_ClassMirror_quickLookObject`
+### `_swift_ClassMirror_subscript`
+### `_swift_EnumMirror_caseName`
+### `_swift_EnumMirror_count`
+### `_swift_EnumMirror_subscript`
+### `_swift_MagicMirrorData_objcValue`
+### `_swift_MagicMirrorData_objcValueType`
+### `_swift_MagicMirrorData_summary`
+### `_swift_MagicMirrorData_value`
+### `_swift_MagicMirrorData_valueType`
+### `_swift_ObjCMirror_count`
+### `_swift_ObjCMirror_subscript`
+### `_swift_StructMirror_count`
+### `_swift_StructMirror_subscript`
+### `_swift_TupleMirror_count`
+### `_swift_TupleMirror_subscript`
+### `_swift_reflectAny`
+
+**ABI TODO**: These functions are implementation details of the standard
+library `reflect` interface. They will be superseded by a low-level
+runtime reflection API.
+
+## Memory allocation
+
+### TODO
 
 ```
-0000000000000000 T __Z13class_getNamePKN5swift13ClassMetadataE
-000000000001c660 T __ZN5swift10fatalErrorEPKcz
-00000000000267b0 T __ZN5swift15getNSErrorClassEv
-0000000000000010 T __ZN5swift15nameForMetadataEPKNS_8MetadataEb
-000000000001e340 T __ZN5swift17MetadataAllocator5allocEm
-000000000002b3c0 T __ZN5swift17getRootSuperclassEv
-00000000000009d0 T __ZN5swift24swift_dynamicCastFailureEPKNS_8MetadataES2_PKc
-0000000000000980 T __ZN5swift24swift_dynamicCastFailureEPKvPKcS1_S3_S3_
-0000000000022600 T __ZN5swift27installCommonValueWitnessesEPNS_17ValueWitnessTableE
-0000000000026de0 T __ZN5swift28tryDynamicCastNSErrorToValueEPNS_11OpaqueValueES1_PKNS_8MetadataES4_NS_16DynamicCastFlagsE
-0000000000023930 T __ZN5swift32swift_assignExistentialWithCopy0EPNS_11OpaqueValueEPKS0_PKNS_8MetadataE
-00000000000239b0 T __ZN5swift32swift_assignExistentialWithCopy1EPNS_11OpaqueValueEPKS0_PKNS_8MetadataE
-000000000002c420 T __ZN5swift8Demangle10mangleNodeERKNSt3__110shared_ptrINS0_4NodeEEE
-0000000000007550 T __ZN5swift8Demangle12nodeToStringENSt3__110shared_ptrINS0_4NodeEEERKNS0_15DemangleOptionsE
-000000000002c180 T __ZN5swift8Demangle16mangleIdentifierEPKcmNS0_12OperatorKindERNSt3__112basic_stringIcNS4_11char_traitsIcEENS4_9allocatorIcEEEEb
-00000000000074a0 T __ZN5swift8Demangle18demangleTypeAsNodeEPKcmRKNS0_15DemangleOptionsE
-00000000000049e0 T __ZN5swift8Demangle20demangleSymbolAsNodeEPKcmRKNS0_15DemangleOptionsE
-0000000000007790 T __ZN5swift8Demangle20demangleTypeAsStringEPKcmRKNS0_15DemangleOptionsE
-0000000000007630 T __ZN5swift8Demangle22demangleSymbolAsStringEPKcmRKNS0_15DemangleOptionsE
-00000000000049d0 T __ZN5swift8Demangle4NodeD1Ev
-0000000000004900 T __ZN5swift8Demangle4NodeD2Ev
-00000000000078f0 T __ZN5swift8Punycode14decodePunycodeEN4llvm9StringRefERNSt3__16vectorIjNS3_9allocatorIjEEEE
-0000000000007c70 T __ZN5swift8Punycode14encodePunycodeERKNSt3__16vectorIjNS1_9allocatorIjEEEERNS1_12basic_stringIcNS1_11char_traitsIcEENS3_IcEEEE
-0000000000007fc0 T __ZN5swift8Punycode18decodePunycodeUTF8EN4llvm9StringRefERNSt3__112basic_stringIcNS3_11char_traitsIcEENS3_9allocatorIcEEEE
-000000000002f720 T __ZN5swift8Punycode18encodePunycodeUTF8EN4llvm9StringRefERNSt3__112basic_stringIcNS3_11char_traitsIcEENS3_9allocatorIcEEEE
-0000000000026910 T __ZNK5swift10SwiftError13isPureNSErrorEv
-0000000000026960 T __ZNK5swift10SwiftError19getErrorConformanceEv
-00000000000266c0 T __ZNK5swift10SwiftError7getTypeEv
-0000000000023430 T __ZNK5swift23ExistentialTypeMetadata12mayTakeValueEPKNS_11OpaqueValueE
-00000000000234a0 T __ZNK5swift23ExistentialTypeMetadata12projectValueEPKNS_11OpaqueValueE
-0000000000023550 T __ZNK5swift23ExistentialTypeMetadata14getDynamicTypeEPKNS_11OpaqueValueE
-00000000000235a0 T __ZNK5swift23ExistentialTypeMetadata15getWitnessTableEPKNS_11OpaqueValueEj
-0000000000023400 T __ZNK5swift23ExistentialTypeMetadata17getRepresentationEv
-0000000000023460 T __ZNK5swift23ExistentialTypeMetadata26deinitExistentialContainerEPNS_11OpaqueValueE
-0000000000002ee0 T __ZNK5swift25ProtocolConformanceRecord15getWitnessTableEPKNS_8MetadataE
-0000000000002e30 T __ZNK5swift25ProtocolConformanceRecord24getCanonicalTypeMetadataEv
-0000000000023e30 T __ZNK5swift8Metadata14getClassObjectEv
-0000000000023de0 T __ZNK5swift8Metadata17getGenericPatternEv
-0000000000023da0 T __ZNK5swift8Metadata24getNominalTypeDescriptorEv
-00000000000048b0 T __ZNR5swift8Demangle16DemanglerPrinterlsEx
-0000000000004860 T __ZNR5swift8Demangle16DemanglerPrinterlsEy
+```
+
+## Reference counting
+
+
+### swift\_retainCount
+
+```
+@convention(c) (@unowned NativeObject) -> UInt
+```
+
+Returns a random number.
+
+**ABI TODO**: Only used by runtime tests and `SwiftObject.mm`. Should be
+internalized.
+
+### TODO
+
+```
+0000000000027ba0 T _swift_bridgeObjectRelease
+0000000000027c50 T _swift_bridgeObjectRelease_n
+0000000000027b50 T _swift_bridgeObjectRetain
+0000000000027be0 T _swift_bridgeObjectRetain_n
+000000000001ce70 T _swift_release
+000000000001cee0 T _swift_release_n
+000000000001ce30 T _swift_retain
+000000000001ce50 T _swift_retain_n
+000000000001d140 T _swift_tryPin
+000000000001d240 T _swift_tryRetain
+0000000000027b10 T _swift_unknownRelease
+0000000000027a70 T _swift_unknownRelease_n
+0000000000027ad0 T _swift_unknownRetain
+0000000000027a10 T _swift_unknownRetain_n
+0000000000027d50 T _swift_unknownUnownedAssign
+00000000000280a0 T _swift_unknownUnownedCopyAssign
+0000000000027fd0 T _swift_unknownUnownedCopyInit
+0000000000027ed0 T _swift_unknownUnownedDestroy
+0000000000027cb0 T _swift_unknownUnownedInit
+0000000000027f20 T _swift_unknownUnownedLoadStrong
+00000000000281f0 T _swift_unknownUnownedTakeAssign
+0000000000028070 T _swift_unknownUnownedTakeInit
+0000000000027f70 T _swift_unknownUnownedTakeStrong
+00000000000282b0 T _swift_unknownWeakAssign
+0000000000028560 T _swift_unknownWeakCopyAssign
+00000000000284e0 T _swift_unknownWeakCopyInit
+00000000000283e0 T _swift_unknownWeakDestroy
+0000000000028270 T _swift_unknownWeakInit
+0000000000028420 T _swift_unknownWeakLoadStrong
+0000000000028610 T _swift_unknownWeakTakeAssign
+0000000000028520 T _swift_unknownWeakTakeInit
+0000000000028470 T _swift_unknownWeakTakeStrong
+000000000001d3c0 T _swift_unownedCheck
+000000000001cfb0 T _swift_unownedRelease
+000000000001d0a0 T _swift_unownedRelease_n
+000000000001cf70 T _swift_unownedRetain
+000000000001cf60 T _swift_unownedRetainCount
+000000000001d2b0 T _swift_unownedRetainStrong
+000000000001d310 T _swift_unownedRetainStrongAndRelease
+000000000001d060 T _swift_unownedRetain_n
+000000000001d1b0 T _swift_unpin
+000000000001ca20 T _swift_verifyEndOfLifetime
+000000000001d680 T _swift_weakAssign
+000000000001d830 T _swift_weakCopyAssign
+000000000001d790 T _swift_weakCopyInit
+000000000001d770 T _swift_weakDestroy
+000000000001d640 T _swift_weakInit
+000000000001d6d0 T _swift_weakLoadStrong
+000000000001d8b0 T _swift_weakTakeAssign
+000000000001d800 T _swift_weakTakeInit
+000000000001d710 T _swift_weakTakeStrong
+```
+
+**ABI TODO**: `_unsynchronized` r/r entry points
+
+## Error objects
+
+The `ErrorType` existential type uses a special single-word, reference-
+counted representation.
+
+**ObjC-only**: The representation is internal to the runtime in order
+to provide efficient bridging with the platform `NSError` and `CFError`
+implementations. On non-ObjC platforms this bridging is unnecessary, and
+the error object interface could be made more fragile.
+
+To preserve the encapsulation of the ErrorType representation, and
+allow for future representation optimizations, the runtime provides
+special entry points for allocating, projecting, and reference
+counting error values.
+
+
+```
+00000000000268e0 T _swift_allocError
+0000000000026d50 T _swift_bridgeErrorTypeToNSError
+0000000000026900 T _swift_deallocError
+0000000000027120 T _swift_errorRelease
+0000000000027100 T _swift_errorRetain
+0000000000026b80 T _swift_getErrorValue
+```
+
+**ABI TODO**: `_unsynchronized` r/r entry points
+
+**ABI TODO**: `_n` r/r entry points
+
+### swift\_convertErrorTypeToNSError, swift\_convertNSErrorToErrorType
+
+**ObjC-only**. Standard library entry points used to handle implicit conversions
+between `ErrorType` and `NSError`.
+
+**ABI TODO**: These should be implemented as shims or in Swift code, not
+in the runtime.
+
+## TODO
+
+```
 000000000002b340 T __swift_class_getInstancePositiveExtentSize
 000000000002b350 T __swift_class_getInstancePositiveExtentSize_native
 0000000000024040 T __swift_debug_verifyTypeLayoutAttribute
@@ -64,49 +177,22 @@ TODO
 0000000000003ff0 T __swift_isClass
 00000000000279f0 T __swift_usesNativeSwiftReferenceCounting_class
 000000000002ae40 T __swift_usesNativeSwiftReferenceCounting_nonNull
-0000000000032e00 T _swift_ClassMirror_count
-00000000000332a0 T _swift_ClassMirror_quickLookObject
-0000000000032e90 T _swift_ClassMirror_subscript
-0000000000032a60 T _swift_EnumMirror_caseName
-0000000000032b40 T _swift_EnumMirror_count
-0000000000032bd0 T _swift_EnumMirror_subscript
-0000000000032590 T _swift_MagicMirrorData_objcValue
-0000000000032730 T _swift_MagicMirrorData_objcValueType
-00000000000325d0 T _swift_MagicMirrorData_summary
-0000000000032530 T _swift_MagicMirrorData_value
-0000000000032580 T _swift_MagicMirrorData_valueType
-00000000000331e0 T _swift_ObjCMirror_count
-0000000000033200 T _swift_ObjCMirror_subscript
-00000000000328a0 T _swift_StructMirror_count
-00000000000328b0 T _swift_StructMirror_subscript
-0000000000032750 T _swift_TupleMirror_count
-0000000000032760 T _swift_TupleMirror_subscript
 000000000001cb30 T _swift_allocBox
-00000000000268e0 T _swift_allocError
 000000000001c990 T _swift_allocObject
-000000000001cab0 T _swift_allocPOD
 000000000001e3e0 T _swift_allocateGenericClassMetadata
 000000000001e620 T _swift_allocateGenericValueMetadata
 0000000000023a40 T _swift_assignExistentialWithCopy
-0000000000026d50 T _swift_bridgeErrorTypeToNSError
 0000000000003b60 T _swift_bridgeNonVerbatimFromObjectiveC
 0000000000003c80 T _swift_bridgeNonVerbatimFromObjectiveCConditional
 00000000000037e0 T _swift_bridgeNonVerbatimToObjectiveC
-0000000000027ba0 T _swift_bridgeObjectRelease
-0000000000027c50 T _swift_bridgeObjectRelease_n
-0000000000027b50 T _swift_bridgeObjectRetain
-0000000000027be0 T _swift_bridgeObjectRetain_n
 000000000001ca60 T _swift_bufferAllocate
 000000000001ca70 T _swift_bufferAllocateOnStack
 000000000001ca80 T _swift_bufferDeallocateFromStack
 000000000001ca90 T _swift_bufferHeaderSize
 0000000000003060 T _swift_conformsToProtocol
-0000000000026db0 T _swift_convertErrorTypeToNSError
-0000000000026d60 T _swift_convertNSErrorToErrorType
 000000000001dbf0 T _swift_copyPOD
 000000000001cd30 T _swift_deallocBox
 000000000001d490 T _swift_deallocClassInstance
-0000000000026900 T _swift_deallocError
 000000000001cd60 T _swift_deallocObject
 000000000001d4c0 T _swift_deallocPartialClassInstance
 0000000000023e60 T _swift_demangleSimpleClass
@@ -131,14 +217,10 @@ TODO
 00000000000287d0 T _swift_dynamicCastTypeToObjCProtocolUnconditional
 0000000000000de0 T _swift_dynamicCastUnknownClass
 0000000000000fd0 T _swift_dynamicCastUnknownClassUnconditional
-0000000000027120 T _swift_errorRelease
-0000000000027100 T _swift_errorRetain
-000000000001d630 T _swift_fixLifetime
 00000000000039c0 T _swift_getBridgedNonVerbatimObjectiveCType
 0000000000000b60 T _swift_getDynamicType
 000000000001c560 T _swift_getEnumCaseMultiPayload
 000000000001be60 T _swift_getEnumCaseSinglePayload
-0000000000026b80 T _swift_getErrorValue
 0000000000023230 T _swift_getExistentialMetatypeMetadata
 0000000000023630 T _swift_getExistentialTypeMetadata
 0000000000023b90 T _swift_getForeignTypeMetadata
@@ -185,66 +267,30 @@ TODO
 0000000000028770 T _swift_objcRespondsToSelector
 0000000000026550 T _swift_once
 000000000001ce10 T _swift_projectBox
-00000000000336d0 T _swift_reflectAny
 0000000000002ef0 T _swift_registerProtocolConformances
-000000000001ce70 T _swift_release
-000000000001cee0 T _swift_release_n
 000000000001c7d0 T _swift_reportFatalError
 000000000001c730 T _swift_reportFatalErrorInFile
 000000000001c940 T _swift_reportMissingMethod
 000000000001c8d0 T _swift_reportUnimplementedInitializer
 000000000001c840 T _swift_reportUnimplementedInitializerInFile
-000000000001ce30 T _swift_retain
-000000000001cf50 T _swift_retainCount
-000000000001ce50 T _swift_retain_n
 000000000001d400 T _swift_rootObjCDealloc
 000000000001c960 T _swift_slowAlloc
 000000000001c980 T _swift_slowDealloc
 0000000000033930 T _swift_stdlib_demangleName
 000000000001c400 T _swift_storeEnumTagMultiPayload
 000000000001bf90 T _swift_storeEnumTagSinglePayload
-000000000001d140 T _swift_tryPin
-000000000001d240 T _swift_tryRetain
-0000000000027b10 T _swift_unknownRelease
-0000000000027a70 T _swift_unknownRelease_n
-0000000000027ad0 T _swift_unknownRetain
-0000000000027a10 T _swift_unknownRetain_n
-0000000000027d50 T _swift_unknownUnownedAssign
-00000000000280a0 T _swift_unknownUnownedCopyAssign
-0000000000027fd0 T _swift_unknownUnownedCopyInit
-0000000000027ed0 T _swift_unknownUnownedDestroy
-0000000000027cb0 T _swift_unknownUnownedInit
-0000000000027f20 T _swift_unknownUnownedLoadStrong
-00000000000281f0 T _swift_unknownUnownedTakeAssign
-0000000000028070 T _swift_unknownUnownedTakeInit
-0000000000027f70 T _swift_unknownUnownedTakeStrong
-00000000000282b0 T _swift_unknownWeakAssign
-0000000000028560 T _swift_unknownWeakCopyAssign
-00000000000284e0 T _swift_unknownWeakCopyInit
-00000000000283e0 T _swift_unknownWeakDestroy
-0000000000028270 T _swift_unknownWeakInit
-0000000000028420 T _swift_unknownWeakLoadStrong
-0000000000028610 T _swift_unknownWeakTakeAssign
-0000000000028520 T _swift_unknownWeakTakeInit
-0000000000028470 T _swift_unknownWeakTakeStrong
-000000000001d3c0 T _swift_unownedCheck
-000000000001cfb0 T _swift_unownedRelease
-000000000001d0a0 T _swift_unownedRelease_n
-000000000001cf70 T _swift_unownedRetain
-000000000001cf60 T _swift_unownedRetainCount
-000000000001d2b0 T _swift_unownedRetainStrong
-000000000001d310 T _swift_unownedRetainStrongAndRelease
-000000000001d060 T _swift_unownedRetain_n
-000000000001d1b0 T _swift_unpin
-000000000001ca20 T _swift_verifyEndOfLifetime
-000000000001d680 T _swift_weakAssign
-000000000001d830 T _swift_weakCopyAssign
-000000000001d790 T _swift_weakCopyInit
-000000000001d770 T _swift_weakDestroy
-000000000001d640 T _swift_weakInit
-000000000001d6d0 T _swift_weakLoadStrong
-000000000001d8b0 T _swift_weakTakeAssign
-000000000001d800 T _swift_weakTakeInit
-000000000001d710 T _swift_weakTakeStrong
 0000000000027140 T _swift_willThrow
 ```
+
+## Tasks
+
+- Moving to per-type instantiation functions instead of using
+  `getGenericMetadata` directly
+
+- `swift_objc_` naming convention for ObjC
+
+- Alternative ABIs for retain/release
+
+- Unsynchronized retain/release
+
+
