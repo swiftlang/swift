@@ -102,7 +102,7 @@ enum class SpecializationPass : uint8_t {
 };
 
 static inline char encodeSpecializationPass(SpecializationPass Pass) {
-  return char(uint8_t(Pass)) + 48;
+  return char(uint8_t(Pass)) + '0';
 }
 
 enum class ValueWitnessKind {
