@@ -496,11 +496,10 @@ public func +<
     RRC2 : RangeReplaceableCollectionType 
     where RRC1.Generator.Element == RRC2.Generator.Element
 >(lhs: RRC1, rhs: RRC2) -> RRC1 {
-  var lhs = lhs
-  // FIXME: what if lhs is a reference type?  This will mutate it.
-  lhs.reserveCapacity(lhs.count + numericCast(rhs.count))
-  lhs.appendContentsOf(rhs)
-  return lhs
+  var result = lhs is AnyObject ? RRC1(lhs) : lhs
+  result.reserveCapacity(lhs.count + numericCast(rhs.count))
+  result.appendContentsOf(rhs)
+  return result
 }
 
 @available(*, unavailable, renamed="RangeReplaceableCollectionType")
