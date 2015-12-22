@@ -4232,11 +4232,11 @@ namespace {
         }
 
         if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(nd)) {
-          // If there is a special declaration associated with this member,
-          // add it now.
-          if (auto special = importSpecialMethod(member)) {
-            if (knownMembers.insert(special).second)
-              members.push_back(special);
+          // If there is a alternate declaration for this member, add it.
+          if (auto alternate = Impl.getAlternateDecl(member)) {
+            if (alternate->getDeclContext() == member->getDeclContext() &&
+                knownMembers.insert(alternate).second)
+              members.push_back(alternate);
           }
 
           // If this is a factory method, try to import it as a constructor.
@@ -4245,7 +4245,7 @@ namespace {
                                objcMethod, 
                                Impl.importSelector(objcMethod->getSelector()),
                                swiftContext)) {
-            if (*factory)
+            if (*factory && knownMembers.insert(*factory).second)
               members.push_back(*factory);
           }
 
@@ -4259,7 +4259,7 @@ namespace {
                                       /*AllowHidden=*/true)) {
               auto classMember = VisitObjCMethodDecl(objcMethod, swiftContext,
                                                      true);
-              if (classMember)
+              if (classMember && knownMembers.insert(classMember).second)
                 members.push_back(classMember);
             }
           }
