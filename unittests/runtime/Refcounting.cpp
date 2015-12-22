@@ -98,13 +98,6 @@ TEST(RefcountingTest, pin_pin_unpin_unpin) {
   EXPECT_EQ(1u, value);
 }
 
-static uintptr_t retainCount(HeapObject *obj) {
-  return obj->refCount.getCount();
-}
-static uintptr_t unownedRetainCount(HeapObject *obj) {
-  return obj->weakRefCount.getCount();
-}
-
 TEST(RefcountingTest, retain_release_n) {
   size_t value = 0;
   auto object = allocTestObject(&value, 1);
@@ -112,16 +105,16 @@ TEST(RefcountingTest, retain_release_n) {
   swift_retain_n(object, 32);
   swift_retain(object);
   EXPECT_EQ(0u, value);
-  EXPECT_EQ(34u, retainCount(object));
+  EXPECT_EQ(34u, swift_retainCount(object));
   swift_release_n(object, 31);
   EXPECT_EQ(0u, value);
-  EXPECT_EQ(3u, retainCount(object));
+  EXPECT_EQ(3u, swift_retainCount(object));
   swift_release(object);
   EXPECT_EQ(0u, value);
-  EXPECT_EQ(2u, retainCount(object));
+  EXPECT_EQ(2u, swift_retainCount(object));
   swift_release_n(object, 1);
   EXPECT_EQ(0u, value);
-  EXPECT_EQ(1u, retainCount(object));
+  EXPECT_EQ(1u, swift_retainCount(object));
   swift_release(object);
   EXPECT_EQ(1u, value);
 }
@@ -133,16 +126,16 @@ TEST(RefcountingTest, unknown_retain_release_n) {
   swift_unknownRetain_n(object, 32);
   swift_unknownRetain(object);
   EXPECT_EQ(0u, value);
-  EXPECT_EQ(34u, retainCount(object));
+  EXPECT_EQ(34u, swift_retainCount(object));
   swift_unknownRelease_n(object, 31);
   EXPECT_EQ(0u, value);
-  EXPECT_EQ(3u, retainCount(object));
+  EXPECT_EQ(3u, swift_retainCount(object));
   swift_unknownRelease(object);
   EXPECT_EQ(0u, value);
-  EXPECT_EQ(2u, retainCount(object));
+  EXPECT_EQ(2u, swift_retainCount(object));
   swift_unknownRelease_n(object, 1);
   EXPECT_EQ(0u, value);
-  EXPECT_EQ(1u, retainCount(object));
+  EXPECT_EQ(1u, swift_retainCount(object));
   swift_unknownRelease(object);
   EXPECT_EQ(1u, value);
 }
@@ -153,13 +146,13 @@ TEST(RefcountingTest, unowned_retain_release_n) {
   EXPECT_EQ(0u, value);
   swift_unownedRetain_n(object, 32);
   swift_unownedRetain(object);
-  EXPECT_EQ(34u, unownedRetainCount(object));
+  EXPECT_EQ(34u, swift_unownedRetainCount(object));
   swift_unownedRelease_n(object, 31);
-  EXPECT_EQ(3u, unownedRetainCount(object));
+  EXPECT_EQ(3u, swift_unownedRetainCount(object));
   swift_unownedRelease(object);
-  EXPECT_EQ(2u, unownedRetainCount(object));
+  EXPECT_EQ(2u, swift_unownedRetainCount(object));
   swift_unownedRelease_n(object, 1);
-  EXPECT_EQ(1u, unownedRetainCount(object));
+  EXPECT_EQ(1u, swift_unownedRetainCount(object));
   swift_release(object);
   EXPECT_EQ(1u, value);
 }
