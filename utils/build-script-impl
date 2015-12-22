@@ -641,7 +641,10 @@ if [[ "$SKIP_TEST_WATCHOS" ]] ; then
     SKIP_TEST_WATCHOS_SIMULATOR=1
 fi
 
-if [[ "${CMAKE_GENERATOR}" == "Ninja" ]] && [[ -z "$(which ninja)" ]] ; then
+# Some Linux distributions, e.g. Fedora, use 'ninja-build' instead of
+# 'ninja' as binary name. Check for both.
+if [[ "${CMAKE_GENERATOR}" == "Ninja" ]] && which ninja > /dev/null 2>&1 &&
+   which ninja-build > /dev/null 2>&1 ; then
     BUILD_NINJA=1
 fi
 
