@@ -37,9 +37,9 @@ func instanceMethods(b: B) {
   b.setEnabled(true)
 
   // SEL
-  b.performSelector("isEqual:", withObject:b)
+  b.perform("isEqual:", withObject:b)
   if let result = b.perform("getAsProto", withObject:nil) {
-    _ = result.takeUnretainedValue()
+    _ = result.object
   }
 
   // Renaming of redundant parameters.

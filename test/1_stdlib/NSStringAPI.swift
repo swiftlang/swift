@@ -1397,7 +1397,7 @@ NSStringAPIs.test("folding(options:locale:)") {
   func fwo(
     s: String, _ options: NSStringCompareOptions
   ) -> (NSLocale?) -> String {
-    return { loc in s.stringByFoldingWithOptions(options, locale: loc) }
+    return { loc in s.folding(options: options, locale: loc) }
   }
   
   expectLocalizedEquality("abcd", fwo("abCD", .CaseInsensitiveSearch), "en")

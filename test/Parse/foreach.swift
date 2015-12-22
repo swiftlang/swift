@@ -30,7 +30,7 @@ func for_each(r: Range<Int>, iir: IntRange<Int>) {
   }
 
   // Parse errors
-  for i r { // expected-error 2{{expected ';' in 'for' statement}} expected-error {{use of unresolved identifier 'i'}} expected-error {{type 'Range<Int>' does not conform to protocol 'BooleanType'}}
+  for i r { // expected-error 2{{expected ';' in 'for' statement}} expected-error {{use of unresolved identifier 'i'}} expected-error {{type 'Range<Int>' does not conform to protocol 'Boolean'}}
   }
   for i in r sum = sum + i; // expected-error{{expected '{' to start the body of for-each loop}}
   for let x in 0..<10 {} // expected-error {{'let' pattern is already in an immutable context}} {{7-11=}}
