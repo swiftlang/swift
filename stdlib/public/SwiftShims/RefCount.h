@@ -275,8 +275,6 @@ class WeakRefCount {
 
   enum : uint32_t {
     // There isn't really a flag here.
-    // Making weak RC_ONE == strong RC_ONE saves an
-    // instruction in allocation on arm64.
     RC_UNUSED_FLAG = 1,
 
     RC_FLAGS_COUNT = 1,
