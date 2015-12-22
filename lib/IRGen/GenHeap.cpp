@@ -24,6 +24,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/IRGenOptions.h"
 
 #include "Explosion.h"
 #include "GenProto.h"
@@ -1169,9 +1170,39 @@ void IRGenFunction::emitNativeUnownedTakeAssign(Address dest, Address src) {
   emitNativeUnownedRelease(oldValue);
 }
 
+llvm::Constant *IRGenModule::getFixLifetimeFn() {
+  if (FixLifetimeFn)
+    return FixLifetimeFn;
+  
+  // Generate a private stub function for the LLVM ARC optimizer to recognize.
+  auto fixLifetimeTy = llvm::FunctionType::get(VoidTy, RefCountedPtrTy,
+                                               /*isVarArg*/ false);
+  auto fixLifetime = llvm::Function::Create(fixLifetimeTy,
+                                         llvm::GlobalValue::PrivateLinkage,
+                                         "__swift_fixLifetime",
+                                         &Module);
+  assert(fixLifetime->getName().equals("__swift_fixLifetime")
+         && "fixLifetime symbol name got mangled?!");
+  // Don't inline the function, so it stays as a signal to the ARC passes.
+  // The ARC passes will remove references to the function when they're
+  // no longer needed.
+  fixLifetime->addAttribute(llvm::AttributeSet::FunctionIndex,
+                            llvm::Attribute::NoInline);
+  
+  // Give the function an empty body.
+  auto entry = llvm::BasicBlock::Create(LLVMContext, "", fixLifetime);
+  llvm::ReturnInst::Create(LLVMContext, entry);
+  
+  FixLifetimeFn = fixLifetime;
+  return fixLifetime;
+}
+
 /// Fix the lifetime of a live value. This communicates to the LLVM level ARC
 /// optimizer not to touch this value.
 void IRGenFunction::emitFixLifetime(llvm::Value *value) {
+  // If we aren't running the LLVM ARC optimizer, we don't need to emit this.
+  if (!IGM.Opts.Optimize || IGM.Opts.DisableLLVMARCOpts)
+    return;
   if (doesNotRequireRefCounting(value)) return;
   emitUnaryRefCountCall(*this, IGM.getFixLifetimeFn(), value);
 }

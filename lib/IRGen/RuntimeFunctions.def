@@ -150,12 +150,6 @@ FUNCTION(NativeUnpin, swift_unpin, RuntimeCC,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
-// void swift_fixLifetime(void *ptr);
-FUNCTION(FixLifetime, swift_fixLifetime, RuntimeCC,
-         RETURNS(VoidTy),
-         ARGS(RefCountedPtrTy),
-         ATTRS(NoUnwind))
-
 // void swift_unknownRetain(void *ptr);
 FUNCTION(UnknownRetain, swift_unknownRetain, RuntimeCC,
          RETURNS(VoidTy),

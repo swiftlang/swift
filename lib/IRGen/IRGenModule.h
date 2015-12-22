@@ -640,11 +640,14 @@ public:                             \
 private:                            \
   llvm::Constant *Id##Fn = nullptr;
 #include "RuntimeFunctions.def"
+  
+  llvm::Constant *FixLifetimeFn = nullptr;
 
   mutable Optional<SpareBitVector> HeapPointerSpareBits;
   
 //--- Generic ---------------------------------------------------------------
 public:
+  llvm::Constant *getFixLifetimeFn();
   
   /// The constructor.
   ///
