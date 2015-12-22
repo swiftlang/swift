@@ -1,82 +1,13 @@
-// RUN: %target-run-simple-swift
+// RUN: rm -rf %t && mkdir %t
+// RUN: %target-build-swift -emit-library -Xfrontend -enable-resilience -c  %S/Inputs/PrintTestTypes.swift -o %t/PrintTestTypes.o
+// RUN: %target-build-swift -emit-module -Xfrontend -enable-resilience -c  %S/Inputs/PrintTestTypes.swift -o %t/PrintTestTypes.o
+// RUN: %target-build-swift %s -Xlinker %t/PrintTestTypes.o -I %t -L %t -o %t/main
+// RUN: %target-run %t/main
 // REQUIRES: executable_test
-// XFAIL: linux
 
 import Swift
-import Darwin
 import StdlibUnittest
-
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
-
-protocol ProtocolUnrelatedToPrinting {}
-struct StructPrintable : CustomStringConvertible, ProtocolUnrelatedToPrinting {
-  let x: Int
-
-  init(_ x: Int) {
-    self.x = x
-  }
-
-  var description: String {
-    return "►\(x)◀︎"
-  }
-}
-
-struct LargeStructPrintable : CustomStringConvertible, ProtocolUnrelatedToPrinting {
-  let a: Int
-  let b: Int
-  let c: Int
-  let d: Int
-
-  init(_ a: Int, _ b: Int, _ c: Int, _ d: Int) {
-    self.a = a
-    self.b = b
-    self.c = c
-    self.d = d
-  }
-
-  var description: String {
-    return "<\(a) \(b) \(c) \(d)>"
-  }
-}
-
-class ClassPrintable : CustomStringConvertible, ProtocolUnrelatedToPrinting {
-  let x: Int
-
-  init(_ x: Int) {
-    self.x = x
-  }
-
-  var description: String {
-    return "►\(x)◀︎"
-  }
-}
-
-
-struct WithoutDescription {
-  let x: Int
-
-  init(_ x: Int) {
-    self.x = x
-  }
-}
-
-struct StructDebugPrintable : CustomDebugStringConvertible {
-  let x: Int
-
-  init(_ x: Int) {
-    self.x = x
-  }
-
-  var debugDescription: String {
-    return "►\(x)◀︎"
-  }
-}
+import PrintTestTypes
 
 let PrintTests = TestSuite("PrintTuple")
 PrintTests.test("Printable") {
@@ -91,13 +22,13 @@ PrintTests.test("Printable") {
   
   let t0 = [ (1, "two", StructPrintable(3), StructDebugPrintable(4),
     WithoutDescription(5)) ]
-  expectPrinted("[(1, \"two\", ►3◀︎, ►4◀︎, main.WithoutDescription(x: 5))]",
+  expectPrinted("[(1, \"two\", ►3◀︎, ►4◀︎, PrintTestTypes.WithoutDescription(x: 5))]",
     t0)
   
   let t1 = [ (1, "2", WithoutDescription(3)),
     (4, "5", WithoutDescription(6)),
     (7, "8", WithoutDescription(9)) ]
-  expectPrinted("[(1, \"2\", main.WithoutDescription(x: 3)), (4, \"5\", main.WithoutDescription(x: 6)), (7, \"8\", main.WithoutDescription(x: 9))]", t1)
+  expectPrinted("[(1, \"2\", PrintTestTypes.WithoutDescription(x: 3)), (4, \"5\", PrintTestTypes.WithoutDescription(x: 6)), (7, \"8\", PrintTestTypes.WithoutDescription(x: 9))]", t1)
 }
 
 runAllTests()

@@ -1,114 +1,36 @@
-// RUN: mkdir -p %t
-// RUN: %target-build-swift %s -parse-stdlib -Xfrontend -disable-access-control -o %t/a.out -Xlinker -dead_strip
-// RUN: %target-run %t/a.out env %s
-// RUN: %target-run %t/a.out ru_RU.UTF-8 %s
+// RUN: rm -rf %t && mkdir %t
+// RUN: %target-build-swift -emit-library -Xfrontend -enable-resilience -c  %S/Inputs/PrintTestTypes.swift -o %t/PrintTestTypes.o
+// RUN: %target-build-swift -emit-module -Xfrontend -enable-resilience -c  %S/Inputs/PrintTestTypes.swift -o %t/PrintTestTypes.o
+// RUN: %target-build-swift %s -Xlinker %t/PrintTestTypes.o -I %t -L %t -o %t/main
+// RUN: %target-run %t/main
 // REQUIRES: executable_test
-// XFAIL: linux
+
 
 import Swift
-import Darwin
 import StdlibUnittest
-
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
-
-struct WithoutDescription {
-  let x: Int
-
-  init(_ x: Int) {
-    self.x = x
-  }
-}
-
-struct EmptyStructWithoutDescription {}
-protocol ProtocolUnrelatedToPrinting {}
-
-struct ValuesWithoutDescription<T, U, V> {
-  let t: T
-  let u: U
-  let v: V
-
-  init(_ t: T, _ u: U, _ v: V) {
-    self.t = t
-    self.u = u
-    self.v = v
-  }
-}
-
-struct StructPrintable : CustomStringConvertible, ProtocolUnrelatedToPrinting {
-  let x: Int
-
-  init(_ x: Int) {
-    self.x = x
-  }
-
-  var description: String {
-    return "►\(x)◀︎"
-  }
-}
-
-struct StructVeryPrintable : CustomStringConvertible, CustomDebugStringConvertible, ProtocolUnrelatedToPrinting {
-  let x: Int
-
-  init(_ x: Int) {
-    self.x = x
-  }
-
-  var description: String {
-    return "<description: \(x)>"
-  }
-
-  var debugDescription: String {
-    return "<debugDescription: \(x)>"
-  }
-}
-
-
-struct LargeStructPrintable : CustomStringConvertible, ProtocolUnrelatedToPrinting {
-  let a: Int
-  let b: Int
-  let c: Int
-  let d: Int
-
-  init(_ a: Int, _ b: Int, _ c: Int, _ d: Int) {
-    self.a = a
-    self.b = b
-    self.c = c
-    self.d = d
-  }
-
-  var description: String {
-    return "<\(a) \(b) \(c) \(d)>"
-  }
-}
-
+import PrintTestTypes
 
 let PrintTests = TestSuite("PrintStruct")
 
 PrintTests.test("Printable") {
   let s0 = [ WithoutDescription(1), WithoutDescription(2), WithoutDescription(3) ]
   expectPrinted(
-  "[a.WithoutDescription(x: 1), a.WithoutDescription(x: 2), a.WithoutDescription(x: 3)]",
+    "[PrintTestTypes.WithoutDescription(x: 1), PrintTestTypes.WithoutDescription(x: 2), PrintTestTypes.WithoutDescription(x: 3)]",
   s0)
   expectDebugPrinted(
-  "[a.WithoutDescription(x: 1), a.WithoutDescription(x: 2), a.WithoutDescription(x: 3)]",
+  "[PrintTestTypes.WithoutDescription(x: 1), PrintTestTypes.WithoutDescription(x: 2), PrintTestTypes.WithoutDescription(x: 3)]",
   s0)
   
   expectPrinted("EmptyStructWithoutDescription()",
     EmptyStructWithoutDescription())
-  expectDebugPrinted("a.EmptyStructWithoutDescription()",
+  expectDebugPrinted("PrintTestTypes.EmptyStructWithoutDescription()",
     EmptyStructWithoutDescription())
   
   expectPrinted(
     "ValuesWithoutDescription<Double, String, Array<Int>>(t: 1.25, u: \"abc\", v: [1, 2, 3])",
     ValuesWithoutDescription(1.25, "abc", [ 1, 2, 3 ]))
   expectDebugPrinted(
-    "a.ValuesWithoutDescription<Swift.Double, Swift.String, Swift.Array<Swift.Int>>(t: 1.25, u: \"abc\", v: [1, 2, 3])", ValuesWithoutDescription(1.25, "abc", [ 1, 2, 3 ]))
+    "PrintTestTypes.ValuesWithoutDescription<Swift.Double, Swift.String, Swift.Array<Swift.Int>>(t: 1.25, u: \"abc\", v: [1, 2, 3])", ValuesWithoutDescription(1.25, "abc", [ 1, 2, 3 ]))
 }
 
 PrintTests.test("custom string convertible structs") {
@@ -151,11 +73,11 @@ PrintTests.test("StructPrintable") {
   
   let structMetatype = StructPrintable.self
   expectPrinted("StructPrintable", structMetatype)
-  expectDebugPrinted("a.StructPrintable", structMetatype)
-  expectPrinted("[a.StructPrintable]", [ structMetatype ])
-  expectDebugPrinted("[a.StructPrintable]", [ structMetatype ])
+  expectDebugPrinted("PrintTestTypes.StructPrintable", structMetatype)
+  expectPrinted("[PrintTestTypes.StructPrintable]", [ structMetatype ])
+  expectDebugPrinted("[PrintTestTypes.StructPrintable]", [ structMetatype ])
   test_ThickMetatypePrintingImpl(structMetatype, "StructPrintable",
-    "a.StructPrintable")
+    "PrintTestTypes.StructPrintable")
 }
 
 PrintTests.test("LargeStructPrintable") {

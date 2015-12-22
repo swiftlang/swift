@@ -1,73 +1,13 @@
-// RUN: %target-run-simple-swift
+// RUN: rm -rf %t && mkdir %t
+// RUN: %target-build-swift -emit-library -Xfrontend -enable-resilience -c  %S/Inputs/PrintTestTypes.swift -o %t/PrintTestTypes.o
+// RUN: %target-build-swift -emit-module -Xfrontend -enable-resilience -c  %S/Inputs/PrintTestTypes.swift -o %t/PrintTestTypes.o
+// RUN: %target-build-swift %s -Xlinker %t/PrintTestTypes.o -I %t -L %t -o %t/main
+// RUN: %target-run %t/main
 // REQUIRES: executable_test
 
 import Swift
-import Darwin
 import StdlibUnittest
-
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
-
-protocol ProtocolUnrelatedToPrinting {}
-
-struct StructPrintable : CustomStringConvertible, ProtocolUnrelatedToPrinting {
-  let x: Int
-
-  init(_ x: Int) {
-    self.x = x
-  }
-
-  var description: String {
-    return "►\(x)◀︎"
-  }
-}
-
-struct LargeStructPrintable : CustomStringConvertible, ProtocolUnrelatedToPrinting {
-  let a: Int
-  let b: Int
-  let c: Int
-  let d: Int
-
-  init(_ a: Int, _ b: Int, _ c: Int, _ d: Int) {
-    self.a = a
-    self.b = b
-    self.c = c
-    self.d = d
-  }
-
-  var description: String {
-    return "<\(a) \(b) \(c) \(d)>"
-  }
-}
-
-class ClassPrintable : CustomStringConvertible, ProtocolUnrelatedToPrinting {
-  let x: Int
-
-  init(_ x: Int) {
-    self.x = x
-  }
-
-  var description: String {
-    return "►\(x)◀︎"
-  }
-}
-
-struct StructDebugPrintable : CustomDebugStringConvertible {
-  let x: Int
-
-  init(_ x: Int) {
-    self.x = x
-  }
-
-  var debugDescription: String {
-    return "►\(x)◀︎"
-  }
-}
+import PrintTestTypes
 
 let PrintTests = TestSuite("PrintArray")
 

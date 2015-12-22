@@ -1,19 +1,26 @@
-// RUN: %target-run-simple-swift
+// RUN: rm -rf %t && mkdir %t
+// RUN: %target-build-swift -emit-library -Xfrontend -enable-resilience -c  %S/Inputs/PrintTestTypes.swift -o %t/PrintTestTypes.o
+// RUN: %target-build-swift -emit-module -Xfrontend -enable-resilience -c  %S/Inputs/PrintTestTypes.swift -o %t/PrintTestTypes.o
+// RUN: %target-build-swift %s -Xlinker %t/PrintTestTypes.o -I %t -L %t -o %t/main
+// RUN: %target-run %t/main env %s
+// RUN: %target-run %t/main ru_RU.UTF-8 %s
 // REQUIRES: executable_test
+// XFAIL: linux
 
 import Swift
-import Darwin
 import StdlibUnittest
-
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
+import Darwin
+import PrintTestTypes
 
 let PrintTests = TestSuite("PrintFloat")
+
+let arg = Process.arguments[1]
+if arg == "env" {
+  setlocale(LC_ALL, "")
+} else {
+  expectEqual("ru_RU.UTF-8", arg)
+  setlocale(LC_ALL, arg)
+}
 
 PrintTests.test("CustomStringConvertible") {
   func hasDescription(any: Any) {

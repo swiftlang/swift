@@ -1,48 +1,15 @@
-// RUN: %target-run-simple-swift
+// RUN: rm -rf %t && mkdir %t
+
+// RUN: %target-build-swift -emit-library -Xfrontend -enable-resilience -c  %S/Inputs/PrintTestTypes.swift -o %t/PrintTestTypes.o
+// RUN: %target-build-swift -emit-module -Xfrontend -enable-resilience -c  %S/Inputs/PrintTestTypes.swift -o %t/PrintTestTypes.o
+
+// RUN: %target-build-swift %s -Xlinker %t/PrintTestTypes.o -I %t -L %t -o %t/main
+// RUN: %target-run %t/main
 // REQUIRES: executable_test
 
 import Swift
-import Darwin
 import StdlibUnittest
-
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
-
-protocol ProtocolUnrelatedToPrinting {}
-
-class ClassPrintable : CustomStringConvertible, ProtocolUnrelatedToPrinting {
-  let x: Int
-
-  init(_ x: Int) {
-    self.x = x
-  }
-
-  var description: String {
-    return "►\(x)◀︎"
-  }
-}
-
-class ClassVeryPrintable : CustomStringConvertible, CustomDebugStringConvertible, ProtocolUnrelatedToPrinting {
-  let x: Int
-
-  init(_ x: Int) {
-    self.x = x
-  }
-
-  var description: String {
-    return "<description: \(x)>"
-  }
-
-  var debugDescription: String {
-    return "<debugDescription: \(x)>"
-  }
-}
-
+import PrintTestTypes
 
 let PrintTests = TestSuite("PrintClass")
 
@@ -59,9 +26,9 @@ PrintTests.test("ClassPrintable") {
   
   let classMetatype = ClassPrintable.self
   expectPrinted("ClassPrintable", classMetatype)
-  expectDebugPrinted("main.ClassPrintable", classMetatype)
-  expectPrinted("[main.ClassPrintable]", [ classMetatype ])
-  expectDebugPrinted("[main.ClassPrintable]", [ classMetatype ])
+  expectDebugPrinted("PrintTestTypes.ClassPrintable", classMetatype)
+  expectPrinted("[PrintTestTypes.ClassPrintable]", [ classMetatype ])
+  expectDebugPrinted("[PrintTestTypes.ClassPrintable]", [ classMetatype ])
 }
 
 PrintTests.test("ClassVeryPrintable") {

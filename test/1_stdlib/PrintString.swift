@@ -1,56 +1,17 @@
-// RUN: mkdir -p %t
-// RUN: %target-build-swift %s -parse-stdlib -Xfrontend -disable-access-control -o %t/a.out -Xlinker -dead_strip
-// RUN: %target-run %t/a.out env %s
-// RUN: %target-run %t/a.out ru_RU.UTF-8 %s
+// RUN: rm -rf %t && mkdir %t
+
+// RUN: %target-build-swift -emit-library -Xfrontend -enable-resilience -c  %S/Inputs/PrintTestTypes.swift -o %t/PrintTestTypes.o
+// RUN: %target-build-swift -emit-module -Xfrontend -enable-resilience -c  %S/Inputs/PrintTestTypes.swift -o %t/PrintTestTypes.o
+
+// RUN: %target-build-swift %s -Xlinker %t/PrintTestTypes.o -I %t -L %t -o %t/main
+// RUN: %target-run %t/main
 // REQUIRES: executable_test
-// XFAIL: linux
 
 import Swift
-import Darwin
 import StdlibUnittest
-
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
-
-struct MyString : StringLiteralConvertible, StringInterpolationConvertible {
-  init(str: String) {
-    value = str
-  }
-
-  var value: String
-
-  init(unicodeScalarLiteral value: String) {
-    self.init(str: value)
-  }
-
-  init(extendedGraphemeClusterLiteral value: String) {
-    self.init(str: value)
-  }
-
-  init(stringLiteral value: String) {
-    self.init(str: value)
-  }
-
-  init(stringInterpolation strings: MyString...) {
-    var result = ""
-    for s in strings {
-      result += s.value
-    }
-    self.init(str: result)
-  }
-
-  init<T>(stringInterpolationSegment expr: T) {
-    self.init(str: "<segment " + String(expr) + ">")
-  }
-}
+import PrintTestTypes
 
 let PrintTests = TestSuite("PrintString")
-
 PrintTests.test("Printable") {
   let s0: String = "abc"
   expectPrinted("abc", s0)
@@ -86,8 +47,8 @@ PrintTests.test("Printable") {
 }
 
 PrintTests.test("CustomStringInterpolation") {
-  expectEqual("<segment aaa><segment 1><segment bbb>",
-    ("aaa\(1)bbb" as MyString).value)
+  let s = ("aaa\(1)bbb" as MyString).value
+  expectEqual("<segment aaa><segment 1><segment bbb>", s)
 }
 
 runAllTests()
