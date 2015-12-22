@@ -544,7 +544,7 @@ tests.test("index-mapping/utf8-to-character") {
   expectEqualSequence(
     winterUtf8Characters,
     winter.utf8.indices.map {
-      (i:String.UTF8Index)->Character? in i.samePositionIn(winter).map {
+      (i:String.UTF8Index) -> Character? in i.samePositionIn(winter).map {
         winter[$0]
       }
     }, sameValue: ==)
