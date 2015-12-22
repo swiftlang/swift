@@ -149,7 +149,7 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
     lastProcessed.setInt(true);
 
     // If we have conformances we can load, do so.
-    // FIXME: This could be more lazy.
+    // FIXME: This could be lazier.
     auto loader = nominal->takeConformanceLoader();
     if (loader.first) {
       SmallVector<ProtocolConformance *, 2> conformances;
@@ -179,7 +179,7 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
     lastProcessed.setPointer(next);
 
     // If we have conformances we can load, do so.
-    // FIXME: This could be more lazy.
+    // FIXME: This could be lazier.
     auto loader = next->takeConformanceLoader();
     if (loader.first) {
       SmallVector<ProtocolConformance *, 2> conformances;
