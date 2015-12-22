@@ -446,10 +446,9 @@ public func +<
     S : SequenceType
     where S.Generator.Element == C.Generator.Element
 >(lhs: C, rhs: S) -> C {
-  var lhs = lhs
-  // FIXME: what if lhs is a reference type?  This will mutate it.
-  lhs.appendContentsOf(rhs)
-  return lhs
+  var result = lhs is AnyObject ? C(lhs) : lhs
+  result.appendContentsOf(rhs)
+  return result
 }
 
 @warn_unused_result
