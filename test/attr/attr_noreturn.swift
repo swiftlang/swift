@@ -42,11 +42,11 @@ class InvalidOnClassMembers {
 }
 
 protocol TestProtocol {
-  // expected-note@+1 {{protocol requires function 'neverReturns()' with type '@noreturn () -> ()'}}
+  // expected-note@+1 {{protocol requires function 'neverReturns()' with type '@noreturn () -> Void'}}
   @noreturn func neverReturns()
   func doesReturn()
 
-  // expected-note@+1 {{protocol requires function 'neverReturnsStatic()' with type '@noreturn () -> ()'}}
+  // expected-note@+1 {{protocol requires function 'neverReturnsStatic()' with type '@noreturn () -> Void'}}
   @noreturn static func neverReturnsStatic()
   static func doesReturnStatic()
 }
@@ -107,29 +107,29 @@ struct MethodWithNoreturn {
 }
 
 func printInt(_: Int) {}
-var maybeReturns: (Int) -> () = exit // no-error
+var maybeReturns: (Int) -> Void = exit // no-error
 var neverReturns1 = exit
-neverReturns1 = printInt // expected-error {{cannot assign value of type '(Int) -> ()' to type '@noreturn (Int) -> ()'}}
+neverReturns1 = printInt // expected-error {{cannot assign value of type '(Int) -> Void' to type '@noreturn (Int) -> Void'}}
 
-var neverReturns2: MethodWithNoreturn -> @noreturn () -> () = MethodWithNoreturn.neverReturns
+var neverReturns2: MethodWithNoreturn -> @noreturn () -> Void = MethodWithNoreturn.neverReturns
 
 exit(5) // no-error
 
 @noreturn
-func exit() -> () {}
+func exit() -> Void {}
 @noreturn
-func testFunctionOverload() -> () {
+func testFunctionOverload() -> Void {
   exit()
 }
 
-func testRvalue(lhs: (), rhs: @noreturn () -> ()) -> () {
+func testRvalue(lhs: (), rhs: @noreturn () -> Void) -> Void {
   return rhs()
 }
 
-var fnr: @noreturn (_: Int) -> () = exit
+var fnr: @noreturn (_: Int) -> Void = exit
 // This might be a desirable syntax, but it does not get properly propagated to SIL, so reject it for now.
 @noreturn // expected-error {{@noreturn may only be used on 'func' declarations}}{{1-11=}}
-var fpr: (_: Int) -> () = exit
+var fpr: (_: Int) -> Void = exit
 
 func testWitnessMethod<T: TestProtocol>(t: T) {
   _ = T.neverReturnsStatic

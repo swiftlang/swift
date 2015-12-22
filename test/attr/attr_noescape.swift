@@ -154,7 +154,7 @@ class SomeClass {
 // Implicit conversions (in this case to @convention(block)) are ok.
 @_silgen_name("whatever")
 func takeNoEscapeAsObjCBlock(@noescape _: @convention(block) () -> Void)
-func takeNoEscapeTest2(@noescape fn : () -> ()) {
+func takeNoEscapeTest2(@noescape fn : () -> Void) {
   takeNoEscapeAsObjCBlock(fn)
 }
 
@@ -178,16 +178,16 @@ protocol P2 : P1 {
   typealias Element
 }
 
-func overloadedEach<O: P1, T>(source: O, _ transform: O.Element -> (), _: T) {}
+func overloadedEach<O: P1, T>(source: O, _ transform: O.Element -> Void, _: T) {}
 
-func overloadedEach<P: P2, T>(source: P, _ transform: P.Element -> (), _: T) {}
+func overloadedEach<P: P2, T>(source: P, _ transform: P.Element -> Void, _: T) {}
 
 struct S : P2 {
   typealias Element = Int
-  func each(@noescape transform: Int -> ()) {
-    overloadedEach(self,  // expected-error {{cannot invoke 'overloadedEach' with an argument list of type '(S, @noescape Int -> (), Int)'}}
+  func each(@noescape transform: Int -> Void) {
+    overloadedEach(self,  // expected-error {{cannot invoke 'overloadedEach' with an argument list of type '(S, @noescape Int -> Void, Int)'}}
                    transform, 1)
-    // expected-note @-2 {{overloads for 'overloadedEach' exist with these partially matching parameter lists: (O, O.Element -> (), T), (P, P.Element -> (), T)}}
+    // expected-note @-2 {{overloads for 'overloadedEach' exist with these partially matching parameter lists: (O, O.Element -> (), T), (P, P.Element -> Void, T)}}
   }
 }
 
@@ -202,9 +202,9 @@ func r19763676Caller(@noescape g: (Int) -> Int) {
 
 
 // <rdar://problem/19763732> False positive in @noescape analysis triggered by default arguments
-func calleeWithDefaultParameters(@noescape f: () -> (), x : Int = 1) {}  // expected-warning {{closure parameter prior to parameters with default arguments will not be treated as a trailing closure}}
+func calleeWithDefaultParameters(@noescape f: () -> Void, x : Int = 1) {}  // expected-warning {{closure parameter prior to parameters with default arguments will not be treated as a trailing closure}}
 
-func callerOfDefaultParams(@noescape g: () -> ()) {
+func callerOfDefaultParams(@noescape g: () -> Void) {
   calleeWithDefaultParameters(g)
 }
 

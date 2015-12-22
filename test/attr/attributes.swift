@@ -54,7 +54,7 @@ func zang()() {} // expected-warning{{curried function declaration syntax will b
 func zung<T>(_: T) {}
 @_transparent // expected-error{{@_transparent cannot be applied to stored properties}} {{1-15=}}
 var zippity : Int
-func zoom(x: @_transparent () -> ()) { } // expected-error{{attribute can only be applied to declarations, not types}} {{1-1=@_transparent }} {{14-28=}}
+func zoom(x: @_transparent () -> Void) { } // expected-error{{attribute can only be applied to declarations, not types}} {{1-1=@_transparent }} {{14-28=}}
 protocol ProtoWithTransparent {
   @_transparent// expected-error{{@_transparent is not supported on declarations within protocols}} {{3-16=}}
   func transInProto()
@@ -116,7 +116,7 @@ class transparentOnCalssVar2 {
 };
 
 @thin  // expected-error {{attribute can only be applied to types, not declarations}}
-func testThinDecl() -> () {}
+func testThinDecl() -> Void {}
 
 protocol Class : class {}
 protocol NonClass {}
@@ -191,7 +191,7 @@ func func_result_attr() -> @xyz Int {       // expected-error {{unknown attribut
 }
 
 // @thin is not supported except in SIL.
-var thinFunc : @thin () -> () // expected-error {{attribute is not supported}}
+var thinFunc : @thin () -> Void // expected-error {{attribute is not supported}}
 
 @inline(never) func nolineFunc() {}
 @inline(never) var noinlineVar : Int // expected-error {{@inline(never) cannot be applied to this declaration}} {{1-16=}}

@@ -11,15 +11,15 @@ class IBOutletClassTy {}
 struct IBStructTy {}
 
 @IBAction // expected-error {{only instance methods can be declared @IBAction}} {{1-11=}}
-func IBFunction() -> () {}
+func IBFunction() -> Void {}
 
 class IBActionWrapperTy {
   @IBAction
-  func click(_: AnyObject) -> () {} // no-warning
+  func click(_: AnyObject) -> Void {} // no-warning
 
-  func outer(_: AnyObject) -> () {
+  func outer(_: AnyObject) -> Void {
     @IBAction  // expected-error {{only instance methods can be declared @IBAction}} {{5-15=}}
-    func inner(_: AnyObject) -> () {}
+    func inner(_: AnyObject) -> Void {}
   }
   @IBAction // expected-error {{@IBAction may only be used on 'func' declarations}} {{3-13=}}
   var value : Void = ()
@@ -30,12 +30,12 @@ class IBActionWrapperTy {
   // @IBAction does /not/ semantically imply @objc.
   @IBAction // expected-note {{attribute already specified here}}
   @IBAction // expected-error {{duplicate attribute}}
-  func doMagic(_: AnyObject) -> () {}
+  func doMagic(_: AnyObject) -> Void {}
 
   @IBAction @objc
-  func moreMagic(_: AnyObject) -> () {} // no-warning
+  func moreMagic(_: AnyObject) -> Void {} // no-warning
   @objc @IBAction
-  func evenMoreMagic(_: AnyObject) -> () {} // no-warning
+  func evenMoreMagic(_: AnyObject) -> Void {} // no-warning
 }
 
 struct S { }
