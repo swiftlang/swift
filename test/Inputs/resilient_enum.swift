@@ -40,8 +40,6 @@ public struct Color {
   case Bespoke(Color, Color)
 }
 
-// Fixed-layout enum with resilient members
-
 // Resilient enum
 public enum Medium {
   // Empty cases
@@ -58,6 +56,21 @@ public enum Medium {
 // Indirect resilient enum
 public indirect enum IndirectApproach {
   case Angle(Double)
+}
+
+// Resilient enum with resilient empty payload case
+public struct EmptyStruct {
+  public init() {}
+}
+
+public enum ResilientEnumWithEmptyCase {
+  case A // should always be case 1
+  case B // should always be case 2
+  case Empty(EmptyStruct) // should always be case 0
+}
+
+public func getResilientEnumWithEmptyCase() -> [ResilientEnumWithEmptyCase] {
+  return [.A, .B, .Empty(EmptyStruct())]
 }
 
 // Specific enum implementations for executable tests

@@ -504,6 +504,8 @@ public:
   }
 
   bool isResilient(Decl *decl, ResilienceScope scope);
+  ResilienceScope getResilienceScopeForAccess(NominalTypeDecl *decl);
+  ResilienceScope getResilienceScopeForLayout(NominalTypeDecl *decl);
 
   SpareBitVector getSpareBitsForType(llvm::Type *scalarTy, Size size);
   

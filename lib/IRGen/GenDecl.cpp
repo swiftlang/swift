@@ -2588,7 +2588,14 @@ StringRef IRGenModule::mangleType(CanType type, SmallVectorImpl<char> &buffer) {
   return StringRef(buffer.data(), buffer.size());
 }
 
-/// Is the given declaration resilient?
+/// Do we have to use resilient access patterns when working with this
+/// declaration?
+///
+/// IRGen is primarily concerned with resilient handling of the following:
+/// - For structs, a struct's size might change
+/// - For enums, new cases can be added
+/// - For classes, the superclass might change the size or number
+///   of stored properties
 bool IRGenModule::isResilient(Decl *D, ResilienceScope scope) {
   auto NTD = dyn_cast<NominalTypeDecl>(D);
   if (!NTD)
@@ -2602,6 +2609,23 @@ bool IRGenModule::isResilient(Decl *D, ResilienceScope scope) {
   }
 
   llvm_unreachable("Bad resilience scope");
+}
+
+// The most general resilience scope where the given declaration is visible.
+ResilienceScope IRGenModule::getResilienceScopeForAccess(NominalTypeDecl *decl) {
+  if (decl->getModuleContext() == SILMod->getSwiftModule() &&
+      decl->getFormalAccess() != Accessibility::Public)
+    return ResilienceScope::Component;
+  return ResilienceScope::Universal;
+}
+
+// The most general resilience scope which has knowledge of the declaration's
+// layout. Calling isResilient() with this scope will always return false.
+ResilienceScope IRGenModule::getResilienceScopeForLayout(NominalTypeDecl *decl) {
+  if (isResilient(decl, ResilienceScope::Universal))
+    return ResilienceScope::Component;
+
+  return getResilienceScopeForAccess(decl);
 }
 
 /// Fetch the witness table access function for a protocol conformance.
