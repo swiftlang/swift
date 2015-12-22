@@ -89,17 +89,6 @@ Rename with a non-`stdlib` naming scheme.
 
 ## Reference counting
 
-### swift\_retainCount
-
-```
-@convention(c) (@unowned NativeObject) -> UInt
-```
-
-Returns a random number.
-
-**ABI TODO**: Only used by runtime tests and `SwiftObject.mm`. Should be
-internalized.
-
 ### TODO
 
 ```
@@ -112,7 +101,6 @@ internalized.
 000000000001ce30 T _swift_retain
 000000000001ce50 T _swift_retain_n
 000000000001d140 T _swift_tryPin
-000000000001d240 T _swift_tryRetain
 0000000000027b10 T _swift_unknownRelease
 0000000000027a70 T _swift_unknownRelease_n
 0000000000027ad0 T _swift_unknownRetain
@@ -139,7 +127,6 @@ internalized.
 000000000001cfb0 T _swift_unownedRelease
 000000000001d0a0 T _swift_unownedRelease_n
 000000000001cf70 T _swift_unownedRetain
-000000000001cf60 T _swift_unownedRetainCount
 000000000001d2b0 T _swift_unownedRetainStrong
 000000000001d310 T _swift_unownedRetainStrongAndRelease
 000000000001d060 T _swift_unownedRetain_n
@@ -163,7 +150,6 @@ internalized.
 000000000002b290 T _swift_isUniquelyReferencedOrPinned_nonNull_native
 000000000002af00 T _swift_isUniquelyReferenced_native
 000000000002aea0 T _swift_isUniquelyReferenced_nonNull_native
-000000000001d280 T _swift_isDeallocating
 ```
 
 **ABI TODO**: `_unsynchronized` r/r entry points
@@ -346,6 +332,8 @@ runtime.
 ```
 0000000000023e60 T _swift_demangleSimpleClass
 0000000000028770 T _swift_objcRespondsToSelector
+000000000001d280 T _swift_isDeallocating
+000000000001d240 T _swift_tryRetain
 ```
 
 ## Metatypes
