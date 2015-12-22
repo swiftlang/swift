@@ -19,13 +19,13 @@ class Base<T> {
 
 // CHECK-LABEL: define %swift.type* @_TMaC3foo12SuperDerived()
 // CHECK:         [[SUPER:%.*]] = call %swift.type* @_TMaC3foo7Derived()
-// CHECK:         call void @swift_initializeSuperclass({{.*}}@_TMfC3foo12SuperDerived{{.*}}, %swift.type* [[SUPER]])
+// CHECK:         call void @swift_initializeSuperclass({{.*}}@_TMfC3foo12SuperDerived{{.*}}, %swift.type* [[SUPER]], i1 false)
 class SuperDerived: Derived {
 }
 
 // CHECK-LABEL: define %swift.type* @_TMaC3foo7Derived()
 // CHECK:         [[SUPER:%.*]] = call %swift.type* @_TMaGC3foo4BaseSS_()
-// CHECK:         call void @swift_initializeSuperclass({{.*}}@_TMfC3foo7Derived{{.*}}, %swift.type* [[SUPER]])
+// CHECK:         call void @swift_initializeSuperclass({{.*}}@_TMfC3foo7Derived{{.*}}, %swift.type* [[SUPER]], i1 false)
 
 class Derived: Base<String> {
   var third: String

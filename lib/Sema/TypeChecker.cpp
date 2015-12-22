@@ -1395,7 +1395,7 @@ TypeChecker::overApproximateOSVersionsAtLocation(SourceLoc loc,
   SourceFile *SF = DC->getParentSourceFile();
 
   // If our source location is invalid (this may be synthesized code), climb
-  // the decl context hierarchy until until we find a location that is valid,
+  // the decl context hierarchy until we find a location that is valid,
   // collecting availability ranges on the way up.
   // We will combine the version ranges from these annotations
   // with the TRC for the valid location to overapproximate the running
@@ -1594,7 +1594,7 @@ public:
   }
 
   /// Once we have found the target node, look for the innermost ancestor
-  /// matching our criteria on the way back up the spine of of the tree.
+  /// matching our criteria on the way back up the spine of the tree.
   bool walkToNodePost(ASTNode Node) {
     if (!InnermostMatchingNode.hasValue() && Predicate(Node, Parent)) {
       assert(Node.getSourceRange().isInvalid() ||
@@ -1801,7 +1801,7 @@ static const Decl *ancestorTypeLevelDeclForAvailabilityFixit(const Decl *D) {
 ///
 /// \param  FoundVersionCheckNode Returns a node that can be wrapped in a
 /// if #available(...) { ... } version check to fix the unavailable reference,
-/// or None if such such a node cannot be found.
+/// or None if such a node cannot be found.
 ///
 /// \param FoundMemberLevelDecl Returns member-level declaration (i.e., the
 ///  child of a type DeclContext) for which an @available attribute would

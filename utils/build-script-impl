@@ -147,6 +147,8 @@ KNOWN_SETTINGS=(
     native-clang-tools-path     ""               "directory that contains Clang tools that are executable on the build machine"
     native-swift-tools-path     ""               "directory that contains Swift tools that are executable on the build machine"
     compiler-vendor             "none"           "compiler vendor name [none,apple]"
+    clang-user-visible-version  "3.8.0"          "user-visible version of the embedded Clang and LLVM compilers"
+    swift-user-visible-version  "2.2"            "user-visible version of the Swift language"
     swift-compiler-version      ""               "string that indicates a compiler version for Swift"
     clang-compiler-version      ""               "string that indicates a compiler version for Clang"
     embed-bitcode-section       "0"              "embed an LLVM bitcode section in stdlib/overlay binaries for supported platforms"
@@ -1390,10 +1392,6 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
         none)
             ;;
         apple)
-            # User-visible versions of the compiler.
-            CLANG_USER_VISIBLE_VERSION="6.1.0"
-            SWIFT_USER_VISIBLE_VERSION="2.2"
-
             llvm_cmake_options=(
                 "${llvm_cmake_options[@]}"
                 -DCLANG_VENDOR=Apple
@@ -1599,6 +1597,8 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 native_clang_tools_path=""
                 native_swift_tools_path=""
                 if [[ $(is_cross_tools_deployment_target $deployment_target) ]] ; then
+                    # Don't build benchmarks and tests when building cross compiler.
+                    build_perf_testsuite_this_time=false
                     build_tests_this_time=false
 
                     # FIXME: don't hardcode macosx-x86_64.
@@ -1615,6 +1615,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                         -DLLVM_MAIN_SRC_DIR:PATH="${LLVM_SOURCE_DIR}"
                     )
                 else
+                    build_perf_testsuite_this_time=$(true_false "${BUILD_SWIFT_PERF_TESTSUITE}")
                     build_tests_this_time=${SOURCE_TREE_INCLUDES_TESTS}
                 fi
 
@@ -1656,6 +1657,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                     -DSWIFT_BUILD_STDLIB:BOOL=$(true_false "${BUILD_SWIFT_STDLIB}")
                     -DSWIFT_BUILD_SDK_OVERLAY:BOOL=$(true_false "${BUILD_SWIFT_SDK_OVERLAY}")
                     -DSWIFT_BUILD_STATIC_STDLIB:BOOL=$(true_false "${BUILD_SWIFT_STATIC_STDLIB}")
+                    -DSWIFT_BUILD_PERF_TESTSUITE:BOOL=$(true_false "${build_perf_testsuite_this_time}")
                     -DSWIFT_BUILD_EXAMPLES:BOOL=$(true_false "${BUILD_SWIFT_EXAMPLES}")
                     -DSWIFT_INCLUDE_TESTS:BOOL=$(true_false "${build_tests_this_time}")
                     -DSWIFT_INSTALL_COMPONENTS:STRING="${SWIFT_INSTALL_COMPONENTS}"
@@ -2172,7 +2174,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                     continue
                 fi
                 echo "--- Installing ${product} ---"
-								build_dir=$(build_directory $deployment_target $product)
+                build_dir=$(build_directory $deployment_target $product)
                 set -x
                 pushd "${FOUNDATION_SOURCE_DIR}"
                 $NINJA_BIN install

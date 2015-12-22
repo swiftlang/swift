@@ -136,9 +136,9 @@ class ExplicitSelfRequiredTest {
   var x = 42
   func method() -> Int {
     // explicit closure requires an explicit "self." base.
-    doStuff({ ++self.x })
-    doStuff({ ++x })    // expected-error {{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}} {{17-17=self.}}
-    doVoidStuff({ ++x })    // expected-error {{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}} {{21-21=self.}}
+    doVoidStuff({ self.x += 1 })
+    doStuff({ x+1 })    // expected-error {{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}} {{15-15=self.}}
+    doVoidStuff({ x += 1 })    // expected-error {{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}} {{19-19=self.}}
 
     // Methods follow the same rules as properties, uses of 'self' must be marked with "self."
     doStuff { method() }  // expected-error {{call to method 'method' in closure requires explicit 'self.' to make capture semantics explicit}} {{15-15=self.}}

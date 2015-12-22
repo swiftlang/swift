@@ -789,7 +789,7 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
                               constant, substFnType, loc);
 }
 
-/// An ASTVisitor for decomposing a a nesting of ApplyExprs into an initial
+/// An ASTVisitor for decomposing a nesting of ApplyExprs into an initial
 /// Callee and a list of CallSites. The CallEmission class below uses these
 /// to generate the actual SIL call.
 ///

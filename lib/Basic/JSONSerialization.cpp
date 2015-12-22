@@ -207,8 +207,7 @@ void Output::scalarString(StringRef &S, bool MustQuote) {
           // Convert the current character into hexadecimal digits.
           Stream << llvm::hexdigit((c >> 4) & 0xF);
           Stream << llvm::hexdigit((c >> 0) & 0xF);
-        }
-        else {
+        } else {
           // This isn't a control character, so we don't need to escape it.
           // As a result, emit it directly; if it's part of a multi-byte UTF8
           // representation, all bytes will be emitted in this fashion.

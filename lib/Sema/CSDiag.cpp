@@ -2877,7 +2877,7 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
   
   // If we have no contextual type information and the subexpr is obviously a
   // overload set, don't recursively simplify this.  The recursive solver will
-  // sometimes pick one based on arbitrary ranking behavior behavior (e.g. like
+  // sometimes pick one based on arbitrary ranking behavior (e.g. like
   // which is the most specialized) even then all the constraints are being
   // fulfilled by UnresolvedType, which doesn't tell us anything.
   if (convertTypePurpose == CTP_Unused &&
@@ -3216,7 +3216,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
 
   exprType = exprType->getRValueType();
 
-  // Special case a some common common conversions involving Swift.String
+  // Special case of some common conversions involving Swift.String
   // indexes, catching cases where people attempt to index them with an integer.
   if (isIntegerToStringIndexConversion(exprType, contextualType, CS)) {
     diagnose(expr->getLoc(), diag::string_index_not_integer,
@@ -3319,7 +3319,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     argType = Type();
   
 
-  // FIXME: This should all just be a matter of getting type type of the
+  // FIXME: This should all just be a matter of getting the type of the
   // sub-expression, but this doesn't work well when typeCheckChildIndependently
   // is over-conservative w.r.t. TupleExprs.
   auto *TE = dyn_cast<TupleExpr>(argExpr);

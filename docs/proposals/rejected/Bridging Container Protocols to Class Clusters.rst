@@ -24,7 +24,7 @@ Here's what I propose instead:
 
 Although I'll be talking about arrays in this proposal, I think the same
 approach would work for ``NSDictionary`` and ``NSSet`` as well, mapping them
-to generic containers for associative map and and unordered container protocols
+to generic containers for associative map and unordered container protocols
 respectively.
 
 NSArray vs Array

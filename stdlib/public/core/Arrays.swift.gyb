@@ -1236,7 +1236,8 @@ internal func _arrayAppendSequence<
     let base = buffer.firstElementAddress
 
     while (nextItem != nil) && length < capacity {
-      (base + length++).initializePointee(nextItem!)
+      (base + length).initializePointee(nextItem!)
+      length += 1
       nextItem = stream.next()
     }
     buffer.length = length

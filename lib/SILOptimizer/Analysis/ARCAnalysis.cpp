@@ -181,7 +181,11 @@ bool swift::canNeverUseValues(SILInstruction *Inst) {
     // Certain builtin function refs we know can never use non-trivial values.
     return canApplyOfBuiltinUseNonTrivialValues(BI);
   }
-
+  // We do not care about branch inst, since if the branch inst's argument is
+  // dead, LLVM will clean it up.
+  case ValueKind::BranchInst:
+  case ValueKind::CondBranchInst:
+    return true;
   default:
     return false;
   }

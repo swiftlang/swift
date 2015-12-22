@@ -336,7 +336,8 @@ final internal class _VaListBuilder {
     }
 
     for word in words {
-      storage[length++] = word
+      storage[length] = word
+      length += 1
     }
   }
 
@@ -406,7 +407,8 @@ final internal class _VaListBuilder {
       sseRegistersUsed += 1
     }
     else if encoded.length == 1 && gpRegistersUsed < _x86_64CountGPRegisters {
-      storage[gpRegistersUsed++] = encoded[0]
+      storage[gpRegistersUsed] = encoded[0]
+      gpRegistersUsed += 1
     }
     else {
       for w in encoded {

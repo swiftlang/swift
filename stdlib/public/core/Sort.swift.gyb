@@ -74,8 +74,8 @@ func _insertionSort<
 
         // Move y forward
         elements[i] = predecessor
-      }
-      while --i != start
+        i._predecessorInPlace()
+      } while i != start
 
       if i != sortedEnd {
         // Plop x into position
@@ -120,8 +120,10 @@ Loop: while true {
     } while false
 
   FindHi: repeat {
-      while --hi != lo {
+      hi._predecessorInPlace()
+      while hi != lo {
         if ${cmp("elements[hi]", "pivot", p)} { break FindHi }
+        hi._predecessorInPlace()
       }
       break Loop
     } while false
@@ -129,7 +131,7 @@ Loop: while true {
     swap(&elements[lo], &elements[hi])
   }
 
-  --lo
+  lo._predecessorInPlace()
   if lo != range.startIndex {
     // swap the pivot into place
     swap(&elements[lo], &elements[range.startIndex])
@@ -242,7 +244,8 @@ func _heapify<
   // any children.
   let root = range.startIndex
   var node = root.advancedBy(C.Index.Distance(range.length.toIntMax()/2))
-  while node-- != root {
+  while node != root {
+    node._predecessorInPlace()
     _siftDown(&elements, node, range ${", &isOrderedBefore" if p else ""})
   }
 }
@@ -257,9 +260,11 @@ func _heapSort<
   var hi = range.endIndex
   let lo = range.startIndex
   _heapify(&elements, range ${", &isOrderedBefore" if p else ""})
-  while --hi != lo {
+  hi._predecessorInPlace()
+  while hi != lo {
     swap(&elements[lo], &elements[hi])
     _siftDown(&elements, lo, lo..<hi ${", &isOrderedBefore" if p else ""})
+    hi._predecessorInPlace()
   }
 }
 

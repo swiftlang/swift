@@ -1603,7 +1603,7 @@ public:
                                         VersionRange &requiredRange);
 
   /// Returns an over-approximation of the range of operating system versions
-  /// that could  the passed-in location location could be executing upon for
+  /// that could the passed-in location could be executing upon for
   /// the target platform.
   VersionRange overApproximateOSVersionsAtLocation(SourceLoc loc,
                                                    const DeclContext *DC);

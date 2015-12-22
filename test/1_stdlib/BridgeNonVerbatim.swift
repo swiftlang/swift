@@ -35,14 +35,15 @@ var nextTrackedSerialNumber = 0
 
 final class Tracked : ForwardIndex, CustomStringConvertible {
   required init(_ value: Int) {
-    ++trackedCount
-    serialNumber = ++nextTrackedSerialNumber
+    trackedCount += 1
+    nextTrackedSerialNumber += 1
+    serialNumber = nextTrackedSerialNumber
     self.value = value
   }
   
   deinit {
     assert(serialNumber > 0, "double destruction!")
-    --trackedCount
+    trackedCount -= 1
     serialNumber = -serialNumber
   }
 
@@ -111,12 +112,12 @@ func testScope() {
 
   // We can get a single element out
   // CHECK-NEXT: nsx[0]: 1 .
-  var one = nsx.objectAt(0) as! Tracked
+  let one = nsx.objectAt(0) as! Tracked
   print("nsx[0]: \(one.value) .")
 
   // We can get the element again, but it may not have the same identity
   // CHECK-NEXT: object identity matches?
-  var anotherOne = nsx.objectAt(0) as! Tracked
+  let anotherOne = nsx.objectAt(0) as! Tracked
   print("object identity matches? \(one === anotherOne)")
 
   // Because the elements come back at +0, we really don't want to

@@ -326,7 +326,7 @@ static Stmt *findNearestStmt(const AbstractFunctionDecl *AFD, SourceLoc Loc,
   auto &SM = AFD->getASTContext().SourceMgr;
   assert(SM.rangeContainsTokenLoc(AFD->getSourceRange(), Loc));
   StmtFinder Finder(SM, Loc, Kind);
-  // FIXME(thread-safety): the walker is is mutating the AST.
+  // FIXME(thread-safety): the walker is mutating the AST.
   const_cast<AbstractFunctionDecl *>(AFD)->walk(Finder);
   return Finder.getFoundStmt();
 }

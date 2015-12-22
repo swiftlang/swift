@@ -504,6 +504,8 @@ public:
   }
 
   bool isResilient(Decl *decl, ResilienceScope scope);
+  ResilienceScope getResilienceScopeForAccess(NominalTypeDecl *decl);
+  ResilienceScope getResilienceScopeForLayout(NominalTypeDecl *decl);
 
   SpareBitVector getSpareBitsForType(llvm::Type *scalarTy, Size size);
   
@@ -640,11 +642,14 @@ public:                             \
 private:                            \
   llvm::Constant *Id##Fn = nullptr;
 #include "RuntimeFunctions.def"
+  
+  llvm::Constant *FixLifetimeFn = nullptr;
 
   mutable Optional<SpareBitVector> HeapPointerSpareBits;
   
 //--- Generic ---------------------------------------------------------------
 public:
+  llvm::Constant *getFixLifetimeFn();
   
   /// The constructor.
   ///

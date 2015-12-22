@@ -35,7 +35,7 @@ tests.test("IteratorSequence") {
   var x = MinimalIterator(Array(r))
   for a in IteratorSequence(x) {
     expectEqual(r.startIndex, a)
-    ++r.startIndex
+    r.startIndex = r.startIndex.successor()
   }
   expectEqual(r.startIndex, r.endIndex)
 }
@@ -43,7 +43,9 @@ tests.test("IteratorSequence") {
 struct MyIterator : IteratorProtocol {
   var i = 0
   mutating func next() -> Int? {
-    return i < 10 ? i++ : nil
+    if i >= 10 { return nil }
+    i += 1
+    return i-1
   }
 }
 
@@ -51,7 +53,8 @@ extension MyIterator : Sequence {}
 tests.test("IteratorsModelSequenceByDeclaration") {
   var n = 0
   for i in MyIterator() {
-    expectEqual(n++, i)
+    expectEqual(n, i)
+    n += 1
   }
 }
 

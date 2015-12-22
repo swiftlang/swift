@@ -2576,12 +2576,12 @@ inline bool isConsumedParameter(ParameterConvention conv) {
 }
 
 enum class InoutAliasingAssumption {
-  /// Assume that that an inout indirect parameter may alias other objects.
+  /// Assume that an inout indirect parameter may alias other objects.
   /// This is the safe assumption an optimizations should make if it may break
   /// memory safety in case the inout aliasing rule is violation.
   Aliasing,
 
-  /// Assume that that an inout indirect parameter cannot alias other objects.
+  /// Assume that an inout indirect parameter cannot alias other objects.
   /// Optimizations should only use this if they can guarantee that they will
   /// not break memory safety even if the inout aliasing rule is violated.
   NotAliasing

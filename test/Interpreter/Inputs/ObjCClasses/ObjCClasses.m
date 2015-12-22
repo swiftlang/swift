@@ -1,7 +1,10 @@
 #include "ObjCClasses.h"
 
 @implementation HasHiddenIvars
-@synthesize count;
+@synthesize x;
+@synthesize y;
+@synthesize z;
+@synthesize t;
 @end
 
 @implementation NilError

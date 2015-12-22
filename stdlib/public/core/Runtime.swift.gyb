@@ -51,7 +51,7 @@ func _stdlib_atomicCompareExchangeStrongPtrImpl(
 /// you need to manually make sure that:
 ///
 /// - all properties in the chain are physical (to make sure that no writeback
-///   happens; the compare-and-exchange instruction should operate on on the
+///   happens; the compare-and-exchange instruction should operate on the
 ///   shared memory); and
 ///
 /// - the shared memory that you are accessing is located inside a heap

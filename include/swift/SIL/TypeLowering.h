@@ -232,7 +232,7 @@ public:
   virtual void emitDestroyAddress(SILBuilder &B, SILLocation loc,
                                   SILValue value) const = 0;
 
-  /// Given a +1 r-value which are are claiming ownership of, destroy it.
+  /// Given a +1 r-value which we are claiming ownership of, destroy it.
   ///
   /// Note that an r-value might be an address.
   virtual void emitDestroyRValue(SILBuilder &B, SILLocation loc,

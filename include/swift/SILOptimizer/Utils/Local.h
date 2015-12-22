@@ -485,7 +485,7 @@ public:
   SILInstruction *
   optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst);
 
-  /// Check if is is a bridged cast and optimize it.
+  /// Check if it is a bridged cast and optimize it.
   /// May change the control flow.
   SILInstruction *
   optimizeBridgedCasts(SILInstruction *Inst,

@@ -361,7 +361,7 @@ struct MyIndexedIterator<C : _MyCollection> : IteratorProtocol {
   mutating func next() -> C._Element? {
     if index == container.myEndIndex { return nil }
     let result = container[index]
-    ++index
+    index = index.successor()
     return result
   }
 }
@@ -373,7 +373,7 @@ struct OtherIndexedIterator<C : _MyCollection> : IteratorProtocol {
   mutating func next() -> C._Element? {
     if index == container.myEndIndex { return nil }
     let result = container[index]
-    ++index
+    index = index.successor()
     return result
   }
 }

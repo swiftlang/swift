@@ -81,7 +81,7 @@ public protocol _ObjectiveCBridgeable {
 ///
 /// The language and runtime do not yet support protocol conformances for
 /// structural types like metatypes. However, we can use a struct that contains
-/// a metatype, make it conform to to _ObjectiveCBridgeable, and its witness table
+/// a metatype, make it conform to _ObjectiveCBridgeable, and its witness table
 /// will be ABI-compatible with one that directly provided conformance to the
 /// metatype type itself.
 public struct _BridgeableMetatype: _ObjectiveCBridgeable {

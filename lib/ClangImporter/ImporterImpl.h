@@ -402,23 +402,20 @@ public:
   llvm::DenseMap<std::pair<ClangDeclAndFlag, DeclContext *>, Decl *>
     ImportedProtocolDecls;
 
-  /// \brief Mapping of already-imported macros.
-  llvm::DenseMap<clang::MacroInfo *, ValueDecl *> ImportedMacros;
+  /// Mapping from identifiers to the set of macros that have that name along
+  /// with their corresponding Swift declaration.
+  ///
+  /// Multiple macro definitions can map to the same declaration if the
+  /// macros are identically defined.
+  llvm::DenseMap<Identifier,
+                 SmallVector<std::pair<clang::MacroInfo *, ValueDecl *>, 2>>
+    ImportedMacros;
 
-  /// Keeps track of active selector-basde lookups, so that we don't infinitely
+  /// Keeps track of active selector-based lookups, so that we don't infinitely
   /// recurse when checking whether a method with a given selector has already
   /// been imported.
   llvm::DenseMap<std::pair<ObjCSelector, char>, unsigned>
     ActiveSelectors;
-
-  // FIXME: An extra level of caching of visible decls, since lookup needs to
-  // be filtered by module after the fact.
-  SmallVector<ValueDecl *, 0> CachedVisibleDecls;
-  enum class CacheState {
-    Invalid,
-    InProgress,
-    Valid
-  } CurrentCacheState = CacheState::Invalid;
 
   /// Whether we should suppress the import of the given Clang declaration.
   static bool shouldSuppressDeclImport(const clang::Decl *decl);
@@ -490,8 +487,6 @@ private:
   void bumpGeneration() {
     ++Generation;
     SwiftContext.bumpGeneration();
-    CachedVisibleDecls.clear();
-    CurrentCacheState = CacheState::Invalid;
   }
 
   /// \brief Cache of the class extensions.

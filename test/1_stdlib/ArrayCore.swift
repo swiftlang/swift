@@ -23,14 +23,15 @@ var nextTrackedSerialNumber = 0
 
 final class Tracked : ForwardIndex, CustomStringConvertible {
   required init(_ value: Int) {
-    ++trackedCount
-    serialNumber = ++nextTrackedSerialNumber
+    trackedCount += 1
+    nextTrackedSerialNumber += 1
+    serialNumber = nextTrackedSerialNumber
     self.value = value
   }
   
   deinit {
     assert(serialNumber > 0, "double destruction!")
-    --trackedCount
+    trackedCount -= 1
     serialNumber = -serialNumber
   }
 

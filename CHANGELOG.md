@@ -1,6 +1,23 @@
 Latest
 ------
 
+* The ++ and -- operators have been deprecated, and are slated to be removed in
+  Swift 3.0.  As a replacement, please use "x += 1" on integer or floating point
+  types, and "x = x.successor()" on Index types.
+
+* The operator identifier lexer grammar has been revised to simplify the rules
+  for operators that start with a dot (".").  The new rule is that an operator
+  that starts with a dot may contain other dots in it, but operators that start
+  with some other character may not contain dots.  For example:
+ 
+    ```
+    x....foo   --> "x" "...." "foo"
+    x&%^.foo   --> "x" "&%^"  ".foo"
+    ```
+
+  This eliminates a special case for the ..< operator, folding it into a simple
+  and consistent rule.
+
 * The "C-style for loop", which is spelled `for init; comparison; increment {}`
   has been deprecated and is slated for removal in Swift 3.0.  See
   [SE-0007](https://github.com/apple/swift-evolution/blob/master/proposals/0007-remove-c-style-for-loops.md)
@@ -37,7 +54,8 @@ Latest
 * `ArraySlice.removeFirst()` now preserves element indices.
 
 * Global `anyGenerator()` functions have been changed into initializers on
-  `AnyGenerator`, making the API more intuitive and idiomatic.
+  `AnyGenerator`, making the API more intuitive and idiomatic.  They have been
+  deprecated in Swift 2.2, and will be removed in Swift 3.
 
 * Closures appearing inside generic types and generic methods can now be
   converted to C function pointers as long as no generic type parameters

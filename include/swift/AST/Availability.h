@@ -35,7 +35,7 @@ class VersionRange {
   // The concretization of lattice elements is:
   //    Empty: empty
   //    All: all versions
-  //    x.y.x: all versions greater than or equal to to x.y.z
+  //    x.y.x: all versions greater than or equal to x.y.z
 
   enum class ExtremalRange { Empty, All };
   

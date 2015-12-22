@@ -2426,7 +2426,7 @@ public:
   }
   
   /// \brief Reorder the disjunctive clauses for a given expression to
-  /// increase the likelihood that a favored constraint will be be successfully
+  /// increase the likelihood that a favored constraint will be successfully
   /// resolved before any others.
   void optimizeConstraints(Expr *e);
   

@@ -30,14 +30,15 @@ final class X : ForwardIndex, Comparable, CustomStringConvertible,
                 IntegerLiteralConvertible 
 {
   required init(_ value: Int) {
-    ++xCount
-    serial = ++xSerial
+    xCount += 1
+    xSerial += 1
+    serial = xSerial
     self.value = value
   }
   
   deinit {
     assert(serial > 0, "double destruction!")
-    --xCount
+    xCount -= 1
     serial = -serial
   }
 
@@ -156,7 +157,7 @@ func test<
       let oldId = bufferID(a)
       growBy1(&a)
       if oldId != bufferID(a) {
-        ++reallocations
+        reallocations += 1
       }
     }
     

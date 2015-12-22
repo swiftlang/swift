@@ -47,14 +47,15 @@ class Tracked : NSObject, Fooable {
   func foo() { }
 
   required init(_ value: Int) {
-    ++trackedCount
-    serialNumber = ++nextTrackedSerialNumber
+    trackedCount += 1
+    nextTrackedSerialNumber += 1
+    serialNumber = nextTrackedSerialNumber
     self.value = value
   }
   
   deinit {
     assert(serialNumber > 0, "double destruction!")
-    --trackedCount
+    trackedCount -= 1
     serialNumber = -serialNumber
   }
 
@@ -102,7 +103,7 @@ struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
   }
   
   func _bridgeToObjectiveC() -> BridgedObjC {
-    ++bridgeToOperationCount
+    bridgeToOperationCount += 1
     return BridgedObjC(trak.value)
   }
 
@@ -115,7 +116,7 @@ struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
     inout result: BridgedSwift?
   ) {
     assert(x.value >= 0, "not bridged")
-    ++bridgeFromOperationCount
+    bridgeFromOperationCount += 1
     result = BridgedSwift(x.value)
   }
 
@@ -527,7 +528,7 @@ func testRoundTrip() {
     }
   }
   
-  var test = Test()
+  let test = Test()
   
   let array = [
     BridgedSwift(10), BridgedSwift(20),  BridgedSwift(30),
@@ -555,7 +556,7 @@ print(x.objectAt(0) as Base)
 */
 
 func testMutableArray() {
-  var m = NSMutableArray(array: ["fu", "bar", "buzz"])
+  let m = NSMutableArray(array: ["fu", "bar", "buzz"])
   let a = m as NSArray as! [NSString]
   print(a) // CHECK-NEXT: [fu, bar, buzz]
   m.add("goop")

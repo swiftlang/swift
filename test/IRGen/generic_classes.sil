@@ -357,39 +357,10 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   [[META_RODATA:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 39
 // CHECK:   [[T2:%.*]] = ptrtoint i8** [[META_RODATA]] to i64
 // CHECK:   store i64 [[T2]], i64* [[T1]], align 8
-//   Set up the rodatas.
-// CHECK:   [[T0:%.*]] = call i8* @swift_getGenericClassObjCName(
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[RODATA]], i32 3
-// CHECK:   store i8* [[T0]], i8** [[T1]], align 8
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[META_RODATA]], i32 3
-// CHECK:   store i8* [[T0]], i8** [[T1]], align 8
 //   Load out the superclass.
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* [[METADATA]] to %swift.type**
 // CHECK:   [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i32 1
 // CHECK:   [[SUPER:%.*]] = load %swift.type*, %swift.type** [[T1]], align 8
-//   Set up the metaclass's superclass from the superclass's metaclass.
-// CHECK:   [[T0:%.*]] = bitcast %swift.type* [[SUPER]] to i64*
-// CHECK:   [[T1:%.*]] = load i64, i64* [[T0]], align 8
-// CHECK:   [[T2:%.*]] = load i64, i64* @swift_isaMask, align 8
-// CHECK:   [[T3:%.*]] = and i64 [[T1]], [[T2]]
-// CHECK:   [[SUPER_METACLASS:%.*]] = inttoptr i64 [[T3]] to %swift.type*
-// CHECK:   [[T0:%.*]] = bitcast %objc_class* [[METACLASS]] to %swift.type**
-// CHECK:   [[META_SUPERCLASS_ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i32 1
-// CHECK:   store %swift.type* [[SUPER_METACLASS]], %swift.type** [[META_SUPERCLASS_ADDR]]
-//   Copy various stuff from the superclass:
-// CHECK:   [[SUPER_ARRAY:%.*]] = bitcast %swift.type* [[SUPER]] to i64*
-// CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i64*
-//    - the superclass's generic args
-// CHECK:   [[SUPER_T_ADDR:%.*]] = getelementptr inbounds i64, i64* [[SUPER_ARRAY]], i32 10
-// CHECK:   [[SELF_T_ADDR:%.*]] = getelementptr inbounds i64, i64* [[METADATA_ARRAY]], i32 10
-// CHECK:   [[T:%.*]] = load i64, i64* [[SUPER_T_ADDR]], align 8
-// CHECK:   store i64 [[T]], i64* [[SELF_T_ADDR]], align 8
-//    - the super field offsets
-// CHECK:   [[SUPER_BASE_VEC:%.*]] = getelementptr inbounds i64, i64* [[SUPER_ARRAY]], i32 15
-// CHECK:   [[SELF_BASE_VEC:%.*]] = getelementptr inbounds i64, i64* [[METADATA_ARRAY]], i32 15
-// CHECK:   [[SELF_BASE_VEC_I8:%.*]] = bitcast i64* [[SELF_BASE_VEC]] to i8*
-// CHECK:   [[SUPER_BASE_VEC_I8:%.*]] = bitcast i64* [[SUPER_BASE_VEC]] to i8*
-// CHECK:   call void @llvm.memcpy.p0i8.p0i8.i64(i8* [[SELF_BASE_VEC_I8]], i8* [[SUPER_BASE_VEC_I8]], i64 24, i32 8, i1 false)
 //   Initialize our own dependent field offsets.
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i64*
 // CHECK:   [[OFFSETS:%.*]] = getelementptr inbounds i64, i64* [[METADATA_ARRAY]], i32 23

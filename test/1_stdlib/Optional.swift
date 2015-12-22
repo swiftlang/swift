@@ -140,7 +140,7 @@ OptionalTests.test("nil comparison") {
 
 OptionalTests.test("??") {
   var counter = 0
-  func nextCounter() -> Int { return counter++ }
+  func nextCounter() -> Int { counter += 1; return counter-1 }
   func nextCounter2() -> Int? { return nextCounter() }
 
   let a: Int? = 123

@@ -393,10 +393,25 @@ ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
   if (!macro)
     return nullptr;
 
-  // Look for the value for an already-imported macro.
-  auto known = ImportedMacros.find(macro);
+  // Look for macros imported with the same name.
+  auto known = ImportedMacros.find(name);
   if (known != ImportedMacros.end()) {
-    return known->second;
+    // Check whether this macro has already been imported.
+    for (const auto &entry : known->second) {
+      if (entry.first == macro) return entry.second;
+    }
+
+    // Otherwise, check whether this macro is identical to a macro that has
+    // already been imported.
+    auto &clangPP = getClangPreprocessor();
+    for (const auto &entry : known->second) {
+      // If the macro is equal to an existing macro, map down to the same
+      // declaration.
+      if (macro->isIdenticalTo(*entry.first, clangPP, true)) {
+        known->second.push_back({macro, entry.second});
+        return entry.second;
+      }
+    }
   }
 
   ImportingEntityRAII ImportingEntity(*this);
@@ -408,6 +423,6 @@ ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
     return nullptr;
 
   auto valueDecl = ::importMacro(*this, DC, name, macro, macro);
-  ImportedMacros[macro] = valueDecl;
+  ImportedMacros[name].push_back({macro, valueDecl});
   return valueDecl;
 }

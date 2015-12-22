@@ -90,7 +90,8 @@ public struct EnumeratedIterator<
   /// - Requires: No preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> Element? {
     guard let b = _base.next() else { return nil }
-    return (offset: _count++, element: b)
+    defer { _count += 1 }
+    return (offset: _count, element: b)
   }
 }
 

@@ -202,7 +202,7 @@ static void redirectTerminator(SILBasicBlock *Latch, unsigned CurLoopIter,
   //   BackegdeBlock:
   //     br HeaderBlock:
   //
-  // Or a a conditional branch back to the header.
+  // Or a conditional branch back to the header.
   //   HeaderBlock:
   //     ...
   //     cond_br %cond, ExitBlock, HeaderBlock

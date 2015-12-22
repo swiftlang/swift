@@ -149,7 +149,7 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
     lastProcessed.setInt(true);
 
     // If we have conformances we can load, do so.
-    // FIXME: This could be more lazy.
+    // FIXME: This could be lazier.
     auto loader = nominal->takeConformanceLoader();
     if (loader.first) {
       SmallVector<ProtocolConformance *, 2> conformances;
@@ -179,7 +179,7 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
     lastProcessed.setPointer(next);
 
     // If we have conformances we can load, do so.
-    // FIXME: This could be more lazy.
+    // FIXME: This could be lazier.
     auto loader = next->takeConformanceLoader();
     if (loader.first) {
       SmallVector<ProtocolConformance *, 2> conformances;
@@ -487,7 +487,7 @@ void ConformanceLookupTable::addProtocols(NominalTypeDecl *nominal,
 void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
                                                        DeclContext *dc, 
                                                        LazyResolver *resolver) {
-  // Note: recursive type-checking implies that that AllConformances
+  // Note: recursive type-checking implies that AllConformances
   // may be reallocated during this traversal, so pay the lookup cost
   // during each iteration.
   for (unsigned i = 0; i != AllConformances[dc].size(); ++i) {

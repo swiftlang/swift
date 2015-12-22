@@ -491,6 +491,23 @@ public final class C {
   init()
 }
 
+// CHECK-LABEL: @ref_element_addr_and_object_itself
+// CHECK: PAIR #0.
+// CHECK-NEXT: (0):   %0 = alloc_ref $C                               // user: %1
+// CHECK-NEXT: (0):   %0 = alloc_ref $C                               // user: %1
+// CHECK-NEXT: MustAlias
+// CHECK: PAIR #1.
+// CHECK-NEXT: (0):   %0 = alloc_ref $C                               // user: %1
+// CHECK-NEXT: (0):   %1 = ref_element_addr %0 : $C, #C.a
+// CHECK-NEXT: PartialAlias
+sil @ref_element_addr_and_object_itself : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $C
+  %1 = ref_element_addr %0 : $C, #C.a
+  %2 = tuple() 
+  return %2 : $() 
+}
+
 // CHECK-LABEL: @different_fields_of_different_refs
 // CHECK: PAIR #13.
 // CHECK-NEXT: (0):   %3 = ref_element_addr %0 : $C, #C.a
@@ -501,5 +518,27 @@ bb0(%0 : $C, %1 : $C, %2 : $Int):
   %6 = ref_element_addr %0 : $C, #C.a
   %8 = ref_element_addr %1 : $C, #C.b
   return %2 : $Int
+}
+
+// CHECK-LABEL: @non_escaping_local_object_does_not_alias_with_unknown
+// CHECK: PAIR #7.
+// CHECK-NEXT: (0):   %1 = alloc_ref $X                               // user: %3
+// CHECK-NEXT: (0):   %3 = apply %2(%1) : $@convention(thin) (X) -> X
+// CHECK-NEXT: NoAlias
+sil @non_escaping_local_object_does_not_alias_with_unknown : $@convention(thin) (X) -> () {
+bb0(%0 : $X):
+  %1 = alloc_ref $X
+
+  %f = function_ref @not_escaping : $@convention(thin) (X) -> X
+  %2 = apply %f(%1) : $@convention(thin) (X) -> X
+
+  %12 = tuple()
+  return %12 : $()
+}
+
+sil @not_escaping: $@convention(thin) (X) -> X {
+bb0(%0 : $X):
+  %1 = alloc_ref $X
+  return %1 : $X
 }
 

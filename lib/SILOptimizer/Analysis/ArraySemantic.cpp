@@ -622,7 +622,7 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
   if (!ASI)
     return false;
 
-  // Expect a check_subscript call or the empty dependence dependence.
+  // Expect a check_subscript call or the empty dependence.
   auto SubscriptCheck = SemanticsCall->getArgument(3);
   ArraySemanticsCall Check(SubscriptCheck.getDef(), "array.check_subscript");
   auto *EmptyDep = dyn_cast<StructInst>(SubscriptCheck);

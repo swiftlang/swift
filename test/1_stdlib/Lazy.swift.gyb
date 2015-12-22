@@ -211,7 +211,7 @@ struct SequenceWithCustomUnderestimateLength : Sequence {
   }
 
   var underestimatedLength: Int {
-    ++SequenceWithCustomUnderestimateLength.timesUnderestimateLengthWasCalled
+    SequenceWithCustomUnderestimateLength.timesUnderestimateLengthWasCalled += 1
     return _data.underestimatedLength
   }
 
@@ -491,7 +491,7 @@ tests.test("LazyMapSequence") {
   var calls = 0
   var mapped = base.map {
     (x: OpaqueValue<Int>)->OpaqueValue<Double> in
-    ++calls
+    calls += 1
     return OpaqueValue(Double(x.value) / 2.0)
   }
 
@@ -533,7 +533,7 @@ tests.test("LazyMapCollection/${traversal}") {
   var calls = 0
   var mapped = base.map {
     (x: OpaqueValue<Int>)->OpaqueValue<Double> in
-    ++calls
+    calls += 1
     return OpaqueValue(Double(x.value) / 2.0)
   }
   expectEqual(0, calls)
@@ -599,7 +599,7 @@ tests.test("ReverseCollection") {
   // Check that the reverse collection is still eager
   do {
     var calls = 0
-    _ = r.reversed().map { _ in ++calls }
+    _ = r.reversed().map { _ in calls += 1 }
     expectEqual(r.length, calls)
   }
   
@@ -610,7 +610,7 @@ tests.test("ReverseCollection") {
   // Check that the reverse collection is still eager
   do {
     var calls = 0
-    _ = "foobar".characters.reversed().map { _ in ++calls }
+    _ = "foobar".characters.reversed().map { _ in calls += 1 }
     expectEqual("foobar".characters.length, calls)
   }
 }
@@ -639,7 +639,7 @@ tests.test("ReverseCollection/Lazy") {
     ExpectType<LazyReversedBase>.test(reversed)
     
     var calls = 0
-    let reversedAndMapped = reversed.map { (x)->Int in ++calls; return x }
+    let reversedAndMapped = reversed.map { (x)->Int in calls += 1; return x }
     expectEqual(0, calls)
     checkRandomAccessCollection(0...11, reversedAndMapped)
     expectNotEqual(0, calls)
@@ -661,7 +661,7 @@ tests.test("ReverseCollection/Lazy") {
     ExpectType<LazyReversedBase>.test(reversed)
     
     var calls = 0
-    let reversedAndMapped = reversed.map { (x)->Character in ++calls; return x }
+    let reversedAndMapped = reversed.map { (x)->Character in calls += 1; return x }
     expectEqual(0, calls)
     checkBidirectionalCollection("raboof".characters, reversedAndMapped)
     expectNotEqual(0, calls)
@@ -701,7 +701,7 @@ tests.test("LazyFilterSequence") {
 
   var calls = 0
   var filtered = MinimalSequence(elements: base).lazy.filter {
-    x in ++calls;
+    x in calls += 1;
     return x.value % 2 == 0
   }
   expectEqual(calls, 0, "filtering was eager!")
@@ -727,7 +727,7 @@ tests.test("LazyFilterSequence") {
   // Try again using explicit construction
   filtered = LazyFilterSequence(
     _base: MinimalSequence(elements: base),
-    whereElementsSatisfy: { x in ++calls; return x.value % 2 == 0})
+    whereElementsSatisfy: { x in calls += 1; return x.value % 2 == 0})
   
   expectEqual(100, calls)
 
@@ -765,7 +765,7 @@ tests.test("LazyFilterCollection") {
 
   var calls = 0
   let filtered = base.lazy.filter {
-    x in ++calls;
+    x in calls += 1;
     return x.value % 2 == 0
   }
   expectEqual(calls, 0, "filtering was eager!")
@@ -827,7 +827,7 @@ do {
         elements: data.map { MinimalSequence(elements: $0) })
       let flattened = base.flatten()
       var calls = 0
-      _ = flattened.map { _ in ++calls }
+      _ = flattened.map { _ in calls += 1 }
       expectEqual(
         expected.length, calls,
         "unexpected laziness in \(flattened.dynamicType)")
@@ -841,7 +841,7 @@ do {
 
       let flattened = base.flatten()
       var calls = 0
-      _ = flattened.map { _ in ++calls }
+      _ = flattened.map { _ in calls += 1 }
       expectEqual(0, calls, "unexpected eagerness in \(flattened.dynamicType)")
     }
     
@@ -856,7 +856,7 @@ do {
 
       // Checking that flatten doesn't introduce laziness
       var calls = 0
-      _ = flattened.map { _ in ++calls }
+      _ = flattened.map { _ in calls += 1 }
       expectLE(
         expected.length, calls,
         "unexpected laziness in \(flattened.dynamicType)")
@@ -871,7 +871,7 @@ do {
       let flattened = base.flatten()
     
       var calls = 0
-      _ = flattened.map { _ in ++calls }
+      _ = flattened.map { _ in calls += 1 }
       expectEqual(0, calls, "unexpected eagerness in \(flattened.dynamicType)")
     }
   % end

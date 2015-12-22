@@ -53,9 +53,9 @@ public func withInvalidOrderings(body: ((Int,Int) -> Bool) -> Void) {
   body { (_,_) in true }
   body { (_,_) in false }
   var i = 0
-  body { (_,_) in i++ % 2 == 0 }
-  body { (_,_) in i++ % 3 == 0 }
-  body { (_,_) in i++ % 5 == 0 }
+  body { (_,_) in defer {i += 1}; return i % 2 == 0 }
+  body { (_,_) in defer {i += 1}; return i % 3 == 0 }
+  body { (_,_) in defer {i += 1}; return i % 5 == 0 }
 }
 
 internal func _mapInPlace<C : MutableCollection>(

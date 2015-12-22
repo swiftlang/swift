@@ -579,6 +579,11 @@ ModuleFile::maybeReadSubstitution(llvm::BitstreamCursor &cursor) {
                                                           replacementID,
                                                           numConformances);
 
+  if (&cursor == &SILCursor) {
+    assert(Types[archetypeID-1].isComplete() &&
+	   "SIL substitutions should always reference existing archetypes");
+  }
+
   auto archetypeTy = getType(archetypeID)->castTo<ArchetypeType>();
   auto replacementTy = getType(replacementID);
 

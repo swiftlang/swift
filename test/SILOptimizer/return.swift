@@ -25,7 +25,7 @@ func multipleBlocksSingleMissing(b: Bool) -> (String, Int) {
 func multipleBlocksAllMissing(x: Int) -> Int {
   var y : Int = x + 1 
   while (y > 0 ) {
-    --y
+    y -= 1
     break
   }
   var x = 0
@@ -81,7 +81,7 @@ func whileLoop(flag: Bool) -> Int {
     if b == 3 {
       return 3
     }
-    b++  
+    b += 1
   }
 } //expected-error {{missing return in a function expected to return 'Int'}}
 
@@ -91,7 +91,7 @@ func whileTrueLoop() -> Int {
     if b == 3 {
       return 3
     }
-    b++  
+    b += 1
   } // no-error
 }
 

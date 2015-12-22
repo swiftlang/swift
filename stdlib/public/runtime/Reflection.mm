@@ -22,7 +22,6 @@
 #include <cstring>
 #include <new>
 #include <string>
-#include <regex>
 #include <dlfcn.h>
 
 #if SWIFT_OBJC_INTEROP

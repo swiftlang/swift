@@ -16,15 +16,15 @@ func testUnreachableAfterIfReturn(a: Bool) -> Int {
 }
 
 func testUnreachableForAfterContinue(b: Bool) {
-  for (var i:Int = 0; i<10; i++) { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
+  for (var i:Int = 0; i<10; i+=1) { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
     var y: Int = 300
-    y++;
+    y += 1
     if b {
       break
-      y++; // expected-warning {{code after 'break' will never be executed}}
+      y += 1 // expected-warning {{code after 'break' will never be executed}}
     }
     continue
-    y--; // expected-warning {{code after 'continue' will never be executed}}
+    y -= 1 // expected-warning {{code after 'continue' will never be executed}}
   }
 }
 
@@ -32,20 +32,20 @@ func testUnreachableWhileAfterContinue(b: Bool) {
   var i:Int = 0
   while (i<10) { 
     var y: Int = 300
-    y++;
+    y += 1
     if b {
       break
-      y++; // expected-warning {{code after 'break' will never be executed}}
+      y += 1 // expected-warning {{code after 'break' will never be executed}}
     }
     continue
-    i++; // expected-warning {{code after 'continue' will never be executed}}
+    i += 1 // expected-warning {{code after 'continue' will never be executed}}
   }
 }
 
 func testBreakAndContinue() {
   var i = 0
   var m = 0
-  for (i = 0; i < 10; ++i) { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
+  for (i = 0; i < 10; i += 1) { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
     m += 1
     if m == 15 {
       break

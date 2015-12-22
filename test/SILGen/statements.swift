@@ -166,7 +166,7 @@ func for_loops1(x: Int, c: Bool) {
    x += 1
   }
   
-  for var i = 0; i < 100; ++i { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
+  for var i = 0; i < 100; i += 1 { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   }
   
   for let i = 0; i < 100; i { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}

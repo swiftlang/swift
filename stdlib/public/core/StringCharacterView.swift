@@ -187,14 +187,14 @@ extension String.CharacterView : Collection {
 
       var graphemeClusterStart = end
 
-      --graphemeClusterStart
+      graphemeClusterStart._predecessorInPlace()
       var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
           unicodeScalars[graphemeClusterStart].value)
 
       var graphemeClusterStartUTF16 = graphemeClusterStart._position
 
       while graphemeClusterStart != start {
-        --graphemeClusterStart
+        graphemeClusterStart._predecessorInPlace()
         let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(
             unicodeScalars[graphemeClusterStart].value)
         if segmenter.isBoundary(gcb1, gcb0) {

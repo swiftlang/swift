@@ -1406,6 +1406,50 @@ void swift::swift_initStructMetadata_UniversalStrategy(size_t numFields,
 
 /*** Classes ***************************************************************/
 
+
+
+static void _swift_initializeSuperclass(ClassMetadata *theClass,
+                                        const ClassMetadata *theSuperclass,
+                                        bool copyFieldOffsetVectors) {
+  // If any ancestors had generic parameters or field offset vectors,
+  // inherit them.
+  auto ancestor = theSuperclass;
+  auto *classWords = reinterpret_cast<uintptr_t *>(theClass);
+  auto *superWords = reinterpret_cast<const uintptr_t *>(theSuperclass);
+  while (ancestor && ancestor->isTypeMetadata()) {
+    auto description = ancestor->getDescription();
+    auto &genericParams = description->GenericParams;
+    if (genericParams.hasGenericParams()) {
+      unsigned numParamWords = 0;
+      for (unsigned i = 0; i < genericParams.NumParams; ++i) {
+        // 1 word for the type metadata, and 1 for every protocol witness
+        numParamWords +=
+            1 + genericParams.Parameters[i].NumWitnessTables;
+      }
+      memcpy(classWords + genericParams.Offset,
+             superWords + genericParams.Offset,
+             numParamWords * sizeof(uintptr_t));
+    }
+    if (copyFieldOffsetVectors &&
+        description->Class.hasFieldOffsetVector()) {
+      unsigned fieldOffsetVector = description->Class.FieldOffsetVectorOffset;
+      memcpy(classWords + fieldOffsetVector,
+             superWords + fieldOffsetVector,
+             description->Class.NumFields * sizeof(uintptr_t));
+    }
+    ancestor = ancestor->SuperClass;
+  }
+
+#if SWIFT_OBJC_INTEROP
+  // Set up the superclass of the metaclass, which is the metaclass of the
+  // superclass.
+  auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
+  auto theSuperMetaclass
+    = (const ClassMetadata *)object_getClass((id)theSuperclass);
+  theMetaclass->SuperClass = theSuperMetaclass;
+#endif
+}
+
 namespace {
   /// The structure of ObjC class ivars as emitted by compilers.
   struct ClassIvarEntry {
@@ -1457,6 +1501,33 @@ static uint32_t getLog2AlignmentFromMask(size_t alignMask) {
     log2++;
   return log2;
 }
+
+static inline ClassROData *getROData(ClassMetadata *theClass) {
+  return (ClassROData*) (theClass->Data & ~uintptr_t(1));
+}
+
+static void _swift_initGenericClassObjCName(ClassMetadata *theClass) {
+  // Use the remangler to generate a mangled name from the type metadata.
+  auto demangling = _swift_buildDemanglingForMetadata(theClass);
+
+  // Remangle that into a new type mangling string.
+  auto typeNode
+    = Demangle::NodeFactory::create(Demangle::Node::Kind::TypeMangling);
+  typeNode->addChild(demangling);
+  auto globalNode
+    = Demangle::NodeFactory::create(Demangle::Node::Kind::Global);
+  globalNode->addChild(typeNode);
+  
+  auto string = Demangle::mangleNode(globalNode);
+  
+  auto fullNameBuf = (char*)swift_slowAlloc(string.size() + 1, 0);
+  memcpy(fullNameBuf, string.c_str(), string.size() + 1);
+
+  auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
+
+  getROData(theClass)->Name = fullNameBuf;
+  getROData(theMetaclass)->Name = fullNameBuf;
+}
 #endif
 
 /// Initialize the field offset vector for a dependent-layout class, using the
@@ -1466,11 +1537,20 @@ void swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
                                           size_t numFields,
                                           const ClassFieldLayout *fieldLayouts,
                                           size_t *fieldOffsets) {
+
+  if (super) {
+    _swift_initializeSuperclass(self, super,
+                                /*copyFieldOffsetVectors=*/true);
+  }
+
   // Start layout by appending to a standard heap object header.
   size_t size, alignMask;
 
 #if SWIFT_OBJC_INTEROP
   ClassROData *rodata = (ClassROData*) (self->Data & ~uintptr_t(1));
+
+  // Generate a runtime name for the class.
+  _swift_initGenericClassObjCName(self);
 #endif
 
   // If we have a superclass, start from its size and alignment instead.
@@ -2495,7 +2575,8 @@ void _swift_debug_verifyTypeLayoutAttribute(Metadata *type,
 
 extern "C"
 void swift_initializeSuperclass(ClassMetadata *theClass,
-                                const ClassMetadata *theSuperclass) {
+                                const ClassMetadata *theSuperclass,
+                                bool copyFieldOffsetVectors) {
   // We need a lock in order to ensure the class initialization and ObjC
   // registration are atomic.
   // TODO: A global lock for this is lame.
@@ -2515,36 +2596,12 @@ void swift_initializeSuperclass(ClassMetadata *theClass,
   
   // Put the superclass reference in the base class.
   theClass->SuperClass = theSuperclass;
-  
-  // If any ancestors had generic parameters, inherit them.
-  auto ancestor = theSuperclass;
-  auto *classWords = reinterpret_cast<uintptr_t *>(theClass);
-  auto *superWords = reinterpret_cast<const uintptr_t *>(theSuperclass);
-  while (ancestor && ancestor->isTypeMetadata()) {
-    auto description = ancestor->getDescription();
-    auto &genericParams = description->GenericParams;
-    if (genericParams.hasGenericParams()) {
-      unsigned numParamWords = 0;
-      for (unsigned i = 0; i < genericParams.NumParams; ++i) {
-        // 1 word for the type metadata, and 1 for every protocol witness
-        numParamWords +=
-          1 + genericParams.Parameters[i].NumWitnessTables;
-      }
-      memcpy(classWords + genericParams.Offset,
-             superWords + genericParams.Offset,
-             numParamWords * sizeof(uintptr_t));
-    }
-    ancestor = ancestor->SuperClass;
-  }
+
+  // Copy generic parameters and field offset vectors from the superclass.
+  _swift_initializeSuperclass(theClass, theSuperclass,
+                              copyFieldOffsetVectors);
   
 #if SWIFT_OBJC_INTEROP
-  // Set up the superclass of the metaclass, which is the metaclass of the
-  // superclass.
-  auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
-  auto theSuperMetaclass
-    = (const ClassMetadata *)object_getClass((id)theSuperclass);
-  theMetaclass->SuperClass = theSuperMetaclass;
-  
   // Register the class pair with the ObjC runtime.
   swift_instantiateObjCClass(theClass);
 #endif

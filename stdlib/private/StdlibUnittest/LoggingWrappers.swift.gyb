@@ -49,7 +49,7 @@ public struct LoggingIterator<Base : IteratorProtocol>
   }
   
   public mutating func next() -> Base.Element? {
-    ++Log.next[selfType]
+    Log.next[selfType] += 1
     return base.next()
   }
   
@@ -99,14 +99,14 @@ public struct LoggingRangeReplaceableCollection<
 
   public init() {
     self.base = Base()
-    ++Log.init_[selfType]
+    Log.init_[selfType] += 1
   }
 
   public init<
     S : Sequence where S.Iterator.Element == Iterator.Element
   >(_ elements: S) {
     self.base = Base(elements)
-    ++Log.initWithSequence[selfType]
+    Log.initWithSequence[selfType] += 1
   }
 
   public init(_ base: Base) {
@@ -142,73 +142,73 @@ public struct LoggingRangeReplaceableCollection<
   >(
     bounds: Range<Base.Index>, with newElements: C
   ) {
-    ++Log.replaceSubrange[selfType]
+    Log.replaceSubrange[selfType] += 1
     base.replaceSubrange(bounds, with: newElements)
   }
 
   public mutating func append(newElement: Base.Iterator.Element) {
-    ++Log.append[selfType]
+    Log.append[selfType] += 1
     base.append(newElement)
   }
 
   public mutating func appendContentsOf<
     S : Sequence where S.Iterator.Element == Base.Iterator.Element
   >(newElements: S) {
-    ++Log.appendContentsOf[selfType]
+    Log.appendContentsOf[selfType] += 1
     base.appendContentsOf(newElements)
   }
 
   public mutating func insert(
     newElement: Base.Iterator.Element, at i: Base.Index
   ) {
-    ++Log.insert[selfType]
+    Log.insert[selfType] += 1
     base.insert(newElement, at: i)
   }
 
   public mutating func removeAt(index: Base.Index) -> Base.Iterator.Element {
-    ++Log.removeAt[selfType]
+    Log.removeAt[selfType] += 1
     return base.removeAt(index)
   }
 
   public mutating func _customRemoveLast() -> Base.Iterator.Element? {
-    ++Log._customRemoveLast[selfType]
+    Log._customRemoveLast[selfType] += 1
     return base._customRemoveLast()
   }
 
   public mutating func _customRemoveLast(n: Int) -> Bool {
-    ++Log._customRemoveLastN[selfType]
+    Log._customRemoveLastN[selfType] += 1
     return base._customRemoveLast(n)
   }
 
   public mutating func removeFirst() -> Base.Iterator.Element {
-    ++Log.removeFirst[selfType]
+    Log.removeFirst[selfType] += 1
     return base.removeFirst()
   }
 
   public mutating func removeFirst(n: Int) {
-    ++Log.removeFirstN[selfType]
+    Log.removeFirstN[selfType] += 1
     base.removeFirst(n)
   }
 
   public mutating func removeSubrange(bounds: Range<Base.Index>) {
-    ++Log.removeSubrange[selfType]
+    Log.removeSubrange[selfType] += 1
     base.removeSubrange(bounds)
   }
 
   public mutating func removeAll(keepingCapacity keepCapacity: Bool) {
-    ++Log.removeAll[selfType]
+    Log.removeAll[selfType] += 1
     base.removeAll(keepingCapacity: keepCapacity)
   }
 
   public mutating func reserveCapacity(n: Base.Index.Distance) {
-    ++Log.reserveCapacity[selfType]
+    Log.reserveCapacity[selfType] += 1
     base.reserveCapacity(n)
   }
 
   public mutating func insertContentsOf<
     C : Collection where C.Iterator.Element == Base.Iterator.Element
   >(newElements: C, at i: Base.Index) {
-    ++Log.insertContentsOf[selfType]
+    Log.insertContentsOf[selfType] += 1
     base.insertContentsOf(newElements, at: i)
   }
 
@@ -331,30 +331,30 @@ public struct Logging${Kind}<
   }
 
   public func successor() -> Logging${Kind} {
-    ++Log.successor[selfType]
+    Log.successor[selfType] += 1
     return Logging${Kind}(base.successor())
   }
 
 %   if Kind == 'BidirectionalIndex' or Kind == 'RandomAccessIndex':
   public func predecessor() -> Logging${Kind}<Base> {
-    ++Log.predecessor[selfType]
+    Log.predecessor[selfType] += 1
     return Logging${Kind}(base.predecessor())
   }
 %   end
 
   public func distanceTo(end: Logging${Kind}<Base>) -> Base.Distance {
-    ++Log.distanceTo[selfType]
+    Log.distanceTo[selfType] += 1
     return base.distanceTo(end.base)
   }
 
   public func advancedBy(n: Base.Distance) -> Logging${Kind}<Base> {
-    ++Log.advancedBy[selfType]
+    Log.advancedBy[selfType] += 1
     return Logging${Kind}(base.advancedBy(n))
   }
 
   public func advancedBy(n: Base.Distance, limit: Logging${Kind}<Base>)
     -> Logging${Kind} {
-    ++Log.advancedByWithLimit[selfType]
+    Log.advancedByWithLimit[selfType] += 1
     return Logging${Kind}(base.advancedBy(n, limit: limit.base))
   }
 }
@@ -376,23 +376,23 @@ public struct Logging${Kind}<Base: ${Kind}> : ${Kind}, LoggingType {
 
 %   if Kind == 'Collection' or Kind == 'MutableCollection':
   public var startIndex: Base.Index {
-    ++Log.startIndex[selfType]
+    Log.startIndex[selfType] += 1
     return base.startIndex
   }
 
   public var endIndex: Base.Index {
-    ++Log.endIndex[selfType]
+    Log.endIndex[selfType] += 1
     return base.endIndex
   }
 
   public subscript(position: Base.Index) -> Base.Iterator.Element {
     get {
-      ++Log.subscriptIndex[selfType]
+      Log.subscriptIndex[selfType] += 1
       return base[position]
     }
 %     if Kind == 'MutableCollection':
     set {
-      ++Log.subscriptIndexSet[selfType]
+      Log.subscriptIndexSet[selfType] += 1
       base[position] = newValue
     }
 %     end
@@ -400,36 +400,36 @@ public struct Logging${Kind}<Base: ${Kind}> : ${Kind}, LoggingType {
 
   public subscript(bounds: Range<Base.Index>) -> Base.SubSequence {
     get {
-      ++Log.subscriptRange[selfType]
+      Log.subscriptRange[selfType] += 1
       return base[bounds]
     }
 %     if Kind == 'MutableCollection':
     set {
-      ++Log.subscriptRangeSet[selfType]
+      Log.subscriptRangeSet[selfType] += 1
       base[bounds] = newValue
     }
 %     end
   }
 
   public var isEmpty: Bool {
-    ++Log.isEmpty[selfType]
+    Log.isEmpty[selfType] += 1
     return base.isEmpty
   }
 
   public var length: Base.Index.Distance {
-    ++Log.length[selfType]
+    Log.length[selfType] += 1
     return base.length
   }
 
   public func _customIndexOfEquatableElement(
     element: Base.Iterator.Element
   ) -> Base.Index?? {
-    ++Log._customIndexOfEquatableElement[selfType]
+    Log._customIndexOfEquatableElement[selfType] += 1
     return base._customIndexOfEquatableElement(element)
   }
 
   public var first: Base.Iterator.Element? {
-    ++Log.first[selfType]
+    Log.first[selfType] += 1
     return base.first
   }
 %   end
@@ -438,29 +438,29 @@ public struct Logging${Kind}<Base: ${Kind}> : ${Kind}, LoggingType {
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     @noescape body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
   ) rethrows -> R? {
-    ++Log._withUnsafeMutableBufferPointerIfSupported[selfType]
+    Log._withUnsafeMutableBufferPointerIfSupported[selfType] += 1
     let result = try base._withUnsafeMutableBufferPointerIfSupported(body)
     if result != nil {
-      ++Log._withUnsafeMutableBufferPointerIfSupportedNonNilReturns[selfType]
+      Log._withUnsafeMutableBufferPointerIfSupportedNonNilReturns[selfType] += 1
     }
     return result
   }
 %   end
 
   public func iterator() -> LoggingIterator<Base.Iterator> {
-    ++Log.iterator[selfType]
+    Log.iterator[selfType] += 1
     return LoggingIterator(base.iterator())
   }
 
   public var underestimatedLength: Int {
-    ++Log.underestimatedLength[selfType]
+    Log.underestimatedLength[selfType] += 1
     return base.underestimatedLength
   }
 
   public func forEach(
     @noescape body: (Base.Iterator.Element) throws -> Void
   ) rethrows {
-    ++Log.forEach[selfType]
+    Log.forEach[selfType] += 1
     try base.forEach(body)
   }
 
@@ -468,7 +468,7 @@ public struct Logging${Kind}<Base: ${Kind}> : ${Kind}, LoggingType {
   public func map<T>(
     @noescape transform: (Base.Iterator.Element) throws -> T
   ) rethrows -> [T] {
-    ++Log.map[selfType]
+    Log.map[selfType] += 1
     return try base.map(transform)
   }
 
@@ -476,27 +476,27 @@ public struct Logging${Kind}<Base: ${Kind}> : ${Kind}, LoggingType {
   public func filter(
     @noescape includeElement: (Base.Iterator.Element) throws -> Bool
   ) rethrows -> [Base.Iterator.Element] {
-    ++Log.filter[selfType]
+    Log.filter[selfType] += 1
     return try base.filter(includeElement)
   }
 
   public func dropFirst(n: Int) -> Base.SubSequence {
-    ++Log.dropFirst[selfType]
+    Log.dropFirst[selfType] += 1
     return base.dropFirst(n)
   }
 
   public func dropLast(n: Int) -> Base.SubSequence {
-    ++Log.dropLast[selfType]
+    Log.dropLast[selfType] += 1
     return base.dropLast(n)
   }
 
   public func prefix(maxLength: Int) -> Base.SubSequence {
-    ++Log.prefix[selfType]
+    Log.prefix[selfType] += 1
     return base.prefix(maxLength)
   }
 
   public func suffix(maxLength: Int) -> Base.SubSequence {
-    ++Log.suffix[selfType]
+    Log.suffix[selfType] += 1
     return base.suffix(maxLength)
   }
 
@@ -505,7 +505,7 @@ public struct Logging${Kind}<Base: ${Kind}> : ${Kind}, LoggingType {
     omitEmptySubsequences: Bool = true,
     @noescape isSeparator: (Base.Iterator.Element) throws -> Bool
   ) rethrows -> [Base.SubSequence] {
-    ++Log.split[selfType]
+    Log.split[selfType] += 1
     return try base.split(maxSplits,
       omitEmptySubsequences: omitEmptySubsequences,
       isSeparator: isSeparator)
@@ -514,17 +514,17 @@ public struct Logging${Kind}<Base: ${Kind}> : ${Kind}, LoggingType {
 %   if Kind == 'Collection' or Kind == 'MutableCollection':
 
   public func prefixUpTo(end: Index) -> Base.SubSequence {
-    ++Log.prefixUpTo[selfType]
+    Log.prefixUpTo[selfType] += 1
     return base.prefixUpTo(end)
   }
 
   public func suffixFrom(start: Index) -> Base.SubSequence {
-    ++Log.suffixFrom[selfType]
+    Log.suffixFrom[selfType] += 1
     return base.suffixFrom(start)
   }
 
   public func prefixThrough(position: Index) -> Base.SubSequence {
-    ++Log.prefixThrough[selfType]
+    Log.prefixThrough[selfType] += 1
     return base.prefixThrough(position)
   }
 
@@ -533,7 +533,7 @@ public struct Logging${Kind}<Base: ${Kind}> : ${Kind}, LoggingType {
   public func _customContainsEquatableElement(
     element: Base.Iterator.Element
   ) -> Bool? {
-    ++Log._customContainsEquatableElement[selfType]
+    Log._customContainsEquatableElement[selfType] += 1
     return base._customContainsEquatableElement(element)
   }
 
@@ -543,7 +543,7 @@ public struct Logging${Kind}<Base: ${Kind}> : ${Kind}, LoggingType {
   public func _preprocessingPass<R>(
     preprocess: (Logging${Kind})->R
   ) -> R? {
-    ++Log._preprocessingPass[selfType]
+    Log._preprocessingPass[selfType] += 1
     return base._preprocessingPass { _ in preprocess(self) }
   }
 
@@ -551,14 +551,14 @@ public struct Logging${Kind}<Base: ${Kind}> : ${Kind}, LoggingType {
   /// in the same order.
   public func _copyToNativeArrayBuffer()
     -> _ContiguousArrayBuffer<Base.Iterator.Element> {
-    ++Log._copyToNativeArrayBuffer[selfType]
+    Log._copyToNativeArrayBuffer[selfType] += 1
     return base._copyToNativeArrayBuffer()
   }
 
   /// Copy a Sequence into an array.
   public func _initializeTo(ptr: UnsafeMutablePointer<Base.Iterator.Element>)
     -> UnsafeMutablePointer<Base.Iterator.Element> {
-    ++Log._initializeTo[selfType]
+    Log._initializeTo[selfType] += 1
     return base._initializeTo(ptr)
   }
   

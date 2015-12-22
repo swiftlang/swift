@@ -1154,7 +1154,7 @@ static Type getCastFromObjC(SILModule &M, CanType source, CanType target) {
 }
 
 /// Create a call of _forceBridgeFromObjectiveC_bridgeable or
-/// _conditionallyBridgeFromObjectiveC_bridgeable  which converts an an ObjC
+/// _conditionallyBridgeFromObjectiveC_bridgeable which converts an ObjC
 /// instance into a corresponding Swift type, conforming to
 /// _ObjectiveCBridgeable.
 SILInstruction *
@@ -1921,7 +1921,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       // Should be in the same BB.
       if (ASI->getParent() != EMI->getParent())
         return nullptr;
-      // Check if this alloc_stac is is only initialized once by means of
+      // Check if this alloc_stac is only initialized once by means of
       // single init_existential_addr.
       bool isLegal = true;
       // init_existential instruction used to initialize this alloc_stack.
@@ -1982,7 +1982,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       // Should be in the same BB.
       if (ASRI->getParent() != EMI->getParent())
         return nullptr;
-      // Check if this alloc_stac is is only initialized once by means of
+      // Check if this alloc_stack is only initialized once by means of
       // a single initt_existential_ref.
       bool isLegal = true;
       for (auto Use: getNonDebugUses(*ASRI)) {

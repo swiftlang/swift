@@ -126,7 +126,7 @@
 +(instancetype)havingConvenienceFactoryAndLaterConvenienceInitWithFlim:(NSInteger)flim;
 -(instancetype)initWithFlim:(NSInteger)flim __attribute__((availability(macosx,introduced=10.11)));
 
-// Convenience convenience init declaration followed by convenience factory
+// Convenience init declaration followed by convenience factory
 -(instancetype)initWithFlam:(NSInteger)flam __attribute__((availability(macosx,introduced=10.11)));
 +(instancetype)havingConvenienceFactoryAndLaterConvenienceInitWithFlam:(NSInteger)flam;
 @end

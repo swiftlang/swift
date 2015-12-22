@@ -37,12 +37,12 @@ func checkNormal(normal: TestFloat) {
 }
 
 func testNormal() {
-  var positiveNormal: TestFloat = 42.0
+  let positiveNormal: TestFloat = 42.0
   checkNormal(positiveNormal)
   _require(!positiveNormal.isSignMinus)
   _require(positiveNormal.floatingPointClass == .PositiveNormal)
 
-  var negativeNormal: TestFloat = -42.0
+  let negativeNormal: TestFloat = -42.0
   checkNormal(negativeNormal)
   _require(negativeNormal.isSignMinus)
   _require(negativeNormal.floatingPointClass == .NegativeNormal)
@@ -74,12 +74,12 @@ func checkZero(zero: TestFloat) {
 }
 
 func testZero() {
-  var plusZero = noinlinePlusZero()
+  let plusZero = noinlinePlusZero()
   checkZero(plusZero)
   _require(!plusZero.isSignMinus)
   _require(plusZero.floatingPointClass == .PositiveZero)
 
-  var minusZero = noinlineMinusZero()
+  let minusZero = noinlineMinusZero()
   checkZero(minusZero)
   _require(minusZero.isSignMinus)
   _require(minusZero.floatingPointClass == .NegativeZero)
@@ -129,7 +129,7 @@ func testSubnormal() {
       _requirementFailure("unhandled float kind")
   }
   var positiveSubnormal: TestFloat = 1.0
-  for var i = 0; i < iterations; i++ {
+  for var i = 0; i < iterations; i += 1 {
     positiveSubnormal /= 2.0 as TestFloat
   }
   checkSubnormal(positiveSubnormal)
@@ -138,7 +138,7 @@ func testSubnormal() {
   _require(positiveSubnormal != 0.0)
 
   var negativeSubnormal: TestFloat = -1.0
-  for var i = 0; i < iterations; i++ {
+  for var i = 0; i < iterations; i += 1{
     negativeSubnormal /= 2.0 as TestFloat
   }
   checkSubnormal(negativeSubnormal)

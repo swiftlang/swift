@@ -150,12 +150,6 @@ FUNCTION(NativeUnpin, swift_unpin, RuntimeCC,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
-// void swift_fixLifetime(void *ptr);
-FUNCTION(FixLifetime, swift_fixLifetime, RuntimeCC,
-         RETURNS(VoidTy),
-         ARGS(RefCountedPtrTy),
-         ATTRS(NoUnwind))
-
 // void swift_unknownRetain(void *ptr);
 FUNCTION(UnknownRetain, swift_unknownRetain, RuntimeCC,
          RETURNS(VoidTy),
@@ -601,13 +595,6 @@ FUNCTION(GetExistentialMetadata,
               ProtocolDescriptorPtrTy->getPointerTo()),
          ATTRS(NoUnwind, ReadOnly))
 
-// const char *swift_getGenericClassObjCName(Metadata *self);
-FUNCTION(GetGenericClassObjCName,
-         swift_getGenericClassObjCName, RuntimeCC,
-         RETURNS(Int8PtrTy),
-         ARGS(TypeMetadataPtrTy),
-         ATTRS(NoUnwind))
-
 // struct FieldInfo { size_t Size; size_t AlignMask; };
 // void swift_initClassMetadata_UniversalStrategy(Metadata *self,
 //                                                Metadata *super,
@@ -877,7 +864,7 @@ FUNCTION(RegisterProtocolConformances,
 
 FUNCTION(InitializeSuperclass, swift_initializeSuperclass, RuntimeCC,
          RETURNS(VoidTy),
-         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy),
+         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy, Int1Ty),
          ATTRS(NoUnwind))
 FUNCTION(InstantiateObjCClass, swift_instantiateObjCClass, RuntimeCC,
          RETURNS(VoidTy),

@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "sil-generic-specialize"
+#define DEBUG_TYPE "sil-generic-specializer"
 
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -25,13 +25,6 @@
 #include "llvm/ADT/SmallVector.h"
 
 using namespace swift;
-
-// STATISTIC(NumEscapingAllocas, "Number of aggregate allocas not chopped up "
-//           "due to uses.");
-// STATISTIC(NumChoppedAllocas, "Number of chopped up aggregate allocas.");
-// STATISTIC(NumUnhandledAllocas, "Number of non struct, tuple allocas.");
-
-namespace {} // end anonymous namespace
 
 namespace {
 

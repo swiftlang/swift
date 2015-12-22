@@ -787,7 +787,7 @@ public func runAllTests() {
       let arg = Process.arguments[i]
       if arg == "--stdlib-unittest-in-process" {
         runTestsInProcess = true
-        ++i
+        i += 1
         continue
       }
       if arg == "--stdlib-unittest-filter" {
@@ -809,7 +809,7 @@ public func runAllTests() {
       }
 
       // FIXME: skipping unrecognized parameters.
-      ++i
+      i += 1
     }
 
     var parent = _ParentProcess(
@@ -1499,9 +1499,9 @@ public func checkHashable<T : Hashable>(
     [lhs, rhs], equalityOracle: { expectedEqual || $0 == $1 }, ${trace})
 }
 
-% for inc, protocol, op, successor, end in (
-%  ('inc', '_Incrementable', '++', 'successor', 'end'),
-%  ('dec', 'BidirectionalIndex', '--', 'predecessor', 'start')):
+% for inc, protocol, successor, end in (
+%  ('inc', '_Incrementable', 'successor', 'end'),
+%  ('dec', 'BidirectionalIndex', 'predecessor', 'start')):
 
 /// Test that the elements of `instances` satisfy
 /// ${'some of ' if inc == 'dec' else ''}the semantic
@@ -1530,16 +1530,6 @@ public func check${inc.capitalize()}rementable<
       // Which is the same as if we apply _${successor}InPlace
       var j = i
       j._${successor}InPlace()
-      expectEqual(j, next, ${trace})
-
-      // Post-${inc}rement works
-      j = i
-      expectEqual(j${op}, i, ${trace})
-      expectEqual(j, next, ${trace})
-
-      // Pre-${inc}rement works
-      j = i
-      expectEqual(${op}j, next, ${trace})
       expectEqual(j, next, ${trace})
     }
   }
@@ -1930,13 +1920,14 @@ public func checkSequence<
   // without destroying the sequence.
   sequence._preprocessingPass { (sequence)->Void in 
     var length = 0
-    for _ in sequence { ++length }
+    for _ in sequence { length += 1 }
     let buf = UnsafeMutablePointer<S.Iterator.Element>(allocatingCapacity: length)
     let end = sequence._initializeTo(buf)
     expectTrue(end == buf + length, "_initializeTo returned the wrong value")
     var j = expected.startIndex
     for i in 0..<(end - buf) {
-      expectTrue(sameValue(expected[j++], buf[i]))
+      expectTrue(sameValue(expected[j], buf[i]))
+      j = j.successor()
     }
     buf.deinitializePointee(count: end - buf)
     buf.deallocateCapacity(length)
@@ -2023,12 +2014,12 @@ public func check${traversal}Collection<
     var i = i
     if n < 0 {
       for _ in 0 ..< -(n.toIntMax()) {
-        --i
+        i -= 1
       }
     }
     else {
       for _ in 0..<n.toIntMax() {
-        ++i
+        i += 1
       }
     }
     return i
@@ -2074,9 +2065,9 @@ public func check${traversal}Collection<
       for i in 0..<allIndices.length-1 {
         let successor1 = allIndices[i].successor()
         var successor2 = allIndices[i]
-        successor2++
+        successor2 = successor2.successor()
         var successor3 = allIndices[i]
-        ++successor3
+        successor3 = successor3.successor()
         for s in [ successor1, successor2, successor3 ] {
           expectEqual(allIndices[i + 1], s, ${trace})
           expectEqual(
@@ -2087,9 +2078,9 @@ public func check${traversal}Collection<
       for i in 1..<allIndices.length {
         let predecessor1 = allIndices[i].predecessor()
         var predecessor2 = allIndices[i]
-        predecessor2--
+        predecessor2 = predecessor2.predecessor()
         var predecessor3 = allIndices[i]
-        --predecessor3
+        predecessor3 = predecessor3.predecessor()
         for p in [ predecessor1, predecessor2, predecessor3 ] {
           expectEqual(allIndices[i - 1], p, ${trace})
           expectEqual(
@@ -2098,8 +2089,8 @@ public func check${traversal}Collection<
       }
       for i in 1..<allIndices.length {
         var index = allIndices[i]
-        --index
-        ++index
+        index = index.predecessor()
+        index = index.successor()
         expectEqual(allIndices[i], index, ${trace})
         expectEqual(
           expectedArray[i], collection[index], ${trace}, sameValue: sameValue)
@@ -2170,29 +2161,29 @@ public func checkSliceableWithBidirectionalIndex<
   var start = sliceable.startIndex
   for startNumericIndex in 0...expectedArray.length {
     if start != sliceable.endIndex {
-      ++start
-      --start
-      ++start
-      --start
+      start = start.successor()
+      start = start.predecessor()
+      start = start.successor()
+      start = start.predecessor()
     }
     var end = start
     for endNumericIndex in startNumericIndex...expectedArray.length {
       if end != sliceable.endIndex {
-        ++end
-        --end
-        ++end
-        --end
+        end = end.successor()
+        end = end.predecessor()
+        end = end.successor()
+        end = end.predecessor()
       }
       let expectedSlice = expectedArray[startNumericIndex..<endNumericIndex]
       let slice = sliceable[start..<end]
       checkBidirectionalCollection(expectedSlice, slice, ${trace})
 
       if end != sliceable.endIndex {
-        ++end
+        end = end.successor()
       }
     }
     if start != sliceable.endIndex {
-      ++start
+      start = start.successor()
     }
   }
 }
@@ -2521,10 +2512,11 @@ public struct MinimalIterator<T> : IteratorProtocol {
       if isConsumed {
         expectUnreachable("next() was called on a consumed iterator")
       }
-      ++_privateState.returnedNilCounter
+      _privateState.returnedNilCounter += 1
       return nil
     }
-    return _sharedState.data[_sharedState.i++]
+    defer { _sharedState.i += 1 }
+    return _sharedState.data[_sharedState.i]
   }
 
   public var isConsumed: Bool {
@@ -2779,7 +2771,8 @@ public struct _CollectionState : Equatable, Hashable {
   }
 
   internal init(newRootStateForLength length: Int) {
-    self._id = _CollectionState._nextUnusedState++
+    self._id = _CollectionState._nextUnusedState
+    _CollectionState._nextUnusedState += 1
     self._elementsLastMutatedStateIds =
       Array(repeatElement(self._id, count: length))
   }
@@ -2835,7 +2828,8 @@ internal struct _CollectionStateTransition {
     previousState: _CollectionState,
     operation: _CollectionOperation
   ) {
-    let nextStateId = _CollectionState._nextUnusedState++
+    let nextStateId = _CollectionState._nextUnusedState
+    _CollectionState._nextUnusedState += 1
     let newElementStates = operation._applyTo(
       previousState._elementsLastMutatedStateIds, nextStateId: nextStateId)
     let nextState = _CollectionState(
@@ -3152,11 +3146,11 @@ public struct ${DefaultedIndex}: ${StrictIndexType} {
   }
 
   public func logSuccessor() {
-    ${DefaultedIndex}.timesSuccessorCalled.value++
+    ${DefaultedIndex}.timesSuccessorCalled.value += 1
   }
 
   public func logPredecessor() {
-    ${DefaultedIndex}.timesPredecessorCalled.value++
+    ${DefaultedIndex}.timesPredecessorCalled.value += 1
   }
 
 % if Traversal == 'RandomAccess':
@@ -3707,7 +3701,7 @@ public func == (
   lhs: MinimalEquatableValue,
   rhs: MinimalEquatableValue
 ) -> Bool {
-  ++MinimalEquatableValue.timesEqualEqualWasCalled
+  MinimalEquatableValue.timesEqualEqualWasCalled += 1
   return lhs.value == rhs.value
 }
 
@@ -3736,7 +3730,7 @@ public struct ${Self} : Equatable, Hashable {
   }
 
   public var hashValue: Int {
-    ++${Self}.timesHashValueWasCalled
+    ${Self}.timesHashValueWasCalled += 1
     return value.hashValue
   }
 }
@@ -3745,7 +3739,7 @@ public func == (
   lhs: ${Self},
   rhs: ${Self}
 ) -> Bool {
-  ++${Self}.timesEqualEqualWasCalled
+  ${Self}.timesEqualEqualWasCalled += 1
   return lhs.value == rhs.value
 }
 
@@ -3782,7 +3776,7 @@ public func == (
   lhs: MinimalComparableValue,
   rhs: MinimalComparableValue
 ) -> Bool {
-  ++MinimalComparableValue.timesEqualEqualWasCalled.value
+  MinimalComparableValue.timesEqualEqualWasCalled.value += 1
   return MinimalComparableValue.equalImpl.value(lhs.value, rhs.value)
 }
 
@@ -3790,7 +3784,7 @@ public func < (
   lhs: MinimalComparableValue,
   rhs: MinimalComparableValue
 ) -> Bool {
-  ++MinimalComparableValue.timesLessWasCalled.value
+  MinimalComparableValue.timesLessWasCalled.value += 1
   return MinimalComparableValue.lessImpl.value(lhs.value, rhs.value)
 }
 
