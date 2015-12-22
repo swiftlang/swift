@@ -76,7 +76,8 @@ genericOperators = {}
 comments = r'//.* | /[*] (.|\n)*? [*]/'  # FIXME: doesn't respect strings or comment nesting)
 
 # read source, stripping all comments
-sourceSansComments = re.sub(comments, '', open(args[1]).read(), flags=reFlags)
+with open(args[1]) as src:
+    sourceSansComments = re.sub(comments, '', src.read(), flags=reFlags)
 
 genericParameterConstraint = interpolate(r' (%(identifier)s) \s* : \s* (%(identifier)s) ')
 
