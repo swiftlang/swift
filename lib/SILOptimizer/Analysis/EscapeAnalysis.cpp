@@ -1635,6 +1635,16 @@ bool EscapeAnalysis::canEscapeToValue(SILValue V, SILValue To) {
   return ConGraph->isReachable(Node, ToNode);
 }
 
+static bool isAddress(SILType T) {
+  // We include local storage, too. This makes it more tolerant for checking
+  // the #0 result of alloc_stack.
+  return T.isAddress() || T.isLocalStorage();
+}
+
+static bool isRefCounted(SILType T) {
+  return T.isObject() && T.hasReferenceSemantics();
+}
+
 bool EscapeAnalysis::canPointToSameMemory(SILValue V1, SILValue V2) {
   // At least one of the values must be a non-escaping local object.
   bool isLocal1 = pointsToLocalObject(V1);
@@ -1668,18 +1678,26 @@ bool EscapeAnalysis::canPointToSameMemory(SILValue V1, SILValue V2) {
   CGNode *Content1 = ConGraph->getContentNode(Node1);
   CGNode *Content2 = ConGraph->getContentNode(Node2);
 
+  SILType T1 = V1.getType();
+  SILType T2 = V2.getType();
+  if (isAddress(T1) && isAddress(T2)) {
+    return Content1 == Content2;
+  }
+  if (isRefCounted(T1) && isRefCounted(T2)) {
+    return Content1 == Content2;
+  }
   // As we model the ref_element_addr instruction as a content-relationship, we
   // have to go down one content level if just one of the values is a
   // ref-counted object.
-  if (V1.getType().hasReferenceSemantics()) {
-    if (!V2.getType().hasReferenceSemantics())
-      Content1 = ConGraph->getContentNode(Content1);
-  } else {
-    if (V2.getType().hasReferenceSemantics())
-      Content2 = ConGraph->getContentNode(Content2);
+  if (isAddress(T1) && isRefCounted(T2)) {
+    Content2 = ConGraph->getContentNode(Content2);
+    return Content1 == Content2;
   }
-
-  return Content1 == Content2;
+  if (isAddress(T2) && isRefCounted(T1)) {
+    Content1 = ConGraph->getContentNode(Content1);
+    return Content1 == Content2;
+  }
+  return true;
 }
 
 void EscapeAnalysis::invalidate(InvalidationKind K) {

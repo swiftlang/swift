@@ -542,3 +542,16 @@ bb0(%0 : $X):
   return %1 : $X
 }
 
+// CHECK-LABEL: @alloc_stack_and_addr_cast
+// CHECK: PAIR #5.
+// CHECK-NEXT: (1):   %0 = alloc_stack $C                             // users: %1, %2
+// CHECK-NEXT: (0):   %1 = unchecked_addr_cast %0#1 : $*C to $*Optional<C>
+// CHECK-NEXT: MayAlias
+sil @alloc_stack_and_addr_cast : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $C
+  %1 = unchecked_addr_cast %0#1 : $*C to $*Optional<C>
+  dealloc_stack %0#0 : $*@local_storage C
+  %2 = tuple() 
+  return %2 : $() 
+}
