@@ -76,6 +76,19 @@ namespace swift {
         Type = Type->getLValueOrInOutObjectType().getPointer();
       }
 
+      // Determine whether this type is an Archetype itself.
+      bool isArchetype() const {
+        return Type->getLValueOrInOutObjectType()->getKind() ==
+               TypeKind::Archetype;
+      }
+
+      /// LValues, inout args, and Archetypes are implicitly indirect by
+      /// virtue of their DWARF type.
+      bool isImplicitlyIndirect() const {
+        return Type->isLValueType() || isArchetype() ||
+               (Type->getKind() == TypeKind::InOut);
+      }
+      
       bool isNull() const { return Type == nullptr; }
       bool operator==(DebugTypeInfo T) const;
       bool operator!=(DebugTypeInfo T) const;

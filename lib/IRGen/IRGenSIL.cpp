@@ -3012,11 +3012,18 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
 
   StringRef Name = getVarName(i);
   auto Addr = getLoweredAddress(SILVal).getAddress();
-  DebugTypeInfo DbgTy(Decl, Decl->getType(), getTypeInfo(SILVal.getType()));
-  // Put the value into a stack slot at -Onone and emit a debug intrinsic.
+  DebugTypeInfo DbgTy(Decl, SILVal.getType().getSwiftType(),
+                      getTypeInfo(SILVal.getType()));
+  // Unwrap implicitly indirect types and types that are passed by
+  // reference only at the SIL level and below.
+  if (DbgTy.isArchetype() || i->getVarInfo().Constant)
+    DbgTy.unwrapLValueOrInOutType();
+  // Put the value's address into a stack slot at -Onone and emit a debug
+  // intrinsic.
   emitDebugVariableDeclaration(
-      emitShadowCopy(Addr, i->getDebugScope(), Name), DbgTy,
-      i->getDebugScope(), Name, i->getVarInfo().ArgNo, IndirectValue);
+      emitShadowCopy(Addr, i->getDebugScope(), Name), DbgTy, i->getDebugScope(),
+      Name, i->getVarInfo().ArgNo,
+      DbgTy.isImplicitlyIndirect() ? DirectValue : IndirectValue);
 }
 
 void IRGenSILFunction::visitLoadWeakInst(swift::LoadWeakInst *i) {
@@ -3427,10 +3434,11 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
     if (Name == IGM.Context.Id_self.str())
       return;
 
+    DebugTypeInfo DbgTy(Decl, i->getElementType().getSwiftType(), type);
     IGM.DebugInfo->emitVariableDeclaration(
         Builder, emitShadowCopy(addr.getAddress(), i->getDebugScope(), Name),
-        DebugTypeInfo(Decl, i->getElementType().getSwiftType(), type),
-        i->getDebugScope(), Name, 0, IndirectValue);
+        DbgTy, i->getDebugScope(), Name, 0,
+        DbgTy.isImplicitlyIndirect() ? DirectValue : IndirectValue);
   }
 }
 
