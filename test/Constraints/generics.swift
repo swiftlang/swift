@@ -165,8 +165,8 @@ func r22459135() {
     g(h([3]))
   }
 
-  func f2<TargetType: AnyObject>(target: TargetType, handler: TargetType -> ()) {
-    let _: AnyObject -> () = { internalTarget in
+  func f2<TargetType: AnyObject>(target: TargetType, handler: TargetType -> Void) {
+    let _: AnyObject -> Void = { internalTarget in
       handler(internalTarget as! TargetType)
     }
   }

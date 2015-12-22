@@ -15,7 +15,7 @@ func f2xy(x x: Int, y: Int) -> Int {}
 func f2ab(a a: Int, b: Int) -> Int {}
 func f2yx(y y: Int, x: Int) -> Int {}
 
-func f3(x: (x: Int, y: Int) -> ()) {}
+func f3(x: (x: Int, y: Int) -> Void) {}
 func f3a(x: Int, y: Int) {}
 func f3b(_: Int) {}
 
@@ -38,7 +38,7 @@ f2(f2ab)
 f2(f2yx) // expected-error{{cannot convert value of type '(y: Int, x: Int) -> Int' to expected argument type '(x: Int, y: Int) -> Int'}} 
 
 f3(f3a)
-f3(f3b) // expected-error{{cannot convert value of type '(Int) -> ()' to expected argument type '(x: Int, y: Int) -> ()'}} 
+f3(f3b) // expected-error{{cannot convert value of type '(Int) -> Void' to expected argument type '(x: Int, y: Int) -> Void'}} 
 
 func getIntFloat() -> (int: Int, float: Float) {}
 var values = getIntFloat()

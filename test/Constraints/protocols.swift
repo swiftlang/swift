@@ -15,9 +15,9 @@ extension Float32 : Barable {
 func f0(_: Barable) {}
 func f1(x: protocol<Fooable, Barable>) {}
 func f2(_: Float) {}
-let nilFunc: Optional<(Barable) -> ()> = nil
+let nilFunc: Optional<(Barable) -> Void> = nil
 
-func g(_: (protocol<Barable, Fooable>) -> ()) {}
+func g(_: (protocol<Barable, Fooable>) -> Void) {}
 
 protocol Classable : AnyObject {}
 class SomeArbitraryClass {}
@@ -26,7 +26,7 @@ func fc0(_: Classable) {}
 func fc1(_: protocol<Fooable, Classable>) {}
 func fc2(_: AnyObject) {}
 func fc3(_: SomeArbitraryClass) {}
-func gc(_: (protocol<Classable, Fooable>) -> ()) {}
+func gc(_: (protocol<Classable, Fooable>) -> Void) {}
 
 var i : Int
 var f : Float
@@ -50,7 +50,7 @@ f1(b) // expected-error{{argument type 'Barable' does not conform to expected ty
 g(f0) // okay (subtype)
 g(f1) // okay (exact match)
 
-g(f2) // expected-error{{cannot convert value of type '(Float) -> ()' to expected argument type '(protocol<Barable, Fooable>) -> ()'}}
+g(f2) // expected-error{{cannot convert value of type '(Float) -> Void' to expected argument type '(protocol<Barable, Fooable>) -> Void'}}
 
 // FIXME: Workaround for ?? not playing nice with function types.
 infix operator ??* {}
@@ -60,7 +60,7 @@ g(nilFunc ??* f0)
 gc(fc0) // okay
 gc(fc1) // okay
 gc(fc2) // okay
-gc(fc3) // expected-error{{cannot convert value of type '(SomeArbitraryClass) -> ()' to expected argument type '(protocol<Classable, Fooable>) -> ()'}}
+gc(fc3) // expected-error{{cannot convert value of type '(SomeArbitraryClass) -> Void' to expected argument type '(protocol<Classable, Fooable>) -> Void'}}
 
 // rdar://problem/19600325
 func getAnyObject() -> AnyObject? {
