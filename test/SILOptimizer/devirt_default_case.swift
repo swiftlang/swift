@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -O -module-name devirt_default_case -emit-sil -enable-testing %s | FileCheck -check-prefix=CHECK -check-prefix=CHECK-TESTABLE %s
 
 @_silgen_name("action")
-func action(n:Int)->()
+func action(n:Int) -> ()
 
 // public class
 public class Base1 {
@@ -206,7 +206,7 @@ public class M {
 
 public class M1: M {
   @inline(never)
-  override func foo()->Int32 {
+  override func foo() -> Int32 {
     return 1
   }
 }

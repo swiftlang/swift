@@ -6,7 +6,7 @@
 @_transparent func transparentFuncWithDefaultArgument (x: Int = 1) -> Int {
   return x
 }
-func useTransparentFuncWithDefaultArgument() ->Int {
+func useTransparentFuncWithDefaultArgument() -> Int {
   return transparentFuncWithDefaultArgument();
 
   // CHECK-LABEL: sil hidden @_TF21transparent_attribute37useTransparentFuncWithDefaultArgumentFT_Si

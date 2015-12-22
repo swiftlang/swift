@@ -506,7 +506,7 @@ func return_generic_tuple()
 @noreturn func testNoReturnAttrPoly<T>(x: T) -> () {}
 
 // CHECK-LABEL: sil hidden @_TF9functions21testNoReturnAttrParam{{.*}} : $@convention(thin) (@owned @noreturn @callee_owned () -> ()) -> ()
-func testNoReturnAttrParam(fptr: @noreturn ()->()) -> () {}
+func testNoReturnAttrParam(fptr: @noreturn () -> ()) -> () {}
 
 // CHECK-LABEL: sil hidden [transparent] @_TF9functions15testTransparent{{.*}} : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
 @_transparent func testTransparent(x: Bool) -> Bool {

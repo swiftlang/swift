@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
-func foo(f f: (()->())!) {
+func foo(f f: (() -> ())!) {
   var f = f
   f?()
 }

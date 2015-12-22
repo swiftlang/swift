@@ -27,11 +27,11 @@ let indirect = LoggingSequence(direct)
 let dispatchLog = base.log
 
 func expectWrapperDispatch<R1, R2>(
-  @autoclosure directOperation: ()->R1,
-  @autoclosure _ indirectOperation: ()->R2,
+  @autoclosure directOperation: () -> R1,
+  @autoclosure _ indirectOperation: () -> R2,
   _ counters: TypeIndexed<Int>,
   //===--- TRACE boilerplate ----------------------------------------------===//
-  @autoclosure _ message: ()->String = "",
+  @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
   file: String = __FILE__, line: UInt = __LINE__

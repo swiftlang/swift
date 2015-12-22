@@ -329,7 +329,7 @@ func add<T : SignedIntegerType>(left: T, _ right: T) -> T {
 }
 
 @_transparent
-func applyBinary<T : SignedIntegerType>(fn: (T, T)->(T), _ left: T, _ right: T) -> T {
+func applyBinary<T : SignedIntegerType>(fn: (T, T) -> (T), _ left: T, _ right: T) -> T {
   return fn(left, right)
 }
 

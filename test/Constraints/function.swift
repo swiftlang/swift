@@ -12,7 +12,7 @@ f1(f1(f))
 f2(f)
 f2(1.0)
 
-func call_lvalue(@autoclosure rhs: ()->Bool) -> Bool {
+func call_lvalue(@autoclosure rhs: () -> Bool) -> Bool {
   return rhs()
 }
 

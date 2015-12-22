@@ -23,7 +23,7 @@ func foreach_variable() {
   }
 }
 
-func takeClosure(fn : (Int)->Int) {}
+func takeClosure(fn : (Int) -> Int) {}
 
 func passClosure() {
   takeClosure { a in
