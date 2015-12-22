@@ -2173,7 +2173,7 @@ public func checkSliceableWithBidirectionalIndex<
       }
     }
     if start != sliceable.endIndex {
-      end = end.successor()
+      start = start.successor()
     }
   }
 }
