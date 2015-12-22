@@ -101,7 +101,10 @@ swift_dynamicCastFailure(const void *sourceType, const char *sourceName,
                          const void *targetType, const char *targetName, 
                          const char *message = nullptr);
 
+extern "C"
+void swift_reportError(const char *message);
+
 // namespace swift
-};
+}
 
 #endif // _SWIFT_RUNTIME_DEBUG_HELPERS_

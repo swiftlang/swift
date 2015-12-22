@@ -360,11 +360,8 @@ runtime.
 ## Error reporting
 
 ```
-000000000001c7d0 T _swift_reportFatalError
-000000000001c730 T _swift_reportFatalErrorInFile
+000000000001c7d0 T _swift_reportError
 000000000001c940 T _swift_reportMissingMethod
-000000000001c8d0 T _swift_reportUnimplementedInitializer
-000000000001c840 T _swift_reportUnimplementedInitializerInFile
 ```
 
 ## Tasks

@@ -8,6 +8,7 @@ if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
 endif()
 
 add_swift_library(swiftStdlibStubs IS_STDLIB IS_STDLIB_CORE
+  Assert.cpp
   GlobalObjects.cpp
   LibcShims.cpp
   Stubs.cpp
