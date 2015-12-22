@@ -119,7 +119,7 @@ let _: Int
 let _: Int
 
 @available(*, deprecated, unavailable, message="message") // expected-error{{'available' attribute cannot be both unconditionally 'unavailable' and 'deprecated'}}
-struct BadUnconditionalAvailability { };
+struct BadUnconditionalAvailability { }
 
 // Encoding in messages
 @available(*, deprecated, message="Say \"Hi\"")

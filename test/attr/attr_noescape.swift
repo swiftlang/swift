@@ -226,7 +226,7 @@ class NoEscapeImmediatelyApplied {
 public func XCTAssertTrue(@autoclosure expression: () -> BooleanType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
 }
 public func XCTAssert( @autoclosure expression: () -> BooleanType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)  -> Void {
-  XCTAssertTrue(expression, message, file: file, line: line);
+  XCTAssertTrue(expression, message, file: file, line: line)
 }
 
 
