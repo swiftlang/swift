@@ -742,6 +742,9 @@ public:
 
   /// Returns true if the pointers \p V1 and \p V2 can possibly point to the
   /// same memory.
+  /// If at aleast one of the pointers refers to a local object and and the
+  /// connection-graph-nodes of both pointers do not point to the same content
+  /// node, the pointers do not alias.
   bool canPointToSameMemory(SILValue V1, SILValue V2);
 
   virtual void invalidate(InvalidationKind K) override;

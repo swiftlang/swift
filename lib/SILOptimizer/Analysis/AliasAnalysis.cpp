@@ -594,17 +594,21 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   if (O1 != O2 && aliasUnequalObjects(O1, O2))
     return AliasResult::NoAlias;
 
-  // Ask escape analysis. This catches cases where we compare e.g. a
-  // non-escaping pointer with another pointer.
+  // Ok, either O1, O2 are the same or we could not prove anything based off of
+  // their inequality.
+  // Next: ask escape analysis. This catches cases where we compare e.g. a
+  // non-escaping pointer with another (maybe escaping) pointer. Escape analysis
+  // uses the connection graph to check if the pointers may point to the same
+  // content.
+  // Note that escape analysis must work with the original pointers and not the
+  // underlying objects because it treats projecetions differently.
   if (!EA->canPointToSameMemory(V1, V2)) {
     DEBUG(llvm::dbgs() << "            Found not-aliased objects based on"
                                       "escape analysis\n");
     return AliasResult::NoAlias;
   }
 
-  // Ok, either O1, O2 are the same or we could not prove anything based off of
-  // their inequality. Now we climb up use-def chains and attempt to do tricks
-  // based off of GEPs.
+  // Now we climb up use-def chains and attempt to do tricks based off of GEPs.
 
   // First if one instruction is a gep and the other is not, canonicalize our
   // inputs so that V1 always is the instruction containing the GEP.
