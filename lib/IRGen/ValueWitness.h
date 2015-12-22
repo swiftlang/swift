@@ -83,7 +83,7 @@ enum class ValueWitness : unsigned {
   ///   T *(*initializeBufferWithCopyOfBuffer)(B *dest, B *src, M *self);
   /// Given an invalid buffer, initialize it as a copy of the
   /// object in the source buffer.  This can be decomposed as:
-  ///   initalizeBufferWithCopy(dest, self->projectBuffer(src), self)
+  ///   initializeBufferWithCopy(dest, self->projectBuffer(src), self)
   InitializeBufferWithCopyOfBuffer,
   
   ///   T *(*projectBuffer)(B *buffer, M *self);
@@ -156,7 +156,7 @@ enum class ValueWitness : unsigned {
   ///   T *(*initializeBufferWithTakeOfBuffer)(B *dest, B *src, M *self);
   /// Given an invalid buffer, initialize it by taking the value out of
   /// the source buffer.  This can be (inefficiently) decomposed as:
-  ///   initalizeBufferWithTake(dest, self->projectBuffer(src), self)
+  ///   initializeBufferWithTake(dest, self->projectBuffer(src), self)
   ///   deallocateBuffer(src, self)
   InitializeBufferWithTakeOfBuffer,
   

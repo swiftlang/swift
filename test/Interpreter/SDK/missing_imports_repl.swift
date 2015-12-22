@@ -15,10 +15,10 @@ import MapKit
 let x = MKMapRectMake(0.0, 1.0, 2.0, 3.0)
 // CHECK-NEXT: x : MKMapRect
 
-import Nonexistant_Module_Name
-// CHECK-ERROR: error: no such module 'Nonexistant_Module_Name'
+import Nonexistent_Module_Name
+// CHECK-ERROR: error: no such module 'Nonexistent_Module_Name'
 
-import SpriteKit.Nonexistant_Submodule
+import SpriteKit.Nonexistent_Submodule
 // CHECK-ERROR: error: no such module
 
 SKScene()

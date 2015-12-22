@@ -189,7 +189,7 @@ SourceCompleteResult ide::isSourceInputComplete(StringRef Text) {
 }
 
 // Adjust the cc1 triple string we got from clang, to make sure it will be
-// accepted when it goes throught the swift clang importer.
+// accepted when it goes through the swift clang importer.
 static std::string adjustClangTriple(StringRef TripleStr) {
   std::string Result;
   llvm::raw_string_ostream OS(Result);

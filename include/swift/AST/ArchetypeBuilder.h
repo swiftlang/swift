@@ -176,7 +176,7 @@ private:
   void visitPotentialArchetypes(F f);
 
 public:
-  /// Construct a new archtype builder.
+  /// Construct a new archetype builder.
   ///
   /// \param mod The module in which the builder will create archetypes.
   ///

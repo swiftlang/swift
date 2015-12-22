@@ -164,7 +164,7 @@ ${comment}
   ///
   /// - Precondition: The memory is not initialized.
   ///
-  /// - Postcondition: The memory is initalized; the value should eventually
+  /// - Postcondition: The memory is initialized; the value should eventually
   ///   be destroyed or moved from to avoid leaks.
   public func initialize(newvalue: Memory) {
     Builtin.initialize(newvalue, _rawValue)

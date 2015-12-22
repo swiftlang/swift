@@ -666,7 +666,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
           if (SI->getDest() == IEAI->getOperand())
             return nullptr;
         }
-        // Allow all instructions inbetween, which don't have any dependency to
+        // Allow all instructions in between, which don't have any dependency to
         // the store.
         if (AA->mayWriteToMemory(&*II, IEAI->getOperand()))
           return nullptr;
@@ -705,7 +705,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
           if (SI->getDest() == IEAI->getOperand())
             return nullptr;
         }
-        // Allow all instructions inbetween, which don't have any dependency to
+        // Allow all instructions in between, which don't have any dependency to
         // the store.
         if (AA->mayWriteToMemory(&*II, IEAI->getOperand()))
           return nullptr;

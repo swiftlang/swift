@@ -747,10 +747,10 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
       C, C.getIdentifier("initialize")));
     auto initializeFnRef
       = new (C) DeclRefExpr(initializeFn, SourceLoc(), /*implicit*/ true);
-    auto initalizeArgs = TupleExpr::createImplicit(C,
+    auto initializeArgs = TupleExpr::createImplicit(C,
                                                    { newValueRef, selfPointer },
                                                    {});
-    auto initialize = new (C) CallExpr(initializeFnRef, initalizeArgs,
+    auto initialize = new (C) CallExpr(initializeFnRef, initializeArgs,
                                        /*implicit*/ true);
     auto body = BraceStmt::create(C, SourceLoc(), { initialize }, SourceLoc(),
                                   /*implicit*/ true);

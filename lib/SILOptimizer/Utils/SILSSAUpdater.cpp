@@ -175,7 +175,7 @@ SILValue SILSSAUpdater::GetValueInMiddleOfBlock(SILBasicBlock *BB) {
   bool FirstPred = true;
 
   // SSAupdater can modify TerminatorInst and therefore invalidate the
-  // predecessor iterator. Find all the predecesors before the SSA update.
+  // predecessor iterator. Find all the predecessors before the SSA update.
   SmallVector<SILBasicBlock *, 4> Preds;
   for (auto *PredBB: BB->getPreds()) {
     Preds.push_back(PredBB);

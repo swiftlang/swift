@@ -481,7 +481,7 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
     // 2048. Is there a better way to identify conversions from literals?
     bool Literal = (SrcBitWidth == 2048);
 
-    // FIXME: This will prevent hard error in cases the error is comming
+    // FIXME: This will prevent hard error in cases the error is coming
     // from ObjC interoperability code. Currently, we treat NSUInteger as
     // Int.
     if (Loc.getSourceLoc().isInvalid()) {
