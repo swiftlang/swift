@@ -210,7 +210,7 @@ ${comment}
     _debugPrecondition(
       source < self || source >= self + count,
       "${Self}.assignBackwardFrom non-preceding overlapping range; use assignFrom instead")
-    for var i = count; --i >= 0; {
+    for i in (0..<count).reverse() {
       self[i] = source[i]
     }
   }
