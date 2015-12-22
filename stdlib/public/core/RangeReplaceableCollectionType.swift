@@ -448,6 +448,7 @@ public func +<
 >(lhs: C, rhs: S) -> C {
   var lhs = lhs
   // FIXME: what if lhs is a reference type?  This will mutate it.
+  lhs.reserveCapacity(lhs.count + numericCast(rhs.underestimateCount()))
   lhs.appendContentsOf(rhs)
   return lhs
 }
