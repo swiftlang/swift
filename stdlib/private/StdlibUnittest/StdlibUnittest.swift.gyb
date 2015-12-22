@@ -787,7 +787,7 @@ public func runAllTests() {
       let arg = Process.arguments[i]
       if arg == "--stdlib-unittest-in-process" {
         runTestsInProcess = true
-        ++i
+        i += 1
         continue
       }
       if arg == "--stdlib-unittest-filter" {
@@ -809,7 +809,7 @@ public func runAllTests() {
       }
 
       // FIXME: skipping unrecognized parameters.
-      ++i
+      i += 1
     }
 
     var parent = _ParentProcess(
@@ -1922,7 +1922,7 @@ public func checkSequence<
   // without destroying the sequence.
   sequence._preprocessingPass { (sequence)->Void in 
     var count = 0
-    for _ in sequence { ++count }
+    for _ in sequence { count += 1 }
     let buf = UnsafeMutablePointer<S.Generator.Element>.alloc(count)
     let end = sequence._initializeTo(buf)
     expectTrue(end == buf + count, "_initializeTo returned the wrong value")
@@ -2013,7 +2013,7 @@ public func check${traversal}Collection<
     var i = i
     if n < 0 {
       for _ in 0 ..< -(n.toIntMax()) {
-        --i
+        i -= 1
       }
     }
     else {
@@ -2077,9 +2077,9 @@ public func check${traversal}Collection<
       for i in 1..<allIndices.count {
         let predecessor1 = allIndices[i].predecessor()
         var predecessor2 = allIndices[i]
-        predecessor2--
+        predecessor2 = predecessor2.predecessor()
         var predecessor3 = allIndices[i]
-        --predecessor3
+        predecessor3 = predecessor3.predecessor()
         for p in [ predecessor1, predecessor2, predecessor3 ] {
           expectEqual(allIndices[i - 1], p, ${trace})
           expectEqual(
@@ -2506,10 +2506,11 @@ public struct MinimalGenerator<T> : GeneratorType {
       if isConsumed {
         expectUnreachable("next() was called on a consumed generator")
       }
-      ++_privateState.returnedNilCounter
+      _privateState.returnedNilCounter += 1
       return nil
     }
-    return _sharedState.data[_sharedState.i++]
+    defer { _sharedState.i += 1 }
+    return _sharedState.data[_sharedState.i]
   }
 
   public var isConsumed: Bool {
@@ -2763,7 +2764,8 @@ public struct _CollectionState : Equatable, Hashable {
   }
 
   internal init(newRootStateForElementCount count: Int) {
-    self._id = _CollectionState._nextUnusedState++
+    self._id = _CollectionState._nextUnusedState
+    _CollectionState._nextUnusedState += 1
     self._elementsLastMutatedStateIds =
       Array(Repeat(count: count, repeatedValue: self._id))
   }
@@ -2819,7 +2821,8 @@ internal struct _CollectionStateTransition {
     previousState: _CollectionState,
     operation: _CollectionOperation
   ) {
-    let nextStateId = _CollectionState._nextUnusedState++
+    let nextStateId = _CollectionState._nextUnusedState
+    _CollectionState._nextUnusedState += 1
     let newElementStates = operation._applyTo(
       previousState._elementsLastMutatedStateIds, nextStateId: nextStateId)
     let nextState = _CollectionState(
@@ -3136,11 +3139,11 @@ public struct ${DefaultedIndex}: ${StrictIndexType} {
   }
 
   public func logSuccessor() {
-    ${DefaultedIndex}.timesSuccessorCalled.value++
+    ${DefaultedIndex}.timesSuccessorCalled.value += 1
   }
 
   public func logPredecessor() {
-    ${DefaultedIndex}.timesPredecessorCalled.value++
+    ${DefaultedIndex}.timesPredecessorCalled.value += 1
   }
 
 % if Traversal == 'RandomAccess':
@@ -3690,7 +3693,7 @@ public func == (
   lhs: MinimalEquatableValue,
   rhs: MinimalEquatableValue
 ) -> Bool {
-  ++MinimalEquatableValue.timesEqualEqualWasCalled
+  MinimalEquatableValue.timesEqualEqualWasCalled += 1
   return lhs.value == rhs.value
 }
 
@@ -3719,7 +3722,7 @@ public struct ${Self} : Equatable, Hashable {
   }
 
   public var hashValue: Int {
-    ++${Self}.timesHashValueWasCalled
+    ${Self}.timesHashValueWasCalled += 1
     return value.hashValue
   }
 }
@@ -3728,7 +3731,7 @@ public func == (
   lhs: ${Self},
   rhs: ${Self}
 ) -> Bool {
-  ++${Self}.timesEqualEqualWasCalled
+  ${Self}.timesEqualEqualWasCalled += 1
   return lhs.value == rhs.value
 }
 
@@ -3765,7 +3768,7 @@ public func == (
   lhs: MinimalComparableValue,
   rhs: MinimalComparableValue
 ) -> Bool {
-  ++MinimalComparableValue.timesEqualEqualWasCalled.value
+  MinimalComparableValue.timesEqualEqualWasCalled.value += 1
   return MinimalComparableValue.equalImpl.value(lhs.value, rhs.value)
 }
 
@@ -3773,7 +3776,7 @@ public func < (
   lhs: MinimalComparableValue,
   rhs: MinimalComparableValue
 ) -> Bool {
-  ++MinimalComparableValue.timesLessWasCalled.value
+  MinimalComparableValue.timesLessWasCalled.value += 1
   return MinimalComparableValue.lessImpl.value(lhs.value, rhs.value)
 }
 
