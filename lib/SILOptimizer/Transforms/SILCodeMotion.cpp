@@ -898,7 +898,7 @@ static bool isRetainAvailableInSomeButNotAllPredecessors(
     // Check that there is no decrement or check from the increment to the end
     // of the basic block. After we have hoisted the first release  this release
     // would prevent further hoisting. Instead we check that no decrement or
-    // check occurs upto this hoisted release.
+    // check occurs up to this hoisted release.
     auto End = CheckUpToInstruction[Pred];
     auto EndIt = SILBasicBlock::iterator(End ? *End : Pred->getTerminator());
     if (Retain == Pred->rend() || valueHasARCDecrementOrCheckInInstructionRange(

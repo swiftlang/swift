@@ -186,7 +186,7 @@ public struct _StringBuffer {
   /// Attempt to claim unused capacity in the buffer.
   ///
   /// Operation succeeds if there is sufficient capacity, and either:
-  /// - the buffer is uniquely-refereced, or
+  /// - the buffer is uniquely-referenced, or
   /// - `oldUsedEnd` points to the end of the currently used capacity.
   ///
   /// - parameter subRange: Range of the substring that the caller tries

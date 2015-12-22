@@ -446,7 +446,7 @@ static void bindAllGenericParameters(Mangler &mangler,
 }
 
 void Mangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
-  assert(DWARFMangling && "DWARFMangling expected whn mangling for debugger");
+  assert(DWARFMangling && "DWARFMangling expected when mangling for debugger");
 
   // Polymorphic function types carry their own generic parameters and
   // manglePolymorphicType will bind them.

@@ -736,7 +736,7 @@ public:
   bool canEscapeTo(SILValue V, RefCountingInst *RI);
 
   /// Returns true if the value \p V can escape to any other pointer \p To.
-  /// This means that either \p To is the same as \p V or containes a reference
+  /// This means that either \p To is the same as \p V or contains a reference
   /// to \p V.
   bool canEscapeToValue(SILValue V, SILValue To);
 

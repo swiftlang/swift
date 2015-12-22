@@ -549,7 +549,7 @@ static bool isAssignedOnlyOnceInInitializer(SILGlobalVariable *SILG) {
   return false;
 }
 
-/// Replace load sequence which may contian
+/// Replace load sequence which may contain
 /// a chain of struct_element_addr followed by a load.
 /// The sequence is traversed starting from the load
 /// instruction.

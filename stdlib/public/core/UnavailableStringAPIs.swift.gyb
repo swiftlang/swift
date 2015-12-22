@@ -38,7 +38,7 @@ stringSubscriptComment = """
   ///   Use this API when you are performing low-level manipulation
   ///   of character data.
   ///
-  /// - `String.chracters` is a collection of extended grapheme
+  /// - `String.characters` is a collection of extended grapheme
   ///   clusters, which are an approximation of user-perceived
   ///   characters.
   ///
@@ -98,7 +98,7 @@ ${stringSubscriptComment}
   ///   Unicode scalars in the string.  Use this API when you are
   ///   performing low-level manipulation of character data.
   ///
-  /// - `String.chracters.count` property returns the number of
+  /// - `String.characters.count` property returns the number of
   ///   extended grapheme clusters.  Use this API to count the
   ///   number of user-perceived characters in the string.
   @available(

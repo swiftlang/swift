@@ -856,7 +856,7 @@ static bool performLocalRetainUnownedOpt(CallInst *Retain, BasicBlock &BB,
 }
 
 /// Removes redundant check_unowned calls if they check the same reference and
-/// there is no instruction inbetween which could decrement the reference count.
+/// there is no instruction in between which could decrement the reference count.
 static void performRedundantCheckUnownedRemoval(BasicBlock &BB) {
   DenseSet<Value *> checkedValues;
   for (BasicBlock::iterator BBI = BB.begin(), E = BB.end(); BBI != E; ) {
