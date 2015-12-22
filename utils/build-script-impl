@@ -1597,6 +1597,8 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 native_clang_tools_path=""
                 native_swift_tools_path=""
                 if [[ $(is_cross_tools_deployment_target $deployment_target) ]] ; then
+                    # Don't build benchmarks and tests when building cross compiler.
+                    build_perf_testsuite_this_time=false
                     build_tests_this_time=false
 
                     # FIXME: don't hardcode macosx-x86_64.
@@ -1613,6 +1615,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                         -DLLVM_MAIN_SRC_DIR:PATH="${LLVM_SOURCE_DIR}"
                     )
                 else
+                    build_perf_testsuite_this_time=$(true_false "${BUILD_SWIFT_PERF_TESTSUITE}")
                     build_tests_this_time=${SOURCE_TREE_INCLUDES_TESTS}
                 fi
 
@@ -1654,6 +1657,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                     -DSWIFT_BUILD_STDLIB:BOOL=$(true_false "${BUILD_SWIFT_STDLIB}")
                     -DSWIFT_BUILD_SDK_OVERLAY:BOOL=$(true_false "${BUILD_SWIFT_SDK_OVERLAY}")
                     -DSWIFT_BUILD_STATIC_STDLIB:BOOL=$(true_false "${BUILD_SWIFT_STATIC_STDLIB}")
+                    -DSWIFT_BUILD_PERF_TESTSUITE:BOOL=$(true_false "${build_perf_testsuite_this_time}")
                     -DSWIFT_BUILD_EXAMPLES:BOOL=$(true_false "${BUILD_SWIFT_EXAMPLES}")
                     -DSWIFT_INCLUDE_TESTS:BOOL=$(true_false "${build_tests_this_time}")
                     -DSWIFT_INSTALL_COMPONENTS:STRING="${SWIFT_INSTALL_COMPONENTS}"
