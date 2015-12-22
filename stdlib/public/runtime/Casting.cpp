@@ -2583,11 +2583,9 @@ recur_inside_cache_lock:
 
   // If the type is a class, try its superclass.
   if (const ClassMetadata *classType = type->getClassObject()) {
-    if (auto super = classType->SuperClass) {
-      if (super != getRootSuperclass()) {
-        type = swift_getObjCClassMetadata(super);
-        goto recur_inside_cache_lock;
-      }
+    if (classHasSuperclass(classType)) {
+      type = swift_getObjCClassMetadata(classType->SuperClass);
+      goto recur_inside_cache_lock;
     }
   }
 
@@ -2615,13 +2613,11 @@ bool isRelatedType(const Metadata *type, const void *candidate) {
 
     // If the type is a class, try its superclass.
     if (const ClassMetadata *classType = type->getClassObject()) {
-      if (auto super = classType->SuperClass) {
-        if (super != getRootSuperclass()) {
-          type = swift_getObjCClassMetadata(super);
-          if (type == candidate)
-            return true;
-          continue;
-        }
+      if (classHasSuperclass(classType)) {
+        type = swift_getObjCClassMetadata(classType->SuperClass);
+        if (type == candidate)
+          return true;
+        continue;
       }
     }
 
@@ -3208,9 +3204,8 @@ extern "C" const Metadata *_swift_getSuperclass_nonNull(
   const Metadata *theClass
 ) {
   if (const ClassMetadata *classType = theClass->getClassObject())
-    if (auto super = classType->SuperClass)
-      if (super != getRootSuperclass())
-        return swift_getObjCClassMetadata(super);
+    if (classHasSuperclass(classType))
+      return swift_getObjCClassMetadata(classType->SuperClass);
   return nullptr;
 }
 

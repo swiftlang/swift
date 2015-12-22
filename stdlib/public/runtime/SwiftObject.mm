@@ -1365,7 +1365,12 @@ extern "C" size_t _swift_class_getInstancePositiveExtentSize_native(
 
 const ClassMetadata *swift::getRootSuperclass() {
 #if SWIFT_OBJC_INTEROP
-  return (const ClassMetadata *)[SwiftObject class];
+  static Lazy<const ClassMetadata *> SwiftObjectClass;
+
+  return SwiftObjectClass.get([](void *ptr) {
+    *((const ClassMetadata **) ptr) =
+        (const ClassMetadata *)[SwiftObject class];
+  });
 #else
   return nullptr;
 #endif
