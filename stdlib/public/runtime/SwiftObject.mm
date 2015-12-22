@@ -238,8 +238,8 @@ static NSString *_getClassDescription(Class cls) {
 }
 
 - (struct _NSZone *)zone {
-  return (struct _NSZone *)
-    (malloc_zone_from_ptr(self) ?: malloc_default_zone());
+  auto zone = malloc_zone_from_ptr(self);
+  return (struct _NSZone *)(zone ? zone : malloc_default_zone());
 }
 
 - (void)doesNotRecognizeSelector: (SEL) sel {
