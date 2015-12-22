@@ -3045,54 +3045,14 @@ namespace {
             !Impl.ImportedDecls[decl->getCanonicalDecl()])
           Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
 
-        (void)importSpecialMethod(result);
+        // If this was a subscript accessor, try to create a
+        // corresponding subscript declaration.
+        if (importedName.IsSubscriptAccessor)
+          (void)importSubscript(result, decl);
       }
       return result;
     }
 
-  public:
-    /// \brief Given an imported method, try to import it as some kind of
-    /// special declaration, e.g., a constructor or subscript.
-    Decl *importSpecialMethod(Decl *decl) {
-      // Check whether there's a method associated with this declaration.
-      auto objcMethod
-        = dyn_cast_or_null<clang::ObjCMethodDecl>(decl->getClangDecl());
-      if (!objcMethod)
-        return nullptr;
-
-      // Only consider Objective-C methods...
-      switch (objcMethod->getMethodFamily()) {
-      case clang::OMF_None:
-        // Check for one of the subscripting selectors.
-        if (objcMethod->isInstanceMethod() &&
-            (objcMethod->getSelector() == Impl.objectAtIndexedSubscript ||
-             objcMethod->getSelector() == Impl.setObjectAtIndexedSubscript ||
-             objcMethod->getSelector() == Impl.objectForKeyedSubscript ||
-             objcMethod->getSelector() == Impl.setObjectForKeyedSubscript))
-          return importSubscript(decl, objcMethod);
-          
-        return nullptr;
-
-      case clang::OMF_init:
-      case clang::OMF_initialize:
-      case clang::OMF_new:
-      case clang::OMF_alloc:
-      case clang::OMF_autorelease:
-      case clang::OMF_copy:
-      case clang::OMF_dealloc:
-      case clang::OMF_finalize:
-      case clang::OMF_mutableCopy:
-      case clang::OMF_performSelector:
-      case clang::OMF_release:
-      case clang::OMF_retain:
-      case clang::OMF_retainCount:
-      case clang::OMF_self:
-        // None of these methods have special consideration.
-        return nullptr;
-      }
-    }
-
-  private:
     /// Record the function or initializer overridden by the given Swift method.
     void recordObjCOverride(AbstractFunctionDecl *decl) {
       // Figure out the class in which this method occurs.
@@ -5690,8 +5650,11 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
 
   if (result) {
     if (!forceClassMethod) {
-      if (auto special = converter.importSpecialMethod(result))
-        result = special;
+      // Prefer subscripts to their accessors.
+      if (auto alternate = getAlternateDecl(result))
+        if (alternate->getDeclContext() == result->getDeclContext() &&
+            isa<SubscriptDecl>(alternate))
+        result = alternate;
     }
 
     assert(result->getClangDecl() && result->getClangDecl() == canon);
