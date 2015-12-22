@@ -57,7 +57,7 @@ protected:
   /// semantics.
   InstructionSet InsertPts;
 
-  /// Have we performed any partial merges of insertion points? We can not
+  /// Have we performed any partial merges of insertion points? We cannot
   /// perform two partial merges in a row unless we are able to reason about
   /// control dependency (which avoid for now).
   bool Partial = false;
@@ -176,7 +176,7 @@ public:
     MightBeUsed,        ///< The pointer will be used and then at this point
                         ///  be decremented
     MightBeDecremented, ///< The pointer might be decremented again implying
-                        ///  that we can not, without being known safe remove
+                        ///  that we cannot, without being known safe remove
                         ///  this decrement.
   };
 

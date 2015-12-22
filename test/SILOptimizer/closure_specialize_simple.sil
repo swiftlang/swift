@@ -16,7 +16,7 @@ bb0(%0 : $@callee_owned (Builtin.Int1) -> Builtin.Int1):
 
 bb1:
   %1 = integer_literal $Builtin.Int1, 0
-  // We can not do anything here for now but in the future I think we should try
+  // We cannot do anything here for now but in the future I think we should try
   // to handle this in closure specialization potentially.
   %2 = apply %0(%1) : $@callee_owned (Builtin.Int1) -> Builtin.Int1
   strong_release %0 : $@callee_owned (Builtin.Int1) -> Builtin.Int1
@@ -34,7 +34,7 @@ bb0(%0 : $@callee_owned (Builtin.Int1) -> Builtin.Int1, %1 : $@callee_owned (Bui
 
 bb1:
   %2 = integer_literal $Builtin.Int1, 0
-  // We can not do anything here for now but in the future I think we should try
+  // We cannot do anything here for now but in the future I think we should try
   // to handle this in closure specialization potentially.
   apply %0(%2) : $@callee_owned (Builtin.Int1) -> Builtin.Int1
   strong_release %0 : $@callee_owned (Builtin.Int1) -> Builtin.Int1
@@ -53,7 +53,7 @@ bb0(%0 : $@callee_owned (Builtin.Int1) -> Builtin.Int1):
 
 bb1:
   %1 = integer_literal $Builtin.Int1, 0
-  // We can not do anything here for now but in the future I think we should try
+  // We cannot do anything here for now but in the future I think we should try
   // to handle this in closure specialization potentially.
   %2 = apply %0(%1) : $@callee_owned (Builtin.Int1) -> Builtin.Int1
   strong_release %0 : $@callee_owned (Builtin.Int1) -> Builtin.Int1

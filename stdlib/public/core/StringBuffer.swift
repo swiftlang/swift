@@ -112,7 +112,7 @@ public struct _StringBuffer {
       let hadError = transcode(
         encoding, UTF32.self, input.generate(), sink,
         stopOnError: true)
-      _sanityCheck(!hadError, "string can not be ASCII if there were decoding errors")
+      _sanityCheck(!hadError, "string cannot be ASCII if there were decoding errors")
       return (result, hadError)
     }
     else {

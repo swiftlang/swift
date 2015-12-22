@@ -186,7 +186,7 @@ public func expectNotEqual<T : Equatable>(expected: T, _ actual: T, ${TRACE}) {
   }
 }
 
-// Can not write a sane set of overloads using generics because of:
+// Cannot write a sane set of overloads using generics because of:
 // <rdar://problem/17015923> Array->NSArray implicit conversion insanity
 public func expectOptionalEqual<T : Equatable>(
   expected: T, _ actual: T?, ${TRACE}

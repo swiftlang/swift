@@ -284,9 +284,9 @@ SILInstruction *
 SILCombiner::
 replaceInstUsesWith(SILInstruction &I, ValueBase *V, unsigned IIndex,
                     unsigned VIndex) {
-  assert(IIndex < I.getNumTypes() && "Can not have more results than "
+  assert(IIndex < I.getNumTypes() && "Cannot have more results than "
          "types.");
-  assert(VIndex < V->getNumTypes() && "Can not have more results than "
+  assert(VIndex < V->getNumTypes() && "Cannot have more results than "
          "types.");
 
   // Add all modified instrs to worklist.
@@ -301,7 +301,7 @@ replaceInstUsesWith(SILInstruction &I, ValueBase *V, unsigned IIndex,
 }
 
 // Some instructions can never be "trivially dead" due to side effects or
-// producing a void value. In those cases, since we can not rely on
+// producing a void value. In those cases, since we cannot rely on
 // SILCombines trivially dead instruction DCE in order to delete the
 // instruction, visit methods should use this method to delete the given
 // instruction and upon completion of their peephole return the value returned

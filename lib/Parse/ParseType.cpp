@@ -315,7 +315,7 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
     if (Tok.is(tok::kw_Self)) {
       Loc = consumeIdentifier(&Name);
     } else {
-      // FIXME: specialize diagnostic for 'Type': type can not start with
+      // FIXME: specialize diagnostic for 'Type': type cannot start with
       // 'metatype'
       // FIXME: offer a fixit: 'self' -> 'Self'
       if (parseIdentifier(Name, Loc, diag::expected_identifier_in_dotted_type))

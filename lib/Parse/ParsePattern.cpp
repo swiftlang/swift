@@ -208,7 +208,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         param.FirstName = Context.getIdentifier(Tok.getText());
         param.FirstNameLoc = consumeToken();
 
-        // Operators can not have API names.
+        // Operators cannot have API names.
         if (paramContext == ParameterContextKind::Operator &&
             param.PoundLoc.isValid()) {
           diagnose(param.PoundLoc, 
@@ -240,7 +240,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         param.SecondNameLoc = consumeToken();
       }
 
-      // Operators can not have API names.
+      // Operators cannot have API names.
       if (paramContext == ParameterContextKind::Operator &&
           !param.FirstName.empty() &&
           param.SecondNameLoc.isValid()) {

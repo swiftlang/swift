@@ -409,7 +409,7 @@ struct Struct2ConformsToP1<T : BooleanType> : BooleanType, Q1 {
   var value: T
 }
 
-// A large struct that can not be stored inline in an opaque buffer.
+// A large struct that cannot be stored inline in an opaque buffer.
 struct Struct3ConformsToP2 : CustomStringConvertible, Q1 {
   var a: UInt64 = 10
   var b: UInt64 = 20
@@ -428,7 +428,7 @@ struct Struct3ConformsToP2 : CustomStringConvertible, Q1 {
   }
 }
 
-// A large struct that can not be stored inline in an opaque buffer.
+// A large struct that cannot be stored inline in an opaque buffer.
 struct Struct4ConformsToP2<T : CustomStringConvertible> : CustomStringConvertible, Q1 {
   var value: T
   var e: UInt64 = 50

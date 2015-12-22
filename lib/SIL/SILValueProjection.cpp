@@ -152,7 +152,7 @@ SILValue LSValue::reduce(LSLocation &Base, SILModule *M,
 
     // In 3 cases do we need aggregation.
     //
-    // 1. If there is only 1 child and we can not strip off any projections,
+    // 1. If there is only 1 child and we cannot strip off any projections,
     // that means we need to create an aggregation.
     // 
     // 2. There are multiple children and they have the same base, but empty
@@ -242,7 +242,7 @@ bool LSLocation::isMustAliasLSLocation(const LSLocation &RHS,
   // If the bases are not must-alias, the locations may not alias.
   if (!AA->isMustAlias(Base, RHS.getBase()))
     return false;
-  // If projection paths are different, then the locations can not alias.
+  // If projection paths are different, then the locations cannot alias.
   if (!hasIdenticalProjectionPath(RHS))
     return false;
   return true;
@@ -250,7 +250,7 @@ bool LSLocation::isMustAliasLSLocation(const LSLocation &RHS,
 
 bool LSLocation::isMayAliasLSLocation(const LSLocation &RHS,
                                       AliasAnalysis *AA) {
-  // If the bases do not alias, then the locations can not alias.
+  // If the bases do not alias, then the locations cannot alias.
   if (AA->isNoAlias(Base, RHS.getBase()))
     return false;
   // If one projection path is a prefix of another, then the locations

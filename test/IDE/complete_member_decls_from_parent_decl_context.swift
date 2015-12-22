@@ -59,7 +59,7 @@ class CodeCompletionInClassMethods1 {
   struct NestedStruct {}
   class NestedClass {}
   enum NestedEnum {}
-  // Can not declare a nested protocol.
+  // Cannot declare a nested protocol.
   // protocol NestedProtocol {}
 
   typealias NestedTypealias = Int
@@ -162,7 +162,7 @@ struct CodeCompletionInStructMethods1 {
   struct NestedStruct {}
   class NestedClass {}
   enum NestedEnum {}
-  // Can not declare a nested protocol.
+  // Cannot declare a nested protocol.
   // protocol NestedProtocol {}
 
   typealias NestedTypealias = Int

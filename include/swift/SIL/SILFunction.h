@@ -546,17 +546,17 @@ public:
   //===--------------------------------------------------------------------===//
 
   SILArgument *getArgument(unsigned i) {
-    assert(!empty() && "Can not get argument of a function without a body");
+    assert(!empty() && "Cannot get argument of a function without a body");
     return begin()->getBBArg(i);
   }
 
   const SILArgument *getArgument(unsigned i) const {
-    assert(!empty() && "Can not get argument of a function without a body");
+    assert(!empty() && "Cannot get argument of a function without a body");
     return begin()->getBBArg(i);
   }
 
   ArrayRef<SILArgument *> getArguments() const {
-    assert(!empty() && "Can not get arguments of a function without a body");
+    assert(!empty() && "Cannot get arguments of a function without a body");
     return begin()->getBBArgs();
   }
 

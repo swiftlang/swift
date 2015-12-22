@@ -171,7 +171,7 @@ FunctionSignatureSpecializationMangler::mangleConstantProp(LiteralInst *LI) {
     StringLiteralInst *SLI = cast<StringLiteralInst>(LI);
     StringRef V = SLI->getValue();
 
-    assert(V.size() <= 32 && "Can not encode string of length > 32");
+    assert(V.size() <= 32 && "Cannot encode string of length > 32");
 
     llvm::SmallString<33> Str;
     Str += "u";

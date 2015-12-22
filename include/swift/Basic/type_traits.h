@@ -22,7 +22,7 @@
 
 namespace swift {
 
-/// Same as \c std::is_trivially_copyable, which we can not use directly
+/// Same as \c std::is_trivially_copyable, which we cannot use directly
 /// because it is not implemented yet in all C++11 standard libraries.
 ///
 /// Unlike \c llvm::isPodLike, this trait should produce a precise result and

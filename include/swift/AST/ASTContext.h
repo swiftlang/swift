@@ -281,7 +281,7 @@ public:
   template <typename T>
   typename std::remove_reference<T>::type *AllocateObjectCopy(T &&t,
               AllocationArena arena = AllocationArena::Permanent) const {
-    // This function can not be named AllocateCopy because it would always win
+    // This function cannot be named AllocateCopy because it would always win
     // overload resolution over the AllocateCopy(ArrayRef<T>).
     using TNoRef = typename std::remove_reference<T>::type;
     TNoRef *res = (TNoRef *) Allocate(sizeof(TNoRef), alignof(TNoRef), arena);

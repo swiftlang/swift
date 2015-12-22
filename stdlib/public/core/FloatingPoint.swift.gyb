@@ -666,23 +666,23 @@ extension ${Self} {
     // <rdar://problem/17959546> Float80.isFinite is missing
     _precondition(
       other.isFinite,
-      "floating point value can not be converted to ${Self} because it is either infinite or NaN")
+      "floating point value cannot be converted to ${Self} because it is either infinite or NaN")
 %      if signed:
     // FIXME: Float80 doesn't have a _fromBitPattern
     // ${That}(roundTowardsZero: ${Self}.min)
     // > ${getMinFloat(srcBits, incIfSigned(intFormatFix(bits), signed))}
     _precondition(other >= ${That}._fromBitPattern(${getMinFloat(srcBits,
       incIfSigned(intFormatFix(bits), signed))}),
-      "floating point value can not be converted to ${Self} because it is less than ${Self}.min")
+      "floating point value cannot be converted to ${Self} because it is less than ${Self}.min")
 %      else:
     _precondition(other >= (0.0 as ${That}),
-      "floating point value can not be converted to ${Self} because it is less than ${Self}.min")
+      "floating point value cannot be converted to ${Self} because it is less than ${Self}.min")
 %      end
     // ${That}(roundTowardsZero: ${Self}.max)
     // > ${getMaxFloat(srcBits, incIfSigned(intFormatFix(bits), signed))}
     _precondition(other <= ${That}._fromBitPattern(${getMaxFloat(srcBits,
       incIfSigned(intFormatFix(bits), signed))}),
-      "floating point value can not be converted to ${Self} because it is greater than ${Self}.max")
+      "floating point value cannot be converted to ${Self} because it is greater than ${Self}.max")
 
 %     end
     self._value =

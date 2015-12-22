@@ -142,7 +142,7 @@ bb0:
   return %4 : $()                                 // id: %6
 }
 
-// We can not remove the local store that is read.
+// We cannot remove the local store that is read.
 //
 // DISABLECHECK-LABEL: blocking_read_on_local_store
 // DISABLECHECK: bb0
@@ -271,7 +271,7 @@ bb2:
   return %9999 : $()
 }
 
-// We can not remove the local store as the debug_value_addr could
+// We cannot remove the local store as the debug_value_addr could
 // be turned to a debug_value and thus act as a read on the memory
 // location..
 //
@@ -941,7 +941,7 @@ bb4:                                              // Preds: bb2 bb3
   return %24 : $()                                // id: %26
 }
 
-// Can not remove partially dead store in split block for simple class.
+// Cannot remove partially dead store in split block for simple class.
 //
 // CHECK-LABEL: partial_dead_store_simple_class
 // CHECK: bb1:
@@ -980,7 +980,7 @@ bb4:                                              // Preds: bb2 bb3
   return %19 : $()                                // id: %21
 }
 
-// Can not remove partially dead store in split block for simple class.
+// Cannot remove partially dead store in split block for simple class.
 //
 // CHECK-LABEL: partial_dead_store_with_function_call
 // CHECK: bb1:
@@ -1060,7 +1060,7 @@ bb2:                                              // Preds: bb1
 }
 
 
-// store to stack allocated memory can not alias with incoming argument.
+// store to stack allocated memory cannot alias with incoming argument.
 //
 // CHECK-LABEL: DeadStoreInoutAndStackAlias
 // CHECK: bb0
@@ -1289,7 +1289,7 @@ bb0(%0 : $*S8):
 }
 
 /// Make sure we do not remove the first store as there is no way to prove
-/// %0 and %1 can not alias here.
+/// %0 and %1 cannot alias here.
 ///
 /// CHECK-LABEL: NoDeadStoreWithInterferingLoad
 /// CHECK: store

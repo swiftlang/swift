@@ -122,7 +122,7 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
   }
 
   if (auto *FD = dyn_cast<FuncDecl>(Member)) {
-    // Can not call static functions on non-metatypes.
+    // Cannot call static functions on non-metatypes.
     if (!LS.isOnMetatype() && FD->isStatic())
       return false;
 
@@ -130,27 +130,27 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
     return true;
   }
   if (auto *VD = dyn_cast<VarDecl>(Member)) {
-    // Can not use static properties on non-metatypes.
+    // Cannot use static properties on non-metatypes.
     if (!(LS.isQualified() && LS.isOnMetatype()) && VD->isStatic())
       return false;
 
-    // Can not use instance properties on metatypes.
+    // Cannot use instance properties on metatypes.
     if (LS.isOnMetatype() && !VD->isStatic())
       return false;
 
     return true;
   }
   if (isa<EnumElementDecl>(Member)) {
-    // Can not reference enum elements on non-metatypes.
+    // Cannot reference enum elements on non-metatypes.
     if (!(LS.isQualified() && LS.isOnMetatype()))
       return false;
   }
   if (auto CD = dyn_cast<ConstructorDecl>(Member)) {
-    // Constructors with stub implementations can not be called in Swift.
+    // Constructors with stub implementations cannot be called in Swift.
     if (CD->hasStubImplementation())
       return false;
     if (LS.isQualified() && LS.isOnSuperclass()) {
-      // Can not call initializers from a superclass, except for inherited
+      // Cannot call initializers from a superclass, except for inherited
       // convenience initializers.
       return LS.isInheritsSuperclassInitializers() && CD->isInheritable();
     }
@@ -277,7 +277,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       if (D->getOverriddenDecl())
         return;
 
-      // Initializers can not be found by dynamic lookup.
+      // Initializers cannot be found by dynamic lookup.
       if (isa<ConstructorDecl>(D))
         return;
 

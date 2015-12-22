@@ -56,7 +56,7 @@ struct ARCMatchingSet {
   /// reference counted value could be used.
   llvm::SetVector<SILInstruction *> DecrementInsertPts;
 
-  // This is a data structure that can not be moved or copied.
+  // This is a data structure that cannot be moved or copied.
   ARCMatchingSet() = default;
   ARCMatchingSet(const ARCMatchingSet &) = delete;
   ARCMatchingSet(ARCMatchingSet &&) = delete;

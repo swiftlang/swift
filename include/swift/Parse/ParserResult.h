@@ -49,7 +49,7 @@ public:
 
   /// Construct a successful parser result.
   explicit ParserResult(T *Result) : PtrAndBits(Result) {
-    assert(Result && "a successful parser result can not be null");
+    assert(Result && "a successful parser result cannot be null");
   }
 
   /// Convert from a different but compatible parser result.

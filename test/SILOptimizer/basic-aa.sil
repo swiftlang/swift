@@ -46,11 +46,11 @@ struct StructLvl1 {
   var x : Builtin.Int64
 }
 
-// Two values with different underlying alloc_stack can not alias.
+// Two values with different underlying alloc_stack cannot alias.
 //
 // CHECK-LABEL: @different_alloc_stack_dont_alias
 
-// @local_storage can not alias non @local_storage types.
+// @local_storage cannot alias non @local_storage types.
 // CHECK: PAIR #0.
 // CHECK-NEXT: (0):   %0 = alloc_stack $StructLvl1
 // CHECK-NEXT: (0):   %0 = alloc_stack $StructLvl1
@@ -156,7 +156,7 @@ sil @different_alloc_stack_dont_alias : $@convention(thin) () -> () {
   return %12 : $()
 }
 
-// Function Arguments can not alias with no alias arguments or with identified
+// Function Arguments cannot alias with no alias arguments or with identified
 // function locals.
 //
 // @args_dont_alias_with_identified_function_locals

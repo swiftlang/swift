@@ -182,7 +182,7 @@ public:
     bool ReadsRC = false;
     
     /// Returns the effecs for an address or reference. This might be a
-    /// parameter, the LocalEffects or, if the value can not be associated to one
+    /// parameter, the LocalEffects or, if the value cannot be associated to one
     /// of them, the GlobalEffects.
     Effects *getEffectsOn(SILValue Addr);
     

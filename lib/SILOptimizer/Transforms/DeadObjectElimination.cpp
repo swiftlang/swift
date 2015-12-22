@@ -79,7 +79,7 @@ static SILFunction *getDestructor(AllocRefInst *ARI) {
 
   DEBUG(llvm::dbgs() << "    Found destructor!\n");
 
-  // If the destructor has an objc_method calling convention, we can not
+  // If the destructor has an objc_method calling convention, we cannot
   // analyze it since it could be swapped out from under us at runtime.
   if (Fn->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod) {
     DEBUG(llvm::dbgs() << "        Found objective-c destructor. Can't "
@@ -146,7 +146,7 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
       }
 
       // dealloc_ref on self can be ignored, but dealloc_ref on anything else
-      // can not be eliminated.
+      // cannot be eliminated.
       if (auto *DeallocRef = dyn_cast<DeallocRefInst>(&I)) {
         if (DeallocRef->getOperand().stripCasts().getDef() == Self) {
           DEBUG(llvm::dbgs() << "            SAFE! dealloc_ref on self.\n");
@@ -741,7 +741,7 @@ bool DeadObjectElimination::processAllocRef(AllocRefInst *ARI) {
   // escape, then we can completely remove the use graph of this alloc_ref.
   UserList UsersToRemove;
   if (hasUnremoveableUsers(ARI, UsersToRemove)) {
-    DEBUG(llvm::dbgs() << "    Found a use that can not be zapped...\n");
+    DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
     return false;
   }
 
@@ -761,7 +761,7 @@ bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
 
   UserList UsersToRemove;
   if (hasUnremoveableUsers(ASI, UsersToRemove)) {
-    DEBUG(llvm::dbgs() << "    Found a use that can not be zapped...\n");
+    DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
     return false;
   }
 

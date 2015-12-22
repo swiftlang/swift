@@ -51,7 +51,7 @@ static bool hasLoopInvariantOperands(SILInstruction *I, SILLoop *L,
   });
 }
 
-/// We can not duplicate blocks with AllocStack instructions (they need to be
+/// We cannot duplicate blocks with AllocStack instructions (they need to be
 /// FIFO). Other instructions can be moved to the preheader.
 static bool
 canDuplicateOrMoveToPreheader(SILLoop *L, SILBasicBlock *Preheader,

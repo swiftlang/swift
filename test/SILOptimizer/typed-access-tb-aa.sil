@@ -243,7 +243,7 @@ bb0:
 // CHECK: NoAlias
 
 // Next check that Int8 addresses can only alias Int8 addresses and raw
-// pointers. This includes ensuring that Int8 can not alias Int32 addresses.
+// pointers. This includes ensuring that Int8 cannot alias Int32 addresses.
 // CHECK: PAIR #184.
 // CHECK: (1):   %3 = alloc_box $Builtin.Int8
 // CHECK: (1):   %4 = alloc_box $Builtin.Int32
@@ -287,7 +287,7 @@ bb0:
 
 // Finally conclude by checking that FPIEEE32 addresses only can alias raw
 // pointer addresses and other FPIEEE32 addresses. Again this includes proving
-// that FPIEEE64 addresses can not alias FPIEEE32.
+// that FPIEEE64 addresses cannot alias FPIEEE32.
 // CHECK: PAIR #266.
 // CHECK: (1):   %5 = alloc_box $Builtin.FPIEEE32
 // CHECK: (1):   %6 = alloc_box $Builtin.FPIEEE64

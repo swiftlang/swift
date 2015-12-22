@@ -83,7 +83,7 @@ public:
   enum class AliasResult : unsigned {
     NoAlias=0,      ///< The two values have no dependencies on each
                     ///  other.
-    MayAlias,       ///< The two values can not be proven to alias or
+    MayAlias,       ///< The two values cannot be proven to alias or
                     ///  not alias. Anything could happen.
     PartialAlias,   ///< The two values overlap in a partial manner.
     MustAlias,      ///< The two values are equal.
@@ -166,7 +166,7 @@ public:
     return alias(V1, V2, TBAAType1, TBAAType2) == AliasResult::PartialAlias;
   }
 
-  /// Convenience method that returns true if V1, V2 can not alias.
+  /// Convenience method that returns true if V1, V2 cannot alias.
   bool isNoAlias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
                  SILType TBAAType2 = SILType()) {
     return alias(V1, V2, TBAAType1, TBAAType2) == AliasResult::NoAlias;

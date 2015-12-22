@@ -624,11 +624,11 @@ public:
   }
 
   bool isRoot() const {
-    // Root does not have a parent. So if we have a parent, we can not be root.
+    // Root does not have a parent. So if we have a parent, we cannot be root.
     if (Parent.hasValue()) {
       assert(Proj.hasValue() && "If parent is not none, then P should be not "
              "none");
-      assert(Index != RootIndex && "If parent is not none, we can not be root");
+      assert(Index != RootIndex && "If parent is not none, we cannot be root");
       return false;
     } else {
       assert(!Proj.hasValue() && "If parent is none, then P should be none");

@@ -124,7 +124,7 @@ func _stdlib_demangleName(mangledName: String) -> String {
 public // @testable
 func _floorLog2(x: Int64) -> Int {
   _sanityCheck(x > 0, "_floorLog2 operates only on non-negative integers")
-  // Note: use unchecked subtraction because we this expression can not
+  // Note: use unchecked subtraction because we this expression cannot
   // overflow.
   return 63 &- Int(_countLeadingZeros(x))
 }

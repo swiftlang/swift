@@ -99,7 +99,7 @@ public:
   /// V1.
   void replace(const ValueT &V1, const ValueT &V2) {
     auto Iter1 = Map.find(V1);
-    assert(Iter1 != Map.end() && "Can not replace value that is not in set");
+    assert(Iter1 != Map.end() && "Cannot replace value that is not in set");
     unsigned V1Index = Iter1->second;
     Map.erase(V1);
 

@@ -147,7 +147,7 @@ static unsigned basicBlockInlineCost(SILBasicBlock *BB, unsigned Cutoff) {
   return Cost;
 }
 
-/// We can not duplicate blocks with AllocStack instructions (they need to be
+/// We cannot duplicate blocks with AllocStack instructions (they need to be
 /// FIFO). Other instructions can be duplicated.
 static bool canDuplicateBlock(SILBasicBlock *BB) {
   for (auto &I : *BB) {

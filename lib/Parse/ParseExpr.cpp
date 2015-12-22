@@ -649,7 +649,7 @@ static bool isStartOfGetSetAccessor(Parser &P) {
       NextToken.isContextualKeyword("willSet"))
     return true;
 
-  // If we don't have attributes, then it can not be an accessor block.
+  // If we don't have attributes, then it cannot be an accessor block.
   if (NextToken.isNot(tok::at_sign))
     return false;
 
