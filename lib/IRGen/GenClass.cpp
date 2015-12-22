@@ -784,7 +784,6 @@ namespace {
       return TheEntity.is<ProtocolDecl*>();
     }
 
-    bool Generic = false;
     bool HasNonTrivialDestructor = false;
     bool HasNonTrivialConstructor = false;
     llvm::SmallString<16> CategoryName;
@@ -810,7 +809,6 @@ namespace {
                      unsigned firstField)
         : IGM(IGM), TheEntity(theClass), TheExtension(nullptr),
           FieldLayout(&fieldLayout),
-          Generic(theClass->isGenericContext()),
           FirstFieldIndex(firstField),
           NextFieldIndex(firstField)
     {
@@ -826,8 +824,7 @@ namespace {
     ClassDataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                      ExtensionDecl *theExtension)
       : IGM(IGM), TheEntity(theClass), TheExtension(theExtension),
-        FieldLayout(nullptr),
-        Generic(theClass->isGenericContext())
+        FieldLayout(nullptr)
     {
       buildCategoryName(CategoryName);
 
@@ -1385,7 +1382,11 @@ namespace {
       
       llvm::Constant *offsetPtr;
       if (elt.getKind() == ElementLayout::Kind::Fixed) {
-        // Emit a field offset variable for the fixed field statically.
+        // Emit a global variable storing the constant field offset, and
+        // reference it from the class metadata. If the superclass was
+        // imported from Objective-C, the offset does not include the
+        // superclass size; instead, we set ROData->InstanceStart to
+        // instruct the Objective-C runtime to slide it down.
         auto offsetAddr = IGM.getAddrOfFieldOffset(ivar, /*indirect*/ false,
                                                    ForDefinition);
         auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
@@ -1396,7 +1397,11 @@ namespace {
         
         offsetPtr = offsetVar;
       } else {
-        // Emit an indirect field offset variable with the field index.
+        // Emit a global variable storing an offset into the field offset
+        // vector within the class metadata. This access pattern is used
+        // when the field offset depends on generic parameters. As above,
+        // the Objective-C runtime will slide the field offsets within the
+        // class metadata to adjust for the superclass size.
         auto offsetAddr = IGM.getAddrOfFieldOffset(ivar, /*indirect*/ true,
                                                    ForDefinition);
         auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
