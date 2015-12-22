@@ -333,7 +333,8 @@ final public class VaListBuilder {
     }
 
     for word in words {
-      storage[count++] = word
+      storage[count] = word
+      count += 1
     }
   }
 
