@@ -681,24 +681,24 @@ protected:
   bool isNonThrowingApply() const { return NonThrowing; }
   
 public:
-  // The operand number of the first argument.
+  /// The operand number of the first argument.
   static unsigned getArgumentOperandNumber() { return 1; }
 
   SILValue getCallee() const { return Operands[Callee].get(); }
 
-  // Gets the referenced function if the callee is a function_ref instruction.
+  /// Gets the referenced function if the callee is a function_ref instruction.
   SILFunction *getCalleeFunction() const {
     if (auto *FRI = dyn_cast<FunctionRefInst>(getCallee()))
       return FRI->getReferencedFunction();
     return nullptr;
   }
 
-  // Get the type of the callee without the applied substitutions.
+  /// Get the type of the callee without the applied substitutions.
   CanSILFunctionType getOrigCalleeType() const {
     return getCallee().getType().template castTo<SILFunctionType>();
   }
 
-  // Get the type of the callee with the applied substitutions.
+  /// Get the type of the callee with the applied substitutions.
   CanSILFunctionType getSubstCalleeType() const {
     return SubstCalleeType.castTo<SILFunctionType>();
   }
@@ -764,7 +764,7 @@ public:
   /// Return the ith argument passed to this instruction.
   SILValue getArgument(unsigned i) const { return getArguments()[i]; }
 
-  // Set the ith argument of this instruction.
+  /// Set the ith argument of this instruction.
   void setArgument(unsigned i, SILValue V) {
     return getArgumentOperands()[i].set(V);
   }
@@ -778,9 +778,9 @@ public:
 /// does it have the given semantics?
 bool doesApplyCalleeHaveSemantics(SILValue callee, StringRef semantics);
 
-// The partial specialization of ApplyInstBase for full applications.
-// Adds some methods relating to 'self' and to result types that don't
-// make sense for partial applications.
+/// The partial specialization of ApplyInstBase for full applications.
+/// Adds some methods relating to 'self' and to result types that don't
+/// make sense for partial applications.
 template <class Impl, class Base>
 class ApplyInstBase<Impl, Base, true>
   : public ApplyInstBase<Impl, Base, false> {
@@ -1333,7 +1333,7 @@ class MarkUninitializedInst
   friend class SILBuilder;
 
 public:
-  // This enum captures what the mark_uninitialized instruction is designating.
+  /// This enum captures what the mark_uninitialized instruction is designating.
   enum Kind {
     /// Var designates the start of a normal variable live range.
     Var,
@@ -2286,7 +2286,7 @@ public:
     return Operands.getDynamicValuesAsArray();
   }
 
-  // Return the i'th value referenced by this TupleInst.
+  /// Return the i'th value referenced by this TupleInst.
   SILValue getElement(unsigned i) const {
     return getElements()[i];
   }
@@ -2490,8 +2490,8 @@ protected:
   unsigned NumCases : 31;
   unsigned HasDefault : 1;
 
-  // The first operand is the operand of select_xxx instruction;
-  // the rest are the case values and results of a select instruction.
+  /// The first operand is the operand of select_xxx instruction. The rest of
+  /// the operands are the case values and results of a select instruction.
   TailAllocatedOperandList<1> Operands;
 
 public:
@@ -2579,12 +2579,12 @@ public:
     return Operands[NumCases + 1].get();
   }
 
-  // If there is a single case that returns a literal "true" value (an
-  // "integer_literal $Builtin.Int1, 1" value), return it.
-  //
-  // FIXME: This is used to interoperate with passes that reasoned about the
-  // old enum_is_tag insn. Ideally those passes would become general enough
-  // not to need this.
+  /// If there is a single case that returns a literal "true" value (an
+  /// "integer_literal $Builtin.Int1, 1" value), return it.
+  ///
+  /// FIXME: This is used to interoperate with passes that reasoned about the
+  /// old enum_is_tag insn. Ideally those passes would become general enough
+  /// not to need this.
   NullablePtr<EnumElementDecl> getSingleTrueElement() const;
 };
   
@@ -3822,12 +3822,12 @@ public:
   };
 private:
   SILSuccessor DestBBs[2];
-  // The number of arguments for the True branch.
+  /// The number of arguments for the True branch.
   unsigned NumTrueArgs;
-  // The number of arguments for the False branch.
+  /// The number of arguments for the False branch.
   unsigned NumFalseArgs;
 
-  // The first argument is the condition; the rest are BB arguments.
+  /// The first argument is the condition; the rest are BB arguments.
   TailAllocatedOperandList<1> Operands;
   CondBranchInst(SILDebugLocation *DebugLoc, SILValue Condition,
                  SILBasicBlock *TrueBB, SILBasicBlock *FalseBB,
@@ -4113,7 +4113,7 @@ class DynamicMethodBranchInst : public TermInst {
 
   SILSuccessor DestBBs[2];
 
-  // The operand.
+  /// The operand.
   FixedOperandList<1> Operands;
 
   DynamicMethodBranchInst(SILDebugLocation *DebugLoc, SILValue Operand,
@@ -4359,7 +4359,8 @@ public:
     FOREACH_IMPL_RETURN(getCallee());
   }
 
-  // Return the referenced function if the callee is a function_ref instruction.
+  /// Return the referenced function if the callee is a function_ref
+  /// instruction.
   SILFunction *getCalleeFunction() const {
     FOREACH_IMPL_RETURN(getCalleeFunction());
   }
@@ -4449,7 +4450,7 @@ public:
   /// Return the ith argument passed to this instruction.
   SILValue getArgument(unsigned i) const { return getArguments()[i]; }
 
-  // Set the ith argument of this instruction.
+  /// Set the ith argument of this instruction.
   void setArgument(unsigned i, SILValue V) const {
     getArgumentOperands()[i].set(V);
   }
