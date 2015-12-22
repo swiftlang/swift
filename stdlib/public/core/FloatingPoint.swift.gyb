@@ -574,12 +574,16 @@ extension ${Self} {
 //===----------------------------------------------------------------------===//
 
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public prefix func ++ (inout rhs: ${Self}) -> ${Self} { rhs += 1.0; return rhs }
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public prefix func -- (inout rhs: ${Self}) -> ${Self} { rhs -= 1.0; return rhs }
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public postfix func ++ (inout lhs: ${Self}) -> ${Self} { let tmp = lhs; lhs += 1.0; return tmp }
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public postfix func -- (inout lhs: ${Self}) -> ${Self} { let tmp = lhs; lhs -= 1.0; return tmp }
 
 

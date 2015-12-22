@@ -551,17 +551,17 @@ _ = C(other: 3) // expected-error {{cannot convert value of type 'Int' to expect
 
 func unaryOps(inout i8: Int8, inout i64: Int64) {
   i8 = ~i8
-  ++i64
-  --i8
+  i64 += 1
+  i8 -= 1
 
-  ++Int64(5) // expected-error{{cannot pass immutable value to mutating operator: function call returns immutable value}}
+  Int64(5) += 1 // expected-error{{left side of mutating operator isn't mutable: function call returns immutable value}}
   
   // <rdar://problem/17691565> attempt to modify a 'let' variable with ++ results in typecheck error not being able to apply ++ to Float
   let a = i8 // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
-  ++a // expected-error {{cannot pass immutable value to mutating operator: 'a' is a 'let' constant}}
+  a += 1 // expected-error {{left side of mutating operator isn't mutable: 'a' is a 'let' constant}}
   
   var b : Int { get { }}
-  ++b  // expected-error {{cannot pass immutable value to mutating operator: 'b' is a get-only property}}
+  b += 1  // expected-error {{left side of mutating operator isn't mutable: 'b' is a get-only property}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -597,7 +597,7 @@ func +-+= (inout x: Int, y: Int) -> Int { return 0}
 
 func lvalue_processing() {
   var i = 0
-  ++i   // obviously ok
+  i += 1   // obviously ok
 
   var fn = (+-+=)
 
@@ -802,3 +802,23 @@ func r22913570() {
   func f(from: Int = 0, to: Int) {}
   f(1 + 1) // expected-error{{missing argument for parameter 'to' in call}}
 }
+
+
+// <rdar://problem/23708702> Emit deprecation warnings for ++/-- in Swift 2.2
+func swift22_deprecation_increment_decrement() {
+  var i = 0
+  var f = 1.0
+  var si = "foo".startIndex
+
+  i++   // expected-warning {{'++' is deprecated: it will be removed in Swift 3}}
+  --i   // expected-warning {{'--' is deprecated: it will be removed in Swift 3}}
+
+  ++f   // expected-warning {{'++' is deprecated: it will be removed in Swift 3}}
+  f--   // expected-warning {{'--' is deprecated: it will be removed in Swift 3}}
+
+  ++si   // expected-warning {{'++' is deprecated: it will be removed in Swift 3}}
+  --si   // expected-warning {{'--' is deprecated: it will be removed in Swift 3}}
+}
+
+
+
