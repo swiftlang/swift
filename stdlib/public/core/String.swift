@@ -272,7 +272,7 @@ extension String {
     Encoding: UnicodeCodecType
   >(encoding: Encoding.Type) -> Int {
     var codeUnitCount = 0
-    let output: (Encoding.CodeUnit) -> Void = { _ in ++codeUnitCount }
+    let output: (Encoding.CodeUnit) -> Void = { _ in codeUnitCount += 1 }
     self._encode(encoding, output: output)
     return codeUnitCount
   }

@@ -403,7 +403,8 @@ final public class VaListBuilder {
       sseRegistersUsed += 1
     }
     else if encoded.count == 1 && gpRegistersUsed < _x86_64CountGPRegisters {
-      storage[gpRegistersUsed++] = encoded[0]
+      storage[gpRegistersUsed] = encoded[0]
+      gpRegistersUsed += 1
     }
     else {
       for w in encoded {

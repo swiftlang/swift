@@ -144,11 +144,18 @@ public struct ${Index}<
   /// - Requires: The previous value is representable.
   public func predecessor() -> ${Index} {
     var prevOuter = _outer
-    var prevInnerCollection = _innerCollection ?? _base[--prevOuter]
+    var prevInnerCollection : BaseElements.Generator.Element
+    if let ic = _innerCollection {
+      prevInnerCollection = ic
+    } else {
+      prevOuter._predecessorInPlace()
+      prevInnerCollection = _base[prevOuter]
+    }
     var prevInner = _inner ?? prevInnerCollection.endIndex
 
     while prevInner == prevInnerCollection.startIndex {
-      prevInnerCollection = _base[--prevOuter]
+      prevOuter._predecessorInPlace()
+      prevInnerCollection = _base[prevOuter]
       prevInner = prevInnerCollection.endIndex
     }
 

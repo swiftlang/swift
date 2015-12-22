@@ -2113,7 +2113,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   var description: String {
     var result = ""
 #if INTERNAL_CHECKS_ENABLED
-    for var i = 0; i != capacity; ++i {
+    for var i = 0; i != capacity; i += 1 {
       if isInitializedEntry(i) {
         let key = keyAt(i)
         result += "bucket \(i), ideal bucket = \(_bucket(key)), key = \(key)\n"
@@ -2231,7 +2231,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
         continue
       }
       nativeStorage.initializeKey(key, at: i.offset)
-      ++count
+      count += 1
     }
     nativeStorage.count = count
 
@@ -2601,7 +2601,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
     let bridged = _createBridgedNativeStorage(nativeStorage.capacity)
 
     // Bridge everything.
-    for var i = 0; i < nativeStorage.capacity; ++i {
+    for var i = 0; i < nativeStorage.capacity; i += 1 {
       if nativeStorage.isInitializedEntry(i) {
         let key = _bridgeToObjectiveCUnconditional(nativeStorage.keyAt(i))
 %if Self == 'Set':
@@ -2684,9 +2684,9 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
         while position < count {
           if bridgedNativeStorage.isInitializedEntry(position) {
             unmanagedObjects[i] = bridgedNativeStorage.valueAt(position)
-            i++
+            i += 1
           }
-          position++
+          position += 1
         }
       }
     } else {
@@ -2695,9 +2695,9 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
         while position < count {
           if bridgedNativeStorage.isInitializedEntry(position) {
             unmanagedKeys[i] = bridgedNativeStorage.keyAt(position)
-            i++
+            i += 1
           }
-          position++
+          position += 1
         }
       } else {
         // keys nonnull, objects nonnull
@@ -2705,9 +2705,9 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
           if bridgedNativeStorage.isInitializedEntry(position) {
             unmanagedObjects[i] = bridgedNativeStorage.valueAt(position)
             unmanagedKeys[i] = bridgedNativeStorage.keyAt(position)
-            i++
+            i += 1
           }
-          position++
+          position += 1
         }
       }
     }
@@ -2766,7 +2766,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 
       let bridgedKey: AnyObject = _getBridgedKey(currIndex)
       unmanagedObjects[i] = bridgedKey
-      ++stored
+      stored += 1
       currIndex._successorInPlace()
     }
     theState.extra.0 = CUnsignedLong(currIndex.offset)
@@ -3187,7 +3187,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
       native.setKey(key, at: i.offset)
     } else {
       native.initializeKey(key, at: i.offset)
-      ++native.count
+      native.count += 1
     }
 %elif Self == 'Dictionary':
     let oldValue: Value? = found ? native.valueAt(i.offset) : nil
@@ -3195,7 +3195,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
       native.setKey(key, value: value, at: i.offset)
     } else {
       native.initializeKey(key, value: value, at: i.offset)
-      ++native.count
+      native.count += 1
     }
 %end
 
@@ -3234,7 +3234,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
 
     // remove the element
     nativeStorage.destroyEntryAt(offset)
-    --nativeStorage.count
+    nativeStorage.count -= 1
 
     // If we've put a hole in a chain of contiguous elements, some
     // element after the hole may belong where the new hole is.
@@ -3409,7 +3409,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
       nativeStorage = native
     }
 
-    for var b = 0; b != nativeStorage.capacity; ++b {
+    for var b = 0; b != nativeStorage.capacity; b  += 1 {
       if nativeStorage.isInitializedEntry(b) {
         nativeStorage.destroyEntryAt(b)
       }
@@ -3510,7 +3510,7 @@ internal struct _Native${Self}Index<${TypeParametersDecl}> :
         break
       }
       // end workaround
-      ++i
+      i += 1
     }
     return NativeIndex(nativeStorage: nativeStorage, offset: i)
   }
@@ -3832,7 +3832,7 @@ final internal class _Cocoa${Self}Generator : GeneratorType {
       UnsafeMutablePointer(_fastEnumerationState.itemsPtr)
     let itemsPtr = _UnmanagedAnyObjectArray(itemsPtrUP)
     let key: AnyObject = itemsPtr[itemIndex]
-    ++itemIndex
+    itemIndex += 1
 %if Self == 'Set':
     return key
 %elif Self == 'Dictionary':
@@ -4094,7 +4094,7 @@ public struct _${Self}Builder<${TypeParametersDecl}> {
   public mutating func add(key newKey: Key, value: Value) {
     _nativeStorage.unsafeAddNew(key: newKey, value: value)
 %end
-    _actualCount++
+    _actualCount += 1
   }
 
   @warn_unused_result
