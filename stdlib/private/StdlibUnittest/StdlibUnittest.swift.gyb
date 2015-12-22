@@ -87,7 +87,7 @@ public struct SourceLocStack {
 }
 
 %{
-  TRACE = '''@autoclosure _ message: ()->String = "",
+  TRACE = '''@autoclosure _ message: () -> String = "",
     showFrame: Bool = true,
     stackTrace: SourceLocStack = SourceLocStack(),  
     file: String = __FILE__, line: UInt = __LINE__'''
@@ -166,7 +166,7 @@ public func expectationFailure(
 }
 
 public func expectEqual<T>(
-  expected: T, _ actual: T, ${TRACE}, sameValue equal: (T,T)->Bool
+  expected: T, _ actual: T, ${TRACE}, sameValue equal: (T,T) -> Bool
 ) {
   if !equal(expected, actual) {
     expectationFailure(
@@ -195,7 +195,7 @@ public func expectOptionalEqual<T : Equatable>(
 }
 
 public func expectOptionalEqual<T>(
-  expected: T, _ actual: T?, ${TRACE}, sameValue equal: (T,T)->Bool
+  expected: T, _ actual: T?, ${TRACE}, sameValue equal: (T,T) -> Bool
 ) {
   if (actual == nil) || !equal(expected, actual!) {
     expectationFailure(
@@ -1478,7 +1478,7 @@ public func checkHashable<
   Instances: CollectionType where Instances.Generator.Element : Hashable
 >(
   instances: Instances,
-  equalityOracle: (Instances.Index, Instances.Index)->Bool,
+  equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   ${TRACE}
 ) {
   checkEquatable(instances, oracle: equalityOracle, ${trace})
@@ -1517,7 +1517,7 @@ public func check${inc.capitalize()}rementable<
   where Instances.Generator.Element : ${protocol}
 >(
   instances: Instances,
-  equalityOracle: (Instances.Index, Instances.Index)->Bool,
+  equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   ${end}Index: Instances.Generator.Element, ${TRACE}
 ) {
   checkEquatable(instances, oracle: equalityOracle, ${trace})
@@ -1726,10 +1726,10 @@ internal func _checkIncrementalAdvance<
   Instances: CollectionType where Instances.Generator.Element : ForwardIndexType
 >(
   instances: Instances,
-  equalityOracle: (Instances.Index, Instances.Index)->Bool,
+  equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   limit: Instances.Generator.Element,
   sign: Instances.Generator.Element.Distance, // 1 or -1
-  next: (Instances.Generator.Element)->Instances.Generator.Element,
+  next: (Instances.Generator.Element) -> Instances.Generator.Element,
   ${TRACE}
 ) {
   for i in instances {
@@ -1760,7 +1760,7 @@ public func checkForwardIndex<
   Instances: CollectionType where Instances.Generator.Element : ForwardIndexType
 >(
   instances: Instances,
-  equalityOracle: (Instances.Index, Instances.Index)->Bool,
+  equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   endIndex: Instances.Generator.Element, ${TRACE}
 ) {
   typealias Index = Instances.Generator.Element
@@ -1786,7 +1786,7 @@ public func checkBidirectionalIndex<
   where Instances.Generator.Element : BidirectionalIndexType
 >(
   instances: Instances,
-  equalityOracle: (Instances.Index, Instances.Index)->Bool,
+  equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   startIndex: Instances.Generator.Element, 
   endIndex: Instances.Generator.Element,
   ${TRACE}
@@ -1910,7 +1910,7 @@ public func checkSequence<
 
   // Check that _initializeTo does the right thing if we can do so
   // without destroying the sequence.
-  sequence._preprocessingPass { (sequence)->Void in 
+  sequence._preprocessingPass { (sequence) -> Void in 
     var count = 0
     for _ in sequence { count += 1 }
     let buf = UnsafeMutablePointer<S.Generator.Element>.alloc(count)
@@ -2194,8 +2194,8 @@ public func checkRangeReplaceable<
 where
   C.Generator.Element : Equatable, C.Generator.Element == N.Generator.Element
 >(
-  makeCollection: ()->C,
-  _ makeNewValues: (Int)->N
+  makeCollection: () -> C,
+  _ makeNewValues: (Int) -> N
 ) {
   typealias A = C
 
@@ -2278,7 +2278,7 @@ public func expectEqualSequence<
   Actual: SequenceType
   where Expected.Generator.Element == Actual.Generator.Element
 >(expected: Expected, _ actual: Actual, ${TRACE},
-  sameValue: (Expected.Generator.Element, Expected.Generator.Element)->Bool) {
+  sameValue: (Expected.Generator.Element, Expected.Generator.Element) -> Bool) {
   
   if !expected.elementsEqual(actual, isEquivalent: sameValue) {
     expectationFailure("expected elements: \"\(expected)\"\n"

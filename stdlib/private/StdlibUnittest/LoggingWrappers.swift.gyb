@@ -540,7 +540,7 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
   public func _preprocessingPass<R>(
-    preprocess: (Logging${Kind})->R
+    preprocess: (Logging${Kind}) -> R
   ) -> R? {
     Log._preprocessingPass[selfType] += 1
     return base._preprocessingPass { _ in preprocess(self) }
@@ -572,7 +572,7 @@ public func expectCustomizable<
   T.Log == T.Base.Log
 >(_: T, _ counters: TypeIndexed<Int>,
   //===--- TRACE boilerplate ----------------------------------------------===//
-  @autoclosure _ message: ()->String = "",
+  @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
   file: String = __FILE__, line: UInt = __LINE__
@@ -590,7 +590,7 @@ public func expectNotCustomizable<
   T.Log == T.Base.Log
 >(_: T, _ counters: TypeIndexed<Int>,
   //===--- TRACE boilerplate ----------------------------------------------===//
-  @autoclosure _ message: ()->String = "",
+  @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
   file: String = __FILE__, line: UInt = __LINE__

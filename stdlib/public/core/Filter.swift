@@ -37,7 +37,7 @@ public struct LazyFilterGenerator<
   /// for which `predicate(x) == true`.
   public init(
     _ base: Base,
-    whereElementsSatisfy predicate: (Base.Element)->Bool
+    whereElementsSatisfy predicate: (Base.Element) -> Bool
   ) {
     self._base = base
     self._predicate = predicate
@@ -50,7 +50,7 @@ public struct LazyFilterGenerator<
   
   /// The predicate used to determine which elements produced by
   /// `base` are also produced by `self`.
-  internal var _predicate: (Base.Element)->Bool
+  internal var _predicate: (Base.Element) -> Bool
 }
 
 /// A sequence whose elements consist of the elements of some base
@@ -73,7 +73,7 @@ public struct LazyFilterSequence<Base : SequenceType>
   /// which `predicate(x) == true`.
   public init(
     _ base: Base,
-    whereElementsSatisfy predicate: (Base.Generator.Element)->Bool
+    whereElementsSatisfy predicate: (Base.Generator.Element) -> Bool
   ) {
     self.base = base
     self._include = predicate
@@ -84,7 +84,7 @@ public struct LazyFilterSequence<Base : SequenceType>
 
   /// The predicate used to determine which elements of `base` are
   /// also elements of `self`.
-  internal let _include: (Base.Generator.Element)->Bool
+  internal let _include: (Base.Generator.Element) -> Bool
 }
 
 /// The `Index` used for subscripting a `LazyFilterCollection`.
@@ -130,7 +130,7 @@ public struct LazyFilterIndex<
 
   /// The predicate used to determine which elements of `base` are
   /// also elements of `self`.
-  internal let _include: (BaseElements.Generator.Element)->Bool
+  internal let _include: (BaseElements.Generator.Element) -> Bool
 
   @available(*, unavailable, renamed="BaseElements")
   public typealias Base = BaseElements
@@ -168,7 +168,7 @@ public struct LazyFilterCollection<
   /// satisfy `predicate`.
   public init(
     _ base: Base,
-    whereElementsSatisfy predicate: (Base.Generator.Element)->Bool
+    whereElementsSatisfy predicate: (Base.Generator.Element) -> Bool
   ) {
     self._base = base
     self._predicate = predicate
@@ -221,7 +221,7 @@ public struct LazyFilterCollection<
   }
 
   var _base: Base
-  var _predicate: (Base.Generator.Element)->Bool
+  var _predicate: (Base.Generator.Element) -> Bool
 }
 
 extension LazySequenceType {
@@ -233,7 +233,7 @@ extension LazySequenceType {
   ///   elements.
   @warn_unused_result
   public func filter(
-    predicate: (Elements.Generator.Element)->Bool
+    predicate: (Elements.Generator.Element) -> Bool
   ) -> LazyFilterSequence<Self.Elements> {
     return LazyFilterSequence(
       self.elements, whereElementsSatisfy: predicate)
@@ -249,7 +249,7 @@ extension LazyCollectionType {
   ///   elements.
   @warn_unused_result
   public func filter(
-    predicate: (Elements.Generator.Element)->Bool
+    predicate: (Elements.Generator.Element) -> Bool
   ) -> LazyFilterCollection<Self.Elements> {
     return LazyFilterCollection(
       self.elements, whereElementsSatisfy: predicate)

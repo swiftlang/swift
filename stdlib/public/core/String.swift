@@ -310,7 +310,7 @@ extension String {
 @_silgen_name("swift_stdlib_compareNSStringDeterministicUnicodeCollation")
 public func _stdlib_compareNSStringDeterministicUnicodeCollation(
   lhs: AnyObject, _ rhs: AnyObject
-)-> Int32
+) -> Int32
 #endif
 
 extension String : Equatable {

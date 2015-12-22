@@ -85,10 +85,10 @@ public typealias Any = protocol<>
 ///       @objc func getCValue() -> Int { return 42 }
 ///     }
 ///
-///     // If x has a method @objc getValue()->Int, call it and
+///     // If x has a method @objc getValue() -> Int, call it and
 ///     // return the result.  Otherwise, return `nil`.
 ///     func getCValue1(x: AnyObject) -> Int? {
-///       if let f: ()->Int = x.getCValue { // <===
+///       if let f: () -> Int = x.getCValue { // <===
 ///         return f()
 ///       }
 ///       return nil
@@ -327,7 +327,7 @@ public protocol Hashable : Equatable {
 }
 
 public protocol _SinkType {}
-@available(*, unavailable, message="SinkType has been removed. Use (T)->() closures directly instead.")
+@available(*, unavailable, message="SinkType has been removed. Use (T) -> () closures directly instead.")
 public typealias SinkType = _SinkType
 
 //===----------------------------------------------------------------------===//
