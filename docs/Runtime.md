@@ -28,38 +28,66 @@ ABI stabilization.
 **ABI TODO**: Any exported C++ symbols are implementation details that are not
 intended to be part of the stable runtime interface.
 
-### `_swift_ClassMirror_count`
-### `_swift_ClassMirror_quickLookObject`
-### `_swift_ClassMirror_subscript`
-### `_swift_EnumMirror_caseName`
-### `_swift_EnumMirror_count`
-### `_swift_EnumMirror_subscript`
-### `_swift_MagicMirrorData_objcValue`
-### `_swift_MagicMirrorData_objcValueType`
-### `_swift_MagicMirrorData_summary`
-### `_swift_MagicMirrorData_value`
-### `_swift_MagicMirrorData_valueType`
-### `_swift_ObjCMirror_count`
-### `_swift_ObjCMirror_subscript`
-### `_swift_StructMirror_count`
-### `_swift_StructMirror_subscript`
-### `_swift_TupleMirror_count`
-### `_swift_TupleMirror_subscript`
-### `_swift_reflectAny`
+### swift\_ClassMirror\_count
+### swift\_ClassMirror\_quickLookObject
+### swift\_ClassMirror\_subscript
+### swift\_EnumMirror\_caseName
+### swift\_EnumMirror\_count
+### swift\_EnumMirror\_subscript
+### swift\_MagicMirrorData\_objcValue
+### swift\_MagicMirrorData\_objcValueType
+### swift\_MagicMirrorData\_summary
+### swift\_MagicMirrorData\_value
+### swift\_MagicMirrorData\_valueType
+### swift\_ObjCMirror\_count
+### swift\_ObjCMirror\_subscript
+### swift\_StructMirror\_count
+### swift\_StructMirror\_subscript
+### swift\_TupleMirror\_count
+### swift\_TupleMirror\_subscript
+### swift\_reflectAny
 
 **ABI TODO**: These functions are implementation details of the standard
 library `reflect` interface. They will be superseded by a low-level
 runtime reflection API.
+
+### swift\_stdlib\_demangleName
+
+```
+@convention(thin) (string: UnsafePointer<UInt8>,
+                   length: UInt,
+                   @out String) -> ()
+```
+
+Given a pointer to a Swift mangled symbol name as a byte string of `length`
+characters, returns the demangled name as a `Swift.String`.
+
+**ABI TODO**: Decouple from the standard library `Swift.String` implementation.
+Rename with a non-`stdlib` naming scheme.
 
 ## Memory allocation
 
 ### TODO
 
 ```
+000000000001cb30 T _swift_allocBox
+000000000001c990 T _swift_allocObject
+000000000001ca60 T _swift_bufferAllocate
+000000000001ca70 T _swift_bufferAllocateOnStack
+000000000001ca80 T _swift_bufferDeallocateFromStack
+000000000001ca90 T _swift_bufferHeaderSize
+000000000001cd30 T _swift_deallocBox
+000000000001d490 T _swift_deallocClassInstance
+000000000001cd60 T _swift_deallocObject
+000000000001d4c0 T _swift_deallocPartialClassInstance
+000000000001d400 T _swift_rootObjCDealloc
+000000000001c960 T _swift_slowAlloc
+000000000001c980 T _swift_slowDealloc
+000000000001ce10 T _swift_projectBox
+000000000001ca00 T _swift_initStackObject
 ```
 
 ## Reference counting
-
 
 ### swift\_retainCount
 
@@ -126,6 +154,16 @@ internalized.
 000000000001d8b0 T _swift_weakTakeAssign
 000000000001d800 T _swift_weakTakeInit
 000000000001d710 T _swift_weakTakeStrong
+000000000002afe0 T _swift_isUniquelyReferencedNonObjC
+000000000002af50 T _swift_isUniquelyReferencedNonObjC_nonNull
+000000000002b060 T _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject
+000000000002b200 T _swift_isUniquelyReferencedOrPinnedNonObjC_nonNull
+000000000002b130 T _swift_isUniquelyReferencedOrPinnedNonObjC_nonNull_bridgeObject
+000000000002b2f0 T _swift_isUniquelyReferencedOrPinned_native
+000000000002b290 T _swift_isUniquelyReferencedOrPinned_nonNull_native
+000000000002af00 T _swift_isUniquelyReferenced_native
+000000000002aea0 T _swift_isUniquelyReferenced_nonNull_native
+000000000001d280 T _swift_isDeallocating
 ```
 
 **ABI TODO**: `_unsynchronized` r/r entry points
@@ -167,35 +205,25 @@ between `ErrorType` and `NSError`.
 **ABI TODO**: These should be implemented as shims or in Swift code, not
 in the runtime.
 
-## TODO
+## Initialization
+
+### swift_once
 
 ```
-000000000002b340 T __swift_class_getInstancePositiveExtentSize
-000000000002b350 T __swift_class_getInstancePositiveExtentSize_native
-0000000000024040 T __swift_debug_verifyTypeLayoutAttribute
-0000000000004080 T __swift_getSuperclass_nonNull
-0000000000003ff0 T __swift_isClass
-00000000000279f0 T __swift_usesNativeSwiftReferenceCounting_class
-000000000002ae40 T __swift_usesNativeSwiftReferenceCounting_nonNull
-000000000001cb30 T _swift_allocBox
-000000000001c990 T _swift_allocObject
-000000000001e3e0 T _swift_allocateGenericClassMetadata
-000000000001e620 T _swift_allocateGenericValueMetadata
-0000000000023a40 T _swift_assignExistentialWithCopy
-0000000000003b60 T _swift_bridgeNonVerbatimFromObjectiveC
-0000000000003c80 T _swift_bridgeNonVerbatimFromObjectiveCConditional
-00000000000037e0 T _swift_bridgeNonVerbatimToObjectiveC
-000000000001ca60 T _swift_bufferAllocate
-000000000001ca70 T _swift_bufferAllocateOnStack
-000000000001ca80 T _swift_bufferDeallocateFromStack
-000000000001ca90 T _swift_bufferHeaderSize
-0000000000003060 T _swift_conformsToProtocol
-000000000001dbf0 T _swift_copyPOD
-000000000001cd30 T _swift_deallocBox
-000000000001d490 T _swift_deallocClassInstance
-000000000001cd60 T _swift_deallocObject
-000000000001d4c0 T _swift_deallocPartialClassInstance
-0000000000023e60 T _swift_demangleSimpleClass
+@convention(thin) (Builtin.RawPointer, @convention(thin) () -> ()) -> ()
+```
+
+Used to lazily initialize global variables. The first parameter must
+point to a word-sized memory location that was initialized to zero at
+process start. It is undefined behavior to reference memory that has
+been initialized to something other than zero or written to by anything other
+than `swift_once` in the current process's lifetime. The function referenced by
+the second parameter will have been run exactly once in the time between
+process start and the function returns.
+
+## Dynamic casting
+
+```
 0000000000001470 T _swift_dynamicCast
 0000000000000a60 T _swift_dynamicCastClass
 0000000000000ae0 T _swift_dynamicCastClassUnconditional
@@ -217,10 +245,63 @@ in the runtime.
 00000000000287d0 T _swift_dynamicCastTypeToObjCProtocolUnconditional
 0000000000000de0 T _swift_dynamicCastUnknownClass
 0000000000000fd0 T _swift_dynamicCastUnknownClassUnconditional
+0000000000003f50 T _swift_isClassOrObjCExistential
+00000000000040c0 T _swift_isClassType
+0000000000004130 T _swift_isOptionalType
+0000000000004080 T __swift_getSuperclass_nonNull
+0000000000003ff0 T __swift_isClass
+00000000000279f0 T __swift_usesNativeSwiftReferenceCounting_class
+000000000002ae40 T __swift_usesNativeSwiftReferenceCounting_nonNull
+```
+
+## Debugging
+
+```
+000000000002b340 T __swift_class_getInstancePositiveExtentSize
+000000000002b350 T __swift_class_getInstancePositiveExtentSize_native
+0000000000024040 T __swift_debug_verifyTypeLayoutAttribute
+0000000000027140 T _swift_willThrow
+```
+
+## Objective-C Bridging
+
+**ObjC-only**.
+
+**ABI TODO**: Decouple from the runtime as much as possible. Much of this
+should be implementable in the standard library now.
+
+```
+0000000000003b60 T _swift_bridgeNonVerbatimFromObjectiveC
+0000000000003c80 T _swift_bridgeNonVerbatimFromObjectiveCConditional
+00000000000037e0 T _swift_bridgeNonVerbatimToObjectiveC
 00000000000039c0 T _swift_getBridgedNonVerbatimObjectiveCType
-0000000000000b60 T _swift_getDynamicType
+0000000000003d90 T _swift_isBridgedNonVerbatimToObjectiveC
+```
+
+## Code generation
+
+Certain common code paths are implemented in the runtime as a code size
+optimization.
+
+```
+0000000000023a40 T _swift_assignExistentialWithCopy
+000000000001dbf0 T _swift_copyPOD
 000000000001c560 T _swift_getEnumCaseMultiPayload
 000000000001be60 T _swift_getEnumCaseSinglePayload
+000000000001c400 T _swift_storeEnumTagMultiPayload
+000000000001bf90 T _swift_storeEnumTagSinglePayload
+```
+## Type metadata lookup
+
+These functions look up metadata for types that potentially require runtime
+instantiation or initialization, including structural types, generics, classes,
+and metadata for imported C and Objective-C types.
+
+**ABI TODO**: Instantiation APIs under flux as part of resilience work. For
+nominal types, `getGenericMetadata` is likely to become an implementation
+detail used to implement resilient per-type metadata accessor functions.
+
+```
 0000000000023230 T _swift_getExistentialMetatypeMetadata
 0000000000023630 T _swift_getExistentialTypeMetadata
 0000000000023b90 T _swift_getForeignTypeMetadata
@@ -228,58 +309,70 @@ in the runtime.
 000000000001eed0 T _swift_getFunctionTypeMetadata1
 000000000001f1f0 T _swift_getFunctionTypeMetadata2
 000000000001f250 T _swift_getFunctionTypeMetadata3
-0000000000028c40 T _swift_getGenericClassObjCName
 000000000001e940 T _swift_getGenericMetadata
 000000000001e9c0 T _swift_getGenericMetadata1
 000000000001ea60 T _swift_getGenericMetadata2
 000000000001eb00 T _swift_getGenericMetadata3
 000000000001eba0 T _swift_getGenericMetadata4
-0000000000028bc0 T _swift_getInitializedObjCClass
 0000000000022fd0 T _swift_getMetatypeMetadata
 000000000001ec50 T _swift_getObjCClassMetadata
-0000000000022fb0 T _swift_getObjectType
 000000000001e6b0 T _swift_getResilientMetadata
 0000000000022260 T _swift_getTupleTypeMetadata
 00000000000225a0 T _swift_getTupleTypeMetadata2
 00000000000225d0 T _swift_getTupleTypeMetadata3
-00000000000006f0 T _swift_getTypeName
+0000000000028bc0 T _swift_getInitializedObjCClass
+```
+
+## Type metadata initialization
+
+Calls to these entry points are emitted when instantiating type metadata at
+runtime.
+
+**ABI TODO**: Initialization APIs under flux as part of resilience work.
+
+```
+000000000001e3e0 T _swift_allocateGenericClassMetadata
+000000000001e620 T _swift_allocateGenericValueMetadata
 0000000000022be0 T _swift_initClassMetadata_UniversalStrategy
 000000000001c100 T _swift_initEnumMetadataMultiPayload
 000000000001bd60 T _swift_initEnumValueWitnessTableSinglePayload
-000000000001ca00 T _swift_initStackObject
 0000000000022a20 T _swift_initStructMetadata_UniversalStrategy
 0000000000024230 T _swift_initializeSuperclass
 0000000000028b60 T _swift_instantiateObjCClass
-0000000000003d90 T _swift_isBridgedNonVerbatimToObjectiveC
-0000000000003f50 T _swift_isClassOrObjCExistential
-00000000000040c0 T _swift_isClassType
-000000000001d280 T _swift_isDeallocating
-0000000000004130 T _swift_isOptionalType
-000000000002afe0 T _swift_isUniquelyReferencedNonObjC
-000000000002af50 T _swift_isUniquelyReferencedNonObjC_nonNull
-000000000002b060 T _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject
-000000000002b200 T _swift_isUniquelyReferencedOrPinnedNonObjC_nonNull
-000000000002b130 T _swift_isUniquelyReferencedOrPinnedNonObjC_nonNull_bridgeObject
-000000000002b2f0 T _swift_isUniquelyReferencedOrPinned_native
-000000000002b290 T _swift_isUniquelyReferencedOrPinned_nonNull_native
-000000000002af00 T _swift_isUniquelyReferenced_native
-000000000002aea0 T _swift_isUniquelyReferenced_nonNull_native
+```
+
+## Objective-C Runtime Interop
+
+```
+0000000000023e60 T _swift_demangleSimpleClass
 0000000000028770 T _swift_objcRespondsToSelector
-0000000000026550 T _swift_once
-000000000001ce10 T _swift_projectBox
+```
+
+## Metatypes
+
+```
+0000000000000b60 T _swift_getDynamicType
+0000000000022fb0 T _swift_getObjectType
+00000000000006f0 T _swift_getTypeName
+```
+
+**ABI TODO**: getTypeByName entry point.
+
+## Protocol conformance lookup
+
+```
 0000000000002ef0 T _swift_registerProtocolConformances
+0000000000003060 T _swift_conformsToProtocol
+```
+
+## Error reporting
+
+```
 000000000001c7d0 T _swift_reportFatalError
 000000000001c730 T _swift_reportFatalErrorInFile
 000000000001c940 T _swift_reportMissingMethod
 000000000001c8d0 T _swift_reportUnimplementedInitializer
 000000000001c840 T _swift_reportUnimplementedInitializerInFile
-000000000001d400 T _swift_rootObjCDealloc
-000000000001c960 T _swift_slowAlloc
-000000000001c980 T _swift_slowDealloc
-0000000000033930 T _swift_stdlib_demangleName
-000000000001c400 T _swift_storeEnumTagMultiPayload
-000000000001bf90 T _swift_storeEnumTagSinglePayload
-0000000000027140 T _swift_willThrow
 ```
 
 ## Tasks
@@ -293,4 +386,4 @@ in the runtime.
 
 - Unsynchronized retain/release
 
-
+- Decouple dynamic casting and reflection from the standard library
