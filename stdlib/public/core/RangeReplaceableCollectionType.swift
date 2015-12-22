@@ -447,6 +447,7 @@ public func +<
     where S.Generator.Element == C.Generator.Element
 >(lhs: C, rhs: S) -> C {
   var result = lhs is AnyObject ? C(lhs) : lhs
+  result.reserveCapacity(lhs.count + numericCast(rhs.underestimateCount()))
   result.appendContentsOf(rhs)
   return result
 }
