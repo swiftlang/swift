@@ -877,13 +877,13 @@ class AvailabilityWalker : public ASTWalker {
   };
 
   TypeChecker &TC;
-  const DeclContext *DC;
+  DeclContext *DC;
   const MemberAccessContext AccessContext;
   SmallVector<const Expr *, 16> ExprStack;
 
 public:
   AvailabilityWalker(
-      TypeChecker &TC, const DeclContext *DC,
+      TypeChecker &TC, DeclContext *DC,
       MemberAccessContext AccessContext = MemberAccessContext::Getter)
       : TC(TC), DC(DC), AccessContext(AccessContext) {}
 
@@ -933,6 +933,8 @@ public:
 
 private:
   bool diagAvailability(const ValueDecl *D, SourceRange R);
+  bool diagnoseIncDecDeprecation(const ValueDecl *D, SourceRange R,
+                                 const AvailableAttr *Attr);
 
   /// Walk an assignment expression, checking for availability.
   void walkAssignExpr(AssignExpr *E) const {
@@ -1049,8 +1051,10 @@ bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R) {
     return true;
 
   // Diagnose for deprecation
-  if (const AvailableAttr *Attr = TypeChecker::getDeprecated(D))
-    TC.diagnoseDeprecated(R, DC, Attr, D->getFullName());
+  if (const AvailableAttr *Attr = TypeChecker::getDeprecated(D)) {
+    if (!diagnoseIncDecDeprecation(D, R, Attr))
+      TC.diagnoseDeprecated(R, DC, Attr, D->getFullName());
+  }
 
   if (TC.getLangOpts().DisableAvailabilityChecking)
     return false;
@@ -1065,10 +1069,78 @@ bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R) {
 }
 
 
+/// Return true if the specified type looks like an integer of floating point
+/// type.
+static bool isIntegerOrFloatingPointType(Type ty, DeclContext *DC,
+                                         TypeChecker &TC) {
+  auto integerType =
+    TC.getProtocol(SourceLoc(),
+                   KnownProtocolKind::IntegerLiteralConvertible);
+  auto floatingType =
+    TC.getProtocol(SourceLoc(),
+                   KnownProtocolKind::FloatLiteralConvertible);
+  if (!integerType || !floatingType) return false;
+
+  return
+    TC.conformsToProtocol(ty, integerType, DC,
+                          ConformanceCheckFlags::InExpression) ||
+    TC.conformsToProtocol(ty, floatingType, DC,
+                          ConformanceCheckFlags::InExpression);
+}
+
+
+/// If this is a call to a deprecated ++ / -- operator, try to diagnose it with
+/// a fixit hint and return true.  If not, or if we fail, return false.
+bool AvailabilityWalker::diagnoseIncDecDeprecation(const ValueDecl *D,
+                                                   SourceRange R,
+                                                   const AvailableAttr *Attr) {
+  // We can only produce a fixit if we're talking about ++ or --.
+  bool isInc = D->getNameStr() == "++";
+  if (!isInc && D->getNameStr() != "--")
+    return false;
+
+  // We can only handle the simple cases of lvalue++ and ++lvalue.  This is
+  // always modeled as:
+  //   (postfix_unary_expr (declrefexpr ++), (inoutexpr (lvalue)))
+  // if not, bail out.
+  if (ExprStack.size() != 2 ||
+      !isa<DeclRefExpr>(ExprStack[1]) ||
+      !(isa<PostfixUnaryExpr>(ExprStack[0]) ||
+        isa<PrefixUnaryExpr>(ExprStack[0])))
+    return false;
+
+  auto call = cast<ApplyExpr>(ExprStack[0]);
+
+  // If the expression type is integer or floating point, then we can rewrite it
+  // to "lvalue += 1".
+  if (isIntegerOrFloatingPointType(call->getType(), DC, TC)) {
+    const char *addition = isInc ? " += 1" : " -= 1";
+
+    // If we emit a deprecation diagnostic, produce a fixit hint as well.
+    TC.diagnoseDeprecated(R, DC, Attr, D->getFullName(),
+                          [&](InFlightDiagnostic &diag) {
+      if (isa<PrefixUnaryExpr>(call)) {
+        // Prefix: remove the ++ or --.
+        diag.fixItRemove(call->getFn()->getSourceRange());
+        diag.fixItInsertAfter(call->getArg()->getEndLoc(), addition);
+      } else {
+        // Postfix: replace the ++ or --.
+        diag.fixItReplace(call->getFn()->getSourceRange(), addition);
+      }
+    });
+
+    return true;
+  }
+
+
+  return false;
+}
+
+
 
 /// Diagnose uses of unavailable declarations.
 static void diagAvailability(TypeChecker &TC, const Expr *E,
-                             const DeclContext *DC) {
+                             DeclContext *DC) {
   AvailabilityWalker walker(TC, DC);
   const_cast<Expr*>(E)->walk(walker);
 }
@@ -1730,7 +1802,7 @@ void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
   diagSyntacticUseRestrictions(TC, E, DC, isExprStmt);
   diagRecursivePropertyAccess(TC, E, DC);
   diagnoseImplicitSelfUseInClosure(TC, E, DC);
-  diagAvailability(TC, E, DC);
+  diagAvailability(TC, E, const_cast<DeclContext*>(DC));
 }
 
 void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {

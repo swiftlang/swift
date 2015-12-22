@@ -1688,10 +1688,14 @@ public:
   static const AvailableAttr *getDeprecated(const Decl *D);
 
   /// Emits a diagnostic for a reference to a declaration that is deprecated.
+  /// Callers can provide a lambda that adds additional information (such as a
+  /// fixit hint) to the deprecation diagnostic, if it is emitted.
   void diagnoseDeprecated(SourceRange SourceRange,
                           const DeclContext *ReferenceDC,
                           const AvailableAttr *Attr,
-                          DeclName Name);
+                          DeclName Name,
+              std::function<void(InFlightDiagnostic&)> extraInfoHandler =
+                          [](InFlightDiagnostic&){});
   /// @}
 
   /// If LangOptions::DebugForbidTypecheckPrefix is set and the given decl

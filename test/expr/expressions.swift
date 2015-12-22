@@ -810,14 +810,18 @@ func swift22_deprecation_increment_decrement() {
   var f = 1.0
   var si = "foo".startIndex
 
-  i++   // expected-warning {{'++' is deprecated: it will be removed in Swift 3}}
-  --i   // expected-warning {{'--' is deprecated: it will be removed in Swift 3}}
+  i++     // expected-warning {{'++' is deprecated: it will be removed in Swift 3}} {{4-6= += 1}}
+  --i     // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{3-5=}} {{6-6= -= 1}}
+  _ = i++ // expected-warning {{'++' is deprecated: it will be removed in Swift 3}}
 
-  ++f   // expected-warning {{'++' is deprecated: it will be removed in Swift 3}}
-  f--   // expected-warning {{'--' is deprecated: it will be removed in Swift 3}}
+  ++f     // expected-warning {{'++' is deprecated: it will be removed in Swift 3}} {{3-5=}} {{6-6= += 1}}
+  f--     // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{4-6= -= 1}}
+  _ = f-- // expected-warning {{'--' is deprecated: it will be removed in Swift 3}}
 
-  ++si   // expected-warning {{'++' is deprecated: it will be removed in Swift 3}}
-  --si   // expected-warning {{'--' is deprecated: it will be removed in Swift 3}}
+
+  ++si      // expected-warning {{'++' is deprecated: it will be removed in Swift 3}}
+  --si      // expected-warning {{'--' is deprecated: it will be removed in Swift 3}}
+  _ = --si  // expected-warning {{'--' is deprecated: it will be removed in Swift 3}}
 }
 
 

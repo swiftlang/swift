@@ -2214,7 +2214,8 @@ static bool isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
 void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
                                      const DeclContext *ReferenceDC,
                                      const AvailableAttr *Attr,
-                                     DeclName Name) {
+                                     DeclName Name,
+                   std::function<void(InFlightDiagnostic&)> extraInfoHandler) {
   // We match the behavior of clang to not report deprecation warnigs
   // inside declarations that are themselves deprecated on all deployment
   // targets.
@@ -2239,24 +2240,30 @@ void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
     DeprecatedVersion = Attr->Deprecated.getValue();
 
   if (Attr->Message.empty() && Attr->Rename.empty()) {
-    diagnose(ReferenceRange.Start, diag::availability_deprecated, Name,
-             Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
-             DeprecatedVersion)
-      .highlight(Attr->getRange());
+    auto diagValue = std::move(
+      diagnose(ReferenceRange.Start, diag::availability_deprecated, Name,
+               Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
+               DeprecatedVersion)
+        .highlight(Attr->getRange()));
+    extraInfoHandler(diagValue);
     return;
   }
 
   if (Attr->Message.empty()) {
-    diagnose(ReferenceRange.Start, diag::availability_deprecated_rename, Name,
-             Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
-             DeprecatedVersion, Attr->Rename)
-      .highlight(Attr->getRange());
+    auto diagValue = std::move(
+      diagnose(ReferenceRange.Start, diag::availability_deprecated_rename, Name,
+               Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
+               DeprecatedVersion, Attr->Rename)
+        .highlight(Attr->getRange()));
+    extraInfoHandler(diagValue);
   } else {
     EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-    diagnose(ReferenceRange.Start, diag::availability_deprecated_msg, Name,
-             Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
-             DeprecatedVersion, EncodedMessage.Message)
-      .highlight(Attr->getRange());
+    auto diagValue = std::move(
+      diagnose(ReferenceRange.Start, diag::availability_deprecated_msg, Name,
+               Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
+               DeprecatedVersion, EncodedMessage.Message)
+        .highlight(Attr->getRange()));
+    extraInfoHandler(diagValue);
   }
 
   if (!Attr->Rename.empty()) {
