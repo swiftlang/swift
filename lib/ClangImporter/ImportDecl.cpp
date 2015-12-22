@@ -3045,7 +3045,7 @@ namespace {
             !Impl.ImportedDecls[decl->getCanonicalDecl()])
           Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
 
-        (void)importSpecialMethod(result, dc);
+        (void)importSpecialMethod(result);
       }
       return result;
     }
@@ -3053,7 +3053,7 @@ namespace {
   public:
     /// \brief Given an imported method, try to import it as some kind of
     /// special declaration, e.g., a constructor or subscript.
-    Decl *importSpecialMethod(Decl *decl, DeclContext *dc) {
+    Decl *importSpecialMethod(Decl *decl) {
       // Check whether there's a method associated with this declaration.
       auto objcMethod
         = dyn_cast_or_null<clang::ObjCMethodDecl>(decl->getClangDecl());
@@ -3069,7 +3069,7 @@ namespace {
              objcMethod->getSelector() == Impl.setObjectAtIndexedSubscript ||
              objcMethod->getSelector() == Impl.objectForKeyedSubscript ||
              objcMethod->getSelector() == Impl.setObjectForKeyedSubscript))
-          return importSubscript(decl, objcMethod, dc);
+          return importSubscript(decl, objcMethod);
           
         return nullptr;
 
@@ -3733,235 +3733,74 @@ namespace {
       return thunk;
     }
     
-    /// Hack: Handle the case where a subscript is read-only in the
-    /// main class interface (either explicitly or because of an adopted
-    /// protocol) and then the setter is added in a category/extension.
-    ///
-    /// \see importSubscript
-    // FIXME: This is basically the same as handlePropertyRedeclaration below.
-    void handleSubscriptRedeclaration(SubscriptDecl *original,
-                                      const SubscriptDecl *redecl) {
-      // If the subscript isn't from Clang, we can't safely update it.
-      if (!original->hasClangNode())
-        return;
+    /// Retrieve the element type and of a subscript setter.
+    std::pair<Type, Pattern *>
+    decomposeSubscriptSetter(FuncDecl *setter) {
+      auto tuple = dyn_cast<TuplePattern>(setter->getBodyParamPatterns()[1]);
+      if (!tuple)
+        return { nullptr, nullptr };
 
-      // If the original declaration was implicit, we may want to change that.
-      if (original->isImplicit() && !redecl->isImplicit() &&
-          !redecl->getDeclContext()->isProtocolOrProtocolExtensionContext())
-        original->setImplicit(false);
+      if (tuple->getNumElements() != 2)
+        return { nullptr, nullptr };
 
-      // The only other transformation we know how to do safely is add a
-      // setter. If the subscript is already settable, we're done.
-      if (original->isSettable())
-        return;
-
-      auto setter = redecl->getSetter();
-      if (!setter)
-        return;
-
-      original->setComputedSetter(setter);
+      return { tuple->getElement(0).getPattern()->getType(),
+               tuple->getElement(1).getPattern() };
     }
 
-    /// \brief Given either the getter or setter for a subscript operation,
-    /// create the Swift subscript declaration.
-    SubscriptDecl *importSubscript(Decl *decl,
-                                   const clang::ObjCMethodDecl *objcMethod,
-                                   DeclContext *dc) {
-      assert(objcMethod->isInstanceMethod() && "Caller must filter");
+    /// Rectify the (possibly different) types determined by the
+    /// getter and setter for a subscript.
+    ///
+    /// \param canUpdateType whether the type of subscript can be
+    /// changed from the getter type to something compatible with both
+    /// the getter and the setter.
+    ///
+    /// \returns the type to be used for the subscript, or a null type
+    /// if the types cannot be rectified.
+    Type rectifySubscriptTypes(Type getterType, Type setterType,
+                               bool canUpdateType) {
+      // If the caller couldn't provide a setter type, there is
+      // nothing to rectify.
+      if (!setterType) return nullptr;
 
-      if (objcMethod->hasAttr<clang::SwiftPrivateAttr>())
-        return nullptr;
+      // Trivial case: same type in both cases.
+      if (getterType->isEqual(setterType)) return getterType;
 
-      const clang::ObjCInterfaceDecl *interface = nullptr;
-      const clang::ObjCProtocolDecl *protocol =
-          dyn_cast<clang::ObjCProtocolDecl>(objcMethod->getDeclContext());
-      if (!protocol)
-        interface = objcMethod->getClassInterface();
-      auto lookupInstanceMethod = [&](clang::Selector Sel) ->
-          const clang::ObjCMethodDecl * {
-        if (interface)
-          return interface->lookupInstanceMethod(Sel);
-        else
-          return protocol->lookupInstanceMethod(Sel);
-      };
+      // The getter/setter types are different. If we cannot update
+      // the type, we have to fail.
+      if (!canUpdateType) return nullptr;
 
-      FuncDecl *getter = nullptr, *setter = nullptr;
-      clang::Selector counterpartSelector;
+      // Unwrap one level of optionality from each.
+      if (Type getterObjectType = getterType->getAnyOptionalObjectType())
+        getterType = getterObjectType;
+      if (Type setterObjectType = setterType->getAnyOptionalObjectType())
+        setterType = setterObjectType;
 
-      if (objcMethod->getSelector() == Impl.objectAtIndexedSubscript) {
-        getter = cast<FuncDecl>(decl);
-        counterpartSelector = Impl.setObjectAtIndexedSubscript;
-      } else if (objcMethod->getSelector() == Impl.setObjectAtIndexedSubscript){
-        setter = cast<FuncDecl>(decl);
-        counterpartSelector = Impl.objectAtIndexedSubscript;
-      } else if (objcMethod->getSelector() == Impl.objectForKeyedSubscript) {
-        getter = cast<FuncDecl>(decl);
-        counterpartSelector = Impl.setObjectForKeyedSubscript;
-      } else if (objcMethod->getSelector() == Impl.setObjectForKeyedSubscript) {
-        setter = cast<FuncDecl>(decl);
-        counterpartSelector = Impl.objectForKeyedSubscript;
-      } else {
-        llvm_unreachable("Unknown getter/setter selector");
-      }
+      // If they are still different, fail.
+      // FIXME: We could produce the greatest common supertype of the
+      // two types.
+      if (!getterType->isEqual(setterType)) return nullptr;
 
-      bool optionalMethods = (objcMethod->getImplementationControl() ==
-                              clang::ObjCMethodDecl::Optional);
+      // Create an implicitly-unwrapped optional of the object type,
+      // which subsumes both behaviors.
+      return ImplicitlyUnwrappedOptionalType::get(setterType);
+    }
 
-      auto *counterpart = lookupInstanceMethod(counterpartSelector);
-      if (counterpart) {
-        auto *importedCounterpart =
-            cast_or_null<FuncDecl>(Impl.importDecl(counterpart));
+    void recordObjCOverride(SubscriptDecl *subscript) {
+      // Figure out the class in which this subscript occurs.
+      auto classTy =
+        subscript->getDeclContext()->isClassOrClassExtensionContext();
+      if (!classTy)
+        return;
 
-        assert(!importedCounterpart || !importedCounterpart->isStatic());
-
-        if (getter)
-          setter = importedCounterpart;
-        else
-          getter = importedCounterpart;
-
-        if (optionalMethods)
-          optionalMethods = (counterpart->getImplementationControl() ==
-                             clang::ObjCMethodDecl::Optional);
-
-        if (counterpart->hasAttr<clang::SwiftPrivateAttr>())
-          return nullptr;
-      }
-
-      // Swift doesn't have write-only subscripting.
-      if (!getter)
-        return nullptr;
-
-      // Check whether we've already created a subscript operation for
-      // this getter/setter pair.
-      if (auto subscript = Impl.Subscripts[{getter, setter}]) {
-        if (subscript->getDeclContext() != dc) return nullptr;
-
-        Impl.AlternateDecls[decl] = subscript;
-        return subscript;
-      }
-
-      // Compute the element type, looking through the implicit 'self'
-      // parameter and the normal function parameters.
-      auto elementTy
-        = getter->getType()->castTo<AnyFunctionType>()->getResult()
-            ->castTo<AnyFunctionType>()->getResult();
-
-      // Check the form of the getter.
-      FuncDecl *getterThunk = nullptr;
-      Pattern *getterIndices = nullptr;
-      auto &context = Impl.SwiftContext;
-
-      // Find the getter indices and make sure they match.
-      {
-        auto tuple = dyn_cast<TuplePattern>(getter->getBodyParamPatterns()[1]);
-        if (tuple && tuple->getNumElements() != 1)
-          return nullptr;
-
-        getterIndices = tuple->getElement(0).getPattern();
-      }
-
-      // Check the form of the setter.
-      FuncDecl *setterThunk = nullptr;
-      Pattern *setterIndices = nullptr;
-      if (setter) {
-        auto tuple = dyn_cast<TuplePattern>(setter->getBodyParamPatterns()[1]);
-        if (!tuple)
-          return nullptr;
-
-        if (tuple->getNumElements() != 2)
-          return nullptr;
-
-        // The setter must accept elements of the same type as the getter
-        // returns.
-        // FIXME: Adjust C++ references?
-        auto setterElementTy = tuple->getElement(0).getPattern()->getType();
-        if (!elementTy->isEqual(setterElementTy)) {
-          auto nonOptionalElementTy = elementTy->getAnyOptionalObjectType();
-          if (nonOptionalElementTy.isNull())
-            nonOptionalElementTy = elementTy;
-
-          auto nonOptionalSetterElementTy =
-              setterElementTy->getAnyOptionalObjectType();
-          if (nonOptionalSetterElementTy.isNull())
-            nonOptionalSetterElementTy = setterElementTy;
-
-          if (!nonOptionalElementTy->isEqual(nonOptionalSetterElementTy))
-            return nullptr;
-
-          elementTy =
-              ImplicitlyUnwrappedOptionalType::get(nonOptionalElementTy);
-        }
-
-        setterIndices = tuple->getElement(1).getPattern();
-
-        // The setter must use the same indices as the getter.
-        // FIXME: Adjust C++ references?
-        if (!setterIndices->getType()->isEqual(getterIndices->getType())) {
-          setter = nullptr;
-          setterIndices = nullptr;
-
-          // Check whether we've already created a subscript operation for
-          // this getter.
-          if (auto subscript = Impl.Subscripts[{getter, nullptr}]) {
-            if (subscript->getDeclContext() != dc) return nullptr;
-
-            Impl.AlternateDecls[decl] = subscript;
-            return subscript;
-          }
-        }
-      }
-
-      getterThunk = buildSubscriptGetterDecl(getter, elementTy, dc,
-                                             getterIndices);
-      if (setter)
-        setterThunk = buildSubscriptSetterDecl(setter, elementTy, dc,
-                                               setterIndices);
-
-      // Build the subscript declaration.
-      auto bodyPatterns =
-          getterThunk->getBodyParamPatterns()[1]->clone(context);
-      DeclName name(context, context.Id_subscript, { Identifier() });
-      auto subscript
-        = Impl.createDeclWithClangNode<SubscriptDecl>(getter->getClangNode(),
-                                      name, decl->getLoc(), bodyPatterns,
-                                      decl->getLoc(),
-                                      TypeLoc::withoutLoc(elementTy), dc);
-
-      /// Record the subscript as an alternative declaration.
-      Impl.AlternateDecls[decl] = subscript;
-
-      subscript->makeComputed(SourceLoc(), getterThunk, setterThunk, nullptr,
-                              SourceLoc());
-      auto indicesType = bodyPatterns->getType();
-      indicesType = indicesType->getRelabeledType(context,
-                                                  name.getArgumentNames());
-
-      subscript->setType(FunctionType::get(indicesType,
-                                           subscript->getElementType()));
-      addObjCAttribute(subscript, None);
-
-      // Optional subscripts in protocols.
-      if (optionalMethods && isa<ProtocolDecl>(dc))
-        subscript->getAttrs().add(new (Impl.SwiftContext)
-                                         OptionalAttr(true));
-
-      // Note that we've created this subscript.
-      Impl.Subscripts[{getter, setter}] = subscript;
-      Impl.Subscripts[{getterThunk, nullptr}] = subscript;
-
-      // Make the getter/setter methods unavailable.
-      if (!getter->getAttrs().isUnavailable(Impl.SwiftContext))
-        Impl.markUnavailable(getter, "use subscripting");
-      if (setter && !setter->getAttrs().isUnavailable(Impl.SwiftContext))
-        Impl.markUnavailable(setter, "use subscripting");
+      auto superTy = classTy->getSuperclass();
+      if (!superTy)
+        return;
 
       // Determine whether this subscript operation overrides another subscript
       // operation.
-      // FIXME: This ends up looking in the superclass for entirely bogus
-      // reasons. Fix it.
-      auto containerTy = dc->getDeclaredTypeInContext();
       SmallVector<ValueDecl *, 2> lookup;
-      dc->lookupQualified(containerTy, name,
+      subscript->getModuleContext()
+        ->lookupQualified(superTy, subscript->getFullName(),
                           NL_QualifiedDefault | NL_KnownNoDependency,
                           Impl.getTypeResolver(), lookup);
       Type unlabeledIndices;
@@ -3982,32 +3821,267 @@ namespace {
         if (!unlabeledIndices->isEqual(parentUnlabeledIndices))
           continue;
 
-        if (parentSub == subscript)
-          continue;
-
-        const DeclContext *overrideContext = parentSub->getDeclContext();
-        assert(dc != overrideContext && "subscript already exists");
-
-        if (overrideContext->getDeclaredTypeInContext()->isEqual(containerTy)) {
-          // We've encountered a redeclaration of the subscript.
-          // HACK: Just update the original declaration instead of importing a
-          // second subscript.
-          handleSubscriptRedeclaration(parentSub, subscript);
-          Impl.Subscripts[{getter, setter}] = parentSub;
-          return nullptr;
-        }
-
         // The index types match. This is an override, so mark it as such.
         subscript->setOverriddenDecl(parentSub);
+        auto getterThunk = subscript->getGetter();
         getterThunk->setOverriddenDecl(parentSub->getGetter());
         if (auto parentSetter = parentSub->getSetter()) {
-          if (setterThunk)
+          if (auto setterThunk = subscript->getSetter())
             setterThunk->setOverriddenDecl(parentSetter);
         }
 
         // FIXME: Eventually, deal with multiple overrides.
         break;
       }
+    }
+
+    /// \brief Given either the getter or setter for a subscript operation,
+    /// create the Swift subscript declaration.
+    SubscriptDecl *importSubscript(Decl *decl,
+                                   const clang::ObjCMethodDecl *objcMethod) {
+      assert(objcMethod->isInstanceMethod() && "Caller must filter");
+
+      // If the method we're attempting to import has the
+      // swift_private attribute, don't import as a subscript.
+      if (objcMethod->hasAttr<clang::SwiftPrivateAttr>())
+        return nullptr;
+
+      // Figure out where to look for the counterpart.
+      const clang::ObjCInterfaceDecl *interface = nullptr;
+      const clang::ObjCProtocolDecl *protocol =
+          dyn_cast<clang::ObjCProtocolDecl>(objcMethod->getDeclContext());
+      if (!protocol)
+        interface = objcMethod->getClassInterface();
+      auto lookupInstanceMethod = [&](clang::Selector Sel) ->
+          const clang::ObjCMethodDecl * {
+        if (interface)
+          return interface->lookupInstanceMethod(Sel);
+
+        return protocol->lookupInstanceMethod(Sel);
+      };
+
+      auto findCounterpart = [&](clang::Selector sel) -> FuncDecl * {
+        // If the declaration we're starting from is in a class, first
+        // look for a class member with the appropriate selector.
+        if (auto classDecl
+              = decl->getDeclContext()->isClassOrClassExtensionContext()) {
+          auto swiftSel = Impl.importSelector(sel);
+          for (auto found : classDecl->lookupDirect(swiftSel, true)) {
+            if (auto foundFunc = dyn_cast<FuncDecl>(found))
+              return foundFunc;
+          }
+        }
+
+        // Find based on selector within the current type.
+        auto counterpart = lookupInstanceMethod(sel);
+        if (!counterpart) return nullptr;
+
+        return cast_or_null<FuncDecl>(Impl.importDecl(counterpart));
+      };
+
+      // Determine the selector of the counterpart.
+      FuncDecl *getter = nullptr, *setter = nullptr;
+      clang::Selector counterpartSelector;
+      if (objcMethod->getSelector() == Impl.objectAtIndexedSubscript) {
+        getter = cast<FuncDecl>(decl);
+        counterpartSelector = Impl.setObjectAtIndexedSubscript;
+      } else if (objcMethod->getSelector() == Impl.setObjectAtIndexedSubscript){
+        setter = cast<FuncDecl>(decl);
+        counterpartSelector = Impl.objectAtIndexedSubscript;
+      } else if (objcMethod->getSelector() == Impl.objectForKeyedSubscript) {
+        getter = cast<FuncDecl>(decl);
+        counterpartSelector = Impl.setObjectForKeyedSubscript;
+      } else if (objcMethod->getSelector() == Impl.setObjectForKeyedSubscript) {
+        setter = cast<FuncDecl>(decl);
+        counterpartSelector = Impl.objectForKeyedSubscript;
+      } else {
+        llvm_unreachable("Unknown getter/setter selector");
+      }
+
+      // Find the counterpart.
+      bool optionalMethods = (objcMethod->getImplementationControl() ==
+                              clang::ObjCMethodDecl::Optional);
+
+      if (auto *counterpart = findCounterpart(counterpartSelector)) {
+        // If the counterpart to the method we're attempting to import has the
+        // swift_private attribute, don't import as a subscript.
+        if (auto importedFrom = counterpart->getClangDecl()) {
+          if (importedFrom->hasAttr<clang::SwiftPrivateAttr>())
+            return nullptr;
+
+          auto counterpartMethod
+            = dyn_cast<clang::ObjCMethodDecl>(importedFrom);
+          if (optionalMethods)
+            optionalMethods = (counterpartMethod->getImplementationControl() ==
+                               clang::ObjCMethodDecl::Optional);
+        }
+
+        assert(!counterpart || !counterpart->isStatic());
+
+        if (getter)
+          setter = counterpart;
+        else
+          getter = counterpart;
+      }
+
+      // Swift doesn't have write-only subscripting.
+      if (!getter)
+        return nullptr;
+
+      // Check whether we've already created a subscript operation for
+      // this getter/setter pair.
+      if (auto subscript = Impl.Subscripts[{getter, setter}]) {
+        return subscript->getDeclContext() == decl->getDeclContext()
+                 ? subscript
+                 : nullptr;
+      }
+
+      // Find the getter indices and make sure they match.
+      Pattern *getterIndices = nullptr;
+      {
+        auto tuple = dyn_cast<TuplePattern>(getter->getBodyParamPatterns()[1]);
+        if (tuple && tuple->getNumElements() != 1)
+          return nullptr;
+
+        getterIndices = tuple->getElement(0).getPattern();
+      }
+
+      // Compute the element type based on the getter, looking through
+      // the implicit 'self' parameter and the normal function
+      // parameters.
+      auto elementTy
+        = getter->getType()->castTo<AnyFunctionType>()->getResult()
+            ->castTo<AnyFunctionType>()->getResult();
+
+      // Local function to mark the setter unavailable.
+      auto makeSetterUnavailable = [&] {
+        if (setter && !setter->getAttrs().isUnavailable(Impl.SwiftContext))
+          Impl.markUnavailable(setter, "use subscripting");
+      };
+
+      // If we have a setter, rectify it with the getter.
+      Pattern *setterIndices = nullptr;
+      bool getterAndSetterInSameType = false;
+      if (setter) {
+        // Whether there is an existing read-only subscript for which
+        // we have now found a setter.
+        SubscriptDecl *existingSubscript = Impl.Subscripts[{getter, nullptr}];
+
+        // Are the getter and the setter in the same type.
+        getterAndSetterInSameType =
+          (getter->getDeclContext()
+             ->isNominalTypeOrNominalTypeExtensionContext()
+           == setter->getDeclContext()
+               ->isNominalTypeOrNominalTypeExtensionContext());
+
+        // Whether we can update the types involved in the subscript
+        // operation.
+        bool canUpdateSubscriptType
+          = !existingSubscript && getterAndSetterInSameType;
+
+        // Determine the setter's element type and indices.
+        Type setterElementTy;
+        std::tie(setterElementTy, setterIndices) =
+          decomposeSubscriptSetter(setter);
+
+        // Rectify the setter element type with the getter's element type.
+        Type newElementTy = rectifySubscriptTypes(elementTy, setterElementTy,
+                                                  canUpdateSubscriptType);
+        if (!newElementTy)
+          return decl == getter ? existingSubscript : nullptr;
+
+        // Update the element type.
+        elementTy = newElementTy;
+
+        // Make sure that the index types are equivalent.
+        // FIXME: Rectify these the same way we do for element types.
+        if (!setterIndices->getType()->isEqual(getterIndices->getType())) {
+          // If there is an existing subscript operation, we're done.
+          if (existingSubscript)
+            return decl == getter ? existingSubscript : nullptr;
+
+          // Otherwise, just forget we had a setter.
+          // FIXME: This feels very, very wrong.
+          setter = nullptr;
+          setterIndices = nullptr;
+        }
+
+        // If there is an existing subscript within this context, we
+        // cannot create a new subscript. Update it if possible.
+        if (setter && existingSubscript && getterAndSetterInSameType) {
+          // Can we update the subscript by adding the setter?
+          if (existingSubscript->hasClangNode() &&
+              !existingSubscript->isSettable()) {
+            // Create the setter thunk.
+            auto setterThunk = buildSubscriptSetterDecl(
+                                 setter, elementTy, setter->getDeclContext(),
+                                 setterIndices);
+
+            // Set the computed setter.
+            existingSubscript->setComputedSetter(setterThunk);
+
+            // Mark the setter as unavailable; one should use
+            // subscripting when it is present.
+            makeSetterUnavailable();
+          }
+
+          return decl == getter ? existingSubscript : nullptr;
+        }
+      }
+
+      // The context into which the subscript should go.
+      bool associateWithSetter = setter && !getterAndSetterInSameType;
+      DeclContext *dc = associateWithSetter ? setter->getDeclContext()
+                                            : getter->getDeclContext();
+
+      // Build the thunks.
+      FuncDecl *getterThunk = buildSubscriptGetterDecl(getter, elementTy, dc,
+                                                       getterIndices);
+
+      FuncDecl *setterThunk = nullptr;
+      if (setter)
+        setterThunk = buildSubscriptSetterDecl(setter, elementTy, dc,
+                                               setterIndices);
+
+      // Build the subscript declaration.
+      auto &context = Impl.SwiftContext;
+      auto bodyPatterns =
+          getterThunk->getBodyParamPatterns()[1]->clone(context);
+      DeclName name(context, context.Id_subscript, { Identifier() });
+      auto subscript
+        = Impl.createDeclWithClangNode<SubscriptDecl>(getter->getClangNode(),
+                                      name, decl->getLoc(), bodyPatterns,
+                                      decl->getLoc(),
+                                      TypeLoc::withoutLoc(elementTy), dc);
+
+      /// Record the subscript as an alternative declaration.
+      Impl.AlternateDecls[associateWithSetter ? setter : getter] = subscript;
+
+      subscript->makeComputed(SourceLoc(), getterThunk, setterThunk, nullptr,
+                              SourceLoc());
+      auto indicesType = bodyPatterns->getType();
+      indicesType = indicesType->getRelabeledType(context,
+                                                  name.getArgumentNames());
+
+      subscript->setType(FunctionType::get(indicesType, elementTy));
+      addObjCAttribute(subscript, None);
+
+      // Optional subscripts in protocols.
+      if (optionalMethods && isa<ProtocolDecl>(dc))
+        subscript->getAttrs().add(new (Impl.SwiftContext) OptionalAttr(true));
+
+      // Note that we've created this subscript.
+      Impl.Subscripts[{getter, setter}] = subscript;
+      if (setter && !Impl.Subscripts[{getter, nullptr}])
+        Impl.Subscripts[{getter, nullptr}] = subscript;
+
+      // Make the getter/setter methods unavailable.
+      if (!getter->getAttrs().isUnavailable(Impl.SwiftContext))
+        Impl.markUnavailable(getter, "use subscripting");
+      makeSetterUnavailable();
+
+      // Wire up overrides.
+      recordObjCOverride(subscript);
 
       return subscript;
     }
@@ -4160,7 +4234,7 @@ namespace {
         if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(nd)) {
           // If there is a special declaration associated with this member,
           // add it now.
-          if (auto special = importSpecialMethod(member, swiftContext)) {
+          if (auto special = importSpecialMethod(member)) {
             if (knownMembers.insert(special).second)
               members.push_back(special);
           }
@@ -5616,7 +5690,7 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
 
   if (result) {
     if (!forceClassMethod) {
-      if (auto special = converter.importSpecialMethod(result, dc))
+      if (auto special = converter.importSpecialMethod(result))
         result = special;
     }
 
