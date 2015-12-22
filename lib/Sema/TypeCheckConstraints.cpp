@@ -27,6 +27,7 @@
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/Confusables.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -451,6 +452,36 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
       diagnose(Loc, diag::use_unresolved_identifier, Name,
                UDRE->getName().isOperator())
         .highlight(Loc);
+
+      const char *buffer = Name.get();
+      std::string expectedIdentifier = std::string();
+      bool isConfused = false;
+      uint32_t codepoint;
+      int offset = 0;
+      while ((codepoint = validateUTF8CharacterAndAdvance(buffer,
+                                                          buffer +
+                                                          strlen(buffer)))
+             != ~0U) {
+        int length = (buffer - Name.get()) - offset;
+        uint32_t expectedCodepoint;
+        if ((expectedCodepoint =
+             confusable::tryConvertConfusableCharacterToASCII(codepoint))) {
+          isConfused = true;
+          expectedIdentifier += (char)expectedCodepoint;
+        } else {
+          expectedIdentifier += (char)codepoint;
+        }
+
+        offset += length;
+      }
+      
+      if (isConfused) {
+        diagnose(Loc, diag::confusable_character,
+                 UDRE->getName().isOperator(),
+                 Name.str(), StringRef(expectedIdentifier.c_str()))
+        .fixItReplaceChars(Loc, Loc.getAdvancedLoc(Name.getLength()),
+                           expectedIdentifier.c_str());
+      }
     }
     return new (Context) ErrorExpr(Loc);
   }

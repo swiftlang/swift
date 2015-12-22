@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/Confusables.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/Fallthrough.h"
@@ -44,11 +45,7 @@ using clang::isWhitespace;
 // UTF8 Validation/Encoding/Decoding helper functions
 //===----------------------------------------------------------------------===//
 
-/// EncodeToUTF8 - Encode the specified code point into a UTF8 stream.  Return
-/// true if it is an erroneous code point.
-static bool EncodeToUTF8(unsigned CharValue,
-                         SmallVectorImpl<char> &Result) {
-  assert(CharValue >= 0x80 && "Single-byte encoding should be already handled");
+bool EncodeToUTF8(unsigned CharValue, SmallVectorImpl<char> &Result) {
   // Number of bits in the value, ignoring leading zeros.
   unsigned NumBits = 32-llvm::countLeadingZeros(CharValue);
 
@@ -99,10 +96,7 @@ static bool isStartOfUTF8Character(unsigned char C) {
   return (signed char)C >= 0 || C >= 0xC0;  // C0 = 0b11000000
 }
 
-/// validateUTF8CharacterAndAdvance - Given a pointer to the starting byte of a
-/// UTF8 character, validate it and advance the lexer past it.  This returns the
-/// encoded character or ~0U if the encoding is invalid.
-static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr,
+uint32_t swift::validateUTF8CharacterAndAdvance(const char *&Ptr,
                                                 const char *End) {
   if (Ptr >= End)
     return ~0U;
@@ -483,7 +477,7 @@ static bool isValidIdentifierStartCodePoint(uint32_t c) {
 static bool advanceIf(char const *&ptr, char const *end,
                       bool (*predicate)(uint32_t)) {
   char const *next = ptr;
-  uint32_t c = validateUTF8CharacterAndAdvance(next, end);
+  uint32_t c = swift::validateUTF8CharacterAndAdvance(next, end);
   if (c == ~0U)
     return false;
   if (predicate(c)) {
@@ -1477,6 +1471,22 @@ Restart:
       } else {
         diagnose(CurPtr-1, diag::lex_invalid_character)
           .fixItReplaceChars(getSourceLoc(CurPtr-1), getSourceLoc(tmp), " ");
+
+        llvm::SmallString<64> buffer;
+        EncodeToUTF8(codepoint, buffer);
+        StringRef confusedChar = buffer.str();
+        uint32_t expectedCodepoint;
+        if ((expectedCodepoint =
+            confusable::tryConvertConfusableCharacterToASCII(codepoint))) {
+          std::string expected = std::string(1, (char)expectedCodepoint);
+          StringRef expectedChar = StringRef(expected);
+          diagnose(CurPtr-1, diag::lex_confusable_character,
+                   confusedChar, expectedChar)
+            .fixItReplaceChars(getSourceLoc(CurPtr-1),
+                               getSourceLoc(tmp),
+                               expectedChar);
+        }
+
         CurPtr = tmp;
         goto Restart;  // Skip presumed whitespace.
       }
