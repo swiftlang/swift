@@ -197,14 +197,6 @@ counting error values.
 
 **ABI TODO**: `_n` r/r entry points
 
-### swift\_convertErrorTypeToNSError, swift\_convertNSErrorToErrorType
-
-**ObjC-only**. Standard library entry points used to handle implicit conversions
-between `ErrorType` and `NSError`.
-
-**ABI TODO**: These should be implemented as shims or in Swift code, not
-in the runtime.
-
 ## Initialization
 
 ### swift_once
