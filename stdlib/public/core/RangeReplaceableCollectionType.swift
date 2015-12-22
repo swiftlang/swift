@@ -459,7 +459,7 @@ public func +<
     where S.Generator.Element == C.Generator.Element
 >(lhs: S, rhs: C) -> C {
   var result = C()
-  result.reserveCapacity(rhs.count + numericCast(rhs.underestimateCount()))
+  result.reserveCapacity(rhs.count + numericCast(lhs.underestimateCount()))
   result.appendContentsOf(lhs)
   result.appendContentsOf(rhs)
   return result
