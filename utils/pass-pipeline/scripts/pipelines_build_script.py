@@ -9,7 +9,6 @@ import textwrap
 # Append the src dir
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src'))
 
-import pass_pipeline_library
 import passes
 
 # TODO: This should not be hard coded.
