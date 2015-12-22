@@ -683,8 +683,7 @@ LifetimeTracker::EndpointRange LifetimeTracker::getEndpoints() {
     if (TheValue->hasOneUse()) {
       Lifetime = ValueLifetime();
       Lifetime->LastUsers.insert(TheValue->use_begin().getUser());
-    }
-    else {
+    } else {
       ValueLifetimeAnalysis VLA(TheValue);
       Lifetime = VLA.computeFromDirectUses();
     }

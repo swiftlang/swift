@@ -1109,8 +1109,7 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
     if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
       PlatformAvailabilityFilter =
         [](StringRef Platform) { return Platform == "ios"; };
-    }
-    else {
+    } else {
       PlatformAvailabilityFilter =
         [](StringRef Platform) {
           return Platform == "ios" ||
@@ -1121,13 +1120,11 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
       [](unsigned major, llvm::Optional<unsigned> minor) { return major <= 7; };
     DeprecatedAsUnavailableMessage =
       "APIs deprecated as of iOS 7 and earlier are unavailable in Swift";
-  }
-  else if (ctx.LangOpts.Target.isTvOS()) {
+  } else if (ctx.LangOpts.Target.isTvOS()) {
     if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
       PlatformAvailabilityFilter =
         [](StringRef Platform) { return Platform == "tvos"; };
-    }
-    else {
+    } else {
       PlatformAvailabilityFilter =
         [](StringRef Platform) {
           return Platform == "tvos" ||
@@ -1138,13 +1135,11 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
       [](unsigned major, llvm::Optional<unsigned> minor) { return major <= 7; };
     DeprecatedAsUnavailableMessage =
       "APIs deprecated as of iOS 7 and earlier are unavailable in Swift";
-  }
-  else if (ctx.LangOpts.Target.isWatchOS()) {
+  } else if (ctx.LangOpts.Target.isWatchOS()) {
     if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
       PlatformAvailabilityFilter =
         [](StringRef Platform) { return Platform == "watchos"; };
-    }
-    else {
+    } else {
       PlatformAvailabilityFilter =
         [](StringRef Platform) {
           return Platform == "watchos" ||
@@ -1159,8 +1154,7 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
     if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
       PlatformAvailabilityFilter =
       [](StringRef Platform) { return Platform == "macosx"; };
-    }
-    else {
+    } else {
       PlatformAvailabilityFilter =
       [](StringRef Platform) {
         return Platform == "macosx" ||
