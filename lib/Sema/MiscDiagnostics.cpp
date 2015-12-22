@@ -905,35 +905,6 @@ bool TypeChecker::diagnoseExplicitUnavailability(const ValueDecl *D,
   return true;
 }
 
-/// Diagnose uses of unavailable declarations. Returns true if a diagnostic
-/// was emitted.
-static bool diagAvailability(TypeChecker &TC, const ValueDecl *D,
-                             SourceRange R, const DeclContext *DC,
-                             const Expr *ParentExpr = nullptr) {
-  if (!D)
-    return false;
-
-  if (TC.diagnoseExplicitUnavailability(D, R, DC, ParentExpr))
-    return true;
-
-  // Diagnose for deprecation
-  if (const AvailableAttr *Attr = TypeChecker::getDeprecated(D)) {
-    TC.diagnoseDeprecated(R, DC, Attr, D->getFullName());
-  }
-  
-  if (TC.getLangOpts().DisableAvailabilityChecking) {
-    return false;
-  }
-
-  // Diagnose for potential unavailability
-  auto maybeUnavail = TC.checkDeclarationAvailability(D, R.Start, DC);
-  if (maybeUnavail.hasValue()) {
-    TC.diagnosePotentialUnavailability(D, R, DC, maybeUnavail.getValue());
-    return true;
-  }
-  return false;
-}
-
 namespace {
 class AvailabilityWalker : public ASTWalker {
   /// Describes how the next member reference will be treated as we traverse
@@ -974,21 +945,21 @@ public:
     };
 
     if (auto DR = dyn_cast<DeclRefExpr>(E))
-      diagAvailability(TC, DR->getDecl(), DR->getSourceRange(), DC,
+      diagAvailability(DR->getDecl(), DR->getSourceRange(),
                        getParentForDeclRef());
     if (auto MR = dyn_cast<MemberRefExpr>(E)) {
       walkMemberRef(MR);
       return skipChildren();
     }
     if (auto OCDR = dyn_cast<OtherConstructorDeclRefExpr>(E))
-      diagAvailability(TC, OCDR->getDecl(), OCDR->getConstructorLoc(), DC);
+      diagAvailability(OCDR->getDecl(), OCDR->getConstructorLoc());
     if (auto DMR = dyn_cast<DynamicMemberRefExpr>(E))
-      diagAvailability(TC, DMR->getMember().getDecl(), DMR->getNameLoc(), DC);
+      diagAvailability(DMR->getMember().getDecl(), DMR->getNameLoc());
     if (auto DS = dyn_cast<DynamicSubscriptExpr>(E))
-      diagAvailability(TC, DS->getMember().getDecl(), DS->getSourceRange(), DC);
+      diagAvailability(DS->getMember().getDecl(), DS->getSourceRange());
     if (auto S = dyn_cast<SubscriptExpr>(E)) {
       if (S->hasDecl())
-        diagAvailability(TC, S->getDecl().getDecl(), S->getSourceRange(), DC);
+        diagAvailability(S->getDecl().getDecl(), S->getSourceRange());
     }
     if (auto A = dyn_cast<AssignExpr>(E)) {
       walkAssignExpr(A);
@@ -1010,6 +981,9 @@ public:
   }
 
 private:
+  bool diagAvailability(const ValueDecl *D, SourceRange R,
+                        const Expr *ParentExpr = nullptr);
+
   /// Walk an assignment expression, checking for availability.
   void walkAssignExpr(AssignExpr *E) const {
     // We take over recursive walking of assignment expressions in order to
@@ -1042,13 +1016,11 @@ private:
 
     ValueDecl *D = E->getMember().getDecl();
     // Diagnose for the member declaration itself.
-    if (diagAvailability(TC, D, E->getNameLoc(), DC)) {
+    if (diagAvailability(D, E->getNameLoc()))
       return;
-    }
 
-    if (TC.getLangOpts().DisableAvailabilityChecking) {
+    if (TC.getLangOpts().DisableAvailabilityChecking)
       return;
-    }
 
     if (auto *ASD = dyn_cast<AbstractStorageDecl>(D)) {
       // Diagnose for appropriate accessors, given the access context.
@@ -1131,6 +1103,37 @@ private:
   }
 };
 }
+
+
+/// Diagnose uses of unavailable declarations. Returns true if a diagnostic
+/// was emitted.
+bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
+                                          const Expr *ParentExpr) {
+  if (!D)
+    return false;
+
+  if (TC.diagnoseExplicitUnavailability(D, R, DC, ParentExpr))
+    return true;
+
+  // Diagnose for deprecation
+  if (const AvailableAttr *Attr = TypeChecker::getDeprecated(D)) {
+    TC.diagnoseDeprecated(R, DC, Attr, D->getFullName());
+  }
+
+  if (TC.getLangOpts().DisableAvailabilityChecking) {
+    return false;
+  }
+
+  // Diagnose for potential unavailability
+  auto maybeUnavail = TC.checkDeclarationAvailability(D, R.Start, DC);
+  if (maybeUnavail.hasValue()) {
+    TC.diagnosePotentialUnavailability(D, R, DC, maybeUnavail.getValue());
+    return true;
+  }
+  return false;
+}
+
+
 
 /// Diagnose uses of unavailable declarations.
 static void diagAvailability(TypeChecker &TC, const Expr *E,
