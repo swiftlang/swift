@@ -479,6 +479,19 @@ public func +<
 
 @warn_unused_result
 public func +<
+    C : RangeReplaceableCollectionType,
+    S : CollectionType
+    where S.Generator.Element == C.Generator.Element
+>(lhs: S, rhs: C) -> C {
+  var result = C()
+  result.reserveCapacity(rhs.count + numericCast(lhs.count))
+  result.appendContentsOf(lhs)
+  result.appendContentsOf(rhs)
+  return result
+}
+
+@warn_unused_result
+public func +<
     RRC1 : RangeReplaceableCollectionType,
     RRC2 : RangeReplaceableCollectionType 
     where RRC1.Generator.Element == RRC2.Generator.Element
