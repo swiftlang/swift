@@ -13,7 +13,8 @@
 public final class LifetimeTracked : ForwardIndexType, CustomStringConvertible {
   public init(_ value: Int, identity: Int = 0) {
     LifetimeTracked.instances += 1
-    serialNumber = LifetimeTracked._nextSerialNumber + 1
+    LifetimeTracked._nextSerialNumber += 1
+    serialNumber =  LifetimeTracked._nextSerialNumber
     self.value = value
     self.identity = identity
   }
