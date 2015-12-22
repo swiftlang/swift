@@ -1499,9 +1499,9 @@ public func checkHashable<T : Hashable>(
     [lhs, rhs], equalityOracle: { expectedEqual || $0 == $1 }, ${trace})
 }
 
-% for inc, protocol, successor, end in (
-%  ('inc', '_Incrementable', 'successor', 'end'),
-%  ('dec', 'BidirectionalIndexType', 'predecessor', 'start')):
+% for inc, protocol, op, successor, end in (
+%  ('inc', '_Incrementable', '++', 'successor', 'end'),
+%  ('dec', 'BidirectionalIndexType', '--', 'predecessor', 'start')):
 
 /// Test that the elements of `instances` satisfy
 /// ${'some of ' if inc == 'dec' else ''}the semantic
@@ -1530,6 +1530,16 @@ public func check${inc.capitalize()}rementable<
       // Which is the same as if we apply _${successor}InPlace
       var j = i
       j._${successor}InPlace()
+      expectEqual(j, next, ${trace})
+
+      // Post-${inc}rement works
+      j = i
+      expectEqual(j${op}, i, ${trace})
+      expectEqual(j, next, ${trace})
+
+      // Pre-${inc}rement works
+      j = i
+      expectEqual(${op}j, next, ${trace})
       expectEqual(j, next, ${trace})
     }
   }
@@ -1918,8 +1928,7 @@ public func checkSequence<
     expectTrue(end == buf + count, "_initializeTo returned the wrong value")
     var j = expected.startIndex
     for i in 0..<(end - buf) {
-      expectTrue(sameValue(expected[j], buf[i]))
-      j = j.successor()
+      expectTrue(sameValue(expected[j++], buf[i]))
     }
     buf.destroy(end - buf)
     buf.dealloc(count)
@@ -2009,7 +2018,7 @@ public func check${traversal}Collection<
     }
     else {
       for _ in 0..<n.toIntMax() {
-        i += 1
+        ++i
       }
     }
     return i
@@ -2055,9 +2064,9 @@ public func check${traversal}Collection<
       for i in 0..<allIndices.count-1 {
         let successor1 = allIndices[i].successor()
         var successor2 = allIndices[i]
-        successor2 = successor2.successor()
+        successor2++
         var successor3 = allIndices[i]
-        successor3 = successor3.successor()
+        ++successor3
         for s in [ successor1, successor2, successor3 ] {
           expectEqual(allIndices[i + 1], s, ${trace})
           expectEqual(
@@ -2079,8 +2088,8 @@ public func check${traversal}Collection<
       }
       for i in 1..<allIndices.count {
         var index = allIndices[i]
-        index = index.predecessor()
-        index = index.successor()
+        --index
+        ++index
         expectEqual(allIndices[i], index, ${trace})
         expectEqual(
           expectedArray[i], collection[index], ${trace}, sameValue: sameValue)
@@ -2151,29 +2160,29 @@ public func checkSliceableWithBidirectionalIndex<
   var start = sliceable.startIndex
   for startNumericIndex in 0...expectedArray.count {
     if start != sliceable.endIndex {
-      start = start.successor()
-      start = start.predecessor()
-      start = start.successor()
-      start = start.predecessor()
+      ++start
+      --start
+      ++start
+      --start
     }
     var end = start
     for endNumericIndex in startNumericIndex...expectedArray.count {
       if end != sliceable.endIndex {
-        end = end.successor()
-        end = end.predecessor()
-        end = end.successor()
-        end = end.predecessor()
+        ++end
+        --end
+        ++end
+        --end
       }
       let expectedSlice = expectedArray[startNumericIndex..<endNumericIndex]
       let slice = sliceable[start..<end]
       checkBidirectionalCollection(expectedSlice, slice, ${trace})
 
       if end != sliceable.endIndex {
-        end = end.successor()
+        ++end
       }
     }
     if start != sliceable.endIndex {
-      end = end.successor()
+      ++start
     }
   }
 }
