@@ -165,7 +165,7 @@ TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
       !dynamicType->getClassOrBoundGenericClass())
     return Type();
 
-  // If the value type canot be bridged, we're done.
+  // If the value type cannot be bridged, we're done.
   if (!valueType->isPotentiallyBridgedValueType())
     return Type();
 
