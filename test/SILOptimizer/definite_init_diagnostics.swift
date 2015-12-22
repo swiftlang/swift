@@ -1046,7 +1046,7 @@ struct StructMutatingMethodTest {
   let y : Int
   init() {
     x = 42
-    ++x     // expected-error {{mutating operator '++' may not be used on immutable value 'self.x'}}
+    x += 1     // expected-error {{mutating operator '+=' may not be used on immutable value 'self.x'}}
 
     y = 12
     myTransparentFunction(&y)  // expected-error {{immutable value 'self.y' may not be passed inout}}
