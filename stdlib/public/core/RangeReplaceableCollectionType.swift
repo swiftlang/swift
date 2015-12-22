@@ -471,11 +471,10 @@ public func +<
     S : CollectionType
     where S.Generator.Element == C.Generator.Element
 >(lhs: C, rhs: S) -> C {
-  var lhs = lhs
-  // FIXME: what if lhs is a reference type?  This will mutate it.
-  lhs.reserveCapacity(lhs.count + numericCast(rhs.count))
-  lhs.appendContentsOf(rhs)
-  return lhs
+  var result = lhs is AnyObject ? C(lhs) : lhs
+  result.reserveCapacity(lhs.count + numericCast(rhs.count))
+  result.appendContentsOf(rhs)
+  return result
 }
 
 @warn_unused_result
