@@ -114,7 +114,7 @@ func useUnavailableObjCClass() {
     o.someMethod()
   }
 
-  for var i = 0; i < getInt(5); ++i {
+  for var i = 0; i < getInt(5); i += 1 {
     if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *) {
       let o: UnavailableObjCClass = printClassMetadataViaGeneric()
       _blackHole(o)
@@ -124,14 +124,14 @@ func useUnavailableObjCClass() {
   class SomeClass { }
   let someObject: AnyObject = _opaqueIdentity(SomeClass() as AnyObject)
 
-  for var i = 0; i < getInt(5); ++i {
+  for var i = 0; i < getInt(5); i += 1 {
     if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *) {
       let isUnavailable = someObject is UnavailableObjCClass
       _blackHole(isUnavailable)
     }
   }
 
-  for var i = 0; i < getInt(5); ++i {
+  for var i = 0; i < getInt(5); i += 1 {
     if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *) {
       let asUnavailable = someObject as? UnavailableObjCClass
       _blackHole(asUnavailable)

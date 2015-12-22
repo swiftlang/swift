@@ -45,7 +45,7 @@ func isPalindrome0<
 >(seq: S) -> Bool {
   typealias Index = S.Index
 
-  var a = seq.indices
+  let a = seq.indices
   var i = seq.indices
   var ir = i.lazy.reverse()
   var b = ir.generate()
@@ -111,7 +111,8 @@ func isPalindrome2<
   var b = seq.startIndex, e = seq.endIndex
 
   while (b != e) {
-    if (b == --e) { 
+    e = e.predecessor()
+    if (b == e) {
       break
     }
     if seq[b++] != seq[e] {

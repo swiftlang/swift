@@ -736,7 +736,7 @@ class CustomImmutableNSArray : NSArray {
 
   @objc
   override func objectAtIndex(index: Int) -> AnyObject {
-    ++CustomImmutableNSArray.timesObjectAtIndexWasCalled
+    CustomImmutableNSArray.timesObjectAtIndexWasCalled += 1
     return _data[index]
   }
 

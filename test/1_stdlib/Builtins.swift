@@ -119,8 +119,8 @@ var NoisyDeathCount = 0
 protocol P {}
 
 class Noisy : P {
-  init() { ++NoisyLifeCount }
-  deinit { ++NoisyDeathCount }
+  init() { NoisyLifeCount += 1 }
+  deinit { NoisyDeathCount += 1}
 }
 
 struct Large : P {
