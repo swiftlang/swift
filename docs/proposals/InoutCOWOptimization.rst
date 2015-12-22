@@ -51,7 +51,7 @@ could be written as follows:
   protocol Sliceable {
     ...
     @mutating
-    func quickSort(compare: (StreamType.Element, StreamType.Element)->Bool) {
+    func quickSort(compare: (StreamType.Element, StreamType.Element) -> Bool) {
       let (start,end) = (startIndex, endIndex)
       if start != end && start.succ() != end {
         let pivot = self[start]
