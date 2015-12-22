@@ -2125,6 +2125,10 @@ bool SimplifyCFG::simplifyBlocks() {
     case TermKind::SwitchEnumAddrInst:
       Changed |= simplifyTermWithIdenticalDestBlocks(BB);
       break;
+    case TermKind::ThrowInst:
+    case TermKind::DynamicMethodBranchInst:
+    case TermKind::ReturnInst:
+      break;
     case TermKind::Invalid:
       llvm_unreachable("Invalid Term Inst?!");
     }
