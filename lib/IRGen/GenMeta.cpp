@@ -978,26 +978,6 @@ static Address emitAddressOfSuperclassRefInClassMetadata(IRGenFunction &IGF,
   return IGF.Builder.CreateConstArrayGEP(addr, index, IGF.IGM.getPointerSize());
 }
 
-static void emitInitializeSuperclassOfMetaclass(IRGenFunction &IGF,
-                                                llvm::Value *metaclass,
-                                                llvm::Value *superMetadata) {
-  assert(IGF.IGM.ObjCInterop && "metaclasses only matter for ObjC interop");
-  
-  // The superclass of the metaclass is the metaclass of the superclass.
-
-  // Read the superclass's metaclass.
-  llvm::Value *superMetaClass = 
-      emitLoadOfObjCHeapMetadataRef(IGF, superMetadata);
-  superMetaClass = IGF.Builder.CreateBitCast(superMetaClass, 
-                                             IGF.IGM.TypeMetadataPtrTy);
-
-  // Write to the new metaclass's superclass field.
-  Address metaSuperField
-    = emitAddressOfSuperclassRefInClassMetadata(IGF, metaclass);
-
-  IGF.Builder.CreateStore(superMetaClass, metaSuperField);
-}
-
 static llvm::Value *emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF,
                                                   CanType type,
                                                   ForDefinition_t shouldDefine);
@@ -3223,11 +3203,9 @@ namespace {
 
     bool HasDependentSuperclass = false;
     bool HasDependentFieldOffsetVector = false;
-    
-    std::vector<std::tuple<ClassDecl*, Size, Size>>
-      AncestorFieldOffsetVectors;
-    
-    std::vector<Size> AncestorFillOps;
+
+    bool InheritFieldOffsetVectors = false;
+    bool InheritGenericParameters = false;
     
     Size MetaclassPtrOffset = Size::invalid();
     Size ClassRODataPtrOffset = Size::invalid();
@@ -3347,21 +3325,15 @@ namespace {
       
       // If we have a field offset vector for an ancestor class, we will copy
       // it from our superclass metadata at instantiation time.
-      AncestorFieldOffsetVectors.emplace_back(whichClass,
-                                              asImpl().getNextOffset(),
-                                              Size::invalid());
+      InheritFieldOffsetVectors = true;
     }
     
     void noteEndOfFieldOffsets(ClassDecl *whichClass) {
       if (whichClass == Target)
         return;
       
-      // Mark the end of the ancestor field offset vector.
-      assert(!AncestorFieldOffsetVectors.empty()
+      assert(InheritFieldOffsetVectors
              && "no start of ancestor field offsets?!");
-      assert(std::get<0>(AncestorFieldOffsetVectors.back()) == whichClass
-             && "mismatched start of ancestor field offsets?!");
-      std::get<2>(AncestorFieldOffsetVectors.back()) = asImpl().getNextOffset();
     }
     
     // Suppress GenericMetadataBuilderBase's default behavior of introducing
@@ -3373,10 +3345,10 @@ namespace {
         // Introduce the fill op.
         GenericMetadataBuilderBase::addGenericArgument(type, forClass);
       } else {
-        // Lay out the field, but don't provide the fill op, which we'll get
-        // from the superclass.
+        // Lay out the field, but don't fill it in, we will copy it from
+        // the superclass.
         HasDependentMetadata = true;
-        AncestorFillOps.push_back(getNextOffset());
+        InheritGenericParameters = true;
         ClassMetadataBuilderBase::addGenericArgument(type, forClass);
       }
     }
@@ -3390,9 +3362,8 @@ namespace {
       } else {
         // Lay out the field, but don't provide the fill op, which we'll get
         // from the superclass.
-
         HasDependentMetadata = true;
-        AncestorFillOps.push_back(getNextOffset());
+        InheritGenericParameters = true;
         ClassMetadataBuilderBase::addGenericWitnessTable(type, protocol,
                                                          forClass);
       }
@@ -3484,19 +3455,6 @@ namespace {
                             metaclassRODataPtr.getAddress(), IGF.IGM.IntPtrTy);
         IGF.Builder.CreateStore(rodata, rodataPtrSlot);
       }
-      
-      if (IGF.IGM.ObjCInterop) {
-        // Generate the runtime name for the class and poke it into the rodata.
-        auto name = IGF.Builder.CreateCall(IGM.getGetGenericClassObjCNameFn(),
-                                           metadata);
-        name->setDoesNotThrow();
-        Size nameOffset(IGM.getPointerAlignment().getValue() > 4 ? 24 : 16);
-        for (Address rodataPtr : {classRODataPtr, metaclassRODataPtr}) {
-          auto namePtr = createPointerSizedGEP(IGF, rodataPtr, nameOffset);
-          namePtr = IGF.Builder.CreateBitCast(namePtr, IGM.Int8PtrPtrTy);
-          IGF.Builder.CreateStore(name, namePtr);
-        }
-      }
 
       // Get the superclass metadata.
       llvm::Value *superMetadata;
@@ -3509,46 +3467,6 @@ namespace {
                && "dependent superclass without superclass?!");
         superMetadata
           = llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy);
-      }
-
-      // If the superclass is generic, we need to populate the
-      // superclass field of the metaclass.
-      if (IGF.IGM.ObjCInterop && HasDependentSuperclass) {
-        emitInitializeSuperclassOfMetaclass(IGF, metaclass, superMetadata);
-      }
-
-      // If we have any ancestor generic parameters or field offset vectors,
-      // copy them from the superclass metadata.
-      if (!AncestorFieldOffsetVectors.empty() || !AncestorFillOps.empty()) {
-        Address superBase(superMetadata, IGF.IGM.getPointerAlignment());
-        Address selfBase(metadata, IGF.IGM.getPointerAlignment());
-        superBase = IGF.Builder.CreateBitCast(superBase,
-                                              IGF.IGM.SizeTy->getPointerTo());
-        selfBase = IGF.Builder.CreateBitCast(selfBase,
-                                             IGF.IGM.SizeTy->getPointerTo());
-        
-        for (Size ancestorOp : AncestorFillOps) {
-          ancestorOp -= AddressPoint;
-          Address superOp = createPointerSizedGEP(IGF, superBase, ancestorOp);
-          Address selfOp = createPointerSizedGEP(IGF, selfBase, ancestorOp);
-          IGF.Builder.CreateStore(IGF.Builder.CreateLoad(superOp), selfOp);
-        }
-        
-        for (auto &ancestorFields : AncestorFieldOffsetVectors) {
-          ClassDecl *ancestor;
-          Size startIndex, endIndex;
-          std::tie(ancestor, startIndex, endIndex) = ancestorFields;
-          assert(startIndex <= endIndex);
-          if (startIndex == endIndex)
-            continue;
-          Size size = endIndex - startIndex;
-          startIndex -= AddressPoint;
-          
-          Address superVec = createPointerSizedGEP(IGF, superBase, startIndex);
-          Address selfVec = createPointerSizedGEP(IGF, selfBase, startIndex);
-          
-          IGF.Builder.CreateMemCpy(selfVec, superVec, size);
-        }
       }
       
       // If the field layout is dependent, ask the runtime to populate the
@@ -3604,6 +3522,13 @@ namespace {
                                {metadata, superMetadata, numFields,
                                 firstField.getAddress(), fieldVector});
 
+      } else if (InheritFieldOffsetVectors || InheritGenericParameters) {
+        // If we have any ancestor generic parameters or field offset vectors,
+        // copy them from the superclass metadata.
+        auto initFn = IGF.IGM.getInitializeSuperclassFn();
+        IGF.Builder.CreateCall(initFn,
+                               {metadata, superMetadata,
+                                llvm::ConstantInt::get(IGF.IGM.Int1Ty, 1)});
       } else if (IGF.IGM.ObjCInterop) {
         // Register the class with the ObjC runtime.
         llvm::Value *instantiateObjC = IGF.IGM.getInstantiateObjCClassFn();
