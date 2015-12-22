@@ -12,15 +12,15 @@
 
 public final class LifetimeTracked : ForwardIndexType, CustomStringConvertible {
   public init(_ value: Int, identity: Int = 0) {
-    ++LifetimeTracked.instances
-    serialNumber = ++LifetimeTracked._nextSerialNumber
+    LifetimeTracked.instances += 1
+    serialNumber = LifetimeTracked._nextSerialNumber + 1
     self.value = value
     self.identity = identity
   }
 
   deinit {
     assert(serialNumber > 0, "double destruction!")
-    --LifetimeTracked.instances
+    LifetimeTracked.instances -= 1
     serialNumber = -serialNumber
   }
 
