@@ -119,11 +119,12 @@ namespace {
     SmallVector<llvm::Type *, 8> Types;
 
     void collect(IRGenFunction &IGF, BoundGenericType *type) {
+      auto subs = type->getSubstitutions(/*FIXME:*/nullptr, nullptr);
       // Add all the argument archetypes.
       // TODO: only the *primary* archetypes
       // TODO: not archetypes from outer contexts
       // TODO: but we are partially determined by the outer context!
-      for (auto &sub : type->getSubstitutions(/*FIXME:*/nullptr, nullptr)) {
+      for (auto &sub : subs) {
         CanType subbed = sub.getReplacement()->getCanonicalType();
         Values.push_back(IGF.emitTypeMetadataRef(subbed));
       }
@@ -132,8 +133,10 @@ namespace {
       Types.append(Values.size(), IGF.IGM.TypeMetadataPtrTy);
 
       // Add protocol witness tables for all those archetypes.
-      for (auto &sub : type->getSubstitutions(/*FIXME:*/nullptr, nullptr))
-        emitWitnessTableRefs(IGF, sub, Values);
+      for (auto i : indices(subs)) {
+        llvm::Value *metadata = Values[i];
+        emitWitnessTableRefs(IGF, subs[i], &metadata, Values);
+      }
 
       // All of those values are witness table pointers.
       Types.append(Values.size() - Types.size(), IGF.IGM.WitnessTablePtrTy);
@@ -438,16 +441,38 @@ bool irgen::hasKnownVTableEntry(IRGenModule &IGM,
   return hasKnownSwiftImplementation(IGM, theClass);
 }
 
-/// If we have a non-generic struct or enum whose size does not
-/// depend on any opaque resilient types, we can access metadata
-/// directly. Otherwise, call an accessor.
-///
-/// FIXME: Really, we want to use accessors for any nominal type
-/// defined in a different module, too.
+static bool hasBuiltinTypeMetadata(CanType type) {
+  // The empty tuple type has a singleton metadata.
+  if (auto tuple = dyn_cast<TupleType>(type))
+    return tuple->getNumElements() == 0;
+
+  // The builtin types generally don't require metadata, but some of them
+  // have nodes in the runtime anyway.
+  if (isa<BuiltinType>(type))
+    return true;
+
+  // SIL box types are artificial, but for the purposes of dynamic layout,
+  // we use the NativeObject metadata.
+  if (isa<SILBoxType>(type))
+    return true;
+
+  return false;
+}
+
+/// Is it basically trivial to access the given metadata?  If so, we don't
+/// need a cache variable in its accessor.
 static bool isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
-  if (isa<StructType>(type) || isa<EnumType>(type))
-    if (IGM.getTypeInfoForLowered(type).isFixedSize())
-      return true;
+  // Value type metadata only requires dynamic initialization on first
+  // access if it contains a resilient type.
+  if (isa<StructType>(type) || isa<EnumType>(type)) {
+    assert(!cast<NominalType>(type)->getDecl()->isGenericContext() &&
+           "shouldn't be called for a generic type");
+    return (IGM.getTypeInfoForLowered(type).isFixedSize());
+  }
+
+  if (hasBuiltinTypeMetadata(type)) {
+    return true;
+  }
 
   return false;
 }
@@ -466,11 +491,15 @@ irgen::getTypeMetadataAccessStrategy(IRGenModule &IGM, CanType type,
   // the metadata for the existential type.
   auto nominal = dyn_cast<NominalType>(type);
   if (nominal && !isa<ProtocolType>(nominal)) {
-    assert(!nominal->getDecl()->isGenericContext());
+    if (nominal->getDecl()->isGenericContext())
+      return MetadataAccessStrategy::NonUniqueAccessor;
 
     if (preferDirectAccess &&
         isTypeMetadataAccessTrivial(IGM, type))
       return MetadataAccessStrategy::Direct;
+
+    // If the type doesn't guarantee that it has an access function,
+    // we might have to use a non-unique accessor.
 
     // Everything else requires accessors.
     switch (getDeclLinkage(nominal->getDecl())) {
@@ -488,21 +517,12 @@ irgen::getTypeMetadataAccessStrategy(IRGenModule &IGM, CanType type,
     llvm_unreachable("bad formal linkage");
   }
 
-  // Builtin types are assumed to be implemented with metadata in the runtime.
-  if (isa<BuiltinType>(type))
-    return MetadataAccessStrategy::Direct;
-
   // DynamicSelfType is actually local.
   if (type->hasDynamicSelfType())
     return MetadataAccessStrategy::Direct;
 
-  // The zero-element tuple has special metadata in the runtime.
-  if (auto tuple = dyn_cast<TupleType>(type))
-    if (tuple->getNumElements() == 0)
-      return MetadataAccessStrategy::Direct;
-
-  // SIL box types are opaque to the runtime; NativeObject stands in for them.
-  if (isa<SILBoxType>(type))
+  // Some types have special metadata in the runtime.
+  if (hasBuiltinTypeMetadata(type))
     return MetadataAccessStrategy::Direct;
 
   // Everything else requires a shared accessor function.
@@ -1116,16 +1136,12 @@ static llvm::Function *getTypeMetadataAccessFunction(IRGenModule &IGM,
 /// for the given type.
 static void maybeEmitTypeMetadataAccessFunction(IRGenModule &IGM,
                                                 NominalTypeDecl *theDecl) {
-  CanType declaredType = theDecl->getDeclaredType()->getCanonicalType();
+  // Currently, we always emit type metadata access functions for
+  // the non-generic types we define.
+  if (theDecl->isGenericContext()) return;
 
-  // FIXME: Also do this for generic structs.
-  // FIXME: Internal types with availability from another module can be
-  // referenced from @_transparent functions.
-  if (!theDecl->isGenericContext() &&
-      (isa<ClassDecl>(theDecl) ||
-       theDecl->getFormalAccess() == Accessibility::Public ||
-       !IGM.getTypeInfoForLowered(declaredType).isFixedSize()))
-    (void) getTypeMetadataAccessFunction(IGM, declaredType, ForDefinition);
+  CanType declaredType = theDecl->getDeclaredType()->getCanonicalType();
+  (void) getTypeMetadataAccessFunction(IGM, declaredType, ForDefinition);
 }
 
 /// Emit a call to the type metadata accessor for the given function.
@@ -1144,7 +1160,7 @@ static llvm::Value *emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF,
   call->setDoesNotThrow();
   
   // Save the metadata for future lookups.
-  IGF.setScopedLocalTypeData(type,  LocalTypeData::forMetatype(), call);
+  IGF.setScopedLocalTypeData(type, LocalTypeData::forMetatype(), call);
   
   return call;
 }
@@ -1167,6 +1183,26 @@ llvm::Value *IRGenFunction::emitTypeMetadataRef(CanType type) {
   }
 
   return emitDirectTypeMetadataRef(*this, type);
+}
+
+/// Return the address of a function that will return type metadata 
+/// for the given non-dependent type.
+llvm::Function *irgen::getOrCreateTypeMetadataAccessFunction(IRGenModule &IGM,
+                                                             CanType type) {
+  assert(!type->hasArchetype() &&
+         "cannot create global function to return dependent type metadata");
+
+  switch (getTypeMetadataAccessStrategy(IGM, type,
+                                        /*preferDirectAccess=*/false)) {
+  case MetadataAccessStrategy::PublicUniqueAccessor:
+  case MetadataAccessStrategy::HiddenUniqueAccessor:
+  case MetadataAccessStrategy::PrivateAccessor:
+    return getTypeMetadataAccessFunction(IGM, type, NotForDefinition);
+  case MetadataAccessStrategy::Direct:
+  case MetadataAccessStrategy::NonUniqueAccessor:
+    return getTypeMetadataAccessFunction(IGM, type, ForDefinition);
+  }
+  llvm_unreachable("bad type metadata access strategy");
 }
 
 namespace {

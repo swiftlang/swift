@@ -278,6 +278,11 @@ namespace irgen {
                                                        CanType type,
                                                        bool preferDirectAccess);
   
+  /// Return the address of a function that will return type metadata 
+  /// for the given non-dependent type.
+  llvm::Function *getOrCreateTypeMetadataAccessFunction(IRGenModule &IGM,
+                                                        CanType type);
+
   /// Get the runtime identifier for a special protocol, if any.
   SpecialProtocol getSpecialProtocolID(ProtocolDecl *P);
 
