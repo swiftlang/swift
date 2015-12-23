@@ -152,5 +152,97 @@ StaticStringTestSuite.test("UnicodeScalarRepresentation/byteSize")
   strOpaque.byteSize
 }
 
-runAllTests()
+StaticStringTestSuite.test("UnicodeScalarView/round-trip/UTF8") {
+  // round-tripping through UnicodeScalarView should return the same value
+  let str: StaticString = "абв"
+  let str2 = StaticString(str.unicodeScalars)
+  expectEqual(str.utf8Start, str2.utf8Start)
+  expectEqual(str.byteSize, str2.byteSize)
+  expectEqual(str.isASCII, str2.isASCII)
+}
 
+StaticStringTestSuite.test("UnicodeScalarView/round-trip/ASCII") {
+  // round-tripping through UnicodeScalarView should return the same value
+  let str: StaticString = "abc"
+  let str2 = StaticString(str.unicodeScalars)
+  expectEqual(str.utf8Start, str2.utf8Start)
+  expectEqual(str.byteSize, str2.byteSize)
+  expectEqual(str.isASCII, str2.isASCII)
+}
+
+StaticStringTestSuite.test("UnicodeScalarView/round-trip/Scalar") {
+  // round-tripping through UnicodeScalarView should return the same value
+  let str: StaticString = StaticString(_builtinUnicodeScalarLiteral: UInt32(0x5a)._value)
+  let str2 = StaticString(str.unicodeScalars)
+  expectEqual(str.hasPointerRepresentation, str2.hasPointerRepresentation)
+  expectEqual(str.unicodeScalar, str2.unicodeScalar)
+}
+
+StaticStringTestSuite.test("UnicodeScalarView/generate/NonEmpty") {
+  let str: StaticString = "абв"
+  expectEqual(["а", "б", "в"], Array(str.unicodeScalars))
+}
+
+StaticStringTestSuite.test("UnicodeScalarView/generate/Empty") {
+  let str: StaticString = ""
+  expectEqual([], Array(str.unicodeScalars))
+}
+
+StaticStringTestSuite.test("UnicodeScalarView/generate/Scalar") {
+  let str: StaticString = StaticString(_builtinUnicodeScalarLiteral: UInt32(0x5a)._value)
+  expectEqual(["Z"], Array(str.unicodeScalars))
+}
+
+StaticStringTestSuite.test("UnicodeScalarView/subscript/Pointer") {
+  let str: StaticString = "абв"
+  let scalars = str.unicodeScalars
+  expectEqual("а", scalars[scalars.startIndex])
+  expectEqual("б", scalars[scalars.startIndex.advancedBy(1)])
+  expectEqual("в", scalars[scalars.startIndex.advancedBy(2)])
+  expectEqual(scalars.endIndex, scalars.startIndex.advancedBy(3))
+}
+
+StaticStringTestSuite.test("UnicodeScalarView/subscript/Scalar") {
+  let str: StaticString = StaticString(_builtinUnicodeScalarLiteral: UInt32(0x5a)._value)
+  let scalars = str.unicodeScalars
+  expectEqual("Z", scalars[scalars.startIndex])
+  expectEqual(scalars.endIndex, scalars.startIndex.advancedBy(1))
+}
+
+StaticStringTestSuite.test("UnicodeScalarView/subscript/Empty") {
+  let str = StaticString()
+  let scalars = str.unicodeScalars
+  expectEqual(scalars.startIndex, scalars.endIndex)
+}
+
+StaticStringTestSuite.test("UnicodeScalarView/Slice/round-trip/NonEmpty/Pointer") {
+  let str: StaticString = "абв"
+  let scalars = str.unicodeScalars
+  let slice = scalars[scalars.startIndex.successor()...scalars.startIndex.successor()]
+  expectEqual("б", StaticString(slice).stringValue)
+}
+
+StaticStringTestSuite.test("UnicodeScalarView/Slice/round-trip/NonEmpty/Scalar") {
+  let str: StaticString = StaticString(_builtinUnicodeScalarLiteral: UInt32(0x5a)._value)
+  let scalars = str.unicodeScalars
+  let slice = scalars[scalars.indices]
+  expectEqual("Z", StaticString(slice).stringValue)
+}
+
+StaticStringTestSuite.test("UnicodeScalarView/Slice/round-trip/Empty/Pointer") {
+  let str: StaticString = "abc"
+  let scalars = str.unicodeScalars
+  let slice = scalars[scalars.startIndex..<scalars.startIndex]
+  expectEqual("", StaticString(slice).stringValue)
+  expectNotEqual(nil, StaticString(slice).utf8Start)
+}
+
+StaticStringTestSuite.test("UnicodeScalarView/Slice/round-trip/Empty/Scalar") {
+  let str: StaticString = StaticString(_builtinUnicodeScalarLiteral: UInt32(0x5a)._value)
+  let scalars = str.unicodeScalars
+  let slice = scalars[scalars.startIndex..<scalars.startIndex]
+  expectEqual("", StaticString(slice).stringValue)
+  expectNotEqual(nil, StaticString(slice).utf8Start)
+}
+
+runAllTests()
