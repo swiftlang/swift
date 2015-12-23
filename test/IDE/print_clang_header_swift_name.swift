@@ -3,6 +3,8 @@
 // RUN:     %S/Inputs/print_clang_header_swift_name.h --cc-args %target-cc-options \
 // RUN:     -isysroot %clang-importer-sdk-path -fsyntax-only %t.m -I %S/Inputs | FileCheck %s
 
+// REQUIRES: objc_interop
+
 // CHECK: enum Normal : Int {
 // CHECK-NOT: {{^}}}
 // CHECK: case One
