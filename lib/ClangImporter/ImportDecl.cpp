@@ -2896,8 +2896,14 @@ namespace {
     }
 
     Decl *VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl,
+                              DeclContext *dc) {
+      return VisitObjCMethodDecl(decl, dc, false);
+    }
+
+  private:
+    Decl *VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl,
                               DeclContext *dc,
-                              bool forceClassMethod = false) {
+                              bool forceClassMethod) {
       // If we have an init method, import it as an initializer.
       if (Impl.isInitMethod(decl)) {
         // Cannot force initializers into class methods.
@@ -3086,11 +3092,19 @@ namespace {
           if (auto imported = VisitObjCMethodDecl(decl, dc,
                                                   /*forceClassMethod=*/true))
             Impl.AlternateDecls[result] = cast<ValueDecl>(imported);
+        } else if (auto factory = importFactoryMethodAsConstructor(
+                                    result, decl, selector, dc)) {
+          // We imported the factory method as an initializer, so
+          // record it as an alternate declaration.
+          if (*factory)
+            Impl.AlternateDecls[result] = *factory;
         }
+
       }
       return result;
     }
 
+  public:
     /// Record the function or initializer overridden by the given Swift method.
     void recordObjCOverride(AbstractFunctionDecl *decl) {
       // Figure out the class in which this method occurs.
@@ -4235,16 +4249,6 @@ namespace {
             if (alternate->getDeclContext() == member->getDeclContext() &&
                 knownMembers.insert(alternate).second)
               members.push_back(alternate);
-          }
-
-          // If this is a factory method, try to import it as a constructor.
-          if (auto factory = importFactoryMethodAsConstructor(
-                               member,
-                               objcMethod, 
-                               Impl.importSelector(objcMethod->getSelector()),
-                               swiftContext)) {
-            if (*factory && knownMembers.insert(*factory).second)
-              members.push_back(*factory);
           }
 
           // Import explicit properties as instance properties, not as separate
