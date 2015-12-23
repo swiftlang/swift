@@ -2113,7 +2113,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   var description: String {
     var result = ""
 #if INTERNAL_CHECKS_ENABLED
-    for var i = 0; i != capacity; i += 1 {
+    for i in 0..<capacity {
       if isInitializedEntry(i) {
         let key = keyAt(i)
         result += "bucket \(i), ideal bucket = \(_bucket(key)), key = \(key)\n"
