@@ -3259,8 +3259,8 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
     while hole != lastInChain {
       // Walk backwards from the end of the chain looking for
       // something out-of-place.
-      var b: Int
-      for b = lastInChain; b != hole; b = nativeStorage._prev(b) {
+      var b = lastInChain
+      while b != hole {
         let idealBucket = nativeStorage._bucket(nativeStorage.keyAt(b))
 
         // Does this element belong between start and hole?  We need
@@ -3271,6 +3271,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
         if start <= hole ? (c0 && c1) : (c0 || c1) {
           break // Found it
         }
+        b = nativeStorage._prev(b)
       }
 
       if b == hole { // No out-of-place elements found; we're done adjusting
