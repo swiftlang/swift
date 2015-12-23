@@ -4201,8 +4201,7 @@ namespace {
     /// list of corresponding Swift members.
     void importObjCMembers(const clang::ObjCContainerDecl *decl,
                            DeclContext *swiftContext,
-                           SmallVectorImpl<Decl *> &members,
-                           bool &hasMissingRequiredMember) {
+                           SmallVectorImpl<Decl *> &members) {
       llvm::SmallPtrSet<Decl *, 4> knownMembers;
       for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
            m != mEnd; ++m) {
@@ -4211,18 +4210,7 @@ namespace {
           continue;
 
         auto member = Impl.importDecl(nd);
-        if (!member) {
-          if (auto method = dyn_cast<clang::ObjCMethodDecl>(nd)) {
-            if (method->getImplementationControl() ==
-                clang::ObjCMethodDecl::Required)
-              hasMissingRequiredMember = true;
-          } else if (auto prop = dyn_cast<clang::ObjCPropertyDecl>(nd)) {
-            if (prop->getPropertyImplementation() ==
-                clang::ObjCPropertyDecl::Required)
-              hasMissingRequiredMember = true;
-          }
-          continue;
-        }
+        if (!member) continue;
 
         if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(nd)) {
           // If there is a alternate declaration for this member, add it.
@@ -5421,8 +5409,32 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
     Result = converter.Visit(ClangDecl);
     HadForwardDeclaration = converter.hadForwardDeclaration();
   }
-  if (!Result)
+  if (!Result) {
+    // If we couldn't import this Objective-C entity, determine
+    // whether it was a required member of a protocol.
+    bool hasMissingRequiredMember = false;
+    if (auto clangProto
+          = dyn_cast<clang::ObjCProtocolDecl>(ClangDecl->getDeclContext())) {
+      if (auto method = dyn_cast<clang::ObjCMethodDecl>(ClangDecl)) {
+        if (method->getImplementationControl()
+              == clang::ObjCMethodDecl::Required)
+          hasMissingRequiredMember = true;
+      } else if (auto prop = dyn_cast<clang::ObjCPropertyDecl>(ClangDecl)) {
+        if (prop->getPropertyImplementation()
+              == clang::ObjCPropertyDecl::Required)
+          hasMissingRequiredMember = true;
+      }
+
+      if (hasMissingRequiredMember) {
+        // Mark the protocol as having missing requirements.
+        if (auto proto = cast_or_null<ProtocolDecl>(importDecl(clangProto))) {
+          proto->setHasMissingRequirements(true);
+        }
+      }
+    }
+
     return nullptr;
+  }
 
   // Finalize the imported declaration.
   auto finalizeDecl = [&](Decl *result) {
@@ -5917,8 +5929,7 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
 
 
 void
-ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t unused,
-                                              bool *hasMissingRequiredMembers) {
+ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t unused) {
   assert(D->hasClangNode());
   auto clangDecl = cast<clang::ObjCContainerDecl>(D->getClangDecl());
 
@@ -5945,12 +5956,7 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t unused,
   ImportingEntityRAII Importing(*this);
 
   SmallVector<Decl *, 16> members;
-  bool scratch;
-  if (!hasMissingRequiredMembers)
-    hasMissingRequiredMembers = &scratch;
-  *hasMissingRequiredMembers = false;
-  converter.importObjCMembers(clangDecl, DC,
-                              members, *hasMissingRequiredMembers);
+  converter.importObjCMembers(clangDecl, DC, members);
 
   protos = takeImportedProtocols(D);
   if (auto clangClass = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl)) {

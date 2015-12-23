@@ -589,8 +589,7 @@ public:
   void verify() const;
 
   virtual void loadAllMembers(Decl *D,
-                              uint64_t contextData,
-                              bool *ignored) override;
+                              uint64_t contextData) override;
 
   virtual void
   loadAllConformances(const Decl *D, uint64_t contextData,

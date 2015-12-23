@@ -803,13 +803,7 @@ void IterableDeclContext::loadAllMembers() const {
     break;
   }
 
-  bool hasMissingRequiredMembers = false;
-  resolver->loadAllMembers(const_cast< Decl *>(container), contextData,
-                           &hasMissingRequiredMembers);
-
-  if (hasMissingRequiredMembers)
-    if (auto proto = dyn_cast<ProtocolDecl>(this))
-      const_cast<ProtocolDecl *>(proto)->setHasMissingRequirements(true);
+  resolver->loadAllMembers(const_cast< Decl *>(container), contextData);
 
   --NumUnloadedLazyIterableDeclContexts;
 }

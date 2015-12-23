@@ -3919,9 +3919,7 @@ Type ModuleFile::getType(TypeID TID) {
   return typeOrOffset;
 }
 
-void ModuleFile::loadAllMembers(Decl *D,
-                                uint64_t contextData,
-                                bool *) {
+void ModuleFile::loadAllMembers(Decl *D, uint64_t contextData) {
   PrettyStackTraceDecl trace("loading members for", D);
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);

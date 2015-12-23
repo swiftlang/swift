@@ -1256,8 +1256,7 @@ public:
   }
 
   virtual void
-  loadAllMembers(Decl *D, uint64_t unused,
-                 bool *hasMissingRequiredMembers) override;
+  loadAllMembers(Decl *D, uint64_t unused) override;
 
   void
   loadAllConformances(
