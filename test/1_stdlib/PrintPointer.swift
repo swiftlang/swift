@@ -1,7 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-import Swift
 import StdlibUnittest
 
 let PrintTests = TestSuite("PrintPointer")
@@ -32,7 +31,9 @@ PrintTests.test("Printable") {
   
   expectPrinted(expectedNull, COpaquePointer())
   expectPrinted(expectedNull, CVaListPointer(_fromUnsafeMutablePointer: nullUP))
+#if _runtime(_ObjC)
   expectPrinted(expectedNull, AutoreleasingUnsafeMutablePointer<Int>())
+#endif
 }
 
 runAllTests()

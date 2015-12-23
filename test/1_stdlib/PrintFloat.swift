@@ -1,25 +1,25 @@
 // RUN: rm -rf %t && mkdir %t
-// RUN: %target-build-swift -emit-library -Xfrontend -enable-resilience -c  %S/Inputs/PrintTestTypes.swift -o %t/PrintTestTypes.o
-// RUN: %target-build-swift -emit-module -Xfrontend -enable-resilience -c  %S/Inputs/PrintTestTypes.swift -o %t/PrintTestTypes.o
-// RUN: %target-build-swift %s -Xlinker %t/PrintTestTypes.o -I %t -L %t -o %t/main
-// RUN: %target-run %t/main env %s
-// RUN: %target-run %t/main ru_RU.UTF-8 %s
+// RUN: %target-build-swift -c -force-single-frontend-invocation -parse-as-library -emit-module -emit-module-path %t/PrintTestTypes.swiftmodule -o %t/PrintTestTypes.o %S/Inputs/PrintTestTypes.swift
+// RUN: %target-build-swift %s -Xlinker %t/PrintTestTypes.o -I %t -L %t -o %t/main.out
+// RUN: %target-run %t/main.out
+// RUN: %target-run %t/main.out --env ru_RU.UTF-8
 // REQUIRES: executable_test
 // XFAIL: linux
 
-import Swift
 import StdlibUnittest
 import Darwin
 import PrintTestTypes
 
 let PrintTests = TestSuite("PrintFloat")
 
-let arg = Process.arguments[1]
-if arg == "env" {
-  setlocale(LC_ALL, "")
-} else {
-  expectEqual("ru_RU.UTF-8", arg)
-  setlocale(LC_ALL, arg)
+PrintTests.setUp {
+  if Process.arguments.contains("--env") {
+    let locale = Process.arguments[4]
+    expectEqual("ru_RU.UTF-8", locale)
+    setlocale(LC_ALL, locale)
+  } else {
+    setlocale(LC_ALL, "")
+  }
 }
 
 PrintTests.test("CustomStringConvertible") {
@@ -56,7 +56,7 @@ PrintTests.test("Printable") {
   expectPrinted("-1.0", asFloat32(-1.0))
   expectPrinted("100.125", asFloat32(100.125))
   expectPrinted("-100.125", asFloat32(-100.125))
-  
+
   expectPrinted("inf", Double.infinity)
   expectPrinted("-inf", -Double.infinity)
   expectPrinted("nan", Double.NaN)
@@ -65,7 +65,7 @@ PrintTests.test("Printable") {
   expectPrinted("-1.0", asFloat64(-1.0))
   expectPrinted("100.125", asFloat64(100.125))
   expectPrinted("-100.125", asFloat64(-100.125))
-  
+
   expectPrinted("1.00001", asFloat32(1.00001))
   expectPrinted("1.25e+17", asFloat32(125000000000000000.0))
   expectPrinted("1.25e+16", asFloat32(12500000000000000.0))
@@ -102,7 +102,7 @@ PrintTests.test("Printable") {
   expectPrinted("1.25e-15", asFloat32(0.00000000000000125))
   expectPrinted("1.25e-16", asFloat32(0.000000000000000125))
   expectPrinted("1.25e-17", asFloat32(0.0000000000000000125))
-  
+
   expectPrinted("1.00000000000001", asFloat64(1.00000000000001))
   expectPrinted("1.25e+17", asFloat64(125000000000000000.0))
   expectPrinted("1.25e+16", asFloat64(12500000000000000.0))
@@ -139,7 +139,7 @@ PrintTests.test("Printable") {
   expectPrinted("1.25e-15", asFloat64(0.00000000000000125))
   expectPrinted("1.25e-16", asFloat64(0.000000000000000125))
   expectPrinted("1.25e-17", asFloat64(0.0000000000000000125))
-  
+
 #if arch(i386) || arch(x86_64)
   expectPrinted("1.00000000000000001", asFloat80(1.00000000000000001))
   expectPrinted("1.25e+19", asFloat80(12500000000000000000.0))

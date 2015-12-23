@@ -477,19 +477,16 @@ struct _ParentProcess {
 
   internal var _runTestsInProcess: Bool
   internal var _filter: String?
-  internal var _env: String?
+  internal var _args: [String]
 
-  init(runTestsInProcess: Bool, filter: String?, env: String?) {
+  init(runTestsInProcess: Bool, args: [String], filter: String?) {
     self._runTestsInProcess = runTestsInProcess
     self._filter = filter
-    self._env = env
+    self._args = args
   }
 
   mutating func _spawnChild() {
-    var params = [ "--stdlib-unittest-run-child" ]
-    if let env = _env {
-      params += [ "--env", env ]
-    }
+    let params = [ "--stdlib-unittest-run-child" ] + _args
     let (pid, childStdinFD, childStdoutFD, childStderrFD) = spawnChild(params)
     _pid = pid
     _childStdin = _FDOutputStream(fd: childStdinFD)
@@ -787,7 +784,7 @@ public func runAllTests() {
   } else {
     var runTestsInProcess: Bool = false
     var filter: String? = nil
-    var env: String? = nil
+    var args = [String]()
     var i = 0
     while i < Process.arguments.count {
       let arg = Process.arguments[i]
@@ -801,11 +798,6 @@ public func runAllTests() {
         i += 2
         continue
       }
-      if arg == "--env" {
-        env = Process.arguments[i + 1]
-        i += 2
-        continue
-      }
       if arg == "--help" {
         let message =
 "optional arguments:\n" +
@@ -814,20 +806,19 @@ public func runAllTests() {
 "                        Useful for running under a debugger.\n" +
 "--stdlib-unittest-filter FILTER-STRING\n" +
 "                        only run tests whose names contain FILTER-STRING as\n" +
-"                        a substring.\n" + 
-"--env STRING\n" +
-"      an environment variable\n"
-
+"                        a substring."
         print(message)
         return
       }
+      
+      // pass through arguments to the child process
+      args.append(Process.arguments[i])
 
-      // FIXME: skipping unrecognized parameters.
       i += 1
     }
 
     var parent = _ParentProcess(
-      runTestsInProcess: runTestsInProcess, filter: filter, env: env)
+      runTestsInProcess: runTestsInProcess, args: args, filter: filter)
     parent.run()
   }
 }
