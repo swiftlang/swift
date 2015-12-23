@@ -4260,27 +4260,6 @@ void ClangImporter::Implementation::lookupObjCMembers(
       if (alternate->getFullName().matchesRef(name))
         consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup);
     }
-
-    // If we imported an Objective-C instance method from a root
-    // class, and there is no corresponding class method, also import
-    // it as a class method.
-    // FIXME: Handle this as an alternate?
-    if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
-      if (objcMethod->isInstanceMethod()) {
-        if (auto method = dyn_cast<FuncDecl>(decl)) {
-          if (auto objcClass = objcMethod->getClassInterface()) {
-            if (!objcClass->getSuperClass() &&
-                !objcClass->getClassMethod(objcMethod->getSelector(),
-                                           /*AllowHidden=*/true)) {
-              if (auto classMethod = importClassMethodVersionOf(method)) {
-                consumer.foundDecl(cast<ValueDecl>(classMethod),
-                                   DeclVisibilityKind::DynamicLookup);
-              }
-            }
-          }
-        }
-      }
-    }
   }
 }
 

@@ -2865,6 +2865,36 @@ namespace {
       return result;
     }
 
+    /// Determine if the given Objective-C instance method should also
+    /// be imported as a class method.
+    ///
+    /// Objective-C root class instance methods are also reflected as
+    /// class methods.
+    bool shouldAlsoImportAsClassMethod(FuncDecl *method) {
+      // Only instance methods.
+      if (!method->isInstanceMember()) return false;
+
+      // Must be a method within a class or extension thereof.
+      auto classDecl =
+        method->getDeclContext()->isClassOrClassExtensionContext();
+      if (!classDecl) return false;
+
+      // The class must not have a superclass.
+      if (classDecl->getSuperclass()) return false;
+
+      // There must not already be a class method with the same
+      // selector.
+      auto objcClass =
+        cast_or_null<clang::ObjCInterfaceDecl>(classDecl->getClangDecl());
+      if (!objcClass) return false;
+
+      auto objcMethod =
+        cast_or_null<clang::ObjCMethodDecl>(method->getClangDecl());
+      if (!objcMethod) return false;
+      return !objcClass->getClassMethod(objcMethod->getSelector(),
+                                        /*AllowHidden=*/true);
+    }
+
     Decl *VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl,
                               DeclContext *dc,
                               bool forceClassMethod = false) {
@@ -3045,10 +3075,18 @@ namespace {
             !Impl.ImportedDecls[decl->getCanonicalDecl()])
           Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
 
-        // If this was a subscript accessor, try to create a
-        // corresponding subscript declaration.
-        if (importedName.IsSubscriptAccessor)
+        if (importedName.IsSubscriptAccessor) {
+          // If this was a subscript accessor, try to create a
+          // corresponding subscript declaration.
           (void)importSubscript(result, decl);
+        } else if (shouldAlsoImportAsClassMethod(result)) {
+          // If we should import this instance method also as a class
+          // method, do so and mark the result as an alternate
+          // declaration.
+          if (auto imported = VisitObjCMethodDecl(decl, dc,
+                                                  /*forceClassMethod=*/true))
+            Impl.AlternateDecls[result] = cast<ValueDecl>(imported);
+        }
       }
       return result;
     }
@@ -3107,7 +3145,7 @@ namespace {
         }
       }
     }
-    
+
     /// \brief Given an imported method, try to import it as a constructor.
     ///
     /// Objective-C methods in the 'init' family are imported as
@@ -4209,21 +4247,6 @@ namespace {
               members.push_back(*factory);
           }
 
-          // Objective-C root class instance methods are reflected on the
-          // metatype as well.
-          if (objcMethod->isInstanceMethod()) {
-            Type swiftTy = swiftContext->getDeclaredTypeInContext();
-            auto swiftClass = swiftTy->getClassOrBoundGenericClass();
-            if (swiftClass && !swiftClass->getSuperclass() &&
-                !decl->getClassMethod(objcMethod->getSelector(),
-                                      /*AllowHidden=*/true)) {
-              auto classMember = VisitObjCMethodDecl(objcMethod, swiftContext,
-                                                     true);
-              if (classMember && knownMembers.insert(classMember).second)
-                members.push_back(classMember);
-            }
-          }
-
           // Import explicit properties as instance properties, not as separate
           // getter and setter methods.
           if (!Impl.isAccessibilityDecl(objcMethod)) {
@@ -4291,10 +4314,6 @@ namespace {
                                        ArrayRef<ProtocolDecl *> protocols,
                                        SmallVectorImpl<Decl *> &members,
                                        ASTContext &Ctx) {
-      Type swiftTy = dc->getDeclaredTypeInContext();
-      auto swiftClass = swiftTy->getClassOrBoundGenericClass();
-      bool isRoot = swiftClass && !swiftClass->getSuperclass();
-
       const clang::ObjCInterfaceDecl *interfaceDecl = nullptr;
       const ClangModuleUnit *declModule;
       const ClangModuleUnit *interfaceModule;
@@ -4395,13 +4414,10 @@ namespace {
           // Import the method.
           if (auto imported = Impl.importMirroredDecl(objcMethod, dc, proto)) {
             members.push_back(imported);
-          }
 
-          // Import instance methods of a root class also as class methods.
-          if (isRoot && objcMethod->isInstanceMethod()) {
-            if (auto classImport = Impl.importMirroredDecl(objcMethod,
-                                                           dc, proto, true))
-              members.push_back(classImport);
+            if (auto alternate = Impl.getAlternateDecl(imported))
+              if (imported->getDeclContext() == alternate->getDeclContext())
+                members.push_back(alternate);
           }
         }
       }
@@ -5623,8 +5639,7 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
 Decl *
 ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
                                                   DeclContext *dc,
-                                                  ProtocolDecl *proto,
-                                                  bool forceClassMethod) {
+                                                  ProtocolDecl *proto) {
   if (!decl)
     return nullptr;
 
@@ -5633,50 +5648,50 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
                                     "importing (mirrored)");
 
   auto canon = decl->getCanonicalDecl();
-  auto known = ImportedProtocolDecls.find({{canon, forceClassMethod}, dc });
+  auto known = ImportedProtocolDecls.find({canon, dc });
   if (known != ImportedProtocolDecls.end())
     return known->second;
 
   SwiftDeclConverter converter(*this);
   Decl *result;
   if (auto method = dyn_cast<clang::ObjCMethodDecl>(decl)) {
-    result = converter.VisitObjCMethodDecl(method, dc, forceClassMethod);
+    result = converter.VisitObjCMethodDecl(method, dc);
   } else if (auto prop = dyn_cast<clang::ObjCPropertyDecl>(decl)) {
-    assert(!forceClassMethod && "can't mirror properties yet");
     result = converter.VisitObjCPropertyDecl(prop, dc);
   } else {
     llvm_unreachable("unexpected mirrored decl");
   }
 
   if (result) {
-    if (!forceClassMethod) {
-      // Prefer subscripts to their accessors.
-      if (auto alternate = getAlternateDecl(result))
-        if (alternate->getDeclContext() == result->getDeclContext() &&
-            isa<SubscriptDecl>(alternate))
-        result = alternate;
-    }
-
     assert(result->getClangDecl() && result->getClangDecl() == canon);
-    result->setImplicit();
 
-    // Map the Clang attributes onto Swift attributes.
-    importAttributes(decl, result);
+    auto updateMirroredDecl = [&](Decl *result) {
+      result->setImplicit();
+    
+      // Map the Clang attributes onto Swift attributes.
+      importAttributes(decl, result);
 
-    if (proto->getAttrs().hasAttribute<AvailableAttr>()) {
-      if (!result->getAttrs().hasAttribute<AvailableAttr>()) {
-        VersionRange protoRange =
+      if (proto->getAttrs().hasAttribute<AvailableAttr>()) {
+        if (!result->getAttrs().hasAttribute<AvailableAttr>()) {
+          VersionRange protoRange =
             AvailabilityInference::availableRange(proto, SwiftContext);
-        applyAvailableAttribute(result, protoRange, SwiftContext);
+          applyAvailableAttribute(result, protoRange, SwiftContext);
+        }
+      } else {
+        // Infer the same availability for the mirrored declaration as
+        // we would for the protocol member it is mirroring.
+        inferProtocolMemberAvailability(*this, dc, result);
       }
-    } else {
-      // Infer the same availability for the mirrored declaration as we would for
-      // the protocol member it is mirroring.
-      inferProtocolMemberAvailability(*this, dc, result);
-    }
+    };
+
+    updateMirroredDecl(result);
+
+    // Update the alternate declaration as well.
+    if (auto alternate = getAlternateDecl(result))
+      updateMirroredDecl(alternate);
   }
   if (result || !converter.hadForwardDeclaration())
-    ImportedProtocolDecls[{{canon, forceClassMethod}, dc}] = result;
+    ImportedProtocolDecls[{canon, dc}] = result;
   return result;
 }
 
@@ -6004,14 +6019,6 @@ ClangImporter::Implementation::getSpecialTypedefKind(clang::TypedefNameDecl *dec
   if (iter == SpecialTypedefNames.end())
     return None;
   return iter->second;
-}
-
-Decl *ClangImporter::Implementation::importClassMethodVersionOf(
-        FuncDecl *method) {
-  SwiftDeclConverter converter(*this);
-  auto objcMethod = cast<clang::ObjCMethodDecl>(method->getClangDecl());
-  return converter.VisitObjCMethodDecl(objcMethod, method->getDeclContext(),
-                                       true);
 }
 
 Identifier
