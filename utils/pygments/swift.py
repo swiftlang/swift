@@ -2,8 +2,21 @@
 
 import re
 
-from pygments.lexer import RegexLexer, include, bygroups
-from pygments.token import *
+from pygments.lexer import (
+    Comment,
+    Generic,
+    Keyword,
+    Name,
+    Number,
+    Operator,
+    Punctuation,
+    RegexLexer,
+    String,
+    Text,
+    Whitespace,
+    bygroups,
+    include,
+)
 
 __all__ = ['SwiftLexer', 'SwiftConsoleLexer']
 
