@@ -118,6 +118,8 @@ namespace irgen {
   IsaEncoding getIsaEncodingForType(IRGenModule &IGM, CanType type);
   
   ClassDecl *getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *theClass);
+
+  bool getClassHasMetadataPattern(IRGenModule &IGM, ClassDecl *theClass);
 } // end namespace irgen
 } // end namespace swift
 

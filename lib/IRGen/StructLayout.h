@@ -416,6 +416,8 @@ struct ClassLayout {
   /// Lazily-initialized metadata access method. See the comment in
   /// ClassLayoutBuilder.
   FieldAccess MetadataAccess;
+  /// Does the class require a metadata pattern.
+  bool HasMetadataPattern;
 
   unsigned getFieldIndex(VarDecl *field) const {
     // FIXME: This is algorithmically terrible.

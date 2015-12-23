@@ -168,6 +168,11 @@ namespace {
 
     unsigned NumInherited = 0;
 
+    // Does the class require a metadata template? This will be true if
+    // the class or any of its ancestors have generic parameters, or if
+    // any of the below conditions are false.
+    bool ClassHasMetadataPattern = false;
+
     // Does the superclass have a fixed number of stored properties?
     // If not, and the class has generally-dependent layout, we have to
     // access stored properties through an indirect offset into the field
@@ -212,6 +217,7 @@ namespace {
       fieldLayout.InheritedStoredProperties = inheritedStoredProps;
       fieldLayout.AllFieldAccesses = IGM.Context.AllocateCopy(AllFieldAccesses);
       fieldLayout.MetadataAccess = MetadataAccess;
+      fieldLayout.HasMetadataPattern = ClassHasMetadataPattern;
       return fieldLayout;
     }
 
@@ -237,6 +243,8 @@ namespace {
         } else if (IGM.isResilient(superclass, ResilienceScope::Component)) {
           // If the superclass is resilient, the number of stored properties
           // is not known at compile time.
+          ClassHasMetadataPattern = true;
+
           ClassHasFixedFieldCount = false;
           ClassHasFixedSize = false;
 
@@ -246,6 +254,9 @@ namespace {
           if (superclass->isGenericContext())
             ClassHasConcreteLayout = false;
         } else {
+          if (superclass->isGenericContext())
+            ClassHasMetadataPattern = true;
+
           // Otherwise, we have total knowledge of the class and its
           // fields, so walk them to compute the layout.
           addFieldsForClass(superclass, superclassType);
@@ -269,10 +280,11 @@ namespace {
         auto &eltType = IGM.getTypeInfo(type);
 
         if (!eltType.isFixedSize()) {
+          ClassHasMetadataPattern = true;
+          ClassHasFixedSize = false;
+
           if (type.hasArchetype())
             ClassHasConcreteLayout = false;
-          
-          ClassHasFixedSize = false;
         }
 
         Elements.push_back(ElementLayout::getIncomplete(eltType));
@@ -1825,4 +1837,12 @@ ClassDecl *irgen::getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C) {
     return IGM.getObjCRuntimeBaseClass(IGM.Context.Id_NSObject);
   
   return IGM.getObjCRuntimeBaseClass(IGM.Context.Id_SwiftObject);
+}
+
+bool irgen::getClassHasMetadataPattern(IRGenModule &IGM, ClassDecl *theClass) {
+  // Classes imported from Objective-C never have a metadata pattern.
+  if (theClass->hasClangNode())
+    return false;
+  
+  return getSelfTypeInfo(IGM, theClass).getClassLayout(IGM).HasMetadataPattern;
 }
