@@ -137,7 +137,7 @@ var _: (Int, Int, Int)-> Int = {a, b in a+b}
 
 // <rdar://problem/15998821> Fail to infer types for closure that takes an inout argument
 func r15998821() {
-  func take_closure(x : (inout Int)-> ()) { }
+  func take_closure(x : (inout Int)-> Void) { }
 
   func test1() {
     take_closure { (inout a : Int) in
@@ -165,7 +165,7 @@ var _: (Int,Int)-> Int = {$0+$1+$2}  // expected-error {{contextual closure type
 // Crash when re-typechecking bodies of non-single expression closures
 
 struct CC {}
-func callCC<U>(f: CC -> U) -> () {}
+func callCC<U>(f: CC -> U) -> Void {}
 
 func typeCheckMultiStmtClosureCrash() {
   callCC { // expected-error {{cannot invoke 'callCC' with an argument list of type '((CC) -> _)'}}

@@ -28,7 +28,7 @@ func test1(a: A) {
   a?.do_a() // expected-error {{cannot use optional chaining on non-optional value of type 'A'}} {{4-5=}}
   a!.do_a() // expected-error {{cannot force unwrap value of non-optional type 'A'}} {{4-5=}}
   // Produce a specialized diagnostic here?
-  a.do_a?() // expected-error {{cannot use optional chaining on non-optional value of type '() -> ()'}} {{9-10=}}
+  a.do_a?() // expected-error {{cannot use optional chaining on non-optional value of type '() -> Void'}} {{9-10=}}
 }
 
 // <rdar://problem/15508756>
@@ -111,11 +111,11 @@ z = z ?? 3
 
 var fo: Float? = 3.14159
 
-func voidOptional(handler: () -> ()?) {}
+func voidOptional(handler: () -> Void?) {}
 func testVoidOptional() {
   let noop: () -> Void = {}
   voidOptional(noop)
 
-  let optNoop: ()? -> ()? = { return $0 }
+  let optNoop: ()? -> Void? = { return $0 }
   voidOptional(optNoop)
 }

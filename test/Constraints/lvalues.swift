@@ -209,7 +209,7 @@ let g = { x in f0(x) } // expected-error{{passing value of type 'Int' to an inou
 
 // <rdar://problem/17245353> Crash with optional closure taking inout
 func rdar17245353() {
-  typealias Fn = (inout Int) -> ()
+  typealias Fn = (inout Int) -> Void
   func getFn() -> Fn? { return nil }
 
   let _: (inout UInt, UInt) -> Void = { $0 += $1 }
@@ -221,7 +221,7 @@ func rdar23131768() {
   f { $0 += 1 } // Crashes compiler
 
   func f2(g: (inout Int) -> Void) { var a = 1; g(&a); print(a) }
-  f2 { $0 = $0 + 1 } // previously error: Cannot convert value of type '_ -> ()' to expected type '(inout Int) -> Void'
+  f2 { $0 = $0 + 1 } // previously error: Cannot convert value of type '_ -> Void' to expected type '(inout Int) -> Void'
 
   func f3(g: (inout Int) -> Void) { var a = 1; g(&a); print(a) }
   f3 { (inout v: Int) -> Void in v += 1 }

@@ -57,7 +57,7 @@ f0(i,
 
 // Function result not a subtype.
 f1(
-   f0 // expected-error {{cannot convert value of type '(Int, Float) -> ()' to expected argument type '(Int, Float) -> Int'}}
+   f0 // expected-error {{cannot convert value of type '(Int, Float) -> Void' to expected argument type '(Int, Float) -> Int'}}
    )
 
 f3(
@@ -81,7 +81,7 @@ f5(i)  // expected-error {{cannot invoke 'f5' with an argument list of type '(In
 // Make sure we don't leave open existentials when diagnosing.
 // <rdar://problem/20598568>
 func pancakes(p: P2) {
-  f4(p.wonka) // expected-error{{cannot convert value of type '() -> ()' to expected argument type 'Int'}}
+  f4(p.wonka) // expected-error{{cannot convert value of type '() -> Void' to expected argument type 'Int'}}
   f4(p.wonka()) // expected-error{{cannot convert value of type '()' to expected argument type 'Int'}}
 }
 
@@ -394,7 +394,7 @@ var c = ident({1.DOESNT_EXIST}) // error: expected-error {{value of type 'Int' h
 var afterMessageCount : Int? = nil
 
 func uintFunc() -> UInt {}
-func takeVoidVoidFn(a : () -> ()) {}
+func takeVoidVoidFn(a : () -> Void) {}
 takeVoidVoidFn { () -> Void in
   afterMessageCount = uintFunc()  // expected-error {{cannot assign value of type 'UInt' to type 'Int?'}}
 }
@@ -442,7 +442,7 @@ zip(numbers, numbers).filter { $0.2 > 1 }  // expected-error {{value of tuple ty
 
 
 // <rdar://problem/20868864> QoI: Cannot invoke 'function' with an argument list of type 'type'
-func foo20868864(callback: ([String]) -> ()) { }
+func foo20868864(callback: ([String]) -> Void) { }
 
 func rdar20868864(s: String) {
   var s = s
@@ -630,7 +630,7 @@ func foo() -> [Int] {
 
 // <rdar://problem/17557899> - This shouldn't suggest calling with ().
 func someOtherFunction() {}
-func someFunction() -> () {
+func someFunction() -> Void {
   // Producing an error suggesting that this
   return someOtherFunction  // expected-error {{unexpected non-void return value in void function}}
 }

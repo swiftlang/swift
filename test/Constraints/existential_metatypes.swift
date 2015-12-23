@@ -74,7 +74,7 @@ func testP2(pt: P2.Type) {
 
 // rdar://problem/21597711
 protocol P3 {
-  func withP3(fn: (P3) -> ())
+  func withP3(fn: (P3) -> Void)
 }
 
 class Something {

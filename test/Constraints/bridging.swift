@@ -205,7 +205,7 @@ func testCallback(f: (AnyObject) -> AnyObject?) {}
 testCallback { return getArrayOfAnyObject($0) }
 
 // <rdar://problem/19724719> Type checker thinks "(optionalNSString ?? nonoptionalNSString) as String" is a forced cast
-func rdar19724719(f: (String) -> (), s1: NSString?, s2: NSString) {
+func rdar19724719(f: (String) -> Void, s1: NSString?, s2: NSString) {
   f((s1 ?? s2) as String)
 }
 

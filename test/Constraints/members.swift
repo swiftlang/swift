@@ -25,7 +25,7 @@ var i : Int
 var x : X
 var yf : Y<Float>
 
-func g0(_: (inout X) -> (Float) -> ()) {}
+func g0(_: (inout X) -> (Float) -> Void) {}
 
 x.f0(i)
 x.f0(i).f1(i)
@@ -190,21 +190,21 @@ protocol ClassP : class {
 func generic<T: P>(t: T) {
   var t = t
   // Instance member of archetype
-  let _: Int -> () = id(t.bar)
+  let _: Int -> Void = id(t.bar)
   let _: () = id(t.bar(0))
 
   // Static member of archetype metatype
-  let _: () -> () = id(T.tum)
+  let _: () -> Void = id(T.tum)
 
   // Instance member of archetype metatype
-  let _: T -> Int -> () = id(T.bar)
-  let _: Int -> () = id(T.bar(t))
+  let _: T -> Int -> Void = id(T.bar)
+  let _: Int -> Void = id(T.bar(t))
 
   _ = t.mut // expected-error{{partial application of 'mutating' method is not allowed}}
   _ = t.tum // expected-error{{static member 'tum' cannot be used on instance of type 'T'}}
 
   // Instance member of extension returning Self)
-  let _: T -> () -> T = id(T.returnSelfInstance)
+  let _: T -> Void -> T = id(T.returnSelfInstance)
   let _: () -> T = id(T.returnSelfInstance(t))
   let _: T = id(T.returnSelfInstance(t)())
 
@@ -238,12 +238,12 @@ func generic<T: P>(t: T) {
 
 func genericClassP<T: ClassP>(t: T) {
   // Instance member of archetype)
-  let _: Int -> () = id(t.bas)
+  let _: Int -> Void = id(t.bas)
   let _: () = id(t.bas(0))
 
   // Instance member of archetype metatype)
-  let _: T -> Int -> () = id(T.bas)
-  let _: Int -> () = id(T.bas(t))
+  let _: T -> Int -> Void = id(T.bas)
+  let _: Int -> Void = id(T.bas(t))
   let _: () = id(T.bas(t)(1))
 }
 
@@ -258,11 +258,11 @@ func existential(p: P) {
   _ = p.mut // expected-error{{partial application of 'mutating' method is not allowed}}
 
   // Instance member of existential)
-  let _: Int -> () = id(p.bar)
+  let _: Int -> Void = id(p.bar)
   let _: () = id(p.bar(0))
 
   // Static member of existential metatype)
-  let _: () -> () = id(p.dynamicType.tum)
+  let _: () -> Void = id(p.dynamicType.tum)
 
   // Instance member of extension returning Self
   let _: () -> P = id(p.returnSelfInstance)
@@ -277,17 +277,17 @@ func staticExistential(p: P.Type, pp: P.Protocol) {
   _ = P() // expected-error{{protocol type 'P' cannot be instantiated}}
 
   // Instance member of metatype
-  let _: P -> Int -> () = P.bar
-  let _: Int -> () = P.bar(ppp)
+  let _: P -> Int -> Void = P.bar
+  let _: Int -> Void = P.bar(ppp)
   P.bar(ppp)(5)
 
   // Instance member of metatype value
-  let _: P -> Int -> () = pp.bar
-  let _: Int -> () = pp.bar(ppp)
+  let _: P -> Int -> Void = pp.bar
+  let _: Int -> Void = pp.bar(ppp)
   pp.bar(ppp)(5)
 
   // Static member of existential metatype value
-  let _: () -> () = p.tum
+  let _: () -> Void = p.tum
 
   // Instance member of existential metatype -- not allowed
   _ = p.bar // expected-error{{instance member 'bar' cannot be used on type 'P'}}
@@ -310,12 +310,12 @@ func staticExistential(p: P.Type, pp: P.Protocol) {
 
 func existentialClassP(p: ClassP) {
   // Instance member of existential)
-  let _: Int -> () = id(p.bas)
+  let _: Int -> Void = id(p.bas)
   let _: () = id(p.bas(0))
 
   // Instance member of existential metatype)
-  let _: ClassP -> Int -> () = id(ClassP.bas)
-  let _: Int -> () = id(ClassP.bas(p))
+  let _: ClassP -> Int -> Void = id(ClassP.bas)
+  let _: Int -> Void = id(ClassP.bas(p))
   let _: () = id(ClassP.bas(p)(1))
 }
 
