@@ -106,13 +106,13 @@ func testMap() {
 // <rdar://problem/22333281> QoI: improve diagnostic when contextual type of closure disagrees with arguments
 var _: () -> Int = {0}
 
-// expected-error @+1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{23-23=_ in }}
+// expected-error @+1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{24-24=_ in }}
 var _: (Int) -> Int = {0}
 
-// expected-error @+1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{23-23= _ in}}
+// expected-error @+1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{24-24= _ in}}
 var _: (Int) -> Int = { 0 }
 
-// expected-error @+1 {{contextual type for closure argument list expects 2 arguments, which cannot be implicitly ignored}} {{28-28=_,_ in }}
+// expected-error @+1 {{contextual type for closure argument list expects 2 arguments, which cannot be implicitly ignored}} {{29-29=_,_ in }}
 var _: (Int, Int) -> Int = {0}
 
 // expected-error @+1 {{contextual closure type '(Int, Int) -> Int' expects 2 arguments, but 3 were used in closure body}}

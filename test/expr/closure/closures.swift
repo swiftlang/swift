@@ -11,7 +11,7 @@ func func6c(f: (Int, Int) -> Int, _ n: Int = 0) {} // expected-warning{{prior to
 var closure1 : () -> Int = {4}  // Function producing 4 whenever it is called.
 var closure2 : (Int,Int) -> Int = { 4 } // expected-error{{contextual type for closure argument list expects 2 arguments, which cannot be implicitly ignored}} {{36-36= _,_ in}}
 var closure3a : () -> () -> (Int,Int) = {{ (4, 2) }} // multi-level closing.
-var closure3b : (Int,Int) -> (Int) -> (Int,Int) = {{ (4, 2) }} // expected-error{{contextual type for closure argument list expects 2 arguments, which cannot be implicitly ignored}}  {{48-48=_,_ in }}
+var closure3b : (Int,Int) -> (Int) -> (Int,Int) = {{ (4, 2) }} // expected-error{{contextual type for closure argument list expects 2 arguments, which cannot be implicitly ignored}}  {{52-52=_,_ in }}
 var closure4 : (Int,Int) -> Int = { $0 + $1 }
 var closure5 : (Double) -> Int = {
        $0 + 1.0  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
@@ -59,7 +59,7 @@ func funcdecl5(a: Int, _ y: Int) {
   func6(fn: { a,b in a+b })
   
   // Infer incompatible type.
-  func6(fn: {a,b -> Float in 4.0 })    // expected-error {{declared closure result 'Float' is incompatible with contextual type 'Int'}} {{19-24=Int}}  // Pattern doesn't need to name arguments.
+  func6(fn: {a,b -> Float in 4.0 })    // expected-error {{declared closure result 'Float' is incompatible with contextual type 'Int'}} {{21-26=Int}}  // Pattern doesn't need to name arguments.
   func6(fn: { _,_ in 4 })
   
   func6(fn: {a,b in 4.0 })  // expected-error {{cannot convert value of type 'Double' to closure result type 'Int'}}
@@ -253,7 +253,7 @@ var x = {return $0}(1)
 
 func returnsInt() -> Int { return 0 }
 takesVoidFunc(returnsInt) // expected-error {{cannot convert value of type '() -> Int' to expected argument type '() -> ()'}}
-takesVoidFunc({() -> Int in 0}) // expected-error {{declared closure result 'Int' is incompatible with contextual type '()'}} {{20-23=()}}
+takesVoidFunc({() -> Int in 0}) // expected-error {{declared closure result 'Int' is incompatible with contextual type '()'}} {{22-25=()}}
   
 // These used to crash the compiler, but were fixed to support the implementation of rdar://problem/17228969
 Void(0) // expected-error{{argument passed to call that takes no arguments}}
