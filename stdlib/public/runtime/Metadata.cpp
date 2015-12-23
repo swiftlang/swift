@@ -2458,38 +2458,6 @@ Metadata::getClassObject() const {
   }
 }
 
-/// Scan and return a single run-length encoded identifier.
-/// Returns a malloc-allocated string, or nullptr on failure.
-/// mangled is advanced past the end of the scanned token.
-static char *scanIdentifier(const char *&mangled)
-{
-  const char *original = mangled;
-
-  {
-    if (*mangled == '0') goto fail;  // length may not be zero
-
-    size_t length = 0;
-    while (Demangle::isDigit(*mangled)) {
-      size_t oldlength = length;
-      length *= 10;
-      length += *mangled++ - '0';
-      if (length <= oldlength) goto fail;  // integer overflow
-    }
-
-    if (length == 0) goto fail;
-    if (length > strlen(mangled)) goto fail;
-
-    char *result = strndup(mangled, length);
-    assert(result);
-    mangled += length;
-    return result;
-  }
-
-fail:
-  mangled = original;  // rewind
-  return nullptr;
-}
-
 #ifndef NDEBUG
 extern "C"
 void _swift_debug_verifyTypeLayoutAttribute(Metadata *type,
