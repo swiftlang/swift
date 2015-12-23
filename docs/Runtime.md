@@ -237,8 +237,6 @@ process start and the function returns.
 00000000000287d0 T _swift_dynamicCastTypeToObjCProtocolUnconditional
 0000000000000de0 T _swift_dynamicCastUnknownClass
 0000000000000fd0 T _swift_dynamicCastUnknownClassUnconditional
-0000000000003f50 T _swift_isClassOrObjCExistential
-0000000000004080 T __swift_getSuperclass_nonNull
 ```
 
 ## Debugging
@@ -341,16 +339,23 @@ runtime.
 0000000000022fb0 T _swift_getObjectType
 00000000000006f0 T _swift_getTypeName
 00000000000040c0 T _swift_isClassType
+0000000000003f50 T _swift_isClassOrObjCExistential
 0000000000004130 T _swift_isOptionalType
 00000000000279f0 T __swift_usesNativeSwiftReferenceCounting_class
 000000000002b340 T __swift_class_getInstancePositiveExtentSize
 000000000002b350 T __swift_class_getInstancePositiveExtentSize_native
+0000000000004080 T __swift_getSuperclass_nonNull
 ```
 
 **ABI TODO**: getTypeByName entry point.
 
 **ABI TODO**: Should have a `getTypeKind` entry point with well-defined enum
 constants to supersede `swift_is*Type`.
+
+**ABI TODO**: Rename class metadata queries with a consistent naming scheme.
+
+**ABI TODO**: `swift_isClassOrObjCExistential` should end in `-Type` for
+consistency.
 
 ## Protocol conformance lookup
 
