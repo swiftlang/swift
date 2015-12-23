@@ -3189,16 +3189,6 @@ extern "C" bool swift_isClassOrObjCExistential(const Metadata *value,
   return swift_isClassOrObjCExistentialImpl(T);
 }
 
-// func _swift_isClass(x: Any) -> Bool
-extern "C" bool _swift_isClass(OpaqueExistentialContainer *value) {
-  bool Result = Metadata::isAnyKindOfClass(value->Type->getKind());
-
-  // Destroy value->Buffer since the Any is passed in at +1.
-  value->Type->vw_destroyBuffer(&value->Buffer);
-
-  return Result;
-}
-
 // func _swift_getSuperclass_nonNull(_: AnyClass) -> AnyClass?
 extern "C" const Metadata *_swift_getSuperclass_nonNull(
   const Metadata *theClass

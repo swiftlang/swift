@@ -241,7 +241,6 @@ process start and the function returns.
 00000000000040c0 T _swift_isClassType
 0000000000004130 T _swift_isOptionalType
 0000000000004080 T __swift_getSuperclass_nonNull
-0000000000003ff0 T __swift_isClass
 00000000000279f0 T __swift_usesNativeSwiftReferenceCounting_class
 000000000002ae40 T __swift_usesNativeSwiftReferenceCounting_nonNull
 ```
