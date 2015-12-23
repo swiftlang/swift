@@ -21,7 +21,6 @@ import re
 import sys
 import tempfile
 import subprocess
-import os
 
 def help():
   print("""\
@@ -138,9 +137,7 @@ def main():
     # Write the output dot file.
 
     fileName = tempfile.gettempdir() + "/viewcfg" + suffix + ".dot"
-    with open(fileName 'w') as outFile:
-        outFile = open(fileName, "w")
-
+    with open(fileName, 'w') as outFile:
         outFile.write('digraph "CFG" {\n')
         for name, block in blocks.iteritems():
             if block.content is not None:
