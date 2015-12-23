@@ -119,11 +119,12 @@ static bool startsParameterName(Parser &parser, bool isClosure) {
     return true;
 
   // To have a parameter name here, we need a name.
-  if (!parser.Tok.is(tok::identifier))
+  if (!parser.Tok.canBeArgumentLabel())
     return false;
 
-  // If the next token is another identifier, '_', or ':', this is a name.
-  if (parser.peekToken().isAny(tok::identifier, tok::kw__, tok::colon))
+  // If the next token can be an argument label or is ':', this is a name.
+  const auto &nextTok = parser.peekToken();
+  if (nextTok.is(tok::colon) || nextTok.canBeArgumentLabel())
     return true;
 
   // The identifier could be a name or it could be a type. In a closure, we
@@ -204,7 +205,16 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
 
     if (param.PoundLoc.isValid() || startsParameterName(*this, isClosure)) {
       // identifier-or-none for the first name
-      if (Tok.is(tok::identifier)) {
+      if (Tok.is(tok::kw__)) {
+        // A back-tick cannot precede an empty name marker.
+        if (param.PoundLoc.isValid()) {
+          diagnose(Tok, diag::parameter_backtick_empty_name)
+          .fixItRemove(param.PoundLoc);
+          param.PoundLoc = SourceLoc();
+        }
+
+        param.FirstNameLoc = consumeToken();
+      } else if (Tok.canBeArgumentLabel()) {
         param.FirstName = Context.getIdentifier(Tok.getText());
         param.FirstNameLoc = consumeToken();
 
@@ -216,15 +226,6 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
             .fixItRemove(param.PoundLoc);
           param.PoundLoc = SourceLoc();
         }
-      } else if (Tok.is(tok::kw__)) {
-        // A back-tick cannot precede an empty name marker.
-        if (param.PoundLoc.isValid()) {
-          diagnose(Tok, diag::parameter_backtick_empty_name)
-            .fixItRemove(param.PoundLoc);
-          param.PoundLoc = SourceLoc();
-        }
-
-        param.FirstNameLoc = consumeToken();
       } else {
         assert(param.PoundLoc.isValid() && "startsParameterName() lied");
         diagnose(Tok, diag::parameter_backtick_missing_name);
@@ -233,10 +234,10 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       }
 
       // identifier-or-none? for the second name
-      if (Tok.is(tok::identifier)) {
-        param.SecondName = Context.getIdentifier(Tok.getText());
-        param.SecondNameLoc = consumeToken();
-      } else if (Tok.is(tok::kw__)) {
+      if (Tok.canBeArgumentLabel()) {
+        if (!Tok.is(tok::kw__))
+          param.SecondName = Context.getIdentifier(Tok.getText());
+
         param.SecondNameLoc = consumeToken();
       }
 

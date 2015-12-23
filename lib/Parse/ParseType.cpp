@@ -473,7 +473,7 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
     // If the tuple element starts with "ident :", then
     // the identifier is an element tag, and it is followed by a type
     // annotation.
-    if (Tok.isIdentifierOrUnderscore() && peekToken().is(tok::colon)) {
+    if (Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) {
       // Consume the name
       Identifier name;
       if (!Tok.is(tok::kw__))
@@ -991,8 +991,8 @@ bool Parser::canParseTypeTupleBody() {
 
       // If the tuple element starts with "ident :", then it is followed
       // by a type annotation.
-      if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
-        consumeToken(tok::identifier);
+      if (Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) {
+        consumeToken();
         consumeToken(tok::colon);
 
         // Parse attributes then a type.

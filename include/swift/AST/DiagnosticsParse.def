@@ -71,6 +71,10 @@ ERROR(extra_tokens_line_directive,parsing,none,
 ERROR(line_directive_line_zero,parsing,none,
       "the line number needs to be greater than zero", ())
 
+WARNING(escaped_parameter_name,parsing,none,
+        "keyword '%0' does not need to be escaped in argument list",
+        (StringRef))
+
 //------------------------------------------------------------------------------
 // Lexer diagnostics
 //------------------------------------------------------------------------------

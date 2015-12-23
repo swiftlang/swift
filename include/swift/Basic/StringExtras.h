@@ -28,6 +28,11 @@
 #include <string>
 
 namespace swift {
+  /// Determine whether the given string can be an argument label.
+  ///
+  /// \seealso Token::canBeArgumentLabel()
+  bool canBeArgumentLabel(StringRef identifier);
+
   /// Describes the kind of preposition a word is.
   enum PrepositionKind {
     PK_None = 0,

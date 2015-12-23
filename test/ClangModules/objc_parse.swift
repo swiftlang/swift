@@ -57,7 +57,7 @@ func instanceMethods(b: B) {
   var obj = NSObject()
   var prot = NSObjectProtocol.self
   b.`protocol`(prot, hasThing:obj)
-  b.doThing(obj, `protocol`: prot)
+  b.doThing(obj, protocol: prot)
 }
 
 // Class method invocation

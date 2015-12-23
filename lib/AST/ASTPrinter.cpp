@@ -31,6 +31,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Config.h"
 #include "swift/Sema/CodeCompletionTypeChecking.h"
@@ -224,6 +225,9 @@ static bool escapeKeywordInContext(StringRef keyword, PrintNameContext context){
 
   case PrintNameContext::GenericParameter:
     return keyword != "Self";
+
+  case PrintNameContext::FunctionParameter:
+    return !canBeArgumentLabel(keyword);
   }
 }
 
@@ -1572,25 +1576,25 @@ void PrintAST::printOneParameter(const Pattern *BodyPattern,
     auto BodyName = BodyPattern->getBodyName();
     switch (Options.ArgAndParamPrinting) {
     case PrintOptions::ArgAndParamPrintingMode::ArgumentOnly:
-      Printer.printName(ArgName);
+      Printer.printName(ArgName, PrintNameContext::FunctionParameter);
 
       if (!ArgNameIsAPIByDefault && !ArgName.empty())
         Printer << " _";
       break;
     case PrintOptions::ArgAndParamPrintingMode::MatchSource:
       if (ArgName == BodyName && ArgNameIsAPIByDefault) {
-        Printer.printName(ArgName);
+        Printer.printName(ArgName, PrintNameContext::FunctionParameter);
         break;
       }
       if (ArgName.empty() && !ArgNameIsAPIByDefault) {
-        Printer.printName(BodyName);
+        Printer.printName(BodyName, PrintNameContext::FunctionParameter);
         break;
       }
       SWIFT_FALLTHROUGH;
     case PrintOptions::ArgAndParamPrintingMode::BothAlways:
-      Printer.printName(ArgName);
+      Printer.printName(ArgName, PrintNameContext::FunctionParameter);
       Printer << " ";
-      Printer.printName(BodyName);
+      Printer.printName(BodyName, PrintNameContext::FunctionParameter);
       break;
     }
     Printer << ": ";
@@ -2627,7 +2631,7 @@ public:
       }
 
       if (TD.hasName()) {
-        Printer.printName(TD.getName());
+        Printer.printName(TD.getName(), PrintNameContext::FunctionParameter);
         Printer << ": ";
       }
 

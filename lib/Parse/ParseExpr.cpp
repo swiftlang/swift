@@ -22,6 +22,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/Basic/StringExtras.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -2009,13 +2010,21 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
     Identifier FieldName;
     SourceLoc FieldNameLoc;
 
-    // Check to see if there is a field specifier
-    if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
-      FieldNameLoc = Tok.getLoc();
-      if (parseIdentifier(FieldName,
-                          diag::expected_field_spec_name_tuple_expr)) {
-        return makeParserError();
+    // Check to see if there is an argument label.
+    if (Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) {
+      // If this was an escaped identifier that need not have been escaped,
+      // say so.
+      if (Tok.isEscapedIdentifier() && canBeArgumentLabel(Tok.getText())) {
+        SourceLoc start = Tok.getLoc();
+        SourceLoc end = start.getAdvancedLoc(Tok.getLength());
+        diagnose(Tok, diag::escaped_parameter_name, Tok.getText())
+          .fixItRemoveChars(start, start.getAdvancedLoc(1))
+          .fixItRemoveChars(end.getAdvancedLoc(-1), end);
       }
+
+      if (!Tok.is(tok::kw__))
+        FieldName = Context.getIdentifier(Tok.getText());
+      FieldNameLoc = consumeToken();
       consumeToken(tok::colon);
     }
 

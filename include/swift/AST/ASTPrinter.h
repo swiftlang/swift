@@ -30,10 +30,13 @@ namespace swift {
 /// Describes the context in which a name is being printed, which
 /// affects the keywords that need to be escaped.
 enum class PrintNameContext {
-  // Normal context
+  /// Normal context
   Normal,
-  // Generic parameter context, where 'Self' is not escaped.
+  /// Generic parameter context, where 'Self' is not escaped.
   GenericParameter,
+  /// Function parameter context, where keywords other than let/var/inout are
+  /// not escaped.
+  FunctionParameter,
 };
 
 /// An abstract class used to print an AST.

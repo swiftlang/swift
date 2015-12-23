@@ -62,7 +62,7 @@ func recover_missing_body_2() // expected-error {{expected '{' in body of functi
 // should produce the error about missing right paren.
 //
 // FIXME: The errors are awful.  We should produce just the error about paren.
-func f_recover_missing_tuple_paren(a: Int // expected-error {{expected parameter type following ':'}} expected-note {{to match this opening '('}} expected-error{{expected '{' in body of function declaration}} expected-error {{expected ')' in parameter}} expected-error 2{{expected ',' separator}} {{42-42=,}} {{42-42=,}}
+func f_recover_missing_tuple_paren(a: Int // expected-note {{to match this opening '('}} expected-error{{expected '{' in body of function declaration}} expected-error {{expected ')' in parameter}} 
 func g_recover_missing_tuple_paren(b: Int) {
 }
 
