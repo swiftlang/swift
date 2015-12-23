@@ -370,7 +370,7 @@ public:
   /// we only need a map between the projection tree of a SILType and the value
   /// each leaf node takes. This will be implemented once ProjectionPath memory
   /// cost is reduced and made copyable (its copy constructor is deleted at the
-  /// momemt). 
+  /// moment).
   static SILValue reduce(LSLocation &Base, SILModule *Mod,
                          LSLocationValueMap &LocAndVal,
                          SILInstruction *InsertPt,

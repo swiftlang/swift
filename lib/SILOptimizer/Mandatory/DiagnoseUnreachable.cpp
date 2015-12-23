@@ -66,7 +66,7 @@ struct UnreachableInfo {
 /// it possible.
 class UnreachableUserCodeReportingState {
 public:
-  /// \brief The set of top-level blocks that became immediately unreachbale due
+  /// \brief The set of top-level blocks that became immediately unreachable due
   /// to conditional branch folding, etc.
   ///
   /// This is a SetVector since several blocks may lead to the same error
@@ -200,7 +200,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
       SILBuilderWithScope B(&BB, CBI);
 
       // Determine which of the successors is unreachable and create a new
-      // terminator that only branches to the reachable sucessor.
+      // terminator that only branches to the reachable successor.
       SILBasicBlock *UnreachableBlock = nullptr;
       bool CondIsTrue = false;
       if (ConstCond->getValue() == APInt(1, /*value*/ 0, false)) {
@@ -645,7 +645,7 @@ static bool diagnoseUnreachableBlock(const SILBasicBlock &B,
         HasReachablePred = true;
     }
 
-    // If all of the predecessors of this sucessor are unreachable, check if
+    // If all of the predecessors of this successor are unreachable, check if
     // it contains user code.
     if (!HasReachablePred && diagnoseUnreachableBlock(*SB, M, Reachable,
                                                     State, TopLevelB, Visited))

@@ -425,7 +425,7 @@ public:
     return getRecursiveProperties().hasOpenedExistential();
   }
 
-  /// Determine whether the type involves the given opend existential
+  /// Determine whether the type involves the given opened existential
   /// archetype.
   bool hasOpenedExistential(ArchetypeType *opened);
 

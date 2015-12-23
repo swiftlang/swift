@@ -674,7 +674,7 @@ struct ASTNodeBase {};
 
       if (auto Overridden = D->getOverriddenDecl()) {
         if (D->getDeclContext() == Overridden->getDeclContext()) {
-          PrettyStackTraceDecl debugStack("verifying overriden", D);
+          PrettyStackTraceDecl debugStack("verifying overridden", D);
           Out << "cannot override a decl in the same DeclContext";
           D->dump(Out);
           Overridden->dump(Out);

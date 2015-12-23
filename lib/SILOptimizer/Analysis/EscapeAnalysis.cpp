@@ -297,7 +297,7 @@ updatePointsTo(CGNode *InitialNode, CGNode *pointsTo) {
     }
   }
   if (isInitialSet) {
-    // Here we handle a special case: all defer-edge pathes must eventually end
+    // Here we handle a special case: all defer-edge paths must eventually end
     // in a points-to edge to pointsTo. We ensure this by setting the edge on
     // nodes which have no defer-successors (see above). But this does not cover
     // the case where there is a terminating cyle in the defer-edge path,
@@ -1547,7 +1547,7 @@ bool EscapeAnalysis::canEscapeToUsePoint(SILValue V, ValueBase *UsePoint,
   if (!Node)
     return true;
 
-  // First check if there are escape pathes which we don't explicitly see
+  // First check if there are escape paths which we don't explicitly see
   // in the graph.
   if (Node->escapesInsideFunction(isNotAliasingArgument(V)))
     return true;
@@ -1574,7 +1574,7 @@ bool EscapeAnalysis::canObjectOrContentEscapeTo(SILValue V, FullApplySite FAS) {
   if (!Node)
     return true;
 
-  // First check if there are escape pathes which we don't explicitly see
+  // First check if there are escape paths which we don't explicitly see
   // in the graph.
   if (Node->escapesInsideFunction(isNotAliasingArgument(V)))
     return true;

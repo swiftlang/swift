@@ -121,7 +121,7 @@ std::string ASTPrinter::sanitizeUtf8(StringRef Text) {
       Builder.append(Data, Data + Step);
     } else {
 
-      // If malformatted, add replacement characters.
+      // If malformed, add replacement characters.
       Builder.append(Replacement);
     }
     Data += Step;

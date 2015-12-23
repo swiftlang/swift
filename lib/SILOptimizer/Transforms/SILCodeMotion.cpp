@@ -981,7 +981,7 @@ static bool hoistDecrementsToPredecessors(SILBasicBlock *BB, AliasAnalysis *AA,
 
   return HoistedDecrement;
 }
-/// Try sink a retain as far as possible.  This is either to sucessor BBs,
+/// Try sink a retain as far as possible.  This is either to successor BBs,
 /// or as far down the current BB as possible
 static bool sinkRefCountIncrement(SILBasicBlock *BB, AliasAnalysis *AA,
                                   RCIdentityFunctionInfo *RCIA) {

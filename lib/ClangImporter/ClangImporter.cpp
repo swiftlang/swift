@@ -4145,7 +4145,7 @@ ClangImporter::Implementation::createExtensionWriter(clang::ASTWriter &writer) {
       auto named = dyn_cast<clang::NamedDecl>(decl);
       if (!named) continue;
 
-      // Add this entry to the lookup tabke.
+      // Add this entry to the lookup table.
       addEntryToLookupTable(sema, table, named);
     }
 

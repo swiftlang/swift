@@ -1183,7 +1183,7 @@ ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC) const {
     
     // "StoredWithTrivialAccessors" are generally always accessed indirectly,
     // but if we know that the trivial accessor will always produce the same
-    // thing as the getter/setter (i.e., it can't be overriden), then just do a
+    // thing as the getter/setter (i.e., it can't be overridden), then just do a
     // direct access.
     //
     // This is true in structs and for final properties.

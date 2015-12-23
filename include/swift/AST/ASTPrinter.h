@@ -105,7 +105,7 @@ public:
     PendingDeclLocCallback = D;
   }
 
-  /// To sanitize a malformatted utf8 string to a well-formatted one.
+  /// To sanitize a malformed utf8 string to a well-formed one.
   static std::string sanitizeUtf8(StringRef Text);
   static bool printTypeInterface(Type Ty, DeclContext *DC, std::string &Result);
   static bool printTypeInterface(Type Ty, DeclContext *DC, llvm::raw_ostream &Out);
