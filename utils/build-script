@@ -21,8 +21,15 @@ import textwrap
 
 sys.path.append(os.path.dirname(__file__))
 
-from SwiftBuildSupport import *
-
+from SwiftBuildSupport import (
+    SWIFT_SOURCE_ROOT,
+    SWIFT_BUILD_ROOT,
+    print_with_argv0,
+    quote_shell_command,
+    check_call,
+    get_preset_options,
+    get_all_preset_names
+)
 
 # Main entry point for the preset mode.
 def main_preset():
