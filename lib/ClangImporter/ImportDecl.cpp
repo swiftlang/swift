@@ -4276,21 +4276,6 @@ namespace {
 
         members.push_back(member);
       }
-
-      // Hack to deal with unannotated Objective-C protocols. If the protocol
-      // comes from clang and is not annotated and the protocol requirement
-      // itself is not annotated, then infer availability of the requirement
-      // based on its types. This makes it possible for a type to conform to an
-      // Objective-C protocol that is missing annotations but whose requirements
-      // use types that are less available than the conforming type.
-      auto *proto = dyn_cast<ProtocolDecl>(swiftContext);
-      if (!proto || proto->getAttrs().hasAttribute<AvailableAttr>())
-        return;
-
-      for (Decl *member : members) {
-        inferProtocolMemberAvailability(Impl, swiftContext, member);
-      }
-
     }
 
     static bool
@@ -5476,8 +5461,30 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
   if (!Result)
     return nullptr;
 
-  if (Result)
-    importAttributes(ClangDecl, Result);
+  // Finalize the imported declaration.
+  auto finalizeDecl = [&](Decl *result) {
+    importAttributes(ClangDecl, result);
+
+    // Hack to deal with unannotated Objective-C protocols. If the protocol
+    // comes from clang and is not annotated and the protocol requirement
+    // itself is not annotated, then infer availability of the requirement
+    // based on its types. This makes it possible for a type to conform to an
+    // Objective-C protocol that is missing annotations but whose requirements
+    // use types that are less available than the conforming type.
+    auto dc = result->getDeclContext();
+    auto *proto = dyn_cast<ProtocolDecl>(dc);
+    if (!proto || proto->getAttrs().hasAttribute<AvailableAttr>())
+      return;
+
+    inferProtocolMemberAvailability(*this, dc, result);
+  };
+
+  if (Result) {
+    finalizeDecl(Result);
+
+    if (auto alternate = getAlternateDecl(Result))
+      finalizeDecl(alternate);
+  }
 
 #ifndef NDEBUG
   auto Canon = cast<clang::NamedDecl>(ClangDecl->getCanonicalDecl());
