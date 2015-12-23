@@ -1218,19 +1218,17 @@ swift::swift_dynamicCastForeignClassMetatypeUnconditional(
   return sourceType;
 }
 
+#if SWIFT_OBJC_INTEROP
 // Given a non-nil object reference, return true iff the object uses
 // native swift reference counting.
-bool swift::_swift_usesNativeSwiftReferenceCounting_nonNull(
+static bool usesNativeSwiftReferenceCounting_nonNull(
   const void* object
 ) {
-    assert(object != nullptr);
-#if SWIFT_OBJC_INTEROP
-    return !isObjCTaggedPointer(object) &&
-      usesNativeSwiftReferenceCounting_allocated(object);
-#else 
-    return true;
-#endif 
+  assert(object != nullptr);
+  return !isObjCTaggedPointer(object) &&
+    usesNativeSwiftReferenceCounting_allocated(object);
 }
+#endif 
 
 bool swift::swift_isUniquelyReferenced_nonNull_native(
   const HeapObject* object
@@ -1250,7 +1248,7 @@ bool swift::swift_isUniquelyReferencedNonObjC_nonNull(const void* object) {
   assert(object != nullptr);
   return
 #if SWIFT_OBJC_INTEROP
-    _swift_usesNativeSwiftReferenceCounting_nonNull(object) &&
+    usesNativeSwiftReferenceCounting_nonNull(object) &&
 #endif 
     swift_isUniquelyReferenced_nonNull_native((HeapObject*)object);
 }
@@ -1320,7 +1318,7 @@ bool swift::swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(
   assert(object != nullptr);
   return
 #if SWIFT_OBJC_INTEROP
-    _swift_usesNativeSwiftReferenceCounting_nonNull(object) &&
+    usesNativeSwiftReferenceCounting_nonNull(object) &&
 #endif 
     swift_isUniquelyReferencedOrPinned_nonNull_native(
                                                     (const HeapObject*)object);

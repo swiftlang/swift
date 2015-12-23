@@ -27,7 +27,6 @@ namespace swift { extern "C" {
 #define bool _Bool
 #endif
 
-bool _swift_usesNativeSwiftReferenceCounting_nonNull(const void *);
 bool _swift_usesNativeSwiftReferenceCounting_class(const void *);
 
 __swift_size_t _swift_class_getInstancePositiveExtentSize(const void *);

@@ -239,15 +239,11 @@ process start and the function returns.
 0000000000000fd0 T _swift_dynamicCastUnknownClassUnconditional
 0000000000003f50 T _swift_isClassOrObjCExistential
 0000000000004080 T __swift_getSuperclass_nonNull
-00000000000279f0 T __swift_usesNativeSwiftReferenceCounting_class
-000000000002ae40 T __swift_usesNativeSwiftReferenceCounting_nonNull
 ```
 
 ## Debugging
 
 ```
-000000000002b340 T __swift_class_getInstancePositiveExtentSize
-000000000002b350 T __swift_class_getInstancePositiveExtentSize_native
 0000000000024040 T __swift_debug_verifyTypeLayoutAttribute
 0000000000027140 T _swift_willThrow
 ```
@@ -346,6 +342,9 @@ runtime.
 00000000000006f0 T _swift_getTypeName
 00000000000040c0 T _swift_isClassType
 0000000000004130 T _swift_isOptionalType
+00000000000279f0 T __swift_usesNativeSwiftReferenceCounting_class
+000000000002b340 T __swift_class_getInstancePositiveExtentSize
+000000000002b350 T __swift_class_getInstancePositiveExtentSize_native
 ```
 
 **ABI TODO**: getTypeByName entry point.
