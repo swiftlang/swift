@@ -60,31 +60,31 @@ protected:
                             Mangler &M, SILFunction *F)
       : Kind(K), Pass(P), M(M), Function(F) {}
 
-  llvm::raw_ostream &getBuffer() { return M.Buffer; }
   SILFunction *getFunction() const { return Function; }
   Mangler &getMangler() const { return M; }
 
   void mangleKind() {
     switch (Kind) {
     case SpecializationKind::Generic:
-      M.Buffer << "g";
+      M.manglePrefix("g");
       break;
     case SpecializationKind::FunctionSignature:
-      M.Buffer << "f";
+      M.manglePrefix("f");
       break;
     }
   }
 
   void manglePass() {
-    M.Buffer << encodeSpecializationPass(Pass);
+    M.manglePrefix(encodeSpecializationPass(Pass));
   }
 
   void mangleSpecializationPrefix() {
-    M.Buffer << "_TTS";
+    M.manglePrefix("_TTS");
   }
 
   void mangleFunctionName() {
-    M.Buffer << "_" << Function->getName();
+    M.manglePrefix("_");
+    M.manglePrefix(Function->getName());
   }
 };
 

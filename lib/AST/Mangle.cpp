@@ -1830,6 +1830,18 @@ void Mangler::mangleTypeMetadataFull(CanType ty, bool isPattern) {
   mangleType(ty, ResilienceExpansion::Minimal, 0);
 }
 
+void Mangler::manglePrefix(StringRef Prefix) {
+  Buffer << Prefix;
+}
+
+void Mangler::manglePrefix(char Prefix) {
+  Buffer << Prefix;
+}
+
+void Mangler::manglePrefix(APInt Prefix) {
+  Buffer << Prefix;
+}
+
 void Mangler::mangleGlobalVariableFull(const VarDecl *decl) {
   // As a special case, Clang functions and globals don't get mangled at all.
   // FIXME: When we can import C++, use Clang's mangler.

@@ -34,8 +34,6 @@ enum class OperatorFixity {
   Postfix
 };
 
-/// Defined in include/swift/SIL/Mangle.h
-class SpecializationManglerBase;
   
 /// A class for mangling declarations.
 class Mangler {
@@ -55,8 +53,6 @@ class Mangler {
   bool DWARFMangling;
   /// If enabled, non-ASCII names are encoded in modified Punycode.
   bool UsePunycode;
-
-  friend class SpecializationManglerBase;
 
 public:
   enum BindGenerics : unsigned {
@@ -147,7 +143,17 @@ public:
   void mangleTypeMetadataFull(CanType ty, bool isPattern);
   void mangleTypeFullMetadataFull(CanType ty);
   void mangleGlobalVariableFull(const VarDecl *decl);
-  
+
+  /// Mangle the string \p Prefix into the name. This is used by SIL passes
+  /// that specialize/clone functions.
+  void manglePrefix(StringRef Prefix);
+
+  /// Mangle the char \p Prefix into the name.
+  void manglePrefix(char Prefix);
+
+  /// Mangle the integer \p Prefix into the name.
+  void manglePrefix(APInt Prefix);
+
   /// Mangles globalinit_token and globalinit_func, which are used to
   /// initialize global variables.
   /// \param decl The global variable or one of the global variables of a

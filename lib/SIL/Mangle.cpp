@@ -57,11 +57,10 @@ static void mangleSubstitution(Mangler &M, Substitution Sub) {
 
 void GenericSpecializationMangler::mangleSpecialization() {
   Mangler &M = getMangler();
-  llvm::raw_ostream &Buf = getBuffer();
 
   for (auto &Sub : Subs) {
     mangleSubstitution(M, Sub);
-    Buf << '_';
+    M.manglePrefix('_');
   }
 }
 
@@ -136,10 +135,9 @@ setArgumentBoxToStack(unsigned ArgNo) {
 void
 FunctionSignatureSpecializationMangler::mangleConstantProp(LiteralInst *LI) {
   Mangler &M = getMangler();
-  llvm::raw_ostream &os = getBuffer();
 
   // Append the prefix for constant propagation 'cp'.
-  os << "cp";
+  M.manglePrefix("cp");
 
   // Then append the unique identifier of our literal.
   switch (LI->getKind()) {
@@ -147,24 +145,26 @@ FunctionSignatureSpecializationMangler::mangleConstantProp(LiteralInst *LI) {
     llvm_unreachable("unknown literal");
   case ValueKind::FunctionRefInst: {
     SILFunction *F = cast<FunctionRefInst>(LI)->getReferencedFunction();
-    os << "fr";
+    M.manglePrefix("fr");
     M.mangleIdentifier(F->getName());
     break;
   }
   case ValueKind::GlobalAddrInst: {
     SILGlobalVariable *G = cast<GlobalAddrInst>(LI)->getReferencedGlobal();
-    os << "g";
+    M.manglePrefix("g");
     M.mangleIdentifier(G->getName());
     break;
   }
   case ValueKind::IntegerLiteralInst: {
     APInt apint = cast<IntegerLiteralInst>(LI)->getValue();
-    os << "i" << apint;
+    M.manglePrefix("i");
+    M.manglePrefix(apint);
     break;
   }
   case ValueKind::FloatLiteralInst: {
     APInt apint = cast<FloatLiteralInst>(LI)->getBits();
-    os << "fl" << apint;
+    M.manglePrefix("fl");
+    M.manglePrefix(apint);
     break;
   }
   case ValueKind::StringLiteralInst: {
@@ -176,7 +176,9 @@ FunctionSignatureSpecializationMangler::mangleConstantProp(LiteralInst *LI) {
     llvm::SmallString<33> Str;
     Str += "u";
     Str += V;
-    os << "se" << unsigned(SLI->getEncoding()) << "v";
+    M.manglePrefix("se");
+    M.manglePrefix(APInt(32, unsigned(SLI->getEncoding())));
+    M.manglePrefix("v");
     M.mangleIdentifier(Str);
     break;
   }
@@ -187,9 +189,7 @@ void
 FunctionSignatureSpecializationMangler::
 mangleClosureProp(PartialApplyInst *PAI) {
   Mangler &M = getMangler();
-  llvm::raw_ostream &os = getBuffer();
-
-  os << "cl";
+  M.manglePrefix("cl");
 
   // Add in the partial applies function name if we can find one. Assert
   // otherwise. The reason why this is ok to do is currently we only perform
@@ -209,9 +209,7 @@ mangleClosureProp(PartialApplyInst *PAI) {
 void FunctionSignatureSpecializationMangler::mangleClosureProp(
     ThinToThickFunctionInst *TTTFI) {
   Mangler &M = getMangler();
-  llvm::raw_ostream &os = getBuffer();
-
-  os << "cl";
+  M.manglePrefix("cl");
 
   // Add in the partial applies function name if we can find one. Assert
   // otherwise. The reason why this is ok to do is currently we only perform
@@ -239,35 +237,33 @@ void FunctionSignatureSpecializationMangler::mangleArgument(
     return;
   }
 
-  llvm::raw_ostream &os = getBuffer();
-
   if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::Unmodified)) {
-    os << "n";
+    M.manglePrefix("n");
     return;
   }
 
   if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::BoxToValue)) {
-    os << "i";
+    M.manglePrefix("i");
     return;
   }
 
   if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::BoxToStack)) {
-    os << "k";
+    M.manglePrefix("k");
     return;
   }
 
   bool hasSomeMod = false;
   if (ArgMod & ArgumentModifierIntBase(ArgumentModifier::Dead)) {
-    os << "d";
+    M.manglePrefix("d");
     hasSomeMod = true;
   }
 
   if (ArgMod & ArgumentModifierIntBase(ArgumentModifier::OwnedToGuaranteed)) {
-    os << "g";
+    M.manglePrefix("g");
     hasSomeMod = true;
   }
   if (ArgMod & ArgumentModifierIntBase(ArgumentModifier::SROA)) {
-    os << "s";
+    M.manglePrefix("s");
     hasSomeMod = true;
   }
 
@@ -275,13 +271,12 @@ void FunctionSignatureSpecializationMangler::mangleArgument(
 }
 
 void FunctionSignatureSpecializationMangler::mangleSpecialization() {
-  llvm::raw_ostream &os = getBuffer();
 
   for (unsigned i : indices(Args)) {
     ArgumentModifierIntBase ArgMod;
     NullablePtr<SILInstruction> Inst;
     std::tie(ArgMod, Inst) = Args[i];
     mangleArgument(ArgMod, Inst);
-    os << "_";
+    M.manglePrefix("_");
   }
 }
