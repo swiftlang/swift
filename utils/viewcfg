@@ -138,27 +138,25 @@ def main():
     # Write the output dot file.
 
     fileName = tempfile.gettempdir() + "/viewcfg" + suffix + ".dot"
-    outFile = open(fileName, "w")
+    with open(fileName 'w') as outFile:
+        outFile = open(fileName, "w")
 
-    outFile.write('digraph "CFG" {\n')
-    for name, block in blocks.iteritems():
-        if block.content is not None:
-            outFile.write("\tNode" + str(block.index) +
-                " [shape=record,label=\"{" + block.content + "}\"];\n")
-        else:
-            outFile.write("\tNode" + str(block.index) +
-                " [shape=record,color=gray,fontcolor=gray,label=\"{" +
-                block.name + "}\"];\n")
+        outFile.write('digraph "CFG" {\n')
+        for name, block in blocks.iteritems():
+            if block.content is not None:
+                outFile.write("\tNode" + str(block.index) +
+                    " [shape=record,label=\"{" + block.content + "}\"];\n")
+            else:
+                outFile.write("\tNode" + str(block.index) +
+                    " [shape=record,color=gray,fontcolor=gray,label=\"{" +
+                    block.name + "}\"];\n")
 
-        for succName in block.getSuccs():
-            succBlock = blocks[succName]
-            outFile.write("\tNode" + str(block.index) + " -> Node" +
-                str(succBlock.index) + ";\n")
+            for succName in block.getSuccs():
+                succBlock = blocks[succName]
+                outFile.write("\tNode" + str(block.index) + " -> Node" +
+                    str(succBlock.index) + ";\n")
 
-    outFile.write("}\n")
-    outFile.flush()
-    os.fsync(outFile.fileno())
-    outFile.close
+        outFile.write("}\n")
 
     # Open the dot file (should be done with Graphviz).
 

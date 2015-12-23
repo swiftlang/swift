@@ -364,9 +364,13 @@ class ParseContext:
     tokens = None       # The rest of the tokens
     closeLines = False
 
-    def __init__(self, filename, template = None):
+    def __init__(self, filename, template=None):
         self.filename = os.path.abspath(filename)
-        self.template = template or open(filename).read()
+        if template is None:
+            with open(filename) as f:
+                self.template = f.read()
+        else:
+            self.template = template
         self.lineStarts = getLineStarts(self.template)
         self.tokens = self.tokenGenerator(tokenizeTemplate(self.template))
         self.nextToken()

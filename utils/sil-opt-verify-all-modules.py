@@ -113,9 +113,8 @@ def run_commands_in_parallel(commands):
     makefile += "all: " + " ".join(targets) + "\n"
 
     temp_dir = tempfile.mkdtemp(prefix="swift-testsuite-main")
-    makefile_file = open(os.path.join(temp_dir, 'Makefile'), 'w')
-    makefile_file.write(makefile)
-    makefile_file.close()
+    with open(os.path.join(temp_dir, 'Makefile'), 'w') as makefile_file:
+        makefile_file.write(makefile)
 
     max_processes = multiprocessing.cpu_count()
     subprocess.check_call([
