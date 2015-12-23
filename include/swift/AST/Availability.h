@@ -117,7 +117,7 @@ public:
   }
 
   /// Mutates this range to be the union of itself and Other. This is the
-  /// join operator (least upper bound) in the veresion range lattice.
+  /// join operator (least upper bound) in the version range lattice.
   void unionWith(const VersionRange &Other) {
     // With the existing lattice this operation is precise. If the lattice
     // is ever extended it is important that this operation be an

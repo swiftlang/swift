@@ -49,7 +49,7 @@ public struct _ArrayBuffer<Element> : _ArrayBufferType {
   var deferredTypeCheckMask : Int { return 1 }
   
   /// Returns an `_ArrayBuffer<U>` containing the same elements,
-  /// deffering checking each element's `U`-ness until it is accessed.
+  /// deferring checking each element's `U`-ness until it is accessed.
   ///
   /// - Requires: `U` is a class or `@objc` existential derived from `Element`.
   @warn_unused_result

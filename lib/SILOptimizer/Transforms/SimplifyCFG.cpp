@@ -2001,7 +2001,7 @@ bool RemoveUnreachable::run() {
 }
 
 /// Checks if the block contains a cond_fail as first side-effect instruction
-/// and trys to move it to the predecessors (if beneficial). A sequence
+/// and tries to move it to the predecessors (if beneficial). A sequence
 ///
 ///     bb1:
 ///       br bb3(%c)

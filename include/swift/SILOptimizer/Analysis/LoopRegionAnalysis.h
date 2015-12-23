@@ -61,7 +61,7 @@
 ///
 /// Then we perform a postorder DFS of the loop nest. The postorder provides the
 /// inductive rule that all loops will be visited after all of their subloops
-/// hae been visited. If a Loop has no subloops (i.e. all subregions are
+/// have been visited. If a Loop has no subloops (i.e. all subregions are
 /// blocks), we do nothing. Otherwise, if the loop does have subloops, we visit
 /// each subloop and do the following:
 ///

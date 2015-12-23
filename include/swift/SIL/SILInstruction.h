@@ -3816,7 +3816,7 @@ public:
     ConditionIdx
   };
   enum {
-    // Map branch targets to block sucessor indices.
+    // Map branch targets to block successor indices.
     TrueIdx,
     FalseIdx
   };
@@ -4252,7 +4252,7 @@ public:
 class TryApplyInstBase : public TermInst {
 public:
   enum {
-    // Map branch targets to block sucessor indices.
+    // Map branch targets to block successor indices.
     NormalIdx,
     ErrorIdx
   };

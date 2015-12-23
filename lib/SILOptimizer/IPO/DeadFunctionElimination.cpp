@@ -87,7 +87,7 @@ protected:
 
   /// Gets or creates the MethodInfo for a vtable or witness table method.
   /// \p decl The method declaration. In case of a vtable method this is always
-  ///         the most overriden method.
+  ///         the most overridden method.
   MethodInfo *getMethodInfo(AbstractFunctionDecl *decl) {
     MethodInfo *&entry = MethodInfos[decl];
     if (entry == nullptr) {

@@ -35,7 +35,7 @@ namespace {
 /// The GlobalPropertyOpt performs an analysis on the whole module to determine
 /// the values of high-level properties.
 ///
-/// Currently only one property is handled and thats the isNativeTypeChecked
+/// Currently only one property is handled and that's the isNativeTypeChecked
 /// property for arrays. If the property can be proved to be true, the
 /// corresponding semantics-call is replaced by a true-literal.
 class GlobalPropertyOpt {

@@ -209,7 +209,7 @@ enum class CircularityCheck {
   Checked
 };
 
-/// Keeps track of whrther a given class inherits initializers from its
+/// Keeps track of whether a given class inherits initializers from its
 /// superclass.
 enum class StoredInheritsSuperclassInits {
   /// We have not yet checked.

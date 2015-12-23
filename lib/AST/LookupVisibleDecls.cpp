@@ -588,7 +588,7 @@ public:
     }
     auto &PossiblyConflicting = FoundDecls[VD->getName()];
 
-    // Check all overriden decls.
+    // Check all overridden decls.
     {
       auto *CurrentVD = VD->getOverriddenDecl();
       while (CurrentVD) {

@@ -227,7 +227,7 @@ public:
   void emitFunction(FuncDecl *fd);
   
   /// \brief Generates code for the given closure expression and adds the
-  /// SILFunction to the current SILModule under the nane SILDeclRef(ce).
+  /// SILFunction to the current SILModule under the name SILDeclRef(ce).
   SILFunction *emitClosure(AbstractClosureExpr *ce);
   /// Generates code for the given ConstructorDecl and adds
   /// the SILFunction to the current SILModule under the name SILDeclRef(decl).

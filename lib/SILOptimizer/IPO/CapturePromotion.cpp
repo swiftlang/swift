@@ -391,7 +391,7 @@ static llvm::SmallString<64> getSpecializedName(SILFunction *F,
 
 /// \brief Create the function corresponding to the clone of the original
 /// closure with the signature modified to reflect promotable captures (which
-/// are givien by PromotableIndices, such that each entry in the set is the
+/// are given by PromotableIndices, such that each entry in the set is the
 /// index of the box containing the variable in the closure's argument list, and
 /// the address of the box's contents is the argument immediately following each
 /// box argument); does not actually clone the body of the function

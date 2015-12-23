@@ -95,7 +95,7 @@ public:
   bool madeChange() const { return Changed; }
 };
 
-/// A wrapper around the results of the bottomup/topdown dataflow that knows how
+/// A wrapper around the results of the bottom-up/top-down dataflow that knows how
 /// to pair the retains/releases in those results.
 struct ARCPairingContext {
   SILFunction &F;

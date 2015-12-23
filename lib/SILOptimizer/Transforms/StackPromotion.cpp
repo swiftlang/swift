@@ -306,7 +306,7 @@ bool StackPromoter::canPromoteAlloc(SILInstruction *AI,
   int NumUsePointsToFind = ConGraph->getNumUsePoints(Node);
   if (NumUsePointsToFind == 0) {
     // There should always be at least one release for an allocated object.
-    // But in case all pathes from this block end in unreachable then the
+    // But in case all paths from this block end in unreachable then the
     // final release of the object may be optimized away. We bail out in this
     // case.
     return false;

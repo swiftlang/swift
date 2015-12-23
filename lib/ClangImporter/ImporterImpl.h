@@ -421,7 +421,7 @@ public:
   /// \brief Check if the declaration is one of the specially handled
   /// accessibility APIs.
   ///
-  /// These appaer as both properties and methods in ObjC and should be
+  /// These appear as both properties and methods in ObjC and should be
   /// imported as methods into Swift.
   static bool isAccessibilityDecl(const clang::Decl *objCMethodOrProp);
 
