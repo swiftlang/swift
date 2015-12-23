@@ -1567,7 +1567,7 @@ StringRef ClangImporter::Implementation::getEnumConstantNamePrefix(
     }
   }
 
-  // Compute th e common prefix.
+  // Compute the common prefix.
   StringRef commonPrefix = (*ec)->getName();
   bool followedByNonIdentifier = false;
   for (++ec; ec != ecEnd; ++ec) {
@@ -1602,15 +1602,9 @@ StringRef ClangImporter::Implementation::getEnumConstantNamePrefix(
         checkPrefix = checkPrefix.drop_front();
     }
 
-    // Account for the enum being imported using
-    // __attribute__((swift_private)). This is a little ad hoc, but it's a
-    // rare case anyway.
-    Identifier enumName = importFullName(decl, None, nullptr, &sema).Imported
-                            .getBaseName();
-    StringRef enumNameStr = enumName.str();
-    if (enumNameStr.startswith("__") && !checkPrefix.startswith("__"))
-      enumNameStr = enumNameStr.drop_front(2);
-
+    // Don't use importFullName() here, we want to ignore the swift_name
+    // and swift_private attributes.
+    StringRef enumNameStr = decl->getName();
     StringRef commonWithEnum = getCommonPluralPrefix(checkPrefix,
                                                      enumNameStr);
     size_t delta = commonPrefix.size() - checkPrefix.size();
