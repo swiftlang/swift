@@ -2601,7 +2601,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
     let bridged = _createBridgedNativeStorage(nativeStorage.capacity)
 
     // Bridge everything.
-    for var i = 0; i < nativeStorage.capacity; i += 1 {
+    for i in 0..<nativeStorage.capacity {
       if nativeStorage.isInitializedEntry(i) {
         let key = _bridgeToObjectiveCUnconditional(nativeStorage.keyAt(i))
 %if Self == 'Set':
