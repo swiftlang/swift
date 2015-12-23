@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from cmpcodesize.main import main
+import cmpcodesize
 
 if __name__ == '__main__':
-    main()
+    cmpcodesize.main()

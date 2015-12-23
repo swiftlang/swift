@@ -8,7 +8,7 @@ import filecmp
 import os
 import shutil
 
-from SwiftBuildSupport import check_call
+from SwiftBuildSupport import *
 
 def merge_file_lists(src_root_dirs, skip_files, skip_subpaths):
     """Merges the file lists recursively from all src_root_dirs supplied,
