@@ -33,12 +33,12 @@ func supported() -> MyMask {
 
 func foo() -> Int {
   do {
-  } catch let err {
+  } catch var err {
     goo(err)
   }
 }
 
-func goo(e : ErrorProtocol) {}
+func goo(var e : ErrorProtocol) {}
 
 struct Test1 : OptionSet {
   init(rawValue: Int) {}
