@@ -338,7 +338,7 @@ runtime.
 0000000000022fb0 T _swift_getObjectType
 00000000000006f0 T _swift_getTypeName
 00000000000040c0 T _swift_isClassType
-0000000000003f50 T _swift_isClassOrObjCExistential
+0000000000003f50 T _swift_isClassOrObjCExistentialType
 0000000000004130 T _swift_isOptionalType
 00000000000279f0 T __swift_usesNativeSwiftReferenceCounting_class
 000000000002b340 T __swift_class_getInstancePositiveExtentSize
@@ -352,9 +352,6 @@ runtime.
 constants to supersede `swift_is*Type`.
 
 **ABI TODO**: Rename class metadata queries with a consistent naming scheme.
-
-**ABI TODO**: `swift_isClassOrObjCExistential` should end in `-Type` for
-consistency.
 
 ## Protocol conformance lookup
 

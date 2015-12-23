@@ -2765,7 +2765,7 @@ _TFs24_injectValueIntoOptionalU__FQ_GSqQ__(OpaqueValue *value,
 extern "C" OpaqueExistentialContainer
 _TFs26_injectNothingIntoOptionalU__FT_GSqQ__(const Metadata *T);
 
-static inline bool swift_isClassOrObjCExistentialImpl(const Metadata *T) {
+static inline bool swift_isClassOrObjCExistentialTypeImpl(const Metadata *T) {
   auto kind = T->getKind();
   // Classes.
   if (Metadata::isAnyKindOfClass(kind))
@@ -3052,7 +3052,7 @@ findBridgeWitness(const Metadata *T) {
 extern "C" HeapObject *swift_bridgeNonVerbatimToObjectiveC(
   OpaqueValue *value, const Metadata *T
 ) {
-  assert(!swift_isClassOrObjCExistentialImpl(T));
+  assert(!swift_isClassOrObjCExistentialTypeImpl(T));
 
   if (const auto *bridgeWitness = findBridgeWitness(T)) {
     if (!bridgeWitness->isBridgedToObjectiveC(T, T)) {
@@ -3075,7 +3075,7 @@ extern "C" const Metadata *swift_getBridgedNonVerbatimObjectiveCType(
   const Metadata *value, const Metadata *T
 ) {
   // Classes and Objective-C existentials bridge verbatim.
-  assert(!swift_isClassOrObjCExistentialImpl(T));
+  assert(!swift_isClassOrObjCExistentialTypeImpl(T));
 
   // Check if the type conforms to _BridgedToObjectiveC, in which case
   // we'll extract its associated type.
@@ -3176,7 +3176,7 @@ swift_bridgeNonVerbatimFromObjectiveCConditional(
 extern "C" bool swift_isBridgedNonVerbatimToObjectiveC(
   const Metadata *value, const Metadata *T
 ) {
-  assert(!swift_isClassOrObjCExistentialImpl(T));
+  assert(!swift_isClassOrObjCExistentialTypeImpl(T));
 
   auto bridgeWitness = findBridgeWitness(T);
   return bridgeWitness && bridgeWitness->isBridgedToObjectiveC(value, T);
@@ -3184,9 +3184,9 @@ extern "C" bool swift_isBridgedNonVerbatimToObjectiveC(
 #endif
 
 // func isClassOrObjCExistential<T>(x: T.Type) -> Bool
-extern "C" bool swift_isClassOrObjCExistential(const Metadata *value,
+extern "C" bool swift_isClassOrObjCExistentialType(const Metadata *value,
                                                const Metadata *T) {
-  return swift_isClassOrObjCExistentialImpl(T);
+  return swift_isClassOrObjCExistentialTypeImpl(T);
 }
 
 // func _swift_getSuperclass_nonNull(_: AnyClass) -> AnyClass?

@@ -175,8 +175,8 @@ func _conditionallyUnreachable() {
 }
 
 @warn_unused_result
-@_silgen_name("swift_isClassOrObjCExistential")
-func _swift_isClassOrObjCExistential<T>(x: T.Type) -> Bool
+@_silgen_name("swift_isClassOrObjCExistentialType")
+func _swift_isClassOrObjCExistentialType<T>(x: T.Type) -> Bool
 
 /// Returns `true` iff `T` is a class type or an `@objc` existential such as
 /// `AnyObject`.
@@ -194,7 +194,7 @@ internal func _isClassOrObjCExistential<T>(x: T.Type) -> Bool {
   }
 
   // Maybe a class.
-  return _swift_isClassOrObjCExistential(x)
+  return _swift_isClassOrObjCExistentialType(x)
 }
 
 /// Returns an `UnsafePointer` to the storage used for `object`.  There's
