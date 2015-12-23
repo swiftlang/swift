@@ -2490,56 +2490,6 @@ fail:
   return nullptr;
 }
 
-
-/// \brief Demangle a mangled class name into module+class.
-/// Returns true if the name was successfully decoded.
-/// On success, *outModule and *outClass must be freed with free().
-/// FIXME: this should be replaced by a real demangler
-bool swift::swift_demangleSimpleClass(const char *mangledName,
-                                      char **outModule, char **outClass) {
-  char *moduleName = nullptr;
-  char *className = nullptr;
-
-  {
-    // Prefix for a mangled class
-    const char *m = mangledName;
-    if (0 != strncmp(m, "_TtC", 4))
-      goto fail;
-    m += 4;
-
-    // Module name
-    if (strncmp(m, "Ss", 2) == 0) {
-      moduleName = strdup(swift::STDLIB_NAME);
-      assert(moduleName);
-      m += 2;
-    } else {
-      moduleName = scanIdentifier(m);
-      if (!moduleName)
-        goto fail;
-    }
-
-    // Class name
-    className = scanIdentifier(m);
-    if (!className)
-      goto fail;
-
-    // Nothing else
-    if (strlen(m))
-      goto fail;
-
-    *outModule = moduleName;
-    *outClass = className;
-    return true;
-  }
-
-fail:
-  if (moduleName) free(moduleName);
-  if (className) free(className);
-  *outModule = nullptr;
-  *outClass = nullptr;
-  return false;
-}
-
 #ifndef NDEBUG
 extern "C"
 void _swift_debug_verifyTypeLayoutAttribute(Metadata *type,

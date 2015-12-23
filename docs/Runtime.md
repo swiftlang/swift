@@ -328,7 +328,6 @@ runtime.
 ## Objective-C Runtime Interop
 
 ```
-0000000000023e60 T _swift_demangleSimpleClass
 0000000000028770 T _swift_objcRespondsToSelector
 ```
 
@@ -375,7 +374,10 @@ consistency.
 
 The Swift runtime exports standard metadata objects for `Builtin` types
 as well as standard value witness tables that can be freely adopted by
-types with common layout attributes.
+types with common layout attributes. Note that, unlike public-facing types,
+the runtime does not guarantee a 1:1 mapping of Builtin types to metadata
+objects, and will reuse metadata objects to represent builtins with the same
+layout characteristics.
 
 ```
 000000000004faa8 S __TMBB
@@ -419,4 +421,6 @@ types with common layout attributes.
 
 - Unsynchronized retain/release
 
-- Decouple dynamic casting and reflection from the standard library
+- Nonnull retain/release
+
+- Decouple dynamic casting, bridging, and reflection from the standard library

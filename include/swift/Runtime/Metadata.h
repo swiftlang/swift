@@ -2818,17 +2818,6 @@ extern "C"
 void swift_registerProtocolConformances(const ProtocolConformanceRecord *begin,
                                         const ProtocolConformanceRecord *end);
   
-/// FIXME: This doesn't belong in the runtime.
-extern "C" void swift_printAny(OpaqueValue *value, const Metadata *type);
-
-/// \brief Demangle a mangled class name into module+class.
-/// Returns true if the name was successfully decoded.
-/// On success, *outModule and *outClass must be freed with free().
-extern "C" bool
-swift_demangleSimpleClass(const char *mangledName, 
-                          char **outModule, char **outClass);
-  
-
 /// Return the type name for a given type metadata.
 std::string nameForMetadata(const Metadata *type,
                             bool qualified = true);
