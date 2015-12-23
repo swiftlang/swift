@@ -277,7 +277,7 @@ ApplySite swift::trySpecializeApplyOfGeneric(ApplySite Apply,
     llvm::raw_svector_ostream buffer(ClonedName);
     ArrayRef<Substitution> Subs = Apply.getSubstitutions();
     Mangle::Mangler M(buffer);
-    Mangle::GenericSpecializationMangler Mangler(M, F, Subs);
+    GenericSpecializationMangler Mangler(M, F, Subs);
     Mangler.mangle();
   }
   DEBUG(llvm::dbgs() << "    Specialized function " << ClonedName << '\n');

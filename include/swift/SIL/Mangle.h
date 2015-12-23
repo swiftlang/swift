@@ -24,9 +24,10 @@
 
 namespace swift {
 
-class AbstractClosureExpr;
+using Mangler = Mangle::Mangler;
 
-namespace Mangle {
+
+class AbstractClosureExpr;
 
 enum class SpecializationKind : uint8_t {
   Generic,
@@ -184,7 +185,6 @@ private:
                       NullablePtr<SILInstruction> Inst);
 };
 
-} // end namespace Mangle
 } // end namespace swift
 
 #endif

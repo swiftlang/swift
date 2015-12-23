@@ -372,8 +372,8 @@ static llvm::SmallString<64> getSpecializedName(SILFunction *F,
   {
     llvm::raw_svector_ostream buffer(Name);
     Mangle::Mangler M(buffer);
-    auto P = Mangle::SpecializationPass::CapturePromotion;
-    Mangle::FunctionSignatureSpecializationMangler FSSM(P, M, F);
+    auto P = SpecializationPass::CapturePromotion;
+    FunctionSignatureSpecializationMangler FSSM(P, M, F);
     CanSILFunctionType FTy = F->getLoweredFunctionType();
 
     ArrayRef<SILParameterInfo> Parameters = FTy->getParameters();

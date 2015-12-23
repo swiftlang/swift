@@ -510,8 +510,8 @@ static void getClonedName(SILFunction *F,
                           llvm::SmallString<64> &Name) {
   llvm::raw_svector_ostream buffer(Name);
   Mangle::Mangler M(buffer);
-  auto P = Mangle::SpecializationPass::AllocBoxToStack;
-  Mangle::FunctionSignatureSpecializationMangler FSSM(P, M, F);
+  auto P = SpecializationPass::AllocBoxToStack;
+  FunctionSignatureSpecializationMangler FSSM(P, M, F);
   for (unsigned i : PromotedParamIndices)
     FSSM.setArgumentBoxToStack(i);
   FSSM.mangle();

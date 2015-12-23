@@ -389,8 +389,8 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
 void CallSiteDescriptor::createName(llvm::SmallString<64> &NewName) const {
   llvm::raw_svector_ostream buffer(NewName);
   Mangle::Mangler M(buffer);
-  auto P = Mangle::SpecializationPass::ClosureSpecializer;
-  Mangle::FunctionSignatureSpecializationMangler FSSM(P, M, getApplyCallee());
+  auto P = SpecializationPass::ClosureSpecializer;
+  FunctionSignatureSpecializationMangler FSSM(P, M, getApplyCallee());
   if (auto *PAI = dyn_cast<PartialApplyInst>(getClosure())) {
     FSSM.setArgumentClosureProp(getClosureIndex(), PAI);
     FSSM.mangle();
