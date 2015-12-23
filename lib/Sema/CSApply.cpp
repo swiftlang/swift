@@ -21,6 +21,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
+#include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
@@ -5460,9 +5461,7 @@ diagnoseArgumentLabelError(Expr *expr, ArrayRef<Identifier> newNames,
       continue;
     }
 
-    tok newNameKind =
-      Lexer::kindOfIdentifier(newName.str(), /*inSILMode=*/false);
-    bool newNameIsReserved = newNameKind != tok::identifier;
+    bool newNameIsReserved = !canBeArgumentLabel(newName.str());
     llvm::SmallString<16> newStr;
     if (newNameIsReserved)
       newStr += "`";
