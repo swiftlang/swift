@@ -107,9 +107,9 @@ swift::fatalError(const char *format, ...)
   abort();
 }
 
-// Crash when a deleted method is called by accident.
+// Report a call to a removed method.
 LLVM_ATTRIBUTE_NORETURN
 extern "C" void
-swift_deletedMethodError() {
-  swift::fatalError("fatal error: call of deleted method\n");
+swift_reportMissingMethod() {
+  swift::fatalError("fatal error: call of removed method\n");
 }

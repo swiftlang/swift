@@ -3178,7 +3178,7 @@ namespace {
       } else {
         // The method is removed by dead method elimination.
         // It should be never called. We add a pointer to an error function.
-        addWord(llvm::ConstantExpr::getBitCast(IGM.getDeletedMethodErrorFn(),
+        addWord(llvm::ConstantExpr::getBitCast(IGM.getDeadMethodErrorFn(),
                                                IGM.FunctionPtrTy));
       }
     }
