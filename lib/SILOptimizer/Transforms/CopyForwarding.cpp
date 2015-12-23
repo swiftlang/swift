@@ -762,15 +762,15 @@ bool CopyForwarding::forwardPropagateCopy(
 static ValueBase *
 findAddressRootAndUsers(ValueBase *Def,
                         SmallPtrSetImpl<SILInstruction*> &RootUserInsts) {
-  if (auto EDAI = dyn_cast<InitEnumDataAddrInst>(Def)) {
-    auto EnumRoot = EDAI->getOperand();
-    for (auto *Use : EnumRoot.getUses()) {
+  if (isa<InitEnumDataAddrInst>(Def) || isa<InitExistentialAddrInst>(Def)) {
+    SILValue InitRoot = cast<SILInstruction>(Def)->getOperand(0);
+    for (auto *Use : InitRoot.getUses()) {
       auto *UserInst = Use->getUser();
       if (UserInst == Def)
         continue;
       RootUserInsts.insert(UserInst);
     }
-    return EnumRoot.getDef();
+    return InitRoot.getDef();
   }
   return Def;
 }
