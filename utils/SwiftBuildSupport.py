@@ -64,11 +64,6 @@ def print_with_argv0(message):
     print(sys.argv[0] + ": " + message)
 
 
-def bad_usage(message):
-    print_with_argv0(message)
-    print("Run '" + pipes.quote(sys.argv[0]) + " --help' for more information.")
-    sys.exit(1)
-
 def quote_shell_command(args):
     return " ".join([ pipes.quote(a) for a in args ])
 
