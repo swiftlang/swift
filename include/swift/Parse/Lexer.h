@@ -264,8 +264,9 @@ public:
   /// resides.
   ///
   /// \param SR The source range
-  static CharSourceRange getCharSourceRangeFromSourceRange(const SourceManager &SM,
-                                                           const SourceRange &SR) {
+  static CharSourceRange
+  getCharSourceRangeFromSourceRange(const SourceManager &SM,
+                                    const SourceRange &SR) {
     return CharSourceRange(SM, SR.Start, getLocForEndOfToken(SM, SR.End));
   }
 

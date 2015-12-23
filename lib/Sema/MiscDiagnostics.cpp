@@ -1113,19 +1113,30 @@ bool AvailabilityWalker::diagnoseIncDecDeprecation(const ValueDecl *D,
 
   // If the expression type is integer or floating point, then we can rewrite it
   // to "lvalue += 1".
-  if (isIntegerOrFloatingPointType(call->getType(), DC, TC)) {
-    const char *addition = isInc ? " += 1" : " -= 1";
-
+  std::string replacement;
+  if (isIntegerOrFloatingPointType(call->getType(), DC, TC))
+    replacement = isInc ? " += 1" : " -= 1";
+  else {
+    // Otherwise, it must be an index type.  Rewrite to:
+    // "lvalue = lvalue.successor()".
+    auto &SM = TC.Context.SourceMgr;
+    auto CSR = Lexer::getCharSourceRangeFromSourceRange(SM,
+                                         call->getArg()->getSourceRange());
+    replacement = " = " + SM.extractText(CSR).str();
+    replacement += isInc ? ".successor()" : ".predecessor()";
+  }
+  
+  if (!replacement.empty()) {
     // If we emit a deprecation diagnostic, produce a fixit hint as well.
     TC.diagnoseDeprecated(R, DC, Attr, D->getFullName(),
                           [&](InFlightDiagnostic &diag) {
       if (isa<PrefixUnaryExpr>(call)) {
         // Prefix: remove the ++ or --.
         diag.fixItRemove(call->getFn()->getSourceRange());
-        diag.fixItInsertAfter(call->getArg()->getEndLoc(), addition);
+        diag.fixItInsertAfter(call->getArg()->getEndLoc(), replacement);
       } else {
         // Postfix: replace the ++ or --.
-        diag.fixItReplace(call->getFn()->getSourceRange(), addition);
+        diag.fixItReplace(call->getFn()->getSourceRange(), replacement);
       }
     });
 
