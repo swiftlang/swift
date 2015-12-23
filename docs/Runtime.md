@@ -273,6 +273,7 @@ optimization.
 000000000001c400 T _swift_storeEnumTagMultiPayload
 000000000001bf90 T _swift_storeEnumTagSinglePayload
 ```
+
 ## Type metadata lookup
 
 These functions look up metadata for types that potentially require runtime
@@ -362,7 +363,7 @@ constants to supersede `swift_is*Type`.
 
 ```
 000000000001c7d0 T _swift_reportError
-000000000001c940 T _swift_reportMissingMethod
+000000000001c940 T _swift_deletedMethodError
 ```
 
 ## Standard metadata

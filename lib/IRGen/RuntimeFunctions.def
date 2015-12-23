@@ -952,8 +952,8 @@ FUNCTION(BlockRelease, _Block_release, C_CC,
          ARGS(ObjCBlockPtrTy),
          ATTRS(NoUnwind))
 
-// void swift_reportMissingMethod();
-FUNCTION(DeadMethodError, swift_reportMissingMethod, C_CC,
+// void swift_deletedMethodError();
+FUNCTION(DeletedMethodError, swift_deletedMethodError, C_CC,
         RETURNS(VoidTy),
         ARGS(),
         ATTRS(NoUnwind))
