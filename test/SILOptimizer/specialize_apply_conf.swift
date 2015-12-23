@@ -14,7 +14,7 @@ class Foo<T> : Pingable {
 }
 
 func main_func<T>(In In : T) {
-  var x = Foo<T>()
+  let x = Foo<T>()
   x.ping(x: In)
 }
 
