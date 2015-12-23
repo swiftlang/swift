@@ -1564,6 +1564,17 @@ bool EscapeAnalysis::canEscapeTo(SILValue V, FullApplySite FAS) {
   return canEscapeToUsePoint(V, FAS.getInstruction(), ConGraph);
 }
 
+static bool isAddress(SILType T) {
+  // We include local storage, too. This makes it more tolerant for checking
+  // the #0 result of alloc_stack.
+  return T.isAddress() || T.isLocalStorage();
+}
+
+static bool hasReferenceSemantics(SILType T) {
+  // Exclude address and local storage types.
+  return T.isObject() && T.hasReferenceSemantics();
+}
+
 bool EscapeAnalysis::canObjectOrContentEscapeTo(SILValue V, FullApplySite FAS) {
   // If it's not a local object we don't know anything about the value.
   if (!pointsToLocalObject(V))
@@ -1584,7 +1595,7 @@ bool EscapeAnalysis::canObjectOrContentEscapeTo(SILValue V, FullApplySite FAS) {
   if (ConGraph->isUsePoint(UsePoint, Node))
     return true;
 
-  if (V.getType().hasReferenceSemantics()) {
+  if (hasReferenceSemantics(V.getType())) {
     // Check if the object "content", i.e. a pointer to one of its stored
     // properties, can escape to the called function.
     CGNode *ContentNode = ConGraph->getContentNode(Node);
@@ -1635,16 +1646,6 @@ bool EscapeAnalysis::canEscapeToValue(SILValue V, SILValue To) {
   return ConGraph->isReachable(Node, ToNode);
 }
 
-static bool isAddress(SILType T) {
-  // We include local storage, too. This makes it more tolerant for checking
-  // the #0 result of alloc_stack.
-  return T.isAddress() || T.isLocalStorage();
-}
-
-static bool isRefCounted(SILType T) {
-  return T.isObject() && T.hasReferenceSemantics();
-}
-
 bool EscapeAnalysis::canPointToSameMemory(SILValue V1, SILValue V2) {
   // At least one of the values must be a non-escaping local object.
   bool isLocal1 = pointsToLocalObject(V1);
@@ -1683,17 +1684,17 @@ bool EscapeAnalysis::canPointToSameMemory(SILValue V1, SILValue V2) {
   if (isAddress(T1) && isAddress(T2)) {
     return Content1 == Content2;
   }
-  if (isRefCounted(T1) && isRefCounted(T2)) {
+  if (hasReferenceSemantics(T1) && hasReferenceSemantics(T2)) {
     return Content1 == Content2;
   }
   // As we model the ref_element_addr instruction as a content-relationship, we
   // have to go down one content level if just one of the values is a
   // ref-counted object.
-  if (isAddress(T1) && isRefCounted(T2)) {
+  if (isAddress(T1) && hasReferenceSemantics(T2)) {
     Content2 = ConGraph->getContentNode(Content2);
     return Content1 == Content2;
   }
-  if (isAddress(T2) && isRefCounted(T1)) {
+  if (isAddress(T2) && hasReferenceSemantics(T1)) {
     Content1 = ConGraph->getContentNode(Content1);
     return Content1 == Content2;
   }
