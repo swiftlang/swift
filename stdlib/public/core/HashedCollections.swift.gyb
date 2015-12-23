@@ -1420,7 +1420,7 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
   switch source._variantStorage {
   case .Native(let nativeOwner):
     // FIXME(performance): this introduces an indirection through Objective-C
-    // runtime, even though we access native storage.  But we can not
+    // runtime, even though we access native storage.  But we cannot
     // unsafeBitCast the owner object, because that would change the generic
     // arguments.
     //
@@ -2252,7 +2252,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
 #if _runtime(_ObjC)
 /// Storage for bridged `${Self}` elements.  We could have used
-/// `${Self}<${AnyTypeParameters}>`, but `AnyObject` can not be a Key because
+/// `${Self}<${AnyTypeParameters}>`, but `AnyObject` cannot be a Key because
 /// it is not `Hashable`.
 internal struct _BridgedNative${Self}Storage {
   internal typealias StorageImpl =
@@ -2860,19 +2860,19 @@ internal struct _Cocoa${Self}Storage : _HashStorageType {
   }
 
   internal mutating func updateValue(value: Value, forKey: Key) -> Value? {
-    _sanityCheckFailure("can not mutate NS${Self}")
+    _sanityCheckFailure("cannot mutate NS${Self}")
   }
 
   internal mutating func removeAtIndex(index: Index) -> SequenceElement {
-    _sanityCheckFailure("can not mutate NS${Self}")
+    _sanityCheckFailure("cannot mutate NS${Self}")
   }
 
   internal mutating func removeValueForKey(key: Key) -> Value? {
-    _sanityCheckFailure("can not mutate NS${Self}")
+    _sanityCheckFailure("cannot mutate NS${Self}")
   }
 
   internal mutating func removeAll(keepCapacity keepCapacity: Bool) {
-    _sanityCheckFailure("can not mutate NS${Self}")
+    _sanityCheckFailure("cannot mutate NS${Self}")
   }
 
   internal var count: Int {
@@ -3584,7 +3584,7 @@ internal struct _Cocoa${Self}Index : ForwardIndexType, Comparable {
   @warn_unused_result
   internal func successor() -> _Cocoa${Self}Index {
     _precondition(
-      currentKeyIndex < allKeys.value, "can not increment endIndex")
+      currentKeyIndex < allKeys.value, "cannot increment endIndex")
     return _Cocoa${Self}Index(cocoa${Self}, allKeys, currentKeyIndex + 1)
   }
 }
@@ -3592,7 +3592,7 @@ internal struct _Cocoa${Self}Index : ForwardIndexType, Comparable {
 @warn_unused_result
 internal func ==(lhs: _Cocoa${Self}Index, rhs: _Cocoa${Self}Index) -> Bool {
   _precondition(lhs.cocoa${Self} === rhs.cocoa${Self},
-    "can not compare indexes pointing to different ${Self}s")
+    "cannot compare indexes pointing to different ${Self}s")
   _precondition(lhs.allKeys.value == rhs.allKeys.value,
     "one or both of the indexes have been invalidated")
 
@@ -3602,7 +3602,7 @@ internal func ==(lhs: _Cocoa${Self}Index, rhs: _Cocoa${Self}Index) -> Bool {
 @warn_unused_result
 internal func <(lhs: _Cocoa${Self}Index, rhs: _Cocoa${Self}Index) -> Bool {
   _precondition(lhs.cocoa${Self} === rhs.cocoa${Self},
-    "can not compare indexes pointing to different ${Self}s")
+    "cannot compare indexes pointing to different ${Self}s")
   _precondition(lhs.allKeys.value == rhs.allKeys.value,
     "one or both of the indexes have been invalidated")
 
@@ -3648,7 +3648,7 @@ public struct ${Self}Index<${TypeParametersDecl}> :
   // not, because neither NSEnumerator nor fast enumeration support moving
   // backwards.  Even if they did, there is another issue: NSEnumerator does
   // not support NSCopying, and fast enumeration does not document that it is
-  // safe to copy the state.  So, we can not implement Index that is a value
+  // safe to copy the state.  So, we cannot implement Index that is a value
   // type for bridged NS${Self} in terms of Cocoa enumeration facilities.
 
   internal typealias _NativeIndex = _Native${Self}Index<${TypeParameters}>
@@ -3771,7 +3771,7 @@ public func < <${TypeParametersDecl}> (
 final internal class _Cocoa${Self}Generator : GeneratorType {
   internal typealias Element = ${AnySequenceType}
 
-  // Cocoa ${Self} generator has to be a class, otherwise we can not
+  // Cocoa ${Self} generator has to be a class, otherwise we cannot
   // guarantee that the fast enumeration struct is pinned to a certain memory
   // location.
 
@@ -3796,7 +3796,7 @@ final internal class _Cocoa${Self}Generator : GeneratorType {
     return UnsafeMutablePointer(_fastEnumerationStatePtr + 1)
   }
 
-  // These members have to be word-sized integers, they can not be limited to
+  // These members have to be word-sized integers, they cannot be limited to
   // Int8 just because our buffer holds 16 elements: fast enumeration is
   // allowed to return inner pointers to the container, which can be much
   // larger.
@@ -4100,7 +4100,7 @@ public struct _${Self}Builder<${TypeParametersDecl}> {
   @warn_unused_result
   public mutating func take() -> ${Self}<${TypeParameters}> {
     _precondition(_actualCount >= 0,
-      "can not take the result twice")
+      "cannot take the result twice")
     _precondition(_actualCount == _requestedCount,
       "the number of members added does not match the promised count")
 

@@ -2481,7 +2481,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     else
       D = T->getAnyNominal();
 
-    // If we can not find the declaration, be extra careful and print
+    // If we cannot find the declaration, be extra careful and print
     // the type qualified.
     if (!D)
       return true;

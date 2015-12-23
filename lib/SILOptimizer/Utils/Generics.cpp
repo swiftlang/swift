@@ -264,7 +264,7 @@ ApplySite swift::trySpecializeApplyOfGeneric(ApplySite Apply,
 
   // We do not support partial specialization.
   if (hasUnboundGenericTypes(InterfaceSubs)) {
-    DEBUG(llvm::dbgs() << "    Can not specialize with interface subs.\n");
+    DEBUG(llvm::dbgs() << "    Cannot specialize with interface subs.\n");
     return ApplySite();
   }
   if (hasDynamicSelfTypes(InterfaceSubs)) {

@@ -44,7 +44,7 @@ bool swift::mayDecrementRefCount(SILInstruction *User,
   if (auto *BI = dyn_cast<BuiltinInst>(User))
     return AA->canBuiltinDecrementRefCount(BI, Ptr);
 
-  // We can not conservatively prove that this instruction can not decrement the
+  // We cannot conservatively prove that this instruction cannot decrement the
   // ref count of Ptr. So assume that it does.
   return true;
 }
@@ -57,10 +57,10 @@ bool swift::mayCheckRefCount(SILInstruction *User) {
 //                                Use Analysis
 //===----------------------------------------------------------------------===//
 
-/// Returns true if a builtin apply can not use reference counted values.
+/// Returns true if a builtin apply cannot use reference counted values.
 ///
 /// The main case that this handles here are builtins that via read none imply
-/// that they can not read globals and at the same time do not take any
+/// that they cannot read globals and at the same time do not take any
 /// non-trivial types via the arguments. The reason why we care about taking
 /// non-trivial types as arguments is that we want to be careful in the face of
 /// intrinsics that may be equivalent to bitcast and inttoptr operations.
@@ -257,7 +257,7 @@ bool swift::mayUseValue(SILInstruction *User, SILValue Ptr,
   }
 
   // If we have a terminator instruction, see if it can use ptr. This currently
-  // means that we first show that TI can not indirectly use Ptr and then use
+  // means that we first show that TI cannot indirectly use Ptr and then use
   // alias analysis on the arguments.
   if (auto *TI = dyn_cast<TermInst>(User))
     return canTerminatorUseValue(TI, Ptr, AA);
@@ -344,7 +344,7 @@ valueHasARCUsesInInstructionRange(SILValue Op,
     ++Start;
   }
 
-  // If all such instructions can not use Op, return false.
+  // If all such instructions cannot use Op, return false.
   return None;
 }
 
@@ -375,7 +375,7 @@ swift::valueHasARCUsesInReverseInstructionRange(SILValue Op,
     --End;
   }
 
-  // If all such instructions can not use Op, return false.
+  // If all such instructions cannot use Op, return false.
   return None;
 }
 
@@ -407,7 +407,7 @@ valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
     ++Start;
   }
 
-  // If all such instructions can not decrement Op, return nothing.
+  // If all such instructions cannot decrement Op, return nothing.
   return None;
 }
 
@@ -428,7 +428,7 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
 
   // Ok, we have an apply site with arguments. Look at the function type and
   // iterate through the function parameters. If any of the parameters are
-  // guaranteed, attempt to prove that the passed in parameter can not alias
+  // guaranteed, attempt to prove that the passed in parameter cannot alias
   // Ptr. If we fail, return true.
   CanSILFunctionType FType = FAS.getSubstCalleeType();
   auto Params = FType->getParameters();
@@ -489,7 +489,7 @@ void ConsumedArgToEpilogueReleaseMatcher::findMatchingReleases(
        II != IE; ++II) {
     // If we do not have a release_value or strong_release...
     if (!isa<ReleaseValueInst>(*II) && !isa<StrongReleaseInst>(*II)) {
-      // And the object can not use values in a manner that will keep the object
+      // And the object cannot use values in a manner that will keep the object
       // alive, continue. We may be able to find additional releases.
       if (canNeverUseValues(&*II))
         continue;

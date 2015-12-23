@@ -488,7 +488,7 @@ hasNonEmptySymmetricDifference(const ProjectionPath &RHS) const {
 SubSeqRelation_t
 ProjectionPath::
 computeSubSeqRelation(const ProjectionPath &RHS) const {
-  // If either path is empty, we can not prove anything, return Unrelated.
+  // If either path is empty, we cannot prove anything, return Unrelated.
   if (empty() || RHS.empty())
     return SubSeqRelation_t::Unknown;
 
@@ -510,7 +510,7 @@ computeSubSeqRelation(const ProjectionPath &RHS) const {
     // in common and should return unrelated. If Index is greater than zero,
     // then we know that the two projection paths have a common base but a
     // non-empty symmetric difference. For now we just return Unrelated since I
-    // can not remember why I had the special check in the
+    // cannot remember why I had the special check in the
     // hasNonEmptySymmetricDifference code.
     if (LHSProj != RHSProj)
       return SubSeqRelation_t::Unknown;
@@ -588,7 +588,7 @@ findMatchingValueProjectionPaths(SILInstruction *I,
 
 Optional<ProjectionPath>
 ProjectionPath::subtractPaths(const ProjectionPath &LHS, const ProjectionPath &RHS) {
-  // If RHS is greater than or equal to LHS in size, RHS can not be a prefix of
+  // If RHS is greater than or equal to LHS in size, RHS cannot be a prefix of
   // LHS. Return None.
   unsigned RHSSize = RHS.size();
   unsigned LHSSize = LHS.size();
@@ -636,7 +636,7 @@ ProjectionPath::expandTypeIntoLeafProjectionPaths(SILType B, SILModule *Mod,
     Projections.clear();
     Projection::getFirstLevelAddrProjections(Ty, *Mod, Projections);
 
-    // Reached the end of the projection tree, this field can not be expanded
+    // Reached the end of the projection tree, this field cannot be expanded
     // anymore.
     if (Projections.empty()) {
       Paths.push_back(std::move(PP.getValue()));
@@ -700,7 +700,7 @@ ProjectionPath::expandTypeIntoNodeProjectionPaths(SILType B, SILModule *Mod,
     Projections.clear();
     Projection::getFirstLevelAddrProjections(Ty, *Mod, Projections);
 
-    // Reached the end of the projection tree, this field can not be expanded
+    // Reached the end of the projection tree, this field cannot be expanded
     // anymore.
     if (Projections.empty()) {
       Paths.push_back(std::move(PP.getValue()));
@@ -1141,7 +1141,7 @@ public:
   }
 
   SILInstruction *createInstruction() const {
-    assert(isComplete() && "Can not create instruction until the aggregate is "
+    assert(isComplete() && "Cannot create instruction until the aggregate is "
            "complete");
     assert(!Invalidated && "Must not be invalidated to create an instruction");
     const_cast<AggregateBuilder *>(this)->Invalidated = true;

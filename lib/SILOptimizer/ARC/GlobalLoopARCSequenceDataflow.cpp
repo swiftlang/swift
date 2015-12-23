@@ -188,7 +188,7 @@ void LoopARCSequenceDataflowEvaluator::mergeSuccessors(const LoopRegion *Region,
 /// pointer in a function that implies that the pointer is alive up to that
 /// point. We "freeze" (i.e. do not attempt to remove or move) such releases if
 /// FreezeOwnedArgEpilogueReleases is set. This is useful since in certain cases
-/// due to dataflow issues, we can not properly propagate the last use
+/// due to dataflow issues, we cannot properly propagate the last use
 /// information. Instead we run an extra iteration of the ARC optimizer with
 /// this enabled in a side table so the information gets propagated everywhere in
 /// the CFG.

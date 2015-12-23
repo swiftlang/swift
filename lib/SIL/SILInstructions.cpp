@@ -542,7 +542,7 @@ bool TupleExtractInst::isTrivialEltOfOneRCIDTuple() const {
   if (!getType().isTrivial(Mod))
     return false;
 
-  // If the elt we are extracting is trivial, we can not have any non trivial
+  // If the elt we are extracting is trivial, we cannot have any non trivial
   // fields.
   if (getOperand().getType().isTrivial(Mod))
     return false;
@@ -585,7 +585,7 @@ bool TupleExtractInst::isTrivialEltOfOneRCIDTuple() const {
 bool TupleExtractInst::isEltOnlyNonTrivialElt() const {
   SILModule &Mod = getModule();
 
-  // If the elt we are extracting is trivial, we can not be a non-trivial
+  // If the elt we are extracting is trivial, we cannot be a non-trivial
   // field... return false.
   if (getType().isTrivial(Mod))
     return false;
@@ -625,7 +625,7 @@ bool StructExtractInst::isTrivialFieldOfOneRCIDStruct() const {
 
   SILType StructTy = getOperand().getType();
 
-  // If the elt we are extracting is trivial, we can not have any non trivial
+  // If the elt we are extracting is trivial, we cannot have any non trivial
   // fields.
   if (StructTy.isTrivial(Mod))
     return false;
@@ -669,7 +669,7 @@ bool StructExtractInst::isTrivialFieldOfOneRCIDStruct() const {
 bool StructExtractInst::isFieldOnlyNonTrivialField() const {
   SILModule &Mod = getModule();
 
-  // If the field we are extracting is trivial, we can not be a non-trivial
+  // If the field we are extracting is trivial, we cannot be a non-trivial
   // field... return false.
   if (getType().isTrivial(Mod))
     return false;
@@ -776,7 +776,7 @@ OperandValueArrayRef CondBranchInst::getFalseArgs() const {
 
 SILValue
 CondBranchInst::getArgForDestBB(SILBasicBlock *DestBB, SILArgument *A) {
-  // If TrueBB and FalseBB equal, we can not find an arg for this DestBB so
+  // If TrueBB and FalseBB equal, we cannot find an arg for this DestBB so
   // return an empty SILValue.
   if (getTrueBB() == getFalseBB()) {
     assert(DestBB == getTrueBB() && "DestBB is not a target of this cond_br");

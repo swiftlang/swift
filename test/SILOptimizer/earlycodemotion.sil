@@ -281,7 +281,7 @@ bb4:
   return %2 : $()
 }
 
-// This test makes sure that we do move ref counts over instructions that can not reference it.
+// This test makes sure that we do move ref counts over instructions that cannot reference it.
 // CHECK-LABEL: sil @sink_ref_count_ops_enum_over_switch_enum_4 :
 // CHECK: bb0({{%[0-9]+}} : $Optional<Builtin.Int32>, [[ARG1:%[0-9]+]] : $Optional<Builtin.NativeObject>):
 // CHECK-NOT: retain_value [[ARG1]]
@@ -884,7 +884,7 @@ bb3:
   return %9999 : $()
 }
 
-// Because our enum is not local to this function, we can not move retain_value
+// Because our enum is not local to this function, we cannot move retain_value
 // %0 past blocker.
 //
 // CHECK-LABEL: sil @enum_simplification_test6b : $@convention(thin) (Optional<Builtin.NativeObject>) -> () {

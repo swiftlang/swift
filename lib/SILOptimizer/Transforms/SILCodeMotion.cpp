@@ -812,7 +812,7 @@ static bool tryToSinkRefCountInst(SILBasicBlock::iterator T,
   // successor.
   if (CanSinkToSuccessors) {
     // If we have a switch, try to sink ref counts across it and then return
-    // that result. We do not keep processing since the code below can not
+    // that result. We do not keep processing since the code below cannot
     // properly sink ref counts over switch_enums so we might as well exit
     // early.
     if (auto *S = dyn_cast<SwitchEnumInst>(T))
@@ -838,7 +838,7 @@ static bool tryToSinkRefCountInst(SILBasicBlock::iterator T,
   }
 
   // Ok, we have a ref count instruction that *could* be sunk. If we have a
-  // terminator that we can not sink through or the cfg will not let us sink
+  // terminator that we cannot sink through or the cfg will not let us sink
   // into our predecessors, just move the increment before the terminator.
   if (!CanSinkToSuccessors ||
       (!isa<CheckedCastBranchInst>(T) && !isa<CondBranchInst>(T))) {
@@ -1323,7 +1323,7 @@ mergePredecessorStates(BBToDataflowStateMap &BBToStateMap) {
   llvm::SmallVector<SILValue, 4> CurBBValuesToBlot;
 
   // If we do not find state for a specific value in any of our predecessor BBs,
-  // we can not be the end of a switch region since we can not cover our
+  // we cannot be the end of a switch region since we cannot cover our
   // predecessor BBs with enum decls. Blot after the loop.
   llvm::SmallVector<SILValue, 4> PredBBValuesToBlot;
 
@@ -1357,9 +1357,9 @@ mergePredecessorStates(BBToDataflowStateMap &BBToStateMap) {
       // the predecessor we are processing.
       auto PredValue = PredBBState->ValueToCaseMap.find(P->first);
 
-      // If we can not find the state associated with this SILValue in this
+      // If we cannot find the state associated with this SILValue in this
       // predecessor or the value in the corresponding predecessor was blotted,
-      // we can not find a covering switch for this BB or forward any enum tag
+      // we cannot find a covering switch for this BB or forward any enum tag
       // information for this enum value.
       if (PredValue == PredBBState->ValueToCaseMap.end() || !(*PredValue)->first) {
         // Otherwise, we are conservative and do not forward the EnumTag that we
@@ -1371,7 +1371,7 @@ mergePredecessorStates(BBToDataflowStateMap &BBToStateMap) {
       }
 
       // Check if out predecessor has any other successors. If that is true we
-      // clear all the state since we can not hoist safely.
+      // clear all the state since we cannot hoist safely.
       if (!PredBB->getSingleSuccessor()) {
         EnumToEnumBBCaseListMap.clear();
         DEBUG(llvm::dbgs() << "                Predecessor has other "
@@ -1497,9 +1497,9 @@ BBEnumTagDataflowState::hoistDecrementsIntoSwitchRegions(AliasAnalysis *AA) {
     }
 
     // Finally ensure that we have no users of this operand preceding the
-    // release_value in this BB. If we have users like that we can not hoist the
+    // release_value in this BB. If we have users like that we cannot hoist the
     // release past them unless we know that there is an additional set of
-    // releases that together post-dominate this release. If we can not do this,
+    // releases that together post-dominate this release. If we cannot do this,
     // skip this release.
     //
     // TODO: We need information from the ARC optimizer to prove that property
@@ -1525,7 +1525,7 @@ BBEnumTagDataflowState::hoistDecrementsIntoSwitchRegions(AliasAnalysis *AA) {
       // Otherwise create the release_value before the terminator of the
       // predecessor.
       assert(P.first->getSingleSuccessor() &&
-             "Can not hoist release into BB that has multiple successors");
+             "Cannot hoist release into BB that has multiple successors");
       SILBuilderWithScope Builder(P.first->getTerminator(), RVI);
       createRefCountOpForPayload(Builder, RVI, P.second);
     }
@@ -1563,7 +1563,7 @@ findLastSinkableMatchingEnumValueRCIncrementInPred(AliasAnalysis *AA,
 
     // Otherwise, see if there are any instructions in between FirstPredInc and
     // the end of the given basic block that could decrement first pred. If such
-    // an instruction exists, we can not perform this optimization so continue.
+    // an instruction exists, we cannot perform this optimization so continue.
     if (valueHasARCDecrementOrCheckInInstructionRange(
             EnumValue, (*FirstInc).getIterator(),
             BB->getTerminator()->getIterator(), AA))

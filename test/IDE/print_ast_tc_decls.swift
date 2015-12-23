@@ -228,7 +228,7 @@ struct d0100_FooStruct {
 // PASS_COMMON-NEXT: {{^}}  enum NestedEnum {{{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
-  // Can not declare a nested protocol.
+  // Cannot declare a nested protocol.
   // protocol NestedProtocol {}
 
   typealias NestedTypealias = Int

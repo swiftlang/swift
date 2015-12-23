@@ -79,7 +79,7 @@ public struct UTF8 : UnicodeCodecType {
   public init() {}
 
   /// Returns the number of expected trailing bytes for a given first byte: 0,
-  /// 1, 2 or 3.  If the first byte can not start a valid UTF-8 code unit
+  /// 1, 2 or 3.  If the first byte cannot start a valid UTF-8 code unit
   /// sequence, returns 4.
   @warn_unused_result
   public static func _numTrailingBytes(cu0: CodeUnit) -> UInt8 {

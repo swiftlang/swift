@@ -163,8 +163,8 @@ static bool isARCSignificantTerminator(TermInst *TI) {
   case TermKind::Invalid:
     llvm_unreachable("Expected a TermInst");
   case TermKind::UnreachableInst:
-  // br is a forwarding use for its arguments. It can not in of itself extend
-  // the lifetime of an object (just like a phi-node) can not.
+  // br is a forwarding use for its arguments. It cannot in of itself extend
+  // the lifetime of an object (just like a phi-node) cannot.
   case TermKind::BranchInst:
   // A cond_br is a forwarding use for its non-operand arguments in a similar
   // way to br. Its operand must be an i1 that has a different lifetime from any
@@ -192,7 +192,7 @@ static bool isARCSignificantTerminator(TermInst *TI) {
 // into all of our predecessors, allowing us to be conservatively correct in all
 // cases.
 //
-// The key thing to notice is that in general this can not happen due to
+// The key thing to notice is that in general this cannot happen due to
 // critical edge splitting. To trigger this, one would need a terminator that
 // uses a reference counted value and only has one successor due to critical
 // edge splitting. This is just to be conservative when faced with the unknown
@@ -300,7 +300,7 @@ static bool getInsertionPtsForLoopRegionExits(
     llvm::SmallVectorImpl<SILInstruction *> &InsertPts) {
   assert(R->isLoop() && "Expected a loop region that is representing a loop");
 
-  // Go through all of our non local successors. If any of them can not be
+  // Go through all of our non local successors. If any of them cannot be
   // ignored, we bail for simplicity. This means that for now we do not handle
   // early exits.
   if (any_of(R->getNonLocalSuccs(), [&](unsigned SuccID) -> bool {

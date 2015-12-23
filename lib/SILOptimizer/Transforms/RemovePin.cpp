@@ -119,7 +119,7 @@ public:
               ++NumPinPairsRemoved;
             } else {
               DEBUG(llvm::dbgs()
-                    << "        Pin users are not safe! Can not remove!\n");
+                    << "        Pin users are not safe! Cannot remove!\n");
             }
 
             continue;

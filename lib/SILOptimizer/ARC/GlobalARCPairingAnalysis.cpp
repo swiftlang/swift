@@ -269,7 +269,7 @@ ARCMatchingSetBuilder::matchDecrementsToIncrements() {
 
 /// Visit each retain/release that is matched up to our operand over and over
 /// again until we converge by not adding any more to the set which we can move.
-/// If we find a situation that we can not handle, we bail and return false. If
+/// If we find a situation that we cannot handle, we bail and return false. If
 /// we succeed and it is safe to move increment/releases, we return true.
 bool ARCMatchingSetBuilder::matchUpIncDecSetsForPtr() {
   bool KnownSafeTD = true;

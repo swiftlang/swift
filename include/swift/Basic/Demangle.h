@@ -90,7 +90,7 @@ enum class FunctionSigSpecializationParamKind : unsigned {
 
 /// The pass that caused the specialization to occur. We use this to make sure
 /// that two passes that generate similar changes do not yield the same
-/// mangling. This currently can not happen, so this is just a safety measure
+/// mangling. This currently cannot happen, so this is just a safety measure
 /// that creates separate name spaces.
 enum class SpecializationPass : uint8_t {
   AllocBoxToStack,

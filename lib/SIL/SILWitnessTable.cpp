@@ -42,7 +42,7 @@ SILWitnessTable *
 SILWitnessTable::create(SILModule &M, SILLinkage Linkage, bool IsFragile,
                         NormalProtocolConformance *Conformance,
                         ArrayRef<SILWitnessTable::Entry> entries) {
-  assert(Conformance && "Can not create a witness table for a null "
+  assert(Conformance && "Cannot create a witness table for a null "
          "conformance.");
 
   // Create the mangled name of our witness table...
@@ -70,7 +70,7 @@ SILWitnessTable::create(SILModule &M, SILLinkage Linkage, bool IsFragile,
 SILWitnessTable *
 SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
                         NormalProtocolConformance *Conformance) {
-  assert(Conformance && "Can not create a witness table for a null "
+  assert(Conformance && "Cannot create a witness table for a null "
          "conformance.");
 
   // Create the mangled name of our witness table...

@@ -44,7 +44,7 @@ public protocol SplittableCollectionType : CollectionType {
   /// FIXME: a better name.  Users will never want to call this method
   /// directly.
   ///
-  /// FIXME: return an optional for the common case when split() can not
+  /// FIXME: return an optional for the common case when split() cannot
   /// subdivide the range further.
   func split(range: Range<Index>) -> [Range<Index>]
 }

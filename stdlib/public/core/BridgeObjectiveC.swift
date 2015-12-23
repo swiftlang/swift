@@ -29,7 +29,7 @@ public protocol _ObjectiveCBridgeable {
   static func _isBridgedToObjectiveC() -> Bool
 
   // _getObjectiveCType is a workaround: right now protocol witness
-  // tables don't include associated types, so we can not find
+  // tables don't include associated types, so we cannot find
   // '_ObjectiveCType.self' from them.
 
   /// Must return `_ObjectiveCType.self`.

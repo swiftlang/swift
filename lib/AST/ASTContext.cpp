@@ -3163,9 +3163,9 @@ ProtocolType::ProtocolType(ProtocolDecl *TheDecl, const ASTContext &Ctx)
 
 LValueType *LValueType::get(Type objectTy) {
   assert(!objectTy->is<ErrorType>() &&
-         "can not have ErrorType wrapped inside LValueType");
+         "cannot have ErrorType wrapped inside LValueType");
   assert(!objectTy->is<LValueType>() && !objectTy->is<InOutType>() &&
-         "can not have 'inout' or @lvalue wrapped inside an @lvalue");
+         "cannot have 'inout' or @lvalue wrapped inside an @lvalue");
 
   auto properties = objectTy->getRecursiveProperties()
                     | RecursiveTypeProperties::IsLValue;
@@ -3183,9 +3183,9 @@ LValueType *LValueType::get(Type objectTy) {
 
 InOutType *InOutType::get(Type objectTy) {
   assert(!objectTy->is<ErrorType>() &&
-         "can not have ErrorType wrapped inside InOutType");
+         "cannot have ErrorType wrapped inside InOutType");
   assert(!objectTy->is<LValueType>() && !objectTy->is<InOutType>() &&
-         "can not have 'inout' or @lvalue wrapped inside an 'inout'");
+         "cannot have 'inout' or @lvalue wrapped inside an 'inout'");
 
   auto properties = objectTy->getRecursiveProperties() |
                      RecursiveTypeProperties::HasInOut;

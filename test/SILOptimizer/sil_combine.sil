@@ -2777,7 +2777,7 @@ bb0(%0 : $*B, %1 : $B, %2 : $Builtin.Int1):
 }
 
 // Make sure that we do not crash when determining if a value is not zero and
-// has a value that can not be stored in a UInt64. The specific issue is that we
+// has a value that cannot be stored in a UInt64. The specific issue is that we
 // were using getZExtValue before which assumes that an APInt can be stored in a
 // UInt64.
 //

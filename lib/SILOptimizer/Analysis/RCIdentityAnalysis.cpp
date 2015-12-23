@@ -162,7 +162,7 @@ static llvm::Optional<bool> proveNonPayloadedEnumCase(SILBasicBlock *BB,
 bool RCIdentityFunctionInfo::
 findDominatingNonPayloadedEdge(SILBasicBlock *IncomingEdgeBB,
                                SILValue RCIdentity) {
-  // First grab the NonPayloadedEnumBB and RCIdentityBB. If we can not find
+  // First grab the NonPayloadedEnumBB and RCIdentityBB. If we cannot find
   // either of them, return false.
   SILBasicBlock *RCIdentityBB = RCIdentity->getParentBB();
   if (!RCIdentityBB)
@@ -226,7 +226,7 @@ findDominatingNonPayloadedEdge(SILBasicBlock *IncomingEdgeBB,
   return false;
 }
 
-/// Return the underlying SILValue after stripping off SILArguments that can not
+/// Return the underlying SILValue after stripping off SILArguments that cannot
 /// affect RC identity.
 ///
 /// This code is meant to enable RCIdentity to be ascertained in the following

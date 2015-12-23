@@ -586,7 +586,7 @@ extension _ContiguousArrayBuffer {
 /// It avoids the extra retain, release overhead from storing the
 /// ContiguousArrayBuffer into
 /// _UnsafePartiallyInitializedContiguousArrayBuffer. Since we do not support
-/// ARC loops, the extra retain, release overhead can not be eliminated which
+/// ARC loops, the extra retain, release overhead cannot be eliminated which
 /// makes assigning ranges very slow. Once this has been implemented, this code
 /// should be changed to use _UnsafePartiallyInitializedContiguousArrayBuffer.
 @warn_unused_result

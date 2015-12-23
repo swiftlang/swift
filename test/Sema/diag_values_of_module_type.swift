@@ -52,7 +52,7 @@ func goodTest1() {
   _ = diag_values_of_module_type_foo.SomeClass.staticVar1
   _ = diag_values_of_module_type_foo.SomeStruct()
   _ = diag_values_of_module_type_foo.SomeEnum.Foo
-  // Can not default-construct a protocol.
+  // Cannot default-construct a protocol.
   // _ = diag_values_of_module_type_foo.SomeExistential()
   _ = diag_values_of_module_type_foo.SomeTypealias()
 

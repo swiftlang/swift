@@ -205,8 +205,8 @@ static bool isARCSignificantTerminator(TermInst *TI) {
   case TermKind::Invalid:
     llvm_unreachable("Expected a TermInst");
   case TermKind::UnreachableInst:
-  // br is a forwarding use for its arguments. It can not in of itself extend
-  // the lifetime of an object (just like a phi-node) can not.
+  // br is a forwarding use for its arguments. It cannot in of itself extend
+  // the lifetime of an object (just like a phi-node) cannot.
   case TermKind::BranchInst:
   // A cond_br is a forwarding use for its non-operand arguments in a similar
   // way to br. Its operand must be an i1 that has a different lifetime from any
@@ -239,7 +239,7 @@ static bool isARCSignificantTerminator(TermInst *TI) {
 /// pointer in a function that implies that the pointer is alive up to that
 /// point. We "freeze" (i.e. do not attempt to remove or move) such releases if
 /// FreezeOwnedArgEpilogueReleases is set. This is useful since in certain cases
-/// due to dataflow issues, we can not properly propagate the last use
+/// due to dataflow issues, we cannot properly propagate the last use
 /// information. Instead we run an extra iteration of the ARC optimizer with
 /// this enabled in a side table so the information gets propagated everywhere in
 /// the CFG.
@@ -299,7 +299,7 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
   // This is ignoring the possibility that we may have a loop with an
   // interesting terminator but for which, we are going to clear all state
   // (since it is a loop boundary). We may in such a case, be too conservative
-  // with our other predecessors. Luckily this can not happen since cond_br is
+  // with our other predecessors. Luckily this cannot happen since cond_br is
   // the only terminator that allows for critical edges and all other
   // "interesting terminators" always having multiple successors. This means
   // that this block could not have multiple predecessors since otherwise, the
