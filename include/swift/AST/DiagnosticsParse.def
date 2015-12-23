@@ -329,7 +329,11 @@ ERROR(expected_arrow_subscript,decl_parsing,PointsToFirstBadToken,
 ERROR(expected_type_subscript,type_parsing,PointsToFirstBadToken,
       "expected subscripting element type", ())
 ERROR(expected_lbrace_subscript,decl_parsing,PointsToFirstBadToken,
-      "expected '{' for subscripting", ())
+      "expected '{' in subscript to specify getter and setter implementation",
+      ())
+ERROR(expected_lbrace_subscript_protocol,decl_parsing,PointsToFirstBadToken,
+      "subscript in protocol must have explicit { get } or "
+      "{ get set } specifier", ())
 ERROR(subscript_without_get,decl_parsing,none,
       "subscript declarations must have a getter", ())
 ERROR(subscript_static,decl_parsing,none,

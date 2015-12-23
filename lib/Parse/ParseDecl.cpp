@@ -4840,7 +4840,11 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
   if (Tok.isNot(tok::l_brace))  {
     // Subscript declarations must always have at least a getter, so they need
     // to be followed by a {.
-    diagnose(Tok, diag::expected_lbrace_subscript);
+    if (Flags.contains(PD_InProtocol))
+      diagnose(Tok, diag::expected_lbrace_subscript_protocol)
+        .fixItInsertAfter(ElementTy.get()->getEndLoc(), " { get set }");
+    else
+      diagnose(Tok, diag::expected_lbrace_subscript);
     Status.setIsParseError();
   } else {
     if (parseGetSet(Flags, Indices.get(), ElementTy.get(),
