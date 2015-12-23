@@ -2884,11 +2884,13 @@ namespace {
     using super::addStruct;
     using super::getNextOffset;
     const StructLayout &Layout;
+    const ClassLayout &FieldLayout;
     SILVTable *VTable;
 
     ClassMetadataBuilderBase(IRGenModule &IGM, ClassDecl *theClass,
-                             const StructLayout &layout)
-      : super(IGM, theClass), Layout(layout) {
+                             const StructLayout &layout,
+                             const ClassLayout &fieldLayout)
+      : super(IGM, theClass), Layout(layout), FieldLayout(fieldLayout) {
       VTable = IGM.SILMod->lookUpVTable(Target);
     }
 
@@ -3143,8 +3145,9 @@ namespace {
     public ClassMetadataBuilderBase<ClassMetadataBuilder> {
   public:
     ClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
-                         const StructLayout &layout)
-      : ClassMetadataBuilderBase(IGM, theClass, layout) {}
+                         const StructLayout &layout,
+                         const ClassLayout &fieldLayout)
+      : ClassMetadataBuilderBase(IGM, theClass, layout, fieldLayout) {}
 
     llvm::Constant *getInit() {
       return getInitWithSuggestedType(NumHeapMetadataFields,
@@ -3192,8 +3195,9 @@ namespace {
     Size DependentMetaclassRODataPoint = Size::invalid();
   public:
     GenericClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
-                                const StructLayout &layout)
-      : super(IGM, theClass, layout)
+                                const StructLayout &layout,
+                                const ClassLayout &fieldLayout)
+      : super(IGM, theClass, layout, fieldLayout)
     {
       // We need special initialization of metadata objects to trick the ObjC
       // runtime into initializing them.
@@ -3531,19 +3535,20 @@ static void emitObjCClassSymbol(IRGenModule &IGM,
 
 /// Emit the type metadata or metadata template for a class.
 void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
-                              const StructLayout &layout) {
+                              const StructLayout &layout,
+                              const ClassLayout &fieldLayout) {
   assert(!classDecl->isForeign());
 
   // TODO: classes nested within generic types
   llvm::Constant *init;
   bool isPattern;
   if (hasMetadataPattern(IGM, classDecl)) {
-    GenericClassMetadataBuilder builder(IGM, classDecl, layout);
+    GenericClassMetadataBuilder builder(IGM, classDecl, layout, fieldLayout);
     builder.layout();
     init = builder.getInit();
     isPattern = true;
   } else {
-    ClassMetadataBuilder builder(IGM, classDecl, layout);
+    ClassMetadataBuilder builder(IGM, classDecl, layout, fieldLayout);
     builder.layout();
     init = builder.getInit();
     isPattern = false;

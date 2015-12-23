@@ -385,6 +385,47 @@ Size getHeapHeaderSize(IRGenModule &IGM);
 void addHeapHeaderToLayout(IRGenModule &IGM, Size &size, Alignment &align,
                            SmallVectorImpl<llvm::Type*> &fieldTypes);
 
+/// Different policies for accessing a physical field.
+enum class FieldAccess : uint8_t {
+  /// Instance variable offsets are constant.
+  ConstantDirect,
+  
+  /// Instance variable offsets must be loaded from "direct offset"
+  /// global variables.
+  NonConstantDirect,
+  
+  /// Instance variable offsets are kept in fields in metadata, but
+  /// the offsets of those fields within the metadata are constant.
+  ConstantIndirect,
+  
+  /// Instance variable offsets are kept in fields in metadata, and
+  /// the offsets of those fields within the metadata must be loaded
+  /// from "indirect offset" global variables.
+  NonConstantIndirect
+};
+
+struct ClassLayout {
+  /// Lazily-initialized array of all fragile stored properties in the class
+  /// (including superclass stored properties).
+  ArrayRef<VarDecl*> AllStoredProperties;
+  /// Lazily-initialized array of all fragile stored properties inherited from
+  /// superclasses.
+  ArrayRef<VarDecl*> InheritedStoredProperties;
+  /// Lazily-initialized array of all field access methods.
+  ArrayRef<FieldAccess> AllFieldAccesses;
+  /// Lazily-initialized metadata access method. See the comment in
+  /// ClassLayoutBuilder.
+  FieldAccess MetadataAccess;
+
+  unsigned getFieldIndex(VarDecl *field) const {
+    // FIXME: This is algorithmically terrible.
+    auto found = std::find(AllStoredProperties.begin(),
+                           AllStoredProperties.end(), field);
+    assert(found != AllStoredProperties.end() && "didn't find field in type?!");
+    return found - AllStoredProperties.begin();
+  }
+};
+
 } // end namespace irgen
 } // end namespace swift
 
