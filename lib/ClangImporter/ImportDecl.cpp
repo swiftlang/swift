@@ -4254,6 +4254,7 @@ namespace {
                                        ArrayRef<ProtocolDecl *> protocols,
                                        SmallVectorImpl<Decl *> &members,
                                        ASTContext &Ctx) {
+      assert(dc);
       const clang::ObjCInterfaceDecl *interfaceDecl = nullptr;
       const ClangModuleUnit *declModule;
       const ClangModuleUnit *interfaceModule;
@@ -4907,6 +4908,8 @@ namespace {
 
     Decl *VisitObjCPropertyDecl(const clang::ObjCPropertyDecl *decl,
                                 DeclContext *dc) {
+      assert(dc);
+
       auto name = Impl.importFullName(decl).Imported.getBaseName();
       if (name.empty())
         return nullptr;
@@ -5626,6 +5629,7 @@ Decl *
 ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
                                                   DeclContext *dc,
                                                   ProtocolDecl *proto) {
+  assert(dc);
   if (!decl)
     return nullptr;
 
@@ -5930,6 +5934,7 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
 
 void
 ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t unused) {
+  assert(D);
   assert(D->hasClangNode());
   auto clangDecl = cast<clang::ObjCContainerDecl>(D->getClangDecl());
 
