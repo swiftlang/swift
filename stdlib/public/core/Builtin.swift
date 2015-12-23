@@ -327,18 +327,23 @@ internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
 }
 
 @warn_unused_result
-@_silgen_name("swift_class_getInstancePositiveExtent")
-func swift_class_getInstancePositiveExtent(theClass: AnyClass) -> UInt
+@_silgen_name("swift_class_getInstanceExtents")
+func swift_class_getInstanceExtents(theClass: AnyClass)
+  -> (negative: UInt, positive: UInt)
 
-/// - Returns: `class_getInstanceSize(theClass)`.
+@warn_unused_result
+@_silgen_name("swift_objc_class_unknownGetInstanceExtents")
+func swift_objc_class_unknownGetInstanceExtents(theClass: AnyClass)
+  -> (negative: UInt, positive: UInt)
+
+/// - Returns: 
 @inline(__always)
 @warn_unused_result
 internal func _class_getInstancePositiveExtentSize(theClass: AnyClass) -> Int {
 #if _runtime(_ObjC)
-  return Int(swift_objc_class_unknownGetInstancePositiveExtent(
-      unsafeAddressOf(theClass)))
+  return Int(swift_objc_class_unknownGetInstanceExtents(theClass).positive)
 #else
-  return Int(swift_class_getInstancePositiveExtent(theClass))
+  return Int(swift_class_getInstanceExtents(theClass).positive)
 #endif
 }
 

@@ -340,8 +340,8 @@ runtime.
 0000000000003f50 T _swift_isClassOrObjCExistentialType
 0000000000004130 T _swift_isOptionalType
 00000000000279f0 T _swift_objc_class_usesNativeSwiftReferenceCounting
-000000000002b340 T _swift_objc_class_unknownGetInstancePositiveExtent
-000000000002b350 T _swift_class_getInstancePositiveExtent
+000000000002b340 T _swift_objc_class_unknownGetInstanceExtents
+000000000002b350 T _swift_class_getInstanceExtents
 0000000000004080 T _swift_class_getSuperclass
 ```
 

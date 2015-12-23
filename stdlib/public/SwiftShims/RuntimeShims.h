@@ -29,8 +29,6 @@ namespace swift { extern "C" {
 
 bool swift_objc_class_usesNativeSwiftReferenceCounting(const void *);
 
-__swift_size_t swift_objc_class_unknownGetInstancePositiveExtent(const void *);
-
 /// Return an NSString to be used as the Mirror summary of the object
 void *_swift_objCMirrorSummary(const void * nsObject);
 

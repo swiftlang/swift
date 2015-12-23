@@ -1345,21 +1345,30 @@ bool swift::swift_isUniquelyReferencedOrPinned_nonNull_native(
   return object->refCount.isUniquelyReferencedOrPinned();
 }
 
-#if SWIFT_OBJC_INTEROP
-/// Returns class_getInstanceSize(c)
-///
-/// That function is otherwise unavailable to the core stdlib.
-size_t swift::swift_objc_class_unknownGetInstancePositiveExtent(const void* c) {
-  return class_getInstanceSize((Class)c);
-}
-#endif
+using ClassExtents = TwoWordPair<size_t, size_t>;
 
-extern "C" size_t swift_class_getInstancePositiveExtent(
-    const Metadata *c) {
+extern "C"
+ClassExtents::Return
+swift_class_getInstanceExtents(const Metadata *c) {
   assert(c && c->isClassObject());
   auto metaData = c->getClassObject();
-  return metaData->getInstanceSize() - metaData->getInstanceAddressPoint();
+  return ClassExtents{
+    metaData->getInstanceAddressPoint(),
+    metaData->getInstanceSize() - metaData->getInstanceAddressPoint()
+  };
 }
+
+#if SWIFT_OBJC_INTEROP
+extern "C"
+ClassExtents::Return
+swift_objc_class_unknownGetInstanceExtents(const ClassMetadata* c) {
+  // Pure ObjC classes never have negative extents.
+  if (c->isPureObjC())
+    return ClassExtents{0, class_getInstanceSize((Class)c)};
+  
+  return swift_class_getInstanceExtents(c);
+}
+#endif
 
 const ClassMetadata *swift::getRootSuperclass() {
 #if SWIFT_OBJC_INTEROP
