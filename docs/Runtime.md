@@ -238,8 +238,6 @@ process start and the function returns.
 0000000000000de0 T _swift_dynamicCastUnknownClass
 0000000000000fd0 T _swift_dynamicCastUnknownClassUnconditional
 0000000000003f50 T _swift_isClassOrObjCExistential
-00000000000040c0 T _swift_isClassType
-0000000000004130 T _swift_isOptionalType
 0000000000004080 T __swift_getSuperclass_nonNull
 00000000000279f0 T __swift_usesNativeSwiftReferenceCounting_class
 000000000002ae40 T __swift_usesNativeSwiftReferenceCounting_nonNull
@@ -346,9 +344,14 @@ runtime.
 0000000000000b60 T _swift_getDynamicType
 0000000000022fb0 T _swift_getObjectType
 00000000000006f0 T _swift_getTypeName
+00000000000040c0 T _swift_isClassType
+0000000000004130 T _swift_isOptionalType
 ```
 
 **ABI TODO**: getTypeByName entry point.
+
+**ABI TODO**: Should have a `getTypeKind` entry point with well-defined enum
+constants to supersede `swift_is*Type`.
 
 ## Protocol conformance lookup
 
@@ -362,6 +365,43 @@ runtime.
 ```
 000000000001c7d0 T _swift_reportError
 000000000001c940 T _swift_deletedMethodError
+```
+
+## Standard metadata
+
+The Swift runtime exports standard metadata objects for `Builtin` types
+as well as standard value witness tables that can be freely adopted by
+types with common layout attributes.
+
+```
+000000000004faa8 S __TMBB
+000000000004fab8 S __TMBO
+000000000004f9f8 S __TMBb
+000000000004f9c8 S __TMBi128_
+000000000004f998 S __TMBi16_
+000000000004f9d8 S __TMBi256_
+000000000004f9a8 S __TMBi32_
+000000000004f9b8 S __TMBi64_
+000000000004f988 S __TMBi8_
+000000000004f9e8 S __TMBo
+000000000004fac8 S __TMT_
+000000000004f568 S __TWVBO
+000000000004f4b0 S __TWVBb
+000000000004f0a8 S __TWVBi128_
+000000000004eec8 S __TWVBi16_
+000000000004f148 S __TWVBi256_
+000000000004ef68 S __TWVBi32_
+000000000004f008 S __TWVBi64_
+000000000004ee28 S __TWVBi8_
+000000000004f1e8 S __TWVBo
+000000000004f778 S __TWVFT_T_
+000000000004f3f8 S __TWVMBo
+000000000004f8e8 S __TWVT_
+000000000004f830 S __TWVXfT_T_
+000000000004f620 S __TWVXoBO
+000000000004f2a0 S __TWVXoBo
+000000000004f6d8 S __TWVXwGSqBO_
+000000000004f358 S __TWVXwGSqBo_
 ```
 
 ## Tasks
