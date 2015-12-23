@@ -1067,7 +1067,11 @@ static bool canNRVO(CopyAddrInst *CopyInst) {
   // optimization will early-initialize the copy dest, so we can't allow aliases
   // to be accessed between the initialization and the return.
   auto OutArg = dyn_cast<SILArgument>(CopyInst->getDest());
-  if (!OutArg || !OutArg->getParameterInfo().isIndirect())
+  if (!OutArg)
+    return false;
+
+  auto ArgConv = OutArg->getParameterInfo().getConvention();
+  if (ArgConv != ParameterConvention::Indirect_Out)
     return false;
 
   SILBasicBlock *BB = CopyInst->getParent();
