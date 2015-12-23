@@ -477,15 +477,20 @@ struct _ParentProcess {
 
   internal var _runTestsInProcess: Bool
   internal var _filter: String?
+  internal var _env: String?
 
-  init(runTestsInProcess: Bool, filter: String?) {
+  init(runTestsInProcess: Bool, filter: String?, env: String?) {
     self._runTestsInProcess = runTestsInProcess
     self._filter = filter
+    self._env = env
   }
 
   mutating func _spawnChild() {
-    let (pid, childStdinFD, childStdoutFD, childStderrFD) =
-      spawnChild([ "--stdlib-unittest-run-child" ])
+    var params = [ "--stdlib-unittest-run-child" ]
+    if let env = _env {
+      params += [ "--env", env ]
+    }
+    let (pid, childStdinFD, childStdoutFD, childStderrFD) = spawnChild(params)
     _pid = pid
     _childStdin = _FDOutputStream(fd: childStdinFD)
     _childStdout = _FDInputStream(fd: childStdoutFD)
@@ -782,6 +787,7 @@ public func runAllTests() {
   } else {
     var runTestsInProcess: Bool = false
     var filter: String? = nil
+    var env: String? = nil
     var i = 0
     while i < Process.arguments.count {
       let arg = Process.arguments[i]
@@ -795,6 +801,11 @@ public func runAllTests() {
         i += 2
         continue
       }
+      if arg == "--env" {
+        env = Process.arguments[i + 1]
+        i += 2
+        continue
+      }
       if arg == "--help" {
         let message =
 "optional arguments:\n" +
@@ -803,7 +814,10 @@ public func runAllTests() {
 "                        Useful for running under a debugger.\n" +
 "--stdlib-unittest-filter FILTER-STRING\n" +
 "                        only run tests whose names contain FILTER-STRING as\n" +
-"                        a substring."
+"                        a substring.\n" + 
+"--env STRING\n" +
+"      an environment variable\n"
+
         print(message)
         return
       }
@@ -813,7 +827,7 @@ public func runAllTests() {
     }
 
     var parent = _ParentProcess(
-      runTestsInProcess: runTestsInProcess, filter: filter)
+      runTestsInProcess: runTestsInProcess, filter: filter, env: env)
     parent.run()
   }
 }
