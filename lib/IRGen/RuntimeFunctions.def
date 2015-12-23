@@ -534,17 +534,6 @@ FUNCTION(GetGenericMetadata4, swift_getGenericMetadata4, RuntimeCC,
          ARGS(TypeMetadataPatternPtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind, ReadNone))
 
-// const ProtocolWitnessTable *
-// swift_getGenericWitnessTable(GenericProtocolWitnessTable *genericTable,
-//                              const Metadata *type,
-//                              void * const *otherData);
-FUNCTION(GetGenericWitnessTable, swift_getGenericWitnessTable, RuntimeCC,
-         RETURNS(WitnessTablePtrTy),
-         ARGS(getGenericWitnessTableCacheTy()->getPointerTo(),
-              TypeMetadataPtrTy,
-              Int8PtrPtrTy),
-         ATTRS(NoUnwind, ReadOnly))
-
 // Metadata *swift_getMetatypeMetadata(Metadata *instanceTy);
 FUNCTION(GetMetatypeMetadata, swift_getMetatypeMetadata, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),

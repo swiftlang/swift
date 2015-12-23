@@ -2106,25 +2106,6 @@ struct GenericMetadata {
   }
 };
 
-/// \brief The control structure of a generic protocol conformance.
-struct GenericWitnessTable {
-  /// The size of the witness table in words.
-  uint16_t WitnessTableSizeInWords;
-
-  /// The amount to copy from the pattern in words.  The rest is zeroed.
-  uint16_t WitnessTableSizeInWordsToCopy;
-
-  /// The pattern.
-  RelativeDirectPointer<WitnessTable> Pattern;
-
-  /// The instantiation function, which is called after the template is copied.
-  RelativeDirectPointer<void(WitnessTable *instantiatedTable,
-                             const Metadata *type,
-                             void * const *instantiationArgs)> Instantiator;
-
-  void *PrivateData[swift::NumGenericMetadataPrivateDataWords];
-};
-
 /// The structure of a protocol conformance record.
 ///
 /// This contains enough static information to recover the witness table for a
@@ -2352,20 +2333,6 @@ swift_allocateGenericClassMetadata(GenericMetadata *pattern,
 extern "C" Metadata *
 swift_allocateGenericValueMetadata(GenericMetadata *pattern,
                                    const void *arguments);
-
-/// Instantiate a generic protocol witness table.
-///
-///
-/// \param instantiationArgs - An opaque pointer that's forwarded to
-///   the instantiation function, used for conditional conformances.
-///   This API implicitly embeds an assumption that these arguments
-///   never form part of the uniquing key for the conformance, which
-///   is ultimately a statement about the user model of overlapping
-///   conformances.
-extern "C" const WitnessTable *
-swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
-                             const Metadata *type,
-                             void * const *instantiationArgs);
   
 /// \brief Fetch a uniqued metadata for a function type.
 extern "C" const FunctionTypeMetadata *

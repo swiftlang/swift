@@ -698,17 +698,6 @@ void Remangler::mangleProtocolWitnessTable(Node *node) {
   mangleSingleChildNode(node); // protocol conformance
 }
 
-void Remangler::mangleGenericProtocolWitnessTable(Node *node) {
-  Out << "WG";
-  mangleSingleChildNode(node); // protocol conformance
-}
-
-void Remangler::mangleGenericProtocolWitnessTableInstantiationFunction(
-                                                                  Node *node) {
-  Out << "WI";
-  mangleSingleChildNode(node); // protocol conformance
-}
-
 void Remangler::mangleProtocolWitnessTableAccessor(Node *node) {
   Out << "Wa";
   mangleSingleChildNode(node); // protocol conformance
@@ -724,17 +713,14 @@ void Remangler::mangleLazyProtocolWitnessTableCacheVariable(Node *node) {
   mangleChildNodes(node); // type, protocol conformance
 }
 
-void Remangler::mangleAssociatedTypeMetadataAccessor(Node *node) {
-  Out << "Wt";
-  mangleChildNodes(node); // protocol conformance, identifier
+void Remangler::mangleDependentProtocolWitnessTableGenerator(Node *node) {
+  Out << "WD";
+  mangleSingleChildNode(node); // protocol conformance
 }
 
-void Remangler::mangleAssociatedTypeWitnessTableAccessor(Node *node) {
-  Out << "WT";
-  assert(node->getNumChildren() == 3);
-  mangleChildNode(node, 0); // protocol conformance
-  mangleChildNode(node, 1); // identifier
-  mangleProtocolWithoutPrefix(node->begin()[2].get()); // type
+void Remangler::mangleDependentProtocolWitnessTableTemplate(Node *node) {
+  Out << "Wd";
+  mangleSingleChildNode(node); // protocol conformance
 }
 
 void Remangler::mangleReabstractionThunkHelper(Node *node) {

@@ -1016,6 +1016,7 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
 
   case Kind::DirectProtocolWitnessTable:
   case Kind::ProtocolWitnessTableAccessFunction:
+  case Kind::DependentProtocolWitnessTableGenerator:
     return getConformanceLinkage(IGM, getProtocolConformance());
 
   case Kind::ProtocolWitnessTableLazyAccessFunction:
@@ -1028,10 +1029,7 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
       return SILLinkage::Shared;
     }
 
-  case Kind::AssociatedTypeMetadataAccessFunction:
-  case Kind::AssociatedTypeWitnessTableAccessFunction:
-  case Kind::GenericProtocolWitnessTableCache:
-  case Kind::GenericProtocolWitnessTableInstantiationFunction:
+  case Kind::DependentProtocolWitnessTableTemplate:
     return SILLinkage::Private;
   
   case Kind::SILFunction:
@@ -1051,7 +1049,8 @@ bool LinkEntity::isFragile(IRGenModule &IGM) const {
     case Kind::SILGlobalVariable:
       return getSILGlobalVariable()->isFragile();
       
-    case Kind::DirectProtocolWitnessTable: {
+    case Kind::DirectProtocolWitnessTable:
+    case Kind::DependentProtocolWitnessTableGenerator: {
       auto wt = IGM.SILMod->lookUpWitnessTable(getProtocolConformance());
       if (wt.first) {
         return wt.first->isFragile();
@@ -1808,51 +1807,33 @@ static llvm::Constant *emitRelativeReference(IRGenModule &IGM,
                                llvm::Constant *base,
                                unsigned arrayIndex,
                                unsigned structIndex) {
-  llvm::Constant *relativeAddr =
-    IGM.emitDirectRelativeReference(target.first, base,
-                                    { arrayIndex, structIndex });
+  auto targetAddr = llvm::ConstantExpr::getPtrToInt(target.first, IGM.SizeTy);
+
+  llvm::Constant *indexes[] = {
+    llvm::ConstantInt::get(IGM.Int32Ty, 0),
+    llvm::ConstantInt::get(IGM.Int32Ty, arrayIndex),
+    llvm::ConstantInt::get(IGM.Int32Ty, structIndex),
+  };
+
+  auto baseElt = llvm::ConstantExpr::getInBoundsGetElementPtr(
+                       base->getType()->getPointerElementType(), base, indexes);
+
+  auto baseAddr = llvm::ConstantExpr::getPtrToInt(baseElt, IGM.SizeTy);
+
+  auto relativeAddr = llvm::ConstantExpr::getSub(targetAddr, baseAddr);
+
+  // Relative addresses can be 32-bit even on 64-bit platforms.
+  if (IGM.SizeTy != IGM.RelativeAddressTy)
+    relativeAddr = llvm::ConstantExpr::getTrunc(relativeAddr,
+                                                IGM.RelativeAddressTy);
 
   // If the reference is to a GOT entry, flag it by setting the low bit.
   // (All of the base, direct target, and GOT entry need to be pointer-aligned
   // for this to be OK.)
   if (target.second == IRGenModule::DirectOrGOT::GOT) {
     relativeAddr = llvm::ConstantExpr::getAdd(relativeAddr,
-                             llvm::ConstantInt::get(IGM.RelativeAddressTy, 1));
+                                        llvm::ConstantInt::get(IGM.Int32Ty, 1));
   }
-
-  return relativeAddr;
-}
-
-/// Form an LLVM constant for the relative distance between a reference
-/// (appearing at gep (0, indices...) of `base`) and `target`.  For now,
-/// for this to succeed portably, both need to be globals defined in the
-/// current translation unit.
-llvm::Constant *
-IRGenModule::emitDirectRelativeReference(llvm::Constant *target,
-                                         llvm::Constant *base,
-                                         ArrayRef<unsigned> baseIndices) {
-  // Convert the target to an integer.
-  auto targetAddr = llvm::ConstantExpr::getPtrToInt(target, SizeTy);
-
-  SmallVector<llvm::Constant*, 4> indices;
-  indices.push_back(llvm::ConstantInt::get(Int32Ty, 0));
-  for (unsigned baseIndex : baseIndices) {
-    indices.push_back(llvm::ConstantInt::get(Int32Ty, baseIndex));
-  };
-
-  // Drill down to the appropriate address in the base, then convert
-  // that to an integer.
-  auto baseElt = llvm::ConstantExpr::getInBoundsGetElementPtr(
-                       base->getType()->getPointerElementType(), base, indices);
-  auto baseAddr = llvm::ConstantExpr::getPtrToInt(baseElt, SizeTy);
-
-  // The relative address is the difference between those.
-  auto relativeAddr = llvm::ConstantExpr::getSub(targetAddr, baseAddr);
-
-  // Relative addresses can be 32-bit even on 64-bit platforms.
-  if (SizeTy != RelativeAddressTy)
-    relativeAddr = llvm::ConstantExpr::getTrunc(relativeAddr,
-                                                RelativeAddressTy);
 
   return relativeAddr;
 }
@@ -2647,49 +2628,6 @@ ResilienceScope IRGenModule::getResilienceScopeForLayout(NominalTypeDecl *decl) 
   return getResilienceScopeForAccess(decl);
 }
 
-llvm::Constant *IRGenModule::
-getAddrOfGenericWitnessTableCache(const NormalProtocolConformance *conf,
-                                  ForDefinition_t forDefinition) {
-  auto entity = LinkEntity::forGenericProtocolWitnessTableCache(conf);
-  auto expectedTy = getGenericWitnessTableCacheTy();
-  auto storageTy = (forDefinition ? expectedTy : nullptr);
-  return getAddrOfLLVMVariable(entity, getPointerAlignment(), storageTy,
-                               expectedTy, DebugTypeInfo());
-}
-
-llvm::Function *
-IRGenModule::getAddrOfGenericWitnessTableInstantiationFunction(
-                                      const NormalProtocolConformance *conf) {
-  auto forDefinition = ForDefinition;
-
-  LinkEntity entity =
-    LinkEntity::forGenericProtocolWitnessTableInstantiationFunction(conf);
-  llvm::Function *&entry = GlobalFuncs[entity];
-  if (entry) {
-    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
-    return entry;
-  }
-
-  auto fnType = llvm::FunctionType::get(VoidTy,
-                                        { WitnessTablePtrTy,
-                                          TypeMetadataPtrTy,
-                                          Int8PtrPtrTy },
-                                        /*varargs*/ false);
-  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, RuntimeCC, llvm::AttributeSet());
-  return entry;
-}
-
-llvm::StructType *IRGenModule::getGenericWitnessTableCacheTy() {
-  if (auto ty = GenericWitnessTableCacheTy) return ty;
-
-  GenericWitnessTableCacheTy = llvm::StructType::create(getLLVMContext(),
-    { Int16Ty, Int16Ty, RelativeAddressTy, RelativeAddressTy,
-      llvm::ArrayType::get(Int8PtrTy, swift::NumGenericMetadataPrivateDataWords)
-    }, "swift.generic_witness_table_cache");
-  return GenericWitnessTableCacheTy;
-}
-
 /// Fetch the witness table access function for a protocol conformance.
 llvm::Function *
 IRGenModule::getAddrOfWitnessTableAccessFunction(
@@ -2764,50 +2702,6 @@ IRGenModule::getAddrOfWitnessTable(const NormalProtocolConformance *conf,
   auto entity = LinkEntity::forDirectProtocolWitnessTable(conf);
   return getAddrOfLLVMVariable(entity, getPointerAlignment(), storageTy,
                                WitnessTableTy, DebugTypeInfo());
-}
-
-llvm::Function *
-IRGenModule::getAddrOfAssociatedTypeMetadataAccessFunction(
-                                  const NormalProtocolConformance *conformance,
-                                  AssociatedTypeDecl *associate) {
-  auto forDefinition = ForDefinition;
-
-  LinkEntity entity =
-    LinkEntity::forAssociatedTypeMetadataAccessFunction(conformance, associate);
-  llvm::Function *&entry = GlobalFuncs[entity];
-  if (entry) {
-    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
-    return entry;
-  }
-
-  auto fnType = getAssociatedTypeMetadataAccessFunctionTy();
-  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, RuntimeCC, llvm::AttributeSet());
-  return entry;
-}
-
-llvm::Function *
-IRGenModule::getAddrOfAssociatedTypeWitnessTableAccessFunction(
-                                  const NormalProtocolConformance *conformance,
-                                  AssociatedTypeDecl *associate,
-                                  ProtocolDecl *associateProtocol) {
-  auto forDefinition = ForDefinition;
-
-  assert(conformance->getProtocol() == associate->getProtocol());
-  LinkEntity entity =
-    LinkEntity::forAssociatedTypeWitnessTableAccessFunction(conformance,
-                                                            associate,
-                                                            associateProtocol);
-  llvm::Function *&entry = GlobalFuncs[entity];
-  if (entry) {
-    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
-    return entry;
-  }
-
-  auto fnType = getAssociatedTypeWitnessTableAccessFunctionTy();
-  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, RuntimeCC, llvm::AttributeSet());
-  return entry;
 }
 
 /// Should we be defining the given helper function?
