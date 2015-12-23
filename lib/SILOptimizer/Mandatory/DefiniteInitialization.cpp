@@ -2161,7 +2161,7 @@ computePredsLiveOut(SILBasicBlock *BB) {
   DEBUG(llvm::dbgs() << "  Get liveness for block " << BB->getDebugID() << "\n");
   
   // Collect blocks for which we have to calculate the out-availability.
-  // These are the pathes from blocks with known out-availability to the BB.
+  // These are the paths from blocks with known out-availability to the BB.
   WorkListType WorkList;
   for (auto Pred : BB->getPreds()) {
     putIntoWorkList(Pred, WorkList);

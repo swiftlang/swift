@@ -37,7 +37,7 @@ namespace {
 ///
 /// We can merge cond_fail instructions if there is no side-effect or memory
 /// write in between them.
-/// This pass merges cond_fail instructions by building the disconjunction of
+/// This pass merges cond_fail instructions by building the disjunction of
 /// their operands.
 class MergeCondFailInsts : public SILFunctionTransform {
 public:

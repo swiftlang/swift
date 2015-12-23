@@ -49,7 +49,7 @@
 // parameter of the base with a concrete type, the derived class can override
 // methods in the base that involved generic types. In the derived class, a
 // method override that involves substituted types will have a different
-// SIL lowering than the base method. In this case, the overriden vtable entry
+// SIL lowering than the base method. In this case, the overridden vtable entry
 // will point to a thunk which transforms parameters and results and invokes
 // the derived method.
 //
@@ -1310,7 +1310,7 @@ static SILValue getThunkResult(SILGenFunction &gen,
 /// \param inputOrigType Abstraction pattern of function value being thunked
 /// \param inputSubstType Formal AST type of function value being thunked
 /// \param outputOrigType Abstraction pattern of the thunk
-/// \param outputSubstType Formal AST type of the thuk
+/// \param outputSubstType Formal AST type of the thunk
 static void buildThunkBody(SILGenFunction &gen, SILLocation loc,
                            AbstractionPattern inputOrigType,
                            CanAnyFunctionType inputSubstType,

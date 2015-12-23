@@ -30,12 +30,10 @@ namespace swift {
 #endif
 
 #if SWIFT_OBJC_INTEROP
-  extern "C" LLVM_LIBRARY_VISIBILITY
-  bool _swift_objectConformsToObjCProtocol(const void *theObject,
+  bool objectConformsToObjCProtocol(const void *theObject,
                                     const ProtocolDescriptor *theProtocol);
   
-  extern "C" LLVM_LIBRARY_VISIBILITY
-  bool _swift_classConformsToObjCProtocol(const void *theClass,
+  bool classConformsToObjCProtocol(const void *theClass,
                                     const ProtocolDescriptor *theProtocol);
 #endif
 
@@ -96,7 +94,13 @@ namespace swift {
   /// Note that this function may return a nullptr on non-objc platforms,
   /// where there is no common root class. rdar://problem/18987058
   const ClassMetadata *getRootSuperclass();
-  
+
+  /// Check if a class has a formal superclass in the AST.
+  static inline
+  bool classHasSuperclass(const ClassMetadata *c) {
+    return (c->SuperClass && c->SuperClass != getRootSuperclass());
+  }
+
   /// Replace entries of a freshly-instantiated value witness table with more
   /// efficient common implementations where applicable.
   ///

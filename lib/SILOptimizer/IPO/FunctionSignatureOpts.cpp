@@ -229,16 +229,16 @@ void ArgumentDescriptor::computeOptimizedInterfaceParams(
     return;
   }
 
-  // If this argument is live, but we can not optimize it.
+  // If this argument is live, but we cannot optimize it.
   if (!canOptimizeLiveArg()) {
-    DEBUG(llvm::dbgs() << "            Can not optimize live arg!\n");
+    DEBUG(llvm::dbgs() << "            Cannot optimize live arg!\n");
     Out.push_back(ParameterInfo);
     return;
   }
 
-  // If we can not explode this value, handle callee release and return.
+  // If we cannot explode this value, handle callee release and return.
   if (!shouldExplode()) {
-    DEBUG(llvm::dbgs() << "            ProjTree can not explode arg.\n");
+    DEBUG(llvm::dbgs() << "            ProjTree cannot explode arg.\n");
     // If we found a release in the callee in the last BB on an @owned
     // parameter, change the parameter to @guaranteed and continue...
     if (CalleeRelease) {
@@ -628,8 +628,8 @@ llvm::SmallString<64> FunctionAnalyzer::getOptimizedName() {
   {
     llvm::raw_svector_ostream buffer(Name);
     Mangle::Mangler M(buffer);
-    auto P = Mangle::SpecializationPass::FunctionSignatureOpts;
-    Mangle::FunctionSignatureSpecializationMangler FSSM(P, M, F);
+    auto P = SpecializationPass::FunctionSignatureOpts;
+    FunctionSignatureSpecializationMangler FSSM(P, M, F);
 
     for (unsigned i : indices(ArgDescList)) {
       const ArgumentDescriptor &Arg = ArgDescList[i];

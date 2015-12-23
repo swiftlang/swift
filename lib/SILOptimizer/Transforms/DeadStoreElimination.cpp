@@ -388,7 +388,7 @@ class DSEContext {
   ///  }
   ///  x.a = 12
   ///
-  /// In this case, DSE can not remove the x.a = 13 inside the loop.
+  /// In this case, DSE cannot remove the x.a = 13 inside the loop.
   ///
   /// To do this, when the algorithm reaches the beginning of the basic block in
   /// the loop it will need to invalidate the LSLocation in the BBWriteSetOut.

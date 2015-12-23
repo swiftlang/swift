@@ -101,7 +101,7 @@ class GenericSignature : public llvm::FoldingSetNode {
              NumGenericParams };
   }
 
-  /// Retrieve a mutable verison of the requirements.
+  /// Retrieve a mutable version of the requirements.
   MutableArrayRef<Requirement> getRequirementsBuffer() {
     void *genericParams = getGenericParamsBuffer().end();
     return { reinterpret_cast<Requirement *>(genericParams),

@@ -82,6 +82,14 @@ Latest
 
   **(rdar://problem/21683348)**
 
+* Argument labels and parameter names can now be any keyword except
+  `var`, `let`, or `inout`. For example:
+
+    NSURLProtectionSpace(host: "somedomain.com", port: 443, protocol: "https", realm: "Some Domain", authenticationMethod: "Basic")
+
+  would previously have required `protocol` to be surrounded in
+  back-ticks. For more information, see
+  [SE-0001](https://github.com/apple/swift-evolution/blob/master/proposals/0001-keywords-as-argument-labels.md).
 
 2015-09-17 [Xcode 7.1, Swift 2.1]
 ----------

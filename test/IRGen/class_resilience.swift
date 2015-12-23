@@ -3,6 +3,15 @@
 
 // CHECK: %swift.type = type { [[INT:i32|i64]] }
 
+// CHECK: @_TWvdvC16class_resilience11MyRectangle1sV16resilient_struct4Size = global [[INT]] 0
+// CHECK: @_TWvdvC16class_resilience11MyRectangle5colorVs5Int32 = global [[INT]] 0
+
+// CHECK: @_TWvdvC16class_resilience24ClassWithResilientLayout1rV16resilient_struct9Rectangle = global [[INT]] 0
+// CHECK: @_TWvdvC16class_resilience24ClassWithResilientLayout5colorVs5Int32 = global [[INT]] 0
+
+// CHECK: @_TWvdvC16class_resilience14ResilientChild5fieldVs5Int32 = global [[INT]] {{8|16}}
+// CHECK: @_TWvivC16class_resilience21ResilientGenericChild5fieldVs5Int32 = global [[INT]] {{44|88}}
+
 import resilient_class
 import resilient_struct
 import resilient_enum

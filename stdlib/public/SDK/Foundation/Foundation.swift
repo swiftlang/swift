@@ -1045,15 +1045,25 @@ extension CGRectEdge {
 
 public typealias NSErrorPointer = AutoreleasingUnsafeMutablePointer<NSError?>
 
+public // COMPILER_INTRINSIC
+let _nilObjCError: ErrorProtocol = _GenericObjCError.NilError
+
 @warn_unused_result
 @_silgen_name("swift_convertNSErrorToErrorProtocol")
 public // COMPILER_INTRINSIC
-func _convertNSErrorToErrorProtocol(error: NSError?) -> ErrorProtocol
+func _convertNSErrorToErrorProtocol(error: NSError?) -> ErrorProtocol {
+  if let error = error {
+    return error
+  }
+  return _nilObjCError
+}
 
 @warn_unused_result
 @_silgen_name("swift_convertErrorProtocolToNSError")
 public // COMPILER_INTRINSIC
-func _convertErrorProtocolToNSError(error: ErrorProtocol) -> NSError
+func _convertErrorProtocolToNSError(error: ErrorProtocol) -> NSError {
+  return unsafeDowncast(_bridgeErrorProtocolToNSError(error))
+}
 
 //===----------------------------------------------------------------------===//
 // Variadic initializers and methods

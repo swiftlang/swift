@@ -117,7 +117,7 @@ bool BottomUpRefCountState::mightRemoveMutators() {
 
 /// Uninitialize the current state.
 void BottomUpRefCountState::clear() {
-  // If we can not conservatively prove that the given RefCountState will not
+  // If we cannot conservatively prove that the given RefCountState will not
   // be removed, be conservative and clear the transition state, so we do not
   // propagate KnownSafety forward.
   if (mightRemoveMutators())
@@ -351,7 +351,7 @@ bool BottomUpRefCountState::handlePotentialGuaranteedUser(
   if (!valueCanBeGuaranteedUsedGivenLatticeState())
     return false;
 
-  // If we can prove that Other can not use the pointer we are tracking,
+  // If we can prove that Other cannot use the pointer we are tracking,
   // return...
   if (!mayGuaranteedUseValue(PotentialGuaranteedUser, getRCRoot(), AA))
     return false;
@@ -384,7 +384,7 @@ bool BottomUpRefCountState::handlePotentialDecrement(
   if (!valueCanBeDecrementedGivenLatticeState())
     return false;
 
-  // If we can prove that Other can not use the pointer we are tracking,
+  // If we can prove that Other cannot use the pointer we are tracking,
   // return...
   if (!mayDecrementRefCount(PotentialDecrement, getRCRoot(), AA))
     return false;
@@ -795,7 +795,7 @@ bool TopDownRefCountState::handlePotentialGuaranteedUser(
   if (!valueCanBeGuaranteedUsedGivenLatticeState())
     return false;
 
-  // If we can prove that Other can not use the pointer we are tracking,
+  // If we can prove that Other cannot use the pointer we are tracking,
   // return...
   if (!mayGuaranteedUseValue(PotentialGuaranteedUser, getRCRoot(), AA))
     return false;
@@ -823,7 +823,7 @@ bool TopDownRefCountState::handlePotentialDecrement(
   if (!valueCanBeDecrementedGivenLatticeState())
     return false;
 
-  // If we can prove that Other can not use the pointer we are tracking,
+  // If we can prove that Other cannot use the pointer we are tracking,
   // return...
   if (!mayDecrementRefCount(PotentialDecrement, getRCRoot(), AA))
     return false;

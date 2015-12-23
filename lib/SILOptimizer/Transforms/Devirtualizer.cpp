@@ -41,7 +41,7 @@ class Devirtualizer : public SILFunctionTransform {
                        << " *****\n");
 
     if (devirtualizeAppliesInFunction(F, CHA))
-      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
   }
 
   StringRef getName() override { return "Devirtualizer"; }

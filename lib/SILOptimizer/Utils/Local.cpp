@@ -2299,9 +2299,9 @@ swift::analyzeStaticInitializer(SILValue V,
   return false;
 }
 
-/// Replace load sequence which may contian
+/// Replace load sequence which may contain
 /// a chain of struct_element_addr followed by a load.
-/// The sequence is travered inside out, i.e.
+/// The sequence is traversed inside out, i.e.
 /// starting with the innermost struct_element_addr
 /// Move into utils.
 void swift::replaceLoadSequence(SILInstruction *I,

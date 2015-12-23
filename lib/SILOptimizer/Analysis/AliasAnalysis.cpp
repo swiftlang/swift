@@ -156,7 +156,7 @@ static bool isSameValueOrGlobal(SILValue V1, SILValue V2) {
   return false;
 }
 
-/// Is this a literal which we know can not refer to a global object?
+/// Is this a literal which we know cannot refer to a global object?
 ///
 /// FIXME: function_ref?
 static bool isLocalLiteral(SILValue V) {
@@ -177,12 +177,12 @@ static bool isIdentifiedFunctionLocal(SILValue V) {
 }
 
 /// Returns true if we can prove that the two input SILValues which do not equal
-/// can not alias.
+/// cannot alias.
 static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
   assert(O1 != O2 && "This function should only be called on unequal values.");
 
   // If O1 and O2 do not equal and they are both values that can be statically
-  // and uniquely identified, they can not alias.
+  // and uniquely identified, they cannot alias.
   if (areDistinctIdentifyableObjects(O1, O2)) {
     DEBUG(llvm::dbgs() << "            Found two unequal identified "
           "objects.\n");
@@ -385,17 +385,17 @@ static bool typedAccessTBAABuiltinTypesMayAlias(SILType LTy, SILType RTy,
   // 2. (Pointer, Pointer): If we have two pointers to pointers, since we know
   // that the two values do not equal due to previous AA calculations, one must
   // be a native object and the other is an unknown object type (i.e. an objc
-  // object) which can not alias.
+  // object) which cannot alias.
   //
   // 3. (Scalar, Scalar): If we have two scalar pointers, since we know that the
-  // types are already not equal, we know that they can not alias. For those
+  // types are already not equal, we know that they cannot alias. For those
   // unfamiliar even though BuiltinIntegerType/BuiltinFloatType are single
   // classes, the AST represents each integer/float of different bit widths as
   // different types, so equality of SILTypes allows us to know that they have
   // different bit widths.
   //
   // Thus we can just return false since in none of the aforementioned cases we
-  // can not alias, so return false.
+  // cannot alias, so return false.
   return false;
 }
 
@@ -470,7 +470,7 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy, SILModule &Mod) {
 
   // FIXME: All the code following could be made significantly more aggressive
   // by saying that aggregates of the same type that do not contain each other
-  // can not alias.
+  // cannot alias.
 
   // Tuples do not alias non-tuples.
   bool LTyTT = LTy.is<TupleType>();
@@ -539,7 +539,7 @@ AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2,
   // Flush the cache if the size of the cache is too large.
   if (AliasCache.size() > AliasAnalysisMaxCacheSize) {
     AliasCache.clear();
-    ValueBaseToIndex.clear();
+    AliasValueBaseToIndex.clear();
   }
 
   // Calculate the aliasing result and store it in the cache.
@@ -589,7 +589,7 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   DEBUG(llvm::dbgs() << "        Underlying V1:" << *O1.getDef());
   DEBUG(llvm::dbgs() << "        Underlying V2:" << *O2.getDef());
 
-  // If O1 and O2 do not equal, see if we can prove that they can not be the
+  // If O1 and O2 do not equal, see if we can prove that they cannot be the
   // same object. If we can, return No Alias.
   if (O1 != O2 && aliasUnequalObjects(O1, O2))
     return AliasResult::NoAlias;
@@ -710,8 +710,8 @@ SILAnalysis *swift::createAliasAnalysis(SILModule *M) {
 
 AliasKeyTy AliasAnalysis::toAliasKey(SILValue V1, SILValue V2,
                                      SILType Type1, SILType Type2) {
-  size_t idx1 = ValueBaseToIndex.getIndex(V1.getDef());
-  size_t idx2 = ValueBaseToIndex.getIndex(V2.getDef());
+  size_t idx1 = AliasValueBaseToIndex.getIndex(V1.getDef());
+  size_t idx2 = AliasValueBaseToIndex.getIndex(V2.getDef());
   unsigned R1 = V1.getResultNumber();
   unsigned R2 = V2.getResultNumber();
   void *t1 = Type1.getOpaqueValue();

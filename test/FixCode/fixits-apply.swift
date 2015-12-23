@@ -33,12 +33,19 @@ func supported() -> MyMask {
 
 func foo() -> Int {
   do {
-  } catch var err {
+  } catch let err {
     goo(err)
   }
 }
 
-func goo(var e : ErrorProtocol) {}
+func goo(e : ErrorProtocol) {}
+
+struct Test1 : OptionSet {
+  init(rawValue: Int) {}
+  var rawValue: Int { return 0 }
+}
+
+print("", false)
 
 func ftest1() {
   // Don't replace the variable name with '_'

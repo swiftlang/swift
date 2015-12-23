@@ -794,7 +794,7 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     expectTrue(s.contains(1010))
 
     s.removeAll()
-    // We can not expectTrue that identity changed, since the new buffer of
+    // We cannot expectTrue that identity changed, since the new buffer of
     // smaller size can be allocated at the same address as the old one.
     var identity1 = unsafeBitCast(s, Int.self)
     expectTrue(s._variantStorage.native.capacity < originalCapacity)
@@ -880,7 +880,7 @@ SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     expectTrue(s.contains(TestKeyTy(1010)))
 
     s.removeAll()
-    // We can not expectTrue that identity changed, since the new buffer of
+    // We cannot expectTrue that identity changed, since the new buffer of
     // smaller size can be allocated at the same address as the old one.
     var identity1 = unsafeBitCast(s, Int.self)
     expectTrue(s._variantStorage.native.capacity < originalCapacity)

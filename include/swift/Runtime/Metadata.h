@@ -93,7 +93,7 @@ struct OpaqueValue;
 /// A buffer can be in one of three states:
 ///  - An unallocated buffer has a completely unspecified state.
 ///  - An allocated buffer has been initialized so that it
-///    owns unintialized value storage for the stored type.
+///    owns uninitialized value storage for the stored type.
 ///  - An initialized buffer is an allocated buffer whose value
 ///    storage has been initialized.
 struct ValueBuffer {
@@ -247,9 +247,9 @@ typedef void destroyBuffer(ValueBuffer *buffer, const Metadata *self);
 /// Given an unallocated buffer, initialize it as a copy of the
 /// object in the source buffer.  This can be decomposed as:
 ///
-///   self->initalizeBufferWithCopy(dest, self->projectBuffer(src), self)
+///   self->initializeBufferWithCopy(dest, self->projectBuffer(src), self)
 ///
-/// This operation does not need to be safe aginst 'dest' and 'src' aliasing.
+/// This operation does not need to be safe against 'dest' and 'src' aliasing.
 /// 
 /// Preconditions:
 ///   'dest' is an unallocated buffer
@@ -305,7 +305,7 @@ typedef OpaqueValue *initializeBufferWithCopy(ValueBuffer *dest,
 /// Given an uninitialized object and an initialized object, copy
 /// the value.
 ///
-/// This operation does not need to be safe aginst 'dest' and 'src' aliasing.
+/// This operation does not need to be safe against 'dest' and 'src' aliasing.
 /// 
 /// Returns the dest object.
 ///
@@ -322,7 +322,7 @@ typedef OpaqueValue *initializeWithCopy(OpaqueValue *dest,
 /// Given two initialized objects, copy the value from one to the
 /// other.
 ///
-/// This operation must be safe aginst 'dest' and 'src' aliasing.
+/// This operation must be safe against 'dest' and 'src' aliasing.
 /// 
 /// Returns the dest object.
 ///
@@ -337,7 +337,7 @@ typedef OpaqueValue *assignWithCopy(OpaqueValue *dest,
 /// the value from the object to the buffer, leaving the source object
 /// uninitialized.
 ///
-/// This operation does not need to be safe aginst 'dest' and 'src' aliasing.
+/// This operation does not need to be safe against 'dest' and 'src' aliasing.
 /// 
 /// Returns the dest object.
 ///
@@ -359,7 +359,7 @@ typedef OpaqueValue *initializeBufferWithTake(ValueBuffer *dest,
 /// can simply be a pointer-aligned memcpy of sizeof(ValueBuffer)
 /// bytes.
 ///
-/// This operation does not need to be safe aginst 'dest' and 'src' aliasing.
+/// This operation does not need to be safe against 'dest' and 'src' aliasing.
 /// 
 /// Returns the dest object.
 ///
@@ -377,7 +377,7 @@ typedef OpaqueValue *initializeWithTake(OpaqueValue *dest,
 /// the value from one to the other, leaving the source object
 /// uninitialized.
 ///
-/// This operation does not need to be safe aginst 'dest' and 'src' aliasing.
+/// This operation does not need to be safe against 'dest' and 'src' aliasing.
 /// Therefore this can be decomposed as:
 ///
 ///   self->destroy(dest, self);
@@ -411,10 +411,10 @@ typedef OpaqueValue *allocateBuffer(ValueBuffer *buffer,
 /// value from one buffer to the other, leaving the source buffer
 /// unallocated.
 ///
-/// This operation does not need to be safe aginst 'dest' and 'src' aliasing.
+/// This operation does not need to be safe against 'dest' and 'src' aliasing.
 /// Therefore this can be decomposed as:
 ///
-///   self->initalizeBufferWithTake(dest, self->projectBuffer(src), self)
+///   self->initializeBufferWithTake(dest, self->projectBuffer(src), self)
 ///   self->deallocateBuffer(src, self)
 ///
 /// However, it may be more efficient because values stored out-of-line
@@ -447,7 +447,7 @@ typedef void destroyArray(OpaqueValue *array, size_t n,
 /// Given an uninitialized array and an initialized array, copy
 /// the value.
 ///
-/// This operation does not need to be safe aginst 'dest' and 'src' aliasing.
+/// This operation does not need to be safe against 'dest' and 'src' aliasing.
 /// 
 /// Returns the dest object.
 ///
@@ -2106,6 +2106,25 @@ struct GenericMetadata {
   }
 };
 
+/// \brief The control structure of a generic protocol conformance.
+struct GenericWitnessTable {
+  /// The size of the witness table in words.
+  uint16_t WitnessTableSizeInWords;
+
+  /// The amount to copy from the pattern in words.  The rest is zeroed.
+  uint16_t WitnessTableSizeInWordsToCopy;
+
+  /// The pattern.
+  RelativeDirectPointer<WitnessTable> Pattern;
+
+  /// The instantiation function, which is called after the template is copied.
+  RelativeDirectPointer<void(WitnessTable *instantiatedTable,
+                             const Metadata *type,
+                             void * const *instantiationArgs)> Instantiator;
+
+  void *PrivateData[swift::NumGenericMetadataPrivateDataWords];
+};
+
 /// The structure of a protocol conformance record.
 ///
 /// This contains enough static information to recover the witness table for a
@@ -2333,6 +2352,20 @@ swift_allocateGenericClassMetadata(GenericMetadata *pattern,
 extern "C" Metadata *
 swift_allocateGenericValueMetadata(GenericMetadata *pattern,
                                    const void *arguments);
+
+/// Instantiate a generic protocol witness table.
+///
+///
+/// \param instantiationArgs - An opaque pointer that's forwarded to
+///   the instantiation function, used for conditional conformances.
+///   This API implicitly embeds an assumption that these arguments
+///   never form part of the uniquing key for the conformance, which
+///   is ultimately a statement about the user model of overlapping
+///   conformances.
+extern "C" const WitnessTable *
+swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
+                             const Metadata *type,
+                             void * const *instantiationArgs);
   
 /// \brief Fetch a uniqued metadata for a function type.
 extern "C" const FunctionTypeMetadata *
@@ -2491,7 +2524,6 @@ struct ClassFieldLayout {
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
 extern "C" void swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
-                                      const ClassMetadata *super,
                                       size_t numFields,
                                       const ClassFieldLayout *fieldLayouts,
                                       size_t *fieldOffsets);

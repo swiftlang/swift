@@ -75,7 +75,7 @@ StringRef getCommandName(CodeCompletionCommandKind Kind) {
   CHECK_CASE(recommended)
   CHECK_CASE(recommendedover)
 #undef CHECK_CASE
-  llvm_unreachable("Can not handle this Kind.");
+  llvm_unreachable("Cannot handle this Kind.");
 }
 
 bool containsInterestedWords(StringRef Content, StringRef Splitter,
@@ -1769,7 +1769,7 @@ public:
     assert(VD->isStatic() ||
            !(InsideStaticMethod &&
             VD->getDeclContext() == CurrentMethod->getDeclContext()) &&
-           "name lookup bug -- can not see an instance variable "
+           "name lookup bug -- cannot see an instance variable "
            "in a static function");
 
     CommandWordsPairs Pairs;
@@ -2057,7 +2057,7 @@ public:
     case LookupKind::EnumElement:
     case LookupKind::Type:
     case LookupKind::TypeInDeclContext:
-      llvm_unreachable("can not have a method call while doing a "
+      llvm_unreachable("cannot have a method call while doing a "
                        "type completion");
     case LookupKind::ImportFromModule:
       IsImplicitlyCurriedInstanceMethod = false;
@@ -2245,7 +2245,7 @@ public:
   }
 
   void addSubscriptCall(const SubscriptDecl *SD, DeclVisibilityKind Reason) {
-    assert(!HaveDot && "can not add a subscript after a dot");
+    assert(!HaveDot && "cannot add a subscript after a dot");
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
@@ -2463,11 +2463,11 @@ public:
       }
 
       if (auto *FD = dyn_cast<FuncDecl>(D)) {
-        // We can not call operators with a postfix parenthesis syntax.
+        // We cannot call operators with a postfix parenthesis syntax.
         if (FD->isBinaryOperator() || FD->isUnaryOperator())
           return;
 
-        // We can not call accessors.  We use VarDecls and SubscriptDecls to
+        // We cannot call accessors.  We use VarDecls and SubscriptDecls to
         // produce completions that refer to getters and setters.
         if (FD->isAccessor())
           return;
@@ -2525,11 +2525,11 @@ public:
       }
 
       if (auto *FD = dyn_cast<FuncDecl>(D)) {
-        // We can not call operators with a postfix parenthesis syntax.
+        // We cannot call operators with a postfix parenthesis syntax.
         if (FD->isBinaryOperator() || FD->isUnaryOperator())
           return;
 
-        // We can not call accessors.  We use VarDecls and SubscriptDecls to
+        // We cannot call accessors.  We use VarDecls and SubscriptDecls to
         // produce completions that refer to getters and setters.
         if (FD->isAccessor())
           return;
@@ -3670,7 +3670,7 @@ public:
       if (FD->isBinaryOperator() || FD->isUnaryOperator())
         return;
 
-      // We can not override individual accessors.
+      // We cannot override individual accessors.
       if (FD->isAccessor())
         return;
 

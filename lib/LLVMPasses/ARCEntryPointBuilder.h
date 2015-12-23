@@ -21,7 +21,7 @@
 namespace swift {
 
 /// A class for building ARC entry points. It is a composition wrapper around an
-/// IRBuilder and a constant Cache. It can not be moved or copied. It is meant
+/// IRBuilder and a constant Cache. It cannot be moved or copied. It is meant
 /// to be created once and passed around by reference.
 class ARCEntryPointBuilder {
   using IRBuilder = llvm::IRBuilder<>;

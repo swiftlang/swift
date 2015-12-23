@@ -26,14 +26,6 @@ public enum _GenericObjCError : ErrorProtocol {
   case NilError
 }
 
-/// An intrinsic used by the runtime to create an error when an
-/// Objective-C API indicates failure but produces a nil error.
-@warn_unused_result
-@_silgen_name("swift_allocNilObjCError")
-public func _allocNilObjCError() -> ErrorProtocol {
-  return _GenericObjCError.NilError
-}
-
 /// An internal protocol to represent Swift error enums that map to standard
 /// Cocoa NSError domains.
 public protocol _ObjectiveCBridgeableErrorProtocol : ErrorProtocol {

@@ -13,6 +13,7 @@ sil @f_owned : $@convention(thin) <T> (@owned T) -> ()
 
 protocol P {
   init(_ i : Int32)
+  mutating func poke()
 };
 
 // CHECK-LABEL: nrvo
@@ -491,4 +492,44 @@ bb0(%0 : $*AClass, %1 : $*AnyObject):
   dealloc_stack %3#0 : $*@local_storage AnyObject // id: %10
   %11 = tuple ()                                  // user: %12
   return %11 : $()                                // id: %12
+}
+
+sil @element_use : $@convention(thin)  (@inout P) -> ()
+
+// CHECK-LABEL: backward_propagate_enum_init
+// CHECK-NOT: copy_addr
+// CHECK: %[[TMP:.*]] = init_enum_data_addr %0 : $*Optional<P>
+// CHECK: copy_addr %1 to [initialization] %[[TMP]]
+// CHECK-NOT: copy_addr
+sil @backward_propagate_enum_init : $@convention(thin) (@out Optional<P>, @inout P) -> () {
+bb0(%0 : $*Optional<P>, %1 : $*P):
+  %2 = alloc_stack $P
+  copy_addr %1 to [initialization] %2#1 : $*P
+  %3 = function_ref @element_use : $@convention(thin)  (@inout P) -> ()
+  %4 = apply %3(%1) : $@convention(thin)  (@inout P) -> ()
+  %5 = init_enum_data_addr %0 : $*Optional<P>, #Optional.Some!enumelt.1
+  copy_addr %2#1 to [initialization] %5 : $*P
+  inject_enum_addr %0 : $*Optional<P>, #Optional.Some!enumelt.1
+  destroy_addr %2#1 : $*P
+  dealloc_stack %2#0 : $*@local_storage P
+  %27 = tuple ()
+  return %27 : $()
+}
+
+// CHECK-LABEL: backward_propagate_exi_init
+// CHECK-NOT: copy_addr
+// CHECK: %[[TMP:.*]] = init_existential_addr %0 : $*P, $T
+// CHECK: copy_addr %1 to [initialization] %[[TMP]] : $*T
+// CHECK-NOT: copy_addr
+sil @backward_propagate_exi_init : $@convention(thin) <T where T : P>(@out P, @inout T) -> () {
+bb0(%0 : $*P, %1 : $*T):
+  %2 = alloc_stack $T
+  copy_addr %1 to [initialization] %2#1 : $*T
+  %3 = witness_method $T, #P.poke!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> ()
+  %4 = apply %3<T>(%1) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> ()
+  %5 = init_existential_addr %0 : $*P, $T
+  copy_addr [take] %2#1 to [initialization] %5 : $*T
+  dealloc_stack %2#0 : $*@local_storage T
+  %27 = tuple ()
+  return %27 : $()
 }

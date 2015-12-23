@@ -139,7 +139,7 @@ SILWitnessTable *
 SILModule::createWitnessTableDeclaration(ProtocolConformance *C,
                                          SILLinkage linkage) {
   // If we are passed in a null conformance (a valid value), just return nullptr
-  // since we can not map a witness table to it.
+  // since we cannot map a witness table to it.
   if (!C)
     return nullptr;
 
@@ -382,7 +382,7 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
   F->setDeclContext(constant.hasDecl() ? constant.getDecl() : nullptr);
 
   // If this function has a self parameter, make sure that it has a +0 calling
-  // convention. This can not be done for general function types, since
+  // convention. This cannot be done for general function types, since
   // function_ref's SILFunctionTypes do not have archetypes associated with
   // it.
   CanSILFunctionType FTy = F->getLoweredFunctionType();

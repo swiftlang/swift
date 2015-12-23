@@ -180,16 +180,8 @@ extern "C" void swift_unexpectedError(SwiftError *object)
 /// Initialize an ErrorProtocol box to make it usable as an NSError instance.
 extern "C" id swift_bridgeErrorProtocolToNSError(SwiftError *errorObject);
 
-/// Convert an (optional) NSError instance to a (non-optional)
-/// ErrorProtocol box.
-extern "C" SwiftError *swift_convertNSErrorToErrorProtocol(id errorObject);
-
-/// Convert a (non-optional) ErrorProtocol box to a (non-optional)
-/// NSError instance.
-extern "C" id swift_convertErrorProtocolToNSError(SwiftError *errorObject);
-
-/// Attempt to dynamically cast an NSError instance to a Swift ErrorProtocol
-/// implementation using the _ObjectiveCBridgeableErrorProtocol protocol.
+/// Attempt to dynamically cast an NSError instance to a Swift ErrorType
+/// implementation using the _ObjectiveCBridgeableErrorType protocol.
 ///
 /// srcType must be some kind of class metadata.
 bool tryDynamicCastNSErrorToValue(OpaqueValue *dest,

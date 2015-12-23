@@ -309,10 +309,6 @@ internal func _class_getInstancePositiveExtentSize(theClass: AnyClass) -> Int {
 #endif
 }
 
-@warn_unused_result
-@_silgen_name("_swift_isClass")
-public func _swift_isClass(x: Any) -> Bool
-
 //===--- Builtin.BridgeObject ---------------------------------------------===//
 
 #if arch(i386) || arch(arm)

@@ -51,7 +51,7 @@ LLVM_TARGETS_TO_BUILD="X86;ARM;AArch64"
 # components).
 #
 # Each variable name is re-exported into this script in uppercase, where dashes
-# are substituded by underscores. For example, `swift-install-components` is
+# are substituted by underscores. For example, `swift-install-components` is
 # referred to as `SWIFT_INSTALL_COMPONENTS` in the remainder of this script.
 KNOWN_SETTINGS=(
     # name                      default          description
@@ -641,7 +641,9 @@ if [[ "$SKIP_TEST_WATCHOS" ]] ; then
     SKIP_TEST_WATCHOS_SIMULATOR=1
 fi
 
-if [[ "${CMAKE_GENERATOR}" == "Ninja" ]] && [[ -z "$(which ninja)" ]] ; then
+if [[ "${CMAKE_GENERATOR}" == "Ninja" && \
+      -z "$(which ninja 2>/dev/null)" &&
+      -z "$(which ninja-build 2>/dev/null)" ]] ; then
     BUILD_NINJA=1
 fi
 

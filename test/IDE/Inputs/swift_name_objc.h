@@ -45,6 +45,12 @@ SWIFT_NAME(SomeProtocol)
 @end
 
 @protocol SNCollision
+@property (readonly,nonnull) id reqSetter;
+- (void)setReqSetter:(nonnull id)bar;
+
+@property (readonly,nonnull) id optSetter;
+@optional
+- (void)setOptSetter:(nonnull id)bar;
 @end
 
 @protocol NSAccessibility

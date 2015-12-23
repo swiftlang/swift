@@ -2984,6 +2984,27 @@ isAccessibilityConformingContext(const clang::DeclContext *ctx) {
   
 }
 
+/// Determine whether the given method potentially conflicts with the
+/// setter for a property in the given protocol.
+static bool
+isPotentiallyConflictingSetter(const clang::ObjCProtocolDecl *proto,
+                               const clang::ObjCMethodDecl *method) {
+  auto sel = method->getSelector();
+  if (sel.getNumArgs() != 1)
+    return false;
+
+  clang::IdentifierInfo *setterID = sel.getIdentifierInfoForSlot(0);
+  if (!setterID || !setterID->getName().startswith("set"))
+    return false;
+
+  for (auto *prop : proto->properties()) {
+    if (prop->getSetterName() == sel)
+      return true;
+  }
+
+  return false;
+}
+
 bool ClangImporter::Implementation::shouldSuppressDeclImport(
        const clang::Decl *decl) {
   if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(decl)) {
@@ -2993,13 +3014,49 @@ bool ClangImporter::Implementation::shouldSuppressDeclImport(
     //
     // Note that this is suppressed for certain accessibility declarations,
     // which are imported as getter/setter pairs and not properties.
-    return objcMethod->isPropertyAccessor() && !isAccessibilityDecl(objcMethod);
+    if (objcMethod->isPropertyAccessor()) {
+      // Suppress the import of this method when the corresponding
+      // property is not suppressed.
+      return !shouldSuppressDeclImport(
+               objcMethod->findPropertyDecl(/*checkOverrides=*/false));
+    }
+
+    // If the method was declared within a protocol, check that it
+    // does not conflict with the setter of a property.
+    if (auto proto = dyn_cast<clang::ObjCProtocolDecl>(decl->getDeclContext()))
+      return isPotentiallyConflictingSetter(proto, objcMethod);
+
+    return false;
   }
 
   if (auto objcProperty = dyn_cast<clang::ObjCPropertyDecl>(decl)) {
     // Suppress certain accessibility properties; they're imported as
     // getter/setter pairs instead.
-    return isAccessibilityDecl(objcProperty);
+    if (isAccessibilityDecl(objcProperty))
+      return true;
+
+    // Check whether there is a superclass method for the getter that
+    // is *not* suppressed, in which case we will need to suppress
+    // this property.
+    auto dc = objcProperty->getDeclContext();
+    auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(dc);
+    if (!objcClass) {
+      if (auto objcCategory = dyn_cast<clang::ObjCCategoryDecl>(dc))
+        objcClass = objcCategory->getClassInterface();
+    }
+
+    if (objcClass) {
+      if (auto objcSuperclass = objcClass->getSuperClass()) {
+        if (auto getterMethod
+              = objcSuperclass->lookupInstanceMethod(
+                  objcProperty->getGetterName())) {
+          if (!shouldSuppressDeclImport(getterMethod))
+            return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   return false;
@@ -4088,7 +4145,7 @@ ClangImporter::Implementation::createExtensionWriter(clang::ASTWriter &writer) {
       auto named = dyn_cast<clang::NamedDecl>(decl);
       if (!named) continue;
 
-      // Add this entry to the lookup tabke.
+      // Add this entry to the lookup table.
       addEntryToLookupTable(sema, table, named);
     }
 
@@ -4259,27 +4316,6 @@ void ClangImporter::Implementation::lookupObjCMembers(
     if (auto alternate = getAlternateDecl(decl)) {
       if (alternate->getFullName().matchesRef(name))
         consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup);
-    }
-
-    // If we imported an Objective-C instance method from a root
-    // class, and there is no corresponding class method, also import
-    // it as a class method.
-    // FIXME: Handle this as an alternate?
-    if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
-      if (objcMethod->isInstanceMethod()) {
-        if (auto method = dyn_cast<FuncDecl>(decl)) {
-          if (auto objcClass = objcMethod->getClassInterface()) {
-            if (!objcClass->getSuperClass() &&
-                !objcClass->getClassMethod(objcMethod->getSelector(),
-                                           /*AllowHidden=*/true)) {
-              if (auto classMethod = importClassMethodVersionOf(method)) {
-                consumer.foundDecl(cast<ValueDecl>(classMethod),
-                                   DeclVisibilityKind::DynamicLookup);
-              }
-            }
-          }
-        }
-      }
     }
   }
 }

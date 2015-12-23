@@ -228,7 +228,7 @@ struct d0100_FooStruct {
 // PASS_COMMON-NEXT: {{^}}  enum NestedEnum {{{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
-  // Can not declare a nested protocol.
+  // Cannot declare a nested protocol.
   // protocol NestedProtocol {}
 
   typealias NestedTypealias = Int
@@ -629,8 +629,8 @@ struct d0200_EscapedIdentifiers {
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
   func `func`<`let`: `protocol`, `where` where `where` : `protocol`>(
-      `class`: Int, `struct`: `protocol`, `foo`: `let`, `bar`: `where`) {}
-// PASS_COMMON-NEXT: {{^}}  func `func`<`let` : `protocol`, `where` where `where` : `protocol`>(`class`: Int, `struct`: `protocol`, foo: `let`, bar: `where`){{$}}
+      class: Int, struct: `protocol`, foo: `let`, bar: `where`) {}
+// PASS_COMMON-NEXT: {{^}}  func `func`<`let` : `protocol`, `where` where `where` : `protocol`>(class: Int, struct: `protocol`, foo: `let`, bar: `where`){{$}}
 
   var `var`: `struct` = `struct`()
 // PASS_COMMON-NEXT: {{^}}  var `var`: {{(d0200_EscapedIdentifiers.)?}}`struct`{{$}}
@@ -644,8 +644,8 @@ struct d0200_EscapedIdentifiers {
   }
 // PASS_COMMON-NEXT: {{^}}  var accessors1: Int{{( { get set })?}}{{$}}
 
-  static func `static`(`protocol`: Int) {}
-// PASS_COMMON-NEXT: {{^}}  static func `static`(`protocol`: Int){{$}}
+  static func `static`(protocol: Int) {}
+// PASS_COMMON-NEXT: {{^}}  static func `static`(protocol: Int){{$}}
 
 // PASS_COMMON-NEXT: {{^}}  init(`var`: {{(d0200_EscapedIdentifiers.)?}}`struct`, tupleType: (`var`: Int, `let`: {{(d0200_EscapedIdentifiers.)?}}`struct`)){{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}

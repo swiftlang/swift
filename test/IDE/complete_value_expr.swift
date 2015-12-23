@@ -271,7 +271,7 @@ struct FooStruct {
   struct NestedStruct {}
   class NestedClass {}
   enum NestedEnum {}
-  // Can not declare a nested protocol.
+  // Cannot declare a nested protocol.
   // protocol NestedProtocol {}
 
   typealias NestedTypealias = Int

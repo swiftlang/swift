@@ -172,7 +172,7 @@ public:
                                       unsigned IIndex, unsigned VIndex=0);
 
   // Some instructions can never be "trivially dead" due to side effects or
-  // producing a void value. In those cases, since we can not rely on
+  // producing a void value. In those cases, since we cannot rely on
   // SILCombines trivially dead instruction DCE in order to delete the
   // instruction, visit methods should use this method to delete the given
   // instruction and upon completion of their peephole return the value returned

@@ -53,7 +53,7 @@ ApplySite swift::replaceWithSpecializedFunction(ApplySite AI,
 
 
 /// Try to convert definition into declaration.
-static bool convertExtenralDefinitionIntoDeclaration(SILFunction *F) {
+static bool convertExternalDefinitionIntoDeclaration(SILFunction *F) {
   // Bail if it is a declaration already.
   if (!F->isDefinition())
     return false;
@@ -207,9 +207,9 @@ SILFunction *swift::getExistingSpecialization(SILModule &M,
     Specialization->setLinkage(SILLinkage::PublicExternal);
     // Ignore body for -Onone and -Odebug.
     assert((Specialization->isExternalDeclaration() ||
-            convertExtenralDefinitionIntoDeclaration(Specialization)) &&
+            convertExternalDefinitionIntoDeclaration(Specialization)) &&
            "Could not remove body of the found specialization");
-    if (!convertExtenralDefinitionIntoDeclaration(Specialization)) {
+    if (!convertExternalDefinitionIntoDeclaration(Specialization)) {
       DEBUG(
           llvm::dbgs() << "Could not remove body of specialization: "
                        << FunctionName << '\n');
@@ -264,7 +264,7 @@ ApplySite swift::trySpecializeApplyOfGeneric(ApplySite Apply,
 
   // We do not support partial specialization.
   if (hasUnboundGenericTypes(InterfaceSubs)) {
-    DEBUG(llvm::dbgs() << "    Can not specialize with interface subs.\n");
+    DEBUG(llvm::dbgs() << "    Cannot specialize with interface subs.\n");
     return ApplySite();
   }
   if (hasDynamicSelfTypes(InterfaceSubs)) {
@@ -277,7 +277,7 @@ ApplySite swift::trySpecializeApplyOfGeneric(ApplySite Apply,
     llvm::raw_svector_ostream buffer(ClonedName);
     ArrayRef<Substitution> Subs = Apply.getSubstitutions();
     Mangle::Mangler M(buffer);
-    Mangle::GenericSpecializationMangler Mangler(M, F, Subs);
+    GenericSpecializationMangler Mangler(M, F, Subs);
     Mangler.mangle();
   }
   DEBUG(llvm::dbgs() << "    Specialized function " << ClonedName << '\n');

@@ -44,6 +44,7 @@ namespace irgen {
   class IRGenModule;
   class Size;
   class StructLayout;
+  struct ClassLayout;
 
   /// Is the given class known to have Swift-compatible metadata?
   bool hasKnownSwiftMetadata(IRGenModule &IGM, ClassDecl *theClass);
@@ -103,7 +104,8 @@ namespace irgen {
 
   /// Emit the metadata associated with the given class declaration.
   void emitClassMetadata(IRGenModule &IGM, ClassDecl *theClass,
-                         const StructLayout &layout);
+                         const StructLayout &layout,
+                         const ClassLayout &fieldLayout);
 
   /// Emit the constant initializer of the type metadata candidate for
   /// the given foreign class declaration.
@@ -278,6 +280,11 @@ namespace irgen {
                                                        CanType type,
                                                        bool preferDirectAccess);
   
+  /// Return the address of a function that will return type metadata 
+  /// for the given non-dependent type.
+  llvm::Function *getOrCreateTypeMetadataAccessFunction(IRGenModule &IGM,
+                                                        CanType type);
+
   /// Get the runtime identifier for a special protocol, if any.
   SpecialProtocol getSpecialProtocolID(ProtocolDecl *P);
 

@@ -1847,37 +1847,3 @@ function(add_swift_executable name)
       ${SWIFTEXE_DONT_STRIP_NON_MAIN_SYMBOLS_FLAG}
       ${SWIFTEXE_DISABLE_ASLR_FLAG})
 endfunction()
-
-function(add_swift_llvm_loadable_module name)
-  add_llvm_loadable_module(${name} ${ARGN})
-  set(sdk "${SWIFT_HOST_VARIANT_SDK}")
-  set(arch "${SWIFT_HOST_VARIANT_ARCH}")
-
-  # Determine compiler flags.
-  set(c_compile_flags)
-  _add_variant_c_compile_flags(
-      "${sdk}"
-      "${arch}"
-      "${CMAKE_BUILD_TYPE}"
-      "${LLVM_ENABLE_ASSERTIONS}"
-      FALSE
-      c_compile_flags)
-
-  set(link_flags)
-  _add_variant_link_flags(
-      "${sdk}"
-      "${arch}"
-      "${CMAKE_BUILD_TYPE}"
-      "${LLVM_ENABLE_ASSERTIONS}"
-      FALSE
-      link_flags)
-
-  # Convert variables to space-separated strings.
-  _list_escape_for_shell("${c_compile_flags}" c_compile_flags)
-  _list_escape_for_shell("${link_flags}" link_flags)
-
-  set_property(TARGET ${name} APPEND_STRING PROPERTY
-      COMPILE_FLAGS " ${c_compile_flags}")
-  set_property(TARGET ${name} APPEND_STRING PROPERTY
-      LINK_FLAGS " ${link_flags}")
-endfunction()

@@ -124,7 +124,7 @@ extension String {
       case .ScalarValue(let us):
         return us
       case .EmptyInput:
-        _sanityCheckFailure("can not subscript using an endIndex")
+        _sanityCheckFailure("cannot subscript using an endIndex")
       case .Error:
         return UnicodeScalar(0xfffd)
       }

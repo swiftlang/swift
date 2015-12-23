@@ -459,7 +459,7 @@ public:
   ///
   /// \arg C The protocol conformance mapped key to use to lookup the witness
   ///        table.
-  /// \arg deserializeLazily If we can not find the witness table should we
+  /// \arg deserializeLazily If we cannot find the witness table should we
   ///                        attempt to lazily deserialize it.
   std::pair<SILWitnessTable *, ArrayRef<Substitution>>
   lookUpWitnessTable(const ProtocolConformance *C, bool deserializeLazily=true);

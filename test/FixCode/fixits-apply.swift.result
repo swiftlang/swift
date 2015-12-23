@@ -40,6 +40,13 @@ func foo() -> Int {
 
 func goo(e : ErrorProtocol) {}
 
+struct Test1 : OptionSet {
+  init(rawValue: Int) {}
+  var rawValue: Int { return 0 }
+}
+
+print("", false)
+
 func ftest1() {
   // Don't replace the variable name with '_'
   let myvar = 0

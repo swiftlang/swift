@@ -602,7 +602,7 @@ static bool _conformsToProtocol(const OpaqueValue *value,
     if (value) {
       return _unknownClassConformsToObjCProtocol(value, protocol);
     } else {
-      return _swift_classConformsToObjCProtocol(type, protocol);
+      return classConformsToObjCProtocol(type, protocol);
     }
 #endif
     return false;
@@ -613,7 +613,7 @@ static bool _conformsToProtocol(const OpaqueValue *value,
       return _unknownClassConformsToObjCProtocol(value, protocol);
     } else {
       auto wrapper = cast<ObjCClassWrapperMetadata>(type);
-      return _swift_classConformsToObjCProtocol(wrapper->Class, protocol);
+      return classConformsToObjCProtocol(wrapper->Class, protocol);
     }
 #endif
     return false;
@@ -1058,7 +1058,7 @@ _dynamicCastUnknownClassToExistential(const void *object,
       if (protocol->Flags.getSpecialProtocol() == SpecialProtocol::AnyObject)
         break;
 
-      if (!_swift_objectConformsToObjCProtocol(object, protocol))
+      if (!objectConformsToObjCProtocol(object, protocol))
         return nullptr;
       break;
 #else
@@ -2583,11 +2583,9 @@ recur_inside_cache_lock:
 
   // If the type is a class, try its superclass.
   if (const ClassMetadata *classType = type->getClassObject()) {
-    if (auto super = classType->SuperClass) {
-      if (super != getRootSuperclass()) {
-        type = swift_getObjCClassMetadata(super);
-        goto recur_inside_cache_lock;
-      }
+    if (classHasSuperclass(classType)) {
+      type = swift_getObjCClassMetadata(classType->SuperClass);
+      goto recur_inside_cache_lock;
     }
   }
 
@@ -2615,13 +2613,11 @@ bool isRelatedType(const Metadata *type, const void *candidate) {
 
     // If the type is a class, try its superclass.
     if (const ClassMetadata *classType = type->getClassObject()) {
-      if (auto super = classType->SuperClass) {
-        if (super != getRootSuperclass()) {
-          type = swift_getObjCClassMetadata(super);
-          if (type == candidate)
-            return true;
-          continue;
-        }
+      if (classHasSuperclass(classType)) {
+        type = swift_getObjCClassMetadata(classType->SuperClass);
+        if (type == candidate)
+          return true;
+        continue;
       }
     }
 
@@ -3193,24 +3189,13 @@ extern "C" bool swift_isClassOrObjCExistential(const Metadata *value,
   return swift_isClassOrObjCExistentialImpl(T);
 }
 
-// func _swift_isClass(x: Any) -> Bool
-extern "C" bool _swift_isClass(OpaqueExistentialContainer *value) {
-  bool Result = Metadata::isAnyKindOfClass(value->Type->getKind());
-
-  // Destroy value->Buffer since the Any is passed in at +1.
-  value->Type->vw_destroyBuffer(&value->Buffer);
-
-  return Result;
-}
-
 // func _swift_getSuperclass_nonNull(_: AnyClass) -> AnyClass?
 extern "C" const Metadata *_swift_getSuperclass_nonNull(
   const Metadata *theClass
 ) {
   if (const ClassMetadata *classType = theClass->getClassObject())
-    if (auto super = classType->SuperClass)
-      if (super != getRootSuperclass())
-        return swift_getObjCClassMetadata(super);
+    if (classHasSuperclass(classType))
+      return swift_getObjCClassMetadata(classType->SuperClass);
   return nullptr;
 }
 

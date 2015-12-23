@@ -461,7 +461,7 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   endif()
 
   if(XCODE)
-    # FIXME: Can not cross-compile stdlib using Xcode.  Xcode insists on
+    # FIXME: Cannot cross-compile stdlib using Xcode.  Xcode insists on
     # passing -mmacosx-version-min to the compiler, and we want to pass
     # -mios-version-min.  Clang sees both options and complains.
     set(swift_can_crosscompile_stdlib FALSE)

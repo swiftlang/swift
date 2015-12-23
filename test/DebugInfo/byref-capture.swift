@@ -7,10 +7,11 @@ func makeIncrementor(inc : Int64) -> () -> Int64
   func inner() -> Int64 {
     // CHECK: call void @llvm.dbg.declare(metadata %Vs5Int64**
     // CHECK-SAME:                        metadata ![[SUM_CAPTURE:[0-9]+]],
-    // CHECK-SAME:                        metadata ![[DEREF:[0-9]+]])
-    // CHECK: ![[DEREF]] = !DIExpression(DW_OP_deref)
-    // CHECK: ![[SUM_CAPTURE]] = !DILocalVariable(name: "sum",
-    // CHECK-SAME:                                line: [[@LINE-8]]
+    // CHECK-SAME:                        metadata ![[EMPTY:.*]])
+    // CHECK: ![[EMPTY]] = !DIExpression()
+    // CHECK: ![[SUM_CAPTURE]] = !DILocalVariable(name: "sum", arg: 1,
+    // CHECK-SAME:     line: [[@LINE-8]], type: !"_TtRVs5Int64"
+    //                                               ^ inout type.
     sum += inc
     return sum
   }

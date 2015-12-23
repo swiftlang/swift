@@ -287,10 +287,10 @@ bb6(%4 : $FakeOptional<Builtin.NativeObject>):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @silargument_dont_strip_over_relevent_loop : $@convention(thin) (FakeOptional<Builtin.NativeObject>) -> () {
+// CHECK-LABEL: sil @silargument_dont_strip_over_relevant_loop : $@convention(thin) (FakeOptional<Builtin.NativeObject>) -> () {
 // CHECK: retain_value
 // CHECK: release_value
-sil @silargument_dont_strip_over_relevent_loop : $@convention(thin) (FakeOptional<Builtin.NativeObject>) -> () {
+sil @silargument_dont_strip_over_relevant_loop : $@convention(thin) (FakeOptional<Builtin.NativeObject>) -> () {
 bb0(%0 : $FakeOptional<Builtin.NativeObject>):
   switch_enum %0 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
 

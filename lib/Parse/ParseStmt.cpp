@@ -453,7 +453,7 @@ void Parser::parseTopLevelCodeDeclDelayed() {
   // Ensure that we restore the parser state at exit.
   ParserPositionRAII PPR(*this);
 
-  // Create a lexer that can not go past the end state.
+  // Create a lexer that cannot go past the end state.
   Lexer LocalLex(*L, BeginParserPosition.LS, EndLexerState);
 
   // Temporarily swap out the parser's current lexer with our new one.
@@ -700,7 +700,7 @@ ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
     ParserResult<Expr> Result = parseExpr(diag::expected_expr_return);
     if (Result.isNull()) {
       // Create an ErrorExpr to tell the type checker that this return
-      // statement had an expression argument in the source.  This supresses
+      // statement had an expression argument in the source.  This suppresses
       // the error about missing return value in a non-void function.
       Result = makeParserErrorResult(new (Context) ErrorExpr(ExprLoc));
     }

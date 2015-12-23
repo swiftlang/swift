@@ -659,18 +659,6 @@ StringMirrorTuple swift_EnumMirror_subscript(intptr_t i,
 }
   
 // -- Class destructuring.
-static bool classHasSuperclass(const ClassMetadata *c) {
-#if SWIFT_OBJC_INTEROP
-  // A class does not have a superclass if its ObjC superclass is the
-  // "SwiftObject" root class.
-  return c->SuperClass
-    && (Class)c->SuperClass != NSClassFromString(@"SwiftObject");
-#else
-  // In non-objc mode, the test is just if it has a non-null superclass.
-  return c->SuperClass != nullptr;
-#endif
-}
-
 static Mirror getMirrorForSuperclass(const ClassMetadata *sup,
                                      HeapObject *owner,
                                      const OpaqueValue *value,

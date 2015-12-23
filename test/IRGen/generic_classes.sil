@@ -314,7 +314,7 @@ entry(%c : $RootGeneric<Int32>):
 
 // CHECK: define private %swift.type* @create_generic_metadata_RootGeneric(%swift.type_pattern*, i8**) {{.*}} {
 // -- initialize the dependent field offsets
-// CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* {{%.*}}, %swift.type* null, i64 3, i64* {{%.*}}, i64* {{%.*}})
+// CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* {{%.*}}, i64 3, i64* {{%.*}}, i64* {{%.*}})
 // CHECK: }
 
 // CHECK: define private %swift.type* @create_generic_metadata_GenericInheritsGeneric(%swift.type_pattern*, i8**) {{.*}} {
@@ -357,10 +357,6 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   [[META_RODATA:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 39
 // CHECK:   [[T2:%.*]] = ptrtoint i8** [[META_RODATA]] to i64
 // CHECK:   store i64 [[T2]], i64* [[T1]], align 8
-//   Load out the superclass.
-// CHECK:   [[T0:%.*]] = bitcast %swift.type* [[METADATA]] to %swift.type**
-// CHECK:   [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i32 1
-// CHECK:   [[SUPER:%.*]] = load %swift.type*, %swift.type** [[T1]], align 8
 //   Initialize our own dependent field offsets.
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i64*
 // CHECK:   [[OFFSETS:%.*]] = getelementptr inbounds i64, i64* [[METADATA_ARRAY]], i32 23
@@ -378,6 +374,6 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   store i64 [[SIZE]], i64* [[SIZE_ADDR]], align 8
 // CHECK:   [[ALIGN_ADDR:%.*]] = getelementptr inbounds [2 x i64], [2 x i64]* [[TYPES]], i32 0, i32 1
 // CHECK:   store i64 [[ALIGN]], i64* [[ALIGN_ADDR]], align 8
-// CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], %swift.type* [[SUPER]], i64 1, i64* [[SIZE_ADDR]], i64* [[OFFSETS]])
+// CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], i64 1, i64* [[SIZE_ADDR]], i64* [[OFFSETS]])
 // CHECK:   ret %swift.type* [[METADATA]]
 // CHECK: }

@@ -395,11 +395,9 @@ public:
   /// \sa SuperfluousTypedefs
   llvm::DenseSet<const clang::Decl *> DeclsWithSuperfluousTypedefs;
 
-  using ClangDeclAndFlag = llvm::PointerIntPair<const clang::Decl *, 1, bool>;
-
   /// \brief Mapping of already-imported declarations from protocols, which
   /// can (and do) get replicated into classes.
-  llvm::DenseMap<std::pair<ClangDeclAndFlag, DeclContext *>, Decl *>
+  llvm::DenseMap<std::pair<const clang::Decl *, DeclContext *>, Decl *>
     ImportedProtocolDecls;
 
   /// Mapping from identifiers to the set of macros that have that name along
@@ -423,7 +421,7 @@ public:
   /// \brief Check if the declaration is one of the specially handled
   /// accessibility APIs.
   ///
-  /// These appaer as both properties and methods in ObjC and should be
+  /// These appear as both properties and methods in ObjC and should be
   /// imported as methods into Swift.
   static bool isAccessibilityDecl(const clang::Decl *objCMethodOrProp);
 
@@ -930,10 +928,6 @@ public:
                                   /*SuperfluousTypedefsAreTransparent=*/false);
   }
 
-  /// Import the class-method version of the given Objective-C
-  /// instance method of a root class.
-  Decl *importClassMethodVersionOf(FuncDecl *method);
-
   /// \brief Import a cloned version of the given declaration, which is part of
   /// an Objective-C protocol and currently must be a method or property, into
   /// the given declaration context.
@@ -941,7 +935,7 @@ public:
   /// \returns The imported declaration, or null if this declaration could not
   /// be represented in Swift.
   Decl *importMirroredDecl(const clang::NamedDecl *decl, DeclContext *dc,
-                           ProtocolDecl *proto, bool forceClassMethod = false);
+                           ProtocolDecl *proto);
 
   /// \brief Import the given Clang declaration context into Swift.
   ///

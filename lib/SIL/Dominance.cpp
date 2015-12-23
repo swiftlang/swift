@@ -68,7 +68,7 @@ void DominanceInfo::verify() const {
 PostDominanceInfo::PostDominanceInfo(SILFunction *F)
   : DominatorTreeBase(/*isPostDom*/ true) {
   assert(!F->isExternalDeclaration() &&
-         "Can not construct a post dominator tree for a declaration");
+         "Cannot construct a post dominator tree for a declaration");
   recalculate(*F);
 }
 

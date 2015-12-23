@@ -192,7 +192,7 @@ mayChangeArraySize(SILInstruction *I, ArrayCallKind &Kind, SILValue &Array,
   return ArrayBoundsEffect::kMayChangeAny;
 }
 
-/// Two allocations of a mutable array struct can not reference the same
+/// Two allocations of a mutable array struct cannot reference the same
 /// storage after modification. So we can treat them as not aliasing for the
 /// purpose of bound checking. The change would only be tracked through one of
 /// the allocations.

@@ -55,7 +55,7 @@ public:
   ///   builtin "int_trap"() : $()
   ///   unreachable
   ///
-  /// This can not have any uses of reference counted values since the frontend
+  /// This cannot have any uses of reference counted values since the frontend
   /// just leaks at that point.
   bool isTrapBB() const { return IsTrapBB; }
 

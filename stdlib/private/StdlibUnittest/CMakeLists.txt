@@ -40,7 +40,7 @@ add_swift_library(swiftStdlibUnittest SHARED IS_STDLIB
   LifetimeTracked.swift
   ${swift_stdlib_unittest_platform_sources}
 
-  # Can not serialize StdlibUnittest because of:
+  # Cannot serialize StdlibUnittest because of:
   # <rdar://problem/18917405> Compiling StdlibUnittest with -sil-serialize-all
   # crashes in SIL serializer
   #

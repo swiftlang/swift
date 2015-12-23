@@ -448,10 +448,7 @@ static Expr *buildTupleExpr(ASTContext &ctx, ArrayRef<Expr*> args) {
 
 
 static Expr *buildTupleForwardingRefExpr(ASTContext &ctx,
-                                         ArrayRef<TuplePatternElt> params,
-                                    ArrayRef<TupleTypeElt> formalIndexTypes) {
-  assert(params.size() == formalIndexTypes.size());
-
+                                         ArrayRef<TuplePatternElt> params) {
   SmallVector<Identifier, 4> labels;
   SmallVector<SourceLoc, 4> labelLocs;
   SmallVector<Expr *, 4> args;
@@ -459,7 +456,12 @@ static Expr *buildTupleForwardingRefExpr(ASTContext &ctx,
   for (unsigned i = 0, e = params.size(); i != e; ++i) {
     const Pattern *param = params[i].getPattern();
     args.push_back(param->buildForwardingRefExpr(ctx));
-    labels.push_back(formalIndexTypes[i].getName());
+    // If this parameter pattern has a name, extract it.
+    if (auto *np =dyn_cast<NamedPattern>(param->getSemanticsProvidingPattern()))
+      labels.push_back(np->getBoundName());
+    else
+      labels.push_back(Identifier());
+    
     labelLocs.push_back(SourceLoc());
   }
 
@@ -497,14 +499,7 @@ static Expr *buildSubscriptIndexReference(ASTContext &ctx, FuncDecl *accessor) {
   if (accessorKind == AccessorKind::IsMaterializeForSet)
     params = params.slice(1);
 
-  // Look for formal subscript labels.
-  auto subscript = cast<SubscriptDecl>(accessor->getAccessorStorageDecl());
-  auto indexType = subscript->getIndicesType();
-  if (auto indexTuple = indexType->getAs<TupleType>()) {
-    return buildTupleForwardingRefExpr(ctx, params, indexTuple->getElements());
-  } else {
-    return buildTupleForwardingRefExpr(ctx, params, TupleTypeElt(indexType));
-  }
+  return buildTupleForwardingRefExpr(ctx, params);
 }
 
 enum class SelfAccessKind {

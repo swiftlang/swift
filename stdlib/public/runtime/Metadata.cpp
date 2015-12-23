@@ -1533,10 +1533,10 @@ static void _swift_initGenericClassObjCName(ClassMetadata *theClass) {
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
 void swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
-                                          const ClassMetadata *super,
                                           size_t numFields,
                                           const ClassFieldLayout *fieldLayouts,
                                           size_t *fieldOffsets) {
+  const ClassMetadata *super = self->SuperClass;
 
   if (super) {
     _swift_initializeSuperclass(self, super,
@@ -1554,7 +1554,7 @@ void swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
 #endif
 
   // If we have a superclass, start from its size and alignment instead.
-  if (super) {
+  if (classHasSuperclass(self)) {
     // This is straightforward if the superclass is Swift.
 #if SWIFT_OBJC_INTEROP
     if (super->isTypeMetadata()) {
@@ -2575,38 +2575,18 @@ void _swift_debug_verifyTypeLayoutAttribute(Metadata *type,
 
 extern "C"
 void swift_initializeSuperclass(ClassMetadata *theClass,
-                                const ClassMetadata *theSuperclass,
                                 bool copyFieldOffsetVectors) {
-  // We need a lock in order to ensure the class initialization and ObjC
-  // registration are atomic.
-  // TODO: A global lock for this is lame.
-  // TODO: A lock is also totally unnecessary for the non-objc runtime.
-  //       Without ObjC registration, a release store of the superclass
-  //       reference should be enough to dependency-order the other
-  //       initialization steps.
-  static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-  
-  pthread_mutex_lock(&mutex);
-  
-  // Bail out if this already happened while we were waiting.
-  if (theClass->SuperClass) {
-    pthread_mutex_unlock(&mutex);
-    return;
-  }
-  
-  // Put the superclass reference in the base class.
-  theClass->SuperClass = theSuperclass;
-
   // Copy generic parameters and field offset vectors from the superclass.
-  _swift_initializeSuperclass(theClass, theSuperclass,
-                              copyFieldOffsetVectors);
-  
+  const ClassMetadata *theSuperclass = theClass->SuperClass;
+  if (theSuperclass) {
+    _swift_initializeSuperclass(theClass, theSuperclass,
+                                copyFieldOffsetVectors);
+  }
+
 #if SWIFT_OBJC_INTEROP
   // Register the class pair with the ObjC runtime.
   swift_instantiateObjCClass(theClass);
 #endif
-  
-  pthread_mutex_unlock(&mutex);
 }
 
 namespace llvm { namespace hashing { namespace detail {
@@ -2615,3 +2595,65 @@ namespace llvm { namespace hashing { namespace detail {
   size_t fixed_seed_override = 0;
 } } }
 
+/*** Protocol witness tables *************************************************/
+
+namespace {
+  class WitnessTableCacheEntry : public CacheEntry<WitnessTableCacheEntry> {
+  public:
+    static const char *getName() { return "WitnessTableCache"; }
+
+    WitnessTableCacheEntry(size_t numArguments) {}
+
+    static constexpr size_t getNumArguments() {
+      return 1;
+    }
+  };
+}
+
+using GenericWitnessTableCache = MetadataCache<WitnessTableCacheEntry>;
+using LazyGenericWitnessTableCache = Lazy<GenericWitnessTableCache>;
+
+/// Fetch the cache for a generic witness-table structure.
+static GenericWitnessTableCache &getCache(GenericWitnessTable *gen) {
+  // Keep this assert even if you change the representation above.
+  static_assert(sizeof(LazyGenericWitnessTableCache) <=
+                sizeof(GenericWitnessTable::PrivateData),
+                "metadata cache is larger than the allowed space");
+
+  auto lazyCache =
+    reinterpret_cast<LazyGenericWitnessTableCache*>(gen->PrivateData);
+  return lazyCache->get();
+}
+
+extern "C" const WitnessTable *
+swift::swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
+                                    const Metadata *type,
+                                    void * const *instantiationArgs) {
+  // Search the cache.
+  constexpr const size_t numGenericArgs = 1;
+  const void *args[] = { type };
+  auto &cache = getCache(genericTable);
+  auto entry = cache.findOrAdd(args, numGenericArgs,
+    [&]() -> WitnessTableCacheEntry* {
+      // Create a new entry for the cache.
+      auto entry = WitnessTableCacheEntry::allocate(cache.getAllocator(),
+                                                    args, numGenericArgs,
+                        genericTable->WitnessTableSizeInWords * sizeof(void*));
+
+      auto *table = entry->getData<WitnessTable>();
+      memcpy((void**) table, (void* const *) &*genericTable->Pattern,
+             genericTable->WitnessTableSizeInWordsToCopy * sizeof(void*));
+      bzero((void**) table + genericTable->WitnessTableSizeInWordsToCopy,
+            (genericTable->WitnessTableSizeInWords
+              - genericTable->WitnessTableSizeInWordsToCopy) * sizeof(void*));
+
+      // Call the instantiation function.
+      if (!genericTable->Instantiator.isNull()) {
+        genericTable->Instantiator(table, type, instantiationArgs);
+      }
+
+      return entry;
+    });
+
+  return entry->getData<WitnessTable>();
+}

@@ -34,7 +34,7 @@ private:
   /// The region that this ARCRegionState summarizes information for.
   ///
   /// The only time that the pointer is null is during initialization. Using
-  /// NullablePtr is just a convient way to make sure that we assert if we
+  /// NullablePtr is just a convenient way to make sure that we assert if we
   /// attempt to use Region during initialization before the pointer is set.
   NullablePtr<LoopRegion> Region;
 

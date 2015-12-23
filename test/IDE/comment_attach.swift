@@ -149,7 +149,7 @@ struct decl_struct_1 {
   /// NestedEnum Aaa.
   enum NestedEnum {}
 
-  // Can not declare a nested protocol.
+  // Cannot declare a nested protocol.
   // protocol NestedProtocol {}
 
   /// NestedTypealias Aaa.

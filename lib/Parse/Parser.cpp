@@ -615,7 +615,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     // If the lexer stopped with an EOF token whose spelling is ")", then this
     // is actually the tuple that is a string literal interpolation context.
     // Just accept the ")" and build the tuple as we usually do.
-    if (Tok.is(tok::eof) && Tok.getText() == ")") {
+    if (Tok.is(tok::eof) && Tok.getText() == ")" && RightK == tok::r_paren) {
       RightLoc = Tok.getLoc();
       return Status;
     }
@@ -626,11 +626,21 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
         continue;
     }
     if (!OptionalSep) {
+      // If we're in a comma-separated list and the next token starts a new
+      // declaration at the beginning of a new line, skip until the end.
+      if (SeparatorK == tok::comma && Tok.isAtStartOfLine() &&
+          isStartOfDecl() && Tok.getLoc() != StartLoc) {
+        skipUntilDeclRBrace(RightK, SeparatorK);
+        break;
+      }
+
       StringRef Separator = (SeparatorK == tok::comma ? "," : ";");
       diagnose(Tok, diag::expected_separator, Separator)
         .fixItInsertAfter(PreviousLoc, Separator);
       Status.setIsParseError();
     }
+
+
     // If we haven't made progress, skip ahead
     if (Tok.getLoc() == StartLoc) {
       skipUntilDeclRBrace(RightK, SeparatorK);

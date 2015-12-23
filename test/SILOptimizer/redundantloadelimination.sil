@@ -171,7 +171,7 @@ bb2:
 // DISABLE this test for now. it seems DCE is not getting rid of the load in bb8 after the RLE happens.
 //
 // Make sure the switch does not affect the forwarding of the load.
-// switch_enum can not have BBArgument, but the %17 = load %2 : $*Int32 is not produced in the
+// switch_enum cannot have BBArgument, but the %17 = load %2 : $*Int32 is not produced in the
 // switch basic block.
 // DISABLE_CHECK-LABEL: load_elimination_disregard_switch_enum
 // DISABLE_CHECK: bb8

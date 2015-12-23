@@ -197,8 +197,10 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
   auto *varDecl = SILG->getDecl();
   llvm::SmallString<20> getterBuffer;
   llvm::raw_svector_ostream getterStream(getterBuffer);
+  {
   Mangle::Mangler getterMangler(getterStream);
   getterMangler.mangleGlobalGetterEntity(varDecl);
+  }
 
   // Check if a getter was generated already.
   if (auto *F = Store->getModule().lookUpFunction(getterStream.str()))
@@ -459,8 +461,10 @@ static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
   // Generate a getter from the global init function without side-effects.
   llvm::SmallString<20> getterBuffer;
   llvm::raw_svector_ostream getterStream(getterBuffer);
+  {
   Mangle::Mangler getterMangler(getterStream);
   getterMangler.mangleGlobalGetterEntity(varDecl);
+  }
 
   // Check if a getter was generated already.
   if (auto *F = InitF->getModule().lookUpFunction(getterStream.str()))
@@ -549,7 +553,7 @@ static bool isAssignedOnlyOnceInInitializer(SILGlobalVariable *SILG) {
   return false;
 }
 
-/// Replace load sequence which may contian
+/// Replace load sequence which may contain
 /// a chain of struct_element_addr followed by a load.
 /// The sequence is traversed starting from the load
 /// instruction.

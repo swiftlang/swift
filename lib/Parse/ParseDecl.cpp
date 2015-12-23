@@ -2195,7 +2195,7 @@ void Parser::parseDeclDelayed() {
   // Ensure that we restore the parser state at exit.
   ParserPositionRAII PPR(*this);
 
-  // Create a lexer that can not go past the end state.
+  // Create a lexer that cannot go past the end state.
   Lexer LocalLex(*L, BeginParserPosition.LS, EndLexerState);
 
   // Temporarily swap out the parser's current lexer with our new one.
@@ -2520,8 +2520,8 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
       return parseDecl(MemberDecls, Options);
     });
-    // Don't propagate the code completion bit from members: we can not help
-    // code completion inside a member decl, and our callers can not do
+    // Don't propagate the code completion bit from members: we cannot help
+    // code completion inside a member decl, and our callers cannot do
     // anything about it either.  But propagate the error bit.
     if (BodyStatus.isError())
       status.setIsParseError();
@@ -3288,7 +3288,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
         Attributes = DeclAttributes();
       }
       if (!IsFirstAccessor) {
-        // Can not have an implicit getter after other accessor.
+        // Cannot have an implicit getter after other accessor.
         diagnose(Tok, diag::expected_accessor_kw);
         skipUntil(tok::r_brace);
         // Don't signal an error since we recovered.
@@ -3419,7 +3419,7 @@ void Parser::parseAccessorBodyDelayed(AbstractFunctionDecl *AFD) {
   // Ensure that we restore the parser state at exit.
   ParserPositionRAII PPR(*this);
 
-  // Create a lexer that can not go past the end state.
+  // Create a lexer that cannot go past the end state.
   Lexer LocalLex(*L, BeginParserPosition.LS, EndLexerState);
 
   // Temporarily swap out the parser's current lexer with our new one.
@@ -4220,7 +4220,7 @@ bool Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
   // Ensure that we restore the parser state at exit.
   ParserPositionRAII PPR(*this);
 
-  // Create a lexer that can not go past the end state.
+  // Create a lexer that cannot go past the end state.
   Lexer LocalLex(*L, BeginParserPosition.LS, EndLexerState);
 
   // Temporarily swap out the parser's current lexer with our new one.
@@ -4840,7 +4840,11 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
   if (Tok.isNot(tok::l_brace))  {
     // Subscript declarations must always have at least a getter, so they need
     // to be followed by a {.
-    diagnose(Tok, diag::expected_lbrace_subscript);
+    if (Flags.contains(PD_InProtocol))
+      diagnose(Tok, diag::expected_lbrace_subscript_protocol)
+        .fixItInsertAfter(ElementTy.get()->getEndLoc(), " { get set }");
+    else
+      diagnose(Tok, diag::expected_lbrace_subscript);
     Status.setIsParseError();
   } else {
     if (parseGetSet(Flags, Indices.get(), ElementTy.get(),

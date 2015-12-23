@@ -30,9 +30,8 @@ using namespace swift::Lowering;
 
 SILType TypeConverter::getLoweredTypeOfGlobal(VarDecl *var) {
   AbstractionPattern origType = getAbstractionPattern(var);
-  CanType swiftType = (origType.isOpaque() ? var->getType()->getCanonicalType()
-                                           : origType.getType());
-  return getLoweredType(origType, swiftType).getObjectType();
+  assert(!origType.isOpaque());
+  return getLoweredType(origType, origType.getType()).getObjectType();
 }
 
 CanType TypeConverter::getBridgedInputType(SILFunctionTypeRepresentation rep,

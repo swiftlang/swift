@@ -238,8 +238,8 @@ static NSString *_getClassDescription(Class cls) {
 }
 
 - (struct _NSZone *)zone {
-  return (struct _NSZone *)
-    (malloc_zone_from_ptr(self) ?: malloc_default_zone());
+  auto zone = malloc_zone_from_ptr(self);
+  return (struct _NSZone *)(zone ? zone : malloc_default_zone());
 }
 
 - (void)doesNotRecognizeSelector: (SEL) sel {
@@ -1029,14 +1029,14 @@ extern "C" bool swift_objcRespondsToSelector(id object, SEL selector) {
   return [object respondsToSelector:selector];
 }
 
-extern "C" bool swift::_swift_objectConformsToObjCProtocol(const void *theObject,
-                                           const ProtocolDescriptor *protocol) {
+bool swift::objectConformsToObjCProtocol(const void *theObject,
+                                         const ProtocolDescriptor *protocol) {
   return [((id) theObject) conformsToProtocol: (Protocol*) protocol];
 }
 
 
-extern "C" bool swift::_swift_classConformsToObjCProtocol(const void *theClass,
-                                           const ProtocolDescriptor *protocol) {
+bool swift::classConformsToObjCProtocol(const void *theClass,
+                                        const ProtocolDescriptor *protocol) {
   return [((Class) theClass) conformsToProtocol: (Protocol*) protocol];
 }
 
@@ -1218,19 +1218,17 @@ swift::swift_dynamicCastForeignClassMetatypeUnconditional(
   return sourceType;
 }
 
+#if SWIFT_OBJC_INTEROP
 // Given a non-nil object reference, return true iff the object uses
 // native swift reference counting.
-bool swift::_swift_usesNativeSwiftReferenceCounting_nonNull(
+static bool usesNativeSwiftReferenceCounting_nonNull(
   const void* object
 ) {
-    assert(object != nullptr);
-#if SWIFT_OBJC_INTEROP
-    return !isObjCTaggedPointer(object) &&
-      usesNativeSwiftReferenceCounting_allocated(object);
-#else 
-    return true;
-#endif 
+  assert(object != nullptr);
+  return !isObjCTaggedPointer(object) &&
+    usesNativeSwiftReferenceCounting_allocated(object);
 }
+#endif 
 
 bool swift::swift_isUniquelyReferenced_nonNull_native(
   const HeapObject* object
@@ -1250,7 +1248,7 @@ bool swift::swift_isUniquelyReferencedNonObjC_nonNull(const void* object) {
   assert(object != nullptr);
   return
 #if SWIFT_OBJC_INTEROP
-    _swift_usesNativeSwiftReferenceCounting_nonNull(object) &&
+    usesNativeSwiftReferenceCounting_nonNull(object) &&
 #endif 
     swift_isUniquelyReferenced_nonNull_native((HeapObject*)object);
 }
@@ -1320,7 +1318,7 @@ bool swift::swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(
   assert(object != nullptr);
   return
 #if SWIFT_OBJC_INTEROP
-    _swift_usesNativeSwiftReferenceCounting_nonNull(object) &&
+    usesNativeSwiftReferenceCounting_nonNull(object) &&
 #endif 
     swift_isUniquelyReferencedOrPinned_nonNull_native(
                                                     (const HeapObject*)object);
@@ -1365,7 +1363,12 @@ extern "C" size_t _swift_class_getInstancePositiveExtentSize_native(
 
 const ClassMetadata *swift::getRootSuperclass() {
 #if SWIFT_OBJC_INTEROP
-  return (const ClassMetadata *)[SwiftObject class];
+  static Lazy<const ClassMetadata *> SwiftObjectClass;
+
+  return SwiftObjectClass.get([](void *ptr) {
+    *((const ClassMetadata **) ptr) =
+        (const ClassMetadata *)[SwiftObject class];
+  });
 #else
   return nullptr;
 #endif

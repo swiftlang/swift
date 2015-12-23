@@ -6,7 +6,7 @@
 // CHECK: sil public_external [fragile] @_TFs11doSomethingFT_T_ : $@convention(thin) () -> () {
 doSomething()
 
-// Make sure we are not linking doSomethign2 because it is marked with 'noimport'
+// Make sure we are not linking doSomething2 because it is marked with 'noimport'
 
 // CHECK: sil [_semantics "stdlib_binary_only"] @_TFs12doSomething2FT_T_ : $@convention(thin) () -> ()
 // CHECK-NOT: return

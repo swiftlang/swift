@@ -30,13 +30,13 @@ func testTrapsAreNoreturn(i: Int) -> Int {
   // are @noreturn.
   switch i {
   case 2:
-    requirementFailure("can not happen")
+    requirementFailure("cannot happen")
   case 3:
-    _requirementFailure("can not happen")
+    _requirementFailure("cannot happen")
   case 4:
-    _stdlibAssertionFailure("can not happen")
+    _stdlibAssertionFailure("cannot happen")
   case 5:
-    _sanityCheckFailure("can not happen")
+    _sanityCheckFailure("cannot happen")
 
   default:
     return 0

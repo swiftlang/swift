@@ -148,7 +148,7 @@ public struct ${Self}<Pointee>
   /// - Requires: The pointee is not initialized.
   ///             `count` is non-negative.
   ///
-  /// - Postcondition: The pointee is initalized; the value should eventually
+  /// - Postcondition: The pointee is initialized; the value should eventually
   ///   be destroyed or moved from to avoid leaks.
   // FIXME: add tests (since the `count` has been added)
   public func initializePointee(newValue: Pointee, count: Int = 1) {

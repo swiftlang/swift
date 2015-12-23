@@ -217,7 +217,7 @@ extension String {
     ///   `position != endIndex`.
     public subscript(position: Index) -> UTF8.CodeUnit {
       let result: UTF8.CodeUnit = numericCast(position._buffer & 0xFF)
-      _require(result != 0xFF, "can not subscript using endIndex")
+      _require(result != 0xFF, "cannot subscript using endIndex")
       return result
     }
 

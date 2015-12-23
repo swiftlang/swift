@@ -166,7 +166,7 @@ func _squeezeHashValue(hashValue: Int, _ resultRange: Range<Int>) -> Int {
   // We perform the unchecked arithmetic on `UInt` (instead of doing
   // straightforward computations on `Int`) in order to handle the following
   // tricky case: `startIndex` is negative, and `resultCardinality >= Int.max`.
-  // We can not convert the latter to `Int`.
+  // We cannot convert the latter to `Int`.
   return
     Int(bitPattern:
       UInt(bitPattern: resultRange.startIndex) &+ unsignedResult)

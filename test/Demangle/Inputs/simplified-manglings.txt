@@ -93,8 +93,8 @@ _TWPC3foo3barS_8barrables ---> protocol witness table for bar
 _TWaC3foo3barS_8barrableS_ ---> protocol witness table accessor for bar
 _TWlC3foo3barS0_S_8barrableS_ ---> lazy protocol witness table accessor for type bar and conformance bar
 _TWLC3foo3barS0_S_8barrableS_ ---> lazy protocol witness table cache variable for type bar and conformance bar
-_TWDC3foo3barS_8barrableS_ ---> dependent protocol witness table generator for bar
-_TWdC3foo3barS_8barrableS_ ---> dependent protocol witness table template for bar
+_TWGC3foo3barS_8barrableS_ ---> generic protocol witness table for bar
+_TWIC3foo3barS_8barrableS_ ---> instantiation function for generic protocol witness table for bar
 _TFSCg5greenVSC5Color ---> green.getter
 _TIF1t1fFT1iSi1sSS_T_A_ ---> (f(i : Int, s : String) -> ()).(default argument 0)
 _TIF1t1fFT1iSi1sSS_T_A0_ ---> (f(i : Int, s : String) -> ()).(default argument 1)

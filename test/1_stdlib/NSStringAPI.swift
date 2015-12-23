@@ -680,7 +680,7 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
 NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
   var s = "abc あかさた"
   do {
-    // The largest buffer that can not accommodate the string plus null terminator.
+    // The largest buffer that cannot accommodate the string plus null terminator.
     let bufferLength = 16
     var buffer = Array(
       repeating: CChar(bitPattern: 0xff), length: bufferLength)
@@ -1188,7 +1188,7 @@ NSStringAPIs.test("rangeOf(_:options:range:locale:)") {
     expectEmpty(s.rangeOf("す"))
 
     // Note: here `rangeOf` API produces indexes that don't point between
-    // grapheme cluster boundaries -- these can not be created with public
+    // grapheme cluster boundaries -- these cannot be created with public
     // String interface.
     //
     // FIXME: why does this search succeed and the above queries fail?  There is

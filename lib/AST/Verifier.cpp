@@ -674,8 +674,8 @@ struct ASTNodeBase {};
 
       if (auto Overridden = D->getOverriddenDecl()) {
         if (D->getDeclContext() == Overridden->getDeclContext()) {
-          PrettyStackTraceDecl debugStack("verifying overriden", D);
-          Out << "can not override a decl in the same DeclContext";
+          PrettyStackTraceDecl debugStack("verifying overridden", D);
+          Out << "cannot override a decl in the same DeclContext";
           D->dump(Out);
           Overridden->dump(Out);
           abort();
@@ -1914,7 +1914,7 @@ struct ASTNodeBase {};
       PrettyStackTraceDecl debugStack("verifying DestructorDecl", DD);
 
       if (DD->isGeneric()) {
-        Out << "DestructorDecl can not be generic";
+        Out << "DestructorDecl cannot be generic";
         abort();
       }
       if (DD->getBodyParamPatterns().size() != 1) {
@@ -2605,8 +2605,10 @@ struct ASTNodeBase {};
     void checkMangling(ValueDecl *D) {
       llvm::SmallString<32> Buf;
       llvm::raw_svector_ostream OS(Buf);
+      {
       Mangle::Mangler Mangler(OS);
       Mangler.mangleDeclName(D);
+      }
       if (OS.str().empty()) {
         Out << "Mangler gave empty string for a ValueDecl";
         abort();

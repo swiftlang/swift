@@ -197,7 +197,7 @@ void DCE::markValueLive(ValueBase *V) {
 }
 
 /// Gets the producing instruction of a cond_fail condition. Currently these
-/// are overflow builtints but may be extended to other instructions in the
+/// are overflow builtins but may be extended to other instructions in the
 /// future.
 static SILInstruction *getProducer(CondFailInst *CFI) {
   // Check for the pattern:

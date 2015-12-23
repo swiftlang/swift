@@ -166,9 +166,9 @@ array.uninitialized(count: Builtin.Word) -> (Array<T>, Builtin.RawPointer)
 array.props.isCocoa/needsElementTypeCheck -> Bool
   Reads storage descriptors properties (isCocoa, needsElementTypeCheck).
   This is not control dependent or guarded. The optimizer has
-  semantic knowledge of the state transfer those properties can not make:
-  An array that is not ``isCocoa`` can not transfer to ``isCocoa``.
-  An array that is not ``needsElementTypeCheck`` can not transfer to
+  semantic knowledge of the state transfer those properties cannot make:
+  An array that is not ``isCocoa`` cannot transfer to ``isCocoa``.
+  An array that is not ``needsElementTypeCheck`` cannot transfer to
   ``needsElementTypeCheck``.
 
 array.get_element(index: Int) -> Element

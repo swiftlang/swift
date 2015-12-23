@@ -103,7 +103,7 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     {
       llvm::raw_svector_ostream buffer(ClonedName);
       Mangle::Mangler M(buffer);
-      Mangle::GenericSpecializationMangler Mangler(M, ReferencedF, Subs);
+      GenericSpecializationMangler Mangler(M, ReferencedF, Subs);
       Mangler.mangle();
     }
 

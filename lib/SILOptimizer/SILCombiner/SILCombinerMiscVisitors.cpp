@@ -232,7 +232,7 @@ public:
   void visitDeallocStackInst(DeallocStackInst *I) {}
 
   void visitInitExistentialAddrInst(InitExistentialAddrInst *I) {
-    // If we have already seen an init_existential_addr, we can not
+    // If we have already seen an init_existential_addr, we cannot
     // optimize. This is because we only handle the single init_existential_addr
     // case.
     if (IEI || HaveSeenCopyInto) {
@@ -243,7 +243,7 @@ public:
   }
 
   void visitOpenExistentialAddrInst(OpenExistentialAddrInst *I) {
-    // If we have already seen an open_existential_addr, we can not
+    // If we have already seen an open_existential_addr, we cannot
     // optimize. This is because we only handle the single open_existential_addr
     // case.
     if (OEI) {
@@ -508,7 +508,7 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
   //
   // Due to the matching pairs being in different basic blocks, the ARC
   // Optimizer (which is currently local to one basic block does not handle
-  // it). But that does not mean that we can not eliminate this pair with a
+  // it). But that does not mean that we cannot eliminate this pair with a
   // peephole.
 
   // If we are not the first instruction in this basic block...
@@ -586,7 +586,7 @@ SILInstruction *SILCombiner::visitStrongRetainInst(StrongRetainInst *SRI) {
   //
   // Due to the matching pairs being in different basic blocks, the ARC
   // Optimizer (which is currently local to one basic block does not handle
-  // it). But that does not mean that we can not eliminate this pair with a
+  // it). But that does not mean that we cannot eliminate this pair with a
   // peephole.
 
   // If we are not the first instruction in this basic block...
@@ -666,7 +666,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
           if (SI->getDest() == IEAI->getOperand())
             return nullptr;
         }
-        // Allow all instructions inbetween, which don't have any dependency to
+        // Allow all instructions in between, which don't have any dependency to
         // the store.
         if (AA->mayWriteToMemory(&*II, IEAI->getOperand()))
           return nullptr;
@@ -705,7 +705,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
           if (SI->getDest() == IEAI->getOperand())
             return nullptr;
         }
-        // Allow all instructions inbetween, which don't have any dependency to
+        // Allow all instructions in between, which don't have any dependency to
         // the store.
         if (AA->mayWriteToMemory(&*II, IEAI->getOperand()))
           return nullptr;
@@ -883,7 +883,7 @@ visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
   if (TEDAI->use_empty())
     return nullptr;
 
-  // If our enum type is address only, we can not do anything here. The key
+  // If our enum type is address only, we cannot do anything here. The key
   // thing to remember is that an enum is address only if any of its cases are
   // address only. So we *could* have a loadable payload resulting from the
   // TEDAI without the TEDAI being loadable itself.

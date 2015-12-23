@@ -1830,7 +1830,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   return; \
 }
   // FIXME: We could generate the code to dynamically report the overflow if the
-  // thrid argument is true. Now, we just ignore it.
+  // third argument is true. Now, we just ignore it.
 
 #define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload) \
   if (Builtin.ID == BuiltinValueKind::id) \

@@ -534,6 +534,17 @@ FUNCTION(GetGenericMetadata4, swift_getGenericMetadata4, RuntimeCC,
          ARGS(TypeMetadataPatternPtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind, ReadNone))
 
+// const ProtocolWitnessTable *
+// swift_getGenericWitnessTable(GenericProtocolWitnessTable *genericTable,
+//                              const Metadata *type,
+//                              void * const *otherData);
+FUNCTION(GetGenericWitnessTable, swift_getGenericWitnessTable, RuntimeCC,
+         RETURNS(WitnessTablePtrTy),
+         ARGS(getGenericWitnessTableCacheTy()->getPointerTo(),
+              TypeMetadataPtrTy,
+              Int8PtrPtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
 // Metadata *swift_getMetatypeMetadata(Metadata *instanceTy);
 FUNCTION(GetMetatypeMetadata, swift_getMetatypeMetadata, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),
@@ -597,14 +608,13 @@ FUNCTION(GetExistentialMetadata,
 
 // struct FieldInfo { size_t Size; size_t AlignMask; };
 // void swift_initClassMetadata_UniversalStrategy(Metadata *self,
-//                                                Metadata *super,
 //                                                size_t numFields,
 //                                                const FieldInfo *fields,
 //                                                size_t *fieldOffsets);
 FUNCTION(InitClassMetadataUniversal,
          swift_initClassMetadata_UniversalStrategy, RuntimeCC,
          RETURNS(VoidTy),
-         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy, SizeTy,
+         ARGS(TypeMetadataPtrTy, SizeTy,
               SizeTy->getPointerTo(),
               SizeTy->getPointerTo()),
          ATTRS(NoUnwind))
@@ -864,7 +874,7 @@ FUNCTION(RegisterProtocolConformances,
 
 FUNCTION(InitializeSuperclass, swift_initializeSuperclass, RuntimeCC,
          RETURNS(VoidTy),
-         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy, Int1Ty),
+         ARGS(TypeMetadataPtrTy, Int1Ty),
          ATTRS(NoUnwind))
 FUNCTION(InstantiateObjCClass, swift_instantiateObjCClass, RuntimeCC,
          RETURNS(VoidTy),
@@ -953,8 +963,8 @@ FUNCTION(BlockRelease, _Block_release, C_CC,
          ARGS(ObjCBlockPtrTy),
          ATTRS(NoUnwind))
 
-// void swift_reportMissingMethod();
-FUNCTION(DeadMethodError, swift_reportMissingMethod, C_CC,
+// void swift_deletedMethodError();
+FUNCTION(DeletedMethodError, swift_deletedMethodError, C_CC,
         RETURNS(VoidTy),
         ARGS(),
         ATTRS(NoUnwind))

@@ -248,7 +248,7 @@ static bool valueMayBeCaptured(SILValue V, CaptureException Exception) {
       continue;
     }
 
-    // An apply of a builtin that does not read memory can not capture a value.
+    // An apply of a builtin that does not read memory cannot capture a value.
     //
     // TODO: Use analysis of the other function perhaps to see if it captures
     // memory in some manner?
@@ -325,7 +325,7 @@ bool swift::pointsToLocalObject(SILValue V,
 /// from the function.
 bool swift::isNonEscapingLocalObject(SILValue V) {
   // If this is a local allocation, or the result of a no read apply inst (which
-  // can not affect memory in the caller), check to see if the allocation
+  // cannot affect memory in the caller), check to see if the allocation
   // escapes.
   if (isa<AllocationInst>(*V) || isNoReadBuiltinInst(V))
     return !valueMayBeCaptured(V, CaptureException::ReturnsCannotCapture);

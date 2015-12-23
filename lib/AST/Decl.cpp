@@ -1183,7 +1183,7 @@ ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC) const {
     
     // "StoredWithTrivialAccessors" are generally always accessed indirectly,
     // but if we know that the trivial accessor will always produce the same
-    // thing as the getter/setter (i.e., it can't be overriden), then just do a
+    // thing as the getter/setter (i.e., it can't be overridden), then just do a
     // direct access.
     //
     // This is true in structs and for final properties.
@@ -2318,13 +2318,14 @@ static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
   {
     buffer.clear();
     llvm::raw_svector_ostream os(buffer);
+    
+    // Mangle the type.
+    Mangle::Mangler mangler(os, false/*dwarf*/, false/*punycode*/);
 
     // We add the "_Tt" prefix to make this a reserved name that will
     // not conflict with any valid Objective-C class or protocol name.
-    os << "_Tt";
+    mangler.manglePrefix("_Tt");
 
-    // Mangle the type.
-    Mangle::Mangler mangler(os, false/*dwarf*/, false/*punycode*/);
     NominalTypeDecl *NTD = const_cast<NominalTypeDecl*>(nominal);
     if (isa<ClassDecl>(nominal)) {
       mangler.mangleNominalType(NTD,
@@ -2472,7 +2473,7 @@ bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
 bool ProtocolDecl::requiresClassSlow() {
   ProtocolDeclBits.RequiresClass = false;
 
-  // Ensure that the result can not change in future.
+  // Ensure that the result cannot change in future.
   assert(isInheritedProtocolsValid() || isBeingTypeChecked());
 
   if (getAttrs().hasAttribute<ObjCAttr>() || isObjC()) {

@@ -165,7 +165,7 @@ public struct Character :
     subscript(position: Int) -> UTF8.CodeUnit {
       _sanityCheck(position >= 0)
       _sanityCheck(position < Int(length))
-      // Note: using unchecked arithmetic because overflow can not happen if the
+      // Note: using unchecked arithmetic because overflow cannot happen if the
       // above sanity checks hold.
       return UTF8.CodeUnit(
         truncatingBitPattern: data >> (UInt64(position) &* 8))
@@ -237,7 +237,7 @@ public struct Character :
     subscript(position: Int) -> UTF16.CodeUnit {
       _sanityCheck(position >= 0)
       _sanityCheck(position < Int(length))
-      // Note: using unchecked arithmetic because overflow can not happen if the
+      // Note: using unchecked arithmetic because overflow cannot happen if the
       // above sanity checks hold.
       return UTF16.CodeUnit(truncatingBitPattern:
         data >> ((UInt64(length) &- UInt64(position) &- 1) &* 16))

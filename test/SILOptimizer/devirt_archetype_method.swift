@@ -20,7 +20,7 @@ func generic_call<T : Pingable>(x: T) {
 //CHECK-NOT: apply
 //CHECK: return
 func interesting_code_here() {
-  var x = ABC()
+  _ = ABC()
   // Make sure that we can specialize the function generic_call that has a
   // generic call to x.ping().
   generic_call(ABC())
@@ -47,7 +47,7 @@ func aMethod<T : TPingable>(x : T) {
 //CHECK-NOT: apply
 //CHECK: return
 func main() {
-  var x = Foo()
+  let x = Foo()
   aMethod(x)
 }
 

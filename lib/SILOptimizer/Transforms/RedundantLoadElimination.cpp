@@ -20,7 +20,7 @@
 /// In this case, one can replace the load instruction with the previous
 /// results.
 ///
-/// Redudant Load Elimination (RLE) eliminates such loads by:
+/// Redundant Load Elimination (RLE) eliminates such loads by:
 ///
 /// 1. Introducing a notion of a LSLocation that is used to model object
 /// fields. (See below for more details).
@@ -45,7 +45,7 @@
 /// 2 Int fields. A store like this will generate 2 *indivisible* LSLocations,
 /// 1 for each field and in addition to keeping a list of LSLocation, RLE also
 /// keeps their available LSValues. We call it *indivisible* because it
-/// can not be broken down to more LSLocations.
+/// cannot be broken down to more LSLocations.
 ///
 /// LSValue consists of a base - a SILValue from the load or store inst,
 /// as well as a projection path to which the field it represents. So, a
@@ -337,7 +337,7 @@ namespace {
 
 using BBValueMap = llvm::DenseMap<SILBasicBlock *, SILValue>;
 
-/// This class stores global state that we use when computing redudant load and
+/// This class stores global state that we use when computing redundant load and
 /// their replacement in each basic block.
 class RLEContext {
   /// Function currently processing.
@@ -707,8 +707,8 @@ bool BlockState::optimize(RLEContext &Ctx, RLEKind Kind) {
     if (!Inst->mayReadOrWriteMemory())
       continue;
 
-    // If we have an instruction that may write to memory and we can not prove
-    // that it and its operands can not alias a load we have visited, invalidate
+    // If we have an instruction that may write to memory and we cannot prove
+    // that it and its operands cannot alias a load we have visited, invalidate
     // that load.
     if (Inst->mayWriteToMemory()) {
       processUnknownWriteInst(Ctx, Inst, Kind);

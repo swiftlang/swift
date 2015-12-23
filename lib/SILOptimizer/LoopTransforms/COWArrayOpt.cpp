@@ -1348,7 +1348,7 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
         // reference to the array by performing an array operation: for example,
         // storing or appending one array into an two-dimensional array.
         // Checking
-        // that all types are the same make guarantees that this can not happen.
+        // that all types are the same make guarantees that this cannot happen.
         if (SameTy.isNull()) {
           SameTy =
               Sem.getSelf().getType().getSwiftRValueType()->getCanonicalType();
@@ -1395,7 +1395,7 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
         if (MatchedReleases.count(&RVI->getOperandRef()))
           continue;
 
-      // Ignore fix_lifetime. It can not increment ref counts.
+      // Ignore fix_lifetime. It cannot increment ref counts.
       if (isa<FixLifetimeInst>(Inst))
         continue;
 

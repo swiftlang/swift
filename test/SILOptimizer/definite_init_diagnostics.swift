@@ -145,7 +145,7 @@ func test4() {
   markUsed(t3.2)
 
 
-  // Partially set, wholey read.
+  // Partially set, wholly read.
   var t4 : (Int, Int, Int)   // expected-note 1 {{variable defined here}}
   t4.0 = 1; t4.2 = 42
   _ = t4            // expected-error {{variable 't4.1' used before being initialized}}

@@ -256,7 +256,7 @@ bb2:
   return %2 : $()
 }
 
-// In this case the release is not in the exit, so we can not specialize.
+// In this case the release is not in the exit, so we cannot specialize.
 // CHECK-LABEL: sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_not_in_exit : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 // CHECK-NOT: @guaranteed
 sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_not_in_exit : $@convention(thin) (@owned Builtin.NativeObject) -> () {

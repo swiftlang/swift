@@ -144,3 +144,26 @@ bb0(%0 : $Int32):
   return %6 : $()                                 // id: %6
 }
 
+// CHECK-LABEL: @allocstack_apply_read_only
+// CHECK:     PAIR #2.
+// CHECK-NEXT: (0):   %4 = apply %3(%1#1) : $@convention(thin) (@in X) -> ()
+// CHECK-NEXT: (1):   %1 = alloc_stack $X                             // users: %2, %4, %5
+// CHECK-NEXT: r=1,w=0,se=0
+sil @allocstack_apply_read_only : $@convention(thin) (X) -> () {
+bb0(%0 : $X):
+  %1 = alloc_stack $X
+  store %0 to %1#1 : $*X
+  %3 = function_ref @load_from_in : $@convention(thin) (@in X) -> ()
+  %4 = apply %3(%1#1) : $@convention(thin) (@in X) -> ()
+  dealloc_stack %1#0 : $*@local_storage X
+  %6 = tuple ()
+  return %6 : $()
+}
+
+sil @load_from_in : $@convention(thin) (@in X) -> () {
+bb0(%0 : $*X):
+  %1 = load %0 : $*X
+  %2 = tuple ()
+  return %2 : $()
+}
+

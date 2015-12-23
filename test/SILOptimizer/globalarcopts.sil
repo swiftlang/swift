@@ -604,7 +604,7 @@ bb2:
   return %9999 : $()
 }
 
-// This hammock can not be optimized.
+// This hammock cannot be optimized.
 // CHECK-LABEL: sil @hammock2 : $@convention(thin) (Builtin.NativeObject) -> () {
 // CHECK: bb0
 // CHECK-NEXT: strong_retain

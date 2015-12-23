@@ -103,7 +103,7 @@ public:
   MemBehavior visitReleaseValueInst(ReleaseValueInst *BI);
 
   // Instructions which are none if our SILValue does not alias one of its
-  // arguments. If we can not prove such a thing, return the relevant memory
+  // arguments. If we cannot prove such a thing, return the relevant memory
   // behavior.
 #define OPERANDALIAS_MEMBEHAVIOR_INST(Name)                             \
   MemBehavior visit##Name(Name *I) {                                    \
@@ -176,7 +176,7 @@ MemBehavior MemoryBehaviorVisitor::visitStoreInst(StoreInst *SI) {
     return MemBehavior::None;
 
   // If the store dest cannot alias the pointer in question, then the
-  // specified value can not be modified by the store.
+  // specified value cannot be modified by the store.
   if (AA->isNoAlias(SI->getDest(), V, computeTBAAType(SI->getDest()),
                    getValueTBAAType())) {
     DEBUG(llvm::dbgs() << "  Store Dst does not alias inst. Returning "
@@ -313,7 +313,7 @@ AliasAnalysis::computeMemoryBehavior(SILInstruction *Inst, SILValue V,
   // Flush the cache if the size of the cache is too large.
   if (MemoryBehaviorCache.size() > MemoryBehaviorAnalysisMaxCacheSize) {
     MemoryBehaviorCache.clear();
-    ValueBaseToIndex.clear();
+    MemoryBehaviorValueBaseToIndex.clear();
   }
 
   // Calculate the aliasing result and store it in the cache.
@@ -333,8 +333,8 @@ AliasAnalysis::computeMemoryBehaviorInner(SILInstruction *Inst, SILValue V,
 
 MemBehaviorKeyTy AliasAnalysis::toMemoryBehaviorKey(SILValue V1, SILValue V2,
                                                     RetainObserveKind M) {
-  size_t idx1 = ValueBaseToIndex.getIndex(V1.getDef());
-  size_t idx2 = ValueBaseToIndex.getIndex(V2.getDef());
+  size_t idx1 = MemoryBehaviorValueBaseToIndex.getIndex(V1.getDef());
+  size_t idx2 = MemoryBehaviorValueBaseToIndex.getIndex(V2.getDef());
   unsigned R2 = V2.getResultNumber();
   return {idx1, idx2, R2, M};
 }

@@ -118,7 +118,7 @@ private:
   /// pointer points to (see NodeType).
   class CGNode {
 
-    /// The associated value in the functino. It is only used for debug printing.
+    /// The associated value in the function. It is only used for debug printing.
     /// There may be multiple nodes associated to the same value, e.g. a Content
     /// node has the same V as its points-to predecessor.
     ValueBase *V;
@@ -341,7 +341,7 @@ public:
   /// 2) A node can only have a single outgoing points-to edge (is enforced by
   ///    CGNode::pointsTo being a single pointer and not a vector).
   /// 3) The target of a points-to edge must be a Content node.
-  /// 4) For any node N, all pathes starting at N which consist of only
+  /// 4) For any node N, all paths starting at N which consist of only
   ///    defer-edges and a single trailing points-to edge must lead to the same
   ///    Content node.
   class ConnectionGraph {
@@ -679,7 +679,7 @@ private:
   /// Sets all operands and results of \p I as global escaping.
   void setAllEscaping(SILInstruction *I, ConnectionGraph *ConGraph);
 
-  /// Recomputes the connection grpah for the function \p Initial and
+  /// Recomputes the connection graph for the function \p Initial and
   /// all called functions, up to a recursion depth of MaxRecursionDepth.
   void recompute(FunctionInfo *Initial);
 
@@ -725,7 +725,7 @@ public:
 
   /// Returns true if the value \p V or its content can escape to the
   /// function call \p FAS.
-  /// This is the same as above, execpt that it returns true if an address of
+  /// This is the same as above, except that it returns true if an address of
   /// a contained property escapes.
   bool canObjectOrContentEscapeTo(SILValue V, FullApplySite FAS);
 
@@ -736,7 +736,7 @@ public:
   bool canEscapeTo(SILValue V, RefCountingInst *RI);
 
   /// Returns true if the value \p V can escape to any other pointer \p To.
-  /// This means that either \p To is the same as \p V or containes a reference
+  /// This means that either \p To is the same as \p V or contains a reference
   /// to \p V.
   bool canEscapeToValue(SILValue V, SILValue To);
 

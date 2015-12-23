@@ -177,7 +177,7 @@ void LoopRegionFunctionInfo::verify() {
     if (!R->ParentID.hasValue()) {
       auto NLSuccs = R->getNonLocalSuccs();
       assert(NLSuccs.begin() == NLSuccs.end() &&
-             "Can not have non local "
+             "Cannot have non local "
              "successors without a parent node");
       continue;
     }

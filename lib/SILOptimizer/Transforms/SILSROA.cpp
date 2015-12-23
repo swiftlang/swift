@@ -143,7 +143,7 @@ bool SROAMemoryUseAnalyzer::analyze() {
     SILInstruction *User = Operand->getUser();
     DEBUG(llvm::dbgs() << "    Visiting use: " << *User);
 
-    // If we store the alloca pointer, we can not analyze its uses so bail...
+    // If we store the alloca pointer, we cannot analyze its uses so bail...
     // It is ok if we store into the alloca pointer though.
     if (auto *SI = dyn_cast<StoreInst>(User)) {
       if (SI->getDest().getDef() == AI) {

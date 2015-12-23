@@ -15,7 +15,7 @@
 //  statically.
 //
 //  These classes are useful only for creating TypeInfo
-//  implementations; unlike the similiarly-named FixedTypeInfo, they
+//  implementations; unlike the similarly-named FixedTypeInfo, they
 //  do not provide a supplemental API.
 //
 //===----------------------------------------------------------------------===//

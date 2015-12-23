@@ -2289,7 +2289,7 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
   if (allUnavailable) {
     auto firstDecl = result.ViableCandidates[0].getDecl();
     if (CS->TC.diagnoseExplicitUnavailability(firstDecl, anchor->getLoc(),
-                                              CS->DC, nullptr))
+                                              CS->DC))
       return true;
   }
   
@@ -3588,8 +3588,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   
   if (calleeInfo.closeness == CC_Unavailable) {
     if (CS->TC.diagnoseExplicitUnavailability(calleeInfo[0].decl,
-                                              SE->getLoc(),
-                                              CS->DC, nullptr))
+                                              SE->getLoc(), CS->DC))
       return true;
     return false;
   }
@@ -3796,8 +3795,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // Handle uses of unavailable symbols.
   if (calleeInfo.closeness == CC_Unavailable)
     return CS->TC.diagnoseExplicitUnavailability(calleeInfo[0].decl,
-                                                 callExpr->getLoc(),
-                                                 CS->DC, nullptr);
+                                                 callExpr->getLoc(), CS->DC);
   
   // A common error is to apply an operator that only has inout forms (e.g. +=)
   // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
@@ -4689,7 +4687,7 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
 
   case CC_Unavailable:
     if (CS->TC.diagnoseExplicitUnavailability(candidateInfo[0].decl,
-                                              E->getLoc(), CS->DC, nullptr))
+                                              E->getLoc(), CS->DC))
       return true;
     return false;
       

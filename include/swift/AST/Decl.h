@@ -209,7 +209,7 @@ enum class CircularityCheck {
   Checked
 };
 
-/// Keeps track of whrther a given class inherits initializers from its
+/// Keeps track of whether a given class inherits initializers from its
 /// superclass.
 enum class StoredInheritsSuperclassInits {
   /// We have not yet checked.
@@ -4430,14 +4430,14 @@ public:
   }
   void setBody(BraceStmt *S, BodyKind NewBodyKind = BodyKind::Parsed) {
     assert(getBodyKind() != BodyKind::Skipped &&
-           "can not set a body if it was skipped");
+           "cannot set a body if it was skipped");
 
     Body = S;
     setBodyKind(NewBodyKind);
   }
 
   /// \brief Note that the body was skipped for this function.  Function body
-  /// can not be attached after this call.
+  /// cannot be attached after this call.
   void setBodySkipped(SourceRange bodyRange) {
     assert(getBodyKind() == BodyKind::None);
     BodyRange = bodyRange;
