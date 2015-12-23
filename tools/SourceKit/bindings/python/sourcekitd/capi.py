@@ -10,22 +10,7 @@
 #
 #===------------------------------------------------------------------------===#
 
-from ctypes import (
-    CFUNCTYPE,
-    POINTER,
-    Structure,
-    addressof,
-    c_bool,
-    c_char_p,
-    c_int,
-    c_int64,
-    c_size_t,
-    c_uint64,
-    c_void_p,
-    cdll,
-    py_object,
-    string_at,
-)
+from ctypes import *
 
 # ctypes doesn't implicitly convert c_void_p to the appropriate wrapper
 # object. This is a problem, because it means that from_parameter will see an
