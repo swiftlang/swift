@@ -940,7 +940,7 @@ Searching
 
 :Swift:
   .. parsed-literal::
-       func **find**\ (match: (Character)->Bool) -> Range<String.IndexType>
+       func **find**\ (match: (Character) -> Bool) -> Range<String.IndexType>
 
   .. Admonition:: Usage Example
 
@@ -1100,7 +1100,7 @@ Capitalization
 
 :Swift:
   .. parsed-literal::
-       trim **trim**\ (match: (Character)->Bool) -> String
+       trim **trim**\ (match: (Character) -> Bool) -> String
 
   .. Admonition:: Usage Example
 

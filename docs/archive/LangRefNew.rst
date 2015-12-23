@@ -1537,8 +1537,8 @@ Short Circuiting Logical Operators
 
 ::
 
-  func && (lhs: Bool, rhs: ()->Bool) -> Bool
-  func || (lhs: Bool, rhs: ()->Bool) -> Bool
+  func && (lhs: Bool, rhs: () -> Bool) -> Bool
+  func || (lhs: Bool, rhs: () -> Bool) -> Bool
 
 Swift has a simplified precedence levels when compared with C.  From highest to
 lowest:

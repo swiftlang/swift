@@ -87,7 +87,7 @@ public func anyGenerator<G: GeneratorType>(base: G) -> AnyGenerator<G.Element> {
 }
 
 @available(*, deprecated, renamed="AnyGenerator")
-public func anyGenerator<Element>(body: ()->Element?) -> AnyGenerator<Element> {
+public func anyGenerator<Element>(body: () -> Element?) -> AnyGenerator<Element> {
   return AnyGenerator(body: body)
 }
 

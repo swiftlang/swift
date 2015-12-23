@@ -501,8 +501,8 @@ public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
   let racingThreadCount = threads ?? max(2, _stdlib_getHardwareConcurrency())
   let sharedState = _RaceTestSharedState<RT>(racingThreadCount: racingThreadCount)
 
-  let masterThreadBody: (_: ())->() = {
-    (_: ())->() in
+  let masterThreadBody: (_: ()) -> () = {
+    (_: ()) -> () in
     for _ in 0..<trials {
       autoreleasepool {
         _masterThreadOneTrial(sharedState)
@@ -510,8 +510,8 @@ public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
     }
   }
 
-  let racingThreadBody: (Int)->() = {
-    (tid: Int)->() in
+  let racingThreadBody: (Int) -> () = {
+    (tid: Int) -> () in
     for _ in 0..<trials {
       _workerThreadOneTrial(tid, sharedState)
     }

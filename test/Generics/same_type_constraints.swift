@@ -48,7 +48,7 @@ struct SatisfySameTypeAssocTypeRequirementDependent<T>
 public struct GeneratorOf<T> : GeneratorType, SequenceType {
 
   /// Construct an instance whose `next()` method calls `nextElement`.
-  public init(_ nextElement: ()->T?) {
+  public init(_ nextElement: () -> T?) {
     self._next = nextElement
   }
   
@@ -74,7 +74,7 @@ public struct GeneratorOf<T> : GeneratorType, SequenceType {
   public func generate() -> GeneratorOf {
     return self
   }
-  let _next: ()->T?
+  let _next: () -> T?
 }
 
 // rdar://problem/19009056
@@ -105,7 +105,7 @@ public final class IterateGenerator<A> : GeneratorType {
 // rdar://problem/18475138
 public protocol Observable : class {
     typealias Output
-    func addObserver(obj : Output->Void)
+    func addObserver(obj : Output -> Void)
 }
 
 public protocol Bindable : class {
@@ -174,7 +174,7 @@ class Cow : Animal {
 
 struct SpecificAnimal<F:Food> : Animal {
     typealias EdibleFood=F
-    let _eat:(f:F)->()
+    let _eat:(f:F) -> ()
 
     init<A:Animal where A.EdibleFood == F>(_ selfie:A) {
         _eat = { selfie.eat($0) }

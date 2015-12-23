@@ -25,10 +25,10 @@ func test_conv() {
   a8 = a9
   a9 = a7
 
-  var _ : ((X)->X) -> ((Y) -> Y) = f2
-  var _ : ((x2 : X)-> (X)) -> (((y2 : Y) -> (Y))) = f2
+  var _ : ((X) -> X) -> ((Y) -> Y) = f2
+  var _ : ((x2 : X) -> (X)) -> (((y2 : Y) -> (Y))) = f2
 
-  typealias fp = ((X)->X) -> ((Y) -> Y)
+  typealias fp = ((X) -> X) -> ((Y) -> Y)
   var _ = f2
 }
 

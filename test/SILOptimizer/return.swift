@@ -35,7 +35,7 @@ func multipleBlocksAllMissing(x: Int) -> Int {
 @noreturn func MYsubscriptNonASCII(idx: Int) -> UnicodeScalar {
 } // no-warning
 
-@noreturn @_silgen_name("exit") func exit ()->()
+@noreturn @_silgen_name("exit") func exit () -> ()
 @noreturn func tryingToReturn (x: Bool) -> () {
   if x {
     return // expected-error {{return from a 'noreturn' function}}

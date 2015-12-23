@@ -19,7 +19,7 @@ extension LazySequenceType {
   /// - Complexity: O(1)
   @warn_unused_result
   public func flatMap<Intermediate: SequenceType>(
-    transform: (Elements.Generator.Element)->Intermediate
+    transform: (Elements.Generator.Element) -> Intermediate
   ) -> LazySequence<
     FlattenSequence<LazyMapSequence<Elements, Intermediate>>> {
     return self.map(transform).flatten()
@@ -35,7 +35,7 @@ extension LazyCollectionType {
   /// - Complexity: O(1)
   @warn_unused_result
   public func flatMap<Intermediate: CollectionType>(
-    transform: (Elements.Generator.Element)->Intermediate
+    transform: (Elements.Generator.Element) -> Intermediate
   ) -> LazyCollection<
     FlattenCollection<
       LazyMapCollection<Elements, Intermediate>>
@@ -57,7 +57,7 @@ extension LazyCollectionType where Elements.Index : BidirectionalIndexType
     Intermediate: CollectionType
     where Intermediate.Index : BidirectionalIndexType
   >(
-    transform: (Elements.Generator.Element)->Intermediate
+    transform: (Elements.Generator.Element) -> Intermediate
   ) -> LazyCollection<
     FlattenBidirectionalCollection<
       LazyMapCollection<Elements, Intermediate>

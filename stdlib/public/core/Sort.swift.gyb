@@ -45,7 +45,7 @@ func _insertionSort<
 >(
   inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
 ) {
   if !range.isEmpty {
     let start = range.startIndex
@@ -102,7 +102,7 @@ public func partition<
 >(
   inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
 ) -> C.Index {
   fatalError("unavailable function can't be called")
 }
@@ -113,7 +113,7 @@ func _partition<
 >(
   inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
 ) -> C.Index {
   var lo = range.startIndex
   var hi = range.endIndex
@@ -168,7 +168,7 @@ func _introSort<
 >(
   inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
 ) {
 %   if p:
   var comp = isOrderedBefore
@@ -189,7 +189,7 @@ func _introSortImpl<
 >(
   inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""},
+  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""},
   _ depthLimit: Int
 ) {
 
@@ -221,7 +221,7 @@ func _siftDown<
   inout elements: C,
   _ index: C.Index,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
 ) {
   let countToIndex = (range.startIndex..<index).count
   let countFromIndex = (index..<range.endIndex).count
@@ -255,7 +255,7 @@ func _heapify<
 >(
   inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
 ) {
   // Here we build a heap starting from the lowest nodes and moving to the root.
   // On every step we sift down the current node to obey the max-heap property:
@@ -276,7 +276,7 @@ func _heapSort<
 >(
   inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
 ) {
   var hi = range.endIndex
   let lo = range.startIndex
@@ -312,7 +312,7 @@ public func sort<
   ${"" if p else ", C.Generator.Element : Comparable"}
 >(
   inout collection: C ${"," if p else ""}
-  ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
 ) {
   fatalError("unavailable function can't be called")
 }
@@ -360,7 +360,7 @@ public func sorted<
   C: SequenceType${"" if p else " where C.Generator.Element : Comparable"}
 >(
   source: C ${"," if p else ""}
-  ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
 ) -> [C.Generator.Element] {
   fatalError("unavailable function can't be called")
 }

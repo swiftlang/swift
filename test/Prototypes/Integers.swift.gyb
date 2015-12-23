@@ -105,7 +105,7 @@ infix operator &>>= { associativity right precedence 90 assignment }
 @_transparent
 public func _assertCond(
   @autoclosure condition: () -> Bool,
-  @autoclosure _ message: ()->String,
+  @autoclosure _ message: () -> String,
   file: StaticString = __FILE__, line: UInt = __LINE__) {
   let ok = condition()
   if _isDebugAssertConfiguration() {

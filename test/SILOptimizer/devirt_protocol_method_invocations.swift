@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -O -emit-sil %s | FileCheck %s
 
 public protocol Foo { 
-  func foo(x:Int)->Int
+  func foo(x:Int) -> Int
 }
 
 public extension Foo {
@@ -25,17 +25,17 @@ public class C : Foo {
 }
 
 @_transparent
-func callfoo(f: Foo)->Int {
+func callfoo(f: Foo) -> Int {
   return f.foo(2) + f.foo(2)
 }
 
 @_transparent
-func callboo(f: Foo)->Int32 {
+func callboo(f: Foo) -> Int32 {
   return f.boo(2) + f.boo(2)
 }
 
 @_transparent
-func callGetSelf(f: Foo)->Foo {
+func callGetSelf(f: Foo) -> Foo {
   return f.getSelf()
 }
 
@@ -64,7 +64,7 @@ func callGetSelf(f: Foo)->Foo {
 // CHECK: apply
 // CHECK: br bb1(
 @inline(never)
-public func test_devirt_protocol_method_invocation(c: C)->Int {
+public func test_devirt_protocol_method_invocation(c: C) -> Int {
   return callfoo(c)
 }
 
@@ -84,7 +84,7 @@ public func test_devirt_protocol_method_invocation(c: C)->Int {
 // CHECK: integer_literal
 // CHECK: return
 @inline(never)
-public func test_devirt_protocol_extension_method_invocation(c: C)->Int32 {
+public func test_devirt_protocol_extension_method_invocation(c: C) -> Int32 {
   return callboo(c)
 }
 

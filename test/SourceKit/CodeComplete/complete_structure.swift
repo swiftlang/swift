@@ -15,7 +15,7 @@ struct S1 {
   func method4(_: Int, _: Int) {}
   func method5(inout _: Int, inout b: Int) {}
   func method6(c: Int) throws {}
-  func method7(callback: ()->() throws) rethrows {}
+  func method7(callback: () -> () throws) rethrows {}
   func method8<T, U>(d: (T, U) -> T, e: T -> U) {}
 
   let v1: Int = 1
@@ -68,7 +68,7 @@ func test5() {
 // S1_INIT: ({params:{n:a:}{t: Int}, {n:b:}{t: Int}})
 // S1_INIT: ({params:{n:c:}{t: Int}})
 
-func test6(xyz: S1, fgh: (S1)->S1) {
+func test6(xyz: S1, fgh: (S1) -> S1) {
   #^STMT_0^#
 }
 // STMT_0: {name:func}
@@ -92,8 +92,8 @@ func test7(x: E1) {
 // ENUM_0: {name:C3}({params:{n:l1:}{t: S1}, {n:l2:}{t: S1}})
 
 class C1 {
-  func foo(x: S1, y: S1, z: (S1)->S1) -> S1 {}
-  func zap<T, U>(x: T, y: U, z: (T)->U) -> T {}
+  func foo(x: S1, y: S1, z: (S1) -> S1) -> S1 {}
+  func zap<T, U>(x: T, y: U, z: (T) -> U) -> T {}
 }
 
 class C2 : C1 {

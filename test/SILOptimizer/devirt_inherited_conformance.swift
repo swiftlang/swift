@@ -114,7 +114,7 @@ infix operator --- { associativity left precedence 140 }
 public protocol Simple {
    func foo(_: Self) -> Bool
    func boo(_: Self, _: Self) -> Bool
-   func ---(_: Self, _: Self)->Bool
+   func ---(_: Self, _: Self) -> Bool
 }
 
 public class C: Equatable, Comparable, Simple {

@@ -343,7 +343,7 @@ public func toDebugString<T>(x: T) -> String {
 }
 
 /// A hook for playgrounds to print through.
-public var _playgroundPrintHook : ((String)->Void)? = {_ in () }
+public var _playgroundPrintHook : ((String) -> Void)? = {_ in () }
 
 internal struct _TeeStream<
   L : OutputStreamType, 

@@ -30,7 +30,7 @@ internal struct _CollectionOf<
   IndexType_ : ForwardIndexType, T
 > : CollectionType {
   init(startIndex: IndexType_, endIndex: IndexType_,
-      _ subscriptImpl: (IndexType_)->T) {
+      _ subscriptImpl: (IndexType_) -> T) {
     self.startIndex = startIndex
     self.endIndex = endIndex
     _subscriptImpl = subscriptImpl
@@ -58,9 +58,9 @@ internal struct _CollectionOf<
     return _subscriptImpl(i)
   }
 
-  let _subscriptImpl: (IndexType_)->T
+  let _subscriptImpl: (IndexType_) -> T
 }
 
-@available(*, unavailable, message="SinkOf has been removed. Use (T)->() closures directly instead.")
+@available(*, unavailable, message="SinkOf has been removed. Use (T) -> () closures directly instead.")
 public struct SinkOf<T> {}
 

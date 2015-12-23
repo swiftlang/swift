@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
-func testCall(f: (()->())?) {
+func testCall(f: (() -> ())?) {
   f?()
 }
 // CHECK:    sil hidden @{{.*}}testCall{{.*}}
@@ -23,7 +23,7 @@ func testCall(f: (()->())?) {
 // CHECK-NEXT: enum $Optional<()>, #Optional.None!enumelt
 // CHECK-NEXT: br bb2
 
-func testAddrOnlyCallResult<T>(f: (()->T)?) {
+func testAddrOnlyCallResult<T>(f: (() -> T)?) {
   var f = f
   var x = f?()
 }
