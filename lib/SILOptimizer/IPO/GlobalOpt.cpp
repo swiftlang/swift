@@ -197,8 +197,10 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
   auto *varDecl = SILG->getDecl();
   llvm::SmallString<20> getterBuffer;
   llvm::raw_svector_ostream getterStream(getterBuffer);
+  {
   Mangle::Mangler getterMangler(getterStream);
   getterMangler.mangleGlobalGetterEntity(varDecl);
+  }
 
   // Check if a getter was generated already.
   if (auto *F = Store->getModule().lookUpFunction(getterStream.str()))
@@ -459,8 +461,10 @@ static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
   // Generate a getter from the global init function without side-effects.
   llvm::SmallString<20> getterBuffer;
   llvm::raw_svector_ostream getterStream(getterBuffer);
+  {
   Mangle::Mangler getterMangler(getterStream);
   getterMangler.mangleGlobalGetterEntity(varDecl);
+  }
 
   // Check if a getter was generated already.
   if (auto *F = InitF->getModule().lookUpFunction(getterStream.str()))

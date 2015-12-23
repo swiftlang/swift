@@ -1462,8 +1462,11 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
     for (auto LTD : LocalTypeDecls) {
       SmallString<64> MangledName;
       llvm::raw_svector_ostream Buffer(MangledName);
+      {
       Mangle::Mangler Mangler(Buffer, /*DWARFMangling*/ true);
-      Mangler.mangleTypeForDebugger(LTD->getDeclaredType(), LTD->getDeclContext());
+      Mangler.mangleTypeForDebugger(LTD->getDeclaredType(),
+                                    LTD->getDeclContext());
+      }
       MangledNames.push_back(Buffer.str());
     }
 

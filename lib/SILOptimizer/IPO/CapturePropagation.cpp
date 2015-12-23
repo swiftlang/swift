@@ -70,6 +70,7 @@ static llvm::SmallString<64> getClonedName(PartialApplyInst *PAI,
   llvm::SmallString<64> ClonedName;
 
   llvm::raw_svector_ostream buffer(ClonedName);
+  {
   Mangle::Mangler M(buffer);
   auto P = SpecializationPass::CapturePropagation;
   FunctionSignatureSpecializationMangler Mangler(P, M, F);
@@ -79,6 +80,7 @@ static llvm::SmallString<64> getClonedName(PartialApplyInst *PAI,
   for (unsigned i : indices(Args))
     Mangler.setArgumentConstantProp(i, getConstant(Args[i]));
   Mangler.mangle();
+  }
 
   return ClonedName;
 }

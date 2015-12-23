@@ -3650,9 +3650,11 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
 
       SmallString<32> MangledName;
       llvm::raw_svector_ostream Stream(MangledName);
+      {
       Mangle::Mangler DebugMangler(Stream, false);
       DebugMangler.mangleType(TD->getDeclaredType(),
                               ResilienceExpansion::Minimal, 0);
+      }
       assert(!MangledName.empty() && "Mangled type came back empty!");
       localTypeGenerator.insert(MangledName, {
         addDeclRef(TD), TD->getLocalDiscriminator()

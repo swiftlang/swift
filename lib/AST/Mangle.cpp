@@ -1279,6 +1279,8 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
 
     if (DWARFMangling) {
       Buffer << 'q' << Index(info.Index);
+
+      {
       // The DWARF output created by Swift is intentionally flat,
       // therefore archetypes are emitted with their DeclContext if
       // they appear at the top level of a type (_Tt).
@@ -1292,6 +1294,8 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
       assert(DC && "no decl context for archetype found");
       if (!DC) return;
       ContextMangler.mangleContext(DC, BindGenerics::None);
+      }
+
     } else {
       if (relativeDepth != 0) {
         Buffer << 'd' << Index(relativeDepth - 1);
