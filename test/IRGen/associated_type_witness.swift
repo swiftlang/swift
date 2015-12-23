@@ -148,3 +148,7 @@ protocol HasAssocked {
 struct FulfilledFromAssociatedType<T : HasAssocked> : HasSimpleAssoc {
   typealias Assoc = PBox<T.Contents.Assoc>
 }
+
+struct UsesVoid : HasSimpleAssoc {
+  typealias Assoc = ()
+}

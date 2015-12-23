@@ -997,9 +997,8 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
     case MetadataAccessStrategy::PrivateAccessor:
       return getSILLinkage(FormalLinkage::Private, forDefinition);
     case MetadataAccessStrategy::NonUniqueAccessor:
-      return SILLinkage::Shared;
     case MetadataAccessStrategy::Direct:
-      llvm_unreachable("metadata accessor for type with direct access?");
+      return SILLinkage::Shared;
     }
     llvm_unreachable("bad metadata access kind");
 
