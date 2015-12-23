@@ -10,8 +10,6 @@ import Swift
 import gizmo
 
 // CHECK: @_TMPC20generic_classes_objc19GenericInheritsObjC
-// CHECK: @_TWvivC20generic_classes_objc19GenericInheritsObjC1xx
-// CHECK: @_TWvivC20generic_classes_objc19GenericInheritsObjC1zSi
 
 class GenericInheritsObjC<D> : Gizmo {
   var a : Int
@@ -35,8 +33,6 @@ bb0(%0 : $GenericInheritsObjC<T>):
 }
 
 // CHECK: @_TMPC20generic_classes_objc20GenericInheritsObjC2
-// CHECK: @_TWvivC20generic_classes_objc20GenericInheritsObjC21yx
-// CHECK: @_TWvivC20generic_classes_objc20GenericInheritsObjC21zVs5UInt8
 
 class GenericInheritsObjC2<E> : Gizmo {
   var x : UInt8

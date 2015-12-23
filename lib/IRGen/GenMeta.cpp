@@ -3099,12 +3099,64 @@ namespace {
     }
 
     void addFieldOffset(VarDecl *var) {
-      // Use a fixed offset if we have one.
-      if (auto offset = tryEmitClassConstantFragileFieldOffset(IGM,Target,var))
-        addWord(offset);
-      // Otherwise, leave a placeholder for the runtime to populate at runtime.
-      else
-        addWord(llvm::ConstantInt::get(IGM.IntPtrTy, 0));
+      assert(var->hasStorage());
+      
+      unsigned fieldIndex = FieldLayout.getFieldIndex(var);
+      llvm::Constant *fieldOffsetOrZero;
+      auto &element = Layout.getElement(fieldIndex);
+
+      if (element.getKind() == ElementLayout::Kind::Fixed) {
+        // Use a fixed offset if we have one.
+        fieldOffsetOrZero = IGM.getSize(element.getByteOffset());
+      } else {
+        // Otherwise, leave a placeholder for the runtime to populate at runtime.
+        fieldOffsetOrZero = llvm::ConstantInt::get(IGM.IntPtrTy, 0);
+      }
+      addWord(fieldOffsetOrZero);
+
+      if (var->getDeclContext() == Target) {
+        switch (FieldLayout.AllFieldAccesses[fieldIndex]) {
+        case FieldAccess::ConstantDirect:
+        case FieldAccess::NonConstantDirect: {
+          // Emit a global variable storing the constant field offset.
+          // If the superclass was imported from Objective-C, the offset
+          // does not include the superclass size; we rely on the
+          // Objective-C runtime sliding it down.
+          //
+          // TODO: Don't emit the symbol if field has a fixed offset and size
+          // in all resilience domains
+          auto offsetAddr = IGM.getAddrOfFieldOffset(var, /*indirect*/ false,
+                                                     ForDefinition);
+          auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
+          offsetVar->setInitializer(fieldOffsetOrZero);
+          offsetVar->setConstant(false);
+
+          break;
+        }
+
+        case FieldAccess::ConstantIndirect:
+          // No global variable is needed.
+          break;
+
+        case FieldAccess::NonConstantIndirect:
+          // Emit a global variable storing an offset into the field offset
+          // vector within the class metadata. This access pattern is used
+          // when the field offset depends on generic parameters. As above,
+          // the Objective-C runtime will slide the field offsets within the
+          // class metadata to adjust for the superclass size.
+          //
+          // TODO: This isn't plumbed through all the way yet.
+          auto offsetAddr = IGM.getAddrOfFieldOffset(var, /*indirect*/ true,
+                                                     ForDefinition);
+          auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
+          offsetVar->setConstant(false);
+          auto offset = getClassFieldOffset(IGM, Target, var).getValue();
+          auto offsetVal = llvm::ConstantInt::get(IGM.IntPtrTy, offset);
+          offsetVar->setInitializer(offsetVal);
+
+          break;
+        }
+      }
     }
 
     void addMethod(SILDeclRef fn) {

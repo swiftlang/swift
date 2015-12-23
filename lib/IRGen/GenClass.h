@@ -102,13 +102,6 @@ namespace irgen {
   /// correspond to the runtime alignment of instances of the class.
   llvm::Constant *tryEmitClassConstantFragileInstanceAlignMask(IRGenModule &IGM,
                                                         ClassDecl *theClass);
-
-  /// Emit the constant fragile byte offset for the field in the class, or null
-  /// if the field does not have fixed layout. For resilient classes this does
-  /// not correspond to the runtime offset of the field.
-  llvm::Constant *tryEmitClassConstantFragileFieldOffset(IRGenModule &IGM,
-                                                         ClassDecl *theClass,
-                                                         VarDecl *field);
   
   /// What reference counting mechanism does a class use?
   ReferenceCounting getReferenceCountingForClass(IRGenModule &IGM,

@@ -395,19 +395,6 @@ static OwnedAddress emitAddressAtOffset(IRGenFunction &IGF,
   return OwnedAddress(addr, base);
 }
 
-llvm::Constant *irgen::tryEmitClassConstantFragileFieldOffset(IRGenModule &IGM,
-                                                            ClassDecl *theClass,
-                                                            VarDecl *field) {
-  assert(field->hasStorage());
-
-  auto &ti = getSelfTypeInfo(IGM, theClass);
-  unsigned fieldIndex = ti.getClassLayout(IGM).getFieldIndex(field);
-  auto &element = ti.getElements(IGM)[fieldIndex];
-  if (element.getKind() == ElementLayout::Kind::Fixed)
-    return IGM.getSize(element.getByteOffset());
-  return nullptr;
-}
-
 OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
                                                       llvm::Value *base,
                                                       SILType baseType,
@@ -1345,40 +1332,19 @@ namespace {
       // FIXME: this is not always the right thing to do!
       auto &elt = FieldLayout->getElement(NextFieldIndex++);
       auto &ivarTI = IGM.getTypeInfo(loweredType);
-      
+
       llvm::Constant *offsetPtr;
       if (elt.getKind() == ElementLayout::Kind::Fixed) {
-        // Emit a global variable storing the constant field offset, and
-        // reference it from the class metadata. If the superclass was
-        // imported from Objective-C, the offset does not include the
-        // superclass size; instead, we set ROData->InstanceStart to
-        // instruct the Objective-C runtime to slide it down.
+        // If the field offset is fixed relative to the start of the superclass,
+        // reference the global from the ivar metadata so that the Objective-C
+        // runtime will slide it down.
         auto offsetAddr = IGM.getAddrOfFieldOffset(ivar, /*indirect*/ false,
-                                                   ForDefinition);
-        auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
-        offsetVar->setConstant(false);
-        auto offsetVal =
-          llvm::ConstantInt::get(IGM.IntPtrTy, elt.getByteOffset().getValue());
-        offsetVar->setInitializer(offsetVal);
-        
-        offsetPtr = offsetVar;
+                                                   NotForDefinition);
+        offsetPtr = cast<llvm::Constant>(offsetAddr.getAddress());
       } else {
-        // Emit a global variable storing an offset into the field offset
-        // vector within the class metadata. This access pattern is used
-        // when the field offset depends on generic parameters. As above,
-        // the Objective-C runtime will slide the field offsets within the
-        // class metadata to adjust for the superclass size.
-        auto offsetAddr = IGM.getAddrOfFieldOffset(ivar, /*indirect*/ true,
-                                                   ForDefinition);
-        auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
-        offsetVar->setConstant(false);
-        auto offset =
-          getClassFieldOffset(IGM, getClass(), ivar).getValue();
-        auto offsetVal =
-          llvm::ConstantInt::get(IGM.IntPtrTy, offset);
-        offsetVar->setInitializer(offsetVal);
-
-        // We need to set this up when the metadata is instantiated.
+        // Otherwise, swift_initClassMetadata_UniversalStrategy() will point
+        // the Objective-C runtime into the field offset vector of the
+        // instantiated metadata.
         offsetPtr
           = llvm::ConstantPointerNull::get(IGM.IntPtrTy->getPointerTo());
       }
