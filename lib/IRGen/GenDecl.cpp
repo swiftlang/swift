@@ -833,7 +833,7 @@ void IRGenModule::emitVTableStubs() {
       continue;
     
     if (!stub) {
-      // Create a single stub function which calls swift_reportMissingMethod().
+      // Create a single stub function which calls swift_deletedMethodError().
       stub = llvm::Function::Create(llvm::FunctionType::get(VoidTy, false),
                                     llvm::GlobalValue::LinkOnceODRLinkage,
                                     "_swift_dead_method_stub");
@@ -842,7 +842,7 @@ void IRGenModule::emitVTableStubs() {
       stub->setVisibility(llvm::GlobalValue::HiddenVisibility);
       stub->setCallingConv(RuntimeCC);
       auto *entry = llvm::BasicBlock::Create(getLLVMContext(), "entry", stub);
-      auto *errorFunc = getDeadMethodErrorFn();
+      auto *errorFunc = getDeletedMethodErrorFn();
       llvm::CallInst::Create(errorFunc, ArrayRef<llvm::Value *>(), "", entry);
       new llvm::UnreachableInst(getLLVMContext(), entry);
     }

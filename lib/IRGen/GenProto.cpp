@@ -1723,7 +1723,7 @@ namespace {
       } else {
         // The method is removed by dead method elimination.
         // It should be never called. We add a pointer to an error function.
-        witness = IGM.getDeadMethodErrorFn();
+        witness = IGM.getDeletedMethodErrorFn();
       }
       Table.push_back(witness);
       return;
