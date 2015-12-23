@@ -3410,7 +3410,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
       nativeStorage = native
     }
 
-    for var b = 0; b != nativeStorage.capacity; b  += 1 {
+    for b in 0..<nativeStorage.capacity {
       if nativeStorage.isInitializedEntry(b) {
         nativeStorage.destroyEntryAt(b)
       }
