@@ -22,9 +22,7 @@ extension String {
   /// UTF-8 code unit sequences.
   @warn_unused_result
   public static func fromCString(cs: UnsafePointer<CChar>) -> String? {
-    if cs._isNull {
-      return nil
-    }
+    guard !cs._isNull else { return nil }
     let len = Int(_swift_stdlib_strlen(cs))
     return String._fromCodeUnitSequence(UTF8.self,
         input: UnsafeBufferPointer(start: UnsafeMutablePointer(cs), count: len))
@@ -40,9 +38,7 @@ extension String {
   public static func fromCStringRepairingIllFormedUTF8(
     cs: UnsafePointer<CChar>)
       -> (String?, hadError: Bool) {
-    if cs._isNull {
-      return (nil, hadError: false)
-    }
+    guard !cs._isNull else { return (nil, hadError: false) }
     let len = Int(_swift_stdlib_strlen(cs))
     let (result, hadError) = String._fromCodeUnitSequenceWithRepair(UTF8.self,
         input: UnsafeBufferPointer(start: UnsafeMutablePointer(cs), count: len))
@@ -55,9 +51,7 @@ extension String {
 /// Returns `nil` if passed a null pointer.
 @warn_unused_result
 public func _persistCString(s: UnsafePointer<CChar>) -> [CChar]? {
-  if s == nil {
-    return nil
-  }
+  guard !cs._isNull else { return nil }
   let length = Int(_swift_stdlib_strlen(s))
   var result = [CChar](count: length + 1, repeatedValue: 0)
   for var i = 0; i < length; i += 1 {
