@@ -123,6 +123,9 @@ namespace {
     mutable ArrayRef<VarDecl*> InheritedStoredProperties;
     /// Lazily-initialized array of all field access methods.
     mutable ArrayRef<FieldAccess> AllFieldAccesses;
+    /// Lazily-initialized metadata access method. See the comment in
+    /// ClassLayoutBuilder.
+    mutable FieldAccess MetadataAccess;
 
     /// Can we use swift reference-counting, or do we have to use
     /// objc_retain/release?
@@ -151,6 +154,7 @@ namespace {
     ArrayRef<VarDecl*> getAllStoredProperties(IRGenModule &IGM) const;
     ArrayRef<VarDecl*> getInheritedStoredProperties(IRGenModule &IGM) const;
     FieldAccess getFieldAccess(IRGenModule &IGM, unsigned index) const;
+    FieldAccess getMetadataAccess(IRGenModule &IGM) const;
 
     Alignment getHeapAlignment(IRGenModule &IGM) const {
       return getLayout(IGM).getAlignment();
@@ -189,6 +193,23 @@ namespace {
     SmallVector<ElementLayout, 8> Elements;
     SmallVector<VarDecl*, 8> AllStoredProperties;
     SmallVector<FieldAccess, 8> AllFieldAccesses;
+
+    // The manner in which this class embeds the field offset vector of
+    // the superclass.
+    //
+    // - ConstantDirect - size and content of superclass metadata is known
+    //   at compile time.
+    // - NonConstantDirect - size of superclass metadata is known, however
+    //   some field offsets depend on the sizes of resilient types, or the
+    //   size of an imported Objective-C base class.
+    // - ConstantIndirect - size of superclass metadata is known, however
+    //   some field offsets depend on generic parameters, sizes of
+    //   resilient types, or the size of an imported Objective-C base class.
+    // - NonConstantIndirect - size of superclass metadata is unknown,
+    //   so all class metadata entries for members of this class must be
+    //   accessed indirectly.
+    FieldAccess MetadataAccess = FieldAccess::ConstantDirect;
+
     unsigned NumInherited = 0;
 
     // Does the superclass have a fixed number of stored properties?
@@ -237,6 +258,11 @@ namespace {
       return AllFieldAccesses;
     }
 
+    /// Return the metadata access method.
+    FieldAccess getMetadataAccess() const {
+      return MetadataAccess;
+    }
+
     /// Return the inherited stored property count.
     unsigned getNumInherited() const {
       return NumInherited;
@@ -279,6 +305,10 @@ namespace {
           NumInherited = Elements.size();
         }
       }
+
+      // The final value is field access for the superclass of the class we're
+      // building.
+      MetadataAccess = getCurFieldAccess();
 
       // Collect fields from this class and add them to the layout as a chunk.
       addDirectFieldsFromClass(theClass, classType);
@@ -355,6 +385,8 @@ void ClassTypeInfo::generateLayout(IRGenModule &IGM) const {
     = AllStoredProperties.slice(0, builder.getNumInherited());
   AllFieldAccesses
     = IGM.Context.AllocateCopy(builder.getAllFieldAccesses());
+  MetadataAccess
+    = builder.getMetadataAccess();
 }
 
 const StructLayout &ClassTypeInfo::getLayout(IRGenModule &IGM) const {
@@ -393,6 +425,16 @@ ClassTypeInfo::getFieldAccess(IRGenModule &IGM, unsigned index) const {
   
   generateLayout(IGM);
   return AllFieldAccesses[index];
+}
+
+FieldAccess
+ClassTypeInfo::getMetadataAccess(IRGenModule &IGM) const {
+  // Return the cached layout if available.
+  if (Layout)
+    return MetadataAccess;
+  
+  generateLayout(IGM);
+  return MetadataAccess;
 }
 
 /// Cast the base to i8*, apply the given inbounds offset (in bytes,
