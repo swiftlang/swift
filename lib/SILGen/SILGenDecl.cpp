@@ -1721,8 +1721,8 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   llvm::SmallString<128> nameBuffer;
   {
     llvm::raw_svector_ostream nameStream(nameBuffer);
-    nameStream << "_TTW";
     Mangler mangler(nameStream);
+    mangler.manglePrefix("_TTW");
     mangler.mangleProtocolConformance(conformance);
 
     if (auto ctor = dyn_cast<ConstructorDecl>(requirement.getDecl())) {
@@ -1795,9 +1795,9 @@ getOrCreateReabstractionThunk(GenericParamList *thunkContextParams,
 
     // This is actually the SIL helper function.  For now, IR-gen
     // makes the actual thunk.
-    stream << "_TTR";
+    mangler.manglePrefix("_TTR");
     if (auto generics = thunkType->getGenericSignature()) {
-      stream << 'G';
+      mangler.manglePrefix('G');
       mangler.setModuleContext(M.getSwiftModule());
       mangler.mangleGenericSignature(generics,
                                      ResilienceExpansion::Minimal);

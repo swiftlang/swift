@@ -2887,9 +2887,9 @@ SILFunction *MaterializeForSetEmitter::createCallback(GeneratorFn generator) {
                                                      nullptr));
     closure.getCaptureInfo().setGenericParamCaptures(true);
 
-    llvm::raw_svector_ostream nameStream(name);
-    nameStream << "_TTW";
-    Mangle::Mangler mangler(nameStream);
+    llvm::raw_svector_ostream stream(name);
+    Mangle::Mangler mangler(stream);
+    mangler.manglePrefix("_TTW");
     mangler.mangleProtocolConformance(Conformance);
     mangler.mangleClosureEntity(&closure, ResilienceExpansion::Minimal, 1);
   }

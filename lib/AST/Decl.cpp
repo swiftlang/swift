@@ -2318,13 +2318,14 @@ static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
   {
     buffer.clear();
     llvm::raw_svector_ostream os(buffer);
+    
+    // Mangle the type.
+    Mangle::Mangler mangler(os, false/*dwarf*/, false/*punycode*/);
 
     // We add the "_Tt" prefix to make this a reserved name that will
     // not conflict with any valid Objective-C class or protocol name.
-    os << "_Tt";
+    mangler.manglePrefix("_Tt");
 
-    // Mangle the type.
-    Mangle::Mangler mangler(os, false/*dwarf*/, false/*punycode*/);
     NominalTypeDecl *NTD = const_cast<NominalTypeDecl*>(nominal);
     if (isa<ClassDecl>(nominal)) {
       mangler.mangleNominalType(NTD,

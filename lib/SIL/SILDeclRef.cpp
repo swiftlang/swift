@@ -478,7 +478,7 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
   //   entity ::= declaration                     // other declaration
   case SILDeclRef::Kind::Func:
     if (!c.hasDecl()) {
-      buffer << introducer;
+      mangler.manglePrefix(introducer);
       mangler.mangleClosureEntity(c.getAbstractClosureExpr(),
                                   c.getResilienceExpansion(),
                                   c.uncurryLevel);
@@ -491,7 +491,7 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
     if (auto AsmA = c.getDecl()->getAttrs().getAttribute<SILGenNameAttr>())
       if (!c.isForeignToNativeThunk() && !c.isNativeToForeignThunk()
           && !c.isCurried) {
-        buffer << AsmA->Name;
+        mangler.manglePrefix(AsmA->Name);
         return;
       }
 
@@ -505,40 +505,44 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
           && !c.isCurried) {
         if (auto namedClangDecl = dyn_cast<clang::DeclaratorDecl>(clangDecl)) {
           if (auto asmLabel = namedClangDecl->getAttr<clang::AsmLabelAttr>()) {
-            buffer << '\01' << asmLabel->getLabel();
+            mangler.manglePrefix('\01');
+            mangler.manglePrefix(asmLabel->getLabel());
           } else if (namedClangDecl->hasAttr<clang::OverloadableAttr>()) {
+            std::string storage;
+            llvm::raw_string_ostream SS(storage);
             // FIXME: When we can import C++, use Clang's mangler all the time.
-            mangleClangDecl(buffer, namedClangDecl,
+            mangleClangDecl(SS, namedClangDecl,
                             c.getDecl()->getASTContext());
+            mangler.manglePrefix(SS.str());
           } else {
-            buffer << namedClangDecl->getName();
+            mangler.manglePrefix(namedClangDecl->getName());
           }
           return;
         }
       }
     }
 
-    buffer << introducer;
+    mangler.manglePrefix(introducer);
     mangler.mangleEntity(c.getDecl(), c.getResilienceExpansion(), c.uncurryLevel);
     return;
       
   //   entity ::= context 'D'                     // deallocating destructor
   case SILDeclRef::Kind::Deallocator:
-    buffer << introducer;
+    mangler.manglePrefix(introducer);
     mangler.mangleDestructorEntity(cast<DestructorDecl>(c.getDecl()),
                                    /*isDeallocating*/ true);
     return;
 
   //   entity ::= context 'd'                     // destroying destructor
   case SILDeclRef::Kind::Destroyer:
-    buffer << introducer;
+    mangler.manglePrefix(introducer);
     mangler.mangleDestructorEntity(cast<DestructorDecl>(c.getDecl()),
                                    /*isDeallocating*/ false);
     return;
 
   //   entity ::= context 'C' type                // allocating constructor
   case SILDeclRef::Kind::Allocator:
-    buffer << introducer;
+    mangler.manglePrefix(introducer);
     mangler.mangleConstructorEntity(cast<ConstructorDecl>(c.getDecl()),
                                     /*allocating*/ true,
                                     c.getResilienceExpansion(),
@@ -547,7 +551,7 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
 
   //   entity ::= context 'c' type                // initializing constructor
   case SILDeclRef::Kind::Initializer:
-    buffer << introducer;
+    mangler.manglePrefix(introducer);
     mangler.mangleConstructorEntity(cast<ConstructorDecl>(c.getDecl()),
                                     /*allocating*/ false,
                                     c.getResilienceExpansion(),
@@ -558,7 +562,7 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
   //   entity ::= declaration 'E'                 // ivar destroyer
   case SILDeclRef::Kind::IVarInitializer:
   case SILDeclRef::Kind::IVarDestroyer:
-    buffer << introducer;
+    mangler.manglePrefix(introducer);
     mangler.mangleIVarInitDestroyEntity(
       cast<ClassDecl>(c.getDecl()),
       c.kind == SILDeclRef::Kind::IVarDestroyer);
@@ -566,19 +570,19 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
 
   //   entity ::= declaration 'a'                 // addressor
   case SILDeclRef::Kind::GlobalAccessor:
-    buffer << introducer;
+    mangler.manglePrefix(introducer);
     mangler.mangleAddressorEntity(c.getDecl());
     return;
 
   //   entity ::= declaration 'G'                 // getter
   case SILDeclRef::Kind::GlobalGetter:
-    buffer << introducer;
+    mangler.manglePrefix(introducer);
     mangler.mangleGlobalGetterEntity(c.getDecl());
     return;
 
   //   entity ::= context 'e' index           // default arg generator
   case SILDeclRef::Kind::DefaultArgGenerator:
-    buffer << introducer;
+    mangler.manglePrefix(introducer);
     mangler.mangleDefaultArgumentEntity(cast<AbstractFunctionDecl>(c.getDecl()),
                                         c.defaultArgIndex);
     return;
