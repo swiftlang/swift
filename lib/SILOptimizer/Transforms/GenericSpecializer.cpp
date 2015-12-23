@@ -39,7 +39,7 @@ class GenericSpecializer : public SILFunctionTransform {
                        << " *****\n");
 
     if (specializeAppliesInFunction(F))
-      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
   }
 
   StringRef getName() override { return "Generic Specializer"; }
