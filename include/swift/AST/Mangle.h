@@ -152,7 +152,7 @@ public:
   void manglePrefix(char Prefix);
 
   /// Mangle the integer \p Prefix into the name.
-  void manglePrefix(APInt Prefix);
+  void manglePrefix(const APInt &Prefix);
 
   /// Mangles globalinit_token and globalinit_func, which are used to
   /// initialize global variables.

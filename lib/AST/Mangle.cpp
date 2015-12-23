@@ -1842,7 +1842,7 @@ void Mangler::manglePrefix(char Prefix) {
   Buffer << Prefix;
 }
 
-void Mangler::manglePrefix(APInt Prefix) {
+void Mangler::manglePrefix(const APInt &Prefix) {
   Buffer << Prefix;
 }
 
