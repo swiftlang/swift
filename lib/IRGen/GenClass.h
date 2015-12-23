@@ -58,7 +58,7 @@ namespace irgen {
   
   llvm::Constant *emitClassPrivateData(IRGenModule &IGM, ClassDecl *theClass);
   void emitGenericClassPrivateDataTemplate(IRGenModule &IGM,
-                                      ClassDecl *cls,
+                                      ClassDecl *theClass,
                                       llvm::SmallVectorImpl<llvm::Constant*> &fields,
                                       Size &metaclassOffset,
                                       Size &classRODataOffset,
@@ -96,12 +96,12 @@ namespace irgen {
   /// does not have fixed layout. For resilient classes this does not
   /// correspond to the runtime alignment of instances of the class.
   llvm::Constant *tryEmitClassConstantFragileInstanceSize(IRGenModule &IGM,
-                                                   ClassDecl *Class);
+                                                   ClassDecl *theClass);
   /// Emit the constant fragile instance alignment mask of the class, or null if
   /// the class does not have fixed layout. For resilient classes this does not
   /// correspond to the runtime alignment of instances of the class.
   llvm::Constant *tryEmitClassConstantFragileInstanceAlignMask(IRGenModule &IGM,
-                                                        ClassDecl *Class);
+                                                        ClassDecl *theClass);
 
   /// Emit the constant fragile byte offset for the field in the class, or null
   /// if the field does not have fixed layout. For resilient classes this does
@@ -117,7 +117,7 @@ namespace irgen {
   /// What isa-encoding mechanism does a type use?
   IsaEncoding getIsaEncodingForType(IRGenModule &IGM, CanType type);
   
-  ClassDecl *getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C);
+  ClassDecl *getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *theClass);
 } // end namespace irgen
 } // end namespace swift
 
