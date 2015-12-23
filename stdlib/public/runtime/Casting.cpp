@@ -602,7 +602,7 @@ static bool _conformsToProtocol(const OpaqueValue *value,
     if (value) {
       return _unknownClassConformsToObjCProtocol(value, protocol);
     } else {
-      return _swift_classConformsToObjCProtocol(type, protocol);
+      return classConformsToObjCProtocol(type, protocol);
     }
 #endif
     return false;
@@ -613,7 +613,7 @@ static bool _conformsToProtocol(const OpaqueValue *value,
       return _unknownClassConformsToObjCProtocol(value, protocol);
     } else {
       auto wrapper = cast<ObjCClassWrapperMetadata>(type);
-      return _swift_classConformsToObjCProtocol(wrapper->Class, protocol);
+      return classConformsToObjCProtocol(wrapper->Class, protocol);
     }
 #endif
     return false;
@@ -1058,7 +1058,7 @@ _dynamicCastUnknownClassToExistential(const void *object,
       if (protocol->Flags.getSpecialProtocol() == SpecialProtocol::AnyObject)
         break;
 
-      if (!_swift_objectConformsToObjCProtocol(object, protocol))
+      if (!objectConformsToObjCProtocol(object, protocol))
         return nullptr;
       break;
 #else
