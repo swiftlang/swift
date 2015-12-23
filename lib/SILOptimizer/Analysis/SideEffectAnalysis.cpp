@@ -37,8 +37,7 @@ FunctionEffects::getMemBehavior(RetainObserveKind ScanKind) const {
   for (auto &ParamEffect : ParamEffects) {
     MemoryBehavior ArgBehavior = ParamEffect.getMemBehavior(ScanKind);
 
-    if (ArgBehavior > Behavior)
-      Behavior = ArgBehavior;
+    Behavior = combineMemoryBehavior(Behavior, ArgBehavior);
 
     // Stop the scan if we've reached the highest level of side effect.
     if (Behavior == MemoryBehavior::MayHaveSideEffects)

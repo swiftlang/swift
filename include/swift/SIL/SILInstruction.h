@@ -282,6 +282,21 @@ public:
   bool isTriviallyDuplicatable() const;
 };
 
+/// Returns the combined behavior of \p B1 and \p B2.
+inline SILInstruction::MemoryBehavior
+combineMemoryBehavior(SILInstruction::MemoryBehavior B1,
+                  SILInstruction::MemoryBehavior B2) {
+  // Basically the combined behavior is the maximum of both operands.
+  auto Result = std::max(B1, B2);
+
+  // With one exception: MayRead, MayWrite -> MayReadWrite.
+  if (Result == SILInstruction::MemoryBehavior::MayWrite &&
+        (B1 == SILInstruction::MemoryBehavior::MayRead ||
+         B2 == SILInstruction::MemoryBehavior::MayRead))
+    return SILInstruction::MemoryBehavior::MayReadWrite;
+  return Result;
+}
+
 #ifndef NDEBUG
 /// Pretty-print the MemoryBehavior.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,

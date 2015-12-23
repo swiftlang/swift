@@ -253,12 +253,13 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
          Idx < End && Behavior < MemBehavior::MayHaveSideEffects; ++Idx) {
       auto &ArgEffect = ApplyEffects.getParameterEffects()[Idx];
       auto ArgBehavior = ArgEffect.getMemBehavior(InspectionMode);
-      if (ArgBehavior > Behavior) {
+      auto NewBehavior = combineMemoryBehavior(Behavior, ArgBehavior);
+      if (NewBehavior != Behavior) {
         SILValue Arg = AI->getArgument(Idx);
         // We only consider the argument effects if the argument aliases V.
         if (!Arg.getType().isAddress() ||
             !AA->isNoAlias(Arg, V, computeTBAAType(Arg), getValueTBAAType())) {
-          Behavior = ArgBehavior;
+          Behavior = NewBehavior;
         }
       }
     }
