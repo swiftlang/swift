@@ -19,7 +19,8 @@ import sys
 
 sys.path.append(os.path.dirname(__file__))
 
-from SwiftBuildSupport import *
+from SwiftBuildSupport import (
+    SWIFT_SOURCE_ROOT, check_call, check_output, WorkingDirectory)
 
 
 def update_git_svn(repo_path):
