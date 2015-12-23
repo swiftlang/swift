@@ -451,7 +451,7 @@ bool swift::usesNativeSwiftReferenceCounting(const ClassMetadata *theClass) {
 
 // version for SwiftShims
 bool
-swift::_swift_usesNativeSwiftReferenceCounting_class(const void *theClass) {
+swift::swift_objc_class_usesNativeSwiftReferenceCounting(const void *theClass) {
 #if SWIFT_OBJC_INTEROP
   return usesNativeSwiftReferenceCounting((const ClassMetadata *)theClass);
 #else
@@ -1349,12 +1349,12 @@ bool swift::swift_isUniquelyReferencedOrPinned_nonNull_native(
 /// Returns class_getInstanceSize(c)
 ///
 /// That function is otherwise unavailable to the core stdlib.
-size_t swift::_swift_class_getInstancePositiveExtentSize(const void* c) {
+size_t swift::swift_objc_class_unknownGetInstancePositiveExtent(const void* c) {
   return class_getInstanceSize((Class)c);
 }
 #endif
 
-extern "C" size_t _swift_class_getInstancePositiveExtentSize_native(
+extern "C" size_t swift_class_getInstancePositiveExtent(
     const Metadata *c) {
   assert(c && c->isClassObject());
   auto metaData = c->getClassObject();

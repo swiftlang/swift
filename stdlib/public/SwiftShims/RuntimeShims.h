@@ -27,9 +27,9 @@ namespace swift { extern "C" {
 #define bool _Bool
 #endif
 
-bool _swift_usesNativeSwiftReferenceCounting_class(const void *);
+bool swift_objc_class_usesNativeSwiftReferenceCounting(const void *);
 
-__swift_size_t _swift_class_getInstancePositiveExtentSize(const void *);
+__swift_size_t swift_objc_class_unknownGetInstancePositiveExtent(const void *);
 
 /// Return an NSString to be used as the Mirror summary of the object
 void *_swift_objCMirrorSummary(const void * nsObject);
@@ -50,7 +50,7 @@ struct Metadata;
   
 /// Return the superclass, if any.  The result is nullptr for root
 /// classes and class protocol types.
-const struct Metadata *_swift_getSuperclass_nonNull(
+const struct Metadata *swift_class_getSuperclass(
   const struct Metadata *);
   
 void _swift_stdlib_flockfile_stdout(void);

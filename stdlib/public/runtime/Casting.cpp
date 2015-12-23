@@ -3189,8 +3189,8 @@ extern "C" bool swift_isClassOrObjCExistentialType(const Metadata *value,
   return swift_isClassOrObjCExistentialTypeImpl(T);
 }
 
-// func _swift_getSuperclass_nonNull(_: AnyClass) -> AnyClass?
-extern "C" const Metadata *_swift_getSuperclass_nonNull(
+// func swift_class_getSuperclass(_: AnyClass) -> AnyClass?
+extern "C" const Metadata *swift_class_getSuperclass(
   const Metadata *theClass
 ) {
   if (const ClassMetadata *classType = theClass->getClassObject())

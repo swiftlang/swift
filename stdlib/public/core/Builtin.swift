@@ -318,7 +318,7 @@ public func _slowPath<C : BooleanType>(x: C) -> Bool {
 @warn_unused_result
 internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
 #if _runtime(_ObjC)
-  return _swift_usesNativeSwiftReferenceCounting_class(
+  return swift_objc_class_usesNativeSwiftReferenceCounting(
     unsafeAddressOf(theClass)
   )
 #else
@@ -327,18 +327,18 @@ internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
 }
 
 @warn_unused_result
-@_silgen_name("_swift_class_getInstancePositiveExtentSize_native")
-func _swift_class_getInstancePositiveExtentSize_native(theClass: AnyClass) -> UInt
+@_silgen_name("swift_class_getInstancePositiveExtent")
+func swift_class_getInstancePositiveExtent(theClass: AnyClass) -> UInt
 
 /// - Returns: `class_getInstanceSize(theClass)`.
 @inline(__always)
 @warn_unused_result
 internal func _class_getInstancePositiveExtentSize(theClass: AnyClass) -> Int {
 #if _runtime(_ObjC)
-  return Int(_swift_class_getInstancePositiveExtentSize(
+  return Int(swift_objc_class_unknownGetInstancePositiveExtent(
       unsafeAddressOf(theClass)))
 #else
-  return Int(_swift_class_getInstancePositiveExtentSize_native(theClass))
+  return Int(swift_class_getInstancePositiveExtent(theClass))
 #endif
 }
 
@@ -477,7 +477,7 @@ internal func _makeBridgeObject(
 public // @testable
 func _getSuperclass(t: AnyClass) -> AnyClass? {
   return unsafeBitCast(
-    _swift_getSuperclass_nonNull(unsafeBitCast(t, COpaquePointer.self)),
+    swift_class_getSuperclass(unsafeBitCast(t, COpaquePointer.self)),
     AnyClass.self)
 }
 
