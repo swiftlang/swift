@@ -119,3 +119,10 @@ func testVoidOptional() {
   let optNoop: ()? -> ()? = { return $0 }
   voidOptional(optNoop)
 }
+
+// SR-164
+let iouNoString : A! = A()
+let _ = (iouNoString is CustomStringConvertible) // expected-warning {{'is' test is always true}} expected-warning {{conditional cast from 'A!' to 'CustomStringConvertible' always succeeds}}
+let _ = (iouNoString as? CustomStringConvertible) // expected-warning {{conditional cast from 'A!' to 'CustomStringConvertible' always succeeds}}
+
+

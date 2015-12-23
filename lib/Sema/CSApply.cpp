@@ -3864,60 +3864,63 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
 /// because most protocols do not conform to themselves -- however we still
 /// allow the conversion here, except the ErasureExpr ends up with trivial
 /// conformances.
-static ArrayRef<ProtocolConformance*>
+static bool
 collectExistentialConformances(TypeChecker &tc, Type fromType, Type toType,
-                               DeclContext *DC) {
+                               DeclContext *DC, SmallVector<ProtocolConformance *, 4> &conformances) {
+    
+  // Look through metatypes
+  while (fromType->is<AnyMetatypeType>() &&
+         toType->is<ExistentialMetatypeType>()) {
+      fromType = fromType->castTo<AnyMetatypeType>()->getInstanceType();
+      toType = toType->castTo<ExistentialMetatypeType>()->getInstanceType();
+  }
+    
   SmallVector<ProtocolDecl *, 4> protocols;
   toType->getAnyExistentialTypeProtocols(protocols);
 
-  SmallVector<ProtocolConformance *, 4> conformances;
   for (auto proto : protocols) {
     ProtocolConformance *conformance;
     bool conforms = tc.containsProtocol(fromType, proto, DC,
                                         (ConformanceCheckFlags::InExpression|
                                          ConformanceCheckFlags::Used),
                                         &conformance);
-    assert(conforms && "Type does not conform to protocol?");
-    (void)conforms;
+    if (!conforms)
+      return false;
     conformances.push_back(conformance);
   }
-
-  return tc.Context.AllocateCopy(conformances);
+  return true;
 }
 
 Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
                                       ConstraintLocatorBuilder locator) {
   auto &tc = solution.getConstraintSystem().getTypeChecker();
   Type fromType = expr->getType();
+    
+  SmallVector<ProtocolConformance *, 4> collection;
+  bool conforms = collectExistentialConformances(tc, fromType, toType, cs.DC, collection);
 
   // Handle existential coercions that implicitly look through ImplicitlyUnwrappedOptional<T>.
-  if (auto ty = cs.lookThroughImplicitlyUnwrappedOptionalType(fromType)) {
-    expr = coerceImplicitlyUnwrappedOptionalToValue(expr, ty, locator);
-    
-    fromType = expr->getType();
-    assert(!fromType->is<AnyMetatypeType>());
+  if (!conforms) {
+    if (auto ty = cs.lookThroughImplicitlyUnwrappedOptionalType(fromType)) {
+      expr = coerceImplicitlyUnwrappedOptionalToValue(expr, ty, locator);
+      fromType = expr->getType();
 
-    // FIXME: Hack. We shouldn't try to coerce existential when there is no
-    // existential upcast to perform.
-    if (fromType->isEqual(toType))
-      return expr;
+      assert(!fromType->is<AnyMetatypeType>());
+        
+      collection.clear();
+      conforms = collectExistentialConformances(tc, fromType, toType, cs.DC, collection);
+
+      // FIXME: Hack. We shouldn't try to coerce existential when there is no
+      // existential upcast to perform.
+      if (fromType->isEqual(toType))
+        return expr;
+    }
   }
-
-  Type fromInstanceType = fromType;
-  Type toInstanceType = toType;
-
-  // Look through metatypes
-  while (fromInstanceType->is<AnyMetatypeType>() &&
-         toInstanceType->is<ExistentialMetatypeType>()) {
-    fromInstanceType = fromInstanceType->castTo<AnyMetatypeType>()->getInstanceType();
-    toInstanceType = toInstanceType->castTo<ExistentialMetatypeType>()->getInstanceType();
-  }
-
+  assert(conforms && "Type does not conform to protocol?");
+      
   ASTContext &ctx = tc.Context;
-
-  auto conformances =
-    collectExistentialConformances(tc, fromInstanceType, toInstanceType, cs.DC);
-
+  auto conformances = tc.Context.AllocateCopy(collection);
+      
   // For existential-to-existential coercions, open the source existential.
   if (fromType->isAnyExistentialType()) {
     fromType = ArchetypeType::getAnyOpened(fromType);
