@@ -685,11 +685,12 @@ void IRGenModule::emitGlobalLists() {
     ExistingLLVMUsed->eraseFromParent();
   }
 
-  assert(std::all_of(LLVMUsed.begin(), LLVMUsed.end(),
-                     [](const llvm::WeakVH &global) {
-    return !isa<llvm::GlobalValue>(global) ||
-           !cast<llvm::GlobalValue>(global)->isDeclaration();
-  }) && "all globals in the 'used' list must be definitions");
+  std::for_each(LLVMUsed.begin(), LLVMUsed.end(),
+                [](const llvm::WeakVH &global) {
+    assert(!isa<llvm::GlobalValue>(global) ||
+           !cast<llvm::GlobalValue>(global)->isDeclaration() &&
+           "all globals in the 'used' list must be definitions");
+  });
   emitGlobalList(*this, LLVMUsed, "llvm.used", "llvm.metadata",
                  llvm::GlobalValue::AppendingLinkage,
                  Int8PtrTy,
