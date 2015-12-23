@@ -4197,25 +4197,6 @@ namespace {
       }
     }
 
-    static bool
-    isPotentiallyConflictingSetter(const clang::ObjCProtocolDecl *proto,
-                                   const clang::ObjCMethodDecl *method) {
-      auto sel = method->getSelector();
-      if (sel.getNumArgs() != 1)
-        return false;
-
-      clang::IdentifierInfo *setterID = sel.getIdentifierInfoForSlot(0);
-      if (!setterID || !setterID->getName().startswith("set"))
-        return false;
-
-      for (auto *prop : proto->properties()) {
-        if (prop->getSetterName() == sel)
-          return true;
-      }
-
-      return false;
-    }
-
     /// Import members of the given Objective-C container and add them to the
     /// list of corresponding Swift members.
     void importObjCMembers(const clang::ObjCContainerDecl *decl,
@@ -4251,27 +4232,9 @@ namespace {
               members.push_back(alternate);
           }
 
-          // Import explicit properties as instance properties, not as separate
-          // getter and setter methods.
-          if (!Impl.isAccessibilityDecl(objcMethod)) {
-            // If this member is a method that is a getter or setter for a
-            // propertythat was imported, don't add it to the list of members
-            // so it won't be found by name lookup. This eliminates the
-            // ambiguity between property names and getter names (by choosing
-            // to only have a variable).
-            if (objcMethod->isPropertyAccessor()) {
-              auto prop = objcMethod->findPropertyDecl(/*checkOverrides=*/false);
-              assert(prop);
-              (void)Impl.importDecl(const_cast<clang::ObjCPropertyDecl *>(prop));
-              // We may have attached this member to an existing property even
-              // if we've failed to import a new property.
-              if (cast<FuncDecl>(member)->isAccessor())
-                continue;
-            } else if (auto *proto = dyn_cast<clang::ObjCProtocolDecl>(decl)) {
-              if (isPotentiallyConflictingSetter(proto, objcMethod))
-                continue;
-            }
-          }
+          // If this declaration shouldn't be visible, don't add it to
+          // the list.
+          if (Impl.shouldSuppressDeclImport(objcMethod)) continue;
         }
 
         members.push_back(member);

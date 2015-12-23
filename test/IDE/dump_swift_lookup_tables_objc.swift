@@ -71,8 +71,12 @@
 // CHECK-NEXT:     NSErrorImports: -[NSErrorImports methodWithFloat:error:]
 // CHECK-NEXT:   objectAtIndexedSubscript:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass objectAtIndexedSubscript:]
+// CHECK-NEXT:   optSetter:
+// CHECK-NEXT:     SNCollision: SNCollision.optSetter
 // CHECK-NEXT:   protoInstanceMethodWithX:
 // CHECK-NEXT:     SNSomeProtocol: -[SNSomeProtocol protoInstanceMethodWithX:y:]
+// CHECK-NEXT:   reqSetter:
+// CHECK-NEXT:     SNCollision: SNCollision.reqSetter
 // CHECK-NEXT:   setAccessibilityFloat:
 // CHECK-NEXT:     NSAccessibility: -[NSAccessibility setAccessibilityFloat:]
 // CHECK-NEXT:   subscript:
