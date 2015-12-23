@@ -189,7 +189,7 @@ public protocol SequenceType {
   /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
-  func _preprocessingPass<R>(preprocess: (Self) -> R) -> R?
+  func _preprocessingPass<R>(@noescape preprocess: (Self) -> R) -> R?
 
   /// Create a native array buffer containing the elements of `self`,
   /// in the same order.
@@ -516,7 +516,7 @@ extension SequenceType {
     return 0
   }
 
-  public func _preprocessingPass<R>(preprocess: (Self) -> R) -> R? {
+  public func _preprocessingPass<R>(@noescape preprocess: (Self) -> R) -> R? {
     return nil
   }
 

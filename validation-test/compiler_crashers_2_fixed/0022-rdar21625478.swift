@@ -146,7 +146,7 @@ extension LoggingSequenceType
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
   public func _preprocessingPass<R>(
-    preprocess: (Self)->R
+    @noescape preprocess: (Self) -> R
   ) -> R? {
     ++Log._preprocessingPass[selfType]
     return base._preprocessingPass { _ in preprocess(self) }

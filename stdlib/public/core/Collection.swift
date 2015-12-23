@@ -605,7 +605,7 @@ extension SequenceType
 }
 
 extension CollectionType {
-  public func _preprocessingPass<R>(preprocess: (Self) -> R) -> R? {
+  public func _preprocessingPass<R>(@noescape preprocess: (Self) -> R) -> R? {
     return preprocess(self)
   }
 }
