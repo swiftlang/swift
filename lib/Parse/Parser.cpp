@@ -615,7 +615,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     // If the lexer stopped with an EOF token whose spelling is ")", then this
     // is actually the tuple that is a string literal interpolation context.
     // Just accept the ")" and build the tuple as we usually do.
-    if (Tok.is(tok::eof) && Tok.getText() == ")") {
+    if (Tok.is(tok::eof) && Tok.getText() == ")" && RightK == tok::r_paren) {
       RightLoc = Tok.getLoc();
       return Status;
     }

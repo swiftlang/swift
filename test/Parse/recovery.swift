@@ -710,4 +710,10 @@ infix operator · {  // expected-error {{'·' is considered to be an identifier,
   associativity none precedence 150
 }
 
+// <rdar://problem/21712891> Swift Compiler bug: String subscripts with range should require closing bracket.
+func r21712891(s : String) -> String {
+  let a = s.startIndex..<s.startIndex
+  // The specific errors produced don't actually matter, but we need to reject this.
+  return "\(s[a)"  // expected-error 3 {{}}
+}
 
