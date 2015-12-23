@@ -112,12 +112,19 @@ private:
   /// The computeMemoryBehavior() method uses this map to cache queries.
   llvm::DenseMap<MemBehaviorKeyTy, MemoryBehavior> MemoryBehaviorCache;
 
-  /// The AliasAnalysis/MemoryBehavior cache can't directly map a pair of
-  /// ValueBase pointers to alias/memorybehavior results because we'd like to
-  /// be able to remove deleted pointers without having to scan the whole map.
-  /// So, instead of storing pointers we map pointers to indices and store the
-  /// indices.
-  ValueEnumerator<ValueBase*> ValueBaseToIndex;
+  /// The AliasAnalysis cache can't directly map a pair of ValueBase pointers
+  /// to alias results because we'd like to be able to remove deleted pointers
+  /// without having to scan the whole map. So, instead of storing pointers we
+  /// map pointers to indices and store the indices.
+  ValueEnumerator<ValueBase*> AliasValueBaseToIndex;
+  
+  /// Same as AliasValueBaseToIndex, map a pointer to the indices for
+  /// MemoryBehaviorCache.
+  ///
+  /// NOTE: we do not use the same ValueEnumerator for the alias cache, 
+  /// as when either cache is cleared, we can not clear the ValueEnumerator
+  /// because doing so could give rise to collisions in the other cache.
+  ValueEnumerator<ValueBase*> MemoryBehaviorValueBaseToIndex;
 
   AliasResult aliasAddressProjection(SILValue V1, SILValue V2,
                                      SILValue O1, SILValue O2);
@@ -134,7 +141,8 @@ private:
     // The pointer I is going away.  We can't scan the whole cache and remove
     // all of the occurrences of the pointer. Instead we remove the pointer
     // from the cache the translates pointers to indices.
-    ValueBaseToIndex.invalidateValue(I);
+    AliasValueBaseToIndex.invalidateValue(I);
+    MemoryBehaviorValueBaseToIndex.invalidateValue(I);
   }
 
   virtual bool needsNotifications() override { return true; }

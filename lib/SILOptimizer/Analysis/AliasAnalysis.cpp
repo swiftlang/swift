@@ -539,7 +539,7 @@ AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2,
   // Flush the cache if the size of the cache is too large.
   if (AliasCache.size() > AliasAnalysisMaxCacheSize) {
     AliasCache.clear();
-    ValueBaseToIndex.clear();
+    AliasValueBaseToIndex.clear();
   }
 
   // Calculate the aliasing result and store it in the cache.
@@ -710,8 +710,8 @@ SILAnalysis *swift::createAliasAnalysis(SILModule *M) {
 
 AliasKeyTy AliasAnalysis::toAliasKey(SILValue V1, SILValue V2,
                                      SILType Type1, SILType Type2) {
-  size_t idx1 = ValueBaseToIndex.getIndex(V1.getDef());
-  size_t idx2 = ValueBaseToIndex.getIndex(V2.getDef());
+  size_t idx1 = AliasValueBaseToIndex.getIndex(V1.getDef());
+  size_t idx2 = AliasValueBaseToIndex.getIndex(V2.getDef());
   unsigned R1 = V1.getResultNumber();
   unsigned R2 = V2.getResultNumber();
   void *t1 = Type1.getOpaqueValue();
