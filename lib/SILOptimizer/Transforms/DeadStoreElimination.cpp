@@ -422,24 +422,15 @@ public:
 
 void BlockState::initReturnBlock(DSEContext &Ctx) {
   auto *EA = Ctx.getEA();
-  auto *ConGraph = EA->getConnectionGraph(Ctx.getFn());
+  auto *Fn = Ctx.getFn();
   std::vector<LSLocation> &LocationVault = Ctx.getLocationVault();
 
+  // We set the store bit at the end of the function if the location does
+  // not escape the function.
   for (unsigned i = 0; i < LocationVault.size(); ++i) {
-    SILValue Base = LocationVault[i].getBase();
-    if (isa<AllocStackInst>(Base)) {
-      // An alloc_stack is definitely dead at the end of the function.
-      startTrackingLocation(BBWriteSetOut, i);
+    if (!LocationVault[i].isNonEscapingLocalLSLocation(Fn, EA))
       continue;
-    }
-    if (isa<AllocationInst>(Base)) {
-      // For other allocations we ask escape analysis.
-      auto *Node = ConGraph->getNodeOrNull(Base, EA);
-      if (Node && !Node->escapes()) {
-        startTrackingLocation(BBWriteSetOut, i);
-        continue;
-      }
-    }
+    startTrackingLocation(BBWriteSetOut, i);
   }
 }
 
