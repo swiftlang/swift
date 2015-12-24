@@ -3269,8 +3269,12 @@ static bool tryDeferFixedSizeBufferInitialization(IRGenSILFunction &IGF,
     
     // We can defer to this initialization. Allocate the fixed-size buffer
     // now, but don't allocate the value inside it.
-    if (!fixedSizeBuffer.getAddress())
+    if (!fixedSizeBuffer.getAddress()) {
       fixedSizeBuffer = IGF.createFixedSizeBufferAlloca(name);
+      IGF.Builder.CreateLifetimeStart(fixedSizeBuffer.getAddress(),
+                llvm::ConstantInt::get(IGF.IGM.Int64Ty,
+                                       getFixedBufferSize(IGF.IGM).getValue()));
+    }
     if (containerValue)
       IGF.setLoweredAddress(containerValue, fixedSizeBuffer);
     IGF.setLoweredUnallocatedAddressInBuffer(addressValue, fixedSizeBuffer);

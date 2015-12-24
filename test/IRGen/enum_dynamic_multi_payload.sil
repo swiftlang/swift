@@ -42,14 +42,16 @@ entry(%e : $Either<(), ()>):
   fix_lifetime %e : $Either<(), ()>
 
   // CHECK-NEXT: alloca
+  // CHECK-NEXT: bitcast
+  // CHECK-NEXT: llvm.lifetime.start
   %s = alloc_stack $Either<(), ()>
 
   %l = enum $Either<(), ()>, #Either.Left!enumelt.1, undef : $()
-  // CHECK-NEXT: bitcast
+  // CHECK-NEXT: bitcast {{.*}} to i1*
   // CHECK-NEXT: store i1 false
   store %l to %s#1 : $*Either<(), ()>
   %r = enum $Either<(), ()>, #Either.Right!enumelt.1, undef : $()
-  // CHECK-NEXT: bitcast
+  // CHECK-NEXT: bitcast {{.*}} to i1*
   // CHECK-NEXT: store i1 true
   store %r to %s#1 : $*Either<(), ()>
 
@@ -57,12 +59,12 @@ entry(%e : $Either<(), ()>):
   %b = unchecked_enum_data %r : $Either<(), ()>, #Either.Right!enumelt.1
 
   // CHECK-NEXT: switch 
-  // CHECK-NEXT:   i1 false, label %5
-  // CHECK-NEXT:   i1 true, label %6
-  // CHECK:      <label>:5
-  // CHECK:        br label %7
+  // CHECK-NEXT:   i1 false, label %6
+  // CHECK-NEXT:   i1 true, label %7
   // CHECK:      <label>:6
   // CHECK:        br label %8
+  // CHECK:      <label>:7
+  // CHECK:        br label %9
   switch_enum %e : $Either<(), ()>,
     case #Either.Left!enumelt.1: left,
     case #Either.Right!enumelt.1: right
@@ -75,7 +77,7 @@ right(%y : $()):
   %1 = integer_literal $Builtin.Int8, 1
   br next(%1 : $Builtin.Int8)
 
-  // CHECK:        phi i8 [ 1, %8 ], [ 0, %7 ]
+  // CHECK:        phi i8 [ 1, %9 ], [ 0, %8 ]
 next(%z : $Builtin.Int8):
   dealloc_stack %s#0 : $*@local_storage Either<(), ()>
   return undef : $()
@@ -91,21 +93,23 @@ entry(%e : $EitherOr<(), ()>):
   fix_lifetime %e : $EitherOr<(), ()>
 
   // CHECK-NEXT: alloca
+  // CHECK-NEXT: bitcast
+  // CHECK-NEXT: llvm.lifetime.start
   %s = alloc_stack $EitherOr<(), ()>
 
-  // CHECK-NEXT: bitcast
+  // CHECK-NEXT: bitcast {{.*}} to i2*
   // CHECK-NEXT: store i2 0
   %l = enum $EitherOr<(), ()>, #EitherOr.Left!enumelt.1, undef : $()
   store %l to %s#1 : $*EitherOr<(), ()>
-  // CHECK-NEXT: bitcast
+  // CHECK-NEXT: bitcast {{.*}} to i2*
   // CHECK-NEXT: store i2 1
   %r = enum $EitherOr<(), ()>, #EitherOr.Right!enumelt.1, undef : $()
   store %r to %s#1 : $*EitherOr<(), ()>
-  // CHECK-NEXT: bitcast
+  // CHECK-NEXT: bitcast {{.*}} to i2*
   // CHECK-NEXT: store i2 -2
   %m = enum $EitherOr<(), ()>, #EitherOr.Middle!enumelt
   store %m to %s#1 : $*EitherOr<(), ()>
-  // CHECK-NEXT: bitcast
+  // CHECK-NEXT: bitcast {{.*}} to i2*
   // CHECK-NEXT: store i2 -1
   %k = enum $EitherOr<(), ()>, #EitherOr.Center!enumelt
   store %k to %s#1 : $*EitherOr<(), ()>
