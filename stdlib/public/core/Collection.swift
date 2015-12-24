@@ -89,7 +89,7 @@ public protocol MutableIndexable {
 ///      }
 public struct IndexingGenerator<Elements : Indexable>
  : GeneratorType, SequenceType {
-
+  
   /// Create a *generator* over the given collection.
   public init(_ elements: Elements) {
     self._elements = elements
@@ -138,11 +138,11 @@ public protocol CollectionType : Indexable, SequenceType {
   // a custom generate() function.  Otherwise we get an
   // IndexingGenerator. <rdar://problem/21539115>
   func generate() -> Generator
-
+  
   // FIXME: should be constrained to CollectionType
   // (<rdar://problem/20715009> Implement recursive protocol
   // constraints)
-
+  
   /// A `SequenceType` that can represent a contiguous subrange of `self`'s
   /// elements.
   ///
@@ -187,10 +187,10 @@ public protocol CollectionType : Indexable, SequenceType {
   /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
   ///   O(N) otherwise.
   var count: Index.Distance { get }
-
+  
   // The following requirement enables dispatching for indexOf when
   // the element type is Equatable.
-
+  
   /// Returns `Optional(Optional(index))` if an element was found;
   /// `nil` otherwise.
   ///
@@ -792,7 +792,7 @@ public protocol MutableSliceable : CollectionType, MutableCollectionType {
   subscript(_: Range<Index>) -> SubSequence { get set }
 }
 
-@available(*, unavailable, message="Use the dropFirst() method instead.")
+@available(*, unavailable, message="Use the dropFirst() method instead.") 
 public func dropFirst<Seq : CollectionType>(s: Seq) -> Seq.SubSequence {
   fatalError("unavailable function can't be called")
 }
@@ -819,3 +819,4 @@ public func suffix<
 
 @available(*, unavailable, renamed="CollectionType")
 public struct Sliceable {}
+

@@ -74,7 +74,7 @@ class Counter : GeneratorType {
     self.n = n
     self.end = end
   }
-
+  
   var n: Int
   var end: Int
 }
@@ -84,7 +84,7 @@ struct IntRange : SequenceType {
   func generate() -> Counter {
     return Counter(start, end)
   }
-
+  
   var start: Int
   var end: Int
 }

@@ -151,3 +151,4 @@ ErrorTypeTests.test("existential in lvalue") {
 }
 
 runAllTests()
+
