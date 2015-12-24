@@ -461,10 +461,10 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
 /// metadata or runtime purposes.
 static llvm::GlobalVariable *
 emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakVH> handles,
-                           StringRef name, StringRef section,
-                           llvm::GlobalValue::LinkageTypes linkage,
-                           llvm::Type *eltTy,
-                           bool isConstant) {
+               StringRef name, StringRef section,
+               llvm::GlobalValue::LinkageTypes linkage,
+               llvm::Type *eltTy,
+               bool isConstant) {
   // Do nothing if the list is empty.
   if (handles.empty()) return nullptr;
 
