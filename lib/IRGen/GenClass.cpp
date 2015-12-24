@@ -224,6 +224,9 @@ namespace {
   private:
     void addFieldsForClass(ClassDecl *theClass,
                            SILType classType) {
+      if (theClass->isGenericContext())
+        ClassHasMetadataPattern = true;
+
       if (theClass->hasSuperclass()) {
         // TODO: apply substitutions when computing base-class layouts!
         SILType superclassType = classType.getSuperclass(nullptr);
@@ -254,9 +257,6 @@ namespace {
           if (superclass->isGenericContext())
             ClassHasConcreteLayout = false;
         } else {
-          if (superclass->isGenericContext())
-            ClassHasMetadataPattern = true;
-
           // Otherwise, we have total knowledge of the class and its
           // fields, so walk them to compute the layout.
           addFieldsForClass(superclass, superclassType);
