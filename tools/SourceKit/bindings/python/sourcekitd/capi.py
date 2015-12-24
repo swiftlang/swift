@@ -1,4 +1,4 @@
-#===- capi.py - sourcekitd Python Bindings -------------------*- python -*--===#
+# capi.py - sourcekitd Python Bindings -*- python -*-
 #
 # This source file is part of the Swift.org open source project
 #
@@ -7,8 +7,6 @@
 #
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-#
-#===------------------------------------------------------------------------===#
 
 from ctypes import (
     CFUNCTYPE,
