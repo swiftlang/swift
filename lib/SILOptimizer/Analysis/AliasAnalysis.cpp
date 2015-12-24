@@ -112,18 +112,12 @@ static bool isFunctionArgument(SILValue V) {
   return Arg->isFunctionArg();
 }
 
-/// A no alias argument is an argument that is an address type of the entry
-/// basic block of a function.
-static bool isNoAliasArgument(SILValue V) {
-  return isFunctionArgument(V) && V.getType().isAddress();
-}
-
 /// Return true if V is an object that at compile time can be uniquely
 /// identified.
 static bool isIdentifiableObject(SILValue V) {
   if (isa<AllocationInst>(V) || isa<LiteralInst>(V))
     return true;
-  if (isNoAliasArgument(V))
+  if (isNotAliasingArgument(V))
     return true;
   return false;
 }
@@ -173,7 +167,8 @@ static bool isLocalLiteral(SILValue V) {
 /// Is this a value that can be unambiguously identified as being defined at the
 /// function level.
 static bool isIdentifiedFunctionLocal(SILValue V) {
-  return isa<AllocationInst>(*V) || isNoAliasArgument(V) || isLocalLiteral(V);
+  return isa<AllocationInst>(*V) || isNotAliasingArgument(V) ||
+         isLocalLiteral(V);
 }
 
 /// Returns true if we can prove that the two input SILValues which do not equal

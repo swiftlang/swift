@@ -58,7 +58,7 @@ bb0(%0 : $Int32, %1 : $*Int32, %2 : $*Int32):
 // CHECK-NEXT:  (0):   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
 // CHECK-NEXT:  (0):   %2 = argument of bb0 : $*Int32
 // CHECK-NEXT:  r=0,w=0,se=0
-sil @call_store_to_int_not_aliased : $@convention(thin) (Int32, @inout Int32, @inout Int32) -> () {
+sil @call_store_to_int_not_aliased : $@convention(thin) (Int32, @inout Int32, @in Int32) -> () {
 bb0(%0 : $Int32, %1 : $*Int32, %2 : $*Int32):
   %3 = function_ref @store_to_int : $@convention(thin) (Int32, @inout Int32) -> ()
   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
