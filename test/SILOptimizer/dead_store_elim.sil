@@ -127,10 +127,10 @@ sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
 
 // We should be able to remove the local store that is not read.
 //
-// DISABLECHECK-LABEL: trivial_local_dead_store
-// DISABLECHECK: bb0
-// DISABLECHECK-NOT: store
-// DISABLECHECK: return
+// CHECK-LABEL: trivial_local_dead_store
+// CHECK: bb0
+// CHECK-NOT: store
+// CHECK: return
 sil hidden @trivial_local_dead_store : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $Int, var, name "a"                 // users: %3, %5
@@ -144,10 +144,10 @@ bb0:
 
 // We cannot remove the local store that is read.
 //
-// DISABLECHECK-LABEL: blocking_read_on_local_store
-// DISABLECHECK: bb0
-// DISABLECHECK: store 
-// DISABLECHECK: return
+// CHECK-LABEL: blocking_read_on_local_store
+// CHECK: bb0
+// CHECK: store 
+// CHECK: return
 sil hidden @blocking_read_on_local_store : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $Int, var, name "a"                 // users: %3, %5
@@ -161,8 +161,7 @@ bb0:
 }
 
 // CHECK-LABEL: sil @store_after_store
-// CHECK: alloc_box
-// CHECK: store
+// CHECK: bb0 
 // CHECK-NOT: store
 // CHECK: return
 sil @store_after_store : $@convention(thin) (@owned B) -> () {
@@ -381,7 +380,6 @@ bb3:
 // CHECK: bb0([[RET0:%.+]] : $Bool):
 // CHECK: store
 // CHECK: store
-// CHECK: store
 sil hidden @DeadStoreWithAliasingBasesSimpleClass : $@convention(thin) (Bool) -> () {
 bb0(%0 : $Bool):
   %1 = alloc_ref $foo                             // users: %3, %6
@@ -405,7 +403,6 @@ bb0(%0 : $Bool):
 // CHECK-LABEL: diamond_control_flow_dead_store
 // CHECK: bb1:
 // CHECK-NOT: store
-// CHECK: br
 // CHECK: bb2:
 // CHECK-NOT: store
 // CHECK: br
@@ -1403,10 +1400,10 @@ bb0(%0 : $Optional<protocol<>.Type>):
 /// Make sure we DO get rid of the store as a dead store, i.e. no read to a store
 /// to a local variable.
 /// 
-/// DISABLECHECK-LABEL: local_dead_store
-/// DISABLECHECK: load
-/// DISABLECHECK-NOT: store 
-/// DISABLECHECK: return 
+/// CHECK-LABEL: local_dead_store
+/// CHECK: load
+/// CHECK-NOT: store 
+/// CHECK: return 
 sil @local_dead_store : $@convention(thin) (Optional<protocol<>.Type>) -> Int {
 bb0(%0 : $Optional<protocol<>.Type>):
   %2 = alloc_stack $Optional<protocol<>.Type>     // users: %3, %17, %19, %26
