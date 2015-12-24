@@ -47,9 +47,9 @@ import gizmo
 
 // -- Check that offset vars are emitted for fixed-layout generics
 //    <rdar://problem/15081049>
-// CHECK: @_TWvdvC15generic_classes22RootGenericFixedLayout1xVs5UInt8 = global i64 16, align 8
-// CHECK: @_TWvdvC15generic_classes22RootGenericFixedLayout1yGSax_ = global i64 24, align 8
-// CHECK: @_TWvdvC15generic_classes22RootGenericFixedLayout1zVs5UInt8 = global i64 32, align 8
+// CHECK: @_TWvdvC15generic_classes22RootGenericFixedLayout1xVs5UInt8 = constant i64 16, align 8
+// CHECK: @_TWvdvC15generic_classes22RootGenericFixedLayout1yGSax_ = constant i64 24, align 8
+// CHECK: @_TWvdvC15generic_classes22RootGenericFixedLayout1zVs5UInt8 = constant i64 32, align 8
 
 // -- fixed-layout nongeneric descriptor
 // CHECK: [[ROOTNONGENERIC_NAME:@.*]] = private unnamed_addr constant [35 x i8] c"C15generic_classes14RootNonGeneric\00"

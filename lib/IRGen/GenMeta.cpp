@@ -3053,7 +3053,8 @@ namespace {
       addWord(fieldOffsetOrZero);
 
       if (var->getDeclContext() == Target) {
-        switch (FieldLayout.AllFieldAccesses[fieldIndex]) {
+        auto access = FieldLayout.AllFieldAccesses[fieldIndex];
+        switch (access) {
         case FieldAccess::ConstantDirect:
         case FieldAccess::NonConstantDirect: {
           // Emit a global variable storing the constant field offset.
@@ -3067,7 +3068,9 @@ namespace {
                                                      ForDefinition);
           auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
           offsetVar->setInitializer(fieldOffsetOrZero);
-          offsetVar->setConstant(false);
+
+          // If we know the offset won't change, make it a constant.
+          offsetVar->setConstant(access == FieldAccess::ConstantDirect);
 
           break;
         }
