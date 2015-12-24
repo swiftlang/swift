@@ -7033,14 +7033,16 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     // If there is a name, check whether the kind of name is
     // appropriate.
     if (auto objcName = objcAttr->getName()) {
-      if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D) || isa<VarDecl>(D)) {
+      if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D) || isa<EnumDecl>(D) ||
+          isa<VarDecl>(D)) {
         // Types and properties can only have nullary
         // names. Complain and recover by chopping off everything
         // after the first name.
         if (objcName->getNumArgs() > 0) {
-          int which = isa<ClassDecl>(D)? 0 
+          int which = isa<ClassDecl>(D)? 0
                     : isa<ProtocolDecl>(D)? 1
-                    : 2;
+                    : isa<EnumDecl>(D)? 2
+                    : 3;
           SourceLoc firstNameLoc = objcAttr->getNameLocs().front();
           SourceLoc afterFirstNameLoc = 
             Lexer::getLocForEndOfToken(TC.Context.SourceMgr, firstNameLoc);
@@ -7050,10 +7052,6 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
             ObjCSelector(TC.Context, 0, objcName->getSelectorPieces()[0]),
             /*implicit=*/false);
         }
-      } else if (isa<EnumDecl>(D)) {
-        // Enums don't have runtime names.
-        TC.diagnose(objcAttr->getLParenLoc(), diag::objc_name_enum);
-        const_cast<ObjCAttr *>(objcAttr)->clearName();
       } else if (isa<SubscriptDecl>(D)) {
         // Subscripts can never have names.
         TC.diagnose(objcAttr->getLParenLoc(), diag::objc_name_subscript);

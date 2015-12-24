@@ -2333,9 +2333,7 @@ ERROR(objc_setter_for_nonobjc_subscript,sema_tcd,none,
 ERROR(objc_enum_generic,sema_tcd,none,
       "'@objc' enum cannot be generic", ())
 ERROR(objc_name_req_nullary,sema_objc,none,
-      "'@objc' %select{class|protocol|property}0 must have a simple name", (int))
-ERROR(objc_name_enum,sema_objc,none,
-      "'@objc' enum cannot have a name", ())
+      "'@objc' %select{class|protocol|enum|property}0 must have a simple name", (int))
 ERROR(objc_name_subscript,sema_objc,none,
       "'@objc' subscript cannot have a name; did you mean to put "
       "the name on the getter or setter?", ())

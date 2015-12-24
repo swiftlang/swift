@@ -5083,8 +5083,9 @@ classifyEnum(clang::Preprocessor &pp, const clang::EnumDecl *decl) {
   auto loc = decl->getLocStart();
   if (loc.isMacroID()) {
     StringRef MacroName = pp.getImmediateMacroName(loc);
-    if (MacroName == "CF_ENUM" || MacroName == "OBJC_ENUM" ||
-        MacroName == "SWIFT_ENUM" || MacroName == "__CF_NAMED_ENUM")
+    if (MacroName == "CF_ENUM" || MacroName == "__CF_NAMED_ENUM" ||
+        MacroName == "OBJC_ENUM" ||
+        MacroName == "SWIFT_ENUM" || MacroName == "SWIFT_ENUM_NAMED")
       return EnumKind::Enum;
     if (MacroName == "CF_OPTIONS" || MacroName == "OBJC_OPTIONS"
         || MacroName == "SWIFT_OPTIONS")
