@@ -127,6 +127,7 @@ set(SWIFTLIB_SOURCES
   Mirror.swift
   Process.swift
   SliceBuffer.swift
+  Tuple.swift.gyb
   VarArgs.swift
   Zip.swift
   Prespecialized.swift

@@ -1,0 +1,55 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+// Generate comparison functions for tuples up to some reasonable arity.
+
+% for arity in range(2,7):
+%   typeParams = [chr(ord("A")+i) for i in range(arity)]
+%   tupleT = "({})".format(",".join(typeParams))
+
+%   equatableTypeParams = ", ".join(["{} : Equatable".format(c) for c in typeParams])
+
+/// Returns `true` iff each component of `lhs` is equal to the corresponding
+/// component of `rhs`.
+@warn_unused_result
+public func == <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool {
+%   ops = ["lhs.{} == rhs.{}".format(i,i) for i in range(arity)]
+  return ${" && ".join(ops)}
+}
+
+/// Returns `true` iff any component of `lhs` is not equal to the corresponding
+/// component of `rhs`.
+@warn_unused_result
+public func != <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool {
+%   ops = ["lhs.{} != rhs.{}".format(i,i) for i in range(arity)]
+  return ${" || ".join(ops)}
+}
+
+%   comparableTypeParams = ", ".join(["{} : Comparable".format(c) for c in typeParams])
+%   for op in ["<", ">"]:
+%     for opeq in ["", "="]:
+/// A [lexicographical order](https://en.wikipedia.org/wiki/Lexicographical_order)
+/// over tuples of `Comparable` elements.
+///
+/// Given two tuples `(a1,a2,…,aN)` and `(b1,b2,…,bN)`, the first tuple is
+/// `${op}${opeq}` the second tuple iff `a1 ${op} b1` or (`a1 == b1` and
+/// `(a2,…,aN) ${op}${opeq} (b2,…,bN)`).
+@warn_unused_result
+public func ${op}${opeq} <${comparableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool {
+%   for i in range(arity-1):
+  if lhs.${i} != rhs.${i} { return lhs.${i} ${op} rhs.${i} }
+%   end
+  return lhs.${arity-1} ${op}${opeq} rhs.${arity-1}
+}
+%     end
+%   end
+% end
