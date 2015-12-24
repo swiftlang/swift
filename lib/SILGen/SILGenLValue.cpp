@@ -2889,7 +2889,7 @@ SILFunction *MaterializeForSetEmitter::createCallback(GeneratorFn generator) {
 
     llvm::raw_svector_ostream stream(name);
     Mangle::Mangler mangler(stream);
-    mangler.manglePrefix("_TTW");
+    mangler.append("_TTW");
     mangler.mangleProtocolConformance(Conformance);
     mangler.mangleClosureEntity(&closure, ResilienceExpansion::Minimal, 1);
   }

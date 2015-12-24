@@ -1834,16 +1834,16 @@ void Mangler::mangleTypeMetadataFull(CanType ty, bool isPattern) {
   mangleType(ty, ResilienceExpansion::Minimal, 0);
 }
 
-void Mangler::manglePrefix(StringRef Prefix) {
-  Buffer << Prefix;
+void Mangler::append(StringRef S) {
+  Buffer << S;
 }
 
-void Mangler::manglePrefix(char Prefix) {
-  Buffer << Prefix;
+void Mangler::append(char C) {
+  Buffer << C;
 }
 
-void Mangler::manglePrefix(const APInt &Prefix) {
-  Buffer << Prefix;
+void Mangler::mangleNatural(const APInt &Nat) {
+  Buffer << Nat;
 }
 
 void Mangler::mangleGlobalVariableFull(const VarDecl *decl) {

@@ -88,14 +88,14 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   switch (getKind()) {
   //   global ::= 'w' value-witness-kind type     // value witness
   case Kind::ValueWitness:
-    mangler.manglePrefix("_Tw");
-    mangler.manglePrefix(mangleValueWitness(getValueWitness()));
+    mangler.append("_Tw");
+    mangler.append(mangleValueWitness(getValueWitness()));
     mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
     return;
 
   //   global ::= 'WV' type                       // value witness
   case Kind::ValueWitnessTable:
-    mangler.manglePrefix("_TWV");
+    mangler.append("_TWV");
     mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
     return;
 
@@ -107,13 +107,13 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
 
   //   global ::= 'Ma' type               // type metadata access function
   case Kind::TypeMetadataAccessFunction:
-    mangler.manglePrefix("_TMa");
+    mangler.append("_TMa");
     mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
     return;
 
   //   global ::= 'ML' type               // type metadata lazy cache variable
   case Kind::TypeMetadataLazyCacheVariable:
-    mangler.manglePrefix("_TML");
+    mangler.append("_TML");
     mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
     return;
 
@@ -138,7 +138,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
 
   //   global ::= 'Mm' type                       // class metaclass
   case Kind::SwiftMetaclassStub:
-     mangler.manglePrefix("_TMm");
+     mangler.append("_TMm");
     mangler.mangleNominalType(cast<ClassDecl>(getDecl()),
                               ResilienceExpansion::Minimal,
                               Mangler::BindGenerics::None);
@@ -146,7 +146,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
       
   //   global ::= 'Mn' type                       // nominal type descriptor
   case Kind::NominalTypeDescriptor:
-    mangler.manglePrefix("_TMn");
+    mangler.append("_TMn");
     mangler.mangleNominalType(cast<NominalTypeDecl>(getDecl()),
                               ResilienceExpansion::Minimal,
                               Mangler::BindGenerics::None);
@@ -154,13 +154,13 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
 
   //   global ::= 'Mp' type                       // protocol descriptor
   case Kind::ProtocolDescriptor:
-    mangler.manglePrefix("_TMp");
+    mangler.append("_TMp");
     mangler.mangleProtocolName(cast<ProtocolDecl>(getDecl()));
     return;
       
   //   global ::= 'Wo' entity
   case Kind::WitnessTableOffset:
-     mangler.manglePrefix("_TWo");
+     mangler.append("_TWo");
 
     // Witness table entries for constructors always refer to the allocating
     // constructor.
@@ -179,39 +179,39 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
       
   //   global ::= 'WP' protocol-conformance
   case Kind::DirectProtocolWitnessTable:
-    mangler.manglePrefix("_TWP");
+    mangler.append("_TWP");
     mangler.mangleProtocolConformance(getProtocolConformance());
     return;
 
   //   global ::= 'Wa' protocol-conformance
   case Kind::ProtocolWitnessTableAccessFunction:
-    mangler.manglePrefix("_TWa");
+    mangler.append("_TWa");
     mangler.mangleProtocolConformance(getProtocolConformance());
     return;
 
   //   global ::= 'Wl' type protocol-conformance
   case Kind::ProtocolWitnessTableLazyAccessFunction:
-    mangler.manglePrefix("_TWl");
+    mangler.append("_TWl");
     mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
     mangler.mangleProtocolConformance(getProtocolConformance());
     return;
 
   //   global ::= 'WL' type protocol-conformance
   case Kind::ProtocolWitnessTableLazyCacheVariable:
-    mangler.manglePrefix("_TWL");
+    mangler.append("_TWL");
     mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
     mangler.mangleProtocolConformance(getProtocolConformance());
     return;
       
   //   global ::= 'WD' protocol-conformance
   case Kind::DependentProtocolWitnessTableGenerator:
-    mangler.manglePrefix("_TWD");
+    mangler.append("_TWD");
     mangler.mangleProtocolConformance(getProtocolConformance());
     return;
       
   //   global ::= 'Wd' protocol-conformance
   case Kind::DependentProtocolWitnessTableTemplate:
-    mangler.manglePrefix("_TWd");
+    mangler.append("_TWd");
     mangler.mangleProtocolConformance(getProtocolConformance());
     return;
 
@@ -222,7 +222,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   case Kind::Function:
     // As a special case, functions can have external asm names.
     if (auto AsmA = getDecl()->getAttrs().getAttribute<SILGenNameAttr>()) {
-       mangler.manglePrefix(AsmA->Name);
+       mangler.append(AsmA->Name);
       return;
     }
 
@@ -234,22 +234,22 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     if (auto clangDecl = getDecl()->getClangDecl()) {
       if (auto namedClangDecl = dyn_cast<clang::DeclaratorDecl>(clangDecl)) {
         if (auto asmLabel = namedClangDecl->getAttr<clang::AsmLabelAttr>()) {
-          mangler.manglePrefix('\01');
-           mangler.manglePrefix(asmLabel->getLabel());
+          mangler.append('\01');
+          mangler.append(asmLabel->getLabel());
         } else if (namedClangDecl->hasAttr<clang::OverloadableAttr>()) {
           // FIXME: When we can import C++, use Clang's mangler all the time.
           std::string storage;
           llvm::raw_string_ostream SS(storage);
           mangleClangDecl(SS, namedClangDecl, getDecl()->getASTContext());
-          mangler.manglePrefix(SS.str());
+          mangler.append(SS.str());
         } else {
-          mangler.manglePrefix(namedClangDecl->getName());
+          mangler.append(namedClangDecl->getName());
         }
         return;
       }
     }
 
-    mangler.manglePrefix("_T");
+    mangler.append("_T");
     if (auto type = dyn_cast<NominalTypeDecl>(getDecl())) {
       mangler.mangleNominalType(type, getResilienceExpansion(),
                                 Mangler::BindGenerics::None);
@@ -267,26 +267,26 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   // An Objective-C class reference;  not a swift mangling.
   case Kind::ObjCClass: {
     llvm::SmallString<64> TempBuffer;
-    mangler.manglePrefix("OBJC_CLASS_$_");
+    mangler.append("OBJC_CLASS_$_");
     StringRef Name = cast<ClassDecl>(getDecl())->getObjCRuntimeName(TempBuffer);
-    mangler.manglePrefix(Name);
+    mangler.append(Name);
     return;
   }
 
   // An Objective-C metaclass reference;  not a swift mangling.
   case Kind::ObjCMetaclass: {
     llvm::SmallString<64> TempBuffer;
-    mangler.manglePrefix("OBJC_METACLASS_$_");
+    mangler.append("OBJC_METACLASS_$_");
     StringRef Name = cast<ClassDecl>(getDecl())->getObjCRuntimeName(TempBuffer);
-    mangler.manglePrefix(Name);
+    mangler.append(Name);
     return;
   }
 
   case Kind::SILFunction:
-     mangler.manglePrefix(getSILFunction()->getName());
+     mangler.append(getSILFunction()->getName());
     return;
   case Kind::SILGlobalVariable:
-     mangler.manglePrefix(getSILGlobalVariable()->getName());
+     mangler.append(getSILGlobalVariable()->getName());
     return;
   }
   llvm_unreachable("bad entity kind!");

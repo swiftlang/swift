@@ -33,7 +33,7 @@ static void mangleConstant(NormalProtocolConformance *C,
 
   //   mangled-name ::= '_T' global
   //   global ::= 'WP' protocol-conformance
-  mangler.manglePrefix("_TWP");
+  mangler.append("_TWP");
   mangler.mangleProtocolConformance(C);
   buffer.flush();
 }

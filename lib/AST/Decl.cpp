@@ -2324,7 +2324,7 @@ static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
 
     // We add the "_Tt" prefix to make this a reserved name that will
     // not conflict with any valid Objective-C class or protocol name.
-    mangler.manglePrefix("_Tt");
+    mangler.append("_Tt");
 
     NominalTypeDecl *NTD = const_cast<NominalTypeDecl*>(nominal);
     if (isa<ClassDecl>(nominal)) {
