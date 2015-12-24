@@ -19,6 +19,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ResilienceExpansion.h"
+#include "swift/Basic/Timer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/SerializedSILLoader.h"
@@ -552,13 +553,14 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
 }
 
 void SILGenModule::emitEnumConstructor(EnumElementDecl *decl) {
+  // Enum element constructors are always emitted by need, so don't need
+  // delayed emission.
   SILDeclRef constant(decl);
-  emitOrDelayFunction(*this, constant, [this,constant,decl](SILFunction *f) {
-    preEmitFunction(constant, decl, f, decl);
-    PrettyStackTraceSILFunction X("silgen enum constructor", f);
-    SILGenFunction(*this, *f).emitEnumConstructor(decl);
-    postEmitFunction(constant, f);
-  });
+  SILFunction *f = getFunction(constant, ForDefinition);
+  preEmitFunction(constant, decl, f, decl);
+  PrettyStackTraceSILFunction X("silgen enum constructor", f);
+  SILGenFunction(*this, *f).emitEnumConstructor(decl);
+  postEmitFunction(constant, f);
 }
 
 SILFunction *SILGenModule::emitClosure(AbstractClosureExpr *ce) {
@@ -1152,6 +1154,7 @@ std::unique_ptr<SILModule>
 SILModule::constructSIL(Module *mod, SILOptions &options, FileUnit *SF,
                         Optional<unsigned> startElem, bool makeModuleFragile,
                         bool isWholeModule) {
+  SharedTimer timer("SILGen");
   const DeclContext *DC;
   if (startElem) {
     assert(SF && "cannot have a start element without a source file");

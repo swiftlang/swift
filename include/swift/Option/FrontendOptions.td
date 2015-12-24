@@ -124,6 +124,8 @@ def debug_forbid_typecheck_prefix : Separate<["-"], "debug-forbid-typecheck-pref
   HelpText<"Triggers llvm fatal_error if typechecker tries to typecheck a decl "
            "with the provided prefix name">;
 
+def debug_time_compilation : Flag<["-"], "debug-time-compilation">,
+  HelpText<"Prints the time taken by each compilation phase">;
 def debug_time_function_bodies : Flag<["-"], "debug-time-function-bodies">,
   HelpText<"Dumps the time it takes to type-check each function body">;
 
@@ -200,10 +202,6 @@ def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
 
-def enable_objc_implicit_properties :
-  Flag<["-"], "enable-objc-implicit-properties">,
-  HelpText<"Import Objective-C \"implicit properties\" as properties">;
-
 def enable_omit_needless_words :
   Flag<["-"], "enable-omit-needless-words">,
   HelpText<"Omit needless words when importing Objective-C names">;
@@ -211,6 +209,10 @@ def enable_omit_needless_words :
 def enable_infer_default_arguments :
   Flag<["-"], "enable-infer-default-arguments">,
   HelpText<"Infer default arguments for imported parameters">;
+
+def enable_swift_name_lookup_tables :
+  Flag<["-"], "enable-swift-name-lookup-tables">,
+  HelpText<"Enable Swift name lookup tables in the Clang importer">;
 
 def warn_omit_needless_words :
   Flag<["-"], "Womit-needless-words">,

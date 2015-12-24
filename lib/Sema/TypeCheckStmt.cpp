@@ -396,10 +396,10 @@ public:
                                        RS->isImplicit());
     }
 
-    auto failed = TC.typeCheckExpression(E, DC, ResultTy, CTP_ReturnStmt);
+    auto hadTypeError = TC.typeCheckExpression(E, DC, ResultTy, CTP_ReturnStmt);
     RS->setResult(E);
     
-    if (failed) {
+    if (hadTypeError) {
       tryDiagnoseUnnecessaryCastOverOptionSet(TC.Context, E, ResultTy,
                                               DC->getParentModule());
       return nullptr;
@@ -415,57 +415,55 @@ public:
     Type exnType = TC.getExceptionType(DC, TS->getThrowLoc());
     if (!exnType) return TS;
     
-    auto failed = TC.typeCheckExpression(E, DC, exnType, CTP_ThrowStmt);
+    auto hadTypeError = TC.typeCheckExpression(E, DC, exnType, CTP_ThrowStmt);
     TS->setSubExpr(E);
-
-    if (failed) return nullptr;
     
-    return TS;
+    return hadTypeError ? nullptr : TS;
   }
     
   Stmt *visitDeferStmt(DeferStmt *DS) {
     TC.typeCheckDecl(DS->getTempDecl(), /*isFirstPass*/false);
 
     Expr *theCall = DS->getCallExpr();
-    if (!TC.typeCheckExpression(theCall, DC))
-      return nullptr;
+    auto hadTypeError = TC.typeCheckExpression(theCall, DC);
     DS->setCallExpr(theCall);
     
-    return DS;
+    return hadTypeError ? nullptr : DS;
   }
   
   Stmt *visitIfStmt(IfStmt *IS) {
-    StmtCondition C = IS->getCond();
+    bool hadTypeError = false;
 
-    if (TC.typeCheckStmtCondition(C, DC, diag::if_always_true)) return 0;
+    StmtCondition C = IS->getCond();
+    hadTypeError |= TC.typeCheckStmtCondition(C, DC, diag::if_always_true);
     IS->setCond(C);
 
     AddLabeledStmt ifNest(*this, IS);
 
     Stmt *S = IS->getThenStmt();
-    if (typeCheckStmt(S)) return 0;
+    hadTypeError |= typeCheckStmt(S);
     IS->setThenStmt(S);
 
     if ((S = IS->getElseStmt())) {
-      if (typeCheckStmt(S)) return 0;
+      hadTypeError |= typeCheckStmt(S);
       IS->setElseStmt(S);
     }
     
-    return IS;
+    return hadTypeError ? nullptr : IS;
   }
   
   Stmt *visitGuardStmt(GuardStmt *GS) {
+    bool hadTypeError = false;
     StmtCondition C = GS->getCond();
-    if (TC.typeCheckStmtCondition(C, DC, diag::guard_always_succeeds))
-      return 0;
+    hadTypeError |= TC.typeCheckStmtCondition(C, DC, diag::guard_always_succeeds);
     GS->setCond(C);
     
     AddLabeledStmt ifNest(*this, GS);
     
     Stmt *S = GS->getBody();
-    if (typeCheckStmt(S)) return 0;
+    hadTypeError |= typeCheckStmt(S);
     GS->setBody(S);
-    return GS;
+    return hadTypeError ? nullptr : GS;
   }
 
   Stmt *visitIfConfigStmt(IfConfigStmt *ICS) {
@@ -479,69 +477,69 @@ public:
   Stmt *visitDoStmt(DoStmt *DS) {
     AddLabeledStmt loopNest(*this, DS);
     Stmt *S = DS->getBody();
-    if (typeCheckStmt(S)) return 0;
+    bool hadTypeError = typeCheckStmt(S);
     DS->setBody(S);
-    return DS;
+    return hadTypeError ? nullptr : DS;
   }
   
   Stmt *visitWhileStmt(WhileStmt *WS) {
+    bool hadTypeError = false;
     StmtCondition C = WS->getCond();
-    if (TC.typeCheckStmtCondition(C, DC, diag::while_always_true)) return 0;
+    hadTypeError |= TC.typeCheckStmtCondition(C, DC, diag::while_always_true);
     WS->setCond(C);
 
     AddLabeledStmt loopNest(*this, WS);
     Stmt *S = WS->getBody();
-    if (typeCheckStmt(S)) return 0;
+    hadTypeError |= typeCheckStmt(S);
     WS->setBody(S);
     
-    return WS;
+    return hadTypeError ? nullptr : WS;
   }
   Stmt *visitRepeatWhileStmt(RepeatWhileStmt *RWS) {
+    bool hadTypeError = false;
     {
       AddLabeledStmt loopNest(*this, RWS);
       Stmt *S = RWS->getBody();
-      if (typeCheckStmt(S)) return nullptr;
+      hadTypeError |= typeCheckStmt(S);
       RWS->setBody(S);
     }
     
     Expr *E = RWS->getCond();
-    if (TC.typeCheckCondition(E, DC)) return nullptr;
+    hadTypeError |= TC.typeCheckCondition(E, DC);
     RWS->setCond(E);
-    return RWS;
+    return hadTypeError ? nullptr : RWS;
   }
   Stmt *visitForStmt(ForStmt *FS) {
+    bool hadTypeError = false;
     // Type check any var decls in the initializer.
     for (auto D : FS->getInitializerVarDecls())
       TC.typeCheckDecl(D, /*isFirstPass*/false);
 
     if (auto *Initializer = FS->getInitializer().getPtrOrNull()) {
-      if (TC.typeCheckExpression(Initializer, DC, Type(), CTP_Unused,
-                                 TypeCheckExprFlags::IsDiscarded))
-        return nullptr;
+      hadTypeError |= TC.typeCheckExpression(Initializer, DC, Type(), CTP_Unused,
+                                       TypeCheckExprFlags::IsDiscarded);
       FS->setInitializer(Initializer);
       TC.checkIgnoredExpr(Initializer);
     }
 
     if (auto *Cond = FS->getCond().getPtrOrNull()) {
-      if (TC.typeCheckCondition(Cond, DC))
-        return nullptr;
+      hadTypeError |= TC.typeCheckCondition(Cond, DC);
       FS->setCond(Cond);
     }
 
     if (auto *Increment = FS->getIncrement().getPtrOrNull()) {
-      if (TC.typeCheckExpression(Increment, DC, Type(), CTP_Unused,
-                                 TypeCheckExprFlags::IsDiscarded))
-        return nullptr;
+      hadTypeError |= TC.typeCheckExpression(Increment, DC, Type(), CTP_Unused,
+                                       TypeCheckExprFlags::IsDiscarded);
       FS->setIncrement(Increment);
       TC.checkIgnoredExpr(Increment);
     }
 
     AddLabeledStmt loopNest(*this, FS);
     Stmt *S = FS->getBody();
-    if (typeCheckStmt(S)) return nullptr;
+    hadTypeError |= typeCheckStmt(S);
     FS->setBody(S);
     
-    return FS;
+    return hadTypeError ? nullptr : FS;
   }
   
   Stmt *visitForEachStmt(ForEachStmt *S) {
@@ -808,16 +806,15 @@ public:
   }
   
   Stmt *visitSwitchStmt(SwitchStmt *S) {
+    bool hadTypeError = false;
     // Type-check the subject expression.
     Expr *subjectExpr = S->getSubjectExpr();
-    bool hadTypeError = TC.typeCheckExpression(subjectExpr, DC);
+    hadTypeError |= TC.typeCheckExpression(subjectExpr, DC);
     subjectExpr = TC.coerceToMaterializable(subjectExpr);
-    
-    if (!subjectExpr)
-      return nullptr;
-    
-    S->setSubjectExpr(subjectExpr);
-    Type subjectType = subjectExpr->getType();
+    if (subjectExpr) {
+      S->setSubjectExpr(subjectExpr);
+    }
+    Type subjectType = S->getSubjectExpr()->getType();
 
     // Type-check the case blocks.
     AddSwitchNest switchNest(*this);
@@ -835,36 +832,32 @@ public:
         if (auto *newPattern = TC.resolvePattern(pattern, DC,
                                                  /*isStmtCondition*/false)) {
           pattern = newPattern;
+          // Coerce the pattern to the subject's type.
+          if (TC.coercePatternToType(pattern, DC, subjectType,
+                                     TR_InExpression)) {
+            // If that failed, mark any variables binding pieces of the pattern
+            // as invalid to silence follow-on errors.
+            pattern->forEachVariable([&](VarDecl *VD) {
+              VD->overwriteType(ErrorType::get(TC.Context));
+              VD->setInvalid();
+            });
+            hadTypeError = true;
+          }
+          labelItem.setPattern(pattern);
         } else {
           hadTypeError = true;
-          continue;
         }
-
-        // Coerce the pattern to the subject's type.
-        if (TC.coercePatternToType(pattern, DC, subjectType, TR_InExpression)) {
-          // If that failed, mark any variables binding pieces of the pattern
-          // as invalid to silence follow-on errors.
-          pattern->forEachVariable([&](VarDecl *VD) {
-            VD->overwriteType(ErrorType::get(TC.Context));
-            VD->setInvalid();
-          });
-          hadTypeError = true;
-        }
-        labelItem.setPattern(pattern);
 
         // Check the guard expression, if present.
         if (auto *guard = labelItem.getGuardExpr()) {
-          if (TC.typeCheckCondition(guard, DC))
-            hadTypeError = true;
-          else
-            labelItem.setGuardExpr(guard);
+          hadTypeError |= TC.typeCheckCondition(guard, DC);
+          labelItem.setGuardExpr(guard);
         }
       }
       
       // Type-check the body statements.
       Stmt *body = caseBlock->getBody();
-      if (typeCheckStmt(body))
-        hadTypeError = true;
+      hadTypeError |= typeCheckStmt(body);
       caseBlock->setBody(body);
     }
     
@@ -882,8 +875,9 @@ public:
   }
 
   bool checkCatchStmt(CatchStmt *S) {
+    bool hadTypeError = false;
     // Check the catch pattern.
-    bool hadTypeError = TC.typeCheckCatchPattern(S, DC);
+    hadTypeError |= TC.typeCheckCatchPattern(S, DC);
 
     // Check the guard expression, if present.
     if (Expr *guard = S->getGuardExpr()) {
@@ -910,11 +904,8 @@ public:
     // Type-check the 'do' body.  Type failures in here will generally
     // not cause type failures in the 'catch' clauses.
     Stmt *newBody = S->getBody();
-    if (typeCheckStmt(newBody)) {
-      hadTypeError = true;
-    } else {
-      S->setBody(newBody);
-    }
+    hadTypeError |= typeCheckStmt(newBody);
+    S->setBody(newBody);
 
     // Check all the catch clauses independently.
     for (auto clause : S->getCatches()) {

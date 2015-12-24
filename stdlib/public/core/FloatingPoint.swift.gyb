@@ -198,7 +198,14 @@ public struct ${Self} {
 extension ${Self} : CustomStringConvertible {
   /// A textual representation of `self`.
   public var description: String {
-    return _float${bits}ToString(self)
+    return _float${bits}ToString(self, debug: false)
+  }
+}
+
+extension ${Self} : CustomDebugStringConvertible {
+  /// A textual representation of `self`.
+  public var debugDescription: String {
+    return _float${bits}ToString(self, debug: true)
   }
 }
 
@@ -567,12 +574,16 @@ extension ${Self} {
 //===----------------------------------------------------------------------===//
 
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public prefix func ++ (inout rhs: ${Self}) -> ${Self} { rhs += 1.0; return rhs }
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public prefix func -- (inout rhs: ${Self}) -> ${Self} { rhs -= 1.0; return rhs }
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public postfix func ++ (inout lhs: ${Self}) -> ${Self} { let tmp = lhs; lhs += 1.0; return tmp }
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public postfix func -- (inout lhs: ${Self}) -> ${Self} { let tmp = lhs; lhs -= 1.0; return tmp }
 
 
@@ -655,23 +666,23 @@ extension ${Self} {
     // <rdar://problem/17959546> Float80.isFinite is missing
     _precondition(
       other.isFinite,
-      "floating point value can not be converted to ${Self} because it is either infinite or NaN")
+      "floating point value cannot be converted to ${Self} because it is either infinite or NaN")
 %      if signed:
     // FIXME: Float80 doesn't have a _fromBitPattern
     // ${That}(roundTowardsZero: ${Self}.min)
     // > ${getMinFloat(srcBits, incIfSigned(intFormatFix(bits), signed))}
     _precondition(other >= ${That}._fromBitPattern(${getMinFloat(srcBits,
       incIfSigned(intFormatFix(bits), signed))}),
-      "floating point value can not be converted to ${Self} because it is less than ${Self}.min")
+      "floating point value cannot be converted to ${Self} because it is less than ${Self}.min")
 %      else:
     _precondition(other >= (0.0 as ${That}),
-      "floating point value can not be converted to ${Self} because it is less than ${Self}.min")
+      "floating point value cannot be converted to ${Self} because it is less than ${Self}.min")
 %      end
     // ${That}(roundTowardsZero: ${Self}.max)
     // > ${getMaxFloat(srcBits, incIfSigned(intFormatFix(bits), signed))}
     _precondition(other <= ${That}._fromBitPattern(${getMaxFloat(srcBits,
       incIfSigned(intFormatFix(bits), signed))}),
-      "floating point value can not be converted to ${Self} because it is greater than ${Self}.max")
+      "floating point value cannot be converted to ${Self} because it is greater than ${Self}.max")
 
 %     end
     self._value =

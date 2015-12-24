@@ -46,7 +46,7 @@ extension String {
   ///   that is the target of this method) during the execution of
   ///   `body`: it may not appear to have its correct value.  Instead,
   ///   use only the `String.CharacterView` argument to `body`.
-  public mutating func withMutableCharacters<R>(body: (inout CharacterView)->R) -> R {
+  public mutating func withMutableCharacters<R>(body: (inout CharacterView) -> R) -> R {
     // Naively mutating self.characters forces multiple references to
     // exist at the point of mutation. Instead, temporarily move the
     // core of this string into a CharacterView.
@@ -88,7 +88,7 @@ extension String.CharacterView : CollectionType {
     ///
     /// - Requires: The next value is representable.
     public func successor() -> Index {
-      _precondition(_base != _base._viewEndIndex, "can not increment endIndex")
+      _precondition(_base != _base._viewEndIndex, "cannot increment endIndex")
       return Index(_base: _endBase)
     }
 
@@ -97,7 +97,7 @@ extension String.CharacterView : CollectionType {
     /// - Requires: The previous value is representable.
     public func predecessor() -> Index {
       _precondition(_base != _base._viewStartIndex,
-          "can not decrement startIndex")
+          "cannot decrement startIndex")
       let predecessorLengthUTF16 =
           Index._measureExtendedGraphemeClusterBackward(_base)
       return Index(
@@ -143,9 +143,9 @@ extension String.CharacterView : CollectionType {
 
       var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
           unicodeScalars[start].value)
-      ++start
+      start._successorInPlace()
 
-      for ; start != end; ++start {
+      for ; start != end; start._successorInPlace() {
         // FIXME(performance): consider removing this "fast path".  A branch
         // that is hard to predict could be worse for performance than a few
         // loads from cache to fetch the property 'gcb1'.
@@ -182,14 +182,14 @@ extension String.CharacterView : CollectionType {
 
       var graphemeClusterStart = end
 
-      --graphemeClusterStart
+      graphemeClusterStart._predecessorInPlace()
       var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
           unicodeScalars[graphemeClusterStart].value)
 
       var graphemeClusterStartUTF16 = graphemeClusterStart._position
 
       while graphemeClusterStart != start {
-        --graphemeClusterStart
+        graphemeClusterStart._predecessorInPlace()
         let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(
             unicodeScalars[graphemeClusterStart].value)
         if segmenter.isBoundary(gcb1, gcb0) {
@@ -242,7 +242,7 @@ extension String.CharacterView : CollectionType {
 
     var valueType: Any.Type { return (_value as Any).dynamicType }
 
-    var objectIdentifier: ObjectIdentifier? { return .None }
+    var objectIdentifier: ObjectIdentifier? { return nil }
 
     var disposition: _MirrorDisposition { return .Aggregate }
 
@@ -255,7 +255,7 @@ extension String.CharacterView : CollectionType {
     var summary: String { return "\(_value._utf16Index)" }
 
     var quickLookObject: PlaygroundQuickLook? {
-      return .Some(.Int(Int64(_value._utf16Index)))
+      return .Int(Int64(_value._utf16Index))
     }
   }
 }

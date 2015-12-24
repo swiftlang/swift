@@ -39,7 +39,7 @@ using namespace swift;
 
 enum BlockIDs {
   /// \brief A top-level block which represents any meta data associated
-  /// with the diagostics, including versioning of the format.
+  /// with the diagnostics, including versioning of the format.
   BLOCK_META = llvm::bitc::FIRST_APPLICATION_BLOCKID,
 
   /// \brief The this block acts as a container for all the information
@@ -382,7 +382,7 @@ void SerializedDiagnosticConsumer::emitBlockInfoBlock() {
   Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Blob)); // Diagnostc text.
   Abbrevs.set(RECORD_DIAG, Stream.EmitBlockInfoAbbrev(BLOCK_DIAG, Abbrev));
 
-  // Emit abbrevation for RECORD_CATEGORY.
+  // Emit abbreviation for RECORD_CATEGORY.
   Abbrev = new BitCodeAbbrev();
   Abbrev->Add(BitCodeAbbrevOp(RECORD_CATEGORY));
   Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 16)); // Category ID.
@@ -390,7 +390,7 @@ void SerializedDiagnosticConsumer::emitBlockInfoBlock() {
   Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Blob));      // Category text.
   Abbrevs.set(RECORD_CATEGORY, Stream.EmitBlockInfoAbbrev(BLOCK_DIAG, Abbrev));
 
-  // Emit abbrevation for RECORD_SOURCE_RANGE.
+  // Emit abbreviation for RECORD_SOURCE_RANGE.
   Abbrev = new BitCodeAbbrev();
   Abbrev->Add(BitCodeAbbrevOp(RECORD_SOURCE_RANGE));
   addRangeLocationAbbrev(Abbrev);

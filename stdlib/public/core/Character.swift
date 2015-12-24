@@ -120,7 +120,7 @@ public struct Character :
   @warn_unused_result
   static func _smallSize(value: UInt64) -> Int {
     var mask: UInt64 = 0xFF
-    for var i = 0; i < 8; ++i {
+    for var i = 0; i < 8; i += 1 {
       if (value & mask) == mask {
         return i
       }
@@ -165,7 +165,7 @@ public struct Character :
     subscript(position: Int) -> UTF8.CodeUnit {
       _sanityCheck(position >= 0)
       _sanityCheck(position < Int(count))
-      // Note: using unchecked arithmetic because overflow can not happen if the
+      // Note: using unchecked arithmetic because overflow cannot happen if the
       // above sanity checks hold.
       return UTF8.CodeUnit(
         truncatingBitPattern: data >> (UInt64(position) &* 8))
@@ -237,7 +237,7 @@ public struct Character :
     subscript(position: Int) -> UTF16.CodeUnit {
       _sanityCheck(position >= 0)
       _sanityCheck(position < Int(count))
-      // Note: using unchecked arithmetic because overflow can not happen if the
+      // Note: using unchecked arithmetic because overflow cannot happen if the
       // above sanity checks hold.
       return UTF16.CodeUnit(truncatingBitPattern:
         data >> ((UInt64(count) &- UInt64(position) &- 1) &* 16))

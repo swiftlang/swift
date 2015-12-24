@@ -117,7 +117,7 @@ func rdar20142523() {
   map(0..<10, { x in // expected-error{{cannot invoke 'map' with an argument list of type '(Range<Int>, (_) -> _)'}}
     // expected-note @-1 {{overloads for 'map' exist with these partially matching parameter lists: (C, (C.Generator.Element) -> T), (T?, @noescape (T) -> U)}}
     ()
-    return x  // expected-error {{type of expression is ambiguous without more context}}
+    return x
   })
 }
 
@@ -339,7 +339,7 @@ c.method2(1.0)(b: 2.0) // expected-error {{cannot convert value of type 'Double'
 CurriedClass.method1(c)()
 _ = CurriedClass.method1(c)
 CurriedClass.method1(c)(1)         // expected-error {{argument passed to call that takes no arguments}}
-CurriedClass.method1(2.0)(1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'CurriedClass'}}
+CurriedClass.method1(2.0)(1)       // expected-error {{use of instance member 'method1' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
 
 CurriedClass.method2(c)(32)(b: 1)
 _ = CurriedClass.method2(c)
@@ -380,7 +380,7 @@ CurriedClass.m1(2, b: 42)   // expected-error {{use of instance member 'm1' on t
 
 
 // <rdar://problem/22108559> QoI: Confusing error message when calling an instance method as a class method
-CurriedClass.m2(12)  // expected-error {{cannot convert value of type 'Int' to expected argument type 'CurriedClass'}}
+CurriedClass.m2(12)  // expected-error {{use of instance member 'm2' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
 
 
 
@@ -425,8 +425,7 @@ func f20371273() {
 // FIXME: Should complain about not having a return type annotation in the closure.
 [0].map { _ in let r =  (1,2).0;  return r }
 // expected-error @-1 {{cannot invoke 'map' with an argument list of type '(@noescape (Int) throws -> _)'}}
-// expected-error @-2 {{cannot convert return expression of type 'Int' to return type 'T'}}
-// expected-note @-3 {{expected an argument list of type '(@noescape Int throws -> T)'}}
+// expected-note @-2 {{expected an argument list of type '(@noescape Int throws -> T)'}}
 
 // <rdar://problem/21078316> Less than useful error message when using map on optional dictionary type
 func rdar21078316() {
@@ -676,4 +675,13 @@ func r23272739(contentType: String) {
   return actualAcceptableContentTypes.contains(contentType)  // expected-error {{unexpected non-void return value in void function}}
 }
 
+// <rdar://problem/23641896> QoI: Strings in Swift cannot be indexed directly with integer offsets
+func r23641896() {
+  var g = "Hello World"
+  g.replaceRange(0...2, with: "ce")  // expected-error {{String may not be indexed with 'Int', it has variable size elements}}
+  // expected-note @-1 {{consider using an existing high level algorithm, str.startIndex.advancedBy(n), or a projection like str.utf8}}
+
+  _ = g[12]  // expected-error {{'subscript' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}}
+
+}
 

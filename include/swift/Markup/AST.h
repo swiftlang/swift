@@ -199,15 +199,19 @@ public:
 
 class CodeBlock final : public MarkupASTNode {
   StringRef LiteralContent;
+  StringRef Language;
 
-  CodeBlock(StringRef LiteralContent)
+  CodeBlock(StringRef LiteralContent, StringRef Langauge)
       : MarkupASTNode(ASTNodeKind::CodeBlock),
-        LiteralContent(LiteralContent) {}
+        LiteralContent(LiteralContent),
+        Language(Langauge) {}
 
 public:
-  static CodeBlock *create(MarkupContext &MC, StringRef LiteralContent);
+  static CodeBlock *create(MarkupContext &MC, StringRef LiteralContent,
+                           StringRef Language);
 
   StringRef getLiteralContent() const { return LiteralContent; };
+  StringRef getLanguage() const { return Language; };
 
   ArrayRef<const MarkupASTNode *> getChildren() const {
     return {};

@@ -89,7 +89,7 @@ public protocol MutableIndexable {
 ///      }
 public struct IndexingGenerator<Elements : Indexable>
  : GeneratorType, SequenceType {
-  
+
   /// Create a *generator* over the given collection.
   public init(_ elements: Elements) {
     self._elements = elements
@@ -101,8 +101,10 @@ public struct IndexingGenerator<Elements : Indexable>
   ///
   /// - Requires: No preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> Elements._Element? {
-    return _position == _elements.endIndex
-    ? .None : .Some(_elements[_position++])
+    if _position == _elements.endIndex { return nil }
+    let element = _elements[_position]
+    _position._successorInPlace()
+    return element
   }
 
   internal let _elements: Elements
@@ -136,11 +138,11 @@ public protocol CollectionType : Indexable, SequenceType {
   // a custom generate() function.  Otherwise we get an
   // IndexingGenerator. <rdar://problem/21539115>
   func generate() -> Generator
-  
+
   // FIXME: should be constrained to CollectionType
   // (<rdar://problem/20715009> Implement recursive protocol
   // constraints)
-  
+
   /// A `SequenceType` that can represent a contiguous subrange of `self`'s
   /// elements.
   ///
@@ -185,10 +187,10 @@ public protocol CollectionType : Indexable, SequenceType {
   /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
   ///   O(N) otherwise.
   var count: Index.Distance { get }
-  
+
   // The following requirement enables dispatching for indexOf when
   // the element type is Equatable.
-  
+
   /// Returns `Optional(Optional(index))` if an element was found;
   /// `nil` otherwise.
   ///
@@ -450,14 +452,14 @@ extension CollectionType {
     while subSequenceEnd != cachedEndIndex {
       if try isSeparator(self[subSequenceEnd]) {
         let didAppend = appendSubsequence(end: subSequenceEnd)
-        ++subSequenceEnd
+        subSequenceEnd._successorInPlace()
         subSequenceStart = subSequenceEnd
         if didAppend && result.count == maxSplit {
           break
         }
         continue
       }
-      ++subSequenceEnd
+      subSequenceEnd._successorInPlace()
     }
 
     if subSequenceStart != cachedEndIndex || allowEmptySlices {
@@ -603,7 +605,7 @@ extension SequenceType
 }
 
 extension CollectionType {
-  public func _preprocessingPass<R>(preprocess: (Self)->R) -> R? {
+  public func _preprocessingPass<R>(@noescape preprocess: (Self) -> R) -> R? {
     return preprocess(self)
   }
 }
@@ -726,16 +728,16 @@ internal func _writeBackMutableSlice<
     newElementIndex != newElementsEndIndex {
 
     self_[selfElementIndex] = slice[newElementIndex]
-    selfElementIndex = selfElementIndex.successor()
-    newElementIndex = newElementIndex.successor()
+    selfElementIndex._successorInPlace()
+    newElementIndex._successorInPlace()
   }
 
   _precondition(
     selfElementIndex == selfElementsEndIndex,
-    "Can not replace a slice of a MutableCollectionType with a slice of a larger size")
+    "Cannot replace a slice of a MutableCollectionType with a slice of a larger size")
   _precondition(
     newElementIndex == newElementsEndIndex,
-    "Can not replace a slice of a MutableCollectionType with a slice of a smaller size")
+    "Cannot replace a slice of a MutableCollectionType with a slice of a smaller size")
 }
 
 /// Returns the range of `x`'s valid index values.
@@ -790,7 +792,7 @@ public protocol MutableSliceable : CollectionType, MutableCollectionType {
   subscript(_: Range<Index>) -> SubSequence { get set }
 }
 
-@available(*, unavailable, message="Use the dropFirst() method instead.") 
+@available(*, unavailable, message="Use the dropFirst() method instead.")
 public func dropFirst<Seq : CollectionType>(s: Seq) -> Seq.SubSequence {
   fatalError("unavailable function can't be called")
 }
@@ -817,4 +819,3 @@ public func suffix<
 
 @available(*, unavailable, renamed="CollectionType")
 public struct Sliceable {}
-

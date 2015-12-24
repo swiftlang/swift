@@ -108,7 +108,7 @@ private:
   /// functions into the thunk.
   unsigned Thunk : 2;
 
-  /// The visiblity of the parent class, if this is a method which is contained
+  /// The visibility of the parent class, if this is a method which is contained
   /// in the vtable of that class.
   unsigned ClassVisibility : 2;
     
@@ -281,7 +281,7 @@ public:
   /// Return the mangled name of this SILFunction.
   StringRef getName() const { return Name; }
 
-  /// A convencience function which checks if the function has a specific
+  /// A convenience function which checks if the function has a specific
   /// \p name. It is equivalent to getName() == Name, but as it is not
   /// inlined it can be called from the debugger.
   bool hasName(const char *Name) const;
@@ -300,7 +300,7 @@ public:
 
   /// Get's the effective linkage which is used to derive the llvm linkage.
   /// Usually this is the same as getLinkage(), except in one case: if this
-  /// function is a method in a class which has higher visiblity than the
+  /// function is a method in a class which has higher visibility than the
   /// method itself, the function can be referenced from vtables of derived
   /// classes in other compilation units.
   SILLinkage getEffectiveSymbolLinkage() const {
@@ -517,7 +517,6 @@ public:
     return std::find_if(begin(), end(),
       [](const SILBasicBlock &BB) -> bool {
         const TermInst *TI = BB.getTerminator();
-        // TODO: We autorelease_return should also be handled here.
         return isa<ReturnInst>(TI);
     });
   }
@@ -547,17 +546,17 @@ public:
   //===--------------------------------------------------------------------===//
 
   SILArgument *getArgument(unsigned i) {
-    assert(!empty() && "Can not get argument of a function without a body");
+    assert(!empty() && "Cannot get argument of a function without a body");
     return begin()->getBBArg(i);
   }
 
   const SILArgument *getArgument(unsigned i) const {
-    assert(!empty() && "Can not get argument of a function without a body");
+    assert(!empty() && "Cannot get argument of a function without a body");
     return begin()->getBBArg(i);
   }
 
   ArrayRef<SILArgument *> getArguments() const {
-    assert(!empty() && "Can not get arguments of a function without a body");
+    assert(!empty() && "Cannot get arguments of a function without a body");
     return begin()->getBBArgs();
   }
 

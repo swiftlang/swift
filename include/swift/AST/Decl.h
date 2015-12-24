@@ -209,7 +209,7 @@ enum class CircularityCheck {
   Checked
 };
 
-/// Keeps track of whrther a given class inherits initializers from its
+/// Keeps track of whether a given class inherits initializers from its
 /// superclass.
 enum class StoredInheritsSuperclassInits {
   /// We have not yet checked.
@@ -1559,7 +1559,7 @@ public:
 
   /// Returns the most appropriate import kind for the given list of decls.
   ///
-  /// If the list is non-homogenous, or if there is more than one decl that
+  /// If the list is non-homogeneous, or if there is more than one decl that
   /// cannot be overloaded, returns None.
   static Optional<ImportKind> findBestImportKind(ArrayRef<ValueDecl *> Decls);
 
@@ -2242,16 +2242,6 @@ public:
   /// If \p DC is null, returns true only if this declaration is public.
   bool isAccessibleFrom(const DeclContext *DC) const;
 
-  /// Get the innermost declaration context that can provide generic
-  /// parameters used within this declaration.
-  DeclContext *getPotentialGenericDeclContext();
-
-  /// Get the innermost declaration context that can provide generic
-  /// parameters used within this declaration.
-  const DeclContext *getPotentialGenericDeclContext() const {
-    return const_cast<ValueDecl *>(this)->getPotentialGenericDeclContext();
-  }
-
   /// Retrieve the "interface" type of this value, which is the type used when
   /// the declaration is viewed from the outside. For a generic function,
   /// this will have generic function type using generic parameters rather than
@@ -2808,7 +2798,7 @@ public:
     return ValidatingGenericSignature;
   }
   
-  /// \brief Returns true if this this decl contains delayed value or protocol
+  /// \brief Returns true if this decl contains delayed value or protocol
   /// declarations.
   bool hasDelayedMembers() const {
     return NominalTypeDeclBits.HasDelayedMembers;
@@ -2870,9 +2860,6 @@ public:
   GenericSignature *getGenericSignature() const {
     return GenericSig;
   }
-
-  /// Mark generic type signature as invalid.
-  void markInvalidGenericSignature();
 
   /// getDeclaredType - Retrieve the type declared by this entity.
   Type getDeclaredType() const { return DeclaredTy; }
@@ -3274,17 +3261,19 @@ public:
     return ClassDeclBits.Foreign;
   }
   void setForeign(bool isForeign = true) {
-    ClassDeclBits.Foreign = true;
+    ClassDeclBits.Foreign = isForeign;
   }
 
   /// Find a method of a class that overrides a given method.
   /// Return nullptr, if no such method exists.
-  FuncDecl *findOverridingDecl(const FuncDecl *method) const;
+  AbstractFunctionDecl *findOverridingDecl(
+      const AbstractFunctionDecl *method) const;
 
   /// Find a method implementation which will be used when a given method
   /// is invoked on an instance of this class. This implementation may stem
   /// either from a class itself or its direct or indirect superclasses.
-  FuncDecl *findImplementingMethod(const FuncDecl *method) const;
+  AbstractFunctionDecl *findImplementingMethod(
+      const AbstractFunctionDecl *method) const;
 
   /// True if the class has a destructor.
   ///
@@ -3958,7 +3947,7 @@ public:
     return getAddressorInfo().MutableAddress;
   }
 
-  /// \brief Return the approproiate addressor for the given access kind.
+  /// \brief Return the appropriate addressor for the given access kind.
   FuncDecl *getAddressorForAccess(AccessKind accessKind) const {
     if (accessKind == AccessKind::Read)
       return getAddressor();
@@ -4369,6 +4358,7 @@ protected:
   };
 
   GenericParamList *GenericParams;
+  GenericSignature *GenericSig;
 
   CaptureInfo Captures;
 
@@ -4377,7 +4367,7 @@ protected:
                        GenericParamList *GenericParams)
       : ValueDecl(Kind, Parent, Name, NameLoc),
         DeclContext(DeclContextKind::AbstractFunctionDecl, Parent),
-        Body(nullptr), GenericParams(nullptr) {
+        Body(nullptr), GenericParams(nullptr), GenericSig(nullptr) {
     setBodyKind(BodyKind::None);
     setGenericParams(GenericParams);
     AbstractFunctionDeclBits.NumParamPatterns = NumParamPatterns;
@@ -4394,6 +4384,17 @@ protected:
   }
 
   void setGenericParams(GenericParamList *GenericParams);
+  
+public:
+  void setGenericSignature(GenericSignature *GenericSig) {
+    assert(!this->GenericSig && "already have signature?");
+    this->GenericSig = GenericSig;
+  }
+  
+  GenericSignature *getGenericSignature() const {
+    return GenericSig;
+  }
+
 public:
   // FIXME: Hack that provides names with keyword arguments for accessors.
   DeclName getEffectiveFullName() const;
@@ -4429,14 +4430,14 @@ public:
   }
   void setBody(BraceStmt *S, BodyKind NewBodyKind = BodyKind::Parsed) {
     assert(getBodyKind() != BodyKind::Skipped &&
-           "can not set a body if it was skipped");
+           "cannot set a body if it was skipped");
 
     Body = S;
     setBodyKind(NewBodyKind);
   }
 
   /// \brief Note that the body was skipped for this function.  Function body
-  /// can not be attached after this call.
+  /// cannot be attached after this call.
   void setBodySkipped(SourceRange bodyRange) {
     assert(getBodyKind() == BodyKind::None);
     BodyRange = bodyRange;
@@ -4557,11 +4558,7 @@ public:
   /// and return the type to be used for the 'self' argument of the type, or an
   /// empty Type() if no 'self' argument should exist.  This can
   /// only be used after name binding has resolved types.
-  ///
-  /// \param outerGenericParams If non-NULL, and this function is an instance
-  /// of a generic type, will be set to the generic parameter list of that
-  /// generic type.
-  Type computeSelfType(GenericParamList **outerGenericParams = nullptr);
+  Type computeSelfType();
 
   /// \brief If this is a method in a type or extension thereof, compute
   /// and return the type to be used for the 'self' argument of the interface
@@ -4589,6 +4586,10 @@ public:
 
   /// Retrieve the declaration that this method overrides, if any.
   AbstractFunctionDecl *getOverriddenDecl() const;
+
+  /// Returns true if a function declaration overrides a given
+  /// method from its direct or indirect superclass.
+  bool isOverridingDecl(const AbstractFunctionDecl *method) const;
 
   /// Whether the declaration is later overridden in the module
   ///
@@ -4929,10 +4930,6 @@ public:
     FuncDeclBits.ForcedStaticDispatch = flag;
   }
 
-  /// Returns true if a function declaration overrides a given
-  /// method from its direct or indirect superclass.
-  bool isOverridingDecl(const FuncDecl *method) const;
-  
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }
   static bool classof(const AbstractFunctionDecl *D) {
     return classof(static_cast<const Decl*>(D));

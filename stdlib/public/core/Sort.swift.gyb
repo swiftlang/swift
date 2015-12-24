@@ -45,7 +45,7 @@ func _insertionSort<
 >(
   inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
 ) {
   if !range.isEmpty {
     let start = range.startIndex
@@ -56,7 +56,8 @@ func _insertionSort<
 
     // One element is trivially already-sorted, thus pre-increment
     // Continue until the sorted elements cover the whole sequence
-    while (++sortedEnd != range.endIndex) {
+    sortedEnd._successorInPlace()
+    while sortedEnd != range.endIndex {
       // get the first unsorted element
       let x: C.Generator.Element = elements[sortedEnd]
 
@@ -73,13 +74,14 @@ func _insertionSort<
 
         // Move y forward
         elements[i] = predecessor
-      }
-      while --i != start
+        i._predecessorInPlace()
+      } while i != start
 
       if i != sortedEnd {
         // Plop x into position
         elements[i] = x
       }
+      sortedEnd._successorInPlace()
     }
   }
 }
@@ -100,7 +102,7 @@ public func partition<
 >(
   inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
 ) -> C.Index {
   fatalError("unavailable function can't be called")
 }
@@ -111,7 +113,7 @@ func _partition<
 >(
   inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
 ) -> C.Index {
   var lo = range.startIndex
   var hi = range.endIndex
@@ -130,15 +132,19 @@ func _partition<
 
 Loop: while true {
   FindLo: repeat {
-      while ++lo != hi {
+      lo._successorInPlace()
+      while lo != hi {
         if !${cmp("elements[lo]", "pivot", p)} { break FindLo }
+        lo._successorInPlace()
       }
       break Loop
     } while false
 
   FindHi: repeat {
-      while --hi != lo {
+      hi._predecessorInPlace()
+      while hi != lo {
         if ${cmp("elements[hi]", "pivot", p)} { break FindHi }
+        hi._predecessorInPlace()
       }
       break Loop
     } while false
@@ -146,7 +152,7 @@ Loop: while true {
     swap(&elements[lo], &elements[hi])
   }
 
-  --lo
+  lo._predecessorInPlace()
   if lo != range.startIndex {
     // swap the pivot into place
     swap(&elements[lo], &elements[range.startIndex])
@@ -162,7 +168,7 @@ func _introSort<
 >(
   inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
 ) {
 %   if p:
   var comp = isOrderedBefore
@@ -183,7 +189,7 @@ func _introSortImpl<
 >(
   inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""},
+  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""},
   _ depthLimit: Int
 ) {
 
@@ -215,7 +221,7 @@ func _siftDown<
   inout elements: C,
   _ index: C.Index,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
 ) {
   let countToIndex = (range.startIndex..<index).count
   let countFromIndex = (index..<range.endIndex).count
@@ -249,7 +255,7 @@ func _heapify<
 >(
   inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
 ) {
   // Here we build a heap starting from the lowest nodes and moving to the root.
   // On every step we sift down the current node to obey the max-heap property:
@@ -259,7 +265,8 @@ func _heapify<
   // any children.
   let root = range.startIndex
   var node = root.advancedBy(C.Index.Distance(range.count.toIntMax()/2))
-  while node-- != root {
+  while node != root {
+    node._predecessorInPlace()
     _siftDown(&elements, node, range ${", &isOrderedBefore" if p else ""})
   }
 }
@@ -269,14 +276,16 @@ func _heapSort<
 >(
   inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
 ) {
   var hi = range.endIndex
   let lo = range.startIndex
   _heapify(&elements, range ${", &isOrderedBefore" if p else ""})
-  while --hi != lo {
+  hi._predecessorInPlace()
+  while hi != lo {
     swap(&elements[lo], &elements[hi])
     _siftDown(&elements, lo, lo..<hi ${", &isOrderedBefore" if p else ""})
+    hi._predecessorInPlace()
   }
 }
 
@@ -303,7 +312,7 @@ public func sort<
   ${"" if p else ", C.Generator.Element : Comparable"}
 >(
   inout collection: C ${"," if p else ""}
-  ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
 ) {
   fatalError("unavailable function can't be called")
 }
@@ -351,7 +360,7 @@ public func sorted<
   C: SequenceType${"" if p else " where C.Generator.Element : Comparable"}
 >(
   source: C ${"," if p else ""}
-  ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool" if p else ""}
 ) -> [C.Generator.Element] {
   fatalError("unavailable function can't be called")
 }
@@ -359,6 +368,8 @@ public func sorted<
 // for p in preds
 
 /// Exchange the values of `a` and `b`.
+///
+/// - Requires: `a` and `b` do not alias each other.
 public func swap<T>(inout a : T, inout _ b : T) {
   // Semantically equivalent to (a, b) = (b, a).
   // Microoptimized to avoid retain/release traffic.

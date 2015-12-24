@@ -5,6 +5,14 @@
 
 import StdlibUnittest
 
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 protocol TestProtocol1 {}
 
 // Check that the generic parameter is called 'Memory'.
@@ -124,7 +132,7 @@ class Missile {
   static var missilesLaunched = 0
   let number: Int
   init(_ number: Int) { self.number = number }
-  deinit { Missile.missilesLaunched++ }
+  deinit { Missile.missilesLaunched += 1 }
 }
 
 func checkPointerCorrectness(check: Check,

@@ -106,7 +106,7 @@ public:
     class_addProtocol = IGM.getClassAddProtocolFn();
 
     CanType origTy = ext->getDeclaredTypeOfContext()->getCanonicalType();
-    classMetadata = tryEmitConstantHeapMetadataRef(IGM, origTy);
+    classMetadata = tryEmitConstantTypeMetadataRef(IGM, origTy);
     assert(classMetadata &&
            "extended objc class doesn't have constant metadata?!");
     classMetadata = llvm::ConstantExpr::getBitCast(classMetadata,
@@ -461,10 +461,10 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
 /// metadata or runtime purposes.
 static llvm::GlobalVariable *
 emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakVH> handles,
-                           StringRef name, StringRef section,
-                           llvm::GlobalValue::LinkageTypes linkage,
-                           llvm::Type *eltTy,
-                           bool isConstant) {
+               StringRef name, StringRef section,
+               llvm::GlobalValue::LinkageTypes linkage,
+               llvm::Type *eltTy,
+               bool isConstant) {
   // Do nothing if the list is empty.
   if (handles.empty()) return nullptr;
 
@@ -685,11 +685,12 @@ void IRGenModule::emitGlobalLists() {
     ExistingLLVMUsed->eraseFromParent();
   }
 
-  assert(std::all_of(LLVMUsed.begin(), LLVMUsed.end(),
-                     [](const llvm::WeakVH &global) {
-    return !isa<llvm::GlobalValue>(global) ||
-           !cast<llvm::GlobalValue>(global)->isDeclaration();
-  }) && "all globals in the 'used' list must be definitions");
+  std::for_each(LLVMUsed.begin(), LLVMUsed.end(),
+                [](const llvm::WeakVH &global) {
+    assert(!isa<llvm::GlobalValue>(global) ||
+           !cast<llvm::GlobalValue>(global)->isDeclaration() &&
+           "all globals in the 'used' list must be definitions");
+  });
   emitGlobalList(*this, LLVMUsed, "llvm.used", "llvm.metadata",
                  llvm::GlobalValue::AppendingLinkage,
                  Int8PtrTy,
@@ -832,7 +833,7 @@ void IRGenModule::emitVTableStubs() {
       continue;
     
     if (!stub) {
-      // Create a single stub function which calls swift_reportMissingMethod().
+      // Create a single stub function which calls swift_deletedMethodError().
       stub = llvm::Function::Create(llvm::FunctionType::get(VoidTy, false),
                                     llvm::GlobalValue::LinkOnceODRLinkage,
                                     "_swift_dead_method_stub");
@@ -841,7 +842,7 @@ void IRGenModule::emitVTableStubs() {
       stub->setVisibility(llvm::GlobalValue::HiddenVisibility);
       stub->setCallingConv(RuntimeCC);
       auto *entry = llvm::BasicBlock::Create(getLLVMContext(), "entry", stub);
-      auto *errorFunc = getDeadMethodErrorFn();
+      auto *errorFunc = getDeletedMethodErrorFn();
       llvm::CallInst::Create(errorFunc, ArrayRef<llvm::Value *>(), "", entry);
       new llvm::UnreachableInst(getLLVMContext(), entry);
     }
@@ -997,9 +998,8 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
     case MetadataAccessStrategy::PrivateAccessor:
       return getSILLinkage(FormalLinkage::Private, forDefinition);
     case MetadataAccessStrategy::NonUniqueAccessor:
-      return SILLinkage::Shared;
     case MetadataAccessStrategy::Direct:
-      llvm_unreachable("metadata accessor for type with direct access?");
+      return SILLinkage::Shared;
     }
     llvm_unreachable("bad metadata access kind");
 
@@ -2588,7 +2588,14 @@ StringRef IRGenModule::mangleType(CanType type, SmallVectorImpl<char> &buffer) {
   return StringRef(buffer.data(), buffer.size());
 }
 
-/// Is the given declaration resilient?
+/// Do we have to use resilient access patterns when working with this
+/// declaration?
+///
+/// IRGen is primarily concerned with resilient handling of the following:
+/// - For structs, a struct's size might change
+/// - For enums, new cases can be added
+/// - For classes, the superclass might change the size or number
+///   of stored properties
 bool IRGenModule::isResilient(Decl *D, ResilienceScope scope) {
   auto NTD = dyn_cast<NominalTypeDecl>(D);
   if (!NTD)
@@ -2602,6 +2609,23 @@ bool IRGenModule::isResilient(Decl *D, ResilienceScope scope) {
   }
 
   llvm_unreachable("Bad resilience scope");
+}
+
+// The most general resilience scope where the given declaration is visible.
+ResilienceScope IRGenModule::getResilienceScopeForAccess(NominalTypeDecl *decl) {
+  if (decl->getModuleContext() == SILMod->getSwiftModule() &&
+      decl->getFormalAccess() != Accessibility::Public)
+    return ResilienceScope::Component;
+  return ResilienceScope::Universal;
+}
+
+// The most general resilience scope which has knowledge of the declaration's
+// layout. Calling isResilient() with this scope will always return false.
+ResilienceScope IRGenModule::getResilienceScopeForLayout(NominalTypeDecl *decl) {
+  if (isResilient(decl, ResilienceScope::Universal))
+    return ResilienceScope::Component;
+
+  return getResilienceScopeForAccess(decl);
 }
 
 /// Fetch the witness table access function for a protocol conformance.

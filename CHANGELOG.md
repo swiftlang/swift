@@ -1,5 +1,28 @@
 Latest
 ------
+
+* The ++ and -- operators have been deprecated, and are slated to be removed in
+  Swift 3.0.  As a replacement, please use "x += 1" on integer or floating point
+  types, and "x = x.successor()" on Index types.
+
+* The operator identifier lexer grammar has been revised to simplify the rules
+  for operators that start with a dot (".").  The new rule is that an operator
+  that starts with a dot may contain other dots in it, but operators that start
+  with some other character may not contain dots.  For example:
+ 
+    ```
+    x....foo   --> "x" "...." "foo"
+    x&%^.foo   --> "x" "&%^"  ".foo"
+    ```
+
+  This eliminates a special case for the ..< operator, folding it into a simple
+  and consistent rule.
+
+* The "C-style for loop", which is spelled `for init; comparison; increment {}`
+  has been deprecated and is slated for removal in Swift 3.0.  See
+  [SE-0007](https://github.com/apple/swift-evolution/blob/master/proposals/0007-remove-c-style-for-loops.md)
+  for more information.
+
 * Three new doc comment fields, namely `- keyword:`, `- recommended:`
   and `- recommendedover:`, allow Swift users to cooperate with code
   completion engine to deliver more effective code completion results.
@@ -31,7 +54,8 @@ Latest
 * `ArraySlice.removeFirst()` now preserves element indices.
 
 * Global `anyGenerator()` functions have been changed into initializers on
-  `AnyGenerator`, making the API more intuitive and idiomatic.
+  `AnyGenerator`, making the API more intuitive and idiomatic.  They have been
+  deprecated in Swift 2.2, and will be removed in Swift 3.
 
 * Closures appearing inside generic types and generic methods can now be
   converted to C function pointers as long as no generic type parameters
@@ -58,6 +82,14 @@ Latest
 
   **(rdar://problem/21683348)**
 
+* Argument labels and parameter names can now be any keyword except
+  `var`, `let`, or `inout`. For example:
+
+    NSURLProtectionSpace(host: "somedomain.com", port: 443, protocol: "https", realm: "Some Domain", authenticationMethod: "Basic")
+
+  would previously have required `protocol` to be surrounded in
+  back-ticks. For more information, see
+  [SE-0001](https://github.com/apple/swift-evolution/blob/master/proposals/0001-keywords-as-argument-labels.md).
 
 2015-09-17 [Xcode 7.1, Swift 2.1]
 ----------
@@ -67,7 +99,7 @@ Latest
   allows you to use C enum pattern matching in switch statements with no
   additional code. **(17287720)**
 
-* The `NSNumberunsignedIntegerValue` property now has the type `UInt` instead
+* The `NSNumber.unsignedIntegerValue` property now has the type `UInt` instead
   of `Int`, as do other methods and properties that use the `NSUInteger` type
   in Objective-C and whose names contain `unsigned..`. Most other uses of
   `NSUInteger` in system frameworks are imported as `Int` as they were in
@@ -75,7 +107,7 @@ Latest
 
 * Field getters and setters are now created for named unions imported from C.
   In addition, an initializer with a named parameter for the field is provided.
-  For example, given the following Objective-C `typdef`:
+  For example, given the following Objective-C `typedef`:
 
   ```objc
   typedef union IntOrFloat {
@@ -2891,7 +2923,7 @@ Latest
     @_silgen_name("foo") @objc
     ```
 
-  The `,` was vestigial when the attribute syntax consisted of bracked lists.
+  The `,` was vestigial when the attribute syntax consisted of bracket lists.
 
 * `switch` now always requires a statement after a `case` or `default`.
 
@@ -3106,7 +3138,7 @@ Latest
   inference (e.g. when passing a function argument).
 
 * Properties defined in classes are now dynamically dispatched and can be
-  overriden with `@override`.  Currently `@override` only works with computed properties
+  overridden with `@override`.  Currently `@override` only works with computed properties
   overriding other computed properties, but this will be enhanced in coming weeks.
 
 
@@ -3190,7 +3222,7 @@ Latest
     ```
 
 * The compiler now warns about cases where a variable is inferred to have
-  `AnyObject`, `AnyClass`, or `()` type, since type inferrence can turn a simple
+  `AnyObject`, `AnyClass`, or `()` type, since type inference can turn a simple
   mistake (e.g. failing to cast an `AnyObject` when you meant to) into something
   with ripple effects.  Here is a simple example:
 
@@ -3386,7 +3418,7 @@ Latest
   `#if` block.
 
   Target configurations are tested against their values via a pseudo-function
-  invocation expression, taking a single argument expressed as an identitifer.
+  invocation expression, taking a single argument expressed as an identifier.
   The argument represents certain static build-time information.
 
   There are currently two supported target configurations:
@@ -4708,7 +4740,7 @@ Latest
     ```
 
 * Attribute syntax has been redesigned (see **(rdar://10700853)** and
-  **(rdar://14462729)**) so that attributes now preceed the declaration and use
+  **(rdar://14462729)**) so that attributes now precede the declaration and use
   the `@` character to signify them.  Where before you might have written:
 
     ```swift
@@ -4830,7 +4862,7 @@ Latest
     ```
 
   checks whether `object` has a value and, if so, asks for the length of
-  its title.  `titleLength` wil have type `Int?`, and if `object` was
+  its title.  `titleLength` will have type `Int?`, and if `object` was
   missing, the variable will be initialized to None.
 
 * Objects with type `id` can now be used as the receiver of property
@@ -5293,5 +5325,5 @@ Latest
 
 * `POSIX.EnvironmentVariables` and `swift.CommandLineArguments` global variables
   were merged into a `swift.Process` variable.  Now you can access command line
-  arguments with `Process.arguments`.  In order to acces environment variables
+  arguments with `Process.arguments`.  In order to access environment variables
   add `import POSIX` and use `Process.environmentVariables`.

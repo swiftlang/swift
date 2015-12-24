@@ -526,7 +526,7 @@ struct DidSetWillSetTests: ForceAccessors {
 
   // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[SELFBOX:%.*]]#1 : $*DidSetWillSetTests, #DidSetWillSetTests.a
   // CHECK-NEXT: [[OLDVAL:%.*]] = load [[AADDR]] : $*Int
-  // CHECK-NEXT: debug_value [[OLDVAL]] : $Int  // let tmp
+  // CHECK-NEXT: debug_value [[OLDVAL]] : $Int, let, name "tmp"
 
   // CHECK-NEXT: // function_ref {{.*}}.DidSetWillSetTests.a.willset : Swift.Int
   // CHECK-NEXT: [[WILLSETFN:%.*]] = function_ref @_TFV10properties18DidSetWillSetTestsw1a
@@ -668,9 +668,9 @@ func propertyWithDidSetTakingOldValue() {
 // CHECK: // properties.(propertyWithDidSetTakingOldValue () -> ()).(p #1).setter : Swift.Int
 // CHECK-NEXT: sil {{.*}} @_TFF10properties32propertyWithDidSetTakingOldValue
 // CHECK: bb0(%0 : $Int, %1 : $@box Int):
-// CHECK-NEXT:  debug_value %0 : $Int  // let newValue, argno: 1
+// CHECK-NEXT:  debug_value %0 : $Int, let, name "newValue", argno 1
 // CHECK-NEXT:  %3 = project_box %1
-// CHECK-NEXT:  debug_value_addr %3 : $*Int  // var p, argno: 2
+// CHECK-NEXT:  debug_value_addr %3 : $*Int, var, name "p", argno 2
 // CHECK-NEXT:  %5 = load %3 : $*Int
 // CHECK-NEXT:  debug_value %5 : $Int
 // CHECK-NEXT:  assign %0 to %3 : $*Int
@@ -998,7 +998,7 @@ struct MutatingGetterStruct {
   }
 
   // CHECK-LABEL: sil hidden @_TZFV10properties20MutatingGetterStruct4test
-  // CHECK: [[X:%.*]] = alloc_box $MutatingGetterStruct  // var x
+  // CHECK: [[X:%.*]] = alloc_box $MutatingGetterStruct, var, name "x"
   // CHECK: store {{.*}} to [[X]]#1 : $*MutatingGetterStruct
   // CHECK: apply {{%.*}}([[X]]#1) : $@convention(method) (@inout MutatingGetterStruct) -> Int
   static func test() {

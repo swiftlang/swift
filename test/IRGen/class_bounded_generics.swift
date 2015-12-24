@@ -257,6 +257,6 @@ func class_bounded_metatype<T: SomeSwiftClass>(t : T) {
   t.dynamicType.foo()
 }
 
-class WeakRef<T: AnyObject>  {
+class WeakRef<T: AnyObject> {
   weak var value: T?
 }

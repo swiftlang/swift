@@ -65,7 +65,7 @@ CodeCompletionCommandKind getCommandKind(StringRef Command) {
   return CodeCompletionCommandKind::none;
 }
 
-StringRef getCommnadName(CodeCompletionCommandKind Kind) {
+StringRef getCommandName(CodeCompletionCommandKind Kind) {
 #define CHECK_CASE(KIND)                                                    \
   if (CodeCompletionCommandKind::KIND == Kind) {                            \
     static std::string Name(#KIND);                                         \
@@ -75,7 +75,7 @@ StringRef getCommnadName(CodeCompletionCommandKind Kind) {
   CHECK_CASE(recommended)
   CHECK_CASE(recommendedover)
 #undef CHECK_CASE
-  llvm_unreachable("Can not handle this Kind.");
+  llvm_unreachable("Cannot handle this Kind.");
 }
 
 bool containsInterestedWords(StringRef Content, StringRef Splitter,
@@ -179,7 +179,7 @@ public:
         auto Text = TC->getText();
         std::vector<StringRef> Subs;
         splitTextByComma(Text, Subs);
-        auto Kind = getCommnadName(CommandKind);
+        auto Kind = getCommandName(CommandKind);
         for (auto S : Subs)
           Words.push_back(std::make_pair(Kind, S));
       } else
@@ -223,7 +223,7 @@ public:
   void visitText(const Text *Text) override {
     if (Kind == CodeCompletionCommandKind::none)
       return;
-    StringRef CommandName = getCommnadName(Kind);
+    StringRef CommandName = getCommandName(Kind);
     std::vector<StringRef> Subs;
     splitTextByComma(Text->str(), Subs);
     for (auto S : Subs)
@@ -326,7 +326,7 @@ static Stmt *findNearestStmt(const AbstractFunctionDecl *AFD, SourceLoc Loc,
   auto &SM = AFD->getASTContext().SourceMgr;
   assert(SM.rangeContainsTokenLoc(AFD->getSourceRange(), Loc));
   StmtFinder Finder(SM, Loc, Kind);
-  // FIXME(thread-safety): the walker is is mutating the AST.
+  // FIXME(thread-safety): the walker is mutating the AST.
   const_cast<AbstractFunctionDecl *>(AFD)->walk(Finder);
   return Finder.getFoundStmt();
 }
@@ -1769,7 +1769,7 @@ public:
     assert(VD->isStatic() ||
            !(InsideStaticMethod &&
             VD->getDeclContext() == CurrentMethod->getDeclContext()) &&
-           "name lookup bug -- can not see an instance variable "
+           "name lookup bug -- cannot see an instance variable "
            "in a static function");
 
     CommandWordsPairs Pairs;
@@ -2057,7 +2057,7 @@ public:
     case LookupKind::EnumElement:
     case LookupKind::Type:
     case LookupKind::TypeInDeclContext:
-      llvm_unreachable("can not have a method call while doing a "
+      llvm_unreachable("cannot have a method call while doing a "
                        "type completion");
     case LookupKind::ImportFromModule:
       IsImplicitlyCurriedInstanceMethod = false;
@@ -2245,7 +2245,7 @@ public:
   }
 
   void addSubscriptCall(const SubscriptDecl *SD, DeclVisibilityKind Reason) {
-    assert(!HaveDot && "can not add a subscript after a dot");
+    assert(!HaveDot && "cannot add a subscript after a dot");
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
@@ -2463,11 +2463,11 @@ public:
       }
 
       if (auto *FD = dyn_cast<FuncDecl>(D)) {
-        // We can not call operators with a postfix parenthesis syntax.
+        // We cannot call operators with a postfix parenthesis syntax.
         if (FD->isBinaryOperator() || FD->isUnaryOperator())
           return;
 
-        // We can not call accessors.  We use VarDecls and SubscriptDecls to
+        // We cannot call accessors.  We use VarDecls and SubscriptDecls to
         // produce completions that refer to getters and setters.
         if (FD->isAccessor())
           return;
@@ -2525,11 +2525,11 @@ public:
       }
 
       if (auto *FD = dyn_cast<FuncDecl>(D)) {
-        // We can not call operators with a postfix parenthesis syntax.
+        // We cannot call operators with a postfix parenthesis syntax.
         if (FD->isBinaryOperator() || FD->isUnaryOperator())
           return;
 
-        // We can not call accessors.  We use VarDecls and SubscriptDecls to
+        // We cannot call accessors.  We use VarDecls and SubscriptDecls to
         // produce completions that refer to getters and setters.
         if (FD->isAccessor())
           return;
@@ -2798,7 +2798,7 @@ public:
     CodeCompletionResultBuilder builder(
         Sink, CodeCompletionResult::ResultKind::Pattern,
         SemanticContextKind::None, {});
-    // FIXME: we can't use the exclaimation mark chunk kind, or it isn't
+    // FIXME: we can't use the exclamation mark chunk kind, or it isn't
     // included in the completion name.
     builder.addTextChunk("!");
     assert(resultType);
@@ -3458,7 +3458,8 @@ public:
     }
     std::string Description = TargetName.str() + " Attribute";
 #define DECL_ATTR(KEYWORD, NAME, ...)                                         \
-    if (!DeclAttribute::isUserInaccessible(DAK_##NAME) &&                     \
+    if (!StringRef(#KEYWORD).startswith("_") &&                               \
+        !DeclAttribute::isUserInaccessible(DAK_##NAME) &&                     \
         !DeclAttribute::isDeclModifier(DAK_##NAME) &&                         \
         !DeclAttribute::shouldBeRejectedByParser(DAK_##NAME) &&               \
         (!DeclAttribute::isSilOnly(DAK_##NAME) || IsInSil)) {                 \
@@ -3669,7 +3670,7 @@ public:
       if (FD->isBinaryOperator() || FD->isUnaryOperator())
         return;
 
-      // We can not override individual accessors.
+      // We cannot override individual accessors.
       if (FD->isAccessor())
         return;
 
@@ -4186,6 +4187,7 @@ public:
         switch (S->getKind()) {
         case StmtKind::Return:
         case StmtKind::ForEach:
+        case StmtKind::RepeatWhile:
           return true;
         default:
           return false;
@@ -4246,6 +4248,15 @@ public:
                                 ParsedExpr->getSourceRange())) {
              Callback(Context.getSequenceTypeDecl()->getDeclaredInterfaceType());
            }
+         }
+         break;
+       }
+       case StmtKind::RepeatWhile: {
+         auto Cond = cast<RepeatWhileStmt>(Parent)->getCond();
+         if (Cond &&
+             SM.rangeContains(Cond->getSourceRange(),
+                              ParsedExpr->getSourceRange())) {
+           Callback(Context.getBoolDecl()->getDeclaredType());
          }
          break;
        }
@@ -4433,7 +4444,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
         Lookup.setHaveRParen(HasRParen);
         Lookup.getValueExprCompletions(*ExprType);
       } else {
-        // Add argument labels, then fallthough to get values.
+        // Add argument labels, then fallthrough to get values.
         Lookup.addArgNameCompletionResults(PossibleNames);
       }
     }

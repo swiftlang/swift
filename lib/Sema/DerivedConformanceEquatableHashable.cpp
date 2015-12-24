@@ -266,11 +266,17 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
   eqDecl->setDerivedForTypeDecl(enumDecl);
   eqDecl->setBodySynthesizer(&deriveBodyEquatable_enum_eq);
 
-  // Compute the type and interface type.
-  Type fnTy, interfaceTy;
-  if (genericParams) {
+  // Compute the type.
+  Type fnTy;
+  if (genericParams)
     fnTy = PolymorphicFunctionType::get(paramsTy, boolTy, genericParams);
-    
+  else
+    fnTy = FunctionType::get(paramsTy, boolTy);
+  eqDecl->setType(fnTy);
+
+  // Compute the interface type.
+  Type interfaceTy;
+  if (auto genericSig = parentDC->getGenericSignatureOfContext()) {
     auto enumIfaceTy = parentDC->getDeclaredInterfaceType();
     TupleTypeElt ifaceParamElts[] = {
       enumIfaceTy, enumIfaceTy,
@@ -278,13 +284,11 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
     auto ifaceParamsTy = TupleType::get(ifaceParamElts, C);
     
     interfaceTy = GenericFunctionType::get(
-                                     parentDC->getGenericSignatureOfContext(),
-                                     ifaceParamsTy, boolTy,
+                                     genericSig, ifaceParamsTy, boolTy,
                                      AnyFunctionType::ExtInfo());
   } else {
-    fnTy = interfaceTy = FunctionType::get(paramsTy, boolTy);
+    interfaceTy = FunctionType::get(paramsTy, boolTy);
   }
-  eqDecl->setType(fnTy);
   eqDecl->setInterfaceType(interfaceTy);
 
   // Since we can't insert the == operator into the same FileUnit as the enum,
@@ -414,9 +418,9 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
   getterDecl->setBodySynthesizer(deriveBodyHashable_enum_hashValue);
 
   // Compute the type of hashValue().
-  GenericParamList *genericParams = nullptr;
+  GenericParamList *genericParams = getterDecl->getGenericParamsOfContext();
   Type methodType = FunctionType::get(TupleType::getEmpty(tc.Context), intType);
-  Type selfType = getterDecl->computeSelfType(&genericParams);
+  Type selfType = getterDecl->computeSelfType();
   Type type;
   if (genericParams)
     type = PolymorphicFunctionType::get(selfType, methodType, genericParams);
@@ -432,7 +436,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
     interfaceType = GenericFunctionType::get(sig, selfIfaceType, methodType,
                                              AnyFunctionType::ExtInfo());
   else
-    interfaceType = type;
+    interfaceType = FunctionType::get(selfType, methodType);
   
   getterDecl->setInterfaceType(interfaceType);
   getterDecl->setAccessibility(enumDecl->getFormalAccess());

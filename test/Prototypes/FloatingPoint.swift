@@ -194,7 +194,7 @@ FloatLiteralConvertible {
   /// edge cases to be aware of:
   ///
   /// - `greatestFiniteMagnitude.ulp` is a finite number, even though
-  ///   the next greater respresentable value is `infinity`.
+  ///   the next greater representable value is `infinity`.
   /// - `x.ulp` is `NaN` if `x` is not a finite number.
   /// - If `x` is very small in magnitude, then `x.ulp` may be a subnormal
   ///   number.  On targets that do not support subnormals, `x.ulp` may be
@@ -329,7 +329,7 @@ FloatLiteralConvertible {
   
   //  TODO: do we actually want to provide remainder as an operator?  It's
   //  definitely not obvious to me that we should, but we have until now.
-  //  See further discustion with func remainder(x,y) above.
+  //  See further discussion with func remainder(x,y) above.
   func %(x: Self, y: Self) -> Self
   
   //  Conversions from all integer types.
@@ -517,7 +517,7 @@ extension FloatingPointType {
 
 public protocol BinaryFloatingPointType: FloatingPointType {
   
-  /// Values that parametrize the type:
+  /// Values that parameterize the type:
   static var _exponentBitCount: UInt { get }
   static var _fractionalBitCount: UInt { get }
   
@@ -770,7 +770,7 @@ extension BinaryFloatingPointType {
   }
   
   public static func sqrt<X: BinaryFloatingPointType>(x: X) -> Self {
-    if X._fractionalBitCount <= Self._fractionalBitCount  { return sqrt(Self(x)) }
+    if X._fractionalBitCount <= Self._fractionalBitCount { return sqrt(Self(x)) }
     return Self(X._sqrtStickyRounding(x))
   }
   
@@ -1117,6 +1117,15 @@ public func ==(lhs: FloatingPointClassification, rhs: FloatingPointClassificatio
 
 //===--- tests ------------------------------------------------------------===//
 import StdlibUnittest
+
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 var tests = TestSuite("Floating Point")
 
 tests.test("Parts") {

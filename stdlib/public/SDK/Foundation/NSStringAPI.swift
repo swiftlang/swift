@@ -54,7 +54,7 @@ func _countFormatSpecifiers(a: String) -> Int {
         lastChar = notPercentUTF16
       }
       else {
-        ++count
+        count += 1
         lastChar = c
       }
     } else {
@@ -103,7 +103,7 @@ extension String {
   /// memory referred to by `index`
   func _withOptionalOutParameter<Result>(
     index: UnsafeMutablePointer<Index>,
-    @noescape body: (UnsafeMutablePointer<Int>)->Result
+    @noescape body: (UnsafeMutablePointer<Int>) -> Result
   ) -> Result {
     var utf16Index: Int = 0
     let result = index._withBridgeValue(&utf16Index) {
@@ -118,7 +118,7 @@ extension String {
   /// it into the memory referred to by `range`
   func _withOptionalOutParameter<Result>(
     range: UnsafeMutablePointer<Range<Index>>,
-    @noescape body: (UnsafeMutablePointer<NSRange>)->Result
+    @noescape body: (UnsafeMutablePointer<NSRange>) -> Result
   ) -> Result {
     var nsRange = NSRange(location: 0, length: 0)
     let result = range._withBridgeValue(&nsRange) {
@@ -141,7 +141,7 @@ extension String {
     var p = NSString.availableStringEncodings()
     while p.memory != 0 {
       result.append(p.memory)
-      ++p
+      p += 1
     }
     return result
   }
@@ -479,7 +479,7 @@ extension String {
   //     enumerateLinesUsingBlock:(void (^)(NSString *line, BOOL *stop))block
 
   /// Enumerates all the lines in a string.
-  public func enumerateLines(body: (line: String, inout stop: Bool)->()) {
+  public func enumerateLines(body: (line: String, inout stop: Bool) -> ()) {
     _ns.enumerateLinesUsingBlock {
       (line: String, stop: UnsafeMutablePointer<ObjCBool>)
     in
@@ -511,7 +511,7 @@ extension String {
     options opts: NSLinguisticTaggerOptions,
     orthography: NSOrthography?,
     _ body:
-      (String, Range<Index>, Range<Index>, inout Bool)->()
+      (String, Range<Index>, Range<Index>, inout Bool) -> ()
   ) {
     _ns.enumerateLinguisticTagsInRange(
       _toNSRange(range),
@@ -546,7 +546,7 @@ extension String {
     _ body: (
       substring: String?, substringRange: Range<Index>,
       enclosingRange: Range<Index>, inout Bool
-    )->()
+    ) -> ()
   ) {
     _ns.enumerateSubstringsInRange(_toNSRange(range), options: opts) {
       var stop_ = false
@@ -1181,7 +1181,7 @@ extension String {
     aSet: NSCharacterSet,
     options mask:NSStringCompareOptions = [],
     range aRange: Range<Index>? = nil
-  )-> Range<Index>? {
+  ) -> Range<Index>? {
     return _optionalRange(
       _ns.rangeOfCharacterFromSet(
         aSet, options: mask,
@@ -1369,7 +1369,7 @@ extension String {
   @available(*, unavailable, message="Use URLByAppendingPathExtension on NSURL instead.")
   public func stringByAppendingPathExtension(ext: String) -> String? {
     // FIXME: This method can return nil in practice, for example when self is
-    // an empty string.  OTOH, this is not documented, documentatios says that
+    // an empty string.  OTOH, this is not documented, documentation says that
     // it always returns a string.
     //
     // <rdar://problem/17902469> -[NSString stringByAppendingPathExtension] can
@@ -1537,7 +1537,7 @@ extension String {
   // - (NSArray *)stringsByAppendingPaths:(NSArray *)paths
 
   /// Returns an array of strings made by separately appending
-  /// to the `String` each string in in a given array.
+  /// to the `String` each string in a given array.
   @available(*, unavailable, message="map over paths with URLByAppendingPathComponent instead.")
   public func stringsByAppendingPaths(paths: [String]) -> [String] {
     return _ns.stringsByAppendingPaths(paths)

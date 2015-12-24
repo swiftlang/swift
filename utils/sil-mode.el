@@ -64,7 +64,7 @@
                     "index_addr" "index_raw_pointer" "to")
 		  'words) . font-lock-keyword-face)
    ;; SIL Instructions - Reference Counting.
-   `(,(regexp-opt '("strong_retain" "strong_retain_autoreleased"
+   `(,(regexp-opt '("strong_retain"
                     "strong_release" "strong_retain_unowned"
                     "unowned_retain" "unowned_release"
                     "ref_to_unmanaged" "unmanaged_to_ref"
@@ -137,7 +137,7 @@
    `(,(regexp-opt '("cond_fail")
 		  'words) . font-lock-keyword-face)
    ;; Terminators
-   `(,(regexp-opt '("unreachable" "return" "autorelease_return" "br"
+   `(,(regexp-opt '("unreachable" "return" "br"
                     "cond_br" "switch_value" "switch_enum"
                     "switch_enum_addr" "dynamic_method_br"
                     "checked_cast_br" "throw")
@@ -162,7 +162,7 @@
 (unless sil-mode-syntax-table
     (progn
       (setq sil-mode-syntax-table (make-syntax-table))
-      (mapcar (function (lambda (n)
+      (mapc (function (lambda (n)
                           (modify-syntax-entry (aref n 0)
                                                (aref n 1)
                                                sil-mode-syntax-table)))

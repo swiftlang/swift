@@ -4,7 +4,7 @@ add_swift_executable(sil-opt
     swiftFrontend
     swiftIRGen
     swiftSILGen
-    swiftSILPasses
+    swiftSILOptimizer
 )
 
 swift_install_in_component(tools

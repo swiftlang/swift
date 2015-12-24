@@ -180,7 +180,7 @@ class rdar18640140 {
   // didSet is not compatible with set/get
   var S1: Int {
     get {
-      return 1;
+      return 1
     }
     set	{
     }

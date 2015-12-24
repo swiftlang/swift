@@ -36,6 +36,7 @@ namespace clang {
 class NamedDecl;
 class DeclContext;
 class MacroInfo;
+class ObjCCategoryDecl;
 }
 
 namespace swift {
@@ -47,10 +48,10 @@ class SwiftLookupTableWriter;
 ///
 const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MAJOR = 1;
 
-/// Lookup table major version number.
+/// Lookup table minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 0;
+const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 2;
 
 /// A lookup table that maps Swift names to the set of Clang
 /// declarations with that particular name.
@@ -162,11 +163,18 @@ private:
   /// the C entities that have that name, in all contexts.
   llvm::DenseMap<StringRef, SmallVector<FullTableEntry, 2>> LookupTable;
 
+  /// The list of Objective-C categories and extensions.
+  llvm::SmallVector<clang::ObjCCategoryDecl *, 4> Categories;
+
   /// The reader responsible for lazily loading the contents of this table.
   SwiftLookupTableReader *Reader;
 
   friend class SwiftLookupTableReader;
   friend class SwiftLookupTableWriter;
+
+  /// Find or create the table entry for the given base name. 
+  llvm::DenseMap<StringRef, SmallVector<FullTableEntry, 2>>::iterator
+  findOrCreate(StringRef baseName);
 
 public:
   explicit SwiftLookupTable(SwiftLookupTableReader *reader) : Reader(reader) { }
@@ -176,6 +184,9 @@ public:
 
   /// Maps a stored macro entry to an actual Clang macro.
   clang::MacroInfo *mapStoredMacro(uintptr_t &entry);
+
+  /// Maps a stored entry to an actual Clang AST node.
+  SingleEntry mapStored(uintptr_t &entry);
 
   /// Translate a Clang DeclContext into a context kind and name.
   llvm::Optional<std::pair<ContextKind, StringRef>>
@@ -189,6 +200,9 @@ public:
   void addEntry(DeclName name, SingleEntry newEntry,
                 clang::DeclContext *effectiveContext);
 
+  /// Add an Objective-C category or extension to the table.
+  void addCategory(clang::ObjCCategoryDecl *category);
+
   /// Lookup the set of entities with the given base name.
   ///
   /// \param baseName The base name to search for. All results will
@@ -199,6 +213,16 @@ public:
   /// all results from all contexts should be produced.
   SmallVector<SingleEntry, 4>
   lookup(StringRef baseName, clang::DeclContext *searchContext);
+
+  /// Retrieve the set of base names that are stored in the lookup table.
+  SmallVector<StringRef, 4> allBaseNames();
+
+  /// Lookup Objective-C members with the given base name, regardless
+  /// of context.
+  SmallVector<clang::NamedDecl *, 4> lookupObjCMembers(StringRef baseName);
+
+  /// Retrieve the set of Objective-C categories and extensions.
+  ArrayRef<clang::ObjCCategoryDecl *> categories();
 
   /// Deserialize all entries.
   void deserializeAll();
@@ -231,15 +255,17 @@ class SwiftLookupTableReader : public clang::ModuleFileExtensionReader {
   std::function<void()> OnRemove;
 
   void *SerializedTable;
+  ArrayRef<clang::serialization::DeclID> Categories;
 
   SwiftLookupTableReader(clang::ModuleFileExtension *extension,
                          clang::ASTReader &reader,
                          clang::serialization::ModuleFile &moduleFile,
                          std::function<void()> onRemove,
-                         void *serializedTable)
+                         void *serializedTable,
+                         ArrayRef<clang::serialization::DeclID> categories)
     : ModuleFileExtensionReader(extension), Reader(reader),
       ModuleFile(moduleFile), OnRemove(onRemove),
-      SerializedTable(serializedTable) { }
+      SerializedTable(serializedTable), Categories(categories) { }
 
 public:
   /// Create a new lookup table reader for the given AST reader and stream
@@ -266,6 +292,11 @@ public:
   /// \returns true if we found anything, false otherwise.
   bool lookup(StringRef baseName,
               SmallVectorImpl<SwiftLookupTable::FullTableEntry> &entries);
+
+  /// Retrieve the declaration IDs of the categories.
+  ArrayRef<clang::serialization::DeclID> categories() const {
+    return Categories;
+  }
 };
 
 }

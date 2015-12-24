@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
-func testCall(f: (()->())?) {
+func testCall(f: (() -> ())?) {
   f?()
 }
 // CHECK:    sil hidden @{{.*}}testCall{{.*}}
@@ -23,16 +23,16 @@ func testCall(f: (()->())?) {
 // CHECK-NEXT: enum $Optional<()>, #Optional.None!enumelt
 // CHECK-NEXT: br bb2
 
-func testAddrOnlyCallResult<T>(f: (()->T)?) {
+func testAddrOnlyCallResult<T>(f: (() -> T)?) {
   var f = f
   var x = f?()
 }
 // CHECK-LABEL: sil hidden @{{.*}}testAddrOnlyCallResult{{.*}} : $@convention(thin) <T> (@owned Optional<() -> T>) -> ()
 // CHECK:    bb0([[T0:%.*]] : $Optional<() -> T>):
-// CHECK: [[F:%.*]] = alloc_box $Optional<() -> T> // var f
+// CHECK: [[F:%.*]] = alloc_box $Optional<() -> T>, var, name "f"
 // CHECK-NEXT: retain_value [[T0]]
 // CHECK-NEXT: store [[T0]] to [[F]]#1
-// CHECK-NEXT: [[X:%.*]] = alloc_box $Optional<T>  // var x
+// CHECK-NEXT: [[X:%.*]] = alloc_box $Optional<T>, var, name "x"
 // CHECK-NEXT: [[TEMP:%.*]] = init_enum_data_addr [[X]]
 //   Check whether 'f' holds a value.
 // CHECK:      [[T1:%.*]] = select_enum_addr [[F]]#1

@@ -324,11 +324,11 @@ ${LazyFlatMapTest}
 //===----------------------------------------------------------------------===//
 
 CollectionTypeTests.test("underestimateCount/CollectionType/DefaultImplementation") {
-  if true {
+  do {
     let s = CollectionWithDefaultUnderestimateCount(count: 0)
     expectEqual(0, callGenericUnderestimatedCount(s))
   }
-  if true {
+  do {
     let s = CollectionWithDefaultUnderestimateCount(count: 5)
     expectEqual(5, callGenericUnderestimatedCount(s))
   }
@@ -368,11 +368,11 @@ struct CollectionWithCustomUnderestimateCount : CollectionType {
 }
 
 CollectionTypeTests.test("underestimateCount/CollectionType/CustomImplementation") {
-  if true {
+  do {
     let s = CollectionWithCustomUnderestimateCount(underestimatedCount: 0)
     expectEqual(0, callGenericUnderestimatedCount(s))
   }
-  if true {
+  do {
     let s = CollectionWithCustomUnderestimateCount(underestimatedCount: 5)
     expectEqual(5, callGenericUnderestimatedCount(s))
   }
@@ -411,7 +411,7 @@ CollectionTypeTests.test("CollectionType.generate()/DefaultImplementation") {
   for count in [ 0, 5 ] {
     let collection = MinimalForwardCollectionWithDefaultGenerator(count: count)
 
-    if true {
+    do {
       // Check the return type of the function when called statically.
       var generator = collection.generate()
       expectType(
@@ -419,7 +419,7 @@ CollectionTypeTests.test("CollectionType.generate()/DefaultImplementation") {
         &generator)
     }
 
-    if true {
+    do {
       // Check the return type of the function when called generically.
       var generator = callGenericGenerate(collection)
       expectType(
@@ -468,7 +468,7 @@ CollectionTypeTests.test("CollectionType.generate()/CustomImplementation") {
   for count in [ 0, 5 ] {
     let collection = MinimalForwardCollectionWithCustomGenerator(count: count)
 
-    if true {
+    do {
       // Check the return type of the function when called statically.
       MinimalForwardCollectionWithCustomGenerator.timesGenerateWasCalled = 0
       var generator = collection.generate()
@@ -478,7 +478,7 @@ CollectionTypeTests.test("CollectionType.generate()/CustomImplementation") {
       expectEqual(1, MinimalForwardCollectionWithCustomGenerator.timesGenerateWasCalled)
     }
 
-    if true {
+    do {
       MinimalForwardCollectionWithCustomGenerator.timesGenerateWasCalled = 0
       // Check the return type of the function when called generically.
       var generator = callGenericGenerate(collection)
@@ -719,7 +719,7 @@ CollectionTypeTests.test("_withUnsafeMutableBufferPointerIfSupported/dispatch") 
 %       Base = "%s%s%sCollection" % (base_kind, traversal, 'Mutable' if mutable else '')
 
 // Test collections using value types as elements.
-if true {
+do {
   var checksAdded: Box<Set<String>> = Box([])
   var resiliencyChecks = CollectionMisuseResiliencyChecks.all
   resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .ExpectationFailure
@@ -762,7 +762,7 @@ if true {
 }
 
 // Test collections using a reference type as element.
-if true {
+do {
   var checksAdded: Box<Set<String>> = Box([])
   var resiliencyChecks = CollectionMisuseResiliencyChecks.all
   resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .ExpectationFailure

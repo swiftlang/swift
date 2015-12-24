@@ -62,7 +62,7 @@ enum RT_Kind {
   /// void swift_unknownRelease_n(%swift.refcounted* %P)
   RT_UnknownReleaseN,
 
-  /// void swift_fixLifetime(%swift.refcounted* %P)
+  /// void __swift_fixLifetime(%swift.refcounted* %P)
   RT_FixLifetime,
 
   /// void swift_bridgeRetain(%swift.refcounted* %P)
@@ -112,7 +112,7 @@ inline RT_Kind classifyInstruction(const llvm::Instruction &I) {
     .Case("swift_unknownRetain_n", RT_UnknownRetainN)
     .Case("swift_unknownRelease", RT_UnknownRelease)
     .Case("swift_unknownRelease_n", RT_UnknownReleaseN)
-    .Case("swift_fixLifetime", RT_FixLifetime)
+    .Case("__swift_fixLifetime", RT_FixLifetime)
     .Default(RT_Unknown);
 }
 

@@ -238,11 +238,11 @@ Runtime.test("_isClassOrObjCExistential") {
   expectFalse(_isClassOrObjCExistential(SwiftObjectCanaryStruct.self))
   expectFalse(_isClassOrObjCExistential_Opaque(SwiftObjectCanaryStruct.self))
 
-  typealias SwiftClosure = ()->()
+  typealias SwiftClosure = () -> ()
   expectFalse(_isClassOrObjCExistential(SwiftClosure.self))
   expectFalse(_isClassOrObjCExistential_Opaque(SwiftClosure.self))
 
-  typealias ObjCClosure = @convention(block) ()->()
+  typealias ObjCClosure = @convention(block) () -> ()
   expectTrue(_isClassOrObjCExistential(ObjCClosure.self))
   expectTrue(_isClassOrObjCExistential_Opaque(ObjCClosure.self))
 
@@ -272,10 +272,10 @@ Runtime.test("_canBeClass") {
   expectEqual(1, _canBeClass(SwiftObjectCanary.self))
   expectEqual(0, _canBeClass(SwiftObjectCanaryStruct.self))
 
-  typealias SwiftClosure = ()->()
+  typealias SwiftClosure = () -> ()
   expectEqual(0, _canBeClass(SwiftClosure.self))
 
-  typealias ObjCClosure = @convention(block) ()->()
+  typealias ObjCClosure = @convention(block) () -> ()
   expectEqual(1, _canBeClass(ObjCClosure.self))
 
   expectEqual(1, _canBeClass(CFArray.self))
@@ -409,7 +409,7 @@ struct Struct2ConformsToP1<T : BooleanType> : BooleanType, Q1 {
   var value: T
 }
 
-// A large struct that can not be stored inline in an opaque buffer.
+// A large struct that cannot be stored inline in an opaque buffer.
 struct Struct3ConformsToP2 : CustomStringConvertible, Q1 {
   var a: UInt64 = 10
   var b: UInt64 = 20
@@ -428,7 +428,7 @@ struct Struct3ConformsToP2 : CustomStringConvertible, Q1 {
   }
 }
 
-// A large struct that can not be stored inline in an opaque buffer.
+// A large struct that cannot be stored inline in an opaque buffer.
 struct Struct4ConformsToP2<T : CustomStringConvertible> : CustomStringConvertible, Q1 {
   var value: T
   var e: UInt64 = 50

@@ -43,7 +43,7 @@ final class Tracked : ForwardIndexType, CustomStringConvertible {
   
   deinit {
     assert(serialNumber > 0, "double destruction!")
-    --trackedCount
+    trackedCount -= 1
     serialNumber = -serialNumber
   }
 
@@ -112,12 +112,12 @@ func testScope() {
 
   // We can get a single element out
   // CHECK-NEXT: nsx[0]: 1 .
-  var one = nsx.objectAtIndex(0) as! Tracked
+  let one = nsx.objectAtIndex(0) as! Tracked
   print("nsx[0]: \(one.value) .")
 
   // We can get the element again, but it may not have the same identity
   // CHECK-NEXT: object identity matches?
-  var anotherOne = nsx.objectAtIndex(0) as! Tracked
+  let anotherOne = nsx.objectAtIndex(0) as! Tracked
   print("object identity matches? \(one === anotherOne)")
 
   // Because the elements come back at +0, we really don't want to
@@ -126,7 +126,7 @@ func testScope() {
 
   objects.withUnsafeMutableBufferPointer {
     // FIXME: Can't elide signature and use $0 here <rdar://problem/17770732> 
-    (inout buf: UnsafeMutableBufferPointer<Int>)->() in
+    (inout buf: UnsafeMutableBufferPointer<Int>) -> () in
     nsx.getObjects(
       UnsafeMutablePointer<AnyObject>(buf.baseAddress),
       range: _SwiftNSRange(location: 1, length: 2))

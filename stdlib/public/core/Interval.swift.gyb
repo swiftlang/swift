@@ -226,6 +226,6 @@ internal struct _IntervalMirror<
   internal var summary: String { return _value.description }
 
   internal var quickLookObject: PlaygroundQuickLook? {
-    return .Some(.Text(summary))
+    return .Text(summary)
   }
 }

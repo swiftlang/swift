@@ -232,7 +232,7 @@ public:
   virtual void emitDestroyAddress(SILBuilder &B, SILLocation loc,
                                   SILValue value) const = 0;
 
-  /// Given a +1 r-value which are are claiming ownership of, destroy it.
+  /// Given a +1 r-value which we are claiming ownership of, destroy it.
   ///
   /// Note that an r-value might be an address.
   virtual void emitDestroyRValue(SILBuilder &B, SILLocation loc,
@@ -695,7 +695,7 @@ public:
   /// not override.
   CanSILFunctionType getConstantOverrideType(SILDeclRef constant) {
     // Fast path if the constant isn't overridden.
-    if (constant.getOverriddenVTableEntry().isNull())
+    if (constant.getNextOverriddenVTableEntry().isNull())
       return getConstantFunctionType(constant);
     SILDeclRef base = constant;
     while (SILDeclRef overridden = base.getOverridden())
@@ -769,9 +769,6 @@ public:
   /// \return - always an address type
   SILType getSubstitutedStorageType(AbstractStorageDecl *value,
                                     Type lvalueType);
-
-  /// Retrieve the set of archetypes open in the given context.
-  GenericParamList *getEffectiveGenericParamsForContext(DeclContext *dc);
 
   /// Retrieve the set of archetypes closed over by the given function.
   GenericParamList *getEffectiveGenericParams(AnyFunctionRef fn,

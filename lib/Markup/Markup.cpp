@@ -1,4 +1,4 @@
-//===--- Markup.h - Markup ------------------------------------------------===//
+//===--- Markup.cpp - Markup ----------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -108,7 +108,16 @@ ParseResult<CodeBlock> parseCodeBlock(MarkupContext &MC, LineList &LL,
                                       ParseState State) {
   assert(cmark_node_get_type(State.Node) == CMARK_NODE_CODE_BLOCK
       && State.Event == CMARK_EVENT_ENTER);
-  return { CodeBlock::create(MC, getLiteralContent(MC, LL, State.Node)),
+
+  StringRef Language("swift");
+
+  if (auto FenceInfo = cmark_node_get_fence_info(State.Node)) {
+    StringRef FenceInfoStr(FenceInfo);
+    if (!FenceInfoStr.empty())
+      Language = MC.allocateCopy(FenceInfoStr);
+  }
+  return { CodeBlock::create(MC, getLiteralContent(MC, LL, State.Node),
+                             Language),
            State.next() };
 }
 

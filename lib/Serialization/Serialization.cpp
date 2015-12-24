@@ -25,6 +25,7 @@
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Timer.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Serialization/SerializationOptions.h"
@@ -1691,6 +1692,21 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
                                                blob);
     return;
   }
+
+  case DAK_MigrationId: {
+    auto *theAttr = cast<MigrationIdAttr>(DA);
+
+    // Compute the blob.
+    SmallString<128> blob;
+    blob += theAttr->getIdent();
+    uint64_t endOfIdentIndex = blob.size();
+    blob += theAttr->getPatternId();
+    auto abbrCode = DeclTypeAbbrCodes[MigrationIdDeclAttrLayout::Code];
+    MigrationIdDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                          endOfIdentIndex,
+                                          blob);
+    return;
+  }
   }
 }
 
@@ -3064,7 +3080,7 @@ void Serializer::writeType(Type ty) {
     auto generic = cast<BoundGenericType>(ty.getPointer());
 
     // We don't want two copies of Archetype being serialized, one by
-    // serializing genericArgs, the other by serializaing the Decl. The reason
+    // serializing genericArgs, the other by serializing the Decl. The reason
     // is that it is likely the Decl's Archetype can be serialized in
     // a different module, causing two copies being constructed at
     // deserialization, one in the other module, one in this module as
@@ -3084,7 +3100,7 @@ void Serializer::writeType(Type ty) {
       if (auto arche = dyn_cast<ArchetypeType>(next.getPointer())) {
         auto genericParams = generic->getDecl()->getGenericParams();
         unsigned idx = 0;
-        // Check if next exisits in the Decl.
+        // Check if next exists in the Decl.
         for (auto archetype : genericParams->getAllArchetypes()) {
           if (archetype == arche) {
             found = true;
@@ -3634,9 +3650,11 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
 
       SmallString<32> MangledName;
       llvm::raw_svector_ostream Stream(MangledName);
+      {
       Mangle::Mangler DebugMangler(Stream, false);
       DebugMangler.mangleType(TD->getDeclaredType(),
                               ResilienceExpansion::Minimal, 0);
+      }
       assert(!MangledName.empty() && "Mangled type came back empty!");
       localTypeGenerator.insert(MangledName, {
         addDeclRef(TD), TD->getLocalDiscriminator()
@@ -3799,6 +3817,7 @@ void swift::serialize(ModuleOrSourceFile DC,
 
   bool hadError = withOutputFile(getContext(DC), options.OutputPath,
                                  [&](raw_ostream &out) {
+    SharedTimer timer("Serialization (swiftmodule)");
     Serializer::writeToStream(out, DC, M, options);
   });
   if (hadError)
@@ -3807,6 +3826,7 @@ void swift::serialize(ModuleOrSourceFile DC,
   if (options.DocOutputPath && options.DocOutputPath[0] != '\0') {
     (void)withOutputFile(getContext(DC), options.DocOutputPath,
                          [&](raw_ostream &out) {
+      SharedTimer timer("Serialization (swiftdoc)");
       Serializer::writeDocToStream(out, DC);
     });
   }

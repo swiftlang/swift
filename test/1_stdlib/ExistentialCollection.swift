@@ -14,6 +14,14 @@
 
 import StdlibUnittest
 
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 // Check that the generic parameter is called 'Element'.
 protocol TestProtocol1 {}
 
@@ -52,7 +60,7 @@ var tests = TestSuite("ExistentialCollection")
 tests.test("AnyGenerator") {
   func countStrings() -> AnyGenerator<String> {
     let lazyStrings = (0..<5).lazy.map { String($0) }
-    
+
     // This is a really complicated type of no interest to our
     // clients.
     let g: LazyMapGenerator<
@@ -62,8 +70,11 @@ tests.test("AnyGenerator") {
   expectEqual(["0", "1", "2", "3", "4"], Array(countStrings()))
 
   var x = 7
-  let g = AnyGenerator { x < 15 ? x : nil }
-  x += 1
+  let g = AnyGenerator<Int> {
+    if x >= 15 { return nil }
+    x += 1
+    return x-1
+  }
   expectEqual([ 7, 8, 9, 10, 11, 12, 13, 14 ], Array(g))
 }
 
@@ -74,45 +85,45 @@ let initialCallCounts = [
 ]
 
 var callCounts = initialCallCounts
-  
+
 struct InstrumentedIndex<I : RandomAccessIndexType> : RandomAccessIndexType {
   typealias Distance = I.Distance
 
   var base: I
-  
+
   init(_ base: I) {
     self.base = base
   }
-  
+
   static func resetCounts() {
     callCounts = initialCallCounts
   }
-  
+
   func successor() -> InstrumentedIndex {
     callCounts["successor"]! += 1
     return InstrumentedIndex(base.successor())
   }
-  
+
   mutating func _successorInPlace() {
     callCounts["_successorInPlace"]! += 1
     base._successorInPlace()
   }
-  
+
   func predecessor() -> InstrumentedIndex {
     callCounts["predecessor"]! += 1
     return InstrumentedIndex(base.predecessor())
   }
-  
+
   mutating func _predecessorInPlace() {
     callCounts["_predecessorInPlace"]! += 1
     base._predecessorInPlace()
   }
-  
+
   func advancedBy(distance: Distance) -> InstrumentedIndex {
     callCounts["advancedBy"]! += 1
     return InstrumentedIndex(base.advancedBy(distance))
   }
-  
+
   func distanceTo(other: InstrumentedIndex) -> Distance {
     callCounts["distanceTo"]! += 1
     return base.distanceTo(other.base)
@@ -160,7 +171,7 @@ tests.test("ForwardIndex") {
   i = i.successor()
   expectEqual(1, callCounts["successor"])
   expectEqual(0, callCounts["_successorInPlace"])
-  i = i.successor()
+  i._successorInPlace()
   expectEqual(1, callCounts["successor"])
   expectEqual(1, callCounts["_successorInPlace"])
   var x = i
@@ -178,7 +189,7 @@ tests.test("BidirectionalIndex") {
   i = i.predecessor()
   expectEqual(1, callCounts["predecessor"])
   expectEqual(0, callCounts["_predecessorInPlace"])
-  i = i.predecessor()
+  i._predecessorInPlace()
   expectEqual(1, callCounts["predecessor"])
   expectEqual(1, callCounts["_predecessorInPlace"])
   var x = i
@@ -207,7 +218,7 @@ tests.test("ForwardCollection") {
 tests.test("BidirectionalCollection") {
   let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
   let fc0 = AnyForwardCollection(a0.lazy.reverse())
-  
+
   let bc0_ = AnyBidirectionalCollection(fc0)         // upgrade!
   expectNotEmpty(bc0_)
   let bc0 = bc0_!
@@ -218,7 +229,7 @@ tests.test("BidirectionalCollection") {
 
   let fc2 = AnyForwardCollection(bc0)                // downgrade
   expectTrue(fc2 === bc0)
-  
+
   let a1 = ContiguousArray(bc0.lazy.reverse())
   expectEqual(a0, a1)
   for e in a0 {
@@ -230,7 +241,7 @@ tests.test("BidirectionalCollection") {
     expectNotEqual(bc0.endIndex, i)
     expectEqual(1, bc0.indices.filter { $0 == i }.count)
   }
-  
+
   // Can't upgrade a non-random-access collection to random access
   let s0 = "Hello, Woyld".characters
   let bc1 = AnyBidirectionalCollection(s0)
@@ -253,7 +264,7 @@ tests.test("RandomAccessCollection") {
 
   let fc1 = AnyBidirectionalCollection(rc0)         // downgrade
   expectTrue(fc1 === rc0)
-  
+
   let a1 = ContiguousArray(rc0.lazy.reverse())
   expectEqual(a0, a1)
   for e in a0 {

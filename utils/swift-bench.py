@@ -26,7 +26,7 @@
 #   o When all files are compiled, the harness begins to run the tests. The
 #     harness chooses a number of iterations for each tests to achieve the best
 #     accuracy in the given time limit (in order to do that, it performs several
-#     auxiliary test runs). When the iteration number is chosen, the measurent
+#     auxiliary test runs). When the iteration number is chosen, the measurement
 #     of execution time is actually performed.
 #   o At this point everything is ready, and the harness simply reports the
 #     results.
@@ -34,9 +34,10 @@
 # Ideas for the harness improvement and development are welcomed here:
 # rdar://problem/18072938
 
+from __future__ import print_function
+
 import subprocess
 import numpy
-import time
 import re
 import os
 import sys
@@ -153,9 +154,8 @@ main()
 """
 
     benchRE = re.compile("^\s*func\s\s*bench_([a-zA-Z0-9_]+)\s*\(\s*\)\s*->\s*Int\s*({)?\s*$")
-    f = open(name)
-    lines = f.readlines()
-    f.close()
+    with open(name) as f:
+      lines = list(f)
     output = header
     lookingForCurlyBrace = False
     testNames = []
@@ -189,9 +189,8 @@ main()
       output += mainBody % (n, n)
     processedName = 'processed_' + os.path.basename(name)
     output += mainEnd
-    f = open(processedName, 'w')
-    f.write(output)
-    f.close()
+    with open(processedName, 'w') as f:
+      f.write(output)
     for n in testNames:
       self.tests[name+":"+n].processedSource = processedName
 
@@ -209,9 +208,8 @@ main()
 extern "C" int32_t opaqueGetInt32(int32_t x) { return x; }
 extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
 """
-    f = open('opaque.cpp', 'w')
-    f.write(fileBody)
-    f.close()
+    with open('opaque.cpp', 'w') as f:
+      f.write(fileBody)
     # TODO: Handle subprocess.CalledProcessError for this call:
     self.runCommand(['clang++', 'opaque.cpp', '-o', 'opaque.o', '-c', '-O2'])
 
@@ -297,7 +295,6 @@ extern "C" int64_t opaqueGetInt64(int64_t x) { return x; }
       return
     samples = []
     self.log("Running bench: %s, numsamples: %d" % (name, numSamples), 2)
-    output = ""
     for i in range(0,numSamples):
       try:
         r = self.runCommand([self.tests[name].binary, str(iterScale),

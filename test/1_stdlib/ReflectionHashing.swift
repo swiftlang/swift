@@ -11,6 +11,14 @@
 
 import StdlibUnittest
 
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 var Reflection = TestSuite("Reflection")
 
 Reflection.test("Dictionary/Empty") {
@@ -67,7 +75,7 @@ Reflection.test("Dictionary") {
   expected += "    - .0: Four\n"
   expected += "    - .1: 4\n"
 #else
-  fatalError("unipmelemented")
+  fatalError("unimplemented")
 #endif
 
   expectEqual(expected, output)

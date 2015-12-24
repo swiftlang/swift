@@ -446,7 +446,7 @@ func test<T: PConforms6>(x: T) -> Int { return x.f() }
 
 struct PConforms6Impl : PConforms6 { }
 
-// Extensions of a protocol that directly satify requirements (i.e.,
+// Extensions of a protocol that directly satisfy requirements (i.e.,
 // default implementations hack N+1).
 protocol PConforms7 {
   func method()

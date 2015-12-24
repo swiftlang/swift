@@ -25,6 +25,85 @@
 #include "clang/AST/DeclObjC.h"
 using namespace swift;
 
+/// Get the method dispatch mechanism for a method.
+MethodDispatch
+swift::getMethodDispatch(AbstractFunctionDecl *method) {
+  // Final methods can be statically referenced.
+  if (method->isFinal())
+    return MethodDispatch::Static;
+  // Some methods are forced to be statically dispatched.
+  if (method->hasForcedStaticDispatch())
+    return MethodDispatch::Static;
+
+  // If this declaration is in a class but not marked final, then it is
+  // always dynamically dispatched.
+  auto dc = method->getDeclContext();
+  if (isa<ClassDecl>(dc))
+    return MethodDispatch::Class;
+
+  // Class extension methods are only dynamically dispatched if they're
+  // dispatched by objc_msgSend, which happens if they're foreign or dynamic.
+  if (dc->isClassOrClassExtensionContext()) {
+    if (method->hasClangNode())
+      return MethodDispatch::Class;
+    if (auto fd = dyn_cast<FuncDecl>(method)) {
+      if (fd->isAccessor() && fd->getAccessorStorageDecl()->hasClangNode())
+        return MethodDispatch::Class;
+    }
+    if (method->getAttrs().hasAttribute<DynamicAttr>())
+      return MethodDispatch::Class;
+  }
+
+  // Otherwise, it can be referenced statically.
+  return MethodDispatch::Static;
+}
+
+bool swift::requiresForeignToNativeThunk(ValueDecl *vd) {
+  // Functions imported from C, Objective-C methods imported from Objective-C,
+  // as well as methods in @objc protocols (even protocols defined in Swift)
+  // require a foreign to native thunk.
+  auto dc = vd->getDeclContext();
+  if (auto proto = dyn_cast<ProtocolDecl>(dc))
+    if (proto->isObjC())
+      return true;
+
+  if (auto fd = dyn_cast<FuncDecl>(vd))
+    return fd->hasClangNode();
+
+  return false;
+}
+
+/// FIXME: merge requiresObjCDispatch() into getMethodDispatch() and add
+/// an ObjectiveC case to the MethodDispatch enum.
+bool swift::requiresObjCDispatch(ValueDecl *vd) {
+  // Final functions never require ObjC dispatch.
+  if (vd->isFinal())
+    return false;
+
+  if (requiresForeignToNativeThunk(vd))
+    return true;
+
+  if (auto *fd = dyn_cast<FuncDecl>(vd)) {
+    // Property accessors should be generated alongside the property.
+    if (fd->isGetterOrSetter())
+      return requiresObjCDispatch(fd->getAccessorStorageDecl());
+
+    return fd->getAttrs().hasAttribute<DynamicAttr>();
+  }
+
+  if (auto *cd = dyn_cast<ConstructorDecl>(vd)) {
+    if (cd->hasClangNode())
+      return true;
+
+    return cd->getAttrs().hasAttribute<DynamicAttr>();
+  }
+
+  if (auto *asd = dyn_cast<AbstractStorageDecl>(vd))
+    return asd->requiresObjCGetterAndSetter();
+
+  return vd->getAttrs().hasAttribute<DynamicAttr>();
+}
+
 static unsigned getFuncNaturalUncurryLevel(AnyFunctionRef AFR) {
   assert(AFR.getBodyParamPatterns().size() >= 1 && "no arguments for func?!");
   unsigned Level = AFR.getBodyParamPatterns().size() - 1;
@@ -248,6 +327,11 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   if (isThunk())
     return SILLinkage::Shared;
   
+  // Enum constructors are essentially the same as thunks, they are
+  // emitted by need and have shared linkage.
+  if (kind == Kind::EnumElement)
+    return SILLinkage::Shared;
+
   // Declarations imported from Clang modules have shared linkage.
   // FIXME: They shouldn't.
   const SILLinkage ClangLinkage = SILLinkage::Shared;
@@ -333,8 +417,7 @@ bool SILDeclRef::isForeignToNativeThunk() const {
   // have a foreign-to-native thunk.
   if (!hasDecl())
     return false;
-  // Otherwise, match whether we have a clang node with whether we're foreign.
-  if (isa<FuncDecl>(getDecl()) && getDecl()->hasClangNode())
+  if (requiresForeignToNativeThunk(getDecl()))
     return !isForeign;
   // ObjC initializing constructors and factories are foreign.
   // We emit a special native allocating constructor though.
@@ -395,7 +478,7 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
   //   entity ::= declaration                     // other declaration
   case SILDeclRef::Kind::Func:
     if (!c.hasDecl()) {
-      buffer << introducer;
+      mangler.manglePrefix(introducer);
       mangler.mangleClosureEntity(c.getAbstractClosureExpr(),
                                   c.getResilienceExpansion(),
                                   c.uncurryLevel);
@@ -408,7 +491,7 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
     if (auto AsmA = c.getDecl()->getAttrs().getAttribute<SILGenNameAttr>())
       if (!c.isForeignToNativeThunk() && !c.isNativeToForeignThunk()
           && !c.isCurried) {
-        buffer << AsmA->Name;
+        mangler.manglePrefix(AsmA->Name);
         return;
       }
 
@@ -422,40 +505,44 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
           && !c.isCurried) {
         if (auto namedClangDecl = dyn_cast<clang::DeclaratorDecl>(clangDecl)) {
           if (auto asmLabel = namedClangDecl->getAttr<clang::AsmLabelAttr>()) {
-            buffer << '\01' << asmLabel->getLabel();
+            mangler.manglePrefix('\01');
+            mangler.manglePrefix(asmLabel->getLabel());
           } else if (namedClangDecl->hasAttr<clang::OverloadableAttr>()) {
+            std::string storage;
+            llvm::raw_string_ostream SS(storage);
             // FIXME: When we can import C++, use Clang's mangler all the time.
-            mangleClangDecl(buffer, namedClangDecl,
+            mangleClangDecl(SS, namedClangDecl,
                             c.getDecl()->getASTContext());
+            mangler.manglePrefix(SS.str());
           } else {
-            buffer << namedClangDecl->getName();
+            mangler.manglePrefix(namedClangDecl->getName());
           }
           return;
         }
       }
     }
 
-    buffer << introducer;
+    mangler.manglePrefix(introducer);
     mangler.mangleEntity(c.getDecl(), c.getResilienceExpansion(), c.uncurryLevel);
     return;
       
   //   entity ::= context 'D'                     // deallocating destructor
   case SILDeclRef::Kind::Deallocator:
-    buffer << introducer;
+    mangler.manglePrefix(introducer);
     mangler.mangleDestructorEntity(cast<DestructorDecl>(c.getDecl()),
                                    /*isDeallocating*/ true);
     return;
 
   //   entity ::= context 'd'                     // destroying destructor
   case SILDeclRef::Kind::Destroyer:
-    buffer << introducer;
+    mangler.manglePrefix(introducer);
     mangler.mangleDestructorEntity(cast<DestructorDecl>(c.getDecl()),
                                    /*isDeallocating*/ false);
     return;
 
   //   entity ::= context 'C' type                // allocating constructor
   case SILDeclRef::Kind::Allocator:
-    buffer << introducer;
+    mangler.manglePrefix(introducer);
     mangler.mangleConstructorEntity(cast<ConstructorDecl>(c.getDecl()),
                                     /*allocating*/ true,
                                     c.getResilienceExpansion(),
@@ -464,7 +551,7 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
 
   //   entity ::= context 'c' type                // initializing constructor
   case SILDeclRef::Kind::Initializer:
-    buffer << introducer;
+    mangler.manglePrefix(introducer);
     mangler.mangleConstructorEntity(cast<ConstructorDecl>(c.getDecl()),
                                     /*allocating*/ false,
                                     c.getResilienceExpansion(),
@@ -475,7 +562,7 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
   //   entity ::= declaration 'E'                 // ivar destroyer
   case SILDeclRef::Kind::IVarInitializer:
   case SILDeclRef::Kind::IVarDestroyer:
-    buffer << introducer;
+    mangler.manglePrefix(introducer);
     mangler.mangleIVarInitDestroyEntity(
       cast<ClassDecl>(c.getDecl()),
       c.kind == SILDeclRef::Kind::IVarDestroyer);
@@ -483,19 +570,19 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
 
   //   entity ::= declaration 'a'                 // addressor
   case SILDeclRef::Kind::GlobalAccessor:
-    buffer << introducer;
+    mangler.manglePrefix(introducer);
     mangler.mangleAddressorEntity(c.getDecl());
     return;
 
   //   entity ::= declaration 'G'                 // getter
   case SILDeclRef::Kind::GlobalGetter:
-    buffer << introducer;
+    mangler.manglePrefix(introducer);
     mangler.mangleGlobalGetterEntity(c.getDecl());
     return;
 
   //   entity ::= context 'e' index           // default arg generator
   case SILDeclRef::Kind::DefaultArgGenerator:
-    buffer << introducer;
+    mangler.manglePrefix(introducer);
     mangler.mangleDefaultArgumentEntity(cast<AbstractFunctionDecl>(c.getDecl()),
                                         c.defaultArgIndex);
     return;
@@ -512,7 +599,7 @@ StringRef SILDeclRef::mangle(SmallVectorImpl<char> &buffer,
   return stream.str();
 }
 
-SILDeclRef SILDeclRef::getOverriddenVTableEntry() const {
+SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
   if (auto overridden = getOverridden()) {
     // If we overrode a foreign decl, a dynamic method, this is an
     // accessor for a property that overrides an ObjC decl, or if it is an
@@ -542,6 +629,19 @@ SILDeclRef SILDeclRef::getOverriddenVTableEntry() const {
     return overridden;
   }
   return SILDeclRef();
+}
+
+SILDeclRef SILDeclRef::getBaseOverriddenVTableEntry() const {
+  // 'method' is the most final method in the hierarchy which we
+  // haven't yet found a compatible override for.  'cur' is the method
+  // we're currently looking at.  Compatibility is transitive,
+  // so we can forget our original method and just keep going up.
+  SILDeclRef method = *this;
+  SILDeclRef cur = method;
+  while ((cur = cur.getNextOverriddenVTableEntry())) {
+    method = cur;
+  }
+  return method;
 }
 
 SILLocation SILDeclRef::getAsRegularLocation() const {

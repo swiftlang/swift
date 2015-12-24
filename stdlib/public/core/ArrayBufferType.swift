@@ -35,7 +35,7 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// If this buffer is backed by a uniquely-referenced mutable
   /// `_ContiguousArrayBuffer` that can be grown in-place to allow the `self`
   /// buffer store `minimumCapacity` elements, returns that buffer.
-  /// Otherwise, returns nil.
+  /// Otherwise, returns `nil`.
   ///
   /// - Note: The result's firstElementAddress may not match ours, if we are a
   ///   _SliceBuffer.
@@ -193,15 +193,15 @@ extension _ArrayBufferType {
         // part of the tail.
         newTailStart.moveAssignFrom(oldTailStart, count: shrinkage)
 
-        //  slide the rest of the tail back
+        // Slide the rest of the tail back
         oldTailStart.moveInitializeFrom(
           oldTailStart + shrinkage, count: tailCount - shrinkage)
       }
-      else {                      // tail fits within erased elements
+      else {                      // Tail fits within erased elements
         // Assign over the start of the replaced range with the tail
         newTailStart.moveAssignFrom(oldTailStart, count: tailCount)
 
-        // destroy elements remaining after the tail in subRange
+        // Destroy elements remaining after the tail in subRange
         (newTailStart + tailCount).destroy(shrinkage - tailCount)
       }
     }

@@ -127,7 +127,7 @@ struct A4 {
 }
 
 struct A5 {
-  subscript(i : Int) -> Int // expected-error {{expected '{' for subscripting}}
+  subscript(i : Int) -> Int // expected-error {{expected '{' in subscript to specify getter and setter implementation}}
 }
 
 struct A6 {
@@ -155,7 +155,7 @@ struct A7b {
 }
 
 struct A8 {
-  subscript(i : Int) -> Int // expected-error{{expected '{' for subscripting}}
+  subscript(i : Int) -> Int // expected-error{{expected '{' in subscript to specify getter and setter implementation}}
     get { // expected-error{{expected declaration}}
       return stored
     }

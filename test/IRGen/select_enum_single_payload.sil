@@ -1,0 +1,34 @@
+// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s
+sil_stage canonical
+
+import Builtin
+
+enum ManyEmptyCases {
+    case A
+    case B
+    case C(Builtin.Int32)
+}
+
+// CHECK-LABEL: define i1 @select_enum_A(i32, i1)
+// CHECK:         [[PAYLOAD:%.*]] = icmp eq i32 %0, 0
+// CHECK:         [[EXTRA:%.*]] = and i1 %1, [[PAYLOAD]]
+// CHECK:         ret i1 [[EXTRA]]
+sil @select_enum_A : $@convention(thin) (ManyEmptyCases) -> Builtin.Int1 {
+entry(%0 : $ManyEmptyCases):
+  %4 = integer_literal $Builtin.Int1, -1          // user: %6
+  %5 = integer_literal $Builtin.Int1, 0           // user: %6
+  %6 = select_enum %0 : $ManyEmptyCases, case #ManyEmptyCases.A!enumelt: %4, default %5 : $Builtin.Int1
+  return %6 : $Builtin.Int1
+}
+
+// CHECK-LABEL: define i1 @select_enum_B(i32, i1)
+// CHECK:         [[PAYLOAD:%.*]] = icmp eq i32 %0, 1
+// CHECK:         [[EXTRA:%.*]] = and i1 %1, [[PAYLOAD]]
+// CHECK:         ret i1 [[EXTRA]]
+sil @select_enum_B : $@convention(thin) (ManyEmptyCases) -> Builtin.Int1 {
+entry(%0 : $ManyEmptyCases):
+  %4 = integer_literal $Builtin.Int1, -1          // user: %6
+  %5 = integer_literal $Builtin.Int1, 0           // user: %6
+  %6 = select_enum %0 : $ManyEmptyCases, case #ManyEmptyCases.B!enumelt: %4, default %5 : $Builtin.Int1
+  return %6 : $Builtin.Int1
+}

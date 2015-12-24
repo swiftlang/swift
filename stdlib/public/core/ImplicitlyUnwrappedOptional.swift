@@ -59,7 +59,7 @@ public enum ImplicitlyUnwrappedOptional<Wrapped>
     }
   }
 
-  /// Returns `nil` if `self` is nil, `f(self!)` otherwise.
+  /// Returns `nil` if `self` is `nil`, `f(self!)` otherwise.
   @warn_unused_result
   public func flatMap<U>(
     @noescape f: (Wrapped) throws -> ImplicitlyUnwrappedOptional<U>
@@ -92,6 +92,17 @@ extension ImplicitlyUnwrappedOptional : CustomStringConvertible {
     case .None:
       return "nil"
     }
+  }
+}
+
+/// Directly conform to CustomDebugStringConvertible to support
+/// optional printing. Implementation of that feature relies on
+/// _isOptional thus cannot distinguish ImplicitlyUnwrappedOptional
+/// from Optional. When conditional conformance is available, this
+/// outright conformance can be removed.
+extension ImplicitlyUnwrappedOptional : CustomDebugStringConvertible {
+  public var debugDescription: String {
+    return description
   }
 }
 

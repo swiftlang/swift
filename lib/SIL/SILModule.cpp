@@ -14,7 +14,6 @@
 #include "swift/SIL/SILModule.h"
 #include "Linker.h"
 #include "swift/SIL/SILDebugScope.h"
-#include "swift/SIL/SILExternalSource.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/SIL/SILValue.h"
@@ -43,9 +42,6 @@ namespace swift {
     }
   };
 } // end namespace swift.
-
-void SILExternalSource::anchor() {
-}
 
 /// SILTypeListUniquingType - This is the type of the folding set maintained by
 /// SILModule that these things are uniqued into.
@@ -124,11 +120,26 @@ SILModule::~SILModule() {
   delete (SILTypeListUniquingType*)TypeListUniquing;
 }
 
+void *SILModule::allocate(unsigned Size, unsigned Align) const {
+  if (getASTContext().LangOpts.UseMalloc)
+    return AlignedAlloc(Size, Align);
+
+  return BPA.Allocate(Size, Align);
+}
+
+void *SILModule::allocateInst(unsigned Size, unsigned Align) const {
+  return AlignedAlloc(Size, Align);
+}
+
+void SILModule::deallocateInst(SILInstruction *I) {
+  AlignedFree(I);
+}
+
 SILWitnessTable *
 SILModule::createWitnessTableDeclaration(ProtocolConformance *C,
                                          SILLinkage linkage) {
   // If we are passed in a null conformance (a valid value), just return nullptr
-  // since we can not map a witness table to it.
+  // since we cannot map a witness table to it.
   if (!C)
     return nullptr;
 
@@ -247,7 +258,7 @@ static SILFunction::ClassVisibility_t getClassVisibility(SILDeclRef constant) {
   if (!constant.hasDecl())
     return SILFunction::NotRelevant;
 
-  // If this decleration is a function which goes into a vtable, then it's
+  // If this declaration is a function which goes into a vtable, then it's
   // symbol must be as visible as its class. Derived classes even have to put
   // all less visible methods of the base class into their vtables.
 
@@ -371,7 +382,7 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
   F->setDeclContext(constant.hasDecl() ? constant.getDecl() : nullptr);
 
   // If this function has a self parameter, make sure that it has a +0 calling
-  // convention. This can not be done for general function types, since
+  // convention. This cannot be done for general function types, since
   // function_ref's SILFunctionTypes do not have archetypes associated with
   // it.
   CanSILFunctionType FTy = F->getLoweredFunctionType();
@@ -511,22 +522,16 @@ SILFunction *SILModule::lookUpFunction(SILDeclRef fnRef) {
   return lookUpFunction(name);
 }
 
-bool SILModule::linkFunction(SILFunction *Fun, SILModule::LinkingMode Mode,
-                             std::function<void(SILFunction *)> Callback) {
-  return SILLinkerVisitor(*this, getSILLoader(), Mode,
-                          ExternalSource, Callback).processFunction(Fun);
+bool SILModule::linkFunction(SILFunction *Fun, SILModule::LinkingMode Mode) {
+  return SILLinkerVisitor(*this, getSILLoader(), Mode).processFunction(Fun);
 }
 
-bool SILModule::linkFunction(SILDeclRef Decl, SILModule::LinkingMode Mode,
-                             std::function<void(SILFunction *)> Callback) {
-  return SILLinkerVisitor(*this, getSILLoader(), Mode,
-                          ExternalSource, Callback).processDeclRef(Decl);
+bool SILModule::linkFunction(SILDeclRef Decl, SILModule::LinkingMode Mode) {
+  return SILLinkerVisitor(*this, getSILLoader(), Mode).processDeclRef(Decl);
 }
 
-bool SILModule::linkFunction(StringRef Name, SILModule::LinkingMode Mode,
-                             std::function<void(SILFunction *)> Callback) {
-  return SILLinkerVisitor(*this, getSILLoader(), Mode,
-                          ExternalSource, Callback).processFunction(Name);
+bool SILModule::linkFunction(StringRef Name, SILModule::LinkingMode Mode) {
+  return SILLinkerVisitor(*this, getSILLoader(), Mode).processFunction(Name);
 }
 
 void SILModule::linkAllWitnessTables() {
@@ -575,8 +580,7 @@ void SILModule::eraseGlobalVariable(SILGlobalVariable *G) {
   getSILGlobalList().erase(G);
 }
 
-SILVTable *SILModule::lookUpVTable(const ClassDecl *C,
-                                   std::function<void(SILFunction *)> Callback) {
+SILVTable *SILModule::lookUpVTable(const ClassDecl *C) {
   if (!C)
     return nullptr;
 
@@ -586,10 +590,9 @@ SILVTable *SILModule::lookUpVTable(const ClassDecl *C,
     return R->second;
 
   // If that fails, try to deserialize it. If that fails, return nullptr.
-  SILVTable *Vtbl = SILLinkerVisitor(*this, getSILLoader(),
-                                     SILModule::LinkingMode::LinkAll,
-                                     ExternalSource,
-                                     Callback).processClassDecl(C);
+  SILVTable *Vtbl =
+      SILLinkerVisitor(*this, getSILLoader(), SILModule::LinkingMode::LinkAll)
+          .processClassDecl(C);
   if (!Vtbl)
     return nullptr;
 

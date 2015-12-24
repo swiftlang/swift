@@ -250,7 +250,8 @@ public:
 
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
-    AllocBoxInst *allocBox = SGF.B.createAllocBox(decl, lType, ArgNo);
+    AllocBoxInst *allocBox =
+        SGF.B.createAllocBox(decl, lType, {decl->isLet(), ArgNo});
     auto box = SILValue(allocBox, 0);
     auto addr = SILValue(allocBox, 1);
 
@@ -1155,12 +1156,9 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   }
   case DeclKind::Enum: {
     auto ed = cast<EnumDecl>(d);
-    // Emit the enum cases and derived conformance methods for the type.
+    // Emit derived conformance methods for the type.
     for (auto member : ed->getMembers()) {
-      if (auto elt = dyn_cast<EnumElementDecl>(member)) {
-        if (elt->hasArgumentType())
-          emitEnumConstructor(elt);
-      } else if (auto func = dyn_cast<FuncDecl>(member))
+      if (auto func = dyn_cast<FuncDecl>(member))
         emitFunction(func);
       else if (auto ctor = dyn_cast<ConstructorDecl>(member))
         emitConstructor(ctor);
@@ -1723,8 +1721,8 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   llvm::SmallString<128> nameBuffer;
   {
     llvm::raw_svector_ostream nameStream(nameBuffer);
-    nameStream << "_TTW";
     Mangler mangler(nameStream);
+    mangler.manglePrefix("_TTW");
     mangler.mangleProtocolConformance(conformance);
 
     if (auto ctor = dyn_cast<ConstructorDecl>(requirement.getDecl())) {
@@ -1797,9 +1795,9 @@ getOrCreateReabstractionThunk(GenericParamList *thunkContextParams,
 
     // This is actually the SIL helper function.  For now, IR-gen
     // makes the actual thunk.
-    stream << "_TTR";
+    mangler.manglePrefix("_TTR");
     if (auto generics = thunkType->getGenericSignature()) {
-      stream << 'G';
+      mangler.manglePrefix('G');
       mangler.setModuleContext(M.getSwiftModule());
       mangler.mangleGenericSignature(generics,
                                      ResilienceExpansion::Minimal);

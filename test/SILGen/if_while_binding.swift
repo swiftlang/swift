@@ -37,7 +37,7 @@ func if_else_chain() {
   // CHECK:   switch_enum [[XVAL]] : $Optional<String>, case #Optional.Some!enumelt.1: [[YESX:bb[0-9]+]], default [[NOX:bb[0-9]+]]
   if let x = foo() {
   // CHECK: [[YESX]]([[XVAL:%[0-9]+]] : $String):
-  // CHECK:   debug_value [[XVAL]] : $String  // let x
+  // CHECK:   debug_value [[XVAL]] : $String, let, name "x"
   // CHECK:   [[A:%.*]] = function_ref @_TF16if_while_binding1aFSST_
   // CHECK:   retain_value [[XVAL]]
   // CHECK:   apply [[A]]([[XVAL]])
@@ -102,7 +102,7 @@ func while_loop() {
 // CHECK-LABEL: sil hidden @_TF16if_while_binding18while_loop_generic
 // CHECK:         br [[COND:bb[0-9]+]]
 // CHECK:       [[COND]]:
-// CHECK:         [[X:%.*]] = alloc_stack $T // let x
+// CHECK:         [[X:%.*]] = alloc_stack $T, let, name "x"
 // CHECK:         [[OPTBUF:%[0-9]+]] = alloc_stack $Optional<T>
 // CHECK:         switch_enum_addr {{.*}}, case #Optional.Some!enumelt.1: [[LOOPBODY:bb.*]], default [[OUT:bb[0-9]+]]
 // CHECK:       [[OUT]]:
@@ -130,7 +130,7 @@ func while_loop_multi() {
   // CHECK:         switch_enum {{.*}}, case #Optional.Some!enumelt.1: [[CHECKBUF2:bb.*]], default [[LOOP_EXIT0:bb[0-9]+]]
 
   // CHECK: [[CHECKBUF2]]([[A:%[0-9]+]] : $String):
-  // CHECK:   debug_value [[A]] : $String  // let a
+  // CHECK:   debug_value [[A]] : $String, let, name "a"
 
   // CHECK:   switch_enum {{.*}}, case #Optional.Some!enumelt.1: [[LOOP_BODY:bb.*]], default [[LOOP_EXIT2a:bb[0-9]+]]
 
@@ -140,8 +140,8 @@ func while_loop_multi() {
 
   // CHECK: [[LOOP_BODY]]([[B:%[0-9]+]] : $String):
   while let a = foo(), b = bar() {
-    // CHECK:   debug_value [[B]] : $String  // let b
-    // CHECK:   debug_value [[A]] : $String  // let c
+    // CHECK:   debug_value [[B]] : $String, let, name "b"
+    // CHECK:   debug_value [[A]] : $String, let, name "c"
     // CHECK:   release_value [[B]]
     // CHECK:   release_value [[A]]
     // CHECK:   br [[LOOP_ENTRY]]
@@ -262,7 +262,7 @@ func if_multi_where() {
 func if_leading_boolean(a : Int) {
   // Test the boolean condition.
   
-  // CHECK: debug_value %0 : $Int  // let a
+  // CHECK: debug_value %0 : $Int, let, name "a"
   // CHECK: [[EQRESULT:%[0-9]+]] = apply {{.*}}(%0, %0) : $@convention(thin) (Int, Int) -> Bool
 
   // CHECK-NEXT: [[EQRESULTI1:%[0-9]+]] = apply %2([[EQRESULT]]) : $@convention(method) (Bool) -> Builtin.Int1
@@ -275,8 +275,8 @@ func if_leading_boolean(a : Int) {
   // CHECK:   switch_enum [[OPTRESULT]] : $Optional<String>, case #Optional.Some!enumelt.1: [[SUCCESS:bb.*]], default [[IF_DONE:bb[0-9]+]]
 
 // CHECK: [[SUCCESS]]([[B:%[0-9]+]] : $String):
-  // CHECK-NEXT:   debug_value [[B:%[0-9]+]] : $String  // let b
-  // CHECK-NEXT:   debug_value [[B:%[0-9]+]] : $String  // let c
+  // CHECK-NEXT:   debug_value [[B:%[0-9]+]] : $String, let, name "b"
+  // CHECK-NEXT:   debug_value [[B:%[0-9]+]] : $String, let, name "c"
   // CHECK-NEXT:   release_value [[B]]
   // CHECK-NEXT:   br [[IFDONE]]
   if a == a, let b = foo() {
@@ -295,7 +295,7 @@ class DerivedClass : BaseClass {}
 // CHECK-LABEL: sil hidden @_TF16if_while_binding20testAsPatternInIfLetFGSqCS_9BaseClass_T_
 func testAsPatternInIfLet(a : BaseClass?) {
   // CHECK: bb0(%0 : $Optional<BaseClass>):
-  // CHECK-NEXT:   debug_value %0 : $Optional<BaseClass>  // let a
+  // CHECK-NEXT:   debug_value %0 : $Optional<BaseClass>, let, name "a"
   // CHECK-NEXT:   retain_value %0 : $Optional<BaseClass>
   // CHECK-NEXT:   switch_enum %0 : $Optional<BaseClass>, case #Optional.Some!enumelt.1: [[OPTPRESENTBB:bb[0-9]+]], default [[NILBB:bb[0-9]+]]
   

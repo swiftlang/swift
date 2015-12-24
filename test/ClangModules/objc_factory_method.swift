@@ -36,7 +36,7 @@ func testFactoryWithLaterIntroducedInit() {
   _ = NSHavingConvenienceFactoryAndEarlierConvenienceInit(flim:5)
   _ = NSHavingConvenienceFactoryAndEarlierConvenienceInit(flam:5)
 
-  // Don't prefer more available convience factory initializer over less
+  // Don't prefer more available convenience factory initializer over less
   // available designated initializer
   _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flim:5) // expected-error {{'init(flim:)' is only available on OS X 10.11 or newer}} 
     // expected-note @-1 {{add 'if #available' version check}}

@@ -3,7 +3,6 @@
 import os
 import sys
 import argparse
-import itertools
 import json
 import textwrap
 
@@ -31,7 +30,7 @@ disabled_passes = sum(args.disable_pass, [])
 disabled_passpipelines = sum(args.disable_passpipeline, [])
 
 # First filter out pipelines.
-normal_pipeline_generated = [x.generate() for x in normal_pipeline if not x.identifier in disabled_passpipelines]
+normal_pipeline_generated = [x.generate() for x in normal_pipeline if x.identifier not in disabled_passpipelines]
 
 # Then filter out specific passes.
 for i in range(len(normal_pipeline_generated)):

@@ -5,6 +5,14 @@
 
 import StdlibUnittest
 
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 var FixedPoint = TestSuite("FixedPoint")
 
 %{
@@ -83,7 +91,7 @@ FixedPoint.test("${Dst}(truncatingBitPattern:)") {
 %
 %       for bit_pattern in test_bit_patterns:
 
-  if true {
+  do {
 %       input = prepare_bit_pattern(bit_pattern, src_ty.bits, src_ty.is_signed)
     let input = get${Src}(${input})
 %       input = prepare_bit_pattern(input, src_ty.bits, False)
@@ -154,7 +162,7 @@ FixedPoint.test("${Dst}(bitPattern: ${Src})") {
 
 %   for bit_pattern in test_bit_patterns:
 
-  if true {
+  do {
 %     input = prepare_bit_pattern(bit_pattern, src_ty.bits, src_ty.is_signed)
     let input = get${Src}(${input})
 %     input = prepare_bit_pattern(input, src_ty.bits, False)
@@ -163,7 +171,7 @@ FixedPoint.test("${Dst}(bitPattern: ${Src})") {
     expectEqual(expected, output)
   }
 
-  if true {
+  do {
 %     input = prepare_bit_pattern(bit_pattern, src_ty.bits, src_ty.is_signed)
     let input = get${Src}(${input})
 
@@ -226,7 +234,7 @@ FixedPoint.test("${Self}.hashValue") {
 
 %   for bit_pattern in test_bit_patterns:
 
-  if true {
+  do {
 %     input = prepare_bit_pattern(bit_pattern, self_ty.bits, self_ty.is_signed)
     let input = get${Self}(${input})
     let output = getInt(input.hashValue)
@@ -329,11 +337,11 @@ FixedPoint.test("byteSwapped") {
 var BoolTestSuite = TestSuite("Bool")
 
 BoolTestSuite.test("literals") {
-  if true {
+  do {
     var v = false
     expectType(Bool.self, &v)
   }
-  if true {
+  do {
     var v = true
     expectType(Bool.self, &v)
   }
@@ -349,34 +357,34 @@ struct Booleanish : BooleanType {
 }
 
 BoolTestSuite.test("init<T : BooleanType>(_:)") {
-  if true {
+  do {
     let v = Bool(Booleanish(boolValue: false))
     expectFalse(v)
   }
-  if true {
+  do {
     let v = Bool(Booleanish(boolValue: true))
     expectTrue(v)
   }
 }
 
 BoolTestSuite.test("BooleanType") {
-  if true {
+  do {
     var v: Bool = false
     expectIsBooleanType(&v)
     expectFalse(v.boolValue)
   }
-  if true {
+  do {
     var v: Bool = true
     expectTrue(v.boolValue)
   }
 }
 
 BoolTestSuite.test("CustomStringConvertible") {
-  if true {
+  do {
     let v: Bool = false
     expectEqual("false", String(v))
   }
-  if true {
+  do {
     let v: Bool = true
     expectEqual("true", String(v))
   }
@@ -391,13 +399,13 @@ BoolTestSuite.test("Equatable,Hashable") {
 }
 
 BoolTestSuite.test("!") {
-  if true {
+  do {
     let v: Bool = false
     var r = !v
     expectType(Bool.self, &r)
     expectTrue(r)
   }
-  if true {
+  do {
     let v: Bool = true
     var r = !v
     expectType(Bool.self, &r)
@@ -407,11 +415,11 @@ BoolTestSuite.test("!") {
 
 BoolTestSuite.test("==,!=") {
   let v: Bool = false
-  if true {
+  do {
     var r = (v == v)
     expectType(Bool.self, &r)
   }
-  if true {
+  do {
     var r = (v != v)
     expectType(Bool.self, &r)
   }

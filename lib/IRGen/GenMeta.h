@@ -44,6 +44,7 @@ namespace irgen {
   class IRGenModule;
   class Size;
   class StructLayout;
+  struct ClassLayout;
 
   /// Is the given class known to have Swift-compatible metadata?
   bool hasKnownSwiftMetadata(IRGenModule &IGM, ClassDecl *theClass);
@@ -76,7 +77,7 @@ namespace irgen {
   /// Emit a reference to a compile-time constant piece of type metadata, or
   /// return a null pointer if the type's metadata cannot be represented by a
   /// constant.
-  llvm::Constant *tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
+  llvm::Constant *tryEmitConstantTypeMetadataRef(IRGenModule &IGM,
                                                  CanType type);
 
   enum class MetadataValueType { ObjCClass, TypeMetadata };
@@ -103,7 +104,8 @@ namespace irgen {
 
   /// Emit the metadata associated with the given class declaration.
   void emitClassMetadata(IRGenModule &IGM, ClassDecl *theClass,
-                         const StructLayout &layout);
+                         const StructLayout &layout,
+                         const ClassLayout &fieldLayout);
 
   /// Emit the constant initializer of the type metadata candidate for
   /// the given foreign class declaration.

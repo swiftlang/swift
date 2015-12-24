@@ -44,59 +44,50 @@ public func find<
 }
 
 /// Returns the lesser of `x` and `y`.
+///
+/// If `x == y`, returns `x`.
 @warn_unused_result
 public func min<T : Comparable>(x: T, _ y: T) -> T {
-  var r = x
-  if y < x {
-    r = y
-  }
-  return r
+  // In case `x == y` we pick `x`.
+  // This preserves any pre-existing order in case `T` has identity,
+  // which is important for e.g. the stability of sorting algorithms.
+  // `(min(x, y), max(x, y))` should return `(x, y)` in case `x == y`.
+  return y < x ? y : x
 }
 
 /// Returns the least argument passed.
+///
+/// If there are multiple equal least arguments, returns the first one.
 @warn_unused_result
 public func min<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
-  var r = x
-  if y < x {
-    r = y
+  var minValue = min(min(x, y), z)
+  // In case `value == minValue`, we pick `minValue`. See min(_:_:).
+  for value in rest where value < minValue {
+    minValue = value
   }
-  if z < r {
-    r = z
-  }
-  for t in rest {
-    if t < r {
-      r = t
-    }
-  }
-  return r
+  return minValue
 }
 
 /// Returns the greater of `x` and `y`.
+///
+/// If `x == y`, returns `y`.
 @warn_unused_result
 public func max<T : Comparable>(x: T, _ y: T) -> T {
-  var r = y
-  if y < x {
-    r = x
-  }
-  return r
+  // In case `x == y`, we pick `y`. See min(_:_:).
+  return y >= x ? y : x
 }
 
 /// Returns the greatest argument passed.
+///
+/// If there are multiple equal greatest arguments, returns the last one.
 @warn_unused_result
 public func max<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
-  var r = y
-  if y < x {
-    r = x
+  var maxValue = max(max(x, y), z)
+  // In case `value == maxValue`, we pick `value`. See min(_:_:).
+  for value in rest where value >= maxValue {
+    maxValue = value
   }
-  if r < z {
-    r = z
-  }
-  for t in rest {
-    if t >= r {
-      r = t
-    }
-  }
-  return r
+  return maxValue
 }
 
 /// Returns the result of slicing `elements` into sub-sequences that
@@ -164,12 +155,11 @@ public struct EnumerateGenerator<
   /// The type of element returned by `next()`.
   public typealias Element = (index: Int, element: Base.Element)
   var base: Base
-  var count: Int
+  var count: Int = 0
 
   /// Construct from a `Base` generator.
   public init(_ base: Base) {
     self.base = base
-    count = 0
   }
 
   /// Advance to the next element and return it, or `nil` if no next
@@ -177,8 +167,9 @@ public struct EnumerateGenerator<
   ///
   /// - Requires: No preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> Element? {
-    guard let b = base.next() else { return .None }
-    return .Some((index: count++, element: b))
+    guard let b = base.next() else { return nil }
+    defer { count += 1 }
+    return (index: count, element: b)
   }
 }
 

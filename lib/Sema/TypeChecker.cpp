@@ -27,6 +27,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/Timer.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/CodeCompletionTypeChecking.h"
@@ -511,13 +512,18 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
   // Make sure that name binding has been completed before doing any type
   // checking.
-  performNameBinding(SF, StartElem);
+  {
+    SharedTimer timer("Name binding");
+    performNameBinding(SF, StartElem);
+  }
 
   auto &Ctx = SF.getASTContext();
   {
     // NOTE: The type checker is scoped to be torn down before AST
     // verification.
     TypeChecker TC(Ctx);
+    SharedTimer timer("Type checking / Semantic analysis");
+
     auto &DefinedFunctions = TC.definedFunctions;
     if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
       TC.enableDebugTimeFunctionBodies();
@@ -609,16 +615,19 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   // Verify that we've checked types correctly.
   SF.ASTStage = SourceFile::TypeChecked;
 
-  // Verify the SourceFile.
-  verify(SF);
+  {
+    SharedTimer timer("AST verification");
+    // Verify the SourceFile.
+    verify(SF);
 
-  // Verify imported modules.
+    // Verify imported modules.
 #ifndef NDEBUG
-  if (SF.Kind != SourceFileKind::REPL &&
-      !Ctx.LangOpts.DebuggerSupport) {
-    Ctx.verifyAllLoadedModules();
-  }
+    if (SF.Kind != SourceFileKind::REPL &&
+        !Ctx.LangOpts.DebuggerSupport) {
+      Ctx.verifyAllLoadedModules();
+    }
 #endif
+  }
 }
 
 void swift::performWholeModuleTypeChecking(SourceFile &SF) {
@@ -838,7 +847,7 @@ class TypeRefinementContextBuilder : private ASTWalker {
 
   /// A mapping from abstract storage declarations with accessors to
   /// to the type refinement contexts for those declarations. We refer to
-  /// this map to determine the appopriate parent TRC to use when
+  /// this map to determine the appropriate parent TRC to use when
   /// walking the accessor function.
   llvm::DenseMap<AbstractStorageDecl *, TypeRefinementContext *>
       StorageContexts;
@@ -1386,7 +1395,7 @@ TypeChecker::overApproximateOSVersionsAtLocation(SourceLoc loc,
   SourceFile *SF = DC->getParentSourceFile();
 
   // If our source location is invalid (this may be synthesized code), climb
-  // the decl context hierarchy until until we find a location that is valid,
+  // the decl context hierarchy until we find a location that is valid,
   // collecting availability ranges on the way up.
   // We will combine the version ranges from these annotations
   // with the TRC for the valid location to overapproximate the running
@@ -1585,7 +1594,7 @@ public:
   }
 
   /// Once we have found the target node, look for the innermost ancestor
-  /// matching our criteria on the way back up the spine of of the tree.
+  /// matching our criteria on the way back up the spine of the tree.
   bool walkToNodePost(ASTNode Node) {
     if (!InnermostMatchingNode.hasValue() && Predicate(Node, Parent)) {
       assert(Node.getSourceRange().isInvalid() ||
@@ -1792,9 +1801,9 @@ static const Decl *ancestorTypeLevelDeclForAvailabilityFixit(const Decl *D) {
 ///
 /// \param  FoundVersionCheckNode Returns a node that can be wrapped in a
 /// if #available(...) { ... } version check to fix the unavailable reference,
-/// or None if such such a node cannot be found.
+/// or None if such a node cannot be found.
 ///
-/// \param FoundMemberLevelDecl Returns memember-level declaration (i.e., the
+/// \param FoundMemberLevelDecl Returns member-level declaration (i.e., the
 ///  child of a type DeclContext) for which an @available attribute would
 /// fix the unavailable reference.
 ///
@@ -2205,7 +2214,8 @@ static bool isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
 void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
                                      const DeclContext *ReferenceDC,
                                      const AvailableAttr *Attr,
-                                     DeclName Name) {
+                                     DeclName Name,
+                   std::function<void(InFlightDiagnostic&)> extraInfoHandler) {
   // We match the behavior of clang to not report deprecation warnigs
   // inside declarations that are themselves deprecated on all deployment
   // targets.
@@ -2230,24 +2240,30 @@ void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
     DeprecatedVersion = Attr->Deprecated.getValue();
 
   if (Attr->Message.empty() && Attr->Rename.empty()) {
-    diagnose(ReferenceRange.Start, diag::availability_deprecated, Name,
-             Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
-             DeprecatedVersion)
-      .highlight(Attr->getRange());
+    auto diagValue = std::move(
+      diagnose(ReferenceRange.Start, diag::availability_deprecated, Name,
+               Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
+               DeprecatedVersion)
+        .highlight(Attr->getRange()));
+    extraInfoHandler(diagValue);
     return;
   }
 
   if (Attr->Message.empty()) {
-    diagnose(ReferenceRange.Start, diag::availability_deprecated_rename, Name,
-             Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
-             DeprecatedVersion, Attr->Rename)
-      .highlight(Attr->getRange());
+    auto diagValue = std::move(
+      diagnose(ReferenceRange.Start, diag::availability_deprecated_rename, Name,
+               Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
+               DeprecatedVersion, Attr->Rename)
+        .highlight(Attr->getRange()));
+    extraInfoHandler(diagValue);
   } else {
     EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-    diagnose(ReferenceRange.Start, diag::availability_deprecated_msg, Name,
-             Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
-             DeprecatedVersion, EncodedMessage.Message)
-      .highlight(Attr->getRange());
+    auto diagValue = std::move(
+      diagnose(ReferenceRange.Start, diag::availability_deprecated_msg, Name,
+               Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
+               DeprecatedVersion, EncodedMessage.Message)
+        .highlight(Attr->getRange()));
+    extraInfoHandler(diagValue);
   }
 
   if (!Attr->Rename.empty()) {

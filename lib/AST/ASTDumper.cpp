@@ -542,10 +542,12 @@ namespace {
                       llvm::Optional<llvm::raw_ostream::Colors>()) {
       printCommon((ValueDecl *)NTD, Name, Color);
 
-      if (NTD->hasFixedLayout())
-        OS << " @_fixed_layout";
-      else
-        OS << " @_resilient_layout";
+      if (NTD->hasType()) {
+        if (NTD->hasFixedLayout())
+          OS << " @_fixed_layout";
+        else
+          OS << " @_resilient_layout";
+      }
     }
 
     void visitSourceFile(const SourceFile &SF) {

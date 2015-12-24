@@ -165,7 +165,7 @@ TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
       !dynamicType->getClassOrBoundGenericClass())
     return Type();
 
-  // If the value type canot be bridged, we're done.
+  // If the value type cannot be bridged, we're done.
   if (!valueType->isPotentiallyBridgedValueType())
     return Type();
 
@@ -367,8 +367,10 @@ Type TypeChecker::applyGenericArguments(Type type,
   if (!unbound) {
     // FIXME: Highlight generic arguments and introduce a Fix-It to remove
     // them.
-    diagnose(loc, diag::not_a_generic_type, type);
-
+    if (!type->is<ErrorType>()) {
+      diagnose(loc, diag::not_a_generic_type, type);
+    }
+    
     // Just return the type; this provides better recovery anyway.
     return type;
   }
@@ -2987,6 +2989,9 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
     if (TupleTy->getNumElements() == 1 && !TupleTy->getElement(0).isVararg())
       IndicesType = TupleTy->getElementType(0);
   }
+  
+  if (IndicesType->is<ErrorType>())
+    return false;
 
   bool IndicesResult = isRepresentableInObjC(SD->getDeclContext(), IndicesType);
   bool ElementResult = isRepresentableInObjC(SD->getDeclContext(),

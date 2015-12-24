@@ -6,6 +6,9 @@
 
 // REQUIRES: objc_interop
 
+// CHECK-LABEL: <<Foundation lookup table>>
+// CHECK: Categories:{{.*}}NSValue(NSValueCreation){{.*}}
+
 // CHECK-LABEL: <<ObjectiveC lookup table>>
 // CHECK-NEXT: Base name -> entry mappings:
 // CHECK-NOT: lookup table
@@ -44,6 +47,8 @@
 // CHECK-NEXT:     TU: UIActionSheet
 // CHECK-NEXT:   __CCItem:
 // CHECK-NEXT:     TU: __CCItem
+// CHECK-NEXT:   __swift:
+// CHECK-NEXT:     TU: __swift
 // CHECK-NEXT:   accessibilityFloat:
 // CHECK-NEXT:     NSAccessibility: -[NSAccessibility accessibilityFloat]
 // CHECK-NEXT:   categoryMethodWithX:
@@ -66,12 +71,23 @@
 // CHECK-NEXT:     NSErrorImports: -[NSErrorImports methodWithFloat:error:]
 // CHECK-NEXT:   objectAtIndexedSubscript:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass objectAtIndexedSubscript:]
+// CHECK-NEXT:   optSetter:
+// CHECK-NEXT:     SNCollision: SNCollision.optSetter
 // CHECK-NEXT:   protoInstanceMethodWithX:
 // CHECK-NEXT:     SNSomeProtocol: -[SNSomeProtocol protoInstanceMethodWithX:y:]
+// CHECK-NEXT:   reqSetter:
+// CHECK-NEXT:     SNCollision: SNCollision.reqSetter
 // CHECK-NEXT:   setAccessibilityFloat:
 // CHECK-NEXT:     NSAccessibility: -[NSAccessibility setAccessibilityFloat:]
 // CHECK-NEXT:   subscript:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass objectAtIndexedSubscript:]
+
+// CHECK: Categories: SNSomeClass(), SNSomeClass(Category1)
+
+// CHECK-OMIT-NEEDLESS-WORDS: <<ObjectiveC lookup table>>
+// CHECK-OMIT-NEEDLESS-WORDS-NOT: lookup table
+// CHECK-OMIT-NEEDLESS-WORDS: respondsTo:
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT:     -[NSObject respondsToSelector:]
 
 // CHECK-OMIT-NEEDLESS-WORDS: Base name -> entry mappings:
 // CHECK-OMIT-NEEDLESS-WORDS:   methodWith:

@@ -93,7 +93,7 @@ struct OpaqueValue;
 /// A buffer can be in one of three states:
 ///  - An unallocated buffer has a completely unspecified state.
 ///  - An allocated buffer has been initialized so that it
-///    owns unintialized value storage for the stored type.
+///    owns uninitialized value storage for the stored type.
 ///  - An initialized buffer is an allocated buffer whose value
 ///    storage has been initialized.
 struct ValueBuffer {
@@ -192,7 +192,7 @@ public:
   /// available in this type's value witness table.
   bool hasExtraInhabitants() const { return Data & HasExtraInhabitants; }
   /// True if this type's binary representation is that of an enum, and the
-  /// enum value witness table entries are avaialble in this type's value
+  /// enum value witness table entries are available in this type's value
   /// witness table.
   bool hasEnumWitnesses() const { return Data & HasEnumWitnesses; }
   constexpr ValueWitnessFlags
@@ -247,9 +247,9 @@ typedef void destroyBuffer(ValueBuffer *buffer, const Metadata *self);
 /// Given an unallocated buffer, initialize it as a copy of the
 /// object in the source buffer.  This can be decomposed as:
 ///
-///   self->initalizeBufferWithCopy(dest, self->projectBuffer(src), self)
+///   self->initializeBufferWithCopy(dest, self->projectBuffer(src), self)
 ///
-/// This operation does not need to be safe aginst 'dest' and 'src' aliasing.
+/// This operation does not need to be safe against 'dest' and 'src' aliasing.
 /// 
 /// Preconditions:
 ///   'dest' is an unallocated buffer
@@ -305,7 +305,7 @@ typedef OpaqueValue *initializeBufferWithCopy(ValueBuffer *dest,
 /// Given an uninitialized object and an initialized object, copy
 /// the value.
 ///
-/// This operation does not need to be safe aginst 'dest' and 'src' aliasing.
+/// This operation does not need to be safe against 'dest' and 'src' aliasing.
 /// 
 /// Returns the dest object.
 ///
@@ -322,7 +322,7 @@ typedef OpaqueValue *initializeWithCopy(OpaqueValue *dest,
 /// Given two initialized objects, copy the value from one to the
 /// other.
 ///
-/// This operation must be safe aginst 'dest' and 'src' aliasing.
+/// This operation must be safe against 'dest' and 'src' aliasing.
 /// 
 /// Returns the dest object.
 ///
@@ -337,7 +337,7 @@ typedef OpaqueValue *assignWithCopy(OpaqueValue *dest,
 /// the value from the object to the buffer, leaving the source object
 /// uninitialized.
 ///
-/// This operation does not need to be safe aginst 'dest' and 'src' aliasing.
+/// This operation does not need to be safe against 'dest' and 'src' aliasing.
 /// 
 /// Returns the dest object.
 ///
@@ -359,7 +359,7 @@ typedef OpaqueValue *initializeBufferWithTake(ValueBuffer *dest,
 /// can simply be a pointer-aligned memcpy of sizeof(ValueBuffer)
 /// bytes.
 ///
-/// This operation does not need to be safe aginst 'dest' and 'src' aliasing.
+/// This operation does not need to be safe against 'dest' and 'src' aliasing.
 /// 
 /// Returns the dest object.
 ///
@@ -377,7 +377,7 @@ typedef OpaqueValue *initializeWithTake(OpaqueValue *dest,
 /// the value from one to the other, leaving the source object
 /// uninitialized.
 ///
-/// This operation does not need to be safe aginst 'dest' and 'src' aliasing.
+/// This operation does not need to be safe against 'dest' and 'src' aliasing.
 /// Therefore this can be decomposed as:
 ///
 ///   self->destroy(dest, self);
@@ -411,10 +411,10 @@ typedef OpaqueValue *allocateBuffer(ValueBuffer *buffer,
 /// value from one buffer to the other, leaving the source buffer
 /// unallocated.
 ///
-/// This operation does not need to be safe aginst 'dest' and 'src' aliasing.
+/// This operation does not need to be safe against 'dest' and 'src' aliasing.
 /// Therefore this can be decomposed as:
 ///
-///   self->initalizeBufferWithTake(dest, self->projectBuffer(src), self)
+///   self->initializeBufferWithTake(dest, self->projectBuffer(src), self)
 ///   self->deallocateBuffer(src, self)
 ///
 /// However, it may be more efficient because values stored out-of-line
@@ -447,7 +447,7 @@ typedef void destroyArray(OpaqueValue *array, size_t n,
 /// Given an uninitialized array and an initialized array, copy
 /// the value.
 ///
-/// This operation does not need to be safe aginst 'dest' and 'src' aliasing.
+/// This operation does not need to be safe against 'dest' and 'src' aliasing.
 /// 
 /// Returns the dest object.
 ///
@@ -1003,6 +1003,7 @@ public:
     case MetadataKind::Function:
     case MetadataKind::Struct:
     case MetadataKind::Enum:
+    case MetadataKind::Optional:
     case MetadataKind::Opaque:
     case MetadataKind::Tuple:
     case MetadataKind::Existential:
@@ -1029,6 +1030,7 @@ public:
     case MetadataKind::ForeignClass:
     case MetadataKind::Struct:
     case MetadataKind::Enum:
+    case MetadataKind::Optional:
     case MetadataKind::Opaque:
     case MetadataKind::Tuple:
     case MetadataKind::Function:
@@ -1746,7 +1748,8 @@ struct EnumMetadata : public Metadata {
   }
 
   static bool classof(const Metadata *metadata) {
-    return metadata->getKind() == MetadataKind::Enum;
+    return metadata->getKind() == MetadataKind::Enum
+      || metadata->getKind() == MetadataKind::Optional;
   }
 };
 
@@ -2488,7 +2491,6 @@ struct ClassFieldLayout {
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
 extern "C" void swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
-                                      const ClassMetadata *super,
                                       size_t numFields,
                                       const ClassFieldLayout *fieldLayouts,
                                       size_t *fieldOffsets);
@@ -2783,17 +2785,6 @@ extern "C"
 void swift_registerProtocolConformances(const ProtocolConformanceRecord *begin,
                                         const ProtocolConformanceRecord *end);
   
-/// FIXME: This doesn't belong in the runtime.
-extern "C" void swift_printAny(OpaqueValue *value, const Metadata *type);
-
-/// \brief Demangle a mangled class name into module+class.
-/// Returns true if the name was successfully decoded.
-/// On success, *outModule and *outClass must be freed with free().
-extern "C" bool
-swift_demangleSimpleClass(const char *mangledName, 
-                          char **outModule, char **outClass);
-  
-
 /// Return the type name for a given type metadata.
 std::string nameForMetadata(const Metadata *type,
                             bool qualified = true);

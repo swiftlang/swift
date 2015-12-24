@@ -230,8 +230,10 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
   // Emit the initialization code into a function.
   llvm::SmallString<20> onceFuncBuffer;
   llvm::raw_svector_ostream onceFuncStream(onceFuncBuffer);
+  {
   Mangler funcMangler(onceFuncStream);
   funcMangler.mangleGlobalInit(varDecl, counter, true);
+  }
 
   SILFunction *onceFunc = emitLazyGlobalInitializer(onceFuncStream.str(), pd,
                                                     pbdEntry);

@@ -57,7 +57,7 @@ public struct _stdlib_ShardedAtomicCounter {
     var result = 0
     let shards = self._shardsPtr
     let count = self._shardsCount
-    for var i = 0; i != count; i++ {
+    for i in 0..<count {
       result += _swift_stdlib_atomicLoadInt(object: shards + i)
     }
     return result
@@ -72,7 +72,7 @@ public struct _stdlib_ShardedAtomicCounter {
 
     public mutating func randomInt() -> Int {
       var result = 0
-      for i in 0..<Int._sizeInBits {
+      for _ in 0..<Int._sizeInBits {
         result = (result << 1) | (_state & 1)
         _state = (_state >> 1) ^ (-(_state & 1) & Int(bitPattern: 0xD0000001))
       }
@@ -80,4 +80,3 @@ public struct _stdlib_ShardedAtomicCounter {
     }
   }
 }
-

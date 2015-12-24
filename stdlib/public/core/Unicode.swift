@@ -79,7 +79,7 @@ public struct UTF8 : UnicodeCodecType {
   public init() {}
 
   /// Returns the number of expected trailing bytes for a given first byte: 0,
-  /// 1, 2 or 3.  If the first byte can not start a valid UTF-8 code unit
+  /// 1, 2 or 3.  If the first byte cannot start a valid UTF-8 code unit
   /// sequence, returns 4.
   @warn_unused_result
   public static func _numTrailingBytes(cu0: CodeUnit) -> UInt8 {
@@ -749,7 +749,7 @@ internal func _transcodeSomeUTF16AsUTF8<
 
     if _fastPath(u <= 0x7f) {
       result |= UTF8Chunk(u) << shift
-      ++utf8Count
+      utf8Count += 1
     } else {
       var scalarUtf8Length: Int
       var r: UInt
@@ -947,7 +947,7 @@ extension UTF16 {
         break loop
       case .Error:
         if !repairIllFormedSequences {
-          return .None
+          return nil
         }
         isAscii = false
         count += width(UnicodeScalar(0xfffd))

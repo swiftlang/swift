@@ -528,7 +528,7 @@ func testRoundTrip() {
     }
   }
   
-  var test = Test()
+  let test = Test()
   
   let array = [
     BridgedSwift(10), BridgedSwift(20),  BridgedSwift(30),
@@ -556,7 +556,7 @@ print(x.objectAtIndex(0) as Base)
 */
 
 func testMutableArray() {
-  var m = NSMutableArray(array: ["fu", "bar", "buzz"])
+  let m = NSMutableArray(array: ["fu", "bar", "buzz"])
   let a = m as NSArray as! [NSString]
   print(a) // CHECK-NEXT: [fu, bar, buzz]
   m.addObject("goop")

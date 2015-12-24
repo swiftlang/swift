@@ -42,7 +42,7 @@ func staticMetatypeFromGeneric(x: Generic<S.Type>) -> S.Type {
 // CHECK:         [[META:%.*]] = load [[ADDR]] : $*@thick T.Type
 // CHECK:         return [[META]] : $@thick T.Type
 // CHECK:       }
-func genericMetatypeFromGenericMetatype<T>(x: GenericMetatype<T>)-> T.Type {
+func genericMetatypeFromGenericMetatype<T>(x: GenericMetatype<T>) -> T.Type {
   var x = x
   return x.value
 }

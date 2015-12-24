@@ -1,4 +1,4 @@
-//===--- ThreadSafeRefCounted.h - Thread-safe Refcounting Base ------------===//
+//===--- ThreadSafeRefCounted.cpp - Thread-safe Refcounting Base ----------===//
 //
 // This source file is part of the Swift.org open source project
 //

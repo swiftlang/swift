@@ -61,7 +61,7 @@ class Foo {
   }
 
   // Call from Swift entrypoint with exploded Rect to @objc entrypoint
-  // with unexploaded ABI-coerced type.
+  // with unexploded ABI-coerced type.
   // x86_64-macosx: define hidden float @_TFC8abitypes3Foo17getXFromRectSwift{{.*}}(%VSC6MyRect* noalias nocapture dereferenceable({{.*}}), [[SELF:%.*]]*) {{.*}} {
   // x86_64-macosx: [[COERCED:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 4
   // x86_64-macosx: [[SEL:%.*]] = load i8*, i8** @"\01L_selector(getXFromRect:)", align 8
@@ -103,7 +103,7 @@ class Foo {
   // Make sure the caller-side from Swift also uses indirect-byval for the argument
   // x86_64-macosx: define hidden float @_TFC8abitypes3Foo25getXFromRectIndirectSwift{{.*}}(%VSC6MyRect* noalias nocapture dereferenceable({{.*}}), %C8abitypes3Foo*) {{.*}} {
   func getXFromRectIndirectSwift(r: MyRect) -> Float {
-    let f : Float = 1.0;
+    let f : Float = 1.0
     // x86_64-macosx: [[TEMP:%.*]] = alloca [[TEMPTYPE:%.*]], align 4
     // x86_64-macosx: [[RESULT:%.*]] = call float bitcast (void ()* @objc_msgSend to float (i8*, i8*, float, float, float, float, float, float, float, [[TEMPTYPE]]*)*)(i8* %{{.*}}, i8* %{{.*}}, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, [[TEMPTYPE]]* byval align 4 [[TEMP]])
     // x86_64-macosx: ret float [[RESULT]]
@@ -427,7 +427,7 @@ class Foo {
   // Test that the makeOne() that we generate somewhere below doesn't
   // use arm_aapcscc for armv7.
   func callInline() -> Float {
-    return makeOne(3,5).second;
+    return makeOne(3,5).second
   }
 }
 

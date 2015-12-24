@@ -1,4 +1,4 @@
-//===--- Passes.cpp - LLVM Reference Counting Optimizations ---------------===//
+//===--- LLVMARCOpts.cpp - LLVM Reference Counting Optimizations ----------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -594,7 +594,7 @@ static DtorKind analyzeDestructor(Value *P) {
       case RT_BridgeRetain:          // x = swift_bridgeRetain(y)
       case RT_Retain: {      // swift_retain(obj)
 
-        // Ignore retains of the "self" object, no ressurection is possible.
+        // Ignore retains of the "self" object, no resurrection is possible.
         Value *ThisRetainedObject = cast<CallInst>(I).getArgOperand(0);
         if (ThisRetainedObject->stripPointerCasts() ==
             ThisObject->stripPointerCasts())
@@ -856,7 +856,7 @@ static bool performLocalRetainUnownedOpt(CallInst *Retain, BasicBlock &BB,
 }
 
 /// Removes redundant check_unowned calls if they check the same reference and
-/// there is no instruction inbetween which could decrement the reference count.
+/// there is no instruction in between which could decrement the reference count.
 static void performRedundantCheckUnownedRemoval(BasicBlock &BB) {
   DenseSet<Value *> checkedValues;
   for (BasicBlock::iterator BBI = BB.begin(), E = BB.end(); BBI != E; ) {

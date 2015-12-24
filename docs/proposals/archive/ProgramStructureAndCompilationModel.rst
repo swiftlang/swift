@@ -35,7 +35,7 @@ to the business and management reality of the world:
 
 **Ownership Domain / Top Level Component**: corresponds to a product that is
 shipped as a unit (Mac OS/X, iWork, Xcode), is a collection of frameworks/dylibs
-and resources. Only acyclic dependences between different domains is
+and resources. Only acyclic dependencies between different domains is
 allowed. There is some correlation in concept here to "umbrella headers" or
 "dyld shared cache" though it isn't exact.
 
@@ -47,7 +47,7 @@ dylib + optional resources. All contributing source files and resources live in
 one directory (with optional subdirs), and have a single "project file". Can
 contribute to multiple namespaces. The division of a domain into components is
 an implementation detail, not something externally visible as API. Can have
-cyclic dependences between other components. Components roughly correspond to
+cyclic dependencies between other components. Components roughly correspond to
 "xcode project" or "B&I project" granularity at Apple. Can rebuild a "debug
 version" of a subcomponent and drop it into an app without rebuilding the entire
 world.
@@ -104,7 +104,7 @@ Components are explicitly declared, and these declarations can include:
 
 * the version of the component (which are used for "availability macros" etc)
 
-* an explicit list of dependences on other top-level components (whose
+* an explicit list of dependencies on other top-level components (whose
   dependence graph is required to be acyclic) optionally with specific versions:
   "I depend on swift standard libs 1.4 or later"
 
@@ -283,7 +283,7 @@ Now the compiler parses each swift file into an AST. We'll keep the swift
 grammar carefully factored to keep types and values distinct, so it is possible
 to parse (but not fully typecheck) the files without first reading "all the
 headers they depend on". This is important because we want to allow arbitrary
-type and value cyclic dependences between files in a component. As each file is
+type and value cyclic dependencies between files in a component. As each file is
 parsed, the compiler resolves as many intra-file references as it can, and ends
 up with a list of (namespace qualified) types and values that are imported by
 the file that are not satisfied by other components. This is the list of things
@@ -311,7 +311,7 @@ carefully layered to be memory efficient (e.g. only processing an SCC at a time
 instead of an entire component) as well as highly parallel for multicore
 machines. For incremental builds, we will have a huge win because the
 fine-grained dependence information between .o files is tracked and we know
-exactly what dependences to rebuild if anything changes. The build cache will
+exactly what dependencies to rebuild if anything changes. The build cache will
 accelerate most of this, which will eventually be a hybrid on-disk/in-memory
 data structure.
 

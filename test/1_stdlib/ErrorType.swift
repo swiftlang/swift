@@ -3,6 +3,14 @@
 
 import StdlibUnittest
 
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 var ErrorTypeTests = TestSuite("ErrorType")
 
 var NoisyErrorLifeCount = 0
@@ -18,7 +26,7 @@ protocol OtherClassProtocol : class {
 
 class NoisyError : ErrorType, OtherProtocol, OtherClassProtocol {
   init() { NoisyErrorLifeCount += 1 }
-  deinit { NoisyErrorDeathCount += 1}
+  deinit { NoisyErrorDeathCount += 1 }
 
   let _domain = "NoisyError"
   let _code = 123
@@ -143,4 +151,3 @@ ErrorTypeTests.test("existential in lvalue") {
 }
 
 runAllTests()
-

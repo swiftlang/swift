@@ -70,7 +70,7 @@ static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
   return type;
 }
 
-/// Reconsistitute type sugar, e.g., for array types, dictionary
+/// Reconstitute type sugar, e.g., for array types, dictionary
 /// types, optionals, etc.
 static Type reconstituteSugar(Type type) {
   if (auto boundGeneric = dyn_cast<BoundGenericType>(type.getPointer())) {
@@ -336,6 +336,8 @@ bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
 
       if (solverState)
         solverState->retiredConstraints.push_front(constraint);
+      else
+        CG.removeConstraint(constraint);
 
       break;
 
@@ -1094,7 +1096,7 @@ static bool tryTypeVariableBindings(
     for (auto binding : bindings) {
       auto type = binding.BindingType;
 
-      // After our first pass, note that that we've explored these
+      // After our first pass, note that we've explored these
       // types.
       if (tryCount == 0)
         exploredTypes.insert(type->getCanonicalType());
@@ -1370,7 +1372,7 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
     // ready for the next component.
     TypeVariables = std::move(allTypeVariables);
 
-    // For each of the partial solutions, substract off the current score.
+    // For each of the partial solutions, subtract off the current score.
     // It doesn't contribute.
     for (auto &solution : partialSolutions[component])
       solution.getFixedScore() -= CurrentScore;

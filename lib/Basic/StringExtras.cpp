@@ -27,6 +27,13 @@
 using namespace swift;
 using namespace camel_case;
 
+bool swift::canBeArgumentLabel(StringRef identifier) {
+  if (identifier == "var" || identifier == "let" || identifier == "inout")
+    return false;
+
+  return true;
+}
+
 PrepositionKind swift::getPrepositionKind(StringRef word) {
 #define DIRECTIONAL_PREPOSITION(Word)           \
   if (word.equals_lower(#Word))                 \

@@ -21,6 +21,14 @@
 
 import StdlibUnittest
 
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 var mirrors = TestSuite("Mirrors")
 
 extension Mirror {
@@ -42,7 +50,7 @@ mirrors.test("RandomAccessStructure") {
   }
 
   let x = Eggs().customMirror()
-  
+
   expectEqual("[nil: \"aay\", nil: \"bee\", nil: \"cee\"]", x.testDescription)
 }
 
@@ -55,13 +63,15 @@ func find(substring: String, within domain: String) -> String.Index? {
   if (domainCount < substringCount) { return nil }
   var sliceStart = domain.startIndex
   var sliceEnd = domain.startIndex.advancedBy(substringCount)
-  for var i = 0;; i += 1  {
+  var i = 0
+  while true {
     if domain[sliceStart..<sliceEnd] == substring {
       return sliceStart
     }
     if i == domainCount - substringCount { break }
     sliceStart = sliceStart.successor()
     sliceEnd = sliceEnd.successor()
+    i += 1
   }
   return nil
 }
@@ -79,7 +89,7 @@ mirrors.test("ForwardStructure") {
   let w = DoubleYou().customMirror()
   expectEqual(.Set, w.displayStyle)
   expectEqual(letters.characters.count, numericCast(w.children.count))
-  
+
   // Because we don't control the order of a Set, we need to do a
   // fancy dance in order to validate the result.
   let description = w.testDescription
@@ -144,7 +154,7 @@ mirrors.test("LabeledStructure") {
 mirrors.test("Legacy") {
   let m = Mirror(reflecting: [1, 2, 3])
   expectTrue(m.subjectType == [Int].self)
-  
+
   let x0: [Mirror.Child] = [
     (label: "[0]", value: 1),
     (label: "[1]", value: 2),
@@ -159,43 +169,43 @@ mirrors.test("Legacy") {
   class D : B { let dx: Int = 1 }
 
   let mb = Mirror(reflecting: B())
-  
+
   func expectBMirror(
     mb: Mirror,   stackTrace: SourceLocStack = SourceLocStack(),
     file: String = __FILE__, line: UInt = __LINE__
   ) {
     expectTrue(mb.subjectType == B.self,
       stackTrace: stackTrace, file: file, line: line)
-    
+
     expectEmpty(
       mb.superclassMirror(),
       stackTrace: stackTrace, file: file, line: line)
-    
+
     expectEqual(
       1, mb.children.count,
       stackTrace: stackTrace, file: file, line: line)
-    
+
     expectEqual(
       "bx", mb.children.first?.label,
       stackTrace: stackTrace, file: file, line: line)
-    
+
     expectEqual(
       0, mb.children.first?.value as? Int,
       stackTrace: stackTrace, file: file, line: line)
   }
-  
+
   expectBMirror(mb)
-  
+
   // Ensure that the base class instance is properly filtered out of
   // the child list
   do {
     let md = Mirror(reflecting: D())
     expectTrue(md.subjectType == D.self)
-    
+
     expectEqual(1, md.children.count)
     expectEqual("dx", md.children.first?.label)
     expectEqual(1, md.children.first?.value as? Int)
-    
+
     expectNotEmpty(md.superclassMirror())
     if let mb2 = md.superclassMirror() { expectBMirror(mb2) }
   }
@@ -204,11 +214,11 @@ mirrors.test("Legacy") {
     // Ensure that we reflect on the dynamic type of the subject
     let md = Mirror(reflecting: D() as B)
     expectTrue(md.subjectType == D.self)
-    
+
     expectEqual(1, md.children.count)
     expectEqual("dx", md.children.first?.label)
     expectEqual(1, md.children.first?.value as? Int)
-    
+
     expectNotEmpty(md.superclassMirror())
     if let mb2 = md.superclassMirror() { expectBMirror(mb2) }
   }
@@ -236,7 +246,7 @@ mirrors.test("Class/Root/superclass:.Generated") {
         self, children: [ "bee": b ], ancestorRepresentation: .Generated)
     }
   }
-  
+
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
   expectEmpty(b.superclassMirror())
@@ -253,7 +263,7 @@ mirrors.test("class/Root/superclass:<default>") {
       return Mirror(self, children: [ "sea": c + 1 ])
     }
   }
-  
+
   let c = Mirror(reflecting: C())
   expectTrue(c.subjectType == C.self)
   expectEmpty(c.superclassMirror())
@@ -268,7 +278,7 @@ mirrors.test("class/Plain/Plain") {
 
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
-  
+
   if let bChild = expectNotEmpty(b.children.first) {
     expectEqual("b", bChild.label)
     expectEqual(42, bChild.value as? UInt)
@@ -361,7 +371,7 @@ mirrors.test("class/ObjCPlain/Plain") {
 
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
-  
+
   if let bChild = expectNotEmpty(b.children.first) {
     expectEqual("b", bChild.label)
     expectEqual(42, bChild.value as? UInt)
@@ -468,7 +478,7 @@ mirrors.test("Class/Root/NoSuperclassMirror") {
         self, children: [ "bee": b ], ancestorRepresentation: .Suppressed)
     }
   }
-  
+
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
   expectEmpty(b.superclassMirror())
@@ -645,7 +655,7 @@ mirrors.test("Addressing") {
   expectEqual(2, m0.descendant("[1]") as? Int)
   expectEqual(3, m0.descendant(2) as? Int)
   expectEqual(3, m0.descendant("[2]") as? Int)
-  
+
   let m1 = Mirror(reflecting: (a: ["one", "two", "three"], b: 4))
   let ott0 = m1.descendant(0) as? [String]
   expectNotEmpty(ott0)
@@ -668,7 +678,7 @@ mirrors.test("Addressing") {
       return Mirror(self, children: ["bark": 1, "bite": 0])
     }
   }
-  
+
   let x = [
     (a: ["one", "two", "three"], b: Zee()),
     (a: ["five"], b: Zee()),
@@ -704,7 +714,7 @@ mirrors.test("PlaygroundQuickLook") {
   switch PlaygroundQuickLook(reflecting: CustomQuickie()) {
   case .Point(1.25, 42): break; default: expectTrue(false)
   }
-  
+
   // PlaygroundQuickLook support from Legacy Mirrors works.
   switch PlaygroundQuickLook(reflecting: true) {
   case .Logical(true): break; default: expectTrue(false)

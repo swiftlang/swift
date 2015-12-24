@@ -105,7 +105,7 @@ public func _stdlib_pthread_barrier_wait(
   if pthread_mutex_lock(barrier.memory.mutex) != 0 {
     return -1
   }
-  ++barrier.memory.numThreadsWaiting
+  barrier.memory.numThreadsWaiting += 1
   if barrier.memory.numThreadsWaiting < barrier.memory.count {
     // Put the thread to sleep.
     if pthread_cond_wait(barrier.memory.cond, barrier.memory.mutex) != 0 {

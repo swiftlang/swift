@@ -81,7 +81,7 @@ func testMixedSignArithmetic() {
   // allow mixed-sign arithmetic to compile.  We create a deliberate
   // ambiguity in these cases.
 % for T in "UInt UInt64 UInt32 UInt16 UInt8".split():
-  if true {
+  do {
     typealias Stride = ${T}.Stride
     ${T}(1) + 0          // OK
     0 + ${T}(1)         // OK

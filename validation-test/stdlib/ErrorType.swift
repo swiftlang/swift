@@ -7,6 +7,14 @@ import SwiftPrivate
 import StdlibUnittest
 import Foundation
 
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivatePthreadExtras
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 enum SomeError : ErrorType {
   case GoneToFail
 }

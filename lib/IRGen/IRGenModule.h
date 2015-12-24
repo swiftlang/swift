@@ -204,7 +204,7 @@ public:
   /// Emit the protocol conformance records needed by each IR module.
   void emitProtocolConformances();
 
-  /// Emit everthing which is reachable from already emitted IR.
+  /// Emit everything which is reachable from already emitted IR.
   void emitLazyDefinitions();
   
   void addLazyFunction(SILFunction *f) {
@@ -431,12 +431,17 @@ public:
   const SpareBitVector &getHeapObjectSpareBits() const;
 
   const SpareBitVector &getFunctionPointerSpareBits() const;
-  SpareBitVector getWeakReferenceSpareBits() const;
-  SpareBitVector getUnownedReferenceSpareBits(ReferenceCounting style) const;
   const SpareBitVector &getWitnessTablePtrSpareBits() const;
 
+  SpareBitVector getWeakReferenceSpareBits() const;
   Size getWeakReferenceSize() const { return PtrSize; }
   Alignment getWeakReferenceAlignment() const { return getPointerAlignment(); }
+
+  SpareBitVector getUnownedReferenceSpareBits(ReferenceCounting style) const;
+  unsigned getUnownedExtraInhabitantCount(ReferenceCounting style);
+  APInt getUnownedExtraInhabitantValue(unsigned bits, unsigned index,
+                                       ReferenceCounting syle);
+  APInt getUnownedExtraInhabitantMask(ReferenceCounting style);
 
   llvm::Type *getFixedBufferTy();
   llvm::Type *getValueWitnessTy(ValueWitness index);
@@ -499,6 +504,8 @@ public:
   }
 
   bool isResilient(Decl *decl, ResilienceScope scope);
+  ResilienceScope getResilienceScopeForAccess(NominalTypeDecl *decl);
+  ResilienceScope getResilienceScopeForLayout(NominalTypeDecl *decl);
 
   SpareBitVector getSpareBitsForType(llvm::Type *scalarTy, Size size);
   
@@ -635,11 +642,14 @@ public:                             \
 private:                            \
   llvm::Constant *Id##Fn = nullptr;
 #include "RuntimeFunctions.def"
+  
+  llvm::Constant *FixLifetimeFn = nullptr;
 
   mutable Optional<SpareBitVector> HeapPointerSpareBits;
   
 //--- Generic ---------------------------------------------------------------
 public:
+  llvm::Constant *getFixLifetimeFn();
   
   /// The constructor.
   ///

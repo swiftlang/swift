@@ -30,7 +30,7 @@ extension SequenceType
   /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
-  public func _preprocessingPass<R>(preprocess: (Self)->R) -> R? {
+  public func _preprocessingPass<R>(@noescape preprocess: (Self) -> R) -> R? {
     return _base._preprocessingPass { _ in preprocess(self) }
   }
 

@@ -14,7 +14,7 @@ protocol EqualComparable {
 func doCompare<T : EqualComparable, U : EqualComparable>(t1: T, t2: T, u: U) -> Bool {
   var b1 = t1.isEqual(t2)
   if b1 {
-    return true;
+    return true
   }
 
   return t1.isEqual(u) // expected-error {{cannot invoke 'isEqual' with an argument list of type '(U)'}}
@@ -195,7 +195,7 @@ func conformanceViaRequires<T
      >(t1: T, t2: T) -> Bool {
   let b1 = t1.isEqual(t2)
   if b1 || t1.isLess(t2) {
-    return true;
+    return true
   }
 }
 

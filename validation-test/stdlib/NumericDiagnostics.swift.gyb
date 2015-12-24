@@ -30,7 +30,7 @@ func testIteratedOperations() {
         %   "// expected-note{{add an explicit type annotation}}  expected-warning{{inferred to have type}}"\
         %   if (op in all_integer_assignment_operator_names() + all_integer_or_real_assignment_operator_names())\
         %   else "" #FIXME Temporary workaround for rdar://15928178 gyb miscompiles nested if elif
-    if true { // ${count}
+    do { // ${count}
       var x1_${T1}: ${T1} = 0
       var x2_${T2}: ${T2} = 0
       var result = x1_${T1} ${op} x2_${T2}  ${theDiagnostic} 

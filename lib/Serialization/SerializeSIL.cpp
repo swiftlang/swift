@@ -167,7 +167,6 @@ namespace {
                          << " for layout " << Layout::Code << "\n");
     }
 
-    // TODO: this is not required anymore. Remove it.
     bool ShouldSerializeAll;
 
     /// Helper function to update ListOfValues for MethodInst. Format:
@@ -247,7 +246,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   // 1. shared_external linkage is just a hack to tell the optimizer that a
   // shared function was deserialized.
   //
-  // 2. We can not just serialize a declaration to a shared_external function
+  // 2. We cannot just serialize a declaration to a shared_external function
   // since shared_external functions still have linkonce_odr linkage at the LLVM
   // level. This means they must be defined not just declared.
   //
@@ -898,9 +897,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::StrongPinInst:
   case ValueKind::StrongReleaseInst:
   case ValueKind::StrongRetainInst:
-  case ValueKind::StrongRetainAutoreleasedInst:
   case ValueKind::StrongUnpinInst:
-  case ValueKind::AutoreleaseReturnInst:
   case ValueKind::StrongRetainUnownedInst:
   case ValueKind::UnownedRetainInst:
   case ValueKind::UnownedReleaseInst:

@@ -46,7 +46,7 @@ D: ClangImporter, Serialization, (Objective-)C printer, Driver
 
 N: Nadav Rotem
 E: nrotem@apple.com
-D: SILAnalysis, SILPasses
+D: SILOptimizer
 
 N: Anna Zaks
 E: ganna@apple.com

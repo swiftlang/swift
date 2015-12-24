@@ -21,7 +21,11 @@ public struct UnsafeBufferPointerGenerator<Element>
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   public mutating func next() -> Element? {
-    return position == end ? nil : (position++).memory
+    if position == end { return nil }
+
+    let result = position.memory
+    position += 1
+    return result
   }
 
   var position, end: UnsafePointer<Element>

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file declares the interfaces for working with abstract and
-// phsyical calling conventions.
+// physical calling conventions.
 //
 //===----------------------------------------------------------------------===//
 

@@ -44,11 +44,10 @@ extension String {
       }
       mutating func next() -> UTF16.CodeUnit? {
         if idx == core.endIndex {
-          return .None
+          return nil
         }
-        let type = self.core[idx]
-        idx += 1
-        return type
+        defer { idx += 1 }
+        return self.core[idx]
       }
     }
 
@@ -75,7 +74,7 @@ extension String {
       /// - Requires: The previous value is representable.
       @warn_unused_result
       public func predecessor() -> Index {
-        var i = _position - 1
+        var i = _position-1
         let codeUnit = _core[i]
         if _slowPath((codeUnit >> 10) == 0b1101_11) {
           if i != 0 && (_core[i - 1] >> 10) == 0b1101_10 {
@@ -125,7 +124,7 @@ extension String {
       case .Result(let us):
         return us
       case .EmptyInput:
-        _sanityCheckFailure("can not subscript using an endIndex")
+        _sanityCheckFailure("cannot subscript using an endIndex")
       case .Error:
         return UnicodeScalar(0xfffd)
       }
@@ -177,7 +176,7 @@ extension String {
             switch self._asciiBase.next() {
             case let x?:
               result = .Result(UnicodeScalar(x))
-            case .None:
+            case nil:
               result = .EmptyInput
             }
           } else {
@@ -190,7 +189,7 @@ extension String {
         case .Result(let us):
           return us
         case .EmptyInput:
-          return .None
+          return nil
         case .Error:
           return UnicodeScalar(0xfffd)
         }

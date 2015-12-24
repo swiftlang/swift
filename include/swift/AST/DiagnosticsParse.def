@@ -71,6 +71,10 @@ ERROR(extra_tokens_line_directive,parsing,none,
 ERROR(line_directive_line_zero,parsing,none,
       "the line number needs to be greater than zero", ())
 
+WARNING(escaped_parameter_name,parsing,none,
+        "keyword '%0' does not need to be escaped in argument list",
+        (StringRef))
+
 //------------------------------------------------------------------------------
 // Lexer diagnostics
 //------------------------------------------------------------------------------
@@ -126,12 +130,14 @@ ERROR(lex_expected_binary_exponent_in_hex_float_literal,lexing,none,
       "hexadecimal floating point literal must end with an exponent", ())
 ERROR(lex_unexpected_block_comment_end,lexing,none,
       "unexpected end of block comment", ())
-ERROR(lex_unary_equal_is_reserved,lexing,none,
-      "%select{prefix|postfix}0 '=' is reserved", (unsigned))
+ERROR(lex_unary_equal,lexing,none,
+      "'=' must have consistent whitespace on both sides", ())
 ERROR(lex_unary_postfix_dot_is_reserved,lexing,none,
       "postfix '.' is reserved", ())
 ERROR(lex_editor_placeholder,lexing,none,
       "editor placeholder in source file", ())
+WARNING(lex_editor_placeholder_in_playground,lexing,none,
+        "editor placeholder in source file", ())
 
 //------------------------------------------------------------------------------
 // Declaration parsing diagnostics
@@ -173,15 +179,8 @@ ERROR(decl_inner_scope,decl_parsing,none,
 ERROR(decl_not_static,decl_parsing,none,
       "declaration cannot be marked %0", (StaticSpellingKind))
 
-ERROR(ownership_not_attribute,decl_parsing,none,
-      "'@%0' is not an attribute, use the '%0' keyword instead",
-      (StringRef))
- 
 ERROR(cskeyword_not_attribute,decl_parsing,none,
       "'%0' is a declaration modifier, not an attribute", (StringRef))
-
-ERROR(convenience_invalid,sema_tcd,none,
-      "'convenience' is not valid on this declaration", ())
 
 ERROR(decl_already_static,decl_parsing,none,
       "%0 specified twice", (StaticSpellingKind))
@@ -286,11 +285,6 @@ ERROR(static_func_decl_global_scope,decl_parsing,none,
       (StaticSpellingKind))
 ERROR(func_decl_expected_arrow,decl_parsing,none,
       "expected '->' after function parameter tuple", ())
-ERROR(func_static_not_allowed,decl_parsing,none,
-      "static functions are not allowed in this context, "
-      "use 'class' to declare a class method", ())
-ERROR(func_conversion,decl_parsing,none,
-      "'__conversion' functions are no longer allowed", ())
 
 // Enum
 ERROR(expected_lbrace_enum,decl_parsing,PointsToFirstBadToken,
@@ -335,7 +329,11 @@ ERROR(expected_arrow_subscript,decl_parsing,PointsToFirstBadToken,
 ERROR(expected_type_subscript,type_parsing,PointsToFirstBadToken,
       "expected subscripting element type", ())
 ERROR(expected_lbrace_subscript,decl_parsing,PointsToFirstBadToken,
-      "expected '{' for subscripting", ())
+      "expected '{' in subscript to specify getter and setter implementation",
+      ())
+ERROR(expected_lbrace_subscript_protocol,decl_parsing,PointsToFirstBadToken,
+      "subscript in protocol must have explicit { get } or "
+      "{ get set } specifier", ())
 ERROR(subscript_without_get,decl_parsing,none,
       "subscript declarations must have a getter", ())
 ERROR(subscript_static,decl_parsing,none,
@@ -362,6 +360,9 @@ ERROR(operator_decl_inner_scope,decl_parsing,none,
       "'operator' may only be declared at file scope", ())
 ERROR(expected_operator_name_after_operator,decl_parsing,PointsToFirstBadToken,
       "expected operator name in operator declaration", ())
+ERROR(identifier_when_expecting_operator,decl_parsing,PointsToFirstBadToken,
+      "%0 is considered to be an identifier, not an operator", (Identifier))
+
 ERROR(operator_decl_no_fixity,decl_parsing,none,
       "operator must be declared as 'prefix', 'postfix', or 'infix'", ())
 ERROR(expected_lbrace_after_operator,decl_parsing,PointsToFirstBadToken,
@@ -463,8 +464,6 @@ ERROR(sil_integer_literal_not_integer_type,decl_parsing,none,
       "integer_literal instruction requires a 'Builtin.Int<n>' type", ())
 ERROR(sil_float_literal_not_float_type,decl_parsing,none,
       "float_literal instruction requires a 'Builtin.FP<n>' type", ())
-ERROR(sil_apply_archetype_not_found,decl_parsing,none,
-      "archetype name not found in polymorphic function type of apply instruction", ())
 ERROR(sil_substitutions_on_non_polymorphic_type,decl_parsing,none,
       "apply of non-polymorphic function cannot have substitutions", ())
 ERROR(sil_witness_method_not_protocol,decl_parsing,none,
@@ -483,6 +482,8 @@ ERROR(sil_missing_substitutions,decl_parsing,none,
       "missing substitutions", ())
 ERROR(sil_too_many_substitutions,decl_parsing,none,
       "too many substitutions", ())
+ERROR(sil_dbg_unknown_key,decl_parsing,none,
+      "unknown key '%0' in debug variable declaration", (StringRef))
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name, decl_parsing,none,
@@ -497,8 +498,6 @@ ERROR(sil_basicblock_arg_rparen, decl_parsing,none,
       "expected ')' in basic block argument list", ())
 
 // SIL Functions
-ERROR(expected_sil_linkage_or_function, decl_parsing,none,
-      "expected SIL linkage type or function name", ())
 ERROR(expected_sil_function_name, decl_parsing,none,
       "expected SIL function name", ())
 ERROR(expected_sil_rbrace, decl_parsing,none,
@@ -583,8 +582,6 @@ ERROR(expected_type_function_result,type_parsing,PointsToFirstBadToken,
       "expected type for function result", ())
 ERROR(generic_non_function,type_parsing,PointsToFirstBadToken,
       "only syntactic function types can be generic", ())
-ERROR(throwing_non_function,type_parsing,PointsToFirstBadToken,
-      "only function types may throw", ())
 ERROR(rethrowing_function_type,type_parsing,PointsToFirstBadToken,
       "only function declarations may be marked 'rethrows'", ())
 ERROR(throws_after_function_result,type_parsing,none,
@@ -755,8 +752,6 @@ ERROR(expected_expr_conditional_letbinding,stmt_parsing,none,
 ERROR(expected_expr_conditional_letbinding_bool_conditions,stmt_parsing,none,
       "expected 'let' or 'var' in conditional; "
       "use '&&' to join boolean conditions", ())
-ERROR(expected_simple_identifier_pattern,stmt_parsing,none,
-      "expected simple identifier pattern in optional binding condition", ())
 ERROR(expected_expr_conditional_var,stmt_parsing,PointsToFirstBadToken,
       "expected expression after '=' in conditional binding", ())
 ERROR(expected_expr_conditional_where,stmt_parsing,PointsToFirstBadToken,
@@ -810,8 +805,6 @@ ERROR(expected_while_after_repeat_body,stmt_parsing,PointsToFirstBadToken,
       "expected 'while' after body of 'repeat' statement", ())
 ERROR(expected_expr_repeat_while,stmt_parsing,PointsToFirstBadToken,
       "expected expression in 'repeat-while' condition", ())
-ERROR(missing_condition_after_repeat_while,stmt_parsing,none,
-      "missing condition in a 'repeat-while' statement", ())
 
 ERROR(do_while_now_repeat_while,stmt_parsing,none,
       "'do-while' statement is not allowed; use 'repeat-while' instead", ())
@@ -969,8 +962,6 @@ ERROR(availability_query_outside_if_stmt_guard, expr_parsing, none,
 
 ERROR(expected_identifier_after_dot_expr,expr_parsing,none,
       "expected identifier after '.' expression", ())
-ERROR(expected_field_spec_name_tuple_expr,expr_parsing,none,
-      "expected field specifier name in tuple expression", ())
 
 ERROR(expected_identifier_after_super_dot_expr,expr_parsing,
       PointsToFirstBadToken,
@@ -1106,14 +1097,6 @@ ERROR(attr_availability_renamed, attribute_parsing, none,
 ERROR(attr_autoclosure_expected_r_paren,attribute_parsing,PointsToFirstBadToken,
       "expected ')' in @autoclosure", ())
 
-// cc
-ERROR(cc_attribute_expected_lparen,attribute_parsing,none,
-      "expected '(' after 'cc' attribute", ())
-ERROR(cc_attribute_expected_name,attribute_parsing,none,
-      "expected calling convention name identifier in 'cc' attribute", ())
-ERROR(cc_attribute_expected_rparen,attribute_parsing,none,
-      "expected ')' after calling convention name for 'cc' attribute", ())
-
 // convention
 ERROR(convention_attribute_expected_lparen,attribute_parsing,none,
       "expected '(' after 'convention' attribute", ())
@@ -1169,6 +1152,20 @@ WARNING(attr_warn_unused_result_unknown_parameter,attribute_parsing,none,
         "unknown parameter '%0' in 'warn_unused_result' attribute", (StringRef))
 ERROR(attr_warn_unused_result_expected_rparen,attribute_parsing,none,
       "expected ')' after 'warn_unused_result' attribute", ())
+
+// _migration_id
+WARNING(attr_migration_id_expected_name,attribute_parsing,none,
+        "expected parameter 'pattern'", ())
+WARNING(attr_migration_id_unknown_parameter,attribute_parsing,none,
+        "unknown parameter '%0' in '_migration_id' attribute", (StringRef))
+ERROR(attr_migration_id_expected_eq,attribute_parsing,none,
+      "expected '=' following '%0' parameter", (StringRef))
+ERROR(attr_migration_id_expected_string,attribute_parsing,none,
+      "expected a string following '=' for '%0' parameter", (StringRef))
+WARNING(attr_migration_id_duplicate_parameter,attribute_parsing,none,
+      "duplicate '%0' parameter; previous value will be ignored", (StringRef))
+ERROR(attr_migration_id_expected_rparen,attribute_parsing,none,
+      "expected ')' after '_migration_id' attribute", ())
 
 //------------------------------------------------------------------------------
 // Generics parsing diagnostics
@@ -1234,9 +1231,6 @@ WARNING(unknown_build_config,parsing,none,
 //------------------------------------------------------------------------------
 // Availability query parsing diagnostics
 //------------------------------------------------------------------------------
-ERROR(avail_query_not_enabled,parsing,Fatal,
-      "experimental availability checking not enabled", ())
-
 ERROR(avail_query_expected_condition,parsing,PointsToFirstBadToken,
       "expected availability condition", ())
 ERROR(avail_query_expected_platform_name,parsing,PointsToFirstBadToken,

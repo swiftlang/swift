@@ -1,4 +1,4 @@
-//===-- KnownDecl.def - Compiler declaration metaprogramming ----*- C++ -*-===//
+//===-- KnownDecls.def - Compiler declaration metaprogramming ---*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

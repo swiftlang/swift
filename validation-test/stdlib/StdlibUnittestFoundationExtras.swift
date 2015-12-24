@@ -4,6 +4,15 @@
 // REQUIRES: objc_interop
 
 import StdlibUnittest
+
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 import Foundation
 import StdlibUnittestFoundationExtras
 
@@ -12,7 +21,7 @@ var FoundationExtrasTests = TestSuite("FoundationExtras")
 FoundationExtrasTests.test("withOverriddenNSLocaleCurrentLocale(NSLocale)") {
   // Check two locales to make sure the behavior is correct even if one of
   // these locales happens to be the same as the actual current locale.
-  if true {
+  do {
     let result = withOverriddenNSLocaleCurrentLocale(
       NSLocale(localeIdentifier: "en_US")) {
       () -> Int in
@@ -21,7 +30,7 @@ FoundationExtrasTests.test("withOverriddenNSLocaleCurrentLocale(NSLocale)") {
     }
     expectEqual(42, result)
   }
-  if true {
+  do {
     let result = withOverriddenNSLocaleCurrentLocale(
       NSLocale(localeIdentifier: "uk")) {
       () -> Int in
@@ -51,7 +60,7 @@ FoundationExtrasTests.test("withOverriddenNSLocaleCurrentLocale(NSLocale)/nested
 FoundationExtrasTests.test("withOverriddenNSLocaleCurrentLocale(String)") {
   // Check two locales to make sure the behavior is correct even if one of
   // these locales happens to be the same as the actual current locale.
-  if true {
+  do {
     let result = withOverriddenNSLocaleCurrentLocale("en_US") {
       () -> Int in
       expectEqual("en_US", NSLocale.currentLocale().localeIdentifier)
@@ -59,7 +68,7 @@ FoundationExtrasTests.test("withOverriddenNSLocaleCurrentLocale(String)") {
     }
     expectEqual(42, result)
   }
-  if true {
+  do {
     let result = withOverriddenNSLocaleCurrentLocale("uk") {
       () -> Int in
       expectEqual("uk", NSLocale.currentLocale().localeIdentifier)

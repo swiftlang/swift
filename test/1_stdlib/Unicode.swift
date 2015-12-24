@@ -22,11 +22,11 @@ UnicodeInternals.test("copy") {
   var u16: [UTF16.CodeUnit] = [ 6, 7, 8, 9, 10, 11 ]
 
   u16.withUnsafeMutableBufferPointer {
-    (u16)->() in
+    (u16) -> () in
     let p16 = u16.baseAddress
 
     u8.withUnsafeMutableBufferPointer {
-      (u8)->() in
+      (u8) -> () in
       let p8 = u8.baseAddress
 
       UTF16._copy(p8, destination: p16, count: 3)

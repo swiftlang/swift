@@ -77,7 +77,7 @@ underscore rule`_:
 `private`
 =========
 
-The `private` modifier can not be used in the stdlib at least until
+The `private` modifier cannot be used in the stdlib at least until
 rdar://17631278 is fixed.
 
 Leading Underscore Rule

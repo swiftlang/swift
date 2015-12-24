@@ -1749,6 +1749,9 @@ class BadClass1 { }
 @objc(Protocol:) // expected-error{{'@objc' protocol must have a simple name}}{{15-16=}}
 protocol BadProto1 { }
 
+@objc(Enum:) // expected-error{{'@objc' enum must have a simple name}}{{11-12=}}
+enum BadEnum1: Int { case X }
+
 class BadClass2 {
   @objc(badprop:foo:wibble:) // expected-error{{'@objc' property must have a simple name}}{{16-28=}}
   var badprop: Int = 5

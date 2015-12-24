@@ -23,7 +23,7 @@ extension String {
   @warn_unused_result
   public static func fromCString(cs: UnsafePointer<CChar>) -> String? {
     if cs._isNull {
-      return .None
+      return nil
     }
     let len = Int(_swift_stdlib_strlen(cs))
     return String._fromCodeUnitSequence(UTF8.self,
@@ -41,7 +41,7 @@ extension String {
     cs: UnsafePointer<CChar>)
       -> (String?, hadError: Bool) {
     if cs._isNull {
-      return (.None, hadError: false)
+      return (nil, hadError: false)
     }
     let len = Int(_swift_stdlib_strlen(cs))
     let (result, hadError) = String._fromCodeUnitSequenceWithRepair(UTF8.self,
@@ -51,16 +51,16 @@ extension String {
 }
 
 /// From a non-`nil` `UnsafePointer` to a null-terminated string
-/// with possibly-transient lifetime, create a nul-terminated array of 'C' char.
+/// with possibly-transient lifetime, create a null-terminated array of 'C' char.
 /// Returns `nil` if passed a null pointer.
 @warn_unused_result
 public func _persistCString(s: UnsafePointer<CChar>) -> [CChar]? {
   if s == nil {
-    return .None
+    return nil
   }
   let length = Int(_swift_stdlib_strlen(s))
   var result = [CChar](count: length + 1, repeatedValue: 0)
-  for var i = 0; i < length; ++i {
+  for var i = 0; i < length; i += 1 {
     // FIXME: this will not compile on platforms where 'CChar' is unsigned.
     result[i] = s[i]
   }

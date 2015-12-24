@@ -698,7 +698,7 @@ public:
   /// Update a lookup table with members from newly-added extensions.
   void updateLookupTable(NominalTypeDecl *nominal);
 
-  /// \brief Add the given member to the lookup tabke.
+  /// \brief Add the given member to the lookup table.
   void addMember(Decl *members);
 
   /// \brief Add the given members to the lookup table.

@@ -17,7 +17,7 @@
 // are involved in its construction.  This feature is crucial for
 // preventing infinite recursion even in non-asserting cases.
 
-/// An simple string designed to represent text that is "knowable at
+/// A simple string designed to represent text that is "knowable at
 /// compile-time".
 ///
 /// Logically speaking, each instance looks something like this:
@@ -119,7 +119,7 @@ public struct StaticString
       var i = 0
       let sink: (UInt8) -> Void = {
         buffer = buffer | (UInt64($0) << (UInt64(i) * 8))
-        ++i
+        i += 1
       }
       UTF8.encode(unicodeScalar, output: sink)
       return body(UnsafeBufferPointer(

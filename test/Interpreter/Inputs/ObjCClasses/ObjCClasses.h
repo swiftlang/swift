@@ -6,7 +6,10 @@
 /* This class has instance variables which are not apparent in the
    interface.  Subclasses will need to be slid by the ObjC runtime. */
 @interface HasHiddenIvars : NSObject
-@property NSInteger count;
+@property NSInteger x;
+@property NSInteger y;
+@property NSInteger z;
+@property NSInteger t;
 @end
 
 /* This class has a method that doesn't fill in the error properly. */

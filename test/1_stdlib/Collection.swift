@@ -34,18 +34,18 @@ print("")
 let i = foobar.indices
 let r = i.lazy.reverse()
 for a in PermutationGenerator(elements: foobar, indices: r) {
-  
+
   print(a, terminator: "")
 }
 print("")
 
 func isPalindrome0<
-  S: CollectionType 
+  S: CollectionType
     where S.Index: BidirectionalIndexType, S.Generator.Element: Equatable
 >(seq: S) -> Bool {
   typealias Index = S.Index
 
-  var a = seq.indices
+  let a = seq.indices
   var i = seq.indices
   var ir = i.lazy.reverse()
   var b = ir.generate()
@@ -63,7 +63,7 @@ print(isPalindrome0(X("GoHangaSalamiImaLasagneHoG")))
 print(isPalindrome0(X("GoHangaSalamiimalaSagnaHoG")))
 
 func isPalindrome1<
-  S: CollectionType 
+  S: CollectionType
   where S.Index: BidirectionalIndexType, S.Generator.Element: Equatable
 >(seq: S) -> Bool {
 
@@ -78,7 +78,7 @@ func isPalindrome1<
 }
 
 func isPalindrome1_5<
-  S: CollectionType 
+  S: CollectionType
   where S.Index: BidirectionalIndexType, S.Generator.Element == S.Generator.Element, S.Generator.Element: Equatable
 >(seq: S) -> Bool {
 
@@ -104,7 +104,7 @@ print(isPalindrome1_5(X("FleetoMeReMoteelF")))
 // Finally, one that actually uses indexing to do half as much work.
 // BidirectionalIndexType traversal finally pays off!
 func isPalindrome2<
-  S: CollectionType 
+  S: CollectionType
     where S.Index: BidirectionalIndexType, S.Generator.Element: Equatable
 >(seq: S) -> Bool {
 
@@ -116,7 +116,6 @@ func isPalindrome2<
       break
     }
     if seq[b] != seq[e] {
-      b = b.successor()
       return false
     }
     b = b.successor()
@@ -137,7 +136,7 @@ print(isPalindrome2(X("ZerimarORamireZ")))
 print(isPalindrome2(X("Zerimar-O-ramireZ")))
 
 func isPalindrome4<
-  S: CollectionType 
+  S: CollectionType
   where S.Index: BidirectionalIndexType, S.Generator.Element: Equatable
 >(seq: S) -> Bool {
   typealias Index = S.Index

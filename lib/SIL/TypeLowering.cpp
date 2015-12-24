@@ -323,7 +323,7 @@ namespace {
     RetTy visitTupleType(CanTupleType type) {
       bool hasReference = false;
       // TODO: We ought to be able to early-exit as soon as we've established
-      // that a type is address-only. However, we also currenty rely on
+      // that a type is address-only. However, we also currently rely on
       // SIL lowering to catch unsupported recursive value types.
       bool isAddressOnly = false;
       for (auto eltType : type.getElementTypes()) {
@@ -1056,7 +1056,7 @@ namespace {
       typedef LoadableTupleTypeLowering::Child Child;
       SmallVector<Child, 8> childElts;
       // TODO: We ought to be able to early-exit as soon as we've established
-      // that a type is address-only. However, we also currenty rely on
+      // that a type is address-only. However, we also currently rely on
       // SIL lowering to catch unsupported recursive value types.
       bool isAddressOnly = false;
       bool hasOnlyTrivialChildren = true;
@@ -1080,7 +1080,7 @@ namespace {
 
     const TypeLowering *visitAnyStructType(CanType structType, StructDecl *D) {
       // TODO: We ought to be able to early-exit as soon as we've established
-      // that a type is address-only. However, we also currenty rely on
+      // that a type is address-only. However, we also currently rely on
       // SIL lowering to catch unsupported recursive value types.
       bool isAddressOnly = false;
       
@@ -1116,7 +1116,7 @@ namespace {
         
     const TypeLowering *visitAnyEnumType(CanType enumType, EnumDecl *D) {
       // TODO: We ought to be able to early-exit as soon as we've established
-      // that a type is address-only. However, we also currenty rely on
+      // that a type is address-only. However, we also currently rely on
       // SIL lowering to catch unsupported recursive value types.
       bool isAddressOnly = false;
 
@@ -1651,12 +1651,7 @@ mapArchetypeToInterfaceType(const PrimaryArchetypeMap &primaryArchetypes,
 CanType
 TypeConverter::getInterfaceTypeOutOfContext(CanType contextTy,
                                          DeclContext *context) const {
-  GenericParamList *genericParams;
-  do {
-    genericParams = context->getGenericParamsOfContext();
-    context = context->getParent();
-  } while (!genericParams && context);
-    
+  GenericParamList *genericParams = context->getGenericParamsOfContext();
   return getInterfaceTypeOutOfContext(contextTy, genericParams);
 }
 
@@ -1864,22 +1859,6 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(ClassDecl *cd,
 }
 
 GenericParamList *
-TypeConverter::getEffectiveGenericParamsForContext(DeclContext *dc) {
-
-  // FIXME: This is a clunky way of uncurrying nested type parameters from
-  // a function context.
-  if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
-    return getConstantInfo(SILDeclRef(func)).ContextGenericParams;
-  }
-
-  if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
-    return getConstantInfo(SILDeclRef(closure)).ContextGenericParams;
-  }
-
-  return dc->getGenericParamsOfContext();
-}
-
-GenericParamList *
 TypeConverter::getEffectiveGenericParams(AnyFunctionRef fn,
                                          CaptureInfo captureInfo) {
   auto dc = fn.getAsDeclContext()->getParent();
@@ -1888,8 +1867,8 @@ TypeConverter::getEffectiveGenericParams(AnyFunctionRef fn,
       !captureInfo.hasGenericParamCaptures()) {
     return nullptr;
   }
-
-  return getEffectiveGenericParamsForContext(dc);
+  
+  return dc->getGenericParamsOfContext();
 }
 
 CanGenericSignature
@@ -1897,30 +1876,19 @@ TypeConverter::getEffectiveGenericSignature(AnyFunctionRef fn,
                                             CaptureInfo captureInfo) {
   auto dc = fn.getAsDeclContext();
 
-  if (auto sig = dc->getGenericSignatureOfContext())
-    return sig->getCanonicalSignature();
-
-  dc = dc->getParent();
-
-  if (dc->isLocalContext() &&
+  // If this is a non-generic local function that does not capture any
+  // generic type parameters from the outer context, don't need a
+  // signature at all.
+  if (!dc->isInnermostContextGeneric() &&
+      dc->getParent()->isLocalContext() &&
       !captureInfo.hasGenericParamCaptures()) {
     return nullptr;
   }
 
-  // Find the innermost context that has a generic parameter list.
-  // FIXME: This is wrong for generic local functions in generic contexts.
-  // Their GenericParamList is not semantically a child of the context
-  // GenericParamList because they "capture" their context's already-bound
-  // archetypes.
-  while (!dc->getGenericSignatureOfContext()) {
-    dc = dc->getParent();
-    if (!dc) return nullptr;
-  }
-  
-  auto sig = dc->getGenericSignatureOfContext();
-  if (!sig)
-    return nullptr;
-  return sig->getCanonicalSignature();
+  if (auto sig = dc->getGenericSignatureOfContext())
+    return sig->getCanonicalSignature();
+
+  return nullptr;
 }
 
 CanAnyFunctionType
@@ -2174,11 +2142,24 @@ TypeConverter::getConstantContextGenericParams(SILDeclRef c) {
       return {getEffectiveGenericParams(ACE, captureInfo), nullptr};
     }
     FuncDecl *func = cast<FuncDecl>(vd);
-    // FIXME: For local generic functions we need to chain the local generic
-    // context to the outer context.
-    if (auto GP = func->getGenericParamsOfContext())
-      return {GP, func->getGenericParams()};
     auto captureInfo = getLoweredLocalCaptures(func);
+
+    // FIXME: This is really weird:
+    // 1) For generic functions, generic methods and generic
+    // local functions, we return the function's generic
+    // parameter list twice.
+    // 2) For non-generic methods inside generic types, we
+    // return the generic type's parameters and nullptr.
+    // 3) For non-generic local functions, we return the
+    // outer function's parameters and nullptr.
+    //
+    // Local generic functions could probably be modeled better
+    // at the SIL level.
+    if (func->isInnermostContextGeneric() ||
+        func->getDeclContext()->isGenericTypeContext()) {
+      if (auto GP = func->getGenericParamsOfContext())
+        return {GP, func->getGenericParams()};
+    }
     return {getEffectiveGenericParams(func, captureInfo),
             func->getGenericParams()};
   }

@@ -88,6 +88,13 @@ protected:
       : ValueBase(Kind, TypeList), ParentBB(0), Location(*DebugLoc) {}
 
 public:
+  /// Instructions should be allocated using a dedicated instruction allocation
+  /// function from the ContextTy.
+  template <typename ContextTy>
+  void *operator new(size_t Bytes, const ContextTy &C,
+                     size_t Alignment = alignof(ValueBase)) {
+    return C.allocateInst(Bytes, Alignment);
+  }
 
   enum class MemoryBehavior {
     None,
@@ -275,6 +282,21 @@ public:
   bool isTriviallyDuplicatable() const;
 };
 
+/// Returns the combined behavior of \p B1 and \p B2.
+inline SILInstruction::MemoryBehavior
+combineMemoryBehavior(SILInstruction::MemoryBehavior B1,
+                  SILInstruction::MemoryBehavior B2) {
+  // Basically the combined behavior is the maximum of both operands.
+  auto Result = std::max(B1, B2);
+
+  // With one exception: MayRead, MayWrite -> MayReadWrite.
+  if (Result == SILInstruction::MemoryBehavior::MayWrite &&
+        (B1 == SILInstruction::MemoryBehavior::MayRead ||
+         B2 == SILInstruction::MemoryBehavior::MayRead))
+    return SILInstruction::MemoryBehavior::MayReadWrite;
+  return Result;
+}
+
 #ifndef NDEBUG
 /// Pretty-print the MemoryBehavior.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
@@ -334,13 +356,45 @@ public:
 /// Holds common debug information about local variables and function
 /// arguments that are needed by DebugValueInst, DebugValueAddrInst,
 /// AllocStackInst, and AllocBoxInst.
-class DebugVariable {
+struct SILDebugVariable {
+  SILDebugVariable() : Constant(true), ArgNo(0) {}
+  SILDebugVariable(bool Constant, unsigned ArgNo)
+    : Constant(Constant), ArgNo(ArgNo) {}
+  SILDebugVariable(StringRef Name, bool Constant, unsigned ArgNo)
+    : Name(Name), Constant(Constant), ArgNo(ArgNo) {}
+  StringRef Name;
+  bool Constant;
+  unsigned ArgNo;
+};
+
+/// A DebugVariable where storage for the strings has been
+/// tail-allocated following the parent SILInstruction.
+class TailAllocatedDebugVariable {
   /// The source function argument position from left to right
   /// starting with 1 or 0 if this is a local variable.
-  unsigned char ArgNo;
+  unsigned ArgNo : 16;
+  /// When this is nonzero there is a tail-allocated string storing
+  /// variable name present. This typically only happens for
+  /// instructions that were created from parsing SIL assembler.
+  unsigned NameLength : 15;
+  bool Constant : 1;
 public:
-  DebugVariable(unsigned ArgNo) : ArgNo(ArgNo) {};
+  TailAllocatedDebugVariable(SILDebugVariable DbgVar, char *buf);
+
   unsigned getArgNo() const { return ArgNo; }
+  void setArgNo(unsigned N) { ArgNo = N; }
+  /// Returns the name of the source variable, if it is stored in the
+  /// instruction.
+  StringRef getName(const char *buf) const;
+  bool isLet() const  { return Constant; }
+
+  SILDebugVariable get(VarDecl *VD, const char *buf) const {
+    if (VD)
+      return {VD->getName().empty() ? "" : VD->getName().str(), VD->isLet(),
+              getArgNo()};
+    else
+      return {getName(buf), isLet(), getArgNo()};
+  }
 };
 
 //===----------------------------------------------------------------------===//
@@ -387,19 +441,24 @@ public:
 /// reference count) stack memory.  The memory is provided uninitialized.
 class AllocStackInst : public AllocationInst {
   friend class SILBuilder;
-  DebugVariable VarInfo;
+  TailAllocatedDebugVariable VarInfo;
 
   AllocStackInst(SILDebugLocation *Loc, SILType elementType, SILFunction &F,
-                 unsigned ArgNo);
+                 SILDebugVariable Var);
+  static AllocStackInst *create(SILDebugLocation *Loc, SILType elementType,
+                                SILFunction &F, SILDebugVariable Var);
 
 public:
 
-  /// getDecl - Return the underlying variable declaration associated with this
+  /// Return the underlying variable declaration associated with this
   /// allocation, or null if this is a temporary allocation.
   VarDecl *getDecl() const;
 
-  DebugVariable getVarInfo() const { return VarInfo; };
-  void setArgNo(unsigned N) { VarInfo = DebugVariable(N); }
+  /// Return the debug variable information attached to this instruction.
+  SILDebugVariable getVarInfo() const {
+    return VarInfo.get(getDecl(), reinterpret_cast<const char *>(this + 1));
+  };
+  void setArgNo(unsigned N) { VarInfo.setArgNo(N); }
 
   /// getElementType - Get the type of the allocated memory (as opposed to the
   /// (second) type of the instruction itself, which will be an address type).
@@ -487,10 +546,12 @@ public:
 class AllocBoxInst : public AllocationInst {
   friend class SILBuilder;
 
-  DebugVariable VarInfo;
+  TailAllocatedDebugVariable VarInfo;
 
   AllocBoxInst(SILDebugLocation *DebugLoc, SILType ElementType, SILFunction &F,
-               unsigned ArgNo);
+               SILDebugVariable Var);
+  static AllocBoxInst *create(SILDebugLocation *Loc, SILType elementType,
+                              SILFunction &F, SILDebugVariable Var);
 
 public:
 
@@ -501,11 +562,14 @@ public:
   SILValue getContainerResult() const { return SILValue(this, 0); }
   SILValue getAddressResult() const { return SILValue(this, 1); }
 
-  /// getDecl - Return the underlying variable declaration associated with this
+  /// Return the underlying variable declaration associated with this
   /// allocation, or null if this is a temporary allocation.
   VarDecl *getDecl() const;
 
-  DebugVariable getVarInfo() const { return VarInfo; };
+  /// Return the debug variable information attached to this instruction.
+  SILDebugVariable getVarInfo() const {
+    return VarInfo.get(getDecl(), reinterpret_cast<const char *>(this + 1));
+  };
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }
@@ -632,24 +696,24 @@ protected:
   bool isNonThrowingApply() const { return NonThrowing; }
   
 public:
-  // The operand number of the first argument.
+  /// The operand number of the first argument.
   static unsigned getArgumentOperandNumber() { return 1; }
 
   SILValue getCallee() const { return Operands[Callee].get(); }
 
-  // Gets the referenced function if the callee is a function_ref instruction.
+  /// Gets the referenced function if the callee is a function_ref instruction.
   SILFunction *getCalleeFunction() const {
     if (auto *FRI = dyn_cast<FunctionRefInst>(getCallee()))
       return FRI->getReferencedFunction();
     return nullptr;
   }
 
-  // Get the type of the callee without the applied substitutions.
+  /// Get the type of the callee without the applied substitutions.
   CanSILFunctionType getOrigCalleeType() const {
     return getCallee().getType().template castTo<SILFunctionType>();
   }
 
-  // Get the type of the callee with the applied substitutions.
+  /// Get the type of the callee with the applied substitutions.
   CanSILFunctionType getSubstCalleeType() const {
     return SubstCalleeType.castTo<SILFunctionType>();
   }
@@ -715,7 +779,7 @@ public:
   /// Return the ith argument passed to this instruction.
   SILValue getArgument(unsigned i) const { return getArguments()[i]; }
 
-  // Set the ith argument of this instruction.
+  /// Set the ith argument of this instruction.
   void setArgument(unsigned i, SILValue V) {
     return getArgumentOperands()[i].set(V);
   }
@@ -729,9 +793,9 @@ public:
 /// does it have the given semantics?
 bool doesApplyCalleeHaveSemantics(SILValue callee, StringRef semantics);
 
-// The partial specialization of ApplyInstBase for full applications.
-// Adds some methods relating to 'self' and to result types that don't
-// make sense for partial applications.
+/// The partial specialization of ApplyInstBase for full applications.
+/// Adds some methods relating to 'self' and to result types that don't
+/// make sense for partial applications.
 template <class Impl, class Base>
 class ApplyInstBase<Impl, Base, true>
   : public ApplyInstBase<Impl, Base, false> {
@@ -758,7 +822,7 @@ public:
   /// The hope is that this will prevent any future bugs from coming up related
   /// to this.
   ///
-  /// Self is always the last parameter, but self subtitutions are always
+  /// Self is always the last parameter, but self substitutions are always
   /// first. The reason to add this method is to wrap that dichotomy to reduce
   /// errors.
   ///
@@ -864,7 +928,7 @@ public:
     return V->getKind() == ValueKind::ApplyInst;
   }
   
-  /// Returns true if the called function has an error result but is not actully
+  /// Returns true if the called function has an error result but is not actually
   /// throwing an error.
   bool isNonThrowing() const {
     return isNonThrowingApply();
@@ -1284,7 +1348,7 @@ class MarkUninitializedInst
   friend class SILBuilder;
 
 public:
-  // This enum captures what the mark_uninitialized instruction is designating.
+  /// This enum captures what the mark_uninitialized instruction is designating.
   enum Kind {
     /// Var designates the start of a normal variable live range.
     Var,
@@ -1370,16 +1434,21 @@ public:
 /// types).
 class DebugValueInst : public UnaryInstructionBase<ValueKind::DebugValueInst> {
   friend class SILBuilder;
-  DebugVariable VarInfo;
+  TailAllocatedDebugVariable VarInfo;
 
-  DebugValueInst(SILDebugLocation *DebugLoc, SILValue Operand, unsigned ArgNo)
-      : UnaryInstructionBase(DebugLoc, Operand), VarInfo(ArgNo) {}
+  DebugValueInst(SILDebugLocation *DebugLoc, SILValue Operand,
+                 SILDebugVariable Var);
+  static DebugValueInst *create(SILDebugLocation *DebugLoc, SILValue Operand,
+                                SILModule &M, SILDebugVariable Var);
 
 public:
-  /// getDecl - Return the underlying variable declaration that this denotes,
+  /// Return the underlying variable declaration that this denotes,
   /// or null if we don't have one.
   VarDecl *getDecl() const;
-  DebugVariable getVarInfo() const { return VarInfo; }
+  /// Return the debug variable information attached to this instruction.
+  SILDebugVariable getVarInfo() const {
+    return VarInfo.get(getDecl(), reinterpret_cast<const char *>(this + 1));
+  }
 };
 
 /// Define the start or update to a symbolic variable value (for address-only
@@ -1387,17 +1456,22 @@ public:
 class DebugValueAddrInst
   : public UnaryInstructionBase<ValueKind::DebugValueAddrInst> {
   friend class SILBuilder;
-  DebugVariable VarInfo;
+  TailAllocatedDebugVariable VarInfo;
 
   DebugValueAddrInst(SILDebugLocation *DebugLoc, SILValue Operand,
-                     unsigned ArgNo)
-      : UnaryInstructionBase(DebugLoc, Operand), VarInfo(ArgNo) {}
+                     SILDebugVariable Var);
+  static DebugValueAddrInst *create(SILDebugLocation *DebugLoc,
+                                    SILValue Operand, SILModule &M,
+                                    SILDebugVariable Var);
 
 public:
-  /// getDecl - Return the underlying variable declaration that this denotes,
+  /// Return the underlying variable declaration that this denotes,
   /// or null if we don't have one.
   VarDecl *getDecl() const;
-  DebugVariable getVarInfo() const { return VarInfo; }
+  /// Return the debug variable information attached to this instruction.
+  SILDebugVariable getVarInfo() const {
+    return VarInfo.get(getDecl(), reinterpret_cast<const char *>(this + 1));
+  };
 };
 
 
@@ -2227,7 +2301,7 @@ public:
     return Operands.getDynamicValuesAsArray();
   }
 
-  // Return the i'th value referenced by this TupleInst.
+  /// Return the i'th value referenced by this TupleInst.
   SILValue getElement(unsigned i) const {
     return getElements()[i];
   }
@@ -2431,8 +2505,8 @@ protected:
   unsigned NumCases : 31;
   unsigned HasDefault : 1;
 
-  // The first operand is the operand of select_xxx instruction;
-  // the rest are the case values and results of a select instruction.
+  /// The first operand is the operand of select_xxx instruction. The rest of
+  /// the operands are the case values and results of a select instruction.
   TailAllocatedOperandList<1> Operands;
 
 public:
@@ -2520,12 +2594,12 @@ public:
     return Operands[NumCases + 1].get();
   }
 
-  // If there is a single case that returns a literal "true" value (an
-  // "integer_literal $Builtin.Int1, 1" value), return it.
-  //
-  // FIXME: This is used to interoperate with passes that reasoned about the
-  // old enum_is_tag insn. Ideally those passes would become general enough
-  // not to need this.
+  /// If there is a single case that returns a literal "true" value (an
+  /// "integer_literal $Builtin.Int1, 1" value), return it.
+  ///
+  /// FIXME: This is used to interoperate with passes that reasoned about the
+  /// old enum_is_tag insn. Ideally those passes would become general enough
+  /// not to need this.
   NullablePtr<EnumElementDecl> getSingleTrueElement() const;
 };
   
@@ -3185,18 +3259,6 @@ class StrongRetainInst
       : UnaryInstructionBase(DebugLoc, Operand) {}
 };
 
-/// StrongRetainAutoreleasedInst - Take ownership of the autoreleased return
-/// value of an ObjC method.
-class StrongRetainAutoreleasedInst
-  : public UnaryInstructionBase<ValueKind::StrongRetainAutoreleasedInst,
-                                RefCountingInst, /*HAS_RESULT*/ false>
-{
-  friend class SILBuilder;
-
-  StrongRetainAutoreleasedInst(SILDebugLocation *DebugLoc, SILValue Operand)
-      : UnaryInstructionBase(DebugLoc, Operand) {}
-};
-
 /// StrongReleaseInst - Decrease the strong reference count of an object.
 ///
 /// An object can be destroyed when its strong reference count is
@@ -3594,6 +3656,32 @@ public:
 // Instructions representing terminators
 //===----------------------------------------------------------------------===//
 
+enum class TermKind {
+  Invalid = 0,
+#define TERMINATOR(Id, Parent, MemBehavior, MayRelease) Id,
+#include "SILNodes.def"
+};
+
+struct ValueKindAsTermKind {
+  TermKind K;
+
+  ValueKindAsTermKind(ValueKind V) {
+    switch (V) {
+#define TERMINATOR(Id, Parent, MemBehavior, MayRelease)                        \
+  case ValueKind::Id:                                                          \
+    K = TermKind::Id;                                                          \
+    break;
+#define VALUE(Id, Parent)                                                      \
+  case ValueKind::Id:                                                          \
+    K = TermKind::Invalid;                                                     \
+    break;
+#include "SILNodes.def"
+    }
+  }
+
+  operator TermKind() const { return K; }
+};
+
 /// This class defines a "terminating instruction" for a SILBasicBlock.
 class TermInst : public SILInstruction {
 protected:
@@ -3617,6 +3705,8 @@ public:
   }
 
   bool isBranch() const { return !getSuccessors().empty(); }
+
+  TermKind getTermKind() const { return ValueKindAsTermKind(getKind()); }
 };
 
 /// UnreachableInst - Position in the code which would be undefined to reach.
@@ -3656,31 +3746,6 @@ class ReturnInst
   /// \param ReturnValue The value to be returned.
   ///
   ReturnInst(SILDebugLocation *DebugLoc, SILValue ReturnValue)
-      : UnaryInstructionBase(DebugLoc, ReturnValue) {}
-
-public:
-  SuccessorListTy getSuccessors() {
-    // No Successors.
-    return SuccessorListTy();
-  }
-};
-
-/// AutoreleaseReturnInst - Transfer ownership of a value to an ObjC
-/// autorelease pool, and then return the value.
-class AutoreleaseReturnInst
-  : public UnaryInstructionBase<ValueKind::AutoreleaseReturnInst, TermInst,
-                                /*HAS_RESULT*/ false>
-{
-  friend class SILBuilder;
-
-  /// Constructs an AutoreleaseReturnInst representing an autorelease-return
-  /// sequence.
-  ///
-  /// \param DebugLoc The backing AST location.
-  ///
-  /// \param ReturnValue The value to be returned.
-  ///
-  AutoreleaseReturnInst(SILDebugLocation *DebugLoc, SILValue ReturnValue)
       : UnaryInstructionBase(DebugLoc, ReturnValue) {}
 
 public:
@@ -3766,18 +3831,18 @@ public:
     ConditionIdx
   };
   enum {
-    // Map branch targets to block sucessor indices.
+    // Map branch targets to block successor indices.
     TrueIdx,
     FalseIdx
   };
 private:
   SILSuccessor DestBBs[2];
-  // The number of arguments for the True branch.
+  /// The number of arguments for the True branch.
   unsigned NumTrueArgs;
-  // The number of arguments for the False branch.
+  /// The number of arguments for the False branch.
   unsigned NumFalseArgs;
 
-  // The first argument is the condition; the rest are BB arguments.
+  /// The first argument is the condition; the rest are BB arguments.
   TailAllocatedOperandList<1> Operands;
   CondBranchInst(SILDebugLocation *DebugLoc, SILValue Condition,
                  SILBasicBlock *TrueBB, SILBasicBlock *FalseBB,
@@ -4063,7 +4128,7 @@ class DynamicMethodBranchInst : public TermInst {
 
   SILSuccessor DestBBs[2];
 
-  // The operand.
+  /// The operand.
   FixedOperandList<1> Operands;
 
   DynamicMethodBranchInst(SILDebugLocation *DebugLoc, SILValue Operand,
@@ -4202,7 +4267,7 @@ public:
 class TryApplyInstBase : public TermInst {
 public:
   enum {
-    // Map branch targets to block sucessor indices.
+    // Map branch targets to block successor indices.
     NormalIdx,
     ErrorIdx
   };
@@ -4309,7 +4374,8 @@ public:
     FOREACH_IMPL_RETURN(getCallee());
   }
 
-  // Return the referenced function if the callee is a function_ref instruction.
+  /// Return the referenced function if the callee is a function_ref
+  /// instruction.
   SILFunction *getCalleeFunction() const {
     FOREACH_IMPL_RETURN(getCalleeFunction());
   }
@@ -4399,7 +4465,7 @@ public:
   /// Return the ith argument passed to this instruction.
   SILValue getArgument(unsigned i) const { return getArguments()[i]; }
 
-  // Set the ith argument of this instruction.
+  /// Set the ith argument of this instruction.
   void setArgument(unsigned i, SILValue V) const {
     getArgumentOperands()[i].set(V);
   }

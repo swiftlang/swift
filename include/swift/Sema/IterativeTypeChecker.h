@@ -33,7 +33,7 @@ class TypeChecker;
 /// An iterative type checker that processes type check requests to
 /// ensure that the AST has the information needed by the client.
 class IterativeTypeChecker {
-  /// The underyling (non-iterative) type checker on which this iterative
+  /// The underlying (non-iterative) type checker on which this iterative
   /// type checker depends.
   ///
   /// Each dependency on the non-iterative type checker potentially

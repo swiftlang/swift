@@ -425,7 +425,7 @@ public:
     return getRecursiveProperties().hasOpenedExistential();
   }
 
-  /// Determine whether the type involves the given opend existential
+  /// Determine whether the type involves the given opened existential
   /// archetype.
   bool hasOpenedExistential(ArchetypeType *opened);
 
@@ -637,7 +637,7 @@ public:
   /// Swift-native reference counting?
   bool usesNativeReferenceCounting(ResilienceExpansion resilience);
 
-  /// Determines whether this type has a bridgable object
+  /// Determines whether this type has a bridgeable object
   /// representation, i.e., whether it is always represented as a single
   /// (non-nil) pointer that can be unknown-retained and
   /// unknown-released.
@@ -2573,6 +2573,42 @@ inline bool isConsumedParameter(ParameterConvention conv) {
     return false;
   }
   llvm_unreachable("bad convention kind");
+}
+
+enum class InoutAliasingAssumption {
+  /// Assume that an inout indirect parameter may alias other objects.
+  /// This is the safe assumption an optimizations should make if it may break
+  /// memory safety in case the inout aliasing rule is violation.
+  Aliasing,
+
+  /// Assume that an inout indirect parameter cannot alias other objects.
+  /// Optimizations should only use this if they can guarantee that they will
+  /// not break memory safety even if the inout aliasing rule is violated.
+  NotAliasing
+};
+
+/// Returns true if \p conv is a not-aliasing indirect parameter.
+/// The \p isInoutAliasing specifies what to assume about the inout convention.
+/// See InoutAliasingAssumption.
+inline bool isNotAliasedIndirectParameter(ParameterConvention conv,
+                                     InoutAliasingAssumption isInoutAliasing) {
+  switch (conv) {
+  case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_Out:
+  case ParameterConvention::Indirect_In_Guaranteed:
+    return true;
+
+  case ParameterConvention::Indirect_Inout:
+    return isInoutAliasing == InoutAliasingAssumption::NotAliasing;
+
+  case ParameterConvention::Indirect_InoutAliasable:
+  case ParameterConvention::Direct_Unowned:
+  case ParameterConvention::Direct_Guaranteed:
+  case ParameterConvention::Direct_Owned:
+  case ParameterConvention::Direct_Deallocating:
+    return false;
+  }
+  llvm_unreachable("covered switch isn't covered?!");
 }
 
 /// Returns true if conv is a guaranteed parameter. This may look unnecessary

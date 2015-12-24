@@ -4,7 +4,10 @@
 Utility script for submitting benchmark results to an LNT server.
 """
 
+from __future__ import print_function
+
 import datetime
+import errno
 import json
 import optparse
 import subprocess
@@ -31,7 +34,7 @@ def capture_with_result(args, include_stderr=False):
         p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=stderr)
     except OSError,e:
         if e.errno == errno.ENOENT:
-            fatal('no such file or directory: %r when running %s.' % (
+            sys.exit('no such file or directory: %r when running %s.' % (
                   args[0], ' '.join(args)))
         raise
     out,_ = p.communicate()
@@ -59,13 +62,13 @@ def submit_results_to_server(results_data, submit_url):
         return json.loads(result_data)
     except:
         import traceback
-        print "Unable to load result, not a valid JSON object."
-        print
-        print "Traceback:"
+        print("Unable to load result, not a valid JSON object.")
+        print()
+        print("Traceback:")
         traceback.print_exc()
-        print
-        print "Result:"
-        print result_data
+        print()
+        print("Result:")
+        print(result_data)
         return
 
 ###

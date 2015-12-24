@@ -285,7 +285,7 @@ else:
           if ${"try isOrderedBefore(e2, e1)" if preds else "e2 < e1"} {
             return false
           }
-          continue // equivalent
+          continue // Equivalent
         }
         return false
       }

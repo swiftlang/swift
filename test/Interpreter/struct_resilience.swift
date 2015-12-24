@@ -57,7 +57,7 @@ struct MyResilientLayoutRuntimeTest {
   }
 }
 
-@inline(never) func getMetadata() -> MyResilientLayoutRuntimeTest.Type {
+@inline(never) func getMetadata() -> Any.Type {
   return MyResilientLayoutRuntimeTest.self
 }
 

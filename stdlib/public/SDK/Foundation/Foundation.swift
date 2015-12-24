@@ -313,8 +313,7 @@ extension Bool: _ObjectiveCBridgeable {
   }
 
   public init(_ number: NSNumber) {
-    if number.boolValue { self = true }
-    else { self = false }
+    self = number.boolValue
   }
 
   public static func _getObjectiveCType() -> Any.Type {
@@ -1044,15 +1043,25 @@ extension CGRectEdge {
 
 public typealias NSErrorPointer = AutoreleasingUnsafeMutablePointer<NSError?>
 
+public // COMPILER_INTRINSIC
+let _nilObjCError: ErrorType = _GenericObjCError.NilError
+
 @warn_unused_result
 @_silgen_name("swift_convertNSErrorToErrorType")
 public // COMPILER_INTRINSIC
-func _convertNSErrorToErrorType(error: NSError?) -> ErrorType
+func _convertNSErrorToErrorType(error: NSError?) -> ErrorType {
+  if let error = error {
+    return error
+  }
+  return _nilObjCError
+}
 
 @warn_unused_result
 @_silgen_name("swift_convertErrorTypeToNSError")
 public // COMPILER_INTRINSIC
-func _convertErrorTypeToNSError(error: ErrorType) -> NSError
+func _convertErrorTypeToNSError(error: ErrorType) -> NSError {
+  return unsafeDowncast(_bridgeErrorTypeToNSError(error))
+}
 
 //===----------------------------------------------------------------------===//
 // Variadic initializers and methods

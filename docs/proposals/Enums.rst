@@ -281,7 +281,7 @@ circumstances:
   StringLiteralConvertible.
 - None of the cases of the enum may have non-void payloads.
 
-If an enum declares an raw type, then its cases may declare raw
+If an enum declares a raw type, then its cases may declare raw
 values. raw values must be integer, float, character, or string
 literals, and must be unique within the enum. If the raw type is
 IntegerLiteralConvertible, then the raw values default to

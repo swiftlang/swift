@@ -795,22 +795,23 @@ void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
   }
 }
 
-static void markInvalidGenericSignature(AbstractFunctionDecl *AFD,
+static void markInvalidGenericSignature(ValueDecl *VD,
                                         TypeChecker &TC) {
-  ArchetypeBuilder builder = TC.createArchetypeBuilder(AFD->getParentModule());
-  auto genericParams = AFD->getGenericParams();
-  
-  // If there is a parent context, add the generic parameters and requirements
-  // from that context.
-  auto dc = AFD->getDeclContext();
-
-  if (dc->isTypeContext())
-    if (auto sig = dc->getGenericSignatureOfContext())
-      builder.addGenericSignature(sig, true);
+  GenericParamList *genericParams;
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
+    genericParams = AFD->getGenericParams();
+  else
+    genericParams = cast<NominalTypeDecl>(VD)->getGenericParams();
   
   // If there aren't any generic parameters at this level, we're done.
-  if (!genericParams)
+  if (genericParams == nullptr)
     return;
+
+  DeclContext *DC = VD->getDeclContext();
+  ArchetypeBuilder builder = TC.createArchetypeBuilder(DC->getParentModule());
+
+  if (auto sig = DC->getGenericSignatureOfContext())
+    builder.addGenericSignature(sig, true);
   
   // Visit each of the generic parameters.
   for (auto param : *genericParams)
@@ -1372,14 +1373,10 @@ void swift::makeDynamic(ASTContext &ctx, ValueDecl *D) {
 /// pattern, etc.
 ///
 /// \param func The function whose 'self' is being configured.
-/// \param outerGenericParams The generic parameters from the outer scope.
 ///
 /// \returns the type of 'self'.
 Type swift::configureImplicitSelf(TypeChecker &tc,
-                                  AbstractFunctionDecl *func,
-                                  GenericParamList *&outerGenericParams) {
-  outerGenericParams = nullptr;
-
+                                  AbstractFunctionDecl *func) {
   auto selfDecl = func->getImplicitSelfDecl();
 
   // Validate the context.
@@ -1390,7 +1387,7 @@ Type swift::configureImplicitSelf(TypeChecker &tc,
   }
 
   // Compute the type of self.
-  Type selfTy = func->computeSelfType(&outerGenericParams);
+  Type selfTy = func->computeSelfType();
   assert(selfDecl && selfTy && "Not a method");
 
   if (selfDecl->hasType())
@@ -1411,7 +1408,6 @@ Type swift::configureImplicitSelf(TypeChecker &tc,
 /// Compute the allocating and initializing constructor types for
 /// the given constructor.
 void swift::configureConstructorType(ConstructorDecl *ctor,
-                                     GenericParamList *outerGenericParams,
                                      Type selfType,
                                      Type argType,
                                      bool throws) {
@@ -1429,6 +1425,9 @@ void swift::configureConstructorType(ConstructorDecl *ctor,
 
   auto extInfo = AnyFunctionType::ExtInfo().withThrows(throws);
 
+  GenericParamList *outerGenericParams =
+      ctor->getDeclContext()->getGenericParamsOfContext();
+
   if (GenericParamList *innerGenericParams = ctor->getGenericParams()) {
     innerGenericParams->setOuterParameters(outerGenericParams);
     fnType = PolymorphicFunctionType::get(argType, resultType,
@@ -1438,7 +1437,7 @@ void swift::configureConstructorType(ConstructorDecl *ctor,
     fnType = FunctionType::get(argType, resultType, extInfo);
   }
   Type selfMetaType = MetatypeType::get(selfType->getInOutObjectType());
-  if (outerGenericParams) {
+  if (ctor->getDeclContext()->isGenericTypeContext()) {
     allocFnType = PolymorphicFunctionType::get(selfMetaType, fnType,
                                                outerGenericParams);
     initFnType = PolymorphicFunctionType::get(selfType, fnType,
@@ -3365,7 +3364,7 @@ public:
     TC.checkDeclAttributes(SD);
   }
 
-  /// Check whether the given propertes can be @NSManaged in this class.
+  /// Check whether the given properties can be @NSManaged in this class.
   static bool propertiesCanBeNSManaged(ClassDecl *classDecl,
                                        ArrayRef<VarDecl *> vars) {
     // Check whether we have an Objective-C-defined class in our
@@ -3669,7 +3668,7 @@ public:
     GenericParamList *outerGenericParams = nullptr;
     auto patterns = FD->getBodyParamPatterns();
     bool hasSelf = FD->getDeclContext()->isTypeContext();
-    if (hasSelf)
+    if (FD->getDeclContext()->isGenericTypeContext())
       outerGenericParams = FD->getDeclContext()->getGenericParamsOfContext();
 
     for (unsigned i = 0, e = patterns.size(); i != e; ++i) {
@@ -4007,13 +4006,12 @@ public:
     }
 
     // Before anything else, set up the 'self' argument correctly if present.
-    GenericParamList *outerGenericParams = nullptr;
     if (FD->getDeclContext()->isTypeContext())
-      configureImplicitSelf(TC, FD, outerGenericParams);
+      configureImplicitSelf(TC, FD);
 
     // If we have generic parameters, check the generic signature now.
     if (auto gp = FD->getGenericParams()) {
-      gp->setOuterParameters(outerGenericParams);
+      gp->setOuterParameters(FD->getDeclContext()->getGenericParamsOfContext());
 
       if (TC.validateGenericFuncSignature(FD)) {
         markInvalidGenericSignature(FD, TC);
@@ -4040,7 +4038,7 @@ public:
         // Assign archetypes.
         finalizeGenericParamList(builder, gp, FD, TC);
       }
-    } else if (outerGenericParams) {
+    } else if (FD->getDeclContext()->isGenericTypeContext()) {
       if (TC.validateGenericFuncSignature(FD)) {
         markInvalidGenericSignature(FD, TC);
       } else if (!FD->hasType()) {
@@ -4844,6 +4842,7 @@ public:
 
     UNINTERESTING_ATTR(WarnUnusedResult)
     UNINTERESTING_ATTR(WarnUnqualifiedAccess)
+    UNINTERESTING_ATTR(MigrationId)
 
 #undef UNINTERESTING_ATTR
 
@@ -5166,7 +5165,7 @@ public:
     auto resultTy = TC.getInterfaceTypeFromInternalType(enumDecl,
                                                         funcTy->getResult());
     auto interfaceTy
-      = GenericFunctionType::get(enumDecl->getGenericSignature(),
+      = GenericFunctionType::get(enumDecl->getGenericSignatureOfContext(),
                                  inputTy, resultTy, funcTy->getExtInfo());
 
     // Record the interface type.
@@ -5195,7 +5194,7 @@ public:
     EED->setIsBeingTypeChecked();
 
     // Only attempt to validate the argument type or raw value if the element
-    // is not currenly being validated.
+    // is not currently being validated.
     if (EED->getRecursiveness() == ElementRecursiveness::NotRecursive) {
       EED->setRecursiveness(ElementRecursiveness::PotentiallyRecursive);
       
@@ -5245,7 +5244,7 @@ public:
     // case the enclosing enum type was illegally declared inside of a generic
     // context. (In that case, we'll post a diagnostic while visiting the
     // parent enum.)
-    if (ED->getGenericParams())
+    if (EED->getDeclContext()->isGenericTypeContext())
       computeEnumElementInterfaceType(EED);
 
     // Require the carried type to be materializable.
@@ -5392,13 +5391,12 @@ public:
       }
     }
 
-    GenericParamList *outerGenericParams;
-    Type SelfTy = configureImplicitSelf(TC, CD, outerGenericParams);
+    Type SelfTy = configureImplicitSelf(TC, CD);
 
     Optional<ArchetypeBuilder> builder;
     if (auto gp = CD->getGenericParams()) {
       // Write up generic parameters and check the generic parameter list.
-      gp->setOuterParameters(outerGenericParams);
+      gp->setOuterParameters(CD->getDeclContext()->getGenericParamsOfContext());
 
       if (TC.validateGenericFuncSignature(CD)) {
         markInvalidGenericSignature(CD, TC);
@@ -5417,7 +5415,7 @@ public:
         // Assign archetypes.
         finalizeGenericParamList(builder, gp, CD, TC);
       }
-    } else if (outerGenericParams) {
+    } else if (CD->getDeclContext()->isGenericTypeContext()) {
       if (TC.validateGenericFuncSignature(CD)) {
         CD->setInvalid();
       } else {
@@ -5431,7 +5429,7 @@ public:
       CD->overwriteType(ErrorType::get(TC.Context));
       CD->setInvalid();
     } else {
-      configureConstructorType(CD, outerGenericParams, SelfTy, 
+      configureConstructorType(CD, SelfTy,
                                CD->getBodyParamPatterns()[1]->getType(),
                                CD->getThrowsLoc().isValid());
     }
@@ -5560,10 +5558,9 @@ public:
       DD->setAccessibility(enclosingClass->getFormalAccess());
     }
 
-    GenericParamList *outerGenericParams;
-    Type SelfTy = configureImplicitSelf(TC, DD, outerGenericParams);
+    Type SelfTy = configureImplicitSelf(TC, DD);
 
-    if (outerGenericParams)
+    if (DD->getDeclContext()->isGenericTypeContext())
       TC.validateGenericFuncSignature(DD);
 
     if (semaFuncParamPatterns(DD)) {
@@ -5572,10 +5569,10 @@ public:
     }
 
     Type FnTy;
-    if (outerGenericParams)
+    if (DD->getDeclContext()->isGenericTypeContext())
       FnTy = PolymorphicFunctionType::get(SelfTy,
                                           TupleType::getEmpty(TC.Context),
-                                          outerGenericParams);
+                             DD->getDeclContext()->getGenericParamsOfContext());
     else
       FnTy = FunctionType::get(SelfTy, TupleType::getEmpty(TC.Context));
 
@@ -5824,7 +5821,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
       // Validate the generic type parameters.
       if (validateGenericTypeSignature(nominal)) {
-        nominal->markInvalidGenericSignature();
+        markInvalidGenericSignature(nominal, *this);
         return;
       }
 
@@ -5889,9 +5886,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     // Validate the generic type signature, which is just <Self : P>.
     validateGenericTypeSignature(proto);
 
-    GenericParamList *outerGenericParams =
-        proto->getDeclContext()->getGenericParamsOfContext();
-    gp->setOuterParameters(outerGenericParams);
+    assert(gp->getOuterParameters() ==
+           proto->getDeclContext()->getGenericParamsOfContext());
 
     revertGenericParamList(gp);
 
@@ -5983,8 +5979,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         if (isa<NominalTypeDecl>(VD->getDeclContext()->getParent())) {
           if (auto funcDeclContext =
                   dyn_cast<AbstractFunctionDecl>(VD->getDeclContext())) {
-            GenericParamList *outerGenericParams = nullptr;
-            configureImplicitSelf(*this, funcDeclContext, outerGenericParams);
+            configureImplicitSelf(*this, funcDeclContext);
           }
         } else {
           D->setType(ErrorType::get(Context));
@@ -7038,14 +7033,16 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     // If there is a name, check whether the kind of name is
     // appropriate.
     if (auto objcName = objcAttr->getName()) {
-      if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D) || isa<VarDecl>(D)) {
+      if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D) || isa<EnumDecl>(D) ||
+          isa<VarDecl>(D)) {
         // Types and properties can only have nullary
         // names. Complain and recover by chopping off everything
         // after the first name.
         if (objcName->getNumArgs() > 0) {
-          int which = isa<ClassDecl>(D)? 0 
+          int which = isa<ClassDecl>(D)? 0
                     : isa<ProtocolDecl>(D)? 1
-                    : 2;
+                    : isa<EnumDecl>(D)? 2
+                    : 3;
           SourceLoc firstNameLoc = objcAttr->getNameLocs().front();
           SourceLoc afterFirstNameLoc = 
             Lexer::getLocForEndOfToken(TC.Context.SourceMgr, firstNameLoc);
@@ -7055,10 +7052,6 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
             ObjCSelector(TC.Context, 0, objcName->getSelectorPieces()[0]),
             /*implicit=*/false);
         }
-      } else if (isa<EnumDecl>(D)) {
-        // Enums don't have runtime names.
-        TC.diagnose(objcAttr->getLParenLoc(), diag::objc_name_enum);
-        const_cast<ObjCAttr *>(objcAttr)->clearName();
       } else if (isa<SubscriptDecl>(D)) {
         // Subscripts can never have names.
         TC.diagnose(objcAttr->getLParenLoc(), diag::objc_name_subscript);

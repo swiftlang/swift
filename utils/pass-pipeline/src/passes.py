@@ -18,7 +18,6 @@ DCE = Pass('DCE')
 DeadFunctionElimination = Pass('DeadFunctionElimination')
 DeadObjectElimination = Pass('DeadObjectElimination')
 DefiniteInitialization = Pass('DefiniteInitialization')
-Devirtualizer = Pass('SpeculativeDevirtualizer')
 DiagnoseUnreachable = Pass('DiagnoseUnreachable')
 DiagnosticConstantPropagation = Pass('DiagnosticConstantPropagation')
 EarlyInliner = Pass('EarlyInliner')
@@ -46,6 +45,7 @@ SILCombine = Pass('SILCombine')
 SILLinker = Pass('SILLinker')
 SROA = Pass('SROA')
 SimplifyCFG = Pass('SimplifyCFG')
+SpeculativeDevirtualizer = Pass('SpeculativeDevirtualizer')
 SplitAllCriticalEdges = Pass('SplitAllCriticalEdges')
 SplitNonCondBrCriticalEdges = Pass('SplitNonCondBrCriticalEdges')
 StripDebugInfo = Pass('StripDebugInfo')
@@ -67,7 +67,6 @@ PASSES = [
     DeadFunctionElimination,
     DeadObjectElimination,
     DefiniteInitialization,
-    SpeculativeDevirtualizer,
     DiagnoseUnreachable,
     DiagnosticConstantPropagation,
     EarlyInliner,
@@ -95,6 +94,7 @@ PASSES = [
     SILLinker,
     SROA,
     SimplifyCFG,
+    SpeculativeDevirtualizer,
     SplitAllCriticalEdges,
     SplitNonCondBrCriticalEdges,
     StripDebugInfo,

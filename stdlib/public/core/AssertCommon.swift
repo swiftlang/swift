@@ -60,26 +60,26 @@ func _isStdlibInternalChecksEnabled() -> Bool {
 #endif
 }
 
-@_silgen_name("swift_reportFatalErrorInFile")
+@_silgen_name("_swift_stdlib_reportFatalErrorInFile")
 func _reportFatalErrorInFile(
   prefix: UnsafePointer<UInt8>, _ prefixLength: UInt,
   _ message: UnsafePointer<UInt8>, _ messageLength: UInt,
   _ file: UnsafePointer<UInt8>, _ fileLength: UInt,
   _ line: UInt)
 
-@_silgen_name("swift_reportFatalError")
+@_silgen_name("_swift_stdlib_reportFatalError")
 func _reportFatalError(
   prefix: UnsafePointer<UInt8>, _ prefixLength: UInt,
   _ message: UnsafePointer<UInt8>, _ messageLength: UInt)
 
-@_silgen_name("swift_reportUnimplementedInitializerInFile")
+@_silgen_name("_swift_stdlib_reportUnimplementedInitializerInFile")
 func _reportUnimplementedInitializerInFile(
   className: UnsafePointer<UInt8>, _ classNameLength: UInt,
   _ initName: UnsafePointer<UInt8>, _ initNameLength: UInt,
   _ file: UnsafePointer<UInt8>, _ fileLength: UInt,
   _ line: UInt, _ column: UInt)
 
-@_silgen_name("swift_reportUnimplementedInitializer")
+@_silgen_name("_swift_stdlib_reportUnimplementedInitializer")
 func _reportUnimplementedInitializer(
   className: UnsafePointer<UInt8>, _ classNameLength: UInt,
   _ initName: UnsafePointer<UInt8>, _ initNameLength: UInt)
@@ -179,7 +179,7 @@ func _fatalErrorMessage(prefix: StaticString, _ message: StaticString,
   Builtin.int_trap()
 }
 
-/// Prints a fatal error message when a unimplemented initializer gets
+/// Prints a fatal error message when an unimplemented initializer gets
 /// called by the Objective-C runtime.
 @_transparent @noreturn
 public // COMPILER_INTRINSIC
@@ -220,4 +220,13 @@ func _unimplemented_initializer(className: StaticString,
   }
 
   Builtin.int_trap()
+}
+
+@noreturn
+public // COMPILER_INTRINSIC
+func _undefined<T>(
+  @autoclosure message: () -> String = String(),
+  file: StaticString = __FILE__, line: UInt = __LINE__
+) -> T {
+  _assertionFailed("fatal error", message(), file, line)
 }

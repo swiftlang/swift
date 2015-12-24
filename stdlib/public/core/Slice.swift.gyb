@@ -21,12 +21,12 @@ def get_slice_doc_comment(Self):
 ///
 /// A `%s` instance inherits the value or reference semantics of the base
 /// collection.  That is, if a `%s` instance is wrapped around a mutable
-/// colection that has value semantics (for example, `Array`), mutating the
+/// collection that has value semantics (for example, `Array`), mutating the
 /// original collection would not affect the copy stored inside of the slice.
 ///
 /// An element of a slice is located under the same index in the slice and in
 /// the base collection, as long as neither the collection or the slice were
-/// mutated.  Thus, indices of a slice can be used interchangibly with indices
+/// mutated.  Thus, indices of a slice can be used interchangeably with indices
 /// of the base collection.
 ///
 /// - Warning: Long-term storage of `%s` instances is discouraged.

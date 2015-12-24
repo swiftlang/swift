@@ -43,12 +43,13 @@
    ;; Decl and type keywords
    `(,(regexp-opt '("class" "init" "deinit" "extension" "func"
                     "import" "let" "protocol" "static" "struct" "subscript"
-                    "typealias" "enum" "var" "where"
+                    "typealias" "enum" "var" "lazy" "where"
                     "private" "public" "internal" "override" "throws")
                   'words) . font-lock-keyword-face)
    ;; Statements
    `(,(regexp-opt '("if" "guard" "in" "else" "for" "do" "repeat" "while" "return"
-                    "break" "continue" "switch" "case" "throw" "try" "catch")
+                    "break" "continue" "switch" "case" "default"
+                    "throw" "try" "catch")
                   'words) . font-lock-keyword-face)
    ;; Expressions
    `(,(regexp-opt '("new") 'words) . font-lock-keyword-face)

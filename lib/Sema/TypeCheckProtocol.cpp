@@ -1249,7 +1249,7 @@ matchWitness(ConformanceChecker &cc, TypeChecker &tc,
     // Open up the type of the requirement. We only truly open 'Self' and
     // its associated types (recursively); inner generic type parameters get
     // mapped to their archetypes directly.
-    DeclContext *reqDC = req->getPotentialGenericDeclContext();
+    DeclContext *reqDC = req->getInnermostDeclContext();
     RequirementTypeOpener reqTypeOpener(*cs, conformance, reqDC);
     std::tie(openedFullReqType, reqType)
       = cs->getTypeOfMemberReference(model, req,
@@ -1292,7 +1292,7 @@ matchWitness(ConformanceChecker &cc, TypeChecker &tc,
 
     if (openedFullWitnessType->hasTypeVariable()) {
       // Figure out the context we're substituting into.
-      auto witnessDC = witness->getPotentialGenericDeclContext();
+      auto witnessDC = witness->getInnermostDeclContext();
       
       // Compute the set of substitutions we'll need for the witness.
       solution->computeSubstitutions(witness->getInterfaceType(),
@@ -1399,7 +1399,7 @@ static Type getRequirementTypeForDisplay(TypeChecker &tc, Module *module,
       }
     }
 
-    // Replace 'Self' with the conforming type type.
+    // Replace 'Self' with the conforming type.
     if (type->isEqual(selfTy))
       return conformance->getType();
 
@@ -3450,7 +3450,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
                                 NormalProtocolConformance *conformance) {
           auto proto = conformance->getProtocol();
           tc.diagnose(failedDefaultedAssocType,
-                      diag::default_assocated_type_req_fail,
+                      diag::default_associated_type_req_fail,
                       failedDefaultedWitness,
                       failedDefaultedAssocType->getFullName(),
                       proto->getDeclaredType(),
@@ -3732,7 +3732,7 @@ void ConformanceChecker::checkConformance() {
   }
 
   // Ensure that all of the requirements of the protocol have been satisfied.
-  // Note: the odd check for one generic parameter parameter copes with
+  // Note: the odd check for one generic parameter copes with
   // protocols nested within other generic contexts, which is ill-formed.
   SourceLoc noteLoc = Proto->getLoc();
   if (noteLoc.isInvalid())
@@ -4210,8 +4210,10 @@ bool TypeChecker::isProtocolExtensionUsable(DeclContext *dc, Type type,
   auto genericSig = protocolExtension->getGenericSignature();
   
   cs.openGeneric(protocolExtension, genericSig->getGenericParams(),
-                 genericSig->getRequirements(), false, nullptr,
-                 ConstraintLocatorBuilder(nullptr), replacements);
+                 genericSig->getRequirements(), false,
+                 protocolExtension->getGenericTypeContextDepth(),
+                 nullptr, ConstraintLocatorBuilder(nullptr),
+                 replacements);
 
   // Bind the 'Self' type variable to the provided type.
   CanType selfType = genericSig->getGenericParams().back()->getCanonicalType();

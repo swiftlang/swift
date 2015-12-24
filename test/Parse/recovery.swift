@@ -162,16 +162,16 @@ func missingControllingExprInFor() {
   }
 
   // Ensure that we don't do recovery in the following cases.
-  for ; ; {
+  for ; ; { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   }
 
-  for { true }(); ; {
+  for { true }(); ; { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   }
 
-  for ; { true }() ; {
+  for ; { true }() ; { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   }
 
-  for acceptsClosure { 42 }; ; {
+  for acceptsClosure { 42 }; ; { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   }
 
   // A trailing closure is not accepted for the condition.
@@ -185,7 +185,7 @@ func missingControllingExprInFor() {
 #if true  // <rdar://problem/21679557> compiler crashes on "for{{"
   // expected-error @+2 {{missing initialization in a 'for' statement}}
   // expected-note @+1 2 {{to match this opening '{'}}
-for{{
+for{{ // expected-error {{expression resolves to an unused function}}
 #endif  // expected-error 2 {{expected '}' at end of closure}}
   
 #if true
@@ -228,7 +228,7 @@ func missingControllingExprInSwitch() {
   }
 
   switch { // expected-error {{expected expression in 'switch' statement}}
-    case Int: return // expected-error {{'is' keyword required to pattern match against type name}} {{10-10=is }} expected-warning {{cast from '<<error type>>' to unrelated type 'Int' always fails}}
+    case Int: return // expected-error {{'is' keyword required to pattern match against type name}} {{10-10=is }} 
     case _: return
   }
 
@@ -680,8 +680,8 @@ class r22240342 {
 
 // <rdar://problem/22387625> QoI: Common errors: 'let x= 5' and 'let x =5' could use Fix-its
 func r22387625() {
-  let _= 5 // expected-error{{postfix '=' is reserved}} {{8-8= }}
-  let _ =5 // expected-error{{prefix '=' is reserved}} {{10-10= }}
+  let _= 5 // expected-error{{'=' must have consistent whitespace on both sides}} {{8-8= }}
+  let _ =5 // expected-error{{'=' must have consistent whitespace on both sides}} {{10-10= }}
 }
 
 
@@ -705,4 +705,15 @@ func test23719432() {
   &(Int:x)  // expected-error {{'&' can only appear immediately in a call argument list}}
 }
 
+// <rdar://problem/19911096> QoI: terrible recovery when using '·' for an operator
+infix operator · {  // expected-error {{'·' is considered to be an identifier, not an operator}}
+  associativity none precedence 150
+}
+
+// <rdar://problem/21712891> Swift Compiler bug: String subscripts with range should require closing bracket.
+func r21712891(s : String) -> String {
+  let a = s.startIndex..<s.startIndex
+  // The specific errors produced don't actually matter, but we need to reject this.
+  return "\(s[a)"  // expected-error 3 {{}}
+}
 

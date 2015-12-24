@@ -3,7 +3,7 @@ add_swift_executable(sil-extract
   LINK_LIBRARIES
     swiftFrontend
     swiftSILGen
-    swiftSILPasses
+    swiftSILOptimizer
     swiftSerialization
     swiftClangImporter
 )

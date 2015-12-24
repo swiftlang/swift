@@ -1415,7 +1415,7 @@ void LValue::addOrigToSubstComponent(SILType loweredSubstType) {
   assert(getTypeOfRValue() != loweredSubstType &&
          "reabstraction component is unnecessary!");
 
-  // Peephole away complementary reabstractons.
+  // Peephole away complementary reabstractions.
   assert(!Path.empty() && "adding translation component to empty l-value");
   if (Path.back()->getKind() == PathComponent::SubstToOrigKind) {
     // But only if the lowered type matches exactly.
@@ -1437,7 +1437,7 @@ void LValue::addSubstToOrigComponent(AbstractionPattern origType,
   assert(getTypeOfRValue() != loweredSubstType &&
          "reabstraction component is unnecessary!");
 
-  // Peephole away complementary reabstractons.
+  // Peephole away complementary reabstractions.
   assert(!Path.empty() && "adding translation component to empty l-value");
   if (Path.back()->getKind() == PathComponent::OrigToSubstKind) {
     // But only if the lowered type matches exactly.
@@ -1529,8 +1529,7 @@ static ArrayRef<Substitution>
 getNonMemberVarDeclSubstitutions(SILGenFunction &gen, VarDecl *var) {
   ArrayRef<Substitution> substitutions;
   if (auto genericParams
-      = gen.SGM.Types.getEffectiveGenericParamsForContext(
-                                                      var->getDeclContext()))
+      = var->getDeclContext()->getGenericParamsOfContext())
     substitutions =
         genericParams->getForwardingSubstitutions(gen.getASTContext());
   return substitutions;
@@ -2888,9 +2887,9 @@ SILFunction *MaterializeForSetEmitter::createCallback(GeneratorFn generator) {
                                                      nullptr));
     closure.getCaptureInfo().setGenericParamCaptures(true);
 
-    llvm::raw_svector_ostream nameStream(name);
-    nameStream << "_TTW";
-    Mangle::Mangler mangler(nameStream);
+    llvm::raw_svector_ostream stream(name);
+    Mangle::Mangler mangler(stream);
+    mangler.manglePrefix("_TTW");
     mangler.mangleProtocolConformance(Conformance);
     mangler.mangleClosureEntity(&closure, ResilienceExpansion::Minimal, 1);
   }

@@ -15,7 +15,7 @@ import SwiftShims
 /// Class used whose sole instance is used as storage for empty
 /// arrays.  The instance is defined in the runtime and statically
 /// initialized.  See stdlib/runtime/GlobalObjects.cpp for details.
-/// Because it's statically referenced, it requires nonlazy realization
+/// Because it's statically referenced, it requires non-lazy realization
 /// by the Objective-C runtime.
 @objc_non_lazy_realization
 internal final class _EmptyArrayStorage
@@ -24,7 +24,7 @@ internal final class _EmptyArrayStorage
   init(_doNotCallMe: ()) {
     _sanityCheckFailure("creating instance of _EmptyArrayStorage")
   }
-  
+
   var countAndCapacity: _ArrayBody
 
 #if _runtime(_ObjC)
@@ -164,7 +164,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
 #if _runtime(_ObjC)
     return proposedElementType is Element.Type
 #else
-    // FIXME: Dynamic casts don't currently work without objc. 
+    // FIXME: Dynamic casts don't currently work without objc.
     // rdar://problem/18801510
     return false
 #endif
@@ -210,7 +210,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
   /// body part of the storage initialized, but not the elements.
   ///
   /// - Warning: The result has uninitialized elements.
-  /// 
+  ///
   /// - Warning: storage may have been stack-allocated, so it's
   ///   crucial not to call, e.g., `malloc_size` on it.
   internal init(count: Int, storage: _ContiguousArrayStorage<Element>) {
@@ -250,7 +250,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
   }
 
   /// If the elements are stored contiguously, a pointer to the first
-  /// element. Otherwise, nil.
+  /// element. Otherwise, `nil`.
   public var firstElementAddress: UnsafeMutablePointer<Element> {
     return __bufferPointer._elementPointer
   }
@@ -455,7 +455,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
   public var identity: UnsafePointer<Void> {
     return withUnsafeBufferPointer { UnsafePointer($0.baseAddress) }
   }
-  
+
   /// Return true iff we have storage for elements of the given
   /// `proposedElementType`.  If not, we'll be treated as immutable.
   func canStoreElementsOfDynamicType(proposedElementType: Any.Type) -> Bool {
@@ -586,7 +586,7 @@ extension _ContiguousArrayBuffer {
 /// It avoids the extra retain, release overhead from storing the
 /// ContiguousArrayBuffer into
 /// _UnsafePartiallyInitializedContiguousArrayBuffer. Since we do not support
-/// ARC loops, the extra retain, release overhead can not be eliminated which
+/// ARC loops, the extra retain, release overhead cannot be eliminated which
 /// makes assigning ranges very slow. Once this has been implemented, this code
 /// should be changed to use _UnsafePartiallyInitializedContiguousArrayBuffer.
 @warn_unused_result
@@ -609,8 +609,8 @@ internal func _copyCollectionToNativeArrayBuffer<
   for _ in 0..<count {
     // FIXME(performance): use _initializeTo().
     p.initialize(source[i])
-    p += 1
-    i = i.successor()
+    i._successorInPlace()
+    p._successorInPlace()
   }
   _expectEnd(i, source)
   return result
@@ -665,7 +665,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   mutating func addWithExistingCapacity(element: Element) {
     _sanityCheck(remainingCapacity > 0,
       "_UnsafePartiallyInitializedContiguousArrayBuffer has no more capacity")
-    remainingCapacity--
+    remainingCapacity -= 1
 
     p.initialize(element)
     p += 1

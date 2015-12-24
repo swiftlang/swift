@@ -1457,24 +1457,105 @@ static uint32_t getLog2AlignmentFromMask(size_t alignMask) {
     log2++;
   return log2;
 }
+
+static inline ClassROData *getROData(ClassMetadata *theClass) {
+  return (ClassROData*) (theClass->Data & ~uintptr_t(1));
+}
+
+static void _swift_initGenericClassObjCName(ClassMetadata *theClass) {
+  // Use the remangler to generate a mangled name from the type metadata.
+  auto demangling = _swift_buildDemanglingForMetadata(theClass);
+
+  // Remangle that into a new type mangling string.
+  auto typeNode
+    = Demangle::NodeFactory::create(Demangle::Node::Kind::TypeMangling);
+  typeNode->addChild(demangling);
+  auto globalNode
+    = Demangle::NodeFactory::create(Demangle::Node::Kind::Global);
+  globalNode->addChild(typeNode);
+  
+  auto string = Demangle::mangleNode(globalNode);
+  
+  auto fullNameBuf = (char*)swift_slowAlloc(string.size() + 1, 0);
+  memcpy(fullNameBuf, string.c_str(), string.size() + 1);
+
+  auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
+
+  getROData(theClass)->Name = fullNameBuf;
+  getROData(theMetaclass)->Name = fullNameBuf;
+}
 #endif
+
+static void _swift_initializeSuperclass(ClassMetadata *theClass,
+                                        bool copyFieldOffsetVectors) {
+#if SWIFT_OBJC_INTEROP
+  // If the class is generic, we need to give it a name for Objective-C.
+  if (theClass->getDescription()->GenericParams.NumParams > 0)
+    _swift_initGenericClassObjCName(theClass);
+#endif
+
+  const ClassMetadata *theSuperclass = theClass->SuperClass;
+  if (theSuperclass == nullptr)
+    return;
+
+  // If any ancestors had generic parameters or field offset vectors,
+  // inherit them.
+  auto ancestor = theSuperclass;
+  auto *classWords = reinterpret_cast<uintptr_t *>(theClass);
+  auto *superWords = reinterpret_cast<const uintptr_t *>(theSuperclass);
+  while (ancestor && ancestor->isTypeMetadata()) {
+    auto description = ancestor->getDescription();
+    auto &genericParams = description->GenericParams;
+    if (genericParams.hasGenericParams()) {
+      unsigned numParamWords = 0;
+      for (unsigned i = 0; i < genericParams.NumParams; ++i) {
+        // 1 word for the type metadata, and 1 for every protocol witness
+        numParamWords +=
+            1 + genericParams.Parameters[i].NumWitnessTables;
+      }
+      memcpy(classWords + genericParams.Offset,
+             superWords + genericParams.Offset,
+             numParamWords * sizeof(uintptr_t));
+    }
+    if (copyFieldOffsetVectors &&
+        description->Class.hasFieldOffsetVector()) {
+      unsigned fieldOffsetVector = description->Class.FieldOffsetVectorOffset;
+      memcpy(classWords + fieldOffsetVector,
+             superWords + fieldOffsetVector,
+             description->Class.NumFields * sizeof(uintptr_t));
+    }
+    ancestor = ancestor->SuperClass;
+  }
+
+#if SWIFT_OBJC_INTEROP
+  // Set up the superclass of the metaclass, which is the metaclass of the
+  // superclass.
+  auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
+  auto theSuperMetaclass
+    = (const ClassMetadata *)object_getClass((id)theSuperclass);
+  theMetaclass->SuperClass = theSuperMetaclass;
+#endif
+}
 
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
 void swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
-                                          const ClassMetadata *super,
                                           size_t numFields,
                                           const ClassFieldLayout *fieldLayouts,
                                           size_t *fieldOffsets) {
+  _swift_initializeSuperclass(self, /*copyFieldOffsetVectors=*/true);
+
   // Start layout by appending to a standard heap object header.
   size_t size, alignMask;
 
 #if SWIFT_OBJC_INTEROP
-  ClassROData *rodata = (ClassROData*) (self->Data & ~uintptr_t(1));
+  ClassROData *rodata = getROData(self);
 #endif
 
   // If we have a superclass, start from its size and alignment instead.
-  if (super) {
+  if (classHasSuperclass(self)) {
+    const ClassMetadata *super = self->SuperClass;
+
     // This is straightforward if the superclass is Swift.
 #if SWIFT_OBJC_INTEROP
     if (super->isTypeMetadata()) {
@@ -2323,6 +2404,7 @@ Metadata::getNominalTypeDescriptor() const {
   }
   case MetadataKind::Struct:
   case MetadataKind::Enum:
+  case MetadataKind::Optional:
     return static_cast<const StructMetadata *>(this)->Description;
   case MetadataKind::ForeignClass:
   case MetadataKind::Opaque:
@@ -2362,6 +2444,7 @@ Metadata::getClassObject() const {
   // Other kinds of types don't have class objects.
   case MetadataKind::Struct:
   case MetadataKind::Enum:
+  case MetadataKind::Optional:
   case MetadataKind::ForeignClass:
   case MetadataKind::Opaque:
   case MetadataKind::Tuple:
@@ -2374,88 +2457,6 @@ Metadata::getClassObject() const {
   case MetadataKind::ErrorObject:
     return nullptr;
   }
-}
-
-/// Scan and return a single run-length encoded identifier.
-/// Returns a malloc-allocated string, or nullptr on failure.
-/// mangled is advanced past the end of the scanned token.
-static char *scanIdentifier(const char *&mangled)
-{
-  const char *original = mangled;
-
-  {
-    if (*mangled == '0') goto fail;  // length may not be zero
-
-    size_t length = 0;
-    while (Demangle::isDigit(*mangled)) {
-      size_t oldlength = length;
-      length *= 10;
-      length += *mangled++ - '0';
-      if (length <= oldlength) goto fail;  // integer overflow
-    }
-
-    if (length == 0) goto fail;
-    if (length > strlen(mangled)) goto fail;
-
-    char *result = strndup(mangled, length);
-    assert(result);
-    mangled += length;
-    return result;
-  }
-
-fail:
-  mangled = original;  // rewind
-  return nullptr;
-}
-
-
-/// \brief Demangle a mangled class name into module+class.
-/// Returns true if the name was successfully decoded.
-/// On success, *outModule and *outClass must be freed with free().
-/// FIXME: this should be replaced by a real demangler
-bool swift::swift_demangleSimpleClass(const char *mangledName,
-                                      char **outModule, char **outClass) {
-  char *moduleName = nullptr;
-  char *className = nullptr;
-
-  {
-    // Prefix for a mangled class
-    const char *m = mangledName;
-    if (0 != strncmp(m, "_TtC", 4))
-      goto fail;
-    m += 4;
-
-    // Module name
-    if (strncmp(m, "Ss", 2) == 0) {
-      moduleName = strdup(swift::STDLIB_NAME);
-      assert(moduleName);
-      m += 2;
-    } else {
-      moduleName = scanIdentifier(m);
-      if (!moduleName)
-        goto fail;
-    }
-
-    // Class name
-    className = scanIdentifier(m);
-    if (!className)
-      goto fail;
-
-    // Nothing else
-    if (strlen(m))
-      goto fail;
-
-    *outModule = moduleName;
-    *outClass = className;
-    return true;
-  }
-
-fail:
-  if (moduleName) free(moduleName);
-  if (className) free(className);
-  *outModule = nullptr;
-  *outClass = nullptr;
-  return false;
 }
 
 #ifndef NDEBUG
@@ -2493,61 +2494,14 @@ void _swift_debug_verifyTypeLayoutAttribute(Metadata *type,
 
 extern "C"
 void swift_initializeSuperclass(ClassMetadata *theClass,
-                                const ClassMetadata *theSuperclass) {
-  // We need a lock in order to ensure the class initialization and ObjC
-  // registration are atomic.
-  // TODO: A global lock for this is lame.
-  // TODO: A lock is also totally unnecessary for the non-objc runtime.
-  //       Without ObjC registration, a release store of the superclass
-  //       reference should be enough to dependency-order the other
-  //       initialization steps.
-  static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-  
-  pthread_mutex_lock(&mutex);
-  
-  // Bail out if this already happened while we were waiting.
-  if (theClass->SuperClass) {
-    pthread_mutex_unlock(&mutex);
-    return;
-  }
-  
-  // Put the superclass reference in the base class.
-  theClass->SuperClass = theSuperclass;
-  
-  // If any ancestors had generic parameters, inherit them.
-  auto ancestor = theSuperclass;
-  auto *classWords = reinterpret_cast<uintptr_t *>(theClass);
-  auto *superWords = reinterpret_cast<const uintptr_t *>(theSuperclass);
-  while (ancestor && ancestor->isTypeMetadata()) {
-    auto description = ancestor->getDescription();
-    auto &genericParams = description->GenericParams;
-    if (genericParams.hasGenericParams()) {
-      unsigned numParamWords = 0;
-      for (unsigned i = 0; i < genericParams.NumParams; ++i) {
-        // 1 word for the type metadata, and 1 for every protocol witness
-        numParamWords +=
-          1 + genericParams.Parameters[i].NumWitnessTables;
-      }
-      memcpy(classWords + genericParams.Offset,
-             superWords + genericParams.Offset,
-             numParamWords * sizeof(uintptr_t));
-    }
-    ancestor = ancestor->SuperClass;
-  }
-  
+                                bool copyFieldOffsetVectors) {
+  // Copy generic parameters and field offset vectors from the superclass.
+  _swift_initializeSuperclass(theClass, copyFieldOffsetVectors);
+
 #if SWIFT_OBJC_INTEROP
-  // Set up the superclass of the metaclass, which is the metaclass of the
-  // superclass.
-  auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
-  auto theSuperMetaclass
-    = (const ClassMetadata *)object_getClass((id)theSuperclass);
-  theMetaclass->SuperClass = theSuperMetaclass;
-  
   // Register the class pair with the ObjC runtime.
   swift_instantiateObjCClass(theClass);
 #endif
-  
-  pthread_mutex_unlock(&mutex);
 }
 
 namespace llvm { namespace hashing { namespace detail {

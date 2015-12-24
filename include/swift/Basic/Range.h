@@ -61,12 +61,13 @@ namespace swift {
   }
 
 /// A range of integers.  This type behaves roughly like an ArrayRef.
-template <class T> class IntRange {
+template <class T=unsigned> class IntRange {
   static_assert(std::is_integral<T>::value, "T must be an integer type");
   T Begin;
   T End;
 public:
   IntRange() : Begin(0), End(0) {}
+  IntRange(T end) : Begin(0), End(end) {}
   IntRange(T begin, T end) : Begin(begin), End(end) {
     assert(begin <= end);
   }
@@ -163,6 +164,17 @@ typename std::enable_if<sizeof(std::declval<T>()[size_t(1)]) != 0,
                         IntRange<decltype(std::declval<T>().size())>>::type
 indices(const T &collection) {
   return IntRange<decltype(std::declval<T>().size())>(0, collection.size());
+}
+
+/// Returns an Int range [start, end).
+static inline IntRange<unsigned> range(unsigned start, unsigned end) {
+  assert(start <= end && "Invalid integral range");
+  return IntRange<unsigned>(start, end);
+}
+
+/// Returns an Int range [0, end).
+static inline IntRange<unsigned> range(unsigned end) {
+  return range(0, end);
 }
 
 /// A random access range that provides iterators that can be used to iterate

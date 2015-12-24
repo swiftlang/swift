@@ -192,7 +192,7 @@ public:
   void emitArtificialFunction(SILModule &SILMod, IRBuilder &Builder,
                               llvm::Function *Fn, SILType SILTy = SILType());
 
-  /// Emit a dbg.declare instrinsic at the current insertion point and
+  /// Emit a dbg.declare intrinsic at the current insertion point and
   /// the Builder's current debug location.
   void emitVariableDeclaration(IRBuilder &Builder,
                                ArrayRef<llvm::Value *> Storage,
@@ -310,7 +310,7 @@ public:
 /// instructions (e.g., ARC-inserted calls to release()) that have no
 /// source location associated with them. The DWARF specification
 /// allows the compiler to use the special line number 0 to indicate
-/// code that can not be attributed to any source location.
+/// code that cannot be attributed to any source location.
 class ArtificialLocation : public AutoRestoreLocation {
 public:
   /// \brief Set the current location to line 0, but within scope DS.

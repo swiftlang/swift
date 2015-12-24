@@ -250,7 +250,6 @@ public:
   /// \brief Swift AST context.
   ASTContext &SwiftContext;
 
-  const bool InferImplicitProperties;
   const bool ImportForwardDeclarations;
   const bool OmitNeedlessWords;
   const bool InferDefaultArguments;
@@ -396,35 +395,33 @@ public:
   /// \sa SuperfluousTypedefs
   llvm::DenseSet<const clang::Decl *> DeclsWithSuperfluousTypedefs;
 
-  using ClangDeclAndFlag = llvm::PointerIntPair<const clang::Decl *, 1, bool>;
-
   /// \brief Mapping of already-imported declarations from protocols, which
   /// can (and do) get replicated into classes.
-  llvm::DenseMap<std::pair<ClangDeclAndFlag, DeclContext *>, Decl *>
+  llvm::DenseMap<std::pair<const clang::Decl *, DeclContext *>, Decl *>
     ImportedProtocolDecls;
 
-  /// \brief Mapping of already-imported macros.
-  llvm::DenseMap<clang::MacroInfo *, ValueDecl *> ImportedMacros;
+  /// Mapping from identifiers to the set of macros that have that name along
+  /// with their corresponding Swift declaration.
+  ///
+  /// Multiple macro definitions can map to the same declaration if the
+  /// macros are identically defined.
+  llvm::DenseMap<Identifier,
+                 SmallVector<std::pair<clang::MacroInfo *, ValueDecl *>, 2>>
+    ImportedMacros;
 
-  /// Keeps track of active selector-basde lookups, so that we don't infinitely
+  /// Keeps track of active selector-based lookups, so that we don't infinitely
   /// recurse when checking whether a method with a given selector has already
   /// been imported.
   llvm::DenseMap<std::pair<ObjCSelector, char>, unsigned>
     ActiveSelectors;
 
-  // FIXME: An extra level of caching of visible decls, since lookup needs to
-  // be filtered by module after the fact.
-  SmallVector<ValueDecl *, 0> CachedVisibleDecls;
-  enum class CacheState {
-    Invalid,
-    InProgress,
-    Valid
-  } CurrentCacheState = CacheState::Invalid;
+  /// Whether we should suppress the import of the given Clang declaration.
+  static bool shouldSuppressDeclImport(const clang::Decl *decl);
 
   /// \brief Check if the declaration is one of the specially handled
   /// accessibility APIs.
   ///
-  /// These appaer as both properties and methods in ObjC and should be
+  /// These appear as both properties and methods in ObjC and should be
   /// imported as methods into Swift.
   static bool isAccessibilityDecl(const clang::Decl *objCMethodOrProp);
 
@@ -488,8 +485,6 @@ private:
   void bumpGeneration() {
     ++Generation;
     SwiftContext.bumpGeneration();
-    CachedVisibleDecls.clear();
-    CurrentCacheState = CacheState::Invalid;
   }
 
   /// \brief Cache of the class extensions.
@@ -540,6 +535,19 @@ public:
   llvm::DenseMap<std::pair<const clang::ObjCMethodDecl *, DeclContext *>,
                  ConstructorDecl *>
     Constructors;
+
+  /// A mapping from imported declarations to their "alternate" declarations,
+  /// for cases where a single Clang declaration is imported to two
+  /// different Swift declarations.
+  llvm::DenseMap<Decl *, ValueDecl *> AlternateDecls;
+
+  /// Retrieve the alternative declaration for the given imported
+  /// Swift declaration.
+  ValueDecl *getAlternateDecl(Decl *decl) {
+    auto known = AlternateDecls.find(decl);
+    if (known == AlternateDecls.end()) return nullptr;
+    return known->second;
+  }
 
 private:
   /// \brief NSObject, imported into Swift.
@@ -727,7 +735,7 @@ public:
   ClangModuleUnit *getClangModuleForMacro(const clang::MacroInfo *MI);
 
   /// Retrieve the type of an instance of the given Clang declaration context,
-  /// or a null type if the DeclContext does not have a correspinding type.
+  /// or a null type if the DeclContext does not have a corresponding type.
   clang::QualType getClangDeclContextType(const clang::DeclContext *dc);
 
   /// Determine whether this typedef is a CF type.
@@ -735,15 +743,17 @@ public:
 
   /// Determine the imported CF type for the given typedef-name, or the empty
   /// string if this is not an imported CF type name.
-  StringRef getCFTypeName(const clang::TypedefNameDecl *decl,
-                          StringRef *secondaryName = nullptr);
+  static StringRef getCFTypeName(const clang::TypedefNameDecl *decl,
+                                 StringRef *secondaryName = nullptr);
 
   /// Retrieve the type name of a Clang type for the purposes of
   /// omitting unneeded words.
-  OmissionTypeName getClangTypeNameForOmission(clang::QualType type);
+  static OmissionTypeName getClangTypeNameForOmission(clang::ASTContext &ctx,
+                                                      clang::QualType type);
 
   /// Omit needless words in a function name.
   bool omitNeedlessWordsInFunctionName(
+         clang::Sema &clangSema,
          StringRef &baseName,
          SmallVectorImpl<StringRef> &argumentNames,
          ArrayRef<const clang::ParmVarDecl *> params,
@@ -925,7 +935,7 @@ public:
   /// \returns The imported declaration, or null if this declaration could not
   /// be represented in Swift.
   Decl *importMirroredDecl(const clang::NamedDecl *decl, DeclContext *dc,
-                           ProtocolDecl *proto, bool forceClassMethod = false);
+                           ProtocolDecl *proto);
 
   /// \brief Import the given Clang declaration context into Swift.
   ///
@@ -1126,7 +1136,8 @@ public:
 
   /// Determine whether we can infer a default argument for a parameter with
   /// the given \c type and (Clang) optionality.
-  bool canInferDefaultArgument(clang::QualType type,
+  bool canInferDefaultArgument(clang::Preprocessor &pp,
+                               clang::QualType type,
                                OptionalTypeKind clangOptionality,
                                Identifier baseName,
                                unsigned numParams,
@@ -1214,7 +1225,7 @@ public:
     SmallVector<ProtocolConformance *, 4> result
       = std::move(conformances->second);
     DelayedConformances.erase(conformances);
-    return std::move(result);
+    return result;
   }
 
   /// Record the set of imported protocols for the given declaration,
@@ -1245,8 +1256,7 @@ public:
   }
 
   virtual void
-  loadAllMembers(Decl *D, uint64_t unused,
-                 bool *hasMissingRequiredMembers) override;
+  loadAllMembers(Decl *D, uint64_t unused) override;
 
   void
   loadAllConformances(
@@ -1281,6 +1291,30 @@ public:
                         clang::ASTReader &reader,
                         clang::serialization::ModuleFile &mod,
                         const llvm::BitstreamCursor &stream) override;
+
+  /// Find the lookup table that corresponds to the given Clang module.
+  ///
+  /// \param clangModule The module, or null to indicate that we're talking
+  /// about the directly-parsed headers.
+  SwiftLookupTable *findLookupTable(const clang::Module *clangModule);
+
+  /// Look for namespace-scope values with the given name in the given
+  /// Swift lookup table.
+  void lookupValue(SwiftLookupTable &table, DeclName name,
+                   VisibleDeclConsumer &consumer);
+
+  /// Look for namespace-scope values in the given Swift lookup table.
+  void lookupVisibleDecls(SwiftLookupTable &table,
+                          VisibleDeclConsumer &consumer);
+
+  /// Look for Objective-C members with the given name in the given
+  /// Swift lookup table.
+  void lookupObjCMembers(SwiftLookupTable &table, DeclName name,
+                         VisibleDeclConsumer &consumer);
+
+  /// Look for all Objective-C members in the given Swift lookup table.
+  void lookupAllObjCMembers(SwiftLookupTable &table,
+                            VisibleDeclConsumer &consumer);
 
   /// Dump the Swift-specific name lookup tables we generate.
   void dumpSwiftLookupTables();

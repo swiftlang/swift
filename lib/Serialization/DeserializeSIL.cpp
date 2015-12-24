@@ -335,7 +335,7 @@ SILFunction *SILDeserializer::getFuncForReference(StringRef name) {
 }
 
 /// Helper function to find a SILGlobalVariable given its name. It first checks
-/// in the module. If we can not find it in the module, we attempt to
+/// in the module. If we cannot find it in the module, we attempt to
 /// deserialize it.
 SILGlobalVariable *SILDeserializer::getGlobalForReference(StringRef name) {
   // Check to see if we have a global by this name already.
@@ -1192,8 +1192,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(StrongUnpin)
   UNARY_INSTRUCTION(StrongRetain)
   UNARY_INSTRUCTION(StrongRelease)
-  UNARY_INSTRUCTION(StrongRetainAutoreleased)
-  UNARY_INSTRUCTION(AutoreleaseReturn)
   UNARY_INSTRUCTION(StrongRetainUnowned)
   UNARY_INSTRUCTION(UnownedRetain)
   UNARY_INSTRUCTION(UnownedRelease)
@@ -2119,8 +2117,8 @@ void SILDeserializer::getAllWitnessTables() {
 
 SILWitnessTable *
 SILDeserializer::lookupWitnessTable(SILWitnessTable *existingWt) {
-  assert(existingWt && "Can not deserialize a null witness table declaration.");
-  assert(existingWt->isDeclaration() && "Can not deserialize a witness table "
+  assert(existingWt && "Cannot deserialize a null witness table declaration.");
+  assert(existingWt->isDeclaration() && "Cannot deserialize a witness table "
                                         "definition.");
 
   // If we don't have a witness table list, we can't look anything up.

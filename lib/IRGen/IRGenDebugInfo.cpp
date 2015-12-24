@@ -1,4 +1,4 @@
-//===--- IRGenDebugInfo.h - Debug Info Support-----------------------------===//
+//===--- IRGenDebugInfo.cpp - Debug Info Support---------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -961,24 +961,6 @@ getStorageSize(const llvm::DataLayout &DL, ArrayRef<llvm::Value *> Storage) {
   return Size(size);
 }
 
-/// LValues, inout args, and Archetypes are implicitly indirect by
-/// virtue of their DWARF type.
-static bool isImplicitlyIndirect(TypeBase *Ty) {
-  switch (Ty->getKind()) {
-  case TypeKind::Paren:
-    return isImplicitlyIndirect(
-        cast<ParenType>(Ty)->getUnderlyingType().getPointer());
-  case TypeKind::NameAlias:
-    return isImplicitlyIndirect(
-        cast<NameAliasType>(Ty)->getSinglyDesugaredType());
-  case TypeKind::InOut:
-  case TypeKind::Archetype:
-    return true;
-  default:
-    return false;
-  }
-}
-
 void IRGenDebugInfo::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo DbgTy,
     const SILDebugScope *DS, StringRef Name, unsigned ArgNo,
@@ -1018,9 +1000,6 @@ void IRGenDebugInfo::emitVariableDeclaration(
   if (Artificial || DITy->isArtificial() || DITy == InternalType)
     Flags |= llvm::DINode::FlagArtificial;
 
-  if (isImplicitlyIndirect(DbgTy.getType()))
-    Indirection = DirectValue;
-
   // Create the descriptor for the variable.
   llvm::DILocalVariable *Var = nullptr;
 
@@ -1059,7 +1038,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
       if (!Dim.SizeInBits || (StorageSize && Dim.SizeInBits > StorageSize))
         Dim.SizeInBits = StorageSize;
 
-      // FIXME: Occasionally we miss out that the Storage is acually a
+      // FIXME: Occasionally we miss out that the Storage is actually a
       // refcount wrapper. Silently skip these for now.
       if (OffsetInBits+Dim.SizeInBits > VarSizeInBits)
         break;
@@ -1112,7 +1091,7 @@ void IRGenDebugInfo::emitDbgIntrinsic(llvm::BasicBlock *BB,
 
   // A dbg.declare is only meaningful if there is a single alloca for
   // the variable that is live throughout the function. With SIL
-  // optimizations this is not guranteed and a variable can end up in
+  // optimizations this is not guaranteed and a variable can end up in
   // two allocas (for example, one function inlined twice).
   if (!Opts.Optimize &&
       (isa<llvm::AllocaInst>(Storage) ||
@@ -1826,7 +1805,7 @@ static bool canMangle(TypeBase *Ty) {
   switch (Ty->getKind()) {
   case TypeKind::PolymorphicFunction: // Mangler crashes.
   case TypeKind::GenericFunction:     // Not yet supported.
-  case TypeKind::SILBlockStorage:     // Not suported at all.
+  case TypeKind::SILBlockStorage:     // Not supported at all.
   case TypeKind::SILBox:
     return false;
   case TypeKind::InOut: {

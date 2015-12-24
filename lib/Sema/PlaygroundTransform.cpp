@@ -637,8 +637,7 @@ public:
               EI += 2;
             }
           }
-        }
-        else {
+        } else {
           if (E->getType()->getCanonicalType() !=
               Context.TheEmptyTupleType) {
             std::pair<PatternBindingDecl *, VarDecl *> PV =
@@ -897,8 +896,7 @@ public:
           dyn_cast<LValueType>(InitExpr->getType().getPointer())) {
       MaybeLoadInitExpr = new (Context) LoadExpr (InitExpr,
                                                   LVT->getObjectType());
-    }
-    else {
+    } else {
       MaybeLoadInitExpr = InitExpr;
     }
 

@@ -1,13 +1,9 @@
-// RUN: rm -rf %t && mkdir %t
-// RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend -sdk %S/Inputs -I %t %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // REQUIRES: CPU=x86_64
-// XFAIL: linux
 
 import Builtin
 import Swift
-import gizmo
 
 // CHECK: [[ROOTGENERIC:%C15generic_classes11RootGeneric]] = type <{ %swift.refcounted, %Vs5UInt8 }>
 
@@ -32,7 +28,7 @@ import gizmo
 // --       generic parameter count, primary count, witness table counts
 // CHECK:   i32 1, i32 1, i32 0
 // CHECK: }
-// CHECK: @_TMPC15generic_classes11RootGeneric = global { {{.*}}* } } {
+// CHECK: @_TMPC15generic_classes11RootGeneric = global
 // --       template fill function
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_RootGeneric
 // --       nominal type descriptor
@@ -47,9 +43,9 @@ import gizmo
 
 // -- Check that offset vars are emitted for fixed-layout generics
 //    <rdar://problem/15081049>
-// CHECK: @_TWvdvC15generic_classes22RootGenericFixedLayout1xVs5UInt8 = global i64 16, align 8
-// CHECK: @_TWvdvC15generic_classes22RootGenericFixedLayout1yGSax_ = global i64 24, align 8
-// CHECK: @_TWvdvC15generic_classes22RootGenericFixedLayout1zVs5UInt8 = global i64 32, align 8
+// CHECK: @_TWvdvC15generic_classes22RootGenericFixedLayout1xVs5UInt8 = constant i64 16, align 8
+// CHECK: @_TWvdvC15generic_classes22RootGenericFixedLayout1yGSax_ = constant i64 24, align 8
+// CHECK: @_TWvdvC15generic_classes22RootGenericFixedLayout1zVs5UInt8 = constant i64 32, align 8
 
 // -- fixed-layout nongeneric descriptor
 // CHECK: [[ROOTNONGENERIC_NAME:@.*]] = private unnamed_addr constant [35 x i8] c"C15generic_classes14RootNonGeneric\00"
@@ -75,18 +71,22 @@ import gizmo
 // CHECK: @_TMfC15generic_classes14RootNonGeneric = internal global { {{.*}} } {
 // CHECK:   void (%C15generic_classes14RootNonGeneric*)* @_TFC15generic_classes14RootNonGenericD,
 // CHECK:   i8** @_TWVBo,
-// CHECK:   i64 ptrtoint (%objc_class* @_TMmC15generic_classes14RootNonGeneric to i64),
-// CHECK:   %objc_class* @"OBJC_CLASS_$_SwiftObject",
-// CHECK:   %swift.opaque* @_objc_empty_cache,
+// CHECK-native: i64 0,
+// CHECK-native: %swift.type* null,
+// CHECK-native: %swift.opaque* null,
+// CHECK-objc:   i64 ptrtoint (%objc_class* @_TMmC15generic_classes14RootNonGeneric to i64),
+// CHECK-objc:   %objc_class* @"OBJC_CLASS_$_SwiftObject",
+// CHECK-objc:   %swift.opaque* @_objc_empty_cache,
 // CHECK:   %swift.opaque* null,
-// CHECK:   @_DATA__TtC15generic_classes14RootNonGeneric
+// CHECK-native: i64 1,
+// CHECK-objc:   @_DATA__TtC15generic_classes14RootNonGeneric
 // CHECK:   i32 33,
 // CHECK:   i16 7,
 // CHECK:   i16 0,
 // CHECK:   {{.*}}* @_TMnC15generic_classes14RootNonGeneric,
 // CHECK: }
 
-// CHECK: @_TMPC15generic_classes22GenericInheritsGeneric = global { {{.*}}* } } {
+// CHECK: @_TMPC15generic_classes22GenericInheritsGeneric = global
 // --       template fill function
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_GenericInheritsGeneric
 // --       RootGeneric vtable
@@ -314,7 +314,11 @@ entry(%c : $RootGeneric<Int32>):
 
 // CHECK: define private %swift.type* @create_generic_metadata_RootGeneric(%swift.type_pattern*, i8**) {{.*}} {
 // -- initialize the dependent field offsets
-// CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* {{%.*}}, %swift.type* null, i64 3, i64* {{%.*}}, i64* {{%.*}})
+// CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* {{%.*}}, i64 3, i64* {{%.*}}, i64* {{%.*}})
+// CHECK: }
+
+// CHECK: define private %swift.type* @create_generic_metadata_RootGenericFixedLayout(%swift.type_pattern*, i8**) {{.*}} {
+// CHECK:   call void @swift_initializeSuperclass(%swift.type* {{%.*}}, i1 false)
 // CHECK: }
 
 // CHECK: define private %swift.type* @create_generic_metadata_GenericInheritsGeneric(%swift.type_pattern*, i8**) {{.*}} {
@@ -338,58 +342,25 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   [[B_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY:%.*]], i32 19
 // CHECK:   store i8* [[T0]], i8** [[B_ADDR]], align 8
 //   Set up the isa.
-// CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
-// CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 0
-// CHECK:   [[T1:%.*]] = bitcast i8** [[T0]] to %objc_class**
-// CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 25
-// CHECK:   [[METACLASS:%.*]] = bitcast i8** [[T0]] to %objc_class*
-// CHECK:   store %objc_class* [[METACLASS]], %objc_class** [[T1]], align 8
+// CHECK-objc:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
+// CHECK-objc:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 0
+// CHECK-objc:   [[T1:%.*]] = bitcast i8** [[T0]] to %objc_class**
+// CHECK-objc:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 25
+// CHECK-objc:   [[METACLASS:%.*]] = bitcast i8** [[T0]] to %objc_class*
+// CHECK-objc:   store %objc_class* [[METACLASS]], %objc_class** [[T1]], align 8
 //   Set up the instance rodata pointer.
-// CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 4
-// CHECK:   [[T1:%.*]] = bitcast i8** [[T0]] to i64*
-// CHECK:   [[RODATA:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 30
-// CHECK:   [[T2:%.*]] = ptrtoint i8** [[RODATA]] to i64
-// CHECK:   [[T3:%.*]] = or i64 [[T2]], 1
-// CHECK:   store i64 [[T3]], i64* [[T1]], align 8
+// CHECK-objc:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 4
+// CHECK-objc:   [[T1:%.*]] = bitcast i8** [[T0]] to i64*
+// CHECK-objc:   [[RODATA:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 30
+// CHECK-objc:   [[T2:%.*]] = ptrtoint i8** [[RODATA]] to i64
+// CHECK-objc:   [[T3:%.*]] = or i64 [[T2]], 1
+// CHECK-objc:   store i64 [[T3]], i64* [[T1]], align 8
 //   Set up the class rodata pointer.
-// CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 29
-// CHECK:   [[T1:%.*]] = bitcast i8** [[T0]] to i64*
-// CHECK:   [[META_RODATA:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 39
-// CHECK:   [[T2:%.*]] = ptrtoint i8** [[META_RODATA]] to i64
-// CHECK:   store i64 [[T2]], i64* [[T1]], align 8
-//   Set up the rodatas.
-// CHECK:   [[T0:%.*]] = call i8* @swift_getGenericClassObjCName(
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[RODATA]], i32 3
-// CHECK:   store i8* [[T0]], i8** [[T1]], align 8
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[META_RODATA]], i32 3
-// CHECK:   store i8* [[T0]], i8** [[T1]], align 8
-//   Load out the superclass.
-// CHECK:   [[T0:%.*]] = bitcast %swift.type* [[METADATA]] to %swift.type**
-// CHECK:   [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i32 1
-// CHECK:   [[SUPER:%.*]] = load %swift.type*, %swift.type** [[T1]], align 8
-//   Set up the metaclass's superclass from the superclass's metaclass.
-// CHECK:   [[T0:%.*]] = bitcast %swift.type* [[SUPER]] to i64*
-// CHECK:   [[T1:%.*]] = load i64, i64* [[T0]], align 8
-// CHECK:   [[T2:%.*]] = load i64, i64* @swift_isaMask, align 8
-// CHECK:   [[T3:%.*]] = and i64 [[T1]], [[T2]]
-// CHECK:   [[SUPER_METACLASS:%.*]] = inttoptr i64 [[T3]] to %swift.type*
-// CHECK:   [[T0:%.*]] = bitcast %objc_class* [[METACLASS]] to %swift.type**
-// CHECK:   [[META_SUPERCLASS_ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i32 1
-// CHECK:   store %swift.type* [[SUPER_METACLASS]], %swift.type** [[META_SUPERCLASS_ADDR]]
-//   Copy various stuff from the superclass:
-// CHECK:   [[SUPER_ARRAY:%.*]] = bitcast %swift.type* [[SUPER]] to i64*
-// CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i64*
-//    - the superclass's generic args
-// CHECK:   [[SUPER_T_ADDR:%.*]] = getelementptr inbounds i64, i64* [[SUPER_ARRAY]], i32 10
-// CHECK:   [[SELF_T_ADDR:%.*]] = getelementptr inbounds i64, i64* [[METADATA_ARRAY]], i32 10
-// CHECK:   [[T:%.*]] = load i64, i64* [[SUPER_T_ADDR]], align 8
-// CHECK:   store i64 [[T]], i64* [[SELF_T_ADDR]], align 8
-//    - the super field offsets
-// CHECK:   [[SUPER_BASE_VEC:%.*]] = getelementptr inbounds i64, i64* [[SUPER_ARRAY]], i32 15
-// CHECK:   [[SELF_BASE_VEC:%.*]] = getelementptr inbounds i64, i64* [[METADATA_ARRAY]], i32 15
-// CHECK:   [[SELF_BASE_VEC_I8:%.*]] = bitcast i64* [[SELF_BASE_VEC]] to i8*
-// CHECK:   [[SUPER_BASE_VEC_I8:%.*]] = bitcast i64* [[SUPER_BASE_VEC]] to i8*
-// CHECK:   call void @llvm.memcpy.p0i8.p0i8.i64(i8* [[SELF_BASE_VEC_I8]], i8* [[SUPER_BASE_VEC_I8]], i64 24, i32 8, i1 false)
+// CHECK-objc:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 29
+// CHECK-objc:   [[T1:%.*]] = bitcast i8** [[T0]] to i64*
+// CHECK-objc:   [[META_RODATA:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 39
+// CHECK-objc:   [[T2:%.*]] = ptrtoint i8** [[META_RODATA]] to i64
+// CHECK-objc:   store i64 [[T2]], i64* [[T1]], align 8
 //   Initialize our own dependent field offsets.
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i64*
 // CHECK:   [[OFFSETS:%.*]] = getelementptr inbounds i64, i64* [[METADATA_ARRAY]], i32 23
@@ -407,6 +378,6 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   store i64 [[SIZE]], i64* [[SIZE_ADDR]], align 8
 // CHECK:   [[ALIGN_ADDR:%.*]] = getelementptr inbounds [2 x i64], [2 x i64]* [[TYPES]], i32 0, i32 1
 // CHECK:   store i64 [[ALIGN]], i64* [[ALIGN_ADDR]], align 8
-// CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], %swift.type* [[SUPER]], i64 1, i64* [[SIZE_ADDR]], i64* [[OFFSETS]])
+// CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], i64 1, i64* [[SIZE_ADDR]], i64* [[OFFSETS]])
 // CHECK:   ret %swift.type* [[METADATA]]
 // CHECK: }

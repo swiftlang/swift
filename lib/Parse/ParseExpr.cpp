@@ -22,6 +22,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/Basic/StringExtras.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -37,7 +38,7 @@ static Expr *createArgWithTrailingClosure(ASTContext &context,
                                           SourceLoc rightParen,
                                           Expr *closure) {
   // If there are no elements, just build a parenthesized expression around
-  // the cosure.
+  // the closure.
   if (elementsIn.empty()) {
     return new (context) ParenExpr(leftParen, closure, rightParen,
                                    /*hasTrailingClosure=*/true);
@@ -291,6 +292,10 @@ parse_operator:
           CodeCompletion->completeAssignmentRHS(assign);
         }
         consumeToken();
+        if (SequencedExprs.size() > 0 && (SequencedExprs.size() & 1) == 0) {
+          // Make sure we have odd number of sequence exprs.
+          SequencedExprs.pop_back();
+        }
         auto Result = SequencedExprs.size() == 1 ?
           makeParserResult(SequencedExprs[0]):
           makeParserResult(SequenceExpr::create(Context, SequencedExprs));
@@ -432,7 +437,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
 
   case tok::oper_postfix:
     // Postfix operators cannot start a subexpression, but can happen
-    // syntactically because the operator may just follow whatever preceeds this
+    // syntactically because the operator may just follow whatever precedes this
     // expression (and that may not always be an expression).
     diagnose(Tok, diag::invalid_postfix_operator);
     Tok.setKind(tok::oper_prefix);
@@ -626,14 +631,14 @@ static StringRef copyAndStripUnderscores(ASTContext &C, StringRef orig) {
 /// the start of a trailing closure, or start the variable accessor block.
 ///
 /// Check to see if the '{' is followed by a 'didSet' or a 'willSet' label,
-/// possibly preceeded by attributes.  If so, we disambiguate the parse as the
+/// possibly preceded by attributes.  If so, we disambiguate the parse as the
 /// start of a get-set block in a variable definition (not as a trailing
 /// closure).
 static bool isStartOfGetSetAccessor(Parser &P) {
   assert(P.Tok.is(tok::l_brace) && "not checking a brace?");
   
   // The only case this can happen is if the accessor label is immediately after
-  // a brace (possibly preceeded by attributes).  "get" is implicit, so it can't
+  // a brace (possibly preceded by attributes).  "get" is implicit, so it can't
   // be checked for.  Conveniently however, get/set properties are not allowed
   // to have initializers, so we don't have an ambiguity, we just have to check
   // for observing accessors.
@@ -645,7 +650,7 @@ static bool isStartOfGetSetAccessor(Parser &P) {
       NextToken.isContextualKeyword("willSet"))
     return true;
 
-  // If we don't have attributes, then it can not be an accessor block.
+  // If we don't have attributes, then it cannot be an accessor block.
   if (NextToken.isNot(tok::at_sign))
     return false;
 
@@ -2005,13 +2010,21 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
     Identifier FieldName;
     SourceLoc FieldNameLoc;
 
-    // Check to see if there is a field specifier
-    if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
-      FieldNameLoc = Tok.getLoc();
-      if (parseIdentifier(FieldName,
-                          diag::expected_field_spec_name_tuple_expr)) {
-        return makeParserError();
+    // Check to see if there is an argument label.
+    if (Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) {
+      // If this was an escaped identifier that need not have been escaped,
+      // say so.
+      if (Tok.isEscapedIdentifier() && canBeArgumentLabel(Tok.getText())) {
+        SourceLoc start = Tok.getLoc();
+        SourceLoc end = start.getAdvancedLoc(Tok.getLength());
+        diagnose(Tok, diag::escaped_parameter_name, Tok.getText())
+          .fixItRemoveChars(start, start.getAdvancedLoc(1))
+          .fixItRemoveChars(end.getAdvancedLoc(-1), end);
       }
+
+      if (!Tok.is(tok::kw__))
+        FieldName = Context.getIdentifier(Tok.getText());
+      FieldNameLoc = consumeToken();
       consumeToken(tok::colon);
     }
 

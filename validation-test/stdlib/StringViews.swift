@@ -15,6 +15,14 @@
 import Swift
 import StdlibUnittest
 
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 // CHECK: testing...
 print("testing...")
 
@@ -536,7 +544,7 @@ tests.test("index-mapping/utf8-to-character") {
   expectEqualSequence(
     winterUtf8Characters,
     winter.utf8.indices.map {
-      (i:String.UTF8Index)->Character? in i.samePositionIn(winter).map {
+      (i:String.UTF8Index) -> Character? in i.samePositionIn(winter).map {
         winter[$0]
       }
     }, sameValue: ==)

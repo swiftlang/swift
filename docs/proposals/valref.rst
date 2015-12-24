@@ -178,8 +178,8 @@ Array elements can be explicitly declared ``val`` or ``ref``::
 When a reference to an array appears without a variable name, it can
 be written using the `usual syntax`__::
 
-  var f : ()->ref Int[42] // a closure returning a reference to an array
-  var b : ref Int[42]     // equivalent to to "ref b : Int[42]"
+  var f : () -> ref Int[42] // a closure returning a reference to an array
+  var b : ref Int[42]       // equivalent to "ref b : Int[42]"
 
 __ `standalone types`_
 
@@ -191,8 +191,8 @@ brackets, that most users will never touch, e.g.::
   var z : Array<ref Int,42>           // an array of 42 integers-on-the-heap
   var z : Array<ref Array<Int,42>, 2> // an array of 2 references to arrays
   ref a : Array<Int,42>               // a reference to an array of 42 integers
-  var f : ()->ref Array<Int,42>       // a closure returning a reference to an array
-  var b : ref Array<Int,42>           // equivalent to to "ref b : Int[42]"
+  var f : () -> ref Array<Int,42>     // a closure returning a reference to an array
+  var b : ref Array<Int,42>           // equivalent to "ref b : Int[42]"
 
 Rules for copying array elements follow those of instance variables.
 
@@ -365,7 +365,7 @@ Objective-C Interoperability
 Clonable Objective-C classes
 -----------------------------
 
-In Cocoa, a notion similar to clonability is captured in the ``NSCopying`` and
+In Cocoa, a notion similar to cloneability is captured in the ``NSCopying`` and
 ``NSMutableCopying`` protocols, and a notion similar to ``val`` instance
 variables is captured by the behavior of ``(copy)`` properties. However, there
 are some behavioral and semantic differences that need to be taken into account.

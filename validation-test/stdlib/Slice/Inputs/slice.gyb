@@ -3,7 +3,7 @@
 
 % Base = "%s%s%sCollection" % (base_kind, traversal, 'Mutable' if mutable else '')
 
-if true {
+do {
   let prefix: [Int] = ${prefix}
   let suffix: [Int] = ${suffix}
 

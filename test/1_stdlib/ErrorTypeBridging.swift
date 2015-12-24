@@ -22,8 +22,8 @@ protocol OtherClassProtocol : class {
 }
 
 class NoisyError : ErrorType, OtherProtocol, OtherClassProtocol {
-  init() { NoisyErrorLifeCount += 1}
-  deinit { NoisyErrorDeathCount += 1}
+  init() { NoisyErrorLifeCount += 1 }
+  deinit { NoisyErrorDeathCount += 1 }
 
   let _domain = "NoisyError"
   let _code = 123
@@ -68,7 +68,7 @@ ErrorTypeBridgingTests.test("NSError-to-enum bridging") {
 
     objc_setAssociatedObject(ns, &CanaryHandle, NoisyError(),
                              .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
-  
+
     let e: ErrorType = ns
 
     let cocoaCode: Int?
@@ -157,7 +157,7 @@ ErrorTypeBridgingTests.test("NSError-to-enum bridging") {
 
     expectTrue(isMemoryFailure)
   }
-  
+
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
 

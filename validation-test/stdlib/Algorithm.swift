@@ -5,6 +5,13 @@
 import StdlibUnittest
 import SwiftPrivate
 
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
 var Algorithm = TestSuite("Algorithm")
 
 // FIXME(prext): remove this conformance.
@@ -18,14 +25,58 @@ public func == (
 
 // FIXME(prext): move this struct to the point of use.
 Algorithm.test("min,max") {
-  expectEqual(2, min(3, 2))
-  expectEqual(3, min(3, 7, 5))
-  expectEqual(3, max(3, 2))
-  expectEqual(7, max(3, 7, 5))
+  // Identities are unique in this set.
+  let a1 = MinimalComparableValue(0, identity: 1)
+  let a2 = MinimalComparableValue(0, identity: 2)
+  let a3 = MinimalComparableValue(0, identity: 3)
+  let b1 = MinimalComparableValue(1, identity: 4)
+  let b2 = MinimalComparableValue(1, identity: 5)
+  let b3 = MinimalComparableValue(1, identity: 6)
+  let c1 = MinimalComparableValue(2, identity: 7)
+  let c2 = MinimalComparableValue(2, identity: 8)
+  let c3 = MinimalComparableValue(2, identity: 9)
 
-  // FIXME: add tests that check that min/max return the
-  // first element of the sequence (by reference equailty) that satisfy the
-  // condition.
+  // 2-arg min()
+  expectEqual(a1.identity, min(a1, b1).identity)
+  expectEqual(a1.identity, min(b1, a1).identity)
+  expectEqual(a1.identity, min(a1, a2).identity)
+
+  // 2-arg max()
+  expectEqual(c1.identity, max(c1, b1).identity)
+  expectEqual(c1.identity, max(b1, c1).identity)
+  expectEqual(c1.identity, max(c2, c1).identity)
+
+  // 3-arg min()
+  expectEqual(a1.identity, min(a1, b1, c1).identity)
+  expectEqual(a1.identity, min(b1, a1, c1).identity)
+  expectEqual(a1.identity, min(c1, b1, a1).identity)
+  expectEqual(a1.identity, min(c1, a1, b1).identity)
+  expectEqual(a1.identity, min(a1, a2, a3).identity)
+  expectEqual(a1.identity, min(a1, a2, b1).identity)
+  expectEqual(a1.identity, min(a1, b1, a2).identity)
+  expectEqual(a1.identity, min(b1, a1, a2).identity)
+ 
+  // 3-arg max()
+  expectEqual(c1.identity, max(c1, b1, a1).identity)
+  expectEqual(c1.identity, max(a1, c1, b1).identity)
+  expectEqual(c1.identity, max(b1, a1, c1).identity)
+  expectEqual(c1.identity, max(b1, c1, a1).identity)
+  expectEqual(c1.identity, max(c3, c2, c1).identity)
+  expectEqual(c1.identity, max(c2, c1, b1).identity)
+  expectEqual(c1.identity, max(c2, b1, c1).identity)
+  expectEqual(c1.identity, max(b1, c2, c1).identity)
+  
+  // 4-arg min()
+  expectEqual(a1.identity, min(a1, b1, a2, b2).identity)
+  expectEqual(a1.identity, min(b1, a1, a2, b2).identity)
+  expectEqual(a1.identity, min(c1, b1, b2, a1).identity)
+  expectEqual(a1.identity, min(c1, b1, a1, a2).identity)
+  
+  // 4-arg max()
+  expectEqual(c1.identity, max(c2, b1, c1, b2).identity)
+  expectEqual(c1.identity, max(b1, c2, c1, b2).identity)
+  expectEqual(c1.identity, max(a1, b1, b2, c1).identity)
+  expectEqual(c1.identity, max(a1, b1, c2, c1).identity)
 }
 
 Algorithm.test("sorted/strings")

@@ -120,23 +120,23 @@ SomeGeneric<Int>
 
 func for_loop() {
   var x = 0
-  for ;; { }
-  for x = 1; x != 42; ++x { }
-  for infloopbooltest(); x != 12; infloopbooltest() {}
+  for ;; { } // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
+  for x = 1; x != 42; x += 1 { } // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
+  for infloopbooltest(); x != 12; infloopbooltest() {} // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   
   for ; { } // expected-error {{expected ';' in 'for' statement}}
   
-  for var y = 1; y != 42; ++y {}
-  for (var y = 1; y != 42; ++y) {}
+  for var y = 1; y != 42; y += 1 {} // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
+  for (var y = 1; y != 42; y += 1) {} // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   var z = 10
-  for (; z != 0; --z) {}
-  for (z = 10; z != 0; --z) {}
-  for var (a,b) = (0,12); a != b; --b {++a}
-  for (var (a,b) = (0,12); a != b; --b) {++a}
+  for (; z != 0; z -= 1) {} // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
+  for (z = 10; z != 0; z -= 1) {} // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
+  for var (a,b) = (0,12); a != b; b -= 1 {a += 1} // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
+  for (var (a,b) = (0,12); a != b; b -= 1) {a += 1} // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   var j, k : Int
-  for ((j,k) = (0,10); j != k; --k) {}
-  for var i = 0, j = 0; i * j < 10; i++, j++ {}
-  for j = 0, k = 52; j < k; ++j, --k { }
+  for ((j,k) = (0,10); j != k; k -= 1) {} // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
+  for var i = 0, j = 0; i * j < 10; i += 1, j += 1 {} // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
+  for j = 0, k = 52; j < k; j += 1, k -= 1 { } // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   // rdar://19540536
   // expected-error@+4{{expected var declaration in a 'for' statement}}
   // expected-error@+3{{expression resolves to an unused function}}
@@ -145,7 +145,7 @@ func for_loop() {
   for @ {}
 
   // <rdar://problem/17462274> Is increment in for loop optional?
-  for (let i = 0; i < 10; ) {}
+  for (let i = 0; i < 10; ) {} // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
 }
 
 break // expected-error {{'break' is only allowed inside a loop, if, do, or switch}}
@@ -187,7 +187,7 @@ func tuple_assign() {
 func missing_semicolons() {
   var w = 321
   func g() {}
-  g() ++w             // expected-error{{consecutive statements}} {{6-6=;}}
+  g() w += 1             // expected-error{{consecutive statements}} {{6-6=;}}
   var z = w"hello"    // expected-error{{consecutive statements}} {{12-12=;}}
   class  C {}class  C2 {} // expected-error{{consecutive statements}} {{14-14=;}}
   struct S {}struct S2 {} // expected-error{{consecutive statements}} {{14-14=;}}
@@ -305,7 +305,7 @@ Loop:  // expected-note {{previously declared here}}
   }
 
 
-  // <rdar://problem/16798323> Following a 'break' statment by another statement on a new line result in an error/fit-it
+  // <rdar://problem/16798323> Following a 'break' statement by another statement on a new line result in an error/fit-it
   switch 5 {
   case 5:
     markUsed("before the break")
@@ -403,7 +403,7 @@ func test_is_as_patterns() {
 func matching_pattern_recursion() {
   switch 42 {
   case {  // expected-error {{expression pattern of type '() -> ()' cannot match values of type 'Int'}}
-      for i in zs {  // expected-error {{use of unresolved identifier 'zs'}}
+      for i in zs {
       }
   }: break
   }
@@ -426,16 +426,27 @@ func testThrowNil() throws {
 // <rdar://problem/16650625>
 func for_ignored_lvalue_init() {
   var i = 0
-  for i;  // expected-error {{expression resolves to an unused l-value}}
-    i < 10; ++i {}
+  for i;  // expected-error {{expression resolves to an unused l-value}} expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
+    i < 10; i += 1 {}
 }
 
 // rdar://problem/18643692
 func for_loop_multi_iter() {
-  for (var i = 0, x = 0; i < 10; i++,
+  for (var i = 0, x = 0; i < 10; i += 1, // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
        x) { // expected-error {{expression resolves to an unused l-value}}
-    --x
+    x -= 1
   }
 }
 
+// rdar://problem/23684220
+// Even if the condition fails to typecheck, save it in the AST anyway; the old
+// condition may have contained a SequenceExpr.
+func r23684220(b: Any) {
+  if let _ = b ?? b {} // expected-error {{initializer for conditional binding must have Optional type, not 'Any' (aka 'protocol<>')}}
+}
 
+// Errors in case syntax
+class
+case, // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{expected pattern}}
+case  // expected-error {{expected identifier after comma in enum 'case' declaration}} expected-error {{expected identifier in enum 'case' declaration}} expected-error {{enum 'case' is not allowed outside of an enum}} expected-error {{expected pattern}}
+// NOTE: EOF is important here to properly test a code path that used to crash the parser

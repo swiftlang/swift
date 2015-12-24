@@ -19,7 +19,7 @@
 //    contiguous sequence of `Element`s.
 //
 //  - `Array<Element>` is like `ContiguousArray<Element>` when `Element` is not
-//    an reference type or an Objective-C existential.  Otherwise, it may use
+//    a reference type or an Objective-C existential.  Otherwise, it may use
 //    an `NSArray` bridged from Cocoa for storage.
 //
 //===----------------------------------------------------------------------===//
@@ -122,7 +122,7 @@ if True:
 /// property, these array types have a `capacity` that reflects their
 /// potential to store elements without reallocation, and when you
 /// know how many elements you'll store, you can call
-/// `reserveCapacity` to pre-emptively reallocate and prevent
+/// `reserveCapacity` to preemptively reallocate and prevent
 /// intermediate reallocations.
 ///
 /// Objective-C Bridge
@@ -210,7 +210,6 @@ public struct ${Self}<Element>
   /// Access the `index`th element. Reading is O(1).  Writing is
   /// ${O1}.
   public subscript(index: Int) -> Element {
-%if Self == 'Array':
     get {
       // This call may be hoisted or eliminated by the optimizer.  If
       // there is an inout violation, this value may be stale so needs to be 
@@ -226,21 +225,6 @@ public struct ${Self}<Element>
         index, wasNativeTypeChecked: wasNativeTypeChecked,
         matchingSubscriptCheck: token)
     }
-%elif Self == 'ContiguousArray':
-    addressWithNativeOwner {
-      _checkSubscript_native(index)
-      return (
-        UnsafePointer(_buffer.subscriptBaseAddress + index),
-        Builtin.castToNativeObject(_buffer.owner))
-    }
-%else:
-    addressWithOwner {
-      _checkSubscript_native(index)
-      return (
-        UnsafePointer(_buffer.subscriptBaseAddress + index),
-        Builtin.castToUnknownObject(_buffer.owner))
-    }
-%end
     mutableAddressWithPinnedNativeOwner {
       _makeMutableAndUniqueOrPinned() // makes the array native, too
       _checkSubscript_native(index)   
@@ -251,14 +235,22 @@ public struct ${Self}<Element>
   /// Access the `index`th element. Reading is O(1).  Writing is
   /// ${O1}.
   public subscript(index: Int) -> Element {
-    
-    addressWithNativeOwner {
-      _checkSubscript_native(index)
-      return (
-        UnsafePointer(_buffer.subscriptBaseAddress + index),
-        Builtin.castToNativeObject(_buffer.owner))
+    get {
+      // This call may be hoisted or eliminated by the optimizer.  If
+      // there is an inout violation, this value may be stale so needs to be
+      // checked again below.
+      let wasNativeTypeChecked = _hoistableIsNativeTypeChecked()
+
+      // Make sure the index is in range and wasNativeTypeChecked is
+      // still valid.
+      let token = _checkSubscript(
+        index, wasNativeTypeChecked: wasNativeTypeChecked)
+
+      return _getElement(
+        index, wasNativeTypeChecked: wasNativeTypeChecked,
+        matchingSubscriptCheck: token)
     }
-    
+
     mutableAddressWithPinnedNativeOwner {
       _makeMutableAndUniqueOrPinned()
       _checkSubscript_native(index)
@@ -373,7 +365,6 @@ public struct ${Self}<Element>
 % end
   }
 
-% if Self == 'Array':
   /// Check that the given `index` is valid for subscripting, i.e. `0
   /// ≤ index < count`.
   @_semantics("array.check_subscript")
@@ -382,14 +373,17 @@ public struct ${Self}<Element>
     index: Int, wasNativeTypeChecked: Bool
   ) -> _DependenceToken {
 #if _runtime(_ObjC)
+% if Self == 'Array':
     _buffer._checkInoutAndNativeTypeCheckedBounds(
       index, wasNativeTypeChecked: wasNativeTypeChecked)
+% else:
+    _buffer._checkValidSubscript(index)
+% end
 #else
     _buffer._checkValidSubscript(index)
 #endif
     return _DependenceToken()
   }
-% end
 
   /// Check that the given `index` is valid, i.e. `0 ≤ index ≤ count`.
   @_semantics("array.check_index")
@@ -471,7 +465,7 @@ public func _allocateUninitializedArray<Element>(_count: Builtin.Word)
     -> (Array<Element>, Builtin.RawPointer) {
   let count = Int(_count)
   if count > 0 {
-    // Doing the actual buffer alloction outside of the array.uninitialized
+    // Doing the actual buffer allocation outside of the array.uninitialized
     // semantics function enables stack propagation of the buffer.
     let bufferObject = ManagedBufferPointer<_ArrayBody, Element>(
       _uncheckedBufferClass: _ContiguousArrayStorage<Element>.self,
@@ -519,7 +513,8 @@ extension ${Self} : _ArrayType {
     var p: UnsafeMutablePointer<Element>
     (self, p) = ${Self}._allocateUninitialized(count)
     for _ in 0..<count {
-      p++.initialize(repeatedValue)
+      p.initialize(repeatedValue)
+      p += 1
     }
   }
 
@@ -538,7 +533,7 @@ extension ${Self} : _ArrayType {
     _buffer = _Buffer()
     if count > 0 {
       // Creating a buffer instead of calling reserveCapacity saves doing an
-      // unneccessary uniqueness check. We disable inlining here to curb code
+      // unnecessary uniqueness check. We disable inlining here to curb code
       // growth.
       _buffer = ${Self}._allocateBufferUninitialized(count)
     }
@@ -914,7 +909,9 @@ internal struct _InitializeMemoryFromCollection<
     var p = rawMemory
     var q = newValues.startIndex
     for _ in 0..<count {
-      p++.initialize(newValues[q++])
+      p.initialize(newValues[q])
+      q = q.successor()
+      p += 1
     }
     _expectEnd(q, newValues)
   }
@@ -1244,7 +1241,8 @@ internal func _arrayAppendSequence<
     let base = buffer.firstElementAddress
 
     while (nextItem != nil) && count < capacity {
-      (base + count++).initialize(nextItem!)
+      (base + count).initialize(nextItem!)
+      count += 1
       nextItem = stream.next()
     }
     buffer.count = count

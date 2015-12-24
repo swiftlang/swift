@@ -176,7 +176,7 @@ Advice: Use value types in Array
 
 In Swift, types can be divided into two different categories: value types
 (structs, enums, tuples) and reference types (classes). A key distinction is
-that value types can not be included inside an NSArray. Thus when using value
+that value types cannot be included inside an NSArray. Thus when using value
 types, the optimizer can remove most of the overhead in Array that is necessary
 to handle the possibility of the array being backed an NSArray.
 
@@ -265,7 +265,7 @@ Swift eliminates integer overflow bugs by checking for overflow when performing
 normal arithmetic. These checks are not appropriate in high performance code
 where one knows that no memory safety issues can result.
 
-Advice: Use unchecked integer arithmetic when you can prove that overflow can not occur
+Advice: Use unchecked integer arithmetic when you can prove that overflow cannot occur
 ---------------------------------------------------------------------------------------
 
 In performance-critical code you can elide overflow checks if you know it is
@@ -446,7 +446,7 @@ argument drops from being O(n), depending on the size of the tree to O(1).
 
 ::
 
-  struct tree : P {
+  struct Tree : P {
     var node : [P?]
     init() {
       node = [ thing ]

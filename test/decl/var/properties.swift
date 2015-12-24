@@ -110,7 +110,7 @@ var implicitGet3: Int {
 
 // Here we used apply weak to the getter itself, not to the variable.
 var x15: Int {
-  // For the purpose of this test we need to use an attribute that can not be
+  // For the purpose of this test we need to use an attribute that cannot be
   // applied to the getter.
   weak
   var foo: SomeClass? = SomeClass()  // expected-warning {{variable 'foo' was written to, but never read}}

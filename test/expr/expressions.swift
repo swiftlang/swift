@@ -448,13 +448,11 @@ func testSingleQuoteStringLiterals() {
   'abc" // expected-error{{unterminated string literal}}
   "a'c"
 
-  // FIXME: <rdar://problem/22709931> QoI: Single-quote => double-quote string literal fixit should escape quote chars
-  // FIXME: The suggested replacement should un-escape the single quote
-  // character.
-  'ab\'c' // expected-error{{single-quoted string literal found, use '"'}}{{3-10="ab\\'c"}}
+  'ab\'c' // expected-error{{single-quoted string literal found, use '"'}}{{3-10="ab'c"}}
 
-  // FIXME: The suggested replacement should escape the double-quote character.
-  'ab"c' // expected-error{{single-quoted string literal found, use '"'}}{{3-9="ab"c"}}
+  'ab"c' // expected-error{{single-quoted string literal found, use '"'}}{{3-9="ab\\"c"}}
+  'ab\"c' // expected-error{{single-quoted string literal found, use '"'}}{{3-10="ab\\"c"}}
+  'ab\\"c' // expected-error{{single-quoted string literal found, use '"'}}{{3-11="ab\\\\\\"c"}}
 }
 
 // <rdar://problem/17128913>
@@ -553,17 +551,17 @@ _ = C(other: 3) // expected-error {{cannot convert value of type 'Int' to expect
 
 func unaryOps(inout i8: Int8, inout i64: Int64) {
   i8 = ~i8
-  ++i64
-  --i8
+  i64 += 1
+  i8 -= 1
 
-  ++Int64(5) // expected-error{{cannot pass immutable value to mutating operator: function call returns immutable value}}
+  Int64(5) += 1 // expected-error{{left side of mutating operator isn't mutable: function call returns immutable value}}
   
   // <rdar://problem/17691565> attempt to modify a 'let' variable with ++ results in typecheck error not being able to apply ++ to Float
   let a = i8 // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
-  ++a // expected-error {{cannot pass immutable value to mutating operator: 'a' is a 'let' constant}}
+  a += 1 // expected-error {{left side of mutating operator isn't mutable: 'a' is a 'let' constant}}
   
   var b : Int { get { }}
-  ++b  // expected-error {{cannot pass immutable value to mutating operator: 'b' is a get-only property}}
+  b += 1  // expected-error {{left side of mutating operator isn't mutable: 'b' is a get-only property}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -599,7 +597,7 @@ func +-+= (inout x: Int, y: Int) -> Int { return 0}
 
 func lvalue_processing() {
   var i = 0
-  ++i   // obviously ok
+  i += 1   // obviously ok
 
   var fn = (+-+=)
 
@@ -798,3 +796,35 @@ protocol P { var y: String? { get } }
 func r23185177(x: P?) -> [String] {
   return x?.y // expected-error{{cannot convert return expression of type 'String?' to return type '[String]'}}
 }
+
+// <rdar://problem/22913570> Miscompile: wrong argument parsing when calling a function in swift2.0
+func r22913570() {
+  func f(from: Int = 0, to: Int) {}
+  f(1 + 1) // expected-error{{missing argument for parameter 'to' in call}}
+}
+
+
+// <rdar://problem/23708702> Emit deprecation warnings for ++/-- in Swift 2.2
+func swift22_deprecation_increment_decrement() {
+  var i = 0
+  var f = 1.0
+  var si = "foo".startIndex
+
+  i++     // expected-warning {{'++' is deprecated: it will be removed in Swift 3}} {{4-6= += 1}}
+  --i     // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{3-5=}} {{6-6= -= 1}}
+  _ = i++ // expected-warning {{'++' is deprecated: it will be removed in Swift 3}}
+
+  ++f     // expected-warning {{'++' is deprecated: it will be removed in Swift 3}} {{3-5=}} {{6-6= += 1}}
+  f--     // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{4-6= -= 1}}
+  _ = f-- // expected-warning {{'--' is deprecated: it will be removed in Swift 3}}
+
+
+  ++si      // expected-warning {{'++' is deprecated: it will be removed in Swift 3}} {{3-5=}} {{7-7= = si.successor()}}
+  --si      // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{3-5=}} {{7-7= = si.predecessor()}}
+  si++      // expected-warning {{'++' is deprecated: it will be removed in Swift 3}} {{5-7= = si.successor()}}
+  si--      // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{5-7= = si.predecessor()}}
+  _ = --si  // expected-warning {{'--' is deprecated: it will be removed in Swift 3}}
+}
+
+
+

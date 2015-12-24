@@ -15,7 +15,7 @@ import SwiftShims
 /// Returns 1 if the running OS version is greater than or equal to
 /// major.minor.patchVersion and 0 otherwise.
 ///
-/// This is a magic entrypoint known to the compiler. It is called in
+/// This is a magic entry point known to the compiler. It is called in
 /// generated code for API availability checking.
 @warn_unused_result
 @_semantics("availability.osversion")
@@ -47,41 +47,41 @@ extension _SwiftNSOperatingSystemVersion : Comparable { }
 
 @warn_unused_result
 public func == (
-  left: _SwiftNSOperatingSystemVersion,
-  right: _SwiftNSOperatingSystemVersion
+  lhs: _SwiftNSOperatingSystemVersion,
+  rhs: _SwiftNSOperatingSystemVersion
 ) -> Bool {
-  return left.majorVersion == right.majorVersion &&
-         left.minorVersion == right.minorVersion &&
-         left.patchVersion == right.patchVersion
+  return lhs.majorVersion == rhs.majorVersion &&
+         lhs.minorVersion == rhs.minorVersion &&
+         lhs.patchVersion == rhs.patchVersion
 }
 
 /// Lexicographic comparison of version components.
 @warn_unused_result
 public func < (
-  _lhs: _SwiftNSOperatingSystemVersion,
-  _rhs: _SwiftNSOperatingSystemVersion
+  lhs: _SwiftNSOperatingSystemVersion,
+  rhs: _SwiftNSOperatingSystemVersion
 ) -> Bool {
-  if _lhs.majorVersion > _rhs.majorVersion {
+  if lhs.majorVersion > rhs.majorVersion {
     return false
   }
 
-  if _lhs.majorVersion < _rhs.majorVersion {
+  if lhs.majorVersion < rhs.majorVersion {
     return true
   }
 
-  if _lhs.minorVersion > _rhs.minorVersion {
+  if lhs.minorVersion > rhs.minorVersion {
     return false
   }
 
-  if _lhs.minorVersion < _rhs.minorVersion {
+  if lhs.minorVersion < rhs.minorVersion {
     return true
   }
 
-  if _lhs.patchVersion > _rhs.patchVersion {
+  if lhs.patchVersion > rhs.patchVersion {
     return false
   }
 
-  if _lhs.patchVersion < _rhs.patchVersion {
+  if lhs.patchVersion < rhs.patchVersion {
     return true
   }
 
@@ -90,30 +90,30 @@ public func < (
 
 @warn_unused_result
 public func >= (
-  _lhs: _SwiftNSOperatingSystemVersion,
-  _rhs: _SwiftNSOperatingSystemVersion
+  lhs: _SwiftNSOperatingSystemVersion,
+  rhs: _SwiftNSOperatingSystemVersion
 ) -> Bool {
-  if _lhs.majorVersion < _rhs.majorVersion {
+  if lhs.majorVersion < rhs.majorVersion {
     return false
   }
 
-  if _lhs.majorVersion > _rhs.majorVersion {
+  if lhs.majorVersion > rhs.majorVersion {
     return true
   }
 
-  if _lhs.minorVersion < _rhs.minorVersion {
+  if lhs.minorVersion < rhs.minorVersion {
     return false
   }
 
-  if _lhs.minorVersion > _rhs.minorVersion {
+  if lhs.minorVersion > rhs.minorVersion {
     return true
   }
 
-  if _lhs.patchVersion < _rhs.patchVersion {
+  if lhs.patchVersion < rhs.patchVersion {
     return false
   }
 
-  if _lhs.patchVersion > _rhs.patchVersion {
+  if lhs.patchVersion > rhs.patchVersion {
     return true
   }
 

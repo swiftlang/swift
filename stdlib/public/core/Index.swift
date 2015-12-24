@@ -73,6 +73,7 @@ public struct _DisabledRangeIndex_ {
 /// Replace `i` with its `successor()` and return the updated value of
 /// `i`.
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public prefix func ++ <T : _Incrementable> (inout i: T) -> T {
   i._successorInPlace()
   return i
@@ -81,6 +82,7 @@ public prefix func ++ <T : _Incrementable> (inout i: T) -> T {
 /// Replace `i` with its `successor()` and return the original
 /// value of `i`.
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public postfix func ++ <T : _Incrementable> (inout i: T) -> T {
   let ret = i
   i._successorInPlace()
@@ -214,8 +216,10 @@ extension ForwardIndexType {
     _precondition(n >= 0,
         "Only BidirectionalIndexType can be advanced by a negative amount")
     var p = self
-    for var i: Distance = 0; i != n; ++i {
-      ++p
+    var i : Distance = 0
+    while i != n {
+      p._successorInPlace()
+      i = i + 1
     }
     return p
   }
@@ -227,8 +231,11 @@ extension ForwardIndexType {
     _precondition(n >= 0,
         "Only BidirectionalIndexType can be advanced by a negative amount")
     var p = self
-    for var i: Distance = 0; i != n && p != limit; ++i {
-      ++p
+    var i : Distance = 0
+    while i != n {
+      if p == limit { break }
+      p._successorInPlace()
+      i = i + 1
     }
     return p
   }
@@ -248,8 +255,8 @@ extension ForwardIndexType {
     var p = self
     var count: Distance = 0
     while p != end {
-      ++count
-      ++p
+      count += 1
+      p._successorInPlace()
     }
     return count
   }
@@ -288,8 +295,10 @@ extension BidirectionalIndexType {
       return _advanceForward(n)
     }
     var p = self
-    for var i: Distance = n; i != 0; ++i {
-      --p
+    var i: Distance = n
+    while i != 0 {
+      p._predecessorInPlace()
+      i._successorInPlace()
     }
     return p
   }
@@ -300,8 +309,10 @@ extension BidirectionalIndexType {
       return _advanceForward(n, limit)
     }
     var p = self
-    for var i: Distance = n; i != 0 && p != limit; ++i {
-      --p
+    var i: Distance = n
+    while i != 0 && p != limit {
+      p._predecessorInPlace()
+      i._successorInPlace()
     }
     return p
   }
@@ -310,6 +321,7 @@ extension BidirectionalIndexType {
 /// Replace `i` with its `predecessor()` and return the updated value
 /// of `i`.
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public prefix func -- <T : BidirectionalIndexType> (inout i: T) -> T {
   i._predecessorInPlace()
   return i
@@ -319,6 +331,7 @@ public prefix func -- <T : BidirectionalIndexType> (inout i: T) -> T {
 /// Replace `i` with its `predecessor()` and return the original
 /// value of `i`.
 @_transparent
+@available(*, deprecated, message="it will be removed in Swift 3")
 public postfix func -- <T : BidirectionalIndexType> (inout i: T) -> T {
   let ret = i
   i._predecessorInPlace()

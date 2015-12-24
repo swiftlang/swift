@@ -1071,8 +1071,11 @@ namespace {
       // If this is an operator func decl in a type context, the 'self' isn't
       // actually going to be applied.
       if (auto *fd = dyn_cast<FuncDecl>(decl))
-        if (fd->isOperator() && fd->getDeclContext()->isTypeContext())
+        if (fd->isOperator() && fd->getDeclContext()->isTypeContext()) {
+          if (type->is<ErrorType>())
+            return nullptr;
           type = type->castTo<AnyFunctionType>()->getResult();
+        }
 
       for (unsigned i = 0, e = level; i != e; ++i) {
         auto funcTy = type->getAs<AnyFunctionType>();
@@ -1700,13 +1703,13 @@ bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *fnExpr,
   // here.
   if (size() != 1) return false;
   
-  // We only handle structural errors here.
-  if (closeness != CC_ArgumentLabelMismatch &&
-      closeness != CC_ArgumentCountMismatch)
-    return false;
-    
+  
   auto args = decomposeArgParamType(argExpr->getType());
-  auto params = decomposeArgParamType(candidates[0].getArgumentType());
+
+  auto argTy = candidates[0].getArgumentType();
+  if (!argTy) return false;
+
+  auto params = decomposeArgParamType(argTy);
 
   // It is a somewhat common error to try to access an instance method as a
   // curried member on the type, instead of using an instance, e.g. the user
@@ -1730,6 +1733,11 @@ bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *fnExpr,
         return true;
       }
   }
+  
+  // We only handle structural errors here.
+  if (closeness != CC_ArgumentLabelMismatch &&
+      closeness != CC_ArgumentCountMismatch)
+    return false;
   
   SmallVector<Identifier, 4> correctNames;
   unsigned OOOArgIdx = ~0U, OOOPrevArgIdx = ~0U;
@@ -1972,6 +1980,7 @@ private:
   bool visitUnresolvedMemberExpr(UnresolvedMemberExpr *E);
   bool visitArrayExpr(ArrayExpr *E);
   bool visitDictionaryExpr(DictionaryExpr *E);
+  bool visitObjectLiteralExpr(ObjectLiteralExpr *E);
 
   bool visitForceValueExpr(ForceValueExpr *FVE);
   bool visitBindOptionalExpr(BindOptionalExpr *BOE);
@@ -2014,14 +2023,16 @@ static bool isConversionConstraint(const Constraint *C) {
 /// low that we would only like to issue an error message about it if there is
 /// nothing else interesting we can scrape out of the constraint system.
 static bool isLowPriorityConstraint(Constraint *C) {
-  // If the member constraint is a ".Element" lookup to find the element type of
-  // a generator in a foreach loop, then it is very low priority: We will get a
-  // better and more useful diagnostic from the failed conversion to
-  // SequenceType that will fail as well.
+  // If the member constraint is a ".Generator" lookup to find the generator
+  // type in a foreach loop, or a ".Element" lookup to find its element type,
+  // then it is very low priority: We will get a better and more useful
+  // diagnostic from the failed conversion to SequenceType that will fail as
+  // well.
   if (C->getKind() == ConstraintKind::TypeMember) {
     if (auto *loc = C->getLocator())
       for (auto Elt : loc->getPath())
-        if (Elt.getKind() ==  ConstraintLocator::GeneratorElementType)
+        if (Elt.getKind() == ConstraintLocator::GeneratorElementType ||
+            Elt.getKind() == ConstraintLocator::SequenceGeneratorType)
           return true;
   }
 
@@ -2060,7 +2071,7 @@ bool FailureDiagnosis::diagnoseConstraintFailure() {
     if (isConversionConstraint(C))
       return rankedConstraints.push_back({C, CR_ConversionConstraint});
 
-    // We occassionally end up with disjunction constraints containing an
+    // We occasionally end up with disjunction constraints containing an
     // original constraint along with one considered with a fix.  If we find
     // this situation, add the original one to our list for diagnosis.
     if (C->getKind() == ConstraintKind::Disjunction) {
@@ -2111,7 +2122,7 @@ bool FailureDiagnosis::diagnoseConstraintFailure() {
     classifyConstraint(&C);
 
   // Okay, now that we've classified all the constraints, sort them by their
-  // priority and priviledge the favored constraints.
+  // priority and privilege the favored constraints.
   std::stable_sort(rankedConstraints.begin(), rankedConstraints.end(),
                    [&] (RCElt LHS, RCElt RHS) {
     // Rank things by their kind as the highest priority.
@@ -2282,7 +2293,7 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
   if (allUnavailable) {
     auto firstDecl = result.ViableCandidates[0].getDecl();
     if (CS->TC.diagnoseExplicitUnavailability(firstDecl, anchor->getLoc(),
-                                              CS->DC, nullptr))
+                                              CS->DC))
       return true;
   }
   
@@ -2457,7 +2468,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
 
   Type fromType = CS->simplifyType(constraint->getFirstType());
   
-  if (fromType->is<TypeVariableType>() && resolvedAnchorToExpr) {
+  if (fromType->hasTypeVariable() && resolvedAnchorToExpr) {
     TCCOptions options;
     
     // If we know we're removing a contextual constraint, then we can force a
@@ -2548,12 +2559,16 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
       return true;
     }
 
-    // Emit a conformance error through conformsToProtocol.  If this succeeds,
-    // then keep searching.
+    // Emit a conformance error through conformsToProtocol.  If this succeeds
+    // and yields a valid protocol conformance, then keep searching.
+    ProtocolConformance *Conformance = nullptr;
     if (CS->TC.conformsToProtocol(fromType, PT->getDecl(), CS->DC,
                                   ConformanceCheckFlags::InExpression,
-                                  nullptr, expr->getLoc()))
-      return false;
+                                  &Conformance, expr->getLoc())) {
+      if (!Conformance || !Conformance->isInvalid()) {
+        return false;
+      }
+    }
     return true;
   }
 
@@ -2866,7 +2881,7 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
   
   // If we have no contextual type information and the subexpr is obviously a
   // overload set, don't recursively simplify this.  The recursive solver will
-  // sometimes pick one based on arbitrary ranking behavior behavior (e.g. like
+  // sometimes pick one based on arbitrary ranking behavior (e.g. like
   // which is the most specialized) even then all the constraints are being
   // fulfilled by UnresolvedType, which doesn't tell us anything.
   if (convertTypePurpose == CTP_Unused &&
@@ -2889,6 +2904,10 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
   // syntactic issues in a well-typed subexpression (which might be because
   // the context is missing).
   TypeCheckExprOptions TCEOptions = TypeCheckExprFlags::DisableStructuralChecks;
+
+  // Don't walk into non-single expression closure bodies, because
+  // ExprTypeSaver and TypeNullifier skip them too.
+  TCEOptions |= TypeCheckExprFlags::SkipMultiStmtClosures;
 
   // Claim that the result is discarded to preserve the lvalue type of
   // the expression.
@@ -3021,6 +3040,28 @@ bool FailureDiagnosis::diagnoseCalleeResultContextualConversionError() {
     return true;
   }
 }
+
+
+/// Return true if the conversion from fromType to toType is an invalid string
+/// index operation.
+static bool isIntegerToStringIndexConversion(Type fromType, Type toType,
+                                             ConstraintSystem *CS) {
+  auto integerType =
+    CS->TC.getProtocol(SourceLoc(),
+                       KnownProtocolKind::IntegerLiteralConvertible);
+  if (!integerType) return false;
+
+  // If the from type is an integer type, and the to type is
+  // String.CharacterView.Index, then we found one.
+  if (CS->TC.conformsToProtocol(fromType, integerType, CS->DC,
+                                ConformanceCheckFlags::InExpression)) {
+    if (toType->getCanonicalType().getString() == "String.CharacterView.Index")
+      return true;
+  }
+
+  return false;
+}
+
 
 bool FailureDiagnosis::diagnoseContextualConversionError() {
   // If the constraint system has a contextual type, then we can test to see if
@@ -3177,6 +3218,18 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
     return true;
   }
 
+  exprType = exprType->getRValueType();
+
+  // Special case of some common conversions involving Swift.String
+  // indexes, catching cases where people attempt to index them with an integer.
+  if (isIntegerToStringIndexConversion(exprType, contextualType, CS)) {
+    diagnose(expr->getLoc(), diag::string_index_not_integer,
+             exprType->getRValueType())
+      .highlight(expr->getSourceRange());
+    diagnose(expr->getLoc(), diag::string_index_not_integer_note);
+    return true;
+  }
+
   // When complaining about conversion to a protocol type, complain about
   // conformance instead of "conversion".
   if (contextualType->is<ProtocolType>() ||
@@ -3205,7 +3258,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
         diagID = diag::noescape_functiontype_mismatch;
     }
 
-  diagnose(expr->getLoc(), diagID, exprType->getRValueType(), contextualType)
+  diagnose(expr->getLoc(), diagID, exprType, contextualType)
     .highlight(expr->getSourceRange());
   return true;
 }
@@ -3260,8 +3313,17 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     if (candidates.size() == 1 && !argType)
       argType = candidates[0].getArgumentType();
   }
+  
+  // If our candidates are instance members at curry level #0, then the argument
+  // being provided is the receiver type for the instance.  We produce better
+  // diagnostics when we don't force the self type down.
+  if (argType && !candidates.empty() &&
+      candidates[0].decl->isInstanceMember() && candidates[0].level == 0 &&
+      !isa<SubscriptDecl>(candidates[0].decl))
+    argType = Type();
+  
 
-  // FIXME: This should all just be a matter of getting type type of the
+  // FIXME: This should all just be a matter of getting the type of the
   // sub-expression, but this doesn't work well when typeCheckChildIndependently
   // is over-conservative w.r.t. TupleExprs.
   auto *TE = dyn_cast<TupleExpr>(argExpr);
@@ -3530,8 +3592,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   
   if (calleeInfo.closeness == CC_Unavailable) {
     if (CS->TC.diagnoseExplicitUnavailability(calleeInfo[0].decl,
-                                              SE->getLoc(),
-                                              CS->DC, nullptr))
+                                              SE->getLoc(), CS->DC))
       return true;
     return false;
   }
@@ -3567,7 +3628,7 @@ namespace {
       // If we have no contextual type, there is nothing to do.
       if (!contextualType) return false;
 
-      // If the expresion is obviously something that produces a metatype,
+      // If the expression is obviously something that produces a metatype,
       // then don't put a constraint on it.
       auto semExpr = expr->getValueProvidingExpr();
       if (isa<TypeExpr>(semExpr) ||isa<UnresolvedConstructorExpr>(semExpr))
@@ -3738,8 +3799,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // Handle uses of unavailable symbols.
   if (calleeInfo.closeness == CC_Unavailable)
     return CS->TC.diagnoseExplicitUnavailability(calleeInfo[0].decl,
-                                                 callExpr->getLoc(),
-                                                 CS->DC, nullptr);
+                                                 callExpr->getLoc(), CS->DC);
   
   // A common error is to apply an operator that only has inout forms (e.g. +=)
   // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
@@ -3987,7 +4047,7 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
       auto pointerEltType = pointerType->getGenericArgs()[0];
       
       // If the element type is Void, then we allow any input type, since
-      // everything is convertable to UnsafePointer<Void>
+      // everything is convertible to UnsafePointer<Void>
       if (pointerEltType->isVoid())
         contextualType = Type();
       else
@@ -4444,6 +4504,77 @@ bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
   return false;
 }
 
+/// When an object literal fails to typecheck because its protocol's
+/// corresponding default type has not been set in the global namespace (e.g.
+/// _ColorLiteralType), suggest that the user import the appropriate module for
+/// the target.
+bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
+  auto &TC = CS->getTypeChecker();
+
+  // Type check the argument first.
+  auto protocol = TC.getLiteralProtocol(E);
+  if (!protocol)
+    return false;
+  DeclName constrName = TC.getObjectLiteralConstructorName(E);
+  assert(constrName);
+  ArrayRef<ValueDecl *> constrs = protocol->lookupDirect(constrName);
+  if (constrs.size() != 1 || !isa<ConstructorDecl>(constrs.front()))
+    return false;
+  auto *constr = cast<ConstructorDecl>(constrs.front());
+  if (!typeCheckChildIndependently(
+        E->getArg(), constr->getArgumentType(), CTP_CallArgument))
+    return true;
+
+  // Conditions for showing this diagnostic:
+  // * The object literal protocol's default type is unimplemented
+  if (TC.getDefaultType(protocol, CS->DC))
+    return false;
+  // * The object literal has no contextual type
+  if (CS->getContextualType())
+    return false;
+
+  // Figure out what import to suggest.
+  auto &Ctx = CS->getASTContext();
+  const auto &target = Ctx.LangOpts.Target;
+  StringRef plainName = E->getName().str();
+  StringRef importModule;
+  StringRef importDefaultTypeName;
+  if (protocol == Ctx.getProtocol(KnownProtocolKind::ColorLiteralConvertible)) {
+    plainName = "color";
+    if (target.isMacOSX()) {
+      importModule = "AppKit";
+      importDefaultTypeName = "NSColor";
+    } else if (target.isiOS() || target.isTvOS()) {
+      importModule = "UIKit";
+      importDefaultTypeName = "UIColor";
+    }
+  } else if (protocol == Ctx.getProtocol(
+               KnownProtocolKind::ImageLiteralConvertible)) {
+    plainName = "image";
+    if (target.isMacOSX()) {
+      importModule = "AppKit";
+      importDefaultTypeName = "NSImage";
+    } else if (target.isiOS() || target.isTvOS()) {
+      importModule = "UIKit";
+      importDefaultTypeName = "UIImage";
+    }
+  } else if (protocol == Ctx.getProtocol( 
+               KnownProtocolKind::FileReferenceLiteralConvertible)) {
+    plainName = "file reference";
+    importModule = "Foundation";
+    importDefaultTypeName = "NSURL";
+  }
+
+  // Emit the diagnostic.
+  TC.diagnose(E->getLoc(), diag::object_literal_default_type_missing,
+              plainName);
+  if (!importModule.empty()) {
+    TC.diagnose(E->getLoc(), diag::object_literal_resolve_import,
+                importModule, importDefaultTypeName, plainName);
+  }
+  return true;
+}
+
 bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   // If we have no contextual type, there is no way to resolve this.  Just
   // diagnose this as an ambiguity.
@@ -4560,7 +4691,7 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
 
   case CC_Unavailable:
     if (CS->TC.diagnoseExplicitUnavailability(candidateInfo[0].decl,
-                                              E->getLoc(), CS->DC, nullptr))
+                                              E->getLoc(), CS->DC))
       return true;
     return false;
       

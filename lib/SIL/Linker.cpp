@@ -64,9 +64,6 @@ bool SILLinkerVisitor::processFunction(SILFunction *F) {
     if (!NewFn || NewFn->isExternalDeclaration())
       return false;
 
-    if (Callback)
-      Callback(NewFn);
-
     F = NewFn;
   }
 
@@ -98,10 +95,6 @@ bool SILLinkerVisitor::processDeclRef(SILDeclRef Decl) {
     return false;
   }
 
-  // Notify client of new deserialized function.
-  if (Callback)
-    Callback(NewFn);
-
   ++NumFuncLinked;
 
   // Try to transitively deserialize everything referenced by NewFn.
@@ -122,10 +115,6 @@ bool SILLinkerVisitor::processFunction(StringRef Name) {
 
   if (!NewFn || NewFn->isExternalDeclaration())
     return false;
-
-  // Notify client of new deserialized function.
-  if (Callback)
-    Callback(NewFn);
 
   ++NumFuncLinked;
 
@@ -168,7 +157,7 @@ SILVTable *SILLinkerVisitor::processClassDecl(const ClassDecl *C) {
 
 bool SILLinkerVisitor::linkInVTable(ClassDecl *D) {
   // Attempt to lookup the Vtbl from the SILModule.
-  SILVTable *Vtbl = Mod.lookUpVTable(D, Callback);
+  SILVTable *Vtbl = Mod.lookUpVTable(D);
 
   // If the SILModule does not have the VTable, attempt to deserialize the
   // VTable. If we fail to do that as well, bail.
@@ -363,25 +352,6 @@ bool SILLinkerVisitor::process() {
             if (!shouldImportFunction(F))
               continue;
 
-            // The ExternalSource may wish to rewrite non-empty bodies.
-            if (!F->isExternalDeclaration() && ExternalSource) {
-              if (auto *NewFn = ExternalSource->lookupSILFunction(F)) {
-                if (NewFn->isExternalDeclaration())
-                  continue;
-
-                NewFn->verify();
-                Worklist.push_back(NewFn);
-
-                // Notify client of new deserialized function.
-                if (Callback)
-                  Callback(NewFn);
-
-                ++NumFuncLinked;
-                Result = true;
-                continue;
-              }
-            }
-
             DEBUG(llvm::dbgs() << "Imported function: "
                                << F->getName() << "\n");
             F->setBare(IsBare);
@@ -394,10 +364,6 @@ bool SILLinkerVisitor::process() {
                 NewFn->verify();
                 Worklist.push_back(NewFn);
                 Result = true;
-
-                // Notify client of new deserialized function.
-                if (Callback)
-                  Callback(NewFn);
 
                 ++NumFuncLinked;
               }

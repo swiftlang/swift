@@ -484,7 +484,8 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
   ConstraintSystem cs(tc, dc1, None);
   llvm::DenseMap<CanType, TypeVariableType *> replacements;
   cs.openGeneric(dc2, sig2->getGenericParams(), sig2->getRequirements(),
-                 false, nullptr, ConstraintLocatorBuilder(nullptr),
+                 false, dc2->getGenericTypeContextDepth(),
+                 nullptr, ConstraintLocatorBuilder(nullptr),
                  replacements);
 
   // Bind the 'Self' type from the first extension to the type parameter from
@@ -608,14 +609,13 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
   // FIXME: Locator when anchored on a declaration.
   // Get the type of a reference to the second declaration.
   Type openedType2 = cs.openType(type2, locator,
-                                 decl2->getPotentialGenericDeclContext());
+                                 decl2->getInnermostDeclContext());
 
   // Get the type of a reference to the first declaration, swapping in
   // archetypes for the dependent types.
-  ArchetypeOpener opener(decl1->getPotentialGenericDeclContext());
+  ArchetypeOpener opener(decl1->getInnermostDeclContext());
   Type openedType1 = cs.openType(type1, locator,
-                                 decl1->getPotentialGenericDeclContext(),
-                                 /*skipProtocolSelfConstraint=*/false,
+                                 decl1->getInnermostDeclContext(),
                                  &opener);
 
   // Extract the self types from the declarations, if they have them.
@@ -1252,7 +1252,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
   return None;
 }
 
-SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions)  {
+SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions) {
   if (solutions.size() <= 1)
     return;
 

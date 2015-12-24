@@ -9,8 +9,8 @@ func baz<T:P>(inout _: T)(_:Int) {}
 
 func ~> <T: P, Args, Result>(
   inout x: T,
-  m: (inout x: T)->((Args)->Result)
-) -> (Args->Result) {
+  m: (inout x: T) -> ((Args) -> Result)
+) -> (Args -> Result) {
   return m(x: &x)
 }
 

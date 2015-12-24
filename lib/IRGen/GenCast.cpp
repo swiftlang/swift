@@ -103,7 +103,7 @@ FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
   // TODO: use ObjC class references
   llvm::Value *targetMetadata;
   if (allowConservative &&
-      (targetMetadata = tryEmitConstantHeapMetadataRef(IGF.IGM,
+      (targetMetadata = tryEmitConstantTypeMetadataRef(IGF.IGM,
                                           toType.getSwiftRValueType()))) {
     // ok
   } else {

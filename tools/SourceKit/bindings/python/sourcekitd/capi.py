@@ -10,7 +10,22 @@
 #
 #===------------------------------------------------------------------------===#
 
-from ctypes import *
+from ctypes import (
+    CFUNCTYPE,
+    POINTER,
+    Structure,
+    addressof,
+    c_bool,
+    c_char_p,
+    c_int,
+    c_int64,
+    c_size_t,
+    c_uint64,
+    c_void_p,
+    cdll,
+    py_object,
+    string_at,
+)
 
 # ctypes doesn't implicitly convert c_void_p to the appropriate wrapper
 # object. This is a problem, because it means that from_parameter will see an
@@ -156,7 +171,7 @@ class ErrorKind(object):
         if value >= len(ErrorKind._kinds):
             ErrorKind._kinds += [None] * (value - len(ErrorKind._kinds) + 1)
         if ErrorKind._kinds[value] is not None:
-            raise ValueError,'ErrorKind already loaded'
+            raise ValueError('ErrorKind already loaded')
         self.value = value
         ErrorKind._kinds[value] = self
         ErrorKind._name_map = None
@@ -177,7 +192,7 @@ class ErrorKind(object):
     @staticmethod
     def from_id(id):
         if id >= len(ErrorKind._kinds) or ErrorKind._kinds[id] is None:
-            raise ValueError,'Unknown type kind %d' % id
+            raise ValueError('Unknown type kind {}'.format(id))
         return ErrorKind._kinds[id]
 
     def __repr__(self):
@@ -239,7 +254,7 @@ class VariantType(object):
         if value >= len(VariantType._kinds):
             VariantType._kinds += [None] * (value - len(VariantType._kinds) + 1)
         if VariantType._kinds[value] is not None:
-            raise ValueError,'VariantType already loaded'
+            raise ValueError('VariantType already loaded')
         self.value = value
         VariantType._kinds[value] = self
         VariantType._name_map = None
@@ -260,7 +275,7 @@ class VariantType(object):
     @staticmethod
     def from_id(id):
         if id >= len(VariantType._kinds) or VariantType._kinds[id] is None:
-            raise ValueError,'Unknown type kind %d' % id
+            raise ValueError('Unknown type kind {}'.format(id))
         return VariantType._kinds[id]
 
     def __repr__(self):
@@ -540,7 +555,7 @@ class Config:
     def set_library_path(path):
         """Set the path in which to search for sourcekitd"""
         if Config.loaded:
-            raise Exception("library path must be set before before using " \
+            raise Exception("library path must be set before before using "
                             "any other functionalities in sourcekitd.")
 
         Config.library_path = path
@@ -549,7 +564,7 @@ class Config:
     def set_library_file(filename):
         """Set the exact location of sourcekitd"""
         if Config.loaded:
-            raise Exception("library file must be set before before using " \
+            raise Exception("library file must be set before before using "
                             "any other functionalities in sourcekitd.")
 
         Config.library_file = filename

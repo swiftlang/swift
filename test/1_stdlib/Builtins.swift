@@ -119,8 +119,8 @@ var NoisyDeathCount = 0
 protocol P {}
 
 class Noisy : P {
-  init() { NoisyLifeCount += 1}
-  deinit { NoisyDeathCount += 1 }
+  init() { NoisyLifeCount += 1 }
+  deinit { NoisyDeathCount += 1}
 }
 
 struct Large : P {
@@ -141,7 +141,7 @@ func exerciseArrayValueWitnesses<T>(value: T) {
 
   (buf + 0).initialize(value)
   (buf + 1).initialize(value)
-  
+
   Builtin.copyArray(T.self, (buf + 2)._rawValue, buf._rawValue, 2._builtinWordValue)
   Builtin.takeArrayBackToFront(T.self, (buf + 1)._rawValue, buf._rawValue, 4._builtinWordValue)
   Builtin.takeArrayFrontToBack(T.self, buf._rawValue, (buf + 1)._rawValue, 4._builtinWordValue)
@@ -182,7 +182,7 @@ tests.test("_getSuperclass") {
 tests.test("type comparison") {
   class B {}
   class D : B {}
-  
+
   let t1 = B.self
   let t1o = Optional(t1)
   let t2 = D.self
@@ -192,7 +192,7 @@ tests.test("type comparison") {
   expectFalse(t1 != t1)
   expectTrue(t2 == t2)
   expectFalse(t2 != t2)
-  
+
   expectFalse(t1 == t2)
   expectFalse(t2 == t1)
   expectTrue(t1 != t2)
@@ -202,17 +202,17 @@ tests.test("type comparison") {
   expectFalse(t1 != t1o)
   expectTrue(t2 == t2o)
   expectFalse(t2 != t2o)
-  
+
   expectFalse(t1 == t2o)
   expectFalse(t2 == t1o)
   expectTrue(t1 != t2o)
   expectTrue(t2 != t1o)
-  
+
   expectTrue(t1o == t1)
   expectFalse(t1o != t1)
   expectTrue(t2o == t2)
   expectFalse(t2o != t2)
-  
+
   expectFalse(t1o == t2)
   expectFalse(t2o == t1)
   expectTrue(t1o != t2)
@@ -222,7 +222,7 @@ tests.test("type comparison") {
   expectFalse(t1o != t1o)
   expectTrue(t2o == t2o)
   expectFalse(t2o != t2o)
-  
+
   expectFalse(t1o == t2o)
   expectFalse(t2o == t1o)
   expectTrue(t1o != t2o)
@@ -233,40 +233,40 @@ tests.test("type comparison") {
 
   expectTrue(nil1 == nil2)
   expectTrue(nil1 == nil1)
-  
+
   expectTrue(nil1 == nil)
   expectTrue(nil == nil1)
-  
+
   expectTrue(nil2 == nil)
   expectTrue(nil == nil2)
-  
+
   expectFalse(t1 == nil1)
   expectFalse(nil1 == t1)
-  
+
   expectFalse(t2 == nil1)
   expectFalse(nil1 == t2)
-  
+
   expectFalse(t1 == nil2)
   expectFalse(nil2 == t1)
-  
+
   expectFalse(t2 == nil2)
   expectFalse(nil2 == t2)
 
   expectFalse(t1o == nil)
   expectFalse(nil == t1o)
-  
+
   expectFalse(t2o == nil)
   expectFalse(nil == t2o)
-  
+
   expectFalse(t1o == nil1)
   expectFalse(nil1 == t1o)
-  
+
   expectFalse(t2o == nil1)
   expectFalse(nil1 == t2o)
-  
+
   expectFalse(t1o == nil2)
   expectFalse(nil2 == t1o)
-  
+
   expectFalse(t2o == nil2)
   expectFalse(nil2 == t2o)
 }
@@ -275,6 +275,16 @@ tests.test("_isPOD") {
   expectTrue(_isPOD(Int.self))
   expectFalse(_isPOD(X.self))
   expectFalse(_isPOD(P.self))
+}
+
+tests.test("_isOptional") {
+  expectTrue(_isOptional(Optional<Int>.self))
+  expectTrue(_isOptional(Optional<X>.self))
+  expectTrue(_isOptional(Optional<P>.self))
+  expectTrue(_isOptional(ImplicitlyUnwrappedOptional<P>.self))
+  expectFalse(_isOptional(Int.self))
+  expectFalse(_isOptional(X.self))
+  expectFalse(_isOptional(P.self))
 }
 
 runAllTests()

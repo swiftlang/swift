@@ -150,7 +150,7 @@ SequenceTypeTests.test("Demonstration/NotCustomizable") {
 }
 
 SequenceTypeTests.test("GeneratorSequence/GeneratorType/empty") {
-  if true {
+  do {
     let data: [OpaqueValue<Int>] = []
     let base = MinimalGenerator(data)
     var g = GeneratorSequence(base)
@@ -159,7 +159,7 @@ SequenceTypeTests.test("GeneratorSequence/GeneratorType/empty") {
       &g)
     checkGenerator(data, g, resiliencyChecks: .none) { $0.value == $1.value }
   }
-  if true {
+  do {
     let data: [OpaqueValue<Int>] = []
     let base = data.generate()
     var g = GeneratorSequence(base)
@@ -171,7 +171,7 @@ SequenceTypeTests.test("GeneratorSequence/GeneratorType/empty") {
 }
 
 SequenceTypeTests.test("GeneratorSequence/GeneratorType") {
-  if true {
+  do {
     let data: [OpaqueValue<Int>] = []
     let base = MinimalGenerator(data)
     var g = GeneratorSequence(base)
@@ -180,7 +180,7 @@ SequenceTypeTests.test("GeneratorSequence/GeneratorType") {
       &g)
     checkGenerator(data, g, resiliencyChecks: .none) { $0.value == $1.value }
   }
-  if true {
+  do {
     let data: [OpaqueValue<Int>] = []
     let base = data.generate()
     var g = GeneratorSequence(base)
@@ -192,7 +192,7 @@ SequenceTypeTests.test("GeneratorSequence/GeneratorType") {
 }
 
 SequenceTypeTests.test("GeneratorSequence/SequenceType/empty") {
-  if true {
+  do {
     let data = [ 10, 20, 30 ].map(OpaqueValue.init)
     let base = MinimalGenerator(data)
     var g = GeneratorSequence(base)
@@ -201,7 +201,7 @@ SequenceTypeTests.test("GeneratorSequence/SequenceType/empty") {
       &g)
     checkSequence(data, g, resiliencyChecks: .none) { $0.value == $1.value }
   }
-  if true {
+  do {
     let data = [ 10, 20, 30 ].map(OpaqueValue.init)
     let base = data.generate()
     var g = GeneratorSequence(base)
@@ -213,7 +213,7 @@ SequenceTypeTests.test("GeneratorSequence/SequenceType/empty") {
 }
 
 SequenceTypeTests.test("GeneratorSequence/SequenceType") {
-  if true {
+  do {
     let data = [ 10, 20, 30 ].map(OpaqueValue.init)
     let base = MinimalGenerator(data)
     var g = GeneratorSequence(base)
@@ -222,7 +222,7 @@ SequenceTypeTests.test("GeneratorSequence/SequenceType") {
       &g)
     checkSequence(data, g, resiliencyChecks: .none) { $0.value == $1.value }
   }
-  if true {
+  do {
     let data = [ 10, 20, 30 ].map(OpaqueValue.init)
     let base = data.generate()
     var g = GeneratorSequence(base)
@@ -280,7 +280,7 @@ SequenceTypeTests.test("enumerate") {
 
 SequenceTypeTests.test("startsWith/WhereElementIsEquatable") {
   for test in startsWithTests {
-    if true {
+    do {
       let s = MinimalSequence<MinimalEquatableValue>(
         elements: test.sequence.map(MinimalEquatableValue.init))
       let prefix = MinimalSequence<MinimalEquatableValue>(
@@ -298,7 +298,7 @@ SequenceTypeTests.test("startsWith/WhereElementIsEquatable") {
     }
 
     // Use different types for the sequence and prefix.
-    if true {
+    do {
       let s = MinimalForwardCollection<MinimalEquatableValue>(
         elements: test.sequence.map(MinimalEquatableValue.init))
       let prefix = MinimalSequence<MinimalEquatableValue>(
@@ -319,7 +319,7 @@ SequenceTypeTests.test("startsWith/WhereElementIsEquatable") {
 
 SequenceTypeTests.test("startsWith/Predicate") {
   for test in startsWithTests {
-    if true {
+    do {
       let s = MinimalSequence<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init))
       let prefix = MinimalSequence<OpaqueValue<Int>>(
@@ -335,7 +335,7 @@ SequenceTypeTests.test("startsWith/Predicate") {
         test.expectedLeftoverPrefix, prefix.map { $0.value },
         stackTrace: SourceLocStack().with(test.loc))
     }
-    if true {
+    do {
       let s = MinimalSequence<OpaqueValue<Int>>(
         elements: test.sequence.map { OpaqueValue($0 * 2) })
       let prefix = MinimalSequence<OpaqueValue<Int>>(
@@ -353,7 +353,7 @@ SequenceTypeTests.test("startsWith/Predicate") {
     }
 
     // Use different types for the sequence and prefix.
-    if true {
+    do {
       let s = MinimalForwardCollection<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init))
       let prefix = MinimalSequence<OpaqueValue<Int>>(
@@ -378,7 +378,7 @@ SequenceTypeTests.test("startsWith/Predicate") {
 
 SequenceTypeTests.test("elementsEqual/WhereElementIsEquatable") {
   for test in elementsEqualTests {
-    if true {
+    do {
       let s = MinimalSequence<MinimalEquatableValue>(
         elements: test.sequence.map(MinimalEquatableValue.init))
       let other = MinimalSequence<MinimalEquatableValue>(
@@ -396,7 +396,7 @@ SequenceTypeTests.test("elementsEqual/WhereElementIsEquatable") {
     }
 
     // Use different types for the sequence and other.
-    if true {
+    do {
       let s = MinimalForwardCollection<MinimalEquatableValue>(
         elements: test.sequence.map(MinimalEquatableValue.init))
       let other = MinimalSequence<MinimalEquatableValue>(
@@ -417,7 +417,7 @@ SequenceTypeTests.test("elementsEqual/WhereElementIsEquatable") {
 
 SequenceTypeTests.test("elementsEqual/Predicate") {
   for test in elementsEqualTests {
-    if true {
+    do {
       let s = MinimalSequence<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init))
       let other = MinimalSequence<OpaqueValue<Int>>(
@@ -435,7 +435,7 @@ SequenceTypeTests.test("elementsEqual/Predicate") {
     }
 
     // Use different types for the sequence and other.
-    if true {
+    do {
       let s = MinimalForwardCollection<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init))
       let other = MinimalSequence<OpaqueValue<Int>>(
@@ -460,7 +460,7 @@ SequenceTypeTests.test("elementsEqual/Predicate") {
 
 SequenceTypeTests.test("lexicographicalCompare/WhereElementIsComparable") {
   for test in lexicographicalCompareTests {
-    if true {
+    do {
       let s = MinimalSequence<MinimalComparableValue>(
         elements: test.sequence.map(MinimalComparableValue.init))
       let other = MinimalSequence<MinimalComparableValue>(
@@ -478,7 +478,7 @@ SequenceTypeTests.test("lexicographicalCompare/WhereElementIsComparable") {
     }
 
     // Use different types for the sequence and other.
-    if true {
+    do {
       let s = MinimalForwardCollection<MinimalComparableValue>(
         elements: test.sequence.map(MinimalComparableValue.init))
       let other = MinimalSequence<MinimalComparableValue>(
@@ -499,7 +499,7 @@ SequenceTypeTests.test("lexicographicalCompare/WhereElementIsComparable") {
 
 SequenceTypeTests.test("lexicographicalCompare/Predicate") {
   for test in lexicographicalCompareTests {
-    if true {
+    do {
       let s = MinimalSequence<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init))
       let other = MinimalSequence<OpaqueValue<Int>>(
@@ -517,7 +517,7 @@ SequenceTypeTests.test("lexicographicalCompare/Predicate") {
     }
 
     // Use different types for the sequence and other.
-    if true {
+    do {
       let s = MinimalForwardCollection<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init))
       let other = MinimalSequence<OpaqueValue<Int>>(
@@ -1089,11 +1089,11 @@ struct SequenceWithCustomUnderestimateCount : SequenceType {
 }
 
 SequenceTypeTests.test("underestimateCount/SequenceType/CustomImplementation") {
-  if true {
+  do {
     let s = SequenceWithCustomUnderestimateCount(underestimatedCount: 5)
     expectEqual(5, callGenericUnderestimatedCount(s))
   }
-  if true {
+  do {
     let s = SequenceWithCustomUnderestimateCount(underestimatedCount: 42)
     expectEqual(42, callGenericUnderestimatedCount(s))
   }
@@ -1120,7 +1120,7 @@ SequenceTypeTests.test("_copyToNativeArrayBuffer/OverestimatedCount")
 //===----------------------------------------------------------------------===//
 
 % for Base in [ 'DefaultedSequence', 'MinimalSequence' ]:
-if true {
+do {
   let checksAdded: Box<Set<String>> = Box([])
   let resiliencyChecks = CollectionMisuseResiliencyChecks.all
 

@@ -165,10 +165,10 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   getterDecl->setStatic(isStatic);
 
   // Compute the type of the getter.
-  GenericParamList *genericParams = nullptr;
+  GenericParamList *genericParams = getterDecl->getGenericParamsOfContext();
   Type type = FunctionType::get(TupleType::getEmpty(C),
                                 propertyContextType);
-  selfType = getterDecl->computeSelfType(&genericParams);
+  selfType = getterDecl->computeSelfType();
   if (genericParams)
     type = PolymorphicFunctionType::get(selfType, type, genericParams);
   else

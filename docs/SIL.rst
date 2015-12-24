@@ -253,7 +253,7 @@ Consider a generic function like this:
 
 ::
 
-  func generateArray<T>(n : Int, generator : () -> T) -> T[]
+  func generateArray<T>(n : Int, generator : () -> T) -> [T]
 
 The function ``generator`` will be expected to store its result
 indirectly into an address passed in an implicit parameter.  There's
@@ -312,7 +312,7 @@ lowered using the pattern ``() -> T``, which eventually causes ``(Int,Int)
 lowering it with the pattern ``U -> V``; the result is that ``g.fn``
 has the following lowered type::
 
-  @callee_owned () -> @owned @callee_owned (@out Float, @in (Int,Int)) -> ()``.
+  @callee_owned () -> @owned @callee_owned (@out Float, @in (Int,Int)) -> ().
 
 As another example, suppose that ``h`` has type
 ``Generator<(Int, @inout Int) -> Float>``.  Neither ``(Int, @inout Int)``
@@ -424,7 +424,7 @@ number of ways:
 - A SIL function type declares its conventional treatment of its
   context value:
 
-  - If it is ``@thin``, the function requires no context value.
+  - If it is ``@convention(thin)``, the function requires no context value.
 
   - If it is ``@callee_owned``, the context value is treated as an
     owned direct parameter.
@@ -511,9 +511,19 @@ throughout the execution of the call. This means that any
 argument can be eliminated.
 
 An autoreleased direct result must have a type with a retainable
-pointer representation.  It may have been autoreleased, and the caller
-should take action to reclaim that autorelease with
-``strong_retain_autoreleased``.
+pointer representation.  Autoreleased results are nominally transferred
+at +0, but the runtime takes steps to ensure that a +1 can be safely
+transferred, and those steps require precise code-layout control.
+Accordingly, the SIL pattern for an autoreleased convention looks exactly
+like the SIL pattern for an owned convention, and the extra runtime
+instrumentation is inserted on both sides when the SIL is lowered into
+LLVM IR.  An autoreleased ``apply`` of a function that is defined with
+an autoreleased result has the effect of a +1 transfer of the result.
+An autoreleased ``apply`` of a function that is not defined with
+an autoreleased result has the effect of performing a strong retain in
+the caller.  A non-autoreleased ``apply`` of a function that is defined
+with an autoreleased result has the effect of performing an
+autorelease in the callee.
 
 - The @noescape declaration attribute on Swift parameters (which is valid only
   on parameters of function type, and is implied by the @autoclosure attribute)
@@ -594,7 +604,7 @@ Some additional meaningful categories of type:
 
 - A *heap object reference* type is a type whose representation consists of a
   single strong-reference-counted pointer. This includes all class types,
-  the ``Builtin.ObjectPointer`` and ``Builtin.ObjCPointer`` types, and
+  the ``Builtin.NativeObject`` and ``Builtin.UnknownObject`` types, and
   archetypes that conform to one or more class protocols.
 - A *reference type* is more general in that its low-level representation may
   include additional global pointers alongside a strong-reference-counted
@@ -789,7 +799,7 @@ are bound by the function's caller::
 
   sil @foo : $(Int) -> Int {
   bb0(%x : $Int):
-    %1 = return %x : $Int
+    return %x : $Int
   }
 
   sil @bar : $(Int, Int) -> () {
@@ -798,7 +808,7 @@ are bound by the function's caller::
     %1 = apply %foo(%x) : $(Int) -> Int
     %2 = apply %foo(%y) : $(Int) -> Int
     %3 = tuple ()
-    %4 = return %3 : $()
+    return %3 : $()
   }
 
 Declaration References
@@ -854,16 +864,17 @@ partial application level. For a curried function declaration::
 The declaration references and types for the different uncurry levels are as
 follows::
 
-  #example.foo!0 : $@thin (x:A) -> (y:B) -> (z:C) -> D
-  #example.foo!1 : $@thin ((y:B), (x:A)) -> (z:C) -> D
-  #example.foo!2 : $@thin ((z:C), (y:B), (x:A)) -> D
+  #example.foo!0 : $@convention(thin) (x:A) -> (y:B) -> (z:C) -> D
+  #example.foo!1 : $@convention(thin) ((y:B), (x:A)) -> (z:C) -> D
+  #example.foo!2 : $@convention(thin) ((z:C), (y:B), (x:A)) -> D
 
 The deepest uncurry level is referred to as the **natural uncurry level**. In
 this specific example, the reference at the natural uncurry level is
 ``#example.foo!2``.  Note that the uncurried argument clauses are composed
 right-to-left, as specified in the `calling convention`_. For uncurry levels
-less than the uncurry level, the entry point itself is ``@thin`` but returns a
-thick function value carrying the partially applied arguments for its context.
+less than the uncurry level, the entry point itself is ``@convention(thin)`` but
+returns a thick function value carrying the partially applied arguments for its
+context.
 
 `Dynamic dispatch`_ instructions such as ``class method`` require their method
 declaration reference to be uncurried to at least uncurry level 1 (which applies
@@ -997,9 +1008,9 @@ implements the method for that class::
     func bas()
   }
 
-  sil @A_foo : $@thin (@owned A) -> ()
-  sil @A_bar : $@thin (@owned A) -> ()
-  sil @A_bas : $@thin (@owned A) -> ()
+  sil @A_foo : $@convention(thin) (@owned A) -> ()
+  sil @A_bar : $@convention(thin) (@owned A) -> ()
+  sil @A_bas : $@convention(thin) (@owned A) -> ()
 
   sil_vtable A {
     #A.foo!1: @A_foo
@@ -1011,7 +1022,7 @@ implements the method for that class::
     func bar()
   }
 
-  sil @B_bar : $@thin (@owned B) -> ()
+  sil @B_bar : $@convention(thin) (@owned B) -> ()
 
   sil_vtable B {
     #A.foo!1: @A_foo
@@ -1023,7 +1034,7 @@ implements the method for that class::
     func bas()
   }
 
-  sil @C_bas : $@thin (@owned C) -> ()
+  sil @C_bas : $@convention(thin) (@owned C) -> ()
 
   sil_vtable C {
     #A.foo!1: @A_foo
@@ -1182,8 +1193,8 @@ Calling Convention
 
 This section describes how Swift functions are emitted in SIL.
 
-Swift Calling Convention @cc(swift)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Swift Calling Convention @convention(swift)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Swift calling convention is the one used by default for native Swift
 functions.
@@ -1383,8 +1394,8 @@ gets lowered to SIL as::
     return
   }
 
-Swift Method Calling Convention @cc(method)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Swift Method Calling Convention @convention(method)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The method calling convention is currently identical to the freestanding
 function convention. Methods are considered to be curried functions, taking
@@ -1398,8 +1409,8 @@ passed last::
 
   sil @Foo_method_1 : $((x : Int), @inout Foo) -> Int { ... }
 
-Witness Method Calling Convention @cc(witness_method)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Witness Method Calling Convention @convention(witness_method)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The witness method calling convention is used by protocol witness methods in
 `witness tables`_. It is identical to the ``method`` calling convention
@@ -1410,8 +1421,8 @@ witnesses must be polymorphically dispatchable on their ``Self`` type,
 the ``Self``-related metadata for a witness must be passed in a maximally
 abstracted manner.
 
-C Calling Convention @cc(cdecl)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C Calling Convention @convention(c)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In Swift's C module importer, C types are always mapped to Swift types
 considered trivial by SIL. SIL does not concern itself with platform
@@ -1421,8 +1432,8 @@ platform calling convention.
 
 SIL (and therefore Swift) cannot currently invoke variadic C functions.
 
-Objective-C Calling Convention @cc(objc_method)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective-C Calling Convention @convention(objc_method)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Reference Counts
 ````````````````
@@ -1513,7 +1524,7 @@ return a class reference::
 
   bb0(%0 : $MyClass):
     %1 = class_method %0 : $MyClass, #MyClass.foo!1
-    %2 = apply %1(%0) : $@cc(method) @thin (@guaranteed MyClass) -> @owned MyOtherClass
+    %2 = apply %1(%0) : $@convention(method) (@guaranteed MyClass) -> @owned MyOtherClass
     // use of %2 goes here; no use of %1
     strong_release %2 : $MyOtherClass
     strong_release %1 : $MyClass
@@ -1620,7 +1631,7 @@ alloc_stack
 ```````````
 ::
 
-  sil-instruction ::= 'alloc_stack' sil-type
+  sil-instruction ::= 'alloc_stack' sil-type (',' debug-var-attr)*
 
   %1 = alloc_stack $T
   // %1#0 has type $*@local_storage T
@@ -1687,7 +1698,7 @@ alloc_box
 `````````
 ::
   
-  sil-instruction ::= 'alloc_box' sil-type
+  sil-instruction ::= 'alloc_box' sil-type (',' debug-var-attr)*
 
   %1 = alloc_box $T
   // %1 has two values:
@@ -1876,7 +1887,7 @@ debug_value
 
 ::
 
-  sil-instruction ::= debug_value sil-operand
+  sil-instruction ::= debug_value sil-operand (',' debug-var-attr)*
   
   debug_value %1 : $Int
   
@@ -1886,12 +1897,24 @@ the SILLocation attached to the debug_value instruction.
 
 The operand must have loadable type.
 
+::
+
+   debug-var-attr ::= 'var'
+   debug-var-attr ::= 'let'
+   debug-var-attr ::= 'name' string-literal
+   debug-var-attr ::= 'argno' integer-literal
+
+There are a number of attributes that provide details about the source
+variable that is being described, including the name of the
+variable. For function and closure arguments ``argno`` is the number
+of the function argument starting with 1.
+
 debug_value_addr
 ````````````````
 
 ::
 
-  sil-instruction ::= debug_value_addr sil-operand
+  sil-instruction ::= debug_value_addr sil-operand (',' debug-var-attr)*
   
   debug_value_addr %7 : $*SomeProtocol
   
@@ -2184,23 +2207,6 @@ strong_retain
 
 Increases the strong retain count of the heap object referenced by ``%0``.
 
-strong_retain_autoreleased
-``````````````````````````
-::
-
-  sil-instruction ::= 'strong_retain_autoreleased' sil-operand
-
-  strong_retain_autoreleased %0 : $T
-  // $T must have a retainable pointer representation
-
-Retains the heap object referenced by ``%0`` using the Objective-C ARC
-"autoreleased return value" optimization. The operand must be the result of an
-``apply`` instruction with an Objective-C method callee, and the
-``strong_retain_autoreleased`` instruction must be first use of the value after
-the defining ``apply`` instruction.
-
-TODO: Specify all the other strong_retain_autoreleased constraints here.
-
 strong_release
 ``````````````
 ::
@@ -2387,8 +2393,8 @@ function_ref
 
   sil-instruction ::= 'function_ref' sil-function-name ':' sil-type
 
-  %1 = function_ref @function : $@thin T -> U
-  // $@thin T -> U must be a thin function type
+  %1 = function_ref @function : $@convention(thin) T -> U
+  // $@convention(thin) T -> U must be a thin function type
   // %1 has type $T -> U
 
 Creates a reference to a SIL function.
@@ -2478,7 +2484,7 @@ class_method
   sil-instruction ::= 'class_method' sil-method-attributes?
                         sil-operand ',' sil-decl-ref ':' sil-type
 
-  %1 = class_method %0 : $T, #T.method!1 : $@thin U -> V
+  %1 = class_method %0 : $T, #T.method!1 : $@convention(thin) U -> V
   // %0 must be of a class type or class metatype $T
   // #T.method!1 must be a reference to a dynamically-dispatched method of T or
   // of one of its superclasses, at uncurry level >= 1
@@ -2507,11 +2513,11 @@ super_method
   sil-instruction ::= 'super_method' sil-method-attributes?
                         sil-operand ',' sil-decl-ref ':' sil-type
   
-  %1 = super_method %0 : $T, #Super.method!1.foreign : $@thin U -> V
+  %1 = super_method %0 : $T, #Super.method!1.foreign : $@convention(thin) U -> V
   // %0 must be of a non-root class type or class metatype $T
   // #Super.method!1.foreign must be a reference to an ObjC method of T's
   // superclass or of one of its ancestor classes, at uncurry level >= 1
-  // %1 will be of type $@thin U -> V
+  // %1 will be of type $@convention(thin) U -> V
 
 Looks up a method in the superclass of a class or class metatype instance.
 Note that for native Swift methods, ``super.method`` calls are statically
@@ -2527,13 +2533,13 @@ witness_method
                         sil-type ',' sil-decl-ref ':' sil-type
 
   %1 = witness_method $T, #Proto.method!1 \
-    : $@thin @cc(witness_method) <Self: Proto> U -> V
+    : $@convention(witness_method) <Self: Proto> U -> V
   // $T must be an archetype
   // #Proto.method!1 must be a reference to a method of one of the protocol
   //   constraints on T
   // <Self: Proto> U -> V must be the type of the referenced method,
   //   generic on Self
-  // %1 will be of type $@thin <Self: Proto> U -> V
+  // %1 will be of type $@convention(thin) <Self: Proto> U -> V
 
 Looks up the implementation of a protocol method for a generic type variable
 constrained by that protocol. The result will be generic on the ``Self``
@@ -2548,20 +2554,20 @@ dynamic_method
   sil-instruction ::= 'dynamic_method' sil-method-attributes?
                       sil-operand ',' sil-decl-ref ':' sil-type
 
-  %1 = dynamic_method %0 : $P, #X.method!1 : $@thin U -> V
+  %1 = dynamic_method %0 : $P, #X.method!1 : $@convention(thin) U -> V
   // %0 must be of a protocol or protocol composition type $P,
   // where $P contains the Swift.DynamicLookup protocol
   // #X.method!1 must be a reference to an @objc method of any class
   // or protocol type
   //
-  // The "self" argument of the method type $@thin U -> V must be 
-  //   Builtin.ObjCPointer
+  // The "self" argument of the method type $@convention(thin) U -> V must be 
+  //   Builtin.UnknownObject
 
 Looks up the implementation of an Objective-C method with the same
 selector as the named method for the dynamic type of the
 value inside an existential container. The "self" operand of the result
 function value is represented using an opaque type, the value for which must
-be projected out as a value of type ``Builtin.ObjCPointer``.
+be projected out as a value of type ``Builtin.UnknownObject``.
 
 It is undefined behavior if the dynamic type of the operand does not
 have an implementation for the Objective-C method with the selector to
@@ -2600,7 +2606,7 @@ apply
   // %1, %2, etc. must be of the argument types $A, $B, etc.
   // %r will be of the return type $R
 
-  %r = apply %0<T = A, U = B>(%1, %2, ...) : $<T, U>(T, U, ...) -> R
+  %r = apply %0<A, B>(%1, %2, ...) : $<T, U>(T, U, ...) -> R
   // %0 must be of a polymorphic function type $<T, U>(T, U, ...) -> R
   // %1, %2, etc. must be of the argument types after substitution $A, $B, etc.
   // %r will be of the substituted return type $R'
@@ -2644,7 +2650,7 @@ partial_apply
   //   of the tail part of the argument tuple of %0
   // %c will be of the partially-applied thick function type (Z...) -> R
 
-  %c = partial_apply %0<T = A, U = B>(%1, %2, ...) : $(Z..., T, U, ...) -> R
+  %c = partial_apply %0<A, B>(%1, %2, ...) : $(Z..., T, U, ...) -> R
   // %0 must be of a polymorphic function type $<T, U>(T, U, ...) -> R
   // %1, %2, etc. must be of the argument types after substitution $A, $B, etc.
   //   of the tail part of the argument tuple of %0
@@ -2680,28 +2686,30 @@ curried function in Swift::
 emits curry thunks in SIL as follows (retains and releases omitted for
 clarity)::
 
-  func @foo : $@thin A -> B -> C -> D -> E {
+  func @foo : $@convention(thin) A -> B -> C -> D -> E {
   entry(%a : $A):
-    %foo_1 = function_ref @foo_1 : $@thin (B, A) -> C -> D -> E
-    %thunk = partial_apply %foo_1(%a) : $@thin (B, A) -> C -> D -> E
+    %foo_1 = function_ref @foo_1 : $@convention(thin) (B, A) -> C -> D -> E
+    %thunk = partial_apply %foo_1(%a) : $@convention(thin) (B, A) -> C -> D -> E
     return %thunk : $B -> C -> D -> E
   }
 
-  func @foo_1 : $@thin (B, A) -> C -> D -> E {
+  func @foo_1 : $@convention(thin) (B, A) -> C -> D -> E {
   entry(%b : $B, %a : $A):
-    %foo_2 = function_ref @foo_2 : $@thin (C, B, A) -> D -> E
-    %thunk = partial_apply %foo_2(%b, %a) : $@thin (C, B, A) -> D -> E
+    %foo_2 = function_ref @foo_2 : $@convention(thin) (C, B, A) -> D -> E
+    %thunk = partial_apply %foo_2(%b, %a) \
+      : $@convention(thin) (C, B, A) -> D -> E
     return %thunk : $(B, A) -> C -> D -> E
   }
 
-  func @foo_2 : $@thin (C, B, A) -> D -> E {
+  func @foo_2 : $@convention(thin) (C, B, A) -> D -> E {
   entry(%c : $C, %b : $B, %a : $A):
-    %foo_3 = function_ref @foo_3 : $@thin (D, C, B, A) -> E
-    %thunk = partial_apply %foo_3(%c, %b, %a) : $@thin (D, C, B, A) -> E
+    %foo_3 = function_ref @foo_3 : $@convention(thin) (D, C, B, A) -> E
+    %thunk = partial_apply %foo_3(%c, %b, %a) \
+      : $@convention(thin) (D, C, B, A) -> E
     return %thunk : $(C, B, A) -> D -> E
   }
 
-  func @foo_3 : $@thin (D, C, B, A) -> E {
+  func @foo_3 : $@convention(thin) (D, C, B, A) -> E {
   entry(%d : $D, %c : $C, %b : $B, %a : $A):
     // ... body of foo ...
   }
@@ -2718,12 +2726,12 @@ following example::
 
 lowers to an uncurried entry point and is curried in the enclosing function::
   
-  func @bar : $@thin (Int, @box Int, *Int) -> Int {
+  func @bar : $@convention(thin) (Int, @box Int, *Int) -> Int {
   entry(%y : $Int, %x_box : $@box Int, %x_address : $*Int):
     // ... body of bar ...
   }
 
-  func @foo : $@thin Int -> Int {
+  func @foo : $@convention(thin) Int -> Int {
   entry(%x : $Int):
     // Create a box for the 'x' variable
     %x_box = alloc_box $Int
@@ -2732,7 +2740,7 @@ lowers to an uncurried entry point and is curried in the enclosing function::
     // Create the bar closure
     %bar_uncurried = function_ref @bar : $(Int, Int) -> Int
     %bar = partial_apply %bar_uncurried(%x_box#0, %x_box#1) \
-      : $(Int, Builtin.ObjectPointer, *Int) -> Int
+      : $(Int, Builtin.NativeObject, *Int) -> Int
 
     // Apply it
     %1 = integer_literal $Int, 1
@@ -2770,8 +2778,8 @@ metatype
 
   sil-instruction ::= 'metatype' sil-type
 
-  %1 = metatype $T.metatype
-  // %1 has type $T.metatype
+  %1 = metatype $T.Type
+  // %1 has type $T.Type
 
 Creates a reference to the metatype object for type ``T``.
 
@@ -2781,9 +2789,9 @@ value_metatype
 
   sil-instruction ::= 'value_metatype' sil-type ',' sil-operand
 
-  %1 = value_metatype $T.metatype, %0 : $T
+  %1 = value_metatype $T.Type, %0 : $T
   // %0 must be a value or address of type $T
-  // %1 will be of type $T.metatype
+  // %1 will be of type $T.Type
 
 Obtains a reference to the dynamic metatype of the value ``%0``.
 
@@ -2793,10 +2801,10 @@ existential_metatype
 
   sil-instruction ::= 'existential_metatype' sil-type ',' sil-operand
 
-  %1 = existential_metatype $P.metatype, %0 : $P
+  %1 = existential_metatype $P.Type, %0 : $P
   // %0 must be a value of class protocol or protocol composition
   //   type $P, or an address of address-only protocol type $*P
-  // %1 will be a $P.metatype value referencing the metatype of the
+  // %1 will be a $P.Type value referencing the metatype of the
   //   concrete value inside %0
 
 Obtains the metatype of the concrete value
@@ -2996,16 +3004,16 @@ the enum is injected with an `inject_enum_addr`_ instruction::
   sil @init_with_data : $(AddressOnlyType) -> AddressOnlyEnum {
   entry(%0 : $*AddressOnlyEnum, %1 : $*AddressOnlyType):
     // Store the data argument for the case.
-    %2 = init_enum_data_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.HasData
+    %2 = init_enum_data_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.HasData!enumelt.1
     copy_addr [take] %2 to [initialization] %1 : $*AddressOnlyType
     // Inject the tag.
-    inject_enum_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.HasData
+    inject_enum_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.HasData!enumelt.1
     return
   }
 
   sil @init_without_data : $() -> AddressOnlyEnum {
     // No data. We only need to inject the tag.
-    inject_enum_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.NoData
+    inject_enum_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.NoData!enumelt
     return
   }
 
@@ -3016,7 +3024,7 @@ discriminator and is done with the `switch_enum`_ terminator::
 
   sil @switch_foo : $(Foo) -> () {
   entry(%foo : $Foo):
-    switch_enum %foo : $Foo, case #Foo.A: a_dest, case #Foo.B: b_dest
+    switch_enum %foo : $Foo, case #Foo.A!enumelt.1: a_dest, case #Foo.B!enumelt.1: b_dest
     
   a_dest(%a : $Int):
     /* use %a */
@@ -3033,14 +3041,15 @@ projecting the enum value with `unchecked_take_enum_data_addr`_::
 
   sil @switch_foo : $<T> (Foo<T>) -> () {
   entry(%foo : $*Foo<T>):
-    switch_enum_addr %foo : $*Foo<T>, case #Foo.A: a_dest, case #Foo.B: b_dest
+    switch_enum_addr %foo : $*Foo<T>, case #Foo.A!enumelt.1: a_dest, \
+      case #Foo.B!enumelt.1: b_dest
     
   a_dest:
-    %a = unchecked_take_enum_data_addr %foo : $*Foo<T>, #Foo.A
+    %a = unchecked_take_enum_data_addr %foo : $*Foo<T>, #Foo.A!enumelt.1
     /* use %a */
   
   b_dest:
-    %b = unchecked_take_enum_data_addr %foo : $*Foo<T>, #Foo.B
+    %b = unchecked_take_enum_data_addr %foo : $*Foo<T>, #Foo.B!enumelt.1
     /* use %b */
   }
 
@@ -3050,8 +3059,8 @@ enum
 
   sil-instruction ::= 'enum' sil-type ',' sil-decl-ref (',' sil-operand)?
 
-  %1 = enum $U, #U.EmptyCase
-  %1 = enum $U, #U.DataCase, %0 : $T
+  %1 = enum $U, #U.EmptyCase!enumelt
+  %1 = enum $U, #U.DataCase!enumelt.1, %0 : $T
   // $U must be an enum type
   // #U.DataCase or #U.EmptyCase must be a case of enum $U
   // If #U.Case has a data type $T, %0 must be a value of type $T
@@ -3067,7 +3076,7 @@ unchecked_enum_data
 
   sil-instruction ::= 'unchecked_enum_data' sil-operand ',' sil-decl-ref
 
-  %1 = unchecked_enum_data %0 : $U, #U.DataCase
+  %1 = unchecked_enum_data %0 : $U, #U.DataCase!enumelt.1
   // $U must be an enum type
   // #U.DataCase must be a case of enum $U with data
   // %1 will be of object type $T for the data type of case U.DataCase
@@ -3082,7 +3091,7 @@ init_enum_data_addr
 
   sil-instruction ::= 'init_enum_data_addr' sil-operand ',' sil-decl-ref
 
-  %1 = init_enum_data_addr %0 : $*U, #U.DataCase
+  %1 = init_enum_data_addr %0 : $*U, #U.DataCase!enumelt.1
   // $U must be an enum type
   // #U.DataCase must be a case of enum $U with data
   // %1 will be of address type $*T for the data type of case U.DataCase
@@ -3104,7 +3113,7 @@ inject_enum_addr
 
   sil-instruction ::= 'inject_enum_addr' sil-operand ',' sil-decl-ref
 
-  inject_enum_addr %0 : $*U, #U.Case
+  inject_enum_addr %0 : $*U, #U.Case!enumelt
   // $U must be an enum type
   // #U.Case must be a case of enum $U
   // %0 will be overlaid with the tag for #U.Case
@@ -3124,7 +3133,7 @@ unchecked_take_enum_data_addr
 
   sil-instruction ::= 'unchecked_take_enum_data_addr' sil-operand ',' sil-decl-ref
 
-  %1 = unchecked_take_enum_data_addr %0 : $*U, #U.DataCase
+  %1 = unchecked_take_enum_data_addr %0 : $*U, #U.DataCase!enumelt.1
   // $U must be an enum type
   // #U.DataCase must be a case of enum $U with data
   // %1 will be of address type $*T for the data type of case U.DataCase
@@ -3151,8 +3160,8 @@ select_enum
                       ':' sil-type
 
   %n = select_enum %0 : $U,      \
-    case #U.Case1: %1,           \
-    case #U.Case2: %2, /* ... */ \
+    case #U.Case1!enumelt: %1,           \
+    case #U.Case2!enumelt: %2, /* ... */ \
     default %3 : $T
 
   // $U must be an enum type
@@ -3165,8 +3174,8 @@ enum value. This is equivalent to a trivial `switch_enum`_ branch sequence::
 
   entry:
     switch_enum %0 : $U,            \
-      case #U.Case1: bb1,           \
-      case #U.Case2: bb2, /* ... */ \
+      case #U.Case1!enumelt: bb1,           \
+      case #U.Case2!enumelt: bb2, /* ... */ \
       default bb_default
   bb1:
     br cont(%1 : $T) // value for #U.Case1
@@ -3190,8 +3199,8 @@ select_enum_addr
                       ':' sil-type
 
   %n = select_enum_addr %0 : $*U,      \
-    case #U.Case1: %1,           \
-    case #U.Case2: %2, /* ... */ \
+    case #U.Case1!enumelt: %1,           \
+    case #U.Case2!enumelt: %2, /* ... */ \
     default %3 : $T
 
   // %0 must be the address of an enum type $*U
@@ -3621,7 +3630,7 @@ ref_to_raw_pointer
   sil-instruction ::= 'ref_to_raw_pointer' sil-operand 'to' sil-type
 
   %1 = ref_to_raw_pointer %0 : $C to $Builtin.RawPointer
-  // $C must be a class type, or Builtin.ObjectPointer, or Builtin.ObjCPointer
+  // $C must be a class type, or Builtin.NativeObject, or Builtin.UnknownObject
   // %1 will be of type $Builtin.RawPointer
 
 Converts a heap object reference to a ``Builtin.RawPointer``. The ``RawPointer``
@@ -3636,7 +3645,7 @@ raw_pointer_to_ref
   sil-instruction ::= 'raw_pointer_to_ref' sil-operand 'to' sil-type
 
   %1 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C
-  // $C must be a class type, or Builtin.ObjectPointer, or Builtin.ObjCPointer
+  // $C must be a class type, or Builtin.NativeObject, or Builtin.UnknownObject
   // %1 will be of type $C
 
 Converts a ``Builtin.RawPointer`` back to a heap object reference. Casting
@@ -3803,10 +3812,10 @@ thick_to_objc_metatype
 
   sil-instruction ::= 'thick_to_objc_metatype' sil-operand 'to' sil-type
 
-  %1 = thick_to_objc_metatype %0 : $@thick T.metatype to $@objc_metatype T.metatype
-  // %0 must be of a thick metatype type $@thick T.metatype
+  %1 = thick_to_objc_metatype %0 : $@thick T.Type to $@objc_metatype T.Type
+  // %0 must be of a thick metatype type $@thick T.Type
   // The destination type must be the corresponding Objective-C metatype type
-  // %1 will be of type $@objc_metatype T.metatype
+  // %1 will be of type $@objc_metatype T.Type
 
 Converts a thick metatype to an Objective-C class metatype. ``T`` must
 be of class, class protocol, or class protocol composition type.
@@ -3817,10 +3826,10 @@ objc_to_thick_metatype
 
   sil-instruction ::= 'objc_to_thick_metatype' sil-operand 'to' sil-type
 
-  %1 = objc_to_thick_metatype %0 : $@objc_metatype T.metatype to $@thick T.metatype
-  // %0 must be of an Objective-C metatype type $@objc_metatype T.metatype
+  %1 = objc_to_thick_metatype %0 : $@objc_metatype T.Type to $@thick T.Type
+  // %0 must be of an Objective-C metatype type $@objc_metatype T.Type
   // The destination type must be the corresponding thick metatype type
-  // %1 will be of type $@thick T.metatype
+  // %1 will be of type $@thick T.Type
 
 Converts an Objective-C class metatype to a thick metatype. ``T`` must
 be of class, class protocol, or class protocol composition type.
@@ -3952,23 +3961,6 @@ will be the operand of this ``return`` instruction.
 
 A function must not contain more than one ``return`` instruction.
 
-autorelease_return
-``````````````````
-::
-
-  sil-terminator ::= 'autorelease_return' sil-operand
-
-  autorelease_return %0 : $T
-  // $T must be the return type of the current function, which must be of
-  //   class type
-
-Exits the current function and returns control to the calling function. The
-result of the ``apply`` instruction that invoked the current function will be
-the operand of this ``return`` instruction. The return value is autoreleased
-into the active Objective-C autorelease pool using the "autoreleased return
-value" optimization. The current function must use the ``@cc(objc_method)``
-calling convention.
-
 throw
 `````
 ::
@@ -4070,7 +4062,7 @@ select_value
   // %r1, %r2, %r3, etc. must have type $T
   // %n has type $T
 
-Selects one of the "case" or "default" operands based on the case of an
+Selects one of the "case" or "default" operands based on the case of a
 value. This is equivalent to a trivial `switch_value`_ branch sequence::
 
   entry:
@@ -4098,8 +4090,8 @@ switch_enum
                        (',' sil-switch-default)?
   sil-switch-enum-case ::= 'case' sil-decl-ref ':' sil-identifier
 
-  switch_enum %0 : $U, case #U.Foo: label1, \
-                        case #U.Bar: label2, \
+  switch_enum %0 : $U, case #U.Foo!enumelt: label1, \
+                        case #U.Bar!enumelt: label2, \
                         ...,                 \
                         default labelN
 
@@ -4133,9 +4125,9 @@ original enum value.  For example::
   sil @sum_of_foo : $Foo -> Int {
   entry(%x : $Foo):
     switch_enum %x : $Foo,       \
-      case #Foo.Nothing: nothing, \
-      case #Foo.OneInt:  one_int, \
-      case #Foo.TwoInts: two_ints
+      case #Foo.Nothing!enumelt: nothing, \
+      case #Foo.OneInt!enumelt.1:  one_int, \
+      case #Foo.TwoInts!enumelt.1: two_ints
 
   nothing:
     %zero = integer_literal 0 : $Int
@@ -4174,8 +4166,8 @@ switch_enum_addr
                        (',' sil-switch-enum-case)*
                        (',' sil-switch-default)?
 
-  switch_enum_addr %0 : $*U, case #U.Foo: label1, \
-                                          case #U.Bar: label2, \
+  switch_enum_addr %0 : $*U, case #U.Foo!enumelt: label1, \
+                                          case #U.Bar!enumelt: label2, \
                                           ...,                 \
                                           default labelN
 

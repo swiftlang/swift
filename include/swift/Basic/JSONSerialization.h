@@ -284,7 +284,7 @@ struct missingTraits : public std::integral_constant<bool,
  && !has_ScalarBitSetTraits<T>::value
  && !has_ScalarTraits<T>::value
  && !has_ObjectTraits<T>::value
- && !has_ArrayTraits<T>::value>  {};
+ && !has_ArrayTraits<T>::value> {};
 
 template<typename T>
 struct validatedObjectTraits : public std::integral_constant<bool,
@@ -425,8 +425,7 @@ private:
                             SaveInfo) ) {
       jsonize(*this, Val, Required);
       this->postflightKey(SaveInfo);
-    }
-    else {
+    } else {
       if ( UseDefault )
         Val = DefaultValue;
     }

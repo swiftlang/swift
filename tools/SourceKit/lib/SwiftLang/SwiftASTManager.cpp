@@ -25,7 +25,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
-#include "swift/SILPasses/Passes.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 // This is included only for createLazyResolver(). Move to different header ?
 #include "swift/Sema/CodeCompletionTypeChecking.h"
 
@@ -363,6 +363,8 @@ static void sanitizeCompilerArgs(ArrayRef<const char *> Args,
     if (Arg == "-c")
       continue;
     if (Arg == "-Xfrontend")
+      continue;
+    if (Arg == "-embed-bitcode")
       continue;
     NewArgs.push_back(CArg);
   }

@@ -31,14 +31,6 @@ class LValue;
 class ManagedValue;
 class RValue;
 class TemporaryInitialization;
-
-/// How a method is dispatched.
-enum class MethodDispatch {
-  // The method implementation can be referenced statically.
-  Static,
-  // The method implementation uses class_method dispatch.
-  Class,
-};
   
 /// Internal context information for the SILGenFunction visitor.
 ///
@@ -695,7 +687,7 @@ public:
   ///                    argument of this type to receive the return value for
   ///                    the function.
   /// \param isThrowing  If true, create an error epilog block.
-  /// \param L           The SILLocation which should be accosocated with
+  /// \param L           The SILLocation which should be associated with
   ///                    cleanup instructions.
   void prepareEpilog(Type returnType, bool isThrowing, CleanupLocation L);
   void prepareRethrowEpilog(CleanupLocation l);
@@ -710,7 +702,7 @@ public:
   /// \returns None if the epilog block is unreachable. Otherwise, returns
   ///          the epilog block's return value argument, or a null SILValue if
   ///          the epilog doesn't take a return value. Also returns the location
-  ///          of the return instrcution if the epilog block is supposed to host
+  ///          of the return instruction if the epilog block is supposed to host
   ///          the ReturnLocation (This happens in case the predecessor block is
   ///          merged with the epilog block.)
   std::pair<Optional<SILValue>, SILLocation>
@@ -1009,7 +1001,6 @@ public:
   /// Returns a reference to a constant in local context. This will return a
   /// retained closure object reference if the constant refers to a local func
   /// decl.
-  ManagedValue emitFunctionRef(SILLocation loc, SILDeclRef constant);
   ManagedValue emitFunctionRef(SILLocation loc, SILDeclRef constant,
                                SILConstantInfo constantInfo);
   
@@ -1022,7 +1013,7 @@ public:
                                    = AccessSemantics::Ordinary);
   
   /// Produce a singular RValue for a reference to the specified declaration,
-  /// with the given type and in response to the specified epxression.  Try to
+  /// with the given type and in response to the specified expression.  Try to
   /// emit into the specified SGFContext to avoid copies (when provided).
   ManagedValue emitRValueForDecl(SILLocation loc, ConcreteDeclRef decl, Type ty,
                                  AccessSemantics semantics,
@@ -1541,9 +1532,6 @@ public:
   /// intrinsic.
   Substitution getPointerSubstitution(Type pointerType,
                                       ArchetypeType *archetype);
-  
-  /// Get the method dispatch mechanism for a method.
-  MethodDispatch getMethodDispatch(AbstractFunctionDecl *method);
 };
 
 

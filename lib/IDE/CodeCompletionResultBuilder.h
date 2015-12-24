@@ -267,7 +267,7 @@ public:
   void addSimpleNamedParameter(StringRef name) {
     CurrentNestingLevel++;
     addSimpleChunk(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin);
-    // Use internal, since we don't want the name to be outisde the placeholder.
+    // Use internal, since we don't want the name to be outside the placeholder.
     addChunkWithText(
         CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName,
         name);
@@ -293,7 +293,7 @@ public:
     if (!Name.empty()) {
       StringRef NameStr = Name.str();
 
-      // 'self' is a keyword, we can not allow to insert it into the source
+      // 'self' is a keyword, we cannot allow to insert it into the source
       // buffer.
       bool IsAnnotation = (NameStr == "self");
 

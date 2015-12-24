@@ -145,7 +145,7 @@ GenericParamList *ProtocolConformance::getGenericParams() const {
 
   case ProtocolConformanceKind::Specialized:
     // If we have a specialized protocol conformance, since we do not support
-    // currently partial specialization, we know that it can not have any open
+    // currently partial specialization, we know that it cannot have any open
     // type variables.
     return nullptr;
   }
@@ -174,7 +174,7 @@ GenericSignature *ProtocolConformance::getGenericSignature() const {
 
   case ProtocolConformanceKind::Specialized:
     // If we have a specialized protocol conformance, since we do not support
-    // currently partial specialization, we know that it can not have any open
+    // currently partial specialization, we know that it cannot have any open
     // type variables.
     return nullptr;
   }
@@ -642,7 +642,7 @@ DeclContext::getLocalProtocols(
     nullptr,
     diagnostics);
 
-  // Sort if requred.
+  // Sort if required.
   if (sorted) {
     llvm::array_pod_sort(result.begin(), result.end(),
                          &ProtocolType::compareProtocols);

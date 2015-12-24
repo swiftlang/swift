@@ -286,6 +286,7 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     LEAF_LVALUE_EXPR(DiscardAssignment)
     LEAF_LVALUE_EXPR(DynamicLookup)
     LEAF_LVALUE_EXPR(OpaqueValue)
+    LEAF_LVALUE_EXPR(EditorPlaceholder)
 
     COMPLETE_PHYSICAL_LVALUE_EXPR(AnyTry, getSubExpr())
     PARTIAL_PHYSICAL_LVALUE_EXPR(BindOptional, getSubExpr())
@@ -841,13 +842,6 @@ StringLiteralExpr::StringLiteralExpr(StringRef Val, SourceRange Range,
       unicode::isSingleExtendedGraphemeCluster(Val);
 }
 
-void DeclRefExpr::setDeclRef(ConcreteDeclRef ref) {
-  if (auto spec = getSpecInfo())
-    spec->D = ref;
-  else
-    DOrSpecialized = ref;
-}
-
 void DeclRefExpr::setSpecialized() {
   if (isSpecialized())
     return;
@@ -899,6 +893,7 @@ bool OverloadSetRefExpr::hasBaseObject() const {
 }
 
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
+  assert(elements.size() & 1 && "even number of elements in sequence");
   void *Buffer = ctx.Allocate(sizeof(SequenceExpr) +
                               elements.size() * sizeof(Expr*),
                               alignof(SequenceExpr));

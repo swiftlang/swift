@@ -21,7 +21,7 @@
 #include "swift/AST/Type.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/DynamicCasts.h"
-#include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/Support/Debug.h"
 
 namespace swift {
@@ -278,7 +278,7 @@ protected:
   TypeSubstitutionMap &SubsMap;
   /// The original function to specialize.
   SILFunction &Original;
-  /// The substiutions used at the call site.
+  /// The substitutions used at the call site.
   ArrayRef<Substitution> ApplySubs;
   /// True, if used for inlining.
   bool Inlining;

@@ -30,7 +30,7 @@ bb0:
   return %7 : $Builtin.RawPointer
 }
 
-// This references a public global so we *SHOULD* derserialize this.
+// This references a public global so we *SHOULD* deserialize this.
 // CHECK-LABEL: sil public_external [fragile] @_TFV18lazy_global_access4Type10staticPropSia_public : $@convention(thin) () -> Builtin.RawPointer {
 sil [fragile] @_TFV18lazy_global_access4Type10staticPropSia_public : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
@@ -614,7 +614,6 @@ class Bas : NSObject {
   var strRealProp : String
   override init()
 }
-sil [fragile] @test_autorelease_return : $@convention(objc_method) (Bas) -> NSString 
 sil [fragile] @test_super_method : $@convention(method) (@guaranteed Bas) -> Bas
 
 sil [fragile] @swift_StringToNSString : $@convention(thin) (@inout String) -> @owned NSString
@@ -1337,7 +1336,6 @@ bb0:
   %73 = function_ref @test_basic_block_arguments : $@convention(thin) (Builtin.Int1) -> Builtin.Word
   %75 = function_ref @test_cond_branch_basic_block_args : $@convention(thin) (Int, Builtin.Int1) -> Int
 
-  %77 = function_ref @test_autorelease_return : $@convention(objc_method) (Bas) -> NSString
   %79 = function_ref @test_super_method : $@convention(method) (@guaranteed Bas) -> Bas
   %81 = function_ref @test_builtin_func_ref : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
   %83 = function_ref @test_dealloc_ref : $@convention(thin) () -> ()

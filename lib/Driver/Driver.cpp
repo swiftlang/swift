@@ -1377,7 +1377,7 @@ Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args) const {
     // TODO: emit diagnostic with error string
     Diags.diagnose(SourceLoc(), diag::error_unable_to_load_output_file_map);
   }
-  return std::move(OFM);
+  return OFM;
 }
 
 void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,

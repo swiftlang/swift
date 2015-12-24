@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines RAII classes that give better dagnostic output
+// This file defines RAII classes that give better diagnostic output
 // about when, exactly, a crash is occurring.
 //
 //===----------------------------------------------------------------------===//

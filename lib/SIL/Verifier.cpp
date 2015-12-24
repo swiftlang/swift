@@ -548,17 +548,21 @@ public:
         LocKind == SILLocation::SILFileKind)
       return;
 
+#if 0
+    // FIXME: This check was tautological before the removal of
+    // AutoreleaseReturnInst, and it turns out that we're violating it.
+    // Fix incoming.
     if (LocKind == SILLocation::CleanupKind ||
         LocKind == SILLocation::InlinedKind)
       require(InstKind != ValueKind::ReturnInst ||
               InstKind != ValueKind::AutoreleaseReturnInst,
         "cleanup and inlined locations are not allowed on return instructions");
+#endif
 
     if (LocKind == SILLocation::ReturnKind ||
         LocKind == SILLocation::ImplicitReturnKind)
       require(InstKind == ValueKind::BranchInst ||
               InstKind == ValueKind::ReturnInst ||
-              InstKind == ValueKind::AutoreleaseReturnInst ||
               InstKind == ValueKind::UnreachableInst,
         "return locations are only allowed on branch and return instructions");
 
@@ -775,7 +779,7 @@ public:
   }
 
   void verifyLLVMIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID) {
-    // Certain llvm instrinsic require constant values as their operands.
+    // Certain llvm intrinsic require constant values as their operands.
     // Consequently, these must not be phi nodes (aka. basic block arguments).
     switch (ID) {
     default:
@@ -1309,16 +1313,6 @@ public:
   void checkStrongRetainInst(StrongRetainInst *RI) {
     requireReferenceValue(RI->getOperand(), "Operand of strong_retain");
   }
-  void checkStrongRetainAutoreleasedInst(StrongRetainAutoreleasedInst *RI) {
-    require(RI->getOperand().getType().isObject(),
-            "Operand of strong_retain_autoreleased must be an object");
-    require(RI->getOperand().getType().hasRetainablePointerRepresentation(),
-            "Operand of strong_retain_autoreleased must be a retainable pointer");
-    require(isa<ApplyInst>(RI->getOperand()) ||
-            isa<SILArgument>(RI->getOperand()),
-            "Operand of strong_retain_autoreleased must be the return value of "
-            "an apply instruction");
-  }
   void checkStrongReleaseInst(StrongReleaseInst *RI) {
     requireReferenceValue(RI->getOperand(), "Operand of release");
   }
@@ -1692,8 +1686,9 @@ public:
   }
 
   void checkSuperMethodInst(SuperMethodInst *CMI) {
-    require(CMI->getType() == TC.getConstantType(CMI->getMember()),
-            "result type of super_method must match type of method");
+    auto overrideTy = TC.getConstantOverrideType(CMI->getMember());
+    requireSameType(CMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
+                    "result type of super_method must match abstracted type of method");
     auto methodType = requireObjectType(SILFunctionType, CMI,
                                         "result of super_method");
     require(!methodType->getExtInfo().hasContext(),
@@ -2338,25 +2333,6 @@ public:
             "return value type does not match return type of function");
   }
 
-  void checkAutoreleaseReturnInst(AutoreleaseReturnInst *RI) {
-    DEBUG(RI->print(llvm::dbgs()));
-
-    CanSILFunctionType ti = F.getLoweredFunctionType();
-    SILType functionResultType
-      = F.mapTypeIntoContext(ti->getResult().getSILType());
-    SILType instResultType = RI->getOperand().getType();
-    DEBUG(llvm::dbgs() << "function return type: ";
-          functionResultType.dump();
-          llvm::dbgs() << "return inst type: ";
-          instResultType.dump(););
-    require(functionResultType == instResultType,
-            "return value type does not match return type of function");
-    require(instResultType.isObject(),
-            "autoreleased return value cannot be an address");
-    require(instResultType.hasRetainablePointerRepresentation(),
-            "autoreleased return value must be a reference type");
-  }
-
   void checkThrowInst(ThrowInst *TI) {
     DEBUG(TI->print(llvm::dbgs()));
 
@@ -2620,6 +2596,12 @@ public:
   }
 
   void checkCondBranchInst(CondBranchInst *CBI) {
+    // It is important that cond_br keeps an i1 type. ARC Sequence Opts assumes
+    // that cond_br does not use reference counted values or decrement reference
+    // counted values under the assumption that the instruction that computes
+    // the i1 is the use/decrement that ARC cares about and that after that
+    // instruction is evaluated, the scalar i1 has a different identity and the
+    // object can be deallocated.
     require(CBI->getCondition().getType() ==
              SILType::getBuiltinIntegerType(1,
                                  CBI->getCondition().getType().getASTContext()),
@@ -2841,15 +2823,13 @@ public:
       return true;
     else if (isa<ReturnInst>(StartBlock->getTerminator()))
       return false;
-    else if (isa<AutoreleaseReturnInst>(StartBlock->getTerminator()))
-      return false;
     else if (isa<ThrowInst>(StartBlock->getTerminator()))
       return false;
 
     // Recursively check all successors.
-    for (const auto &SuccBB : StartBlock->getSuccessors())
-      if (!Visited.insert(SuccBB.getBB()).second)
-        if (!isUnreachableAlongAllPathsStartingAt(SuccBB.getBB(), Visited))
+    for (auto *SuccBB : StartBlock->getSuccessorBlocks())
+      if (!Visited.insert(SuccBB).second)
+        if (!isUnreachableAlongAllPathsStartingAt(SuccBB, Visited))
           return false;
 
     return true;
@@ -2898,8 +2878,7 @@ public:
                   "stack dealloc does not match most recent stack alloc");
           stack.pop_back();
         }
-        if (isa<ReturnInst>(&i) || isa<AutoreleaseReturnInst>(&i) ||
-            isa<ThrowInst>(&i)) {
+        if (isa<ReturnInst>(&i) || isa<ThrowInst>(&i)) {
           require(stack.empty(),
                   "return with stack allocs that haven't been deallocated");
         }
@@ -2966,25 +2945,20 @@ public:
   void visitSILBasicBlock(SILBasicBlock *BB) {
     // Make sure that each of the successors/predecessors of this basic block
     // have this basic block in its predecessor/successor list.
-    for (const SILSuccessor &S : BB->getSuccessors()) {
-      SILBasicBlock *SuccBB = S.getBB();
+    for (const auto *SuccBB : BB->getSuccessorBlocks()) {
       bool FoundSelfInSuccessor = false;
-      for (const SILBasicBlock *PredBB : SuccBB->getPreds()) {
-        if (PredBB == BB) {
-          FoundSelfInSuccessor = true;
-          break;
-        }
+      if (SuccBB->isPredecessor(BB)) {
+        FoundSelfInSuccessor = true;
+        break;
       }
       require(FoundSelfInSuccessor, "Must be a predecessor of each successor.");
     }
 
     for (const SILBasicBlock *PredBB : BB->getPreds()) {
       bool FoundSelfInPredecessor = false;
-      for (const SILSuccessor &S : PredBB->getSuccessors()) {
-        if (S.getBB() == BB) {
-          FoundSelfInPredecessor = true;
-          break;
-        }
+      if (PredBB->isSuccessor(BB)) {
+        FoundSelfInPredecessor = true;
+        break;
       }
       require(FoundSelfInPredecessor, "Must be a successor of each predecessor.");
     }

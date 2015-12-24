@@ -53,7 +53,8 @@ func testDynamicLookup(obj: AnyObject) {
   _ = obj.method(5, withDouble: 5.0)
   
   // CHECK-DAG: - !private "subscript"
-  _ = obj[2]
+  _ = obj[2] as AnyObject
+  _ = obj[2] as AnyObject!
 }
 
 // CHECK-DAG: - "counter"

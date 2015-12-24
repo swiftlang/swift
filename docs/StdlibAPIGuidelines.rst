@@ -200,7 +200,7 @@ Acceptable Short or Non-Descriptive Names
 
     func map<U>(transformation: T->U) -> [U] // not this one
 
-    func forEach<S: SequenceType>(body: (S.Generator.Element)->())
+    func forEach<S: SequenceType>(body: (S.Generator.Element) -> ())
 
 Prefixes and Suffixes
 ---------------------

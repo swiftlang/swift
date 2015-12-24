@@ -159,7 +159,7 @@ UnicodeTrie.test("GraphemeClusterSegmentation/UnicodeSpec") {
   // specification.
 
 % for code_points,expected_boundaries in grapheme_cluster_break_tests:
-  if true {
+  do {
     let scalars: [UInt32] =
         [ ${", ".join([ str(cp) for cp in code_points ])} ]
     let expectedBoundaries: [Int] =

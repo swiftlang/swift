@@ -23,8 +23,8 @@ GS(a: 5, b: 7) // expected-warning{{unused}}
 func f1(a a: Int, b: Int) { }
 f1(a: 1, b: 2)
 
-func f2(`class` cls: Int) { }
-f2(`class`: 5)
+func f2(class cls: Int) { }
+f2(class: 5)
 
 
 // # diagnostics.

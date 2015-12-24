@@ -15,7 +15,6 @@ Reference Counting Instructions
 ===============================
 
 - strong_retain
-- strong_retain_autoreleased
 - strong_release
 - strong_retain_unowned
 - unowned_retain

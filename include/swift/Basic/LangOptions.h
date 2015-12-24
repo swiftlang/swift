@@ -130,7 +130,7 @@ namespace swift {
     /// This is for testing purposes.
     std::string DebugForbidTypecheckPrefix;
 
-    /// Number of paralellel processes performing AST verification.
+    /// Number of parallel processes performing AST verification.
     unsigned ASTVerifierProcessCount = 1U;
 
     /// ID of the current process for the purposes of AST verification.

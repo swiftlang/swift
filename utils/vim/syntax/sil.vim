@@ -25,7 +25,7 @@ syn keyword swiftKeyword getter setter allocator initializer enumelt destroyer g
 syn keyword swiftKeyword alloc_stack alloc_ref alloc_ref_dynamic alloc_box dealloc_stack dealloc_box dealloc_ref skipwhite
 syn keyword swiftKeyword debug_value debug_value_addr skipwhite
 syn keyword swiftKeyword load store assign  mark_uninitialized mark_function_escape copy_addr destroy_addr index_addr index_raw_pointer to skipwhite
-syn keyword swiftKeyword strong_retain strong_retain_autoreleased strong_release strong_retain_unowned ref_to_unowned unowned_to_ref unowned_retain unowned_release load_weak store_weak fix_lifetime skipwhite
+syn keyword swiftKeyword strong_retain strong_release strong_retain_unowned ref_to_unowned unowned_to_ref unowned_retain unowned_release load_weak store_weak fix_lifetime skipwhite
 syn keyword swiftKeyword function_ref integer_literal float_literal string_literal global_addr skipwhite
 syn keyword swiftKeyword class_method super_method witness_method dynamic_method skipwhite
 syn keyword swiftKeyword apply partial_apply builtin skipwhite
@@ -36,7 +36,7 @@ syn keyword swiftKeyword init_existential_addr deinit_existential_addr open_exis
 syn keyword swiftKeyword upcast address_to_pointer pointer_to_address unchecked_addr_cast unchecked_ref_cast ref_to_raw_pointer raw_pointer_to_ref convert_function thick_to_objc_metatype objc_to_thick_metatype thin_to_thick_function is_nonnull unchecked_ref_bit_cast unchecked_trivial_bit_cast skipwhite
 syn keyword swiftKeyword unconditional_checked_cast skipwhite
 syn keyword swiftKeyword cond_fail skipwhite
-syn keyword swiftKeyword unreachable return autorelease_return br cond_br switch_value select_value switch_enum switch_enum_addr dynamic_method_br checked_cast_br skipwhite
+syn keyword swiftKeyword unreachable return br cond_br switch_value select_value switch_enum switch_enum_addr dynamic_method_br checked_cast_br skipwhite
 syn keyword swiftKeyword project_block_storage init_block_storage_header copy_block skipwhite
 
 syn keyword swiftTypeDefinition class extension protocol struct typealias enum skipwhite nextgroup=swiftTypeName

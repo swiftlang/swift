@@ -1,4 +1,4 @@
-//===--- TypeCheckDecl.cpp - Type Checking for Declarations ---------------===//
+//===--- CodeSynthesis.cpp - Type Checking for Declarations ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -448,10 +448,7 @@ static Expr *buildTupleExpr(ASTContext &ctx, ArrayRef<Expr*> args) {
 
 
 static Expr *buildTupleForwardingRefExpr(ASTContext &ctx,
-                                         ArrayRef<TuplePatternElt> params,
-                                    ArrayRef<TupleTypeElt> formalIndexTypes) {
-  assert(params.size() == formalIndexTypes.size());
-
+                                         ArrayRef<TuplePatternElt> params) {
   SmallVector<Identifier, 4> labels;
   SmallVector<SourceLoc, 4> labelLocs;
   SmallVector<Expr *, 4> args;
@@ -459,7 +456,12 @@ static Expr *buildTupleForwardingRefExpr(ASTContext &ctx,
   for (unsigned i = 0, e = params.size(); i != e; ++i) {
     const Pattern *param = params[i].getPattern();
     args.push_back(param->buildForwardingRefExpr(ctx));
-    labels.push_back(formalIndexTypes[i].getName());
+    // If this parameter pattern has a name, extract it.
+    if (auto *np =dyn_cast<NamedPattern>(param->getSemanticsProvidingPattern()))
+      labels.push_back(np->getBoundName());
+    else
+      labels.push_back(Identifier());
+    
     labelLocs.push_back(SourceLoc());
   }
 
@@ -497,14 +499,7 @@ static Expr *buildSubscriptIndexReference(ASTContext &ctx, FuncDecl *accessor) {
   if (accessorKind == AccessorKind::IsMaterializeForSet)
     params = params.slice(1);
 
-  // Look for formal subscript labels.
-  auto subscript = cast<SubscriptDecl>(accessor->getAccessorStorageDecl());
-  auto indexType = subscript->getIndicesType();
-  if (auto indexTuple = indexType->getAs<TupleType>()) {
-    return buildTupleForwardingRefExpr(ctx, params, indexTuple->getElements());
-  } else {
-    return buildTupleForwardingRefExpr(ctx, params, TupleTypeElt(indexType));
-  }
+  return buildTupleForwardingRefExpr(ctx, params);
 }
 
 enum class SelfAccessKind {
@@ -764,7 +759,7 @@ static void maybeMarkTransparent(FuncDecl *accessor,
 }
 
 /// Synthesize the body of a trivial getter.  For a non-member vardecl or one
-/// which is not an override of a base class property, it performs a a direct
+/// which is not an override of a base class property, it performs a direct
 /// storage load.  For an override of a base member property, it chains up to
 /// super.
 static void synthesizeTrivialGetter(FuncDecl *getter,
@@ -1348,7 +1343,7 @@ static void synthesizeAddressedMaterializeForSet(FuncDecl *materializeForSet,
     }();
 
     // Initialize the callback storage with the owner value, which is
-    // the second elemenet of the addressor result.
+    // the second element of the addressor result.
     Expr *owner = new (ctx) DeclRefExpr(tempDecl, SourceLoc(), IsImplicit);
     owner = new (ctx) TupleElementExpr(owner, SourceLoc(), /*field index*/ 1,
                                        SourceLoc(), Type());
@@ -2238,13 +2233,12 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                                                         ctx);
 
   // Configure 'self'.
-  GenericParamList *outerGenericParams = nullptr;
-  Type selfType = configureImplicitSelf(tc, ctor, outerGenericParams);
+  Type selfType = configureImplicitSelf(tc, ctor);
   selfBodyPattern->setType(selfType);
   cast<TypedPattern>(selfBodyPattern)->getSubPattern()->setType(selfType);
 
   // Set the type of the initializer.
-  configureConstructorType(ctor, outerGenericParams, selfType, 
+  configureConstructorType(ctor, selfType,
                            bodyParamPatterns->getType(),
                            superclassCtor->isBodyThrowing());
   if (superclassCtor->isObjC()) {

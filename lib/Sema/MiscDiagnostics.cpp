@@ -115,7 +115,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       enum : unsigned {
         Function,
         MutatingMethod,
-        ObjCProtocolMethod,
         SuperInit,
         SelfInit,
       };
@@ -138,32 +137,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
     /// If this is an application of a function that cannot be partially
     /// applied, arrange for us to check that it gets fully applied.
-    void recordUnsupportedPartialApply(DeclRefExpr *expr) {
-      bool requiresFullApply = false;
-      unsigned kind;
-
-      auto fn = dyn_cast<FuncDecl>(expr->getDecl());
-      if (!fn)
-        return;
-
-      // @objc protocol methods cannot be partially applied.
-      if (auto proto = fn->getDeclContext()->isProtocolOrProtocolExtensionContext()) {
-        if (proto->isObjC()) {
-          requiresFullApply = true;
-          kind = PartialApplication::ObjCProtocolMethod;
-        }
-      }
-
-      if (requiresFullApply) {
-        // We need to apply all argument clauses.
-        InvalidPartialApplications.insert({
-          expr, {fn->getNaturalArgumentCount(), kind}
-        });
-      }
-    }
-
-    /// If this is an application of a function that cannot be partially
-    /// applied, arrange for us to check that it gets fully applied.
     void recordUnsupportedPartialApply(ApplyExpr *expr, Expr *fnExpr) {
 
       if (isa<OtherConstructorDeclRefExpr>(fnExpr)) {
@@ -180,8 +153,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       auto fnDeclRef = dyn_cast<DeclRefExpr>(fnExpr);
       if (!fnDeclRef)
         return;
-
-      recordUnsupportedPartialApply(fnDeclRef);
 
       auto fn = dyn_cast<FuncDecl>(fnDeclRef->getDecl());
       if (!fn)
@@ -203,11 +174,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     /// This method is called in post-order over the AST to validate that
     /// methods are fully applied when they can't support partial application.
     void checkInvalidPartialApplication(Expr *E) {
-      if (auto DRE = dyn_cast<DeclRefExpr>(E)) {
-        recordUnsupportedPartialApply(DRE);
-        return;
-      }
-
       if (auto AE = dyn_cast<ApplyExpr>(E)) {
         Expr *fnExpr = AE->getFn()->getSemanticsProvidingExpr();
         if (auto forceExpr = dyn_cast<ForceValueExpr>(fnExpr))
@@ -809,59 +775,11 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
 // Diagnose availability.
 //===--------------------------------------------------------------------===//
 
-static void tryFixPrintWithAppendNewline(const ValueDecl *D,
-                                         const Expr *ParentExpr,
-                                         InFlightDiagnostic &Diag) {
-  if (!D || !ParentExpr)
-    return;
-  if (!D->getModuleContext()->isStdlibModule())
-    return;
-
-  DeclName Name = D->getFullName();
-  if (Name.getBaseName().str() != "print")
-    return;
-  auto ArgNames = Name.getArgumentNames();
-  if (ArgNames.size() != 2)
-    return;
-  if (ArgNames[1].str() != "appendNewline")
-    return;
-
-  // Go through the expr to determine if second parameter is boolean literal.
-  auto *CE = dyn_cast_or_null<CallExpr>(ParentExpr);
-  if (!CE)
-    return;
-  auto *TE = dyn_cast<TupleExpr>(CE->getArg());
-  if (!TE)
-    return;
-  if (TE->getNumElements() != 2)
-    return;
-  auto *SCE = dyn_cast<CallExpr>(TE->getElement(1));
-  if (!SCE || !SCE->isImplicit())
-    return;
-  auto *STE = dyn_cast<TupleExpr>(SCE->getArg());
-  if (!STE || !STE->isImplicit())
-    return;
-  if (STE->getNumElements() != 1)
-    return;
-  auto *BE = dyn_cast<BooleanLiteralExpr>(STE->getElement(0));
-  if (!BE)
-    return;
-
-  SmallString<20> termStr = StringRef("terminator: \"");
-  if (BE->getValue())
-    termStr += "\\n";
-  termStr += "\"";
-
-  SourceRange RangeToFix(TE->getElementNameLoc(1), BE->getEndLoc());
-  Diag.fixItReplace(RangeToFix, termStr);
-}
-
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted=".
 bool TypeChecker::diagnoseExplicitUnavailability(const ValueDecl *D,
                                                  SourceRange R,
-                                                 const DeclContext *DC,
-                                                 const Expr *ParentExpr) {
+                                                 const DeclContext *DC) {
   auto *Attr = AvailableAttr::isUnavailable(D);
   if (!Attr)
     return false;
@@ -899,9 +817,9 @@ bool TypeChecker::diagnoseExplicitUnavailability(const ValueDecl *D,
       diagnose(Loc, diag::availability_decl_unavailable, Name).highlight(R);
     } else {
       EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-      tryFixPrintWithAppendNewline(D, ParentExpr,
-        diagnose(Loc, diag::availability_decl_unavailable_msg, Name,
-                    EncodedMessage.Message).highlight(R));
+      diagnose(Loc, diag::availability_decl_unavailable_msg, Name,
+               EncodedMessage.Message)
+        .highlight(R);
     }
     break;
 
@@ -939,35 +857,6 @@ bool TypeChecker::diagnoseExplicitUnavailability(const ValueDecl *D,
   return true;
 }
 
-/// Diagnose uses of unavailable declarations. Returns true if a diagnostic
-/// was emitted.
-static bool diagAvailability(TypeChecker &TC, const ValueDecl *D,
-                             SourceRange R, const DeclContext *DC,
-                             const Expr *ParentExpr = nullptr) {
-  if (!D)
-    return false;
-
-  if (TC.diagnoseExplicitUnavailability(D, R, DC, ParentExpr))
-    return true;
-
-  // Diagnose for deprecation
-  if (const AvailableAttr *Attr = TypeChecker::getDeprecated(D)) {
-    TC.diagnoseDeprecated(R, DC, Attr, D->getFullName());
-  }
-  
-  if (TC.getLangOpts().DisableAvailabilityChecking) {
-    return false;
-  }
-
-  // Diagnose for potential unavailability
-  auto maybeUnavail = TC.checkDeclarationAvailability(D, R.Start, DC);
-  if (maybeUnavail.hasValue()) {
-    TC.diagnosePotentialUnavailability(D, R, DC, maybeUnavail.getValue());
-    return true;
-  }
-  return false;
-}
-
 namespace {
 class AvailabilityWalker : public ASTWalker {
   /// Describes how the next member reference will be treated as we traverse
@@ -988,13 +877,13 @@ class AvailabilityWalker : public ASTWalker {
   };
 
   TypeChecker &TC;
-  const DeclContext *DC;
+  DeclContext *DC;
   const MemberAccessContext AccessContext;
   SmallVector<const Expr *, 16> ExprStack;
 
 public:
   AvailabilityWalker(
-      TypeChecker &TC, const DeclContext *DC,
+      TypeChecker &TC, DeclContext *DC,
       MemberAccessContext AccessContext = MemberAccessContext::Getter)
       : TC(TC), DC(DC), AccessContext(AccessContext) {}
 
@@ -1008,21 +897,20 @@ public:
     };
 
     if (auto DR = dyn_cast<DeclRefExpr>(E))
-      diagAvailability(TC, DR->getDecl(), DR->getSourceRange(), DC,
-                       getParentForDeclRef());
+      diagAvailability(DR->getDecl(), DR->getSourceRange());
     if (auto MR = dyn_cast<MemberRefExpr>(E)) {
       walkMemberRef(MR);
       return skipChildren();
     }
     if (auto OCDR = dyn_cast<OtherConstructorDeclRefExpr>(E))
-      diagAvailability(TC, OCDR->getDecl(), OCDR->getConstructorLoc(), DC);
+      diagAvailability(OCDR->getDecl(), OCDR->getConstructorLoc());
     if (auto DMR = dyn_cast<DynamicMemberRefExpr>(E))
-      diagAvailability(TC, DMR->getMember().getDecl(), DMR->getNameLoc(), DC);
+      diagAvailability(DMR->getMember().getDecl(), DMR->getNameLoc());
     if (auto DS = dyn_cast<DynamicSubscriptExpr>(E))
-      diagAvailability(TC, DS->getMember().getDecl(), DS->getSourceRange(), DC);
+      diagAvailability(DS->getMember().getDecl(), DS->getSourceRange());
     if (auto S = dyn_cast<SubscriptExpr>(E)) {
       if (S->hasDecl())
-        diagAvailability(TC, S->getDecl().getDecl(), S->getSourceRange(), DC);
+        diagAvailability(S->getDecl().getDecl(), S->getSourceRange());
     }
     if (auto A = dyn_cast<AssignExpr>(E)) {
       walkAssignExpr(A);
@@ -1044,6 +932,10 @@ public:
   }
 
 private:
+  bool diagAvailability(const ValueDecl *D, SourceRange R);
+  bool diagnoseIncDecDeprecation(const ValueDecl *D, SourceRange R,
+                                 const AvailableAttr *Attr);
+
   /// Walk an assignment expression, checking for availability.
   void walkAssignExpr(AssignExpr *E) const {
     // We take over recursive walking of assignment expressions in order to
@@ -1076,13 +968,11 @@ private:
 
     ValueDecl *D = E->getMember().getDecl();
     // Diagnose for the member declaration itself.
-    if (diagAvailability(TC, D, E->getNameLoc(), DC)) {
+    if (diagAvailability(D, E->getNameLoc()))
       return;
-    }
 
-    if (TC.getLangOpts().DisableAvailabilityChecking) {
+    if (TC.getLangOpts().DisableAvailabilityChecking)
       return;
-    }
 
     if (auto *ASD = dyn_cast<AbstractStorageDecl>(D)) {
       // Diagnose for appropriate accessors, given the access context.
@@ -1147,49 +1037,123 @@ private:
                                                  ForInout);
     }
   }
-
-  const Expr *getParentForDeclRef() {
-    assert(isa<DeclRefExpr>(ExprStack.back()));
-    ArrayRef<const Expr *> Stack = ExprStack;
-
-    Stack = Stack.drop_back();
-    if (Stack.empty())
-      return nullptr;
-
-    if (isa<DotSyntaxBaseIgnoredExpr>(Stack.back()))
-      Stack = Stack.drop_back();
-    if (Stack.empty())
-      return nullptr;
-    
-    return Stack.back();
-  }
 };
 }
 
+
+/// Diagnose uses of unavailable declarations. Returns true if a diagnostic
+/// was emitted.
+bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R) {
+  if (!D)
+    return false;
+
+  if (TC.diagnoseExplicitUnavailability(D, R, DC))
+    return true;
+
+  // Diagnose for deprecation
+  if (const AvailableAttr *Attr = TypeChecker::getDeprecated(D)) {
+    if (!diagnoseIncDecDeprecation(D, R, Attr))
+      TC.diagnoseDeprecated(R, DC, Attr, D->getFullName());
+  }
+
+  if (TC.getLangOpts().DisableAvailabilityChecking)
+    return false;
+
+  // Diagnose for potential unavailability
+  auto maybeUnavail = TC.checkDeclarationAvailability(D, R.Start, DC);
+  if (maybeUnavail.hasValue()) {
+    TC.diagnosePotentialUnavailability(D, R, DC, maybeUnavail.getValue());
+    return true;
+  }
+  return false;
+}
+
+
+/// Return true if the specified type looks like an integer of floating point
+/// type.
+static bool isIntegerOrFloatingPointType(Type ty, DeclContext *DC,
+                                         TypeChecker &TC) {
+  auto integerType =
+    TC.getProtocol(SourceLoc(),
+                   KnownProtocolKind::IntegerLiteralConvertible);
+  auto floatingType =
+    TC.getProtocol(SourceLoc(),
+                   KnownProtocolKind::FloatLiteralConvertible);
+  if (!integerType || !floatingType) return false;
+
+  return
+    TC.conformsToProtocol(ty, integerType, DC,
+                          ConformanceCheckFlags::InExpression) ||
+    TC.conformsToProtocol(ty, floatingType, DC,
+                          ConformanceCheckFlags::InExpression);
+}
+
+
+/// If this is a call to a deprecated ++ / -- operator, try to diagnose it with
+/// a fixit hint and return true.  If not, or if we fail, return false.
+bool AvailabilityWalker::diagnoseIncDecDeprecation(const ValueDecl *D,
+                                                   SourceRange R,
+                                                   const AvailableAttr *Attr) {
+  // We can only produce a fixit if we're talking about ++ or --.
+  bool isInc = D->getNameStr() == "++";
+  if (!isInc && D->getNameStr() != "--")
+    return false;
+
+  // We can only handle the simple cases of lvalue++ and ++lvalue.  This is
+  // always modeled as:
+  //   (postfix_unary_expr (declrefexpr ++), (inoutexpr (lvalue)))
+  // if not, bail out.
+  if (ExprStack.size() != 2 ||
+      !isa<DeclRefExpr>(ExprStack[1]) ||
+      !(isa<PostfixUnaryExpr>(ExprStack[0]) ||
+        isa<PrefixUnaryExpr>(ExprStack[0])))
+    return false;
+
+  auto call = cast<ApplyExpr>(ExprStack[0]);
+
+  // If the expression type is integer or floating point, then we can rewrite it
+  // to "lvalue += 1".
+  std::string replacement;
+  if (isIntegerOrFloatingPointType(call->getType(), DC, TC))
+    replacement = isInc ? " += 1" : " -= 1";
+  else {
+    // Otherwise, it must be an index type.  Rewrite to:
+    // "lvalue = lvalue.successor()".
+    auto &SM = TC.Context.SourceMgr;
+    auto CSR = Lexer::getCharSourceRangeFromSourceRange(SM,
+                                         call->getArg()->getSourceRange());
+    replacement = " = " + SM.extractText(CSR).str();
+    replacement += isInc ? ".successor()" : ".predecessor()";
+  }
+  
+  if (!replacement.empty()) {
+    // If we emit a deprecation diagnostic, produce a fixit hint as well.
+    TC.diagnoseDeprecated(R, DC, Attr, D->getFullName(),
+                          [&](InFlightDiagnostic &diag) {
+      if (isa<PrefixUnaryExpr>(call)) {
+        // Prefix: remove the ++ or --.
+        diag.fixItRemove(call->getFn()->getSourceRange());
+        diag.fixItInsertAfter(call->getArg()->getEndLoc(), replacement);
+      } else {
+        // Postfix: replace the ++ or --.
+        diag.fixItReplace(call->getFn()->getSourceRange(), replacement);
+      }
+    });
+
+    return true;
+  }
+
+
+  return false;
+}
+
+
+
 /// Diagnose uses of unavailable declarations.
 static void diagAvailability(TypeChecker &TC, const Expr *E,
-                             const DeclContext *DC) {
+                             DeclContext *DC) {
   AvailabilityWalker walker(TC, DC);
   const_cast<Expr*>(E)->walk(walker);
-}
-
-//===--------------------------------------------------------------------===//
-// High-level entry points.
-//===--------------------------------------------------------------------===//
-
-/// \brief Emit diagnostics for syntactic restrictions on a given expression.
-void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
-                                            const DeclContext *DC,
-                                            bool isExprStmt) {
-  diagSelfAssignment(TC, E);
-  diagSyntacticUseRestrictions(TC, E, DC, isExprStmt);
-  diagRecursivePropertyAccess(TC, E, DC);
-  diagnoseImplicitSelfUseInClosure(TC, E, DC);
-  diagAvailability(TC, E, DC);
-}
-
-void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
-  TC.checkUnsupportedProtocolType(const_cast<Stmt *>(S));
 }
 
 //===--------------------------------------------------------------------===//
@@ -1235,7 +1199,16 @@ public:
           VarDecls[VD] = 0;
       });
   }
-
+    
+  VarDeclUsageChecker(TypeChecker &TC, VarDecl *VD) : TC(TC) {
+    // Track a specific VarDecl
+    VarDecls[VD] = 0;
+  }
+    
+  void suppressDiagnostics() {
+    sawError = true; // set this flag so that no diagnostics will be emitted on delete.
+  }
+    
   // After we have scanned the entire region, diagnose variables that could be
   // declared with a narrower usage kind.
   ~VarDeclUsageChecker();
@@ -1257,6 +1230,10 @@ public:
       });
     }
     return sawMutation;
+  }
+    
+  bool isVarDeclEverWritten(VarDecl *VD) {
+    return (VarDecls[VD] & RK_Written) != 0;
   }
 
   bool shouldTrackVarDecl(VarDecl *VD) {
@@ -1600,7 +1577,7 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
   // are mutating the base expression.  We also need to visit the index
   // expressions as loads though.
   if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
-    // The index of the subscript is evaluted as an rvalue.
+    // The index of the subscript is evaluated as an rvalue.
     SE->getIndex()->walk(*this);
     if (SE->hasDecl())
       markBaseOfAbstractStorageDeclStore(SE->getBase(), SE->getDecl());
@@ -1723,8 +1700,128 @@ void swift::performAbstractFuncDeclDiagnostics(TypeChecker &TC,
   AFD->getBody()->walk(VarDeclUsageChecker(TC, AFD));
 }
 
+/// Diagnose C style for loops.
 
+static Expr *endConditionValueForConvertingCStyleForLoop(const ForStmt *FS, VarDecl *loopVar) {
+  auto *Cond = FS->getCond().getPtrOrNull();
+  if (!Cond)
+    return nullptr;
+  auto callExpr = dyn_cast<CallExpr>(Cond);
+  if (!callExpr)
+    return nullptr;
+  auto dotSyntaxExpr = dyn_cast<DotSyntaxCallExpr>(callExpr->getFn());
+  if (!dotSyntaxExpr)
+    return nullptr;
+  auto binaryExpr = dyn_cast<BinaryExpr>(dotSyntaxExpr->getBase());
+  if (!binaryExpr)
+    return nullptr;
+  auto binaryFuncExpr = dyn_cast<DeclRefExpr>(binaryExpr->getFn());
+  if (!binaryFuncExpr)
+    return nullptr;
 
+  // Verify that the condition is a simple != or < comparison to the loop variable.
+  auto comparisonOpName = binaryFuncExpr->getDecl()->getNameStr();
+  if (comparisonOpName != "!=" && comparisonOpName != "<")
+    return nullptr;
+  auto args = binaryExpr->getArg()->getElements();
+  auto loadExpr = dyn_cast<LoadExpr>(args[0]);
+  if (!loadExpr)
+    return nullptr;
+  auto declRefExpr = dyn_cast<DeclRefExpr>(loadExpr->getSubExpr());
+  if (!declRefExpr)
+    return nullptr;
+  if (declRefExpr->getDecl() != loopVar)
+    return nullptr;
+  return args[1];
+}
+
+static bool simpleIncrementForConvertingCStyleForLoop(const ForStmt *FS, VarDecl *loopVar) {
+  auto *Increment = FS->getIncrement().getPtrOrNull();
+  if (!Increment)
+    return false;
+  ApplyExpr *unaryExpr = dyn_cast<PrefixUnaryExpr>(Increment);
+  if (!unaryExpr)
+    unaryExpr = dyn_cast<PostfixUnaryExpr>(Increment);
+  if (!unaryExpr)
+    return false;
+  auto inoutExpr = dyn_cast<InOutExpr>(unaryExpr->getArg());
+  if (!inoutExpr)
+   return false;
+  auto incrementDeclRefExpr = dyn_cast<DeclRefExpr>(inoutExpr->getSubExpr());
+  if (!incrementDeclRefExpr)
+    return false;
+  auto unaryFuncExpr = dyn_cast<DeclRefExpr>(unaryExpr->getFn());
+  if (!unaryFuncExpr)
+    return false;
+  if (unaryFuncExpr->getDecl()->getNameStr() != "++")
+    return false;
+  return incrementDeclRefExpr->getDecl() == loopVar;    
+}
+
+static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
+  // If we're missing semi-colons we'll already be erroring out, and this may not even have been intended as C-style.
+  if (FS->getFirstSemicolonLoc().isInvalid() || FS->getSecondSemicolonLoc().isInvalid())
+    return;
+    
+  InFlightDiagnostic diagnostic = TC.diagnose(FS->getStartLoc(), diag::deprecated_c_style_for_stmt);
+    
+  // Try to construct a fix it using for-each:
+
+  // Verify that there is only one loop variable, and it is declared here.
+  auto initializers = FS->getInitializerVarDecls();
+  PatternBindingDecl *loopVarDecl = initializers.size() == 2 ? dyn_cast<PatternBindingDecl>(initializers[0]) : nullptr;
+  if (!loopVarDecl || loopVarDecl->getNumPatternEntries() != 1)
+    return;
+
+  VarDecl *loopVar = dyn_cast<VarDecl>(initializers[1]);
+  Expr *startValue = loopVarDecl->getInit(0);
+  Expr *endValue = endConditionValueForConvertingCStyleForLoop(FS, loopVar);
+  bool strideByOne = simpleIncrementForConvertingCStyleForLoop(FS, loopVar);
+
+  if (!loopVar || !startValue || !endValue || !strideByOne)
+    return;
+    
+  // Verify that the loop variable is invariant inside the body.
+  VarDeclUsageChecker checker(TC, loopVar);
+  checker.suppressDiagnostics();
+  FS->getBody()->walk(checker);
+    
+  if (checker.isVarDeclEverWritten(loopVar)) {
+    diagnostic.flush();
+    TC.diagnose(FS->getStartLoc(), diag::cant_fix_c_style_for_stmt);
+    return;
+  }
+    
+  SourceLoc loopPatternEnd = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, loopVarDecl->getPattern(0)->getEndLoc());
+  SourceLoc endOfIncrementLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, FS->getIncrement().getPtrOrNull()->getEndLoc());
+    
+  diagnostic
+   .fixItReplaceChars(loopPatternEnd, startValue->getStartLoc(), " in ")
+   .fixItReplaceChars(FS->getFirstSemicolonLoc(), endValue->getStartLoc(), " ..< ")
+   .fixItRemoveChars(FS->getSecondSemicolonLoc(), endOfIncrementLoc);
+}
+
+//===--------------------------------------------------------------------===//
+// High-level entry points.
+//===--------------------------------------------------------------------===//
+
+/// \brief Emit diagnostics for syntactic restrictions on a given expression.
+void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
+                                            const DeclContext *DC,
+                                            bool isExprStmt) {
+  diagSelfAssignment(TC, E);
+  diagSyntacticUseRestrictions(TC, E, DC, isExprStmt);
+  diagRecursivePropertyAccess(TC, E, DC);
+  diagnoseImplicitSelfUseInClosure(TC, E, DC);
+  diagAvailability(TC, E, const_cast<DeclContext*>(DC));
+}
+
+void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
+  TC.checkUnsupportedProtocolType(const_cast<Stmt *>(S));
+    
+  if (auto forStmt = dyn_cast<ForStmt>(S))
+    checkCStyleForLoop(TC, forStmt);
+}
 
 //===--------------------------------------------------------------------===//
 // Utility functions

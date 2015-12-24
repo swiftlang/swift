@@ -2,6 +2,8 @@
 # GYB: Generate Your Boilerplate (improved names welcome; at least
 # this one's short).  See -h output for instructions
 
+from __future__ import print_function
+
 import re
 from cStringIO import StringIO
 import tokenize
@@ -362,9 +364,13 @@ class ParseContext:
     tokens = None       # The rest of the tokens
     closeLines = False
 
-    def __init__(self, filename, template = None):
+    def __init__(self, filename, template=None):
         self.filename = os.path.abspath(filename)
-        self.template = template or open(filename).read()
+        if template is None:
+            with open(filename) as f:
+                self.template = f.read()
+        else:
+            self.template = template
         self.lineStarts = getLineStarts(self.template)
         self.tokens = self.tokenGenerator(tokenizeTemplate(self.template))
         self.nextToken()
@@ -464,7 +470,8 @@ class ParseContext:
                 if (kind == 'gybBlockOpen'):
                     # Absorb any '}% <optional-comment> \n'
                     m2 = gybBlockClose.match(self.template, closePos)
-                    assert m2, "Invalid block closure" # FIXME: need proper error handling here.
+                    if not m2:
+                        raise ValueError("Invalid block closure")
                     nextPos = m2.end(0)
                 else:
                     assert kind == 'substitutionOpen'
@@ -476,7 +483,6 @@ class ParseContext:
             elif kind == 'gybLines':
                 
                 self.codeStartLine = self.posToLine(self.tokenMatch.start('gybLines'))
-                codeStartPos = self.tokenMatch.end('_indent')
                 indentation = self.tokenMatch.group('_indent')
 
                 # Strip off the leading indentation and %-sign
@@ -655,7 +661,9 @@ class Code(ASTNode):
         # Execute the code with our __children__ in scope 
         context.localBindings['__children__'] = self.children
         result = eval(self.code, context.localBindings)
-        assert context.localBindings['__children__'] is self.children
+
+        if context.localBindings['__children__'] is not self.children:
+            raise ValueError("The code is not allowed to mutate __children__")
         # Restore the bindings
         context.localBindings['__children__'] = saveChildren
 
@@ -1051,8 +1059,8 @@ def main():
     bindings = dict( x.split('=', 1) for x in args.defines )
     ast = parseTemplate(args.file.name, args.file.read())
     if args.dump:
-        print ast
         
+        print(ast)
     # Allow the template to import .py files from its own directory
     sys.path = [os.path.split(args.file.name)[0] or '.'] + sys.path
     

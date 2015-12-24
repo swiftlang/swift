@@ -142,7 +142,9 @@ static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
                      Associativity::Right,
                      /*assignment*/ false);
 
-  } else if (auto *assign = dyn_cast<AssignExpr>(E)) {
+  }
+
+  if (auto *assign = dyn_cast<AssignExpr>(E)) {
     // Assignment has fixed precedence.
     assert(!assign->isFolded() && "already folded assign expr in sequence?!");
     (void)assign;
@@ -150,7 +152,9 @@ static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
                      Associativity::Right,
                      /*assignment*/ true);
 
-  } else if (auto *as = dyn_cast<ExplicitCastExpr>(E)) {
+  }
+
+  if (auto *as = dyn_cast<ExplicitCastExpr>(E)) {
     // 'as' and 'is' casts have fixed precedence.
     assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
     (void)as;
@@ -158,7 +162,9 @@ static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
                      Associativity::None,
                      /*assignment*/ false);
 
-  } else if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
+  }
+
+  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
     SourceFile *SF = DC->getParentSourceFile();
     Identifier name = DRE->getDecl()->getName();
     bool isCascading = DC->isCascadingContextForLookup(true);
@@ -166,7 +172,9 @@ static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
                                                         E->getLoc()))
       return op->getInfixData();
 
-  } else if (OverloadedDeclRefExpr *OO = dyn_cast<OverloadedDeclRefExpr>(E)) {
+  }
+
+  if (OverloadedDeclRefExpr *OO = dyn_cast<OverloadedDeclRefExpr>(E)) {
     SourceFile *SF = DC->getParentSourceFile();
     Identifier name = OO->getDecls()[0]->getName();
     bool isCascading = DC->isCascadingContextForLookup(true);
@@ -174,8 +182,12 @@ static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
                                                         E->getLoc()))
       return op->getInfixData();
   }
-  
-  TC.diagnose(E->getLoc(), diag::unknown_binop);
+
+  // If E is already an ErrorExpr, then we've diagnosed it as invalid already,
+  // otherwise emit an error.
+  if (!isa<ErrorExpr>(E))
+    TC.diagnose(E->getLoc(), diag::unknown_binop);
+
   // Recover with an infinite-precedence left-associative operator.
   return InfixData((unsigned char)~0U, Associativity::Left,
                    /*assignment*/ false);
@@ -1064,30 +1076,16 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
     }
   }
 
-  // We don't distinguish inner from outer generic parameters yet, but also
-  // nested generics are not really supported by the rest of the compiler.
-  // There are three cases where getGenericSignatureOfContext() returns a
-  // non-null value:
+  // Since nested generic functions are not supported yet, the only case where
+  // generic parameters can be captured is by closures and non-generic local
+  // functions.
   //
-  // 1) Top-level generic functions
-  // 2) Methods with a generic signature either on the type or the method
-  // 3) Local generic functions
-  //
-  // But *not*
-  //
-  // 4) Closure or non-generic local function inside a generic context
-  //
-  // In case 1) and 2), usages of generic type parameters are never formally
-  // "captures". In case 3), the only way a generic type parameter can be
-  // captured is if the local generic function is itself nested inside a generic
-  // context. However, SILGen does not currently support this anyway.
-  //
-  // So we only set GenericParamCaptures in case 4), to avoid confusing SILGen.
-  // Eventually, the computation in checkType() will be more exact and this
-  // conditional should be removed.
-  if (!(AFR.getAbstractFunctionDecl() &&
-        AFR.getAbstractFunctionDecl()->hasType() &&
-        AFR.getAbstractFunctionDecl()->getGenericSignatureOfContext())) {
+  // So we only set GenericParamCaptures if we have a closure, or a
+  // non-generic function defined inside a local context.
+  auto *AFD = AFR.getAbstractFunctionDecl();
+  if (!AFD ||
+      (!AFD->getGenericParams() &&
+       AFD->getDeclContext()->isLocalContext())) {
     AFR.getCaptureInfo().setGenericParamCaptures(GenericParamCaptures);
   }
 

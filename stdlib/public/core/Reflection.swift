@@ -175,7 +175,7 @@ func _dumpWithMirror<TargetStream : OutputStreamType>(
     inout _ targetStream: TargetStream
 ) {
   if maxItemCounter <= 0 { return }
-  --maxItemCounter
+  maxItemCounter -= 1
 
   for _ in 0..<indent { print(" ", terminator: "", toStream: &targetStream) }
 
@@ -407,7 +407,7 @@ struct _ClassMirror : _MirrorType {
 #if _runtime(_ObjC)
     return _getClassPlaygroundQuickLook(data)
 #else
-    return .None
+    return nil
 #endif
   }
   var disposition: _MirrorDisposition { return .Class }

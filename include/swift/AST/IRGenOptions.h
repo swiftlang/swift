@@ -135,7 +135,8 @@ public:
                    DisableLLVMARCOpts(false), DisableLLVMSLPVectorizer(false),
                    DisableFPElim(true), Playground(false),
                    EmitStackPromotionChecks(false), GenerateProfile(false),
-                   EmbedMode(IRGenEmbedMode::None) {}
+                   EmbedMode(IRGenEmbedMode::None)
+                   {}
   
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.

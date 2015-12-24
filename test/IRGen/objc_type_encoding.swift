@@ -112,7 +112,7 @@ func testArchetype(work: P3) {
 // CHECK-tvos: private unnamed_addr constant [11 x i8] c"v24@0:8@16\00"
 
 @objc func foo(x: Int -> Int) -> Int {
-  return 1;
+  return 1
 }
 // CHECK-macosx: private unnamed_addr constant [12 x i8] c"q24@0:8@?16\00"
 // CHECK-ios: private unnamed_addr constant [12 x i8] c"q24@0:8@?16\00"

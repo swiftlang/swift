@@ -51,7 +51,7 @@ namespace constraints {
 /// to indicate constraints on its argument or result type.
 class ConstraintLocator : public llvm::FoldingSetNode {
 public:
-  /// \brief Describes the kind of a a particular path element, e.g.,
+  /// \brief Describes the kind of a particular path element, e.g.,
   /// "tuple element", "call result", "base of member lookup", etc.
   enum PathElementKind : unsigned char {
     /// \brief The argument of function application.
@@ -116,7 +116,7 @@ public:
     Load,
     /// The candidate witness during protocol conformance checking.
     Witness,
-    /// This is refering to a type produced by opening a generic type at the
+    /// This is referring to a type produced by opening a generic type at the
     /// base of the locator.
     OpenedGeneric,
   };

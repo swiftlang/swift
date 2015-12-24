@@ -29,7 +29,7 @@ public protocol _ObjectiveCBridgeable {
   static func _isBridgedToObjectiveC() -> Bool
 
   // _getObjectiveCType is a workaround: right now protocol witness
-  // tables don't include associated types, so we can not find
+  // tables don't include associated types, so we cannot find
   // '_ObjectiveCType.self' from them.
 
   /// Must return `_ObjectiveCType.self`.
@@ -81,7 +81,7 @@ public protocol _ObjectiveCBridgeable {
 ///
 /// The language and runtime do not yet support protocol conformances for
 /// structural types like metatypes. However, we can use a struct that contains
-/// a metatype, make it conform to to _ObjectiveCBridgeable, and its witness table
+/// a metatype, make it conform to _ObjectiveCBridgeable, and its witness table
 /// will be ABI-compatible with one that directly provided conformance to the
 /// metatype type itself.
 public struct _BridgeableMetatype: _ObjectiveCBridgeable {
@@ -131,7 +131,7 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
 
 /// Attempt to convert `x` to its Objective-C representation.
 ///
-/// - If `T` is a class type, it is alaways bridged verbatim, the function
+/// - If `T` is a class type, it is always bridged verbatim, the function
 ///   returns `x`;
 ///
 /// - otherwise, `T` conforms to `_ObjectiveCBridgeable`:
@@ -257,7 +257,7 @@ func _bridgeNonVerbatimFromObjectiveC<T>(
   inout _ result: T?
 )
 
-/// Runtime optional to conditionall perform a bridge from an object to a value
+/// Runtime optional to conditionally perform a bridge from an object to a value
 /// type.
 ///
 /// - parameter result: Will be set to the resulting value if bridging succeeds, and

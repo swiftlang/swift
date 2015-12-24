@@ -248,7 +248,7 @@ bool DoCatchStmt::isSyntacticallyExhaustive() const {
 }
 
 void LabeledConditionalStmt::setCond(StmtCondition e) {
-  // When set set a condition into a Conditional Statement, inform each of the
+  // When set a condition into a Conditional Statement, inform each of the
   // variables bound in any patterns that this is the owning statement for the
   // pattern.
   for (auto &elt : e)

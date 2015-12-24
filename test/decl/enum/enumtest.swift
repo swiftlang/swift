@@ -267,11 +267,11 @@ func testDirection() {
   switch dir {
   case .North(let x):
     i = x
-    break;
+    break
 
   case .NorthEast(let x):
     i = x.distanceEast
-    break;
+    break
   }
   _ = i
 }
@@ -287,7 +287,7 @@ enum SimpleEnum {
 func testSimpleEnum() {
   let _ : SimpleEnum = .X
   let _ : SimpleEnum = (.X)
-  let _ : SimpleEnum=.X    // expected-error {{postfix '=' is reserved}}
+  let _ : SimpleEnum=.X    // expected-error {{'=' must have consistent whitespace on both sides}}
 }
 
 

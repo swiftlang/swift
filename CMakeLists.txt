@@ -44,9 +44,9 @@ option(SWIFT_BUILD_STATIC_STDLIB
     "Build static variants of the Swift standard library and SDK overlay"
     FALSE)
 
-option(SWIFT_INCLUDE_BENCHMARKS
-    "Create targets for running swift benchmarks"
-    TRUE)
+option(SWIFT_BUILD_PERF_TESTSUITE
+    "Create targets for swift performance benchmarks."
+    FALSE)
 
 option(SWIFT_INCLUDE_TESTS "Create targets for building/running tests." TRUE)
 
@@ -69,7 +69,7 @@ set(SWIFT_ENABLE_GOLD_LINKER FALSE CACHE BOOL
     "Enable using the gold linker when available")
 
 set(_SWIFT_KNOWN_INSTALL_COMPONENTS
-    "compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;editor-integration;tools;testsuite-tools;dev;sourcekit-xpc-service;sourcekit-inproc")
+    "compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;editor-integration;tools;testsuite-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc")
 
 # Set the SWIFT_INSTALL_COMPONENTS variable to the default value if it is not passed in via -D
 set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_KNOWN_INSTALL_COMPONENTS}" CACHE STRING
@@ -124,6 +124,9 @@ option(SWIFT_EMBED_BITCODE_SECTION
 option(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT
     "Whether to enable CrashReporter integration"
     FALSE)
+
+set(SWIFT_DARWIN_XCRUN_TOOLCHAIN "XcodeDefault" CACHE STRING
+    "The name of the toolchain to pass to 'xcrun'")
 
 set(SWIFT_DARWIN_ICU_INCLUDE_PATH "" CACHE STRING
     "Path to the directory where the ICU headers are located")
@@ -222,9 +225,6 @@ endif()
 option(SWIFT_BUILD_SOURCEKIT
     "Build SourceKit"
     ${SWIFT_BUILD_SOURCEKIT_default})
-# Force updating the cache, remove the following after a couple of weeks or so.
-set(SWIFT_BUILD_SOURCEKIT ${SWIFT_BUILD_SOURCEKIT_default}
-    CACHE BOOL "Build SourceKit" FORCE)
 
 #
 # Include CMake modules
@@ -385,20 +385,39 @@ endfunction()
 # FIXME: separate the notions of SDKs used for compiler tools and target
 # binaries.
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
-  configure_sdk_unix(LINUX "Linux" "linux" "linux" "x86_64" "x86_64-unknown-linux-gnu")
-
   set(CMAKE_EXECUTABLE_FORMAT "ELF")
 
   set(SWIFT_HOST_VARIANT "linux" CACHE STRING
       "Deployment OS for Swift host tools (the compiler) [linux].")
 
   set(SWIFT_HOST_VARIANT_SDK "LINUX")
-  set(SWIFT_HOST_VARIANT_ARCH "x86_64")
-
   set(SWIFT_PRIMARY_VARIANT_SDK_default "LINUX")
-  set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
+
+  # FIXME: This will not work while trying to cross-compile.
+  if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
+    configure_sdk_unix(LINUX "Linux" "linux" "linux" "x86_64" "x86_64-unknown-linux-gnu")
+    set(SWIFT_HOST_VARIANT_ARCH "x86_64")
+    set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
+  # FIXME: This only matches ARMv7l (by far the most common variant).
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "armv7l")
+    configure_sdk_unix(LINUX "Linux" "linux" "linux" "armv7" "armv7-unknown-linux-gnueabihf")
+    set(SWIFT_HOST_VARIANT_ARCH "armv7")
+    set(SWIFT_PRIMARY_VARIANT_ARCH_default "armv7")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64")
+    configure_sdk_unix(LINUX "Linux" "linux" "linux" "aarch64" "aarch64-unknown-linux-gnu")
+    set(SWIFT_HOST_VARIANT_ARCH "aarch64")
+    set(SWIFT_PRIMARY_VARIANT_ARCH_default "aarch64")
+  else()
+    message(FATAL_ERROR "Unknown or unsupported architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+  endif()
+
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
-  configure_sdk_unix(FREEBSD "FreeBSD" "freebsd" "freebsd" "x86_64" "x86_64-freebsd10")
+  # FIXME: Using the host OS version won't produce correct results for
+  # cross-compilation.
+  string(REPLACE "[-].*" "" FREEBSD_SYSTEM_VERSION ${CMAKE_SYSTEM_VERSION})
+  message(STATUS "FreeBSD Version: ${FREEBSD_SYSTEM_VERSION}")
+  configure_sdk_unix(FREEBSD "FreeBSD" "freebsd" "freebsd" "x86_64"
+    "x86_64-unknown-freebsd${FREEBSD_SYSTEM_VERSION}")
 
   set(CMAKE_EXECUTABLE_FORMAT "ELF")
 
@@ -442,7 +461,7 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   endif()
 
   if(XCODE)
-    # FIXME: Can not cross-compile stdlib using Xcode.  Xcode insists on
+    # FIXME: Cannot cross-compile stdlib using Xcode.  Xcode insists on
     # passing -mmacosx-version-min to the compiler, and we want to pass
     # -mios-version-min.  Clang sees both options and complains.
     set(swift_can_crosscompile_stdlib FALSE)
@@ -614,7 +633,7 @@ if(SWIFT_BUILD_TOOLS)
 endif()
 add_subdirectory(utils)
 add_subdirectory(stdlib)
-if(SWIFT_INCLUDE_BENCHMARKS)
+if(SWIFT_BUILD_PERF_TESTSUITE)
   add_subdirectory(benchmark)
 endif()
 if(SWIFT_INCLUDE_TESTS)
@@ -624,6 +643,10 @@ endif()
 if(SWIFT_INCLUDE_DOCS)
   add_subdirectory(docs)
 endif()
+
+swift_install_in_component(license
+  FILES "LICENSE.txt"
+  DESTINATION "share/swift")
 
 # Add a documentation target so that documentation shows up in the
 # Xcode project.

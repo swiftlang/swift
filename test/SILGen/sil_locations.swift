@@ -1,13 +1,13 @@
 // RUN: %target-swift-frontend -emit-silgen -emit-verbose-sil %s | FileCheck %s
 
-// FIXME: Not sure if this an ideal source info for the branch - 
+// FIXME: Not sure if this an ideal source info for the branch -
 // it points to if, not the last instruction in the block.
 func ifexpr() -> Int {
-  var x : Int = 0; 
+  var x : Int = 0
   if true {
     x += 1;
   }
-  return x;
+  return x
   // CHECK-LABEL: sil hidden  @_TF13sil_locations6ifexprFT_Si
   // CHECK: apply {{.*}} line:[[@LINE-5]]:6
   // CHECK: cond_br {{%.*}}, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]] // {{.*}} line:[[@LINE-6]]:6
@@ -16,13 +16,13 @@ func ifexpr() -> Int {
 }
 
 func ifelseexpr() -> Int {
-  var x : Int = 0; 
+  var x : Int = 0
   if true {
     x += 1;
   } else {
     x -= 1;
   }
-  return x;
+  return x
   // CHECK-LABEL: sil hidden  @_TF13sil_locations10ifelseexprFT_Si
   // CHECK: cond_br {{%.*}}, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]] // {{.*}} line:[[@LINE-7]]:6
   // CHECK: [[TRUE_BB]]:
@@ -32,14 +32,14 @@ func ifelseexpr() -> Int {
   // CHECK: return {{.*}} // {{.*}} line:[[@LINE-7]]:3:return
 }
 
-// The source locations are handled differently here - since 
-// the return is unified, we keep the location of the return(not the if) 
+// The source locations are handled differently here - since
+// the return is unified, we keep the location of the return(not the if)
 // in the branch.
 func ifexpr_return() -> Int {
   if true {
-    return 5; 
+    return 5
   }
-  return 6;
+  return 6
   // CHECK-LABEL: sil hidden  @_TF13sil_locations13ifexpr_returnFT_Si
   // CHECK: apply {{.*}} line:[[@LINE-5]]:6
   // CHECK: cond_br {{%.*}}, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]] // {{.*}} line:[[@LINE-6]]:6
@@ -51,8 +51,8 @@ func ifexpr_return() -> Int {
 }
 
 func ifexpr_rval() -> Int {
-  var x = true ? 5 : 6;
-  return x;
+  var x = true ? 5 : 6
+  return x
   // CHECK-LABEL: sil hidden  @_TF13sil_locations11ifexpr_rvalFT_Si
   // CHECK: apply {{.*}} line:[[@LINE-3]]:11
   // CHECK: cond_br {{%.*}}, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]] // {{.*}} line:[[@LINE-4]]:11
@@ -104,17 +104,17 @@ class LocationClass {
   func mem() {}
 }
 func testMethodCall() {
-  var l: LocationClass;
+  var l: LocationClass
   l.mem();
   // CHECK-LABEL: sil hidden  @_TF13sil_locations14testMethodCallFT_T_
-  
+
   // CHECK: class_method {{.[0-9]+}} : $LocationClass, #LocationClass.mem!1 {{.*}} line:[[@LINE-3]]:5
 }
 
 func multipleReturnsImplicitAndExplicit() {
-  var x = 5+3;
+  var x = 5+3
   if x > 10 {
-    return;
+    return
   }
   x += 1;
   // CHECK-LABEL: sil hidden  @_TF13sil_locations34multipleReturnsImplicitAndExplicitFT_T_
@@ -125,7 +125,7 @@ func multipleReturnsImplicitAndExplicit() {
 }
 
 func simplifiedImplicitReturn() -> () {
-  var y = 0 
+  var y = 0
   // CHECK-LABEL: sil hidden  @_TF13sil_locations24simplifiedImplicitReturnFT_T_
   // CHECK: return {{.*}} // {{.*}} line:[[@LINE+1]]:1:imp_return
 }
@@ -145,7 +145,7 @@ func testSwitch() {
   // CHECK: cond_br
   //
     var z: Int = 200
-  // CHECK: [[VAR_Z:%[0-9]+]] = alloc_box $Int     // {{.*}} line:[[@LINE-1]]:9
+  // CHECK: [[VAR_Z:%[0-9]+]] = alloc_box $Int, var, name "z"{{.*}}line:[[@LINE-1]]:9
   // CHECK: integer_literal $Builtin.Int2048, 200  // {{.*}} line:[[@LINE-2]]:18
     x = z
   // CHECK:  strong_release [[VAR_Z]]{{.*}}        // {{.*}} line:[[@LINE-1]]:9:cleanup
@@ -156,16 +156,16 @@ func testSwitch() {
 
 func testIf() {
   if true {
-    var y:Int;
+    var y:Int
   } else {
-    var x:Int;
+    var x:Int
   }
   // CHECK-LABEL: sil hidden @_TF13sil_locations6testIfFT_T_
   //
   // FIXME: Missing location info here.
   // CHECK: function_ref
   // CHECK: apply
-  // 
+  //
   //
   //
   // CHECK: br {{.*}}                                            // {{.*}} line:[[@LINE-13]]:6
@@ -179,21 +179,21 @@ func testFor() {
     var y: Int = 300;
     y += 1;
     if true {
-      break;
+      break
     }
     y -= 1;
     continue;
   }
 
   // CHECK-LABEL: sil hidden @_TF13sil_locations7testForFT_T_
-  // CHECK: [[VAR_Y_IN_FOR:%[0-9]+]]  = alloc_box $Int                 // {{.*}} line:[[@LINE-10]]:9
+  // CHECK: [[VAR_Y_IN_FOR:%[0-9]+]]  = alloc_box $Int, var, name "y"    // {{.*}} line:[[@LINE-10]]:9
   // CHECK: integer_literal $Builtin.Int2048, 300                        // {{.*}} line:[[@LINE-11]]:18
   // CHECK: strong_release [[VAR_Y_IN_FOR]]#0 : $@box Int
   // CHECK: br bb{{.*}}                                                  // {{.*}} line:[[@LINE-10]]:7
   // CHECK: strong_release [[VAR_Y_IN_FOR]]#0 : $@box Int
   // CHECK: br bb{{.*}}                                                  // {{.*}} line:[[@LINE-9]]:5
-  
-  
+
+
 }
 
 func testTuples() {
@@ -207,10 +207,10 @@ func testTuples() {
   // CHECK: integer_literal $Builtin.Int2048, 2                      {{.*}} line:[[@LINE-7]]:12
   // CHECK: integer_literal $Builtin.Int2048, 3                      {{.*}} line:[[@LINE-8]]:14
   // CHECK: tuple_element_addr                                       {{.*}} line:[[@LINE-8]]:12
-  // CHECK: tuple_element_addr                                       {{.*}} line:[[@LINE-9]]:16  
+  // CHECK: tuple_element_addr                                       {{.*}} line:[[@LINE-9]]:16
 }
 
-// Test tuple emploding/exploding.
+// Test tuple imploding/exploding.
 protocol Ordinable {
   func ord() -> Int
 }
@@ -228,7 +228,7 @@ func captures_tuple<T, U>(x: (T, U)) -> () -> (T, U) {
   // CHECK: copy_addr [take]                                      {{.*}} line:[[@LINE-6]]:27
   // CHECK: function_ref                                          {{.*}} line:[[@LINE-6]]:10
 
-  
+
   // CHECK-LABEL: sil shared @_TFF13sil_locations14captures_tuple
   // CHECK: copy_addr                                             {{.*}} line:[[@LINE-10]]:11
 }
@@ -246,7 +246,7 @@ func interpolated_string(x: Int, y: String) -> String {
 
 
 func int(x: Int) {}
-func tuple() -> (Int, Float) { return (1, 1.0) }  
+func tuple() -> (Int, Float) { return (1, 1.0) }
 func tuple_element(x: (Int, Float)) {
   int(tuple().0)
   // CHECK-LABEL: sil hidden @_TF13sil_locations13tuple_element
@@ -255,21 +255,21 @@ func tuple_element(x: (Int, Float)) {
   // CHECK: tuple_extract{{.*}}, 0                                   {{.*}} line:[[@LINE-4]]:7
   // CHECK: tuple_extract{{.*}}, 1                                   {{.*}} line:[[@LINE-5]]:7
   // CHECK: apply                                                    {{.*}} line:[[@LINE-6]]:3
-     
+
 }
 
 func containers() -> ([Int], Dictionary<String, Int>) {
   return ([1, 2, 3], ["Ankeny": 1, "Burnside": 2, "Couch": 3])
   // CHECK-LABEL: sil hidden @_TF13sil_locations10containers
   // CHECK: apply {{%.*}}<(String, Int)>({{%.*}})            {{.*}} line:[[@LINE-2]]:22
-  
+
   // CHECK: string_literal utf8 "Ankeny"                             {{.*}} line:[[@LINE-4]]:23
 
   // CHECK: integer_literal $Builtin.Int2048, 1                      {{.*}} line:[[@LINE-6]]:33
   // CHECK: integer_literal $Builtin.Int2048, 2                      {{.*}} line:[[@LINE-7]]:48
 
-  
-  
+
+
 }
 
 
@@ -284,7 +284,7 @@ func test_isa_2(p: P) {
   case _:
     a()
   }
-  
+
 
 
   // CHECK-LABEL: sil hidden @_TF13sil_locations10test_isa_2
@@ -295,7 +295,7 @@ func test_isa_2(p: P) {
   //
   // CHECK: checked_cast_addr_br                                     {{.*}} line:[[@LINE-14]]:9
   // CHECK: load                                                     {{.*}} line:[[@LINE-15]]:9
-    
+
 }
 
 func runcibleWhy() {}
@@ -313,8 +313,8 @@ func printSinglePayloadAddressOnly(v:SinglePayloadAddressOnly) {
   case .y:
     runcibleWhy()
   }
-  
-  
+
+
   // CHECK_LABEL: sil hidden @_TF13sil_locations29printSinglePayloadAddressOnly
   // CHECK: bb0
   // CHECK: switch_enum_addr {{.*}} [[FALSE_BB:bb[0-9]+]] // {{.*}} line:[[@LINE-10]]:3
@@ -324,14 +324,14 @@ func printSinglePayloadAddressOnly(v:SinglePayloadAddressOnly) {
 
 
 func testStringForEachStmt() {
-  var i = 0;
+  var i = 0
   for index in 1..<20 {
     i += 1
     if i == 15 {
       break
     }
   }
-  
+
   // CHECK-LABEL: sil hidden @_TF13sil_locations21testStringForEachStmtFT_T_
   // CHECK: br         {{.*}} line:[[@LINE-8]]:3
   // CHECK: cond_br {{.*}} line:[[@LINE-9]]:3
@@ -342,10 +342,10 @@ func testStringForEachStmt() {
   // CHECK: br         {{.*}} line:[[@LINE-9]]:3
   // Condition is false branch:
   // CHECK: br         {{.*}} line:[[@LINE-16]]:3
-  
-  
-  
-  
+
+
+
+
 }
 
 
@@ -380,23 +380,23 @@ func testForStmt() {
 
 
 func testRepeatWhile() {
-  var m = 0;
+  var m = 0
   repeat {
     m += 1
   } while (m < 200)
-  
-  
+
+
   // CHECK-LABEL: sil hidden @_TF13sil_locations15testRepeatWhileFT_T_
   // CHECK: br         {{.*}} line:[[@LINE-6]]:3
   // CHECK: cond_br {{.*}} line:[[@LINE-5]]:11
   // Loop back branch:
-  // CHECK: br         {{.*}} line:[[@LINE-7]]:11  
+  // CHECK: br         {{.*}} line:[[@LINE-7]]:11
 }
 
 
 
 func testWhile() {
-  var m = 0;
+  var m = 0
   while m < 100 {
     m += 1
     if m > 5 {
@@ -404,7 +404,7 @@ func testWhile() {
     }
     m += 1
   }
-  
+
   // CHECK-LABEL: sil hidden @_TF13sil_locations9testWhileFT_T_
   // CHECK: br         {{.*}} line:[[@LINE-9]]:3
   // While loop conditional branch:
@@ -417,5 +417,5 @@ func testWhile() {
   // CHECK: br         {{.*}} line:[[@LINE-11]]:3
 
 
-  
+
 }

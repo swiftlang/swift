@@ -35,6 +35,27 @@ class SILBuilder;
 class ProjectionPath;
 using ProjectionPathList = llvm::SmallVector<Optional<ProjectionPath>, 8>;
 
+enum class SubSeqRelation_t : uint8_t {
+  Unknown,
+  LHSStrictSubSeqOfRHS,
+  RHSStrictSubSeqOfLHS,
+  Equal,
+};
+
+/// Returns true if Seq is either LHSStrictSubSeqOfRHS or
+/// RHSStrictSubSeqOfLHS. Returns false if Seq is one of either Equal or
+/// Unrelated.
+inline bool isStrictSubSeqRelation(SubSeqRelation_t Seq) {
+  switch (Seq) {
+  case SubSeqRelation_t::Unknown:
+  case SubSeqRelation_t::Equal:
+    return false;
+  case SubSeqRelation_t::LHSStrictSubSeqOfRHS:
+  case SubSeqRelation_t::RHSStrictSubSeqOfLHS:
+    return true;
+  }
+}
+
 /// Extract an integer index from a SILValue.
 ///
 /// Return true if IndexVal is a constant index representable as unsigned
@@ -42,7 +63,7 @@ using ProjectionPathList = llvm::SmallVector<Optional<ProjectionPath>, 8>;
 bool getIntegerIndex(SILValue IndexVal, unsigned &IndexConst);
 
 /// Given a SIL value, capture its element index and the value of the aggregate
-/// that immeditely contains it.
+/// that immediately contains it.
 ///
 /// This lightweight utility maps a SIL address projection to an index.
 struct ProjectionIndex {
@@ -343,27 +364,6 @@ private:
   explicit Projection(UncheckedEnumDataInst *UEDAI);
 };
 
-enum class SubSeqRelation_t : uint8_t {
-  Unrelated = 0,
-  LHSStrictSubSeqOfRHS = 1,
-  RHSStrictSubSeqOfLHS = 2,
-  Equal = 3
-};
-
-/// Returns true if Seq is either LHSStrictSubSeqOfRHS or
-/// RHSStrictSubSeqOfLHS. Returns false if Seq is one of either Equal or
-/// Unrelated.
-inline bool isStrictSubSeqRelation(SubSeqRelation_t Seq) {
-  switch (Seq) {
-  case SubSeqRelation_t::Unrelated:
-  case SubSeqRelation_t::Equal:
-    return false;
-  case SubSeqRelation_t::LHSStrictSubSeqOfRHS:
-  case SubSeqRelation_t::RHSStrictSubSeqOfLHS:
-    return true;
-  }
-}
-
 /// A "path" of projections abstracting either value or aggregate projections
 /// upon a value.
 ///
@@ -394,7 +394,7 @@ public:
   /// We only allow for moves of ProjectionPath since we only want them to be
   /// able to be constructed by calling our factory method or by going through
   /// the append function.
-  ProjectionPath(ProjectionPath &&Other) : Path(Other.Path) {}
+  ProjectionPath(ProjectionPath &&Other) : Path(std::move(Other.Path)) {}
 
   /// Append the projection P onto this.
   ProjectionPath &append(const Projection &P) {
@@ -411,8 +411,7 @@ public:
   }
 
   ProjectionPath &operator=(ProjectionPath &&O) {
-    *this = std::move(O);
-    O.Path.clear();
+    std::swap(Path, O.Path);
     return *this;
   }
 
@@ -429,11 +428,21 @@ public:
   subtractPaths(const ProjectionPath &LHS, const ProjectionPath &RHS);
 
   /// Given the SILType Base, expand every leaf nodes in the type tree.
-  /// Include the intermediate nodes if OnlyLeafNode is false.
+  ///
+  /// NOTE: this function returns a single empty projection path if the BaseType
+  /// is a leaf node in the type tree.
   static void expandTypeIntoLeafProjectionPaths(SILType BaseType,
                                                 SILModule *Mod,
-                                                ProjectionPathList &P,
-                                                bool OnlyLeafNode);
+                                                ProjectionPathList &P);
+
+  /// Given the SILType Base, expand every intermediate and leaf nodes in the
+  /// type tree.
+  ///
+  /// NOTE: this function returns a single empty projection path if the BaseType
+  /// is a leaf node in the type tree.
+  static void expandTypeIntoNodeProjectionPaths(SILType BaseType,
+                                                SILModule *Mod,
+                                                ProjectionPathList &P);
 
   /// Returns true if the two paths have a non-empty symmetric difference.
   ///
@@ -615,11 +624,11 @@ public:
   }
 
   bool isRoot() const {
-    // Root does not have a parent. So if we have a parent, we can not be root.
+    // Root does not have a parent. So if we have a parent, we cannot be root.
     if (Parent.hasValue()) {
       assert(Proj.hasValue() && "If parent is not none, then P should be not "
              "none");
-      assert(Index != RootIndex && "If parent is not none, we can not be root");
+      assert(Index != RootIndex && "If parent is not none, we cannot be root");
       return false;
     } else {
       assert(!Proj.hasValue() && "If parent is none, then P should be none");

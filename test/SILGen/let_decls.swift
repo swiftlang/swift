@@ -152,7 +152,7 @@ func testGetOnlySubscript(x : GetOnlySubscriptStruct, idx : Int) -> Int {
 extension Optional {
   func getLV() -> Int { }
 }
-struct CloseOverAddressOnlyConstant<T>  {
+struct CloseOverAddressOnlyConstant<T> {
   func isError() {
     let AOV = Optional<T>()
     takeClosure({ AOV.getLV() })
@@ -315,11 +315,11 @@ func testLetArchetypeBases<T : SimpleProtocol>(p : T) {
 
 // CHECK-LABEL: sil hidden @{{.*}}testDebugValue
 // CHECK: bb0(%0 : $Int, %1 : $*SimpleProtocol):
-// CHECK-NEXT: debug_value %0 : $Int  // let a
-// CHECK-NEXT: debug_value_addr %1 : $*SimpleProtocol  // let b
+// CHECK-NEXT: debug_value %0 : $Int, let, name "a"
+// CHECK-NEXT: debug_value_addr %1 : $*SimpleProtocol, let, name "b"
 func testDebugValue(a : Int, b : SimpleProtocol) -> Int {
 
-  // CHECK-NEXT: debug_value %0 : $Int  // let x
+  // CHECK-NEXT: debug_value %0 : $Int, let, name "x"
   let x = a
 
   // CHECK: apply
@@ -335,7 +335,7 @@ func testDebugValue(a : Int, b : SimpleProtocol) -> Int {
 // CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyTupleArgument
 func testAddressOnlyTupleArgument(bounds: (start: SimpleProtocol, pastEnd: Int)) {
 // CHECK:       bb0(%0 : $*SimpleProtocol, %1 : $Int):
-// CHECK-NEXT:    %2 = alloc_stack $(start: SimpleProtocol, pastEnd: Int)  // let bounds
+// CHECK-NEXT:    %2 = alloc_stack $(start: SimpleProtocol, pastEnd: Int), let, name "bounds"
 // CHECK-NEXT:    %3 = tuple_element_addr %2#1 : $*(start: SimpleProtocol, pastEnd: Int), 0
 // CHECK-NEXT:    copy_addr [take] %0 to [initialization] %3 : $*SimpleProtocol
 // CHECK-NEXT:    %5 = tuple_element_addr %2#1 : $*(start: SimpleProtocol, pastEnd: Int), 1
@@ -389,7 +389,7 @@ struct StructMemberTest {
   }
   // CHECK-LABEL: sil hidden @{{.*}}testIntMemberLoad{{.*}} : $@convention(method) (@guaranteed StructMemberTest)
   // CHECK: bb0(%0 : $StructMemberTest):
-  // CHECK:  debug_value %0 : $StructMemberTest  // let self
+  // CHECK:  debug_value %0 : $StructMemberTest, let, name "self"
   // CHECK:  %2 = struct_extract %0 : $StructMemberTest, #StructMemberTest.i
   // CHECK-NOT:  release_value %0 : $StructMemberTest
   // CHECK:  return %2 : $Int
@@ -400,7 +400,7 @@ struct StructMemberTest {
   }
   // CHECK-LABEL: sil hidden @{{.*}}testRecursiveIntMemberLoad{{.*}} : $@convention(method) (@guaranteed StructMemberTest)
   // CHECK: bb0(%0 : $StructMemberTest):
-  // CHECK:  debug_value %0 : $StructMemberTest  // let self
+  // CHECK:  debug_value %0 : $StructMemberTest, let, name "self"
   // CHECK:  %2 = struct_extract %0 : $StructMemberTest, #StructMemberTest.s
   // CHECK:  %3 = struct_extract %2 : $AnotherStruct, #AnotherStruct.i
   // CHECK-NOT:  release_value %0 : $StructMemberTest
@@ -411,7 +411,7 @@ struct StructMemberTest {
   }
   // CHECK-LABEL: sil hidden @{{.*}}testTupleMemberLoad{{.*}} : $@convention(method) (@guaranteed StructMemberTest)
   // CHECK: bb0(%0 : $StructMemberTest):
-  // CHECK-NEXT:   debug_value %0 : $StructMemberTest  // let self
+  // CHECK-NEXT:   debug_value %0 : $StructMemberTest, let, name "self"
   // CHECK-NEXT:   [[T0:%.*]] = struct_extract %0 : $StructMemberTest, #StructMemberTest.t
   // CHECK-NEXT:   [[T1:%.*]] = tuple_extract [[T0]] : $(Int, AnotherStruct), 0
   // CHECK-NEXT:   [[T2:%.*]] = tuple_extract [[T0]] : $(Int, AnotherStruct), 1
@@ -429,7 +429,7 @@ struct GenericStruct<T> {
   }
   // CHECK-LABEL: sil hidden @{{.*}}GenericStruct4getA{{.*}} : $@convention(method) <T> (@out T, @in_guaranteed GenericStruct<T>)
   // CHECK: bb0(%0 : $*T, %1 : $*GenericStruct<T>):
-  // CHECK-NEXT: debug_value_addr %1 : $*GenericStruct<T>  // let self
+  // CHECK-NEXT: debug_value_addr %1 : $*GenericStruct<T>, let, name "self"
   // CHECK-NEXT: %3 = struct_element_addr %1 : $*GenericStruct<T>, #GenericStruct.a
   // CHECK-NEXT: copy_addr %3 to [initialization] %0 : $*T
   // CHECK-NEXT: %5 = tuple ()
@@ -441,7 +441,7 @@ struct GenericStruct<T> {
   
   // CHECK-LABEL: sil hidden @{{.*}}GenericStruct4getB{{.*}} : $@convention(method) <T> (@in_guaranteed GenericStruct<T>) -> Int
   // CHECK: bb0(%0 : $*GenericStruct<T>):
-  // CHECK-NEXT: debug_value_addr %0 : $*GenericStruct<T>  // let self
+  // CHECK-NEXT: debug_value_addr %0 : $*GenericStruct<T>, let, name "self"
   // CHECK-NEXT: %2 = struct_element_addr %0 : $*GenericStruct<T>, #GenericStruct.b
   // CHECK-NEXT: %3 = load %2 : $*Int
   // CHECK-NOT: destroy_addr %0 : $*GenericStruct<T>
@@ -497,7 +497,7 @@ struct LetDeclInStruct {
 func test_unassigned_let_constant() {
   let string : String
 }
-// CHECK: [[S:%[0-9]+]] = alloc_stack $String  // let string
+// CHECK: [[S:%[0-9]+]] = alloc_stack $String, let, name "string"
 // CHECK-NEXT:  [[MUI:%[0-9]+]] = mark_uninitialized [var] [[S]]#1 : $*String
 // CHECK-NEXT:  destroy_addr [[MUI]] : $*String
 // CHECK-NEXT:  dealloc_stack [[S]]#0 : $*@local_storage String

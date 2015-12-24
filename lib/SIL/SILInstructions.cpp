@@ -1,4 +1,4 @@
-//===--- SILInstruction.cpp - Instructions for SIL code -------------------===//
+//===--- SILInstructions.cpp - Instructions for SIL code ------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -45,10 +45,36 @@ static SILTypeList *getAllocStackType(SILType eltTy, SILFunction &F) {
   return F.getModule().getSILTypeList(resTys);
 }
 
+template <typename INST>
+static void *allocateDebugVarCarryingInst(SILModule &M, SILDebugVariable Var) {
+  return M.allocateInst(sizeof(INST) + Var.Name.size(), alignof(INST));
+}
+
+TailAllocatedDebugVariable::TailAllocatedDebugVariable(SILDebugVariable Var,
+                                                       char *buf)
+    : ArgNo(Var.ArgNo), NameLength(Var.Name.size()), Constant(Var.Constant) {
+  assert((Var.ArgNo < (2<<16)) && "too many arguments");
+  assert((NameLength < (2<<15)) && "variable name too long");
+  memcpy(buf, Var.Name.data(), NameLength);
+}
+
+StringRef TailAllocatedDebugVariable::getName(const char *buf) const {
+  return NameLength ? StringRef(buf, NameLength) : StringRef();
+}
+
 AllocStackInst::AllocStackInst(SILDebugLocation *Loc, SILType elementType,
-                               SILFunction &F, unsigned ArgNo)
+                               SILFunction &F, SILDebugVariable Var)
     : AllocationInst(ValueKind::AllocStackInst, Loc,
-                     getAllocStackType(elementType, F)), VarInfo(ArgNo) {}
+                     getAllocStackType(elementType, F)),
+      VarInfo(Var, reinterpret_cast<char *>(this + 1)) {}
+
+AllocStackInst *AllocStackInst::create(SILDebugLocation *Loc,
+                                       SILType elementType, SILFunction &F,
+                                       SILDebugVariable Var) {
+  void *buf = allocateDebugVarCarryingInst<AllocStackInst>(F.getModule(), Var);
+  return ::new (buf)
+      AllocStackInst(Loc, elementType, F, Var);
+}
 
 /// getDecl - Return the underlying variable declaration associated with this
 /// allocation, or null if this is a temporary allocation.
@@ -75,15 +101,45 @@ static SILTypeList *getAllocBoxType(SILType EltTy, SILFunction &F) {
 }
 
 AllocBoxInst::AllocBoxInst(SILDebugLocation *Loc, SILType ElementType,
-                           SILFunction &F, unsigned ArgNo)
+                           SILFunction &F, SILDebugVariable Var)
     : AllocationInst(ValueKind::AllocBoxInst, Loc,
                      getAllocBoxType(ElementType, F)),
-      VarInfo(ArgNo) {}
+      VarInfo(Var, reinterpret_cast<char *>(this + 1)) {}
+
+AllocBoxInst *AllocBoxInst::create(SILDebugLocation *Loc, SILType ElementType,
+                                   SILFunction &F, SILDebugVariable Var) {
+  void *buf = allocateDebugVarCarryingInst<AllocStackInst>(F.getModule(), Var);
+  return ::new (buf) AllocBoxInst(Loc, ElementType, F, Var);
+}
 
 /// getDecl - Return the underlying variable declaration associated with this
 /// allocation, or null if this is a temporary allocation.
 VarDecl *AllocBoxInst::getDecl() const {
   return getLoc().getAsASTNode<VarDecl>();
+}
+
+DebugValueInst::DebugValueInst(SILDebugLocation *DebugLoc, SILValue Operand,
+                               SILDebugVariable Var)
+    : UnaryInstructionBase(DebugLoc, Operand),
+      VarInfo(Var, reinterpret_cast<char *>(this + 1)) {}
+
+DebugValueInst *DebugValueInst::create(SILDebugLocation *DebugLoc,
+                                       SILValue Operand, SILModule &M,
+                                       SILDebugVariable Var) {
+  void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var);
+  return ::new (buf) DebugValueInst(DebugLoc, Operand, Var);
+}
+
+DebugValueAddrInst::DebugValueAddrInst(SILDebugLocation *DebugLoc,
+                                       SILValue Operand, SILDebugVariable Var)
+    : UnaryInstructionBase(DebugLoc, Operand),
+      VarInfo(Var, reinterpret_cast<char *>(this + 1)) {}
+
+DebugValueAddrInst *DebugValueAddrInst::create(SILDebugLocation *DebugLoc,
+                                               SILValue Operand, SILModule &M,
+                                               SILDebugVariable Var) {
+  void *buf = allocateDebugVarCarryingInst<DebugValueAddrInst>(M, Var);
+  return ::new (buf) DebugValueAddrInst(DebugLoc, Operand, Var);
 }
 
 VarDecl *DebugValueInst::getDecl() const {
@@ -127,8 +183,8 @@ AllocExistentialBoxInst *AllocExistentialBoxInst::create(
     SILType ConcreteLoweredType, ArrayRef<ProtocolConformance *> Conformances,
     SILFunction *F) {
   SILModule &Mod = F->getModule();
-  void *Buffer = Mod.allocate(sizeof(AllocExistentialBoxInst),
-                              alignof(AllocExistentialBoxInst));
+  void *Buffer = Mod.allocateInst(sizeof(AllocExistentialBoxInst),
+                                  alignof(AllocExistentialBoxInst));
   for (ProtocolConformance *C : Conformances)
     declareWitnessTable(Mod, C);
   return ::new (Buffer) AllocExistentialBoxInst(Loc,
@@ -143,7 +199,7 @@ BuiltinInst *BuiltinInst::create(SILDebugLocation *Loc, Identifier Name,
                                  ArrayRef<Substitution> Substitutions,
                                  ArrayRef<SILValue> Args,
                                  SILFunction &F) {
-  void *Buffer = F.getModule().allocate(
+  void *Buffer = F.getModule().allocateInst(
                               sizeof(BuiltinInst)
                                 + decltype(Operands)::getExtraSize(Args.size())
                                 + sizeof(Substitution) * Substitutions.size(),
@@ -190,7 +246,7 @@ bool swift::doesApplyCalleeHaveSemantics(SILValue callee, StringRef semantics) {
 }
 
 void *swift::allocateApplyInst(SILFunction &F, size_t size, size_t alignment) {
-  return F.getModule().allocate(size, alignment);
+  return F.getModule().allocateInst(size, alignment);
 }
 
 PartialApplyInst::PartialApplyInst(SILDebugLocation *Loc, SILValue Callee,
@@ -276,14 +332,14 @@ static unsigned getWordsForBitWidth(unsigned bits) {
 
 template<typename INST>
 static void *allocateLiteralInstWithTextSize(SILFunction &F, unsigned length) {
-  return F.getModule().allocate(sizeof(INST) + length, alignof(INST));
+  return F.getModule().allocateInst(sizeof(INST) + length, alignof(INST));
 }
 
 template<typename INST>
 static void *allocateLiteralInstWithBitSize(SILFunction &F, unsigned bits) {
   unsigned words = getWordsForBitWidth(bits);
-  return F.getModule().allocate(sizeof(INST) + sizeof(llvm::integerPart)*words,
-                                alignof(INST));
+  return F.getModule().allocateInst(
+      sizeof(INST) + sizeof(llvm::integerPart)*words, alignof(INST));
 }
 
 IntegerLiteralInst::IntegerLiteralInst(SILDebugLocation *Loc, SILType Ty,
@@ -409,7 +465,7 @@ AssignInst::AssignInst(SILDebugLocation *Loc, SILValue Src, SILValue Dest)
 MarkFunctionEscapeInst *
 MarkFunctionEscapeInst::create(SILDebugLocation *Loc,
                                ArrayRef<SILValue> Elements, SILFunction &F) {
-  void *Buffer = F.getModule().allocate(sizeof(MarkFunctionEscapeInst) +
+  void *Buffer = F.getModule().allocateInst(sizeof(MarkFunctionEscapeInst) +
                               decltype(Operands)::getExtraSize(Elements.size()),
                                         alignof(MarkFunctionEscapeInst));
   return ::new(Buffer) MarkFunctionEscapeInst(Loc, Elements);
@@ -452,7 +508,7 @@ UnconditionalCheckedCastAddrInst::UnconditionalCheckedCastAddrInst(
 
 StructInst *StructInst::create(SILDebugLocation *Loc, SILType Ty,
                                ArrayRef<SILValue> Elements, SILFunction &F) {
-  void *Buffer = F.getModule().allocate(sizeof(StructInst) +
+  void *Buffer = F.getModule().allocateInst(sizeof(StructInst) +
                             decltype(Operands)::getExtraSize(Elements.size()),
                             alignof(StructInst));
   return ::new(Buffer) StructInst(Loc, Ty, Elements);
@@ -466,7 +522,7 @@ StructInst::StructInst(SILDebugLocation *Loc, SILType Ty,
 
 TupleInst *TupleInst::create(SILDebugLocation *Loc, SILType Ty,
                              ArrayRef<SILValue> Elements, SILFunction &F) {
-  void *Buffer = F.getModule().allocate(sizeof(TupleInst) +
+  void *Buffer = F.getModule().allocateInst(sizeof(TupleInst) +
                             decltype(Operands)::getExtraSize(Elements.size()),
                             alignof(TupleInst));
   return ::new(Buffer) TupleInst(Loc, Ty, Elements);
@@ -486,7 +542,7 @@ bool TupleExtractInst::isTrivialEltOfOneRCIDTuple() const {
   if (!getType().isTrivial(Mod))
     return false;
 
-  // If the elt we are extracting is trivial, we can not have any non trivial
+  // If the elt we are extracting is trivial, we cannot have any non trivial
   // fields.
   if (getOperand().getType().isTrivial(Mod))
     return false;
@@ -529,7 +585,7 @@ bool TupleExtractInst::isTrivialEltOfOneRCIDTuple() const {
 bool TupleExtractInst::isEltOnlyNonTrivialElt() const {
   SILModule &Mod = getModule();
 
-  // If the elt we are extracting is trivial, we can not be a non-trivial
+  // If the elt we are extracting is trivial, we cannot be a non-trivial
   // field... return false.
   if (getType().isTrivial(Mod))
     return false;
@@ -569,7 +625,7 @@ bool StructExtractInst::isTrivialFieldOfOneRCIDStruct() const {
 
   SILType StructTy = getOperand().getType();
 
-  // If the elt we are extracting is trivial, we can not have any non trivial
+  // If the elt we are extracting is trivial, we cannot have any non trivial
   // fields.
   if (StructTy.isTrivial(Mod))
     return false;
@@ -613,7 +669,7 @@ bool StructExtractInst::isTrivialFieldOfOneRCIDStruct() const {
 bool StructExtractInst::isFieldOnlyNonTrivialField() const {
   SILModule &Mod = getModule();
 
-  // If the field we are extracting is trivial, we can not be a non-trivial
+  // If the field we are extracting is trivial, we cannot be a non-trivial
   // field... return false.
   if (getType().isTrivial(Mod))
     return false;
@@ -669,7 +725,7 @@ BranchInst *BranchInst::create(SILDebugLocation *Loc, SILBasicBlock *DestBB,
 BranchInst *BranchInst::create(SILDebugLocation *Loc,
                                SILBasicBlock *DestBB, ArrayRef<SILValue> Args,
                                SILFunction &F) {
-  void *Buffer = F.getModule().allocate(sizeof(BranchInst) +
+  void *Buffer = F.getModule().allocateInst(sizeof(BranchInst) +
                               decltype(Operands)::getExtraSize(Args.size()),
                             alignof(BranchInst));
   return ::new (Buffer) BranchInst(Loc, DestBB, Args);
@@ -703,7 +759,7 @@ CondBranchInst::create(SILDebugLocation *Loc, SILValue Condition,
   Args.append(TrueArgs.begin(), TrueArgs.end());
   Args.append(FalseArgs.begin(), FalseArgs.end());
 
-  void *Buffer = F.getModule().allocate(sizeof(CondBranchInst) +
+  void *Buffer = F.getModule().allocateInst(sizeof(CondBranchInst) +
                               decltype(Operands)::getExtraSize(Args.size()),
                             alignof(CondBranchInst));
   return ::new (Buffer) CondBranchInst(Loc, Condition, TrueBB, FalseBB, Args,
@@ -720,7 +776,7 @@ OperandValueArrayRef CondBranchInst::getFalseArgs() const {
 
 SILValue
 CondBranchInst::getArgForDestBB(SILBasicBlock *DestBB, SILArgument *A) {
-  // If TrueBB and FalseBB equal, we can not find an arg for this DestBB so
+  // If TrueBB and FalseBB equal, we cannot find an arg for this DestBB so
   // return an empty SILValue.
   if (getTrueBB() == getFalseBB()) {
     assert(DestBB == getTrueBB() && "DestBB is not a target of this cond_br");
@@ -806,6 +862,12 @@ SwitchValueInst::SwitchValueInst(SILDebugLocation *Loc, SILValue Operand,
   }
 
   for (unsigned i = 0, size = Cases.size(); i < size; ++i) {
+    // If we have undef, just add the case and continue.
+    if (isa<SILUndef>(Cases[i])) {
+      ::new (succs + i) SILSuccessor(this, BBs[i]);
+      continue;
+    }
+
     if (OperandBitWidth) {
       auto *IL = dyn_cast<IntegerLiteralInst>(Cases[i]);
       assert(IL && "switch_value case value should be of an integer type");
@@ -853,7 +915,7 @@ SwitchValueInst *SwitchValueInst::create(
   size_t bufSize = sizeof(SwitchValueInst) +
                    decltype(Operands)::getExtraSize(Cases.size()) +
                    sizeof(SILSuccessor) * numSuccessors;
-  void *buf = F.getModule().allocate(bufSize, alignof(SwitchValueInst));
+  void *buf = F.getModule().allocateInst(bufSize, alignof(SwitchValueInst));
   return ::new (buf) SwitchValueInst(Loc, Operand, DefaultBB, Cases, BBs);
 }
 
@@ -901,7 +963,7 @@ SelectValueInst::create(SILDebugLocation *Loc, SILValue Operand, SILType Type,
 
   size_t bufSize = sizeof(SelectValueInst) + decltype(Operands)::getExtraSize(
                                                CaseValuesAndResults.size());
-  void *buf = F.getModule().allocate(bufSize, alignof(SelectValueInst));
+  void *buf = F.getModule().allocateInst(bufSize, alignof(SelectValueInst));
   return ::new (buf)
       SelectValueInst(Loc, Operand, Type, DefaultResult, CaseValuesAndResults);
 }
@@ -942,7 +1004,7 @@ SELECT_ENUM_INST *SelectEnumInstBase::createSelectEnum(
   // and `CaseBBs.size() + (DefaultBB ? 1 : 0)` values.
   unsigned numCases = CaseValues.size();
 
-  void *buf = F.getModule().allocate(
+  void *buf = F.getModule().allocateInst(
     sizeof(SELECT_ENUM_INST) + sizeof(EnumElementDecl*) * numCases
      + TailAllocatedOperandList<1>::getExtraSize(numCases + (bool)DefaultValue),
     alignof(SELECT_ENUM_INST));
@@ -1063,7 +1125,7 @@ SWITCH_ENUM_INST *SwitchEnumInstBase::createSwitchEnum(
   unsigned numCases = CaseBBs.size();
   unsigned numSuccessors = numCases + (DefaultBB ? 1 : 0);
 
-  void *buf = F.getModule().allocate(sizeof(SWITCH_ENUM_INST)
+  void *buf = F.getModule().allocateInst(sizeof(SWITCH_ENUM_INST)
                                        + sizeof(EnumElementDecl*) * numCases
                                        + sizeof(SILSuccessor) * numSuccessors,
                                      alignof(SWITCH_ENUM_INST));
@@ -1129,8 +1191,8 @@ DynamicMethodBranchInst *
 DynamicMethodBranchInst::create(SILDebugLocation *Loc, SILValue Operand,
                                 SILDeclRef Member, SILBasicBlock *HasMethodBB,
                                 SILBasicBlock *NoMethodBB, SILFunction &F) {
-  void *Buffer = F.getModule().allocate(sizeof(DynamicMethodBranchInst),
-                                        alignof(DynamicMethodBranchInst));
+  void *Buffer = F.getModule().allocateInst(sizeof(DynamicMethodBranchInst),
+                                            alignof(DynamicMethodBranchInst));
   return ::new (Buffer)
       DynamicMethodBranchInst(Loc, Operand, Member, HasMethodBB, NoMethodBB);
 }
@@ -1172,7 +1234,7 @@ WitnessMethodInst::create(SILDebugLocation *Loc, CanType LookupType,
                           SILValue OpenedExistential, bool Volatile) {
   SILModule &Mod = F->getModule();
   void *Buffer =
-      Mod.allocate(sizeof(WitnessMethodInst), alignof(WitnessMethodInst));
+      Mod.allocateInst(sizeof(WitnessMethodInst), alignof(WitnessMethodInst));
 
   declareWitnessTable(Mod, Conformance);
   return ::new (Buffer) WitnessMethodInst(Loc, LookupType, Conformance, Member,
@@ -1184,8 +1246,8 @@ InitExistentialAddrInst *InitExistentialAddrInst::create(
     SILType ConcreteLoweredType, ArrayRef<ProtocolConformance *> Conformances,
     SILFunction *F) {
   SILModule &Mod = F->getModule();
-  void *Buffer = Mod.allocate(sizeof(InitExistentialAddrInst),
-                              alignof(InitExistentialAddrInst));
+  void *Buffer = Mod.allocateInst(sizeof(InitExistentialAddrInst),
+                                  alignof(InitExistentialAddrInst));
   for (ProtocolConformance *C : Conformances)
     declareWitnessTable(Mod, C);
   return ::new (Buffer) InitExistentialAddrInst(Loc, Existential,
@@ -1200,8 +1262,8 @@ InitExistentialRefInst::create(SILDebugLocation *Loc, SILType ExistentialType,
                                ArrayRef<ProtocolConformance *> Conformances,
                                SILFunction *F) {
   SILModule &Mod = F->getModule();
-  void *Buffer = Mod.allocate(sizeof(InitExistentialRefInst),
-                              alignof(InitExistentialRefInst));
+  void *Buffer = Mod.allocateInst(sizeof(InitExistentialRefInst),
+                                  alignof(InitExistentialRefInst));
   for (ProtocolConformance *C : Conformances) {
     if (!C)
       continue;
@@ -1235,7 +1297,7 @@ InitExistentialMetatypeInst *InitExistentialMetatypeInst::create(
   unsigned size = sizeof(InitExistentialMetatypeInst);
   size += conformances.size() * sizeof(ProtocolConformance *);
 
-  void *buffer = M.allocate(size, alignof(InitExistentialMetatypeInst));
+  void *buffer = M.allocateInst(size, alignof(InitExistentialMetatypeInst));
   for (ProtocolConformance *conformance : conformances)
     if (!M.lookUpWitnessTable(conformance, false).first)
       declareWitnessTable(M, conformance);

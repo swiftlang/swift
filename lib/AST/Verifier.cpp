@@ -246,7 +246,7 @@ struct ASTNodeBase {};
 #undef DISPATCH
       }
 
-      llvm_unreachable("Unhandled declaratiom kind");
+      llvm_unreachable("Unhandled declaration kind");
     }
 
   private:
@@ -436,7 +436,7 @@ struct ASTNodeBase {};
             return false;
 
           // We should know about archetypes corresponding to opened
-          // existerntial archetypes.
+          // existential archetypes.
           if (archetype->getOpenedExistentialType()) {
             if (OpenedExistentialArchetypes.count(archetype) == 0) {
               Out << "Found opened existential archetype "
@@ -462,8 +462,8 @@ struct ASTNodeBase {};
               } while (!activeScope->isModuleScopeContext());
             }
 
-            Out << "AST verification error: archetype " << archetype
-                << " not allowed in this context\n";
+            Out << "AST verification error: archetype "
+                << archetype->getString() << " not allowed in this context\n";
 
             auto knownDC = Ctx.ArchetypeContexts.find(archetype);
             if (knownDC != Ctx.ArchetypeContexts.end()) {
@@ -674,8 +674,8 @@ struct ASTNodeBase {};
 
       if (auto Overridden = D->getOverriddenDecl()) {
         if (D->getDeclContext() == Overridden->getDeclContext()) {
-          PrettyStackTraceDecl debugStack("verifying overriden", D);
-          Out << "can not override a decl in the same DeclContext";
+          PrettyStackTraceDecl debugStack("verifying overridden", D);
+          Out << "cannot override a decl in the same DeclContext";
           D->dump(Out);
           Overridden->dump(Out);
           abort();
@@ -814,6 +814,13 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(DeclRefExpr *E) {
+      if (E->getType()->is<InOutType>()) {
+        PrettyStackTraceExpr debugStack(Ctx, "verifying decl reference", E);
+        Out << "reference with inout type "
+          << E->getType().getString() << "\n";
+        E->dump(Out);
+        abort();
+      }
       if (E->getType()->is<PolymorphicFunctionType>()) {
         PrettyStackTraceExpr debugStack(Ctx, "verifying decl reference", E);
         Out << "unspecialized reference with polymorphic type "
@@ -1907,7 +1914,7 @@ struct ASTNodeBase {};
       PrettyStackTraceDecl debugStack("verifying DestructorDecl", DD);
 
       if (DD->isGeneric()) {
-        Out << "DestructorDecl can not be generic";
+        Out << "DestructorDecl cannot be generic";
         abort();
       }
       if (DD->getBodyParamPatterns().size() != 1) {
@@ -2598,8 +2605,10 @@ struct ASTNodeBase {};
     void checkMangling(ValueDecl *D) {
       llvm::SmallString<32> Buf;
       llvm::raw_svector_ostream OS(Buf);
+      {
       Mangle::Mangler Mangler(OS);
       Mangler.mangleDeclName(D);
+      }
       if (OS.str().empty()) {
         Out << "Mangler gave empty string for a ValueDecl";
         abort();
