@@ -66,7 +66,7 @@ OptionalTests.test("nil comparison") {
 
 func testRelation(p: (Int?, Int?) -> Bool) -> [Bool] {
   typealias optPair = (Int?, Int?)
-
+  
   let relationships: [optPair] = [
     (1, 1), (1, 2), (2, 1), (1, .None), (.None, 1), (.None, .None)
   ]
@@ -110,7 +110,7 @@ OptionalTests.test("nil comparison") {
 
   let e0: E? = nil
   let e1: E? = E()
-
+  
   expectFalse(e1 == nil)
   expectTrue(e1 != nil)
   expectTrue(e0 == nil)

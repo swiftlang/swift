@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -parse-as-library -emit-silgen -verify %s | FileCheck %s
 
-class MyClass {
+class MyClass { 
   func foo() { }
 }
 
@@ -151,7 +151,7 @@ func do_loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
   bar(x);
 }
 
-// CHECK-LABEL: sil hidden  @_TF10statements21do_loop_with_continue
+// CHECK-LABEL: sil hidden  @_TF10statements21do_loop_with_continue 
 
 
 // CHECK-LABEL: sil hidden  @{{.*}}for_loops1
@@ -160,15 +160,15 @@ func for_loops1(x: Int, c: Bool) {
   for i in 1..<100 {
     markUsed(i)
   }
-
+  
   for ; x < 40;  { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
    markUsed(x)
    x += 1
   }
-
+  
   for var i = 0; i < 100; i += 1 { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   }
-
+  
   for let i = 0; i < 100; i { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}}
   }
 }
@@ -185,7 +185,7 @@ func for_loops2() {
     obj.foo()
   }
 
-  return
+  return 
 }
 
 func void_return() {
@@ -240,8 +240,8 @@ func for_each_loop(x: [C]) {
 // CHECK-LABEL: sil hidden @{{.*}}test_break
 func test_break(i : Int) {
   switch i {
-  case (let x) where x != 17:
-    if x == 42 { break }
+  case (let x) where x != 17: 
+    if x == 42 { break } 
     markUsed(x)
   default:
     break
@@ -362,7 +362,7 @@ func test_do() {
     // CHECK: [[OBJ:%.*]] = apply [[CTOR]](
     let obj = MyClass()
     _ = obj
-
+    
     // CHECK: [[BAR:%.*]] = function_ref @_TF10statements3barFSiT_
     // CHECK: integer_literal $Builtin.Int2048, 1
     // CHECK: apply [[BAR]](
@@ -448,7 +448,7 @@ func defer_test1() {
   defer { callee1() }
   defer { callee2() }
   callee3()
-
+  
   // CHECK: [[C3:%.*]] = function_ref @{{.*}}callee3FT_T_
   // CHECK: apply [[C3]]
   // CHECK: [[C2:%.*]] = function_ref @{{.*}}_TFF10statements11defer_test1FT_T_L0_6$deferFT_T_
@@ -468,7 +468,7 @@ func defer_test2(cond : Bool) {
   // CHECK: apply [[C3]]
   // CHECK: br [[LOOP:bb[0-9]+]]
   callee3()
-
+  
 // CHECK: [[LOOP]]:
 // test the condition.
 // CHECK:  [[CONDTRUE:%.*]] = apply {{.*}}(%0)
@@ -485,7 +485,7 @@ func defer_test2(cond : Bool) {
     callee2()
     break
   }
-
+  
 // CHECK: [[EXIT]]:
 // CHECK: [[C3:%.*]] = function_ref @{{.*}}callee3FT_T_
 // CHECK: apply [[C3]]
@@ -690,3 +690,4 @@ func let_else_tuple_binding(a : (Int, Int)?) -> Int {
   // CHECK-NEXT:   debug_value %6 : $Int, let, name "y"
   // CHECK-NEXT:   return %4 : $Int
 }
+

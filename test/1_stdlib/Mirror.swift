@@ -371,7 +371,7 @@ mirrors.test("class/ObjCPlain/Plain") {
 
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
-
+  
   if let bChild = expectNotEmpty(b.children.first) {
     expectEqual("b", bChild.label)
     expectEqual(42, bChild.value as? UInt)
@@ -478,7 +478,7 @@ mirrors.test("Class/Root/NoSuperclassMirror") {
         self, children: [ "bee": b ], ancestorRepresentation: .Suppressed)
     }
   }
-
+  
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
   expectEmpty(b.superclassMirror())
@@ -655,7 +655,7 @@ mirrors.test("Addressing") {
   expectEqual(2, m0.descendant("[1]") as? Int)
   expectEqual(3, m0.descendant(2) as? Int)
   expectEqual(3, m0.descendant("[2]") as? Int)
-
+  
   let m1 = Mirror(reflecting: (a: ["one", "two", "three"], b: 4))
   let ott0 = m1.descendant(0) as? [String]
   expectNotEmpty(ott0)
@@ -678,7 +678,7 @@ mirrors.test("Addressing") {
       return Mirror(self, children: ["bark": 1, "bite": 0])
     }
   }
-
+  
   let x = [
     (a: ["one", "two", "three"], b: Zee()),
     (a: ["five"], b: Zee()),
@@ -714,7 +714,7 @@ mirrors.test("PlaygroundQuickLook") {
   switch PlaygroundQuickLook(reflecting: CustomQuickie()) {
   case .Point(1.25, 42): break; default: expectTrue(false)
   }
-
+  
   // PlaygroundQuickLook support from Legacy Mirrors works.
   switch PlaygroundQuickLook(reflecting: true) {
   case .Logical(true): break; default: expectTrue(false)

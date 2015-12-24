@@ -25,3 +25,4 @@ public func ifelseexpr() -> Int64 {
   // CHECK:  ret{{.*}}, !dbg ![[RELEASE]]
   return x.x // CHECK: ![[RELEASE]] = !DILocation(line: [[@LINE]], column: 3
 }
+

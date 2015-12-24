@@ -113,7 +113,7 @@ struct InstrumentedIndex<I : RandomAccessIndexType> : RandomAccessIndexType {
     callCounts["predecessor"]! += 1
     return InstrumentedIndex(base.predecessor())
   }
-
+  
   mutating func _predecessorInPlace() {
     callCounts["_predecessorInPlace"]! += 1
     base._predecessorInPlace()
@@ -218,7 +218,7 @@ tests.test("ForwardCollection") {
 tests.test("BidirectionalCollection") {
   let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
   let fc0 = AnyForwardCollection(a0.lazy.reverse())
-
+  
   let bc0_ = AnyBidirectionalCollection(fc0)         // upgrade!
   expectNotEmpty(bc0_)
   let bc0 = bc0_!
