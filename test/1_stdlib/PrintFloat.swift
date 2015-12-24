@@ -2,7 +2,7 @@
 // RUN: %target-build-swift -c -force-single-frontend-invocation -parse-as-library -emit-module -emit-module-path %t/PrintTestTypes.swiftmodule -o %t/PrintTestTypes.o %S/Inputs/PrintTestTypes.swift
 // RUN: %target-build-swift %s -Xlinker %t/PrintTestTypes.o -I %t -L %t -o %t/main.out
 // RUN: %target-run %t/main.out
-// RUN: %target-run %t/main.out --env ru_RU.UTF-8
+// RUN: %target-run %t/main.out --locale ru_RU.UTF-8
 // REQUIRES: executable_test
 // XFAIL: linux
 
@@ -13,8 +13,8 @@ import PrintTestTypes
 let PrintTests = TestSuite("PrintFloat")
 
 PrintTests.setUp {
-  if Process.arguments.contains("--env") {
-    let locale = Process.arguments[4]
+  if let localeArgIndex = Process.arguments.indexOf("--locale") {
+    let locale = Process.arguments[localeArgIndex + 1]
     expectEqual("ru_RU.UTF-8", locale)
     setlocale(LC_ALL, locale)
   } else {
