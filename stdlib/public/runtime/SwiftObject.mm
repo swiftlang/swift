@@ -1025,10 +1025,6 @@ swift::swift_dynamicCastForeignClassUnconditional(
   return object;
 }
 
-extern "C" bool swift_objcRespondsToSelector(id object, SEL selector) {
-  return [object respondsToSelector:selector];
-}
-
 bool swift::objectConformsToObjCProtocol(const void *theObject,
                                          const ProtocolDescriptor *protocol) {
   return [((id) theObject) conformsToProtocol: (Protocol*) protocol];
