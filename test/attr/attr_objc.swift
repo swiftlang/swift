@@ -194,14 +194,31 @@ extension subject_genericClass {
 
 @objc
 enum subject_enum: Int {
-  @objc   // expected-error {{@objc cannot be applied to this declaration}} {{3-9=}}
+  @objc   // expected-error {{attribute has no effect; cases within an '@objc' enum are already exposed to Objective-C}} {{3-9=}}
   case subject_enumElement1
+
+  @objc(subject_enumElement2)
+  case subject_enumElement2
+
+  @objc(subject_enumElement3)
+  case subject_enumElement3, subject_enumElement4 // expected-error {{'@objc' enum case declaration defines multiple enum cases with the same Objective-C name}}{{3-8=}}
+
+  @objc   // expected-error {{attribute has no effect; cases within an '@objc' enum are already exposed to Objective-C}} {{3-9=}}
+  case subject_enumElement5, subject_enumElement6
+
+  @nonobjc // expected-error {{@nonobjc cannot be applied to this declaration}}
+  case subject_enumElement7
 
   @objc   
   init() {} // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
 
   @objc
   func subject_instanceFunc() {} // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-8=}}
+}
+
+enum subject_enum2 {
+  @objc(subject_enum2Element1)
+  case subject_enumElement1 // expected-error{{'@objc' enum case is not allowed outside of an '@objc' enum}}{{3-8=}}
 }
 
 @objc
@@ -1751,6 +1768,12 @@ protocol BadProto1 { }
 
 @objc(Enum:) // expected-error{{'@objc' enum must have a simple name}}{{11-12=}}
 enum BadEnum1: Int { case X }
+
+@objc
+enum BadEnum2: Int {
+  @objc(X:)   // expected-error{{'@objc' enum case must have a simple name}}{{10-11=}}
+  case X
+}
 
 class BadClass2 {
   @objc(badprop:foo:wibble:) // expected-error{{'@objc' property must have a simple name}}{{16-28=}}
