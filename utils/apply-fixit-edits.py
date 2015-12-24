@@ -1,6 +1,5 @@
 #!/usr/bin/env python
-
-#===--- apply-fixit-edits.py - Tool for applying edits from .remap files ---===#
+# utils/apply-fixit-edits.py - Apply edits from .remap files -*- python -*-
 #
 # This source file is part of the Swift.org open source project
 #
@@ -9,8 +8,6 @@
 #
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-#
-#===------------------------------------------------------------------------===#
 
 from __future__ import print_function
 
