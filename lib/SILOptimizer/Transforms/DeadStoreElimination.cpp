@@ -69,6 +69,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILValueProjection.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -301,6 +302,9 @@ class DSEContext {
   /// Alias Analysis.
   AliasAnalysis *AA;
 
+  /// Escape analysis.
+  EscapeAnalysis *EA;
+
   /// Type Expansion Analysis.
   TypeExpansionAnalysis *TE;
 
@@ -408,8 +412,8 @@ class DSEContext {
 public:
   /// Constructor.
   DSEContext(SILFunction *F, SILModule *M, SILPassManager *PM,
-             AliasAnalysis *AA, TypeExpansionAnalysis *TE)
-      : Mod(M), F(F), PM(PM), AA(AA), TE(TE) {}
+             AliasAnalysis *AA, EscapeAnalysis *EA, TypeExpansionAnalysis *TE)
+      : Mod(M), F(F), PM(PM), AA(AA), EA(EA), TE(TE) {}
 
   /// Entry point for dead store elimination.
   bool run();
@@ -516,10 +520,24 @@ void DSEContext::mergeSuccessorStates(SILBasicBlock *BB) {
   if (BB->succ_empty()) {
     if (DisableLocalStoreDSE)
       return;
+
+    auto *ConGraph = EA->getConnectionGraph(F);
+
     for (unsigned i = 0; i < LocationVault.size(); ++i) {
-      if (!LocationVault[i].isNonEscapingLocalLSLocation())
+      SILValue Base = LocationVault[i].getBase();
+      if (isa<AllocStackInst>(Base)) {
+        // An alloc_stack is definitely dead at the end of the function.
+        C->startTrackingLocation(C->BBWriteSetOut, i);
         continue;
-      C->startTrackingLocation(C->BBWriteSetOut, i);
+      }
+      if (isa<AllocationInst>(Base)) {
+        // For other allocations we ask escape analysis.
+        auto *Node = ConGraph->getNodeOrNull(Base, EA);
+        if (Node && !Node->escapes()) {
+          C->startTrackingLocation(C->BBWriteSetOut, i);
+          continue;
+        }
+      }
     }
     return;
   }
@@ -1009,11 +1027,12 @@ public:
   /// The entry point to the transformation.
   void run() override {
     auto *AA = PM->getAnalysis<AliasAnalysis>();
+    auto *EA = PM->getAnalysis<EscapeAnalysis>();
     auto *TE = PM->getAnalysis<TypeExpansionAnalysis>();
     SILFunction *F = getFunction();
     DEBUG(llvm::dbgs() << "*** DSE on function: " << F->getName() << " ***\n");
 
-    DSEContext DSE(F, &F->getModule(), PM, AA, TE);
+    DSEContext DSE(F, &F->getModule(), PM, AA, EA, TE);
     if (DSE.run()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
