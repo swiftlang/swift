@@ -21,6 +21,7 @@
 #define DEBUG_TYPE "arc-sequence-opts"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "ARCSequenceOpts.h"
+#include "ARCLoopHoisting.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
@@ -69,16 +70,19 @@ class ARCLoopOpts : public SILFunctionTransform {
     auto *AA = getAnalysis<AliasAnalysis>();
     auto *RCFI = getAnalysis<RCIdentityAnalysis>()->get(F);
     auto *LRFI = getAnalysis<LoopRegionAnalysis>()->get(F);
+    auto *SEA = getAnalysis<SideEffectAnalysis>();
     ProgramTerminationFunctionInfo PTFI(F);
 
     // Create all of our visitors, register them with the visitor group, and
     // run.
+    LoopHoister Hoister(F, LI, AA, RCFI, LRFI, &PTFI, SEA);
     LoopARCPairingContext ARCSequenceOptsCtx(*F, AA, LRFI, LI, RCFI, &PTFI);
     SILLoopVisitorGroup VisitorGroup(F, LI);
+    VisitorGroup.addVisitor(&Hoister);
     VisitorGroup.addVisitor(&ARCSequenceOptsCtx);
     VisitorGroup.run();
 
-    if (ARCSequenceOptsCtx.madeChange())
+    if (Hoister.madeChange() || ARCSequenceOptsCtx.madeChange())
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
   }
 
