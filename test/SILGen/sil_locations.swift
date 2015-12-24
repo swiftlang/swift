@@ -350,8 +350,8 @@ func testStringForEachStmt() {
 
 
 func testForStmt() {
-  var i = 0;
-  var m = 0;
+  var i = 0
+  var m = 0
   for i in 0..<10 {
     m += 1
     if m == 15 {

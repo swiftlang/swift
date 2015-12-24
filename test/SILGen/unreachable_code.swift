@@ -30,7 +30,7 @@ func testUnreachableForAfterContinue(b: Bool) {
 
 func testUnreachableWhileAfterContinue(b: Bool) {
   var i:Int = 0
-  while (i<10) {
+  while (i<10) { 
     var y: Int = 300
     y += 1
     if b {
