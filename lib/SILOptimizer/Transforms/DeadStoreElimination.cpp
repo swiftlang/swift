@@ -1008,14 +1008,24 @@ bool DSEContext::run() {
   // BBWriteSetIn of a basic block changes, the optimization is rerun on its
   // predecessors.
   llvm::SmallVector<SILBasicBlock *, 16> WorkList;
-  for (SILBasicBlock *B : PO->getPostOrder()) {
+  llvm::DenseSet<SILBasicBlock *> HandledBBs;
+  // Push into reverse post order so that we can pop from the back and get
+  // post order.
+  for (SILBasicBlock *B : PO->getReversePostOrder()) {
     WorkList.push_back(B);
+    HandledBBs.insert(B);
   }
   while (!WorkList.empty()) {
     SILBasicBlock *BB = WorkList.pop_back_val();
+    HandledBBs.erase(BB);
     if (processBasicBlockWithGenKillSet(BB)) {
-      for (auto X : BB->getPreds())
+      for (auto X : BB->getPreds()) {
+        // We do not push basic block into the worklist if its already 
+        // in the worklist.
+        if (HandledBBs.find(X) != HandledBBs.end())
+          continue;
         WorkList.push_back(X);
+      }
     }
   }
 
