@@ -847,11 +847,7 @@ namespace {
       llvm::Constant *superPtr;
       if (getClass()->hasSuperclass()) {
         auto base = getClass()->getSuperclass()->getClassOrBoundGenericClass();
-        // If the base is generic, we'll need to instantiate it at runtime.
-        if (base->isGenericContext())
-          superPtr = llvm::ConstantPointerNull::get(IGM.ObjCClassPtrTy);
-        else
-          superPtr = IGM.getAddrOfMetaclassObject(base, NotForDefinition);
+        superPtr = IGM.getAddrOfMetaclassObject(base, NotForDefinition);
       } else {
         superPtr = IGM.getAddrOfMetaclassObject(
           IGM.getObjCRuntimeBaseForSwiftRootClass(getClass()),

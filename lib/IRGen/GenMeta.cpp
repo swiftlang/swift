@@ -2940,32 +2940,6 @@ namespace {
       if (!addReferenceToType(parentType->getCanonicalType()))
         HasRuntimeParent = true;
     }
-
-    void addSuperClass() {
-      // If this is a root class, use SwiftObject as our formal parent.
-      if (!Target->hasSuperclass()) {
-        // This is only required for ObjC interoperation.
-        if (!IGM.ObjCInterop) {
-          addWord(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
-          return;
-        }
-
-        // We have to do getAddrOfObjCClass ourselves here because
-        // the ObjC runtime base needs to be ObjC-mangled but isn't
-        // actually imported from a clang module.
-        addWord(IGM.getAddrOfObjCClass(
-                               IGM.getObjCRuntimeBaseForSwiftRootClass(Target),
-                               NotForDefinition));
-        return;
-      }
-
-      Type superclassTy
-        = ArchetypeBuilder::mapTypeIntoContext(Target,
-                                               Target->getSuperclass());
-
-      // If the superclass has generic heritage, we will fill it in at runtime.
-      addReferenceToType(superclassTy->getCanonicalType());
-    }
     
     bool addReferenceToType(CanType type) {
       if (llvm::Constant *metadata
@@ -3169,6 +3143,34 @@ namespace {
       return getInitWithSuggestedType(NumHeapMetadataFields,
                                       IGM.FullHeapMetadataStructTy);
     }
+
+    void addSuperClass() {
+      // If this is a root class, use SwiftObject as our formal parent.
+      if (!Target->hasSuperclass()) {
+        // This is only required for ObjC interoperation.
+        if (!IGM.ObjCInterop) {
+          addWord(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
+          return;
+        }
+
+        // We have to do getAddrOfObjCClass ourselves here because
+        // the ObjC runtime base needs to be ObjC-mangled but isn't
+        // actually imported from a clang module.
+        addWord(IGM.getAddrOfObjCClass(
+                               IGM.getObjCRuntimeBaseForSwiftRootClass(Target),
+                               NotForDefinition));
+        return;
+      }
+
+      Type superclassTy
+        = ArchetypeBuilder::mapTypeIntoContext(Target,
+                                               Target->getSuperclass());
+
+      bool constantSuperclass =
+          addReferenceToType(superclassTy->getCanonicalType());
+      assert(constantSuperclass && "need template if superclass is dependent");
+      (void) constantSuperclass;
+    }
   };
   
   Address emitAddressOfFieldOffsetVectorInClassMetadata(IRGenFunction &IGF,
@@ -3197,7 +3199,6 @@ namespace {
   {
     typedef GenericMetadataBuilderBase super;
 
-    bool HasDependentSuperclass = false;
     bool HasDependentFieldOffsetVector = false;
 
     bool InheritFieldOffsetVectors = false;
@@ -3218,13 +3219,11 @@ namespace {
       // We need special initialization of metadata objects to trick the ObjC
       // runtime into initializing them.
       HasDependentMetadata = true;
-      
-      // If the superclass is generic, we'll need to initialize the superclass
-      // reference at runtime.
-      if (theClass->hasSuperclass() &&
-          theClass->getSuperclass()->is<BoundGenericClassType>()) {
-        HasDependentSuperclass = true;
-      }
+    }
+
+    void addSuperClass() {
+      // Filled in by the runtime.
+      addWord(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
     }
 
     llvm::Value *emitAllocateMetadata(IRGenFunction &IGF,
@@ -3276,16 +3275,7 @@ namespace {
       auto isa = IGM.getAddrOfMetaclassObject(rootClass, NotForDefinition);
       addWord(isa);
       // super, which is dependent if the superclass is generic
-      llvm::Constant *super;
-      if (HasDependentSuperclass)
-        super = llvm::ConstantPointerNull::get(IGM.ObjCClassPtrTy);
-      else if (Target->hasSuperclass())
-        super = IGM.getAddrOfMetaclassObject(
-                         Target->getSuperclass()->getClassOrBoundGenericClass(),
-                         NotForDefinition);
-      else
-        super = isa;
-      addWord(super);
+      addWord(llvm::ConstantPointerNull::get(IGM.ObjCClassPtrTy));
       // cache
       addWord(IGM.getObjCEmptyCachePtr());
       // vtable
