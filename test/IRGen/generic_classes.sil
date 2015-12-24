@@ -317,6 +317,10 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* {{%.*}}, i64 3, i64* {{%.*}}, i64* {{%.*}})
 // CHECK: }
 
+// CHECK: define private %swift.type* @create_generic_metadata_RootGenericFixedLayout(%swift.type_pattern*, i8**) {{.*}} {
+// CHECK:   call void @swift_initializeSuperclass(%swift.type* {{%.*}}, i1 false)
+// CHECK: }
+
 // CHECK: define private %swift.type* @create_generic_metadata_GenericInheritsGeneric(%swift.type_pattern*, i8**) {{.*}} {
 //   Bind the generic parameters.
 // CHECK:   [[T0:%.*]] = load i8*, i8** %1

@@ -254,7 +254,7 @@ namespace {
           // If the superclass is in a generic context, conservatively
           // assume the layout depends on generic parameters, since we
           // can't look at stored properties.
-          if (superclass->isGenericContext())
+          if (superclassType.hasArchetype())
             ClassHasConcreteLayout = false;
         } else {
           // Otherwise, we have total knowledge of the class and its

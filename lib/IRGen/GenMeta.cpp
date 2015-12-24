@@ -188,32 +188,19 @@ static bool hasMetadataPattern(IRGenModule &IGM, NominalTypeDecl *theDecl) {
   // Protocols must be special-cased in a few places.
   assert(!isa<ProtocolDecl>(theDecl));
 
-  // Classes imported from Objective-C never have a metadata pattern.
-  if (theDecl->hasClangNode())
-    return false;
+  // For classes, we already computed this when we did the layout.
+  // FIXME: Try not to call this for classes of other modules, by referencing
+  // the metadata accessor instead.
+  if (auto *theClass = dyn_cast<ClassDecl>(theDecl))
+    return getClassHasMetadataPattern(IGM, theClass);
 
-  // A generic class, struct, or enum is always initialized at runtime.
+  // Ok, we have a value type. If it is generic, it is always initialized
+  // at runtime.
   if (theDecl->isGenericContext())
     return true;
 
-  // A class with generic ancestry is always initialized at runtime.
-  // TODO: This should be cached in the ClassDecl since it is checked for in
-  // several places.
-  if (auto *theClass = dyn_cast<ClassDecl>(theDecl)) {
-    Type superclassTy = theClass->getSuperclass();
-    while (superclassTy) {
-      if (superclassTy->getClassOrBoundGenericClass()->isGenericContext())
-        return true;
-      superclassTy = superclassTy->getSuperclass(nullptr);
-    }
-
-    // TODO: check if class fields are resilient. Fixed-size check for value
-    // types isn't meaningful here.
-    return false;
-  }
-
-  // If we have fields of resilient type, the metadata still has to be
-  // initialized at runtime.
+  // If the type is not fixed-size, its size depends on resilient types,
+  // and the metadata is initialized at runtime.
   if (!IGM.getTypeInfoForUnlowered(theDecl->getDeclaredType()).isFixedSize())
     return true;
 
@@ -2864,6 +2851,7 @@ namespace {
     }
 
     bool HasRuntimeParent = false;
+
   public:
     /// The 'metadata flags' field in a class is actually a pointer to
     /// the metaclass object for the class.
@@ -3140,7 +3128,15 @@ namespace {
     ClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                          const StructLayout &layout,
                          const ClassLayout &fieldLayout)
-      : ClassMetadataBuilderBase(IGM, theClass, layout, fieldLayout) {}
+      : ClassMetadataBuilderBase(IGM, theClass, layout, fieldLayout) {
+
+      assert(layout.isFixedLayout() &&
+             "non-fixed layout classes require a template");
+      // FIXME: Distinguish Objective-C sliding from resilient layout
+      assert((fieldLayout.MetadataAccess == FieldAccess::ConstantDirect ||
+              fieldLayout.MetadataAccess == FieldAccess::NonConstantDirect) &&
+             "resilient superclasses require a template");
+    }
 
     llvm::Constant *getInit() {
       return getInitWithSuggestedType(NumHeapMetadataFields,
@@ -3202,11 +3198,6 @@ namespace {
   {
     typedef GenericMetadataBuilderBase super;
 
-    bool HasDependentFieldOffsetVector = false;
-
-    bool InheritFieldOffsetVectors = false;
-    bool InheritGenericParameters = false;
-    
     Size MetaclassPtrOffset = Size::invalid();
     Size ClassRODataPtrOffset = Size::invalid();
     Size MetaclassRODataPtrOffset = Size::invalid();
@@ -3305,26 +3296,9 @@ namespace {
 
     void noteStartOfFieldOffsets(ClassDecl *whichClass) {
       HasDependentMetadata = true;
-
-      if (whichClass == Target) {
-        // If the metadata contains a field offset vector for the class itself,
-        // then we need to initialize it at runtime.
-        HasDependentFieldOffsetVector = true;
-        return;
-      }
-      
-      // If we have a field offset vector for an ancestor class, we will copy
-      // it from our superclass metadata at instantiation time.
-      InheritFieldOffsetVectors = true;
     }
     
-    void noteEndOfFieldOffsets(ClassDecl *whichClass) {
-      if (whichClass == Target)
-        return;
-      
-      assert(InheritFieldOffsetVectors
-             && "no start of ancestor field offsets?!");
-    }
+    void noteEndOfFieldOffsets(ClassDecl *whichClass) {}
     
     // Suppress GenericMetadataBuilderBase's default behavior of introducing
     // fill ops for generic arguments unless they belong directly to the target
@@ -3338,7 +3312,6 @@ namespace {
         // Lay out the field, but don't fill it in, we will copy it from
         // the superclass.
         HasDependentMetadata = true;
-        InheritGenericParameters = true;
         ClassMetadataBuilderBase::addGenericArgument(type, forClass);
       }
     }
@@ -3353,7 +3326,6 @@ namespace {
         // Lay out the field, but don't provide the fill op, which we'll get
         // from the superclass.
         HasDependentMetadata = true;
-        InheritGenericParameters = true;
         ClassMetadataBuilderBase::addGenericWitnessTable(type, protocol,
                                                          forClass);
       }
@@ -3446,15 +3418,13 @@ namespace {
         IGF.Builder.CreateStore(rodata, rodataPtrSlot);
       }
       
-      // If the field layout is dependent, ask the runtime to populate the
-      // offset vector.
+      // If we have fields that are not fixed-size, ask the runtime to
+      // populate the offset vector.
       //
-      // FIXME: the right check here is if the class layout is dependent or
-      // resilient. Also if only the superclass is resilient, we can get away
+      // FIXME: if only the superclass is resilient, we can get away
       // with sliding field offsets instead of doing the entire layout all
       // over again.
-      if (Target->isGenericContext() &&
-          HasDependentFieldOffsetVector) {
+      if (!Layout.isFixedLayout()) {
         llvm::Value *fieldVector
           = emitAddressOfFieldOffsetVectorInClassMetadata(IGF,
                                                           Target, metadata)
@@ -3505,18 +3475,19 @@ namespace {
                                {metadata, numFields,
                                 firstField.getAddress(), fieldVector});
 
-      } else if (InheritFieldOffsetVectors || InheritGenericParameters) {
+      } else {
         // If we have any ancestor generic parameters or field offset vectors,
         // copy them from the superclass metadata.
         auto initFn = IGF.IGM.getInitializeSuperclassFn();
+
+        bool copyFieldOffsetVectors = false;
+        if (FieldLayout.MetadataAccess != FieldAccess::ConstantDirect)
+          copyFieldOffsetVectors = true;
+
         IGF.Builder.CreateCall(initFn,
                                {metadata,
                                 llvm::ConstantInt::get(IGF.IGM.Int1Ty,
-                                                       InheritFieldOffsetVectors)});
-      } else if (IGF.IGM.ObjCInterop) {
-        // Register the class with the ObjC runtime.
-        llvm::Value *instantiateObjC = IGF.IGM.getInstantiateObjCClassFn();
-        IGF.Builder.CreateCall(instantiateObjC, metadata);
+                                                       copyFieldOffsetVectors)});
       }
     }
     
