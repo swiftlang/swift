@@ -9,8 +9,8 @@
 // CHECK: @_TWvdvC16class_resilience24ClassWithResilientLayout1rV16resilient_struct9Rectangle = global [[INT]] 0
 // CHECK: @_TWvdvC16class_resilience24ClassWithResilientLayout5colorVs5Int32 = global [[INT]] 0
 
-// CHECK: @_TWvdvC16class_resilience14ResilientChild5fieldVs5Int32 = global [[INT]] {{8|16}}
-// CHECK: @_TWvivC16class_resilience21ResilientGenericChild5fieldVs5Int32 = global [[INT]] {{44|88}}
+// CHECK: @_TWvdvC16class_resilience14ResilientChild5fieldVs5Int32 = global [[INT]] {{12|16}}
+// CHECK: @_TWvivC16class_resilience21ResilientGenericChild5fieldVs5Int32 = global [[INT]] {{56|88}}
 
 import resilient_class
 import resilient_struct
