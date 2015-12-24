@@ -14,6 +14,7 @@
 from __future__ import print_function
 
 import argparse
+import multiprocessing
 import os
 import shutil
 import sys
@@ -493,7 +494,8 @@ placed""",
         help="""
 the number of parallel build jobs to use""",
         type=int,
-        dest="build_jobs")
+        dest="build_jobs",
+        default=multiprocessing.cpu_count())
 
     parser.add_argument("--extra-swift-args", help=textwrap.dedent("""
     Pass through extra flags to swift in the form of a cmake list 'module_regexp;flag'. Can
@@ -721,10 +723,9 @@ the number of parallel build jobs to use""",
         "--swift-enable-assertions", str(args.swift_assertions).lower(),
         "--swift-stdlib-enable-assertions", str(args.swift_stdlib_assertions).lower(),
         "--cmake-generator", args.cmake_generator,
+        "--build-jobs", str(args.build_jobs),
         "--workspace", SWIFT_SOURCE_ROOT
     ]
-    if args.build_jobs:
-        build_script_impl_args += ["--build-jobs", str(args.build_jobs)]
     if args.build_foundation:
         build_script_impl_args += [
             "--foundation-build-type", args.foundation_build_variant
