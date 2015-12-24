@@ -57,6 +57,8 @@ KNOWN_SETTINGS=(
     # name                      default          description
     build-args                  ""               "arguments to the build tool; defaults to -j8 when CMake generator is \"Unix Makefiles\""
     build-dir                   ""               "out-of-tree build directory; default is in-tree. **This argument is required**"
+    host-cc                     ""               "the path to CC, the 'clang' compiler for the host platform. **This argument is requied**"
+    host-cxx                    ""               "the path to CXX, the 'clang++' compiler for the host platform. **This argument is requied**"
     darwin-xcrun-toolchain      "default"        "the name of the toolchain to use on Darwin"
     build-ninja                 ""               "build the Ninja tool"
     cmark-build-type            "Debug"          "the CMake build variant for CommonMark (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
@@ -1037,33 +1039,10 @@ if [[ "${EXPORT_COMPILE_COMMANDS}" ]] ; then
     )
 fi
 
-if [ -z "${HOST_CC}" ] ; then
-    if [ "$(uname -s)" == "Darwin" ] ; then
-        HOST_CC="$(xcrun_find_tool clang)"
-        HOST_CXX="$(xcrun_find_tool clang++)"
-    elif [ "$(uname -s)" == "FreeBSD" ]; then
-        if [ $(sysctl -n kern.osreldate) -ge 1100000 ]; then
-            HOST_CC="clang"
-            HOST_CXX="clang++"
-        else
-            for clang_candidate_suffix in "38" "37" "36" "35" ; do
-                if which "clang${clang_candidate_suffix}" > /dev/null ; then
-                    HOST_CC="clang${clang_candidate_suffix}"
-                    HOST_CXX="clang++${clang_candidate_suffix}"
-                    break
-                fi
-            done
-        fi
-    else
-        for clang_candidate_suffix in "" "-3.8" "-3.7" "-3.6" "-3.5" ; do
-            if which "clang${clang_candidate_suffix}" > /dev/null ; then
-                HOST_CC="clang${clang_candidate_suffix}"
-                HOST_CXX="clang++${clang_candidate_suffix}"
-                break
-            fi
-        done
-    fi
-fi
+# FIXME: HOST_CC is set and its presence is validated by utils/build-script.
+#        This check is redundant, but must remain until build-script-impl
+#        is merged completely with utils/build-script.
+#        For additional information, see: https://bugs.swift.org/browse/SR-237
 if [ -z "${HOST_CC}" ] ; then
     echo "Can't find clang.  Please install clang-3.5 or a later version."
     exit 1
