@@ -477,18 +477,6 @@ public:
   /// projection.
   void getFirstLevelLSLocations(LSLocationList &Locs, SILModule *Mod);
 
-  /// Returns true if the LSLocation is local to this function, i.e.
-  /// does not escape.
-  ///
-  /// TODO: we should look at the projection path as well. i.e. one field
-  /// might escape but the object itself does not.
-  ///
-  bool isNonEscapingLocalLSLocation() {
-    assert(isValid() && "Invalid memory location");
-    // TODO: this does not have to be limited to allocstack.
-    return isa<AllocStackInst>(Base) && isNonEscapingLocalObject(Base);
-  }
-
   /// Check whether the 2 LSLocations may alias each other or not.
   bool isMayAliasLSLocation(const LSLocation &RHS, AliasAnalysis *AA);
 

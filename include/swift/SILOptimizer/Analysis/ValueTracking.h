@@ -42,10 +42,6 @@ bool isNotAliasingArgument(SILValue V, InoutAliasingAssumption isInoutAliasing =
   bool pointsToLocalObject(SILValue V, InoutAliasingAssumption isInoutAliasing =
                                          InoutAliasingAssumption::Aliasing);
 
-/// Return true if the pointer is to a function-local object that never escapes
-/// from the function.
-bool isNonEscapingLocalObject(SILValue V);
-
 enum class IsZeroKind {
   Zero,
   NotZero,
