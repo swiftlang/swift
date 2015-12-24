@@ -1071,8 +1071,11 @@ namespace {
       // If this is an operator func decl in a type context, the 'self' isn't
       // actually going to be applied.
       if (auto *fd = dyn_cast<FuncDecl>(decl))
-        if (fd->isOperator() && fd->getDeclContext()->isTypeContext())
+        if (fd->isOperator() && fd->getDeclContext()->isTypeContext()) {
+          if (type->is<ErrorType>())
+            return nullptr;
           type = type->castTo<AnyFunctionType>()->getResult();
+        }
 
       for (unsigned i = 0, e = level; i != e; ++i) {
         auto funcTy = type->getAs<AnyFunctionType>();
