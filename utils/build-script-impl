@@ -195,26 +195,6 @@ function to_varname() {
     toupper "${1//-/_}"
 }
 
-function get_make_parallelism() {
-    case "$(uname -s)" in
-        Linux)
-            nproc
-            ;;
-
-        Darwin)
-            sysctl -n hw.activecpu
-            ;;
-
-        *)
-            echo 8
-            ;;
-    esac
-}
-
-function get_dsymutil_parallelism() {
-    get_make_parallelism
-}
-
 function set_lldb_build_mode() {
     LLDB_BUILD_MODE="CustomSwift-${LLDB_BUILD_TYPE}"
 }
@@ -1114,19 +1094,13 @@ fi
 
 case "${CMAKE_GENERATOR}" in
     Ninja)
+        BUILD_ARGS="${BUILD_ARGS} -j${BUILD_JOBS}"
         if [[ "${VERBOSE_BUILD}" ]] ; then
             BUILD_ARGS="${BUILD_ARGS} -v"
         fi
-        if [[ "${BUILD_JOBS}" ]] ; then
-            BUILD_ARGS="${BUILD_ARGS} -j${BUILD_JOBS}"
-        fi
         ;;
     'Unix Makefiles')
-        if [[ "${BUILD_JOBS}" ]] ; then
-            BUILD_ARGS="${BUILD_ARGS} -j${BUILD_JOBS}"
-        else
-            BUILD_ARGS="${BUILD_ARGS:--j$(get_make_parallelism)}"
-        fi
+        BUILD_ARGS="${BUILD_ARGS} -j${BUILD_JOBS}"
         if [[ "${VERBOSE_BUILD}" ]] ; then
             BUILD_ARGS="${BUILD_ARGS} VERBOSE=1"
         fi
@@ -1136,9 +1110,7 @@ case "${CMAKE_GENERATOR}" in
         # but since we're not using proper Xcode 4 schemes, this is the
         # only way to get target-level parallelism.
         BUILD_ARGS="${BUILD_ARGS} -parallelizeTargets"
-        if [[ "${BUILD_JOBS}" ]] ; then
-            BUILD_ARGS="${BUILD_ARGS} -jobs ${BUILD_JOBS}"
-        fi
+        BUILD_ARGS="${BUILD_ARGS} -jobs ${BUILD_JOBS}"
         BUILD_TARGET_FLAG="-target"
         COMMON_CMAKE_OPTIONS=(
             "${COMMON_CMAKE_OPTIONS[@]}"
@@ -2246,13 +2218,13 @@ if [[ "${DARWIN_INSTALL_EXTRACT_SYMBOLS}" ]] ; then
        grep -v swift-stdlib-tool | \
        grep -v crashlog.py | \
        grep -v symbolication.py | \
-       xargs -n 1 -P $(get_dsymutil_parallelism) $(xcrun_find_tool dsymutil))
+       xargs -n 1 -P $(BUILD_JOBS) $(xcrun_find_tool dsymutil))
 
     # Strip executables, shared libraries and static libraries in
     # INSTALL_DESTDIR.
     find "${INSTALL_DESTDIR}"/"${TOOLCHAIN_PREFIX}" \
       \( -perm -0111 -or -name "*.a" \) -type f -print | \
-      xargs -n 1 -P $(get_dsymutil_parallelism) $(xcrun_find_tool strip) -S
+      xargs -n 1 -P $(BUILD_JOBS) $(xcrun_find_tool strip) -S
 
     { set +x; } 2>/dev/null
 fi
