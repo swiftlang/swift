@@ -718,7 +718,8 @@ namespace {
     IRGenModule &IGM;
     PointerUnion<ClassDecl *, ProtocolDecl *> TheEntity;
     ExtensionDecl *TheExtension;
-    const StructLayout *FieldLayout;
+    const StructLayout *Layout;
+    const ClassLayout *FieldLayout;
     
     ClassDecl *getClass() const {
       return TheEntity.get<ClassDecl*>();
@@ -758,13 +759,15 @@ namespace {
     unsigned NextFieldIndex;
   public:
     ClassDataBuilder(IRGenModule &IGM, ClassDecl *theClass,
-                     const StructLayout &fieldLayout,
-                     unsigned firstField)
+                     const StructLayout &layout,
+                     const ClassLayout &fieldLayout)
         : IGM(IGM), TheEntity(theClass), TheExtension(nullptr),
-          FieldLayout(&fieldLayout),
-          FirstFieldIndex(firstField),
-          NextFieldIndex(firstField)
+          Layout(&layout),
+          FieldLayout(&fieldLayout)
     {
+      FirstFieldIndex = fieldLayout.InheritedStoredProperties.size();
+      NextFieldIndex = FirstFieldIndex;
+
       visitConformances(theClass);
       visitMembers(theClass);
 
@@ -777,8 +780,11 @@ namespace {
     ClassDataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                      ExtensionDecl *theExtension)
       : IGM(IGM), TheEntity(theClass), TheExtension(theExtension),
-        FieldLayout(nullptr)
+        Layout(nullptr), FieldLayout(nullptr)
     {
+      FirstFieldIndex = -1;
+      NextFieldIndex = -1;
+
       buildCategoryName(CategoryName);
 
       visitConformances(theExtension);
@@ -827,7 +833,7 @@ namespace {
     }
 
     void buildMetaclassStub() {
-      assert(FieldLayout && "can't build a metaclass from a category");
+      assert(Layout && "can't build a metaclass from a category");
       // The isa is the metaclass pointer for the root class.
       auto rootClass = getRootClassForMetaclass(IGM, TheEntity.get<ClassDecl *>());
       auto rootPtr = IGM.getAddrOfMetaclassObject(rootClass, NotForDefinition);
@@ -959,7 +965,7 @@ namespace {
     }
 
     llvm::Constant *emitRODataFields(ForMetaClass_t forMeta) {
-      assert(FieldLayout && "can't emit rodata for a category");
+      assert(Layout && "can't emit rodata for a category");
       SmallVector<llvm::Constant*, 11> fields;
       // struct _class_ro_t {
       //   uint32_t flags;
@@ -980,14 +986,14 @@ namespace {
         // historical nonsense
         instanceStart = instanceSize;
       } else {
-        instanceSize = FieldLayout->getSize();
-        if (FieldLayout->getElements().empty()
-            || FieldLayout->getElements().size() == FirstFieldIndex) {
+        instanceSize = Layout->getSize();
+        if (Layout->getElements().empty()
+            || Layout->getElements().size() == FirstFieldIndex) {
           instanceStart = instanceSize;
-        } else if (FieldLayout->getElement(FirstFieldIndex).getKind()
+        } else if (Layout->getElement(FirstFieldIndex).getKind()
                      == ElementLayout::Kind::Fixed) {
           // FIXME: assumes layout is always sequential!
-          instanceStart = FieldLayout->getElement(FirstFieldIndex).getByteOffset();
+          instanceStart = Layout->getElement(FirstFieldIndex).getByteOffset();
         } else {
           instanceStart = Size(0);
         }
@@ -1305,7 +1311,7 @@ namespace {
     /// affect flags.
     void visitStoredVar(VarDecl *var) {
       // FIXME: how to handle ivar extensions in categories?
-      if (!FieldLayout)
+      if (!Layout)
         return;
 
       // For now, we never try to emit specialized versions of the
@@ -1328,25 +1334,31 @@ namespace {
     ///   uint32_t size;
     /// };
     llvm::Constant *buildIvar(VarDecl *ivar, SILType loweredType) {
-      assert(FieldLayout && "can't build ivar for category");
+      assert(Layout && "can't build ivar for category");
       // FIXME: this is not always the right thing to do!
-      auto &elt = FieldLayout->getElement(NextFieldIndex++);
+      //auto &elt = Layout->getElement(NextFieldIndex++);
       auto &ivarTI = IGM.getTypeInfo(loweredType);
 
       llvm::Constant *offsetPtr;
-      if (elt.getKind() == ElementLayout::Kind::Fixed) {
+      switch (FieldLayout->AllFieldAccesses[NextFieldIndex++]) {
+      case FieldAccess::ConstantDirect:
+      case FieldAccess::NonConstantDirect: {
         // If the field offset is fixed relative to the start of the superclass,
         // reference the global from the ivar metadata so that the Objective-C
         // runtime will slide it down.
         auto offsetAddr = IGM.getAddrOfFieldOffset(ivar, /*indirect*/ false,
                                                    NotForDefinition);
         offsetPtr = cast<llvm::Constant>(offsetAddr.getAddress());
-      } else {
+        break;
+      }
+      case FieldAccess::ConstantIndirect:
+      case FieldAccess::NonConstantIndirect:
         // Otherwise, swift_initClassMetadata_UniversalStrategy() will point
         // the Objective-C runtime into the field offset vector of the
         // instantiated metadata.
         offsetPtr
           = llvm::ConstantPointerNull::get(IGM.IntPtrTy->getPointerTo());
+        break;
       }
 
       // TODO: clang puts this in __TEXT,__objc_methname,cstring_literals
@@ -1673,9 +1685,9 @@ llvm::Constant *irgen::emitClassPrivateData(IRGenModule &IGM,
   assert(IGM.ObjCInterop && "emitting RO-data outside of interop mode");
   SILType selfType = getSelfType(cls);
   auto &classTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
-  auto &fieldLayout = classTI.getLayout(IGM);
-  ClassDataBuilder builder(IGM, cls, fieldLayout,
-               classTI.getClassLayout(IGM).InheritedStoredProperties.size());
+  auto &layout = classTI.getLayout(IGM);
+  auto &fieldLayout = classTI.getClassLayout(IGM);
+  ClassDataBuilder builder(IGM, cls, layout, fieldLayout);
 
   // First, build the metaclass object.
   builder.buildMetaclassStub();
@@ -1691,9 +1703,9 @@ irgen::emitClassPrivateDataFields(IRGenModule &IGM, ClassDecl *cls) {
   assert(IGM.ObjCInterop && "emitting RO-data outside of interop mode");
   SILType selfType = getSelfType(cls);
   auto &classTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
-  auto &fieldLayout = classTI.getLayout(IGM);
-  ClassDataBuilder builder(IGM, cls, fieldLayout,
-                  classTI.getClassLayout(IGM).InheritedStoredProperties.size());
+  auto &layout = classTI.getLayout(IGM);
+  auto &fieldLayout = classTI.getClassLayout(IGM);
+  ClassDataBuilder builder(IGM, cls, layout, fieldLayout);
 
   auto classFields = builder.emitRODataFields(ForClass);
   auto metaclassFields = builder.emitRODataFields(ForMetaClass);
