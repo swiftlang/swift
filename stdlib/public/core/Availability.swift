@@ -61,31 +61,15 @@ public func < (
   lhs: _SwiftNSOperatingSystemVersion,
   rhs: _SwiftNSOperatingSystemVersion
 ) -> Bool {
-  if lhs.majorVersion > rhs.majorVersion {
-    return false
+  guard lhs.majorVersion == rhs.majorVersion else {
+    return lhs.majorVersion < rhs.majorVersion
   }
 
-  if lhs.majorVersion < rhs.majorVersion {
-    return true
+  guard lhs.minorVersion == rhs.minorVersion else {
+    return lhs.minorVersion < rhs.minorVersion
   }
 
-  if lhs.minorVersion > rhs.minorVersion {
-    return false
-  }
-
-  if lhs.minorVersion < rhs.minorVersion {
-    return true
-  }
-
-  if lhs.patchVersion > rhs.patchVersion {
-    return false
-  }
-
-  if lhs.patchVersion < rhs.patchVersion {
-    return true
-  }
-
-  return false
+  return lhs.patchVersion < rhs.patchVersion
 }
 
 @warn_unused_result
@@ -93,29 +77,13 @@ public func >= (
   lhs: _SwiftNSOperatingSystemVersion,
   rhs: _SwiftNSOperatingSystemVersion
 ) -> Bool {
-  if lhs.majorVersion < rhs.majorVersion {
-    return false
+  guard lhs.majorVersion == rhs.majorVersion else {
+    return lhs.majorVersion >= rhs.majorVersion
   }
 
-  if lhs.majorVersion > rhs.majorVersion {
-    return true
+  guard lhs.minorVersion == rhs.minorVersion else {
+    return lhs.minorVersion >= rhs.minorVersion
   }
 
-  if lhs.minorVersion < rhs.minorVersion {
-    return false
-  }
-
-  if lhs.minorVersion > rhs.minorVersion {
-    return true
-  }
-
-  if lhs.patchVersion < rhs.patchVersion {
-    return false
-  }
-
-  if lhs.patchVersion > rhs.patchVersion {
-    return true
-  }
-
-  return true
+  return lhs.patchVersion >= rhs.patchVersion
 }
