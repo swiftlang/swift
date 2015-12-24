@@ -2590,7 +2590,7 @@ static bool splitBBArguments(SILFunction &Fn) {
   bool Changed = false;
   std::vector<SILArgument *> Worklist;
 
-  // We know that we have atleast one BB, so this is safe since in such a case
+  // We know that we have at least one BB, so this is safe since in such a case
   // std::next(Fn->begin()) == Fn->end(), the exit case of iteration on a range.
   for (auto &BB : make_range(std::next(Fn.begin()), Fn.end())) {
     for (auto *Arg : BB.getBBArgs()) {

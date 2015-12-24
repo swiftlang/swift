@@ -81,7 +81,7 @@ struct llvm::yaml::MappingTraits<SwiftArguments> {
 };
 
 static std::string serializeCompilerArguments(const SwiftArguments &Args) {
-  // Serialize comiler instance
+  // Serialize compiler instance
   std::string OptionsAsYaml;
   llvm::raw_string_ostream OptionsStream(OptionsAsYaml);
   llvm::yaml::Output YamlOutput(OptionsStream);
