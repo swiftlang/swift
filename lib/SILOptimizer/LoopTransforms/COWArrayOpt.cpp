@@ -2287,7 +2287,7 @@ class SwiftArrayOptPass : public SILFunctionTransform {
 
     // Check whether we can hoist 'array.props' calls out of loops, collecting
     // the preheader we can hoist to. We only hoist out of loops if 'all'
-    // arrray.props call can be hoisted for a given loop nest.
+    // array.props call can be hoisted for a given loop nest.
     // We process the loop tree preorder (top-down) to hoist over the biggest
     // possible loop-nest.
     SmallVector<SILBasicBlock *, 16> HoistableLoopNests;

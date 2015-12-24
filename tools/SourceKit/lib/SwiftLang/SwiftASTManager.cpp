@@ -678,7 +678,7 @@ static void collectModuleDependencies(Module *TopMod,
     Module *Mod = Import.second;
     if (Mod->isSystemModule())
       continue;
-    // FIXME: Setup dependecies on the included headers.
+    // FIXME: Setup dependencies on the included headers.
     if (ClangModuleLoader &&
         Mod == ClangModuleLoader->getImportedHeaderModule())
       continue;
