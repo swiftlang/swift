@@ -785,8 +785,7 @@ public func runAllTests() {
     var runTestsInProcess: Bool = false
     var filter: String? = nil
     var args = [String]()
-    var i = 0
-    i += 1 // Skip the name of the executable.
+    var i = 1 // Skip the name of the executable.
     while i < Process.arguments.count {
       let arg = Process.arguments[i]
       if arg == "--stdlib-unittest-in-process" {
