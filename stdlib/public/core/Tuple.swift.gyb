@@ -40,9 +40,9 @@ public func != <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool 
 /// A [lexicographical order](https://en.wikipedia.org/wiki/Lexicographical_order)
 /// over tuples of `Comparable` elements.
 ///
-/// Given two tuples `(a1,a2,…,aN)` and `(b1,b2,…,bN)`, the first tuple is
-/// `${op}${opeq}` the second tuple iff `a1 ${op} b1` or (`a1 == b1` and
-/// `(a2,…,aN) ${op}${opeq} (b2,…,bN)`).
+/// Given two tuples `(a1, a2, ..., aN)` and `(b1, b2, ..., bN)`, the
+/// first tuple is `${op}${opeq}` the second tuple iff `a1 ${op} b1` or
+/// (`a1 == b1` and `(a2, ..., aN) ${op}${opeq} (b2, ..., bN)`).
 @warn_unused_result
 public func ${op}${opeq} <${comparableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool {
 %   for i in range(arity-1):
