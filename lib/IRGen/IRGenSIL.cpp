@@ -4374,8 +4374,12 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
   ProtocolConformance *conformance = i->getConformance();
   SILDeclRef member = i->getMember();
 
+  // It would be nice if this weren't discarded.
+  llvm::Value *baseMetadataCache = nullptr;
+
   Explosion lowered;
-  emitWitnessMethodValue(*this, baseTy, member, conformance, lowered);
+  emitWitnessMethodValue(*this, baseTy, &baseMetadataCache,
+                         member, conformance, lowered);
   
   setLoweredExplosion(SILValue(i, 0), lowered);
 }

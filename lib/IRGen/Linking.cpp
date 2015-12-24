@@ -183,6 +183,18 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     mangler.mangleProtocolConformance(getProtocolConformance());
     return;
 
+  //   global ::= 'WG' protocol-conformance
+  case Kind::GenericProtocolWitnessTableCache:
+    buffer << "_TWG";
+    mangler.mangleProtocolConformance(getProtocolConformance());
+    return;
+
+  //   global ::= 'WI' protocol-conformance
+  case Kind::GenericProtocolWitnessTableInstantiationFunction:
+    buffer << "_TWI";
+    mangler.mangleProtocolConformance(getProtocolConformance());
+    return;
+
   //   global ::= 'Wa' protocol-conformance
   case Kind::ProtocolWitnessTableAccessFunction:
     mangler.append("_TWa");
@@ -203,16 +215,19 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     mangler.mangleProtocolConformance(getProtocolConformance());
     return;
       
-  //   global ::= 'WD' protocol-conformance
-  case Kind::DependentProtocolWitnessTableGenerator:
-    mangler.append("_TWD");
+  //   global ::= 'Wt' protocol-conformance identifier
+  case Kind::AssociatedTypeMetadataAccessFunction:
+    mangler.append("_TWt");
     mangler.mangleProtocolConformance(getProtocolConformance());
+    mangler.mangleIdentifier(getAssociatedType()->getNameStr());
     return;
-      
-  //   global ::= 'Wd' protocol-conformance
-  case Kind::DependentProtocolWitnessTableTemplate:
-    mangler.append("_TWd");
+
+  //   global ::= 'WT' protocol-conformance identifier nominal-type
+  case Kind::AssociatedTypeWitnessTableAccessFunction:
+    mangler.append("_TWT");
     mangler.mangleProtocolConformance(getProtocolConformance());
+    mangler.mangleIdentifier(getAssociatedType()->getNameStr());
+    mangler.mangleProtocolDecl(getAssociatedProtocol());
     return;
 
   // For all the following, this rule was imposed above:

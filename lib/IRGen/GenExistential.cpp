@@ -1570,10 +1570,10 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
 /// Retrieve the protocol witness table for a conformance.
 static llvm::Value *getProtocolWitnessTable(IRGenFunction &IGF,
                                             CanType srcType,
-                                            const TypeInfo &srcTI,
+                                            llvm::Value **srcMetadataCache,
                                             ProtocolEntry protoEntry,
                                             ProtocolConformance *conformance) {
-  return emitWitnessTableRef(IGF, srcType, srcTI,
+  return emitWitnessTableRef(IGF, srcType, srcMetadataCache,
                              protoEntry.getProtocol(),
                              protoEntry.getInfo(),
                              conformance);
@@ -1582,7 +1582,8 @@ static llvm::Value *getProtocolWitnessTable(IRGenFunction &IGF,
 /// Emit protocol witness table pointers for the given protocol conformances,
 /// passing each emitted witness table index into the given function body.
 static void forEachProtocolWitnessTable(IRGenFunction &IGF,
-                          CanType srcType, CanType destType,
+                          CanType srcType, llvm::Value **srcMetadataCache,
+                          CanType destType,
                           ArrayRef<ProtocolEntry> protocols,
                           ArrayRef<ProtocolConformance*> conformances,
                           std::function<void (unsigned, llvm::Value*)> body) {
@@ -1600,9 +1601,8 @@ static void forEachProtocolWitnessTable(IRGenFunction &IGF,
   assert(protocols.size() == witnessConformances.size() &&
          "mismatched protocol conformances");
 
-  auto &srcTI = IGF.getTypeInfoForUnlowered(srcType);
   for (unsigned i = 0, e = protocols.size(); i < e; ++i) {
-    auto table = getProtocolWitnessTable(IGF, srcType, srcTI,
+    auto table = getProtocolWitnessTable(IGF, srcType, srcMetadataCache,
                                          protocols[i], witnessConformances[i]);
     body(i, table);
   }
@@ -1676,7 +1676,7 @@ Address irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
   // Should only be one conformance, for the ErrorType protocol.
   assert(conformances.size() == 1 && destTI.getStoredProtocols().size() == 1);
   const ProtocolEntry &entry = destTI.getStoredProtocols()[0];
-  auto witness = getProtocolWitnessTable(IGF, formalSrcType, srcTI,
+  auto witness = getProtocolWitnessTable(IGF, formalSrcType, &srcMetadata,
                                          entry, conformances[0]);
   
   // Call the runtime to allocate the box.
@@ -1771,7 +1771,8 @@ void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
   out.add(opaqueInstance);
 
   // Emit the witness table pointers.
-  forEachProtocolWitnessTable(IGF, instanceFormalType,
+  llvm::Value *instanceMetadata = nullptr;
+  forEachProtocolWitnessTable(IGF, instanceFormalType, &instanceMetadata,
                               outType.getSwiftRValueType(),
                               destTI.getStoredProtocols(),
                               conformances,
@@ -1801,7 +1802,8 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
 
 
   // Next, write the protocol witness tables.
-  forEachProtocolWitnessTable(IGF, formalSrcType, destType.getSwiftRValueType(),
+  forEachProtocolWitnessTable(IGF, formalSrcType, &metadata,
+                              destType.getSwiftRValueType(),
                               destTI.getStoredProtocols(), conformances,
                               [&](unsigned i, llvm::Value *ptable) {
     Address ptableSlot = destLayout.projectWitnessTable(IGF, dest, i);
@@ -1832,7 +1834,8 @@ void irgen::emitExistentialMetatypeContainer(IRGenFunction &IGF,
   }
 
   // Emit the witness table pointers.
-  forEachProtocolWitnessTable(IGF, srcType, destType,
+  llvm::Value *srcMetadata = nullptr;
+  forEachProtocolWitnessTable(IGF, srcType, &srcMetadata, destType,
                               destTI.getStoredProtocols(),
                               conformances,
                               [&](unsigned i, llvm::Value *ptable) {

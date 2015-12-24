@@ -43,9 +43,39 @@ namespace irgen {
   /// as a function value.
   void emitWitnessMethodValue(IRGenFunction &IGF,
                               CanType baseTy,
+                              llvm::Value **baseMetadataCache,
                               SILDeclRef member,
                               ProtocolConformance *conformance,
                               Explosion &out);
+
+  /// Given a type T and an associated type X of some protoocol P to
+  /// which T conforms, return the type metadata for T.X.
+  ///
+  /// \param parentMetadata - the type metadata for T
+  /// \param wtable - the witness table witnessing the conformance of T to P
+  /// \param associatedType - the declaration of X; a member of P
+  llvm::Value *emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
+                                             llvm::Value *parentMetadata,
+                                             llvm::Value *wtable,
+                                           AssociatedTypeDecl *associatedType);
+
+  /// Given a type T and an associated type X of a protocol PT to which
+  /// T conforms, where X is required to implement some protocol PX, return
+  /// the witness table witnessing the conformance of T.X to PX.
+  ///
+  /// PX must be a direct requirement of X.
+  ///
+  /// \param parentMetadata - the type metadata for T
+  /// \param wtable - the witness table witnessing the conformance of T to PT
+  /// \param associatedType - the declaration of X; a member of PT
+  /// \param associatedTypeMetadata - the type metadata for T.X
+  /// \param associatedProtocol - the declaration of PX
+  llvm::Value *emitAssociatedTypeWitnessTableRef(IRGenFunction &IGF,
+                                                 llvm::Value *parentMetadata,
+                                                 llvm::Value *wtable,
+                                          AssociatedTypeDecl *associatedType,
+                                          llvm::Value *associatedTypeMetadata,
+                                          ProtocolDecl *associatedProtocol);
 
   /// Add the witness parameters necessary for calling a function with
   /// the given generics clause.
@@ -125,12 +155,13 @@ namespace irgen {
   /// Emit references to the witness tables for the substituted type
   /// in the given substitution.
   void emitWitnessTableRefs(IRGenFunction &IGF, const Substitution &sub,
+                            llvm::Value **metadataCache,
                             SmallVectorImpl<llvm::Value *> &out);
 
   /// Emit a witness table reference.
   llvm::Value *emitWitnessTableRef(IRGenFunction &IGF,
                                    CanType srcType,
-                                   const TypeInfo &srcTI,
+                                   llvm::Value **srcMetadataCache,
                                    ProtocolDecl *proto,
                                    const ProtocolInfo &protoI,
                                    ProtocolConformance *conformance);
