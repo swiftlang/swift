@@ -20,11 +20,7 @@ public struct UnicodeScalar :
   var _value: UInt32
 
   /// A numeric representation of `self`.
-  public var value: UInt32 {
-    get {
-      return _value
-    }
-  }
+  public var value: UInt32 { return _value }
 
   @_transparent
   public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {

@@ -52,21 +52,21 @@ struct _NSViewMirror : _MirrorType {
   
   init(_ v : NSView) { _v = v }
   
-  var value: Any { get { return _v } }
+  var value: Any { return _v }
   
-  var valueType: Any.Type { get { return (_v as Any).dynamicType } }
+  var valueType: Any.Type { return (_v as Any).dynamicType }
   
-  var objectIdentifier: ObjectIdentifier? { get { return .None } }
+  var objectIdentifier: ObjectIdentifier? { return .None }
   
-  var count: Int { get { return 0 } }
+  var count: Int { return 0 }
   
   subscript(_: Int) -> (String, _MirrorType) {
     _preconditionFailure("_MirrorType access out of bounds")
   }
   
-  var summary: String { get { return "" } }
+  var summary: String { return "" }
   
-  var quickLookObject: PlaygroundQuickLook? { get {
+  var quickLookObject: PlaygroundQuickLook? {
       // adapted from the Xcode QuickLooks implementation
       
       var result: PlaygroundQuickLook? = nil
@@ -94,9 +94,9 @@ struct _NSViewMirror : _MirrorType {
       
       return result
       
-  } }
+  }
   
-  var disposition : _MirrorDisposition { get { return .Aggregate } }
+  var disposition : _MirrorDisposition { return .Aggregate }
 }
 
 extension NSView : _Reflectable {
