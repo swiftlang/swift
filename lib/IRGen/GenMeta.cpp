@@ -4454,7 +4454,7 @@ public:
   void addPayloadSize() {
     auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
     auto &enumTI = IGM.getTypeInfoForLowered(enumTy);
-    
+    (void) enumTI;
     assert(enumTI.isFixedSize(ResilienceScope::Component) &&
            "emitting constant enum metadata for resilient-sized type?");
     assert(!enumTI.isFixedSize(ResilienceScope::Universal) &&
@@ -4499,6 +4499,7 @@ public:
     // runtime-dependent, so fill in a zero here.
     auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
     auto &enumTI = IGM.getTypeInfoForLowered(enumTy);
+    (void) enumTI;
     assert(!enumTI.isFixedSize(ResilienceScope::Universal) &&
            "non-generic, non-resilient enums don't need payload size in metadata");
     addConstantWord(0);
