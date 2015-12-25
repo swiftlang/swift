@@ -47,19 +47,18 @@ extension UIOffset : Equatable {}
 #if !os(watchOS) && !os(tvOS)
 public extension UIDeviceOrientation {
   var isLandscape: Bool {
-    get { return self == .LandscapeLeft || self == .LandscapeRight }
+    return self == .LandscapeLeft || self == .LandscapeRight
   }
 
   var isPortrait: Bool {
-    get { return self == .Portrait || self == .PortraitUpsideDown }
+    return self == .Portrait || self == .PortraitUpsideDown
   }
 
   var isFlat: Bool {
-    get { return self == .FaceUp || self == .FaceDown }
+    return self == .FaceUp || self == .FaceDown
   }
 
   var isValidInterfaceOrientation: Bool {
-    get {
       switch (self) {
         case .Portrait, .PortraitUpsideDown, .LandscapeLeft, .LandscapeRight:
           return true
@@ -67,7 +66,6 @@ public extension UIDeviceOrientation {
           return false
       }
     }
-  }
 }
 
 @warn_unused_result
@@ -99,11 +97,11 @@ public func UIDeviceOrientationIsValidInterfaceOrientation(
 #if !os(watchOS) && !os(tvOS)
 public extension UIInterfaceOrientation {
   var isLandscape: Bool {
-    get { return self == .LandscapeLeft || self == .LandscapeRight }
+    return self == .LandscapeLeft || self == .LandscapeRight
   }
 
   var isPortrait: Bool {
-    get { return self == .Portrait || self == .PortraitUpsideDown }
+    return self == .Portrait || self == .PortraitUpsideDown
   }
 }
 
@@ -169,34 +167,33 @@ public extension UIAlertView {
 
 #if !os(watchOS)
 struct _UIViewMirror : _MirrorType {
-  static var _views = NSMutableSet()
+  static var _views = Set<UIView>()
 
   var _v : UIView
   
   init(_ v : UIView) { _v = v }
   
-  var value: Any { get { return _v } }
+  var value: Any { return _v }
   
-  var valueType: Any.Type { get { return (_v as Any).dynamicType } }
+  var valueType: Any.Type { return (_v as Any).dynamicType }
   
-  var objectIdentifier: ObjectIdentifier? { get { return .None } }
+  var objectIdentifier: ObjectIdentifier? { return .None }
   
-  var count: Int { get { return 0 } }
+  var count: Int { return 0 }
   
   subscript(_: Int) -> (String, _MirrorType) {
     _preconditionFailure("_MirrorType access out of bounds")
   }
   
-  var summary: String { get { return "" } }
+  var summary: String { return "" }
   
   var quickLookObject: PlaygroundQuickLook? {
       // iOS 7 or greater only
       
       var result: PlaygroundQuickLook? = nil
       
-      switch _UIViewMirror._views.member(_v) {
-        case nil:
-          _UIViewMirror._views.addObject(_v)
+      if !_UIViewMirror._views.contains(_v) {
+          _UIViewMirror._views.insert(_v)
           
           let bounds = _v.bounds
           // in case of an empty rectangle abort the logging
@@ -220,16 +217,13 @@ struct _UIViewMirror : _MirrorType {
       
           result = .Some(.View(image))
 
-          _UIViewMirror._views.removeObject(_v)
-          
-        default: ()
+          _UIViewMirror._views.remove(_v)
       }
-
 
       return result
   }
   
-  var disposition : _MirrorDisposition { get { return .Aggregate } }
+  var disposition : _MirrorDisposition { return .Aggregate }
 }
 
 extension UIView : _Reflectable {

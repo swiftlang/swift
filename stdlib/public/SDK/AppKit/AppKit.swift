@@ -46,7 +46,7 @@ extension NSCursor : _Reflectable {
 }
 
 struct _NSViewMirror : _MirrorType {
-  static var _views = NSMutableSet()
+  static var _views = Set<NSView>()
 
   var _v : NSView
   
@@ -78,9 +78,8 @@ struct _NSViewMirror : _MirrorType {
       // This code checks that we aren't trying to log the same view recursively - and if so just returns
       // nil, which is probably a safer option than crashing
       // FIXME: is there a way to say "cacheDisplayInRect butDoNotRedrawEvenIfISaidSo"?
-      switch _NSViewMirror._views.member(_v) {
-        case nil:
-          _NSViewMirror._views.addObject(_v)
+      if !_NSViewMirror._views.contains(_v) {
+          _NSViewMirror._views.insert(_v)
 
           let bounds = _v.bounds
           if let b = _v.bitmapImageRepForCachingDisplayInRect(bounds) {
@@ -88,8 +87,7 @@ struct _NSViewMirror : _MirrorType {
               result = .Some(.View(b))
           }
           
-          _NSViewMirror._views.removeObject(_v)
-        default: ()
+          _NSViewMirror._views.remove(_v)
       }
       
       return result
