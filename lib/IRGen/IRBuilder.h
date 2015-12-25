@@ -211,6 +211,18 @@ public:
                         std::min(dest.getAlignment(),
                                  src.getAlignment()).getValue());
   }
+  
+  using IRBuilderBase::CreateLifetimeStart;
+  llvm::CallInst *CreateLifetimeStart(Address buf, Size size) {
+    return CreateLifetimeStart(buf.getAddress(),
+                   llvm::ConstantInt::get(Context, APInt(64, size.getValue())));
+  }
+  
+  using IRBuilderBase::CreateLifetimeEnd;
+  llvm::CallInst *CreateLifetimeEnd(Address buf, Size size) {
+    return CreateLifetimeEnd(buf.getAddress(),
+                   llvm::ConstantInt::get(Context, APInt(64, size.getValue())));
+  }
 };
 
 } // end namespace irgen
