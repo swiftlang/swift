@@ -18,10 +18,18 @@
 
 public var errno: Int32 {
   get {
+#if os(FreeBSD)
+    return __error().memory
+#else
     return __errno_location().memory
+#endif
   }
   set(val) {
+#if os(FreeBSD)
+    return __error().memory = val
+#else
     return __errno_location().memory = val
+#endif
   }
 }
 
