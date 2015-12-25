@@ -66,7 +66,7 @@ def obtain_additional_swift_sources(opts = {'with_ssh': False}):
         'swift-corelibs-foundation': 'apple/swift-corelibs-foundation',
         'swift-integration-tests': 'apple/swift-integration-tests',
     }
-    for dir_name, repo in additional_repos.iteritems():
+    for dir_name, repo in additional_repos.items():
         with WorkingDirectory(SWIFT_SOURCE_ROOT):
             if not os.path.isdir(os.path.join(dir_name, ".git")):
                 print("--- Cloning '" + dir_name + "' ---")
