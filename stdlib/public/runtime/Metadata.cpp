@@ -2510,3 +2510,65 @@ namespace llvm { namespace hashing { namespace detail {
   size_t fixed_seed_override = 0;
 } } }
 
+/*** Protocol witness tables *************************************************/
+
+namespace {
+  class WitnessTableCacheEntry : public CacheEntry<WitnessTableCacheEntry> {
+  public:
+    static const char *getName() { return "WitnessTableCache"; }
+
+    WitnessTableCacheEntry(size_t numArguments) {}
+
+    static constexpr size_t getNumArguments() {
+      return 1;
+    }
+  };
+}
+
+using GenericWitnessTableCache = MetadataCache<WitnessTableCacheEntry>;
+using LazyGenericWitnessTableCache = Lazy<GenericWitnessTableCache>;
+
+/// Fetch the cache for a generic witness-table structure.
+static GenericWitnessTableCache &getCache(GenericWitnessTable *gen) {
+  // Keep this assert even if you change the representation above.
+  static_assert(sizeof(LazyGenericWitnessTableCache) <=
+                sizeof(GenericWitnessTable::PrivateData),
+                "metadata cache is larger than the allowed space");
+
+  auto lazyCache =
+    reinterpret_cast<LazyGenericWitnessTableCache*>(gen->PrivateData);
+  return lazyCache->get();
+}
+
+extern "C" const WitnessTable *
+swift::swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
+                                    const Metadata *type,
+                                    void * const *instantiationArgs) {
+  // Search the cache.
+  constexpr const size_t numGenericArgs = 1;
+  const void *args[] = { type };
+  auto &cache = getCache(genericTable);
+  auto entry = cache.findOrAdd(args, numGenericArgs,
+    [&]() -> WitnessTableCacheEntry* {
+      // Create a new entry for the cache.
+      auto entry = WitnessTableCacheEntry::allocate(cache.getAllocator(),
+                                                    args, numGenericArgs,
+                        genericTable->WitnessTableSizeInWords * sizeof(void*));
+
+      auto *table = entry->getData<WitnessTable>();
+      memcpy((void**) table, (void* const *) &*genericTable->Pattern,
+             genericTable->WitnessTableSizeInWordsToCopy * sizeof(void*));
+      bzero((void**) table + genericTable->WitnessTableSizeInWordsToCopy,
+            (genericTable->WitnessTableSizeInWords
+              - genericTable->WitnessTableSizeInWordsToCopy) * sizeof(void*));
+
+      // Call the instantiation function.
+      if (!genericTable->Instantiator.isNull()) {
+        genericTable->Instantiator(table, type, instantiationArgs);
+      }
+
+      return entry;
+    });
+
+  return entry->getData<WitnessTable>();
+}

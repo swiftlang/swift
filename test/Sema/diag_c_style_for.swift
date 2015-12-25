@@ -45,8 +45,10 @@ for (var m : Int8 = start; m < count; ++m) { // expected-warning {{C-style for s
   m += 3
 }
 
-// could theoretically fix this (and more like it if we auto-suggested "stride:")
-for var o = 2; o < 888; o += 1 { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}} {{none}}
+for var o = 2; o < 888; o += 1 { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}} {{10-13= in }} {{14-20= ..< }} {{23-31=}}
+}
+
+for var o = 2; o < 888; o += 11 { // expected-warning {{C-style for statement is deprecated and will be removed in a future version of Swift}} {{none}}
 }
 
 // could theoretically fix this with "..."

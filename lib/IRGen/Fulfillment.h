@@ -88,6 +88,13 @@ public:
                           unsigned sourceIndex, MetadataPath &&path,
                           const InterestingKeysCallback &interestingKeys);
 
+  /// Search the given witness table for useful fulfillments.
+  ///
+  /// \return true if any fulfillments were added by this search.
+  bool searchWitnessTable(ModuleDecl &M, CanType type, ProtocolDecl *protocol,
+                          unsigned sourceIndex, MetadataPath &&path,
+                          const InterestingKeysCallback &interestingKeys);
+
   /// Register a fulfillment for the given key.
   ///
   /// \return true if the fulfillment was added, which won't happen if there's
@@ -130,6 +137,16 @@ private:
                                  unsigned source, const MetadataPath &path,
                                  unsigned argIndex,
                                  const InterestingKeysCallback &keys);
+
+  /// Search the given witness table for useful fulfillments.
+  ///
+  /// \return true if any fulfillments were added by this search.
+  bool searchWitnessTable(ModuleDecl &M, CanType type, ProtocolDecl *protocol,
+                          unsigned sourceIndex, MetadataPath &&path,
+                          const InterestingKeysCallback &interestingKeys,
+                          const llvm::SmallPtrSetImpl<ProtocolDecl*> *
+                            interestingConformances);
+
 };
 
 }
