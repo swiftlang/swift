@@ -1735,7 +1735,7 @@ static Expr *endConditionValueForConvertingCStyleForLoop(const ForStmt *FS, VarD
   return args[1];
 }
 
-static bool simpleIncrementForConvertingCStyleForLoop(const ForStmt *FS, VarDecl *loopVar) {
+static bool unaryIncrementForConvertingCStyleForLoop(const ForStmt *FS, VarDecl *loopVar) {
   auto *Increment = FS->getIncrement().getPtrOrNull();
   if (!Increment)
     return false;
@@ -1758,6 +1758,39 @@ static bool simpleIncrementForConvertingCStyleForLoop(const ForStmt *FS, VarDecl
   return incrementDeclRefExpr->getDecl() == loopVar;    
 }
 
+static bool plusEqualOneIncrementForConvertingCStyleForLoop(TypeChecker &TC, const ForStmt *FS, VarDecl *loopVar) {
+  auto *Increment = FS->getIncrement().getPtrOrNull();
+  if (!Increment)
+    return false;
+  ApplyExpr *binaryExpr = dyn_cast<BinaryExpr>(Increment);
+  if (!binaryExpr)
+    return false;
+  auto binaryFuncExpr = dyn_cast<DeclRefExpr>(binaryExpr->getFn());
+  if (!binaryFuncExpr)
+    return false;
+  if (binaryFuncExpr->getDecl()->getNameStr() != "+=")
+    return false;
+  auto argTupleExpr = dyn_cast<TupleExpr>(binaryExpr->getArg());
+  if (!argTupleExpr)
+    return false;
+  auto addOneConstExpr = argTupleExpr->getElement(1);
+
+  // Rather than unwrapping expressions all the way down implicit constructors, etc, just check that the
+  // source text for the += argument is "1".
+  SourceLoc constEndLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, addOneConstExpr->getEndLoc());
+  auto range = CharSourceRange(TC.Context.SourceMgr, addOneConstExpr->getStartLoc(), constEndLoc);
+  if (range.str() != "1")
+    return false;
+
+  auto inoutExpr = dyn_cast<InOutExpr>(argTupleExpr->getElement(0));
+  if (!inoutExpr)
+    return false;
+  auto declRefExpr = dyn_cast<DeclRefExpr>(inoutExpr->getSubExpr());
+  if (!declRefExpr)
+    return false;
+  return declRefExpr->getDecl() == loopVar;
+}
+
 static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
   // If we're missing semi-colons we'll already be erroring out, and this may not even have been intended as C-style.
   if (FS->getFirstSemicolonLoc().isInvalid() || FS->getSecondSemicolonLoc().isInvalid())
@@ -1776,7 +1809,8 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
   VarDecl *loopVar = dyn_cast<VarDecl>(initializers[1]);
   Expr *startValue = loopVarDecl->getInit(0);
   Expr *endValue = endConditionValueForConvertingCStyleForLoop(FS, loopVar);
-  bool strideByOne = simpleIncrementForConvertingCStyleForLoop(FS, loopVar);
+  bool strideByOne = unaryIncrementForConvertingCStyleForLoop(FS, loopVar) ||
+                     plusEqualOneIncrementForConvertingCStyleForLoop(TC, FS, loopVar);
 
   if (!loopVar || !startValue || !endValue || !strideByOne)
     return;
