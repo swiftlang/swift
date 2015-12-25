@@ -62,6 +62,9 @@ public:
                                  const llvm::Twine &name) const override {
     // Make a fixed-size buffer.
     Address buffer = IGF.createFixedSizeBufferAlloca(name);
+    IGF.Builder.CreateLifetimeStart(buffer.getAddress(),
+                llvm::ConstantInt::get(IGF.IGM.Int64Ty,
+                                       getFixedBufferSize(IGF.IGM).getValue()));
 
     // Allocate an object of the appropriate type within it.
     llvm::Value *address = emitAllocateBufferCall(IGF, T, buffer);
@@ -71,6 +74,9 @@ public:
   void deallocateStack(IRGenFunction &IGF, Address buffer,
                        SILType T) const override {
     emitDeallocateBufferCall(IGF, T, buffer);
+    IGF.Builder.CreateLifetimeEnd(buffer.getAddress(),
+                llvm::ConstantInt::get(IGF.IGM.Int64Ty,
+                                       getFixedBufferSize(IGF.IGM).getValue()));
   }
 
   llvm::Value *getValueWitnessTable(IRGenFunction &IGF, SILType T) const {

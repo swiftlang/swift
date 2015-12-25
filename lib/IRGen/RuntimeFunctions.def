@@ -553,11 +553,6 @@ FUNCTION(GetObjCClassMetadata, swift_getObjCClassMetadata, RuntimeCC,
          ARGS(ObjCClassPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
-// _Bool swift_objcRespondsToSelector(id, void*);
-FUNCTION(ObjCRespondsToSelector, swift_objcRespondsToSelector, C_CC,
-         RETURNS(Int1Ty), ARGS(ObjCPtrTy, Int8PtrTy),
-         ATTRS(NoUnwind, ReadOnly))
-
 // Metadata *swift_getTupleTypeMetadata(size_t numElements,
 //                                      Metadata * const *elts,
 //                                      const char *labels,

@@ -477,15 +477,17 @@ struct _ParentProcess {
 
   internal var _runTestsInProcess: Bool
   internal var _filter: String?
+  internal var _args: [String]
 
-  init(runTestsInProcess: Bool, filter: String?) {
+  init(runTestsInProcess: Bool, args: [String], filter: String?) {
     self._runTestsInProcess = runTestsInProcess
     self._filter = filter
+    self._args = args
   }
 
   mutating func _spawnChild() {
-    let (pid, childStdinFD, childStdoutFD, childStderrFD) =
-      spawnChild([ "--stdlib-unittest-run-child" ])
+    let params = [ "--stdlib-unittest-run-child" ] + _args
+    let (pid, childStdinFD, childStdoutFD, childStderrFD) = spawnChild(params)
     _pid = pid
     _childStdin = _FDOutputStream(fd: childStdinFD)
     _childStdout = _FDInputStream(fd: childStdoutFD)
@@ -782,7 +784,9 @@ public func runAllTests() {
   } else {
     var runTestsInProcess: Bool = false
     var filter: String? = nil
+    var args = [String]()
     var i = 0
+    i += 1 // Skip the name of the executable.
     while i < Process.arguments.count {
       let arg = Process.arguments[i]
       if arg == "--stdlib-unittest-in-process" {
@@ -808,12 +812,14 @@ public func runAllTests() {
         return
       }
 
-      // FIXME: skipping unrecognized parameters.
+      // Pass through unparsed arguments to the child process.
+      args.append(Process.arguments[i])
+
       i += 1
     }
 
     var parent = _ParentProcess(
-      runTestsInProcess: runTestsInProcess, filter: filter)
+      runTestsInProcess: runTestsInProcess, args: args, filter: filter)
     parent.run()
   }
 }

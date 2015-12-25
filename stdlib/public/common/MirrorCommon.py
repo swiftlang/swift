@@ -1,17 +1,20 @@
-#//===--- MirrorCommon.py -------------------------------------*- python -*-===//
-#//
-#// This source file is part of the Swift.org open source project
-#//
-#// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
-#// Licensed under Apache License v2.0 with Runtime Library Exception
-#//
-#// See http://swift.org/LICENSE.txt for license information
-#// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-#//
-#//===----------------------------------------------------------------------===//
+# MirrorCommon.py -*- python -*-
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See http://swift.org/LICENSE.txt for license information
+# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
+# -----------------------------------------------------------------------------
+#
 # This file contains utility functions that are used by the gyb template files
 # that generate Mirrors for the Swift Standard Library.
 # If you edit this, make sure to also accordingly tweak the actual template files.
+#
+# -----------------------------------------------------------------------------
 
 def getDisposition(disp=None):
   if disp is None:

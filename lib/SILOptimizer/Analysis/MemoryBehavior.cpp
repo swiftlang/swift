@@ -315,6 +315,9 @@ AliasAnalysis::computeMemoryBehavior(SILInstruction *Inst, SILValue V,
   if (MemoryBehaviorCache.size() > MemoryBehaviorAnalysisMaxCacheSize) {
     MemoryBehaviorCache.clear();
     MemoryBehaviorValueBaseToIndex.clear();
+
+    // Key is no longer valid as we cleared the MemoryBehaviorValueBaseToIndex.
+    Key = toMemoryBehaviorKey(SILValue(Inst), V, InspectionMode);
   }
 
   // Calculate the aliasing result and store it in the cache.

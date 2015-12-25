@@ -144,15 +144,14 @@ public:
   void mangleTypeFullMetadataFull(CanType ty);
   void mangleGlobalVariableFull(const VarDecl *decl);
 
-  /// Mangle the string \p Prefix into the name. This is used by SIL passes
-  /// that specialize/clone functions.
-  void manglePrefix(StringRef Prefix);
+  /// Adds the string \p S into the mangled name.
+  void append(StringRef S);
 
-  /// Mangle the char \p Prefix into the name.
-  void manglePrefix(char Prefix);
+  /// Adds the char \p C into the mangled name.
+  void append(char C);
 
-  /// Mangle the integer \p Prefix into the name.
-  void manglePrefix(const APInt &Prefix);
+  /// Mangle the integer \p Nat into the name.
+  void mangleNatural(const APInt &Nat);
 
   /// Mangles globalinit_token and globalinit_func, which are used to
   /// initialize global variables.

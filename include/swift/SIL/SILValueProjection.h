@@ -29,6 +29,7 @@
 
 #include "swift/SIL/Projection.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/TypeExpansionAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/Utils/Local.h"
@@ -482,6 +483,9 @@ public:
 
   /// Check whether the 2 LSLocations must alias each other or not.
   bool isMustAliasLSLocation(const LSLocation &RHS, AliasAnalysis *AA);
+
+  /// Check whether the LSLocation can escape the current function.
+  bool isNonEscapingLocalLSLocation(SILFunction *Fn, EscapeAnalysis *EA);
 
   //============================//
   //       static functions.    //

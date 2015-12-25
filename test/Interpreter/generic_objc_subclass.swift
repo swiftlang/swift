@@ -79,6 +79,8 @@ class B : A<(Int, Int)> {
   }
 }
 
+class BB : B {}
+
 class C : A<(Int, Int)> {
   @nonobjc override var description: String {
     return "Invisible Chicken"
@@ -90,7 +92,9 @@ class C : A<(Int, Int)> {
 }
 
 // CHECK: 400
+// CHECK: 400
 // CHECK: 650
+print((BB() as P).calculatePrice())
 print((B() as P).calculatePrice())
 print((C() as P).calculatePrice())
 
@@ -111,3 +115,73 @@ b.third = 17
 
 // CHECK: (101, 0, 0, 0, 16, Optional((19, 84)), 17)
 print(g())
+
+class FixedA<T> : HasHiddenIvars, P {
+  var first: Int = 16
+  var second: [T] = []
+  var third: Int = 61
+
+  override var description: String {
+    return "Grilled artichokes"
+  }
+
+  func calculatePrice() -> Int {
+    return 400
+  }
+}
+
+let fixedA = FixedA<Int>()
+
+// CHECK: Grilled artichokes
+// CHECK: Grilled artichokes
+print(fixedA.description)
+print((fixedA as NSObject).description)
+
+let fixedF = { (fixedA.x, fixedA.y, fixedA.z, fixedA.t, fixedA.first, fixedA.second, fixedA.third) }
+
+// CHECK: (0, 0, 0, 0, 16, [], 61)
+print(fixedF())
+
+// CHECK: (25, 225, 255, 2255, 16, [], 61)
+fixedA.x = 25
+fixedA.y = 225
+fixedA.z = 255
+fixedA.t = 2255
+print(fixedF())
+
+// CHECK: (36, 225, 255, 2255, 16, [], 61)
+fixedA.x = 36
+print(fixedF())
+
+// CHECK: (36, 225, 255, 2255, 16, [121], 61)
+fixedA.second = [121]
+print(fixedF())
+
+class FixedB : FixedA<Int> {
+  override var description: String {
+    return "Salmon"
+  }
+
+  override func calculatePrice() -> Int {
+    return 1675
+  }
+}
+
+// CHECK: 675
+print((FixedB() as P).calculatePrice())
+
+// CHECK: Salmon
+print((FixedB() as NSObject).description)
+
+let fixedB = FixedB()
+let fixedG = { (fixedB.x, fixedB.y, fixedB.z, fixedB.t, fixedB.first, fixedB.second, fixedB.third) }
+
+// CHECK: (0, 0, 0, 0, 16, [], 61)
+print(fixedG())
+
+fixedB.x = 101
+fixedB.second = [19, 84]
+fixedB.third = 17
+
+// CHECK: (101, 0, 0, 0, 16, [19, 84], 17)
+print(fixedG())

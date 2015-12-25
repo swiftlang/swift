@@ -535,6 +535,9 @@ AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2,
   if (AliasCache.size() > AliasAnalysisMaxCacheSize) {
     AliasCache.clear();
     AliasValueBaseToIndex.clear();
+
+    // Key is no longer valid as we cleared the AliasValueBaseToIndex.
+    Key = toAliasKey(V1, V2, TBAAType1, TBAAType2);
   }
 
   // Calculate the aliasing result and store it in the cache.

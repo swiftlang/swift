@@ -2745,7 +2745,7 @@ void IRGenSILFunction::visitDynamicMethodBranchInst(DynamicMethodBranchInst *i){
   LoweredBB &hasMethodBB = getLoweredBB(i->getHasMethodBB());
   LoweredBB &noMethodBB = getLoweredBB(i->getNoMethodBB());
 
-  // Emit the swift_objcRespondsToSelector() call.
+  // Emit the respondsToSelector: call.
   StringRef selector;
   llvm::SmallString<64> selectorBuffer;
   if (auto fnDecl = dyn_cast<FuncDecl>(i->getMember().getDecl()))
@@ -2759,8 +2759,24 @@ void IRGenSILFunction::visitDynamicMethodBranchInst(DynamicMethodBranchInst *i){
   if (object->getType() != IGM.ObjCPtrTy)
     object = Builder.CreateBitCast(object, IGM.ObjCPtrTy);
   llvm::Value *loadSel = emitObjCSelectorRefLoad(selector);
-  llvm::CallInst *call = Builder.CreateCall(IGM.getObjCRespondsToSelectorFn(),
-                                            {object, loadSel});
+  
+  llvm::Value *respondsToSelector
+    = emitObjCSelectorRefLoad("respondsToSelector:");
+  
+  llvm::Constant *messenger = IGM.getObjCMsgSendFn();
+  llvm::Type *argTys[] = {
+    IGM.ObjCPtrTy,
+    IGM.Int8PtrTy,
+    IGM.Int8PtrTy,
+  };
+  auto respondsToSelectorTy = llvm::FunctionType::get(IGM.Int1Ty,
+                                                      argTys,
+                                                      /*isVarArg*/ false)
+  ->getPointerTo();
+  messenger = llvm::ConstantExpr::getBitCast(messenger,
+                                             respondsToSelectorTy);
+  llvm::CallInst *call = Builder.CreateCall(messenger,
+                                        {object, respondsToSelector, loadSel});
   call->setDoesNotThrow();
 
   // FIXME: Assume (probably safely) that the hasMethodBB has only us as a
@@ -3253,8 +3269,12 @@ static bool tryDeferFixedSizeBufferInitialization(IRGenSILFunction &IGF,
     
     // We can defer to this initialization. Allocate the fixed-size buffer
     // now, but don't allocate the value inside it.
-    if (!fixedSizeBuffer.getAddress())
+    if (!fixedSizeBuffer.getAddress()) {
       fixedSizeBuffer = IGF.createFixedSizeBufferAlloca(name);
+      IGF.Builder.CreateLifetimeStart(fixedSizeBuffer.getAddress(),
+                llvm::ConstantInt::get(IGF.IGM.Int64Ty,
+                                       getFixedBufferSize(IGF.IGM).getValue()));
+    }
     if (containerValue)
       IGF.setLoweredAddress(containerValue, fixedSizeBuffer);
     IGF.setLoweredUnallocatedAddressInBuffer(addressValue, fixedSizeBuffer);

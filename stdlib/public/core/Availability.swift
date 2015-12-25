@@ -47,75 +47,43 @@ extension _SwiftNSOperatingSystemVersion : Comparable { }
 
 @warn_unused_result
 public func == (
-  left: _SwiftNSOperatingSystemVersion,
-  right: _SwiftNSOperatingSystemVersion
+  lhs: _SwiftNSOperatingSystemVersion,
+  rhs: _SwiftNSOperatingSystemVersion
 ) -> Bool {
-  return left.majorVersion == right.majorVersion &&
-         left.minorVersion == right.minorVersion &&
-         left.patchVersion == right.patchVersion
+  return lhs.majorVersion == rhs.majorVersion &&
+         lhs.minorVersion == rhs.minorVersion &&
+         lhs.patchVersion == rhs.patchVersion
 }
 
 /// Lexicographic comparison of version components.
 @warn_unused_result
 public func < (
-  _lhs: _SwiftNSOperatingSystemVersion,
-  _rhs: _SwiftNSOperatingSystemVersion
+  lhs: _SwiftNSOperatingSystemVersion,
+  rhs: _SwiftNSOperatingSystemVersion
 ) -> Bool {
-  if _lhs.majorVersion > _rhs.majorVersion {
-    return false
+  guard lhs.majorVersion == rhs.majorVersion else {
+    return lhs.majorVersion < rhs.majorVersion
   }
 
-  if _lhs.majorVersion < _rhs.majorVersion {
-    return true
+  guard lhs.minorVersion == rhs.minorVersion else {
+    return lhs.minorVersion < rhs.minorVersion
   }
 
-  if _lhs.minorVersion > _rhs.minorVersion {
-    return false
-  }
-
-  if _lhs.minorVersion < _rhs.minorVersion {
-    return true
-  }
-
-  if _lhs.patchVersion > _rhs.patchVersion {
-    return false
-  }
-
-  if _lhs.patchVersion < _rhs.patchVersion {
-    return true
-  }
-
-  return false
+  return lhs.patchVersion < rhs.patchVersion
 }
 
 @warn_unused_result
 public func >= (
-  _lhs: _SwiftNSOperatingSystemVersion,
-  _rhs: _SwiftNSOperatingSystemVersion
+  lhs: _SwiftNSOperatingSystemVersion,
+  rhs: _SwiftNSOperatingSystemVersion
 ) -> Bool {
-  if _lhs.majorVersion < _rhs.majorVersion {
-    return false
+  guard lhs.majorVersion == rhs.majorVersion else {
+    return lhs.majorVersion >= rhs.majorVersion
   }
 
-  if _lhs.majorVersion > _rhs.majorVersion {
-    return true
+  guard lhs.minorVersion == rhs.minorVersion else {
+    return lhs.minorVersion >= rhs.minorVersion
   }
 
-  if _lhs.minorVersion < _rhs.minorVersion {
-    return false
-  }
-
-  if _lhs.minorVersion > _rhs.minorVersion {
-    return true
-  }
-
-  if _lhs.patchVersion < _rhs.patchVersion {
-    return false
-  }
-
-  if _lhs.patchVersion > _rhs.patchVersion {
-    return true
-  }
-
-  return true
+  return lhs.patchVersion >= rhs.patchVersion
 }

@@ -53,7 +53,7 @@ extension SequenceType {
 if preds:
   orderingRequirement = """
   /// - Requires: `isOrderedBefore` is a
-  ///   [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings).
+  ///   [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
   ///   over `self`."""
   rethrows_ = "rethrows "
 else:

@@ -324,12 +324,6 @@ runtime.
 0000000000028b60 T _swift_instantiateObjCClass
 ```
 
-## Objective-C Runtime Interop
-
-```
-0000000000028770 T _swift_objcRespondsToSelector
-```
-
 ## Metatypes
 
 ```

@@ -188,32 +188,19 @@ static bool hasMetadataPattern(IRGenModule &IGM, NominalTypeDecl *theDecl) {
   // Protocols must be special-cased in a few places.
   assert(!isa<ProtocolDecl>(theDecl));
 
-  // Classes imported from Objective-C never have a metadata pattern.
-  if (theDecl->hasClangNode())
-    return false;
+  // For classes, we already computed this when we did the layout.
+  // FIXME: Try not to call this for classes of other modules, by referencing
+  // the metadata accessor instead.
+  if (auto *theClass = dyn_cast<ClassDecl>(theDecl))
+    return getClassHasMetadataPattern(IGM, theClass);
 
-  // A generic class, struct, or enum is always initialized at runtime.
+  // Ok, we have a value type. If it is generic, it is always initialized
+  // at runtime.
   if (theDecl->isGenericContext())
     return true;
 
-  // A class with generic ancestry is always initialized at runtime.
-  // TODO: This should be cached in the ClassDecl since it is checked for in
-  // several places.
-  if (auto *theClass = dyn_cast<ClassDecl>(theDecl)) {
-    Type superclassTy = theClass->getSuperclass();
-    while (superclassTy) {
-      if (superclassTy->getClassOrBoundGenericClass()->isGenericContext())
-        return true;
-      superclassTy = superclassTy->getSuperclass(nullptr);
-    }
-
-    // TODO: check if class fields are resilient. Fixed-size check for value
-    // types isn't meaningful here.
-    return false;
-  }
-
-  // If we have fields of resilient type, the metadata still has to be
-  // initialized at runtime.
+  // If the type is not fixed-size, its size depends on resilient types,
+  // and the metadata is initialized at runtime.
   if (!IGM.getTypeInfoForUnlowered(theDecl->getDeclaredType()).isFixedSize())
     return true;
 
@@ -2864,6 +2851,7 @@ namespace {
     }
 
     bool HasRuntimeParent = false;
+
   public:
     /// The 'metadata flags' field in a class is actually a pointer to
     /// the metaclass object for the class.
@@ -2939,32 +2927,6 @@ namespace {
         forClass->getDeclContext()->getDeclaredTypeInContext();
       if (!addReferenceToType(parentType->getCanonicalType()))
         HasRuntimeParent = true;
-    }
-
-    void addSuperClass() {
-      // If this is a root class, use SwiftObject as our formal parent.
-      if (!Target->hasSuperclass()) {
-        // This is only required for ObjC interoperation.
-        if (!IGM.ObjCInterop) {
-          addWord(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
-          return;
-        }
-
-        // We have to do getAddrOfObjCClass ourselves here because
-        // the ObjC runtime base needs to be ObjC-mangled but isn't
-        // actually imported from a clang module.
-        addWord(IGM.getAddrOfObjCClass(
-                               IGM.getObjCRuntimeBaseForSwiftRootClass(Target),
-                               NotForDefinition));
-        return;
-      }
-
-      Type superclassTy
-        = ArchetypeBuilder::mapTypeIntoContext(Target,
-                                               Target->getSuperclass());
-
-      // If the superclass has generic heritage, we will fill it in at runtime.
-      addReferenceToType(superclassTy->getCanonicalType());
     }
     
     bool addReferenceToType(CanType type) {
@@ -3079,7 +3041,8 @@ namespace {
       addWord(fieldOffsetOrZero);
 
       if (var->getDeclContext() == Target) {
-        switch (FieldLayout.AllFieldAccesses[fieldIndex]) {
+        auto access = FieldLayout.AllFieldAccesses[fieldIndex];
+        switch (access) {
         case FieldAccess::ConstantDirect:
         case FieldAccess::NonConstantDirect: {
           // Emit a global variable storing the constant field offset.
@@ -3093,7 +3056,9 @@ namespace {
                                                      ForDefinition);
           auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
           offsetVar->setInitializer(fieldOffsetOrZero);
-          offsetVar->setConstant(false);
+
+          // If we know the offset won't change, make it a constant.
+          offsetVar->setConstant(access == FieldAccess::ConstantDirect);
 
           break;
         }
@@ -3163,11 +3128,47 @@ namespace {
     ClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                          const StructLayout &layout,
                          const ClassLayout &fieldLayout)
-      : ClassMetadataBuilderBase(IGM, theClass, layout, fieldLayout) {}
+      : ClassMetadataBuilderBase(IGM, theClass, layout, fieldLayout) {
+
+      assert(layout.isFixedLayout() &&
+             "non-fixed layout classes require a template");
+      // FIXME: Distinguish Objective-C sliding from resilient layout
+      assert((fieldLayout.MetadataAccess == FieldAccess::ConstantDirect ||
+              fieldLayout.MetadataAccess == FieldAccess::NonConstantDirect) &&
+             "resilient superclasses require a template");
+    }
 
     llvm::Constant *getInit() {
       return getInitWithSuggestedType(NumHeapMetadataFields,
                                       IGM.FullHeapMetadataStructTy);
+    }
+
+    void addSuperClass() {
+      // If this is a root class, use SwiftObject as our formal parent.
+      if (!Target->hasSuperclass()) {
+        // This is only required for ObjC interoperation.
+        if (!IGM.ObjCInterop) {
+          addWord(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
+          return;
+        }
+
+        // We have to do getAddrOfObjCClass ourselves here because
+        // the ObjC runtime base needs to be ObjC-mangled but isn't
+        // actually imported from a clang module.
+        addWord(IGM.getAddrOfObjCClass(
+                               IGM.getObjCRuntimeBaseForSwiftRootClass(Target),
+                               NotForDefinition));
+        return;
+      }
+
+      Type superclassTy
+        = ArchetypeBuilder::mapTypeIntoContext(Target,
+                                               Target->getSuperclass());
+
+      bool constantSuperclass =
+          addReferenceToType(superclassTy->getCanonicalType());
+      assert(constantSuperclass && "need template if superclass is dependent");
+      (void) constantSuperclass;
     }
   };
   
@@ -3197,12 +3198,6 @@ namespace {
   {
     typedef GenericMetadataBuilderBase super;
 
-    bool HasDependentSuperclass = false;
-    bool HasDependentFieldOffsetVector = false;
-
-    bool InheritFieldOffsetVectors = false;
-    bool InheritGenericParameters = false;
-    
     Size MetaclassPtrOffset = Size::invalid();
     Size ClassRODataPtrOffset = Size::invalid();
     Size MetaclassRODataPtrOffset = Size::invalid();
@@ -3218,13 +3213,11 @@ namespace {
       // We need special initialization of metadata objects to trick the ObjC
       // runtime into initializing them.
       HasDependentMetadata = true;
-      
-      // If the superclass is generic, we'll need to initialize the superclass
-      // reference at runtime.
-      if (theClass->hasSuperclass() &&
-          theClass->getSuperclass()->is<BoundGenericClassType>()) {
-        HasDependentSuperclass = true;
-      }
+    }
+
+    void addSuperClass() {
+      // Filled in by the runtime.
+      addWord(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
     }
 
     llvm::Value *emitAllocateMetadata(IRGenFunction &IGF,
@@ -3276,16 +3269,7 @@ namespace {
       auto isa = IGM.getAddrOfMetaclassObject(rootClass, NotForDefinition);
       addWord(isa);
       // super, which is dependent if the superclass is generic
-      llvm::Constant *super;
-      if (HasDependentSuperclass)
-        super = llvm::ConstantPointerNull::get(IGM.ObjCClassPtrTy);
-      else if (Target->hasSuperclass())
-        super = IGM.getAddrOfMetaclassObject(
-                         Target->getSuperclass()->getClassOrBoundGenericClass(),
-                         NotForDefinition);
-      else
-        super = isa;
-      addWord(super);
+      addWord(llvm::ConstantPointerNull::get(IGM.ObjCClassPtrTy));
       // cache
       addWord(IGM.getObjCEmptyCachePtr());
       // vtable
@@ -3312,26 +3296,9 @@ namespace {
 
     void noteStartOfFieldOffsets(ClassDecl *whichClass) {
       HasDependentMetadata = true;
-
-      if (whichClass == Target) {
-        // If the metadata contains a field offset vector for the class itself,
-        // then we need to initialize it at runtime.
-        HasDependentFieldOffsetVector = true;
-        return;
-      }
-      
-      // If we have a field offset vector for an ancestor class, we will copy
-      // it from our superclass metadata at instantiation time.
-      InheritFieldOffsetVectors = true;
     }
     
-    void noteEndOfFieldOffsets(ClassDecl *whichClass) {
-      if (whichClass == Target)
-        return;
-      
-      assert(InheritFieldOffsetVectors
-             && "no start of ancestor field offsets?!");
-    }
+    void noteEndOfFieldOffsets(ClassDecl *whichClass) {}
     
     // Suppress GenericMetadataBuilderBase's default behavior of introducing
     // fill ops for generic arguments unless they belong directly to the target
@@ -3345,7 +3312,6 @@ namespace {
         // Lay out the field, but don't fill it in, we will copy it from
         // the superclass.
         HasDependentMetadata = true;
-        InheritGenericParameters = true;
         ClassMetadataBuilderBase::addGenericArgument(type, forClass);
       }
     }
@@ -3360,7 +3326,6 @@ namespace {
         // Lay out the field, but don't provide the fill op, which we'll get
         // from the superclass.
         HasDependentMetadata = true;
-        InheritGenericParameters = true;
         ClassMetadataBuilderBase::addGenericWitnessTable(type, protocol,
                                                          forClass);
       }
@@ -3453,15 +3418,13 @@ namespace {
         IGF.Builder.CreateStore(rodata, rodataPtrSlot);
       }
       
-      // If the field layout is dependent, ask the runtime to populate the
-      // offset vector.
+      // If we have fields that are not fixed-size, ask the runtime to
+      // populate the offset vector.
       //
-      // FIXME: the right check here is if the class layout is dependent or
-      // resilient. Also if only the superclass is resilient, we can get away
+      // FIXME: if only the superclass is resilient, we can get away
       // with sliding field offsets instead of doing the entire layout all
       // over again.
-      if (Target->isGenericContext() &&
-          HasDependentFieldOffsetVector) {
+      if (!Layout.isFixedLayout()) {
         llvm::Value *fieldVector
           = emitAddressOfFieldOffsetVectorInClassMetadata(IGF,
                                                           Target, metadata)
@@ -3512,18 +3475,19 @@ namespace {
                                {metadata, numFields,
                                 firstField.getAddress(), fieldVector});
 
-      } else if (InheritFieldOffsetVectors || InheritGenericParameters) {
+      } else {
         // If we have any ancestor generic parameters or field offset vectors,
         // copy them from the superclass metadata.
         auto initFn = IGF.IGM.getInitializeSuperclassFn();
+
+        bool copyFieldOffsetVectors = false;
+        if (FieldLayout.MetadataAccess != FieldAccess::ConstantDirect)
+          copyFieldOffsetVectors = true;
+
         IGF.Builder.CreateCall(initFn,
                                {metadata,
                                 llvm::ConstantInt::get(IGF.IGM.Int1Ty,
-                                                       InheritFieldOffsetVectors)});
-      } else if (IGF.IGM.ObjCInterop) {
-        // Register the class with the ObjC runtime.
-        llvm::Value *instantiateObjC = IGF.IGM.getInstantiateObjCClassFn();
-        IGF.Builder.CreateCall(instantiateObjC, metadata);
+                                                       copyFieldOffsetVectors)});
       }
     }
     
@@ -4490,7 +4454,7 @@ public:
   void addPayloadSize() {
     auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
     auto &enumTI = IGM.getTypeInfoForLowered(enumTy);
-    
+    (void) enumTI;
     assert(enumTI.isFixedSize(ResilienceScope::Component) &&
            "emitting constant enum metadata for resilient-sized type?");
     assert(!enumTI.isFixedSize(ResilienceScope::Universal) &&
@@ -4535,6 +4499,7 @@ public:
     // runtime-dependent, so fill in a zero here.
     auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
     auto &enumTI = IGM.getTypeInfoForLowered(enumTy);
+    (void) enumTI;
     assert(!enumTI.isFixedSize(ResilienceScope::Universal) &&
            "non-generic, non-resilient enums don't need payload size in metadata");
     addConstantWord(0);

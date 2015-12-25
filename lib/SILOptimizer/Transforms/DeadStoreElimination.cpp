@@ -54,13 +54,6 @@
 /// treated as killing the entire store.  However, using ProjectionPath does
 /// lead to more memory uses.
 ///
-/// TODO: Handle same value store in DSE, currently handled in RLE.
-///
-/// e.g.
-/// %0 = load %A
-/// ... nothing happens in middle and the %A contains the value of %0.
-/// store %0 to %A  <---- no need to do this store.
-///
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-dead-store-elim"
@@ -86,9 +79,6 @@
 
 using namespace swift;
 using swift::LSLocation;
-
-static llvm::cl::opt<bool> DisableLocalStoreDSE("disable-local-store-dse",
-                                                llvm::cl::init(true));
 
 STATISTIC(NumDeadStores, "Number of dead stores removed");
 STATISTIC(NumPartialDeadStores, "Number of partial dead stores removed");
@@ -153,29 +143,29 @@ namespace {
 /// non-dead store.
 constexpr unsigned MaxPartialDeadStoreCountLimit = 1;
 
+/// forward declaration.
+class DSEContext;
 /// BlockState summarizes how LSLocations are used in a basic block.
 ///
 /// Initially the BBWriteSetOut is empty. Before a basic block is processed, it
-/// is
-/// initialized to the intersection of BBWriteSetIns of all successors of the
+/// is initialized to the intersection of BBWriteSetIns of all successors of the
 /// basic block.
 ///
 /// Initially BBWriteSetIn is set to true. After the basic block is processed,
-/// if
-/// its BBWriteSetOut is different from BBWriteSetIn, BBWriteSetIn is
-/// initialized to
-/// the value of BBWriteSetOut and the data flow is rerun.
+/// if its BBWriteSetMid is different from BBWriteSetIn, BBWriteSetIn is
+/// initialized to the value of BBWriteSetMid and the data flow is rerun on the
+/// current basic block's predecessors.
 ///
 /// Instructions in each basic block are processed in post-order as follows:
 ///
 /// 1. When a store instruction is encountered, the stored location is tracked.
 ///
 /// 2. When a load instruction is encountered, remove the loaded location and
-///    any location it may alias with from the BBWriteSetOut.
+///    any location it may alias with from the BBWriteSetMid.
 ///
 /// 3. When an instruction reads from  memory in an unknown way, the
-/// BBWriteSetOut
-///    bit is cleared if the instruction can read the corresponding LSLocation.
+///    BBWriteSetMid bit is cleared if the instruction can read the
+///    corresponding LSLocation.
 ///
 class BlockState {
 public:
@@ -187,8 +177,13 @@ public:
 
   /// A bit vector for which the ith bit represents the ith LSLocation in
   /// LocationVault. If the bit is set, then the location currently has an
-  /// upward visible store.
+  /// upward visible store at the end of the basic block.
   llvm::BitVector BBWriteSetOut;
+
+  /// A bit vector for which the ith bit represents the ith LSLocation in
+  /// LocationVault. If the bit is set, then the location currently has an
+  /// upward visible store in middle of the basic block.
+  llvm::BitVector BBWriteSetMid;
 
   /// A bit vector for which the ith bit represents the ith LSLocation in
   /// LocationVault. If a bit in the vector is set, then the location has an
@@ -216,6 +211,9 @@ public:
 
   /// Keeps track of what stores to generate after the data flow stabilizes.
   /// these stores come from partial dead stores.
+  ///
+  /// The first SILValue keeps the address of the live store and the second
+  /// SILValue keeps the value of the store.
   llvm::DenseMap<SILValue, SILValue> LiveStores;
 
   /// Constructors.
@@ -225,49 +223,29 @@ public:
   /// Return the current basic block.
   SILBasicBlock *getBB() const { return BB; }
 
-  void init(unsigned lcnt) {
-    LocationNum = lcnt;
-    // The initial state of BBWriteSetIn should be all 1's. Otherwise the
-    // dataflow solution could be too conservative.
-    //
-    // consider this case, the dead store by var a = 10 before the loop will not
-    // be eliminated if the BBWriteSetIn is set to 0 initially.
-    //
-    //   var a = 10
-    //   for _ in 0...1024 {}
-    //   a = 10
-    //
-    // However, by doing so, we can only eliminate the dead stores after the
-    // data flow stabilizes.
-    //
-    BBWriteSetIn.resize(LocationNum, true);
-    BBWriteSetOut.resize(LocationNum, false);
+  /// Initialize the bitvectors for the return basic block.
+  void initReturnBlock(DSEContext &Ctx);
 
-    // GenSet and KillSet initially empty.
-    BBGenSet.resize(LocationNum, false);
-    BBKillSet.resize(LocationNum, false);
-
-    // MaxStoreSet is optimistically set to true initially.
-    BBMaxStoreSet.resize(LocationNum, true);
-  }
+  /// Initialize the bitvectors for the basic block.
+  void init(DSEContext &Ctx);
 
   /// Check whether the BBWriteSetIn has changed. If it does, we need to rerun
   /// the data flow on this block's predecessors to reach fixed point.
-  bool updateBBWriteSetIn();
+  bool updateBBWriteSetIn(llvm::BitVector &X);
 
   /// Functions to manipulate the write set.
   void startTrackingLocation(llvm::BitVector &BV, unsigned bit);
   void stopTrackingLocation(llvm::BitVector &BV, unsigned bit);
-  bool isTrackingLSLocation(llvm::BitVector &BV, unsigned bit);
+  bool isTrackingLocation(llvm::BitVector &BV, unsigned bit);
 };
 
 } // end anonymous namespace
 
-bool BlockState::updateBBWriteSetIn() {
-  bool Changed = (BBWriteSetIn != BBWriteSetOut);
+bool BlockState::updateBBWriteSetIn(llvm::BitVector &X) {
+  bool Changed = (BBWriteSetIn != X);
   if (!Changed)
     return Changed;
-  BBWriteSetIn = BBWriteSetOut;
+  BBWriteSetIn = X;
   return Changed;
 }
 
@@ -279,7 +257,7 @@ void BlockState::stopTrackingLocation(llvm::BitVector &BV, unsigned i) {
   BV.reset(i);
 }
 
-bool BlockState::isTrackingLSLocation(llvm::BitVector &BV, unsigned i) {
+bool BlockState::isTrackingLocation(llvm::BitVector &BV, unsigned i) {
   return BV.test(i);
 }
 
@@ -323,6 +301,7 @@ class DSEContext {
   std::vector<LSLocation> LocationVault;
 
   /// Contains a map between location to their index in the LocationVault.
+  /// used to facilitate fast location to index lookup.
   LSLocationIndexMap LocToBitIndex;
 
   /// Return the BlockState for the basic block this basic block belongs to.
@@ -336,52 +315,41 @@ class DSEContext {
   /// LSLocation written has been extracted, expanded and mapped to the bit
   /// position in the bitvector. update the max store set using the bit
   /// position.
-  void updateMaxStoreSetForWrite(BlockState *S, unsigned bit);
-
-  /// LSLocation read has been extracted, expanded and mapped to the bit
-  /// position in the bitvector. update the gen kill set using the bit
-  /// position.
-  void updateGenKillSetForRead(BlockState *S, unsigned bit);
-
-  /// LSLocation written has been extracted, expanded and mapped to the bit
-  /// position in the bitvector. update the gen kill set using the bit
-  /// position.
-  void updateGenKillSetForWrite(BlockState *S, unsigned bit);
-
-  /// LSLocation read has been extracted, expanded and mapped to the bit
-  /// position in the bitvector. process it using the bit position.
-  void updateWriteSetForRead(BlockState *S, unsigned Bit);
-
-  /// LSLocation written has been extracted, expanded and mapped to the bit
-  /// position in the bitvector. process it using the bit position.
-  bool updateWriteSetForWrite(BlockState *S, unsigned Bit);
+  void processWriteForMaxStoreSet(BlockState *S, unsigned bit);
 
   /// There is a read to a location, expand the location into individual fields
   /// before processing them.
-  void processRead(SILInstruction *Inst, BlockState *State, SILValue Mem,
-                   DSEKind Kind);
+  void processRead(SILInstruction *Inst, BlockState *S, SILValue M, DSEKind K);
+  void processReadForGenKillSet(BlockState *S, unsigned bit);
+  void processReadForDSE(BlockState *S, unsigned Bit);
 
   /// There is a write to a location, expand the location into individual fields
   /// before processing them.
-  void processWrite(SILInstruction *Inst, BlockState *State, SILValue Val,
-                    SILValue Mem, DSEKind Kind);
+  void processWrite(SILInstruction *Inst, BlockState *S, SILValue V, SILValue M,
+                    DSEKind K);
+  void processWriteForGenKillSet(BlockState *S, unsigned bit);
+  bool processWriteForDSE(BlockState *S, unsigned bit);
 
-  /// Process Instructions. Extract LSLocations from SIL LoadInst.
+  /// Process Instructions. Extract locations from SIL LoadInst.
   void processLoadInst(SILInstruction *Inst, DSEKind Kind);
 
-  /// Process Instructions. Extract LSLocations from SIL StoreInst.
+  /// Process Instructions. Extract locations from SIL StoreInst.
   void processStoreInst(SILInstruction *Inst, DSEKind Kind);
 
-  /// Process Instructions. Extract LSLocations from SIL DebugValueAddrInst.
+  /// Process Instructions. Extract locations from SIL DebugValueAddrInst.
   /// DebugValueAddrInst maybe promoted to DebugValue, when this is done,
-  /// DebugValueAddrInst is effectively a read on the LSLocation.
+  /// DebugValueAddrInst is effectively a read on the location.
   void processDebugValueAddrInst(SILInstruction *I, DSEKind Kind);
+  void processDebugValueAddrInstForGenKillSet(SILInstruction *I);
+  void processDebugValueAddrInstForDSE(SILInstruction *I);
 
-  /// Process Instructions. Extract LSLocations from unknown memory inst.
+  /// Process Instructions. Extract locations from unknown memory inst.
   void processUnknownReadInst(SILInstruction *Inst, DSEKind Kind);
+  void processUnknownReadInstForGenKillSet(SILInstruction *Inst);
+  void processUnknownReadInstForDSE(SILInstruction *Inst);
 
-  /// Check whether the instruction invalidate any LSLocations due to change in
-  /// its LSLocation Base.
+  /// Check whether the instruction invalidate any locations due to change in
+  /// its location Base.
   ///
   /// This is to handle a case like this.
   ///
@@ -395,14 +363,15 @@ class DSEContext {
   /// In this case, DSE cannot remove the x.a = 13 inside the loop.
   ///
   /// To do this, when the algorithm reaches the beginning of the basic block in
-  /// the loop it will need to invalidate the LSLocation in the BBWriteSetOut.
-  /// i.e.
-  /// the base of the LSLocation is changed.
+  /// the loop it will need to invalidate the location in the BBWriteSetMid.
+  /// i.e. the base of the location is changed.
   ///
   /// If not, on the second iteration, the intersection of the successors of
   /// the loop basic block will have store to x.a and therefore x.a = 13 can now
   /// be considered dead.
   void invalidateLSLocationBase(SILInstruction *Inst, DSEKind Kind);
+  void invalidateLSLocationBaseForGenKillSet(SILInstruction *Inst);
+  void invalidateLSLocationBaseForDSE(SILInstruction *Inst);
 
   /// Get the bit representing the location in the LocationVault.
   ///
@@ -418,15 +387,24 @@ public:
   /// Entry point for dead store elimination.
   bool run();
 
+  /// Returns the escape analysis we use.
+  EscapeAnalysis *getEA() { return EA; }
+
+  /// Returns the function currently being processing.
+  SILFunction *getFn() { return F; }
+
+  /// Retursn the location vault of the current function.
+  std::vector<LSLocation> &getLocationVault() { return LocationVault; }
+
   /// Compute the kill set for the basic block. return true if the store set
   /// changes.
-  bool processBasicBlockForDSE(SILBasicBlock *BB);
-
-  /// Compute the genset and killset for the current basic block.
-  void processBasicBlockForGenKillSet(SILBasicBlock *BB);
+  void processBasicBlockForDSE(SILBasicBlock *BB);
 
   /// Compute the max store set for the current basic block.
   void processBasicBlockForMaxStoreSet(SILBasicBlock *BB);
+
+  /// Compute the genset and killset for the current basic block.
+  void processBasicBlockForGenKillSet(SILBasicBlock *BB);
 
   /// Compute the BBWriteSetOut and BBWriteSetIn for the current basic
   /// block with the generated gen and kill set.
@@ -440,6 +418,53 @@ public:
 };
 
 } // end anonymous namespace
+
+void BlockState::initReturnBlock(DSEContext &Ctx) {
+  auto *EA = Ctx.getEA();
+  auto *Fn = Ctx.getFn();
+  std::vector<LSLocation> &LocationVault = Ctx.getLocationVault();
+
+  // We set the store bit at the end of the function if the location does
+  // not escape the function.
+  for (unsigned i = 0; i < LocationVault.size(); ++i) {
+    if (!LocationVault[i].isNonEscapingLocalLSLocation(Fn, EA))
+      continue;
+    startTrackingLocation(BBWriteSetOut, i);
+  }
+}
+
+void BlockState::init(DSEContext &Ctx)  {
+  std::vector<LSLocation> &LV = Ctx.getLocationVault();
+  LocationNum = LV.size();
+  // The initial state of BBWriteSetIn should be all 1's. Otherwise the
+  // dataflow solution could be too conservative.
+  //
+  // consider this case, the dead store by var a = 10 before the loop will not
+  // be eliminated if the BBWriteSetIn is set to 0 initially.
+  //
+  //   var a = 10
+  //   for _ in 0...1024 {}
+  //   a = 10
+  //
+  // However, by doing so, we can only eliminate the dead stores after the
+  // data flow stabilizes.
+  //
+  BBWriteSetIn.resize(LocationNum, true);
+  BBWriteSetOut.resize(LocationNum, false);
+  BBWriteSetMid.resize(LocationNum, false);
+
+  // GenSet and KillSet initially empty.
+  BBGenSet.resize(LocationNum, false);
+  BBKillSet.resize(LocationNum, false);
+
+  // MaxStoreSet is optimistically set to true initially.
+  BBMaxStoreSet.resize(LocationNum, true);
+
+  // If basic block has no successor, then all local writes can be considered
+  // dead for block with no successor.
+  if (BB->succ_empty()) 
+    initReturnBlock(Ctx);
+}
 
 unsigned DSEContext::getLocationBit(const LSLocation &Loc) {
   // Return the bit position of the given Loc in the LocationVault. The bit
@@ -462,7 +487,7 @@ void DSEContext::processBasicBlockForMaxStoreSet(SILBasicBlock *BB) {
   // Compute the MaxStoreSet at the end of the basic block.
   auto *BBState = getBlockState(BB);
   if (BB->succ_empty()) {
-    BBState->BBMaxStoreSet.reset();
+    BBState->BBMaxStoreSet = BBState->BBWriteSetOut;
   } else {
     auto Iter = BB->succ_begin();
     BBState->BBMaxStoreSet = getBlockState(*Iter)->BBMaxStoreSet;
@@ -485,64 +510,39 @@ bool DSEContext::processBasicBlockWithGenKillSet(SILBasicBlock *BB) {
   // Compute the BBWriteSetOut at the end of the basic block.
   mergeSuccessorStates(BB);
 
-  // Compute the BBWriteSetOut at the beginning of the basic block.
+  // Compute the BBWriteSet at the beginning of the basic block.
   BlockState *S = getBlockState(BB);
-  llvm::BitVector T = S->BBKillSet;
-  S->BBWriteSetOut &= T.flip();
-  S->BBWriteSetOut |= S->BBGenSet;
-
+  S->BBWriteSetMid = S->BBWriteSetOut;
+  S->BBWriteSetMid.reset(S->BBKillSet);
+  S->BBWriteSetMid |= S->BBGenSet;
+ 
   // If BBWriteSetIn changes, then keep iterating until reached a fixed point.
-  return S->updateBBWriteSetIn();
+  return S->updateBBWriteSetIn(S->BBWriteSetMid);
 }
 
-bool DSEContext::processBasicBlockForDSE(SILBasicBlock *BB) {
+void DSEContext::processBasicBlockForDSE(SILBasicBlock *BB) {
   // Intersect in the successor WriteSetIns. A store is dead if it is not read
   // from any path to the end of the program. Thus an intersection.
   mergeSuccessorStates(BB);
+
+  // Initialize the BBWriteSetMid to BBWriteSetOut to get started.
+  BlockState *S = getBlockState(BB);
+  S->BBWriteSetMid = S->BBWriteSetOut;
 
   // Process instructions in post-order fashion.
   for (auto I = BB->rbegin(), E = BB->rend(); I != E; ++I) {
     processInstruction(&(*I), DSEKind::PerformDSE);
   }
-
-  // If BBWriteSetIn changes, then keep iterating until reached a fixed
-  // point.
-  return getBlockState(BB)->updateBBWriteSetIn();
 }
 
 void DSEContext::mergeSuccessorStates(SILBasicBlock *BB) {
-  // First, clear the BBWriteSetOut for the current basicblock.
-  BlockState *C = getBlockState(BB);
-  C->BBWriteSetOut.reset();
-
   // If basic block has no successor, then all local writes can be considered
   // dead for block with no successor.
-  if (BB->succ_empty()) {
-    if (DisableLocalStoreDSE)
-      return;
-
-    auto *ConGraph = EA->getConnectionGraph(F);
-
-    for (unsigned i = 0; i < LocationVault.size(); ++i) {
-      SILValue Base = LocationVault[i].getBase();
-      if (isa<AllocStackInst>(Base)) {
-        // An alloc_stack is definitely dead at the end of the function.
-        C->startTrackingLocation(C->BBWriteSetOut, i);
-        continue;
-      }
-      if (isa<AllocationInst>(Base)) {
-        // For other allocations we ask escape analysis.
-        auto *Node = ConGraph->getNodeOrNull(Base, EA);
-        if (Node && !Node->escapes()) {
-          C->startTrackingLocation(C->BBWriteSetOut, i);
-          continue;
-        }
-      }
-    }
+  if (BB->succ_empty())
     return;
-  }
 
   // Use the first successor as the base condition.
+  BlockState *C = getBlockState(BB);
   auto Iter = BB->succ_begin();
   C->BBWriteSetOut = getBlockState(*Iter)->BBWriteSetIn;
 
@@ -563,73 +563,61 @@ void DSEContext::mergeSuccessorStates(SILBasicBlock *BB) {
   }
 }
 
+void DSEContext::invalidateLSLocationBaseForGenKillSet(SILInstruction *I) {
+  BlockState *S = getBlockState(I);
+  for (unsigned i = 0; i < S->LocationNum; ++i) {
+    if (LocationVault[i].getBase().getDef() != I)
+      continue;
+    S->startTrackingLocation(S->BBKillSet, i);
+    S->stopTrackingLocation(S->BBGenSet, i);
+  }
+}
+
+void DSEContext::invalidateLSLocationBaseForDSE(SILInstruction *I) {
+  BlockState *S = getBlockState(I);
+  for (unsigned i = 0; i < S->LocationNum; ++i) {
+    if (!S->BBWriteSetMid.test(i))
+      continue;
+    if (LocationVault[i].getBase().getDef() != I)
+      continue;
+    S->stopTrackingLocation(S->BBWriteSetMid, i);
+  }
+}
+
 void DSEContext::invalidateLSLocationBase(SILInstruction *I, DSEKind Kind) {
   // If this instruction defines the base of a location, then we need to
   // invalidate any locations with the same base.
-  BlockState *S = getBlockState(I);
 
   // Are we building genset and killset.
   if (isBuildingGenKillSet(Kind)) {
-    for (unsigned i = 0; i < S->LocationNum; ++i) {
-      if (LocationVault[i].getBase().getDef() != I)
-        continue;
-      S->startTrackingLocation(S->BBKillSet, i);
-      S->stopTrackingLocation(S->BBGenSet, i);
-    }
+    invalidateLSLocationBaseForGenKillSet(I);
     return;
   }
 
   // Are we performing dead store elimination.
   if (isPerformingDSE(Kind)) {
-    for (unsigned i = 0; i < S->LocationNum; ++i) {
-      if (!S->BBWriteSetOut.test(i))
-        continue;
-      if (LocationVault[i].getBase().getDef() != I)
-        continue;
-      S->stopTrackingLocation(S->BBWriteSetOut, i);
-    }
+    invalidateLSLocationBaseForDSE(I);
     return;
   }
 
   llvm_unreachable("Unknown DSE compute kind");
 }
 
-void DSEContext::updateWriteSetForRead(BlockState *S, unsigned bit) {
+void DSEContext::processReadForDSE(BlockState *S, unsigned bit) {
   // Remove any may/must-aliasing stores to the LSLocation, as they cant be
   // used to kill any upward visible stores due to the interfering load.
   LSLocation &R = LocationVault[bit];
   for (unsigned i = 0; i < S->LocationNum; ++i) {
-    if (!S->isTrackingLSLocation(S->BBWriteSetOut, i))
+    if (!S->isTrackingLocation(S->BBWriteSetMid, i))
       continue;
     LSLocation &L = LocationVault[i];
     if (!L.isMayAliasLSLocation(R, AA))
       continue;
-    S->stopTrackingLocation(S->BBWriteSetOut, i);
+    S->stopTrackingLocation(S->BBWriteSetMid, i);
   }
 }
 
-bool DSEContext::updateWriteSetForWrite(BlockState *S, unsigned bit) {
-  // If a tracked store must aliases with this store, then this store is dead.
-  bool IsDead = false;
-  LSLocation &R = LocationVault[bit];
-  for (unsigned i = 0; i < S->LocationNum; ++i) {
-    if (!S->isTrackingLSLocation(S->BBWriteSetOut, i))
-      continue;
-    // If 2 locations may alias, we can still keep both stores.
-    LSLocation &L = LocationVault[i];
-    if (!L.isMustAliasLSLocation(R, AA))
-      continue;
-    // There is a must alias store. No need to check further.
-    IsDead = true;
-    break;
-  }
-
-  // Track this new store.
-  S->startTrackingLocation(S->BBWriteSetOut, bit);
-  return IsDead;
-}
-
-void DSEContext::updateGenKillSetForRead(BlockState *S, unsigned bit) {
+void DSEContext::processReadForGenKillSet(BlockState *S, unsigned bit) {
   // Start tracking the read to this LSLocation in the killset and update
   // the genset accordingly.
   //
@@ -647,14 +635,6 @@ void DSEContext::updateGenKillSetForRead(BlockState *S, unsigned bit) {
     S->startTrackingLocation(S->BBKillSet, i);
     S->stopTrackingLocation(S->BBGenSet, i);
   }
-}
-
-void DSEContext::updateGenKillSetForWrite(BlockState *S, unsigned bit) {
-  S->startTrackingLocation(S->BBGenSet, bit);
-}
-
-void DSEContext::updateMaxStoreSetForWrite(BlockState *S, unsigned bit) {
-  S->startTrackingLocation(S->BBMaxStoreSet, bit);
 }
 
 void DSEContext::processRead(SILInstruction *I, BlockState *S, SILValue Mem,
@@ -690,7 +670,7 @@ void DSEContext::processRead(SILInstruction *I, BlockState *S, SILValue Mem,
   if (isBuildingGenKillSet(Kind)) {
     for (auto &E : Locs) {
       // Only building the gen and kill sets for now.
-      updateGenKillSetForRead(S, getLocationBit(E));
+      processReadForGenKillSet(S, getLocationBit(E));
     }
     return;
   }
@@ -699,12 +679,41 @@ void DSEContext::processRead(SILInstruction *I, BlockState *S, SILValue Mem,
   if (isPerformingDSE(Kind)) {
     for (auto &E : Locs) {
       // This is the last iteration, compute BBWriteSetOut and perform DSE. 
-      updateWriteSetForRead(S, getLocationBit(E));
+      processReadForDSE(S, getLocationBit(E));
     }
     return;
   }
 
   llvm_unreachable("Unknown DSE compute kind");
+}
+
+bool DSEContext::processWriteForDSE(BlockState *S, unsigned bit) {
+  // If a tracked store must aliases with this store, then this store is dead.
+  bool IsDead = false;
+  LSLocation &R = LocationVault[bit];
+  for (unsigned i = 0; i < S->LocationNum; ++i) {
+    if (!S->isTrackingLocation(S->BBWriteSetMid, i))
+      continue;
+    // If 2 locations may alias, we can still keep both stores.
+    LSLocation &L = LocationVault[i];
+    if (!L.isMustAliasLSLocation(R, AA))
+      continue;
+    // There is a must alias store. No need to check further.
+    IsDead = true;
+    break;
+  }
+
+  // Track this new store.
+  S->startTrackingLocation(S->BBWriteSetMid, bit);
+  return IsDead;
+}
+
+void DSEContext::processWriteForGenKillSet(BlockState *S, unsigned bit) {
+  S->startTrackingLocation(S->BBGenSet, bit);
+}
+
+void DSEContext::processWriteForMaxStoreSet(BlockState *S, unsigned bit) {
+  S->startTrackingLocation(S->BBMaxStoreSet, bit);
 }
 
 void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
@@ -736,22 +745,22 @@ void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
   LSLocation::expand(L, Mod, Locs, TE);
   llvm::BitVector V(Locs.size());
 
-  // Are we computing genset and killset.
-  if (isBuildingGenKillSet(Kind)) {
-    for (auto &E : Locs) {
-      // Only building the gen and kill sets here.
-      updateGenKillSetForWrite(S, getLocationBit(E));
-    }
-    // Data flow has not stabilized, do not perform the DSE just yet.
-    return;
-  }
-
   // Are we computing max store set.
   if (isComputeMaxStoreSet(Kind)) {
     for (auto &E : Locs) {
       // Update the max store set for the basic block.
-      updateMaxStoreSetForWrite(S, getLocationBit(E));
+      processWriteForMaxStoreSet(S, getLocationBit(E));
     }
+    return;
+  }
+
+  // Are we computing genset and killset.
+  if (isBuildingGenKillSet(Kind)) {
+    for (auto &E : Locs) {
+      // Only building the gen and kill sets here.
+      processWriteForGenKillSet(S, getLocationBit(E));
+    }
+    // Data flow has not stabilized, do not perform the DSE just yet.
     return;
   }
 
@@ -761,7 +770,7 @@ void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
   for (auto &E : Locs) {
     // This is the last iteration, compute BBWriteSetOut and perform the dead
     // store elimination.
-    if (updateWriteSetForWrite(S, getLocationBit(E)))
+    if (processWriteForDSE(S, getLocationBit(E)))
       V.set(idx);
     Dead &= V.test(idx);
     ++idx;
@@ -808,8 +817,8 @@ void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
       X.subtractPaths(BP);
     }
 
-    // We merely setup the remain live stores, but do not materialize in IR yet,
-    // These stores will be materialized when before the algorithm exits.
+    // We merely setup the remaining live stores, but do not materialize in IR
+    // yet, These stores will be materialized before the algorithm exits.
     for (auto &X : Alives) {
       SILValue Value =
           SILValueProjection::createExtract(Val, X.getPath(), I, true);
@@ -834,62 +843,81 @@ void DSEContext::processStoreInst(SILInstruction *I, DSEKind Kind) {
   processWrite(I, getBlockState(I), SI->getSrc(), SI->getDest(), Kind);
 }
 
-void DSEContext::processDebugValueAddrInst(SILInstruction *I, DSEKind Kind) {
+void DSEContext::processDebugValueAddrInstForGenKillSet(SILInstruction *I) {
   BlockState *S = getBlockState(I);
   SILValue Mem = cast<DebugValueAddrInst>(I)->getOperand();
+  for (unsigned i = 0; i < S->LocationNum; ++i) {
+    if (!S->BBMaxStoreSet.test(i))
+      continue;
+    if (AA->isNoAlias(Mem, LocationVault[i].getBase()))
+      continue;
+    S->stopTrackingLocation(S->BBGenSet, i);
+    S->startTrackingLocation(S->BBKillSet, i);
+  }
+}
+
+void DSEContext::processDebugValueAddrInstForDSE(SILInstruction *I) {
+  BlockState *S = getBlockState(I);
+  SILValue Mem = cast<DebugValueAddrInst>(I)->getOperand();
+  for (unsigned i = 0; i < S->LocationNum; ++i) {
+    if (!S->isTrackingLocation(S->BBWriteSetMid, i))
+      continue;
+    if (AA->isNoAlias(Mem, LocationVault[i].getBase()))
+      continue;
+    S->stopTrackingLocation(S->BBWriteSetMid, i);
+  }
+}
+
+void DSEContext::processDebugValueAddrInst(SILInstruction *I, DSEKind Kind) {
   // Are we building genset and killset.
   if (isBuildingGenKillSet(Kind)) {
-    for (unsigned i = 0; i < S->LocationNum; ++i) {
-      if (!S->BBMaxStoreSet.test(i))
-        continue;
-      if (AA->isNoAlias(Mem, LocationVault[i].getBase()))
-        continue;
-      S->stopTrackingLocation(S->BBGenSet, i);
-      S->startTrackingLocation(S->BBKillSet, i);
-    }
+    processDebugValueAddrInstForGenKillSet(I);
     return;
   }
 
   // Are we performing dead store elimination.
   if (isPerformingDSE(Kind)) {
-    for (unsigned i = 0; i < S->LocationNum; ++i) {
-      if (!S->isTrackingLSLocation(S->BBWriteSetOut, i))
-        continue;
-      if (AA->isNoAlias(Mem, LocationVault[i].getBase()))
-        continue;
-      S->stopTrackingLocation(S->BBWriteSetOut, i);
-    }
+    processDebugValueAddrInstForDSE(I);
     return;
   }
 
   llvm_unreachable("Unknown DSE compute kind");
 }
 
-void DSEContext::processUnknownReadInst(SILInstruction *I, DSEKind Kind) {
+void DSEContext::processUnknownReadInstForGenKillSet(SILInstruction *I) {
   BlockState *S = getBlockState(I);
+  for (unsigned i = 0; i < S->LocationNum; ++i) {
+    if (!S->BBMaxStoreSet.test(i))
+      continue;
+    if (!AA->mayReadFromMemory(I, LocationVault[i].getBase()))
+      continue;
+    // Update the genset and kill set.
+    S->startTrackingLocation(S->BBKillSet, i);
+    S->stopTrackingLocation(S->BBGenSet, i);
+  }
+}
+
+void DSEContext::processUnknownReadInstForDSE(SILInstruction *I) {
+  BlockState *S = getBlockState(I);
+  for (unsigned i = 0; i < S->LocationNum; ++i) {
+    if (!S->isTrackingLocation(S->BBWriteSetMid, i))
+      continue;
+    if (!AA->mayReadFromMemory(I, LocationVault[i].getBase()))
+      continue;
+    S->stopTrackingLocation(S->BBWriteSetMid, i);
+  }
+}
+
+void DSEContext::processUnknownReadInst(SILInstruction *I, DSEKind Kind) {
   // Are we building genset and killset.
   if (isBuildingGenKillSet(Kind)) {
-    for (unsigned i = 0; i < S->LocationNum; ++i) {
-      if (!S->BBMaxStoreSet.test(i))
-        continue;
-      if (!AA->mayReadFromMemory(I, LocationVault[i].getBase()))
-        continue;
-      // Update the genset and kill set.
-      S->startTrackingLocation(S->BBKillSet, i);
-      S->stopTrackingLocation(S->BBGenSet, i);
-    }
+    processUnknownReadInstForGenKillSet(I);
     return;
   }
 
   // Are we performing dead store elimination.
   if (isPerformingDSE(Kind)) {
-    for (unsigned i = 0; i < S->LocationNum; ++i) {
-      if (!S->isTrackingLSLocation(S->BBWriteSetOut, i))
-        continue;
-      if (!AA->mayReadFromMemory(I, LocationVault[i].getBase()))
-        continue;
-      S->stopTrackingLocation(S->BBWriteSetOut, i);
-    }
+    processUnknownReadInstForDSE(I);
     return;
   }
 
@@ -911,7 +939,7 @@ void DSEContext::processInstruction(SILInstruction *I, DSEKind Kind) {
     processDebugValueAddrInst(I, Kind);
   } else if (I->mayReadFromMemory()) {
     processUnknownReadInst(I, Kind);
-  }
+  }  
 
   // Check whether this instruction will invalidate any other locations.
   invalidateLSLocationBase(I, Kind);
@@ -931,7 +959,7 @@ bool DSEContext::run() {
     BlockStates.push_back(BlockState(&B));
     // Since we know all the locations accessed in this function, we can resize
     // the bit vector to the appropriate size.
-    BlockStates.back().init(LocationVault.size());
+    BlockStates.back().init(*this);
   }
 
   // Initialize the BBToLocState mapping.
@@ -976,21 +1004,31 @@ bool DSEContext::run() {
   // BBWriteSetIn of a basic block changes, the optimization is rerun on its
   // predecessors.
   llvm::SmallVector<SILBasicBlock *, 16> WorkList;
-  for (SILBasicBlock *B : PO->getPostOrder()) {
+  llvm::DenseSet<SILBasicBlock *> HandledBBs;
+  // Push into reverse post order so that we can pop from the back and get
+  // post order.
+  for (SILBasicBlock *B : PO->getReversePostOrder()) {
     WorkList.push_back(B);
+    HandledBBs.insert(B);
   }
   while (!WorkList.empty()) {
     SILBasicBlock *BB = WorkList.pop_back_val();
+    HandledBBs.erase(BB);
     if (processBasicBlockWithGenKillSet(BB)) {
-      for (auto X : BB->getPreds())
+      for (auto X : BB->getPreds()) {
+        // We do not push basic block into the worklist if its already 
+        // in the worklist.
+        if (HandledBBs.find(X) != HandledBBs.end())
+          continue;
         WorkList.push_back(X);
+      }
     }
   }
 
   // The data flow has stabilized, run one last iteration over all the basic
   // blocks and try to remove dead stores.
-  for (SILBasicBlock &BB : *F) {
-    processBasicBlockForDSE(&BB);
+  for (SILBasicBlock *B : PO->getPostOrder()) {
+    processBasicBlockForDSE(B);
   }
 
   // Finally, delete the dead stores and create the live stores.
