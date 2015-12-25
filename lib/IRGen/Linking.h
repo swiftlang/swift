@@ -83,9 +83,6 @@ class LinkEntity {
     // These fields appear in the TypeMetadata kind.
     MetadataAddressShift = 8, MetadataAddressMask = 0x0300,
     IsPatternShift = 10, IsPatternMask = 0x0400,
-
-    // This field appears in associated type access function kinds.
-    AssociatedTypeIndexShift = 8, AssociatedTypeIndexMask = ~KindMask,
   };
 #define LINKENTITY_SET_FIELD(field, value) (value << field##Shift)
 #define LINKENTITY_GET_FIELD(value, field) ((value & field##Mask) >> field##Shift)
@@ -130,8 +127,6 @@ class LinkEntity {
     /// A SIL global variable. The pointer is a SILGlobalVariable*.
     SILGlobalVariable,
 
-    // These next few are protocol-conformance kinds.
-
     /// A direct protocol witness table. The secondary pointer is a
     /// ProtocolConformance*.
     DirectProtocolWitnessTable,
@@ -139,25 +134,14 @@ class LinkEntity {
     /// A witness accessor function. The secondary pointer is a
     /// ProtocolConformance*.
     ProtocolWitnessTableAccessFunction,
-
-    /// A generic protocol witness table cache.  The secondary pointer is a
-    /// ProtocolConformance*.
-    GenericProtocolWitnessTableCache,
-
-    /// The instantiation function for a generic protocol witness table.
-    /// The secondary pointer is a ProtocolConformance*.
-    GenericProtocolWitnessTableInstantiationFunction,
     
-    /// A function which returns the type metadata for the associated type
-    /// of a protocol.  The secondary pointer is a ProtocolConformance*.
-    /// The index of the associated type declaration is stored in the data.
-    AssociatedTypeMetadataAccessFunction,
-
-    /// A function which returns the witness table for a protocol-constrained
-    /// associated type of a protocol.  The secondary pointer is a
-    /// ProtocolConformance*.  The primary pointer is a ProtocolDecl*.
-    /// The index of the associated type declaration is stored in the data.
-    AssociatedTypeWitnessTableAccessFunction,
+    /// A dependent protocol witness table instantiation function. The
+    /// secondary pointer is a ProtocolConformance*.
+    DependentProtocolWitnessTableGenerator,
+    
+    /// A template for dependent protocol witness table instantiation. The
+    /// secondary pointer is a ProtocolConformance*.
+    DependentProtocolWitnessTableTemplate,
 
     // These are both type kinds and protocol-conformance kinds.
 
@@ -252,43 +236,6 @@ class LinkEntity {
     Pointer = type.getPointer();
     SecondaryPointer = const_cast<void*>(static_cast<const void*>(c));
     Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind));
-  }
-
-  void setForProtocolConformanceAndAssociatedType(Kind kind,
-                                                  const ProtocolConformance *c,
-                                                  AssociatedTypeDecl *associate,
-                                   ProtocolDecl *associatedProtocol = nullptr) {
-    assert(isProtocolConformanceKind(kind));
-    Pointer = associatedProtocol;
-    SecondaryPointer = const_cast<void*>(static_cast<const void*>(c));
-    Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind)) |
-           LINKENTITY_SET_FIELD(AssociatedTypeIndex,
-                                getAssociatedTypeIndex(c, associate));
-  }
-
-  // We store associated types using their index in their parent protocol
-  // in order to avoid bloating LinkEntity out to three key pointers.
-  static unsigned getAssociatedTypeIndex(const ProtocolConformance *conformance,
-                                         AssociatedTypeDecl *associate) {
-    assert(conformance->getProtocol() == associate->getProtocol());
-    unsigned result = 0;
-    for (auto requirement : associate->getProtocol()->getMembers()) {
-      if (requirement == associate) return result;
-      if (isa<AssociatedTypeDecl>(requirement)) result++;
-    }
-    llvm_unreachable("didn't find associated type in protocol?");
-  }
-
-  static AssociatedTypeDecl *
-  getAssociatedTypeByIndex(const ProtocolConformance *conformance,
-                           unsigned index) {
-    for (auto requirement : conformance->getProtocol()->getMembers()) {
-      if (auto associate = dyn_cast<AssociatedTypeDecl>(requirement)) {
-        if (index == 0) return associate;
-        index--;
-      }
-    }
-    llvm_unreachable("didn't find associated type in protocol?");
   }
 
   void setForType(Kind kind, CanType type) {
@@ -443,22 +390,6 @@ public:
   }
 
   static LinkEntity
-  forGenericProtocolWitnessTableCache(const ProtocolConformance *C) {
-    LinkEntity entity;
-    entity.setForProtocolConformance(Kind::GenericProtocolWitnessTableCache, C);
-    return entity;
-  }
-
-  static LinkEntity
-  forGenericProtocolWitnessTableInstantiationFunction(
-                                      const ProtocolConformance *C) {
-    LinkEntity entity;
-    entity.setForProtocolConformance(
-                     Kind::GenericProtocolWitnessTableInstantiationFunction, C);
-    return entity;
-  }
-
-  static LinkEntity
   forProtocolWitnessTableLazyAccessFunction(const ProtocolConformance *C,
                                             CanType type) {
     LinkEntity entity;
@@ -473,26 +404,6 @@ public:
     LinkEntity entity;
     entity.setForProtocolConformanceAndType(
              Kind::ProtocolWitnessTableLazyCacheVariable, C, type);
-    return entity;
-  }
-
-  static LinkEntity
-  forAssociatedTypeMetadataAccessFunction(const ProtocolConformance *C,
-                                          AssociatedTypeDecl *associate) {
-    LinkEntity entity;
-    entity.setForProtocolConformanceAndAssociatedType(
-                     Kind::AssociatedTypeMetadataAccessFunction, C, associate);
-    return entity;
-  }
-
-  static LinkEntity
-  forAssociatedTypeWitnessTableAccessFunction(const ProtocolConformance *C,
-                                              AssociatedTypeDecl *associate,
-                                              ProtocolDecl *associateProtocol) {
-    LinkEntity entity;
-    entity.setForProtocolConformanceAndAssociatedType(
-                Kind::AssociatedTypeWitnessTableAccessFunction, C, associate,
-                                                      associateProtocol);
     return entity;
   }
 
@@ -524,18 +435,6 @@ public:
   const ProtocolConformance *getProtocolConformance() const {
     assert(isProtocolConformanceKind(getKind()));
     return reinterpret_cast<ProtocolConformance*>(SecondaryPointer);
-  }
-
-  AssociatedTypeDecl *getAssociatedType() const {
-    assert(getKind() == Kind::AssociatedTypeMetadataAccessFunction ||
-           getKind() == Kind::AssociatedTypeWitnessTableAccessFunction);
-    return getAssociatedTypeByIndex(getProtocolConformance(),
-                              LINKENTITY_GET_FIELD(Data, AssociatedTypeIndex));
-  }
-
-  ProtocolDecl *getAssociatedProtocol() const {
-    assert(getKind() == Kind::AssociatedTypeWitnessTableAccessFunction);
-    return reinterpret_cast<ProtocolDecl*>(Pointer);
   }
   
   ResilienceExpansion getResilienceExpansion() const {

@@ -46,9 +46,6 @@ class MetadataPath {
 
       // Everything past this point has at most one index.
 
-      /// Base protocol P of a protocol.
-      InheritedProtocol,
-
       /// Type argument P of a generic nominal type.
       NominalTypeArgument,
       LastWithPrimaryIndex = NominalTypeArgument,
@@ -169,14 +166,6 @@ public:
                                                   unsigned conformanceIndex) {
     Path.push_back(Component(Component::Kind::NominalTypeArgumentConformance,
                              argIndex, conformanceIndex));
-  }
-
-  /// Add a step to this path which gets the kth inherited protocol from a
-  /// witness table.
-  ///
-  /// k is computed including protocols which do not have witness tables.
-  void addInheritedProtocolComponent(unsigned index) {
-    Path.push_back(Component(Component::Kind::InheritedProtocol, index));
   }
 
   /// Return an abstract measurement of the cost of this path.

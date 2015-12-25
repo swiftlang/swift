@@ -100,10 +100,8 @@ _TWPC3foo3barS_8barrables ---> protocol witness table for foo.bar : foo.barrable
 _TWaC3foo3barS_8barrableS_ ---> protocol witness table accessor for foo.bar : foo.barrable in foo
 _TWlC3foo3barS0_S_8barrableS_ ---> lazy protocol witness table accessor for type foo.bar and conformance foo.bar : foo.barrable in foo
 _TWLC3foo3barS0_S_8barrableS_ ---> lazy protocol witness table cache variable for type foo.bar and conformance foo.bar : foo.barrable in foo
-_TWGC3foo3barS_8barrableS_ ---> generic protocol witness table for foo.bar : foo.barrable in foo
-_TWIC3foo3barS_8barrableS_ ---> instantiation function for generic protocol witness table for foo.bar : foo.barrable in foo
-_TWtC3foo3barS_8barrableS_4fred ---> associated type metadata accessor for fred in foo.bar : foo.barrable in foo
-_TWTC3foo3barS_8barrableS_4fredS_6thomas ---> associated type witness table accessor for fred : foo.thomas in foo.bar : foo.barrable in foo
+_TWDC3foo3barS_8barrableS_ ---> dependent protocol witness table generator for foo.bar : foo.barrable in foo
+_TWdC3foo3barS_8barrableS_ ---> dependent protocol witness table template for foo.bar : foo.barrable in foo
 _TFSCg5greenVSC5Color ---> __C.green.getter : __C.Color
 _TIF1t1fFT1iSi1sSS_T_A_ ---> t.(f (i : Swift.Int, s : Swift.String) -> ()).(default argument 0)
 _TIF1t1fFT1iSi1sSS_T_A0_ ---> t.(f (i : Swift.Int, s : Swift.String) -> ()).(default argument 1)

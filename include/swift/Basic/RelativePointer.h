@@ -102,10 +102,6 @@ public:
     return reinterpret_cast<PointerTy>(absolute);
   }
 
-  /// A zero relative offset encodes a null reference.
-  bool isNull() const & {
-    return RelativeOffset == 0;
-  }
 };
 
 /// A direct relative reference to an object.
@@ -126,8 +122,6 @@ public:
   const typename super::ValueTy *operator->() const & {
     return this->get();
   }
-
-  using super::isNull;
 };
 
 /// A specialization of RelativeDirectPointer for function pointers,
@@ -145,8 +139,6 @@ public:
   RetTy operator()(ArgTy...arg) {
     return this->get()(std::forward<ArgTy>(arg)...);
   }
-
-  using super::isNull;
 };
 
 }
