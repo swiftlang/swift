@@ -59,13 +59,13 @@ public extension UIDeviceOrientation {
   }
 
   var isValidInterfaceOrientation: Bool {
-      switch (self) {
-        case .Portrait, .PortraitUpsideDown, .LandscapeLeft, .LandscapeRight:
-          return true
-        default:
-          return false
-      }
+    switch (self) {
+    case .Portrait, .PortraitUpsideDown, .LandscapeLeft, .LandscapeRight:
+      return true
+    default:
+      return false
     }
+  }
 }
 
 @warn_unused_result
@@ -188,39 +188,39 @@ struct _UIViewMirror : _MirrorType {
   var summary: String { return "" }
   
   var quickLookObject: PlaygroundQuickLook? {
-      // iOS 7 or greater only
+    // iOS 7 or greater only
+    
+    var result: PlaygroundQuickLook? = nil
+    
+    if !_UIViewMirror._views.contains(_v) {
+      _UIViewMirror._views.insert(_v)
       
-      var result: PlaygroundQuickLook? = nil
-      
-      if !_UIViewMirror._views.contains(_v) {
-          _UIViewMirror._views.insert(_v)
-          
-          let bounds = _v.bounds
-          // in case of an empty rectangle abort the logging
-          if (bounds.size.width == 0) || (bounds.size.height == 0) {
-            return nil
-          }
-      
-          UIGraphicsBeginImageContextWithOptions(bounds.size, false, 0.0)
-
-          // UIKit is about to update this to be optional, so make it work
-          // with both older and newer SDKs. (In this context it should always
-          // be present.)
-          let ctx: CGContext! = UIGraphicsGetCurrentContext()
-          UIColor(white:1.0, alpha:0.0).set()
-          CGContextFillRect(ctx, bounds)
-          _v.layer.renderInContext(ctx)
-
-          let image: UIImage! = UIGraphicsGetImageFromCurrentImageContext()
-      
-          UIGraphicsEndImageContext()
-      
-          result = .Some(.View(image))
-
-          _UIViewMirror._views.remove(_v)
+      let bounds = _v.bounds
+      // in case of an empty rectangle abort the logging
+      if (bounds.size.width == 0) || (bounds.size.height == 0) {
+        return nil
       }
-
-      return result
+      
+      UIGraphicsBeginImageContextWithOptions(bounds.size, false, 0.0)
+      
+      // UIKit is about to update this to be optional, so make it work
+      // with both older and newer SDKs. (In this context it should always
+      // be present.)
+      let ctx: CGContext! = UIGraphicsGetCurrentContext()
+      UIColor(white:1.0, alpha:0.0).set()
+      CGContextFillRect(ctx, bounds)
+      _v.layer.renderInContext(ctx)
+      
+      let image: UIImage! = UIGraphicsGetImageFromCurrentImageContext()
+      
+      UIGraphicsEndImageContext()
+      
+      result = .Some(.View(image))
+      
+      _UIViewMirror._views.remove(_v)
+    }
+    
+    return result
   }
   
   var disposition : _MirrorDisposition { return .Aggregate }
