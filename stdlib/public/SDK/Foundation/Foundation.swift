@@ -1170,7 +1170,7 @@ extension NSOrderedSet : ArrayLiteralConvertible {
 
 //===--- "Copy constructors" ----------------------------------------------===//
 // These are needed to make Cocoa feel natural since we eliminated
-// implicit briding conversions from Objective-C to Swift
+// implicit bridging conversions from Objective-C to Swift
 //===----------------------------------------------------------------------===//
 
 extension NSArray {

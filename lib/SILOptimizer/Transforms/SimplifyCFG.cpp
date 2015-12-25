@@ -454,7 +454,7 @@ static SILInstruction *createValueForEdge(SILInstruction *UserInst,
   return createEnumElement(Builder, SEI, Case.get());
 }
 
-/// Peform dominator based value simplifications and jump threading on all users
+/// Perform dominator based value simplifications and jump threading on all users
 /// of the operand of 'DominatingBB's terminator.
 static bool tryDominatorBasedSimplifications(
     SILBasicBlock *DominatingBB, DominanceInfo *DT,

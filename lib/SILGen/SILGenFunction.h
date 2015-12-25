@@ -201,7 +201,7 @@ public:
   
   MetatypeInst *createMetatype(SILLocation Loc, SILType Metatype);
 
-  // Generic pply instructions use the conformances necessary to form the call.
+  // Generic apply instructions use the conformances necessary to form the call.
 
   using SILBuilder::createApply;
 

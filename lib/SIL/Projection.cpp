@@ -840,7 +840,7 @@ processUsersOfValue(ProjectionTree &Tree,
             "Adding to non projection user!\b");
 
       // The only projection which we do not currently handle are enums since we
-      // may not know the correct case. This can be xtended in the future.
+      // may not know the correct case. This can be extended in the future.
       addNonProjectionUser(Op);
     }
   }

@@ -2436,7 +2436,7 @@ public:
           if (HaveDot)
             return;
 
-          // If instance type is type alias, showing users that the contructed
+          // If instance type is type alias, showing users that the constructed
           // type is the typealias instead of the underlying type of the alias.
           Optional<Type> Result = None;
           if (auto AT = MT->getInstanceType()) {
@@ -3311,7 +3311,7 @@ public:
   static bool isPotentialSignatureMatch(ArrayRef<Type> TupleEles,
                                         ArrayRef<Type> ExprTypes,
                                         DeclContext *DC) {
-    // Not likely to be a mactch if users provide more arguments than expected.
+    // Not likely to be a match if users provide more arguments than expected.
     if (ExprTypes.size() >= TupleEles.size())
       return false;
     for (unsigned I = 0; I < ExprTypes.size(); ++ I) {

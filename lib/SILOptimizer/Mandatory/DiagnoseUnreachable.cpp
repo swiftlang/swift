@@ -267,7 +267,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
           }
         }
 
-      // Not fully covered switches will be diagnosed later. SILGen represnets
+      // Not fully covered switches will be diagnosed later. SILGen represents
       // them with a Default basic block with an unrechable instruction.
       // We are going to produce an error on all unreachable instructions not
       // eliminated by DCE.

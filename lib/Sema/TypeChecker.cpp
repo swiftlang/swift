@@ -2216,7 +2216,7 @@ void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
                                      const AvailableAttr *Attr,
                                      DeclName Name,
                    std::function<void(InFlightDiagnostic&)> extraInfoHandler) {
-  // We match the behavior of clang to not report deprecation warnigs
+  // We match the behavior of clang to not report deprecation warnings
   // inside declarations that are themselves deprecated on all deployment
   // targets.
   if (isInsideDeprecatedDeclaration(ReferenceRange, ReferenceDC, *this)) {

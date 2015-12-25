@@ -3036,7 +3036,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
     if (Adoptee->is<ErrorType>())
       return Type();
 
-    // UnresolvedTypes propagated their unresolveness to any witnesses.
+    // UnresolvedTypes propagated their unresolvedness to any witnesses.
     if (Adoptee->is<UnresolvedType>())
       return Adoptee;
 

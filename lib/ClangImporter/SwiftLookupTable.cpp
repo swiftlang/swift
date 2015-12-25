@@ -146,7 +146,7 @@ auto SwiftLookupTable::findOrCreate(StringRef baseName)
   // Find entries for this base name.
   auto known = LookupTable.find(baseName);
 
-  // If we found somthing, we're done.
+  // If we found something, we're done.
   if (known != LookupTable.end()) return known;
   
   // If there's no reader, we've found all there is to find.

@@ -1605,7 +1605,7 @@ public:
   /// \brief Whether we should be recording failures.
   bool shouldRecordFailures() {
     // FIXME: It still makes sense to record failures when there are fixes
-    // present, but they shold be less desirable.
+    // present, but they should be less desirable.
     if (!Fixes.empty())
       return false;
 

@@ -1,4 +1,4 @@
-//===- CodeCompletionResultBuilder.h - Bulid completion results -----------===//
+//===- CodeCompletionResultBuilder.h - Build completion results -----------===//
 //
 // This source file is part of the Swift.org open source project
 //

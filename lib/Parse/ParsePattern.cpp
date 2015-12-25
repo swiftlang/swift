@@ -467,7 +467,7 @@ mapParsedParameters(Parser &parser,
       if (isKeywordArgumentByDefault || param.PoundLoc.isValid()) {
         argName = param.FirstName;
 
-        // THe pound is going away. Complain.
+        // The pound is going away. Complain.
         if (param.PoundLoc.isValid()) {
           if (isKeywordArgumentByDefault) {
             parser.diagnose(param.PoundLoc, diag::parameter_extraneous_pound,

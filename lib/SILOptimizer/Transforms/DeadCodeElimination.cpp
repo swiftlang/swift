@@ -91,7 +91,7 @@ class DCE : public SILFunctionTransform {
 
   /// Tracks if the pass changed branches.
   bool BranchesChanged;
-  /// Trackes if the pass changed ApplyInsts.
+  /// Tracks if the pass changed ApplyInsts.
   bool CallsChanged;
 
   /// The entry point to the transformation.

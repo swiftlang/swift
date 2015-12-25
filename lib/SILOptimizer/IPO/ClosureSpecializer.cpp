@@ -314,7 +314,7 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
     // executed more frequently than the closure (for example, if the closure is
     // created in a loop preheader and the callee taking the closure is executed
     // in the loop). In such a case we must keep the argument live across the
-    // call site of the callee and emit a matching retain for every innvocation
+    // call site of the callee and emit a matching retain for every invocation
     // of the callee.
     //
     //    %closure = partial_apply (%arg)

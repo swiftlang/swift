@@ -357,7 +357,7 @@ static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
   // Check all the potential splits.
   for (unsigned splitLoc = 1, e = nameStr.size(); splitLoc != e; ++splitLoc) {
     // For it to be a valid split, the start and end section must be valid
-    // operators, spliting a unicode code point isn't kosher.
+    // operators, splitting a unicode code point isn't kosher.
     auto startStr = nameStr.substr(0, splitLoc);
     auto endStr = nameStr.drop_front(splitLoc);
     if (!Lexer::isOperator(startStr) || !Lexer::isOperator(endStr))

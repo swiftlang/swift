@@ -1,4 +1,4 @@
-//===--- Metadata.cpp - Swift Language ABI Metdata Support ----------------===//
+//===--- Metadata.cpp - Swift Language ABI Metadata Support ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -2221,7 +2221,7 @@ ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
   }
 
   // The return type here describes extra structure for the protocol
-  // witness table for some reason.  We should probaby have a nominal
+  // witness table for some reason.  We should probably have a nominal
   // type for these, just for type safety reasons.
   return witnessTables[i];
 }

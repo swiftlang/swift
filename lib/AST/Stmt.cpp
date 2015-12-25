@@ -165,7 +165,7 @@ SourceLoc DeferStmt::getEndLoc() const {
   return tempDecl->getBody()->getEndLoc();
 }
 
-/// Dig the original users's body of the defer out for AST fidelity.
+/// Dig the original user's body of the defer out for AST fidelity.
 BraceStmt *DeferStmt::getBodyAsWritten() const {
   return tempDecl->getBody();
 }

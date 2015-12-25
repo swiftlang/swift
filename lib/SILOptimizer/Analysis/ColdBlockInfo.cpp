@@ -34,7 +34,7 @@ enum BranchHint : unsigned {
 };
 } // namespace
 
-/// \return a BranHint if this call is a builtin branch hint.
+/// \return a BranchHint if this call is a builtin branch hint.
 static BranchHint getBranchHint(SILValue Cond) {
   // Handle the fully inlined Builtin.
   if (auto *BI = dyn_cast<BuiltinInst>(Cond)) {

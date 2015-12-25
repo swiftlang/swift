@@ -599,7 +599,7 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   // uses the connection graph to check if the pointers may point to the same
   // content.
   // Note that escape analysis must work with the original pointers and not the
-  // underlying objects because it treats projecetions differently.
+  // underlying objects because it treats projections differently.
   if (!EA->canPointToSameMemory(V1, V2)) {
     DEBUG(llvm::dbgs() << "            Found not-aliased objects based on"
                                       "escape analysis\n");

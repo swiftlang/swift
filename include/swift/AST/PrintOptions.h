@@ -247,7 +247,7 @@ struct PrintOptions {
 
   static PrintOptions printTypeInterface(Type T, DeclContext *DC);
 
-  /// Retrive the print options that are suitable to print the testable interface.
+  /// Retrieve the print options that are suitable to print the testable interface.
   static PrintOptions printTestableInterface() {
     PrintOptions result = printInterface();
     result.AccessibilityFilter = Accessibility::Internal;
