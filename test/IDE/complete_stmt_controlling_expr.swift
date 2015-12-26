@@ -378,7 +378,7 @@ func testCStyleForBodyI5(fooObject: FooStruct) {
 func testCStyleForBodyI6(fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
-  for var i = 0; ; unknown_var++ {
+  for var i = 0; ; unknown_var += 1 {
     #^C_STYLE_FOR_BODY_I_6^#
   }
 }

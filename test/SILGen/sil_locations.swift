@@ -5,7 +5,7 @@
 func ifexpr() -> Int {
   var x : Int = 0
   if true {
-    x++; 
+    x += 1;
   }
   return x
   // CHECK-LABEL: sil hidden  @_TF13sil_locations6ifexprFT_Si
@@ -18,9 +18,9 @@ func ifexpr() -> Int {
 func ifelseexpr() -> Int {
   var x : Int = 0
   if true {
-    x++; 
+    x += 1;
   } else {
-    x--;
+    x -= 1;
   }
   return x
   // CHECK-LABEL: sil hidden  @_TF13sil_locations10ifelseexprFT_Si
@@ -64,7 +64,7 @@ func ifexpr_rval() -> Int {
 
 // TODO: missing info on the first branch.
 func forstmt_empty_cond(i: Int) -> Int {
-  for var i=0;;++i {}
+  for var i=0;; i += 1 {}
     // CHECK-LABEL: sil hidden  @{{.*}}forstmt_empty_cond{{.*}}
     // CHECK: apply {{.*}} line:[[@LINE-2]]:13
     // CHECK: br [[TRUE_BB:bb[0-9]+]]
@@ -116,7 +116,7 @@ func multipleReturnsImplicitAndExplicit() {
   if x > 10 {
     return
   }
-  x++;
+  x += 1;
   // CHECK-LABEL: sil hidden  @_TF13sil_locations34multipleReturnsImplicitAndExplicitFT_T_
   // CHECK: cond_br
   // CHECK: br bb{{[0-9]+}} // {{.*}} line:[[@LINE-5]]:5:return
@@ -175,13 +175,13 @@ func testIf() {
 }
 
 func testFor() {
-  for (var i:Int = 0; i<10; i++) {
+  for i in 0..<10 {
     var y: Int = 300
-    y++;
+    y += 1;
     if true {
       break
     }
-    y--;
+    y -= 1;
     continue
   }
 
@@ -352,7 +352,7 @@ func testStringForEachStmt() {
 func testForStmt() {
   var i = 0
   var m = 0
-  for (i = 0; i < 10; ++i) {
+  for i in 0..<10 {
     m += 1
     if m == 15 {
       break

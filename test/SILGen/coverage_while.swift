@@ -9,13 +9,15 @@ func foo() -> Int32 {
   }
 
   // CHECK: [[@LINE+1]]:9 -> [[@LINE+1]]:18 : (0 + 2)
-  while (--x > 0) {
-    if (x % 2 == 0) { continue }
+  while (x > 0) {
+    if (x % 2 == 0) { x -= 1; continue }
+	x -= 1
   }
 
   // CHECK: [[@LINE+1]]:9 -> [[@LINE+1]]:18 : ((0 + 4) - 5)
   while (x < 100) {
-    if (x++ == 10) { break }
+    if (x == 10) { break }
+	x += 1
   }
 
   // CHECK: [[@LINE+1]]:9 -> [[@LINE+1]]:18 : ((0 + 6) - 9)

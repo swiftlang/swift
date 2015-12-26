@@ -243,7 +243,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   // Validate our results
   //
   correct = 0
-  for(i = 0; i < count; i++)
+  for i in 0..<count
   {
     if(results[i] == data[i] * data[i]){
       correct += 1

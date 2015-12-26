@@ -73,7 +73,7 @@ var (sd2: Qtys)
 }
 
 for i in 0...5 {}
-for var i = 0, i2 = 1; i == 0; ++i {}
+for var i = 0, i2 = 1; i == 0; i += 1 {}
 while let v = o, z = o where v > z {}
 repeat {} while v == 0
 if let v = o, z = o where v > z {}
