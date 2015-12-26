@@ -178,33 +178,33 @@ public:
   /// A bit vector for which the ith bit represents the ith LSLocation in
   /// LocationVault. If the bit is set, then the location currently has an
   /// upward visible store at the end of the basic block.
-  llvm::BitVector BBWriteSetOut;
+  llvm::SmallBitVector BBWriteSetOut;
 
   /// A bit vector for which the ith bit represents the ith LSLocation in
   /// LocationVault. If the bit is set, then the location currently has an
   /// upward visible store in middle of the basic block.
-  llvm::BitVector BBWriteSetMid;
+  llvm::SmallBitVector BBWriteSetMid;
 
   /// A bit vector for which the ith bit represents the ith LSLocation in
   /// LocationVault. If a bit in the vector is set, then the location has an
   /// upward visible store at the beginning of the basic block.
-  llvm::BitVector BBWriteSetIn;
+  llvm::SmallBitVector BBWriteSetIn;
 
   /// A bit vector for which the ith bit represents the ith LSLocation in
   /// LocationVault. If the bit is set, then the current basic block
   /// generates an upward visible store.
-  llvm::BitVector BBGenSet;
+  llvm::SmallBitVector BBGenSet;
 
   /// A bit vector for which the ith bit represents the ith LSLocation in
   /// LocationVault. If the bit is set, then the current basic block
   /// kills an upward visible store.
-  llvm::BitVector BBKillSet;
+  llvm::SmallBitVector BBKillSet;
 
   /// A bit vector to keep the maximum number of stores that can reach the
   /// beginning of the basic block. If a bit is set, that means there is
   /// potentially a upward visible store to the location at the beginning
   /// of the basic block.
-  llvm::BitVector BBMaxStoreSet;
+  llvm::SmallBitVector BBMaxStoreSet;
 
   /// The dead stores in the current basic block.
   llvm::DenseSet<SILInstruction *> DeadStores;
@@ -231,17 +231,17 @@ public:
 
   /// Check whether the BBWriteSetIn has changed. If it does, we need to rerun
   /// the data flow on this block's predecessors to reach fixed point.
-  bool updateBBWriteSetIn(llvm::BitVector &X);
+  bool updateBBWriteSetIn(llvm::SmallBitVector &X);
 
   /// Functions to manipulate the write set.
-  void startTrackingLocation(llvm::BitVector &BV, unsigned bit);
-  void stopTrackingLocation(llvm::BitVector &BV, unsigned bit);
-  bool isTrackingLocation(llvm::BitVector &BV, unsigned bit);
+  void startTrackingLocation(llvm::SmallBitVector &BV, unsigned bit);
+  void stopTrackingLocation(llvm::SmallBitVector &BV, unsigned bit);
+  bool isTrackingLocation(llvm::SmallBitVector &BV, unsigned bit);
 };
 
 } // end anonymous namespace
 
-bool BlockState::updateBBWriteSetIn(llvm::BitVector &X) {
+bool BlockState::updateBBWriteSetIn(llvm::SmallBitVector &X) {
   bool Changed = (BBWriteSetIn != X);
   if (!Changed)
     return Changed;
@@ -249,15 +249,15 @@ bool BlockState::updateBBWriteSetIn(llvm::BitVector &X) {
   return Changed;
 }
 
-void BlockState::startTrackingLocation(llvm::BitVector &BV, unsigned i) {
+void BlockState::startTrackingLocation(llvm::SmallBitVector &BV, unsigned i) {
   BV.set(i);
 }
 
-void BlockState::stopTrackingLocation(llvm::BitVector &BV, unsigned i) {
+void BlockState::stopTrackingLocation(llvm::SmallBitVector &BV, unsigned i) {
   BV.reset(i);
 }
 
-bool BlockState::isTrackingLocation(llvm::BitVector &BV, unsigned i) {
+bool BlockState::isTrackingLocation(llvm::SmallBitVector &BV, unsigned i) {
   return BV.test(i);
 }
 
@@ -746,7 +746,7 @@ void DSEContext::processWrite(SILInstruction *I, BlockState *S, SILValue Val,
   bool Dead = true;
   LSLocationList Locs;
   LSLocation::expand(L, Mod, Locs, TE);
-  llvm::BitVector V(Locs.size());
+  llvm::SmallBitVector V(Locs.size());
 
   // Are we computing max store set.
   if (isComputeMaxStoreSet(Kind)) {
