@@ -999,6 +999,7 @@ static void emitDirectExternalParameter(IRGenSILFunction &IGF,
   paramTI.loadAsTake(IGF, temporary, out);
 
   // Deallocate the temporary.
+  // `deallocateStack` emits the lifetime.end marker for us.
   paramTI.deallocateStack(IGF, temporary, paramType);
 }
 
@@ -3643,7 +3644,7 @@ static void emitUncheckedValueBitCast(IRGenSILFunction &IGF,
                                         outTI.getStorageType()->getPointerTo());
   outTI.loadAsTake(IGF, outStorage, out);
   
-  IGF.Builder.CreateLifetimeStart(inStorage, maxSize);
+  IGF.Builder.CreateLifetimeEnd(inStorage, maxSize);
   return;
 }
 
