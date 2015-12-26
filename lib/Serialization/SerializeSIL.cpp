@@ -258,7 +258,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   bool NoBody = DeclOnly || isAvailableExternally(Linkage) ||
                 F.isExternalDeclaration();
 
-  // If we don't emit a function body then make sure to mark the decleration
+  // If we don't emit a function body then make sure to mark the declaration
   // as available externally.
   if (NoBody) {
     Linkage = addExternalToLinkage(Linkage);

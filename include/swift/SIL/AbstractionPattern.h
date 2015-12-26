@@ -1,4 +1,4 @@
-//===--- AbstractionPattern.h - SIL type abstraction pattersn ---*- C++ -*-===//
+//===--- AbstractionPattern.h - SIL type abstraction patterns ---*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

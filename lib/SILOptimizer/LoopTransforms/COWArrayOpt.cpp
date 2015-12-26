@@ -449,7 +449,7 @@ bool COWArrayOpt::checkUniqueArrayContainer(SILValue ArrayContainer) {
   return false;
 }
 
-/// Lazilly compute blocks that may reach the loop.
+/// Lazily compute blocks that may reach the loop.
 SmallPtrSetImpl<SILBasicBlock*> &COWArrayOpt::getReachingBlocks() {
   if (ReachingBlocks.empty()) {
     SmallVector<SILBasicBlock*, 8> Worklist;
@@ -1770,7 +1770,7 @@ private:
       return false;
     }
 
-    // Otherwise, all of our users are sane. The array does not scape.
+    // Otherwise, all of our users are sane. The array does not escape.
     return true;
   }
 

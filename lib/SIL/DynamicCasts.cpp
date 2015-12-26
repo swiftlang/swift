@@ -400,7 +400,7 @@ swift::classifyDynamicCast(Module *M,
 
   // FIXME: tuple conversions?
 
-  // FIXME: Be more careful with briding conversions from
+  // FIXME: Be more careful with bridging conversions from
   // NSArray, NSDictionary and NSSet as they may fail?
 
   // Check if there might be a bridging conversion.

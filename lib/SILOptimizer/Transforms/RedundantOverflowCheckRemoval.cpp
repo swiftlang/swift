@@ -130,7 +130,7 @@ public:
     // Perform a forward scan and use control flow and previously detected
     // overflow checks to remove the overflow checks.
 
-    // For each block in a Reverse Post Prder scan:
+    // For each block in a Reverse Post Order scan:
     for (auto &BB : ReversePostOrder) {
       // For each instruction:
       for (auto Inst = BB->begin(), End = BB->end(); Inst != End; Inst++) {

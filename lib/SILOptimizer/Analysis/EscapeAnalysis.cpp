@@ -300,7 +300,7 @@ updatePointsTo(CGNode *InitialNode, CGNode *pointsTo) {
     // Here we handle a special case: all defer-edge paths must eventually end
     // in a points-to edge to pointsTo. We ensure this by setting the edge on
     // nodes which have no defer-successors (see above). But this does not cover
-    // the case where there is a terminating cyle in the defer-edge path,
+    // the case where there is a terminating cycle in the defer-edge path,
     // e.g.  A -> B -> C -> B
     // We find all nodes which don't reach a points-to edge and add additional
     // points-to edges to fix that.

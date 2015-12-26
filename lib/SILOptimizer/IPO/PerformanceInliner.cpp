@@ -1289,7 +1289,7 @@ void SILPerformanceInliner::visitColdBlocks(
 
 
 //===----------------------------------------------------------------------===//
-//                          Performane Inliner Pass
+//                          Performance Inliner Pass
 //===----------------------------------------------------------------------===//
 
 namespace {

@@ -485,7 +485,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
 
 /// Try to sink literals that are passed to arguments that are coming from
 /// multiple predecessors.
-/// Notice that unline other sinking methods in this file we do allow sinking
+/// Notice that unlike other sinking methods in this file we do allow sinking
 /// of literals from blocks with multiple successors.
 static bool sinkLiteralsFromPredecessors(SILBasicBlock *BB) {
   if (BB->pred_empty() || BB->getSinglePredecessor())

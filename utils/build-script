@@ -498,7 +498,7 @@ the number of parallel build jobs to use""",
     parser.add_argument("--extra-swift-args", help=textwrap.dedent("""
     Pass through extra flags to swift in the form of a cmake list 'module_regexp;flag'. Can
     be called multiple times to add multiple such module_regexp flag pairs. All semicolons
-    in flags must be scaped with a '\'"""),
+    in flags must be escaped with a '\'"""),
                         action="append", dest="extra_swift_args", default=[])
 
     parser.add_argument("build_script_impl_args",

@@ -43,7 +43,7 @@ public:
     /// Observe that we successfully deserialized a function body.
     virtual void didDeserializeFunctionBody(ModuleDecl *M, SILFunction *fn) {}
 
-    /// Oberve that we successfully deserialized a witness table's entries.
+    /// Observe that we successfully deserialized a witness table's entries.
     virtual void didDeserializeWitnessTableEntries(ModuleDecl *M,
                                                    SILWitnessTable *wt) {}
 

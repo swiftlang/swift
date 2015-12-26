@@ -433,7 +433,7 @@ SILPassManager::~SILPassManager() {
 }
 
 /// \brief Reset the state of the pass manager and remove all transformation
-/// owned by the pass manager. Anaysis passes will be kept.
+/// owned by the pass manager. Analysis passes will be kept.
 void SILPassManager::resetAndRemoveTransformations() {
   for (auto T : Transformations)
     delete T;

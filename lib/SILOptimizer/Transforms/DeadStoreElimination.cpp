@@ -393,7 +393,7 @@ public:
   /// Returns the function currently being processing.
   SILFunction *getFn() { return F; }
 
-  /// Retursn the location vault of the current function.
+  /// Returns the location vault of the current function.
   std::vector<LSLocation> &getLocationVault() { return LocationVault; }
 
   /// Compute the kill set for the basic block. return true if the store set

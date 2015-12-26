@@ -162,7 +162,7 @@ enum class ValueWitness : unsigned {
   
   ///   void (*destroyArray)(T *object, size_t n, witness_t *self);
   ///
-  /// Given a vaild array of n objects of this type, destroy the object, leaving
+  /// Given a valid array of n objects of this type, destroy the object, leaving
   /// the array invalid. This is useful when generically destroying an array of
   /// objects to avoid calling the scalar 'destroy' witness in a loop.
   DestroyArray,

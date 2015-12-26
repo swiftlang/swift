@@ -366,7 +366,7 @@ static SILInstruction *constantFoldBinary(BuiltinInst *BI,
   }
 }
 
-static std::pair<bool, bool> getTypeSigndness(const BuiltinInfo &Builtin) {
+static std::pair<bool, bool> getTypeSignedness(const BuiltinInfo &Builtin) {
   bool SrcTySigned =
   (Builtin.ID == BuiltinValueKind::SToSCheckedTrunc ||
    Builtin.ID == BuiltinValueKind::SToUCheckedTrunc ||
@@ -503,7 +503,7 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
     // Otherwise report the overflow error.
     if (Literal) {
       bool SrcTySigned, DstTySigned;
-      std::tie(SrcTySigned, DstTySigned) = getTypeSigndness(Builtin);
+      std::tie(SrcTySigned, DstTySigned) = getTypeSignedness(Builtin);
       SmallString<10> SrcAsString;
       SrcVal.toString(SrcAsString, /*radix*/10, SrcTySigned);
 
@@ -521,7 +521,7 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
       // Otherwise, print the Builtin Types.
       } else {
         bool SrcTySigned, DstTySigned;
-        std::tie(SrcTySigned, DstTySigned) = getTypeSigndness(Builtin);
+        std::tie(SrcTySigned, DstTySigned) = getTypeSignedness(Builtin);
         diagnose(M.getASTContext(), Loc.getSourceLoc(),
                  diag::integer_literal_overflow_builtin_types,
                  DstTySigned, DstTy, SrcAsString);
@@ -540,10 +540,10 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
 
         // Otherwise, print the Builtin Types.
         } else {
-          // Since builtin types are sign-agnostic, print the signdness
+          // Since builtin types are sign-agnostic, print the signedness
           // separately.
           bool SrcTySigned, DstTySigned;
-          std::tie(SrcTySigned, DstTySigned) = getTypeSigndness(Builtin);
+          std::tie(SrcTySigned, DstTySigned) = getTypeSignedness(Builtin);
           diagnose(M.getASTContext(), Loc.getSourceLoc(),
                    diag::integer_conversion_overflow_builtin_types,
                    SrcTySigned, SrcTy, DstTySigned, DstTy);

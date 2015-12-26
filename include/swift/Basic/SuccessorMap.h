@@ -233,7 +233,7 @@ private:
       return foundUpperBound;
     };
 
-    // A heler to finish the operation, given that 'cur' is an upper bound.
+    // A helper to finish the operation, given that 'cur' is an upper bound.
     auto finishWithUpperBound = [&] {
       assert(cur->Left == nullptr);
       return reassemble(true);

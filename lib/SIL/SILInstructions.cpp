@@ -951,7 +951,7 @@ SelectValueInst::create(SILDebugLocation *Loc, SILValue Operand, SILType Type,
                         SILFunction &F) {
   // Allocate enough room for the instruction with tail-allocated data for all
   // the case values and the SILSuccessor arrays. There are `CaseBBs.size()`
-  // SILValuues and `CaseBBs.size() + (DefaultBB ? 1 : 0)` successors.
+  // SILValues and `CaseBBs.size() + (DefaultBB ? 1 : 0)` successors.
   SmallVector<SILValue, 8> CaseValuesAndResults;
   for (auto pair : CaseValues) {
     CaseValuesAndResults.push_back(pair.first);

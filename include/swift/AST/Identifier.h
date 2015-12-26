@@ -255,7 +255,7 @@ public:
   DeclName(ASTContext &C, Identifier baseName,
            ArrayRef<Identifier> argumentNames);
   
-  /// Retrive the 'base' name, i.e., the name that follows the introducer,
+  /// Retrieve the 'base' name, i.e., the name that follows the introducer,
   /// such as the 'foo' in 'func foo(x:Int, y:Int)' or the 'bar' in
   /// 'var bar: Int'.
   Identifier getBaseName() const {

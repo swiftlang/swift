@@ -64,7 +64,7 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
   }
   CanType t = *cacheSlot;
 
-  // It is possible that we won't find a briding type (e.g. String) when we're
+  // It is possible that we won't find a bridging type (e.g. String) when we're
   // parsing the stdlib itself.
   if (t) {
     DEBUG(llvm::dbgs() << "Bridging type " << moduleName << '.' << typeName

@@ -562,7 +562,7 @@ void SwiftLangSupport::getCursorInfo(
     if (trace::enabled()) {
       trace::SwiftInvocation SwiftArgs;
       trace::initTraceInfo(SwiftArgs, InputFile, Args);
-      // Do we nedd to record any files? If yes -- which ones?
+      // Do we need to record any files? If yes -- which ones?
       trace::StringPairs OpArgs {
         std::make_pair("DocumentName", IFaceGenRef->getDocumentName()),
         std::make_pair("ModuleOrHeaderName", IFaceGenRef->getModuleOrHeaderName()),

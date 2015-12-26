@@ -1296,7 +1296,7 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
                                       ArrayRef<SpecializedRow> rows,
                                       const FailureHandler &innerFailure) {
     // These two operations must follow the same rules for column
-    // placement because 'arguments' are parallel to the matrix colums.
+    // placement because 'arguments' are parallel to the matrix columns.
     // We use the column-specialization algorithm described in
     // specializeInPlace.
     ClauseMatrix innerClauses = clauses.specializeRowsInPlace(column, rows);

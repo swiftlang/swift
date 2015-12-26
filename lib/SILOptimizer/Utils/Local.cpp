@@ -1921,7 +1921,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       // Should be in the same BB.
       if (ASI->getParent() != EMI->getParent())
         return nullptr;
-      // Check if this alloc_stac is only initialized once by means of
+      // Check if this alloc_stack is only initialized once by means of
       // single init_existential_addr.
       bool isLegal = true;
       // init_existential instruction used to initialize this alloc_stack.
@@ -1983,7 +1983,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       if (ASRI->getParent() != EMI->getParent())
         return nullptr;
       // Check if this alloc_stack is only initialized once by means of
-      // a single initt_existential_ref.
+      // a single init_existential_ref.
       bool isLegal = true;
       for (auto Use: getNonDebugUses(*ASRI)) {
         auto *User = Use->getUser();

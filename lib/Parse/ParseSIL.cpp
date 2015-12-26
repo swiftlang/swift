@@ -3726,7 +3726,7 @@ bool Parser::parseDeclSIL() {
   if (FunctionState.diagnoseProblems())
     return true;
 
-  // If SIL prsing succeeded, verify the generated SIL.
+  // If SIL parsing succeeded, verify the generated SIL.
   if (!FunctionState.P.Diags.hadAnyError())
     FunctionState.F->verify();
 

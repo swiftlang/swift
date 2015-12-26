@@ -371,7 +371,7 @@ static bool sinkFixLiftime(SILLoop *Loop, DominanceInfo *DomTree,
 }
 
 namespace {
-/// \brief Summmary of may writes occurring in the loop tree rooted at \p
+/// \brief Summary of may writes occurring in the loop tree rooted at \p
 /// Loop. This includes all writes of the sub loops and the loop itself.
 struct LoopNestSummary {
   SILLoop *Loop;
