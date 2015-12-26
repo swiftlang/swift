@@ -751,7 +751,10 @@ getRegionForNonLocalSuccessor(const LoopRegion *Child, unsigned SuccID) const {
     SuccID = Succ.ID;
   } while (Succ.IsNonLocal);
 
-  return getRegion(SuccID);
+  auto *R = getRegion(SuccID);
+  assert(R->isBlock() && "This should be the endpoint of a CFG edge implying R "
+                         "should be a block");
+  return R;
 }
 
 void LoopRegionFunctionInfo::dump() const {
