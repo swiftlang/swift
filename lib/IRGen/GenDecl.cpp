@@ -1563,7 +1563,7 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity, Alignment alignment,
                                defaultType, debugType);
 }
 
-/// Get or create a llvm::GlobalVariable.
+/// Get or create an llvm::GlobalVariable.
 ///
 /// If a definition type is given, the result will always be an
 /// llvm::GlobalVariable of that type.  Otherwise, the result will

@@ -364,7 +364,7 @@ public:
   /// location holds. This may involve extracting and aggregating available
   /// values.
   ///
-  /// NOTE: reduce assumes that every component of the location has an concrete
+  /// NOTE: reduce assumes that every component of the location has a concrete
   /// (i.e. not coverings set) available value in LocAndVal.
   ///
   /// TODO: we do not really need the llvm::DenseMap<LSLocation, LSValue> here

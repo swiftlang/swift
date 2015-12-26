@@ -330,7 +330,7 @@ client builds against the component to type check the client and ensure that its
 references are resolved.
 
 Because we have the version number as well as the full interface to the
-component available in a consumable format is that we can build a SDK generation
+component available in a consumable format is that we can build an SDK generation
 tool. This tool would take manifest files for a set of releases (e.g. iOS 4.0,
 4.0.1, 4.0.2, 4.1, 4.1.1, 4.2) and build a single SDK manifest which would have
 a mapping from symbol+type -> version list that indicates what the versions a

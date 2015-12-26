@@ -303,7 +303,7 @@ enum class ThrowingKind {
   Throws,
 };
 
-/// A type expressing the result of classifying whether an call or function
+/// A type expressing the result of classifying whether a call or function
 /// throws.
 class Classification {
   ThrowingKind Result;

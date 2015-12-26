@@ -3464,7 +3464,7 @@ public:
   }
 };
 
-/// Deallocate memory allocated for a unsafe value buffer.
+/// Deallocate memory allocated for an unsafe value buffer.
 class DeallocValueBufferInst :
   public UnaryInstructionBase<ValueKind::DeallocValueBufferInst,
                               DeallocationInst, /*HAS_RESULT*/ true> {

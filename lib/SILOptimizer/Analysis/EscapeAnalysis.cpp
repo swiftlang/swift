@@ -1350,13 +1350,13 @@ analyzeSelectInst(SelectInst *SI, ConnectionGraph *ConGraph) {
       SILValue CaseVal = SI->getCase(Idx).second;
       auto *ArgNode = ConGraph->getNode(CaseVal, this);
       assert(ArgNode &&
-             "there should be an argument node if there is an result node");
+             "there should be an argument node if there is a result node");
       ConGraph->defer(ResultNode, ArgNode);
     }
     // ... also including the default value.
     auto *DefaultNode = ConGraph->getNode(SI->getDefaultResult(), this);
     assert(DefaultNode &&
-           "there should be an argument node if there is an result node");
+           "there should be an argument node if there is a result node");
     ConGraph->defer(ResultNode, DefaultNode);
   }
 }

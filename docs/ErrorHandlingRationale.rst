@@ -389,7 +389,7 @@ options as a programmer:
   function called by your function.
 
 - You can carefully arrange your function so that there are no
-  critical sections where an universal error can leave things in an
+  critical sections where a universal error can leave things in an
   unwanted state.
 
 There are techniques for making the second more palatable.  Chiefly,

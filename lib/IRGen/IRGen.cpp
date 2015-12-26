@@ -665,7 +665,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   std::vector<std::thread> Threads;
   llvm::sys::Mutex DiagMutex;
 
-  // Start all the threads an do the LLVM compilation.
+  // Start all the threads and do the LLVM compilation.
   for (int ThreadIdx = 1; ThreadIdx < numThreads; ++ThreadIdx) {
     Threads.push_back(std::thread(ThreadEntryPoint, &dispatcher, &DiagMutex,
                                   ThreadIdx));

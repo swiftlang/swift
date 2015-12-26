@@ -2266,7 +2266,7 @@ namespace {
                                                  ElementsWithNoPayload.size())});
     }
 
-    /// Emit an reassignment sequence from an enum at one address to another.
+    /// Emit a reassignment sequence from an enum at one address to another.
     void emitIndirectAssign(IRGenFunction &IGF,
        Address dest, Address src, SILType T,
        IsTake_t isTake)

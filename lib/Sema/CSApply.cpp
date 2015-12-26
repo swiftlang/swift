@@ -240,7 +240,7 @@ static DeclTy *findNamedWitnessImpl(TypeChecker &tc, DeclContext *dc, Type type,
   if (!conforms)
     return nullptr;
 
-  // For an type with dependent conformance, just return the requirement from
+  // For a type with dependent conformance, just return the requirement from
   // the protocol. There are no protocol conformance tables.
   if (type->hasDependentProtocolConformances()) {
     return requirement;

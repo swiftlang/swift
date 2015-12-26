@@ -3048,7 +3048,7 @@ public:
 
 
 /// \brief This is a closure of the contained subexpression that is formed
-/// when an scalar expression is converted to @autoclosure function type.
+/// when a scalar expression is converted to @autoclosure function type.
 /// For example:
 /// \code
 ///   @autoclosure var x : () -> Int = 4

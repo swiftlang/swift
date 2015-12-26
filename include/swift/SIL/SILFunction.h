@@ -102,7 +102,7 @@ private:
   /// functions in the stdlib.
   unsigned Fragile : 1;
 
-  /// Specifies if this function is a thunk or an reabstraction thunk.
+  /// Specifies if this function is a thunk or a reabstraction thunk.
   ///
   /// The inliner uses this information to avoid inlining (non-trivial)
   /// functions into the thunk.

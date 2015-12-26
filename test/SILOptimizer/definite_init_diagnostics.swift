@@ -290,7 +290,7 @@ func emptyStructTest() {
 
 func takesTuplePair(inout a : (SomeClass, SomeClass)) {}
 
-// This tests cases where an store might be an init or assign based on control
+// This tests cases where a store might be an init or assign based on control
 // flow path reaching it.
 func conditionalInitOrAssign(c : Bool, x : Int) {
   var t : Int  // Test trivial types.

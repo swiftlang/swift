@@ -26,11 +26,11 @@ public:
     Stop
   };
 
-  /// This method is called when first visiting an type before walking into its
+  /// This method is called when first visiting a type before walking into its
   /// children.
   virtual Action walkToTypePre(Type ty) { return Action::Continue; }
 
-  /// This method is called after visiting an type's children.
+  /// This method is called after visiting a type's children.
   virtual Action walkToTypePost(Type ty) { return Action::Continue; }
 
   /// Controls whether the original type of a SubstitutedType is visited.

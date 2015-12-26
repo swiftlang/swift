@@ -341,7 +341,7 @@ private:
   template <typename T, typename ...Args>
   T *createDecl(Args &&... args);
 
-  /// Constructs an new module and validates it.
+  /// Constructs a new module and validates it.
   ModuleFile(std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
              std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
              bool isFramework, serialization::ExtendedValidationInfo *extInfo);

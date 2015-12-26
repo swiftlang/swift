@@ -298,7 +298,7 @@ private:
   /// Inserts release/destroy instructions for all owner and in-parameters.
   void eraseApply(FullApplySite FAS, const UserListTy &Users);
 
-  /// Returns true if the results of an try_apply are not used.
+  /// Returns true if the results of a try_apply are not used.
   static bool isTryApplyResultNotUsed(UserListTy &AcceptedUses,
                                       TryApplyInst *TAI);
 };

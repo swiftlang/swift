@@ -131,7 +131,7 @@ public:
   /// Get the semantics call as an ApplyInst.
   operator ApplyInst *() const { return SemanticsCall; }
 
-  /// Is this an semantics call.
+  /// Is this a semantics call.
   operator bool() const { return SemanticsCall != nullptr; }
 
   /// Could this array be backed by an NSArray.

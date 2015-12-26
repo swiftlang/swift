@@ -249,7 +249,7 @@ class r17192398Failure {
 let x = r17192398Failure()
 x.testLazy()
 
-// <rdar://problem/17226384> Setting an lazy optional property to nil has a strange behavior (Swift)
+// <rdar://problem/17226384> Setting a lazy optional property to nil has a strange behavior (Swift)
 class r17226384Class {
   lazy var x : Int? = { print("propertyRun"); return 42 }()
 }

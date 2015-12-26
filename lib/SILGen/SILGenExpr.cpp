@@ -293,7 +293,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   // Any writebacks for this access are tightly scoped.
   WritebackScope scope(*this);
   
-  // If this is an decl that we have an lvalue for, produce and return it.
+  // If this is a decl that we have an lvalue for, produce and return it.
   ValueDecl *decl = declRef.getDecl();
   
   if (!ncRefType) ncRefType = decl->getType();

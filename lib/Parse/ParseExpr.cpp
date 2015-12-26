@@ -467,7 +467,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   if (SubExpr.isNull())
     return nullptr;
 
-  // Check if we have an unary '-' with number literal sub-expression, for
+  // Check if we have a unary '-' with number literal sub-expression, for
   // example, "-42" or "-1.25".
   if (auto *LE = dyn_cast<NumberLiteralExpr>(SubExpr.get())) {
     if (Operator->hasName() && Operator->getName().str() == "-") {
