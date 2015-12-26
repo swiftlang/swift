@@ -505,16 +505,15 @@ PromotedParamCloner::PromotedParamCloner(SILFunction *Orig,
   assert(Orig->getDebugScope()->SILFn != getCloned()->getDebugScope()->SILFn);
 }
 
-static void getClonedName(SILFunction *F,
-                          ParamIndexList &PromotedParamIndices,
-                          llvm::SmallString<64> &Name) {
-  llvm::raw_svector_ostream buffer(Name);
-  Mangle::Mangler M(buffer);
+static std::string getClonedName(SILFunction *F,
+                                 ParamIndexList &PromotedParamIndices) {
+  Mangle::Mangler M;
   auto P = SpecializationPass::AllocBoxToStack;
   FunctionSignatureSpecializationMangler FSSM(P, M, F);
   for (unsigned i : PromotedParamIndices)
     FSSM.setArgumentBoxToStack(i);
   FSSM.mangle();
+  return M.finalize();
 }
 
 /// \brief Create the function corresponding to the clone of the
@@ -702,8 +701,7 @@ specializePartialApply(PartialApplyInst *PartialApply,
   auto *F = FRI->getReferencedFunction();
   assert(F && "Expected a referenced function!");
 
-  llvm::SmallString<64> ClonedName;
-  getClonedName(F, PromotedParamIndices, ClonedName);
+  std::string ClonedName = getClonedName(F, PromotedParamIndices);
 
   auto &M = PartialApply->getModule();
 

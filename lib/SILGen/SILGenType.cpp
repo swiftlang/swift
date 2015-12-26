@@ -33,8 +33,7 @@ using namespace Lowering;
 SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
                                            SILConstantInfo constantInfo) {
   // Mangle the constant with a _TTD header.
-  llvm::SmallString<32> name;
-  constant.mangle(name, "_TTD");
+  auto name = constant.mangle("_TTD");
 
   auto F = M.getOrCreateFunction(constant.getDecl(), name, SILLinkage::Shared,
                             constantInfo.getSILType().castTo<SILFunctionType>(),
@@ -63,8 +62,7 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   // TODO: If we allocated a new vtable slot for the derived method, then
   // further derived methods would potentially need multiple thunks, and we
   // would need to mangle the base method into the symbol as well.
-  llvm::SmallString<32> name;
-  derived.mangle(name, "_TTV");
+  auto name = derived.mangle("_TTV");
 
   // If we already emitted this thunk, reuse it.
   // TODO: Allocating new vtable slots for derived methods with different ABIs

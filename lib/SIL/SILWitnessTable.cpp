@@ -26,16 +26,16 @@
 
 using namespace swift;
 
-static void mangleConstant(NormalProtocolConformance *C,
-                           llvm::raw_ostream &buffer) {
+static std::string mangleConstant(NormalProtocolConformance *C) {
   using namespace Mangle;
-  Mangler mangler(buffer);
+  Mangler mangler;
 
   //   mangled-name ::= '_T' global
   //   global ::= 'WP' protocol-conformance
   mangler.append("_TWP");
   mangler.mangleProtocolConformance(C);
-  buffer.flush();
+  return mangler.finalize();
+
 }
 
 SILWitnessTable *
@@ -46,10 +46,7 @@ SILWitnessTable::create(SILModule &M, SILLinkage Linkage, bool IsFragile,
          "conformance.");
 
   // Create the mangled name of our witness table...
-  llvm::SmallString<32> buffer;
-  llvm::raw_svector_ostream stream(buffer);
-  mangleConstant(Conformance, stream);
-  Identifier Name = M.getASTContext().getIdentifier(buffer);
+  Identifier Name = M.getASTContext().getIdentifier(mangleConstant(Conformance));
 
   // Allocate the witness table and initialize it.
   void *buf = M.allocate(sizeof(SILWitnessTable), alignof(SILWitnessTable));
@@ -74,10 +71,8 @@ SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
          "conformance.");
 
   // Create the mangled name of our witness table...
-  llvm::SmallString<32> buffer;
-  llvm::raw_svector_ostream stream(buffer);
-  mangleConstant(Conformance, stream);
-  Identifier Name = M.getASTContext().getIdentifier(buffer);
+  Identifier Name = M.getASTContext().getIdentifier(mangleConstant(Conformance));
+
 
   // Allocate the witness table and initialize it.
   void *buf = M.allocate(sizeof(SILWitnessTable), alignof(SILWitnessTable));

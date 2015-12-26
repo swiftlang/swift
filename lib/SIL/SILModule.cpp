@@ -324,8 +324,7 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
                                             SILDeclRef constant,
                                             ForDefinition_t forDefinition) {
 
-  SmallVector<char, 128> buffer;
-  auto name = constant.mangle(buffer);
+  auto name = constant.mangle();
   auto constantType = Types.getConstantType(constant).castTo<SILFunctionType>();
   SILLinkage linkage = constant.getLinkage(forDefinition);
 
@@ -517,8 +516,7 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
 }
 
 SILFunction *SILModule::lookUpFunction(SILDeclRef fnRef) {
-  llvm::SmallString<32> name;
-  fnRef.mangle(name);
+  auto name = fnRef.mangle();
   return lookUpFunction(name);
 }
 

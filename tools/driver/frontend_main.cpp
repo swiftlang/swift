@@ -168,10 +168,10 @@ static bool extendedTypeIsPrivate(TypeLoc inheritedType) {
   return std::all_of(protocols.begin(), protocols.end(), declIsPrivate);
 }
 
-template <typename StreamTy>
-static void mangleTypeAsContext(StreamTy &&out, const NominalTypeDecl *type) {
-  Mangle::Mangler mangler(out, /*debug style=*/false, /*Unicode=*/true);
+static std::string mangleTypeAsContext(const NominalTypeDecl *type) {
+  Mangle::Mangler mangler(/*debug style=*/false, /*Unicode=*/true);
   mangler.mangleContext(type, Mangle::Mangler::BindGenerics::None);
+  return mangler.finalize();
 }
 
 /// Emits a Swift-style dependencies file.
@@ -301,22 +301,21 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     if (!entry.second)
       continue;
     out << "- \"";
-    mangleTypeAsContext(out, entry.first);
+    out << mangleTypeAsContext(entry.first);
     out << "\"\n";
   }
 
   out << "provides-member:\n";
   for (auto entry : extendedNominals) {
     out << "- [\"";
-    mangleTypeAsContext(out, entry.first);
+    out << mangleTypeAsContext(entry.first);
     out << "\", \"\"]\n";
   }
 
   // This is also part of "provides-member".
   for (auto *ED : extensionsWithJustMembers) {
-    SmallString<32> mangledName;
-    mangleTypeAsContext(llvm::raw_svector_ostream(mangledName),
-                        ED->getExtendedType()->getAnyNominal());
+    auto mangledName = mangleTypeAsContext(
+                                        ED->getExtendedType()->getAnyNominal());
 
     for (auto *member : ED->getMembers()) {
       auto *VD = dyn_cast<ValueDecl>(member);
@@ -324,7 +323,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
           VD->getFormalAccess() == Accessibility::Private) {
         continue;
       }
-      out << "- [\"" << mangledName.str() << "\", \""
+      out << "- [\"" << mangledName << "\", \""
           << escape(VD->getName()) << "\"]\n";
     }
   }
@@ -378,12 +377,9 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
       return lhs->first.first->getName().compare(rhs->first.first->getName());
 
     // Break type name ties by mangled name.
-    SmallString<32> lhsMangledName, rhsMangledName;
-    mangleTypeAsContext(llvm::raw_svector_ostream(lhsMangledName),
-                        lhs->first.first);
-    mangleTypeAsContext(llvm::raw_svector_ostream(rhsMangledName),
-                        rhs->first.first);
-    return lhsMangledName.str().compare(rhsMangledName.str());
+    auto lhsMangledName = mangleTypeAsContext(lhs->first.first);
+    auto rhsMangledName = mangleTypeAsContext(rhs->first.first);
+    return lhsMangledName.compare(rhsMangledName);
   });
   
   for (auto &entry : sortedMembers) {
@@ -396,7 +392,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     if (!entry.second)
       out << "!private ";
     out << "[\"";
-    mangleTypeAsContext(out, entry.first.first);
+    out << mangleTypeAsContext(entry.first.first);
     out << "\", \"";
     if (!entry.first.second.empty())
       out << escape(entry.first.second);
@@ -419,7 +415,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     if (!isCascading)
       out << "!private ";
     out << "\"";
-    mangleTypeAsContext(out, i->first.first);
+    out <<  mangleTypeAsContext(i->first.first);
     out << "\"\n";
   }
 

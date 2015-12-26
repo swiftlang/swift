@@ -2603,13 +2603,9 @@ struct ASTNodeBase {};
     }
 
     void checkMangling(ValueDecl *D) {
-      llvm::SmallString<32> Buf;
-      llvm::raw_svector_ostream OS(Buf);
-      {
-      Mangle::Mangler Mangler(OS);
+      Mangle::Mangler Mangler;
       Mangler.mangleDeclName(D);
-      }
-      if (OS.str().empty()) {
+      if (Mangler.finalize().empty()) {
         Out << "Mangler gave empty string for a ValueDecl";
         abort();
       }

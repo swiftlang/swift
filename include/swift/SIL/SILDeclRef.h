@@ -234,8 +234,7 @@ struct SILDeclRef {
   ///
   /// If 'prefix' is non-empty, it will be used in place of the standard '_T'
   /// prefix.
-  llvm::StringRef mangle(llvm::SmallVectorImpl<char> &buffer,
-                         StringRef prefix = {}) const;
+  std::string mangle(StringRef prefix = {}) const;
 
   /// True if the SILDeclRef references a function.
   bool isFunc() const {

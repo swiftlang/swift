@@ -99,12 +99,12 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
       continue;
 
     // Create a name of the specialization.
-    llvm::SmallString<64> ClonedName;
+    std::string ClonedName;
     {
-      llvm::raw_svector_ostream buffer(ClonedName);
-      Mangle::Mangler M(buffer);
+      Mangle::Mangler M;
       GenericSpecializationMangler Mangler(M, ReferencedF, Subs);
       Mangler.mangle();
+      ClonedName = M.finalize();
     }
 
     SILFunction *NewF = nullptr;

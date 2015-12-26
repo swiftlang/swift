@@ -1133,14 +1133,9 @@ StringRef IRGenDebugInfo::getMangledName(DebugTypeInfo DbgTy) {
   if (MetadataTypeDecl && DbgTy.getDecl() == MetadataTypeDecl)
     return BumpAllocatedString(DbgTy.getDecl()->getName().str());
 
-  llvm::SmallString<160> Buffer;
-  {
-    llvm::raw_svector_ostream S(Buffer);
-    Mangle::Mangler M(S, /* DWARF */ true);
-    M.mangleTypeForDebugger(DbgTy.getType(), DbgTy.getDeclContext());
-  }
-  assert(!Buffer.empty() && "mangled name came back empty");
-  return BumpAllocatedString(Buffer);
+  Mangle::Mangler M(/* DWARF */ true);
+  M.mangleTypeForDebugger(DbgTy.getType(), DbgTy.getDeclContext());
+  return BumpAllocatedString(M.finalize());
 }
 
 /// Create a member of a struct, class, tuple, or enum.

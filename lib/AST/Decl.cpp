@@ -2316,11 +2316,8 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
 static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
                                        llvm::SmallVectorImpl<char> &buffer) {
   {
-    buffer.clear();
-    llvm::raw_svector_ostream os(buffer);
-    
     // Mangle the type.
-    Mangle::Mangler mangler(os, false/*dwarf*/, false/*punycode*/);
+    Mangle::Mangler mangler(false/*dwarf*/, false/*punycode*/);
 
     // We add the "_Tt" prefix to make this a reserved name that will
     // not conflict with any valid Objective-C class or protocol name.
@@ -2334,8 +2331,13 @@ static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
     } else {
       mangler.mangleProtocolDecl(cast<ProtocolDecl>(NTD));
     }
+
+    buffer.clear();
+    llvm::raw_svector_ostream os(buffer);
+    mangler.finalize(os);
   }
 
+  assert(buffer.size() && "Invalid buffer size");
   return StringRef(buffer.data(), buffer.size());
 }
 

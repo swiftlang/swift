@@ -365,28 +365,23 @@ computeNewArgInterfaceTypes(SILFunction *F,
   }
 }
 
-static llvm::SmallString<64> getSpecializedName(SILFunction *F,
-                                                IndicesSet &PromotableIndices) {
-  llvm::SmallString<64> Name;
+static std::string getSpecializedName(SILFunction *F,
+                                      IndicesSet &PromotableIndices) {
+  Mangle::Mangler M;
+  auto P = SpecializationPass::CapturePromotion;
+  FunctionSignatureSpecializationMangler FSSM(P, M, F);
+  CanSILFunctionType FTy = F->getLoweredFunctionType();
 
-  {
-    llvm::raw_svector_ostream buffer(Name);
-    Mangle::Mangler M(buffer);
-    auto P = SpecializationPass::CapturePromotion;
-    FunctionSignatureSpecializationMangler FSSM(P, M, F);
-    CanSILFunctionType FTy = F->getLoweredFunctionType();
-
-    ArrayRef<SILParameterInfo> Parameters = FTy->getParameters();
-    for (unsigned Index : indices(Parameters)) {
-      if (!PromotableIndices.count(Index))
-        continue;
-      FSSM.setArgumentBoxToValue(Index);
-    }
-
-    FSSM.mangle();
+  ArrayRef<SILParameterInfo> Parameters = FTy->getParameters();
+  for (unsigned Index : indices(Parameters)) {
+    if (!PromotableIndices.count(Index))
+      continue;
+    FSSM.setArgumentBoxToValue(Index);
   }
 
-  return Name;
+  FSSM.mangle();
+
+  return M.finalize();
 }
 
 /// \brief Create the function corresponding to the clone of the original

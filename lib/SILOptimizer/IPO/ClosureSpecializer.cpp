@@ -201,7 +201,7 @@ public:
 
   FullApplySite getApplyInst() const { return AI; }
 
-  void createName(llvm::SmallString<64> &NewName) const;
+  std::string createName() const;
 
   OperandValueArrayRef getArguments() const {
     if (auto *PAI = dyn_cast<PartialApplyInst>(getClosure()))
@@ -386,20 +386,21 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
   // AI from parent?
 }
 
-void CallSiteDescriptor::createName(llvm::SmallString<64> &NewName) const {
-  llvm::raw_svector_ostream buffer(NewName);
-  Mangle::Mangler M(buffer);
+std::string CallSiteDescriptor::createName() const {
+  Mangle::Mangler M;
   auto P = SpecializationPass::ClosureSpecializer;
   FunctionSignatureSpecializationMangler FSSM(P, M, getApplyCallee());
+
   if (auto *PAI = dyn_cast<PartialApplyInst>(getClosure())) {
     FSSM.setArgumentClosureProp(getClosureIndex(), PAI);
     FSSM.mangle();
-    return;
+    return M.finalize();
   }
 
   auto *TTTFI = cast<ThinToThickFunctionInst>(getClosure());
   FSSM.setArgumentClosureProp(getClosureIndex(), TTTFI);
   FSSM.mangle();
+  return M.finalize();
 }
 
 void CallSiteDescriptor::extendArgumentLifetime(SILValue Arg) const {
@@ -418,8 +419,7 @@ void CallSiteDescriptor::extendArgumentLifetime(SILValue Arg) const {
 
 static void specializeClosure(ClosureInfo &CInfo,
                               CallSiteDescriptor &CallDesc) {
-  llvm::SmallString<64> NewFName;
-  CallDesc.createName(NewFName);
+  auto NewFName = CallDesc.createName();
   DEBUG(llvm::dbgs() << "    Perform optimizations with new name " << NewFName
                      << '\n');
 

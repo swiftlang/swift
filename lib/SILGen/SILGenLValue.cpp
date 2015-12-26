@@ -2873,7 +2873,7 @@ SILFunction *MaterializeForSetEmitter::createCallback(GeneratorFn generator) {
  
   // Mangle this as if it were a conformance thunk for a closure
   // within the witness.
-  llvm::SmallString<128> name;
+  std::string name;
   {
     ClosureExpr closure(/*patterns*/ nullptr,
                         /*throws*/ SourceLoc(),
@@ -2887,11 +2887,11 @@ SILFunction *MaterializeForSetEmitter::createCallback(GeneratorFn generator) {
                                                      nullptr));
     closure.getCaptureInfo().setGenericParamCaptures(true);
 
-    llvm::raw_svector_ostream stream(name);
-    Mangle::Mangler mangler(stream);
+    Mangle::Mangler mangler;
     mangler.append("_TTW");
     mangler.mangleProtocolConformance(Conformance);
     mangler.mangleClosureEntity(&closure, ResilienceExpansion::Minimal, 1);
+    name = mangler.finalize();
   }
 
   // Create the SILFunctionType for the callback.

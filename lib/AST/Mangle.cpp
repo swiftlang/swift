@@ -1281,19 +1281,20 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
       Buffer << 'q' << Index(info.Index);
 
       {
-      // The DWARF output created by Swift is intentionally flat,
-      // therefore archetypes are emitted with their DeclContext if
-      // they appear at the top level of a type (_Tt).
-      // Clone a new, non-DWARF Mangler for the DeclContext.
-      Mangler ContextMangler(Buffer, /*DWARFMangling=*/false);
-      SmallVector<const void *, 4> SortedSubsts(Substitutions.size());
-      for (auto S : Substitutions) SortedSubsts[S.second] = S.first;
-      for (auto S : SortedSubsts) ContextMangler.addSubstitution(S);
-      for (; relativeDepth > 0; --relativeDepth)
-        DC = DC->getParent();
-      assert(DC && "no decl context for archetype found");
-      if (!DC) return;
-      ContextMangler.mangleContext(DC, BindGenerics::None);
+        // The DWARF output created by Swift is intentionally flat,
+        // therefore archetypes are emitted with their DeclContext if
+        // they appear at the top level of a type (_Tt).
+        // Clone a new, non-DWARF Mangler for the DeclContext.
+        Mangler ContextMangler(/*DWARFMangling=*/false);
+        SmallVector<const void *, 4> SortedSubsts(Substitutions.size());
+        for (auto S : Substitutions) SortedSubsts[S.second] = S.first;
+        for (auto S : SortedSubsts) ContextMangler.addSubstitution(S);
+        for (; relativeDepth > 0; --relativeDepth)
+          DC = DC->getParent();
+        assert(DC && "no decl context for archetype found");
+        if (!DC) return;
+        ContextMangler.mangleContext(DC, BindGenerics::None);
+        ContextMangler.finalize(Buffer);
       }
 
     } else {

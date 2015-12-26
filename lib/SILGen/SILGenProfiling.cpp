@@ -604,9 +604,7 @@ static void walkForProfiling(AbstractFunctionDecl *Root, ASTWalker &Walker) {
 }
 
 void SILGenProfiling::assignRegionCounters(AbstractFunctionDecl *Root) {
-  SmallString<128> NameBuffer;
-  SILDeclRef(Root).mangle(NameBuffer);
-  CurrentFuncName = NameBuffer.str();
+  CurrentFuncName = SILDeclRef(Root).mangle();
 
   MapRegionCounters Mapper(RegionCounterMap);
   walkForProfiling(Root, Mapper);
