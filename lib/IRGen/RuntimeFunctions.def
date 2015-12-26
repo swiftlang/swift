@@ -17,7 +17,7 @@
 
 /// FUNCTION(Id, Name, ReturnTys, ArgTys, CC, Attrs)
 ///   Makes available as "Id" the following runtime function:
-///     ReturnTy Name(ArgsTys...);
+///     ReturnTy Name(ArgTys...);
 ///   ReturnTys is a call to RETURNS, which takes a non-empty list
 ///     of expressions meant to be looked up in IRGenModule.
 ///   ArgTys is either NO_ARGS or a call to ARGS, which takes a non-empty

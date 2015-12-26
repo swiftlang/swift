@@ -56,7 +56,7 @@ def main():
     omit_needless_words_args = ['-enable-omit-needless-words', '-enable-infer-default-arguments']
 
     # Determine the output files.
-    # No good way with argparse to set default value based on depenency of other arg.
+    # No good way with argparse to set default value based on dependency of other arg.
     if not args.before_file:
         args.before_file = '%s.before.txt' % (args.module)
     if not args.after_file:

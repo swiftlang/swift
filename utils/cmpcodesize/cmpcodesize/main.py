@@ -92,7 +92,7 @@ How to specify files:
                         default=False)
 
     # Positional arguments.
-    # These can be specififed in means beyond what argparse supports,
+    # These can be specified in means beyond what argparse supports,
     # so we gather them in a list and parse them manually.
     parser.add_argument('files', nargs='*',
                         help='A list of old and new files.')
