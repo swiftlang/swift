@@ -385,12 +385,16 @@ public:
   llvm::PointerType *ErrorPtrTy;       /// %swift.error*
   llvm::StructType *OpenedErrorTripleTy; /// { %swift.opaque*, %swift.type*, i8** }
   llvm::PointerType *OpenedErrorTriplePtrTy; /// { %swift.opaque*, %swift.type*, i8** }*
-  
+
   unsigned InvariantMetadataID; /// !invariant.load
   unsigned DereferenceableID;   /// !dereferenceable
   llvm::MDNode *InvariantNode;
   
   llvm::CallingConv::ID RuntimeCC;     /// lightweight calling convention
+
+  llvm::FunctionType *getAssociatedTypeMetadataAccessFunctionTy();
+  llvm::FunctionType *getAssociatedTypeWitnessTableAccessFunctionTy();
+  llvm::StructType *getGenericWitnessTableCacheTy();
 
   /// Get the bit width of an integer type for the target platform.
   unsigned getBuiltinIntegerWidth(BuiltinIntegerType *t);
@@ -446,6 +450,10 @@ public:
   llvm::Type *getFixedBufferTy();
   llvm::Type *getValueWitnessTy(ValueWitness index);
 
+  llvm::Constant *emitDirectRelativeReference(llvm::Constant *target,
+                                              llvm::Constant *base,
+                                              ArrayRef<unsigned> baseIndices);
+
   void unimplemented(SourceLoc, StringRef Message);
   LLVM_ATTRIBUTE_NORETURN
   void fatal_unimplemented(SourceLoc, StringRef Message);
@@ -456,6 +464,9 @@ private:
   llvm::Type *FixedBufferTy;          /// [N x i8], where N == 3 * sizeof(void*)
 
   llvm::Type *ValueWitnessTys[MaxNumValueWitnesses];
+  llvm::FunctionType *AssociatedTypeMetadataAccessFunctionTy = nullptr;
+  llvm::FunctionType *AssociatedTypeWitnessTableAccessFunctionTy = nullptr;
+  llvm::StructType *GenericWitnessTableCacheTy = nullptr;
   
   llvm::DenseMap<llvm::Type *, SpareBitVector> SpareBitsForTypes;
   
@@ -753,6 +764,20 @@ public:
                                                ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfWitnessTable(const NormalProtocolConformance *C,
                                         llvm::Type *definitionTy = nullptr);
+  llvm::Constant *
+  getAddrOfGenericWitnessTableCache(const NormalProtocolConformance *C,
+                                    ForDefinition_t forDefinition);
+  llvm::Function *
+  getAddrOfGenericWitnessTableInstantiationFunction(
+                                    const NormalProtocolConformance *C);
+  llvm::Function *getAddrOfAssociatedTypeMetadataAccessFunction(
+                                           const NormalProtocolConformance *C,
+                                           AssociatedTypeDecl *associatedType);
+  llvm::Function *getAddrOfAssociatedTypeWitnessTableAccessFunction(
+                                           const NormalProtocolConformance *C,
+                                           AssociatedTypeDecl *associatedType,
+                                           ProtocolDecl *requiredProtocol);
+
   Address getAddrOfObjCISAMask();
 
   StringRef mangleType(CanType type, SmallVectorImpl<char> &buffer);

@@ -36,6 +36,19 @@ namespace irgen {
                                    CanArchetypeType archetype,
                                    ProtocolDecl *protocol);
 
+  /// Emit a metadata reference for an associated type of an archetype.
+  llvm::Value *emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
+                                             CanArchetypeType origin,
+                                             AssociatedTypeDecl *associate);
+
+  /// Emit a witness table reference for a specific conformance of an
+  /// associated type of an archetype.
+  llvm::Value *emitAssociatedTypeWitnessTableRef(IRGenFunction &IGF,
+                                                 CanArchetypeType origin,
+                                                 AssociatedTypeDecl *associate,
+                                                 llvm::Value *associateMetadata,
+                                               ProtocolDecl *associateProtocol);
+
   /// Emit a dynamic metatype lookup for the given archetype.
   llvm::Value *emitDynamicTypeOfOpaqueArchetype(IRGenFunction &IGF,
                                                 Address archetypeAddr,
