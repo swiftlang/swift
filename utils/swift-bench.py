@@ -112,7 +112,7 @@ func _opaqueGetInt64(x: Int) -> Int
 public func getInt(x: Int) -> Int {
 #if arch(i386) || arch(arm)
   return _opaqueGetInt32(x)
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
   return _opaqueGetInt64(x)
 #else
   return x

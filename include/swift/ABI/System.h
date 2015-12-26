@@ -93,4 +93,9 @@
 #define SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK 0x8000000000000000ULL
 #define SWIFT_ABI_ARM64_OBJC_NUM_RESERVED_LOW_BITS 0
 
+/*********************************** powerpc64 ************************************/
+
+// Heap objects are pointer-aligned, so the low three bits are unused.
+#define SWIFT_ABI_POWERPC64_SWIFT_SPARE_BITS_MASK 0x0000000000000007ULL
+
 #endif /* SWIFT_ABI_SYSTEM_H */

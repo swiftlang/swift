@@ -127,7 +127,7 @@ FixedPoint.test("${Dst}(truncatingBitPattern:)") {
       test_bit_patterns=test_bit_patterns,
       word_bits=32)}
 
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
 
   ${gyb.executeTemplate(
       truncating_bit_pattern_test_template,
@@ -203,7 +203,7 @@ FixedPoint.test("${Dst}(bitPattern: ${Src})") {
       test_bit_patterns=test_bit_patterns,
       word_bits=32)}
 
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
 
   ${gyb.executeTemplate(
       bit_pattern_test_template,
@@ -261,7 +261,7 @@ FixedPoint.test("${Self}.hashValue") {
       test_bit_patterns=test_bit_patterns,
       word_bits=32)}
 
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
 
   ${gyb.executeTemplate(
       hash_value_test_template,

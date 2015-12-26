@@ -935,6 +935,17 @@ static const uintptr_t ObjCReservedBitsMask =
 static const unsigned ObjCReservedLowBits =
   SWIFT_ABI_ARM64_OBJC_NUM_RESERVED_LOW_BITS;
 
+#elif defined(__powerpc64__)
+
+static const uintptr_t LeastValidPointerValue =
+  SWIFT_ABI_DEFAULT_LEAST_VALID_POINTER;
+static const uintptr_t SwiftSpareBitsMask =
+  SWIFT_ABI_POWERPC64_SWIFT_SPARE_BITS_MASK;
+static const uintptr_t ObjCReservedBitsMask =
+  SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK;
+static const unsigned ObjCReservedLowBits =
+  SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS;
+
 #else
 
 static const uintptr_t LeastValidPointerValue =

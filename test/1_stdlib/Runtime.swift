@@ -1494,7 +1494,7 @@ BitTwiddlingTestSuite.test("_isPowerOf2/Int") {
   expectTrue(_isPowerOf2(asInt(1024)))
 #if arch(i386) || arch(arm)
   // Not applicable to 32-bit architectures.
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
   expectTrue(_isPowerOf2(asInt(0x8000_0000)))
 #else
   fatalError("implement")
