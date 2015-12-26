@@ -15,7 +15,7 @@ func test1() {
 func test2() {
   print("test2")
   var i : Int
-  for i in 0..<10 {
+  for i=0;i<10;i += 1 {
     if i > 2 {
       continue
     }
@@ -25,7 +25,7 @@ func test2() {
 func test3() {
   print("test3")
   var i : Int
-  for i in 0..<10 {
+  for i=0;i<10;i += 1 {
     if i > 2 {
       break
     }
