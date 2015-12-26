@@ -10,7 +10,7 @@
 #
 #===----------------------------------------------------------------------===#
 
-# The list of sources without which it's impossble to build a core
+# The list of sources without which it's impossible to build a core
 # standard library.  Try to add new standard library sources to
 # SWIFTLIB_SOURCES, below, rather than SWIFTLIB_ESSENTIAL, if
 # possible, to improve layering.  Check that you got it right by
