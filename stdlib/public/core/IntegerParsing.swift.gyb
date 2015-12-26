@@ -80,7 +80,7 @@ internal func _parseAsciiAsUIntMax(
     else { return nil }
   // Disallow < 0.
   if hasMinus && result != 0 { return nil }
-  // Return.
+
   return result
 }
 
@@ -102,7 +102,7 @@ internal func _parseAsciiAsIntMax(
   guard let absValue =
     _parseUnsignedAsciiAsUIntMax(digitsUTF16, radix, absValueMax)
     else { return nil }
-  // Return signed result.
+  // Convert to signed.
   return IntMax(bitPattern: hasMinus ? 0 &- absValue : absValue)
 }
 
