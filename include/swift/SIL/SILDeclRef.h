@@ -269,7 +269,7 @@ struct SILDeclRef {
   /// \brief True if the function has __always inline attribute.
   bool isAlwaysInline() const;
   
-  /// \return True if the function has a effects attribute.
+  /// \return True if the function has an effects attribute.
   bool hasEffectsAttribute() const;
 
   /// \return the effects kind of the function.

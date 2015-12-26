@@ -37,7 +37,7 @@ class TemporaryInitialization;
 /// In general, emission methods which take an SGFContext indicate
 /// that they've initialized the emit-into buffer (if they have) by
 /// returning a "isInContext()" ManagedValue of whatever type.  Callers who
-/// propagate down an SGFContext that might have a emit-into buffer must be
+/// propagate down an SGFContext that might have an emit-into buffer must be
 /// aware of this.
 ///
 /// Clients of emission routines that take an SGFContext can also specify that

@@ -298,7 +298,7 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
 
   // The header needs to exit the loop.
   if (!L->isLoopExiting(Header)) {
-    DEBUG(llvm::dbgs() << *L << " not a exiting header\n");
+    DEBUG(llvm::dbgs() << *L << " not an exiting header\n");
     DEBUG(L->getHeader()->getParent()->dump());
     return false;
   }

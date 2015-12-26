@@ -420,7 +420,7 @@ static bool isKnownEdgeValue(TermInst *Term, SILBasicBlock *SuccBB,
   return SuccBB->getSinglePredecessor() != nullptr;
 }
 
-/// Create a enum element by extracting the operand of a switch_enum.
+/// Create an enum element by extracting the operand of a switch_enum.
 static SILInstruction *createEnumElement(SILBuilder &Builder,
                                          SwitchEnumInst *SEI,
                                          EnumElementDecl *EnumElement) {
@@ -2190,7 +2190,7 @@ static SILBasicBlock *isObjCMethodCallBlock(SILBasicBlock &Block) {
     return nullptr;
 
   for (auto &Inst : Block) {
-    // Look for a objc method call.
+    // Look for an objc method call.
     auto *Apply = dyn_cast<ApplyInst>(&Inst);
     if (!Apply)
       continue;

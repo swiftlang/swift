@@ -110,7 +110,7 @@ public:
     return false;
   }
 
-  /// True if the memory object is the 'self' argument of a enum initializer.
+  /// True if the memory object is the 'self' argument of an enum initializer.
   bool isEnumInitSelf() const {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
       if (MUI->isRootSelf())

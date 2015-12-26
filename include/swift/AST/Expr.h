@@ -3094,7 +3094,7 @@ public:
 
 /// DynamicTypeExpr - "base.dynamicType" - Produces a metatype value.
 ///
-/// The metatype value can comes from a evaluating an expression and then
+/// The metatype value can comes from evaluating an expression and then
 /// getting its metatype.
 class DynamicTypeExpr : public Expr {
   Expr *Base;
