@@ -968,10 +968,12 @@ static void emitDirectExternalParameter(IRGenSILFunction &IGF,
 
   // Otherwise, we need to traffic through memory.
   // Create a temporary.
-  Address temporary = allocateForCoercion(IGF,
+  Address temporary; Size tempSize;
+  std::tie(temporary, tempSize) = allocateForCoercion(IGF,
                                           coercionTy,
                                           paramTI.getStorageType(),
                                           "");
+  IGF.Builder.CreateLifetimeStart(temporary, tempSize);
 
   // Write the input parameters into the temporary:
   Address coercedAddr =
@@ -3631,12 +3633,17 @@ static void emitUncheckedValueBitCast(IRGenSILFunction &IGF,
                                            outTI.getFixedAlignment()),
                                   "bitcast");
   
+  auto maxSize = std::max(inTI.getFixedSize(), outTI.getFixedSize());
+  IGF.Builder.CreateLifetimeStart(inStorage, maxSize);
+  
   // Store the 'in' value.
   inTI.initialize(IGF, in, inStorage);
   // Load the 'out' value as the destination type.
   auto outStorage = IGF.Builder.CreateBitCast(inStorage,
                                         outTI.getStorageType()->getPointerTo());
   outTI.loadAsTake(IGF, outStorage, out);
+  
+  IGF.Builder.CreateLifetimeStart(inStorage, maxSize);
   return;
 }
 

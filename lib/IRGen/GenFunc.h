@@ -111,10 +111,11 @@ namespace irgen {
   
   /// Allocate a stack buffer of the appropriate size to bitwise-coerce a value
   /// between two LLVM types.
-  Address allocateForCoercion(IRGenFunction &IGF,
-                              llvm::Type *fromTy,
-                              llvm::Type *toTy,
-                              const llvm::Twine &basename);
+  std::pair<Address, Size>
+  allocateForCoercion(IRGenFunction &IGF,
+                      llvm::Type *fromTy,
+                      llvm::Type *toTy,
+                      const llvm::Twine &basename);
 
 } // end namespace irgen
 } // end namespace swift

@@ -31,6 +31,6 @@ func test_arch() {
   // CHECK: store i8* bitcast (%swift.type* @_TMVs4Int8 to i8*)
   // CHECK: getelementptr inbounds [6 x i8*], [6 x i8*]* %function-arguments, i32 0, i32 5
   // CHECK: store %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_TMT_, i32 0, i32 1)
-  // CHECK: call %swift.type* @swift_getFunctionTypeMetadata(i8** %2) {{#[0-9]+}}
+  // CHECK: call %swift.type* @swift_getFunctionTypeMetadata(i8** {{%.*}}) {{#[0-9]+}}
   arch({(inout x: Int, y: Double, z: String, w: Int8) -> () in })
 }

@@ -363,6 +363,8 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
   Address argsBuffer = IGF.createAlloca(argsBufferTy,
                                         IGF.IGM.getPointerAlignment(),
                                         "generic.arguments");
+  IGF.Builder.CreateLifetimeStart(argsBuffer,
+                          IGF.IGM.getPointerSize() * genericArgs.Values.size());
   for (unsigned i = 0, e = genericArgs.Values.size(); i != e; ++i) {
     Address elt = IGF.Builder.CreateStructGEP(argsBuffer, i,
                                               IGF.IGM.getPointerSize() * i);
@@ -379,6 +381,9 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
   result->setDoesNotThrow();
   result->addAttribute(llvm::AttributeSet::FunctionIndex,
                        llvm::Attribute::ReadOnly);
+
+  IGF.Builder.CreateLifetimeEnd(argsBuffer,
+                          IGF.IGM.getPointerSize() * genericArgs.Values.size());
 
   IGF.setScopedLocalTypeData(theType, LocalTypeData::forMetatype(), result);
   return result;
@@ -664,6 +669,8 @@ namespace {
                                             elements.size());
         Address buffer = IGF.createAlloca(arrayTy,IGF.IGM.getPointerAlignment(),
                                           "tuple-elements");
+        IGF.Builder.CreateLifetimeStart(buffer,
+                                    IGF.IGM.getPointerSize() * elements.size());
         for (unsigned i = 0, e = elements.size(); i != e; ++i) {
           // Find the metadata pointer for this element.
           llvm::Value *eltMetadata = IGF.emitTypeMetadataRef(elements[i]);
@@ -688,6 +695,9 @@ namespace {
                                            args);
         call->setDoesNotThrow();
         call->setCallingConv(IGF.IGM.RuntimeCC);
+
+        IGF.Builder.CreateLifetimeEnd(buffer,
+                                    IGF.IGM.getPointerSize() * elements.size());
 
         return setLocal(type, call);
       }
@@ -813,6 +823,8 @@ namespace {
           Address buffer = IGF.createAlloca(arrayTy,
                                             IGF.IGM.getPointerAlignment(),
                                             "function-arguments");
+          IGF.Builder.CreateLifetimeStart(buffer,
+                                  IGF.IGM.getPointerSize() * arguments.size());
           Address pointerToFirstArg = IGF.Builder.CreateStructGEP(buffer, 0,
                                                                    Size(0));
           Address flagsPtr = IGF.Builder.CreateBitCast(pointerToFirstArg,
@@ -838,6 +850,10 @@ namespace {
                                              pointerToFirstArg.getAddress());
           call->setDoesNotThrow();
           call->setCallingConv(IGF.IGM.RuntimeCC);
+          
+          IGF.Builder.CreateLifetimeEnd(buffer,
+                                   IGF.IGM.getPointerSize() * arguments.size());
+
           return setLocal(type, call);
       }
     }
@@ -885,6 +901,8 @@ namespace {
       Address descriptorArray = IGF.createAlloca(descriptorArrayTy,
                                                  IGF.IGM.getPointerAlignment(),
                                                  "protocols");
+      IGF.Builder.CreateLifetimeStart(descriptorArray,
+                                   IGF.IGM.getPointerSize() * protocols.size());
       descriptorArray = IGF.Builder.CreateBitCast(descriptorArray,
                                IGF.IGM.ProtocolDescriptorPtrTy->getPointerTo());
       
@@ -902,6 +920,8 @@ namespace {
                                           descriptorArray.getAddress()});
       call->setDoesNotThrow();
       call->setCallingConv(IGF.IGM.RuntimeCC);
+      IGF.Builder.CreateLifetimeEnd(descriptorArray,
+                                   IGF.IGM.getPointerSize() * protocols.size());
       return setLocal(type, call);
     }
 
@@ -1245,6 +1265,8 @@ namespace {
                                             elements.size());
         Address buffer = IGF.createAlloca(arrayTy,IGF.IGM.getPointerAlignment(),
                                           "tuple-elements");
+        IGF.Builder.CreateLifetimeStart(buffer,
+                                    IGF.IGM.getPointerSize() * elements.size());
         for (unsigned i = 0, e = elements.size(); i != e; ++i) {
           // Find the metadata pointer for this element.
           llvm::Value *eltMetadata = visit(elements[i]);
@@ -1270,6 +1292,9 @@ namespace {
                                            args);
         call->setDoesNotThrow();
         call->setCallingConv(IGF.IGM.RuntimeCC);
+
+        IGF.Builder.CreateLifetimeEnd(buffer,
+                                    IGF.IGM.getPointerSize() * elements.size());
 
         return setLocal(type, call);
       }
@@ -3441,6 +3466,9 @@ namespace {
                          llvm::ArrayType::get(IGF.IGM.SizeTy,
                                               storedProperties.size() * 2),
                          IGF.IGM.getPointerAlignment(), "classFields");
+        IGF.Builder.CreateLifetimeStart(fields,
+                        IGF.IGM.getPointerSize() * storedProperties.size() * 2);
+        
         Address firstField;
         unsigned index = 0;
         for (auto prop : storedProperties) {
@@ -3474,6 +3502,8 @@ namespace {
         IGF.Builder.CreateCall(IGF.IGM.getInitClassMetadataUniversalFn(),
                                {metadata, numFields,
                                 firstField.getAddress(), fieldVector});
+        IGF.Builder.CreateLifetimeEnd(fields,
+                        IGF.IGM.getPointerSize() * storedProperties.size() * 2);
 
       } else {
         // If we have any ancestor generic parameters or field offset vectors,

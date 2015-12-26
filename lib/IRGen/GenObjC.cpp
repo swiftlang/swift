@@ -570,6 +570,7 @@ static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
   Address super = IGF.createAlloca(IGF.IGM.ObjCSuperStructTy,
                                    IGF.IGM.getPointerAlignment(),
                                    "objc_super");
+  // TODO: Track lifetime markers for function args.
   llvm::Value *self = IGF.Builder.CreateBitCast(selfValue,
                                                 IGF.IGM.ObjCPtrTy);
   

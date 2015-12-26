@@ -3153,21 +3153,27 @@ void IRGenFunction::emitEpilogue() {
   AllocaIP->eraseFromParent();
 }
 
-Address irgen::allocateForCoercion(IRGenFunction &IGF,
-                                   llvm::Type *fromTy,
-                                   llvm::Type *toTy,
-                                   const llvm::Twine &basename) {
+std::pair<Address, Size>
+irgen::allocateForCoercion(IRGenFunction &IGF,
+                           llvm::Type *fromTy,
+                           llvm::Type *toTy,
+                           const llvm::Twine &basename) {
   auto &DL = IGF.IGM.DataLayout;
   
-  auto bufferTy = DL.getTypeSizeInBits(fromTy) >= DL.getTypeSizeInBits(toTy)
+  auto fromSize = DL.getTypeSizeInBits(fromTy);
+  auto toSize = DL.getTypeSizeInBits(toTy);
+  auto bufferTy = fromSize >= toSize
     ? fromTy
     : toTy;
 
   auto alignment = std::max(DL.getABITypeAlignment(fromTy),
                             DL.getABITypeAlignment(toTy));
 
-  return IGF.createAlloca(bufferTy, Alignment(alignment),
-                          basename + ".coerced");
+  auto buffer = IGF.createAlloca(bufferTy, Alignment(alignment),
+                                 basename + ".coerced");
+  
+  Size size(std::max(fromSize, toSize));
+  return {buffer, size};
 }
 
 llvm::Value* IRGenFunction::coerceValue(llvm::Value *value, llvm::Type *toTy,
@@ -3193,12 +3199,16 @@ llvm::Value* IRGenFunction::coerceValue(llvm::Value *value, llvm::Type *toTy,
   }
 
   // Otherwise we need to store, bitcast, and load.
-  auto address = allocateForCoercion(*this, fromTy, toTy,
-                                     value->getName() + ".coercion");
+  Address address; Size size;
+  std::tie(address, size) = allocateForCoercion(*this, fromTy, toTy,
+                                                value->getName() + ".coercion");
+  Builder.CreateLifetimeStart(address, size);
   auto orig = Builder.CreateBitCast(address, fromTy->getPointerTo());
   Builder.CreateStore(value, orig);
   auto coerced = Builder.CreateBitCast(address, toTy->getPointerTo());
-  return Builder.CreateLoad(coerced);
+  auto loaded = Builder.CreateLoad(coerced);
+  Builder.CreateLifetimeEnd(address, size);
+  return loaded;
 }
 
 void IRGenFunction::emitScalarReturn(llvm::Type *resultType,

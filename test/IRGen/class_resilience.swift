@@ -234,7 +234,7 @@ public class MyResilientChild : MyResilientParent {
 // CHECK:      [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(
 // CHECK:      [[SIZE_METADATA:%.*]] = call %swift.type* @_TMaV16resilient_struct4Size()
 // CHECK:      call void @swift_initClassMetadata_UniversalStrategy(
-// CHECK-NEXT: ret %swift.type* [[METADATA]]
+// CHECK:      ret %swift.type* [[METADATA]]
 
 
 // ClassWithResilientlySizedProperty metadata instantiation function
@@ -243,4 +243,4 @@ public class MyResilientChild : MyResilientParent {
 // CHECK:      [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(
 // CHECK:      [[RECTANGLE_METADATA:%.*]] = call %swift.type* @_TMaV16resilient_struct9Rectangle()
 // CHECK:      call void @swift_initClassMetadata_UniversalStrategy(
-// CHECK-NEXT: ret %swift.type* [[METADATA]]
+// CHECK:      ret %swift.type* [[METADATA]]

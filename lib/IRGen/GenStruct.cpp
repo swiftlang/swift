@@ -415,6 +415,8 @@ namespace {
                        llvm::ArrayType::get(IGF.IGM.Int8PtrPtrTy,
                                             storedProperties.size()),
                        IGF.IGM.getPointerAlignment(), "structFields");
+      IGF.Builder.CreateLifetimeStart(fields,
+                            IGF.IGM.getPointerSize() * storedProperties.size());
 
       fields = IGF.Builder.CreateStructGEP(fields, 0, Size(0));
       unsigned index = 0;
@@ -433,6 +435,8 @@ namespace {
       IGF.Builder.CreateCall(IGF.IGM.getInitStructMetadataUniversalFn(),
                              {numFields, fields.getAddress(),
                               fieldVector, vwtable});
+      IGF.Builder.CreateLifetimeEnd(fields,
+                            IGF.IGM.getPointerSize() * storedProperties.size());
     }
   };
 
