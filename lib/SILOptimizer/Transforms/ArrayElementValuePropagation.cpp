@@ -125,7 +125,7 @@ bool ArrayAllocation::mapInitializationStores() {
     } else if (SI)
       return false;
 
-    // Store a index_addr projection.
+    // Store an index_addr projection.
     auto *IndexAddr = dyn_cast<IndexAddrInst>(Inst);
     if (!IndexAddr)
       return false;
@@ -148,7 +148,7 @@ bool ArrayAllocation::mapInitializationStores() {
   return !ElementValueMap.empty();
 }
 
-/// Check that we have a array initialization call with known elements.
+/// Check that we have an array initialization call with known elements.
 ///
 /// The returned array value is known not to be aliased since it was just
 /// allocated.

@@ -857,7 +857,7 @@ void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF,
                       (Alignment)CI.getTargetInfo().getPointerAlign(0));
   emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
                           TName, 0,
-                          // swift.type is a already pointer type,
+                          // swift.type is already a pointer type,
                           // having a shadow copy doesn't add another
                           // layer of indirection.
                           DirectValue, ArtificialValue);

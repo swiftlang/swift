@@ -1710,7 +1710,7 @@ ERROR(try_assign_rhs_noncovering,sema_tce,none,
       "everything to its right", (unsigned))
 
 ERROR(reference_non_inout,sema_tce,none,
-      "reference to %0 not used to initialize a inout parameter", (Type))
+      "reference to %0 not used to initialize an inout parameter", (Type))
 NOTE(subscript_decl_here,sema_tca,none,
      "subscript operator declared here", ())
 ERROR(condition_broken_proto,sema_tce,none,

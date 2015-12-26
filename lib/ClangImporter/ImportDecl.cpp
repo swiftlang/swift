@@ -4213,7 +4213,7 @@ namespace {
         if (!member) continue;
 
         if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(nd)) {
-          // If there is a alternate declaration for this member, add it.
+          // If there is an alternate declaration for this member, add it.
           if (auto alternate = Impl.getAlternateDecl(member)) {
             if (alternate->getDeclContext() == member->getDeclContext() &&
                 knownMembers.insert(alternate).second)

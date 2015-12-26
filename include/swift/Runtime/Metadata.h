@@ -355,7 +355,7 @@ typedef OpaqueValue *initializeBufferWithTake(ValueBuffer *dest,
 /// the value from one to the other, leaving the source object
 /// uninitialized.
 ///
-/// There is no need for a initializeBufferWithTakeOfBuffer, because that
+/// There is no need for an initializeBufferWithTakeOfBuffer, because that
 /// can simply be a pointer-aligned memcpy of sizeof(ValueBuffer)
 /// bytes.
 ///

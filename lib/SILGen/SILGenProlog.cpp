@@ -34,7 +34,7 @@ SILValue SILGenFunction::emitSelfDecl(VarDecl *selfDecl) {
 
 namespace {
 
-/// Cleanup that writes back to a inout argument on function exit.
+/// Cleanup that writes back to an inout argument on function exit.
 class CleanupWriteBackToInOut : public Cleanup {
   VarDecl *var;
   SILValue inoutAddr;

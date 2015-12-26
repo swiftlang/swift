@@ -140,7 +140,7 @@ enum class DeclVisibilityKind {
   MemberOfOutsideNominal,
 
   /// Declaration is visible at the top level because it is declared in this
-  /// module or in a imported module.
+  /// module or in an imported module.
   VisibleAtTopLevel,
 
   /// Declaration was found via \c AnyObject or \c AnyObject.Type.
