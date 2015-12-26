@@ -704,7 +704,7 @@ public:
 
   /// \brief Apply generic arguments to the given type.
   ///
-  /// \param type The unbound generic type to which to apply arguments.
+  /// \param unbound The unbound generic type to which to apply arguments.
   /// \param loc The source location for diagnostic reporting.
   /// \param dc The context where the arguments are applied.
   /// \param genericArgs The list of generic arguments to apply to the type.
@@ -714,12 +714,12 @@ public:
   ///
   /// \returns A BoundGenericType bound to the given arguments, or null on
   /// error.
-  Type applyGenericArguments(Type type,
-                             SourceLoc loc,
-                             DeclContext *dc,
-                             MutableArrayRef<TypeLoc> genericArgs,
-                             bool isGenericSignature,
-                             GenericTypeResolver *resolver);
+  Type applyUnboundGenericArguments(UnboundGenericType *unbound,
+                                    SourceLoc loc,
+                                    DeclContext *dc,
+                                    MutableArrayRef<TypeLoc> genericArgs,
+                                    bool isGenericSignature,
+                                    GenericTypeResolver *resolver);
 
   /// \brief Substitute the given base type into the type of the given member,
   /// producing the effective type that the member will have.
