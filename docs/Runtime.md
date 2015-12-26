@@ -306,6 +306,9 @@ detail used to implement resilient per-type metadata accessor functions.
 0000000000028bc0 T _swift_getInitializedObjCClass
 ```
 
+**ABI TODO**: Fast entry points for `getExistential*TypeMetadata1-3`. Static
+metadata for `Any` and `AnyObject` is probably worth considering too.
+
 ## Type metadata initialization
 
 Calls to these entry points are emitted when instantiating type metadata at
