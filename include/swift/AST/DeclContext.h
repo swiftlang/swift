@@ -245,7 +245,7 @@ public:
   /// ClassDecl, otherwise return null.
   ClassDecl *isClassOrClassExtensionContext() const;
 
-  /// If this DeclContext is a enum, or an extension on a enum, return the
+  /// If this DeclContext is an enum, or an extension on an enum, return the
   /// EnumDecl, otherwise return null.
   EnumDecl *isEnumOrEnumExtensionContext() const;
 

@@ -86,7 +86,7 @@ static SILValue getAccessPathRoot(SILValue Pointer) {
 ///
 /// This will return a subelement number of 2.
 ///
-/// If this pointer is to within a existential projection, it returns ~0U.
+/// If this pointer is to within an existential projection, it returns ~0U.
 ///
 static unsigned computeSubelement(SILValue Pointer, SILInstruction *RootInst) {
   unsigned SubEltNumber = 0;

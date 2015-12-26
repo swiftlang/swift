@@ -1358,7 +1358,7 @@ public:
     return TupleEltTypeArrayRef(getElements());
   }
   
-  /// getNamedElementId - If this tuple has a element with the specified name,
+  /// getNamedElementId - If this tuple has an element with the specified name,
   /// return the element index, otherwise return -1.
   int getNamedElementId(Identifier I) const;
   

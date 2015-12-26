@@ -331,7 +331,7 @@ namespace {
 /// dead arrays. We just need a slightly better destructor analysis to prove
 /// that it only releases elements.
 class DeadObjectAnalysis {
-  // Map a each address projection of this object to a list of stores.
+  // Map each address projection of this object to a list of stores.
   // Do not iterate over this map's entries.
   using AddressToStoreMap =
     llvm::DenseMap<IndexTrieNode*, llvm::SmallVector<StoreInst*, 4> >;

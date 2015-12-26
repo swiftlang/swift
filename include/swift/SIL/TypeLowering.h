@@ -193,7 +193,7 @@ public:
   /// Return the lowering for the semantic type.
   inline const TypeLowering &getSemanticTypeLowering(TypeConverter &TC) const;
 
-  /// Produce a exact copy of the value in the given address as a
+  /// Produce an exact copy of the value in the given address as a
   /// scalar.  The caller is responsible for destroying this value,
   /// e.g. by releasing it.
   ///

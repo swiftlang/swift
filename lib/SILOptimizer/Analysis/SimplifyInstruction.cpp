@@ -207,7 +207,7 @@ SILValue InstSimplifier::visitSelectEnumInst(SelectEnumInst *SEI) {
 
   auto *EI = dyn_cast<EnumInst>(SEI->getEnumOperand());
   if (EI && EI->getType() == SEI->getEnumOperand().getType()) {
-    // Simplify a select_enum on a enum instruction.
+    // Simplify a select_enum on an enum instruction.
     //   %27 = enum $Optional<Int>, #Optional.Some!enumelt.1, %20 : $Int
     //   %28 = integer_literal $Builtin.Int1, -1
     //   %29 = integer_literal $Builtin.Int1, 0
