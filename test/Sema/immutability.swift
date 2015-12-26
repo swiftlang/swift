@@ -95,7 +95,7 @@ func let_decls() {
 
   
   let e = 42  // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
-  e += 1      // expected-error {{cannot pass immutable value to mutating operator: 'e' is a 'let' constant}}
+  ++e         // expected-error {{cannot pass immutable value to mutating operator: 'e' is a 'let' constant}}
   
   // <rdar://problem/16306600> QoI: passing a 'let' value as an inout results in an unfriendly diagnostic
   let f = 96 // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
@@ -322,8 +322,8 @@ func testSelectorStyleArguments1(x: Int, bar y: Int) {
 
 func testSelectorStyleArguments2(x: Int,
                                  bar y: Int) {
-  x += 1  // expected-error {{cannot pass immutable value to mutating operator: 'x' is a 'let' constant}}
-  y += 1  // expected-error {{cannot pass immutable value to mutating operator: 'y' is a 'let' constant}}
+  ++x  // expected-error {{cannot pass immutable value to mutating operator: 'x' is a 'let' constant}}
+  ++y  // expected-error {{cannot pass immutable value to mutating operator: 'y' is a 'let' constant}}
 }
 
 func invalid_inout(inout var x : Int) { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{26-30=}}

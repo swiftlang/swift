@@ -93,10 +93,10 @@ func test1(cp: ComputedProperty, sub: CC2) {
   var x = cp.value
   x = cp.readOnly
   cp.value = x
-  cp.value += 1
+  ++cp.value
   x = sub[0]
   sub[0] = x
-  sub[0] += 1
+  ++sub[0]
 }
 
 struct S2 {
