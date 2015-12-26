@@ -357,25 +357,14 @@ Type TypeChecker::applyUnboundGenericArguments(
     MutableArrayRef<TypeLoc> genericArgs, bool isGenericSignature,
     GenericTypeResolver *resolver) {
 
+  assert(unbound &&
+         genericArgs.size() == unbound->getDecl()->getGenericParams()->size() &&
+         "Did you enter via applyGenericTypeReprArgs?");
+
   // Make sure we always have a resolver to use.
   PartialGenericTypeToArchetypeResolver defaultResolver(*this);
   if (!resolver)
     resolver = &defaultResolver;
-
-  // Make sure we have the right number of generic arguments.
-  // FIXME: If we have fewer arguments than we need, that might be okay, if
-  // we're allowed to deduce the remaining arguments from context.
-  auto genericParams = unbound->getDecl()->getGenericParams();
-  if (genericParams->size() != genericArgs.size()) {
-    // FIXME: Highlight <...>.
-    diagnose(loc, diag::type_parameter_count_mismatch,
-             unbound->getDecl()->getName(),
-             genericParams->size(), genericArgs.size(),
-             genericArgs.size() < genericParams->size());
-    diagnose(unbound->getDecl(), diag::generic_type_declared_here,
-             unbound->getDecl()->getName());
-    return nullptr;
-  }
 
   TypeResolutionOptions options;
   if (isGenericSignature)
@@ -436,6 +425,23 @@ static Type applyGenericTypeReprArgs(TypeChecker &TC, Type type, SourceLoc loc,
           .fixItRemove(generic->getAngleBrackets());
     return type;
   }
+
+  // Make sure we have the right number of generic arguments.
+  // FIXME: If we have fewer arguments than we need, that might be okay, if
+  // we're allowed to deduce the remaining arguments from context.
+  auto unboundDecl = unbound->getDecl();
+  auto genericArgs = generic->getGenericArgs();
+  auto genericParams = unboundDecl->getGenericParams();
+  if (genericParams->size() != genericArgs.size()) {
+    TC.diagnose(loc, diag::type_parameter_count_mismatch,
+                unboundDecl->getName(), genericParams->size(),
+                genericArgs.size(), genericArgs.size() < genericParams->size())
+        .highlight(generic->getAngleBrackets());
+    TC.diagnose(unboundDecl, diag::generic_type_declared_here,
+                unboundDecl->getName());
+    return ErrorType::get(TC.Context);
+  }
+
   SmallVector<TypeLoc, 8> args;
   for (auto tyR : genericArgs)
     args.push_back(tyR);
