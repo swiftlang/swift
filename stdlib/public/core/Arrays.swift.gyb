@@ -1356,6 +1356,36 @@ extension Array {
   }
 }
 
+extension ${Self} {
+  /// Rotates the order of the elements in the range [firstIndex, lastIndex]
+  /// in such a way that the element pointed by middleIndex
+  ///  becomes the new first element.
+  ///
+  /// - Complexity: TO BE DEFIEND 
+  mutating func rotate(firstIndex: Int, middleIndex: Int, lastIndex: Int) {
+    if firstIndex >= self.count || middleIndex >= self.count || lastIndex >= self.count {
+      return
+    }
+    if firstIndex > middleIndex || middleIndex > lastIndex {
+      return
+    }
+    
+    // TODO: Replace Algorithm
+    var nextIndex = firstIndex
+    while (nextIndex != middleIndex) {
+      let element = removeAtIndex(firstIndex)
+      
+      if lastIndex == self.count {
+        append(element)
+      } else {
+        insert(element, atIndex: lastIndex-1)
+      }
+      
+      nextIndex++
+    }
+  }
+}
+
 extension ContiguousArray {
   /// If `!self.isEmpty`, remove the last element and return it, otherwise
   /// return `nil`.
