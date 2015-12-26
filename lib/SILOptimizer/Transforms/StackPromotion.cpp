@@ -409,7 +409,7 @@ bool StackPromoter::canPromoteAlloc(SILInstruction *AI,
     if (WorkList.empty()) {
       if (EndBlock == BB) {
         // We reached the EndBlock but didn't find a place for the deallocation
-        // so far (because we didn't find all uses yet or we entered a another
+        // so far (because we didn't find all uses yet or we entered another
         // stack alloc-dealloc region). Let's extend our lifetime region.
         // E.g.:
         //     %obj = alloc_ref // the allocation

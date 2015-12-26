@@ -293,7 +293,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         // Address only 'let' values are passed by box.  This isn't great, in
         // that a variable captured by multiple closures will be boxed for each
         // one.  This could be improved by doing an "isCaptured" analysis when
-        // emitting address-only let constants, and emit them into a alloc_box
+        // emitting address-only let constants, and emit them into an alloc_box
         // like a variable instead of into an alloc_stack.
         AllocBoxInst *allocBox =
           B.createAllocBox(loc, vl.value.getType().getObjectType());

@@ -792,7 +792,7 @@ public:
       // Look for induction variables.
       IVInfo::IVDesc IV;
       if (!(IV = IVs.getInductionDesc(Arg))) {
-        DEBUG(llvm::dbgs() << " not a induction variable: " << *Arg);
+        DEBUG(llvm::dbgs() << " not an induction variable: " << *Arg);
         continue;
       }
 

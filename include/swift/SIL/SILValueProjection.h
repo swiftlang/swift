@@ -463,7 +463,7 @@ public:
 
   /// Returns the type of the object the LSLocation represents.
   SILType getType() const {
-    // Base might be a address type, e.g. from alloc_stack of struct,
+    // Base might be an address type, e.g. from alloc_stack of struct,
     // enum or tuples.
     if (Path.getValue().empty())
       return Base.getType().getObjectType();

@@ -2739,7 +2739,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   return CheckedCastKind::ValueCast;
 }
 
-/// If the expression is a an implicit call to _forceBridgeFromObjectiveC or
+/// If the expression is an implicit call to _forceBridgeFromObjectiveC or
 /// _conditionallyBridgeFromObjectiveC, returns the argument of that call.
 static Expr *lookThroughBridgeFromObjCCall(ASTContext &ctx, Expr *expr) {
   auto call = dyn_cast<CallExpr>(expr);

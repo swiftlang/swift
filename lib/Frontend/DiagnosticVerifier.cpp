@@ -624,7 +624,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
 /// file and drop it back in place.
 void DiagnosticVerifier::autoApplyFixes(unsigned BufferID,
                                         ArrayRef<llvm::SMDiagnostic> diags) {
-  // Walk the list of diagnostics, pulling out any fixits into a array of just
+  // Walk the list of diagnostics, pulling out any fixits into an array of just
   // them.
   SmallVector<llvm::SMFixIt, 4> FixIts;
   for (auto &diag : diags)

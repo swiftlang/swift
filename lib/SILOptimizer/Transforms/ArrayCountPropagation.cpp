@@ -91,7 +91,7 @@ bool ArrayAllocation::propagate() {
   return propagateCountToUsers();
 }
 
-/// Check that we have a array initialization call with a known count.
+/// Check that we have an array initialization call with a known count.
 ///
 /// The returned array value is known not to be aliased since it was just
 /// allocated.

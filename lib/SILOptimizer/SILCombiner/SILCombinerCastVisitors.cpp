@@ -86,7 +86,7 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
                                            PTAI->getType());
   }
 
-  // Turn this also into a index_addr. We generate this pattern after switching
+  // Turn this also into an index_addr. We generate this pattern after switching
   // the Word type to an explicit Int32 or Int64 in the stdlib.
   //
   // %101 = builtin "strideof_nonzero"<Int>(%84 : $@thick Int.Type) :

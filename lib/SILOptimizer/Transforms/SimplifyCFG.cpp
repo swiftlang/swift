@@ -1557,7 +1557,7 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
 }
 
 /// simplifySwitchEnumBlock - Simplify a basic block that ends with a
-/// switch_enum instruction that gets its operand from a an enum
+/// switch_enum instruction that gets its operand from an enum
 /// instruction.
 bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
   auto *EI = dyn_cast<EnumInst>(SEI->getOperand());
@@ -1600,7 +1600,7 @@ bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
 }
 
 /// simplifySwitchValueBlock - Simplify a basic block that ends with a
-/// switch_value instruction that gets its operand from a an integer
+/// switch_value instruction that gets its operand from an integer
 /// literal instruction.
 bool SimplifyCFG::simplifySwitchValueBlock(SwitchValueInst *SVI) {
   auto *ThisBB = SVI->getParent();

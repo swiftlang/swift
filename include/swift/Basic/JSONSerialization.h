@@ -613,7 +613,7 @@ operator<<(Output &yout, T &map) {
   return yout;
 }
 
-// Define non-member operator<< so that Output can stream out a array.
+// Define non-member operator<< so that Output can stream out an array.
 template <typename T>
 inline
 typename
