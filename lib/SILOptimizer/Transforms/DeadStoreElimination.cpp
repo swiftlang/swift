@@ -400,9 +400,6 @@ public:
   /// changes.
   void processBasicBlockForDSE(SILBasicBlock *BB);
 
-  /// Compute the max store set for the current basic block.
-  void processBasicBlockForMaxStoreSet(SILBasicBlock *BB);
-
   /// Compute the genset and killset for the current basic block.
   void processBasicBlockForGenKillSet(SILBasicBlock *BB);
 
@@ -478,12 +475,6 @@ unsigned DSEContext::getLocationBit(const LSLocation &Loc) {
 }
 
 void DSEContext::processBasicBlockForGenKillSet(SILBasicBlock *BB) {
-  for (auto I = BB->rbegin(), E = BB->rend(); I != E; ++I) {
-    processInstruction(&(*I), DSEKind::BuildGenKillSet);
-  }
-}
-
-void DSEContext::processBasicBlockForMaxStoreSet(SILBasicBlock *BB) {
   // Compute the MaxStoreSet at the end of the basic block.
   auto *BBState = getBlockState(BB);
   if (BB->succ_empty()) {
@@ -497,12 +488,24 @@ void DSEContext::processBasicBlockForMaxStoreSet(SILBasicBlock *BB) {
     }
   }
 
-  // Compute the MaxStoreSet at the beginning of the basic block.
+  // Compute the genset and killset. 
+  //
+  // Also compute the MaxStoreSet at the current position of the basic block.
+  //
+  // This helps generating the genset and killset. If there is no way a
+  // location can have an upward visible store at a particular point in the
+  // basic block, we do not need to turn on the genset and killset for the
+  // location.
+  //
+  // Turning on the genset and killset can be costly as it involves querying
+  // the AA interface.
   for (auto I = BB->rbegin(), E = BB->rend(); I != E; ++I) {
     // Only process store insts.
-    if (!isa<StoreInst>(*I))
-      continue;
-    processStoreInst(&(*I), DSEKind::ComputeMaxStoreSet);
+    if (isa<StoreInst>(*I))
+      processStoreInst(&(*I), DSEKind::ComputeMaxStoreSet);
+
+    // Compute the genset and killset for this instruction.
+    processInstruction(&(*I), DSEKind::BuildGenKillSet);
   }
 }
 
@@ -980,24 +983,15 @@ bool DSEContext::run() {
   //
   // Phase 5. we remove the dead stores.
 
-  // Compute the max store set at the beginning of the basic block.
-  //
-  // This helps generating the genset and killset. If there is no way a
-  // location can have an upward visible store at a particular point in the
-  // basic block, we do not need to turn on the genset and killset for the
-  // location.
-  //
-  // Turning on the genset and killset can be costly as it involves querying
-  // the AA interface.
-  auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
-  for (SILBasicBlock *B : PO->getPostOrder()) {
-    processBasicBlockForMaxStoreSet(B);
-  }
 
   // Generate the genset and killset for each basic block. We can process the
   // basic blocks in any order.
-  for (auto &B : *F) {
-    processBasicBlockForGenKillSet(&B);
+  // 
+  // We also Compute the max store set at the beginning of the basic block.
+  //
+  auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
+  for (SILBasicBlock *B : PO->getPostOrder()) {
+    processBasicBlockForGenKillSet(B);
   }
 
   // Process each basic block with the gen and kill set. Every time the
