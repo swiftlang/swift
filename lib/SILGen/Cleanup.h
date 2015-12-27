@@ -194,7 +194,7 @@ public:
   bool hasAnyActiveCleanups(CleanupsDepth from);
 };
 
-/// An RAII object that allows the state of a cleanup to be
+/// A RAII object that allows the state of a cleanup to be
 /// temporarily modified.
 class CleanupStateRestorationScope {
   CleanupManager &Cleanups;

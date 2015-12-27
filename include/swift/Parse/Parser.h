@@ -272,7 +272,7 @@ public:
     Optional<StringRef> LeadingWhitespace;
   };
 
-  /// An RAII object that notes when we have seen a structure marker.
+  /// A RAII object that notes when we have seen a structure marker.
   class StructureMarkerRAII {
     Parser &P;
 

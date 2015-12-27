@@ -175,7 +175,7 @@ namespace {
     }
   };
 
-  /// An RAII type to exclude tokens contributing to private decls from the
+  /// A RAII type to exclude tokens contributing to private decls from the
   /// interface hash of the source file. On destruct, it checks if the set of
   /// attributes includes the "private" attribute; if so, it resets the MD5
   /// hash of the source file to what it was when the IgnorePrivateDeclTokens

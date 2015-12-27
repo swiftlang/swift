@@ -778,7 +778,7 @@ public:
   CanGenericSignature getEffectiveGenericSignature(AnyFunctionRef fn,
                                                    CaptureInfo captureInfo);
 
-  /// Push a generic function context. See GenericContextScope for an RAII
+  /// Push a generic function context. See GenericContextScope for a RAII
   /// interface to this function.
   ///
   /// Types containing generic parameter references must be lowered in a generic
@@ -792,7 +792,7 @@ public:
     return CurGenericContext;
   }
   
-  /// Pop a generic function context. See GenericContextScope for an RAII
+  /// Pop a generic function context. See GenericContextScope for a RAII
   /// interface to this function. There must be an active generic context.
   void popGenericContext(CanGenericSignature sig);
   

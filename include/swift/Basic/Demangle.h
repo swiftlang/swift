@@ -367,7 +367,7 @@ struct NodeFactory {
   }
 };
 
-  /// A class for printing to a std::string.
+  /// A class for printing to an std::string.
 class DemanglerPrinter {
 public:
   DemanglerPrinter(std::string &out) : Stream(out) {}

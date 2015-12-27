@@ -211,7 +211,7 @@ private:
   Types_t Types;
 };
 
-/// An RAII interface for entering a generic context for type conversion in
+/// A RAII interface for entering a generic context for type conversion in
 /// a scope.
 class GenericContextScope {
   TypeConverter &TC;

@@ -1442,7 +1442,7 @@ private:
   }  
 };
 
-/// An RAII version of SILBuilder that automatically sets up identical
+/// A RAII version of SILBuilder that automatically sets up identical
 /// SILDebugScopes for all instructions.  This is useful for
 /// situations where a single SIL instruction is lowered into a
 /// sequence of SIL instructions.
