@@ -69,7 +69,7 @@
                     "unowned_retain" "unowned_release"
                     "ref_to_unmanaged" "unmanaged_to_ref"
                     "load_weak" "store_weak" "fix_lifetime" "mark_dependence"
-                    "strong_unpin" "strong_pin")
+                    "strong_unpin" "strong_pin" "is_unique" "is_unique_or_pinned")
 		  'words) . font-lock-keyword-face)
    ;; Literals
    `(,(regexp-opt '("function_ref"
