@@ -288,7 +288,7 @@ private:
   TypeAliasDecl *getMetadataType();
 };
 
-/// \brief An RAII object that autorestores the debug location.
+/// \brief A RAII object that autorestores the debug location.
 class AutoRestoreLocation {
   IRGenDebugInfo *DI;
 public:
@@ -304,7 +304,7 @@ public:
   }
 };
 
-/// \brief An RAII object that temporarily switches to
+/// \brief A RAII object that temporarily switches to
 /// an artificial debug location that has a valid scope, but no line
 /// information. This is useful when emitting compiler-generated
 /// instructions (e.g., ARC-inserted calls to release()) that have no
@@ -324,7 +324,7 @@ public:
   }
 };
 
-/// \brief An RAII object that temporarily switches to an
+/// \brief A RAII object that temporarily switches to an
 /// empty location. This is how the function prologue is represented.
 class PrologueLocation : public AutoRestoreLocation {
 public:

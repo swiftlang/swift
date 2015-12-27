@@ -1144,7 +1144,7 @@ class CheckErrorCoverage : public ErrorHandlingWalker<CheckErrorCoverage> {
     Flags.set(ContextFlags::HasTryThrowSite);
   }
 
-  /// An RAII object for restoring all the interesting state in an
+  /// A RAII object for restoring all the interesting state in an
   /// error-coverage.
   class ContextScope {
     CheckErrorCoverage &Self;

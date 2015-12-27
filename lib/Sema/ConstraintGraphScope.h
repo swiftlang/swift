@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the \c ConstraintGraphScope class, an RAII object that
+// This file defines the \c ConstraintGraphScope class, a RAII object that
 // introduces a new scope in which changes to the constraint graph are
 // capture and will be reverted when the scope disappears.
 //

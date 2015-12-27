@@ -1003,7 +1003,7 @@ SILGenModule::useConformancesFromSubstitutions(ArrayRef<Substitution> subs) {
 
 namespace {
 
-/// An RAII class to scope source file codegen.
+/// A RAII class to scope source file codegen.
 class SourceFileScope {
   SILGenModule &sgm;
   SourceFile *sf;
