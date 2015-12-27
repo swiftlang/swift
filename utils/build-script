@@ -18,8 +18,11 @@ import shutil
 import sys
 import textwrap
 
+# FIXME: Instead of modifying the system path in order to enable imports from
+#        other directories, all Python modules related to the build script
+#        should be moved to the `swift_build_support` module.
+#        For additional information, see: https://bugs.swift.org/browse/SR-237.
 sys.path.append(os.path.dirname(__file__))
-
 from SwiftBuildSupport import (
     HOME,
     SWIFT_BUILD_ROOT,
@@ -30,6 +33,11 @@ from SwiftBuildSupport import (
     print_with_argv0,
     quote_shell_command,
 )
+
+sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
+import swift_build_support.clang
+from swift_build_support.migration import migrate_impl_args
+
 
 # Main entry point for the preset mode.
 def main_preset():
@@ -495,6 +503,10 @@ the number of parallel build jobs to use""",
         dest="build_jobs",
         default=multiprocessing.cpu_count())
 
+    parser.add_argument("--darwin-xcrun-toolchain",
+                        help="the name of the toolchain to use on Darwin",
+                        default="default")
+
     parser.add_argument("--extra-swift-args", help=textwrap.dedent("""
     Pass through extra flags to swift in the form of a cmake list 'module_regexp;flag'. Can
     be called multiple times to add multiple such module_regexp flag pairs. All semicolons
@@ -505,7 +517,8 @@ the number of parallel build jobs to use""",
         help="",
         nargs="*")
 
-    args = parser.parse_args()
+    args = parser.parse_args(migrate_impl_args(sys.argv[1:], [
+        '--darwin-xcrun-toolchain']))
 
     # Build cmark if any cmark-related options were specified.
     if (args.cmark_build_variant is not None):
@@ -709,9 +722,18 @@ the number of parallel build jobs to use""",
     if args.clean:
         shutil.rmtree(build_dir)
 
+    host_clang = swift_build_support.clang.host_clang(
+        xcrun_toolchain=args.darwin_xcrun_toolchain)
+    if not host_clang:
+        print_with_argv0(
+            "Can't find clang.  Please install clang-3.5 or a later version.")
+        return 1
     build_script_impl_args = [
         os.path.join(SWIFT_SOURCE_ROOT, "swift", "utils", "build-script-impl"),
         "--build-dir", build_dir,
+        "--host-cc", host_clang.cc,
+        "--host-cxx", host_clang.cxx,
+        "--darwin-xcrun-toolchain", args.darwin_xcrun_toolchain,
         "--cmark-build-type", args.cmark_build_variant,
         "--llvm-build-type", args.llvm_build_variant,
         "--swift-build-type", args.swift_build_variant,
