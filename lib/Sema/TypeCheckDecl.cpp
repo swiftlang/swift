@@ -5618,7 +5618,7 @@ bool TypeChecker::isAvailabilitySafeForConformance(
     return true;
 
   NominalTypeDecl *conformingDecl = DC->isNominalTypeOrNominalTypeExtensionContext();
-  assert(conformingDecl && "Must have conformining declaration");
+  assert(conformingDecl && "Must have conforming declaration");
 
   // Make sure that any access of the witness through the protocol
   // can only occur when the witness is available. That is, make sure that

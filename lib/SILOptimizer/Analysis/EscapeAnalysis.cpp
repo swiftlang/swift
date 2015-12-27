@@ -126,7 +126,7 @@ EscapeAnalysis::CGNode *EscapeAnalysis::ConnectionGraph::getContentNode(
 }
 
 bool EscapeAnalysis::ConnectionGraph::addDeferEdge(CGNode *From, CGNode *To) {
-  if (!From->addDefered(To))
+  if (!From->addDeferred(To))
     return false;
 
   CGNode *FromPointsTo = From->pointsTo;
@@ -167,7 +167,7 @@ void EscapeAnalysis::ConnectionGraph::mergeAllScheduledNodes() {
           PredNode->setPointsTo(To);
       } else {
         assert(PredNode != From);
-        auto Iter = PredNode->findDefered(From);
+        auto Iter = PredNode->findDeferred(From);
         assert(Iter != PredNode->defersTo.end() &&
                "Incoming defer-edge not found in predecessor's defer list");
         PredNode->defersTo.erase(Iter);
@@ -280,10 +280,10 @@ updatePointsTo(CGNode *InitialNode, CGNode *pointsTo) {
     }
 
     // Add all adjacent nodes to the WorkList.
-    for (auto *Defered : Node->defersTo) {
-      if (!Defered->isInWorkList) {
-        WorkList.push_back(Defered);
-        Defered->isInWorkList = true;
+    for (auto *Deferred : Node->defersTo) {
+      if (!Deferred->isInWorkList) {
+        WorkList.push_back(Deferred);
+        Deferred->isInWorkList = true;
       }
     }
     for (Predecessor Pred : Node->Preds) {
@@ -506,10 +506,10 @@ bool EscapeAnalysis::ConnectionGraph::mergeFrom(ConnectionGraph *SourceGraph,
         DestFrom = DestFrom->getMergeTarget();
       }
 
-      for (auto *Defered : SourceReachable->defersTo) {
-        if (!Defered->isInWorkList) {
-          WorkList.push_back(Defered);
-          Defered->isInWorkList = true;
+      for (auto *Deferred : SourceReachable->defersTo) {
+        if (!Deferred->isInWorkList) {
+          WorkList.push_back(Deferred);
+          Deferred->isInWorkList = true;
         }
       }
     }
@@ -572,7 +572,7 @@ struct CGForDotView {
 
   enum EdgeTypes {
     PointsTo,
-    Defered
+    Deferred
   };
 
   struct Node {
@@ -629,7 +629,7 @@ CGForDotView::CGForDotView(const EscapeAnalysis::ConnectionGraph *CG) :
     }
     for (auto *Def : OrigNode->defersTo) {
       Nd.Children.push_back(Orig2Node[Def]);
-      Nd.ChildrenTypes.push_back(Defered);
+      Nd.ChildrenTypes.push_back(Deferred);
     }
   }
 }
@@ -767,7 +767,7 @@ namespace llvm {
       unsigned ChildIdx = I - Node->Children.begin();
       switch (Node->ChildrenTypes[ChildIdx]) {
         case CGForDotView::PointsTo: return "";
-        case CGForDotView::Defered: return "color=\"gray\"";
+        case CGForDotView::Deferred: return "color=\"gray\"";
       }
     }
   };
@@ -930,7 +930,7 @@ void EscapeAnalysis::ConnectionGraph::verifyStructure() const {
     for (Predecessor Pred : Nd->Preds) {
       CGNode *PredNode = Pred.getPointer();
       if (Pred.getInt() == EdgeType::Defer) {
-        assert(PredNode->findDefered(Nd) != PredNode->defersTo.end());
+        assert(PredNode->findDeferred(Nd) != PredNode->defersTo.end());
       } else {
         assert(Pred.getInt() == EdgeType::PointsTo);
         assert(PredNode->getPointsToEdge() == Nd);

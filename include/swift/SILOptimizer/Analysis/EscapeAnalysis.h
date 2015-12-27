@@ -192,7 +192,7 @@ private:
     }
 
     /// Finds a successor node in the outgoing defer edges.
-    llvm::SmallVectorImpl<CGNode *>::iterator findDefered(CGNode *Def) {
+    llvm::SmallVectorImpl<CGNode *>::iterator findDeferred(CGNode *Def) {
       return std::find(defersTo.begin(), defersTo.end(), Def);
     }
 
@@ -209,7 +209,7 @@ private:
     }
 
     /// Adds a defer-edge to another node \p To. Not done if \p To is this node.
-    bool addDefered(CGNode *To) {
+    bool addDeferred(CGNode *To) {
       assert(!To->isMerged);
       if (To == this)
         return false;
