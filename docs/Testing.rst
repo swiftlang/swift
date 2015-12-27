@@ -313,6 +313,8 @@ Other substitutions:
 * ``%platform-sdk-overlay-dir``: absolute path of the directory where the SDK
   overlay module files for the target platform are stored.
 
+* ``%{python}``: run the same Python interpreter that's being used to run the
+  current ``lit`` test.
 
 When writing a test where output (or IR, SIL) depends on the bitness of the
 target CPU, use this pattern::
