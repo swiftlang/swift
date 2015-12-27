@@ -25,7 +25,7 @@ using namespace swift;
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS, PatternKind kind) {
   switch (kind) {
   case PatternKind::Paren:
-    return OS << "parethesized pattern";
+    return OS << "parenthesized pattern";
   case PatternKind::Tuple:
     return OS << "tuple pattern";
   case PatternKind::Named:

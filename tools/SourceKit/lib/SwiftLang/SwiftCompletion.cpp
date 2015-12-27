@@ -450,7 +450,7 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
       llvm::SmallString<64> LogMessage;
       llvm::raw_svector_ostream LogMessageOs(LogMessage);
 
-      LogMessageOs << "Code cpompletion result with empty name and/or "
+      LogMessageOs << "Code completion result with empty name and/or "
                       "description was ignored: \n";
       Result->print(LogMessageOs);
 

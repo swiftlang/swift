@@ -171,7 +171,7 @@ void LoopARCSequenceDataflowEvaluator::mergeSuccessors(const LoopRegion *Region,
     }
 
     // Otherwise, we treat it as unknown control flow.
-    DEBUG(llvm::dbgs() << "        Cleaing state b/c of early exit\n");
+    DEBUG(llvm::dbgs() << "        Clearing state b/c of early exit\n");
     State.clear();
     break;
   }

@@ -2728,7 +2728,7 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
     llvm_unreachable("following an impossible path!");
 
   } 
-  llvm_unreachable("bad metata path component");
+  llvm_unreachable("bad metadata path component");
 }
 
 /// Collect any required metadata for a witness method from the end of

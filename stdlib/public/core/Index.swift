@@ -350,7 +350,7 @@ public protocol _RandomAccessAmbiguity {
 extension _RandomAccessAmbiguity {
   @warn_unused_result
   public func advancedBy(n: Distance) -> Self {
-    fatalError("advancedBy(n) not implememented")
+    fatalError("advancedBy(n) not implemented")
   }
 }
 

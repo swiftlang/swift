@@ -173,7 +173,7 @@ response for the cursor-info request will have an entry for the module name:
   key.modulename: "<module-name>"
 
 Also if there is already a generated-interface document for this module
-previously opened, there will be an entry with the "virtual name" assosiated
+previously opened, there will be an entry with the "virtual name" associated
 with this document (from the previous 'editor.open.interface' request):
 
   key.module_interface_name: "<virtual name for interface document>"
