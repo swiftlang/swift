@@ -38,14 +38,6 @@
 # include <objc/objc.h>
 #include "swift/Runtime/ObjCBridge.h"
 #endif
-#if SWIFT_RUNTIME_ENABLE_DTRACE
-# include "SwiftRuntimeDTraceProbes.h"
-#else
-# define SWIFT_ALLOCATEOBJECT()
-# define SWIFT_DEALLOCATEOBJECT()
-# define SWIFT_RELEASE()
-# define SWIFT_RETAIN()
-#endif
 #include "Leaks.h"
 
 using namespace swift;
@@ -54,7 +46,6 @@ HeapObject *
 swift::swift_allocObject(HeapMetadata const *metadata,
                          size_t requiredSize,
                          size_t requiredAlignmentMask) {
-  SWIFT_ALLOCATEOBJECT();
   return _swift_allocObject(metadata, requiredSize, requiredAlignmentMask);
 }
 static HeapObject *
@@ -268,7 +259,6 @@ void _swift_release_dealloc(HeapObject *object)
   __attribute__((noinline,used));
 
 void swift::swift_retain(HeapObject *object) {
-  SWIFT_RETAIN();
   _swift_retain(object);
 }
 static void _swift_retain_(HeapObject *object) {
@@ -277,7 +267,6 @@ static void _swift_retain_(HeapObject *object) {
 auto swift::_swift_retain = _swift_retain_;
 
 void swift::swift_retain_n(HeapObject *object, uint32_t n) {
-  SWIFT_RETAIN();
   _swift_retain_n(object, n);
 }
 static void _swift_retain_n_(HeapObject *object, uint32_t n) {
@@ -288,7 +277,6 @@ static void _swift_retain_n_(HeapObject *object, uint32_t n) {
 auto swift::_swift_retain_n = _swift_retain_n_;
 
 void swift::swift_release(HeapObject *object) {
-  SWIFT_RELEASE();
   return _swift_release(object);
 }
 static void _swift_release_(HeapObject *object) {
@@ -299,7 +287,6 @@ static void _swift_release_(HeapObject *object) {
 auto swift::_swift_release = _swift_release_;
 
 void swift::swift_release_n(HeapObject *object, uint32_t n) {
-  SWIFT_RELEASE();
   return _swift_release_n(object, n);
 }
 static void _swift_release_n_(HeapObject *object, uint32_t n) {
@@ -497,7 +484,6 @@ static inline void memset_pattern8(void *b, const void *pattern8, size_t len) {
 
 void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize,
                                 size_t allocatedAlignMask) {
-  SWIFT_DEALLOCATEOBJECT();
   assert(isAlignmentMask(allocatedAlignMask));
   assert(object->refCount.isDeallocating());
 #ifdef SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS

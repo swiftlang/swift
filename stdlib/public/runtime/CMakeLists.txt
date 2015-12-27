@@ -17,13 +17,6 @@ if(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
   set(swift_runtime_leaks_sources Leaks.mm)
 endif()
 
-set(swift_runtime_dtrace_sources)
-if (SWIFT_RUNTIME_ENABLE_DTRACE)
-  set(swift_runtime_dtrace_sources SwiftRuntimeDTraceProbes.d)
-  list(APPEND swift_runtime_compile_flags
-      "-DSWIFT_RUNTIME_ENABLE_DTRACE=1")
-endif()
-
 # Acknowledge that the following sources are known.
 set(LLVM_OPTIONAL_SOURCES
     Remangle.cpp)
@@ -53,7 +46,6 @@ add_swift_library(swiftRuntime IS_STDLIB IS_STDLIB_CORE
   Reflection.cpp
   SwiftObject.cpp
   ${swift_runtime_objc_sources}
-  ${swift_runtime_dtrace_sources}
   ${swift_runtime_leaks_sources}
   C_COMPILE_FLAGS ${swift_runtime_compile_flags}
   INSTALL_IN_COMPONENT stdlib)
