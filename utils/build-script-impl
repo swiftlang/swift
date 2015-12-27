@@ -57,8 +57,8 @@ KNOWN_SETTINGS=(
     # name                      default          description
     build-args                  ""               "arguments to the build tool; defaults to -j8 when CMake generator is \"Unix Makefiles\""
     build-dir                   ""               "out-of-tree build directory; default is in-tree. **This argument is required**"
-    host-cc                     ""               "the path to CC, the 'clang' compiler for the host platform. **This argument is requied**"
-    host-cxx                    ""               "the path to CXX, the 'clang++' compiler for the host platform. **This argument is requied**"
+    host-cc                     ""               "the path to CC, the 'clang' compiler for the host platform. **This argument is required**"
+    host-cxx                    ""               "the path to CXX, the 'clang++' compiler for the host platform. **This argument is required**"
     darwin-xcrun-toolchain      "default"        "the name of the toolchain to use on Darwin"
     build-ninja                 ""               "build the Ninja tool"
     cmark-build-type            "Debug"          "the CMake build variant for CommonMark (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
