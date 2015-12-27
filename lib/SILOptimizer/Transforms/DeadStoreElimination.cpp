@@ -114,6 +114,21 @@ static inline bool isPerformingDSE(DSEKind Kind) {
   return Kind == DSEKind::PerformDSE;
 }
 
+/// Return true if all basic blocks have their successors processed if
+/// they are iterated in post order.
+static bool isOneIterationFunction(PostOrderFunctionInfo *PO) {
+  bool OneIterationFunction = true;
+  llvm::DenseSet<SILBasicBlock *> HandledBBs;
+
+  for (SILBasicBlock *B : PO->getPostOrder()) {
+    for (auto &X : B->getSuccessors()) {
+      OneIterationFunction &= (HandledBBs.find(X) != HandledBBs.end());
+    }
+    HandledBBs.insert(B);
+  }
+  return OneIterationFunction;
+}
+
 /// Returns true if this is an instruction that may have side effects in a
 /// general sense but are inert from a load store perspective.
 static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
@@ -227,7 +242,7 @@ public:
   void initReturnBlock(DSEContext &Ctx);
 
   /// Initialize the bitvectors for the basic block.
-  void init(DSEContext &Ctx);
+  void init(DSEContext &Ctx, bool OneIterationFunction);
 
   /// Check whether the BBWriteSetIn has changed. If it does, we need to rerun
   /// the data flow on this block's predecessors to reach fixed point.
@@ -387,6 +402,9 @@ public:
   /// Entry point for dead store elimination.
   bool run();
 
+  /// Run the iterative DF to converge the BBWriteSetIn.
+  void runIterativeDF();
+
   /// Returns the escape analysis we use.
   EscapeAnalysis *getEA() { return EA; }
 
@@ -430,7 +448,7 @@ void BlockState::initReturnBlock(DSEContext &Ctx) {
   }
 }
 
-void BlockState::init(DSEContext &Ctx)  {
+void BlockState::init(DSEContext &Ctx, bool OneIterationFunction)  {
   std::vector<LSLocation> &LV = Ctx.getLocationVault();
   LocationNum = LV.size();
   // The initial state of BBWriteSetIn should be all 1's. Otherwise the
@@ -446,7 +464,7 @@ void BlockState::init(DSEContext &Ctx)  {
   // However, by doing so, we can only eliminate the dead stores after the
   // data flow stabilizes.
   //
-  BBWriteSetIn.resize(LocationNum, true);
+  BBWriteSetIn.resize(LocationNum, !OneIterationFunction);
   BBWriteSetOut.resize(LocationNum, false);
   BBWriteSetMid.resize(LocationNum, false);
 
@@ -536,6 +554,8 @@ void DSEContext::processBasicBlockForDSE(SILBasicBlock *BB) {
   for (auto I = BB->rbegin(), E = BB->rend(); I != E; ++I) {
     processInstruction(&(*I), DSEKind::PerformDSE);
   }
+
+  S->BBWriteSetIn = S->BBWriteSetMid;
 }
 
 void DSEContext::mergeSuccessorStates(SILBasicBlock *BB) {
@@ -948,28 +968,7 @@ void DSEContext::processInstruction(SILInstruction *I, DSEKind Kind) {
   invalidateLSLocationBase(I, Kind);
 }
 
-bool DSEContext::run() {
-  // Walk over the function and find all the locations accessed by
-  // this function.
-  LSLocation::enumerateLSLocations(*F, LocationVault, LocToBitIndex, TE);
-
-  // For all basic blocks in the function, initialize a BB state.
-  //
-  // DenseMap has a minimum size of 64, while many functions do not have more
-  // than 64 basic blocks. Therefore, allocate the BlockState in a vector and
-  // use pointer in BBToLocState to access them.
-  for (auto &B : *F) {
-    BlockStates.push_back(BlockState(&B));
-    // Since we know all the locations accessed in this function, we can resize
-    // the bit vector to the appropriate size.
-    BlockStates.back().init(*this);
-  }
-
-  // Initialize the BBToLocState mapping.
-  for (auto &S : BlockStates) {
-    BBToLocState[S.getBB()] = &S;
-  }
-
+void DSEContext::runIterativeDF() {
   // We perform dead store elimination in the following phases.
   //
   // Phase 1. we compute the max store set at the beginning of the basic block.
@@ -982,7 +981,6 @@ bool DSEContext::run() {
   // Phase 4. we run the data flow for the last iteration and perform the DSE.
   //
   // Phase 5. we remove the dead stores.
-
 
   // Generate the genset and killset for each basic block. We can process the
   // basic blocks in any order.
@@ -1018,6 +1016,40 @@ bool DSEContext::run() {
       }
     }
   }
+}
+
+bool DSEContext::run() {
+  // Is this a one iteration function.
+  auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
+
+  // Do we really need to run the iterative data flow on the function.
+  bool OneIterationFunction = isOneIterationFunction(PO);
+
+  // Walk over the function and find all the locations accessed by
+  // this function.
+  LSLocation::enumerateLSLocations(*F, LocationVault, LocToBitIndex, TE);
+
+  // For all basic blocks in the function, initialize a BB state.
+  //
+  // DenseMap has a minimum size of 64, while many functions do not have more
+  // than 64 basic blocks. Therefore, allocate the BlockState in a vector and
+  // use pointer in BBToLocState to access them.
+  for (auto &B : *F) {
+    BlockStates.push_back(BlockState(&B));
+    // Since we know all the locations accessed in this function, we can resize
+    // the bit vector to the appropriate size.
+    BlockStates.back().init(*this, OneIterationFunction);
+  }
+
+  // Initialize the BBToLocState mapping.
+  for (auto &S : BlockStates) {
+    BBToLocState[S.getBB()] = &S;
+  }
+
+  // We need to run the iterative data flow on the function.
+  if (!OneIterationFunction) {
+    runIterativeDF();
+  }
 
   // The data flow has stabilized, run one last iteration over all the basic
   // blocks and try to remove dead stores.
@@ -1043,6 +1075,7 @@ bool DSEContext::run() {
       recursivelyDeleteTriviallyDeadInstructions(I, true);
     }
   }
+
   return Changed;
 }
 
