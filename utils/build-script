@@ -36,6 +36,7 @@ from SwiftBuildSupport import (
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
 import swift_build_support.clang
+import swift_build_support.cmake
 from swift_build_support.migration import migrate_impl_args
 
 
@@ -506,6 +507,9 @@ the number of parallel build jobs to use""",
     parser.add_argument("--darwin-xcrun-toolchain",
                         help="the name of the toolchain to use on Darwin",
                         default="default")
+    parser.add_argument("--cmake",
+                        help="the path to a CMake executable that will be "
+                             "used to build Swift")
 
     parser.add_argument("--extra-swift-args", help=textwrap.dedent("""
     Pass through extra flags to swift in the form of a cmake list 'module_regexp;flag'. Can
@@ -518,7 +522,9 @@ the number of parallel build jobs to use""",
         nargs="*")
 
     args = parser.parse_args(migrate_impl_args(sys.argv[1:], [
-        '--darwin-xcrun-toolchain']))
+        '--darwin-xcrun-toolchain',
+        '--cmake',
+    ]))
 
     # Build cmark if any cmark-related options were specified.
     if (args.cmark_build_variant is not None):
@@ -728,12 +734,21 @@ the number of parallel build jobs to use""",
         print_with_argv0(
             "Can't find clang.  Please install clang-3.5 or a later version.")
         return 1
+
+    host_cmake = args.cmake
+    if not host_cmake:
+        host_cmake = swift_build_support.cmake.host_cmake(
+            args.darwin_xcrun_toolchain)
+    if not host_cmake:
+        print_with_argv0("Can't find CMake. Please install CMake.")
+        return 1
     build_script_impl_args = [
         os.path.join(SWIFT_SOURCE_ROOT, "swift", "utils", "build-script-impl"),
         "--build-dir", build_dir,
         "--host-cc", host_clang.cc,
         "--host-cxx", host_clang.cxx,
         "--darwin-xcrun-toolchain", args.darwin_xcrun_toolchain,
+        "--cmake", host_cmake,
         "--cmark-build-type", args.cmark_build_variant,
         "--llvm-build-type", args.llvm_build_variant,
         "--swift-build-type", args.swift_build_variant,
