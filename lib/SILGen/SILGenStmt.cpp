@@ -511,7 +511,7 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
   SILArgument *exnArg =
     throwDest.getBlock()->createBBArg(exnTL.getLoweredType());
 
-  // We always need an continuation block because we might fall out of
+  // We always need a continuation block because we might fall out of
   // a catch block.  But we don't need a loop block unless the 'do'
   // statement is labeled.
   JumpDest endDest = createJumpDest(S->getBody());

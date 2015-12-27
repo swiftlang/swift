@@ -202,7 +202,7 @@ public:
 
   /// A bit vector to keep the maximum number of stores that can reach the
   /// beginning of the basic block. If a bit is set, that means there is
-  /// potentially a upward visible store to the location at the beginning
+  /// potentially an upward visible store to the location at the beginning
   /// of the basic block.
   llvm::SmallBitVector BBMaxStoreSet;
 

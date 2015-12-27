@@ -350,7 +350,7 @@ updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
     if (!AnyRequired)
       return;
     
-    // If the copyaddr is of an non-loadable type, we can't promote it.  Just
+    // If the copyaddr is of a non-loadable type, we can't promote it.  Just
     // consider it to be a clobber.
     if (CAI->getOperand(0).getType().isLoadable(Module)) {
       // Otherwise, some part of the copy_addr's value is demanded by a load, so

@@ -582,7 +582,7 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
   case TypeMatchKind::SameType:
   case TypeMatchKind::ConformsTo:
   case TypeMatchKind::Subtype:
-    llvm_unreachable("Not an call argument constraint");
+    llvm_unreachable("Not a call argument constraint");
   }
   
   auto haveOneNonUserConversion =

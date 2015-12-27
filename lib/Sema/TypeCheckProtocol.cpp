@@ -2263,7 +2263,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
             });
         }
 
-        // An non-failable initializer requirement cannot be satisfied
+        // A non-failable initializer requirement cannot be satisfied
         // by a failable initializer.
         if (ctor->getFailability() == OTK_None) {
           switch (witnessCtor->getFailability()) {

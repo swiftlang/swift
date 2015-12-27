@@ -536,7 +536,7 @@ bool COWArrayOpt::isRetainReleasedBeforeMutate(SILInstruction *RetainInst,
       //   release %ptr
       //   array_operation(..., @owned %ptr)
       //
-      // This is not the case for an potentially aliased array because a release
+      // This is not the case for a potentially aliased array because a release
       // can cause a destructor to run. The destructor in turn can cause
       // arbitrary side effects.
       if (isa<ReleaseValueInst>(II) || isa<StrongReleaseInst>(II))
@@ -1346,7 +1346,7 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
         // All array types must be the same. This is a stronger guaranteed than
         // we actually need. The requirement is that we can't create another
         // reference to the array by performing an array operation: for example,
-        // storing or appending one array into an two-dimensional array.
+        // storing or appending one array into a two-dimensional array.
         // Checking
         // that all types are the same make guarantees that this cannot happen.
         if (SameTy.isNull()) {

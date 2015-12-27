@@ -250,7 +250,7 @@ public:
   ABCAnalysis(const ABCAnalysis &) = delete;
   ABCAnalysis &operator=(const ABCAnalysis &) = delete;
 
-  /// Find safe array bounds check in a loop. An bounds_check is safe if no size
+  /// Find safe array bounds check in a loop. A bounds_check is safe if no size
   /// modifying instruction to the same array has been seen so far.
   ///
   /// The code relies on isIdentifiedUnderlyingArrayObject' to make sure that a

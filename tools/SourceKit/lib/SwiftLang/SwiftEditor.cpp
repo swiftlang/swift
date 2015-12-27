@@ -1783,7 +1783,7 @@ public:
         SM.getLineAndColumn(If->getElseLoc()).first == Line)
       return false;
 
-    // If we're in an DoCatchStmt and at a 'catch', don't add an indent.
+    // If we're in a DoCatchStmt and at a 'catch', don't add an indent.
     if (auto *DoCatchS = dyn_cast_or_null<DoCatchStmt>(Cursor->getAsStmt())) {
       for (CatchStmt *CatchS : DoCatchS->getCatches()) {
         SourceLoc Loc = CatchS->getCatchLoc();

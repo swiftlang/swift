@@ -1783,7 +1783,7 @@ bool CalleeCandidateInfo::diagnoseAnyStructuralArgumentError(Expr *fnExpr,
     return false;
   
   
-  // If we are missing an parameter, diagnose that.
+  // If we are missing a parameter, diagnose that.
   if (missingParamIdx != ~0U) {
     Identifier name = params[missingParamIdx].Label;
     auto loc = argExpr->getStartLoc();

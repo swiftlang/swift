@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 //  This file defines the MetadataPath type, which efficiently records the
-//  path to an metadata object.
+//  path to a metadata object.
 //
 //===----------------------------------------------------------------------===//
 

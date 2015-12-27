@@ -61,7 +61,7 @@ sil @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
 // CHECK-LABEL: sil @used_by_inout
 sil @used_by_inout : $@convention(thin) (Int) -> (Int, Int) {
 bb0(%0 : $Int):
-  // This alloc_stack can't be removed since it is used by a inout call.
+  // This alloc_stack can't be removed since it is used by an inout call.
   // CHECK: %1 = alloc_box $Int
   %1 = alloc_box $Int
   %2 = store %0 to %1#1 : $*Int

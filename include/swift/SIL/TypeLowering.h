@@ -511,7 +511,7 @@ class TypeConverter {
   
   friend struct llvm::DenseMapInfo<OverrideKey>;
 
-  /// Find an cached TypeLowering by TypeKey, or return null if one doesn't
+  /// Find a cached TypeLowering by TypeKey, or return null if one doesn't
   /// exist.
   const TypeLowering *find(TypeKey k);
   /// Insert a mapping into the cache.

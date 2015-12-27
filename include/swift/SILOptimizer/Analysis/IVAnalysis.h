@@ -30,7 +30,7 @@ public:
 
 public:
 
-  /// A descriptor for an induction variable comprised of an header argument
+  /// A descriptor for an induction variable comprised of a header argument
   /// (phi node) and an increment by an integer literal.
   class IVDesc {
   public:

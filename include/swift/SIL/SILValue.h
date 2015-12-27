@@ -172,7 +172,7 @@ enum {
   ValueResultNumberBits = 2
 };
 
-/// SILValue - A SILValue is a use of a specific result of an ValueBase.  As
+/// SILValue - A SILValue is a use of a specific result of a ValueBase.  As
 /// such, it is a pair of the ValueBase and the result number being referenced.
 class SILValue {
   llvm::PointerIntPair<ValueBase *, ValueResultNumberBits> ValueAndResultNumber;

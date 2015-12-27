@@ -1960,7 +1960,7 @@ ManagedValue SILGenFunction::emitApply(
     }
   }
 
-  // If there's an foreign error parameter, fill it in.
+  // If there's a foreign error parameter, fill it in.
   Optional<WritebackScope> errorTempWriteback;
   ManagedValue errorTemp;
   if (foreignError) {
@@ -3775,7 +3775,7 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
     }
   }
 
-  // Dispatch in a struct/enum or to an final method is always direct.
+  // Dispatch in a struct/enum or to a final method is always direct.
   if (!isClassDispatch || decl->isFinal())
     return Callee::forDirect(gen, constant, substAccessorType, loc);
 

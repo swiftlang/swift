@@ -352,7 +352,7 @@ makeTransformRange(Range range, Operation op) {
 }
 
 /// An iterator that filters and transforms the results of an
-/// underlying forward iterator based on an transformation from the underlying
+/// underlying forward iterator based on a transformation from the underlying
 /// value type to an optional result type.
 ///
 /// \tparam Iterator the underlying iterator.

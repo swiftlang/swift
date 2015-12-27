@@ -77,14 +77,14 @@ public:
     return *this;
   }
   
-  /// Create a RValue from a single value. If the value is of tuple type, it
+  /// Create an RValue from a single value. If the value is of tuple type, it
   /// will be exploded.
   ///
   /// \param expr - the expression which yielded this r-value; its type
   ///   will become the substituted formal type of this r-value
   RValue(SILGenFunction &gen, Expr *expr, ManagedValue v);
 
-  /// Create a RValue from a single value. If the value is of tuple type, it
+  /// Create an RValue from a single value. If the value is of tuple type, it
   /// will be exploded.
   RValue(SILGenFunction &gen, SILLocation l, CanType type, ManagedValue v);
 

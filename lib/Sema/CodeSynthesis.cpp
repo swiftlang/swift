@@ -1614,7 +1614,7 @@ namespace {
   };
 }
 
-/// Synthesize the getter for an lazy property with the specified storage
+/// Synthesize the getter for a lazy property with the specified storage
 /// vardecl.
 static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
                                             TypeChecker &TC) {

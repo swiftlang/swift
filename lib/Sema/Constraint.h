@@ -138,7 +138,7 @@ enum class ConstraintClassification : char {
   /// it a reference type.
   Member,
 
-  /// \brief An property of a single type, such as whether it is an archetype.
+  /// \brief A property of a single type, such as whether it is an archetype.
   TypeProperty,
 
   /// \brief A disjunction constraint.

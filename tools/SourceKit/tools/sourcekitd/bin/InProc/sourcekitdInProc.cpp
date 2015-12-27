@@ -79,7 +79,7 @@ UIdent sourcekitd::UIdentFromSKDUID(sourcekitd_uid_t uid) {
 }
 
 std::string sourcekitd::getRuntimeLibPath() {
-  // FIXME: Move to a llvm API. Note that libclang does the same thing.
+  // FIXME: Move to an LLVM API. Note that libclang does the same thing.
 #ifdef LLVM_ON_WIN32
 #error Not implemented
 #else
