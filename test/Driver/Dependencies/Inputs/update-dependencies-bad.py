@@ -1,7 +1,20 @@
 #!/usr/bin/env python
-
+# update-dependencies-bad.py - Fails on bad.swift -*- python -*-
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See http://swift.org/LICENSE.txt for license information
+# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
+# ----------------------------------------------------------------------------
+#
 # Fails if the input file is named "bad.swift"; otherwise dispatches to
 # update-dependencies.py.
+#
+# ----------------------------------------------------------------------------
 
 from __future__ import print_function
 
