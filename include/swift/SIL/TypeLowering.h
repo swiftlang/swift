@@ -14,16 +14,10 @@
 #define SIL_TypeLowering_h
 
 #include "swift/AST/ArchetypeBuilder.h"
-#include "swift/AST/CaptureInfo.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SIL/SILDeclRef.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/Allocator.h"
 
 namespace clang {
   class Type;
