@@ -16,7 +16,6 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerIntPair.h"
-#include <vector>
 
 namespace llvm {
 class raw_ostream;
