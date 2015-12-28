@@ -17,16 +17,9 @@
 #ifndef SWIFT_PATTERN_H
 #define SWIFT_PATTERN_H
 
-#include "swift/Basic/SourceLoc.h"
-#include "swift/Basic/type_traits.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/Expr.h"
-#include "swift/Basic/LLVM.h"
-#include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
-#include "swift/AST/TypeLoc.h"
-#include "swift/Basic/OptionSet.h"
 
 namespace swift {
   class ASTContext;
