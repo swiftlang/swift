@@ -22,10 +22,7 @@
 #define SWIFT_BASIC_ENCODEDSEQUENCE_H
 
 #include <climits>
-#include "swift/Basic/LLVM.h"
 #include "swift/Basic/PrefixMap.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/Support/Host.h"
 
 namespace swift {
 
