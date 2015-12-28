@@ -13,12 +13,7 @@
 #ifndef SWIFT_SILOPTIMIZER_ANALYSIS_IVANALYSIS_H
 #define SWIFT_SILOPTIMIZER_ANALYSIS_IVANALYSIS_H
 
-#include "swift/SILOptimizer/Analysis/Analysis.h"
-#include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Utils/SCCVisitor.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 
 namespace swift {
