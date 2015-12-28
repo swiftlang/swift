@@ -13,7 +13,6 @@
 #ifndef SWIFT_PARSE_CODE_COMPLETION_CALLBACKS_H
 #define SWIFT_PARSE_CODE_COMPLETION_CALLBACKS_H
 
-#include "swift/AST/ASTContext.h"
 #include "swift/Parse/Parser.h"
 
 namespace swift {
