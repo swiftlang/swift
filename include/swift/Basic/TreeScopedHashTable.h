@@ -17,9 +17,7 @@
 #define SWIFT_BASIC_TREESCOPEDHASHTABLE_H
 
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/Support/Allocator.h"
 #include "swift/Basic/Malloc.h"
-#include <utility>
 
 namespace swift {
 
