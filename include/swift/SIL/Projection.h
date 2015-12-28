@@ -19,15 +19,8 @@
 #ifndef SWIFT_SIL_PROJECTION_H
 #define SWIFT_SIL_PROJECTION_H
 
-#include "swift/Basic/NullablePtr.h"
-#include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILInstruction.h"
-#include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/Optional.h"
-#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SetVector.h"
-#include "llvm/Support/Allocator.h"
-#include <type_traits>
 
 namespace swift {
 
