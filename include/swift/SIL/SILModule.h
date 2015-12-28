@@ -18,28 +18,14 @@
 #define SWIFT_SIL_SILMODULE_H
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Builtins.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SILOptions.h"
-#include "swift/Basic/LangOptions.h"
-#include "swift/Basic/Range.h"
 #include "swift/SIL/SILCoverageMap.h"
-#include "swift/SIL/SILDeclRef.h"
-#include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/Notifications.h"
-#include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/TypeLowering.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/Optional.h"
-#include "llvm/ADT/PointerIntPair.h"
-#include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/ilist.h"
-#include "llvm/Support/Allocator.h"
-#include "llvm/Support/raw_ostream.h"
-#include <functional>
 
 namespace swift {
   class AnyFunctionType;
