@@ -13,13 +13,10 @@
 #ifndef SWIFT_SILOPTIMIZER_ANALYSIS_SIDEEFFECTANALYSIS_H_
 #define SWIFT_SILOPTIMIZER_ANALYSIS_SIDEEFFECTANALYSIS_H_
 
-#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/Analysis/BottomUpIPAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
 
