@@ -38,8 +38,6 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/raw_ostream.h"
-#include <algorithm>
-#include <iterator>
 #include "swift/Basic/type_traits.h"
 
 namespace swift {
