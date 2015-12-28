@@ -15,7 +15,6 @@
 
 #include "swift/LLVMPasses/PassesFwd.h"
 #include "llvm/Analysis/AliasAnalysis.h"
-#include "llvm/Pass.h"
 
 namespace swift {
 
