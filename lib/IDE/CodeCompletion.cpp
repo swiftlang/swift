@@ -1584,7 +1584,7 @@ public:
   void addImportModuleNames() {
     // FIXME: Add user-defined swift modules
     SmallVector<clang::Module*, 20> Modules;
-    Ctx.getVisibleTopLevelClangeModules(Modules);
+    Ctx.getVisibleTopLevelClangModules(Modules);
     std::sort(Modules.begin(), Modules.end(),
               [](clang::Module* LHS , clang::Module* RHS) {
                 return LHS->getTopLevelModuleName().compare_lower(
@@ -3265,10 +3265,10 @@ public:
     }
   }
 
-  static void collectArgumentExpection(unsigned Position, bool HasName,
-                                       ArrayRef<Type> Types, SourceLoc Loc,
-                                       std::vector<Type> &ExpectedTypes,
-                                       std::vector<StringRef> &ExpectedNames) {
+  static void collectArgumentExpectation(unsigned Position, bool HasName,
+                                         ArrayRef<Type> Types, SourceLoc Loc,
+                                         std::vector<Type> &ExpectedTypes,
+                                         std::vector<StringRef> &ExpectedNames) {
     SmallPtrSet<TypeBase *, 4> seenTypes;
     SmallPtrSet<const char *, 4> seenNames;
 
@@ -3298,8 +3298,8 @@ public:
                                       ArrayRef<Type> Types, SourceLoc Loc) {
     std::vector<Type> ExpectedTypes;
     std::vector<StringRef> ExpectedNames;
-    collectArgumentExpection(Position, HasName, Types, Loc, ExpectedTypes,
-                             ExpectedNames);
+    collectArgumentExpectation(Position, HasName, Types, Loc, ExpectedTypes,
+                               ExpectedNames);
     addArgNameCompletionResults(ExpectedNames);
     if (!ExpectedTypes.empty()) {
       setExpectedTypes(ExpectedTypes);
@@ -3376,16 +3376,16 @@ public:
   }
 
   static bool
-  collectArgumentExpectatation(DeclContext &DC, CallExpr *CallE, Expr *CCExpr,
-                               std::vector<Type> &ExpectedTypes,
-                               std::vector<StringRef> &ExpectedNames) {
+  collectArgumentExpectation(DeclContext &DC, CallExpr *CallE, Expr *CCExpr,
+                             std::vector<Type> &ExpectedTypes,
+                             std::vector<StringRef> &ExpectedNames) {
     SmallVector<Type, 2> PossibleTypes;
     unsigned Position;
     bool HasName;
     if (collectPossibleArgTypes(DC, CallE, CCExpr, PossibleTypes, Position,
                                 HasName, true)) {
-      collectArgumentExpection(Position, HasName, PossibleTypes,
-                               CCExpr->getStartLoc(), ExpectedTypes, ExpectedNames);
+      collectArgumentExpectation(Position, HasName, PossibleTypes,
+                                 CCExpr->getStartLoc(), ExpectedTypes, ExpectedNames);
       return !ExpectedTypes.empty() || !ExpectedNames.empty();
     }
     return false;
@@ -4209,7 +4209,7 @@ public:
       case ExprKind::Call: {
         std::vector<Type> PotentialTypes;
         std::vector<StringRef> ExpectedNames;
-        CompletionLookup::collectArgumentExpectatation(
+        CompletionLookup::collectArgumentExpectation(
             *DC, cast<CallExpr>(Parent), ParsedExpr, PotentialTypes,
             ExpectedNames);
         for (Type Ty : PotentialTypes)

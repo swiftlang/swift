@@ -543,7 +543,7 @@ bb0(%0 : $Bool, %1 : $Bool):
 
 
 
-sil [transparent] @convertFromBultinIntegerLiteral : $@convention(thin) (Builtin.Int2048, @thin Int64.Type) -> Int64 {
+sil [transparent] @convertFromBuiltinIntegerLiteral : $@convention(thin) (Builtin.Int2048, @thin Int64.Type) -> Int64 {
 bb0(%0 : $Builtin.Int2048, %1 : $@thin Int64.Type):
   %3 = builtin "s_to_s_checked_trunc_Int2048_Int64"(%0 : $Builtin.Int2048) : $(Builtin.Int64, Builtin.Int1)
   %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
@@ -555,7 +555,7 @@ sil @test_with_dead_argument : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   %1 = alloc_box $Int64
-  %2 = function_ref @convertFromBultinIntegerLiteral : $@convention(thin) (Builtin.Int2048, @thin Int64.Type) -> Int64
+  %2 = function_ref @convertFromBuiltinIntegerLiteral : $@convention(thin) (Builtin.Int2048, @thin Int64.Type) -> Int64
   %3 = metatype $@thin Int64.Type
   %4 = integer_literal $Builtin.Int2048, 1
   %5 = apply %2(%4, %3) : $@convention(thin) (Builtin.Int2048, @thin Int64.Type) -> Int64

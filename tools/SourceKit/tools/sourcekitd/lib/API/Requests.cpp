@@ -1125,8 +1125,8 @@ static void reportCursorInfo(StringRef Filename,
     }
     if (Info.IsSystem)
       Elem.setBool(KeyIsSystem, true);
-    if (!Info.TypeInteface.empty())
-      Elem.set(KeyTypeInterface, Info.TypeInteface);
+    if (!Info.TypeInterface.empty())
+      Elem.set(KeyTypeInterface, Info.TypeInterface);
 
     return Rec(RespBuilder.createResponse());
   });

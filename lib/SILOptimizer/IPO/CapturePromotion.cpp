@@ -951,8 +951,8 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
 }
 
 static void
-constructMapFromPartialApplyToPromoteableIndices(SILFunction *F,
-                                                 PartialApplyIndicesMap &Map) {
+constructMapFromPartialApplyToPromotableIndices(SILFunction *F,
+                                                PartialApplyIndicesMap &Map) {
   ReachabilityInfo RS(F);
 
   // This is a map from each partial apply to a single index which is a
@@ -980,7 +980,7 @@ processFunction(SILFunction *F, SmallVectorImpl<SILFunction*> &Worklist) {
   // This is a map from each partial apply to a set of indices of promotable
   // box variables.
   PartialApplyIndicesMap IndicesMap;
-  constructMapFromPartialApplyToPromoteableIndices(F, IndicesMap);
+  constructMapFromPartialApplyToPromotableIndices(F, IndicesMap);
 
   // Do the actual promotions; all promotions on a single partial_apply are
   // handled together.

@@ -124,7 +124,7 @@ static bool isIdentifiableObject(SILValue V) {
 
 /// Return true if V1 and V2 are distinct objects that can be uniquely
 /// identified at compile time.
-static bool areDistinctIdentifyableObjects(SILValue V1, SILValue V2) {
+static bool areDistinctIdentifiableObjects(SILValue V1, SILValue V2) {
   // Do both values refer to the same global variable?
   if (auto *GA1 = dyn_cast<GlobalAddrInst>(V1)) {
     if (auto *GA2 = dyn_cast<GlobalAddrInst>(V2)) {
@@ -178,7 +178,7 @@ static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
 
   // If O1 and O2 do not equal and they are both values that can be statically
   // and uniquely identified, they cannot alias.
-  if (areDistinctIdentifyableObjects(O1, O2)) {
+  if (areDistinctIdentifiableObjects(O1, O2)) {
     DEBUG(llvm::dbgs() << "            Found two unequal identified "
           "objects.\n");
     return true;

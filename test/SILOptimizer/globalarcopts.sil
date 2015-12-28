@@ -510,10 +510,10 @@ bb0(%0 : $Cls):
   return %r : $()
 }
 
-// CHECK-LABEL: sil @dont_remove_as_arg0_may_be_incdirectly_released_by_callee
+// CHECK-LABEL: sil @dont_remove_as_arg0_may_be_indirectly_released_by_callee
 // CHECK: strong_retain
 // CHECK: strong_release
-sil @dont_remove_as_arg0_may_be_incdirectly_released_by_callee : $@convention(thin) (Cls, Cls) -> () {
+sil @dont_remove_as_arg0_may_be_indirectly_released_by_callee : $@convention(thin) (Cls, Cls) -> () {
 bb0(%0 : $Cls, %1 : $Cls):
   %2 = function_ref @release_arg1 : $@convention(thin) (Cls, Cls) -> ()
   retain_value %0 : $Cls

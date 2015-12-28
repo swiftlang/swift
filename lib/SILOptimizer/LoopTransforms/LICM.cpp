@@ -309,8 +309,8 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT,
   return Changed;
 }
 
-static bool sinkFixLiftime(SILLoop *Loop, DominanceInfo *DomTree,
-                           SILLoopInfo *LI) {
+static bool sinkFixLifetime(SILLoop *Loop, DominanceInfo *DomTree,
+                            SILLoopInfo *LI) {
   DEBUG(llvm::errs() << " Sink fix_lifetime attempt\n");
   auto Preheader = Loop->getLoopPreheader();
   if (!Preheader)
@@ -520,7 +520,7 @@ void LoopTreeOptimization::optimizeLoop(SILLoop *CurrentLoop,
   Changed |= sinkCondFail(CurrentLoop);
   Changed |= hoistInstructions(CurrentLoop, DomTree, SafeReads,
                                RunsOnHighLevelSil);
-  Changed |= sinkFixLiftime(CurrentLoop, DomTree, LoopInfo);
+  Changed |= sinkFixLifetime(CurrentLoop, DomTree, LoopInfo);
 }
 
 namespace {

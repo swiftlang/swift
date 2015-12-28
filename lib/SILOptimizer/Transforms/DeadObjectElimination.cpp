@@ -227,7 +227,7 @@ static bool canZapInstruction(SILInstruction *Inst) {
 /// Analyze the use graph of AllocRef for any uses that would prevent us from
 /// zapping it completely.
 static bool
-hasUnremoveableUsers(SILInstruction *AllocRef, UserList &Users) {
+hasUnremovableUsers(SILInstruction *AllocRef, UserList &Users) {
   SmallVector<SILInstruction *, 16> Worklist;
   Worklist.push_back(AllocRef);
 
@@ -740,7 +740,7 @@ bool DeadObjectElimination::processAllocRef(AllocRefInst *ARI) {
   // Our destructor has no side effects, so if we can prove that no loads
   // escape, then we can completely remove the use graph of this alloc_ref.
   UserList UsersToRemove;
-  if (hasUnremoveableUsers(ARI, UsersToRemove)) {
+  if (hasUnremovableUsers(ARI, UsersToRemove)) {
     DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
     return false;
   }
@@ -760,7 +760,7 @@ bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
     return false;
 
   UserList UsersToRemove;
-  if (hasUnremoveableUsers(ASI, UsersToRemove)) {
+  if (hasUnremovableUsers(ASI, UsersToRemove)) {
     DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
     return false;
   }

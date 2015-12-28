@@ -238,14 +238,14 @@ class ElementClass : BaseClass {
   }
 }
 
-class ViolateInoutSafeySwitchToObjcBuffer {
+class ViolateInoutSafetySwitchToObjcBuffer {
   final var anArray: [ElementClass] = []
 
   let nsArray = NSArray(
     objects: ElementClass("a"), ElementClass("b"), ElementClass("c"))
 
   @inline(never)
-  func accessArrayViaInoutVolation() {
+  func accessArrayViaInoutViolation() {
     anArray = _convertNSArrayToArray(nsArray)
   }
 
@@ -259,7 +259,7 @@ class ViolateInoutSafeySwitchToObjcBuffer {
         i, wasNativeTypeChecked: isNativeTypeChecked)
       _ = A._getElement(
         i, wasNativeTypeChecked: isNativeTypeChecked, matchingSubscriptCheck: t)
-      accessArrayViaInoutVolation()
+      accessArrayViaInoutViolation()
     }
   }
 
@@ -277,16 +277,16 @@ ArraySemanticOptzns.test("inout_rule_violated_isNativeBuffer")
   .crashOutputMatches(_isDebugAssertConfiguration() ?
     "fatal error: inout rules were violated: the array was overwritten" : "")
   .code {
-  let v = ViolateInoutSafeySwitchToObjcBuffer()
+  let v = ViolateInoutSafetySwitchToObjcBuffer()
   expectCrashLater()
   v.inoutViolation()
 }
 
-class ViolateInoutSafeyNeedElementTypeCheck {
+class ViolateInoutSafetyNeedElementTypeCheck {
   final var anArray : [ElementClass] = []
 
   @inline(never)
-  func accessArrayViaInoutVolation() {
+  func accessArrayViaInoutViolation() {
     // Overwrite the array with one that needs an element type check.
     let ba: [BaseClass] = [ BaseClass(), BaseClass() ]
     anArray = ba as! [ElementClass]
@@ -302,7 +302,7 @@ class ViolateInoutSafeyNeedElementTypeCheck {
         i, wasNativeTypeChecked: isNativeTypeChecked)
       _ = A._getElement(
         i, wasNativeTypeChecked: isNativeTypeChecked, matchingSubscriptCheck: t)
-      accessArrayViaInoutVolation()
+      accessArrayViaInoutViolation()
     }
   }
 
@@ -320,7 +320,7 @@ ArraySemanticOptzns.test("inout_rule_violated_needsElementTypeCheck")
   .crashOutputMatches(_isDebugAssertConfiguration() ?
     "fatal error: inout rules were violated: the array was overwritten" : "")
   .code {
-  let v = ViolateInoutSafeyNeedElementTypeCheck()
+  let v = ViolateInoutSafetyNeedElementTypeCheck()
   expectCrashLater()
   v.inoutViolation()
 }

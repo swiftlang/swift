@@ -26,9 +26,8 @@ class Container<T> {
 func useContainer() -> () {
   var a : Container<not a type [skip this greater: >] >, b : Int // expected-error{{expected '>' to complete generic argument list}} expected-note{{to match this opening '<'}}
   b = 5 // no-warning
-  a.exists() // expected-warnin
+  a.exists()
 }
-
 
 @xyz class BadAttributes { // expected-error{{unknown attribute 'xyz'}}
   func exists() -> Bool { return true }

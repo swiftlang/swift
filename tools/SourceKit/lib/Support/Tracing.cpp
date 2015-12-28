@@ -57,9 +57,9 @@ void trace::disable() {
 }
 
 // Trace start of perform sema call, returns OpId
-uint64_t trace::startOpertation(trace::OperationKind OpKind,
-                                const trace::SwiftInvocation &Inv,
-                                const trace::StringPairs &OpArgs) {
+uint64_t trace::startOperation(trace::OperationKind OpKind,
+                               const trace::SwiftInvocation &Inv,
+                               const trace::StringPairs &OpArgs) {
   auto OpId = ++operation_id;
   if (trace::enabled()) {
     auto Node = consumers.load(std::memory_order_acquire);
