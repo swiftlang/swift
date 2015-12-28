@@ -66,7 +66,7 @@ class GraphemeClusterBreakPropertyTable(UnicodeProperty):
         # values to symbolic values.
         self.symbolic_values = \
             [ None ] * (max(self.numeric_value_table.values()) + 1)
-        for k,v in self.numeric_value_table.iteritems():
+        for k,v in self.numeric_value_table.items():
             self.symbolic_values[v] = k
 
         # Load the data file.
