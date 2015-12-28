@@ -5,7 +5,10 @@
 from __future__ import print_function
 
 import re
-from cStringIO import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from io import StringIO
 import tokenize
 import textwrap
 from bisect import bisect
