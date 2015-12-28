@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This filed defines a 'defer' macro for performing a cleanup on any exit out
+// This file defines a 'defer' macro for performing a cleanup on any exit out
 // of a scope.
 //
 //===----------------------------------------------------------------------===//

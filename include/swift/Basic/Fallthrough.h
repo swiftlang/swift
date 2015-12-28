@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This filed defines a SWIFT_FALLTHROUGH macro to annotate intentional
+// This file defines a SWIFT_FALLTHROUGH macro to annotate intentional
 // fallthrough between switch cases. For compilers that support the
 // "clang::fallthrough" attribute, it expands to an empty statement with the
 // attribute applied; otherwise, it expands to just an empty statement.

@@ -562,7 +562,7 @@ namespace {
 static bool isReadNoneFunction(const Expr *e) {
   // If this is a curried call to an integer literal conversion operations, then
   // we can "safely" assume it is readnone (btw, yes this is totally gross).
-  // This is better to be attribute driven, ala rdar://15587352.
+  // This is better to be attribute driven, a la rdar://15587352.
   if (auto *dre = dyn_cast<DeclRefExpr>(e)) {
     DeclName name = dre->getDecl()->getFullName();
     return (name.getArgumentNames().size() == 1 &&
