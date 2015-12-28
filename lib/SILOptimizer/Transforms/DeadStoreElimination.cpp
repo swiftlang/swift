@@ -434,6 +434,9 @@ public:
 } // end anonymous namespace
 
 void BlockState::initReturnBlock(DSEContext &Ctx) {
+  if (DisableLocalDSE)
+    return;
+
   auto *EA = Ctx.getEA();
   auto *Fn = Ctx.getFn();
   std::vector<LSLocation> &LocationVault = Ctx.getLocationVault();
