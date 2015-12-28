@@ -12,7 +12,6 @@
 #ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_TRANSFORMS_H
 #define SWIFT_SILOPTIMIZER_PASSMANAGER_TRANSFORMS_H
 
-#include "swift/SIL/Notifications.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 
 
