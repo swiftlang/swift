@@ -4217,7 +4217,7 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
     
     // It is very common for a contextual type to disagree with the argument
     // list built into the closure expr.  This can be because the closure expr
-    // had an explicitly specified pattern, ala:
+    // had an explicitly specified pattern, a la:
     //    { a,b in ... }
     // or could be because the closure has an implicitly generated one:
     //    { $0 + $1 }

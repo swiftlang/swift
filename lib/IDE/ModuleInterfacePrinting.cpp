@@ -472,7 +472,7 @@ void swift::ide::printSwiftSourceInterface(SourceFile &File,
                                            ASTPrinter &Printer,
                                            const PrintOptions &Options) {
 
-  // We print all comments before the fist line of Swift code.
+  // We print all comments before the first line of Swift code.
   printUntilFirstDeclStarts(File, Printer);
   File.print(Printer, Options);
 }
