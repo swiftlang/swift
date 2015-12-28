@@ -201,10 +201,10 @@ class CodeBlock final : public MarkupASTNode {
   StringRef LiteralContent;
   StringRef Language;
 
-  CodeBlock(StringRef LiteralContent, StringRef Langauge)
+  CodeBlock(StringRef LiteralContent, StringRef Language)
       : MarkupASTNode(ASTNodeKind::CodeBlock),
         LiteralContent(LiteralContent),
-        Language(Langauge) {}
+        Language(Language) {}
 
 public:
   static CodeBlock *create(MarkupContext &MC, StringRef LiteralContent,

@@ -419,7 +419,7 @@ static TypeBase* getTypeAtIndex(TypeBase* containerType, size_t index) {
 /// against a non-existential parameter at the same position of the first decl.
 /// This is used to disambiguate function overloads that would otherwise be
 /// identical after opening their parameter types.
-static bool hasEmptyExistenialParameterMismatch(ValueDecl *decl1,
+static bool hasEmptyExistentialParameterMismatch(ValueDecl *decl1,
                                                 ValueDecl *decl2) {
   
   auto func1 = dyn_cast<FuncDecl>(decl1);
@@ -922,11 +922,11 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
     // wise comparison between an empty existential collection and a non-
     // existential type.
     if (!(foundRefinement1 && foundRefinement2)) {
-      if (hasEmptyExistenialParameterMismatch(decl1, decl2)) {
+      if (hasEmptyExistentialParameterMismatch(decl1, decl2)) {
         foundRefinement1 = true;
       }
       
-      if (hasEmptyExistenialParameterMismatch(decl2, decl1)) {
+      if (hasEmptyExistentialParameterMismatch(decl2, decl1)) {
         foundRefinement2 = true;
       }
     }

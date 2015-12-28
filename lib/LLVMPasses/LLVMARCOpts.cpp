@@ -553,8 +553,8 @@ static DtorKind analyzeDestructor(Value *P) {
 
   // FIXME: Would like to abstract the dtor slot (#0) out from this to somewhere
   // unified.
-  enum { DTorSlotOfHeapMeatadata = 0 };
-  Function *DtorFn =dyn_cast<Function>(CS->getOperand(DTorSlotOfHeapMeatadata));
+  enum { DTorSlotOfHeapMetadata = 0 };
+  Function *DtorFn =dyn_cast<Function>(CS->getOperand(DTorSlotOfHeapMetadata));
   if (DtorFn == 0 || DtorFn->mayBeOverridden() || DtorFn->hasExternalLinkage())
     return DtorKind::Unknown;
 

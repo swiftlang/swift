@@ -2268,7 +2268,7 @@ sil [noinline] @takeBB : $@convention(thin) (@owned BB) -> @owned BB
 // CHECK: return
 sil @try_apply_with_convert_function_returning_casted_unlabeled_tuple: $@convention(thin) () -> (Int32, Int32) {
 bb0:
-  %3 = function_ref @returnLabledTuple : $@convention(thin) () -> (first: Int32, second: Int32)
+  %3 = function_ref @returnLabeledTuple : $@convention(thin) () -> (first: Int32, second: Int32)
   %6 = convert_function %3 : $@convention(thin) () -> (first: Int32, second: Int32) to $@convention(thin) () -> ((Int32, Int32), @error ErrorType)
   try_apply %6() : $@convention(thin) () -> ((Int32, Int32), @error ErrorType), normal bb1, error bb2
  
@@ -2307,7 +2307,7 @@ bb2(%10 : $ErrorType):
   unreachable
 }
 
-sil [noinline] @returnLabledTuple: $@convention(thin) () -> (first: Int32, second: Int32)
+sil [noinline] @returnLabeledTuple: $@convention(thin) () -> (first: Int32, second: Int32)
 sil [noinline] @returnUnlabeledTuple : $@convention(thin) () -> (Int32, Int32)
 
 public class AAA {

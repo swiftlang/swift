@@ -411,8 +411,8 @@ func f0(x: Int, y: Int, z: Int) {}
 /// ```
 /// thisIsASwiftCodeExample()
 /// ```
-func codeListingWithDefaultLangauge() {}
-// CHECK: DocCommentAsXML=[<Function file="{{.*}} line="{{.*}}" column="{{.*}}"><Name>codeListingWithDefaultLangauge()</Name><USR>s:F14swift_ide_test30codeListingWithDefaultLangaugeFT_T_</USR><Declaration>func codeListingWithDefaultLangauge()</Declaration><Abstract><Para>Brief.</Para></Abstract><Discussion><CodeListing language="swift"><zCodeLineNumbered><![CDATA[thisIsASwiftCodeExample()]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>] CommentXMLValid
+func codeListingWithDefaultLanguage() {}
+// CHECK: DocCommentAsXML=[<Function file="{{.*}} line="{{.*}}" column="{{.*}}"><Name>codeListingWithDefaultLanguage()</Name><USR>s:F14swift_ide_test30codeListingWithDefaultLanguageFT_T_</USR><Declaration>func codeListingWithDefaultLanguage()</Declaration><Abstract><Para>Brief.</Para></Abstract><Discussion><CodeListing language="swift"><zCodeLineNumbered><![CDATA[thisIsASwiftCodeExample()]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>] CommentXMLValid
 
 
 /// Brief.

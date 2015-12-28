@@ -266,13 +266,13 @@ public:
     }
 
     static Chunk createWithText(ChunkKind Kind, unsigned NestingLevel,
-                                StringRef Text, bool isAnnoation = false) {
-      return Chunk(Kind, NestingLevel, Text, isAnnoation);
+                                StringRef Text, bool isAnnotation = false) {
+      return Chunk(Kind, NestingLevel, Text, isAnnotation);
     }
 
     static Chunk createSimple(ChunkKind Kind, unsigned NestingLevel,
-                              bool isAnnoation = false) {
-      return Chunk(Kind, NestingLevel, isAnnoation);
+                              bool isAnnotation = false) {
+      return Chunk(Kind, NestingLevel, isAnnotation);
     }
   };
 

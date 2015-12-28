@@ -642,7 +642,7 @@ bool swift::getFinalReleasesForValue(SILValue V, ReleaseTracker &Tracker) {
 //                            Leaking BB Analysis
 //===----------------------------------------------------------------------===//
 
-static bool ignoreableApplyInstInUnreachableBlock(const ApplyInst *AI) {
+static bool ignorableApplyInstInUnreachableBlock(const ApplyInst *AI) {
   const char *fatalName = "_TFs18_fatalErrorMessageFTVs12StaticStringS_S_Su_T_";
   const auto *Fn = AI->getCalleeFunction();
 
@@ -654,7 +654,7 @@ static bool ignoreableApplyInstInUnreachableBlock(const ApplyInst *AI) {
   return true;
 }
 
-static bool ignoreableBuiltinInstInUnreachableBlock(const BuiltinInst *BI) {
+static bool ignorableBuiltinInstInUnreachableBlock(const BuiltinInst *BI) {
   const BuiltinInfo &BInfo = BI->getBuiltinInfo();
   if (BInfo.ID == BuiltinValueKind::CondUnreachable)
     return true;
@@ -691,7 +691,7 @@ bool swift::isARCInertTrapBB(const SILBasicBlock *BB) {
 
     // Check for apply insts that we can ignore.
     if (auto *AI = dyn_cast<ApplyInst>(&*II)) {
-      if (ignoreableApplyInstInUnreachableBlock(AI)) {
+      if (ignorableApplyInstInUnreachableBlock(AI)) {
         ++II;
         continue;
       }
@@ -699,7 +699,7 @@ bool swift::isARCInertTrapBB(const SILBasicBlock *BB) {
 
     // Check for builtins that we can ignore.
     if (auto *BI = dyn_cast<BuiltinInst>(&*II)) {
-      if (ignoreableBuiltinInstInUnreachableBlock(BI)) {
+      if (ignorableBuiltinInstInUnreachableBlock(BI)) {
         ++II;
         continue;
       }

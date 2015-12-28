@@ -42,7 +42,7 @@ var subject_getterSetter: Int {
   }
 }
 
-var subject_global_observingAccesorsVar1: Int = 0 {
+var subject_global_observingAccessorsVar1: Int = 0 {
   @objc 
   willSet { // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
   }
@@ -804,16 +804,16 @@ class infer_instanceVar1 {
     // CHECK-NEXT: @objc set {}
   }
 
-  var observingAccesorsVar1: Int {
-  // CHECK: @objc var observingAccesorsVar1: Int {
+  var observingAccessorsVar1: Int {
+  // CHECK: @objc var observingAccessorsVar1: Int {
     willSet {}
     // CHECK-NEXT: {{^}} final willSet {}
     didSet {}
     // CHECK-NEXT: {{^}} final didSet {}
   }
 
-  @objc var observingAccesorsVar1_: Int {
-  // CHECK: {{^}} @objc var observingAccesorsVar1_: Int {
+  @objc var observingAccessorsVar1_: Int {
+  // CHECK: {{^}} @objc var observingAccessorsVar1_: Int {
     willSet {}
     // CHECK-NEXT: {{^}} final willSet {}
     didSet {}

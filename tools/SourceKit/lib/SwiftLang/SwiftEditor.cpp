@@ -1837,7 +1837,7 @@ class FormatWalker: public ide::SourceEntityWalker {
     SourceLoc &TargetLoc;
     TokenIt TI;
 
-    bool isImmediateAfterSeparator(SourceLoc End, tok Seperator) {
+    bool isImmediateAfterSeparator(SourceLoc End, tok Separator) {
       auto BeforeE = [&]() {
         return TI != Tokens.end() &&
                !SM.isBeforeInBuffer(End, TI->getLoc());
@@ -1845,7 +1845,7 @@ class FormatWalker: public ide::SourceEntityWalker {
       if (!BeforeE())
         return false;
       for (; BeforeE(); TI ++);
-      if (TI == Tokens.end() || TI->getKind() != Seperator)
+      if (TI == Tokens.end() || TI->getKind() != Separator)
         return false;
       auto SeparatorLoc = TI->getLoc();
       TI ++;

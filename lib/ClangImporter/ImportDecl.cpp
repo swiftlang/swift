@@ -121,9 +121,9 @@ static Pattern *createTypedNamedPattern(VarDecl *decl) {
 }
 
 template <size_t A, size_t B>
-static bool verifyNameMapping(MappedTypeNameKind NameMappping,
+static bool verifyNameMapping(MappedTypeNameKind NameMapping,
                               const char (&left)[A], const char (&right)[B]) {
-  return NameMappping == MappedTypeNameKind::DoNothing ||
+  return NameMapping == MappedTypeNameKind::DoNothing ||
          strcmp(left, right) != 0;
 }
 

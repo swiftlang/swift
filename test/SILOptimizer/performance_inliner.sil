@@ -819,15 +819,15 @@ sil public_external @public_external_function_test : $@convention(thin) () -> ()
 // CHECK-LABEL: @caller_of_noinline
 sil @caller_of_noinline : $@convention(thin) () -> () {
 bb0:
-  // CHECK: function_ref @noinlin_callee
+  // CHECK: function_ref @noinline_callee
   // CHECK: apply
-  %0 = function_ref @noinlin_callee : $@convention(thin) () -> Int
+  %0 = function_ref @noinline_callee : $@convention(thin) () -> Int
   %1 = apply %0() : $@convention(thin) () -> Int
   %2 = tuple ()
   return %2 : $()
 }
-// CHECK-LABEL: [noinline] @noinlin_callee
-sil [noinline] @noinlin_callee : $@convention(thin) () -> Int {
+// CHECK-LABEL: [noinline] @noinline_callee
+sil [noinline] @noinline_callee : $@convention(thin) () -> Int {
 bb0:
   %0 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
   %1 = metatype $@thin Int.Type

@@ -258,7 +258,7 @@ struct CursorInfo {
   StringRef USR;
   StringRef TypeName;
   StringRef DocComment;
-  StringRef TypeInteface;
+  StringRef TypeInterface;
   /// Annotated XML pretty printed declaration.
   StringRef AnnotatedDeclaration;
   /// Non-empty if the symbol was imported from a clang module.

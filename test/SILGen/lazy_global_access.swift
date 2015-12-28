@@ -17,7 +17,7 @@ struct Fooo {
 // MAIN:   function_ref @_TFV18lazy_global_access4Foooau10staticPropSi : $@convention(thin) () -> Builtin.RawPointer
 // LIBRARY: sil hidden @_TF18lazy_global_access8usePropsFT_TSiSi_ : $@convention(thin) () -> (Int, Int) {
 // LIBRARY:   function_ref @_TF18lazy_global_accessau10globalPropSi : $@convention(thin) () -> Builtin.RawPointer
-// LIRBARY:   function_ref @_TFV18lazy_global_access4Foooau10staticPropSi : $@convention(thin) () -> Builtin.RawPointer
+// LIBRARY:   function_ref @_TFV18lazy_global_access4Foooau10staticPropSi : $@convention(thin) () -> Builtin.RawPointer
 func useProps() -> (Int, Int) {
   return (globalProp, Fooo.staticProp)
 }

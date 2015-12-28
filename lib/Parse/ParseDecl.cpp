@@ -2292,9 +2292,9 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
     auto BufferId = SourceMgr.getCodeCompletionBufferID();
     auto IdEndOffset = SourceMgr.getLocOffsetInBuffer(ImportPath.back().second,
       BufferId) + ImportPath.back().first.str().size();
-    auto CCTokenOffeset =  SourceMgr.getLocOffsetInBuffer(SourceMgr.
+    auto CCTokenOffset = SourceMgr.getLocOffsetInBuffer(SourceMgr.
       getCodeCompletionLoc(), BufferId);
-    if (IdEndOffset == CCTokenOffeset) {
+    if (IdEndOffset == CCTokenOffset) {
       consumeToken();
     }
   }

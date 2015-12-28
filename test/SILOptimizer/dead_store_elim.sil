@@ -1170,11 +1170,11 @@ bb0(%0 : $*S5):
 
 /// Make sure we do not coalesce the 2 live stores to the 2 fields in S6.
 ///
-/// CHECK-LABEL : DiscontiguosPartialDeadStoreInSimpleStruct
+/// CHECK-LABEL : DiscontiguousPartialDeadStoreInSimpleStruct
 /// CHECK: store
 /// CHECK: store
 /// CHECK: store
-sil hidden @DiscontiguosPartialDeadStoreInSimpleStruct : $@convention(thin) (@inout S6) -> () {
+sil hidden @DiscontiguousPartialDeadStoreInSimpleStruct : $@convention(thin) (@inout S6) -> () {
 bb0(%0 : $*S6):
   %1 = function_ref @S6_init : $@convention(thin) (@thin S6.Type) -> S6 // user: %3
   %2 = metatype $@thin S6.Type                    // user: %3
@@ -1191,11 +1191,11 @@ bb0(%0 : $*S6):
 /// Make sure we do not generate too many stores from a large store that
 /// is partially dead.
 ///
-/// CHECK-LABEL : DiscontiguosPartialDeadStoreInSimpleLargeStruct
+/// CHECK-LABEL : DiscontiguousPartialDeadStoreInSimpleLargeStruct
 /// CHECK: store
 /// CHECK-NOT: store
 /// CHECK: store
-sil hidden @DiscontiguosPartialDeadStoreInSimpleLargeStruct : $@convention(thin) (@inout S7) -> () {
+sil hidden @DiscontiguousPartialDeadStoreInSimpleLargeStruct : $@convention(thin) (@inout S7) -> () {
 bb0(%0 : $*S7):
   %1 = function_ref @S7_init : $@convention(thin) (@thin S7.Type) -> S7 // user: %3
   %2 = metatype $@thin S7.Type                    // user: %3
