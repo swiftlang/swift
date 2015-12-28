@@ -23,8 +23,6 @@
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/PlatformKind.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "clang/Basic/VersionTuple.h"
 
