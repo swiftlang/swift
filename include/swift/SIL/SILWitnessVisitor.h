@@ -20,12 +20,7 @@
 #define SWIFT_SIL_SILWITNESSVISITOR_H
 
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/Decl.h"
-#include "swift/AST/Types.h"
 #include "swift/SIL/TypeLowering.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
 
