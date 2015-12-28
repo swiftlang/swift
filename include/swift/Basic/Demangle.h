@@ -14,9 +14,7 @@
 #define SWIFT_BASIC_DEMANGLE_H
 
 #include <memory>
-#include <string>
 #include <vector>
-#include <cassert>
 #include <cstdint>
 #include "llvm/ADT/StringRef.h"
 #include "swift/Basic/Malloc.h"
