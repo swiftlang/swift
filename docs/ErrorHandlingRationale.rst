@@ -741,8 +741,8 @@ This approach is therefore relatively even-handed about the error
 vs. the non-error path, although it requires some care in order to
 minimize code-size penalties for parallel error paths.
 
-``setjmp`` / ``longmp``
-~~~~~~~~~~~~~~~~~~~~~~~
+``setjmp`` / ``longjmp``
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Another strategy to is to dynamically maintain a thread-local stack of
 interesting frames.  A function with an interesting frame must save

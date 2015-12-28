@@ -132,7 +132,7 @@ Array
 The following semantic tags describe Array operations. The operations
 are first described in terms of the Array "state". Relations between the
 operations are formally defined below. 'Array' refers to the standard library
-Array<T>, ContigousArray<T>, and ArraySlice<T> data-structures.
+Array<T>, ContiguousArray<T>, and ArraySlice<T> data-structures.
 
 We consider the array state to consist of a set of disjoint elements
 and a storage descriptor that encapsulates nonelement data such as the
@@ -262,7 +262,7 @@ check_subscript  guards          get_element, get_element_address
 make_mutable     interferes-with props.isCocoa/needsElementTypeCheck
 get_elt_addr     interferes-with get_element, get_element_address,
                                  props.isCocoa/needsElementTypeCheck
-mutate_unknown   itereferes-with get_element, check_subscript, get_count,
+mutate_unknown   interferes-with get_element, check_subscript, get_count,
                                  get_capacity, get_element_address,
                                  props.isCocoa/needsElementTypeCheck
 ================ =============== ==========================================

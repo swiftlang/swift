@@ -68,7 +68,7 @@ There are a few aspects of the language that make it challenging to implement th
   extension C { }
   extension B { struct Inner { } }
 
-Here, the name lookup used for the first extension needs to resolve the typealias, which depends on the second extension having already been bound. There is a similar dependency on resolving superclasses beforing binding extensions::
+Here, the name lookup used for the first extension needs to resolve the typealias, which depends on the second extension having already been bound. There is a similar dependency on resolving superclasses before binding extensions::
 
   class X { struct Inner { } }
   class Y : X { }

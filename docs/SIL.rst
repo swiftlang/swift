@@ -4049,7 +4049,7 @@ select_value
   sil-instruction ::= 'select_value' sil-operand sil-select-value-case*
                       (',' 'default' sil-value)?
                       ':' sil-type
-  sil-selct-value-case ::= 'case' sil-value ':' sil-value
+  sil-select-value-case ::= 'case' sil-value ':' sil-value
 
 
   %n = select_value %0 : $U, \
