@@ -5,7 +5,7 @@
 // This is safe, because once assigned, these variables cannot change their value.
 
 // Helper function, which models an external functions with unknown side-effects.
-// It is calle just to trigger flushing of all known stored in LoadStore optimizations.
+// It is called just to trigger flushing of all known stored in LoadStore optimizations.
 @inline(never)
 func action() {
     print("")

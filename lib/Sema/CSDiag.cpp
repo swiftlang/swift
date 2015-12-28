@@ -4395,7 +4395,7 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
       diagnose(E->getStartLoc(), diag::type_is_not_array, contextualType)
         .highlight(E->getSourceRange());
 
-      // If the contextual type conforms to DicitonaryLiteralConvertible, then
+      // If the contextual type conforms to DictionaryLiteralConvertible, then
       // they wrote "x = [1,2]" but probably meant "x = [1:2]".
       if ((E->getElements().size() & 1) == 0 && !E->getElements().empty() &&
           isDictionaryLiteralCompatible(contextualType, CS, E->getLoc())) {

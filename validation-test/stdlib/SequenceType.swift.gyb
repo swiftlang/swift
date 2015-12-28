@@ -12,7 +12,7 @@ import SwiftPrivate
 
 // Extend LoggingSequence to shadow the new operation.  When
 // requirements are added to a protocol 'P', there should be an
-// implementation in 'InstrumentedP' that does some bookeeping for
+// implementation in 'InstrumentedP' that does some bookkeeping for
 // testing (like counting calls to the operation) and then dispatches
 // to the same operation on its 'base' member.  InstrumentedSequence
 // already contains implementations of all the SequenceType

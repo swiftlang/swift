@@ -270,7 +270,7 @@ bool swift::computeMayBindDynamicSelf(SILFunction *F) {
 }
 
 /// Find a new position for an ApplyInst's FuncRef so that it dominates its
-/// use. Not that FuncionRefInsts may be shared by multiple ApplyInsts.
+/// use. Not that FunctionRefInsts may be shared by multiple ApplyInsts.
 void swift::placeFuncRef(ApplyInst *AI, DominanceInfo *DT) {
   FunctionRefInst *FuncRef = cast<FunctionRefInst>(AI->getCallee());
   SILBasicBlock *DomBB =
