@@ -14,7 +14,6 @@
 #define SWIFT_AST_COMMENT_H
 
 #include "swift/Markup/Markup.h"
-#include "llvm/ADT/Optional.h"
 
 namespace swift {
 class Decl;
