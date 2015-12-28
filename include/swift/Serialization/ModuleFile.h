@@ -13,22 +13,11 @@
 #ifndef SWIFT_SERIALIZATION_MODULEFILE_H
 #define SWIFT_SERIALIZATION_MODULEFILE_H
 
-#include "swift/AST/Decl.h"
-#include "swift/AST/Identifier.h"
-#include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/RawComment.h"
-#include "swift/AST/TypeLoc.h"
 #include "swift/Serialization/ModuleFormat.h"
 #include "swift/Serialization/Validation.h"
-#include "swift/Basic/LLVM.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/Fixnum.h"
-#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Bitcode/BitstreamReader.h"
-#include "llvm/Support/MemoryBuffer.h"
 
 namespace llvm {
   class BitstreamCursor;
