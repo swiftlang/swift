@@ -17,7 +17,6 @@
 #ifndef SWIFT_AST_AST_NODE_H
 #define SWIFT_AST_AST_NODE_H
 
-#include "llvm/ADT/PointerUnion.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/TypeAlignments.h"
 
