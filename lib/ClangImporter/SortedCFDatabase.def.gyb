@@ -17,6 +17,8 @@
 %{
 
 import re
+import sys
+import codecs
 
 prologueLines = ""
 epilogueLines = ""
@@ -26,7 +28,7 @@ epilogueLines = ""
 lineForName = {}
 
 # Load the data file.
-with open(CFDatabaseFile, 'rb') as f:
+with codecs.open(CFDatabaseFile, encoding=sys.getfilesystemencoding(), errors='strict') as f:
   for line in f:
     # Pass through preprocessor directives literally.
     # Assume that they all fall into either a strict prologue or epilogue.

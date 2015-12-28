@@ -11,6 +11,8 @@
 ##===----------------------------------------------------------------------===##
 
 import re
+import sys
+import codecs
 
 class UnicodeProperty(object):
     """Abstract base class for Unicode properties."""
@@ -68,7 +70,7 @@ class GraphemeClusterBreakPropertyTable(UnicodeProperty):
             self.symbolic_values[v] = k
 
         # Load the data file.
-        with open(grapheme_break_property_file_name, 'rb') as f:
+        with codecs.open(grapheme_break_property_file_name, encoding=sys.getfilesystemencoding(), errors='strict') as f:
             for line in f:
                 # Strip comments.
                 line = re.sub('#.*', '', line)
@@ -514,9 +516,9 @@ def get_grapheme_cluster_break_tests_as_UTF8(grapheme_break_test_file_name):
 
         # Match a list of code points.
         for token in line.split(" "):
-            if token == "÷":
+            if token == u"÷":
                 boundaries += [ curr_bytes ]
-            elif token == "×":
+            elif token == u"×":
                 pass
             else:
                 code_point = int(token, 16)
@@ -529,21 +531,21 @@ def get_grapheme_cluster_break_tests_as_UTF8(grapheme_break_test_file_name):
                 # and test separately that we handle ill-formed UTF-8 sequences.
                 if code_point >= 0xd800 and code_point <= 0xdfff:
                     code_point = 0x200b
-                code_point = ('\U%(cp)08x' % { 'cp': code_point }).decode('unicode_escape')
-                as_UTF8_bytes = code_point.encode('utf8')
-                as_UTF8_escaped = ''.join(['\\x%(byte)02x' % { 'byte': ord(byte) } for byte in as_UTF8_bytes])
+                code_point = (b'\U%(cp)08x' % { b'cp': code_point }).decode('unicode_escape', 'strict')
+                as_UTF8_bytes = bytearray(code_point.encode('utf8', 'strict'))
+                as_UTF8_escaped = ''.join(['\\x%(byte)02x' % { 'byte': byte } for byte in as_UTF8_bytes])
                 test += as_UTF8_escaped
                 curr_bytes += len(as_UTF8_bytes)
 
         return (test, boundaries)
 
     # Self-test.
-    assert(_convert_line('÷ 0903 × 0308 ÷ AC01 ÷ # abc') == ('\\xe0\\xa4\\x83\\xcc\\x88\\xea\\xb0\\x81', [ 0, 5, 8 ]))
-    assert(_convert_line('÷ D800 ÷ # abc') == ('\\xe2\\x80\\x8b', [ 0, 3 ]))
+    assert(_convert_line(u'÷ 0903 × 0308 ÷ AC01 ÷ # abc') == ('\\xe0\\xa4\\x83\\xcc\\x88\\xea\\xb0\\x81', [ 0, 5, 8 ]))
+    assert(_convert_line(u'÷ D800 ÷ # abc') == ('\\xe2\\x80\\x8b', [ 0, 3 ]))
 
     result = []
 
-    with open(grapheme_break_test_file_name, 'rb') as f:
+    with codecs.open(grapheme_break_test_file_name, encoding=sys.getfilesystemencoding(), errors='strict') as f:
         for line in f:
             test = _convert_line(line)
             if test:
