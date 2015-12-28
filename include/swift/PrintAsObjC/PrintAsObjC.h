@@ -13,7 +13,6 @@
 #ifndef SWIFT_PRINTASOBJC_H
 #define SWIFT_PRINTASOBJC_H
 
-#include "swift/Basic/LLVM.h"
 #include "swift/AST/Attr.h"
 
 namespace swift {
