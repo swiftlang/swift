@@ -14,9 +14,7 @@
 #define SWIFT_SIL_LOOPINFO_H
 
 #include "swift/SIL/CFG.h"
-#include "swift/SIL/SILBasicBlock.h"
 #include "llvm/Analysis/LoopInfo.h"
-#include "llvm/ADT/iterator_range.h"
 
 namespace swift {
   class DominanceInfo;
