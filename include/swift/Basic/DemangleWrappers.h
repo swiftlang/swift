@@ -21,7 +21,6 @@
 
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/StringRef.h"
 
 namespace swift {
 namespace demangle_wrappers {
