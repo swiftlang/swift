@@ -15,8 +15,6 @@
 
 #include "swift/AST/Module.h"
 
-#include <string>
-#include <vector>
 
 namespace llvm {
   class MemoryBuffer;
