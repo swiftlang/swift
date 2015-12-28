@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/Metadata.h"
-#include <cstdlib>
 
 namespace swift {
   
