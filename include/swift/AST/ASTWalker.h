@@ -14,7 +14,6 @@
 #define SWIFT_AST_ASTWALKER_H
 
 #include "llvm/ADT/PointerUnion.h"
-#include <utility>
 
 namespace swift {
 
