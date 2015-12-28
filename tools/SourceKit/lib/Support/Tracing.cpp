@@ -64,7 +64,7 @@ uint64_t trace::startOperation(trace::OperationKind OpKind,
   if (trace::enabled()) {
     auto Node = consumers.load(std::memory_order_acquire);
     while (Node) {
-      Node->Consumer->opertationStarted(OpId, OpKind, Inv, OpArgs);
+      Node->Consumer->operationStarted(OpId, OpKind, Inv, OpArgs);
       Node = Node->Next;
     }
   }
