@@ -138,7 +138,8 @@ def tokenizePythonToUnmatchedCloseCurly(sourceText, start, lineStarts):
                 if nesting < 0:
                     return tokenPosToIndex(tokenStart, start, lineStarts)
 
-    except tokenize.TokenError, (message, errorPos):
+    except tokenize.TokenError as error:
+        (message, errorPos) = error.args
         return tokenPosToIndex(errorPos, start, lineStarts)
 
     return len(sourceText)
@@ -327,7 +328,7 @@ def splitGybLines(sourceLines):
                 
             lastTokenText,lastTokenKind = tokenText,tokenKind
 
-    except tokenize.TokenError, (message, errorPos):
+    except tokenize.TokenError:
         return [] # Let the later compile() call report the error
 
     if lastTokenText == ':':
