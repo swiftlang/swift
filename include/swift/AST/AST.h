@@ -18,16 +18,11 @@
 #define SWIFT_AST_H
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Builtins.h"
-#include "swift/AST/Decl.h"
-#include "swift/AST/Expr.h"
 #include "swift/AST/ExprHandle.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
-#include "swift/AST/Types.h"
-#include "swift/AST/TypeRepr.h"
 
 #endif
