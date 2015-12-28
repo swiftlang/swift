@@ -17,14 +17,9 @@
 #ifndef SWIFT_TYPE_H
 #define SWIFT_TYPE_H
 
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/DenseMapInfo.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/OptionSet.h"
-#include <functional>
-#include <string>
 
 namespace swift {
 
