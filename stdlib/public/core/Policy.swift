@@ -142,6 +142,10 @@ public protocol AnyObject : class {}
 /// - SeeAlso: `AnyObject`
 public typealias AnyClass = AnyObject.Type
 
+/// Returns true iff `lhs` and `rhs` are references to the same object
+/// instance (in other words, are identical pointers).
+///
+/// - SeeAlso: `Equatable`, `==`
 @warn_unused_result
 public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   switch (lhs, rhs) {
@@ -447,4 +451,3 @@ infix operator  |= { associativity right precedence 90 assignment }
 // example of how this operator is used, and how its use can be hidden
 // from users.
 infix operator ~> { associativity left precedence 255 }
-
