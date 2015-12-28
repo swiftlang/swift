@@ -14,10 +14,7 @@
 #define SWIFT_IDE_SYNTAX_MODEL_H
 
 #include "swift/AST/Attr.h"
-#include "swift/Basic/SourceLoc.h"
-#include "swift/Config.h"
 
-#include <vector>
 
 namespace swift {
   class Decl;
