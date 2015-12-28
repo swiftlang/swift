@@ -117,16 +117,15 @@ static inline bool isPerformingDSE(DSEKind Kind) {
 /// Return true if all basic blocks have their successors processed if
 /// they are iterated in post order.
 static bool isOneIterationFunction(PostOrderFunctionInfo *PO) {
-  bool OneIterationFunction = true;
   llvm::DenseSet<SILBasicBlock *> HandledBBs;
-
   for (SILBasicBlock *B : PO->getPostOrder()) {
     for (auto &X : B->getSuccessors()) {
-      OneIterationFunction &= (HandledBBs.find(X) != HandledBBs.end());
+      if (HandledBBs.find(X) == HandledBBs.end())
+        return false;
     }
     HandledBBs.insert(B);
   }
-  return OneIterationFunction;
+  return true;
 }
 
 /// Returns true if this is an instruction that may have side effects in a
