@@ -18,16 +18,10 @@
 #define SWIFT_DRIVER_DRIVER_H
 
 #include "swift/AST/IRGenOptions.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/Driver/Types.h"
 #include "swift/Driver/Util.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/StringMap.h"
-#include "llvm/ADT/StringRef.h"
 
-#include <functional>
-#include <memory>
-#include <string>
 
 namespace llvm {
 namespace opt {
