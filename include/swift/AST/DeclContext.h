@@ -21,11 +21,8 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/AST/TypeAlignments.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/STLExtras.h"
-#include "llvm/ADT/PointerIntPair.h"
-#include "llvm/ADT/PointerUnion.h"
 
 namespace llvm {
   class raw_ostream;
