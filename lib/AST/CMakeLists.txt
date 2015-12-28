@@ -25,6 +25,7 @@ add_swift_library(swiftAST
   Module.cpp
   ModuleNameLookup.cpp
   NameLookup.cpp
+  Parameter.cpp
   Pattern.cpp
   PlatformKind.cpp
   PrettyStackTrace.cpp

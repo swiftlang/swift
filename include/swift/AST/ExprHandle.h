@@ -26,7 +26,7 @@ namespace swift {
 
 /// ExprHandle - Provides an indirection for expressions, so both a type and a
 /// pattern can point at the same expression during type-checking.
-class ExprHandle {
+class alignas(8) ExprHandle {
   /// \brief The expression along with a bit saying whether this expression
   /// was already type-checked (or not).
   llvm::PointerIntPair<Expr *, 1, bool> EAndChecked;
