@@ -167,7 +167,7 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
   auto swiftCache = Lang.getCodeCompletionCache(); // Pin the cache.
   ide::CodeCompletionContext CompletionContext(swiftCache->getCache());
 
-  // Cerate a factory for code completion callbacks that will feed the
+  // Create a factory for code completion callbacks that will feed the
   // Consumer.
   std::unique_ptr<CodeCompletionCallbacksFactory> CompletionCallbacksFactory(
       ide::makeCodeCompletionCallbacksFactory(CompletionContext,
