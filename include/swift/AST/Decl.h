@@ -4635,7 +4635,7 @@ class FuncDecl : public AbstractFunctionDecl {
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
   SourceLoc ThrowsLoc;  // Location of the 'throws' token.
-  SourceLoc AccessorKeywordLoc; // Location of the accessor keyword token, e,g. 'set'.
+  SourceLoc AccessorKeywordLoc; // Location of the accessor keyword, e.g. 'set'.
 
   TypeLoc FnRetType;
 
@@ -4654,7 +4654,8 @@ class FuncDecl : public AbstractFunctionDecl {
   /// which property and what kind of accessor.
   llvm::PointerIntPair<AbstractStorageDecl*, 3, AccessorKind> AccessorDecl;
   llvm::PointerUnion<FuncDecl *, NominalTypeDecl*> OverriddenOrDerivedForDecl;
-  llvm::PointerIntPair<OperatorDecl *, 3, AddressorKind> OperatorAndAddressorKind;
+  llvm::PointerIntPair<OperatorDecl *, 3,
+                       AddressorKind> OperatorAndAddressorKind;
 
   FuncDecl(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
            SourceLoc FuncLoc, DeclName Name,
