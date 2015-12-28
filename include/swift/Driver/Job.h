@@ -13,19 +13,14 @@
 #ifndef SWIFT_DRIVER_JOB_H
 #define SWIFT_DRIVER_JOB_H
 
-#include "swift/Basic/LLVM.h"
 #include "swift/Driver/Types.h"
 #include "swift/Driver/Util.h"
 #include "llvm/Option/Option.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerIntPair.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/TimeValue.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include <memory>
 
 namespace swift {
 namespace driver {
